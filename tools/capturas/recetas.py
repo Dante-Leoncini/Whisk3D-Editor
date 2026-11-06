@@ -670,3 +670,223 @@ def camara_nokia(idioma):
     g.keypad("camara")
     g.foto(dur=450, tecla="8", teclas=("num8",))
     return g.cuadros(calidad=80)
+
+
+# -- bloquear la orbita: el plano de una casa, de arriba y en ortografica --
+BLOQUEAR_ORBITA, CAMARA_A_LA_VISTA = 421, 423                   # sus opciones (ids de LayoutAccionView)
+NOMBRES_PLANO = {"es": ("Pared", "Mueble"), "en": ("Wall", "Furniture"), "pt": ("Parede", "Movel")}
+PAREDES = [(0, 3.5, 5.1, 0.1), (0, -3.5, 5.1, 0.1), (-5, 0, 0.1, 3.5), (5, 0, 0.1, 3.5),   # (x, z, medio ancho, medio largo)
+           (1, -1.6, 0.1, 1.9), (-3.1, 0.8, 1.9, 0.1), (3.6, 0.8, 1.4, 0.1)]
+MUEBLES = [("cube", -3.3, -2.0, (0.9, 0.25, 1.2)), ("cylinder", 3.0, -1.6, (0.7, 0.3, 0.7)),
+           ("cube", -2.6, 2.4, (1.3, 0.3, 0.45)), ("cube", 3.6, 2.6, (0.5, 0.3, 0.5)), ("cylinder", -0.6, -2.6, (0.4, 0.3, 0.4))]
+
+
+def escena_plano(g, idioma):
+    """El plano de una casa (paredes finas y algunos muebles), sin el cubo, visto de arriba en ortografica."""
+    pared, mueble = NOMBRES_PLANO[idioma]
+    g.linea("delete")
+    for k, (x, z, ax, az) in enumerate(PAREDES, 1):
+        g.linea("add cube")
+        g.linea("objname %s%d" % (pared, k))
+        g.linea("objpos %g 0.4 %g" % (x, z))
+        g.linea("objscale %g 0.4 %g" % (ax, az))
+    for k, (prim, x, z, (sx, sy, sz)) in enumerate(MUEBLES, 1):
+        g.linea("add %s" % prim)
+        g.linea("objname %s%d" % (mueble, k))
+        g.linea("objpos %g %g %g" % (x, sy, z))
+        g.linea("objscale %g %g %g" % (sx, sy, sz))
+    g.linea("deselectall")
+    g.linea("vporbita 0 0 0 13")
+    g.tecla("Keypad_7")                 # de arriba...
+    g.tecla("Keypad_5")                 # ...y en ortografica
+
+
+def ir_con_el_raton(g, x0, y0, x1, y1, pasos=8, dur=45):
+    """El puntero va de un lugar a otro (frenando al llegar), con fotos."""
+    for k in range(1, pasos + 1):
+        t = suave(k / pasos)
+        g.raton_mover(round(x0 + (x1 - x0) * t), round(y0 + (y1 - y0) * t))
+        g.foto(dur=dur)
+
+
+def circulo(n, r, x0, y0):
+    """Los puntos de un circulo que arranca y termina en (x0, y0) (centro a la izquierda)."""
+    return [(x0 - r + round(r * math.cos(2 * math.pi * k / n)), y0 + round(r * math.sin(2 * math.pi * k / n)))
+            for k in range(1, n + 1)]
+
+
+def maximizar_3d(g, raton=False):
+    """La Vista 3D a toda la ventana (sin fotos): los menus de su barra entran enteros."""
+    i = g.info()
+    x, y = i.esquina(VISTA_3D)
+    g.clic(x, y) if raton else g.tocar(x, y)
+    i = g.info()
+    x, y = i.item(MAXIMIZAR)
+    g.clic(x, y) if raton else g.tocar(x, y)
+    g.sin_puntero()
+
+
+def al_item(g, item):
+    """Donde esta una opcion del menu abierto. El puntero SALTA ahi: cualquier recorrido pasa por arriba de otra
+    cosa que reacciona (Camaras o Punto de Vista abren su submenu; otro boton de la barra, su menu)."""
+    return g.info().item(item)
+
+
+@receta("navegacion-bloquear-orbita-raton")
+def bloquear_orbita_raton(idioma):
+    """Menu Vista -> Bloquear Orbita; despues el boton del medio ya no gira el plano: lo desplaza."""
+    g = Guion(idioma, raton=True)
+    escena_plano(g, idioma)
+    maximizar_3d(g, raton=True)
+    rec, (cx, cy) = vista_pc(g)
+    vx, vy = g.info().boton_vista
+    x0, y0 = cx + 120, cy + 80
+    g.raton_mover(x0, y0)
+    g.foto(dur=900)
+    ir_con_el_raton(g, x0, y0, vx, vy)
+    g.clic(vx, vy)
+    g.foto(dur=600)
+    ix, iy = al_item(g, BLOQUEAR_ORBITA)
+    g.raton_mover(ix, iy)
+    g.foto(dur=600)
+    g.clic(ix, iy)
+    g.foto(dur=700)
+    ir_con_el_raton(g, ix, iy, cx, cy, pasos=6)
+    g.raton_abajo(cx, cy, "medio")
+    g.foto(dur=250)
+    for x, y in circulo(26, 90, cx, cy):
+        g.raton_mover(x, y)
+        g.foto(dur=60)
+    g.raton_mover(cx, cy)               # (cierra el recorrido: el delta va en el movimiento siguiente)
+    g.raton_arriba("medio")
+    g.foto(dur=900)
+    return g.cuadros(recorte=rec, calidad=72)
+
+
+@receta("navegacion-bloquear-orbita-dedo")
+def bloquear_orbita_dedo(idioma):
+    """Menu Vista -> Bloquear Orbita con el dedo; despues arrastrar desplaza el plano en vez de girarlo."""
+    g = Guion(idioma)
+    escena_plano(g, idioma)
+    maximizar_3d(g)
+    rec, (cx, cy) = vista_pc(g)
+    vx, vy = g.info().boton_vista
+    g.dedo_flotando(vx, vy)
+    g.foto(dur=900)
+    g.tocar(vx, vy)
+    g.foto(dur=600)
+    ix, iy = al_item(g, BLOQUEAR_ORBITA)
+    g.dedo_flotando(ix, iy)
+    g.foto(dur=600)
+    g.tocar(ix, iy)
+    g.sin_puntero()
+    g.foto(dur=700)
+    x0, y0 = cx + 60, cy + 60
+    g.dedo_abajo(x0, y0)
+    g.esperar(220)
+    g.foto(dur=300)
+    for x, y in circulo(26, 90, x0, y0):
+        g.dedo_mover(x, y)
+        g.foto(dur=60)
+    g.dedo_mover(x0, y0)
+    g.dedo_arriba()
+    g.foto(dur=900)
+    return g.cuadros(recorte=rec, calidad=72)
+
+
+@receta("navegacion-bloquear-orbita-nokia")
+def bloquear_orbita_nokia(idioma):
+    """N95: el 9 bloquea la orbita; despues las flechas desplazan el plano en vez de girarlo."""
+    g = Guion(idioma, n95="vertical")
+    escena_plano(g, idioma)
+    g.foto(dur=900)
+    g.foto(dur=300, teclas=("num9",), tecla="9")
+    g.keypad("bloquearorbita")
+    g.foto(dur=900, teclas=("num9",), tecla="9")
+    g.foto(dur=500)
+    flechas_n95(g, (("derecha", 5), ("abajo", 4), ("izquierda", 5), ("arriba", 4)), "orbitar")
+    return g.cuadros(calidad=70)
+
+
+# -- la camara bloqueada a la vista: navegar mueve la camara activa, para acomodar la toma --
+@receta("navegacion-camara-bloquear-raton")
+def camara_bloquear_raton(idioma):
+    """Num 0 (mirar por la camara) -> click en el candado -> orbitar y la rueda mueven la CAMARA: el cubo, que
+    estaba cortado en una punta, queda encuadrado en el medio."""
+    g = Guion(idioma, raton=True)
+    rec, (cx, cy) = vista_pc(g)
+    x0, y0 = cx + 120, cy + 70
+    g.raton_mover(x0, y0)
+    g.foto(dur=900)
+    g.foto(dur=350, tecla="Num 0")
+    g.tecla("Keypad_0")
+    g.foto(dur=900, tecla="Num 0")
+    lx, ly = g.info().centro_candado()
+    ir_con_el_raton(g, x0, y0, lx, ly)
+    g.foto(dur=300)
+    g.clic(lx, ly)
+    g.foto(dur=800)
+    ir_con_el_raton(g, lx, ly, cx, cy, pasos=6)
+    g.raton_abajo(cx, cy, "medio")
+    g.foto(dur=200)
+    for k in range(1, 11):              # la gira hasta que el cubo queda en el medio...
+        g.raton_mover(cx - 7 * k, cy)
+        g.foto(dur=60)
+    g.raton_mover(cx - 70, cy)
+    g.raton_arriba("medio")
+    g.foto(dur=400)
+    for _ in range(4):                  # ...y la aleja para que entre entero
+        g.rueda(-1, cx - 70, cy)
+        g.foto(dur=260)
+    g.foto(dur=1900)
+    return g.cuadros(recorte=rec, calidad=72)
+
+
+@receta("navegacion-camara-bloquear-dedo")
+def camara_bloquear_dedo(idioma):
+    """Mirando por la camara: un toque en el candado, y arrastrar mueve la CAMARA hasta encuadrar el cubo."""
+    g = Guion(idioma)
+    rec, (cx, cy) = vista_pc(g)
+    g.keypad("camara")                  # (arranca mirando por la camara)
+    lx, ly = g.info().centro_candado()
+    g.foto(dur=900)
+    g.dedo_flotando(lx, ly)
+    g.foto(dur=700)
+    g.tocar(lx, ly)
+    g.foto(dur=800)
+    x0, y0 = cx + 60, cy + 30
+    g.dedo_abajo(x0, y0)
+    g.esperar(220)
+    g.foto(dur=250)
+    for k in range(1, 11):
+        g.dedo_mover(x0 - 7 * k, y0)
+        g.foto(dur=60)
+    g.dedo_arriba()
+    g.sin_puntero()
+    g.foto(dur=1900)
+    return g.cuadros(recorte=rec, calidad=72)
+
+
+@receta("navegacion-camara-bloquear-nokia")
+def camara_bloquear_nokia(idioma):
+    """N95: el 8 mira por la camara; la soft izquierda y el menu Vista -> Mover la camara con la vista; las flechas
+    y el 0 mueven la CAMARA hasta encuadrar el cubo."""
+    g = Guion(idioma, n95="vertical")
+    def apretar(accion, tecla, cual, cartel, dur):
+        g.foto(dur=110, teclas=(cual,), tecla=cartel)
+        accion() if accion else g.tecla(tecla)
+        g.foto(dur=200, teclas=(cual,), tecla=cartel)
+        g.foto(dur=dur)
+    g.foto(dur=800)
+    apretar(lambda: g.keypad("camara"), None, "num8", "8", 800)
+    apretar(None, "m", "soft-izq", SOFT_IZQ[idioma], 400)
+    for _ in range(5):                  # por la barra hasta el menu Vista
+        apretar(None, "Right", "derecha", "→", 160)
+    for _ in range(7):                  # bajando hasta "Mover la camara con la vista" (el menu abre sin fila marcada)
+        apretar(None, "Down", "abajo", "↓", 160)
+    g.foto(dur=500)
+    apretar(None, "Return", "ok", "OK", 800)
+    flechas_n95(g, (("derecha", 4),), "orbitar")
+    flechas_n95(g, (("abajo", 4),), "zoom", modificador="num0", cartel_mod="0", cuadros=2)
+    g.foto(dur=1500)
+    return g.cuadros(calidad=64)

@@ -127,6 +127,16 @@ namespace {
         printf("@cap vp kind=%d x=%d y=%d w=%d h=%d esquina=%d,%d,%d,%d barra=%d botones=%d activo=%d\n",
                n->ViewportKind(), n->x, n->y, n->width, n->height, bx, by, bw, bh,
                n->BarHeight(), (int)n->BarButtons.size(), n == viewPortActive ? 1 : 0);
+        // el boton del menu View de la Vista 3D (en la PC es solo un icono: no se lo encuentra por el texto)
+        if (n->ViewportKind() == 1) {
+            Button* bv = BarRolBtn(n->BarButtons, BR_View);
+            if (bv && bv->visible) printf("@cap botonvista x=%d y=%d w=%d h=%d\n", bv->sx, bv->sy, bv->width, bv->height);
+        }
+        // el candado de la vista de camara (si se ve): para apuntarle con el mouse o el dedo
+        if (n->ViewportKind() == 1 && ((Viewport3D*)n)->CandadoCamaraVisible()) {
+            int rx = 0, ry = 0, lado = 0; ((Viewport3D*)n)->CandadoCamaraRect(rx, ry, lado);
+            printf("@cap candado x=%d y=%d lado=%d\n", n->x + rx, n->y + ry, lado);
+        }
         for (size_t i = 0; i < n->BarButtons.size(); i++) {
             Button* b = n->BarButtons[i];
             printf("@cap boton kind=%d i=%d x=%d y=%d w=%d h=%d texto=%s\n",
@@ -136,8 +146,8 @@ namespace {
 
     void InfoMenu(PopupMenu* m, int nivel) {
         if (!m || !m->abierto) return;
-        printf("@cap menu nivel=%d x=%d y=%d w=%d h=%d filas=%d scroll=%d titulo=%s\n",
-               nivel, m->x, m->y, m->width, m->height, (int)m->items.size(), m->scroll, m->titulo.c_str());
+        printf("@cap menu nivel=%d x=%d y=%d w=%d h=%d filas=%d scroll=%d sel=%d titulo=%s\n",
+               nivel, m->x, m->y, m->width, m->height, (int)m->items.size(), m->scroll, m->selectIndex, m->titulo.c_str());
         const int fila = RenglonHeightGS + gapGS;
         const int oy = m->titulo.empty() ? 0 : fila;
         const int visibles = m->FilasVisibles();
@@ -281,6 +291,7 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
     //   n95 perspectiva                   # solo, sin flecha
     //   n95 encuadrar                     0 solo, sin flecha
     //   n95 camara                        8 (fuera del Modo Edicion): mirar por la camara activa / volver
+    //   n95 bloquearorbita                9: bloquear la orbita (lo que orbitaba, desplaza) / desbloquearla
     if (cmd == "n95") {
         std::string que; ss >> que;
         if (!Viewport3DActive && rootViewport) rootViewport->Render();   // (lo puebla el dibujado)
@@ -305,7 +316,8 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         } else if (que == "perspectiva") vp->ChangePerspective();
         else if (que == "encuadrar") vp->EnfocarObject();
         else if (que == "camara") vp->SetViewFromCameraActive(!vp->ViewFromCameraActive);
-        else { err = "n95: accion desconocida '" + que + "' (orbitar|zoom|panear|vista|perspectiva|encuadrar|camara)"; return false; }
+        else if (que == "bloquearorbita") { extern bool LayoutLockOrbitToggle(); LayoutLockOrbitToggle(); }
+        else { err = "n95: accion desconocida '" + que + "' (orbitar|zoom|panear|vista|perspectiva|encuadrar|camara|bloquearorbita)"; return false; }
         g_redraw = true; Cuadro();
         return true;
     }

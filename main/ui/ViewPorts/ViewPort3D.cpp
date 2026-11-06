@@ -107,6 +107,7 @@ PopupMenu* MenuSetOrigin = NULL; // submenu de Object: Geometry/Origin/Cursor
 PopupMenu* MenuApply = NULL;     // submenu de Object: Apply Location/Rotation/Scale/All (Ctrl A)
 PopupMenu* MenuView = NULL;      // boton "View" (antes de Select): submenus Cameras + Viewpoint
 MenuItem* MenuItemLockOrbit = NULL; // el item "Lock Orbit" del menu View (para refrescar su tilde al abrir)
+MenuItem* MenuItemCamaraBloqueada = NULL; // "Mover la camara con la vista" (el candado de la vista de camara) en el menu View
 MenuItem* MenuItemLocalView = NULL; // el item "Local View" del menu View (tilde = local view activo en el viewport)
 PopupMenu* MenuViewpoint = NULL; // submenu de View: Camera/Top/Bottom/Front/Back/Right/Left (numpad)
 PopupMenu* MenuCameras = NULL;   // submenu de View: Set Active Object as Camera / Active Camera
@@ -412,6 +413,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         // tilde (verde) se refresca al abrir el menu, con el estado del viewport activo (LayoutInput).
         MenuItemLockOrbit = MenuView->Agregar(T("Lock Orbit"), 421);
         MenuItemLockOrbit->atajo = "@tel:9";   // solo el keypad del N95 tiene tecla para esto
+        // el CANDADO de la vista de camara tambien desde el menu: en el N95 sin mouse no hay como tocarlo
+        MenuItemCamaraBloqueada = MenuView->Agregar(T("Lock the camera to the view"), 423);
     }
     if (!MenuRender){
         // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de

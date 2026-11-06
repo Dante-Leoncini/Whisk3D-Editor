@@ -1845,6 +1845,8 @@ static void LayoutAccionView(int aId) {
         case 420: Viewport3DActive->EnfocarObject(); break; // Frame Selected (Numpad .): enfoca la seleccion
         case 421: LayoutLockOrbitToggle(); break; // Lock Orbit: orbitar -> panear
         case 422: Viewport3DActive->LocalViewToggle(); break; // Local View (/): aisla la seleccion en el viewport activo
+        // el candado de la vista de camara (Viewport3D::CandadoCamaraClick): navegar mueve la camara activa
+        case 423: Viewport3DActive->CameraToView = !Viewport3DActive->CameraToView; g_redraw = true; break;
     }
 }
 
@@ -3411,6 +3413,8 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         // refrescar el tilde de "Lock Orbit" con el estado del viewport activo (el menu se arma 1 sola vez)
         extern MenuItem* MenuItemLockOrbit;
         if (MenuItemLockOrbit && Viewport3DActive) MenuItemLockOrbit->verde = Viewport3DActive->lockOrbit;
+        extern MenuItem* MenuItemCamaraBloqueada;
+        if (MenuItemCamaraBloqueada && Viewport3DActive) MenuItemCamaraBloqueada->verde = Viewport3DActive->CameraToView;
         extern MenuItem* MenuItemLocalView;
         if (MenuItemLocalView && Viewport3DActive) MenuItemLocalView->verde = Viewport3DActive->localViewActivo;
     } else if (MenuSelect && bSel && bSel->visible && bSel->Contains(mx, my)) {

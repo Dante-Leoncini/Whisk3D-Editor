@@ -66,18 +66,24 @@ class Info:
     def __init__(self, salida):
         self.pantalla = (0, 0)
         self.vps, self.botones, self.menus, self.items = [], [], [], []
+        self.candado = None        # el candado de la vista de camara: (x, y, lado), si se ve
+        self.boton_vista = None    # el centro del boton del menu View de la Vista 3D
         for linea in salida.splitlines():
             if not linea.startswith("@cap "):
                 continue
             partes = linea[5:].split(" ", 1)
             tipo, resto = partes[0], partes[1] if len(partes) > 1 else ""
             d = {}
-            # texto=... va siempre ultimo y puede tener espacios
-            if " texto=" in " " + resto:
-                resto, texto = (" " + resto).split(" texto=", 1)
-                d["texto"] = texto
+            # texto=... / titulo=... van siempre ultimos y pueden tener espacios
+            for campo in ("texto", "titulo"):
+                if (" %s=" % campo) in " " + resto:
+                    resto, valor = (" " + resto).split(" %s=" % campo, 1)
+                    d[campo] = valor
             for k, v in re.findall(r"(\w+)=(\S+)", resto):
-                d[k] = [int(n) for n in v.split(",")] if "," in v else int(v)
+                try:
+                    d[k] = [int(n) for n in v.split(",")] if "," in v else int(v)
+                except ValueError:
+                    d[k] = v
             if tipo == "pantalla":
                 self.pantalla = (d["w"], d["h"])
             elif tipo == "vp":
@@ -88,6 +94,10 @@ class Info:
                 self.menus.append(d)
             elif tipo == "item":
                 self.items.append(d)
+            elif tipo == "botonvista":
+                self.boton_vista = (d["x"] + d["w"] // 2, d["y"] + d["h"] // 2)
+            elif tipo == "candado":
+                self.candado = (d["x"], d["y"], d["lado"])
 
     def vp(self, kind, n=0):
         hay = [v for v in self.vps if v["kind"] == kind]
@@ -99,6 +109,20 @@ class Info:
         """Centro del boton de la esquina (arriba a la izquierda) del viewport."""
         x, y, w, h = self.vp(kind, n)["esquina"]
         return x + w // 2, y + h // 2
+
+    def boton(self, kind, texto):
+        """Centro del boton de la barra de un viewport, por su texto (el del idioma de la interfaz)."""
+        for b in self.botones:
+            if b["kind"] == kind and b.get("texto") == texto:
+                return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+        raise SystemExit("capturas: el viewport %d no tiene un boton '%s' (tiene: %s)"
+                         % (kind, texto, [b.get("texto") for b in self.botones if b["kind"] == kind]))
+
+    def centro_candado(self):
+        if not self.candado:
+            raise SystemExit("capturas: no se ve el candado de la vista de camara")
+        x, y, lado = self.candado
+        return x + lado // 2, y + lado // 2
 
     def item(self, ident, nivel=0):
         """Centro de una fila del menu abierto, por su id (no por el texto: cambia con el idioma)."""
