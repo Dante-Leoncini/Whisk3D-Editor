@@ -5,5 +5,6 @@
 [Группа и форум Whisk3D в Discord](https://discord.gg/2sjpuact8)
 [Группа в Telegram](https://t.me/Whisk3D)
 
-1. [Вьюпорты](viewports.md)
-2. [Навигация в 3D Viewport](navegacion.md)
+- Базовый уровень
+    1. [Вьюпорты](viewports.md)
+    2. [Навигация в 3D Viewport](navegacion.md)

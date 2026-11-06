@@ -5,5 +5,6 @@ Whisk3D の使い方を説明するチュートリアルです。プログラム
 [Whisk3D の Discord グループとフォーラム](https://discord.gg/2sjpuact8)
 [Telegram グループ](https://t.me/Whisk3D)
 
-1. [ビューポート](viewports.md)
-2. [3D Viewportのナビゲーション](navegacion.md)
+- 基本
+    1. [ビューポート](viewports.md)
+    2. [3D Viewportのナビゲーション](navegacion.md)

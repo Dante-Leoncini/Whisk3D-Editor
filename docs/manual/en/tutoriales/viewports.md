@@ -1,7 +1,7 @@
 # Viewports
 
 > [!NOTE]
-> The Nokia N95 supports a mouse and keyboard (over Bluetooth). The Nokia parts of this tutorial explain how to use it without a mouse or keyboard, with just the phone's keys.
+> ![Nokia](img/icono-nokia.svg) The Nokia N95 supports a mouse and keyboard (over Bluetooth). The Nokia parts of this tutorial explain how to use it without a mouse or keyboard, with just the phone's keys.
 
 The Whisk3D window is divided into **viewports**: panels, each with its own editor (the 3D Viewport, the Outliner, Properties...). You can split them, resize them and choose what each one shows. It works the same with a mouse, with your finger on a touch screen and with a Nokia's keypad.
 
@@ -15,7 +15,7 @@ The viewport under the mouse is the **active viewport**, and it's marked with a 
 
 ![The mouse pointer goes over the 3D Viewport, the Outliner, Properties and the Timeline, and each time the green border marks the viewport under it](img/viewports-activo.webp)
 
-**On a Nokia N95:** each press of the **green call key** ![](img/tecla-verde.svg) moves to the next viewport. Two fit on the N95's screen: the 3D Viewport on the left and Properties on the right.
+![Nokia](img/icono-nokia.svg) **On a Nokia N95:** each press of the **green call key** ![](img/tecla-verde.svg) moves to the next viewport. Two fit on the N95's screen: the 3D Viewport on the left and Properties on the right.
 
 ![A Nokia N95 with the 3D Viewport on the left and Properties on the right: each time the green key is pressed, the green border moves to the other viewport](img/viewports-activo-nokia.webp)
 
@@ -31,7 +31,7 @@ Every viewport has a **menu bar** at the top (green in the image) with that edit
 
 ![A finger drags the corner button of the bottom-right viewport in circles, and the three viewports change size](img/viewports-arrastrar.webp)
 
-**On a Nokia:** hold down the **green call key** ![](img/tecla-verde.svg) and press an arrow: the border of the active viewport (the one with the green frame) moves that way, so it grows or shrinks. The green key on its own, without arrows, moves to the next viewport.
+![Nokia](img/icono-nokia.svg) **On a Nokia:** hold down the **green call key** ![](img/tecla-verde.svg) and press an arrow: the border of the active viewport (the one with the green frame) moves that way, so it grows or shrinks. The green key on its own, without arrows, moves to the next viewport.
 
 ![A Nokia N95 with the green key held down: with the right arrow the 3D Viewport grows, with the left one it shrinks, and then it goes back to how it was](img/viewports-tamano-nokia.webp)
 
@@ -76,15 +76,15 @@ The Outliner takes the space of Properties:
 
 If the viewport is narrow, its bar doesn't fit entirely. The same happens with the toolbar at the bottom of the 3D Viewport. To see the rest:
 
-- **With your finger:** drag it sideways.
-- **With the mouse:** hold down the mouse button on the bar and drag, or turn the **wheel** over it.
-- **With the keyboard:** <kbd>M</kbd> on PC, or the **left soft key** on the Nokia, enters the bar of the active viewport. Go through it with the left and right arrows; each menu opens when you reach it. Move through the menu with up and down, and choose with OK (<kbd>Enter</kbd> on PC). The bar scrolls by itself to show where you are.
+- ![Android](img/icono-android.svg) **With your finger:** drag it sideways.
+- ![PC](img/icono-pc.svg) **With the mouse:** hold down the mouse button on the bar and drag, or turn the **wheel** over it.
+- ![PC](img/icono-pc.svg) ![Nokia](img/icono-nokia.svg) **With the keyboard:** <kbd>M</kbd> on PC, or the **left soft key** on the Nokia, enters the bar of the active viewport. Go through it with the left and right arrows; each menu opens when you reach it. Move through the menu with up and down, and choose with OK (<kbd>Enter</kbd> on PC). The bar scrolls by itself to show where you are.
 
 ![A finger drags the Outliner's bar sideways and the buttons that didn't fit appear](img/viewports-barra-dedo.webp)
 
 ![The mouse pointer over the Outliner's bar: with the wheel, the bar scrolls](img/viewports-barra-rueda.webp)
 
-On a Nokia N95: the left soft key enters the bar and the arrows go through it.
+![Nokia](img/icono-nokia.svg) On a Nokia N95: the left soft key enters the bar and the arrows go through it.
 
 ![The Nokia N95 interface: the left soft key opens the Mode menu and the right arrow goes through the menus on the bar, which scrolls by itself](img/viewports-barra-nokia.webp)
 

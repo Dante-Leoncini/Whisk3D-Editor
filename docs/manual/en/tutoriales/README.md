@@ -5,5 +5,6 @@ Tutorials on how to use Whisk3D. Tutorials and videos of the program will be add
 [Whisk3D Discord group and forum](https://discord.gg/2sjpuact8)
 [Telegram group](https://t.me/Whisk3D)
 
-1. [Viewports](viewports.md)
-2. [Navigating the 3D Viewport](navegacion.md)
+- Basic
+    1. [Viewports](viewports.md)
+    2. [Navigating the 3D Viewport](navegacion.md)

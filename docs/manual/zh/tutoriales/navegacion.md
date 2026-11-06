@@ -1,7 +1,7 @@
 # 在 3D Viewport 中导航
 
 > [!NOTE]
-> Nokia N95 支持鼠标和键盘（通过蓝牙）。本教程中关于 Nokia 的部分，讲的是不用鼠标和键盘、只用手机按键时怎么操作。
+> ![Nokia](img/icono-nokia.svg) Nokia N95 支持鼠标和键盘（通过蓝牙）。本教程中关于 Nokia 的部分，讲的是不用鼠标和键盘、只用手机按键时怎么操作。
 
 本教程讲解如何在 3D Viewport 中导航。导航就是移动你的视角：绕着场景转动、往旁边移动，以及拉近或拉远。
 
@@ -15,15 +15,15 @@
 
 环绕就是让视图绕着场景转动，就像绕着一张桌子走一圈，从各个方向看桌上的东西。
 
-**用鼠标：**按住**中键**（把滚轮按下去就是中键）并拖动。在 触控板 上，或者鼠标没有中键时，按住 <kbd>Alt</kbd>，再用**主键**（左键）拖动。
+![PC](img/icono-pc.svg) **用鼠标：**按住**中键**（把滚轮按下去就是中键）并拖动。在 触控板 上，或者鼠标没有中键时，按住 <kbd>Alt</kbd>，再用**主键**（左键）拖动。
 
 ![鼠标指针位于 3D Viewport 上：按住中键拖动，视图就绕着立方体转动](img/navegacion-orbitar-raton.webp)
 
-**用手指：**在 3D Viewport 上用一根手指拖动。要从背景上开始：如果手指按在 Gizmo（对象上的彩色箭头）上，就会移动它。
+![Android](img/icono-android.svg) **用手指：**在 3D Viewport 上用一根手指拖动。要从背景上开始：如果手指按在 Gizmo（对象上的彩色箭头）上，就会移动它。
 
 ![一根手指在 3D Viewport 的背景上拖动，视图绕着立方体转动](img/navegacion-orbitar-dedo.webp)
 
-**在 Nokia N95 上：**按住方向键中的一个**方向**。按住期间，视图会一直朝那个方向转动。
+![Nokia](img/icono-nokia.svg) **在 Nokia N95 上：**按住方向键中的一个**方向**。按住期间，视图会一直朝那个方向转动。
 
 ![一部竖着的 Nokia N95：按住右、左、上、下方向键，视图绕着立方体转动](img/navegacion-orbitar-nokia.webp)
 
@@ -31,15 +31,15 @@
 
 平移（*pan*）是把视图往旁边、往上或往下移动，而不转动它。
 
-**用鼠标：**按住 <kbd>Shift</kbd>，再用**中键**拖动。在 触控板 上：按住 <kbd>Alt</kbd> + <kbd>Shift</kbd>，再用主键拖动。
+![PC](img/icono-pc.svg) **用鼠标：**按住 <kbd>Shift</kbd>，再用**中键**拖动。在 触控板 上：按住 <kbd>Alt</kbd> + <kbd>Shift</kbd>，再用主键拖动。
 
 ![按住 Shift 和中键，指针画一个圆，视图也跟着平移](img/navegacion-panear-raton.webp)
 
-**用手指：**放上**两根手指**，朝同一个方向一起移动。
+![Android](img/icono-android.svg) **用手指：**放上**两根手指**，朝同一个方向一起移动。
 
 ![两根手指一起画圆移动，视图随之平移](img/navegacion-panear-dedo.webp)
 
-**在 Nokia N95 上：**按住 <kbd>\*</kbd> 键，再用方向键。
+![Nokia](img/icono-nokia.svg) **在 Nokia N95 上：**按住 <kbd>\*</kbd> 键，再用方向键。
 
 ![按住星号键的 Nokia N95：每按一个方向键，视图就朝那个方向平移](img/navegacion-panear-nokia.webp)
 
@@ -47,15 +47,15 @@
 
 缩放让你靠近或远离。每一步的幅度会随距离变化：靠近小东西时前进得慢，离得远时前进得快，所以无论是看整个场景还是看一个顶点，都同样好用。
 
-**用鼠标：**滚动**滚轮**。向前滚拉近，向后滚拉远。在 触控板 上，用两根手指上下滑动。
+![PC](img/icono-pc.svg) **用鼠标：**滚动**滚轮**。向前滚拉近，向后滚拉远。在 触控板 上，用两根手指上下滑动。
 
 ![鼠标指针位于立方体上：滚轮向前滚，视图拉近；向后滚，视图拉远](img/navegacion-zoom-raton.webp)
 
-**用手指：**双指捏合。两指分开拉近，两指并拢拉远。
+![Android](img/icono-android.svg) **用手指：**双指捏合。两指分开拉近，两指并拢拉远。
 
 ![两根手指分开，视图向立方体拉近；并拢，视图拉远](img/navegacion-zoom-dedo.webp)
 
-**在 Nokia N95 上：**按住 <kbd>0</kbd>，用**上**方向键拉近，用**下**方向键拉远。
+![Nokia](img/icono-nokia.svg) **在 Nokia N95 上：**按住 <kbd>0</kbd>，用**上**方向键拉近，用**下**方向键拉远。
 
 ![按住 0 的 Nokia N95：按上，视图向立方体拉近；按下，视图拉远](img/navegacion-zoom-nokia.webp)
 
@@ -65,9 +65,9 @@
 
 | | 如何框显 |
 |---|---|
-| PC | <kbd>Num .</kbd>（数字小键盘上的点） |
-| Nokia N95 | 单按一下 <kbd>0</kbd>，不按方向键（和方向键一起按住则是缩放） |
-| 触屏 | 双指双击 |
+| ![PC](img/icono-pc.svg) PC | <kbd>Num .</kbd>（数字小键盘上的点） |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | 单按一下 <kbd>0</kbd>，不按方向键（和方向键一起按住则是缩放） |
+| ![Android](img/icono-android.svg) 触屏 | 双指双击 |
 | 菜单 | View → Frame Selected |
 
 ![视图离得很远而且偏到一边，立方体小小地缩在角落里；按 Num . 后，立方体回到中央，填满视图](img/navegacion-encuadrar.webp)
@@ -88,8 +88,8 @@
 
 | | 如何进入和退出 |
 |---|---|
-| PC | <kbd>/</kbd> |
-| Nokia N95 和触屏 | View 菜单 → Local View |
+| ![PC](img/icono-pc.svg) PC | <kbd>/</kbd> |
+| ![Nokia](img/icono-nokia.svg) ![Android](img/icono-android.svg) Nokia N95 和触屏 | View 菜单 → Local View |
 
 ![一个摆满盒子、球体、圆柱体和圆锥体的场景，其中一个圆锥体被选中：按 / 后只剩下这个圆锥体，并被框显；再按一次 / 全部恢复](img/navegacion-vista-local.webp)
 
@@ -97,7 +97,7 @@
 
 不用手动调整环绕角度，就能从某一侧正对着看场景：
 
-| 视图 | PC | 菜单 |
+| 视图 | ![PC](img/icono-pc.svg) PC | 菜单 |
 |---|---|---|
 | 前 / 后 | <kbd>Num 1</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 1</kbd> | View → Viewpoint → Front / Back |
 | 右 / 左 | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
@@ -107,7 +107,7 @@
 
 ![摆满东西的场景，分别从前视图、右视图和顶视图来看，以及加上 Ctrl 后各自相反方向的视图](img/navegacion-vistas.webp)
 
-**在 Nokia N95 上：**按住 <kbd>#</kbd> 键，再按方向键。左和右让视图绕着场景每次转 90°。上切换到顶视图；下回到侧视图，再按一次下则切换到底视图。如果之前在自由环绕，第一次按方向键只会把视图摆正到最接近的那个视图。
+![Nokia](img/icono-nokia.svg) **在 Nokia N95 上：**按住 <kbd>#</kbd> 键，再按方向键。左和右让视图绕着场景每次转 90°。上切换到顶视图；下回到侧视图，再按一次下则切换到底视图。如果之前在自由环绕，第一次按方向键只会把视图摆正到最接近的那个视图。
 
 ![按住井号键的 Nokia N95：按右方向键，视图每次转 90 度；按上切换到顶视图，按下再回来](img/navegacion-vistas-nokia.webp)
 
@@ -122,8 +122,8 @@
 
 | | 如何切换 |
 |---|---|
-| PC | <kbd>Num 5</kbd> |
-| Nokia N95 | 单按一下 <kbd>#</kbd>，不按方向键 |
+| ![PC](img/icono-pc.svg) PC | <kbd>Num 5</kbd> |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | 单按一下 <kbd>#</kbd>，不按方向键 |
 | 菜单 | View → Perspective/Ortho |
 
 ![两排一模一样的盒子：在透视中，后面的盒子看起来很小；按 Num 5 切换到正交后，所有盒子大小都一样](img/navegacion-perspectiva.webp)
@@ -138,8 +138,8 @@
 
 | | 如何进入和退出 |
 |---|---|
-| PC | <kbd>Num 0</kbd> |
-| Nokia N95 | <kbd>8</kbd>（在 Edit Mode 之外：在 Edit Mode 中，8 是 Loop Cut） |
+| ![PC](img/icono-pc.svg) PC | <kbd>Num 0</kbd> |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>8</kbd>（在 Edit Mode 之外：在 Edit Mode 中，8 是 Loop Cut） |
 | 菜单 | View → Cameras → Active Camera |
 
 ![按 Num 0 后，3D Viewport 改为通过相机观看，并显示渲染范围的边框；再按一次 Num 0 就回到原来的视图](img/navegacion-camara.webp)
@@ -157,7 +157,7 @@
 
 ## 更多视图选项
 
-| 选项 | 作用 | PC | Nokia N95 |
+| 选项 | 作用 | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
 |---|---|---|---|
 | 滚转视图 | 让视图绕自身的轴旋转 15°，就像歪一下头。 | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
 | Lock Orbit | 视图不再转动：原本的环绕变成平移，就像在一块 2D 画板上操作。 | View → Lock Orbit | <kbd>9</kbd> |

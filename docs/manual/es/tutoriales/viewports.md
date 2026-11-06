@@ -1,7 +1,7 @@
 # Los viewports
 
 > [!NOTE]
-> El Nokia N95 soporta mouse y teclado (por Bluetooth). Las partes de este tutorial sobre el Nokia explican cómo se usa sin mouse ni teclado, solo con las teclas del teléfono.
+> ![Nokia](img/icono-nokia.svg) El Nokia N95 soporta mouse y teclado (por Bluetooth). Las partes de este tutorial sobre el Nokia explican cómo se usa sin mouse ni teclado, solo con las teclas del teléfono.
 
 La ventana de Whisk3D se divide en **viewports**: paneles, cada uno con su editor (la Vista 3D, el Outliner, Propiedades...). Los podés dividir, cambiarles el tamaño y elegir qué muestra cada uno. Funciona igual con mouse, con el dedo en una pantalla táctil y con el teclado de un Nokia.
 
@@ -15,7 +15,7 @@ El viewport que está debajo del mouse es el **viewport activo**, y se marca con
 
 ![El puntero del mouse pasa por la Vista 3D, el Outliner, Propiedades y la Línea de tiempo, y el borde verde marca cada vez el viewport que está debajo](img/viewports-activo.webp)
 
-**En el Nokia N95:** cada toque de la **tecla verde** de llamada ![](img/tecla-verde.svg) pasa al viewport siguiente. En la pantalla del N95 entran dos: la Vista 3D a la izquierda y Propiedades a la derecha.
+![Nokia](img/icono-nokia.svg) **En el Nokia N95:** cada toque de la **tecla verde** de llamada ![](img/tecla-verde.svg) pasa al viewport siguiente. En la pantalla del N95 entran dos: la Vista 3D a la izquierda y Propiedades a la derecha.
 
 ![Un Nokia N95 con la Vista 3D a la izquierda y Propiedades a la derecha: cada vez que se aprieta la tecla verde, el borde verde pasa al otro viewport](img/viewports-activo-nokia.webp)
 
@@ -31,7 +31,7 @@ Todos los viewports tienen arriba una **barra de menús** (en verde en la imagen
 
 ![Un dedo arrastra en círculos el botón de la esquina del viewport de abajo a la derecha, y los tres viewports cambian de tamaño](img/viewports-arrastrar.webp)
 
-**En el Nokia:** mantené apretada la **tecla verde** de llamada ![](img/tecla-verde.svg) y apretá una flecha: el borde del viewport activo (el que tiene el marco verde) se corre para ese lado, y así lo agrandás o lo achicás. La tecla verde sola, sin flechas, pasa al viewport siguiente.
+![Nokia](img/icono-nokia.svg) **En el Nokia:** mantené apretada la **tecla verde** de llamada ![](img/tecla-verde.svg) y apretá una flecha: el borde del viewport activo (el que tiene el marco verde) se corre para ese lado, y así lo agrandás o lo achicás. La tecla verde sola, sin flechas, pasa al viewport siguiente.
 
 ![Un Nokia N95 con la tecla verde apretada: con la flecha derecha la Vista 3D se agranda, con la izquierda se achica, y vuelve a como estaba](img/viewports-tamano-nokia.webp)
 
@@ -76,15 +76,15 @@ El Outliner se queda con el lugar de Propiedades:
 
 Si el viewport es angosto, su barra no entra entera. Lo mismo pasa con la barra de herramientas de abajo de la Vista 3D. Para ver el resto:
 
-- **Con el dedo:** arrastrala de costado.
-- **Con el mouse:** mantené apretado el click sobre la barra y arrastrá, o girá la **rueda** encima.
-- **Con el teclado:** <kbd>M</kbd> en la PC, o la **soft izquierda** en el Nokia, entra a la barra del viewport activo. Con las flechas izquierda y derecha la recorrés, y cada menú se abre al llegar. Con arriba y abajo te movés por el menú, y con OK (<kbd>Enter</kbd> en la PC) elegís. La barra se desplaza sola para mostrar dónde estás.
+- ![Android](img/icono-android.svg) **Con el dedo:** arrastrala de costado.
+- ![PC](img/icono-pc.svg) **Con el mouse:** mantené apretado el click sobre la barra y arrastrá, o girá la **rueda** encima.
+- ![PC](img/icono-pc.svg) ![Nokia](img/icono-nokia.svg) **Con el teclado:** <kbd>M</kbd> en la PC, o la **soft izquierda** en el Nokia, entra a la barra del viewport activo. Con las flechas izquierda y derecha la recorrés, y cada menú se abre al llegar. Con arriba y abajo te movés por el menú, y con OK (<kbd>Enter</kbd> en la PC) elegís. La barra se desplaza sola para mostrar dónde estás.
 
 ![Un dedo arrastra de costado la barra del Outliner y aparecen los botones que no entraban](img/viewports-barra-dedo.webp)
 
 ![El puntero del mouse sobre la barra del Outliner: con la rueda, la barra se desplaza](img/viewports-barra-rueda.webp)
 
-En un Nokia N95: la soft izquierda entra a la barra y las flechas la recorren.
+![Nokia](img/icono-nokia.svg) En un Nokia N95: la soft izquierda entra a la barra y las flechas la recorren.
 
 ![La interfaz del Nokia N95: la soft izquierda abre el menú Modo y la flecha derecha va pasando por los menús de la barra, que se desplaza sola](img/viewports-barra-nokia.webp)
 

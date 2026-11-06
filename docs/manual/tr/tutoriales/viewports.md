@@ -1,7 +1,7 @@
 # Viewport'lar
 
 > [!NOTE]
-> Nokia N95 fare ve klavyeyi (Bluetooth ile) destekler. Bu eğitimin Nokia ile ilgili kısımları, onu fare ve klavye olmadan, yalnızca telefonun tuşlarıyla nasıl kullanacağını anlatır.
+> ![Nokia](img/icono-nokia.svg) Nokia N95 fare ve klavyeyi (Bluetooth ile) destekler. Bu eğitimin Nokia ile ilgili kısımları, onu fare ve klavye olmadan, yalnızca telefonun tuşlarıyla nasıl kullanacağını anlatır.
 
 Whisk3D penceresi **viewport**'lara bölünür: her birinin kendi editörü olan paneller (3D Viewport, Outliner, Properties...). Onları bölebilir, boyutlarını değiştirebilir ve her birinin ne göstereceğini seçebilirsin. Fareyle, dokunmatik ekranda parmakla ve bir Nokia'nın tuş takımıyla aynı şekilde çalışır.
 
@@ -15,7 +15,7 @@ Farenin altındaki viewport **etkin viewport**'tur ve yeşil bir kenarlıkla iş
 
 ![Fare imleci 3D Viewport, Outliner, Properties ve Timeline üzerinden geçiyor ve yeşil kenarlık her seferinde altındaki viewport'u işaretliyor](img/viewports-activo.webp)
 
-**Nokia N95'te:** yeşil **arama tuşuna** ![](img/tecla-verde.svg) her basışta bir sonraki viewport'a geçilir. N95'in ekranına iki viewport sığar: solda 3D Viewport, sağda Properties.
+![Nokia](img/icono-nokia.svg) **Nokia N95'te:** yeşil **arama tuşuna** ![](img/tecla-verde.svg) her basışta bir sonraki viewport'a geçilir. N95'in ekranına iki viewport sığar: solda 3D Viewport, sağda Properties.
 
 ![Solda 3D Viewport, sağda Properties olan bir Nokia N95: yeşil tuşa her basıldığında yeşil kenarlık diğer viewport'a geçiyor](img/viewports-activo-nokia.webp)
 
@@ -31,7 +31,7 @@ Boyutu değiştirmek için köşe düğmesini (parmağınla ya da fareyle) **bas
 
 ![Bir parmak sağ alttaki viewport'un köşe düğmesini daireler çizerek sürüklüyor ve üç viewport da boyut değiştiriyor](img/viewports-arrastrar.webp)
 
-**Nokia'da:** yeşil **arama tuşunu** ![](img/tecla-verde.svg) basılı tut ve bir ok tuşuna bas: etkin viewport'un (yeşil çerçeveli olanın) kenarı o yöne kayar, böylece viewport büyür ya da küçülür. Yeşil tuş tek başına, ok tuşu olmadan, bir sonraki viewport'a geçer.
+![Nokia](img/icono-nokia.svg) **Nokia'da:** yeşil **arama tuşunu** ![](img/tecla-verde.svg) basılı tut ve bir ok tuşuna bas: etkin viewport'un (yeşil çerçeveli olanın) kenarı o yöne kayar, böylece viewport büyür ya da küçülür. Yeşil tuş tek başına, ok tuşu olmadan, bir sonraki viewport'a geçer.
 
 ![Yeşil tuşu basılı tutulan bir Nokia N95: sağ ok tuşuyla 3D Viewport büyüyor, sol ok tuşuyla küçülüyor ve sonra eski haline dönüyor](img/viewports-tamano-nokia.webp)
 
@@ -76,15 +76,15 @@ Outliner, Properties'in yerini alır:
 
 Viewport darsa çubuğu tamamen sığmaz. Aynı şey 3D Viewport'un alt çubuğunda da olur. Geri kalanını görmek için:
 
-- **Parmakla:** çubuğu yana doğru sürükle.
-- **Fareyle:** fare düğmesini çubuğun üzerinde basılı tutup sürükle ya da çubuğun üzerinde **tekerleği** çevir.
-- **Klavyeyle:** PC'de <kbd>M</kbd> ya da Nokia'da **sol seçim tuşu**, etkin viewport'un çubuğuna girmeni sağlar. Sol ve sağ ok tuşlarıyla çubukta gezersin; her menü üzerine gelince açılır. Yukarı ve aşağı ile menüde hareket eder, OK ile (PC'de <kbd>Enter</kbd>) seçersin. Çubuk, nerede olduğunu göstermek için kendiliğinden kayar.
+- ![Android](img/icono-android.svg) **Parmakla:** çubuğu yana doğru sürükle.
+- ![PC](img/icono-pc.svg) **Fareyle:** fare düğmesini çubuğun üzerinde basılı tutup sürükle ya da çubuğun üzerinde **tekerleği** çevir.
+- ![PC](img/icono-pc.svg) ![Nokia](img/icono-nokia.svg) **Klavyeyle:** PC'de <kbd>M</kbd> ya da Nokia'da **sol seçim tuşu**, etkin viewport'un çubuğuna girmeni sağlar. Sol ve sağ ok tuşlarıyla çubukta gezersin; her menü üzerine gelince açılır. Yukarı ve aşağı ile menüde hareket eder, OK ile (PC'de <kbd>Enter</kbd>) seçersin. Çubuk, nerede olduğunu göstermek için kendiliğinden kayar.
 
 ![Bir parmak Outliner'ın çubuğunu yana doğru sürüklüyor ve sığmayan düğmeler beliriyor](img/viewports-barra-dedo.webp)
 
 ![Fare işaretçisi Outliner'ın çubuğunun üzerinde: tekerlekle çubuk kayıyor](img/viewports-barra-rueda.webp)
 
-Bir Nokia N95'te: sol seçim tuşu çubuğa girer, ok tuşları da çubukta gezer.
+![Nokia](img/icono-nokia.svg) Bir Nokia N95'te: sol seçim tuşu çubuğa girer, ok tuşları da çubukta gezer.
 
 ![Nokia N95 arayüzü: sol seçim tuşu Mode menüsünü açıyor, sağ ok tuşu da çubuğun menülerinden sırayla geçiyor; çubuk kendiliğinden kayıyor](img/viewports-barra-nokia.webp)
 

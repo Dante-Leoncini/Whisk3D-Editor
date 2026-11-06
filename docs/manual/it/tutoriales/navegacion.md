@@ -1,7 +1,7 @@
 # Navigare nel 3D Viewport
 
 > [!NOTE]
-> Il Nokia N95 supporta mouse e tastiera (via Bluetooth). Le parti di questo tutorial dedicate al Nokia spiegano come usarlo senza mouse né tastiera, solo con i tasti del telefono.
+> ![Nokia](img/icono-nokia.svg) Il Nokia N95 supporta mouse e tastiera (via Bluetooth). Le parti di questo tutorial dedicate al Nokia spiegano come usarlo senza mouse né tastiera, solo con i tasti del telefono.
 
 Questo tutorial spiega come navigare nel 3D Viewport. Navigare significa spostare il tuo punto di vista: girare intorno alla scena, spostarti di lato e avvicinarti o allontanarti.
 
@@ -15,15 +15,15 @@ Le tre cose che userai di più sono **orbitare**, **spostare la vista** e fare *
 
 Orbitare significa ruotare la vista intorno alla scena, come se girassi intorno a un tavolo per vedere da tutti i lati quello che c'è sopra.
 
-**Con il mouse:** tieni premuto il **tasto centrale** (si preme spingendo giù la rotella) e trascina. Su un trackpad, o con un mouse senza tasto centrale, tieni premuto <kbd>Alt</kbd> e trascina con il **clic principale** (il sinistro).
+![PC](img/icono-pc.svg) **Con il mouse:** tieni premuto il **tasto centrale** (si preme spingendo giù la rotella) e trascina. Su un trackpad, o con un mouse senza tasto centrale, tieni premuto <kbd>Alt</kbd> e trascina con il **clic principale** (il sinistro).
 
 ![Il puntatore sul 3D Viewport: con il tasto centrale premuto, il trascinamento ruota la vista intorno al cubo](img/navegacion-orbitar-raton.webp)
 
-**Con il dito:** trascina un dito sul 3D Viewport. Parti dallo sfondo: se lo appoggi sul gizmo (le frecce colorate dell'oggetto), finirai per spostarlo.
+![Android](img/icono-android.svg) **Con il dito:** trascina un dito sul 3D Viewport. Parti dallo sfondo: se lo appoggi sul gizmo (le frecce colorate dell'oggetto), finirai per spostarlo.
 
 ![Un dito trascina sullo sfondo del 3D Viewport e la vista ruota intorno al cubo](img/navegacion-orbitar-dedo.webp)
 
-**Su un Nokia N95:** tieni premuta una **freccia** del pad. La vista ruota da quel lato finché la tieni premuta.
+![Nokia](img/icono-nokia.svg) **Su un Nokia N95:** tieni premuta una **freccia** del pad. La vista ruota da quel lato finché la tieni premuta.
 
 ![Un Nokia N95 in verticale: con le frecce destra, sinistra, su e giù premute, la vista ruota intorno al cubo](img/navegacion-orbitar-nokia.webp)
 
@@ -31,15 +31,15 @@ Orbitare significa ruotare la vista intorno alla scena, come se girassi intorno 
 
 Spostare la vista (o fare *pan*) significa farla scorrere di lato, verso l'alto o verso il basso, senza ruotarla.
 
-**Con il mouse:** tieni premuto <kbd>Shift</kbd> e trascina con il **tasto centrale**. Su un trackpad: <kbd>Alt</kbd> + <kbd>Shift</kbd> e trascina con il clic principale.
+![PC](img/icono-pc.svg) **Con il mouse:** tieni premuto <kbd>Shift</kbd> e trascina con il **tasto centrale**. Su un trackpad: <kbd>Alt</kbd> + <kbd>Shift</kbd> e trascina con il clic principale.
 
 ![Con Shift e il tasto centrale premuti, il puntatore disegna un cerchio e la vista si sposta insieme a lui](img/navegacion-panear-raton.webp)
 
-**Con le dita:** appoggia **due dita** e muovile insieme nella stessa direzione.
+![Android](img/icono-android.svg) **Con le dita:** appoggia **due dita** e muovile insieme nella stessa direzione.
 
 ![Due dita si muovono insieme in cerchio e la vista si sposta](img/navegacion-panear-dedo.webp)
 
-**Su un Nokia N95:** tieni premuto il tasto <kbd>\*</kbd> e usa le frecce.
+![Nokia](img/icono-nokia.svg) **Su un Nokia N95:** tieni premuto il tasto <kbd>\*</kbd> e usa le frecce.
 
 ![Un Nokia N95 con il tasto asterisco premuto: con ogni freccia la vista si sposta da quel lato](img/navegacion-panear-nokia.webp)
 
@@ -47,15 +47,15 @@ Spostare la vista (o fare *pan*) significa farla scorrere di lato, verso l'alto 
 
 Lo zoom ti avvicina o ti allontana. Il passo si adatta alla distanza: vicino a qualcosa di piccolo avanza piano e da lontano avanza veloce, quindi va bene sia per guardare tutta la scena sia per un singolo vertice.
 
-**Con il mouse:** gira la **rotella**. In avanti avvicina e all'indietro allontana. Su un trackpad, fai scorrere due dita verso l'alto o verso il basso.
+![PC](img/icono-pc.svg) **Con il mouse:** gira la **rotella**. In avanti avvicina e all'indietro allontana. Su un trackpad, fai scorrere due dita verso l'alto o verso il basso.
 
 ![Il puntatore sul cubo: la rotella in avanti avvicina la vista e all'indietro la allontana](img/navegacion-zoom-raton.webp)
 
-**Con le dita:** pizzica. Allargare le dita avvicina e stringerle allontana.
+![Android](img/icono-android.svg) **Con le dita:** pizzica. Allargare le dita avvicina e stringerle allontana.
 
 ![Due dita si allargano e la vista si avvicina al cubo; si stringono e si allontana](img/navegacion-zoom-dedo.webp)
 
-**Su un Nokia N95:** tieni premuto lo <kbd>0</kbd> e usa la freccia **su** per avvicinare o la freccia **giù** per allontanare.
+![Nokia](img/icono-nokia.svg) **Su un Nokia N95:** tieni premuto lo <kbd>0</kbd> e usa la freccia **su** per avvicinare o la freccia **giù** per allontanare.
 
 ![Un Nokia N95 con lo 0 premuto: con su la vista si avvicina al cubo e con giù si allontana](img/navegacion-zoom-nokia.webp)
 
@@ -65,9 +65,9 @@ Se hai perso l'orientamento, o vuoi lavorare su qualcosa in particolare, **inqua
 
 | | Come si inquadra |
 |---|---|
-| PC | <kbd>Num .</kbd> (il punto del tastierino numerico) |
-| Nokia N95 | Una pressione dello <kbd>0</kbd>, senza frecce (tenuto premuto con una freccia fa lo zoom) |
-| Schermo touch | Doppio tocco con due dita |
+| ![PC](img/icono-pc.svg) PC | <kbd>Num .</kbd> (il punto del tastierino numerico) |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | Una pressione dello <kbd>0</kbd>, senza frecce (tenuto premuto con una freccia fa lo zoom) |
+| ![Android](img/icono-android.svg) Schermo touch | Doppio tocco con due dita |
 | Menu | View → Frame Selected |
 
 ![La vista è lontana e spostata, con il cubo piccolissimo in un angolo; con Num . il cubo resta centrato e riempie la vista](img/navegacion-encuadrar.webp)
@@ -88,8 +88,8 @@ Per tornare indietro si ripete la stessa cosa: tutto ricompare e la vista torna 
 
 | | Come si entra e si esce |
 |---|---|
-| PC | <kbd>/</kbd> |
-| Nokia N95 e schermo touch | Menu View → Local View |
+| ![PC](img/icono-pc.svg) PC | <kbd>/</kbd> |
+| ![Nokia](img/icono-nokia.svg) ![Android](img/icono-android.svg) Nokia N95 e schermo touch | Menu View → Local View |
 
 ![Una scena piena di scatole, sfere, cilindri e coni, con un cono selezionato: con / resta solo il cono, inquadrato, e con / di nuovo torna tutto](img/navegacion-vista-local.webp)
 
@@ -97,7 +97,7 @@ Per tornare indietro si ripete la stessa cosa: tutto ricompare e la vista torna 
 
 Per guardare la scena esattamente da un lato, senza sistemare l'orbita a mano:
 
-| Vista | PC | Menu |
+| Vista | ![PC](img/icono-pc.svg) PC | Menu |
 |---|---|---|
 | Frontale / Posteriore | <kbd>Num 1</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 1</kbd> | View → Viewpoint → Front / Back |
 | Destra / Sinistra | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
@@ -107,7 +107,7 @@ Con <kbd>Ctrl</kbd>, ogni tasto dà la vista opposta.
 
 ![La scena piena vista di fronte, da destra, dall'alto e, con Ctrl, dai lati opposti](img/navegacion-vistas.webp)
 
-**Su un Nokia N95:** tieni premuto il tasto <kbd>#</kbd> e premi una freccia. Sinistra e destra ruotano la vista di 90° alla volta intorno alla scena. Su passa alla vista dall'alto; giù torna a quella di lato, e di nuovo giù passa a quella dal basso. Se stavi orbitando liberamente, la prima freccia si limita a raddrizzare la vista su quella più vicina.
+![Nokia](img/icono-nokia.svg) **Su un Nokia N95:** tieni premuto il tasto <kbd>#</kbd> e premi una freccia. Sinistra e destra ruotano la vista di 90° alla volta intorno alla scena. Su passa alla vista dall'alto; giù torna a quella di lato, e di nuovo giù passa a quella dal basso. Se stavi orbitando liberamente, la prima freccia si limita a raddrizzare la vista su quella più vicina.
 
 ![Un Nokia N95 con il cancelletto premuto: con la freccia destra la vista ruota di 90 gradi alla volta, con su passa alla vista dall'alto e con giù torna indietro](img/navegacion-vistas-nokia.webp)
 
@@ -122,8 +122,8 @@ L'ortografica serve per modellare con precisione: allineare le cose, confrontare
 
 | | Come si cambia |
 |---|---|
-| PC | <kbd>Num 5</kbd> |
-| Nokia N95 | Una pressione del <kbd>#</kbd>, senza frecce |
+| ![PC](img/icono-pc.svg) PC | <kbd>Num 5</kbd> |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | Una pressione del <kbd>#</kbd>, senza frecce |
 | Menu | View → Perspective/Ortho |
 
 ![Due file di scatole uguali: in prospettiva quelle in fondo sembrano piccole; con Num 5, in ortografica, hanno tutte la stessa dimensione](img/navegacion-perspectiva.webp)
@@ -138,8 +138,8 @@ Per guardare attraverso la camera attiva:
 
 | | Come si entra e si esce |
 |---|---|
-| PC | <kbd>Num 0</kbd> |
-| Nokia N95 | <kbd>8</kbd> (fuori da Edit Mode: lì l'8 è Loop Cut) |
+| ![PC](img/icono-pc.svg) PC | <kbd>Num 0</kbd> |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>8</kbd> (fuori da Edit Mode: lì l'8 è Loop Cut) |
 | Menu | View → Cameras → Active Camera |
 
 ![Con Num 0 il 3D Viewport passa a guardare attraverso la camera, con la cornice di ciò che uscirà nel render, e con Num 0 di nuovo torna indietro](img/navegacion-camara.webp)
@@ -157,7 +157,7 @@ Perché un'altra camera diventi quella attiva: selezionala e premi <kbd>Ctrl</kb
 
 ## Altre opzioni della vista
 
-| Opzione | Cosa fa | PC | Nokia N95 |
+| Opzione | Cosa fa | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
 |---|---|---|---|
 | Ruotare la vista | La ruota di 15° sul proprio asse, come quando inclini la testa. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
 | Lock Orbit | La vista smette di ruotare: ciò che la faceva orbitare ora la sposta, come su una tavola 2D. | View → Lock Orbit | <kbd>9</kbd> |

@@ -1,7 +1,7 @@
 # 视口
 
 > [!NOTE]
-> Nokia N95 支持鼠标和键盘（通过蓝牙）。本教程中关于 Nokia 的部分，讲的是不用鼠标和键盘、只用手机按键时怎么操作。
+> ![Nokia](img/icono-nokia.svg) Nokia N95 支持鼠标和键盘（通过蓝牙）。本教程中关于 Nokia 的部分，讲的是不用鼠标和键盘、只用手机按键时怎么操作。
 
 Whisk3D 的窗口被划分为多个**视口**：每个视口是一个面板，里面有自己的编辑器（3D Viewport、Outliner、Properties……）。你可以拆分视口、调整大小，并选择每个视口显示什么。用鼠标、在触屏上用手指，或者用 Nokia 的键盘，操作方式都一样。
 
@@ -15,7 +15,7 @@ Whisk3D 的窗口被划分为多个**视口**：每个视口是一个面板，�
 
 ![鼠标指针依次经过 3D Viewport、Outliner、Properties 和 Timeline，绿色边框每次都标出指针下方的视口](img/viewports-activo.webp)
 
-**在 Nokia N95 上：**每按一下绿色的**通话键** ![](img/tecla-verde.svg)，就会切换到下一个视口。N95 的屏幕上放得下两个视口：左边是 3D Viewport，右边是 Properties。
+![Nokia](img/icono-nokia.svg) **在 Nokia N95 上：**每按一下绿色的**通话键** ![](img/tecla-verde.svg)，就会切换到下一个视口。N95 的屏幕上放得下两个视口：左边是 3D Viewport，右边是 Properties。
 
 ![一部 Nokia N95，左边是 3D Viewport，右边是 Properties：每按一次绿色键，绿色边框就移到另一个视口](img/viewports-activo-nokia.webp)
 
@@ -31,7 +31,7 @@ Whisk3D 的窗口被划分为多个**视口**：每个视口是一个面板，�
 
 ![一根手指绕圈拖动右下角视口的角落按钮，三个视口的大小随之变化](img/viewports-arrastrar.webp)
 
-**在 Nokia 上：**按住绿色的**通话键** ![](img/tecla-verde.svg)，再按方向键：活动视口（带绿色边框的那个）的边框会朝那个方向移动，视口随之变大或变小。只按绿色键、不按方向键，则会切换到下一个视口。
+![Nokia](img/icono-nokia.svg) **在 Nokia 上：**按住绿色的**通话键** ![](img/tecla-verde.svg)，再按方向键：活动视口（带绿色边框的那个）的边框会朝那个方向移动，视口随之变大或变小。只按绿色键、不按方向键，则会切换到下一个视口。
 
 ![按住绿色键的 Nokia N95：按右方向键，3D Viewport 变大；按左方向键，它变小，然后恢复原样](img/viewports-tamano-nokia.webp)
 
@@ -76,15 +76,15 @@ Outliner 占用了 Properties 的位置：
 
 如果视口比较窄，它的栏就放不下。3D Viewport 底部的工具栏也是一样。要查看其余部分：
 
-- **用手指**：横向拖动栏。
-- **用鼠标**：在栏上按住鼠标键并拖动，或者在栏上滚动**滚轮**。
-- **用键盘**：在 PC 上按 <kbd>M</kbd>，在 Nokia 上按**左软键**，即可进入活动视口的栏。用左右方向键在栏上移动，到达某个菜单时它会自动打开。用上下方向键在菜单中移动，按 OK（PC 上是 <kbd>Enter</kbd>）选择。栏会自动滚动，显示你当前的位置。
+- ![Android](img/icono-android.svg) **用手指**：横向拖动栏。
+- ![PC](img/icono-pc.svg) **用鼠标**：在栏上按住鼠标键并拖动，或者在栏上滚动**滚轮**。
+- ![PC](img/icono-pc.svg) ![Nokia](img/icono-nokia.svg) **用键盘**：在 PC 上按 <kbd>M</kbd>，在 Nokia 上按**左软键**，即可进入活动视口的栏。用左右方向键在栏上移动，到达某个菜单时它会自动打开。用上下方向键在菜单中移动，按 OK（PC 上是 <kbd>Enter</kbd>）选择。栏会自动滚动，显示你当前的位置。
 
 ![一根手指横向拖动 Outliner 的栏，原来放不下的按钮显示出来](img/viewports-barra-dedo.webp)
 
 ![鼠标指针位于 Outliner 的栏上：滚动滚轮，栏就会滚动](img/viewports-barra-rueda.webp)
 
-在 Nokia N95 上：左软键进入栏，方向键在栏上移动。
+![Nokia](img/icono-nokia.svg) 在 Nokia N95 上：左软键进入栏，方向键在栏上移动。
 
 ![Nokia N95 的界面：左软键打开模式菜单，右方向键依次经过栏上的各个菜单，栏会自动滚动](img/viewports-barra-nokia.webp)
 

@@ -5,5 +5,6 @@
 [Whisk3D 的 Discord 群组和论坛](https://discord.gg/2sjpuact8)
 [Telegram 群](https://t.me/Whisk3D)
 
-1. [视口](viewports.md)
-2. [在 3D Viewport 中导航](navegacion.md)
+- 基础
+    1. [视口](viewports.md)
+    2. [在 3D Viewport 中导航](navegacion.md)
