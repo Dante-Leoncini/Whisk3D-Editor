@@ -6,3 +6,4 @@ Whisk3D इस्तेमाल करना सीखने के लिए �
 [Telegram ग्रुप](https://t.me/Whisk3D)
 
 1. [व्यूपोर्ट](viewports.md)
+2. [3D Viewport में नेविगेट करना](navegacion.md)

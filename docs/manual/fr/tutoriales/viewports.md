@@ -105,3 +105,5 @@ Sur un Nokia N95 : la touche de sélection gauche entre dans la barre et les fl�
 Chaque viewport aura son propre tutoriel, plus détaillé. En attendant, le [Manuel de Whisk3D](../editor/README.md) les explique un par un.
 
 Whisk3D continue de grandir : avec le temps, de nouveaux viewports s'ajouteront et ceux d'aujourd'hui pourront changer. Ils fonctionneront tous de la même façon, avec la barre en haut et le bouton dans le coin.
+
+Tutoriel suivant : [Naviguer dans le 3D Viewport](navegacion.md).

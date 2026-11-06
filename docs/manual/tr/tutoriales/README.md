@@ -6,3 +6,4 @@ Whisk3D'nin nasıl kullanılacağını anlatan eğitimler. Programın eğitimler
 [Telegram grubu](https://t.me/Whisk3D)
 
 1. [Viewport'lar](viewports.md)
+2. [3D Viewport'ta gezinme](navegacion.md)

@@ -105,3 +105,5 @@ Bir Nokia N95'te: sol seçim tuşu çubuğa girer, ok tuşları da çubukta geze
 Her viewport'un daha ayrıntılı kendi eğitimi olacak. Şimdilik her birini [Whisk3D kılavuzu](../editor/README.md) anlatıyor.
 
 Whisk3D büyümeye devam ediyor: zamanla yeni viewport'lar eklenecek, mevcut olanlar da değişebilir. Hepsi aynı şekilde çalışacak: üstte çubuk, köşede düğme.
+
+Sonraki eğitim: [3D Viewport'ta gezinme](navegacion.md).

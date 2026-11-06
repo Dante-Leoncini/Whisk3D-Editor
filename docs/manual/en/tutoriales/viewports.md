@@ -105,3 +105,5 @@ On a Nokia N95: the left soft key enters the bar and the arrows go through it.
 Each viewport will get its own tutorial with more detail. In the meantime, the [Whisk3D manual](../editor/README.md) explains each one.
 
 Whisk3D keeps growing: over time new viewports will be added and the current ones may change. They will all work the same way, with the bar at the top and the button in the corner.
+
+Next tutorial: [Navigating the 3D Viewport](navegacion.md).

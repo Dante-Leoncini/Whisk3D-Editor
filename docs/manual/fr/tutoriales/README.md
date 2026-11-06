@@ -6,3 +6,4 @@ Des tutoriels pour apprendre à utiliser Whisk3D. Les tutoriels et les vidéos d
 [Groupe Telegram](https://t.me/Whisk3D)
 
 1. [Les viewports](viewports.md)
+2. [Naviguer dans le 3D Viewport](navegacion.md)

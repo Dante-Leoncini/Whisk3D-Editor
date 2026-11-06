@@ -6,3 +6,4 @@
 [Группа в Telegram](https://t.me/Whisk3D)
 
 1. [Вьюпорты](viewports.md)
+2. [Навигация в 3D Viewport](navegacion.md)

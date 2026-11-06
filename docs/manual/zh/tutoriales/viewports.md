@@ -105,3 +105,5 @@ Outliner 占用了 Properties 的位置：
 以后每个视口都会有自己更详细的教程。在那之前，可以参考 [Whisk3D 手册](../editor/README.md)，里面对每个视口都有说明。
 
 Whisk3D 还在不断发展：以后会加入新的视口，现有的视口也可能会变化。它们都会以同样的方式工作：顶部有栏，角落有按钮。
+
+下一个教程：[在 3D Viewport 中导航](navegacion.md)。

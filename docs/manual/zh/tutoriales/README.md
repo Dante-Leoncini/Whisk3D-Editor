@@ -6,3 +6,4 @@
 [Telegram 群](https://t.me/Whisk3D)
 
 1. [视口](viewports.md)
+2. [在 3D Viewport 中导航](navegacion.md)

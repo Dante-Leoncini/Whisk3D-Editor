@@ -105,3 +105,5 @@ Em um Nokia N95: a soft esquerda entra na barra e as setas a percorrem.
 Cada viewport vai ter o seu próprio tutorial, com mais detalhes. Enquanto isso, o [Manual do Whisk3D](../editor/README.md) explica cada uma.
 
 O Whisk3D continua crescendo: com o tempo, novas viewports vão ser adicionadas e as atuais podem mudar. Todas vão funcionar do mesmo jeito, com a barra em cima e o botão no canto.
+
+Próximo tutorial: [Navegar na Viewport 3D](navegacion.md).
