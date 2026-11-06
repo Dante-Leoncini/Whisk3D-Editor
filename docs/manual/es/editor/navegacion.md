@@ -11,6 +11,7 @@
 | Selección por caja | Arrastrar sobre el fondo marca un rectángulo. | Arrastrar con el botón izquierdo, o <kbd>B</kbd>. |
 | Menú contextual | Abre el menú del modo en el puntero (durante un transform, lo cancela). | Click derecho. |
 | Bloquear órbita | Lo que orbitaba pasa a desplazar: la vista queda como un tablero 2D. | Menú Vista → Bloquear Órbita. |
+| Mover la cámara con la vista | Mirando por la cámara activa, navegar mueve la cámara: así se acomoda la toma. | Click en el candado (abajo, en la vista de cámara), o Menú Vista → Mover la cámara con la vista. |
 
 ## Con teclado
 
@@ -53,6 +54,7 @@
 | Extruir (Modo Edición) | <kbd>7</kbd> |
 | Loop Cut (Modo Edición) / vista de cámara (fuera de edición) | <kbd>8</kbd> |
 | Bloquear órbita | <kbd>9</kbd> |
+| Mover la cámara con la vista (mirando por la cámara) | Tecla de selección izquierda → menú Vista |
 | Ciclar la selección / sumar, quitar, todo o nada | Lápiz / Lápiz + flechas |
 | Barra de menús / cursor virtual | Tecla de selección izquierda / derecha |
 | Cambiar de viewport, redimensionar, maximizar | Tecla verde (sola, + flechas, + OK) |

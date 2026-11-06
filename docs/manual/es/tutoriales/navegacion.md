@@ -130,6 +130,24 @@ La ortográfica sirve para modelar con precisión: alinear cosas, comparar tama�
 
 ![Un Nokia N95: con un toque del numeral, las filas de cajas pasan de perspectiva a ortográfica y vuelven](img/navegacion-perspectiva-nokia.webp)
 
+## Bloquear la órbita
+
+Con la **órbita bloqueada**, la vista deja de girar: lo que antes orbitaba ahora la desplaza, como si movieras una hoja sobre una mesa. Es ideal para trabajar cómodo en modelos que se dibujan como un plano 2D, como el plano de una casa o una pieza mecánica: mirando de arriba y en ortográfica, te movés por todo el plano sin que se tuerza nunca.
+
+| | Cómo se bloquea y se desbloquea |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Menú Vista → Bloquear Órbita |
+| ![Android](img/icono-android.svg) Pantalla táctil | Menú Vista → Bloquear Órbita |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+Al bloquearla o desbloquearla aparece un aviso, y mientras está bloqueada, Bloquear Órbita se ve en verde en el menú.
+
+![El plano de una casa visto de arriba: se elige Vista → Bloquear Órbita y, con el botón del medio, el plano se desplaza sin girar](img/navegacion-bloquear-orbita-raton.webp)
+
+![El plano de una casa visto de arriba: se toca Vista → Bloquear Órbita y el dedo desplaza el plano sin girarlo](img/navegacion-bloquear-orbita-dedo.webp)
+
+![Un Nokia N95 con el plano de una casa: con el 9 se bloquea la órbita y las flechas desplazan el plano sin girarlo](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## La cámara activa
 
 La escena puede tener varias cámaras, pero una sola es la **cámara activa**: la que sirve para el juego y para los renders. Lo que ve esa cámara es lo que se ve al jugar y lo que sale cuando hacés el render de una imagen o de un video. La vista con la que navegás es solo para trabajar: no aparece ni en el juego ni en los renders.
@@ -151,7 +169,22 @@ El rectángulo es el encuadre: lo que queda adentro es lo que sale. Abajo al cen
 - **Abierto** (como arranca): el zoom y el desplazamiento solo te acercan para revisar el encuadre, sin tocar la cámara. Orbitar te saca de la vista de cámara y seguís navegando desde donde estaba.
 - **Cerrado:** orbitar, desplazar y hacer zoom mueven la **cámara**. Así se acomoda la toma.
 
-Se abre y se cierra tocándolo o con un click.
+### Bloquear la cámara a la vista
+
+Con el candado cerrado, la cámara activa queda bloqueada a la vista: orbitás, desplazás y hacés zoom como en la navegación normal, y la cámara se mueve con vos. Es la forma más cómoda de colocar una cámara exactamente donde querés: mirás por ella, la bloqueás y navegás hasta que la toma quede como la buscás.
+
+| | Cómo se bloquea y se desbloquea |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Un click en el candado |
+| ![Android](img/icono-android.svg) Pantalla táctil | Un toque en el candado |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | La soft izquierda abre la barra de menús (como en el [tutorial anterior](viewports.md#cuando-la-barra-no-entra)); ahí, Vista → Mover la cámara con la vista |
+| Menú | Vista → Mover la cámara con la vista |
+
+![Con Num 0 la vista pasa a la cámara; un click en el candado lo cierra y, al orbitar y girar la rueda, la cámara se mueve hasta que el cubo queda encuadrado](img/navegacion-camara-bloquear-raton.webp)
+
+![Mirando por la cámara, un toque en el candado lo cierra y, al arrastrar el dedo, la cámara se mueve hasta que el cubo queda encuadrado](img/navegacion-camara-bloquear-dedo.webp)
+
+![Un Nokia N95: el 8 pasa a la cámara; con la soft izquierda se abre el menú Vista y se elige Mover la cámara con la vista; las flechas y el 0 mueven la cámara hasta encuadrar el cubo](img/navegacion-camara-bloquear-nokia.webp)
 
 Para que otra cámara pase a ser la activa: seleccionala y apretá <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (o Vista → Cámaras → Objeto Activo como Cámara).
 
@@ -160,6 +193,5 @@ Para que otra cámara pase a ser la activa: seleccionala y apretá <kbd>Ctrl</kb
 | Opción | Qué hace | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menú |
 |---|---|---|---|---|
 | Girar la vista | La gira 15° sobre su propio eje, como inclinar la cabeza. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Bloquear Órbita | La vista deja de girar: lo que orbitaba pasa a desplazar, como sobre un tablero 2D. | — | <kbd>9</kbd> | Vista → Bloquear Órbita |
 
 Todos los atajos del editor están en [Atajos](../editor/atajos.md), y la [Navegación](../editor/navegacion.md) del manual los resume en tablas.

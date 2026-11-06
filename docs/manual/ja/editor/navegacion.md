@@ -11,6 +11,7 @@
 | Box Select | 背景の上をドラッグすると、四角形で範囲を指定できます。 | 左ボタンでドラッグ、または<kbd>B</kbd>。 |
 | Context menu | ポインターの位置にモードのメニューを開きます（トランスフォーム中は、トランスフォームをキャンセルします）。 | 右クリック。 |
 | Lock Orbit | オービットだった操作がパンになり、ビューが2Dのボードのようになります。 | Viewメニュー → Lock Orbit。 |
+| Lock the camera to the view | アクティブなカメラから見ているとき、ナビゲーションでカメラが動きます。こうしてショットを調整します。 | 鍵をクリック（カメラのビューの下）、またはViewメニュー → Lock the camera to the view。 |
 
 ## キーボード
 
@@ -53,6 +54,7 @@
 | Extrude（Edit Mode） | <kbd>7</kbd> |
 | Loop Cut（Edit Mode）/ Camera View（Edit Mode以外） | <kbd>8</kbd> |
 | Lock Orbit | <kbd>9</kbd> |
+| Lock the camera to the view（カメラから見ているとき） | 左ソフトキー → Viewメニュー |
 | 選択の切り替え / 追加、解除、すべて、なし | Pencilキー / Pencilキー + 方向キー |
 | Menu bar / 仮想カーソル | 左 / 右ソフトキー |
 | ビューポートの切り替え、サイズ変更、最大化 | 緑キー（単独、+ 方向キー、+ OK） |

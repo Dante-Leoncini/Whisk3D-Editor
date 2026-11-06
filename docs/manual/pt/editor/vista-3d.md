@@ -22,7 +22,7 @@ A Viewport 3D é onde você vê e edita a cena. Ela trabalha em diferentes **mod
 | Orientação | Os eixos do transform: Global, Local, Normal (a direção da face) ou Vista. |
 | Ímã (Snap) | Opções de ímã. Fica verde se estiver ativo (<kbd>Shift+Tab</kbd>). |
 | Edição proporcional | Ao mover algo, o que está perto acompanha suavemente. Fica verde se estiver ativa (<kbd>O</kbd>). |
-| Vista | Câmeras, pontos de vista, enquadrar, vista local, perspectiva, travar órbita. |
+| Vista | Câmeras, pontos de vista, enquadrar, vista local, perspectiva, travar órbita, mover a câmera com a vista. |
 | Selecionar | Tudo, nenhum, inverter, caixa, vinculado, loops e caminhos. |
 | Adicionar (+) | Só no Modo Objeto: criar objetos novos. |
 | Malha | Só no Modo Edição: as operações de modelagem. |

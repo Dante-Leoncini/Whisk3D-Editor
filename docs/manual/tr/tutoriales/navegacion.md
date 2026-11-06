@@ -130,6 +130,24 @@ Ortografik görünüm hassas modelleme için işe yarar: nesneleri hizalamak, bo
 
 ![Bir Nokia N95: kare tuşuna bir kez basınca kutu sıraları perspektiften ortografiğe geçiyor ve geri dönüyor](img/navegacion-perspectiva-nokia.webp)
 
+## Yörüngeyi kilitleme
+
+**Yörünge kilitliyken** görünüm dönmeyi bırakır: önceden yörüngede döndüren hareket artık görünümü kaydırır, sanki masanın üzerinde bir kâğıdı kaydırıyormuşsun gibi. Bir evin kat planı ya da mekanik bir parça gibi 2D bir plan olarak çizilen modellerde rahat çalışmak için idealdir: yukarıdan ortografik görünümde bakarken planın tamamında gezinirsin ve plan hiç eğilmez.
+
+| | Nasıl kilitlenir ve açılır |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | View menüsü → Lock Orbit |
+| ![Android](img/icono-android.svg) Dokunmatik ekran | View menüsü → Lock Orbit |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+Kilitlediğinde ya da kilidi açtığında bir bildirim çıkar; kilitli olduğu sürece menüde Lock Orbit yeşil görünür.
+
+![Yukarıdan görülen bir evin kat planı: View → Lock Orbit seçiliyor ve orta tuşla plan dönmeden kayıyor](img/navegacion-bloquear-orbita-raton.webp)
+
+![Yukarıdan görülen bir evin kat planı: View → Lock Orbit'e dokunuluyor ve parmak planı döndürmeden kaydırıyor](img/navegacion-bloquear-orbita-dedo.webp)
+
+![Bir evin kat planını gösteren bir Nokia N95: 9 ile yörünge kilitleniyor ve ok tuşları planı döndürmeden kaydırıyor](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## Etkin kamera
 
 Sahnede birden fazla kamera olabilir, ama **etkin kamera** yalnızca bir tanedir: oyunda ve render'larda kullanılan kamera. Bu kameranın gördüğü şey, oynarken görülen ve bir görüntünün ya da videonun render'ını aldığında ortaya çıkan şeydir. Gezindiğin görünüm yalnızca çalışmak içindir: ne oyunda ne de render'larda görünür.
@@ -151,7 +169,22 @@ Dikdörtgen kadrajdır: içinde kalan, render'da çıkan şeydir. Alt ortada bir
 - **Açık** (başlangıçtaki hali): yakınlaştırma ve kaydırma, kameraya dokunmadan, yalnızca kadrajı incelemen için seni yaklaştırır. Yörüngede döndürme seni kamera görünümünden çıkarır ve kameranın bulunduğu yerden gezinmeye devam edersin.
 - **Kapalı:** yörüngede döndürme, kaydırma ve yakınlaştırma **kamerayı** hareket ettirir. Çekim böyle ayarlanır.
 
-Kilit, üzerine dokunarak ya da tıklayarak açılıp kapanır.
+### Kamerayı görünüme kilitleme
+
+Kilit kapalıyken etkin kamera görünüme kilitlenir: normal gezinmedeki gibi yörüngede döndürür, kaydırır ve yakınlaştırırsın, kamera da seninle birlikte hareket eder. Bir kamerayı tam istediğin yere yerleştirmenin en rahat yolu budur: kameradan bakar, kilitler ve çekim tam aradığın gibi olana kadar gezinirsin.
+
+| | Nasıl kilitlenir ve açılır |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Kilide bir tık |
+| ![Android](img/icono-android.svg) Dokunmatik ekran | Kilide bir dokunuş |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | Sol seçim tuşu menü çubuğunu açar ([önceki eğitimdeki](viewports.md#çubuk-sığmadığında) gibi); orada View → Lock the camera to the view |
+| Menü | View → Lock the camera to the view |
+
+![Num 0 ile görünüm kameraya geçiyor; kilide bir tık onu kapatıyor ve yörüngede döndürüp tekerleği çevirince kamera, küp kadraja girene kadar hareket ediyor](img/navegacion-camara-bloquear-raton.webp)
+
+![Kameradan bakarken kilide bir dokunuş onu kapatıyor ve parmak sürüklenince kamera, küp kadraja girene kadar hareket ediyor](img/navegacion-camara-bloquear-dedo.webp)
+
+![Bir Nokia N95: 8 ile kameraya geçiliyor; sol seçim tuşuyla View menüsü açılıyor ve Lock the camera to the view seçiliyor; ok tuşları ve 0, küp kadraja girene kadar kamerayı hareket ettiriyor](img/navegacion-camara-bloquear-nokia.webp)
 
 Başka bir kamerayı etkin yapmak için onu seç ve <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> tuşlarına bas (ya da View → Cameras → Set Active Object as Camera).
 
@@ -160,6 +193,5 @@ Başka bir kamerayı etkin yapmak için onu seç ve <kbd>Ctrl</kbd> + <kbd>Num 0
 | Seçenek | Ne yapar | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menü |
 |---|---|---|---|---|
 | Görünümü döndürme | Görünümü kendi ekseni etrafında 15° döndürür; başını yana eğmek gibi. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Lock Orbit | Görünüm dönmeyi bırakır: yörüngede döndürme yerine kaydırma yapılır, 2D bir tahtadaki gibi. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 Editörün tüm kısayolları [Klavye kısayolları](../editor/atajos.md) sayfasında; kılavuzun [Gezinme](../editor/navegacion.md) sayfası da bunları tablolar hâlinde özetler.

@@ -22,7 +22,7 @@
 | Orientation | トランスフォームの軸：Global、Local、Normal（面の向き）、View。 |
 | Snap（スナップ） | スナップのオプションです。有効なときは緑になります（<kbd>Shift+Tab</kbd>）。 |
 | Proportional Editing | 何かを動かすと、近くにあるものが滑らかについてきます。有効なときは緑になります（<kbd>O</kbd>）。 |
-| View | カメラ、視点、フレーミング、Local View、Perspective、Lock Orbit。 |
+| View | カメラ、視点、フレーミング、Local View、Perspective、Lock Orbit、Lock the camera to the view。 |
 | Select | All、None、Invert、Box Select、Select Linked、ループと経路の選択。 |
 | Add (+) | Object Modeのみ：新しいオブジェクトを作成します。 |
 | Mesh | Edit Modeのみ：モデリングの操作です。 |

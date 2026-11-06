@@ -130,6 +130,24 @@ L'ortografica serve per modellare con precisione: allineare le cose, confrontare
 
 ![Un Nokia N95: con una pressione del cancelletto, le file di scatole passano dalla prospettiva all'ortografica e tornano indietro](img/navegacion-perspectiva-nokia.webp)
 
+## Bloccare l'orbita
+
+Con l'**orbita bloccata**, la vista smette di ruotare: ciò che prima la faceva orbitare ora la sposta, come se muovessi un foglio su un tavolo. È l'ideale per lavorare comodamente su modelli che si disegnano come una pianta 2D, per esempio la pianta di una casa o un pezzo meccanico: guardando dall'alto e in ortografica, ti muovi su tutta la pianta senza che si inclini mai.
+
+| | Come si blocca e si sblocca |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Menu View → Lock Orbit |
+| ![Android](img/icono-android.svg) Schermo touch | Menu View → Lock Orbit |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+Quando la blocchi o la sblocchi compare un avviso e, finché è bloccata, Lock Orbit appare in verde nel menu.
+
+![La pianta di una casa vista dall'alto: si sceglie View → Lock Orbit e, con il tasto centrale, la pianta si sposta senza ruotare](img/navegacion-bloquear-orbita-raton.webp)
+
+![La pianta di una casa vista dall'alto: si tocca View → Lock Orbit e il dito sposta la pianta senza ruotarla](img/navegacion-bloquear-orbita-dedo.webp)
+
+![Un Nokia N95 con la pianta di una casa: con il 9 si blocca l'orbita e le frecce spostano la pianta senza ruotarla](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## La camera attiva
 
 La scena può avere più camere, ma una sola è la **camera attiva**: quella che serve per il gioco e per i render. Ciò che vede quella camera è ciò che si vede quando giochi e ciò che esce quando fai il render di un'immagine o di un video. La vista con cui navighi serve solo per lavorare: non compare né nel gioco né nei render.
@@ -151,7 +169,22 @@ Il rettangolo è l'inquadratura: ciò che sta dentro è ciò che esce. In basso 
 - **Aperto** (com'è all'inizio): lo zoom e lo spostamento ti avvicinano solo per controllare l'inquadratura, senza toccare la camera. Orbitare ti fa uscire dalla vista della camera e continui a navigare da dove si trovava.
 - **Chiuso:** orbitare, spostare la vista e fare zoom muovono la **camera**. Così si sistema la ripresa.
 
-Si apre e si chiude toccandolo o con un clic.
+### Bloccare la camera alla vista
+
+Con il lucchetto chiuso, la camera attiva resta bloccata alla vista: orbiti, sposti la vista e fai zoom come nella navigazione normale, e la camera si muove con te. È il modo più comodo per mettere una camera esattamente dove vuoi: guardi attraverso la camera, la blocchi e navighi finché la ripresa non è proprio come la cerchi.
+
+| | Come si blocca e si sblocca |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Un clic sul lucchetto |
+| ![Android](img/icono-android.svg) Schermo touch | Un tocco sul lucchetto |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | Il tasto di selezione sinistro apre la barra dei menu (come nel [tutorial precedente](viewports.md#quando-la-barra-non-ci-sta)); lì, View → Lock the camera to the view |
+| Menu | View → Lock the camera to the view |
+
+![Con Num 0 la vista passa alla camera; un clic sul lucchetto lo chiude e, orbitando e girando la rotella, la camera si muove finché il cubo non è inquadrato](img/navegacion-camara-bloquear-raton.webp)
+
+![Guardando attraverso la camera, un tocco sul lucchetto lo chiude e, trascinando il dito, la camera si muove finché il cubo non è inquadrato](img/navegacion-camara-bloquear-dedo.webp)
+
+![Un Nokia N95: l'8 passa alla camera; con il tasto di selezione sinistro si apre il menu View e si sceglie Lock the camera to the view; le frecce e lo 0 muovono la camera finché il cubo non è inquadrato](img/navegacion-camara-bloquear-nokia.webp)
 
 Perché un'altra camera diventi quella attiva: selezionala e premi <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (oppure View → Cameras → Set Active Object as Camera).
 
@@ -160,6 +193,5 @@ Perché un'altra camera diventi quella attiva: selezionala e premi <kbd>Ctrl</kb
 | Opzione | Cosa fa | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
 |---|---|---|---|---|
 | Ruotare la vista | La ruota di 15° sul proprio asse, come quando inclini la testa. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Lock Orbit | La vista smette di ruotare: ciò che la faceva orbitare ora la sposta, come su una tavola 2D. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 Tutte le scorciatoie dell'editor sono in [Scorciatoie da tastiera](../editor/atajos.md), e la pagina [Navigazione](../editor/navegacion.md) del manuale le riassume in tabelle.

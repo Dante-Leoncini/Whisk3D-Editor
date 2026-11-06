@@ -11,6 +11,7 @@
 | Box Select | Dragging over the background draws a rectangle. | Drag with the left button, or <kbd>B</kbd>. |
 | Context menu | Opens the mode's menu at the pointer (during a transform, it cancels it). | Right click. |
 | Lock Orbit | What used to orbit now pans: the view behaves like a 2D board. | View menu → Lock Orbit. |
+| Lock the camera to the view | Looking through the active camera, navigating moves the camera: this is how you set up the shot. | Click the padlock (at the bottom, in the camera view), or View menu → Lock the camera to the view. |
 
 ## With the keyboard
 
@@ -53,6 +54,7 @@
 | Extrude (Edit Mode) | <kbd>7</kbd> |
 | Loop Cut (Edit Mode) / camera view (outside Edit Mode) | <kbd>8</kbd> |
 | Lock Orbit | <kbd>9</kbd> |
+| Lock the camera to the view (looking through the camera) | Left selection key → View menu |
 | Cycle the selection / add, remove, all or none | Pencil / Pencil + arrows |
 | Menu bar / virtual cursor | Left / right selection key |
 | Switch viewport, resize, maximize | Green key (alone, + arrows, + OK) |

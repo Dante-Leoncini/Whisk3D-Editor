@@ -22,7 +22,7 @@ Il 3D Viewport è dove si vede e si modifica la scena. Lavora in diverse **modal
 | Orientation | Gli assi della trasformazione: Global, Local, Normal (la direzione della faccia) o View. |
 | Snap | Opzioni di snap. Diventa verde se è attivo (<kbd>Shift+Tab</kbd>). |
 | Proportional Editing | Quando si sposta qualcosa, ciò che è vicino lo accompagna dolcemente. Diventa verde se è attivo (<kbd>O</kbd>). |
-| View | Camere, punti di vista, inquadrare, vista locale, prospettiva, bloccare l'orbita. |
+| View | Camere, punti di vista, inquadrare, vista locale, prospettiva, bloccare l'orbita, bloccare la camera alla vista. |
 | Select | Tutto, niente, invertire, riquadro, collegato, loop e percorsi. |
 | Add (+) | Solo in Object Mode: creare nuovi oggetti. |
 | Mesh | Solo in Edit Mode: le operazioni di modellazione. |

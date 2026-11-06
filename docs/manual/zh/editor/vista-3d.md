@@ -22,7 +22,7 @@
 | Orientation | 变换使用的坐标轴：Global、Local、Normal（面的方向）或 View。 |
 | Snap | 吸附选项。启用时显示为绿色（<kbd>Shift+Tab</kbd>）。 |
 | Proportional Editing | 移动某个元素时，附近的部分会平滑地跟着移动。启用时显示为绿色（<kbd>O</kbd>）。 |
-| View | 相机、视角、取景、局部视图、透视、锁定环绕。 |
+| View | 相机、视角、取景、局部视图、透视、锁定环绕、将相机锁定到视图。 |
 | Select | 全选、全不选、反选、框选、关联选择、循环和路径。 |
 | Add（+） | 仅在 Object Mode 中：创建新对象。 |
 | Mesh | 仅在 Edit Mode 中：各种建模操作。 |

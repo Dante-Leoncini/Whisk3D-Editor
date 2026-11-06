@@ -130,6 +130,24 @@ Orthographic is useful for modeling precisely: aligning things, comparing sizes 
 
 ![A Nokia N95: with a quick press of the hash key, the rows of boxes switch from perspective to orthographic and back](img/navegacion-perspectiva-nokia.webp)
 
+## Lock the orbit
+
+With the **orbit locked**, the view stops turning: what used to orbit now pans it, as if you were sliding a sheet of paper across a table. It's ideal for working comfortably on models that are drawn like a 2D plan, such as a house floor plan or a mechanical part: looking from the top in orthographic, you move over the whole plan without it ever tilting.
+
+| | How to lock and unlock it |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | View menu → Lock Orbit |
+| ![Android](img/icono-android.svg) Touch screen | View menu → Lock Orbit |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+A notice appears when you lock or unlock it, and while it's locked, Lock Orbit shows in green in the menu.
+
+![A house floor plan seen from the top: View → Lock Orbit is chosen and, with the middle button, the plan pans without turning](img/navegacion-bloquear-orbita-raton.webp)
+
+![A house floor plan seen from the top: View → Lock Orbit is tapped and a finger pans the plan without turning it](img/navegacion-bloquear-orbita-dedo.webp)
+
+![A Nokia N95 with a house floor plan: 9 locks the orbit and the arrows pan the plan without turning it](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## The active camera
 
 The scene can have several cameras, but only one is the **active camera**: the one used for the game and for renders. What that camera sees is what you see when you play, and what comes out when you render an image or a video. The view you navigate with is only for working: it doesn't show up in the game or in renders.
@@ -151,7 +169,22 @@ The rectangle is the framing: whatever is inside it is what comes out. At the bo
 - **Open** (how it starts): zooming and panning only bring you closer to check the framing, without touching the camera. Orbiting takes you out of the camera view, and you keep navigating from where the camera was.
 - **Closed:** orbiting, panning and zooming move the **camera**. This is how you set up the shot.
 
-Tap or click the padlock to open and close it.
+### Lock the camera to the view
+
+With the padlock closed, the active camera is locked to the view: you orbit, pan and zoom just like in normal navigation, and the camera moves with you. It's the most comfortable way to place a camera exactly where you want it: look through it, lock it and navigate until you get the shot you're after.
+
+| | How to lock and unlock it |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | A click on the padlock |
+| ![Android](img/icono-android.svg) Touch screen | A tap on the padlock |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | The left soft key opens the menu bar (as in the [previous tutorial](viewports.md#when-the-bar-doesnt-fit)); there, View → Lock the camera to the view |
+| Menu | View → Lock the camera to the view |
+
+![With Num 0 the view switches to the camera; a click on the padlock closes it and, when orbiting and turning the wheel, the camera moves until the cube is framed](img/navegacion-camara-bloquear-raton.webp)
+
+![Looking through the camera, a tap on the padlock closes it and, when dragging a finger, the camera moves until the cube is framed](img/navegacion-camara-bloquear-dedo.webp)
+
+![A Nokia N95: 8 switches to the camera; the left soft key opens the View menu and Lock the camera to the view is chosen; the arrows and 0 move the camera until the cube is framed](img/navegacion-camara-bloquear-nokia.webp)
 
 To make another camera the active one: select it and press <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (or View → Cameras → Set Active Object as Camera).
 
@@ -160,6 +193,5 @@ To make another camera the active one: select it and press <kbd>Ctrl</kbd> + <kb
 | Option | What it does | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
 |---|---|---|---|---|
 | Roll the view | Rotates it 15° around its own axis, like tilting your head. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Lock Orbit | The view stops turning: what used to orbit now pans, as on a 2D board. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 All the editor's shortcuts are in [Keyboard Shortcuts](../editor/atajos.md), and the manual's [Navigation](../editor/navegacion.md) page sums them up in tables.

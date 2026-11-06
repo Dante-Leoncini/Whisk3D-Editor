@@ -22,7 +22,7 @@ The 3D Viewport is where you see and edit the scene. It works in different **mod
 | Orientation | The transform axes: Global, Local, Normal (the face's direction) or View. |
 | Snap | Snap options. It turns green when active (<kbd>Shift+Tab</kbd>). |
 | Proportional Editing | When you move something, whatever is nearby follows smoothly. It turns green when active (<kbd>O</kbd>). |
-| View | Cameras, viewpoints, framing, local view, perspective, lock orbit. |
+| View | Cameras, viewpoints, framing, local view, perspective, lock orbit, lock the camera to the view. |
 | Select | All, none, invert, box, linked, loops and paths. |
 | Add (+) | Object Mode only: create new objects. |
 | Mesh | Edit Mode only: the modeling operations. |

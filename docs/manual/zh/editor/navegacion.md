@@ -11,6 +11,7 @@
 | Box Select | 在背景上拖动会框出一个矩形。 | 按住左键拖动，或按 <kbd>B</kbd>。 |
 | Context menu | 在指针处打开当前模式的菜单（变换进行中时则会取消变换）。 | 右键单击。 |
 | Lock Orbit | 原本的环绕变成平移：视图就像一块 2D 画板。 | View 菜单 → Lock Orbit。 |
+| Lock the camera to the view | 通过活动相机观看时，导航会移动相机：用这种方式调整镜头。 | 单击锁（在相机视图的底部），或 View 菜单 → Lock the camera to the view。 |
 
 ## 使用键盘
 
@@ -53,6 +54,7 @@
 | Extrude（Edit Mode） | <kbd>7</kbd> |
 | Loop Cut（Edit Mode）/ Camera View（非编辑状态下） | <kbd>8</kbd> |
 | Lock Orbit | <kbd>9</kbd> |
+| Lock the camera to the view（通过相机观看时） | 左软键 → View 菜单 |
 | 循环切换选择 / 加选、减选、全选或全不选 | Pencil 键 / Pencil 键 + 方向键 |
 | 菜单栏 / 虚拟光标 | 左 / 右软键 |
 | 切换视口、调整大小、最大化 | 绿色键（单按、+ 方向键、+ OK） |

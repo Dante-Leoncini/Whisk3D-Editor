@@ -22,7 +22,7 @@ Le 3D Viewport est l'endroit où l'on voit et modifie la scène. Il fonctionne s
 | Orientation | Les axes de la transformation : Global, Local, Normal (la direction de la face) ou View. |
 | Snap | Options d'aimantation. Le bouton devient vert si elle est active (<kbd>Shift+Tab</kbd>). |
 | Proportional Editing | Quand on déplace quelque chose, ce qui est proche suit en douceur. Le bouton devient vert si elle est active (<kbd>O</kbd>). |
-| View | Caméras, points de vue, cadrage, vue locale, perspective, verrouillage de l'orbite. |
+| View | Caméras, points de vue, cadrage, vue locale, perspective, verrouillage de l'orbite, verrouillage de la caméra sur la vue. |
 | Select | Tout, aucun, inverser, boîte, lié, boucles et chemins. |
 | Add (+) | Uniquement en Object Mode : créer de nouveaux objets. |
 | Mesh | Uniquement en Edit Mode : les opérations de modélisation. |

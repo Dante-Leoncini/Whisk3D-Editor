@@ -130,6 +130,24 @@ A ortográfica serve para modelar com precisão: alinhar coisas, comparar tamanh
 
 ![Um Nokia N95: com um toque na cerquilha, as fileiras de caixas passam de perspectiva para ortográfica e voltam](img/navegacion-perspectiva-nokia.webp)
 
+## Travar a órbita
+
+Com a **órbita travada**, a vista para de girar: o que antes orbitava agora a desloca, como se você movesse uma folha sobre uma mesa. É ideal para trabalhar com conforto em modelos que se desenham como uma planta 2D, por exemplo a planta de uma casa ou uma peça mecânica: olhando de cima e em ortográfica, você se move por toda a planta sem que ela jamais se incline.
+
+| | Como travar e destravar |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Menu Vista → Travar Órbita |
+| ![Android](img/icono-android.svg) Tela touch | Menu Vista → Travar Órbita |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+Ao travar ou destravar, aparece um aviso, e enquanto ela estiver travada, Travar Órbita aparece em verde no menu.
+
+![A planta de uma casa vista de cima: escolhe-se Vista → Travar Órbita e, com o botão do meio, a planta se desloca sem girar](img/navegacion-bloquear-orbita-raton.webp)
+
+![A planta de uma casa vista de cima: toca-se em Vista → Travar Órbita e o dedo desloca a planta sem girá-la](img/navegacion-bloquear-orbita-dedo.webp)
+
+![Um Nokia N95 com a planta de uma casa: com o 9 a órbita é travada e as setas deslocam a planta sem girá-la](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## A câmera ativa
 
 A cena pode ter várias câmeras, mas só uma é a **câmera ativa**: a que serve para o jogo e para os renders. O que essa câmera vê é o que aparece ao jogar e o que sai quando você faz o render de uma imagem ou de um vídeo. A vista com que você navega é só para trabalhar: não aparece nem no jogo nem nos renders.
@@ -151,7 +169,22 @@ O retângulo é o enquadramento: o que fica dentro dele é o que sai. Embaixo, n
 - **Aberto** (como começa): o zoom e o deslocamento só aproximam você para conferir o enquadramento, sem mexer na câmera. Orbitar tira você da vista da câmera, e você continua navegando a partir de onde ela estava.
 - **Fechado:** orbitar, deslocar e dar zoom movem a **câmera**. É assim que se ajusta a tomada.
 
-Ele se abre e se fecha com um toque ou com um clique.
+### Travar a câmera na vista
+
+Com o cadeado fechado, a câmera ativa fica travada na vista: você orbita, desloca e dá zoom como na navegação normal, e a câmera se move junto com você. É a forma mais cômoda de colocar uma câmera exatamente onde você quer: você olha por ela, trava e navega até a tomada ficar do jeito que procura.
+
+| | Como travar e destravar |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Um clique no cadeado |
+| ![Android](img/icono-android.svg) Tela touch | Um toque no cadeado |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | A soft esquerda abre a barra de menus (como no [tutorial anterior](viewports.md#quando-a-barra-não-cabe)); ali, Vista → Mover a câmera com a vista |
+| Menu | Vista → Mover a câmera com a vista |
+
+![Com Num 0 a vista passa para a câmera; um clique no cadeado o fecha e, ao orbitar e girar a roda, a câmera se move até o cubo ficar enquadrado](img/navegacion-camara-bloquear-raton.webp)
+
+![Olhando pela câmera, um toque no cadeado o fecha e, ao arrastar o dedo, a câmera se move até o cubo ficar enquadrado](img/navegacion-camara-bloquear-dedo.webp)
+
+![Um Nokia N95: o 8 passa para a câmera; com a soft esquerda se abre o menu Vista e se escolhe Mover a câmera com a vista; as setas e o 0 movem a câmera até enquadrar o cubo](img/navegacion-camara-bloquear-nokia.webp)
 
 Para que outra câmera passe a ser a ativa: selecione-a e aperte <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (ou Vista → Câmeras → Objeto Ativo como Câmera).
 
@@ -160,6 +193,5 @@ Para que outra câmera passe a ser a ativa: selecione-a e aperte <kbd>Ctrl</kbd>
 | Opção | O que faz | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
 |---|---|---|---|---|
 | Girar a vista | Gira a vista 15° sobre o seu próprio eixo, como quando se inclina a cabeça. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Travar Órbita | A vista para de girar: o que orbitava passa a deslocar, como em um tabuleiro 2D. | — | <kbd>9</kbd> | Vista → Travar Órbita |
 
 Todos os atalhos do editor estão em [Atalhos de teclado](../editor/atajos.md), e a página [Navegação](../editor/navegacion.md) do manual os resume em tabelas.

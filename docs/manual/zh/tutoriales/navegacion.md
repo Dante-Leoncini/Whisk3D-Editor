@@ -130,6 +130,24 @@
 
 ![一部 Nokia N95：单按一下井号键，一排排盒子从透视变成正交，然后再变回来](img/navegacion-perspectiva-nokia.webp)
 
+## 锁定环绕
+
+**锁定环绕**后，视图不再转动：原本的环绕变成平移，就像在桌面上移动一张纸。这非常适合处理那些像 2D 图纸一样绘制的模型，比如房屋平面图或机械零件，用起来很顺手：从上方用正交观看时，你可以在整张图纸上自由移动，图纸始终不会倾斜。
+
+| | 如何锁定和解锁 |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | View 菜单 → Lock Orbit |
+| ![Android](img/icono-android.svg) 触屏 | View 菜单 → Lock Orbit |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+锁定或解锁时会显示一条提示；锁定期间，菜单中的 Lock Orbit 显示为绿色。
+
+![从上方看的房屋平面图：选择 View → Lock Orbit 后，按住中键拖动，平面图只平移不转动](img/navegacion-bloquear-orbita-raton.webp)
+
+![从上方看的房屋平面图：点一下 View → Lock Orbit，手指拖动时平面图只平移不转动](img/navegacion-bloquear-orbita-dedo.webp)
+
+![显示房屋平面图的 Nokia N95：按 9 锁定环绕，方向键让平面图只平移不转动](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## 活动相机
 
 场景中可以有好几台相机，但只有一台是**活动相机**：它用于游戏和渲染。玩游戏时看到的，以及渲染图像或视频时输出的，都是这台相机看到的画面。你用来导航的视图只是工作用的：它既不会出现在游戏里，也不会出现在渲染结果中。
@@ -151,7 +169,22 @@
 - **打开**（初始状态）：缩放和平移只是让你拉近查看取景框，不会动到相机。环绕会让你离开相机视图，从相机所在的位置继续导航。
 - **锁上**：环绕、平移和缩放都会移动**相机**。用这种方式调整镜头。
 
-点一下或单击它，就能打开或锁上。
+### 将相机锁定到视图
+
+把锁锁上后，活动相机就会锁定到视图上：你像平常导航一样环绕、平移和缩放，相机会跟着你一起移动。这是把相机准确放到想要位置的最方便的方法：通过它观看，把它锁定，然后导航，直到镜头符合你的要求。
+
+| | 如何锁定和解锁 |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | 单击锁 |
+| ![Android](img/icono-android.svg) 触屏 | 点一下锁 |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | 左软键打开菜单栏（和[上一个教程](viewports.md#栏放不下时)中一样）；在那里选择 View → Lock the camera to the view |
+| 菜单 | View → Lock the camera to the view |
+
+![按 Num 0 切换到相机视图；单击锁把它锁上，然后环绕并滚动滚轮，相机随之移动，直到立方体进入取景框](img/navegacion-camara-bloquear-raton.webp)
+
+![通过相机观看时，点一下锁把它锁上，然后拖动手指，相机随之移动，直到立方体进入取景框](img/navegacion-camara-bloquear-dedo.webp)
+
+![一部 Nokia N95：按 8 切换到相机；用左软键打开 View 菜单，选择 Lock the camera to the view；用方向键和 0 移动相机，直到立方体进入取景框](img/navegacion-camara-bloquear-nokia.webp)
 
 要让另一台相机成为活动相机：选中它，按 <kbd>Ctrl</kbd> + <kbd>Num 0</kbd>（或者 View → Cameras → Set Active Object as Camera）。
 
@@ -160,6 +193,5 @@
 | 选项 | 作用 | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | 菜单 |
 |---|---|---|---|---|
 | 滚转视图 | 让视图绕自身的轴旋转 15°，就像歪一下头。 | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Lock Orbit | 视图不再转动：原本的环绕变成平移，就像在一块 2D 画板上操作。 | — | <kbd>9</kbd> | View → Lock Orbit |
 
 编辑器的所有快捷键都在[键盘快捷键](../editor/atajos.md)中，手册里的[导航](../editor/navegacion.md)页面则把它们汇总成了表格。

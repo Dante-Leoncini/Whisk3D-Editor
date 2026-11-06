@@ -130,6 +130,24 @@ La vue orthographique sert à modéliser avec précision : aligner des élément
 
 ![Un Nokia N95 : avec un appui bref sur le dièse, les rangées de boîtes passent de la perspective à l'orthographique, puis reviennent](img/navegacion-perspectiva-nokia.webp)
 
+## Verrouiller l'orbite
+
+Avec l'**orbite verrouillée**, la vue ne tourne plus : ce qui la faisait orbiter la déplace désormais, comme si vous faisiez glisser une feuille sur une table. C'est idéal pour travailler confortablement sur des modèles qui se dessinent comme un plan 2D, par exemple le plan d'une maison ou une pièce mécanique : en regardant de dessus et en orthographique, vous vous déplacez sur tout le plan sans qu'il bascule jamais.
+
+| | Comment verrouiller et déverrouiller |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Menu View → Lock Orbit |
+| ![Android](img/icono-android.svg) Écran tactile | Menu View → Lock Orbit |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
+
+Une notification s'affiche quand vous la verrouillez ou la déverrouillez et, tant qu'elle est verrouillée, Lock Orbit apparaît en vert dans le menu.
+
+![Le plan d'une maison vu de dessus : on choisit View → Lock Orbit et, avec le bouton du milieu, le plan se déplace sans tourner](img/navegacion-bloquear-orbita-raton.webp)
+
+![Le plan d'une maison vu de dessus : on touche View → Lock Orbit et le doigt déplace le plan sans le faire tourner](img/navegacion-bloquear-orbita-dedo.webp)
+
+![Un Nokia N95 avec le plan d'une maison : avec le 9, l'orbite se verrouille et les flèches déplacent le plan sans le faire tourner](img/navegacion-bloquear-orbita-nokia.webp)
+
 ## La caméra active
 
 La scène peut avoir plusieurs caméras, mais une seule est la **caméra active** : celle qui sert pour le jeu et pour les rendus. Ce que voit cette caméra, c'est ce que l'on voit en jouant et ce qui sort quand vous faites le rendu d'une image ou d'une vidéo. La vue avec laquelle vous naviguez ne sert qu'à travailler : elle n'apparaît ni dans le jeu ni dans les rendus.
@@ -151,7 +169,22 @@ Le rectangle est le cadrage : ce qui est à l'intérieur, c'est ce qui sort. En 
 - **Ouvert** (au départ) : le zoom et le déplacement de la vue ne font que vous rapprocher pour vérifier le cadrage, sans toucher à la caméra. Orbiter vous fait sortir de la vue caméra, et vous continuez à naviguer depuis l'endroit où elle se trouvait.
 - **Fermé :** orbiter, déplacer la vue et zoomer déplacent la **caméra**. C'est ainsi que l'on règle le plan.
 
-Il s'ouvre et se ferme d'un toucher ou d'un clic.
+### Verrouiller la caméra sur la vue
+
+Cadenas fermé, la caméra active est verrouillée sur la vue : vous orbitez, déplacez la vue et zoomez comme en navigation normale, et la caméra se déplace avec vous. C'est le moyen le plus commode de placer une caméra exactement où vous le voulez : regardez à travers elle, verrouillez-la et naviguez jusqu'à obtenir le plan que vous cherchez.
+
+| | Comment verrouiller et déverrouiller |
+|---|---|
+| ![PC](img/icono-pc.svg) PC | Un clic sur le cadenas |
+| ![Android](img/icono-android.svg) Écran tactile | Un toucher sur le cadenas |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | La touche de sélection gauche ouvre la barre de menus (comme dans le [tutoriel précédent](viewports.md#quand-la-barre-ne-tient-pas)) ; là, View → Lock the camera to the view |
+| Menu | View → Lock the camera to the view |
+
+![Avec Num 0, la vue passe à la caméra ; un clic sur le cadenas le ferme et, en orbitant et en tournant la molette, la caméra se déplace jusqu'à ce que le cube soit cadré](img/navegacion-camara-bloquear-raton.webp)
+
+![En regardant à travers la caméra, un toucher sur le cadenas le ferme et, en faisant glisser le doigt, la caméra se déplace jusqu'à ce que le cube soit cadré](img/navegacion-camara-bloquear-dedo.webp)
+
+![Un Nokia N95 : le 8 passe à la caméra ; avec la touche de sélection gauche, on ouvre le menu View et on choisit Lock the camera to the view ; les flèches et le 0 déplacent la caméra jusqu'à cadrer le cube](img/navegacion-camara-bloquear-nokia.webp)
 
 Pour qu'une autre caméra devienne la caméra active : sélectionnez-la et appuyez sur <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (ou View → Cameras → Set Active Object as Camera).
 
@@ -160,6 +193,5 @@ Pour qu'une autre caméra devienne la caméra active : sélectionnez-la et appuy
 | Option | Ce qu'elle fait | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
 |---|---|---|---|---|
 | Faire pivoter la vue | La fait tourner de 15° autour de son propre axe, comme quand on penche la tête. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
-| Lock Orbit | La vue ne tourne plus : ce qui la faisait orbiter la déplace désormais, comme sur un plateau 2D. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 Tous les raccourcis de l'éditeur se trouvent dans [Raccourcis clavier](../editor/atajos.md), et la page [Navigation](../editor/navegacion.md) du manuel les résume dans des tableaux.

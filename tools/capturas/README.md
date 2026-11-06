@@ -30,7 +30,9 @@ No abre ninguna ventana: usa `whisk3d --script` con el driver `offscreen` de SDL
    - Entran por `InputUsuarioSDL3`, la misma puerta que los eventos reales, y cada uno dibuja un cuadro
      después, como el loop del editor.
 2. Las posiciones **no se escriben a mano**: `g.info()` corre el guion hasta ahí y devuelve lo que imprime
-   `capinfo` (cada viewport, el botón de su esquina, las filas del menú abierto). Las opciones del menú se
+   `capinfo` (cada viewport, el botón de su esquina, las filas del menú abierto y cuál está marcada, el
+   botón del menú View de la Vista 3D y el candado de la vista de cámara: `i.boton_vista`,
+   `i.centro_candado()`). Las opciones del menú se
    buscan por **id**, no por texto, así la misma receta sirve en los tres idiomas.
 3. `g.foto()` agrega un `uishot`. Al final se dibuja encima el dedo, el puntero, la tecla apretada o los
    resaltados, y se guarda un `.webp`: quieto (sin pérdida) o animado en bucle.

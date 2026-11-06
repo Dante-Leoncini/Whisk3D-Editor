@@ -11,6 +11,7 @@
 | Seleção por caixa | Arrastar sobre o fundo marca um retângulo. | Arrastar com o botão esquerdo, ou <kbd>B</kbd>. |
 | Menu de contexto | Abre o menu do modo no ponteiro (durante um transform, cancela-o). | Clique direito. |
 | Travar órbita | O que orbitava passa a deslocar: a vista fica como um tabuleiro 2D. | Menu Vista → Travar Órbita. |
+| Mover a câmera com a vista | Olhando pela câmera ativa, navegar move a câmera: é assim que se ajusta a tomada. | Clique no cadeado (embaixo, na vista da câmera), ou Menu Vista → Mover a câmera com a vista. |
 
 ## Com teclado
 
@@ -53,6 +54,7 @@
 | Extrudar (Modo Edição) | <kbd>7</kbd> |
 | Loop Cut (Modo Edição) / vista da câmera (fora da edição) | <kbd>8</kbd> |
 | Travar órbita | <kbd>9</kbd> |
+| Mover a câmera com a vista (olhando pela câmera) | Tecla de seleção esquerda → menu Vista |
 | Percorrer a seleção / adicionar, remover, tudo ou nada | Lápis / Lápis + setas |
 | Barra de menus / cursor virtual | Tecla de seleção esquerda / direita |
 | Mudar de viewport, redimensionar, maximizar | Tecla verde (sozinha, + setas, + OK) |

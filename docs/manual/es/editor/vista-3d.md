@@ -22,7 +22,7 @@ La Vista 3D es donde se ve y se edita la escena. Trabaja en distintos **modos**:
 | Orientación | Los ejes del transform: Global, Local, Normal (la dirección de la cara) o Vista. |
 | Imán (Snap) | Opciones de imán. Se pone verde si está activo (<kbd>Shift+Tab</kbd>). |
 | Edición proporcional | Al mover algo, lo que está cerca lo acompaña con suavidad. Se pone verde si está activa (<kbd>O</kbd>). |
-| Vista | Cámaras, puntos de vista, encuadrar, vista local, perspectiva, bloquear órbita. |
+| Vista | Cámaras, puntos de vista, encuadrar, vista local, perspectiva, bloquear órbita, mover la cámara con la vista. |
 | Seleccionar | Todo, ninguno, invertir, caja, vinculado, loops y caminos. |
 | Añadir (+) | Solo en Modo Objeto: crear objetos nuevos. |
 | Malla | Solo en Modo Edición: las operaciones de modelado. |

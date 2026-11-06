@@ -22,7 +22,7 @@
 | Orientation | Dönüştürmenin eksenleri: Global, Local, Normal (yüzün yönü) veya View. |
 | Snap | Snap (yapıştırma) seçenekleri. Etkinse yeşil olur (<kbd>Shift+Tab</kbd>). |
 | Proportional Editing | Bir şeyi taşırken yakınındakiler de yumuşakça ona eşlik eder. Etkinse yeşil olur (<kbd>O</kbd>). |
-| View | Cameras, Viewpoint, Frame Selected, Local View, Perspective/Ortho, Lock Orbit. |
+| View | Cameras, Viewpoint, Frame Selected, Local View, Perspective/Ortho, Lock Orbit, Lock the camera to the view. |
 | Select | All, None, Invert, Box Select, Select Linked, loop'lar ve yollar. |
 | Add (+) | Yalnızca Object Mode'da: yeni nesneler oluşturma. |
 | Mesh | Yalnızca Edit Mode'da: modelleme işlemleri. |

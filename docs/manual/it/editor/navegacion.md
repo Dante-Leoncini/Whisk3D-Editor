@@ -11,6 +11,7 @@
 | Box Select | Trascinando sullo sfondo si traccia un rettangolo. | Trascinare con il tasto sinistro, o <kbd>B</kbd>. |
 | Context menu | Apre il menu della modalità sul puntatore (durante una trasformazione, la annulla). | Clic destro. |
 | Lock Orbit | I comandi che orbitavano ora spostano la vista, che resta come una tavola 2D. | Menu View → Lock Orbit. |
+| Lock the camera to the view | Guardando attraverso la camera attiva, navigare muove la camera: così si sistema la ripresa. | Clic sul lucchetto (in basso, nella vista camera), o menu View → Lock the camera to the view. |
 
 ## Con la tastiera
 
@@ -53,6 +54,7 @@
 | Extrude (Edit Mode) | <kbd>7</kbd> |
 | Loop Cut (Edit Mode) / vista camera (fuori da Edit Mode) | <kbd>8</kbd> |
 | Lock Orbit | <kbd>9</kbd> |
+| Lock the camera to the view (guardando attraverso la camera) | Tasto di selezione sinistro → menu View |
 | Ciclare la selezione / aggiungere, togliere, tutto o niente | Pencil / Pencil + frecce |
 | Barra dei menu / cursore virtuale | Tasto di selezione sinistro / destro |
 | Cambiare viewport, ridimensionare, massimizzare | Tasto verde (da solo, + frecce, + OK) |

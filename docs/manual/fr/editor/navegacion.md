@@ -11,6 +11,7 @@
 | Box Select | Faire glisser sur le fond trace un rectangle. | Glisser avec le bouton gauche, ou <kbd>B</kbd>. |
 | Context menu | Ouvre le menu du mode sous le pointeur (pendant une transformation, l'annule). | Clic droit. |
 | Lock Orbit | Ce qui faisait orbiter fait désormais défiler la vue : elle devient comme un plateau 2D. | Menu View → Lock Orbit. |
+| Lock the camera to the view | En regardant à travers la caméra active, naviguer déplace la caméra : c'est ainsi que l'on règle le plan. | Clic sur le cadenas (en bas, dans la vue caméra), ou menu View → Lock the camera to the view. |
 
 ## Au clavier
 
@@ -53,6 +54,7 @@
 | Extrude (Edit Mode) | <kbd>7</kbd> |
 | Loop Cut (Edit Mode) / Camera View (hors édition) | <kbd>8</kbd> |
 | Lock Orbit | <kbd>9</kbd> |
+| Lock the camera to the view (en regardant à travers la caméra) | Touche de sélection gauche → menu View |
 | Parcourir la sélection / ajouter, retirer, tout ou rien | Crayon / Crayon + flèches |
 | Barre de menus / curseur virtuel | Touche de sélection gauche / droite |
 | Changer de viewport, redimensionner, agrandir | Touche verte (seule, + flèches, + OK) |

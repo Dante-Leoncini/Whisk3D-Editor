@@ -11,6 +11,7 @@
 | Box Select | Arka planda sürüklemek bir dikdörtgen çizer. | Sol tuşla sürükle ya da <kbd>B</kbd>. |
 | Context menu | Modun menüsünü işaretçinin olduğu yerde açar (bir dönüştürme sırasında ise onu iptal eder). | Sağ tık. |
 | Lock Orbit | Yörüngede döndürme yerine kaydırma yapılır: görünüm bir 2D tahta gibi kalır. | View menüsü → Lock Orbit. |
+| Lock the camera to the view | Etkin kameradan bakarken gezinmek kamerayı hareket ettirir: çekim böyle ayarlanır. | Kilide tık (altta, kamera görünümünde) ya da View menüsü → Lock the camera to the view. |
 
 ## Klavyeyle
 
@@ -53,6 +54,7 @@
 | Extrude (Edit Mode) | <kbd>7</kbd> |
 | Loop Cut (Edit Mode) / Camera View (düzenleme dışında) | <kbd>8</kbd> |
 | Lock Orbit | <kbd>9</kbd> |
+| Lock the camera to the view (kameradan bakarken) | Sol seçim tuşu → View menüsü |
 | Seçimde sırayla dolaşma / ekleme, çıkarma, hepsi ya da hiçbiri | Pencil / Pencil + ok tuşları |
 | Menü çubuğu / sanal imleç | Sol / sağ seçim tuşu |
 | Viewport değiştirme, yeniden boyutlandırma, büyütme | Yeşil tuş (tek başına, + ok tuşları, + OK) |
