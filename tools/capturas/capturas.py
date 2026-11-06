@@ -27,7 +27,7 @@ import math, os, re, shutil, subprocess, sys, tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
-import n95
+import n95 as n95_mod
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.abspath(os.path.join(AQUI, "..", ".."))
@@ -115,19 +115,44 @@ class Guion:
     w, h     tamanio del layout (la 'ventana' del editor)
     escala   escala de la interfaz (1 = como en el N95)
     ampliar  agrandar cada foto N veces sin suavizar (para la escala 1, que es chica)
-    n95      la demo va adentro de la foto del Nokia N95 (n95.py) y se resaltan las teclas que se aprietan
+    n95      la demo va adentro de la foto del Nokia N95 (n95.py) y se resaltan las teclas que se aprietan:
+             True = apaisado (320x240, la Vista 3D al 55 % y Propiedades al 45 %);
+             "vertical" = parado (240x320, con el teclado numerico: la Vista 3D arriba y Propiedades abajo)
+    raton    dibujar un mouse abajo a la derecha con los botones que se aprietan y la rueda (las demos de PC)
     """
 
-    def __init__(self, idioma, w=960, h=540, escala=2, ampliar=1, n95=False):
-        if n95:     # la pantalla del telefono, adentro de la foto del N95 (n95.py): 320x240, escala 1,
-            w, h, escala, ampliar = 320, 240, 1, 1      # la Vista 3D al 55 % y Propiedades al 45 %
-        self.idioma, self.w, self.h, self.ampliar, self.n95 = idioma, w, h, ampliar, n95
+    def __init__(self, idioma, w=960, h=540, escala=2, ampliar=1, n95=False, raton=False):
+        self.telefono = None
+        if n95 == "vertical":
+            self.telefono = n95_mod.VERTICAL
+        elif n95:
+            self.telefono = n95_mod.HORIZONTAL
+        if self.telefono:   # la pantalla del telefono, en escala 1, adentro de su foto (n95.py)
+            w, h, escala, ampliar = self.telefono.ancho, self.telefono.alto, 1, 1
+        self.idioma, self.w, self.h, self.ampliar, self.n95 = idioma, w, h, ampliar, bool(self.telefono)
         self.lineas = ["ventana %d %d" % (w, h), "escala %d" % escala]
-        if n95:
-            self.lineas += ["layoutpordefecto", "division 0.55"]
+        if self.telefono:
+            self.lineas += ["layoutpordefecto"]
+            if self.telefono is n95_mod.HORIZONTAL:
+                self.lineas += ["division 0.55"]
         self.fotos = []
-        self.puntero = None        # {'tipo': 'dedo'|'raton', 'x', 'y', 'abajo'}
+        self.punteros = {}         # id -> {'tipo': 'dedo'|'raton', 'x', 'y', 'abajo'} (id 1 = el dedo o el mouse)
+        self.raton = raton
+        self.botones = set()       # los botones del mouse apretados ('izq', 'medio', 'der')
+        self.giro = 0              # la rueda en la proxima foto: 1 = arriba, -1 = abajo
+        self.mods = []             # las teclas mantenidas mientras se usa el mouse ('Shift', 'Alt')
         self.tmp = tempfile.mkdtemp(prefix="w3d_capturas_")
+
+    @property
+    def puntero(self):
+        return self.punteros.get(1)
+
+    @puntero.setter
+    def puntero(self, p):
+        if p is None:
+            self.punteros.pop(1, None)
+        else:
+            self.punteros[1] = p
 
     # ---- correr ---------------------------------------------------------------
     def _correr(self, lineas):
@@ -147,18 +172,22 @@ class Guion:
         return Info(self._correr([l for l in self.lineas if not l.startswith("uishot ")] + ["capinfo"]))
 
     # ---- entrada ---------------------------------------------------------------
-    def dedo_abajo(self, x, y):
-        self.lineas.append("dedo down %d %d" % (x, y))
-        self.puntero = {"tipo": "dedo", "x": x, "y": y, "abajo": True}
+    def dedo_abajo(self, x, y, id=1):
+        self.lineas.append("dedo down %d %d %d" % (x, y, id))
+        self.punteros[id] = {"tipo": "dedo", "x": x, "y": y, "abajo": True}
 
-    def dedo_mover(self, x, y):
-        self.lineas.append("dedo move %d %d" % (x, y))
-        self.puntero = dict(self.puntero or {"tipo": "dedo", "abajo": True}, x=x, y=y)
+    def dedo_mover(self, x, y, id=1):
+        self.lineas.append("dedo move %d %d %d" % (x, y, id))
+        self.punteros[id] = dict(self.punteros.get(id) or {"tipo": "dedo", "abajo": True}, x=x, y=y)
 
-    def dedo_arriba(self):
-        p = self.puntero
-        self.lineas.append("dedo up %d %d" % (p["x"], p["y"]))
-        self.puntero = dict(p, abajo=False)
+    def dedo_arriba(self, id=1):
+        p = self.punteros[id]
+        self.lineas.append("dedo up %d %d %d" % (p["x"], p["y"], id))
+        self.punteros[id] = dict(p, abajo=False)
+
+    def dedos_quitar(self):
+        """Solo el dibujo: saca los dedos que ya se levantaron."""
+        self.punteros = {k: p for k, p in self.punteros.items() if p.get("abajo")}
 
     def tocar(self, x, y):
         self.dedo_abajo(x, y)
@@ -169,8 +198,25 @@ class Guion:
         self.puntero = {"tipo": "dedo", "x": x, "y": y, "abajo": False}
 
     def raton_mover(self, x, y):
+        """Mueve el mouse (si hay botones apretados, es un arrastre)."""
         self.lineas.append("raton move %d %d" % (x, y))
-        self.puntero = {"tipo": "raton", "x": x, "y": y, "abajo": False}
+        self.puntero = {"tipo": "raton", "x": x, "y": y, "abajo": bool(self.botones)}
+
+    def raton_abajo(self, x, y, boton="izq"):
+        self.lineas.append("raton down %d %d %s" % (x, y, boton))
+        self.botones.add(boton)
+        self.puntero = {"tipo": "raton", "x": x, "y": y, "abajo": True}
+
+    def raton_arriba(self, boton="izq"):
+        p = self.puntero
+        self.lineas.append("raton up %d %d %s" % (p["x"], p["y"], boton))
+        self.botones.discard(boton)
+        self.puntero = dict(p, abajo=bool(self.botones))
+
+    def mod(self, *teclas):
+        """Mantener teclas modificadoras ('Shift', 'Alt', 'Ctrl') mientras se usa el mouse; mod() las suelta."""
+        self.lineas.append(("mod " + " ".join(t.lower() for t in teclas)).strip())
+        self.mods = list(teclas)
 
     def clic(self, x, y, boton="izq"):
         self.lineas += ["raton down %d %d %s" % (x, y, boton), "raton up %d %d %s" % (x, y, boton)]
@@ -178,6 +224,7 @@ class Guion:
 
     def rueda(self, pasos, x, y):
         self.lineas.append("rueda %d %d %d" % (pasos, x, y))
+        self.giro = 1 if pasos > 0 else -1          # (se dibuja en la proxima foto)
 
     def tecla(self, nombre):
         self.lineas.append("tecla %s" % nombre)
@@ -186,7 +233,7 @@ class Guion:
         self.lineas.append("esperar %d" % ms)
 
     def sin_puntero(self):
-        self.puntero = None
+        self.punteros = {}
 
     # ---- fotos ----------------------------------------------------------------
     def verde(self):
@@ -197,6 +244,15 @@ class Guion:
         """N95: la tecla verde mantenida + una flecha durante esos cuadros (cambia el tamanio del viewport activo)."""
         self.lineas.append("verde %d %d %d" % (dx, dy, cuadros))
 
+    def keypad(self, accion, *args):
+        """N95: el keypad sobre la Vista 3D (ver el comando 'n95' de W3dCapturas.cpp): orbitar dx dy cuadros,
+        zoom dy cuadros, panear dx dy cuadros, vista dx dy, perspectiva, encuadrar, camara."""
+        self.lineas.append(" ".join(["n95", accion] + [str(a) for a in args]))
+
+    def linea(self, texto):
+        """Un comando del harness tal cual (preparar la escena: add, objpos, selobj, vporbita...)."""
+        self.lineas.append(texto)
+
     def foto(self, dur=100, marcas=(), tecla=None, puntero=True, teclas=()):
         """Saca una foto de la interfaz. dur = cuanto dura ese cuadro en la animacion (ms).
         marcas: ('rect', x, y, w, h) | ('circulo', cx, cy, r)  resaltados encima.
@@ -204,26 +260,37 @@ class Guion:
         teclas: con n95=True, las teclas del telefono que se ven apretadas (ids de n95.svg: 'verde', 'derecha'...)."""
         png = os.path.join(self.tmp, "f%04d.png" % len(self.fotos))
         self.lineas.append("uishot " + png)
+        raton = None
+        if self.raton:
+            raton = {"botones": set(self.botones), "giro": self.giro, "mods": list(self.mods)}
+            self.giro = 0
         self.fotos.append({"png": png, "dur": dur, "marcas": list(marcas), "tecla": tecla, "teclas": tuple(teclas),
-                           "puntero": dict(self.puntero) if (puntero and self.puntero) else None})
+                           "punteros": [dict(p) for _, p in sorted(self.punteros.items())] if puntero else [],
+                           "raton": raton})
 
-    def cuadros(self, ancho=None, calidad=82):
+    def cuadros(self, ancho=None, calidad=82, recorte=None):
         """Corre el guion entero y devuelve las fotos ya con el dedo / puntero / tecla dibujados.
         ancho: achicar el resultado a ese ancho (las animaciones donde cambia toda la pantalla pesan mucho).
-        calidad: la del .webp animado (0-100; las quietas van sin perdida)."""
+        calidad: la del .webp animado (0-100; las quietas van sin perdida).
+        recorte: (x, y, w, h) de la interfaz: mostrar solo eso (la Vista 3D, por ejemplo)."""
         self._correr(self.lineas)
         res = Cuadros()
         res.calidad = calidad
         for f in self.fotos:
             im = Image.open(f["png"]).convert("RGB")
+            origen = (0, 0)
+            if recorte:
+                x, y, w, h = recorte
+                im = im.crop((x, y, x + w, y + h))
+                origen = (x, y)
             if self.ampliar > 1:
                 im = im.resize((im.width * self.ampliar, im.height * self.ampliar), Image.NEAREST)
-            if self.n95:
+            if self.telefono:
                 # el cartel de la tecla va debajo del telefono, no sobre la pantalla
-                im = n95.componer(dibujar(im, dict(f, tecla=None), 1), f["teclas"])
+                im = self.telefono.componer(dibujar(im, dict(f, tecla=None), 1, origen), f["teclas"])
                 im = con_cartel(im, f["tecla"])
             else:
-                im = dibujar(im, f, self.ampliar)
+                im = dibujar(im, f, self.ampliar, origen)
             if ancho and im.width > ancho:
                 im = im.resize((ancho, round(im.height * ancho / im.width)), Image.LANCZOS)
             res.append((im, f["dur"]))
@@ -237,18 +304,31 @@ class Cuadros(list):
 
 
 # ---- lo que se dibuja encima ----------------------------------------------------
-def dibujar(im, f, k):
+def dibujar(im, f, k, origen=(0, 0)):
     capa = Image.new("RGBA", im.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(capa)
+    ox, oy = origen
     for m in f["marcas"]:
         if m[0] == "rect":
-            x, y, w, h = [v * k for v in m[1:5]]
+            x, y, w, h = [v * k for v in (m[1] - ox, m[2] - oy) + tuple(m[3:5])]
             d.rounded_rectangle([x, y, x + w - 1, y + h - 1], radius=6, outline=VERDE + (255,), width=3, fill=VERDE + (38,))
         elif m[0] == "circulo":
-            cx, cy, r = [v * k for v in m[1:4]]
+            cx, cy, r = [v * k for v in (m[1] - ox, m[2] - oy, m[3])]
             d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=NARANJA + (255,), width=4)
-    p = f["puntero"]
-    if p and p["tipo"] == "dedo":
+    for p in f["punteros"]:
+        dibujar_puntero(d, dict(p, x=p["x"] - ox, y=p["y"] - oy), k)
+    x1 = im.width - 16
+    if f.get("raton"):
+        x1 = dibujar_raton(capa, f["raton"], x1, im.height - 16)
+        for t in reversed(f["raton"]["mods"]):
+            x1 = cartel(d, t, x1, im.height - 16, 22 if k == 1 else 26) - 12
+    if f["tecla"]:
+        cartel(d, f["tecla"], x1, im.height - 16, 22 if k == 1 else 26)
+    return Image.alpha_composite(im.convert("RGBA"), capa).convert("RGB")
+
+
+def dibujar_puntero(d, p, k):
+    if p["tipo"] == "dedo":
         x, y = p["x"] * k, p["y"] * k
         r = 24
         if p["abajo"]:   # apoyado: relleno; arriba (por tocar): solo el borde
@@ -258,20 +338,66 @@ def dibujar(im, f, k):
         else:
             d.ellipse([x - r - 3, y - r - 3, x + r + 3, y + r + 3], outline=(0, 0, 0, 90), width=3)
             d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 50), outline=(255, 255, 255, 200), width=3)
-    elif p and p["tipo"] == "raton":
+    elif p["tipo"] == "raton":
         x, y = p["x"] * k, p["y"] * k
         s = 1.4
         flecha = [(0, 0), (0, 18), (4.5, 14), (7.5, 21), (10.5, 19.8), (7.5, 13), (13, 13)]
         pts = [(x + a * s, y + b * s) for a, b in flecha]
         d.polygon(pts, fill=(255, 255, 255, 255), outline=(0, 0, 0, 255))
         d.line(pts + [pts[0]], fill=(0, 0, 0, 255), width=2)
-    if f["tecla"]:
-        cartel(d, f["tecla"], im.width - 16, im.height - 16, 22 if k == 1 else 26)
-    return Image.alpha_composite(im.convert("RGBA"), capa).convert("RGB")
+
+
+def dibujar_raton(capa, r, x1, y1, ancho=58, alto=90):
+    """Un mouse con la esquina de abajo a la derecha en (x1, y1): los botones apretados en verde, la rueda en verde
+    si se aprieta (boton del medio) o si gira (con una flecha al costado). Devuelve donde termina a la izquierda."""
+    s = 4                                           # se dibuja grande y se achica: bordes suaves
+    W, H = ancho * s, alto * s
+    corte = int(H * 0.42)                           # donde terminan los botones
+    cuerpo = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(cuerpo).rounded_rectangle([0, 0, W - 1, H - 1], radius=int(W * 0.48), fill=255)
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    im.paste((246, 246, 246, 255), (0, 0), cuerpo)
+    for boton, caja in (("izq", (0, 0, W // 2, corte)), ("der", (W // 2, 0, W, corte))):
+        if boton in r["botones"]:
+            m = Image.new("L", (W, H), 0)
+            ImageDraw.Draw(m).rectangle(caja, fill=255)
+            im.paste(VERDE + (255,), (0, 0), _y(cuerpo, m))
+    d = ImageDraw.Draw(im)
+    oscuro = (40, 40, 40, 255)
+    d.line([(W // 2, 0), (W // 2, corte)], fill=oscuro, width=2 * s)
+    d.line([(0, corte), (W, corte)], fill=oscuro, width=2 * s)
+    rw, rh = int(W * 0.2), int(corte * 0.55)
+    rueda = [W // 2 - rw // 2, int(corte * 0.2), W // 2 + rw // 2, int(corte * 0.2) + rh]
+    activa = "medio" in r["botones"] or r["giro"]
+    d.rounded_rectangle(rueda, radius=rw // 2, fill=VERDE + (255,) if activa else (120, 120, 120, 255), outline=oscuro, width=2 * s)
+    borde = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(borde).rounded_rectangle([0, 0, W - 1, H - 1], radius=int(W * 0.48), outline=oscuro, width=3 * s)
+    im = Image.alpha_composite(im, borde).resize((ancho, alto), Image.LANCZOS)
+    x0, y0 = x1 - ancho, y1 - alto
+    sombra = Image.new("RGBA", capa.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).rounded_rectangle([x0 + 3, y0 + 4, x1 + 3, y1 + 4], radius=int(ancho * 0.48), fill=(0, 0, 0, 110))
+    capa.alpha_composite(sombra)
+    capa.alpha_composite(im, (x0, y0))
+    if r["giro"]:                                   # la flecha del giro, a la izquierda de la rueda
+        d = ImageDraw.Draw(capa)
+        cx, cy, t = x0 - 16, y0 + int(alto * 0.42 * 0.48), 11
+        tri = [(cx - t, cy + t * 0.6), (cx + t, cy + t * 0.6), (cx, cy - t * 0.9)] if r["giro"] > 0 else \
+              [(cx - t, cy - t * 0.6), (cx + t, cy - t * 0.6), (cx, cy + t * 0.9)]
+        d.polygon(tri, fill=VERDE + (255,), outline=(255, 255, 255, 255))
+        d.line(tri + [tri[0]], fill=(255, 255, 255, 255), width=2)
+        return x0 - 34
+    return x0 - 14
+
+
+def _y(a, b):
+    """La interseccion de dos mascaras (L)."""
+    from PIL import ImageChops
+    return ImageChops.multiply(a, b)
 
 
 def cartel(d, texto, x1, y1, tam=26):
-    """El cartel de una tecla (blanco, con sombra), con la esquina de abajo a la derecha en (x1, y1)."""
+    """El cartel de una tecla (blanco, con sombra), con la esquina de abajo a la derecha en (x1, y1). Devuelve
+    donde empieza a la izquierda."""
     fnt = fuente(tam)
     caja = d.textbbox((0, 0), texto, font=fnt)
     tw, th = caja[2] - caja[0], caja[3] - caja[1]
@@ -279,6 +405,7 @@ def cartel(d, texto, x1, y1, tam=26):
     d.rounded_rectangle([x0 + 3, y0 + 4, x1 + 3, y1 + 4], radius=10, fill=(0, 0, 0, 120))
     d.rounded_rectangle([x0, y0, x1, y1], radius=10, fill=(245, 245, 245, 245), outline=(40, 40, 40, 255), width=2)
     d.text((x0 + 14 - caja[0], y0 + 11 - caja[1]), texto, font=fnt, fill=(25, 25, 25, 255))
+    return x0
 
 
 def con_cartel(im, texto, alto=64):

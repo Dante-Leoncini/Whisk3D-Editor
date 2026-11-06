@@ -267,3 +267,406 @@ def barra_nokia(idioma):
             apretar(tecla, flecha, simbolo, 330)
     g.tecla("Escape")
     return g.cuadros(calidad=75)
+
+
+# ---- tutorial: navegar en la Vista 3D ---------------------------------------------------------------------
+# Tres maneras de hacer lo mismo: con el mouse en la PC (se dibuja el mouse con el boton apretado), con los dedos
+# en una pantalla tactil y con el teclado del N95 (parado, con el teclado numerico a la vista). Las de la PC y las
+# tactiles muestran solo la Vista 3D.
+FLECHA = {"derecha": "→", "izquierda": "←", "arriba": "↑", "abajo": "↓"}
+MOVIDA = {"derecha": (1, 0), "izquierda": (-1, 0), "arriba": (0, -1), "abajo": (0, 1)}
+
+# la escena con muchas cosas (vista local, vistas, perspectiva): (primitiva, nombre, posicion, tamanio)
+NOMBRES = {"es": {"Caja": "Caja", "Esfera": "Esfera", "Cilindro": "Cilindro", "Cono": "Cono"},
+           "en": {"Caja": "Box", "Esfera": "Sphere", "Cilindro": "Cylinder", "Cono": "Cone"},
+           "pt": {"Caja": "Caixa", "Esfera": "Esfera", "Cilindro": "Cilindro", "Cono": "Cone"}}
+LLENA = [("cube", "Caja", (3.5, -2.5), 0.7), ("uvsphere", "Esfera", (-3, -1.5), 0.9), ("cylinder", "Cilindro", (2.5, 2.5), 0.6),
+         ("cone", "Cono", (0.2, -3.2), 0.8), ("cube", "Caja", (-2.5, 2.8), 0.5), ("uvsphere", "Esfera", (4.5, 0.8), 0.5),
+         ("cone", "Cono", (-4.5, -3.5), 0.6), ("cylinder", "Cilindro", (-1, -5.5), 0.7), ("cube", "Caja", (1.8, -5.8), 0.6),
+         ("uvsphere", "Esfera", (-5, 1), 0.6), ("cube", "Caja", (5.5, -4.5), 0.8)]
+
+
+def escena_llena(g, idioma):
+    """Once cosas alrededor del cubo, apoyadas en el piso. Devuelve el nombre del cono del medio (el que se elige)."""
+    cuenta = {}
+    elegido = None
+    for prim, base, (x, z), e in LLENA:
+        cuenta[base] = cuenta.get(base, 0) + 1
+        nombre = "%s%d" % (NOMBRES[idioma][base], cuenta[base])
+        g.linea("add %s" % prim)
+        g.linea("objname %s" % nombre)
+        g.linea("objpos %g %g %g" % (x, e, z))
+        g.linea("objscale %g %g %g" % (e, e, e))
+        if base == "Cono" and elegido is None:
+            elegido = nombre
+    return elegido
+
+
+LEJOS_LLENA = "vporbita 0 0.5 -1.5 15"     # la escena llena entera a la vista
+
+
+def vista_pc(g):
+    """La Vista 3D de la PC: el recorte para mostrar solo ese viewport y el centro de su area de dibujo."""
+    v = g.info().vp(VISTA_3D)
+    alto = v["h"] - v["barra"]
+    return (v["x"], v["y"], v["w"], v["h"]), (v["x"] + v["w"] // 2, v["y"] + v["barra"] + alto // 2)
+
+
+def con_tecla(g, tecla, cartel, antes=1300, despues=1900, teclas=()):
+    """La tecla: la vista quieta, el cartel (todavia sin cambio), la tecla, el resultado con el cartel y sin el."""
+    g.foto(dur=antes)
+    g.foto(dur=350, tecla=cartel, teclas=teclas)
+    tecla()
+    g.foto(dur=450, tecla=cartel, teclas=teclas)
+    g.foto(dur=despues)
+
+
+# -- orbitar --
+@receta("navegacion-orbitar-raton")
+def orbitar_raton(idioma):
+    """El boton del medio (apretar la rueda) mantenido y arrastrar: la vista gira alrededor de la escena. El
+    recorrido va y vuelve por el mismo camino (girar es distinto segun el orden: volviendo por donde se fue, la vista
+    termina igual que empezo y el bucle no salta)."""
+    g = Guion(idioma, raton=True)
+    rec, (cx, cy) = vista_pc(g)
+    x0, y0 = cx + 30, cy + 30
+    g.raton_mover(x0, y0)
+    g.foto(dur=700)
+    g.raton_abajo(x0, y0, "medio")
+    g.foto(dur=300)
+    n = 30
+    for k in range(1, n + 1):
+        a = 2 * math.pi * k / n
+        g.raton_mover(x0 + round(150 * math.sin(a)), y0 - round(45 * math.sin(a)))
+        g.foto(dur=60)
+    # el editor aplica el delta de cada movimiento en el siguiente: uno mas en el mismo lugar cierra el recorrido
+    g.raton_mover(x0, y0)
+    g.foto(dur=250)
+    g.raton_arriba("medio")
+    g.foto(dur=600)
+    return g.cuadros(recorte=rec, calidad=68)
+
+
+@receta("navegacion-orbitar-dedo")
+def orbitar_dedo(idioma):
+    """Un dedo arrastrado sobre la Vista 3D: orbita. El mismo ida y vuelta que con el mouse, pero desde el fondo:
+    apoyado sobre el cubo, el dedo agarraria el gizmo y lo moveria."""
+    g = Guion(idioma)
+    rec, (cx, cy) = vista_pc(g)
+    x0, y0 = cx - 150, cy + 110
+    g.dedo_abajo(x0, y0)
+    g.esperar(220)                              # (el tactil espera un instante antes de decidir el gesto)
+    g.dedo_mover(x0 + 24, y0)                   # pasa el umbral del arrastre (sin foto) y vuelve
+    g.dedo_mover(x0, y0)
+    g.foto(dur=600)
+    n = 30
+    for k in range(1, n + 1):
+        a = 2 * math.pi * k / n
+        g.dedo_mover(x0 + round(150 * math.sin(a)), y0 - round(45 * math.sin(a)))
+        g.foto(dur=60)
+    # el editor aplica el delta de cada movimiento en el siguiente: uno mas en el mismo lugar cierra el recorrido
+    g.dedo_mover(x0, y0)
+    g.foto(dur=400)
+    g.dedo_arriba()
+    return g.cuadros(recorte=rec, calidad=68)
+
+
+def flechas_n95(g, pasos, accion, modificador=None, cartel_mod=None, cuadros=3, dur=90):
+    """N95: cada flecha mantenida un rato (la accion corre unos cuadros por foto), con la tecla resaltada."""
+    for flecha, veces in pasos:
+        dx, dy = MOVIDA[flecha]
+        teclas = ((modificador,) if modificador else ()) + (flecha,)
+        cartel = ("%s + %s" % (cartel_mod, FLECHA[flecha])) if cartel_mod else FLECHA[flecha]
+        g.foto(dur=150, teclas=teclas, tecla=cartel)        # apretada, todavia sin moverse
+        for _ in range(veces):
+            if accion == "zoom":
+                g.keypad("zoom", dy, cuadros)
+            else:
+                g.keypad(accion, dx, dy, cuadros)
+            g.foto(dur=dur, teclas=teclas, tecla=cartel)
+        if modificador:
+            g.foto(dur=250, teclas=(modificador,), tecla=cartel_mod)
+        g.foto(dur=450)
+
+
+@receta("navegacion-orbitar-nokia")
+def orbitar_nokia(idioma):
+    """N95: las flechas mantenidas orbitan (derecha, izquierda, arriba, abajo: vuelve a donde empezo)."""
+    g = Guion(idioma, n95="vertical")
+    g.foto(dur=800)
+    flechas_n95(g, (("derecha", 8), ("izquierda", 8), ("arriba", 4), ("abajo", 4)), "orbitar")
+    return g.cuadros(calidad=66)
+
+
+# -- desplazar --
+@receta("navegacion-panear-raton")
+def panear_raton(idioma):
+    """Shift + el boton del medio, arrastrando: la vista se desplaza de costado (en circulo, vuelve al inicio)."""
+    g = Guion(idioma, raton=True)
+    rec, (cx, cy) = vista_pc(g)
+    x0, y0 = cx + 60, cy + 30
+    g.raton_mover(x0, y0)
+    g.foto(dur=600)
+    g.mod("Shift")
+    g.foto(dur=350)
+    g.raton_abajo(x0, y0, "medio")
+    g.foto(dur=250)
+    n, r = 26, 85
+    for k in range(1, n + 1):
+        a = 2 * math.pi * k / n
+        g.raton_mover(x0 - r + round(r * math.cos(a)), y0 + round(r * math.sin(a)))
+        g.foto(dur=60)
+    # el editor aplica el delta de cada movimiento en el siguiente: uno mas en el mismo lugar cierra el recorrido
+    g.raton_mover(x0, y0)
+    g.foto(dur=250)
+    g.raton_arriba("medio")
+    g.mod()
+    g.foto(dur=500)
+    return g.cuadros(recorte=rec, calidad=68)
+
+
+@receta("navegacion-panear-dedo")
+def panear_dedo(idioma):
+    """Dos dedos que se mueven juntos: la vista se desplaza (en circulo, vuelve al inicio)."""
+    g = Guion(idioma)
+    rec, (cx, cy) = vista_pc(g)
+    sep = 70                                    # medio espacio entre los dos dedos
+    g.dedo_abajo(cx - sep, cy, 1)
+    g.dedo_abajo(cx + sep, cy, 2)
+    g.foto(dur=600)
+    n, r = 26, 80
+    for k in range(1, n + 1):
+        a = 2 * math.pi * k / n
+        dx, dy = round(r * math.cos(a)) - r, round(r * math.sin(a))
+        g.dedo_mover(cx - sep + dx, cy + dy, 1)
+        g.dedo_mover(cx + sep + dx, cy + dy, 2)
+        g.foto(dur=60)
+    g.foto(dur=400)
+    g.dedo_arriba(2)
+    g.dedo_arriba(1)
+    return g.cuadros(recorte=rec, calidad=68)
+
+
+@receta("navegacion-panear-nokia")
+def panear_nokia(idioma):
+    """N95: la tecla * mantenida + las flechas desplazan la vista."""
+    g = Guion(idioma, n95="vertical")
+    g.foto(dur=800)
+    flechas_n95(g, (("derecha", 6), ("izquierda", 6), ("arriba", 4), ("abajo", 4)), "panear",
+                modificador="asterisco", cartel_mod="*")
+    return g.cuadros(calidad=66)
+
+
+# -- zoom --
+@receta("navegacion-zoom-raton")
+def zoom_raton(idioma):
+    """La rueda del mouse: para arriba acerca, para abajo aleja (vuelve a donde empezo)."""
+    g = Guion(idioma, raton=True)
+    rec, (cx, cy) = vista_pc(g)
+    g.raton_mover(cx + 30, cy + 20)
+    g.foto(dur=700)
+    for pasos in (1, -1):
+        for _ in range(6):
+            g.rueda(pasos, cx + 30, cy + 20)
+            g.foto(dur=220)
+        g.foto(dur=600)
+    return g.cuadros(recorte=rec, calidad=68)
+
+
+@receta("navegacion-zoom-dedo")
+def zoom_dedo(idioma):
+    """Pellizcar: separar los dos dedos acerca, juntarlos aleja."""
+    g = Guion(idioma)
+    rec, (cx, cy) = vista_pc(g)
+    cerca, lejos, n = 50, 190, 12
+    g.dedo_abajo(cx - cerca, cy + 20, 1)
+    g.dedo_abajo(cx + cerca, cy + 20, 2)
+    g.foto(dur=600)
+    for ida in (True, False):
+        for k in range(1, n + 1):
+            t = suave(k / n)
+            s = round(cerca + (lejos - cerca) * (t if ida else 1 - t))
+            g.dedo_mover(cx - s, cy + 20, 1)
+            g.dedo_mover(cx + s, cy + 20, 2)
+            g.foto(dur=70)
+        g.foto(dur=600)
+    g.dedo_arriba(2)
+    g.dedo_arriba(1)
+    return g.cuadros(recorte=rec, calidad=68)
+
+
+@receta("navegacion-zoom-nokia")
+def zoom_nokia(idioma):
+    """N95: el 0 mantenido + arriba acerca, + abajo aleja."""
+    g = Guion(idioma, n95="vertical")
+    g.foto(dur=800)
+    flechas_n95(g, (("arriba", 8), ("abajo", 8)), "zoom", modificador="num0", cartel_mod="0", cuadros=2)
+    return g.cuadros(calidad=66)
+
+
+# -- encuadrar --
+LEJOS = "vporbita 9 2 -7 42"       # la vista lejos y corrida: el cubo queda chiquito en una punta
+
+
+@receta("navegacion-encuadrar")
+def encuadrar(idioma):
+    """Num . (el punto del teclado numerico): la vista se centra en lo seleccionado (el cubo) y lo encuadra."""
+    g = Guion(idioma)
+    rec, _ = vista_pc(g)
+    g.linea(LEJOS)
+    con_tecla(g, lambda: g.tecla("Keypad_."), "Num .")
+    return g.cuadros(recorte=rec)
+
+
+@receta("navegacion-encuadrar-nokia")
+def encuadrar_nokia(idioma):
+    """N95: el 0 solo (un toque, sin flechas) encuadra lo seleccionado."""
+    g = Guion(idioma, n95="vertical")
+    g.linea(LEJOS)
+    con_tecla(g, lambda: g.keypad("encuadrar"), "0", teclas=("num0",))
+    return g.cuadros(calidad=80)
+
+
+@receta("navegacion-encuadrar-edicion")
+def encuadrar_edicion(idioma):
+    """En el Modo Edicion se encuadra lo seleccionado de la malla: unas caras de una esfera llenan la vista."""
+    g = Guion(idioma)
+    rec, _ = vista_pc(g)
+    g.linea("delete")                           # (el cubo)
+    g.linea("add uvsphere")
+    g.linea("objscale 2 2 2")
+    g.linea("mode edit")
+    # un parche de seis caras que mira a la camara (cara = anillo * 16 + segmento)
+    g.linea("caras " + " ".join(str(16 * anillo + seg) for anillo in (3, 4) for seg in (2, 3, 4)))
+    con_tecla(g, lambda: g.tecla("Keypad_."), "Num .")
+    return g.cuadros(recorte=rec)
+
+
+# -- vista local --
+@receta("navegacion-vista-local")
+def vista_local(idioma):
+    """/ : con muchas cosas en la escena, queda solo lo seleccionado (el cono del medio) y se encuadra. Otra vez
+    / y vuelve todo, como estaba."""
+    g = Guion(idioma)
+    rec, _ = vista_pc(g)
+    cono = escena_llena(g, idioma)
+    g.linea("selobj %s" % cono)
+    con_tecla(g, lambda: g.tecla("/"), "/", antes=1500, despues=1800)
+    g.foto(dur=350, tecla="/")
+    g.tecla("/")
+    g.foto(dur=450, tecla="/")
+    return g.cuadros(recorte=rec)
+
+
+# -- las vistas --
+VISTAS_PC = (("Keypad_1", None, "Num 1"), ("Keypad_3", None, "Num 3"), ("Keypad_7", None, "Num 7"),
+             ("Keypad_1", "Left_Ctrl", "Ctrl + Num 1"), ("Keypad_3", "Left_Ctrl", "Ctrl + Num 3"),
+             ("Keypad_7", "Left_Ctrl", "Ctrl + Num 7"))
+
+
+@receta("navegacion-vistas")
+def vistas(idioma):
+    """El teclado numerico: frente (1), derecha (3), arriba (7) y, con Ctrl, las opuestas."""
+    g = Guion(idioma)
+    rec, _ = vista_pc(g)
+    escena_llena(g, idioma)
+    g.linea("deselectall")
+    g.linea(LEJOS_LLENA)
+    g.foto(dur=1200)
+    for tecla, ctrl, cartel in VISTAS_PC:
+        g.foto(dur=300, tecla=cartel)
+        if ctrl:
+            g.tecla(ctrl + " down")
+        g.tecla(tecla)
+        if ctrl:
+            g.tecla(ctrl + " up")
+        g.foto(dur=1100, tecla=cartel)
+    return g.cuadros(recorte=rec)
+
+
+@receta("navegacion-vistas-nokia")
+def vistas_nokia(idioma):
+    """N95: el # mantenido + una flecha: izquierda y derecha giran de a 90 grados, arriba va a la vista de arriba
+    y abajo vuelve (y otra vez abajo, a la de abajo)."""
+    g = Guion(idioma, n95="vertical")
+    escena_llena(g, idioma)
+    g.linea("deselectall")
+    g.linea(LEJOS_LLENA)
+    g.foto(dur=1000)
+    for flecha in ("derecha", "derecha", "derecha", "derecha", "arriba", "abajo", "abajo", "arriba"):
+        cartel = "# + %s" % FLECHA[flecha]
+        g.foto(dur=250, teclas=("numeral", flecha), tecla=cartel)
+        g.keypad("vista", *MOVIDA[flecha])
+        g.foto(dur=900, teclas=("numeral",), tecla="#")
+    g.foto(dur=600)
+    return g.cuadros(calidad=66)
+
+
+# -- perspectiva y ortografica --
+PERSPECTIVA = "vporbita 0 0.8 -4.5 15 -14 30"     # un poco de arriba y de costado, mirando a lo largo de las filas
+
+
+def escena_filas(g, idioma):
+    """Dos filas de cajas iguales que se alejan (sin el cubo): en perspectiva las del fondo se ven chicas, en
+    ortografica todas del mismo tamanio."""
+    g.linea("delete")
+    n = 0
+    for x in (-2.2, 2.2):
+        for z in (3, 0, -3, -6, -9, -12):
+            n += 1
+            g.linea("add cube")
+            g.linea("objname %s%d" % (NOMBRES[idioma]["Caja"], n))
+            g.linea("objpos %g 0.8 %g" % (x, z))
+            g.linea("objscale 0.6 0.8 0.6")
+    g.linea("deselectall")
+
+
+@receta("navegacion-perspectiva")
+def perspectiva(idioma):
+    """Num 5: perspectiva <-> ortografica, sobre dos filas de cajas iguales (en ortografica lo lejano no se achica)."""
+    g = Guion(idioma)
+    rec, _ = vista_pc(g)
+    escena_filas(g, idioma)
+    g.linea(PERSPECTIVA)
+    con_tecla(g, lambda: g.tecla("Keypad_5"), "Num 5", antes=1500, despues=1800)
+    g.foto(dur=350, tecla="Num 5")
+    g.tecla("Keypad_5")
+    g.foto(dur=450, tecla="Num 5")
+    return g.cuadros(recorte=rec)
+
+
+@receta("navegacion-perspectiva-nokia")
+def perspectiva_nokia(idioma):
+    """N95: el # solo (un toque, sin flechas) cambia entre perspectiva y ortografica."""
+    g = Guion(idioma, n95="vertical")
+    escena_filas(g, idioma)
+    g.linea(PERSPECTIVA)
+    con_tecla(g, lambda: g.keypad("perspectiva"), "#", antes=1400, despues=1700, teclas=("numeral",))
+    g.foto(dur=350, tecla="#", teclas=("numeral",))
+    g.keypad("perspectiva")
+    g.foto(dur=450, tecla="#", teclas=("numeral",))
+    return g.cuadros(calidad=80)
+
+
+# -- la camara activa --
+@receta("navegacion-camara")
+def camara(idioma):
+    """Num 0: mirar por la camara activa (lo que va a salir en el juego y en los renders) y volver."""
+    g = Guion(idioma)
+    rec, _ = vista_pc(g)
+    con_tecla(g, lambda: g.tecla("Keypad_0"), "Num 0", antes=1300, despues=2200)
+    g.foto(dur=350, tecla="Num 0")
+    g.tecla("Keypad_0")
+    g.foto(dur=450, tecla="Num 0")
+    return g.cuadros(recorte=rec)
+
+
+@receta("navegacion-camara-nokia")
+def camara_nokia(idioma):
+    """N95: el 8 (fuera del Modo Edicion) mira por la camara activa; otra vez, vuelve."""
+    g = Guion(idioma, n95="vertical")
+    con_tecla(g, lambda: g.keypad("camara"), "8", antes=1200, despues=2200, teclas=("num8",))
+    g.foto(dur=350, tecla="8", teclas=("num8",))
+    g.keypad("camara")
+    g.foto(dur=450, tecla="8", teclas=("num8",))
+    return g.cuadros(calidad=80)
