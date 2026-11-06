@@ -34,6 +34,7 @@
 #ifndef PSAPI_VERSION
 #define PSAPI_VERSION 2   // (K32GetProcessMemoryInfo, en kernel32: sin linkear psapi)
 #endif
+#include "WhiskUI/text/font.h"   // UTF8_Largo
 #include <windows.h>
 #include <psapi.h>
 #elif defined(W3D_SYMBIAN)
@@ -1475,7 +1476,7 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
                 const std::string tt = Recortar(TamanoTexto(f.bytes), rw);
                 SetColorID(ColorID::grisUI, f.cargado ? 0.9f : 0.55f);
                 w3dEngine::PushMatrix();
-                w3dEngine::Translatef((GLfloat)(rx + (rw - (int)tt.size() * CharacterWidthGS) / 2), (GLfloat)(ry + lado + gapGS / 2 + alto), 0);
+                w3dEngine::Translatef((GLfloat)(rx + (rw - UTF8_Largo(tt) * CharacterWidthGS) / 2), (GLfloat)(ry + lado + gapGS / 2 + alto), 0);
                 RenderBitmapText(tt);
                 w3dEngine::PopMatrix();
             }

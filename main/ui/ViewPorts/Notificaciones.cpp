@@ -2,6 +2,7 @@
 //  NOTIFICACIONES (toasts). Extraido de LayoutInput.cpp (Fase 2 del reorg). Ver Notificaciones.h.
 //  Es una HOJA: todo el editor llama Notificar(), pero esto no llama nada del resto de LayoutInput.
 // ===================================================================================================
+#include "WhiskUI/text/font.h"   // UTF8_Largo
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
@@ -213,7 +214,7 @@ void NotificacionesRender(int screenW, int screenH) {
     for (int i = (int)gNotifs.size() - 1; i >= 0; i--) { // viejo abajo -> nuevo arriba
         Notif& n = gNotifs[i];
         const float* col = n.error ? rojo : (n.hint ? azul : accent);
-        int textW  = (int)n.msg.size() * CharacterWidthGS;
+        int textW  = UTF8_Largo(n.msg) * CharacterWidthGS;
         int maxCardW = screenW - margin*2;
         int cardW  = pad + IconSizeGS + gapGS + textW + pad + (n.error ? xBtnW : 0);
         bool wrap = false;

@@ -1,3 +1,4 @@
+#include "WhiskUI/text/font.h"   // UTF8_Largo
 #include "ViewPorts/Timeline.h"
 #include "ViewPorts/TransformUI.h"     // TbVerdeBg: el verde de un boton ACTIVO (como el proportional editing)
 #include "edit/BoxSelect.h"               // la caja de seleccion (verde = entero adentro, azul = rozar)
@@ -160,7 +161,7 @@ static void LineaFina(float ax, float ay, float bx, float by){
 }
 // texto centrado horizontalmente en cx, con su top en py (necesita textura del atlas activa)
 static void TextCentrado(float cx, int py, const std::string& s){
-    int tw = (int)s.size() * CharacterWidthGS;
+    int tw = UTF8_Largo(s) * CharacterWidthGS;
     gfx::PushMatrix();
     gfx::Translatef((float)((int)cx - tw/2), (float)py, 0);
     RenderBitmapText(s, textAlign::left, tw + GlobalScale*2);
@@ -1139,7 +1140,7 @@ void Timeline::ConstruirDopeRows(){
         int w = marginGS + d.nivel*(IconSizeGS+gapGS);
         if (!d.claveDespliegue.empty()) w += IconSizeGS + gapGS;
         if (d.icono >= 0)               w += IconSizeGS + gapGS;
-        w += (int)d.nombre.size()*CharacterWidthGS + marginGS*2;
+        w += UTF8_Largo(d.nombre)*CharacterWidthGS + marginGS*2;
         w += IconSizeGS + gapGS;   // la columna de OJOS de la derecha
         if (w > maxw) maxw = w;
     }
@@ -1581,7 +1582,7 @@ void Timeline::Render(){
     // numY-GlobalScale*2 y se dibujaba al final, encima de la barra).
     std::string curTxt; { bool ec=(g_propFloatEditando==pfCur);
         if (ec) curTxt = pfCur->field.text; else { char b[16]; snprintf(b,sizeof b,"%d",CurrentFrame); curTxt=b; } }
-    int curTw = (int)curTxt.size()*CharacterWidthGS;
+    int curTw = UTF8_Largo(curTxt)*CharacterWidthGS;
     curBtnW = curTw + GlobalScale*8; curBtnX = (int)px - curBtnW/2;
     int curBtnY = numY, curBtnH = barH2;
 
@@ -1982,7 +1983,7 @@ void Timeline::RenderCurvas(){
 bool Timeline::DopeRectFlotante(int& rx, int& ry, int& rw, int& rh) const {
     if (dopeRows.empty() || panelW > 0) return false;
     rx = 0; ry = stripY;   // DEBAJO de los numeros (como todas las filas)
-    rw = marginGS + IconSizeGS + gapGS + (int)dopeRows[0].nombre.size()*CharacterWidthGS + marginGS;
+    rw = marginGS + IconSizeGS + gapGS + UTF8_Largo(dopeRows[0].nombre)*CharacterWidthGS + marginGS;
     rh = rowH;
     return true;
 }

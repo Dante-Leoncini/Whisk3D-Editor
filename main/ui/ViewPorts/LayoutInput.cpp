@@ -1,3 +1,4 @@
+#include "WhiskUI/text/font.h"   // UTF8_Largo
 #include "io/RaicesEditor.h"   // el selector de escena/prefab de las barras (3D y outliner)
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
@@ -6053,7 +6054,7 @@ void W3dAyudaRender(int screenW, int screenH) {
     g_redraw = true;                                 // (para que se vaya solo al cumplir el tiempo)
     const std::string txt = T(b->ayuda.c_str());
     const int pad = gapGS * 2;
-    const int w = (int)txt.size() * CharacterWidthGS + 2 * pad;
+    const int w = UTF8_Largo(txt) * CharacterWidthGS + 2 * pad;
     const int h = (int)RenglonHeightGS + 2 * GlobalScale;
     int x0 = b->sx;
     int y0 = b->sy + b->height + 2 * GlobalScale;              // debajo del boton...
