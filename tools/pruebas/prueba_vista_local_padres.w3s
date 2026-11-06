@@ -3,7 +3,7 @@
 # Antes los huesos del armature padre se veian igual, encima de todo, aunque solo se hubiera elegido la malla.
 # Los huesos van de (0,0,0) a (0,2,0) en azul, encima de todo (X-RAY); el cubo hijo esta al costado.
 ventana 1280 720
-selobj Light
+selobj Luz
 delete
 selobj Cámara
 delete

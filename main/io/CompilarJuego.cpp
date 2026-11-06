@@ -119,6 +119,15 @@ static void BldPublicar(const std::string& etapa, int pct) {
     if (pct > cur) g_bldPct.store(pct);
 }
 
+// un texto con UN %s, con el formato YA TRADUCIDO (BldFmt(T("Compiling (%s)"), "emcc")): las etapas de la barra
+// y los avisos del build salen en el idioma del editor. El buffer se mide con el formato y el argumento: en
+// cirilico una traduccion ocupa el doble de bytes y las rutas no tienen cota.
+static std::string BldFmt(const char* fmt, const std::string& a) {
+    std::vector<char> b(strlen(fmt) + a.size() + 64);
+    snprintf(&b[0], b.size(), fmt, a.c_str());
+    return std::string(&b[0]);
+}
+
 // modos de progreso de BldCorrer (que hacer con cada linea de salida del proceso)
 enum {
     BLD_CREEP  = 0,  // sin % real (emcc/cpack): la barra avanza DE A POCO por linea/tiempo,
@@ -145,10 +154,11 @@ static void BldLinea(const std::string& s, FILE* log, int modo, int pctIni, int 
             }
         }
     } else if (modo == BLD_MARCAS && s.compare(0, 6, "[W3D] ") == 0) {
-        // marca del script generado: "[W3D] <pct> <texto de la etapa>" (ej "ndk-build (arm64-v8a)")
+        // marca del script generado: "[W3D] <pct> <texto de la etapa>" (ej "ndk-build (arm64-v8a)"). El texto
+        // es la CLAVE en ingles: sale traducido (lo tecnico, como "ndk-build ($ABIS)", no esta y sale tal cual)
         char* fin = NULL;
         long pct = strtol(s.c_str() + 6, &fin, 10);
-        if (fin && *fin == ' ' && pct >= 0 && pct <= 100) BldPublicar(fin + 1, (int)pct);
+        if (fin && *fin == ' ' && pct >= 0 && pct <= 100) BldPublicar(T(fin + 1), (int)pct);
     } else {
         // sin % real: cada linea (BLD_CREEP) o cada 5 (BLD_MARCAS: ndk/gradle imprimen muchas)
         // empuja la barra 1 punto hasta el tope de la franja
@@ -922,7 +932,7 @@ static bool CompilarLuasStaging(const std::string& out, std::string* err,
         w3dFileSystem::ReadFileBytes(ruta, antes);   // peso fuente (solo informativo)
         std::string detalle;
         if (!LuaCompilarArchivo(ruta, ruta, &detalle)) {
-            *err = detalle.empty() ? (rutas[i] + ": no compilo") : detalle;
+            *err = detalle.empty() ? BldFmt(T("%s: does not compile"), rutas[i]) : detalle;
             return false;
         }
         w3dFileSystem::ReadFileBytes(ruta, despues);
@@ -944,13 +954,13 @@ static bool EscribirPak(const std::string& out, const std::string& nombre, std::
     // mas las dos de los proyectos v3. Si una carpeta no existe, no agrega nada.
     for (int c = 0; CarpAsset(c); c++)
         PakListarAssets(out, CarpAsset(c), &rutas);
-    if (rutas.empty()) { *err = "no hay archivos del juego para empaquetar"; return false; }
+    if (rutas.empty()) { *err = T("there are no game files to pack"); return false; }
 
     // contenido de cada archivo (en memoria: los juegos Whisk3D son chicos)
     std::vector< std::vector<unsigned char> > datos(rutas.size());
     for (size_t i = 0; i < rutas.size(); i++) {
         if (!w3dFileSystem::ReadFileBytes(out + "/" + rutas[i], datos[i])) {
-            *err = "no pude leer " + rutas[i]; return false;
+            *err = BldFmt(T("could not read %s"), rutas[i]); return false;
         }
     }
     unsigned semilla = PakSemilla(nombre);
@@ -990,7 +1000,7 @@ static bool EscribirPak(const std::string& out, const std::string& nombre, std::
     // pak.cpp: el array + su tamano (el main generado los declara extern y llama
     // a W3dPakRegistrar antes de cargar nada)
     FILE* f = fopen((out + "/pak.cpp").c_str(), "w");
-    if (!f) { *err = "no pude escribir pak.cpp"; return false; }
+    if (!f) { *err = T("could not write pak.cpp"); return false; }
     fputs("// GENERADO por Whisk3D (Compilar juego, Assets: Empaquetados).\n", f);
     fprintf(f, "// %u archivo(s) del juego en un pak ofuscado (XOR de flujo).\n",
             (unsigned)rutas.size());
@@ -1910,7 +1920,7 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
     fputs("[ -x \"$NDK/ndk-build\" ] || { echo \"ERROR: ndk-build no encontrado en '$NDK' (exporta ANDROID_NDK)\"; exit 1; }\n", f);
     // marcas "[W3D] <pct> <etapa>": las parsea el worker del editor para la barra de
     // progreso (a mano por consola son inofensivas: solo lineas de log)
-    fputs("echo \"[W3D] 12 Copiando la plantilla Android\"\n", f);
+    fputs("echo \"[W3D] 12 Copying the Android template\"\n", f);
     // 1) copiar la plantilla del proyecto Android (sin los artefactos de build:
     //    app/distribution y distribution son el buildDir redirigido de la plantilla
     //    y traen APKs VIEJOS del whiskpaddle que confundirian la copia final)
@@ -2044,7 +2054,7 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
     fprintf(f, "\"$NDK/ndk-build\" %s APP_ABI=\"$ABIS\" NDK_PROJECT_PATH=\"$AND\" "
                "APP_BUILD_SCRIPT=\"$AND/jni/Android.mk\" NDK_APPLICATION_MK=\"$AND/jni/Application.mk\"\n",
             W3dCompilarJobsFlag().c_str());
-    fputs("echo \"[W3D] 58 Copiando libmain.so (jniLibs)\"\n", f);
+    fputs("echo \"[W3D] 58 Copying libmain.so (jniLibs)\"\n", f);
     fputs("for A in $ABIS; do\n", f);
     fputs("  JNILIBS=\"$AND/app/src/main/jniLibs/$A\"; mkdir -p \"$JNILIBS\"\n", f);
     fputs("  cp \"$AND/libs/$A\"/*.so \"$JNILIBS\"/\n", f);
@@ -2094,7 +2104,7 @@ static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string
     fputs("[ -x \"$BT/aapt\" ] && [ -f \"$JAR\" ] || { echo \"ERROR: faltan las build-tools o android.jar en $SDK\"; exit 1; }\n", f);
     // (el clang del r15c pide libncurses.so.5: preparar_android_viejo.sh deja unos enlaces en host/lib)
     fputs("export LD_LIBRARY_PATH=\"$VIEJO/host/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"\n", f);
-    fputs("echo \"[W3D] 12 Preparando el proyecto Android 2.3\"\n", f);
+    fputs("echo \"[W3D] 12 Preparing the Android 2.3 project\"\n", f);
     fputs("rm -rf \"$AND\"; mkdir -p \"$AND/jni\" \"$AND/java\" \"$AND/res/drawable\" \"$AND/assets\" \"$B\"\n", f);
     fputs("cp \"$OUT/main.cpp\" \"$AND/jni/main_generado.cpp\"\n", f);
     if (empaquetar) fputs("cp \"$OUT/pak.cpp\" \"$AND/jni/pak_generado.cpp\"\n", f);
@@ -2226,7 +2236,7 @@ static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string
     fputs("javac -nowarn -source 8 -target 8 -bootclasspath \"$JAR\" -classpath \"$JAR\" -d \"$B/clases\" "
           "\"$SDLD\"/android-project/src/org/libsdl/app/*.java $(find \"$AND/java\" -name '*.java')\n", f);
     fputs("\"$BT/d8\" --min-api 10 --lib \"$JAR\" --output \"$B/dex\" $(find \"$B/clases\" -name '*.class')\n", f);
-    fputs("echo \"[W3D] 80 APK (aapt, firma)\"\n", f);
+    fputs("echo \"[W3D] 80 APK (aapt, signing)\"\n", f);
     fputs("rm -rf \"$B/apk\" && mkdir -p \"$B/apk/lib/armeabi\"\n", f);
     fputs("\"$BT/aapt\" package -f -M \"$AND/AndroidManifest.xml\" -S \"$AND/res\" -A \"$AND/assets\" -I \"$JAR\" "
           "-F \"$B/sin_firmar.apk\"\n", f);
@@ -2241,19 +2251,21 @@ static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string
     // un telefono conectado: se instala y se abre (sin telefono, el APK queda en build/android23)
     fputs("ADB=\"$SDK/platform-tools/adb\"\n", f);
     fputs("if [ -x \"$ADB\" ] && [ \"$(\"$ADB\" devices | awk 'NR>1 && $2==\"device\"' | wc -l)\" = 1 ]; then\n", f);
-    fputs("  echo \"[W3D] 90 Instalando en el telefono\"\n", f);
+    fputs("  echo \"[W3D] 90 Installing on the phone\"\n", f);
     // (adb de esa epoca sale con 0 aunque falle: se mira lo que dice)
     // (con -r el telefono guarda el APK nuevo mientras el viejo sigue instalado: en uno de poca memoria -el Galaxy Ace,
     // ~35 MB libres- no entra. Entonces se desinstala la version anterior del MISMO juego -se pierden sus datos guardados en
     // el telefono- y se instala de nuevo)
     fputs("  INST=\"$(\"$ADB\" install -r \"$OUT/$NOMBRE-android23.apk\" 2>&1 || true)\"; echo \"$INST\"\n", f);
     fputs("  if echo \"$INST\" | grep -q 'INSUFFICIENT_STORAGE' && \"$ADB\" shell pm path \"$PKG\" | grep -q package; then\n", f);
-    fputs("    echo \"[W3D] 92 Falta lugar: se desinstala la version anterior de $PKG (sus datos en el telefono se pierden)\"\n", f);
+    // (el paquete va en su propia linea: con $PKG adentro la marca no seria una clave fija y saldria sin traducir)
+    fputs("    echo \"[W3D] 92 Not enough space: uninstalling the previous version (its data on the phone is lost)\"\n", f);
+    fputs("    echo \"    ($PKG)\"\n", f);
     fputs("    \"$ADB\" uninstall \"$PKG\" || true\n", f);
     fputs("    INST=\"$(\"$ADB\" install \"$OUT/$NOMBRE-android23.apk\" 2>&1 || true)\"; echo \"$INST\"\n  fi\n", f);
     fputs("  if echo \"$INST\" | grep -q '^Success'; then\n", f);
     fputs("    \"$ADB\" shell am start -n \"$PKG/.JuegoActivity\"\n", f);
-    fputs("  else\n    echo \"[W3D] 95 NO SE PUDO INSTALAR en el telefono (poco lugar?): el APK queda en build/android23\"\n  fi\n", f);
+    fputs("  else\n    echo \"[W3D] 95 COULD NOT INSTALL on the phone (low on space?): the APK stays in build/android23\"\n  fi\n", f);
     fputs("else\n  echo \"(sin un telefono conectado por adb: el APK queda en build/android23)\"\nfi\n", f);
     bool okSh = (ferror(f) == 0);
     if (fclose(f) != 0) okSh = false;
@@ -2271,7 +2283,7 @@ struct BldTrabajo {
     std::string cmdBuild;    // linux: cmake --build | web: emcc | android: bash script
     std::string cmdCpack;    // linux .deb: cpack (vacio = no empaquetar)
     std::string cmdCopia;    // [4/4]: limpiar build/<plat> y copiar los artefactos
-    std::string msgOk;       // "Juego compilado: ..." (lo arma el hilo principal)
+    std::string msgOk;       // "Game built: ..." (lo arma el hilo principal, ya traducido)
 };
 
 // el HILO WORKER: [3/4] compilar + [4/4] copiar resultados. Corre los procesos con
@@ -2287,41 +2299,40 @@ static void BldWorker(BldTrabajo t) {
     FILE* log = fopen((t.out + "/build.log").c_str(), "w");
     int rc;
     if (t.plataforma == 3 || t.plataforma == 6) {
-        BldPublicar(t.plataforma == 6 ? "Preparando Android 2.3" : "Preparando Android (plantilla)", 10);
+        BldPublicar(t.plataforma == 6 ? T("Preparing Android 2.3") : T("Preparing Android (template)"), 10);
         rc = BldCorrer(t.cmdBuild, log, BLD_MARCAS, 10, 90);
     } else if (t.plataforma == 2) {
-        BldPublicar("Compilando (emcc)", 10);
+        BldPublicar(BldFmt(T("Compiling (%s)"), "emcc"), 10);
         rc = BldCorrer(t.cmdBuild, log, BLD_CREEP, 10, 85);
     } else {
-        BldPublicar("Configurando (cmake)", 8);
+        BldPublicar(T("Configuring (cmake)"), 8);
         rc = BldCorrer(t.cmdCfg, log, BLD_CREEP, 8, 15);
         if (rc == 0) {
-            BldPublicar("Compilando (cmake)", 15);
+            BldPublicar(BldFmt(T("Compiling (%s)"), "cmake"), 15);
             rc = BldCorrer(t.cmdBuild, log, BLD_CMAKE, 15, 85);
         }
         if (rc == 0 && !t.cmdCpack.empty()) {
-            BldPublicar("Empaquetando .deb (cpack)", 85);
+            BldPublicar(T("Packaging .deb (cpack)"), 85);
             // como siempre: si cpack falla el binario igual queda (no es fatal)
             BldCorrer(t.cmdCpack, log, BLD_CREEP, 85, 94);
         }
     }
     if (log) fclose(log);
     if (rc != 0) {
-        { BLD_LOCK(); g_bldFinal = "Compilar: fallo la compilacion (ver platform-build/" +
-                                   t.plat + "/build.log)"; }
+        { BLD_LOCK(); g_bldFinal = BldFmt(T("Build: compilation failed (see platform-build/%s/build.log)"), t.plat); }
         g_bldOk.store(false);
         g_bldTermino.store(true);   // SIEMPRE al final: es la senal para el Tick
         return;
     }
     // [4/4] SOLO filesystem: limpiar build/<plat> y copiar los artefactos finales
-    BldPublicar("Copiando resultados", 95);
+    BldPublicar(T("Copying results"), 95);
     if (system(t.cmdCopia.c_str()) != 0) {
-        { BLD_LOCK(); g_bldFinal = "Compilar: no pude copiar el resultado a build/" + t.plat; }
+        { BLD_LOCK(); g_bldFinal = BldFmt(T("Build: could not copy the result to build/%s"), t.plat); }
         g_bldOk.store(false);
         g_bldTermino.store(true);
         return;
     }
-    BldPublicar("Listo", 100);
+    BldPublicar(T("Done"), 100);
     { BLD_LOCK(); g_bldFinal = t.msgOk; }
     g_bldOk.store(true);
     g_bldTermino.store(true);
@@ -3154,12 +3165,12 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
                       : (plataforma == 3) ? (nombre + " -> build/android/" + nombre + "-android.apk")
                       : (plataforma == 2) ? (nombre + " -> build/web/" + nombre + ".html")
                                           : (nombre + " -> build/linux/");
-    t.msgOk = "Juego compilado: " + donde;
+    t.msgOk = BldFmt(T("Game built: %s"), donde);
 
     // estado inicial de la barra + LANZAR el worker. La UI vuelve al loop enseguida:
     // el editor sigue usable y la barra (overlay abajo) muestra etapa + porcentaje.
     g_bldPct.store(5);   // 0..5 = la fase sincrona de arriba (exportar + generar)
-    { BLD_LOCK(); g_bldEtapa = std::string("Compilando (") + nomPlat + ")"; g_bldFinal.clear(); }
+    { BLD_LOCK(); g_bldEtapa = BldFmt(T("Compiling (%s)"), nomPlat); g_bldFinal.clear(); }
     g_bldOk.store(false);
     g_bldTermino.store(false);
     g_bldActivo.store(true);

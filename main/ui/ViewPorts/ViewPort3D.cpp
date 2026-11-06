@@ -189,8 +189,8 @@ Viewport3D::Viewport3D(Vector3 pos){
     // MODO JUEGO: transporte minimo (visible SOLO con la animacion "Juego" activa).
     // Sin ellos, un layout con solo el viewport 3D no tenia forma de pausar/parar.
     b = new Button(T("Stop")); b->rol = BR_JuegoStop; b->visible = false; BarButtons.push_back(b);
-    b = new Button("Play");    b->rol = BR_JuegoPlay;  b->visible = false; BarButtons.push_back(b);
-    b = new Button("UV"); b->rol = BR_UV;                                  // Mark Seam + proyecciones
+    b = new Button(T("Play")); b->rol = BR_JuegoPlay;  b->visible = false; BarButtons.push_back(b);
+    b = new Button(T("UV")); b->rol = BR_UV;                                  // Mark Seam + proyecciones
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit
     barAlpha = 0.5f; // en el 3D la barra deja ver la escena detras
     // barra de HERRAMIENTAS (abajo): MISMOS Button que la barra de arriba. El mecanismo (layout/
@@ -565,7 +565,7 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayStats->AgregarCheck(T("FPS"),      12, &OverlayFps);
     MenuOverlayStats->AgregarCheck(T("Vertices"), 17, &OverlayStatVertices);
     MenuOverlayStats->AgregarCheck(T("Faces"),    18, &OverlayStatFaces);
-    MenuOverlayStats->AgregarCheck("GL Calls", 21, &OverlayStatGL); // llamadas GL por frame (draw/bind/estado)
+    MenuOverlayStats->AgregarCheck(T("GL Calls"), 21, &OverlayStatGL); // llamadas GL por frame (draw/bind/estado)
     MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
     MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
     MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
@@ -3740,7 +3740,7 @@ void Viewport3D::RenderUI() {
             if (bl) {
                 bl->visible = true;
                 // UN SOLO boton play/pausa: dice lo que va a HACER el click
-                bl->text = PlayAnimation ? "Pausa" : "Play";
+                bl->text = PlayAnimation ? T("Pause") : T("Play");
                 // verde mientras el juego CORRE (mismo estilo que Snap ON)
                 static float playVerde[3]; const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
                 for (int i = 0; i < 3; i++) playVerde[i] = acc[i] * 0.4f;
@@ -3758,7 +3758,7 @@ void Viewport3D::RenderUI() {
               if ((bt = BarRolBtn(BarButtons, BR_JuegoStop)))  bt->visible = false;
               if ((bt = BarRolBtn(BarButtons, BR_JuegoPlay))) {
                   bt->visible = AnimEsJuego;
-                  bt->text = "Play";
+                  bt->text = T("Play");
                   bt->tinte = NULL; bt->colorTexto = NULL;
               } }
             bool esMesh = ObjActivo && ObjActivo->getType() == ObjectType::mesh;
@@ -3818,9 +3818,9 @@ void Viewport3D::RenderUI() {
                  (InteractionMode == EditMode && ActiveAnimKind == 3)); // editando una vertex anim: Insert Keyframe a mano
             Button* bOri = BarRolBtn(BarButtons, BR_Orient);  // muestra la orientacion actual
             if (bOri) bOri->visible = !pintura;
-            if (bOri) bOri->text = (transformOrientation == LocalOrient)  ? "Local" :
-                                   (transformOrientation == ViewOrient)   ? "View"  :
-                                   (transformOrientation == NormalOrient) ? "Normal" : "Global";
+            if (bOri) bOri->text = T((transformOrientation == LocalOrient)  ? "Local" :
+                                     (transformOrientation == ViewOrient)   ? "View"  :
+                                     (transformOrientation == NormalOrient) ? "Normal" : "Global");
             // SNAP: el boton se ilumina VERDE cuando esta ON (para saber que el imantado esta activo)
             Button* bSnap = BarRolBtn(BarButtons, BR_Snap);
             if (bSnap) bSnap->visible = !pintura;
@@ -3915,9 +3915,9 @@ static SaveState* W3dEstadoGuardado(Object* o){
 // el texto de la barra de estado: operacion + valores en vivo del objeto activo
 // (mismo mapeo de ejes que el panel Properties: Location Y=z, Z=y; Scale x/y/z)
 static const char* W3dOrientPalabra(){
-    if (transformOrientation == LocalOrient) return "local";
-    if (transformOrientation == ViewOrient)  return "view";
-    return "global";
+    if (transformOrientation == LocalOrient) return T("local");
+    if (transformOrientation == ViewOrient)  return T("view");
+    return T("global");
 }
 
 // arma el texto: un solo eje muestra SOLO ese eje ("X: .. along global X"); un
@@ -3928,14 +3928,14 @@ static std::string W3dLineaTransform(const char* titulo, float vx, float vy, flo
     if (a == X || a == Y || a == Z){
         const char* L = (a == X) ? "X" : (a == Y) ? "Y" : "Z";
         float v = (a == X) ? vx : (a == Y) ? vy : vz;
-        return std::string(titulo) + " " + L + ": " + W3dFmtF(v, 4) + "  along " + ori + " " + L;
+        return std::string(titulo) + " " + L + ": " + W3dFmtF(v, 4) + "  " + T("along") + " " + ori + " " + L;
     }
     if (a == PlaneX || a == PlaneY || a == PlaneZ){
         std::string s = titulo, ejes;
         if (a != PlaneX){ s += "  X: " + W3dFmtF(vx, 4); ejes += "X"; }
         if (a != PlaneY){ s += "  Y: " + W3dFmtF(vy, 4); if (!ejes.empty()) ejes += "-"; ejes += "Y"; }
         if (a != PlaneZ){ s += "  Z: " + W3dFmtF(vz, 4); if (!ejes.empty()) ejes += "-"; ejes += "Z"; }
-        return s + "  along " + ori + " " + ejes;
+        return s + "  " + T("along") + " " + ori + " " + ejes;
     }
     // libre (3 ejes)
     return std::string(titulo) + "  X: " + W3dFmtF(vx, 4) +
@@ -3946,10 +3946,10 @@ static std::string W3dLineaTransform(const char* titulo, float vx, float vy, flo
 static std::string W3dSufijoEjes(){
     int a = axisSelect;
     std::string ori = W3dOrientPalabra();
-    if (a==X||a==Y||a==Z) return std::string("  along ") + ori + " " + ((a==X)?"X":(a==Y)?"Y":"Z");
-    if (a==PlaneX) return std::string("  along ") + ori + " Y-Z";
-    if (a==PlaneY) return std::string("  along ") + ori + " X-Z";
-    if (a==PlaneZ) return std::string("  along ") + ori + " X-Y";
+    if (a==X||a==Y||a==Z) return std::string("  ") + T("along") + " " + ori + " " + ((a==X)?"X":(a==Y)?"Y":"Z");
+    if (a==PlaneX) return std::string("  ") + T("along") + " " + ori + " Y-Z";
+    if (a==PlaneY) return std::string("  ") + T("along") + " " + ori + " X-Z";
+    if (a==PlaneZ) return std::string("  ") + T("along") + " " + ori + " X-Y";
     return ""; // libre
 }
 
@@ -3970,10 +3970,10 @@ static std::string W3dTextoTransform(){
     if (edit){
         if (estado == translacion){
             Vector3 d = EditXformTransDelta(); // mundo (engine xyz) -> user X/Y/Z (swap z/y)
-            return W3dLineaTransform("Translate", d.x, d.z, d.y);
+            return W3dLineaTransform(T("Translate"), d.x, d.z, d.y);
         }
         if (estado == EditScale){
-            if (EditShrinkActivo()) return std::string("Shrink/Fatten: ") + W3dFmtF(EditXformShrinkAmt(), 4);
+            if (EditShrinkActivo()) return std::string(T("Shrink/Fatten")) + ": " + W3dFmtF(EditXformShrinkAmt(), 4);
             float f = EditXformScaleFactor();
             return W3dLineaTransform(T("Scale"), f, f, f);
         }
@@ -3983,16 +3983,16 @@ static std::string W3dTextoTransform(){
     // Rotate cae al bloque comun (usa gAnguloTransform, que BoneXformAplicar setea).
     if (InteractionMode == EditMode && BoneXformModo()){
         int bm = BoneXformModo();
-        if (bm == 1) return std::string("Translate: ") + W3dFmtF(BoneXformHeaderValor(), 4) + W3dSufijoEjes();
-        if (bm == 3) return std::string("Scale: ") + W3dFmtF(BoneXformHeaderValor(), 3);
+        if (bm == 1) return std::string(T("Translate")) + ": " + W3dFmtF(BoneXformHeaderValor(), 4) + W3dSufijoEjes();
+        if (bm == 3) return std::string(T("Scale")) + ": " + W3dFmtF(BoneXformHeaderValor(), 3);
     }
     // POSE Mode: translate/scale muestran el valor de la POSE (no el del objeto armature). Rotate cae al bloque comun
     // (usa gAnguloTransform, que el transform de pose setea). El numerico ya lo cubre el bloque de arriba.
     { extern int PoseHeaderModo(); extern float PoseHeaderValor();
       if (InteractionMode == PoseMode && PoseHeaderModo()){
         int pm = PoseHeaderModo();
-        if (pm == 1) return std::string("Translate: ") + W3dFmtF(PoseHeaderValor(), 4) + W3dSufijoEjes();
-        if (pm == 3) return std::string("Scale: ") + W3dFmtF(PoseHeaderValor(), 3);
+        if (pm == 1) return std::string(T("Translate")) + ": " + W3dFmtF(PoseHeaderValor(), 4) + W3dSufijoEjes();
+        if (pm == 3) return std::string(T("Scale")) + ": " + W3dFmtF(PoseHeaderValor(), 3);
       } }
     if (!ObjActivo) return "";
     SaveState* st = W3dEstadoGuardado(ObjActivo);
@@ -4000,7 +4000,7 @@ static std::string W3dTextoTransform(){
         Vector3 p = ObjActivo->pos;
         Vector3 p0 = st ? st->pos : p;
         // X/Y/Z del usuario = engine x / z / y (swap del modelo)
-        return W3dLineaTransform("Translate", p.x - p0.x, p.z - p0.z, p.y - p0.y);
+        return W3dLineaTransform(T("Translate"), p.x - p0.x, p.z - p0.z, p.y - p0.y);
     }
     if (estado == EditScale){
         Vector3 s = ObjActivo->scale;
@@ -4011,13 +4011,13 @@ static std::string W3dTextoTransform(){
         return W3dLineaTransform(T("Scale"), fx, fz, fy); // Y=scale.z, Z=scale.y
     }
     if (estado == rotacion){
-        std::string r = "Rotate  " + W3dFmtF(gAnguloTransform, 1) + "\xC2\xB0";
+        std::string r = std::string(T("Rotate")) + "  " + W3dFmtF(gAnguloTransform, 1) + "\xC2\xB0";
         int a = axisSelect;
         if (a == X || a == Y || a == Z){
             const char* L = (a == X) ? "X" : (a == Y) ? "Y" : "Z";
-            r += std::string("  along ") + W3dOrientPalabra() + " " + L;
+            r += std::string("  ") + T("along") + " " + W3dOrientPalabra() + " " + L;
         }
-        else if (a == OrbitalAxis) r += "  Orbital";
+        else if (a == OrbitalAxis) r += std::string("  ") + T("Orbital");
         return r;
     }
     return "";
@@ -5152,8 +5152,8 @@ bool JuegoEsperarTexturas() {
     TexturasDespertarUsadas();
     const int pend = TexturasPendientes();
     if (pend <= 0) return true;
-    char msg[96];
-    snprintf(msg, sizeof(msg), "Loading %d texture(s) before Play...", pend);
+    char msg[192];
+    snprintf(msg, sizeof(msg), T("Loading %d texture(s) before Play..."), pend);
     Notificar(msg, false);
     w3dLogMemoria("antes de las texturas del Play");
     CargarTodasTexturasPendientes();

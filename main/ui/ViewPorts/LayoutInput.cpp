@@ -1143,7 +1143,7 @@ bool EditXformStart(int est, int eje) { // expuesto (lo usa el harness para test
 // ============================================================================
 SnapCfg g_snap = { false, SNAP_CLOSEST, SNAP_VERTEX, true,true,true, true,true,true, false,false };
 bool SnapEnabled(){ return g_snap.enabled; }
-void SnapToggle(){ g_snap.enabled = !g_snap.enabled; Notificar(g_snap.enabled ? "Snap: ON" : "Snap: OFF", false); g_redraw = true; }
+void SnapToggle(){ g_snap.enabled = !g_snap.enabled; Notificar(T(g_snap.enabled ? "Snap: ON" : "Snap: OFF"), false); g_redraw = true; }
 // resultado del ultimo snap (para dibujar el recuadro verde en el viewport)
 bool  g_snapHit = false;   // hubo snap en el ultimo move
 float g_snapSx = 0, g_snapSy = 0; // su posicion en pantalla (viewport-relativa)
@@ -1379,7 +1379,7 @@ void LayoutProyectarUV(int tipo) {
     ((Mesh*)g_editMesh)->ProyectarUVCaras(tipo);
     g_redraw = true;
     const char* n = (tipo == 0) ? "cube" : (tipo == 1) ? "cylinder" : "sphere";
-    Notificar(std::string("UV: ") + n + " projection", false);
+    Notificar(std::string("UV: ") + T(n) + " " + T("projection"), false);
 }
 // Project from View (+Bounds): proyecta los verts de las caras seleccionadas a coords de
 // PANTALLA -> UV (con la camara actual). bounds = re-normaliza la seleccion a [0,1].
@@ -1427,7 +1427,7 @@ void LayoutProyectarUVDesdeVista(bool bounds) {
     }
     m->EscribirUVProyeccion(uvL);
     g_redraw = true;
-    Notificar(bounds ? "UV: projected from view (bounds)" : "UV: projected from view", false);
+    Notificar(T(bounds ? "UV: projected from view (bounds)" : "UV: projected from view"), false);
 }
 // las operaciones del menu UV que DESPLIEGAN (edit/UVUnwrap): 0..2 unwrap (angular/conforme/estiramiento),
 // 3 smart project, 4 lightmap, 5 follow active quads, 6 reset. Avisan el resultado (islas) o el error.
@@ -1446,7 +1446,7 @@ static void LayoutUVOperacion(int op) {
         case 4: ok = W3dLightmapPack(m, 0.02f, msg); if (ok) msg = T("Lightmap Pack"); break;
         case 5:
             ok = W3dFollowActiveQuads(m, msg, &n);
-            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Follow Active Quads")) + ": " + num + " quads"; }
+            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Follow Active Quads")) + ": " + num + " " + T("quads"); }
             break;
         case 6: ok = W3dUVReset(m, msg); if (ok) msg = std::string(T("Reset")) + " UV"; break;
         default: return;
@@ -1477,7 +1477,7 @@ static PopupMenu* gMenuSnapTool = NULL; // idem: LayoutCambiarMenuBarra lo neces
 void LayoutMenuUV(int mx, int my) {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (!gMenuUVops) {
-        gMenuUVops = new PopupMenu(); gMenuUVops->titulo = "UV"; gMenuUVops->action = LayoutAccionObject;
+        gMenuUVops = new PopupMenu(); gMenuUVops->titulo = T("UV"); gMenuUVops->action = LayoutAccionObject;
         gMenuUVops->Agregar(T("Unwrap Angle Based"), 350);
         gMenuUVops->Agregar(T("Unwrap Conformal"), 365);
         gMenuUVops->Agregar(T("Unwrap Minimum Stretch"), 366);
@@ -2354,7 +2354,7 @@ static void LayoutAbrirMenuUVGuardar(UVEditor* uv, int x, int y) {
     Texture* t = UVGuardarTextura();
     if (!gMenuUVGuardar) { gMenuUVGuardar = new PopupMenu(); gMenuUVGuardar->action = LayoutAccionUVGuardar; }
     gMenuUVGuardar->Limpiar();
-    gMenuUVGuardar->titulo = t ? TexEditEtiqueta(t) : std::string("UV");
+    gMenuUVGuardar->titulo = t ? TexEditEtiqueta(t) : std::string(T("UV"));
     // la TEXTURA mostrada (mismo menu que el Archivo del IDE): Guardar solo las que se editaron (en memoria);
     // Guardar como... y dentro / fuera del .w3d, cualquiera
     if (t) {
@@ -2387,7 +2387,7 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
         bool dup = false; for (size_t k = 0; k < vistas.size(); k++) if (vistas[k] == t) { dup = true; break; }
         if (dup) continue;
         vistas.push_back(t);
-        std::string lbl; char buf[24]; sprintf(buf, "Texture %d", (int)vistas.size());
+        std::string lbl; char buf[64]; snprintf(buf, sizeof buf, T("Texture %d"), (int)vistas.size());
         if (!t->path.empty()){ size_t sl = t->path.find_last_of("/\\"); lbl = (sl==std::string::npos) ? t->path : t->path.substr(sl+1); }
         else lbl = buf;
         if (TexEditSinGuardar(t)) lbl += "*";   // en memoria / con cambios sin guardar
@@ -2549,8 +2549,8 @@ static void Add2DVideoElegido(const std::string& ruta) {
 
 static void LayoutAccion2DAdd(int id) {
     // imagen y video piden PRIMERO el archivo (con vista previa); cancelar no crea nada
-    if (id == 1) { AbrirFileBrowser("Cargar imagen", T("Open"), ".png .jpg .jpeg .webp .bmp .tga .gif", Add2DImagenElegida); return; }
-    if (id == 8) { AbrirFileBrowser("Cargar video", T("Open"), ".mp4 .webm .gif .mov .avi", Add2DVideoElegido); return; }
+    if (id == 1) { AbrirFileBrowser(T("Load image"), T("Open"), ".png .jpg .jpeg .webp .bmp .tga .gif", Add2DImagenElegida); return; }
+    if (id == 8) { AbrirFileBrowser(T("Load video"), T("Open"), ".mp4 .webm .gif .mov .avi", Add2DVideoElegido); return; }
     UI* raiz = UIRaizParaAgregar();
     // posicion CERO: con el ancla en el centro (default) cero = centrado en la ventana
     Object* nuevo = NULL;
@@ -2760,7 +2760,7 @@ static void IDECargarLuaElegido(const std::string& elegido) {
     if (ide->sucio && ruta != ide->archivo) {   // con cambios sin guardar avisa antes de descartarlos
         gIDECambiarA = ruta;
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("Descartar los cambios de " + IDENombreScript(ide->archivo) + "?", IDEConfirmarCambio);
+        confirmarPopup->Abrir(std::string(T("Discard the unsaved changes of")) + " " + IDENombreScript(ide->archivo) + "?", IDEConfirmarCambio);
         return;
     }
     ide->AbrirArchivo(ruta);
@@ -2777,7 +2777,7 @@ static void LayoutAccionIDEScript(int id) {
         // cambiar con cambios sin guardar AVISA: popup Si/No antes de descartar
         gIDECambiarA = ruta;
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("Descartar los cambios de " + IDENombreScript(ide->archivo) + "?",
+        confirmarPopup->Abrir(std::string(T("Discard the unsaved changes of")) + " " + IDENombreScript(ide->archivo) + "?",
                               IDEConfirmarCambio);
         return;
     }
@@ -5748,7 +5748,7 @@ bool LayoutUVNavFrame(int dx, int dy, bool zoomMode) {
 bool LayoutLockOrbitToggle(){
     if (!Viewport3DActive) return false;
     Viewport3DActive->lockOrbit = !Viewport3DActive->lockOrbit;
-    Notificar(Viewport3DActive->lockOrbit ? "Orbit locked" : "Orbit unlocked", false);
+    Notificar(T(Viewport3DActive->lockOrbit ? "Orbit locked" : "Orbit unlocked"), false);
     g_redraw = true;
     return true;
 }

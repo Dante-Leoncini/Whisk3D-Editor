@@ -127,7 +127,7 @@ static std::string RuFilaTexto(Object* o, int i) {
     }
     if (p.tipo == PasoVisible) return t + " -> " + p.n[0].ref + (p.ref2.empty() ? std::string() : " (" + p.ref2 + ")");
     if (p.tipo == PasoLua) return t + (p.ref2.empty() ? std::string() : " (" + p.ref2 + ")");
-    if (p.tipo == PasoSaltarSi || p.tipo == PasoSaltarOculto || p.tipo == PasoSaltarSiNinguna || p.tipo == PasoSaltarFuera || p.tipo == PasoSaltarRiel || p.tipo == PasoSaltarNoListado) { snprintf(b, sizeof b, " skip %d", p.entero); t += b; }
+    if (p.tipo == PasoSaltarSi || p.tipo == PasoSaltarOculto || p.tipo == PasoSaltarSiNinguna || p.tipo == PasoSaltarFuera || p.tipo == PasoSaltarRiel || p.tipo == PasoSaltarNoListado) { snprintf(b, sizeof b, T("skip %d"), p.entero); t += " "; t += b; }
     const int nn = W3dPasoNumeros(p);
     if (nn > 0 && !ColorFijo(p)) {
         t += " (";

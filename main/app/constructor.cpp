@@ -27,6 +27,7 @@ void W3dCrearEscenaPorDefecto() {
 
     new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(-35.0f, -45.0f, 0.0f));
     Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
+    L->SetNameObj(T("Light"));   // el Core la llama "Light"; el nombre lo pone el editor en su idioma (como Agregar > Luz)
     L->SetDiffuse(1, 1, 1); // luz BLANCA por defecto (antes era roja)
 
     NewMesh(MeshType::cube, CollectionActive);

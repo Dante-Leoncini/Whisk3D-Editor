@@ -81,10 +81,11 @@ int BuscarVertexAnimation() { return 0; }
 #else
 
 #include "ViewPorts/PopUp/FileBrowser.h" // el explorador COMPARTIDO (reemplaza tinyfd)
+#include "W3dLang.h"                       // T(): el titulo del explorador en el idioma del editor
 
 int abrir() {
     // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX + glTF/GLB)
-    AbrirFileBrowser("Importar modelo", "Import 3D model", ".obj .fbx .gltf .glb", ImportModeloCallback);
+    AbrirFileBrowser(T("Import 3D model"), T("Import 3D model"), ".obj .fbx .gltf .glb", ImportModeloCallback);
     return 0;
 }
 

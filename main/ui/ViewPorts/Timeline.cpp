@@ -824,7 +824,7 @@ static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Time
         for (int c=0;c<3;c++){
             std::vector<int> ks; DopeKeysDeCurva(props, propId[g], compId[c], ks); // los keyframes de ESTE canal
             if (ks.empty()) continue;                                              // canal sin animacion: no se lista
-            Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=noms[g][c]; r.icono=-1; r.keys=ks;
+            Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=T(noms[g][c]); r.icono=-1; r.keys=ks;
             r.ownerKey = ownerKey; r.propId = propId[g]; r.compId = compId[c];
             char cb[24]; snprintf(cb,sizeof cb,"|p%d|c%d", propId[g], compId[c]);
             r.claveFila = ownerKey + cb;
@@ -833,11 +833,11 @@ static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Time
     }
     // canales de UNA sola componente (curvas 0/1): Visible y Renderizar
     const int propUno[2] = { AnimVisible, AnimRender };
-    const char* nomUno[2] = { "Visible", "Renderizar" };
+    const char* nomUno[2] = { "Visible", "Renderable" };
     for (int u=0; u<2; u++){
         std::vector<int> ks; DopeKeysDeCurva(props, propUno[u], AnimX, ks);
         if (ks.empty()) continue;
-        Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=nomUno[u]; r.icono=-1; r.keys=ks;
+        Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=T(nomUno[u]); r.icono=-1; r.keys=ks;
         r.ownerKey = ownerKey; r.propId = propUno[u]; r.compId = AnimX;
         char cb[24]; snprintf(cb,sizeof cb,"|p%d|c0", propUno[u]);
         r.claveFila = ownerKey + cb;
@@ -864,7 +864,7 @@ static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Time
         const int campo = comps[i] % AnimPasoCampos;
         W3dPaso* paso = (obj && obj->getType() == ObjectType::rutina) ? ((Rutina*)obj)->PasoPorId((unsigned)(comps[i] / AnimPasoCampos)) : NULL;
         std::string nom = paso ? std::string(T(W3dPasoEtiqueta(paso->tipo))) : std::string("?");
-        nom += std::string(" \xC2\xB7 ") + (campo == AnimPasoOn ? std::string("on") : paso ? std::string(T(W3dPasoNumeroNombre(*paso, campo))) : std::string("?"));
+        nom += std::string(" \xC2\xB7 ") + (campo == AnimPasoOn ? std::string(T("on")) : paso ? std::string(T(W3dPasoNumeroNombre(*paso, campo))) : std::string("?"));
         Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=nom; r.icono=-1; r.keys=ks;
         r.ownerKey = ownerKey; r.propId = AnimPaso; r.compId = comps[i];
         char cb[32]; snprintf(cb,sizeof cb,"|p%d|c%d", AnimPaso, comps[i]);
@@ -883,7 +883,7 @@ static void DopeCanales2D(const std::vector<AnimProperty>& props, std::vector<Ti
     for (int c = 0; c < 5; c++){
         std::vector<int> ks; DopeKeysDeCurva(props, propId[c], compId[c], ks);
         if (ks.empty()) continue;                       // canal sin animacion: no se lista
-        Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=noms[c]; r.icono=-1; r.keys=ks;
+        Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=T(noms[c]); r.icono=-1; r.keys=ks;
         r.ownerKey = ownerKey; r.propId = propId[c]; r.compId = compId[c];
         char cb[24]; snprintf(cb,sizeof cb,"|p%d|c%d", propId[c], compId[c]);
         r.claveFila = ownerKey + cb;
@@ -1023,13 +1023,13 @@ void Timeline::ConstruirDopeRows(){
                     // "objvtx:"/"objuv:" a los VertexFrame de SU capa (ver
                     // SetInterpolacionSel/DopeBorrarSeleccion/move).
                     if (!vtx.empty()){
-                        DopeRow v; v.tipo=2; v.nivel=1; v.nombre="Vertices"; v.icono=(int)IconType::mesh;
+                        DopeRow v; v.tipo=2; v.nivel=1; v.nombre=T("Vertices"); v.icono=(int)IconType::mesh;
                         v.claveDespliegue = "objvtx:" + DopeIdDueno(o); v.claveFila = v.claveDespliegue;
                         v.ownerKey = v.claveDespliegue; v.propId=AnimVertex; v.compId=0; v.keys = vtx;
                         filas.push_back(v);
                     }
                     if (!vuv.empty()){
-                        DopeRow v; v.tipo=2; v.nivel=1; v.nombre="UV"; v.icono=(int)IconType::textura;
+                        DopeRow v; v.tipo=2; v.nivel=1; v.nombre=T("UV"); v.icono=(int)IconType::textura;
                         v.claveDespliegue = "objuv:" + DopeIdDueno(o); v.claveFila = v.claveDespliegue;
                         v.ownerKey = v.claveDespliegue; v.propId=AnimVertex; v.compId=1; v.keys = vuv;
                         filas.push_back(v);
@@ -1062,7 +1062,7 @@ void Timeline::ConstruirDopeRows(){
             r.ownerKey = r.claveDespliegue; r.propId=-1; r.compId=-1; r.keys = u;
             filas.push_back(r);
             if (!DopeColapsado(r.claveDespliegue)){
-                DopeRow g; g.tipo=2; g.nivel=1; g.nombre=(ao.obj->getType()==ObjectType::sonido) ? std::string(T("Sound")) : std::string("Object Transforms"); g.icono=-1; // SIN icono -> el texto va mas a la izquierda
+                DopeRow g; g.tipo=2; g.nivel=1; g.nombre=(ao.obj->getType()==ObjectType::sonido) ? std::string(T("Sound")) : std::string(T("Object Transforms")); g.icono=-1; // SIN icono -> el texto va mas a la izquierda
                 g.claveDespliegue = prefEsc + DopeIdDueno(ao.obj) + "/xf"; g.claveFila = g.claveDespliegue;
                 g.ownerKey = r.ownerKey; g.propId=-1; g.compId=-1; g.keys = u;
                 filas.push_back(g);
@@ -1111,7 +1111,7 @@ void Timeline::ConstruirDopeRows(){
 
     // SUMMARY (arriba de todo): la UNION de los keyframes de TODO lo listado (= solo lo seleccionado).
     // Es DESPLEGABLE: plegado oculta TODAS las filas de abajo (queda solo el Summary).
-    DopeRow s; s.tipo=0; s.nivel=0; s.nombre="Summary"; s.icono=-1;
+    DopeRow s; s.tipo=0; s.nivel=0; s.nombre=T("Summary"); s.icono=-1;
     s.claveDespliegue = "summary"; s.claveFila = "summary"; s.ownerKey = ""; s.propId = -1;
     for (size_t i=0;i<filas.size();i++) if (filas[i].tipo==1) DopeUnir(s.keys, filas[i].keys);
     dopeRows.push_back(s);
@@ -1445,7 +1445,7 @@ void Timeline::SyncFields(){
     }
     else if (ActiveAnimKind == 5){   // FLIPBOOK activo: su nombre
         extern Flipbook* g_flipActivo;
-        btnAnim->text = g_flipActivo ? g_flipActivo->nombre : std::string("Flipbook");
+        btnAnim->text = g_flipActivo ? g_flipActivo->nombre : std::string(T("Flipbook"));
         btnAnim->icon = (int)IconType::textura;
     }
     else if (c){ btnAnim->text = c->name; btnAnim->icon = (int)IconType::armature; }
@@ -1457,7 +1457,7 @@ void Timeline::SyncFields(){
     }
     bool hayFilas = !dopeRows.empty();
     btnModo->visible   = false;             // Dope Sheet / Curves: en el menu View (el monitor)
-    btnModo->text      = (modo == TL_MODO_CURVAS) ? "Dope Sheet" : "Curves";  // dice a DONDE va
+    btnModo->text      = T((modo == TL_MODO_CURVAS) ? "Dope Sheet" : "Curves");  // dice a DONDE va
     btnSelect->visible = hayFilas;          // menu Select: solo cuando el dope sheet tiene filas
     btnView->visible   = hayFilas;          // menu View: idem (sin keyframes no hay nada que encuadrar)
     // el menu Key esta SIEMPRE: es un menu, no un boton de accion. Sus opciones actuan sobre lo que
@@ -3588,20 +3588,23 @@ void DopeXformAceptar(){ if (g_tlActivo && g_dopeMov) g_tlActivo->DopeMoveConfir
 // readout del transform de keyframes (lo dibuja Render arriba del strip)
 std::string Timeline::DopeTextoTransform() const {
     if (!g_dopeMov) return "";
-    const char* op = (g_dopeMovModo==DOPE_ESC) ? "Scale" : (g_dopeMovModo==DOPE_ROT) ? "Rotate" : "Move";
-    const char* uni = (g_dopeMovModo==DOPE_ESC) ? "x" : (g_dopeMovModo==DOPE_ROT) ? " deg" : " frames";
-    const char* eje = (g_dopeMovEje==DOPE_EJE_X) ? "  [X: time]" : (g_dopeMovEje==DOPE_EJE_Y) ? "  [Y: value]" : "";
-    char b[128];
+    const char* op = T((g_dopeMovModo==DOPE_ESC) ? "Scale" : (g_dopeMovModo==DOPE_ROT) ? "Rotate" : "Move");
+    const std::string uniS = (g_dopeMovModo==DOPE_ESC) ? std::string("x") : std::string(" ") + T((g_dopeMovModo==DOPE_ROT) ? "deg" : "frames");
+    const std::string ejeS = (g_dopeMovEje==DOPE_EJE_X) ? std::string("  ") + T("[X: time]") : (g_dopeMovEje==DOPE_EJE_Y) ? std::string("  ") + T("[Y: value]") : std::string();
+    const char* uni = uniS.c_str();
+    const char* eje = ejeS.c_str();
+    const char* piv = T((g_dopePivot==DOPE_PIV_CURFRAME) ? "current frame" : "center");
+    char b[256];
     if (g_dopeNumOn){
         float v; bool ok = W3dEvalExpr(g_dopeNumBuf, v);
         std::string expr = (g_dopeNumNeg?"-[":"[") + g_dopeNumBuf + "]";
         if (ok) snprintf(b, sizeof b, "%s: %s = %.2f%s%s", op, expr.c_str(), g_dopeNumNeg?-v:v, uni, eje);
         else    snprintf(b, sizeof b, "%s: %s = ?%s", op, expr.c_str(), eje);
     }
-    else if (g_dopeMovModo==DOPE_ESC) snprintf(b, sizeof b, "Scale: %.2fx  (pivot %s)%s", g_dopeMovVal, (g_dopePivot==DOPE_PIV_CURFRAME)?"current frame":"center", eje);
-    else if (g_dopeMovModo==DOPE_ROT) snprintf(b, sizeof b, "Rotate: %.1f deg  (pivot %s)", g_dopeMovVal, (g_dopePivot==DOPE_PIV_CURFRAME)?"current frame":"center");
-    else if (modo==TL_MODO_CURVAS)    snprintf(b, sizeof b, "Move: %d frames, %.3f value%s", (int)floorf(g_dopeMovVal+0.5f), g_dopeMovValV, eje);
-    else                              snprintf(b, sizeof b, "Move: %d frames", (int)floorf(g_dopeMovVal+0.5f));
+    else if (g_dopeMovModo==DOPE_ESC) snprintf(b, sizeof b, T("Scale: %.2fx  (pivot %s)%s"), g_dopeMovVal, piv, eje);
+    else if (g_dopeMovModo==DOPE_ROT) snprintf(b, sizeof b, T("Rotate: %.1f deg  (pivot %s)"), g_dopeMovVal, piv);
+    else if (modo==TL_MODO_CURVAS)    snprintf(b, sizeof b, T("Move: %d frames, %.3f value%s"), (int)floorf(g_dopeMovVal+0.5f), g_dopeMovValV, eje);
+    else                              snprintf(b, sizeof b, T("Move: %d frames"), (int)floorf(g_dopeMovVal+0.5f));
     return std::string(b);
 }
 

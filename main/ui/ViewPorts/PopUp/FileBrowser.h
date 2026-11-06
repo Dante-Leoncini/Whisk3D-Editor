@@ -115,8 +115,8 @@ void AbrirFileBrowser(const std::string& title, const std::string& accionLabel,
                       const std::string& filtro, void (*accept)(const std::string&),
                       bool guardar = false); // guardar=true: elegir carpeta destino
 
-// texto EXACTO del boton verde cuando no hay archivo seleccionado en modo guardar
-// (lo comparte el test del harness para no duplicar el literal)
+// texto del boton verde cuando no hay archivo seleccionado en modo guardar, en INGLES: el boton muestra
+// T(kUsarCarpetaActual) (lo comparte el test del harness para no duplicar el literal)
 extern const char* const kUsarCarpetaActual;
 
 // ---------------------------------------------------------------------------

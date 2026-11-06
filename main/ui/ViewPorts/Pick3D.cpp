@@ -590,7 +590,7 @@ void LayoutLoopSelectActivo(int tipo){
         UndoCapturarSeleccionEdit(m); // Ctrl+Z: el loop select (+ refinar direccion con flechas) = 1 sola accion
         gLoopSelFace = act; gLoopSelDir = 0; gLoopSelOrient = true;
         e->SeleccionarLoopFace(e->faceEdges[act][0], true);
-        NotificarHint("Loop Select: arrows = direction, Enter to confirm");
+        NotificarHint(T("Loop Select: arrows = direction, Enter to confirm"));
     } else {                                          // EDGE LOOP / RING desde el borde activo
         int act = e->activeIdx;
         if (act<0) for (size_t k=0;k<e->edgeSel.size();k++) if (e->edgeSel[k]){ act=(int)k; break; }
@@ -646,7 +646,7 @@ static const char* PathElemNombre(){
 void LayoutPickPathIniciar(bool fill){
     if (InteractionMode != EditMode || !g_editMesh) return;
     gPathGuided = true; gPathFill = fill; gPathStep = 0;
-    NotificarHint(std::string("Pick Shortest Path: click the first ") + PathElemNombre());
+    NotificarHint(std::string(T("Pick Shortest Path: click the first")) + " " + T(PathElemNombre()));
     g_redraw = true;
 }
 void LayoutPickPathCancelar(){
@@ -665,12 +665,12 @@ static bool PickPathClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH)
         else if (EditSelectMode==SelEdge) m->edit->TogglearEdge(k, true);
         else                              m->edit->TogglearVert(k, true);
         gPathStep = 1;
-        NotificarHint(std::string("Now click the second ") + PathElemNombre());
+        NotificarHint(std::string(T("Now click the second")) + " " + T(PathElemNombre()));
     } else {
         m->edit->SeleccionarShortestPath(k, gPathFill);
         gPathGuided = false;
         NotificarHintClear();
-        Notificar(gPathFill ? "Shortest path: region filled" : "Shortest path selected", false);
+        Notificar(T(gPathFill ? "Shortest path: region filled" : "Shortest path selected"), false);
     }
     g_redraw = true;
     return true;
@@ -931,13 +931,13 @@ static const char* GuiadoElemNombre(){ return (EditSelectMode==SelFace)?"face":(
 void LayoutSelectLinkedGuiado(){
     if (InteractionMode != EditMode || !g_editMesh) return;
     gGuiadoOp = 1;
-    NotificarHint(std::string("Select Linked: click the ") + GuiadoElemNombre() + " you want to select (Esc to cancel)");
+    NotificarHint(std::string(T("Select Linked: click the")) + " " + T(GuiadoElemNombre()) + " " + T("you want to select (Esc to cancel)"));
     g_redraw = true;
 }
 void LayoutLoopSelectGuiado(){ // fallback de Loop Select cuando no hay elemento activo (pide click)
     if (InteractionMode != EditMode || !g_editMesh) return;
     gGuiadoOp = 2;
-    NotificarHint(std::string("Loop Select: click an ") + ((EditSelectMode==SelFace)?"edge of a face":"edge") + " (Esc to cancel)");
+    NotificarHint(std::string(T("Loop Select: click an")) + " " + T((EditSelectMode==SelFace)?"edge of a face":"edge") + " " + T("(Esc to cancel)"));
     g_redraw = true;
 }
 // click durante el modo guiado: true si lo consumio (ScenePick3D NO sigue con el pick normal).
@@ -1095,9 +1095,9 @@ static void LoopCutActualizarPreview(int mx, int my){
 // cartel-tutorial del loop cut, segun la fase (orientacion / cortes / slide). Se cierra al confirmar/cancelar.
 static void LoopCutHint(){
     if (!gLoopCutOn){ NotificarHintClear(); return; }
-    if (gLoopCutOrientando) NotificarHint("Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)");
-    else if (gLoopCutSlide) NotificarHint("Loop Cut: move = slide, Enter to confirm, Esc = center");
-    else                    NotificarHint("Loop Cut: scroll = number of cuts, Enter to confirm");
+    if (gLoopCutOrientando) NotificarHint(T("Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)"));
+    else if (gLoopCutSlide) NotificarHint(T("Loop Cut: move = slide, Enter to confirm, Esc = center"));
+    else                    NotificarHint(T("Loop Cut: scroll = number of cuts, Enter to confirm"));
 }
 
 void LoopCutIniciar(int mx, int my){
@@ -1585,7 +1585,7 @@ void InsetCentroPantalla(float& x, float& y, float& pxPorU) { x = gInCx; y = gIn
 
 static void InsetHint() {
     if (!gInsetOn) { NotificarHintClear(); return; }
-    NotificarHint("Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm");
+    NotificarHint(T("Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm"));
 }
 
 // re-inseta desde el snapshot con las opciones de ahora (el modal y el panel redo)
@@ -1710,7 +1710,7 @@ void BevelCentroPantalla(float& x, float& y, float& pxPorU) { x = gBvCx; y = gBv
 
 static void BevelHint() {
     if (!gBevelOn) { NotificarHintClear(); return; }
-    NotificarHint("Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm");
+    NotificarHint(T("Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm"));
 }
 static void BevelAplicar() {
     Mesh* m = (Mesh*)g_editMesh;

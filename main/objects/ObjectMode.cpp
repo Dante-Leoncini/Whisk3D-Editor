@@ -1624,7 +1624,7 @@ void JoinObjetos(){
     DeseleccionarTodo(); // seleccion final: solo el activo (resultado del join)
     active->Seleccionar();
     ObjActivo = active;
-    Notificar(std::string("Joined into ") + active->name, false);
+    Notificar(std::string(T("Joined into")) + " " + active->name, false);
 }
 
 // APPLY (Alt+A, menu Object > Apply): hornea el transform del objeto en la MALLA y resetea ese componente, dejando
@@ -1694,7 +1694,7 @@ void AplicarTransform(int what){
     UndoApplyConfirmar();
     UndoGrupoFinSecuencial();   // [hacer unica, hornear]: Ctrl+Z al reves, Ctrl+Y al derecho
     const char* nom = (what==0)?"Location":(what==1)?"Rotation":(what==2)?"Scale":"All Transforms";
-    Notificar(std::string("Apply ") + nom + ": baked", false);
+    Notificar(std::string(T("Apply")) + " " + T(nom) + T(": baked"), false);
 }
 
 // Set Active Object as Camera (Ctrl+Numpad 0 / menu View > Cameras): hace que el objeto ACTIVO sea la CAMARA
@@ -1805,8 +1805,8 @@ static bool CruceUIValido(Object* obj, Object* nuevoPadre) {
     if (!obj || !nuevoPadre) return false;
     if (!UI2D_EsElemento2D(obj)) return true;   // (1) el 3D bajo un 2D si se permite
     if (nuevoPadre->getType() == ObjectType::ui || UI2D_EsElemento2D(nuevoPadre)) return true;
-    W3dAvisof(true, "'%s' es un elemento 2D: solo puede colgar de su escena UI o de otro "
-                    "elemento 2D (no se movio).", W3dNombreCorto(obj->name).c_str());
+    W3dAvisof(true, T("'%s' is a 2D element: it can only hang from its UI scene or from another "
+                      "2D element (it was not moved)."), W3dNombreCorto(obj->name).c_str());
     w3dLogfW("[ui2d] reparent bloqueado: '%s' (elemento 2D) -> '%s' (fuera de una escena UI)",
              obj->name.c_str(), nuevoPadre->name.c_str());
     return false;
@@ -1864,7 +1864,7 @@ static void W3dAdjuntarA(Object* obj, Object* nuevoPadre, Object* refHermano, bo
                  viejo.c_str(), sub[i]->name.c_str());
     }
     if (n > 0)
-        W3dAvisof(true, "%d nombre(s) renumerados al cambiar de escena (%s%s). Revisa tus scripts lua.",
+        W3dAvisof(true, T("%d name(s) renumbered when changing scene (%s%s). Check your Lua scripts."),
                   n, primeros.c_str(), n > 3 ? ", ..." : "");
 }
 
@@ -2946,9 +2946,9 @@ std::string W3dRenombrarObjeto(Object* o, const std::string& pedido, bool avisar
         const std::string norm = W3dNombreNormalizar(pedido, "Objeto");
         if (nuevo != norm) W3dAvisoYaExiste(norm, nuevo);
         if (nrefs > 0 || ntgt > 0)
-            W3dAvisof(false, "%d referencia(s) de script y %d target(s) actualizados", nrefs, ntgt);
+            W3dAvisof(false, T("%d script reference(s) and %d target(s) updated"), nrefs, ntgt);
         if (o->getType() == ObjectType::ui)
-            W3dAvisof(true, "escena '%s' -> '%s': revisa los cambiarEscena(\"%s\") de tus .lua",
+            W3dAvisof(true, T("scene '%s' -> '%s': check the cambiarEscena(\"%s\") calls in your .lua files"),
                       W3dNombreCorto(viejo).c_str(), W3dNombreCorto(nuevo).c_str(),
                       W3dNombreCorto(viejo).c_str());
     }
@@ -3264,8 +3264,8 @@ int W3dNombresRepararEscena(bool avisar) {
     if (tocoColores) PaletasPropagarColores();
 
     if (n > 0 && avisar)        // ROJO: los nombres que se ven en el outliner cambiaron
-        W3dAvisof(true, "%d nombre(s) repetidos renumerados (%s%s). El original NO cambio: lo que "
-                        "apuntaba por nombre sigue apuntando ahi.",
+        W3dAvisof(true, T("%d repeated name(s) renumbered (%s%s). The original did NOT change: whatever "
+                          "pointed to it by name still points there."),
                   n, primeros.c_str(), n > 3 ? ", ..." : "");
     return n;
 }

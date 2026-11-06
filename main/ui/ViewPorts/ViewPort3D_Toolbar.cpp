@@ -227,9 +227,9 @@ void Viewport3D::ToolbarSincronizar(){
             btn->tinte = TbRojoBg(); btn->colorTexto = TbRojo();
         } else if (rol == TBR_Orient){
             btn->visible = transformando;
-            btn->text = (transformOrientation == LocalOrient)  ? "Local"  :
-                        (transformOrientation == ViewOrient)   ? "View"   :
-                        (transformOrientation == NormalOrient) ? "Normal" : "Global";
+            btn->text = T((transformOrientation == LocalOrient)  ? "Local"  :
+                          (transformOrientation == ViewOrient)   ? "View"   :
+                          (transformOrientation == NormalOrient) ? "Normal" : "Global");
         } else if (rol >= TBR_EjeX && rol <= TBR_EjeZ){
             int e = rol - TBR_EjeX;
             // en orientacion VIEW no hay eje Y (es la profundidad de la vista): solo X y Z

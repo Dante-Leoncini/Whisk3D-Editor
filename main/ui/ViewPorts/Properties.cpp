@@ -586,7 +586,7 @@ static void RenameDespuesVGroup(){
     for (size_t k = 0; k < v.size(); k++)
         if (std::string* p = W3dDestResolver(v[k])) *p = nuevo;
     m->lastSkinFrame = -999999;           // el CSR de skinning hashea los nombres
-    W3dAvisoArrastre((int)v.size(), "hueso(s)", g_renameViejo, nuevo);
+    W3dAvisoArrastre((int)v.size(), T("bone(s)"), g_renameViejo, nuevo);
 }
 static void AccionRenameGroup(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameGroup) return;
@@ -617,7 +617,7 @@ static void RenameDespuesUVGroup(){
     for (size_t k = 0; k < v.size(); k++)
         if (std::string* p = W3dDestResolver(v[k])) *p = nuevo;
     m->pose2dDirty = true;
-    W3dAvisoArrastre((int)v.size(), "hueso(s) 2D", g_renameViejo, nuevo);
+    W3dAvisoArrastre((int)v.size(), T("2D bone(s)"), g_renameViejo, nuevo);
 }
 static void AccionRenameUVGroup(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameUVGroup) return;
@@ -1465,7 +1465,7 @@ static void AccionMenuCapaMezcla(int n) {
     gCapaMenu = n;
     if (!MenuCapaMezcla) { MenuCapaMezcla = new PopupMenu(); MenuCapaMezcla->action = AccionCapaMezclaElegida; }
     MenuCapaMezcla->Limpiar();
-    for (int k = 0; k < W3D_CAPA_MEZCLAS; k++) MenuCapaMezcla->Agregar(W3dCapaMezclaNombre(k), k, IconType::material);
+    for (int k = 0; k < W3D_CAPA_MEZCLAS; k++) MenuCapaMezcla->Agregar(T(W3dCapaMezclaNombre(k)), k, IconType::material);
     AbrirMenuBajoBoton(MenuCapaMezcla, PropsActivo->propCapaMezcla[n]->button);
 }
 // los botones no reciben argumentos: una accion por fila
@@ -1625,9 +1625,9 @@ static void OnMatShaderOn() {
 
 static PopupMenu* MenuReflectMode = NULL;
 static const char* NombreReflectMode(int m){
-    return (m == 1) ? "Sphere Map (software)"
-         : (m == 2) ? "Equirectangular (software)"
-         :            "Matcap (hardware)";
+    return (m == 1) ? T("Sphere Map (software)")
+         : (m == 2) ? T("Equirectangular (software)")
+         :            T("Matcap (hardware)");
 }
 static void AccionReflectModeElegido(int id){
     if (!PropsActivo) return;
@@ -1720,13 +1720,13 @@ static void OnMatAlfaChange() {
 static PopupMenu* MenuMezcla = NULL;
 static const char* NombreMezcla(int m) {
     switch (m) {
-        case w3dEngine::MezclaOff:      return "Opaque (ONE, ZERO)";
-        case w3dEngine::MezclaAdd:      return "Additive (ADITIVO)";
-        case w3dEngine::MezclaAddAlpha: return "Additive by alpha";
-        case w3dEngine::MezclaMultiply: return "Multiply (darkens)";
-        case w3dEngine::MezclaScreen:   return "Screen (lightens)";
-        case w3dEngine::MezclaPremult:  return "Premultiplied alpha";
-        case w3dEngine::MezclaSubtract: return "Subtract (darkens)";
+        case w3dEngine::MezclaOff:      return T("Opaque (ONE, ZERO)");
+        case w3dEngine::MezclaAdd:      return T("Additive (ADITIVO)");
+        case w3dEngine::MezclaAddAlpha: return T("Additive by alpha");
+        case w3dEngine::MezclaMultiply: return T("Multiply (darkens)");
+        case w3dEngine::MezclaScreen:   return T("Screen (lightens)");
+        case w3dEngine::MezclaPremult:  return T("Premultiplied alpha");
+        case w3dEngine::MezclaSubtract: return T("Subtract (darkens)");
         default:                        return T("Alpha (normal)");
     }
 }
@@ -2276,8 +2276,8 @@ static const char* T2dNombreAncla(int v){
     switch (v){
         case 1: return T("Left");        case 2: return T("Right");
         case 3: return T("Top");           case 4: return T("Bottom");
-        case 5: return "Arriba-Izquierda"; case 6: return "Arriba-Derecha";
-        case 7: return "Abajo-Izquierda";  case 8: return "Abajo-Derecha";
+        case 5: return T("Top-Left");      case 6: return T("Top-Right");
+        case 7: return T("Bottom-Left");   case 8: return T("Bottom-Right");
         default: return T("Center");
     }
 }
@@ -2523,7 +2523,7 @@ static const char* NombreAssetsModo(int m){ return (m==1)?T("Packed (protected)"
 // UID3 de Symbian del juego: 0 = sin asignar (el boton lo genera). Se muestra en hex.
 static const char* NombreUID(){
     static char buf[16];
-    if (g_proyCompilar.uid == 0) return "Generar";
+    if (g_proyCompilar.uid == 0) return T("Generate");
     snprintf(buf, sizeof(buf), "0x%08X", g_proyCompilar.uid);
     return buf;
 }
@@ -2633,7 +2633,7 @@ static void AccionMenuAssets(){
 // de ahi los tamanos chicos (hicolor del .deb, mipmaps del APK, icono de ventana).
 // Se persiste en el .w3d como ruta EXTERNA relativa (g_proyIcono, ver GuardarW3D.h).
 static std::string NombreIconoJuego(){
-    if (g_proyIcono.empty()) return "(ninguno)";
+    if (g_proyIcono.empty()) return T("(none)");
     size_t s = g_proyIcono.find_last_of("/\\");
     return (s == std::string::npos) ? g_proyIcono : g_proyIcono.substr(s + 1);
 }
@@ -2656,7 +2656,7 @@ static void AccionIconoElegido(const std::string& rutaElegida){
     g_redraw = true;
 }
 static void AccionMenuIcono(){
-    AbrirFileBrowser("Icono del juego", "Elegir", ".png", AccionIconoElegido);
+    AbrirFileBrowser(T("Game icon"), T("Open"), ".png", AccionIconoElegido);
 }
 static void AccionUIexportar(){
     if (!UIActivaProps()) return;
@@ -2797,7 +2797,7 @@ static void AccionHijosRefrescar(){
 // ============ UNIDAD del tamano (tamModo): fraccion / pixeles / escalado ============
 static const char* TamNombreModo(int m){
     return m == TAM2D_FRACCION ? T("Fraction")
-         : (m == TAM2D_ESCALADO ? "Escalado" : "Pixeles");
+         : (m == TAM2D_ESCALADO ? T("Scaled") : T("Pixels"));
 }
 // el desplegable de Unidad de la tarjeta del tipo ACTIVO (imagen/rect/cont/slice9/video)
 static PropButton* PropUnidadDelActivo(){
@@ -2899,7 +2899,7 @@ static void AccionMenuHijosAlign(){
 // ni se muestra). Con un modo distinto de Gap el align y los Expandir no aplican.
 static const char* HijosNombreDistrib(int d){
     return d == 1 ? "Space-between" : (d == 2 ? "Space-around"
-         : (d == 3 ? "Space-evenly" : "Gap"));
+         : (d == 3 ? "Space-evenly" : T("Gap")));
 }
 static int* HijosDistribDe(Object* o){
     if (!o) return NULL;
@@ -3043,7 +3043,7 @@ static void VidArchivoElegido(const std::string& rutaElegida){
 }
 static void AccionVidArchivo(){
     if (!Vid2dActivo()) return;
-    AbrirFileBrowser("Cargar video", T("Open"), ".mp4 .webm .gif .mov .avi", VidArchivoElegido);
+    AbrirFileBrowser(T("Load video"), T("Open"), ".mp4 .webm .gif .mov .avi", VidArchivoElegido);
 }
 
 // ============================ SCRIPT (estilo Unity) ============================
@@ -3086,7 +3086,7 @@ static void AccionScriptAgregar() {
     if (!ObjActivo) return;
     if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;   // (ver ScriptElegido)
     g_scriptCambiarIdx = -1;
-    AbrirFileBrowser("Elegir script", T("Open"), ".lua .luac", ScriptElegido);
+    AbrirFileBrowser(T("Load script"), T("Open"), ".lua .luac", ScriptElegido);
 }
 // el script SELECCIONADO en la lista de la tarjeta Control (-1 = ninguno)
 static int ScriptActivoIdx() {
@@ -3252,7 +3252,7 @@ static void AccionScriptCardFila() {
     if (fila == 0) {                 // [0] el archivo: elegir otro .lua
         if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;   // (ver ScriptElegido)
         g_scriptCambiarIdx = card;
-        AbrirFileBrowser("Elegir script", T("Open"), ".lua .luac", ScriptElegido);
+        AbrirFileBrowser(T("Load script"), T("Open"), ".lua .luac", ScriptElegido);
         return;
     }
     if (fila == ultima) {            // ultima fila: QUITAR el script
@@ -3910,7 +3910,7 @@ static void AccionPvsPathElegido(int id){
     if (id == 0) mod->pathNombre.clear();
     else if (id - 1 < (int)g_pvsPathNombres.size()) mod->pathNombre = g_pvsPathNombres[id - 1];
     if (PropsActivo && PropsActivo->propPvsPath)
-        PropsActivo->propPvsPath->button->text = mod->pathNombre.empty() ? std::string("None") : mod->pathNombre;
+        PropsActivo->propPvsPath->button->text = mod->pathNombre.empty() ? std::string(T("None")) : mod->pathNombre;
     g_redraw = true;
 }
 static void AccionMenuPvsPath(){
@@ -3945,9 +3945,9 @@ static void AccionMenuPvsRamas(){
     if ((int)mod->ramasOn.size() < cv->nRamas) mod->ramasOn.resize(cv->nRamas, 1);
     if (!MenuPvsRamas){ MenuPvsRamas = new PopupMenu(); MenuPvsRamas->action = AccionPvsRamaToggle; }
     MenuPvsRamas->Limpiar();
-    char lbl[32];
+    char lbl[64];
     for (int r = 0; r < cv->nRamas; r++) {
-        snprintf(lbl, sizeof(lbl), "Rama %d", r + 1);
+        snprintf(lbl, sizeof(lbl), T("Branch %d"), r + 1);
         MenuPvsRamas->Agregar(lbl, r, IconType::curve)->verde = (mod->ramasOn[r] != 0);
     }
     AbrirMenuBajoBoton(MenuPvsRamas, PropsActivo->propPvsRamas->button);
@@ -4011,7 +4011,7 @@ static void AccionOptimizarVertexGroups(){
     if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, true)) return;
     g_pendingOptVGMesh = (Mesh*)ObjActivo;
     if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-    confirmarPopup->Abrir("Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.", HacerOptimizarVG);
+    confirmarPopup->Abrir(T("This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost."), HacerOptimizarVG);
 }
 
 extern bool g_uiTapEnCurso; // (controles.cpp; en Symbian lo define variables.cpp) tap tactil diferido en curso
@@ -4100,13 +4100,13 @@ static void AccionExport(){
     // OBJ con rig: un SOLO cartel que avisa la perdida (y que se sobrescribe si existe) -> Continuar = exportar.
     if (f == 0 && ExportMeshPierdeRig(SceneCollection, PropsActivo->exportSelectedOnly)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?", HacerExportActual);
+        confirmarPopup->Abrir(T("OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?"), HacerExportActual);
         return;
     }
 #ifndef W3D_SYMBIAN
     if (w3dFileSystem::FileExists(full)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("The file \"" + SoloNombre(full) + "\" already exists. Do you want to replace it?", HacerExportActual);
+        confirmarPopup->Abrir(std::string(T("The file \"")) + SoloNombre(full) + T("\" already exists. Do you want to replace it?"), HacerExportActual);
         return;
     }
 #endif
@@ -4145,7 +4145,7 @@ static void ExportFolderElegido(const std::string& elegido){
 }
 // boton de la carpeta: abre el explorador para elegir la carpeta de salida
 static void AccionBrowseExport(){
-    AbrirFileBrowser("Export to...", T("Use this file"), ".obj .gltf .glb .fbx", ExportFolderElegido, true);
+    AbrirFileBrowser(T("Export to..."), T("Use this file"), ".obj .gltf .glb .fbx", ExportFolderElegido, true);
 }
 
 // ---------- RENDER (Path + File name + confirmacion) ----------
@@ -4194,7 +4194,7 @@ static void RenderFolderElegido(const std::string& elegido){
     }
 }
 static void AccionBrowseRender(){
-    AbrirFileBrowser("Render to...", T("Use this file"), ".png", RenderFolderElegido, true);
+    AbrirFileBrowser(T("Render to..."), T("Use this file"), ".png", RenderFolderElegido, true);
 }
 
 // boton "Render Image": guarda el pase beauty (siempre) + los pases tildados (zbuffer/normal)
@@ -4600,7 +4600,7 @@ static void HacerRenderImage(){
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
     int total = PasesActivos() * vp->TilesNecesarios(w, h); // 1 frame: PASES x TILES
-    ProgresoIniciar("Rendering...");
+    ProgresoIniciar(T("Rendering..."));
     int fallos = 0;
     extern int CurrentFrame;
     PrepararAnterior(vp, w, h, CurrentFrame);   // (los vectores: el movimiento desde el cuadro anterior)
@@ -4661,7 +4661,7 @@ static void AccionRenderImage(){
     std::string beauty = RenderFileNamePNG(""); // el pase principal
     if (w3dFileSystem::FileExists(beauty)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("The file \"" + SoloNombre(beauty) + "\" already exists. Do you want to replace it?", HacerRenderImage);
+        confirmarPopup->Abrir(std::string(T("The file \"")) + SoloNombre(beauty) + T("\" already exists. Do you want to replace it?"), HacerRenderImage);
         return;
     }
 #endif
@@ -4697,7 +4697,7 @@ static void HacerRenderAnimation(){
     int total = nFrames * PasesActivos() * vp->TilesNecesarios(w, h);
     int guardado = CurrentFrame;
     CalcularRenderBase();
-    ProgresoIniciar("Rendering animation...");
+    ProgresoIniciar(T("Rendering animation..."));
     int fallos = 0, base = 0;
     PrepararAnterior(vp, w, h, f0);   // (los vectores del primer cuadro: desde f0-1; los demas, del que se acaba de renderizar)
     for (int f = f0; f <= f1; f++){
@@ -5711,7 +5711,7 @@ static void NuevaVertexAnimation(Mesh* m){
     anim->UseUV = (m->uv != NULL);
     NewActiveVertexAnimation(m, anim);   // agrega a m->animations + controlador
     AnimSelVertex(m, (int)m->animations.size() - 1);
-    Notificar(std::string("Animacion nueva: ") + nom, false);
+    Notificar(std::string(T("New Animation")) + ": " + nom, false);
 }
 // La ANIMACION DEL OBJETO activa (kind 3), CREANDOLA si no hay ninguna: mismo patron que
 // InsertarKeyframeEsqueleto (que crea el clip si el armature no tiene). Insertar un keyframe
@@ -6490,7 +6490,7 @@ static void ProyCarpetaElegida(const std::string& elegido) {
 }
 // el campo "Carpeta" ES el boton de examinar: abre el explorador en modo carpeta
 static void AccionBrowseProyCarpeta() {
-    AbrirFileBrowser("Carpeta del proyecto", T("Use this file"), ".w3d", ProyCarpetaElegida, true);
+    AbrirFileBrowser(T("Project folder"), T("Use this file"), ".w3d", ProyCarpetaElegida, true);
 }
 
 // FORMATO DE LAS MALLAS del proyecto (la opcion "formatoMallas" del proyecto.json, ver
@@ -6562,7 +6562,7 @@ static void AccionProyAbrirElegido(const std::string& ruta) {
     AbrirProyectoDesde(ruta);
 }
 static void AccionProyAbrir() {
-    AbrirFileBrowser("Abrir proyecto", "Abrir", ".w3d", AccionProyAbrirElegido);
+    AbrirFileBrowser(T("Open project"), T("Open"), ".w3d", AccionProyAbrirElegido);
 }
 // valida que el proyecto tenga NOMBRE antes de guardar. Si falta, marca el campo en rojo
 // (PropText::error) + avisa por toast, y devuelve false: el caller NO guarda (antes, sin
@@ -6621,12 +6621,12 @@ static void ProyExtraerCarpetaElegida(const std::string& elegido) {
         // W3dContenedorExtraer crea las carpetas del destino ("texturas/") solo
         if (W3dContenedorExtraer(ents[i], dir + "/" + ents[i])) { sacados++; W3dDescargarSiWeb(dir + "/" + ents[i]); } else fallados++;
     }
-    char b[256];
+    char b[512];   // (las traducciones en cirilico ocupan el doble de bytes)
     if (fallados)
-        snprintf(b, sizeof(b), "Extraidos %d archivo(s); %d fallaron (ver el log)", sacados, fallados);
+        snprintf(b, sizeof(b), T("Extracted %d file(s); %d failed (see the log)"), sacados, fallados);
     else
-        snprintf(b, sizeof(b), "Extraidos %d archivo(s). Son COPIAS: para que un cambio "
-                               "vuelva al proyecto hay que importarlo de nuevo", sacados);
+        snprintf(b, sizeof(b), T("Extracted %d file(s). They are COPIES: for a change to go back into the "
+                                 "project you have to import it again"), sacados);
     Notificar(b, fallados != 0);
 }
 static void AccionProyExtraer() {
@@ -6634,7 +6634,7 @@ static void AccionProyExtraer() {
         Notificar(T("Extract: save the project first (the assets live inside the .w3d)"), true);
         return;
     }
-    AbrirFileBrowser("Extraer los assets a...", T("Use this file"), "", ProyExtraerCarpetaElegida, true);
+    AbrirFileBrowser(T("Extract the assets to..."), T("Use this file"), "", ProyExtraerCarpetaElegida, true);
 }
 
 
@@ -6986,10 +6986,10 @@ static void AccionMenuNieblaModo(){
 // nombre visible del metodo para el texto del boton
 static const char* CullMetodoLabel(int m){
     switch (m) {
-        case Culling::Grid:      return "Grid (cells)";
+        case Culling::Grid:      return T("Grid (cells)");
         case Culling::Riel:      return T("Rail (nodes)");
         case Culling::Bsp:       return "BSP (PVS)";
-        default:                 return "Frustum (AABB)";
+        default:                 return T("Frustum (AABB)");
     }
 }
 
@@ -8206,7 +8206,7 @@ void Properties::ConstruirGrupos(){
     // + boton "Recalcular". Los campos de grilla (Cell size / 3D grid) solo aparecen con metodo=Grid.
     propCulling = new GroupPropertie(T("Culling"));
     // SELECTOR de metodo (dropdown), primero de la lista.
-    propCullMetodo = new PropButton("Frustum (AABB)", IconType::visible);
+    propCullMetodo = new PropButton(T("Frustum (AABB)"), IconType::visible);
     propCullMetodo->button->desplegable = true;
     propCullMetodo->action = AccionMenuCullMetodo;
     propCulling->properties.push_back(propCullMetodo);
@@ -8677,7 +8677,7 @@ void Properties::ConstruirGrupos(){
     // (el FPS de reproduccion se movio a la tarjeta Animation, junto a Start/End)
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
     renderZbuffer = false; renderNormal = false; renderAlpha = false;
-    propRenderZbuffer = new PropBool("ZBuffer"); propRenderZbuffer->value = &renderZbuffer;
+    propRenderZbuffer = new PropBool(T("Z-Buffer")); propRenderZbuffer->value = &renderZbuffer;
     propRender->properties.push_back(propRenderZbuffer);
     propRenderNormal = new PropBool(T("Normal")); propRenderNormal->value = &renderNormal;
     propRender->properties.push_back(propRenderNormal);
@@ -9181,7 +9181,7 @@ void Properties::ConstruirGrupos(){
     propAjSkin->action = AccionMenuSkin;
     propAjustes->properties.push_back(propAjSkin);
 
-    propAjLogs = new PropButton("Logs");
+    propAjLogs = new PropButton(T("Logs"));
     propAjLogs->conLabel = true;
     propAjLogs->button->text = T(LogsLabel(cfg.logs));
     propAjLogs->button->desplegable = true;
@@ -9191,7 +9191,7 @@ void Properties::ConstruirGrupos(){
     // RAIZ DEL REPO para Compilar: solo hace falta cuando el editor corre INSTALADO (sin el repo al lado).
     // El que compila juegos pega aca la ruta a la carpeta del repo (la que tiene libs/Whisk3DCore) y con
     // "Save Changes" queda guardada en el config. Vacio = el editor la busca sola subiendo de carpetas.
-    propAjRepo = new PropText("Repo", cfg.repoPath.c_str());
+    propAjRepo = new PropText(T("Repo"), cfg.repoPath.c_str());
     propAjustes->properties.push_back(propAjRepo);
 
     // el NOMBRE de este dispositivo en la red: el que ven los demas al buscar partidas (por defecto, el del equipo).
@@ -9339,12 +9339,12 @@ void Properties::ConstruirGrupos(){
     propBoneConectado->value = &g_boneConectado;
     propBoneConectado->onChange = AccionBoneConectado;
     propArmBones->properties.push_back(propBoneConectado);
-    { PropFloat* px=new PropFloat("Pos X"); px->value=&g_bonePosX; px->onChange=AccionBoneTransform; propArmBones->properties.push_back(px);
-      PropFloat* py=new PropFloat("Pos Y"); py->value=&g_bonePosY; py->onChange=AccionBoneTransform; propArmBones->properties.push_back(py);
-      PropFloat* pz=new PropFloat("Pos Z"); pz->value=&g_bonePosZ; pz->onChange=AccionBoneTransform; propArmBones->properties.push_back(pz); }
-    { PropFloat* rx=new PropFloat("Rot X"); rx->value=&g_boneRotX; rx->onChange=AccionBoneTransform; propArmBones->properties.push_back(rx);
-      PropFloat* ry=new PropFloat("Rot Y"); ry->value=&g_boneRotY; ry->onChange=AccionBoneTransform; propArmBones->properties.push_back(ry);
-      PropFloat* rz=new PropFloat("Rot Z"); rz->value=&g_boneRotZ; rz->onChange=AccionBoneTransform; propArmBones->properties.push_back(rz); }
+    { PropFloat* px=new PropFloat(T("Pos X")); px->value=&g_bonePosX; px->onChange=AccionBoneTransform; propArmBones->properties.push_back(px);
+      PropFloat* py=new PropFloat(T("Pos Y")); py->value=&g_bonePosY; py->onChange=AccionBoneTransform; propArmBones->properties.push_back(py);
+      PropFloat* pz=new PropFloat(T("Pos Z")); pz->value=&g_bonePosZ; pz->onChange=AccionBoneTransform; propArmBones->properties.push_back(pz); }
+    { PropFloat* rx=new PropFloat(T("Rot X")); rx->value=&g_boneRotX; rx->onChange=AccionBoneTransform; propArmBones->properties.push_back(rx);
+      PropFloat* ry=new PropFloat(T("Rot Y")); ry->value=&g_boneRotY; ry->onChange=AccionBoneTransform; propArmBones->properties.push_back(ry);
+      PropFloat* rz=new PropFloat(T("Rot Z")); rz->value=&g_boneRotZ; rz->onChange=AccionBoneTransform; propArmBones->properties.push_back(rz); }
     { PropFloat* sx=new PropFloat(T("Scale X")); sx->value=&g_boneSclX; sx->onChange=AccionBoneTransform; propArmBones->properties.push_back(sx);
       PropFloat* sy=new PropFloat(T("Scale Y")); sy->value=&g_boneSclY; sy->onChange=AccionBoneTransform; propArmBones->properties.push_back(sy);
       PropFloat* sz=new PropFloat(T("Scale Z")); sz->value=&g_boneSclZ; sz->onChange=AccionBoneTransform; propArmBones->properties.push_back(sz); }
@@ -9382,9 +9382,9 @@ void Properties::ConstruirGrupos(){
     propBone2DConectado->onChange = AccionBone2DConectado;
     propBones2D->properties.push_back(propBone2DConectado);
     // filas DE ESTE PANEL (miembros): ActualizarPestanias refresca las suyas, no las de otro panel
-    propBone2DPosX = new PropFloat("Pos X"); propBone2DPosX->value = &g_b2dPosX; propBone2DPosX->onChange = AccionBone2DPos;
+    propBone2DPosX = new PropFloat(T("Pos X")); propBone2DPosX->value = &g_b2dPosX; propBone2DPosX->onChange = AccionBone2DPos;
     propBones2D->properties.push_back(propBone2DPosX);
-    propBone2DPosY = new PropFloat("Pos Y"); propBone2DPosY->value = &g_b2dPosY; propBone2DPosY->onChange = AccionBone2DPos;
+    propBone2DPosY = new PropFloat(T("Pos Y")); propBone2DPosY->value = &g_b2dPosY; propBone2DPosY->onChange = AccionBone2DPos;
     propBones2D->properties.push_back(propBone2DPosY);
     propBone2DRot  = new PropFloat(T("Rotation")); propBone2DRot->value = NULL; propBone2DRot->onChange = AccionBone2DPose;
     propBones2D->properties.push_back(propBone2DRot);
@@ -10302,8 +10302,8 @@ void Properties::Rebind(){
     bool esDefault = (!material || material == MaterialDefecto || deLibreria);
     if (propMsgDefault) {
         propMsgDefault->oculto = !esDefault; // aviso: con el material por defecto o uno de una libreria
-        const char* aviso = deLibreria ? "It belongs to a library (read-only): open the library to edit it"
-                                       : "The default material can not be edited. Create a new material.";
+        const char* aviso = T(deLibreria ? "It belongs to a library (read-only): open the library to edit it"
+                                         : "The default material can not be edited. Create a new material.");
         if (propMsgDefault->name != aviso) { propMsgDefault->name = aviso; PropertiesLayoutDirty = true; }
     }
     if (propSepMat)     propSepMat->oculto     = esDefault;  // separador: OCULTO con el default (sino linea huerfana)
@@ -10485,7 +10485,7 @@ void Properties::Rebind(){
                 const TexLayer& cap = material->capas[(size_t)i];
                 propCapaTex[i]->button->text = NombreDeTextura(cap.tex);
                 propCapaUV[i]->button->text = NombreCapaUV(cap.uvMapa);
-                propCapaMezcla[i]->button->text = W3dCapaMezclaNombre(cap.blend);
+                propCapaMezcla[i]->button->text = T(W3dCapaMezclaNombre(cap.blend));
             } else if (agregar) {
                 propCapaTex[i]->button->text = T("Add Layer");
             }
@@ -10521,10 +10521,11 @@ void Properties::Rebind(){
         }
     }
 
-    // el selector muestra el material actual del mesh part
+    // el selector muestra el material actual del mesh part (el por defecto, con su nombre traducido: el
+    // "Default Material" de MaterialDefecto->name es un identificador, no se renombra)
     if (propBtnNewMaterial) {
         propBtnNewMaterial->button->text =
-            material ? material->name : std::string("Default Material");
+            (material && material != MaterialDefecto) ? material->name : std::string(T("Default Material"));
     }
     PropertiesLayoutDirty = true; // el alto de la tarjeta pudo cambiar
 }
@@ -10663,26 +10664,26 @@ void Properties::RefreshTargetProperties(){
     //rotacion: el MODO decide que campos se muestran y a que apuntan
     ObjActivo->ActualizarDisplayRot(); // display fresco desde el quaternion
     int rm = ObjActivo->rotMode;
-    propRotMode->button->text = (rm == RotQuaternion) ? "Quaternion (WXYZ)"
-                              : (rm == RotAxisAngle)  ? "Axis Angle" : "XYZ Euler";
+    propRotMode->button->text = T((rm == RotQuaternion) ? "Quaternion (WXYZ)"
+                                : (rm == RotAxisAngle)  ? "Axis Angle" : "XYZ Euler");
     PropFloat* pw = static_cast<PropFloat*>(propTransform->properties[5]); // W
     PropFloat* px = static_cast<PropFloat*>(propTransform->properties[6]); // X
     PropFloat* py = static_cast<PropFloat*>(propTransform->properties[7]); // Y
     PropFloat* pz = static_cast<PropFloat*>(propTransform->properties[8]); // Z
     if (rm == RotQuaternion){
         // el panel edita la COPIA de display (rotQuat); SincronizarRotacionActiva la baja al quaternion real
-        pw->name = "Rotation W"; pw->value = &ObjActivo->rotQuat.w; pw->unit = "";
+        pw->name = T("Rotation W"); pw->value = &ObjActivo->rotQuat.w; pw->unit = "";
         px->name = "X"; px->value = &ObjActivo->rotQuat.x; px->unit = "";
         py->value = &ObjActivo->rotQuat.y; py->unit = "";
         pz->value = &ObjActivo->rotQuat.z; pz->unit = "";
     } else if (rm == RotAxisAngle){
-        pw->name = "Rotation W"; pw->value = &ObjActivo->rotAngle; pw->unit = "°";
+        pw->name = T("Rotation W"); pw->value = &ObjActivo->rotAngle; pw->unit = "°";
         px->name = "X"; px->value = &ObjActivo->rotAxis.x; px->unit = "";
         py->value = &ObjActivo->rotAxis.y; py->unit = "";
         pz->value = &ObjActivo->rotAxis.z; pz->unit = "";
     } else { // XYZ Euler
         pw->value = NULL; // oculto (Resize devuelve 0; el teclado lo saltea)
-        px->name = "Rotation X"; px->value = &ObjActivo->rotEuler.x; px->unit = "°";
+        px->name = T("Rotation X"); px->value = &ObjActivo->rotEuler.x; px->unit = "°";
         py->value = &ObjActivo->rotEuler.y; py->unit = "°";
         pz->value = &ObjActivo->rotEuler.z; pz->unit = "°";
     }
@@ -11919,7 +11920,7 @@ void Properties::ActualizarPestanias(){
         if (propKeyframe->visible){
             const keyFrame& k = kap->keyframes[ki];
             std::string canal = DopeKeyframeActivoCanal();
-            propKeyframe->name = canal.empty() ? "Keyframe" : ("Keyframe - " + canal);
+            propKeyframe->name = canal.empty() ? std::string(T("Keyframe")) : (std::string(T("Keyframe")) + " - " + canal);
             if (g_propFloatEditando != gKfFrame) g_kfFrame = (float)k.frame;
             if (g_propFloatEditando != gKfValor) g_kfValor = k.value;
             if (g_propFloatEditando != gKfInDF)  g_kfInDF  = k.inDF;
@@ -11927,7 +11928,7 @@ void Properties::ActualizarPestanias(){
             if (g_propFloatEditando != gKfOutDF) g_kfOutDF = k.outDF;
             if (g_propFloatEditando != gKfOutDV) g_kfOutDV = k.outDV;
             if (gKfInterp) gKfInterp->button->text = KfNombreInterp(k.Interpolation);
-            if (gKfHandle) gKfHandle->button->text = KfNombreHandle(k.handleType);
+            if (gKfHandle) gKfHandle->button->text = T(KfNombreHandle(k.handleType));
             if (gKfCicloA) gKfCicloA->button->text = T(KfNombreCiclo(kap->cicloAntes));
             if (gKfCicloD) gKfCicloD->button->text = T(KfNombreCiclo(kap->cicloDespues));
             // los handles SOLO existen si el tramo es bezier, y solo se pueden tipear si el TIPO los guarda
@@ -12360,7 +12361,7 @@ void Properties::ActualizarPestanias(){
         if (propArrConstY)  propArrConstY->value  = (esArray && mod->arrConstOn) ? &mod->arrConstY : NULL;
         if (propArrConstZ)  propArrConstZ->value  = (esArray && mod->arrConstOn) ? &mod->arrConstZ : NULL;
         if (propArrTarget) { propArrTarget->oculto = !esArray;
-            if (esArray) propArrTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+            if (esArray) propArrTarget->button->text = mod->target ? mod->target->name : std::string(T("None")); }
         if (propArrMerge)     propArrMerge->value     = esArray ? &mod->arrMerge : NULL;
         if (propArrMergeDist) propArrMergeDist->value = (esArray && mod->arrMerge) ? &mod->arrMergeDist : NULL;
         // Boolean: la fila de operacion (visible solo aca; la activa con tinte verde) + el objeto
@@ -12372,7 +12373,7 @@ void Properties::ActualizarPestanias(){
                 propBoolOp->botones[k]->colorTexto = on ? ListaColores[static_cast<int>(ColorID::accent)] : NULL;
             } }
         if (propBoolTarget) { propBoolTarget->oculto = !esBool;
-            if (esBool) propBoolTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+            if (esBool) propBoolTarget->button->text = mod->target ? mod->target->name : std::string(T("None")); }
         if (propSubSimple) propSubSimple->value = esSub ? &mod->subSimple    : NULL;
         if (propSubLevel)  propSubLevel->value  = esSub ? &mod->subLevel      : NULL;
         if (propSubRender) propSubRender->value = esSub ? &mod->subRenderLevel: NULL;
@@ -12395,10 +12396,10 @@ void Properties::ActualizarPestanias(){
         if (propMirDist)  propMirDist->value  = esMirror ? &mod->mergeDist : NULL;
         if (propMirClip)  propMirClip->value  = esMirror ? &mod->clipping : NULL;
         if (propMirTarget) { propMirTarget->oculto = !esMirror;
-            if (esMirror) propMirTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+            if (esMirror) propMirTarget->button->text = mod->target ? mod->target->name : std::string(T("None")); }
         bool esArmMod = (mod && mod->tipo == ModifierType::Armature);
         if (propArmTarget) { propArmTarget->oculto = !esArmMod;
-            if (esArmMod) propArmTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+            if (esArmMod) propArmTarget->button->text = mod->target ? mod->target->name : std::string(T("None")); }
         if (propBtnOptVG) propBtnOptVG->oculto = !esArmMod; // "Optimize Vertex Groups": solo en el modificador Armature
         if (esArmMod) ActualizarSkinArmature(mm); // mantener skinArmature en sync con el modificador
         // Culling (PVS por triangulo): metodo + Recalcular + la info del sidecar cargado
@@ -12407,18 +12408,18 @@ void Properties::ActualizarPestanias(){
         if (propPvsRecalc) propPvsRecalc->oculto = !esPvs;
         if (propPvsInfo) { propPvsInfo->oculto = !esPvs;
             if (esPvs) {
-                char inf[96];
+                char inf[192];
                 int nCel = !mod->pvsSectores.empty() ? (int)mod->pvsSectores.size()
                          : (mod->visSet.Valido() ? (int)mod->visSet.nCeldas : 0);
                 if (nCel > 0)
-                    snprintf(inf, sizeof(inf), "%d nodos | nodo activo: %d", nCel, mod->sectorPVS);
+                    snprintf(inf, sizeof(inf), T("%d nodes | active node: %d"), nCel, mod->sectorPVS);
                 else
-                    snprintf(inf, sizeof(inf), "%s", mod->pvsCargado ? "sin dato (malla completa)" : "sidecar sin cargar (Recalcular)");
+                    snprintf(inf, sizeof(inf), "%s", T(mod->pvsCargado ? "no data (whole mesh)" : "sidecar not loaded (Recalculate)"));
                 propPvsInfo->name = inf;
             } }
         // Oclusion: path (el motor elige el nodo) + ojo de medida + nodo actual editable
         if (propPvsPath) { propPvsPath->oculto = !esPvs;
-            if (esPvs) propPvsPath->button->text = mod->pathNombre.empty() ? std::string("None") : mod->pathNombre; }
+            if (esPvs) propPvsPath->button->text = mod->pathNombre.empty() ? std::string(T("None")) : mod->pathNombre; }
         if (propPvsSoloCam) propPvsSoloCam->value = esPvs ? &mod->soloCamaraActiva : NULL;
         if (propPvsRamas) {   // solo con path resuelto y MAS de una rama
             Curve* cvR = esPvs ? PvsCurveDelMod(mod) : NULL;
@@ -12426,9 +12427,9 @@ void Properties::ActualizarPestanias(){
             if (cvR && cvR->nRamas > 1) {
                 int off = 0;
                 for (size_t r = 0; r < mod->ramasOn.size(); r++) if (!mod->ramasOn[r]) off++;
-                char t[40];
-                if (off) snprintf(t, sizeof(t), "Ramas: %d/%d", cvR->nRamas - off, cvR->nRamas);
-                else     snprintf(t, sizeof(t), "Ramas: %d (todas)", cvR->nRamas);
+                char t[96];
+                if (off) snprintf(t, sizeof(t), T("Branches: %d/%d"), cvR->nRamas - off, cvR->nRamas);
+                else     snprintf(t, sizeof(t), T("Branches: %d (all)"), cvR->nRamas);
                 propPvsRamas->button->text = t;
             }
         }
@@ -12554,7 +12555,7 @@ void Properties::ActualizarPestanias(){
         if (propListUVGroups)   propListUVGroups->mesh   = mv; // UV groups (pesos por corner del rig 2D)
         if (propBtnColorMode && mv->colorActivo >= 0 && mv->colorActivo < (int)mv->colorLayers.size())
             propBtnColorMode->button->text =
-                mv->colorLayers[mv->colorActivo]->porVertice ? "Per-Vertex" : "Per-Corner";
+                T(mv->colorLayers[mv->colorActivo]->porVertice ? "Per-Vertex" : "Per-Corner");
         // Delete | Move Up | Move Down: toda la fila solo si hay >1 elemento (borrar/reordenar necesita >=2)
         if (propRowUVOps && propRowUVOps->botones.size() >= 3){
             bool mas = (mv->uvMaps.size() > 1);
@@ -12614,7 +12615,7 @@ void Properties::ActualizarPestanias(){
         Target* tgt = ObjComoTarget(ObjActivo);
         PropButton* btn = esCam ? propBtnCamTarget : propBtnInstTarget;
         if (tgt && btn)
-            btn->button->text = tgt->target ? tgt->target->name : std::string("None");
+            btn->button->text = tgt->target ? tgt->target->name : std::string(T("None"));
     }
 
     ActualizarTarjetaRecurso(this, hayRec && pestaniaActiva == 3, recVista, recId);
@@ -12705,7 +12706,8 @@ void Properties::Render(){
     ActualizarPestanias(); // que grupo mostrar segun la pestania (Objeto/Mesh)
     // el '*' del nombre del proyecto en la tarjeta Archivo: hay cambios sin guardar (io/CambiosProyecto.h)
     if (propProyNombre && propArchivo && propArchivo->visible) {
-        const char* quiero = W3dCambiosHayCache() ? "Nombre *" : "Nombre";
+        // (el MISMO label "Name" con que se construye la fila, traducido; el '*' al final lo mira el harness)
+        const std::string quiero = std::string(T("Name")) + (W3dCambiosHayCache() ? " *" : "");
         if (propProyNombre->name != quiero) propProyNombre->name = quiero;
     }
 

@@ -4,16 +4,38 @@
 #+Down	#+Abajo
 #+Left/Right	#+Izq/Der
 #+Up	#+Arriba
+%d %s '%s' -> '%s' (binding by name)	%d %s '%s' -> '%s' (binding por nombre)
+%d Push matrix without its Pop	%d Apilar matriz sin su Desapilar matriz
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d curva(s) de animación de la selección ya no animan nada (Deshacer las devuelve)
+%d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d curva(s) de animación quedaron sin objeto (la primera: '%s'): ver whisk3d.log
+%d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d nombre(s) renumerados al cambiar de escena (%s%s). Revisa tus scripts Lua.
+%d nodes | active node: %d	%d nodos | nodo activo: %d
 %d object(s) got their own copy of the mesh	%d objeto(s) pasaron a tener su propia copia de la malla
 %d object(s) of the project use 3D meshes of "%s": each one gets its own copy (Ctrl+Z undoes it). Unlink it?	%d objeto(s) del proyecto usan mallas 3D de "%s": cada uno pasa a tener su propia copia (Ctrl+Z lo deshace). ¿Desvincularla?
+%d object(s) with vertex anims keep the previous mesh: '%s'	%d objeto(s) con vertex anims siguen con la malla anterior: '%s'
+%d old constraint(s) without a target: they did nothing, nothing was migrated	%d constraint(s) viejo(s) sin target: no hacían nada, no se migró nada
 %d reference(s) of the unpacked objects now find another object with the same name	%d referencia(s) de los objetos desempaquetados ahora encuentran otro objeto con el mismo nombre
+%d repeated name(s) renumbered (%s%s). The original did NOT change: whatever pointed to it by name still points there.	%d nombre(s) repetidos renumerados (%s%s). El original NO cambió: lo que apuntaba por nombre sigue apuntando ahí.
 %d resources are in use (%d users). Delete them anyway? Their users will be left without them.	%d recursos están en uso (%d usuarios). ¿Borrarlos igual? Sus usuarios quedarán sin ellos.
+%d script reference(s) and %d target(s) updated	%d referencia(s) de script y %d target(s) actualizados
+%s: does not compile	%s: no compiló
+'%s' already exists -> '%s'	'%s' ya existe -> '%s'
+'%s' has more than 65535 vertices: saving it as text (.w3dm), not binary	'%s' tiene más de 65535 vértices: la guardo en texto (.w3dm), no en binario
+'%s' is a 2D element: it can only hang from its UI scene or from another 2D element (it was not moved).	'%s' es un elemento 2D: solo puede colgar de su escena UI o de otro elemento 2D (no se movió).
+'%s' pointed to another constraint ('%s'): it could not be migrated	'%s' apuntaba a otro constraint ('%s'): no se pudo migrar
+'%s' uses the animations '%s' from a missing library: no clips until you link it	'%s' usa las animaciones '%s' de una librería que no está: sin clips hasta vincularla
+'%s' uses the mesh '%s' from a missing library: it stays empty until you link it	'%s' usa la malla '%s' de una librería que no está: queda vacío hasta vincularla
+'%s' was a constraint: it is now an Empty, its %d child(ren) stayed where they were	'%s' era un constraint: ahora es un Empty, sus %d hijo(s) quedaron donde estaban
+'%s' was opened WITH ERRORS (truncated file): when saving, whatever was missing is lost	'%s' se había abierto CON ERRORES (archivo cortado): al guardar, lo que faltaba se pierde
+'%s': %s (and more: see whisk3d.log)	'%s': %s (y más: ver whisk3d.log)
+'%s': could not load its clips (%s)	'%s': no pude cargar sus clips (%s)
 (Esc to cancel)	(Esc para cancelar)
 (choose)	(elegir)
 (coming soon)	(próximamente)
 (default)	(por defecto)
 (empty)	(vacío)
+(inherited)	(heredada)
+(no .lua scripts or .glsl shaders in the project)	(no hay scripts .lua ni shaders .glsl en el proyecto)
 (no .lua scripts)	(no hay scripts .lua)
 (no properties yet)	(sin propiedades aún)
 (none)	(ninguna)
@@ -21,11 +43,13 @@
 (nothing to choose)	(no hay nada para elegir)
 (root)	(raíz)
 (this routine)	(esta rutina)
+(unnamed)	(sin nombre)
 16-bit textures	Texturas de 16 bits
 2D Armature Animation	Animación de Armature 2D
 2D Cursor	Cursor 2D
 2D Editor	Editor 2D
 2D armature animation: the mesh has no 2D armature	Animación de armature 2D: la malla no tiene armature 2D
+2D bone(s)	hueso(s) 2D
 3D Cursor	Cursor 3D
 3D Mesh	Malla 3D
 3D Mesh of	Malla 3D de
@@ -45,8 +69,8 @@ A project needs at least one scene	Un proyecto necesita al menos una escena
 A scene can't contain itself	Una escena no se puede contener a sí misma
 A scene with that name already existed, renamed:	Ya existía una escena con ese nombre, se renombró:
 A texture with that name already exists	Ya hay una textura con ese nombre
+APK (aapt, signing)	APK (aapt, firma)
 Above: once at start. Below: every frame.	Arriba: una vez al empezar. Abajo: cada cuadro.
-Abrir normal map	Abrir Mapa de Normales
 Absolute	Absoluto
 Acceleration	Aceleración
 Accept	Aceptar
@@ -72,7 +96,9 @@ Add Vertex Group	Añadir Grupo de Vértices
 Add shortcut	Agregar atajo
 Added to the library	Agregado a la biblioteca
 Additive	Aditiva
+Additive (ADITIVO)	Aditiva (ADITIVO)
 Additive (by alpha)	Aditiva (por alfa)
+Additive by alpha	Aditiva por alfa
 Advanced: custom shader	Avanzado: shader personalizado
 Affect	Afecta
 Affect Move	Afectar Mover
@@ -110,6 +136,7 @@ Angle	Ángulo
 Angle random	Azar del ángulo
 Animation	Animación
 Animation deleted: 	Animación borrada: 
+Animation recovered in a new scene: '%s'	Animación recuperada en una escena nueva: '%s'
 Animation rendered!	¡Animación renderizada!
 Animations	Animaciones
 Animations of	Animaciones de
@@ -197,6 +224,8 @@ Border Y	Borde Y
 Borderless	Sin bordes
 Bottom	Inferior
 Bottom View	Vista inferior
+Bottom-Left	Abajo-Izquierda
+Bottom-Right	Abajo-Derecha
 Bounce	Rebote
 Boundary	Borde
 Box (memory)	Caja (memoria)
@@ -204,10 +233,15 @@ Box Select	Selección por caja
 Box X	Caja X
 Box Y	Caja Y
 Box Z	Caja Z
+Branch %d	Rama %d
 Branches	Ramas
+Branches: %d (all)	Ramas: %d (todas)
+Branches: %d/%d	Ramas: %d/%d
 Build game	Compilar juego
 Build: a build is already running	Compilar: ya hay una compilación en curso
 Build: a library uses files by absolute path; they do not travel with the game	Compilar: una librería usa archivos por ruta absoluta; no viajan con el juego
+Build: compilation failed (see platform-build/%s/build.log)	Compilar: falló la compilación (ver platform-build/%s/build.log)
+Build: could not copy the result to build/%s	Compilar: no pude copiar el resultado a build/%s
 Build: could not generate CMakeLists.txt	Compilar: no se pudo generar CMakeLists.txt
 Build: could not generate main.cpp	Compilar: no se pudo generar main.cpp
 Build: could not generate the Android script	Compilar: no se pudo generar el script de Android
@@ -227,6 +261,7 @@ By words	Por palabras
 Bytes	Bytes
 C+Left	C+Izq
 C+Right	C+Der
+COULD NOT INSTALL on the phone (low on space?): the APK stays in build/android23	NO SE PUDO INSTALAR en el teléfono (¿poco lugar?): el APK queda en build/android23
 CPU memory	Memoria de CPU
 Call Lua	Llamar Lua
 Call routine	Llamar rutina
@@ -235,7 +270,6 @@ Camera View	Vista de cámara
 Cameras	Cámaras
 Cancel	Cancelar
 Cancelled	Cancelado
-Cargar normal map	Cargar Mapa de Normales
 Cargar textura (imagen)	Cargar textura (imagen)
 Cell size	Tamaño de celda
 Center	Centro
@@ -245,6 +279,7 @@ Center Z	Centro Z
 Center of frame	Centro del cuadro
 Changes will be lost in:	Se perderán los cambios en:
 Channels	Canales
+Character	Personaje
 Child Of	Hijo De
 Children	Hijos
 Choose a shader	Elegí un shader
@@ -294,9 +329,11 @@ Colors	Colores
 Columns	Columnas
 Compile	Compilar
 Compiled	Compilado
+Compiling (%s)	Compilando (%s)
 Complete	Completo
 Component	Componente
 Cone	Cono
+Configuring (cmake)	Configurando (cmake)
 Confirm	Confirmar
 Connect Vertex Path	Conectar camino de vértices
 Connect: no path between the vertices	Conectar: no hay camino entre los vértices
@@ -318,6 +355,7 @@ Context	Contexto
 Context menu	Menú contextual
 Continue without saving	Seguir sin guardar
 Control	Control
+Controller disconnected: %s	Se desconectó un control: %s
 Convert to Game	Convertir en juego
 Convert to Scene	Convertir en escena
 Convert to editable mesh	Convertir en malla editable
@@ -326,13 +364,21 @@ Copy	Copiar
 Copy X	Copiar X
 Copy Y	Copiar Y
 Copy Z	Copiar Z
+Copying libmain.so (jniLibs)	Copiando libmain.so (jniLibs)
+Copying results	Copiando resultados
+Copying the Android template	Copiando la plantilla Android
 Core (advanced)	Núcleo (avanzado)
 Correct UVs	Corregir UVs
 Could not copy the objects	No se pudieron copiar los objetos
 Could not create a viewport on the external display: cloning the screen	No se pudo crear un viewport en la pantalla externa: se clona la pantalla
 Could not encode the PNG	No se pudo codificar el PNG
 Could not import	No se pudo importar
+Could not link the copy of '%s' to its mesh	No pude vincular la copia de '%s' a su malla
+Could not load the mesh '%s'	No pude cargar la malla '%s'
+Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	No pude leer las animaciones de '%s' (%s): quedan VACÍAS y no lo voy a guardar encima (ver whisk3d.log)
 Could not read the file	No se pudo leer el archivo
+Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	No pude leer los frames de la animación '%s' de '%s': queda VACÍA y no la voy a guardar encima (ver whisk3d.log)
+Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	No pude leer la geometría de '%s': queda VACÍA y no la voy a guardar encima (ver whisk3d.log)
 Could not write config.ini	No se pudo escribir config.ini
 Could not write the file	No se pudo escribir el archivo
 Count	Copias
@@ -421,6 +467,7 @@ Distance X	Distancia X
 Distances	Distancias
 Distribution	Distribución
 Don't allow	No permitir
+Done	Listo
 Done by CPU on this graphics backend (slow)	Con este backend gráfico se hace por CPU (lento)
 Dope Sheet	Hoja de claves
 Drag (speed kept per second)	Arrastre (velocidad que queda por segundo)
@@ -496,11 +543,16 @@ Export UI to...	Exportar UI a...
 Export UV Layout	Exportar mapa UV
 Export UV Layout...	Exportar mapa UV...
 Export to...	Exportar a...
+Exporting glTF...	Exportando glTF...
+Exporting model...	Exportando modelo...
 External	Externo
 External (choose where)...	Externo (elegir dónde)...
 External display	Pantalla externa
 Extract assets	Extraer assets
+Extract the assets to...	Extraer los assets a...
 Extract: save the project first (the assets live inside the .w3d)	Extraer: primero guardá el proyecto (los assets viven adentro del .w3d)
+Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Extraídos %d archivo(s). Son COPIAS: para que un cambio vuelva al proyecto hay que importarlo de nuevo
+Extracted %d file(s); %d failed (see the log)	Extraídos %d archivo(s); %d fallaron (ver el log)
 Extrude	Extruir
 Extrude Bone	Extruir hueso
 Extrude Edges	Extruir Aristas
@@ -548,6 +600,7 @@ Flags (memory)	Banderas (memoria)
 Flat	Plano
 Flip	Voltear
 Flip Normals	Invertir Normales
+Flipbook	Flipbook
 Flipbook frames	Cuadros del flipbook
 Flipbooks	Flipbooks
 Float	Decimal
@@ -587,15 +640,20 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Radio a volumen pleno
 Fullscreen	Pantalla completa
 Function	Función
+GL Calls	Llamadas GL
 GL Light	Luz GL
+GLB saved successfully!	¡GLB guardado!
 GPU (A-Trous)	GPU (A-Trous)
 GPU memory	Memoria de GPU
 GPU-only meshes	Mallas solo en GPU
 Game	Juego
 Game UID generated (saved with the project)	UID del juego generado (se guarda con el proyecto)
 Game View	Vista de juego
+Game built: %s	Juego compilado: %s
+Game icon	Icono del juego
 Gap	Gap
 General	General
+Generate	Generar
 Generated by	Generado por
 Geometry to Origin	Geometría al Origen
 Give the project a name to save it	Ponele un nombre al proyecto para poder guardar
@@ -636,12 +694,16 @@ IOR	IOR
 Icon	Icono
 Ignore order	Ignorar orden
 Image	Imagen
+Import 3D model	Importar modelo 3D
 Import FBX	Importar FBX
 Import GLB	Importar GLB
 Import OBJ	Importar OBJ
 Import glTF	Importar glTF
 Import w3dui	Importar w3dui
 Imported	Importado
+Importing FBX...	Importando FBX...
+Importing glTF...	Importando glTF...
+Importing model...	Importando modelo...
 Imports	Importar
 In the .w3d	En el .w3d
 In use	En uso
@@ -667,6 +729,7 @@ Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boun
 Inset: select faces first	Inset: primero selecciona caras
 Inside	Interior
 Inside the .w3d	Dentro del .w3d
+Installing on the phone	Instalando en el teléfono
 Intensity	Intensidad
 Interpolate	Interpolar
 Interpolate (mix)	Interpolar (mezcla)
@@ -762,11 +825,14 @@ Load UI	Cargar UI
 Load font	Cargar fuente
 Load from disk...	Cargar del disco...
 Load image	Cargar imagen
+Load normal map	Cargar Mapa de Normales
 Load script	Cargar script
 Load shader	Cargar shader
 Load sound	Cargar sonido
 Load sound from the file browser...	Cargar sonido desde el explorador...
+Load video	Cargar video
 Loaded	Cargada
+Loading %d texture(s) before Play...	Cargando %d textura(s) antes de iniciar...
 Loading mode	Carga
 Loading...	Cargando...
 Local	Local
@@ -777,6 +843,7 @@ Location X	Posición X
 Lock Normals	Bloquear normales
 Lock Orbit	Bloquear Órbita
 Lock the camera to the view	Mover la cámara con la vista
+Logs	Logs
 Longest clip	Clip más largo
 Loop	Loop
 Loop (smpl)	Loop (smpl)
@@ -879,6 +946,7 @@ Move to Folder	Mover a carpeta
 Move: %d frames	Mover: %d frames
 Move: %d frames, %.3f value%s	Mover: %d frames, %.3f valor%s
 Multiply	Multiplicar
+Multiply (darkens)	Multiplicar (oscurece)
 Multiply (lightmap)	Multiplicar (lightmap)
 Multiply 2x	Multiplicar 2x
 NRD (real time)	NRD (tiempo real)
@@ -910,6 +978,7 @@ New Texture: could not save	Nueva Textura: no se pudo guardar
 New Texture: invalid size	Nueva Textura: tamaño inválido
 New UV Map	Nuevo mapa UV
 New W3D proxy of this element	Proxy W3D nuevo de este elemento
+New controller detected: %s	Se detectó un nuevo control: %s
 New instance of this prefab	Nueva instancia de este prefab
 New instance of this scene	Nueva instancia de esta escena
 New material with this shader	Material nuevo con este shader
@@ -960,10 +1029,22 @@ Normals	Normales
 Normals layer deleted	Capa de normales borrada
 Not assigned	No se asignó
 Not deleted	No se borró
+Not enough space: uninstalling the previous version (its data on the phone is lost)	Falta lugar: se desinstala la versión anterior (sus datos en el teléfono se pierden)
 Not linked	No se vinculó
 Not moved	No se movió
 Not opened	No se abrió
 Not saved in the project yet	Todavía no se guardó en el proyecto
+Not saving '%s': %s	No guardo '%s': %s
+Not saving '%s': could not read its faces and saving would erase them	No guardo '%s': no pude leer sus caras y guardarla las borraría
+Not saving '%s': its geometry could not be read when opening and saving would erase it	No guardo '%s': su geometría no se pudo leer al abrir y guardarla la borraría
+Not saving '%s': its mesh needs the block '%s' from a newer version of Whisk3D	No guardo '%s': su malla necesita el bloque '%s' de una versión más nueva de Whisk3D
+Not saving '%s': the frames of its animation '%s' could not be read when opening and saving would erase them	No guardo '%s': los frames de su animación '%s' no se pudieron leer al abrir y guardarlos los borraría
+Not saving: '%s' could not be read and saving would leave it empty	No guardo: '%s' no se pudo leer y guardar la dejaría vacía
+Not saving: could not read the mesh '%s'	No guardo: no pude leer la malla '%s'
+Not saving: the UI scene '%s' could not be read when opening and saving would remove it from the project	No guardo: la escena UI '%s' no se pudo leer al abrir y guardar la sacaría del proyecto
+Not saving: the animations of '%s' could not be read when opening and saving would erase them	No guardo: las animaciones de '%s' no se pudieron leer al abrir y guardarlo las borraría
+Not saving: the clips of '%s' could not be read when opening and saving would erase them	No guardo: los clips de '%s' no se pudieron leer al abrir y guardarlo los borraría
+Not saving: the mesh '%s' could not be written (%s)	No guardo: la malla '%s' no se pudo escribir (%s)
 Nothing to paste	No hay nada para pegar
 Nothing to save	No hay nada para guardar
 Now click the second	Ahora, segundo clic en
@@ -1003,15 +1084,19 @@ Only its visibility and script values are saved	Solo se guardan su visibilidad y
 Only selected vertices	Solo vértices seleccionados
 Only the final image	Solo la imagen final
 Opacity	Opacidad
+Opaque (ONE, ZERO)	Opaco (ONE, ZERO)
 Opaque (one, zero)	Opaco (one, zero)
 Open	Abrir
 Open in IDE	Abrir en el IDE
+Open normal map	Abrir Mapa de Normales
 Open project	Abrir proyecto
 Open without saving	Abrir sin guardar
+Opening project...	Abriendo proyecto...
 Operation	Operación
 Optimize Vertex Groups	Optimizar Grupos de Vértices
 Orbit locked	Órbita bloqueada
 Orbit unlocked	Órbita desbloqueada
+Orbital	Orbital
 Orient	Orient.
 Orientation	Orientación
 Origin to 3D Cursor	Origen al Cursor 3D
@@ -1030,6 +1115,7 @@ Overrides	Overrides
 Own	Propio
 PVS recalculated	PVS recalculado
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: falta <modelo>.pvs.json junto al .obj de origen
+Packaging .deb (cpack)	Empaquetando .deb (cpack)
 Packed (protected)	Empaquetados (protegidos)
 Pad bottom	Pad abajo
 Pad left	Pad izq
@@ -1038,6 +1124,7 @@ Pad top	Pad arriba
 Padding	Padding
 Paint background	Pintar fondo
 Palette	Paleta
+Palettes	Paletas
 Pan	Paneo
 Parent	Padre
 Part (-1 = all)	Parte (-1 = todas)
@@ -1054,6 +1141,7 @@ Paste	Pegar
 Pasted	Pegado
 Patch	Parche
 Path	Ruta
+Pause	Pausa
 Pencil+Up	Lápiz+Arriba
 Per Pixel Shading	Sombreado por píxel
 Per Vertex Shading	Sombreado por vértice
@@ -1073,7 +1161,7 @@ Pivot	Pivote
 Pixels	Píxeles
 Plane	Plano
 Platform	Plataforma
-Play	Escuchar
+Play	Reproducir
 Play / Pause	Reproducir / Pausa
 Play Reverse	Reproducir al revés
 Play once (dies at the end)	Una sola vez (muere al terminar)
@@ -1083,6 +1171,9 @@ Points	Puntos
 Polygon (simulated)	Polígono (simulado)
 Pop matrix	Desapilar matriz
 Portrait only	Solo vertical
+Pos X	Pos X
+Pos Y	Pos Y
+Pos Z	Pos Z
 Pose	Pose
 Pose Mode	Modo Pose
 Position	Posición
@@ -1096,6 +1187,9 @@ Prefab instances come with the prefabs phase	Las instancias de prefab llegan con
 Prefab of	Prefab de
 Prefabs	Prefabs
 Premultiplied alpha	Alfa premultiplicado
+Preparing Android (template)	Preparando Android (plantilla)
+Preparing Android 2.3	Preparando Android 2.3
+Preparing the Android 2.3 project	Preparando el proyecto Android 2.3
 Press a key...	Apretá una tecla...
 Preview	Vista previa
 Preview animation	Ver animación
@@ -1108,10 +1202,12 @@ Primitive	Primitiva
 Profile Shape	Forma del perfil
 Profile Type	Tipo de perfil
 Project	Proyecto
+Project folder	Carpeta del proyecto
 Project from View	Proyectar desde Vista
 Project from View (Bounds)	Proyectar desde Vista (Límites)
 Project from View: select faces first	Proyectar desde Vista: selecciona caras primero
 Project saved: 	Proyecto guardado: 
+Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Proyecto guardado: %s (%d referencia(s) externa(s), ver EXTERNOS.txt)
 Properties	Propiedades
 Properties viewport	Viewport de propiedades
 Proportional Editing	Edición Proporcional
@@ -1189,6 +1285,7 @@ Repeat with Offset	Repetir con desplazamiento
 Replace	Reemplazar
 Replace all	Reemplazar todo
 Replace...	Reemplazar...
+Repo	Repo
 Reset	Restablecer
 Reset Overrides	Quitar overrides
 Reset all	Restablecer todo
@@ -1208,6 +1305,9 @@ Rip: the selection does not separate the mesh	Rip: la selección no separa la ma
 Roll Left	Girar vista a la izquierda
 Roll Right	Girar vista a la derecha
 Root	Raíz
+Rot X	Rot X
+Rot Y	Rot Y
+Rot Z	Rot Z
 Rotate	Rotar
 Rotate handles	Rotar manijas
 Rotate: %.1f deg  (pivot %s)	Rotar: %.1f grados  (pivote %s)
@@ -1245,9 +1345,13 @@ Save outside the .w3d...	Guardar fuera del w3d...
 Save project	Guardar proyecto
 Save script	Guardar script
 Save the project first	Guardá el proyecto primero
+Save version v%d	Guardar versión v%d
 Save version: the project has no location (use Save first)	Guardar versión: el proyecto no tiene ubicación (usá Guardar primero)
 Save: could not replace the file (the previous version was kept):	Guardar: no se pudo reemplazar el archivo (quedó la versión anterior):
 Save: incomplete write. The file was not touched:	Guardar: escritura incompleta. No se tocó el archivo:
+Saved (note: %d curve(s) without a source file are not saved)	Guardado (ojo: %d curva(s) sin archivo de origen no se guardan)
+Saved OK, but copying version v%d failed (see the log)	Guardado OK, pero falló la copia de la versión v%d (ver el log)
+Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Guardado, pero %d archivo(s) externo(s) NO están (ver EXTERNOS.txt). Si es el original de una malla importada: Objeto > Definir Origen > Olvidar Archivo Original
 Saved: 	Guardado: 
 Scale	Escalar
 Scale Only	Solo Escala
@@ -1263,6 +1367,7 @@ Scene Animation	Animación de Escena
 Scene Instance	Instancia de escena
 Scenes	Escenas
 Screen	Trama
+Screen (lightens)	Trama (aclara)
 Screen Rect	Recorte
 Screw	Tornillo
 Script	Script
@@ -1290,6 +1395,7 @@ Select a prefab instance	Elegí una instancia de prefab
 Select an object first	Primero elige un objeto
 Select faces with more than 3 sides to triangulate	Selecciona caras de más de 3 lados para triangular
 Select objects first	Primero elegí objetos
+Select symbol	Seleccionar símbolo
 Select the objects of the prefab	Elegí los objetos del prefab
 Selected only	Solo seleccionados
 Selection to Active	Selección al activo
@@ -1368,6 +1474,8 @@ Snap Target	Destino de Snap
 Snap Target for Individual Elements	Destino de Snap para elementos individuales
 Snap Target:	Destino de Snap:
 Snap menu	Menú de imán (Snap)
+Snap: OFF	Imán: desactivado
+Snap: ON	Imán: activado
 Soft Knee	Rodilla suave
 Solid	Sólido
 Solid Preview	Vista Sólido
@@ -1418,6 +1526,7 @@ Stretched	Estirada
 String	Texto
 Subdivision Surface	Superficie de Subdivisión
 Subtract	Restar
+Subtract (darkens)	Restar (oscurece)
 Summary	Resumen
 Sun	Sol
 Superellipse	Superelipse
@@ -1450,6 +1559,9 @@ Textures	Texturas
 Texturing	Texturizado
 The 3D mesh couldn't be loaded	No se pudo cargar la malla 3D
 The Object tab shows the BASE transform (the one that gets saved). Constraints modify it when drawing, so the object can appear elsewhere.	La pestaña Objeto muestra la transformación BASE (la que se guarda). Las restricciones la modifican al dibujar, así que el objeto puede verse en otro lugar.
+The Script object '%s' no longer exists: it was migrated to an empty object with its scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated.	El objeto Script '%s' ya no existe: se migró a un objeto vacío con sus scripts. Su física hardcodeada (velocidad/gravedad/límites) NO se migra.
+The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	La escena UI '%s' no se pudo leer: el proyecto abre sin ella y NO lo voy a guardar encima (ver whisk3d.log)
+The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	Falta la escena UI '%s': el proyecto abre sin ella y NO lo voy a guardar encima (ver whisk3d.log)
 The armature has its own clips	El armature tiene clips propios
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	Los cambiarEscena() de su .lua siguen apuntando a la primera: editalos a mano.
 The clip library could not be read	No se pudo leer la biblioteca de clips
@@ -1472,7 +1584,9 @@ The library has no such element	La librería no tiene ese elemento
 The library is read-only	La librería es de solo lectura
 The library isn't linked	La librería no está vinculada
 The library's proyecto.json can't be read	No se puede leer el proyecto.json de la librería
+The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	La luz '%s' no se cargó: la escena ya tiene el máximo de luces (%d).
 The list of All	La de Todo
+The mesh '%s' (no objects) could not be read: saving without it	La malla '%s' (sin objetos) no se pudo leer: se guarda sin ella
 The objects of the 3D meshes will be deleted too (Undo brings them back).	Los objetos de las mallas 3D también se borran (Deshacer los devuelve).
 The selected folders are deleted too if they end up empty.	Las carpetas elegidas también se borran si quedan vacías.
 The shader does not compile	El shader no compila
@@ -1500,6 +1614,7 @@ This resource can't be renamed	Este recurso no se puede renombrar
 This resource type can't be deleted	Este tipo de recurso no se puede borrar
 This resource type can't be duplicated	Este tipo de recurso no se puede duplicar
 This step has nothing to animate	Este paso no tiene nada para animar
+This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Esto modificará los grupos de vértices y los simplificará a 1 hueso por vértice (skinning más rápido). Puede haber pérdida de datos.
 Threshold	Umbral
 Timeline	Línea de Tiempo
 Times	Tiempos
@@ -1507,6 +1622,8 @@ Timing	Tiempo
 Toggle Snap	Activar/desactivar imán
 Top	Superior
 Top View	Vista superior
+Top-Left	Arriba-Izquierda
+Top-Right	Arriba-Derecha
 Tracks	Pistas
 Trail points	Puntos de estela
 Trail step	Paso de estela
@@ -1530,14 +1647,18 @@ Trim end	Recorte del final
 Trim start	Recorte del principio
 Turbulence	Turbulencia
 Type	Tipo
+U Location	U Posición
 UI	UI
 UV	UV
 UV Editor	Editor UV
 UV Grid	Grilla UV
+UV Group	Grupo UV
 UV Groups	Grupos UV
 UV Map	Mapa UV
 UV Maps	Mapas UV
 UV Sphere	Esfera UV
+UV array	array de UV
+UV group(s)	grupo(s) UV
 UV layer (0 = active)	Capa UV (0 = la activa)
 UV layout saved	Mapa UV guardado
 UV menu	Menú UV
@@ -1566,6 +1687,7 @@ Upscaler	Reescalador
 Upscaling	Reescalado
 Use	Usa
 Use camera focus	Usar el foco de la cámara
+Use current folder	Usar carpeta actual
 Use index	Usar índice
 Use new viewport	Usar nuevo viewport
 Use physics engine	Usar motor de física
@@ -1575,11 +1697,13 @@ Use this file	Usar este archivo
 Use this folder	Usar esta carpeta
 Users	Usuarios
 Users selected	Usuarios seleccionados
+V Location	V Posición
 Value	Valor
 Value Y	Valor Y
 Variation	Variación
 Vector	Vector
 Velocity	Velocidad
+Version v%d saved: versiones/%s	Versión v%d guardada: versiones/%s
 Vertex	Vértice
 Vertex Animation	Animación de Vértices
 Vertex Color	Color de Vértice
@@ -1652,12 +1776,22 @@ all opaque	todo opaco
 along	en
 binary	binario
 bone	hueso
+bone(s)	hueso(s)
 bones	huesos
 center	centro
 clip	clip
 clips	clips
 color	color
+color array	array de colores
 compiled	compilado
+compiling Lua is not available on Symbian	compilar Lua no está disponible en Symbian
+could not load %s	no pude cargar %s
+could not read %s	no pude leer %s
+could not read its faces	no pude leer sus caras
+could not read the mesh	no pude leer la malla
+could not rename %s -> %s	no pude renombrar %s -> %s
+could not write %s	no pude escribir %s
+could not write pak.cpp	no pude escribir pak.cpp
 cube	cubo
 current frame	frame actual
 cylinder	cilindro
@@ -1668,23 +1802,38 @@ done	listo
 edge	arista
 edge of a face	arista de una cara
 face	cara
+faces: %d/%d	caras: %d/%d
+first triangle %d does not exist: the part of '%s' has %d triangles (0..%d)	el primer triángulo %d no existe: la parte de '%s' tiene %d triángulos (0..%d)
+frames	frames
 free	libre
 game	juego
 glTF imported successfully!	¡glTF importado!
+glTF saved successfully!	¡glTF guardado!
 glTF: could not open the file	glTF: no se pudo abrir el archivo
 glTF: could not write the file	glTF: no se pudo escribir el archivo
 glTF: invalid JSON	glTF: JSON inválido
 glTF: nothing to export	glTF: nada que exportar
 glTF: nothing to import	glTF: nada que importar
+global	global
 hierarchy	jerarquía
 hierarchy clip	clip de jerarquía
 hierarchy clips	clips de jerarquía
 islands	islas
+it has more than 65535 vertices and this platform uses 16-bit indices	tiene más de 65535 vértices y esta plataforma usa índices de 16 bits
+its geometry could not be read when opening	su geometría no se pudo leer al abrir
+its mesh cannot be written	su malla no se puede escribir
+its mesh needs the block '%s' from a newer version	su malla necesita el bloque '%s' de una versión más nueva
+last triangle %d is before the first one (%d)	el último triángulo %d está antes del primero (%d)
+last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or max)	el último triángulo %d pasa del final: la parte de '%s' tiene %d triángulos (0..%d, o máximo)
 list	lista
+local	local
+matrix stack too deep (%d levels, max %d)	pila de matrices demasiado profunda (%d niveles, máximo %d)
 missing	falta
 mono (1)	mono (1)
 new	nuevo
+no data (whole mesh)	sin dato (malla completa)
 no new changes in the file	el archivo no tiene cambios nuevos
+normal array	array de normales
 not loaded	sin cargar
 not saved	sin guardar
 not uploaded	sin subir
@@ -1694,12 +1843,15 @@ object(s) reloaded live	objeto(s) recargados en vivo
 objects	objetos
 of	de
 off	apagado
+on	activo
 open	abierta
+out of memory for the Lua state	sin memoria para el estado de Lua
 part	parte
 parts	partes
 prefab	prefab
 preview	vista previa
 projection	proyección
+quads	quads
 read-only	solo lectura
 read-only library	librería de solo lectura
 reloaded from the file	recargado desde el archivo
@@ -1707,22 +1859,67 @@ removed from	quitado de
 replacements	reemplazos
 results	resultados
 root	raíz
+routine '%s' calls itself (cycle)	la rutina '%s' se llama a sí misma (ciclo)
 running	corriendo
+saved	guardado
+saved (save the project so it stays in the .w3d)	guardado (guarda el proyecto para que quede en el .w3d)
 saved inside the .w3d	guardado en el .w3d
 saved outside the .w3d	guardado fuera del .w3d
 scene	escena
+scene '%s' -> '%s': check the cambiarEscena("%s") calls in your .lua files	escena '%s' -> '%s': revisa los cambiarEscena("%s") de tus .lua
+see whisk3d.log	ver whisk3d.log
 select a mesh object first	elegí primero un objeto malla
+sidecar not loaded (Recalculate)	sidecar sin cargar (Recalcular)
+skip %d	saltar %d
 soon	pronto
 sphere	esfera
 start	inicial
 stencil	estencil
+step %d (%s): '%s' is not a mesh object with a library mesh	paso %d (%s): '%s' no es un objeto malla con una malla de la biblioteca
+step %d (%s): '%s' not found	paso %d (%s): no se encontró '%s'
+step %d (%s): bad memory reference '%s' (use @name[0..%d])	paso %d (%s): referencia a memoria inválida '%s' (usa @nombre[0..%d])
+step %d (%s): light %d does not exist (0..%d)	paso %d (%s): la luz %d no existe (0..%d)
+step %d (%s): nothing chosen	paso %d (%s): no se eligió nada
+step %d (%s): object '%s' not found	paso %d (%s): no se encontró el objeto '%s'
+step %d (%s): option %d does not exist (0..%d)	paso %d (%s): la opción %d no existe (0..%d)
+step %d (%s): write the name of the Lua function	paso %d (%s): escribe el nombre de la función Lua
+step %d (Draw elements): %s	paso %d (Dibujar elementos): %s
+step %d (Draw elements): a manual range or an array needs the Triangles primitive	paso %d (Dibujar elementos): un rango manual o un array necesita la primitiva Triángulos
+step %d (Draw elements): array %s says %d ranges (0..%d fit from there)	paso %d (Dibujar elementos): el array %s dice %d rangos (desde ahí entran 0..%d)
+step %d (Draw elements): array %s, range %d: %s	paso %d (Dibujar elementos): array %s, rango %d: %s
+step %d (Draw elements): array %s, range %d: flag %d out of %s	paso %d (Dibujar elementos): array %s, rango %d: la bandera %d está fuera de %s
+step %d (Draw elements): choose the array (a memory: @name[i])	paso %d (Dibujar elementos): elige el array (una memoria: @nombre[i])
+step %d (Draw elements): primitive %d does not exist	paso %d (Dibujar elementos): la primitiva %d no existe
+step %d (Draw elements): the %s ('%s', %d vertices) has fewer vertices than the Vertex pointer ('%s', %d)	paso %d (Dibujar elementos): el %s ('%s', %d vértices) tiene menos vértices que el Puntero de vértices ('%s', %d)
+step %d (Draw elements): the %s is on but its pointer's mesh ('%s') has no %s (turn the array off with Array on/off)	paso %d (Dibujar elementos): el %s está prendido pero la malla de su puntero ('%s') no tiene %s (apaga el array con Prender/apagar array)
+step %d (Draw elements): the %s is on but this routine did not point it: add a %s before (or turn the array off with Array on/off)	paso %d (Dibujar elementos): el %s está prendido pero esta rutina no lo apuntó: agrega un %s antes (o apaga el array con Prender/apagar array)
+step %d (Draw elements): the %s may be on (it depends on what was drawn before): turn it on or off with Array on/off before drawing	paso %d (Dibujar elementos): el %s puede estar prendido (depende de lo que se dibujó antes): préndelo o apágalo con Prender/apagar array antes de dibujar
+step %d (Draw elements): the flags have to be a memory (@name[i])	paso %d (Dibujar elementos): las banderas tienen que ser una memoria (@nombre[i])
+step %d (Draw elements): the part uses vertices up to %d but the vertex pointer ('%s') has %d	paso %d (Dibujar elementos): la parte usa vértices hasta el %d pero el puntero de vértices ('%s') tiene %d
+step %d (Draw elements): the vertex array is off (Array on/off)	paso %d (Dibujar elementos): el array de vértices está apagado (Prender/apagar array)
+step %d (Draw elements): there is no Vertex pointer before it	paso %d (Dibujar elementos): no hay un Puntero de vértices antes
+step %d (Draw elements): unknown range %d	paso %d (Dibujar elementos): rango desconocido %d
+step %d (UV pointer): mesh '%s' has no UV layer %d (0 = its render UV)	paso %d (Puntero de UV): la malla '%s' no tiene la capa UV %d (0 = su UV de render)
+step %d (Visibility test): 'Write to' has to be a memory (@name[i])	paso %d (Test de visibilidad): 'Escribir en' tiene que ser una memoria (@nombre[i])
+step %d (Visibility test): part %d does not exist (-1 = the whole mesh)	paso %d (Test de visibilidad): la parte %d no existe (-1 = toda la malla)
+step %d: Pop matrix without its Push	paso %d: Desapilar matriz sin su Apilar matriz
+step %d: mesh '%s' has %d parts (part %d does not exist; -1 = all)	paso %d: la malla '%s' tiene %d partes (la parte %d no existe; -1 = todas)
+step %d: mesh '%s' has no geometry loaded	paso %d: la malla '%s' no tiene geometría cargada
+step %d: skips %d steps but only %d follow	paso %d: salta %d pasos pero solo siguen %d
+step %d: the steps a 'Skip if zero' can skip leave the matrix stack unbalanced	paso %d: los pasos que puede saltar un 'Saltar si es cero' dejan la pila de matrices desbalanceada
+step %d: unknown type	paso %d: tipo desconocido
 stereo (2)	estéreo (2)
+the bytecode dump of %s failed	falló el volcado del bytecode de %s
+there are no game files to pack	no hay archivos del juego para empaquetar
+too many nested routines	demasiadas rutinas anidadas
 track	pista
 tracks	pistas
 triangle	triángulo
 triangles	triángulos
 unsaved	sin guardar
 vertex	vértice
+vertex group(s)	grupo(s) de vértices
+vertex: %d/%d	vértices: %d/%d
 vertices	vértices
 view	vista
 with mipmaps	con mipmaps

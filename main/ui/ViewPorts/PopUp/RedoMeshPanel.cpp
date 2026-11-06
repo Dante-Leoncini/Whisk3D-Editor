@@ -240,7 +240,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
                        : (m->meshTipo == (int)MeshType::cone)     ? "Add Cone"
                        : (m->meshTipo == (int)MeshType::cylinder) ? "Add Cylinder"
                                                                   : "Add Circle";
-    grupo = new GroupPropertie(titulo);
+    grupo = new GroupPropertie(T(titulo));
     grupo->anchoValores = 0.5f;
 
     if (m->meshTipo == (int)MeshType::circle){

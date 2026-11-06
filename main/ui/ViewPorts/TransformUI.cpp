@@ -66,23 +66,23 @@ std::string TransformUITexto2D(int modo, float d1, float d2, float ang, float fa
         const char* op = (modo == 2) ? T("Rotate") : (modo == 3) ? T("Scale") : T("Move");
         const char* unit = (modo == 2) ? "\xC2\xB0" : unidad;
         std::string suf;
-        if (modo != 2 && ejeLock == 1) suf = std::string("  along ") + ejeA;
-        if (modo != 2 && ejeLock == 2) suf = std::string("  along ") + ejeB;
+        if (modo != 2 && ejeLock == 1) suf = std::string("  ") + T("along") + " " + ejeA;
+        if (modo != 2 && ejeLock == 2) suf = std::string("  ") + T("along") + " " + ejeB;
         return std::string(op) + ": " + TransformUITextoNum(unit) + suf;
     }
-    if (modo == 2) return std::string("Rotate  ") + W3dFmtFloat(ang, 1) + "\xC2\xB0";
+    if (modo == 2) return std::string(T("Rotate")) + "  " + W3dFmtFloat(ang, 1) + "\xC2\xB0";
     if (modo == 3){
         std::string s = std::string(T("Scale")) + ": " + W3dFmtFloat(fac, 4);
-        if (ejeLock == 1) s += std::string("  along ") + ejeA;
-        if (ejeLock == 2) s += std::string("  along ") + ejeB;
+        if (ejeLock == 1) s += std::string("  ") + T("along") + " " + ejeA;
+        if (ejeLock == 2) s += std::string("  ") + T("along") + " " + ejeB;
         return s;
     }
     // mover: un eje bloqueado muestra SOLO ese eje (como el 3D); libre muestra los dos
-    if (ejeLock == 1) return std::string("Translate ") + ejeA + ": " + W3dFmtFloat(d1, 4) + unidad +
-                             "  along " + ejeA;
-    if (ejeLock == 2) return std::string("Translate ") + ejeB + ": " + W3dFmtFloat(d2, 4) + unidad +
-                             "  along " + ejeB;
-    return std::string("Translate  ") + ejeA + ": " + W3dFmtFloat(d1, 4) + unidad +
+    if (ejeLock == 1) return std::string(T("Translate")) + " " + ejeA + ": " + W3dFmtFloat(d1, 4) + unidad +
+                             "  " + T("along") + " " + ejeA;
+    if (ejeLock == 2) return std::string(T("Translate")) + " " + ejeB + ": " + W3dFmtFloat(d2, 4) + unidad +
+                             "  " + T("along") + " " + ejeB;
+    return std::string(T("Translate")) + "  " + ejeA + ": " + W3dFmtFloat(d1, 4) + unidad +
            "  " + ejeB + ": " + W3dFmtFloat(d2, 4) + unidad;
 }
 

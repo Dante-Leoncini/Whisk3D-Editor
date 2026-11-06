@@ -110,6 +110,7 @@
 #include "io/MallasProyecto.h"   // las mallas 3D como RECURSO: plan de guardado + registro "mallas"
 #include "objects/MallaRecurso.h"
 #include <stdio.h>
+#include <string.h>    // strlen: el buffer de los avisos se mide con el formato traducido
 #include <string>
 #include <vector>
 #include <algorithm>   // std::sort: los refs de script se escriben en orden deterministico
@@ -536,7 +537,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
     if (!falta.empty()) {
         w3dLogfE("[W3D] '%s': el .w3dm REQUIERE el bloque '%s' y esta version no lo entiende: NO guardo encima",
                  nombreObj.c_str(), falta.c_str());
-        W3dAvisof(true, "No guardo '%s': su malla necesita el bloque '%s' de una version mas nueva de Whisk3D",
+        W3dAvisof(true, T("Not saving '%s': its mesh needs the block '%s' from a newer version of Whisk3D"),
                   W3dNombreCorto(nombreObj).c_str(), W3dNombreCorto(falta, 16).c_str());
         cx->error = true;   // no hay medio guardado posible: o sale entero o no sale
         return nom;
@@ -550,7 +551,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
     if (m->w3dmAjenos.noCargo) {
         w3dLogfE("[W3D] '%s': su geometria NO se pudo leer (la malla quedo vacia): NO guardo encima",
                  nombreObj.c_str());
-        W3dAvisof(true, "No guardo '%s': su geometria no se pudo leer al abrir y guardarla la borraria",
+        W3dAvisof(true, T("Not saving '%s': its geometry could not be read when opening and saving would erase it"),
                   W3dNombreCorto(nombreObj).c_str());
         cx->error = true;   // no hay medio guardado posible: o sale entero o no sale
         return nom;
@@ -561,7 +562,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
     //  caras: se frena igual que con "no cargo".
     if (!m->edicionPendiente.empty() && !W3dMallaBinMaterializarEdicion(m)) {
         w3dLogfE("[W3D] '%s': no pude leer las caras de su entrada .w3db: NO guardo encima", nombreObj.c_str());
-        W3dAvisof(true, "No guardo '%s': no pude leer sus caras y guardarla las borraria",
+        W3dAvisof(true, T("Not saving '%s': could not read its faces and saving would erase them"),
                   W3dNombreCorto(nombreObj).c_str());
         cx->error = true;
         return nom;
@@ -572,7 +573,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
     //  sincronico de punta a punta y el popup es asincronico, asi que por ahora se
     //  avisa FUERTE (no se hornea en silencio) y queda pendiente el confirmar.
     if (m->w3dmAjenos.truncado)
-        W3dAvisof(true, "'%s' se habia abierto CON ERRORES (archivo cortado): al guardar, lo que faltaba se pierde",
+        W3dAvisof(true, T("'%s' was opened WITH ERRORS (truncated file): when saving, whatever was missing is lost"),
                   W3dNombreCorto(nombreObj).c_str());
 
     // ---- LA MALLA SE GUARDA EN REPOSO, NO EN LA POSE DEL PLAYHEAD --------------
@@ -605,7 +606,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
         if (pideBinario) {   // el proyecto pedia binario y esta malla no entra (ver arriba)
             w3dLogfW("[W3D] '%s': %d vertices de render y esta plataforma usa indices de 16 bits: la guardo en texto (.w3dm)",
                      nombreObj.c_str(), nRV);
-            W3dAvisof(false, "'%s' tiene mas de 65535 vertices: la guardo en texto (.w3dm), no en binario",
+            W3dAvisof(false, T("'%s' has more than 65535 vertices: saving it as text (.w3dm), not binary"),
                       W3dNombreCorto(nombreObj).c_str());
         }
         escrita = W3dMallaEscribir(m, txt, &avisos);
@@ -625,8 +626,8 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
     for (size_t i = 0; i < avisos.size(); i++)
         w3dLogfW("[W3D] '%s': %s", nombreObj.c_str(), avisos[i].c_str());
     if (!avisos.empty())
-        W3dAvisof(true, "'%s': %s%s", W3dNombreCorto(nombreObj).c_str(), avisos[0].c_str(),
-                  avisos.size() > 1 ? " (y mas: ver whisk3d.log)" : "");
+        W3dAvisof(true, avisos.size() > 1 ? T("'%s': %s (and more: see whisk3d.log)") : "'%s': %s",
+                  W3dNombreCorto(nombreObj).c_str(), avisos[0].c_str());
     if (!cx->esc->AgregarBytes(nom, txt, false)) {
         w3dLogfE("GuardarW3D: no pude meter %s adentro del .w3d", nom.c_str());
         cx->error = true;
@@ -829,7 +830,7 @@ static void EscribirAnimsVertex(std::string& s, Mesh* m, int ind, CtxGuardar* cx
         if (!a || !a->noCargo) continue;
         w3dLogfE("[W3D] '%s': los frames de la vertex anim '%s' no se pudieron leer al abrir: NO guardo encima",
                  m->name.c_str(), a->name.c_str());
-        W3dAvisof(true, "No guardo '%s': los frames de su animacion '%s' no se pudieron leer al abrir y guardarlos los borraria",
+        W3dAvisof(true, T("Not saving '%s': the frames of its animation '%s' could not be read when opening and saving would erase them"),
                   W3dNombreCorto(m->name).c_str(), W3dNombreCorto(a->name).c_str());
         cx->error = true;
         return;
@@ -3061,7 +3062,7 @@ bool GuardarW3D(const std::string& ruta) {
     if (!g_w3dUINoCargo.empty()) {
         w3dLogfE("[W3D] la escena UI '%s' no cargo al abrir: NO guardo encima (se perderia del proyecto)",
                  g_w3dUINoCargo.c_str());
-        W3dAvisof(true, "No guardo: la escena UI '%s' no se pudo leer al abrir y guardar la sacaria del proyecto",
+        W3dAvisof(true, T("Not saving: the UI scene '%s' could not be read when opening and saving would remove it from the project"),
                   W3dNombreCorto(g_w3dUINoCargo).c_str());
         return false;
     }
@@ -3087,7 +3088,7 @@ bool GuardarW3D(const std::string& ruta) {
             if (fs[i].cargaFallo) {
                 w3dLogfE("[W3D] %s '%s' no se pudo leer al abrirla: NO guardo encima (se perderia)",
                          W3dRaizTipoClave(fs[i].tipo), fs[i].nombre.c_str());
-                W3dAvisof(true, "No guardo: '%s' no se pudo leer y guardar la dejaria vacia",
+                W3dAvisof(true, T("Not saving: '%s' could not be read and saving would leave it empty"),
                           W3dNombreCorto(fs[i].nombre).c_str());
                 return false;
             }
@@ -3464,23 +3465,28 @@ bool GuardarW3D(const std::string& ruta) {
         TexEditProyectoGuardado();   // las texturas que vivian en memoria ya estan adentro del .w3d
         { extern void W3dCambiosFoto(); W3dCambiosFoto(); }   // todo guardado: se apagan los '*' (CambiosProyecto)
         size_t nExt = esc.CantidadExternos(), nFaltan = esc.CantidadExternosQueFaltan();
-        char b[256];
+        // (el texto sale en el idioma del editor: las traducciones en cirilico ocupan el doble de bytes, y el
+        //  nombre del archivo no tiene cota -> el buffer se dimensiona con el formato traducido y el nombre)
+        const std::string nomArch = Base(ruta);
         if (nFaltan > 0) {
             // EL AVISO TIENE QUE DECIR COMO APAGARLO. El caso comun de lejos es el .obj/.fbx
             // del que se importo una malla: la geometria ya viaja horneada adentro, o sea que
             // ese renglon es SOLO procedencia y el aviso, sin salida, era ruido para siempre.
-            snprintf(b, sizeof(b), "Guardado, pero %d archivo(s) externo(s) NO estan (ver EXTERNOS.txt). "
-                     "Si es el original de una malla importada: Object > Set Origin > Clear Original File",
-                     (int)nFaltan);
-            Notificar(b, true);
+            const char* fmt = T("Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). "
+                                "If it is the original of an imported mesh: Object > Set Origin > Clear Original File");
+            std::vector<char> b(strlen(fmt) + 64);
+            snprintf(&b[0], b.size(), fmt, (int)nFaltan);
+            Notificar(&b[0], true);
         } else if (nExt > 0) {
-            snprintf(b, sizeof(b), "Proyecto guardado: %s (%d referencia(s) externa(s), ver EXTERNOS.txt)",
-                     Base(ruta).c_str(), (int)nExt);
-            Notificar(b, false);
+            const char* fmt = T("Project saved: %s (%d external reference(s), see EXTERNOS.txt)");
+            std::vector<char> b(strlen(fmt) + nomArch.size() + 64);
+            snprintf(&b[0], b.size(), fmt, nomArch.c_str(), (int)nExt);
+            Notificar(&b[0], false);
         } else if (gNoCubiertos > 0) {
-            snprintf(b, sizeof(b), "Guardado (ojo: %d curva(s) sin archivo de origen no se guardan)",
-                     gNoCubiertos);
-            Notificar(b, true);
+            const char* fmt = T("Saved (note: %d curve(s) without a source file are not saved)");
+            std::vector<char> b(strlen(fmt) + 64);
+            snprintf(&b[0], b.size(), fmt, gNoCubiertos);
+            Notificar(&b[0], true);
         } else {
             Notificar(T("Project saved: ") + Base(ruta), false);
         }
@@ -3524,8 +3530,8 @@ static void GuardarElegido(const std::string& elegido) {
     g_guardarPendiente = W3dRutaDeSalida(elegido, NombreProyectoSugerido(), ".w3d");
     if (w3dFileSystem::FileExists(g_guardarPendiente)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("The file \"" + Base(g_guardarPendiente) +
-                              "\" already exists. Do you want to replace it?", GuardarPendienteAhora);
+        confirmarPopup->Abrir(std::string(T("The file \"")) + Base(g_guardarPendiente) +
+                              T("\" already exists. Do you want to replace it?"), GuardarPendienteAhora);
         return;
     }
     GuardarPendienteAhora();
@@ -3533,9 +3539,9 @@ static void GuardarElegido(const std::string& elegido) {
 
 void GuardarProyecto() {
     if (!w3dPath.empty()) { GuardarW3D(w3dPath); return; }
-    AbrirFileBrowser("Guardar proyecto", "Guardar", ".w3d", GuardarElegido, true /*guardar*/);
+    AbrirFileBrowser(T("Save project"), T("Save"), ".w3d", GuardarElegido, true /*guardar*/);
 }
 
 void GuardarProyectoComo() {
-    AbrirFileBrowser("Guardar proyecto como", "Guardar", ".w3d", GuardarElegido, true /*guardar*/);
+    AbrirFileBrowser(T("Save As"), T("Save"), ".w3d", GuardarElegido, true /*guardar*/);
 }

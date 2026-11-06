@@ -4,6 +4,7 @@
 #include <string>
 #include <cstdio>
 #include <cstdarg>
+#include "W3dLang.h"   // T(): el formato de los avisos sale en el idioma del editor
 
 // Notificar vive en LayoutInput.cpp (toasts). Se declara aca para no arrastrar
 // Notificaciones.h a los .cpp del modelo (ObjectMode/MeshEdit ya lo forward-declaraban).
@@ -55,15 +56,16 @@ inline void W3dAvisof(bool error, const char* fmt, ...) {
 }
 
 // ---- los DOS avisos de nombres que se repiten en todo el editor -------------
-// "'Pedido' ya existe -> 'Pedido.001'" (informativo, no es un error)
+// "'Pedido' already exists -> 'Pedido.001'" (informativo, no es un error)
 inline void W3dAvisoYaExiste(const std::string& pedido, const std::string& quedo) {
-    W3dAvisof(false, "'%s' ya existe -> '%s'",
+    W3dAvisof(false, T("'%s' already exists -> '%s'"),
               W3dNombreCorto(pedido).c_str(), W3dNombreCorto(quedo).c_str());
 }
-// "N hueso(s) 'Viejo' -> 'Nuevo' (binding por nombre)": el arrastre de la OTRA punta
-// de un vinculo por nombre. 'que' = "hueso(s)" / "hueso(s) 2D" / "vertex group(s)" / "UV group(s)".
+// "N bone(s) 'Viejo' -> 'Nuevo' (binding by name)": el arrastre de la OTRA punta
+// de un vinculo por nombre. 'que' ya viene TRADUCIDO: T("bone(s)") / T("2D bone(s)") /
+// T("vertex group(s)") / T("UV group(s)").
 inline void W3dAvisoArrastre(int n, const char* que, const std::string& viejo, const std::string& nuevo) {
-    W3dAvisof(false, "%d %s '%s' -> '%s' (binding por nombre)",
+    W3dAvisof(false, T("%d %s '%s' -> '%s' (binding by name)"),
               n, que ? que : "?", W3dNombreCorto(viejo).c_str(), W3dNombreCorto(nuevo).c_str());
 }
 

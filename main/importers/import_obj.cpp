@@ -1304,7 +1304,7 @@ bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifie
     std::ofstream obj(filepath.c_str());
     if (!obj.is_open()) { w3dLogfE("ExportOBJ: no se pudo abrir '%s' errno=%d (%s)", filepath.c_str(), errno, strerror(errno)); return false; }
 
-    ProgresoIniciar("Exporting model..."); // barra de progreso (no-op sin GUI; clave en el N95)
+    ProgresoIniciar(T("Exporting model...")); // barra de progreso (no-op sin GUI; clave en el N95)
 
     std::string base   = ExtractBaseName(filepath);
     std::string mtlNom = base + ".mtl";
@@ -1537,7 +1537,7 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     }
 
     w3dLogf("ImportOBJ: '%s' -> %d lineas", filepath.c_str(), (int)lines.size());
-    ProgresoIniciar("Importing model..."); // barra de progreso (clave en el N95: importar tarda)
+    ProgresoIniciar(T("Importing model...")); // barra de progreso (clave en el N95: importar tarda)
 
     size_t idx = 0;
     int objetosCargados = 0;

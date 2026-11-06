@@ -9,6 +9,7 @@
 #include "WhiskUI/widgets/TextField.h"              // TextFieldInputChar (mismo camino que el teclado fisico)
 #include "WhiskUI/text/bitmapText.h"
 #include "WhiskUI/text/font.h"                   // WhiskFont->getMeshTri (barra de espacio: guion estirado)
+#include "W3dLang.h"                             // T(): el titulo y los softkeys del popup de simbolos
 #include <cstdio>   // snprintf (resultado -> texto)
 #include <cstdlib>  // strtod (evaluador)
 #include <cstring>  // strcmp (tokens de tecla: "OK" "DEL" "<" ">")
@@ -545,7 +546,7 @@ static void SimbInsertar(const char* s){
     else if (g_textFieldActivo) TextFieldInputChar((int)c);
 }
 
-SimbolosPopup::SimbolosPopup() : PopUpBase("seleccionar simbolo") {
+SimbolosPopup::SimbolosPopup() : PopUpBase(T("Select symbol")) {
     celda = new Card(NULL, 10, 10);
     celW = celH = recentY = gridY = 0;
     focoFila = 0; focoCol = 0;
@@ -616,9 +617,9 @@ void SimbolosPopup::Render(){
       int barTY = barraY + (celH - RenglonHeightGS) / 2;
       w3dEngine::Color4f(acc[0], acc[1], acc[2], 1.0f);
       w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)barTY, 0);
-      RenderBitmapText(std::string("aceptar"), textAlign::left, popUpWindow->width / 2); w3dEngine::PopMatrix();
+      RenderBitmapText(std::string(T("Accept")), textAlign::left, popUpWindow->width / 2); w3dEngine::PopMatrix();
       w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(popUpWindow->width - borderGS - gapGS), (GLfloat)barTY, 0);
-      RenderBitmapText(std::string("cancelar"), textAlign::right, popUpWindow->width / 2); w3dEngine::PopMatrix(); }
+      RenderBitmapText(std::string(T("Cancel")), textAlign::right, popUpWindow->width / 2); w3dEngine::PopMatrix(); }
     endView();
 }
 

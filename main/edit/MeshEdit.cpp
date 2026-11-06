@@ -3854,7 +3854,7 @@ std::string VertexGroupRenombrar(Mesh* m, int idx, const std::string& pedido) {
         if (std::string* p = W3dDestResolver(aRenombrar[k])) *p = nuevo;
     ListaDeMallaCambio(m);
     m->lastSkinFrame = -999999;          // el CSR de skinning hashea los nombres
-    if (nb > 0) W3dAvisoArrastre(nb, "hueso(s)", viejo, nuevo);
+    if (nb > 0) W3dAvisoArrastre(nb, T("bone(s)"), viejo, nuevo);
     if (nuevo != W3dNombreNormalizar(pedido, "Group"))
         W3dAvisoYaExiste(W3dNombreNormalizar(pedido, "Group"), nuevo);
     return nuevo;
@@ -3924,7 +3924,7 @@ std::string UVGroupRenombrar(Mesh* m, int idx, const std::string& pedido) {
         if (std::string* p = W3dDestResolver(aRenombrar[k])) *p = nuevo;
     ListaDeMallaCambio(m);
     m->pose2dDirty = true;
-    if (nb > 0) W3dAvisoArrastre(nb, "hueso(s) 2D", viejo, nuevo);
+    if (nb > 0) W3dAvisoArrastre(nb, T("2D bone(s)"), viejo, nuevo);
     if (nuevo != W3dNombreNormalizar(pedido, "UV Group"))
         W3dAvisoYaExiste(W3dNombreNormalizar(pedido, "UV Group"), nuevo);
     return nuevo;

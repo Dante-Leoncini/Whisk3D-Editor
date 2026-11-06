@@ -207,7 +207,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
     for (size_t i = 0; i < meshes.size() && !arm; i++) if (meshes[i]->skinArmature) arm = meshes[i]->skinArmature;
     int nBones = arm ? (int)arm->bones.size() : 0;
 
-    ProgresoIniciar("Exporting glTF...");
+    ProgresoIniciar(T("Exporting glTF..."));
 
     Bufb buf;
     std::vector<std::string> nodesJson, meshesJson, animsJson, matsJson, texsJson, imgsJson;
@@ -687,6 +687,6 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
     ProgresoFin();
     w3dLogf("ExportGLTF: %s (%d malla(s), %d hueso(s), %d clip(s), buffer=%d bytes)", filepath.c_str(), (int)meshesJson.size(), nBones, (int)animsJson.size(), (int)buf.bin.size());
     W3dDescargarSiWeb(filepath);   // navegador: bajar el archivo a la PC (el disco de emscripten es virtual)
-    Notificar(binary ? "GLB saved successfully!" : "glTF saved successfully!", false);
+    Notificar(T(binary ? "GLB saved successfully!" : "glTF saved successfully!"), false);
     return true;
 }

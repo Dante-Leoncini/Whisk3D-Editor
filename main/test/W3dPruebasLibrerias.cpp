@@ -77,6 +77,7 @@
 //        enemigos=1 sonoro=listo")
 //    libmover <de> <a>                    renombra un archivo de disco (una libreria que FALTA y despues vuelve)
 // ============================================================================
+#include "W3dLang.h"   // T(): el aviso del material sale en el idioma del sistema
 #include "test/W3dPruebasLibrerias.h"
 #include "test/W3dScript.h"            // W3dRunCommand("prefabenemigo ...")
 #include "objects/Objects.h"
@@ -600,7 +601,7 @@ bool CmdLibPropsMat(std::istringstream& ss, std::string& err) {
     if (p->pestaniaActiva != 2 && p->BarTabs.size() > 2 && p->BarTabs[2]->visible) { p->pestaniaActiva = 2; p->ActualizarPestanias(); }
     rootViewport->Render();
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) p->Rebind();
-    const bool lectura = p->propMsgDefault && !p->propMsgDefault->oculto && p->propMsgDefault->name.find("library") != std::string::npos &&
+    const bool lectura = p->propMsgDefault && !p->propMsgDefault->oculto && p->propMsgDefault->name == T("It belongs to a library (read-only): open the library to edit it") &&
                          p->propBtnNewMaterial && p->propBtnNewMaterial->oculto;
     std::string tarjeta = "-";
     if (p->propPrefab && p->propPrefab->visible)

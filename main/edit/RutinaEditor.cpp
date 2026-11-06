@@ -82,17 +82,17 @@ static bool PunterosAlDia(Rutina* r) {
 
 // un rango de triangulos [a, b] de una parte de 'tris' triangulos (b < 0 = hasta el ultimo). "" = esta bien
 static std::string RangoMalo(int a, int b, int tris, const std::string& malla) {
-    char buf[220];
+    char buf[320];   // (traducido puede ocupar el doble: el cirilico va en 2 bytes)
     if (a < 0 || a >= tris) {
-        snprintf(buf, sizeof buf, "first triangle %d does not exist: the part of '%s' has %d triangles (0..%d)", a, malla.c_str(), tris, tris - 1);
+        snprintf(buf, sizeof buf, T("first triangle %d does not exist: the part of '%s' has %d triangles (0..%d)"), a, malla.c_str(), tris, tris - 1);
         return buf;
     }
     if (b >= tris) {
-        snprintf(buf, sizeof buf, "last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or max)", b, malla.c_str(), tris, tris - 1);
+        snprintf(buf, sizeof buf, T("last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or max)"), b, malla.c_str(), tris, tris - 1);
         return buf;
     }
     if (b >= 0 && b < a) {
-        snprintf(buf, sizeof buf, "last triangle %d is before the first one (%d)", b, a);
+        snprintf(buf, sizeof buf, T("last triangle %d is before the first one (%d)"), b, a);
         return buf;
     }
     return std::string();
@@ -120,7 +120,7 @@ struct Punteros {
     int uvCapa;                 // la capa de UV a la que apunta el de UV (0 = la de render; k = uvExtra[k])
     void Olvidar() { for (int k = 0; k < 4; k++) { m[k] = 0; on[k] = -1; conocido[k] = false; } uvNormales = false; uvCapa = 0; }
 };
-static const char* const kArrayNombre[4] = { "vertex", "normal", "UV", "color" };
+static const char* const kArrayNombre[4] = { "vertex array", "normal array", "UV array", "color array" };   // (avisos: pasan por T())
 static const char* const kArrayPaso[4] = { "Vertex pointer", "Normal pointer", "UV pointer", "Color pointer" };
 // (en RAM o, si la malla solto su RAM -soloGPU, MallaRecurso.h-, en su VBO)
 static bool TieneArray(const MallaRecurso* r, int k) {
@@ -138,35 +138,35 @@ static void Leido(const float* p, int n) { if (gLecturas && p && n > 0) gLectura
 
 // "Dibujar elementos": la malla, la parte, que los punteros alcancen sus indices y el rango
 static bool DibujarOk(const W3dPaso& p, int num, const Punteros& pu, std::string& motivo) {
-    char buf[300];
+    char buf[512];   // (traducido puede ocupar el doble: el cirilico va en 2 bytes)
     MallaRecurso* m = (MallaRecurso*)p.ptr;
     if (!W3dMallaRecursoTieneArray(m, W3DMD_FACES) || m->facesSize < 1) {
-        snprintf(buf, sizeof buf, "step %d: mesh '%s' has no geometry loaded", num, p.ref.c_str()); motivo = buf; return false;
+        snprintf(buf, sizeof buf, T("step %d: mesh '%s' has no geometry loaded"), num, p.ref.c_str()); motivo = buf; return false;
     }
     const int nPartes = (int)m->partes.size();
     if (p.entero < -1 || p.entero >= (nPartes > 0 ? nPartes : 1)) {
-        snprintf(buf, sizeof buf, "step %d: mesh '%s' has %d parts (part %d does not exist; -1 = all)", num,
+        snprintf(buf, sizeof buf, T("step %d: mesh '%s' has %d parts (part %d does not exist; -1 = all)"), num,
                  p.ref.c_str(), nPartes, p.entero);
         motivo = buf; return false;
     }
     if (p.modo < 0 || p.modo >= RPrimN) {
-        snprintf(buf, sizeof buf, "step %d (Draw elements): primitive %d does not exist", num, p.modo); motivo = buf; return false;
+        snprintf(buf, sizeof buf, T("step %d (Draw elements): primitive %d does not exist"), num, p.modo); motivo = buf; return false;
     }
     // los ARRAYS: el de vertices prendido, apuntado y alcanzando el indice mas alto de la parte; cada array que puede
     // estar PRENDIDO (normales, uv, colores) apuntado por esta rutina a una malla con ese array y AL MENOS los vertices
     // del de vertices (si tiene menos, GL lee de mas). Uno que no se sabe si esta prendido (lo dejo lo que se dibujo
     // antes, los hijos) hay que fijarlo con "Array on/off"
     if (pu.on[0] == 0) {
-        snprintf(buf, sizeof buf, "step %d (Draw elements): the vertex array is off (Array on/off)", num); motivo = buf; return false;
+        snprintf(buf, sizeof buf, T("step %d (Draw elements): the vertex array is off (Array on/off)"), num); motivo = buf; return false;
     }
     if (pu.conocido[0]) {
         const MallaRecurso* v = pu.m[0];
         if (!v) {
-            snprintf(buf, sizeof buf, "step %d (Draw elements): there is no Vertex pointer before it", num); motivo = buf; return false;
+            snprintf(buf, sizeof buf, T("step %d (Draw elements): there is no Vertex pointer before it"), num); motivo = buf; return false;
         }
         const int maxIdx = W3dMallaParteMaxIndice(m, p.entero);
         if (maxIdx >= v->vertexSize) {
-            snprintf(buf, sizeof buf, "step %d (Draw elements): the part uses vertices up to %d but the vertex pointer ('%s') has %d",
+            snprintf(buf, sizeof buf, T("step %d (Draw elements): the part uses vertices up to %d but the vertex pointer ('%s') has %d"),
                      num, maxIdx, v->nombre.c_str(), v->vertexSize);
             motivo = buf; return false;
         }
@@ -175,21 +175,21 @@ static bool DibujarOk(const W3dPaso& p, int num, const Punteros& pu, std::string
             const MallaRecurso* q = pu.m[k];
             if (!q) {
                 if (pu.on[k] == 1)
-                    snprintf(buf, sizeof buf, "step %d (Draw elements): the %s array is on but this routine did not point it: add a %s "
-                             "before (or turn the array off with Array on/off)", num, kArrayNombre[k], kArrayPaso[k]);
+                    snprintf(buf, sizeof buf, T("step %d (Draw elements): the %s is on but this routine did not point it: add a %s "
+                             "before (or turn the array off with Array on/off)"), num, T(kArrayNombre[k]), T(kArrayPaso[k]));
                 else
-                    snprintf(buf, sizeof buf, "step %d (Draw elements): the %s array may be on (it depends on what was drawn "
-                             "before): turn it on or off with Array on/off before drawing", num, kArrayNombre[k]);
+                    snprintf(buf, sizeof buf, T("step %d (Draw elements): the %s may be on (it depends on what was drawn "
+                             "before): turn it on or off with Array on/off before drawing"), num, T(kArrayNombre[k]));
                 motivo = buf; return false;
             }
             if (!(k == 2 && pu.uvNormales ? TieneArray(q, 1) : (k == 2 && pu.uvCapa > 0) ? TieneCapaUV(q, pu.uvCapa) : TieneArray(q, k))) {
-                snprintf(buf, sizeof buf, "step %d (Draw elements): the %s array is on but its pointer's mesh ('%s') has no %s array "
-                         "(turn the array off with Array on/off)", num, kArrayNombre[k], q->nombre.c_str(), kArrayNombre[k]);
+                snprintf(buf, sizeof buf, T("step %d (Draw elements): the %s is on but its pointer's mesh ('%s') has no %s "
+                         "(turn the array off with Array on/off)"), num, T(kArrayNombre[k]), q->nombre.c_str(), T(kArrayNombre[k]));
                 motivo = buf; return false;
             }
             if (q->vertexSize < v->vertexSize) {
-                snprintf(buf, sizeof buf, "step %d (Draw elements): the %s pointer ('%s', %d vertices) has fewer vertices than the "
-                         "vertex pointer ('%s', %d)", num, kArrayNombre[k], q->nombre.c_str(), q->vertexSize,
+                snprintf(buf, sizeof buf, T("step %d (Draw elements): the %s ('%s', %d vertices) has fewer vertices than the "
+                         "Vertex pointer ('%s', %d)"), num, T(kArrayPaso[k]), q->nombre.c_str(), q->vertexSize,
                          v->nombre.c_str(), v->vertexSize);
                 motivo = buf; return false;
             }
@@ -197,7 +197,7 @@ static bool DibujarOk(const W3dPaso& p, int num, const Punteros& pu, std::string
     }
     if (p.sub == RangoParte) return true;
     if (p.modo != RPrimTriangulos) {
-        snprintf(buf, sizeof buf, "step %d (Draw elements): a manual range or an array needs the Triangles primitive", num);
+        snprintf(buf, sizeof buf, T("step %d (Draw elements): a manual range or an array needs the Triangles primitive"), num);
         motivo = buf; return false;
     }
     const int tris = W3dMallaFlujoIndices(m, p.entero, RPrimTriangulos) / 3;
@@ -205,17 +205,17 @@ static bool DibujarOk(const W3dPaso& p, int num, const Punteros& pu, std::string
         Leido(p.n[0].p, 1); Leido(p.n[1].p, 1);
         std::string e = RangoMalo((int)p.n[0].Valor(), (int)p.n[1].Valor(), tris, p.ref);
         if (e.empty()) return true;
-        snprintf(buf, sizeof buf, "step %d (Draw elements): %s", num, e.c_str()); motivo = buf; return false;
+        snprintf(buf, sizeof buf, T("step %d (Draw elements): %s"), num, e.c_str()); motivo = buf; return false;
     }
     if (p.sub == RangoArray) {
         const W3dNum& arr = p.n[2];
         if (arr.ref.empty()) {
-            snprintf(buf, sizeof buf, "step %d (Draw elements): choose the array (a memory: @name[i])", num); motivo = buf; return false;
+            snprintf(buf, sizeof buf, T("step %d (Draw elements): choose the array (a memory: @name[i])"), num); motivo = buf; return false;
         }
         const float* a = arr.p;
         const W3dNum& ban = p.n[3];   // (opcional: con banderas cada rango lleva la suya)
         if (!ban.ref.empty() && !ban.p) {
-            snprintf(buf, sizeof buf, "step %d (Draw elements): the flags have to be a memory (@name[i])", num); motivo = buf; return false;
+            snprintf(buf, sizeof buf, T("step %d (Draw elements): the flags have to be a memory (@name[i])"), num); motivo = buf; return false;
         }
         const int ancho = ban.p ? 3 : 2;
         const int i0 = W3dMemoriaIndice(arr.ref);
@@ -224,14 +224,14 @@ static bool DibujarOk(const W3dPaso& p, int num, const Punteros& pu, std::string
         const int k = (int)a[0];
         Leido(a, 1 + ((k > 0 && k <= maxPares) ? k * ancho : 0));
         if (k < 0 || k > maxPares) {
-            snprintf(buf, sizeof buf, "step %d (Draw elements): array %s says %d ranges (0..%d fit from there)", num,
+            snprintf(buf, sizeof buf, T("step %d (Draw elements): array %s says %d ranges (0..%d fit from there)"), num,
                      arr.ref.c_str(), k, maxPares);
             motivo = buf; return false;
         }
         for (int j = 0; j < k; j++) {
             const float* e0 = a + 1 + ancho * j;
             if (ban.p && (e0[2] < 0 || (int)e0[2] >= banTam)) {
-                snprintf(buf, sizeof buf, "step %d (Draw elements): array %s, range %d: flag %d out of %s", num, arr.ref.c_str(), j,
+                snprintf(buf, sizeof buf, T("step %d (Draw elements): array %s, range %d: flag %d out of %s"), num, arr.ref.c_str(), j,
                          (int)e0[2], ban.ref.c_str());
                 motivo = buf; return false;
             }
@@ -239,12 +239,12 @@ static bool DibujarOk(const W3dPaso& p, int num, const Punteros& pu, std::string
             if (ra >= 0 && ra < tris && rb < tris && (rb < 0 || rb >= ra)) continue;   // (lo de RangoMalo, sin armar texto)
             std::string e = RangoMalo(ra, rb, tris, p.ref);
             if (e.empty()) continue;
-            snprintf(buf, sizeof buf, "step %d (Draw elements): array %s, range %d: %s", num, arr.ref.c_str(), j, e.c_str());
+            snprintf(buf, sizeof buf, T("step %d (Draw elements): array %s, range %d: %s"), num, arr.ref.c_str(), j, e.c_str());
             motivo = buf; return false;
         }
         return true;
     }
-    snprintf(buf, sizeof buf, "step %d (Draw elements): unknown range %d", num, p.sub); motivo = buf; return false;
+    snprintf(buf, sizeof buf, T("step %d (Draw elements): unknown range %d"), num, p.sub); motivo = buf; return false;
 }
 
 // la profundidad maxima que agrega una lista y si cierra en 0; -1 = error (motivo escrito)
@@ -252,8 +252,12 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
                        Punteros& pu);
 
 static int ProfRutina(Rutina* r, std::string& motivo, std::set<Rutina*>& pila, int nivel, Punteros& pu) {
-    if (pila.count(r)) { motivo = "routine '" + r->name + "' calls itself (cycle)"; return -1; }
-    if (nivel > 8) { motivo = "too many nested routines"; return -1; }
+    if (pila.count(r)) {
+        char buf[400];   // (snprintf acotado: un nombre larguisimo se corta, no desborda)
+        snprintf(buf, sizeof buf, T("routine '%s' calls itself (cycle)"), r->name.c_str());
+        motivo = buf; return -1;
+    }
+    if (nivel > 8) { motivo = T("too many nested routines"); return -1; }
     if (r->sucia || !PunterosAlDia(r)) r->Resolver();   // (una subrutina que nunca se dibujo sola: sus nombres)
     pila.insert(r);
     int prof = Profundidad(r, r->ListaActual(), motivo, pila, nivel, pu);
@@ -263,7 +267,7 @@ static int ProfRutina(Rutina* r, std::string& motivo, std::set<Rutina*>& pila, i
 
 static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, std::set<Rutina*>& pila, int nivel,
                        Punteros& pu) {
-    char buf[260];
+    char buf[400];   // (traducido puede ocupar el doble: el cirilico va en 2 bytes)
     int d = 0, maxd = 0;
     // donde termina cada salto (lo salteado tiene que dejar la pila como la encontro): por paso destino, la profundidad
     // que tiene que tener la pila al llegar (INT_MIN = ningun salto llega ahi; INT_MAX = llegan dos con distinta, que es
@@ -272,47 +276,47 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
     for (size_t i = 0; i < L.size(); i++) {
         W3dPaso& p = L[i];
         const int num = (int)i + 1;
-        if (p.tipo >= PasoN) { snprintf(buf, sizeof buf, "step %d: unknown type", num); motivo = buf; return -1; }
+        if (p.tipo >= PasoN) { snprintf(buf, sizeof buf, T("step %d: unknown type"), num); motivo = buf; return -1; }
         for (int k = 0; k < W3dPasoNumeros(p); k++)
             if (!p.n[k].ref.empty() && !p.n[k].p) {
-                snprintf(buf, sizeof buf, "step %d (%s): bad memory reference '%s' (use @name[0..%d])", num,
-                         W3dPasoEtiqueta(p.tipo), p.n[k].ref.c_str(), W3D_MEMORIA_TAM - 1);
+                snprintf(buf, sizeof buf, T("step %d (%s): bad memory reference '%s' (use @name[0..%d])"), num,
+                         T(W3dPasoEtiqueta(p.tipo)), p.n[k].ref.c_str(), W3D_MEMORIA_TAM - 1);
                 motivo = buf; return -1;
             }
         const int rt = W3dPasoRef(p.tipo);
         if (rt == RefFuncion && p.ref.empty()) {
-            snprintf(buf, sizeof buf, "step %d (%s): write the name of the Lua function", num, W3dPasoEtiqueta(p.tipo));
+            snprintf(buf, sizeof buf, T("step %d (%s): write the name of the Lua function"), num, T(W3dPasoEtiqueta(p.tipo)));
             motivo = buf; return -1;
         }
         if (p.tipo == PasoLua && !p.ref2.empty() && !p.ptr2) {
-            snprintf(buf, sizeof buf, "step %d (%s): object '%s' not found", num, W3dPasoEtiqueta(p.tipo), p.ref2.c_str());
+            snprintf(buf, sizeof buf, T("step %d (%s): object '%s' not found"), num, T(W3dPasoEtiqueta(p.tipo)), p.ref2.c_str());
             motivo = buf; return -1;
         }
         const bool cajaEnMemoria = (p.tipo == PasoVisible && p.ref.empty() && p.n[1].p);   // (la caja, 6 numeros de una memoria)
         if (rt != RefNada && rt != RefFuncion && rt != RefShader && !p.ptr && !(p.tipo == PasoMatcap && !p.on) && !cajaEnMemoria) {   // (apagar el matcap: sin malla)
-            if (p.ref.empty()) snprintf(buf, sizeof buf, "step %d (%s): nothing chosen", num, W3dPasoEtiqueta(p.tipo));
-            else snprintf(buf, sizeof buf, "step %d (%s): '%s' not found", num, W3dPasoEtiqueta(p.tipo), p.ref.c_str());
+            if (p.ref.empty()) snprintf(buf, sizeof buf, T("step %d (%s): nothing chosen"), num, T(W3dPasoEtiqueta(p.tipo)));
+            else snprintf(buf, sizeof buf, T("step %d (%s): '%s' not found"), num, T(W3dPasoEtiqueta(p.tipo)), p.ref.c_str());
             motivo = buf; return -1;
         }
         if (!p.ref2.empty() && !p.ptr2) {
-            snprintf(buf, sizeof buf, "step %d (%s): object '%s' not found", num, W3dPasoEtiqueta(p.tipo), p.ref2.c_str());
+            snprintf(buf, sizeof buf, T("step %d (%s): object '%s' not found"), num, T(W3dPasoEtiqueta(p.tipo)), p.ref2.c_str());
             motivo = buf; return -1;
         }
         const int opc = W3dPasoOpciones(p.tipo);
         if (opc != OpcNada && (p.modo < 0 || p.modo >= W3dOpcionesN(opc))) {
-            snprintf(buf, sizeof buf, "step %d (%s): option %d does not exist (0..%d)", num, W3dPasoEtiqueta(p.tipo),
+            snprintf(buf, sizeof buf, T("step %d (%s): option %d does not exist (0..%d)"), num, T(W3dPasoEtiqueta(p.tipo)),
                      p.modo, W3dOpcionesN(opc) - 1);
             motivo = buf; return -1;
         }
         if (W3dPasoEntero(p.tipo) == EnteroLuz && (p.entero < 0 || p.entero >= W3D_RUTINA_LUCES)) {
-            snprintf(buf, sizeof buf, "step %d (%s): light %d does not exist (0..%d)", num, W3dPasoEtiqueta(p.tipo),
+            snprintf(buf, sizeof buf, T("step %d (%s): light %d does not exist (0..%d)"), num, T(W3dPasoEtiqueta(p.tipo)),
                      p.entero, W3D_RUTINA_LUCES - 1);
             motivo = buf; return -1;
         }
         switch (p.tipo) {
         case PasoApilar: d++; if (d > maxd) maxd = d; break;
         case PasoDesapilar:
-            if (--d < 0) { snprintf(buf, sizeof buf, "step %d: Pop matrix without its Push", num); motivo = buf; return -1; }
+            if (--d < 0) { snprintf(buf, sizeof buf, T("step %d: Pop matrix without its Push"), num); motivo = buf; return -1; }
             break;
         case PasoArray:
             pu.on[p.modo] = p.on ? 1 : 0;
@@ -325,7 +329,7 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
                 pu.uvNormales = false;
                 pu.uvCapa = p.entero;
                 if (p.entero < 0 || (p.entero > 0 && !TieneCapaUV((const MallaRecurso*)p.ptr, p.entero))) {
-                    snprintf(buf, sizeof buf, "step %d (UV pointer): mesh '%s' has no UV layer %d (0 = its render UV)", num,
+                    snprintf(buf, sizeof buf, T("step %d (UV pointer): mesh '%s' has no UV layer %d (0 = its render UV)"), num,
                              p.ref.c_str(), p.entero);
                     motivo = buf; return -1;
                 }
@@ -344,8 +348,8 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
             Object* o = (Object*)p.ptr;
             const Mesh* me = (o && o->getType() == ObjectType::mesh) ? (const Mesh*)o : NULL;
             if (!me || !me->malla) {
-                snprintf(buf, sizeof buf, "step %d (%s): '%s' is not a mesh object with a library mesh", num,
-                         W3dPasoEtiqueta(p.tipo), p.ref.c_str());
+                snprintf(buf, sizeof buf, T("step %d (%s): '%s' is not a mesh object with a library mesh"), num,
+                         T(W3dPasoEtiqueta(p.tipo)), p.ref.c_str());
                 motivo = buf; return -1;
             }
             if (p.tipo == PasoPunteroPose) {
@@ -369,11 +373,11 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
             break;
         case PasoVisible:
             if (p.n[0].ref.empty() || !p.n[0].p) {
-                snprintf(buf, sizeof buf, "step %d (Visibility test): 'Write to' has to be a memory (@name[i])", num);
+                snprintf(buf, sizeof buf, T("step %d (Visibility test): 'Write to' has to be a memory (@name[i])"), num);
                 motivo = buf; return -1;
             }
             if (p.ptr && (p.entero < -1 || p.entero >= (int)((const MallaRecurso*)p.ptr)->partes.size() + (((const MallaRecurso*)p.ptr)->partes.empty() ? 1 : 0))) {
-                snprintf(buf, sizeof buf, "step %d (Visibility test): part %d does not exist (-1 = the whole mesh)", num, p.entero);
+                snprintf(buf, sizeof buf, T("step %d (Visibility test): part %d does not exist (-1 = the whole mesh)"), num, p.entero);
                 motivo = buf; return -1;
             }
             break;
@@ -386,7 +390,7 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
         }
         case PasoSaltarSi: case PasoSaltarOculto: case PasoSaltarSiNinguna: case PasoSaltarFuera: case PasoSaltarRiel: case PasoSaltarNoListado:
             if (p.entero < 0 || i + (size_t)p.entero >= L.size()) {
-                snprintf(buf, sizeof buf, "step %d: skips %d steps but only %d follow", num, p.entero, (int)(L.size() - i - 1));
+                snprintf(buf, sizeof buf, T("step %d: skips %d steps but only %d follow"), num, p.entero, (int)(L.size() - i - 1));
                 motivo = buf; return -1;
             }
             {
@@ -398,12 +402,12 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
         default: break;
         }
         if (!esperada.empty() && esperada[i] != INT_MIN && esperada[i] != d) {
-            snprintf(buf, sizeof buf, "step %d: the steps a 'Skip if zero' can skip leave the matrix stack unbalanced", num);
+            snprintf(buf, sizeof buf, T("step %d: the steps a 'Skip if zero' can skip leave the matrix stack unbalanced"), num);
             motivo = buf; return -1;
         }
     }
-    if (d != 0) { snprintf(buf, sizeof buf, "%d Push matrix without its Pop", d); motivo = buf; return -1; }
-    if (maxd > kProfMax) { snprintf(buf, sizeof buf, "matrix stack too deep (%d levels, max %d)", maxd, kProfMax); motivo = buf; return -1; }
+    if (d != 0) { snprintf(buf, sizeof buf, T("%d Push matrix without its Pop"), d); motivo = buf; return -1; }
+    if (maxd > kProfMax) { snprintf(buf, sizeof buf, T("matrix stack too deep (%d levels, max %d)"), maxd, kProfMax); motivo = buf; return -1; }
     return maxd;
 }
 

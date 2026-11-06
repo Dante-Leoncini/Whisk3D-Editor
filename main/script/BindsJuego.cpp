@@ -1913,7 +1913,7 @@ bool W3dControlAlta(void* handle, int id, const char* nombre, const char* tipo) 
     gControles.push_back(r);
     w3dLogf("[control] se detecto un nuevo control: %s (%s), %d conectado(s)",
             r.nombre.c_str(), r.tipo.c_str(), (int)gControles.size());
-    W3dAvisof(false, "Se detecto un nuevo control: %s", W3dNombreCorto(r.nombre).c_str());
+    W3dAvisof(false, T("New controller detected: %s"), W3dNombreCorto(r.nombre).c_str());
     return true;
 }
 
@@ -1926,7 +1926,7 @@ bool W3dControlBaja(int id, void** handle) {
         gControles.erase(gControles.begin() + (long)i);
         w3dLogf("[control] se desconecto un control: %s, quedan %d",
                 nom.c_str(), (int)gControles.size());
-        W3dAvisof(true, "Se desconecto un control: %s", W3dNombreCorto(nom).c_str());
+        W3dAvisof(true, T("Controller disconnected: %s"), W3dNombreCorto(nom).c_str());
         return true;
     }
     return false;

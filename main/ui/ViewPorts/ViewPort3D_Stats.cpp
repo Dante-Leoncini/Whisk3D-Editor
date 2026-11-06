@@ -14,6 +14,7 @@
 #include "objects/Mesh.h"               // Mesh (contar vertices/caras de la escena)
 #include "objects/Rutina.h"             // W3dRutinaContar (lo que dibujan las rutinas)
 #include <cstdio>                        // sprintf
+#include "W3dLang.h"                      // T(): las lineas de vertices / caras en el idioma del sistema
 
 // suma recursiva de las estadisticas de malla de toda la escena (la usa tambien el comando de prueba "carastotal")
 void W3dContarMallas(Object* o, int& vAgr, int& vReal, int& fLog, int& fTri){
@@ -63,7 +64,7 @@ void Viewport3D::RenderEstadisticas(){
     if (OverlayStatVertices || OverlayStatFaces){
         int vAgr=0, vReal=0, fLog=0, fTri=0;
         W3dContarMallas(SceneCollection, vAgr, vReal, fLog, fTri);
-        if (OverlayStatVertices){ sprintf(buf, "vertex: %d/%d", vAgr, vReal); StatLinea(buf, width, margen, ly, lineH); }
+        if (OverlayStatVertices){ snprintf(buf, sizeof buf, T("vertex: %d/%d"), vAgr, vReal); StatLinea(buf, width, margen, ly, lineH); }
         // "faces: DIBUJADAS/total": lo que el pase de escena de ESTE frame emitio de
         // verdad (indices/3 de los contadores del Core, ya con frustum + LOD + Culling
         // + celdas por triangulo aplicados; los mide Render(), misma fuente que el
@@ -71,7 +72,7 @@ void Viewport3D::RenderEstadisticas(){
         // "cuantos poligonos con el culling se estan dibujando y cuantas hay en
         // total. asi sabemos cuanto ahorramos". Antes mostraba logicas/triangulos
         // (total/total): no reflejaba el culling.
-        if (OverlayStatFaces){    sprintf(buf, "faces: %d/%d", statTrisFrame, fTri); StatLinea(buf, width, margen, ly, lineH); }
+        if (OverlayStatFaces){    snprintf(buf, sizeof buf, T("faces: %d/%d"), statTrisFrame, fTri); StatLinea(buf, width, margen, ly, lineH); }
     }
     if (OverlayStatGL){
         // TODAS las llamadas al driver del cuadro anterior (cada gl* = 1; los ahorros del cache de estado no llegan):

@@ -2,6 +2,7 @@
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/LayoutArbol.h" // aviso de destruccion + borrar un arbol entero
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include <math.h>
 
 // -----------------------------
@@ -749,9 +750,9 @@ void ViewportBase::RenderBar(){
                 // el modo (Abc/abc/ABC/123) queda CENTRADO para no pisar "pegar".
                 SetColorID(ColorID::blanco);
                 w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)ty, 0);
-                RenderBitmapText(std::string("copiar"), textAlign::left, width / 2); w3dEngine::PopMatrix();
+                RenderBitmapText(std::string(T("Copy")), textAlign::left, width / 2); w3dEngine::PopMatrix();
                 w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - gapGS), (GLfloat)ty, 0);
-                RenderBitmapText(std::string("pegar"), textAlign::right, width / 2); w3dEngine::PopMatrix();
+                RenderBitmapText(std::string(T("Paste")), textAlign::right, width / 2); w3dEngine::PopMatrix();
                 SetColorID(ColorID::accent);
                 w3dEngine::PushMatrix(); w3dEngine::Translatef(0, (GLfloat)ty, 0);
                 RenderBitmapText(std::string(modo), textAlign::center, width); w3dEngine::PopMatrix();

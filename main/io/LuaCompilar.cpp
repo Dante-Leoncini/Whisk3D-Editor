@@ -3,22 +3,33 @@
 //  el interprete que ya linkea el editor (nada de luac externo).
 // ============================================================================
 #include "io/LuaCompilar.h"
+#include "W3dLang.h"   // T(): el error llega al aviso de "Compilar juego", en el idioma del editor
 
 #ifdef W3D_SYMBIAN
 // El build Symbian no linkea lua (W3dScript.cpp no esta en el .mmp) y tampoco
 // tiene el boton "Compilar juego": stub no-op para cumplir la regla del repo
 // (todo .cpp nuevo de main/ entra al Whisk3D.mmp).
 bool LuaCompilarArchivo(const std::string&, const std::string&, std::string* err) {
-    if (err) *err = "compilar lua no esta disponible en Symbian";
+    if (err) *err = T("compiling Lua is not available on Symbian");
     return false;
 }
 #else
 
 #include <stdio.h>
+#include <string.h>
+#include <vector>
 
 extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
+}
+
+// el detalle del error con el formato YA TRADUCIDO (uno o dos %s). El buffer se mide con el formato y las rutas:
+// en cirilico una traduccion ocupa el doble de bytes y las rutas no tienen cota.
+static std::string LcError(const char* fmt, const std::string& a, const std::string& b = std::string()) {
+    std::vector<char> buf(strlen(fmt) + a.size() + b.size() + 64);
+    snprintf(&buf[0], buf.size(), fmt, a.c_str(), b.c_str());
+    return std::string(&buf[0]);
 }
 
 // writer de lua_dump: vuelca cada trozo del bytecode al FILE* del .tmp.
@@ -33,13 +44,13 @@ bool LuaCompilarArchivo(const std::string& rutaLua, const std::string& rutaSalid
     if (err) err->clear();
     // estado efimero SOLO para compilar: sin libs abiertas (no se ejecuta nada)
     lua_State* L = luaL_newstate();
-    if (!L) { if (err) *err = "sin memoria para el estado de lua"; return false; }
+    if (!L) { if (err) *err = T("out of memory for the Lua state"); return false; }
     // luaL_loadfile: parsea (y salta el BOM si lo hay). Si rutaLua ya fuese
     // bytecode lo carga igual y el dump lo re-emite stripped: inofensivo.
     if (luaL_loadfile(L, rutaLua.c_str()) != LUA_OK) {
         if (err) {
             const char* m = lua_tostring(L, -1);
-            *err = m ? m : ("no pude cargar " + rutaLua);
+            *err = m ? std::string(m) : LcError(T("could not load %s"), rutaLua);
         }
         lua_close(L);
         return false;
@@ -48,7 +59,7 @@ bool LuaCompilarArchivo(const std::string& rutaLua, const std::string& rutaSalid
     std::string tmp = rutaSalida + ".tmp";
     FILE* f = fopen(tmp.c_str(), "wb");
     if (!f) {
-        if (err) *err = "no pude escribir " + tmp;
+        if (err) *err = LcError(T("could not write %s"), tmp);
         lua_close(L);
         return false;
     }
@@ -58,7 +69,7 @@ bool LuaCompilarArchivo(const std::string& rutaLua, const std::string& rutaSalid
     lua_close(L);
     if (!ok) {
         remove(tmp.c_str());
-        if (err) *err = "fallo el volcado del bytecode de " + rutaLua;
+        if (err) *err = LcError(T("the bytecode dump of %s failed"), rutaLua);
         return false;
     }
 #ifdef _WIN32
@@ -68,7 +79,7 @@ bool LuaCompilarArchivo(const std::string& rutaLua, const std::string& rutaSalid
 #endif
     if (rename(tmp.c_str(), rutaSalida.c_str()) != 0) {
         remove(tmp.c_str());
-        if (err) *err = "no pude renombrar " + tmp + " -> " + rutaSalida;
+        if (err) *err = LcError(T("could not rename %s -> %s"), tmp, rutaSalida);
         return false;
     }
     return true;

@@ -414,7 +414,7 @@ bool ImportGLTF(const std::string& filepath) {
         Notificar(T("glTF: invalid JSON"), true); return false;
     }
 
-    ProgresoIniciar("Importing glTF..."); // barra de progreso (no-op sin GUI; clave en el N95). Faltaba en glTF.
+    ProgresoIniciar(T("Importing glTF...")); // barra de progreso (no-op sin GUI; clave en el N95). Faltaba en glTF.
     ProgresoActualizar(0.1f);
 
     // ---- buffers ----

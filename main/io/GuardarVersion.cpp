@@ -244,8 +244,8 @@ int GuardarVersionSiguienteN() {
 }
 
 std::string GuardarVersionLabel() {
-    char b[48];
-    snprintf(b, sizeof(b), "Guardar version v%d", GuardarVersionSiguienteN());
+    char b[128];   // (el label sale en el idioma del editor: en cirilico ocupa el doble de bytes)
+    snprintf(b, sizeof(b), T("Save version v%d"), GuardarVersionSiguienteN());
     return std::string(b);
 }
 
@@ -267,16 +267,18 @@ bool GuardarVersionEjecutar() {
     // 2) la version ES una copia del archivo recien guardado, adentro de versiones/
     //    (VerCopiarArchivo crea la carpeta del destino si no existe)
     std::string destino = dir + "/" + VerNombreDe(base, n);
-    char b[400];
+    // (el aviso sale en el idioma del editor y lleva el nombre del archivo, sin cota: el buffer se mide con los dos)
+    const std::string nomVer = VerNombreDe(base, n);
+    std::vector<char> b(nomVer.size() + 512);
     if (VerCopiarArchivo(w3dPath, destino)) {
         W3dDescargarSiWeb(destino);   // navegador: la copia de la version tambien baja a la PC
-        snprintf(b, sizeof(b), "Version v%d guardada: versiones/%s", n, VerNombreDe(base, n).c_str());
-        Notificar(b, false);
+        snprintf(&b[0], b.size(), T("Version v%d saved: versiones/%s"), n, nomVer.c_str());
+        Notificar(&b[0], false);
         w3dLogf("[Version] v%d = copia de %s en %s", n, VerBase(w3dPath).c_str(), destino.c_str());
     } else {
         remove(destino.c_str());   // una copia a medias no es una version
-        snprintf(b, sizeof(b), "Guardado OK, pero fallo la copia de la version v%d (ver log)", n);
-        Notificar(b, true);
+        snprintf(&b[0], b.size(), T("Saved OK, but copying version v%d failed (see the log)"), n);
+        Notificar(&b[0], true);
         w3dLogfE("[Version] no pude copiar %s a %s", w3dPath.c_str(), destino.c_str());
     }
     return true;

@@ -183,7 +183,7 @@ bool GuardarAnimSetsPreparar(W3dContenedorEscritor* esc, Object* raiz) {
         if (!jer[i]->clipsJer->noCargo.empty()) {
             w3dLogfE("[W3D] '%s': sus clips (biblioteca '%s') no se pudieron leer al abrir: NO guardo encima",
                      jer[i]->name.c_str(), jer[i]->clipsJer->noCargo.c_str());
-            W3dAvisof(true, "No guardo: los clips de '%s' no se pudieron leer al abrir y guardarlo los borraria",
+            W3dAvisof(true, T("Not saving: the clips of '%s' could not be read when opening and saving would erase them"),
                       W3dNombreCorto(jer[i]->name).c_str());
             return false;
         }
@@ -192,7 +192,7 @@ bool GuardarAnimSetsPreparar(W3dContenedorEscritor* esc, Object* raiz) {
         if (!arms[i]->animSetNoCargo.empty()) {
             w3dLogfE("[W3D] '%s': sus animaciones (animset '%s') no se pudieron leer al abrir: NO guardo encima",
                      arms[i]->name.c_str(), arms[i]->animSetNoCargo.c_str());
-            W3dAvisof(true, "No guardo: las animaciones de '%s' no se pudieron leer al abrir y guardarlo las borraria",
+            W3dAvisof(true, T("Not saving: the animations of '%s' could not be read when opening and saving would erase them"),
                       W3dNombreCorto(arms[i]->name).c_str());
             return false;
         }

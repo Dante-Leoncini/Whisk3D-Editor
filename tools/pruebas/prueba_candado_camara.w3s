@@ -64,10 +64,10 @@ vpestado encuadrar
 vpestado camara igual
 vpestado vista no
 # --- el CLICK mirando por la camara: el pick usa la lente de la CAMARA (antes la del visor: una luz no se podia elegir) ---
-selname Light
+selname Luz
 objpos 0 1.6 0
 deselectall
 vpcamara on
-clicobj Light si
+clicobj Luz si
 deselectall
 clicobj Cubo si

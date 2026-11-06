@@ -216,7 +216,7 @@ bool FileBrowser::archivoSeleccionado() const {
 // seleccionado) confirma ESA carpeta -> "Usar carpeta actual"; si tocaste un archivo pasa
 // a la accion del caller (Guardar/Elegir = sobrescribir ese archivo).
 std::string FileBrowser::EtiquetaAccion() const {
-    if (modoGuardar && !archivoSeleccionado()) return std::string(kUsarCarpetaActual);
+    if (modoGuardar && !archivoSeleccionado()) return std::string(T(kUsarCarpetaActual));
     return actionLabel;
 }
 
@@ -787,9 +787,9 @@ void FileBrowser::Cerrar() {
 
 // ============================================================================
 #ifdef W3D_SYMBIAN
-const char* const kUsarCarpetaActual = "Usar esta carpeta"; // pantalla angosta (240px)
+const char* const kUsarCarpetaActual = "Use this folder";     // pantalla angosta (240px). En INGLES: es la clave de T()
 #else
-const char* const kUsarCarpetaActual = "Usar carpeta actual";
+const char* const kUsarCarpetaActual = "Use current folder";
 #endif
 
 void AbrirFileBrowser(const std::string& title, const std::string& accionLabel,

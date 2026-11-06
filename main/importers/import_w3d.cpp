@@ -40,6 +40,7 @@
 #include "io/RecursosProyecto.h"  // las carpetas del outliner por recursos (se leen del proyecto)
 #endif
 #include "w3dlog.h"              // avisos de layout tambien al log (los ve la Console)
+#include "W3dLang.h"             // T(): el texto de la barra de progreso en el idioma del editor
 #include "objects/UI.h"          // la UI del proyecto (rama UI { archivo: ... })
 #include "objects/Empty.h"       // el nodo generico ("tipo": "objeto") vuelve como Empty
 #include "objects/Instance.h"    // Instance ("tipo": "Instance"): usado antes del include de mas abajo
@@ -687,7 +688,7 @@ static UI* CargarUIProyecto(const std::string& ruta, const std::string& refRel =
     if (!w3dFileSystem::FileExists(ruta)) {
         w3dLogfE("[W3D] falta la escena UI %s: se omite (el resto del proyecto abre)", ruta.c_str());
         if (g_w3dUINoCargo.empty()) g_w3dUINoCargo = ruta;
-        W3dAvisof(true, "Falta la escena UI '%s': el proyecto abre sin ella y NO lo voy a guardar encima (ver whisk3d.log)",
+        W3dAvisof(true, T("The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)"),
                   W3dNombreCorto(ruta).c_str());
         return NULL;
     }
@@ -695,7 +696,7 @@ static UI* CargarUIProyecto(const std::string& ruta, const std::string& refRel =
     if (!u) {
         w3dLogfE("[W3D] la escena UI %s no parsea: se omite", ruta.c_str());
         if (g_w3dUINoCargo.empty()) g_w3dUINoCargo = ruta;
-        W3dAvisof(true, "La escena UI '%s' no se pudo leer: el proyecto abre sin ella y NO lo voy a guardar encima (ver whisk3d.log)",
+        W3dAvisof(true, T("The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)"),
                   W3dNombreCorto(ruta).c_str());
         return NULL;
     }
@@ -1290,9 +1291,9 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // salto) y el 'target': esa fisica ya vivia en lua desde hace rondas. Se avisa en
         // pantalla para que nadie se entere por casualidad.
         Empty* gamepad = new Empty(parent);
-        W3dAvisof(false, "El objeto Script '%s' ya no existe: se migro a un objeto vacio con sus "
-                         "scripts. Su fisica hardcodeada (velocidad/gravedad/limites) NO se migra.",
-                  p.count("name") ? Unquote(w3dMapAt(p, "name")).c_str() : "(sin nombre)");
+        W3dAvisof(false, T("The Script object '%s' no longer exists: it was migrated to an empty object with its "
+                           "scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated."),
+                  p.count("name") ? Unquote(w3dMapAt(p, "name")).c_str() : T("(unnamed)"));
 
         // el SCRIPT declarado con `script:` lo levanta LeerScriptsDeProps (en
         // BuildObjectRecursive, para CUALQUIER objeto). Aca queda solo la
@@ -1932,7 +1933,7 @@ static void CargarAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
                 anim->noCargo = true;
                 w3dLogfE("[W3D] '%s': no pude leer los frames de la vertex anim '%s' (%s): queda VACIA y no la voy a guardar encima",
                          mesh->name.c_str(), anim->name.c_str(), buffers.c_str());
-                W3dAvisof(true, "No pude leer los frames de la animacion '%s' de '%s': queda VACIA y no la voy a guardar encima (ver whisk3d.log)",
+                W3dAvisof(true, T("Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)"),
                           W3dNombreCorto(anim->name).c_str(), W3dNombreCorto(mesh->name).c_str());
             }
         }
@@ -2791,7 +2792,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
     if (tipo == "luz") {
         Light* l = Light::Create(parent);
         if (!l) {   // tope de GL (MAX_LIGHTS): se saltea la luz (antes: crash con NULL en JsonComunes)
-            W3dAvisof(false, "La luz '%s' no se cargo: la escena ya tiene el maximo de luces (%d).",
+            W3dAvisof(false, T("The light '%s' was not loaded: the scene already has the maximum number of lights (%d)."),
                       JS(j, "nombre", "").c_str(), (int)MAX_LUCES_ESCENA);
             return NULL;
         }
@@ -2820,8 +2821,8 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         // La fisica hardcodeada ("fisica") y el "target" se descartan a proposito.
         Empty* g = new Empty(parent);
         JsonComunes(j, g);
-        W3dAvisof(false, "El objeto Script '%s' ya no existe: se migro a un objeto vacio con sus "
-                         "scripts. Su fisica hardcodeada (velocidad/gravedad/limites) NO se migra.",
+        W3dAvisof(false, T("The Script object '%s' no longer exists: it was migrated to an empty object with its "
+                           "scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated."),
                   g->name.c_str());
         // (los scripts los lee el call site COMUN de JsonObjeto, como los constraints)
         return g;
@@ -2890,7 +2891,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
                 refLib = true;
                 w3dLogfW("[W3D] la malla '%s' es de la libreria '%s', que no esta: el objeto queda vacio hasta vincularla "
                          "(la referencia se conserva)", nomMalla.c_str(), W3dLibPrefijoDe(nomMalla).c_str());
-                W3dAvisof(false, "'%s' usa la malla '%s' de una libreria que no esta: queda vacio hasta vincularla",
+                W3dAvisof(false, T("'%s' uses the mesh '%s' from a missing library: it stays empty until you link it"),
                           W3dNombreCorto(JS(j, "nombre", "")).c_str(), W3dNombreCorto(nomMalla).c_str());
             } else if (!recMalla)
                 w3dLogfE("[W3D] la malla '%s' no esta en el registro del proyecto (el objeto queda vacio)", nomMalla.c_str());
@@ -2942,7 +2943,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         //  trabajando; lo que no puede es destruir el archivo sin enterarse.
         if (!cargo && !geo.empty()) {
             mesh->w3dmAjenos.noCargo = true;
-            W3dAvisof(true, "No pude leer la geometria de '%s': queda VACIA y no la voy a guardar encima (ver whisk3d.log)",
+            W3dAvisof(true, T("Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)"),
                       W3dNombreCorto(geo).c_str());
         }
         // SILENCIOSO JAMAS: cada problema del archivo sale por el log con su numero de
@@ -3122,7 +3123,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
                     W3dLibRefAnotar(a, W3D_LIBREF_ANIMSET, ref);
                     w3dLogfW("[W3D] '%s': su animset '%s' es de una libreria que no esta: sin clips hasta vincularla "
                              "(la referencia se conserva)", a->name.c_str(), animSet.c_str());
-                    W3dAvisof(false, "'%s' usa las animaciones '%s' de una libreria que no esta: sin clips hasta vincularla",
+                    W3dAvisof(false, T("'%s' uses the animations '%s' from a missing library: no clips until you link it"),
                               W3dNombreCorto(a->name).c_str(), W3dNombreCorto(animSet).c_str());
                 } else {
                 // NI SILENCIO NI BORRARLO: el armature queda sin clips, se avisa en pantalla y el
@@ -3130,7 +3131,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
                 a->animSetNoCargo = animSet;
                 w3dLogfE("[W3D] '%s': no pude cargar sus clips (animset '%s'): %s",
                          a->name.c_str(), animSet.c_str(), motivo.c_str());
-                W3dAvisof(true, "No pude leer las animaciones de '%s' (%s): quedan VACIAS y no lo voy a guardar encima (ver whisk3d.log)",
+                W3dAvisof(true, T("Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)"),
                           W3dNombreCorto(a->name).c_str(), W3dNombreCorto(animSet).c_str());
                 }
             }
@@ -3570,7 +3571,7 @@ static void JsonObjeto(JVal* j, Object* parent, const std::string& base) {
         if (!lib.empty()) {
             std::string motivo;
             if (!W3dJerAsignar(creado, lib, &motivo))
-                W3dAvisof(true, "'%s': no pude cargar sus clips (%s)", W3dNombreCorto(creado->name).c_str(), motivo.c_str());
+                W3dAvisof(true, T("'%s': could not load its clips (%s)"), W3dNombreCorto(creado->name).c_str(), motivo.c_str());
         }
         // su RETARGET PROPIO (un armature: el de sus clips de esqueleto; si no, el de sus clips de jerarquia) y
         // las CAPAS de clips de jerarquia de su Mix (ver EscribirClipsJerarquia en GuardarW3D.cpp)
@@ -4239,7 +4240,7 @@ static void CargarAnimacionesEscena(JVal* raiz) {
     // rango + fps PROPIOS de la animacion activa -> StartFrame/EndFrame/AnimFPS
     AnimCargarRangoActivo();
     if (perdidos > 0)
-        W3dAvisof(true, "%d curva(s) de animacion quedaron sin objeto (la primera: '%s'): ver whisk3d.log",
+        W3dAvisof(true, T("%d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log"),
                   perdidos, W3dNombreCorto(primerPerdido).c_str());
 }
 
@@ -4897,7 +4898,7 @@ static void MigrarConstraintsViejos() {
                 w3dLogfW("[W3D] '%s' era un constraint viejo y su target '%s' es OTRO constraint viejo "
                          "que sale de la escena: no hay a quien migrarlo, no se migra nada",
                          nombreNodo.c_str(), p.target.c_str());
-                W3dAvisof(true, "'%s' apuntaba a otro constraint ('%s'): no se pudo migrar",
+                W3dAvisof(true, T("'%s' pointed to another constraint ('%s'): it could not be migrated"),
                           W3dNombreCorto(nombreNodo).c_str(), W3dNombreCorto(p.target).c_str());
             } else {
                 // el constraint viejo arrancaba con "if (!target) return": SIN target no hacia
@@ -4948,7 +4949,7 @@ static void MigrarConstraintsViejos() {
             w3dLogfW("[W3D] '%s' era un constraint viejo y tiene %d hijo(s): queda como Empty "
                      "en la misma posicion (sus propiedades ya pasaron al objeto apuntado)",
                      nombreNodo.c_str(), (int)p.nodo->Childrens.size());
-            W3dAvisof(false, "'%s' era un constraint: ahora es un Empty, sus %d hijo(s) quedaron donde estaban",
+            W3dAvisof(false, T("'%s' was a constraint: it is now an Empty, its %d child(ren) stayed where they were"),
                       W3dNombreCorto(nombreNodo).c_str(), (int)p.nodo->Childrens.size());
         }
         p.nodo = NULL;
@@ -4958,7 +4959,7 @@ static void MigrarConstraintsViejos() {
             "Empty por tener hijos)",
             (int)gPendConsViejo.size(), puestos, sinTarget, aOtroNodo, conHijos);
     if (sinTarget > 0)
-        W3dAvisof(true, "%d constraint(s) viejo(s) sin target: no hacian nada, no se migro nada", sinTarget);
+        W3dAvisof(true, T("%d old constraint(s) without a target: they did nothing, nothing was migrated"), sinTarget);
     gPendConsViejo.clear();
 }
 
@@ -5419,7 +5420,7 @@ void AbrirProyectoAhora(const std::string& ruta) {
     // congelada -> parece trabado. La barra bombea el render (swap) desde adentro, como el
     // import de modelos: el usuario ve que avanza (y si se traba, en que % quedo).
     extern void ProgresoIniciar(const std::string&); extern void ProgresoFin();
-    ProgresoIniciar("Abriendo proyecto...");
+    ProgresoIniciar(T("Opening project..."));
     ReiniciarEscena();
     // EL LAYOUT ANTERIOR SE LIBERA. Antes quedaba huerfano ("el viejo queda"): ~0,2 MB de heap
     // por apertura, fijos (las tarjetas del panel de propiedades, las barras...). El proyecto trae

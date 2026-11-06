@@ -803,7 +803,7 @@ bool ImportFBX(const std::string& filepath) {
     uint32_t version = 0; memcpy(&version, &bytes[0] + 23, 4);
     bool w64 = (version >= 7500);
 
-    ProgresoIniciar("Importing FBX..."); // barra de progreso (clave en el N95: parsear + convertir tarda)
+    ProgresoIniciar(T("Importing FBX...")); // barra de progreso (clave en el N95: parsear + convertir tarda)
 
     Rd r; r.p = &bytes[0] + 27; r.end = &bytes[0] + bytes.size();
     const unsigned char* base = &bytes[0];

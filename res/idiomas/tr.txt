@@ -4,16 +4,38 @@
 #+Down	#+Aşağı
 #+Left/Right	#+Sol/Sağ
 #+Up	#+Yukarı
+%d %s '%s' -> '%s' (binding by name)	%d %s '%s' -> '%s' (ada göre bağlantı)
+%d Push matrix without its Pop	Matrisi çıkar (pop) olmadan %d Matrisi it (push)
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Seçimin %d animasyon eğrisi artık hiçbir şeyi canlandırmıyor (Geri Al geri getirir)
+%d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d animasyon eğrisi nesnesiz kaldı (ilki: '%s'): whisk3d.log'a bakın
+%d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d ad sahne değişirken yeniden numaralandı (%s%s). Lua betiklerinizi kontrol edin.
+%d nodes | active node: %d	%d düğüm | etkin düğüm: %d
 %d object(s) got their own copy of the mesh	%d nesnenin artık kendi örgü kopyası var
 %d object(s) of the project use 3D meshes of "%s": each one gets its own copy (Ctrl+Z undoes it). Unlink it?	Projedeki %d nesne "%s" içindeki 3D örgüleri kullanıyor: her biri kendi kopyasını alır (Ctrl+Z geri alır). Bağlantı kesilsin mi?
+%d object(s) with vertex anims keep the previous mesh: '%s'	%d vertex anim'li nesne önceki örgüyü koruyor: '%s'
+%d old constraint(s) without a target: they did nothing, nothing was migrated	Hedefi olmayan %d eski kısıtlama: hiçbir şey yapmıyorlardı, hiçbir şey taşınmadı
 %d reference(s) of the unpacked objects now find another object with the same name	Paketten çıkarılan nesnelerin %d referansı artık aynı adlı başka bir nesneyi buluyor
+%d repeated name(s) renumbered (%s%s). The original did NOT change: whatever pointed to it by name still points there.	%d tekrarlanan ad yeniden numaralandı (%s%s). Orijinal DEĞİŞMEDİ: ona adıyla işaret eden her şey hala oraya işaret ediyor.
 %d resources are in use (%d users). Delete them anyway? Their users will be left without them.	%d kaynak kullanımda (%d kullanıcı). Yine de silinsin mi? Kullanıcıları onlarsız kalacak.
+%d script reference(s) and %d target(s) updated	%d betik başvurusu ve %d hedef güncellendi
+%s: does not compile	%s: derlenmiyor
+'%s' already exists -> '%s'	'%s' zaten var -> '%s'
+'%s' has more than 65535 vertices: saving it as text (.w3dm), not binary	'%s' 65535'ten fazla köşeye sahip: ikili değil, metin (.w3dm) olarak kaydediliyor
+'%s' is a 2D element: it can only hang from its UI scene or from another 2D element (it was not moved).	'%s' bir 2D öğedir: yalnızca kendi UI sahnesine veya başka bir 2D öğeye bağlanabilir (taşınmadı).
+'%s' pointed to another constraint ('%s'): it could not be migrated	'%s' başka bir kısıtlamayı ('%s') gösteriyordu: taşınamadı
+'%s' uses the animations '%s' from a missing library: no clips until you link it	'%s', eksik bir kütüphanedeki '%s' animasyonlarını kullanıyor: bağlanana kadar klip yok
+'%s' uses the mesh '%s' from a missing library: it stays empty until you link it	'%s', eksik bir kütüphanedeki '%s' örgüsünü kullanıyor: bağlanana kadar boş kalır
+'%s' was a constraint: it is now an Empty, its %d child(ren) stayed where they were	'%s' bir kısıtlamaydı: artık bir Boş nesne, %d alt öğesi olduğu yerde kaldı
+'%s' was opened WITH ERRORS (truncated file): when saving, whatever was missing is lost	'%s' HATALARLA açılmıştı (kesik dosya): kaydederken eksik olan kaybolur
+'%s': %s (and more: see whisk3d.log)	'%s': %s (ve dahası: whisk3d.log'a bakın)
+'%s': could not load its clips (%s)	'%s': klipleri yüklenemedi (%s)
 (Esc to cancel)	(İptal için Esc)
 (choose)	(seç)
 (coming soon)	(yakında)
 (default)	(varsayılan)
 (empty)	(boş)
+(inherited)	(devralınan)
+(no .lua scripts or .glsl shaders in the project)	(projede .lua betiği veya .glsl shader'ı yok)
 (no .lua scripts)	(.lua betiği yok)
 (no properties yet)	(henüz özellik yok)
 (none)	(yok)
@@ -21,11 +43,13 @@
 (nothing to choose)	(seçilecek bir şey yok)
 (root)	(kök)
 (this routine)	(bu rutin)
+(unnamed)	(adsız)
 16-bit textures	16 bit dokular
 2D Armature Animation	2D İskelet Animasyonu
 2D Cursor	2D İmleç
 2D Editor	2D Düzenleyici
 2D armature animation: the mesh has no 2D armature	2D iskelet animasyonu: örgünün 2D iskeleti yok
+2D bone(s)	2D kemik
 3D Cursor	3D İmleç
 3D Mesh	3D Örgü
 3D Mesh of	3D Örgü:
@@ -45,8 +69,8 @@ A project needs at least one scene	Projenin en az bir sahnesi olmalı
 A scene can't contain itself	Sahne kendini içeremez
 A scene with that name already existed, renamed:	Bu adda bir sahne zaten vardı, yeni adı:
 A texture with that name already exists	Bu adda bir doku zaten var
+APK (aapt, signing)	APK (aapt, imzalama)
 Above: once at start. Below: every frame.	Üstte: başta bir kez. Altta: her karede.
-Abrir normal map	Normal haritası aç
 Absolute	Mutlak
 Acceleration	İvme
 Accept	Kabul et
@@ -72,7 +96,9 @@ Add Vertex Group	Köşe Grubu Ekle
 Add shortcut	Kısayol ekle
 Added to the library	Kütüphaneye eklendi
 Additive	Toplamsal
+Additive (ADITIVO)	Toplamsal (ADITIVO)
 Additive (by alpha)	Toplamsal (alfaya göre)
+Additive by alpha	Alfaya göre toplamsal
 Advanced: custom shader	Gelişmiş: özel shader
 Affect	Etkiler
 Affect Move	Taşımayı Etkile
@@ -110,6 +136,7 @@ Angle	Açı
 Angle random	Rastgele açı (±)
 Animation	Animasyon
 Animation deleted: 	Animasyon silindi: 
+Animation recovered in a new scene: '%s'	Animasyon yeni bir sahnede kurtarıldı: '%s'
 Animation rendered!	Animasyon render alındı!
 Animations	Animasyonlar
 Animations of	Animasyonlar:
@@ -197,6 +224,8 @@ Border Y	Kenarlık Y
 Borderless	Kenarlıksız
 Bottom	Alt
 Bottom View	Alt görünüm
+Bottom-Left	Sol alt
+Bottom-Right	Sağ alt
 Bounce	Sekme
 Boundary	Sınır
 Box (memory)	Kutu (bellek)
@@ -204,10 +233,15 @@ Box Select	Kutu Seçimi
 Box X	Kutu X
 Box Y	Kutu Y
 Box Z	Kutu Z
+Branch %d	Dal %d
 Branches	Dallar
+Branches: %d (all)	Dallar: %d (tümü)
+Branches: %d/%d	Dallar: %d/%d
 Build game	Oyunu derle
 Build: a build is already running	Derle: zaten bir derleme sürüyor
 Build: a library uses files by absolute path; they do not travel with the game	Derle: bir kütüphane mutlak yollu dosyalar kullanıyor; bunlar oyunla gitmez
+Build: compilation failed (see platform-build/%s/build.log)	Derle: derleme başarısız oldu (platform-build/%s/build.log'a bakın)
+Build: could not copy the result to build/%s	Derle: sonuç build/%s klasörüne kopyalanamadı
 Build: could not generate CMakeLists.txt	Derle: CMakeLists.txt oluşturulamadı
 Build: could not generate main.cpp	Derle: main.cpp oluşturulamadı
 Build: could not generate the Android script	Derle: Android betiği oluşturulamadı
@@ -227,6 +261,7 @@ By words	Kelimelere göre
 Bytes	Bayt
 C+Left	C+Sol
 C+Right	C+Sağ
+COULD NOT INSTALL on the phone (low on space?): the APK stays in build/android23	Telefona YÜKLENEMEDİ (yer az mı?): APK build/android23 içinde kalıyor
 CPU memory	CPU belleği
 Call Lua	Lua çağır
 Call routine	Rutin çağır
@@ -235,7 +270,6 @@ Camera View	Kamera görünümü
 Cameras	Kameralar
 Cancel	İptal
 Cancelled	İptal edildi
-Cargar normal map	Normal haritası yükle
 Cargar textura (imagen)	Doku yükle (görüntü)
 Cell size	Hücre boyutu
 Center	Merkez
@@ -245,6 +279,7 @@ Center Z	Merkez Z
 Center of frame	Kare merkezi
 Changes will be lost in:	Değişiklikler kaybolacak:
 Channels	Kanallar
+Character	Karakter
 Child Of	Alt Öğesi
 Children	Alt öğeler
 Choose a shader	Bir shader seçin
@@ -294,9 +329,11 @@ Colors	Renkler
 Columns	Sütunlar
 Compile	Derle
 Compiled	Derlendi
+Compiling (%s)	Derleniyor (%s)
 Complete	Tam
 Component	Bileşen
 Cone	Koni
+Configuring (cmake)	Yapılandırılıyor (cmake)
 Confirm	Onayla
 Connect Vertex Path	Köşe Yolunu Bağla
 Connect: no path between the vertices	Bağla: köşeler arasında yol yok
@@ -318,6 +355,7 @@ Context	Bağlam
 Context menu	Bağlam menüsü
 Continue without saving	Kaydetmeden devam et
 Control	Kontrol
+Controller disconnected: %s	Oyun kumandasının bağlantısı kesildi: %s
 Convert to Game	Oyuna dönüştür
 Convert to Scene	Sahneye dönüştür
 Convert to editable mesh	Düzenlenebilir örgüye dönüştür
@@ -326,13 +364,21 @@ Copy	Kopyala
 Copy X	X Kopyala
 Copy Y	Y Kopyala
 Copy Z	Z Kopyala
+Copying libmain.so (jniLibs)	libmain.so kopyalanıyor (jniLibs)
+Copying results	Sonuçlar kopyalanıyor
+Copying the Android template	Android şablonu kopyalanıyor
 Core (advanced)	Çekirdek (gelişmiş)
 Correct UVs	UV'leri Düzelt
 Could not copy the objects	Nesneler kopyalanamadı
 Could not create a viewport on the external display: cloning the screen	Harici ekranda görünüm oluşturulamadı: ekran klonlanıyor
 Could not encode the PNG	PNG kodlanamadı
 Could not import	İçe aktarılamadı
+Could not link the copy of '%s' to its mesh	'%s' kopyası örgüsüne bağlanamadı
+Could not load the mesh '%s'	'%s' örgüsü yüklenemedi
+Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	'%s' animasyonları okunamadı (%s): BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
 Could not read the file	Dosya okunamadı
+Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	'%s' animasyonunun kareleri okunamadı ('%s' nesnesi): BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
+Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	'%s' geometrisi okunamadı: BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
 Could not write config.ini	config.ini yazılamadı
 Could not write the file	Dosya yazılamadı
 Count	Adet
@@ -421,6 +467,7 @@ Distance X	Mesafe X
 Distances	Mesafeler
 Distribution	Dağılım
 Don't allow	İzin verme
+Done	Bitti
 Done by CPU on this graphics backend (slow)	Bu grafik arka ucunda CPU ile yapılır (yavaş)
 Dope Sheet	Anahtar Tablosu
 Drag (speed kept per second)	Direnç (saniyede kalan hız)
@@ -496,11 +543,16 @@ Export UI to...	UI dışa aktar...
 Export UV Layout	UV Düzenini Dışa Aktar
 Export UV Layout...	UV Düzenini Dışa Aktar...
 Export to...	Dışa aktar...
+Exporting glTF...	glTF dışa aktarılıyor...
+Exporting model...	Model dışa aktarılıyor...
 External	Harici
 External (choose where)...	Harici (yer seç)...
 External display	Harici ekran
 Extract assets	Varlıkları çıkar
+Extract the assets to...	Varlıkları şuraya çıkar...
 Extract: save the project first (the assets live inside the .w3d)	Çıkar: önce projeyi kaydedin (varlıklar .w3d içinde durur)
+Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	%d dosya çıkarıldı. Bunlar KOPYA: bir değişikliğin projeye dönmesi için yeniden içe aktarılması gerekir
+Extracted %d file(s); %d failed (see the log)	%d dosya çıkarıldı; %d başarısız (günlüğe bakın)
 Extrude	Ekstrüde
 Extrude Bone	Kemiği Ekstrüde Et
 Extrude Edges	Kenarları Ekstrüde Et
@@ -548,6 +600,7 @@ Flags (memory)	Bayraklar (bellek)
 Flat	Düz
 Flip	Çevir
 Flip Normals	Normalleri Çevir
+Flipbook	Flipbook
 Flipbook frames	Flipbook kareleri
 Flipbooks	Flipbook'lar
 Float	Ondalık
@@ -587,15 +640,20 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Tam ses yarıçapı
 Fullscreen	Tam ekran
 Function	Fonksiyon
+GL Calls	GL çağrıları
 GL Light	GL Işığı
+GLB saved successfully!	GLB kaydedildi!
 GPU (A-Trous)	GPU (A-Trous)
 GPU memory	GPU belleği
 GPU-only meshes	Yalnızca GPU'daki örgüler
 Game	Oyun
 Game UID generated (saved with the project)	Oyun UID'si oluşturuldu (projeyle kaydedilir)
 Game View	Oyun görünümü
+Game built: %s	Oyun derlendi: %s
+Game icon	Oyun simgesi
 Gap	Boşluk
 General	Genel
+Generate	Oluştur
 Generated by	Üreten:
 Geometry to Origin	Geometriyi Orijine
 Give the project a name to save it	Kaydetmek için projeye bir ad verin
@@ -636,12 +694,16 @@ IOR	IOR
 Icon	Simge
 Ignore order	Sırayı yoksay
 Image	Görüntü
+Import 3D model	3D Model İçe Aktar
 Import FBX	FBX İçe Aktar
 Import GLB	GLB İçe Aktar
 Import OBJ	OBJ İçe Aktar
 Import glTF	glTF İçe Aktar
 Import w3dui	w3dui İçe Aktar
 Imported	İçe aktarıldı
+Importing FBX...	FBX içe aktarılıyor...
+Importing glTF...	glTF içe aktarılıyor...
+Importing model...	Model içe aktarılıyor...
 Imports	İçe aktar
 In the .w3d	.w3d içinde
 In use	Kullanımda
@@ -667,6 +729,7 @@ Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boun
 Inset: select faces first	İçe Kaydır: önce yüzleri seçin
 Inside	İç
 Inside the .w3d	.w3d'nin içinde
+Installing on the phone	Telefona yükleniyor
 Intensity	Şiddet
 Interpolate	Enterpole et
 Interpolate (mix)	Enterpole et (karışım)
@@ -762,11 +825,14 @@ Load UI	UI Yükle
 Load font	Yazı tipi yükle
 Load from disk...	Diskten yükle...
 Load image	Görüntü yükle
+Load normal map	Normal haritası yükle
 Load script	Betik yükle
 Load shader	Shader yükle
 Load sound	Ses yükle
 Load sound from the file browser...	Dosya tarayıcısından ses yükle...
+Load video	Video yükle
 Loaded	Yüklendi
+Loading %d texture(s) before Play...	Başlatmadan önce %d doku yükleniyor...
 Loading mode	Yükleme
 Loading...	Yükleniyor...
 Local	Yerel
@@ -777,6 +843,7 @@ Location X	Konum X
 Lock Normals	Normalleri Kilitle
 Lock Orbit	Yörüngeyi Kilitle
 Lock the camera to the view	Kamerayı görünüme kilitle
+Logs	Günlükler
 Longest clip	En uzun klip
 Loop	Döngü
 Loop (smpl)	Döngü (smpl)
@@ -879,6 +946,7 @@ Move to Folder	Klasöre taşı
 Move: %d frames	Taşı: %d kare
 Move: %d frames, %.3f value%s	Taşı: %d kare, %.3f değer%s
 Multiply	Çarp
+Multiply (darkens)	Çarp (koyulaştırır)
 Multiply (lightmap)	Çarp (lightmap)
 Multiply 2x	Çarp 2x
 NRD (real time)	NRD (gerçek zamanlı)
@@ -910,6 +978,7 @@ New Texture: could not save	Yeni Doku: kaydedilemedi
 New Texture: invalid size	Yeni Doku: geçersiz boyut
 New UV Map	Yeni UV haritası
 New W3D proxy of this element	Bu öğenin yeni W3D proxy'si
+New controller detected: %s	Yeni oyun kumandası algılandı: %s
 New instance of this prefab	Bu prefabın yeni örneği
 New instance of this scene	Bu sahnenin yeni örneği
 New material with this shader	Bu shader ile yeni malzeme
@@ -960,10 +1029,22 @@ Normals	Normaller
 Normals layer deleted	Normal katmanı silindi
 Not assigned	Atanmadı
 Not deleted	Silinmedi
+Not enough space: uninstalling the previous version (its data on the phone is lost)	Yer yetersiz: önceki sürüm kaldırılıyor (telefondaki verileri kaybolur)
 Not linked	Bağlanmadı
 Not moved	Taşınmadı
 Not opened	Açılmadı
 Not saved in the project yet	Henüz projeye kaydedilmedi
+Not saving '%s': %s	'%s' kaydedilmiyor: %s
+Not saving '%s': could not read its faces and saving would erase them	'%s' kaydedilmiyor: yüzleri okunamadı ve kaydetmek onları silerdi
+Not saving '%s': its geometry could not be read when opening and saving would erase it	'%s' kaydedilmiyor: geometrisi açılırken okunamadı ve kaydetmek onu silerdi
+Not saving '%s': its mesh needs the block '%s' from a newer version of Whisk3D	'%s' kaydedilmiyor: örgüsü Whisk3D'nin daha yeni bir sürümündeki '%s' bloğunu gerektiriyor
+Not saving '%s': the frames of its animation '%s' could not be read when opening and saving would erase them	'%s' kaydedilmiyor: '%s' animasyonunun kareleri açılırken okunamadı ve kaydetmek onları silerdi
+Not saving: '%s' could not be read and saving would leave it empty	Kaydedilmiyor: '%s' okunamadı ve kaydetmek onu boş bırakırdı
+Not saving: could not read the mesh '%s'	Kaydedilmiyor: '%s' örgüsü okunamadı
+Not saving: the UI scene '%s' could not be read when opening and saving would remove it from the project	Kaydedilmiyor: '%s' UI sahnesi açılırken okunamadı ve kaydetmek onu projeden çıkarırdı
+Not saving: the animations of '%s' could not be read when opening and saving would erase them	Kaydedilmiyor: '%s' animasyonları açılırken okunamadı ve kaydetmek onları silerdi
+Not saving: the clips of '%s' could not be read when opening and saving would erase them	Kaydedilmiyor: '%s' klipleri açılırken okunamadı ve kaydetmek onları silerdi
+Not saving: the mesh '%s' could not be written (%s)	Kaydedilmiyor: '%s' örgüsü yazılamadı (%s)
 Nothing to paste	Yapıştırılacak bir şey yok
 Nothing to save	Kaydedilecek bir şey yok
 Now click the second	Şimdi ikinciye tıklayın:
@@ -1003,15 +1084,19 @@ Only its visibility and script values are saved	Yalnızca görünürlüğü ve b
 Only selected vertices	Yalnızca seçili köşeler
 Only the final image	Yalnızca son görüntü
 Opacity	Opaklık
+Opaque (ONE, ZERO)	Opak (ONE, ZERO)
 Opaque (one, zero)	Opak (one, zero)
 Open	Aç
 Open in IDE	IDE'de aç
+Open normal map	Normal haritası aç
 Open project	Proje aç
 Open without saving	Kaydetmeden aç
+Opening project...	Proje açılıyor...
 Operation	İşlem
 Optimize Vertex Groups	Köşe Gruplarını Optimize Et
 Orbit locked	Yörünge kilitlendi
 Orbit unlocked	Yörünge kilidi açıldı
+Orbital	Yörüngesel
 Orient	Yön
 Orientation	Yönelim
 Origin to 3D Cursor	Orijini 3D İmlece
@@ -1030,6 +1115,7 @@ Overrides	Override'lar
 Own	Kendi
 PVS recalculated	PVS yeniden hesaplandı
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: kaynak .obj'nin yanında <model>.pvs.json eksik
+Packaging .deb (cpack)	.deb paketleniyor (cpack)
 Packed (protected)	Paketli (korumalı)
 Pad bottom	Dolgu alt
 Pad left	Dolgu sol
@@ -1038,6 +1124,7 @@ Pad top	Dolgu üst
 Padding	Dolgu
 Paint background	Arka planı boya
 Palette	Palet
+Palettes	Paletler
 Pan	Pan
 Parent	Ebeveyn
 Part (-1 = all)	Parça (-1 = tümü)
@@ -1054,6 +1141,7 @@ Paste	Yapıştır
 Pasted	Yapıştırıldı
 Patch	Yama
 Path	Yol
+Pause	Duraklat
 Pencil+Up	Kalem+Yukarı
 Per Pixel Shading	Piksel Başına Gölgeleme
 Per Vertex Shading	Köşe Başına Gölgeleme
@@ -1073,7 +1161,7 @@ Pivot	Pivot
 Pixels	Piksel
 Plane	Düzlem
 Platform	Platform
-Play	Çal
+Play	Oynat
 Play / Pause	Oynat / Duraklat
 Play Reverse	Tersten Oynat
 Play once (dies at the end)	Bir kez (sonunda ölür)
@@ -1083,6 +1171,9 @@ Points	Noktalar
 Polygon (simulated)	Çokgen (benzetim)
 Pop matrix	Matrisi çıkar (pop)
 Portrait only	Yalnızca dikey
+Pos X	Konum X
+Pos Y	Konum Y
+Pos Z	Konum Z
 Pose	Poz
 Pose Mode	Poz Modu
 Position	Konum
@@ -1096,6 +1187,9 @@ Prefab instances come with the prefabs phase	Prefab örnekleri prefab aşamasıy
 Prefab of	Prefab:
 Prefabs	Prefab'lar
 Premultiplied alpha	Önçarpımlı alfa
+Preparing Android (template)	Android hazırlanıyor (şablon)
+Preparing Android 2.3	Android 2.3 hazırlanıyor
+Preparing the Android 2.3 project	Android 2.3 projesi hazırlanıyor
 Press a key...	Bir tuşa basın...
 Preview	Önizleme
 Preview animation	Animasyonu önizle
@@ -1108,10 +1202,12 @@ Primitive	İlkel
 Profile Shape	Profil şekli
 Profile Type	Profil türü
 Project	Proje
+Project folder	Proje klasörü
 Project from View	Görünümden Yansıt
 Project from View (Bounds)	Görünümden Yansıt (Sınırlar)
 Project from View: select faces first	Görünümden Yansıt: önce yüzleri seçin
 Project saved: 	Proje kaydedildi: 
+Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Proje kaydedildi: %s (%d harici başvuru, EXTERNOS.txt'ye bakın)
 Properties	Özellikler
 Properties viewport	Özellikler görünümü
 Proportional Editing	Orantılı Düzenleme
@@ -1189,6 +1285,7 @@ Repeat with Offset	Ofsetle tekrarla
 Replace	Değiştir
 Replace all	Tümünü değiştir
 Replace...	Değiştir...
+Repo	Depo
 Reset	Sıfırla
 Reset Overrides	Override'ları sıfırla
 Reset all	Tümünü sıfırla
@@ -1208,6 +1305,9 @@ Rip: the selection does not separate the mesh	Yırt: seçim örgüyü ayırmıyo
 Roll Left	Görünümü sola döndür
 Roll Right	Görünümü sağa döndür
 Root	Kök
+Rot X	Dönme X
+Rot Y	Dönme Y
+Rot Z	Dönme Z
 Rotate	Döndür
 Rotate handles	Tutamaçları döndür
 Rotate: %.1f deg  (pivot %s)	Döndür: %.1f derece  (pivot %s)
@@ -1245,9 +1345,13 @@ Save outside the .w3d...	.w3d dışına kaydet...
 Save project	Projeyi kaydet
 Save script	Betiği kaydet
 Save the project first	Önce projeyi kaydedin
+Save version v%d	Sürüm kaydet v%d
 Save version: the project has no location (use Save first)	Sürüm kaydet: projenin konumu yok (önce Kaydet'i kullanın)
 Save: could not replace the file (the previous version was kept):	Kaydet: dosya değiştirilemedi (önceki sürüm korundu):
 Save: incomplete write. The file was not touched:	Kaydet: yazma eksik kaldı. Dosyaya dokunulmadı:
+Saved (note: %d curve(s) without a source file are not saved)	Kaydedildi (dikkat: kaynak dosyası olmayan %d eğri kaydedilmez)
+Saved OK, but copying version v%d failed (see the log)	Kaydedildi, ancak v%d sürümünün kopyalanması başarısız oldu (günlüğe bakın)
+Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Kaydedildi, ancak %d harici dosya YOK (EXTERNOS.txt'ye bakın). İçe aktarılmış bir örgünün orijinaliyse: Nesne > Orijini Ayarla > Orijinal Dosyayı Unut
 Saved: 	Kaydedildi: 
 Scale	Ölçekle
 Scale Only	Yalnızca Ölçek
@@ -1263,6 +1367,7 @@ Scene Animation	Sahne Animasyonu
 Scene Instance	Sahne örneği
 Scenes	Sahneler
 Screen	Ekran
+Screen (lightens)	Ekran (açıklaştırır)
 Screen Rect	Ekran Kırpma
 Screw	Vida
 Script	Betik
@@ -1290,6 +1395,7 @@ Select a prefab instance	Bir prefab örneği seçin
 Select an object first	Önce bir nesne seçin
 Select faces with more than 3 sides to triangulate	Üçgenlemek için 3'ten fazla kenarı olan yüzleri seçin
 Select objects first	Önce nesneleri seçin
+Select symbol	Sembol seç
 Select the objects of the prefab	Prefabın nesnelerini seçin
 Selected only	Yalnızca seçililer
 Selection to Active	Seçimi Etkine
@@ -1368,6 +1474,8 @@ Snap Target	Mıknatıs Hedefi
 Snap Target for Individual Elements	Ayrı Öğeler için Mıknatıs Hedefi
 Snap Target:	Mıknatıs Hedefi:
 Snap menu	Mıknatıs menüsü (Snap)
+Snap: OFF	Mıknatıs: kapalı
+Snap: ON	Mıknatıs: açık
 Soft Knee	Yumuşak diz
 Solid	Katı
 Solid Preview	Katı Önizleme
@@ -1418,6 +1526,7 @@ Stretched	Gerilmiş
 String	Metin
 Subdivision Surface	Alt Bölüm Yüzeyi
 Subtract	Çıkar
+Subtract (darkens)	Çıkar (koyulaştırır)
 Summary	Özet
 Sun	Güneş
 Superellipse	Süperelips
@@ -1450,6 +1559,9 @@ Textures	Dokular
 Texturing	Dokulama
 The 3D mesh couldn't be loaded	3D örgü yüklenemedi
 The Object tab shows the BASE transform (the one that gets saved). Constraints modify it when drawing, so the object can appear elsewhere.	Nesne sekmesi TEMEL dönüşümü gösterir (kaydedilen). Kısıtlamalar çizerken onu değiştirir, bu yüzden nesne başka bir yerde görünebilir.
+The Script object '%s' no longer exists: it was migrated to an empty object with its scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated.	Script nesnesi '%s' artık yok: betikleriyle birlikte boş bir nesneye taşındı. Koda gömülü fiziği (hız/yerçekimi/sınırlar) TAŞINMAZ.
+The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	'%s' UI sahnesi okunamadı: proje onsuz açılıyor ve üzerine KAYDEDİLMEYECEK (whisk3d.log'a bakın)
+The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	'%s' UI sahnesi eksik: proje onsuz açılıyor ve üzerine KAYDEDİLMEYECEK (whisk3d.log'a bakın)
 The armature has its own clips	İskeletin kendi klipleri var
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	.lua dosyasındaki cambiarEscena() çağrıları halen ilkini gösteriyor: elle düzenleyin.
 The clip library could not be read	Klip kütüphanesi okunamadı
@@ -1472,7 +1584,9 @@ The library has no such element	Kütüphanede böyle bir öğe yok
 The library is read-only	Kütüphane salt okunur
 The library isn't linked	Kütüphane bağlantılı değil
 The library's proyecto.json can't be read	Kütüphanenin proyecto.json dosyası okunamıyor
+The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	'%s' ışığı yüklenmedi: sahnede zaten en fazla sayıda ışık var (%d).
 The list of All	Tümü'nün listesi
+The mesh '%s' (no objects) could not be read: saving without it	'%s' örgüsü (nesnesiz) okunamadı: onsuz kaydediliyor
 The objects of the 3D meshes will be deleted too (Undo brings them back).	3D örgülerin nesneleri de silinecek (Geri Al geri getirir).
 The selected folders are deleted too if they end up empty.	Seçili klasörler boş kalırsa onlar da silinir.
 The shader does not compile	Shader derlenmiyor
@@ -1500,6 +1614,7 @@ This resource can't be renamed	Bu kaynak yeniden adlandırılamaz
 This resource type can't be deleted	Bu kaynak türü silinemez
 This resource type can't be duplicated	Bu kaynak türü çoğaltılamaz
 This step has nothing to animate	Bu adımda canlandırılacak bir şey yok
+This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Bu işlem köşe gruplarını değiştirip köşe başına 1 kemiğe indirger (daha hızlı skinning). Bazı veriler kaybolabilir.
 Threshold	Eşik
 Timeline	Zaman Çizelgesi
 Times	Süreler
@@ -1507,6 +1622,8 @@ Timing	Zamanlama
 Toggle Snap	Mıknatısı aç/kapat
 Top	Üst
 Top View	Üst görünüm
+Top-Left	Sol üst
+Top-Right	Sağ üst
 Tracks	İzler
 Trail points	Kuyruk noktaları
 Trail step	Kuyruk adımı
@@ -1530,14 +1647,18 @@ Trim end	Sondan kırp
 Trim start	Baştan kırp
 Turbulence	Türbülans
 Type	Tür
+U Location	U Konumu
 UI	UI
 UV	UV
 UV Editor	UV Düzenleyici
 UV Grid	UV Izgarası
+UV Group	UV Grubu
 UV Groups	UV Grupları
 UV Map	UV Haritası
 UV Maps	UV Haritaları
 UV Sphere	UV Küre
+UV array	UV dizisi
+UV group(s)	UV grubu
 UV layer (0 = active)	UV katmanı (0 = etkin)
 UV layout saved	UV düzeni kaydedildi
 UV menu	UV menüsü
@@ -1566,6 +1687,7 @@ Upscaler	Büyütücü
 Upscaling	Büyütme
 Use	Kullan
 Use camera focus	Kamera odağını kullan
+Use current folder	Geçerli klasörü kullan
 Use index	İndeks kullan
 Use new viewport	Yeni görünüm kullan
 Use physics engine	Fizik motorunu kullan
@@ -1575,11 +1697,13 @@ Use this file	Bu dosyayı kullan
 Use this folder	Bu klasörü kullan
 Users	Kullanıcılar
 Users selected	Seçilen kullanıcılar
+V Location	V Konumu
 Value	Değer
 Value Y	Değer Y
 Variation	Varyasyon
 Vector	Vektör
 Velocity	Hız
+Version v%d saved: versiones/%s	v%d sürümü kaydedildi: versiones/%s
 Vertex	Köşe
 Vertex Animation	Köşe Animasyonu
 Vertex Color	Köşe Rengi
@@ -1652,12 +1776,22 @@ all opaque	tamamen opak
 along	boyunca
 binary	ikili
 bone	kemik
+bone(s)	kemik
 bones	kemikler
 center	merkez
 clip	klip
 clips	klip
 color	renk
+color array	renk dizisi
 compiled	derlendi
+compiling Lua is not available on Symbian	Symbian'da Lua derleme kullanılamıyor
+could not load %s	%s yüklenemedi
+could not read %s	%s okunamadı
+could not read its faces	yüzleri okunamadı
+could not read the mesh	örgü okunamadı
+could not rename %s -> %s	%s -> %s yeniden adlandırılamadı
+could not write %s	%s yazılamadı
+could not write pak.cpp	pak.cpp yazılamadı
 cube	küp
 current frame	geçerli kare
 cylinder	silindir
@@ -1668,23 +1802,38 @@ done	bitti
 edge	kenar
 edge of a face	bir yüzün kenarı
 face	yüz
+faces: %d/%d	yüz: %d/%d
+first triangle %d does not exist: the part of '%s' has %d triangles (0..%d)	ilk üçgen %d yok: '%s' parçasında %d üçgen var (0..%d)
+frames	kare
 free	boş
 game	oyun
 glTF imported successfully!	glTF içe aktarıldı!
+glTF saved successfully!	glTF kaydedildi!
 glTF: could not open the file	glTF: dosya açılamadı
 glTF: could not write the file	glTF: dosya yazılamadı
 glTF: invalid JSON	glTF: geçersiz JSON
 glTF: nothing to export	glTF: dışa aktarılacak bir şey yok
 glTF: nothing to import	glTF: içe aktarılacak bir şey yok
+global	global
 hierarchy	hiyerarşi
 hierarchy clip	hiyerarşi klibi
 hierarchy clips	hiyerarşi klibi
 islands	ada
+it has more than 65535 vertices and this platform uses 16-bit indices	65535'ten fazla köşesi var ve bu platform 16 bit indisler kullanıyor
+its geometry could not be read when opening	geometrisi açılırken okunamadı
+its mesh cannot be written	örgüsü yazılamıyor
+its mesh needs the block '%s' from a newer version	örgüsü daha yeni bir sürümdeki '%s' bloğunu gerektiriyor
+last triangle %d is before the first one (%d)	son üçgen %d, ilk üçgenden (%d) önce
+last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or max)	son üçgen %d sonu aşıyor: '%s' parçasında %d üçgen var (0..%d veya en fazla)
 list	liste
+local	yerel
+matrix stack too deep (%d levels, max %d)	matris yığını çok derin (%d seviye, en fazla %d)
 missing	eksik
 mono (1)	mono (1)
 new	yeni
+no data (whole mesh)	veri yok (tüm örgü)
 no new changes in the file	dosyada yeni değişiklik yok
+normal array	normal dizisi
 not loaded	yüklenmedi
 not saved	kaydedilmedi
 not uploaded	gönderilmedi
@@ -1694,12 +1843,15 @@ object(s) reloaded live	nesne canlı olarak yeniden yüklendi
 objects	nesne
 of	/
 off	kapalı
+on	açık
 open	açık
+out of memory for the Lua state	Lua durumu için bellek yetersiz
 part	parça
 parts	parça
 prefab	prefab
 preview	önizleme
 projection	izdüşüm
+quads	dörtgen
 read-only	salt okunur
 read-only library	salt okunur kütüphane
 reloaded from the file	dosyadan yeniden yüklendi
@@ -1707,22 +1859,67 @@ removed from	kaldırıldı:
 replacements	değiştirme
 results	sonuç
 root	kök
+routine '%s' calls itself (cycle)	'%s' rutini kendini çağırıyor (döngü)
 running	çalışan
+saved	kaydedildi
+saved (save the project so it stays in the .w3d)	kaydedildi (.w3d içinde kalması için projeyi kaydedin)
 saved inside the .w3d	.w3d içine kaydedildi
 saved outside the .w3d	.w3d dışına kaydedildi
 scene	sahne
+scene '%s' -> '%s': check the cambiarEscena("%s") calls in your .lua files	sahne '%s' -> '%s': .lua dosyalarınızdaki cambiarEscena("%s") çağrılarını kontrol edin
+see whisk3d.log	whisk3d.log'a bakın
 select a mesh object first	önce bir örgü nesnesi seçin
+sidecar not loaded (Recalculate)	PVS dosyası yüklenmedi (Yeniden hesapla)
+skip %d	%d atla
 soon	yakında
 sphere	küre
 start	başlangıç
 stencil	stencil
+step %d (%s): '%s' is not a mesh object with a library mesh	adım %d (%s): '%s', kütüphane örgüsü olan bir örgü nesnesi değil
+step %d (%s): '%s' not found	adım %d (%s): '%s' bulunamadı
+step %d (%s): bad memory reference '%s' (use @name[0..%d])	adım %d (%s): geçersiz bellek referansı '%s' (@ad[0..%d] kullanın)
+step %d (%s): light %d does not exist (0..%d)	adım %d (%s): %d ışığı yok (0..%d)
+step %d (%s): nothing chosen	adım %d (%s): hiçbir şey seçilmedi
+step %d (%s): object '%s' not found	adım %d (%s): '%s' nesnesi bulunamadı
+step %d (%s): option %d does not exist (0..%d)	adım %d (%s): %d seçeneği yok (0..%d)
+step %d (%s): write the name of the Lua function	adım %d (%s): Lua fonksiyonunun adını yazın
+step %d (Draw elements): %s	adım %d (Öğeleri çiz): %s
+step %d (Draw elements): a manual range or an array needs the Triangles primitive	adım %d (Öğeleri çiz): elle aralık veya dizi için Üçgenler ilkeli gerekir
+step %d (Draw elements): array %s says %d ranges (0..%d fit from there)	adım %d (Öğeleri çiz): %s dizisi %d aralık diyor (oradan itibaren 0..%d sığar)
+step %d (Draw elements): array %s, range %d: %s	adım %d (Öğeleri çiz): %s dizisi, aralık %d: %s
+step %d (Draw elements): array %s, range %d: flag %d out of %s	adım %d (Öğeleri çiz): %s dizisi, aralık %d: %d bayrağı %s dışında
+step %d (Draw elements): choose the array (a memory: @name[i])	adım %d (Öğeleri çiz): diziyi seçin (bir bellek: @ad[i])
+step %d (Draw elements): primitive %d does not exist	adım %d (Öğeleri çiz): %d ilkeli yok
+step %d (Draw elements): the %s ('%s', %d vertices) has fewer vertices than the Vertex pointer ('%s', %d)	adım %d (Öğeleri çiz): %s ('%s', %d köşe), Köşe işaretçisinden ('%s', %d) daha az köşeye sahip
+step %d (Draw elements): the %s is on but its pointer's mesh ('%s') has no %s (turn the array off with Array on/off)	adım %d (Öğeleri çiz): %s açık ama işaretçisinin örgüsünde ('%s') %s yok (diziyi Diziyi aç/kapat ile kapatın)
+step %d (Draw elements): the %s is on but this routine did not point it: add a %s before (or turn the array off with Array on/off)	adım %d (Öğeleri çiz): %s açık ama bu rutin onu işaret etmedi: önce bir %s ekleyin (veya diziyi Diziyi aç/kapat ile kapatın)
+step %d (Draw elements): the %s may be on (it depends on what was drawn before): turn it on or off with Array on/off before drawing	adım %d (Öğeleri çiz): %s açık olabilir (önce ne çizildiğine bağlı): çizmeden önce Diziyi aç/kapat ile açın veya kapatın
+step %d (Draw elements): the flags have to be a memory (@name[i])	adım %d (Öğeleri çiz): bayraklar bir bellek olmalı (@ad[i])
+step %d (Draw elements): the part uses vertices up to %d but the vertex pointer ('%s') has %d	adım %d (Öğeleri çiz): parça %d köşesine kadar kullanıyor ama köşe işaretçisinde ('%s') %d köşe var
+step %d (Draw elements): the vertex array is off (Array on/off)	adım %d (Öğeleri çiz): köşe dizisi kapalı (Diziyi aç/kapat)
+step %d (Draw elements): there is no Vertex pointer before it	adım %d (Öğeleri çiz): öncesinde Köşe işaretçisi yok
+step %d (Draw elements): unknown range %d	adım %d (Öğeleri çiz): bilinmeyen aralık %d
+step %d (UV pointer): mesh '%s' has no UV layer %d (0 = its render UV)	adım %d (UV işaretçisi): '%s' örgüsünde %d UV katmanı yok (0 = render UV'si)
+step %d (Visibility test): 'Write to' has to be a memory (@name[i])	adım %d (Görünürlük testi): 'Yazılacak yer' bir bellek olmalı (@ad[i])
+step %d (Visibility test): part %d does not exist (-1 = the whole mesh)	adım %d (Görünürlük testi): %d parçası yok (-1 = tüm örgü)
+step %d: Pop matrix without its Push	adım %d: Matrisi it (push) olmadan Matrisi çıkar (pop)
+step %d: mesh '%s' has %d parts (part %d does not exist; -1 = all)	adım %d: '%s' örgüsünde %d parça var (%d parçası yok; -1 = tümü)
+step %d: mesh '%s' has no geometry loaded	adım %d: '%s' örgüsünün yüklü geometrisi yok
+step %d: skips %d steps but only %d follow	adım %d: %d adım atlıyor ama ardından yalnızca %d adım var
+step %d: the steps a 'Skip if zero' can skip leave the matrix stack unbalanced	adım %d: bir 'Sıfırsa atla' adımının atlayabileceği adımlar matris yığınını dengesiz bırakıyor
+step %d: unknown type	adım %d: bilinmeyen tür
 stereo (2)	stereo (2)
+the bytecode dump of %s failed	%s bytecode dökümü başarısız oldu
+there are no game files to pack	paketlenecek oyun dosyası yok
+too many nested routines	çok fazla iç içe rutin
 track	iz
 tracks	iz
 triangle	üçgen
 triangles	üçgen
 unsaved	kaydedilmedi
 vertex	köşe
+vertex group(s)	köşe grubu
+vertex: %d/%d	köşe: %d/%d
 vertices	köşe
 view	görünüm
 with mipmaps	mipmap ile

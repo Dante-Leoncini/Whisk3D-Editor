@@ -55,21 +55,25 @@ bool W3dMallaSerializar(Mesh* m, const std::string& nombre, std::string& out, st
     if (!m) return false;
     // los mismos frenos que el guardado de siempre (EscribirMallaW3dm): nada se hornea a medias
     if (m->w3dmAjenos.noCargo) {
-        if (avisos) avisos->push_back("su geometria no se pudo leer al abrir");
+        if (avisos) avisos->push_back(T("its geometry could not be read when opening"));
         return false;
     }
     const std::string falta = W3dMallaBloqueQueFalta(m);
     if (!falta.empty()) {
-        if (avisos) avisos->push_back("su malla necesita el bloque '" + falta + "' de una version mas nueva");
+        if (avisos) {
+            char b[384];   // (las traducciones en cirilico ocupan el doble de bytes)
+            snprintf(b, sizeof(b), T("its mesh needs the block '%s' from a newer version"), W3dNombreCorto(falta).c_str());
+            avisos->push_back(b);
+        }
         return false;
     }
     const int nRV = m->vertex ? m->vertexSize : 0;
     if (!W3dMallaBinIndicesAlcanzan(nRV) || (g_w3dIndices16Simulado && nRV > 65535)) {
-        if (avisos) avisos->push_back("tiene mas de 65535 vertices y esta plataforma usa indices de 16 bits");
+        if (avisos) avisos->push_back(T("it has more than 65535 vertices and this platform uses 16-bit indices"));
         return false;
     }
     if (!m->edicionPendiente.empty() && !W3dMallaBinMaterializarEdicion(m)) {
-        if (avisos) avisos->push_back("no pude leer sus caras");
+        if (avisos) avisos->push_back(T("could not read its faces"));
         return false;
     }
     // el reposo del skinning 2D es dato (ver EscribirMallaW3dm)
@@ -192,7 +196,7 @@ static void ApartarAnimados(MallaRecurso* r, int nRVNuevo, const std::vector<Mes
     w3dLogfW("[mallas] '%s' cambio de topologia: %d objeto(s) con vertex anims quedan con la malla anterior ('%s')",
              r->nombre.c_str(), n, copia->nombre.c_str());
     if (n > 0)
-        W3dAvisof(false, "%d objeto(s) con vertex anims siguen con la malla anterior: '%s'",
+        W3dAvisof(false, T("%d object(s) with vertex anims keep the previous mesh: '%s'"),
                   n, W3dNombreCorto(copia->nombre).c_str());
 }
 
@@ -396,7 +400,7 @@ bool W3dMallaAsignar(Mesh* m, MallaRecurso* r) {
     MallaRecurso* anterior = m->malla;
     if (!W3dMallaVincular(m, r, false)) {
         UndoGrupoFinSecuencial();
-        W3dAvisof(true, "No pude cargar la malla '%s'", W3dNombreCorto(r->nombre).c_str());
+        W3dAvisof(true, T("Could not load the mesh '%s'"), W3dNombreCorto(r->nombre).c_str());
         return false;
     }
     if (!m->modificadores.empty()) m->GenerarMallaModificada();
@@ -541,7 +545,7 @@ Mesh* W3dMallaDuplicarVinculado(Mesh* src) {
     d->noEditable = src->noEditable;
     d->soloRutina = src->soloRutina;
     if (!W3dMallaVincular(d, src->malla, TieneEdicion(d))) {
-        W3dAvisof(true, "No pude vincular la copia de '%s' a su malla", W3dNombreCorto(src->name).c_str());
+        W3dAvisof(true, T("Could not link the copy of '%s' to its mesh"), W3dNombreCorto(src->name).c_str());
     }
     if (!d->modificadores.empty()) d->GenerarMallaModificada();
     return d;
@@ -878,7 +882,7 @@ static bool TextoDeMalla(Mesh* m, const std::string& nombre, int ancla, std::str
     // la suelta (igual que el camino de siempre, EscribirMallaW3dm)
     const bool prestada = m->malla && !m->edicionPendiente.empty();
     if (!m->edicionPendiente.empty() && !W3dMallaBinMaterializarEdicion(m)) {
-        if (avisos) avisos->push_back("no pude leer sus caras");
+        if (avisos) avisos->push_back(T("could not read its faces"));
         return false;
     }
     if (m->TieneArm2D()) m->Armature2DRestCapturar();   // el reposo 2D es dato (ver EscribirMallaW3dm)
@@ -908,7 +912,7 @@ static bool TextoDeBytes(const std::string& b, const std::string& nombre, const 
             t->materialsGroup[k].material = (k < mats.size() && mats[k]) ? mats[k]
                                           : (k < info.materiales.size() ? BuscarMaterialPorNombre(info.materiales[k]) : NULL);
         ok = W3dMallaEscribir(t, txt, avisos);
-    } else if (avisos) avisos->push_back("no pude leer la malla");
+    } else if (avisos) avisos->push_back(T("could not read the mesh"));
     W3dMallaTemporalBorrar(t);
     return ok;
 }
@@ -990,15 +994,15 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
         if (!W3dMallaSerializar(m, m->malla ? m->malla->nombre : m->name, b, &avisos)) {
             // los frenos de siempre: el proyecto no se guarda y se dice por que
             w3dLogfE("[W3D] '%s': %s: NO guardo encima", m->name.c_str(), avisos.empty() ? "?" : avisos[0].c_str());
-            W3dAvisof(true, "No guardo '%s': %s", W3dNombreCorto(m->name).c_str(),
-                      avisos.empty() ? "su malla no se puede escribir" : avisos[0].c_str());
+            W3dAvisof(true, T("Not saving '%s': %s"), W3dNombreCorto(m->name).c_str(),
+                      avisos.empty() ? T("its mesh cannot be written") : avisos[0].c_str());
             ok = false;
             continue;
         }
         for (size_t k = 0; k < avisos.size(); k++) w3dLogfW("[W3D] '%s': %s", m->name.c_str(), avisos[k].c_str());
         if (!avisos.empty())
-            W3dAvisof(true, "'%s': %s%s", W3dNombreCorto(m->name).c_str(), avisos[0].c_str(),
-                      avisos.size() > 1 ? " (y mas: ver whisk3d.log)" : "");
+            W3dAvisof(true, avisos.size() > 1 ? T("'%s': %s (and more: see whisk3d.log)") : "'%s': %s",
+                      W3dNombreCorto(m->name).c_str(), avisos[0].c_str());
         const std::string clave = ClaveContenido(b);
         size_t gi = (size_t)-1;
         MallaRecurso* r = m->malla;
@@ -1116,7 +1120,7 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
             // quitar); se avisa y el proyecto se guarda sin esa malla.
             g.perdido = true;
             w3dLogfW("[W3D] la malla huerfana '%s' (%s) no se pudo leer: no se guarda", r->nombre.c_str(), r->entrada.c_str());
-            W3dAvisof(true, "La malla '%s' (sin objetos) no se pudo leer: se guarda sin ella",
+            W3dAvisof(true, T("The mesh '%s' (no objects) could not be read: saving without it"),
                       W3dNombreCorto(r->nombre).c_str());
         }
         gPlan.push_back(g);
@@ -1181,20 +1185,20 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
                 // (un huerfano ilegible: igual que en binario, se avisa y se guarda sin el)
                 g.perdido = true;
                 w3dLogfW("[W3D] la malla huerfana '%s' no se pudo escribir en texto: no se guarda", g.nombre.c_str());
-                W3dAvisof(true, "La malla '%s' (sin objetos) no se pudo leer: se guarda sin ella",
+                W3dAvisof(true, T("The mesh '%s' (no objects) could not be read: saving without it"),
                           W3dNombreCorto(g.nombre).c_str());
                 continue;
             }
             if (!okT) {
                 w3dLogfE("[W3D] la malla '%s' no se pudo escribir en texto", g.nombre.c_str());
-                W3dAvisof(true, "No guardo: la malla '%s' no se pudo escribir (%s)", W3dNombreCorto(g.nombre).c_str(),
-                          avisos.empty() ? "ver whisk3d.log" : avisos[0].c_str());
+                W3dAvisof(true, T("Not saving: the mesh '%s' could not be written (%s)"), W3dNombreCorto(g.nombre).c_str(),
+                          avisos.empty() ? T("see whisk3d.log") : avisos[0].c_str());
                 ok = false;
                 break;
             }
             if (!avisos.empty())
-                W3dAvisof(true, "'%s': %s%s", W3dNombreCorto(g.nombre).c_str(), avisos[0].c_str(),
-                          avisos.size() > 1 ? " (y mas: ver whisk3d.log)" : "");
+                W3dAvisof(true, avisos.size() > 1 ? T("'%s': %s (and more: see whisk3d.log)") : "'%s': %s",
+                          W3dNombreCorto(g.nombre).c_str(), avisos[0].c_str());
             if (!g.bytes.empty()) {
                 std::string t;
                 if (W3dMallaBinRenombrar(g.bytes, g.nombre, t)) g.bytes.swap(t);
@@ -1216,13 +1220,13 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
             // (un huerfano ilegible: se avisa y se guarda sin el, ver arriba)
             g.perdido = true;
             w3dLogfW("[W3D] la malla huerfana '%s' no se pudo leer: no se guarda", g.nombre.c_str());
-            W3dAvisof(true, "La malla '%s' (sin objetos) no se pudo leer: se guarda sin ella",
+            W3dAvisof(true, T("The mesh '%s' (no objects) could not be read: saving without it"),
                       W3dNombreCorto(g.nombre).c_str());
             continue;
         }
         else if (!g.rec || !BytesDelRecurso(g.rec, b)) {
             w3dLogfE("[W3D] la malla '%s' no se pudo leer para guardarla", g.nombre.c_str());
-            W3dAvisof(true, "No guardo: no pude leer la malla '%s'", W3dNombreCorto(g.nombre).c_str());
+            W3dAvisof(true, T("Not saving: could not read the mesh '%s'"), W3dNombreCorto(g.nombre).c_str());
             ok = false;
             break;
         }

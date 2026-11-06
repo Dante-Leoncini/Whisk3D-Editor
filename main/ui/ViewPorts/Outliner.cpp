@@ -18,7 +18,8 @@
 #include "ViewPorts/Notificaciones.h"       // Notificar (renames del modo mover)
 #include "Undo.h"                           // UndoCapturarRenames (1 solo paso al confirmar el mover)
 #include "WhiskUI/widgets/Button.h"          // los botones de la barra: vista y acciones (por recursos)
-#include <cstdio>                           // sprintf (el contador del aviso)
+#include <cstdio>                           // snprintf (el aviso de los renames)
+#include <cstring>                          // strlen
 #include "io/Prefabs.h"             // W3dPrefabEsEscena: el icono de una escena instanciada
 #include "objects/InstanciaPrefab.h"
 #ifdef W3D_SYMBIAN
@@ -680,7 +681,7 @@ void Outliner::DibujarArm2D(Mesh* m, int idx, bool hidden, int prof){
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
     W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(IconType::armature)]->uvs);
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
-    RenderBitmapText(m->armatures2d[idx] ? m->armatures2d[idx]->nombre : std::string("Armature 2D"));
+    RenderBitmapText(m->armatures2d[idx] ? m->armatures2d[idx]->nombre : std::string(T("Armature 2D")));
     w3dEngine::PopMatrix();
 }
 
@@ -1194,9 +1195,10 @@ static void MoverUniquificarSubarbol(Object* raiz) {
         if (n <= 3) { if (!primeros.empty()) primeros += ", "; primeros += viejo + " -> " + sub[i]->name; }
     }
     if (n > 0) {
-        char cant[32]; sprintf(cant, "%d", n);
-        Notificar(std::string(cant) + " nombre(s) renumerados al cambiar de escena (" +
-                  primeros + (n > 3 ? ", ...)" : ")") + ". Revisa tus scripts lua.", true);
+        const char* fmt = T("%d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.");
+        std::vector<char> msg(strlen(fmt) + primeros.size() + 64);
+        snprintf(&msg[0], msg.size(), fmt, n, primeros.c_str(), n > 3 ? ", ..." : "");
+        Notificar(std::string(&msg[0]), true);
     }
 }
 

@@ -560,7 +560,7 @@ bool IDE::Guardar(bool forzar) {
         }
         sucio = false;
         textoDisco = t; hayTextoDisco = true;
-        if (!silencioso) Notificar(IDENombreScript(archivo) + " guardado (guarda el proyecto para que quede en el .w3d)", false);
+        if (!silencioso) Notificar(IDENombreScript(archivo) + " " + T("saved (save the project so it stays in the .w3d)"), false);
         IdeShaderGuardado(archivo);
         RecargarEnVivo(false);
         g_redraw = true;
@@ -591,7 +591,7 @@ bool IDE::Guardar(bool forzar) {
     sucio = false;
     textoDisco = t; hayTextoDisco = true;
     W3dDescargarSiWeb(archivo);   // navegador: el .lua externo guardado baja a la PC
-    if (!silencioso) Notificar(IDENombreScript(archivo) + " guardado", false);
+    if (!silencioso) Notificar(IDENombreScript(archivo) + " " + T("saved"), false);
     IdeShaderGuardado(archivo);
     RecargarEnVivo(false);
     g_redraw = true;
@@ -612,7 +612,7 @@ bool IDE::GuardarEnProyecto() {
         Notificar(IDENombreScript(archivo) + " " + T("saved inside the .w3d"), false);
         return true;
     }
-    Notificar(IDENombreScript(archivo) + " guardado (guarda el proyecto para que quede en el .w3d)", false);
+    Notificar(IDENombreScript(archivo) + " " + T("saved (save the project so it stays in the .w3d)"), false);
     return true;
 }
 
@@ -1609,7 +1609,7 @@ void IDE::Render() {
     // el codigo, por tramos de color del lexer
     gfx::Scissor(x + gutterW, glY, (width > gutterW) ? width - gutterW : 0, hVis);
     if (archivo.empty() && n == 1 && lineas[0].empty()) {
-        IdeTexto(textX0, py0, "(no hay scripts .lua ni shaders .glsl en el proyecto)",
+        IdeTexto(textX0, py0, T("(no .lua scripts or .glsl shaders in the project)"),
                  ListaColores[static_cast<int>(ColorID::grisUI)]);
     }
     std::vector<unsigned char> tipos;

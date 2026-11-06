@@ -11647,8 +11647,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 if (d.propId < 0) continue; for (size_t k = 0; k < d.keys.size(); k++) if (d.keys[k] == f) return true; } return false; } };
         { bool zEsY = false, yEsZ = false;
           for (size_t i = 0; i < tl->dopeRows.size(); i++){ const Timeline::DopeRow& d = tl->dopeRows[i];
-            if (d.propId == AnimPosition && d.compId == AnimY && d.nombre == "Z Location") zEsY = true;
-            if (d.propId == AnimPosition && d.compId == AnimZ && d.nombre == "Y Location") yEsZ = true; }
+            if (d.propId == AnimPosition && d.compId == AnimY && d.nombre == T("Z Location")) zEsY = true;   // (traducido)
+            if (d.propId == AnimPosition && d.compId == AnimZ && d.nombre == T("Y Location")) yEsZ = true; }
           TLC_VER(zEsY, "la fila Z Location es pos.y (arriba, como Properties)");
           TLC_VER(yEsZ, "la fila Y Location es pos.z"); }
         const int n0 = C::Keys(tl);
@@ -23301,9 +23301,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             tl->DopeMoveCancel();
             S::restaurar(tl, pre);
             printf("      [dopewrap] 'g' tras hoverear 500px desde el ultimo click, sin mover: %s\n", txt.c_str());
+            char cero[96]; snprintf(cero, sizeof cero, T("Move: %d frames"), 0);   // (el texto sale en el idioma del sistema)
             printf("         tiene que decir 0 frames (si dice ~43 se comio el hover) -> %s\n",
-                   (txt.find("Move: 0 frames") != std::string::npos) ? "OK" : "SE COMIO EL HOVER!");
-            if (txt.find("Move: 0 frames") == std::string::npos){
+                   (txt.find(cero) != std::string::npos) ? "OK" : "SE COMIO EL HOVER!");
+            if (txt.find(cero) == std::string::npos){
                 err="dopewrap: el transform arranca corrido por la distancia hovereada"; delete tl; return false;
             }
         }
@@ -26036,7 +26037,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         std::string txt = uv->XformTextoBarra();
         bool barraOk = txt.find("[1|]") != std::string::npos &&
                        txt.find("= 1.0000") != std::string::npos &&
-                       txt.find("along X") != std::string::npos;
+                       txt.find(std::string(T("along")) + " X") != std::string::npos;   // (en el idioma del sistema)
         uv->XformConfirmar();
         bool confirmo = (uv->uvXform == 0) && !NumInputActivo();
         printf("      [uvxform] g+x+\"1\": lockX=%s consumido=%s delta u=1.0 exacto=%s | barra='%s' %s | confirma=%s\n",
@@ -35080,7 +35081,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                fb->selected, sinAutoSel?"OK":"MAL");
         if (!sinAutoSel) ok = false;
         std::string etiq = fb->EtiquetaAccion();
-        bool etiqOk = (etiq == kUsarCarpetaActual);
+        bool etiqOk = (etiq == T(kUsarCarpetaActual));   // la etiqueta sale traducida
         printf("      [fbcarpeta] boton verde sin seleccion = '%s' %s\n", etiq.c_str(), etiqOk?"OK":"MAL");
         if (!etiqOk) ok = false;
         fb->Tecla(LayoutKey::Accept);    // = pulsar el boton verde (cierra y llama al callback)

@@ -104,7 +104,7 @@ static void RGBaHSV(float r, float g, float b, float* h, float* s, float* v) {
 
 // ----------------------------------------------------------------
 
-ColorPicker::ColorPicker() : PopUpBase("Color") {
+ColorPicker::ColorPicker() : PopUpBase(T("Color")) {
     // (eran inicializadores de clase: C++03)
     target = NULL;
     original[0] = original[1] = original[2] = original[3] = 1.0f;
@@ -126,7 +126,7 @@ ColorPicker::ColorPicker() : PopUpBase("Color") {
     arrastreX = 0;
     rect = new Rec2D();
     filaCard = new Card(NULL, 10, 10);
-    btnOk = new Button("OK");
+    btnOk = new Button(T("OK"));
     btnCancel = new Button(T("Cancel"));
     btnUnidad = new Button(T("Switch to 0-100%"));
     btnCopiar = new Button(T("Copy"));
@@ -546,7 +546,7 @@ void ColorPicker::Render() {
                 w3dEngine::PushMatrix();
                 w3dEngine::Translatef((GLfloat)(izq + gapGS), (GLfloat)(yFila + GlobalScale), 0);
                 w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
-                RenderBitmapText(d == 0 ? "Colores" : "Paletas", textAlign::left, cajaW);
+                RenderBitmapText(T(d == 0 ? "Colors" : "Palettes"), textAlign::left, cajaW);
                 w3dEngine::PopMatrix();
                 continue;
             }
@@ -565,13 +565,13 @@ void ColorPicker::Render() {
             bool marcado = false;
             std::string etiqueta;
             const float* sw = NULL;   // swatch (solo filas de color)
-            if (k == 0) { etiqueta = "Propio"; marcado = palRef && *palRef < 0; }
+            if (k == 0) { etiqueta = T("Own"); marcado = palRef && *palRef < 0; }
             else if (k <= nC) {
                 etiqueta = (*cs)[k - 1].nombre;
                 sw = (*cs)[k - 1].rgba;
                 marcado = palRef && *palRef == k - 1;
             } else if (k == nC + 1) {
-                etiqueta = "Igual que el padre";
+                etiqueta = T("Same as parent");
                 marcado = palObj && palObj->paleta.empty();
             } else {
                 int j = k - nC - 2;
@@ -579,7 +579,7 @@ void ColorPicker::Render() {
                 marcado = palObj && palObj->paleta == ps[j].nombre;
                 // sin seleccion propia: senalar la HEREDADA (la efectiva)
                 if (!marcado && palObj && palObj->paleta.empty() && efectiva == &ps[j])
-                    etiqueta += " (heredada)";
+                    etiqueta += std::string(" ") + T("(inherited)");
             }
             int tx = gapGS * 2;
             if (marcado) {
@@ -719,7 +719,7 @@ void ColorPicker::Render() {
                 w3dEngine::Translatef((GLfloat)(gapGS * 2), (GLfloat)slotY, 0);
                 if (i == fila) w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
                 else w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
-                RenderBitmapText(etiqueta, textAlign::left, cajaW / 2);
+                RenderBitmapText(T(etiqueta), textAlign::left, cajaW / 2);
                 w3dEngine::PopMatrix();
                 w3dEngine::PushMatrix();
                 w3dEngine::Translatef((GLfloat)(cajaW - gapGS * 2), (GLfloat)slotY, 0);
@@ -759,7 +759,7 @@ void ColorPicker::Render() {
             w3dEngine::Translatef((GLfloat)(gapGS * 2), (GLfloat)GlobalScale, 0);
             if (fila == 3) w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
             else w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
-            RenderBitmapText("Alpha", textAlign::left, cajaW / 2);
+            RenderBitmapText(T("Alpha"), textAlign::left, cajaW / 2);
             w3dEngine::PopMatrix();
             w3dEngine::PushMatrix();
             w3dEngine::Translatef((GLfloat)(cajaW - gapGS * 2), (GLfloat)GlobalScale, 0);
@@ -778,8 +778,8 @@ void ColorPicker::Render() {
         int contW = popUpWindow->width - izq - marginGS - borderGS;
         if (pestania == 0) {
             // solo en RGB (HSV es flotante 0..1 y Hex no usa unidad)
-            btnUnidad->text = ColorPickerUnidad ? "Switch to 0-255"
-                                                : "Switch to 0-100%";
+            btnUnidad->text = T(ColorPickerUnidad ? "Switch to 0-255"
+                                                  : "Switch to 0-100%");
             btnUnidad->focoMenu = (fila == Filas()); // enfocado con flechas (la fila del switch en RGB)
             btnUnidad->Resize(contW);
             w3dEngine::PushMatrix();

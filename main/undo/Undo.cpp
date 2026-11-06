@@ -1376,7 +1376,7 @@ class DeleteUndo : public UndoCmd {
         hechas.push_back(std::make_pair(nombre, idx));
         w3dLogfW("[undo] curva huerfana: la escena '%s' ya no existe -> recreada como '%s'",
                  nombre.c_str(), libre.c_str());
-        W3dAvisof(false, "Animacion recuperada en una escena nueva: '%s'", W3dNombreCorto(libre).c_str());
+        W3dAvisof(false, T("Animation recovered in a new scene: '%s'"), W3dNombreCorto(libre).c_str());
         return idx;
     }
     void DevolverAnimaciones() {

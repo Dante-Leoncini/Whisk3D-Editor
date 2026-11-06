@@ -38,12 +38,12 @@
 
 // el callback del menu "Add > Import OBJ": abre el explorador filtrado a .obj
 static void PCImportObj() {
-    AbrirFileBrowser("Import OBJ", "Import OBJ", ".obj", ImportModeloCallback);
+    AbrirFileBrowser(T("Import OBJ"), T("Import OBJ"), ".obj", ImportModeloCallback);
 }
 // "Add > Imports > FBX/glTF/GLB": mismo explorador; ImportModeloPorExtension rutea por extension al importador correcto.
-static void PCImportFbx()  { AbrirFileBrowser("Import FBX",  "Import FBX",  ".fbx",  ImportModeloCallback); }
-static void PCImportGltf() { AbrirFileBrowser("Import glTF", "Import glTF", ".gltf", ImportModeloCallback); }
-static void PCImportGlb()  { AbrirFileBrowser("Import GLB",  "Import GLB",  ".glb",  ImportModeloCallback); }
+static void PCImportFbx()  { AbrirFileBrowser(T("Import FBX"),  T("Import FBX"),  ".fbx",  ImportModeloCallback); }
+static void PCImportGltf() { AbrirFileBrowser(T("Import glTF"), T("Import glTF"), ".gltf", ImportModeloCallback); }
+static void PCImportGlb()  { AbrirFileBrowser(T("Import GLB"),  T("Import GLB"),  ".glb",  ImportModeloCallback); }
 
 // EL CUADRO A LA VENTANA y el vsync: con el backend Vulkan no hay contexto de GL, los hace el (vk/w3dVk.h)
 #ifdef W3D_VULKAN
@@ -136,8 +136,8 @@ static void TexturaElegida(const std::string& pathElegido) {
 // valor correcto (false=textura, true=normal); el callback de arriba decide el destino.
 static void PCCargarTexturaEn(Material* mat) {
     gTexMat = mat;
-    AbrirFileBrowser(gCargarTexturaComoNormal ? "Cargar normal map" : "Cargar textura",
-                    gCargarTexturaComoNormal ? "Abrir normal map" : "Abrir textura",
+    AbrirFileBrowser(gCargarTexturaComoNormal ? T("Load normal map") : T("Load Texture"),
+                    gCargarTexturaComoNormal ? T("Open normal map") : T("Open"),
                     ".png .jpg .jpeg .bmp .tga", TexturaElegida);
 }
 

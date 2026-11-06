@@ -593,7 +593,7 @@ void BoneRenombradoDesdeUI(Armature* a, int idx, const std::string& viejo){
     { std::vector<W3dRenameDest> v; JuntarVGroupsHomonimos(SceneCollection, a, viejo, v);
       UndoCapturarRenames(v); }
     int nvg = BoneRenombrarGrupos(SceneCollection, a, viejo, nuevo);
-    if (nvg > 0) W3dAvisoArrastre(nvg, "vertex group(s)", viejo, nuevo);
+    if (nvg > 0) W3dAvisoArrastre(nvg, T("vertex group(s)"), viejo, nuevo);
     BoneEditAplicado(a);
 }
 
@@ -614,7 +614,7 @@ bool BoneRenombrar(Armature* a, int idx, const std::string& nuevo){
       if (!v.empty()) { UndoCapturarRenames(v); UndoFundirUltimos(2); } }
     a->bones[idx].name = unico;
     int nvg = BoneRenombrarGrupos(SceneCollection, a, viejo, unico);
-    if (nvg > 0) W3dAvisoArrastre(nvg, "vertex group(s)", viejo, unico);
+    if (nvg > 0) W3dAvisoArrastre(nvg, T("vertex group(s)"), viejo, unico);
     BoneEditAplicado(a);
     return true;
 }

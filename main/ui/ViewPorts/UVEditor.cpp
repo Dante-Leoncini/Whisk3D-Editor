@@ -1101,7 +1101,7 @@ void UVEditor::SyncBarra() {
           bMip->visible = (tid != 0) && uvModo != UVModoTextura;
           if (tid) {
               int niv = UVMipNivel();
-              if (niv < 0 || !w3dEngine::TexTieneMips(tid)) bMip->text = "Mip: Auto";
+              if (niv < 0 || !w3dEngine::TexTieneMips(tid)) bMip->text = std::string("Mip: ") + T("Auto");
               else {
                   int tw = 0, th = 0;
                   w3dEngine::TextureSize(tid, tw, th);
@@ -3291,7 +3291,7 @@ bool Bone2DRenombrar(Mesh* m, int idx, const std::string& nuevo) {
     const int nvg = (int)aRenombrar.size();
     for (size_t k = 0; k < aRenombrar.size(); k++)
         if (std::string* p = W3dDestResolver(aRenombrar[k])) *p = unico;
-    if (nvg > 0) W3dAvisoArrastre(nvg, "UV group(s)", viejo, unico);   // ver W3dAviso.h
+    if (nvg > 0) W3dAvisoArrastre(nvg, T("UV group(s)"), viejo, unico);   // ver W3dAviso.h
     g_redraw = true;
     return true;
 }

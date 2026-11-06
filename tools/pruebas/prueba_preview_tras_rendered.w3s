@@ -3,7 +3,7 @@
 # como ese foco (un cono angosto apuntando a cualquier lado) y la escena se veia casi negra. Tiene que verse igual
 # que antes de pasar por Rendered. (Sin la luz y el cubo de fabrica: el foco tiene que ser la luz del slot 0)
 ventana 1280 720
-selobj Light
+selobj Luz
 delete
 selobj Cubo
 delete

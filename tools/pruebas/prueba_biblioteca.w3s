@@ -105,9 +105,9 @@ seleccion n 1 tiene Caja
 # un click AFUERA (en otra fila) confirma lo tipeado
 outdobleclick Caja
 outtipear Caja2
-outclick Light
+outclick Luz
 outrender
-seleccion n 1 tiene Light
+seleccion n 1 tiene Luz
 outclick Caja2
 outteclapc f2
 outescribir Caja
@@ -149,12 +149,12 @@ outtap Caja
 seleccion n 1 tiene Caja
 outmantener Caja soltar
 # en la ESCENA, llevar lo agarrado al medio de otra fila lo EMPARENTA (como el arrastre del mouse), con undo
-outmantener Caja mover Light
-objrel Caja padre Light
-objrel Light hijos 1
+outmantener Caja mover Luz
+objrel Caja padre Luz
+objrel Luz hijos 1
 undo
-objrel Light hijos 0
-fail objrel Caja padre Light
+objrel Luz hijos 0
+fail objrel Caja padre Luz
 
 # ---- F) los MENUS de la barra ----
 # la escena: Objeto

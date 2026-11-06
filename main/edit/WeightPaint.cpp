@@ -1073,7 +1073,7 @@ static void BrushLabels(std::string& tam, std::string& fuerza, std::string& modo
 void WeightPaintLabels(Mesh* m, std::string& tam, std::string& fuerza,
                        std::string& modo, std::string& grupo) {
     BrushLabels(tam, fuerza, modo);
-    grupo = "Group";
+    grupo = T("Group");
     if (m && m->grupoActivo >= 0 && m->grupoActivo < (int)m->vertexGroups.size())
         grupo = m->vertexGroups[m->grupoActivo]->nombre;
 }
@@ -1081,7 +1081,7 @@ void WeightPaintLabels(Mesh* m, std::string& tam, std::string& fuerza,
 void WeightPaintLabelsUV(Mesh* m, std::string& tam, std::string& fuerza,
                          std::string& modo, std::string& grupo) {
     BrushLabels(tam, fuerza, modo);
-    grupo = "UV Group";
+    grupo = T("UV Group");
     if (m && m->uvGrupoActivo >= 0 && m->uvGrupoActivo < (int)m->uvGroups.size())
         grupo = m->uvGroups[m->uvGrupoActivo]->nombre;
 }
