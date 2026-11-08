@@ -71,6 +71,10 @@ list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRigido.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dColMalla.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dHitbox.cpp
+    # ragdolls caseros (particulas + articulaciones con limites) e IK de dos huesos / FABRIK
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRagdoll.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/nav/W3dNav.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/animation/W3dLocomocion.cpp
     # jugar en red (LAN, wifi, internet: UDP). Va junto a W3dScript.cpp: registra los binds red*
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/net/W3dRed.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp

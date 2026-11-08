@@ -256,6 +256,8 @@ SOURCE          MallaRecurso.cpp // las mallas 3D como RECURSO compartido (regis
 SOURCE          MallaFlujos.cpp // los flujos de indices por parte para las rutinas (tiras, aristas, vertices, quads simulados)
 SOURCE          VisBsp.cpp       // metodo Bsp del Culling: arbol BSP + PVS por cluster (.w3dbsp)
 SOURCE          MundoBsp.cpp     // el MUNDO del .w3dbsp v2: geometria por hoja y material, un draw por material (C++03)
+SOURCE          W3dCables.cpp    // cables finos: lineas de 1 pixel con el grosor en la opacidad por la distancia
+SOURCE          W3dVideoTex.cpp  // un video como textura: cuadros RGB565 comprimidos leidos de a uno, dos texturas alternadas
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp W3dClipboardSymbian.cpp
 SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: la rama de escritorio, sin vibrador)
@@ -291,6 +293,14 @@ SOURCE          W3dRigido.cpp
 SOURCE          W3dColMalla.cpp
 // hitbox del Core (cajas de deteccion + eventos alEntrar/alSalir/alTocar para lua)
 SOURCE          W3dHitbox.cpp
+// ragdolls caseros e IK (dos huesos con polo, FABRIK)
+SOURCE          W3dRagdoll.cpp
+// la navegacion (caminos por una rejilla del piso, A* tensado) y la locomocion (ritmo, giro, mirada, pies)
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\nav
+SOURCE          W3dNav.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\animation
+SOURCE          W3dLocomocion.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 // jugar en red (LAN, wifi, internet: UDP por los sockets de Open C; pide NetworkServices)
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\net
 SOURCE          W3dRed.cpp

@@ -23,6 +23,9 @@ FUENTES_CPP += \
     libs/Whisk3DCore/physics/W3dRigido.cpp \
     libs/Whisk3DCore/physics/W3dColMalla.cpp \
     libs/Whisk3DCore/physics/W3dHitbox.cpp \
+    libs/Whisk3DCore/physics/W3dRagdoll.cpp \
+    libs/Whisk3DCore/nav/W3dNav.cpp \
+    libs/Whisk3DCore/animation/W3dLocomocion.cpp \
     libs/Whisk3DCore/net/W3dRed.cpp \
     libs/Whisk3DCore/io/w3dFilesystem.cpp \
     libs/Whisk3DCore/gfx/w3dTexture.cpp \

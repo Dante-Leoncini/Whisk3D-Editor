@@ -43,6 +43,9 @@ SRC="$SRC $CORE/physics/W3dFisica.cpp"
 # colSuelo...). Faltaban aca (el CMakeLists y el Android.mk ya los tenian).
 SRC="$SRC $CORE/physics/W3dRigido.cpp $CORE/physics/W3dColMalla.cpp"
 SRC="$SRC $CORE/physics/W3dHitbox.cpp"   # hitbox + eventos alEntrar/alSalir/alTocar
+SRC="$SRC $CORE/physics/W3dRagdoll.cpp"  # ragdolls + IK
+SRC="$SRC $CORE/nav/W3dNav.cpp"  # navegacion (caminos)
+SRC="$SRC $CORE/animation/W3dLocomocion.cpp"  # locomocion (pies, mirada)
 SRC="$SRC $CORE/net/W3dRed.cpp"          # binds red* (en el navegador: sin red por ahora)
 # volumen del proyecto (VolumenAplicarProyecto, lo llama el lector) + el dispatcher de musica que
 # W3dVolumen usa (sin W3D_ENABLE_MUSIC son stubs mudos). Mismo par que el CMakeLists.
