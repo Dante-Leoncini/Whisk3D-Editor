@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------------------------------------------
 #  Whisk3D para Nintendo 3DS: devkitARM + libctru + citro3d (la GPU PICA200) + SDL2 de 3DS (tactil, botones,
 #  eventos), todo libre (devkitPro: nada de Nintendo). Es el MISMO editor que la PC (main.cpp + controles.cpp con
-#  SDL2); el dibujo va por el backend citro3d (libs/Whisk3DCore/c3d) en vez del de OpenGL. Lo propio de la consola va
+#  SDL2); el dibujo va por el backend citro3d (libs/Whisk3DCore/graphics/citro3d) en vez del de OpenGL. Lo propio de la consola va
 #  con #ifdef W3D_3DS.
 #
 #  No se usa directo: lo llama build_3ds.sh (que carga el entorno de ~/3ds). Salida en build/:
@@ -30,10 +30,10 @@ FUENTES_CPP += \
     libs/Whisk3DCore/physics/W3dColMalla.cpp \
     libs/Whisk3DCore/physics/W3dHitbox.cpp \
     libs/Whisk3DCore/physics/W3dRagdoll.cpp \
-    libs/Whisk3DCore/nav/W3dNav.cpp \
+    libs/Whisk3DCore/physics/W3dNav.cpp \
     libs/Whisk3DCore/net/W3dRed.cpp \
     libs/Whisk3DCore/io/w3dFilesystem.cpp \
-    libs/Whisk3DCore/gfx/w3dTexture.cpp \
+    libs/Whisk3DCore/graphics/w3dTexture.cpp \
     libs/Whisk3DCore/io/w3dCompress.cpp \
     libs/Whisk3DCore/io/W3dZip.cpp \
     libs/Whisk3DCore/io/W3dTexto.cpp \
@@ -41,13 +41,13 @@ FUENTES_CPP += \
     libs/Whisk3DCore/io/W3dMallaBin.cpp \
     libs/Whisk3DCore/io/W3dAlmacen.cpp \
     libs/Whisk3DCore/io/W3dRecursos.cpp \
-    libs/Whisk3DCore/c3d/w3dGraphicsC3D.cpp \
-    libs/Whisk3DCore/c3d/w3dGLc3d.cpp \
+    libs/Whisk3DCore/graphics/citro3d/w3dGraphicsC3D.cpp \
+    libs/Whisk3DCore/graphics/citro3d/w3dGLc3d.cpp \
     libs/Whisk3DCore/base/w3dlog.cpp \
     libs/Whisk3DCore/base/W3dInteractionState.cpp \
     libs/Whisk3DCore/base/W3dConfig.cpp \
-    libs/Whisk3DCore/base/W3dTactil.cpp \
-    libs/Whisk3DCore/base/W3dVibrar.cpp \
+    libs/Whisk3DCore/input/W3dTactil.cpp \
+    libs/Whisk3DCore/input/W3dVibrar.cpp \
     libs/Whisk3DCore/math/Vector3.cpp \
     libs/Whisk3DCore/math/Quaternion.cpp \
     libs/Whisk3DCore/math/Matrix4.cpp \
@@ -55,7 +55,7 @@ FUENTES_CPP += \
     libs/Whisk3DCore/audio/W3dAudioSDL.cpp \
     libs/Whisk3DCore/audio/W3dVolumen.cpp \
     libs/Whisk3DCore/audio/W3dMusic.cpp \
-    libs/Whisk3DCore/base/W3dClipboardSDL.cpp \
+    libs/Whisk3DCore/input/W3dClipboardSDL.cpp \
     platform/3ds/w3d_3ds.cpp
 FUENTES_C := $(filter-out thirdparty/lua/src/lua.c thirdparty/lua/src/luac.c, \
                  $(shell cd $(RAIZ) && ls thirdparty/lua/src/*.c))
@@ -66,7 +66,7 @@ OBJS := $(addprefix $(OBJDIR)/,$(FUENTES_CPP:.cpp=.o) $(FUENTES_C:.c=.o)) $(OBJD
 INCS := -I$(RAIZ)/platform/3ds/include -I$(OBJDIR) \
         -I$(RAIZ) -I$(RAIZ)/main -I$(RAIZ)/main/app -I$(RAIZ)/main/config -I$(RAIZ)/main/io -I$(RAIZ)/main/undo \
         -I$(RAIZ)/main/ui -I$(RAIZ)/main/ui/ViewPorts -I$(RAIZ)/main/ui/GeometriaUI \
-        -I$(RAIZ)/libs/Whisk3DCore -I$(RAIZ)/libs/Whisk3DCore/base -I$(RAIZ)/libs/Whisk3DCore/gfx \
+        -I$(RAIZ)/libs/Whisk3DCore -I$(RAIZ)/libs/Whisk3DCore/base -I$(RAIZ)/libs/Whisk3DCore/graphics \
         -I$(RAIZ)/libs/Whisk3DCore/io -I$(RAIZ)/libs/Whisk3DCore/thirdparty -I$(RAIZ)/libs \
         -I$(RAIZ)/libs/WhiskUI/widgets -I$(RAIZ)/libs/WhiskUI/text -I$(RAIZ)/libs/WhiskUI/draw \
         -I$(RAIZ)/libs/WhiskUI/theme -I$(RAIZ)/libs/WhiskUI/core -I$(RAIZ)/thirdparty -I$(RAIZ)/thirdparty/lua/src \
@@ -111,7 +111,7 @@ $(OBJDIR)/%.o: $(RAIZ)/%.c
 	@$(CC) $(CFLAGS_W3D) -c $< -o $@
 
 # ---- el vertex shader: picasso lo ensambla y bin2s lo vuelve un arreglo (w3d_shbin + w3d_shbin_size) ----
-$(OBJDIR)/w3d.shbin: $(RAIZ)/libs/Whisk3DCore/c3d/w3d.v.pica
+$(OBJDIR)/w3d.shbin: $(RAIZ)/libs/Whisk3DCore/graphics/citro3d/w3d.v.pica
 	@mkdir -p $(OBJDIR)
 	@echo "  picasso $(notdir $<)"
 	@$(TOOLS)/picasso -o $@ $<

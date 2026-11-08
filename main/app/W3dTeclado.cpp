@@ -25,10 +25,15 @@ static SDL_Window* gVentana = NULL;
 bool W3dTecladoVisible() { return gVisible; }
 
 void W3dTecladoAbrir() {
+#if defined(W3D_PSP)
+    // (la PSP: el QWERTY de Whisk3D, que abre w3d_psp.cpp cuando un campo toma el foco. El teclado del sistema que abre
+    // SDL dibuja por su cuenta en el GE y no deja pasar la ñ)
+#else
 #ifdef __ANDROID__
     if (gFullAuto && !gSalioDeFull && gVentana) { SDL_SetWindowFullscreen(gVentana, 0); gSalioDeFull = true; }
 #endif
     SDL_StartTextInput();
+#endif
 }
 
 void W3dTecladoRedimension(int w, int h) {

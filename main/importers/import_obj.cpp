@@ -15,7 +15,7 @@
 #include <cstdio> // sprintf para FloatStr
 #include <cerrno>  // errno del ofstream fallido (diagnostico del export en Android)
 #include <cstring> // strerror
-#include "gfx/w3dGraphics.h" // gfx::MezclaAdd: la palabra ADITIVO del .mtl
+#include "graphics/w3dGraphics.h" // gfx::MezclaAdd: la palabra ADITIVO del .mtl
 #include "io/W3dMallaBin.h"       // W3dMallaBinMaterializarEdicion: las caras pendientes de una malla de un recurso
 #include "objects/MallaRecurso.h" // W3dMallaSoltarEdicion: y vuelven a quedar pendientes al terminar
 #include "io/W3dWeb.h"            // W3dDescargarSiWeb: en el navegador las texturas del export bajan a la PC

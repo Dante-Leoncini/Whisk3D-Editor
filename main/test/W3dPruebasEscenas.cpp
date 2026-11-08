@@ -158,7 +158,7 @@
 #include "config/W3dLang.h"
 #include "io/W3dZip.h"
 #include "w3dFilesystem.h"
-#include "gfx/w3dGraphics.h"              // pantallafoto: w3dEngine::ReadPixelsRGBA
+#include "graphics/w3dGraphics.h"              // pantallafoto: w3dEngine::ReadPixelsRGBA
 #include "WhiskUI/Propieties/PropList.h"   // las filas del arbol del Mix (MixFilasCount / MixFilaTexto)
 #include "WhiskUI/Propieties/PropertieBase.h"   // los hooks del rombo de keyframe (W3dKeyframeToggle / Estado)
 #include "ViewPorts/Notificaciones.h"   // lo que se le dijo al usuario (notif)

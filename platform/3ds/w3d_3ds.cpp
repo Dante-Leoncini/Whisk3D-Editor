@@ -18,7 +18,7 @@
 #include <errno.h>
 #include <string>
 #include <string.h>
-#include "c3d/w3dC3D.h"
+#include "graphics/citro3d/w3dC3D.h"
 #include "w3dGraphics.h"
 
 extern "C" FILE* popen(const char*, const char*) { errno = ENOSYS; return NULL; }

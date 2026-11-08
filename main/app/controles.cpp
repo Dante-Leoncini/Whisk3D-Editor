@@ -20,7 +20,7 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 #include "Undo.h" // Ctrl+Z
 #include "objects/Gamepad.h"    // axisState/buttonState: se sueltan al desenchufar el mando
 #include "script/BindsJuego.h"  // el REGISTRO compartido de controles (hotplug + avisos + lua)
-#include "base/W3dVibrar.h"     // el agarre del outliner vibra
+#include "input/W3dVibrar.h"     // el agarre del outliner vibra
 #include "script/W3dScript.h"   // W3dScriptMandosVibrarHook: vibrar() de lua en los mandos
 #include "app/W3dAtajos.h"      // atajos de teclado reasignables
 

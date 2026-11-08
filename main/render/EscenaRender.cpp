@@ -5,7 +5,7 @@
 #include "objects/Rutina.h"   // g_w3dSoloJuego / W3dHayConstructor (el cache no se invalida)
 #include "EscenaRender.h"
 #include "objects/CameraBase.h"   // g_renderMarco: el cuadro de la imagen (lo miden los Recortes)
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include "objects/Objects.h"
 #include "objects/Mesh.h"        // w3dLoteStamp + los diferidos (calcomanias / luces aditivas)
 #include "objects/Particulas.h"  // particulas diferidas (billboards translucidos)
@@ -14,7 +14,7 @@
 #include "objects/Niebla.h"        // la niebla arranca y termina apagada en cada pase
 #include "W3dEscena.h"             // dibujar3D(false) de lua: el pase no se hace
 #include "objects/Textures.h"      // las capturas de pantalla: texturas registradas por ruta
-#include "gfx/w3dTexture.h"
+#include "graphics/w3dTexture.h"
 #include <math.h>
 #include <map>
 

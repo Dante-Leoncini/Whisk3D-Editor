@@ -117,7 +117,7 @@
 #include <set>
 #include <sstream>     // el nombre del PRIMER frame de una vertex anim (base + 001 + .obj)
 #include <iomanip>     // std::setw/std::setfill: el mismo padding que VertexAnimation::LoadFrames
-#include "gfx/w3dTexture.h"   // Texturas16Siempre: se guarda en la cabecera
+#include "graphics/w3dTexture.h"   // Texturas16Siempre: se guarda en la cabecera
 #ifdef _WIN32
     #include <direct.h>
     #define W3D_MKDIR(p) _mkdir(p)

@@ -93,6 +93,15 @@ platform/windows/build_*/
 platform/vita/build/
 
 # ===============================
+# PSP (pspdev)
+# ===============================
+
+# lo que genera build_psp.sh (el .elf, el .prx, el PARAM.SFO, la carpeta PSP/GAME/Whisk3D con el EBOOT.PBP y el .zip) y
+# las capturas de captura_ppsspp.sh. Ya lo cubre la regla generica 'build/', pero va explicito como el de la Vita. El
+# kit (pspdev) y el emulador (PPSSPP) viven fuera del proyecto, en ~/psp.
+platform/psp/build/
+
+# ===============================
 # IDEs
 # ===============================
 

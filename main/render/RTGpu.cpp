@@ -2,11 +2,11 @@
 //  RTGpu.cpp - el trazado de rayos en la GPU (ver RTGpu.h): un dispositivo de Vulkan SOLO de computo (sin ventana,
 //  aparte del backend grafico), los buffers de la escena en la memoria de la GPU y dos compute shaders
 //  (RTGpuShader.inc: trazar y el denoiser A-Trous). Vulkan se abre a mano (vulkan-1 / libvulkan.so.1) y los shaders
-//  los compila shaderc (vk/w3dVk.h): nada enlazado.
+//  los compila shaderc (graphics/vulkan/w3dVk.h): nada enlazado.
 // ============================================================================
 #include "render/RTGpu.h"
 #if defined(W3D_VULKAN)
-#include "vk/w3dVk.h"
+#include "graphics/vulkan/w3dVk.h"
 #ifdef _WIN32
     #ifndef NOMINMAX
         #define NOMINMAX

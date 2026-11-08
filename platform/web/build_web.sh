@@ -8,7 +8,7 @@
 #      emrun web/whisk3d.html
 #    o  python -m http.server --directory web      (y abrir http://localhost:8000/whisk3d.html)
 #
-#  El backend de graficos es gles2/w3dGraphicsGLES2.cpp (ES2/WebGL), NO el
+#  El backend de graficos es graphics/gles2/w3dGraphicsGLES2.cpp (ES2/WebGL), NO el
 #  w3dGraphics.cpp de escritorio. Todo el editor dibuja por w3dEngine.
 # ============================================================================
 set -e
@@ -20,7 +20,7 @@ mkdir -p "$OUT"
 
 # --- fuentes: mismo set que el CMakeLists, pero con el backend ES2 en vez del de desktop ---
 SRC=$(find main "$CORE/objects" "$CORE/animation" libs/WhiskUI -name '*.cpp')
-SRC="$SRC $CORE/io/w3dFilesystem.cpp $CORE/gfx/w3dTexture.cpp $CORE/io/w3dCompress.cpp $CORE/io/W3dZip.cpp"
+SRC="$SRC $CORE/io/w3dFilesystem.cpp $CORE/graphics/w3dTexture.cpp $CORE/io/w3dCompress.cpp $CORE/io/W3dZip.cpp"
 # OJO: los .cpp del Core de io/ NO entran por el find de arriba (que solo barre main/, objects/,
 # animation/ y WhiskUI) -> van A MANO, igual que en el CMakeLists. Estos tres son el formato v4
 # (el .w3d contenedor): W3dTexto = round-trip exacto de floats, W3dMalla = el .w3dm, W3dAlmacen =
@@ -31,9 +31,9 @@ SRC="$SRC $CORE/io/W3dTexto.cpp $CORE/io/W3dMalla.cpp $CORE/io/W3dAlmacen.cpp"
 # W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
 SRC="$SRC $CORE/io/W3dMallaBin.cpp"
 SRC="$SRC $CORE/io/W3dRecursos.cpp"
-SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp $CORE/base/W3dTactil.cpp"
+SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp $CORE/input/W3dTactil.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
-SRC="$SRC $CORE/gles2/w3dGraphicsGLES2.cpp"
+SRC="$SRC $CORE/graphics/gles2/w3dGraphicsGLES2.cpp"
 # scripts lua: el modulo del Core + el interprete vendorizado. Los .c de lua NO
 # aceptan -std=c++17 -> se compilan APARTE a una lib estatica y se linkea al final.
 SRC="$SRC $CORE/script/W3dScript.cpp"
@@ -44,8 +44,7 @@ SRC="$SRC $CORE/physics/W3dFisica.cpp"
 SRC="$SRC $CORE/physics/W3dRigido.cpp $CORE/physics/W3dColMalla.cpp"
 SRC="$SRC $CORE/physics/W3dHitbox.cpp"   # hitbox + eventos alEntrar/alSalir/alTocar
 SRC="$SRC $CORE/physics/W3dRagdoll.cpp"  # ragdolls + IK
-SRC="$SRC $CORE/nav/W3dNav.cpp"  # navegacion (caminos)
-SRC="$SRC $CORE/animation/W3dLocomocion.cpp"  # locomocion (pies, mirada)
+SRC="$SRC $CORE/physics/W3dNav.cpp"  # navegacion (caminos)
 SRC="$SRC $CORE/net/W3dRed.cpp"          # binds red* (en el navegador: sin red por ahora)
 # volumen del proyecto (VolumenAplicarProyecto, lo llama el lector) + el dispatcher de musica que
 # W3dVolumen usa (sin W3D_ENABLE_MUSIC son stubs mudos). Mismo par que el CMakeLists.
@@ -54,9 +53,9 @@ SRC="$SRC $CORE/audio/W3dVolumen.cpp $CORE/audio/W3dMusic.cpp"
 # Sin estas fuentes el link falla: W3dScript/main referencian W3dSoundBeep/W3dSoundPlay/W3dAudioInit.
 SRC="$SRC $CORE/audio/W3dAudio.cpp $CORE/audio/W3dAudioSDL.cpp"
 # portapapeles del sistema (Core): backend SDL (mapea al del navegador en emscripten)
-SRC="$SRC $CORE/base/W3dClipboardSDL.cpp"
+SRC="$SRC $CORE/input/W3dClipboardSDL.cpp"
 # la vibracion (navigator.vibrate o el "tic" de iOS): controles.cpp la llama al agarrar algo en la biblioteca
-SRC="$SRC $CORE/base/W3dVibrar.cpp"
+SRC="$SRC $CORE/input/W3dVibrar.cpp"
 LUA_A="$OUT/libw3dlua.a"
 if [[ ! -f "$LUA_A" || thirdparty/lua/src -nt "$LUA_A" ]]; then
     echo "compilando lua (C) -> libw3dlua.a"
@@ -70,7 +69,7 @@ fi
 # --- includes: los mismos del CMakeLists + platform/web (shim de <GL/gl.h> -> ES2) ---
 INC="-Iplatform/web -I. -Imain -Imain/app -Imain/config -Imain/io -Imain/undo"
 INC="$INC -Imain/ui -Imain/ui/ViewPorts -Imain/ui/GeometriaUI"
-INC="$INC -I$CORE -I$CORE/base -I$CORE/gfx -I$CORE/io -I$CORE/thirdparty"
+INC="$INC -I$CORE -I$CORE/base -I$CORE/graphics -I$CORE/io -I$CORE/thirdparty"
 INC="$INC -Ilibs -Ilibs/WhiskUI/widgets -Ilibs/WhiskUI/text -Ilibs/WhiskUI/draw"
 INC="$INC -Ilibs/WhiskUI/theme -Ilibs/WhiskUI/core -Ithirdparty -Ithirdparty/lua/src"
 

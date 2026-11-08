@@ -67,7 +67,7 @@ static struct InstalarAlTerminar {
 //  una flecha blanca con borde negro arriba de todo, al final de cada cuadro (main.cpp, antes del swap).
 // ----------------------------------------------------------------------------------------------------------------
 #include <SDL.h>
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 namespace gfx = w3dEngine;
 
 #ifdef W3D_DC_CAPTURA

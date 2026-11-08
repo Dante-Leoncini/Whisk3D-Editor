@@ -1,5 +1,5 @@
 // ============================================================================
-//  W3dPruebasLlamadas.cpp — comandos de harness de MENOS LLAMADAS GL POR CUADRO (gfx/w3dGraphics.h): la pila
+//  W3dPruebasLlamadas.cpp — comandos de harness de MENOS LLAMADAS GL POR CUADRO (graphics/w3dGraphics.h): la pila
 //  PEREZOSA de la modelview (g_matricesPerezosas) y el CACHE DE PUNTEROS y binds de buffers (g_punterosCache). Los
 //  despacha W3dPruebasRecursosCmd (test/W3dPruebasRecursos.cpp). La prueba: tools/pruebas/prueba_menos_llamadas.w3s.
 //
@@ -26,7 +26,7 @@
 //                                                mismos draws
 // ============================================================================
 #include "test/W3dPruebasRecursos.h"
-#include "gfx/w3dTexture.h"     // SavePNG (W3D_CUADRO_PNG)
+#include "graphics/w3dTexture.h"     // SavePNG (W3D_CUADRO_PNG)
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
 #include "objects/Empty.h"
@@ -46,7 +46,7 @@
 #include "animation/SkeletalAnimation.h" // EvaluarPoseEsqueleto / PrepararSkinAutorado
 #include "animation/Animation.h"         // CurrentFrame
 #include "io/TexturaEditada.h"           // TexEditCrear: una textura en memoria
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include "ViewPorts/ViewPorts.h"         // rootViewport
 #include "ViewPorts/ViewPort3D.h"        // Viewport3D
 #include "ViewPorts/LayoutInput.h"       // LayoutRenderMenu

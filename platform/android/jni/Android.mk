@@ -31,7 +31,7 @@ SRC_FILES := $(shell find $(PROJECT_ROOT)/main $(PROJECT_ROOT)/libs/$(CORE)/obje
 $(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/WhiskUI \
 -name '*.cpp')
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dFilesystem.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gfx/w3dTexture.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/w3dTexture.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dCompress.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dZip.cpp
 # formato v4 (el .w3d contenedor). Los .cpp del Core de io/ NO entran por el find de arriba, van a
@@ -49,10 +49,10 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dInteractionState.cpp
 # config/mute del Core: W3dScript.cpp lo usa (ConfigMudo/ConfigSetMudo/ConfigGetStr...).
 # Faltaba en el build del editor -> undefined symbols al linkear.
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dConfig.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dTactil.cpp      # pantalla tactil sin SDL (el editor engancha su receptor)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dVibrar.cpp      # la vibracion (vibrar() de la actividad, por JNI)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dTactil.cpp      # pantalla tactil sin SDL (el editor engancha su receptor)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dVibrar.cpp      # la vibracion (vibrar() de la actividad, por JNI)
 # SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dGraphics.cpp #1.1
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gles2/w3dGraphicsGLES2.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Vector3.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Quaternion.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Matrix4.cpp
@@ -64,13 +64,12 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dFisica.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudio.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudioSDL.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolumen.cpp        # volumen del proyecto (VolumenAplicarProyecto)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dClipboardSDL.cpp     # portapapeles del IDE (SDL_SetClipboardText)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dClipboardSDL.cpp     # portapapeles del IDE (SDL_SetClipboardText)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigido.cpp        # cuerpos rigidos (W3dRigidos*)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMalla.cpp      # colision contra mallas (colSuelo/colPared)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dHitbox.cpp        # hitbox + eventos alEntrar/alSalir/alTocar
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRagdoll.cpp       # ragdolls + IK
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/nav/W3dNav.cpp                # navegacion (caminos)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/animation/W3dLocomocion.cpp  # locomocion (pies, mirada)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dNav.cpp                # navegacion (caminos)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dRed.cpp                # jugar en red (binds red*)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp   # musica (W3dMusicRefrescarVolumenes)
 SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
@@ -91,7 +90,7 @@ $(PROJECT_ROOT)/main/ui/ViewPorts \
 $(PROJECT_ROOT)/main/ui/GeometriaUI \
 $(PROJECT_ROOT)/libs/$(CORE) \
 $(PROJECT_ROOT)/libs/$(CORE)/base \
-$(PROJECT_ROOT)/libs/$(CORE)/gfx \
+$(PROJECT_ROOT)/libs/$(CORE)/graphics \
 $(PROJECT_ROOT)/libs/$(CORE)/io \
 $(PROJECT_ROOT)/libs/$(CORE)/thirdparty \
 $(PROJECT_ROOT)/libs \

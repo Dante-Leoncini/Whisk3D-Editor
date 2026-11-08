@@ -1,6 +1,6 @@
 # Whisk3D en la web (WebGL / Emscripten)
 
-Compila el editor a WebGL con Emscripten. El backend de gráficos es `gles2/w3dGraphicsGLES2.cpp` (ES2/WebGL), no el de escritorio.
+Compila el editor a WebGL con Emscripten. El backend de gráficos es `graphics/gles2/w3dGraphicsGLES2.cpp` (ES2/WebGL), no el de escritorio.
 
 ## Requisitos
 

@@ -2,12 +2,12 @@
 #define PARTICULAS_H
 #include "objects/Objects.h"
 #include "WhiskUI/draw/icons.h" // el icono compartido del outliner
-#include "gfx/w3dParticles.h"   // el sistema de particulas del Core (billboards)
+#include "graphics/w3dParticles.h"   // el sistema de particulas del Core (billboards)
 #include <string>
 
 // ============================================================================
 //  Objeto Particulas: el EMISOR 3D que envuelve al sistema de particulas del
-//  Core (libs/Whisk3DCore/gfx/w3dParticles.h). El emisor vive en su transform:
+//  Core (libs/Whisk3DCore/graphics/w3dParticles.h). El emisor vive en su transform:
 //  las particulas NACEN en su origen de MUNDO, disparadas en un CONO alrededor
 //  de su eje +Y local (rotar el objeto apunta el chorro), y despues viven en
 //  espacio de MUNDO (no siguen al emisor: el polvo de una pisada queda atras).

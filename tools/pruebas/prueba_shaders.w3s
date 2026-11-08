@@ -1,4 +1,4 @@
-# SHADERS ESCRITOS y TRANSMISION (objects/ShaderEscrito.*, gles2/w3dGraphicsGLES2.cpp: setupEscrito, render/RayTracer.cpp)
+# SHADERS ESCRITOS y TRANSMISION (objects/ShaderEscrito.*, graphics/gles2/w3dGraphicsGLES2.cpp: setupEscrito, render/RayTracer.cpp)
 #  1. TRANSMISION en el trazado de rayos (todos los backends; CPU y GPU): con transmision el cubo deja ver lo de atras,
 #     y con IOR 1.5 lo de atras sale doblado (distinto que con IOR 1)
 #  2. (solo los backends con shaders: GLES 2.0 y Vulkan) el material con un archivo .glsl se dibuja con el: un color

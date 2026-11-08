@@ -90,8 +90,8 @@
 #include "animation/Animation.h"       // PlayAnimation
 #include "io/TexturaEditada.h"
 #include "undo/Undo.h"                 // streamundolimpiar
-#include "gfx/w3dTexture.h"            // paquetetest: .w3dt
-#include "gfx/w3dGraphics.h"           // TexTieneMips / MipmapsGlobal
+#include "graphics/w3dTexture.h"            // paquetetest: .w3dt
+#include "graphics/w3dGraphics.h"           // TexTieneMips / MipmapsGlobal
 #include "io/W3dZip.h"                 // paquetetest: LeerRango
 #include "importers/import_obj.h"      // la cola diferida y las texturas dormidas (streambench)
 #include "ViewPorts/Properties.h"      // streamtarjeta: la tarjeta de la instancia

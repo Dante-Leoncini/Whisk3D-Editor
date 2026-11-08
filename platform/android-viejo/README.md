@@ -16,7 +16,7 @@ Lo propio de esta plataforma va con `#ifdef W3D_ANDROID_VIEJO`.
 
 ## Cómo dibuja
 
-Usa el backend de shaders de la web y el Android de siempre (`libs/Whisk3DCore/gles2`). El driver de la VideoCore IV tiene sus mañas, y el backend se adapta solo cuando las detecta:
+Usa el backend de shaders de la web y el Android de siempre (`libs/Whisk3DCore/graphics/gles2`). El driver de la VideoCore IV tiene sus mañas, y el backend se adapta solo cuando las detecta:
 
 - **El programa entero no le entra.** Al arrancar, el backend prueba si el shader con todas las funciones dibuja. En esta GPU no, así que cada draw usa un programa armado con lo que necesita (sin luz, sin niebla, sin recorte...). Se arman la primera vez que se usan.
 - **Cada programa con una sola combinación de estado.** El driver traduce el programa según la primitiva, el blending y cómo llega cada atributo, y guarda pocas traducciones: usado con más combinaciones, lo traducía de nuevo en cada cuadro (unos 35 ms cada vez). Esa combinación también es parte de la clave del programa.

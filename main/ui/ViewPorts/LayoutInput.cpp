@@ -20,7 +20,7 @@
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
 #include "ViewPorts/Parent.h" // emparentar/desemparentar (extraido a su propio archivo)
 #include "ViewPorts/Pick3D.h"  // pick/seleccion 3D + loop cut (extraido a su propio archivo)
-#include "W3dClipboard.h"      // el portapapeles del sistema (cortar / copiar / pegar objetos)
+#include "input/W3dClipboard.h"      // el portapapeles del sistema (cortar / copiar / pegar objetos)
 #include <time.h>              // (la carpeta de cada copia)
 #include "edit/BoxSelect.h"    // Box Select (tecla B / menu Select)
 #include "ViewPorts/ViewPort3D.h"

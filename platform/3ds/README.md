@@ -3,7 +3,7 @@
 Es el mismo editor de la PC, compilado para el ARM11 de la 3DS con los kits libres de devkitPro (nada de Nintendo):
 
 - **devkitARM** es el compilador; **libctru**, el sistema de la consola.
-- **citro3d** maneja la GPU (PICA200). Whisk3D la usa con su propio backend, `libs/Whisk3DCore/c3d`, en vez del de OpenGL.
+- **citro3d** maneja la GPU (PICA200). Whisk3D la usa con su propio backend, `libs/Whisk3DCore/graphics/citro3d`, en vez del de OpenGL.
 - **SDL2 de 3DS** (el de `thirdparty/SDL2`, que trae el port oficial) maneja el táctil, los botones y los eventos. Entra por `main.cpp` y `controles.cpp`, igual que en la PC.
 
 Lo propio de la consola va con `#ifdef W3D_3DS`, y lo que no tiene lugar en el código compartido, en `w3d_3ds.cpp`.
@@ -34,7 +34,7 @@ Mientras el juego corre (Play), los botones son del juego.
 
 La PICA200 no tiene el pipeline fijo de OpenGL. El backend `c3d` lo emula con lo que la GPU trae por hardware:
 
-- **Vértices en la GPU:** la transformación corre en un vertex shader (`c3d/w3d.v.pica`, lo ensambla picasso).
+- **Vértices en la GPU:** la transformación corre en un vertex shader (`graphics/citro3d/w3d.v.pica`, lo ensambla picasso).
 - **Luz por fragmento:** hasta 8 luces, con la especular por tabla.
 - **El combiner:** modulate, replace, DOT3, la mezcla de dos texturas.
 - **Lo demás por hardware:** scissor, estencil, alpha test, mezclas y z.

@@ -3,7 +3,7 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_menos_llamadas.w3s
 #
-#  Dos caches de gfx (libs/Whisk3DCore/gfx/w3dGraphics.h), cada uno con su opcion para el A/B:
+#  Dos caches de gfx (libs/Whisk3DCore/graphics/w3dGraphics.h), cada uno con su opcion para el A/B:
 #   - la PILA PEREZOSA de la modelview (perezosas): Push/Pop/Mult/Load solo cambian la sombra en la CPU y la
 #     matriz va a GL (un glLoadMatrixf) recien antes de lo que la usa: los draws, las luces, los planos de recorte.
 #     Un objeto que el autocull descarta no cuesta nada; uno que dibuja, 1 llamada en vez de 3

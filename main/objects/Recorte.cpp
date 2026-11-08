@@ -5,7 +5,7 @@
 #include "objects/Camera.h"
 #include "objects/CameraBase.h"
 #include "objects/Light.h"          // W3dLucesPrepase: las luces se recalculan con la vista de la camara propia
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include <math.h>
 
 namespace gfx = w3dEngine;

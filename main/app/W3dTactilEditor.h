@@ -3,7 +3,7 @@
 
 // ---------------------------------------------------------------------------------------------------------------
 //  La pantalla tactil de las plataformas SIN SDL (Symbian) en el EDITOR. Los dedos los sigue el Core
-//  (libs/Whisk3DCore/base/W3dTactil.h: los mismos eventos que SDL arma en Android); aca solo se los vuelve
+//  (libs/Whisk3DCore/input/W3dTactil.h: los mismos eventos que SDL arma en Android); aca solo se los vuelve
 //  SDL_Event y entran por la misma puerta que en Android y la web (InputUsuarioSDL3, controles.cpp). Los gestos del
 //  telefono son los de Android tal cual: una mejora en uno llega al otro.
 // ---------------------------------------------------------------------------------------------------------------

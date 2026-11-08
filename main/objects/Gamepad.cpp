@@ -52,7 +52,7 @@ void RefreshInputControllerSDL(SDL_Event &e) {
 //      el estado va a los mismos lugares que llena SDL: de ahi EntradaPad (SimJuego.cpp) lo pasa a los scripts igual.
 #include <e32std.h>
 #include <stdio.h>
-#include "base/W3dMandos.h"
+#include "input/W3dMandos.h"
 #include "script/BindsJuego.h"   // W3dControlAlta / W3dControlBaja
 #include "script/W3dScript.h"    // W3dScriptMandosVibrarHook
 

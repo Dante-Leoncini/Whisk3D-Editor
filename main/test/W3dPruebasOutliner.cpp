@@ -132,7 +132,7 @@
 #include "variables.h"
 #include "w3dGraphics.h"
 #include "w3dFilesystem.h"            // entradacruda: los bytes de un archivo de prueba
-#include "gfx/w3dTexture.h"          // outmini png: SavePNG
+#include "graphics/w3dTexture.h"          // outmini png: SavePNG
 #include "config/W3dProfile.h"       // bibmedir: W3dNowMs
 #include <cmath>     // propsalfa: fabsf
 #include <cstdio>

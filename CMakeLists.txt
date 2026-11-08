@@ -73,12 +73,12 @@ list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dHitbox.cpp
     # ragdolls caseros (particulas + articulaciones con limites) e IK de dos huesos / FABRIK
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRagdoll.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/nav/W3dNav.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dNav.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/animation/W3dLocomocion.cpp
     # jugar en red (LAN, wifi, internet: UDP). Va junto a W3dScript.cpp: registra los binds red*
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/net/W3dRed.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dTexture.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/w3dTexture.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dCompress.cpp
     # zip minimo del Core: el formato de proyecto .w3d es un ZIP estandar
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dZip.cpp
@@ -97,15 +97,15 @@ list(APPEND SRC_FILES
     # almacen de RECURSOS (refcount + streaming): la contabilidad generica que
     # comparten texturas (TexturaCache es su fachada), mallas y animaciones.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dRecursos.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphics.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/w3dlog.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dInteractionState.cpp
     # configuracion persistente del Core (clave=valor): W3dScript.cpp la usa para
     # los bindings de config/mute de lua. Sin este .cpp el link falla (w3dEngine::Config*).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dConfig.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dVibrar.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dVibrar.cpp
     # la pantalla tactil de las plataformas sin SDL (Symbian); el editor le engancha su receptor en todas
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dTactil.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dTactil.cpp
     # matematica del engine (antes en core/math): Vector3/Quaternion/Matrix4.
     # Se incluyen como "math/X.h" (engine es include dir). No los globea core/.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/math/Vector3.cpp
@@ -120,22 +120,22 @@ list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dVolumen.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dMusic.cpp
     # PORTAPAPELES del sistema (Core): backend SDL (en Symbian se usa W3dClipboardSymbian.cpp via .mmp)
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dClipboardSDL.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dClipboardSDL.cpp
 )
 
 # BACKEND DE SHADERS EN PC (para comparar): -DW3D_PC_GLES2=ON compila el editor de escritorio con el backend que
-# usan la web y Android (gles2/w3dGraphicsGLES2.cpp) en vez del fijo. Asi el harness puede dibujar la MISMA escena
+# usan la web y Android (graphics/gles2/w3dGraphicsGLES2.cpp) en vez del fijo. Asi el harness puede dibujar la MISMA escena
 # con los dos y comparar las capturas (uishot) sin pasar por el navegador ni el telefono. En un build dir aparte.
 option(W3D_PC_GLES2 "PC con el backend de shaders de web/Android (para comparar con el fijo)" OFF)
 if(W3D_PC_GLES2)
-    list(REMOVE_ITEM SRC_FILES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphics.cpp)
-    list(APPEND SRC_FILES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp)
+    list(REMOVE_ITEM SRC_FILES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp)
+    list(APPEND SRC_FILES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/gles2/w3dGraphicsGLES2.cpp)
     add_compile_definitions(W3D_WEBGL)
 endif()
 
-# VARIOS BACKENDS EN UN EJECUTABLE (libs/Whisk3DCore/gfx/w3dBackend.h): en la PC el editor trae OpenGL fijo Y OpenGL ES 2.0
+# VARIOS BACKENDS EN UN EJECUTABLE (libs/Whisk3DCore/graphics/w3dBackend.h): en la PC el editor trae OpenGL fijo Y OpenGL ES 2.0
 # (y despues Vulkan); el que se usa se elige AL ARRANCAR (Ajustes > Graphics). Cada backend se compila en su namespace
-# (w3dEngine::gl / ::es2) y gfx/w3dGraphicsDespacho.cpp reparte las llamadas al activo. (Con W3D_PC_GLES2 queda uno solo.)
+# (w3dEngine::gl / ::es2) y graphics/w3dGraphicsDespacho.cpp reparte las llamadas al activo. (Con W3D_PC_GLES2 queda uno solo.)
 if(NOT W3D_PC_GLES2 AND (WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID)) AND NOT EMSCRIPTEN)
     option(W3D_MULTIBACKEND "Varios backends graficos en el ejecutable, elegidos al arrancar" ON)
 else()
@@ -143,13 +143,13 @@ else()
 endif()
 if(W3D_MULTIBACKEND)
     list(APPEND SRC_FILES
-        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp
-        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphicsDespacho.cpp)
-    set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphics.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=gl")
-    set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=es2")
+        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/gles2/w3dGraphicsGLES2.cpp
+        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/w3dGraphicsDespacho.cpp)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=gl")
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/gles2/w3dGraphicsGLES2.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=es2")
     add_compile_definitions(W3D_MULTIBACKEND)
     message(STATUS "Whisk3D: varios backends graficos (OpenGL + OpenGL ES 2.0), elegidos al arrancar")
-    # VULKAN (vk/w3dVk.h): el backend de ES 2.0 compilado otra vez sobre un ES 2.0 hecho con Vulkan. Nada se enlaza: el
+    # VULKAN (graphics/vulkan/w3dVk.h): el backend de ES 2.0 compilado otra vez sobre un ES 2.0 hecho con Vulkan. Nada se enlaza: el
     # cargador lo abre la ventana (SDL) y el compilador de shaders (shaderc_shared, del SDK) va al lado del ejecutable;
     # sin ellos el editor sigue con OpenGL. Los headers de Vulkan vienen en libs/Whisk3DCore/thirdparty/vulkan.
     # (32 bits -Windows 7 / XP, netbooks-: apagado por defecto; el SDK de Vulkan trae shaderc solo de 64 bits)
@@ -161,10 +161,10 @@ if(W3D_MULTIBACKEND)
     option(W3D_VULKAN "Backend Vulkan (opcional al arrancar: sin el driver o sin shaderc queda OpenGL)" ${W3D_VULKAN_DEFAULT})
     if(W3D_VULKAN AND EXISTS ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty/vulkan/include/vulkan/vulkan_core.h)
         list(APPEND SRC_FILES
-            ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dGraphicsVk.cpp
-            ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dVkGL.cpp)
-        set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dGraphicsVk.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=vk;W3D_VKGL")
-        set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dVkGL.cpp ${CMAKE_SOURCE_DIR}/main/render/RTGpu.cpp PROPERTIES
+            ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/vulkan/w3dGraphicsVk.cpp
+            ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/vulkan/w3dVkGL.cpp)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/vulkan/w3dGraphicsVk.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=vk;W3D_VKGL")
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/vulkan/w3dVkGL.cpp ${CMAKE_SOURCE_DIR}/main/render/RTGpu.cpp PROPERTIES
             INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty/vulkan/include)
         add_compile_definitions(W3D_VULKAN)
         set(W3D_VULKAN_ON ON)
@@ -201,7 +201,7 @@ if(NOT ANDROID AND NOT EMSCRIPTEN)
 endif()
 
 # Whisk3DCore owns graphics backend selection and native graphics dependencies.
-include(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/cmake/w3dGraphicsBackend.cmake)
+include(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/w3dGraphicsBackend.cmake)
 w3d_configure_graphics_backend(whisk3d)
 
 # ---- LOS DENOISERS del trazado de rayos (render/Denoiser.cpp): OPCIONALES. Nada se enlaza: se cargan al usarse.
@@ -270,7 +270,7 @@ target_include_directories(whisk3d PRIVATE
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore
     # Core reorganizado: base/gfx/io como include dir para los includes pelados ("w3dTexture.h", "w3dlog.h")
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty # stb: dep del engine, vive CON el core ("stb/stb_image.h")
     ${CMAKE_SOURCE_DIR}/libs

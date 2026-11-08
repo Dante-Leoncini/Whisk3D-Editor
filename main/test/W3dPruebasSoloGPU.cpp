@@ -34,7 +34,7 @@
 #include "io/RecursosProyecto.h"       // W3D_VISTA_MALLAS
 #include "io/W3dZip.h"
 #include "io/W3dRecursos.h"        // W3dRecurso::bytes (lo que el almacen le cuenta)
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include "ViewPorts/ViewPorts.h"       // rootViewport
 #include "ViewPorts/ViewPort3D.h"      // Viewport3D
 #include "WhiskUI/draw/glesdraw.h"     // W3dPantallaAlto

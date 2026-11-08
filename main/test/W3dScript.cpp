@@ -44,7 +44,7 @@
 #include "render/OpcionesRender.h" // bonetest: g_transformPivot (pivote de los R/S de huesos)
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
-#include "base/W3dTactil.h"        // tactiltest: la pantalla tactil del Core (Symbian: dedos -> eventos SDL)
+#include "input/W3dTactil.h"        // tactiltest: la pantalla tactil del Core (Symbian: dedos -> eventos SDL)
 #include "app/W3dTactilEditor.h"    // W3dEventoTactil
 extern int W3dDedosActivos();       // (controles.cpp) dedos apoyados segun el editor
 #include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva

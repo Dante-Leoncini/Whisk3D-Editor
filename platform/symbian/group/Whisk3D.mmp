@@ -9,7 +9,7 @@
 // DOS VARIANTES desde este mismo archivo (una sola lista de fuentes):
 //  - Whisk3D.mmp       -> whisk3D.exe, OpenGL ES 1.1 (pipeline fijo): N95 y todo S60 3rd/5th
 //  - Whisk3D_gles2.mmp -> whisk3D_gles2.exe, OpenGL ES 2.0 (shaders): N8/C7/E7 y Symbian^3+.
-//    Define W3D_MMP_GLES2 e incluye este archivo. Cambia el backend de graficos (gles2/w3dGraphicsGLES2.cpp,
+//    Define W3D_MMP_GLES2 e incluye este archivo. Cambia el backend de graficos (graphics/gles2/w3dGraphicsGLES2.cpp,
 //    el mismo de Android y la web), las libs (libglesv2 + libegl) y no vuelve a compilar los recursos.
 //    El .pkg de GLES2 lo instala como Whisk3D.exe (misma UID: una variante reemplaza a la otra).
 #ifdef W3D_MMP_GLES2
@@ -86,12 +86,13 @@ SOURCEPATH      ..\..\..\main\ui\ViewPorts
 SOURCE          PantallasExternas.cpp // el popup clonar/viewport y el dibujo de cada pantalla externa (compartido)
 
 // motor compartido (Whisk3DCore / libs\Whisk3DCore): texturas + estado de graficos + log
-SOURCEPATH      ..\..\..\libs\Whisk3DCore\gfx
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\graphics
 SOURCE          w3dTexture.cpp
 #ifdef W3D_MMP_GLES2
-SOURCEPATH      ..\..\..\libs\Whisk3DCore\gles2
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\graphics\gles2
 SOURCE          w3dGraphicsGLES2.cpp
 #else
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\graphics\opengl
 SOURCE          w3dGraphics.cpp
 #endif
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
@@ -176,7 +177,7 @@ SOURCE          W3dInitUI.cpp // init de UI compartido
 SOURCE          W3dAtajos.cpp // atajos de teclado reasignables (la tabla + el traductor + atajos.ini)
 SOURCE          W3dTeclado.cpp // teclado en pantalla (Android); en Symbian son stubs vacios
 SOURCE          controles.cpp // el input de PC/Android: los gestos tactiles (Symbian les manda los mismos eventos)
-SOURCE          W3dTactilEditor.cpp // los dedos del Core (base/W3dTactil) -> SDL_Event -> controles.cpp
+SOURCE          W3dTactilEditor.cpp // los dedos del Core (input/W3dTactil) -> SDL_Event -> controles.cpp
 SOURCE          W3dRatonEditor.cpp // el mouse Bluetooth -> SDL_Event -> controles.cpp (como el mouse de la PC)
 SOURCEPATH      ..\..\..\main\config
 SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
@@ -259,7 +260,9 @@ SOURCE          MundoBsp.cpp     // el MUNDO del .w3dbsp v2: geometria por hoja 
 SOURCE          W3dCables.cpp    // cables finos: lineas de 1 pixel con el grosor en la opacidad por la distancia
 SOURCE          W3dVideoTex.cpp  // un video como textura: cuadros RGB565 comprimidos leidos de a uno, dos texturas alternadas
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
-SOURCE          W3dConfig.cpp W3dClipboardSymbian.cpp
+SOURCE          W3dConfig.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\input
+SOURCE          W3dClipboardSymbian.cpp
 SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: la rama de escritorio, sin vibrador)
 SOURCE          W3dTactil.cpp W3dTactilSymbian.cpp // la pantalla tactil (S60 5th: 1 dedo; Symbian^3: multitactil)
 SOURCE          W3dMandosSymbian.cpp // los joysticks Bluetooth (DualShock 3/4) del driver bthid-s60, cargado en runtime
@@ -296,7 +299,7 @@ SOURCE          W3dHitbox.cpp
 // ragdolls caseros e IK (dos huesos con polo, FABRIK)
 SOURCE          W3dRagdoll.cpp
 // la navegacion (caminos por una rejilla del piso, A* tensado) y la locomocion (ritmo, giro, mirada, pies)
-SOURCEPATH      ..\..\..\libs\Whisk3DCore\nav
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 SOURCE          W3dNav.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\animation
 SOURCE          W3dLocomocion.cpp
@@ -332,7 +335,7 @@ USERINCLUDE     ..\inc
 USERINCLUDE     ..\..\..\libs\Whisk3DCore
 // Core reorganizado: base/gfx/io como include dir para los includes pelados ("w3dTexture.h", "w3dlog.h")
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\base
-USERINCLUDE     ..\..\..\libs\Whisk3DCore\gfx
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\graphics
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\io
 // thirdparty del Core (stb) + lua src (lua.h/lauxlib.h/lualib.h del interprete embebido)
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\thirdparty

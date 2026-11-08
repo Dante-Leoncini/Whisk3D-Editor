@@ -1,6 +1,6 @@
 // ============================================================================
 //  Particulas.cpp — ver Particulas.h. El emisor 3D que envuelve al sistema de
-//  particulas del Core (gfx/w3dParticles.h): Tick simula en MUNDO, RenderObject
+//  particulas del Core (graphics/w3dParticles.h): Tick simula en MUNDO, RenderObject
 //  ANOTA el emisor y W3dParticulasDibujarPendientes dibuja todas juntas DESPUES
 //  de los opacos (billboards a la camara, depth test ON / depth write OFF).
 // ============================================================================

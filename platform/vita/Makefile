@@ -29,10 +29,10 @@ FUENTES_CPP += \
     libs/Whisk3DCore/physics/W3dColMalla.cpp \
     libs/Whisk3DCore/physics/W3dHitbox.cpp \
     libs/Whisk3DCore/physics/W3dRagdoll.cpp \
-    libs/Whisk3DCore/nav/W3dNav.cpp \
+    libs/Whisk3DCore/physics/W3dNav.cpp \
     libs/Whisk3DCore/net/W3dRed.cpp \
     libs/Whisk3DCore/io/w3dFilesystem.cpp \
-    libs/Whisk3DCore/gfx/w3dTexture.cpp \
+    libs/Whisk3DCore/graphics/w3dTexture.cpp \
     libs/Whisk3DCore/io/w3dCompress.cpp \
     libs/Whisk3DCore/io/W3dZip.cpp \
     libs/Whisk3DCore/io/W3dTexto.cpp \
@@ -40,12 +40,12 @@ FUENTES_CPP += \
     libs/Whisk3DCore/io/W3dMallaBin.cpp \
     libs/Whisk3DCore/io/W3dAlmacen.cpp \
     libs/Whisk3DCore/io/W3dRecursos.cpp \
-    libs/Whisk3DCore/gfx/w3dGraphics.cpp \
+    libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp \
     libs/Whisk3DCore/base/w3dlog.cpp \
     libs/Whisk3DCore/base/W3dInteractionState.cpp \
     libs/Whisk3DCore/base/W3dConfig.cpp \
-    libs/Whisk3DCore/base/W3dTactil.cpp \
-    libs/Whisk3DCore/base/W3dVibrar.cpp \
+    libs/Whisk3DCore/input/W3dTactil.cpp \
+    libs/Whisk3DCore/input/W3dVibrar.cpp \
     libs/Whisk3DCore/math/Vector3.cpp \
     libs/Whisk3DCore/math/Quaternion.cpp \
     libs/Whisk3DCore/math/Matrix4.cpp \
@@ -53,7 +53,7 @@ FUENTES_CPP += \
     libs/Whisk3DCore/audio/W3dAudioSDL.cpp \
     libs/Whisk3DCore/audio/W3dVolumen.cpp \
     libs/Whisk3DCore/audio/W3dMusic.cpp \
-    libs/Whisk3DCore/base/W3dClipboardSDL.cpp \
+    libs/Whisk3DCore/input/W3dClipboardSDL.cpp \
     platform/vita/w3d_vita.cpp
 FUENTES_C := $(filter-out thirdparty/lua/src/lua.c thirdparty/lua/src/luac.c, \
                  $(shell cd $(RAIZ) && ls thirdparty/lua/src/*.c))
@@ -64,7 +64,7 @@ OBJS := $(addprefix $(OBJDIR)/,$(FUENTES_CPP:.cpp=.o) $(FUENTES_C:.c=.o))
 INCS := -I$(RAIZ)/platform/vita/include \
         -I$(RAIZ) -I$(RAIZ)/main -I$(RAIZ)/main/app -I$(RAIZ)/main/config -I$(RAIZ)/main/io -I$(RAIZ)/main/undo \
         -I$(RAIZ)/main/ui -I$(RAIZ)/main/ui/ViewPorts -I$(RAIZ)/main/ui/GeometriaUI \
-        -I$(RAIZ)/libs/Whisk3DCore -I$(RAIZ)/libs/Whisk3DCore/base -I$(RAIZ)/libs/Whisk3DCore/gfx \
+        -I$(RAIZ)/libs/Whisk3DCore -I$(RAIZ)/libs/Whisk3DCore/base -I$(RAIZ)/libs/Whisk3DCore/graphics \
         -I$(RAIZ)/libs/Whisk3DCore/io -I$(RAIZ)/libs/Whisk3DCore/thirdparty -I$(RAIZ)/libs \
         -I$(RAIZ)/libs/WhiskUI/widgets -I$(RAIZ)/libs/WhiskUI/text -I$(RAIZ)/libs/WhiskUI/draw \
         -I$(RAIZ)/libs/WhiskUI/theme -I$(RAIZ)/libs/WhiskUI/core -I$(RAIZ)/thirdparty -I$(RAIZ)/thirdparty/lua/src \

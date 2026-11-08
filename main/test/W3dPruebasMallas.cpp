@@ -95,7 +95,7 @@
 #include "animation/Animation.h"   // CurrentFrame
 #include "undo/Undo.h"
 #include "base/W3dInteractionState.h"
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include "ViewPorts/ViewPorts.h"       // rootViewport
 #include "ViewPorts/ViewPort3D.h"      // Viewport3D (proyectar al viewport)
 #include "ViewPorts/LayoutInput.h"     // SnapBuscarTarget / g_snap

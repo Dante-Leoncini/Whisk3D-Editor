@@ -1087,7 +1087,7 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     // pantalla ya girada) -> inclinacion() de lua (W3dScriptInclinacion)
     fputs("#ifdef __ANDROID__\nstatic SDL_Joystick* g_acel=0;\n#endif\n", f);
     // vibrar() de lua en los MANDOS (W3dScriptMandosVibrarHook): todos los conectados (SDL 2.0.9 o mas nuevo; la 2.0.7 de
-    // Android 2.3 no tiene: ahi vibra el telefono, base/W3dVibrar.cpp)
+    // Android 2.3 no tiene: ahi vibra el telefono, input/W3dVibrar.cpp)
     fputs("static void vibrarMandos(int ms,float f){\n#if SDL_VERSION_ATLEAST(2,0,9)\n"
           "Uint16 v=(Uint16)(f*65535.0f);for(int ci=0;ci<W3dControlesCuantos();ci++){\n"
           " SDL_GameController* gc=(SDL_GameController*)W3dControlHandle(ci);if(gc)SDL_GameControllerRumble(gc,v,v,(Uint32)ms);}\n"
@@ -1571,14 +1571,14 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
 //  y el audio (checkboxes), las fuentes 3D (kFuentes3D) y lua.
 // ============================================================================
 static const char* kFuentesBase[] = {
-    "${CORE}/gfx/w3dTexture.cpp",
+    "${CORE}/graphics/w3dTexture.cpp",
     "${CORE}/io/w3dFilesystem.cpp", "${CORE}/io/w3dCompress.cpp",
     // .w3db / .w3dm: la geometria de las mallas viaja en NUESTRO formato (binario lista para memoria,
     // o texto): el juego la lee con el MISMO lector que el editor
     "${CORE}/io/W3dTexto.cpp", "${CORE}/io/W3dMalla.cpp", "${CORE}/io/W3dMallaBin.cpp",
     "${CORE}/base/w3dlog.cpp", "${CORE}/base/W3dInteractionState.cpp", "${CORE}/base/W3dConfig.cpp",
     // (vibrar() de lua: el telefono, la web y la opcion "vibracion"; se instala solo)
-    "${CORE}/base/W3dVibrar.cpp",
+    "${CORE}/input/W3dVibrar.cpp",
     "${CORE}/math/Vector3.cpp", "${CORE}/math/Quaternion.cpp", "${CORE}/math/Matrix4.cpp",
     "${CORE}/objects/Objects.cpp", "${CORE}/objects/Mesh.cpp", "${CORE}/objects/Light.cpp",
     "${CORE}/objects/Materials.cpp", "${CORE}/objects/Textures.cpp", "${CORE}/objects/CameraBase.cpp",
@@ -1624,7 +1624,7 @@ static const char* kFuentesBase[] = {
 // LOS INCLUDES comunes (misma razon: uno solo para las dos plataformas).
 static const char* kIncludesBase[] = {
     "${W3DROOT}", "${W3DROOT}/libs", "${W3DROOT}/main", "${W3DROOT}/main/render", "${W3DROOT}/main/io",
-    "${CORE}", "${CORE}/base", "${CORE}/gfx", "${CORE}/io", "${CORE}/math", "${CORE}/objects",
+    "${CORE}", "${CORE}/base", "${CORE}/graphics", "${CORE}/io", "${CORE}/math", "${CORE}/objects",
     "${CORE}/script", "${CORE}/animation", "${CORE}/thirdparty",
     "${UILIB}", "${UILIB}/text", "${UILIB}/draw", "${UILIB}/core", "${UILIB}/theme", "${UILIB}/widgets",
     0
@@ -1743,7 +1743,7 @@ static bool EscribirCMake(const std::string& ruta, const std::string& nombre,
     fputs("  ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp\n  ${GAME}/w3drun.cpp\n", f);
     if (empaquetar)   // el pak generado con todos los archivos del juego
         fputs("  ${CMAKE_CURRENT_SOURCE_DIR}/pak.cpp\n", f);
-    fputs("  ${CORE}/gfx/w3dGraphics.cpp\n", f);   // backend GL de PC (en Android es el de GLES2)
+    fputs("  ${CORE}/graphics/opengl/w3dGraphics.cpp\n", f);   // backend GL de PC (en Android es el de GLES2)
     // el resto del runtime: kFuentesBase, la MISMA lista que usa el generador de Android
     for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s\n", kFuentesBase[i]);
     // fisica minima del Core (velocidad + rebotes): solo con el checkbox "Usar motor de
@@ -1965,7 +1965,7 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
     fputs("SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
     if (empaquetar) fputs("  $(MY_PATH)/pak_generado.cpp \\\n", f);
     fputs("  $(EXAMP)/game/w3drun.cpp \\\n", f);
-    fputs("  $(CORE)/gles2/w3dGraphicsGLES2.cpp \\\n", f);   // backend de shaders (Android)
+    fputs("  $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp \\\n", f);   // backend de shaders (Android)
     for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentesBase[i]).c_str());
     if (usarFisica) fputs("  $(CORE)/physics/W3dFisica.cpp \\\n", f);
     if (usarSonido) fputs("  $(CORE)/audio/W3dAudio.cpp $(CORE)/audio/W3dAudioSDL.cpp \\\n", f);
@@ -2120,7 +2120,7 @@ static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string
     fputs("LOCAL_PATH := $(MY_PATH)\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := main\n", f);
     fputs("LOCAL_SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
     if (empaquetar) fputs("  $(MY_PATH)/pak_generado.cpp \\\n", f);
-    fputs("  $(EXAMP)/game/w3drun.cpp \\\n  $(CORE)/gles2/w3dGraphicsGLES2.cpp \\\n", f);
+    fputs("  $(EXAMP)/game/w3drun.cpp \\\n  $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp \\\n", f);
     for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentesBase[i]).c_str());
     if (usarFisica) fputs("  $(CORE)/physics/W3dFisica.cpp \\\n", f);
     if (usarSonido) fputs("  $(CORE)/audio/W3dAudio.cpp $(CORE)/audio/W3dAudioSDL.cpp \\\n", f);
@@ -3047,7 +3047,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
             "CORE=$W3D/libs/Whisk3DCore; UILIB=$W3D/libs/WhiskUI; LUA=$W3D/thirdparty/lua/src; "
             "LUASRC=$(ls $LUA/*.c | grep -vE '/lua\\.c|/luac\\.c'); "
             "emcc main.cpp %s$GAME/w3drun.cpp "
-            "$CORE/gles2/w3dGraphicsGLES2.cpp "   // backend de shaders (WebGL)
+            "$CORE/graphics/gles2/w3dGraphicsGLES2.cpp "   // backend de shaders (WebGL)
             "%s"   // kFuentesBase: LA MISMA lista que el CMake de PC y el Android.mk
             "%s"   // fisica del Core (W3dFisica.cpp) solo con el checkbox tildado
             "%s"   // audio: W3dAudio.cpp siempre (stub sin flag); el backend SDL es opcional

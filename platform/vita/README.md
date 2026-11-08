@@ -3,7 +3,7 @@
 Es el mismo editor de la PC, compilado para el ARM (Cortex-A9) de la Vita con el kit libre VitaSDK (nada de Sony):
 
 - **VitaSDK** es el compilador (`arm-vita-eabi-gcc`) y trae las herramientas que arman el `.vpk`.
-- **vitaGL** es el OpenGL: emula el pipeline fijo sobre la GPU de la Vita (sceGxm). Whisk3D dibuja con su backend fijo de siempre (`gfx/w3dGraphics.cpp`), como en la Dreamcast con GLdc.
+- **vitaGL** es el OpenGL: emula el pipeline fijo sobre la GPU de la Vita (sceGxm). Whisk3D dibuja con su backend fijo de siempre (`graphics/opengl/w3dGraphics.cpp`), como en la Dreamcast con GLdc.
 - **SDL2 de la Vita, con vitaGL** abre el contexto de GL y maneja el táctil, los botones y el sonido. Entra por `main.cpp` y `controles.cpp`, igual que en la PC.
 
 Lo propio de la consola va con `#ifdef W3D_VITA`, y lo que no tiene lugar en el código compartido, en `w3d_vita.cpp`. El `GL/gl.h` de `include/` apunta a vitaGL y completa lo que no trae: `glLightf` y `glLightModelf`, y los enums de los focos.

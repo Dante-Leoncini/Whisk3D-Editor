@@ -2,7 +2,7 @@
 //  Niebla.cpp — ver Niebla.h
 // ============================================================================
 #include "objects/Niebla.h"
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include "render/OpcionesRender.h"   // g_renderBg (fondo del render)
 #include "script/BindsJuego.h"        // W3dNieblaHook: niebla()/setNiebla() de lua
 

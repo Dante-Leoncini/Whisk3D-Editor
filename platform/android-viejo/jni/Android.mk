@@ -22,7 +22,7 @@ SRC_FILES := $(shell find $(PROJECT_ROOT)/main $(PROJECT_ROOT)/libs/$(CORE)/obje
 $(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/WhiskUI \
 -name '*.cpp' -not -path '*/main/test/*')
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dFilesystem.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gfx/w3dTexture.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/w3dTexture.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dCompress.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dZip.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dTexto.cpp
@@ -33,9 +33,9 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dRecursos.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/w3dlog.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dInteractionState.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dConfig.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dTactil.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dVibrar.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gles2/w3dGraphicsGLES2.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dTactil.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dVibrar.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Vector3.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Quaternion.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Matrix4.cpp
@@ -44,13 +44,12 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dFisica.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudio.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudioSDL.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolumen.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dClipboardSDL.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dClipboardSDL.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigido.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMalla.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dHitbox.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRagdoll.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/nav/W3dNav.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/animation/W3dLocomocion.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dNav.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dRed.cpp
 SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
@@ -73,7 +72,7 @@ $(PROJECT_ROOT)/main/ui/ViewPorts \
 $(PROJECT_ROOT)/main/ui/GeometriaUI \
 $(PROJECT_ROOT)/libs/$(CORE) \
 $(PROJECT_ROOT)/libs/$(CORE)/base \
-$(PROJECT_ROOT)/libs/$(CORE)/gfx \
+$(PROJECT_ROOT)/libs/$(CORE)/graphics \
 $(PROJECT_ROOT)/libs/$(CORE)/io \
 $(PROJECT_ROOT)/libs/$(CORE)/thirdparty \
 $(PROJECT_ROOT)/libs \

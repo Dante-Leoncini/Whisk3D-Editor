@@ -46,11 +46,19 @@ static void PCImportGltf() { AbrirFileBrowser(T("Import glTF"), T("Import glTF")
 static void PCImportGlb()  { AbrirFileBrowser(T("Import GLB"),  T("Import GLB"),  ".glb",  ImportModeloCallback); }
 static void PCImportStl()  { AbrirFileBrowser(T("Import STL"),  T("Import STL"),  ".stl",  ImportModeloCallback); }
 
-// EL CUADRO A LA VENTANA y el vsync: con el backend Vulkan no hay contexto de GL, los hace el (vk/w3dVk.h)
+// EL CUADRO A LA VENTANA y el vsync: con el backend Vulkan no hay contexto de GL, los hace el (graphics/vulkan/w3dVk.h)
 #ifdef W3D_VULKAN
-#include "vk/w3dVk.h"
+#include "graphics/vulkan/w3dVk.h"
+#endif
+#ifdef W3D_PSP
+#include "graphics/gu/w3dGu.h"   // la PSP: dibuja el GE con sceGu (sin OpenGL)
 #endif
 static void W3dPresentar(SDL_Window* w) {
+#ifdef W3D_PSP
+    (void)w;
+    w3dEngine::GuCuadroTerminar();   // (la PSP: espera al GE, el vsync y da vuelta los buffers)
+    return;
+#endif
 #ifdef W3D_VULKAN
     if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) { VkGLPresentar(); return; }
 #endif
@@ -370,7 +378,7 @@ static unsigned int RelojSDL() { return SDL_GetTicks(); }
 //  W3D_GL_PRUEBA_RESPALDO=1 hace fallar el primer intento a proposito (para probar el respaldo sin ese driver).
 // ---------------------------------------------------------------------------------------------------------------
 #ifdef W3D_3DS
-#include "c3d/w3dC3D.h"   // la 3DS: dibuja citro3d (sin OpenGL)
+#include "graphics/citro3d/w3dC3D.h"   // la 3DS: dibuja citro3d (sin OpenGL)
 #endif
 struct W3dIntentoGL { int msaa, estencil, z; const char* que; };
 static bool g_glSinMsaa = false;   // se pidio antialiasing y el driver no lo dio (se avisa al abrir)
@@ -378,12 +386,21 @@ static bool g_ventanaOculta = false;   // --script en Windows: la ventana se cre
 static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags, bool antialias, SDL_GLContext* ctxOut) {
 #ifdef W3D_3DS
     // la 3DS no tiene OpenGL: la ventana es la pantalla de abajo (la tactil, donde SDL entrega los toques) y dibuja
-    // citro3d (c3d/w3dGraphicsC3D.cpp), que se inicia aca: SDL ya inicio las pantallas (gfxInit)
+    // citro3d (graphics/citro3d/w3dGraphicsC3D.cpp), que se inicia aca: SDL ya inicio las pantallas (gfxInit)
     (void)antialias;
     *ctxOut = NULL;
     SDL_Window* win3ds = SDL_CreateWindow(titulo, SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), w, h, flags);
     if (win3ds && !w3dEngine::C3DInit()) { w3dLogfE("citro3d no inicio"); SDL_DestroyWindow(win3ds); return NULL; }
     return win3ds;
+#endif
+#ifdef W3D_PSP
+    // la PSP no tiene OpenGL: la ventana es la pantalla (SDL entrega ahi los eventos) y dibuja el GE con sceGu
+    // (graphics/gu/w3dGraphicsGu.cpp), que se inicia aca
+    (void)antialias;
+    *ctxOut = NULL;
+    SDL_Window* winPsp = SDL_CreateWindow(titulo, 0, 0, w, h, flags);
+    if (winPsp && !w3dEngine::GuIniciar()) { w3dLogfE("el GE no inicio"); SDL_DestroyWindow(winPsp); return NULL; }
+    return winPsp;
 #endif
     static const W3dIntentoGL kIntentos[] = {
         { 4, 8, 24, "antialiasing 4x, estencil 8, profundidad 24" },
@@ -415,7 +432,7 @@ static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags
 }
 #ifdef W3D_VULKAN
 // LA VENTANA DE VULKAN: la abre SDL con el cargador del sistema (vulkan-1.dll / libvulkan.so.1) y el backend arranca
-// sobre ella (vk/w3dVk.h). NULL = no anduvo (ya quedo en el log por que)
+// sobre ella (graphics/vulkan/w3dVk.h). NULL = no anduvo (ya quedo en el log por que)
 #include <SDL2/SDL_vulkan.h>
 static bool VkSuperficieSDL(void* user, void* instancia, void* out) {
     return SDL_Vulkan_CreateSurface((SDL_Window*)user, (VkInstance)instancia, (VkSurfaceKHR*)out) == SDL_TRUE;
@@ -932,6 +949,12 @@ static void MainLoopFrame() {
         W3dVitaControles(AnimEsJuego && PlayAnimation && SimActiva());
     }
 #endif
+#ifdef W3D_PSP
+    {   // el control como mouse (sin pantalla tactil; fuera del modo juego, como en la Dreamcast)
+        extern bool SimActiva(); extern void W3dPspControles(bool);
+        W3dPspControles(AnimEsJuego && PlayAnimation && SimActiva());
+    }
+#endif
     while (SDL_PollEvent(&e)) ProcesarEvento(e); // manejo compartido (mismo que la espera de reposo)
     // la PULSACION LARGA tactil (agarrar una fila del outliner): se mide con el reloj, no con eventos
     { extern void ControlesTick(); ControlesTick(); }
@@ -1103,6 +1126,9 @@ static void MainLoopFrame() {
         w3dEngine::C3DCuadroEmpezar();                     // (la 3DS: el cuadro de citro3d, el editor en la de abajo)
         { extern void W3d3dsPantallaArriba(); W3d3dsPantallaArriba(); }   // (la vista grande; deja elegida la de abajo)
 #endif
+#ifdef W3D_PSP
+        w3dEngine::GuCuadroEmpezar();                      // (la PSP: la lista del GE de este cuadro)
+#endif
         if (rootViewport){
             rootViewport->Render();
         }
@@ -1124,6 +1150,9 @@ static void MainLoopFrame() {
 #ifdef W3D_DREAMCAST
         { extern void W3dDcDibujarCursor(int, int); W3dDcDibujarCursor(winW, winH); }   // (la consola no tiene cursor propio)
 #endif
+#ifdef W3D_PSP
+        { extern void W3dPspDibujarCursor(int, int); W3dPspDibujarCursor(winW, winH); }   // (el cursor que mueve el control)
+#endif
 #ifdef W3D_3DS
         w3dEngine::C3DCuadroTerminar();
         { extern void W3d3dsCuadroDibujado(); W3d3dsCuadroDibujado(); }   // (la captura de prueba en la SD)
@@ -1136,6 +1165,9 @@ static void MainLoopFrame() {
 #endif
 #ifdef W3D_DREAMCAST
         { extern void W3dDcCuadroDibujado(); W3dDcCuadroDibujado(); }   // (la captura de prueba por la consola serie)
+#endif
+#ifdef W3D_PSP
+        { extern void W3dPspCuadroDibujado(); W3dPspCuadroDibujado(); }   // (la captura de prueba en el Memory Stick)
 #endif
         g_prof.swap = W3dNowMs() - _profSwap0; // profiler: swap (con vsync ON = espera al vblank)
         W3dProfEnd(); // profiler: suaviza g_profShow hacia g_prof (numeros estables). NO se resetea g_redraw aca: se
@@ -1261,6 +1293,10 @@ int main(int argc, char* argv[]) {
     {
     #ifdef W3D_DREAMCAST
         w3dFileSystem::SetUserDataDir("/ram");   // la Dreamcast: lo unico escribible es el disco en RAM
+    #elif defined(W3D_PSP)
+        // la PSP: la carpeta del EBOOT.PBP (la carpeta actual al arrancar). El SDL_GetPrefPath de la PSP arma dos
+        // carpetas una adentro de la otra y crea solo la ultima: no existia
+        { char cwd[512]; if (getcwd(cwd, sizeof(cwd))) w3dFileSystem::SetUserDataDir(cwd); }
     #else
         char* pref = SDL_GetPrefPath("Whisk3D", "Whisk3D");
         if (pref) { w3dFileSystem::SetUserDataDir(pref); SDL_free(pref); }
@@ -1357,6 +1393,10 @@ int main(int argc, char* argv[]) {
     // la 3DS: el editor en la pantalla de abajo (la tactil, 320x240), la UI a escala 1 y sin antialiasing
     winW = 320; winH = 240; cfg.fullscreen = true; cfg.scale = 1; cfg.enableAntialiasing = false;
 #endif
+#ifdef W3D_PSP
+    // la PSP: la pantalla de 480x272, la UI a escala 1 (como la 3DS) y sin antialiasing
+    winW = 480; winH = 272; cfg.fullscreen = true; cfg.scale = 1; cfg.enableAntialiasing = false;
+#endif
 #ifdef W3D_VITA
     // la Vita: la pantalla de 960x544 (unos 220 puntos por pulgada, como un telefono: la UI a la escala 2 de fabrica
     // del config, o la que eligio el usuario) y sin antialiasing
@@ -1372,7 +1412,7 @@ int main(int argc, char* argv[]) {
     g_w3dLogNivel = cfg.logs;
 
 #ifdef W3D_MULTIBACKEND
-    // EL BACKEND GRAFICO se elige ACA, antes de crear la ventana (gfx/w3dBackend.h): Ajustes > Graphics
+    // EL BACKEND GRAFICO se elige ACA, antes de crear la ventana (graphics/w3dBackend.h): Ajustes > Graphics
     // (cfg.graphicsAPI), o "--backend <OpenGL|es2>" en la linea de comandos (el harness corre las pruebas con cada uno)
     {
         std::string pedido = cfg.graphicsAPI;
@@ -1400,6 +1440,8 @@ int main(int argc, char* argv[]) {
         Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CrearVentanaGL)
     #elif defined(W3D_VITA)
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;   // (la consola es una sola pantalla)
+    #elif defined(W3D_PSP)
+        Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CrearVentanaGL)
     #else
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
         if (cfg.fullscreen) windowFlags |= SDL_WINDOW_MAXIMIZED;

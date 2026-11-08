@@ -28,11 +28,11 @@
 #include <hal.h>                       // HAL EPen: el telefono es tactil
 #include <stdio.h>                     // sprintf (la captura de diagnostico)
 #include "w3dTexture.h"                // SavePNG (idem)
-#include "base/W3dTactil.h"            // la pantalla tactil (Core): los mismos eventos que SDL en Android
+#include "input/W3dTactil.h"            // la pantalla tactil (Core): los mismos eventos que SDL en Android
 #include "app/variables.h"             // cfg (la barra de herramientas en los tactiles)
 #include "objects/Gamepad.h"           // MandosSymbianTick: los joysticks Bluetooth
 #include "app/W3dRatonEditor.h"        // W3dRatonTick: el mouse Bluetooth (boton del medio emulado)
-#include "base/W3dMandos.h"            // MandosCerrar
+#include "input/W3dMandos.h"            // MandosCerrar
 void ControlesTick();                  // (controles.cpp) la pulsacion larga tactil, por reloj
 bool LayoutToggleEditMode();            // (LayoutInput.cpp) Tab: entrar/salir del modo edicion
 void LayoutCiclarViewportActivo(int dir);
@@ -1480,7 +1480,7 @@ void CWhisk3DContainer::HandleControlEventL(
     }
 
 // ---------------------------------------------------------
-// PANTALLA TACTIL: cada dedo -> el Core (base/W3dTactil), que arma los mismos eventos que SDL en Android; el
+// PANTALLA TACTIL: cada dedo -> el Core (input/W3dTactil), que arma los mismos eventos que SDL en Android; el
 // editor los recibe por controles.cpp, el mismo camino que Android y la web
 // ---------------------------------------------------------
 //

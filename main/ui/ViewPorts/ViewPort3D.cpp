@@ -602,12 +602,13 @@ void Viewport3D::event_mouse_wheel(float dy, int mx, int my) {
     Zoom(dy * 2.0f); // Zoom() ya distingue: viewport normal = distancia; vista de camara = inspeccion
 }
 
-// EL Z DE 16 BITS (N8 / N95): en perspectiva la precision cae con d^2/near. Con el near de 0.01 a 5 metros el z
-// distinguia de a ~4 cm y la jaula de edicion de ATRAS se veia a traves de la malla (bordes, vertices). En la orbita se
-// usa un near proporcional a la distancia al pivot (2%: a 5 m, 10 cm -> ~4 mm de precision): lo que quede a menos de eso
-// de la camara se recorta, como en cualquier visor. La PC (z de 24) queda con el de siempre. Lo usa tambien el pick
+// EL Z DE 16 BITS (N8 / N95 / PSP): en perspectiva la precision cae con d^2/near. Con el near de 0.01 a 5 metros el z
+// distinguia de a ~4 cm y la jaula de edicion de ATRAS se veia a traves de la malla (bordes, vertices); en la PSP, con la
+// vista alejada, la grilla del piso se veia a traves del cubo. En la orbita se usa un near proporcional a la distancia al
+// pivot (2%: a 5 m, 10 cm -> ~4 mm de precision): lo que quede a menos de eso de la camara se recorta, como en cualquier
+// visor. La PC (z de 24) queda con el de siempre. Lo usa tambien el pick
 float Viewport3D::NearVista() const {
-#if defined(W3D_SYMBIAN)
+#if defined(W3D_SYMBIAN) || defined(W3D_PSP)
     const float n = orbitDistance * 0.02f;
     return (!orthographic && n > nearClip) ? n : nearClip;
 #else
@@ -4226,10 +4227,11 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // (en tactil se confirma con el tilde de la barra de herramientas, no soltando).
     // modo VIEW (toggle de Edit Mode): con 1 dedo se ORBITA aunque haya una operacion en curso (mover/rotar/
     // extrude/strip) -> se puede mirar desde otro angulo sin cancelar; se apaga View y sigue editando.
-    // (la 3DS y la Vita tambien: su "mouse" es siempre el dedo de la pantalla tactil)
+    // (la 3DS y la Vita tambien: su "mouse" es siempre el dedo de la pantalla tactil. Y la PSP, que no tiene: su cursor
+    // es el control, con la interfaz tactil, ver platform/psp/w3d_psp.cpp)
     // En las demas (PC, Symbian) decide el DEDO, no la plataforma: una pantalla tactil orbita igual que Android; el
     // mouse (el de la PC, el Bluetooth del telefono) sigue con el boton del medio / Alt y arrastrar es la caja.
-    #if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || defined(W3D_3DS) || defined(W3D_VITA)
+    #if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || defined(W3D_3DS) || defined(W3D_VITA) || defined(W3D_PSP)
         const bool izqOrbita = true;
     #else
         const bool izqOrbita = g_ultimoDownTactil;

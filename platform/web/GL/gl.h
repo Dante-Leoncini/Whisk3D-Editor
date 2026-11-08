@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 //  El editor incluye <GL/gl.h> en muchos headers, pero SOLO por los TIPOS
 //  (GLfloat/GLushort/GLenum...) y algunas constantes: todo el dibujo real ya
-//  pasa por w3dEngine (backend ES2 gles2/w3dGraphicsGLES2.cpp). En WebGL no
+//  pasa por w3dEngine (backend ES2 graphics/gles2/w3dGraphicsGLES2.cpp). En WebGL no
 //  existe <GL/gl.h>; con -Iplatform/web este archivo lo reemplaza y redirige
 //  al header ES2, que trae los tipos y las constantes core (GL_TEXTURE_2D,
 //  GL_LINES, GL_FLOAT, GL_REPEAT, GL_RGBA, ...).

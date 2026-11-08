@@ -8,7 +8,7 @@
 #include "WhiskUI/text/bitmapText.h"
 #include "objects/Textures.h"
 #include "Undo.h" // Ctrl+Z: captura el cambio de color al cerrar
-#include "base/W3dClipboard.h"   // pestania Hex: Copiar / Pegar
+#include "input/W3dClipboard.h"   // pestania Hex: Copiar / Pegar
 #include "W3dAviso.h"            // Notificar (el portapapeles no tiene un color)
 #include <cstdio>
 #include <cmath>

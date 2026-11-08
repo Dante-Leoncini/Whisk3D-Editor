@@ -2,7 +2,7 @@
 #include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "app/W3dTeclado.h"   // W3dTecladoAbrir: el teclado del celular (y el layout que se adapta)
-#include "gfx/w3dTexture.h"   // Texturas16Siempre (tarjeta Render)
+#include "graphics/w3dTexture.h"   // Texturas16Siempre (tarjeta Render)
 #include "W3dNombres.h"   // LA regla de nombres unicos (compartida por todo el editor)
 #include "variables.h"
 #include "io/GuardarW3D.h"   // tarjeta Archivo: guardar el proyecto (.w3d v3: JSON plano + archivos externos)
@@ -1817,7 +1817,7 @@ static void AccionMenuIdioma(){
 }
 
 static PopupMenu* MenuBackend = NULL;
-// EL BACKEND GRAFICO (Ajustes > Graphics): con varios en el ejecutable (la PC, gfx/w3dBackend.h) se elige al ARRANCAR;
+// EL BACKEND GRAFICO (Ajustes > Graphics): con varios en el ejecutable (la PC, graphics/w3dBackend.h) se elige al ARRANCAR;
 // el boton dice el elegido y, si todavia corre otro (falta reiniciar, o el elegido no anda aca), cual esta corriendo
 static std::string TextoBackend(){
 #ifdef W3D_MULTIBACKEND

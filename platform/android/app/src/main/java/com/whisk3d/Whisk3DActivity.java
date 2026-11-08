@@ -139,7 +139,7 @@ public class Whisk3DActivity extends SDLActivity {
         }
     }
 
-    // la VIBRACION (base/W3dVibrar.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
+    // la VIBRACION (input/W3dVibrar.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
     // que ya se puede arrastrar
     public void vibrar(int ms) {
         try {

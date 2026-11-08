@@ -3,7 +3,7 @@
 Dos variantes, desde el mismo proyecto:
 
 - **OpenGL ES 1.1** (pipeline fijo): el N95 y todo S60 3rd/5th. El objetivo insignia del proyecto: correr en un teléfono de 2007.
-- **OpenGL ES 2.0** (shaders): el N8, C7, E7 y todo Symbian^3/Anna/Belle. Usa el mismo backend de shaders que Android y la web (`libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp`).
+- **OpenGL ES 2.0** (shaders): el N8, C7, E7 y todo Symbian^3/Anna/Belle. Usa el mismo backend de shaders que Android y la web (`libs/Whisk3DCore/graphics/gles2/w3dGraphicsGLES2.cpp`).
 
 Las dos tienen la misma UID: instalar una reemplaza a la otra.
 
@@ -32,7 +32,7 @@ Se compila con el SDK de S60 3rd Edition + **Carbide.c++** (o `bldmake` + `abld`
 Los gestos son los mismos de Android y la web, con el mismo código:
 
 - S60 5th (5800, N97): un dedo. Symbian^3 (N8 y los que siguen; la variante ES 2.0): multitáctil.
-- Los dedos los sigue el Core (`libs/Whisk3DCore/base/W3dTactil.cpp`, y `W3dTactilSymbian.cpp` para el `TPointerEvent`). Arma los mismos eventos que SDL en Android: el primer dedo mueve y aprieta el mouse, los demás solo avisan como dedos.
+- Los dedos los sigue el Core (`libs/Whisk3DCore/input/W3dTactil.cpp`, y `W3dTactilSymbian.cpp` para el `TPointerEvent`). Arma los mismos eventos que SDL en Android: el primer dedo mueve y aprieta el mouse, los demás solo avisan como dedos.
 - El editor los convierte en `SDL_Event` (`main/app/W3dTactilEditor.cpp`) y entran por `controles.cpp`, como en Android. Para eso `controles.cpp` compila en Symbian contra `main/app/W3dSdlMinimo.h`.
 - Una mejora de los gestos en Android llega sola al teléfono. En la PC se prueba con `tactiltest` (`tools/pruebas/prueba_tactil.w3s`), que pasa por el mismo camino del Core.
 - En Symbian los handlers de PC del viewport 3D y de los paneles corren solo con el dedo o el mouse Bluetooth (`W3D_SOLO_POR_CONTROLES`): el keypad y el cursor virtual del N95 siguen como antes.

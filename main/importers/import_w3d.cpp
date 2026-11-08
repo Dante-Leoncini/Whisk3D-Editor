@@ -71,8 +71,8 @@
 #include "io/Streaming.h"            // las instancias DIFERIDAS ("carga": "distancia") no se generan al abrir el juego
 #include "io/W3dNodos.h"         // .w3dnodos: oclusion por nodos de riel (estilo SLST de PS1)
 #include "objects/Materials.h"   // bloque raiz "materiales" (antes viajaban dentro del GLB)
-#include "gfx/w3dGraphics.h"     // gfx::Mezcla: acotar el modo de mezcla que venga del archivo
-#include "gfx/w3dTexture.h"      // Texturas16Siempre: el formato de las texturas del proyecto
+#include "graphics/w3dGraphics.h"     // gfx::Mezcla: acotar el modo de mezcla que venga del archivo
+#include "graphics/w3dTexture.h"      // Texturas16Siempre: el formato de las texturas del proyecto
 #include "objects/Textures.h"
 #include "importers/import_obj.h" // EncolarTextura: la carga de texturas es DIFERIDA (1 por frame)
 #include "w3dFilesystem.h"

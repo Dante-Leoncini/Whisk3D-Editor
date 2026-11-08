@@ -4,8 +4,8 @@
 #include "render/Postproceso.h"
 #include "render/VectoresMovimiento.h"   // W3dDesenfoqueMovimiento (el de la CPU)
 #include "objects/Camera.h"              // el foco de la camara activa
-#include "gfx/w3dGraphics.h"
-#include "gfx/w3dTexture.h"              // ReservarPantalla / CopiarPantalla
+#include "graphics/w3dGraphics.h"
+#include "graphics/w3dTexture.h"              // ReservarPantalla / CopiarPantalla
 #include <math.h>
 #include <string.h>
 

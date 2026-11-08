@@ -105,7 +105,7 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver {
 		TKeyResponse OfferKeyEventL( const TKeyEvent& aKeyEvent,TEventCode aType );
 
         /**
-         * La pantalla tactil (S60 5th: un dedo; Symbian^3: varios). Cada dedo va al Core (base/W3dTactil), que lo
+         * La pantalla tactil (S60 5th: un dedo; Symbian^3: varios). Cada dedo va al Core (input/W3dTactil), que lo
          * convierte en los mismos eventos que SDL en Android: los gestos del editor son los mismos.
          */
         void HandlePointerEventL( const TPointerEvent& aPointerEvent );

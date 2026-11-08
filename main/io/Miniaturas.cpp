@@ -19,7 +19,7 @@
 #include "importers/import_w3d.h"       // la malla de trabajo fuera de la escena (un recurso sin cargar)
 #include "importers/import_obj.h"       // TexturaPendienteDe: la textura de un material que espera en la cola
 #include "math/Matrix4.h"
-#include "gfx/w3dTexture.h"
+#include "graphics/w3dTexture.h"
 #include "render/OpcionesRender.h"      // g_redraw
 #include "w3dlog.h"
 #include <map>

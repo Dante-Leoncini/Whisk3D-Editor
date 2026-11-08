@@ -254,7 +254,7 @@ cada bloque pone solo lo que varía (arranca sin saber lo demás: los de antes s
 como vacíos con su nombre y la rutina los dibuja con "Skip if hidden" y la matriz cargada.
 
 Carrera, modo juego puro, cuadro estable (simular + dibujar; `statsvivo`: TODAS las llamadas al driver de la escena,
-cada `gl*` = 1, ver "El contador de llamadas" en `libs/Whisk3DCore/gfx/w3dGraphics.h`):
+cada `gl*` = 1, ver "El contador de llamadas" en `libs/Whisk3DCore/graphics/w3dGraphics.h`):
 
 | | antes | ahora |
 |---|---|---|
@@ -295,5 +295,5 @@ de la textura que la muestra derecha.
 - `libs/Whisk3DCore/objects/MallaFlujos.h/.cpp`: los flujos por parte (tiras, aristas, vértices, simuladas) y la caja.
 - `main/edit/RutinaEditor.cpp`: la validación, los íconos y el menú agrupado (solo el editor).
 - `main/ui/ViewPorts/PropsRutina.cpp`: la tarjeta del panel.
-- `libs/Whisk3DCore/gfx/w3dGraphics.h`: `DrawElements` (primitivas), `LightN` / `LightNfv` / `LightModelAmbient`,
+- `libs/Whisk3DCore/graphics/w3dGraphics.h`: `DrawElements` (primitivas), `LightN` / `LightNfv` / `LightModelAmbient`,
   `EstadoFotoTomar` / `EstadoFotoReponer`.

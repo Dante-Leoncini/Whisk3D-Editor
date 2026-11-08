@@ -8,7 +8,7 @@
 #include "WhiskUI/draw/glesdraw.h"       // W3dPantallaAlto
 #include "WhiskUI/theme/colores.h"       // ListaColores / ColorID
 #include "WhiskUI/text/bitmapText.h"     // RenderBitmapText
-#include "W3dClipboard.h"                // portapapeles del sistema (Core): copiar/pegar con navegador/notas
+#include "input/W3dClipboard.h"                // portapapeles del sistema (Core): copiar/pegar con navegador/notas
 #include "WhiskUI/core/UI.h"             // marginGS / RenglonHeightGS / LetterWidthGS / GlobalScale / borderGS
 #include "objects/Textures.h"            // Textures[0] = atlas de la fuente
 #include "render/OpcionesRender.h"       // g_redraw (render event-driven)

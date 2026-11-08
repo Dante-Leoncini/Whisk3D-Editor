@@ -6,7 +6,7 @@
 //
 //  El tactil del editor (tap / arrastre / pinch / doble tap de 2 dedos / pulsacion larga / scroll de paneles) vive
 //  en controles.cpp y habla SDL_Event: es lo que llega en PC, Android y la web. En vez de reescribirlo para el
-//  telefono, el Core sigue los dedos y arma los MISMOS eventos (libs/Whisk3DCore/base/W3dTactil.h, main/app/W3dTactilEditor.cpp) y
+//  telefono, el Core sigue los dedos y arma los MISMOS eventos (libs/Whisk3DCore/input/W3dTactil.h, main/app/W3dTactilEditor.cpp) y
 //  entran por la misma puerta
 //  (InputUsuarioSDL3). Una mejora del tactil en Android llega sola al N8 y al reves.
 //

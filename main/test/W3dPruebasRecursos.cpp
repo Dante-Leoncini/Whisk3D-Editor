@@ -154,7 +154,7 @@
 #include "io/W3dRecursos.h"
 #include "io/Textura2D.h"             // Textura2DListar: el cache de imagenes 2D del proyecto
 #include "w3dFilesystem.h"
-#include "gfx/w3dGraphics.h"           // Finish: drenar la GPU (la subida de VBOs es perezosa)
+#include "graphics/w3dGraphics.h"           // Finish: drenar la GPU (la subida de VBOs es perezosa)
 #include "w3dTexture.h"                // juego2dpx: DecodeImage de la captura del binario
 #include "ViewPorts/ViewPorts.h"       // rootViewport
 #include "ViewPorts/LayoutArbol.h"     // viewports: ViewportsVivos / LayoutRaizCompleta

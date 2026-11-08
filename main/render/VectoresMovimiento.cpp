@@ -7,7 +7,7 @@
 #include "objects/Mesh.h"
 #include "animation/SkeletalAnimation.h"   // SkinearMesh: la pose del esqueleto al cuadro actual
 #include "animation/VertexAnimation.h"     // W3dPoseAlDia: la de la vertex anim
-#include "gfx/w3dGraphics.h"
+#include "graphics/w3dGraphics.h"
 #include <map>
 #include <math.h>
 #include <string.h>

@@ -1,6 +1,6 @@
-// Los dedos del Core (base/W3dTactil.h) -> SDL_Event -> InputUsuarioSDL3. Ver W3dTactilEditor.h. C++03 (Symbian).
+// Los dedos del Core (input/W3dTactil.h) -> SDL_Event -> InputUsuarioSDL3. Ver W3dTactilEditor.h. C++03 (Symbian).
 #include "W3dTactilEditor.h"
-#include "base/W3dTactil.h"
+#include "input/W3dTactil.h"
 #include "controles.h"                // SDL_Event (o W3dSdlMinimo.h) + InputUsuarioSDL3
 #include "render/OpcionesRender.h"    // g_redraw
 #include <string.h>
