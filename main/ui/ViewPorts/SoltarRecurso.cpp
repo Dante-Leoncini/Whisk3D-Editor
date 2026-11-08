@@ -455,7 +455,7 @@ bool W3dSoltarRecursoEn3D(Viewport3D* vp, int mx, int my, int tipo, const std::s
 
 // ============================================================================
 //  UN ARCHIVO SOLTADO DESDE EL SISTEMA (Windows / Linux / Mac: arrastrarlo desde el explorador a la ventana)
-//    - sobre el VIEWPORT 3D: un modelo (.obj .fbx .gltf .glb) se importa a la escena; una imagen se suma a la
+//    - sobre el VIEWPORT 3D: un modelo (.obj .fbx .gltf .glb .stl) se importa a la escena; una imagen se suma a la
 //      biblioteca y va al material de la malla que queda bajo el puntero;
 //    - sobre la BIBLIOTECA (o cualquier otro panel): queda en la biblioteca del proyecto, en memoria hasta guardar el
 //      .w3d. Un modelo pasa a ser un PREFAB (no queda en la escena); imagenes, sonidos, scripts, fuentes y videos, su
@@ -524,7 +524,7 @@ bool W3dSoltarArchivo(const std::string& ruta0, int mx, int my, std::string* que
     const std::string carpeta = en3D ? std::string() : CarpetaBajo(bajo, mx, my);
     const std::string ext = ExtDe(ruta);
     const std::string cat = W3dCategoriaPorExtension(ruta);
-    const bool esModelo = (ext == "obj" || ext == "fbx" || ext == "gltf" || ext == "glb");
+    const bool esModelo = (ext == "obj" || ext == "fbx" || ext == "gltf" || ext == "glb" || ext == "stl");
     if (!esModelo && cat != "texturas" && cat != "sonidos" && cat != "scripts" && cat != "fuentes" && cat != "videos" && cat != "shaders") {
         if (que) *que = std::string(T("This file type can't be added")) + ": " + HojaDe(ruta);
         return false;

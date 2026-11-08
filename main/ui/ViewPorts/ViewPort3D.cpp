@@ -290,6 +290,10 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar(T("Transform"), 0, -1, MenuTransform);    // abre submenu
         MenuObject->Agregar(T("Set Origin"), 4, -1, MenuSetOrigin);  // abre submenu
         MenuObject->Agregar(T("Apply"), 6, -1, MenuApply)->atajo = "@3d.aplicar"; // submenu Location/Rotation/Scale/All
+        // IMAN (Shift+S): el cursor 3D a lo seleccionado / al origen, lo seleccionado al cursor... En Modo Objeto solo
+        // se abria con el atajo: en pantallas tactiles y en el N95 no habia forma de mover el cursor 3D. Sus opciones
+        // se ejecutan en el propio submenu (AccionSnap): los ids 0-7 no chocan con los de este menu.
+        { extern PopupMenu* LayoutSubmenuSnap(); MenuObject->Agregar(T("Snap"), 8, -1, LayoutSubmenuSnap())->atajo = "@global.menuSnap"; }
         // CORTAR / COPIAR / PEGAR (tambien entre ventanas de Whisk3D: LayoutObjetosCopiar), separados con una linea
         MenuObject->Agregar(T("Cut"), 720, IconType::borrar)->atajo = "Ctrl+X";
         MenuObject->Agregar(T("Copy"), 721)->atajo = "Ctrl+C";
@@ -4222,10 +4226,10 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // (en tactil se confirma con el tilde de la barra de herramientas, no soltando).
     // modo VIEW (toggle de Edit Mode): con 1 dedo se ORBITA aunque haya una operacion en curso (mover/rotar/
     // extrude/strip) -> se puede mirar desde otro angulo sin cancelar; se apaga View y sigue editando.
-    // (la 3DS tambien: su "mouse" es siempre el dedo de la pantalla tactil)
+    // (la 3DS y la Vita tambien: su "mouse" es siempre el dedo de la pantalla tactil)
     // En las demas (PC, Symbian) decide el DEDO, no la plataforma: una pantalla tactil orbita igual que Android; el
     // mouse (el de la PC, el Bluetooth del telefono) sigue con el boton del medio / Alt y arrastrar es la caja.
-    #if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || defined(W3D_3DS)
+    #if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || defined(W3D_3DS) || defined(W3D_VITA)
         const bool izqOrbita = true;
     #else
         const bool izqOrbita = g_ultimoDownTactil;

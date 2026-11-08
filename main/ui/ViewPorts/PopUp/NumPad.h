@@ -22,6 +22,7 @@ class NumPad : public PopUpBase {
         bool EsTeclado() const W3D_OVERRIDE { return true; }
 
         PopUpBase* prevPopup;        // popup a restaurar al cerrar (ej: el panel redo del loop cut). NULL = ninguno
+        bool TeclaCentro(const char* texto, int& cx, int& cy);   // (NumPadTeclaCentro)
 
     private:
         Card* keyCard;               // tarjeta reusada para dibujar cada tecla
@@ -37,6 +38,9 @@ class NumPad : public PopUpBase {
 
 // abre el teclado (reemplaza la instancia anterior) para el PropFloat en edicion
 void NumPadAbrir();
+// harness (las capturas de los tutoriales): el centro EN PANTALLA de la tecla con ese texto ("7", "*", "OK"...) del
+// teclado abierto. false = no hay teclado abierto o no tiene esa tecla
+bool NumPadTeclaCentro(const char* texto, int& cx, int& cy);
 // abre el teclado en modo TRANSFORM: edita directamente el transform de la barra de estado
 // (mover/rotar/escalar) como un teclado fisico en PC. Sin popup/textinput propio.
 void NumPadAbrirTransform();

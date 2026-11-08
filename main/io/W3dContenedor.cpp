@@ -453,7 +453,7 @@ const char* W3dCategoriaPorExtension(const std::string& r) {
     if (e == "w3db" || e == "w3dm" || e == "glb" || e == "gltf" || e == "w3dmesh") return "mallas";
     // "w3da": las bibliotecas de clips de esqueleto (animsets, animation/W3dAnimSet.h)
     if (e == "bin" || e == "w3danim" || e == "w3da") return "animaciones";
-    if (e == "obj" || e == "wobj" || e == "fbx" || e == "mtl") return "modelos";
+    if (e == "obj" || e == "wobj" || e == "fbx" || e == "mtl" || e == "stl") return "modelos";
     return "extra";
 }
 

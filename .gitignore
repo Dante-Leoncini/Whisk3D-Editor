@@ -85,6 +85,14 @@ platform/windows/build_*/
 # serve_nocache.py) SI va al repo. La vieja carpeta raiz /web quedo obsoleta.
 
 # ===============================
+# PS VITA (VitaSDK)
+# ===============================
+
+# lo que genera build_vita.sh (el .elf, el .self, el param.sfo y el .vpk). Ya lo cubre la regla generica 'build/',
+# pero va explicito como el de Windows. El kit (VitaSDK) y el emulador (Vita3K) viven fuera del proyecto, en ~/vita.
+platform/vita/build/
+
+# ===============================
 # IDEs
 # ===============================
 
@@ -129,3 +137,6 @@ platform/linux/debug/
 # versionar (es el punto de coordinacion entre las dos PCs para los nombres de bloque),
 # sacar esta linea.
 /formato/
+
+# modelos de terceros para las capturas de los tutoriales (Leon, de Resident Evil 4: de Capcom). Solo locales.
+tools/capturas/modelos/

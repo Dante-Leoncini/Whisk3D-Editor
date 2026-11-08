@@ -100,6 +100,7 @@ static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
 #include "importers/import_obj.h" // ExportOBJ (boton Wavefront.obj de la tarjeta Export)
 #include "importers/import_w3d.h" // g_w3dFormatoMallasProyecto (tilde "Meshes as text")
 #include "importers/export_gltf.h" // ExportGLTF (glTF/GLB: rig + animaciones, sin hornear el skinning)
+#include "importers/stl.h"         // ExportSTL (solo triangulos: impresion 3D / CAD)
 #include "render/OpcionesRender.h" // g_redraw (scroll de la lista con la rueda)
 #include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
 #include "ViewPorts/PropImagen.h"  // pestania RECURSO: la vista previa de una textura
@@ -4036,11 +4037,12 @@ std::string W3dRutaSalidaCampos(const std::string& dir, const std::string& nombr
     return W3dRutaEnCarpeta(dir, nm, "");   // sin ext: el nombre ya la trae
 }
 
-// ---------- EXPORT (dropdown de formato: OBJ / FBX / glTF / GLB + Path + File name) ----------
-// Formato: 0=OBJ 1=FBX 2=glTF 3=GLB. OBJ solo malla (avisa que pierde rig/animaciones); glTF/GLB llevan
-// el rig y sus clips SIN hornear el skinning (import_gltf es su inverso). FBX (binario) todavia no exporta.
-static const char* ExtDeFormato(int f){ return (f==0)?".obj":(f==1)?".fbx":(f==2)?".gltf":".glb"; }
-static const char* NombreFormato(int f){ return (f==0)?"Wavefront .obj":(f==1)?"FBX":(f==2)?"glTF":"GLB"; }
+// ---------- EXPORT (dropdown de formato: OBJ / FBX / glTF / GLB / STL + Path + File name) ----------
+// Formato: 0=OBJ 1=FBX 2=glTF 3=GLB 4=STL. OBJ y STL solo malla (avisan que pierden rig/animaciones); glTF/GLB
+// llevan el rig y sus clips SIN hornear el skinning (import_gltf es su inverso). FBX (binario) todavia no exporta.
+// STL = solo los triangulos (sin UV, color ni materiales): para imprimir en 3D o pasar a un programa de CAD.
+static const char* ExtDeFormato(int f){ return (f==0)?".obj":(f==1)?".fbx":(f==2)?".gltf":(f==3)?".glb":".stl"; }
+static const char* NombreFormato(int f){ return (f==0)?"Wavefront .obj":(f==1)?"FBX":(f==2)?"glTF":(f==3)?"GLB":"STL"; }
 
 // cambia la extension del File name al formato elegido (respeta el nombre base)
 static void ActualizarExtensionExport(){
@@ -4078,6 +4080,9 @@ static void HacerExportActual(){
             W3dDescargarSiWeb(path);
             W3dDescargarSiWeb((sl == std::string::npos ? std::string() : path.substr(0, sl + 1)) + ExtractBaseName(path) + ".mtl");
         }
+    } else if (f == 4) {
+        ok = ExportSTL(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
+        // ExportSTL ya tira su propia notificacion + autodescarga en web
     } else {
         ok = ExportGLTF(path, PropsActivo->exportSelectedOnly, f == 3); // f==2 glTF (texto), f==3 GLB (binario)
         // ExportGLTF ya tira su propia notificacion + autodescarga en web
@@ -4103,6 +4108,11 @@ static void AccionExport(){
         confirmarPopup->Abrir(T("OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?"), HacerExportActual);
         return;
     }
+    if (f == 4 && ExportMeshPierdeRig(SceneCollection, PropsActivo->exportSelectedOnly)) {
+        if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+        confirmarPopup->Abrir(T("STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?"), HacerExportActual);
+        return;
+    }
 #ifndef W3D_SYMBIAN
     if (w3dFileSystem::FileExists(full)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
@@ -4112,11 +4122,11 @@ static void AccionExport(){
 #endif
     HacerExportActual();
 }
-// dropdown de formato: elige OBJ/FBX/glTF/GLB y ajusta la extension del File name.
+// dropdown de formato: elige OBJ/FBX/glTF/GLB/STL y ajusta la extension del File name.
 static PopupMenu* MenuExportFormat = NULL;
 static void AccionExportFormatElegido(int id){
     if (!PropsActivo) return;
-    if (id >= 0 && id <= 3) { PropsActivo->exportFormat = id; ActualizarExtensionExport(); }
+    if (id >= 0 && id <= 4) { PropsActivo->exportFormat = id; ActualizarExtensionExport(); }
     PropertiesLayoutDirty = true; g_redraw = true;
 }
 static void AccionMenuExportFormat(){
@@ -4127,6 +4137,7 @@ static void AccionMenuExportFormat(){
     MenuExportFormat->Agregar("FBX", 1, IconType::armature);
     MenuExportFormat->Agregar("glTF", 2, IconType::mesh);
     MenuExportFormat->Agregar("GLB", 3, IconType::mesh);
+    MenuExportFormat->Agregar("STL", 4, IconType::mesh);
     AbrirMenuBajoBoton(MenuExportFormat, PropsActivo->propExportFormat->button);
 }
 // el explorador (modo guardar) devolvio una CARPETA: se pone en el campo Path (el nombre no se toca).
@@ -4145,7 +4156,7 @@ static void ExportFolderElegido(const std::string& elegido){
 }
 // boton de la carpeta: abre el explorador para elegir la carpeta de salida
 static void AccionBrowseExport(){
-    AbrirFileBrowser(T("Export to..."), T("Use this file"), ".obj .gltf .glb .fbx", ExportFolderElegido, true);
+    AbrirFileBrowser(T("Export to..."), T("Use this file"), ".obj .gltf .glb .fbx .stl", ExportFolderElegido, true);
 }
 
 // ---------- RENDER (Path + File name + confirmacion) ----------

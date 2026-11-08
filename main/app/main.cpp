@@ -44,6 +44,7 @@ static void PCImportObj() {
 static void PCImportFbx()  { AbrirFileBrowser(T("Import FBX"),  T("Import FBX"),  ".fbx",  ImportModeloCallback); }
 static void PCImportGltf() { AbrirFileBrowser(T("Import glTF"), T("Import glTF"), ".gltf", ImportModeloCallback); }
 static void PCImportGlb()  { AbrirFileBrowser(T("Import GLB"),  T("Import GLB"),  ".glb",  ImportModeloCallback); }
+static void PCImportStl()  { AbrirFileBrowser(T("Import STL"),  T("Import STL"),  ".stl",  ImportModeloCallback); }
 
 // EL CUADRO A LA VENTANA y el vsync: con el backend Vulkan no hay contexto de GL, los hace el (vk/w3dVk.h)
 #ifdef W3D_VULKAN
@@ -689,6 +690,9 @@ static bool CambiosGuardar() {
     return GuardarW3D(w3dPath);
 }
 static void ProcesarEvento(SDL_Event& e) {
+#ifdef W3D_VITA
+    { extern bool W3dVitaEventoValido(const SDL_Event&); if (!W3dVitaEventoValido(e)) return; }   // (el panel de atras)
+#endif
     g_redraw = true;
 #ifdef W3D_DREAMCAST
     if (e.type == SDL_MOUSEMOTION && e.motion.which != SDL_TOUCH_MOUSEID) { extern void W3dDcMouseMovido(); W3dDcMouseMovido(); }
@@ -922,6 +926,12 @@ static void MainLoopFrame() {
         W3d3dsControles(AnimEsJuego && PlayAnimation && SimActiva());
     }
 #endif
+#ifdef W3D_VITA
+    {   // los botones y los sticks de la consola en el editor (fuera del modo juego, como en la 3DS)
+        extern bool SimActiva(); extern void W3dVitaControles(bool);
+        W3dVitaControles(AnimEsJuego && PlayAnimation && SimActiva());
+    }
+#endif
     while (SDL_PollEvent(&e)) ProcesarEvento(e); // manejo compartido (mismo que la espera de reposo)
     // la PULSACION LARGA tactil (agarrar una fila del outliner): se mide con el reloj, no con eventos
     { extern void ControlesTick(); ControlesTick(); }
@@ -1119,6 +1129,9 @@ static void MainLoopFrame() {
         { extern void W3d3dsCuadroDibujado(); W3d3dsCuadroDibujado(); }   // (la captura de prueba en la SD)
 #else
         w3dEngine::DibujarPendiente();
+#ifdef W3D_VITA
+        { extern void W3dVitaCuadroDibujado(); W3dVitaCuadroDibujado(); }   // (la captura de prueba, antes de mostrarlo)
+#endif
         W3dPresentar(window);
 #endif
 #ifdef W3D_DREAMCAST
@@ -1208,10 +1221,19 @@ int main(int argc, char* argv[]) {
     // abre un framebuffer de software y no hay contexto GL
     SDL_SetHint(SDL_HINT_DC_VIDEO_MODE, "SDL_DC_OPENGL_VIDEO");
 #endif
+#ifdef W3D_VITA
+    // la Vita: el click del mouse sale del toque (como en Android) solo si se dice de que panel. Sin el hint, SDL no lo
+    // arma para ninguno y el editor no ve los toques (los gestos de dos dedos si, pero no un toque solo)
+    SDL_SetHint(SDL_HINT_VITA_TOUCH_MOUSE_DEVICE, "0");   // (la pantalla; el panel de atras no)
+#endif
     if (SDL_Init(initFlags) != 0) {
         std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
         return -1;
     }
+#ifdef W3D_VITA
+    // la Vita: sin el compilador de shaders del sistema vitaGL no puede dibujar (se avisa y se sale, ver w3d_vita.cpp)
+    { extern bool W3dVitaPuedeDibujar(); if (!W3dVitaPuedeDibujar()) { SDL_Quit(); return 1; } }
+#endif
 
     W3dSetReloj(RelojSDL);   // el motor usa el reloj de PARED de SDL en vez de su respaldo
     w3dFileSystem::Init();
@@ -1335,6 +1357,11 @@ int main(int argc, char* argv[]) {
     // la 3DS: el editor en la pantalla de abajo (la tactil, 320x240), la UI a escala 1 y sin antialiasing
     winW = 320; winH = 240; cfg.fullscreen = true; cfg.scale = 1; cfg.enableAntialiasing = false;
 #endif
+#ifdef W3D_VITA
+    // la Vita: la pantalla de 960x544 (unos 220 puntos por pulgada, como un telefono: la UI a la escala 2 de fabrica
+    // del config, o la que eligio el usuario) y sin antialiasing
+    winW = 960; winH = 544; cfg.fullscreen = true; cfg.enableAntialiasing = false;
+#endif
 #ifdef W3D_ANDROID_VIEJO
     // Android 2.3: sin antialiasing. La VideoCore IV lo da (4x), pero con tiles cuatro veces mas chicos el cuadro tardaba
     // ~300 ms en la GPU
@@ -1371,6 +1398,8 @@ int main(int argc, char* argv[]) {
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;   // (la consola es una sola pantalla)
     #elif defined(W3D_3DS)
         Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CrearVentanaGL)
+    #elif defined(W3D_VITA)
+        Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;   // (la consola es una sola pantalla)
     #else
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
         if (cfg.fullscreen) windowFlags |= SDL_WINDOW_MAXIMIZED;
@@ -1455,6 +1484,7 @@ int main(int argc, char* argv[]) {
     LayoutImportFbx = PCImportFbx;
     LayoutImportGltf = PCImportGltf;
     LayoutImportGlb = PCImportGlb;
+    LayoutImportStl = PCImportStl;
     DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
@@ -1467,6 +1497,7 @@ int main(int argc, char* argv[]) {
     LayoutImportFbx = PCImportFbx;
     LayoutImportGltf = PCImportGltf;
     LayoutImportGlb = PCImportGlb;
+    LayoutImportStl = PCImportStl;
     DialogoCargarTextura = PCCargarTexturaEn;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers;
 #endif

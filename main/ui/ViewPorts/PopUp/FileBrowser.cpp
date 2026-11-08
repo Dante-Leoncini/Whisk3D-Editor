@@ -63,7 +63,7 @@ static bool EsVideo(const std::string& name) {
 // icono segun el tipo de archivo
 static int IconoEntrada(const w3dFileSystem::DirEntry& e) {
     if (e.isDir) return (int)IconType::carpeta;
-    if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx") || TerminaEn(e.name, ".gltf") || TerminaEn(e.name, ".glb")) return (int)IconType::mesh;
+    if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx") || TerminaEn(e.name, ".gltf") || TerminaEn(e.name, ".glb") || TerminaEn(e.name, ".stl")) return (int)IconType::mesh;
     if (EsImagen(e.name)) return (int)IconType::foto;
     if (EsVideo(e.name))  return (int)IconType::camera;  // video (mientras carga su preview)
     if (EsFuente(e.name)) return (int)IconType::lista;   // fuente (mientras carga su preview)

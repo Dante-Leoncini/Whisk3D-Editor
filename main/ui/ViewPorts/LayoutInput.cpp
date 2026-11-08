@@ -112,6 +112,7 @@ void (*LayoutImportObj)() = NULL;
 void (*LayoutImportFbx)() = NULL; // "Add > Imports > FBX": abre el explorador filtrado a .fbx (lo cablea la plataforma)
 void (*LayoutImportGltf)() = NULL; // "Add > Imports > glTF": explorador filtrado a .gltf
 void (*LayoutImportGlb)() = NULL;  // "Add > Imports > GLB": explorador filtrado a .glb
+void (*LayoutImportStl)() = NULL;  // "Add > Imports > STL": explorador filtrado a .stl
 void (*LayoutWarpMouse)(int x, int y) = NULL;
 void (*LayoutArbolCambiado)() = NULL;
 
@@ -724,10 +725,10 @@ void AddCulling(){  TrasCrearAdd(new Culling(NULL, cursor3D.pos)); }
 void AddNiebla(){   TrasCrearAdd(new Niebla(NULL, cursor3D.pos)); }
 // un SONIDO en el cursor 3D (con el primer sonido del proyecto, si hay; se cambia en su tarjeta)
 void AddSonido(){
+    // nace SIN sonido (Ninguno), como todo objeto nuevo: el archivo lo elige el usuario en Propiedades. Antes tomaba
+    // el primero de la biblioteca, que no tiene por que ser el que se quiere.
     Sonido* s = new Sonido(NULL, cursor3D.pos);
     s->SetNameObj(T("Sound"));
-    std::vector<W3dRecursoItem> it; W3dVistaRecListar(W3D_VISTA_SONIDOS, it);
-    if (!it.empty()) s->archivo = it[0].id;
     TrasCrearAdd(s);
 }
 void AddLimpiarZ(){ TrasCrearAdd(new LimpiarZ(NULL, cursor3D.pos)); }
@@ -944,6 +945,7 @@ void AddImportObj(){  if (LayoutImportObj)  LayoutImportObj(); }
 void AddImportFbx(){  if (LayoutImportFbx)  LayoutImportFbx(); }
 void AddImportGltf(){ if (LayoutImportGltf) LayoutImportGltf(); }
 void AddImportGlb(){  if (LayoutImportGlb)  LayoutImportGlb(); }
+void AddImportStl(){  if (LayoutImportStl)  LayoutImportStl(); }
 
 // importar una INTERFAZ 2D (.w3dui): el arbol entero aparece en la escena, seleccionado
 static void UIImportElegido(const std::string& ruta){
@@ -993,12 +995,13 @@ void AddImportUI(){
     AbrirFileBrowser(T("Load UI"), T("Open"), ".w3dui .json", UIImportElegido);
 }
 
-// submenu Imports (OBJ/FBX/glTF/GLB). Nombres de formato: NO se traducen (son marcas).
+// submenu Imports (OBJ/FBX/glTF/GLB/STL). Nombres de formato: NO se traducen (son marcas).
 static const MenuDef ADD_IMPORTS[] = {
     { "OBJ",  AddImportObj,  NULL, ICONO(IconType::mesh) },
     { "FBX",  AddImportFbx,  NULL, ICONO(IconType::mesh) },
     { "glTF", AddImportGltf, NULL, ICONO(IconType::mesh) },
     { "GLB",  AddImportGlb,  NULL, ICONO(IconType::mesh) },
+    { "STL",  AddImportStl,  NULL, ICONO(IconType::mesh) },
     { "Whisk3D UI", AddImportUI, NULL, ICONO(IconType::textura) },
 };
 

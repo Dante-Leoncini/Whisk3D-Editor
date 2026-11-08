@@ -25,7 +25,6 @@ FUENTES_CPP += \
     libs/Whisk3DCore/physics/W3dHitbox.cpp \
     libs/Whisk3DCore/physics/W3dRagdoll.cpp \
     libs/Whisk3DCore/nav/W3dNav.cpp \
-    libs/Whisk3DCore/animation/W3dLocomocion.cpp \
     libs/Whisk3DCore/net/W3dRed.cpp \
     libs/Whisk3DCore/io/w3dFilesystem.cpp \
     libs/Whisk3DCore/gfx/w3dTexture.cpp \
@@ -41,6 +40,7 @@ FUENTES_CPP += \
     libs/Whisk3DCore/base/W3dInteractionState.cpp \
     libs/Whisk3DCore/base/W3dConfig.cpp \
     libs/Whisk3DCore/base/W3dTactil.cpp \
+    libs/Whisk3DCore/base/W3dVibrar.cpp \
     libs/Whisk3DCore/math/Vector3.cpp \
     libs/Whisk3DCore/math/Quaternion.cpp \
     libs/Whisk3DCore/math/Matrix4.cpp \

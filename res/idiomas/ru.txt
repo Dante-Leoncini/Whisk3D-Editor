@@ -375,6 +375,7 @@ Could not encode the PNG	Не удалось закодировать PNG
 Could not import	Не удалось импортировать
 Could not link the copy of '%s' to its mesh	Не удалось связать копию '%s' с её мешем
 Could not load the mesh '%s'	Не удалось загрузить меш '%s'
+Could not read the STL file	Не удалось прочитать файл STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать анимации '%s' (%s): они остаются ПУСТЫМИ, и сохранять поверх я не буду (см. whisk3d.log)
 Could not read the file	Не удалось прочитать файл
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать кадры анимации '%s' объекта '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
@@ -528,6 +529,7 @@ Equal	Равно
 Equirectangular (software)	Эквиректангулярная (программно)
 Error rendering animation	Ошибка рендера анимации
 Error: could not save the OBJ	Ошибка: не удалось сохранить OBJ
+Error: could not save the STL	Ошибка: не удалось сохранить STL
 Error: could not save the render	Ошибка: не удалось сохранить рендер
 Errors only	Только ошибки
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Это изменит группу вершин и упростит её до 1 кости на вершину (скиннинг быстрее). Возможна потеря данных.
@@ -698,6 +700,7 @@ Import 3D model	Импорт 3D-модели
 Import FBX	Импорт FBX
 Import GLB	Импорт GLB
 Import OBJ	Импорт OBJ
+Import STL	Импорт STL
 Import glTF	Импорт glTF
 Import w3dui	Импорт w3dui
 Imported	Импортировано
@@ -1322,6 +1325,10 @@ Routine	Процедура
 Routine loop	Цикл процедуры
 Routines	Процедуры
 Rows	Строки
+STL imported successfully!	STL импортирован!
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL хранит только треугольники: арматура, анимации, UV и материалы будут потеряны. Существующий файл будет перезаписан. Продолжить?
+STL saved successfully!	STL сохранён!
+STL: nothing to import	STL: нечего импортировать
 Same as	Как в режиме
 Same as parent	Как у родителя
 Same scale as the editor	Масштаб как в редакторе

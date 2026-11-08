@@ -1,0 +1,21 @@
+# PULSACION LARGA en la Vista 3D (tactil, main/app/controles.cpp: ControlesTick): el dedo quieto medio segundo abre el
+# menu contextual (el del click derecho de la PC: Objeto, con el cubo elegido). Al levantarlo no se elige nada.
+ventana 960 540
+escala 2
+selobj Cubo
+dedo down 200 200
+esperar 200
+tick
+menuabierto no
+esperar 450
+tick
+menuabierto si
+dedo up 200 200
+menuabierto si
+# un toque corto NO abre el menu (selecciona: en el vacio, nada)
+tecla Escape
+menuabierto no
+dedo down 200 200
+dedo up 200 200
+tick
+menuabierto no

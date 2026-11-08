@@ -830,7 +830,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButtonRow* propRowUVGroupAsig; // UV Groups: Assign | Remove
         PropButtonRow* propRowUVGroupSel;  // UV Groups: Select | Deselect
         PropText*   propNameObj;        // campo "Name" del OBJETO activo (tab Objeto): se ve el nombre y se edita al clickear
-        int  exportFormat;           // formato de export: 0=OBJ 1=FBX 2=glTF 3=GLB (dropdown propExportFormat)
+        int  exportFormat;           // formato de export: 0=OBJ 1=FBX 2=glTF 3=GLB 4=STL (dropdown propExportFormat)
         bool exportSelectedOnly;     // checkbox "Selected only"
         bool exportApplyModifiers;   // checkbox "Apply Modifiers" (default ON): exporta la malla generada por los mods
         bool exportApplyTransforms;  // checkbox "Apply Transforms" (default ON): hornea el transform en el .obj

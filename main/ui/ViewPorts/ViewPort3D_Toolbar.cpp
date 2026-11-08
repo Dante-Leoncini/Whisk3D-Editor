@@ -139,7 +139,12 @@ static bool ToolbarTransformando(){
             (InteractionMode == PoseMode && g_poseModo)); // POSE: tambien muestra tilde/cruz + ejes en el tactil
 }
 
+// las capturas de los tutoriales (main/test/W3dCapturas.cpp, 'vista3d barra 0'): la Vista 3D como en el N95, sin la
+// barra de abajo. Solo la toca el harness.
+bool g_capturaSinBarra3D = false;
+
 bool Viewport3D::ToolbarVisible() const {
+    if (g_capturaSinBarra3D) return false;
     // MODO JUEGO: sin toolbar (RenderToolbar tampoco la dibuja). Sin esto la barra
     // INVISIBLE seguia consumiendo los clicks (ToolbarClick "consumia igual") y le
     // restaba su franja al lienzo del juego.

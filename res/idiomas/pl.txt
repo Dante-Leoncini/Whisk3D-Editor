@@ -375,6 +375,7 @@ Could not encode the PNG	Nie udało się zakodować PNG
 Could not import	Nie udało się zaimportować
 Could not link the copy of '%s' to its mesh	Nie udało się powiązać kopii '%s' z jej siatką
 Could not load the mesh '%s'	Nie udało się wczytać siatki '%s'
+Could not read the STL file	Nie udało się odczytać pliku STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Nie udało się odczytać animacji '%s' (%s): zostają PUSTE i nie zostanie nadpisany (zobacz whisk3d.log)
 Could not read the file	Nie udało się odczytać pliku
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Nie udało się odczytać klatek animacji '%s' obiektu '%s': zostaje PUSTA i nie zostanie nadpisana (zobacz whisk3d.log)
@@ -528,6 +529,7 @@ Equal	Równe
 Equirectangular (software)	Równoprostokątna (programowo)
 Error rendering animation	Błąd renderowania animacji
 Error: could not save the OBJ	Błąd: nie udało się zapisać OBJ
+Error: could not save the STL	Błąd: nie udało się zapisać STL
 Error: could not save the render	Błąd: nie udało się zapisać renderu
 Errors only	Tylko błędy
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	To zmieni grupę wierzchołków i uprości ją do 1 kości na wierzchołek (szybszy skinning). Możliwa utrata danych.
@@ -698,6 +700,7 @@ Import 3D model	Importuj model 3D
 Import FBX	Importuj FBX
 Import GLB	Importuj GLB
 Import OBJ	Importuj OBJ
+Import STL	Importuj STL
 Import glTF	Importuj glTF
 Import w3dui	Importuj w3dui
 Imported	Zaimportowano
@@ -1322,6 +1325,10 @@ Routine	Procedura
 Routine loop	Pętla procedury
 Routines	Procedury
 Rows	Wiersze
+STL imported successfully!	Zaimportowano STL!
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL zapisuje tylko trójkąty: szkielet, animacje, UV i materiały przepadną. Istniejący plik zostanie nadpisany. Kontynuować?
+STL saved successfully!	Zapisano STL!
+STL: nothing to import	STL: nic do importu
 Same as	Jak:
 Same as parent	Jak rodzic
 Same scale as the editor	Skala jak w edytorze

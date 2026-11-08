@@ -1,0 +1,17 @@
+# STL (main/importers/stl.cpp): el formato de la impresion 3D y del CAD.
+# EXPORTAR: el cubo de la escena, subido 3 m, sale como STL binario con 12 triangulos y Z arriba (el cubo va de 2 a 4).
+deselectall
+selobj Cubo
+objpos 0 3 0
+stl exportar /tmp/w3d_stl_cubo.stl sel
+stl archivo /tmp/w3d_stl_cubo.stl 12 4
+# IMPORTAR lo exportado: entra parado (Y de 2 a 4) y SOLDADO: 8 puntos, no 36 (3 por triangulo)
+import /tmp/w3d_stl_cubo.stl
+stl revisar w3d_stl_cubo 8 12 2 4
+# ASCII con CRLF y dos "solid": un objeto por cada uno, con su nombre. La punta (z=2 en el archivo) queda en Y=2.
+import stl-ascii.stl
+stl revisar piramide 4 4 0 2
+stl revisar suelto 3 1 0 0
+# exportar de nuevo todo y volver a leerlo: la vuelta no pierde triangulos (12 + 12 + 4 + 1)
+stl exportar /tmp/w3d_stl_todo.stl
+stl archivo /tmp/w3d_stl_todo.stl 29 4

@@ -7,12 +7,12 @@ abierto), asi la receta sigue andando aunque cambie el tamanio de la interfaz.
 """
 import math
 
-from capturas import (receta, Guion, MENU_TIPO, VISTA_3D, OUTLINER, PROPIEDADES, EDITOR_UV, LINEA_DE_TIEMPO,
+from capturas import (receta, Guion, PorIdioma, MENU_TIPO, VISTA_3D, OUTLINER, PROPIEDADES, EDITOR_UV, LINEA_DE_TIEMPO,
                       EXPANDIR, DIVIDIR_COLUMNAS, DIVIDIR_FILAS, MAXIMIZAR)
 
 # lo que se escribe en el cartel de la tecla (el resto son flechas, que no se traducen)
-SOFT_IZQ = {"es": "Soft izquierda", "en": "Left soft key", "pt": "Soft esquerda"}
-TECLA_VERDE = {"es": "Tecla verde", "en": "Green key", "pt": "Tecla verde"}
+SOFT_IZQ = PorIdioma({"es": "Soft izquierda", "en": "Left soft key", "pt": "Soft esquerda"})
+TECLA_VERDE = PorIdioma({"es": "Tecla verde", "en": "Green key", "pt": "Tecla verde"})
 
 
 def suave(t):
@@ -277,9 +277,9 @@ FLECHA = {"derecha": "→", "izquierda": "←", "arriba": "↑", "abajo": "↓"}
 MOVIDA = {"derecha": (1, 0), "izquierda": (-1, 0), "arriba": (0, -1), "abajo": (0, 1)}
 
 # la escena con muchas cosas (vista local, vistas, perspectiva): (primitiva, nombre, posicion, tamanio)
-NOMBRES = {"es": {"Caja": "Caja", "Esfera": "Esfera", "Cilindro": "Cilindro", "Cono": "Cono"},
+NOMBRES = PorIdioma({"es": {"Caja": "Caja", "Esfera": "Esfera", "Cilindro": "Cilindro", "Cono": "Cono"},
            "en": {"Caja": "Box", "Esfera": "Sphere", "Cilindro": "Cylinder", "Cono": "Cone"},
-           "pt": {"Caja": "Caixa", "Esfera": "Esfera", "Cilindro": "Cilindro", "Cono": "Cone"}}
+           "pt": {"Caja": "Caixa", "Esfera": "Esfera", "Cilindro": "Cilindro", "Cono": "Cone"}})
 LLENA = [("cube", "Caja", (3.5, -2.5), 0.7), ("uvsphere", "Esfera", (-3, -1.5), 0.9), ("cylinder", "Cilindro", (2.5, 2.5), 0.6),
          ("cone", "Cono", (0.2, -3.2), 0.8), ("cube", "Caja", (-2.5, 2.8), 0.5), ("uvsphere", "Esfera", (4.5, 0.8), 0.5),
          ("cone", "Cono", (-4.5, -3.5), 0.6), ("cylinder", "Cilindro", (-1, -5.5), 0.7), ("cube", "Caja", (1.8, -5.8), 0.6),
@@ -674,7 +674,7 @@ def camara_nokia(idioma):
 
 # -- bloquear la orbita: el plano de una casa, de arriba y en ortografica --
 BLOQUEAR_ORBITA, CAMARA_A_LA_VISTA = 421, 423                   # sus opciones (ids de LayoutAccionView)
-NOMBRES_PLANO = {"es": ("Pared", "Mueble"), "en": ("Wall", "Furniture"), "pt": ("Parede", "Movel")}
+NOMBRES_PLANO = PorIdioma({"es": ("Pared", "Mueble"), "en": ("Wall", "Furniture"), "pt": ("Parede", "Movel")})
 PAREDES = [(0, 3.5, 5.1, 0.1), (0, -3.5, 5.1, 0.1), (-5, 0, 0.1, 3.5), (5, 0, 0.1, 3.5),   # (x, z, medio ancho, medio largo)
            (1, -1.6, 0.1, 1.9), (-3.1, 0.8, 1.9, 0.1), (3.6, 0.8, 1.4, 0.1)]
 MUEBLES = [("cube", -3.3, -2.0, (0.9, 0.25, 1.2)), ("cylinder", 3.0, -1.6, (0.7, 0.3, 0.7)),
@@ -890,3 +890,8 @@ def camara_bloquear_nokia(idioma):
     flechas_n95(g, (("abajo", 4),), "zoom", modificador="num0", cartel_mod="0", cuadros=2)
     g.foto(dur=1500)
     return g.cuadros(calidad=64)
+
+
+# el tutorial 3 (El Modo Objeto) tiene sus recetas aparte
+import recetas_objeto  # noqa: E402,F401
+import recetas_viewports  # noqa: E402,F401  (los articulos de Los viewports)

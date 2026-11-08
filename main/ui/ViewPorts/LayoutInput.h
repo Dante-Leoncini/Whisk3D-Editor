@@ -333,6 +333,7 @@ extern void (*LayoutImportObj)();
 extern void (*LayoutImportFbx)();
 extern void (*LayoutImportGltf)(); // Add > Imports > glTF
 extern void (*LayoutImportGlb)();  // Add > Imports > GLB
+extern void (*LayoutImportStl)();  // Add > Imports > STL
 // el arbol cambio (cambio de tipo / expand / split): la plataforma
 // refresca sus punteros cacheados si los tiene
 extern void (*LayoutArbolCambiado)();

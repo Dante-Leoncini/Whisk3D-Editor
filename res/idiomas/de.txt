@@ -375,6 +375,7 @@ Could not encode the PNG	PNG konnte nicht kodiert werden
 Could not import	Import fehlgeschlagen
 Could not link the copy of '%s' to its mesh	Die Kopie von '%s' konnte nicht mit ihrem Mesh verknüpft werden
 Could not load the mesh '%s'	Das Mesh '%s' konnte nicht geladen werden
+Could not read the STL file	Die STL-Datei konnte nicht gelesen werden
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Die Animationen von '%s' (%s) konnten nicht gelesen werden: sie bleiben LEER und es wird nicht überschrieben (siehe whisk3d.log)
 Could not read the file	Datei konnte nicht gelesen werden
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Die Frames der Animation '%s' von '%s' konnten nicht gelesen werden: sie bleibt LEER und wird nicht überschrieben (siehe whisk3d.log)
@@ -528,6 +529,7 @@ Equal	Gleich
 Equirectangular (software)	Equirektangular (Software)
 Error rendering animation	Fehler beim Rendern der Animation
 Error: could not save the OBJ	Fehler: OBJ konnte nicht gespeichert werden
+Error: could not save the STL	Fehler: STL konnte nicht gespeichert werden
 Error: could not save the render	Fehler: Render konnte nicht gespeichert werden
 Errors only	Nur Fehler
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Dies ändert die Vertexgruppe und vereinfacht sie auf 1 Knochen pro Vertex (schnelleres Skinning). Datenverlust möglich.
@@ -698,6 +700,7 @@ Import 3D model	3D-Modell importieren
 Import FBX	FBX importieren
 Import GLB	GLB importieren
 Import OBJ	OBJ importieren
+Import STL	STL importieren
 Import glTF	glTF importieren
 Import w3dui	w3dui importieren
 Imported	Importiert
@@ -1322,6 +1325,10 @@ Routine	Routine
 Routine loop	Routinen-Schleife
 Routines	Routinen
 Rows	Zeilen
+STL imported successfully!	STL importiert!
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL speichert nur die Dreiecke: Skelett, Animationen, UVs und Materialien gehen verloren. Eine vorhandene Datei wird überschrieben. Fortfahren?
+STL saved successfully!	STL gespeichert!
+STL: nothing to import	STL: nichts zu importieren
 Same as	Wie
 Same as parent	Wie Elternteil
 Same scale as the editor	Gleiche Skalierung wie der Editor

@@ -7,6 +7,7 @@
 | Añadir | Crea un objeto nuevo en el cursor 3D (ver [menú Añadir](#menú-añadir)). | <kbd>Shift+A</kbd> o botón + |
 | Aplicar | Hornea la posición, la rotación, la escala o todo en la malla (el objeto queda en 0, 0, 0 sin rotar y a escala 1). | <kbd>Ctrl+A</kbd> |
 | Definir origen | Geometría al origen, Origen a la geometría, Origen al cursor 3D. | Menú Objeto |
+| Imán | Lleva el cursor 3D a lo seleccionado, al activo, al origen del mundo o a la cuadrícula, y lo seleccionado al cursor, al activo o a la cuadrícula. | <kbd>Shift+S</kbd> o menú Objeto → Imán |
 | Duplicar objetos | Copia independiente; queda agarrada para moverla. | <kbd>Shift+D</kbd> |
 | Duplicar vinculado | Copia que comparte la malla con el original (editar una edita las dos). | <kbd>Alt+D</kbd> |
 | Unir | Junta las mallas seleccionadas en el objeto activo. | <kbd>Ctrl+J</kbd> |
@@ -40,5 +41,5 @@ Solo en Modo Objeto. Lo nuevo aparece en el cursor 3D y queda seleccionado. Las 
 | LOD / Culling / Grid Cull | Objetos de optimización: niveles de detalle y ocultamiento de lo que no se ve. |
 | Limpiar Z / Recorte | Herramientas de dibujo: limpiar la profundidad o recortar una zona de pantalla. |
 | Prefab / Escena / Proxy W3D | Insertar un prefab del proyecto, otra escena, o un prefab de una librería externa. |
-| Importar | OBJ, FBX, glTF, GLB o una interfaz Whisk3D UI. |
+| Importar | OBJ, FBX, glTF, GLB, STL o una interfaz Whisk3D UI. El STL (impresión 3D, CAD) entra con Z arriba girado para que quede parado, con los vértices iguales soldados. |
 | Núcleo (avanzado) | Rutinas: listas de pasos de dibujo que se arman a mano (transformar, dibujar, texturas, luces, niebla, mezcla, profundidad, control, Llamar Lua). Incluye **Bucle de rutina**: una rutina que repite sus pasos varias veces (por ejemplo "trasladar, dibujar" 20 veces), como un array pero más rápido. |

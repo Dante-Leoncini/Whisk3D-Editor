@@ -375,6 +375,7 @@ Could not encode the PNG	No se pudo codificar el PNG
 Could not import	No se pudo importar
 Could not link the copy of '%s' to its mesh	No pude vincular la copia de '%s' a su malla
 Could not load the mesh '%s'	No pude cargar la malla '%s'
+Could not read the STL file	No se pudo leer el archivo STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	No pude leer las animaciones de '%s' (%s): quedan VACÍAS y no lo voy a guardar encima (ver whisk3d.log)
 Could not read the file	No se pudo leer el archivo
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	No pude leer los frames de la animación '%s' de '%s': queda VACÍA y no la voy a guardar encima (ver whisk3d.log)
@@ -528,6 +529,7 @@ Equal	Igual
 Equirectangular (software)	Equirectangular (software)
 Error rendering animation	Error al renderizar la animación
 Error: could not save the OBJ	Error: no se pudo guardar el OBJ
+Error: could not save the STL	Error: no se pudo guardar el STL
 Error: could not save the render	Error: no se pudo guardar el render
 Errors only	Solo errores
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Esto modificará el grupo de vértices y lo simplificará a 1 hueso por vértice (skinning más rápido). Puede haber pérdida de datos.
@@ -698,6 +700,7 @@ Import 3D model	Importar modelo 3D
 Import FBX	Importar FBX
 Import GLB	Importar GLB
 Import OBJ	Importar OBJ
+Import STL	Importar STL
 Import glTF	Importar glTF
 Import w3dui	Importar w3dui
 Imported	Importado
@@ -1322,6 +1325,10 @@ Routine	Rutina
 Routine loop	Bucle de rutina
 Routines	Rutinas
 Rows	Filas
+STL imported successfully!	¡STL importado!
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL solo guarda los triángulos: se perderán el esqueleto, las animaciones, los UV y los materiales. Sobrescribirá el archivo si ya existe. ¿Continuar?
+STL saved successfully!	¡STL guardado correctamente!
+STL: nothing to import	STL: nada que importar
 Same as	Igual que
 Same as parent	Igual que el padre
 Same scale as the editor	Escala igual que el editor

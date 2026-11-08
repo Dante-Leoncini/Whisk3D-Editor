@@ -48,6 +48,7 @@ extern bool MouseWheel;
 #include "WhiskUI/text/W3dFont.h"
 #include "w3dlog.h"
 #include "w3dnewscene.h" // mundo nuevo (Fase 3c-2)
+#include "importers/stl.h"  // ImportSTL (Add > Imports > STL)
 #include "ViewPorts/LayoutInput.h" // ruteo COMPARTIDO (menus/barras/paneles)
 #include "ViewPorts/PantallasExternas.h" // el monitor extendido: su menu y su arbol
 #include "ViewPorts/LayoutArbol.h" // LayoutRaizCompleta: el arbol entero aunque haya un viewport maximizado
@@ -258,6 +259,17 @@ static void W3dImportGlbMenu() {
                      W3dImportGltfElegido);
 }
 
+// Import STL: el importador compartido (main/importers/stl.cpp). En el telefono rechaza lo que no entra en los
+// indices de 16 bits, con aviso, igual que el OBJ.
+static void W3dImportStlElegido(const std::string& aPath) {
+    w3dLogf("W3dImportStl: aPath='%s'", aPath.c_str());
+    ImportSTL(aPath);
+}
+static void W3dImportStlMenu() {
+    AbrirFileBrowser("Importar STL", "Import STL", ".stl",
+                     W3dImportStlElegido);
+}
+
 extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
 extern bool gCargarTexturaComoB;      // Properties.cpp: idem el de la TEXTURA B (mezcla de texturas)
 static Material* gSymTexMat = NULL;
@@ -390,6 +402,7 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     LayoutImportFbx = W3dImportFbxMenu;        // Add > Import FBX
     LayoutImportGltf = W3dImportGltfMenu;      // Add > Imports > glTF
     LayoutImportGlb = W3dImportGlbMenu;        // Add > Imports > GLB
+    LayoutImportStl = W3dImportStlMenu;        // Add > Imports > STL
     DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura
 
     // barra del viewport activo: mostrar el modo de entrada de texto (Abc/abc/ABC/123) del T9 mientras se edita un

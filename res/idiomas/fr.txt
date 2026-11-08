@@ -375,6 +375,7 @@ Could not encode the PNG	Impossible d'encoder le PNG
 Could not import	Impossible d'importer
 Could not link the copy of '%s' to its mesh	Impossible de lier la copie de '%s' à son maillage
 Could not load the mesh '%s'	Impossible de charger le maillage '%s'
+Could not read the STL file	Impossible de lire le fichier STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Impossible de lire les animations de '%s' (%s) : elles restent VIDES et je ne l'enregistrerai pas par-dessus (voir whisk3d.log)
 Could not read the file	Impossible de lire le fichier
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Impossible de lire les frames de l'animation '%s' de '%s' : elle reste VIDE et je ne l'enregistrerai pas par-dessus (voir whisk3d.log)
@@ -528,6 +529,7 @@ Equal	Égal
 Equirectangular (software)	Équirectangulaire (logiciel)
 Error rendering animation	Erreur de rendu de l'animation
 Error: could not save the OBJ	Erreur : impossible d'enregistrer l'OBJ
+Error: could not save the STL	Erreur : impossible d'enregistrer le STL
 Error: could not save the render	Erreur : impossible d'enregistrer le rendu
 Errors only	Erreurs seules
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Ceci modifiera le groupe de sommets et le simplifiera à 1 os par sommet (skinning plus rapide). Perte de données possible.
@@ -698,6 +700,7 @@ Import 3D model	Importer modèle 3D
 Import FBX	Importer FBX
 Import GLB	Importer GLB
 Import OBJ	Importer OBJ
+Import STL	Importer STL
 Import glTF	Importer glTF
 Import w3dui	Importer w3dui
 Imported	Importé
@@ -1322,6 +1325,10 @@ Routine	Routine
 Routine loop	Boucle de routine
 Routines	Routines
 Rows	Lignes
+STL imported successfully!	STL importé !
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL ne stocke que les triangles : le squelette, les animations, les UV et les matériaux seront perdus. Le fichier sera écrasé s'il existe. Continuer ?
+STL saved successfully!	STL enregistré !
+STL: nothing to import	STL : rien à importer
 Same as	Identique à
 Same as parent	Comme le parent
 Same scale as the editor	Même échelle que l'éditeur

@@ -460,6 +460,7 @@ SOURCEPATH ..\..\..\main\importers
 SOURCE import_fbx.cpp            // importador FBX binario (parseo + descompresion + malla/esqueleto/materiales)
 SOURCE import_gltf.cpp           // importador glTF 2.0 / GLB (JSON propio + accessors + malla/esqueleto/animaciones)
 SOURCE export_gltf.cpp           // exportador glTF 2.0 / GLB (inverso: bind pose + skin + huesos + clips, sin hornear)
+SOURCE stl.cpp                   // importador STL (binario y ASCII) y exportador STL binario
 
 // --- guardado por versiones del proyecto (.w3d): en Symbian queda como STUB no-op
 //     (GuardarW3D/W3dZip no estan en este build; el #ifdef W3D_SYMBIAN del .cpp

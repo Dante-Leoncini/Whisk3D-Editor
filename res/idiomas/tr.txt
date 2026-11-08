@@ -375,6 +375,7 @@ Could not encode the PNG	PNG kodlanamadı
 Could not import	İçe aktarılamadı
 Could not link the copy of '%s' to its mesh	'%s' kopyası örgüsüne bağlanamadı
 Could not load the mesh '%s'	'%s' örgüsü yüklenemedi
+Could not read the STL file	STL dosyası okunamadı
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	'%s' animasyonları okunamadı (%s): BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
 Could not read the file	Dosya okunamadı
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	'%s' animasyonunun kareleri okunamadı ('%s' nesnesi): BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
@@ -528,6 +529,7 @@ Equal	Eşit
 Equirectangular (software)	Eşdikdörtgen (yazılım)
 Error rendering animation	Animasyon render alınırken hata
 Error: could not save the OBJ	Hata: OBJ kaydedilemedi
+Error: could not save the STL	Hata: STL kaydedilemedi
 Error: could not save the render	Hata: render kaydedilemedi
 Errors only	Yalnızca hatalar
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Bu, köşe grubunu değiştirip köşe başına 1 kemiğe sadeleştirecek (daha hızlı skinning). Veri kaybı olabilir.
@@ -698,6 +700,7 @@ Import 3D model	3D Model İçe Aktar
 Import FBX	FBX İçe Aktar
 Import GLB	GLB İçe Aktar
 Import OBJ	OBJ İçe Aktar
+Import STL	STL İçe Aktar
 Import glTF	glTF İçe Aktar
 Import w3dui	w3dui İçe Aktar
 Imported	İçe aktarıldı
@@ -1322,6 +1325,10 @@ Routine	Rutin
 Routine loop	Rutin döngüsü
 Routines	Rutinler
 Rows	Satırlar
+STL imported successfully!	STL içe aktarıldı!
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL yalnızca üçgenleri saklar: iskelet, animasyonlar, UV'ler ve malzemeler kaybolur. Dosya varsa üzerine yazılır. Devam edilsin mi?
+STL saved successfully!	STL kaydedildi!
+STL: nothing to import	STL: içe aktarılacak bir şey yok
 Same as	Aynısı:
 Same as parent	Ebeveynle aynı
 Same scale as the editor	Düzenleyiciyle aynı ölçek

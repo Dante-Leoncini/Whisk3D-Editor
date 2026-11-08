@@ -9,7 +9,7 @@
     #include <e32const.h>
 #elif defined(__EMSCRIPTEN__)
     #include <emscripten.h>
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) || defined(W3D_VITA)
     #if defined(SDL_MAJOR_VERSION) || 1
         #include <SDL.h>
     #endif
@@ -74,8 +74,9 @@ void W3dIdiomaDetectar(){
     }, cod);
     g_idioma = W3dIdiomaDe(cod);
 
-#elif defined(__ANDROID__)
-    // Android no tiene LANG en el entorno: el idioma lo sabe el sistema y SDL lo trae ya resuelto.
+#elif defined(__ANDROID__) || defined(W3D_VITA)
+    // Android no tiene LANG en el entorno: el idioma lo sabe el sistema y SDL lo trae ya resuelto (en la Vita, el del
+    // menu de la consola).
     g_idioma = W3dLangEN;
     #if SDL_MAJOR_VERSION >= 3
         int n = 0;

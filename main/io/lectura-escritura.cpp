@@ -1,5 +1,6 @@
 #include "lectura-escritura.h"
 #include <iostream>
+#include "importers/stl.h"         // ImportSTL
 #include "importers/import_obj.h"
 #include "importers/import_fbx.h"        // ImportFBX
 #include "importers/import_gltf.h"       // ImportGLTF (.gltf/.glb)
@@ -52,7 +53,7 @@ static void MarcarOrigenRec(Object* o, const std::string& path, unsigned int des
     for (size_t i = 0; i < o->Childrens.size(); i++) MarcarOrigenRec(o->Childrens[i], path, desdeSerial);
 }
 
-// dispatch por EXTENSION: .fbx -> ImportFBX; .gltf/.glb -> ImportGLTF; el resto (.obj) -> ImportOBJ.
+// dispatch por EXTENSION: .fbx -> ImportFBX; .gltf/.glb -> ImportGLTF; .stl -> ImportSTL; el resto (.obj) -> ImportOBJ.
 // Va FUERA de la guarda de plataforma: los tres importadores se compilan en todas, y main.cpp lo
 // llama para "--open <archivo>". Lo que es solo de PC es el explorador de archivos, no esto.
 // ES LA PUERTA UNICA: cualquier camino que importe un modelo (file browser, menu Add > Import,
@@ -66,6 +67,7 @@ bool ImportModeloPorExtension(const std::string& path) {
     bool ok;
     if (ext == ".fbx") ok = ImportFBX(path);
     else if (ext == ".gltf" || ext == ".glb") ok = ImportGLTF(path);
+    else if (ext == ".stl") ok = ImportSTL(path);
     else               ok = ImportOBJ(path, false);
     MarcarOrigenRec(SceneCollection, path, antes);
     return ok;
@@ -84,8 +86,8 @@ int BuscarVertexAnimation() { return 0; }
 #include "W3dLang.h"                       // T(): el titulo del explorador en el idioma del editor
 
 int abrir() {
-    // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX + glTF/GLB)
-    AbrirFileBrowser(T("Import 3D model"), T("Import 3D model"), ".obj .fbx .gltf .glb", ImportModeloCallback);
+    // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX + glTF/GLB + STL)
+    AbrirFileBrowser(T("Import 3D model"), T("Import 3D model"), ".obj .fbx .gltf .glb .stl", ImportModeloCallback);
     return 0;
 }
 

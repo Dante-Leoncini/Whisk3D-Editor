@@ -171,6 +171,9 @@ bool g_barTapPending = false;       // toque sobre una barra: si LEVANTA sin arr
 bool g_contentTapPending = false;   // toque sobre el CONTENIDO de un panel (properties/outliner): si LEVANTA sin
                                     // arrastrar = tap (togglea checkbox / selecciona); si arrastra = scroll (NO togglea)
 bool g_slideNum = false;            // arrastre HORIZONTAL sobre un campo numerico -> editar el valor (slider tactil)
+static bool g_view3dTapTactil = false;   // el toque pendiente del 3D es de un DEDO (la pulsacion larga solo es tactil)
+static bool g_view3dMenuLargo = false;   // la pulsacion larga abrio el menu contextual: el dedo que sigue apoyado no
+                                         // orbita, y al levantarlo no se elige nada (la opcion se toca despues)
 bool g_view3dTapPending = false;    // toque sobre el VIEWPORT 3D (tactil): si LEVANTA sin arrastrar = TAP (selecciona);
                                     // si arrastra = orbita/panea (NO cambia la seleccion). Antes se perdia al orbitar.
 ViewportBase* g_barTapView = NULL;  // viewport cuya barra/contenido se toco (para lockear el scroll a ESE, no al hover)
@@ -213,6 +216,20 @@ static bool g_contentTapTactil = false;   // el toque de contenido pendiente es 
 static Uint32 g_ultimoTapTicks = 0;
 static int g_ultimoTapX = -1000, g_ultimoTapY = -1000;
 void ControlesTick() {
+    // PULSACION LARGA sobre la VISTA 3D (tactil): el dedo quieto medio segundo es el click DERECHO de la PC: abre el
+    // menu contextual donde esta el dedo (Objeto en el Modo Objeto; el de la malla en Edicion; Pose). Vibra.
+    if (g_view3dTapPending && g_view3dTapTactil && fingers.size() <= 1 && estado == editNavegacion &&
+        g_barTapView && g_barTapView->isLeaf() && g_barTapView->ViewportKind() == 1) {
+        if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }   // (sigue esperando)
+        g_view3dTapPending = false;      // ya no es un toque: al levantar no selecciona
+        g_view3dMenuLargo = true;
+        ViewPortClickDown = false;
+        w3dEngine::Vibrar(w3dEngine::VibGolpe);
+        extern void LayoutMenuContexto3D(int mx, int my);
+        LayoutMenuContexto3D(g_tapStartX, g_tapStartY);
+        g_redraw = true;
+        return;
+    }
     if (!g_contentTapPending || !g_contentTapTactil || g_outAgarre || fingers.size() > 1) return;
     // IDE: dedo quieto un rato sobre el codigo = la LUPA para poner el cursor justo
     if (g_barTapView && g_barTapView->isLeaf() && g_barTapView->ViewportKind() == 8) {
@@ -614,6 +631,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             g_redraw = true;
             return;
         }
+        if (g_view3dMenuLargo) { GuardarMousePos(); g_redraw = true; return; }   // (el dedo del menu contextual: no orbita)
         if (leftMouseDown && fingers.size() <= 1) {
             // NAVEGACION CON ALT: pasado el umbral el arrastre ORBITA (o desplaza con Shift) y el click no pickea
             if (g_altNavPend) {
@@ -1111,7 +1129,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                     ViewPortClickDown = true;
                 }
                 else if (esTouch && es3Dnav) {
-                    g_view3dTapPending = true;
+                    g_view3dTapPending = true; g_view3dTapTactil = true;
                     g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
                 } else {
                     g_ultimoDownTactil = esTouch;   // el viewport decide si ESPERA antes de pintar
@@ -1121,7 +1139,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                     // ARRASTRE (box select): si se pickeara en el down, arrastrar deseleccionaba
                     // todo antes de empezar la caja -- que es justo lo que pasaba.
                     if (es3Dnav) {
-                        g_view3dTapPending = true;
+                        g_view3dTapPending = true; g_view3dTapTactil = false;
                         g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
                     }
                 }
@@ -1208,6 +1226,8 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        // el dedo que abrio el menu contextual con la pulsacion larga: se levanta sin elegir nada (la opcion se toca)
+        if (g_view3dMenuLargo) { g_view3dMenuLargo = false; ViewPortClickDown = false; GuardarMousePos(); return; }
         if (g_ideGestoVp) {     // IDE: se solto la lupa / la agarradera (el cursor y la seleccion quedan ahi)
             g_ideGestoVp->GestoTactilFin();
             g_ideGestoVp = NULL;

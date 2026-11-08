@@ -13,14 +13,14 @@ El editor cambia seguido: estas capturas NO se retocan a mano, se REGENERAN.
 Despues de tocar la interfaz, correr esto y commitear las imagenes nuevas.
 
 Uso (desde cualquier carpeta):
-    python3 tools/capturas/capturas.py                  todas, en es/en/pt
+    python3 tools/capturas/capturas.py                  todas, en los 9 idiomas del editor
     python3 tools/capturas/capturas.py viewports        las que empiezan con "viewports"
     python3 tools/capturas/capturas.py --idiomas es     solo en castellano
     python3 tools/capturas/capturas.py --lista          las recetas que hay
 
 Salida: docs/manual/<idioma>/tutoriales/img/<nombre>.webp
-El editor tiene la interfaz en castellano, ingles y portugues: las paginas en otros
-idiomas muestran las capturas en ingles (la web las busca ahi).
+El editor tiene la interfaz en 9 idiomas (IDIOMAS): las paginas en los demas (hindi,
+japones, chino) muestran las capturas en ingles (la web las busca ahi).
 Binario: W3D_BIN, o el build de linux del repo (platform/linux/build/whisk3d).
 """
 import math, os, re, shutil, subprocess, sys, tempfile
@@ -34,8 +34,37 @@ RAIZ = os.path.abspath(os.path.join(AQUI, "..", ".."))
 BIN = os.environ.get("W3D_BIN", os.path.join(RAIZ, "platform", "linux", "build", "whisk3d"))
 SALIDA = os.path.join(RAIZ, "docs", "manual", "{idioma}", "tutoriales", "img")
 
-# el idioma de la interfaz sale del sistema (W3dIdiomaDetectar): se le pasa por LANG
-IDIOMAS = {"es": "es_AR.UTF-8", "en": "en_US.UTF-8", "pt": "pt_BR.UTF-8"}
+# el idioma de la interfaz sale del sistema (W3dIdiomaDetectar): se le pasa por LANG. Son los 9 del editor
+# (res/idiomas/); las paginas en otros idiomas (hindi, japones, chino) muestran las capturas en ingles.
+IDIOMAS = {"es": "es_AR.UTF-8", "en": "en_US.UTF-8", "pt": "pt_BR.UTF-8", "fr": "fr_FR.UTF-8", "it": "it_IT.UTF-8",
+           "tr": "tr_TR.UTF-8", "de": "de_DE.UTF-8", "pl": "pl_PL.UTF-8", "ru": "ru_RU.UTF-8"}
+
+
+class PorIdioma(dict):
+    """Un texto de las recetas por idioma ({'es': ..., 'en': ...}); el idioma que falta usa el ingles."""
+    def __missing__(self, idioma):
+        return self["en"]
+
+
+_TRADUCCIONES = {}
+
+
+def T(idioma, en):
+    """Lo que muestra el editor en ese idioma para el texto en ingles 'en' (res/idiomas/<idioma>.txt, la misma tabla
+    que usa T() en el editor). Sirve para los nombres que pone el editor, como la "Luz" o la "Camara" de la escena."""
+    if idioma == "en":
+        return en
+    if idioma not in _TRADUCCIONES:
+        tabla = {}
+        ruta = os.path.join(RAIZ, "res", "idiomas", idioma + ".txt")
+        if os.path.isfile(ruta):
+            for linea in open(ruta, encoding="utf-8").read().split("\n"):
+                if linea.count("\t") == 1:
+                    a, b = linea.split("\t")
+                    if b:
+                        tabla[a] = b
+        _TRADUCCIONES[idioma] = tabla
+    return _TRADUCCIONES[idioma].get(en, en)
 
 # tipos de viewport (ViewportKind) y opciones del menu de la esquina (ids de LayoutAccionTipo)
 VISTA_3D, OUTLINER, PROPIEDADES, EDITOR_UV, LINEA_DE_TIEMPO, EDITOR_2D, CONSOLA, IDE, BIBLIOTECA = range(1, 10)
@@ -66,6 +95,15 @@ class Info:
     def __init__(self, salida):
         self.pantalla = (0, 0)
         self.vps, self.botones, self.menus, self.items = [], [], [], []
+        self.herramientas = []     # la barra de abajo de cada viewport (Mover, Rotar, Escalar..., la tilde y la cruz)
+        self.manijas = {}          # las manijas del gizmo de la Vista 3D: numero -> (x, y)
+        self.modo_gizmo = None     # 0 mover, 1 rotar, 2 escalar
+        self.filas = []            # las filas del Outliner: {'nombre', 'x', 'y', 'prof'}
+        self.pestanias = []        # Propiedades: las pestanias visibles {'i', 'x', 'y', 'w', 'h', 'activa'}
+        self.tarjetas = []         # Propiedades: el titulo de cada tarjeta {'i', 'x', 'y', 'w', 'h', 'abierta', 'titulo'}
+        self.props = []            # Propiedades: cada fila {'g', 'j', 'y', 'h', 'tipo', 'valor', 'rombo', 'nombre'}
+        self.objetos = {}          # la Vista 3D: nombre -> {'x', 'y', 'elegido'} (el origen en pantalla)
+        self.numpad = {}           # el teclado numerico tactil abierto: texto de la tecla -> (x, y)
         self.candado = None        # el candado de la vista de camara: (x, y, lado), si se ve
         self.boton_vista = None    # el centro del boton del menu View de la Vista 3D
         for linea in salida.splitlines():
@@ -74,8 +112,8 @@ class Info:
             partes = linea[5:].split(" ", 1)
             tipo, resto = partes[0], partes[1] if len(partes) > 1 else ""
             d = {}
-            # texto=... / titulo=... van siempre ultimos y pueden tener espacios
-            for campo in ("texto", "titulo"):
+            # texto=... / titulo=... / nombre=... van siempre ultimos y pueden tener espacios
+            for campo in ("texto", "titulo", "nombre"):
                 if (" %s=" % campo) in " " + resto:
                     resto, valor = (" " + resto).split(" %s=" % campo, 1)
                     d[campo] = valor
@@ -98,6 +136,23 @@ class Info:
                 self.boton_vista = (d["x"] + d["w"] // 2, d["y"] + d["h"] // 2)
             elif tipo == "candado":
                 self.candado = (d["x"], d["y"], d["lado"])
+            elif tipo == "herramienta":
+                self.herramientas.append(d)
+            elif tipo == "gizmo":
+                self.manijas[d["manija"]] = (d["x"], d["y"])
+                self.modo_gizmo = d["modo"]
+            elif tipo == "fila":
+                self.filas.append(d)
+            elif tipo == "pestania":
+                self.pestanias.append(d)
+            elif tipo == "tarjeta":
+                self.tarjetas.append(d)
+            elif tipo == "prop":
+                self.props.append(d)
+            elif tipo == "objeto":
+                self.objetos[d.get("nombre")] = d
+            elif tipo == "numpad":
+                self.numpad[d.get("texto")] = (d["x"], d["y"])
 
     def vp(self, kind, n=0):
         hay = [v for v in self.vps if v["kind"] == kind]
@@ -117,6 +172,77 @@ class Info:
                 return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
         raise SystemExit("capturas: el viewport %d no tiene un boton '%s' (tiene: %s)"
                          % (kind, texto, [b.get("texto") for b in self.botones if b["kind"] == kind]))
+
+    def boton_rol(self, kind, rol):
+        """Centro de un boton de la barra de ARRIBA de un viewport por su ROL (los que son solo un icono)."""
+        for b in self.botones:
+            if b["kind"] == kind and b.get("rol") == rol and b.get("visible", 1):
+                return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+        raise SystemExit("capturas: la barra del viewport %d no tiene un boton con el rol %d" % (kind, rol))
+
+    def item_texto(self, texto, nivel=0):
+        """Centro de una fila del menu abierto por su texto (para los nombres que no se traducen, como GLB)."""
+        for it in self.items:
+            if it["nivel"] == nivel and it.get("texto") == texto:
+                return it["cx"], it["cy"]
+        raise SystemExit("capturas: el menu abierto no tiene '%s' (tiene: %s)" % (texto, [i.get("texto") for i in self.items]))
+
+    def herramienta(self, kind, texto):
+        """Centro de un boton de la barra de abajo de un viewport, por su texto (el del idioma de la interfaz)."""
+        for b in self.herramientas:
+            if b["kind"] == kind and b.get("texto") == texto:
+                return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+        raise SystemExit("capturas: la barra de abajo del viewport %d no tiene '%s' (tiene: %s)"
+                         % (kind, texto, [b.get("texto") for b in self.herramientas if b["kind"] == kind]))
+
+    def herramienta_rol(self, kind, rol):
+        """Centro de un boton de la barra de abajo por su ROL (la tilde y la cruz no tienen texto)."""
+        for b in self.herramientas:
+            if b["kind"] == kind and b["rol"] == rol:
+                return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+        raise SystemExit("capturas: la barra de abajo del viewport %d no tiene el rol %d (tiene: %s)"
+                         % (kind, rol, [(b["rol"], b.get("texto")) for b in self.herramientas if b["kind"] == kind]))
+
+    def manija(self, n):
+        """Centro de una manija del gizmo (GizmoManija: 0..2 ejes X/Y/Z, 3..5 planos, 6 centro, 7 anillo, 8 libre)."""
+        if n not in self.manijas:
+            raise SystemExit("capturas: no se ve la manija %d del gizmo (se ven: %s)" % (n, sorted(self.manijas)))
+        return self.manijas[n]
+
+    def pestania(self, n):
+        """Centro de la pestania n de Propiedades (el numero fijo: 1 Objeto, 2 la del tipo...)."""
+        for t in self.pestanias:
+            if t["i"] == n:
+                return t["x"] + t["w"] // 2, t["y"] + t["h"] // 2
+        raise SystemExit("capturas: Propiedades no muestra la pestania %d (muestra: %s)" % (n, [t["i"] for t in self.pestanias]))
+
+    def tarjeta(self, titulo):
+        """El titulo de una tarjeta de Propiedades (texto en el idioma de la interfaz): su dict."""
+        for t in self.tarjetas:
+            if t.get("titulo") == titulo:
+                return t
+        raise SystemExit("capturas: no hay una tarjeta '%s' (hay: %s)" % (titulo, [t.get("titulo") for t in self.tarjetas]))
+
+    def prop(self, nombre, n=0):
+        """Una fila de Propiedades por su nombre (el n-esimo, si se repite): su dict (y, valor, rombo...)."""
+        hay = [p for p in self.props if p.get("nombre") == nombre]
+        if len(hay) <= n:
+            raise SystemExit("capturas: no hay una fila '%s' (hay: %s)" % (nombre, [p.get("nombre") for p in self.props]))
+        return hay[n]
+
+    def fila_info(self, nombre):
+        """La fila de un objeto en el Outliner: {'x', 'y' (el nombre), 'ojo', 'camara', 'flecha' (sus X), 'elegido'}."""
+        for f in self.filas:
+            if f.get("nombre") == nombre:
+                return f
+        raise SystemExit("capturas: el Outliner no muestra '%s' (muestra: %s)" % (nombre, [f.get("nombre") for f in self.filas]))
+
+    def fila(self, nombre):
+        """Centro del nombre de un objeto en el Outliner."""
+        for f in self.filas:
+            if f.get("nombre") == nombre:
+                return f["x"], f["y"]
+        raise SystemExit("capturas: el Outliner no muestra '%s' (muestra: %s)" % (nombre, [f.get("nombre") for f in self.filas]))
 
     def centro_candado(self):
         if not self.candado:
@@ -258,6 +384,11 @@ class Guion:
 
     def sin_puntero(self):
         self.punteros = {}
+
+    def puntero_xy(self):
+        """Donde esta el mouse (o el dedo) ahora."""
+        p = self.puntero
+        return p["x"], p["y"]
 
     # ---- fotos ----------------------------------------------------------------
     def verde(self):

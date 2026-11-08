@@ -85,6 +85,11 @@ static const char* kTeclas[NP_FILAS][NP_COLS] = {
 
 static NumPad* gNumPad = NULL;
 
+bool NumPadTeclaCentro(const char* texto, int& cx, int& cy){
+    if (!gNumPad || PopUpActive != gNumPad) return false;
+    return gNumPad->TeclaCentro(texto, cx, cy);
+}
+
 NumPad::NumPad(bool transform) : PopUpBase("NumPad") {
     modoTransform = transform;
     prevPopup = NULL;
@@ -98,6 +103,18 @@ NumPad::NumPad(bool transform) : PopUpBase("NumPad") {
 void NumPad::CerrarRestaurando(){
     if (PopUpActive == this) PopUpActive = prevPopup;
     if (prevPopup) g_redraw = true;
+}
+
+bool NumPad::TeclaCentro(const char* texto, int& cx, int& cy){
+    Reubicar();
+    for (int fila = 0; fila < NP_FILAS; fila++)
+        for (int col = 0; col < NP_COLS; col++)
+            if (kTeclas[fila][col][0] && strcmp(kTeclas[fila][col], texto) == 0) {
+                cx = x + borderGS + col * (keyW + gapGS) + keyW / 2;
+                cy = y + borderGS + dispH + fila * (keyH + gapGS) + keyH / 2;
+                return true;
+            }
+    return false;
 }
 
 void NumPad::Reubicar(){
