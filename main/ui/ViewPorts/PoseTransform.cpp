@@ -24,6 +24,7 @@
 #include "objects/Empty.h"
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
+#include "animation/W3dAnimSet.h"         // W3dArmatureAnimsPropias (borrar keyframes de la pose: clip propio)
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
@@ -356,10 +357,37 @@ float PoseHeaderValor(){
 }
 // 'canales' = mascara KfCanalLoc/Rot/Scl del menu desplegable de Insert Keyframe (0 = los tres)
 void PoseInsertKeyframe(int canales){ Armature* a = PoseArmActiva(); if (a){ InsertarKeyframeEsqueleto(a, canales); PoseInvalidar(a); } }
+// Delete / Clear Keyframe del Modo Pose: los keyframes de los huesos ELEGIDOS y del ACTIVO (los mismos que keyea
+// InsertarKeyframeEsqueleto) en el clip activo. 'soloFrame' = solo los del frame actual; si no, todos.
+static void PoseQuitarKeyframes(bool soloFrame){
+    Armature* a = PoseArmActiva(); if (!a) return;
+    if (a->animActiva < 0 || a->animActiva >= (int)a->animations.size()) return;
+    extern void UndoKeyframesIniciarArm(Armature*); extern void UndoKeyframesConfirmar();
+    UndoKeyframesIniciarArm(a);                  // Ctrl+Z: un paso
+    W3dArmatureAnimsPropias(a);                  // borrar escribe en el clip: nunca en uno compartido
+    SkeletalAnimation* clip = a->animations[a->animActiva];
+    for (size_t t = 0; t < clip->tracks.size(); t++){
+        BoneTrack& tr = clip->tracks[t];
+        if (tr.bone < 0 || tr.bone >= (int)a->bones.size()) continue;
+        if (!a->bones[tr.bone].select && tr.bone != a->boneActivo) continue;
+        for (size_t p = 0; p < tr.Propertys.size(); p++){
+            W3dClaves& kf = tr.Propertys[p].keyframes;
+            if (!soloFrame){ kf.clear(); continue; }
+            for (size_t k = 0; k < kf.size(); k++) if (kf.Frame(k) == CurrentFrame){ kf.erase(kf.begin() + k); break; }
+        }
+    }
+    UndoKeyframesConfirmar();
+    a->lastPoseFrame = -999999; a->lastPoseAnim = -999; a->poseDirty = true;   // la pose se vuelve a leer del clip
+    PoseInvalidar(a);
+}
+void PoseBorrarKeyframe(){ PoseQuitarKeyframes(true); }
+void PoseLimpiarKeyframes(){ PoseQuitarKeyframes(false); }
 // Pose Mode > Clear Transform: resetea la pose de los huesos SELECCIONADOS a su rest (si no hay seleccion, TODOS).
 // what: 0=All (T+R+S), 1=Translation (Alt+G), 2=Rotation (Alt+R), 3=Scale (Alt+S). No inserta keyframe.
 void PoseClearTransform(int what){
     Armature* a = PoseArmActiva(); if (!a) return;
+    if (g_poseModo || g_pose2dModo) return;      // (en medio de un transform de pose: no se pisa su snapshot)
+    UndoPoseIniciar(a);                          // Ctrl+Z: un paso (nada si ya estaban en reposo)
     bool haySel = false; for (size_t b = 0; b < a->bones.size(); b++) if (a->bones[b].select){ haySel = true; break; }
     for (size_t b = 0; b < a->bones.size(); b++){ W3dBone& bo = a->bones[b];
         if (haySel && !bo.select) continue; // solo los seleccionados; si no hay ninguno seleccionado -> todos
@@ -368,6 +396,7 @@ void PoseClearTransform(int what){
         if (what == 0 || what == 3) bo.poseS = bo.restS;
     }
     PoseInvalidar(a);
+    UndoPoseConfirmar();
 }
 void PoseClearTransformAll(){ PoseClearTransform(0); } // compat
 

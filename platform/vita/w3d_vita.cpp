@@ -25,14 +25,59 @@ extern "C" int pclose(FILE*) { errno = ENOSYS; return -1; }
 
 bool W3dRunScript(const std::string&) { return false; }
 
-// donde lo buscan vitaGL y vitaShaRK: el modulo del sistema (solo en las consolas de desarrollo) y el que se instala
 #include <psp2/io/stat.h>
+#include <psp2/io/fcntl.h>
 #include "w3dlog.h"
-bool W3dVitaPuedeDibujar() {
-    static const char* const kRutas[] = { "ur0:data/external/libshacccg.suprx", "vs0:sys/external/libshacccg.suprx" };
+// vitaGL carga el compilador de shaders de UN solo lugar: ur0:data/external/libshacccg.suprx (donde lo deja ShaRKBR33D
+// hoy). Las versiones viejas de ShaRKBR33D lo dejaban en ur0:data/libshacccg.suprx: si esta ahi (o en el sistema, en las
+// consolas de desarrollo), se copia al lugar nuevo una sola vez. false = no esta en ningun lado o no se pudo copiar
+// ('copiaFallo' = estaba en un lugar viejo)
+static bool CopiarArchivoVita(const char* de, const char* a) {
+    const SceUID in = sceIoOpen(de, SCE_O_RDONLY, 0);
+    if (in < 0) return false;
+    const SceUID out = sceIoOpen(a, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+    if (out < 0) { sceIoClose(in); return false; }
+    static char buf[64 * 1024];
+    bool ok = true;
+    for (;;) {
+        const int n = sceIoRead(in, buf, sizeof(buf));
+        if (n < 0) { ok = false; break; }
+        if (n == 0) break;
+        if (sceIoWrite(out, buf, n) != n) { ok = false; break; }
+    }
+    sceIoClose(in);
+    sceIoClose(out);
+    if (!ok) sceIoRemove(a);   // (un modulo a medias no se deja: vitaGL lo cargaria igual)
+    return ok;
+}
+static bool CompiladorShadersVita(bool* copiaFallo) {
+    static const char* const kNueva = "ur0:data/external/libshacccg.suprx";
+    static const char* const kViejas[] = { "ur0:data/libshacccg.suprx", "vs0:sys/external/libshacccg.suprx" };
+    if (copiaFallo) *copiaFallo = false;
+    SceIoStat st;
+    if (sceIoGetstat(kNueva, &st) >= 0) return true;
     for (int i = 0; i < 2; i++) {
-        SceIoStat st;
-        if (sceIoGetstat(kRutas[i], &st) >= 0) return true;
+        if (sceIoGetstat(kViejas[i], &st) < 0) continue;
+        sceIoMkdir("ur0:data/external", 0777);
+        if (CopiarArchivoVita(kViejas[i], kNueva)) {
+            w3dLogf("[vita] el compilador de shaders estaba en %s: copiado a %s", kViejas[i], kNueva);
+            return true;
+        }
+        w3dLogfE("[vita] el compilador de shaders esta en %s y no se pudo copiar a %s", kViejas[i], kNueva);
+        if (copiaFallo) *copiaFallo = true;
+        return false;
+    }
+    return false;
+}
+bool W3dVitaPuedeDibujar() {
+    bool copiaFallo = false;
+    if (CompiladorShadersVita(&copiaFallo)) return true;
+    if (copiaFallo) {
+        const char* m = "libshacccg.suprx esta en ur0:data/, pero vitaGL lo busca en ur0:data/external/ y no se pudo copiar ahi.\n\n"
+                        "Copialo con VitaShell a ur0:data/external/libshacccg.suprx.\n\n"
+                        "libshacccg.suprx is in ur0:data/ but vitaGL needs it in ur0:data/external/: copy it there with VitaShell.";
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Whisk3D", m, NULL);
+        return false;
     }
     const char* msg = "Whisk3D necesita el compilador de shaders de la Vita (libshacccg.suprx) y no esta instalado.\n\n"
                       "Se instala una sola vez, con la aplicacion ShaRKBR33D: queda en ur0:data/external/libshacccg.suprx.\n\n"

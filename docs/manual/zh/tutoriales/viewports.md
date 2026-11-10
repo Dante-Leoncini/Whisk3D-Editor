@@ -23,6 +23,10 @@ Whisk3D 的窗口被划分为多个**视口**：每个视口是一个面板，�
 
 每个视口顶部都有一个**菜单栏**（图中绿色部分），放着该编辑器的菜单和按钮。左上角始终是**角落按钮**（橙色部分）：它用来切换或修改视口。
 
+![角落按钮的放大图：3D Viewport 菜单栏左上角的向下小箭头](img/viewports-esquina.webp)
+
+所有视口中的角落按钮都一样，而且它是所有视口唯一共有的按钮。
+
 ![Whisk3D 的四个视口，每个视口的菜单栏用绿色标出，角落按钮用橙色标出](img/viewports-barras.webp)
 
 ## 调整大小
@@ -72,9 +76,9 @@ Outliner 占用了 Properties 的位置：
 
 ![3D Viewport 最大化到整个窗口，然后用 Minimize 回到原位](img/viewports-maximizar.webp)
 
-## 栏放不下时
+## 菜单栏的选项显示不全时
 
-如果视口比较窄，它的栏就放不下。3D Viewport 底部的工具栏也是一样。要查看其余部分：
+如果视口比较窄，它的菜单栏就放不下。3D Viewport 底部的工具栏也是一样。要查看其余部分：
 
 - ![Android](img/icono-android.svg) **用手指**：横向拖动栏。
 - ![PC](img/icono-pc.svg) **用鼠标**：在栏上按住鼠标键并拖动，或者在栏上滚动**滚轮**。
@@ -102,8 +106,13 @@ Outliner 占用了 Properties 的位置：
 | [Console](../editor/consola.md) | 引擎日志：错误、警告和信息。 |
 | [IDE](../editor/editor-de-scripts.md) | Lua 脚本和着色器的编辑器。 |
 
-以后每个视口都会有自己更详细的教程。在那之前，可以参考 [Whisk3D 手册](../editor/README.md)，里面对每个视口都有说明。
+手册中逐个按钮地介绍了每个视口：
 
-Whisk3D 还在不断发展：以后会加入新的视口，现有的视口也可能会变化。它们都会以同样的方式工作：顶部有栏，角落有按钮。
+- [3D Viewport](../editor/vista-3d.md) 及其[菜单栏](../editor/vista-3d-barra.md)
+- [Outliner](../editor/outliner.md)
+- [Properties](../editor/propiedades.md)：每个字段的用法、颜色、列表和动画用的菱形图标
+- 其他视口见[编辑器手册](../editor/README.md)
+
+Whisk3D 还在不断发展：以后会加入新的视口，现有的视口也可能会变化。它们都会以同样的方式工作：顶部有菜单栏，角落有按钮。
 
 下一个教程：[在 3D Viewport 中导航](navegacion.md)。

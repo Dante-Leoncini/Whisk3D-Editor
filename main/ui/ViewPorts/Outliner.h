@@ -50,8 +50,9 @@ struct OutFilaRec {
     bool atras;            // CUADRICULA: la celda "Ir atras" (la carpeta de arriba; clave = esa carpeta)
     long bytes;            // recurso: cuanto ocupa (-1 = no se sabe)
     bool cargado;          // recurso: esta en memoria (false: guardado, sin cargar -> la carpeta azul)
+    int  tilde;            // recurso: su casilla (-1 = no tiene, 0 / 1): las escenas abiertas en el editor
     OutFilaRec() : carpeta(false), tipo(0), prof(0), icono(-1), usuarios(0), plegada(false), soloLectura(false),
-                   renombrable(true), parte(false), sucio(false), atras(false), bytes(-1), cargado(true) {}
+                   renombrable(true), parte(false), sucio(false), atras(false), bytes(-1), cargado(true), tilde(-1) {}
 };
 
 // "Select Users" de la biblioteca (el menu del outliner y el boton de la tarjeta del recurso de

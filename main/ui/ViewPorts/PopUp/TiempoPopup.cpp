@@ -137,3 +137,16 @@ void AbrirTiempoPopup(PropFloat* actual, PropFloat* inicio, PropFloat* fin, Prop
     g_redraw = true;
 }
 bool TiempoPopupAbierto() { return gTP && PopUpActive == gTP; }
+// el centro (pantalla) del campo j del reloj abierto y su nombre: la MISMA cuenta de filas que Click. Lo usa el harness
+// de capturas para filmar "Fin: 28" con el mouse o el dedo
+bool TiempoPopupCampo(int j, int& cx, int& cy, std::string& nombre) {
+    if (!TiempoPopupAbierto() || !gTP->grupo || j < 0 || j >= (int)gTP->grupo->properties.size()) return false;
+    GroupPropertie* g = gTP->grupo;
+    int yRow = borderGS + RenglonHeightGS + gapGS;
+    for (int k = 0; k < j; k++) yRow += g->properties[k]->Resize(g->width);
+    const int h = g->properties[j]->Resize(g->width);
+    const int boxStart = g->colEtiqueta + 2 * borderGS, boxW = g->propertiBox->width - bordersGS;
+    cx = gTP->x + boxStart + boxW / 2; cy = gTP->y + yRow + h / 2;
+    nombre = g->properties[j]->name;
+    return true;
+}

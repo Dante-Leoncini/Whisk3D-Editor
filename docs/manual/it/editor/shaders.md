@@ -10,11 +10,11 @@ Lo stesso file funziona allo stesso modo su tutti i backend grafici:
 
 | Backend | `@vertice` | `@fragmento` |
 |---|---|---|
-| OpenGL ES 2.0: Android, browser (WebGL), Nokia N8, PC con **Graphics → OpenGL ES 2.0** | Sulla GPU | Sulla GPU |
+| OpenGL ES 2.0: Android, browser (WebGL), Nokia N8, PC con **Grafica → OpenGL ES 2.0** | Sulla GPU | Sulla GPU |
 | Vulkan (PC) | Sulla GPU | Sulla GPU |
 | OpenGL del PC (quello predefinito), OpenGL ES 1.1 (Nokia N95), Nintendo 3DS, Dreamcast | **Sulla CPU** | No: il materiale si disegna come sempre |
 
-Su un backend senza shader non si rompe niente: il **`@vertice` gira sulla CPU** (l'acqua con le onde si muove allo stesso modo sull'N95) e il colore viene dal materiale normale. La scheda Material lo segnala: *"This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual"* (questo backend grafico non ha shader: la sezione @vertice gira sulla CPU e il resto del materiale si disegna come sempre).
+Su un backend senza shader non si rompe niente: il **`@vertice` gira sulla CPU** (l'acqua con le onde si muove allo stesso modo sull'N95) e il colore viene dal materiale normale. La scheda Materiale lo segnala: *"Questo backend grafico non ha shader: la sezione @vertice gira sulla CPU e il resto del materiale si disegna come sempre"*.
 
 ### Il `@vertice` sulla CPU
 
@@ -32,27 +32,27 @@ Non capisce matrici, array, `while` né `#define`: se li usi, l'errore lo dice c
 
 ## Usare uno shader in un materiale
 
-1. Seleziona l'oggetto e apri la scheda **Material** di Properties.
-2. In fondo alla scheda, spunta **Advanced: custom shader**. Se il materiale non ha ancora un file, se ne crea uno nuovo (`shader.glsl`) con un modello, viene usato subito e si apre nell'IDE.
+1. Seleziona l'oggetto e apri la scheda **Materiale** di Proprietà.
+2. In fondo alla scheda, spunta **Avanzato: shader personalizzato**. Se il materiale non ha ancora un file, se ne crea uno nuovo (`shader.glsl`) con un modello, viene usato subito e si apre nell'IDE.
 3. In **Shader** scegli il file:
    - i `.glsl` già presenti nel progetto;
-   - **New shader**: un altro file con il modello;
-   - **Load from disk...**: un `.glsl` del tuo computer. Viene copiato dentro il progetto, come le texture e gli script.
+   - **Nuovo shader**: un altro file con il modello;
+   - **Carica dal disco...**: un `.glsl` del tuo computer. Viene copiato dentro il progetto, come le texture e gli script.
 4. Il pulsantino a destra di **Shader** apre il file nell'**IDE** (serve un IDE nel layout).
-5. Scrivi, e **Ctrl+S** salva e compila. Puoi anche premere **Compile** nel materiale o nella barra dell'IDE (compare accanto al nome del file quando è un `.glsl`).
-6. Sotto **Compile** compare il risultato: **Compiled**, oppure l'errore in rosso con la sua riga.
+5. Scrivi, e **Ctrl+S** salva e compila. Puoi anche premere **Compila** nel materiale o nella barra dell'IDE (compare accanto al nome del file quando è un `.glsl`).
+6. Sotto **Compila** compare il risultato: **Compilato**, oppure l'errore in rosso con la sua riga.
 
 Non serve salvare il progetto per cominciare. Se non l'hai ancora salvato, lo shader viene scritto in una cartella di lavoro dell'editor; quando salvi il progetto entra dentro il `.w3d`, nella cartella `shaders/`, e il materiale e l'IDE passano a usare quella copia. Da lì viaggia con il progetto (sul telefono, nel gioco compilato, su un altro computer). Se togli la spunta, il materiale torna a disegnarsi come sempre; il file resta selezionato.
 
 Se uno shader non compila, l'oggetto si disegna con il suo materiale normale finché non lo correggi. L'editor non va in crash.
 
-### Dalla Library: trascinare uno shader su una mesh
+### Dalla Libreria: trascinare uno shader su una mesh
 
-Gli shader del progetto compaiono nella **Library** (l'Outliner in modalità Library), in **Shaders**, con quanti oggetti li usano. Da lì:
+Gli shader del progetto compaiono nella **Libreria** (l'Outliner in modalità Libreria), in **Shader**, con quanti oggetti li usano. Da lì:
 
-- **Trascinalo su una mesh** nel 3D Viewport: mentre lo muovi, la **parte della mesh** sotto il puntatore si disegna con quello shader, così vedi a quale parte lo applicherai. Se passi a un'altra parte o esci dalla mesh, torna al suo materiale. Al rilascio, il materiale di quella parte passa a usare lo shader (con il materiale predefinito, la parte riceve un materiale nuovo). Si annulla con **Ctrl+Z**.
+- **Trascinalo su una mesh** nella Vista 3D: mentre lo muovi, la **parte della mesh** sotto il puntatore si disegna con quello shader, così vedi a quale parte lo applicherai. Se passi a un'altra parte o esci dalla mesh, torna al suo materiale. Al rilascio, il materiale di quella parte passa a usare lo shader (con il materiale predefinito, la parte riceve un materiale nuovo). Si annulla con **Ctrl+Z**.
 - Lo stesso con un **materiale**: mentre lo trascini, la parte si vede con quello.
-- **Open in IDE**, rinominarlo, spostarlo di cartella o portarlo fuori dal `.w3d`, come uno script.
+- **Apri nell'IDE**, rinominarlo, spostarlo di cartella o portarlo fuori dal `.w3d`, come uno script.
 - Un `.glsl` trascinato **dal file explorer del tuo computer** nella finestra entra nel progetto; se lo rilasci su una mesh, viene anche applicato a quella parte.
 
 ## Com'è fatto il file
@@ -96,12 +96,12 @@ vec4 Fragmento() {
 | `w3d_luzColor` | `vec4` | Il colore della prima luce (con la sua intensità). |
 | `w3d_luzPos` | `vec4` | La posizione della prima luce nello spazio della camera (`w` = 0: è una direzione, il sole). |
 | `w3d_ambiente` | `vec4` | La luce ambiente. |
-| `w3d_color` | `vec4` | Il **Color** del materiale (con il suo alfa). |
-| `w3d_emision` | `vec4` | L'**Emission** del materiale. |
+| `w3d_color` | `vec4` | Il **Colore** del materiale (con il suo alfa). |
+| `w3d_emision` | `vec4` | L'**Emissione** del materiale. |
 | `w3d_Textura(uv)` | `vec4` | La texture del materiale in quelle UV (bianco se non ne ha). La `v` parte dall'**alto** dell'immagine (0 = la riga in alto, 1 = quella in basso). |
-| `w3d_colorVertice` | `vec4` | Il colore dei vertici (se la mesh ce l'ha e il materiale usa **Vertex color**). |
-| `w3d_rugosidad`, `w3d_metalico` | `float` | La **Roughness** e il **Metallic** del materiale. |
-| `w3d_ior`, `w3d_transmision` | `float` | L'**IOR** e la **Transmission** del materiale (quelli del ray tracing). |
+| `w3d_colorVertice` | `vec4` | Il colore dei vertici (se la mesh ce l'ha e il materiale usa **Colore vertice**). |
+| `w3d_rugosidad`, `w3d_metalico` | `float` | La **Rugosità** e il **Metallico** del materiale. |
+| `w3d_ior`, `w3d_transmision` | `float` | L'**IOR** e la **Trasmissione** del materiale (quelli del ray tracing). |
 | `w3d_tiempo` | `float` | I secondi, per animare. Nell'editor è il tempo della **timeline** (il fotogramma attuale ÷ gli FPS): in pausa resta fermo, con **Play** avanza e trascinando la timeline vedi qualsiasi momento. Nel gioco esportato è il tempo dall'avvio. |
 | `w3d_PuntoPantalla()` | `vec2` | Dove si trova il pixel nella vista: (0,0) in basso a sinistra, (1,1) in alto a destra. |
 | `w3d_Pixel()` | `vec2` | La dimensione di un pixel nelle stesse unità. |
@@ -119,7 +119,7 @@ Un materiale che legge lo schermo con `w3d_Pantalla` può mostrare ciò che sta 
 - Le mesh con uno shader che legge lo schermo si disegnano **per ultime**, dopo il resto della scena, così ciò che sta dietro è già disegnato. Non importa dove siano nell'Outliner.
 - Prima di ognuna, la vista viene copiata in una texture (una copia per mesh e per parte di mesh). Su un PC o su un telefono moderno costa poco. Su un telefono vecchio, meglio pochi oggetti così.
 - Le **particelle** si disegnano dopo, quindi non si vedono attraverso il vetro.
-- Conviene che il materiale **non** sia **Transparent**: lo shader mescola già ciò che sta dietro e restituisce alfa 1.
+- Conviene che il materiale **non** sia **Trasparente**: lo shader mescola già ciò che sta dietro e restituisce alfa 1.
 
 ## Esempi
 
@@ -183,7 +183,7 @@ vec4 Fragmento() {
 }
 ```
 
-Perché l'onda si veda, il piano ha bisogno di vertici: suddividilo in Edit Mode.
+Perché l'onda si veda, il piano ha bisogno di vertici: suddividilo in Modalità Modifica.
 
 ### Vetro smerigliato
 
@@ -228,11 +228,11 @@ vec4 Fragmento() {
 }
 ```
 
-Si controlla dal materiale: **Transmission** (0 = vetro opaco del colore del materiale, 1 = si vede tutto ciò che sta dietro), **IOR** (quanto si piega ciò che sta dietro) e **Roughness** (quanto si sfoca). Sono gli stessi valori che usa il **ray tracing**, quindi in Render Preview lo stesso oggetto è vetro vero.
+Si controlla dal materiale: **Trasmissione** (0 = vetro opaco del colore del materiale, 1 = si vede tutto ciò che sta dietro), **IOR** (quanto si piega ciò che sta dietro) e **Rugosità** (quanto si sfoca). Sono gli stessi valori che usa il **ray tracing**, quindi in Anteprima render lo stesso oggetto è vetro vero.
 
 ### Vetro piano smerigliato
 
-Per un **piano**: una finestra, un box doccia, uno schermo di vetro. È `examples/shaders/vidrio_plano.glsl`. Fa la media di 17 letture di ciò che sta dietro su due anelli; la **Roughness** allarga gli anelli. La **texture** del materiale dice *dove* è smerigliato: bianco = sfocato, nero = liscio. Con `texturas/escarcha.png` restano aloni, una finestrella pulita e gocce che scendono; senza texture, tutto il vetro è smerigliato. Conviene togliere il **Culling** al piano per vederlo da entrambi i lati.
+Per un **piano**: una finestra, un box doccia, uno schermo di vetro. È `examples/shaders/vidrio_plano.glsl`. Fa la media di 17 letture di ciò che sta dietro su due anelli; la **Rugosità** allarga gli anelli. La **texture** del materiale dice *dove* è smerigliato: bianco = sfocato, nero = liscio. Con `texturas/escarcha.png` restano aloni, una finestrella pulita e gocce che scendono; senza texture, tutto il vetro è smerigliato. Conviene togliere il **Culling** al piano per vederlo da entrambi i lati.
 
 ```glsl
 float esmerilado = w3d_Textura(w3d_uv).r * w3d_rugosidad;   // quanto si sfoca QUESTO punto
@@ -246,7 +246,7 @@ vec2 r = w3d_Pixel() * (1.0 + 26.0 * esmerilado);           // il raggio delle l
 1. `reflect(-ojo, n)` dice dove **rimbalza lo sguardo**, nello spazio della camera.
 2. `w3d_AMundo(...)` porta quella direzione nel **mondo**, così il riflesso resta fermo anche se la camera ruota.
 3. `Panorama(...)` converte la direzione in un punto della foto: l'angolo intorno (`atan`) è la `u` e l'angolo dall'alto in basso (`acos`) è la `v`.
-4. Si mescola con la superficie secondo **Fresnel** (di taglio riflette di più) e il **Metallic** (un metallo riflette tutto, tinto del suo **Color**).
+4. Si mescola con la superficie secondo **Fresnel** (di taglio riflette di più) e il **Metallico** (un metallo riflette tutto, tinto del suo **Colore**).
 
 ```glsl
 @fragmento
@@ -287,7 +287,7 @@ vec4 Fragmento() {
 
 ## In una routine: il passo **Shader**
 
-Uno shader scritto è come uno **stato di GL**: lo si attiva e ciò che si disegna dopo lo usa. In una **routine** (Add → Draw → **Shader**) il passo ha il **file** `.glsl`, la spunta **On** e quattro numeri: **IOR**, **Transmission**, **Roughness** e **Metallic** (arrivano come `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico`; si possono animare o leggere da una memoria).
+Uno shader scritto è come uno **stato di GL**: lo si attiva e ciò che si disegna dopo lo usa. In una **routine** (Aggiungi → Draw → **Shader**) il passo ha il **file** `.glsl`, la spunta **On** e quattro numeri: **IOR**, **Transmission**, **Roughness** e **Metallic** (arrivano come `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico`; si possono animare o leggere da una memoria).
 
 ```
 Shader          vidrio_plano.glsl  On   (IOR 1.5, Roughness 0.6)
@@ -301,15 +301,15 @@ Con **On**, i "Draw elements" che seguono usano lo shader; togliendo la spunta l
 
 ## Con il ray tracing
 
-Il ray tracing non esegue il tuo shader. Usa i valori del materiale: **Color**, **Roughness**, **Metallic**, **Transmission**, **IOR** e la texture. Se nello shader usi quegli stessi valori (come il vetro smerigliato), Material Preview e Render Preview dicono la stessa cosa.
+Il ray tracing non esegue il tuo shader. Usa i valori del materiale: **Colore**, **Rugosità**, **Metallico**, **Trasmissione**, **IOR** e la texture. Se nello shader usi quegli stessi valori (come il vetro smerigliato), Anteprima materiale e Anteprima render dicono la stessa cosa.
 
-**Transmission** (da 0 a 1, nella scheda Material con il ray tracing attivo) dice quanta parte della superficie è vetro: la luce passa piegata dall'**IOR** e, con **Roughness**, esce smerigliata. L'**alfa** è un'altra cosa: ciò che è trasparente per l'alfa (o per la sua mappa) non c'è, e lì si vede ciò che sta dietro dritto, senza piegarsi. Con alfa al 50 % e transmission 1, metà passa dritta e l'altra metà rifratta. Con transmission 0, l'IOR piega ciò che si vede attraverso l'alfa, come nelle versioni precedenti.
+**Trasmissione** (da 0 a 1, nella scheda Materiale con il ray tracing attivo) dice quanta parte della superficie è vetro: la luce passa piegata dall'**IOR** e, con **Rugosità**, esce smerigliata. L'**alfa** è un'altra cosa: ciò che è trasparente per l'alfa (o per la sua mappa) non c'è, e lì si vede ciò che sta dietro dritto, senza piegarsi. Con alfa al 50 % e trasmissione 1, metà passa dritta e l'altra metà rifratta. Con trasmissione 0, l'IOR piega ciò che si vede attraverso l'alfa, come nelle versioni precedenti.
 
 ## Cosa non fa (ancora)
 
 - Usa una sola luce: la prima della scena (o quella dell'anteprima).
 - Non applica la **nebbia** né i **piani di taglio** degli specchi.
-- In **Solid** e nelle viste di debug (normali, alfa, vettori) si vede il materiale normale.
+- In **Solido** e nelle viste di debug (normali, alfa, vettori) si vede il materiale normale.
 - Non ha parametri propri: usa quelli del materiale (colore, rugosità, metallicità, transmission, IOR, emissione).
 
 ## Errori comuni
@@ -320,4 +320,4 @@ Il ray tracing non esegue il tuo shader. Usa i valori del materiale: **Color**, 
 | `cannot convert` / `wrong operand types` | Tipi mescolati: `1` è un `int`, scrivi `1.0`. Un `vec3` non si somma con un `vec4`. |
 | `Fragmento: no matching overloaded function` o non compila senza `Fragmento` | Manca la funzione `vec4 Fragmento()` o restituisce un altro tipo. |
 | `redefinition of main` | Non scrivere `main`: lo aggiunge Whisk3D. |
-| Non si vede ciò che sta dietro | Lo shader usa `w3d_Pantalla` ma il materiale è **Transparent** con alfa basso, oppure ciò che sta dietro si disegna dopo (particelle). |
+| Non si vede ciò che sta dietro | Lo shader usa `w3d_Pantalla` ma il materiale è **Trasparente** con alfa basso, oppure ciò che sta dietro si disegna dopo (particelle). |

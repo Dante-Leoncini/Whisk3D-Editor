@@ -23,6 +23,8 @@ The basics of the language and everything Whisk3D adds to it for making games. D
    - [Particles, fog and visibility](api-particulas-niebla.md)
    - [Time, randomness and utilities](api-tiempo-y-utilidades.md)
    - [Saved settings](api-configuracion.md)
+   - [Network play (LAN, Wi-Fi or internet)](api-red.md)
+   - [Split screen and a gamepad for each player](api-pantalla-dividida.md)
    - [Messages and debugging](api-mensajes-y-depuracion.md)
    - [Routines and memories](api-rutinas-y-memorias.md)
 7. [Key and button names](teclas-y-botones.md)

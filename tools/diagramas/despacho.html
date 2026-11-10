@@ -1,0 +1,73 @@
+<!doctype html>
+<!-- El viaje de un DrawTriangles (docs/manual/<idioma>/core/img/whisk3d-core-despacho.webp): un mismo pedido del
+     codigo, cada backend del Core y la GPU de cada sistema. Se arma con tools/diagramas/diagramas.py. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --rojo: #d71313; --fondo: #12161c; --tarjeta: #1b2028; --borde: #2c333d; --texto: #e8ecf1; --suave: #9aa4b0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fondo); }
+  body { width: 1400px; padding: 34px 40px 40px; font-family: "Noto Sans", "DejaVu Sans", sans-serif; color: var(--texto); }
+  .pedido { margin: 0 auto; width: 1040px; white-space: nowrap; display: flex; align-items: center; gap: 22px; background: var(--tarjeta); border: 3px solid var(--borde); border-radius: 16px; padding: 16px 24px; }
+  .pedido .quien { font-size: 18px; color: var(--suave); }
+  code { font-family: "DejaVu Sans Mono", monospace; }
+  .pedido code { font-size: 28px; color: #ffe08a; }
+  .core { margin: 0 auto; width: 1180px; display: flex; align-items: center; gap: 22px; border: 4px solid var(--rojo); border-radius: 18px; padding: 16px 26px; background: #1d1416; box-shadow: 0 0 34px rgba(215, 19, 19, .25); }
+  .core img { width: 92px; height: 92px; }
+  .core h2 { margin: 0 0 4px; font-size: 30px; color: #ff6b6b; }
+  .core p { margin: 0; font-size: 19px; }
+  .flecha { text-align: center; font-size: 34px; color: var(--suave); margin: 8px 0; line-height: 1; }
+  .columnas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .back { background: #3a1416; border: 1px solid #7a2125; border-radius: 12px; padding: 12px; text-align: center; }
+  .back b { display: block; font-size: 21px; color: #ffd0d0; }
+  .back span { display: block; font-size: 15px; color: #f0b0b0; margin-top: 4px; }
+  .hace { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 12px; font-size: 16px; line-height: 1.4; color: var(--suave); flex: 1 1 auto; }
+  .hace code { color: #ffe08a; font-size: 15px; }
+  .sis { background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 12px; padding: 10px; text-align: center; font-size: 18px; font-weight: bold; }
+  .mini { text-align: center; font-size: 24px; color: var(--suave); line-height: 1; }
+</style>
+</head>
+<body>
+  <div class="pedido"><div class="quien">El juego o el editor pide:</div><code>gfx::DrawTriangles(cantidad, indices)</code></div>
+  <div class="flecha">↓</div>
+  <div class="core">
+    <img src="logo_core.svg" alt="">
+    <div><h2>Whisk3D Core</h2><p>El mismo pedido, siempre igual. Cada sistema compila su backend (la PC elige el suyo al arrancar, con una tabla de despacho).</p></div>
+  </div>
+  <div class="flecha">↓</div>
+  <div class="columnas">
+    <div class="col">
+      <div class="back"><b>opengl/</b><span>pipeline fijo</span></div>
+      <div class="hace">Casi derecho a <code>glDrawElements</code>, con la matriz en un solo <code>glLoadMatrixf</code>. Sobre OpenGL de escritorio, OpenGL ES 1.1, GLdc o vitaGL.</div>
+      <div class="mini">↓</div>
+      <div class="sis">PC · macOS · Nokia N95<br>Dreamcast · PS Vita</div>
+    </div>
+    <div class="col">
+      <div class="back"><b>gles2/</b><span>shaders</span></div>
+      <div class="hace">Las matrices viajan como uniforms al uber-shader. En WebGL, los arreglos pasan a buffers.</div>
+      <div class="mini">↓</div>
+      <div class="sis">Android · Navegador<br>Nokia N8 · PC</div>
+    </div>
+    <div class="col">
+      <div class="back"><b>vulkan/</b><span>shaders sobre Vulkan</span></div>
+      <div class="hace">El mismo backend de shaders, compilado sobre un OpenGL ES 2.0 hecho con Vulkan.</div>
+      <div class="mini">↓</div>
+      <div class="sis">PC (opcional)</div>
+    </div>
+    <div class="col">
+      <div class="back"><b>gu/</b><span>el GE</span></div>
+      <div class="hace">La CPU recorta cada vértice y lo escribe en un anillo de memoria que lee el GE. Luces y niebla, por hardware.</div>
+      <div class="mini">↓</div>
+      <div class="sis">PSP</div>
+    </div>
+    <div class="col">
+      <div class="back"><b>citro3d/</b><span>la PICA200</span></div>
+      <div class="hace">Los vértices van a memoria lineal y los transforma un vertex shader propio. Los dibujos chicos seguidos salen juntos.</div>
+      <div class="mini">↓</div>
+      <div class="sis">Nintendo 3DS</div>
+    </div>
+  </div>
+</body>
+</html>

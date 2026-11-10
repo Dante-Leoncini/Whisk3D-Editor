@@ -44,7 +44,11 @@ namespace w3dEngine {
     void  W3dAudioReverb(float sala, float amortiguacion, float nivel);
 }
 namespace gfx = w3dEngine;
-extern bool g_showSonidos;   // el overlay "Sounds" del editor (el juego lo tiene apagado)
+#ifdef W3D_SIN_EDITOR
+static const bool g_showSonidos = false;   // el overlay "Sounds" es del editor: en el juego no se dibuja
+#else
+extern bool g_showSonidos;   // el overlay "Sounds" del editor
+#endif
 extern int AnimFPS;
 
 namespace {

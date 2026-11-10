@@ -1,89 +1,88 @@
 # 3D Viewport
 
-The 3D Viewport is where you see and edit the scene. It works in different **modes**: what clicks, keys and menus do depends on the current mode. The mode is chosen with the selector in the top bar (it only appears if the active object is a mesh or an armature) or with <kbd>Tab</kbd>.
+The **3D Viewport** is the viewport where you see and edit the scene: it's where you model, move objects, paint, pose and animate. Like every viewport, it has its **menu bar** at the top and its **toolbar** at the bottom.
+
+![The 3D Viewport with the cube selected, in Object Mode: at the top, the whole menu bar](../tutoriales/img/vista-3d-barra.webp)
+
+- **The menu bar**, button by button, with its menus: [The 3D Viewport menu bar](vista-3d-barra.md).
+- **Navigating** (orbit, pan, zoom, the views, the camera): [Navigating the 3D Viewport](navegacion.md) and the tutorial [Navigating the 3D Viewport](../tutoriales/navegacion.md).
+- **Moving, rotating and scaling**, the gizmo, the pivot and the orientation: [Move, rotate and scale](transformar.md).
+
+## The modes
+
+The 3D Viewport works in different **modes**: what clicks, keys and menus do depends on the current mode. The mode is chosen with the first button of the menu bar, which shows the current mode, or with <kbd>Tab</kbd> (Object ↔ Edit; on the Nokia N95, <kbd>OK</kbd>).
+
+The modes you can choose depend on the **active object**. Every object has **Object Mode**. A 3D mesh adds Edit Mode and the three paint modes; an armature, Edit Mode and Pose Mode. With any other object (a light, a camera, a sound) the only mode is Object Mode, and the button doesn't appear.
+
+![The mode menu with a cube selected: Object Mode, Edit Mode, Vertex Paint, Weight Paint and Texture Paint](../tutoriales/img/vista-3d-menu-modo.webp)
+
+![The mode menu with an armature selected: Object Mode, Edit Mode and Pose Mode](../tutoriales/img/vista-3d-modos-esqueleto.webp)
 
 | Mode | For which objects | What it's for |
 |---|---|---|
-| [Object Mode](modo-objeto.md) | All | Create, move, rotate, scale, duplicate, parent and delete whole objects. |
-| [Edit Mode](modo-edicion.md) | Meshes and curves | Edit vertices, edges and faces (modeling). |
-| [Armature Edit Mode](esqueletos.md#armature-edit-mode) | Armatures | Create and arrange the bones. |
-| [Pose Mode](esqueletos.md#pose-mode) | Armatures | Pose and animate the bones. |
-| [Weight Paint](pintura.md#weight-paint) | 3D meshes only | Paint how much each bone moves each vertex. |
-| [Vertex Paint](pintura.md#vertex-paint) | 3D meshes only | Paint colors directly on the vertices. |
-| [Texture Paint](pintura.md#texture-paint) | 3D meshes only | Paint on the texture, directly on top of the object. |
+| [Object Mode](modo-objeto.md) | All | Work with whole objects: create, move, rotate, scale, duplicate, parent and delete them. |
+| [Edit Mode](modo-edicion.md) | 3D meshes and curves | Modeling: move, add and delete the mesh's vertices, edges and faces. |
+| [Edit Mode](esqueletos.md#armature-edit-mode) | Armatures | Build the armature: create bones and arrange them in their rest position. |
+| [Pose Mode](esqueletos.md#pose-mode) | Armatures | Pose the bones and save the poses: that's how a character is animated. |
+| [Weight Paint](pintura.md#weight-paint) | 3D meshes | Paint how much each bone moves each vertex. |
+| [Vertex Paint](pintura.md#vertex-paint) | 3D meshes | Paint colors directly on the vertices. |
+| [Texture Paint](pintura.md#texture-paint) | 3D meshes | Paint on the texture, directly on top of the object. |
 
-## 3D Viewport top bar
+### Object Mode
 
-| Button | Description |
-|---|---|
-| Mode selector | Switches mode (Object, Edit, Pose, Paint…). |
-| Vertex / Edge / Face | Edit Mode only: what gets selected. |
-| Transform Pivot Point | What rotating and scaling happen around: 3D Cursor, Individual Origins, Median Point or Active Element. With the Lock Normals checkbox. |
-| Orientation | The transform axes: Global, Local, Normal (the face's direction) or View. |
-| Snap | Snap options. It turns green when active (<kbd>Shift+Tab</kbd>). |
-| Proportional Editing | When you move something, whatever is nearby follows smoothly. It turns green when active (<kbd>O</kbd>). |
-| View | Cameras, viewpoints, framing, local view, perspective, lock orbit, lock the camera to the view. |
-| Select | All, none, invert, box, linked, loops and paths. |
-| Add (+) | Object Mode only: create new objects. |
-| Mesh | Edit Mode only: the modeling operations. |
-| Save Texture (floppy disk) | Texture Paint only. Green if there's unsaved paint. |
-| Animation (diamond) | Insert, delete and clear keyframes; motion trail. |
-| Context | The mode's menu: Object, Vertex/Edge/Face, Armature or Pose. |
-| Overlays (eye) | Which helpers are drawn: floor, axes, gizmo, 3D cursor, normals, statistics, X-ray. |
-| Render (camera) | The shading mode. |
-| Scene | Choose which scene, game or prefab of the project is being edited, and create new ones. |
-| UV | Edit Mode only: unwrap and project UVs. |
+It's the mode Whisk3D starts in, and the only one every object has. You work with whole objects: you select, move, rotate, scale, add and delete them. See [Object Mode](modo-objeto.md) and the tutorial [Object Mode](../tutoriales/modo-objeto.md).
 
-## Menus shared by several modes
+### Edit Mode of a mesh
 
-### Select
+You model the mesh's **shape**: its vertices, edges and faces. The menu bar shows the **Vertex / Edge / Face** button (what a click selects) and the **Mesh** and **UV** menus. The rest of the scene stays visible, but you can't touch it.
 
-| Function | Description | Shortcut |
-|---|---|---|
-| All | Selects everything. | <kbd>A</kbd> |
-| None | Deselects everything. | <kbd>Alt+A</kbd> |
-| Invert | What was selected gets deselected and vice versa. | <kbd>Ctrl+I</kbd> |
-| Box Select | Dragging from left to right (green) only takes what ends up completely inside; from right to left (blue) just touching is enough. <kbd>Shift</kbd> adds. | <kbd>B</kbd> |
-| Show selection | Shows or hides the outline of the selection. | Menu |
+![A cube in Edit Mode, with a face selected in green and the gizmo on it](../tutoriales/img/vista-3d-modo-edicion.webp)
 
-### Render (shading modes)
+### Edit Mode of an armature
 
-| Function | Description |
-|---|---|
-| Render Preview | With the scene's lights. If ray tracing is on, it shows the traced image little by little. |
-| Material Preview | The default: a neutral light from the view, independent of the scene's lights. |
-| Solid / Wireframe / ZBuffer Preview | Solid gray, only the edges, or the depth. |
-| Normal View / Alpha Preview | The normals in color, or the transparency in black and white. |
-| Motion vectors | How far each pixel moved on screen since the previous frame (red = X, green = Y; lavender = still, olive = background). The same image as the `_vectores` pass of the render. |
-| Wireframe: Only Visible | The wireframe view shows only what is actually drawn. |
+You build the **armature**: you create bones (extruding them from the tip of another one), move them and parent them. This is its **rest** position, the one it has when it isn't animated.
 
-### Overlays
+![Leon's armature in Edit Mode: the bones in blue, in their rest position](../tutoriales/img/vista-3d-modo-edicion-esqueleto.webp)
 
-| Function | Description | Shortcut |
-|---|---|---|
-| Show Overlays | Turns all the visual helpers on or off at once. | <kbd>K</kbd> |
-| Floor, X Axis, Y Axis, Origins, 3D Cursor, Relationship Lines | Each helper separately. | Menu |
-| Gizmo | The move/rotate/scale gizmo. | Menu |
-| Objects | Show or hide armatures, lights, cameras, empties, particles, curves, hitboxes. | Menu |
-| Normals | Draws vertex, custom or face normals, with their size. | Menu |
-| Statistics | FPS, vertices, faces, draw calls and timings. | Menu |
-| X-Ray | The mesh being edited looks semi-transparent and you can pick the elements behind. | Menu |
+### Pose Mode
 
-### Snap
+You **pose** the armature: the bones are rotated and moved without changing the armature itself, and the mesh follows them. The poses saved on different frames are the character's animation.
 
-| Function | Description | Shortcut |
-|---|---|---|
-| Enable Snap | What you move sticks to vertices, edges, faces or their centers. | <kbd>Shift+Tab</kbd> |
-| Snap Base and Snap Target | Which point of what's being moved sticks (closest, center, median, active) and to what. | Menu |
-| Face Project / Face Nearest | For retopology: vertices rest on another surface. | Menu |
-| Affect Move / Rotate / Scale | Which operations snapping acts on. | Menu |
-| Cursor Snap menu | Selection to Grid, to Cursor or to Active; Cursor to Selected, to World Origin, to Grid or to Active. | <kbd>Shift+S</kbd> |
+![Leon's armature in Pose Mode, halfway through his walk animation: the bones bent](../tutoriales/img/vista-3d-modo-pose.webp)
 
-### Proportional Editing
+### Weight Paint
 
-| Function | Description | Shortcut |
-|---|---|---|
-| Enable | When moving, rotating or scaling, the neighbors follow according to their distance. | <kbd>O</kbd> |
-| Connected Only | Measures distance along the edges: it doesn't drag loose pieces. | Menu |
-| Falloff | Shape of the influence: smooth, sphere, root, inverse square, sharp, linear, constant, random. | Menu |
-| Proportional Size | The influence radius. During the transform it's changed with the wheel or with <kbd>PageUp</kbd> / <kbd>PageDown</kbd>. | Menu / wheel |
+You paint **how much each bone moves each part of the mesh**: red is what the selected bone moves fully, blue is what it doesn't move. This is what makes the arm bend, and not the waist, when you bend the arm.
+
+![A Leon mesh in Weight Paint: the selected bone moves the chest (red and yellow) and nothing else (blue)](../tutoriales/img/vista-3d-modo-pesos.webp)
+
+### Vertex Paint
+
+You paint **colors on the mesh's vertices**, without a texture. It's useful to give color to simple models, for hand-painted shadows and for effects in shaders.
+
+![A cube in Vertex Paint: the brush goes from side to side and the vertices it touches turn red](../tutoriales/img/vista-3d-modo-vertices.webp)
+
+### Texture Paint
+
+You paint **directly on the texture**, on top of the object, as if on a doll. What you paint is saved with the floppy disk that appears in the menu bar.
+
+![Leon in Texture Paint: the brush paints a red stroke on his jacket](../tutoriales/img/vista-3d-modo-textura.webp)
+
+In the paint modes, the brush row (**Radius** and **Value**) appears above the toolbar. See [Paint modes](pintura.md).
+
+## The toolbar
+
+At the bottom of the 3D Viewport are **Undo** and **Redo** (the arrows), the **last commands used** (at first, Move, Rotate, Scale and Delete; whatever you use moves to the front) and **proportional editing**. While you move, rotate or scale, the toolbar changes: the green check mark confirms, the red cross cancels, the orientation, and **X**, **Y** and **Z** keep the movement on those axes. See [Move, rotate and scale](transformar.md#toolbar).
+
+![Android](../tutoriales/img/icono-android.svg) On a touch screen it adds **Shift** and **Ctrl**, which stay on (in green) and act as those keys, and the **View** button (the monitor), so that in Edit Mode and in the paint modes your finger navigates instead of selecting or painting.
+
+![Nokia](../tutoriales/img/icono-nokia.svg) On the Nokia N95 it's hidden, to leave the screen to the scene, and it appears when needed: in the paint modes the brush row shows up (**Radius** and **Value**), and while you move, rotate or scale with proportional editing on, the bar for its radius. Its buttons are used with the **virtual mouse**: you turn it on with the right selection key, the arrows move it and <kbd>OK</kbd> clicks.
+
+## The gizmo and the 3D cursor
+
+![The selected cube with the gizmo on it (the colored arrows) and, on the left, the 3D cursor, each one marked with an orange circle and its name](../tutoriales/img/vista-3d-gizmo-cursor.webp)
+
+- The **gizmo** is the colored arrows on the selection: you grab them to move, rotate and scale. A click on the gizmo switches from one mode to the next. See [The gizmo](transformar.md#the-gizmo).
+- The **3D cursor** is the circle with a cross: it's where whatever you add with Add appears, and it can be the pivot point. See [The 3D cursor](../tutoriales/modo-objeto.md#the-3d-cursor).
+
+![Nokia](../tutoriales/img/icono-nokia.svg) On the Nokia N95 the gizmo is off, because the screen is small and there you move with the keys. You turn it on in **Overlays → Gizmo**, and grab it with the virtual mouse.

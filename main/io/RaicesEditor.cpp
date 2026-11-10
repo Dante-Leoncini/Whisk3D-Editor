@@ -200,14 +200,15 @@ static void SoltarUIDeLaRaiz() {
     }
     PropsOlvidarEscena();
 }
-// la UI de la raiz nueva: el outliner arranca arriba y rearma su scroll
-static void RefrescarUI() {
+// la UI de la raiz nueva: el outliner arranca arriba y rearma su scroll ('conservarScroll': entre escenas abiertas,
+// que el outliner muestra todas juntas, no se mueve)
+static void RefrescarUI(bool conservarScroll = false) {
     std::vector<ViewportBase*> hojas;
     JuntarHojas(LayoutRaizCompleta(), hojas);
     for (size_t i = 0; i < hojas.size(); i++)
         if (VpEsOutliner(hojas[i])) {
             Outliner* o = (Outliner*)hojas[i];
-            if (o->vista == W3D_VISTA_ESCENA) { o->PosY = 0; o->PosX = 0; }
+            if (o->vista == W3D_VISTA_ESCENA && !conservarScroll) { o->PosY = 0; o->PosX = 0; }
             o->lastContentRows = -1;
             if (o->width > 0 && o->height > 0) o->Resize(o->width, o->height);
         }
@@ -215,10 +216,91 @@ static void RefrescarUI() {
     g_redraw = true;
 }
 
+// ============================================================================
+//  LAS ESCENAS ABIERTAS A LA VEZ (W3dRaices.h): tildar en la lista abre; destildar cierra y libera la memoria
+// ============================================================================
+// cerrarla de verdad: fuera de la lista, sin sus pasos de undo ni su marca de "sin guardar", y fuera de la memoria
+// (salvo la del proyecto -el bloque- y una que todavia no se guardo: quedan cargadas, solo se cierran)
+static void DescargarCerrada(const std::string& nombre) {
+    const int idx = W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre);
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    if (idx < 0 || idx >= (int)fs.size()) return;
+    Object* r = fs[(size_t)idx].raiz;
+    W3dRaizSacarDeAbiertas(idx);
+    if (r) { UndoOlvidarRaiz(r); W3dCambiosOlvidarRaiz(r); }
+    std::vector<int> v(1, idx);
+    if (r && W3dRaicesDescargar(v) == 0)
+        w3dLogf("[raices] '%s' cerrada (queda en memoria: %s)", nombre.c_str(),
+                fs[(size_t)idx].bloque ? "es la del bloque del proyecto" : "todavia no se guardo");
+    else w3dLogf("[raices] '%s' cerrada y fuera de la memoria", nombre.c_str());
+    RefrescarUI(true);
+}
+bool W3dRaizTildar(int idx, bool abrir, std::string* motivo) {
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    if (idx < 0 || idx >= (int)fs.size() || !W3dRaizEs3D(fs[(size_t)idx].tipo)) {
+        if (motivo) *motivo = "It doesn't exist anymore";
+        return false;
+    }
+    if (SimActiva()) { if (motivo) *motivo = "Stop the game first"; return false; }
+    if (abrir) {
+        if (!W3dRaizAbrir(idx)) { if (motivo) *motivo = "It could not be loaded"; return false; }
+        w3dLogf("[raices] '%s' abierta", fs[(size_t)idx].nombre.c_str());
+        RefrescarUI(true);
+        return true;
+    }
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    bool esta = false;
+    for (size_t i = 0; i < ab.size(); i++) if (ab[i] == idx) esta = true;
+    if (!esta) return true;
+    if (ab.size() <= 1) { if (motivo) *motivo = "At least one scene stays open"; return false; }
+    const std::string nombre = fs[(size_t)idx].nombre;
+    // la ACTIVA no se cierra: primero pasa a ser activa la siguiente abierta
+    if (idx == W3dRaizActiva()) {
+        int otra = -1;
+        for (size_t i = 0; i < ab.size() && otra < 0; i++) if (ab[i] != idx) otra = ab[i];
+        if (!W3dActivarRaiz(otra, motivo)) return false;
+    }
+    // con cambios sin guardar: el cartel (guardar y cerrar / cerrar sin guardar / cancelar) lo termina
+    if (W3dCambiosPreguntarCerrarEscena(nombre)) return true;
+    DescargarCerrada(nombre);
+    return true;
+}
+struct RaicesEngancheCerrar { RaicesEngancheCerrar() { W3dCambiosCerrarEscenaHook = DescargarCerrada; } };
+static RaicesEngancheCerrar gRaicesEngancheCerrar;
+// el objeto de la raiz de una escena abierta pasa a ser la activa (un click en el outliner o en el 3D sobre algo suyo)
+bool W3dActivarRaizDe(Object* raiz) {
+    if (!raiz || raiz == SceneCollection) return true;
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    for (size_t i = 0; i < fs.size(); i++)
+        if (fs[i].raiz == raiz) {
+            std::string motivo;
+            if (W3dActivarRaiz((int)i, &motivo)) return true;
+            if (!motivo.empty()) Notificar(T(motivo.c_str()), true);
+            return false;
+        }
+    return false;
+}
+
 bool W3dActivarRaiz(int idx, std::string* motivo) {
     const std::vector<W3dRaizFila>& fs = W3dRaices();
     if (idx < 0 || idx >= (int)fs.size()) { if (motivo) *motivo = "It doesn't exist anymore"; return false; }
     if (idx == W3dRaizActiva()) return true;
+    // ENTRE ESCENAS ABIERTAS (varias a la vez en el editor): el historial sigue (cada paso de undo sabe de que raiz es
+    // y la activa antes de aplicarse: Undo.cpp) y el outliner no se mueve. Con un prefab de por medio (se edita
+    // aislado) es como siempre: historial limpio
+    // (la que no estaba abierta -el selector, "New Scene"- REEMPLAZA a la activa en la lista: la otra sale de la lista y
+    //  queda en memoria, como siempre; ahi el historial se limpia)
+    const int actVieja = W3dRaizActiva();
+    const bool yaAbierta = W3dRaizEstaAbierta(idx);
+    const bool viejaEs3D = actVieja >= 0 && actVieja < (int)fs.size() && W3dRaizEs3D(fs[(size_t)actVieja].tipo);
+    const bool entreAbiertas = yaAbierta && W3dRaizEs3D(fs[(size_t)idx].tipo) && viejaEs3D;
+    int posEnLista = -1;
+    if (!yaAbierta && viejaEs3D) {
+        std::vector<int> ab;
+        W3dRaicesAbiertas(ab);
+        for (size_t i = 0; i < ab.size(); i++) if (ab[i] == actVieja) posEnLista = (int)i;
+    }
     // PRECONDICIONES: el Play tiene su snapshot de ESTA raiz (el Stop la restaura) y un transform en
     // curso tiene los objetos seleccionados en estadoObjetos
     if (SimActiva()) { if (motivo) *motivo = "Stop the game before changing the scene"; return false; }
@@ -241,22 +323,27 @@ bool W3dActivarRaiz(int idx, std::string* motivo) {
     // el Mix de escenas movio objetos de ESTA raiz: vuelven a su base (sus capas quedan con ella)
     if (g_animMix) W3dMixEscenasSoltar();
     SoltarUIDeLaRaiz();
-    // UNDO LIMPIO: el historial nombra objetos de la raiz que se deja (validar contra la otra
-    // convertiria sus pasos en no-ops o, peor, re-insertaria un borrado en la raiz equivocada)
-    UndoLimpiar();
-    // (sin historial ya no hay pasos que nombren una vista por su indice: las HUERFANAS -la vista de un clip
-    //  que se borro- se pueden sacar de la lista)
-    W3dClipsVistasPurgar();
+    // UNDO LIMPIO (si no es entre escenas abiertas): el historial nombra objetos de la raiz que se deja (validar contra
+    // la otra convertiria sus pasos en no-ops o, peor, re-insertaria un borrado en la raiz equivocada)
+    if (!entreAbiertas) {
+        UndoLimpiar();
+        // (sin historial ya no hay pasos que nombren una vista por su indice: las HUERFANAS -la vista de un clip
+        //  que se borro- se pueden sacar de la lista)
+        W3dClipsVistasPurgar();
+    }
     const std::string antes = (W3dRaizActiva() >= 0) ? fs[(size_t)W3dRaizActiva()].nombre : std::string();
     const bool eraPrefab = (W3dRaizActiva() >= 0 && fs[(size_t)W3dRaizActiva()].tipo == W3D_RAIZ_PREFAB);
     if (!W3dRaizCambiarActiva(idx)) { if (motivo) *motivo = "It could not be loaded"; return false; }
-    W3dClipsVistasPurgar();
+    if (!entreAbiertas) W3dClipsVistasPurgar();
+    if (posEnLista >= 0) W3dRaizSacarDeAbiertas(actVieja);
+    W3dRaizAbrir(idx);   // (una escena que se activa queda abierta)
+    if (posEnLista >= 0) W3dRaizMoverAbierta(idx, posEnLista);
     W3dMallasTickEditor();   // (la activa que se miraba era de la otra raiz: se suelta)
     // se DEJO DE EDITAR un prefab: sus instancias (de todas las raices cargadas) se regeneran con lo que quedo. Una
     // ESCENA tambien: se puede instanciar en otra ("escena:<nombre>", io/Prefabs.h)
     if (eraPrefab) W3dPrefabDejoDeEditarse(antes);
     else if (!antes.empty()) W3dPrefabDejoDeEditarse(W3dPrefabClaveEscena(antes));
-    RefrescarUI();
+    RefrescarUI(entreAbiertas);
     w3dLogf("[raices] editando %s '%s' (antes '%s')", W3dRaizTipoClave(W3dRaizTipoDe(idx)),
             fs[(size_t)idx].nombre.c_str(), antes.c_str());
     return true;
@@ -466,9 +553,12 @@ public:
             it.info = std::string(T(t == W3D_RAIZ_JUEGO ? "game" : t == W3D_RAIZ_PREFAB ? "prefab" : "scene")) + ", ";
             it.info += (n < 0) ? std::string(T("not loaded"))
                                : std::string(b) + T(n == 1 ? "object" : "objects");
-            if ((int)i == act) it.info += std::string(", ") + T("open");
+            if ((int)i == act) it.info += std::string(", ") + T("active");
             if (W3dRaizEs3D(t) && (int)i == W3dRaizInicialIdx() && fs.size() > 1)
                 it.info += std::string(", ") + T("start");
+            // la CASILLA: abierta en el editor (cargada, a la vista y en el outliner). Los prefabs no (se editan solos)
+            if (W3dRaizEs3D(t)) it.tilde = W3dRaizEstaAbierta((int)i) ? 1 : 0;
+            it.cargado = (fs[i].raiz != NULL);
             out.push_back(it);
         }
     }
@@ -526,6 +616,11 @@ public:
         for (size_t i = 0; i < v.size(); i++) out.push_back((Object*)v[i]);
     }
     bool Purgable() const { return false; }
+    // tildar = abrirla en el editor; destildar = cerrarla y sacarla de la memoria (ver W3dRaizTildar)
+    bool Tildar(const std::string& id, bool on, std::string* motivo) {
+        if (tipo != W3D_RAIZ_ESCENA) { if (motivo) *motivo = "It has no checkbox"; return false; }
+        return W3dRaizTildar(W3dRaizBuscar(tipo, id), on, motivo);
+    }
 };
 
 static ProveedorRaices gProvEscenas(W3D_RAIZ_ESCENA);

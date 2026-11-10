@@ -100,6 +100,11 @@ std::string CompilarJuegoRepoRaiz(std::string* via);
 // ---- estado del build asincronico (lo consulta el hilo PRINCIPAL, 1x por frame) ----
 bool CompilarJuegoEnCurso();                    // hay un build corriendo (bloquea re-disparo)
 int  CompilarJuegoProgreso(std::string* etapa); // avance GLOBAL 0..100 + texto de la etapa actual
+// el proyecto tiene un juego que compilar: una raiz de tipo Juego, o una UI con scripts (un juego solo 2D). Sin eso el
+// boton "Compilar juego" sale gris
+bool CompilarJuegoHayJuego();
+// el juego es 3D (arranca con una escena o un juego 3D); si no, con una escena 2D (una UI)
+bool CompilarJuegoEs3D();
 void CompilarJuegoTick();                       // 1x por frame en el hilo de UI: mantiene vivo el
                                                 // render y, al terminar el worker, hace join +
                                                 // Notificar() de exito/error (nunca desde el worker)

@@ -7,7 +7,7 @@
 
 学会导航很重要：要舒服又快速地制作 3D 模型和动画，你需要会在场景里移动，并把视角放到便于工作的位置。
 
-正如[上一个教程](viewports.md#活动视口)所讲的，要使用下面这些命令，3D Viewport 必须是活动视口，也就是带绿色边框的那个。
+正如[视口](viewports.md#活动视口)教程中所讲的，要使用下面这些命令，3D Viewport 必须是活动视口，也就是带绿色边框的那个。
 
 最常用的三种操作是**环绕**、**平移**和**缩放**。每一种都可以用鼠标、在触屏上用手指，或者用 Nokia N95 的键盘来完成。在 PC 的视频中，右下角的鼠标图会用绿色标出正在按下的按键。
 
@@ -177,7 +177,7 @@
 |---|---|
 | ![PC](img/icono-pc.svg) PC | 单击锁 |
 | ![Android](img/icono-android.svg) 触屏 | 点一下锁 |
-| ![Nokia](img/icono-nokia.svg) Nokia N95 | 左软键打开菜单栏（和[上一个教程](viewports.md#栏放不下时)中一样）；在那里选择 View → Lock the camera to the view |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | 左软键打开菜单栏（和[视口](viewports.md#菜单栏的选项显示不全时)教程中一样）；在那里选择 View → Lock the camera to the view |
 | 菜单 | View → Lock the camera to the view |
 
 ![按 Num 0 切换到相机视图；单击锁把它锁上，然后环绕并滚动滚轮，相机随之移动，直到立方体进入取景框](img/navegacion-camara-bloquear-raton.webp)

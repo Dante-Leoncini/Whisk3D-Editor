@@ -1,19 +1,122 @@
 # インターフェース
 
-ウィンドウは複数の**ビューポート**（パネル）に分かれています。それぞれ次のいずれかの種類にできます：3D Viewport、Outliner、Properties、UV Editor、Timeline、2D Editor、Console、Script Editor（IDE）。
+> [!NOTE]
+> ![Nokia](../tutoriales/img/icono-nokia.svg) Nokia N95はマウスとキーボード（Bluetooth）に対応しています。このページのNokiaの説明は、マウスやキーボードを使わずに、電話のキーだけで操作する方法です。
+
+Whisk3Dのウィンドウは**ビューポート**に分かれています。ビューポートはパネルで、それぞれにエディター（3D Viewport、Outliner、Properties…）が入っています。ビューポートは分割したり、サイズを変えたり、それぞれに何を表示するかを選んだりできます。マウスでも、タッチスクリーンで指を使っても、Nokiaのキーパッドでも、同じように操作できます。
+
+これは、プログラムを初めて起動したときの画面です。
+
+![起動直後の Whisk3D：立方体、カメラ、ライトがある 3D Viewport、右に Outliner と Properties、下に Timeline](../tutoriales/img/inicio.webp)
+
+## アクティブなビューポート
+
+マウスの下にあるビューポートが**アクティブなビューポート**で、緑の枠で示されます。キーボードのコマンドやコントローラー、そのほかの周辺機器の入力は、このビューポートが受け取ります。マウスをビューポートからビューポートへ動かすと、緑の枠がついてきます。
+
+![マウスポインターが3D Viewport、Outliner、Properties、Timelineの上を通り、そのたびに下にあるビューポートが緑の枠で示されます](../tutoriales/img/viewports-activo.webp)
+
+![Nokia](../tutoriales/img/icono-nokia.svg) **Nokia N95では：** 緑の**通話キー** ![](../tutoriales/img/tecla-verde.svg) を1回押すごとに、次のビューポートに移ります。N95の画面には、左に3D Viewport、右にPropertiesの2つが入ります。
+
+![左に3D Viewport、右にPropertiesがあるNokia N95。緑キーを押すたびに、緑の枠がもう一方のビューポートに移ります](../tutoriales/img/viewports-activo-nokia.webp)
+
+## メニューバーと隅のボタン
+
+どのビューポートにも、上部に**メニューバー**（画像の緑の部分）があり、そのエディターのメニューとボタンが並んでいます。左上にはいつも**隅のボタン**（オレンジの部分）があります。ビューポートを切り替えたり変更したりするボタンです。
+
+![隅のボタンの拡大：3D Viewportのメニューバーの左上にある、下向きの小さな矢印](../tutoriales/img/viewports-esquina.webp)
+
+どのビューポートでも同じで、すべてのビューポートにある唯一のボタンです。
+
+![Whisk3Dの4つのビューポート。それぞれのメニューバーが緑で、隅のボタンがオレンジで強調されています](../tutoriales/img/viewports-barras.webp)
+
+## サイズを変える
+
+![PC](../tutoriales/img/icono-pc.svg) ![Android](../tutoriales/img/icono-android.svg) 隅のボタンを（指またはマウスで）**押したまま**ドラッグすると、サイズを変えられます。そのビューポートの左端と上端が動き、隣のビューポートもそれに合わせて変わります。ドラッグせずに**1回タップ**すると、ビューポートのオプションが入ったドロップダウンメニューが開きます。この例では、右下のビューポートのボタンを円を描くようにドラッグしていて、3つのビューポートのサイズが変わります。
+
+![指で右下のビューポートの隅のボタンを円を描くようにドラッグすると、3つのビューポートのサイズが変わります](../tutoriales/img/viewports-arrastrar.webp)
+
+![Nokia](../tutoriales/img/icono-nokia.svg) **Nokiaでは：** 緑の**通話キー** ![](../tutoriales/img/tecla-verde.svg) を押したまま、方向キーを押します。アクティブなビューポート（緑の枠があるもの）の境界がその方向に動き、ビューポートが大きく、または小さくなります。方向キーを使わずに緑キーだけを押すと、次のビューポートに移ります。
+
+![緑キーを押したままのNokia N95。右の方向キーで3D Viewportが大きくなり、左の方向キーで小さくなって、元の大きさに戻ります](../tutoriales/img/viewports-tamano-nokia.webp)
+
+## ビューポートのオプション
+
+隅のボタンをタップすると、このメニューが開きます。
+
+![指が3D Viewportの隅のボタンまで動いてタップすると、メニューが開きます。上にビューポートの種類があり、線の下にExpand、Split in Columns、Split in Rows、Maximizeがあります](../tutoriales/img/viewports-menu.webp)
+
+上にあるのは**ビューポートの種類**です。1つ選ぶと、ビューポートがそのエディターに変わります。線の下には、ビューポートに対してできる操作があります。
+
+| オプション | 内容 |
+|---|---|
+| Expand | ビューポートが隣のビューポートの場所も使うようになり、隣のビューポートは閉じます（隣が分割されている場合は、そのグループ全体が閉じます）。 |
+| Split in Columns | 左右に並ぶ2つに分けます。 |
+| Split in Rows | 上下に並ぶ2つに分けます。 |
+| Maximize | ウィンドウ全体に拡大します。最大化している間、メニューには**Minimize**しかありません。これを選ぶと元の位置に戻ります。 |
+
+### 種類を変える
+
+3D ViewportをUV Editorに変えた例です。
+
+![3D Viewportの隅のボタンをタップしてUV Editorを選ぶと、ビューポートがUV Editorになります](../tutoriales/img/viewports-cambiar-tipo.webp)
+
+### Split in Columns / Rows
+
+![Split in Columns：3D Viewportが、左右に並ぶ2つのビューに分かれます](../tutoriales/img/viewports-dividir-columnas.webp)
+
+![Split in Rows：3D Viewportが、上下に並ぶ2つのビューに分かれます](../tutoriales/img/viewports-dividir-filas.webp)
+
+### Expand
+
+OutlinerがPropertiesの場所も使うようになります。
+
+![OutlinerでExpandを選ぶと、Propertiesの場所も使うようになります](../tutoriales/img/viewports-expandir.webp)
+
+### Maximize / Minimize
+
+![3D Viewportがウィンドウ全体に最大化され、そのあとMinimizeで元の位置に戻ります](../tutoriales/img/viewports-maximizar.webp)
+
+## メニューバーのオプションが全部見えないとき
+
+ビューポートの幅が狭いと、メニューバー全体が収まりません。3D Viewportの下にあるツールバーも同じです。残りの部分を見るには：
+
+- ![Android](../tutoriales/img/icono-android.svg) **指で**：バーを横にドラッグします。
+- ![PC](../tutoriales/img/icono-pc.svg) **マウスで**：バーの上でクリックしたままドラッグするか、バーの上で**ホイール**を回します。
+- ![PC](../tutoriales/img/icono-pc.svg) ![Nokia](../tutoriales/img/icono-nokia.svg) **キーボードで**：PCでは<kbd>M</kbd>、Nokiaでは**左ソフトキー**で、アクティブなビューポートのバーに入ります。左右の矢印キーでバーの上を移動し、各メニューはそこに来ると開きます。上下の矢印キーでメニューの中を移動し、OK（PCでは<kbd>Enter</kbd>）で選びます。バーは、今いる場所が見えるように自動でスクロールします。
+
+![指でOutlinerのバーを横にドラッグすると、収まっていなかったボタンが現れます](../tutoriales/img/viewports-barra-dedo.webp)
+
+![Outlinerのバーの上にあるマウスポインター。ホイールを回すとバーがスクロールします](../tutoriales/img/viewports-barra-rueda.webp)
+
+![Nokia](../tutoriales/img/icono-nokia.svg) Nokia N95では、左ソフトキーでバーに入り、方向キーでバーの上を移動します。
+
+![Nokia N95のインターフェース。左ソフトキーでモードのメニューが開き、右の方向キーでバーのメニューを順に移動します。バーは自動でスクロールします](../tutoriales/img/viewports-barra-nokia.webp)
+
+## ビューポートの種類
+
+| ビューポート | 用途 |
+|---|---|
+| [3D Viewport](vista-3d.md) | シーンを表示して編集する場所です。モデリング、オブジェクトの移動、ペイント、ポーズ付け、アニメーションを行います。 |
+| [Outliner](outliner.md) | シーンにあるものすべての一覧です。 |
+| [Library](outliner.md#libraryビュー) | プロジェクトのリソースです。メッシュ、マテリアル、テクスチャ、アニメーション、サウンド、スクリプトなどがあります。 |
+| [Properties](propiedades.md) | アクティブなオブジェクトのデータを、タブに分けて表示します。 |
+| [UV Editor](editor-uv.md) | テクスチャがメッシュにどう貼られるかを扱います。 |
+| [Timeline](linea-de-tiempo.md) | アニメーションです。キーフレームとカーブを扱います。 |
+| [2D Editor](editor-2d.md) | ゲームのインターフェース、HUD、2Dゲームを作ります。 |
+| [Console](consola.md) | エンジンのログです。エラー、警告、情報が表示されます。 |
+| [IDE](editor-de-scripts.md) | Luaスクリプトとシェーダーのエディターです。 |
+
+
+Whisk3Dは今も成長しています。今後、新しいビューポートが加わったり、今あるビューポートが変わったりすることがあります。どれも同じように、上にメニューバー、隅にボタンがある形で使えます。
+
+## インターフェースのその他の機能
 
 | 機能 | 説明 | 使い方 |
 |---|---|---|
-| アクティブなビューポート | キーボード入力を受け取るビューポートです。緑の枠で示され、ポインターに追従します。キー入力はマウスの下にあるパネルに送られます。 | マウスを重ねます。タッチ操作ではタップします。 |
-| ビューポートの種類を変更 | パネルを別の種類のエディターに切り替えます。 | 上部バーの左端にあるボタン。 |
-| Split in Columns / Rows | ビューポートを2つに分割します。 | 隅のボタン → Split in Columns / Split in Rows。 |
-| Maximize / Minimize | ビューポートをウィンドウ全体に拡大し、また元の位置に戻します。 | 隅のボタン → Maximize。 |
-| サイズ変更 | パネルの大きさを変えます。 | 2つのビューポートの境界（または隅）をドラッグします。 |
-| 上部バー | ビューポートのメニューです。収まらない場合はスクロールします。 | マウスホイール、または指でドラッグします。 |
 | キーボードでメニューバーを操作 | アクティブなビューポートのメニューバーを開き、矢印キーで移動できるようにします。 | <kbd>M</kbd>（Edit Modeでは<kbd>M</kbd>はMergeです）。 |
-| Undo / Redo | 直前の操作を取り消す、またはやり直します。 | <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>または<kbd>Ctrl+Shift+Z</kbd>。下部バーの矢印。 |
+| Undo / Redo | 直前の操作を取り消す、またはやり直します。 | <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>または<kbd>Ctrl+Shift+Z</kbd>。ツールバーの矢印。 |
 | Save project | 開いている.w3dを保存します（新規の場合は名前を入力します）。 | <kbd>Ctrl+S</kbd>、またはProperties → File/Renderタブ → Fileカード（[プロジェクト](proyecto.md)を参照）。 |
 | Fullscreen | フルスクリーン表示に切り替え、また元に戻します。 | <kbd>F11</kbd>。Androidでは、端末にノッチがなければ自動的にフルスクリーンになります。 |
 | Play / Pause | どのパネルからでもアニメーション（またはゲーム）を再生します。 | <kbd>Space</kbd>、またはTimelineのPlayボタン。 |
 
-**Androidの場合**：縦向きでは、上に3D Viewport、下にPropertiesのレイアウトになります。横向きではTimelineが加わります。画面キーボードが開くと（たとえばScript Editorで）、アクティブなビューポートが見えている部分いっぱいに最大化され、キーボードを閉じると元の位置に戻ります。
+![Android](../tutoriales/img/icono-android.svg) **Androidの場合**：縦向きでは、上に3D Viewport、下にPropertiesのレイアウトになります。横向きではTimelineが加わります。画面キーボードが開くと（たとえばScript Editorで）、アクティブなビューポートが見えている部分いっぱいに最大化され、キーボードを閉じると元の位置に戻ります。

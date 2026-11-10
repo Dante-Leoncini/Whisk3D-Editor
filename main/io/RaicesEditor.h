@@ -27,6 +27,13 @@ class Object;
 // cambia la raiz ACTIVA del editor. false + motivo (en ingles; la UI lo pasa por T()) si no se
 // puede ahora. Carga la raiz si todavia no se habia abierto.
 bool W3dActivarRaiz(int idx, std::string* motivo);
+// LAS ESCENAS ABIERTAS A LA VEZ: la casilla de la lista. Tildar abre (la carga si hace falta: se ve en el viewport y en
+// el outliner); destildar la cierra y la saca de la memoria (con cambios sin guardar, primero el cartel: guardar y
+// cerrar / cerrar sin guardar / cancelar). La activa se cierra pasando la activa a otra; la ultima abierta no se cierra
+bool W3dRaizTildar(int idx, bool abrir, std::string* motivo);
+// la escena abierta de esa RAIZ (el objeto Scene de arriba) pasa a ser la activa: un click en el outliner o en el
+// viewport sobre algo de otra escena abierta. false = no se pudo (ya quedo avisado)
+bool W3dActivarRaizDe(Object* raiz);
 // "New Scene" / "New Game" / "New Prefab": crea una raiz vacia (un prefab nace con su objeto raiz)
 // con nombre libre y la ABRE. Devuelve su indice (-1 = no se pudo abrir: la fila queda creada igual).
 int  W3dRaizCrearYAbrir(int tipo, const std::string& nombre);

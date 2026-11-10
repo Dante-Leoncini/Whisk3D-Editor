@@ -22,6 +22,8 @@
 #include <cstring>                          // strlen
 #include "io/Prefabs.h"             // W3dPrefabEsEscena: el icono de una escena instanciada
 #include "objects/InstanciaPrefab.h"
+#include "W3dRaices.h"              // varias escenas abiertas: una fila por escena arriba del arbol
+#include "io/RaicesEditor.h"        // W3dActivarRaizDe: un click en otra escena abierta la activa
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
     extern int W3dPantallaAlto;  // alto de pantalla (flip de Y; glesdraw.cpp)
@@ -137,6 +139,54 @@ bool g_outVerRender = true;
 static bool OutOculto(Object* o) {
     if (!o || o->getType() != ObjectType::rutina) return false;
     return EsConstructor(o) ? !g_outVerConstructor : !g_outVerRutinas;
+}
+
+// ===================================================================================================
+//  VARIAS ESCENAS ABIERTAS (W3dRaices.h): con dos o mas, lo de ARRIBA del arbol son sus RAICES, en el orden de la lista
+//  (la prioridad del Play): una fila por escena, desplegable, con su ojo (muestra u oculta la escena entera en el
+//  viewport) y sus objetos adentro. La de la escena ACTIVA (donde van los objetos nuevos) va resaltada; un click en su
+//  nombre la activa y arrastrarla cambia el orden. Un objeto no se muda de escena arrastrandolo. Con una sola escena
+//  abierta lo de arriba son los hijos de la activa, como siempre.
+// ===================================================================================================
+static std::vector<Object*> gOutRaices;   // (se rearma en cada OutTope: se recorre por indice)
+static const std::vector<Object*>& OutTope() {
+    static const std::vector<Object*> vacia;
+    if (!SceneCollection) return vacia;
+    gOutRaices.clear();
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    if (ab.size() >= 2) {
+        const std::vector<W3dRaizFila>& fs = W3dRaices();
+        for (size_t i = 0; i < ab.size(); i++)
+            if (ab[i] >= 0 && ab[i] < (int)fs.size() && fs[(size_t)ab[i]].raiz) gOutRaices.push_back(fs[(size_t)ab[i]].raiz);
+        if (gOutRaices.size() >= 2) return gOutRaices;
+        gOutRaices.clear();
+    }
+    return SceneCollection->Childrens;
+}
+// la fila es la de una ESCENA (una raiz del proyecto: no tiene padre; solo aparece arriba con varias abiertas)
+static bool OutEsRaiz(Object* o) { return o && !o->Parent && W3dRaizDeObjeto(o) >= 0; }
+static Object* OutRaizDe(Object* o) { while (o && o->Parent) o = o->Parent; return o; }
+static std::string OutNombreRaiz(Object* r) {
+    const int i = W3dRaizDeObjeto(r);
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    return (i >= 0 && i < (int)fs.size()) ? fs[(size_t)i].nombre : r->name;
+}
+static int OutIconoRaiz(Object* r) { return W3dRaizIcono(W3dRaizTipoDe(W3dRaizDeObjeto(r))); }
+// arrastrar una escena: va antes o despues de 'junto' en la lista de las abiertas
+static void OutMoverEscena(Object* raiz, Object* junto, bool despues) {
+    const int idx = W3dRaizDeObjeto(raiz), ref = W3dRaizDeObjeto(junto);
+    if (idx < 0 || ref < 0 || idx == ref) return;
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    int pos = 0;
+    for (size_t i = 0; i < ab.size(); i++) { if (ab[i] == idx) continue; if (ab[i] == ref) break; pos++; }
+    W3dRaizMoverAbierta(idx, despues ? pos + 1 : pos);
+}
+// un objeto de otra escena abierta: su escena pasa a ser la ACTIVA (antes de elegirlo). false = no se pudo (avisado)
+bool OutlinerActivarEscenaDe(Object* o) {
+    Object* r = OutRaizDe(o);
+    return !r || r == SceneCollection || W3dActivarRaizDe(r);
 }
 
 // Constructor
@@ -289,8 +339,9 @@ void Outliner::Resize(int newW, int newH){
         return;
     }
     const size_t sepTope = ConstructorTope();
-    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-        CalcularRenglon(SceneCollection->Childrens[c], &MaxPosXtemp, &MaxPosYtemp);
+    const std::vector<Object*>& tope = OutTope();
+    for (size_t c = 0; c < tope.size(); c++) {
+        CalcularRenglon(tope[c], &MaxPosXtemp, &MaxPosYtemp);
         if (c + 1 == sepTope) MaxPosYtemp += RenglonHeightGS;   // la fila del separador
     }
     //este es el gap para la barra de desplazamiento de abajo
@@ -340,7 +391,8 @@ void Outliner::Render(){
             }
             return n; } };
         int filas = 0;
-        for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) filas += C::rec(SceneCollection->Childrens[c]);
+        const std::vector<Object*>& tope = OutTope();
+        for (size_t c = 0; c < tope.size(); c++) filas += C::rec(tope[c]);
         if (ConstructorTope() > 0) filas++;   // el separador constructor / rutina
         if (filas != lastContentRows){ lastContentRows = filas; Resize(width, height); }
     }
@@ -460,8 +512,9 @@ void Outliner::Render(){
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(marginGS + PosX, PosY + borderGS + BarTopOffset(), 0);
     const size_t sepTope = ConstructorTope();
-    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++){
-        DibujarRenglon(SceneCollection->Childrens[c], !SceneCollection->Childrens[c]->visible, 0);
+    const std::vector<Object*>& tope = OutTope();
+    for (size_t c = 0; c < tope.size(); c++){
+        DibujarRenglon(tope[c], !tope[c]->visible, 0);
         if (c + 1 == sepTope) {
             w3dEngine::PushMatrix();
             w3dEngine::Translatef(0, (GLfloat)((int)filaDFS * (int)RenglonHeightGS), 0);
@@ -487,9 +540,8 @@ void Outliner::Render(){
     }
 
     cullBaseY = GlobalScale + PosY + borderGS + BarTopOffset(); filaDFS = 0; // culling: Y de la 1er fila del recorrido de OJOS
-    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-        DibujarOjos(SceneCollection->Childrens[c], !SceneCollection->Childrens[c]->visible,
-                    !SceneCollection->Childrens[c]->renderizable);
+    for (size_t c = 0; c < tope.size(); c++) {
+        DibujarOjos(tope[c], !tope[c]->visible, !tope[c]->renderizable);
         if (c + 1 == sepTope) filaDFS++;   // (el separador no tiene ojos)
     }
     w3dEngine::PopMatrix();
@@ -580,7 +632,11 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden, int prof){
     // lo GENERADO por una instancia de prefab va en GRIS (se ve y se elige, pero es del prefab: no se edita)
     if (W3dEsGenerado(obj)) opacityRow *= 0.55f;
 
-    if (moviendo && obj == moverObj){
+    if (OutEsRaiz(obj) && !(dragging && obj == dragObjeto)) {
+        // la fila de una ESCENA (varias abiertas): la ACTIVA en blanco
+        SetColorID(obj == SceneCollection ? ColorID::blanco : ColorID::grisUI, opacityRow);
+    }
+    else if (moviendo && obj == moverObj){
         // MODO MOVER con teclado: el objeto que se esta moviendo se resalta (accent),
         // para que en el N95 (sin mouse) se vea claro cual se esta reordenando.
         SetColorID(ColorID::accent, opacityRow);
@@ -624,14 +680,15 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden, int prof){
 
     //icono de la coleccion
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
-    W3dDrawStrip4(IconMesh, IconsUV[IconoDeObjeto(obj)]->uvs);
+    W3dDrawStrip4(IconMesh, IconsUV[OutEsRaiz(obj) ? OutIconoRaiz(obj) : IconoDeObjeto(obj)]->uvs);
 
     //texto render (o el campo del RENOMBRAR EN LINEA si es el objeto que se esta renombrando)
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
     if (renombrando && renombreObjeto && obj->serial == renombreSerial) {
         SetColorID(ColorID::blanco);
         RenderTextField(renombre, g_textFieldActivo == &renombre, textAlign::left, 1920);
-    } else RenderBitmapText(obj->name);
+    } else if (OutEsRaiz(obj)) RenderBitmapText(OutNombreRaiz(obj));   // (el nombre de la escena en el proyecto)
+    else RenderBitmapText(obj->name);
     // lo que genera un PROXY de una libreria lleva el CANDADO de solo lectura despues del nombre: no se edita ni se
     // guarda, es de su .w3d (OutlinerMarcaDeObjeto)
     {
@@ -701,7 +758,8 @@ void Outliner::DibujarOjos(Object* obj, bool hidden, bool noRender){
         // si SI pero un PADRE no se renderiza -> camara encendida pero SEMI-TRANSPARENTE (igual que el ojo)
         w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
         SetColorID(ColorID::grisUI, noRender ? 0.5f : 1.0f);
-        if (g_outVerRender) W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(obj->renderizable ? IconType::camera : IconType::camera_off)]->uvs);
+        if (g_outVerRender && !OutEsRaiz(obj))   // (una escena no tiene camara de render: solo su ojo)
+            W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(obj->renderizable ? IconType::camera : IconType::camera_off)]->uvs);
         w3dEngine::PopMatrix();
     }
 
@@ -902,10 +960,16 @@ void Outliner::event_key_up(int tecla){
     const int key = tecla;
     switch (key) {
         case W3dK_LSHIFT:
+        #ifdef W3D_SYMBIAN
+            // el TAP de Shift (el lapiz del N95, sin mouse) recorre los objetos: es un idioma del TELEFONO
             if (ShiftCount < 20){
                 changeSelect(SelectMode::NextSingle, true);
                 AsegurarVisible();
             }
+        #endif
+            // En la PC, Android y la web Shift es SOLO modificador, como en la Vista 3D (ViewPort3D::event_key_up): el
+            // tap que cambiaba de objeto saltaba al escribir una mayuscula al RENOMBRAR una fila (la letra la toma el
+            // campo de texto, el Shift no se anulaba como modificador y al soltarlo el activo pasaba al primer objeto)
             ShiftCount = 0;
             LShiftPressed = false;
             break;
@@ -938,8 +1002,9 @@ static bool W3dFilaVisibleRec(Object* obj, int& fila, int prof, OutFila& out) {
 static bool W3dFilaEnArbol(int fila, OutFila& out) {
     if (!SceneCollection) return false;
     const size_t sepTope = ConstructorTope();
-    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-        if (W3dFilaVisibleRec(SceneCollection->Childrens[c], fila, 0, out)) return true;
+    const std::vector<Object*>& tope = OutTope();
+    for (size_t c = 0; c < tope.size(); c++) {
+        if (W3dFilaVisibleRec(tope[c], fila, 0, out)) return true;
         if (c + 1 == sepTope) {
             if (fila == 0) { out.obj = NULL; out.arm2d = NULL; out.sep = true; out.prof = 0; return true; }
             fila--;
@@ -973,7 +1038,8 @@ static bool W3dBuscarFila(Object* obj, Object* objetivo, int* fila) {
 
 // el objeto de la fila visible N de la escena (NULL = vacio o una fila virtual): lo usan el doble click, el menu
 // contextual y la pulsacion larga de OutlinerRecursos.cpp
-Object* OutlinerObjetoEnFila(int fila) { return fila < 0 ? NULL : W3dObjetoEnFila(fila); }
+// (la fila de una ESCENA no es un objeto: NULL)
+Object* OutlinerObjetoEnFila(int fila) { Object* o = fila < 0 ? NULL : W3dObjetoEnFila(fila); return OutEsRaiz(o) ? NULL : o; }
 // la profundidad (sangria) de la fila de un objeto: donde empieza su NOMBRE (-1 = vacio o fila virtual)
 int OutlinerProfDeFila(int fila) { int p = 0; return (fila >= 0 && W3dObjetoEnFila(fila, &p)) ? p : -1; }
 static int W3dFilaDe(Object* objetivo);
@@ -983,8 +1049,9 @@ static int W3dFilaDe(Object* objetivo) {
     if (!objetivo || !SceneCollection) return -1;
     int fila = 0;
     const size_t sepTope = ConstructorTope();
-    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-        if (W3dBuscarFila(SceneCollection->Childrens[c], objetivo, &fila)) {
+    const std::vector<Object*>& tope = OutTope();
+    for (size_t c = 0; c < tope.size(); c++) {
+        if (W3dBuscarFila(tope[c], objetivo, &fila)) {
             return fila;
         }
         if (c + 1 == sepTope) fila++;   // el separador
@@ -1059,6 +1126,15 @@ void Outliner::ActualizarDrop(int mx, int my) {
     if (hay && (hitF.arm2d || hitF.sep)) { dropZona = -2; return; }
     Object* destino = hay ? hitF.obj : NULL;
     dropProf = hay ? hitF.prof : 0; // profundidad del destino: la linea se indenta ahi
+    // VARIAS ESCENAS: una escena arrastrada va antes o despues de otra (solo sobre las filas de las escenas); un objeto no
+    // sale de su escena (sobre la fila de su escena = a su primer nivel)
+    if (OutEsRaiz(dragObjeto)) {
+        if (!OutEsRaiz(destino) || destino == dragObjeto) { dropZona = -2; return; }
+        dropZona = (resto < RenglonHeightGS / 2) ? 0 : 2;
+        return;
+    }
+    if (destino && OutRaizDe(destino) != OutRaizDe(dragObjeto)) { dropZona = -2; return; }
+    if (OutEsRaiz(destino)) { dropZona = 1; return; }
     if (!destino) dropZona = -1; // al vacio: a la raiz
     else if (destino == dragObjeto) dropZona = -2;
     else if (resto < RenglonHeightGS / 4) dropZona = 0;
@@ -1127,6 +1203,14 @@ void Outliner::SoltarDrag(int mx, int my) {
     bool hay = W3dFilaEnArbol(f, hitF);
     if (hay && (hitF.arm2d || hitF.sep)) return;   // fila VIRTUAL (armature 2D / separador): no acepta drops
     Object* destino = hay ? hitF.obj : NULL;
+    // una ESCENA: cambia su lugar en la lista de las abiertas (la prioridad del Play)
+    if (OutEsRaiz(obj)) {
+        if (OutEsRaiz(destino) && destino != obj) OutMoverEscena(obj, destino, resto >= RenglonHeightGS / 2);
+        Resize(width, height);
+        return;
+    }
+    if (destino && OutRaizDe(destino) != OutRaizDe(obj)) return;   // (a otra escena: no se muda)
+    if (OutEsRaiz(destino)) destino = NULL;                          // (sobre su escena: a su primer nivel)
     if (!destino) {
         // al vacio: desemparenta hacia la raiz, sin moverse del lugar
         ReparentKeepTransform(obj, SceneCollection);
@@ -1318,11 +1402,12 @@ void Outliner::ClickSeleccionar(int mx, int my) {
         if (W3dFilaEnArbol(fv, hv) && (hv.arm2d || hv.sep)) return;
     }
     const size_t sepTopeClick = ConstructorTope();
-    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
+    const std::vector<Object*>& tope = OutTope();
+    for (size_t c = 0; c < tope.size(); c++) {
         if (c == sepTopeClick && sepTopeClick > 0) fila--;   // (el separador corre la numeracion)
         int prof = 0;
         OutFila hf;
-        Object* hit = W3dFilaVisibleRec(SceneCollection->Childrens[c], fila, 0, hf) ? hf.obj : NULL;
+        Object* hit = W3dFilaVisibleRec(tope[c], fila, 0, hf) ? hf.obj : NULL;
         prof = hf.prof;
         if (hit) {
             // la FLECHA de desplegar (primer icono, segun la profundidad)
@@ -1333,6 +1418,16 @@ void Outliner::ClickSeleccionar(int mx, int my) {
                 Resize(width, height); // recalcular el scroll
                 return;
             }
+            // la fila de una ESCENA (varias abiertas): su ojo la muestra u oculta entera; su nombre la ACTIVA (y se puede
+            // arrastrar para cambiar el orden). No se selecciona: no es un objeto de la escena
+            if (OutEsRaiz(hit)) {
+                if (enOjo) W3dRaizFijarAbiertaVisible(W3dRaizDeObjeto(hit), !hit->visible);
+                else if (!enCamara && W3dActivarRaizDe(hit)) { dragObjeto = hit; dragging = false; dragY0 = my; }
+                g_redraw = true;
+                return;
+            }
+            // un objeto de OTRA escena abierta: su escena pasa a ser la activa antes de elegirlo (el ojo y la camara no)
+            if (!enOjo && !enCamara && !OutlinerActivarEscenaDe(hit)) return;
             if (!enOjo && !enCamara) {
                 // el click puede convertirse en ARRASTRE (reordenar /
                 // emparentar): se confirma al moverse con el boton
@@ -1359,7 +1454,9 @@ void Outliner::ClickSeleccionar(int mx, int my) {
                         // operaciones como Join arman su lista desde ObjSelects pero borran por el
                         // flag select -> un rango select=true fuera de ObjSelects se borra SIN unirse
                         // (las mallas intermedias "desaparecen"). Mantener ambos consistentes.
-                        if (o && !o->select) { o->select = true; ObjSelects.push_back(o); }
+                        if (o && !o->select && !OutEsRaiz(o) && OutRaizDe(o) == SceneCollection) {   // (de su escena)
+                            o->select = true; ObjSelects.push_back(o);
+                        }
                     }
                     hit->Seleccionar(); // el clickeado queda activo
                 }

@@ -138,6 +138,25 @@ bool W3dRaizFijarTipo(int idx, int tipo);
 // escena). 'forzar' = aunque el juego estuviera editando un clip (vuelve a "Juego").
 void W3dRaizModoPorTipo(bool forzar);
 
+// ---- LAS ESCENAS ABIERTAS EN EL EDITOR (varias a la vez) -------------------------
+// Las escenas y juegos TILDADOS en la lista: estan en memoria, se ven juntos en el viewport y cada una es un nodo del
+// outliner con su ojo. Una es la ACTIVA (SceneCollection: ahi van los objetos nuevos). El ORDEN de la lista es su
+// prioridad: el Play del editor arranca con la primera y carga las demas encima (cargarEscena). Las que no estan
+// abiertas no ocupan memoria hasta que se abren. Se guarda en el proyecto ("escenasAbiertas" / "escenasOcultas": cosa
+// del editor, el juego no las mira). Con un prefab activo (se edita aislado) la lista es solo el.
+void W3dRaicesAbiertas(std::vector<int>& out);       // las filas abiertas, en orden (la activa incluida)
+bool W3dRaizEstaAbierta(int idx);
+bool W3dRaizAbrir(int idx);                          // la carga si hace falta y la agrega al final de la lista
+void W3dRaizSacarDeAbiertas(int idx);                // la saca de la lista (no la descarga: eso es W3dRaicesDescargar)
+bool W3dRaizMoverAbierta(int idx, int pos);          // la pone en la posicion 'pos' de la lista
+bool W3dRaizAbiertaVisible(int idx);                 // el ojo del outliner
+// las OTRAS abiertas que se ven (cargadas y con el ojo prendido), en su orden: el editor las dibuja y las pickea junto a
+// la activa
+void W3dRaicesOtrasVisibles(std::vector<Object*>& out);
+void W3dRaizFijarAbiertaVisible(int idx, bool v);
+void W3dRaicesAbiertasCargar();                      // al abrir el proyecto: carga las que quedaron abiertas
+void W3dRaicesAbiertasEscribir(std::string& s);      // las dos claves para proyecto.json (vacio si no hace falta)
+
 // ---- ESCENA INICIAL (la que arranca el juego compilado; "" = la del bloque) ----
 const std::string& W3dRaizInicial();
 bool W3dRaizFijarInicial(const std::string& nombre);       // false = no es una escena del proyecto

@@ -8,7 +8,7 @@
 | Función | Descripción | Cómo se usa |
 |---|---|---|
 | Pintar | Pinta solo las caras de frente que se ven (con Rayos X, también las de atrás). Cada trazo es un paso de deshacer. | Click y arrastrar |
-| Radio | El tamaño del pincel en píxeles. Al cambiarlo aparece un círculo en el centro de la vista con el tamaño real. | Barra arrastrable sobre la barra inferior |
+| Radio | El tamaño del pincel en píxeles. Al cambiarlo aparece un círculo en el centro de la vista con el tamaño real. | Barra arrastrable sobre la barra de herramientas |
 | Valor | La intensidad del pincel. | Barra arrastrable |
 | Caída | Cómo se suaviza el borde del pincel; se puede dibujar una curva propia. | Botón de caída |
 | Vista (táctil) | Prendido: el dedo navega. Apagado: el dedo pinta. | Botón con forma de monitor |

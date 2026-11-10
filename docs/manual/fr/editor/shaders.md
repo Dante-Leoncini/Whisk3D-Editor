@@ -10,11 +10,11 @@ Le même fichier marche de la même façon sur tous les backends graphiques :
 
 | Backend | `@vertice` | `@fragmento` |
 |---|---|---|
-| OpenGL ES 2.0 : Android, navigateur (WebGL), Nokia N8, PC avec **Graphics → OpenGL ES 2.0** | Sur le GPU | Sur le GPU |
+| OpenGL ES 2.0 : Android, navigateur (WebGL), Nokia N8, PC avec **Graphismes → OpenGL ES 2.0** | Sur le GPU | Sur le GPU |
 | Vulkan (PC) | Sur le GPU | Sur le GPU |
 | OpenGL du PC (celui par défaut), OpenGL ES 1.1 (Nokia N95), Nintendo 3DS, Dreamcast | **Sur le CPU** | Non : le matériau est dessiné comme d'habitude |
 
-Sur un backend sans shaders, rien ne casse : le **`@vertice` s'exécute sur le CPU** (l'eau avec des vagues bouge de la même façon sur le N95) et la couleur vient du matériau normal. La carte Material le signale : *"This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual"* (ce backend graphique n'a pas de shaders : la section @vertice s'exécute sur le CPU et le reste du matériau est dessiné comme d'habitude).
+Sur un backend sans shaders, rien ne casse : le **`@vertice` s'exécute sur le CPU** (l'eau avec des vagues bouge de la même façon sur le N95) et la couleur vient du matériau normal. La carte Matériau le signale : *"Ce backend graphique n'a pas de shaders : la section @vertice tourne sur le CPU et le reste du matériau est dessiné normalement"*.
 
 ### Le `@vertice` sur le CPU
 
@@ -32,27 +32,27 @@ Il ne comprend ni les matrices, ni les tableaux, ni `while`, ni `#define` : si 
 
 ## Utiliser un shader dans un matériau
 
-1. Sélectionnez l'objet et ouvrez l'onglet **Material** des Properties.
-2. Tout en bas, cochez **Advanced: custom shader**. Si le matériau n'a pas encore de fichier, un nouveau (`shader.glsl`) est créé à partir d'un modèle, utilisé tout de suite et ouvert dans l'IDE.
+1. Sélectionnez l'objet et ouvrez l'onglet **Matériau** des Propriétés.
+2. Tout en bas, cochez **Avancé : shader personnalisé**. Si le matériau n'a pas encore de fichier, un nouveau (`shader.glsl`) est créé à partir d'un modèle, utilisé tout de suite et ouvert dans l'IDE.
 3. Dans **Shader**, vous choisissez le fichier :
    - les `.glsl` déjà présents dans le projet ;
-   - **New shader** : un autre fichier avec le modèle ;
-   - **Load from disk...** : un `.glsl` de votre ordinateur. Il est copié dans le projet, comme les textures et les scripts.
+   - **Nouveau shader** : un autre fichier avec le modèle ;
+   - **Charger du disque...** : un `.glsl` de votre ordinateur. Il est copié dans le projet, comme les textures et les scripts.
 4. Le petit bouton à droite de **Shader** ouvre le fichier dans l'**IDE** (il faut un IDE dans le layout).
-5. Vous écrivez, et **Ctrl+S** enregistre et compile. Vous pouvez aussi appuyer sur **Compile** dans le matériau ou dans la barre de l'IDE (il apparaît à côté du nom du fichier quand c'est un `.glsl`).
-6. Sous **Compile** s'affiche le résultat : **Compiled**, ou l'erreur en rouge avec sa ligne.
+5. Vous écrivez, et **Ctrl+S** enregistre et compile. Vous pouvez aussi appuyer sur **Compiler** dans le matériau ou dans la barre de l'IDE (il apparaît à côté du nom du fichier quand c'est un `.glsl`).
+6. Sous **Compiler** s'affiche le résultat : **Compilé**, ou l'erreur en rouge avec sa ligne.
 
 Pas besoin d'enregistrer le projet pour commencer. S'il n'est pas encore enregistré, le shader est écrit dans un dossier de travail de l'éditeur ; quand vous enregistrez le projet, il passe dans le `.w3d`, dans le dossier `shaders/`, et le matériau et l'IDE utilisent alors cette copie. Dès lors, il voyage avec le projet (sur le téléphone, dans le jeu compilé, sur un autre ordinateur). Si vous décochez la case, le matériau est de nouveau dessiné comme d'habitude ; le fichier reste sélectionné.
 
 Si un shader ne compile pas, l'objet est dessiné avec son matériau normal jusqu'à ce que vous le corrigiez. L'éditeur ne plante pas.
 
-### Depuis la Library : glisser un shader sur un maillage
+### Depuis la Bibliothèque : glisser un shader sur un maillage
 
-Les shaders du projet apparaissent dans la **Library** (l'Outliner en mode Library), sous **Shaders**, avec le nombre d'objets qui les utilisent. De là :
+Les shaders du projet apparaissent dans la **Bibliothèque** (l'Outliner en mode Bibliothèque), sous **Shaders**, avec le nombre d'objets qui les utilisent. De là :
 
-- **Glissez-le sur un maillage** dans le 3D Viewport : pendant que vous le déplacez, la **partie du maillage** sous le pointeur est dessinée avec ce shader, pour que vous voyiez à quelle partie vous allez l'appliquer. Si vous passez sur une autre partie ou sortez du maillage, elle retrouve son matériau. Au relâchement, le matériau de cette partie utilise le shader (avec le matériau par défaut, la partie reçoit un nouveau matériau). **Ctrl+Z** l'annule.
+- **Glissez-le sur un maillage** dans la Vue 3D : pendant que vous le déplacez, la **partie du maillage** sous le pointeur est dessinée avec ce shader, pour que vous voyiez à quelle partie vous allez l'appliquer. Si vous passez sur une autre partie ou sortez du maillage, elle retrouve son matériau. Au relâchement, le matériau de cette partie utilise le shader (avec le matériau par défaut, la partie reçoit un nouveau matériau). **Ctrl+Z** l'annule.
 - Pareil avec un **matériau** : pendant que vous le glissez, la partie s'affiche avec lui.
-- **Open in IDE**, le renommer, le changer de dossier ou le sortir du `.w3d`, comme un script.
+- **Ouvrir dans l'IDE**, le renommer, le changer de dossier ou le sortir du `.w3d`, comme un script.
 - Un `.glsl` glissé **depuis l'explorateur de fichiers de votre ordinateur** dans la fenêtre entre dans le projet ; si vous le relâchez sur un maillage, il est en plus appliqué à cette partie.
 
 ## À quoi ressemble le fichier
@@ -96,12 +96,12 @@ vec4 Fragmento() {
 | `w3d_luzColor` | `vec4` | La couleur de la première lumière (avec son intensité). |
 | `w3d_luzPos` | `vec4` | La position de la première lumière dans l'espace de la caméra (`w` = 0 : c'est une direction, le soleil). |
 | `w3d_ambiente` | `vec4` | La lumière ambiante. |
-| `w3d_color` | `vec4` | La **Color** du matériau (avec son alpha). |
-| `w3d_emision` | `vec4` | L'**Emission** du matériau. |
+| `w3d_color` | `vec4` | La **Couleur** du matériau (avec son alpha). |
+| `w3d_emision` | `vec4` | L'**Émission** du matériau. |
 | `w3d_Textura(uv)` | `vec4` | La texture du matériau à ces UV (blanc s'il n'en a pas). Le `v` commence **en haut** de l'image (0 = la ligne du haut, 1 = celle du bas). |
-| `w3d_colorVertice` | `vec4` | La couleur de sommet (si le maillage en a et que le matériau utilise **Vertex color**). |
-| `w3d_rugosidad`, `w3d_metalico` | `float` | La **Roughness** et le **Metallic** du matériau. |
-| `w3d_ior`, `w3d_transmision` | `float` | L'**IOR** et la **Transmission** du matériau (ceux du Ray Tracing). |
+| `w3d_colorVertice` | `vec4` | La couleur de sommet (si le maillage en a et que le matériau utilise **Couleur de sommet**). |
+| `w3d_rugosidad`, `w3d_metalico` | `float` | La **Rugosité** et le **Métallique** du matériau. |
+| `w3d_ior`, `w3d_transmision` | `float` | L'**IOR** et la **Transmission** du matériau (ceux du lancer de rayons). |
 | `w3d_tiempo` | `float` | Les secondes, pour animer. Dans l'éditeur, c'est le temps de la **timeline** (l'image actuelle ÷ les FPS) : en pause il reste figé, avec **Play** il avance, et en faisant glisser la timeline vous voyez n'importe quel instant. Dans le jeu exporté, c'est le temps écoulé depuis le lancement. |
 | `w3d_PuntoPantalla()` | `vec2` | Où se trouve le pixel dans la vue : (0,0) en bas à gauche, (1,1) en haut à droite. |
 | `w3d_Pixel()` | `vec2` | La taille d'un pixel dans ces mêmes unités. |
@@ -183,7 +183,7 @@ vec4 Fragmento() {
 }
 ```
 
-Pour que la vague se voie, le plan a besoin de sommets : subdivisez-le en Edit Mode.
+Pour que la vague se voie, le plan a besoin de sommets : subdivisez-le en Mode Édition.
 
 ### Verre dépoli
 
@@ -228,11 +228,11 @@ vec4 Fragmento() {
 }
 ```
 
-Il se règle depuis le matériau : **Transmission** (0 = verre opaque de la couleur du matériau, 1 = on voit tout ce qui est derrière), **IOR** (à quel point ce qui est derrière est dévié) et **Roughness** (à quel point c'est flou). Ce sont les mêmes valeurs que celles du **Ray Tracing**, donc en Render Preview le même objet est du vrai verre.
+Il se règle depuis le matériau : **Transmission** (0 = verre opaque de la couleur du matériau, 1 = on voit tout ce qui est derrière), **IOR** (à quel point ce qui est derrière est dévié) et **Rugosité** (à quel point c'est flou). Ce sont les mêmes valeurs que celles du **lancer de rayons**, donc en Aperçu rendu le même objet est du vrai verre.
 
 ### Verre plat dépoli
 
-Pour un **plan** : une fenêtre, une paroi vitrée, un écran de verre. C'est `examples/shaders/vidrio_plano.glsl`. Il fait la moyenne de 17 lectures de ce qui est derrière sur deux anneaux ; la **Roughness** élargit les anneaux. La **texture** du matériau indique *où* il est dépoli : blanc = flou, noir = lisse. Avec `texturas/escarcha.png`, on obtient des traces, une petite fenêtre propre et des gouttes qui coulent ; sans texture, tout le verre est dépoli. Mieux vaut désactiver le **Culling** du plan pour le voir des deux côtés.
+Pour un **plan** : une fenêtre, une paroi vitrée, un écran de verre. C'est `examples/shaders/vidrio_plano.glsl`. Il fait la moyenne de 17 lectures de ce qui est derrière sur deux anneaux ; la **Rugosité** élargit les anneaux. La **texture** du matériau indique *où* il est dépoli : blanc = flou, noir = lisse. Avec `texturas/escarcha.png`, on obtient des traces, une petite fenêtre propre et des gouttes qui coulent ; sans texture, tout le verre est dépoli. Mieux vaut désactiver le **Culling** du plan pour le voir des deux côtés.
 
 ```glsl
 float esmerilado = w3d_Textura(w3d_uv).r * w3d_rugosidad;   // à quel point CE point est flou
@@ -246,7 +246,7 @@ C'est `examples/shaders/reflejo_entorno.glsl`. La **texture du matériau** est u
 1. `reflect(-ojo, n)` indique dans quelle direction **rebondit le regard**, dans l'espace de la caméra.
 2. `w3d_AMundo(...)` passe cette direction dans le **monde**, pour que le reflet reste immobile même si la caméra tourne.
 3. `Panorama(...)` convertit la direction en un point de la photo : l'angle autour (`atan`) est le `u` et l'angle de haut en bas (`acos`) est le `v`.
-4. On mélange avec la surface selon **Fresnel** (de biais, ça reflète davantage) et le **Metallic** (un métal reflète tout, teinté de sa **Color**).
+4. On mélange avec la surface selon **Fresnel** (de biais, ça reflète davantage) et le **Métallique** (un métal reflète tout, teinté de sa **Couleur**).
 
 ```glsl
 @fragmento
@@ -287,7 +287,7 @@ vec4 Fragmento() {
 
 ## Dans une routine : l'étape **Shader**
 
-Un shader écrit est comme un **état GL** : on le met, et ce qui est dessiné ensuite l'utilise. Dans une **routine** (Add → Draw → **Shader**), l'étape a le **fichier** `.glsl`, la case **On** et quatre nombres : **IOR**, **Transmission**, **Roughness** et **Metallic** (ils arrivent comme `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico` ; on peut les animer ou les lire depuis une mémoire).
+Un shader écrit est comme un **état GL** : on le met, et ce qui est dessiné ensuite l'utilise. Dans une **routine** (Ajouter → Draw → **Shader**), l'étape a le **fichier** `.glsl`, la case **On** et quatre nombres : **IOR**, **Transmission**, **Roughness** et **Metallic** (ils arrivent comme `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico` ; on peut les animer ou les lire depuis une mémoire).
 
 ```
 Shader          vidrio_plano.glsl  On   (IOR 1.5, Roughness 0.6)
@@ -299,17 +299,17 @@ Draw elements   Marco           ← désormais sans shader
 
 Avec **On**, les « Draw elements » qui suivent utilisent le shader ; case décochée, il est retiré. À la fin de la routine, il est retiré automatiquement. Ça marche en **OpenGL ES 2.0 et Vulkan** ; en OpenGL ES 1.1 et en GL fixe, l'étape ne fait rien (les dessins d'une routine pointent directement sur les données du maillage : le `@vertice` sur le CPU est réservé aux matériaux). Un shader qui lit l'écran (`w3d_Pantalla`) voit ce que la routine et la scène ont dessiné **avant** cette étape : c'est vous qui décidez de l'ordre.
 
-## Avec le ray tracing
+## Avec le lancer de rayons
 
-Le Ray Tracing n'exécute pas votre shader. Il utilise les valeurs du matériau : **Color**, **Roughness**, **Metallic**, **Transmission**, **IOR** et la texture. Si votre shader utilise ces mêmes valeurs (comme le verre dépoli), Material Preview et Render Preview montrent la même chose.
+Le lancer de rayons n'exécute pas votre shader. Il utilise les valeurs du matériau : **Couleur**, **Rugosité**, **Métallique**, **Transmission**, **IOR** et la texture. Si votre shader utilise ces mêmes valeurs (comme le verre dépoli), l'Aperçu matériau et l'Aperçu rendu montrent la même chose.
 
-**Transmission** (de 0 à 1, dans la carte Material avec le Ray Tracing activé) indique quelle part de la surface est du verre : la lumière la traverse déviée par l'**IOR** et, avec **Roughness**, ressort dépolie. L'**alpha** est autre chose : ce qui est transparent par l'alpha (ou par sa texture) n'existe pas, et à travers on voit ce qui est derrière en ligne droite, sans déviation. Avec un alpha de 50 % et une transmission de 1, la moitié passe tout droit et l'autre moitié est réfractée. Avec une transmission de 0, l'IOR dévie ce qu'on voit à travers l'alpha, comme dans les versions précédentes.
+**Transmission** (de 0 à 1, dans la carte Matériau avec le lancer de rayons activé) indique quelle part de la surface est du verre : la lumière la traverse déviée par l'**IOR** et, avec **Rugosité**, ressort dépolie. L'**alpha** est autre chose : ce qui est transparent par l'alpha (ou par sa texture) n'existe pas, et à travers on voit ce qui est derrière en ligne droite, sans déviation. Avec un alpha de 50 % et une transmission de 1, la moitié passe tout droit et l'autre moitié est réfractée. Avec une transmission de 0, l'IOR dévie ce qu'on voit à travers l'alpha, comme dans les versions précédentes.
 
 ## Ce qu'il ne fait pas (encore)
 
 - Il n'utilise qu'une lumière : la première de la scène (ou celle de l'aperçu).
 - Il ne prend pas en compte le **brouillard** ni les **plans de découpe** des miroirs.
-- En **Solid** et dans les vues de débogage (normales, alpha, vecteurs), c'est le matériau normal qui s'affiche.
+- En **Solide** et dans les vues de débogage (normales, alpha, vecteurs), c'est le matériau normal qui s'affiche.
 - Il n'a pas de paramètres propres : il utilise ceux du matériau (couleur, rugosité, métallique, transmission, IOR, émission).
 
 ## Erreurs courantes

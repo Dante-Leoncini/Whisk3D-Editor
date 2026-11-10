@@ -8,7 +8,7 @@
 | Função | Descrição | Como usar |
 |---|---|---|
 | Pintar | Pinta só as faces de frente que estão visíveis (com Raio-X, também as de trás). Cada traço é um passo de desfazer. | Clicar e arrastar |
-| Raio | O tamanho do pincel em pixels. Ao mudá-lo, aparece um círculo no centro da vista com o tamanho real. | Barra arrastável sobre a barra inferior |
+| Raio | O tamanho do pincel em pixels. Ao mudá-lo, aparece um círculo no centro da vista com o tamanho real. | Barra arrastável sobre a barra de ferramentas |
 | Valor | A intensidade do pincel. | Barra arrastável |
 | Queda | Como a borda do pincel é suavizada; dá para desenhar uma curva própria. | Botão de queda |
 | Vista (touch) | Ligado: o dedo navega. Desligado: o dedo pinta. | Botão em forma de monitor |

@@ -29,8 +29,10 @@ void CambiosPopup::Abrir(int a) {
     W3dCambiosListar(cambios);
     foco = 0; scroll = 0; arrastrando = false;
     // los textos, en el idioma de ahora y segun lo que se queria hacer
-    btn[0]->text = T(a == W3D_CAMBIOS_SALIR ? "Save and quit" : a == W3D_CAMBIOS_ABRIR ? "Save and open" : "Save and continue");
-    btn[1]->text = T(a == W3D_CAMBIOS_SALIR ? "Quit without saving" : a == W3D_CAMBIOS_ABRIR ? "Open without saving" : "Continue without saving");
+    btn[0]->text = T(a == W3D_CAMBIOS_SALIR ? "Save and quit" : a == W3D_CAMBIOS_ABRIR ? "Save and open" :
+                     a == W3D_CAMBIOS_CERRAR_ESCENA ? "Save and close" : "Save and continue");
+    btn[1]->text = T(a == W3D_CAMBIOS_SALIR ? "Quit without saving" : a == W3D_CAMBIOS_ABRIR ? "Open without saving" :
+                     a == W3D_CAMBIOS_CERRAR_ESCENA ? "Close without saving" : "Continue without saving");
     btn[2]->text = T("Cancel");
     PopUpActive = this;
     g_redraw = true;

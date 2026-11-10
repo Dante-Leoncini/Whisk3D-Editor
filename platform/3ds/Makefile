@@ -77,7 +77,7 @@ ARCH := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 DEFS := -D__3DS__ -DW3D_3DS -DW3D_OPENGL -DW3D_VERSION=\"$(VERSION)\"
 OPT  := -O2 -ffunction-sections -fdata-sections
 # CAPTURA=n: despues del cuadro n la pantalla de abajo queda en la SD (sdmc:/whisk3d_captura.ppm); PRUEBA=n: las
-# pruebas de w3d_3ds.cpp (1 = rendimiento). Solo las usa ese archivo: se recompila cuando cambian (prueba.flags)
+# pruebas de w3d_3ds.cpp (1 = rendimiento, 2 = el cierre). Solo las usa ese archivo: se recompila cuando cambian (prueba.flags)
 PRUEBA_DEFS :=
 ifneq ($(CAPTURA),)
 PRUEBA_DEFS += -DW3D_3DS_CAPTURA=$(CAPTURA)

@@ -11,7 +11,10 @@
 #include "WhiskUI/widgets/TextField.h"   // TextFieldParpadeoTick (el cursor que parpadea)   // RenderType / g_redraw: son del editor
 #include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
-#include "test/W3dMcp.h"    // whisk3d --mcp: el editor atiende a una IA (Model Context Protocol, solo en la PC)
+#include "test/W3dMcp.h"
+#ifdef W3D_MCP
+#include "test/W3dHistorial.h"   // la grabadora de pasos (W3D_HISTORIAL=<ruta>)
+#endif    // whisk3d --mcp: el editor atiende a una IA (Model Context Protocol, solo en la PC)
 #include "io/CambiosProyecto.h" // lo no guardado: el cartel al cerrar y el '*' del titulo
 
 #ifdef __EMSCRIPTEN__       // WebGL: el browser es 1 hilo -> el loop es emscripten_set_main_loop
@@ -706,7 +709,31 @@ static bool CambiosGuardar() {
     if (w3dPath.empty()) { GuardarProyectoComo(); return false; }   // (sin archivo: primero "Guardar como")
     return GuardarW3D(w3dPath);
 }
+// MIENTRAS SE COMPILA UN JUEGO ("Compilar juego") el editor queda bloqueado: no se usa ni se guarda el proyecto hasta que
+// termina; se ve la barra de progreso sobre el editor oscurecido (ProgresoOverlayRender). Lo que hace el usuario se
+// descarta, salvo SOLTAR (el mouse, un dedo, una tecla): terminan lo que se apreto antes (el click que lanzo la
+// compilacion) y no dejan nada trabado. Los eventos de la ventana (el tamanio) y de los mandos que se conectan siguen
+static bool EventoBloqueadoAlCompilar(const SDL_Event& e) {
+    switch (e.type) {
+        case SDL_QUIT: case SDL_KEYDOWN: case SDL_TEXTEDITING: case SDL_TEXTINPUT:
+        case SDL_MOUSEMOTION: case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEWHEEL:
+        case SDL_FINGERDOWN: case SDL_FINGERMOTION: case SDL_MULTIGESTURE: case SDL_DOLLARGESTURE:
+        case SDL_JOYAXISMOTION: case SDL_JOYBALLMOTION: case SDL_JOYHATMOTION: case SDL_JOYBUTTONDOWN:
+        case SDL_CONTROLLERAXISMOTION: case SDL_CONTROLLERBUTTONDOWN:
+        case SDL_DROPFILE: case SDL_DROPTEXT: case SDL_DROPBEGIN: case SDL_DROPCOMPLETE:
+            return true;
+        default: return false;
+    }
+}
 static void ProcesarEvento(SDL_Event& e) {
+    {   extern bool CompilarJuegoEnCurso();
+        if (CompilarJuegoEnCurso() && EventoBloqueadoAlCompilar(e)) {
+            if (e.type == SDL_QUIT) { extern void Notificar(const std::string&, bool); Notificar(T("Wait for the build to finish"), false); }
+            if (e.type == SDL_DROPFILE && e.drop.file) SDL_free(e.drop.file);
+            if (e.type == SDL_DROPTEXT && e.drop.file) SDL_free(e.drop.file);
+            return;
+        }
+    }
 #ifdef W3D_VITA
     { extern bool W3dVitaEventoValido(const SDL_Event&); if (!W3dVitaEventoValido(e)) return; }   // (el panel de atras)
 #endif
@@ -774,6 +801,7 @@ static void ProcesarEvento(SDL_Event& e) {
 
 static void MainLoopFrame() {
 #ifdef W3D_MCP
+    W3dHistorialCuadro();   // la grabadora de pasos: lo que cambio (sin W3D_HISTORIAL no hace nada)
     // el MCP (--mcp): los pedidos de la IA se atienden aca, entre cuadros. Si el cliente se va, el editor se cierra
     // por la misma puerta que la cruz de la ventana (con el cartel si hay cambios sin guardar)
     if (W3dMcpActivo()) {
@@ -961,6 +989,10 @@ static void MainLoopFrame() {
 
 #ifdef __EMSCRIPTEN__
     if (!running) { emscripten_cancel_main_loop(); return; } // SDL_QUIT -> salir del loop del browser
+#else
+    // se pidio salir (SDL_QUIT): este cuadro ya no se dibuja. En la 3DS el sistema suspende la GPU para cerrar la app
+    // (cerrar desde HOME) y empezar un cuadro de citro3d esperaria a la GPU para siempre: la consola quedaba trabada
+    if (!running) return;
 #endif
 
     // CAPTURA DEL MOUSE (juego estilo FPS, PC): mientras el juego CORRE, la ventana tiene el foco y un script pidio
@@ -1200,6 +1232,9 @@ int main(int argc, char* argv[]) {
 #endif
 #ifndef __EMSCRIPTEN__
     w3dRedirigirCoutAlLog();   // cout/cerr -> whisk3d.log (no la consola blanca de Windows). Impl comun en w3dlog.cpp.
+#endif
+#ifdef W3D_MCP
+    W3dHistorialIniciar();     // W3D_HISTORIAL=<ruta.txt>: anota los pasos de la persona (para armar tutoriales)
 #endif
 #ifdef __EMSCRIPTEN__
     SDL_SetMainReady(); // web: no arrancamos por el main de SDL
@@ -1682,11 +1717,17 @@ int main(int argc, char* argv[]) {
 
     W3dDockProgresoFin(); // ultimo seguro: cerrar el editor no puede dejar la barra prendida en el dock
     if (controller) SDL_GameControllerClose(controller);
+#ifdef W3D_3DS
+    // citro3d se cierra ANTES que la ventana: SDL_Quit apaga las pantallas (gfxExit) y citro3d tiene enganchados al
+    // sistema su hook de APT y su interrupcion del vblank. Cerrar la app con eso puesto trababa la consola
+    w3dEngine::C3DFin();
+#endif
 #ifdef W3D_VULKAN
     VkGLTerminar();
 #endif
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
+    w3dLogf("[editor] cerrado");   // (la prueba de cierre de las consolas espera esta linea: no se trabo en el camino)
     return 0;
 }

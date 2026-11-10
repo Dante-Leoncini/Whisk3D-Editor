@@ -4,7 +4,7 @@ Script'in özel adlara sahip fonksiyonlar tanımlar ve motor bunları tam zaman�
 
 | Fonksiyon | Ne zaman çağrılır |
 |---|---|
-| `inicio()` | Bir kez, Play'e basıldığında (ya da nesne `instanciar` ile oluşturulur oluşturulmaz). Nesneleri bulmak ve değişkenleri hazırlamak için kullanılır. |
+| `inicio()` | Bir kez, Oynat'a basıldığında (ya da nesne `instanciar` ile oluşturulur oluşturulmaz). Nesneleri bulmak ve değişkenleri hazırlamak için kullanılır. |
 | `actualizar(dt)` | Her karede, nesne **görünür** olduğu ve etkin sahnede bulunduğu sürece. `dt`, önceki kareden bu yana geçen saniyedir (0.001 ile 0.1 arasında). |
 | `alEntrar(otro, miHitbox, suHitbox)` | Bir hitbox başka birine dokunmaya başladığında. |
 | `alQuedarse(otro, miHitbox, suHitbox)` | Birbirlerine dokunmaya devam ettikleri sürece her karede. |
@@ -32,4 +32,4 @@ end
 
 ## Oyunu durdurunca
 
-Stop'a basınca tüm script'ler kapatılır, ortak alan silinir ve sahne Play'den önceki hâline döner. Oyun çalışırken bir script'i düzenlersen, o nesne script'i yeniden yükler: değişkenleri sıfırlanır ve `inicio()` yeniden çağrılır.
+Durdur'a basınca tüm script'ler kapatılır, ortak alan silinir ve sahne Oynat'tan önceki hâline döner. Oyun çalışırken bir script'i düzenlersen, o nesne script'i yeniden yükler: değişkenleri sıfırlanır ve `inicio()` yeniden çağrılır.

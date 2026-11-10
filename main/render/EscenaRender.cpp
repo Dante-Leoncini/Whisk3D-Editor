@@ -10,6 +10,8 @@
 #include "objects/Mesh.h"        // w3dLoteStamp + los diferidos (calcomanias / luces aditivas)
 #include "objects/Particulas.h"  // particulas diferidas (billboards translucidos)
 #include "objects/Light.h"        // MAX_LIGHTS: apagar los GL lights antes del pase
+#include "W3dRaices.h"              // las escenas abiertas a la vez en el editor
+#include "script/W3dScript.h"       // W3dScriptHayPartida: jugando solo se ve la base
 #include "render/OpcionesRender.h"// RenderType + la luz de los modos de preview
 #include "objects/Niebla.h"        // la niebla arranca y termina apagada en cada pase
 #include "W3dEscena.h"             // dibujar3D(false) de lua: el pase no se hace
@@ -167,6 +169,15 @@ void W3dEscena3DPasada() {
     W3dNieblaReiniciar();               // la NIEBLA la prende el objeto Niebla del arbol (desde ahi en adelante)
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
+#ifndef W3D_SIN_EDITOR
+    // LAS OTRAS ESCENAS ABIERTAS en el editor (varias a la vez, W3dRaices.h): se ven juntas, en su orden, con las luces
+    // de la activa. Jugando no: el Play dibuja su base y lo que cargo encima (cargarEscena)
+    if (!W3dScriptHayPartida()) {
+        std::vector<Object*> otras;
+        W3dRaicesOtrasVisibles(otras);
+        for (size_t i = 0; i < otras.size(); i++) otras[i]->Render();
+    }
+#endif
     W3dLucesPrepaseFin();
     // CALCOMANIAS (sombras) y LUCES ADITIVAS (chispas/halos): no escriben z, asi que
     // van DESPUES de toda la escena opaca o cualquier opaco posterior las borra.

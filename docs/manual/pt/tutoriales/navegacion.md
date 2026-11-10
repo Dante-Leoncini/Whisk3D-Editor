@@ -7,7 +7,7 @@ Este tutorial explica como navegar na Viewport 3D. Navegar é mover o seu ponto 
 
 Saber navegar é importante: para fazer modelos 3D e animações de um jeito confortável e rápido, você precisa saber se mover pela cena e se colocar numa posição confortável para trabalhar.
 
-Como foi explicado no [tutorial anterior](viewports.md#a-viewport-ativa), para usar os comandos a seguir, a Viewport 3D precisa ser a viewport ativa, a da borda verde.
+Como foi explicado no tutorial [As viewports](viewports.md#a-viewport-ativa), para usar os comandos a seguir, a Viewport 3D precisa ser a viewport ativa, a da borda verde.
 
 As três coisas que você mais vai usar são **orbitar**, **deslocar** e dar **zoom**. Cada uma pode ser feita com o mouse, com os dedos em uma tela touch ou com o teclado do Nokia N95. Nos vídeos do PC, o mouse no canto inferior direito mostra em verde o botão que está sendo apertado.
 
@@ -177,7 +177,7 @@ Com o cadeado fechado, a câmera ativa fica travada na vista: você orbita, desl
 |---|---|
 | ![PC](img/icono-pc.svg) PC | Um clique no cadeado |
 | ![Android](img/icono-android.svg) Tela touch | Um toque no cadeado |
-| ![Nokia](img/icono-nokia.svg) Nokia N95 | A soft esquerda abre a barra de menus (como no [tutorial anterior](viewports.md#quando-a-barra-não-cabe)); ali, Vista → Mover a câmera com a vista |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | A soft esquerda abre a barra de menus (como no tutorial [As viewports](viewports.md#quando-não-dá-para-ver-todas-as-opções-da-barra-de-menus)); ali, Vista → Mover a câmera com a vista |
 | Menu | Vista → Mover a câmera com a vista |
 
 ![Com Num 0 a vista passa para a câmera; um clique no cadeado o fecha e, ao orbitar e girar a roda, a câmera se move até o cubo ficar enquadrado](img/navegacion-camara-bloquear-raton.webp)

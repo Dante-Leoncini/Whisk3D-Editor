@@ -130,18 +130,35 @@ def color(idioma):
     return g.cuadros(calidad=78)
 
 
+def activar_props(g, pestania):
+    """El primer click en Propiedades solo la vuelve el viewport activo (no toca nada): se hace antes de grabar, en la
+    pestania que ya esta abierta."""
+    g.clic(*g.info().pestania(pestania))
+
+
+def a_la_vista(g, nombre, margen=170):
+    """Desplaza Propiedades con la rueda hasta que la fila 'nombre' quede comoda adentro del panel."""
+    for _ in range(40):
+        i = g.info()
+        p, v = i.prop(nombre), i.vp(PROPIEDADES)
+        if p["y"] < v["y"] + v["h"] - margen:
+            return p
+        g.linea("propscroll 1")
+    raise SystemExit("capturas: la fila '%s' no llega a verse" % nombre)
+
+
 @receta("propiedades-texto")
 def texto(idioma):
-    """El nombre del objeto: un click en el campo Nombre, se escribe otro y Enter (el Outliner lo muestra)."""
-    g = guion_props(idioma)
-    p = g.info().prop(T(idioma, "Name"))
+    """El nombre del cubo: un click en el campo Nombre, se escribe otro y Enter (el Outliner lo muestra)."""
+    g = guion_props(idioma, h=900)
+    activar_props(g, 1)
+    p = a_la_vista(g, T(idioma, "Name"))
+    g.fotos = []                                  # (lo de arriba es la preparacion)
     g.raton_mover(p["valor"] - 30, p["y"] - 100)
     g.foto(dur=700)
     clic_en(g, p["valor"], p["y"], despues=600)
     nuevo = {"es": "Caja", "en": "Box", "pt": "Caixa"}.get(idioma, T(idioma, "Cube") + "2")
-    g.mod("Ctrl")
-    g.tecla("a")                                  # (todo el texto elegido: lo que se escribe lo reemplaza)
-    g.mod()
+    teclas(g, ["Backspace"] * len(T(idioma, "Cube")), "Backspace", dur=600)   # se borra el nombre de antes
     teclas(g, ["=" + nuevo], nuevo, dur=600)
     teclas(g, ["Return"], "Enter", dur=1800)
     return g.cuadros(calidad=78)
@@ -149,14 +166,20 @@ def texto(idioma):
 
 @receta("propiedades-casilla")
 def casilla(idioma):
-    """Un click en la casilla Visible: el cubo desaparece de la vista; otro click, vuelve."""
-    g = guion_props(idioma)
-    p = g.info().prop(T(idioma, "Visible"))
-    x = p["valor"]
-    g.raton_mover(x - 30, p["y"] - 100)
-    g.foto(dur=700)
-    clic_en(g, x, p["y"], despues=1400)
-    clic_en(g, x, p["y"], despues=1400)
+    """La casilla Iluminacion del material del cubo: apagada, el cubo se ve blanco y plano, sin luces; otro click, la
+    prende y vuelve a verse iluminado."""
+    g = guion_props(idioma, h=900)
+    g.linea("propstab 2")
+    activar_props(g, 2)
+    b = g.info().prop(T(idioma, "New Material"))  # el material del cubo es el por defecto: uno nuevo, editable
+    g.clic(b["valor"], b["y"])
+    g.clic(*g.info().item_texto(T(idioma, "New Material")))
+    p = a_la_vista(g, T(idioma, "Lighting"))
+    g.fotos = []                                  # (lo de arriba es la preparacion)
+    g.raton_mover(p["valor"] - 30, p["y"] - 100)
+    g.foto(dur=900)
+    clic_en(g, p["valor"], p["y"], despues=1600)
+    clic_en(g, p["valor"], p["y"], despues=1600)
     return g.cuadros(calidad=78)
 
 
@@ -207,13 +230,8 @@ def tactil_props(g):
 
 
 def tocar_en(g, x, y, antes=500, despues=600):
-    g.dedo_flotando(x, y)
-    g.foto(dur=antes)
-    g.dedo_abajo(x, y)
-    g.foto(dur=150)
-    g.dedo_arriba()
-    g.dedos_quitar()
-    g.foto(dur=despues)
+    """Un toque que se puede seguir (ver Guion.toque): el dedo llega flotando y se ilumina al tocar."""
+    g.toque(x, y, antes=antes, despues=despues)
 
 
 @receta("propiedades-numero-dedo")
@@ -467,6 +485,21 @@ def v3d_barra(idioma):
     return g.cuadros(recorte=(v["x"], v["y"], v["w"], v["h"]))
 
 
+@receta("vista-3d-barra-menus")
+def v3d_barra_menus(idioma):
+    """Solo la barra de menus de la Vista 3D (ancha: entera), con el cubo elegido en el Modo Objeto."""
+    g = Guion(idioma, w=1600, h=600)
+    g.linea("division 0.78")
+    i = g.info()
+    v = i.vp(VISTA_3D)
+    botones = [b for b in i.botones if b["kind"] == VISTA_3D and b.get("visible", 1)]
+    x1 = max(b["x"] + b["w"] for b in botones) + 8      # hasta el ultimo boton (lo de la derecha es vacio)
+    borde = 3                                              # (por dentro del borde verde del viewport activo)
+    g.sin_puntero()
+    g.foto()
+    return g.cuadros(recorte=(v["x"] + borde, v["y"] + borde, x1 - v["x"] - borde, v["barra"] - borde))
+
+
 @receta("vista-3d-sombreado")
 def v3d_sombreado(idioma):
     """Leon: Z (o el 6 en el N95) pasa por los modos de vista: Vista previa de material, Solido, Normales, Alambrico,
@@ -486,13 +519,225 @@ def v3d_sombreado(idioma):
     return g.cuadros(recorte=rec, calidad=72)
 
 
-@receta("vista-3d-superposiciones")
-def v3d_superposiciones(idioma):
-    """El menu Superposiciones abierto (el ojo de la barra de la Vista 3D)."""
-    g = Guion(idioma, w=960, h=760)
-    x, y = g.info().boton_rol(VISTA_3D, 7)        # BR_Overlays
-    g.clic(x, y)
+
+@receta("vista-3d-gizmo-cursor")
+def v3d_gizmo_cursor(idioma):
+    """El cubo elegido con el gizmo encima y, a un costado, el cursor 3D: cada uno marcado y con su nombre."""
+    import math
+    from recetas import vista_pc
+    g = Guion(idioma, w=1200, h=680)
+    g.linea("division 0.8")
+    g.linea("cursor3d -2.4 0 1.4")
+    g.linea("vporbita -1.0 0.3 0.6 6 -25 24")          # cerca: el cubo y el cursor llenan la vista
+    rec, _ = vista_pc(g)
+    i = g.info()
+    cx, cy = i.manijas[6]                               # el centro del gizmo
+    r = max(math.hypot(x - cx, y - cy) for k, (x, y) in i.manijas.items() if k in (0, 1, 2)) + 50
+    ux, uy = i.cursor3d
     g.sin_puntero()
-    v = g.info().vp(VISTA_3D)
+    g.foto(marcas=(("circulo", cx, cy, r), ("etiqueta", cx, cy - r - 22, T(idioma, "Gizmo")),
+                   ("circulo", ux, uy, 40), ("etiqueta", ux, uy - 40 - 22, T(idioma, "3D Cursor"))))
+    return g.cuadros(recorte=rec)
+
+
+# ---- Los viewports: el boton de la esquina, ampliado --------------------------------------------------------------
+@receta("viewports-esquina")
+def esquina(idioma):
+    """El boton de la esquina de la Vista 3D, ampliado 3 veces y marcado."""
+    g = Guion(idioma, ampliar=3)
+    i = g.info()
+    x, y = i.esquina(VISTA_3D)
+    v = i.vp(VISTA_3D)
+    g.foto(marcas=(("circulo", x, y, 15),))
+    return g.cuadros(recorte=(v["x"], v["y"], 240, 46))
+
+
+# ---- La Vista 3D: los modos y el pivote ---------------------------------------------------------------------------
+BR_MODO, BR_PIVOTE = 1, 3
+
+
+def recorte_menu(g, kind=VISTA_3D, margen=12):
+    """El viewport hasta abajo del menu abierto (que el menu entre entero)."""
+    i = g.info()
+    v = i.vp(kind)
+    m = i.menus[0]
+    alto = max(v["h"] // 2, m["y"] + m["h"] + margen - v["y"])
+    return (v["x"], v["y"], v["w"], min(v["h"], alto))
+
+
+
+@receta("vista-3d-modos-esqueleto")
+def v3d_modos_esqueleto(idioma):
+    """El menu del boton de modo con un esqueleto (Leon): Modo Objeto, Modo Edicion y Modo Pose."""
+    from recetas_objeto import escena_leon
+    g = Guion(idioma)
+    escena_leon(g)
+    g.clic(*g.info().boton_rol(VISTA_3D, BR_MODO))
+    g.sin_puntero()
+    rec = recorte_menu(g)
     g.foto()
-    return g.cuadros(recorte=(v["x"], v["y"], v["w"], v["h"]))
+    return g.cuadros(recorte=rec)
+
+
+def foto_vista(g):
+    from recetas import vista_pc
+    rec, _ = vista_pc(g)
+    g.sin_puntero()
+    g.foto()
+    return g.cuadros(recorte=rec)
+
+
+@receta("vista-3d-modo-edicion")
+def v3d_modo_edicion(idioma):
+    """El cubo en el Modo Edicion, con una cara elegida."""
+    g = Guion(idioma)
+    g.linea("modo edicion")
+    g.linea("caras 0")
+    return foto_vista(g)
+
+
+@receta("vista-3d-modo-edicion-esqueleto")
+def v3d_modo_edicion_esqueleto(idioma):
+    """El esqueleto de Leon en el Modo Edicion: los huesos en su posicion de reposo."""
+    from recetas_objeto import escena_leon
+    g = Guion(idioma)
+    escena_leon(g, vista="vporbita 0 0.9 0 3 -10 28")
+    g.linea("vista3d huesos 1")
+    g.linea("modo edicion")
+    return foto_vista(g)
+
+
+@receta("vista-3d-modo-pose")
+def v3d_modo_pose(idioma):
+    """El esqueleto de Leon en el Modo Pose, a mitad de su animacion de caminar."""
+    from recetas_objeto import escena_leon
+    g = Guion(idioma)
+    escena_leon(g, vista="vporbita 0 0.9 0 3 -10 28")
+    g.linea("vista3d huesos 1")
+    g.linea("animlistsel 1")                      # (el clip 'caminar')
+    g.linea("frame 12")
+    g.linea("modo pose")
+    return foto_vista(g)
+
+
+@receta("vista-3d-modo-pesos")
+def v3d_modo_pesos(idioma):
+    """Una malla de Leon en la Pintura de Pesos: en rojo lo que mueve mucho el hueso elegido, en azul lo que no."""
+    from recetas_objeto import escena_leon
+    g = Guion(idioma)
+    escena_leon(g, vista="vporbita 0 0.9 0 3 -10 28")
+    g.linea("deselectall")
+    g.linea("selobj leon")
+    g.linea("modo pesos")
+    return foto_vista(g)
+
+
+def trazo(g, modo, color=None):
+    """El cubo en un modo de pintura: un trazo con el mouse de lado a lado."""
+    from recetas_objeto import recorrido
+    from recetas import vista_pc
+    if color:
+        g.linea("brushcolor %s" % color)
+    g.linea("modo " + modo)
+    rec, (cx, cy) = vista_pc(g)
+    a, b = (cx - 90, cy - 10), (cx + 90, cy + 25)
+    g.raton_mover(*a)
+    g.foto(dur=700)
+    g.raton_abajo(*a)
+    for x, y in recorrido(a, b, 14):
+        g.raton_mover(x, y)
+        g.foto(dur=60)
+    g.raton_arriba()
+    g.foto(dur=1800)
+    return g.cuadros(recorte=rec, calidad=74)
+
+
+@receta("vista-3d-modo-vertices")
+def v3d_modo_vertices(idioma):
+    """El cubo en la Pintura de Vertices: un trazo rojo sobre sus vertices."""
+    g = Guion(idioma, raton=True)
+    return trazo(g, "vertices", "1 0.1 0.1 1 1")
+
+
+@receta("vista-3d-modo-textura")
+def v3d_modo_textura(idioma):
+    """Leon en la Pintura de Textura: un trazo rojo sobre su campera (se pinta la textura)."""
+    from recetas_objeto import escena_leon
+    g = Guion(idioma, raton=True)
+    escena_leon(g, vista="vporbita 0 1.2 0 1.8 -5 15")
+    g.linea("deselectall")
+    g.linea("selobj leon")
+    return trazo(g, "textura", "1 0.1 0.1 1 1")
+
+
+
+# ---- La Vista 3D: cada boton de la barra de menus (su icono, para el texto) y su menu abierto -----------------------
+# (rol en BarRol3D, nombre del archivo, lo que hay que tener elegido: 'cubo' = como arranca)
+BOTONES_3D = ((1, "modo"), (3, "pivote"), (9, "orientacion"), (12, "iman"), (17, "proporcional"), (11, "vista"),
+              (4, "seleccionar"), (5, "anadir"), (16, "animacion"), (6, "objeto"), (7, "superposiciones"), (8, "render"),
+              (18, "escena"))
+
+
+def receta_boton(rol, nombre):
+    def icono(idioma):
+        g = Guion(idioma, w=1600, h=600)          # (ancha: la barra entera, como en vista-3d-barra)
+        g.linea("division 0.78")
+        b = [x for x in g.info().botones if x["kind"] == VISTA_3D and x.get("rol") == rol]
+        if not b:
+            raise SystemExit("capturas: la barra de la Vista 3D no muestra el boton %d" % rol)
+        b = b[0]
+        g.foto()
+        return g.cuadros(recorte=(b["x"] - 2, b["y"] - 2, b["w"] + 4, b["h"] + 4))
+    icono.__doc__ = "El boton '%s' de la barra de menus de la Vista 3D, recortado (va en el texto, al lado de su nombre)." % nombre
+    receta("boton-vista3d-" + nombre)(icono)
+
+    def menu(idioma):
+        g = Guion(idioma, w=1600, h=760)
+        g.linea("division 0.78")
+        g.clic(*g.info().boton_rol(VISTA_3D, rol))
+        g.sin_puntero()
+        rec = recorte_menu(g)
+        g.foto()
+        return g.cuadros(recorte=rec)
+    menu.__doc__ = "El menu del boton '%s' de la barra de la Vista 3D, abierto." % nombre
+    receta("vista-3d-menu-" + nombre)(menu)
+
+
+for _rol, _nombre in BOTONES_3D:
+    receta_boton(_rol, _nombre)
+
+
+@receta("vista-3d-menu-animacion-pose")
+def v3d_menu_animacion_pose(idioma):
+    """El menu Animacion en el Modo Pose (el esqueleto de Leon): Insertar Keyframe y Resetear Pose."""
+    from recetas_objeto import escena_leon
+    g = Guion(idioma, w=1600, h=760)
+    g.linea("division 0.78")
+    escena_leon(g)
+    g.linea("modo pose")
+    g.clic(*g.info().boton_rol(VISTA_3D, 16))
+    g.sin_puntero()
+    rec = recorte_menu(g)
+    g.foto()
+    return g.cuadros(recorte=rec)
+
+
+# el boton del pivote con cada punto de pivote elegido: su icono va al lado de su nombre (TransformPivot)
+PIVOTES = ((0, "cursor"), (1, "individual"), (2, "medio"), (3, "activo"))
+
+
+def receta_pivote(n, nombre):
+    def icono(idioma):
+        g = Guion(idioma, w=1600, h=600)
+        g.linea("division 0.78")
+        g.linea("pivote %d" % n)
+        b = [x for x in g.info().botones if x["kind"] == VISTA_3D and x.get("rol") == 3][0]
+        g.sin_puntero()
+        g.foto()
+        return g.cuadros(recorte=(b["x"] - 2, b["y"] - 2, b["w"] + 4, b["h"] + 4))
+    icono.__doc__ = "El boton del pivote con '%s' elegido (su icono, al lado de su nombre en el texto)." % nombre
+    receta("boton-pivote-" + nombre)(icono)
+
+
+for _n, _nombre in PIVOTES:
+    receta_pivote(_n, _nombre)

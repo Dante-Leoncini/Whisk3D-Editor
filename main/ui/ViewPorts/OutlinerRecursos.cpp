@@ -149,6 +149,7 @@ static OutFilaRec FilaDeItem(const W3dRecursoItem* it, const std::string& carpet
     f.sucio = !libExt && W3dCambiosRecursoSucio(it->tipo, it->id);
     f.bytes = it->bytes;
     f.cargado = it->cargado;
+    f.tilde = it->tilde;
     return f;
 }
 // arma las filas de 'carpeta' (sus subcarpetas primero, despues sus recursos) con su sangria. Las PARTES de un
@@ -1087,7 +1088,9 @@ bool Outliner::MenuContexto(int mx, int my) {
         const int rel = my - y - borderGS - PosY - BarTopOffset();
         if (rel >= 0) {
             extern Object* OutlinerObjetoEnFila(int fila);
+            extern bool OutlinerActivarEscenaDe(Object* o);
             Object* hit = OutlinerObjetoEnFila(rel / (int)RenglonHeightGS);
+            if (hit && !OutlinerActivarEscenaDe(hit)) return true;   // (de otra escena abierta: primero la activa)
             if (hit && !hit->select) { UndoCapturarSeleccion(); DeseleccionarTodo(); hit->Seleccionar(); }
             else if (hit) ObjActivo = hit;
         }
@@ -1299,6 +1302,17 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
             // flechita (solo las carpetas se pliegan; la columna queda vacia en los recursos)
             if (f.carpeta)
                 W3dDrawStrip4(IconMesh, IconsUV[(size_t)(f.plegada ? IconType::arrowRight : IconType::arrow)]->uvs);
+            else if (f.tilde >= 0) {
+                // LA CASILLA (una escena abierta en el editor): en la columna de la flechita, que los recursos no usan
+                w3dEngine::PopMatrix();
+                const int cx = marginGS + PosX + f.prof * (IconSizeGS + gapGS), cy = yf + (alto - IconSizeGS) / 2;
+                SetColorID(ColorID::grisUI);
+                Marco(cx + GlobalScale, cy + GlobalScale, IconSizeGS - 2 * GlobalScale, IconSizeGS - 2 * GlobalScale, GlobalScale);
+                w3dEngine::PushMatrix();
+                w3dEngine::Translatef((GLfloat)(marginGS + PosX + f.prof * (IconSizeGS + gapGS)), (GLfloat)yf, 0);
+                if (f.tilde > 0) { SetColorID(ColorID::accent); RenderBitmapText(unicodeCheck, textAlign::center, IconSizeGS); }
+                Colorear::Fila(this, f, (int)i == fc, arrastrada);
+            }
             w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
             if (f.icono >= 0 && f.icono < (int)IconsUV.size()) W3dDrawStrip4(IconMesh, IconsUV[(size_t)f.icono]->uvs);
             w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
@@ -1638,6 +1652,18 @@ void Outliner::ClickRecursos(int mx, int my) {
     // dedo, al tocarla (con el dedo arrastrar es scroll)
     { extern bool g_uiTapEnCurso;
       if (cuadricula && f.carpeta && g_uiTapEnCurso && !LCtrlPressed && !LShiftPressed) { EntrarCarpetaGrid(f.clave); return; } }
+    // LA CASILLA de un recurso que la tiene (una escena: abrirla o cerrarla en el editor), en la columna de la flechita
+    if (!f.carpeta && !cuadricula && f.tilde >= 0 && !LCtrlPressed && !LShiftPressed) {
+        const int xCasilla = x + marginGS + PosX + f.prof * (IconSizeGS + gapGS);
+        if (mx >= xCasilla && mx < xCasilla + IconSizeGS + gapGS) {
+            W3dProveedorRecursos* p = W3dRecursosVistaProveedor(f.tipo);
+            std::string motivo;
+            if (p && !p->Tildar(f.id, f.tilde == 0, &motivo) && !motivo.empty()) Notificar(T(motivo.c_str()), true);
+            lastContentRows = -1;
+            g_redraw = true;
+            return;
+        }
+    }
     if (f.carpeta && !cuadricula) {
         // la FLECHITA (o el icono) pliega/despliega sin tocar la seleccion
         const int xFlecha = x + marginGS + (cuadricula ? 0 : PosX) + f.prof * (IconSizeGS + gapGS);
@@ -1936,8 +1962,9 @@ bool Outliner::DobleClick(int mx, int my) {
         const int fila = rel / (int)RenglonHeightGS;
         extern Object* OutlinerObjetoEnFila(int fila);
         extern int OutlinerProfDeFila(int fila);
+        extern bool OutlinerActivarEscenaDe(Object* o);
         Object* o = OutlinerObjetoEnFila(fila);
-        if (!o) return false;
+        if (!o || !OutlinerActivarEscenaDe(o)) return false;
         // el NOMBRE: despues de la flechita y el icono, antes de las columnas del ojo y la camara
         const int x0 = x + marginGS + PosX + (OutlinerProfDeFila(fila) + 2) * (IconSizeGS + gapGS);
         const int x1 = x + width - 2 * IconSizeGS - gapGS - marginGS - borderGS - reservaBarra;
@@ -1976,8 +2003,9 @@ bool Outliner::PulsacionLarga(int mx, int my) {
         const int rel = my - y - borderGS - PosY - BarTopOffset();
         if (rel < 0) return false;
         extern Object* OutlinerObjetoEnFila(int fila);
+        extern bool OutlinerActivarEscenaDe(Object* o);
         Object* o = OutlinerObjetoEnFila(rel / (int)RenglonHeightGS);
-        if (!o) return false;
+        if (!o || !OutlinerActivarEscenaDe(o)) return false;
         if (!o->select) { UndoCapturarSeleccion(); DeseleccionarTodo(); o->Seleccionar(); }
         dragObjeto = o; dragging = false; dragY0 = my;
         agarreFila = rel / (int)RenglonHeightGS;

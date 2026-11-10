@@ -895,3 +895,6 @@ def camara_bloquear_nokia(idioma):
 # el tutorial 3 (El Modo Objeto) tiene sus recetas aparte
 import recetas_objeto  # noqa: E402,F401
 import recetas_viewports  # noqa: E402,F401  (los articulos de Los viewports)
+import recetas_picaporte  # noqa: E402,F401  (el tutorial 8: Modelar el picaporte)
+import recetas_animar  # noqa: E402,F401  (el tutorial 9: Animar la puerta)
+import recetas_pelota  # noqa: E402,F401  (el tutorial 10: Hacer picar una pelota)

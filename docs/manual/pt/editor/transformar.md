@@ -29,10 +29,10 @@ O gizmo aparece sobre o pivô no Modo Objeto e no Modo Edição (liga e desliga 
 
 ## Ajustar a última operação
 
-Depois de mover, rotacionar ou escalar (no Modo Objeto ou Edição), aparece embaixo à esquerda um painel com o que foi feito: os valores X, Y, Z (ou o ângulo), a orientação e a edição proporcional com suas opções. Mudar um valor refaz a operação com o valor novo. **Cancelar** a desfaz e **Aceitar** a mantém. Um clique fora do painel também aceita. Enquanto o painel está aberto, a barra inferior da Viewport 3D fica oculta.
+Depois de mover, rotacionar ou escalar (no Modo Objeto ou Edição), aparece embaixo à esquerda um painel com o que foi feito: os valores X, Y, Z (ou o ângulo), a orientação e a edição proporcional com suas opções. Mudar um valor refaz a operação com o valor novo. **Cancelar** a desfaz e **Aceitar** a mantém. Um clique fora do painel também aceita. Enquanto o painel está aberto, a barra de ferramentas da Viewport 3D fica oculta.
 
 O painel tem borda verde porque é a janela com o foco. Se não couber na metade da altura da tela, ele encolhe para essa metade e rola arrastando o dedo (sem tocar nas opções), com a roda ou com as setas. Com o teclado ou o celular: as setas percorrem as linhas, <kbd>OK</kbd> / <kbd>Enter</kbd> edita o valor sem fechar o painel, **Aceitar**, <kbd>Esc</kbd> ou <kbd>Delete</kbd> (o <kbd>C</kbd> no N95) o fecham mantendo a mudança, e só **Cancelar** a desfaz.
 
-## Barra inferior
+## Barra de ferramentas
 
 Tem Desfazer e Refazer, as últimas ações usadas e o botão de edição proporcional. Durante um transform, mostra o visto (aceitar), o X (cancelar), a orientação e os eixos X / Y / Z (dois eixos ligados = um plano). Em telas touch, depois de extrudar aparece **Repetir**, que aceita e extruda de novo.

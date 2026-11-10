@@ -1,3 +1,6 @@
+#ifdef W3D_MCP
+#include <typeinfo>  // typeid: el tipo del paso, para la grabadora de pasos (solo PC)
+#endif
 #include "Undo.h"
 extern bool g_redraw;   // el frame se redibuja cuando un undo/redo/borrado cambia algo visible
 #include "variables.h"           // InteractionMode, ObjActivo, ObjSelects
@@ -58,6 +61,10 @@ extern void InvalidarSkinDeArmature(Armature* a); // ObjectMode.cpp (re-skinnea 
 // ============================================================================
 class UndoCmd {
 public:
+    // LA RAIZ del paso (la escena que estaba activa al apilarlo; NULL = no es de una raiz: la biblioteca). Con varias
+    // escenas abiertas a la vez el historial es uno solo: antes de aplicarse, la suya pasa a ser la activa
+    Object* raizDe;
+    UndoCmd() : raizDe(NULL) {}
     virtual ~UndoCmd() {}
     virtual void Aplicar() = 0; // intercambia el estado guardado con el vivo (undo Y redo)
     // Una lista CORRIO SUS INDICES (se reordeno o se borro un elemento): los miembros que
@@ -1907,9 +1914,33 @@ int g_undoSinRaiz = 0;
 static void Push(UndoCmd* c) {
     if (!c) return;
     LimpiarRedo(); // una accion NUEVA invalida el redo
+    if (g_undoSinRaiz <= 0) c->raizDe = SceneCollection;
     g_undo.push_back(c);
+#ifdef W3D_MCP
+    { extern void W3dHistorialUndo(const char*); W3dHistorialUndo(typeid(*c).name()); }   // la grabadora de pasos
+#endif
     DesalojarViejos();
     if (g_undoSinRaiz <= 0) W3dCambiosTocado();
+}
+// el paso es de OTRA escena abierta: esa pasa a ser la activa antes de aplicarlo (io/RaicesEditor.h). false = no se
+// pudo (el paso se descarta)
+static bool ActivarRaizDelPaso(UndoCmd* c) {
+    if (!c->raizDe || c->raizDe == SceneCollection) return true;
+    extern bool W3dActivarRaizDe(Object* raiz);
+    return W3dActivarRaizDe(c->raizDe);
+}
+// una escena que se cierra y se libera: sus pasos se van (nombran objetos que dejan de existir)
+static void SacarDeLaRaiz(std::vector<UndoCmd*>& v, Object* raiz, std::vector<UndoCmd*>& fuera) {
+    for (size_t i = v.size(); i-- > 0; )
+        if (v[i]->raizDe == raiz) { fuera.push_back(v[i]); v.erase(v.begin() + (long)i); }
+}
+void UndoOlvidarRaiz(Object* raiz) {
+    if (!raiz) return;
+    std::vector<UndoCmd*> fuera;
+    SacarDeLaRaiz(g_undo, raiz, fuera);
+    SacarDeLaRaiz(g_redo, raiz, fuera);
+    if (!fuera.empty()) g_grupos.clear();   // (las bases de los grupos indexan el stack de antes)
+    BorrarCmds(fuera);
 }
 
 // ============================================================================
@@ -3641,6 +3672,7 @@ void UndoDeshacer() {
     RedoMeshPanelCerrar();
     if (g_undoCambioHook) g_undoCambioHook();
     UndoCmd* c = g_undo.back(); g_undo.pop_back();
+    if (!ActivarRaizDelPaso(c)) { delete c; return; }
     c->Aplicar();          // intercambia: el comando queda con el estado NUEVO
     g_redo.push_back(c);   // disponible para rehacer
     W3dCambiosTocado();    // (lo no guardado: la raiz activa cambio)
@@ -3652,6 +3684,7 @@ void UndoRehacer() {
     RedoMeshPanelCerrar();
     if (g_undoCambioHook) g_undoCambioHook();
     UndoCmd* c = g_redo.back(); g_redo.pop_back();
+    if (!ActivarRaizDelPaso(c)) { delete c; return; }
     c->Aplicar();          // intercambia de nuevo: re-aplica el cambio
     g_undo.push_back(c);
     W3dCambiosTocado();

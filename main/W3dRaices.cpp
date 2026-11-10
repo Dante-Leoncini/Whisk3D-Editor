@@ -24,6 +24,7 @@
 #include "base/W3dNombres.h"
 #include "w3dGraphics.h"
 #include "w3dlog.h"
+#include <set>
 
 // ============================================================================
 //  EL CONTEXTO DE UNA RAIZ: lo que es "de la escena que se esta mirando" y vive en
@@ -439,6 +440,8 @@ bool W3dRaizRenombrar(int idx, const std::string& nuevo, std::string* final) {
     if (final) *final = n;
     if (n == f.nombre) return true;
     if (W3dRaizEs3D(f.tipo) && gInicial == f.nombre) gInicial = n;   // la inicial la sigue
+    if (W3dRaizEs3D(f.tipo)) { extern void W3dRaicesAbiertasRenombrar(const std::string&, const std::string&);
+                               W3dRaicesAbiertasRenombrar(f.nombre, n); }   // (y la lista de abiertas)
     f.nombre = n;
     return true;
 }
@@ -595,6 +598,8 @@ void W3dRaicesLeerJson(JVal* raiz) {
     gFilas[(size_t)bloque].escena = SceneDe(SceneCollection);
     if (SceneCollection) W3dRaizRegistrar(SceneCollection);
     W3dRaizFijarInicial(raiz ? JS(raiz, "escena3dInicial", "") : std::string());
+    // las escenas que el editor tenia ABIERTAS (y las del ojo cerrado): se cargan al terminar de abrir el proyecto
+    { extern void W3dRaicesAbiertasLeer(JVal* raiz); W3dRaicesAbiertasLeer(raiz); }
     if (gFilas.size() > 1)
         w3dLogf("[raices] el proyecto trae %d escena(s)/juego(s)/prefab(s); inicial '%s'", (int)gFilas.size(),
                 gInicial.empty() ? gFilas[(size_t)bloque].nombre.c_str() : gInicial.c_str());
@@ -610,6 +615,7 @@ void W3dRaicesCerrarProyecto() {
     // la activa sigue siendo SceneCollection (ReiniciarEscena la vacia); sale del registro
     if (SceneCollection) W3dRaizOlvidar(SceneCollection);
     gFilas.clear(); gActiva = -1; gInicial.clear();
+    { extern void W3dRaicesAbiertasOlvidar(); W3dRaicesAbiertasOlvidar(); }
 }
 
 void W3dRaicesGuardadas(const std::vector<std::string>& entradas) {
@@ -633,6 +639,10 @@ bool W3dRaizCargarEnActiva(int idx) {
     W3dMixEscenasOlvidar();
     if (KindDeObjeto(ActiveAnimKind)) ActiveAnimKind = AnimEsJuego ? 2 : 0;
     ActiveAnimArm = NULL; ActiveAnimMesh = NULL;
+    // LAS CAPAS (escenas cargadas encima: cargarEscena, W3dEscena.h) sobreviven al cambio: se descuelgan antes y se
+    // cuelgan arriba de todo en la nueva
+    std::vector<Object*> capas;
+    W3dEscenaCapasDesprender(true, capas);
     // la escena actual se DESTRUYE entera (la raiz queda: la pedida se arma en ella)
     while (!SceneCollection->Childrens.empty()) {
         Object* o = SceneCollection->Childrens.back();
@@ -649,12 +659,197 @@ bool W3dRaizCargarEnActiva(int idx) {
     gActiva = idx;
     const bool ok = W3dRaizLeerContenido(gFilas[(size_t)idx]);
     InitSceneAnimations();
+    W3dEscenaCapasColgar(SceneCollection, capas);
     DeseleccionarTodo(); ObjActivo = NULL;
     w3dLogf("[raices] escena '%s' cargada en la raiz activa%s", gFilas[(size_t)idx].nombre.c_str(),
             ok ? "" : " (NO SE PUDO LEER)");
     g_redraw = true;
     return ok;
 }
+
+// ============================================================================
+//  LAS ESCENAS ABIERTAS EN EL EDITOR (ver W3dRaices.h). Por NOMBRE (las filas corren sus indices al crear o borrar)
+// ============================================================================
+static std::vector<std::string> gAbiertas;   // en orden de prioridad
+static void JsonEsc(std::string& s, const std::string& t) {
+    s += '"';
+    for (size_t i = 0; i < t.size(); i++) {
+        const char c = t[i];
+        if (c == '"' || c == '\\') { s += '\\'; s += c; }
+        else if ((unsigned char)c < 0x20) { char b[8]; snprintf(b, sizeof(b), "\\u%04x", (unsigned char)c); s += b; }
+        else s += c;
+    }
+    s += '"';
+}
+static std::set<std::string> gOcultas;       // las abiertas con el ojo cerrado
+void W3dRaicesAbiertasOlvidar() { gAbiertas.clear(); gOcultas.clear(); }
+void W3dRaicesAbiertasRenombrar(const std::string& de, const std::string& a) {
+    for (size_t i = 0; i < gAbiertas.size(); i++) if (gAbiertas[i] == de) gAbiertas[i] = a;
+    if (gOcultas.erase(de)) gOcultas.insert(a);
+}
+static bool Contiene(const std::vector<int>& v, int x) {
+    for (size_t i = 0; i < v.size(); i++) if (v[i] == x) return true;
+    return false;
+}
+// la lista DEL USUARIO (las que tildo), sin las que ya no existen
+static void AbiertasValidas(std::vector<int>& out) {
+    out.clear();
+    for (size_t k = 0; k < gAbiertas.size(); ) {
+        const int i = W3dRaizBuscar(W3D_RAIZ_ESCENA, gAbiertas[k]);
+        if (i < 0 || !W3dRaizEs3D(gFilas[(size_t)i].tipo)) { gAbiertas.erase(gAbiertas.begin() + (long)k); continue; }
+        if (!Contiene(out, i)) out.push_back(i);
+        k++;
+    }
+}
+static bool ActivaEs3D() {
+    return gActiva >= 0 && gActiva < (int)gFilas.size() && W3dRaizEs3D(gFilas[(size_t)gActiva].tipo);
+}
+void W3dRaicesAbiertas(std::vector<int>& out) {
+    Asegurar();
+    // sin lista todavia (un proyecto nuevo, o uno de antes de las escenas abiertas): la activa
+    if (gAbiertas.empty() && ActivaEs3D()) gAbiertas.push_back(gFilas[(size_t)gActiva].nombre);
+    AbiertasValidas(out);
+    // la activa que NO esta en la lista es la unica: un PREFAB (se edita aislado) o la escena a la que paso la PARTIDA
+    // (cambiarEscena, una cinematica). No entra a la lista del usuario: el Stop vuelve y la lista sigue como estaba
+    if (gActiva >= 0 && gActiva < (int)gFilas.size() && !Contiene(out, gActiva)) {
+        out.clear();
+        out.push_back(gActiva);
+    }
+}
+bool W3dRaizEstaAbierta(int idx) {
+    std::vector<int> v;
+    W3dRaicesAbiertas(v);
+    return Contiene(v, idx);
+}
+bool W3dRaizAbrir(int idx) {
+    Asegurar();
+    if (idx < 0 || idx >= (int)gFilas.size() || !W3dRaizEs3D(gFilas[(size_t)idx].tipo)) return false;
+    if (!gFilas[(size_t)idx].raiz && !W3dRaizCargar(idx)) return false;
+    const std::string& n = gFilas[(size_t)idx].nombre;
+    bool esta = false;
+    for (size_t i = 0; i < gAbiertas.size(); i++) if (gAbiertas[i] == n) esta = true;
+    if (!esta) gAbiertas.push_back(n);
+    gFilas[(size_t)idx].raiz->visible = !gOcultas.count(n);
+    g_redraw = true;
+    return true;
+}
+void W3dRaizSacarDeAbiertas(int idx) {
+    Asegurar();
+    if (idx < 0 || idx >= (int)gFilas.size()) return;
+    const std::string& n = gFilas[(size_t)idx].nombre;
+    for (size_t i = gAbiertas.size(); i-- > 0; ) if (gAbiertas[i] == n) gAbiertas.erase(gAbiertas.begin() + (long)i);
+    gOcultas.erase(n);
+    if (gFilas[(size_t)idx].raiz) gFilas[(size_t)idx].raiz->visible = true;   // (cerrada, como recien abierta)
+    // la que queda SOLA se ve: con una sola abierta el outliner no muestra su fila (ni su ojo para volver a prenderla)
+    std::vector<int> v;
+    W3dRaicesAbiertas(v);
+    if (v.size() == 1) W3dRaizFijarAbiertaVisible(v[0], true);
+    g_redraw = true;
+}
+bool W3dRaizMoverAbierta(int idx, int pos) {
+    std::vector<int> v;
+    W3dRaicesAbiertas(v);
+    if (!Contiene(v, idx) || !W3dRaizEs3D(gFilas[(size_t)idx].tipo)) return false;
+    const std::string n = gFilas[(size_t)idx].nombre;
+    for (size_t i = gAbiertas.size(); i-- > 0; ) if (gAbiertas[i] == n) gAbiertas.erase(gAbiertas.begin() + (long)i);
+    if (pos < 0) pos = 0;
+    if (pos > (int)gAbiertas.size()) pos = (int)gAbiertas.size();
+    gAbiertas.insert(gAbiertas.begin() + pos, n);
+    g_redraw = true;
+    return true;
+}
+void W3dRaicesOtrasVisibles(std::vector<Object*>& out) {
+    out.clear();
+    std::vector<int> v;
+    W3dRaicesAbiertas(v);
+    for (size_t i = 0; i < v.size(); i++) {
+        Object* r = gFilas[(size_t)v[i]].raiz;
+        if (r && r != SceneCollection && r->visible) out.push_back(r);
+    }
+}
+bool W3dRaizAbiertaVisible(int idx) {
+    Asegurar();
+    if (idx < 0 || idx >= (int)gFilas.size()) return false;
+    if (gFilas[(size_t)idx].raiz) return gFilas[(size_t)idx].raiz->visible;
+    return !gOcultas.count(gFilas[(size_t)idx].nombre);
+}
+void W3dRaizFijarAbiertaVisible(int idx, bool v) {
+    Asegurar();
+    if (idx < 0 || idx >= (int)gFilas.size()) return;
+    if (gFilas[(size_t)idx].raiz) gFilas[(size_t)idx].raiz->visible = v;
+    if (v) gOcultas.erase(gFilas[(size_t)idx].nombre); else gOcultas.insert(gFilas[(size_t)idx].nombre);
+    g_redraw = true;
+}
+void W3dRaicesAbiertasLeer(JVal* raiz) {
+    gAbiertas.clear(); gOcultas.clear();
+    if (!raiz) return;
+    JVal* a = JHijo(raiz, "escenasAbiertas", 5);
+    if (a) for (size_t i = 0; i < a->lista.size(); i++) if (a->lista[i] && a->lista[i]->tipo == 2) gAbiertas.push_back(a->lista[i]->str);
+    JVal* o = JHijo(raiz, "escenasOcultas", 5);
+    if (o) for (size_t i = 0; i < o->lista.size(); i++) if (o->lista[i] && o->lista[i]->tipo == 2) gOcultas.insert(o->lista[i]->str);
+}
+void W3dRaicesAbiertasCargar() {
+    const std::vector<std::string> nombres = gAbiertas;
+    for (size_t k = 0; k < nombres.size(); k++) {
+        const int i = W3dRaizBuscar(W3D_RAIZ_ESCENA, nombres[k]);
+        if (i >= 0) W3dRaizAbrir(i);
+    }
+    // la que se abre (la del bloque, hasta que la sesion elija otra) es de la lista: si no estaba, va adelante
+    if (!gAbiertas.empty() && ActivaEs3D()) {
+        const std::string& n = gFilas[(size_t)gActiva].nombre;
+        bool esta = false;
+        for (size_t i = 0; i < gAbiertas.size(); i++) if (gAbiertas[i] == n) esta = true;
+        if (!esta) gAbiertas.insert(gAbiertas.begin(), n);
+    }
+    // (la activa: su ojo tambien)
+    if (gActiva >= 0 && gActiva < (int)gFilas.size() && gFilas[(size_t)gActiva].raiz)
+        gFilas[(size_t)gActiva].raiz->visible = !gOcultas.count(gFilas[(size_t)gActiva].nombre);
+}
+void W3dRaicesAbiertasEscribir(std::string& s) {
+    std::vector<int> v;
+    W3dRaicesAbiertas(v);
+    AbiertasValidas(v);   // (la lista del usuario: guardando con un prefab activo, las escenas que tenia abiertas)
+    // el ojo es el 'visible' de cada raiz: lo que dice ahora (cualquiera lo pudo cambiar)
+    for (size_t i = 0; i < v.size(); i++) {
+        const W3dRaizFila& f = gFilas[(size_t)v[i]];
+        if (!f.raiz) continue;
+        if (f.raiz->visible) gOcultas.erase(f.nombre); else gOcultas.insert(f.nombre);
+    }
+    if (v.size() <= 1 && gOcultas.empty()) return;   // (una sola: lo de siempre, nada que guardar)
+    s += "  \"escenasAbiertas\": [";
+    for (size_t i = 0; i < v.size(); i++) { if (i) s += ", "; JsonEsc(s, gFilas[(size_t)v[i]].nombre); }
+    s += "],\n";
+    if (!gOcultas.empty()) {
+        s += "  \"escenasOcultas\": [";
+        bool primero = true;
+        for (std::set<std::string>::iterator it = gOcultas.begin(); it != gOcultas.end(); ++it) {
+            if (!primero) s += ", ";
+            primero = false;
+            JsonEsc(s, *it);
+        }
+        s += "],\n";
+    }
+}
+
+// ============================================================================
+//  LAS CAPAS 3D (cargarEscena, W3dEscena.h): una escena o un juego 3D del proyecto cargado ENCIMA de la base es
+//  una instancia de "escena:<nombre>" (como instanciar(): en el editor sale de la escena en memoria, en el juego
+//  compilado de su entrada), con sus scripts arrancados por la partida. La base es la raiz activa
+// ============================================================================
+static Object* CrearCapa3D(const std::string& nombre) {
+    if (W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre) < 0 || !W3dPrefabInstanciarHook) return 0;   // (escenas y juegos)
+    W3dPrefabInstanciarPadre = 0;   // (en la raiz activa)
+    Object* o = W3dPrefabInstanciarHook(("escena:" + nombre).c_str(), 0, 0.0f);
+    if (o) W3dScriptAvisarObjetoNuevo(o);   // sus scripts y sus cuerpos: los arranca la partida
+    return o;
+}
+static std::string NombreBase3D() {
+    Asegurar();
+    if (gActiva >= 0 && gActiva < (int)gFilas.size()) return gFilas[(size_t)gActiva].nombre;
+    return SceneCollection ? SceneCollection->name : std::string();
+}
+struct W3dRaicesEngancheCapas { W3dRaicesEngancheCapas() { W3dEscenaSetCapas3D(CrearCapa3D, NombreBase3D); } };
+static W3dRaicesEngancheCapas gRaicesEngancheCapas;
 
 // ============================================================================
 //  cambiarEscena() CON ESCENAS 3D (el pedido llega de W3dEscena, que primero mira las UI)

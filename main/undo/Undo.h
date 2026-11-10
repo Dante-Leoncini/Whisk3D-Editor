@@ -31,6 +31,9 @@ class Material; // modificacion de material (checkbox/shininess)
 void UndoDeshacer(); // Ctrl+Z: deshace el ultimo comando (pasa al stack de redo)
 void UndoRehacer();  // Ctrl+Y: rehace el ultimo deshecho (pasa de vuelta al stack de undo)
 void UndoLimpiar();  // limpia ambos stacks (al borrar/crear objetos: punteros invalidos)
+// una escena abierta que se CIERRA y se libera (io/RaicesEditor.h): sus pasos de undo y redo se descartan
+class Object;
+void UndoOlvidarRaiz(Object* raiz);
 bool UndoHayAlgo();  // hay algo para deshacer?
 bool UndoHayRedo();  // hay algo para rehacer?
 const void* UndoUltimo();          // identidad del ultimo comando (NULL = vacio): el panel de la ultima operacion

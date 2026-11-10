@@ -406,6 +406,11 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propNieblaFondo;   // el fondo del render toma el color de la niebla
         // SONIDO (objects/Sonido.h): el archivo, como suena, desde cuando (segundos), el recorte, el bucle y el 3D
         GroupPropertie* propSonido;
+        // VACIO: como se dibuja (la forma, el tamanio y el giro del dibujo). Solo la vista: no cambia el objeto
+        GroupPropertie* propVacio;
+        PropButton* propVacioForma;
+        PropFloat*  propVacioTam;
+        PropFloat*  propVacioRotX; PropFloat* propVacioRotY; PropFloat* propVacioRotZ;
         PropButton* propSonArchivo;    // desplegable: los sonidos del proyecto
         PropBool*   propSonActivo;
         PropFloat*  propSonVol;        // animable (AnimSonido X)
@@ -632,7 +637,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propFlipFps;       // velocidad (cuadros/seg)
         // tarjeta "Juego" (debajo de Animacion): compilar + cache del viaje en el tiempo
         GroupPropertie* propJuego;
-        PropButton* propJuegoPlat;      // desplegable: Linux .deb / AppImage / WebGL
+        PropButton* propJuegoPlat;      // desplegable: Linux .deb / AppImage / WebGL / ... / las consolas
+        PropButton* propJuegoBackend;   // desplegable: el backend grafico (los que tenga la plataforma elegida)
+        PropButton* propJuegoInicio;    // desplegable: con que escena o juego arranca el juego compilado
         PropButton* propJuegoModoVent;  // desplegable: Ventana / Pantalla completa / Sin bordes
         PropButton* propJuegoOrient;    // desplegable: Todas / Solo vertical / Solo horizontal
         PropButton* propJuegoIcono;     // elegir el PNG (maxima definicion) del icono del juego
@@ -691,6 +698,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropLabel*  propPvsInfo;
         GroupPropertie* propMeshEdicion;   // card "Edicion" (pestania Mesh): interruptor editable/no-editable
         PropButton* propBtnMeshEditable;   // "Borrar datos para edicion" / "Convertir en mesh editable"
+        PropBool* propMeshBloquearNormales; // casilla "Bloquear normales" (Mesh::bloquearNormales)
         // card "3D Mesh" (la PRIMERA de la pestania "Malla 3D", la 3): que malla 3D (un RECURSO de la
         // biblioteca, objects/MallaRecurso.h) usa el objeto. SOLO se elige: el nombre y la carpeta del
         // recurso se editan en la biblioteca (el outliner)
@@ -839,6 +847,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         unsigned int exportLastSerial;
         PropButton* propBtnCamTarget;
         PropButton* propBtnInstTarget;
+        PropFloat* propInstCopias;        // cuantas veces dibuja un Array a su target (Instance::count)
         PropButton* propBtnNewMaterial;
         PropButton* propBtnTextura;
         PropButton* propBtnNormalTex; // selector de la textura del normal map (visible si Normal Mapping ON)

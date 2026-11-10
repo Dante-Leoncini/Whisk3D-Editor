@@ -8,7 +8,7 @@
 | Function | Description | How to use it |
 |---|---|---|
 | Paint | Paints only the front-facing faces that are visible (with X-Ray, also the ones behind). Each stroke is one undo step. | Click and drag |
-| Radius | The brush size in pixels. When you change it, a circle with the real size appears in the center of the view. | Draggable bar above the bottom bar |
+| Radius | The brush size in pixels. When you change it, a circle with the real size appears in the center of the view. | Draggable bar above the toolbar |
 | Value | The brush intensity. | Draggable bar |
 | Falloff | How the brush edge is softened; you can draw your own curve. | Falloff button |
 | View (touch) | On: your finger navigates. Off: your finger paints. | Monitor-shaped button |

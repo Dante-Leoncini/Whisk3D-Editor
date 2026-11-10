@@ -854,6 +854,15 @@ void ProporcionalObjetosActualizar(){
     }
 }
 
+// un PADRE suyo ya entra en el transform? Entonces este objeto NO se transforma por su cuenta: ya lo lleva el padre.
+// (Como en Blender. Bug del duenio, 2026-11-09: con la puerta y su manija HIJA elegidas, R giraba la puerta, la manija
+// la acompaniaba Y ADEMAS giraba sola: quedaba girada dos veces y el picaporte se desarmaba.)
+static bool PadreEnElTransform(Object* obj){
+    for (Object* p = obj->Parent; p; p = p->Parent)
+        if (p->select && p->visible && !p->sinTransformacion && !W3dEsGenerado(p)) return true;
+    return false;
+}
+
 // lo GENERADO por una instancia de prefab no se mueve: su transform no se guarda (el archivo solo lleva la
 // instancia y sus overrides) y se perderia al guardar o al regenerar
 void guardarEstadoRec(Object* obj){
@@ -871,7 +880,7 @@ void guardarEstadoRec(Object* obj){
     }
 
     // Si está seleccionado, guardar estado (un objeto SIN TRANSFORMACION -la Rutina- no se mueve: no tiene que)
-    if (obj->select && obj->visible && !obj->sinTransformacion) {
+    if (obj->select && obj->visible && !obj->sinTransformacion && !PadreEnElTransform(obj)) {
         SaveState NuevoEstado;
         NuevoEstado.obj = obj;
         NuevoEstado.pos = obj->pos;
@@ -1047,6 +1056,7 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         d->meshSize = m->meshSize; d->meshSize2 = m->meshSize2; d->meshDepth = m->meshDepth;
         d->meshVerts = m->meshVerts; d->meshVerts2 = m->meshVerts2;
         d->meshSmooth = m->meshSmooth;
+        d->bloquearNormales = m->bloquearNormales;
         // buffers PRECALCULADOS: se copian tal cual (mismas posiciones) -> el
         // duplicado queda identico (mismo contorno y MISMAS vertex-normals, sin
         // recalcular). Antes posRep no se copiaba y la vertex-normal del duplicado
@@ -1117,7 +1127,9 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         nuevo = d;
     }
     else if (src->getType() == ObjectType::empty) {
-        nuevo = new Empty(src->Parent, src->pos);
+        Empty* d = new Empty(src->Parent, src->pos);
+        d->CopiarDibujo((const Empty*)src);   // la forma, el tamanio y el giro del dibujo
+        nuevo = d;
     }
     else if (src->getType() == ObjectType::lod) {
         LOD* d = new LOD(src->Parent, src->pos);
@@ -1521,6 +1533,9 @@ bool SepararSeleccionEdit(Mesh* m) {
           L += nc;
       }
       nuevo->faces3d.swap(nf3d);
+      // el pedazo es SOLO las caras elegidas: las lineas y los puntos sueltos que el clon trajo de la malla entera
+      // no son suyos (quedaban colgando en el pedazo nuevo)
+      nuevo->looseEdges.clear(); nuevo->looseVerts.clear();
       CompactarCapas(nuevo, survCorner);
       nuevo->GenerarRender();
     }
@@ -1540,7 +1555,10 @@ bool SepararSeleccionEdit(Mesh* m) {
         for (size_t f = 0; f < e->faces.size(); f++)
             if (f < e->faceSrc.size()) { int f3 = e->faceSrc[f];
                 if (f3 >= 0 && f3 < (int)m->faces3d.size() && sel3d[f3]) e->faceSel[f] = 1; }
-        m->BorrarSeleccionEdit(SelFace);
+        // sinRestos: el pedazo se va ENTERO. Con el borrado de caras de siempre (X > Caras) sus aristas y sus vertices
+        // quedaban en el original como lineas sueltas: en el Modo Objeto se seguia viendo el contorno del pedazo
+        // que ya era otra malla (bug del duenio, 2026-11-09)
+        m->BorrarSeleccionEdit(SelFace, true);
     }
     EditSelectMode = modoPrev;
     // 3b) el ORIGINAL tambien perdio aristas, y sus marcas sobre lo que se fue tambien se
@@ -2554,7 +2572,7 @@ void MoverSeleccionEditLocal(Mesh* m, const Vector3& delta) {
     // persistir: empuja al render + rearma overlay + bordes/normales + preview de modificadores (igual que el confirm de un move)
     e->EmpujarPosiciones(); e->RefrescarOverlay();
     m->CalcularBordes(false);
-    if (!g_editLockNormales) m->RecalcularNormales();
+    if (!m->bloquearNormales) m->RecalcularNormales();
     if (!m->modificadores.empty()) m->GenerarMallaModificada();
     g_redraw = true;
 }

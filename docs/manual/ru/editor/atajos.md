@@ -4,23 +4,23 @@
 
 ## Как изменить сочетание клавиш
 
-1. Открыть **Properties → вкладка File/Render → карточка Settings → Keyboard Shortcuts…**
-2. Выбрать **Context** (General, 3D Viewport, During a transform, UV Editor, Timeline, Outliner, 2D Editor, Properties, Script Editor). Стрелки влево/вправо тоже его переключают.
-3. Выбрать функцию в списке и нажать **Add shortcut** (или ещё раз коснуться выбранной строки). Появится "Press a key…".
+1. Открыть **Свойства → вкладка Файл/Рендер → карточка Настройки → Сочетания клавиш…**
+2. Выбрать **Контекст** (Общие, 3D-вьюпорт, Во время трансформации, UV-редактор, Таймлайн, Аутлайнер, 2D-редактор, Свойства, Редактор скриптов). Стрелки влево/вправо тоже его переключают.
+3. Выбрать функцию в списке и нажать **Добавить сочетание** (или ещё раз коснуться выбранной строки). Появится "Нажмите клавишу…".
 4. Нажать новое сочетание (например, <kbd>Ctrl+M</kbd>). <kbd>Esc</kbd> отменяет, ничего не меняя.
 
 | Кнопка | Что делает |
 |---|---|
-| Add shortcut | Добавляет сочетание к функции. Если оно было у другой функции того же контекста, оно у неё снимается, и выводится предупреждение. |
-| Clear | Оставляет функцию без сочетания. |
-| Reset | Возвращает функции её сочетание по умолчанию. |
-| Reset all | Все функции возвращаются к сочетаниям по умолчанию. |
+| Добавить сочетание | Добавляет сочетание к функции. Если оно было у другой функции того же контекста, оно у неё снимается, и выводится предупреждение. |
+| Очистить | Оставляет функцию без сочетания. |
+| Сбросить | Возвращает функции её сочетание по умолчанию. |
+| Сбросить всё | Все функции возвращаются к сочетаниям по умолчанию. |
 
-Меню показывают рядом с каждым пунктом **настроенное** сочетание: если ты переназначишь функцию, меню покажет новое сочетание. На N95 меню показывают клавишу телефона (например, <kbd>1</kbd> для Move или <kbd>C</kbd> для Delete); если подключена Bluetooth-клавиатура, они показывают клавишу этой клавиатуры, когда могут её распознать.
+Меню показывают рядом с каждым пунктом **настроенное** сочетание: если ты переназначишь функцию, меню покажет новое сочетание. На N95 меню показывают клавишу телефона (например, <kbd>1</kbd> для «Переместить» или <kbd>C</kbd> для «Удалить»); если подключена Bluetooth-клавиатура, они показывают клавишу этой клавиатуры, когда могут её распознать.
 
 Изменённые сочетания выделяются зелёным. Если у функции убрать сочетание по умолчанию, эта клавиша освобождается: в этом контексте она больше ничего не делает.
 
-Сочетания каждого контекста действуют, когда указатель находится над этой панелью; сочетания **General** действуют везде. Сочетания **During a transform** действуют, пока что-то перемещается, вращается или масштабируется, и имеют приоритет. В Script Editor буквы всегда вводят текст: там можно переназначать только сочетания с <kbd>Ctrl</kbd>, <kbd>Alt</kbd> или F-клавишами.
+Сочетания каждого контекста действуют, когда указатель находится над этой панелью; сочетания **Общие** действуют везде. Сочетания **Во время трансформации** действуют, пока что-то перемещается, вращается или масштабируется, и имеют приоритет. В Редакторе скриптов буквы всегда вводят текст: там можно переназначать только сочетания с <kbd>Ctrl</kbd>, <kbd>Alt</kbd> или F-клавишами.
 
 ## Файл atajos.ini
 
@@ -42,186 +42,186 @@ xf.cancelar = Esc, Q
 
 <!--ATAJOS-INICIO-->
 
-### General (любая панель)
+### Общие (любая панель)
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
 |---|---|---|---|
-| Save project | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
-| Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.deshacer` |
-| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Right</kbd> | `global.rehacer` |
-| Object / Edit Mode | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.modo` |
-| Toggle Snap | <kbd>Shift+Tab</kbd> | — | `global.snap` |
-| Snap menu | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
-| Play / Pause | <kbd>Space</kbd> | <kbd>Green+Left soft</kbd> | `global.play` |
-| Menu bar | <kbd>M</kbd> | <kbd>Left soft</kbd> | `global.barraMenu` |
-| Parent | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
-| Clear Parent | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
-| Fullscreen | <kbd>F11</kbd> | — | `global.pantalla` |
-| Render Image | <kbd>F12</kbd> | — | `global.render` |
-| Render Animation | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
+| Сохранить проект | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
+| Отменить | <kbd>Ctrl+Z</kbd> | <kbd>C+Влево</kbd> | `global.deshacer` |
+| Повторить | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Вправо</kbd> | `global.rehacer` |
+| Объект / Редактирование | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.modo` |
+| Вкл/выкл привязку | <kbd>Shift+Tab</kbd> | — | `global.snap` |
+| Меню привязки | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
+| Пуск / Пауза | <kbd>Space</kbd> | <kbd>Зелёная+Лев. софт</kbd> | `global.play` |
+| Строка меню | <kbd>M</kbd> | <kbd>Лев. софт</kbd> | `global.barraMenu` |
+| Родитель | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
+| Снять родителя | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
+| Полный экран | <kbd>F11</kbd> | — | `global.pantalla` |
+| Рендер изображения | <kbd>F12</kbd> | — | `global.render` |
+| Рендер анимации | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
-### 3D Viewport
-
-| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
-|---|---|---|---|
-| Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
-| Box Select | <kbd>B</kbd> | — | `3d.caja` |
-| Select Linked | <kbd>L</kbd> | — | `3d.vinculado` |
-| Add | <kbd>Shift+A</kbd> | — | `3d.agregar` |
-| Apply | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
-| Clear Location (Pose) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
-| Clear Rotation (Pose) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
-| Shrink/Fatten / Clear Scale | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
-| Duplicate Linked | <kbd>Alt+D</kbd> | — | `3d.instancia` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
-| Hide / Show | <kbd>H</kbd> | — | `3d.ocultar` |
-| Join | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
-| Insert Keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
-| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
-| Proportional Editing | <kbd>O</kbd> | — | `3d.proporcional` |
-| Overlays | <kbd>K</kbd> | — | `3d.overlays` |
-| Local View | <kbd>/</kbd> | — | `3d.vistaLocal` |
-| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
-| Front View | <kbd>Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaFrente` |
-| Back View | <kbd>Ctrl+Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaAtras` |
-| Right View | <kbd>Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaDerecha` |
-| Left View | <kbd>Ctrl+Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaIzquierda` |
-| Top View | <kbd>Num7</kbd> | <kbd>#+Up</kbd> | `3d.vistaArriba` |
-| Bottom View | <kbd>Ctrl+Num7</kbd> | <kbd>#+Down</kbd> | `3d.vistaAbajo` |
-| Perspective / Orthographic | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
-| Roll Left | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
-| Roll Right | <kbd>Num6</kbd> | — | `3d.rodarDer` |
-| Camera View | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
-| Set Active Camera | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
-| Extrude | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
-| New Face from Vertices | <kbd>F</kbd> | — | `3d.cara` |
-| Recalculate Normals | <kbd>Shift+N</kbd> | — | `3d.normales` |
-| Loop Cut and Slide | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
-| Connect Vertex Path | <kbd>J</kbd> | — | `3d.conectar` |
-| Rip | <kbd>V</kbd> | — | `3d.rip` |
-| Vertex Slide | <kbd>Shift+V</kbd> | — | `3d.slide` |
-| Separate | <kbd>P</kbd> | — | `3d.separar` |
-| Merge | <kbd>M</kbd> | — | `3d.merge` |
-| Context menu | <kbd>W</kbd> | — | `3d.menuContexto` |
-| Triangulate | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
-| UV menu | <kbd>U</kbd> | — | `3d.menuUV` |
-
-### During a transform (перемещение / вращение / масштабирование)
+### 3D-вьюпорт
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
 |---|---|---|---|
-| Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
-| Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
-| X axis | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
-| Y axis | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
-| Z axis | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
-| Exclude X (plane) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
-| Exclude Y (plane) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
-| Exclude Z (plane) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
-| Proportional radius + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
-| Proportional radius - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
+| Выделить всё | <kbd>A</kbd> | <kbd>Карандаш+Вверх</kbd> | `3d.seleccionarTodo` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | <kbd>Карандаш+Вверх</kbd> | `3d.deseleccionar` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
+| Выделение рамкой | <kbd>B</kbd> | — | `3d.caja` |
+| Выделить связанное | <kbd>L</kbd> | — | `3d.vinculado` |
+| Добавить | <kbd>Shift+A</kbd> | — | `3d.agregar` |
+| Применить | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
+| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
+| Сбросить положение (поза) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
+| Сбросить вращение (поза) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
+| Сжать/раздуть / Сбросить масштаб | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
+| Дублировать связанно | <kbd>Alt+D</kbd> | — | `3d.instancia` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
+| Скрыть / Показать | <kbd>H</kbd> | — | `3d.ocultar` |
+| Объединить | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
+| Вставить ключевой кадр | <kbd>I</kbd> | — | `3d.keyframe` |
+| Вставить ключевой кадр (всё) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
+| Пропорциональное редактирование | <kbd>O</kbd> | — | `3d.proporcional` |
+| Наложения | <kbd>K</kbd> | — | `3d.overlays` |
+| Локальный вид | <kbd>/</kbd> | — | `3d.vistaLocal` |
+| Показать выделенное | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
+| Вид спереди | <kbd>Num1</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaFrente` |
+| Вид сзади | <kbd>Ctrl+Num1</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaAtras` |
+| Вид справа | <kbd>Num3</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaDerecha` |
+| Вид слева | <kbd>Ctrl+Num3</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaIzquierda` |
+| Вид сверху | <kbd>Num7</kbd> | <kbd>#+Вверх</kbd> | `3d.vistaArriba` |
+| Вид снизу | <kbd>Ctrl+Num7</kbd> | <kbd>#+Вниз</kbd> | `3d.vistaAbajo` |
+| Перспектива / Орто | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
+| Крен влево | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
+| Крен вправо | <kbd>Num6</kbd> | — | `3d.rodarDer` |
+| Вид из камеры | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
+| Сделать активной камерой | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
+| Выдавить | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
+| Новая грань из вершин | <kbd>F</kbd> | — | `3d.cara` |
+| Пересчитать нормали | <kbd>Shift+N</kbd> | — | `3d.normales` |
+| Петлевой разрез и сдвиг | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
+| Соединить путь вершин | <kbd>J</kbd> | — | `3d.conectar` |
+| Разорвать | <kbd>V</kbd> | — | `3d.rip` |
+| Сдвиг вершин | <kbd>Shift+V</kbd> | — | `3d.slide` |
+| Разделить | <kbd>P</kbd> | — | `3d.separar` |
+| Слить | <kbd>M</kbd> | — | `3d.merge` |
+| Контекстное меню | <kbd>W</kbd> | — | `3d.menuContexto` |
+| Триангулировать | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
+| Меню UV | <kbd>U</kbd> | — | `3d.menuUV` |
 
-### UV Editor
-
-| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
-|---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
-| Select Linked | <kbd>L</kbd> | — | `uv.vinculado` |
-| Box Select | <kbd>B</kbd> | — | `uv.caja` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
-| Insert Keyframe | <kbd>I</kbd> | — | `uv.keyframe` |
-| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
-| Extrude | <kbd>E</kbd> | — | `uv.extruir` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
-| Frame Selected | <kbd>Num.</kbd> | — | `uv.encuadrar` |
-
-### Timeline
-
-| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
-|---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
-| Rotate handles | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
-| Delete | <kbd>X</kbd> | — | `tl.borrar` |
-| Interpolation | <kbd>T</kbd> | — | `tl.interp` |
-| Handle type | <kbd>V</kbd> | — | `tl.handle` |
-| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
-| Previous frame | <kbd>Left</kbd> | — | `tl.frameAnt` |
-| Next frame | <kbd>Right</kbd> | — | `tl.frameSig` |
-| Previous keyframe | <kbd>Down</kbd> | — | `tl.keyAnt` |
-| Next keyframe | <kbd>Up</kbd> | — | `tl.keySig` |
-| Go to start | <kbd>Home</kbd> | — | `tl.inicio` |
-| Go to end | <kbd>End</kbd> | — | `tl.fin` |
-
-### Outliner
+### Во время трансформации (перемещение / вращение / масштабирование)
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `out.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
-| Move (reorder) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
-| Rename | <kbd>F2</kbd> | — | `out.renombrar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `out.duplicar` |
-| Duplicate Linked | <kbd>Alt+D</kbd> | — | `out.instancia` |
-| Hide / Show | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
-| Show active | <kbd>Num.</kbd> | — | `out.encuadrar` |
+| Подтвердить | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
+| Отмена | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
+| Ось X | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
+| Ось Y | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
+| Ось Z | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
+| Исключить X (плоскость) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
+| Исключить Y (плоскость) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
+| Исключить Z (плоскость) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
+| Пропорциональный радиус + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
+| Пропорциональный радиус - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
 
-### 2D Editor
-
-| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
-|---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
-| Frame Selected | <kbd>Num.</kbd> | — | `2d.encuadrar` |
-| Game View | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
-
-### Properties (шаги процедуры)
+### UV-редактор
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
 |---|---|---|---|
-| Grab step | <kbd>G</kbd> | — | `props.agarrar` |
-| Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
-| Insert Keyframe | <kbd>I</kbd> | — | `props.keyframe` |
+| Выделить всё | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
+| Выделить связанное | <kbd>L</kbd> | — | `uv.vinculado` |
+| Выделение рамкой | <kbd>B</kbd> | — | `uv.caja` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
+| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
+| Вставить ключевой кадр | <kbd>I</kbd> | — | `uv.keyframe` |
+| Вставить ключевой кадр (всё) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
+| Выдавить | <kbd>E</kbd> | — | `uv.extruir` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
+| Показать выделенное | <kbd>Num.</kbd> | — | `uv.encuadrar` |
 
-### Script Editor
+### Таймлайн
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
 |---|---|---|---|
-| Save script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
-| Undo | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
-| Copy | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
-| Cut | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
-| Paste | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
-| Select All | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
-| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
-| Find | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
-| Replace | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
+| Выделить всё | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
+| Вращать рукоятки | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
+| Удалить | <kbd>X</kbd> | — | `tl.borrar` |
+| Интерполяция | <kbd>T</kbd> | — | `tl.interp` |
+| Тип рукоятки | <kbd>V</kbd> | — | `tl.handle` |
+| Показать выделенное | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
+| Предыдущий кадр | <kbd>Left</kbd> | — | `tl.frameAnt` |
+| Следующий кадр | <kbd>Right</kbd> | — | `tl.frameSig` |
+| Предыдущий ключевой кадр | <kbd>Down</kbd> | — | `tl.keyAnt` |
+| Следующий ключевой кадр | <kbd>Up</kbd> | — | `tl.keySig` |
+| В начало | <kbd>Home</kbd> | — | `tl.inicio` |
+| В конец | <kbd>End</kbd> | — | `tl.fin` |
+
+### Аутлайнер
+
+| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
+|---|---|---|---|
+| Выделить всё | <kbd>A</kbd> | — | `out.seleccionarTodo` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
+| Переместить (порядок) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
+| Переименовать | <kbd>F2</kbd> | — | `out.renombrar` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `out.duplicar` |
+| Дублировать связанно | <kbd>Alt+D</kbd> | — | `out.instancia` |
+| Скрыть / Показать | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
+| Показать активный | <kbd>Num.</kbd> | — | `out.encuadrar` |
+
+### 2D-редактор
+
+| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
+|---|---|---|---|
+| Выделить всё | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
+| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
+| Показать выделенное | <kbd>Num.</kbd> | — | `2d.encuadrar` |
+| Вид игры | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
+
+### Свойства (шаги процедуры)
+
+| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
+|---|---|---|---|
+| Захватить шаг | <kbd>G</kbd> | — | `props.agarrar` |
+| Удалить шаг | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
+| Вставить ключевой кадр | <kbd>I</kbd> | — | `props.keyframe` |
+
+### Редактор скриптов
+
+| Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в atajos.ini |
+|---|---|---|---|
+| Сохранить скрипт | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
+| Отменить | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
+| Копировать | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
+| Вырезать | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
+| Вставить | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
+| Выделить всё | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
+| Повторить | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
+| Найти | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
+| Заменить | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
 
 <!--ATAJOS-FIN-->
 
 ## Фиксированные клавиши (не переназначаются)
 
-Некоторых клавиш нет в списке, потому что их действие зависит от того, что ты делаешь: стрелки при навигации по меню и панелям, <kbd>Enter</kbd> и <kbd>Esc</kbd> в меню и окнах, стрелки в Outliner во время перемещения строки, клавиатура в IDE при наборе текста и клавиатура телефона на N95 (см. [Навигация](navegacion.md)).
+Некоторых клавиш нет в списке, потому что их действие зависит от того, что ты делаешь: стрелки при навигации по меню и панелям, <kbd>Enter</kbd> и <kbd>Esc</kbd> в меню и окнах, стрелки в Аутлайнере во время перемещения строки, клавиатура в IDE при наборе текста и клавиатура телефона на N95 (см. [Навигация](navegacion.md)).

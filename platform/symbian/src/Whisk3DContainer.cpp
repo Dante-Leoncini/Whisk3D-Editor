@@ -833,6 +833,22 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				// outliner) por teclado, sin mouse. Single-press (no se mantiene).
 				if (W3dLayoutTeclaPanel(sc)) return EKeyWasConsumed;
 			}
+			// LAPIZ + TECLADO durante un transform: el valor EXACTO, como tipear en la PC ("mover 1.5 metros", "rotar 90").
+			// Con el lapiz mantenido los numeros se ESCRIBEN; sin el, el 1/2/3 siguen eligiendo el eje y el 0 lo de siempre.
+			// * = punto decimal, # = cambia el signo, C = borra. OK confirma, como siempre. (Pedido Dante.)
+			if (gLapizHeld && W3dNewTransformActive()){
+				TInt c = 0;
+				if (sc >= '0' && sc <= '9') c = sc;
+				else if (sc == '*') c = '.';
+				else if (sc == EStdKeyHash) c = '-';
+				else if (sc == EStdKeyBackspace) c = 8;
+				if (c){
+					extern bool NumInputChar(int);
+					gLapizArrowUsed = ETrue;   // (soltar el lapiz despues NO cicla la seleccion)
+					NumInputChar((int)c);
+					return EKeyWasConsumed;
+				}
+			}
 			if (sc == '0' && W3dNewTransformActive() && W3dNewTransformModo() == 2){
 				W3dNewToggleOrbital(); // 0 durante rotacion: trackball <-> orbital
 				return EKeyWasConsumed;

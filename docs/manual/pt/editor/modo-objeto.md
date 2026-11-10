@@ -7,6 +7,7 @@
 | Adicionar | Cria um objeto novo no cursor 3D (veja o [menu Adicionar](#menu-adicionar)). | <kbd>Shift+A</kbd> ou botão + |
 | Aplicar | Incorpora na malha a posição, a rotação, a escala ou tudo (o objeto fica em 0, 0, 0, sem rotação e com escala 1). | <kbd>Ctrl+A</kbd> |
 | Definir origem | Geometria para Origem, Origem para Geometria, Origem para Cursor 3D. | Menu Objeto |
+| Ímã | Leva o cursor 3D para o selecionado, para o ativo, para a origem do mundo ou para a grade, e o selecionado para o cursor, para o ativo ou para a grade. | <kbd>Shift+S</kbd> ou menu Objeto → Ímã |
 | Duplicar objetos | Cópia independente; fica presa ao ponteiro para você movê-la. | <kbd>Shift+D</kbd> |
 | Duplicar vinculado | Cópia que compartilha a malha com o original (editar uma edita as duas). | <kbd>Alt+D</kbd> |
 | Juntar | Junta as malhas selecionadas no objeto ativo. | <kbd>Ctrl+J</kbd> |
@@ -40,5 +41,5 @@ Só no Modo Objeto. O que é novo aparece no cursor 3D e fica selecionado. As pr
 | LOD / Culling / Grid Cull | Objetos de otimização: níveis de detalhe e ocultação do que não se vê. |
 | Limpar Z / Recorte | Ferramentas de desenho: limpar a profundidade ou recortar uma área da tela. |
 | Prefab / Cena / Proxy W3D | Inserir um prefab do projeto, outra cena, ou um prefab de uma biblioteca externa. |
-| Importar | OBJ, FBX, glTF, GLB ou uma interface Whisk3D UI. |
+| Importar | OBJ, FBX, glTF, GLB, STL ou uma interface Whisk3D UI. O STL (impressão 3D, CAD) entra com Z para cima, girado para ficar em pé, com os vértices iguais soldados. |
 | Núcleo (avançado) | Rotinas: listas de passos de desenho montadas à mão (transformar, desenhar, texturas, luzes, névoa, mistura, profundidade, controle, Chamar Lua). Inclui o **Laço de rotina**: uma rotina que repete seus passos várias vezes (por exemplo "transladar, desenhar" 20 vezes), como um array, mas mais rápido. |

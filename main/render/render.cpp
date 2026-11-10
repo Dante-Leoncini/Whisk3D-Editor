@@ -13,6 +13,8 @@
 #ifndef W3D_SYMBIAN
 #include "GeometriaUI/GeometriaUI.h" // LineaLightVertex/LineaEdge (gizmo de la luz; PC)
 #include "variables.h"               // showOverlayGlobal
+#include "W3dRaices.h"               // las otras escenas abiertas: sus iconos tambien
+#include "script/W3dScript.h"        // (jugando no: el Play dibuja su base y sus capas)
 #endif
 
 // angulo (rad) en el vertice p del triangulo p-q-r (pondera la normal de cara en el vertex-normal)
@@ -433,7 +435,14 @@ void RenderIcons3D(){
     w3dEngine::Enable(w3dEngine::PointSprite);
     w3dEngine::PointSize(16 * GlobalScale); // iconos de 16 relativos a la UI
 
-    DibujarIcono3D(SceneCollection);
+    // (las OTRAS escenas abiertas en el editor tambien: se ven y se eligen junto a la activa)
+    std::vector<Object*> raices(1, (Object*)SceneCollection);
+    if (!W3dScriptHayPartida()) {
+        std::vector<Object*> otras;
+        W3dRaicesOtrasVisibles(otras);
+        raices.insert(raices.end(), otras.begin(), otras.end());
+    }
+    for (size_t r = 0; r < raices.size(); r++) DibujarIcono3D(raices[r]);
     // los SONIDOS (overlay "Sounds"): su parlante
     { extern bool g_showSonidos;
       const unsigned int tp = g_showSonidos ? TexParlante() : 0;
@@ -444,7 +453,7 @@ void RenderIcons3D(){
           w3dEngine::TexFilter(false);
 #endif
           w3dEngine::PointSize((float)IconSizeGS * 16.0f / 10.0f);
-          DibujarIconoSonido3D(SceneCollection);
+          for (size_t r = 0; r < raices.size(); r++) DibujarIconoSonido3D(raices[r]);
       } }
 
     w3dEngine::PointSpriteCoordReplace(false);

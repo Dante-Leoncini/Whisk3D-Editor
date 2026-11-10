@@ -126,13 +126,17 @@ struct W3dCompilarCfg {
     int  modoVentana;   // 0 Ventana, 1 Pantalla completa, 2 Sin bordes
     int  orientacion;   // 0 Todas, 1 Solo vertical, 2 Solo horizontal
     int  assetsModo;    // 0 Sueltos (editables), 1 Empaquetados (protegidos)
-    int  plataforma;    // 0 Linux .deb, 1 Linux AppImage, 2 WebGL, 3 Android
+    int  plataforma;    // 0 Linux .deb, 1 Linux AppImage, 2 WebGL, 3 Android, 4 Windows, 5 Symbian, 6 Android 2.3,
+                        // 7 PSP, 8 PS Vita, 9 Nintendo 3DS, 10 Dreamcast
     bool usarFisica;    // false = W3D_SIN_FISICA (binds stub no-op)
     bool usarSonido;    // false = sin W3D_ENABLE_AUDIO (beep() mudo)
     bool modoDebug;     // true = W3D_DEV_LOG=1 (log + ring + depurar())
     unsigned uid;       // UID3 de Symbian del juego (app propia). 0 = sin asignar. Rango self-signed: 0xE0000000-0xEFFFFFFF
     int  volumen;       // 0..100 volumen del gameplay (audio del juego). 100 = sin atenuar.
     int  resolucion;    // 25..100 % de la pantalla al que dibuja el juego (Android 2.3: el sistema lo estira). 100 = nativa
+    int  backend;       // el backend grafico, donde la plataforma tiene varios: 0 el de pipeline fijo (OpenGL, OpenGL ES
+                        // 1.1), 1 el de shaders (OpenGL ES 2.0), 2 Vulkan. -1 = el de siempre de cada plataforma (la PC el
+                        // fijo, Android el de shaders). Las demas tienen uno solo (ver W3dCompilarBackends)
 };
 extern W3dCompilarCfg g_proyCompilar;
 
@@ -149,7 +153,17 @@ const char* W3dCompilarOrientacionStr(int o);   // "todas"|"vertical"|"horizonta
 int         W3dCompilarOrientacionInt(const std::string& s);
 const char* W3dCompilarAssetsStr(int a);        // "sueltos"|"empaquetados"
 int         W3dCompilarAssetsInt(const std::string& s);
-const char* W3dCompilarPlataformaStr(int p);    // "linux-deb"|"appimage"|"web"|"android"
+const char* W3dCompilarPlataformaStr(int p);    // "linux-deb"|"appimage"|"web"|"android"|...|"psp"|"vita"|"3ds"|"dreamcast"
 int         W3dCompilarPlataformaInt(const std::string& s);
+const char* W3dCompilarBackendStr(int b);       // "auto"|"fijo"|"shaders"|"vulkan"
+int         W3dCompilarBackendInt(const std::string& s);
+// LOS BACKENDS GRAFICOS DE CADA PLATAFORMA: cuantos tiene y el nombre visible de cada uno. Linux, Windows y Android
+// tienen tres (el fijo, el de shaders y Vulkan), Symbian dos (sin shaders y con shaders); las demas, el suyo (WebGL,
+// el GE de la PSP, vitaGL, citro3d, GLdc)
+int         W3dCompilarBackends(int plataforma);
+const char* W3dCompilarBackendNombre(int plataforma, int backend);
+// el backend que se usa al compilar (0 fijo, 1 shaders, 2 Vulkan): el elegido si la plataforma lo tiene, sino el de
+// siempre de la plataforma
+int         W3dCompilarBackendDe(int plataforma);
 
 #endif // GUARDARW3D_H

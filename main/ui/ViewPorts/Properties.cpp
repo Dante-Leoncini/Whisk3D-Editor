@@ -1,3 +1,4 @@
+#include "objects/Empty.h"   // el dibujo del Vacio (su tarjeta)
 #include "io/W3dWeb.h"   // navegador: guardar = descargar
 #include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
@@ -5,7 +6,9 @@
 #include "graphics/w3dTexture.h"   // Texturas16Siempre (tarjeta Render)
 #include "W3dNombres.h"   // LA regla de nombres unicos (compartida por todo el editor)
 #include "variables.h"
-#include "io/GuardarW3D.h"   // tarjeta Archivo: guardar el proyecto (.w3d v3: JSON plano + archivos externos)
+#include "io/GuardarW3D.h"
+#include "io/CompilarJuego.h"   // tarjeta Juego: hay un juego que compilar, es 3D
+#include "W3dEscena.h"          // tarjeta Juego: la escena 2D con que arranca   // tarjeta Archivo: guardar el proyecto (.w3d v3: JSON plano + archivos externos)
 #include "io/GuardarVersion.h" // tarjeta Archivo: "Guardar version vN" (guardado por versiones)
 #include "W3dRaices.h"         // renombrar un material/malla carga antes las escenas sin abrir; el tipo de la raiz
 #include "io/RaicesEditor.h"   // el estado BASE de un juego (volver a "Juego" desde uno de sus clips)
@@ -734,6 +737,34 @@ static void SincronizarLodDist(Properties* p){
             pt->field.SetText(l->DistanciasTexto()); // display fresco (cambio de objeto / undo)
             g_redraw = true;
         }
+    }
+}
+
+// COPIAS de un Array: Instance::count es un entero sin signo y el campo edita un float. Se copian en cada cuadro: lo que
+// cambia el campo va al Array; lo que cambia afuera (el undo, un script, otro Array elegido) vuelve al campo. Una
+// instancia en modo espejo (de un archivo viejo) no tiene copias: el campo queda sin editar
+static float g_instCopias = 1.0f, g_instCopiasUlt = 1.0f;
+static Instance* g_instCopiasDe = NULL;
+static void SincronizarInstCopias(Properties* p){
+    if (!p || !p->propInstCopias) return;
+    Instance* in = (ObjActivo && ObjActivo->getType() == ObjectType::instance) ? (Instance*)ObjActivo : NULL;
+    if (in && in->mirror) in = NULL;
+    p->propInstCopias->value = in ? &g_instCopias : NULL;
+    if (in != g_instCopiasDe) {
+        g_instCopiasDe = in;
+        if (in) g_instCopias = g_instCopiasUlt = (float)in->count;
+        return;
+    }
+    if (!in) return;
+    if (g_instCopias != g_instCopiasUlt) {
+        int n = (int)(g_instCopias + 0.5f);
+        if (n < 1) n = 1;
+        in->count = (size_t)n;
+        g_instCopias = g_instCopiasUlt = (float)n;
+        g_redraw = true;
+    } else if ((float)in->count != g_instCopiasUlt) {
+        g_instCopias = g_instCopiasUlt = (float)in->count;
+        g_redraw = true;
     }
 }
 
@@ -2514,7 +2545,12 @@ void W3dJuegoVolRefUI(){ g_juegoVolF = (float)g_proyCompilar.volumen; g_juegoRes
 // y se escribe al guardar con los valores vigentes. Antes eran statics de aca y
 // se reseteaban en cada arranque (el modo ventana elegido se perdia).
 // nombres VISIBLES de cada valor (los del JSON son otros: ver W3dCompilar*Str)
-static const char* NombrePlat(int p){ return (p==6)?"Android 2.3":(p==5)?"Symbian .sisx":(p==4)?"Windows .exe":(p==3)?"Android":(p==2)?"WebGL":(p==1)?"Linux AppImage":"Linux .deb"; }
+static const char* NombrePlat(int p){ return (p==10)?"Dreamcast":(p==9)?"Nintendo 3DS":(p==8)?"PS Vita":(p==7)?"PSP":
+    (p==6)?"Android 2.3":(p==5)?"Symbian .sisx":(p==4)?"Windows .exe":(p==3)?"Android":(p==2)?"WebGL":(p==1)?"Linux AppImage":"Linux .deb"; }
+// el backend grafico que se usa con la plataforma elegida (GuardarW3D: los que tiene cada una)
+static const char* NombreBackendJuego(){
+    return W3dCompilarBackendNombre(g_proyCompilar.plataforma, W3dCompilarBackendDe(g_proyCompilar.plataforma));
+}
 static const char* NombreModoVent(int m){ return (m==2)?T("Borderless"):(m==0)?T("Window"):T("Fullscreen"); }
 // la ORIENTACION solo afecta a Android (manifest + hint SDL); en desktop/web no aplica.
 static const char* NombreOrientacion(int o){ return (o==2)?T("Landscape only"):(o==1)?T("Portrait only"):T("Any orientation"); }
@@ -2538,18 +2574,57 @@ static UI* UIParaCompilar(){
 }
 static void AccionCompilarJuego(){
     extern bool CompilarJuego(UI*, int, int, int, bool, bool, bool, bool);
+    // (un juego 3D no necesita UI: CompilarJuego decide si hay un juego que compilar)
+    CompilarJuego(UIParaCompilar(), g_proyCompilar.plataforma, g_proyCompilar.modoVentana,
+                  g_proyCompilar.orientacion, g_proyCompilar.usarFisica,
+                  g_proyCompilar.usarSonido, g_proyCompilar.modoDebug,
+                  g_proyCompilar.assetsModo == 1);
+}
+// "EMPIEZA CON": la escena o el juego con que arranca el juego compilado. En un juego 3D, una raiz 3D del proyecto
+// (escena3dInicial: W3dRaizFijarInicial); en uno solo 2D, una de sus escenas UI (escenaInicial). Queda en el .w3d
+static std::string NombreInicioJuego(){
+    if (CompilarJuegoEs3D()) {
+        const std::vector<W3dRaizFila>& fs = W3dRaices();
+        const int i = W3dRaizInicialIdx();
+        if (i >= 0 && i < (int)fs.size()) return fs[(size_t)i].nombre;
+        return SceneCollection ? SceneCollection->name : std::string();
+    }
+    if (!W3dEscenaInicial().empty()) return W3dEscenaInicial();
     UI* u = UIParaCompilar();
-    if (u) CompilarJuego(u, g_proyCompilar.plataforma, g_proyCompilar.modoVentana,
-                         g_proyCompilar.orientacion, g_proyCompilar.usarFisica,
-                         g_proyCompilar.usarSonido, g_proyCompilar.modoDebug,
-                         g_proyCompilar.assetsModo == 1);
-    else Notificar(T("Build: there is no UI in the scene"), true);
+    return u ? u->name : std::string("-");
+}
+static PopupMenu* MenuInicioJuego = NULL;
+static std::vector<std::string> gInicioNombres;   // los del menu abierto (id = indice; 3D o 2D segun el proyecto)
+static void AccionInicioElegido(int id){
+    if (id < 0 || id >= (int)gInicioNombres.size()) return;
+    if (CompilarJuegoEs3D()) W3dRaizFijarInicial(gInicioNombres[(size_t)id]);
+    else                     W3dEscenaSetInicial(gInicioNombres[(size_t)id]);
+    if (PropsActivo && PropsActivo->propJuegoInicio) PropsActivo->propJuegoInicio->button->text = NombreInicioJuego();
+    g_redraw = true;
+}
+static void AccionMenuInicio(){
+    if (!PropsActivo || !PropsActivo->propJuegoInicio) return;
+    if (!MenuInicioJuego){ MenuInicioJuego = new PopupMenu(); MenuInicioJuego->action = AccionInicioElegido; }
+    MenuInicioJuego->Limpiar();
+    MenuInicioJuego->titulo = T("Starts with");
+    gInicioNombres.clear();
+    if (CompilarJuegoEs3D()) {
+        const std::vector<W3dRaizFila>& fs = W3dRaices();
+        for (size_t i = 0; i < fs.size(); i++) if (W3dRaizEs3D(fs[i].tipo)) gInicioNombres.push_back(fs[i].nombre);
+        if (gInicioNombres.empty() && SceneCollection) gInicioNombres.push_back(SceneCollection->name);
+    } else if (SceneCollection) {
+        for (size_t i = 0; i < SceneCollection->Childrens.size(); i++)
+            if (SceneCollection->Childrens[i]->getType() == ObjectType::ui) gInicioNombres.push_back(SceneCollection->Childrens[i]->name);
+    }
+    for (size_t i = 0; i < gInicioNombres.size(); i++) MenuInicioJuego->Agregar(gInicioNombres[i], (int)i);
+    AbrirMenuBajoBoton(MenuInicioJuego, PropsActivo->propJuegoInicio->button);
 }
 static PopupMenu* MenuPlat = NULL;
 static void AccionPlatElegida(int id){
     g_proyCompilar.plataforma = id;   // queda en el .w3d al guardar el proyecto
     if (PropsActivo && PropsActivo->propJuegoPlat) PropsActivo->propJuegoPlat->button->text = NombrePlat(id);
     if (PropsActivo && PropsActivo->propJuegoUID) PropsActivo->propJuegoUID->oculto = (id != 5); // UID: solo cuando Symbian esta elegido
+    if (PropsActivo && PropsActivo->propJuegoBackend) PropsActivo->propJuegoBackend->button->text = NombreBackendJuego();
     g_redraw = true;
 }
 static void AccionMenuPlat(){
@@ -2564,7 +2639,29 @@ static void AccionMenuPlat(){
     MenuPlat->Agregar("WebGL", 2);
     MenuPlat->Agregar("Android", 3);
     MenuPlat->Agregar("Android 2.3", 6);   // (los telefonos viejos: ARMv6, API 10; ver platform/android-viejo)
+    // las consolas, con el kit libre de cada una (platform/<consola>/preparar_<consola>.sh lo deja en ~/<consola>)
+    MenuPlat->Agregar("PSP", 7);
+    MenuPlat->Agregar("PS Vita", 8);
+    MenuPlat->Agregar("Nintendo 3DS", 9);
+    MenuPlat->Agregar("Dreamcast", 10);
     AbrirMenuBajoBoton(MenuPlat, PropsActivo->propJuegoPlat->button);
+}
+// desplegable "Backend grafico": los que tiene la plataforma elegida (la PC y Symbian: el fijo o el de shaders; las
+// demas, el suyo). Queda en el .w3d al guardar
+static PopupMenu* MenuBackendJuego = NULL;
+static void AccionBackendJuegoElegido(int id){
+    if (W3dCompilarBackends(g_proyCompilar.plataforma) > 1) g_proyCompilar.backend = id;
+    if (PropsActivo && PropsActivo->propJuegoBackend) PropsActivo->propJuegoBackend->button->text = NombreBackendJuego();
+    g_redraw = true;
+}
+static void AccionMenuBackendJuego(){
+    if (!PropsActivo || !PropsActivo->propJuegoBackend) return;
+    if (!MenuBackendJuego){ MenuBackendJuego = new PopupMenu(); MenuBackendJuego->action = AccionBackendJuegoElegido; }
+    MenuBackendJuego->Limpiar();
+    MenuBackendJuego->titulo = T("Graphics backend");
+    const int p = g_proyCompilar.plataforma;
+    for (int b = 0; b < W3dCompilarBackends(p); b++) MenuBackendJuego->Agregar(W3dCompilarBackendNombre(p, b), b);
+    AbrirMenuBajoBoton(MenuBackendJuego, PropsActivo->propJuegoBackend->button);
 }
 // GENERAR un UID3 random para el JUEGO (app propia de Symbian: no pisa el editor). Rango
 // self-signed 0xE0000000-0xEFFFFFFF. Queda en el .w3d (bloque "compilar") al guardar.
@@ -3857,14 +3954,15 @@ static void AccionMenuArmTarget(){
 static PopupMenu* MenuScrewAxis = NULL;
 static void AccionScrewAxisElegido(int id){
     Modifier* mod = ModActivoUI(); if (!mod) return;
-    mod->screwAxis = id; // 0=X, 1=Y, 2=Z
+    mod->screwAxis = id; // INTERNO: 0=X, 1=Y interna (la vertical), 2=Z interna
     AccionModParamChanged();
 }
 static void AccionMenuScrewAxis(){
     if (!PropsActivo || !PropsActivo->propScrewAxis) return;
     if (!MenuScrewAxis){ MenuScrewAxis = new PopupMenu(); MenuScrewAxis->action = AccionScrewAxisElegido; }
     MenuScrewAxis->Limpiar();
-    MenuScrewAxis->Agregar("X", 0); MenuScrewAxis->Agregar("Y", 1); MenuScrewAxis->Agregar("Z", 2);
+    // como los ve la persona (Z arriba): la "Y" de la pantalla es la Z interna y la "Z" (la vertical) es la Y interna
+    MenuScrewAxis->Agregar("X", 0); MenuScrewAxis->Agregar("Y", 2); MenuScrewAxis->Agregar("Z", 1);
     AbrirMenuBajoBoton(MenuScrewAxis, PropsActivo->propScrewAxis->button);
 }
 // --- modificador CULLING (PVS por triangulo): metodo (desplegable) + boton Recalcular ---
@@ -5800,7 +5898,7 @@ void VertexAnimInsertarKeyframe(){ VertexAnimInsertarKeyframeCapa(0); }
 // del mapeo y de la pose 2D). "Son cosas distintas": cada editor keyframea SU curva.
 void VertexAnimInsertarKeyframeUV(){ VertexAnimInsertarKeyframeCapa(1); }
 // captura SOLO mesh->normals en la curva NORMALES ("normal animation"): la tercera capa, elegible
-// desde el submenu "Insert Keyframe Layer" del menu Animation.
+// desde el submenu "Insert Mesh Keyframe" del menu Animation.
 void VertexAnimInsertarKeyframeNormales(){ VertexAnimInsertarKeyframeCapa(2); }
 // ---- BORRAR LA CAPA DE NORMALES de la vertex anim activa (menu Animation) ----
 // Un modelo SIN ILUMINACION (estilo plataformas de PS1) no necesita normales animadas: son 3 bytes por vertice por
@@ -5812,9 +5910,13 @@ void VertexAnimInsertarKeyframeNormales(){ VertexAnimInsertarKeyframeCapa(2); }
 // OJO (asimetria a proposito): insertar keyframes de vertices captura normales solo si an->UseNormals, que esto
 // apaga -> despues de borrar la capa, los keyframes nuevos ya no la vuelven a crear (que es justamente lo que se
 // pidio: ahorrar procesamiento). Para volver atras, Ctrl+Z.
-void VertexAnimBorrarCapaNormalesActiva(){
+// ---- BORRAR UNA CAPA de la animacion de la malla activa (menu Animation > Delete Mesh Layer) ----
+// capa: 0 vertices, 1 UV, 2 normales (las mismas de VertexAnimBorrarCapa). La capa sale de TODOS los frames; un frame
+// que se queda sin capas se va, pero la animacion conserva siempre al menos uno (igual que borrar la fila en la
+// linea de tiempo). Las normales tienen su borrado propio (VertexAnimBorrarCapaNormales).
+void VertexAnimBorrarCapaActiva(int capa){
     // aca NO se auto-crea nada: borrar una capa de una animacion que no existe no tiene sentido.
-    if (ActiveAnimKind != 3 || !ActiveAnimMesh){ Notificar(T("Delete normals layer: select an object animation in the timeline"), true); return; }
+    if (ActiveAnimKind != 3 || !ActiveAnimMesh){ Notificar(T("Delete mesh layer: select an object animation in the timeline"), true); return; }
     Mesh* m = ActiveAnimMesh;
     VertexAnimationActive* va = FindTargetAnim(m);
     int ai = va ? va->currentAnim : -1;
@@ -5822,14 +5924,23 @@ void VertexAnimBorrarCapaNormalesActiva(){
     VertexAnimation* an = m->animations[ai];
     extern void UndoKeyframesIniciar(); extern void UndoKeyframesConfirmar();
     UndoKeyframesIniciar();                       // Ctrl+Z: un paso de undo por operacion
-    bool algo = VertexAnimBorrarCapaNormales(*an);
+    bool algo = false;
+    if (capa == 2) algo = VertexAnimBorrarCapaNormales(*an);
+    else for (size_t k = an->frames.size(); k-- > 0; ){
+        VertexFrame* f = an->frames[k];
+        if (!f || (capa == 0 ? !f->positions : !f->uvs)) continue;
+        const int capas = (f->positions ? 1 : 0) + (f->uvs ? 1 : 0) + (f->normals ? 1 : 0);
+        if (capas <= 1 && an->frames.size() <= 1) continue;   // dejar siempre un frame
+        if (VertexAnimBorrarCapa(*an, f->frame, capa)) algo = true;
+    }
     UndoKeyframesConfirmar();
-    if (!algo){ Notificar(T("This animation has no normals layer"), true); return; }
-    if (m->normals) m->RecalcularNormales();      // normales ESTATICAS coherentes con la pose actual
+    if (!algo){ Notificar(T("This animation has no keyframes in that layer"), true); return; }
+    if (capa == 2 && m->normals) m->RecalcularNormales();  // normales ESTATICAS coherentes con la pose actual
     m->skinGeomVersion++;                         // re-subir el VBO
-    Notificar(T("Normals layer deleted"), false);
+    Notificar(T("Mesh layer deleted"), false);
     g_redraw = true;
 }
+void VertexAnimBorrarCapaNormalesActiva(){ VertexAnimBorrarCapaActiva(2); }
 // ---- tarjeta "Animacion" del OBJETO (pestania Objeto): las animaciones DEL objeto.
 // Una animacion de objeto es un CONTENEDOR: hoy envuelve una vertex animation
 // (mallas); a futuro suma canales de transform (mover/rotar/escalar), visible
@@ -6560,6 +6671,7 @@ void ProyectoSincronizarCampos() {
     // desplegables de la tarjeta Juego. Los checkboxes (fisica/sonido/debug)
     // apuntan directo a g_proyCompilar y se refrescan solos.
     if (PropsActivo->propJuegoPlat)     PropsActivo->propJuegoPlat->button->text     = NombrePlat(g_proyCompilar.plataforma);
+    if (PropsActivo->propJuegoBackend)  PropsActivo->propJuegoBackend->button->text  = NombreBackendJuego();
     if (PropsActivo->propJuegoModoVent) PropsActivo->propJuegoModoVent->button->text = NombreModoVent(g_proyCompilar.modoVentana);
     if (PropsActivo->propJuegoOrient)   PropsActivo->propJuegoOrient->button->text   = NombreOrientacion(g_proyCompilar.orientacion);
     if (PropsActivo->propJuegoAssets)   PropsActivo->propJuegoAssets->button->text   = NombreAssetsModo(g_proyCompilar.assetsModo);
@@ -6924,6 +7036,41 @@ static void AccionMenuRcCamara(){
     MenuRcCamara->Agregar(T("(none)"), 0, IconType::empty);
     for (size_t i = 0; i < gCamMenu.size(); i++) MenuRcCamara->Agregar(gCamMenu[i]->name, (int)i + 1, IconType::camera);
     AbrirMenuBajoBoton(MenuRcCamara, PropsActivo->propRcCamara->button);
+}
+
+// LA FORMA del Vacio (como se dibuja): cruz, cuadrado, circulo o esfera. En el orden de VacioCruz.. (Empty.h)
+static PopupMenu* MenuVacioForma = NULL;
+static const char* kVacioFormas[VacioFormas] = { "Cross", "Square", "Circle", "Sphere", "Cube" };
+// el icono de cada forma (el mismo orden): la cruz, el cuadrado (plano), el circulo, la esfera y el cubo
+static int VacioFormaIcono(int f) {
+    static const int kIc[VacioFormas] = { (int)IconType::cruz, (int)IconType::plane, (int)IconType::circle,
+                                          (int)IconType::esfera, (int)IconType::object };
+    return kIc[(f >= 0 && f < VacioFormas) ? f : VacioCirculo];
+}
+// en el menu, de la mas simple a la mas completa (los ids son los de Empty.h)
+static const int kVacioOrdenMenu[VacioFormas] = { VacioCruz, VacioCuadrado, VacioCubo, VacioCirculo, VacioEsfera };
+static const char* VacioFormaTexto(int f) { return T(kVacioFormas[(f >= 0 && f < VacioFormas) ? f : VacioCirculo]); }
+static void AccionVacioFormaElegida(int id){
+    if (id < 0 || id >= VacioFormas || !ObjActivo || ObjActivo->getType() != ObjectType::empty) return;
+    static_cast<Empty*>(ObjActivo)->forma = id;
+    if (PropsActivo && PropsActivo->propVacioForma) {
+        PropsActivo->propVacioForma->button->text = VacioFormaTexto(id);
+        PropsActivo->propVacioForma->button->icon = VacioFormaIcono(id);
+    }
+    extern void W3dCambiosTocado(); W3dCambiosTocado();
+    g_redraw = true;
+}
+static void AccionMenuVacioForma(){
+    if (!PropsActivo || !PropsActivo->propVacioForma) return;
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::empty) return;
+    if (!MenuVacioForma){ MenuVacioForma = new PopupMenu(); MenuVacioForma->action = AccionVacioFormaElegida; }
+    MenuVacioForma->Limpiar();
+    const int actual = static_cast<Empty*>(ObjActivo)->forma;
+    for (int k = 0; k < VacioFormas; k++) {
+        const int i = kVacioOrdenMenu[k];
+        MenuVacioForma->Agregar(T(kVacioFormas[i]), i, VacioFormaIcono(i))->verde = (i == actual);
+    }
+    AbrirMenuBajoBoton(MenuVacioForma, PropsActivo->propVacioForma->button);
 }
 
 // EL ARCHIVO del Sonido: los sonidos del proyecto (soltar un .wav en la biblioteca o en la vista 3D los agrega)
@@ -7794,6 +7941,10 @@ void Properties::ConstruirGrupos(){
     propBtnMeshEditable = new PropButton(T("Delete editing data"), IconType::borrar);
     propBtnMeshEditable->action = AccionMeshEditableToggle;
     propMeshEdicion->properties.push_back(propBtnMeshEditable);
+    // BLOQUEAR NORMALES: en el Modo Edicion, al confirmar un movimiento no se recalculan las normales de ESTA malla
+    // (estaba en el menu del pivote, como opcion global: no tenia nada que ver con el pivote)
+    propMeshBloquearNormales = new PropBool(T("Lock Normals"));
+    propMeshEdicion->properties.push_back(propMeshBloquearNormales);
     GroupProperties.push_back(propMeshEdicion);
 
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
@@ -8198,6 +8349,10 @@ void Properties::ConstruirGrupos(){
     propBtnInstTarget->button->desplegable = true;
     propBtnInstTarget->action = AccionMenuTarget;
     propInstance->properties.push_back(propBtnInstTarget);
+    // las COPIAS de un Array (una instancia comun es un Array de 1). Se sincroniza por frame: SincronizarInstCopias
+    propInstCopias = new PropFloat(T("Count"));
+    propInstCopias->SetRango(1.0f, 1000.0f); propInstCopias->entero = true;
+    propInstance->properties.push_back(propInstCopias);
     GroupProperties.push_back(propInstance);
 
     // pestania del objeto LOD: los umbrales de distancia, como texto "20, 45, 90"
@@ -8296,6 +8451,21 @@ void Properties::ConstruirGrupos(){
     propSonAlcance->stepFino = 0.5f; propSonAlcance->stepGrueso = 5.0f; propSonAlcance->dragStep = 0.1f;
     propSonido->properties.push_back(propSonAlcance);
     GroupProperties.push_back(propSonido);
+
+    // VACIO: como se dibuja. Es solo la vista: no cambia el objeto, ni su transformacion, ni a sus hijos
+    propVacio = new GroupPropertie(T("Empty"));
+    propVacioForma = new PropButton(T("Shape"), IconType::cruz);
+    propVacioForma->conLabel = true;
+    propVacioForma->button->desplegable = true;
+    propVacioForma->action = AccionMenuVacioForma;
+    propVacio->properties.push_back(propVacioForma);
+    propVacioTam = new PropFloat(T("Size"), "m"); propVacioTam->SetRango(0.001f, 100000.0f);
+    propVacioTam->stepFino = 0.1f; propVacioTam->stepGrueso = 1.0f; propVacioTam->dragStep = 0.05f;
+    propVacio->properties.push_back(propVacioTam);
+    propVacioRotX = new PropFloat(T("Rotation X"), "\xc2\xb0"); propVacio->properties.push_back(propVacioRotX);
+    propVacioRotY = new PropFloat("Y", "\xc2\xb0");             propVacio->properties.push_back(propVacioRotY);
+    propVacioRotZ = new PropFloat("Z", "\xc2\xb0");             propVacio->properties.push_back(propVacioRotZ);
+    GroupProperties.push_back(propVacio);
 
     propNiebla = new GroupPropertie(T("Fog"));
     propNieblaActiva = new PropBool(T("Active"));
@@ -8999,12 +9169,24 @@ void Properties::ConstruirGrupos(){
     // ===== Tarjeta "Juego" (debajo de Animacion): compilar + el cache del viaje en
     // el tiempo. El juego NO se mezcla con la UI ni con las animaciones normales.
     propJuego = new GroupPropertie(T("Game"));
+    propJuegoInicio = new PropButton(T("Starts with"));
+    propJuegoInicio->conLabel = true;
+    propJuegoInicio->button->desplegable = true;
+    propJuegoInicio->button->text = NombreInicioJuego();
+    propJuegoInicio->action = AccionMenuInicio;
+    propJuego->properties.push_back(propJuegoInicio);
     propJuegoPlat = new PropButton(T("Platform"));
     propJuegoPlat->conLabel = true;
     propJuegoPlat->button->desplegable = true;
     propJuegoPlat->button->text = NombrePlat(g_proyCompilar.plataforma);
     propJuegoPlat->action = AccionMenuPlat;
     propJuego->properties.push_back(propJuegoPlat);
+    propJuegoBackend = new PropButton(T("Graphics backend"));
+    propJuegoBackend->conLabel = true;
+    propJuegoBackend->button->desplegable = true;
+    propJuegoBackend->button->text = NombreBackendJuego();
+    propJuegoBackend->action = AccionMenuBackendJuego;
+    propJuego->properties.push_back(propJuegoBackend);
     propJuegoModoVent = new PropButton(T("Window mode"));
     propJuegoModoVent->conLabel = true;
     propJuegoModoVent->button->desplegable = true;
@@ -10634,6 +10816,7 @@ void Properties::RefreshTargetProperties(){
     SincronizarTexto2D(this);      // idem para el campo "Text" del elemento de texto 2D
     SincronizarLodDist(this);      // y el campo "Distances" del objeto LOD
     SincronizarMirrorTarget(this); // y el campo "Target" del objeto Mirror
+    SincronizarInstCopias(this);   // y las copias de un Array
     // (color y textura de particula ya no son campos de texto: color = PropColor/picker, textura = dropdown)
     SincronizarTextoBoton(this);   // y el del boton 2D
     SincronizarNombreBone(this);   // fila "Name" de la tarjeta Bones: renombra hueso + vertex group al commitear
@@ -11297,9 +11480,11 @@ void Properties::RefreshTargetProperties(){
     // por nombre va con SincronizarMirrorTarget (patron LOD, sync por frame)
     if (propMirror && propMirrorX){
         Mirror* mi = (ObjActivo->getType() == ObjectType::mirror) ? static_cast<Mirror*>(ObjActivo) : NULL;
+        // los ejes con la convencion Z-arriba del panel (la de Transform): la casilla "Y" es el eje z del motor (la
+        // profundidad) y la "Z" es el y (lo vertical: el espejo de agua, el piso)
         propMirrorX->value       = mi ? &mi->mirrorX         : NULL;
-        propMirrorY->value       = mi ? &mi->mirrorY         : NULL;
-        propMirrorZ->value       = mi ? &mi->mirrorZ         : NULL;
+        propMirrorY->value       = mi ? &mi->mirrorZ         : NULL;
+        propMirrorZ->value       = mi ? &mi->mirrorY         : NULL;
         propMirrorHijos->value   = mi ? &mi->RenderChildrens : NULL;
         propMirrorLimites->value = mi ? &mi->usaLimites      : NULL;
         propMirrorU0->value      = (mi && mi->usaLimites) ? &mi->limU0 : NULL;
@@ -11327,6 +11512,17 @@ void Properties::RefreshTargetProperties(){
         if (propCullRecalc) propCullRecalc->oculto = !grid; // Recalcular solo tiene sentido con grilla
     }
 
+
+    // VACIO: bind directo a su dibujo (NULL = oculto)
+    if (propVacioTam){
+        Empty* va = (ObjActivo && ObjActivo->getType() == ObjectType::empty) ? static_cast<Empty*>(ObjActivo) : NULL;
+        if (propVacioForma->oculto != !va) { propVacioForma->oculto = !va; PropertiesLayoutDirty = true; }
+        if (va) { propVacioForma->button->text = VacioFormaTexto(va->forma); propVacioForma->button->icon = VacioFormaIcono(va->forma); }
+        propVacioTam->value  = va ? &va->tamDibujo : NULL;
+        propVacioRotX->value = va ? &va->rotDibujo.x : NULL;
+        propVacioRotY->value = va ? &va->rotDibujo.y : NULL;
+        propVacioRotZ->value = va ? &va->rotDibujo.z : NULL;
+    }
 
     // SONIDO: bind directo; el paneo solo sin 3D, radio / alcance / esferas solo con 3D (NULL = oculto)
     if (propSonActivo){
@@ -11525,7 +11721,7 @@ Properties::Properties() : ViewportBase() {
     propControl = NULL; scriptFirma = -1;
     propListScripts = NULL; propRowScript = NULL; propRowScriptMove = NULL;
     for (int i = 0; i < kMaxScriptCards; i++) propScriptCards[i] = NULL;
-    propJuego = NULL; propJuegoCompilar = NULL; propJuegoPlat = NULL; propJuegoModoVent = NULL;
+    propJuego = NULL; propJuegoCompilar = NULL; propJuegoPlat = NULL; propJuegoModoVent = NULL; propJuegoInicio = NULL; propJuegoBackend = NULL;
     propJuegoOrient = NULL; propJuegoIcono = NULL; propJuegoFisica = NULL; propJuegoSonido = NULL;
     propObjAnim = NULL; propListObjAnims = NULL; propJerLib = NULL; propClipRetarget = NULL; propObjRetarget = NULL;
     propBtnPalFondo = NULL; propBtnPalTexto = NULL; propBtnPalBorde = NULL;
@@ -11568,6 +11764,7 @@ Properties::Properties() : ViewportBase() {
     propPfCarga = NULL; propPfDistancia = NULL; propPfObjetivo = NULL; propPfVista = NULL;   // (el streaming de la tarjeta)
     for (int k = 0; k < 3; k++) { propHbTam[k] = NULL; propHbCentro[k] = NULL; }
     propRcAncho = NULL; propRcAlto = NULL; propRcCamara = NULL; propRcLimpiarZ = NULL; propRcFondo = NULL; propRcColor = NULL;
+    propVacio = NULL; propVacioForma = NULL; propVacioTam = NULL; propVacioRotX = NULL; propVacioRotY = NULL; propVacioRotZ = NULL;
     propSonido = NULL; propSonArchivo = NULL; propSonActivo = NULL; propSonVol = NULL; propSonTono = NULL; propSonReverb = NULL;
     propSonPaneo = NULL; propSonInicio = NULL; propSonRecIni = NULL; propSonRecFin = NULL; propSonBucle = NULL; propSonPos = NULL;
     propSonRadio = NULL; propSonAlcance = NULL;
@@ -11601,6 +11798,7 @@ Properties::Properties() : ViewportBase() {
     propRenderIni = NULL; propRenderFin = NULL; propRenderFps = NULL;
     propBtnCamTarget = NULL;
     propBtnInstTarget = NULL;
+    propInstCopias = NULL;
     // tarjeta Fisica (cuerpo rigido)
     propFisica = NULL; propFisTipo = NULL; propFisMasa = NULL;
     propFisCajaX = NULL; propFisCajaY = NULL; propFisCajaZ = NULL;
@@ -11637,7 +11835,7 @@ Properties::Properties() : ViewportBase() {
     propMirMerge = NULL; propMirDist = NULL; propMirClip = NULL; propBtnApplyMod = NULL;
     propPvsMetodo = NULL; propPvsRecalc = NULL; propPvsInfo = NULL; // modificador Oclusion (PVS por triangulo)
     propPvsPath = NULL; propPvsSoloCam = NULL; propPvsNodo = NULL; propPvsRamas = NULL;
-    propMeshEdicion = NULL; propBtnMeshEditable = NULL; // card "Edicion" (editable/no-editable)
+    propMeshEdicion = NULL; propBtnMeshEditable = NULL; propMeshBloquearNormales = NULL; // card "Edicion"
     propMalla3D = NULL; propBtnMallaSel = NULL; // card "3D Mesh"
     propLblMallaUsos = NULL; propBtnMallaUnica = NULL;
     propLblMallaLib = NULL; propLblModsLib = NULL; propBtnNewPart = NULL;   // (lo de una libreria: solo lectura)
@@ -11771,6 +11969,7 @@ void Properties::ActualizarPestanias(){
     bool esCull = (tipo == (int)ObjectType::culling);
     bool esNiebla = (tipo == (int)ObjectType::niebla);
     bool esSon    = (tipo == (int)ObjectType::sonido);
+    bool esVacio  = (tipo == (int)ObjectType::empty);   // su dibujo (forma, tamanio, giro)
     bool esLz = (tipo == (int)ObjectType::limpiarz);
     bool esPost = (tipo == (int)ObjectType::postproceso);
     bool esRc = (tipo == (int)ObjectType::recorte);
@@ -11782,7 +11981,7 @@ void Properties::ActualizarPestanias(){
     bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esLz || esRc || esHb || esPf || esPx || esRu || esPost;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esVacio || esLz || esRc || esHb || esPf || esPx || esRu || esPost;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -11808,6 +12007,7 @@ void Properties::ActualizarPestanias(){
         else if (esMirror) icono = (int)IconType::mirror;        // objeto Mirror (target + ejes)
         else if (esNiebla) icono = (int)IconType::niebla;        // objeto Niebla (glFog en el arbol)
         else if (esSon)    icono = (int)IconType::sonido;        // objeto Sonido (el parlante)
+        else if (esVacio)  icono = (int)IconType::cruz;          // objeto Vacio (la cruz de tres ejes)
         else if (esLz) icono = (int)IconType::limpiarz;
         else if (esPost) icono = (int)IconType::monitor;
         else if (esRc) icono = (int)IconType::recorte;
@@ -12016,6 +12216,10 @@ void Properties::ActualizarPestanias(){
         // Render Animation: se grisa solo si hay CERO animaciones. Siempre existe la escena "Scene" (rendea su rango
         // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
         if (propBtnAnimRender && !RenderEsJuego()) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
+        // COMPILAR JUEGO: gris si el proyecto no tiene un juego (una raiz de tipo Juego, o una UI con scripts); el
+        // "Empieza con" al dia (se renombran o se agregan escenas)
+        if (propJuegoCompilar) propJuegoCompilar->gris = !CompilarJuegoHayJuego();
+        if (propJuegoInicio) propJuegoInicio->button->text = NombreInicioJuego();
         // MODO JUEGO: el Fin desaparece (la animacion es infinita)
         if (g_animMix && AnimEsJuego) AnimEsJuego = false;   // Mix y Juego son excluyentes (un .w3d viejo pudo traer los dos)
         if (gPropAnimEnd) gPropAnimEnd->value = AnimEsJuego ? NULL : &g_animEndF;
@@ -12153,6 +12357,8 @@ void Properties::ActualizarPestanias(){
     if (propMeshEdicion) {
         // (los datos de edicion de una malla de una LIBRERIA son de ella: sin la tarjeta)
         propMeshEdicion->visible = tabMalla && !(ObjActivo->getType() == ObjectType::mesh && W3dMallaSoloLectura((Mesh*)ObjActivo, true));
+        if (propMeshBloquearNormales)
+            propMeshBloquearNormales->value = (esMesh && ObjActivo->getType() == ObjectType::mesh) ? &((Mesh*)ObjActivo)->bloquearNormales : NULL;
         if (esMesh && propBtnMeshEditable && ObjActivo->getType() == ObjectType::mesh) {
             bool noEd = ((Mesh*)ObjActivo)->noEditable;
             propBtnMeshEditable->button->text = noEd ? T("Convert to editable mesh") : T("Delete editing data");
@@ -12169,6 +12375,7 @@ void Properties::ActualizarPestanias(){
     if (propCulling)   propCulling->visible   = (pestaniaActiva == 2 && esCull);
     if (propNiebla)    propNiebla->visible    = (pestaniaActiva == 2 && esNiebla);
     if (propSonido)    propSonido->visible    = (pestaniaActiva == 2 && esSon);
+    if (propVacio)     propVacio->visible     = (pestaniaActiva == 2 && esVacio);
     if (propLimpiarZ)  propLimpiarZ->visible  = (pestaniaActiva == 2 && esLz);
     if (propRecorte)   propRecorte->visible   = (pestaniaActiva == 2 && esRc);
     PropsHitboxActualizar(this, pestaniaActiva == 2 && esHb);   // visibilidad + bindeo + textos
@@ -12399,10 +12606,14 @@ void Properties::ActualizarPestanias(){
         if (propScrewMerge)   propScrewMerge->value   = esScrew ? &mod->screwMerge         : NULL;
         if (propScrewFlip)    propScrewFlip->value    = esScrew ? &mod->screwFlip          : NULL;
         if (propScrewAxis){ propScrewAxis->oculto = !esScrew;
-            if (esScrew) propScrewAxis->button->text = (mod->screwAxis==0)?"X":(mod->screwAxis==1)?"Y":"Z"; }
+            // screwAxis es INTERNO (1 = Y interna = la vertical): en pantalla la vertical es la Z (ver AccionMenuScrewAxis)
+            if (esScrew) propScrewAxis->button->text = (mod->screwAxis==0)?"X":(mod->screwAxis==1)?"Z":"Y"; }
+        // los ejes del Mirror son INTERNOS (ejeY = la vertical, MirrorPoly con axY(0,1,0)): las casillas van como las ve la
+        // persona, Z arriba. "Espejo Y" = ejeZ y "Espejo Z" = ejeY, igual que el objeto espejo (RefreshPropMirror). Antes iban
+        // derecho y para espejar a lo ancho de una puerta (la Y de la pantalla) habia que prender la Z
         if (propMirX) propMirX->value = esMirror ? &mod->ejeX : NULL;
-        if (propMirY) propMirY->value = esMirror ? &mod->ejeY : NULL;
-        if (propMirZ) propMirZ->value = esMirror ? &mod->ejeZ : NULL;
+        if (propMirY) propMirY->value = esMirror ? &mod->ejeZ : NULL;
+        if (propMirZ) propMirZ->value = esMirror ? &mod->ejeY : NULL;
         if (propMirMerge) propMirMerge->value = esMirror ? &mod->merge : NULL;
         if (propMirDist)  propMirDist->value  = esMirror ? &mod->mergeDist : NULL;
         if (propMirClip)  propMirClip->value  = esMirror ? &mod->clipping : NULL;

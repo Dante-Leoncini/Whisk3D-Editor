@@ -1,89 +1,88 @@
-# 3D Viewport
+# 3D Görünüm
 
-3D Viewport, sahnenin görüntülendiği ve düzenlendiği yerdir. Farklı **modlarda** çalışır: tıklamaların, tuşların ve menülerin ne yaptığı o anki moda bağlıdır. Mod, üst çubuktaki seçiciyle (yalnızca etkin nesne bir mesh ya da iskeletse görünür) veya <kbd>Tab</kbd> ile seçilir.
+**3D Görünüm**, sahnenin görüntülendiği ve düzenlendiği viewport'tur: modelleme, nesneleri taşıma, boyama, poz verme ve canlandırma burada yapılır. Tüm viewport'lar gibi üstte kendi **menü çubuğu**, altta da kendi **araç çubuğu** vardır.
 
-| Mod | Hangi nesneler için | Ne işe yarar |
+![Nesne Modunda, küp seçiliyken 3D Görünüm: üstte menü çubuğunun tamamı](../tutoriales/img/vista-3d-barra.webp)
+
+- **Menü çubuğu**, düğme düğme ve menüleriyle: [3D Görünüm'ün menü çubuğu](vista-3d-barra.md).
+- **Gezinme** (yörüngede döndürme, kaydırma, yakınlaştırma, görünümler, kamera): [3D Görünüm'de gezinme](navegacion.md) ve [3D Görünüm'de gezinme](../tutoriales/navegacion.md) eğitimi.
+- **Taşıma, döndürme ve ölçekleme**, gizmo, pivot ve yönelim: [Taşıma, döndürme ve ölçekleme](transformar.md).
+
+## Modlar
+
+3D Görünüm farklı **modlarda** çalışır: tıklamaların, tuşların ve menülerin ne yaptığı o anki moda bağlıdır. Mod, menü çubuğunun o anki modu gösteren ilk düğmesiyle ya da <kbd>Tab</kbd> ile seçilir (Nesne ↔ Düzenleme; Nokia N95'te <kbd>OK</kbd>).
+
+Seçilebilen modlar **etkin nesneye** bağlıdır. **Nesne Modu** hepsinde vardır. Bir 3D örgüye Düzenleme Modu ve üç boyama modu eklenir; bir iskelete Düzenleme Modu ve Poz Modu. Başka herhangi bir nesneyle (bir ışık, bir kamera, bir ses) tek mod Nesne Modudur ve düğme görünmez.
+
+![Bir küp seçiliyken mod menüsü: Nesne Modu, Düzenleme Modu, Köşe Boyama, Ağırlık Boyama ve Doku Boyama](../tutoriales/img/vista-3d-menu-modo.webp)
+
+![Bir iskelet seçiliyken mod menüsü: Nesne Modu, Düzenleme Modu ve Poz Modu](../tutoriales/img/vista-3d-modos-esqueleto.webp)
+
+| Mod | Hangi nesnelerde var | Ne işe yarar |
 |---|---|---|
-| [Object Mode](modo-objeto.md) | Hepsi | Nesnelerin bütününü oluşturma, taşıma, döndürme, ölçekleme, çoğaltma, ebeveyne bağlama ve silme. |
-| [Edit Mode](modo-edicion.md) | Mesh'ler ve eğriler | Köşeleri, kenarları ve yüzleri düzenleme (modelleme). |
-| [Edit Mode (iskelet)](esqueletos.md#edit-mode-iskelet) | İskeletler | Kemikleri oluşturma ve yerleştirme. |
-| [Pose Mode](esqueletos.md#pose-mode) | İskeletler | Kemiklere poz verme ve onları canlandırma. |
-| [Weight Paint](pintura.md#weight-paint) | Yalnızca 3D mesh'ler | Her kemiğin her köşeyi ne kadar hareket ettirdiğini boyama. |
-| [Vertex Paint](pintura.md#vertex-paint) | Yalnızca 3D mesh'ler | Renkleri doğrudan köşelerin üzerine boyama. |
-| [Texture Paint](pintura.md#texture-paint) | Yalnızca 3D mesh'ler | Doğrudan nesnenin üzerinden dokuya boyama. |
+| [Nesne Modu](modo-objeto.md) | Hepsi | Nesnelerin bütünüyle çalışma: oluşturma, taşıma, döndürme, ölçekleme, çoğaltma, ebeveyne bağlama ve silme. |
+| [Düzenleme Modu](modo-edicion.md) | 3D örgüler ve eğriler | Modelleme: örgünün köşelerini, kenarlarını ve yüzlerini taşıma, ekleme ve silme. |
+| [Düzenleme Modu](esqueletos.md#düzenleme-modu-iskelet) | İskeletler | İskeleti kurma: kemikleri oluşturma ve dinlenme pozisyonlarına yerleştirme. |
+| [Poz Modu](esqueletos.md#poz-modu) | İskeletler | Kemiklere poz verme ve pozları kaydetme: bir karakter böyle canlandırılır. |
+| [Ağırlık Boyama](pintura.md#ağırlık-boyama) | 3D örgüler | Her kemiğin her köşeyi ne kadar hareket ettirdiğini boyama. |
+| [Köşe Boyama](pintura.md#köşe-boyama) | 3D örgüler | Renkleri doğrudan köşelerin üzerine boyama. |
+| [Doku Boyama](pintura.md#doku-boyama) | 3D örgüler | Doğrudan nesnenin üzerinden dokuya boyama. |
 
-## 3D Viewport'un üst çubuğu
+### Nesne Modu
 
-| Düğme | Açıklama |
-|---|---|
-| Mod seçici | Modu değiştirir (Object, Edit, Pose, Paint…). |
-| Vertex / Edge / Face | Yalnızca Edit Mode'da: neyin seçileceği. |
-| Transform Pivot Point | Döndürme ve ölçeklemenin neyin etrafında yapılacağı: 3D Cursor, Individual Origins, Median Point veya Active Element. Lock Normals onay kutusuyla birlikte. |
-| Orientation | Dönüştürmenin eksenleri: Global, Local, Normal (yüzün yönü) veya View. |
-| Snap | Snap (yapıştırma) seçenekleri. Etkinse yeşil olur (<kbd>Shift+Tab</kbd>). |
-| Proportional Editing | Bir şeyi taşırken yakınındakiler de yumuşakça ona eşlik eder. Etkinse yeşil olur (<kbd>O</kbd>). |
-| View | Cameras, Viewpoint, Frame Selected, Local View, Perspective/Ortho, Lock Orbit, Lock the camera to the view. |
-| Select | All, None, Invert, Box Select, Select Linked, loop'lar ve yollar. |
-| Add (+) | Yalnızca Object Mode'da: yeni nesneler oluşturma. |
-| Mesh | Yalnızca Edit Mode'da: modelleme işlemleri. |
-| Save Texture (disket) | Yalnızca Texture Paint'te. Kaydedilmemiş boya varsa yeşildir. |
-| Animation (eşkenar dörtgen) | Keyframe ekleme, silme ve temizleme; Motion Trail. |
-| Context | Modun menüsü: Object, Vertex/Edge/Face, Armature veya Pose. |
-| Overlays (göz) | Hangi yardımcıların çizileceği: Floor, eksenler, Gizmo, 3D Cursor, Normals, Statistics, X-Ray. |
-| Render (kamera) | Gölgelendirme modu. |
-| Scene | Projenin hangi sahnesinin, oyununun ya da prefab'ının düzenleneceğini seçme ve yenilerini oluşturma. |
-| UV | Yalnızca Edit Mode'da: UV açma ve yansıtma. |
+Whisk3D'nin açıldığı mod ve tüm nesnelerde olan tek moddur. Nesnelerin bütünüyle çalışılır: seçilir, taşınır, döndürülür, ölçeklenir, eklenir ve silinir. Bkz. [Nesne Modu](modo-objeto.md) ve [Nesne Modu](../tutoriales/modo-objeto.md) eğitimi.
 
-## Birden fazla modda ortak menüler
+### Bir örgünün Düzenleme Modu
 
-### Select
+Örgünün **şekli** modellenir: köşeler, kenarlar ve yüzler. Menü çubuğunda **Köşe / Kenar / Yüz** düğmesi (tek tıklamayla neyin seçileceği) ile **Örgü** ve **UV** menüleri belirir. Sahnenin geri kalanı görünmeye devam eder ama ona dokunulamaz.
 
-| İşlev | Açıklama | Kısayol |
-|---|---|---|
-| All | Her şeyi seçer. | <kbd>A</kbd> |
-| None | Tüm seçimi kaldırır. | <kbd>Alt+A</kbd> |
-| Invert | Seçili olanların seçimi kalkar, seçili olmayanlar seçilir. | <kbd>Ctrl+I</kbd> |
-| Box Select | Soldan sağa sürüklemek (yeşil) yalnızca tamamen içinde kalanları alır; sağdan sola sürüklemekte (mavi) değmesi yeterlidir. <kbd>Shift</kbd> ekler. | <kbd>B</kbd> |
-| Show selection | Seçilenin dış çizgisini gösterir ya da gizler. | Menü |
+![Düzenleme Modunda bir küp: bir yüzü yeşille seçili ve gizmo onun üzerinde](../tutoriales/img/vista-3d-modo-edicion.webp)
 
-### Render (gölgelendirme modları)
+### Bir iskeletin Düzenleme Modu
 
-| İşlev | Açıklama |
-|---|---|
-| Render Preview | Sahnenin ışıklarıyla. Ray Tracing etkinse, ışın izlenen görüntüyü yavaş yavaş gösterir. |
-| Material Preview | Varsayılan mod: sahnenin ışıklarına bağlı olmadan, görünümden gelen nötr bir ışık. |
-| Solid Preview / Wireframe Preview / ZBuffer Preview | Düz gri, yalnızca kenarlar ya da derinlik. |
-| Normal View / Alpha Preview | Renkli normaller ya da siyah beyaz saydamlık. |
-| Motion vectors | Her pikselin önceki kareden beri ekranda ne kadar hareket ettiği (kırmızı = X, yeşil = Y; lavanta = sabit, zeytin yeşili = arka plan). Render’ın `_vectores` geçişiyle aynı görüntü. |
-| Wireframe: Only Visible | Tel kafes görünüm yalnızca gerçekten çizilenleri gösterir. |
+**İskelet** kurulur: kemikler oluşturulur (başka bir kemiğin ucundan ekstrüde edilerek), taşınır ve ebeveyne bağlanır. Bu, iskeletin **dinlenme** pozisyonudur, yani canlandırılmadığındaki hâli.
 
-### Overlays
+![Leon'un iskeleti Düzenleme Modunda: kemikler mavi, dinlenme pozisyonunda](../tutoriales/img/vista-3d-modo-edicion-esqueleto.webp)
 
-| İşlev | Açıklama | Kısayol |
-|---|---|---|
-| Show Overlays | Tüm görsel yardımcıları tek seferde açar ya da kapatır. | <kbd>K</kbd> |
-| Floor, X Axis, Y Axis, Origins, 3D Cursor, Relationship Lines | Her yardımcı ayrı ayrı. | Menü |
-| Gizmo | Taşıma/döndürme/ölçekleme gizmosu. | Menü |
-| Objects | İskeletleri, ışıkları, kameraları, boş nesneleri, parçacıkları, eğrileri, hitbox'ları gösterme ya da gizleme. | Menü |
-| Normals | Köşe normallerini, özel normalleri ya da yüz normallerini boyutlarıyla birlikte çizer. | Menü |
-| Statistics | FPS, köşeler, yüzler, çizim çağrıları ve süreler. | Menü |
-| X-Ray | Düzenlenen mesh yarı saydam görünür ve arkadaki öğeler de seçilebilir. | Menü |
+### Poz Modu
 
-### Snap
+İskelete **poz verilir**: kemikler iskeletin kendisi değişmeden döndürülür ve taşınır, örgü de onları takip eder. Farklı karelere kaydedilen pozlar karakterin animasyonudur.
 
-| İşlev | Açıklama | Kısayol |
-|---|---|---|
-| Enable | Taşınan şey köşelere, kenarlara, yüzlere ya da bunların merkezlerine yapışır. | <kbd>Shift+Tab</kbd> |
-| Snap Base / Snap Target | Taşınanın hangi noktasının yapışacağı (Closest, Center, Median, Active) ve neye yapışacağı. | Menü |
-| Face Project / Face Nearest | Retopoloji için: köşeler başka bir yüzeyin üzerine oturur. | Menü |
-| Affect Move / Rotate / Scale | Snap'in hangi işlemlerde etkili olacağı. | Menü |
-| İmlecin Snap menüsü | Selection to Grid, Selection to Cursor ya da Selection to Active; Cursor to Selected, Cursor to World Origin, Cursor to Grid ya da Cursor to Active. | <kbd>Shift+S</kbd> |
+![Leon'un iskeleti Poz Modunda, yürüme animasyonunun ortasında: kemikler bükülmüş](../tutoriales/img/vista-3d-modo-pose.webp)
 
-### Proportional Editing
+### Ağırlık Boyama
 
-| İşlev | Açıklama | Kısayol |
-|---|---|---|
-| Enable | Taşırken, döndürürken ya da ölçeklerken komşu öğeler uzaklığa göre eşlik eder. | <kbd>O</kbd> |
-| Connected Only | Uzaklığı kenarlar boyunca ölçer: ayrı parçaları sürüklemez. | Menü |
-| Falloff | Etkinin şekli: Smooth, Sphere, Root, Inverse Square, Sharp, Linear, Constant, Random. | Menü |
-| Proportional Size | Etki yarıçapı. Dönüştürme sırasında tekerlekle ya da <kbd>PageUp</kbd> / <kbd>PageDown</kbd> ile değiştirilir. | Menü / tekerlek |
+**Her kemiğin örgünün her bir parçasını ne kadar hareket ettirdiği** boyanır: kırmızı, seçili kemiğin tamamen hareket ettirdiği yerler; mavi, hiç hareket ettirmediği yerler. Kol büküldüğünde belin değil kolun bükülmesini sağlayan budur.
+
+![Ağırlık Boyamada Leon'un bir örgüsü: seçili kemik göğsü hareket ettiriyor (kırmızı ve sarı), geri kalanını hiç (mavi)](../tutoriales/img/vista-3d-modo-pesos.webp)
+
+### Köşe Boyama
+
+Örgünün **köşelerine renkler** boyanır, doku olmadan. Basit modellere renk vermeye, elle boyanmış gölgelere ve shader'lardaki efektlere yarar.
+
+![Köşe Boyamada bir küp: fırça bir yandan öbür yana geçiyor ve dokunduğu köşeler kırmızıya boyanıyor](../tutoriales/img/vista-3d-modo-vertices.webp)
+
+### Doku Boyama
+
+Bir bebeğin üzerine boyar gibi, **doğrudan dokunun üzerine**, nesnenin üstünden boyanır. Boyanan, menü çubuğunda beliren disketle kaydedilir.
+
+![Doku Boyamada Leon: fırça ceketinin üzerine kırmızı bir çizgi çiziyor](../tutoriales/img/vista-3d-modo-textura.webp)
+
+Boyama modlarında araç çubuğunun üstünde fırça satırı (**Yarıçap** ve **Değer**) belirir. Bkz. [Boyama modları](pintura.md).
+
+## Araç çubuğu
+
+3D Görünüm'ün altında **Geri Al** ve **Yinele** (oklar), **son kullanılan komutlar** (başlangıçta Taşı, Döndür, Ölçekle ve Sil; kullanılan öne geçer) ve **orantılı düzenleme** bulunur. Taşırken, döndürürken ya da ölçeklerken araç çubuğu değişir: yeşil onay işareti onaylar, kırmızı çarpı iptal eder, yönelim, ve **X**, **Y** ile **Z** hareketi o eksenlerle sınırlar. Bkz. [Taşıma, döndürme ve ölçekleme](transformar.md#araç-çubuğu).
+
+![Android](../tutoriales/img/icono-android.svg) Dokunmatik ekranda **Shift** ve **Ctrl** eklenir; açık kalırlar (yeşil) ve o tuşların yerine geçerler. Bir de **Görünüm** düğmesi (monitör) eklenir; böylece Düzenleme Modunda ve boyama modlarında parmak seçmek ya da boyamak yerine gezinir.
+
+![Nokia](../tutoriales/img/icono-nokia.svg) Nokia N95'te ekranı sahneye bırakmak için gizlidir ve gerektiğinde belirir: boyama modlarında fırça satırı (**Yarıçap** ve **Değer**) çıkar; orantılı düzenleme açıkken taşırken, döndürürken ya da ölçeklerken de onun yarıçap çubuğu. Düğmeleri **sanal fareyle** kullanılır: sağ seçim tuşuyla açılır, ok tuşları onu hareket ettirir ve <kbd>OK</kbd> tıklar.
+
+## Gizmo ve 3D imleç
+
+![Seçili küp, üzerinde gizmo (renkli oklar) ve solda 3D imleç; her biri turuncu bir daire ve adıyla işaretlenmiş](../tutoriales/img/vista-3d-gizmo-cursor.webp)
+
+- **Gizmo**, seçilenin üzerindeki renkli oklardır: taşımak, döndürmek ve ölçeklemek için tutulur. Gizmonun üzerine bir tık bir moddan diğerine geçirir. Bkz. [Gizmo](transformar.md#gizmo).
+- **3D imleç**, artılı dairedir: **Ekle** ile eklenen her şey orada belirir ve pivot noktası olabilir. Bkz. [3D imleç](../tutoriales/modo-objeto.md#3d-imleç).
+
+![Nokia](../tutoriales/img/icono-nokia.svg) Nokia N95'te gizmo kapalı gelir, çünkü ekran küçüktür ve orada tuşlarla taşınır. **Bindirmeler → Gizmo**'dan açılır ve sanal fareyle tutulur.

@@ -9,6 +9,6 @@
 | `soltarSonido(h)` | Relâche la note : l'enveloppe passe à son relâchement. |
 | `reverb(sala, amortiguacion, nivel)` | La réverbération générale : taille de la salle, amortissement et niveau (de 0 à 1 ; niveau 0 l'éteint). |
 | `silenciar(bool)`, `estaMudo()` | Silence général. |
-| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Relance un **objet Sound** (à partir de `seg` secondes de son passage) ou le fait taire. |
-| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Lire / changer un objet Sound : `archivo` (la source), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (et en lecture `duracion`, `sonando`). |
-| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Un nouvel objet Sound (`destruir(obj)` le retire). Dans un prefab, il s'instancie comme n'importe quel objet. |
+| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Relance un **objet Son** (à partir de `seg` secondes de son passage) ou le fait taire. |
+| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Lire / changer un objet Son : `archivo` (la source), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (et en lecture `duracion`, `sonando`). |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Un nouvel objet Son (`destruir(obj)` le retire). Dans un prefab, il s'instancie comme n'importe quel objet. |

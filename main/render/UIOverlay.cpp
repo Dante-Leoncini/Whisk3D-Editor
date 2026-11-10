@@ -1121,6 +1121,24 @@ double g_uiMs = 0.0;
 double W3dNowMs();
 namespace { struct CronoUI { double t0; CronoUI() { t0 = W3dNowMs(); }
                              ~CronoUI() { g_uiMs += W3dNowMs() - t0; } }; }
+// UNA ventana UI (una escena 2D) con sus elementos, en el rect del lienzo
+static void DibujarVentanaUI(UI* u, float x0, float y0, float w, float h, float escala, std::vector<UI2DPos>* outPos) {
+    Object* o = (Object*)u;
+    if (u->color[3] > 0.0f) {   // fondo de la ventana (transparente por defecto)
+        EstadoQuad(0, false);
+        gfx::Color4f(u->color[0], u->color[1], u->color[2], u->color[3] * u->opacidad);
+        QuadUV(x0, y0, x0 + w, y0 + h, 0, 0, 1, 1);
+    }
+    // la ESCALA GLOBAL del UI multiplica todo lo que este en px (texto, tamanos,
+    // padding, gap, bordes): x1 = N95, x3 = como se ve en PC. La ventana no cambia.
+    float esc2 = escala * UI_EscalaEfectiva(u);
+    float pi, pd, pa, pb;
+    PaddingLados(o, esc2, w, h, &pi, &pd, &pa, &pb);
+    DibujarHijosRecortados(o, x0, y0, x0 + w, y0 + h,
+                           x0 + pi, y0 + pa, w - pi - pd, h - pa - pb,
+                           esc2, outPos, u->opacidad);
+}
+
 void UI2D_DibujarOverlay(float x0, float y0, float w, float h, float escala,
                          std::vector<UI2DPos>* outPos, bool saltarVerEn3D) {
     if (!SceneCollection) return;
@@ -1153,20 +1171,16 @@ void UI2D_DibujarOverlay(float x0, float y0, float w, float h, float escala,
         if (!o || o->getType() != ObjectType::ui || !o->visible) continue;
         if (soloEsta && (UI*)o != soloEsta) continue;       // solo la escena elegida (multi-escena)
         if (saltarVerEn3D && ((UI*)o)->verEn3D) continue;   // ese se esta viendo EN el mundo
-        UI* u = (UI*)o;
-        if (u->color[3] > 0.0f) {   // fondo de la ventana (transparente por defecto)
-            EstadoQuad(0, false);
-            gfx::Color4f(u->color[0], u->color[1], u->color[2], u->color[3] * u->opacidad);
-            QuadUV(x0, y0, x0 + w, y0 + h, 0, 0, 1, 1);
-        }
-        // la ESCALA GLOBAL del UI multiplica todo lo que este en px (texto, tamanos,
-        // padding, gap, bordes): x1 = N95, x3 = como se ve en PC. La ventana no cambia.
-        float esc2 = escala * UI_EscalaEfectiva(u);
-        float pi, pd, pa, pb;
-        PaddingLados(o, esc2, w, h, &pi, &pd, &pa, &pb);
-        DibujarHijosRecortados(o, x0, y0, x0 + w, y0 + h,
-                               x0 + pi, y0 + pa, w - pi - pd, h - pa - pb,
-                               esc2, outPos, u->opacidad);
+        if (W3dEscenaEsCapaRaiz(o)) continue;                // (las capas van despues: arriba de todo)
+        DibujarVentanaUI((UI*)o, x0, y0, w, h, escala, outPos);
+    }
+    // LAS CAPAS 2D (cargarEscena, W3dEscena.h): arriba de la escena activa, en el orden en que se cargaron. Pueden
+    // vivir en otra raiz (el editor, despues de un cambiarEscena 3D): se dibujan de su lista, no del arbol
+    for (int c = 0; c < W3dEscenaCapas(); c++) {
+        Object* o = W3dEscenaCapaRaiz(c);
+        if (!o || W3dEscenaCapaEs3D(c) || !o->visible || o->getType() != ObjectType::ui) continue;
+        if (saltarVerEn3D && ((UI*)o)->verEn3D) continue;
+        DibujarVentanaUI((UI*)o, x0, y0, w, h, escala, outPos);
     }    // (el texto ya no apaga lo suyo en cada cadena: una vez, al terminar)
     gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
 }

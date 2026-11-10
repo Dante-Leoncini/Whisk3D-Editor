@@ -161,6 +161,7 @@ Assets	Ассеты
 Assign	Назначить
 At Center	В центре
 At Cursor	У курсора
+At least one scene stays open	Хотя бы одна сцена должна оставаться открытой
 Atlas	Атлас
 Att Constant	Затух. постоянное
 Att Linear	Затух. линейное
@@ -238,6 +239,7 @@ Branches	Ветви
 Branches: %d (all)	Ветви: %d (все)
 Branches: %d/%d	Ветви: %d/%d
 Build game	Собрать игру
+Build: Symbian packs the saved project: save it first (File > Save)	Сборка: Symbian упаковывает сохранённый проект: сначала сохраните его (Файл > Сохранить)
 Build: a build is already running	Сборка: сборка уже идёт
 Build: a library uses files by absolute path; they do not travel with the game	Сборка: библиотека использует файлы по абсолютному пути; они не попадут в игру
 Build: compilation failed (see platform-build/%s/build.log)	Сборка: компиляция не удалась (см. platform-build/%s/build.log)
@@ -245,6 +247,9 @@ Build: could not copy the result to build/%s	Сборка: не удалось �
 Build: could not generate CMakeLists.txt	Сборка: не удалось создать CMakeLists.txt
 Build: could not generate main.cpp	Сборка: не удалось создать main.cpp
 Build: could not generate the Android script	Сборка: не удалось создать скрипт для Android
+Build: could not generate the AppImage script	Сборка: не удалось создать скрипт AppImage
+Build: could not generate the Makefile	Сборка: не удалось создать Makefile
+Build: could not generate the Symbian project	Сборка: не удалось создать проект Symbian
 Build: could not open the library	Сборка: не удалось открыть библиотеку
 Build: could not pack the assets	Сборка: не удалось упаковать ассеты
 Build: could not read the icon; continuing without it	Сборка: не удалось прочитать иконку; сборка без неё
@@ -252,6 +257,7 @@ Build: could not write a scene (.w3dui)	Сборка: не удалось зап
 Build: could not write the .w3dui	Сборка: не удалось записать .w3dui
 Build: error in a Lua script: 	Сборка: ошибка в скрипте Lua: 
 Build: the Whisk3D repo (runtime sources) was not found. Set the repo folder in Settings (or build from the source tree).	Сборка: не найден репозиторий Whisk3D (исходники рантайма). Укажите папку репозитория в Настройках (или собирайте из дерева исходников).
+Build: the project has no game (a Game scene, or a UI with scripts)	Сборка: в проекте нет игры (сцены «Игра» или UI со скриптами)
 Build: the project has no scripts (add them to a Script object)	Сборка: в проекте нет скриптов (добавьте их в объект Script)
 Build: there are external references outside the project folder; they do not travel with the game	Сборка: есть внешние ссылки вне папки проекта; они не попадут в игру
 Build: there is no UI in the scene	Сборка: в сцене нет UI
@@ -314,6 +320,7 @@ Clipping	Обрезка
 Clips	Клипы
 Clone screen	Клонировать экран
 Close	Закрыть
+Close without saving	Закрыть без сохранения
 Closest	Ближайший
 Collapse	Схлопнуть
 Collection	Коллекция
@@ -386,6 +393,7 @@ Count	Количество
 Cover	Заполнить
 Create	Создать
 Create Prefab	Создать префаб
+Cross	Крест
 Cube	Куб
 Cube Projection	Кубическая проекция
 Cubic	Кубическая
@@ -424,9 +432,11 @@ Delete Folder	Удалить папку
 Delete Keyframe	Удалить ключевой кадр
 Delete Keyframe: no keyframe at the current frame	Удалить ключевой кадр: на текущем кадре его нет
 Delete Keyframe: the animation needs at least one keyframe	Удалить ключевой кадр: анимации нужен хотя бы один ключевой кадр
+Delete Mesh Layer	Удалить слой меша
 Delete Normals Layer	Удалить слой нормалей
 Delete Palette	Удалить палитру
 Delete editing data	Удалить данные редактирования
+Delete mesh layer: select an object animation in the timeline	Удалить слой меша: выберите анимацию объекта на таймлайне
 Delete normals layer: select an object animation in the timeline	Удалить слой нормалей: выберите анимацию объекта на таймлайне
 Delete selected?	Удалить выделенное?
 Delete step	Удалить шаг
@@ -667,6 +677,7 @@ Go to start	В начало
 Grab step	Захватить шаг
 Grain size	Размер зерна
 Graphics	Графика
+Graphics backend	Графический бэкенд
 Gravity	Гравитация
 Green	Зелёный
 Green+Left soft	Зелёная+Лев. софт
@@ -722,9 +733,9 @@ Influence	Влияние
 Info	Инфо
 Insert Keyframe	Вставить ключевой кадр
 Insert Keyframe (all)	Вставить ключевой кадр (всё)
-Insert Keyframe Layer	Вставить ключевой кадр слоя
 Insert Keyframe: select an object animation in the timeline	Вставить ключевой кадр: выберите анимацию объекта на таймлайне
 Insert Keyframe: the mesh has no normals	Вставить ключевой кадр: у меша нет нормалей
+Insert Mesh Keyframe	Вставить ключевой кадр меша
 Insert UV keyframe: the mesh has no UV	Вставить ключевой кадр UV: у меша нет UV
 Inset Faces	Вставить грани
 Inset: enter Edit Mode first	Вставка: сначала войдите в Режим редактирования
@@ -733,6 +744,7 @@ Inset: select faces first	Вставка: сначала выберите гра
 Inside	Внутрь
 Inside the .w3d	Внутри .w3d
 Installing on the phone	Установка на телефон
+Instance	Экземпляр
 Intensity	Интенсивность
 Interpolate	Интерполировать
 Interpolate (mix)	Интерполировать (смешать)
@@ -753,6 +765,7 @@ It can't be opened	Нельзя открыть
 It could not be loaded	Не удалось загрузить
 It couldn't be copied into the .w3d	Не удалось скопировать внутрь .w3d
 It doesn't exist anymore	Больше не существует
+It has no checkbox	У него нет флажка
 It has no proyecto.json	Нет proyecto.json
 It is a W3D proxy: choose its library element	Это прокси W3D: выберите его элемент библиотеки
 It is already linked	Уже связано
@@ -820,6 +833,7 @@ Lines	Линии
 Link	Связать
 Link .w3d...	Связать .w3d...
 Linked	Связано
+Linking	Компоновка
 List	Список
 Load (camera x object)	Загрузить (камера x объект)
 Load .lua...	Загрузить .lua...
@@ -909,6 +923,7 @@ Merge Distance	Расстояние слияния
 Mesh	Меш
 Mesh Parts	Части меша
 Mesh editable again	Меш снова редактируемый
+Mesh layer deleted	Слой меша удалён
 Mesh made single user	Меш стал уникальным
 Mesh not editable (Convert to editable mesh, Mesh card)	Меш не редактируемый (Преобразовать в редактируемый меш, карточка Меш)
 Mesh part	Часть меша
@@ -934,6 +949,7 @@ Mix start	Начало микса
 Mode	Режим
 Model too big for the N95: more than 65535 vertices (16-bit limit)	Модель слишком большая для N95: больше 65535 вершин (предел 16 бит)
 Modifier	Модификатор
+Modifier Objects	Объекты-модификаторы
 Modifier applied	Модификатор применён
 Modifiers	Модификаторы
 Modulate	Модуляция
@@ -1119,6 +1135,7 @@ Own	Своя
 PVS recalculated	PVS пересчитан
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: нет <модель>.pvs.json рядом с исходным .obj
 Packaging .deb (cpack)	Упаковка .deb (cpack)
+Packaging AppImage	Упаковка AppImage
 Packed (protected)	Упаковано (защищено)
 Pad bottom	Поле снизу
 Pad left	Поле слева
@@ -1291,6 +1308,7 @@ Replace...	Заменить...
 Repo	Репозиторий
 Reset	Сбросить
 Reset Overrides	Сбросить переопределения
+Reset Pose	Сбросить позу
 Reset all	Сбросить всё
 Reset: select faces first	Сбросить: сначала выберите грани
 Resolution	Разрешение
@@ -1344,6 +1362,7 @@ Save Texture	Сохранить текстуру
 Save Texture: could not encode	Сохранить текстуру: не удалось закодировать
 Save Texture: could not write	Сохранить текстуру: не удалось записать
 Save Texture: no texture	Сохранить текстуру: нет текстуры
+Save and close	Сохранить и закрыть
 Save and continue	Сохранить и продолжить
 Save and open	Сохранить и открыть
 Save and quit	Сохранить и выйти
@@ -1506,6 +1525,7 @@ Spot	Прожектор
 Spot Cutoff	Угол прожектора
 Spot Exponent	Экспонента прожектора
 Spread	Разброс
+Square	Квадрат
 Start	Начало
 Start / End / FPS	Начало / Конец / FPS
 Start angle	Начальный угол
@@ -1513,6 +1533,7 @@ Start of frame	Начало кадра
 Start time	Время начала
 Start:%d	Начало:%d
 Starts at frame	Начинается с кадра
+Starts with	Начинается с
 State	Состояние
 Static	Статический
 Statistics	Статистика
@@ -1537,9 +1558,11 @@ Subtract (darkens)	Вычитание (затемняет)
 Summary	Сводка
 Sun	Солнце
 Superellipse	Суперэллипс
+Swap	Поменять местами
 Switch to 0-100%	Переключить на 0-100%
 Switch to 0-255	Переключить на 0-255
 Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: эта цель ещё не подключена к этой кнопке.
+Symbian project ready: %s (build it on Windows with build_symbian.bat)	Проект Symbian готов: %s (соберите его в Windows с помощью build_symbian.bat)
 Sync Selection	Синхронизировать выделение
 Tag	Тег
 Target	Цель
@@ -1607,6 +1630,7 @@ There is no script editor (IDE) in the layout	В компоновке нет р�
 There is no such prefab	Такого префаба нет
 There is no such scene	Такой сцены нет
 Thickness	Толщина
+This animation has no keyframes in that layer	У этой анимации нет ключевых кадров в этом слое
 This animation has no normals layer	У этой анимации нет слоя нормалей
 This file type can't be added	Этот тип файла нельзя добавить
 This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	В этом графическом бэкенде нет шейдеров: секция @vertice выполняется на CPU, остальное рисуется как обычно
@@ -1735,6 +1759,7 @@ Visibility test	Тест видимости
 Visible	Видимый
 Volume	Громкость
 Volume line	Линия громкости
+Wait for the build to finish	Дождитесь окончания сборки
 Warning	Внимание
 Warnings and errors	Предупреждения и ошибки
 Waveform	Форма волны
@@ -1778,6 +1803,7 @@ Zoom 3:1	Масштаб 3:1
 Zoom 4:1	Масштаб 4:1
 [X: time]	[X: время]
 [Y: value]	[Y: значение]
+active	активная
 all	все
 all opaque	всё непрозрачное
 along	вдоль

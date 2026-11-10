@@ -7,6 +7,7 @@
 | Add | 在 3D 光标处创建一个新对象（参见 [Add 菜单](#add-菜单)）。 | <kbd>Shift+A</kbd> 或 + 按钮 |
 | Apply | 把位置、旋转、缩放或全部烘焙到网格中（对象回到 0, 0, 0，没有旋转，缩放为 1）。 | <kbd>Ctrl+A</kbd> |
 | Set Origin | Geometry to Origin、Origin to Geometry、Origin to 3D Cursor。 | Object 菜单 |
+| Snap | 把 3D 光标移到所选内容、活动对象、世界原点或栅格上，或者把所选内容移到光标、活动对象或栅格上。 | <kbd>Shift+S</kbd> 或 Object 菜单 → Snap |
 | Duplicate Objects | 独立的副本；创建后会被直接抓取，可以马上移动。 | <kbd>Shift+D</kbd> |
 | Duplicate Linked | 与原对象共享网格的副本（编辑其中一个，两个都会改变）。 | <kbd>Alt+D</kbd> |
 | Join | 把所选的网格合并到活动对象中。 | <kbd>Ctrl+J</kbd> |
@@ -40,5 +41,5 @@
 | LOD / Culling / Grid Cull | 优化用的对象：细节层级，以及隐藏看不见的部分。 |
 | Clear Depth / Screen Rect | 绘制工具：清除深度，或裁剪屏幕上的某个区域。 |
 | Prefab / Scene / Proxy W3D | 插入项目中的预制体、另一个场景，或外部库中的预制体。 |
-| Imports | OBJ、FBX、glTF、GLB 或 Whisk3D UI 界面。 |
+| Imports | OBJ、FBX、glTF、GLB、STL 或 Whisk3D UI 界面。STL（3D 打印、CAD）以 Z 轴朝上，导入时会被旋转，使模型立起来，相同的顶点会被焊接在一起。 |
 | Core (advanced) | Routines：手动搭建的绘制步骤列表（变换、绘制、纹理、灯光、雾、混合、深度、控制、Call Lua）。其中包括 **Routine loop**：把自己的步骤重复多次的例程（例如“平移、绘制”重复 20 次），效果像阵列，但速度更快。 |

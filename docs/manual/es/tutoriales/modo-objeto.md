@@ -17,7 +17,7 @@ Hay objetos de muchos tipos, pero todos se eligen, se mueven, se rotan y se esca
 | | Cómo se elige |
 |---|---|
 | ![PC](img/icono-pc.svg) PC | Un click sobre el objeto. <kbd>Shift</kbd> + click suma o quita otro. Un click en el vacío no deja nada elegido. |
-| ![Android](img/icono-android.svg) Pantalla táctil | Un toque sobre el objeto. Con **Shift** prendido en la barra de abajo de la Vista 3D, cada toque suma o quita otro. |
+| ![Android](img/icono-android.svg) Pantalla táctil | Un toque sobre el objeto. Con **Shift** prendido en la barra de herramientas de la Vista 3D, cada toque suma o quita otro. |
 | ![Nokia](img/icono-nokia.svg) Nokia N95 | La tecla del **lápiz** pasa de un objeto al siguiente. Con el lápiz y las flechas se suma, se quita, se elige todo o nada. |
 
 Lo elegido se ve con un borde, y el último que elegiste es el **objeto activo**: el que muestra Propiedades.
@@ -66,7 +66,7 @@ Las demás opciones del menú se ven en este mismo tutorial: Transformar (mover,
 
 ## Mover, rotar y escalar
 
-Las tres operaciones básicas de un objeto son **mover**, **rotar** y **escalar**. Cada una se puede hacer con el gizmo, con el teclado o, en una pantalla táctil, con los comandos de la barra de abajo. Si algo sale mal, **Deshacer** (<kbd>Ctrl</kbd> + <kbd>Z</kbd> en la PC) lo vuelve atrás.
+Las tres operaciones básicas de un objeto son **mover**, **rotar** y **escalar**. Cada una se puede hacer con el gizmo, con el teclado o, en una pantalla táctil, con los comandos de la barra de herramientas. Si algo sale mal, **Deshacer** (<kbd>Ctrl</kbd> + <kbd>Z</kbd> en la PC) lo vuelve atrás.
 
 ### El gizmo
 
@@ -121,21 +121,31 @@ Con el teclado no hace falta apuntarle a nada: se aprieta la tecla y el objeto s
 
 ![Un Nokia N95 parado: con el 1 y las flechas Leon se mueve; con el 2 y el 3 (el eje Z) gira sobre su eje; con el 3 se agranda; cada vez, el OK lo confirma](img/objeto-teclas-nokia.webp)
 
-![Android](img/icono-android.svg) **En una pantalla táctil**, sin teclado, se puede usar el gizmo, como se vio arriba, o los **comandos** de la barra de abajo de la Vista 3D. Tocás **Mover**, **Rotar** o **Escalar** y arrastrás el dedo en cualquier parte de la vista: el objeto sigue al dedo. La barra cambia: la **tilde verde** confirma, la **cruz roja** cancela, y los botones **X**, **Y** y **Z** dejan el movimiento en esos ejes.
+![Android](img/icono-android.svg) **En una pantalla táctil**, sin teclado, se puede usar el gizmo, como se vio arriba, o los **comandos** de la barra de herramientas de la Vista 3D. Tocás **Mover**, **Rotar** o **Escalar** y arrastrás el dedo en cualquier parte de la vista: el objeto sigue al dedo. La barra cambia: la **tilde verde** confirma, la **cruz roja** cancela, y los botones **X**, **Y** y **Z** dejan el movimiento en esos ejes.
 
-![Se toca Mover en la barra de abajo, el dedo arrastra en la vista y Leon lo sigue; con un toque en la tilde verde queda hecho](img/objeto-comandos-dedo.webp)
+![Se toca Mover en la barra de herramientas, el dedo arrastra en la vista y Leon lo sigue; con un toque en la tilde verde queda hecho](img/objeto-comandos-dedo.webp)
 
-Mientras dura la operación, la barra de arriba de la Vista 3D muestra lo que se está haciendo, con los números exactos.
+### Con números exactos
+
+Para trabajar con precisión, el movimiento se escribe con un número: girar algo exactamente 90°, escalarlo a la mitad con `0.5` o al doble exacto de su tamaño con `2`, o moverlo 1,5 metros. **Una unidad de Whisk3D es un metro.**
+
+Mientras dura la operación, la barra de menús de la Vista 3D muestra lo que se está haciendo y el valor.
+
+![PC](img/icono-pc.svg) **Con el teclado:** después de <kbd>G</kbd>, <kbd>R</kbd> o <kbd>S</kbd>, escribí el número y apretá <kbd>Enter</kbd>. <kbd>R</kbd> <kbd>Z</kbd> <kbd>9</kbd> <kbd>0</kbd> <kbd>Enter</kbd> lo gira 90° sobre el eje vertical; <kbd>S</kbd> <kbd>0</kbd> <kbd>.</kbd> <kbd>5</kbd> <kbd>Enter</kbd> lo deja a la mitad y <kbd>S</kbd> <kbd>2</kbd> <kbd>Enter</kbd>, al doble; <kbd>G</kbd> <kbd>X</kbd> <kbd>1</kbd> <kbd>.</kbd> <kbd>5</kbd> <kbd>Enter</kbd> lo corre 1,5 metros en X.
+
+![Android](img/icono-android.svg) **En una pantalla táctil:** empezá la operación con **Mover**, **Rotar** o **Escalar** en la barra de herramientas y tocá la barra de arriba, la que muestra el valor: se abre el teclado numérico de Whisk3D. Escribí el número y tocá **OK**; la tilde verde lo deja hecho. El teclado también hace cuentas, como `90/2`.
+
+![Se toca Rotar en la barra de herramientas y después Z; un toque en la barra de arriba abre el teclado numérico, se escribe 90 y OK, y Leon queda girado exactamente 90 grados; la tilde verde lo deja hecho](img/objeto-numero-dedo.webp)
 
 Todos los atajos del Modo Objeto están en el manual: [Mover, rotar y escalar](../editor/transformar.md) y [Modo Objeto](../editor/modo-objeto.md).
 
-### La barra de abajo: los últimos comandos
+### La barra de herramientas: los últimos comandos
 
-![PC](img/icono-pc.svg) ![Android](img/icono-android.svg) En la barra de abajo de la Vista 3D están Deshacer y Rehacer (las flechas), y después **los últimos comandos que usaste**, con el último adelante. Al empezar son Mover, Rotar, Escalar y Borrar. Si escalás un objeto, Escalar pasa al frente: lo que más usás queda siempre a mano.
+![PC](img/icono-pc.svg) ![Android](img/icono-android.svg) En la **barra de herramientas** de la Vista 3D (la de abajo) están Deshacer y Rehacer (las flechas), y después **los últimos comandos que usaste**, con el último adelante. Al empezar son Mover, Rotar, Escalar y Borrar. Si escalás un objeto, Escalar pasa al frente: lo que más usás queda siempre a mano.
 
-![La barra de abajo con Mover, Rotar y Escalar; después de escalar a Leon, Escalar pasa adelante](img/objeto-barra-inferior.webp)
+![La barra de herramientas con Mover, Rotar y Escalar; después de escalar a Leon, Escalar pasa adelante](img/objeto-barra-inferior.webp)
 
-![Nokia](img/icono-nokia.svg) En el Nokia N95 esta barra viene apagada: ahí todo se hace con las teclas del teléfono.
+![Nokia](img/icono-nokia.svg) En el Nokia N95 la barra de herramientas viene oculta, para dejarle la pantalla a la escena: mover, rotar y escalar se hace con las teclas del teléfono. Cuando aparece (por ejemplo, la de la edición proporcional mientras se transforma), sus botones se usan con el **mouse virtual**: se prende con la tecla de selección derecha, las flechas lo mueven y <kbd>OK</kbd> hace click.
 
 ## Desde dónde se mueve, se rota y se escala
 
@@ -145,9 +155,14 @@ Cada objeto tiene un **origen**: el punto desde donde sale el gizmo. Es el punto
 
 En las primitivas, el origen está en el centro. En un modelo importado está donde lo dejó el programa en que se hizo: en Leon, a sus pies.
 
+![El origen de un cubo elegido, de cerca: un punto verde en su centro](img/objeto-origen.webp)
+
 ### El cursor 3D
 
-El **cursor 3D** es el círculo con una cruz de la Vista 3D. Al empezar está en el centro del mundo. Sirve para dos cosas:
+El **cursor 3D** es el círculo con una cruz de la Vista 3D. Al empezar está en el centro del mundo.
+
+![El cursor 3D de cerca: un círculo verde con cuatro rayos, como una mira](img/objeto-cursor3d.webp)
+ Sirve para dos cosas:
 
 - todo lo que se agrega con **Añadir** aparece ahí;
 - puede ser el centro desde el que se rota y se escala, como se ve en [El punto de pivote](#el-punto-de-pivote).
@@ -206,25 +221,9 @@ La diferencia se ve cuando el objeto está girado. Por ejemplo, Leon rotado 40°
 
 ![Leon girado 40°: con el gizmo en Global las flechas siguen la cuadrícula del mundo; con Local giran con él y la flecha verde lo hace avanzar derecho hacia donde mira](img/objeto-local-global.webp)
 
-### Cambiar el origen: una puerta
+### Cambiar el origen
 
-El origen de una malla 3D se puede cambiar de lugar sin mover la malla, con **Objeto → Definir Origen**:
-
-| Opción | Qué hace |
-|---|---|
-| **Origen a Geometría** | Lleva el origen al centro de la malla. |
-| **Origen al Cursor 3D** | Lleva el origen a donde está el cursor 3D. |
-| **Geometría al Origen** | Al revés: deja el origen y mueve la malla hasta que su centro quede en él. |
-
-El ejemplo típico es una **puerta**. Una caja con forma de puerta tiene el origen en el centro, y al rotarla gira sobre sí misma, como una puerta giratoria. Para que se abra desde la bisagra:
-
-1. Entrá al Modo Edición (<kbd>Tab</kbd> en la PC, <kbd>OK</kbd> en el N95) y elegí la cara angosta del lado de la bisagra.
-2. Menú Imán → **Cursor a lo seleccionado**: el cursor 3D queda sobre la bisagra.
-3. Volvé al Modo Objeto y elegí **Objeto → Definir Origen → Origen al Cursor 3D**.
-
-Ahora, al rotarla en Z, la puerta se abre desde la bisagra.
-
-![Una puerta gira en Z desde su centro; en el Modo Edición se elige la cara de la bisagra, Cursor a lo seleccionado, y de vuelta en el Modo Objeto, Origen al Cursor 3D: ahora gira 90° desde la bisagra y se abre](img/objeto-puerta.webp)
+El origen de una malla 3D se puede cambiar de lugar sin mover la malla, con **Objeto → Definir Origen**. Cómo se hace, con el ejemplo de una puerta que tiene que abrirse desde la bisagra, está en el tutorial [Cambiar el origen: una puerta](puerta.md).
 
 ## Las propiedades
 
@@ -272,7 +271,7 @@ Meter un objeto adentro de otro se llama **emparentar**:
 | | Cómo se emparenta |
 |---|---|
 | ![PC](img/icono-pc.svg) PC | En el Outliner, arrastrar la fila del hijo y soltarla encima de la del padre. O elegir el hijo, después el padre (con <kbd>Shift</kbd>) y <kbd>Ctrl</kbd> + <kbd>P</kbd>. |
-| ![Android](img/icono-android.svg) Pantalla táctil | Elegir el hijo; prender **Shift** en la barra de abajo y tocar el padre; después, menú Objeto → Emparentar. |
+| ![Android](img/icono-android.svg) Pantalla táctil | Elegir el hijo; prender **Shift** en la barra de herramientas y tocar el padre; después, menú Objeto → Emparentar. |
 | ![Nokia](img/icono-nokia.svg) Nokia N95 | Con el Outliner activo y el hijo elegido: <kbd>1</kbd>, la flecha **derecha** lo mete adentro del de arriba y la **izquierda** lo saca; <kbd>1</kbd> otra vez confirma. |
 | Menú | Objeto → Emparentar; para sacarlo, Objeto → Desemparentar |
 
@@ -290,11 +289,11 @@ Los básicos son estos:
 
 | Objeto | Qué es |
 |---|---|
-| [Malla 3D](objeto-malla.md) | Un modelo 3D: un personaje, una casa, una piedra. Está hecho de vértices, aristas y caras, y se ve con su material y sus texturas. Las primitivas de Añadir → Malla (cubo, esfera, cilindro...) son mallas para empezar a modelar. |
-| [Cámara](objeto-camara.md) | El punto de vista del juego y de los renders. Lo que ve la cámara activa es lo que se ve al jugar y lo que sale en una imagen o un video. |
-| [Luz](objeto-luz.md) | Ilumina la escena. Hay tres tipos: Puntual (una lamparita), Sol (luz de día, con rayos paralelos) y Foco (un cono, como una linterna). |
-| [Esqueleto](objeto-esqueleto.md) | Una cadena de huesos que mueve una malla, para animar personajes. Leon tiene uno: cuando el esqueleto camina, la malla lo sigue. |
-| [Sonido](objeto-sonido.md) | Un sonido puesto en la escena. Puede sonar de fondo, como una música, o desde donde está el objeto. |
+| [Malla 3D](../editor/objeto-malla.md) | Un modelo 3D: un personaje, una casa, una piedra. Está hecho de vértices, aristas y caras, y se ve con su material y sus texturas. Las primitivas de Añadir → Malla (cubo, esfera, cilindro...) son mallas para empezar a modelar. |
+| [Cámara](../editor/objeto-camara.md) | El punto de vista del juego y de los renders. Lo que ve la cámara activa es lo que se ve al jugar y lo que sale en una imagen o un video. |
+| [Luz](../editor/objeto-luz.md) | Ilumina la escena. Hay tres tipos: Puntual (una lamparita), Sol (luz de día, con rayos paralelos) y Foco (un cono, como una linterna). |
+| [Esqueleto](../editor/objeto-esqueleto.md) | Una cadena de huesos que mueve una malla, para animar personajes. Leon tiene uno: cuando el esqueleto camina, la malla lo sigue. |
+| [Sonido](../editor/objeto-sonido.md) | Un sonido puesto en la escena. Puede sonar de fondo, como una música, o desde donde está el objeto. |
 | Vacío | Un objeto sin forma: un punto en la escena. Sirve de padre para agrupar otros o como referencia. |
 | Colección | Una carpeta para ordenar los objetos en el Outliner. |
 
@@ -306,9 +305,9 @@ Además de su transformación y de sus propiedades, cualquier objeto puede tener
 
 - **Scripts** de Lua, que le dan comportamiento en el juego: que se mueva solo, que responda a las teclas, que choque. Se ven más adelante.
 - **Animaciones**: cualquier propiedad con rombo se puede animar. Tienen su propio tutorial.
-- **Restricciones**: reglas que lo atan a otro objeto, como copiar su posición o mirar siempre a la cámara. Se explican en [Restricciones](restricciones.md).
+- **Restricciones**: reglas que lo atan a otro objeto, como copiar su posición o mirar siempre a la cámara. Se explican en [Restricciones](../editor/restricciones.md).
 
-Algunos tipos tienen además cosas propias. Las mallas 3D, por ejemplo, tienen **modificadores**, que cambian la forma sin destruirla: reflejarla como en un espejo, repetirla, suavizarla. Están en [Malla 3D](objeto-malla.md).
+Algunos tipos tienen además cosas propias. Las mallas 3D, por ejemplo, tienen **modificadores**, que cambian la forma sin destruirla: reflejarla como en un espejo, repetirla, suavizarla. Están en [Malla 3D](../editor/objeto-malla.md).
 
 ## Importar modelos 3D
 

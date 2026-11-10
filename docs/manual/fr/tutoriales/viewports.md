@@ -3,25 +3,29 @@
 > [!NOTE]
 > ![Nokia](img/icono-nokia.svg) Le Nokia N95 prend en charge une souris et un clavier (en Bluetooth). Les parties de ce tutoriel consacrées au Nokia expliquent comment l'utiliser sans souris ni clavier, uniquement avec les touches du téléphone.
 
-La fenêtre de Whisk3D est divisée en **viewports** : des panneaux, chacun avec son éditeur (le 3D Viewport, l'Outliner, Properties...). Vous pouvez les diviser, changer leur taille et choisir ce que chacun affiche. Cela fonctionne de la même façon à la souris, au doigt sur un écran tactile et avec le clavier d'un Nokia.
+La fenêtre de Whisk3D est divisée en **viewports** : des panneaux, chacun avec son éditeur (la Vue 3D, l'Outliner, Propriétés...). Vous pouvez les diviser, changer leur taille et choisir ce que chacun affiche. Cela fonctionne de la même façon à la souris, au doigt sur un écran tactile et avec le clavier d'un Nokia.
 
 Voici ce que l’on voit au premier lancement du programme :
 
-![Whisk3D juste ouvert : le 3D Viewport avec un cube, une caméra et une lumière ; à droite l’Outliner et Properties ; en bas la Timeline](img/inicio.webp)
+![Whisk3D juste ouvert : la Vue 3D avec un cube, une caméra et une lumière ; à droite l’Outliner et Propriétés ; en bas la Timeline](img/inicio.webp)
 
 ## Le viewport actif
 
 Le viewport qui se trouve sous la souris est le **viewport actif** : il est marqué d'une bordure verte. C'est lui qui reçoit les commandes du clavier, les manettes et tout autre périphérique. Quand vous passez la souris d'un viewport à l'autre, la bordure verte la suit :
 
-![Le pointeur de la souris passe sur le 3D Viewport, l'Outliner, Properties et la Timeline, et la bordure verte marque chaque fois le viewport qui se trouve dessous](img/viewports-activo.webp)
+![Le pointeur de la souris passe sur la Vue 3D, l'Outliner, Propriétés et la Timeline, et la bordure verte marque chaque fois le viewport qui se trouve dessous](img/viewports-activo.webp)
 
-![Nokia](img/icono-nokia.svg) **Sur un Nokia N95 :** chaque appui sur la **touche verte** d'appel ![](img/tecla-verde.svg) passe au viewport suivant. Sur l'écran du N95, il y en a deux : le 3D Viewport à gauche et Properties à droite.
+![Nokia](img/icono-nokia.svg) **Sur un Nokia N95 :** chaque appui sur la **touche verte** d'appel ![](img/tecla-verde.svg) passe au viewport suivant. Sur l'écran du N95, il y en a deux : la Vue 3D à gauche et Propriétés à droite.
 
-![Un Nokia N95 avec le 3D Viewport à gauche et Properties à droite : à chaque appui sur la touche verte, la bordure verte passe à l'autre viewport](img/viewports-activo-nokia.webp)
+![Un Nokia N95 avec la Vue 3D à gauche et Propriétés à droite : à chaque appui sur la touche verte, la bordure verte passe à l'autre viewport](img/viewports-activo-nokia.webp)
 
 ## La barre de menus et le bouton du coin
 
 Tous les viewports ont en haut une **barre de menus** (en vert sur l'image) avec les menus et les boutons de cet éditeur. En haut à gauche se trouve toujours le **bouton du coin** (en orange) : c'est lui qui change ou modifie le viewport.
+
+![Le bouton du coin, agrandi : la petite flèche vers le bas, en haut à gauche de la barre de menus de la Vue 3D](img/viewports-esquina.webp)
+
+Il est identique dans tous les viewports, et c'est le seul bouton qu'ils ont tous.
 
 ![Les quatre viewports de Whisk3D, avec la barre de menus de chacun surlignée en vert et le bouton du coin en orange](img/viewports-barras.webp)
 
@@ -33,48 +37,48 @@ Tous les viewports ont en haut une **barre de menus** (en vert sur l'image) avec
 
 ![Nokia](img/icono-nokia.svg) **Sur un Nokia :** maintenez enfoncée la **touche verte** d'appel ![](img/tecla-verde.svg) et appuyez sur une flèche : la bordure du viewport actif (celui qui a le cadre vert) se déplace de ce côté, ce qui l'agrandit ou le réduit. La touche verte seule, sans flèche, passe au viewport suivant.
 
-![Un Nokia N95 avec la touche verte maintenue : avec la flèche droite, le 3D Viewport s'agrandit, avec la gauche il rétrécit, puis il revient comme avant](img/viewports-tamano-nokia.webp)
+![Un Nokia N95 avec la touche verte maintenue : avec la flèche droite, la Vue 3D s'agrandit, avec la gauche elle rétrécit, puis elle revient comme avant](img/viewports-tamano-nokia.webp)
 
 ## Les options du viewport
 
 Un toucher sur le bouton du coin ouvre ce menu :
 
-![Un doigt va jusqu'au bouton du coin du 3D Viewport, le touche et le menu s'ouvre : les types de viewport en haut et, sous la ligne, Expand, Split in Columns, Split in Rows et Maximize](img/viewports-menu.webp)
+![Un doigt va jusqu'au bouton du coin de la Vue 3D, le touche et le menu s'ouvre : les types de viewport en haut et, sous la ligne, Développer, Diviser en colonnes, Diviser en lignes et Agrandir](img/viewports-menu.webp)
 
 En haut se trouvent les **types de viewport** : en choisir un transforme le viewport en cet éditeur. Sous la ligne se trouve ce que vous pouvez en faire :
 
 | Option | Ce qu'elle fait |
 |---|---|
-| Expand | Le viewport prend la place de son voisin, qui se ferme (si le voisin est divisé, tout ce groupe se ferme). |
-| Split in Columns | Le coupe en deux, l'un à côté de l'autre. |
-| Split in Rows | Le coupe en deux, l'un au-dessus de l'autre. |
-| Maximize | L'agrandit à toute la fenêtre. Tant qu'il est agrandi, le menu ne propose que **Minimize**, qui le remet à sa place. |
+| Développer | Le viewport prend la place de son voisin, qui se ferme (si le voisin est divisé, tout ce groupe se ferme). |
+| Diviser en colonnes | Le coupe en deux, l'un à côté de l'autre. |
+| Diviser en lignes | Le coupe en deux, l'un au-dessus de l'autre. |
+| Agrandir | L'agrandit à toute la fenêtre. Tant qu'il est agrandi, le menu ne propose que **Réduire**, qui le remet à sa place. |
 
 ### Changer le type
 
-Le 3D Viewport transformé en UV Editor :
+La Vue 3D transformée en Éditeur UV :
 
-![On touche le bouton du coin du 3D Viewport, on choisit UV Editor et le viewport devient un UV Editor](img/viewports-cambiar-tipo.webp)
+![On touche le bouton du coin de la Vue 3D, on choisit Éditeur UV et le viewport devient un Éditeur UV](img/viewports-cambiar-tipo.webp)
 
-### Split in Columns et Split in Rows
+### Diviser en colonnes et Diviser en lignes
 
-![Split in Columns : le 3D Viewport est coupé en deux vues, l'une à côté de l'autre](img/viewports-dividir-columnas.webp)
+![Diviser en colonnes : la Vue 3D est coupée en deux vues, l'une à côté de l'autre](img/viewports-dividir-columnas.webp)
 
-![Split in Rows : le 3D Viewport est coupé en deux vues, l'une au-dessus de l'autre](img/viewports-dividir-filas.webp)
+![Diviser en lignes : la Vue 3D est coupée en deux vues, l'une au-dessus de l'autre](img/viewports-dividir-filas.webp)
 
-### Expand
+### Développer
 
-L'Outliner prend la place de Properties :
+L'Outliner prend la place de Propriétés :
 
-![On choisit Expand dans l'Outliner et il occupe aussi la place de Properties](img/viewports-expandir.webp)
+![On choisit Développer dans l'Outliner et il occupe aussi la place de Propriétés](img/viewports-expandir.webp)
 
-### Maximize et Minimize
+### Agrandir et Réduire
 
-![Le 3D Viewport est agrandi à toute la fenêtre puis, avec Minimize, reprend sa place](img/viewports-maximizar.webp)
+![La Vue 3D est agrandie à toute la fenêtre puis, avec Réduire, reprend sa place](img/viewports-maximizar.webp)
 
-## Quand la barre ne tient pas
+## Quand toutes les options de la barre de menus ne sont pas visibles
 
-Si le viewport est étroit, sa barre ne tient pas en entier. C'est pareil pour la barre d'outils en bas du 3D Viewport. Pour voir le reste :
+Si le viewport est étroit, sa barre de menus ne tient pas en entier. C'est pareil pour la barre d'outils en bas de la Vue 3D. Pour voir le reste :
 
 - ![Android](img/icono-android.svg) **Au doigt :** faites-la glisser sur le côté.
 - ![PC](img/icono-pc.svg) **À la souris :** maintenez le clic sur la barre et faites glisser, ou tournez la **molette** au-dessus.
@@ -92,18 +96,23 @@ Si le viewport est étroit, sa barre ne tient pas en entier. C'est pareil pour l
 
 | Viewport | À quoi il sert |
 |---|---|
-| [3D Viewport](../editor/vista-3d.md) | Là où l'on voit et modifie la scène : modéliser, déplacer des objets, peindre, poser et animer. |
+| [Vue 3D](../editor/vista-3d.md) | Là où l'on voit et modifie la scène : modéliser, déplacer des objets, peindre, poser et animer. |
 | [Outliner](../editor/outliner.md) | La liste de tout ce qui se trouve dans la scène. |
-| [Library](../editor/outliner.md#vue-library) | Les ressources du projet : maillages, matériaux, textures, animations, sons, scripts et plus encore. |
-| [Properties](../editor/propiedades.md) | Les données de l'objet actif, en onglets. |
-| [UV Editor](../editor/editor-uv.md) | Comment la texture se pose sur le maillage. |
+| [Bibliothèque](../editor/outliner.md#vue-bibliothèque) | Les ressources du projet : maillages, matériaux, textures, animations, sons, scripts et plus encore. |
+| [Propriétés](../editor/propiedades.md) | Les données de l'objet actif, en onglets. |
+| [Éditeur UV](../editor/editor-uv.md) | Comment la texture se pose sur le maillage. |
 | [Timeline](../editor/linea-de-tiempo.md) | L'animation : les keyframes et les courbes. |
-| [2D Editor](../editor/editor-2d.md) | Interfaces de jeu, HUD et jeux 2D. |
+| [Éditeur 2D](../editor/editor-2d.md) | Interfaces de jeu, HUD et jeux 2D. |
 | [Console](../editor/consola.md) | Le journal du moteur : erreurs, avertissements et informations. |
 | [IDE](../editor/editor-de-scripts.md) | L'éditeur de scripts Lua et de shaders. |
 
-Chaque viewport aura son propre tutoriel, plus détaillé. En attendant, le [Manuel de Whisk3D](../editor/README.md) les explique un par un.
+Chaque viewport est décrit bouton par bouton dans le manuel :
 
-Whisk3D continue de grandir : avec le temps, de nouveaux viewports s'ajouteront et ceux d'aujourd'hui pourront changer. Ils fonctionneront tous de la même façon, avec la barre en haut et le bouton dans le coin.
+- [La Vue 3D](../editor/vista-3d.md) et [sa barre de menus](../editor/vista-3d-barra.md)
+- [L'Outliner](../editor/outliner.md)
+- [Propriétés](../editor/propiedades.md) : comment utiliser chaque champ, les couleurs, les listes et le losange de l'animation
+- Les autres, dans le [Manuel de l'éditeur](../editor/README.md)
 
-Tutoriel suivant : [Naviguer dans le 3D Viewport](navegacion.md).
+Whisk3D continue de grandir : avec le temps, de nouveaux viewports s'ajouteront et ceux d'aujourd'hui pourront changer. Ils fonctionneront tous de la même façon, avec la barre de menus en haut et le bouton dans le coin.
+
+Tutoriel suivant : [Naviguer dans la Vue 3D](navegacion.md).

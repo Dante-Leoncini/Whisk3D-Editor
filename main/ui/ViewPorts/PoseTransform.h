@@ -21,6 +21,8 @@ void PoseCiclarOrient();            // "R de nuevo": Global->Local->View
 bool PoseEjesMundo(Vector3& ex, Vector3& ey, Vector3& ez);
 int  PoseHeaderModo();              // 0=none 1=grab 2=rotate 3=scale (para la barra de estado)
 void PoseInsertKeyframe(int canales = 0); // canales = mascara KfCanal* (0 = Loc+Rot+Scl)
+void PoseBorrarKeyframe();   // Animation > Delete Keyframe en el Modo Pose: los del frame actual de los huesos elegidos
+void PoseLimpiarKeyframes(); // Animation > Clear Keyframe en el Modo Pose: todos los de los huesos elegidos
 void PoseClearTransform(int what);
 void PoseClearTransformAll();
 

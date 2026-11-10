@@ -48,6 +48,7 @@
 #include "io/RaicesEditor.h"          // el estado base de un juego que se guarda editando uno de sus clips
 #include "W3dPaletas.h"               // las paletas del PROYECTO (raiz "paletas" del .w3d)
 #include "objects/Objects.h"
+#include "objects/Empty.h"          // el dibujo del Vacio (forma, tamanio, giro)
 #include "objects/ObjectMode.h"        // W3dAplicarCurvasEnFrame: el objeto se guarda EN REPOSO
 #include "physics/W3dRigido.h"         // W3dRigidoDef: el bloque "fisica" del objeto
 #include "objects/UI.h"
@@ -145,7 +146,7 @@ extern std::string g_w3dUINoCargo;
 
 // CONFIG de la tarjeta Juego (Compilar juego): viaja con el proyecto como
 // objeto raiz "compilar" del .w3d (ver GuardarW3D.h). Arranca en los defaults.
-W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0, 100, 100 };   // (volumen y resolucion al 100)
+W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0, 100, 100, -1 };   // (volumen y resolucion al 100)
 
 void W3dCompilarReset() {
     g_proyCompilar.modoVentana = 1;      // Pantalla completa (el default de siempre)
@@ -158,6 +159,7 @@ void W3dCompilarReset() {
     g_proyCompilar.uid         = 0;       // sin UID: un proyecto sin "uid" no hereda el del anterior. El save/load lo persiste.
     g_proyCompilar.volumen     = 100;     // volumen del gameplay al maximo por defecto
     g_proyCompilar.resolucion  = 100;     // la pantalla nativa
+    g_proyCompilar.backend     = -1;      // el de siempre de cada plataforma
 }
 
 // int <-> string legible del bloque "compilar" (el JSON se edita a mano: nada
@@ -181,7 +183,8 @@ int W3dCompilarOrientacionInt(const std::string& s) {
 const char* W3dCompilarAssetsStr(int a) { return (a == 1) ? "empaquetados" : "sueltos"; }
 int W3dCompilarAssetsInt(const std::string& s) { return (s == "empaquetados") ? 1 : 0; }
 const char* W3dCompilarPlataformaStr(int p) {
-    return (p == 6) ? "android23" : (p == 5) ? "symbian" : (p == 4) ? "windows" :
+    return (p == 10) ? "dreamcast" : (p == 9) ? "3ds" : (p == 8) ? "vita" : (p == 7) ? "psp" :
+           (p == 6) ? "android23" : (p == 5) ? "symbian" : (p == 4) ? "windows" :
            (p == 3) ? "android" : (p == 2) ? "web" : (p == 1) ? "appimage" : "linux-deb";
 }
 int W3dCompilarPlataformaInt(const std::string& s) {
@@ -191,7 +194,41 @@ int W3dCompilarPlataformaInt(const std::string& s) {
     if (s == "windows")  return 4;
     if (s == "symbian")  return 5;
     if (s == "android23") return 6;   // (Android 2.3: el APK de platform/android-viejo)
+    if (s == "psp")       return 7;
+    if (s == "vita")      return 8;
+    if (s == "3ds")       return 9;
+    if (s == "dreamcast") return 10;
     return 0;
+}
+const char* W3dCompilarBackendStr(int b) { return (b == 2) ? "vulkan" : (b == 1) ? "shaders" : (b == 0) ? "fijo" : "auto"; }
+int W3dCompilarBackendInt(const std::string& s) {
+    return (s == "vulkan") ? 2 : (s == "shaders") ? 1 : (s == "fijo") ? 0 : -1;
+}
+int W3dCompilarBackends(int p) {
+    if (p == 0 || p == 1 || p == 3 || p == 4) return 3;   // Linux, Windows y Android: fijo, shaders y Vulkan
+    if (p == 5) return 2;                                 // Symbian: sin shaders y con shaders
+    return 1;
+}
+const char* W3dCompilarBackendNombre(int p, int b) {
+    switch (p) {
+        case 0: case 1: case 4:   // (el de shaders, sobre GL 2.1; Vulkan cae a OpenGL donde no esta)
+            return (b == 2) ? "Vulkan" : (b == 1) ? "OpenGL ES 2.0" : "OpenGL";
+        case 3:  return (b == 2) ? "Vulkan" : (b == 1) ? "OpenGL ES 2.0" : "OpenGL ES 1.1";
+        case 5:  return (b == 1) ? "OpenGL ES 2.0" : "OpenGL ES 1.1";            // (el N95: 1.1; el N8 y los Belle: 2.0)
+        case 2:  return "WebGL";
+        case 6:  return "OpenGL ES 2.0";
+        case 7:  return "sceGu (GE)";
+        case 8:  return "vitaGL";
+        case 9:  return "citro3d";
+        case 10: return "GLdc";
+        default: return "OpenGL";
+    }
+}
+int W3dCompilarBackendDe(int p) {
+    const int n = W3dCompilarBackends(p);
+    if (n > 1 && g_proyCompilar.backend >= 0 && g_proyCompilar.backend < n) return g_proyCompilar.backend;
+    // (el de siempre: Android y la web dibujan con shaders; la PC, Symbian y las consolas con el fijo o el suyo)
+    return (p == 3 || p == 6) ? 1 : 0;
 }
 
 static int gNoCubiertos = 0;    // curvas SIN archivo de origen (unico caso que el guardado no cubre)
@@ -989,7 +1026,7 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
             { "showOverlays", v3->showOverlays, true },
             { "showArmature", v3->showArmature, true }, { "showLights", v3->showLights, true },
             { "showCamera", v3->showCamera, true }, { "showEmpty", v3->showEmpty, true },
-            { "showParticulas", v3->showParticulas, false }, { "showCurvas", v3->showCurvas, true },
+            { "showParticulas", v3->showParticulas, true }, { "showCurvas", v3->showCurvas, true },
             { "showHitbox", v3->showHitbox, true }, { "showSonidos", v3->showSonidos, true },
             { "ShowRelantionshipsLines", v3->ShowRelantionshipsLines, true } };
         for (size_t k = 0; k < sizeof(ov) / sizeof(ov[0]); k++)
@@ -2270,6 +2307,7 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // (edges 0 -> N) y la malla dejaba de ser identica a la original.
         if (m->noEditable) { s += ",\n"; JSang(s, ind + 1); s += "\"noEditable\": true"; }
         if (m->soloRutina) { s += ",\n"; JSang(s, ind + 1); s += "\"soloRutina\": true"; }
+        if (m->bloquearNormales) { s += ",\n"; JSang(s, ind + 1); s += "\"bloquearNormales\": true"; }
         // el UV PERSONALIZADO de los mapas de sus materiales (Mesh::uvPersonal): material, mapa y la capa UV por nombre
         // (por NOMBRE de su capa UV, o un INDICE propio)
         if (!m->uvPersonal.empty() || !m->uvPersonalIdx.empty()) {
@@ -2328,6 +2366,15 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // tipo sin rama propia: al menos el nombre/transform (no rompe el abrir)
         JSang(s, ind + 1); s += "\"tipo\": \"objeto\",\n";
         CamposComunes(s, ind + 1, o);
+        // el VACIO: como se dibuja (solo la vista). Sigue siendo el nodo generico "objeto": un editor viejo ignora estos
+        // campos, y un archivo viejo (sin ellos) abre con el dibujo por defecto
+        if (t == ObjectType::empty) {
+            const Empty* e = (const Empty*)o;
+            s += ",\n"; JSang(s, ind + 1); s += "\"forma\": "; JNum(s, (float)e->forma);
+            s += ",\n"; JSang(s, ind + 1); s += "\"tamDibujo\": "; JNum(s, e->tamDibujo);
+            s += ",\n"; JSang(s, ind + 1); s += "\"rotDibujo\": ["; JNum(s, e->rotDibujo.x); s += ", "; JNum(s, e->rotDibujo.y);
+            s += ", "; JNum(s, e->rotDibujo.z); s += "]";
+        }
     }
 
     // EL STACK DE CONSTRAINTS, DE TODOS LOS TIPOS, DE UNA SOLA VEZ. Va aca por el
@@ -2866,6 +2913,8 @@ static void EscribirRegistroRaices(std::string& s, const std::vector<std::string
         if (clase == W3D_RAIZ_ESCENA && !W3dRaizInicial().empty()) {
             s += "  \"escena3dInicial\": "; JEsc(s, W3dRaizInicial()); s += ",\n";
         }
+        // las escenas ABIERTAS en el editor y las del ojo cerrado (cosa del editor: el juego no las mira)
+        if (clase == W3D_RAIZ_ESCENA) W3dRaicesAbiertasEscribir(s);
     }
 }
 
@@ -3235,6 +3284,7 @@ bool GuardarW3D(const std::string& ruta) {
     s += "    \"debug\": ";   s += g_proyCompilar.modoDebug  ? "true" : "false"; s += ",\n";
     s += "    \"assets\": ";  JEsc(s, W3dCompilarAssetsStr(g_proyCompilar.assetsModo)); s += ",\n";
     s += "    \"plataforma\": "; JEsc(s, W3dCompilarPlataformaStr(g_proyCompilar.plataforma)); s += ",\n";
+    s += "    \"backend\": "; JEsc(s, W3dCompilarBackendStr(g_proyCompilar.backend)); s += ",\n";
     { char uidhex[16]; snprintf(uidhex, sizeof(uidhex), "0x%08X", g_proyCompilar.uid);
       s += "    \"uid\": "; JEsc(s, uidhex); s += "\n"; }   // UID3 de Symbian del juego (0 = sin asignar)
     s += "  },\n";

@@ -18,6 +18,9 @@ extern "C" {
 }
 
 #include <map>
+#include <set>
+#include "script/W3dScript.h"   // las capas: scripts, objetos nuevos y destruidos; los mensajes (W3dValorLua)
+#include "w3dlog.h"
 
 // ---------------------------------------------------------------------------
 //  ESTADO del sistema (una sola simulacion/juego a la vez).
@@ -42,9 +45,12 @@ void W3dEscenaSet3D(bool (*pedir)(const std::string&, bool), bool (*aplicar)()) 
     gPedir3D = pedir; gAplicar3D = aplicar;
 }
 
+static bool EsCapa(Object* o);   // (abajo: las capas)
 void W3dEscenaRegistrarTodas() {
     gEscenas.clear();
-    gInited.clear();
+    // (una escena 2D cargada como capa ya corrio su inicio(): sigue iniciada)
+    { std::map<UI*, bool> viejo; viejo.swap(gInited);
+      for (std::map<UI*, bool>::iterator it = viejo.begin(); it != viejo.end(); ++it) if (EsCapa((Object*)it->first)) gInited[it->first] = true; }
     gEscActiva = 0;
     gHayCambio = false; gReiniciarPend = false; gCambioNombre.clear();
     if (!SceneCollection) return;
@@ -72,14 +78,18 @@ bool W3dEscenaModo() { return gModoMulti; }
 static void MostrarSolo(UI* nueva) {
     for (std::map<std::string, UI*>::iterator it = gEscenas.begin(); it != gEscenas.end(); ++it) {
         Object* u = it->second;
-        if (u) u->visible = (u == (Object*)nueva);
+        if (u && !EsCapa(u)) u->visible = (u == (Object*)nueva);   // (una capa sigue como esta: encima)
     }
 }
 
 void W3dEscenaArrancar() {
     if (gEscenas.empty()) return;
     UI* ini = W3dEscenaBuscar(gInicial);
-    if (!ini) ini = gEscenas.begin()->second;   // fallback: la primera escena registrada
+    if (ini && EsCapa((Object*)ini)) ini = 0;   // (una escena cargada encima ya corre: no es la que arranca)
+    // fallback: la primera escena registrada que no sea una capa (sin ninguna: no hay escena 2D activa)
+    for (std::map<std::string, UI*>::iterator it = gEscenas.begin(); it != gEscenas.end() && !ini; ++it)
+        if (it->second && !EsCapa((Object*)it->second)) ini = it->second;
+    if (!ini) return;
     MostrarSolo(ini);
     gEscActiva = ini;
     if (gInitFn) gInitFn(ini, false);            // init de la escena inicial (el resto, perezoso)
@@ -94,7 +104,12 @@ void W3dEscenaPedirCambio(const std::string& nombre, bool reiniciar) {
     gHayCambio = true; gCambioNombre = nombre; gReiniciarPend = reiniciar;
 }
 
+static void CapasEntregarMensajes();
+static void CapasAplicar();
 void W3dEscenaAplicarPendiente() {
+    // primero los MENSAJES (un "guardar" llega antes de que la escena se vaya) y las CAPAS
+    CapasEntregarMensajes();
+    CapasAplicar();
     // una ESCENA 3D pedida cambia el arbol ENTERO (sus escenas UI incluidas): un cambio de UI
     // pendiente era de la escena que se fue
     if (gAplicar3D && gAplicar3D()) { gHayCambio = false; gReiniciarPend = false; return; }
@@ -125,9 +140,16 @@ Object* W3dEscenaBuscarRef(Object* o, const std::string& nombre) {
     return W3dBuscarNombreDesde(o, nombre, raiz);
 }
 
+static int CapaDe(Object* o);   // (abajo: las capas)
+static bool CapaCorre(int i);
 bool W3dEscenaEsDeActiva(Object* o) {
     if (!o) return false;
     if (!o->visible) return false;        // invisible: no corre (regla del editor de siempre)
+    // UNA CAPA corre aunque no sea la escena activa (si no esta en pausa); la BASE en pausa no corre
+    { const int c = CapaDe(o);
+      if (c >= 0) { for (Object* p = o; p; p = p->Parent) { if (!p->visible) return false; if (EsCapa(p)) break; }
+                    return CapaCorre(c); }
+      if (W3dEscenaBasePausada()) return false; }
     if (gEscenas.empty()) return true;    // sin multi-escena: solo importa visible
     Object* raiz = W3dEscenaRaizDe(o);
     if (!raiz || raiz->getType() != ObjectType::ui) return true;  // fuera de escenas UI (3D): regla vieja
@@ -402,6 +424,237 @@ void W3dPaletaRenombrar(int idx, const std::string& nuevo) {
 }
 
 // ---------------------------------------------------------------------------
+// ============================================================================
+//  LAS CAPAS y LOS MENSAJES (ver W3dEscena.h)
+// ============================================================================
+struct W3dCapa { std::string nombre; Object* raiz; unsigned serial; bool es3D; bool pausada; };
+static std::vector<W3dCapa> gCapas;                 // en el orden en que se cargaron (la ultima, arriba)
+enum { CapaCargar = 0, CapaDescargar, CapaMostrar, CapaOcultar, CapaPausar, CapaReanudar };
+struct W3dCapaPedido { int op; std::string nombre; };
+static std::vector<W3dCapaPedido> gCapaPedidos;
+struct W3dMensajeEscena { std::string destino, texto, de; W3dValorLua datos; };
+static std::vector<W3dMensajeEscena> gMensajes;
+static bool gBasePausada = false;
+static Object* (*gCapa3DCrear)(const std::string&) = 0;
+static std::string (*gNombreBase3D)() = 0;
+void W3dEscenaSetCapas3D(Object* (*crear)(const std::string&), std::string (*nombreBase)()) {
+    gCapa3DCrear = crear; gNombreBase3D = nombreBase;
+}
+
+static bool CapaViva(int i) {
+    return i >= 0 && i < (int)gCapas.size() && W3dObjetoVivoSerial(gCapas[(size_t)i].raiz, gCapas[(size_t)i].serial);
+}
+static bool EsCapa(Object* o) {
+    if (!o) return false;
+    for (size_t i = 0; i < gCapas.size(); i++) if (gCapas[i].raiz == o && CapaViva((int)i)) return true;
+    return false;
+}
+static int CapaDe(Object* o) {
+    if (gCapas.empty()) return -1;
+    for (Object* p = o; p; p = p->Parent)
+        for (size_t i = 0; i < gCapas.size(); i++) if (gCapas[i].raiz == p && CapaViva((int)i)) return (int)i;
+    return -1;
+}
+static bool CapaCorre(int i) {
+    if (!CapaViva(i)) return false;
+    const W3dCapa& c = gCapas[(size_t)i];
+    return c.raiz->visible && !c.pausada;
+}
+static int CapaPorNombre(const std::string& n) {
+    for (size_t i = 0; i < gCapas.size(); i++) if (gCapas[i].nombre == n && CapaViva((int)i)) return (int)i;
+    return -1;
+}
+// la BASE: la escena (o el juego) 3D que corre, o la escena 2D activa en un juego solo 2D
+static std::string NombreBase() {
+    if (gNombreBase3D) { std::string b = gNombreBase3D(); if (!b.empty()) return b; }
+    return gEscActiva ? gEscActiva->name : std::string();
+}
+int     W3dEscenaCapas() { return (int)gCapas.size(); }
+Object* W3dEscenaCapaRaiz(int i) { return CapaViva(i) ? gCapas[(size_t)i].raiz : 0; }
+bool    W3dEscenaCapaEs3D(int i) { return CapaViva(i) && gCapas[(size_t)i].es3D; }
+bool    W3dEscenaEsCapaRaiz(Object* o) { return EsCapa(o); }
+bool    W3dEscenaEnCapa(Object* o) { return CapaDe(o) >= 0; }
+bool    W3dEscenaBasePausada() { return gBasePausada; }
+std::string W3dEscenaDe(Object* o) {
+    const int c = CapaDe(o);
+    if (c >= 0) return gCapas[(size_t)c].nombre;
+    for (Object* p = o; p; p = p->Parent)
+        if (p->getType() == ObjectType::ui && p != (Object*)gEscActiva) return p->name;   // una escena 2D (no la base)
+    return NombreBase();
+}
+void W3dEscenaCapasDesprender(bool conUI, std::vector<Object*>& sueltas) {
+    sueltas.clear();
+    for (size_t i = 0; i < gCapas.size(); i++) {
+        if (!CapaViva((int)i)) continue;
+        Object* o = gCapas[i].raiz;
+        if (!conUI && !gCapas[i].es3D) continue;
+        if (o->Parent) {
+            std::vector<Object*>& ch = o->Parent->Childrens;
+            for (size_t k = 0; k < ch.size(); k++) if (ch[k] == o) { ch.erase(ch.begin() + (long)k); break; }
+            o->Parent = 0;
+        }
+        sueltas.push_back(o);
+    }
+}
+void W3dEscenaCapasColgar(Object* raiz, const std::vector<Object*>& sueltas) {
+    if (!raiz) return;
+    for (size_t i = 0; i < sueltas.size(); i++) {
+        if (!sueltas[i] || sueltas[i]->Parent) continue;
+        sueltas[i]->Parent = raiz;
+        raiz->Childrens.push_back(sueltas[i]);
+    }
+}
+bool W3dEscenaCapaAdentroDe(Object* raiz) {
+    for (size_t i = 0; i < gCapas.size(); i++) {
+        if (!CapaViva((int)i)) continue;
+        for (Object* p = gCapas[i].raiz; p; p = p->Parent) if (p == raiz) return true;
+    }
+    return false;
+}
+void W3dEscenaCapasLimpiar() {
+    for (size_t i = 0; i < gCapas.size(); i++)
+        if (CapaViva((int)i) && !gCapas[i].es3D) gCapas[i].raiz->visible = true;   // (en edicion las UI se ven)
+    gCapas.clear();
+    gCapaPedidos.clear();
+    gMensajes.clear();
+    gBasePausada = false;
+}
+
+// los scripts de un subarbol (los de una escena 2D que se descarga)
+static void DescargarScriptsDe(Object* o) {
+    if (!o) return;
+    if (o->scriptDatos && !o->scriptDatos->scripts.empty()) W3dScriptDescargarDe(o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) DescargarScriptsDe(o->Childrens[i]);
+}
+static void CapasAplicar() {
+    if (gCapaPedidos.empty()) return;
+    std::vector<W3dCapaPedido> lista;
+    lista.swap(gCapaPedidos);
+    for (size_t k = 0; k < lista.size(); k++) {
+        const std::string& n = lista[k].nombre;
+        const int i = CapaPorNombre(n);
+        switch (lista[k].op) {
+            case CapaCargar: {
+                if (i >= 0) break;                                    // ya esta cargada
+                if (n == NombreBase()) { w3dLogfW("[escenas] cargarEscena('%s'): es la escena que corre", n.c_str()); break; }
+                W3dCapa c; c.nombre = n; c.raiz = 0; c.serial = 0; c.es3D = false; c.pausada = false;
+                UI* u = W3dEscenaBuscar(n);
+                if (u) {
+                    c.raiz = u; c.serial = u->serial;
+                    gCapas.push_back(c);
+                    u->visible = true;
+                    if (gInited.find(u) == gInited.end() || !gInited[u]) {
+                        if (gInitFn) gInitFn(u, false);
+                        gInited[u] = true;
+                    }
+                } else if (gCapa3DCrear) {
+                    // (se anota ANTES de crearla: lo que su inicio() pida ya la ve como capa)
+                    Object* o = gCapa3DCrear(n);
+                    if (o) { c.raiz = o; c.serial = o->serial; c.es3D = true; gCapas.push_back(c); }
+                }
+                if (c.raiz) w3dLogf("[escenas] '%s' cargada encima (%s)", n.c_str(), c.es3D ? "3D" : "2D");
+                else w3dLogfW("[escenas] cargarEscena('%s'): no hay ninguna escena con ese nombre", n.c_str());
+                break;
+            }
+            case CapaDescargar: {
+                if (i < 0) { w3dLogfW("[escenas] descargarEscena('%s'): no esta cargada encima", n.c_str()); break; }
+                W3dCapa c = gCapas[(size_t)i];
+                gCapas.erase(gCapas.begin() + i);
+                if (c.es3D) W3dScriptDestruirAhora(c.raiz);
+                else {
+                    DescargarScriptsDe(c.raiz);
+                    c.raiz->visible = false;
+                    gInited.erase((UI*)c.raiz);
+                }
+                w3dLogf("[escenas] '%s' descargada", n.c_str());
+                break;
+            }
+            case CapaMostrar: case CapaOcultar:
+                if (i >= 0) gCapas[(size_t)i].raiz->visible = (lista[k].op == CapaMostrar);
+                else w3dLogfW("[escenas] %s('%s'): solo una escena cargada encima", lista[k].op == CapaMostrar ?
+                              "mostrarEscena" : "ocultarEscena", n.c_str());
+                break;
+            case CapaPausar: case CapaReanudar: {
+                const bool p = (lista[k].op == CapaPausar);
+                if (i >= 0) gCapas[(size_t)i].pausada = p;
+                else if (n == NombreBase()) gBasePausada = p;
+                else w3dLogfW("[escenas] %s('%s'): no esta cargada", p ? "pausarEscena" : "reanudarEscena", n.c_str());
+                break;
+            }
+        }
+    }
+}
+
+// a cada script del subarbol: alRecibir(texto, datos, de). 'sinCapas': sin entrar a las capas (la base)
+static void EntregarEn(Object* o, const W3dMensajeEscena& m, bool sinCapas, std::set<Object*>& vistos) {
+    if (!o || vistos.count(o)) return;
+    if (sinCapas && EsCapa(o)) return;
+    vistos.insert(o);
+    if (o->scriptDatos && !o->scriptDatos->scripts.empty())
+        W3dScriptLlamarConDatos(o, "alRecibir", m.texto, m.datos, m.de);
+    for (size_t i = 0; i < o->Childrens.size(); i++) EntregarEn(o->Childrens[i], m, sinCapas, vistos);
+}
+static void CapasEntregarMensajes() {
+    if (gMensajes.empty()) return;
+    std::vector<W3dMensajeEscena> lista;
+    lista.swap(gMensajes);   // (lo que alRecibir mande va al frame siguiente)
+    for (size_t k = 0; k < lista.size(); k++) {
+        const W3dMensajeEscena& m = lista[k];
+        std::set<Object*> vistos;
+        if (m.destino.empty() || m.destino == "*") {                 // a todas
+            EntregarEn(SceneCollection, m, false, vistos);
+            for (size_t i = 0; i < gCapas.size(); i++) if (CapaViva((int)i)) EntregarEn(gCapas[i].raiz, m, false, vistos);
+            continue;
+        }
+        const int c = CapaPorNombre(m.destino);
+        if (c >= 0) { EntregarEn(gCapas[(size_t)c].raiz, m, false, vistos); continue; }
+        if (m.destino == NombreBase()) { EntregarEn(SceneCollection, m, true, vistos); continue; }
+        UI* u = W3dEscenaBuscar(m.destino);
+        if (u) { EntregarEn(u, m, false, vistos); continue; }
+        w3dLogfW("[escenas] enviar('%s', '%s'): no hay ninguna escena cargada con ese nombre", m.destino.c_str(),
+                 m.texto.c_str());
+    }
+}
+
+// ---- los binds de lua ----
+static void PedirCapa(lua_State* L, int op) {
+    const char* n = lua_tostring(L, 1);
+    if (!n || !*n) return;
+    W3dCapaPedido p; p.op = op; p.nombre = n;
+    gCapaPedidos.push_back(p);
+}
+void W3dEscenaPedirCarga(const std::string& nombre) {
+    if (nombre.empty()) return;
+    W3dCapaPedido p; p.op = CapaCargar; p.nombre = nombre;
+    gCapaPedidos.push_back(p);
+}
+static int LCargarEscena(lua_State* L)    { PedirCapa(L, CapaCargar); return 0; }
+static int LDescargarEscena(lua_State* L) { PedirCapa(L, CapaDescargar); return 0; }
+static int LMostrarEscena(lua_State* L)   { PedirCapa(L, CapaMostrar); return 0; }
+static int LOcultarEscena(lua_State* L)   { PedirCapa(L, CapaOcultar); return 0; }
+static int LPausarEscena(lua_State* L)    { PedirCapa(L, CapaPausar); return 0; }
+static int LReanudarEscena(lua_State* L)  { PedirCapa(L, CapaReanudar); return 0; }
+static int LEscenaCargada(lua_State* L) {
+    const char* n = lua_tostring(L, 1);
+    lua_pushboolean(L, n && (CapaPorNombre(n) >= 0 || NombreBase() == n) ? 1 : 0);
+    return 1;
+}
+// enviar(escena, mensaje [, datos]): escena nil o "*" = a todas
+static int LEnviar(lua_State* L) {
+    W3dMensajeEscena m;
+    const char* d = lua_tostring(L, 1);
+    const char* t = lua_tostring(L, 2);
+    if (!t) return 0;
+    m.destino = d ? d : "";
+    m.texto = t;
+    if (lua_gettop(L) >= 3) m.datos = W3dValorLuaLeer(L, 3);
+    lua_getfield(L, LUA_REGISTRYINDEX, "w3d_duenio");
+    Object* yo = lua_islightuserdata(L, -1) ? (Object*)lua_touserdata(L, -1) : 0;
+    lua_pop(L, 1);
+    m.de = yo ? W3dEscenaDe(yo) : std::string();
+    gMensajes.push_back(m);
+    return 0;
+}
 //  BIND lua: cambiarEscena(nombre[, reiniciar]).
 // ---------------------------------------------------------------------------
 static int LCambiarEscena(lua_State* L) {
@@ -460,4 +713,13 @@ void W3dEscenaRegistrarBind(void* Lv) {
     lua_pushcfunction(L, LPararEscena3D);       lua_setglobal(L, "pararEscena3D");
     lua_pushcfunction(L, LEscenaReproduciendo); lua_setglobal(L, "escenaReproduciendo");
     lua_pushcfunction(L, LDibujar3D);           lua_setglobal(L, "dibujar3D");
+    // las capas y los mensajes entre escenas
+    lua_pushcfunction(L, LCargarEscena);        lua_setglobal(L, "cargarEscena");
+    lua_pushcfunction(L, LDescargarEscena);     lua_setglobal(L, "descargarEscena");
+    lua_pushcfunction(L, LMostrarEscena);       lua_setglobal(L, "mostrarEscena");
+    lua_pushcfunction(L, LOcultarEscena);       lua_setglobal(L, "ocultarEscena");
+    lua_pushcfunction(L, LPausarEscena);        lua_setglobal(L, "pausarEscena");
+    lua_pushcfunction(L, LReanudarEscena);      lua_setglobal(L, "reanudarEscena");
+    lua_pushcfunction(L, LEscenaCargada);       lua_setglobal(L, "escenaCargada");
+    lua_pushcfunction(L, LEnviar);              lua_setglobal(L, "enviar");
 }

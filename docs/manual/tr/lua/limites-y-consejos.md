@@ -9,7 +9,7 @@
 ## Hatalar
 
 - Bir fonksiyonda hata varsa, hata günlüğe yazılır (`archivo.lua:LÍNEA: mensaje`) ve o çağrı kesilir, ama fonksiyon bir sonraki karede yeniden çağrılır: sen düzeltene kadar aynı hata her karede tekrarlanır.
-- Dosya okunamıyorsa ya da bir sözdizimi hatası içeriyorsa, o script bir sonraki Play'e kadar kapalı kalır.
+- Dosya okunamıyorsa ya da bir sözdizimi hatası içeriyorsa, o script bir sonraki Oynat'a kadar kapalı kalır.
 - Whisk3D'de `error("...")` yalnızca mesajı günlüğe yazar ve script devam eder. Durdurmak istiyorsan `assert(condicion, "mensaje")` kullan.
 
 ## Dikkat edilmesi gerekenler

@@ -2,7 +2,7 @@
 
 In Whisk3D uno script appartiene sempre a un **oggetto** della scena (una mesh, un empty, un pulsante 2D…). Un oggetto può avere più script; ognuno viene eseguito separatamente, con le proprie variabili, nell'ordine in cui compaiono.
 
-Dallo script, `yo()` restituisce l'oggetto proprietario. Per usare *altri* oggetti, lo script dichiara una tabella globale chiamata `propiedades`. L'editor la legge e mostra un campo per ogni voce nel riquadro dello script, nel pannello Properties:
+Dallo script, `yo()` restituisce l'oggetto proprietario. Per usare *altri* oggetti, lo script dichiara una tabella globale chiamata `propiedades`. L'editor la legge e mostra un campo per ogni voce nel riquadro dello script, nel pannello Proprietà:
 
 ```lua
 propiedades = {

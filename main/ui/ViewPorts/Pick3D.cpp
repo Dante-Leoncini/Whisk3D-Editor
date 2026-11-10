@@ -45,6 +45,9 @@
 #include "ViewPorts/Pick3D.h"
 #include "edit/BoxSelect.h"   // la caja compartida + sus predicados
 #include "objects/Hitbox.h"   // el pick de un hitbox es su ALAMBRE (HitboxAristas)
+#include "W3dRaices.h"         // las otras escenas abiertas: el click tambien las elige
+#include "io/RaicesEditor.h"   // W3dActivarRaizDe: lo elegido en otra escena abierta la activa
+#include "script/W3dScript.h"  // (jugando no: el Play dibuja su base y sus capas)
 
 // ====================================================================
 // pick 3D por color (antes vivia en w3dnewscene.cpp, solo Symbian)
@@ -1492,9 +1495,18 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     w3dEngine::ClearColor(0, 0, 0, 1);
     w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
 
+    // LAS RAICES que se ven: la activa y las otras escenas abiertas (EscenaRender las dibuja despues de la activa). Una
+    // oculta con su ojo no se pinta (sus objetos no se ven)
+    std::vector<Object*> raices;
+    if (SceneCollection->visible) raices.push_back(SceneCollection);
+    if (!W3dScriptHayPartida()) {
+        std::vector<Object*> otras;
+        W3dRaicesOtrasVisibles(otras);
+        raices.insert(raices.end(), otras.begin(), otras.end());
+    }
     pickCounter = 0;
-    PickPaint(SceneCollection, false); // 1ra pasada: NO-armatures (con z-buffer)
-    PickPaint(SceneCollection, true);  // 2da pasada: armatures XRAY (sin z, encima) -> se pickean como se ven
+    for (size_t r = 0; r < raices.size(); r++) PickPaint(raices[r], false); // 1ra pasada: NO-armatures (con z-buffer)
+    for (size_t r = 0; r < raices.size(); r++) PickPaint(raices[r], true);  // 2da: armatures XRAY (sin z, encima)
     w3dEngine::Enable(w3dEngine::DepthTest); // restaurar (la pasada xray lo dejo off)
 
     GLubyte pix[4] = {0, 0, 0, 0};
@@ -1506,14 +1518,22 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
 
     int id = ((pix[1] >> 2) << 5) | (pix[0] >> 3);
 
+    pickFound = NULL;
+    if (id > 0) {
+        pickCounter = 0;
+        for (size_t r = 0; r < raices.size() && !pickFound; r++) PickResolve(raices[r], id, false);   // 1ra pasada
+        for (size_t r = 0; r < raices.size() && !pickFound; r++) PickResolve(raices[r], id, true);    // 2da (sigue la cuenta)
+    }
+    // un objeto de OTRA escena abierta: su escena pasa a ser la activa y el click elige ahi
+    if (pickFound) {
+        Object* raiz = pickFound;
+        while (raiz->Parent) raiz = raiz->Parent;
+        if (raiz != SceneCollection && !W3dActivarRaizDe(raiz)) return true;
+    }
     if (!LShiftPressed) {
         DeseleccionarTodo();
     }
-    if (id > 0) {
-        pickCounter = 0;
-        pickFound = NULL;
-        PickResolve(SceneCollection, id, false);              // 1ra pasada: NO-armatures
-        if (!pickFound) PickResolve(SceneCollection, id, true); // 2da pasada: armatures (continua el contador)
+    {
         if (pickFound) {
             if (LShiftPressed && pickFound->select) {
                 pickFound->select = false; // shift: sacar de la seleccion

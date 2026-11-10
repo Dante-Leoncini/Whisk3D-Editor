@@ -23,6 +23,8 @@
    - [パーティクル、フォグ、可視性](api-particulas-niebla.md)
    - [時間、乱数、ユーティリティ](api-tiempo-y-utilidades.md)
    - [保存される設定](api-configuracion.md)
+   - [ネットワークで遊ぶ（LAN、Wi-Fi、インターネット）](api-red.md)
+   - [画面分割とプレイヤーごとのゲームパッド](api-pantalla-dividida.md)
    - [メッセージとデバッグ](api-mensajes-y-depuracion.md)
    - [ルーチンとメモリ](api-rutinas-y-memorias.md)
 7. [キーとボタンの名前](teclas-y-botones.md)

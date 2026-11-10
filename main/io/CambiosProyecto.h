@@ -54,11 +54,19 @@ unsigned W3dCambiosEdiciones();
 
 // ---- EL CARTEL AL CERRAR / ABRIR OTRO PROYECTO ----
 // que se queria hacer cuando aparecio el cartel
-enum { W3D_CAMBIOS_SALIR = 0, W3D_CAMBIOS_ABRIR, W3D_CAMBIOS_NUEVO };
+enum { W3D_CAMBIOS_SALIR = 0, W3D_CAMBIOS_ABRIR, W3D_CAMBIOS_NUEVO, W3D_CAMBIOS_CERRAR_ESCENA };
 // si hay algo sin guardar abre el cartel y devuelve true (la accion queda PENDIENTE: el cartel la hace si
 // el usuario elige "Guardar y ..." o "... sin guardar"); si no hay nada, false y el que llama sigue. En el
 // harness (--script) nunca abre nada (devuelve false). 'ruta' = el proyecto a abrir (ABRIR).
 bool W3dCambiosPreguntar(int accion, const std::string& ruta);
+// CERRAR UNA ESCENA ABIERTA en el editor (destildarla, io/RaicesEditor.h) que tiene cambios sin guardar: abre el cartel
+// (guardar y cerrar / cerrar sin guardar / cancelar) y devuelve true; la cierra W3dCambiosCerrarEscenaHook si el
+// usuario sigue. false = no hay nada sin guardar en ESA escena (o el harness): el que llama la cierra
+bool W3dCambiosPreguntarCerrarEscena(const std::string& nombre);
+extern void (*W3dCambiosCerrarEscenaHook)(const std::string& nombre);
+class Object;
+// una raiz que se cierra y se libera (sus cambios se guardaron o se descartaron): deja de contar como editada
+void W3dCambiosOlvidarRaiz(const Object* raiz);
 // lo elegido en el cartel: 0 = guardar y seguir, 1 = seguir sin guardar, 2 = cancelar. Lo llama el cartel.
 void W3dCambiosResponder(int respuesta);
 // hay un cartel pendiente (el harness lo consulta)

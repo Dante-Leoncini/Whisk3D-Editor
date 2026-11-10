@@ -1,89 +1,88 @@
-# 3D Viewport
+# Vista 3D
 
-Il 3D Viewport è dove si vede e si modifica la scena. Lavora in diverse **modalità**: ciò che fanno i clic, i tasti e i menu dipende dalla modalità attuale. La modalità si sceglie con il selettore della barra superiore (appare solo se l'oggetto attivo è una mesh o un'armatura) o con <kbd>Tab</kbd>.
+La **Vista 3D** è il viewport dove si vede e si modifica la scena: lì si modella, si spostano gli oggetti, si dipinge, si mette in posa e si anima. Come tutti i viewport, ha in alto la sua **barra dei menu** e in basso la sua **barra degli strumenti**.
+
+![La Vista 3D con il cubo scelto, in Modalità Oggetto: in alto, la barra dei menu intera](../tutoriales/img/vista-3d-barra.webp)
+
+- **La barra dei menu**, pulsante per pulsante, con i suoi menu: [La barra dei menu della Vista 3D](vista-3d-barra.md).
+- **Navigare** (orbitare, spostarsi, zoom, le viste, la camera): [Navigazione nella Vista 3D](navegacion.md) e il tutorial [Navigare nella Vista 3D](../tutoriales/navegacion.md).
+- **Spostare, ruotare e scalare**, il gizmo, il perno e l'orientamento: [Spostare, ruotare e scalare](transformar.md).
+
+## Le modalità
+
+La Vista 3D lavora in diverse **modalità**: ciò che fanno i clic, i tasti e i menu dipende dalla modalità in cui si trova. La modalità si sceglie con il primo pulsante della barra dei menu, che mostra la modalità attuale, o con <kbd>Tab</kbd> (Oggetto ↔ Modifica; sul Nokia N95, <kbd>OK</kbd>).
+
+Le modalità che si possono scegliere dipendono dall'**oggetto attivo**. La **Modalità Oggetto** ce l'hanno tutti. Una mesh 3D aggiunge la Modalità Modifica e le tre pitture; un'armatura, la Modalità Modifica e la Modalità Posa. Con qualsiasi altro oggetto (una luce, una camera, un suono) l'unica modalità è la Modalità Oggetto, e il pulsante non appare.
+
+![Il menu della modalità con un cubo scelto: Modalità Oggetto, Modalità Modifica, Pittura vertici, Pittura pesi e Pittura texture](../tutoriales/img/vista-3d-menu-modo.webp)
+
+![Il menu della modalità con un'armatura scelta: Modalità Oggetto, Modalità Modifica e Modalità Posa](../tutoriales/img/vista-3d-modos-esqueleto.webp)
 
 | Modalità | Per quali oggetti | A cosa serve |
 |---|---|---|
-| [Object Mode](modo-objeto.md) | Tutti | Creare, spostare, ruotare, scalare, duplicare, imparentare ed eliminare oggetti interi. |
-| [Edit Mode](modo-edicion.md) | Mesh e curve | Modificare vertici, spigoli e facce (modellare). |
-| [Armature Edit Mode](esqueletos.md#armature-edit-mode) | Armature | Creare e sistemare le ossa. |
-| [Pose Mode](esqueletos.md#pose-mode) | Armature | Mettere in posa e animare le ossa. |
-| [Weight Paint](pintura.md#weight-paint) | Solo mesh 3D | Dipingere quanto ogni osso muove ogni vertice. |
-| [Vertex Paint](pintura.md#vertex-paint) | Solo mesh 3D | Dipingere colori direttamente sui vertici. |
-| [Texture Paint](pintura.md#texture-paint) | Solo mesh 3D | Dipingere sulla texture, direttamente sopra l'oggetto. |
+| [Modalità Oggetto](modo-objeto.md) | Tutti | Lavorare con gli oggetti interi: crearli, spostarli, ruotarli, scalarli, duplicarli, imparentarli ed eliminarli. |
+| [Modalità Modifica](modo-edicion.md) | Mesh 3D e curve | Modellare: spostare, aggiungere ed eliminare i vertici, gli spigoli e le facce della mesh. |
+| [Modalità Modifica](esqueletos.md#modalità-modifica-dellarmatura) | Armature | Costruire l'armatura: creare le ossa e sistemarle nella loro posizione di riposo. |
+| [Modalità Posa](esqueletos.md#modalità-posa) | Armature | Mettere in posa le ossa e salvare le pose: così si anima un personaggio. |
+| [Pittura pesi](pintura.md#pittura-pesi) | Mesh 3D | Dipingere quanto ogni osso muove ogni vertice. |
+| [Pittura vertici](pintura.md#pittura-vertici) | Mesh 3D | Dipingere colori direttamente sui vertici. |
+| [Pittura texture](pintura.md#pittura-texture) | Mesh 3D | Dipingere sulla texture, direttamente sopra l'oggetto. |
 
-## Barra superiore del 3D Viewport
+### Modalità Oggetto
 
-| Pulsante | Descrizione |
-|---|---|
-| Selettore di modalità | Cambia modalità (Object, Edit, Pose, Paint…). |
-| Vertex / Edge / Face | Solo in Edit Mode: cosa si seleziona. |
-| Transform Pivot Point | Attorno a cosa si ruota e si scala: 3D Cursor, Individual Origins, Median Point o Active Element. Con la casella Lock Normals. |
-| Orientation | Gli assi della trasformazione: Global, Local, Normal (la direzione della faccia) o View. |
-| Snap | Opzioni di snap. Diventa verde se è attivo (<kbd>Shift+Tab</kbd>). |
-| Proportional Editing | Quando si sposta qualcosa, ciò che è vicino lo accompagna dolcemente. Diventa verde se è attivo (<kbd>O</kbd>). |
-| View | Camere, punti di vista, inquadrare, vista locale, prospettiva, bloccare l'orbita, bloccare la camera alla vista. |
-| Select | Tutto, niente, invertire, riquadro, collegato, loop e percorsi. |
-| Add (+) | Solo in Object Mode: creare nuovi oggetti. |
-| Mesh | Solo in Edit Mode: le operazioni di modellazione. |
-| Save Texture (dischetto) | Solo in Texture Paint. Verde se c'è pittura non salvata. |
-| Animation (rombo) | Inserire, eliminare e ripulire keyframe; scia di movimento. |
-| Context | Il menu della modalità: Object, Vertex/Edge/Face, Armature o Pose. |
-| Overlays (occhio) | Quali aiuti vengono disegnati: pavimento, assi, gizmo, cursore 3D, normali, statistiche, raggi X. |
-| Render (camera) | La modalità di shading. |
-| Scene | Scegliere quale scena, gioco o prefab del progetto si modifica, e crearne di nuovi. |
-| UV | Solo in Edit Mode: fare l'unwrap e proiettare le UV. |
+È la modalità con cui si avvia Whisk3D, e l'unica che hanno tutti gli oggetti. Si lavora con gli oggetti interi: si scelgono, si spostano, si ruotano, si scalano, si aggiungono e si eliminano. Vedi [Modalità Oggetto](modo-objeto.md) e il tutorial [La Modalità Oggetto](../tutoriales/modo-objeto.md).
 
-## Menu comuni a più modalità
+### Modalità Modifica di una mesh
 
-### Select
+Si modella la **forma** della mesh: i vertici, gli spigoli e le facce. Nella barra dei menu appaiono il pulsante **Vertice / Spigolo / Faccia** (cosa si sceglie con un clic) e i menu **Mesh** e **UV**. Il resto della scena si continua a vedere, ma non si può toccare.
 
-| Funzione | Descrizione | Scorciatoia |
-|---|---|---|
-| All | Seleziona tutto. | <kbd>A</kbd> |
-| None | Deseleziona tutto. | <kbd>Alt+A</kbd> |
-| Invert | Ciò che è selezionato viene deselezionato e viceversa. | <kbd>Ctrl+I</kbd> |
-| Box Select | Trascinando da sinistra a destra (verde) prende solo ciò che resta interamente dentro; da destra a sinistra (blu) basta sfiorare. <kbd>Shift</kbd> aggiunge. | <kbd>B</kbd> |
-| Show selection | Mostra o nasconde il contorno di ciò che è selezionato. | Menu |
+![Un cubo in Modalità Modifica, con una faccia scelta in verde e il gizmo sopra di essa](../tutoriales/img/vista-3d-modo-edicion.webp)
 
-### Render (modalità di shading)
+### Modalità Modifica di un'armatura
 
-| Funzione | Descrizione |
-|---|---|
-| Render Preview | Con le luci della scena. Se il ray tracing è attivo, mostra l'immagine tracciata poco a poco. |
-| Material Preview | Quella predefinita: una luce neutra dalla vista, senza dipendere dalle luci della scena. |
-| Solid / Wireframe / ZBuffer Preview | Grigio solido, solo gli spigoli, o la profondità. |
-| Normal View / Alpha Preview | Le normali a colori, o la trasparenza in bianco e nero. |
-| Motion vectors | Quanto si è mosso ogni pixel sullo schermo dal fotogramma precedente (rosso = X, verde = Y; lavanda = fermo, oliva = lo sfondo). La stessa immagine della passata `_vectores` del render. |
-| Wireframe: Only Visible | La vista wireframe mostra solo ciò che viene disegnato davvero. |
+Si costruisce l'**armatura**: si creano le ossa (estrudendole dalla punta di un altro), si spostano e si imparentano. È la sua posizione di **riposo**, quella che ha quando non è animata.
 
-### Overlays
+![L'armatura di Leon in Modalità Modifica: le ossa in blu, nella loro posizione di riposo](../tutoriales/img/vista-3d-modo-edicion-esqueleto.webp)
 
-| Funzione | Descrizione | Scorciatoia |
-|---|---|---|
-| Show Overlays | Accende o spegne tutti gli aiuti visivi in una volta. | <kbd>K</kbd> |
-| Floor, X Axis, Y Axis, Origins, 3D Cursor, Relationship Lines | Ogni aiuto separatamente. | Menu |
-| Gizmo | Il gizmo per spostare/ruotare/scalare. | Menu |
-| Objects | Mostrare o nascondere armature, luci, camere, empty, particelle, curve, hitbox. | Menu |
-| Normals | Disegna le normali di vertice, personalizzate o di faccia, con la loro dimensione. | Menu |
-| Statistics | FPS, vertici, facce, chiamate di disegno e tempi. | Menu |
-| X-Ray | La mesh in modifica appare semitrasparente e si possono scegliere gli elementi che stanno dietro. | Menu |
+### Modalità Posa
 
-### Snap
+Si **mette in posa** l'armatura: le ossa si ruotano e si spostano senza cambiare l'armatura in sé, e la mesh le segue. Le pose salvate in diversi frame sono l'animazione del personaggio.
 
-| Funzione | Descrizione | Scorciatoia |
-|---|---|---|
-| Attivare lo snap | Ciò che si sposta si aggancia a vertici, spigoli, facce o ai loro centri. | <kbd>Shift+Tab</kbd> |
-| Snap Base / Snap Target | Quale punto di ciò che si sposta si aggancia (il più vicino, il centro, la mediana, l'attivo) e a cosa. | Menu |
-| Face Project / Face Nearest | Per la retopologia: i vertici si appoggiano su un'altra superficie. | Menu |
-| Affect Move / Rotate / Scale | In quali operazioni agisce lo snap. | Menu |
-| Snap menu del cursore | Selection to Grid, to Cursor o to Active; Cursor to Selected, to World Origin, to Grid o to Active. | <kbd>Shift+S</kbd> |
+![L'armatura di Leon in Modalità Posa, a metà della sua animazione di camminata: le ossa piegate](../tutoriales/img/vista-3d-modo-pose.webp)
 
-### Proportional Editing
+### Pittura pesi
 
-| Funzione | Descrizione | Scorciatoia |
-|---|---|---|
-| Attivare | Quando si sposta, ruota o scala, i vicini seguono in base alla distanza. | <kbd>O</kbd> |
-| Connected Only | Misura la distanza lungo gli spigoli: non trascina pezzi separati. | Menu |
-| Falloff | Forma dell'influenza: Smooth, Sphere, Root, Inverse Square, Sharp, Linear, Constant, Random. | Menu |
-| Proportional Size | Il raggio d'influenza. Durante la trasformazione si cambia con la rotella o con <kbd>PageUp</kbd> / <kbd>PageDown</kbd>. | Menu / rotella |
+Si dipinge **quanto ogni osso muove ogni parte della mesh**: in rosso ciò che l'osso scelto muove del tutto, in blu ciò che non muove. È ciò che fa sì che, piegando il braccio, si pieghi il braccio e non la vita.
+
+![Una mesh di Leon in Pittura pesi: l'osso scelto muove il petto (rosso e giallo) e niente del resto (blu)](../tutoriales/img/vista-3d-modo-pesos.webp)
+
+### Pittura vertici
+
+Si dipingono **colori sui vertici** della mesh, senza texture. Serve per dare colore a modelli semplici, per ombre dipinte a mano e per effetti negli shader.
+
+![Un cubo in Pittura vertici: il pennello passa da un lato all'altro e i vertici che tocca si tingono di rosso](../tutoriales/img/vista-3d-modo-vertices.webp)
+
+### Pittura texture
+
+Si dipinge **direttamente sulla texture**, sopra l'oggetto, come su un pupazzo. Ciò che si è dipinto si salva con il dischetto che appare nella barra dei menu.
+
+![Leon in Pittura texture: il pennello dipinge un tratto rosso sulla sua giacca](../tutoriales/img/vista-3d-modo-textura.webp)
+
+Nelle modalità di pittura, sopra la barra degli strumenti appare la fila del pennello (il **Raggio** e il **Valore**). Vedi [Modalità di pittura](pintura.md).
+
+## La barra degli strumenti
+
+In fondo alla Vista 3D ci sono **Annulla** e **Rifai** (le frecce), gli **ultimi comandi usati** (all'inizio, Sposta, Ruota, Scala ed Elimina; ciò che si usa passa davanti) e la **modifica proporzionale**. Mentre si sposta, si ruota o si scala, la barra degli strumenti cambia: la spunta verde conferma, la croce rossa annulla, l'orientamento, e **X**, **Y** e **Z** limitano il movimento a quegli assi. Vedi [Spostare, ruotare e scalare](transformar.md#barra-degli-strumenti).
+
+![Android](../tutoriales/img/icono-android.svg) Su uno schermo touch aggiunge **Shift** e **Ctrl**, che restano accesi (in verde) e fanno da quei tasti, e il pulsante **Vista** (il monitor), perché in Modalità Modifica e nelle pitture il dito navighi invece di scegliere o dipingere.
+
+![Nokia](../tutoriales/img/icono-nokia.svg) Sul Nokia N95 è nascosta, per lasciare lo schermo alla scena, e appare quando serve: nelle modalità di pittura esce la fila del pennello (il **Raggio** e il **Valore**), e mentre si sposta, si ruota o si scala con la modifica proporzionale accesa, la barra del suo raggio. I suoi pulsanti si usano con il **mouse virtuale**: si accende con il tasto di selezione destro, le frecce lo muovono e <kbd>OK</kbd> fa clic.
+
+## Il gizmo e il cursore 3D
+
+![Il cubo scelto con sopra il gizmo (le frecce colorate) e, a sinistra, il cursore 3D, ognuno segnato con un cerchio arancione e il suo nome](../tutoriales/img/vista-3d-gizmo-cursor.webp)
+
+- Il **gizmo** sono le frecce colorate sopra ciò che è scelto: si afferrano per spostare, ruotare e scalare. Un clic sul gizmo passa da una modalità all'altra. Vedi [Il gizmo](transformar.md#il-gizmo).
+- Il **cursore 3D** è il cerchio con una croce: lì appare ciò che si aggiunge con Aggiungi, e può essere il punto di perno. Vedi [Il cursore 3D](../tutoriales/modo-objeto.md#il-cursore-3d).
+
+![Nokia](../tutoriales/img/icono-nokia.svg) Sul Nokia N95 il gizmo è spento, perché lo schermo è piccolo e lì si sposta con i tasti. Si accende in **Sovrapposizioni → Gizmo**, e si afferra con il mouse virtuale.

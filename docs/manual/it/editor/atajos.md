@@ -4,23 +4,23 @@ Tutte le funzioni delle tabelle qui sotto si possono riassegnare, e ognuna può 
 
 ## Come cambiare una scorciatoia
 
-1. Aprire **Properties → scheda File/Render → riquadro Settings → Keyboard Shortcuts…**
-2. Scegliere il **Context** (General, 3D Viewport, During a transform, UV Editor, Timeline, Outliner, 2D Editor, Properties, Script Editor). Anche le frecce sinistra/destra lo cambiano.
-3. Scegliere la funzione nell'elenco e toccare **Add shortcut** (o toccare di nuovo la riga scelta). Appare "Press a key…".
+1. Aprire **Proprietà → scheda File/Render → riquadro Impostazioni → Scorciatoie da tastiera…**
+2. Scegliere il **Contesto** (Generale, Vista 3D, Durante una trasformazione, Editor UV, Timeline, Outliner, Editor 2D, Proprietà, Editor di script). Anche le frecce sinistra/destra lo cambiano.
+3. Scegliere la funzione nell'elenco e toccare **Aggiungi scorciatoia** (o toccare di nuovo la riga scelta). Appare "Premi un tasto…".
 4. Premere la nuova combinazione (per esempio <kbd>Ctrl+M</kbd>). <kbd>Esc</kbd> annulla senza cambiare nulla.
 
 | Pulsante | Cosa fa |
 |---|---|
-| Add shortcut | Aggiunge una combinazione alla funzione. Se un'altra funzione dello stesso contesto la aveva, gliela toglie e avvisa. |
-| Clear | Lascia la funzione senza scorciatoia. |
-| Reset | Riporta la funzione alla sua scorciatoia predefinita. |
-| Reset all | Tutte le funzioni tornano a quelle predefinite. |
+| Aggiungi scorciatoia | Aggiunge una combinazione alla funzione. Se un'altra funzione dello stesso contesto la aveva, gliela toglie e avvisa. |
+| Pulisci | Lascia la funzione senza scorciatoia. |
+| Ripristina | Riporta la funzione alla sua scorciatoia predefinita. |
+| Ripristina tutto | Tutte le funzioni tornano a quelle predefinite. |
 
-I menu mostrano accanto a ogni opzione la scorciatoia **configurata**: se riassegni una funzione, il menu mostra la nuova combinazione. Sull'N95 i menu mostrano il tasto del telefono (per esempio <kbd>1</kbd> per Move o <kbd>C</kbd> per Delete); se è collegata una tastiera Bluetooth, mostrano il tasto di quella tastiera quando lo riconoscono.
+I menu mostrano accanto a ogni opzione la scorciatoia **configurata**: se riassegni una funzione, il menu mostra la nuova combinazione. Sull'N95 i menu mostrano il tasto del telefono (per esempio <kbd>1</kbd> per Sposta o <kbd>C</kbd> per Elimina); se è collegata una tastiera Bluetooth, mostrano il tasto di quella tastiera quando lo riconoscono.
 
 Le combinazioni modificate appaiono in verde. Quando a una funzione si toglie una scorciatoia predefinita, quel tasto resta libero: non fa più nulla in quel contesto.
 
-Le scorciatoie di ogni contesto valgono quando il puntatore si trova su quel pannello; quelle di **General** valgono ovunque. Quelle di **During a transform** valgono mentre si sposta, ruota o scala qualcosa, e hanno la precedenza. Nell'editor di script le lettere scrivono sempre: lì si possono riassegnare solo combinazioni con <kbd>Ctrl</kbd>, <kbd>Alt</kbd> o i tasti F.
+Le scorciatoie di ogni contesto valgono quando il puntatore si trova su quel pannello; quelle di **Generale** valgono ovunque. Quelle di **Durante una trasformazione** valgono mentre si sposta, ruota o scala qualcosa, e hanno la precedenza. Nell'editor di script le lettere scrivono sempre: lì si possono riassegnare solo combinazioni con <kbd>Ctrl</kbd>, <kbd>Alt</kbd> o i tasti F.
 
 ## Il file atajos.ini
 
@@ -42,183 +42,183 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 <!--ATAJOS-INICIO-->
 
-### General (qualsiasi pannello)
+### Generale (qualsiasi pannello)
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Save project | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
-| Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.deshacer` |
-| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Right</kbd> | `global.rehacer` |
-| Object / Edit Mode | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.modo` |
-| Toggle Snap | <kbd>Shift+Tab</kbd> | — | `global.snap` |
-| Snap menu | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
-| Play / Pause | <kbd>Space</kbd> | <kbd>Green+Left soft</kbd> | `global.play` |
-| Menu bar | <kbd>M</kbd> | <kbd>Left soft</kbd> | `global.barraMenu` |
-| Parent | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
-| Clear Parent | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
-| Fullscreen | <kbd>F11</kbd> | — | `global.pantalla` |
-| Render Image | <kbd>F12</kbd> | — | `global.render` |
-| Render Animation | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
+| Salva progetto | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
+| Annulla | <kbd>Ctrl+Z</kbd> | <kbd>C+Sx</kbd> | `global.deshacer` |
+| Rifai | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Dx</kbd> | `global.rehacer` |
+| Modalità Oggetto / Modifica | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.modo` |
+| Attiva/disattiva aggancio | <kbd>Shift+Tab</kbd> | — | `global.snap` |
+| Menu aggancio (Snap) | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
+| Riproduci / Pausa | <kbd>Space</kbd> | <kbd>Verde+Soft sx</kbd> | `global.play` |
+| Barra dei menu | <kbd>M</kbd> | <kbd>Soft sx</kbd> | `global.barraMenu` |
+| Genitore | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
+| Rimuovi genitore | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
+| Schermo intero | <kbd>F11</kbd> | — | `global.pantalla` |
+| Renderizza immagine | <kbd>F12</kbd> | — | `global.render` |
+| Renderizza animazione | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
-### 3D Viewport
-
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
-|---|---|---|---|
-| Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
-| Box Select | <kbd>B</kbd> | — | `3d.caja` |
-| Select Linked | <kbd>L</kbd> | — | `3d.vinculado` |
-| Add | <kbd>Shift+A</kbd> | — | `3d.agregar` |
-| Apply | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
-| Clear Location (Pose) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
-| Clear Rotation (Pose) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
-| Shrink/Fatten / Clear Scale | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
-| Duplicate Linked | <kbd>Alt+D</kbd> | — | `3d.instancia` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
-| Hide / Show | <kbd>H</kbd> | — | `3d.ocultar` |
-| Join | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
-| Insert Keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
-| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
-| Proportional Editing | <kbd>O</kbd> | — | `3d.proporcional` |
-| Overlays | <kbd>K</kbd> | — | `3d.overlays` |
-| Local View | <kbd>/</kbd> | — | `3d.vistaLocal` |
-| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
-| Front View | <kbd>Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaFrente` |
-| Back View | <kbd>Ctrl+Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaAtras` |
-| Right View | <kbd>Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaDerecha` |
-| Left View | <kbd>Ctrl+Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaIzquierda` |
-| Top View | <kbd>Num7</kbd> | <kbd>#+Up</kbd> | `3d.vistaArriba` |
-| Bottom View | <kbd>Ctrl+Num7</kbd> | <kbd>#+Down</kbd> | `3d.vistaAbajo` |
-| Perspective / Orthographic | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
-| Roll Left | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
-| Roll Right | <kbd>Num6</kbd> | — | `3d.rodarDer` |
-| Camera View | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
-| Set Active Camera | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
-| Extrude | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
-| New Face from Vertices | <kbd>F</kbd> | — | `3d.cara` |
-| Recalculate Normals | <kbd>Shift+N</kbd> | — | `3d.normales` |
-| Loop Cut and Slide | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
-| Connect Vertex Path | <kbd>J</kbd> | — | `3d.conectar` |
-| Rip | <kbd>V</kbd> | — | `3d.rip` |
-| Vertex Slide | <kbd>Shift+V</kbd> | — | `3d.slide` |
-| Separate | <kbd>P</kbd> | — | `3d.separar` |
-| Merge | <kbd>M</kbd> | — | `3d.merge` |
-| Context menu | <kbd>W</kbd> | — | `3d.menuContexto` |
-| Triangulate | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
-| UV menu | <kbd>U</kbd> | — | `3d.menuUV` |
-
-### During a transform (spostare / ruotare / scalare)
+### Vista 3D
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
-| Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
-| X axis | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
-| Y axis | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
-| Z axis | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
-| Exclude X (plane) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
-| Exclude Y (plane) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
-| Exclude Z (plane) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
-| Proportional radius + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
-| Proportional radius - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
+| Seleziona tutto | <kbd>A</kbd> | <kbd>Matita+Su</kbd> | `3d.seleccionarTodo` |
+| Deseleziona tutto | <kbd>Alt+A</kbd> | <kbd>Matita+Su</kbd> | `3d.deseleccionar` |
+| Inverti selezione | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
+| Selezione a riquadro | <kbd>B</kbd> | — | `3d.caja` |
+| Seleziona collegati | <kbd>L</kbd> | — | `3d.vinculado` |
+| Aggiungi | <kbd>Shift+A</kbd> | — | `3d.agregar` |
+| Applica | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
+| Sposta | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
+| Ruota | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
+| Scala | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
+| Azzera posizione (Posa) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
+| Azzera rotazione (Posa) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
+| Ingrassa / Azzera scala | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
+| Duplica | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
+| Duplica collegato | <kbd>Alt+D</kbd> | — | `3d.instancia` |
+| Elimina | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
+| Nascondi / Mostra | <kbd>H</kbd> | — | `3d.ocultar` |
+| Unisci | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
+| Inserisci keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
+| Inserisci keyframe (tutto) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
+| Modifica proporzionale | <kbd>O</kbd> | — | `3d.proporcional` |
+| Sovrapposizioni | <kbd>K</kbd> | — | `3d.overlays` |
+| Vista locale | <kbd>/</kbd> | — | `3d.vistaLocal` |
+| Inquadra selezionati | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
+| Vista frontale | <kbd>Num1</kbd> | <kbd>#+Sx/Dx</kbd> | `3d.vistaFrente` |
+| Vista posteriore | <kbd>Ctrl+Num1</kbd> | <kbd>#+Sx/Dx</kbd> | `3d.vistaAtras` |
+| Vista destra | <kbd>Num3</kbd> | <kbd>#+Sx/Dx</kbd> | `3d.vistaDerecha` |
+| Vista sinistra | <kbd>Ctrl+Num3</kbd> | <kbd>#+Sx/Dx</kbd> | `3d.vistaIzquierda` |
+| Vista superiore | <kbd>Num7</kbd> | <kbd>#+Su</kbd> | `3d.vistaArriba` |
+| Vista inferiore | <kbd>Ctrl+Num7</kbd> | <kbd>#+Giù</kbd> | `3d.vistaAbajo` |
+| Prospettiva / Ortografica | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
+| Ruota vista a sinistra | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
+| Ruota vista a destra | <kbd>Num6</kbd> | — | `3d.rodarDer` |
+| Vista camera | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
+| Imposta camera attiva | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
+| Estrudi | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
+| Nuova faccia da vertici | <kbd>F</kbd> | — | `3d.cara` |
+| Ricalcola normali | <kbd>Shift+N</kbd> | — | `3d.normales` |
+| Taglio ad anello e scorri | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
+| Connetti percorso di vertici | <kbd>J</kbd> | — | `3d.conectar` |
+| Strappa | <kbd>V</kbd> | — | `3d.rip` |
+| Scorri vertici | <kbd>Shift+V</kbd> | — | `3d.slide` |
+| Separa | <kbd>P</kbd> | — | `3d.separar` |
+| Fondi | <kbd>M</kbd> | — | `3d.merge` |
+| Menu contestuale | <kbd>W</kbd> | — | `3d.menuContexto` |
+| Triangola | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
+| Menu UV | <kbd>U</kbd> | — | `3d.menuUV` |
 
-### UV Editor
+### Durante una trasformazione (spostare / ruotare / scalare)
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
-| Select Linked | <kbd>L</kbd> | — | `uv.vinculado` |
-| Box Select | <kbd>B</kbd> | — | `uv.caja` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
-| Insert Keyframe | <kbd>I</kbd> | — | `uv.keyframe` |
-| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
-| Extrude | <kbd>E</kbd> | — | `uv.extruir` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
-| Frame Selected | <kbd>Num.</kbd> | — | `uv.encuadrar` |
+| Conferma | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
+| Annulla | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
+| Asse X | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
+| Asse Y | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
+| Asse Z | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
+| Escludi X (piano) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
+| Escludi Y (piano) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
+| Escludi Z (piano) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
+| Raggio proporzionale + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
+| Raggio proporzionale - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
+
+### Editor UV
+
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+|---|---|---|---|
+| Seleziona tutto | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
+| Deseleziona tutto | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
+| Inverti selezione | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
+| Seleziona collegati | <kbd>L</kbd> | — | `uv.vinculado` |
+| Selezione a riquadro | <kbd>B</kbd> | — | `uv.caja` |
+| Sposta | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
+| Ruota | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
+| Scala | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
+| Inserisci keyframe | <kbd>I</kbd> | — | `uv.keyframe` |
+| Inserisci keyframe (tutto) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
+| Estrudi | <kbd>E</kbd> | — | `uv.extruir` |
+| Duplica | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
+| Elimina | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
+| Inquadra selezionati | <kbd>Num.</kbd> | — | `uv.encuadrar` |
 
 ### Timeline
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
-| Rotate handles | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
-| Delete | <kbd>X</kbd> | — | `tl.borrar` |
-| Interpolation | <kbd>T</kbd> | — | `tl.interp` |
-| Handle type | <kbd>V</kbd> | — | `tl.handle` |
-| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
-| Previous frame | <kbd>Left</kbd> | — | `tl.frameAnt` |
-| Next frame | <kbd>Right</kbd> | — | `tl.frameSig` |
-| Previous keyframe | <kbd>Down</kbd> | — | `tl.keyAnt` |
-| Next keyframe | <kbd>Up</kbd> | — | `tl.keySig` |
-| Go to start | <kbd>Home</kbd> | — | `tl.inicio` |
-| Go to end | <kbd>End</kbd> | — | `tl.fin` |
+| Seleziona tutto | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
+| Deseleziona tutto | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
+| Inverti selezione | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
+| Sposta | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
+| Scala | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
+| Ruota maniglie | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
+| Duplica | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
+| Elimina | <kbd>X</kbd> | — | `tl.borrar` |
+| Interpolazione | <kbd>T</kbd> | — | `tl.interp` |
+| Tipo maniglia | <kbd>V</kbd> | — | `tl.handle` |
+| Inquadra selezionati | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
+| Frame precedente | <kbd>Left</kbd> | — | `tl.frameAnt` |
+| Frame successivo | <kbd>Right</kbd> | — | `tl.frameSig` |
+| Keyframe precedente | <kbd>Down</kbd> | — | `tl.keyAnt` |
+| Keyframe successivo | <kbd>Up</kbd> | — | `tl.keySig` |
+| Vai all'inizio | <kbd>Home</kbd> | — | `tl.inicio` |
+| Vai alla fine | <kbd>End</kbd> | — | `tl.fin` |
 
 ### Outliner
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `out.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
-| Move (reorder) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
-| Rename | <kbd>F2</kbd> | — | `out.renombrar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `out.duplicar` |
-| Duplicate Linked | <kbd>Alt+D</kbd> | — | `out.instancia` |
-| Hide / Show | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
-| Show active | <kbd>Num.</kbd> | — | `out.encuadrar` |
+| Seleziona tutto | <kbd>A</kbd> | — | `out.seleccionarTodo` |
+| Deseleziona tutto | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
+| Inverti selezione | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
+| Sposta (riordina) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
+| Rinomina | <kbd>F2</kbd> | — | `out.renombrar` |
+| Duplica | <kbd>Shift+D</kbd> | — | `out.duplicar` |
+| Duplica collegato | <kbd>Alt+D</kbd> | — | `out.instancia` |
+| Nascondi / Mostra | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
+| Elimina | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
+| Mostra l'attivo | <kbd>Num.</kbd> | — | `out.encuadrar` |
 
-### 2D Editor
-
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
-|---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
-| Frame Selected | <kbd>Num.</kbd> | — | `2d.encuadrar` |
-| Game View | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
-
-### Properties (passi di una routine)
+### Editor 2D
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Grab step | <kbd>G</kbd> | — | `props.agarrar` |
-| Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
-| Insert Keyframe | <kbd>I</kbd> | — | `props.keyframe` |
+| Seleziona tutto | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
+| Deseleziona tutto | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
+| Inverti selezione | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
+| Sposta | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
+| Ruota | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
+| Scala | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
+| Duplica | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
+| Elimina | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
+| Inquadra selezionati | <kbd>Num.</kbd> | — | `2d.encuadrar` |
+| Vista gioco | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
 
-### Script Editor
+### Proprietà (passi di una routine)
 
 | Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
 |---|---|---|---|
-| Save script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
-| Undo | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
-| Copy | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
-| Cut | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
-| Paste | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
-| Select All | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
-| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
-| Find | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
-| Replace | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
+| Afferra passo | <kbd>G</kbd> | — | `props.agarrar` |
+| Elimina passo | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
+| Inserisci keyframe | <kbd>I</kbd> | — | `props.keyframe` |
+
+### Editor di script
+
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+|---|---|---|---|
+| Salva script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
+| Annulla | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
+| Copia | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
+| Taglia | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
+| Incolla | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
+| Seleziona tutto | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
+| Rifai | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
+| Trova | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
+| Sostituisci | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
 
 <!--ATAJOS-FIN-->
 

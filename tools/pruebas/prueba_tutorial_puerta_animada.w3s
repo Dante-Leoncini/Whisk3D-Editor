@@ -1,0 +1,209 @@
+# EL TUTORIAL 9, ANIMAR LA PUERTA (docs/manual/es/tutoriales/animar-puerta.md): la puerta del tutorial 8 con su
+# picaporte y, despues, los pasos del texto con sus teclas. Tiene que dejar los MISMOS keyframes que la animacion del
+# duenio (puerta-picaporte.w3d, 2026-11-09): el picaporte baja del 1 al 9 (R Y -34), se queda abajo hasta el 26 y
+# vuelve en el 33; la puerta se abre del 11 al 26 (R Z -80); el picaporte con la Cuadratica (acelera y frena de golpe).
+# Generado desde tools/capturas/recetas_picaporte.py y recetas_animar.py (las mismas ETAPAS que filman los videos).
+
+# ---- la puerta con su picaporte (tutorial 8) ----
+objname Puerta
+objscale 0.45 1 0.05
+objpos 0 1 0
+apply scale
+cursor3d 0.45 1 0
+origen cursor
+cursor3d 0 -30 0
+selobj Puerta
+ratonvista3d
+tecla Tab
+selmode face
+select none
+elegircerca -0.45 0.05 0
+tecla Left_Shift down
+tecla d
+tecla Left_Shift up
+tecla Escape
+tecla s
+texto 0.15
+tecla Return
+tecla s
+tecla z
+texto 0.45
+tecla Return
+tecla g
+tecla x
+texto -0.31
+tecla Return
+tecla e
+texto 0.03
+tecla Return
+vinculado
+ratonvista3d
+tecla p
+tecla Tab
+selobj Puerta
+matnombre Madera
+matcolor 0.55 0.33 0.17
+selobj Puerta.001
+matnew
+matnombre Metal
+matcolor 0.75 0.75 0.78
+selobj Puerta.001
+agregar modificador 1
+propstab 4
+cuadro
+propclic Mirror X
+propclic Mirror Y
+selobj Puerta.001
+ratonvista3d
+tecla Keypad_/
+tecla Tab
+selmode face
+elegircerca -0.76 0.08 0
+tecla Left_Shift down
+tecla d
+tecla Left_Shift up
+tecla Escape
+tecla s
+texto 0.6
+tecla Return
+tecla e
+texto 0.08
+tecla Return
+selmode edge
+elegircerca -0.8005 0.16 0
+tecla g
+tecla y
+texto 0.05
+tecla Return
+selmode face
+elegircerca -0.76 0.185 0
+tecla e
+tecla x
+texto 0.34
+tecla Return
+tecla s
+tecla x
+texto 0
+tecla Return
+vinculado
+tecla p
+tecla Tab
+tecla Keypad_/
+renombrarfila Puerta.002 Manija
+selobj Puerta.001
+propstab 4
+cuadro
+propclic Apply Modifier
+selobj Puerta.001
+selname Puerta
+ratonvista3d
+tecla Left_Ctrl down
+tecla j
+tecla Left_Ctrl up
+selobj Puerta
+ratonvista3d
+tecla Tab
+selmode face
+elegircerca -0.76 0.05 0
+elegircerca -0.76 -0.05 0 +
+tecla x
+menuelegir Faces
+tecla Tab
+selobj Manija
+propstab 4
+cuadro
+propclic Apply Modifier
+ratonvista3d
+tecla Tab
+selmode face
+elegircerca -0.76 0.08 0
+elegircerca -0.76 -0.08 0 +
+tecla Left_Shift down
+tecla s
+tecla Left_Shift up
+menuelegir Cursor to Selected
+tecla x
+menuelegir Faces
+tecla Tab
+origen cursor
+selobj Manija
+selname Puerta
+ratonvista3d
+tecla Left_Ctrl down
+tecla p
+tecla Left_Ctrl up
+menuelegir Object (Keep Transform)
+
+# ---- picaporte ----
+selobj Manija
+ratonvista3d
+frame 1
+tecla i
+menuelegir Rotation Only
+frame 9
+tecla r
+tecla y
+texto -34
+tecla Return
+tecla i
+menuelegir Rotation Only
+keyvalor rot y 1 0
+keyvalor rot y 9 -34
+
+# ---- duplicados ----
+tl selframe 9
+tl duplicar
+tl valor 16
+tl aceptar
+tl selframe 1
+tl duplicar
+tl valor 31
+tl aceptar
+keyvalor rot y 26 -34
+keyvalor rot y 33 0
+tlframes 1 9 26 33
+
+# ---- puerta ----
+selobj Puerta
+ratonvista3d
+frame 11
+tecla i
+menuelegir Rotation Only
+frame 26
+tecla r
+tecla z
+texto -80
+tecla Return
+tecla i
+menuelegir Rotation Only
+keyvalor rot z 11 0
+keyvalor rot z 26 -80
+tlframes 11 26
+# el picaporte, hijo de la puerta, no se toco
+selobj Manija
+keyvalor rot y 9 -34
+selobj Puerta
+
+# ---- fin ----
+tl fin 50
+
+# ---- limpias ----
+selobj Manija
+tl borrarcurva rot x
+tl borrarcurva rot z
+selobj Puerta
+tl borrarcurva rot x
+tl borrarcurva rot y
+
+# ---- curvas ----
+selobj Manija
+keyinterp cuadratica 1 rot
+keyinterp cuadratica 9 rot
+keyinterp cuadratica 26 rot
+keyinterp cuadratica 33 rot
+keyvalor rot y 1 0 4
+keyvalor rot y 9 -34 4
+keyvalor rot y 26 -34 4
+keyvalor rot y 33 0 4
+selobj Puerta
+keyvalor rot z 11 0 2

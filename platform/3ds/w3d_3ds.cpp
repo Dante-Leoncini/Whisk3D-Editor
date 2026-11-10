@@ -9,7 +9,8 @@
 //  - W3d3dsControles: los botones y los sticks en el editor (orbitar, panear, zoom, atajos).
 //  - W3D_3DS_CAPTURA=n (make CAPTURA=n): despues del cuadro n la pantalla de abajo se guarda en la tarjeta SD como
 //    sdmc:/whisk3d_captura.ppm (para la consola de verdad; en el emulador captura_azahar.sh saca las dos pantallas).
-//  - W3D_3DS_PRUEBA=n (make PRUEBA=n): las pruebas (1 = rendimiento: la vista gira sin parar y el log anota cuanto
+//  - W3D_3DS_PRUEBA=n (make PRUEBA=n): las pruebas (2 = el cierre: en el segundo cuadro llega el SDL_QUIT que manda SDL
+//    cuando el sistema cierra la app, y el log tiene que llegar a "[editor] cerrado"; 1 = rendimiento: la vista gira sin parar y el log anota cuanto
 //    tarda cada cuadro y en que).
 // ============================================================================
 #include <3ds.h>
@@ -20,6 +21,7 @@
 #include <string.h>
 #include "graphics/citro3d/w3dC3D.h"
 #include "w3dGraphics.h"
+#include "w3dlog.h"   // (la prueba de cierre anota en el log)
 
 extern "C" FILE* popen(const char*, const char*) { errno = ENOSYS; return NULL; }
 extern "C" int pclose(FILE*) { errno = ENOSYS; return -1; }
@@ -210,6 +212,19 @@ void W3d3dsCuadroDibujado() {
         }
     }
     tAntes = t;
+#endif
+#if W3D_3DS_PRUEBA == 2
+    // PRUEBA DE CIERRE (make PRUEBA=2): lo que pasa al cerrar desde HOME. SDL ve que aptMainLoop() dio false y manda
+    // SDL_QUIT; el editor no dibuja mas, cierra citro3d y despues SDL apaga las pantallas
+    if (cuadro == 2) {
+        SDL_Event e;
+        SDL_memset(&e, 0, sizeof(e));
+        e.type = SDL_QUIT;
+        SDL_PushEvent(&e);
+        const char* m = "[prueba] cierre: SDL_QUIT";
+        svcOutputDebugString(m, strlen(m));
+        w3dLogf("%s", m);
+    }
 #endif
 #if W3D_3DS_PRUEBA == 1
     // PRUEBA DE RENDIMIENTO (make PRUEBA=1): la vista gira sin parar (un cuadro nuevo cada vez, como al orbitar con

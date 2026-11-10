@@ -394,7 +394,13 @@ void W3dControlesAbrirLosQueHay() {
 // las teclas que el JUEGO tiene apretadas (en play): su soltar va al juego siempre, y si la ventana pierde el
 // foco (alt-tab) se las suelta todas (SDL no manda el KEY_UP de lo que se suelta afuera)
 static std::set<int> gTeclasJuego;
+#ifdef W3D_MCP
+#include "test/W3dHistorial.h"   // la grabadora de pasos (W3D_HISTORIAL=<ruta>): anota cada tecla y cada click
+#endif
 void InputUsuarioSDL3(SDL_Event &e){
+#ifdef W3D_MCP
+    if (W3dHistorialActivo()) W3dHistorialEvento(e);   // ANTES de procesarlo: lo que hay debajo del click
+#endif
     if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_LOST && !gTeclasJuego.empty()) {
         extern void SimTeclaSDL(int, bool);
         for (std::set<int>::iterator it = gTeclasJuego.begin(); it != gTeclasJuego.end(); ++it) SimTeclaSDL(*it, false);
@@ -650,11 +656,17 @@ void InputUsuarioSDL3(SDL_Event &e){
                 if (e.motion.which == SDL_TOUCH_MOUSEID && SDL_GetTicks() - g_tapStartTicks < kEsperaGestoMs) { g_redraw = true; return; }
                 int vdx = mx - g_tapStartX; if (vdx < 0) vdx = -vdx;
                 int vdy = my - g_tapStartY; if (vdy < 0) vdy = -vdy;
-                if (vdx + vdy > 8 * GlobalScale) {
+                // todavia es un TOQUE / CLICK (no paso el umbral): no se mueve NADA. Antes este movimiento seguia de
+                // largo al viewport y la camara orbitaba con el dedo puesto sobre el gizmo; recien al pasar el umbral
+                // se agarraba el gizmo y giraba el objeto. Hasta no saber que es un arrastre no se sabe si es la
+                // orbita, el gizmo o la caja; y si se suelta antes, es el toque (cambia el modo del gizmo o elige).
+                if (vdx + vdy <= 8 * GlobalScale) { g_redraw = true; return; }
+                {
                     g_view3dTapPending = false;
-                    // DEDO sobre una manija del gizmo: recien ahora se agarra, desde el punto del down
+                    // DEDO sobre una manija del gizmo: recien ahora se agarra, desde el punto del down, y en este
+                    // mismo movimiento ya sigue al dedo: el objeto gira (o se mueve, o escala) justo al pasar el umbral
                     if (e.motion.which == SDL_TOUCH_MOUSEID && GizmoDown(g_barTapView, g_tapStartX, g_tapStartY)) {
-                        ViewPortClickDown = true; GuardarMousePos(); return;
+                        ViewPortClickDown = true; GizmoMotion((Viewport3D*)g_barTapView, mx, my); GuardarMousePos(); return;
                     }
                     // PC: arrastrar sobre el contenido del 3D es un BOX SELECT (con el mouse ese
                     // arrastre no hacia nada: la orbita es el boton del medio). En TACTIL no, que
@@ -670,6 +682,9 @@ void InputUsuarioSDL3(SDL_Event &e){
                         GuardarMousePos();
                         return;
                     }
+                    // sigue de largo: es la ORBITA (o el paneo). Arranca en cero desde aca, sin el salto del umbral
+                    // ni el delta viejo de antes del toque
+                    dx = 0; dy = 0; lastMouseX = mx; lastMouseY = my;
                 }
             }
             // ESQUINA (boton de menu): si se ARRASTRA, redimensiona el viewport (borde izq + sup). Un TAP
@@ -1558,6 +1573,15 @@ void InputUsuarioSDL3(SDL_Event &e){
         // W (Edit Mode): menu de contexto del sub-modo (Vertex/Edge/Face) en el cursor
         if (e.key.keysym.sym == SDLK_w && InteractionMode == EditMode && !PopUpActive && !focoUV) {
             LayoutMenuEditContexto(lastMouseX, lastMouseY);
+            atajoMenu = true;
+        }
+        // W en el MODO OBJETO y en el POSE (3d.menuContexto): lo mismo que el click derecho sobre la Vista 3D, el menu
+        // Objeto (o Pose) en el mouse. Estaba en la tabla de atajos pero nadie lo atendia: solo andaba en Edicion
+        else if (e.key.keysym.sym == SDLK_w && (InteractionMode == ObjectMode || InteractionMode == PoseMode) &&
+                 !PopUpActive && !focoUV && !LCtrlPressed && !LShiftPressed && !LAltPressed && estado == editNavegacion &&
+                 viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 1) {
+            extern void LayoutMenuContexto3D(int mx, int my);
+            LayoutMenuContexto3D((int)lastMouseX, (int)lastMouseY);
             atajoMenu = true;
         }
         // Ctrl+T (Edit Mode): triangula las caras seleccionadas (>3 lados)

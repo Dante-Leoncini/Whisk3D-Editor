@@ -7,7 +7,7 @@ This tutorial explains how to navigate in the 3D Viewport. Navigating means movi
 
 Knowing how to navigate is important: to make 3D models and animations comfortably and quickly, you need to know how to move around the scene and put yourself in a comfortable position to work.
 
-As explained in the [previous tutorial](viewports.md#the-active-viewport), to use the commands that follow, the 3D Viewport has to be the active viewport, the one with the green border.
+As explained in the [Viewports](viewports.md#the-active-viewport) tutorial, to use the commands that follow, the 3D Viewport has to be the active viewport, the one with the green border.
 
 The three things you'll use most are **orbiting**, **panning** and **zooming**. You can do each one with the mouse, with your fingers on a touch screen or with the Nokia N95 keypad. In the PC videos, the mouse at the bottom right shows the button being pressed in green.
 
@@ -177,7 +177,7 @@ With the padlock closed, the active camera is locked to the view: you orbit, pan
 |---|---|
 | ![PC](img/icono-pc.svg) PC | A click on the padlock |
 | ![Android](img/icono-android.svg) Touch screen | A tap on the padlock |
-| ![Nokia](img/icono-nokia.svg) Nokia N95 | The left soft key opens the menu bar (as in the [previous tutorial](viewports.md#when-the-bar-doesnt-fit)); there, View → Lock the camera to the view |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | The left soft key opens the menu bar (as in the [Viewports](viewports.md#when-you-cant-see-all-the-menu-bar-options) tutorial); there, View → Lock the camera to the view |
 | Menu | View → Lock the camera to the view |
 
 ![With Num 0 the view switches to the camera; a click on the padlock closes it and, when orbiting and turning the wheel, the camera moves until the cube is framed](img/navegacion-camara-bloquear-raton.webp)

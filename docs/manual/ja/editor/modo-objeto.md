@@ -7,6 +7,7 @@
 | Add | 3Dカーソルの位置に新しいオブジェクトを作成します（[Addメニュー](#addメニュー)を参照）。 | <kbd>Shift+A</kbd>または+ボタン |
 | Apply | 位置、回転、スケール、またはそのすべてをメッシュにベイクします（オブジェクトは回転なし、スケール1で0, 0, 0に置かれます）。 | <kbd>Ctrl+A</kbd> |
 | Set Origin | Geometry to Origin、Origin to Geometry、Origin to 3D Cursor。 | Objectメニュー |
+| Snap | 3Dカーソルを、選択したもの、アクティブなオブジェクト、ワールドの原点、またはグリッドへ移動します。また、選択したものをカーソル、アクティブなオブジェクト、またはグリッドへ移動します。 | <kbd>Shift+S</kbd>またはObjectメニュー → Snap |
 | Duplicate Objects | 独立したコピーを作り、動かせるようにつかんだ状態にします。 | <kbd>Shift+D</kbd> |
 | Duplicate Linked | 元のオブジェクトとメッシュを共有するコピーです（片方を編集すると両方が変わります）。 | <kbd>Alt+D</kbd> |
 | Join | 選択したメッシュをアクティブなオブジェクトにまとめます。 | <kbd>Ctrl+J</kbd> |
@@ -40,5 +41,5 @@ Object Modeのみです。新しいものは3Dカーソルの位置に作成さ�
 | LOD / Culling / Grid Cull | 最適化用のオブジェクト：詳細度（LOD）の切り替えと、見えないものを描画しない処理。 |
 | Clear Depth / Screen Rect | 描画用のツール：深度をクリアする、または画面の一部を切り抜きます。 |
 | Prefab / Scene / Proxy W3D | プロジェクトのプレハブ、別のシーン、または外部ライブラリーのプレハブを挿入します。 |
-| Imports | OBJ、FBX、glTF、GLB、またはWhisk3D UIのインターフェース。 |
+| Imports | OBJ、FBX、glTF、GLB、STL、またはWhisk3D UIのインターフェース。STL（3Dプリント、CAD）はZ軸が上のデータとして、立った向きになるよう回転して読み込まれ、同じ位置にある頂点は結合されます。 |
 | Core (advanced) | ルーチン：手で組み立てる描画ステップのリストです（トランスフォーム、描画、テクスチャ、ライト、フォグ、ブレンド、深度、制御、Call Lua）。**Routine loop**も含まれます。これはステップを何度も繰り返すルーチンで（たとえば「移動、描画」を20回）、Arrayに似ていますが、より高速です。 |

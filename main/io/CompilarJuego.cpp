@@ -17,6 +17,7 @@
 #include "objects/Gamepad.h"
 #include "script/W3dScript.h"
 #include "W3dEscena.h"                // escena inicial (multi-escena) al compilar
+#include "W3dRaices.h"                // las raices del proyecto: hay un juego, con cual arranca
 #include "ViewPorts/Notificaciones.h"
 #include "render/OpcionesRender.h"    // g_redraw: mantener vivo el render mientras compila
 #include "W3dDock.h"                  // apagar la barra del icono del dock al terminar el build
@@ -156,9 +157,15 @@ static void BldLinea(const std::string& s, FILE* log, int modo, int pctIni, int 
     } else if (modo == BLD_MARCAS && s.compare(0, 6, "[W3D] ") == 0) {
         // marca del script generado: "[W3D] <pct> <texto de la etapa>" (ej "ndk-build (arm64-v8a)"). El texto
         // es la CLAVE en ingles: sale traducido (lo tecnico, como "ndk-build ($ABIS)", no esta y sale tal cual)
+        // ("<clave>|<arg>": una clave con un %s, como "Compiling (%s)|PSP": sale traducida con el argumento adentro)
         char* fin = NULL;
         long pct = strtol(s.c_str() + 6, &fin, 10);
-        if (fin && *fin == ' ' && pct >= 0 && pct <= 100) BldPublicar(T(fin + 1), (int)pct);
+        if (fin && *fin == ' ' && pct >= 0 && pct <= 100) {
+            const std::string txt(fin + 1);
+            const size_t bar = txt.find('|');
+            if (bar == std::string::npos) BldPublicar(T(txt.c_str()), (int)pct);
+            else BldPublicar(BldFmt(T(txt.substr(0, bar).c_str()), txt.substr(bar + 1)), (int)pct);
+        }
     } else {
         // sin % real: cada linea (BLD_CREEP) o cada 5 (BLD_MARCAS: ndk/gradle imprimen muchas)
         // empuja la barra 1 punto hasta el tope de la franja
@@ -445,6 +452,17 @@ static bool GenerarIconos(const std::string& rutaPng, const std::string& out,
         if (system(cmd)) {}
     }
     return mayor > 0;
+}
+
+// UN tamano (n x n) de un PNG, en 'dst' (crea su carpeta): el icono de una consola cuando el proyecto no trae uno
+static bool GenerarIcono(const std::string& src, const std::string& dst, int n) {
+    unsigned char* px = 0; int w = 0, h = 0;
+    if (!w3dEngine::DecodeImage(src.c_str(), &px, &w, &h) || !px || w < 1 || h < 1) return false;
+    { char cmd[1400]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Carpeta(dst).c_str()); if (system(cmd)) {} }
+    std::vector<unsigned char> buf((size_t)n * n * 4, 0);
+    IcEscalar(px, w, h, &buf[0], n);
+    w3dEngine::FreeImage(px);
+    return IcGuardarPNG(dst, &buf[0], n, n);
 }
 
 // las ESCENAS del proyecto = los UI raiz colgados de SceneCollection (tipo ui). Cada uno
@@ -1043,6 +1061,11 @@ static bool EscribirPak(const std::string& out, const std::string& nombre, std::
 // 'empaquetar': assets EMPAQUETADOS -> declara el pak generado (pak.cpp) y lo
 // registra en el Core (W3dPakRegistrar) como PRIMERA linea del main, antes de
 // cargar nada (el icono, la fuente y las escenas ya salen del pak).
+// "con Vulkan, primero su ventana": la linea que va antes del SDL_CreateWindow de OpenGL (que queda con "if(!g_win)")
+static std::string VentanaVk(const std::string& tit, const char* tam, const char* flags) {
+    return "#ifdef W3D_VULKAN\ng_win=ventanaVulkan(\"" + tit + "\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED," + tam + "," +
+           flags + ");\nif(!g_win)\n#endif\n";
+}
 static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
                          bool multi,
                          const std::string& w3duiRel, const std::vector<ObjScript>& objs,
@@ -1055,9 +1078,13 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     if (!f) return false;
     fputs("// GENERADO por Whisk3D (Compilar juego). No hace falta editarlo.\n", f);
     // Android NO define SDL_MAIN_HANDLED: SDL renombra main->SDL_main y SDLActivity
-    // lo busca por ese nombre (sin esto la app abre y se cierra).
-    fputs("#ifndef __ANDROID__\n#define SDL_MAIN_HANDLED\n#endif\n", f);
+    // lo busca por ese nombre (sin esto la app abre y se cierra). La PSP y la 3DS tampoco: el main de verdad es el de
+    // SDL2main (la PSP: la informacion del modulo y el boton Home; la 3DS: monta el romfs)
+    fputs("#if !defined(__ANDROID__) && !defined(W3D_PSP) && !defined(W3D_3DS)\n#define SDL_MAIN_HANDLED\n#endif\n", f);
     fputs("#include <SDL2/SDL.h>\n#include \"w3drun.h\"\n", f);
+    // LAS CONSOLAS (PSP, PS Vita, 3DS, Dreamcast): la ventana, los graficos, cada cuadro y la carpeta de los assets
+    // van por la capa de consola del runtime (Whisk3D-Examples/game/w3dconsola.h)
+    fputs("#ifdef W3D_CONSOLA\n#include \"w3dconsola.h\"\n#endif\n", f);
     fputs("#include \"w3dGraphics.h\"\n", f);
     fputs("#include \"io/w3dFilesystem.h\"\n#include \"base/W3dConfig.h\"\n", f);
     fputs("#include \"script/W3dScript.h\"\n", f);
@@ -1078,6 +1105,29 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
         fputs("// assets EMPAQUETADOS: todos los archivos del juego viajan en este pak\n"
               "extern const unsigned char g_w3dPakDatos[];\nextern const unsigned g_w3dPakTam;\n", f);
     fputs("namespace gfx = w3dEngine;\nstatic SDL_Window* g_win=0; static bool g_run=true;\n", f);
+    // VULKAN (la PC con el backend Vulkan: los tres backends en el ejecutable, graphics/w3dBackend.h): la ventana la abre
+    // SDL con el cargador del sistema y el backend arranca sobre ella. Si no anda en esa maquina (sin el driver, sin la
+    // GPU, o sin shaderc), el juego sigue con OpenGL
+    fputs("#ifdef W3D_VULKAN\n#ifdef __ANDROID__\n#include <SDL_vulkan.h>\n#else\n#include <SDL2/SDL_vulkan.h>\n#endif\n"
+          "#include \"graphics/vulkan/w3dVk.h\"\n"
+          "#include \"graphics/w3dBackend.h\"\n#include <vector>\n#include <string>\n"
+          "static bool g_vk=false;\n"
+          "static bool vkSup(void* u,void* i,void* o){return SDL_Vulkan_CreateSurface((SDL_Window*)u,(VkInstance)i,(VkSurfaceKHR*)o)==SDL_TRUE;}\n"
+          "static void vkTam(void* u,int* w,int* h){SDL_Vulkan_GetDrawableSize((SDL_Window*)u,w,h);}\n"
+          "static SDL_Window* ventanaVulkan(const char* t,int x,int y,int w,int h,Uint32 fl){\n"
+          " SDL_Window* win=0;\n"
+          " if(gfx::BackendUsar(gfx::BackendVulkan)&&SDL_Vulkan_LoadLibrary(NULL)==0){\n"
+          "  win=SDL_CreateWindow(t,x,y,w,h,(fl&~SDL_WINDOW_OPENGL)|SDL_WINDOW_VULKAN);\n"
+          "  if(win){unsigned n=0;SDL_Vulkan_GetInstanceExtensions(win,&n,NULL);std::vector<const char*> e(n);\n"
+          "   if(n)SDL_Vulkan_GetInstanceExtensions(win,&n,&e[0]);\n"
+          "   W3dVkVentana v;v.getInstanceProcAddr=SDL_Vulkan_GetVkGetInstanceProcAddr();v.extensiones=n?&e[0]:NULL;\n"
+          "   v.nExtensiones=n;v.crearSuperficie=vkSup;v.tamanio=vkTam;v.user=win;std::string err;\n"
+          "   if(!VkGLIniciar(v,&err)){w3dLogfW(\"[vk] no arranco: %s\",err.c_str());SDL_DestroyWindow(win);win=0;}}\n"
+          "  if(!win)SDL_Vulkan_UnloadLibrary();}\n"
+          " if(win){g_vk=true;w3dLogf(\"[juego] Vulkan: %s\",VkGLDispositivo());}\n"
+          " else{w3dLogfW(\"[juego] Vulkan no anda en esta maquina: se usa OpenGL\");\n"
+          "#ifdef __ANDROID__\n gfx::BackendUsar(gfx::BackendGLES2);\n#else\n gfx::BackendUsar(gfx::BackendOpenGL);\n#endif\n }\n"
+          " return win;}\n#endif\n", f);
     fputs("static SDL_GameController* g_pad=0; static Uint32 g_lastMs=0;\n", f);
     // LA RESOLUCION REDUCIDA (Android 2.3, W3D_RESOLUCION = % de la pantalla): SDL 2.0.7 da el dedo (y el mouse que
     // simula) en px de la VISTA divididos por el ancho del bufer achicado -> se lleva al bufer
@@ -1135,7 +1185,9 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("double cw=0,ch=0; emscripten_get_element_css_size(\"#canvas\",&cw,&ch);\n", f);
     fputs("*w=(int)cw;*h=(int)ch; static int lw=0,lh=0;\n", f);
     fputs("if(*w!=lw||*h!=lh){emscripten_set_canvas_element_size(\"#canvas\",*w,*h);lw=*w;lh=*h;}\n", f);
-    fputs("#else\nSDL_GL_GetDrawableSize(g_win,w,h);\n", f);
+    fputs("#elif defined(W3D_CONSOLA)\nW3dConsolaTam(w,h);\n#else\n"
+          "#ifdef W3D_VULKAN\nif(g_vk){SDL_Vulkan_GetDrawableSize(g_win,w,h);return;}\n#endif\n"
+          "SDL_GL_GetDrawableSize(g_win,w,h);\n", f);
     fputs("if(*w<1||*h<1)SDL_GetWindowSize(g_win,w,h);\n#endif\nif(*w<1)*w=1;if(*h<1)*h=1;}\n", f);
     // Android: insets del notch/barras (getSafeInsets del Activity) -> la UI se acota
     // (cada medio segundo, no cada cuadro: es una llamada a Java. Si el Activity no tiene getSafeInsets -una
@@ -1229,7 +1281,9 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
           "W3dGameDedo(s,(int)(e.tfinger.x*w*W3D_KDEDO),(int)(e.tfinger.y*h*W3D_KDEDO),false);\n", f);
     fputs(" g_dedoId[s]=(SDL_FingerID)-1;}}\n", f);
     fputs("}\n", f);
-    fputs("#ifdef __EMSCRIPTEN__\nif(!g_run){emscripten_cancel_main_loop();return;}\n#endif\n", f);
+    // (se pidio salir: este cuadro ya no se dibuja. En la 3DS el sistema suspende la GPU para cerrar la app y empezar un
+    // cuadro de citro3d la esperaria para siempre)
+    fputs("#ifdef __EMSCRIPTEN__\nif(!g_run){emscripten_cancel_main_loop();return;}\n#else\nif(!g_run)return;\n#endif\n", f);
     // GAMEPAD del juego COMPILADO. Tiene que entregar exactamente lo mismo que el
     // Play del editor (SimJuego.cpp, TickReal) o el juego se porta distinto una vez
     // exportado. Aca se leian SOLO el stick izquierdo y el boton "a": el stick
@@ -1297,11 +1351,13 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("g_run=false;return;}\n#endif\n", f);
     fputs("#ifdef __ANDROID__\nactualizarSafeArea();\n#endif\n", f);
     fputs("#if W3D_DEV_LOG\nUint64 m1=SDL_GetPerformanceCounter();\n#endif\n", f);
-    fputs("int w,h;tamActual(&w,&h);W3dGameRender(w,h);gfx::DibujarPendiente();\n", f);
+    fputs("int w,h;tamActual(&w,&h);\n#ifdef W3D_CONSOLA\nW3dConsolaCuadroEmpezar();\n#endif\n"
+          "W3dGameRender(w,h);gfx::DibujarPendiente();\n", f);
     fputs("#if W3D_DEV_LOG\nUint64 m2=SDL_GetPerformanceCounter(),mg=m2;\n"
           "static int medirGpu=-1;if(medirGpu<0){const char* g=getenv(\"W3D_MEDIR_GPU\");medirGpu=(g&&*g=='1')?1:0;}\n"
           "if(medirGpu){gfx::Finish();mg=SDL_GetPerformanceCounter();}\n#endif\n", f);
-    fputs("SDL_GL_SwapWindow(g_win);\n", f);
+    fputs("#ifdef W3D_CONSOLA\nW3dConsolaCuadroTerminar(g_win);\n#else\n"
+          "#ifdef W3D_VULKAN\nif(g_vk)VkGLPresentar();else\n#endif\nSDL_GL_SwapWindow(g_win);\n#endif\n", f);
     fputs("#if W3D_DEV_LOG\n{Uint64 m3=SDL_GetPerformanceCounter();double k=1000.0/(double)SDL_GetPerformanceFrequency();\n", f);
     fputs("static double sa=0,sr=0,ss=0,s3=0,s2=0,sg=0;static int n=0;static Uint32 t0=0;\n", f);
     fputs("{float a3=0,a2=0;W3dGameTiempos(&a3,&a2);s3+=a3;s2+=a2;}\n", f);
@@ -1323,9 +1379,11 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
           "st.drawMaxVBO?\" VBO\":\"\",st.total,st.tris);sa=sr=ss=s3=s2=0;n=0;t0=now;}}\n#endif\n", f);
     fputs("}\n", f);
     fputs("int main(int,char**){\n", f);
+    // (las consolas, antes que nada: sus hints, la carpeta de los assets como la actual y el log en la carpeta del juego)
+    fprintf(f, "#ifdef W3D_CONSOLA\nW3dConsolaAntesDeSDL(\"%s\");\n#endif\n", Esc(nombre).c_str());
     if (empaquetar)   // ANTES de cargar nada: que icono/fuente/escenas ya salgan del pak
         fputs("w3dFileSystem::W3dPakRegistrar(g_w3dPakDatos,g_w3dPakTam);\n", f);
-    fputs("#ifndef __ANDROID__\nSDL_SetMainReady();\n#endif\n", f);
+    fputs("#if !defined(__ANDROID__) && !defined(W3D_PSP) && !defined(W3D_3DS)\nSDL_SetMainReady();\n#endif\n", f);
     // dedos por separado (SDL_FINGER*), sin emular un mouse desde el touch: con la
     // emulacion 2 dedos pelean por el unico cursor y el multi-touch se rompe
     fputs("SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,\"0\");\n", f);
@@ -1377,7 +1435,11 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
           "SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,v[4]);SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE,v[5]);}}\n#endif\n", f);
     // WebGL y Android: contexto GLES 2.0 (backend de shaders); desktop: COMPATIBILITY 2.1
     // (pipeline fijo; sin esto el driver puede dar un contexto CORE y no dibuja nada)
-    fputs("#if defined(W3D_WEBGL)||defined(__ANDROID__)\n", f);
+    // (Android con el pipeline fijo: OpenGL ES 1.1)
+    fputs("#if defined(__ANDROID__)&&!defined(W3D_GLES2)&&!defined(W3D_MULTIBACKEND)\n"
+          "SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);\n"
+          "SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,1);SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);\n"
+          "#elif defined(__EMSCRIPTEN__)||defined(__ANDROID__)\n", f);
     fputs("SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);\n", f);
     fputs("SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,2);SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,0);\n", f);
     fputs("#else\nSDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,2);SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);\n", f);
@@ -1386,26 +1448,33 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     // tamano lo maneja el canvas de la pagina): se crea la ventana comun siempre.
     // El titulo de la ventana = el nombre del juego (el archivo .w3d del proyecto).
     std::string tit = Esc(nombre);
-    fputs("#ifdef __EMSCRIPTEN__\n", f);
+    // (las consolas: una sola pantalla, del tamano de la consola; el contexto de GL donde lo hay)
+    fprintf(f, "#if defined(W3D_CONSOLA)\ng_win=W3dConsolaVentana(\"%s\");if(!g_win)return 2;\n", tit.c_str());
+    fputs("#elif defined(__EMSCRIPTEN__)\n", f);
     fputs("// Web: el modo ventana no aplica (manda el canvas de la pagina)\n", f);
     fprintf(f, "g_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,600,600,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);\n", tit.c_str());
     fputs("#else\n", f);
     if (modoVentana == 0) {
         // VENTANA: redimensionable, sin fullscreen (en Android queda la barra de estado)
         fputs("// modo Ventana: redimensionable, sin fullscreen\n", f);
-        fprintf(f, "g_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,600,600,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);\n", tit.c_str());
+        fprintf(f, "%sg_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,600,600,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);\n",
+                VentanaVk(tit, "600,600", "SDL_WINDOW_RESIZABLE").c_str(), tit.c_str());
     } else if (modoVentana == 2) {
         // SIN BORDES: ventana al tamano de la UI y sin decoracion (en Android no hay
         // ventanas: va a pantalla completa igual que el modo fullscreen, mas abajo)
         fputs("// modo Sin bordes: tamano de la UI, sin decoracion\n", f);
-        fprintf(f, "g_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,%d,%d,SDL_WINDOW_OPENGL|SDL_WINDOW_BORDERLESS);\n", tit.c_str(), winW, winH);
+        { char tam[32]; snprintf(tam, sizeof(tam), "%d,%d", winW, winH);
+          fprintf(f, "%sg_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,%d,%d,SDL_WINDOW_OPENGL|SDL_WINDOW_BORDERLESS);\n",
+                  VentanaVk(tit, tam, "SDL_WINDOW_BORDERLESS").c_str(), tit.c_str(), winW, winH); }
     } else {
         // PANTALLA COMPLETA (default): fullscreen "desktop" (la resolucion del escritorio)
         fputs("// modo Pantalla completa: fullscreen desktop\n", f);
-        fprintf(f, "g_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,600,600,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_FULLSCREEN_DESKTOP);\n", tit.c_str());
+        fprintf(f, "%sg_win=SDL_CreateWindow(\"%s\",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,600,600,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_FULLSCREEN_DESKTOP);\n",
+                VentanaVk(tit, "600,600", "SDL_WINDOW_RESIZABLE|SDL_WINDOW_FULLSCREEN_DESKTOP").c_str(), tit.c_str());
     }
     fputs("#endif\n", f);
-    fputs("SDL_GLContext ctx=SDL_GL_CreateContext(g_win);if(!ctx)return 2;SDL_GL_SetSwapInterval(1);\n", f);
+    fputs("#ifndef W3D_CONSOLA\n#ifdef W3D_VULKAN\nif(!g_vk)\n#endif\n"
+          "{SDL_GLContext ctx=SDL_GL_CreateContext(g_win);if(!ctx)return 2;SDL_GL_SetSwapInterval(1);}\n#endif\n", f);
     // (modo debug: W3D_SIN_VSYNC=1 no espera el refresco: los cuadros por segundo dicen lo que cuesta un cuadro, sin
     // redondear a 60/n)
     fputs("#if W3D_DEV_LOG\nif(getenv(\"W3D_SIN_VSYNC\"))w3dLogf(\"[juego] sin vsync: %d\",SDL_GL_SetSwapInterval(0));\n#endif\n", f);
@@ -1415,7 +1484,7 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
         // En el modo Ventana NO se llama: el juego queda con la barra de estado visible.
         fputs("#ifdef __ANDROID__\nSDL_SetWindowFullscreen(g_win,SDL_WINDOW_FULLSCREEN_DESKTOP);\n#endif\n", f);
     }
-    fputs("#ifdef W3D_GLES2\ngfx::GLES2Init((void*(*)(const char*))SDL_GL_GetProcAddress);\n#endif\n", f);
+    fputs("#if defined(W3D_GLES2)||defined(W3D_MULTIBACKEND)\ngfx::GLES2Init((void*(*)(const char*))SDL_GL_GetProcAddress);\n#endif\n", f);
     fputs("#if W3D_DEV_LOG\ngfx::g_medirDraws=true;   // (el medidor: el tiempo de los draws)\n"
           "{int r=0,g=0,b=0,a=0,z=0,e=0;SDL_GL_GetAttribute(SDL_GL_RED_SIZE,&r);SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE,&g);\n"
           "SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE,&b);SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE,&a);"
@@ -1453,8 +1522,11 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("}}\n#endif\n", f);
     // CONFIG persistente de los scripts (config.set/get de lua): necesita una carpeta
     // ESCRIBIBLE por plataforma (SDL_GetPrefPath; en web SetUserDataDir usa localStorage)
+    // (las consolas: la suya -la carpeta del juego en la PSP, ux0:data en la Vita, la SD en la 3DS, la RAM en la
+    // Dreamcast-; el SDL_GetPrefPath de la PSP arma dos carpetas una adentro de la otra y crea solo la ultima)
+    fprintf(f, "#ifdef W3D_CONSOLA\nw3dFileSystem::SetUserDataDir(W3dConsolaDatos(\"%s\"));\n#else\n", tit.c_str());
     fprintf(f, "{char* pref=SDL_GetPrefPath(\"Whisk3D\",\"%s\");\n", tit.c_str());
-    fputs("if(pref){w3dFileSystem::SetUserDataDir(pref);SDL_free(pref);}}\n", f);
+    fputs("if(pref){w3dFileSystem::SetUserDataDir(pref);SDL_free(pref);}}\n#endif\n", f);
     fprintf(f, "w3dEngine::ConfigSetNombre(\"%s\");w3dEngine::ConfigLoad();\n", tit.c_str());
     // reforzar la semilla del random con entropia que varia entre corridas
     fputs("W3dScriptSemilla((unsigned)time(0));\n", f);
@@ -1513,7 +1585,10 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     // ANDROID: al salir (la tecla de volver, SDL_QUIT) el proceso NO muere: la proxima vez que se abre el juego, main
     // corre en el mismo proceso con los globales del anterior (g_run en false: no dibujaba nada, pantalla negra). Se
     // termina el proceso, como cuando el juego pide pararse
-    fputs("while(g_run)frame();SDL_Quit();\n#ifdef __ANDROID__\nexit(0);\n#endif\n#endif\nreturn 0;}\n", f);
+    // (en una consola, lo suyo se cierra antes que SDL: la 3DS apaga citro3d antes de que SDL apague las pantallas)
+    fputs("while(g_run)frame();\n#ifdef W3D_VULKAN\nif(g_vk)VkGLTerminar();\n#endif\n"
+          "#ifdef W3D_CONSOLA\nW3dConsolaFin(g_win);\n#endif\n"
+          "SDL_Quit();\n#ifdef __ANDROID__\nexit(0);\n#endif\n#endif\nreturn 0;}\n", f);
     bool okMain = (ferror(f) == 0);
     if (fclose(f) != 0) okMain = false;   // el flush pasa al cerrar: sin esto el main.cpp quedaba truncado
     return okMain;
@@ -1601,6 +1676,9 @@ static const char* kFuentesBase[] = {
     // todos los objetos que la usan): Mesh.cpp la llama sin ifdef (vinculo, VBO compartidos)
     "${CORE}/objects/MallaRecurso.cpp",
     "${CORE}/objects/MallaFlujos.cpp",          // las rutinas: tiras, aristas, vertices y quads simulados por parte
+    // los SHADERS ESCRITOS de los materiales (y su seccion @vertice en la CPU para los backends sin shaders): Mesh.cpp y
+    // Materials.cpp los llaman sin ifdef
+    "${CORE}/objects/ShaderEscrito.cpp", "${CORE}/objects/ShaderCPU.cpp",
     "${CORE}/script/W3dScript.cpp",
     // W3dScript.cpp registra SIEMPRE los binds de los cuerpos rigidos (fisicaVel...) y de la colision
     // contra mallas (colSuelo/colPared...): sin estos dos el juego compilado no linkea
@@ -1616,6 +1694,7 @@ static const char* kFuentesBase[] = {
     // visibilidad" le llegan por hook desde Culling.cpp (solo 3D)
     "${W3DROOT}/main/objects/Rutina.cpp",         // Rutina: lista de pasos del render (sin la validacion del editor)
     "${W3DROOT}/main/config/W3dProfile.cpp",      // W3dNowMs: el reloj de las rutinas (CerrarCorrida)
+    "${W3DROOT}/main/config/W3dLang.cpp",         // T(): los avisos del juego (un mando se conecta) en su idioma
     "${W3DROOT}/main/W3dEscena.cpp",
     "${W3DROOT}/main/io/UI2DFormato.cpp", "${W3DROOT}/main/io/Fuente2D.cpp",
     "${W3DROOT}/main/io/Textura2D.cpp",
@@ -1624,6 +1703,9 @@ static const char* kFuentesBase[] = {
 // LOS INCLUDES comunes (misma razon: uno solo para las dos plataformas).
 static const char* kIncludesBase[] = {
     "${W3DROOT}", "${W3DROOT}/libs", "${W3DROOT}/main", "${W3DROOT}/main/render", "${W3DROOT}/main/io",
+    // (main/config y main/app tambien en un juego 2D: BindsJuego incluye W3dAviso.h -> W3dLang.h, y Rutina incluye
+    // objects/Camera.h -> variables.h. Sin esto un juego solo 2D no compilaba)
+    "${W3DROOT}/main/config", "${W3DROOT}/main/app",
     "${CORE}", "${CORE}/base", "${CORE}/graphics", "${CORE}/io", "${CORE}/math", "${CORE}/objects",
     "${CORE}/script", "${CORE}/animation", "${CORE}/thirdparty",
     "${UILIB}", "${UILIB}/text", "${UILIB}/draw", "${UILIB}/core", "${UILIB}/theme", "${UILIB}/widgets",
@@ -1654,6 +1736,7 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/objects/Recorte.cpp",        // LimpiarZ / Recorte (composicion de la pantalla)
     "${W3DROOT}/main/objects/PostprocesoObj.cpp", // el objeto Postproceso (el arbol lo trae)
     "${W3DROOT}/main/render/Postproceso.cpp",     // su pila de efectos
+    "${W3DROOT}/main/render/VectoresMovimiento.cpp",  // el desenfoque de movimiento del postproceso (en la CPU)
     "${W3DROOT}/main/objects/Hitbox.cpp",         // Hitbox: caja de deteccion (el motor esta en el Core)
     "${W3DROOT}/main/objects/VisZona.cpp",
     "${W3DROOT}/main/objects/Collection.cpp",
@@ -1670,7 +1753,6 @@ static const char* kFuentes3D[] = {
     // a la musica, asi que viaja con su dispatcher (sin W3D_ENABLE_MUSIC son stubs mudos)
     "${CORE}/audio/W3dVolumen.cpp", "${CORE}/audio/W3dMusic.cpp",
     "${W3DROOT}/main/ui/W3dColors.cpp",
-    "${W3DROOT}/main/config/W3dLang.cpp",
     "${W3DROOT}/main/config/w3dVersion.cpp",
     // (fase de prefabs) la INSTANCIA de prefab y la generacion de sus hijos + instanciar()/destruir() de lua
     "${W3DROOT}/main/objects/InstanciaPrefab.cpp",
@@ -1725,7 +1807,8 @@ static std::string AMk(const char* ruta) {
 
 static bool EscribirCMake(const std::string& ruta, const std::string& nombre,
                           bool usarFisica, bool usarSonido, bool modoDebug,
-                          const std::vector<int>& iconos, bool empaquetar, bool con3D) {
+                          const std::vector<int>& iconos, bool empaquetar, bool con3D, int backend) {
+    const bool shaders = (backend == 1), vulkan = (backend == 2);
     FILE* f = fopen(ruta.c_str(), "w");
     if (!f) return false;
     fputs("# GENERADO por Whisk3D (Compilar juego). No hace falta editarlo.\n", f);
@@ -1743,7 +1826,16 @@ static bool EscribirCMake(const std::string& ruta, const std::string& nombre,
     fputs("  ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp\n  ${GAME}/w3drun.cpp\n", f);
     if (empaquetar)   // el pak generado con todos los archivos del juego
         fputs("  ${CMAKE_CURRENT_SOURCE_DIR}/pak.cpp\n", f);
-    fputs("  ${CORE}/graphics/opengl/w3dGraphics.cpp\n", f);   // backend GL de PC (en Android es el de GLES2)
+    // EL BACKEND GRAFICO (el desplegable de la tarjeta Juego): el de pipeline fijo (OpenGL) o el de shaders (el de la web
+    // y Android, sobre un contexto GL 2.1: carga las funciones de GL 2.0 con GLES2Init y los shaders van en GLSL 1.20)
+    // VULKAN: como el editor, los tres en el ejecutable (cada uno en su namespace) y el despacho al activo: arranca en
+    // Vulkan y, donde no anda, sigue con OpenGL
+    if (vulkan)
+        fputs("  ${CORE}/graphics/opengl/w3dGraphics.cpp ${CORE}/graphics/gles2/w3dGraphicsGLES2.cpp\n"
+              "  ${CORE}/graphics/vulkan/w3dGraphicsVk.cpp ${CORE}/graphics/vulkan/w3dVkGL.cpp\n"
+              "  ${CORE}/graphics/w3dGraphicsDespacho.cpp\n", f);
+    else if (shaders) fputs("  ${CORE}/graphics/gles2/w3dGraphicsGLES2.cpp\n", f);
+    else              fputs("  ${CORE}/graphics/opengl/w3dGraphics.cpp\n", f);
     // el resto del runtime: kFuentesBase, la MISMA lista que usa el generador de Android
     for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s\n", kFuentesBase[i]);
     // fisica minima del Core (velocidad + rebotes): solo con el checkbox "Usar motor de
@@ -1761,9 +1853,9 @@ static bool EscribirCMake(const std::string& ruta, const std::string& nombre,
     // W3D_DEV_LOG: 1 = modo debug (log + ring + depurar()); 0 = produccion (stubs no-op)
     // W3D_SIN_EDITOR: el lector de proyecto compartido deja afuera lo que solo existe
     // con editor (layout de viewports, sesion, icono de ventana). Ver import_w3d.cpp.
-    fprintf(f, "target_compile_definitions(%s PRIVATE W3D_OPENGL W3D_GAME_RUNTIME W3D_GAME_NO_TEX "
+    fprintf(f, "target_compile_definitions(%s PRIVATE W3D_OPENGL%s W3D_GAME_RUNTIME W3D_GAME_NO_TEX "
                "LUA_USE_POSIX W3D_STB_IMPL W3D_DEV_LOG=%d%s%s%s)\n", nombre.c_str(),
-            modoDebug ? 1 : 0,
+            vulkan ? " W3D_MULTIBACKEND W3D_VULKAN" : shaders ? " W3D_WEBGL W3D_GLES2" : "", modoDebug ? 1 : 0,
             usarSonido ? " W3D_ENABLE_AUDIO" : "",
             usarFisica ? "" : " W3D_SIN_FISICA",
             con3D ? " W3D_SIN_EDITOR W3D_JUEGO_3D" : "");
@@ -1773,6 +1865,24 @@ static bool EscribirCMake(const std::string& ruta, const std::string& nombre,
         for (int i = 0; kIncludes3D[i]; i++) fprintf(f, "  %s\n", kIncludes3D[i]);
     fputs("  ${LUA})\n", f);
     fprintf(f, "target_link_libraries(%s PRIVATE SDL2::SDL2 OpenGL::GL OpenGL::GLU)\n", nombre.c_str());
+    if (vulkan) {
+        // cada backend en su namespace; los headers de Vulkan vienen con el Core. shaderc (GLSL -> SPIR-V) va ADENTRO si
+        // esta compilado (tools/preparar_shaderc.sh); si no, el juego lo busca instalado (libshaderc_shared) y sin el
+        // dibuja con OpenGL
+        fputs("set_source_files_properties(${CORE}/graphics/opengl/w3dGraphics.cpp PROPERTIES COMPILE_DEFINITIONS \"W3D_BACKEND_NS=gl\")\n"
+              "set_source_files_properties(${CORE}/graphics/gles2/w3dGraphicsGLES2.cpp PROPERTIES COMPILE_DEFINITIONS \"W3D_BACKEND_NS=es2\")\n"
+              "set_source_files_properties(${CORE}/graphics/vulkan/w3dGraphicsVk.cpp PROPERTIES COMPILE_DEFINITIONS \"W3D_BACKEND_NS=vk;W3D_VKGL\")\n"
+              "set_source_files_properties(${CORE}/graphics/vulkan/w3dVkGL.cpp PROPERTIES INCLUDE_DIRECTORIES ${CORE}/thirdparty/vulkan/include)\n"
+              "if(NOT DEFINED W3D_SHADERC)\n  set(W3D_SHADERC \"$ENV{HOME}/shaderc/linux/lib/libshaderc_combined.a\")\nendif()\n", f);
+        fprintf(f, "if(EXISTS ${W3D_SHADERC})\n  target_compile_definitions(%s PRIVATE W3D_SHADERC_ESTATICO)\n"
+                   "  target_link_libraries(%s PRIVATE ${W3D_SHADERC} pthread)\n"
+                   "  set(CPACK_DEBIAN_PACKAGE_RECOMMENDS \"libvulkan1\")\nelse()\n"
+                   "  message(WARNING \"Vulkan sin shaderc adentro (correr Whisk3D/tools/preparar_shaderc.sh linux): el juego usa "
+                   "libshaderc_shared si esta instalada, sino OpenGL\")\n"
+                   // (el .deb los recomienda: sin ellos el juego anda igual, con OpenGL)
+                   "  set(CPACK_DEBIAN_PACKAGE_RECOMMENDS \"libvulkan1, libshaderc1\")\nendif()\n"
+                   "target_link_libraries(%s PRIVATE ${CMAKE_DL_LIBS})\n", nombre.c_str(), nombre.c_str(), nombre.c_str());
+    }
     // (los sockets de net/W3dRed.cpp: en Windows vienen aparte)
     fprintf(f, "if(WIN32)\n  target_link_libraries(%s PRIVATE ws2_32)\nendif()\n", nombre.c_str());
     if (!empaquetar) {
@@ -1883,7 +1993,7 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
                                  const std::string& out, const std::string& nombre,
                                  int orientacion,
                                  bool usarFisica, bool usarSonido, bool modoDebug,
-                                 bool conIcono, bool empaquetar, bool con3D) {
+                                 bool conIcono, bool empaquetar, bool con3D, int backend) {
     std::string root = Carpeta(repo); // carpeta del ecosistema (contiene Whisk3D y Whisk3D-Examples)
     FILE* f = fopen(ruta.c_str(), "w");
     if (!f) return false;
@@ -1965,7 +2075,14 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
     fputs("SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
     if (empaquetar) fputs("  $(MY_PATH)/pak_generado.cpp \\\n", f);
     fputs("  $(EXAMP)/game/w3drun.cpp \\\n", f);
-    fputs("  $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp \\\n", f);   // backend de shaders (Android)
+    // EL BACKEND GRAFICO: OpenGL ES 1.1 (el pipeline fijo), OpenGL ES 2.0 (los shaders) o Vulkan. Con Vulkan van los tres,
+    // como en la PC (graphics/w3dBackend.h), y si el telefono no lo tiene sigue con ES 2.0. Cada uno en su namespace: lo
+    // ponen los backend_*.cpp que escribe este script (ndk-build no tiene flags por archivo)
+    if (backend == 2)
+        fputs("  $(MY_PATH)/backend_gl.cpp $(MY_PATH)/backend_es2.cpp $(MY_PATH)/backend_vk.cpp \\\n"
+              "  $(CORE)/graphics/vulkan/w3dVkGL.cpp $(CORE)/graphics/w3dGraphicsDespacho.cpp \\\n", f);
+    else if (backend == 0) fputs("  $(CORE)/graphics/opengl/w3dGraphics.cpp \\\n", f);
+    else                   fputs("  $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp \\\n", f);
     for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentesBase[i]).c_str());
     if (usarFisica) fputs("  $(CORE)/physics/W3dFisica.cpp \\\n", f);
     if (usarSonido) fputs("  $(CORE)/audio/W3dAudio.cpp $(CORE)/audio/W3dAudioSDL.cpp \\\n", f);
@@ -1979,21 +2096,38 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
     for (int i = 0; kIncludesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludesBase[i]).c_str());
     if (con3D)
         for (int i = 0; kIncludes3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludes3D[i]).c_str());
-    fputs("  $(W3D)/thirdparty/lua/src \\\n  $(W3D)/thirdparty/SDL2/include\n", f);
+    fputs("  $(W3D)/thirdparty/lua/src \\\n  $(W3D)/thirdparty/SDL2/include", f);
+    fputs(backend == 2 ? " \\\n  $(CORE)/thirdparty/vulkan/include\n" : "\n", f);
     fputs("LOCAL_CPP_FEATURES := exceptions rtti\n", f);
     // lua (C): Android es linux -> posix. En armeabi-v7a el NDK 27 fuerza
     // -D_FILE_OFFSET_BITS=64 y fseeko/ftello recien existen en API 24 (aca es 21), asi
     // que liolib.c no compila: se fuerzan las macros de lua a fseek/ftell (long).
     fputs("LOCAL_CFLAGS   := -DLUA_USE_POSIX \\\n", f);
     fputs("  '-Dl_fseek(f,o,w)=fseek(f,o,w)' '-Dl_ftell(f)=ftell(f)' -Dl_seeknum=long\n", f);
-    fprintf(f, "LOCAL_CPPFLAGS := -std=c++17 -DW3D_GLES2 -DW3D_GAME_RUNTIME -DW3D_GAME_NO_TEX "
+    fprintf(f, "LOCAL_CPPFLAGS := -std=c++17 %s -DW3D_GAME_RUNTIME -DW3D_GAME_NO_TEX "
                "-DW3D_STB_IMPL -DW3D_DEV_LOG=%d%s%s%s\n",
+            backend == 2 ? "-DW3D_MULTIBACKEND -DW3D_VULKAN" : backend == 0 ? "-DW3D_GLES1" : "-DW3D_GLES2",
             modoDebug ? 1 : 0,
             usarSonido ? " -DW3D_ENABLE_AUDIO" : "",
             usarFisica ? "" : " -DW3D_SIN_FISICA",
             con3D ? " -DW3D_SIN_EDITOR -DW3D_JUEGO_3D" : "");
-    fputs("LOCAL_SHARED_LIBRARIES := SDL2\nLOCAL_LDLIBS := -lGLESv2 -llog -landroid\n", f);
+    fprintf(f, "LOCAL_SHARED_LIBRARIES := SDL2\nLOCAL_LDLIBS := %s -llog -landroid\n",
+            backend == 2 ? "-lGLESv1_CM -lGLESv2 -lEGL" : backend == 0 ? "-lGLESv1_CM -lEGL" : "-lGLESv2");
+    if (backend == 2)
+        // shaderc (GLSL -> SPIR-V) ADENTRO si esta compilado para el ABI (tools/preparar_shaderc.sh android); si no, se busca
+        // libshaderc_shared.so en el APK y sin ella el juego dibuja con OpenGL ES 2.0
+        fputs("SHADERC := $(HOME)/shaderc/android-$(TARGET_ARCH_ABI)/lib/libshaderc_combined.a\n"
+              "ifneq ($(wildcard $(SHADERC)),)\nLOCAL_CPPFLAGS += -DW3D_SHADERC_ESTATICO\nLOCAL_LDFLAGS += $(SHADERC)\nelse\n"
+              "$(warning Vulkan sin shaderc adentro para $(TARGET_ARCH_ABI): correr Whisk3D/tools/preparar_shaderc.sh android)\n"
+              "endif\n", f);
     fputs("include $(BUILD_SHARED_LIBRARY)\nW3DMK\n", f);
+    if (backend == 2) {
+        // los tres backends, cada uno en su namespace (graphics/w3dBackend.h)
+        fputs("printf '#define W3D_BACKEND_NS gl\\n#include \"graphics/opengl/w3dGraphics.cpp\"\\n' > \"$AND/jni/backend_gl.cpp\"\n"
+              "printf '#define W3D_BACKEND_NS es2\\n#include \"graphics/gles2/w3dGraphicsGLES2.cpp\"\\n' > \"$AND/jni/backend_es2.cpp\"\n"
+              "printf '#define W3D_BACKEND_NS vk\\n#define W3D_VKGL\\n#include \"graphics/gles2/w3dGraphicsGLES2.cpp\"\\n' "
+              "> \"$AND/jni/backend_vk.cpp\"\n", f);
+    }
     // la raiz del ecosistema, con la ruta REAL (el heredoc va sin expandir a proposito)
     fputs("sed -i \"s#^ROOT  := .*#ROOT  := $ROOT#\" \"$AND/jni/Android.mk\"\n", f);
     // 2b'') ICONO del launcher: los android-<dpi>.png generados reemplazan los
@@ -2272,11 +2406,513 @@ static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string
     return okSh;
 }
 
+// ============================================================================
+//  LAS CONSOLAS (plataformas 7 PSP, 8 PS Vita, 9 Nintendo 3DS, 10 Dreamcast): el juego con el kit LIBRE de cada una,
+//  en las carpetas de siempre (~/psp, ~/vita, ~/3ds, ~/dc: los dejan los preparar_<consola>.sh de Whisk3D/platform,
+//  los mismos con que se compila el editor para esa consola).
+//
+//  Se generan dos archivos en platform-build/<consola>:
+//    Makefile                  las MISMAS listas de fuentes que los otros destinos (kFuentesBase, kFuentes3D...),
+//                              con el backend grafico de la consola y la capa de consola del runtime
+//                              (Whisk3D-Examples/game/w3dconsola: la ventana, los graficos, cada cuadro), y el paquete
+//    build_<consola>.sh        arma el entorno del kit y corre make (con las marcas "[W3D] <pct> <etapa>" de la barra)
+//  Los assets del juego van donde los lee cada consola: al lado del EBOOT.PBP (PSP), adentro del .vpk (Vita), en el
+//  romfs del .3dsx (3DS) y en el romdisk del ejecutable (Dreamcast). Empaquetados, van adentro del binario (pak.cpp).
+//  Como los otros destinos, platform-build/<consola> se puede compilar a mano sin abrir el editor.
+// ============================================================================
+enum { PlatWindows = 4, PlatSymbian = 5, PlatPSP = 7, PlatVita = 8, Plat3DS = 9, PlatDreamcast = 10 };
+static bool EsConsola(int p) { return p >= PlatPSP && p <= PlatDreamcast; }
+// los que se compilan con un Makefile generado (las consolas y Windows, cruzado desde Linux)
+static bool ConMakefile(int p) { return EsConsola(p) || p == PlatWindows; }
+static const char* DirConsola(int p) {
+    return (p == PlatWindows) ? "windows" : (p == PlatSymbian) ? "symbian" : (p == PlatPSP) ? "psp"
+         : (p == PlatVita) ? "vita" : (p == Plat3DS) ? "3ds" : "dreamcast";
+}
+static const char* NombreConsola(int p) {
+    return (p == PlatWindows) ? "Windows" : (p == PlatSymbian) ? "Symbian" : (p == PlatPSP) ? "PSP"
+         : (p == PlatVita) ? "PS Vita" : (p == Plat3DS) ? "Nintendo 3DS" : "Dreamcast";
+}
+// EL ICONO DE WINDOWS (.ico): las imagenes de icons/ (16, 32, 48 y 256, las que se hayan generado) guardadas como PNG
+// adentro del .ico, que Windows lee desde Vista. Lo enlaza el Makefile con windres
+static bool EscribirIco(const std::string& out, const std::string& ruta) {
+    static const int tam[4] = { 16, 32, 48, 256 };
+    std::vector<int> n;
+    std::vector<std::vector<unsigned char> > png;
+    for (int i = 0; i < 4; i++) {
+        std::vector<unsigned char> d;
+        char r[1200];
+        snprintf(r, sizeof(r), "%s/icons/%dx%d.png", out.c_str(), tam[i], tam[i]);
+        if (w3dFileSystem::ReadFileBytes(r, d) && !d.empty()) { n.push_back(tam[i]); png.push_back(d); }
+    }
+    if (n.empty()) return false;
+    std::vector<unsigned char> ico;
+    unsigned off = 6 + 16 * (unsigned)n.size();
+    const unsigned char cab[6] = { 0, 0, 1, 0, (unsigned char)n.size(), 0 };
+    ico.insert(ico.end(), cab, cab + 6);
+    for (size_t i = 0; i < n.size(); i++) {
+        const unsigned t = (unsigned)png[i].size();
+        const unsigned char e[16] = { (unsigned char)(n[i] >= 256 ? 0 : n[i]), (unsigned char)(n[i] >= 256 ? 0 : n[i]),
+            0, 0, 1, 0, 32, 0, (unsigned char)t, (unsigned char)(t >> 8), (unsigned char)(t >> 16), (unsigned char)(t >> 24),
+            (unsigned char)off, (unsigned char)(off >> 8), (unsigned char)(off >> 16), (unsigned char)(off >> 24) };
+        ico.insert(ico.end(), e, e + 16);
+        off += t;
+    }
+    for (size_t i = 0; i < png.size(); i++) ico.insert(ico.end(), png[i].begin(), png[i].end());
+    FILE* f = fopen(ruta.c_str(), "wb");
+    if (!f) return false;
+    const bool ok = fwrite(&ico[0], 1, ico.size(), f) == ico.size();
+    return (fclose(f) == 0) && ok;
+}
+// el TITLE_ID de la Vita: 4 letras y 5 numeros, propio de cada juego (sale de su nombre)
+static std::string TitleIdVita(const std::string& nombre) {
+    unsigned h = 2166136261u;
+    for (size_t i = 0; i < nombre.size(); i++) { h ^= (unsigned char)nombre[i]; h *= 16777619u; }
+    char id[16];
+    snprintf(id, sizeof(id), "WJGO%05u", h % 100000u);
+    return id;
+}
+
+static bool EscribirMakefileConsola(const std::string& ruta, int plat, const std::string& repo,
+                                    const std::string& nombre, bool usarFisica, bool usarSonido,
+                                    bool modoDebug, bool empaquetar, bool con3D, int backend = 0,
+                                    bool conIco = false) {
+    const bool shaders = (backend == 1), vulkan = (backend == 2);
+    FILE* f = fopen(ruta.c_str(), "w");
+    if (!f) return false;
+    fprintf(f, "# GENERADO por Whisk3D (Compilar juego -> %s). No hace falta editarlo.\n", NombreConsola(plat));
+    fprintf(f, "# Lo corre build_%s.sh (arma el entorno del kit); con el entorno ya armado alcanza con 'make'.\n",
+            DirConsola(plat));
+    fprintf(f, "W3D    := %s\n", repo.c_str());
+    fputs("EXAMP  := $(abspath $(W3D)/../Whisk3D-Examples)\nCORE   := $(W3D)/libs/Whisk3DCore\n"
+          "UILIB  := $(W3D)/libs/WhiskUI\nGAME   := $(EXAMP)/game\nLUA    := $(W3D)/thirdparty/lua/src\n", f);
+    fprintf(f, "NOMBRE := %s\n", nombre.c_str());
+    fputs("OUT    := out\nOBJDIR := $(OUT)/obj\nDATOS  := $(OUT)/datos\n\n", f);
+
+    // ---- el kit, el procesador y el backend grafico de cada consola ----
+    if (plat == PlatWindows) {
+        // (todo estatico: SDL2, libc++ y el runtime de C adentro del .exe; las DLL de Windows son las del sistema)
+        fputs("# Windows de 64 bits, compilado desde Linux: llvm-mingw (clang + lld) y SDL2 para mingw, todo estatico (un\n"
+              "# .exe sin DLLs al lado). -mwindows: sin la ventana de consola\n"
+              "LLVM_MINGW ?= $(HOME)/windows/llvm-mingw\nSDL2_MINGW ?= $(HOME)/windows/sdl2-mingw/x86_64-w64-mingw32\n"
+              "CXX      := $(LLVM_MINGW)/bin/x86_64-w64-mingw32-clang++\nCC       := $(LLVM_MINGW)/bin/x86_64-w64-mingw32-clang\n"
+              "WINDRES  := $(LLVM_MINGW)/bin/x86_64-w64-mingw32-windres\n"
+              "ARCH     :=\nOPT      := -O2 -ffunction-sections -fdata-sections\n", f);
+        fprintf(f, "PLATDEFS := -DW3D_OPENGL%s\n", vulkan ? " -DW3D_MULTIBACKEND -DW3D_VULKAN"
+                                                   : shaders ? " -DW3D_WEBGL -DW3D_GLES2" : "");
+        fputs("INCPRE   :=\nINCPLAT  := -I$(SDL2_MINGW)/include -I$(SDL2_MINGW)/include/SDL2\nEXTRA    :=\n", f);
+        if (vulkan)   // (los tres backends, cada uno en su namespace, y el despacho: como el editor)
+            fputs("BACKEND  := $(CORE)/graphics/opengl/w3dGraphics.cpp $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp "
+                  "$(CORE)/graphics/vulkan/w3dGraphicsVk.cpp $(CORE)/graphics/vulkan/w3dVkGL.cpp "
+                  "$(CORE)/graphics/w3dGraphicsDespacho.cpp\n", f);
+        else
+            fprintf(f, "BACKEND  := %s\n", shaders ? "$(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp"
+                                                  : "$(CORE)/graphics/opengl/w3dGraphics.cpp");
+        fputs("LIBS     := -static $(SDL2_MINGW)/lib/libSDL2.a -lopengl32 -lglu32 -lws2_32 -lsetupapi -lwinmm -limm32 "
+              "-lversion -lole32 -loleaut32 -lgdi32 -luser32 -lshell32 -luuid -ladvapi32 -mwindows\n", f);
+        if (vulkan)
+            // shaderc ADENTRO si esta compilado (tools/preparar_shaderc.sh windows); si no, el juego busca
+            // shaderc_shared.dll al lado del .exe y sin ella dibuja con OpenGL
+            fputs("INCPLAT  += -I$(CORE)/thirdparty/vulkan/include\n"
+                  "SHADERC  ?= $(HOME)/shaderc/windows/lib/libshaderc_combined.a\n"
+                  "ifneq ($(wildcard $(SHADERC)),)\nPLATDEFS += -DW3D_SHADERC_ESTATICO\nLIBS     := $(SHADERC) $(LIBS)\nelse\n"
+                  "$(warning Vulkan sin shaderc adentro (correr Whisk3D/tools/preparar_shaderc.sh windows): el juego busca "
+                  "shaderc_shared.dll al lado del .exe, sino usa OpenGL)\nendif\n", f);
+    } else if (plat == PlatPSP) {
+        fputs("# PSP: pspdev (psp-gcc, el MIPS Allegrex) y el GE con el backend sceGu del Core\n"
+              "PSPDEV   ?= $(HOME)/psp/pspdev\nPSPSDK   := $(PSPDEV)/psp/sdk\n"
+              "CXX      := $(PSPDEV)/bin/psp-g++\nCC       := $(PSPDEV)/bin/psp-gcc\n"
+              "ARCH     := -G0\nOPT      := -O2 -ffunction-sections -fdata-sections\n"
+              "# (-Umips: el gcc de MIPS define el macro 'mips', y el Core tiene variables que se llaman asi)\n"
+              "PLATDEFS := -DW3D_PSP -D_PSP_FW_VERSION=600 -Umips\n"
+              "INCPRE   := -I$(W3D)/platform/psp/include\n"
+              "INCPLAT  := -I$(PSPDEV)/psp/include/SDL2 -I$(PSPDEV)/psp/include -I$(PSPSDK)/include\n"
+              "EXTRA    := -include climits\n"
+              "BACKEND  := $(CORE)/graphics/gu/w3dGraphicsGu.cpp $(CORE)/graphics/gu/w3dGLgu.cpp\n"
+              "LIBS     := -lSDL2main -lSDL2 -lpspvram -lpspaudio -lpspvfpu -lpspdisplay -lpspgu -lpspge -lpsphprm "
+              "-lpspctrl -lpsppower\n", f);
+    } else if (plat == PlatVita) {
+        fputs("# PS Vita: VitaSDK (el Cortex-A9) y vitaGL (OpenGL con el pipeline fijo emulado) con el backend fijo\n"
+              "VITASDK  ?= $(HOME)/vita/vitasdk\n"
+              "CXX      := $(VITASDK)/bin/arm-vita-eabi-g++\nCC       := $(VITASDK)/bin/arm-vita-eabi-gcc\n"
+              "ARCH     := -march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard\n"
+              "OPT      := -O2 -ffunction-sections -fdata-sections\n"
+              "PLATDEFS := -DW3D_VITA -DW3D_OPENGL\n"
+              "INCPRE   := -I$(W3D)/platform/vita/include\nINCPLAT  := -I$(VITASDK)/arm-vita-eabi/include/SDL2\n"
+              "EXTRA    := -include climits -include sys/syslimits.h\n"
+              "BACKEND  := $(CORE)/graphics/opengl/w3dGraphics.cpp\n"
+              "LIBS     := -lSDL2 -lvitaGL -lvitashark -lSceShaccCgExt -lmathneon -ltaihen_stub -lSceShaccCg_stub "
+              "-lSceKernelDmacMgr_stub -lSceIme_stub -lSceGxm_stub -lSceDisplay_stub -lSceCtrl_stub -lSceAppMgr_stub "
+              "-lSceAppUtil_stub -lSceAudio_stub -lSceAudioIn_stub -lSceSysmodule_stub -lSceIofilemgr_stub "
+              "-lSceCommonDialog_stub -lSceTouch_stub -lSceHid_stub -lSceMotion_stub -lScePower_stub "
+              "-lSceProcessmgr_stub -lSceLibKernel_stub -lpthread -lm\n", f);
+        fprintf(f, "TITLE_ID := %s\n", TitleIdVita(nombre).c_str());
+    } else if (plat == Plat3DS) {
+        fputs("# Nintendo 3DS: devkitARM + libctru + citro3d (la GPU PICA200) con el backend citro3d del Core\n"
+              "DEVKITPRO ?= $(HOME)/3ds/devkitpro\nDEVKITARM ?= $(DEVKITPRO)/devkitARM\n"
+              "SDL2_3DS  ?= $(HOME)/3ds/sdl2-3ds-inst\n"
+              "CXX      := $(DEVKITARM)/bin/arm-none-eabi-g++\nCC       := $(DEVKITARM)/bin/arm-none-eabi-gcc\n"
+              "TOOLS    := $(DEVKITPRO)/tools/bin\n"
+              "ARCH     := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft\n"
+              "OPT      := -O2 -ffunction-sections -fdata-sections\n"
+              "PLATDEFS := -D__3DS__ -DW3D_3DS -DW3D_OPENGL\n"
+              "INCPRE   := -I$(W3D)/platform/3ds/include -I$(OBJDIR)\n"
+              "INCPLAT  := -I$(SDL2_3DS)/include -I$(SDL2_3DS)/include/SDL2 -I$(DEVKITPRO)/libctru/include\n"
+              "EXTRA    := -include climits\n"
+              "BACKEND  := $(CORE)/graphics/citro3d/w3dGraphicsC3D.cpp $(CORE)/graphics/citro3d/w3dGLc3d.cpp\n"
+              "LIBS     := -L$(SDL2_3DS)/lib -L$(DEVKITPRO)/libctru/lib -lSDL2main -lSDL2 -lcitro3d -lctru -lm\n", f);
+    } else {
+        fputs("# Dreamcast: KallistiOS (el SH-4; el entorno lo arma environ.sh) y GLdc (OpenGL 1.x de la PVR) con el\n"
+              "# backend fijo. LUA_32BITS: los numeros de lua en float (el SH-4 los hace en un ciclo)\n"
+              "SDL2_DC  ?= $(HOME)/dc/sdl2-dc-inst\n"
+              "CXX      := kos-c++\nCC       := kos-cc\n"
+              "ARCH     :=\nOPT      := -Os -ffunction-sections -fdata-sections\n"
+              "PLATDEFS := -DW3D_DREAMCAST -DW3D_OPENGL -DDREAMCAST -DLUA_32BITS=1\n"
+              "INCPRE   :=\nINCPLAT  := -I$(SDL2_DC)/include -I$(SDL2_DC)/include/SDL2\n"
+              "EXTRA    :=\n"
+              "BACKEND  := $(CORE)/graphics/opengl/w3dGraphics.cpp\n"
+              "LIBS     := -L$(SDL2_DC)/lib -lSDL2 -lSDL2main -lGL -lGLU -lm -lkosutils -lpthread\n"
+              "MKDCDISC ?= $(HOME)/dc/mkdcdisc/build_manual/mkdcdisc\n", f);
+    }
+
+    // ---- las fuentes: las MISMAS listas que el CMake de la PC, el Android.mk y emcc ----
+    fputs("\nFUENTES := $(CURDIR)/main.cpp \\\n", f);
+    if (empaquetar) fputs("  $(CURDIR)/pak.cpp \\\n", f);
+    fputs("  $(GAME)/w3drun.cpp $(GAME)/w3dconsola.cpp $(BACKEND) \\\n", f);
+    for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentesBase[i]).c_str());
+    if (usarFisica) fputs("  $(CORE)/physics/W3dFisica.cpp \\\n", f);
+    if (usarSonido) fputs("  $(CORE)/audio/W3dAudio.cpp $(CORE)/audio/W3dAudioSDL.cpp \\\n", f);
+    else            fputs("  $(CORE)/audio/W3dAudio.cpp \\\n", f);
+    if (con3D)
+        for (int i = 0; kFuentes3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentes3D[i]).c_str());
+    fputs("\nFUENTES_C := $(filter-out %/lua.c %/luac.c,$(wildcard $(LUA)/*.c))\n", f);
+    // (cada objeto en su ruta absoluta adentro de obj/: hay archivos con el mismo nombre en carpetas distintas)
+    fputs("OBJS := $(addprefix $(OBJDIR),$(addsuffix .o,$(abspath $(FUENTES) $(FUENTES_C))))\n\n", f);
+    fputs("INCS := $(INCPRE) -I$(GAME) \\\n", f);
+    for (int i = 0; kIncludesBase[i]; i++) fprintf(f, "  -I%s \\\n", AMk(kIncludesBase[i]).c_str());
+    if (con3D)
+        for (int i = 0; kIncludes3D[i]; i++) fprintf(f, "  -I%s \\\n", AMk(kIncludes3D[i]).c_str());
+    fputs("  -I$(LUA) $(INCPLAT)\n", f);
+    fprintf(f, "DEFS := %s$(PLATDEFS) -DW3D_GAME_RUNTIME -DW3D_GAME_NO_TEX -DW3D_STB_IMPL -DW3D_DEV_LOG=%d%s%s%s\n",
+            EsConsola(plat) ? "-DW3D_CONSOLA " : "", modoDebug ? 1 : 0, usarSonido ? " -DW3D_ENABLE_AUDIO" : "", usarFisica ? "" : " -DW3D_SIN_FISICA",
+            con3D ? " -DW3D_SIN_EDITOR -DW3D_JUEGO_3D" : "");
+    fputs("CXXFLAGS := $(ARCH) $(OPT) -std=gnu++17 $(EXTRA) $(DEFS) $(INCS) -w -MMD -MP\n"
+          "CFLAGS   := $(ARCH) $(OPT) -std=gnu99 $(DEFS) $(INCS) -w -MMD -MP\n\n", f);
+    if (vulkan)   // cada backend en su namespace (graphics/w3dBackend.h)
+        fputs("$(OBJDIR)$(abspath $(CORE)/graphics/opengl/w3dGraphics.cpp).o: CXXFLAGS += -DW3D_BACKEND_NS=gl\n"
+              "$(OBJDIR)$(abspath $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp).o: CXXFLAGS += -DW3D_BACKEND_NS=es2\n"
+              "$(OBJDIR)$(abspath $(CORE)/graphics/vulkan/w3dGraphicsVk.cpp).o: CXXFLAGS += -DW3D_BACKEND_NS=vk -DW3D_VKGL\n\n", f);
+
+    fputs("all: paquete\n\ncuantos:\n\t@echo $(words $(OBJS))\n\n", f);
+    // LOS FLAGS en un sello: si cambian (debug o produccion, fisica, sonido, el backend), make no lo ve en los archivos
+    // y mezclaria objetos de las dos maneras. Con el sello distinto se recompila todo
+    fputs("$(OBJDIR)/flags.txt: FORZAR\n\t@mkdir -p $(OBJDIR)\n"
+          "\t@echo '$(CXXFLAGS) $(CFLAGS)' | cmp -s - $@ || echo '$(CXXFLAGS) $(CFLAGS)' > $@\n"
+          "$(OBJS): $(OBJDIR)/flags.txt\nFORZAR:\n\n", f);
+    fputs("$(OBJDIR)/%.cpp.o: /%.cpp\n\t@mkdir -p $(dir $@)\n\t@echo \"  c++ $(notdir $<)\"\n"
+          "\t@$(CXX) $(CXXFLAGS) -c $< -o $@\n", f);
+    fputs("$(OBJDIR)/%.c.o: /%.c\n\t@mkdir -p $(dir $@)\n\t@echo \"  cc  $(notdir $<)\"\n"
+          "\t@$(CC) $(CFLAGS) -c $< -o $@\n\n", f);
+
+    // ---- los assets del juego (sueltos): los de la raiz y las carpetas de assets, como en los otros destinos ----
+    fputs("# los assets del juego, como los lee la consola (vacio si van empaquetados: estan en pak.cpp)\n", f);
+    fputs("datos:\n\t@rm -rf $(DATOS) && mkdir -p $(DATOS)\n", f);
+    if (!empaquetar) {
+        fputs("\t@for a in *.w3dui *.lua *.png *.json; do if [ -f \"$$a\" ]; then cp \"$$a\" $(DATOS)/; fi; done\n", f);
+        std::string dirs;
+        for (int c = 0; CarpAsset(c); c++) { dirs += " "; dirs += CarpAsset(c); }
+        if (!dirs.empty())
+            fprintf(f, "\t@for d in%s; do if [ -d \"$$d\" ]; then cp -r \"$$d\" $(DATOS)/; fi; done\n", dirs.c_str());
+    }
+    fputs("\n", f);
+
+    // ---- enlazar y armar el paquete de cada consola ----
+    if (plat == PlatWindows) {
+        // el .exe y, al lado, los assets (si van sueltos): la carpeta <juego>/ lista para copiar, y el mismo .zip
+        if (conIco)
+            fputs("$(OUT)/icono.o: icono.ico\n\t@mkdir -p $(OUT)\n\t@echo '1 ICON \"icono.ico\"' > $(OUT)/icono.rc\n"
+                  "\t@$(WINDRES) -I. $(OUT)/icono.rc -O coff -o $@\n"
+                  "ICONO := $(OUT)/icono.o\n", f);
+        fputs("$(OUT)/$(NOMBRE).exe: $(OBJS) $(ICONO)\n\t@echo \"  link $@\"\n"
+              "\t@$(CXX) -o $@ $(OBJS) $(ICONO) -Wl,--gc-sections -s $(LIBS)\n"
+              "paquete: $(OUT)/$(NOMBRE).exe datos\n"
+              "\t@rm -rf $(OUT)/$(NOMBRE) && mkdir -p $(OUT)/$(NOMBRE)\n"
+              "\t@cp $(OUT)/$(NOMBRE).exe $(OUT)/$(NOMBRE)/ && cp -r $(DATOS)/. $(OUT)/$(NOMBRE)/\n"
+              "\t@cd $(OUT) && rm -f $(NOMBRE)-windows.zip && if command -v zip > /dev/null; then "
+              "zip -qr $(NOMBRE)-windows.zip $(NOMBRE); fi\n"
+              "\t@echo \"  exe $(OUT)/$(NOMBRE)/$(NOMBRE).exe\"\n", f);
+    } else if (plat == PlatPSP) {
+        fputs("# un PRX (reubicable, como piden los firmwares de ahora) adentro del EBOOT.PBP. MEMSIZE=1: la memoria grande\n"
+              "# de las PSP 2000 en adelante. El juego va en PSP/GAME/<juego>, con sus assets al lado\n"
+              "CARPETA := $(OUT)/PSP/GAME/$(NOMBRE)\n"
+              "$(OUT)/$(NOMBRE).elf: $(OBJS)\n\t@echo \"  link $@\"\n"
+              "\t@$(CXX) $(ARCH) -L$(PSPDEV)/psp/lib -L$(PSPSDK)/lib -specs=$(PSPSDK)/lib/prxspecs "
+              "-Wl,-q,-T$(PSPSDK)/lib/linkfile.prx -Wl,-zmax-page-size=128 -Wl,--gc-sections -o $@ "
+              "$(PSPSDK)/lib/prxexports.o $(OBJS) $(LIBS)\n"
+              "\t@$(PSPDEV)/bin/psp-fixup-imports $@\n"
+              "$(OUT)/$(NOMBRE).prx: $(OUT)/$(NOMBRE).elf\n\t@$(PSPDEV)/bin/psp-prxgen $< $@\n"
+              "$(OUT)/PARAM.SFO:\n\t@mkdir -p $(OUT)\n\t@$(PSPDEV)/bin/mksfoex -d MEMSIZE=1 '$(NOMBRE)' $@\n"
+              "paquete: $(OUT)/$(NOMBRE).prx $(OUT)/PARAM.SFO datos\n"
+              "\t@rm -rf $(OUT)/PSP && mkdir -p $(CARPETA)\n"
+              "\t@$(PSPDEV)/bin/pack-pbp $(CARPETA)/EBOOT.PBP $(OUT)/PARAM.SFO NULL NULL NULL NULL NULL "
+              "$(OUT)/$(NOMBRE).prx NULL > /dev/null\n"
+              "\t@cp -r $(DATOS)/. $(CARPETA)/\n"
+              "\t@cd $(OUT) && rm -f $(NOMBRE)-psp.zip && if command -v zip > /dev/null; then zip -qr $(NOMBRE)-psp.zip PSP; fi\n"
+              "\t@echo \"  EBOOT.PBP $(CARPETA)\"\n", f);
+    } else if (plat == PlatVita) {
+        fputs("# -Wl,-q: deja las reubicaciones, que vita-elf-create necesita. __sce_headroom: el lugar del final del codigo\n"
+              "# para los datos del modulo. eboot.bin sin -s (modo \"unsafe\": vitaGL carga el compilador de shaders de\n"
+              "# ur0:data/external y pide la memoria extra, ATTRIBUTE2=12). Los assets van adentro del .vpk (app0:)\n"
+              "$(OUT)/$(NOMBRE).elf: $(OBJS)\n\t@echo \"  link $@\"\n"
+              "\t@$(CXX) $(ARCH) -Wl,-q -Wl,--gc-sections -Wl,--defsym=__sce_headroom=0x4000 -o $@ $(OBJS) $(LIBS)\n"
+              "$(OUT)/$(NOMBRE).velf: $(OUT)/$(NOMBRE).elf\n\t@$(VITASDK)/bin/vita-elf-create $< $@ > /dev/null\n"
+              "$(OUT)/eboot.bin: $(OUT)/$(NOMBRE).velf\n\t@$(VITASDK)/bin/vita-make-fself -c $< $@\n"
+              "$(OUT)/param.sfo:\n\t@mkdir -p $(OUT)\n"
+              "\t@$(VITASDK)/bin/vita-mksfoex -s TITLE_ID=$(TITLE_ID) -s APP_VER=01.00 -d ATTRIBUTE2=12 '$(NOMBRE)' $@\n"
+              "paquete: $(OUT)/eboot.bin $(OUT)/param.sfo datos\n"
+              "\t@cd $(OUT) && rm -f $(NOMBRE).vpk && $(VITASDK)/bin/vita-pack-vpk -s param.sfo -b eboot.bin "
+              "$$(cd datos && find . -type f | sed 's|^\\./||' | while read a; do printf -- '-a datos/%s=%s ' \"$$a\" \"$$a\"; done) "
+              "$(NOMBRE).vpk > /dev/null\n"
+              "\t@echo \"  vpk $(OUT)/$(NOMBRE).vpk ($(TITLE_ID))\"\n", f);
+    } else if (plat == Plat3DS) {
+        fputs("# el vertex shader de citro3d: picasso lo ensambla y bin2s lo vuelve un arreglo (w3d_shbin.h)\n"
+              "$(OBJDIR)/w3d.shbin: $(CORE)/graphics/citro3d/w3d.v.pica\n"
+              "\t@mkdir -p $(OBJDIR)\n\t@$(TOOLS)/picasso -o $@ $<\n"
+              "$(OBJDIR)/w3d_shbin.h $(OBJDIR)/w3d_shbin.s: $(OBJDIR)/w3d.shbin\n"
+              "\t@cd $(OBJDIR) && $(TOOLS)/bin2s -a 4 -H w3d_shbin.h w3d.shbin > w3d_shbin.s\n"
+              "$(OBJDIR)/w3d_shbin.o: $(OBJDIR)/w3d_shbin.s\n\t@$(CC) $(ARCH) -x assembler-with-cpp -c $< -o $@\n"
+              "$(OBJS): | $(OBJDIR)/w3d_shbin.h\n"
+              "$(OUT)/$(NOMBRE).elf: $(OBJS) $(OBJDIR)/w3d_shbin.o\n\t@echo \"  link $@\"\n"
+              "\t@$(CXX) $(ARCH) -specs=3dsx.specs -o $@ $(OBJS) $(OBJDIR)/w3d_shbin.o -Wl,--gc-sections $(LIBS)\n", f);
+        // el icono y los datos del menu (smdh): el icono de 48x48 lo deja el editor en icons/ (el del proyecto, o el de
+        // Whisk3D si no tiene). Va siempre: 3dsxtool no arma un .3dsx con romfs sin el smdh
+        fputs("$(OUT)/$(NOMBRE).smdh: icons/48x48.png\n"
+              "\t@$(TOOLS)/smdhtool --create '$(NOMBRE)' 'Juego hecho con Whisk3D' 'Whisk3D' $< $@\n"
+              "paquete: $(OUT)/$(NOMBRE).elf $(OUT)/$(NOMBRE).smdh datos\n"
+              "\t@$(TOOLS)/3dsxtool $(OUT)/$(NOMBRE).elf $(OUT)/$(NOMBRE).3dsx --smdh=$(OUT)/$(NOMBRE).smdh "
+              "--romfs=$(DATOS)\n", f);
+        fputs("\t@echo \"  3dsx $(OUT)/$(NOMBRE).3dsx\"\n", f);
+    } else {
+        fputs("# los assets en un romdisk adentro del ejecutable (/rd)\n"
+              "$(OUT)/romdisk.o: datos\n"
+              "\t@$(KOS_GENROMFS) -f $(OUT)/romdisk.img -d $(DATOS) > /dev/null\n"
+              "\t@$(KOS_BASE)/utils/bin2c/bin2c $(OUT)/romdisk.img $(OUT)/romdisk_tmp.c romdisk\n"
+              "\t@kos-cc -o $(OUT)/romdisk_tmp.o -c $(OUT)/romdisk_tmp.c\n"
+              "\t@$(KOS_CC) -o $@ -r $(OUT)/romdisk_tmp.o $(KOS_LIB_PATHS) -Wl,--whole-archive -lromdiskbase -nostdlib\n"
+              "\t@rm -f $(OUT)/romdisk_tmp.c $(OUT)/romdisk_tmp.o\n"
+              "$(OUT)/$(NOMBRE)_debug.elf: $(OBJS) $(OUT)/romdisk.o\n\t@echo \"  link $@\"\n"
+              "\t@kos-c++ -o $@ $(OBJS) $(OUT)/romdisk.o -Wl,--gc-sections $(LIBS)\n"
+              "$(OUT)/$(NOMBRE).elf: $(OUT)/$(NOMBRE)_debug.elf\n"
+              "\t@$(KOS_CC_BASE)/bin/$(KOS_CC_PREFIX)-strip -o $@ $<\n"
+              "# el disco .cdi (lo abren los emuladores y se graba para la consola), si esta mkdcdisc\n"
+              "paquete: $(OUT)/$(NOMBRE).elf\n"
+              "\t@rm -f $(OUT)/$(NOMBRE).cdi\n"
+              "\t@if [ -x \"$(MKDCDISC)\" ]; then $(MKDCDISC) -q -N -e $(OUT)/$(NOMBRE).elf -o $(OUT)/$(NOMBRE).cdi "
+              "-n '$(NOMBRE)' -a 'Whisk3D' -V W3DJUEGO; echo \"  cdi $(OUT)/$(NOMBRE).cdi\"; "
+              "else echo \"  (sin mkdcdisc: solo $(OUT)/$(NOMBRE).elf)\"; fi\n", f);
+    }
+    fputs("\nclean:\n\trm -rf $(OUT)\n\n-include $(OBJS:.o=.d)\n\n.PHONY: all cuantos paquete datos clean FORZAR\n", f);
+    bool ok = (ferror(f) == 0);
+    if (fclose(f) != 0) ok = false;
+    return ok;
+}
+
+// el script que arma el entorno del kit de la consola y corre el Makefile (con las marcas de la barra)
+static bool EscribirBuildConsola(const std::string& ruta, int plat, const std::string& out) {
+    FILE* f = fopen(ruta.c_str(), "w");
+    if (!f) return false;
+    fputs("#!/usr/bin/env bash\n", f);
+    fprintf(f, "# GENERADO por Whisk3D (Compilar juego -> %s). Arma el entorno del kit y compila con el Makefile.\n",
+            NombreConsola(plat));
+    // (sin -u: el environ.sh de KallistiOS lee variables que pueden no estar)
+    fputs("set -eo pipefail\n", f);
+    fprintf(f, "cd \"%s\"\n", Esc(out).c_str());
+    if (plat == PlatWindows)
+        fputs("export LLVM_MINGW=\"${LLVM_MINGW:-$HOME/windows/llvm-mingw}\"\n"
+              "export SDL2_MINGW=\"${SDL2_MINGW:-$HOME/windows/sdl2-mingw/x86_64-w64-mingw32}\"\n"
+              "[ -x \"$LLVM_MINGW/bin/x86_64-w64-mingw32-clang++\" ] && [ -f \"$SDL2_MINGW/lib/libSDL2.a\" ] || { echo "
+              "\"ERROR: falta llvm-mingw o SDL2 para mingw: correr Whisk3D/platform/windows/preparar_mingw.sh\"; exit 1; }\n", f);
+    else if (plat == PlatPSP)
+        fputs("export PSPDEV=\"${PSPDEV:-$HOME/psp/pspdev}\"\nexport PATH=\"$PSPDEV/bin:$PATH\"\n"
+              "[ -x \"$PSPDEV/bin/psp-g++\" ] && [ -f \"$PSPDEV/psp/lib/libSDL2.a\" ] || { echo \"ERROR: falta pspdev "
+              "(o SDL2 de la PSP) en $PSPDEV: correr Whisk3D/platform/psp/preparar_psp.sh\"; exit 1; }\n", f);
+    else if (plat == PlatVita)
+        fputs("export VITASDK=\"${VITASDK:-$HOME/vita/vitasdk}\"\nexport PATH=\"$VITASDK/bin:$PATH\"\n"
+              "[ -x \"$VITASDK/bin/arm-vita-eabi-g++\" ] && [ -f \"$VITASDK/arm-vita-eabi/lib/libvitaGL.a\" ] || { echo "
+              "\"ERROR: falta VitaSDK (o vitaGL) en $VITASDK: correr Whisk3D/platform/vita/preparar_vita.sh\"; exit 1; }\n", f);
+    else if (plat == Plat3DS)
+        fputs("export DEVKITPRO=\"${DEVKITPRO:-$HOME/3ds/devkitpro}\"\nexport DEVKITARM=\"${DEVKITARM:-$DEVKITPRO/devkitARM}\"\n"
+              "export SDL2_3DS=\"${SDL2_3DS:-$HOME/3ds/sdl2-3ds-inst}\"\n"
+              "[ -x \"$DEVKITARM/bin/arm-none-eabi-g++\" ] && [ -f \"$DEVKITPRO/libctru/lib/libcitro3d.a\" ] && "
+              "[ -f \"$SDL2_3DS/lib/libSDL2.a\" ] || { echo \"ERROR: falta devkitARM, citro3d o SDL2 de la 3DS: correr "
+              "Whisk3D/platform/3ds/preparar_3ds.sh\"; exit 1; }\n", f);
+    else
+        fputs("KOS_ENV=\"${KOS_ENV:-$HOME/dc/kos/environ.sh}\"\n"
+              "[ -f \"$KOS_ENV\" ] || { echo \"ERROR: falta el entorno de KallistiOS ($KOS_ENV): correr "
+              "Whisk3D/platform/dreamcast/preparar_dreamcast.sh\"; exit 1; }\n"
+              "source \"$KOS_ENV\"\nexport SDL2_DC=\"${SDL2_DC:-$HOME/dc/sdl2-dc-inst}\"\n"
+              "[ -f \"$SDL2_DC/lib/libSDL2.a\" ] || { echo \"ERROR: falta SDL2 de la Dreamcast en $SDL2_DC\"; exit 1; }\n", f);
+    // el avance: cada "  c++ x.cpp" / "  cc x.c" de make es un objeto de los TOTAL (make cuantos) -> 12..86
+    fprintf(f, "echo \"[W3D] 12 Compiling (%%s)|%s\"\n", NombreConsola(plat));
+    fputs("TOTAL=$(make -s cuantos 2>/dev/null || echo 150)\n", f);
+    fprintf(f, "make %s 2>&1 | awk -v t=\"$TOTAL\" -v nom=\"%s\" '{print; fflush()}\n"
+               "  /^  (c[+][+]|cc ) /{n++; p=12+int(n*74/(t>0?t:1)); if(p>86)p=86; "
+               "printf \"[W3D] %%d Compiling (%%%%s)|%%s\\n\", p, nom; fflush()}\n"
+               "  /^  link /{print \"[W3D] 88 Linking\"; fflush()}'\n",
+            W3dCompilarJobsFlag().c_str(), NombreConsola(plat));
+    fputs("echo \"[W3D] 92 Copying results\"\n", f);
+    bool ok = (ferror(f) == 0);
+    if (fclose(f) != 0) ok = false;
+    return ok;
+}
+
+// ============================================================================
+//  LINUX APPIMAGE (plataforma 1): un solo archivo <juego>-linux-x86_64.AppImage que corre en cualquier Linux.
+//  Lo arma este script despues de compilar, con las mismas herramientas que el AppImage del editor
+//  (platform/linux/build_appimage.sh: linuxdeploy y appimagetool, en ~/.cache/whisk3d-appimage o en el PATH):
+//    AppDir/usr/bin/<juego>   el ejecutable y, si van sueltos, sus assets al lado
+//    AppDir/AppRun            entra a esa carpeta (el juego lee sus assets de la carpeta actual) y lo corre
+//    linuxdeploy              mete adentro SDL2 y lo demas que no viene con todo Linux, y appimagetool lo empaqueta
+//  Con Vulkan y sin shaderc adentro va tambien el libshaderc del sistema (se abre en tiempo de ejecucion: linuxdeploy
+//  no lo ve solo).
+// ============================================================================
+static bool EscribirAppImage(const std::string& ruta, const std::string& out, const std::string& nombre,
+                             bool empaquetar, bool vulkan, const std::string& icono) {
+    FILE* f = fopen(ruta.c_str(), "w");
+    if (!f) return false;
+    fputs("#!/usr/bin/env bash\n# GENERADO por Whisk3D (Compilar juego -> Linux AppImage). Arma el AppImage del juego ya "
+          "compilado (out/).\nset -euo pipefail\n", f);
+    fprintf(f, "cd \"%s\"\nN=\"%s\"\n", Esc(out).c_str(), nombre.c_str());
+    fputs("CACHE=\"${APPIMAGE_TOOLS:-$HOME/.cache/whisk3d-appimage}\"\n"
+          "LD=$(command -v linuxdeploy || echo \"$CACHE/linuxdeploy-x86_64.AppImage\")\n"
+          "AT=$(command -v appimagetool || echo \"$CACHE/appimagetool-x86_64.AppImage\")\n"
+          "[ -x \"$LD\" ] && [ -x \"$AT\" ] || { echo \"ERROR: faltan linuxdeploy y appimagetool: correr una vez "
+          "Whisk3D/platform/linux/build_appimage.sh (las deja en $CACHE)\"; exit 1; }\n"
+          "export PATH=\"$(dirname \"$AT\"):$PATH\" APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64\n"
+          "# (linuxdeploy busca appimagetool en el PATH con ese nombre)\n"
+          "mkdir -p out/herramientas && ln -sf \"$AT\" out/herramientas/appimagetool && export PATH=\"$PWD/out/herramientas:$PATH\"\n"
+          "rm -rf out/AppDir out/appimage && mkdir -p out/AppDir/usr/bin out/appimage\n"
+          "cp \"out/$N\" out/AppDir/usr/bin/\n", f);
+    if (!empaquetar) {
+        fputs("# los assets, al lado del ejecutable\n"
+              "for a in *.w3dui *.lua *.png *.json; do if [ -f \"$a\" ]; then cp \"$a\" out/AppDir/usr/bin/; fi; done\n", f);
+        std::string dirs;
+        for (int c = 0; CarpAsset(c); c++) { dirs += " "; dirs += CarpAsset(c); }
+        if (!dirs.empty())
+            fprintf(f, "for d in%s; do if [ -d \"$d\" ]; then cp -r \"$d\" out/AppDir/usr/bin/; fi; done\n", dirs.c_str());
+    }
+    fputs("printf '#!/bin/sh\\nAQUI=\"$(dirname \"$(readlink -f \"$0\")\")\"\\ncd \"$AQUI/usr/bin\" && exec ./%s \"$@\"\\n' \"$N\" "
+          "> out/AppRun\nchmod +x out/AppRun\n"
+          "printf '[Desktop Entry]\\nType=Application\\nName=%s\\nComment=Juego hecho con Whisk3D\\nExec=%s\\nIcon=%s\\n"
+          "Terminal=false\\nCategories=Game;\\n' \"$N\" \"$N\" \"$N\" > \"out/$N.desktop\"\n", f);
+    fprintf(f, "cp \"%s\" \"out/$N.png\"\n", Esc(icono).c_str());
+    fputs("EXTRA=()\n", f);
+    if (vulkan)
+        fputs("# Vulkan sin shaderc adentro: el del sistema (el paquete libshaderc1), si esta\n"
+              "if [ ! -f \"$HOME/shaderc/linux/lib/libshaderc_combined.a\" ]; then\n"
+              "  for l in /lib/x86_64-linux-gnu/libshaderc.so.1 /usr/lib/x86_64-linux-gnu/libshaderc.so.1; do\n"
+              "    if [ -f \"$l\" ]; then EXTRA=(--library \"$l\"); break; fi\n  done\nfi\n", f);
+    fputs("( cd out/appimage && \"$LD\" --appdir ../AppDir --executable \"../AppDir/usr/bin/$N\" "
+          "--desktop-file \"../$N.desktop\" --icon-file \"../$N.png\" --custom-apprun ../AppRun \"${EXTRA[@]}\" "
+          "--output appimage )\n"
+          "rm -f \"out/$N-linux-x86_64.AppImage\"\n"
+          "mv out/appimage/*.AppImage \"out/$N-linux-x86_64.AppImage\"\n"
+          "echo \"  AppImage out/$N-linux-x86_64.AppImage\"\n", f);
+    bool ok = (ferror(f) == 0);
+    if (fclose(f) != 0) ok = false;
+    return ok;
+}
+
+// ============================================================================
+//  SYMBIAN (plataforma 5): el KIT para compilar en Windows con el SDK de S60.
+//
+//  El juego de Symbian es la app de Whisk3D en MODO JUEGO: si el .sisx trae un proyecto en su carpeta privada
+//  (game\juego.w3d), la app lo abre sola, con el 3D a pantalla completa (platform/symbian/src/Whisk3D.cpp). Lleva la
+//  UID del editor: instalar el juego reemplaza al editor en el telefono.
+//
+//  En platform-build/symbian (y en build/symbian) quedan:
+//    juego.w3d            el proyecto GUARDADO (un contenedor: lleva todo adentro)
+//    <juego>.pkg          el instalador: el de Whisk3D (sis/Whisk3D_gcce.pkg) con el nombre del juego y el proyecto
+//    build_symbian.bat    en Windows, con el SDK: compila la app (bldmake + abld, GCCE) y arma <juego>.sisx
+//                         (makesis + signsis con el certificado del repo)
+//  Con el backend de shaders (OpenGL ES 2.0: el N8 y los Symbian^3) usa la variante Whisk3D_gles2.mmp.
+// ============================================================================
+static bool EscribirKitSymbian(const std::string& out, const std::string& repo, const std::string& nombre,
+                               bool shaders, std::string* err) {
+    extern std::string w3dPath;
+    if (w3dPath.empty() || !W3dContenedorHayMontado()) {
+        *err = T("Build: Symbian packs the saved project: save it first (File > Save)");
+        return false;
+    }
+    std::vector<unsigned char> w3d;
+    if (!w3dFileSystem::ReadFileBytes(w3dPath, w3d) || w3d.empty()) { *err = w3dPath; return false; }
+    { FILE* f = fopen((out + "/juego.w3d").c_str(), "wb");
+      if (!f) { *err = out + "/juego.w3d"; return false; }
+      fwrite(&w3d[0], 1, w3d.size(), f); fclose(f); }
+    // el .pkg: el de Whisk3D (GCCE), con el nombre del juego y su proyecto en game\juego.w3d
+    std::vector<unsigned char> base;
+    const std::string pkgBase = repo + "/platform/symbian/sis/Whisk3D_gcce.pkg";
+    if (!w3dFileSystem::ReadFileBytes(pkgBase, base) || base.empty()) { *err = pkgBase; return false; }
+    std::string pkg((const char*)&base[0], base.size()), sal;
+    size_t i = 0;
+    while (i < pkg.size()) {
+        size_t fin = pkg.find('\n', i);
+        std::string l = pkg.substr(i, fin == std::string::npos ? std::string::npos : fin - i + 1);
+        i = (fin == std::string::npos) ? pkg.size() : fin + 1;
+        if (l.compare(0, 12, "#{\"Whisk3D\"}") == 0) l = "#{\"" + nombre + "\"}" + l.substr(12);
+        if (shaders) {
+            size_t p = l.find("gcce\\urel\\Whisk3D.exe\"");
+            if (p != std::string::npos) l.replace(p, 22, "gcce\\urel\\whisk3D_gles2.exe\"");
+            if (l.compare(0, 12, "[0x101F7961]") == 0) l = "[0x20022E6D], 0, 0, 0, {\"Symbian^3\"}\n";
+        }
+        sal += l;
+    }
+    sal += "\n; el proyecto del juego: la app lo abre sola en modo juego\n"
+           "\"w3djuego.w3d\"   -\"!:\\private\\A00D021D\\game\\juego.w3d\"\n";
+    { FILE* f = fopen((out + "/" + nombre + ".pkg").c_str(), "wb");
+      if (!f) { *err = out + "/" + nombre + ".pkg"; return false; }
+      fwrite(sal.data(), 1, sal.size(), f); fclose(f); }
+    // el .bat: la carpeta del repo en Windows sale de W3D (variable de entorno), o de la ruta del repo si el editor
+    // corre en Windows
+    std::string repoWin = (repo.size() > 1 && repo[1] == ':') ? repo : std::string("C:\\Whisk3D");
+    for (size_t k = 0; k < repoWin.size(); k++) if (repoWin[k] == '/') repoWin[k] = '\\';
+    const char* mmp = shaders ? "Whisk3D_gles2" : "Whisk3D";
+    std::string bat;
+    bat += "@echo off\r\n";
+    bat += "REM GENERADO por Whisk3D (Compilar juego -> Symbian). Se corre en Windows, con el SDK de S60 3rd Edition\r\n";
+    bat += "REM (o el de Symbian^3 para OpenGL ES 2.0) y su GCCE en el PATH, como para compilar el editor.\r\n";
+    bat += "REM La carpeta del repo de Whisk3D: la variable W3D, o la de abajo.\r\n";
+    bat += "setlocal\r\n";
+    bat += "if \"%W3D%\"==\"\" set \"W3D=" + repoWin + "\"\r\n";
+    bat += "if not exist \"%W3D%\\platform\\symbian\\group\\Whisk3D.mmp\" (echo ERROR: no esta el repo de Whisk3D en %W3D% "
+           "^(poner su carpeta en la variable W3D^) & exit /b 1)\r\n";
+    bat += "pushd \"%W3D%\\platform\\symbian\\group\" || exit /b 1\r\n";
+    bat += "call bldmake bldfiles || goto :error\r\n";
+    bat += std::string("call abld build gcce urel ") + mmp + " || goto :error\r\n";
+    bat += "popd\r\n";
+    bat += "copy /y \"%~dp0" + nombre + ".pkg\" \"%W3D%\\platform\\symbian\\sis\\w3djuego.pkg\" > nul || exit /b 1\r\n";
+    bat += "copy /y \"%~dp0juego.w3d\" \"%W3D%\\platform\\symbian\\sis\\w3djuego.w3d\" > nul || exit /b 1\r\n";
+    bat += "pushd \"%W3D%\\platform\\symbian\\sis\" || exit /b 1\r\n";
+    bat += "makesis w3djuego.pkg w3djuego.sis || goto :error\r\n";
+    bat += "signsis w3djuego.sis \"%~dp0" + nombre + ".sisx\" whisk3d_selfsign.cer whisk3d_selfsign.key || goto :error\r\n";
+    bat += "del w3djuego.pkg w3djuego.w3d w3djuego.sis\r\n";
+    bat += "popd\r\n";
+    bat += "echo listo: %~dp0" + nombre + ".sisx\r\n";
+    bat += "exit /b 0\r\n";
+    bat += ":error\r\n";
+    bat += "echo ERROR: fallo la compilacion de Symbian\r\n";
+    bat += "popd\r\n";
+    bat += "exit /b 1\r\n";
+    { FILE* f = fopen((out + "/build_symbian.bat").c_str(), "wb");
+      if (!f) { *err = out + "/build_symbian.bat"; return false; }
+      fwrite(bat.data(), 1, bat.size(), f); fclose(f); }
+    return true;
+}
+
 // ----------------------------------------------------------------------------
 //  El TRABAJO del worker: todo por VALOR (strings propios). El worker no ve la
 //  escena ni la UI: solo corre estos comandos y copia archivos.
 struct BldTrabajo {
-    int plataforma;          // 0 .deb / 1 AppImage / 2 web / 3 android / 6 android 2.3
+    int plataforma;          // 0 .deb / 1 AppImage / 2 web / 3 android / 6 android 2.3 / 7..10 las consolas
     std::string plat;        // "linux" / "web" / "android" (para los mensajes)
     std::string out;         // <juego>/platform-build/<plat> (ahi vive build.log)
     std::string cmdCfg;      // linux: cmake -S . -B out (configurar)
@@ -2298,7 +2934,10 @@ struct BldTrabajo {
 static void BldWorker(BldTrabajo t) {
     FILE* log = fopen((t.out + "/build.log").c_str(), "w");
     int rc;
-    if (t.plataforma == 3 || t.plataforma == 6) {
+    if (ConMakefile(t.plataforma) || t.plataforma == PlatSymbian) {
+        BldPublicar(BldFmt(T("Compiling (%s)"), NombreConsola(t.plataforma)), 10);
+        rc = BldCorrer(t.cmdBuild, log, BLD_MARCAS, 10, 92);
+    } else if (t.plataforma == 3 || t.plataforma == 6) {
         BldPublicar(t.plataforma == 6 ? T("Preparing Android 2.3") : T("Preparing Android (template)"), 10);
         rc = BldCorrer(t.cmdBuild, log, BLD_MARCAS, 10, 90);
     } else if (t.plataforma == 2) {
@@ -2312,9 +2951,14 @@ static void BldWorker(BldTrabajo t) {
             rc = BldCorrer(t.cmdBuild, log, BLD_CMAKE, 15, 85);
         }
         if (rc == 0 && !t.cmdCpack.empty()) {
-            BldPublicar(T("Packaging .deb (cpack)"), 85);
-            // como siempre: si cpack falla el binario igual queda (no es fatal)
-            BldCorrer(t.cmdCpack, log, BLD_CREEP, 85, 94);
+            if (t.plataforma == 1) {   // el AppImage ES el resultado: si no se arma, fallo
+                BldPublicar(T("Packaging AppImage"), 85);
+                rc = BldCorrer(t.cmdCpack, log, BLD_CREEP, 85, 94);
+            } else {
+                BldPublicar(T("Packaging .deb (cpack)"), 85);
+                // como siempre: si cpack falla el binario igual queda (no es fatal)
+                BldCorrer(t.cmdCpack, log, BLD_CREEP, 85, 94);
+            }
         }
     }
     if (log) fclose(log);
@@ -2336,6 +2980,24 @@ static void BldWorker(BldTrabajo t) {
     { BLD_LOCK(); g_bldFinal = t.msgOk; }
     g_bldOk.store(true);
     g_bldTermino.store(true);
+}
+
+// estado inicial de la barra + LANZAR el worker. La UI vuelve al loop enseguida:
+// el editor sigue usable y la barra (overlay abajo) muestra etapa + porcentaje.
+static void BldLanzar(const BldTrabajo& t, const char* nomPlat) {
+    g_bldPct.store(5);   // 0..5 = la fase sincrona de arriba (exportar + generar)
+    { BLD_LOCK(); g_bldEtapa = BldFmt(T("Compiling (%s)"), nomPlat); g_bldFinal.clear(); }
+    g_bldOk.store(false);
+    g_bldTermino.store(false);
+    g_bldActivo.store(true);
+    g_redraw = true;     // que la barra aparezca ya mismo
+#ifndef __EMSCRIPTEN__
+    g_bldHilo = new std::thread(BldWorker, t);
+#else
+    // editor web: sin hilos (ver arriba). Corre sincrono y falla claro: popen/system
+    // no existen en el sandbox del browser (igual que antes de este cambio).
+    BldWorker(t);
+#endif
 }
 
 // 1x por frame en el HILO PRINCIPAL (lo llama MainLoopFrame): mientras el build corre
@@ -2407,10 +3069,58 @@ static bool HayTres3D(Object* raiz) {
     return false;
 }
 
+// EL PROYECTO TIENE 3D: lo activo (HayTres3D) o mas de una raiz 3D en el registro (los juegos y escenas del proyecto)
+static bool ProyectoTiene3D() {
+    if (HayTres3D(SceneCollection)) return true;
+    int n3d = 0;
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    for (size_t i = 0; i < fs.size(); i++) if (W3dRaizEs3D(fs[i].tipo)) n3d++;
+    return n3d > 1;
+}
+bool CompilarJuegoEs3D() { return ProyectoTiene3D(); }
+// HAY UN JUEGO QUE COMPILAR: una raiz de tipo JUEGO (la marcada asi, o una con scripts: W3dRaizTipoDe), o un juego
+// solo 2D (una UI con scripts: el whiskpaddle, la calculadora). Un juego 3D no necesita UI
+bool CompilarJuegoHayJuego() {
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    for (size_t i = 0; i < fs.size(); i++) if (W3dRaizTipoDe((int)i) == W3D_RAIZ_JUEGO) return true;
+    if (W3dRaizTipoActiva() == W3D_RAIZ_JUEGO) return true;
+    if (SceneCollection)
+        for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
+            Object* o = SceneCollection->Childrens[i];
+            if (!o || o->getType() != ObjectType::ui) continue;
+            std::vector<ObjScript> sc; std::vector<std::string> r;
+            RecolectarScripts(o, &sc, &r);
+            if (!sc.empty()) return true;
+        }
+    return false;
+}
+
+// el valor de una clave de TEXTO de la raiz de un JSON (el proyecto.json del staging): la pisa o la agrega
+static void JsonPonerTextoRaiz(const std::string& ruta, const std::string& clave, const std::string& valor) {
+    std::vector<unsigned char> d;
+    if (!w3dFileSystem::ReadFileBytes(ruta, d) || d.empty()) return;
+    std::string j((const char*)&d[0], d.size()), v;
+    JsonTexto(v, valor);
+    const std::string k = "\"" + clave + "\":";
+    size_t p = j.find(k);
+    if (p != std::string::npos) {
+        size_t a = j.find('"', p + k.size());                 // la comilla que abre el valor
+        size_t b = (a == std::string::npos) ? a : a + 1;
+        while (b != std::string::npos && b < j.size() && j[b] != '"') b += (j[b] == '\\') ? 2 : 1;
+        if (a == std::string::npos || b >= j.size()) return;
+        j = j.substr(0, a) + v + j.substr(b + 1);
+    } else {
+        size_t a = j.find('{');
+        if (a == std::string::npos) return;
+        j.insert(a + 1, "\n  " + k + " " + v + ",");
+    }
+    FILE* f = fopen(ruta.c_str(), "wb");
+    if (f) { fwrite(j.data(), 1, j.size(), f); fclose(f); }
+}
+
 bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
                    bool usarFisica, bool usarSonido, bool modoDebug,
                    bool empaquetarAssets) {
-    if (!u) return false;
     // ya hay un build corriendo: NO se dispara otro (el resto del editor sigue usable;
     // la barra de abajo muestra el que esta en curso)
     if (g_bldActivo.load()) {
@@ -2420,18 +3130,29 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     // Windows (4) y Symbian (5): el pipeline de build de estos targets todavia NO esta
     // cableado a este boton (el flujo de abajo genera el runtime SDL/cmake de Linux/web/
     // android). Se hace aparte para no romper este camino. Mensaje claro en vez de fallar raro.
-    if (plataforma == 5) {
-        Notificar(T("Symbian .sisx: this target is not wired to this button yet."), true);
-        return false;
-    }
+#ifdef _WIN32
+    // (Windows se compila desde Linux, con llvm-mingw: el editor de Windows no tiene bash para los scripts)
     if (plataforma == 4) {
         Notificar(T("Windows .exe: not generated from this button yet. The EDITOR is built with platform/windows/build_windows.bat."), true);
+        return false;
+    }
+#endif
+    // HAY UN JUEGO? (un juego 3D no necesita UI; uno solo 2D es su UI con scripts)
+    if (!CompilarJuegoHayJuego()) {
+        Notificar(T("Build: the project has no game (a Game scene, or a UI with scripts)"), true);
+        return false;
+    }
+    // JUEGO 3D: hay algo que dibujar en 3D -> el binario lleva el pase 3D y la escena
+    // viaja como proyecto.json al lado (ver EsObjeto3D / kFuentes3D)
+    const bool con3D = ProyectoTiene3D();
+    if (!con3D && !u) {
+        Notificar(T("Build: there is no UI in the scene"), true);
         return false;
     }
     std::vector<ObjScript> objs;
     std::vector<std::string> rutasLua;
     if (SceneCollection) RecolectarScripts(SceneCollection, &objs, &rutasLua);
-    if (objs.empty()) {
+    if (objs.empty() && !con3D) {
         Notificar(T("Build: the project has no scripts (add them to a Script object)"), true);
         return false;
     }
@@ -2457,7 +3178,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     //   build/<plat>/           SOLO los RESULTADOS: ejecutable+instaladores (linux),
     //                           .html/.js/.wasm (web), .apk (android). Se limpia y
     //                           rellena al final de cada compilacion.
-    const char* plat = (plataforma == 6) ? "android23" : (plataforma == 3) ? "android"
+    const char* plat = (ConMakefile(plataforma) || plataforma == PlatSymbian) ? DirConsola(plataforma)
+                     : (plataforma == 6) ? "android23" : (plataforma == 3) ? "android"
                      : (plataforma == 2) ? "web" : "linux";
     std::string out        = proy + "/platform-build/" + plat;
     std::string resultados = proy + "/build/" + plat;
@@ -2472,6 +3194,27 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     if (nombre.empty()) nombre = "juego";
     { char cmd[700]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", out.c_str()); if (system(cmd)) {} }
     AsegurarGitignore(proy);   // platform-build/ y build/ fuera del repo del juego
+
+    // SYMBIAN: el kit para compilar en Windows (ver EscribirKitSymbian). No usa el staging: el telefono abre el .w3d
+    if (plataforma == PlatSymbian) {
+        std::string err;
+        if (!EscribirKitSymbian(out, repo, nombre, W3dCompilarBackendDe(plataforma) == 1, &err)) {
+            Notificar(std::string(T("Build: could not generate the Symbian project")) + " (" + err + ")", true);
+            return false;
+        }
+        BldTrabajo t;
+        t.plataforma = plataforma; t.plat = plat; t.out = out;
+        t.cmdBuild = "echo \"[W3D] 90 Copying results\"";
+        char cmd[3000];
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/juego.w3d\" \"%s/%s.pkg\" "
+                 "\"%s/build_symbian.bat\" \"%s/\"", resultados.c_str(), resultados.c_str(), out.c_str(), out.c_str(),
+                 nombre.c_str(), out.c_str(), resultados.c_str());
+        t.cmdCopia = cmd;
+        t.msgOk = BldFmt(T("Symbian project ready: %s (build it on Windows with build_symbian.bat)"),
+                         nombre + " -> build/symbian/");
+        BldLanzar(t, "Symbian");
+        return true;
+    }
 
     // ========================================================================
     //  UN PAQUETE POR COMPILACION: LIMPIAR LOS ARTEFACTOS DE LA ANTERIOR.
@@ -2517,7 +3260,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     bool multi = (escenasUI.size() >= 2);
     // JUEGO 3D: hay algo que dibujar en 3D -> el binario lleva el pase 3D y la escena
     // viaja como proyecto.json al lado (ver EsObjeto3D / kFuentes3D). Ver mas abajo.
-    const bool con3D = HayTres3D(SceneCollection);
+    // (con3D: ver arriba, ProyectoTiene3D)
 
     // [1/4] exportar las escenas + copiar los scripts + las texturas + la tipografia
     // (fase SINCRONA y rapida en el hilo de UI: es lo unico que toca la escena. El
@@ -2550,7 +3293,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     } else {
         // UNA sola escena / legacy: exportar la UI activa. base = carpeta del proyecto (proy)
         // para que texturas/fuente queden relativas planas (igual que multi) y resuelvan al lado.
-        if (!UI2DGuardar(u, out + "/" + w3duiLegacy, proy)) {
+        // (un juego 3D sin UI no tiene escena 2D que exportar)
+        if (u && !UI2DGuardar(u, out + "/" + w3duiLegacy, proy)) {
             Notificar(T("Build: could not write the .w3dui"), true); return false;
         }
     }
@@ -2683,6 +3427,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
             snprintf(cmd, sizeof(cmd), "cp \"%s\" \"%s/proyecto.json\"", w3dPath.c_str(), out.c_str());
             if (system(cmd)) {}
         }
+        // CON QUE ARRANCA (el "Empieza con" de la tarjeta Juego): el de AHORA, aunque el proyecto no se haya guardado
+        if (!W3dRaizInicial().empty()) JsonPonerTextoRaiz(out + "/proyecto.json", "escena3dInicial", W3dRaizInicial());
     }
     // ------------------------------------------------------------------
     //  REFERENCIAS EXTERNAS ("ext:"): archivos que el proyecto deja A PROPOSITO
@@ -2868,7 +3614,9 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     // reemplazan por bytecode stripped con el mismo nombre (ver CompilarLuasStaging).
     // Corre antes del pak/embed/copia -> aplica a los 4 targets. Un error de sintaxis
     // ABORTA el build aca, con el mensaje de lua (archivo:linea) en la notificacion.
-    if (!modoDebug) {
+    // (la Dreamcast no: compila lua con LUA_32BITS -enteros de 32 bits y float, que el SH-4 hace por hardware- y el
+    // bytecode que arma el editor, con enteros de 64 bits y double, no carga ahi. Sus .lua viajan como fuente)
+    if (!modoDebug && plataforma != PlatDreamcast) {
         std::string errLua; unsigned nLua = 0; size_t bFuente = 0, bByte = 0;
         if (!CompilarLuasStaging(out, &errLua, &nLua, &bFuente, &bByte)) {
             Notificar(std::string(T("Build: error in a Lua script: ")) + errLua, true);
@@ -2932,7 +3680,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     // tamano de la ventana para el modo "Sin bordes": el lienzo de la UI cuando es
     // responsive; si la UI usa el tamano del render, se mantiene el 600x600 de siempre
     int winW = 600, winH = 600;
-    if (!u->igualQueRender) {
+    if (u && !u->igualQueRender) {
         winW = (int)(u->ancho + 0.5f); winH = (int)(u->alto + 0.5f);
         if (winW < 1) winW = 1;
         if (winH < 1) winH = 1;
@@ -2944,8 +3692,9 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     }
     // CMakeLists para PC (Linux): GENERADO (copia/instala TODAS las escenas + scripts + texturas
     // cuando van sueltos; empaquetado compila pak.cpp y no copia/instala nada del juego)
-    if (!EscribirCMake(out + "/CMakeLists.txt", nombre, usarFisica, usarSonido, modoDebug,
-                       iconosLinux, empaquetarAssets, con3D)) {
+    if (!ConMakefile(plataforma) &&
+        !EscribirCMake(out + "/CMakeLists.txt", nombre, usarFisica, usarSonido, modoDebug,
+                       iconosLinux, empaquetarAssets, con3D, W3dCompilarBackendDe(plataforma))) {
         Notificar(T("Build: could not generate CMakeLists.txt"), true); return false;
     }
 
@@ -2953,7 +3702,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     // NADA toca la escena. El hilo de UI solo ARMA los comandos (strings propios)
     // y lanza el worker, que los corre + copia los resultados publicando etapa y
     // porcentaje para la barra (overlay) que dibuja el hilo principal cada frame.
-    const char* nomPlat = (plataforma == 6) ? "Android 2.3" : (plataforma == 3) ? "Android"
+    const char* nomPlat = ConMakefile(plataforma) ? NombreConsola(plataforma)
+                        : (plataforma == 6) ? "Android 2.3" : (plataforma == 3) ? "Android"
                         : (plataforma == 2) ? "WebGL" : (plataforma == 1) ? "Linux AppImage" : "Linux .deb";
     w3dLogf("CompilarJuego [3/4]: compilando (%s) en segundo plano", nomPlat);
     BldTrabajo t;
@@ -2966,7 +3716,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         // El script emite marcas "[W3D] <pct> <etapa>" que el worker parsea para la barra.
         std::string sh = out + "/build_android.sh";
         if (!EscribirBuildAndroid(sh, repo, out, nombre, orientacion, usarFisica, usarSonido,
-                                  modoDebug, conIcono, empaquetarAssets, con3D)) {
+                                  modoDebug, conIcono, empaquetarAssets, con3D, W3dCompilarBackendDe(plataforma))) {
             Notificar(T("Build: could not generate the Android script"), true); return false;
         }
         char cmd[1200];
@@ -2983,6 +3733,28 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         char cmd[1200];
         snprintf(cmd, sizeof(cmd), "bash \"%s\"", sh.c_str());
         t.cmdBuild = cmd;
+    } else if (ConMakefile(plataforma)) {
+        // LAS CONSOLAS (y Windows): el Makefile (las mismas listas de fuentes, con el backend y el paquete de cada una) y el script
+        // que arma el entorno del kit y lo corre (con las marcas de la barra). Ver EscribirMakefileConsola
+        // (la 3DS: el icono de 48x48 del menu. Sin icono en el proyecto -o uno tan chico que no dio ese tamano-, el de
+        // Whisk3D)
+        if (plataforma == Plat3DS && !w3dFileSystem::FileExists(out + "/icons/48x48.png") &&
+            !GenerarIcono(repo + "/res/Whisk3D.png", out + "/icons/48x48.png", 48)) {
+            Notificar(std::string(T("Build: could not read the icon; continuing without it")) + " (Whisk3D.png)", true);
+            return false;
+        }
+        // (Windows: el icono del .exe, de los tamanos que genero GenerarIconos)
+        const bool conIco = (plataforma == PlatWindows) && conIcono && EscribirIco(out, out + "/icono.ico");
+        if (plataforma == PlatWindows && !conIco) remove((out + "/icono.ico").c_str());
+        if (!EscribirMakefileConsola(out + "/Makefile", plataforma, repo, nombre, usarFisica, usarSonido, modoDebug,
+                                     empaquetarAssets, con3D, W3dCompilarBackendDe(plataforma), conIco)) {
+            Notificar(T("Build: could not generate the Makefile"), true); return false;
+        }
+        std::string sh = out + "/build_" + DirConsola(plataforma) + ".sh";
+        if (!EscribirBuildConsola(sh, plataforma, out)) {
+            Notificar(T("Build: could not generate the Makefile"), true); return false;
+        }
+        t.cmdBuild = "bash \"" + sh + "\"";
     } else if (plataforma == 2) {
         // WebGL: MISMO set de fuentes que el build_web.sh del ejemplo (incluye W3dEscena.cpp para
         // multi-escena y Textura2D.cpp para las imagenes) y EMBEBE por glob TODAS las escenas
@@ -3093,6 +3865,22 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
             char deb[900];
             snprintf(deb, sizeof(deb), "cd \"%s/out\" && cpack -G DEB", out.c_str());
             t.cmdCpack = deb;
+        } else {                 // AppImage: el script de EscribirAppImage (si falla, falla la compilacion)
+            // el icono: el mas grande que se genero del proyecto, o el de Whisk3D (el AppImage lo pide)
+            std::string icono;
+            static const int tams[6] = { 256, 128, 64, 48, 32, 16 };
+            for (int i = 0; i < 6 && icono.empty(); i++) {
+                char r[1200]; snprintf(r, sizeof(r), "%s/icons/%dx%d.png", out.c_str(), tams[i], tams[i]);
+                if (w3dFileSystem::FileExists(r)) icono = r;
+            }
+            if (icono.empty() && GenerarIcono(repo + "/res/Whisk3D.png", out + "/icons/256x256.png", 256))
+                icono = out + "/icons/256x256.png";
+            const std::string sh = out + "/armar_appimage.sh";
+            if (icono.empty() ||
+                !EscribirAppImage(sh, out, nombre, empaquetarAssets, W3dCompilarBackendDe(plataforma) == 2, icono)) {
+                Notificar(T("Build: could not generate the AppImage script"), true); return false;
+            }
+            t.cmdCpack = "bash \"" + sh + "\"";
         }
     }
 
@@ -3103,7 +3891,34 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         // holgado a proposito: la copia de Linux lleva UN cp por carpeta de assets
         // (kCarpetasAssets) y cada uno nombra dos rutas absolutas
         char cmd[9000];
-        if (plataforma == 6) {
+        if (plataforma == PlatWindows) {
+            // WINDOWS: la carpeta <juego>/ (el .exe con sus assets al lado) y el mismo .zip
+            snprintf(cmd, sizeof(cmd),
+                "rm -rf \"%s\" && mkdir -p \"%s\" && cp -r \"%s/out/%s\" \"%s/\" && "
+                "(cp \"%s/out/%s-windows.zip\" \"%s/\" 2>/dev/null || true)",
+                resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(), resultados.c_str(),
+                out.c_str(), nombre.c_str(), resultados.c_str());
+        } else if (plataforma == PlatPSP) {
+            // PSP: la carpeta PSP/GAME/<juego> (va a la raiz del Memory Stick) y el mismo .zip
+            snprintf(cmd, sizeof(cmd),
+                "rm -rf \"%s\" && mkdir -p \"%s\" && cp -r \"%s/out/PSP\" \"%s/\" && "
+                "(cp \"%s/out/%s-psp.zip\" \"%s/\" 2>/dev/null || true)",
+                resultados.c_str(), resultados.c_str(), out.c_str(), resultados.c_str(),
+                out.c_str(), nombre.c_str(), resultados.c_str());
+        } else if (plataforma == PlatVita) {
+            snprintf(cmd, sizeof(cmd), "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/out/%s.vpk\" \"%s/\"",
+                     resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(), resultados.c_str());
+        } else if (plataforma == Plat3DS) {
+            snprintf(cmd, sizeof(cmd), "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/out/%s.3dsx\" \"%s/\"",
+                     resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(), resultados.c_str());
+        } else if (plataforma == PlatDreamcast) {
+            // el .elf (para dc-tool o un emulador) y el disco .cdi si se pudo armar
+            snprintf(cmd, sizeof(cmd),
+                "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/out/%s.elf\" \"%s/\" && "
+                "(cp \"%s/out/%s.cdi\" \"%s/\" 2>/dev/null || true)",
+                resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(), resultados.c_str(),
+                out.c_str(), nombre.c_str(), resultados.c_str());
+        } else if (plataforma == 6) {
             // ANDROID 2.3: el APK firmado que dejo el script en platform-build/android23
             snprintf(cmd, sizeof(cmd),
                 "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/%s-android23.apk\" \"%s/\"",
@@ -3124,6 +3939,10 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
                 "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/out/%s\".* \"%s/\"",
                 resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(),
                 resultados.c_str());
+        } else if (plataforma == 1) {
+            // LINUX APPIMAGE: el .AppImage (lleva adentro el ejecutable, sus bibliotecas y sus assets)
+            snprintf(cmd, sizeof(cmd), "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/out/%s-linux-x86_64.AppImage\" \"%s/\"",
+                     resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(), resultados.c_str());
         } else if (empaquetarAssets) {
             // LINUX EMPAQUETADO: solo el ejecutable (los assets viajan adentro) + los
             // instaladores que haya. Nada de archivos sueltos del juego al lado.
@@ -3161,26 +3980,17 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         }
         t.cmdCopia = cmd;
     }
-    std::string donde = (plataforma == 6) ? (nombre + " -> build/android23/" + nombre + "-android23.apk")
+    std::string donde = (plataforma == PlatWindows) ? (nombre + " -> build/windows/" + nombre + "/" + nombre + ".exe")
+                      : (plataforma == PlatPSP) ? (nombre + " -> build/psp/PSP/GAME/" + nombre + "/EBOOT.PBP")
+                      : (plataforma == PlatVita) ? (nombre + " -> build/vita/" + nombre + ".vpk")
+                      : (plataforma == Plat3DS) ? (nombre + " -> build/3ds/" + nombre + ".3dsx")
+                      : (plataforma == PlatDreamcast) ? (nombre + " -> build/dreamcast/")
+                      : (plataforma == 6) ? (nombre + " -> build/android23/" + nombre + "-android23.apk")
                       : (plataforma == 3) ? (nombre + " -> build/android/" + nombre + "-android.apk")
                       : (plataforma == 2) ? (nombre + " -> build/web/" + nombre + ".html")
+                      : (plataforma == 1) ? (nombre + " -> build/linux/" + nombre + "-linux-x86_64.AppImage")
                                           : (nombre + " -> build/linux/");
     t.msgOk = BldFmt(T("Game built: %s"), donde);
-
-    // estado inicial de la barra + LANZAR el worker. La UI vuelve al loop enseguida:
-    // el editor sigue usable y la barra (overlay abajo) muestra etapa + porcentaje.
-    g_bldPct.store(5);   // 0..5 = la fase sincrona de arriba (exportar + generar)
-    { BLD_LOCK(); g_bldEtapa = BldFmt(T("Compiling (%s)"), nomPlat); g_bldFinal.clear(); }
-    g_bldOk.store(false);
-    g_bldTermino.store(false);
-    g_bldActivo.store(true);
-    g_redraw = true;     // que la barra aparezca ya mismo
-#ifndef __EMSCRIPTEN__
-    g_bldHilo = new std::thread(BldWorker, t);
-#else
-    // editor web: sin hilos (ver arriba). Corre sincrono y falla claro: popen/system
-    // no existen en el sandbox del browser (igual que antes de este cambio).
-    BldWorker(t);
-#endif
+    BldLanzar(t, nomPlat);
     return true;   // true = el build ARRANCO (el resultado llega por notificacion)
 }

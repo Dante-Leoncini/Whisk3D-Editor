@@ -23,6 +23,8 @@ Les bases du langage et tout ce que Whisk3D y ajoute pour programmer des jeux. B
    - [Particules, brouillard et visibilité](api-particulas-niebla.md)
    - [Temps, hasard et utilitaires](api-tiempo-y-utilidades.md)
    - [Configuration enregistrée](api-configuracion.md)
+   - [Jouer en réseau (LAN, wifi ou internet)](api-red.md)
+   - [Écran partagé et une manette pour chacun](api-pantalla-dividida.md)
    - [Messages et débogage](api-mensajes-y-depuracion.md)
    - [Routines et mémoires](api-rutinas-y-memorias.md)
 7. [Noms des touches et des boutons](teclas-y-botones.md)

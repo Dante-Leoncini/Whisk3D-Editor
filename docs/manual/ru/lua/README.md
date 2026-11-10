@@ -23,6 +23,8 @@
    - [Частицы, туман и видимость](api-particulas-niebla.md)
    - [Время, случайные числа и утилиты](api-tiempo-y-utilidades.md)
    - [Сохраняемые настройки](api-configuracion.md)
+   - [Сетевая игра (LAN, Wi-Fi или интернет)](api-red.md)
+   - [Разделённый экран и свой геймпад для каждого](api-pantalla-dividida.md)
    - [Сообщения и отладка](api-mensajes-y-depuracion.md)
    - [Процедуры и память](api-rutinas-y-memorias.md)
 7. [Имена клавиш и кнопок](teclas-y-botones.md)

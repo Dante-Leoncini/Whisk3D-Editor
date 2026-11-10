@@ -179,16 +179,23 @@ void ProgresoFin() {
 
 bool ProgresoActivo() { return g_progresoActivo; }
 
-// ---------------- overlay NO MODAL (build de "Compilar juego") ----------------
-// DECISION: el export de modelos usa esta barra en modo MODAL-bloqueante (clear negro
-// + swap propio) porque esa operacion congela el hilo de UI. El build de juegos corre
-// en un hilo worker y el editor sigue VIVO, asi que aca se reusa el MISMO widget
-// (identica estetica: Card + borde verde + mensaje con % + barra accent) pero dibujado
-// DENTRO del frame normal del editor (sin clear ni swap: el frame lo swapea el loop) y
-// anclado ABAJO-centro para no tapar el viewport. No entra al stack de popups -> no
-// captura input: el editor queda usable mientras compila.
+// ---------------- la barra de "Compilar juego" ----------------
+// El export de modelos usa esta barra en modo MODAL-bloqueante (clear negro + swap propio) porque esa operacion congela
+// el hilo de UI. El build de juegos corre en un hilo worker y el editor sigue dibujando: aca se reusa el MISMO widget
+// (Card + borde verde + mensaje con % + barra accent) dentro del frame normal del editor (sin clear ni swap), anclado
+// ABAJO-centro, sobre el editor OSCURECIDO: mientras compila el editor no se usa ni se guarda (los eventos los descarta
+// ProcesarEvento, en main.cpp) y el velo lo deja a la vista.
 void ProgresoOverlayRender(const std::string& etapa, float frac) {
     if (!progressPopup) progressPopup = new ProgressPopup();
+    {   // el velo: toda la ventana, atenuada
+        static Rec2D* velo = NULL;
+        if (!velo) velo = new Rec2D();
+        w3dEngine::Disable(w3dEngine::Texture2D);
+        w3dEngine::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
+        velo->SetSize(0, 0, (GLshort)MenuPantallaW, (GLshort)MenuPantallaH);
+        velo->RenderObject(false);
+        w3dEngine::Enable(w3dEngine::Texture2D);
+    }
     progressPopup->mensaje = etapa;
     progressPopup->frac = frac;
     progressPopup->Layout();          // mismo tamano/posicion X que el modal

@@ -52,6 +52,7 @@ extern PopupMenu* MenuAdd;      // el desplegable del boton "Add"
 extern PopupMenu* MenuImports;  // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 extern PopupMenu* MenuMallas;   // submenu "Add > Mesh": las primitivas (plano, cubo, esfera...)
 extern PopupMenu* MenuCore;     // submenu "Add > Core": las rutinas (pasos del render)
+extern PopupMenu* MenuModificadores;   // submenu "Add > Modifier Objects": espejo, array, instancia
 extern PopupMenu* MenuPrefabsAdd; // submenu "Add > Prefab": los prefabs del proyecto (se rearma al abrir el Add)
 extern PopupMenu* MenuEscenasAdd; // submenu "Add > Scene": las otras escenas del proyecto (se rearma al abrir el Add)
 extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"
@@ -170,7 +171,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showLights;
         bool showCamera;
         bool showEmpty;
-        bool showParticulas;   // overlay "Objects": gizmo (flecha) de los emisores de particulas. Default OFF.
+        bool showParticulas;   // overlay "Objects": gizmo (flecha) de los emisores de particulas. Default ON.
         bool showCurvas;       // overlay "Objects": la LINEA de las curvas/rieles. Default ON (se puede ocultar).
         bool showSonidos;      // overlay "Objects": el icono de parlante de los Sonido (oculto = tampoco se clickea)
         bool showHitbox;       // overlay "Objects": el alambre de los hitbox. Default ON (oculto = tampoco se clickea).
@@ -203,6 +204,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         std::set<Object*> localViewPaso;  // sus PADRES: se atraviesan (por la matriz) pero no se dibujan
         Quaternion lvViewRot; Vector3 lvPivot; float lvOrbitDistance;   // camara guardada al entrar (se restaura al salir)
         bool lvOrtho; bool lvFromCam; float lvZoom, lvPanX, lvPanY;
+        unsigned int lvNacidos;   // W3dObjetosNacidos() la ultima vez que se miro: lo que nace despues entra a la vista local
         void LocalViewToggle();
         void LocalViewEntrar();
         void LocalViewSalir();

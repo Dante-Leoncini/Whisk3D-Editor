@@ -11,6 +11,9 @@
 #include "W3dEscena.h"                // motor multi-escena COMPARTIDO (activa / init perezoso / cambio pendiente)
 #include "W3dRaices.h"                // cambiarEscena() a otra ESCENA 3D del proyecto (el Stop vuelve a la de antes)
 #include "io/Streaming.h"             // las instancias DIFERIDAS cargan/descargan jugando (el Stop las repone)
+#include "io/RaicesEditor.h"          // W3dActivarRaiz: el Play arranca con la PRIMERA escena abierta
+#include "ViewPorts/Notificaciones.h" // (si no se puede pasar a esa escena, el aviso)
+#include "config/W3dLang.h"
 #include "w3dlog.h"
 #include "audio/W3dAudio.h"           // Parar = cortar TODAS las voces; Play = despausar el mixer
 #include "objects/Objects.h"
@@ -476,10 +479,17 @@ static void SimCambiarRaiz(int idx) {
     // el MODO de la partida (el timeline en "Juego") sigue en la raiz nueva aunque sea una escena:
     // lo que corre es el juego. El Stop vuelve a la raiz del Play y cada una recupera el suyo.
     const int kind = ActiveAnimKind; const bool esJuego = AnimEsJuego; const int ini = StartFrame;
-    for (size_t i = 0; i < gScripted.size(); i++) W3dScriptDescargarDe(gScripted[i]);
-    for (size_t i = 0; i < gScriptedNuevos.size(); i++) W3dScriptDescargarDe(gScriptedNuevos[i]);
+    // LAS CAPAS (escenas cargadas encima: cargarEscena, W3dEscena.h) siguen corriendo: sus scripts no se descargan y
+    // las 3D pasan a la raiz nueva (las 2D quedan en la suya: son del usuario; se dibujan y corren desde la lista)
+    std::vector<Object*> scriptedCapas;
+    for (size_t i = 0; i < gScripted.size(); i++)
+        if (W3dEscenaEnCapa(gScripted[i])) scriptedCapas.push_back(gScripted[i]); else W3dScriptDescargarDe(gScripted[i]);
+    for (size_t i = 0; i < gScriptedNuevos.size(); i++)
+        if (W3dEscenaEnCapa(gScriptedNuevos[i])) scriptedCapas.push_back(gScriptedNuevos[i]); else W3dScriptDescargarDe(gScriptedNuevos[i]);
     gScripted.clear();
     gScriptedNuevos.clear();
+    std::vector<Object*> capas3D;
+    W3dEscenaCapasDesprender(false, capas3D);
     W3dFisicaLimpiar();
     W3dRigidosLimpiar();
     W3dHitboxLimpiar();
@@ -505,10 +515,13 @@ static void SimCambiarRaiz(int idx) {
             gBasesRaices.push_back(SimBaseRaiz()); gBasesRaices.back().raiz = r; Snapshot(&gBasesRaices.back().snap);
         }
     }
+    W3dEscenaCapasColgar(SceneCollection, capas3D);   // (las capas 3D, arriba de todo en la raiz nueva)
     { extern void PropsOlvidarEscena(); PropsOlvidarEscena(); }
     // la raiz que se deja, si la cargo la PARTIDA (no el usuario) y no es la del Play: se DESCARGA (en el N95 la
-    // cinematica y el area 1 juntas no entran en la RAM). Antes, fuera de todas las listas y fotos del Play
-    if (vieja && vieja != SceneCollection && vieja != gRaizPlay && !gRaicesDelUsuario.count(vieja)) {
+    // cinematica y el area 1 juntas no entran en la RAM). Antes, fuera de todas las listas y fotos del Play. (No si
+    // ahi vive una escena 2D cargada encima: sigue en pantalla)
+    if (vieja && vieja != SceneCollection && vieja != gRaizPlay && !gRaicesDelUsuario.count(vieja) &&
+        !W3dEscenaCapaAdentroDe(vieja)) {
         std::vector<Object*> sub;
         JuntarSub(vieja, sub);
         std::set<Object*> fuera(sub.begin(), sub.end());
@@ -537,7 +550,10 @@ static void SimCambiarRaiz(int idx) {
         gPodando = false;
     }
     Recorrer(SceneCollection, NULL, &gScripted);
+    // (lo de las capas ya corre: no se vuelve a arrancar)
+    for (size_t i = gScripted.size(); i-- > 0; ) if (W3dEscenaEnCapa(gScripted[i])) gScripted.erase(gScripted.begin() + (long)i);
     ArrancarRaizActual();
+    gScripted.insert(gScripted.end(), scriptedCapas.begin(), scriptedCapas.end());
     W3dStreamingPartidaInicio();   // (las diferidas cerca de la escena nueva, como al arrancar el Play)
     W3dRaizArrancarCinematica();   // (una ESCENA: su animacion desde el inicio; un juego no hace nada)
     w3dLogf("[juego] cambiarEscena: ahora corre '%s' (%d objeto(s) con script)",
@@ -820,6 +836,21 @@ namespace {
 struct SimEngancharDesvincular { SimEngancharDesvincular() { W3dDesvincularRegistrar(SimDesvincular); } } gSimEngancheDesvincular;
 }
 
+// LAS ESCENAS ABIERTAS en el editor (W3dRaices.h): el Play arranca con la PRIMERA de la lista (la base) y carga las demas
+// encima, en su orden, como cargarEscena(). Si se estaba editando otra, la primera pasa a ser la activa y el Stop vuelve
+// a la que se editaba. El ojo del outliner es solo del editor: la base se ve jugando aunque estuviera oculta
+static std::string gActivaAntesDelPlay;
+static Object* gBaseOjoRaiz = NULL;
+static bool gBaseOjo = true;
+static void SimVolverALaQueSeEditaba() {
+    if (gActivaAntesDelPlay.empty()) return;
+    const int k = W3dRaizBuscar(W3D_RAIZ_ESCENA, gActivaAntesDelPlay);
+    gActivaAntesDelPlay.clear();
+    std::string motivo;
+    if (k < 0 || !W3dRaizEstaAbierta(k)) return;
+    if (!W3dActivarRaiz(k, &motivo)) w3dLogfW("[play] no se pudo volver a '%s': %s", W3dRaices()[(size_t)k].nombre.c_str(),
+                                              motivo.c_str());
+}
 static void SimPlay() {
     // volcar a disco/overlay los .lua editados en el IDE (sucios) ANTES de leerlos: sino Play corre el .lua VIEJO
     // (el cambio vivia solo en el buffer del IDE). Asi cambiar un valor en el script y dar Play YA se ve.
@@ -827,13 +858,34 @@ static void SimPlay() {
     // LA RED: un proyecto que juega en red sin el permiso decidido pregunta antes de arrancar (y arranca al
     // responder). Ver config/W3dRedPermisos.h
     { extern bool RedPuedeJugar(); if (!RedPuedeJugar()) return; }
+    std::vector<std::string> capasDelPlay;
+    {
+        std::vector<int> ab;
+        W3dRaicesAbiertas(ab);
+        const std::vector<W3dRaizFila>& fs = W3dRaices();
+        if (ab.size() >= 2 && ab[0] != W3dRaizActiva()) {
+            const int act = W3dRaizActiva();
+            std::string motivo;
+            const bool reproduciendo = PlayAnimation;   // (cambiar de escena para la reproduccion: el Play la sigue)
+            const bool ok = W3dActivarRaiz(ab[0], &motivo);
+            PlayAnimation = reproduciendo;
+            if (!ok) {   // (el Play no arranca: que no lo reintente en cada cuadro)
+                Notificar(T(motivo.c_str()), true);
+                PlayAnimation = false;
+                return;
+            }
+            gActivaAntesDelPlay = (act >= 0 && act < (int)fs.size()) ? fs[(size_t)act].nombre : std::string();
+        }
+        for (size_t i = 1; i < ab.size(); i++) capasDelPlay.push_back(fs[(size_t)ab[i]].nombre);
+    }
     // ...y la vista de un clip de jerarquia que se estaba editando vuelve a su clip: lo que animObjeto()
     // reproduce es la biblioteca (compartida), no la vista
     W3dClipsVistasSincronizar();
     gScripted.clear();
     Recorrer(SceneCollection, NULL, &gScripted);   // en el orden del arbol (outliner)
-    // sin scripts no hay partida... salvo en un JUEGO, que simula igual (fisica, particulas, hitbox)
-    if (gScripted.empty() && !W3dRaizActivaEsJuego()) return;
+    // sin scripts no hay partida... salvo en un JUEGO, que simula igual (fisica, particulas, hitbox), o con otras
+    // escenas abiertas encima (sus scripts)
+    if (gScripted.empty() && !W3dRaizActivaEsJuego() && capasDelPlay.empty()) { SimVolverALaQueSeEditaba(); return; }
     // STREAMING (io/Streaming.h): las instancias DIFERIDAS sueltan lo que generaron (quedan como en el juego compilado
     // recien abierto: el streaming las carga jugando) ANTES de la foto y de juntar los scripts; el Stop las repone
     W3dStreamingPartidaPreparar();
@@ -842,6 +894,9 @@ static void SimPlay() {
     // snapshot de la escena DEL USUARIO (antes de que inicio() toque nada): es lo
     // que Stop restaura. (Antes se pisaba con el snapshot post-inicio de abajo y
     // Stop dejaba pegado lo que los scripts movieron en inicio().)
+    gBaseOjoRaiz = SceneCollection;
+    gBaseOjo = SceneCollection->visible;
+    SceneCollection->visible = true;
     Snapshot(&gBaseEditor);
     gRaizPlay = SceneCollection;
     gBasesRaices.clear();
@@ -869,6 +924,10 @@ static void SimPlay() {
     // simula los JUEGOS) arranca como en el juego compilado: con su animacion desde el inicio
     W3dRaizArrancarCinematica();
     gArrancando = false;
+    // ...y las otras escenas abiertas, encima (se aplica al final del cuadro, como un cargarEscena de un inicio())
+    for (size_t i = 0; i < capasDelPlay.size(); i++) W3dEscenaPedirCarga(capasDelPlay[i]);
+    if (!capasDelPlay.empty()) w3dLogf("[play] base '%s' + %d escena(s) encima", W3dRaizActiva() >= 0 ?
+        W3dRaices()[(size_t)W3dRaizActiva()].nombre.c_str() : "", (int)capasDelPlay.size());
     gTick = 0;
     gActiva = true;
     CurrentFrame = StartFrame;
@@ -1015,16 +1074,19 @@ static void TickReal(float dt) {
     // corren los scripts, asi el script ve la posicion nueva y resuelve el choque (rebotar)
     // en el MISMO frame. Es el mismo orden y el mismo dt que el runtime compilado
     // (W3dGameActualizar en game/w3drun.cpp) -> el juego se comporta igual en los dos lados.
-    W3dFisicaPaso(dt);
+    // LA BASE EN PAUSA (pausarEscena con su nombre: un menu de pausa cargado encima): el mundo no avanza (su fisica,
+    // sus hitbox, sus animaciones; sus scripts los frena W3dEscenaEsDeActiva). Igual que el runtime compilado
+    const bool mundo = !W3dEscenaBasePausada();
+    if (mundo) W3dFisicaPaso(dt);
     // CUERPOS RIGIDOS (cajas con masa): mismo orden que la fisica minima, y los
     // scripts leen contactos() de ESTE paso en el mismo frame.
-    W3dRigidosPaso(dt);
+    if (mundo) W3dRigidosPaso(dt);
     _t2 = W3dNowMs(); gSimMs[SIM_PERF_FISICA] += _t2 - _t; _t = _t2;
     // HITBOX: solapes de ESTE paso (despues de mover los cuerpos) -> alEntrar / alQuedarse /
     // alSalir, y los contactos nuevos de los rigidos -> alTocar. Antes de los actualizar():
     // el script ve el evento y su actualizar() del mismo tick ya puede reaccionar. Mismo lugar
     // que en el runtime compilado (W3dGameActualizar).
-    W3dHitboxPaso(dt);
+    if (mundo) W3dHitboxPaso(dt);
     _t2 = W3dNowMs(); gSimMs[SIM_PERF_HITBOX] += _t2 - _t; _t = _t2;
     // CAMARAS CON RIEL: el indice fraccionario (rielIndice, el 5to valor de rielDe)
     // lo horneaba SOLO el dibujo (Viewport3D::UpdateViewOrbit -> UpdatePosition), asi
@@ -1058,13 +1120,13 @@ static void TickReal(float dt) {
     // reloj y APLICAR las curvas. Va DESPUES del bucle de scripts para que un
     // animEscena() recien pedido pose los objetos en ESTE mismo frame (el editor
     // solo evalua estas curvas con kind 0; en el juego el dueno es este tick).
-    W3dAnimEscenaTick(dt);
+    if (mundo) W3dAnimEscenaTick(dt);
     // CLIPS DE OBJETO (animObjeto de lua): cada objeto con su cabezal, varios a la vez. Mismo lugar
     // que la animacion de escena (en el runtime tambien).
-    W3dAnimObjetosTick(dt);
+    if (mundo) W3dAnimObjetosTick(dt);
     // ESQUELETOS: cada armature avanza su clip con su propio reloj (animClip de lua). Despues de los scripts,
     // igual que la animacion de escena: el clip recien pedido arranca en ESTE frame. (Mismo lugar en el runtime.)
-    W3dArmaturesJuegoTick(dt);
+    if (mundo) W3dArmaturesJuegoTick(dt);
     // SNAPSHOT del estado apretado para el flanco de apretado() del PROXIMO frame (DESPUES de los scripts,
     // igual que el runtime en W3dGameActualizar): asi apretado() funciona identico en el Play y compilado.
     BindsJuegoSnapshotPunteros();
@@ -1231,10 +1293,14 @@ void SimStop() {
     gFlecha[0] = gFlecha[1] = gFlecha[2] = gFlecha[3] = false;  // flechas del teclado
     BindsJuegoResetPunteros();   // soltar el dedo/mouse: que no quede un toque viejo para la proxima partida
     W3dEscenaLimpiar();          // soltar el mapa de escenas / activa (el editor vuelve a elegir UI por ObjActivo)
+    W3dEscenaCapasLimpiar();     // ...y las capas (cargarEscena): sin pausa, sin mensajes, las 2D visibles otra vez
     gScripted.clear();
     gTick = 0;
     gActiva = false;
     CurrentFrame = StartFrame;
+    if (gBaseOjoRaiz && W3dRaizDeObjeto(gBaseOjoRaiz) >= 0) gBaseOjoRaiz->visible = gBaseOjo;   // (el ojo del editor)
+    gBaseOjoRaiz = NULL;
+    SimVolverALaQueSeEditaba();
     g_redraw = true;
 }
 

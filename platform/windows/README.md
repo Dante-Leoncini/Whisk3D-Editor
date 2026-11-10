@@ -49,3 +49,13 @@ platform\windows\build\Release\whisk3d.exe
 ```
 
 Busca `res\` **al lado del .exe** (el build ya la copia ahí).
+
+## Juegos para Windows (desde Linux)
+
+"Compilar juego" con la plataforma **Windows .exe** compila el juego desde Linux, sin Windows. Usa llvm-mingw y SDL2 para mingw, que deja en `~/windows` el script:
+
+```sh
+bash platform/windows/preparar_mingw.sh
+```
+
+El resultado es `build/windows/<juego>/<juego>.exe`, con los assets al lado si van sueltos, y el mismo contenido en un `.zip`. SDL2 va adentro del `.exe`, así que no hace falta ninguna DLL al lado. Corre en Windows 10 y 11; en Windows 7 y 8.1 necesita la actualización del runtime de C universal (KB2999226).

@@ -97,7 +97,7 @@ static bool EvalExpr(const std::string& str, float& out){
 bool W3dEvalExpr(const std::string& str, float& out){ return EvalExpr(str, out); }
 
 // CAJA DE TEXTO EDITABLE: el campo enfocado + el ruteo de caracteres (compartido).
-TextField* g_textFieldActivo = NULL;
+// (g_textFieldActivo vive en WhiskUI: text/bitmapText.cpp)
 // edicion numerica por texto de un PropFloat (WhiskUI/PropFloat): Enter aplica, Cancel descarta.
 extern bool NumEditActivo();
 extern void NumEditCommit();

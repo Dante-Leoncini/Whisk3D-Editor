@@ -12,7 +12,7 @@ Lo propio de la consola va con `#ifdef W3D_VITA`, y lo que no tiene lugar en el 
 
 vitaGL arma los shaders del pipeline fijo en la consola, mientras corre: cada combinación de estado (luces, texturas, niebla) se compila la primera vez y queda guardada en `ux0:data/shader_cache`. El compilador es el de Sony, **`libshacccg.suprx`**. No viene con la Vita ni con VitaSDK: se instala aparte, una vez, y lo usan casi todos los juegos y programas caseros hechos con vitaGL.
 
-- **En la consola:** con la aplicación ShaRKBR33D, que lo deja en `ur0:data/external/libshacccg.suprx`.
+- **En la consola:** con la aplicación ShaRKBR33D, que lo deja en `ur0:data/external/libshacccg.suprx`. Las versiones viejas lo dejaban en `ur0:data/libshacccg.suprx`, y vitaGL ya no lo busca ahí: si Whisk3D lo encuentra en ese lugar, lo copia solo a `ur0:data/external/` la primera vez que arranca.
 - **En Vita3K:** se copia ese mismo archivo a `~/vita/emu/home/data/Vita3K/Vita3K/ur0/data/external/libshacccg.suprx`.
 
 Sin ese archivo, Whisk3D avisa con un cartel y se cierra (en vez de colgarse en el primer cuadro).

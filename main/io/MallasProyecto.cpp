@@ -544,6 +544,7 @@ Mesh* W3dMallaDuplicarVinculado(Mesh* src) {
     // copia de la de src, que coincide con el recurso: se conserva si la hay.
     d->noEditable = src->noEditable;
     d->soloRutina = src->soloRutina;
+    d->bloquearNormales = src->bloquearNormales;
     if (!W3dMallaVincular(d, src->malla, TieneEdicion(d))) {
         W3dAvisof(true, T("Could not link the copy of '%s' to its mesh"), W3dNombreCorto(src->name).c_str());
     }
@@ -566,6 +567,7 @@ Mesh* W3dMallaDuplicarConRecursoPropio(Mesh* src) {
     MaterialesDe(src, nuevo->materiales);
     d->noEditable = src->noEditable;
     d->soloRutina = src->soloRutina;
+    d->bloquearNormales = src->bloquearNormales;
     W3dMallaVincular(d, nuevo, TieneEdicion(d));
     if (!d->modificadores.empty()) d->GenerarMallaModificada();
     return d;

@@ -23,6 +23,8 @@ Lua 语言基础，以及 Whisk3D 为制作游戏所添加的全部功能。待�
    - [粒子、雾和可见性](api-particulas-niebla.md)
    - [时间、随机数和实用工具](api-tiempo-y-utilidades.md)
    - [保存的配置](api-configuracion.md)
+   - [联网游戏（局域网、Wi-Fi 或互联网）](api-red.md)
+   - [分屏，每人一个手柄](api-pantalla-dividida.md)
    - [消息和调试](api-mensajes-y-depuracion.md)
    - [例程和内存](api-rutinas-y-memorias.md)
 7. [按键和按钮名称](teclas-y-botones.md)

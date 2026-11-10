@@ -157,10 +157,10 @@ void LayoutResetMaximizado(); // limpiar el flag de maximizado (al abrir proyect
 void LayoutJuegoPuroToggle(); // MODO JUEGO PURO (N95 VERDE+0): 3D fullscreen con vista de camara y CERO editor
 
 // menu TRANSFORM PIVOT POINT (objeto + edit): sale cerca de (mx,my). Setea el
-// pivote (g_transformPivot) que usan rotar/escalar + el checkbox Lock Normals.
+// pivote (g_transformPivot) que usan rotar/escalar.
 void LayoutMenuPivot(int mx, int my);
 // variante 2D del mismo menu (editor UV): sin "Active Element" (el UV no tiene elemento
-// activo) ni "Lock Normals" (en 2D no hay normales). Mismo g_transformPivot y misma accion.
+// activo). Mismo g_transformPivot y misma accion.
 void LayoutMenuPivotUV(int mx, int my);
 // menu de ORIENTACION (Global/Local/Normal/View) desde la barra de HERRAMIENTAS: crece hacia arriba
 void LayoutMenuOrientToolbar(int sx, int syTop);
@@ -176,7 +176,7 @@ void ClipMirrorReset();             // (def. en MeshEdit.cpp) olvida los verts "
 // (def. en MeshEdit.cpp) MERGE de la seleccion: 0 At Center, 1 At Cursor (cursorLocal), 2 Collapse, 3 By Distance(<dist)
 void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal);
 void EditXformReiniciar();          // restaura al snapshot (cambio de eje X/Y/Z)
-void EditXformConfirmar();          // fija: recalcula bordes + normales (salvo Lock Normals)
+void EditXformConfirmar();          // fija: recalcula bordes + normales (salvo Mesh::bloquearNormales)
 void EditXformCancelar();           // descarta: restaura el snapshot
 void EditXformIniciarExtrude(const Vector3& normalLocal); // move de la tapa del extrude
 void EditXformNumValor(float v); // entrada numerica: aplica el valor exacto (malla)

@@ -48,7 +48,7 @@ bool g_showLights = true;   // overlays por tipo (submenu "Objects"); sincroniza
 bool g_showCamera = true;
 bool g_showEmpty  = true;
 bool g_showSonidos = true;   // el parlante (y las esferas) de los objetos Sonido
-bool g_showParticulas = false;  // default OFF: no mostrar las flechas de los emisores de particulas
+bool g_showParticulas = true;   // las flechas de los emisores de particulas se ven (el viewport lo pisa por cuadro)
 bool g_showCurvas     = true;   // default ON: las curvas/rieles se ven salvo que se destilde
 bool ViewFromCameraActiveGlobal = false;
 

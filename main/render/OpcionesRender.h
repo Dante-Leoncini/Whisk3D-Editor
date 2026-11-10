@@ -86,7 +86,6 @@ enum TransformPivot { PivotCursor3D, PivotIndividual, PivotMedian, PivotActive }
 extern int g_transformPivot;
 // editar la malla 3D SIN tocar las normales (checkbox). Si esta en false (default),
 // las normales se recalculan al CONFIRMAR el move/rotate/scale (no frame a frame).
-extern bool g_editLockNormales;
 // distancia del Merge > By Distance (suelda verts a <= esta distancia). Default 0.0001 m (como Blender).
 extern float g_mergeDist;
 // modificadores: true durante el RENDER final -> Subdivision usa subRenderLevel en vez de subLevel (viewport).

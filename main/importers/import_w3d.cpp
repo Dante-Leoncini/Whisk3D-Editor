@@ -1009,6 +1009,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             return NULL;
         }
         mesh->soloRutina = GetBoolOrDefault(n->props, "soloRutina", false);   // la dibuja una rutina (Mesh.h)
+        mesh->bloquearNormales = GetBoolOrDefault(n->props, "bloquearNormales", false);
 
 
         for (size_t _ci=0; _ci<n->children.size(); _ci++) {
@@ -2861,6 +2862,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         const std::string nomMalla = NombreRecursoJson(JS(j, "malla", ""));   // (con el prefijo de su libreria)
         Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
         mesh->soloRutina = JB(j, "soloRutina", false);   // la dibuja una rutina (Mesh.h)
+        mesh->bloquearNormales = JB(j, "bloquearNormales", false);   // Bloquear normales (Mesh.h)
         { JVal* ju = JHijo(j, "uvMateriales", 5);   // el UV PERSONALIZADO de los mapas de sus materiales
           if (ju) for (size_t c = 0; c < ju->lista.size(); c++) {
               JVal* ue = ju->lista[c]; if (!ue || ue->tipo != 4) continue;
@@ -3406,6 +3408,12 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         // que es lo que el usuario puede crear) con su nombre y su transform.
         Empty* o = new Empty(parent);
         JsonComunes(j, o);
+        // como se dibuja (solo la vista): sin estos campos (archivos de antes) queda el circulo en el piso
+        const int fo = (int)JF(j, "forma", (float)o->forma);
+        if (fo >= 0 && fo < VacioFormas) o->forma = fo;
+        o->tamDibujo = JF(j, "tamDibujo", o->tamDibujo);
+        JVal* rd = JHijo(j, "rotDibujo", 5);   // (5 = lista)
+        if (rd && rd->lista.size() >= 3) o->rotDibujo = Vector3((float)rd->lista[0]->num, (float)rd->lista[1]->num, (float)rd->lista[2]->num);
         return o;
     }
     return NULL;   // tipo desconocido: sus hijos cuelgan del padre (nunca se pierde el arbol)
@@ -3625,6 +3633,7 @@ static void AplicarCompilar(JVal* jc) {
     g_proyCompilar.modoDebug   = JB(jc, "debug", false);
     g_proyCompilar.assetsModo  = W3dCompilarAssetsInt(JS(jc, "assets", ""));
     g_proyCompilar.plataforma  = W3dCompilarPlataformaInt(JS(jc, "plataforma", ""));
+    g_proyCompilar.backend     = W3dCompilarBackendInt(JS(jc, "backend", ""));      // auto|fijo|shaders|vulkan
     g_proyCompilar.uid         = (unsigned)strtoul(JS(jc, "uid", "0").c_str(), 0, 16);  // UID3 Symbian (hex string)
     g_proyCompilar.volumen     = JIRango(jc, "volumen", 100, 0, 100, "compilar");        // 0..100 volumen del gameplay
     g_proyCompilar.resolucion  = JIRango(jc, "resolucion", 100, 25, 100, "compilar");    // % de la pantalla (Android 2.3)
@@ -4490,7 +4499,8 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     { JVal* jm = JHijo(raiz, "mipmaps", 3); if (jm) w3dEngine::SetMipmapsGlobal(jm->b); }
     // TEXTURAS DE 16 BITS (ausente = solo las exactas). Antes de la cola diferida: gobierna esta carga
     { JVal* j16 = JHijo(raiz, "texturas16", 3); w3dEngine::SetTexturas16Siempre(j16 && j16->b); }
-    // EL TRAZADO DE RAYOS del proyecto (ausente = el de fabrica)
+    // EL TRAZADO DE RAYOS del proyecto (ausente = el de fabrica). Es del editor (el render final): el juego no lo trae
+#ifndef W3D_SIN_EDITOR
     {
         g_rt = W3dRTOpciones();
         JVal* t = JHijo(raiz, "trazado", 4);
@@ -4507,6 +4517,7 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
         }
         RTInvalidar();
     }
+#endif
     // EL POSTPROCESADO (render/Postproceso.h): sin el bloque, apagado y sin efectos
     {
         // (los proyectos de ANTES tenian UN postprocesado global, el bloque "postproceso": pasa a ser un objeto
@@ -4735,6 +4746,7 @@ Object* W3dImportarW3DAnexo(const std::string& ruta) {
 //  materiales por la puerta de siempre (el homonimo identico se reusa) y los objetos con el lector de siempre, con
 //  nombres libres (pegar dos veces da "Cubo.001", "Cubo.002"). 'nuevos' = los objetos de arriba que entraron
 // ---------------------------------------------------------------------------
+#ifndef W3D_SIN_EDITOR   // (pegar es del editor: el juego no tiene portapapeles de objetos)
 static void RenombrarMallasJson(JVal* j, const std::map<std::string, std::string>& ren) {
     if (!j) return;
     if (j->tipo == 4) {
@@ -4787,6 +4799,7 @@ bool W3dPortapapelesPegar(const std::string& carpeta, std::vector<Object*>& nuev
     delete raiz;
     return !nuevos.empty();
 }
+#endif // W3D_SIN_EDITOR (pegar)
 
 // ---------------------------------------------------------------------------
 //  MigrarConstraintsViejos: el segundo tiempo de la migracion (ver PendConsViejo).
@@ -5747,6 +5760,9 @@ void AbrirW3D(const std::string& ruta) {
         // (el cambio de raiz para la reproduccion: un JUEGO reabierto arranca como el del bloque)
         else if (W3dRaizTipoActiva() == W3D_RAIZ_JUEGO) PlayAnimation = (g_proyReproduciendo != 0);
     }
+
+    // LAS ESCENAS QUE QUEDARON ABIERTAS (varias a la vez en el editor): se cargan ahora, con la activa ya puesta
+    W3dRaicesAbiertasCargar();
 
     // SESION: el frame y la seleccion que el usuario tenia en ESTE proyecto. Va DESPUES
     // de W3dNombresRepararEscena (los nombres recien ahi son los definitivos) y despues

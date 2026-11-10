@@ -23,6 +23,10 @@ A viewport que está embaixo do mouse é a **viewport ativa**, e ela fica marcad
 
 Todas as viewports têm em cima uma **barra de menus** (em verde na imagem) com os menus e botões desse editor. No canto superior esquerdo fica sempre o **botão do canto** (em laranja): é ele que muda ou modifica a viewport.
 
+![O botão do canto, ampliado: a setinha para baixo, no canto superior esquerdo da barra de menus da Viewport 3D](img/viewports-esquina.webp)
+
+Ele é igual em todas as viewports, e é o único botão que todas têm.
+
 ![As quatro viewports do Whisk3D, com a barra de menus de cada uma destacada em verde e o botão do canto em laranja](img/viewports-barras.webp)
 
 ## Mudar o tamanho
@@ -72,9 +76,9 @@ O Outliner fica com o lugar de Propriedades:
 
 ![A Viewport 3D é maximizada para a janela inteira e depois, com Minimizar, volta ao seu lugar](img/viewports-maximizar.webp)
 
-## Quando a barra não cabe
+## Quando não dá para ver todas as opções da barra de menus
 
-Se a viewport for estreita, a barra dela não cabe inteira. O mesmo acontece com a barra de ferramentas de baixo da Viewport 3D. Para ver o resto:
+Se a viewport for estreita, a barra de menus dela não cabe inteira. O mesmo acontece com a barra de ferramentas de baixo da Viewport 3D. Para ver o resto:
 
 - ![Android](img/icono-android.svg) **Com o dedo:** arraste a barra para o lado.
 - ![PC](img/icono-pc.svg) **Com o mouse:** mantenha o clique pressionado sobre a barra e arraste, ou gire a **roda** em cima dela.
@@ -102,8 +106,13 @@ Se a viewport for estreita, a barra dela não cabe inteira. O mesmo acontece com
 | [Console](../editor/consola.md) | O registro do motor: erros, avisos e informações. |
 | [IDE](../editor/editor-de-scripts.md) | O editor de scripts Lua e de shaders. |
 
-Cada viewport vai ter o seu próprio tutorial, com mais detalhes. Enquanto isso, o [Manual do Whisk3D](../editor/README.md) explica cada uma.
+Cada viewport, botão por botão, está no manual:
 
-O Whisk3D continua crescendo: com o tempo, novas viewports vão ser adicionadas e as atuais podem mudar. Todas vão funcionar do mesmo jeito, com a barra em cima e o botão no canto.
+- [A Viewport 3D](../editor/vista-3d.md) e [a barra de menus dela](../editor/vista-3d-barra.md)
+- [O Outliner](../editor/outliner.md)
+- [Propriedades](../editor/propiedades.md): como usar cada campo, as cores, as listas e o losango da animação
+- As outras, no [Manual do editor](../editor/README.md)
+
+O Whisk3D continua crescendo: com o tempo, novas viewports vão ser adicionadas e as atuais podem mudar. Todas vão funcionar do mesmo jeito, com a barra de menus em cima e o botão no canto.
 
 Próximo tutorial: [Navegar na Viewport 3D](navegacion.md).

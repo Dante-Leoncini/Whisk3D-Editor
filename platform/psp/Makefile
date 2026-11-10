@@ -10,6 +10,9 @@
 # ---------------------------------------------------------------------------------------------------------------
 RAIZ     := $(abspath ../..)
 VERSION  ?= $(shell date +%y.%m.%d)
+# la version del PARAM.SFO: el formato de Sony es NN.NN (dos cifras, punto, dos cifras: "01.00"). La fecha entera
+# (26.11.08) el emulador la acepta, pero el menu de una PSP de verdad lee el SFO a su manera: va el anio y el mes
+APP_VER  := $(shell date +%y.%m)
 SALIDA   := build
 OBJDIR   := $(SALIDA)/obj
 CARPETA  := $(SALIDA)/PSP/GAME/Whisk3D
@@ -130,14 +133,17 @@ $(SALIDA)/whisk3d.prx: $(SALIDA)/whisk3d.elf
 # de 24)
 $(SALIDA)/PARAM.SFO: FORCE
 	@mkdir -p $(SALIDA)
-	@$(PSPDEV)/bin/mksfoex -d MEMSIZE=1 -s APP_VER=$(VERSION) 'Whisk3D' $(SALIDA)/PARAM.SFO.nuevo
+	@$(PSPDEV)/bin/mksfoex -d MEMSIZE=1 -s APP_VER=$(APP_VER) 'Whisk3D' $(SALIDA)/PARAM.SFO.nuevo
 	@cmp -s $(SALIDA)/PARAM.SFO.nuevo $@ && rm $(SALIDA)/PARAM.SFO.nuevo || mv $(SALIDA)/PARAM.SFO.nuevo $@
 
 # ---- el icono del menu (144x80) y el fondo (480x272) ----
-$(SALIDA)/ICON0.PNG: $(RAIZ)/res/Whisk3D.png
+# PNG de 8 bits por canal y sin bloques de mas (-depth 8 -strip, PNG24): el lienzo de convert sale de 16 bits con
+# cHRM/bKGD/tIME, y el decodificador del menu de la PSP es el de un PNG simple
+$(SALIDA)/ICON0.PNG: $(RAIZ)/res/Whisk3D.png Makefile
 	@mkdir -p $(SALIDA)
-	@convert -size 144x80 xc:'#1d1d1d' \( $< -resize 72x72 \) -gravity center -composite $@
-	@convert -size 480x272 xc:'#1d1d1d' \( $< -resize 200x200 \) -gravity center -composite $(SALIDA)/PIC1.PNG
+	@convert -size 144x80 xc:'#1d1d1d' \( $< -resize 72x72 \) -gravity center -composite -depth 8 -strip PNG24:$@
+	@convert -size 480x272 xc:'#1d1d1d' \( $< -resize 200x200 \) -gravity center -composite -depth 8 -strip \
+	    PNG24:$(SALIDA)/PIC1.PNG
 
 $(CARPETA)/EBOOT.PBP: $(SALIDA)/whisk3d.prx $(SALIDA)/PARAM.SFO $(SALIDA)/ICON0.PNG
 	@mkdir -p $(CARPETA)

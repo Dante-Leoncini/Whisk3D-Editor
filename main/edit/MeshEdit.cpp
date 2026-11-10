@@ -94,7 +94,7 @@ void Mesh::EditInvertir()                { EnsureEdit(); if (edit) edit->Inverti
 // elegir "Vertices" estando en modo cara no borra de mas. Compacta los arrays de
 // render (preserva UV/normales), reconstruye faces3d + faces[], y deja como
 // looseEdges los bordes que quedan sin cara.
-void Mesh::BorrarSeleccionEdit(int deleteType) {
+void Mesh::BorrarSeleccionEdit(int deleteType, bool sinRestos) {
     DesinstanciarDatos(W3DMD_TODO);  // COW: la op de edicion muta la geometria (MallaDatos.h)
     EnsureEdit();
     if (!edit || !vertex) return;
@@ -186,7 +186,8 @@ void Mesh::BorrarSeleccionEdit(int deleteType) {
     // Corre para TODOS los modos (antes se saltaba SelVertex -> al borrar un vert desaparecian las lineas). En
     // Delete Vertices, la arista que USA un vert borrado se va con el; las demas quedan como lineas sueltas.
     std::set<std::pair<int,int> > nuevasSueltas;
-    {
+    // sinRestos (Separar): las aristas de las caras borradas NO quedan sueltas: se van con las caras
+    if (!sinRestos) {
         for (size_t f = 0; f < faces3d.size(); f++) {
             if (!delF[f]) continue;
             const std::vector<int>& idx = faces3d[f].idx;
@@ -252,9 +253,18 @@ void Mesh::BorrarSeleccionEdit(int deleteType) {
     for (size_t f=0; f<nf3d.size(); f++){ const std::vector<int>& ix=nf3d[f].idx;
         for (size_t c=0;c<ix.size();c++){ int gi=ix[c]; if(gi>=0&&gi<nV) enGeo.insert(hayRep?posRep[gi]:gi); } }
     for (std::set<std::pair<int,int> >::iterator it=nuevasSueltas.begin(); it!=nuevasSueltas.end(); ++it){ enGeo.insert(it->first); enGeo.insert(it->second); }
+    // sinRestos (Separar): un vertice de las caras borradas que ya no esta en nada se va con ellas (no queda punto suelto).
+    // Los puntos sueltos que la malla YA tenia (looseVerts) siguen.
+    std::set<int> deCaraBorrada, yaSueltos;
+    if (sinRestos) {
+        for (size_t f=0; f<faces3d.size(); f++){ if (!delF[f]) continue; const std::vector<int>& ix=faces3d[f].idx;
+            for (size_t c=0;c<ix.size();c++){ int gi=ix[c]; if(gi>=0&&gi<nV) deCaraBorrada.insert(hayRep?posRep[gi]:gi); } }
+        for (size_t i=0; i<looseVerts.size(); i++){ int gi=looseVerts[i]; if(gi>=0&&gi<nV) yaSueltos.insert(hayRep?posRep[gi]:gi); }
+    }
     std::vector<int> nLooseV; std::set<int> looseRepDone;
     for (int gi=0; gi<nV; gi++){ if (delV[gi]) continue; int rep=hayRep?posRep[gi]:gi;
         if (rep<0||rep>=nV || enGeo.count(rep) || looseRepDone.count(rep)) continue;
+        if (deCaraBorrada.count(rep) && !yaSueltos.count(rep)) continue;
         looseRepDone.insert(rep); nLooseV.push_back(gi); }
 
     if (nf3d.empty() && nLoose.empty() && nLooseV.empty()) { // se borro TODA la geometria
@@ -670,6 +680,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
 
     // ---- segun el modo: capReps (a duplicar), interiorReps (caras: a mover) + datos ----
     std::vector<char> selFace(faces3d.size(), 0);
+    std::vector<char> caraSuelta(faces3d.size(), 0);    // caras de un pedazo SUELTO: la original queda de fondo (ver abajo)
     std::set<int> capReps, interiorReps;
     std::vector<std::pair<int,int> > selEdgesDir;        // edge mode: (ra,rb) dirigido
     std::set<std::pair<int,int> > selEdgesSet;           // edge mode: undirected
@@ -710,6 +721,60 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             if (it->second == 1) { capReps.insert(it->first.first); capReps.insert(it->first.second); }
         for (std::set<int>::iterator it=regionReps.begin(); it!=regionReps.end(); ++it)
             if (!capReps.count(*it)) interiorReps.insert(*it);
+
+        // ---- PEDAZOS SUELTOS (pedido del duenio, 2026-11-09): un plano suelto extruido tiene que quedar CERRADO, como
+        // una caja. La cara original se va solo si el pedazo esta PEGADO a otras caras (la de arriba de un cubo: si
+        // quedara, seria una cara escondida adentro). Si ninguna arista del borde del pedazo toca una cara NO elegida,
+        // la original QUEDA, dada vuelta (es el fondo), y la tapa sale entera de vertices nuevos. Un pedazo sin borde
+        // (todas las caras de una malla cerrada) no tiene fondo: se mueve entero, como antes.
+        {
+            std::map<std::pair<int,int>,int> usoTotal;                    // arista -> cuantas caras de la malla la usan
+            std::map<std::pair<int,int>,std::vector<int> > elegidasDe;    // arista -> las caras ELEGIDAS que la usan
+            for (size_t f = 0; f < faces3d.size(); f++) {
+                const std::vector<int>& idx = faces3d[f].idx; int m=(int)idx.size(); if (m<3) continue;
+                for (int c = 0; c < m; c++) {
+                    int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
+                    std::pair<int,int> key(ra<rb?ra:rb, ra<rb?rb:ra);
+                    usoTotal[key]++;
+                    if (selFace[f]) elegidasDe[key].push_back((int)f);
+                }
+            }
+            // los pedazos: caras elegidas unidas por aristas compartidas
+            std::vector<int> pedazo(faces3d.size(), -1); int nPed = 0;
+            for (size_t f0 = 0; f0 < faces3d.size(); f0++) {
+                if (!selFace[f0] || pedazo[f0] >= 0) continue;
+                std::vector<int> pila(1, (int)f0); pedazo[f0] = nPed;
+                while (!pila.empty()) {
+                    const int f = pila.back(); pila.pop_back();
+                    const std::vector<int>& idx = faces3d[f].idx; int m=(int)idx.size();
+                    for (int c = 0; c < m; c++) {
+                        int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
+                        const std::vector<int>& v = elegidasDe[std::make_pair(ra<rb?ra:rb, ra<rb?rb:ra)];
+                        for (size_t j = 0; j < v.size(); j++) if (pedazo[v[j]] < 0) { pedazo[v[j]] = nPed; pila.push_back(v[j]); }
+                    }
+                }
+                nPed++;
+            }
+            std::vector<char> conBorde(nPed, 0), pegado(nPed, 0);
+            for (size_t f = 0; f < faces3d.size(); f++) {
+                if (!selFace[f]) continue;
+                const std::vector<int>& idx = faces3d[f].idx; int m=(int)idx.size();
+                for (int c = 0; c < m; c++) {
+                    int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
+                    std::pair<int,int> key(ra<rb?ra:rb, ra<rb?rb:ra);
+                    if (edgeCount[key] != 1) continue;                       // arista de adentro del pedazo
+                    conBorde[pedazo[f]] = 1;
+                    if (usoTotal[key] > 1) pegado[pedazo[f]] = 1;            // la usa tambien una cara NO elegida
+                }
+            }
+            for (size_t f = 0; f < faces3d.size(); f++) {
+                if (!selFace[f] || !conBorde[pedazo[f]] || pegado[pedazo[f]]) continue;
+                caraSuelta[f] = 1;
+                // TODOS sus vertices van a la tapa (tambien los de adentro): el fondo se queda con los originales, quietos
+                const std::vector<int>& idx = faces3d[f].idx;
+                for (size_t c = 0; c < idx.size(); c++) { int r = XREP(idx[c]); capReps.insert(r); interiorReps.erase(r); }
+            }
+        }
     } else {
         // material (mesh part) de cada arista de la malla, buscando la cara que la contiene: las paredes
         // del extrude de aristas lo heredan (asi conservan el color de la cara de la que salen).
@@ -862,6 +927,18 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             AgregarCornerCapas(this,vertCorner[rb]); AgregarCornerCapas(this,vertCorner[ra]);
             AgregarCornerCapas(this,vertCorner[ra]); AgregarCornerCapas(this,vertCorner[rb]);
         }
+        // el FONDO de los pedazos sueltos: la cara original con sus vertices de siempre, dada vuelta (mira para el lado
+        // contrario de la tapa). Hereda las capas (uv/color) de sus propias esquinas, en el orden invertido.
+        { int Lc = 0;
+          for (size_t f = 0; f < faces3d.size(); f++) {
+              const std::vector<int>& idx = faces3d[f].idx; const int m = (int)idx.size();
+              if (caraSuelta[f] && m >= 3) {
+                  std::vector<int> w; for (int c = m - 1; c >= 0; c--) w.push_back(idx[c]);
+                  MeshFace mf; mf.idx = w; mf.mat = faces3d[f].mat; mf.smooth = faces3d[f].smooth; nf3d.push_back(mf);
+                  for (int c = m - 1; c >= 0; c--) AgregarCornerCapas(this, Lc + c);
+              }
+              Lc += m;   // (la misma cuenta que vertCorner: todas las esquinas de faces3d, en orden)
+          } }
     } else if (mode == SelEdge) { // un QUAD por arista: [ra,rb,new_rb,new_ra]
         for (size_t i = 0; i < selEdgesDir.size(); i++) {
             int ra=selEdgesDir[i].first, rb=selEdgesDir[i].second;

@@ -1,0 +1,122 @@
+# EL TUTORIAL 10, HACER PICAR UNA PELOTA (docs/manual/es/tutoriales/pelota.md), paso por paso y con las teclas del
+# texto: tiene que dejar los MISMOS keyframes que la animacion del duenio (pelota.w3d, 2026-11-10). Si una tecla, el
+# menu de Insertar Keyframe, el duplicado de keyframes o el Fin cambian, el tutorial deja de dar lo que dice y esto
+# falla. Los controles (keyvalor, tlframes, tl...) estan en main/test/W3dCapturas.cpp.
+
+# ---- 1) la pelota apoyada en el piso y el Vacio en su vertice de abajo (Shift+S > Cursor a lo seleccionado) ----
+selobj Cubo
+delete
+add sphere
+ratonvista3d
+tecla g
+tecla z
+texto 1
+tecla Return
+tecla Tab
+elegirvertice abajo
+tecla Left_Shift down
+tecla s
+tecla Left_Shift up
+menuelegir Cursor to Selected
+tecla Tab
+agregar vacio
+objat Vacío 0 0 0 0.001
+# la esfera, hija del Vacio (Ctrl+P > Objeto (Mantener Transform.)): la pelota NO se mueve
+selobj EsferaUV
+selname Vacío
+ratonvista3d
+tecla Left_Ctrl down
+tecla p
+tecla Left_Ctrl up
+menuelegir Object (Keep Transform)
+cajamundo EsferaUV -1 0 -1 1 2 1 0.01
+selobj Vacío
+ratonvista3d
+
+# ---- 2) aplastar: cuadro 1 redonda, flecha a la derecha, S Z 0.75 y S Shift+Z 1.6 ----
+frame 1
+tecla i
+menuelegir Scale Only
+tecla Right
+tecla s
+tecla z
+texto 0.75
+tecla Return
+tecla s
+tecla Left_Shift down
+tecla z
+tecla Left_Shift up
+texto 1.6
+tecla Return
+tecla i
+menuelegir Scale Only
+keyvalor esc z 2 0.75
+keyvalor esc x 2 1.6
+keyvalor esc y 2 1.6
+
+# ---- 3) estirar: el keyframe del 1 duplicado al 4, al 17 y al 29 (Shift+D saca la copia un cuadro a la derecha;
+# el numero tipeado se suma); en el 4, S Z 1.1 y S Shift+Z 0.9 ----
+tl selframe 1
+tl duplicar
+tl valor 2
+tl aceptar
+tl selframe 1
+tl duplicar
+tl valor 15
+tl aceptar
+tl selframe 1
+tl duplicar
+tl valor 27
+tl aceptar
+frame 4
+ratonvista3d
+tecla s
+tecla z
+texto 1.1
+tecla Return
+tecla s
+tecla Left_Shift down
+tecla z
+tecla Left_Shift up
+texto 0.9
+tecla Return
+tecla i
+menuelegir Scale Only
+keyvalor esc z 4 1.1
+keyvalor esc x 4 0.9
+keyvalor esc z 17 1
+keyvalor esc z 29 1
+# el aplastado del 2 no se toco al duplicar por encima
+keyvalor esc z 2 0.75
+
+# ---- 4) el salto: cuadro 3 en el piso, 16 arriba (G Z 5), el 3 duplicado al 29 ----
+frame 3
+tecla i
+menuelegir Location Only
+frame 16
+tecla g
+tecla z
+texto 5
+tecla Return
+tecla i
+menuelegir Location Only
+tl selframe 3
+tl duplicar
+tl valor 25
+tl aceptar
+keyvalor loc z 3 0
+keyvalor loc z 16 5
+keyvalor loc z 29 0
+
+# ---- 5) el loop: Fin 28 ----
+tl fin 28
+
+# ---- 6) las curvas: sin X ni Y Posicion; la subida frena al llegar (cubica, Al llegar) y la caida acelera (cubica,
+# Al arrancar) ----
+tl borrarcurva loc x
+tl borrarcurva loc y
+keyinterp out 3 loc
+keyinterp in 16 loc
+keyvalor loc z 3 0 517
+keyvalor loc z 16 5 261
+tlframes 1 2 3 4 16 17 29

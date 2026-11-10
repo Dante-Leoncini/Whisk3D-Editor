@@ -1,89 +1,88 @@
 # 3D Viewport
 
-3D Viewport 是查看和编辑场景的地方。它有多种**模式**：单击、按键和菜单的作用取决于当前模式。你可以用顶部栏的模式选择器（只有当活动对象是网格或骨架时才会出现）或 <kbd>Tab</kbd> 来切换模式。
+**3D Viewport** 是查看和编辑场景的视口：建模、移动对象、绘制、摆姿势和制作动画都在这里进行。和所有视口一样，它顶部是**菜单栏**，底部是**工具栏**。
+
+![Object Mode 下选中立方体的 3D Viewport：顶部是完整的菜单栏](../tutoriales/img/vista-3d-barra.webp)
+
+- **菜单栏**的每个按钮及其菜单：[3D Viewport 的菜单栏](vista-3d-barra.md)。
+- **导航**（环绕、平移、缩放、各种视图、相机）：[在 3D Viewport 中导航](navegacion.md)，以及[在 3D Viewport 中导航](../tutoriales/navegacion.md)教程。
+- **移动、旋转和缩放**，以及 Gizmo、轴心点和方向：[移动、旋转和缩放](transformar.md)。
+
+## 模式
+
+3D Viewport 有多种**模式**：单击、按键和菜单的作用取决于当前所处的模式。模式可以用菜单栏的第一个按钮（它显示当前模式）来选择，也可以用 <kbd>Tab</kbd>（Object ↔ Edit；在 Nokia N95 上是 <kbd>OK</kbd>）。
+
+能选择哪些模式取决于**活动对象**。所有对象都有 **Object Mode**。3D 网格另外还有 Edit Mode 和三种绘制模式；骨架则有 Edit Mode 和 Pose Mode。如果是其他任何对象（灯光、相机、声音），唯一的模式就是 Object Mode，这个按钮也不会出现。
+
+![选中立方体时的模式菜单：Object Mode、Edit Mode、Vertex Paint、Weight Paint 和 Texture Paint](../tutoriales/img/vista-3d-menu-modo.webp)
+
+![选中骨架时的模式菜单：Object Mode、Edit Mode 和 Pose Mode](../tutoriales/img/vista-3d-modos-esqueleto.webp)
 
 | 模式 | 适用对象 | 用途 |
 |---|---|---|
-| [Object Mode](modo-objeto.md) | 全部 | 创建、移动、旋转、缩放、复制、设置父级和删除整个对象。 |
-| [Edit Mode](modo-edicion.md) | 网格和曲线 | 编辑顶点、边和面（建模）。 |
-| [骨架的 Edit Mode](esqueletos.md#骨架的-edit-mode) | 骨架 | 创建和摆放骨骼。 |
-| [Pose Mode](esqueletos.md#pose-mode) | 骨架 | 为骨骼摆姿势并制作动画。 |
-| [Weight Paint](pintura.md#weight-paint) | 仅限 3D 网格 | 绘制每根骨骼对每个顶点的影响程度。 |
-| [Vertex Paint](pintura.md#vertex-paint) | 仅限 3D 网格 | 直接在顶点上绘制颜色。 |
-| [Texture Paint](pintura.md#texture-paint) | 仅限 3D 网格 | 直接在对象表面上绘制纹理。 |
+| [Object Mode](modo-objeto.md) | 全部 | 处理整个对象：创建、移动、旋转、缩放、复制、设置父级和删除对象。 |
+| [Edit Mode](modo-edicion.md) | 3D 网格和曲线 | 建模：移动、添加和删除网格的顶点、边和面。 |
+| [Edit Mode](esqueletos.md#骨架的-edit-mode) | 骨架 | 搭建骨架：创建骨骼，并把它们摆到静止姿态的位置。 |
+| [Pose Mode](esqueletos.md#pose-mode) | 骨架 | 为骨骼摆姿势并保存姿势：角色就是这样制作动画的。 |
+| [Weight Paint](pintura.md#weight-paint) | 3D 网格 | 绘制每根骨骼对每个顶点的影响程度。 |
+| [Vertex Paint](pintura.md#vertex-paint) | 3D 网格 | 直接在顶点上绘制颜色。 |
+| [Texture Paint](pintura.md#texture-paint) | 3D 网格 | 在纹理上绘制，直接画在对象表面上。 |
 
-## 3D Viewport 的顶部栏
+### Object Mode
 
-| 按钮 | 说明 |
-|---|---|
-| 模式选择器 | 切换模式（Object、Edit、Pose、Paint…）。 |
-| Vertex / Edge / Face | 仅在 Edit Mode 中：选择哪种元素。 |
-| Transform Pivot Point | 旋转和缩放围绕的中心：3D Cursor、Individual Origins、Median Point 或 Active Element。附带 Lock Normals 复选框。 |
-| Orientation | 变换使用的坐标轴：Global、Local、Normal（面的方向）或 View。 |
-| Snap | 吸附选项。启用时显示为绿色（<kbd>Shift+Tab</kbd>）。 |
-| Proportional Editing | 移动某个元素时，附近的部分会平滑地跟着移动。启用时显示为绿色（<kbd>O</kbd>）。 |
-| View | 相机、视角、取景、局部视图、透视、锁定环绕、将相机锁定到视图。 |
-| Select | 全选、全不选、反选、框选、关联选择、循环和路径。 |
-| Add（+） | 仅在 Object Mode 中：创建新对象。 |
-| Mesh | 仅在 Edit Mode 中：各种建模操作。 |
-| Save Texture（软盘图标） | 仅在 Texture Paint 中。有未保存的绘制内容时显示为绿色。 |
-| Animation（菱形图标） | 插入、删除和清除关键帧；运动轨迹。 |
-| Context | 当前模式的菜单：Object、Vertex/Edge/Face、Armature 或 Pose。 |
-| Overlays（眼睛图标） | 要绘制哪些辅助元素：地面、坐标轴、Gizmo、3D 光标、法线、统计信息、X 射线。 |
-| Render（相机图标） | 着色模式。 |
-| Scene | 选择要编辑项目中的哪个场景、游戏或预制体，也可以新建。 |
-| UV | 仅在 Edit Mode 中：展开和投影 UV。 |
+这是 Whisk3D 启动时所在的模式，也是所有对象都有的唯一模式。在这里处理的是整个对象：选择、移动、旋转、缩放、添加和删除对象。参见 [Object Mode](modo-objeto.md) 和 [Object Mode](../tutoriales/modo-objeto.md) 教程。
 
-## 多个模式共用的菜单
+### 网格的 Edit Mode
 
-### Select
+编辑网格的**形状**：顶点、边和面。菜单栏上会出现 **Vertex / Edge / Face** 按钮（决定单击时选择哪种元素），以及 **Mesh** 和 **UV** 菜单。场景的其余部分仍然可见，但无法操作。
 
-| 功能 | 说明 | 快捷键 |
-|---|---|---|
-| All | 全部选中。 | <kbd>A</kbd> |
-| None | 取消全部选择。 | <kbd>Alt+A</kbd> |
-| Invert | 已选中的变为未选中，反之亦然。 | <kbd>Ctrl+I</kbd> |
-| Box Select | 从左往右拖（绿色）只选中完全位于框内的元素；从右往左拖（蓝色）只要碰到就会选中。按住 <kbd>Shift</kbd> 可加选。 | <kbd>B</kbd> |
-| Show selection | 显示或隐藏所选内容的轮廓。 | 菜单 |
+![Edit Mode 中的立方体：一个面被选中，显示为绿色，Gizmo 位于其上](../tutoriales/img/vista-3d-modo-edicion.webp)
 
-### Render（着色模式）
+### 骨架的 Edit Mode
 
-| 功能 | 说明 |
-|---|---|
-| Render Preview | 使用场景中的灯光。如果启用了光线追踪，会逐步显示追踪出的图像。 |
-| Material Preview | 默认模式：从视图方向打一盏中性灯光，不依赖场景中的灯光。 |
-| Solid / Wireframe / ZBuffer Preview | 灰色实体、只显示边，或显示深度。 |
-| Normal View / Alpha Preview | 用颜色显示法线，或用黑白显示透明度。 |
-| Motion vectors | 每个像素自上一帧以来在屏幕上移动了多少（红 = X，绿 = Y；淡紫 = 静止，橄榄绿 = 背景）。与渲染的 `_vectores` 通道是同一张图。 |
-| Wireframe: Only Visible | 线框视图只显示真正被绘制出来的部分。 |
+搭建**骨架**：创建骨骼（从另一根骨骼的末端挤出）、移动骨骼并设置父级。这是骨架的**静止**姿态，也就是没有动画时的姿态。
 
-### Overlays
+![Edit Mode 中 Leon 的骨架：骨骼显示为蓝色，处于静止姿态](../tutoriales/img/vista-3d-modo-edicion-esqueleto.webp)
 
-| 功能 | 说明 | 快捷键 |
-|---|---|---|
-| Show Overlays | 一次性开启或关闭所有视觉辅助元素。 | <kbd>K</kbd> |
-| Floor、X Axis、Y Axis、Origins、3D Cursor、Relationship Lines | 分别控制每种辅助元素。 | 菜单 |
-| Gizmo | 移动/旋转/缩放的 Gizmo。 | 菜单 |
-| Objects | 显示或隐藏骨架、灯光、相机、空物体、粒子、曲线、碰撞盒（hitbox）。 | 菜单 |
-| Normals | 绘制顶点法线、自定义法线或面法线，并可设置其大小。 | 菜单 |
-| Statistics | FPS、顶点数、面数、绘制调用次数和耗时。 | 菜单 |
-| X-Ray | 正在编辑的网格显示为半透明，可以选中背面的元素。 | 菜单 |
+### Pose Mode
 
-### Snap
+为骨架**摆姿势**：旋转和移动骨骼，但不改变骨架本身，网格会跟着骨骼动。保存在不同帧上的姿势，就构成了角色的动画。
 
-| 功能 | 说明 | 快捷键 |
-|---|---|---|
-| Enable | 移动的元素会吸附到顶点、边、面或它们的中心。 | <kbd>Shift+Tab</kbd> |
-| Snap Base 和 Snap Target | 被移动元素的哪个点用来吸附（Closest、Center、Median、Active），以及吸附到什么上。 | 菜单 |
-| Face Project / Face Nearest | 用于重新拓扑：让顶点贴附在另一个表面上。 | 菜单 |
-| Affect Move / Rotate / Scale | 吸附对哪些操作生效。 | 菜单 |
-| 光标的 Snap menu | Selection to Grid、Selection to Cursor 或 Selection to Active；Cursor to Selected、Cursor to World Origin、Cursor to Grid 或 Cursor to Active。 | <kbd>Shift+S</kbd> |
+![Pose Mode 中 Leon 的骨架，行走动画进行到一半：骨骼是弯曲的](../tutoriales/img/vista-3d-modo-pose.webp)
 
-### Proportional Editing
+### Weight Paint
 
-| 功能 | 说明 | 快捷键 |
-|---|---|---|
-| Enable | 移动、旋转或缩放时，相邻的部分会根据距离跟着动。 | <kbd>O</kbd> |
-| Connected Only | 沿着边来计算距离：不会带动分离的部分。 | 菜单 |
-| Falloff | 影响范围的形状：Smooth、Sphere、Root、Inverse Square、Sharp、Linear、Constant、Random。 | 菜单 |
-| Proportional Size | 影响半径。变换过程中可以用滚轮或 <kbd>PageUp</kbd> / <kbd>PageDown</kbd> 调整。 | 菜单 / 滚轮 |
+绘制**每根骨骼对网格每个部分的影响程度**：红色表示所选骨骼完全带动的部分，蓝色表示它不带动的部分。正是它让你弯曲手臂时，弯的是手臂而不是腰。
+
+![Weight Paint 中 Leon 的一个网格：所选骨骼带动胸部（红色和黄色），其余部分都不受影响（蓝色）](../tutoriales/img/vista-3d-modo-pesos.webp)
+
+### Vertex Paint
+
+在网格的**顶点上绘制颜色**，不使用纹理。可以用来给简单的模型上色、手绘阴影，以及在着色器中制作效果。
+
+![Vertex Paint 中的立方体：画笔从一侧划到另一侧，碰到的顶点被染成红色](../tutoriales/img/vista-3d-modo-vertices.webp)
+
+### Texture Paint
+
+**直接在纹理上**绘制，画在对象表面上，就像给玩偶上色一样。画好的内容用菜单栏上出现的软盘图标来保存。
+
+![Texture Paint 中的 Leon：画笔在他的夹克上画出一道红色笔触](../tutoriales/img/vista-3d-modo-textura.webp)
+
+在绘制模式中，工具栏上方会出现画笔栏（**Radius** 和 **Value**）。参见[绘制模式](pintura.md)。
+
+## 工具栏
+
+3D Viewport 底部有 **Undo** 和 **Redo**（箭头）、**最近使用的命令**（一开始是 Move、Rotate、Scale 和 Delete；用过的会移到前面），以及**比例编辑**（Proportional Editing）。移动、旋转或缩放时，工具栏会改变：绿色对勾确认，红色叉号取消，还有方向，以及把移动限制在相应轴上的 **X**、**Y** 和 **Z**。参见[移动、旋转和缩放](transformar.md#工具栏)。
+
+![Android](../tutoriales/img/icono-android.svg) 在触屏上，工具栏还会多出 **Shift** 和 **Ctrl**：它们会保持开启（显示为绿色），起到这两个键的作用；以及 **View** 按钮（显示器图标），让手指在 Edit Mode 和各绘制模式中用来导航，而不是选择或绘制。
+
+![Nokia](../tutoriales/img/icono-nokia.svg) 在 Nokia N95 上，工具栏默认是隐藏的，好把屏幕留给场景，需要时才会出现：在绘制模式中会出现画笔栏（**Radius** 和 **Value**）；在开启比例编辑的情况下移动、旋转或缩放时，会出现它的半径栏。它的按钮要用**虚拟鼠标**来操作：用右软键打开虚拟鼠标，方向键移动它，<kbd>OK</kbd> 单击。
+
+## Gizmo 和 3D 光标
+
+![选中的立方体，上面是 Gizmo（彩色箭头），左边是 3D 光标，各自用橙色圆圈和名称标出](../tutoriales/img/vista-3d-gizmo-cursor.webp)
+
+- **Gizmo** 是所选内容上的彩色箭头：抓住它们就能移动、旋转和缩放。在 Gizmo 上单击一下，会从一种模式切换到另一种。参见 [Gizmo](transformar.md#gizmo)。
+- **3D 光标**是那个带十字的圆：用 Add 添加的东西会出现在这里，它也可以作为轴心点。参见 [3D 光标](../tutoriales/modo-objeto.md#3d-光标)。
+
+![Nokia](../tutoriales/img/icono-nokia.svg) 在 Nokia N95 上，Gizmo 默认是关闭的，因为屏幕很小，而且在那里是用按键来移动的。可以在 **Overlays → Gizmo** 中开启它，然后用虚拟鼠标来抓取。

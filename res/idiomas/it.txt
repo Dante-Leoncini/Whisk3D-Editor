@@ -161,6 +161,7 @@ Assets	Asset
 Assign	Assegna
 At Center	Al centro
 At Cursor	Al cursore
+At least one scene stays open	Almeno una scena deve restare aperta
 Atlas	Atlas
 Att Constant	Att costante
 Att Linear	Att lineare
@@ -238,6 +239,7 @@ Branches	Rami
 Branches: %d (all)	Rami: %d (tutti)
 Branches: %d/%d	Rami: %d/%d
 Build game	Compila gioco
+Build: Symbian packs the saved project: save it first (File > Save)	Compila: Symbian impacchetta il progetto salvato: salvalo prima (File > Salva)
 Build: a build is already running	Compila: c'è già una compilazione in corso
 Build: a library uses files by absolute path; they do not travel with the game	Compila: una libreria usa file con percorso assoluto; non viaggiano con il gioco
 Build: compilation failed (see platform-build/%s/build.log)	Compila: compilazione non riuscita (vedi platform-build/%s/build.log)
@@ -245,6 +247,9 @@ Build: could not copy the result to build/%s	Compila: impossibile copiare il ris
 Build: could not generate CMakeLists.txt	Compila: impossibile generare CMakeLists.txt
 Build: could not generate main.cpp	Compila: impossibile generare main.cpp
 Build: could not generate the Android script	Compila: impossibile generare lo script Android
+Build: could not generate the AppImage script	Compila: impossibile generare lo script AppImage
+Build: could not generate the Makefile	Compila: impossibile generare il Makefile
+Build: could not generate the Symbian project	Compila: impossibile generare il progetto Symbian
 Build: could not open the library	Compila: impossibile aprire la libreria
 Build: could not pack the assets	Compila: impossibile impacchettare gli asset
 Build: could not read the icon; continuing without it	Compila: impossibile leggere l'icona; si prosegue senza
@@ -252,6 +257,7 @@ Build: could not write a scene (.w3dui)	Compila: impossibile scrivere una scena 
 Build: could not write the .w3dui	Compila: impossibile scrivere il .w3dui
 Build: error in a Lua script: 	Compila: errore in uno script Lua: 
 Build: the Whisk3D repo (runtime sources) was not found. Set the repo folder in Settings (or build from the source tree).	Compila: repo di Whisk3D (sorgenti del runtime) non trovato. Imposta la cartella del repo nelle Impostazioni (o compila dall'albero dei sorgenti).
+Build: the project has no game (a Game scene, or a UI with scripts)	Compila: il progetto non ha nessun gioco (una scena Gioco, o una UI con script)
 Build: the project has no scripts (add them to a Script object)	Compila: il progetto non ha script (aggiungili a un oggetto Script)
 Build: there are external references outside the project folder; they do not travel with the game	Compila: ci sono riferimenti esterni fuori dalla cartella del progetto; non viaggiano con il gioco
 Build: there is no UI in the scene	Compila: non c'è nessuna UI nella scena
@@ -314,6 +320,7 @@ Clipping	Clipping
 Clips	Clip
 Clone screen	Clona schermo
 Close	Chiudi
+Close without saving	Chiudi senza salvare
 Closest	Più vicino
 Collapse	Collassa
 Collection	Collezione
@@ -386,6 +393,7 @@ Count	Copie
 Cover	Copri
 Create	Crea
 Create Prefab	Crea prefab
+Cross	Croce
 Cube	Cubo
 Cube Projection	Proiezione cubo
 Cubic	Cubica
@@ -424,9 +432,11 @@ Delete Folder	Elimina cartella
 Delete Keyframe	Elimina keyframe
 Delete Keyframe: no keyframe at the current frame	Elimina keyframe: nessun keyframe nel frame corrente
 Delete Keyframe: the animation needs at least one keyframe	Elimina keyframe: l'animazione richiede almeno un keyframe
+Delete Mesh Layer	Elimina livello della mesh
 Delete Normals Layer	Elimina livello normali
 Delete Palette	Elimina tavolozza
 Delete editing data	Elimina dati di modifica
+Delete mesh layer: select an object animation in the timeline	Elimina livello della mesh: scegli un'animazione dell'oggetto nella timeline
 Delete normals layer: select an object animation in the timeline	Elimina livello normali: scegli un'animazione dell'oggetto nella timeline
 Delete selected?	Eliminare la selezione?
 Delete step	Elimina passo
@@ -667,6 +677,7 @@ Go to start	Vai all'inizio
 Grab step	Afferra passo
 Grain size	Dimensione grana
 Graphics	Grafica
+Graphics backend	Backend grafico
 Gravity	Gravità
 Green	Verde
 Green+Left soft	Verde+Soft sx
@@ -722,9 +733,9 @@ Influence	Influenza
 Info	Info
 Insert Keyframe	Inserisci keyframe
 Insert Keyframe (all)	Inserisci keyframe (tutto)
-Insert Keyframe Layer	Inserisci keyframe di livello
 Insert Keyframe: select an object animation in the timeline	Inserisci keyframe: scegli un'animazione dell'oggetto nella timeline
 Insert Keyframe: the mesh has no normals	Inserisci keyframe: la mesh non ha normali
+Insert Mesh Keyframe	Inserisci keyframe di mesh
 Insert UV keyframe: the mesh has no UV	Inserisci keyframe UV: la mesh non ha UV
 Inset Faces	Inset facce
 Inset: enter Edit Mode first	Inset: entra prima in Modalità Modifica
@@ -733,6 +744,7 @@ Inset: select faces first	Inset: seleziona prima delle facce
 Inside	Interno
 Inside the .w3d	Dentro il .w3d
 Installing on the phone	Installazione sul telefono
+Instance	Istanza
 Intensity	Intensità
 Interpolate	Interpola
 Interpolate (mix)	Interpola (mix)
@@ -753,6 +765,7 @@ It can't be opened	Non si può aprire
 It could not be loaded	Impossibile caricarlo
 It couldn't be copied into the .w3d	Impossibile copiarlo dentro il .w3d
 It doesn't exist anymore	Non esiste più
+It has no checkbox	Non ha una casella
 It has no proyecto.json	Non ha proyecto.json
 It is a W3D proxy: choose its library element	È un proxy W3D: scegli l'elemento della sua libreria
 It is already linked	È già collegato
@@ -820,6 +833,7 @@ Lines	Linee
 Link	Collega
 Link .w3d...	Collega .w3d...
 Linked	Collegato
+Linking	Collegamento
 List	Lista
 Load (camera x object)	Carica (camera x oggetto)
 Load .lua...	Carica .lua...
@@ -909,6 +923,7 @@ Merge Distance	Distanza di fusione
 Mesh	Mesh
 Mesh Parts	Parti mesh
 Mesh editable again	Mesh di nuovo modificabile
+Mesh layer deleted	Livello della mesh eliminato
 Mesh made single user	La mesh ora è unica
 Mesh not editable (Convert to editable mesh, Mesh card)	Mesh non modificabile (Converti in mesh modificabile, scheda Mesh 3D)
 Mesh part	Parte mesh
@@ -934,6 +949,7 @@ Mix start	Inizio del mix
 Mode	Modalità
 Model too big for the N95: more than 65535 vertices (16-bit limit)	Modello troppo grande per il N95: oltre 65535 vertici (limite a 16 bit)
 Modifier	Modificatore
+Modifier Objects	Oggetti modificatori
 Modifier applied	Modificatore applicato
 Modifiers	Modificatori
 Modulate	Modula
@@ -1119,6 +1135,7 @@ Own	Proprio
 PVS recalculated	PVS ricalcolato
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: manca <modello>.pvs.json accanto al .obj sorgente
 Packaging .deb (cpack)	Impacchettamento .deb (cpack)
+Packaging AppImage	Creazione dell'AppImage
 Packed (protected)	Impacchettati (protetti)
 Pad bottom	Pad giù
 Pad left	Pad sx
@@ -1291,6 +1308,7 @@ Replace...	Sostituisci...
 Repo	Repo
 Reset	Ripristina
 Reset Overrides	Rimuovi override
+Reset Pose	Ripristina posa
 Reset all	Ripristina tutto
 Reset: select faces first	Ripristina: seleziona prima delle facce
 Resolution	Risoluzione
@@ -1344,6 +1362,7 @@ Save Texture	Salva texture
 Save Texture: could not encode	Salva texture: impossibile codificare
 Save Texture: could not write	Salva texture: impossibile scrivere
 Save Texture: no texture	Salva texture: nessuna texture
+Save and close	Salva e chiudi
 Save and continue	Salva e continua
 Save and open	Salva e apri
 Save and quit	Salva ed esci
@@ -1506,6 +1525,7 @@ Spot	Faretto
 Spot Cutoff	Angolo faretto
 Spot Exponent	Esponente faretto
 Spread	Dispersione
+Square	Quadrato
 Start	Inizio
 Start / End / FPS	Inizio / Fine / FPS
 Start angle	Angolo iniziale
@@ -1513,6 +1533,7 @@ Start of frame	Inizio del frame
 Start time	Inizia a
 Start:%d	Inizio:%d
 Starts at frame	Inizia al frame
+Starts with	Inizia con
 State	Stato
 Static	Statico
 Statistics	Statistiche
@@ -1537,9 +1558,11 @@ Subtract (darkens)	Sottrai (scurisce)
 Summary	Riepilogo
 Sun	Sole
 Superellipse	Superellisse
+Swap	Scambia
 Switch to 0-100%	Passa a 0-100%
 Switch to 0-255	Passa a 0-255
 Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: questa destinazione non è ancora collegata a questo pulsante.
+Symbian project ready: %s (build it on Windows with build_symbian.bat)	Progetto Symbian pronto: %s (si compila su Windows con build_symbian.bat)
 Sync Selection	Sincronizza selezione
 Tag	Etichetta
 Target	Obiettivo
@@ -1607,6 +1630,7 @@ There is no script editor (IDE) in the layout	Non c'è un editor di script (IDE)
 There is no such prefab	Quel prefab non esiste
 There is no such scene	Quella scena non esiste
 Thickness	Spessore
+This animation has no keyframes in that layer	Questa animazione non ha keyframe in quel livello
 This animation has no normals layer	Questa animazione non ha un livello normali
 This file type can't be added	Questo tipo di file non si può aggiungere
 This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	Questo backend grafico non ha shader: la sezione @vertice gira sulla CPU e il resto del materiale si disegna come sempre
@@ -1735,6 +1759,7 @@ Visibility test	Test di visibilità
 Visible	Visibile
 Volume	Volume
 Volume line	Linea di volume
+Wait for the build to finish	Attendi che la compilazione finisca
 Warning	Avviso
 Warnings and errors	Avvisi ed errori
 Waveform	Forma d'onda
@@ -1778,6 +1803,7 @@ Zoom 3:1	Zoom 3:1
 Zoom 4:1	Zoom 4:1
 [X: time]	[X: tempo]
 [Y: value]	[Y: valore]
+active	attiva
 all	tutte
 all opaque	tutto opaco
 along	lungo

@@ -161,6 +161,7 @@ Assets	Varlıklar
 Assign	Ata
 At Center	Merkezde
 At Cursor	İmleçte
+At least one scene stays open	En az bir sahne açık kalmalı
 Atlas	Atlas
 Att Constant	Att Sabit
 Att Linear	Att Doğrusal
@@ -238,6 +239,7 @@ Branches	Dallar
 Branches: %d (all)	Dallar: %d (tümü)
 Branches: %d/%d	Dallar: %d/%d
 Build game	Oyunu derle
+Build: Symbian packs the saved project: save it first (File > Save)	Derle: Symbian kayıtlı projeyi paketler: önce kaydedin (Dosya > Kaydet)
 Build: a build is already running	Derle: zaten bir derleme sürüyor
 Build: a library uses files by absolute path; they do not travel with the game	Derle: bir kütüphane mutlak yollu dosyalar kullanıyor; bunlar oyunla gitmez
 Build: compilation failed (see platform-build/%s/build.log)	Derle: derleme başarısız oldu (platform-build/%s/build.log'a bakın)
@@ -245,6 +247,9 @@ Build: could not copy the result to build/%s	Derle: sonuç build/%s klasörüne 
 Build: could not generate CMakeLists.txt	Derle: CMakeLists.txt oluşturulamadı
 Build: could not generate main.cpp	Derle: main.cpp oluşturulamadı
 Build: could not generate the Android script	Derle: Android betiği oluşturulamadı
+Build: could not generate the AppImage script	Derle: AppImage betiği oluşturulamadı
+Build: could not generate the Makefile	Derle: Makefile oluşturulamadı
+Build: could not generate the Symbian project	Derle: Symbian projesi oluşturulamadı
 Build: could not open the library	Derle: kütüphane açılamadı
 Build: could not pack the assets	Derle: varlıklar paketlenemedi
 Build: could not read the icon; continuing without it	Derle: simge okunamadı; simgesiz devam ediliyor
@@ -252,6 +257,7 @@ Build: could not write a scene (.w3dui)	Derle: bir sahne yazılamadı (.w3dui)
 Build: could not write the .w3dui	Derle: .w3dui yazılamadı
 Build: error in a Lua script: 	Derle: Lua betiğinde hata: 
 Build: the Whisk3D repo (runtime sources) was not found. Set the repo folder in Settings (or build from the source tree).	Derle: Whisk3D deposu (runtime kaynakları) bulunamadı. Depo klasörünü Ayarlar'dan belirleyin (veya kaynak ağacından derleyin).
+Build: the project has no game (a Game scene, or a UI with scripts)	Derle: projede oyun yok (bir Oyun sahnesi ya da betikli bir UI)
 Build: the project has no scripts (add them to a Script object)	Derle: projede betik yok (bir Betik nesnesine ekleyin)
 Build: there are external references outside the project folder; they do not travel with the game	Derle: proje klasörü dışında harici referanslar var; bunlar oyunla gitmez
 Build: there is no UI in the scene	Derle: sahnede hiç UI yok
@@ -314,6 +320,7 @@ Clipping	Kırpma
 Clips	Klipler
 Clone screen	Ekranı klonla
 Close	Kapat
+Close without saving	Kaydetmeden kapat
 Closest	En Yakın
 Collapse	Çökert
 Collection	Koleksiyon
@@ -386,6 +393,7 @@ Count	Adet
 Cover	Kapla
 Create	Oluştur
 Create Prefab	Prefab oluştur
+Cross	Haç
 Cube	Küp
 Cube Projection	Küp İzdüşümü
 Cubic	Kübik
@@ -424,9 +432,11 @@ Delete Folder	Klasörü sil
 Delete Keyframe	Anahtar Kareyi Sil
 Delete Keyframe: no keyframe at the current frame	Anahtar kareyi sil: geçerli karede anahtar kare yok
 Delete Keyframe: the animation needs at least one keyframe	Anahtar kareyi sil: animasyonun en az bir anahtar karesi olmalı
+Delete Mesh Layer	Örgü katmanını sil
 Delete Normals Layer	Normal katmanını sil
 Delete Palette	Paleti sil
 Delete editing data	Düzenleme verilerini sil
+Delete mesh layer: select an object animation in the timeline	Örgü katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
 Delete normals layer: select an object animation in the timeline	Normal katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
 Delete selected?	Seçilenler silinsin mi?
 Delete step	Adımı sil
@@ -667,6 +677,7 @@ Go to start	Başa git
 Grab step	Adımı tut
 Grain size	Gren boyutu
 Graphics	Grafik
+Graphics backend	Grafik altyapısı
 Gravity	Yerçekimi
 Green	Yeşil
 Green+Left soft	Yeşil+Sol soft
@@ -722,9 +733,9 @@ Influence	Etki
 Info	Bilgi
 Insert Keyframe	Anahtar Kare Ekle
 Insert Keyframe (all)	Anahtar kare ekle (tümü)
-Insert Keyframe Layer	Katman Anahtar Karesi Ekle
 Insert Keyframe: select an object animation in the timeline	Anahtar kare ekle: zaman çizelgesinde bir nesne animasyonu seçin
 Insert Keyframe: the mesh has no normals	Anahtar kare ekle: örgünün normalleri yok
+Insert Mesh Keyframe	Örgü Anahtar Karesi Ekle
 Insert UV keyframe: the mesh has no UV	UV anahtar karesi ekle: örgünün UV'si yok
 Inset Faces	Yüzleri İçe Kaydır
 Inset: enter Edit Mode first	İçe Kaydır: önce Düzenleme Moduna girin
@@ -733,6 +744,7 @@ Inset: select faces first	İçe Kaydır: önce yüzleri seçin
 Inside	İç
 Inside the .w3d	.w3d'nin içinde
 Installing on the phone	Telefona yükleniyor
+Instance	Örnek
 Intensity	Şiddet
 Interpolate	Enterpole et
 Interpolate (mix)	Enterpole et (karışım)
@@ -753,6 +765,7 @@ It can't be opened	Açılamaz
 It could not be loaded	Yüklenemedi
 It couldn't be copied into the .w3d	.w3d içine kopyalanamadı
 It doesn't exist anymore	Artık yok
+It has no checkbox	Onay kutusu yok
 It has no proyecto.json	proyecto.json yok
 It is a W3D proxy: choose its library element	Bir W3D proxy: kütüphanedeki öğesini seçin
 It is already linked	Zaten bağlantılı
@@ -820,6 +833,7 @@ Lines	Çizgiler
 Link	Bağla
 Link .w3d...	.w3d bağla...
 Linked	Bağlantılı
+Linking	Bağlanıyor
 List	Liste
 Load (camera x object)	Yükle (kamera x nesne)
 Load .lua...	.lua yükle...
@@ -909,6 +923,7 @@ Merge Distance	Kaynaştırma Mesafesi
 Mesh	Örgü
 Mesh Parts	Örgü Parçaları
 Mesh editable again	Örgü yeniden düzenlenebilir
+Mesh layer deleted	Örgü katmanı silindi
 Mesh made single user	Örgü artık tek kullanıcılı
 Mesh not editable (Convert to editable mesh, Mesh card)	Örgü düzenlenemez (Düzenlenebilir örgüye dönüştür, 3D Örgü kartı)
 Mesh part	Örgü parçası
@@ -934,6 +949,7 @@ Mix start	Karışım başı
 Mode	Mod
 Model too big for the N95: more than 65535 vertices (16-bit limit)	N95 için model çok büyük: 65535'ten fazla köşe (16 bit sınırı)
 Modifier	Değiştirici
+Modifier Objects	Değiştirici nesneler
 Modifier applied	Değiştirici uygulandı
 Modifiers	Değiştiriciler
 Modulate	Modüle et
@@ -1119,6 +1135,7 @@ Own	Kendi
 PVS recalculated	PVS yeniden hesaplandı
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: kaynak .obj'nin yanında <model>.pvs.json eksik
 Packaging .deb (cpack)	.deb paketleniyor (cpack)
+Packaging AppImage	AppImage paketleniyor
 Packed (protected)	Paketli (korumalı)
 Pad bottom	Dolgu alt
 Pad left	Dolgu sol
@@ -1291,6 +1308,7 @@ Replace...	Değiştir...
 Repo	Depo
 Reset	Sıfırla
 Reset Overrides	Override'ları sıfırla
+Reset Pose	Pozu Sıfırla
 Reset all	Tümünü sıfırla
 Reset: select faces first	Sıfırla: önce yüzleri seçin
 Resolution	Çözünürlük
@@ -1344,6 +1362,7 @@ Save Texture	Dokuyu Kaydet
 Save Texture: could not encode	Dokuyu Kaydet: kodlanamadı
 Save Texture: could not write	Dokuyu Kaydet: yazılamadı
 Save Texture: no texture	Dokuyu Kaydet: doku yok
+Save and close	Kaydet ve kapat
 Save and continue	Kaydet ve devam et
 Save and open	Kaydet ve aç
 Save and quit	Kaydet ve çık
@@ -1506,6 +1525,7 @@ Spot	Spot
 Spot Cutoff	Spot Açısı
 Spot Exponent	Spot Üssü
 Spread	Yayılım
+Square	Kare
 Start	Başlangıç
 Start / End / FPS	Başlangıç / Son / FPS
 Start angle	Başlangıç açısı
@@ -1513,6 +1533,7 @@ Start of frame	Kare başı
 Start time	Başlama zamanı
 Start:%d	Baş:%d
 Starts at frame	Başladığı kare
+Starts with	Başlangıç
 State	Durum
 Static	Statik
 Statistics	İstatistikler
@@ -1537,9 +1558,11 @@ Subtract (darkens)	Çıkar (koyulaştırır)
 Summary	Özet
 Sun	Güneş
 Superellipse	Süperelips
+Swap	Yer değiştir
 Switch to 0-100%	0-100%'e geç
 Switch to 0-255	0-255'e geç
 Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: bu hedef henüz bu düğmeye bağlı değil.
+Symbian project ready: %s (build it on Windows with build_symbian.bat)	Symbian projesi hazır: %s (Windows'ta build_symbian.bat ile derleyin)
 Sync Selection	Seçimi Eşitle
 Tag	Etiket
 Target	Hedef
@@ -1607,6 +1630,7 @@ There is no script editor (IDE) in the layout	Yerleşimde betik düzenleyici (ID
 There is no such prefab	Böyle bir prefab yok
 There is no such scene	Böyle bir sahne yok
 Thickness	Kalınlık
+This animation has no keyframes in that layer	Bu animasyonun o katmanda anahtar karesi yok
 This animation has no normals layer	Bu animasyonun normal katmanı yok
 This file type can't be added	Bu dosya türü eklenemez
 This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	Bu grafik arka ucunda shader yok: @vertice bölümü CPU'da çalışır, malzemenin geri kalanı her zamanki gibi çizilir
@@ -1735,6 +1759,7 @@ Visibility test	Görünürlük testi
 Visible	Görünür
 Volume	Ses düzeyi
 Volume line	Ses düzeyi çizgisi
+Wait for the build to finish	Derlemenin bitmesini bekleyin
 Warning	Uyarı
 Warnings and errors	Uyarılar ve hatalar
 Waveform	Dalga biçimi
@@ -1778,6 +1803,7 @@ Zoom 3:1	Zoom 3:1
 Zoom 4:1	Zoom 4:1
 [X: time]	[X: zaman]
 [Y: value]	[Y: değer]
+active	etkin
 all	tümü
 all opaque	tamamen opak
 along	boyunca

@@ -97,9 +97,34 @@ PopupMenu* MenuMallas  = NULL; // submenu "Add > Mesh": las primitivas (8 de las
 PopupMenu* MenuPrefabsAdd = NULL; // submenu "Add > Prefab": los prefabs del proyecto (io/PrefabsEditor.h)
 PopupMenu* MenuEscenasAdd = NULL; // submenu "Add > Scene": las otras escenas instanciadas (io/PrefabsEditor.h)
 PopupMenu* MenuCore = NULL;      // submenu "Add > Core": las RUTINAS (objetos avanzados: pasos del render)
+PopupMenu* MenuModificadores = NULL;   // submenu "Add > Modifier Objects": espejo, array, instancia
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuAnimation = NULL; // "Animation": keyframes del objeto + Motion Trail (solo con seleccion)
+// los submenus de las capas de la animacion de una malla (vertices, normales, UV): insertar un keyframe y borrar la capa
+static PopupMenu* MenuKeyMalla = NULL;
+static PopupMenu* MenuBorrarCapaMalla = NULL;
+// El menu "Animation" se ARMA AL ABRIRLO (LayoutInput.cpp), segun el contexto: lo de las mallas (sus keyframes de
+// vertices, normales y UV, y borrar una de esas capas) solo con una MALLA activa; en el Modo Pose, los keyframes de
+// los huesos y Reset Pose (los huesos elegidos vuelven a como estan en el Modo Edicion). El item 0 es SIEMPRE Insert
+// Keyframe (LayoutSyncInsertKeySubmenu le pone o le saca el submenu de canales).
+void MenuAnimationArmar(){
+    if (!MenuAnimation) return;
+    extern PopupMenu* MenuInsertKey;
+    MenuAnimation->Limpiar();
+    MenuAnimation->Agregar(T("Insert Keyframe"), 510, IconType::keyframe, MenuInsertKey)->atajo = "@3d.keyframe";
+    const bool pose = (InteractionMode == PoseMode);
+    const bool malla = !pose && ObjActivo && ObjActivo->getType() == ObjectType::mesh;
+    if (malla) MenuAnimation->Agregar(T("Insert Mesh Keyframe"), 0, IconType::mesh, MenuKeyMalla);
+    // (en el Modo Pose, Delete/Clear Keyframe son los de los HUESOS: el dispatch de 511/512 lo ve)
+    MenuAnimation->Agregar(T("Delete Keyframe"), 511, IconType::borrar);
+    MenuAnimation->Agregar(T("Clear Keyframe"),  512);
+    if (pose) MenuAnimation->Agregar(T("Reset Pose"), 520, IconType::armature);   // PoseClearTransform(0)
+    // una CAPA entera de la animacion de la malla (p. ej. las normales de un modelo sin iluminacion). No es un
+    // keyframe: es una capa de la animacion, por eso va en su propio submenu.
+    if (malla) MenuAnimation->Agregar(T("Delete Mesh Layer"), 0, IconType::borrar, MenuBorrarCapaMalla);
+    MenuAnimation->AgregarCheck(T("Motion Trail"), 513, &MotionTrailOn);
+}
 PopupMenu* MenuMesh = NULL;      // edit mode: operaciones de malla (Transform + Extrude)
 PopupMenu* MenuTransform = NULL; // submenu de Object: Move / Rotate / Scale
 PopupMenu* MenuPose = NULL;      // menu "Pose" (Pose Mode): Insert Keyframe + Transform
@@ -249,6 +274,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuPrefabsAdd = new PopupMenu();
         MenuEscenasAdd = new PopupMenu();
         MenuCore = new PopupMenu();
+        MenuModificadores = new PopupMenu();
         extern void LayoutConstruirMenuAdd();
         LayoutConstruirMenuAdd();
         MenuAdd->titulo = T("Add");   // el boton es un icono sin texto -> el menu lleva titulo
@@ -295,9 +321,9 @@ Viewport3D::Viewport3D(Vector3 pos){
         // se ejecutan en el propio submenu (AccionSnap): los ids 0-7 no chocan con los de este menu.
         { extern PopupMenu* LayoutSubmenuSnap(); MenuObject->Agregar(T("Snap"), 8, -1, LayoutSubmenuSnap())->atajo = "@global.menuSnap"; }
         // CORTAR / COPIAR / PEGAR (tambien entre ventanas de Whisk3D: LayoutObjetosCopiar), separados con una linea
-        MenuObject->Agregar(T("Cut"), 720, IconType::borrar)->atajo = "Ctrl+X";
-        MenuObject->Agregar(T("Copy"), 721)->atajo = "Ctrl+C";
-        MenuObject->Agregar(T("Paste"), 722)->atajo = "Ctrl+V";
+        MenuObject->Agregar(T("Cut"), 720, IconType::tijera)->atajo = "Ctrl+X";
+        MenuObject->Agregar(T("Copy"), 721, IconType::copiar)->atajo = "Ctrl+C";
+        MenuObject->Agregar(T("Paste"), 722, IconType::pegar)->atajo = "Ctrl+V";
         MenuObject->Agregar(T("Duplicate Objects"), 1)->atajo = "@3d.duplicar";
         MenuObject->items[MenuObject->items.size() - 1]->lineaArriba = true;
         MenuObject->Agregar(T("Duplicate Linked"), 2)->atajo = "@3d.instancia";
@@ -306,7 +332,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         // los atajos). Solo aparecen aca -> solo en Object Mode (MenuObject no se muestra en Edit).
         MenuObject->Agregar(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->atajo = "@global.emparentar";
         MenuObject->Agregar(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->atajo = "@global.desemparentar";
-        MenuObject->Agregar(T("Delete"), 3)->atajo = "@3d.borrar";
+        MenuObject->Agregar(T("Delete"), 3, IconType::borrar)->atajo = "@3d.borrar";
         // PREFABS (io/PrefabsEditor.h): lo elegido pasa a un prefab nuevo (queda una instancia) / la instancia
         // activa se desempaqueta en objetos comunes
         MenuObject->Agregar(T("Create Prefab"), 700, IconType::prefab);
@@ -328,23 +354,20 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuInsertKey->Agregar(T("Scale Only"), 533);
         MenuAnimation = new PopupMenu();
         MenuAnimation->titulo = T("Animation");   // el boton es un icono sin texto -> el menu lleva titulo
-        MenuAnimation->Agregar(T("Insert Keyframe"), 510, IconType::keyframe, MenuInsertKey)->atajo = "@3d.keyframe";
-        // CAPAS de la animacion del objeto: "vertex animation", "normal animation" y "animar los UV"
-        // son la MISMA animacion con capas distintas. Este submenu deja elegir cual capturar en vez de
-        // dejar que la decida el editor desde el que insertaste (que es el default y sigue estando).
-        static PopupMenu* MenuKeyCapa = NULL;
-        MenuKeyCapa = new PopupMenu();
-        { extern void LayoutAccionObject(int); MenuKeyCapa->action = LayoutAccionObject; }   // (ids 540-542: ver MenuInsertKey)
-        MenuKeyCapa->Agregar(T("Vertices"), 540, IconType::mesh);
-        MenuKeyCapa->Agregar(T("Normals"),  541, IconType::normalVertex);
-        MenuKeyCapa->Agregar(T("UV"),       542, IconType::textura);
-        MenuAnimation->Agregar(T("Insert Keyframe Layer"), 0, IconType::keyframe, MenuKeyCapa);
-        MenuAnimation->Agregar(T("Delete Keyframe"), 511, IconType::borrar);
-        MenuAnimation->Agregar(T("Clear Keyframe"),  512);
-        // capa de NORMALES de la vertex anim activa: borrarla entera (modelos sin iluminacion). No es un
-        // keyframe: es una CAPA de la animacion, por eso va abajo de todo y no en el submenu de keyframes.
-        MenuAnimation->Agregar(T("Delete Normals Layer"), 514, IconType::normalVertex);
-        MenuAnimation->AgregarCheck(T("Motion Trail"), 513, &MotionTrailOn);
+        // KEYFRAMES DE LA MALLA: "vertex animation", "normal animation" y "animar los UV" son la MISMA
+        // animacion con capas distintas. Este submenu deja elegir cual capturar en vez de dejar que la
+        // decida el editor desde el que insertaste (que es el default y sigue estando).
+        MenuKeyMalla = new PopupMenu();
+        { extern void LayoutAccionObject(int); MenuKeyMalla->action = LayoutAccionObject; }   // (ids 540-542: ver MenuInsertKey)
+        MenuKeyMalla->Agregar(T("Vertices"), 540, IconType::mesh);
+        MenuKeyMalla->Agregar(T("Normals"),  541, IconType::normalVertex);
+        MenuKeyMalla->Agregar(T("UV"),       542, IconType::textura);
+        MenuBorrarCapaMalla = new PopupMenu();
+        { extern void LayoutAccionObject(int); MenuBorrarCapaMalla->action = LayoutAccionObject; }   // (ids 550-552)
+        MenuBorrarCapaMalla->Agregar(T("Vertices"), 550, IconType::mesh);
+        MenuBorrarCapaMalla->Agregar(T("Normals"),  551, IconType::normalVertex);
+        MenuBorrarCapaMalla->Agregar(T("UV"),       552, IconType::textura);
+        MenuAnimationArmar();   // (se vuelve a armar cada vez que se abre: depende del modo y del objeto activo)
         // menu "Pose" (Pose Mode): Insert Keyframe + submenu Transform (Move/Rotate/Scale). Reusa MenuTransform.
         extern PopupMenu* MenuPose;
         // (regla de los titulos: el boton de contexto es un icono sin texto -> su menu lleva titulo)
@@ -492,7 +515,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     showCamera = true;
     showEmpty = true;
     showSonidos = true;
-    showParticulas = false;  // DEFAULT DESTILDADO: no ver las flechas de los emisores en el juego del editor
+    showParticulas = true;   // los emisores de particulas SE VEN (al dar Play, JuegoPrepararViewports apaga los overlays)
     showCurvas = true;       // las curvas/rieles se ven por defecto; el checkbox permite ocultarlas
     showHitbox = true;       // el alambre de los hitbox (sin apagar los demas overlays ni el hitbox)
     show3DCursor = true;
@@ -500,6 +523,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     limpiarPantalla = true;
     lockOrbit = false; // por defecto se orbita normal; el usuario lo activa para modo tablero 2D
     localViewActivo = false;   // local view ("/") apagado
+    lvNacidos = 0;
     view = RenderType::MaterialPreview;
     nearClip = 0.01f;
     farClip = 1000.0f;
@@ -691,6 +715,15 @@ static void LV_AgregarSubarbol(Object* o, std::set<Object*>& s){
 static void LV_AgregarAncestros(Object* o, std::set<Object*>& s){
     for (Object* p = o->Parent; p; p = p->Parent) s.insert(p);   // padres: para que la recursion ALCANCE al hijo
 }
+// los objetos que NACIERON con serial >= desde (Separar, Shift+D, Aniadir, Pegar, importar...): entran a la vista local
+static void LV_AgregarNacidos(Object* raiz, unsigned int desde, std::set<Object*>& vis, std::set<Object*>& paso){
+    if (!raiz) return;
+    for (size_t i = 0; i < raiz->Childrens.size(); i++){
+        Object* o = raiz->Childrens[i];
+        if (o->serial >= desde) { LV_AgregarSubarbol(o, vis); LV_AgregarAncestros(o, paso); }
+        else LV_AgregarNacidos(o, desde, vis, paso);
+    }
+}
 void Viewport3D::LocalViewEntrar(){
     localViewSet.clear(); localViewPaso.clear();
     for (size_t i = 0; i < ObjSelects.size(); i++){
@@ -698,6 +731,7 @@ void Viewport3D::LocalViewEntrar(){
         LV_AgregarAncestros(ObjSelects[i], localViewPaso); // + su cadena de padres: solo de paso (no se dibujan)
     }
     if (SceneCollection) localViewSet.insert(SceneCollection); // la raiz siempre traversable
+    lvNacidos = W3dObjetosNacidos();   // desde aca, lo que nazca en esta vista entra a la vista local
     // snapshot de la camara para restaurarla al salir
     lvViewRot = viewRot; lvPivot = pivot; lvOrbitDistance = orbitDistance;
     lvOrtho = orthographic; lvFromCam = ViewFromCameraActive;
@@ -2276,6 +2310,16 @@ void Viewport3D::Render() {
     { extern bool g_showSonidos; g_showSonidos = showSonidos && ovl; }   // objects/Sonido.cpp (icono, esferas y pick)   // objects/Hitbox.cpp (dibujo y pick)
     // LOCAL VIEW de ESTE viewport -> globals que lee Object::Render (mismo patron que g_mostrarOverlays). El set
     // vive en el viewport; otro viewport sin local view lo deja en false/NULL al publicar SU estado.
+    // lo que NACE mientras dura la vista local (Separar con P, Shift+D, Aniadir, Pegar...) entra a la vista local de la
+    // Vista 3D donde se esta trabajando, como en Blender. Antes el objeto nuevo desaparecia y parecia un error (duenio,
+    // 2026-11-09). Las OTRAS Vistas 3D en vista local solo se ponen al dia (no lo suman)
+    if (localViewActivo) {
+        const unsigned int nacidos = W3dObjetosNacidos();
+        if (nacidos != lvNacidos) {
+            if (Viewport3DActive == this) LV_AgregarNacidos(SceneCollection, lvNacidos, localViewSet, localViewPaso);
+            lvNacidos = nacidos;
+        }
+    }
     { g_localViewActivo = localViewActivo; g_localViewVisibles = localViewActivo ? &localViewSet : 0;
       g_localViewPaso = localViewActivo ? &localViewPaso : 0; }
 
@@ -3815,11 +3859,11 @@ void Viewport3D::RenderUI() {
                                    (g_transformPivot == PivotActive)     ? (int)IconType::pivotActive :
                                                                            (int)IconType::pivotMedian;
             SyncBotonContexto();
-            // "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado y en Object Mode
-            // (en Pose Mode los keyframes van por el menu "Pose").
+            // "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado, en Object Mode y en
+            // Pose Mode (ahi: Insert Keyframe y Reset Pose).
             Button* bAnim = BarRolBtn(BarButtons, BR_Animation);
             if (bAnim) bAnim->visible = HayObjetosSeleccionados() &&
-                ((InteractionMode == ObjectMode) ||
+                ((InteractionMode == ObjectMode) || (InteractionMode == PoseMode) ||
                  (InteractionMode == EditMode && ActiveAnimKind == 3)); // editando una vertex anim: Insert Keyframe a mano
             Button* bOri = BarRolBtn(BarButtons, BR_Orient);  // muestra la orientacion actual
             if (bOri) bOri->visible = !pintura;

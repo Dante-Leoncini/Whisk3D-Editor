@@ -1,0 +1,184 @@
+# LO BASICO QUE NO SE PUEDE VOLVER A ROMPER. Los errores que encontro el duenio el 2026-11-09 al modelar el picaporte
+# del tutorial ("la gente tiene que poder hacer estos tutoriales en cualquier sistema y en todos conseguir el mismo
+# resultado"). Cada uno se hace por la MISMA puerta que usa la persona: las teclas, los clicks, el dedo. Los controles
+# (topologia, volumen, cajamundo, propclic, renombrarfila, dedogizmo...) estan en main/test/W3dCapturas.cpp.
+
+# ---- 1) EXTRUIR UN PLANO SUELTO: queda CERRADO, como una caja (se perdia la cara de abajo) ----
+add plane
+ratonvista3d
+tecla Tab
+selmode face
+select face 0
+tecla e
+texto 1
+tecla Return
+tecla Tab
+topologia Plano 8 12 6 0
+# positivo: todas las caras miran para afuera (el fondo tambien). 2 x 2 x 1 = 4
+volumen Plano 3.99 4.02
+
+# ---- 2) EXTRUIR LA CARA DE UN CUBO: la original SI se va (si quedara, seria una cara escondida adentro) ----
+selobj Cubo
+ratonvista3d
+tecla Tab
+selmode face
+select none
+select face 0
+tecla e
+texto 0.5
+tecla Return
+tecla Tab
+topologia Cubo 12 20 10 0
+# 2 x 2 x 2 + 2 x 2 x 0,5 = 10
+volumen Cubo 9.99 10.02
+
+# ---- 3) SEPARAR (P): el pedazo se va ENTERO. En el original no quedan sus aristas como lineas sueltas (en el Modo
+#      Objeto se seguia viendo el contorno de lo separado) ----
+selobj Plano
+ratonvista3d
+tecla Tab
+selmode face
+select all
+duplicate
+tecla p
+tecla Tab
+topologia Plano 8 12 6 0
+topologia Plano.001 8 12 6 0
+
+# ---- 4) ORIGEN AL CURSOR 3D: se mueve el origen; la geometria queda exactamente donde estaba ----
+selobj Plano
+cajamundo Plano -1 0 -1 1 1 1 0.002
+cursor3d 0.5 0.5 0.5
+origen cursor
+cajamundo Plano -1 0 -1 1 1 1 0.002
+objat Plano 0.5 0.5 0.5 0.001
+cursor3d 0 0 0
+
+# ---- 5) EL MIRROR: la casilla "Espejo Y" es la Y de la pantalla (la Z interna), no la vertical. Antes estaban
+#      cruzadas: para espejar a lo ancho de una puerta habia que prender la Z ----
+selobj Cubo
+agregar modificador 1
+propstab 4
+cuadro
+modeje x 1
+modeje y 0
+modeje z 0
+propclic Mirror Y
+modeje z 1
+modeje y 0
+propclic Mirror Z
+modeje y 1
+
+# ---- 6) EL EJE DEL TORNILLO: la vertical se llama Z, como en el resto de la pantalla ----
+agregar modificador 0
+cuadro
+propboton Axis | Z
+
+# ---- 7) W EN EL MODO OBJETO: abre el menu Objeto en el mouse, como el click derecho (solo andaba en Edicion) ----
+selobj Cubo
+ratonvista3d
+tecla w
+menuabierto si
+menuitem Set Origin
+tecla Escape
+menuabierto no
+
+# ---- 8) RENOMBRAR CON MAYUSCULAS EN EL OUTLINER: el objeto activo no cambia (soltar el Shift saltaba al primero) ----
+selobj Cubo
+renombrarfila Cubo Picaporte
+activo Picaporte
+
+# ---- 10) LA VISTA LOCAL: lo que se separa con P se sigue viendo (antes el objeto nuevo desaparecia de la vista local
+#       y parecia un error). Lo que no estaba aislado, sigue oculto ----
+selobj Plano
+ratonvista3d
+tecla Keypad_/
+vistalocal Plano 1
+vistalocal Picaporte 0
+tecla Tab
+selmode face
+select all
+duplicate
+tecla p
+tecla Tab
+vistalocal Plano.002 1
+vistalocal Picaporte 0
+tecla Keypad_/
+
+# ---- 11) EL VACIO SE LLAMA EN EL IDIOMA DEL EDITOR: Aniadir > Vacio daba "Empty" aunque el editor estuviera en
+#       castellano (la luz, la camara y el cubo si se traducian) ----
+agregar vacio
+activo Vacío
+
+# ---- 12) EL DIBUJO DEL VACIO: nace circulo acostado en el piso; la forma se elige en Propiedades (pestania con la
+#       cruz); la forma, el tamanio y el giro vuelven iguales al abrir el .w3d. Es solo la vista ----
+vaciodibujo 2 1 0 0 0
+propstab 2
+cuadro
+propclic Shape
+menuabierto si
+menuelegir Sphere
+vaciodibujo 3 1 0 0 0
+propclic Shape
+menuabierto si
+menuitem Cube
+menuelegir Cube
+vaciodibujo 4 1 0 0 0
+vacioponer 3 1.5 90 0 45
+guardarw3d /tmp/w3d_prueba_vacio.w3d
+abrirw3d /tmp/w3d_prueba_vacio.w3d
+selobj Vacío
+vaciodibujo 3 1.5 90 0 45
+
+# ---- 13) DUPLICAR Y PEGAR KEYFRAMES: lo que tapan al nacer NO se borra si despues se corren (antes: duplicar el
+#       keyframe 1 lo ponia en el 2 y BORRABA el 2 en el acto; pegar parado en el 2, tambien). Solo pisa si se SUELTA
+#       encima. Un cubo con un keyframe en el 1 (x = 0) y otro en el 2 (x = 2) ----
+add cube
+keyobj 1 0
+keyobj 2 2
+tlframes 1 2
+tl selframe 1
+tl duplicar
+tl valor 3
+tl aceptar
+tlframes 1 2 5
+tl selframe 1
+tl copiar
+tl frame 2
+tl pegar
+tl valor 5
+tl aceptar
+tlframes 1 2 5 7
+frame 2
+objat Cubo 2 0 0 0.001
+# soltado ENCIMA si pisa: duplicar el 1 y aceptar sin correrlo -> el 2 pasa a ser la copia del 1 (x = 0)
+tl selframe 1
+tl duplicar
+tl aceptar
+tlframes 1 2 5 7
+frame 2
+objat Cubo 0 0 0 0.001
+
+# ---- 14) PADRE E HIJO ELEGIDOS JUNTOS: al girar, el hijo solo acompania al padre (antes giraba DOS veces: con el
+#       padre y por su cuenta, y el picaporte se desarmaba de la puerta) ----
+add cube
+objname PadreP
+add cube
+objname HijoP
+objpos 2 0 0
+parent HijoP PadreP
+selobj HijoP
+selname PadreP
+ratonvista3d
+tecla r
+tecla z
+texto 90
+tecla Return
+objat HijoP 2 0 0 0.001
+
+# ---- 9) EL GIZMO CON EL DEDO: la camara no orbita mientras el dedo arrastra el anillo; gira el objeto. (Va al FINAL:
+#       despues de un toque el editor ignora un momento los clicks del mouse -los fantasma del navegador-, y un
+#       propclic justo despues no llegaria) ----
+selobj Picaporte
+gizmomodo 1
+dedogizmo 2 120 0 24

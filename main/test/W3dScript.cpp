@@ -1529,6 +1529,119 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- addmodif <Mirror|Array|Instance> [target X|-] [targetactivo 1] [copias N] : Add > Modifier Objects > ese item
+    //      (por la tabla del menu: el submenu tiene que estar colgado del Add) y asserta lo que creo. 'targetactivo 1' =
+    //      su target es el objeto que estaba activo al crearlo ----
+    if (cmd == "addmodif") {
+        std::string que; ss >> que;
+        if (!MenuAdd || !MenuModificadores) { err = "addmodif: sin el menu Add"; return false; }
+        bool colgado = false;
+        for (size_t i = 0; i < MenuAdd->items.size(); i++) if (MenuAdd->items[i]->submenu == MenuModificadores) colgado = true;
+        if (!colgado) { err = "addmodif: 'Modifier Objects' no esta en el menu Add"; return false; }
+        MenuItem* it = NULL;
+        for (size_t i = 0; i < MenuModificadores->items.size() && !it; i++)
+            if (MenuModificadores->items[i]->text == T(que.c_str())) it = MenuModificadores->items[i];
+        if (!it || !it->accion) { err = "addmodif: no hay un item '" + que + "' en Modifier Objects"; return false; }
+        Object* antes = ObjActivo;
+        it->accion();
+        Object* o = ObjActivo;
+        Target* tg = NULL;
+        if (o && o->getType() == ObjectType::instance) tg = (Instance*)o;
+        else if (o && o->getType() == ObjectType::mirror) tg = (Mirror*)o;
+        if (!tg) { err = "addmodif: no quedo elegido un espejo o una instancia"; return false; }
+        printf("      [addmodif] %s -> '%s' (%s) target '%s' copias %d\n", que.c_str(), o->name.c_str(),
+               o->getType() == ObjectType::mirror ? "mirror" : "instance", tg->target ? tg->target->name.c_str() : "-",
+               o->getType() == ObjectType::instance ? (int)((Instance*)o)->count : 0);
+        std::string k, v;
+        while (ss >> k >> v) {
+            if (k == "target") {
+                const std::string hay = tg->target ? tg->target->name : std::string("-");
+                if (hay != v) { err = "addmodif: el target es '" + hay + "', se esperaba '" + v + "'"; return false; }
+            } else if (k == "targetactivo") {
+                if ((tg->target == antes && antes) != (v == "1")) { err = "addmodif: su target no es el objeto que estaba activo"; return false; }
+            } else if (k == "copias") {
+                if (o->getType() != ObjectType::instance || (int)((Instance*)o)->count != atoi(v.c_str())) {
+                    err = "addmodif: no tiene " + v + " copias"; return false;
+                }
+            } else { err = "addmodif: no entiendo '" + k + "'"; return false; }
+        }
+        return true;
+    }
+    // ---- mirrorcasilla X|Y|Z <0|1> [eje x|y|z] : la casilla "Mirror X/Y/Z" de la tarjeta del espejo activo (como la ve
+    //      el usuario: Y y Z con la convencion Z-arriba del panel) y asserta que eje del motor cambio ----
+    // ---- instcopias <n> : el campo "Count" de la tarjeta Linked del Array activo (se aplica en el cuadro siguiente) ----
+    if (cmd == "mirrorcasilla" || cmd == "instcopias") {
+        Properties* pp = PropsActivo;
+        if (!pp) {   // (el primer panel Properties del layout)
+            std::vector<ViewportBase*> pila(1, rootViewport);
+            while (!pila.empty() && !pp) {
+                ViewportBase* n = pila.back(); pila.pop_back();
+                if (!n) continue;
+                if (n->isLeaf()) { if (n->ViewportKind() == 3) pp = (Properties*)n; continue; }
+                pila.push_back(n->ContainerKind() == 1 ? ((ViewportRow*)n)->childA : ((ViewportColumn*)n)->childA);
+                pila.push_back(n->ContainerKind() == 1 ? ((ViewportRow*)n)->childB : ((ViewportColumn*)n)->childB);
+            }
+        }
+        if (!pp) { err = cmd + ": sin el panel Properties activo"; return false; }
+        rootViewport->Render();   // (la tarjeta se ata al objeto activo al dibujarse)
+        if (cmd == "instcopias") {
+            int n = 1; ss >> n;
+            Instance* in = (ObjActivo && ObjActivo->getType() == ObjectType::instance) ? (Instance*)ObjActivo : NULL;
+            if (!in || !pp->propInstCopias || !pp->propInstCopias->value) { err = "instcopias: sin un Array activo (o sin el campo)"; return false; }
+            pp->propInstCopias->Set((float)n);
+            rootViewport->Render();
+            printf("      [instcopias] '%s': %d copias\n", in->name.c_str(), (int)in->count);
+            if ((int)in->count != n) { char b[64]; snprintf(b, sizeof(b), "instcopias: el Array quedo con %d", (int)in->count); err = b; return false; }
+            return true;
+        }
+        std::string casilla, eje; int val = 1; ss >> casilla >> val;
+        std::string k; if (ss >> k && k == "eje") ss >> eje;
+        Mirror* mi = (ObjActivo && ObjActivo->getType() == ObjectType::mirror) ? (Mirror*)ObjActivo : NULL;
+        if (!mi) { err = "mirrorcasilla: el activo no es un espejo"; return false; }
+        PropBool* pb = casilla == "X" ? pp->propMirrorX : casilla == "Y" ? pp->propMirrorY : pp->propMirrorZ;
+        if (!pb || !pb->value) { err = "mirrorcasilla: la casilla no esta atada"; return false; }
+        *pb->value = (val != 0);
+        printf("      [mirrorcasilla] %s=%d -> motor x%d y%d z%d\n", casilla.c_str(), val, mi->mirrorX, mi->mirrorY, mi->mirrorZ);
+        if (!eje.empty()) {
+            const bool* e = eje == "x" ? &mi->mirrorX : eje == "y" ? &mi->mirrorY : &mi->mirrorZ;
+            if (pb->value != e) { err = "mirrorcasilla: la casilla " + casilla + " no es el eje " + eje + " del motor"; return false; }
+        }
+        return true;
+    }
+    // ---- vpswap <tipo> : "Swap" del menu de tipo del primer viewport de ese tipo (3d outliner properties timeline...)
+    //      con su hermano; asserta que cambiaron de lugar y que cada uno conserva su tamanio ----
+    if (cmd == "vpswap") {
+        std::string t; ss >> t;
+        const int kind = t == "3d" ? 1 : t == "outliner" ? 2 : t == "properties" ? 3 : t == "timeline" ? 5 : -1;
+        std::vector<ViewportBase*> pila(1, rootViewport);
+        ViewportBase* vp = NULL; ViewportBase* padre = NULL;
+        while (!pila.empty() && !vp) {
+            ViewportBase* n = pila.back(); pila.pop_back();
+            if (!n || n->isLeaf()) continue;
+            ViewportBase* a = n->ContainerKind() == 1 ? ((ViewportRow*)n)->childA : ((ViewportColumn*)n)->childA;
+            ViewportBase* b = n->ContainerKind() == 1 ? ((ViewportRow*)n)->childB : ((ViewportColumn*)n)->childB;
+            if (a && a->isLeaf() && a->ViewportKind() == kind) { vp = a; padre = n; }
+            else if (b && b->isLeaf() && b->ViewportKind() == kind) { vp = b; padre = n; }
+            pila.push_back(a); pila.push_back(b);
+        }
+        if (!vp) { err = "vpswap: no hay un viewport '" + t + "' con hermano"; return false; }
+        const bool fila = padre->ContainerKind() == 1;
+        ViewportBase* a0 = fila ? ((ViewportRow*)padre)->childA : ((ViewportColumn*)padre)->childA;
+        const float f0 = fila ? ((ViewportRow*)padre)->splitFrac : ((ViewportColumn*)padre)->splitFrac;
+        const int w0 = vp->width, h0 = vp->height, x0 = vp->x, y0 = vp->y;
+        extern void LayoutCambiarTipoViewport(ViewportBase* v, int aId);
+        LayoutCambiarTipoViewport(vp, 24);   // (el id del "Swap" del menu de tipo)
+        ViewportBase* a1 = fila ? ((ViewportRow*)padre)->childA : ((ViewportColumn*)padre)->childA;
+        const float f1 = fila ? ((ViewportRow*)padre)->splitFrac : ((ViewportColumn*)padre)->splitFrac;
+        printf("      [vpswap] %s en una %s: (%d,%d %dx%d) -> (%d,%d %dx%d), division %.2f -> %.2f\n", t.c_str(),
+               fila ? "fila" : "columna", x0, y0, w0, h0, vp->x, vp->y, vp->width, vp->height, f0, f1);
+        if ((a0 == vp) == (a1 == vp)) { err = "vpswap: no cambio de lugar"; return false; }
+        if (fabsf(f0 + f1 - 1.0f) > 0.001f) { err = "vpswap: la division no se dio vuelta"; return false; }
+        if (abs(vp->width - w0) > 2 || abs(vp->height - h0) > 2) { err = "vpswap: cambio de tamanio"; return false; }
+        if (vp->x == x0 && vp->y == y0) { err = "vpswap: sigue en el mismo lugar"; return false; }
+        return true;
+    }
+
     // ---- addarmature : crea un Armature (2 huesos en cadena) y lo deja activo ----
     if (cmd == "addarmature") {
         Armature* a = new Armature(NULL, Vector3(0,0,0));
@@ -4328,13 +4441,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // whisk3d.log al lado del binario). Es lo que permite AUDITAR un .deb sin
         // adivinar: que ruta pidio, que asset no encontro, por que fallo.
         int debug = g_proyCompilar.modoDebug ? 1 : 0;
-        ss >> plataforma >> assets >> debug;
+        // 4to argumento OPCIONAL: el backend grafico donde la plataforma tiene dos (0 el fijo, 1 el de shaders)
+        int backend = g_proyCompilar.backend;
+        ss >> plataforma >> assets >> debug >> backend;
+        g_proyCompilar.backend = backend;
         UI* u = NULL;   // la primera UI raiz de la escena (como UIParaCompilar)
         if (SceneCollection)
             for (size_t i = 0; i < SceneCollection->Childrens.size() && !u; i++)
                 if (SceneCollection->Childrens[i]->getType() == ObjectType::ui)
                     u = (UI*)SceneCollection->Childrens[i];
-        if (!u) { err = "compilarjuego: no hay ninguna UI en la escena"; return false; }
+        // (sin UI tambien: un juego 3D no la necesita; CompilarJuego decide si hay un juego)
         extern bool CompilarJuego(UI*, int, int, int, bool, bool, bool, bool);
         extern bool CompilarJuegoEnCurso();
         extern int  CompilarJuegoProgreso(std::string*);
@@ -8372,11 +8488,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (it->icon == (int)IconType::gamepad) iconoGamepad++;   // el viejo objeto "Script"
         }
         printf("\n");
-        // la PRIMERA fila es el submenu de mallas (8 primitivas); despues los de los PREFABS y las ESCENAS del
-        // proyecto (Add > Prefab / Escena), Imports y, al final, el Nucleo (avanzado): 5 submenus
+        // la PRIMERA fila es el submenu de mallas (8 primitivas); despues los objetos modificadores (espejo, array,
+        // instancia), los de los PREFABS y las ESCENAS del proyecto (Add > Prefab / Escena), Imports y, al final, el
+        // Nucleo (avanzado): 6 submenus
         if (!MenuAdd->items.empty() && MenuAdd->items[0]->submenu)
             primitivas = (int)MenuAdd->items[0]->submenu->items.size();
-        const bool menuOk = (primitivas >= 6 && conSubmenu == 5 && iconoGamepad == 0);
+        const bool menuOk = (primitivas >= 6 && conSubmenu == 6 && iconoGamepad == 0);
         printf("      [uxeditor] D primera fila = submenu de mallas con %d primitivas | submenus=%d "
                "| filas con el icono del viejo objeto Script=%d %s\n",
                primitivas, conSubmenu, iconoGamepad,
@@ -40183,6 +40300,48 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         franja->visible = false;
         DeseleccionarTodo(); ObjActivo = NULL;
         printf("      [juego3dmin] cubo + camara (aspecto 1:1) + HUD con script en '%s'\n", dir.c_str());
+        return true;
+    }
+
+    // ---- ejemplocubo <carpeta> : el EJEMPLO del cubo (Whisk3D-Examples/w3d_format/cubo): un cubo que gira con su
+    //      script (girar.lua, colgado del cubo: yo() es el cubo), la camara y una luz (sin UI: no le hace falta). Despues
+    //      "guardarw3d <carpeta>/cubo.w3d" lo deja en un solo archivo (el .lua va adentro) ----
+    if (cmd == "ejemplocubo") {
+        std::string dir; ss >> dir;
+        if (dir.empty()) { err = "ejemplocubo: uso: ejemplocubo <carpeta> [r g b]"; return false; }
+        float luzRGB[3] = { -1.0f, -1.0f, -1.0f };   // (opcional: el color de la luz, 0..1)
+        ss >> luzRGB[0] >> luzRGB[1] >> luzRGB[2];
+        std::error_code ec; std::filesystem::create_directories(dir, ec);
+        const std::string lua = dir + "/girar.lua";
+        { FILE* f = fopen(lua.c_str(), "w");
+          if (!f) { err = "ejemplocubo: no pude escribir el .lua"; return false; }
+          fputs("-- gira el cubo: este script esta colgado del cubo, asi que yo() es el cubo.\n"
+                "-- actualizar(dt) corre una vez por cuadro; dt son los segundos desde el anterior,\n"
+                "-- asi gira igual de rapido a 60 cuadros por segundo que a 20.\n"
+                "local VEL_X = 25   -- grados por segundo\n"
+                "local VEL_Y = 45\n"
+                "\n"
+                "function actualizar(dt)\n"
+                "  girar(yo(), VEL_X * dt, VEL_Y * dt, 0)\n"
+                "end\n", f);
+          fclose(f); }
+        extern void ReiniciarEscena();
+        ReiniciarEscena();
+        Mesh* cubo = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!cubo) { err = "ejemplocubo: NewMesh fallo"; return false; }
+        cubo->SetNameObj("Cubo");
+        if (!cubo->scriptDatos) cubo->scriptDatos = new W3dScriptDatos();
+        { W3dScriptEntrada e; e.ruta = lua; cubo->scriptDatos->scripts.push_back(e); }
+        Light* luz = Light::Create(NULL, 3.0f, 4.0f, 5.0f);
+        luz->SetNameObj("Luz");
+        if (luzRGB[2] >= 0.0f) { luz->diffuse[0] = luzRGB[0]; luz->diffuse[1] = luzRGB[1]; luz->diffuse[2] = luzRGB[2]; }
+        // (el tercer parametro es la rotacion en grados: inclinada hacia abajo para mirar al cubo, atan(1.5/6) = 14)
+        Camera* cam = new Camera(NULL, Vector3(0, 1.5f, 6), Vector3(-14.0f, 0, 0));
+        cam->SetNameObj("Camara");
+        cam->fov = 50.0f; cam->nearClip = 0.1f; cam->farClip = 100.0f;
+        extern Camera* CameraActive; CameraActive = cam;
+        DeseleccionarTodo(); ObjActivo = NULL;
+        printf("      [ejemplocubo] cubo (con girar.lua) + luz + camara en '%s'\n", dir.c_str());
         return true;
     }
 

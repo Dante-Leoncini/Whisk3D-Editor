@@ -534,8 +534,26 @@ static keyFrame g_dopeHOrig;          // handles ANTES del transform (absoluto -
 // entrada NUMERICA propia del timeline (acepta matematica: "2", "(3+1)/2", ...)
 static bool g_dopeNumOn = false; static std::string g_dopeNumBuf; static bool g_dopeNumNeg = false;
 extern bool W3dEvalExpr(const std::string& s, float& out); // LayoutInput.cpp (mismo parser que la barra 3D)
-struct DopeMovProp { std::string ownerKey; int propId, compId; std::vector<keyFrame> orig; std::vector<int> selFrames; };
+struct DopeMovProp { std::string ownerKey; int propId, compId; std::vector<keyFrame> orig; std::vector<int> selFrames;
+                     std::vector<char> quieto; };   // quieto[k]: orig[k] es un PISADO (ver g_dopePisados): nunca se mueve
 static std::vector<DopeMovProp> g_dopeMovSnap;
+// LO QUE DUPLICAR Y PEGAR TAPAN AL NACER (pedido del duenio, 2026-11-09). La copia nace en un cuadro donde puede haber
+// otro keyframe y enseguida se agarra para moverla. Antes ese keyframe se BORRABA en el acto: al correr la copia ya no
+// volvia ("muevo lo duplicado por arriba del keyframe 2 y se borra"). Ahora se saca pero se anota aca, y al arrancar el
+// movimiento vuelve a la foto como un keyframe QUIETO: mientras la copia esta encima no se ve, si la copia se va vuelve,
+// y solo queda pisado si la copia se SUELTA encima (lo mismo que pasa al mover cualquier keyframe).
+static std::vector<DopeMovProp> g_dopePisados;
+static void DopePisadoAnotar(const std::string& owner, int propId, int compId, const keyFrame& kf){
+    for (size_t i=0;i<g_dopePisados.size();i++){ DopeMovProp& p = g_dopePisados[i];
+        if (p.ownerKey==owner && p.propId==propId && p.compId==compId){ p.orig.push_back(kf); return; } }
+    DopeMovProp p; p.ownerKey=owner; p.propId=propId; p.compId=compId; p.orig.push_back(kf); g_dopePisados.push_back(p);
+}
+// el keyframe k de la foto, se mueve? (los elegidos; los pisados nunca: comparten el cuadro con la copia)
+static bool DopeMovSel(const DopeMovProp& mp, size_t k){
+    if (k < mp.quieto.size() && mp.quieto[k]) return false;
+    for (size_t i=0;i<mp.selFrames.size();i++) if (mp.selFrames[i]==mp.orig[k].frame) return true;
+    return false;
+}
 // snapshot paralelo para MOVER las filas VERTICES/UV (los frames de la vertex anim NO
 // son AnimProperty). UN snapshot por ANIM: las dos filas comparten los VertexFrame (un
 // frame con ambas capas es UN solo cuadro), asi que se guardan punteros ESTABLES a los
@@ -2828,6 +2846,7 @@ bool Timeline::DopeCopiarSeleccion(){
 void Timeline::DopeCortarSeleccion(){ if (DopeCopiarSeleccion()) DopeBorrarSeleccion(); }
 void Timeline::DopePegar(){
     if (g_dopeClip.empty() || g_dopeMov) return;
+    g_dopePisados.clear();
     UndoKeyframesIniciar();   // Ctrl+Z: el pegado es UN comando
     std::set<std::string> nuevaSel;
     for (size_t i=0;i<g_dopeClip.size();i++){
@@ -2843,7 +2862,10 @@ void Timeline::DopePegar(){
         }
         if (!ap) continue;
         keyFrame k = c.k; k.frame = CurrentFrame + c.rel;
-        for (size_t j=ap->keyframes.size(); j-- > 0; ) if (ap->keyframes[j].frame == k.frame) ap->keyframes.erase(ap->keyframes.begin()+j);
+        for (size_t j=ap->keyframes.size(); j-- > 0; ) if (ap->keyframes[j].frame == k.frame){
+            DopePisadoAnotar(owner, c.propId, c.compId, ap->keyframes[j]);   // (vuelve si lo pegado se corre: ver arriba)
+            ap->keyframes.erase(ap->keyframes.begin()+j);
+        }
         ap->keyframes.push_back(k);
         ap->SortKeyFrames();
         nuevaSel.insert(DopeKeyId(owner, c.propId, c.compId, k.frame));
@@ -2853,6 +2875,7 @@ void Timeline::DopePegar(){
     InvalidarAnimYRedraw();
     // ...y AGARRADO, como el Duplicar: el mouse lo corre, click/Enter lo deja (Esc lo deja donde se pego)
     if (!g_dopeKeySel.empty()) DopeMoveStart(DOPE_MOV);
+    g_dopePisados.clear();   // (sin movimiento, lo pegado se quedo encima: lo tapado queda pisado)
 }
 // CLICK DERECHO en el strip: el menu de los keyframes elegidos (y Pegar, aunque no haya nada elegido)
 static void TL_menuCtxAction(int id){
@@ -2892,6 +2915,7 @@ bool Timeline::MenuContexto(int mx, int my){
 
 void Timeline::DopeDuplicarSeleccion(){
     if (g_dopeKeySel.empty() || g_dopeMov) return;
+    g_dopePisados.clear();
     // estado ANTERIOR a duplicar (para que Esc pueda volver a el)
     g_dopeDupPre.clear();
     g_dopeDupVtxPre.clear();
@@ -2943,7 +2967,10 @@ void Timeline::DopeDuplicarSeleccion(){
         if (copias.empty()) continue;
         // sacar lo que estuviera en los frames de destino y meter las copias
         for (size_t c=0;c<copias.size();c++){
-            for (size_t k=ap->keyframes.size(); k-- > 0; ) if (ap->keyframes[k].frame == copias[c].frame) ap->keyframes.erase(ap->keyframes.begin()+k);
+            for (size_t k=ap->keyframes.size(); k-- > 0; ) if (ap->keyframes[k].frame == copias[c].frame){
+                DopePisadoAnotar(mp.ownerKey, mp.propId, mp.compId, ap->keyframes[k]);   // (vuelve si la copia se corre)
+                ap->keyframes.erase(ap->keyframes.begin()+k);
+            }
         }
         for (size_t c=0;c<copias.size();c++){ ap->keyframes.push_back(copias[c]);
             nuevaSel.insert(DopeKeyId(mp.ownerKey, mp.propId, mp.compId, copias[c].frame)); }
@@ -3024,8 +3051,13 @@ void Timeline::DopeMoveStart(int modoT){  // DOPE_MOV ('g') / DOPE_ESC ('s') / D
         DopeMovProp mp; mp.ownerKey=d.ownerKey; mp.propId=d.propId; mp.compId=d.compId; mp.orig=ap->keyframes;
         for (size_t k=0;k<ap->keyframes.size();k++)
             if (g_dopeKeySel.count(DopeKeyId(d.ownerKey,d.propId,d.compId,ap->keyframes[k].frame))) mp.selFrames.push_back(ap->keyframes[k].frame);
+        mp.quieto.assign(mp.orig.size(), 0);
+        for (size_t i=0;i<g_dopePisados.size();i++){ const DopeMovProp& pz = g_dopePisados[i];
+            if (pz.ownerKey!=mp.ownerKey || pz.propId!=mp.propId || pz.compId!=mp.compId) continue;
+            for (size_t j=0;j<pz.orig.size();j++){ mp.orig.push_back(pz.orig[j]); mp.quieto.push_back(1); } }
         if (!mp.selFrames.empty()) g_dopeMovSnap.push_back(mp);
     }
+    g_dopePisados.clear();   // (ya estan en la foto)
     // snapshot PARALELO de las filas VERTICES/UV (frames de vertices, fuente de verdad
     // aparte). UNO por anim: las dos filas comparten los VertexFrame — mover un cuadro
     // que trae ambas capas mueve el cuadro entero (es UN keyframe con dos capas).
@@ -3162,8 +3194,7 @@ void Timeline::DopeXformAplicar(){
         // 1) los MOVIDOS: frame nuevo desde el ORIGINAL (absoluto -> sin drift al arrastrar)
         std::vector<keyFrame> movidos; std::set<int> ocupados;
         for (size_t k=0;k<mp.orig.size();k++){
-            bool sel=false; for (size_t i=0;i<mp.selFrames.size();i++) if (mp.selFrames[i]==mp.orig[k].frame){ sel=true; break; }
-            if (!sel) continue;
+            if (!DopeMovSel(mp, k)) continue;
             float f0 = (float)mp.orig[k].frame, v0 = mp.orig[k].value;
             float fn = f0, vn = v0;
             const bool curvas = (modo == TL_MODO_CURVAS);
@@ -3192,8 +3223,7 @@ void Timeline::DopeXformAplicar(){
         // 2) los QUIETOS, salvo los que quedaron pisados por un movido
         ap->keyframes.clear();
         for (size_t k=0;k<mp.orig.size();k++){
-            bool sel=false; for (size_t i=0;i<mp.selFrames.size();i++) if (mp.selFrames[i]==mp.orig[k].frame){ sel=true; break; }
-            if (sel || ocupados.count(mp.orig[k].frame)) continue;
+            if (DopeMovSel(mp, k) || ocupados.count(mp.orig[k].frame)) continue;   // (un quieto tapado no se ve: se pisa si se suelta ahi)
             ap->keyframes.push_back(mp.orig[k]);
         }
         for (size_t k=0;k<movidos.size();k++){
@@ -3646,7 +3676,19 @@ void Timeline::DopeMoveCancel(){
     for (size_t s=0;s<g_dopeMovSnap.size();s++){
         DopeMovProp& mp = g_dopeMovSnap[s];
         // mp.orig es de ANTES del transform: restaurarlo devuelve tambien los handles (el bakeo del arranque incluido)
-        AnimProperty* ap = DopeResolverProp(mp.ownerKey, mp.propId, mp.compId); if (ap) ap->keyframes = mp.orig;
+        AnimProperty* ap = DopeResolverProp(mp.ownerKey, mp.propId, mp.compId);
+        if (ap){
+            // un PISADO (lo tapado por un Pegar) que comparte cuadro con lo elegido no vuelve: Esc deja lo pegado donde
+            // se pego, pisando lo que habia (como antes de que existieran los pisados)
+            ap->keyframes.clear();
+            for (size_t k=0;k<mp.orig.size();k++){
+                if (k < mp.quieto.size() && mp.quieto[k]){
+                    bool tapado=false; for (size_t i=0;i<mp.selFrames.size();i++) if (mp.selFrames[i]==mp.orig[k].frame){ tapado=true; break; }
+                    if (tapado) continue;
+                }
+                ap->keyframes.push_back(mp.orig[k]);
+            }
+        }
         for (size_t i=0;i<mp.selFrames.size();i++) vieja.insert(DopeKeyId(mp.ownerKey, mp.propId, mp.compId, mp.selFrames[i]));
     }
     // filas VERTICES/UV: devolver cada frame a su valor original y re-ordenar (nada se borro)

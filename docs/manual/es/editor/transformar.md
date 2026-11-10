@@ -29,10 +29,10 @@ El gizmo aparece sobre el pivote en Modo Objeto y en Modo Edición (se prende y 
 
 ## Ajustar la última operación
 
-Después de mover, rotar o escalar (en Modo Objeto o Edición) aparece abajo a la izquierda un panel con lo que se hizo: los valores X, Y, Z (o el ángulo), la orientación y la edición proporcional con sus opciones. Cambiar un valor rehace la operación con el valor nuevo. **Cancelar** la deshace y **Aceptar** la deja. Un click afuera del panel también acepta. Mientras el panel está abierto, la barra inferior de la Vista 3D se oculta.
+Después de mover, rotar o escalar (en Modo Objeto o Edición) aparece abajo a la izquierda un panel con lo que se hizo: los valores X, Y, Z (o el ángulo), la orientación y la edición proporcional con sus opciones. Cambiar un valor rehace la operación con el valor nuevo. **Cancelar** la deshace y **Aceptar** la deja. Un click afuera del panel también acepta. Mientras el panel está abierto, la barra de herramientas de la Vista 3D se oculta.
 
 El panel tiene borde verde porque es la ventana con el foco. Si no entra en la mitad del alto de la pantalla, se achica a esa mitad y se desplaza arrastrando el dedo (sin tocar las opciones), con la rueda o con las flechas. Con el teclado o el teléfono: las flechas recorren las filas, <kbd>OK</kbd> / <kbd>Enter</kbd> edita el valor sin cerrar el panel, **Aceptar**, <kbd>Esc</kbd> o <kbd>Supr</kbd> (la <kbd>C</kbd> en el N95) lo cierran dejando el cambio, y solo **Cancelar** lo deshace.
 
-## Barra inferior
+## Barra de herramientas
 
 Tiene Deshacer y Rehacer, las últimas acciones usadas y el botón de edición proporcional. Durante un transform muestra la tilde (aceptar), la cruz (cancelar), la orientación y los ejes X / Y / Z (dos ejes prendidos = un plano). En táctil, después de extruir aparece **Repetir**, que acepta y vuelve a extruir.

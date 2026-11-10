@@ -23,6 +23,8 @@
    - [पार्टिकल, फ़ॉग और दृश्यता](api-particulas-niebla.md)
    - [समय, रैंडम और उपयोगी फ़ंक्शन](api-tiempo-y-utilidades.md)
    - [सेव की गई सेटिंग](api-configuracion.md)
+   - [नेटवर्क पर खेलना (LAN, Wi-Fi या इंटरनेट)](api-red.md)
+   - [स्प्लिट स्क्रीन और हर खिलाड़ी के लिए एक कंट्रोलर](api-pantalla-dividida.md)
    - [मैसेज और डीबगिंग](api-mensajes-y-depuracion.md)
    - [रूटीन और मेमोरी](api-rutinas-y-memorias.md)
 7. [कुंजियों और बटनों के नाम](teclas-y-botones.md)

@@ -1,6 +1,6 @@
 # Yazılan shader'lar
 
-**Yazılan shader**, bir materyalin piksel piksel nasıl çizileceğine karar veren bir metin dosyasıdır (`.glsl`). Sıradan materyalde olmayan efektler içindir: arkasındakini bulanık gösteren buzlu cam, hareket eden su, sıcaklık dalgalanması, çizgi film görünümü, nabız gibi atan bir parıltı…
+**Yazılan shader**, bir malzemenin piksel piksel nasıl çizileceğine karar veren bir metin dosyasıdır (`.glsl`). Sıradan malzemede olmayan efektler içindir: arkasındakini bulanık gösteren buzlu cam, hareket eden su, sıcaklık dalgalanması, çizgi film görünümü, nabız gibi atan bir parıltı…
 
 Sen yalnızca kendi kısmını yazarsın: bir `Fragmento()` fonksiyonu (her pikselin rengi) ve istersen bir `Vertice()` (köşeleri hareket ettirmek için). Geri kalan her şeyi Whisk3D ekler.
 
@@ -10,11 +10,11 @@ Aynı dosya tüm grafik arka uçlarında aynı şekilde çalışır:
 
 | Arka uç | `@vertice` | `@fragmento` |
 |---|---|---|
-| OpenGL ES 2.0: Android, tarayıcı (WebGL), Nokia N8, **Graphics → OpenGL ES 2.0** seçili PC | GPU'da | GPU'da |
+| OpenGL ES 2.0: Android, tarayıcı (WebGL), Nokia N8, **Grafik → OpenGL ES 2.0** seçili PC | GPU'da | GPU'da |
 | Vulkan (PC) | GPU'da | GPU'da |
-| PC'nin OpenGL'i (varsayılan olan), OpenGL ES 1.1 (Nokia N95), Nintendo 3DS, Dreamcast | **CPU'da** | Hayır: materyal her zamanki gibi çizilir |
+| PC'nin OpenGL'i (varsayılan olan), OpenGL ES 1.1 (Nokia N95), Nintendo 3DS, Dreamcast | **CPU'da** | Hayır: malzeme her zamanki gibi çizilir |
 
-Shader'ı olmayan bir arka uçta hiçbir şey bozulmaz: **`@vertice` CPU'da çalışır** (dalgalı su N95'te de aynı şekilde hareket eder) ve renk normal materyalden gelir. Material kartı bunu bildirir: *"This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual"* (bu grafik arka ucunda shader yok: @vertice bölümü CPU'da çalışır ve materyalin geri kalanı her zamanki gibi çizilir).
+Shader'ı olmayan bir arka uçta hiçbir şey bozulmaz: **`@vertice` CPU'da çalışır** (dalgalı su N95'te de aynı şekilde hareket eder) ve renk normal malzemeden gelir. Malzeme kartı bunu bildirir: *"Bu grafik arka ucunda shader yok: @vertice bölümü CPU'da çalışır, malzemenin geri kalanı her zamanki gibi çizilir"*.
 
 ### CPU'da `@vertice`
 
@@ -26,34 +26,34 @@ Shader olmayan yerlerde Whisk3D, `@vertice`'in **aynı metnini** okuyup çizmede
 - GLSL'in sayı fonksiyonları: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `pow`, `exp`, `log`, `sqrt`, `abs`, `sign`, `floor`, `ceil`, `fract`, `mod`, `min`, `max`, `clamp`, `mix`, `step`, `smoothstep`, `length`, `distance`, `dot`, `cross`, `normalize`, `reflect`, `refract`;
 - `w3d_tiempo`, `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico`.
 
-Matrisleri, dizileri, `while`'ı ve `#define`'ı anlamaz: kullanırsan hata bunu satırıyla birlikte söyler (GPU'da ise çalışırdı). Her karede mesh'in tüm köşeleri üzerinde bir kez çalışır: N95'te küçük mesh'lerde kullanmak iyi olur (örnekteki su gibi birkaç yüz köşe). Mesh'in **tüm** parçaları aynı shader'ı kullanıyorsa çalışır; yoksa mesh hareket etmeden çizilir.
+Matrisleri, dizileri, `while`'ı ve `#define`'ı anlamaz: kullanırsan hata bunu satırıyla birlikte söyler (GPU'da ise çalışırdı). Her karede örgünün tüm köşeleri üzerinde bir kez çalışır: N95'te küçük örgülerde kullanmak iyi olur (örnekteki su gibi birkaç yüz köşe). Örgünün **tüm** parçaları aynı shader'ı kullanıyorsa çalışır; yoksa örgü hareket etmeden çizilir.
 
 > **Aynı dosya neden her yerde çalışır:** dosyada bir arka uca özgü hiçbir şey yoktur. Her arka uç önüne kendi kısmını ekler (`w3d_*` girdileri, hassasiyet, `main`). OpenGL ES 2.0 onu doğrudan derler; Vulkan onu kendi içinde SPIR-V'ye çevirir. Yarın Whisk3D'ye başka bir arka uç eklenirse shader'ın yine işe yarar.
 
-## Bir materyalde shader kullanmak
+## Bir malzemede shader kullanmak
 
-1. Nesneyi seç ve Properties'te **Material** sekmesini aç.
-2. En altta **Advanced: custom shader** kutusunu işaretle. Materyalin henüz dosyası yoksa bir şablonla yeni bir dosya (`shader.glsl`) oluşturulur, hemen kullanılmaya başlar ve IDE'de açılır.
+1. Nesneyi seç ve Özellikler'de **Malzeme** sekmesini aç.
+2. En altta **Gelişmiş: özel shader** kutusunu işaretle. Malzemenin henüz dosyası yoksa bir şablonla yeni bir dosya (`shader.glsl`) oluşturulur, hemen kullanılmaya başlar ve IDE'de açılır.
 3. **Shader** içinde dosyayı seçersin:
    - projede zaten bulunan `.glsl` dosyaları;
-   - **New shader**: şablonlu başka bir dosya;
-   - **Load from disk...**: bilgisayarındaki bir `.glsl`. Dokular ve script'ler gibi projenin içine kopyalanır.
+   - **Yeni shader**: şablonlu başka bir dosya;
+   - **Diskten yükle...**: bilgisayarındaki bir `.glsl`. Dokular ve script'ler gibi projenin içine kopyalanır.
 4. **Shader**'ın sağındaki küçük düğme dosyayı **IDE**'de açar (yerleşimde bir IDE olması gerekir).
-5. Yazarsın ve **Ctrl+S** kaydedip derler. Materyaldeki ya da IDE çubuğundaki **Compile** düğmesine de basabilirsin (dosya bir `.glsl` olduğunda dosya adının yanında görünür).
-6. Sonuç **Compile**'ın altında görünür: **Compiled** ya da satırıyla birlikte kırmızı hata.
+5. Yazarsın ve **Ctrl+S** kaydedip derler. Malzemedeki ya da IDE çubuğundaki **Derle** düğmesine de basabilirsin (dosya bir `.glsl` olduğunda dosya adının yanında görünür).
+6. Sonuç **Derle**'nin altında görünür: **Derlendi** ya da satırıyla birlikte kırmızı hata.
 
-Başlamak için projeyi kaydetmen gerekmez. Henüz kaydetmediysen shader editörün bir çalışma klasörüne yazılır; projeyi kaydettiğinde `.w3d`'nin içine, `shaders/` klasörüne girer ve materyal ile IDE o kopyayı kullanmaya geçer. O andan itibaren projeyle birlikte taşınır (telefona, derlenmiş oyuna, başka bir bilgisayara). İşareti kaldırırsan materyal yine her zamanki gibi çizilir; dosya seçili kalır.
+Başlamak için projeyi kaydetmen gerekmez. Henüz kaydetmediysen shader editörün bir çalışma klasörüne yazılır; projeyi kaydettiğinde `.w3d`'nin içine, `shaders/` klasörüne girer ve malzeme ile IDE o kopyayı kullanmaya geçer. O andan itibaren projeyle birlikte taşınır (telefona, derlenmiş oyuna, başka bir bilgisayara). İşareti kaldırırsan malzeme yine her zamanki gibi çizilir; dosya seçili kalır.
 
-Bir shader derlenmezse, sen düzeltene kadar nesne normal materyaliyle çizilir. Editör çökmez.
+Bir shader derlenmezse, sen düzeltene kadar nesne normal malzemesiyle çizilir. Editör çökmez.
 
-### Library'den: bir shader'ı mesh'e sürüklemek
+### Kütüphane'den: bir shader'ı örgüye sürüklemek
 
-Projenin shader'ları **Library**'de (Library modundaki Outliner), **Shaders** altında, kaç nesnenin kullandığıyla birlikte görünür. Oradan:
+Projenin shader'ları **Kütüphane**'de (Kütüphane modundaki Outliner), **Shader'lar** altında, kaç nesnenin kullandığıyla birlikte görünür. Oradan:
 
-- 3D Viewport'ta **onu bir mesh'in üzerine sürükle**: sen hareket ettirirken işaretçinin altındaki **mesh parçası** o shader ile çizilir, böylece hangi parçaya uygulayacağını görürsün. Başka bir parçaya geçersen ya da mesh'ten çıkarsan, parça kendi materyaline döner. Bıraktığında o parçanın materyali shader'ı kullanmaya başlar (varsayılan materyalde parça yeni bir materyal alır). **Ctrl+Z** ile geri alınır.
-- Bir **materyal** ile de aynısı: sürüklerken parça onunla görünür.
-- Bir script gibi **Open in IDE**, yeniden adlandırma, başka klasöre taşıma ya da `.w3d`'nin dışına çıkarma.
-- **Bilgisayarının dosya gezgininden** pencereye sürüklenen bir `.glsl` projeye girer; bir mesh'in üzerine bırakırsan ayrıca o parçaya uygulanır.
+- 3D Görünüm'de **onu bir örgünün üzerine sürükle**: sen hareket ettirirken işaretçinin altındaki **örgü parçası** o shader ile çizilir, böylece hangi parçaya uygulayacağını görürsün. Başka bir parçaya geçersen ya da örgüden çıkarsan, parça kendi malzemesine döner. Bıraktığında o parçanın malzemesi shader'ı kullanmaya başlar (varsayılan malzemede parça yeni bir malzeme alır). **Ctrl+Z** ile geri alınır.
+- Bir **malzeme** ile de aynısı: sürüklerken parça onunla görünür.
+- Bir script gibi **IDE'de aç**, yeniden adlandırma, başka klasöre taşıma ya da `.w3d`'nin dışına çıkarma.
+- **Bilgisayarının dosya gezgininden** pencereye sürüklenen bir `.glsl` projeye girer; bir örgünün üzerine bırakırsan ayrıca o parçaya uygulanır.
 
 ## Dosya nasıl görünür
 
@@ -96,13 +96,13 @@ vec4 Fragmento() {
 | `w3d_luzColor` | `vec4` | İlk ışığın rengi (şiddetiyle birlikte). |
 | `w3d_luzPos` | `vec4` | İlk ışığın kamera uzayındaki konumu (`w` = 0: bir yöndür, güneş). |
 | `w3d_ambiente` | `vec4` | Ortam ışığı. |
-| `w3d_color` | `vec4` | Materyalin **Color** değeri (alfasıyla). |
-| `w3d_emision` | `vec4` | Materyalin **Emission** değeri. |
-| `w3d_Textura(uv)` | `vec4` | Materyalin o UV'lerdeki dokusu (dokusu yoksa beyaz). `v` görüntünün **üstünden** başlar (0 = en üst satır, 1 = en alttaki). |
-| `w3d_colorVertice` | `vec4` | Köşe rengi (mesh'te varsa ve materyal **Vertex color** kullanıyorsa). |
-| `w3d_rugosidad`, `w3d_metalico` | `float` | Materyalin **Roughness** ve **Metallic** değerleri. |
-| `w3d_ior`, `w3d_transmision` | `float` | Materyalin **IOR** ve **Transmission** değerleri (ray tracing'inkiler). |
-| `w3d_tiempo` | `float` | Saniyeler, animasyon için. Editörde **zaman çizelgesinin** zamanıdır (geçerli kare ÷ FPS): duraklatıldığında sabit kalır, **Play** ile ilerler ve zaman çizelgesini sürükleyerek herhangi bir anı görebilirsin. Dışa aktarılan oyunda, oyunun başlamasından beri geçen zamandır. |
+| `w3d_color` | `vec4` | Malzemenin **Renk** değeri (alfasıyla). |
+| `w3d_emision` | `vec4` | Malzemenin **Işıma** değeri. |
+| `w3d_Textura(uv)` | `vec4` | Malzemenin o UV'lerdeki dokusu (dokusu yoksa beyaz). `v` görüntünün **üstünden** başlar (0 = en üst satır, 1 = en alttaki). |
+| `w3d_colorVertice` | `vec4` | Köşe rengi (örgüde varsa ve malzeme **Köşe rengi** kullanıyorsa). |
+| `w3d_rugosidad`, `w3d_metalico` | `float` | Malzemenin **Pürüzlülük** ve **Metalik** değerleri. |
+| `w3d_ior`, `w3d_transmision` | `float` | Malzemenin **IOR** ve **Geçirgenlik** değerleri (ışın izlemeninkiler). |
+| `w3d_tiempo` | `float` | Saniyeler, animasyon için. Editörde **zaman çizelgesinin** zamanıdır (geçerli kare ÷ FPS): duraklatıldığında sabit kalır, **Oynat** ile ilerler ve zaman çizelgesini sürükleyerek herhangi bir anı görebilirsin. Dışa aktarılan oyunda, oyunun başlamasından beri geçen zamandır. |
 | `w3d_PuntoPantalla()` | `vec2` | Pikselin görünümdeki yeri: (0,0) sol alt, (1,1) sağ üst. |
 | `w3d_Pixel()` | `vec2` | Bir pikselin aynı birimlerdeki boyutu. |
 | `w3d_Pantalla(p)` | `vec4` | Görünümün `p` noktasında **zaten çizilmiş olan**. Aşağıya bak. |
@@ -114,12 +114,12 @@ vec4 Fragmento() {
 
 ## Arkadakini görmek: `w3d_Pantalla`
 
-Ekranı `w3d_Pantalla` ile okuyan bir materyal nesnenin arkasındakini gösterebilir; onu kaydırabilir, bulanıklaştırabilir ya da renklendirebilir. Cam, su, sıcak hava ya da bir kuvvet alanı böyle yapılır.
+Ekranı `w3d_Pantalla` ile okuyan bir malzeme nesnenin arkasındakini gösterebilir; onu kaydırabilir, bulanıklaştırabilir ya da renklendirebilir. Cam, su, sıcak hava ya da bir kuvvet alanı böyle yapılır.
 
-- Ekranı okuyan bir shader'a sahip mesh'ler, arkadaki şey zaten çizilmiş olsun diye sahnenin geri kalanından sonra, **en son** çizilir. Outliner'da nerede durdukları önemli değildir.
-- Her birinden önce görünüm bir dokuya kopyalanır (her mesh ve her mesh parçası için bir kopya). Bir PC'de ya da modern bir telefonda ucuzdur. Eski bir telefonda bu tür nesneleri az tutmak iyi olur.
+- Ekranı okuyan bir shader'a sahip örgüler, arkadaki şey zaten çizilmiş olsun diye sahnenin geri kalanından sonra, **en son** çizilir. Outliner'da nerede durdukları önemli değildir.
+- Her birinden önce görünüm bir dokuya kopyalanır (her örgü ve her örgü parçası için bir kopya). Bir PC'de ya da modern bir telefonda ucuzdur. Eski bir telefonda bu tür nesneleri az tutmak iyi olur.
 - **Parçacıklar** sonra çizilir, bu yüzden camın arkasından görünmezler.
-- Materyalin **Transparent** **olmaması** iyi olur: shader arkadakini zaten karıştırır ve alfa 1 döndürür.
+- Malzemenin **Saydam** **olmaması** iyi olur: shader arkadakini zaten karıştırır ve alfa 1 döndürür.
 
 ## Örnekler
 
@@ -139,7 +139,7 @@ Bunların hepsi deponun **`examples/shaders/`** klasöründe dosya olarak, dokul
 | `torcer.glsl` | Dikey eksen etrafında burulur (yalnızca `@vertice`). |
 | `saltar.glsl` | Zemine değince zıplar ve yassılaşır (yalnızca `@vertice`). |
 
-Köşe örnekleri, N95 için hazırlanmış **`examples/shaders/Ejemplos_Vertex_N95.w3d`** içinde küçük mesh'lere uygulanmıştır (orada `@vertice` CPU'da çalışır). Zaman çizelgesinin **Play**'i ile hareket ederler.
+Köşe örnekleri, N95 için hazırlanmış **`examples/shaders/Ejemplos_Vertex_N95.w3d`** içinde küçük örgülere uygulanmıştır (orada `@vertice` CPU'da çalışır). Zaman çizelgesinin **Oynat** düğmesiyle hareket ederler.
 
 ### Nabız gibi atan bir renk
 
@@ -151,7 +151,7 @@ vec4 Fragmento() {
 }
 ```
 
-`w3d_tiempo` kullanan bir shader, zaman çizelgesinin **Play**'i ile hareket eder (bir animasyon gibi); duraklatıldığında sabit kalır ve editör gereksiz yere yeniden çizmez. Dışa aktarılan oyunda kendi kendine hareket eder.
+`w3d_tiempo` kullanan bir shader, zaman çizelgesinin **Oynat** düğmesiyle hareket eder (bir animasyon gibi); duraklatıldığında sabit kalır ve editör gereksiz yere yeniden çizmez. Dışa aktarılan oyunda kendi kendine hareket eder.
 
 ### Çizgi film (üç ton)
 
@@ -183,7 +183,7 @@ vec4 Fragmento() {
 }
 ```
 
-Dalganın fark edilmesi için düzlemin köşelere ihtiyacı var: onu Edit Mode'da alt bölümlere ayır.
+Dalganın fark edilmesi için düzlemin köşelere ihtiyacı var: onu Düzenleme Modunda alt bölümlere ayır.
 
 ### Buzlu cam
 
@@ -228,11 +228,11 @@ vec4 Fragmento() {
 }
 ```
 
-Materyalden yönetilir: **Transmission** (0 = materyal renginde opak cam, 1 = arkadaki her şey görünür), **IOR** (arkadakinin ne kadar büküldüğü) ve **Roughness** (ne kadar bulanıklaştığı). Bunlar **ray tracing**'in kullandığı değerlerle aynıdır, bu yüzden Render Preview'da aynı nesne gerçek camdır.
+Malzemeden yönetilir: **Geçirgenlik** (0 = malzeme renginde opak cam, 1 = arkadaki her şey görünür), **IOR** (arkadakinin ne kadar büküldüğü) ve **Pürüzlülük** (ne kadar bulanıklaştığı). Bunlar **ışın izlemenin** kullandığı değerlerle aynıdır, bu yüzden Render Önizleme'de aynı nesne gerçek camdır.
 
 ### Düz buzlu cam
 
-Bir **düzlem** için: bir pencere, bir cam bölme, bir cam ekran. Dosya `examples/shaders/vidrio_plano.glsl`. Arkadakinin 17 okumasının ortalamasını iki halka üzerinde alır; **Roughness** halkaları genişletir. Materyalin **dokusu** *nerenin* buzlu olduğunu söyler: beyaz = bulanık, siyah = pürüzsüz. `texturas/escarcha.png` ile lekeler, küçük temiz bir pencere ve aşağı süzülen damlalar oluşur; dokusuz bütün cam buzludur. Düzlemi iki taraftan da görmek için **Culling**'i kapatmak iyi olur.
+Bir **düzlem** için: bir pencere, bir cam bölme, bir cam ekran. Dosya `examples/shaders/vidrio_plano.glsl`. Arkadakinin 17 okumasının ortalamasını iki halka üzerinde alır; **Pürüzlülük** halkaları genişletir. Malzemenin **dokusu** *nerenin* buzlu olduğunu söyler: beyaz = bulanık, siyah = pürüzsüz. `texturas/escarcha.png` ile lekeler, küçük temiz bir pencere ve aşağı süzülen damlalar oluşur; dokusuz bütün cam buzludur. Düzlemi iki taraftan da görmek için **Culling**'i kapatmak iyi olur.
 
 ```glsl
 float esmerilado = w3d_Textura(w3d_uv).r * w3d_rugosidad;   // BU noktanın ne kadar bulanıklaştığı
@@ -241,12 +241,12 @@ vec2 r = w3d_Pixel() * (1.0 + 26.0 * esmerilado);           // okumaların yarı
 
 ### Ortam yansıması (yansıtmak için doku nasıl kullanılır)
 
-Dosya `examples/shaders/reflejo_entorno.glsl`. **Materyalin dokusu**, nesneyi çevreleyenlerin **panoramik** bir fotoğrafıdır: genişliği yüksekliğinin iki katı olan, çevrede 360° ve yukarıdan aşağıya 180° kapsayan *eşdikdörtgen* (equirectangular) bir görüntü (`texturas/entorno.png` gibi: gökyüzü, güneş, binalar ve damalı bir zemin). Her piksel için:
+Dosya `examples/shaders/reflejo_entorno.glsl`. **Malzemenin dokusu**, nesneyi çevreleyenlerin **panoramik** bir fotoğrafıdır: genişliği yüksekliğinin iki katı olan, çevrede 360° ve yukarıdan aşağıya 180° kapsayan *eşdikdörtgen* (equirectangular) bir görüntü (`texturas/entorno.png` gibi: gökyüzü, güneş, binalar ve damalı bir zemin). Her piksel için:
 
 1. `reflect(-ojo, n)`, kamera uzayında **bakışın nereye sektiğini** söyler.
 2. `w3d_AMundo(...)` bu yönü **dünyaya** çevirir; böylece kamera dönse bile yansıma yerinde kalır.
 3. `Panorama(...)` yönü fotoğrafta bir noktaya çevirir: çevredeki açı (`atan`) `u`, yukarıdan aşağıya açı (`acos`) ise `v` olur.
-4. Yüzeyle **Fresnel**'e (yandan bakınca daha çok yansır) ve **Metallic**'e (bir metal her şeyi, kendi **Color**'ı ile renklenmiş olarak yansıtır) göre karıştırılır.
+4. Yüzeyle **Fresnel**'e (yandan bakınca daha çok yansır) ve **Metalik**'e (bir metal her şeyi, kendi **Renk**'i ile renklenmiş olarak yansıtır) göre karıştırılır.
 
 ```glsl
 @fragmento
@@ -287,7 +287,7 @@ vec4 Fragmento() {
 
 ## Bir rutinde: **Shader** adımı
 
-Yazılan bir shader bir **GL durumu** gibidir: ayarlanır ve sonra çizilen her şey onu kullanır. Bir **rutinde** (Add → Draw → **Shader**) adımın bir `.glsl` **dosyası**, bir **On** kutusu ve dört sayısı vardır: **IOR**, **Transmission**, **Roughness** ve **Metallic** (`w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico` olarak gelirler; canlandırılabilir ya da bir bellekten okunabilirler).
+Yazılan bir shader bir **GL durumu** gibidir: ayarlanır ve sonra çizilen her şey onu kullanır. Bir **rutinde** (Ekle → Draw → **Shader**) adımın bir `.glsl` **dosyası**, bir **On** kutusu ve dört sayısı vardır: **IOR**, **Transmission**, **Roughness** ve **Metallic** (`w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico` olarak gelirler; canlandırılabilir ya da bir bellekten okunabilirler).
 
 ```
 Shader          vidrio_plano.glsl  On   (IOR 1.5, Roughness 0.6)
@@ -297,20 +297,20 @@ Shader          Off
 Draw elements   Marco           ← artık shader yok
 ```
 
-**On** ile sonraki "Draw elements" adımları shader'ı kullanır; kutu kapalıyken shader kaldırılır. Rutin bitince kendiliğinden kaldırılır. **OpenGL ES 2.0 ve Vulkan**'da çalışır; OpenGL ES 1.1'de ve sabit GL'de adım hiçbir şey yapmaz (bir rutinin çizimleri doğrudan mesh verisini gösterir: CPU'daki `@vertice` materyaller içindir). Ekranı okuyan bir shader (`w3d_Pantalla`), rutinin ve sahnenin o adımdan **önce** çizdiklerini görür: sırayı sen belirlersin.
+**On** ile sonraki "Draw elements" adımları shader'ı kullanır; kutu kapalıyken shader kaldırılır. Rutin bitince kendiliğinden kaldırılır. **OpenGL ES 2.0 ve Vulkan**'da çalışır; OpenGL ES 1.1'de ve sabit GL'de adım hiçbir şey yapmaz (bir rutinin çizimleri doğrudan örgü verisini gösterir: CPU'daki `@vertice` malzemeler içindir). Ekranı okuyan bir shader (`w3d_Pantalla`), rutinin ve sahnenin o adımdan **önce** çizdiklerini görür: sırayı sen belirlersin.
 
-## Ray tracing ile
+## Işın izleme ile
 
-Ray tracing senin shader'ını çalıştırmaz. Materyalin değerlerini kullanır: **Color**, **Roughness**, **Metallic**, **Transmission**, **IOR** ve doku. Shader'ında bu aynı değerleri kullanırsan (buzlu cam gibi), Material Preview ile Render Preview aynı şeyi gösterir.
+Işın izleme senin shader'ını çalıştırmaz. Malzemenin değerlerini kullanır: **Renk**, **Pürüzlülük**, **Metalik**, **Geçirgenlik**, **IOR** ve doku. Shader'ında bu aynı değerleri kullanırsan (buzlu cam gibi), Malzeme Önizleme ile Render Önizleme aynı şeyi gösterir.
 
-**Transmission** (0'dan 1'e, ray tracing açıkken Material kartında) yüzeyin ne kadarının cam olduğunu söyler: ışık **IOR** ile bükülerek geçer ve **Roughness** ile buzlu çıkar. **Alfa** başka bir şeydir: alfa (ya da haritası) yüzünden saydam olan kısım yoktur ve oradan arkadaki düz, bükülmeden görünür. Alfa %50 ve transmission 1 iken yarısı düz, öbür yarısı kırılarak geçer. Transmission 0 iken IOR, önceki sürümlerde olduğu gibi alfanın arasından görüneni büker.
+**Geçirgenlik** (0'dan 1'e, ışın izleme açıkken Malzeme kartında) yüzeyin ne kadarının cam olduğunu söyler: ışık **IOR** ile bükülerek geçer ve **Pürüzlülük** ile buzlu çıkar. **Alfa** başka bir şeydir: alfa (ya da haritası) yüzünden saydam olan kısım yoktur ve oradan arkadaki düz, bükülmeden görünür. Alfa %50 ve geçirgenlik 1 iken yarısı düz, öbür yarısı kırılarak geçer. Geçirgenlik 0 iken IOR, önceki sürümlerde olduğu gibi alfanın arasından görüneni büker.
 
 ## (Henüz) yapmadıkları
 
 - Tek bir ışık kullanır: sahnedeki ilk ışık (ya da önizlemeninki).
 - **Sisi** ve aynaların **kırpma düzlemlerini** almaz.
-- **Solid**'de ve hata ayıklama görünümlerinde (normaller, alfa, vektörler) normal materyal görünür.
-- Kendine ait parametreleri yoktur: materyalinkileri kullanır (renk, pürüzlülük, metaliklik, transmission, IOR, emisyon).
+- **Katı**'da ve hata ayıklama görünümlerinde (normaller, alfa, vektörler) normal malzeme görünür.
+- Kendine ait parametreleri yoktur: malzemeninkileri kullanır (renk, pürüzlülük, metaliklik, geçirgenlik, IOR, ışıma).
 
 ## Sık görülen hatalar
 
@@ -320,4 +320,4 @@ Ray tracing senin shader'ını çalıştırmaz. Materyalin değerlerini kullanı
 | `cannot convert` / `wrong operand types` | Türler karışmış: `1` bir `int`'tir, `1.0` yaz. Bir `vec3` bir `vec4` ile toplanamaz. |
 | `Fragmento: no matching overloaded function` ya da `Fragmento` olmadan derlenmiyor | `vec4 Fragmento()` fonksiyonu eksik ya da başka bir tür döndürüyor. |
 | `redefinition of main` | `main` yazma: onu Whisk3D ekler. |
-| Arkadaki görünmüyor | Shader `w3d_Pantalla` kullanıyor ama materyal düşük alfayla **Transparent** durumda, ya da arkadaki daha sonra çiziliyor (parçacıklar). |
+| Arkadaki görünmüyor | Shader `w3d_Pantalla` kullanıyor ama malzeme düşük alfayla **Saydam** durumda, ya da arkadaki daha sonra çiziliyor (parçacıklar). |

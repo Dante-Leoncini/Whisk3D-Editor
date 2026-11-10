@@ -1,8 +1,8 @@
 # Script, bir nesnenin bileşenidir
 
-Whisk3D'de bir script her zaman sahnedeki bir **nesneye** aittir (bir mesh, bir boş nesne, bir 2D düğme…). Bir nesnenin birden fazla script'i olabilir; her biri kendi değişkenleriyle, ayrı ayrı ve göründükleri sırayla çalışır.
+Whisk3D'de bir script her zaman sahnedeki bir **nesneye** aittir (bir örgü, bir boş nesne, bir 2D düğme…). Bir nesnenin birden fazla script'i olabilir; her biri kendi değişkenleriyle, ayrı ayrı ve göründükleri sırayla çalışır.
 
-Script'in içinden `yo()` sahibi olan nesneyi döndürür. *Başka* nesneleri kullanmak için script, `propiedades` adında global bir tablo tanımlar. Editör onu okur ve Properties panelinde, script'in kartında her girdi için bir alan gösterir:
+Script'in içinden `yo()` sahibi olan nesneyi döndürür. *Başka* nesneleri kullanmak için script, `propiedades` adında global bir tablo tanımlar. Editör onu okur ve Özellikler panelinde, script'in kartında her girdi için bir alan gösterir:
 
 ```lua
 propiedades = {

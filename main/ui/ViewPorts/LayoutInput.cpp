@@ -86,6 +86,7 @@
 #include "animation/Armature2DAnimation.h" // InsertarKeyframeArm2D (pose 2D: Insert Keyframe con clips propios)
 #include "animation/Animation.h"         // ActiveAnimKind/ActiveAnimMesh/CurrentFrame (menu Animation del UV)
 #include "objects/Instance.h"
+#include "objects/Mirror.h"     // Add > Modifier Objects > Mirror
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
@@ -418,6 +419,26 @@ static void LayoutExpandir(ViewportBase* aVp) {
     LayoutRescan(aVp, w, h);
 }
 
+// Swap: el viewport y su hermano (otro viewport, o una division entera) cambian de lugar en su fila o columna: el de
+// arriba pasa abajo, el de la izquierda a la derecha. Cada uno se lleva su tamanio (la division se da vuelta)
+static void LayoutIntercambiar(ViewportBase* aVp) {
+    ViewportBase* padre = LayoutPadreDe(rootViewport, aVp);
+    if (!padre) return;   // el root: no tiene hermano
+    const int w = rootViewport->width, h = rootViewport->height;
+    if (padre->ContainerKind() == 1) {
+        ViewportRow* r = (ViewportRow*)padre;
+        ViewportBase* t = r->childA; r->childA = r->childB; r->childB = t;
+        r->splitFrac = 1.0f - r->splitFrac;
+    } else {
+        ViewportColumn* c = (ViewportColumn*)padre;
+        ViewportBase* t = c->childA; c->childA = c->childB; c->childB = t;
+        c->splitFrac = 1.0f - c->splitFrac;
+    }
+    LayoutRescan(aVp, w, h);
+}
+// (harness) el Swap por la misma puerta que el menu de tipo
+void LayoutIntercambiarViewport(ViewportBase* v) { LayoutIntercambiar(v); }
+
 // Split: en el lugar del viewport aparece una fila/columna con el
 // original y un viewport NUEVO del mismo tipo (no se clona)
 static void LayoutDividir(ViewportBase* aVp, bool aEnFila) {
@@ -538,6 +559,7 @@ static void LayoutAccionTipo(int aId) {
     if (aId == 20) { LayoutExpandir(vp); return; }
     if (aId == 21) { LayoutDividir(vp, true); return; }   // en columnas (lado a lado)
     if (aId == 22) { LayoutDividir(vp, false); return; }  // en filas (apilados)
+    if (aId == 24) { LayoutIntercambiar(vp); return; }    // Swap: con su hermano de la fila / columna
     if (vp->ViewportKind() == aId + 1) return; // ya es de ese tipo
     int w = rootViewport->width;
     int h = rootViewport->height;
@@ -718,7 +740,9 @@ void AddCircle(){   TrasCrearAdd(NewMesh(MeshType::circle, NULL, false)); }
 void AddUVSphere(){ TrasCrearAdd(NewMesh(MeshType::UVsphere, NULL, false)); }
 void AddCone(){     TrasCrearAdd(NewMesh(MeshType::cone, NULL, false)); }
 void AddCylinder(){ TrasCrearAdd(NewMesh(MeshType::cylinder, NULL, false)); }
-void AddEmpty(){    TrasCrearAdd(new Empty(NULL, cursor3D.pos)); }
+// el Core lo bautiza "Empty" (no conoce T()): como la luz y el sonido, el editor le pone el nombre en el idioma
+// elegido ("Vacio" en castellano, igual que en el menu Aniadir)
+void AddEmpty(){    Empty* e = new Empty(NULL, cursor3D.pos); e->SetNameObj(T("Empty")); TrasCrearAdd(e); }
 // LOD: nace sin umbrales (dibuja el ultimo hijo siempre); se cargan en el panel
 void AddLOD(){      TrasCrearAdd(new LOD(NULL, cursor3D.pos)); }
 void AddCulling(){  TrasCrearAdd(new Culling(NULL, cursor3D.pos)); }
@@ -892,17 +916,25 @@ void AddProxyW3d(){
     std::string motivo;
     if (!W3dProxyAgregar(lib, W3D_LIB_PREFAB, elem, cursor3D.pos, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
 }
-// objetos LINKEADOS a un target (el activo, o NULL): renderizan a ese target una vez / N veces / espejado.
+// ---- Add > Modifier Objects: objetos que dibujan OTRO objeto (su target: el activo al crearlos, o ninguno; se cambia
+// en su tarjeta) -------------------------------------------------------------------------------------------------
+// INSTANCIA: el target una vez mas, donde esta la instancia
 void AddDuplicateLinked(){
     Instance* inst = new Instance(NULL, ObjActivo); inst->pos = cursor3D.pos; TrasCrearAdd(inst);
 }
+// ARRAY: el target N veces, cada copia corrida por la posicion y la rotacion del Array (la cantidad: su tarjeta)
 void AddArray(){
     Instance* inst = new Instance(NULL, ObjActivo);
     inst->count = 3; inst->pos = Vector3(2, 0, 0); inst->SetNameObj("Array"); TrasCrearAdd(inst);
 }
+// ESPEJO: el target reflejado por el plano del espejo (objects/Mirror.h: los ejes, otros targets, el reflejo en agua,
+// el recorte al rectangulo del plano). Nace en el cursor 3D reflejando en X
 void AddMirror(){
-    Instance* inst = new Instance(NULL, ObjActivo);
-    inst->mirror = true; inst->mirrorEje = 0; inst->SetNameObj("Mirror"); TrasCrearAdd(inst);
+    Object* tgt = ObjActivo;
+    Mirror* mi = new Mirror(NULL, cursor3D.pos, true, false, false);
+    mi->SetNameObj("Mirror");
+    if (tgt && tgt != (Object*)mi) { mi->target = tgt; mi->targetName = tgt->name; }
+    TrasCrearAdd(mi);
 }
 void AddVertex(){
     // se crea y ya entras a EDITARLO, con el vertice elegido. Un vert suelto es lo unico que no se puede tocar
@@ -1019,11 +1051,19 @@ static const MenuDef ADD_MESHES[] = {
     { "Reference",  AddReference,       NULL, ICONO(IconType::textura) },
 };
 
+// submenu Modifier Objects: los objetos que dibujan a otro (el activo al crearlos)
+static const MenuDef ADD_MODIFICADORES[] = {
+    { "Mirror",     AddMirror,          NULL, ICONO(IconType::mirror) },
+    { "Array",      AddArray,           NULL, ICONO(IconType::array) },
+    { "Instance",   AddDuplicateLinked, NULL, ICONO(IconType::instance) },
+};
+
 // EL MENU ADD, de una mirada: texto + accion + icono por fila. Agregar una primitiva = una linea en
 // ADD_MESHES, y ya queda conectada (no hay switch que actualizar ni id que inventar).
 static const MenuDef ADD[] = {
     { "Mesh",       NULL,               NULL, ICONO(IconType::mesh),   &MenuMallas },
     { "Empty",      AddEmpty,           NULL, ICONO(IconType::empty) },
+    { "Modifier Objects", NULL,         NULL, ICONO(IconType::instance), &MenuModificadores },
     { "LOD",        AddLOD,             NULL, ICONO(IconType::array) },
     { "Culling",    AddCulling,         NULL, ICONO(IconType::visible) },
     { "Grid Cull",  AddGridCull,        NULL, ICONO(IconType::cuadricula) },
@@ -1060,6 +1100,8 @@ void LayoutConstruirMenuAdd(){
     if (MenuEscenasAdd) { MenuEscenasAdd->action = W3dEscenaMenuAddAccion; W3dEscenaMenuAddArmar(MenuEscenasAdd); }
     MenuImports->Construir(ADD_IMPORTS, (int)(sizeof(ADD_IMPORTS)/sizeof(ADD_IMPORTS[0])));
     MenuMallas->Construir(ADD_MESHES, (int)(sizeof(ADD_MESHES)/sizeof(ADD_MESHES[0])));
+    if (MenuModificadores)
+        MenuModificadores->Construir(ADD_MODIFICADORES, (int)(sizeof(ADD_MODIFICADORES)/sizeof(ADD_MODIFICADORES[0])));
     if (MenuCore) W3dRutinaMenuPasos(MenuCore, gSubsCore, AddRutinaCon, true);
     MenuAdd->Construir(ADD, (int)(sizeof(ADD)/sizeof(ADD[0])));
 }
@@ -1081,7 +1123,6 @@ static void LayoutAccionSelect(int aId) {
         case 14: LayoutPickPathIniciar(true);  break; // + Fill Region (rellena)
         case 15: LayoutSelectLinkedGuiado();   break; // Select Linked (isla conexa) en modo guiado: pide click
         case 16: LayoutLoopSelectGuiado();     break; // Loop Select en modo VERTICE: guiado (click sobre un borde)
-        case 20: w3dVerSeleccion = !w3dVerSeleccion; g_redraw = true; break; // Ver seleccion (contorno + tinte)
         case 30: // Box Select: arma la cruz guia y espera el arrastre (idem tecla B)
             { extern void TimelineCajaOlvidar(); TimelineCajaOlvidar(); }   // (la del 3D, no la del timeline)
             BoxSelectArmar(); BoxSelectMover(lastMouseX, lastMouseY); break;
@@ -1099,9 +1140,7 @@ static void LayoutRebuildMenuSelect() {
     // BOX SELECT: arma la caja (igual que la tecla). El atajo va en el item para que se
     // aprenda solo -- desde el menu hace exactamente lo mismo que apretar B.
     MenuSelect->Agregar(T("Box Select"), 30)->atajo = "@3d.caja";
-    // "Ver seleccion" (pedido del dueno): OFF = ni contorno verde ni tinte de malla no
-    // editable -- para mirar el escenario seleccionado tal como se ve de verdad.
-    MenuSelect->Agregar(T("Show selection"), 20)->verde = w3dVerSeleccion;
+    // (sin "Ver seleccion": lo elegido se ve siempre con su contorno; que se ve y que no lo maneja el Outliner)
     if (InteractionMode == EditMode) {
         // Select Linked (L): selecciona la ISLA conexa. Desde el menu = guiado (pide click sobre el elemento).
         MenuSelect->Agregar(T("Select Linked"), 15)->atajo = "@3d.vinculado";
@@ -1700,22 +1739,26 @@ void LayoutAccionObject(int aId) {
         case 510:
         case 530: InsertarKeyframeContexto(KfCanalTodos); break; // Todos (localizacion+rotacion+escala)
         case 531: InsertarKeyframeContexto(KfCanalLoc);   break; // Solo localizacion
-        // CAPAS de la animacion del objeto (submenu "Insert Keyframe Layer"): explicitas, sin depender
+        // CAPAS de la animacion de la malla (submenu "Insert Mesh Keyframe"): explicitas, sin depender
         // del editor desde el que se inserta. Los tres son la misma animacion, distinta capa.
         case 540: { extern void VertexAnimInsertarKeyframe();          VertexAnimInsertarKeyframe();          break; }
         case 541: { extern void VertexAnimInsertarKeyframeNormales();  VertexAnimInsertarKeyframeNormales();  break; }
         case 542: { extern void VertexAnimInsertarKeyframeUV();        VertexAnimInsertarKeyframeUV();        break; }
         case 532: InsertarKeyframeContexto(KfCanalRot);   break; // Solo rotacion
         case 533: InsertarKeyframeContexto(KfCanalScl);   break; // Solo escala
-        case 511: BorrarKeyframeObjeto();   break; // Object > Animation: Delete Keyframe (del frame actual)
-        case 512: LimpiarKeyframeObjeto();  break; // Animation: Clear Keyframe (toda la animacion del objeto)
+        case 511: if (InteractionMode == PoseMode) PoseBorrarKeyframe();   else BorrarKeyframeObjeto();  break; // Delete Keyframe (frame actual)
+        case 512: if (InteractionMode == PoseMode) PoseLimpiarKeyframes(); else LimpiarKeyframeObjeto(); break; // Clear Keyframe (toda la animacion)
         case 513: g_redraw = true; break;          // Animation > Motion Trail: el checkbox ya lo toggleo PopupMenu
                                                    // (y a proposito NO cierra el menu)
-        case 514: {                                // Animation: Delete Normals Layer (capa de la vertex anim activa)
+        case 514: {                                // (compat) Delete Normals Layer: hoy es Delete Mesh Layer > Normals
             extern void VertexAnimBorrarCapaNormalesActiva();
             VertexAnimBorrarCapaNormalesActiva();
             break;
         }
+        // Animation > Delete Mesh Layer: la capa entera de la animacion de la malla (0 vertices, 1 UV, 2 normales)
+        case 550: { extern void VertexAnimBorrarCapaActiva(int); VertexAnimBorrarCapaActiva(0); break; }
+        case 551: { extern void VertexAnimBorrarCapaActiva(int); VertexAnimBorrarCapaActiva(2); break; }
+        case 552: { extern void VertexAnimBorrarCapaActiva(int); VertexAnimBorrarCapaActiva(1); break; }
         case 220: AplicarTransform(0); break;   // Apply Location
         case 221: AplicarTransform(1); break;   // Apply Rotation
         case 222: AplicarTransform(2); break;   // Apply Scale
@@ -1724,7 +1767,7 @@ void LayoutAccionObject(int aId) {
         case 101: if (InteractionMode==PoseMode) PoseXformStart(2); else if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break; // Rotate(R)
         case 102: if (InteractionMode==PoseMode) PoseXformStart(3); else if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break; // Scale (S)
         case 500: InsertarKeyframeContexto(KfCanalTodos); break; // Pose Mode: Insert Keyframe (alias de "todos")
-        case 520: PoseClearTransform(0); break; // Pose Mode: Clear Transform > All (T+R+S de los huesos seleccionados)
+        case 520: PoseClearTransform(0); break; // Pose Mode: Clear Transform > All y Animation > Reset Pose (T+R+S de los huesos seleccionados)
         case 521: PoseClearTransform(1); break; // Clear Translation (Alt+G)
         case 522: PoseClearTransform(2); break; // Clear Rotation (Alt+R)
         case 523: PoseClearTransform(3); break; // Clear Scale (Alt+S)
@@ -2075,6 +2118,8 @@ void LayoutAbrirMenuTipo(ViewportBase* aVp) {
         // OJO nombres: dividir "en columnas" = 2 paneles LADO A LADO (ViewportRow);
         // "en filas" = APILADOS (ViewportColumn). Antes decia Fila/Columna al reves.
         gMenuTipo->Agregar(T("Split in Rows"), 22, (int)IconType::filas);
+        // (con un hermano en su fila o columna: los dos cambian de lugar)
+        if (aVp != rootViewport) gMenuTipo->Agregar(T("Swap"), 24, (int)IconType::intercambiar);
         if (aVp != rootViewport) gMenuTipo->Agregar(T("Maximize"), 23, (int)IconType::maximizar); // fullscreen del viewport activo
     }
     gMenuTipoDe = aVp;
@@ -2677,7 +2722,7 @@ static void LayoutAbrirMenu2DObj(Editor2D* ed, int x, int y) {
         gMenu2DObj->Agregar(T("Duplicate Objects"), 1)->atajo = "@2d.duplicar";
         gMenu2DObj->Agregar(T("Set Parent"), 40);
         gMenu2DObj->Agregar(T("Clear Parent"), 41);
-        gMenu2DObj->Agregar(T("Delete"), 3)->atajo = "@2d.borrar";
+        gMenu2DObj->Agregar(T("Delete"), 3, IconType::borrar)->atajo = "@2d.borrar";
     }
     if (MenuAbierto && MenuAbierto != gMenu2DObj) MenuAbierto->Cerrar();
     gMenu2DObj->Abrir(x, y, MenuPantallaW, MenuPantallaH);
@@ -2952,9 +2997,9 @@ static void LayoutAbrirMenuIDEEditar(IDE* ide, int x, int y) {
     gMenuIDEEditar->Limpiar();
     gMenuIDEEditar->Agregar(T("Undo"), IDEE_Deshacer)->atajo = "@ide.deshacer";
     gMenuIDEEditar->Agregar(T("Redo"), IDEE_Rehacer)->atajo = "@ide.rehacer";
-    gMenuIDEEditar->Agregar(T("Cut"), IDEE_Cortar)->atajo = "@ide.cortar";
-    gMenuIDEEditar->Agregar(T("Copy"), IDEE_Copiar)->atajo = "@ide.copiar";
-    gMenuIDEEditar->Agregar(T("Paste"), IDEE_Pegar)->atajo = "@ide.pegar";
+    gMenuIDEEditar->Agregar(T("Cut"), IDEE_Cortar, IconType::tijera)->atajo = "@ide.cortar";
+    gMenuIDEEditar->Agregar(T("Copy"), IDEE_Copiar, IconType::copiar)->atajo = "@ide.copiar";
+    gMenuIDEEditar->Agregar(T("Paste"), IDEE_Pegar, IconType::pegar)->atajo = "@ide.pegar";
     gMenuIDEEditar->Agregar(T("Find..."), IDEE_Buscar)->atajo = "@ide.buscar";
     gMenuIDEEditar->Agregar(T("Replace..."), IDEE_Reemplazar)->atajo = "@ide.reemplazar";
     if (MenuAbierto && MenuAbierto != gMenuIDEEditar) MenuAbierto->Cerrar();
@@ -3100,7 +3145,7 @@ static void LayoutAbrirMenuUVAnim(UVEditor* uv, int x, int y) {
         gMenuUVCapa->Agregar(T("Vertices"), 540, IconType::mesh);
         gMenuUVCapa->Agregar(T("Normals"),  541, IconType::normalVertex);
         gMenuUVCapa->Agregar(T("UV"),       542, IconType::textura);
-        gMenuUVAnim->Agregar(T("Insert Keyframe Layer"), 0, IconType::keyframe, gMenuUVCapa);
+        gMenuUVAnim->Agregar(T("Insert Mesh Keyframe"), 0, IconType::mesh, gMenuUVCapa);
         gMenuUVAnim->Agregar(T("Delete Keyframe"), 1, IconType::borrar);
         gMenuUVAnim->Agregar(T("Clear Keyframe"),  2);
         gMenuUVAnim->action = LayoutAccionUVAnim;
@@ -3438,7 +3483,8 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         // (estaba anidado adentro del Contains de "Object": pedia el cursor sobre los DOS botones a la vez y no
         //  se abria nunca).
         objetivo = MenuAnimation; boton = bAnim;
-        if (!MenuAnimation->action) MenuAnimation->action = LayoutAccionObject; // ids 510..513 / 530..533
+        if (!MenuAnimation->action) MenuAnimation->action = LayoutAccionObject; // ids 510..514 / 520 / 530..542
+        { extern void MenuAnimationArmar(); MenuAnimationArmar(); }   // segun el modo y el objeto activo
         LayoutSyncInsertKeySubmenu(MenuAnimation, 0); // "Insert Keyframe": submenu de canales segun el contexto
     } else if (bObj && bObj->visible && bObj->Contains(mx, my)) {
         // Edit Mode -> menu de contexto Vertex/Edge/Face (o "Armature" si se editan huesos);
@@ -3869,12 +3915,11 @@ void LayoutMenuSharp(int mx, int my) {
 
 // ====================================================================
 // menu TRANSFORM PIVOT POINT (objeto + edit): desde donde/como rotan-escalan.
-// 4 modos  + checkbox "Lock Normals". Sale en el cursor.
+// 4 modos (Bloquear normales es de la malla: Propiedades > Malla 3D > Edicion). Sale en el cursor.
 // (gMenuPivot se declara mas arriba, junto al dispatch de la barra.)
 // ====================================================================
 static void AccionPivot(int aId) {
     if (aId >= 0 && aId <= 3) g_transformPivot = aId; // 0..3 = enum TransformPivot
-    // id 9 = el checkbox Lock Normals (lo maneja AgregarCheck, no hace falta accion)
 }
 
 // ===== menu SNAP (boton "Snap" de la barra): Enable + Snap Base + Snap Target + Affect + Target Selection =====
@@ -3958,7 +4003,6 @@ void LayoutMenuPivot(int mx, int my) {
     gMenuPivot->Agregar(T("Individual Origins"), PivotIndividual, IconType::pivotIndividual)->verde = (g_transformPivot==PivotIndividual);
     gMenuPivot->Agregar(T("Median Point"), PivotMedian, IconType::pivotMedian)->verde = (g_transformPivot==PivotMedian);
     gMenuPivot->Agregar(T("Active Element"), PivotActive, IconType::pivotActive)->verde = (g_transformPivot==PivotActive);
-    gMenuPivot->AgregarCheck(T("Lock Normals"), 9, &g_editLockNormales);
     gMenuPivot->Abrir(mx, my, MenuPantallaW, MenuPantallaH); // EN EL CURSOR
     MenuAbierto = gMenuPivot;
 }
@@ -3968,7 +4012,6 @@ void LayoutMenuPivot(int mx, int my) {
 // ofrece, porque en 2D dos de los items no significan nada:
 //   - "Active Element": el editor UV no tiene ELEMENTO ACTIVO (el pick escribe uvSelVert y nada
 //     mas). Elegirlo pivoteaba igual en la mediana y el icono de la barra mentia.
-//   - "Lock Normals": es del transform de la MALLA en 3D; en el mapa UV no hay normales.
 // "Individual Origins" SI se ofrece: en modo CARA el UV lo implementa de verdad (cada cara rota
 // alrededor de su centro, ver UVEditor::IniciarXform).
 void LayoutMenuPivotUV(int mx, int my) {
@@ -3999,7 +4042,7 @@ void LayoutMenuPivotUV(int mx, int my) {
 // el TARGET son los vertices. Trabaja en MUNDO (TRS global de la malla, constante
 // durante el drag): snapshot de las posiciones de mundo al empezar, acumula la
 // transform y reescribe desde el snapshot (sin drift). Al CONFIRMAR recalcula
-// bordes + normales (salvo Lock Normals); al CANCELAR restaura el snapshot.
+// bordes + normales (salvo Bloquear normales); al CANCELAR restaura el snapshot.
 
 struct EditVtxSnap {
     int editK;      // indice del vertice editable; su pos[] es autoritativa (un valor por
@@ -4822,7 +4865,7 @@ bool EditSlideTecla(int cual){
 }
 
 // fija el resultado: recalcula bordes/centro/posRep (sin invalidar el edit) y las
-// NORMALES (salvo Lock Normals). El overlay ya esta sincronizado (SincronizarPos).
+// NORMALES (salvo Bloquear normales, de la malla). El overlay ya esta sincronizado (SincronizarPos).
 void EditXformConfirmar(){
     // un solo Ctrl+Z: el move Y el keyframe del auto key de vertices (solo si va a haber keyframe: sin auto key el
     // Auto Merge sigue siendo su propio paso)
@@ -4835,7 +4878,7 @@ void EditXformConfirmar(){
         // CONSERVA posRep (reagruparPosRep=false): un move NO cambia la topologia, y si el snap dejo 2 verts
         // INDEPENDIENTES encimados, rederivar posRep por posicion los SOLDARIA (caras y edit desincronizados).
         m->CalcularBordes(false, false);      // posRep(conserva)/centroGeom/bordes; conserva el edit
-        if (!g_editLockNormales) m->RecalcularNormales();
+        if (!m->bloquearNormales) m->RecalcularNormales();
         // AUTO MERGE (opt-in, OFF por defecto): recien AHORA, si el usuario lo pidio, se sueldan los verts movidos
         // con cualquier vert a <= threshold. No-op si no hay nada cerca (MergeVertsEdit retorna sin tocar nada).
         if (g_autoMerge) MergeVertsEdit(m, 3 /*By Distance*/, g_autoMergeThreshold, Vector3(0,0,0));

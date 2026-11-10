@@ -1,13 +1,13 @@
-# Navigare nel 3D Viewport
+# Navigare nella Vista 3D
 
 > [!NOTE]
 > ![Nokia](img/icono-nokia.svg) Il Nokia N95 supporta mouse e tastiera (via Bluetooth). Le parti di questo tutorial dedicate al Nokia spiegano come usarlo senza mouse né tastiera, solo con i tasti del telefono.
 
-Questo tutorial spiega come navigare nel 3D Viewport. Navigare significa spostare il tuo punto di vista: girare intorno alla scena, spostarti di lato e avvicinarti o allontanarti.
+Questo tutorial spiega come navigare nella Vista 3D. Navigare significa spostare il tuo punto di vista: girare intorno alla scena, spostarti di lato e avvicinarti o allontanarti.
 
 Saper navigare è importante: per creare modelli 3D e animazioni in modo comodo e veloce, devi saperti muovere nella scena e metterti in una posizione comoda per lavorare.
 
-Come spiegato nel [tutorial precedente](viewports.md#il-viewport-attivo), per usare i comandi che seguono il 3D Viewport deve essere il viewport attivo, quello con il bordo verde.
+Come spiegato nel tutorial [I viewport](viewports.md#il-viewport-attivo), per usare i comandi che seguono la Vista 3D deve essere il viewport attivo, quello con il bordo verde.
 
 Le tre cose che userai di più sono **orbitare**, **spostare la vista** e fare **zoom**. Ognuna si può fare con il mouse, con le dita su uno schermo touch o con la tastiera del Nokia N95. Nei video del PC, il mouse in basso a destra mostra in verde il tasto che si sta premendo.
 
@@ -17,11 +17,11 @@ Orbitare significa ruotare la vista intorno alla scena, come se girassi intorno 
 
 ![PC](img/icono-pc.svg) **Con il mouse:** tieni premuto il **tasto centrale** (si preme spingendo giù la rotella) e trascina. Su un trackpad, o con un mouse senza tasto centrale, tieni premuto <kbd>Alt</kbd> e trascina con il **clic principale** (il sinistro).
 
-![Il puntatore sul 3D Viewport: con il tasto centrale premuto, il trascinamento ruota la vista intorno al cubo](img/navegacion-orbitar-raton.webp)
+![Il puntatore sulla Vista 3D: con il tasto centrale premuto, il trascinamento ruota la vista intorno al cubo](img/navegacion-orbitar-raton.webp)
 
-![Android](img/icono-android.svg) **Con il dito:** trascina un dito sul 3D Viewport. Parti dallo sfondo: se lo appoggi sul gizmo (le frecce colorate dell'oggetto), finirai per spostarlo.
+![Android](img/icono-android.svg) **Con il dito:** trascina un dito sulla Vista 3D. Parti dallo sfondo: se lo appoggi sul gizmo (le frecce colorate dell'oggetto), finirai per spostarlo.
 
-![Un dito trascina sullo sfondo del 3D Viewport e la vista ruota intorno al cubo](img/navegacion-orbitar-dedo.webp)
+![Un dito trascina sullo sfondo della Vista 3D e la vista ruota intorno al cubo](img/navegacion-orbitar-dedo.webp)
 
 ![Nokia](img/icono-nokia.svg) **Su un Nokia N95:** tieni premuta una **freccia** del pad. La vista ruota da quel lato finché la tieni premuta.
 
@@ -68,28 +68,28 @@ Se hai perso l'orientamento, o vuoi lavorare su qualcosa in particolare, **inqua
 | ![PC](img/icono-pc.svg) PC | <kbd>Num .</kbd> (il punto del tastierino numerico) |
 | ![Nokia](img/icono-nokia.svg) Nokia N95 | Una pressione dello <kbd>0</kbd>, senza frecce (tenuto premuto con una freccia fa lo zoom) |
 | ![Android](img/icono-android.svg) Schermo touch | Doppio tocco con due dita |
-| Menu | View → Frame Selected |
+| Menu | Vista → Inquadra selezionati |
 
 ![La vista è lontana e spostata, con il cubo piccolissimo in un angolo; con Num . il cubo resta centrato e riempie la vista](img/navegacion-encuadrar.webp)
 
 ![Un Nokia N95: con una pressione dello 0, il cubo che era piccolissimo in un angolo resta centrato e inquadrato](img/navegacion-encuadrar-nokia.webp)
 
-### In Edit Mode
+### In Modalità Modifica
 
-In [Edit Mode](../editor/modo-edicion.md) si inquadra la parte selezionata della mesh: i vertici, gli spigoli o le facce che hai scelto, non l'intero oggetto. Serve per lavorare su un dettaglio di un modello grande: lo selezioni, lo inquadri e ci orbiti intorno.
+In [Modalità Modifica](../editor/modo-edicion.md) si inquadra la parte selezionata della mesh: i vertici, gli spigoli o le facce che hai scelto, non l'intero oggetto. Serve per lavorare su un dettaglio di un modello grande: lo selezioni, lo inquadri e ci orbiti intorno.
 
-![Una sfera in Edit Mode con sei facce selezionate (in verde): con Num . la vista si avvicina e quelle facce riempiono lo schermo](img/navegacion-encuadrar-edicion.webp)
+![Una sfera in Modalità Modifica con sei facce selezionate (in verde): con Num . la vista si avvicina e quelle facce riempiono lo schermo](img/navegacion-encuadrar-edicion.webp)
 
 ## La vista locale
 
-Quando nella scena ci sono molte cose, lavorare su una sola è scomodo: quelle davanti la coprono, e quando orbiti si mettono in mezzo. La **vista locale** lascia visibile solo ciò che è selezionato (uno o più oggetti) e lo inquadra. Il resto non viene cancellato né nascosto nella scena: smette solo di vedersi in questo viewport. In alto a sinistra compare la scritta "Local View".
+Quando nella scena ci sono molte cose, lavorare su una sola è scomodo: quelle davanti la coprono, e quando orbiti si mettono in mezzo. La **vista locale** lascia visibile solo ciò che è selezionato (uno o più oggetti) e lo inquadra. Il resto non viene cancellato né nascosto nella scena: smette solo di vedersi in questo viewport. In alto a sinistra compare la scritta "Vista locale".
 
 Per tornare indietro si ripete la stessa cosa: tutto ricompare e la vista torna com'era prima.
 
 | | Come si entra e si esce |
 |---|---|
 | ![PC](img/icono-pc.svg) PC | <kbd>/</kbd> |
-| ![Nokia](img/icono-nokia.svg) ![Android](img/icono-android.svg) Nokia N95 e schermo touch | Menu View → Local View |
+| ![Nokia](img/icono-nokia.svg) ![Android](img/icono-android.svg) Nokia N95 e schermo touch | Menu Vista → Vista locale |
 
 ![Una scena piena di scatole, sfere, cilindri e coni, con un cono selezionato: con / resta solo il cono, inquadrato, e con / di nuovo torna tutto](img/navegacion-vista-local.webp)
 
@@ -99,9 +99,9 @@ Per guardare la scena esattamente da un lato, senza sistemare l'orbita a mano:
 
 | Vista | ![PC](img/icono-pc.svg) PC | Menu |
 |---|---|---|
-| Frontale / Posteriore | <kbd>Num 1</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 1</kbd> | View → Viewpoint → Front / Back |
-| Destra / Sinistra | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
-| Dall'alto / Dal basso | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | View → Viewpoint → Top / Bottom |
+| Frontale / Posteriore | <kbd>Num 1</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 1</kbd> | Vista → Punto di vista → Frontale / Posteriore |
+| Destra / Sinistra | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | Vista → Punto di vista → Destra / Sinistra |
+| Dall'alto / Dal basso | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | Vista → Punto di vista → Superiore / Inferiore |
 
 ![PC](img/icono-pc.svg) Con <kbd>Ctrl</kbd>, ogni tasto dà la vista opposta.
 
@@ -113,7 +113,7 @@ Per guardare la scena esattamente da un lato, senza sistemare l'orbita a mano:
 
 ## Prospettiva e vista ortografica
 
-Il 3D Viewport ha due modi di mostrare la scena:
+La Vista 3D ha due modi di mostrare la scena:
 
 - **Prospettiva:** come la vede l'occhio o una camera. Ciò che è lontano appare più piccolo, e le linee parallele (i bordi di una strada, le file di scatole del video) si incontrano in un punto dell'orizzonte: il **punto di fuga**. È così che si vede davvero, con profondità.
 - **Ortografica:** senza prospettiva. Tutto mantiene la sua dimensione, vicino o lontano che sia, e le linee parallele non si toccano mai. È come una pianta architettonica o un disegno tecnico.
@@ -124,7 +124,7 @@ L'ortografica serve per modellare con precisione: allineare le cose, confrontare
 |---|---|
 | ![PC](img/icono-pc.svg) PC | <kbd>Num 5</kbd> |
 | ![Nokia](img/icono-nokia.svg) Nokia N95 | Una pressione del <kbd>#</kbd>, senza frecce |
-| Menu | View → Perspective/Ortho |
+| Menu | Vista → Prospettiva/Orto |
 
 ![Due file di scatole uguali: in prospettiva quelle in fondo sembrano piccole; con Num 5, in ortografica, hanno tutte la stessa dimensione](img/navegacion-perspectiva.webp)
 
@@ -136,15 +136,15 @@ Con l'**orbita bloccata**, la vista smette di ruotare: ciò che prima la faceva 
 
 | | Come si blocca e si sblocca |
 |---|---|
-| ![PC](img/icono-pc.svg) PC | Menu View → Lock Orbit |
-| ![Android](img/icono-android.svg) Schermo touch | Menu View → Lock Orbit |
+| ![PC](img/icono-pc.svg) PC | Menu Vista → Blocca orbita |
+| ![Android](img/icono-android.svg) Schermo touch | Menu Vista → Blocca orbita |
 | ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>9</kbd> |
 
-Quando la blocchi o la sblocchi compare un avviso e, finché è bloccata, Lock Orbit appare in verde nel menu.
+Quando la blocchi o la sblocchi compare un avviso e, finché è bloccata, Blocca orbita appare in verde nel menu.
 
-![La pianta di una casa vista dall'alto: si sceglie View → Lock Orbit e, con il tasto centrale, la pianta si sposta senza ruotare](img/navegacion-bloquear-orbita-raton.webp)
+![La pianta di una casa vista dall'alto: si sceglie Vista → Blocca orbita e, con il tasto centrale, la pianta si sposta senza ruotare](img/navegacion-bloquear-orbita-raton.webp)
 
-![La pianta di una casa vista dall'alto: si tocca View → Lock Orbit e il dito sposta la pianta senza ruotarla](img/navegacion-bloquear-orbita-dedo.webp)
+![La pianta di una casa vista dall'alto: si tocca Vista → Blocca orbita e il dito sposta la pianta senza ruotarla](img/navegacion-bloquear-orbita-dedo.webp)
 
 ![Un Nokia N95 con la pianta di una casa: con il 9 si blocca l'orbita e le frecce spostano la pianta senza ruotarla](img/navegacion-bloquear-orbita-nokia.webp)
 
@@ -157,10 +157,10 @@ Per guardare attraverso la camera attiva:
 | | Come si entra e si esce |
 |---|---|
 | ![PC](img/icono-pc.svg) PC | <kbd>Num 0</kbd> |
-| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>8</kbd> (fuori da Edit Mode: lì l'8 è Loop Cut) |
-| Menu | View → Cameras → Active Camera |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | <kbd>8</kbd> (fuori dalla Modalità Modifica: lì l'8 è Taglio ad anello) |
+| Menu | Vista → Camere → Camera attiva |
 
-![Con Num 0 il 3D Viewport passa a guardare attraverso la camera, con la cornice di ciò che uscirà nel render, e con Num 0 di nuovo torna indietro](img/navegacion-camara.webp)
+![Con Num 0 la Vista 3D passa a guardare attraverso la camera, con la cornice di ciò che uscirà nel render, e con Num 0 di nuovo torna indietro](img/navegacion-camara.webp)
 
 ![Un Nokia N95: con l'8 la vista passa alla camera attiva e con l'8 di nuovo torna indietro](img/navegacion-camara-nokia.webp)
 
@@ -177,16 +177,16 @@ Con il lucchetto chiuso, la camera attiva resta bloccata alla vista: orbiti, spo
 |---|---|
 | ![PC](img/icono-pc.svg) PC | Un clic sul lucchetto |
 | ![Android](img/icono-android.svg) Schermo touch | Un tocco sul lucchetto |
-| ![Nokia](img/icono-nokia.svg) Nokia N95 | Il tasto di selezione sinistro apre la barra dei menu (come nel [tutorial precedente](viewports.md#quando-la-barra-non-ci-sta)); lì, View → Lock the camera to the view |
-| Menu | View → Lock the camera to the view |
+| ![Nokia](img/icono-nokia.svg) Nokia N95 | Il tasto di selezione sinistro apre la barra dei menu (come nel tutorial [I viewport](viewports.md#quando-non-si-vedono-tutte-le-opzioni-della-barra-dei-menu)); lì, Vista → Blocca la camera alla vista |
+| Menu | Vista → Blocca la camera alla vista |
 
 ![Con Num 0 la vista passa alla camera; un clic sul lucchetto lo chiude e, orbitando e girando la rotella, la camera si muove finché il cubo non è inquadrato](img/navegacion-camara-bloquear-raton.webp)
 
 ![Guardando attraverso la camera, un tocco sul lucchetto lo chiude e, trascinando il dito, la camera si muove finché il cubo non è inquadrato](img/navegacion-camara-bloquear-dedo.webp)
 
-![Un Nokia N95: l'8 passa alla camera; con il tasto di selezione sinistro si apre il menu View e si sceglie Lock the camera to the view; le frecce e lo 0 muovono la camera finché il cubo non è inquadrato](img/navegacion-camara-bloquear-nokia.webp)
+![Un Nokia N95: l'8 passa alla camera; con il tasto di selezione sinistro si apre il menu Vista e si sceglie Blocca la camera alla vista; le frecce e lo 0 muovono la camera finché il cubo non è inquadrato](img/navegacion-camara-bloquear-nokia.webp)
 
-Perché un'altra camera diventi quella attiva: selezionala e premi <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (oppure View → Cameras → Set Active Object as Camera).
+Perché un'altra camera diventi quella attiva: selezionala e premi <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> (oppure Vista → Camere → Oggetto attivo come camera).
 
 ## Altre opzioni della vista
 

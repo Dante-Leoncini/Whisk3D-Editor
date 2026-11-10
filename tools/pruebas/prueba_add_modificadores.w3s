@@ -1,0 +1,20 @@
+# ==========================================================================
+#  Add > Modifier Objects (Mirror / Array / Instance: objetos que dibujan a otro, el activo al crearlos), las casillas
+#  del espejo con la convencion Z-arriba del panel (la casilla "Y" es el eje z del motor y la "Z" el y, como en
+#  Transform), el campo "Count" del Array, y el "Swap" del menu de tipo de viewport (cambia de lugar con su hermano).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_add_modificadores.w3s
+# ==========================================================================
+add cube
+addmodif Mirror targetactivo 1
+mirrorcasilla X 1 eje x
+mirrorcasilla Y 1 eje z
+mirrorcasilla Z 1 eje y
+add cube
+addmodif Array targetactivo 1 copias 3
+instcopias 5
+add cube
+addmodif Instance targetactivo 1 copias 1
+# el Swap: el timeline (abajo del 3D) pasa arriba, el outliner (arriba de Properties) pasa abajo
+vpswap timeline
+vpswap outliner

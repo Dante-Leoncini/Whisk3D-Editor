@@ -2,7 +2,7 @@
 
 Dans Whisk3D, un script appartient toujours à un **objet** de la scène (un maillage, un empty, un bouton 2D…). Un objet peut avoir plusieurs scripts ; chacun s'exécute séparément, avec ses propres variables, dans l'ordre où ils apparaissent.
 
-Depuis le script, `yo()` renvoie l'objet propriétaire. Pour utiliser *d'autres* objets, le script déclare une table globale nommée `propiedades`. L'éditeur la lit et affiche un champ pour chaque entrée dans la carte du script, dans le panneau Properties :
+Depuis le script, `yo()` renvoie l'objet propriétaire. Pour utiliser *d'autres* objets, le script déclare une table globale nommée `propiedades`. L'éditeur la lit et affiche un champ pour chaque entrée dans la carte du script, dans le panneau Propriétés :
 
 ```lua
 propiedades = {

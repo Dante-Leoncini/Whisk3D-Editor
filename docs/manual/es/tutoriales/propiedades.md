@@ -1,7 +1,7 @@
 # Propiedades
 
 > [!NOTE]
-> ![Nokia](img/icono-nokia.svg) El Nokia N95 soporta mouse y teclado (por Bluetooth). Las partes de este tutorial sobre el Nokia explican cómo se usa sin mouse ni teclado, solo con las teclas del teléfono.
+> ![Nokia](img/icono-nokia.svg) El Nokia N95 soporta mouse y teclado (por Bluetooth). Las partes de esta página sobre el Nokia explican cómo se usa sin mouse ni teclado, solo con las teclas del teléfono.
 
 **Propiedades** es el viewport con los datos del **objeto activo**, el último que elegiste: su posición, su nombre, su material, el color de una luz, los modificadores de una malla. Está organizado en **pestañas**, y cada pestaña tiene **tarjetas** con filas de valores. Casi todo lo que cambiás acá se ve en el momento en la Vista 3D.
 
@@ -11,7 +11,7 @@ Como se explicó en [Los viewports](viewports.md#el-viewport-activo), las teclas
 
 ## Las pestañas
 
-Las pestañas son los íconos de la barra de arriba de Propiedades, al lado del botón de la esquina. Cada una muestra un grupo de tarjetas.
+Las pestañas son los íconos de la barra de menús de Propiedades. Cada una muestra un grupo de tarjetas.
 
 Las pestañas **cambian según el objeto activo**: cada tipo de objeto muestra solo las que le sirven. Una malla tiene Material, Malla 3D y Modificadores; una luz tiene, en el lugar del material, la pestaña Luz; una cámara, la pestaña Cámara.
 
@@ -100,9 +100,9 @@ Un **desplegable** es un botón que muestra la opción elegida, como el **Tipo**
 
 ## Las casillas
 
-Una **casilla** se prende o se apaga: tildada es sí y vacía es no. Va a la derecha de la fila, como **Visible** en la tarjeta Transformar: destildada, el objeto deja de verse en la Vista 3D. Un click o un toque en la fila (en la casilla o en su nombre) la cambia, y en el Nokia, <kbd>OK</kbd>.
+Una **casilla** se prende o se apaga: tildada es sí y vacía es no. Va a la derecha de la fila, como **Iluminación** en el material: apagada, el objeto no recibe las luces y se ve de su color, plano. Un click o un toque en la fila (en la casilla o en su nombre) la cambia, y en el Nokia, <kbd>OK</kbd>.
 
-![Se destilda Visible en la tarjeta Transformar y el cubo desaparece de la Vista 3D; se tilda otra vez y vuelve](img/propiedades-casilla.webp)
+![En el material del cubo se apaga Iluminación y el cubo se ve blanco y plano, sin luces; se prende otra vez y vuelve a verse iluminado](img/propiedades-casilla.webp)
 
 ## Los textos
 
@@ -167,4 +167,31 @@ En la pestaña Animación, la tarjeta **Cámara activa** elige qué cámara mand
 
 La animación tiene su propio tutorial más adelante.
 
-Todas las pestañas y sus tarjetas están en el manual: [Propiedades](../editor/propiedades.md). Volver a [Los viewports](viewports.md).
+Todas las pestañas y sus tarjetas están en el manual: [Propiedades](propiedades.md). Volver a [Los viewports](viewports.md).
+
+## Qué tiene cada pestaña
+
+| Pestaña | Qué tiene |
+|---|---|
+| Archivo / Render (diskette) | **Archivo**: abrir, guardar, guardar como, guardar versión, extraer assets. **Render**: ruta, tamaño, pases extra, fondo, **Trazado de rayos** (rayos, muestras, pases), Renderizar imagen y Renderizar animación. **Juego**: plataforma (Windows, Symbian, Linux .deb, AppImage, WebGL, Android, Android 2.3), ventana, orientación, icono, física, sonido, volumen, **resolución** (el porcentaje de la pantalla al que dibuja el juego: en Android 2.3 el sistema lo estira, y en esos teléfonos dibujar menos píxeles da más cuadros) y Compilar juego (con un teléfono conectado por adb lo instala y lo abre). **Exportar**: OBJ, glTF, GLB, STL (solo los triángulos, para imprimir en 3D o pasar a un programa de CAD). **Ajustes**: idioma, antialiasing, gráficos, skin, logs, escala, **Atajos de teclado…** y Guardar cambios. |
+| Objeto | Posición, rotación (Euler, cuaternión o eje-ángulo), escala, nombre, visible, renderizar; animaciones y paleta del objeto. |
+| Contextual | Depende del tipo: partes de malla y **material** (textura, iluminación, color de vértice, transparencia, reflejos, normal map, mezcla, profundidad, capas de textura, **Avanzado: shader personalizado** — ver [Shaders escritos](../editor/shaders.md); Rugosidad, Metálico, Transmisión e IOR con trazado de rayos), luz, cámara, niebla, partículas, física, hitbox, esqueleto y huesos, elementos 2D, prefabs, rutinas. |
+| Malla 3D | La malla usada (y cuántos la comparten), mapas UV, capas de color, grupos de vértices, grupos UV. Con un recurso elegido en la Biblioteca: sus datos y su ubicación (dentro o fuera del .w3d). |
+| Modificadores | Ver [Modificadores](../editor/objeto-malla.md#la-pestaña-modificadores). |
+| Transformar | Solo en Modo Edición: centro de la selección y de sus UV, editables. |
+| Esqueleto 2D | Esqueletos y huesos 2D de la malla. |
+| Restricciones | Copiar posición, Copiar rotación, Billboard (mirar a la cámara), Child Of. |
+| Scripts | Los scripts Lua del objeto y sus propiedades (ver el [documento de Lua](../lua/README.md)). |
+| Animación | La animación activa, capas de mezcla (Mix), valores exactos del keyframe elegido y cortes de cámara. |
+
+## Rutinas
+
+Una rutina es una lista de pasos de dibujo (trasladar, rotar, fijar textura, dibujar una malla, llamar a otra rutina, Llamar Lua…) que se arma en Propiedades. Es la forma más rápida de dibujar en el N95.
+
+| Función | Descripción | Atajo |
+|---|---|---|
+| Añadir / Quitar paso | Agrega pasos agrupados por tema, o quita el elegido. | Botones; <kbd>X</kbd> o <kbd>Supr</kbd> quita |
+| Agarrar paso | Reordena el paso con las flechas; <kbd>Enter</kbd> confirma. | <kbd>G</kbd> |
+| Insertar keyframe | Anima los valores del paso en el frame actual. | <kbd>I</kbd> |
+| Repetir | Cuántas veces corre la lista seguida (bucle de rutina). 1 = rutina normal. | Campo Repetir |
+| Modo de render / Usa | Una lista distinta por modo de sombreado, o la misma para todos. | Desplegables |

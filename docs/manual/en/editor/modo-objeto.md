@@ -7,6 +7,7 @@
 | Add | Creates a new object at the 3D cursor (see [Add menu](#add-menu)). | <kbd>Shift+A</kbd> or + button |
 | Apply | Bakes the location, rotation, scale or all of them into the mesh (the object ends up at 0, 0, 0 with no rotation and at scale 1). | <kbd>Ctrl+A</kbd> |
 | Set Origin | Geometry to Origin, Origin to Geometry, Origin to 3D Cursor. | Object menu |
+| Snap | Moves the 3D cursor to the selection, to the active object, to the world origin or to the grid, and the selection to the cursor, to the active object or to the grid. | <kbd>Shift+S</kbd> or Object menu → Snap |
 | Duplicate Objects | Independent copy; it stays grabbed so you can move it. | <kbd>Shift+D</kbd> |
 | Duplicate Linked | A copy that shares the mesh with the original (editing one edits both). | <kbd>Alt+D</kbd> |
 | Join | Merges the selected meshes into the active object. | <kbd>Ctrl+J</kbd> |
@@ -40,5 +41,5 @@ Object Mode only. New things appear at the 3D cursor and stay selected. Primitiv
 | LOD / Culling / Grid Cull | Optimization objects: levels of detail and hiding what can't be seen. |
 | Clear Depth / Screen Rect | Drawing tools: clear the depth or clip an area of the screen. |
 | Prefab / Scene / Proxy W3D | Insert a prefab from the project, another scene, or a prefab from an external library. |
-| Imports | OBJ, FBX, glTF, GLB or a Whisk3D UI interface. |
+| Imports | OBJ, FBX, glTF, GLB, STL or a Whisk3D UI interface. STL (3D printing, CAD) comes in Z-up, rotated so it stands upright, with identical vertices welded together. |
 | Core (advanced) | Routines: lists of drawing steps built by hand (transform, draw, textures, lights, fog, blending, depth, control, Call Lua). Includes **Routine loop**: a routine that repeats its steps several times (for example "translate, draw" 20 times), like an array but faster. |

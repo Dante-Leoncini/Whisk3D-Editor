@@ -23,6 +23,8 @@ Dilin temelleri ve Whisk3D'nin oyun programlamak için dile eklediği her şey. 
    - [Parçacıklar, sis ve görünürlük](api-particulas-niebla.md)
    - [Zaman, rastgelelik ve yardımcı işlevler](api-tiempo-y-utilidades.md)
    - [Kaydedilen ayarlar](api-configuracion.md)
+   - [Ağda oynama (LAN, Wi-Fi ya da internet)](api-red.md)
+   - [Bölünmüş ekran ve herkese bir oyun kumandası](api-pantalla-dividida.md)
    - [Mesajlar ve hata ayıklama](api-mensajes-y-depuracion.md)
    - [Rutinler ve bellekler](api-rutinas-y-memorias.md)
 7. [Tuş ve düğme adları](teclas-y-botones.md)

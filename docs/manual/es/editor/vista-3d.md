@@ -1,89 +1,88 @@
 # Vista 3D
 
-La Vista 3D es donde se ve y se edita la escena. Trabaja en distintos **modos**: lo que hacen los clicks, las teclas y los menús depende del modo actual. El modo se elige con el selector de la barra superior (solo aparece si el objeto activo es una malla o un esqueleto) o con <kbd>Tab</kbd>.
+La **Vista 3D** es el viewport donde se ve y se edita la escena: ahí se modela, se mueven los objetos, se pinta, se posa y se anima. Como todos los viewports, tiene arriba su **barra de menús** y abajo su **barra de herramientas**.
 
-| Modo | Para qué objetos | Para qué sirve |
+![La Vista 3D con el cubo elegido, en el Modo Objeto: arriba, la barra de menús entera](../tutoriales/img/vista-3d-barra.webp)
+
+- **La barra de menús**, botón por botón, con sus menús: [La barra de menús de la Vista 3D](vista-3d-barra.md).
+- **Navegar** (orbitar, desplazarse, zoom, las vistas, la cámara): [Navegación en la Vista 3D](navegacion.md) y el tutorial [Navegar en la Vista 3D](../tutoriales/navegacion.md).
+- **Mover, rotar y escalar**, el gizmo, el pivote y la orientación: [Mover, rotar y escalar](transformar.md).
+
+## Los modos
+
+La Vista 3D trabaja en distintos **modos**: lo que hacen los clicks, las teclas y los menús depende del modo en el que está. El modo se elige con el primer botón de la barra de menús, que muestra el modo actual, o con <kbd>Tab</kbd> (Objeto ↔ Edición; en el Nokia N95, <kbd>OK</kbd>).
+
+Los modos que se pueden elegir dependen del **objeto activo**. El **Modo Objeto** lo tienen todos. Una malla 3D suma el Modo Edición y las tres pinturas; un esqueleto, el Modo Edición y el Modo Pose. Con cualquier otro objeto (una luz, una cámara, un sonido) el único modo es el Modo Objeto, y el botón no aparece.
+
+![El menú del modo con un cubo elegido: Modo Objeto, Modo Edición, Pintura de Vértices, Pintura de Pesos y Pintura de Textura](../tutoriales/img/vista-3d-menu-modo.webp)
+
+![El menú del modo con un esqueleto elegido: Modo Objeto, Modo Edición y Modo Pose](../tutoriales/img/vista-3d-modos-esqueleto.webp)
+
+| Modo | Qué objetos lo tienen | Para qué sirve |
 |---|---|---|
-| [Modo Objeto](modo-objeto.md) | Todos | Crear, mover, rotar, escalar, duplicar, emparentar y borrar objetos enteros. |
-| [Modo Edición](modo-edicion.md) | Mallas y curvas | Editar vértices, aristas y caras (modelar). |
-| [Modo Edición de esqueleto](esqueletos.md#modo-edición-de-esqueleto) | Esqueletos | Crear y acomodar los huesos. |
-| [Modo Pose](esqueletos.md#modo-pose) | Esqueletos | Posar y animar los huesos. |
-| [Pintura de pesos](pintura.md#pintura-de-pesos) | Solo mallas 3D | Pintar cuánto mueve cada hueso a cada vértice. |
-| [Pintura de vértices](pintura.md#pintura-de-vértices) | Solo mallas 3D | Pintar colores directamente sobre los vértices. |
-| [Pintura de textura](pintura.md#pintura-de-textura) | Solo mallas 3D | Pintar sobre la textura, directamente encima del objeto. |
+| [Modo Objeto](modo-objeto.md) | Todos | Trabajar con los objetos enteros: crearlos, moverlos, rotarlos, escalarlos, duplicarlos, emparentarlos y borrarlos. |
+| [Modo Edición](modo-edicion.md) | Mallas 3D y curvas | Modelar: mover, agregar y borrar los vértices, las aristas y las caras de la malla. |
+| [Modo Edición](esqueletos.md#modo-edición-de-esqueleto) | Esqueletos | Armar el esqueleto: crear huesos y acomodarlos en su posición de reposo. |
+| [Modo Pose](esqueletos.md#modo-pose) | Esqueletos | Posar los huesos y guardar las poses: así se anima un personaje. |
+| [Pintura de Pesos](pintura.md#pintura-de-pesos) | Mallas 3D | Pintar cuánto mueve cada hueso a cada vértice. |
+| [Pintura de Vértices](pintura.md#pintura-de-vértices) | Mallas 3D | Pintar colores directamente sobre los vértices. |
+| [Pintura de Textura](pintura.md#pintura-de-textura) | Mallas 3D | Pintar sobre la textura, directamente encima del objeto. |
 
-## Barra superior de la Vista 3D
+### Modo Objeto
 
-| Botón | Descripción |
-|---|---|
-| Selector de modo | Cambia de modo (Objeto, Edición, Pose, Pintura…). |
-| Vértice / Arista / Cara | Solo en Modo Edición: qué se selecciona. |
-| Punto de pivote | Alrededor de qué se rota y escala: Cursor 3D, Orígenes individuales, Punto medio o Elemento activo. Con la casilla Bloquear normales. |
-| Orientación | Los ejes del transform: Global, Local, Normal (la dirección de la cara) o Vista. |
-| Imán (Snap) | Opciones de imán. Se pone verde si está activo (<kbd>Shift+Tab</kbd>). |
-| Edición proporcional | Al mover algo, lo que está cerca lo acompaña con suavidad. Se pone verde si está activa (<kbd>O</kbd>). |
-| Vista | Cámaras, puntos de vista, encuadrar, vista local, perspectiva, bloquear órbita, mover la cámara con la vista. |
-| Seleccionar | Todo, ninguno, invertir, caja, vinculado, loops y caminos. |
-| Añadir (+) | Solo en Modo Objeto: crear objetos nuevos. |
-| Malla | Solo en Modo Edición: las operaciones de modelado. |
-| Guardar textura (diskette) | Solo en Pintura de textura. Verde si hay pintura sin guardar. |
-| Animación (rombo) | Insertar, borrar y limpiar keyframes; rastro de movimiento. |
-| Contexto | El menú del modo: Objeto, Vértice/Arista/Cara, Armature o Pose. |
-| Superposiciones (ojo) | Qué ayudas se dibujan: piso, ejes, gizmo, cursor 3D, normales, estadísticas, rayos X. |
-| Render (cámara) | El modo de sombreado. |
-| Escena | Elegir qué escena, juego o prefab del proyecto se edita, y crear nuevos. |
-| UV | Solo en Modo Edición: desplegar y proyectar UVs. |
+Es el modo en el que arranca Whisk3D, y el único que tienen todos los objetos. Se trabaja con los objetos enteros: se eligen, se mueven, se rotan, se escalan, se agregan y se borran. Ver [Modo Objeto](modo-objeto.md) y el tutorial [El Modo Objeto](../tutoriales/modo-objeto.md).
 
-## Menús comunes a varios modos
+### Modo Edición de una malla
 
-### Seleccionar
+Se modela la **forma** de la malla: los vértices, las aristas y las caras. En la barra de menús aparece el botón **Vértice / Arista / Cara** (qué se elige con un click) y los menús **Malla** y **UV**. El resto de la escena se sigue viendo, pero no se puede tocar.
 
-| Función | Descripción | Atajo |
-|---|---|---|
-| Todo | Selecciona todo. | <kbd>A</kbd> |
-| Ninguno | Deselecciona todo. | <kbd>Alt+A</kbd> |
-| Invertir | Lo seleccionado se deselecciona y al revés. | <kbd>Ctrl+I</kbd> |
-| Selección por caja | Arrastrar de izquierda a derecha (verde) toma solo lo que queda entero adentro; de derecha a izquierda (azul) alcanza con rozar. <kbd>Shift</kbd> suma. | <kbd>B</kbd> |
-| Ver selección | Muestra u oculta el contorno de lo seleccionado. | Menú |
+![Un cubo en el Modo Edición, con una cara elegida en verde y el gizmo sobre ella](../tutoriales/img/vista-3d-modo-edicion.webp)
 
-### Render (modos de sombreado)
+### Modo Edición de un esqueleto
 
-| Función | Descripción |
-|---|---|
-| Vista Render | Con las luces de la escena. Si el trazado de rayos está activo, muestra la imagen trazada de a poco. |
-| Vista Material | La de fábrica: una luz neutra desde la vista, sin depender de las luces de la escena. |
-| Vista Sólido / Alámbrica / ZBuffer | Gris sólido, solo las aristas, o la profundidad. |
-| Vista Normal / Vista Alpha | Las normales en color, o la transparencia en blanco y negro. |
-| Vectores de movimiento | Cuánto se movió cada píxel en la pantalla desde el cuadro anterior (rojo = X, verde = Y; lavanda = quieto, verde oliva = el fondo). La misma imagen que el pase `_vectores` del render. |
-| Alambre: solo lo visible | La vista alámbrica muestra solo lo que se dibuja de verdad. |
+Se arma el **esqueleto**: se crean los huesos (extruyéndolos desde la punta de otro), se mueven y se emparentan. Es su posición de **reposo**, la que tiene cuando no está animado.
 
-### Superposiciones
+![El esqueleto de Leon en el Modo Edición: los huesos en azul, en su posición de reposo](../tutoriales/img/vista-3d-modo-edicion-esqueleto.webp)
 
-| Función | Descripción | Atajo |
-|---|---|---|
-| Mostrar superposiciones | Prende o apaga todas las ayudas visuales de una vez. | <kbd>K</kbd> |
-| Piso, Eje X, Eje Y, Orígenes, Cursor 3D, Líneas de relación | Cada ayuda por separado. | Menú |
-| Gizmo | El gizmo de mover/rotar/escalar. | Menú |
-| Objetos | Mostrar u ocultar esqueletos, luces, cámaras, vacíos, partículas, curvas, hitboxes. | Menú |
-| Normales | Dibuja las normales de vértice, personalizadas o de cara, con su tamaño. | Menú |
-| Estadísticas | FPS, vértices, caras, llamadas de dibujo y tiempos. | Menú |
-| Rayos X | La malla en edición se ve semitransparente y se pueden elegir los elementos de atrás. | Menú |
+### Modo Pose
 
-### Imán (Snap)
+Se **posa** el esqueleto: los huesos se rotan y se mueven sin cambiar el esqueleto en sí, y la malla los sigue. Las poses guardadas en distintos frames son la animación del personaje.
 
-| Función | Descripción | Atajo |
-|---|---|---|
-| Activar imán | Lo que se mueve se pega a vértices, aristas, caras o sus centros. | <kbd>Shift+Tab</kbd> |
-| Base y destino de snap | Qué punto de lo movido se pega (más cercano, centro, mediana, activo) y a qué. | Menú |
-| Proyectar en cara / Cara más cercana | Para retopología: los vértices se apoyan sobre otra superficie. | Menú |
-| Afectar mover / rotar / escalar | En qué operaciones actúa el imán. | Menú |
-| Menú Snap del cursor | Selección a la cuadrícula, al cursor o al activo; Cursor a lo seleccionado, al origen, a la cuadrícula o al activo. | <kbd>Shift+S</kbd> |
+![El esqueleto de Leon en el Modo Pose, a mitad de su animación de caminar: los huesos doblados](../tutoriales/img/vista-3d-modo-pose.webp)
 
-### Edición proporcional
+### Pintura de Pesos
 
-| Función | Descripción | Atajo |
-|---|---|---|
-| Activar | Al mover, rotar o escalar, los vecinos acompañan según la distancia. | <kbd>O</kbd> |
-| Solo conectados | Mide la distancia por las aristas: no arrastra piezas sueltas. | Menú |
-| Caída | Forma de la influencia: suave, esfera, raíz, cuadrado inverso, aguda, lineal, constante, aleatoria. | Menú |
-| Tamaño proporcional | El radio de influencia. Durante el transform se cambia con la rueda o con <kbd>RePág</kbd> / <kbd>AvPág</kbd>. | Menú / rueda |
+Se pinta **cuánto mueve cada hueso a cada parte de la malla**: en rojo lo que el hueso elegido mueve del todo, en azul lo que no mueve. Es lo que hace que, al doblar el brazo, se doble el brazo y no la cintura.
+
+![Una malla de Leon en la Pintura de Pesos: el hueso elegido mueve el pecho (rojo y amarillo) y nada del resto (azul)](../tutoriales/img/vista-3d-modo-pesos.webp)
+
+### Pintura de Vértices
+
+Se pintan **colores sobre los vértices** de la malla, sin textura. Sirve para dar color a modelos simples, para sombras pintadas a mano y para efectos en los shaders.
+
+![Un cubo en la Pintura de Vértices: el pincel pasa de lado a lado y los vértices que toca se tiñen de rojo](../tutoriales/img/vista-3d-modo-vertices.webp)
+
+### Pintura de Textura
+
+Se pinta **directamente sobre la textura**, encima del objeto, como sobre un muñeco. Lo pintado se guarda con el disquete que aparece en la barra de menús.
+
+![Leon en la Pintura de Textura: el pincel pinta un trazo rojo sobre su campera](../tutoriales/img/vista-3d-modo-textura.webp)
+
+En los modos de pintura, arriba de la barra de herramientas aparece la fila del pincel (el **Radio** y el **Valor**). Ver [Modos de pintura](pintura.md).
+
+## La barra de herramientas
+
+Abajo de la Vista 3D están **Deshacer** y **Rehacer** (las flechas), los **últimos comandos usados** (al empezar, Mover, Rotar, Escalar y Borrar; lo que se usa pasa adelante) y la **edición proporcional**. Mientras se mueve, rota o escala, la barra de herramientas cambia: la tilde verde confirma, la cruz roja cancela, la orientación, y **X**, **Y** y **Z** dejan el movimiento en esos ejes. Ver [Mover, rotar y escalar](transformar.md#barra-de-herramientas).
+
+![Android](../tutoriales/img/icono-android.svg) En una pantalla táctil suma **Shift** y **Ctrl**, que quedan prendidos (en verde) y hacen de esas teclas, y el botón **Vista** (el monitor), para que en el Modo Edición y en las pinturas el dedo navegue en vez de elegir o pintar.
+
+![Nokia](../tutoriales/img/icono-nokia.svg) En el Nokia N95 viene oculta, para dejarle la pantalla a la escena, y aparece cuando hace falta: en los modos de pintura sale la fila del pincel (el **Radio** y el **Valor**), y mientras se mueve, rota o escala con la edición proporcional prendida, la barra de su radio. Sus botones se usan con el **mouse virtual**: se prende con la tecla de selección derecha, las flechas lo mueven y <kbd>OK</kbd> hace click.
+
+## El gizmo y el cursor 3D
+
+![El cubo elegido con el gizmo encima (las flechas de colores) y, a la izquierda, el cursor 3D, cada uno marcado con un círculo naranja y su nombre](../tutoriales/img/vista-3d-gizmo-cursor.webp)
+
+- El **gizmo** son las flechas de colores sobre lo elegido: se agarran para mover, rotar y escalar. Un click sobre el gizmo pasa de un modo al otro. Ver [El gizmo](transformar.md#el-gizmo).
+- El **cursor 3D** es el círculo con una cruz: ahí aparece lo que se agrega con Añadir, y puede ser el punto de pivote. Ver [El cursor 3D](../tutoriales/modo-objeto.md#el-cursor-3d).
+
+![Nokia](../tutoriales/img/icono-nokia.svg) En el Nokia N95 el gizmo viene apagado, porque la pantalla es chica y ahí se mueve con las teclas. Se prende en **Superposiciones → Gizmo**, y se agarra con el mouse virtual.

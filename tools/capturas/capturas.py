@@ -103,9 +103,14 @@ class Info:
         self.tarjetas = []         # Propiedades: el titulo de cada tarjeta {'i', 'x', 'y', 'w', 'h', 'abierta', 'titulo'}
         self.props = []            # Propiedades: cada fila {'g', 'j', 'y', 'h', 'tipo', 'valor', 'rombo', 'nombre'}
         self.objetos = {}          # la Vista 3D: nombre -> {'x', 'y', 'elegido'} (el origen en pantalla)
+        self.cursor3d = None       # la Vista 3D: (x, y) del cursor 3D en pantalla
         self.numpad = {}           # el teclado numerico tactil abierto: texto de la tecla -> (x, y)
         self.candado = None        # el candado de la vista de camara: (x, y, lado), si se ve
         self.boton_vista = None    # el centro del boton del menu View de la Vista 3D
+        self.tlpanel = None        # la Linea de tiempo: {'x', 'y', 'w' (el panel de filas), 'numeros' (su Y), 'f1', 'f11'}
+        self.tlfilas = []          # sus filas: {'r', 'y', 'tipo', 'prop', 'comp', 'nombre'}
+        self.tlkeys = []           # sus keyframes: {'r', 'f', 'x', 'y'} (en el editor de curvas, sobre la curva)
+        self.tiempos = {}          # el reloj abierto: campo j -> (x, y) (0 cuadro actual, 1 Inicio, 2 Fin, 3 FPS)
         for linea in salida.splitlines():
             if not linea.startswith("@cap "):
                 continue
@@ -151,8 +156,57 @@ class Info:
                 self.props.append(d)
             elif tipo == "objeto":
                 self.objetos[d.get("nombre")] = d
+            elif tipo == "cursor3d":
+                self.cursor3d = (d["x"], d["y"])
             elif tipo == "numpad":
                 self.numpad[d.get("texto")] = (d["x"], d["y"])
+            elif tipo == "tlpanel":
+                self.tlpanel = d
+            elif tipo == "tlfila":
+                self.tlfilas.append(d)
+            elif tipo == "tlkey":
+                self.tlkeys.append(d)
+            elif tipo == "tiempo":
+                self.tiempos[d["j"]] = (d["x"], d["y"])
+
+    # ---- la Linea de tiempo ----
+    def tl_x(self, f):
+        """La X (pantalla) del cuadro f."""
+        p = self.tlpanel
+        if not p:
+            raise SystemExit("capturas: no hay una Linea de tiempo")
+        return int(round(p["f1"] + (f - 1) * (p["f11"] - p["f1"]) / 10.0))
+
+    def tl_key(self, r, f):
+        """El keyframe del cuadro f en la fila r (0 = el Resumen)."""
+        for k in self.tlkeys:
+            if k["r"] == r and k["f"] == f:
+                return k["x"], k["y"]
+        raise SystemExit("capturas: la fila %d de la Linea de tiempo no tiene un keyframe en %d (tiene: %s)"
+                         % (r, f, [k["f"] for k in self.tlkeys if k["r"] == r]))
+
+    def tl_fila_r(self, prop, comp):
+        for d in self.tlfilas:
+            if d["prop"] == prop and d["comp"] == comp:
+                return d
+        raise SystemExit("capturas: la Linea de tiempo no tiene la fila %d/%d (tiene: %s)"
+                         % (prop, comp, [(d["prop"], d["comp"], d.get("nombre")) for d in self.tlfilas]))
+
+    def tl_fila(self, prop, comp):
+        """Donde hacer click para elegir la fila de un canal (prop: 0 Localizacion, 1 Rotacion, 2 Escala; comp interno)."""
+        d = self.tl_fila_r(prop, comp)
+        p = self.tlpanel
+        return p["x"] + min(p["w"] // 2, p["ojo"] - p["x"] - 30), d["y"]
+
+    def tl_key_curva(self, prop, comp, f):
+        """El keyframe del cuadro f de esa curva (en el editor de curvas: sobre la curva)."""
+        return self.tl_key(self.tl_fila_r(prop, comp)["r"], f)
+
+    def tiempo(self, j):
+        """El centro de un campo del reloj abierto (0 cuadro actual, 1 Inicio, 2 Fin, 3 FPS)."""
+        if j not in self.tiempos:
+            raise SystemExit("capturas: el reloj no esta abierto (o no tiene el campo %d)" % j)
+        return self.tiempos[j]
 
     def vp(self, kind, n=0):
         hay = [v for v in self.vps if v["kind"] == kind]
@@ -347,6 +401,38 @@ class Guion:
         """Solo el dibujo: el dedo arriba de (x, y), sin tocar (para mostrar adonde va)."""
         self.puntero = {"tipo": "dedo", "x": x, "y": y, "abajo": False}
 
+    def acercar_dedo(self, x, y, dur=40):
+        """El dedo va FLOTANDO desde donde estaba hasta (x, y), por la pantalla y sin apuro (de medio segundo a un
+        segundo, segun la distancia), para GUIAR LA MIRADA de quien mira el tutorial. Si no estaba en ningun lado,
+        entra desde abajo a la derecha, como una mano que llega a la pantalla."""
+        desde = self.puntero
+        if desde and desde.get("tipo") == "dedo":
+            x0, y0 = desde["x"], desde["y"]
+        else:
+            x0, y0 = x + 160, y + 200
+        dist = math.hypot(x - x0, y - y0)
+        if dist < 4:
+            self.dedo_flotando(x, y)
+            return
+        pasos = max(12, min(26, int(dist / 18)))
+        for k in range(1, pasos + 1):
+            t = k / float(pasos)
+            t = t * t * (3 - 2 * t)                  # arranca y frena despacio
+            self.dedo_flotando(int(x0 + (x - x0) * t), int(y0 + (y - y0) * t))
+            self.foto(dur=dur)
+
+    def toque(self, x, y, antes=500, despues=600):
+        """Un toque que se puede SEGUIR: el dedo llega flotando, se ilumina al apoyarse y queda arriba del lugar.
+        (El toque de verdad es corto: mantenido, la Vista 3D abriria el menu de la pulsacion larga. El iluminado es
+        solo el dibujo de esa foto.)"""
+        self.acercar_dedo(x, y)
+        self.foto(dur=antes)
+        self.puntero = {"tipo": "dedo", "x": x, "y": y, "abajo": True}
+        self.foto(dur=300)                           # el dedo apoyado (iluminado) sobre lo que toca, ANTES del cambio
+        self.tocar(x, y)
+        self.dedo_flotando(x, y)
+        self.foto(dur=despues)                       # y lo que pasa despues del toque
+
     def raton_mover(self, x, y):
         """Mueve el mouse (si hay botones apretados, es un arrastre)."""
         self.lineas.append("raton move %d %d" % (x, y))
@@ -410,7 +496,7 @@ class Guion:
 
     def foto(self, dur=100, marcas=(), tecla=None, puntero=True, teclas=()):
         """Saca una foto de la interfaz. dur = cuanto dura ese cuadro en la animacion (ms).
-        marcas: ('rect', x, y, w, h) | ('circulo', cx, cy, r)  resaltados encima.
+        marcas: ('rect', x, y, w, h) | ('circulo', cx, cy, r) | ('etiqueta', cx, cy, texto)  resaltados encima.
         tecla:  texto de la tecla apretada (se dibuja abajo a la derecha).
         teclas: con n95=True, las teclas del telefono que se ven apretadas (ids de n95.svg: 'verde', 'derecha'...)."""
         png = os.path.join(self.tmp, "f%04d.png" % len(self.fotos))
@@ -470,6 +556,39 @@ def dibujar(im, f, k, origen=(0, 0)):
         elif m[0] == "circulo":
             cx, cy, r = [v * k for v in (m[1] - ox, m[2] - oy, m[3])]
             d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=NARANJA + (255,), width=4)
+        elif m[0] == "grafico":    # la FORMA de una curva: ("grafico", x, y, w, h, [(t, v)...], t_actual, titulo)
+            gx, gy, gw, gh, puntos, t, titulo = m[1:8]
+            x0, y0, w, h = (gx - ox) * k, (gy - oy) * k, gw * k, gh * k
+            d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=10, fill=(18, 18, 18, 235), outline=(95, 95, 95, 255), width=2)
+            fnt = fuente(17 if k == 1 else 21)
+            d.text((x0 + 10, y0 + 6), titulo, font=fnt, fill=NARANJA + (255,))
+            alto_t = (24 if k == 1 else 28)
+            px0, py0, px1, py1 = x0 + 14, y0 + alto_t + 10, x0 + w - 14, y0 + h - 10
+            vmin = min(0.0, min(v for _, v in puntos))
+            vmax = max(1.0, max(v for _, v in puntos))
+            def P(tt, vv):
+                return (px0 + (px1 - px0) * tt, py1 - (py1 - py0) * (vv - vmin) / (vmax - vmin))
+            for vv in (0.0, 1.0):                  # de donde sale y adonde llega
+                d.line([P(0, vv), P(1, vv)], fill=(70, 70, 70, 255), width=1)
+            d.line([P(tt, vv) for tt, vv in puntos], fill=VERDE + (255,), width=3, joint="curve")
+            if t is not None:                      # por donde va ahora
+                v = puntos[-1][1]
+                for (ta, va), (tb, vb) in zip(puntos, puntos[1:]):
+                    if ta <= t <= tb:
+                        v = va + (vb - va) * ((t - ta) / (tb - ta) if tb > ta else 0)
+                        break
+                cx, cy = P(t, v)
+                d.line([(cx, py0), (cx, py1)], fill=(120, 120, 120, 200), width=1)
+                r = 6 if k == 1 else 7
+                d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 255, 255, 255), outline=(25, 25, 25, 255), width=2)
+        elif m[0] == "etiqueta":   # un nombre, centrado en (x, y): para decir que es lo marcado
+            cx, cy = (m[1] - ox) * k, (m[2] - oy) * k
+            fnt = fuente(20 if k == 1 else 24)
+            caja = d.textbbox((0, 0), m[3], font=fnt)
+            tw, th = caja[2] - caja[0], caja[3] - caja[1]
+            x0, y0 = cx - tw / 2 - 12, cy - th / 2 - 8
+            d.rounded_rectangle([x0, y0, x0 + tw + 24, y0 + th + 16], radius=9, fill=NARANJA + (240,))
+            d.text((x0 + 12 - caja[0], y0 + 8 - caja[1]), m[3], font=fnt, fill=(25, 25, 25, 255))
     for p in f["punteros"]:
         dibujar_puntero(d, dict(p, x=p["x"] - ox, y=p["y"] - oy), k)
     x1 = im.width - 16
@@ -486,13 +605,15 @@ def dibujar_puntero(d, p, k):
     if p["tipo"] == "dedo":
         x, y = p["x"] * k, p["y"] * k
         r = 24
-        if p["abajo"]:   # apoyado: relleno; arriba (por tocar): solo el borde
+        if p["abajo"]:   # apoyado: se ILUMINA (verde, con un halo); arriba (flotando): solo el borde
+            d.ellipse([x - r - 9, y - r - 9, x + r + 9, y + r + 9], outline=VERDE + (110,), width=6)
             d.ellipse([x - r - 3, y - r - 3, x + r + 3, y + r + 3], outline=(0, 0, 0, 110), width=3)
-            d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 120), outline=(255, 255, 255, 235), width=3)
-            d.ellipse([x - 6, y - 6, x + 6, y + 6], fill=(255, 255, 255, 220))
-        else:
-            d.ellipse([x - r - 3, y - r - 3, x + r + 3, y + r + 3], outline=(0, 0, 0, 90), width=3)
-            d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 50), outline=(255, 255, 255, 200), width=3)
+            d.ellipse([x - r, y - r, x + r, y + r], fill=VERDE + (170,), outline=(255, 255, 255, 240), width=3)
+            d.ellipse([x - 6, y - 6, x + 6, y + 6], fill=(255, 255, 255, 235))
+        else:            # (bien visible tambien flotando: es lo que guia la mirada)
+            d.ellipse([x - r - 4, y - r - 4, x + r + 4, y + r + 4], outline=(0, 0, 0, 140), width=4)
+            d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 95), outline=(255, 255, 255, 245), width=4)
+            d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 255, 255, 200))
     elif p["tipo"] == "raton":
         x, y = p["x"] * k, p["y"] * k
         s = 1.4

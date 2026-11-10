@@ -1,6 +1,7 @@
 #ifndef W3DESCENA_H
 #define W3DESCENA_H
 #include <string>
+#include <vector>
 
 // ============================================================================
 //  W3dEscena — el motor MULTI-ESCENA, COMPARTIDO por el editor (Play, via
@@ -95,6 +96,51 @@ void W3dEscenaSet3D(bool (*pedir)(const std::string& nombre, bool reiniciar), bo
 // que la pidio y la funcion a llamar al volver). Sin 3D (juego 2D) los binds existen y no hacen nada.
 void W3dEscenaSetCine(bool (*reproducir)(const std::string& nombre, Object* llamador, const std::string& fn),
                       void (*parar)(), const char* (*actual)());
+
+// ============================================================================
+//  LAS CAPAS: escenas cargadas ENCIMA de la que corre (la "base"), a la vez. Por ejemplo un menu que queda
+//  cargado todo el juego (salir, guardar, cambiar de mapa) encima de cada nivel.
+//    cargarEscena("Menu")       la carga encima (no reemplaza nada). Una escena 2D (una UI) se dibuja arriba de
+//                               las demas, en el orden en que se cargaron; una escena o un juego 3D del proyecto
+//                               se suma al mundo (una instancia de "escena:<nombre>", como instanciar()).
+//    descargarEscena("Menu")    la saca (sus scripts se descargan; una 3D se destruye)
+//    cambiarEscena("Nivel 2")   reemplaza la BASE, como siempre; las capas siguen cargadas
+//    mostrarEscena / ocultarEscena(nombre)   la capa se ve o no (oculta: tampoco corre, como un objeto oculto)
+//    pausarEscena / reanudarEscena(nombre)   sus scripts no corren (se sigue viendo). Con el nombre de la BASE
+//                               se pausa el mundo entero: sus scripts, la fisica, los hitbox y las animaciones
+//                               (un menu de pausa); las capas siguen
+//    escenaCargada(nombre)      true si es la base o una capa
+//  Todo se aplica al FINAL del frame (W3dEscenaAplicarPendiente), como cambiarEscena.
+//
+//  LOS MENSAJES entre escenas: enviar("Nivel 1", "guardar", datos) llama, al final del frame, a
+//  alRecibir(mensaje, datos, de) en cada script de esa escena ("de" = la escena del que lo mando). Sin escena
+//  (nil o "*") le llega a todas. 'datos' se COPIA (nil, booleanos, numeros, textos, objetos y tablas de eso).
+// ============================================================================
+// cuantas capas hay, la raiz de cada una (una UI, o la instancia de una escena 3D) y si corre ahora
+int     W3dEscenaCapas();
+Object* W3dEscenaCapaRaiz(int i);
+bool    W3dEscenaCapaEs3D(int i);
+bool    W3dEscenaEsCapaRaiz(Object* o);
+bool    W3dEscenaEnCapa(Object* o);           // 'o' esta adentro de una capa (o es su raiz)
+// la base esta en pausa (pausarEscena con su nombre): el mundo no avanza (scripts, fisica, hitbox, animaciones)
+bool    W3dEscenaBasePausada();
+// la escena de 'o': la de su capa, la de su UI o la base
+std::string W3dEscenaDe(Object* o);
+// cambiarEscena 3D: las capas sobreviven al cambio de base. 'Desprender' las descuelga de su padre antes de que la
+// base se vaya ('conUI': tambien las escenas 2D; el editor deja las suyas donde estan) y 'Colgar' las cuelga de la
+// raiz nueva, arriba de todo
+void    W3dEscenaCapasDesprender(bool conUI, std::vector<Object*>& sueltas);
+void    W3dEscenaCapasColgar(Object* raiz, const std::vector<Object*>& sueltas);
+// alguna capa vive adentro de este subarbol (el editor no descarga esa raiz al cambiar de escena)
+bool    W3dEscenaCapaAdentroDe(Object* raiz);
+// el cargarEscena(nombre) de lua, desde C++ (el Play del editor carga asi las otras escenas abiertas encima de la base)
+void    W3dEscenaPedirCarga(const std::string& nombre);
+// fin de la partida (el Stop del editor): sin capas, sin pausa, sin mensajes; las escenas 2D cargadas encima
+// vuelven a verse como las dejo el usuario
+void    W3dEscenaCapasLimpiar();
+// lo 3D que no conoce este modulo (compila tambien en los juegos 2D): crear una capa 3D (NULL = no es una escena 3D
+// del proyecto) y el nombre de la base 3D ("" = no hay: la base es la escena 2D activa)
+void    W3dEscenaSetCapas3D(Object* (*crear)(const std::string& nombre), std::string (*nombreBase)());
 
 // registra el bind lua cambiarEscena(nombre[,reiniciar]). Lo llama el punto de binds
 // COMPARTIDO (BindsJuegoRegistrar), asi el editor y el runtime lo exponen identico.

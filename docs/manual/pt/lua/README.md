@@ -23,6 +23,8 @@ O básico da linguagem e tudo o que o Whisk3D acrescenta para programar jogos. R
    - [Partículas, névoa e visibilidade](api-particulas-niebla.md)
    - [Tempo, acaso e utilitários](api-tiempo-y-utilidades.md)
    - [Configuração salva](api-configuracion.md)
+   - [Jogar em rede (LAN, wi-fi ou internet)](api-red.md)
+   - [Tela dividida e um controle para cada um](api-pantalla-dividida.md)
    - [Mensagens e depuração](api-mensajes-y-depuracion.md)
    - [Rotinas e memórias](api-rutinas-y-memorias.md)
 7. [Nomes de teclas e botões](teclas-y-botones.md)

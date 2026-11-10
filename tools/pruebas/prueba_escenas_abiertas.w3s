@@ -1,0 +1,87 @@
+# ==========================================================================
+#  VARIAS ESCENAS ABIERTAS A LA VEZ en el editor (W3dRaices.h, io/RaicesEditor.h): la casilla de la lista las abre y
+#  las cierra (cerrar libera la memoria; con cambios sin guardar pregunta), cada una es un nodo del outliner con su ojo,
+#  el click en algo de otra escena la activa, arrastrar cambia el orden, y el Play arranca con la primera (la base) y
+#  carga las demas encima. La lista y los ojos se guardan con el proyecto.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas_abiertas.w3s
+#
+#  Usa el proyecto de pruebacapas: "Nivel 1" (un juego: Cubo1 con nivel1.lua, la camara, la luz y dos escenas 2D),
+#  "Nivel 2" (otro juego) y "Decorado" (una escena 3D: CuboDeco con deco.lua).
+# ==========================================================================
+pruebacapas /tmp/w3d_prueba_abiertas
+escenasabiertas Nivel 1
+escenaactiva Nivel 1
+# tildar el Decorado: se abre al lado; la activa sigue siendo el Nivel 1
+escenatildar abrir Decorado
+escenasabiertas Nivel 1,Decorado
+escenaactiva Nivel 1
+escenacargada 1 Decorado
+# el outliner: un nodo por escena y sus objetos adentro
+escenafila 0 Nivel 1
+escenafila 1 Cubo1
+# click en un objeto del Decorado: su escena pasa a ser la activa y el objeto queda elegido
+escenaclick nombre CuboDeco
+escenaactiva Decorado
+raizcontexto activo CuboDeco
+# el UNDO cruza las escenas: ocultar el CuboDeco (H), pasar al Nivel 1 (click en su nodo: lo activa, no lo elige: no es
+# un objeto) y Ctrl+Z vuelve al Decorado y lo deshace ahi
+escenatecla h
+objvis CuboDeco 0
+escenaclick nombre Nivel 1
+escenaactiva Nivel 1
+undo
+escenaactiva Decorado
+objvis CuboDeco 1
+escenaclick nombre Nivel 1
+escenaactiva Nivel 1
+# el ojo del nodo
+escenaclick ojo Decorado
+escenaocultas Decorado
+escenaclick ojo Decorado
+escenaocultas -
+# plegar el nodo del Nivel 1: el del Decorado pasa a la fila 1
+escenaclick flecha Nivel 1
+escenafila 1 Decorado
+escenaclick flecha Nivel 1
+# arrastrar el Decorado antes del Nivel 1 (agarrar su nodo lo activa)
+escenaarrastrar antes Decorado,Nivel 1
+escenasabiertas Decorado,Nivel 1
+escenafila 0 Decorado
+escenaactiva Decorado
+# el PLAY editando el Nivel 1: arranca con la primera (el Decorado, la base) y el Nivel 1 encima, como cargarEscena
+escenaclick nombre Nivel 1
+escenaactiva Nivel 1
+simplay 4
+escenaactiva Decorado
+scriptinfo compartido deco_ticks 4
+scriptinfo compartido nivel1 inicio
+simstop
+# el Stop vuelve a la que se editaba
+escenaactiva Nivel 1
+escenasabiertas Decorado,Nivel 1
+# cerrar: el Decorado no se guardo nunca (queda en memoria, solo se cierra); la ultima abierta no se cierra
+escenatildar cerrar Decorado
+escenasabiertas Nivel 1
+escenacargada 1 Decorado
+escenatildar cerrarfalla Nivel 1
+# guardar y reabrir: la lista y los ojos vuelven con el proyecto
+escenatildar abrir Nivel 2
+escenaojo 0 Nivel 2
+escenaocultas Nivel 2
+guardarw3d /tmp/w3d_prueba_abiertas/abiertas.w3d
+abrirw3d /tmp/w3d_prueba_abiertas/abiertas.w3d
+escenasabiertas Nivel 1,Nivel 2
+escenaocultas Nivel 2
+escenacargada 1 Nivel 2
+escenacargada 0 Decorado
+# cerrar con cambios sin guardar: pregunta; "Cerrar sin guardar" la saca de la memoria
+escenaojo 1 Nivel 2
+escenaclick nombre Cubo2
+escenaactiva Nivel 2
+escenatecla h
+escenatildar cerrarcartel Nivel 2
+cartelresponder seguir
+escenasabiertas Nivel 1
+escenaactiva Nivel 1
+escenacargada 0 Nivel 2

@@ -29,10 +29,10 @@ The gizmo appears over the pivot in Object Mode and in Edit Mode (it's turned on
 
 ## Adjust the last operation
 
-After moving, rotating or scaling (in Object or Edit Mode) a panel appears at the bottom left with what was done: the X, Y, Z values (or the angle), the orientation and proportional editing with its options. Changing a value redoes the operation with the new value. **Cancel** undoes it and **Accept** keeps it. Clicking outside the panel also accepts. While the panel is open, the 3D Viewport's bottom bar is hidden.
+After moving, rotating or scaling (in Object or Edit Mode) a panel appears at the bottom left with what was done: the X, Y, Z values (or the angle), the orientation and proportional editing with its options. Changing a value redoes the operation with the new value. **Cancel** undoes it and **Accept** keeps it. Clicking outside the panel also accepts. While the panel is open, the 3D Viewport's toolbar is hidden.
 
 The panel has a green border because it's the window with focus. If it doesn't fit in half the screen height, it shrinks to that half and scrolls by dragging your finger (without touching the options), with the wheel or with the arrows. With the keyboard or the phone: the arrows go through the rows, <kbd>OK</kbd> / <kbd>Enter</kbd> edits the value without closing the panel, **Accept**, <kbd>Esc</kbd> or <kbd>Delete</kbd> (<kbd>C</kbd> on the N95) close it keeping the change, and only **Cancel** undoes it.
 
-## Bottom bar
+## Toolbar
 
 It has Undo and Redo, the last actions used and the proportional editing button. During a transform it shows the check mark (accept), the cross (cancel), the orientation and the X / Y / Z axes (two axes on = a plane). On touch screens, after extruding, **Repeat** appears, which accepts and extrudes again.

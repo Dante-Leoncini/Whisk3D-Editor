@@ -1,26 +1,27 @@
 # ==========================================================================
-#  LAS LISTAS CON BOTON DE REORDENAR Y SU UNDO POR INDICE
+#  CAPAS de escenas y MENSAJES entre escenas (main/W3dEscena.h): cargarEscena, descargarEscena, pausarEscena,
+#  reanudarEscena, escenaCargada, enviar / alRecibir; y que las capas sigan cargadas despues de cambiarEscena.
 #  Correr DESDE ESTA CARPETA:
-#    cd <motor>/tools/pruebas
 #    ../../platform/linux/build/whisk3d --script prueba_capas.w3s
 #
-#  El editor tiene siete listas con botones de subir/bajar/borrar: vertex
-#  groups, UV groups, UV maps, capas de color, los clips 3D del esqueleto
-#  (borrar y reordenar), las vertex anims y los clips 2D del armature 2D.
-#  TODAS guardan el destino de un rename POR INDICE, asi que mover o borrar un
-#  elemento corre los indices y deja los pasos de undo anteriores apuntando al
-#  elemento equivocado: el Ctrl+Z de un rename no lo deshacia Y ADEMAS escribia
-#  el nombre viejo ENCIMA del vecino.
-#
-#  Los dos comandos arman su propia escena (ReiniciarEscena + una malla nueva),
-#  asi que esta prueba no necesita ningun fixture en disco. Hasta hoy ningun
-#  .w3s los corria: el motor tenia el detector escrito y apagado.
+#  pruebacapas arma el proyecto: "Nivel 1" (la base: un cubo con nivel1.lua, y dos escenas 2D, HUD -la inicial- y
+#  Menu), "Nivel 2" (otro juego) y "Decorado" (una escena 3D). nivel1.lua carga encima el Menu (2D) y el Decorado
+#  (3D); el menu le manda "hola" al Nivel 1, lo pausa y lo reanuda, en su actualizar 15 hace cambiarEscena("Nivel 2"),
+#  en el 20 le manda "hola" al Nivel 2 y en el 25 descarga el Decorado. Cada script anota en compartido().
 # ==========================================================================
-
-# reordenar una capa (UV group) NO puede romper el undo de un rename anterior,
-# ni de ida (undo x2) ni de vuelta (redo x2)
-capaorden
-
-# lo mismo en las OTRAS cinco listas, incluido el caso que rompe de verdad:
-# BORRAR uno de abajo, que desplaza a los de arriba
-capaindices
+pruebacapas /tmp/w3d_prueba_capas
+simplay 41
+scriptinfo
+# los inicio() de la base y de la capa 2D
+scriptinfo compartido nivel1 inicio
+scriptinfo compartido menu inicio
+# los mensajes: con sus datos (el entero llega entero) y la escena que lo mando
+scriptinfo compartido nivel1_recibio hola:5:Menu
+# cambiarEscena reemplazo la base y el menu siguio: su mensaje le llego al Nivel 2
+scriptinfo compartido nivel2 inicio
+scriptinfo compartido nivel2_recibio hola:7:Menu
+# el menu corrio todos los cuadros desde que se cargo (no lo corto el cambio de escena)
+scriptinfo compartido menu_ticks 40
+# el Decorado (3D) corrio hasta que el menu lo descargo, tambien despues del cambio de escena
+scriptinfo compartido deco_ticks 24
+simstop

@@ -2,10 +2,10 @@
 
 | Функция | Что делает |
 |---|---|
-| `buscar(nombre [, raiz]) → obj \| nil` | Ищет объект по имени в Outliner (или только внутри `raiz`). |
+| `buscar(nombre [, raiz]) → obj \| nil` | Ищет объект по имени в Аутлайнере (или только внутри `raiz`). |
 | `nombre(obj) → texto` | Имя объекта. |
 | `tipo(obj) → texto` | Что это: `"mesh"`, `"luz"`, `"camara"`, `"vacio"`, `"esqueleto"`, `"texto"`, `"imagen"`, `"boton"`, `"hitbox"`, `"prefab"`, `"rutina"`… (`""`, если объекта нет). |
-| `instanciar(prefab [, x, y, z [, rotY]]) → obj \| nil` | Создаёт копию префаба в этой позиции (rotY в градусах). |
+| `instanciar(prefab [, x, y, z [, rotY [, padre]]]) → obj \| nil` | Создаёт копию префаба в этой позиции (rotY в градусах). `"Libreria/Escena"` создаёт копию из подключённой библиотеки. С `padre` копия становится потомком этого объекта (положение и поворот задаются относительно него). |
 | `destruir(obj) → bool` | Удаляет объект в конце кадра. |
 | `importarW3D(ruta) → obj \| nil` | Добавляет в сцену другой файл .w3d во время игры. |
 | `cargar(obj)` / `descargar(obj)` / `cargaAuto(obj)` | Вручную загружает или выгружает часть уровня (стриминг) или возвращает её в автоматический режим. |

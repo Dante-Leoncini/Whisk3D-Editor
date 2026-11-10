@@ -104,7 +104,10 @@ struct W3dRecursoItem {
     long bytes;              // cuanto ocupa: cargado, lo que ocupa en memoria (una textura: en la GPU); si no, su archivo
                              // (-1 = no se sabe / no aplica, un material)
     bool cargado;            // esta en memoria (false = guardado en el proyecto o en un archivo, sin cargar)
-    W3dRecursoItem() : tipo(0), icono(-1), usuarios(0), soloLectura(false), renombrable(true), bytes(-1), cargado(true) {}
+    int  tilde;              // la casilla de la fila: -1 = no tiene, 0 = sin tildar, 1 = tildada (las escenas ABIERTAS en el
+                             // editor: tildada = cargada y a la vista). La cambia el proveedor (Tildar)
+    W3dRecursoItem() : tipo(0), icono(-1), usuarios(0), soloLectura(false), renombrable(true), bytes(-1), cargado(true),
+                       tilde(-1) {}
 };
 
 // un DATO de un recurso para Properties: etiqueta y valor, ya en el idioma de la UI
@@ -146,6 +149,9 @@ public:
     // "Purge orphans" borra los huerfanos de este tipo? (las escenas y los prefabs no: un prefab sin
     // instancias o una escena que nadie nombra se borran de a uno, a pedido, nunca en montonera)
     virtual bool Purgable() const { return true; }
+    // LA CASILLA de la fila (W3dRecursoItem::tilde): tildar / destildar. false + motivo (en ingles) = no se pudo
+    virtual bool Tildar(const std::string& id, bool on, std::string* motivo)
+        { (void)id; (void)on; if (motivo) *motivo = "It has no checkbox"; return false; }
     // "Duplicate": una copia sin usuarios con nombre libre. false + motivo = el tipo no sabe.
     virtual bool Duplicar(const std::string& id, std::string* idNuevo, std::string* motivo)
         { (void)id; (void)idNuevo; if (motivo) *motivo = "This resource type can't be duplicated"; return false; }

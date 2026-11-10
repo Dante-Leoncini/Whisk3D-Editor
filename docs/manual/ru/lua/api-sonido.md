@@ -9,6 +9,6 @@
 | `soltarSonido(h)` | Отпускает ноту: огибающая переходит к затуханию. |
 | `reverb(sala, amortiguacion, nivel)` | Общая реверберация: размер зала, демпфирование и уровень (каждый от 0 до 1; уровень 0 выключает). |
 | `silenciar(bool)`, `estaMudo()` | Общее отключение звука. |
-| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Запустить **объект Sound** заново (с `seg` секунд его отрезка) или заглушить. |
-| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Прочитать / изменить объект Sound: `archivo` (источник), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (при чтении ещё `duracion`, `sonando`). |
-| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Новый объект Sound (`destruir(obj)` удаляет его). В префабе создаётся как любой объект. |
+| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Запустить **объект Звук** заново (с `seg` секунд его отрезка) или заглушить. |
+| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Прочитать / изменить объект Звук: `archivo` (источник), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (при чтении ещё `duracion`, `sonando`). |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Новый объект Звук (`destruir(obj)` удаляет его). В префабе создаётся как любой объект. |

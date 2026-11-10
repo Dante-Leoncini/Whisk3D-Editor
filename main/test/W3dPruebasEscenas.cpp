@@ -15,6 +15,21 @@
 //        el registro de raices y sus asserts ('objetos' = los de la ACTIVA, recursivo; los
 //        tipos son los EFECTIVOS: el de un proyecto viejo sale de sus scripts).
 //    raiztipo escena|juego [falla]   "Convert to Scene" / "Convert to Game" de la activa (con undo)
+//
+//  LAS ESCENAS ABIERTAS A LA VEZ (W3dRaices.h: la casilla de la lista; el nombre va al final, con espacios):
+//    escenatildar abrir|cerrar|cerrarcartel|cerrarfalla <nombre>
+//        la casilla de la lista (W3dRaizTildar). 'cerrarcartel' asserta que pregunta por los cambios sin guardar (el
+//        cartel se responde con cartelresponder); 'cerrarfalla' que no se puede cerrar
+//    escenasabiertas <A,B,...>      la lista de las abiertas, en su orden
+//    escenaocultas <A,B,...|->      las que tienen el ojo cerrado
+//    escenaactiva <nombre>          la activa (SceneCollection)
+//    escenacargada 0|1 <nombre>     esta en memoria (cerrarla la libera, salvo la del proyecto o una sin guardar)
+//    escenaojo 0|1 <nombre>         el ojo de esa escena (sin el outliner)
+//    escenamover <pos> <nombre>     su lugar en la lista
+//    escenafila <fila> <nombre>     la fila del outliner de esa escena (su nodo) o de ese objeto de cualquier abierta
+//    escenaclick nombre|ojo|flecha <nombre>   CLICK en el outliner en el nombre, el ojo o la flechita de la fila
+//    escenaarrastrar antes|despues <A,B>      arrastra la fila de la escena A y la suelta antes / despues de la B
+//    escenatecla h                  la H con el mouse en el outliner: oculta lo elegido (con su paso de undo)
 //    raizmodo [kind N] [juego 0|1] [autokey 0|1] [menujuego 0|1]
 //        el MODO del timeline: ActiveAnimKind, AnimEsJuego, si el boton Auto Key esta visible y
 //        si el selector de animacion ofrece "Juego"
@@ -162,6 +177,10 @@
 #include "WhiskUI/Propieties/PropList.h"   // las filas del arbol del Mix (MixFilasCount / MixFilaTexto)
 #include "WhiskUI/Propieties/PropertieBase.h"   // los hooks del rombo de keyframe (W3dKeyframeToggle / Estado)
 #include "ViewPorts/Notificaciones.h"   // lo que se le dijo al usuario (notif)
+#include "objects/UI.h"                 // pruebacapas: las escenas 2D
+#include "W3dEscena.h"                  // pruebacapas: la escena 2D inicial
+#include "ViewPorts/W3dInput.h"         // escenatecla: W3dK_H
+#include "io/CambiosProyecto.h"         // escenatildar: el cartel de los cambios sin guardar al cerrar una escena
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -1825,11 +1844,308 @@ static bool CmdMenuObjeto(std::istringstream& ss, std::string& err) {
 }
 
 // ============================================================================
+//  pruebacapas <carpeta> : el proyecto de prueba de las CAPAS (W3dEscena.h): dos juegos ("Nivel 1", la base, y
+//  "Nivel 2"), una escena 3D ("Decorado") y dos escenas 2D en el Nivel 1 ("HUD", la inicial, y "Menu"). Cada una con
+//  un script que anota lo que le pasa en compartido() y en el log (depurar):
+//    nivel1.lua   inicio(): cargarEscena("Menu") y cargarEscena("Decorado"); cuenta sus actualizar(); alRecibir
+//    menu.lua     inicio(): enviar("Nivel 1", "hola", {n = 5}); en sus actualizar 5/10 pausa y reanuda el Nivel 1, en
+//                 el 15 cambiarEscena("Nivel 2") (el menu sigue) y en el 25 descargarEscena("Decorado")
+//    deco.lua     cuenta sus actualizar()        nivel2.lua   inicio() y alRecibir
+//  Despues: simplay, scriptinfo compartido ..., guardarw3d, compilarjuego.
+// ============================================================================
+static bool EscribirLuaCapas(const std::string& ruta, const char* t) {
+    FILE* f = fopen(ruta.c_str(), "w");
+    if (!f) return false;
+    fputs(t, f);
+    return fclose(f) == 0;
+}
+static Mesh* CuboConScript(const char* nombre, const std::string& lua, float x) {
+    Mesh* c = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
+    if (!c) return NULL;
+    c->SetNameObj(nombre);
+    c->pos = Vector3(x, 0, 0);
+    if (!lua.empty()) {
+        if (!c->scriptDatos) c->scriptDatos = new W3dScriptDatos();
+        W3dScriptEntrada e; e.ruta = lua; c->scriptDatos->scripts.push_back(e);
+    }
+    return c;
+}
+static bool CmdPruebaCapas(std::istringstream& ss, std::string& err) {
+    std::string dir; ss >> dir;
+    if (dir.empty()) { err = "pruebacapas: uso: pruebacapas <carpeta>"; return false; }
+    { std::string cmd = "mkdir -p \"" + dir + "\""; if (system(cmd.c_str())) {} }
+    const bool ok =
+        EscribirLuaCapas(dir + "/nivel1.lua",
+            "local t = 0\n"
+            "function inicio()\n"
+            "  cargarEscena(\"Menu\")\n  cargarEscena(\"Decorado\")\n"
+            "  setCompartido(\"nivel1\", \"inicio\")\n  depurar(\"[capas] nivel1 inicio\")\nend\n"
+            "function actualizar(dt)\n  t = t + 1\n  setCompartido(\"nivel1_ticks\", t)\nend\n"
+            "function alRecibir(msg, datos, de)\n"
+            "  local r = msg .. \":\" .. tostring(datos and datos.n) .. \":\" .. tostring(de)\n"
+            "  setCompartido(\"nivel1_recibio\", r)\n  depurar(\"[capas] nivel1 recibio \" .. r)\nend\n") &&
+        EscribirLuaCapas(dir + "/menu.lua",
+            "local t = 0\n"
+            "function inicio()\n  setCompartido(\"menu\", \"inicio\")\n  depurar(\"[capas] menu inicio\")\n"
+            "  enviar(\"Nivel 1\", \"hola\", {n = 5})\nend\n"
+            "function actualizar(dt)\n  t = t + 1\n  setCompartido(\"menu_ticks\", t)\n"
+            "  if t == 5 then pausarEscena(\"Nivel 1\") end\n"
+            "  if t == 10 then reanudarEscena(\"Nivel 1\") end\n"
+            "  if t == 15 then depurar(\"[capas] menu: cambiarEscena Nivel 2\") cambiarEscena(\"Nivel 2\") end\n"
+            "  if t == 20 then enviar(\"Nivel 2\", \"hola\", {n = 7}) end\n"
+            "  if t == 25 then descargarEscena(\"Decorado\") end\n"
+            "  if t % 10 == 0 then depurar(\"[capas] menu t=\" .. t .. \" decorado=\" .. tostring(escenaCargada(\"Decorado\"))) end\nend\n") &&
+        EscribirLuaCapas(dir + "/deco.lua",
+            "local t = 0\nfunction actualizar(dt)\n  t = t + 1\n  setCompartido(\"deco_ticks\", t)\nend\n") &&
+        EscribirLuaCapas(dir + "/nivel2.lua",
+            "function inicio()\n  setCompartido(\"nivel2\", \"inicio\")\n  depurar(\"[capas] nivel2 inicio\")\nend\n"
+            "function alRecibir(msg, datos, de)\n"
+            "  local r = msg .. \":\" .. tostring(datos and datos.n) .. \":\" .. tostring(de)\n"
+            "  setCompartido(\"nivel2_recibio\", r)\n  depurar(\"[capas] nivel2 recibio \" .. r)\nend\n");
+    if (!ok) { err = "pruebacapas: no pude escribir los .lua"; return false; }
+    extern void ReiniciarEscena();
+    ReiniciarEscena();
+    // EL NIVEL 1 (la raiz de arranque): su cubo, la camara, una luz y sus dos escenas 2D
+    W3dRaizRenombrar(W3dRaizActiva(), "Nivel 1", NULL);
+    CuboConScript("Cubo1", dir + "/nivel1.lua", 0);
+    { Camera* cam = new Camera(NULL, Vector3(0, 1.5f, 8), Vector3(-10.0f, 0, 0)); cam->SetNameObj("Camara1");
+      extern Camera* CameraActive; CameraActive = cam; }
+    { Light* l = Light::Create(NULL, 3.0f, 4.0f, 5.0f); l->SetNameObj("Luz1"); }
+    UI* hud = new UI(NULL, Vector3(0, 0, 0)); hud->SetNameObj("HUD"); hud->igualQueRender = true;
+    UI* menu = new UI(NULL, Vector3(0, 0, 0)); menu->SetNameObj("Menu"); menu->igualQueRender = true;
+    if (!menu->scriptDatos) menu->scriptDatos = new W3dScriptDatos();
+    { W3dScriptEntrada e; e.ruta = dir + "/menu.lua"; menu->scriptDatos->scripts.push_back(e); }
+    W3dEscenaSetInicial("HUD");
+    // EL NIVEL 2 (otro juego) y EL DECORADO (una escena 3D que se carga encima)
+    if (W3dRaizCrearYAbrir(W3D_RAIZ_JUEGO, "Nivel 2") < 0) { err = "pruebacapas: no pude crear 'Nivel 2'"; return false; }
+    CuboConScript("Cubo2", dir + "/nivel2.lua", 0);
+    { Camera* cam = new Camera(NULL, Vector3(0, 1.5f, 8), Vector3(-10.0f, 0, 0)); cam->SetNameObj("Camara2");
+      extern Camera* CameraActive; CameraActive = cam; }
+    { Light* l = Light::Create(NULL, 3.0f, 4.0f, 5.0f); l->SetNameObj("Luz2"); }
+    if (W3dRaizCrearYAbrir(W3D_RAIZ_ESCENA, "Decorado") < 0) { err = "pruebacapas: no pude crear 'Decorado'"; return false; }
+    CuboConScript("CuboDeco", dir + "/deco.lua", 3.0f);
+    // de vuelta al Nivel 1, que es con el que arranca
+    std::string motivo;
+    if (!W3dActivarRaiz(W3dRaizBuscar(W3D_RAIZ_ESCENA, "Nivel 1"), &motivo)) { err = "pruebacapas: " + motivo; return false; }
+    W3dRaizFijarInicial("Nivel 1");
+    printf("      [pruebacapas] Nivel 1 (HUD, Menu), Nivel 2 y Decorado en '%s'\n", dir.c_str());
+    return true;
+}
+
+// ============================================================================
+//  LAS ESCENAS ABIERTAS A LA VEZ
+// ============================================================================
+extern int OutlinerFilaDeObjeto(Object* o);   // Outliner.cpp
+extern bool g_w3dCambiosSinCartel;            // CambiosProyecto.cpp: el harness no pregunta (salvo a proposito)
+static std::string RestoDeLinea(std::istringstream& ss) {
+    std::string r;
+    std::getline(ss, r);
+    const size_t a = r.find_first_not_of(" \t");
+    if (a == std::string::npos) return std::string();
+    const size_t b = r.find_last_not_of(" \t\r");
+    return r.substr(a, b - a + 1);
+}
+static void PartirComas(const std::string& t, std::vector<std::string>& out) {
+    out.clear();
+    size_t i = 0;
+    while (i <= t.size()) {
+        const size_t c = t.find(',', i);
+        const std::string p = t.substr(i, c == std::string::npos ? std::string::npos : c - i);
+        if (!p.empty()) out.push_back(p);
+        if (c == std::string::npos) break;
+        i = c + 1;
+    }
+}
+static std::string AbiertasTexto() {
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    std::string t;
+    for (size_t i = 0; i < ab.size(); i++) { if (i) t += ","; t += W3dRaices()[(size_t)ab[i]].nombre; }
+    return t;
+}
+static int EscenaIdx(const std::string& n, std::string& err, const char* cmd) {
+    const int i = W3dRaizBuscar(W3D_RAIZ_ESCENA, n);
+    if (i < 0) err = std::string(cmd) + ": no hay una escena '" + n + "'";
+    return i;
+}
+// el nodo de una escena abierta (por su nombre en el proyecto) o un objeto de cualquiera de las abiertas
+static Object* FilaObjeto(const std::string& n) {
+    const int i = W3dRaizBuscar(W3D_RAIZ_ESCENA, n);
+    if (i >= 0 && W3dRaizEstaAbierta(i)) return W3dRaices()[(size_t)i].raiz;
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    for (size_t k = 0; k < ab.size(); k++) {
+        Object* r = W3dRaices()[(size_t)ab[k]].raiz;
+        Object* o = r ? FindObjectByName(r, n) : NULL;
+        if (o) return o;
+    }
+    return NULL;
+}
+static Outliner* ElOutlinerEscena(std::string& err, const char* cmd) {
+    std::vector<ViewportBase*> hs;
+    Hojas(rootViewport, hs);
+    for (size_t i = 0; i < hs.size(); i++)
+        if (VpEsOutliner(hs[i]) && ((Outliner*)hs[i])->vista == OUT_VISTA_ESCENA) return (Outliner*)hs[i];
+    err = std::string(cmd) + ": no hay un outliner en la vista Escena";
+    return NULL;
+}
+static bool CmdEscenaTildar(std::istringstream& ss, std::string& err) {
+    std::string modo; ss >> modo;
+    const std::string n = RestoDeLinea(ss);
+    const int i = EscenaIdx(n, err, "escenatildar"); if (i < 0) return false;
+    const bool abrir = (modo == "abrir");
+    const bool cartel = (modo == "cerrarcartel");
+    if (cartel) g_w3dCambiosSinCartel = false;
+    std::string motivo;
+    const bool ok = W3dRaizTildar(i, abrir, &motivo);
+    g_w3dCambiosSinCartel = true;
+    const bool popup = W3dCambiosCartelAbierto();
+    printf("      [escenatildar] %s '%s' -> %s%s%s%s; abiertas: %s\n", modo.c_str(), n.c_str(), ok ? "si" : "NO",
+           motivo.empty() ? "" : ": ", motivo.c_str(), popup ? " (pregunta por los cambios)" : "", AbiertasTexto().c_str());
+    if (modo == "cerrarfalla") { if (ok) { err = "escenatildar: se cerro y se esperaba que no"; return false; } return true; }
+    if (!ok) { err = "escenatildar: no se pudo (" + motivo + ")"; return false; }
+    if (cartel != popup) { err = std::string("escenatildar: ") + (popup ? "pregunto" : "no pregunto") + " por los cambios"; return false; }
+    return true;
+}
+static bool CmdEscenasAbiertas(std::istringstream& ss, std::string& err) {
+    const std::string esperada = RestoDeLinea(ss), hay = AbiertasTexto();
+    printf("      [escenasabiertas] %s\n", hay.c_str());
+    if (hay != esperada) { err = "escenasabiertas: son '" + hay + "', se esperaban '" + esperada + "'"; return false; }
+    return true;
+}
+static bool CmdEscenaOcultas(std::istringstream& ss, std::string& err) {
+    std::string esperada = RestoDeLinea(ss);
+    if (esperada == "-") esperada.clear();
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    std::string hay;
+    for (size_t i = 0; i < ab.size(); i++)
+        if (!W3dRaizAbiertaVisible(ab[i])) { if (!hay.empty()) hay += ","; hay += W3dRaices()[(size_t)ab[i]].nombre; }
+    printf("      [escenaocultas] '%s'\n", hay.c_str());
+    if (hay != esperada) { err = "escenaocultas: son '" + hay + "', se esperaban '" + esperada + "'"; return false; }
+    return true;
+}
+static bool CmdEscenaActiva(std::istringstream& ss, std::string& err) {
+    const std::string n = RestoDeLinea(ss);
+    const int act = W3dRaizActiva();
+    const std::string hay = act >= 0 ? W3dRaices()[(size_t)act].nombre : std::string("?");
+    printf("      [escenaactiva] '%s'\n", hay.c_str());
+    if (hay != n) { err = "escenaactiva: la activa es '" + hay + "', se esperaba '" + n + "'"; return false; }
+    if (W3dRaices()[(size_t)act].raiz != SceneCollection) { err = "escenaactiva: la activa no es SceneCollection"; return false; }
+    return true;
+}
+static bool CmdEscenaCargada(std::istringstream& ss, std::string& err) {
+    int v = 1; ss >> v;
+    const std::string n = RestoDeLinea(ss);
+    const int i = EscenaIdx(n, err, "escenacargada"); if (i < 0) return false;
+    const bool hay = W3dRaices()[(size_t)i].raiz != NULL;
+    printf("      [escenacargada] '%s': %s\n", n.c_str(), hay ? "en memoria" : "sin cargar");
+    if (hay != (v != 0)) { err = "escenacargada: '" + n + "' " + (hay ? "esta" : "no esta") + " en memoria"; return false; }
+    return true;
+}
+static bool CmdEscenaOjo(std::istringstream& ss, std::string& err) {
+    int v = 1; ss >> v;
+    const std::string n = RestoDeLinea(ss);
+    const int i = EscenaIdx(n, err, "escenaojo"); if (i < 0) return false;
+    W3dRaizFijarAbiertaVisible(i, v != 0);
+    return true;
+}
+static bool CmdEscenaMover(std::istringstream& ss, std::string& err) {
+    int pos = 0; ss >> pos;
+    const std::string n = RestoDeLinea(ss);
+    const int i = EscenaIdx(n, err, "escenamover"); if (i < 0) return false;
+    if (!W3dRaizMoverAbierta(i, pos)) { err = "escenamover: '" + n + "' no esta abierta"; return false; }
+    printf("      [escenamover] %s\n", AbiertasTexto().c_str());
+    return true;
+}
+static bool CmdEscenaFila(std::istringstream& ss, std::string& err) {
+    int f = 0; ss >> f;
+    const std::string n = RestoDeLinea(ss);
+    Object* o = FilaObjeto(n);
+    if (!o) { err = "escenafila: no hay una escena abierta ni un objeto '" + n + "'"; return false; }
+    const int hay = OutlinerFilaDeObjeto(o);
+    printf("      [escenafila] '%s': fila %d\n", n.c_str(), hay);
+    if (hay != f) { err = "escenafila: '" + n + "' esta en la fila " + EsEntero(hay) + ", se esperaba la " + EsEntero(f); return false; }
+    return true;
+}
+// el punto de una fila del outliner: en su NOMBRE, su OJO o su FLECHITA
+static bool PuntoDeFila(Outliner* ol, Object* o, const std::string& donde, int& mx, int& my) {
+    const int fila = OutlinerFilaDeObjeto(o);
+    if (fila < 0) return false;
+    int prof = 0;
+    for (Object* p = o->Parent; p; p = p->Parent) prof++;   // (el nodo de una escena es la fila 0 de su arbol)
+    std::vector<int> ab;
+    W3dRaicesAbiertas(ab);
+    if (ab.size() < 2) prof--;   // con una sola abierta no hay nodo: lo de arriba es su primer nivel
+    my = ol->y + borderGS + ol->PosY + ol->BarTopOffset() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
+    const int reservaBarra = ol->scrollY ? (GlobalScale * 9 + gapGS) : 0;
+    if (donde == "ojo") mx = ol->x + ol->width - 2 * IconSizeGS - gapGS - marginGS - borderGS - reservaBarra + IconSizeGS / 2;
+    else if (donde == "flecha") mx = ol->x + marginGS + ol->PosX + prof * (IconSizeGS + gapGS) + IconSizeGS / 2;
+    else mx = ol->x + marginGS + ol->PosX + (prof + 2) * (IconSizeGS + gapGS) + LetterWidthGS;
+    return true;
+}
+static bool CmdEscenaClick(std::istringstream& ss, std::string& err) {
+    Outliner* ol = ElOutlinerEscena(err, "escenaclick"); if (!ol) return false;
+    std::string donde; ss >> donde;
+    const std::string n = RestoDeLinea(ss);
+    Object* o = FilaObjeto(n);
+    int mx = 0, my = 0;
+    if (!o || !PuntoDeFila(ol, o, donde, mx, my)) { err = "escenaclick: no hay una fila '" + n + "'"; return false; }
+    ol->ClickSeleccionar(mx, my);
+    ol->SoltarDrag(mx, my);
+    rootViewport->Render();
+    printf("      [escenaclick] %s '%s' -> activa '%s', objeto activo '%s'\n", donde.c_str(), n.c_str(),
+           W3dRaizActiva() >= 0 ? W3dRaices()[(size_t)W3dRaizActiva()].nombre.c_str() : "?",
+           ObjActivo ? ObjActivo->name.c_str() : "-");
+    return true;
+}
+static bool CmdEscenaTecla(std::istringstream& ss, std::string& err) {
+    Outliner* ol = ElOutlinerEscena(err, "escenatecla"); if (!ol) return false;
+    std::string t; ss >> t;
+    if (t != "h") { err = "escenatecla: uso: escenatecla h"; return false; }
+    ol->event_key_down(W3dK_H, false);
+    return true;
+}
+static bool CmdEscenaArrastrar(std::istringstream& ss, std::string& err) {
+    Outliner* ol = ElOutlinerEscena(err, "escenaarrastrar"); if (!ol) return false;
+    std::string donde; ss >> donde;
+    std::vector<std::string> ns;
+    PartirComas(RestoDeLinea(ss), ns);
+    if (ns.size() != 2) { err = "escenaarrastrar: uso: escenaarrastrar antes|despues <A>,<B>"; return false; }
+    Object* a = FilaObjeto(ns[0]);
+    Object* b = FilaObjeto(ns[1]);
+    int ax = 0, ay = 0, bx = 0, by = 0;
+    if (!a || !b || !PuntoDeFila(ol, a, "nombre", ax, ay) || !PuntoDeFila(ol, b, "nombre", bx, by)) {
+        err = "escenaarrastrar: no estan las dos filas"; return false;
+    }
+    by += (donde == "antes" ? -1 : 1) * ((int)RenglonHeightGS / 2 - 1);   // (el borde de arriba o el de abajo de la fila)
+    ol->ClickSeleccionar(ax, ay);
+    if (ol->dragObjeto != a) { err = "escenaarrastrar: el click no agarro la fila de '" + ns[0] + "'"; return false; }
+    ol->dragging = true;
+    ol->ActualizarDrop(bx, by);
+    ol->SoltarDrag(bx, by);
+    printf("      [escenaarrastrar] %s: %s\n", donde.c_str(), AbiertasTexto().c_str());
+    return true;
+}
+
+// ============================================================================
 //  el despachador
 // ============================================================================
 bool W3dPruebasEscenasCmd(const std::string& cmd, std::istringstream& ss, std::string& err, bool& manejado) {
     manejado = true;
     if (cmd == "raiznueva")       return CmdRaizNueva(ss, err);
+    if (cmd == "pruebacapas")     return CmdPruebaCapas(ss, err);
+    if (cmd == "escenatildar")    return CmdEscenaTildar(ss, err);
+    if (cmd == "escenasabiertas") return CmdEscenasAbiertas(ss, err);
+    if (cmd == "escenaocultas")   return CmdEscenaOcultas(ss, err);
+    if (cmd == "escenaactiva")    return CmdEscenaActiva(ss, err);
+    if (cmd == "escenaojo")       return CmdEscenaOjo(ss, err);
+    if (cmd == "escenacargada")   return CmdEscenaCargada(ss, err);
+    if (cmd == "escenamover")     return CmdEscenaMover(ss, err);
+    if (cmd == "escenafila")      return CmdEscenaFila(ss, err);
+    if (cmd == "escenaclick")     return CmdEscenaClick(ss, err);
+    if (cmd == "escenaarrastrar") return CmdEscenaArrastrar(ss, err);
+    if (cmd == "escenatecla")     return CmdEscenaTecla(ss, err);
     if (cmd == "raizabrir")       return CmdRaizAbrir(ss, err);
     if (cmd == "raizinfo")        return CmdRaizInfo(ss, err);
     if (cmd == "raizcontexto")    return CmdRaizContexto(ss, err);

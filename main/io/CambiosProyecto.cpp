@@ -326,14 +326,37 @@ bool W3dCambiosHayCache() {
 static bool gCartel = false;
 static int gAccion = W3D_CAMBIOS_SALIR;
 static std::string gRutaAbrir;
+static std::string gEscenaCerrar;   // W3D_CAMBIOS_CERRAR_ESCENA: cual
+extern void CambiosPopupAbrir(int accion);   // ui/ViewPorts/PopUp/CambiosPopup.cpp
+// SIN CARTEL en el telefono Symbian y en las consolas (3DS, PSP, PS Vita): salir, abrir otro proyecto, empezar uno nuevo
+// o cerrar una escena lo hacen directo, sin guardar (pedido del dueno: "se cierra y punto"; en las consolas el cartel al
+// cerrar colgaba todo: el que cierra es el sistema -HOME, el boton PS- y no espera). El cartel queda para PC, la web y
+// Android (donde el cierre del sistema tampoco pregunta: main.cpp)
+#if defined(W3D_SYMBIAN) || defined(W3D_3DS) || defined(W3D_PSP) || defined(W3D_VITA)
+#define W3D_CAMBIOS_SIN_CARTEL 1
+#endif
+void (*W3dCambiosCerrarEscenaHook)(const std::string& nombre) = 0;
+void W3dCambiosOlvidarRaiz(const Object* raiz) { if (raiz && gTocadas.erase(raiz)) gVersion++; }
+bool W3dCambiosPreguntarCerrarEscena(const std::string& nombre) {
+#ifdef W3D_CAMBIOS_SIN_CARTEL
+    (void)nombre;
+    return false;
+#endif
+    if (g_w3dCambiosSinCartel) return false;
+    if (!W3dCambiosRaizSucia(W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre))) return false;
+    gCartel = true;
+    gAccion = W3D_CAMBIOS_CERRAR_ESCENA;
+    gEscenaCerrar = nombre;
+    CambiosPopupAbrir(W3D_CAMBIOS_CERRAR_ESCENA);
+    return true;
+}
 extern void CambiosPopupAbrir(int accion);   // ui/ViewPorts/PopUp/CambiosPopup.cpp
 
 bool W3dCambiosCartelAbierto() { return gCartel; }
 
 bool W3dCambiosPreguntar(int accion, const std::string& ruta) {
-#ifdef W3D_SYMBIAN
-    // en el telefono NO se pregunta (pedido del dueno: "en symbian se cierra y punto"): salir, abrir otro proyecto o
-    // empezar uno nuevo lo hacen directo. El cartel queda para PC, Android y el resto.
+#ifdef W3D_CAMBIOS_SIN_CARTEL
+    // (Symbian y las consolas: ver W3D_CAMBIOS_SIN_CARTEL arriba)
     (void)accion; (void)ruta;
     return false;
 #endif
@@ -357,6 +380,7 @@ static void Seguir() {
         }
     }
     else if (gAccion == W3D_CAMBIOS_NUEVO) { if (W3dCambiosNuevoHook) W3dCambiosNuevoHook(); }
+    else if (gAccion == W3D_CAMBIOS_CERRAR_ESCENA) { if (W3dCambiosCerrarEscenaHook) W3dCambiosCerrarEscenaHook(gEscenaCerrar); }
 }
 // "Guardar y ..." sin gancho (Symbian): el guardado de siempre sobre el archivo abierto
 static bool GuardarPorDefecto() {
