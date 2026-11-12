@@ -83,12 +83,42 @@ static void JuntarLista(Object* o, std::vector<Ficha>& out) {
 static void Reconstruir() {
     const unsigned nacidos = W3dObjetosNacidos();
     if (!gListaSucia && nacidos == gListaNacidos && gListaRaiz == SceneCollection) return;
+
+    // gCursor apunta a la PROXIMA ficha que el round-robin debe revisar. Generar o
+    // descargar una instancia cambia W3dObjetosNacidos y obliga a reconstruir la lista;
+    // reiniciar el cursor a cero en cada reconstruccion hacia que las primeras fichas
+    // monopolizaran las tajadas y las del final pudieran pasar decenas de frames sin
+    // evaluarse. Conservamos la ficha por serial (la direccion puede reciclarse).
+    unsigned siguienteSerial = 0;
+    bool haySiguiente = false;
+    size_t cursorAnterior = gCursor;
+    if (!gLista.empty()) {
+        cursorAnterior %= gLista.size();
+        siguienteSerial = gLista[cursorAnterior].serial;
+        haySiguiente = true;
+    }
+
     gLista.clear();
     JuntarLista(SceneCollection, gLista);
     gListaNacidos = nacidos;
     gListaRaiz = SceneCollection;
     gListaSucia = false;
+
     gCursor = 0;
+    if (!gLista.empty()) {
+        bool recuperado = false;
+        if (haySiguiente) {
+            for (size_t i = 0; i < gLista.size(); i++) {
+                if (gLista[i].serial == siguienteSerial) {
+                    gCursor = i;
+                    recuperado = true;
+                    break;
+                }
+            }
+        }
+        if (!recuperado) gCursor = cursorAnterior % gLista.size();
+    }
+
     gPidiendo.clear();
     for (size_t i = 0; i < gLista.size(); i++)
         if (gLista[i].ip->streamEstado == W3D_STREAM_PIDIENDO) gPidiendo.push_back(i);
