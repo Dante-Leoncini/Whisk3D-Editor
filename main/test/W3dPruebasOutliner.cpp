@@ -183,7 +183,7 @@ static int VistaDe(const std::string& c, std::string& err, const char* cmd) {
     return v;
 }
 static std::string Guion(const std::string& s) { return s == "-" ? std::string() : s; }
-static std::string Entero(long n) { char b[32]; sprintf(b, "%ld", n); return std::string(b); }
+static std::string Entero(long n) { char b[32]; snprintf(b, sizeof(b), "%ld", n); return std::string(b); }
 // el id de un recurso de AFUERA: el harness escribe rutas RELATIVAS a tools/pruebas y 'recubicar' las pasa
 // afuera con la ruta absoluta (la de disco): si el id tal cual no es de la vista y el absoluto si, va ese
 static std::string IdDeVista(int vista, const std::string& id) {
@@ -541,7 +541,7 @@ static bool CmdOutColumna(std::istringstream& ss, std::string& err) {
     const int ancho = der[col] - iz[col];
     printf("      [outcolumna] %s %+d -> ancho %d (columnas %d %d %d %d)\n", c.c_str(), dx, ancho, xT, xTm, xE, xF);
     if (o->colArrastre >= 0) { err = "outcolumna: el divisor quedo agarrado"; return false; }
-    if (k == "ancho" && (ancho < esp - 2 || ancho > esp + 2)) { char b[96]; sprintf(b, "outcolumna: ancho %d (se esperaba %d)", ancho, esp); err = b; return false; }
+    if (k == "ancho" && (ancho < esp - 2 || ancho > esp + 2)) { char b[96]; snprintf(b, sizeof(b), "outcolumna: ancho %d (se esperaba %d)", ancho, esp); err = b; return false; }
     return true;
 }
 

@@ -2829,7 +2829,7 @@ bool Timeline::DopeCopiarSeleccion(){
     int mn = 0x7fffffff;
     for (size_t r=0;r<dopeRows.size();r++){ const DopeRow& d=dopeRows[r];
         if (d.propId < 0 || DopeVertexAnimDe(d.ownerKey)) continue;
-        char id[32]; sprintf(id, "|%d|%d", d.propId, d.compId);
+        char id[32]; snprintf(id, sizeof(id), "|%d|%d", d.propId, d.compId);
         if (!vistas.insert(d.ownerKey + id).second) continue;     // (la misma curva puede estar en 2 filas)
         AnimProperty* ap = DopeResolverProp(d.ownerKey, d.propId, d.compId, false); if (!ap) continue;
         for (size_t k=0;k<ap->keyframes.size();k++){

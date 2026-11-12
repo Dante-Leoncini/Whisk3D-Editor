@@ -99,7 +99,7 @@ enum ToolbarRolUV {
 //    mesh vs solo la parte activa) y "Repeat Texture" (tiling hasta el infinito).
 class UVEditor : public ViewportBase, public WithBorder {
     public:
-        int ViewportKind() const { return 4; } // 1=3D 2=outliner 3=properties 4=UV
+        int ViewportKind() const W3D_OVERRIDE { return 4; } // 1=3D 2=outliner 3=properties 4=UV
 
         float zoom;          // 1 = la textura llena ~80% del viewport
         float panX, panY;    // desplazamiento en pixeles (paneo)

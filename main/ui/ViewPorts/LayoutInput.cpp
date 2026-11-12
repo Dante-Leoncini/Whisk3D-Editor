@@ -1479,16 +1479,16 @@ static void LayoutUVOperacion(int op) {
     switch (op) {
         case 0: case 1: case 2:
             ok = W3dUnwrap(m, op, 0.02f, msg, &n);
-            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Unwrap")) + ": " + num + " " + T("islands"); }
+            if (ok) { snprintf(num, sizeof(num), "%d", n); msg = std::string(T("Unwrap")) + ": " + num + " " + T("islands"); }
             break;
         case 3:
             ok = W3dSmartUVProject(m, 66.0f, 0.02f, msg, &n);
-            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Smart UV Project")) + ": " + num + " " + T("islands"); }
+            if (ok) { snprintf(num, sizeof(num), "%d", n); msg = std::string(T("Smart UV Project")) + ": " + num + " " + T("islands"); }
             break;
         case 4: ok = W3dLightmapPack(m, 0.02f, msg); if (ok) msg = T("Lightmap Pack"); break;
         case 5:
             ok = W3dFollowActiveQuads(m, msg, &n);
-            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Follow Active Quads")) + ": " + num + " " + T("quads"); }
+            if (ok) { snprintf(num, sizeof(num), "%d", n); msg = std::string(T("Follow Active Quads")) + ": " + num + " " + T("quads"); }
             break;
         case 6: ok = W3dUVReset(m, msg); if (ok) msg = std::string(T("Reset")) + " UV"; break;
         default: return;
@@ -2476,7 +2476,7 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
         it->verde = (!sinProyecto && ruta == UVTexProyectoRuta());
         gUVTexRutas.push_back(ruta);
     }
-    { char tit[48]; sprintf(tit, "%s (%d)", T("Texture"), (int)gUVTexRutas.size());
+    { char tit[48]; snprintf(tit, sizeof(tit), "%s (%d)", T("Texture"), (int)gUVTexRutas.size());
       gMenuUVTex->titulo = tit; }
     gMenuUVTex->action = LayoutAccionUVTex;
     if (MenuAbierto && MenuAbierto != gMenuUVTex) MenuAbierto->Cerrar();
@@ -2537,7 +2537,7 @@ static void LayoutAbrirMenuUVMip(UVEditor* uv, int x, int y) {
         w3dEngine::TextureSize(tid, tw, th);
         int niv = 0;
         while (tw >= 1 && th >= 1) {
-            char b[24]; sprintf(b, "%dx%d", tw, th);
+            char b[24]; snprintf(b, sizeof(b), "%dx%d", tw, th);
             gMenuUVMip->Agregar(b, niv)->verde = (UVMipNivel() == niv);
             if (tw == 1 && th == 1) break;
             if (tw > 1) tw /= 2;

@@ -1167,7 +1167,7 @@ static float* ValorDeMapa(Material* m, int k) {
 static std::string NumMapaTexto(float v) {
     if (v < 0.0f) v = 0.0f;
     const int c = (int)(v * 100.0f + 0.5f);
-    char b[24]; sprintf(b, "%d.%02d", c / 100, c % 100);
+    char b[24]; snprintf(b, sizeof(b), "%d.%02d", c / 100, c % 100);
     return b;
 }
 static bool NumMapaLeer(const std::string& t, float& out) {
@@ -1185,7 +1185,7 @@ static bool NumMapaLeer(const std::string& t, float& out) {
 }
 static std::string ColorHex(const float* c) {
     char b[16];
-    sprintf(b, "#%02X%02X%02X", (int)(c[0] * 255.0f + 0.5f) & 255, (int)(c[1] * 255.0f + 0.5f) & 255, (int)(c[2] * 255.0f + 0.5f) & 255);
+    snprintf(b, sizeof(b), "#%02X%02X%02X", (int)(c[0] * 255.0f + 0.5f) & 255, (int)(c[1] * 255.0f + 0.5f) & 255, (int)(c[2] * 255.0f + 0.5f) & 255);
     return b;
 }
 // ---- el NUMERO en el lugar: el boton se vuelve un campo; al soltar el foco (Enter, click afuera) se aplica, con undo
@@ -10196,7 +10196,7 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
     W3dRecursoItem it;
     if (!W3dVistaRecInfo(vista, id, &it)) return;
     p->propRecurso->icono = W3dVistaIcono(vista);
-    char b[32]; sprintf(b, "%d", it.usuarios);
+    char b[32]; snprintf(b, sizeof(b), "%d", it.usuarios);
     std::string tipo = std::string(T(W3dVistaSingular(vista))) + " - ";
     if (it.usuarios > 0) tipo += std::string(T("In use")) + " (" + T("Users") + ": " + b + ")";
     else tipo += T("Orphan (no users)");

@@ -88,7 +88,7 @@ void OutlinerArrastreRender(int pantallaW, int pantallaH);
 class Outliner : public ViewportBase, public WithBorder, public Scrollable {
     friend class Biblioteca;   // (la biblioteca es un outliner fijo en los recursos: arma su barra)
     public:
-        Scrollable* ComoScrollable() { return this; }
+        Scrollable* ComoScrollable() W3D_OVERRIDE { return this; }
         size_t CantidadRenglones;
         int lastContentRows;   // filas visibles del ultimo render: si cambian (import/add/delete/desplegar) se recalcula
                                // el scrollbar (antes solo se recalculaba al redimensionar -> tras importar no scrolleaba)
@@ -172,8 +172,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void MoverConfirmar();     // sale del modo (deja la posicion nueva)
         void MoverCancelar();      // restaura la posicion original y sale
         bool ModoMover() const { return moviendo; }
-        int ViewportKind() const { return 2; } // (menu de tipo)
-        void ClearHover() { hoverFila = -1; hoverMx = hoverMy = -1; colHover = -1; } // el mouse se fue
+        int ViewportKind() const W3D_OVERRIDE { return 2; } // (menu de tipo)
+        void ClearHover() W3D_OVERRIDE { hoverFila = -1; hoverMx = hoverMy = -1; colHover = -1; } // el mouse se fue
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE;   // 2 dedos: zoom de la cuadricula
 
         void key_down_return();

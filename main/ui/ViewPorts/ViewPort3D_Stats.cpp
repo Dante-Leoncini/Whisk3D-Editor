@@ -79,17 +79,17 @@ void Viewport3D::RenderEstadisticas(){
         // la escena (con sus particulas), la interfaz del JUEGO y la del editor, y de la escena los draws, binds y
         // cambios de estado. Antes era solo la escena y sin clear/viewport/color/niebla/lineas: no contaba la UI
         const w3dEngine::StatsDeCuadro& c = w3dEngine::g_statCuadro;
-        sprintf(buf, "gl: %d", c.total); StatLinea(buf, width, margen, ly, lineH);
-        sprintf(buf, " esc %d ui %d ed %d", c.llamadas[w3dEngine::StatCatEscena] + c.llamadas[w3dEngine::StatCatParticulas],
+        snprintf(buf, sizeof(buf), "gl: %d", c.total); StatLinea(buf, width, margen, ly, lineH);
+        snprintf(buf, sizeof(buf), " esc %d ui %d ed %d", c.llamadas[w3dEngine::StatCatEscena] + c.llamadas[w3dEngine::StatCatParticulas],
                 c.llamadas[w3dEngine::StatCatUI], c.llamadas[w3dEngine::StatCatEditor]);
         StatLinea(buf, width, margen, ly, lineH);
-        sprintf(buf, " escena: dw %d tx %d st %d", statDrawsFrame, statBindsFrame, statEstadosFrame);
+        snprintf(buf, sizeof(buf), " escena: dw %d tx %d st %d", statDrawsFrame, statBindsFrame, statEstadosFrame);
         StatLinea(buf, width, margen, ly, lineH);
     }
     if (OverlayStatModgen){
         // DIAGNOSTICO de performance: regeneraciones de la malla de modificadores. Al ROTAR la camara NO debe subir
         // (la subdivision/screw se cachea en genValido). Si sube al rotar -> se esta recalculando de mas.
-        sprintf(buf, "modgen: %ld", g_genMallaCount); StatLinea(buf, width, margen, ly, lineH);
+        snprintf(buf, sizeof(buf), "modgen: %ld", g_genMallaCount); StatLinea(buf, width, margen, ly, lineH);
     }
     if (OverlayStatTimes){
         // PROFILER: ms por categoria del frame (para saber a que atacar). scene=modelo+skinning; 3d=overhead del
@@ -100,23 +100,23 @@ void Viewport3D::RenderEstadisticas(){
                            g_profShow.render - g_profShow.viewport3d, g_profShow.logic,
                            g_profShow.swap, g_profShow.logic + g_profShow.render + g_profShow.swap };
           for (int i = 0; i < 6; i++) { double v = vs[i]; if (v < 0) v = 0; ms[i] = (long)(v * 10.0 + 0.5); } }
-        sprintf(buf, "ms scn:%ld.%ld 3d:%ld.%ld",  ms[0]/10, ms[0]%10, ms[1]/10, ms[1]%10); StatLinea(buf, width, margen, ly, lineH);
-        sprintf(buf, "ms ui:%ld.%ld log:%ld.%ld",  ms[2]/10, ms[2]%10, ms[3]/10, ms[3]%10); StatLinea(buf, width, margen, ly, lineH);
-        sprintf(buf, "ms swap:%ld.%ld tot:%ld.%ld", ms[4]/10, ms[4]%10, ms[5]/10, ms[5]%10); StatLinea(buf, width, margen, ly, lineH);
+        snprintf(buf, sizeof(buf), "ms scn:%ld.%ld 3d:%ld.%ld",  ms[0]/10, ms[0]%10, ms[1]/10, ms[1]%10); StatLinea(buf, width, margen, ly, lineH);
+        snprintf(buf, sizeof(buf), "ms ui:%ld.%ld log:%ld.%ld",  ms[2]/10, ms[2]%10, ms[3]/10, ms[3]%10); StatLinea(buf, width, margen, ly, lineH);
+        snprintf(buf, sizeof(buf), "ms swap:%ld.%ld tot:%ld.%ld", ms[4]/10, ms[4]%10, ms[5]/10, ms[5]%10); StatLinea(buf, width, margen, ly, lineH);
         // SCRIPTS lua: ms del loop + activos/total. "activos" = los que corrieron (visibles/escena activa); los
         // que estan fuera de camara NO cuentan (el "solo calcular lo cercano"). caras/draws ya salen arriba (faces:/gl:).
         { extern int g_luaScriptsActivos, g_luaScriptsTotal; extern double g_luaTickMs;
           long lm = (long)(g_luaTickMs * 10.0 + 0.5); if (lm < 0) lm = 0;
-          sprintf(buf, "lua:%ld.%ld ms scr:%d/%d", lm/10, lm%10, g_luaScriptsActivos, g_luaScriptsTotal);
+          snprintf(buf, sizeof(buf), "lua:%ld.%ld ms scr:%d/%d", lm/10, lm%10, g_luaScriptsActivos, g_luaScriptsTotal);
           StatLinea(buf, width, margen, ly, lineH); }
     }
     if (OverlayFps){
-        sprintf(buf, "fps: %d", (int)(g_fpsActual + 0.5f)); StatLinea(buf, width, margen, ly, lineH);
+        snprintf(buf, sizeof(buf), "fps: %d", (int)(g_fpsActual + 0.5f)); StatLinea(buf, width, margen, ly, lineH);
         // con el trazado: las imagenes trazadas terminadas por segundo (el editor puede dibujar mas cuadros que eso)
         if (view == RenderType::Rendered && g_rt.on) {
-            sprintf(buf, "rt: %.1f fps", RTImagenesPorSegundo()); StatLinea(buf, width, margen, ly, lineH);
+            snprintf(buf, sizeof(buf), "rt: %.1f fps", RTImagenesPorSegundo()); StatLinea(buf, width, margen, ly, lineH);
             const double rps = RTRayosPorSegundo();
-            if (rps > 0.0) { sprintf(buf, "rt: %.0f Mrayos/s", rps / 1e6); StatLinea(buf, width, margen, ly, lineH); }
+            if (rps > 0.0) { snprintf(buf, sizeof(buf), "rt: %.0f Mrayos/s", rps / 1e6); StatLinea(buf, width, margen, ly, lineH); }
         }
     }
 }

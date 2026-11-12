@@ -337,7 +337,7 @@ bool BoneEditBorrar(Armature* a){
     // Y se avisa POR CADA CLIP: un hueso es del ARMATURE, no de un clip, asi que borrarlo corre los
     // indices de las claves de TODOS sus clips (la clave lleva el clip adentro desde la ronda 7).
     for (size_t c = 0; c < a->animations.size(); c++){
-        char kb[24]; sprintf(kb, "/k%d/b", (int)c);   // "arm:#<serial>/k<CLIP>/b": el dueno va PRIMERO
+        char kb[24]; snprintf(kb, sizeof(kb), "/k%d/b", (int)c);   // "arm:#<serial>/k<CLIP>/b": el dueno va PRIMERO
         // el dueno va por SERIAL, no por nombre: el nombre se recicla al renombrar/borrar y el
         // aviso terminaria corriendo (o no corriendo) los indices del rig equivocado (ver Timeline.h).
         const std::string pref = "arm:" + DopeIdDueno(a) + kb;

@@ -96,7 +96,7 @@ void JuegoPrepararViewports(bool apagarOverlays);
 
 class Viewport3D : public ViewportBase, public WithBorder {
     public:
-        int ViewportKind() const { return 1; } // (menu de tipo)
+        int ViewportKind() const W3D_OVERRIDE { return 1; } // (menu de tipo)
         bool orthographic;
         bool ViewFromCameraActive;
         // PASSEPARTOUT de camara: cuando se mira DESDE la camara, el marco (aspecto del render) encuadrado en el

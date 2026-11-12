@@ -34,7 +34,7 @@ enum ToolbarRol2D {
 // =====================================================================
 class Editor2D : public ViewportBase, public WithBorder {
     public:
-        int ViewportKind() const { return 6; } // 1=3D 2=outliner 3=props 4=UV 5=timeline 6=2D
+        int ViewportKind() const W3D_OVERRIDE { return 6; } // 1=3D 2=outliner 3=props 4=UV 5=timeline 6=2D
 
         float zoom;           // px de pantalla por px de lienzo (arranca ajustado al viewport)
         bool  zoomInicializado; // el primer Render calcula el zoom "que entre comodo" UNA vez

@@ -204,7 +204,7 @@ void UVMapaPopup::Render() {
             w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)(ry + (RenglonHeightGS - LetterHeightGS) / 2), 0);
             std::string txt = T("Use index");
             if (sel >= 0 && gUVmesh && gUVmesh->uvMaps[(size_t)sel]) {
-                char b[16]; sprintf(b, "%d  ", sel + 1);
+                char b[16]; snprintf(b, sizeof(b), "%d  ", sel + 1);
                 txt = b + gUVmesh->uvMaps[(size_t)sel]->nombre;
             }
             RenderBitmapText(txt, textAlign::left, lw - bordersGS - gapGS);
