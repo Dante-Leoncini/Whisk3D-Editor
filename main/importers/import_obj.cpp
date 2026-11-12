@@ -256,8 +256,9 @@ bool TexturasAdormecer(Material* m) {
     m->normalTexture = NULL;
     m->texturaB = NULL;
     TexturasDormir(d);
-    // las ranuras sueltan su referencia (la textura que ningun otro material retiene se libera YA)
-    for (size_t i = 0; i < sueltas.size(); i++) TexturaSoltar(sueltas[i]);
+    // las ranuras sueltan su referencia. En streaming la ultima NO queda como huerfana:
+    // la ruta ya vive en TexDormida y la GPU se recupera solo cuando otra malla la necesite.
+    for (size_t i = 0; i < sueltas.size(); i++) TexturaSoltarSinHuerfana(sueltas[i]);
     return true;
 }
 int TexturasDespertarUsadas() {
