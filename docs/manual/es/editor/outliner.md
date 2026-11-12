@@ -15,7 +15,7 @@ Lo que elegís en el Outliner queda elegido también en la Vista 3D, y al revés
 
 Cada fila es un objeto. La **flecha** pliega o despliega lo que tiene adentro; el **ícono** dice su tipo (malla, cámara, luz, colección...); después va el **nombre**, en verde si es el activo y en un verde más oscuro si está elegido; y a la derecha, el **ojo** y la **cámara**. Un objeto que está adentro de otro aparece más a la derecha, colgando de él, y una fila tenue es un objeto oculto.
 
-En un proyecto nuevo, arriba está el **Constructor**, una rutina que prepara la pantalla, y debajo la **Colección** con la cámara, la luz y el cubo. Una colección es una carpeta para ordenar.
+En un proyecto nuevo, arriba está el **Constructor**, una rutina que prepara la pantalla y corre una sola vez, al empezar el juego. Una línea negra lo separa de lo que corre en cada cuadro: primero **Limpiar pantalla** y después la **Colección** con la cámara, la luz y el cubo. Una colección es una carpeta para ordenar.
 
 ## Elegir
 

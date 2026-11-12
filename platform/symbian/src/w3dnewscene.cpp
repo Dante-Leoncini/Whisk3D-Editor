@@ -94,7 +94,7 @@ void W3dNewSceneInit() {
     W3dModelInit();
 
     if (SceneCollection && SceneCollection->Childrens.empty()) {
-        // arriba de todo el CONSTRUCTOR y el "Limpiar pantalla" de cada cuadro (igual que el constructor de PC)
+        // arriba de todo el CONSTRUCTOR y, afuera de el, el "Limpiar pantalla" de cada cuadro (igual que el de PC)
         W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
                              ListaColores[static_cast<int>(ColorID::background)]);
         // todo cuelga de una "Collection" (igual que el constructor de PC)

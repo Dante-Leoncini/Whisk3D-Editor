@@ -32,6 +32,7 @@
 
 extern ViewportBase* rootViewport;
 extern int OutlinerFilaDeObjeto(Object* o);
+extern int OutlinerYDeFila(int fila);   // (con los cortes constructor / cada cuadro)
 extern Object* g_editMesh;
 
 static FILE* g_f = NULL;
@@ -162,7 +163,7 @@ static std::string FilaOutliner(Outliner* o, Object* raiz, int my) {
         Object* ob = raiz->Childrens[i];
         const int fila = OutlinerFilaDeObjeto(ob);
         if (fila >= 0) {
-            const int y = o->y + borderGS + o->PosY + o->BarTopOffset() + fila * (int)RenglonHeightGS;
+            const int y = o->y + borderGS + o->PosY + o->BarTopOffset() + OutlinerYDeFila(fila);
             if (my >= y && my < y + (int)RenglonHeightGS) return "fila '" + ob->name + "'";
         }
         std::string s = FilaOutliner(o, ob, my);

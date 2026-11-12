@@ -598,7 +598,7 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
     MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
     // (aca estaba "Clear Screen": limpiar la pantalla ahora es PROGRAMABLE. Todo proyecto trae arriba de todo el
-    // "Clear color" en el constructor y la rutina "Limpiar pantalla" (Rutina.h, W3dRutinasPorDefecto): quitarla o
+    // "Clear color" en el constructor y, despues de el, la rutina "Limpiar pantalla" (Rutina.h, W3dRutinasPorDefecto): quitarla o
     // apagarla = no limpiar, tambien en el editor (ver "QUIEN LIMPIA" en Render).)
     // X-Ray (retopologia): la malla EN EDICION se dibuja semitransparente (30%) sin z-test y sus bordes/vertices
     // siempre encima -> se ven y se pueden SELECCIONAR los verts/aristas de atras (los tapados por las caras).

@@ -45,6 +45,7 @@ Button* PropsAyudaEn(Properties* p, int mx, int my);   // el cartelito de ayuda 
 #include "WhiskUI/widgets/Tab.h"
 #include "WhiskUI/Propieties/GroupPropertie.h"
 extern int OutlinerFilaDeObjeto(Object* o);   // Outliner.cpp: la fila visible de un objeto en la escena (-1)
+extern int OutlinerYDeFila(int fila);         // Outliner.cpp: su Y desde arriba del arbol (con los cortes del constructor)
 
 extern ViewportBase* rootViewport;
 extern int MenuPantallaW, MenuPantallaH;
@@ -162,7 +163,7 @@ namespace {
                 int prof = 0;
                 for (Object* p = ob->Parent; p && p != SceneCollection; p = p->Parent) prof++;
                 const int x = o->x + marginGS + o->PosX + (prof + 2) * (IconSizeGS + gapGS) + LetterWidthGS;
-                const int y = o->y + borderGS + o->PosY + o->BarTopOffset() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
+                const int y = o->y + borderGS + o->PosY + o->BarTopOffset() + OutlinerYDeFila(fila) + (int)RenglonHeightGS / 2;
                 const int reserva = o->scrollY ? (GlobalScale * 9 + gapGS) : 0;   // (Outliner.cpp: la barra de desplazamiento)
                 const int ojo = o->x + o->width - 2 * IconSizeGS - gapGS - marginGS - borderGS - reserva + IconSizeGS / 2;
                 const int cam = o->x + o->width - IconSizeGS - marginGS - borderGS - reserva + IconSizeGS / 2;
@@ -437,7 +438,7 @@ namespace {
                 int prof = 0;
                 for (Object* p = ob->Parent; p && p != SceneCollection; p = p->Parent) prof++;
                 x = o->x + marginGS + o->PosX + (prof + 2) * (IconSizeGS + gapGS) + LetterWidthGS;
-                y = o->y + borderGS + o->PosY + o->BarTopOffset() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
+                y = o->y + borderGS + o->PosY + o->BarTopOffset() + OutlinerYDeFila(fila) + (int)RenglonHeightGS / 2;
                 return true;
             }
             if (FilaOutlinerDe(o, ob, nom, x, y)) return true;

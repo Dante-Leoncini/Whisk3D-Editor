@@ -1088,8 +1088,9 @@ bool Outliner::MenuContexto(int mx, int my) {
         const int rel = my - y - borderGS - PosY - BarTopOffset();
         if (rel >= 0) {
             extern Object* OutlinerObjetoEnFila(int fila);
+            extern int OutlinerFilaDeY(int rel);   // (Outliner.cpp: con los cortes constructor / cada cuadro)
             extern bool OutlinerActivarEscenaDe(Object* o);
-            Object* hit = OutlinerObjetoEnFila(rel / (int)RenglonHeightGS);
+            Object* hit = OutlinerObjetoEnFila(OutlinerFilaDeY(rel));
             if (hit && !OutlinerActivarEscenaDe(hit)) return true;   // (de otra escena abierta: primero la activa)
             if (hit && !hit->select) { UndoCapturarSeleccion(); DeseleccionarTodo(); hit->Seleccionar(); }
             else if (hit) ObjActivo = hit;
@@ -1959,7 +1960,8 @@ bool Outliner::DobleClick(int mx, int my) {
     if (vista == OUT_VISTA_ESCENA) {
         const int rel = my - y - borderGS - PosY - BarTopOffset();
         if (rel < 0) return false;
-        const int fila = rel / (int)RenglonHeightGS;
+        extern int OutlinerFilaDeY(int rel);   // (Outliner.cpp: con los cortes constructor / cada cuadro)
+        const int fila = OutlinerFilaDeY(rel);
         extern Object* OutlinerObjetoEnFila(int fila);
         extern int OutlinerProfDeFila(int fila);
         extern bool OutlinerActivarEscenaDe(Object* o);
@@ -2003,12 +2005,14 @@ bool Outliner::PulsacionLarga(int mx, int my) {
         const int rel = my - y - borderGS - PosY - BarTopOffset();
         if (rel < 0) return false;
         extern Object* OutlinerObjetoEnFila(int fila);
+        extern int OutlinerFilaDeY(int rel);   // (Outliner.cpp: con los cortes constructor / cada cuadro)
         extern bool OutlinerActivarEscenaDe(Object* o);
-        Object* o = OutlinerObjetoEnFila(rel / (int)RenglonHeightGS);
+        const int filaRel = OutlinerFilaDeY(rel);
+        Object* o = OutlinerObjetoEnFila(filaRel);
         if (!o || !OutlinerActivarEscenaDe(o)) return false;
         if (!o->select) { UndoCapturarSeleccion(); DeseleccionarTodo(); o->Seleccionar(); }
         dragObjeto = o; dragging = false; dragY0 = my;
-        agarreFila = rel / (int)RenglonHeightGS;
+        agarreFila = filaRel;
         g_redraw = true;
         return true;
     }

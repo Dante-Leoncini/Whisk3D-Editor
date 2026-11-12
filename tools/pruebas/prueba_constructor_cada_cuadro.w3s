@@ -1,0 +1,64 @@
+# ==========================================================================
+#  CONSTRUCTOR / CADA CUADRO
+#  Lo de ADENTRO del Constructor corre UNA vez al empezar el juego (en el editor corre en cada cuadro solo porque la
+#  interfaz pisa su estado). Limpiar la pantalla es de CADA cuadro: va AFUERA del constructor, justo despues y antes
+#  de la coleccion. En el outliner los separa una linea negra de 3 pixeles (no es una fila: corre las de abajo).
+#  Un proyecto de antes con la limpieza ADENTRO del constructor la saca afuera al abrirse.
+# ==========================================================================
+escenadefecto
+hijos - : Constructor | Limpiar pantalla | Colección
+hijos Constructor :
+
+# ---- el outliner: la linea va arriba de "Limpiar pantalla" (la fila 1) y los clicks caen en la fila de abajo ----
+escenafila 0 Constructor
+escenafila 1 Limpiar pantalla
+escenafila 2 Colección
+outcortes 1
+escenaclick nombre Limpiar pantalla
+activo Limpiar pantalla
+escenaclick nombre Colección
+activo Colección
+escenaclick nombre Cubo
+activo Cubo
+escenaclick nombre Constructor
+activo Constructor
+# con el Constructor oculto (menu del ojo) no hay linea; con las demas rutinas ocultas va arriba de la coleccion
+outver 0 1
+outcortes -
+outver 1 0
+outcortes 1
+escenafila 1 Colección
+escenaclick nombre Colección
+activo Colección
+outver 1 1
+
+# ---- un proyecto de ANTES: la limpieza adentro del constructor (y otra rutina que si es de una vez) ----
+rutina Viejo Constructor
+rutinapaso Viejo limpiar
+rutina Una Constructor
+rutinapaso Una tamPunto n0=2
+hijos Constructor : Viejo | Una
+guardarw3d /tmp/w3d_constructor_cada_cuadro.w3d
+abrirw3d /tmp/w3d_constructor_cada_cuadro.w3d
+# la que limpia sale afuera, pegada al constructor; la otra se queda adentro
+hijos - : Constructor | Viejo | Limpiar pantalla | Colección
+hijos Constructor : Una
+# (y se guarda asi)
+guardarw3d /tmp/w3d_constructor_cada_cuadro_2.w3d
+abrirw3d /tmp/w3d_constructor_cada_cuadro_2.w3d
+hijos - : Constructor | Viejo | Limpiar pantalla | Colección
+hijos Constructor : Una
+
+# ---- el modo SOLO JUEGO: lo de adentro del constructor corre UNA vez; limpiar, en cada cuadro ----
+rutinaperfil on
+juegopuro
+cuadro
+cuadro
+cuadro
+cuadro
+rutinaperfil
+rutinaperfil es tamPunto 1
+rutinaperfil es limpiar 8
+# (cover y de vuelta con la UI)
+juegopuro
+juegopuro

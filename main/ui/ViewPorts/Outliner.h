@@ -92,6 +92,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         size_t CantidadRenglones;
         int lastContentRows;   // filas visibles del ultimo render: si cambian (import/add/delete/desplegar) se recalcula
                                // el scrollbar (antes solo se recalculaba al redimensionar -> tras importar no scrolleaba)
+        int lastCortes;        // cuantos CORTES constructor / cada cuadro tenia (cambian el alto del contenido igual)
         Rec2D* Renglon;
 
         // CULLING vertical: DibujarRenglon/DibujarOjos recorren la jerarquia contando filas (filaDFS = indice de fila en
@@ -147,7 +148,6 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         int dropZona;
         int dropProf; // profundidad (nivel de sangria) del destino: la linea de insercion se indenta a ese nivel
         void SoltarDrag(int mx, int my);
-        void DibujarSeparador();   // la fila virtual constructor / rutina (ver EsConstructor en Outliner.cpp)
         // AUTO-SCROLL del arrastre: con el mouse en la franja de arriba/abajo de la lista, la lista se mueve sola
         // (mas rapido cuanto mas cerca del borde; afuera de la lista, a la velocidad maxima). Por TIEMPO (W3dNowMs),
         // no por evento: el mouse quieto en el borde sigue scrolleando. Lo corre Render cada cuadro.

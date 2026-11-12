@@ -1939,6 +1939,7 @@ static bool CmdPruebaCapas(std::istringstream& ss, std::string& err) {
 //  LAS ESCENAS ABIERTAS A LA VEZ
 // ============================================================================
 extern int OutlinerFilaDeObjeto(Object* o);   // Outliner.cpp
+extern int OutlinerYDeFila(int fila);         // Outliner.cpp (con los cortes constructor / cada cuadro)
 extern bool g_w3dCambiosSinCartel;            // CambiosProyecto.cpp: el harness no pregunta (salvo a proposito)
 static std::string RestoDeLinea(std::istringstream& ss) {
     std::string r;
@@ -2080,7 +2081,7 @@ static bool PuntoDeFila(Outliner* ol, Object* o, const std::string& donde, int& 
     std::vector<int> ab;
     W3dRaicesAbiertas(ab);
     if (ab.size() < 2) prof--;   // con una sola abierta no hay nodo: lo de arriba es su primer nivel
-    my = ol->y + borderGS + ol->PosY + ol->BarTopOffset() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
+    my = ol->y + borderGS + ol->PosY + ol->BarTopOffset() + OutlinerYDeFila(fila) + (int)RenglonHeightGS / 2;
     const int reservaBarra = ol->scrollY ? (GlobalScale * 9 + gapGS) : 0;
     if (donde == "ojo") mx = ol->x + ol->width - 2 * IconSizeGS - gapGS - marginGS - borderGS - reservaBarra + IconSizeGS / 2;
     else if (donde == "flecha") mx = ol->x + marginGS + ol->PosX + prof * (IconSizeGS + gapGS) + IconSizeGS / 2;

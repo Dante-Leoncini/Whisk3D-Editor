@@ -19,8 +19,9 @@ bool running = false;
 // definicion: la usa el arranque y el comando `escenadefecto` del harness (los tests que
 // trabajan "sobre la escena del usuario" la necesitan en un proceso que ya corrio otros).
 void W3dCrearEscenaPorDefecto() {
-    // arriba de todo: el CONSTRUCTOR (corre una vez al empezar el juego: fija el "Clear color", el fondo del tema) y
-    // la rutina que LIMPIA la pantalla en cada cuadro (apagarla o quitarla = no limpiar, tambien en el editor)
+    // arriba de todo: el CONSTRUCTOR (corre una vez al empezar el juego: fija el "Clear color", el fondo del tema) y,
+    // afuera de el y antes de la coleccion, la rutina que LIMPIA la pantalla en cada cuadro (apagarla o quitarla = no
+    // limpiar, tambien en el editor)
     W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
                          ListaColores[static_cast<int>(ColorID::background)]);
     CollectionActive = new Collection(SceneCollection);

@@ -284,10 +284,13 @@ extern bool g_w3dRecorteVistaOn;
 extern int g_w3dRecorteVista[4];
 // cuantas veces un "Clear" limpio el COLOR (crece siempre): el editor sabe si en un cuadro alguien limpio la pantalla
 extern unsigned g_w3dLimpiezasColor;
-// lo que trae todo proyecto nuevo, arriba de todo en 'raiz': el CONSTRUCTOR (con el "Clear color": 'fondo') y la
-// rutina de cada cuadro que LIMPIA la pantalla (color y profundidad). Quitarla o apagarla = no limpiar
+// lo que trae todo proyecto nuevo, arriba de todo en 'raiz': el CONSTRUCTOR (con el "Clear color": 'fondo') y, AFUERA
+// de el y antes de la coleccion, la rutina de cada cuadro que LIMPIA la pantalla (color y profundidad). Quitarla o
+// apagarla = no limpiar
 void W3dRutinasPorDefecto(Object* raiz, const std::string& nombreConstructor, const std::string& nombreLimpiar,
                           const float fondo[4]);
+// un proyecto de antes con la limpieza ADENTRO del constructor 'c': la saca afuera, justo despues (al abrirlo)
+void W3dConstructorSacarLimpiar(Object* c);
 
 // PERFIL (harness 'rutinaperfil'): por tipo de paso, cuantas veces corrio y cuantas llamadas GL hizo (draws + binds
 // + estados + otras). Apagado no cuesta nada

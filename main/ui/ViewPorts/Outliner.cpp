@@ -12,7 +12,7 @@
 #include "io/PrefabsEditor.h"   // lo generado por una instancia de prefab: en gris, sin arrastre ni mudanza
 #include "objects/Mesh.h"       // Mesh::armatures2d (una fila VIRTUAL azul por rig 2D bajo la malla)
 #include "objects/Rutina.h"     // la Rutina mal armada va en rojo, con su motivo
-#include "W3dLang.h"            // T(): el texto del separador constructor / rutina
+#include "W3dLang.h"
 #include "config/W3dProfile.h"   // W3dNowMs: el auto-scroll del arrastre va por tiempo
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (confirmar antes de borrar)
 #include "ViewPorts/Notificaciones.h"       // Notificar (renames del modo mover)
@@ -111,24 +111,12 @@ struct OutFila {
     Mesh*   arm2d;  // != NULL -> fila virtual "Armature 2D" de esta malla
     int     arm2dIdx; // indice del armature 2D de esa fila (solo si arm2d != NULL)
     int     prof;   // nivel de sangria
-    bool    sep;    // la fila VIRTUAL que separa el CONSTRUCTOR de la RUTINA de cada cuadro
-    OutFila() : obj(NULL), arm2d(NULL), arm2dIdx(-1), prof(0), sep(false) {}
+    OutFila() : obj(NULL), arm2d(NULL), arm2dIdx(-1), prof(0) {}
 };
 
-// ===================================================================================================
-//  EL SEPARADOR CONSTRUCTOR / RUTINA: las rutinas CONSTRUCTOR van arriba de todo (hijos de la raiz, primeras)
-//  y corren UNA vez al empezar el juego (en el editor, en cada cuadro: la interfaz pisa su estado). Lo de
-//  abajo es la RUTINA: se dibuja en cada cuadro. Entre las dos, una fila VIRTUAL inerte con una linea y el
-//  texto que lo explica (no se elige, no se arrastra, no recibe drops). Sin constructor no hay separador.
-// ===================================================================================================
 static bool EsConstructor(Object* o) {
     return o && o->getType() == ObjectType::rutina && ((Rutina*)o)->constructor;
 }
-// el SEPARADOR (la fila "Arriba: una vez al empezar. Abajo: cada cuadro." con su linea) se SACO: el Constructor ya es
-// una fila desplegable con adentro lo que corre una sola vez. Devolver 0 apaga el separador en TODOS los recorridos
-// (medir, dibujar, fila -> objeto, clicks) a la vez. (Ademas la medida lo SUMABA al alto en vez de restarlo: la lista
-// quedaba dos renglones mas corta y el scroll no llegaba al final.)
-static size_t ConstructorTope() { return 0; }
 
 // FILTROS de la vista Escena (menu del OJO de la barra): ocultar el Constructor, las demas rutinas, y las columnas de
 // iconos de visibilidad (ojo) y de render (camara)
@@ -183,6 +171,80 @@ static void OutMoverEscena(Object* raiz, Object* junto, bool despues) {
     for (size_t i = 0; i < ab.size(); i++) { if (ab[i] == idx) continue; if (ab[i] == ref) break; pos++; }
     W3dRaizMoverAbierta(idx, despues ? pos + 1 : pos);
 }
+// ===================================================================================================
+//  EL CORTE CONSTRUCTOR / CADA CUADRO: 3 pixeles NEGROS (de la escala de la interfaz) entre lo de arriba -el
+//  CONSTRUCTOR, con lo que tenga adentro: corre UNA vez al empezar el juego (en el editor, en cada cuadro: la
+//  interfaz pisa su estado)- y lo de abajo, que corre en CADA cuadro (primero "Limpiar pantalla"). No es una fila:
+//  corre para abajo las que siguen. Va entre dos hermanos de los que uno es constructor y el otro no (con varias
+//  escenas abiertas, uno adentro de cada una). TODA cuenta fila <-> Y del arbol pasa por OutYDeFila / OutFilaDeY.
+// ===================================================================================================
+static std::vector<int> gOutCortes;   // las filas que llevan el corte ARRIBA, en orden (OutCortesArmar)
+static int OutCorteAlto() { return 3 * GlobalScale; }
+static int OutFilasDe(Object* o) {   // las filas visibles de 'o' y lo que tiene desplegado (como la cuenta de Render)
+    if (OutOculto(o)) return 0;
+    int n = 1;
+    if (OutTieneHijos(o) && o->desplegado) {
+        n += Arm2DCant(o);
+        for (size_t i = 0; i < o->Childrens.size(); i++) n += OutFilasDe(o->Childrens[i]);
+    }
+    return n;
+}
+static void OutCortesHermanos(const std::vector<Object*>& hs, int& fila, bool raices) {
+    // (despues del ultimo constructor -o de la ultima escena- no hay mas cortes: no se cuentan las filas que siguen)
+    size_t ultimo = hs.size();
+    for (size_t i = 0; i < hs.size(); i++)
+        if (hs[i] && !OutOculto(hs[i]) && (EsConstructor(hs[i]) || (raices && OutEsRaiz(hs[i])))) ultimo = i;
+    if (ultimo == hs.size()) return;
+    bool hayAntes = false, antesConstructor = false;
+    for (size_t i = 0; i < hs.size(); i++) {
+        Object* o = hs[i];
+        if (!o || OutOculto(o)) continue;
+        const bool esC = EsConstructor(o);
+        if (hayAntes && esC != antesConstructor) gOutCortes.push_back(fila);
+        hayAntes = true; antesConstructor = esC;
+        if (i > ultimo) return;
+        if (raices && OutEsRaiz(o)) {   // una ESCENA (varias abiertas): su fila y, desplegada, su constructor adentro
+            fila++;
+            if (OutTieneHijos(o) && o->desplegado) { fila += Arm2DCant(o); OutCortesHermanos(o->Childrens, fila, false); }
+        } else fila += OutFilasDe(o);
+    }
+}
+static void OutCortesArmar() {
+    gOutCortes.clear();
+    if (!SceneCollection) return;
+    int fila = 0;
+    OutCortesHermanos(OutTope(), fila, true);
+}
+// la Y (desde arriba del arbol) donde empieza la fila 'fila'
+static int OutYDeFila(int fila) {
+    int y = fila * (int)RenglonHeightGS;
+    for (size_t i = 0; i < gOutCortes.size() && gOutCortes[i] <= fila; i++) y += OutCorteAlto();
+    return y;
+}
+// la fila de una Y desde arriba del arbol; 'resto' = la Y adentro de la fila. Sobre un corte: el borde de ABAJO de la
+// fila de arriba (un drop ahi va "despues" de ella). Una Y negativa (arriba del arbol) da lo de siempre
+static int OutFilaDeY(int rel, int* resto = NULL) {
+    const int alto = (int)RenglonHeightGS;
+    int extra = 0;
+    for (size_t i = 0; i < gOutCortes.size(); i++) {
+        const int yc = gOutCortes[i] * alto + extra;   // el corte empieza aca (arriba de su fila)
+        if (rel < yc) break;
+        if (rel < yc + OutCorteAlto()) {
+            int r = yc - 1 - extra; if (r < 0) r = 0;
+            if (resto) *resto = r % alto;
+            return r / alto;
+        }
+        extra += OutCorteAlto();
+    }
+    rel -= extra;
+    if (resto) *resto = rel % alto;
+    return rel / alto;
+}
+// (lo mismo para OutlinerRecursos.cpp y el harness: rearman los cortes, el arbol pudo cambiar)
+int OutlinerYDeFila(int fila) { OutCortesArmar(); return OutYDeFila(fila); }
+int OutlinerFilaDeY(int rel) { OutCortesArmar(); return OutFilaDeY(rel); }
+void OutlinerCortes(std::vector<int>& out) { OutCortesArmar(); out = gOutCortes; }   // (el harness: 'outcortes')
+
 // un objeto de otra escena abierta: su escena pasa a ser la ACTIVA (antes de elegirlo). false = no se pudo (avisado)
 bool OutlinerActivarEscenaDe(Object* o) {
     Object* r = OutRaizDe(o);
@@ -198,6 +260,7 @@ Outliner::Outliner() : ViewportBase() {
     Renglon = new Rec2D();
     CantidadRenglones = 5;
     lastContentRows = -1;
+    lastCortes = 0;
     hoverFila = -1;
     dragObjeto = NULL;
     dragging = false;
@@ -338,12 +401,10 @@ void Outliner::Resize(int newW, int newH){
         Renglon->SetSize(0, 0, (GLshort)width, RenglonHeightGS);
         return;
     }
-    const size_t sepTope = ConstructorTope();
     const std::vector<Object*>& tope = OutTope();
-    for (size_t c = 0; c < tope.size(); c++) {
-        CalcularRenglon(tope[c], &MaxPosXtemp, &MaxPosYtemp);
-        if (c + 1 == sepTope) MaxPosYtemp += RenglonHeightGS;   // la fila del separador
-    }
+    for (size_t c = 0; c < tope.size(); c++) CalcularRenglon(tope[c], &MaxPosXtemp, &MaxPosYtemp);
+    OutCortesArmar();
+    MaxPosYtemp -= OutCorteAlto() * (int)gOutCortes.size();   // los cortes constructor / cada cuadro
     //este es el gap para la barra de desplazamiento de abajo
     MaxPosYtemp -= marginGS;
     //std::cout << "MaxPosXtemp: " << MaxPosXtemp << " width: " << width << std::endl;
@@ -393,8 +454,10 @@ void Outliner::Render(){
         int filas = 0;
         const std::vector<Object*>& tope = OutTope();
         for (size_t c = 0; c < tope.size(); c++) filas += C::rec(tope[c]);
-        if (ConstructorTope() > 0) filas++;   // el separador constructor / rutina
-        if (filas != lastContentRows){ lastContentRows = filas; Resize(width, height); }
+        OutCortesArmar();
+        if (filas != lastContentRows || (int)gOutCortes.size() != lastCortes) {
+            lastContentRows = filas; lastCortes = (int)gOutCortes.size(); Resize(width, height);
+        }
     }
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
@@ -438,12 +501,14 @@ void Outliner::Render(){
     // scrolleada se dibujan las que caen en el panel, desde la primera visible: antes solo existian
     // las franjas 0..CantidadRenglones-1 y las filas de mas abajo quedaban sin fondo (sin cebra, sin
     // el resaltado de la seleccion multiple ni el del destino de un arrastre). (+1: la de abajo, a medias)
-    const size_t primeraFila = (PosY < 0) ? (size_t)(-PosY / (int)RenglonHeightGS) : 0;
+    // (la escena: con los CORTES constructor / cada cuadro -la biblioteca no tiene-)
+    if (vista != OUT_VISTA_ESCENA) gOutCortes.clear();
+    const size_t primeraFila = (PosY < 0) ? (size_t)OutFilaDeY(-PosY) : 0;
     // (la CUADRICULA de la biblioteca no tiene franjas: sus celdas y carpetas pintan su propio fondo)
     const size_t franjas = (vista != OUT_VISTA_ESCENA && cuadricula) ? 0 : CantidadRenglones + 1;
     for (size_t i = primeraFila; i < primeraFila + franjas; i++) {
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef(0, (GLfloat)((int)i * (int)RenglonHeightGS), 0);
+        w3dEngine::Translatef(0, (GLfloat)OutYDeFila((int)i), 0);
         // Renglón Seleccionado
         if ((dragging && dropZona == 1 && (int)i == dropFila) ||
             (vista != OUT_VISTA_ESCENA && recArrastrando && (int)i == recDropFila)) {
@@ -473,6 +538,20 @@ void Outliner::Render(){
         //RenderObject2D(*Renglon);
         Renglon->Render(false);
         w3dEngine::PopMatrix();
+    }
+    // los CORTES constructor / cada cuadro: 3 pixeles negros arriba de su fila, a lo ancho de las franjas
+    if (!gOutCortes.empty()) {
+        static Rec2D* corte = NULL;
+        if (!corte) corte = new Rec2D();
+        const int reservaV = scrollY ? (borderGS + GlobalScale * 9 + 2) : 0;   // (lo mismo que deja Renglon)
+        corte->SetSize(0, 0, (GLshort)(width - reservaV), (GLshort)OutCorteAlto());
+        w3dEngine::Color4ub(0, 0, 0, 255);
+        for (size_t i = 0; i < gOutCortes.size(); i++) {
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef(0, (GLfloat)(OutYDeFila(gOutCortes[i]) - OutCorteAlto()), 0);
+            corte->Render(false);
+            w3dEngine::PopMatrix();
+        }
     }
     w3dEngine::PopMatrix();
 
@@ -511,18 +590,8 @@ void Outliner::Render(){
     cullBaseY = PosY + borderGS + BarTopOffset(); filaDFS = 0; // culling: Y de la 1er fila del recorrido de NOMBRES
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(marginGS + PosX, PosY + borderGS + BarTopOffset(), 0);
-    const size_t sepTope = ConstructorTope();
     const std::vector<Object*>& tope = OutTope();
-    for (size_t c = 0; c < tope.size(); c++){
-        DibujarRenglon(tope[c], !tope[c]->visible, 0);
-        if (c + 1 == sepTope) {
-            w3dEngine::PushMatrix();
-            w3dEngine::Translatef(0, (GLfloat)((int)filaDFS * (int)RenglonHeightGS), 0);
-            DibujarSeparador();
-            w3dEngine::PopMatrix();
-            filaDFS++;
-        }
-    }
+    for (size_t c = 0; c < tope.size(); c++) DibujarRenglon(tope[c], !tope[c]->visible, 0);
     w3dEngine::PopMatrix();
 
     SetColorID(ColorID::grisUI);
@@ -540,10 +609,7 @@ void Outliner::Render(){
     }
 
     cullBaseY = GlobalScale + PosY + borderGS + BarTopOffset(); filaDFS = 0; // culling: Y de la 1er fila del recorrido de OJOS
-    for (size_t c = 0; c < tope.size(); c++) {
-        DibujarOjos(tope[c], !tope[c]->visible, !tope[c]->renderizable);
-        if (c + 1 == sepTope) filaDFS++;   // (el separador no tiene ojos)
-    }
+    for (size_t c = 0; c < tope.size(); c++) DibujarOjos(tope[c], !tope[c]->visible, !tope[c]->renderizable);
     w3dEngine::PopMatrix();
     w3dEngine::Disable(w3dEngine::ScissorTest);
 
@@ -552,7 +618,7 @@ void Outliner::Render(){
         static Rec2D* linea = NULL;
         if (!linea) linea = new Rec2D();
         int lineY = borderGS + PosY + BarTopOffset()
-                    + (dropFila + (dropZona == 2 ? 1 : 0)) * RenglonHeightGS;
+                    + OutYDeFila(dropFila) + (dropZona == 2 ? (int)RenglonHeightGS : 0);
         w3dEngine::Disable(w3dEngine::Texture2D);
         SetColorID(ColorID::accent);
         // la linea se INDENTA al nivel del destino: si el objeto va a quedar emparentado (nivel > 0)
@@ -589,28 +655,9 @@ int OutlinerMarcaDeObjeto(Object* obj) {
     return -1;
 }
 
-// el SEPARADOR constructor / rutina: una linea arriba de la fila y el texto que explica las dos partes
-void Outliner::DibujarSeparador() {
-    int myY = cullBaseY + (int)filaDFS * (int)RenglonHeightGS;
-    if (myY + (int)RenglonHeightGS * 2 <= 0 || myY >= (int)height + (int)RenglonHeightGS) return;
-    static Rec2D* linea = NULL;
-    if (!linea) linea = new Rec2D();
-    w3dEngine::Disable(w3dEngine::Texture2D);
-    SetColorID(ColorID::accent, 0.8f);
-    linea->SetSize(0, 0, (GLshort)(width), (GLshort)(GlobalScale > 0 ? GlobalScale : 1));
-    linea->RenderObject(false);
-    w3dEngine::Enable(w3dEngine::Texture2D);   // (el texto y las filas que siguen van con la textura de la fuente)
-    SetColorID(ColorID::grisUI, 0.9f);
-    w3dEngine::PushMatrix();
-    w3dEngine::Translatef((GLfloat)gapGS, 0, 0);
-    RenderBitmapText(T("Above: once at start. Below: every frame."), textAlign::left,
-                     width - 2 * IconSizeGS - marginGS * 2);
-    w3dEngine::PopMatrix();
-}
-
 // la fila cae en el area visible (con margen de 1 fila arriba y abajo: no cortar las del borde)
 bool Outliner::FilaEnVista(unsigned fila) const {
-    const int myY = cullBaseY + (int)fila * (int)RenglonHeightGS;
+    const int myY = cullBaseY + OutYDeFila((int)fila);
     return (myY + (int)RenglonHeightGS * 2 > 0) && (myY < (int)height + (int)RenglonHeightGS);
 }
 
@@ -621,7 +668,7 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden, int prof){
     const unsigned fila = filaDFS++;
     if (FilaEnVista(fila)) {
     w3dEngine::PushMatrix();
-    w3dEngine::Translatef(0, (GLfloat)((int)fila * (int)RenglonHeightGS), 0);
+    w3dEngine::Translatef(0, (GLfloat)OutYDeFila((int)fila), 0);
     // las LINEAS del arbol: una por ancestro (sus columnas, a la izquierda de la flecha)
     if (prof > 0) SetColorID(ColorID::grisUI);
     for (int d = 0; d < prof; d++) {
@@ -726,7 +773,7 @@ void Outliner::DibujarArm2D(Mesh* m, int idx, bool hidden, int prof){
     const unsigned fila = filaDFS++;
     if (!FilaEnVista(fila)) return;
     w3dEngine::PushMatrix();
-    w3dEngine::Translatef(0, (GLfloat)((int)fila * (int)RenglonHeightGS), 0);
+    w3dEngine::Translatef(0, (GLfloat)OutYDeFila((int)fila), 0);
     SetColorID(ColorID::grisUI);
     for (int d = 0; d < prof; d++) {   // (las lineas del arbol)
         W3dDrawStrip4(IconLineMesh, IconsUV[static_cast<size_t>(IconType::line)]->uvs);
@@ -748,7 +795,7 @@ void Outliner::DibujarOjos(Object* obj, bool hidden, bool noRender){
     const unsigned fila = filaDFS++;
     if (FilaEnVista(fila)) {
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef(0, (GLfloat)((int)fila * (int)RenglonHeightGS), 0);
+        w3dEngine::Translatef(0, (GLfloat)OutYDeFila((int)fila), 0);
         // OJO (visible): ocultado por si mismo o por un PADRE oculto -> tenue. Sin la columna de la CAMARA, el ojo
         // ocupa su lugar (pegado a la derecha)
         if (!g_outVerRender) w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
@@ -834,7 +881,8 @@ bool Outliner::event_finger_scroll(int px, int py, int dx, int dy){
 void Outliner::event_mouse_motion(int mx, int my) {
     if (hoverMx != mx || hoverMy != my) { hoverMx = mx; hoverMy = my; if (vista != OUT_VISTA_ESCENA) g_redraw = true; }
     // hover: fila bajo el mouse (feedback antes del click)
-    hoverFila = (my - y - borderGS - PosY - BarTopOffset()) / RenglonHeightGS;
+    if (vista == OUT_VISTA_ESCENA) OutCortesArmar(); else gOutCortes.clear();
+    hoverFila = OutFilaDeY(my - y - borderGS - PosY - BarTopOffset());
     // el "scrollbar area" esta reservada: ahi no hay hover de renglon
     if (mouseOverScrollY || mouseOverScrollX) {
         hoverFila = -1;
@@ -1001,15 +1049,9 @@ static bool W3dFilaVisibleRec(Object* obj, int& fila, int prof, OutFila& out) {
 // (debajo del ultimo renglon) -> ahi el drop desemparenta a la raiz, como siempre.
 static bool W3dFilaEnArbol(int fila, OutFila& out) {
     if (!SceneCollection) return false;
-    const size_t sepTope = ConstructorTope();
     const std::vector<Object*>& tope = OutTope();
-    for (size_t c = 0; c < tope.size(); c++) {
+    for (size_t c = 0; c < tope.size(); c++)
         if (W3dFilaVisibleRec(tope[c], fila, 0, out)) return true;
-        if (c + 1 == sepTope) {
-            if (fila == 0) { out.obj = NULL; out.arm2d = NULL; out.sep = true; out.prof = 0; return true; }
-            fila--;
-        }
-    }
     return false;
 }
 
@@ -1048,14 +1090,9 @@ int OutlinerFilaDeObjeto(Object* o) { return W3dFilaDe(o); }   // (el harness: l
 static int W3dFilaDe(Object* objetivo) {
     if (!objetivo || !SceneCollection) return -1;
     int fila = 0;
-    const size_t sepTope = ConstructorTope();
     const std::vector<Object*>& tope = OutTope();
-    for (size_t c = 0; c < tope.size(); c++) {
-        if (W3dBuscarFila(tope[c], objetivo, &fila)) {
-            return fila;
-        }
-        if (c + 1 == sepTope) fila++;   // el separador
-    }
+    for (size_t c = 0; c < tope.size(); c++)
+        if (W3dBuscarFila(tope[c], objetivo, &fila)) return fila;
     return -1;
 }
 
@@ -1078,11 +1115,12 @@ void Outliner::CentrarSeleccion() {
     if (n == 0) return;                     // nada seleccionado a la vista: no hay que encuadrar
     int fila = (int)(suma / n);
     // geometria de las filas (la misma cuenta que Render/ClickSeleccionar):
-    //   y_local(fila) = borderGS + PosY + BarTopOffset() + fila * RenglonHeightGS
+    //   y_local(fila) = borderGS + PosY + BarTopOffset() + OutYDeFila(fila)
     // se pide y_local(fila) + RenglonHeightGS/2 == centro del area de contenido.
     int top = BarTopOffset();
     int centro = top + (height - top) / 2;
-    int nuevo = centro - (int)RenglonHeightGS / 2 - borderGS - top - fila * (int)RenglonHeightGS;
+    OutCortesArmar();
+    int nuevo = centro - (int)RenglonHeightGS / 2 - borderGS - top - OutYDeFila(fila);
     if (nuevo > 0) nuevo = 0;               // no scrollear "antes" del inicio
     if (nuevo < MaxPosY) nuevo = MaxPosY;   // ni mas alla del final (MaxPosY es <= 0)
     if (nuevo != PosY) { PosY = nuevo; g_redraw = true; }
@@ -1099,8 +1137,9 @@ void Outliner::AsegurarVisible() {
     if (fila < 0) return;                   // adentro de una rama plegada: no tiene fila
     const int top = BarTopOffset();
     const int alto = (int)RenglonHeightGS;
-    // y_local(fila) = borderGS + PosY + top + fila * alto   (la misma cuenta de Render)
-    const int yFila = borderGS + PosY + top + fila * alto;
+    // y_local(fila) = borderGS + PosY + top + OutYDeFila(fila)   (la misma cuenta de Render)
+    OutCortesArmar();
+    const int yFila = borderGS + PosY + top + OutYDeFila(fila);
     int nuevo = PosY;
     if (yFila < top)                  nuevo = PosY + (top - yFila);              // se fue por ARRIBA
     else if (yFila + alto > height)   nuevo = PosY - (yFila + alto - height);    // se fue por ABAJO
@@ -1116,14 +1155,15 @@ void Outliner::ActualizarDrop(int mx, int my) {
     if (!Contains(mx, my)) return;
     int rel = my - y - borderGS - PosY - BarTopOffset();
     if (rel < 0) return;
-    dropFila = rel / RenglonHeightGS;
-    int resto = rel % RenglonHeightGS;
+    OutCortesArmar();
+    int resto = 0;
+    dropFila = OutFilaDeY(rel, &resto);
     int f = dropFila;
     OutFila hitF;
     bool hay = W3dFilaEnArbol(f, hitF);
     // fila VIRTUAL del armature 2D: NO es destino de drop (no es un objeto; el
     // armature 2D no se puede re-emparentar desde el outliner)
-    if (hay && (hitF.arm2d || hitF.sep)) { dropZona = -2; return; }
+    if (hay && hitF.arm2d) { dropZona = -2; return; }
     Object* destino = hay ? hitF.obj : NULL;
     dropProf = hay ? hitF.prof : 0; // profundidad del destino: la linea se indenta ahi
     // VARIAS ESCENAS: una escena arrastrada va antes o despues de otra (solo sobre las filas de las escenas); un objeto no
@@ -1196,12 +1236,13 @@ void Outliner::SoltarDrag(int mx, int my) {
     if (!Contains(mx, my)) return;
     int rel = my - y - borderGS - PosY - BarTopOffset();
     if (rel < 0) return;
-    int fila = rel / RenglonHeightGS;
-    int resto = rel % RenglonHeightGS;
+    OutCortesArmar();
+    int resto = 0;
+    int fila = OutFilaDeY(rel, &resto);
     int f = fila;
     OutFila hitF;
     bool hay = W3dFilaEnArbol(f, hitF);
-    if (hay && (hitF.arm2d || hitF.sep)) return;   // fila VIRTUAL (armature 2D / separador): no acepta drops
+    if (hay && hitF.arm2d) return;   // fila VIRTUAL (armature 2D): no acepta drops
     Object* destino = hay ? hitF.obj : NULL;
     // una ESCENA: cambia su lugar en la lista de las abiertas (la prioridad del Play)
     if (OutEsRaiz(obj)) {
@@ -1381,7 +1422,8 @@ void Outliner::ClickSeleccionar(int mx, int my) {
     if (!SceneCollection) return;
     int rel = my - y - borderGS - PosY - BarTopOffset();
     if (rel < 0) return;   // franja del borde: la division de un negativo chico daba fila 0
-    int fila = rel / RenglonHeightGS;
+    OutCortesArmar();
+    int fila = OutFilaDeY(rel);
     int filaClick = fila; // (el walk de abajo consume "fila")
     // columnas de la derecha: CAMARA (renderizar) y OJO (a su izquierda), corridas
     // por la barra de scroll vertical si esta presente
@@ -1399,12 +1441,10 @@ void Outliner::ClickSeleccionar(int mx, int my) {
     // "Armature 2D" del panel Properties). El click se COME aca para que no caiga en la malla.
     {
         int fv = fila; OutFila hv;
-        if (W3dFilaEnArbol(fv, hv) && (hv.arm2d || hv.sep)) return;
+        if (W3dFilaEnArbol(fv, hv) && hv.arm2d) return;
     }
-    const size_t sepTopeClick = ConstructorTope();
     const std::vector<Object*>& tope = OutTope();
     for (size_t c = 0; c < tope.size(); c++) {
-        if (c == sepTopeClick && sepTopeClick > 0) fila--;   // (el separador corre la numeracion)
         int prof = 0;
         OutFila hf;
         Object* hit = W3dFilaVisibleRec(tope[c], fila, 0, hf) ? hf.obj : NULL;

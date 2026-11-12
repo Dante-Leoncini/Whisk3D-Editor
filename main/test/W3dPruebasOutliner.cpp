@@ -1414,6 +1414,7 @@ static bool CmdTexDormidas(std::istringstream& ss, std::string& err) {
 //  FASE 4b: LA BIBLIOTECA (el outliner como explorador del .w3d)
 // ============================================================================
 extern int OutlinerFilaDeObjeto(Object* o);   // Outliner.cpp: la fila visible de un objeto en la escena (-1)
+extern int OutlinerYDeFila(int fila);         // Outliner.cpp: su Y desde arriba del arbol (con los cortes del constructor)
 extern void PropsDestinosRecurso(Properties* p, int tipo, std::vector<int>& rects);   // Properties.cpp
 // el punto del NOMBRE de una fila de cualquiera de las dos vistas: por nombre (la escena: el del objeto)
 static bool PuntoDeNombre(Outliner* o, const std::string& n, int& mx, int& my, std::string& err, const char* cmd) {
@@ -1424,7 +1425,7 @@ static bool PuntoDeNombre(Outliner* o, const std::string& n, int& mx, int& my, s
         int prof = 0;
         for (Object* p = ob->Parent; p && p != SceneCollection; p = p->Parent) prof++;
         mx = o->x + marginGS + o->PosX + (prof + 2) * (IconSizeGS + gapGS) + LetterWidthGS;
-        my = o->y + borderGS + o->PosY + o->BarTopOffset() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
+        my = o->y + borderGS + o->PosY + o->BarTopOffset() + OutlinerYDeFila(fila) + (int)RenglonHeightGS / 2;
         return true;
     }
     std::vector<OutFilaRec> filas; o->FilasRecursos(filas);

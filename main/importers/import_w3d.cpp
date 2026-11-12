@@ -3611,6 +3611,8 @@ static void JsonObjeto(JVal* j, Object* parent, const std::string& base) {
     if (!h) return;
     Object* p = creado ? creado : parent;
     for (size_t i = 0; i < h->lista.size(); i++) JsonObjeto(h->lista[i], p, base);
+    // un proyecto de antes: la limpieza de la pantalla venia ADENTRO del constructor (corre una vez); va afuera
+    if (creado && creado->getType() == ObjectType::rutina) W3dConstructorSacarLimpiar(creado);
 }
 
 // CONFIG de la tarjeta Juego (bloque raiz "compilar", opcional): pisa los

@@ -1174,15 +1174,41 @@ void W3dRutinasPorDefecto(Object* raiz, const std::string& nombreConstructor, co
     W3dPaso col = W3dPasoNuevo(PasoColorLimpieza);   // (el color una vez; la limpieza, cada cuadro)
     for (int k = 0; k < 4; k++) col.n[k].v = fondo[k];
     c->listas[Rutina::ModoDefecto].push_back(col);
-    // la que LIMPIA va ADENTRO del constructor (siempre esta: es parte de preparar el cuadro). Corre despues de la lista
-    // del constructor (el "Clear color") y en cada cuadro, tambien en el modo solo-juego (Object::Render)
-    Rutina* l = new Rutina(c, nombreLimpiar);
+    // la que LIMPIA va AFUERA del constructor, justo DESPUES (antes de la coleccion): limpiar es de CADA cuadro, y lo
+    // de adentro del constructor corre UNA vez al empezar el juego (en el editor corre en cada cuadro solo porque la
+    // interfaz pisa su estado)
+    Rutina* l = new Rutina(raiz, nombreLimpiar);
     l->listas[Rutina::ModoDefecto].push_back(W3dPasoNuevo(PasoLimpiar));
-    // el constructor ARRIBA de todo: el orden del arbol es el de ejecucion
+    // el constructor ARRIBA de todo y la limpieza segunda: el orden del arbol es el de ejecucion
     std::vector<Object*>& h = raiz->Childrens;
-    for (size_t i = 0; i < h.size(); i++) if (h[i] == c) { h.erase(h.begin() + (long)i); i--; }
+    for (size_t i = 0; i < h.size(); i++) if (h[i] == c || h[i] == l) { h.erase(h.begin() + (long)i); i--; }
+    h.insert(h.begin(), (Object*)l);
     h.insert(h.begin(), (Object*)c);
     g_w3dConstructorGen++;
+}
+// los proyectos de antes traian la limpieza ADENTRO del constructor (corria en cada cuadro porque Object::Render
+// recorria los hijos de un constructor ya corrido): al abrirlos se SACA afuera, justo despues de el. Asi lo de adentro
+// del constructor es todo de una sola vez
+static bool RutinaLimpia(Rutina* r) {
+    for (int m = 0; m < Rutina::ModoN; m++)
+        for (size_t i = 0; i < r->listas[m].size(); i++)
+            if (r->listas[m][i].tipo == PasoLimpiar) return true;
+    return false;
+}
+void W3dConstructorSacarLimpiar(Object* c) {
+    if (!c || !c->Parent || c->getType() != ObjectType::rutina || !((Rutina*)c)->constructor) return;
+    std::vector<Object*>& afuera = c->Parent->Childrens;
+    size_t pos = 0;
+    while (pos < afuera.size() && afuera[pos] != c) pos++;
+    if (pos == afuera.size()) return;
+    std::vector<Object*>& h = c->Childrens;
+    for (size_t i = 0; i < h.size(); i++) {
+        Object* o = h[i];
+        if (!o || o->getType() != ObjectType::rutina || ((Rutina*)o)->constructor || !RutinaLimpia((Rutina*)o)) continue;
+        h.erase(h.begin() + (long)i); i--;
+        o->Parent = c->Parent;
+        afuera.insert(afuera.begin() + (long)(++pos), o);   // (en orden: la primera queda pegada al constructor)
+    }
 }
 
 void Rutina::Ejecutar(std::vector<W3dPaso>& L) {

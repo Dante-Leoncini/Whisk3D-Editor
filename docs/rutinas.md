@@ -17,17 +17,19 @@ menor CPU y la menor cantidad de llamadas posible: nada se hace si no está en l
 
 ## Constructor y rutina
 
-El outliner tiene dos partes separadas por una línea y un texto:
+El outliner tiene dos partes separadas por una línea negra de 3 píxeles:
 
 - **Arriba, el CONSTRUCTOR** (la rutina con la llave): prepara el estado. En el editor corre en cada cuadro (la
   interfaz de Whisk3D pisa el estado). En el **modo solo-juego** (VERDE+0 en el editor, o el juego compilado) corre
-  **una vez**; después el motor saca una FOTO del estado cacheado y en cada cuadro solo repone lo que algo cambió
+  **una vez**, con todo lo que tenga adentro (lo de adentro no se vuelve a recorrer); después el motor saca una FOTO del estado cacheado y en cada cuadro solo repone lo que algo cambió
   (el HUD 2D, por ejemplo): solo llama al driver por esas diferencias. Medido en una prueba: 29 → 23 llamadas por
   cuadro, la imagen idéntica y `glaudit` sin desincronizaciones. (En GLES2/web no hay foto: corre en cada cuadro.)
   Lo que el cache no lleva (parámetros de niebla, de las luces, el clear color) queda puesto si nadie lo toca; las
   luces 1..7 se prenden en la rutina de cada cuadro.
 - **Abajo, la RUTINA** de cada cuadro. Todo proyecto nuevo trae primero **Limpiar pantalla** ("Clear" de color y
-  profundidad); el color de limpieza ("Clear color", el fondo del tema) lo pone el constructor una vez.
+  profundidad), afuera del constructor y antes de la colección: limpiar es de cada cuadro. El color de limpieza
+  ("Clear color", el fondo del tema) lo pone el constructor una vez. Un proyecto de antes que traía la limpieza
+  adentro del constructor la saca afuera al abrirse.
 
 ### Limpiar la pantalla es del proyecto
 

@@ -5280,6 +5280,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         std::string q; ss >> q;
         if (q == "on") { for (int t = 0; t < PasoN; t++) { g_rutinaPerfilVeces[t] = 0; g_rutinaPerfilGL[t] = 0; } g_rutinaPerfil = true; return true; }
         if (q == "off") { g_rutinaPerfil = false; return true; }
+        // rutinaperfil es <paso> <veces> : ASSERTEA cuantas veces corrio ese tipo de paso desde el 'on'
+        if (q == "es") {
+            std::string pn; long v = -1; ss >> pn >> v;
+            const int t = W3dPasoDesdeNombre(pn);
+            if (t < 0) { err = "rutinaperfil es: paso desconocido '" + pn + "'"; return false; }
+            printf("      [rutinaperfil] %s veces=%ld\n", pn.c_str(), g_rutinaPerfilVeces[t]);
+            if (g_rutinaPerfilVeces[t] != v) { err = "rutinaperfil es: '" + pn + "' corrio " + std::to_string(g_rutinaPerfilVeces[t]) + " veces"; return false; }
+            return true;
+        }
         long tv = 0, tg = 0;
         for (int t = 0; t < PasoN; t++) {
             if (!g_rutinaPerfilVeces[t]) continue;
@@ -8350,6 +8359,43 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Object* o = SceneCollection ? FindObjectByName(SceneCollection, n) : NULL;
         if (!o) { err = "selobj: objeto no encontrado"; return false; }
         DeseleccionarTodo(); o->Seleccionar(); ObjActivo = o; return true;
+    }
+    // ---- hijos <padre|-> : <nombre> | <nombre> | ... : ASSERTEA los hijos de 'padre' (- = la raiz de la escena), en
+    //      orden (los nombres pueden tener espacios: "Limpiar pantalla") ----
+    if (cmd == "hijos") {
+        std::string pn, resto; ss >> pn; std::getline(ss, resto);
+        Object* p = (pn == "-") ? SceneCollection : (SceneCollection ? FindObjectByName(SceneCollection, pn) : NULL);
+        if (!p) { err = "hijos: no hay un objeto '" + pn + "'"; return false; }
+        const size_t dp = resto.find(':');
+        if (dp == std::string::npos) { err = "hijos: uso: hijos <padre|-> : a | b | c"; return false; }
+        std::vector<std::string> esp;
+        std::string t;
+        std::istringstream rs(resto.substr(dp + 1));
+        while (std::getline(rs, t, '|')) {
+            while (!t.empty() && (t[0] == ' ' || t[0] == '\t')) t.erase(0, 1);
+            while (!t.empty() && (t[t.size() - 1] == ' ' || t[t.size() - 1] == '\r')) t.erase(t.size() - 1);
+            if (!t.empty()) esp.push_back(t);
+        }
+        std::string hay;
+        for (size_t i = 0; i < p->Childrens.size(); i++) hay += (i ? " | " : "") + p->Childrens[i]->name;
+        printf("      [hijos] %s: %s\n", pn.c_str(), hay.c_str());
+        bool ok = esp.size() == p->Childrens.size();
+        for (size_t i = 0; ok && i < esp.size(); i++) ok = (p->Childrens[i]->name == esp[i]);
+        if (!ok) { err = "hijos: los de '" + pn + "' son: " + hay; return false; }
+        return true;
+    }
+    // ---- outcortes <fila>... | outcortes - : ASSERTEA donde van los CORTES constructor / cada cuadro del outliner
+    //      (las filas que llevan arriba la linea negra; '-' = ninguno) ----
+    if (cmd == "outcortes") {
+        extern void OutlinerCortes(std::vector<int>& out);
+        std::vector<int> c; OutlinerCortes(c);
+        std::vector<int> esp; std::string t;
+        while (ss >> t) if (t != "-") esp.push_back(atoi(t.c_str()));
+        std::string hay;
+        for (size_t i = 0; i < c.size(); i++) hay += (i ? " " : "") + std::to_string(c[i]);
+        printf("      [outcortes] %s\n", hay.empty() ? "-" : hay.c_str());
+        if (c != esp) { err = "outcortes: los cortes estan en: " + (hay.empty() ? std::string("-") : hay); return false; }
+        return true;
     }
     // ---- scene : lista los hijos top-level (nombre/tipo/hijos) ----
     if (cmd == "scene") {
