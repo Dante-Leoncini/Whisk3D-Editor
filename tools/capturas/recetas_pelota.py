@@ -295,6 +295,9 @@ def curvas(idioma):
     """Las filas X e Y Localizacion (lineas planas): X las borra. Vista > Curvas: el keyframe del 3 (la subida) Cubica +
     Al llegar; el del 16 (la caida) Cubica + Al arrancar. Play."""
     g = guion(idioma, "fin", vista=VISTA_SALTO)
+    # la Linea de tiempo mas ancha que en las otras capturas: con la barra de los suavizados a la vista (Cubica + los
+    # cuatro de Al arrancar / Al llegar) no entra en 0.7 de 1440 y 'Al llegar' queda afuera de la pantalla
+    g.linea("division 0.78")
     g.foto(dur=700)
     for comp in (0, 2):                            # X Localizacion; Y Localizacion (interno: Z)
         x, y = g.info().tl_fila(0, comp)

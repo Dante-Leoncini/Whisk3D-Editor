@@ -21,7 +21,7 @@ function actualizar(dt)
   local x1, y1 = stick("izq", 1)
   local x2, y2 = stick("izq", 2)
   if tecla("w") then y2 = -1 end
-  mover(jugador1, x1 * dt * 5, 0, y1 * dt * 5)
-  mover(jugador2, x2 * dt * 5, 0, y2 * dt * 5)
+  mover(jugador1, x1 * dt * 5, y1 * dt * 5, 0)
+  mover(jugador2, x2 * dt * 5, y2 * dt * 5, 0)
 end
 ```

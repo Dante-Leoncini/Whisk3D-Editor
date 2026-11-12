@@ -13,6 +13,15 @@
 #include "edit/Modifier.h"            // Modifier (modeje)
 #include "objects/Empty.h"            // el dibujo del Vacio (vaciodibujo)
 #include "animation/Animation.h"      // las curvas de los keyframes (keyinterp)
+#include "script/W3dScript.h"         // W3dScriptDatos / W3dScriptEntrada (scriptval: los valores de un script)
+#include "physics/W3dRigido.h"        // W3dRigidoDef (objfisica)
+#include "objects/Armature.h"         // tiraesqueleto / esqueletoclip
+#include "animation/SkeletalAnimation.h"   // W3dArmatureClipPorNombre (tiraesqueleto)
+// el centro del ojo de un script de la lista (Properties.cpp): capinfo y ojoscript
+class Properties;
+bool PropsOjoScriptCentro(Properties* p, int fila, int* cx, int* cy);
+class Button;
+Button* PropsAyudaEn(Properties* p, int mx, int my);   // el cartelito de ayuda de Propiedades (Properties.cpp)
 #include "WhiskUI/text/font.h"         // WhiskFont->Soporta (cobertura)
 #include "config/W3dLang.h"           // los idiomas (cobertura)
 #include "w3dFilesystem.h"            // leer res/idiomas (cobertura)
@@ -28,6 +37,8 @@
 #include "importers/import_obj.h"   // CargarTodasTexturasPendientes (texturas)
 #include "undo/Undo.h"               // UndoConAgregar / UndoModAgregar (agregar)
 #include "ViewPorts/Outliner.h"      // las filas (capinfo)
+#include "ViewPorts/PopUp/FileBrowser.h"   // el explorador de archivos (capinfo: sus archivos y botones)
+#include "ViewPorts/PopUp/GuardarComoPopup.h"   // guardarcomofijar: llenar el "Guardar como..." sin guardar
 #include "ViewPorts/Timeline.h"      // la linea de tiempo (tl, tlframes)
 #include "ViewPorts/Properties.h"    // las tarjetas y filas (capinfo)
 #include "ViewPorts/PopUp/NumPad.h"  // NumPadTeclaCentro (capinfo)
@@ -303,6 +314,15 @@ namespace {
                 }
                 yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
             }
+            // el OJO de cada script de la lista (tarjeta Control): donde tocar para prenderlo / apagarlo
+            if (ObjActivo && ObjActivo->scriptDatos) {
+                for (size_t f = 0; f < ObjActivo->scriptDatos->scripts.size(); f++) {
+                    int ox, oy;
+                    if (PropsOjoScriptCentro(P, (int)f, &ox, &oy))
+                        printf("@cap ojoscript fila=%d x=%d y=%d apagado=%d\n", (int)f, ox, oy,
+                               ObjActivo->scriptDatos->scripts[f].apagado ? 1 : 0);
+                }
+            }
         }
     }
 
@@ -452,6 +472,63 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
             gClicks = 1;
         } else { err = "raton: uso: raton down|move|up|doble <x> <y> [izq|medio|der]"; return false; }
         gRatonX = x; gRatonY = y;
+        return true;
+    }
+    // 'ojoscript <fila>': un click de verdad en el OJO de ese script (la lista de la tarjeta Control, en Propiedades)
+    // 'scriptapagado <fila> 0|1': el script de esa fila del objeto activo esta apagado (1) o prendido (0)
+    // 'guardarcomofijar <nombre> <interno 0|1>': llena el "Guardar como..." abierto (el nombre y la casilla "Dentro del
+    // .w3d") SIN guardar: para la captura del formulario (guardarcomo, en W3dScript.cpp, lo llena y guarda)
+    if (cmd == "guardarcomofijar") {
+        std::string nombre; int interno = -1; ss >> nombre >> interno;
+        if (!GuardarComoAbierto()) { err = "guardarcomofijar: el formulario no esta abierto"; return false; }
+        GuardarComoFijar(nombre, interno, std::string(), std::string());
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'scriptanadir': el boton Aniadir de la tarjeta Control (objeto activo): abre su menu (los scripts del proyecto y
+    // "Cargar .lua..."); despues se elige con menuelegir <nombre>
+    if (cmd == "scriptanadir") {
+        if (!ObjActivo) { err = "scriptanadir: no hay objeto activo"; return false; }
+        extern void _ScriptAgregarFwd(); _ScriptAgregarFwd();
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    if (cmd == "ojoscript" || cmd == "scriptapagado") {
+        int fila = -1, esperado = -1; ss >> fila >> esperado;
+        if (!ObjActivo || !ObjActivo->scriptDatos || fila < 0 || fila >= (int)ObjActivo->scriptDatos->scripts.size()) {
+            err = cmd + ": el objeto activo no tiene el script " + std::to_string(fila); return false;
+        }
+        if (cmd == "scriptapagado") {
+            const int ap = ObjActivo->scriptDatos->scripts[fila].apagado ? 1 : 0;
+            printf("      [scriptapagado] fila %d: %s\n", fila, ap ? "APAGADO" : "prendido");
+            if (esperado >= 0 && ap != esperado) { err = "scriptapagado: se esperaba " + std::to_string(esperado); return false; }
+            return true;
+        }
+        Properties* P = NULL;
+        struct VK { static ViewportBase* Buscar(ViewportBase* n) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == 3 ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA); if (a) return a; return Buscar(((ViewportColumn*)n)->childB); } };
+        P = (Properties*)VK::Buscar(rootViewport);
+        int x = 0, y = 0;
+        if (!P || !PropsOjoScriptCentro(P, fila, &x, &y)) { err = "ojoscript: no se ve el ojo de la fila " + std::to_string(fila); return false; }
+        Movio(0, gRatonBotones, x, y, gRatonX, gRatonY);
+        gRatonBotones |= SDL_BUTTON(1); Boton(0, 1, true, x, y);
+        gRatonBotones &= ~SDL_BUTTON(1); Boton(0, 1, false, x, y);
+        gRatonX = x; gRatonY = y;
+        return true;
+    }
+    // 'ayuda [texto en ingles]': el cartelito de ayuda (Button::ayuda, el que muestra W3dAyudaRender despues de un
+    // momento quieto) de lo que esta bajo el mouse en Propiedades; con texto, falla si no es ese. (El cartelito en si no
+    // sale en las capturas: el harness no dibuja la capa de los avisos)
+    if (cmd == "ayuda") {
+        std::string esperado; std::getline(ss, esperado);
+        const size_t p0 = esperado.find_first_not_of(" \t"); esperado = (p0 == std::string::npos) ? "" : esperado.substr(p0);
+        struct VK { static ViewportBase* Buscar(ViewportBase* n) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == 3 ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA); if (a) return a; return Buscar(((ViewportColumn*)n)->childB); } };
+        Properties* P = (Properties*)VK::Buscar(rootViewport);
+        Button* b = P ? PropsAyudaEn(P, gRatonX, gRatonY) : NULL;
+        const std::string hay = b ? b->ayuda : std::string();
+        printf("      [ayuda] (%d, %d): '%s'\n", gRatonX, gRatonY, hay.c_str());
+        if (!esperado.empty() && hay != esperado) { err = "ayuda: se esperaba '" + esperado + "'"; return false; }
         return true;
     }
     if (cmd == "dedo") {
@@ -906,6 +983,25 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         printf("@cap pantalla w=%d h=%d\n", MenuPantallaW, MenuPantallaH);
         InfoHojas(rootViewport);
         InfoMenu(MenuAbierto, 0);
+        // la VENTANA EMERGENTE abierta (un "Guardar como...", el explorador...): su rectangulo (para recortar una captura)
+        if (PopUpActive && PopUpActive->popUpWindow)
+            printf("@cap popup x=%d y=%d w=%d h=%d nombre=%s\n", PopUpActive->x, PopUpActive->y, (int)PopUpActive->popUpWindow->width,
+                   (int)PopUpActive->popUpWindow->height, PopUpActive->name.c_str());
+        // el EXPLORADOR DE ARCHIVOS, si esta abierto: cada archivo / carpeta de la grilla (su rectangulo en la pantalla y
+        // su nombre) y los botones de abajo (la accion, como "Abrir", y Cancelar)
+        if (FileBrowser* fb = dynamic_cast<FileBrowser*>(PopUpActive)) {
+            printf("@cap explorador ruta=%s\n", fb->currentPath.c_str());
+            const int cols = fb->cols > 0 ? fb->cols : 1;
+            for (size_t k = 0; k < fb->entries.size(); k++) {
+                const int ex = fb->fileX + (int)(k % cols) * fb->cellW, ey = fb->fileY + (int)(k / cols) * fb->cellH;
+                printf("@cap archivo i=%d x=%d y=%d w=%d h=%d sel=%d nombre=%s\n", (int)k, ex, ey, fb->cellW, fb->cellH,
+                       fb->selected == (int)k ? 1 : 0, fb->entries[k].name.c_str());
+            }
+            Button* bs[2] = { fb->btnAction, fb->btnCancel };
+            for (int k = 0; k < 2; k++)
+                if (bs[k]) printf("@cap exploradorboton x=%d y=%d w=%d h=%d texto=%s\n", bs[k]->sx, bs[k]->sy, bs[k]->width,
+                                  bs[k]->height, bs[k]->text.c_str());
+        }
         // el TECLADO NUMERICO tactil, si esta abierto: el centro de cada tecla
         {
             static const char* kTec[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "*", "/", "+", "-", "(", ")", "DEL", "<", ">", "X", "OK" };
@@ -1228,6 +1324,50 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
     // 'keyinterp <lineal|bezier|in|out|inout> [frame] [loc|rot|esc]': la CURVA de los keyframes del objeto activo (Key >
     // Interpolacion / Easing): lineal (robotico), bezier, o cubica que acelera al arrancar (in), frena al llegar (out) o
     // las dos (inout). Con un cuadro, solo el tramo que SALE de ese cuadro; con loc/rot/esc, solo esas curvas
+    // 'scriptval "<objeto>" <tarjeta> <prop> <valor>': lo MISMO que el panel de Propiedades al cambiar un valor de un
+    // script (ScriptValGuardar): lo guarda en el objeto y, con el juego andando, se lo avisa a la sim (SimReresolver)
+    // para que el script lo vea en ese momento, como el inspector de Unity
+    if (cmd == "scriptval") {
+        std::string resto; std::getline(ss, resto);
+        size_t a = resto.find('"'), b2 = (a == std::string::npos) ? a : resto.find('"', a + 1);
+        if (b2 == std::string::npos) { err = "scriptval: el objeto va entre comillas"; return false; }
+        const std::string nom = resto.substr(a + 1, b2 - a - 1);
+        std::istringstream r2(resto.substr(b2 + 1));
+        int card = 0; std::string prop, valor; r2 >> card >> prop >> valor;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nom) : NULL;
+        if (!o || !o->scriptDatos || card < 0 || card >= (int)o->scriptDatos->scripts.size()) {
+            err = "scriptval: '" + nom + "' no tiene la tarjeta de script " + std::to_string(card); return false;
+        }
+        W3dScriptEntrada& e = o->scriptDatos->scripts[card];
+        bool hay = false;
+        for (size_t i = 0; i < e.refs.size(); i++) if (e.refs[i].first == prop) { e.refs[i].second = valor; hay = true; }
+        if (!hay) e.refs.push_back(std::make_pair(prop, valor));
+        extern bool SimActiva(); extern void SimReresolver(Object*);
+        if (SimActiva()) SimReresolver(o);
+        printf("      [scriptval] '%s' %s = %s%s\n", nom.c_str(), prop.c_str(), valor.c_str(), SimActiva() ? " (en vivo)" : "");
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'scriptref "<objeto>" <tarjeta> <prop> [esperado]': el valor guardado de una propiedad de ese script (lo del
+    // inspector); '-' = no tiene valor propio (usa el de fabrica). Con 'esperado', falla si no es ese
+    if (cmd == "scriptref") {
+        std::string resto; std::getline(ss, resto);
+        size_t a = resto.find('"'), b2 = (a == std::string::npos) ? a : resto.find('"', a + 1);
+        if (b2 == std::string::npos) { err = "scriptref: el objeto va entre comillas"; return false; }
+        const std::string nom = resto.substr(a + 1, b2 - a - 1);
+        std::istringstream r2(resto.substr(b2 + 1));
+        int card = 0; std::string prop, esperado; r2 >> card >> prop >> esperado;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nom) : NULL;
+        if (!o || !o->scriptDatos || card < 0 || card >= (int)o->scriptDatos->scripts.size()) {
+            err = "scriptref: '" + nom + "' no tiene la tarjeta de script " + std::to_string(card); return false;
+        }
+        std::string hay = "-";
+        const W3dScriptEntrada& e = o->scriptDatos->scripts[card];
+        for (size_t i = 0; i < e.refs.size(); i++) if (e.refs[i].first == prop) hay = e.refs[i].second;
+        printf("      [scriptref] '%s' [%d] %s = %s\n", nom.c_str(), card, prop.c_str(), hay.c_str());
+        if (!esperado.empty() && hay != esperado) { err = "scriptref: se esperaba " + esperado; return false; }
+        return true;
+    }
     if (cmd == "keyinterp") {
         std::string q, qp; int fsolo = -1; ss >> q; if (!(ss >> fsolo)) fsolo = -1; ss >> qp;
         const int psolo = (qp == "loc") ? AnimPosition : (qp == "rot") ? AnimRotation : (qp == "esc") ? AnimScale : -1;
@@ -1339,6 +1479,121 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         }
         extern int StartFrame, EndFrame;
         printf("      [keyver] rango %d a %d\n", StartFrame, EndFrame);
+        return true;
+    }
+    // 'objkeys <objeto> [n]': cuantos keyframes de ESCENA tiene el objeto (de la raiz activa) sumando TODAS sus
+    // animaciones de escena (la activa vive en AnimationObjects; las otras, en su lista). Con n, falla si no son esos.
+    // ("Convert to Game": la copia del juego no tiene ninguno y la escena conserva los suyos)
+    if (cmd == "objkeys") {
+        std::string nm; int esperado = -1; ss >> nm >> esperado;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o) { err = "objkeys: no hay un objeto '" + nm + "'"; return false; }
+        struct K { static int De(const std::vector<AnimationObject>& v, Object* o) {
+            int n = 0;
+            for (size_t a = 0; a < v.size(); a++)
+                if (v[a].obj == o)
+                    for (size_t k = 0; k < v[a].Propertys.size(); k++) n += (int)v[a].Propertys[k].keyframes.size();
+            return n;
+        } };
+        int n = K::De(AnimationObjects, o);
+        for (size_t e = 0; e < SceneAnimations.size(); e++)
+            if ((int)e != SceneAnimActiva && SceneAnimations[e]) n += K::De(SceneAnimations[e]->objetos, o);
+        printf("      [objkeys] %s: %d keyframe(s) de escena (%d animacion(es) de escena)\n", nm.c_str(), n,
+               (int)SceneAnimations.size());
+        if (esperado >= 0 && n != esperado) {
+            err = "objkeys: " + nm + " tiene " + std::to_string(n) + " keyframe(s), se esperaban " + std::to_string(esperado);
+            return false;
+        }
+        return true;
+    }
+    // 'objscript <objeto> <fila> [ruta R] [apagado 0|1] [ref P V]...': el script de esa fila de un objeto de la raiz
+    // activa: su .lua, su ojo y sus valores (los asserta)
+    if (cmd == "objscript") {
+        std::string nm; int fila = -1; ss >> nm >> fila;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o || !o->scriptDatos || fila < 0 || fila >= (int)o->scriptDatos->scripts.size()) {
+            err = "objscript: '" + nm + "' no tiene el script " + std::to_string(fila); return false;
+        }
+        const W3dScriptEntrada& e = o->scriptDatos->scripts[(size_t)fila];
+        printf("      [objscript] %s #%d: %s%s, %d valor(es)\n", nm.c_str(), fila, e.ruta.c_str(), e.apagado ? " (APAGADO)" : "",
+               (int)e.refs.size());
+        std::string k;
+        while (ss >> k) {
+            if (k == "ruta") {
+                std::string r; ss >> r;
+                if (e.ruta != r) { err = "objscript: el script es '" + e.ruta + "', se esperaba '" + r + "'"; return false; }
+            } else if (k == "apagado") {
+                int a = -1; ss >> a;
+                if ((e.apagado ? 1 : 0) != a) { err = std::string("objscript: el script esta ") + (e.apagado ? "apagado" : "prendido"); return false; }
+            } else if (k == "ref") {
+                std::string p, v; ss >> p >> v;
+                bool hay = false;
+                for (size_t r = 0; r < e.refs.size(); r++)
+                    if (e.refs[r].first == p) {
+                        hay = true;
+                        if (e.refs[r].second != v) { err = "objscript: " + p + " = '" + e.refs[r].second + "', se esperaba '" + v + "'"; return false; }
+                    }
+                if (!hay) { err = "objscript: el script no tiene el valor '" + p + "'"; return false; }
+            } else { err = "objscript: no entiendo '" + k + "'"; return false; }
+        }
+        return true;
+    }
+    // 'objfisica <objeto> poner <estatico|dinamico|personaje|malla> <masa>': le pone un cuerpo rigido (lo de la tarjeta
+    // Fisica); 'objfisica <objeto> <tipo|-> [masa M]': asserta el que tiene ('-' = ninguno)
+    if (cmd == "objfisica") {
+        static const char* kTipos[4] = { "estatico", "dinamico", "personaje", "malla" };
+        std::string nm, t; ss >> nm >> t;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o) { err = "objfisica: no hay un objeto '" + nm + "'"; return false; }
+        if (t == "poner") {
+            std::string q; float masa = 1.0f; ss >> q >> masa;
+            int tipo = -1;
+            for (int i = 0; i < 4; i++) if (q == kTipos[i]) tipo = i;
+            if (tipo < 0) { err = "objfisica: uso: objfisica <objeto> poner estatico|dinamico|personaje|malla <masa>"; return false; }
+            if (!o->fisica) o->fisica = new W3dRigidoDef();
+            o->fisica->tipo = tipo; o->fisica->masa = masa;
+            return true;
+        }
+        const std::string hay = o->fisica ? std::string(kTipos[o->fisica->tipo & 3]) : std::string("-");
+        printf("      [objfisica] %s: %s", nm.c_str(), hay.c_str());
+        if (o->fisica) printf(" masa %.3f", o->fisica->masa);
+        printf("\n");
+        if (hay != t) { err = "objfisica: " + nm + " tiene '" + hay + "', se esperaba '" + t + "'"; return false; }
+        std::string k;
+        while (ss >> k) {
+            float m = 0.0f; ss >> m;
+            if (k == "masa" && o->fisica && fabsf(o->fisica->masa - m) > 1e-4f) { err = "objfisica: otra masa"; return false; }
+        }
+        return true;
+    }
+    // 'tiraesqueleto <armature> <clip> <frame>': una TIRA de esqueleto en la animacion de escena activa (el armature toca
+    // ese clip desde ese frame de la escena: una cinematica)
+    // 'esqueletoclip <armature> <clip|-> [cabezal F]': el clip ACTIVO del armature (el que reproduce en "Juego") y su
+    // cabezal de juego (juegoFrame: frames desde el inicio del clip)
+    if (cmd == "tiraesqueleto" || cmd == "esqueletoclip") {
+        std::string nm, clip; ss >> nm >> clip;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o || o->getType() != ObjectType::armature) { err = cmd + ": no hay un armature '" + nm + "'"; return false; }
+        Armature* a = (Armature*)o;
+        if (cmd == "tiraesqueleto") {
+            int f = 1; ss >> f;
+            InitSceneAnimations();
+            if (SceneAnimActiva < 0 || SceneAnimActiva >= (int)SceneAnimations.size() || W3dArmatureClipPorNombre(a, clip) < 0) {
+                err = "tiraesqueleto: '" + nm + "' no tiene el clip '" + clip + "'"; return false;
+            }
+            SceneAnimation::PistaEsqueleto p; p.armature = a->name; p.clip = clip; p.frame = f;
+            SceneAnimations[(size_t)SceneAnimActiva]->esqueletos.push_back(p);
+            return true;
+        }
+        const std::string hay = (a->animActiva >= 0 && a->animActiva < (int)a->animations.size() && a->animations[(size_t)a->animActiva])
+                                    ? a->animations[(size_t)a->animActiva]->name : std::string("-");
+        printf("      [esqueletoclip] %s: clip %s cabezal %.3f\n", nm.c_str(), hay.c_str(), a->juegoFrame);
+        if (hay != clip) { err = "esqueletoclip: el clip activo de " + nm + " es '" + hay + "', se esperaba '" + clip + "'"; return false; }
+        std::string k; float v = 0.0f;
+        if (ss >> k >> v && k == "cabezal" && fabsf(a->juegoFrame - v) > 1e-3f) {
+            err = "esqueletoclip: el cabezal de " + nm + " es " + std::to_string(a->juegoFrame) + ", se esperaba " + std::to_string(v);
+            return false;
+        }
         return true;
     }
     // 'tlframes <f1> <f2> ...': la Linea de tiempo tiene keyframes EXACTAMENTE en esos cuadros

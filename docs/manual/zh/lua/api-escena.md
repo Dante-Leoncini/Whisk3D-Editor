@@ -3,6 +3,7 @@
 | 函数 | 作用 |
 |---|---|
 | `buscar(nombre [, raiz]) → obj \| nil` | 按名称在 Outliner 中查找对象（或只在 `raiz` 内部查找）。 |
+| `seleccionados() → { obj, … }` | 编辑器中所选的对象（用于作为编辑器插件使用的[按钮](scripts-y-objetos.md#按钮)）。 |
 | `nombre(obj) → texto` | 对象的名称。 |
 | `tipo(obj) → texto` | 它是什么：`"mesh"`、`"luz"`、`"camara"`、`"vacio"`、`"esqueleto"`、`"texto"`、`"imagen"`、`"boton"`、`"hitbox"`、`"prefab"`、`"rutina"`……（不存在时返回 `""`）。 |
 | `instanciar(prefab [, x, y, z [, rotY [, padre]]]) → obj \| nil` | 在该位置创建预制体的一个副本（rotY 以度为单位）。`"Libreria/Escena"` 会创建已链接库中那个预制体的副本。传入 `padre` 时，副本会挂在该对象下（位置和旋转都相对于它）。 |

@@ -154,6 +154,7 @@ static void EscribirScript(FILE* f, int ind, Object* o, const std::string& base)
         W3dScriptEntrada& ent = o->scriptDatos->scripts[e];   // NO const: ver RutaParaGuardar
         Sangria(f, ind + 1); fputs("{ \"ruta\": ", f);
         JsonEscapar(f, RutaParaGuardar(ent.ruta, base));
+        if (ent.apagado) fputs(", \"apagado\": true", f);   // el ojo de la lista de scripts
         fputs(", \"refs\": {", f);
         for (size_t i = 0; i < ent.refs.size(); i++) {
             fprintf(f, "%s ", i ? "," : "");
@@ -476,6 +477,7 @@ static void LeerScript(JVal* j, Object* o, const std::string& base) {
             W3dScriptEntrada ent;
             ent.ruta = RutaAlCargar(JS(je, "ruta", ""), base);
             if (ent.ruta.empty()) continue;
+            ent.apagado = JB(je, "apagado", false);
             std::map<std::string, JVal*>::iterator jr = je->obj.find("refs");
             if (jr != je->obj.end()) LeerRefsDe(jr->second, &ent);
             if (!o->scriptDatos) o->scriptDatos = new W3dScriptDatos();

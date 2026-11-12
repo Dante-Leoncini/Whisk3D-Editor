@@ -10,8 +10,10 @@
 #           Render Image del cuadro actual).
 #           Sus animaciones de escena son CLIPS (los dispara Lua): se editan eligiendolos en
 #           el timeline y al volver a "Juego" todo vuelve a su frame 1.
-#  Se prueba tambien: "New Game" en el selector de la barra, "Convert to Game/Scene" con
-#  undo, el "+" desplegable del outliner (UN boton con New Scene / New Game / New Prefab), la
+#  Se prueba tambien: "New Game" en el selector de la barra, el cambio de TIPO en el lugar
+#  (raiztipo: lo que hace "Convert to Scene"; "Convert to Game" DUPLICA la escena como un juego
+#  nuevo, ver prueba_escena_a_juego.w3s) con undo, el "+" desplegable del outliner (UN boton con
+#  New Scene / New Game / New Prefab), la
 #  vista Scenes con los dos tipos, los ICONOS (escena = la camara, juego = el control de
 #  juego: los que ya existian), el tipo DEDUCIDO de un proyecto de una sola raiz (tiene
 #  scripts = juego) y que los tipos sobreviven a guardar/abrir.
@@ -74,7 +76,7 @@ raizboton juego
 raizinfo n 3 activa Game.001 tipo juego juegos 2
 raizabrir Game
 
-# ---- convertir: la escena de arranque pasa a ser un juego (y vuelve, con undo) ----
+# ---- el TIPO en el lugar (raiztipo): la escena de arranque pasa a ser un juego (y vuelve, con undo) ----
 raizabrir Scene
 raiztipo juego
 raizinfo tipo juego juegos 3 escenas 0
@@ -123,10 +125,14 @@ raizabrir Scene
 guardarw3d /tmp/w3d_f6_juego_2.w3d
 w3diguales /tmp/w3d_f6_juego.w3d /tmp/w3d_f6_juego_2.w3d
 
-# ---- un proyecto de UNA raiz: su tipo sale de su contenido (proyecto viejo) ----
+# ---- un proyecto de UNA raiz: una ESCENA sigue siendo escena aunque le pongas un script (2026-11-11: una escena puede
+#      tener scripts). Un JUEGO con scripts no escribe el registro (es el tipo que se deduce de su contenido): asi son los
+#      proyectos viejos, y al abrirlos su tipo sale de lo que tienen ----
 escenadefecto
 raizinfo n 1 tipo escena
 raizscript Cubo prueba_escenas_juego.lua
+raizinfo tipo escena
+raiztipo juego
 raizinfo tipo juego
 guardarw3d /tmp/w3d_f6_juego_viejo.w3d
 entradatiene /tmp/w3d_f6_juego_viejo.w3d proyecto.json escenas3d 0

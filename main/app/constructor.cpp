@@ -32,6 +32,8 @@ void W3dCrearEscenaPorDefecto() {
 
     NewMesh(MeshType::cube, CollectionActive);
     if (W3dMallaNacioHook) W3dMallaNacioHook();   // el cubo ya es el recurso "Cubo" de la biblioteca
+    // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (ver W3dRaicesFijarTiposDeducidos)
+    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
 }
 
 void ConstructUniversal(int argc, char* argv[]) {

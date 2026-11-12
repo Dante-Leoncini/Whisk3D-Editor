@@ -5,7 +5,7 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_escenas_cine.w3s
 #
-#  "Scene" (JUEGO: el bloque, deducido por tener scripts) pide la ESCENA "Intro" a los 3
+#  "Scene" (JUEGO: el bloque; desde 2026-11-11 una escena con scripts sigue siendo escena, se la declara juego) pide la ESCENA "Intro" a los 3
 #  ticks. Intro es una escena explicita (aunque tenga un script): al entrar arranca su
 #  animacion "Cine" (CuboIntro va de x=0 en el frame 1 a x=10 en el 11); su script solo
 #  la mira con animEscenaActual() y al llegar al ultimo frame pide el JUEGO "Nivel2".
@@ -18,6 +18,7 @@ escenadefecto
 add cube
 objname DirA
 raizscript DirA prueba_escenas_cine_a.lua
+raiztipo juego
 raizinfo n 1 tipo juego
 
 # ---- la cinematica: una ESCENA con su animacion (la activa) y un script que la sigue ----

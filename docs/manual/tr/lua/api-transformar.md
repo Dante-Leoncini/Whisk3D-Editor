@@ -6,9 +6,11 @@
 | `setPosicion(obj, x, y, z)` | Onu tam bir konuma yerleştirir (fiziği yok sayar). |
 | `mover(obj, dx, dy, dz)` | Onu bulunduğu yerden kaydırır (`dt` ile kullan). |
 | `rotacion(obj) → x, y, z` | Derece cinsinden dönüşü. |
-| `setRotacion(obj, x, y, z [, orden])` | Tam dönüş; `orden` örneğin `"YXZ"` olur (varsayılan `"XYZ"`). |
+| `setRotacion(obj, x, y, z [, orden])` | Tam dönüş, Dönüştür kartındakiyle aynı. `orden` ile eksenlerin hangi sırayla uygulanacağı seçilir, örneğin `"ZXY"` (önce dikey eksen etrafındaki yön, bir araçtaki gibi). |
+| `rotacionX(obj)`, `rotacionY(obj)`, `rotacionZ(obj) → derece` | Tek bir eksenin dönüşü. `rotacionZ`, dikey eksen etrafındaki dönüştür. |
+| `setRotacionX(obj, g)`, `setRotacionY(obj, g)`, `setRotacionZ(obj, g)` | Yalnızca bir ekseni değiştirir; diğer ikisi aynı kalır. Örneğin `setRotacionZ(obj, rotacionZ(obj) + 90 * dt)` onu dikey eksen etrafında döndürür. |
 | `girar(obj, dx, dy, dz)` | Onu kendi eksenleri etrafında döndürür. |
-| `girarHacia(obj, dx, dz [, factor])` | Onu zemindeki bir yöne doğru yumuşakça döndürür. |
+| `girarHacia(obj, dx, dy [, factor])` | Onu zemindeki bir yöne (X ve Y) doğru yumuşakça döndürür. |
 | `mirarA(obj, x, y, z)` | Onu bir noktaya doğru yöneltir (bir kameranın önü). |
 | `escala(obj) → sx, sy, sz` | Ölçeği. |
 | `setEscala(obj, s [, sy, sz])` | Tam ölçek; tek bir sayıyla eşit oranda ölçekler. |

@@ -1,0 +1,12 @@
+// ==========================================================================
+//  PRUEBA de rotacionX/Y/Z y setRotacionX/Y/Z (un eje solo). La usa prueba_rotacion_eje.w3s
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        Mesh {
+            name: "Caja"
+            script: "rotacion_eje.lua"
+        }
+    }
+}

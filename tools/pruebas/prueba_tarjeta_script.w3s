@@ -1,0 +1,21 @@
+# La tarjeta de cada script en Propiedades ya no tiene la fila "Quitar script" (2026-11-11): se quita con Quitar en la
+# tarjeta Control. Esa fila era la ULTIMA, y el click en la ultima fila quitaba el script; ahora la ultima es una
+# propiedad. Esta prueba toca la ultima fila (el desplegable "dificultad" de tarjeta_componente.lua) y controla que se
+# abra el desplegable y que el script SIGA en el objeto (corre y escribe su compartido). Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_tarjeta_script.w3s
+ventana 1280 720
+escala 1
+abrirw3d prueba_tarjeta_script.w3d
+timeline pause
+selobj Caja
+tick 2
+propstab 8
+tick 1
+propclic dificultad
+menuabierto si
+tecla Escape
+tick 1
+simplay 3
+scriptinfo compartido dificultad facil
+simstop

@@ -839,8 +839,11 @@ static int LRelojMs(lua_State* L) {
 // lineaCrear(nombre, {{x, y, z}, ...}) -> id: copia los puntos (la linea es CERRADA: despues del ultimo vuelve al
 // primero). El mismo nombre reusa su lugar (abrir el proyecto otra vez no acumula copias).
 // lineaPunto(id, s) -> x, y, z, rumbo, largo, cabeceo: s en tramos (s = 3.25: un cuarto entre el punto 4 y el 5,
-// base 1 como la tabla), la curva de Catmull-Rom por los 4 puntos de alrededor. rumbo en grados (adelante = (-sin,
-// -cos) en x/z, la convencion del motor), largo = el largo horizontal del tramo, cabeceo = su pendiente en grados
+// base 1 como la tabla), la curva de Catmull-Rom por los 4 puntos de alrededor. rumbo en grados alrededor de la
+// vertical (adelante = (-sin, -cos) en el plano horizontal: x/y de lua, x/z del motor), largo = el largo horizontal
+// del tramo, cabeceo = su pendiente en grados.
+// EJES: los puntos van y vienen en los de LUA (Z arriba); se guardan en los del MOTOR (W3dLuaEjes al entrar) y las
+// cuentas de abajo (rumbo/largo en x/z, pendiente en y) son las de siempre; el punto sale convertido otra vez.
 static std::vector<std::vector<double> > gLineas;
 static std::map<std::string, int> gLineaDe;
 static int LLineaCrear(lua_State* L) {
@@ -855,6 +858,7 @@ static int LLineaCrear(lua_State* L) {
             v[(size_t)i * 3 + c] = lua_tonumber(L, -1);
             lua_pop(L, 1);
         }
+        W3dLuaEjes(v[(size_t)i * 3 + 1], v[(size_t)i * 3 + 2]);   // lua (x,y,z) -> motor (x,z,y)
         lua_pop(L, 1);
     }
     std::map<std::string, int>::iterator it = gLineaDe.find(nombre);
@@ -885,13 +889,14 @@ static int LLineaPunto(lua_State* L) {
     const double c1 = 2 * p01 - 5 * a1 + 4 * b1 - p31, d1 = 3 * a1 - p01 - 3 * b1 + p31;
     const double c3 = 2 * p03 - 5 * a3 + 4 * b3 - p33, d3 = 3 * a3 - p03 - 3 * b3 + p33;
     const double px = 0.5 * (2 * a1 + (b1 - p01) * f + c1 * f2 + d1 * f3);
-    const double py = 0.5 * (2 * a2 + (b2 - p02) * f + (2 * p02 - 5 * a2 + 4 * b2 - p32) * f2 + (3 * a2 - p02 - 3 * b2 + p32) * f3);
-    const double pz = 0.5 * (2 * a3 + (b3 - p03) * f + c3 * f2 + d3 * f3);
+    double py = 0.5 * (2 * a2 + (b2 - p02) * f + (2 * p02 - 5 * a2 + 4 * b2 - p32) * f2 + (3 * a2 - p02 - 3 * b2 + p32) * f3);
+    double pz = 0.5 * (2 * a3 + (b3 - p03) * f + c3 * f2 + d3 * f3);
     double tx = 0.5 * ((b1 - p01) + 2 * c1 * f + 3 * d1 * f2);
     double tz = 0.5 * ((b3 - p03) + 2 * c3 * f + 3 * d3 * f2);
     if (tx * tx + tz * tz < 1e-8) { tx = b1 - a1; tz = b3 - a3; }
     const double gr = 180.0 / 3.141592653589793238462643383279502884;
     const double largo = sqrt((b1 - a1) * (b1 - a1) + (b3 - a3) * (b3 - a3));
+    W3dLuaEjes(py, pz);   // el punto, de vuelta en los ejes de lua
     lua_pushnumber(L, px); lua_pushnumber(L, py); lua_pushnumber(L, pz);
     lua_pushnumber(L, atan2(-tx, -tz) * gr);
     lua_pushnumber(L, largo);
@@ -1362,13 +1367,16 @@ static int LDentro(lua_State* L) {
     return 1;
 }
 // escala() -> factor responsive = min(anchoPantalla, altoPantalla) / 480.
-// escala(objeto) -> sx, sy, sz: la escala del OBJETO (el mismo bind del Core, script/W3dScript.cpp).
+// escala(objeto) -> sx, sy, sz: la escala del OBJETO (el mismo bind del Core, script/W3dScript.cpp), en los ejes de
+// LUA (Z arriba): sy es la scale.z del motor y sz la scale.y (W3dLuaEjes), igual que el del Core.
 // Las dos formas conviven en un solo nombre porque este registro corre DESPUES del Core y lo pisa:
 // si viene un objeto se responde la escala del objeto, si no el factor de pantalla de siempre.
 static int LEscala(lua_State* L) {
     Object* o = W3dScriptParamObjeto(L, 1);
     if (o) {
-        lua_pushnumber(L, o->scale.x); lua_pushnumber(L, o->scale.y); lua_pushnumber(L, o->scale.z);
+        float sy = o->scale.y, sz = o->scale.z;
+        W3dLuaEjes(sy, sz);
+        lua_pushnumber(L, o->scale.x); lua_pushnumber(L, sy); lua_pushnumber(L, sz);
         return 3;
     }
     float w, h; TamLienzo(&w, &h);
@@ -1432,7 +1440,8 @@ static int LCajaUI(lua_State* L) {
 // OJO: con camara ORTOGRAFICA proyecta con la lente en perspectiva (aproximado).
 // rayoPantalla(x, y) -> ox, oy, oz, dx, dy, dz: el rayo de la camara ACTIVA que pasa por el punto (x, y)
 // del lienzo (px, centro 0,0, y hacia abajo: lo que dan raton() y toque()). Origen en el plano cercano y
-// direccion normalizada, en MUNDO: se le pasa tal cual a colRayo / rayoMalla. Es la "pistola de luz" de un
+// direccion normalizada, en MUNDO y en los ejes de LUA (Z arriba; el hook da los del motor y se convierten con
+// W3dLuaEjes): se le pasa tal cual a colRayo / rayoMalla. Es la "pistola de luz" de un
 // juego de disparos: clic -> rayo -> lo primero que toca. Sin camara activa devuelve nil.
 static int LRayoPantalla(lua_State* L) {
     float w, h; TamLienzo(&w, &h);
@@ -1441,17 +1450,21 @@ static int LRayoPantalla(lua_State* L) {
         lua_pushnil(L);
         return 1;
     }
+    W3dLuaEjes(o[1], o[2]);
+    W3dLuaEjes(d[1], d[2]);
     for (int i = 0; i < 3; i++) lua_pushnumber(L, o[i]);
     for (int i = 0; i < 3; i++) lua_pushnumber(L, d[i]);
     return 6;
 }
 // pantallaPunto(x, y, z) -> sx, sy, delante: como pantallaDe pero para un PUNTO de mundo (no el origen de un
-// objeto): la mira de un enemigo, un impacto, la esquina de una caja. Mismo espacio que posPx.
+// objeto): la mira de un enemigo, un impacto, la esquina de una caja. El punto en los ejes de LUA (Z arriba; al hook
+// va en los del motor, W3dLuaEjes). Lo que devuelve, en el mismo espacio que posPx (2D: no se convierte).
 static int LPantallaPunto(lua_State* L) {
     float w, h; TamLienzo(&w, &h);
     float sx = 0, sy = 0; bool delante = false;
-    if (!W3dCamaraProyectarPuntoHook || !W3dCamaraProyectarPuntoHook((float)luaL_checknumber(L, 1), (float)luaL_checknumber(L, 2),
-                                                                     (float)luaL_checknumber(L, 3), w, h, &sx, &sy, &delante)) {
+    float px = (float)luaL_checknumber(L, 1), py = (float)luaL_checknumber(L, 2), pz = (float)luaL_checknumber(L, 3);
+    W3dLuaEjes(py, pz);
+    if (!W3dCamaraProyectarPuntoHook || !W3dCamaraProyectarPuntoHook(px, py, pz, w, h, &sx, &sy, &delante)) {
         lua_pushnumber(L, 0); lua_pushnumber(L, 0); lua_pushboolean(L, 0);
         return 3;
     }
@@ -1662,7 +1675,10 @@ static bool FisicaPosCruda(Object* o) {
 //  instala quien linkee esos objetos, y donde no haya camara el bind devuelve un
 //  default sensato en vez de nil (un juego que lo llama sin guarda NO se cae).
 // ============================================================================
-// camaraXZ() -> fx, fz, rx, rz (adelante y derecha de la camara, en el plano XZ)
+// camaraXZ() -> fx, fy, rx, ry: adelante y derecha de la camara en el plano HORIZONTAL, que en lua (Z arriba) es el
+// XY. El nombre quedo del plano XZ del MOTOR (Y arriba), donde los calcula el hook: la z del motor es la y de lua, asi
+// que los cuatro numeros son los mismos y no hay nada que convertir (W3dLuaEjes no aplica: no hay vertical). Sin
+// camara: adelante (0, -1), derecha (1, 0).
 static int LCamaraXZ(lua_State* L) {
     float fx = 0.0f, fz = -1.0f, rx = 1.0f, rz = 0.0f;   // default: sin camara
     if (W3dCamaraXZHook) W3dCamaraXZHook(&fx, &fz, &rx, &rz);

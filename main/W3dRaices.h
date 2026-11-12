@@ -80,6 +80,10 @@ int         W3dRaizTipoDeClave(const std::string& clave, int defecto);
 struct W3dRaizFila {
     int tipo;                // W3dRaizTipo
     bool tipoExplicito;      // el archivo dijo su tipo; si no (proyecto viejo) sale de su contenido al cargarla
+    // el ARCHIVO escribio su tipo (el registro "escenas3d" lo traia). Entonces se vuelve a escribir siempre: el tipo que se
+    // deduce depende de lo que haya cargado (sin una libreria en disco sus proxies abren vacios, sin scripts), y si solo
+    // se escribiera cuando difiere, una escena con scripts de una libreria que falto volvia como juego al reabrirla
+    bool tipoEnArchivo;
     std::string nombre;      // unico entre las de su CLASE (escenas + juegos / prefabs)
     std::string entrada;     // su entrada del contenedor ("" = el bloque "escena" o todavia sin guardar)
     std::string carpeta;     // carpeta COSMETICA del outliner
@@ -88,7 +92,7 @@ struct W3dRaizFila {
     W3dContextoRaiz* ctx;    // su contexto guardado (NULL mientras es la activa o si no cargo)
     bool bloque;             // la escena del bloque "escena" de proyecto.json (hay UNA)
     bool cargaFallo;         // su entrada no se pudo leer: no se guarda encima (se conserva el archivo)
-    W3dRaizFila() : tipo(W3D_RAIZ_ESCENA), tipoExplicito(false), raiz(0), escena(0), ctx(0), bloque(false),
+    W3dRaizFila() : tipo(W3D_RAIZ_ESCENA), tipoExplicito(false), tipoEnArchivo(false), raiz(0), escena(0), ctx(0), bloque(false),
                     cargaFallo(false) {}
 };
 // (el ORDEN de las filas es el del proyecto: primero las escenas y los juegos, despues los prefabs. Es el
@@ -130,6 +134,7 @@ inline bool W3dRaizActivaEsJuego() { return W3dRaizTipoActiva() == W3D_RAIZ_JUEG
 // el tipo que se DEDUCE del contenido de una raiz 3D (proyectos viejos): JUEGO si algun objeto
 // tiene scripts, si no ESCENA
 int  W3dRaizTipoDeducido(Object* raiz);
+void W3dRaicesFijarTiposDeducidos();   // deducir el tipo de las escenas sin tipo UNA vez y dejarlo fijo (al abrir)
 // convierte una escena en juego o al reves (los prefabs no). Si es la ACTIVA, el modo del timeline
 // pasa al de su tipo nuevo (ver W3dRaizModoPorTipo). false = no es una raiz 3D.
 bool W3dRaizFijarTipo(int idx, int tipo);

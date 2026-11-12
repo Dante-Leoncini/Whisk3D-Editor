@@ -1,0 +1,19 @@
+// PRUEBA del inspector en vivo: un cubo con inspector_componente.lua (gira a "velocidad" grados por segundo).
+// La usa prueba_inspector_en_vivo.w3s
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Mesh {
+            name: "Cubo"
+            script: "inspector_componente.lua"
+        }
+    }
+}

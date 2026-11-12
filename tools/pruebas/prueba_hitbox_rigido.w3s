@@ -11,8 +11,9 @@
 #    - ConFiltro (y 3.3..3.7, detecta cuerpos pero con filtro): nada (los cuerpos
 #      no tienen etiqueta).
 #  Al aterrizar, alTocar en el piso y en la caja (normal de cada uno HACIA el
-#  otro: +Y para el piso, -Y para la caja). Apoyada, la caja se DUERME y el par
-#  sigue "tocandose": dormir no dispara otro alTocar.
+#  otro: +Y del motor para el piso, -Y para la caja; lua la recibe Z arriba,
+#  asi que hitbox_contador.lua anota la vertical nz en <prefijo>_nz). Apoyada,
+#  la caja se DUERME y el par sigue "tocandose": dormir no dispara otro alTocar.
 #  prueba_hitbox_rigido_oculta.w3d es la misma escena con la Caja OCULTA: la
 #  fisica la sigue simulando (cae y se apoya), pero un objeto oculto no participa:
 #  ni entra a la Zona ni dispara alTocar (ni en el piso ni en ella).
@@ -38,8 +39,8 @@ scriptinfo compartido piso_tocado Caja
 scriptinfo compartido caja_tocado Piso
 compartidonum piso_tocar 1
 compartidonum caja_tocar 1
-compartidonum piso_ny 0.99 1.01
-compartidonum caja_ny -1.01 -0.99
+compartidonum piso_nz 0.99 1.01
+compartidonum caja_nz -1.01 -0.99
 posobjeto Caja 0 0.5 0 0.05
 hitboxstats cuerpos 2 contactos 1
 

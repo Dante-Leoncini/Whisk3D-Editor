@@ -835,10 +835,11 @@ static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Time
     const int propId[3] = { AnimPosition, AnimRotation, AnimScale };
     const char* const* noms[3] = { nP, nR, nS };
     for (int g=0; g<3; g++){
-        // la POSICION se muestra Z-ARRIBA, como en Properties: su "Y" es pos.z y su "Z" es pos.y (la rotacion y la
-        // escala van tal cual). Con los nombres internos la curva "Z" era la de profundidad y se movia como la Y.
-        const int compPos[3] = { AnimX, AnimZ, AnimY }, compXyz[3] = { AnimX, AnimY, AnimZ };
-        const int* compId = (propId[g] == AnimPosition) ? compPos : compXyz;
+        // TODO se muestra Z-ARRIBA, como en Properties (y en Lua): la "Y" de cada canal es la z interna y la "Z" la y.
+        // (Hasta el 2026-11-11 solo la posicion: la rotacion y la escala iban con los ejes del motor, y "Y Escala" era
+        // la altura.)
+        const int compZArriba[3] = { AnimX, AnimZ, AnimY };
+        const int* compId = compZArriba;
         for (int c=0;c<3;c++){
             std::vector<int> ks; DopeKeysDeCurva(props, propId[g], compId[c], ks); // los keyframes de ESTE canal
             if (ks.empty()) continue;                                              // canal sin animacion: no se lista

@@ -1,0 +1,14 @@
+// ==========================================================================
+//  PRUEBA de la tarjeta de un script en Propiedades: un cubo con tarjeta_componente.lua, que expone solo
+//  "dificultad" (una lista desplegable): el desplegable es la ULTIMA fila de la tarjeta.
+//  La usa prueba_tarjeta_script.w3s
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        Mesh {
+            name: "Caja"
+            script: "tarjeta_componente.lua"
+        }
+    }
+}

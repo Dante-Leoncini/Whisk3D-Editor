@@ -3,6 +3,7 @@
 | फ़ंक्शन | क्या करता है |
 |---|---|
 | `buscar(nombre [, raiz]) → obj \| nil` | Outliner में किसी ऑब्जेक्ट को उसके नाम से खोजता है (या सिर्फ़ `raiz` के अंदर)। |
+| `seleccionados() → { obj, … }` | एडिटर में चुने हुए ऑब्जेक्ट (उन [बटन](scripts-y-objetos.md#बटन) के लिए जो एडिटर के ऐड-ऑन की तरह काम करते हैं)। |
 | `nombre(obj) → texto` | ऑब्जेक्ट का नाम। |
 | `tipo(obj) → texto` | वह क्या है: `"mesh"`, `"luz"`, `"camara"`, `"vacio"`, `"esqueleto"`, `"texto"`, `"imagen"`, `"boton"`, `"hitbox"`, `"prefab"`, `"rutina"`… (अगर वह मौजूद न हो तो `""`)। |
 | `instanciar(prefab [, x, y, z [, rotY [, padre]]]) → obj \| nil` | उस पोज़िशन पर किसी प्रीफ़ैब की कॉपी बनाता है (rotY डिग्री में)। `"Libreria/Escena"` किसी लिंक की हुई लाइब्रेरी के प्रीफ़ैब की कॉपी बनाता है। `padre` देने पर कॉपी उस ऑब्जेक्ट से लटकती है (पोज़िशन और घुमाव उसके सापेक्ष)। |

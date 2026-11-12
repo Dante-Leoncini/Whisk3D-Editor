@@ -1,0 +1,13 @@
+# Prueba de las listas desplegables de `propiedades` (la de dificultad del manual de Lua): opcion() devuelve lo
+# elegido en el editor y, si no se eligio nada, la opcion DE FABRICA (la primera de la lista), la misma que muestra
+# el panel de Propiedades. Antes devolvia "" y el juego hacia otra cosa que lo que se veia en el editor (lo reporto
+# un usuario el 2026-11-11). Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_opcion_desplegable.w3s
+abrirw3d prueba_opcion_desplegable.w3d
+scriptinfo
+simplay 3
+scriptinfo compartido dificultad1 dificil
+scriptinfo compartido dificultad2 facil
+scriptinfo compartido sinlista []
+simstop

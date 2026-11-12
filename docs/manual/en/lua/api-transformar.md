@@ -6,9 +6,11 @@
 | `setPosicion(obj, x, y, z)` | Puts it in an exact place (ignores physics). |
 | `mover(obj, dx, dy, dz)` | Moves it from where it is (use it with `dt`). |
 | `rotacion(obj) → x, y, z` | Its rotation in degrees. |
-| `setRotacion(obj, x, y, z [, orden])` | Exact rotation; `orden` is for example `"YXZ"` (the default is `"XYZ"`). |
+| `setRotacion(obj, x, y, z [, orden])` | Exact rotation, the same one as in the Transform card. `orden` chooses the order in which the axes are applied, for example `"ZXY"` (first the heading around the vertical, like a vehicle). |
+| `rotacionX(obj)`, `rotacionY(obj)`, `rotacionZ(obj) → degrees` | The rotation of a single axis. `rotacionZ` is the turn around the vertical. |
+| `setRotacionX(obj, g)`, `setRotacionY(obj, g)`, `setRotacionZ(obj, g)` | Changes a single axis; the other two stay the same. For example, `setRotacionZ(obj, rotacionZ(obj) + 90 * dt)` spins it around the vertical. |
 | `girar(obj, dx, dy, dz)` | Rotates it around its own axes. |
-| `girarHacia(obj, dx, dz [, factor])` | Turns it smoothly toward a direction on the floor. |
+| `girarHacia(obj, dx, dy [, factor])` | Turns it smoothly toward a direction on the floor (X and Y). |
 | `mirarA(obj, x, y, z)` | Points it at a point (the front of a camera). |
 | `escala(obj) → sx, sy, sz` | Its scale. |
 | `setEscala(obj, s [, sy, sz])` | Exact scale; with a single number it scales uniformly. |

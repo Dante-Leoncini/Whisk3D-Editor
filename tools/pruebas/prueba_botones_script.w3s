@@ -1,0 +1,69 @@
+# Los BOTONES de las propiedades de un script: en `propiedades`, una funcion (o { "Etiqueta", funcion }) es un boton en
+# la tarjeta del script; tocarlo llama a esa funcion. Sin el juego, el script se carga solo para esa llamada: un
+# complemento del editor ("Subir lo elegido": seleccionados() y mover). Con el juego andando, en la instancia viva
+# ("Volver a cero": setRotacion). Con el juego parado, lo que hace el boton (mover, tocar la malla) se deshace con
+# Ctrl+Z en un paso; jugando no se graba nada (al Parar se repone todo). Clicks de verdad (propclic, por lo que dice el boton). Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_botones_script.w3s
+ventana 1280 720
+escala 1
+abrirw3d prueba_botones_script.w3d
+timeline pause
+selobj Caja
+tick 2
+propstab 8
+tick 1
+# sin el juego: un complemento del editor. Lo elegido sube 1 m (la Z de Lua es la y del motor)
+objat Caja 0 0 0 0.001
+propclic Subir lo elegido
+objat Caja 0 1 0 0.001
+# lo que hace un script con el juego PARADO se deshace (Ctrl+Z) y se rehace (Ctrl+Y), en UN paso
+undo
+objat Caja 0 0 0 0.001
+redo
+objat Caja 0 1 0 0.001
+# tambien lo que le hace a la MALLA (setVerticePos: la Z de Lua es la y del motor)
+vertrender Caja 1 -1 -1 1 0.001
+propclic Punta arriba
+vertrender Caja 1 0 3 0 0.001
+undo
+vertrender Caja 1 -1 -1 1 0.001
+objat Caja 0 1 0 0.001
+redo
+vertrender Caja 1 0 3 0 0.001
+# con el juego andando: gira (a 90 por segundo) y el boton lo vuelve a cero en vivo
+simplay 30
+objroteuler 0 90 0 0.5
+propclic Volver a cero
+objroteuler 0 0 0 0.01
+scriptinfo compartido boton apretado
+simstop
+# jugando NO hay historial: el boton de recien no agrego un paso; el ultimo sigue siendo el del vertice
+objroteuler 0 0 0 0.01
+undo
+vertrender Caja 1 -1 -1 1 0.001
+# CREAR y BORRAR con el juego parado (instanciar / destruir): Ctrl+Z los saca y los devuelve, como Shift+D y Supr
+add cube
+objname Bloque
+selobj Bloque
+prefabcrear nombre Bloque
+scene
+prefabcontar Bloque 1
+selobj Caja
+tick 2
+propclic Poner un bloque
+scene
+prefabcontar Bloque 2
+undo
+prefabcontar Bloque 1
+redo
+prefabcontar Bloque 2
+selobj Caja
+tick 2
+propclic Borrar el bloque
+scene
+prefabcontar Bloque 1
+undo
+prefabcontar Bloque 2
+redo
+prefabcontar Bloque 1

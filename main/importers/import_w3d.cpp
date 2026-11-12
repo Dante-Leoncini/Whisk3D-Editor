@@ -1802,6 +1802,7 @@ static void JsonScripts(JVal* j, Object* o, const std::string& base) {
         if (!o->scriptDatos) o->scriptDatos = new W3dScriptDatos();
         W3dScriptEntrada ent;
         ent.ruta = RutaJson(JS(e, "archivo", ""), base);
+        ent.apagado = JB(e, "apagado", false);   // el ojo de la lista de scripts (ausente = prendido)
         // una UI trae sus scripts en su .w3dui Y el guardado los repite en el nodo del proyecto: sin esto el mismo
         // script quedaba cargado DOS veces (dos instancias corriendo a la par)
         bool repetido = false;
@@ -5066,6 +5067,58 @@ bool W3dRaizLeerContenido(const W3dRaizFila& fila) {
     return true;
 }
 
+#ifndef W3D_SIN_EDITOR
+// ============================================================================
+//  LA COPIA DE UNA RAIZ ("Convert to Game", io/RaicesEditor.h): arma en SceneCollection (la raiz NUEVA, que en este
+//  momento es la activa y esta vacia) los objetos que escribio W3dRaizSerializarSeco (io/GuardarW3D.cpp), con el
+//  MISMO lector y los MISMOS post-pasos que la carga de una raiz (W3dRaizLeerContenido): nombres crudos (el espacio de
+//  nombres de los objetos es por raiz: la copia se llama igual), rutas como estan en memoria, las mallas y los
+//  materiales por el nombre de su recurso (compartidos). SIN animaciones de escena: queda la "Scene" vacia de
+//  siempre. 'origenes' recibe cada objeto creado con su "_origen" (el serial del original), para lo que el JSON en
+//  seco no lleva (W3dPrefabArreglarHook y lo demas, en RaicesEditor). false = no parsea.
+// ============================================================================
+bool W3dRaizLeerCopiaSeca(const std::string& json, std::vector<std::pair<Object*, unsigned> >* origenes) {
+    if (!SceneCollection || json.empty()) return false;
+    JParser parser(json.data(), json.size());
+    JVal* raiz = parser.Valor();
+    if (parser.error || !raiz || raiz->tipo != 4) {
+        w3dLogfE("[W3D] la copia de la raiz no parsea: queda vacia");
+        delete raiz;
+        return false;
+    }
+    const bool nc = W3dNombresCargando, v4 = gProyectoV4, refs = g_w3dRefsEntradas;
+    W3dNombresCargando = true;
+    gProyectoV4 = true;
+    g_w3dRefsEntradas = true;
+    gPendModArm.clear(); gPendModTgt.clear(); gPendModGen.clear();
+    gPendConsViejo.clear();
+    ClipsPendientesOlvidar();
+    std::vector<std::pair<Object*, unsigned> >* orig = gOrigenes;
+    gOrigenes = origenes;
+    JVal* objs = JHijo(raiz, "objetos", 5);
+    if (objs)
+        for (size_t i = 0; i < objs->lista.size(); i++) JsonObjeto(objs->lista[i], SceneCollection, gBaseProyecto);
+    gOrigenes = orig;
+    ResolverModArmaturePendientes();
+    TexturasDespertarUsadas();
+    // (los clips INLINE de un nodo son de las animaciones de escena del formato viejo: la copia no las lleva)
+    ClipsPendientesOlvidar();
+    InitSceneAnimations();
+    delete raiz;
+    W3dNombresCargando = nc;
+    gProyectoV4 = v4;
+    g_w3dRefsEntradas = refs;
+    // los post-pasos de la carga de una raiz, sobre ESTA
+    MigrarConstraintsViejos();
+    W3dNombresRepararEscena(true);
+    W3dRecursosVistaInvalidar();
+    SearchLoop();
+    SceneCollection->ReloadAll();
+    W3dConstraintsResolverNombres(SceneCollection);
+    return true;
+}
+#endif
+
 // ============================================================================
 //  LOS HIJOS DE UNA INSTANCIA DE PREFAB (io/Prefabs.h): el objeto raiz del prefab ('j', de su
 //  definicion) armado con el MISMO lector bajo el nodo de la instancia. Nombres CRUDOS (la
@@ -5461,6 +5514,8 @@ void AbrirProyectoAhora(const std::string& ruta) {
       extern void (*LayoutArbolCambiado)(); if (LayoutArbolCambiado) LayoutArbolCambiado(); }
     extern void ProyectoSincronizarCampos();
     ProyectoSincronizarCampos();
+    // el tipo de las escenas sin tipo guardado se deduce AHORA y queda fijo (antes de la foto: no es un cambio)
+    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
     // lo que se abrio esta GUARDADO: la foto de lo no guardado (los '*', el cartel al cerrar)
     { extern void W3dCambiosFoto(); W3dCambiosFoto(); }
     // MODO JUEGO (.sisx bundleado): full-screen del 3D -> el juego se ve solo, sin el chrome

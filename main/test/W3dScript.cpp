@@ -6661,6 +6661,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!rootViewport) { err = "ventana: no hay layout de viewports"; return false; }
         extern int W3dPantallaAlto; extern int MenuPantallaW; extern int MenuPantallaH;
         W3dPantallaAlto = h; MenuPantallaW = w; MenuPantallaH = h;
+        // ...y el tamanio de la ventana (winW/winH): lo usa el explorador de archivos para armarse (sin esto quedaba
+        // armado para la ventana de arranque y sus botones caian afuera de la captura)
+        extern int winW; extern int winH; winW = w; winH = h;
         rootViewport->Resize(w, h);
         printf("      [ventana] layout %dx%d (los reads de pixel usan este alto)\n", w, h);
         return true;
@@ -6888,6 +6891,31 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      color del primer vert de cada grupo (para que la prueba de los binds lua
     //      grupoVertices/setVertices/setVerticeColor pueda verificar el efecto).
     //      FALLA si el objeto no existe o no es una malla. ----
+    // ---- vertrender <malla> <i> [ex ey ez tol] : el vertice i (desde 1, como en lua) del array de RENDER de la malla, en
+    //      coordenadas del motor (y arriba). Sin esperado lo imprime. Lo usa el deshacer de los scripts (setVerticePos) ----
+    if (cmd == "vertrender") {
+        std::string nombre; int i = 0;
+        if (!(ss >> nombre >> i)) { err = "vertrender: <malla> <i> [ex ey ez tol]"; return false; }
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nombre) : NULL;
+        if (!o || o->getType() != ObjectType::mesh) { err = "vertrender: no hay una malla '" + nombre + "'"; return false; }
+        Mesh* m = (Mesh*)o;
+        if (!m->vertex || i < 1 || i > m->vertexSize) { err = "vertrender: indice fuera de la malla"; return false; }
+        const GLfloat* v = m->vertex + (size_t)(i - 1) * 3;
+        float ex, ey, ez, tol;
+        if (ss >> ex >> ey >> ez >> tol) {
+            if (fabsf(v[0]-ex) > tol || fabsf(v[1]-ey) > tol || fabsf(v[2]-ez) > tol) {
+                char b[200]; sprintf(b, "vertrender: el vertice %d de '%s' esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", i, nombre.c_str(), v[0], v[1], v[2], ex, ey, ez); err = b; return false;
+            }
+        } else printf("      [vertrender] '%s' %d en (%.4f,%.4f,%.4f)\n", nombre.c_str(), i, v[0], v[1], v[2]);
+        return true;
+    }
+    // ---- undohay <0|1> [redo 0|1] : hay (o no) algo para deshacer (y para rehacer) ----
+    if (cmd == "undohay") {
+        int esp = -1, espRedo = -1; std::string r; ss >> esp; if (ss >> r >> espRedo) {}
+        if (esp >= 0 && (UndoHayAlgo() ? 1 : 0) != esp) { err = esp ? "undohay: no hay nada para deshacer" : "undohay: hay algo para deshacer"; return false; }
+        if (espRedo >= 0 && (UndoHayRedo() ? 1 : 0) != espRedo) { err = espRedo ? "undohay: no hay nada para rehacer" : "undohay: hay algo para rehacer"; return false; }
+        return true;
+    }
     if (cmd == "vertinfo") {
         // vertinfo <malla> [grupo [cps [render]]]: el nombre de la malla es UN token
         // (los demas argumentos son asserts opcionales, ver abajo). Un nombre con
@@ -18406,11 +18434,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //  Lo reporto el dueno probando el .deb: "el copiar X, Y y Z estan al revez. apreto
     //  copiar Z y copia el Y. y el Y es el Z".
     //  La causa: el panel muestra la POSICION en Z-ARRIBA (el campo "Y" de la tarjeta
-    //  Transform apunta a pos.z y el "Z" a pos.y; ver ConstruirGrupos) pero la ROTACION la
-    //  muestra DERECHA. O sea que el mismo checkbox tiene que ir a un campo distinto segun
-    //  el tipo, y eso es lo que este test fija:
+    //  Transform apunta a pos.z y el "Z" a pos.y; ver ConstruirGrupos), y desde el 2026-11-11
+    //  tambien la ROTACION y la ESCALA. Lo que este test fija:
     //     Copy LOCATION  -> "Copy Y" enmascara ejeZ y "Copy Z" enmascara ejeY
-    //     Copy ROTATION  -> van derecho
+    //     Copy ROTATION  -> igual (antes iban derecho, cuando la rotacion se mostraba derecha)
     //  Se compara contra la tarjeta Transform EN VIVO (no contra una constante escrita a
     //  mano): si algun dia se unifica el criterio de display, este test acompania solo.
     // ============================================================================
@@ -18461,16 +18488,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [consejes] B2 destildar \"Copy Z\" apaga el eje interno Y: %s\n", destildoY ? "OK" : "MAL");
         if (!destildoY) ok = false;
 
-        // C) COPY ROTATION: la rotacion se muestra derecha -> los checkbox van derecho
+        // C) COPY ROTATION: desde el 2026-11-11 la rotacion TAMBIEN se muestra Z-arriba -> cruzados como la posicion
         W3dConstraint* cr = new W3dConstraint(W3dConstraintTipo::CopyRotation);
         cr->fuenteTipo = W3dConstraintFuente::Vista;
         o->constraints.push_back(cr);
         o->constraintActivo = 1;
         pr->ActualizarPestanias();
         const bool rotOK = (pr->propConEjeX->value == &cr->ejeX &&
-                            pr->propConEjeY->value == &cr->ejeY &&
-                            pr->propConEjeZ->value == &cr->ejeZ);
-        printf("      [consejes] C Copy Rotation: los tres derecho %s\n", rotOK ? "OK" : "MAL");
+                            pr->propConEjeY->value == &cr->ejeZ &&
+                            pr->propConEjeZ->value == &cr->ejeY);
+        printf("      [consejes] C Copy Rotation: Y y Z cruzados (Z-arriba) %s\n", rotOK ? "OK" : "MAL");
         if (!rotOK) ok = false;
 
         W3dConPanel::Cerrar(pr);
@@ -40318,11 +40345,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
           fputs("-- gira el cubo: este script esta colgado del cubo, asi que yo() es el cubo.\n"
                 "-- actualizar(dt) corre una vez por cuadro; dt son los segundos desde el anterior,\n"
                 "-- asi gira igual de rapido a 60 cuadros por segundo que a 20.\n"
-                "local VEL_X = 25   -- grados por segundo\n"
-                "local VEL_Y = 45\n"
+                "local VEL_X = 25   -- grados por segundo, sobre el eje X\n"
+                "local VEL_Z = 45   -- y sobre el Z (el de arriba)\n"
                 "\n"
                 "function actualizar(dt)\n"
-                "  girar(yo(), VEL_X * dt, VEL_Y * dt, 0)\n"
+                "  girar(yo(), VEL_X * dt, 0, VEL_Z * dt)\n"
                 "end\n", f);
           fclose(f); }
         extern void ReiniciarEscena();

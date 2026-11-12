@@ -23,24 +23,24 @@ end
 ```lua
 propiedades = { velocidad = 4, salto = 6 }
 
-local vy = 0                   -- ऊर्ध्वाधर वेग (छलाँग के लिए)
+local vz = 0                   -- ऊर्ध्वाधर वेग (छलाँग के लिए)
 
 function actualizar(dt)
   local yo_ = yo()
   local v = propiedad("velocidad")
-  local dx, dz = 0, 0
+  local dx, dy = 0, 0
   if tecla("izquierda") then dx = dx - 1 end
   if tecla("derecha")   then dx = dx + 1 end
-  if tecla("arriba")    then dz = dz - 1 end
-  if tecla("abajo")     then dz = dz + 1 end
-  mover(yo_, dx * v * dt, 0, dz * v * dt)
+  if tecla("arriba")    then dy = dy - 1 end
+  if tecla("abajo")     then dy = dy + 1 end
+  mover(yo_, dx * v * dt, dy * v * dt, 0)
 
-  -- सरल छलाँग: ऊपर जाता है, गुरुत्वाकर्षण उसे नीचे लाता है और वह फ़र्श (y = 0) से नीचे नहीं जाता
+  -- सरल छलाँग: ऊपर जाता है, गुरुत्वाकर्षण उसे नीचे लाता है और वह फ़र्श (z = 0) से नीचे नहीं जाता
   local x, y, z = posicion(yo_)
-  if teclaApretada("espacio") and y <= 0 then vy = propiedad("salto") end
-  vy = vy - 9.8 * dt
-  y = y + vy * dt
-  if y < 0 then y = 0; vy = 0 end
+  if teclaApretada("espacio") and z <= 0 then vz = propiedad("salto") end
+  vz = vz - 9.8 * dt
+  z = z + vz * dt
+  if z < 0 then z = 0; vz = 0 end
   setPosicion(yo_, x, y, z)
 end
 ```

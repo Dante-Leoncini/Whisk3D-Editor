@@ -4,7 +4,7 @@
 |---|---|
 | `yo() → obj` | Bu script'in sahibi olan nesne. |
 | `objeto(prop) → obj \| nil` | `propiedades` içindeki `prop` alanında seçilen nesne. |
-| `opcion(prop) → texto` | `propiedades` içindeki bir açılır listede seçilen seçenek. |
+| `opcion(prop) → texto` | `propiedades` içindeki bir açılır listede seçilen seçenek; hiçbiri seçilmediyse listenin ilki (varsayılan). |
 | `propiedad(prop) → valor` | Bu nesneye özel sayı, evet/hayır ya da metin (veya tanımlanan varsayılan değer). |
 | `parametro(prop [, def]) → número` | `propiedad` gibi ama her zaman sayı döndürür; yoksa `def`'i (ya da 0) döndürür. |
 | `objetivo() → obj \| nil` | Sahip nesnenin hedefi ("target"). |

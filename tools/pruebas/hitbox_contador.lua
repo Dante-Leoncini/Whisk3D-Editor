@@ -2,8 +2,9 @@
 --  Contador de eventos de HITBOX y de CONTACTOS (pruebas del motor).
 --  Cuenta alEntrar / alQuedarse / alSalir / alTocar en compartido("<prefijo>_...")
 --  y anota los objetos que llegaron: <prefijo>_otro / _mio / _suyo del ultimo
---  alEntrar, <prefijo>_salio del ultimo alSalir, <prefijo>_tocado y _ny del
---  ultimo alTocar. El mismo .lua va en varios objetos con otro 'prefijo'.
+--  alEntrar, <prefijo>_salio del ultimo alSalir, <prefijo>_tocado y _nz del
+--  ultimo alTocar (nz: la componente VERTICAL de la normal; lua es Z arriba).
+--  El mismo .lua va en varios objetos con otro 'prefijo'.
 -- ==========================================================================
 propiedades = { prefijo = "x" }
 
@@ -44,6 +45,6 @@ end
 function alTocar(otro, impulso, x, y, z, nx, ny, nz)
   suma("tocar")
   setCompartido(p .. "_tocado", nom(otro))
-  setCompartido(p .. "_ny", ny)
+  setCompartido(p .. "_nz", nz)
   setCompartido(p .. "_impulso", impulso)
 end

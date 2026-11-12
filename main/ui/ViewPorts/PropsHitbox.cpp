@@ -67,9 +67,11 @@ void PropsHitboxActualizar(Properties* p, bool visible) {
     p->propHitbox->visible = (h != NULL);
     if (p->propHbActivo)  p->propHbActivo->value  = h ? &h->activo : NULL;
     if (p->propHbCuerpos) p->propHbCuerpos->value = h ? &h->detectarCuerpos : NULL;
+    // Z-ARRIBA, como la tarjeta Transformar y Lua (desde el 2026-11-11): el campo "Y" es la z interna y el "Z" la y
+    static const int kEje[3] = { 0, 2, 1 };
     for (int k = 0; k < 3; k++) {
-        if (p->propHbTam[k])    p->propHbTam[k]->value    = h ? &h->tam[k] : NULL;
-        if (p->propHbCentro[k]) p->propHbCentro[k]->value = h ? &h->centro[k] : NULL;
+        if (p->propHbTam[k])    p->propHbTam[k]->value    = h ? &h->tam[kEje[k]] : NULL;
+        if (p->propHbCentro[k]) p->propHbCentro[k]->value = h ? &h->centro[kEje[k]] : NULL;
     }
     if (p->propHbEtiqueta) p->propHbEtiqueta->oculto = (h == NULL);
     if (p->propHbFiltro)   p->propHbFiltro->oculto   = (h == NULL);

@@ -16,6 +16,8 @@
 #include "objects/Camera.h"              // la camara activa y su lente son parte del estado base de un juego
 #include "objects/Light.h"
 #include "objects/Mesh.h"                // los pesos de las shape keys (los posan los clips)
+#include "objects/Armature.h"            // "Convert to Game": el clip y el cabezal que el cuadro le pone a un esqueleto
+#include "script/W3dScript.h"            // "Convert to Game": los scripts de la copia, tal cual (W3dScriptDatos)
 #include "animation/Animation.h"         // los clips de un juego: sus animaciones de escena
 #include "animation/SkeletalAnimation.h" // g_animMix / W3dMixEscenasSoltar
 #include "base/W3dInteractionState.h"    // InteractionMode / estado
@@ -35,6 +37,7 @@
 #include "base/W3dNombres.h"
 #include "w3dlog.h"
 #include <vector>
+#include <map>
 #include <cstdio>
 
 extern bool SimActiva();
@@ -397,6 +400,205 @@ int W3dRaizCrearYAbrir(int tipo, const std::string& nombre) {
 }
 
 // ============================================================================
+//  "CONVERT TO GAME": LA ESCENA SE DUPLICA COMO UN JUEGO NUEVO (ver RaicesEditor.h)
+//  El juego arranca con lo que se ve en el cuadro actual y sin las animaciones de la escena. La copia sale del
+//  lector de siempre: la raiz escrita EN SECO (io/GuardarW3D.cpp, sin el reposo del guardado: la pose del cuadro
+//  actual es lo que se copia) y leida en la raiz nueva (importers/import_w3d.cpp). Nombres, scripts, fisica, hitbox,
+//  constraints, instancias de prefab... viajan como en un guardado; las mallas, los materiales y las bibliotecas de
+//  clips de jerarquia son los MISMOS recursos (van por su nombre). Las animaciones de escena (keyframes, cortes de
+//  camara, tiras de esqueleto, capas del Mix) no se escriben: el juego nace con la "Scene" vacia de siempre.
+//  Lo que el JSON en seco no lleva se toma del ORIGINAL (por el "_origen" de cada nodo):
+//    - los clips de un esqueleto y las vertex anims de una malla: COMPARTIDOS, como entre las instancias de un prefab
+//      (W3dPrefabArreglarHook: los mismos clips en memoria, los mismos frames con copia al escribir);
+//    - los scripts tal cual (el orden de sus valores y cual esta elegido en el panel), como en Shift+D;
+//    - lo que la animacion le puso en ESE cuadro y el archivo no guarda: los pesos de las formas de una malla y el
+//      clip + cabezal de un esqueleto (el de su tira en la animacion de escena, o el clip que se edita en el
+//      timeline: en "Juego" cada esqueleto muestra su clip activo desde su cabezal);
+//    - la camara activa (la del corte de ese cuadro) y la coleccion activa.
+// ============================================================================
+extern bool W3dRaizSerializarSeco(Object* raiz, std::string& json);   // io/GuardarW3D.cpp
+extern bool W3dRaizLeerCopiaSeca(const std::string& json,              // importers/import_w3d.cpp
+                                 std::vector<std::pair<Object*, unsigned> >* origenes);
+extern int g_undoSinRaiz;   // undo/Undo.cpp: el paso que se apila no es de la raiz activa
+
+namespace {
+// el clip y el cabezal que muestra un esqueleto en el cuadro actual (los casos de EvaluarPoseEsqueleto fuera de
+// "Juego"). false = se ve en reposo, o lo posan sus capas del Mix (esas viajan con el: el juego tambien las usa)
+bool ClipEnPantalla(Armature* a, int& clip, float& cabezal) {
+    if (!a->capas.empty()) return false;
+    int c = -1, f = CurrentFrame;
+    if (ActiveAnimKind == 1 && ActiveAnimArm == a) c = a->animActiva;   // el clip que se edita en el timeline
+    else if (ActiveAnimKind == 0 && SceneAnimActiva >= 0 && SceneAnimActiva < (int)SceneAnimations.size()) {
+        // su TIRA en la animacion de escena activa: el frame 'frame' de la escena es el primero del clip
+        const SceneAnimation* e = SceneAnimations[(size_t)SceneAnimActiva];
+        if (e && !e->esClip)
+            for (size_t t = 0; t < e->esqueletos.size(); t++) {
+                if (e->esqueletos[t].armature != a->name) continue;
+                c = W3dArmatureClipPorNombre(a, e->esqueletos[t].clip);
+                if (c >= 0) f = a->animations[(size_t)c]->startFrame + (CurrentFrame - e->esqueletos[t].frame);
+                break;
+            }
+    }
+    if (c < 0 || c >= (int)a->animations.size() || !a->animations[(size_t)c]) return false;
+    const SkeletalAnimation* cl = a->animations[(size_t)c];
+    if (f > cl->endFrame) f = cl->endFrame;
+    if (f < cl->startFrame) f = cl->startFrame;
+    clip = c;
+    cabezal = (float)(f - cl->startFrame);
+    return true;
+}
+struct PoseEsqueleto { int clip; float cabezal; };
+void JuntarPoses(Object* o, std::map<unsigned, PoseEsqueleto>& out) {
+    if (!o) return;
+    if (o->getType() == ObjectType::armature) {
+        PoseEsqueleto p;
+        if (ClipEnPantalla((Armature*)o, p.clip, p.cabezal)) out[o->serial] = p;
+    }
+    for (size_t i = 0; i < o->Childrens.size(); i++) JuntarPoses(o->Childrens[i], out);
+}
+void MapaSeriales(Object* o, std::map<unsigned, Object*>& out) {
+    if (!o) return;
+    out[o->serial] = o;
+    for (size_t i = 0; i < o->Childrens.size(); i++) MapaSeriales(o->Childrens[i], out);
+}
+// lo que el JSON en seco no lleva, de 'o' (el original) a 'g' (su copia)
+void CompletarCopia(Object* g, Object* o, const std::map<unsigned, PoseEsqueleto>& poses) {
+    if (!g || !o || g->getType() != o->getType()) return;
+    if (W3dPrefabArreglarHook) W3dPrefabArreglarHook(g, o);   // clips de esqueleto y vertex anims, compartidos
+    if (o->scriptDatos) { delete g->scriptDatos; g->scriptDatos = new W3dScriptDatos(*o->scriptDatos); }
+    if (o->getType() == ObjectType::mesh) {
+        Mesh* gm = (Mesh*)g;
+        const Mesh* om = (const Mesh*)o;
+        for (size_t k = 0; k < om->shapePesos.size(); k++) gm->SetShapePeso((int)k, om->shapePesos[k]);
+    } else if (o->getType() == ObjectType::armature) {
+        std::map<unsigned, PoseEsqueleto>::const_iterator p = poses.find(o->serial);
+        Armature* ga = (Armature*)g;
+        if (p != poses.end() && p->second.clip < (int)ga->animations.size()) {
+            ga->animActiva = p->second.clip;
+            ga->juegoFrame = p->second.cabezal;
+            ga->juegoTermino = false;
+        }
+    }
+}
+}
+
+// el paso de undo de "Convert to Game": Ctrl+Z vuelve a la escena y SACA el juego (su arbol queda en el paso, como en
+// un borrado de la vista Scenes); Ctrl+Y lo devuelve y lo vuelve a abrir. No es de ninguna raiz (g_undoSinRaiz): con
+// el juego afuera el undo no podria activarlo antes de aplicar el paso, el paso cambia de raiz solo. (Pasar a una
+// escena que no estaba abierta vacia el historial, como siempre: el paso sobrevive porque en ese momento no esta en
+// ninguna pila -el undo lo saco para aplicarlo- y queda solo)
+struct UndoAJuego { std::string escena, juego; bool fuera; W3dRaizSacada s; };
+static void UndoAJuegoAplicar(void* d) {
+    UndoAJuego* u = (UndoAJuego*)d;
+    std::string motivo;
+    if (!u->fuera) {
+        const int ie = W3dRaizBuscar(W3D_RAIZ_ESCENA, u->escena);
+        const int ij = W3dRaizBuscar(W3D_RAIZ_JUEGO, u->juego);
+        if (ie < 0 || ij < 0 || ie == ij) return;
+        if (W3dRaizActiva() == ij && !W3dActivarRaiz(ie, &motivo)) {
+            if (!motivo.empty()) Notificar(std::string(T(motivo.c_str())), true);
+            return;
+        }
+        // (activar la escena pudo correr los indices: se busca de nuevo)
+        const int j = W3dRaizBuscar(W3D_RAIZ_JUEGO, u->juego);
+        W3dRaizSacarDeAbiertas(j);
+        if (!W3dRaizSacar(j, &u->s, &motivo)) {
+            if (!motivo.empty()) Notificar(std::string(T(motivo.c_str())), true);
+            return;
+        }
+        u->fuera = true;
+    } else {
+        Object* raiz = u->s.fila.raiz;
+        if (!W3dRaizDevolver(u->s)) return;
+        u->fuera = false;
+        const int ij = W3dRaizDeObjeto(raiz);
+        if (ij < 0) return;
+        u->juego = W3dRaices()[(size_t)ij].nombre;   // (el nombre con el que quedo: el Ctrl+Z lo busca por el)
+        if (!W3dActivarRaiz(ij, &motivo) && !motivo.empty()) Notificar(std::string(T(motivo.c_str())), true);
+    }
+    W3dRecursosVistaInvalidar();
+    g_redraw = true;
+}
+static void UndoAJuegoLiberar(void* d) {
+    UndoAJuego* u = (UndoAJuego*)d;
+    if (u->fuera) W3dRaizSacadaLiberar(u->s);
+    delete u;
+}
+
+int W3dRaizConvertirEnJuego(std::string* motivo) {
+    const int act = W3dRaizActiva();
+    if (act < 0 || act >= (int)W3dRaices().size() || !SceneCollection) { if (motivo) *motivo = "It doesn't exist anymore"; return -1; }
+    if (W3dRaizTipoDe(act) != W3D_RAIZ_ESCENA) { if (motivo) *motivo = "It can't be converted"; return -1; }
+    if (SimActiva()) { if (motivo) *motivo = "Stop the game first"; return -1; }
+    if (estado != editNavegacion) { if (motivo) *motivo = "Finish the current transform first"; return -1; }
+    // lo que esta a medio editar se cierra ANTES de la foto, como al dejar la raiz (W3dActivarRaiz): la malla que sale
+    // de Edit Mode se publica en su recurso, la vista de un clip de jerarquia se escribe en su clip, y toda malla
+    // tiene su recurso (la copia la nombra por el)
+    PlayAnimation = false;
+    W3dCurveEdicionCerrar();
+    if (InteractionMode != ObjectMode) LayoutModoElegir(ObjectMode);
+    InteractionMode = ObjectMode;
+    ActualizarEditMeshActivo();
+    W3dMallasTickEditor();
+    W3dMallasAsegurarRecursos();
+    W3dClipsVistasSincronizar();
+    // LA FOTO DEL CUADRO ACTUAL (con la escena todavia activa: su animacion y su timeline son los globales)
+    Object* original = SceneCollection;
+    std::string json;
+    if (!W3dRaizSerializarSeco(original, json)) { if (motivo) *motivo = "It can't be converted"; return -1; }
+    std::map<unsigned, PoseEsqueleto> poses;
+    JuntarPoses(original, poses);
+    const unsigned camSerial = CameraActive ? ((Object*)CameraActive)->serial : 0u;
+    const unsigned colSerial = (CollectionActive && CollectionActive != SceneCollection) ? CollectionActive->serial : 0u;
+    const std::string escena = W3dRaices()[(size_t)act].nombre;
+    const int cuadro = CurrentFrame;
+    // EL JUEGO NUEVO, con el nombre de una copia de la escena ("Intro" -> "Intro.001": escenas y juegos comparten
+    // nombres). Se arma como la carga de una raiz (W3dRaizCargar): mientras se lo llena es la activa
+    const int idxNueva = W3dRaizNueva(W3D_RAIZ_JUEGO, escena);
+    Object* juego = W3dRaices()[(size_t)idxNueva].raiz;
+    const int antes = W3dRaizActiva();   // (la fila nueva pudo correr los indices)
+    const unsigned selSerial = W3dSeleccionSerial;   // (armar la copia no es ELEGIR: ver W3dSeleccionSerial)
+    W3dRaizUsar(idxNueva);
+    std::vector<std::pair<Object*, unsigned> > origenes;
+    const bool leyo = W3dRaizLeerCopiaSeca(json, &origenes);
+    std::map<unsigned, Object*> orig;
+    MapaSeriales(original, orig);
+    for (size_t i = 0; i < origenes.size(); i++) {
+        std::map<unsigned, Object*>::iterator t = orig.find(origenes[i].second);
+        if (t == orig.end()) continue;
+        Object* g = origenes[i].first;
+        CompletarCopia(g, t->second, poses);
+        if (camSerial && t->first == camSerial && g->getType() == ObjectType::camera) CameraActive = (Camera*)g;
+        if (colSerial && t->first == colSerial) CollectionActive = g;
+    }
+    DeseleccionarTodo(); ObjActivo = NULL;   // (los constructores fueron seleccionando)
+    W3dRaizUsar(antes);
+    W3dSeleccionSerial = selSerial;
+    if (!leyo) {
+        W3dRaizBorrar(W3dRaizDeObjeto(juego), NULL);
+        if (motivo) *motivo = "It can't be converted";
+        return -1;
+    }
+    w3dLogf("[raices] la escena '%s' se duplico como el juego '%s' con su cuadro %d (%d objeto(s), sin sus animaciones "
+            "de escena; la escena queda como estaba)", escena.c_str(), W3dRaices()[(size_t)W3dRaizDeObjeto(juego)].nombre.c_str(),
+            cuadro, (int)origenes.size());
+    // y pasa a ser la activa, como un "New Game" (la escena sale de la lista de abiertas y queda en memoria)
+    if (!W3dActivarRaiz(W3dRaizDeObjeto(juego), motivo)) { W3dRecursosVistaInvalidar(); return -1; }
+    // EL PASO DE UNDO, despues de activarlo (pasar a una raiz que no estaba abierta vacio el historial)
+    UndoAJuego* u = new UndoAJuego();
+    u->escena = escena;
+    u->juego = W3dRaices()[(size_t)W3dRaizDeObjeto(juego)].nombre;
+    u->fuera = false;
+    UndoExterno f; f.aplicar = UndoAJuegoAplicar; f.liberar = UndoAJuegoLiberar;
+    g_undoSinRaiz++;
+    UndoPushExterno(f, u);
+    g_undoSinRaiz--;
+    W3dRecursosVistaInvalidar();
+    g_redraw = true;
+    return W3dRaizDeObjeto(juego);
+}
+
+// ============================================================================
 //  EL SELECTOR
 // ============================================================================
 // los tres "New ..." (el selector y el "+" del outliner). 'iconoDeTipo': con el icono de lo que crean
@@ -438,7 +640,8 @@ void W3dRaicesMenuArmar(PopupMenu* m) {
     // la escena/juego que se edita pasa a ser la que arranca el juego
     if (W3dRaizEs3D(tAct) && act != ini)
         m->Agregar(T("Set as Start Scene"), W3D_RAIZ_MENU_INICIAL, W3dRaizIcono(tAct));
-    // una escena se vuelve juego (simula: sin keyframes propios, se renderiza su cache) y al reves
+    // una escena se DUPLICA como un juego nuevo (la foto de su cuadro actual, sin sus animaciones de escena: un juego
+    // simula y no tiene keyframes propios); un juego vuelve a ser escena en el lugar
     if (tAct == W3D_RAIZ_ESCENA) m->Agregar(T("Convert to Game"), W3D_RAIZ_MENU_A_JUEGO, W3dRaizIcono(W3D_RAIZ_JUEGO));
     if (tAct == W3D_RAIZ_JUEGO)  m->Agregar(T("Convert to Scene"), W3D_RAIZ_MENU_A_ESCENA, W3dRaizIcono(W3D_RAIZ_ESCENA));
 }
@@ -448,9 +651,12 @@ void W3dRaicesMenuAccion(int id) {
     if (id == W3D_RAIZ_MENU_NUEVA_ESCENA) { W3dRaizCrearYAbrir(W3D_RAIZ_ESCENA, std::string()); return; }
     if (id == W3D_RAIZ_MENU_NUEVO_JUEGO)  { W3dRaizCrearYAbrir(W3D_RAIZ_JUEGO, std::string()); return; }
     if (id == W3D_RAIZ_MENU_NUEVO_PREFAB) { W3dRaizCrearYAbrir(W3D_RAIZ_PREFAB, std::string()); return; }
-    if (id == W3D_RAIZ_MENU_A_JUEGO || id == W3D_RAIZ_MENU_A_ESCENA) {
-        if (!W3dRaizConvertirActiva(id == W3D_RAIZ_MENU_A_JUEGO ? W3D_RAIZ_JUEGO : W3D_RAIZ_ESCENA, &motivo))
-            Notificar(std::string(T(motivo.c_str())), true);
+    if (id == W3D_RAIZ_MENU_A_JUEGO) {
+        if (W3dRaizConvertirEnJuego(&motivo) < 0 && !motivo.empty()) Notificar(std::string(T(motivo.c_str())), true);
+        return;
+    }
+    if (id == W3D_RAIZ_MENU_A_ESCENA) {
+        if (!W3dRaizConvertirActiva(W3D_RAIZ_ESCENA, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
         return;
     }
     if (id == W3D_RAIZ_MENU_INICIAL) {

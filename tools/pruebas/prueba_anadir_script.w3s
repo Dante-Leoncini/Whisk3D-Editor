@@ -1,0 +1,29 @@
+# El boton ANIADIR de la tarjeta Control (Propiedades, pestania del joystick) abre un MENU: los scripts del proyecto
+# (los de adentro del .w3d) y "Cargar .lua..." (el explorador del disco, para un script de afuera). Antes abria directo
+# el explorador, y un script guardado ADENTRO del .w3d no se podia poner en un objeto (2026-11-11). Aca: un proyecto
+# v4 con ojo_a.lua y ojo_b.lua adentro; al Testigo (que tiene ojo_b) se le agrega ojo_a desde el menu. Correr DESDE
+# ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_anadir_script.w3s
+ventana 1280 720
+escala 1
+abrirw3d prueba_ojo_script.w3d
+timeline pause
+guardarw3d /tmp/w3d_prueba_anadir_script.w3d
+abrirw3d /tmp/w3d_prueba_anadir_script.w3d
+timeline pause
+selobj Testigo
+tick 2
+propstab 8
+tick 1
+scriptapagado 0 0
+scriptanadir
+menuabierto si
+menuelegir ojo_a.lua
+menuabierto no
+# ahora el Testigo tiene dos scripts: el suyo (0) y ojo_a (1), prendido
+scriptapagado 1 0
+# y "Cargar .lua..." sigue: abre el explorador (el menu se cierra)
+scriptanadir
+menuelegir Load .lua...
+menuabierto no

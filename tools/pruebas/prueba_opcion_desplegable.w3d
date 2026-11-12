@@ -1,0 +1,34 @@
+// ==========================================================================
+//  PRUEBA de las listas desplegables de `propiedades` (opcion() en lua).
+//  Dos objetos con opcion_componente.lua: Elegida eligio "dificil" en el
+//  editor (opt_dificultad); SinElegir no eligio nada y tiene que usar la de
+//  fabrica, la primera de la lista ("facil"). La usa prueba_opcion_desplegable.w3s
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Elegida"
+            filePath: uvanim-quad.obj
+            script: "opcion_componente.lua"
+            val_id: "1"
+            opt_dificultad: "dificil"
+        }
+
+        Wavefront {
+            name: "SinElegir"
+            filePath: uvanim-quad.obj
+            x: 3.0
+            script: "opcion_componente.lua"
+            val_id: "2"
+        }
+    }
+}

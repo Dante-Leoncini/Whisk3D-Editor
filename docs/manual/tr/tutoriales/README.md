@@ -2,9 +2,6 @@
 
 Whisk3D'nin nasıl kullanılacağını anlatan eğitimler. Whisk3D'nin farklı araçlarını, bir kapı gibi basit bir şeyden orta ve daha ileri seviyelere kadar pratik örneklerle açıklarlar. Programın eğitimleri ve videoları zamanla buraya eklenecek. Bir sorun olursa Discord'da veya Telegram'da sorabilirsin.
 
-[Whisk3D Discord grubu ve forumu](https://discord.gg/2sjpuact8)
-[Telegram grubu](https://t.me/Whisk3D)
-
 - Temel
     1. [Viewport'lar](viewports.md)
     2. [Özellikler](propiedades.md)
@@ -16,3 +13,4 @@ Whisk3D'nin nasıl kullanılacağını anlatan eğitimler. Whisk3D'nin farklı a
     8. [Kapı kolunu modelleme](modelar-picaporte.md)
     9. [Kapıyı canlandırma](animar-puerta.md)
     10. [Bir topu zıplatma](pelota.md)
+    11. [İlk script'in: dönen bir küp](primer-script.md)

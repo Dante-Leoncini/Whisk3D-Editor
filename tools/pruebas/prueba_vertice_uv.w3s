@@ -5,7 +5,8 @@
 #  escena por defecto con scripts/uv.lua en el Cubo. En cada tick el script
 #  escribe la UV del vertice 1 en la capa base (0.25, 0.75) y en la capa UV 1
 #  (0.1, 0.9), y mueve el Cubo segun verticePosAnim(vert 2) - verticePos(vert 2)
-#  (sin skinning tienen que ser iguales: el Cubo solo sube 1 por tick en z).
+#  (sin skinning tienen que ser iguales: el Cubo solo avanza 1 por tick en la
+#  z del motor, que en lua es la y).
 #  Es la base del iris del G-Man de la demo de HL2: un script que recalcula por
 #  frame la proyeccion del iris sobre el globo ocular deformado por los
 #  parpados.

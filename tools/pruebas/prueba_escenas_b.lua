@@ -7,7 +7,7 @@ end
 function actualizar(dt)
   n = n + 1
   local x, y, z = posicion(yo())
-  setPosicion(yo(), x, y + 1, z)
+  setPosicion(yo(), x, y, z + 1)   -- sube: la z (Z arriba)
   setCompartido("b_n", n)
   if n == 4 and (compartido("b_inicios") or 0) < 2 then cambiarEscena("Scene") end
 end

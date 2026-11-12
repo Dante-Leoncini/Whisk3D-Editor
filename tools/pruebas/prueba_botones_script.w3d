@@ -1,0 +1,12 @@
+// ==========================================================================
+//  PRUEBA de los BOTONES de las propiedades de un script. La usa prueba_botones_script.w3s
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        Mesh {
+            name: "Caja"
+            script: "botones_componente.lua"
+        }
+    }
+}

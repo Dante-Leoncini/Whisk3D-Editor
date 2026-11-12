@@ -1,4 +1,4 @@
-# Manuels de Whisk3D
+# Tutoriels et manuels de Whisk3D
 
 - [Tutoriels](tutoriales/README.md) : pas à pas, avec des images et des animations de l'éditeur.
 - [Manuel de Whisk3D Editor](editor/README.md) : ce que l'éditeur sait faire, classé par panneau et par mode.

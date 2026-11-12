@@ -1593,6 +1593,7 @@ The Script object '%s' no longer exists: it was migrated to an empty object with
 The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	'%s' UI sahnesi okunamadı: proje onsuz açılıyor ve üzerine KAYDEDİLMEYECEK (whisk3d.log'a bakın)
 The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	'%s' UI sahnesi eksik: proje onsuz açılıyor ve üzerine KAYDEDİLMEYECEK (whisk3d.log'a bakın)
 The armature has its own clips	İskeletin kendi klipleri var
+The button's function failed	Düğmenin işlevi başarısız oldu
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	.lua dosyasındaki cambiarEscena() çağrıları halen ilkini gösteriyor: elle düzenleyin.
 The clip library could not be read	Klip kütüphanesi okunamadı
 The clipboard has no hex color	Panoda hex renk yok
@@ -1677,6 +1678,7 @@ Triangulate Faces	Yüzleri Üçgenle
 Trim end	Sondan kırp
 Trim start	Baştan kırp
 Turbulence	Türbülans
+Turn the script on or off	Betiği aç veya kapat
 Type	Tür
 U Location	U Konumu
 UI	UI

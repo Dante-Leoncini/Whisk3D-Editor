@@ -3,6 +3,7 @@
 | Función | Qué hace |
 |---|---|
 | `buscar(nombre [, raiz]) → obj \| nil` | Busca un objeto por su nombre en el outliner (o solo dentro de `raiz`). |
+| `seleccionados() → { obj, … }` | Los objetos elegidos en el editor (para los [botones](scripts-y-objetos.md#botones) que funcionan como complementos del editor). |
 | `nombre(obj) → texto` | El nombre del objeto. |
 | `tipo(obj) → texto` | Qué es: `"mesh"`, `"luz"`, `"camara"`, `"vacio"`, `"esqueleto"`, `"texto"`, `"imagen"`, `"boton"`, `"hitbox"`, `"prefab"`, `"rutina"`… (`""` si no existe). |
 | `instanciar(prefab [, x, y, z [, rotY [, padre]]]) → obj \| nil` | Crea una copia de un prefab en esa posición (rotY en grados). `"Libreria/Escena"` crea la de una librería vinculada. Con `padre` cuelga de ese objeto (posición y giro relativos a él). |

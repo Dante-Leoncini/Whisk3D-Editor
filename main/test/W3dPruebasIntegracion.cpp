@@ -126,14 +126,15 @@ const char* kLuaContador =
     "function alEntrar(otro, mio, suyo) suma(\"entrar\"); if otro then setCompartido(p .. \"_otro\", nombre(otro)) end end\n"
     "function alQuedarse(otro, mio, suyo) suma(\"quedarse\") end\n"
     "function alSalir(otro, mio, suyo) suma(\"salir\") end\n";
-// avanza en X un paso FIJO por tick (determinista aunque el dt del juego varie)
+// avanza en X un paso FIJO por tick (determinista aunque el dt del juego varie). Las propiedades "y" y "z" son las de
+// cuando lua era Y arriba ("y" la ALTURA, "z" la profundidad; asi vienen en las refs): con Z arriba van cruzadas
 const char* kLuaMover =
     "-- avanza en X un paso fijo por tick (x = x0 + paso * n)\n"
     "propiedades = { x0 = 0, paso = 0.4, y = 0, z = 0 }\n"
     "local n = 0\n"
     "function actualizar(dt)\n"
     "  n = n + 1\n"
-    "  setPosicion(yo(), propiedad(\"x0\") + propiedad(\"paso\") * n, propiedad(\"y\"), propiedad(\"z\"))\n"
+    "  setPosicion(yo(), propiedad(\"x0\") + propiedad(\"paso\") * n, propiedad(\"z\"), propiedad(\"y\"))\n"
     "end\n";
 // EL JUEZ: cuando el jugador paso a todos, mira los contadores y los clips de cada personaje, y
 // que los esqueletos se MUEVAN: la punta del brazo del primero (clip Saludo) al arrancar contra la
@@ -151,12 +152,12 @@ const char* kLuaJuez =
     "  if listo then return end\n"
     "  ticks = ticks + 1\n"
     "  local a0 = buscar(\"Personaje\")\n"
-    "  if ticks == 1 then x1, y1, z1 = huesoPunto(a0, \"brazo\", 0, 1, 0) end\n"
+    "  if ticks == 1 then x1, y1, z1 = huesoPunto(a0, \"brazo\", 0, 0, 1) end   -- el (0, 1, 0) del hueso en el motor: Z arriba\n"
     "  local x = posicion(buscar(\"Jugador\"))\n"
     "  local f = animFrame(a0) or 0\n"
     "  if (x < propiedad(\"fin\") or f < 8) and ticks < 100000 then return end\n"
     "  listo = true\n"
-    "  local x2, y2, z2 = huesoPunto(a0, \"brazo\", 0, 1, 0)\n"
+    "  local x2, y2, z2 = huesoPunto(a0, \"brazo\", 0, 0, 1)\n"
     "  local d = -1\n"
     "  if x1 and x2 then d = math.abs(x2 - x1) + math.abs(y2 - y1) + math.abs(z2 - z1) end\n"
     "  local pose = (d > 0.01) and \"mueve\" or \"quieta\"\n"
@@ -191,7 +192,7 @@ const char* kLuaDirector =
     "  animTransicion(b, 6)                   -- 6 frames a 30 fps: 0.2 s fundiendo\n"
     "  animCapa(b, 1, \"Saludo\", 0.5, \"sumar\")\n"
     "  local p = buscar(\"Paseante\")\n"
-    "  setPosicion(p, -20, 50, -8)           -- el mix lo toca desde ACA (su base en la partida)\n"
+    "  setPosicion(p, -20, -8, 50)           -- el mix lo toca desde ACA (su base en la partida)\n"
     "  escenaCapa(1, \"Paseo\", 0.25)          -- una capa del mix de ESCENAS (global)\n"
     "end\n";
 

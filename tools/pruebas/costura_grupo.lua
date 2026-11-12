@@ -16,11 +16,12 @@ function inicio()
     local idx = grupoVertices(m, "costura")
     setCompartido("nverts", #idx)
     -- y que TODOS esten en una de las dos posiciones del grupo (x = -1 o x = 1,
-    -- con z = -1 y z = 1 respectivamente): si entrara alguno de mas, se veria aca
+    -- con y = -1 e y = 1 respectivamente; la y de lua es la profundidad, Z arriba):
+    -- si entrara alguno de mas, se veria aca
     local fuera = 0
     for k = 1, #idx do
         local x, y, z = verticePos(m, idx[k])
-        if not ((x < -0.9 and z < -0.9) or (x > 0.9 and z > 0.9)) then fuera = fuera + 1 end
+        if not ((x < -0.9 and y < -0.9) or (x > 0.9 and y > 0.9)) then fuera = fuera + 1 end
     end
     setCompartido("fuera", fuera)
 end

@@ -1,0 +1,19 @@
+// ==========================================================================
+//  PRUEBA del OJO de la lista de scripts (prender / apagar un script sin quitarlo ni ocultar el objeto).
+//  Caja tiene ojo_a.lua (el que se apaga); Testigo, ojo_b.lua (siempre prendido: anota lo que ve de A).
+//  La usa prueba_ojo_script.w3s
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        Mesh {
+            name: "Caja"
+            script: "ojo_a.lua"
+        }
+        Mesh {
+            name: "Testigo"
+            x: 3.0
+            script: "ojo_b.lua"
+        }
+    }
+}

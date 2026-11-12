@@ -2,9 +2,6 @@
 
 Tutorial su come usare Whisk3D. Spiegano con esempi pratici i diversi strumenti di Whisk3D, da qualcosa di semplice come una porta fino a livelli intermedi e più avanzati. Qui verranno pubblicati, man mano, i tutorial e i video del programma. Per qualsiasi dubbio, chiedi su Discord o su Telegram.
 
-[Gruppo e forum Discord di Whisk3D](https://discord.gg/2sjpuact8)
-[Gruppo Telegram](https://t.me/Whisk3D)
-
 - Base
     1. [I viewport](viewports.md)
     2. [Proprietà](propiedades.md)
@@ -16,3 +13,4 @@ Tutorial su come usare Whisk3D. Spiegano con esempi pratici i diversi strumenti 
     8. [Modellare la maniglia](modelar-picaporte.md)
     9. [Animare la porta](animar-puerta.md)
     10. [Far rimbalzare una palla](pelota.md)
+    11. [Il tuo primo script: un cubo che gira](primer-script.md)

@@ -176,6 +176,20 @@ static bool TieneScripts(Object* o) {
     return false;
 }
 int W3dRaizTipoDeducido(Object* raiz) { return TieneScripts(raiz) ? W3D_RAIZ_JUEGO : W3D_RAIZ_ESCENA; }
+// DEDUCIR UNA SOLA VEZ: las escenas sin tipo guardado (un proyecto nuevo, o un .w3d viejo sin registro) toman el de su
+// contenido AL ABRIRSE (o al crearse la de fabrica) y desde ahi queda FIJO. Antes se recalculaba en cada consulta, y una
+// escena a la que se le agregaba un script pasaba sola a ser un juego (y en el menu dejaba de estar "Convertir en
+// juego"). Una escena PUEDE tener scripts (pedido del dueno, 2026-11-11): para animar o simular. El .w3d viejo con
+// scripts sigue abriendo como juego, como siempre. Lo llaman AbrirProyectoAhora y W3dCrearEscenaPorDefecto.
+void W3dRaicesFijarTiposDeducidos() {
+    Asegurar();
+    for (size_t i = 0; i < gFilas.size(); i++) {
+        W3dRaizFila& f = gFilas[i];
+        if (f.tipoExplicito || !W3dRaizEs3D(f.tipo) || !f.raiz) continue;
+        f.tipo = W3dRaizTipoDeducido(f.raiz);
+        f.tipoExplicito = true;
+    }
+}
 int W3dRaizTipoDe(int idx) {
     Asegurar();
     if (idx < 0 || idx >= (int)gFilas.size()) return -1;
@@ -266,8 +280,8 @@ bool W3dRaicesHayRegistro() {
     const W3dRaizFila& f = gFilas[0];
     if (!W3dRaizEs3D(f.tipo) || f.nombre != W3dRaizNombrePorDefecto(W3D_RAIZ_ESCENA) ||
         !f.carpeta.empty() || !gInicial.empty()) return true;
-    // su tipo solo hace falta escribirlo si NO es el que se deduciria al abrir
-    return f.tipoExplicito && f.raiz && f.tipo != W3dRaizTipoDeducido(f.raiz);
+    // su tipo hace falta escribirlo si NO es el que se deduciria al abrir, o si el archivo ya lo traia (ver tipoEnArchivo)
+    return f.tipoExplicito && (f.tipoEnArchivo || (f.raiz && f.tipo != W3dRaizTipoDeducido(f.raiz)));
 }
 
 const std::string& W3dRaizInicial() { return gInicial; }
@@ -560,6 +574,7 @@ void W3dRaicesLeerJson(JVal* raiz) {
             f.tipo = W3dRaizTipoDeClave(tc, W3D_RAIZ_ESCENA);
             if (f.tipo == W3D_RAIZ_PREFAB) f.tipo = W3D_RAIZ_ESCENA;   // (un prefab no va en esta lista)
             f.tipoExplicito = !tc.empty() && W3dRaizTipoDeClave(tc, -1) >= 0;
+            f.tipoEnArchivo = f.tipoExplicito;
             f.nombre = JS(e, "nombre", "");
             f.entrada = JS(e, "entrada", "");
             f.carpeta = W3dMallaCarpetaNormalizar(JS(e, "carpeta", ""));

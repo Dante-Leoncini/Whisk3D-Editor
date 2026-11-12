@@ -1,0 +1,13 @@
+# Prueba del "inspector" en vivo (como en Unity): con el juego andando, cambiar un valor de un script en el panel de
+# Propiedades le llega al script en ese momento. scriptval hace lo mismo que el panel (lo guarda y avisa a la sim con
+# SimReresolver). Un cubo gira a 90 grados por segundo: 1 s de juego = 90; la velocidad pasa a 360 y 1 s mas = 450.
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_inspector_en_vivo.w3s
+abrirw3d prueba_inspector_en_vivo.w3d
+simplay 30
+scriptinfo compartido giro 90
+scriptval "Cubo" 0 velocidad 360
+simplay 30
+scriptinfo compartido giro 450
+simstop

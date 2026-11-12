@@ -308,8 +308,9 @@ static bool CmdHitboxProps(std::istringstream& ss, std::string& err) {
     pr->ActualizarPestanias();
     bool ok = pr->propHitbox->visible && pr->propHbActivo->value == &h->activo &&
               pr->propHbCuerpos->value == &h->detectarCuerpos;
+    static const int kEje[3] = { 0, 2, 1 };   // los campos son Z-ARRIBA: "Y" = tam[2] (la z interna), "Z" = tam[1]
     for (int k = 0; k < 3; k++)
-        ok = ok && pr->propHbTam[k]->value == &h->tam[k] && pr->propHbCentro[k]->value == &h->centro[k];
+        ok = ok && pr->propHbTam[k]->value == &h->tam[kEje[k]] && pr->propHbCentro[k]->value == &h->centro[kEje[k]];
     const bool iconoTab = pr->BarTabs.size() >= 3 && pr->BarTabs[2]->visible && pr->BarTabs[2]->icon == (int)IconType::hitbox;
     const bool iconoOut = IconoDeObjeto(o) == (size_t)IconType::hitbox;
     // texto con commit EN VIVO: lo tipeado va al hitbox; sin foco el campo muestra el valor real
@@ -753,7 +754,8 @@ static bool CmdOrdenHijo(std::istringstream& ss, std::string& err) {
 // ---------------------------------------------------------------------------
 //  juegohitboxmin / juegohitboxlog: lo mismo en el Play y en el juego compilado
 // ---------------------------------------------------------------------------
-// el contador generico: alEntrar/alQuedarse/alSalir (y alTocar) en compartido("<prefijo>_...")
+// el contador generico: alEntrar/alQuedarse/alSalir (y alTocar) en compartido("<prefijo>_..."); de alTocar anota la
+// vertical de la normal (nz: lua es Z arriba) en "<prefijo>_nz"
 static const char* kLuaContador =
     "-- contador de eventos de hitbox / contactos (prueba del motor)\n"
     "propiedades = { prefijo = \"x\" }\n"
@@ -772,21 +774,22 @@ static const char* kLuaContador =
     "function alQuedarse(otro, mio, suyo) suma(\"quedarse\") end\n"
     "function alSalir(otro, mio, suyo) suma(\"salir\"); setCompartido(p .. \"_salio\", nom(otro)) end\n"
     "function alTocar(otro, impulso, x, y, z, nx, ny, nz)\n"
-    "  suma(\"tocar\"); setCompartido(p .. \"_tocado\", nom(otro)); setCompartido(p .. \"_ny\", ny)\n"
+    "  suma(\"tocar\"); setCompartido(p .. \"_tocado\", nom(otro)); setCompartido(p .. \"_nz\", nz)\n"
     "end\n";
-// un objeto que avanza en X un paso FIJO por tick (determinista aunque el dt varie)
+// un objeto que avanza en X un paso FIJO por tick (determinista aunque el dt varie). La propiedad "y" es la ALTURA
+// (asi se llamaba cuando lua era Y arriba; el Movil la trae en su ref): con Z arriba va en la z de setPosicion
 static const char* kLuaMover =
     "-- avanza en X un paso fijo por tick (x = x0 + paso * n)\n"
     "propiedades = { x0 = 0, paso = 0.4, y = 0 }\n"
     "local n = 0\n"
     "function actualizar(dt)\n"
     "  n = n + 1\n"
-    "  setPosicion(yo(), propiedad(\"x0\") + propiedad(\"paso\") * n, propiedad(\"y\"), 0)\n"
+    "  setPosicion(yo(), propiedad(\"x0\") + propiedad(\"paso\") * n, 0, propiedad(\"y\"))\n"
     "end\n";
 // la caja que cae: los dinamicos arrancan DORMIDOS, se la despierta con una velocidad
 static const char* kLuaDespertar =
     "-- despierta el cuerpo rigido (los dinamicos arrancan dormidos)\n"
-    "function inicio() fisicaVel(yo(), 0, -0.5, 0) end\n";
+    "function inicio() fisicaVel(yo(), 0, 0, -0.5) end   -- hacia abajo (Z arriba)\n";
 // arranca la animacion de escena (one-shot)
 static const char* kLuaAnim =
     "function inicio() animEscena(\"Subir\", false) end\n";
@@ -803,7 +806,7 @@ static const char* kLuaJuez =
     "function actualizar(dt)\n"
     "  if listo then return end\n"
     "  t = t + 1; seg = seg + dt\n"
-    "  local _, ay = posicion(buscar(\"Ascensor\"))\n"
+    "  local _, _, ay = posicion(buscar(\"Ascensor\"))   -- la altura: la z (Z arriba)\n"
     "  local ok = c(\"puerta_entrar\") == 1 and c(\"puerta_quedarse\") == 7 and c(\"puerta_salir\") == 1\n"
     "     and c(\"zona_entrar\") == 1 and c(\"zona_salir\") == 1 and c(\"caja_entrar\") == 1 and c(\"caja_salir\") == 1\n"
     "     and c(\"piso_tocar\") == 1 and c(\"caja_tocar\") == 1 and ay > 4.9\n"

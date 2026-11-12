@@ -1593,6 +1593,7 @@ The Script object '%s' no longer exists: it was migrated to an empty object with
 The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	A cena UI '%s' não pôde ser lida: o projeto abre sem ela e NÃO vou salvar por cima (veja whisk3d.log)
 The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	Falta a cena UI '%s': o projeto abre sem ela e NÃO vou salvar por cima (veja whisk3d.log)
 The armature has its own clips	O armature tem clipes próprios
+The button's function failed	A função do botão falhou
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	As chamadas cambiarEscena() do seu .lua ainda apontam para a primeira: edite-as à mão.
 The clip library could not be read	Não foi possível ler a biblioteca de clipes
 The clipboard has no hex color	A área de transferência não tem uma cor hex
@@ -1677,6 +1678,7 @@ Triangulate Faces	Triangular Faces
 Trim end	Corte do final
 Trim start	Corte do início
 Turbulence	Turbulência
+Turn the script on or off	Ligar ou desligar o script
 Type	Tipo
 U Location	U Posição
 UI	UI

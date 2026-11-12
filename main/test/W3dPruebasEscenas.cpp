@@ -14,7 +14,9 @@
 //             [tipode X escena|juego|prefab]
 //        el registro de raices y sus asserts ('objetos' = los de la ACTIVA, recursivo; los
 //        tipos son los EFECTIVOS: el de un proyecto viejo sale de sus scripts).
-//    raiztipo escena|juego [falla]   "Convert to Scene" / "Convert to Game" de la activa (con undo)
+//    raiztipo escena|juego [falla]   cambia el TIPO de la activa en el lugar, con undo (W3dRaizConvertirActiva: lo
+//                                    que hace "Convert to Scene"; "Convert to Game" DUPLICA la escena como un juego
+//                                    nuevo, se elige con 'raizmenu 3d Convert to Game': prueba_escena_a_juego.w3s)
 //
 //  LAS ESCENAS ABIERTAS A LA VEZ (W3dRaices.h: la casilla de la lista; el nombre va al final, con espacios):
 //    escenatildar abrir|cerrar|cerrarcartel|cerrarfalla <nombre>
@@ -1347,7 +1349,8 @@ static const char* kLuaCineJuego =
     "local function ajenos()\n"
     "  local fg, fp, f2 = animObjetoFrame(buscar(\"Grua\")), animObjetoFrame(buscar(\"Puerta\")), animObjetoFrame(buscar(\"Puerta2\"))\n"
     "  local jc = objetoCapaFrame(buscar(\"Plataforma\"), 1)\n"
-    "  local yg, y2, yp = select(2, posicion(buscar(\"Grua\"))), select(2, posicion(buscar(\"Puerta2\"))), select(2, posicion(buscar(\"Plataforma\")))\n"
+    "  -- (la altura de cada uno: la z de posicion, Z arriba)\n"
+    "  local yg, y2, yp = select(3, posicion(buscar(\"Grua\"))), select(3, posicion(buscar(\"Puerta2\"))), select(3, posicion(buscar(\"Plataforma\")))\n"
     "  local ok = fg ~= nil and f2 ~= nil and math.abs((fg - 1) - math.min(60, 2 * (fp - 1))) < 0.05 and math.abs(yg - (fg - 1)) < 0.02\n"
     "     and math.abs(y2 - 2 * (f2 - 1)) < 0.02 and jc > 0 and math.abs(yp - 0.5 * math.min(jc, 10)) < 0.02\n"
     "  return ok, string.format(\"grua=%.2f/%.2f puerta2=%.2f/%.2f plataforma=%.2f/%.2f\", fg or -1, yg, f2 or -1, y2, jc, yp)\n"
@@ -1393,7 +1396,7 @@ static const char* kLuaCineJuego =
     "-- al VOLVER de la cinematica: el juego EXACTAMENTE como quedo (en pausa: ni un frame de mas)\n"
     "function alVolver()\n"
     "  local fp = animObjetoFrame(buscar(\"Puerta\"))\n"
-    "  local py = select(2, posicion(buscar(\"Puerta\")))\n"
+    "  local py = select(3, posicion(buscar(\"Puerta\")))   -- la altura (Z arriba)\n"
     "  setCompartido(\"vuelta\", t)\n"
     "  setCompartido(\"iguales\", math.abs(fp - antes) < 0.01 and math.abs(py - (fp - 1)) < 0.01\n"
     "                            and escenaReproduciendo() == nil)\n"

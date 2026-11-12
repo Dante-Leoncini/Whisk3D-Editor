@@ -3,6 +3,7 @@
 | Function | What it does |
 |---|---|
 | `buscar(nombre [, raiz]) → obj \| nil` | Finds an object by its name in the outliner (or only inside `raiz`). |
+| `seleccionados() → { obj, … }` | The objects selected in the editor (for [buttons](scripts-y-objetos.md#buttons) that work as editor add-ons). |
 | `nombre(obj) → texto` | The object's name. |
 | `tipo(obj) → texto` | What it is: `"mesh"`, `"luz"`, `"camara"`, `"vacio"`, `"esqueleto"`, `"texto"`, `"imagen"`, `"boton"`, `"hitbox"`, `"prefab"`, `"rutina"`… (`""` if it doesn't exist). |
 | `instanciar(prefab [, x, y, z [, rotY [, padre]]]) → obj \| nil` | Creates a copy of a prefab at that position (rotY in degrees). `"Libreria/Escena"` creates the one from a linked library. With `padre` it hangs from that object (position and rotation relative to it). |

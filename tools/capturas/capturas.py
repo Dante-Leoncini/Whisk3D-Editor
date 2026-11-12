@@ -110,6 +110,9 @@ class Info:
         self.tlpanel = None        # la Linea de tiempo: {'x', 'y', 'w' (el panel de filas), 'numeros' (su Y), 'f1', 'f11'}
         self.tlfilas = []          # sus filas: {'r', 'y', 'tipo', 'prop', 'comp', 'nombre'}
         self.tlkeys = []           # sus keyframes: {'r', 'f', 'x', 'y'} (en el editor de curvas, sobre la curva)
+        self.archivos = []         # el explorador de archivos abierto: {'i', 'x', 'y', 'w', 'h', 'sel', 'nombre'}
+        self.popup = None          # la ventana emergente abierta: {'x', 'y', 'w', 'h', 'nombre'}
+        self.botones_explorador = []   # sus botones de abajo (la accion y Cancelar): {'x', 'y', 'w', 'h', 'texto'}
         self.tiempos = {}          # el reloj abierto: campo j -> (x, y) (0 cuadro actual, 1 Inicio, 2 Fin, 3 FPS)
         for linea in salida.splitlines():
             if not linea.startswith("@cap "):
@@ -164,6 +167,12 @@ class Info:
                 self.tlpanel = d
             elif tipo == "tlfila":
                 self.tlfilas.append(d)
+            elif tipo == "popup":
+                self.popup = d
+            elif tipo == "archivo":
+                self.archivos.append(d)
+            elif tipo == "exploradorboton":
+                self.botones_explorador.append(d)
             elif tipo == "tlkey":
                 self.tlkeys.append(d)
             elif tipo == "tiempo":
@@ -241,11 +250,22 @@ class Info:
                 return it["cx"], it["cy"]
         raise SystemExit("capturas: el menu abierto no tiene '%s' (tiene: %s)" % (texto, [i.get("texto") for i in self.items]))
 
+    def _herramienta_visible(self, kind, b, nombre):
+        """El centro de un boton de la barra de abajo, si cae ADENTRO de su viewport. Una barra que no entra en el ancho
+        corta los ultimos botones: el harness igual informa su lugar, y un click ahi cae en el viewport de al lado sin
+        hacer nada (asi el tutorial de la pelota salio con la subida mal: 'Al llegar' quedaba afuera y el keyframe se
+        quedaba con el suavizado automatico). Mejor cortar aca que sacar una captura que muestra otra cosa."""
+        cx, cy = b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+        if not any(v["x"] <= cx < v["x"] + v["w"] for v in self.vps if v["kind"] == kind):
+            raise SystemExit("capturas: el boton %s de la barra de abajo del viewport %d queda afuera (x=%d): la barra no "
+                             "entra en el ancho; ensanchar el viewport o correr la barra con la rueda" % (nombre, kind, cx))
+        return cx, cy
+
     def herramienta(self, kind, texto):
         """Centro de un boton de la barra de abajo de un viewport, por su texto (el del idioma de la interfaz)."""
         for b in self.herramientas:
             if b["kind"] == kind and b.get("texto") == texto:
-                return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+                return self._herramienta_visible(kind, b, "'%s'" % texto)
         raise SystemExit("capturas: la barra de abajo del viewport %d no tiene '%s' (tiene: %s)"
                          % (kind, texto, [b.get("texto") for b in self.herramientas if b["kind"] == kind]))
 
@@ -253,7 +273,7 @@ class Info:
         """Centro de un boton de la barra de abajo por su ROL (la tilde y la cruz no tienen texto)."""
         for b in self.herramientas:
             if b["kind"] == kind and b["rol"] == rol:
-                return b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
+                return self._herramienta_visible(kind, b, "de rol %d" % rol)
         raise SystemExit("capturas: la barra de abajo del viewport %d no tiene el rol %d (tiene: %s)"
                          % (kind, rol, [(b["rol"], b.get("texto")) for b in self.herramientas if b["kind"] == kind]))
 
@@ -262,6 +282,13 @@ class Info:
         if n not in self.manijas:
             raise SystemExit("capturas: no se ve la manija %d del gizmo (se ven: %s)" % (n, sorted(self.manijas)))
         return self.manijas[n]
+
+    def archivo(self, nombre):
+        """Centro de un archivo o carpeta del explorador abierto, por su nombre."""
+        for a in self.archivos:
+            if a.get("nombre") == nombre:
+                return a["x"] + a["w"] // 2, a["y"] + a["h"] // 2
+        raise SystemExit("capturas: el explorador no muestra '%s' (muestra: %s)" % (nombre, [a.get("nombre") for a in self.archivos]))
 
     def pestania(self, n):
         """Centro de la pestania n de Propiedades (el numero fijo: 1 Objeto, 2 la del tipo...)."""
@@ -364,6 +391,7 @@ class Guion:
         with open(guion, "w", encoding="utf-8") as f:
             f.write("\n".join(lineas) + "\n")
         env = dict(os.environ, LANG=IDIOMAS[self.idioma], LC_ALL=IDIOMAS[self.idioma], LANGUAGE="")
+        env.update(getattr(self, "entorno", {}))   # (una receta puede cambiar el HOME: el explorador arranca ahi)
         r = subprocess.run([BIN, "--script", guion], cwd=RAIZ, env=env,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
         salida = r.stdout.decode("utf-8", "replace")

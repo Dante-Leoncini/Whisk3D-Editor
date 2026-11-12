@@ -1,4 +1,4 @@
-# Whisk3D kılavuzları
+# Whisk3D eğitimleri ve kılavuzları
 
 - [Eğitimler](tutoriales/README.md): editörden görüntüler ve animasyonlarla adım adım.
 - [Whisk3D Editor kılavuzu](editor/README.md): editörün neler yapabildiği, panele ve moda göre düzenlenmiş hâlde.

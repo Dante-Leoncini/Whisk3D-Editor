@@ -8,7 +8,7 @@ function actualizar(dt)
   if n == 3 then
     muerto = buscar("Enemigo.001")
     destruir(muerto)
-    local c = instanciar("Enemigo", 0, 0, 10, 45)
+    local c = instanciar("Enemigo", 0, 10, 0, 45)
     setCompartido("creado", nombre(c))
   end
   if n == 5 then

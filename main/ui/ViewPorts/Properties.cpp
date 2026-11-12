@@ -3159,6 +3159,7 @@ static void ScriptRefrescar(){
     if (PropsActivo) { PropsActivo->target = NULL; PropsActivo->scriptFirma = -1; }
     g_redraw = true;
 }
+void PropsScriptsRefrescar(){ ScriptRefrescar(); }   // (SimStop: los scripts vuelven a como estaban antes del Play)
 // el file browser eligio un .lua: agregarlo o cambiar el del script elegido
 static void ScriptElegido(const std::string& rutaElegida) {
     if (!ObjActivo) return;
@@ -3180,12 +3181,42 @@ static void ScriptElegido(const std::string& rutaElegida) {
     { extern void SimScriptsCambiados(Object*); SimScriptsCambiados(ObjActivo); }
     ScriptRefrescar();
 }
+// ANIADIR un script: un MENU bajo el boton con los scripts del PROYECTO (los de adentro del .w3d y los que ya usa la
+// escena: IDEColectarScripts, la misma lista que el selector del IDE, solo los .lua) y al final "Cargar .lua...": el
+// explorador del disco, para un script de AFUERA (escrito en otro IDE o guardado fuera del .w3d). Antes Aniadir abria
+// directo el explorador, y un script guardado ADENTRO del .w3d no se le podia poner a ningun objeto (2026-11-11).
+static PopupMenu* MenuScriptAgregar = NULL;
+static std::vector<std::string> gScriptAgregarRutas;
+static const int kScriptCargarLua = 100000;
+static void AccionScriptAgregarElegido(int id) {
+    if (!ObjActivo) return;
+    g_scriptCambiarIdx = -1;
+    if (id == kScriptCargarLua) { AbrirFileBrowser(T("Load script"), T("Open"), ".lua .luac", ScriptElegido); return; }
+    if (id < 0 || id >= (int)gScriptAgregarRutas.size()) return;
+    ScriptElegido(gScriptAgregarRutas[(size_t)id]);   // (una entrada de adentro queda tal cual: W3dImportarAsset)
+}
 static void AccionScriptAgregar() {
     if (!ObjActivo) return;
     if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;   // (ver ScriptElegido)
-    g_scriptCambiarIdx = -1;
-    AbrirFileBrowser(T("Load script"), T("Open"), ".lua .luac", ScriptElegido);
+    if (!PropsActivo || !PropsActivo->propRowScript || PropsActivo->propRowScript->botones.empty()) return;
+    if (!MenuScriptAgregar) { MenuScriptAgregar = new PopupMenu(); MenuScriptAgregar->action = AccionScriptAgregarElegido; }
+    MenuScriptAgregar->Limpiar();
+    MenuScriptAgregar->titulo = T("Add");
+    extern void IDEColectarScripts(std::vector<std::string>* rutas); extern std::string IDENombreScript(const std::string& ruta);
+    std::vector<std::string> todas;
+    IDEColectarScripts(&todas);
+    gScriptAgregarRutas.clear();
+    for (size_t i = 0; i < todas.size(); i++) {
+        const std::string& r = todas[i];
+        if (r.size() >= 4 && r.compare(r.size() - 4, 4, ".lua") == 0) gScriptAgregarRutas.push_back(r);
+    }
+    if (gScriptAgregarRutas.empty()) MenuScriptAgregar->Agregar(T("(no .lua scripts)"), -1);
+    for (size_t i = 0; i < gScriptAgregarRutas.size(); i++)
+        MenuScriptAgregar->Agregar(IDENombreScript(gScriptAgregarRutas[i]), (int)i, (int)IconType::archive);
+    MenuScriptAgregar->Agregar(T("Load .lua..."), kScriptCargarLua, (int)IconType::carpeta);
+    AbrirMenuBajoBoton(MenuScriptAgregar, PropsActivo->propRowScript->botones[0]);
 }
+void _ScriptAgregarFwd(){ AccionScriptAgregar(); }   // (el harness: el mismo boton)
 // el script SELECCIONADO en la lista de la tarjeta Control (-1 = ninguno)
 static int ScriptActivoIdx() {
     if (!ObjActivo || !ObjActivo->scriptDatos) return -1;
@@ -3327,6 +3358,20 @@ static void MoverScriptDe(Object* o, int i, int j) {
 }
 // el harness de tests aprieta los MISMOS botones (mismo idiom que _QuitarScriptDeObjetoFwd)
 void _MoverScriptDeObjetoFwd(Object* o, int i, int j){ MoverScriptDe(o, i, j); }
+// el OJO de la lista de scripts (tarjeta Control): prende o apaga el script i del objeto activo SIN quitarlo y sin
+// ocultar el objeto. Apagado, el motor no llama a ninguna de sus funciones (W3dScriptEntrada::apagado, se guarda en el
+// .w3d); con el juego andando cambia en ese momento (W3dScriptSetApagado: prenderlo corre su inicio() si no corrio).
+static bool ScriptToggleOjo(int i) {
+    if (!ObjActivo || !ObjActivo->scriptDatos) return false;
+    std::vector<W3dScriptEntrada>& v = ObjActivo->scriptDatos->scripts;
+    if (i < 0 || i >= (int)v.size()) return false;
+    if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return true;   // (los scripts de lo generado son los del prefab)
+    v[i].apagado = !v[i].apagado;
+    W3dScriptSetApagado(ObjActivo, i, v[i].apagado);
+    g_redraw = true;
+    return true;
+}
+void _ScriptToggleOjoFwd(int i){ ScriptToggleOjo(i); }   // (el harness: el mismo click)
 static void MoverScript(int i, int j) { MoverScriptDe(ObjActivo, i, j); }
 static void AccionScriptUp()   { int a = ScriptActivoIdx(); if (a > 0) MoverScript(a, a - 1); }
 static void AccionScriptDown() {
@@ -3346,23 +3391,30 @@ static void AccionScriptCardFila() {
     if (card < 0 || !ObjActivo || !ObjActivo->scriptDatos) return;
     if (card >= (int)ObjActivo->scriptDatos->scripts.size()) return;
     GroupPropertie* g = PropsActivo->propScriptCards[card];
-    int ultima = (int)g->properties.size() - 1;
     if (fila == 0) {                 // [0] el archivo: elegir otro .lua
         if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;   // (ver ScriptElegido)
         g_scriptCambiarIdx = card;
         AbrirFileBrowser(T("Load script"), T("Open"), ".lua .luac", ScriptElegido);
         return;
     }
-    if (fila == ultima) {            // ultima fila: QUITAR el script
-        QuitarScriptDeObjeto(ObjActivo, card);
-        ScriptRefrescar();
-        return;
-    }
-    // filas del medio: una PROPIEDAD expuesta (desplegable de objetos u opciones)
+    // las demas filas: una PROPIEDAD expuesta (desplegable de objetos u opciones). (Antes la ultima era "Quitar
+    // script"; ya no esta: se quita con Quitar en la tarjeta Control.)
     int pi = fila - 1;
     g_scriptCardSel = card; g_scriptPropSel = pi;
     if (card >= (int)gScriptPropsMulti.size() || pi < 0 || pi >= (int)gScriptPropsMulti[card].size()) return;
     W3dScriptProp& p = gScriptPropsMulti[card][pi];
+    if (p.tipo == 3) {   // un BOTON: llama a su funcion (con el juego andando, en vivo; sin el, como un complemento)
+        // con el juego PARADO lo que haga es un cambio del usuario: va al historial (Ctrl+Z lo deshace entero). Jugando
+        // no (SimUndoScriptIniciar no hace nada): al Parar se repone todo igual
+        SimUndoScriptIniciar();
+        const bool ok = W3dScriptLlamarBoton(ObjActivo, card, p.nombre);
+        SimUndoScriptConfirmar();    // (aunque haya fallado a la mitad: lo que alcanzo a hacer tambien se deshace)
+        if (!ok) {
+            Notificar(std::string(T("The button's function failed")) + ": " + W3dScriptUltimoError(), true);
+        }
+        ScriptRefrescar();
+        return;
+    }
     if (!MenuScriptRef) { MenuScriptRef = new PopupMenu(); MenuScriptRef->action = AccionScriptRefElegida; }
     MenuScriptRef->Limpiar();
     MenuScriptRef->titulo = p.nombre;
@@ -7196,11 +7248,13 @@ void Properties::ConstruirGrupos(){
       pf=(PropFloat*)propTransform->properties[1]; pf->animProp=AnimPosition; pf->animComp=AnimZ; // el campo "Y" es pos.z (display Z-up)
       pf=(PropFloat*)propTransform->properties[2]; pf->animProp=AnimPosition; pf->animComp=AnimY; // el campo "Z" es pos.y
       pf=(PropFloat*)propTransform->properties[6]; pf->animProp=AnimRotation; pf->animComp=AnimX;
-      pf=(PropFloat*)propTransform->properties[7]; pf->animProp=AnimRotation; pf->animComp=AnimY;
-      pf=(PropFloat*)propTransform->properties[8]; pf->animProp=AnimRotation; pf->animComp=AnimZ;
+      // la rotacion y la escala tambien Z-ARRIBA (desde el 2026-11-11, como la posicion y como Lua): su "Y" es la z
+      // interna y su "Z" la y (la vertical)
+      pf=(PropFloat*)propTransform->properties[7]; pf->animProp=AnimRotation; pf->animComp=AnimZ;
+      pf=(PropFloat*)propTransform->properties[8]; pf->animProp=AnimRotation; pf->animComp=AnimY;
       pf=(PropFloat*)propTransform->properties[10]; pf->animProp=AnimScale; pf->animComp=AnimX;
-      pf=(PropFloat*)propTransform->properties[11]; pf->animProp=AnimScale; pf->animComp=AnimY;
-      pf=(PropFloat*)propTransform->properties[12]; pf->animProp=AnimScale; pf->animComp=AnimZ; }
+      pf=(PropFloat*)propTransform->properties[11]; pf->animProp=AnimScale; pf->animComp=AnimZ;
+      pf=(PropFloat*)propTransform->properties[12]; pf->animProp=AnimScale; pf->animComp=AnimY; }
     // checkboxes VISIBLE + RENDERIZAR (propiedades del objeto que nunca se mostraban;
     // animables: la curva 0/1 dice si en ese frame se ve / se renderiza)
     propObjVisible = new PropBool(T("Visible"));
@@ -7784,7 +7838,8 @@ void Properties::ConstruirGrupos(){
     propControl->properties.push_back(propListScripts);       // [0] la lista (mismo componente)
     // fila: Add (abre el file browser) | Remove (oculta si no hay scripts)
     propRowScript = new PropButtonRow();
-    propRowScript->Agregar(T("Add"), AccionScriptAgregar, (int)IconType::archive);
+    { Button* ba = propRowScript->Agregar(T("Add"), AccionScriptAgregar, (int)IconType::archive);
+      if (ba) ba->desplegable = true; }   // (abre un menu: los scripts del proyecto y "Cargar .lua...")
     propRowScript->Agregar(T("Remove"), AccionScriptQuitar);
     propControl->properties.push_back(propRowScript);
     // fila: Move Up | Move Down (oculta entera con < 2 scripts: el orden solo importa con 2+)
@@ -9826,14 +9881,12 @@ void Properties::ConstruirGrupos(){
     // ================================================================================
     //  LOS EJES QUE SE COPIAN (Copy Location / Copy Rotation)
     //
-    //  OJO CON EL NOMBRE DE LOS EJES: el panel muestra la POSICION en Z-ARRIBA (el campo
-    //  "Y" de la tarjeta Transform apunta a pos.z y el "Z" a pos.y; esta escrito en
-    //  ConstruirGrupos, en el bloque de los canales de animacion). La ROTACION y la
-    //  ESCALA, en cambio, se muestran DIRECTAS (rotEuler.y va al campo "Y").
-    //  O sea que estos tres checkboxes NO se pueden bindear igual para los dos tipos:
-    //    - Copy LOCATION: "Copy Y" tiene que enmascarar ejeZ y "Copy Z" ejeY, para que
-    //      diga lo mismo que el campo de posicion que el usuario esta mirando arriba.
-    //    - Copy ROTATION: van derecho, porque la rotacion se muestra derecho.
+    //  OJO CON EL NOMBRE DE LOS EJES: el panel muestra TODO en Z-ARRIBA (el campo "Y" de
+    //  la tarjeta Transform apunta a la z interna y el "Z" a la y; esta escrito en
+    //  ConstruirGrupos, en el bloque de los canales de animacion). Desde el 2026-11-11 la
+    //  ROTACION y la ESCALA tambien (antes iban directas y aca se cruzaba solo la posicion).
+    //  O sea: "Copy Y" enmascara ejeZ y "Copy Z" ejeY, para que diga lo mismo que el campo
+    //  que el usuario esta mirando arriba, sea de posicion o de rotacion.
     //  El dato GUARDADO (W3dConstraint::ejeX/Y/Z) es siempre el eje INTERNO del motor,
     //  igual que pos: el .w3d nunca ve el espacio de display. El cruce vive SOLO aca,
     //  en el bindeo (ver ActualizarPestanias).
@@ -10285,8 +10338,79 @@ void PropsDestinosRecurso(Properties* p, int tipo, std::vector<int>& rects) {
 }
 // el CARTELITO DE AYUDA de los botones chicos de los mapas del material (numero / textura, la capa UV): el que queda
 // bajo el puntero (con su rectangulo de pantalla en sx / sy), o NULL. Lo pregunta W3dAyudaRender (LayoutInput.cpp)
+// el OJO de la lista de scripts bajo (mx, my): la fila, y su rectangulo de pantalla en x/y/w/h; -1 si no hay. El mismo
+// recorrido que ClickEn y ListaBajoY, y la misma columna que el click (la del ojo, a la derecha de la tarjeta)
+static int OjoDeScriptEn(Properties* p, int mx, int my, int* ox, int* oy, int* ow, int* oh) {
+    if (!p || !p->propListScripts || !ObjActivo || !ObjActivo->scriptDatos) return -1;
+    int yCursor = p->y + p->BarTopOffset() + p->PosY + borderGS + RenglonHeightGS + gapGS;
+    for (size_t i = 0; i < p->GroupProperties.size(); i++) {
+        GroupPropertie* g = p->GroupProperties[i];
+        if (!g->visible) continue;
+        const int hCabecera = borderGS + RenglonHeightGS + gapGS;
+        if (g->open) {
+            int yFila = yCursor + hCabecera;
+            for (size_t j = 0; j < g->properties.size(); j++) {
+                PropertieBase* prop = g->properties[j];
+                const int hFila = prop->Resize(g->width);
+                if (prop == p->propListScripts) {
+                    PropListMeshParts* l = p->propListScripts;
+                    const int rowH = RenglonHeightGS + gapGS;
+                    if (my < yFila + borderGS || my >= yFila + hFila - gapGS - borderGS || rowH <= 0) return -1;
+                    const int k = (my - yFila - borderGS) / rowH;
+                    const int item = l->scrollFila + k;
+                    if (item < 0 || item >= l->ListaCount()) return -1;
+                    const int x0 = p->x + p->PosX + g->width - (int)IconSizeGS - gapGS * 6;
+                    if (mx < x0 || mx >= p->x + p->PosX + g->width + borderGS * 2) return -1;
+                    *ox = x0; *oy = yFila + borderGS + k * rowH; *ow = (int)IconSizeGS + gapGS * 6; *oh = RenglonHeightGS;
+                    return item;
+                }
+                yFila += hFila;
+            }
+        }
+        yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    return -1;
+}
+// el CENTRO del ojo de la fila 'fila' de la lista de scripts (si se ve): para el harness (ojoscript, capinfo) y las
+// capturas. Cae adentro de la columna que mira el click (ClickEn) y el cartelito (OjoDeScriptEn)
+bool PropsOjoScriptCentro(Properties* p, int fila, int* cx, int* cy) {
+    if (!p || !p->propListScripts || !ObjActivo || !ObjActivo->scriptDatos) return false;
+    PropListMeshParts* l = p->propListScripts;
+    const int k = fila - l->scrollFila;
+    if (fila < 0 || fila >= l->ListaCount() || k < 0 || k >= l->filasMax) return false;
+    int yCursor = p->y + p->BarTopOffset() + p->PosY + borderGS + RenglonHeightGS + gapGS;
+    for (size_t i = 0; i < p->GroupProperties.size(); i++) {
+        GroupPropertie* g = p->GroupProperties[i];
+        if (!g->visible) continue;
+        if (g->open) {
+            int yFila = yCursor + borderGS + RenglonHeightGS + gapGS;
+            for (size_t j = 0; j < g->properties.size(); j++) {
+                PropertieBase* prop = g->properties[j];
+                const int hFila = prop->Resize(g->width);
+                if (prop == l) {
+                    *cx = p->x + p->PosX + g->width - (int)IconSizeGS / 2 - gapGS * 4;
+                    *cy = yFila + borderGS + k * (RenglonHeightGS + gapGS) + RenglonHeightGS / 2;
+                    return true;
+                }
+                yFila += hFila;
+            }
+        }
+        yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    return false;
+}
 Button* PropsAyudaEn(Properties* p, int mx, int my) {
     if (!p || !p->Contains(mx, my)) return NULL;
+    {   // el OJO de la lista de scripts: "Prender o apagar el script" (un boton que no se dibuja: solo lleva el
+        // texto y el lugar, como los de la barra que muestra W3dAyudaRender)
+        int ox, oy, ow, oh;
+        if (OjoDeScriptEn(p, mx, my, &ox, &oy, &ow, &oh) >= 0) {
+            static Button* ojo = NULL;
+            if (!ojo) { ojo = new Button(""); ojo->ayuda = "Turn the script on or off"; }
+            ojo->sx = ox; ojo->sy = oy; ojo->width = ow; ojo->height = oh; ojo->visible = true;
+            return ojo;
+        }
+    }
     for (int k = 0; k < W3D_MAPAS; k++) {
         PropButton* b = BotonDeMapa(p, k);
         if (!b || b->oculto || b->nExtras <= 0 || !UbicarBotonDeTarjeta(p, b)) continue;
@@ -10868,24 +10992,24 @@ void Properties::RefreshTargetProperties(){
         // el panel edita la COPIA de display (rotQuat); SincronizarRotacionActiva la baja al quaternion real
         pw->name = T("Rotation W"); pw->value = &ObjActivo->rotQuat.w; pw->unit = "";
         px->name = "X"; px->value = &ObjActivo->rotQuat.x; px->unit = "";
-        py->value = &ObjActivo->rotQuat.y; py->unit = "";
-        pz->value = &ObjActivo->rotQuat.z; pz->unit = "";
+        py->value = &ObjActivo->rotQuat.z; py->unit = "";   // (Z-arriba: la "Y" es la z interna)
+        pz->value = &ObjActivo->rotQuat.y; pz->unit = "";
     } else if (rm == RotAxisAngle){
         pw->name = T("Rotation W"); pw->value = &ObjActivo->rotAngle; pw->unit = "°";
         px->name = "X"; px->value = &ObjActivo->rotAxis.x; px->unit = "";
-        py->value = &ObjActivo->rotAxis.y; py->unit = "";
-        pz->value = &ObjActivo->rotAxis.z; pz->unit = "";
+        py->value = &ObjActivo->rotAxis.z; py->unit = "";   // (Z-arriba)
+        pz->value = &ObjActivo->rotAxis.y; pz->unit = "";
     } else { // XYZ Euler
         pw->value = NULL; // oculto (Resize devuelve 0; el teclado lo saltea)
         px->name = T("Rotation X"); px->value = &ObjActivo->rotEuler.x; px->unit = "°";
-        py->value = &ObjActivo->rotEuler.y; py->unit = "°";
-        pz->value = &ObjActivo->rotEuler.z; pz->unit = "°";
+        py->value = &ObjActivo->rotEuler.z; py->unit = "°";   // (Z-arriba: la "Z" es el giro sobre la vertical)
+        pz->value = &ObjActivo->rotEuler.y; pz->unit = "°";
     }
 
     //escala (indices corridos +2 por el Mode y el W)
     static_cast<PropFloat*>(propTransform->properties[10])->value = &ObjActivo->scale.x;
-    static_cast<PropFloat*>(propTransform->properties[11])->value = &ObjActivo->scale.y;
-    static_cast<PropFloat*>(propTransform->properties[12])->value = &ObjActivo->scale.z;
+    static_cast<PropFloat*>(propTransform->properties[11])->value = &ObjActivo->scale.z;   // (Z-arriba: la "Z" es la altura)
+    static_cast<PropFloat*>(propTransform->properties[12])->value = &ObjActivo->scale.y;
     if (propObjVisible) propObjVisible->value = &ObjActivo->visible;       // checkboxes visible/render
     if (propObjRender)  propObjRender->value  = &ObjActivo->renderizable;
     if (propObjRelLines) propObjRelLines->value = &ObjActivo->showRelantionshipsLines;
@@ -11147,6 +11271,13 @@ void Properties::RefreshTargetProperties(){
                         gScriptValRows.push_back(r);
                         continue;
                     }
+                    if (props[pi].tipo == 3) {
+                        // un BOTON (una funcion del script): lo que dice, y al tocarlo la llama (AccionScriptCardFila)
+                        PropButton* pbt = new PropButton(props[pi].etiqueta.empty() ? props[pi].nombre : props[pi].etiqueta, -1);
+                        pbt->action = AccionScriptCardFila;
+                        g->properties.push_back(pbt);
+                        continue;
+                    }
                     PropButton* pb = new PropButton(props[pi].nombre);
                     pb->conLabel = true;
                     pb->button->desplegable = true;
@@ -11157,10 +11288,8 @@ void Properties::RefreshTargetProperties(){
                     pb->action = AccionScriptCardFila;
                     g->properties.push_back(pb);
                 }
-                // ultima fila: QUITAR este script
-                PropButton* pq = new PropButton(T("Remove script"), -1);
-                pq->action = AccionScriptCardFila;
-                g->properties.push_back(pq);
+                // (sin fila "Quitar script": quitarlo es el boton Quitar de la tarjeta Control, con el script elegido en
+                //  la lista; tenerlo en las dos tarjetas era repetir lo mismo)
             }
             scriptFirma = firma;
             PropertiesLayoutDirty = true;   // cambio la cantidad de tarjetas visibles
@@ -12715,13 +12844,11 @@ void Properties::ActualizarPestanias(){
         if (propConActivo)     propConActivo->value     = c ? &c->activo      : NULL;
         if (propConVerEdit)    propConVerEdit->value    = c ? &c->mostrarEdit : NULL;
         if (propConInfluencia) propConInfluencia->value = c ? &c->influencia : NULL;
-        // EL CRUCE Y<->Z DE LA POSICION: el panel muestra la posicion en Z-arriba y la rotacion
-        // derecha, asi que el mismo checkbox apunta a un campo distinto segun el tipo (el por que
-        // completo esta en ConstruirGrupos, arriba de propConEjeX).
-        const bool esLoc = (c && c->tipo == W3dConstraintTipo::CopyLocation);
+        // EL CRUCE Y<->Z: el panel muestra todo en Z-arriba (posicion, rotacion y escala), asi que "Copy Y" es el
+        // eje Z interno y "Copy Z" el Y (el por que completo esta en ConstruirGrupos, arriba de propConEjeX).
         if (propConEjeX) propConEjeX->value = esCopia ? &c->ejeX : NULL;
-        if (propConEjeY) propConEjeY->value = esCopia ? (esLoc ? &c->ejeZ : &c->ejeY) : NULL;
-        if (propConEjeZ) propConEjeZ->value = esCopia ? (esLoc ? &c->ejeY : &c->ejeZ) : NULL;
+        if (propConEjeY) propConEjeY->value = esCopia ? &c->ejeZ : NULL;
+        if (propConEjeZ) propConEjeZ->value = esCopia ? &c->ejeY : NULL;
         if (propConFuente){
             propConFuente->oculto = !conFuente;
             // EL TEXTO SE REFRESCA POR FRAME, y ese es el punto: cuando borran el objeto fuente,
@@ -13854,6 +13981,11 @@ void Properties::ClickEn(int mx, int my) {
                             lista->AjustarVentana();
                             gPasoArrastre = lista; gPasoDesde = item; gPasoY0 = my;
                             gPasoTope = yFila + borderGS; gPasoMovio = false;
+                            return;
+                        }
+                        // SCRIPTS: el click en el OJO (a la derecha) prende/apaga el script sin elegirlo
+                        if (lista->modo == 12 && item >= 0 && item < n &&
+                            mx >= x + PosX + g->width - (int)IconSizeGS - gapGS * 6 && ScriptToggleOjo(item)) {
                             return;
                         }
                         // MIX: el click en la columna del OJO (a la derecha) oculta/muestra la capa sin elegirla

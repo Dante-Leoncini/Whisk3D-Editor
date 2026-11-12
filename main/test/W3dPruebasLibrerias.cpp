@@ -139,7 +139,7 @@ namespace {
 const char* kLuaLanzador =
     "-- un script de la libreria de prueba: instanciar() de un prefab de la MISMA libreria, por su nombre pelado\n"
     "function inicio()\n"
-    "  local e = instanciar(\"Arbol\", 0, 0, 5)\n"
+    "  local e = instanciar(\"Arbol\", 0, 5, 0)\n"
     "  setCompartido(\"lanzado\", e and tipo(e) or \"nada\")\n"
     "end\n";
 
@@ -150,7 +150,7 @@ const char* kLuaDirector =
     "function actualizar(dt)\n"
     "  if fase == 0 then\n"
     "    for i = 1, 5 do\n"
-    "      local e = instanciar(propiedad(\"lib\") .. \"/\" .. propiedad(\"elem\"), i * 2, 0, -20, 90)\n"
+    "      local e = instanciar(propiedad(\"lib\") .. \"/\" .. propiedad(\"elem\"), i * 2, -20, 0, 90)\n"
     "      if e then creados = creados + 1 end\n"
     "    end\n"
     "    fase = 1\n"
@@ -708,7 +708,7 @@ const char* kLuaSonoro =
 const char* kLuaLlamador =
     "-- un script de la libreria instancia un prefab de la libreria de ADENTRO, con el nombre de SU registro\n"
     "function inicio()\n"
-    "  local e = instanciar(\"personajes/Arbol\", 0, 0, 5)\n"
+    "  local e = instanciar(\"personajes/Arbol\", 0, 5, 0)\n"
     "  setCompartido(\"llamado\", e and tipo(e) or \"nada\")\n"
     "  setCompartido(\"tronco\", (e and buscar(\"Tronco\", e)) and \"si\" or \"no\")\n"
     "end\n";

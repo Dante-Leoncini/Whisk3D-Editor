@@ -1708,6 +1708,7 @@ static void EscribirScripts(std::string& s, Object* o, int ind, CtxGuardar* cx) 
         // proyecto nuevo y deja la entrada apuntando a la copia
         W3dScriptEntrada& e = o->scriptDatos->scripts[i];
         JSang(s, ind + 1); s += "{ \"archivo\": "; JEsc(s, Asset(cx, e.ruta));
+        if (e.apagado) s += ", \"apagado\": true";   // (prendido no se escribe: es lo de siempre)
         if (!e.refs.empty()) {
             // ORDEN DETERMINISTICO: los refs se escriben SIEMPRE por nombre. En memoria
             // son un vector (orden de llegada) pero el JSON los relee a un std::map, o
@@ -2968,6 +2969,28 @@ static bool SerializarEscenaSeca(Object* raizEscena, const std::string& nombre, 
     for (size_t i = 0; i < raizEscena->Childrens.size(); i++)
         if (!EsDeLaEscena(raizEscena->Childrens[i])) EscribirObjeto(s, raizEscena->Childrens[i], 3, &cx, &primero);
     s += "\n    ]\n  }\n}\n";
+    gSeco = false;
+    gQuien = quienAntes;
+    json.swap(s);
+    return !cx.error;
+}
+// UNA RAIZ ENTERA EN SECO ("Convert to Game", io/RaicesEditor.h: la escena se DUPLICA como juego): TODOS sus objetos de
+// primer nivel -tambien las UI 2D y las rutinas de la escena: la copia es una raiz entera, no una instancia- como
+// {"objetos": [...]}, cada nodo con su "_origen". Van TAL COMO ESTAN EN PANTALLA: sin el reposo del guardado
+// (ReposoAnimObjetos), porque la pose del cuadro actual es justamente lo que se copia. Las animaciones de escena no van.
+// La lee W3dRaizLeerCopiaSeca (importers/import_w3d.cpp).
+bool W3dRaizSerializarSeco(Object* raiz, std::string& json) {
+    if (!raiz) return false;
+    CtxGuardar cx;
+    cx.esc = NULL;
+    cx.vtxN = 0;
+    cx.error = false;
+    const std::string quienAntes = gQuien;
+    gSeco = true;
+    std::string s = "{\n  \"objetos\": [\n";
+    bool primero = true;
+    for (size_t i = 0; i < raiz->Childrens.size(); i++) EscribirObjeto(s, raiz->Childrens[i], 2, &cx, &primero);
+    s += "\n  ]\n}\n";
     gSeco = false;
     gQuien = quienAntes;
     json.swap(s);

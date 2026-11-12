@@ -1,0 +1,33 @@
+# PARAR deja todo como estaba antes del Play: lo que pasa jugando se pierde (como en Unity). Ademas de lo que ya
+# reponia la foto (posiciones, rotaciones, visibilidad, colores, velocidades...) y de los objetos creados o destruidos,
+# lo de los SCRIPTS en el inspector: el valor de una propiedad cambiado jugando y el ojo (apagar el script) vuelven a
+# como los dejo el usuario. Antes quedaban (2026-11-11: "eso esta mal de diseno, lo que ocurre durante el gameplay se
+# pierde"). Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_parar_repone.w3s
+ventana 1280 720
+escala 1
+abrirw3d prueba_inspector_en_vivo.w3d
+timeline pause
+selobj Cubo
+tick 2
+propstab 8
+tick 1
+scriptref "Cubo" 0 velocidad -
+scriptapagado 0 0
+simplay 5
+# jugando: la velocidad pasa a 360 (como el inspector) y el script se apaga con el ojo
+scriptval "Cubo" 0 velocidad 360
+scriptref "Cubo" 0 velocidad 360
+ojoscript 0
+scriptapagado 0 1
+simplay 5
+simstop
+# Parar: vuelven a como estaban antes del Play
+scriptref "Cubo" 0 velocidad -
+scriptapagado 0 0
+# y sin juego, lo que se cambia SI queda (es la edicion de siempre)
+scriptval "Cubo" 0 velocidad 200
+ojoscript 0
+scriptref "Cubo" 0 velocidad 200
+scriptapagado 0 1

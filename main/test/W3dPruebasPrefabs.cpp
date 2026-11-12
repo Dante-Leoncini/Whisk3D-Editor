@@ -149,7 +149,7 @@ const char* kLuaEnemigo =
     "end\n";
 const char* kLuaCaja =
     "-- la caja con fisica del prefab: arranca cayendo (los dinamicos nacen dormidos)\n"
-    "function inicio() fisicaVel(yo(), 0, -4, 0) end\n";
+    "function inicio() fisicaVel(yo(), 0, 0, -4) end   -- hacia abajo (Z arriba)\n";
 // EL DIRECTOR: instancia y destruye enemigos EN JUEGO; al final, el veredicto
 const char* kLuaDirector =
     "-- director de la prueba de prefabs: instanciar()/destruir() en juego, con un juez al final\n"
@@ -173,7 +173,7 @@ const char* kLuaDirector =
     "    vivos = {}\n"
     "    if ciclo <= propiedad(\"ciclos\") then\n"
     "      for i = 1, propiedad(\"porCiclo\") do\n"
-    "        local e = instanciar(\"Enemigo\", i * 2, 0, -20, 90)\n"
+    "        local e = instanciar(\"Enemigo\", i * 2, -20, 0, 90)\n"
     "        if e then vivos[#vivos + 1] = e; creados = creados + 1 end\n"
     "      end\n"
     "    else fase = 1 end\n"

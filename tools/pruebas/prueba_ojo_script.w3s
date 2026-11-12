@@ -1,0 +1,35 @@
+# El OJO de la lista de scripts (tarjeta Control, en Propiedades): un click lo apaga y el motor no llama a ninguna de
+# sus funciones (ni inicio, ni actualizar); prenderlo con el juego andando corre su inicio() en ese momento (como en
+# Unity); al Parar vuelve a como estaba antes del Play; y el apagado se guarda en el .w3d. Todo con clicks de verdad en el ojo (ojoscript). Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_ojo_script.w3s
+ventana 1280 720
+escala 1
+abrirw3d prueba_ojo_script.w3d
+timeline pause
+selobj Caja
+tick 2
+propstab 8
+tick 1
+scriptapagado 0 0
+ojoscript 0
+scriptapagado 0 1
+# el mouse quedo sobre el ojo: su cartelito de ayuda
+ayuda Turn the script on or off
+# apagado desde el Play: A no corre (el testigo no ve nada)
+simplay 5
+scriptinfo compartido vio_a no
+# prenderlo con el juego andando: su inicio() corre ahora, y despues su actualizar()
+ojoscript 0
+scriptapagado 0 0
+simplay 2
+scriptinfo compartido vio_a corrio
+scriptinfo compartido a_act si
+simstop
+# Parar: el ojo vuelve a como estaba antes del Play (apagado): lo que pasa jugando se pierde
+scriptapagado 0 1
+# apagado, guardado y vuelto a abrir: sigue apagado
+guardarw3d /tmp/w3d_prueba_ojo_script.w3d
+abrirw3d /tmp/w3d_prueba_ojo_script.w3d
+selobj Caja
+scriptapagado 0 1

@@ -1,0 +1,14 @@
+# rotacionX/Y/Z(obj) y setRotacionX/Y/Z(obj, grados): un eje solo, en los ejes de Lua (Z arriba: la Z es el giro sobre
+# la vertical, la Y del motor). El script pone (10, 20, 0), cambia solo la Z a 30 y lee las tres: 10, 20 y 30; en el
+# motor queda rotEuler (10, 30, 20) (la Z de Lua es la y del motor). Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_rotacion_eje.w3s
+abrirw3d prueba_rotacion_eje.w3d
+timeline pause
+selobj Caja
+simplay 1
+compartidonum x 9.99 10.01
+compartidonum y 19.99 20.01
+compartidonum z 29.99 30.01
+objroteuler 10 30 20 0.01
+simstop

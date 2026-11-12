@@ -16,6 +16,11 @@
 // ============================================================================
 
 bool SimActiva();                 // hay una partida cargada (jugando o en pausa)
+// el DESHACER de lo que hace un script con el juego PARADO (un boton de sus propiedades, un complemento del editor):
+// Iniciar ANTES de llamar a la funcion del script, Confirmar DESPUES. Lo que movio/roto/escalo/ocultó y las mallas que
+// toco quedan en UN paso del historial (Ctrl+Z / Ctrl+Y). Jugando no hacen nada (no hay historial en el gameplay).
+void SimUndoScriptIniciar();
+void SimUndoScriptConfirmar();
 // MODO JUEGO de verdad: el timeline esta en "Juego" (AnimEsJuego) Y hay una
 // partida cargada (jugando o en pausa; con Stop vuelve a false). Es el gate
 // compartido de "el juego se ve limpio": los overlays de EDICION (curvas,

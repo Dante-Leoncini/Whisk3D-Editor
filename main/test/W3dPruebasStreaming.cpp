@@ -136,6 +136,7 @@ namespace {
 const char* kLuaRecorrido =
     "-- recorrido de la prueba de streaming: la camara pasa por puntos fijos y en cada uno cuenta las cargadas\n"
     "propiedades = { cam = \"objeto\", n = 256, vueltas = 2, espera = 40, tramo = 50 }\n"
+    "-- los puntos son (x, y) del piso y la camara va a 6 de altura (la z: Z arriba)\n"
     "local vuelta = { {0, 0}, {75, 75}, {150, 0}, {150, 150}, {75, 75}, {-80, -80} }\n"
     "local puntos = { {-80, -80} }\n"
     "local k, f, fase = 1, 0, \"espera\"\n"
@@ -152,7 +153,7 @@ const char* kLuaRecorrido =
     "  for v = 1, tonumber(propiedad(\"vueltas\")) do\n"
     "    for i = 1, #vuelta do puntos[#puntos + 1] = vuelta[i] end\n"
     "  end\n"
-    "  setPosicion(objeto(\"cam\"), puntos[1][1], 6, puntos[1][2])\n"
+    "  setPosicion(objeto(\"cam\"), puntos[1][1], puntos[1][2], 6)\n"
     "end\n"
     "function actualizar(dt)\n"
     "  if fase == \"fin\" then return end\n"
@@ -178,7 +179,7 @@ const char* kLuaRecorrido =
     "    local a, b = puntos[k], puntos[k + 1]\n"
     "    local t = f / tonumber(propiedad(\"tramo\"))\n"
     "    if t > 1 then t = 1 end\n"
-    "    setPosicion(objeto(\"cam\"), a[1] + (b[1] - a[1]) * t, 6, a[2] + (b[2] - a[2]) * t)\n"
+    "    setPosicion(objeto(\"cam\"), a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, 6)\n"
     "    if t >= 1 then k = k + 1; fase = \"espera\"; f = 0 end\n"
     "  end\n"
     "end\n";

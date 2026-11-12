@@ -3,6 +3,8 @@
 // ============================================================================
 #include "animation/SkeletalAnimation.h" // W3dArmaturesJuegoTick
 #include "script/SimJuego.h"
+#include "undo/Undo.h"                // el deshacer de lo que hace un script FUERA del juego (botones)
+#include "base/W3dInteractionState.h" // (idem: crear/borrar lo que pidio el script, solo en el Modo Objeto)
 #include "script/W3dScript.h"
 #include "script/BindsJuego.h"        // alimentar el estado de los binds de juego (apretado/etc) en el Play
 #include "physics/W3dFisica.h"        // paso de fisica del Core (el MISMO que corre el juego compilado)
@@ -288,6 +290,44 @@ static void Recorrer(Object* o, SimSnap* snap, std::vector<Object*>* scripted) {
         scripted->push_back(o);
     for (size_t i = 0; i < o->Childrens.size(); i++)
         Recorrer(o->Childrens[i], snap, scripted);
+}
+
+// LOS SCRIPTS de cada objeto: lo del inspector (los valores de sus propiedades, las opciones, las refs, el ojo y los
+// scripts que se agregan o se quitan). Lo que se cambia JUGANDO tambien es de la partida, y Stop lo devuelve como lo dejo
+// el usuario: TODO lo que pasa jugando se pierde (como los objetos creados o destruidos y lo que esta en la foto).
+// Va aparte de SimSnap: el viaje en el tiempo no lo necesita, y asi no se copian textos en cada cuadro.
+struct SimScriptsObj { Object* o; std::vector<W3dScriptEntrada> scripts; bool tenia; };
+static std::vector<SimScriptsObj> gScriptsBase;
+static void ScriptsFoto(Object* o) {
+    if (!o) return;
+    SimScriptsObj s; s.o = o; s.tenia = (o->scriptDatos != NULL);
+    if (o->scriptDatos) s.scripts = o->scriptDatos->scripts;
+    gScriptsBase.push_back(s);
+    for (size_t i = 0; i < o->Childrens.size(); i++) ScriptsFoto(o->Childrens[i]);
+}
+static void ScriptsVivos(Object* o, std::set<Object*>& vivos) {
+    if (!o) return;
+    vivos.insert(o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) ScriptsVivos(o->Childrens[i], vivos);
+}
+static void ScriptsReponer() {
+    std::set<Object*> vivos;   // (solo los que siguen en la escena: lo creado jugando ya se fue)
+    ScriptsVivos(SceneCollection, vivos);
+    for (size_t i = 0; i < W3dRaices().size(); i++) if (W3dRaices()[i].raiz) ScriptsVivos(W3dRaices()[i].raiz, vivos);
+    for (size_t i = 0; i < gScriptsBase.size(); i++) {
+        SimScriptsObj& s = gScriptsBase[i];
+        if (!vivos.count(s.o)) continue;
+        if (s.tenia) {
+            if (!s.o->scriptDatos) s.o->scriptDatos = new W3dScriptDatos();
+            s.o->scriptDatos->scripts = s.scripts;
+            if (s.o->scriptDatos->activo >= (int)s.scripts.size()) s.o->scriptDatos->activo = (int)s.scripts.size() - 1;
+            if (s.o->scriptDatos->activo < 0) s.o->scriptDatos->activo = 0;
+        } else if (s.o->scriptDatos) {
+            s.o->scriptDatos->scripts.clear();   // (le agregaron scripts jugando)
+        }
+    }
+    gScriptsBase.clear();
+    extern void PropsScriptsRefrescar(); PropsScriptsRefrescar();   // las tarjetas de Propiedades, con lo repuesto
 }
 
 static void Snapshot(SimSnap* s) {
@@ -898,6 +938,10 @@ static void SimPlay() {
     gBaseOjo = SceneCollection->visible;
     SceneCollection->visible = true;
     Snapshot(&gBaseEditor);
+    gScriptsBase.clear();   // (y lo de los scripts: el inspector, el ojo; ver ScriptsFoto)
+    ScriptsFoto(SceneCollection);
+    for (size_t i = 0; i < W3dRaices().size(); i++)
+        if (W3dRaices()[i].raiz && W3dRaices()[i].raiz != SceneCollection) ScriptsFoto(W3dRaices()[i].raiz);
     gRaizPlay = SceneCollection;
     gBasesRaices.clear();
     gRaicesDelUsuario.clear();
@@ -1280,6 +1324,7 @@ void SimStop() {
     W3dScriptSetObjetoLiberar(NULL);
     SimDeshacerCreadosYDestruidos();
     Aplicar(gBaseEditor);   // la escena del usuario, NO el frame 0 post-inicio()
+    ScriptsReponer();       // ...y lo de sus scripts (lo que se cambio en el inspector jugando)
     // STREAMING: lo que cargo jugando ya se libero (era creado en el Play); las diferidas que el Play solto se vuelven a
     // generar como estaban y se sueltan los pedidos de la partida
     W3dStreamingPartidaFin();
@@ -1330,4 +1375,150 @@ void SimTeclaSDL(int sdlk, bool down) {
     else if (sdlk >= SDLK_0 && sdlk <= SDLK_9) { letra[0] = (char)('0' + (sdlk - SDLK_0)); n = letra; }
     if (n) W3dScriptTecla(n, down);
 #endif
+}
+
+
+// ============================================================================
+//  EL DESHACER DE LO QUE HACE UN SCRIPT FUERA DEL JUEGO (2026-11-11, pedido del dueno: "si un script hace cambios en la
+//  escena, cada cosa que hace se tiene que poder deshacer; donde no hay historial es durante el gameplay, porque al
+//  detener se reinicia todo y seria gastar memoria y rendimiento"). Hoy: un BOTON de las propiedades tocado con el juego
+//  parado (un complemento del editor). Se graba asi:
+//    Iniciar:   la FOTO de la escena (la misma de Parar: posiciones, rotaciones, escalas, visibilidad, colores, hitbox,
+//               texto...), los objetos que hay, y el gancho de las MALLAS (antes de que lua toque los vertices, UV o
+//               colores de una, su geometria: UndoCapturarMallaGeo, una vez por malla).
+//    Confirmar: lo que el script CREO (instanciar) es una creacion como la de Shift+D (Ctrl+Z la saca); lo que pidio
+//               DESTRUIR se borra como con la tecla Supr (detachado, Ctrl+Z lo devuelve: antes quedaba en la cola
+//               hasta el proximo Play); y si la foto cambio, un paso que la repone. Todo es UN paso del historial.
+//  Jugando no se graba nada.
+// ============================================================================
+struct SimUndoScript { SimSnap otro; };
+static void SimUndoScriptAplicar(void* d) {
+    SimUndoScript* u = (SimUndoScript*)d;
+    SimSnap ahora; Snapshot(&ahora);
+    Aplicar(u->otro);
+    u->otro = ahora;   // (el mismo paso sirve para ir y volver)
+    g_redraw = true;
+}
+static void SimUndoScriptDesvincular(void* d, Object* borrado) {
+    SimUndoScript* u = (SimUndoScript*)d;
+    std::set<Object*> fuera; fuera.insert(borrado);
+    PodarSnap(u->otro, fuera);
+}
+static void SimUndoScriptLiberar(void* d) { delete (SimUndoScript*)d; }
+// cambio algo de lo que esta en la foto? (si no, no se agrega un paso vacio al historial: un boton que solo imprime)
+static bool CapasIguales(const std::vector<W3dCapaAnim>& a, const std::vector<W3dCapaAnim>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); i++) {
+        const W3dCapaAnim& x = a[i]; const W3dCapaAnim& y = b[i];
+        if (x.anim != y.anim || x.influencia != y.influencia || x.modo != y.modo || x.visible != y.visible ||
+            x.hueso != y.hueso || x.desde != y.desde || x.vel != y.vel || x.loop != y.loop || x.juegoFrame != y.juegoFrame) return false;
+    }
+    return true;
+}
+static bool FotosIguales(const SimSnap& a, const SimSnap& b) {
+    if (a.ents.size() != b.ents.size() || a.arms.size() != b.arms.size() || a.jer.size() != b.jer.size()) return false;
+    for (size_t i = 0; i < a.ents.size(); i++) {
+        const SimEnt& x = a.ents[i]; const SimEnt& y = b.ents[i];
+        if (x.o != y.o || x.px != y.px || x.py != y.py || x.pz != y.pz || x.vis != y.vis || x.renderiz != y.renderiz) return false;
+        if (x.rotEuler.x != y.rotEuler.x || x.rotEuler.y != y.rotEuler.y || x.rotEuler.z != y.rotEuler.z) return false;
+        if (x.rot.x != y.rot.x || x.rot.y != y.rot.y || x.rot.z != y.rot.z || x.rot.w != y.rot.w) return false;
+        if (x.scale.x != y.scale.x || x.scale.y != y.scale.y || x.scale.z != y.scale.z) return false;
+        if (x.esLuz) for (int k = 0; k < 4; k++) if (x.dif[k] != y.dif[k] || x.amb[k] != y.amb[k] || x.spe[k] != y.spe[k]) return false;
+        if (x.esPart && x.partActivo != y.partActivo) return false;
+        if (x.esNiebla) for (int k = 0; k < 6; k++) if (x.niebla[k] != y.niebla[k]) return false;
+        if (x.esCam && (x.riel != y.riel || x.offRiel != y.offRiel || x.rielNodo != y.rielNodo || x.miradaRiel != y.miradaRiel)) return false;
+        if (x.tieneVel && (x.vx != y.vx || x.vy != y.vy || x.vz != y.vz)) return false;
+        if (x.tieneVA && (x.vaPlay != y.vaPlay || x.vaAnim != y.vaAnim || x.vaProx != y.vaProx)) return false;
+        if (x.esHb && (x.hbActivo != y.hbActivo || x.hbTam[0] != y.hbTam[0] || x.hbTam[1] != y.hbTam[1] || x.hbTam[2] != y.hbTam[2])) return false;
+        if (x.es2d && (x.rot2d != y.rot2d || x.ancho != y.ancho || x.alto != y.alto || x.opacidad != y.opacidad ||
+                       x.scrollX != y.scrollX || x.scrollY != y.scrollY)) return false;
+        if (x.esTexto && x.texto != y.texto) return false;
+    }
+    for (size_t i = 0; i < a.arms.size(); i++) {
+        const SimArm& x = a.arms[i]; const SimArm& y = b.arms[i];
+        if (x.a != y.a || x.clip != y.clip || x.frame != y.frame || x.vel != y.vel || x.loop != y.loop ||
+            x.retarget != y.retarget || !CapasIguales(x.capas, y.capas)) return false;
+    }
+    for (size_t i = 0; i < a.jer.size(); i++)
+        if (a.jer[i].o != b.jer[i].o || a.jer[i].retarget != b.jer[i].retarget || !CapasIguales(a.jer[i].capas, b.jer[i].capas)) return false;
+    return CapasIguales(a.mixEscenas, b.mixEscenas);
+}
+static SimSnap* gUndoScriptAntes = NULL;
+static std::set<Object*> gUndoScriptMallas;      // las mallas ya guardadas en esta grabacion (una vez cada una)
+static std::set<unsigned> gUndoScriptHabia;       // los objetos (por serial) que habia antes del script
+static void SerialesDe(Object* o, std::set<unsigned>& out) {
+    if (!o) return;
+    out.insert(o->serial);
+    for (size_t i = 0; i < o->Childrens.size(); i++) SerialesDe(o->Childrens[i], out);
+}
+// las RAICES de lo nuevo: un objeto que no estaba colgado de uno que si (sus hijos son parte de el)
+static void NuevasRaices(Object* o, std::vector<Object*>& out) {
+    if (!o) return;
+    for (size_t i = 0; i < o->Childrens.size(); i++) {
+        Object* h = o->Childrens[i];
+        if (!h) continue;
+        if (!gUndoScriptHabia.count(h->serial)) out.push_back(h);
+        else NuevasRaices(h, out);
+    }
+}
+static void SimUndoScriptAntesDeTocarMalla(Object* o) {
+    if (!gUndoScriptAntes || !o || o->getType() != ObjectType::mesh || gUndoScriptMallas.count(o)) return;
+    gUndoScriptMallas.insert(o);
+    UndoCapturarMallaGeo((Mesh*)o);
+}
+void SimUndoScriptIniciar() {
+    if (SimActiva() || gUndoScriptAntes) return;   // jugando no hay historial (y no se anida)
+    UndoGrupoIniciar();
+    gUndoScriptAntes = new SimSnap();
+    Snapshot(gUndoScriptAntes);
+    gUndoScriptMallas.clear();
+    gUndoScriptHabia.clear();
+    SerialesDe(SceneCollection, gUndoScriptHabia);
+    W3dScriptAntesDeTocarMallaHook = SimUndoScriptAntesDeTocarMalla;
+}
+void SimUndoScriptConfirmar() {
+    if (!gUndoScriptAntes) return;
+    W3dScriptAntesDeTocarMallaHook = NULL;
+    // lo CREADO y lo que pidio DESTRUIR: por las mismas puertas que el editor (Shift+D / Supr), que trabajan con lo
+    // elegido. Al final queda elegido lo creado (como despues de Shift+D); si no creo nada, lo que estaba (sin lo borrado)
+    std::vector<Object*> creados; NuevasRaices(SceneCollection, creados);
+    std::vector<Object*> borrar;  W3dScriptTomarDestruirPedidos(borrar);
+    if ((!creados.empty() || !borrar.empty()) && estado == editNavegacion && InteractionMode == ObjectMode) {
+        const std::vector<Object*> selAntes = ObjSelects;
+        Object* actAntes = ObjActivo;
+        std::set<Object*> borrados(borrar.begin(), borrar.end());
+        if (!creados.empty()) {
+            DeseleccionarTodo();
+            for (size_t i = 0; i < creados.size(); i++) creados[i]->Seleccionar();
+            UndoCapturarCreacion();      // (nace "en escena": Ctrl+Z los saca, Ctrl+Y los devuelve)
+        }
+        if (!borrar.empty()) {
+            DeseleccionarTodo();
+            for (size_t i = 0; i < borrar.size(); i++) borrar[i]->Seleccionar();
+            UndoCapturarBorrado(false);  // los DETACHA (sin liberar): Ctrl+Z los devuelve
+        }
+        DeseleccionarTodo();
+        if (!creados.empty()) {
+            for (size_t i = 0; i < creados.size(); i++) if (!borrados.count(creados[i])) creados[i]->Seleccionar();
+        } else {
+            for (size_t i = 0; i < selAntes.size(); i++) if (!borrados.count(selAntes[i])) selAntes[i]->Seleccionar();
+            if (actAntes && !borrados.count(actAntes) && actAntes->select) ObjActivo = actAntes;
+        }
+    } else if (!borrar.empty()) {
+        // (fuera del Modo Objeto no se borra: que el pedido no quede colgado hasta el proximo Play)
+        w3dLogf("[script] destruir() con el juego parado fuera del Modo Objeto: no se borro nada");
+    }
+    SimSnap despues; Snapshot(&despues);
+    if (!FotosIguales(*gUndoScriptAntes, despues)) {
+        SimUndoScript* u = new SimUndoScript();
+        u->otro = *gUndoScriptAntes;
+        // (lo que se borro recien queda en la foto: esta detachado, vivo mientras su paso este en el historial)
+        UndoExterno f; f.aplicar = SimUndoScriptAplicar; f.desvincular = SimUndoScriptDesvincular; f.liberar = SimUndoScriptLiberar;
+        UndoPushExterno(f, u);
+    }
+    delete gUndoScriptAntes; gUndoScriptAntes = NULL;
+    gUndoScriptMallas.clear();
+    gUndoScriptHabia.clear();
+    // SECUENCIAL: Ctrl+Z deshace al reves (la foto, lo borrado, lo creado, las mallas); Ctrl+Y al derecho
+    UndoGrupoFinSecuencial();
 }

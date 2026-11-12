@@ -4,7 +4,8 @@
 #  prueba_raton_rel.w3d (hecho por hl2-w3d/tools/fixtures_pruebas.py): la
 #  escena por defecto con scripts/raton.lua en el Cubo, que en inicio() pide
 #  capturarRaton(true) y en cada tick mueve el Cubo con ratonRel():
-#  x += dx/100, y -= dy/100. En PC main.cpp captura el mouse con SDL mientras
+#  x += dx/100, z -= dy/100 (z de lua, Z arriba: la y del motor que mira
+#  objat). En PC main.cpp captura el mouse con SDL mientras
 #  el juego corre (ESC pausa y lo suelta); aca el movimiento se inyecta con el
 #  comando `ratonrel dx dy` (lo mismo que llega de SDL_GetRelativeMouseState).
 #
