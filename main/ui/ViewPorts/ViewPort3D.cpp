@@ -1263,6 +1263,9 @@ void Viewport3D::SetViewpoint(Viewpoint value) {
             viewRot = Quaternion::FromAxisAngle(Vector3(1,0,0), 90.0f);
             break;
         }
+        case Viewpoint::camera:
+            SetViewFromCameraActive(true);
+            return;
     }
 
     // IMPORTANTE:

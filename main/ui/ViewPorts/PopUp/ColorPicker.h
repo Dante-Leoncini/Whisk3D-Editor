@@ -82,14 +82,14 @@ class ColorPicker : public PopUpBase {
         // adentro de el) y cerrar, sin desreferenciar nada. Ver el bloque en ColorPicker.cpp.
         void OlvidarDueno();
 
-        void Render();
-        bool Click(int mx, int my);
-        bool Motion(int mx, int my);
-        bool Tecla(int tecla);
-        bool TeclaRepeat(int tecla); // flecha mantenida (N95): SOLO ajusta valores (no navega)
+        void Render() W3D_OVERRIDE;
+        bool Click(int mx, int my) W3D_OVERRIDE;
+        bool Motion(int mx, int my) W3D_OVERRIDE;
+        bool Tecla(int tecla) W3D_OVERRIDE;
+        bool TeclaRepeat(int tecla) W3D_OVERRIDE; // flecha mantenida (N95): SOLO ajusta valores (no navega)
         int  PasoHold(int dir);      // aceleracion del hold: arranca LENTO (1) y acelera de a poco (antes saltaba a 30)
-        void Soltar();      // PC: el boton se solto (si hubo movimiento)
-        bool Arrastrando(); // cursor violeta mientras se arrastra
+        void Soltar() W3D_OVERRIDE;      // PC: el boton se solto (si hubo movimiento)
+        bool Arrastrando() W3D_OVERRIDE; // cursor violeta mientras se arrastra
 
         int Filas() const; // filas de la pestania activa
         void DeRGB();  // target -> h,s,v

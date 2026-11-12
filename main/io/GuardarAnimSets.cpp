@@ -123,7 +123,7 @@ std::string EntradaLibre(W3dContenedorEscritor* esc, const std::string& nombre, 
     const std::string base = "animaciones/" + W3dSlugEntrada(nombre);
     std::string e = base + ".w3da";
     for (int k = 2; (esc && esc->Tiene(e)) || usadas.count(e); k++) {
-        char b[16]; sprintf(b, "-%d", k);
+        char b[16]; snprintf(b, sizeof(b), "-%d", k);
         e = base + b + ".w3da";
     }
     return e;
@@ -487,7 +487,7 @@ void GuardarAnimSetsConfirmar() {
         } else if (!nuevas.count(r->id)) continue;       // no choca con nada: no se toca
         else if (r->refTotal <= 0 && r->estado != W3DREC_LISTO) { olvidar.push_back(r); continue; }
         if (destino.empty()) {
-            char b[48]; sprintf(b, "#guardado%d:", ++nDesenganchados);
+            char b[48]; snprintf(b, sizeof(b), "#guardado%d:", ++nDesenganchados);
             destino = std::string(b) + W3dAnimSetIdEntrada(r->id);
         }
         if (destino != r->id) destinos.push_back(std::make_pair(r, destino));
@@ -495,7 +495,7 @@ void GuardarAnimSetsConfirmar() {
     // (antes de los renombres: la clave que ocupaban queda libre para el que llega)
     for (size_t i = 0; i < olvidar.size(); i++) W3dAnimSetDesenganchar(olvidar[i], "guardado", ++nDesenganchados);
     for (size_t i = 0; i < destinos.size(); i++) {
-        char b[48]; sprintf(b, "#tmp%d:", (int)i);
+        char b[48]; snprintf(b, sizeof(b), "#tmp%d:", (int)i);
         W3dRecursoRenombrar(W3DREC_ANIMSET, destinos[i].first->id, std::string(b) + destinos[i].first->id);
     }
     for (size_t i = 0; i < destinos.size(); i++)

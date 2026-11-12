@@ -1362,7 +1362,7 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
                 else w3dEngine::Color4f(kRojoHuerfano[0], kRojoHuerfano[1], kRojoHuerfano[2], 0.85f);
                 W3dDrawStrip4(IconMesh, IconsUV[(size_t)(enUso ? IconType::notifOk : IconType::notifError)]->uvs);
                 w3dEngine::PopMatrix();
-                char b[16]; sprintf(b, "%d", f.usuarios);
+                char b[16]; snprintf(b, sizeof(b), "%d", f.usuarios);
                 SetColorID(ColorID::grisUI, enUso ? 1.0f : 0.6f);
                 w3dEngine::PushMatrix();
                 w3dEngine::Translatef((GLfloat)(xIcono - gapGS), (GLfloat)yf, 0);
@@ -1792,7 +1792,7 @@ void Outliner::MotionRecursos(int mx, int my) {
         for (size_t i = 0; i < fs.size(); i++)
             if (fs[i].clave == recArrastreId && fs[i].carpeta == recArrastreCarpeta) { g_outArrastre.nombre = fs[i].nombre; g_outArrastre.icono = fs[i].icono; break; }
         const int n = SeleccionCantidad();
-        if (n > 1) { char b[24]; sprintf(b, "  (+%d)", n - 1); g_outArrastre.nombre += b; }
+        if (n > 1) { char b[24]; snprintf(b, sizeof(b), "  (+%d)", n - 1); g_outArrastre.nombre += b; }
     }
     if (VistaSoloLectura()) return;   // (adentro de una libreria externa no se mueve nada)
     std::vector<OutFilaRec> filas;
@@ -2461,7 +2461,7 @@ static void BorrarConfirmado() {
         if (n == 1) Notificar(std::string(T("Deleted")) + ": " + nombre, false);
         else Notificar(std::string(T("Not deleted")) + ": " + T(motivo.c_str()), true);
     } else {
-        char b[48]; sprintf(b, "%d / %d", n + nc, total);
+        char b[48]; snprintf(b, sizeof(b), "%d / %d", n + nc, total);
         Notificar(std::string(T("Deleted")) + ": " + b + (motivo.empty() ? std::string() : std::string(" (") + T(motivo.c_str()) + ")"),
                   n + nc < total);
     }
@@ -2474,7 +2474,7 @@ static int gPurgarTipo = -1;
 static void PurgarConfirmado() {
     std::vector<std::string> nombres;
     const int n = W3dVistaRecPurgar(gPurgarTipo, &nombres);
-    char b[64]; sprintf(b, "%d", n);
+    char b[64]; snprintf(b, sizeof(b), "%d", n);
     Notificar(std::string(T("Orphans purged")) + ": " + b, false);
     g_redraw = true;
 }
@@ -2586,7 +2586,7 @@ int Outliner::AccionPurgar(bool confirmar) {
     gPurgarTipo = filtro;
     if (confirmar) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        char b[32]; sprintf(b, "%d", huerfanos);
+        char b[32]; snprintf(b, sizeof(b), "%d", huerfanos);
         confirmarPopup->Abrir(std::string(T("Purge orphans")) + " (" + b + ")?", PurgarConfirmado);
         return huerfanos;
     }
@@ -2644,7 +2644,7 @@ int OutlinerSeleccionarUsuarios(const std::vector<std::string>& claves) {
         outs[i]->Resize(outs[i]->width, outs[i]->height);
         outs[i]->CentrarSeleccion();
     }
-    char b[32]; sprintf(b, "%d", n);
+    char b[32]; snprintf(b, sizeof(b), "%d", n);
     Notificar(std::string(T("Users selected")) + ": " + b, false);
     g_redraw = true;
     return n;

@@ -210,7 +210,7 @@ extern void WeightPaintAsegurarMapa(Mesh* m);
 // ---------------------------------------------------------------------------
 //  helpers
 // ---------------------------------------------------------------------------
-static std::string EsEntero(long n) { char b[32]; sprintf(b, "%ld", n); return std::string(b); }
+static std::string EsEntero(long n) { char b[32]; snprintf(b, sizeof(b), "%ld", n); return std::string(b); }
 static int TipoDe(const std::string& s) { return W3dRaizTipoDeClave(s, W3D_RAIZ_ESCENA); }
 static const char* NombreTipo(int t) { return W3dRaizTipoClave(t); }
 static std::string NomObj(const Object* o) { return o ? o->name : std::string("-"); }

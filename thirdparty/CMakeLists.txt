@@ -13,7 +13,38 @@ set(SDL_STATIC ON)
 # ===============================
 # SDL2
 # ===============================
+# SDL2 is vendored upstream code. Keep warnings from our sources enabled, but
+# don't turn new Apple SDK deprecations inside the vendor into project noise.
+# This is scoped to the SDL target and only on Apple; no source patch is carried.
+# New CMake versions also diagnose SDL2's historical policy minimum.
+# CMake explicitly supports raising the effective policy version for an
+# unmodified third-party subdirectory through CMAKE_POLICY_VERSION_MINIMUM.
+if(DEFINED CMAKE_POLICY_VERSION_MINIMUM)
+    set(W3D_SAVED_POLICY_VERSION_MINIMUM "${CMAKE_POLICY_VERSION_MINIMUM}")
+    set(W3D_HAD_POLICY_VERSION_MINIMUM TRUE)
+else()
+    set(W3D_HAD_POLICY_VERSION_MINIMUM FALSE)
+endif()
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 add_subdirectory(SDL2)
+if(W3D_HAD_POLICY_VERSION_MINIMUM)
+    set(CMAKE_POLICY_VERSION_MINIMUM "${W3D_SAVED_POLICY_VERSION_MINIMUM}")
+else()
+    unset(CMAKE_POLICY_VERSION_MINIMUM)
+endif()
+unset(W3D_SAVED_POLICY_VERSION_MINIMUM)
+unset(W3D_HAD_POLICY_VERSION_MINIMUM)
+
+if(APPLE)
+    foreach(W3D_SDL_TARGET SDL2-static SDL2)
+        if(TARGET ${W3D_SDL_TARGET})
+            target_compile_options(${W3D_SDL_TARGET} PRIVATE
+                -Wno-deprecated-declarations
+                -Wno-gnu-folding-constant
+            )
+        endif()
+    endforeach()
+endif()
 
 # SDL2 puede exportar SDL2-static o SDL2
 if (TARGET SDL2-static)

@@ -149,3 +149,4 @@ platform/linux/debug/
 
 # modelos de terceros para las capturas de los tutoriales (Leon, de Resident Evil 4: de Capcom). Solo locales.
 tools/capturas/modelos/
+*.DS_Store

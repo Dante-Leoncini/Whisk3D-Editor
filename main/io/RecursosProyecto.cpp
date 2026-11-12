@@ -156,7 +156,7 @@ static bool W3dBorrarObjetosConUndo(const std::vector<Object*>& us) {
     return true;
 }
 
-static std::string EnteroTexto(long n) { char b[32]; sprintf(b, "%ld", n); return std::string(b); }
+static std::string EnteroTexto(long n) { char b[32]; snprintf(b, sizeof(b), "%ld", n); return std::string(b); }
 // "24 vertices", "1 part": el numero y la palabra TRADUCIDA, en singular o plural. Los datos de un
 // recurso (W3dRecursoItem::info) se arman ya en el idioma de la UI: un texto con numeros adentro no
 // esta en la tabla y T() lo devolveria en ingles.
@@ -947,7 +947,7 @@ static std::string EntradaTexturaLibre(const std::string& clave, const std::stri
     const std::string raiz = conExt ? pedida.substr(0, pto) : pedida;
     const std::string ext = conExt ? pedida.substr(pto) : std::string();
     for (int n = 2; n < 10000; n++) {
-        char b[16]; sprintf(b, "-%d", n);
+        char b[16]; snprintf(b, sizeof(b), "-%d", n);
         const std::string c = raiz + b + ext;
         if (c == clave || !EntradaTexturaOcupada(c)) return c;
     }
@@ -1498,7 +1498,7 @@ public:
         UndoExterno f; f.aplicar = UndoRenArchivoAplicar; f.liberar = UndoRenArchivoLiberar;
         UndoPushExterno(f, u);
         if (scripts > 0) {
-            char b[16]; sprintf(b, "%d", scripts);
+            char b[16]; snprintf(b, sizeof(b), "%d", scripts);
             Notificar(std::string(T("Scripts that name the file")) + " (" + b + "): " +
                       W3dNombreCorto(BaseDeRuta(id)) + " -> " + W3dNombreCorto(BaseDeRuta(destino)), true);
         }
@@ -1549,7 +1549,7 @@ public:
         UndoPushExterno(f, u);
         const int scripts = ScriptsQueNombran(id);
         if (scripts > 0) {
-            char b[16]; sprintf(b, "%d", scripts);
+            char b[16]; snprintf(b, sizeof(b), "%d", scripts);
             Notificar(std::string(T("Scripts that name the file")) + " (" + b + "): " + W3dNombreCorto(BaseDeRuta(id)), true);
         }
         return true;
@@ -1746,7 +1746,7 @@ public:
         // los .lua no se reescriben (arman nombres en tiempo de ejecucion): se avisa, como al
         // renombrar una escena que un cambiarEscena() nombra
         if (scripts > 0) {
-            char b[16]; sprintf(b, "%d", scripts);
+            char b[16]; snprintf(b, sizeof(b), "%d", scripts);
             Notificar(std::string(T("Scripts that name the texture")) + " (" + b + "): " +
                       W3dNombreCorto(BaseDeRuta(id)) + " -> " + W3dNombreCorto(BaseDeRuta(destino)), true);
         }
@@ -2905,7 +2905,7 @@ static void JEsc(std::string& s, const std::string& v) {
         else if (c == '\n') s += "\\n";
         else if (c == '\r') s += "\\r";
         else if (c == '\t') s += "\\t";
-        else if (c < 0x20) { char b[8]; sprintf(b, "\\u%04x", (unsigned)c); s += b; }
+        else if (c < 0x20) { char b[8]; snprintf(b, sizeof(b), "\\u%04x", (unsigned)c); s += b; }
         else s += (char)c;
     }
     s += '"';

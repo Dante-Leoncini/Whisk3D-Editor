@@ -35,7 +35,8 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 // morirse en silencio dejando todos los atajos rotos.
 // (Symbian compila con RVCT 2.2, C++03: sin static_assert. Usa W3dSdlMinimo.h, con los mismos numeros)
 #ifndef W3D_SYMBIAN
-static_assert(SDLK_g == W3dK_G && SDLK_x == W3dK_X && SDLK_0 == W3dK_0 && SDLK_SPACE == W3dK_SPACE,
+static_assert((int)SDLK_g == (int)W3dK_G && (int)SDLK_x == (int)W3dK_X &&
+              (int)SDLK_0 == (int)W3dK_0 && (int)SDLK_SPACE == (int)W3dK_SPACE,
               "SDL dejo de numerar los imprimibles por su ASCII: revisar W3dTeclaDesdeSDL");
 static_assert(SDL_BUTTON_LEFT == W3dMB_IZQ && SDL_BUTTON_MIDDLE == W3dMB_MEDIO && SDL_BUTTON_RIGHT == W3dMB_DER,
               "SDL cambio los numeros de los botones: revisar W3dBotonDesdeSDL");

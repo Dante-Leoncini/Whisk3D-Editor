@@ -54,7 +54,7 @@ static std::string gIDEClipInterno;
 // ---------------------------------------------------------------------------
 static std::string IdeNum(int v) {
     char buf[16];
-    sprintf(buf, "%d", v);
+    snprintf(buf, sizeof(buf), "%d", v);
     return std::string(buf);
 }
 static bool IdeTerminaEn(const std::string& s, const char* suf) {

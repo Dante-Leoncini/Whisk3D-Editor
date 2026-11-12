@@ -62,9 +62,9 @@ std::string DopeIdDueno(const Object* o);
 //  animacion (StartFrame/EndFrame/CurrentFrame/PlayAnimation).
 class Timeline : public ViewportBase, public WithBorder, public Scrollable {
     public:
-        int ViewportKind() const { return 5; } // 1=3D 2=outliner 3=properties 4=UV 5=timeline
+        int ViewportKind() const W3D_OVERRIDE { return 5; } // 1=3D 2=outliner 3=properties 4=UV 5=timeline
         // el dope sheet scrollea en vertical: con esto hereda hover, agarre, arrastre y touch del ruteo generico
-        Scrollable* ComoScrollable() { return this; }
+        Scrollable* ComoScrollable() W3D_OVERRIDE { return this; }
 
         float pxPerFrame; // zoom HORIZONTAL: pixeles por frame (tiempo)
         float viewStartF; // frame en el borde IZQUIERDO (float; arranca en negativo para ver el frame 0 prolijo)

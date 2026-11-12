@@ -89,7 +89,7 @@ std::string W3dRutaSalidaCampos(const std::string& dir, const std::string& nombr
 
 class Properties : public ViewportBase, public WithBorder, public Scrollable {
     public:
-        Scrollable* ComoScrollable() { return this; }
+        Scrollable* ComoScrollable() W3D_OVERRIDE { return this; }
         Properties();
         ~Properties() W3D_OVERRIDE;
 
@@ -934,8 +934,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void SetOpenGroup(bool open);
 
         bool editando;
-        int ViewportKind() const { return 3; } // (menu de tipo)
-        void ClearHover(); // apaga el hover de los botones de fila
+        int ViewportKind() const W3D_OVERRIDE { return 3; } // (menu de tipo)
+        void ClearHover() W3D_OVERRIDE; // apaga el hover de los botones de fila
         void ResetButtonHovers(); // apaga el hover de TODOS los botones (filas)
         void EnterPropertieSelect();
 

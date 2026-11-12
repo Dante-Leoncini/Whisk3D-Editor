@@ -236,7 +236,7 @@ std::string W3dComboTexto(W3dCombo c) {
         char b[2]; b[0] = (char)toupper(c.tecla); b[1] = 0;
         return s + b;
     }
-    char b[16]; sprintf(b, "#%d", c.tecla);   // una tecla sin nombre igual se puede guardar y releer
+    char b[16]; snprintf(b, sizeof(b), "#%d", c.tecla);   // una tecla sin nombre igual se puede guardar y releer
     return s + b;
 }
 

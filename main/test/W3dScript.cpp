@@ -4053,7 +4053,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             int espUndo[4] = { vc4, vc3, vc2, vc1 };
             for (int u=0; u<4; ++u){
                 UndoDeshacer();
-                char fase[24]; sprintf(fase, "undo%d", u+1);
+                char fase[24]; snprintf(fase, sizeof(fase), "undo%d", u+1);
                 if (m->vertexSize != espUndo[u]){
                     printf("      [vatest] %s: vc=%d esperado %d\n", fase, m->vertexSize, espUndo[u]);
                     err="undo no volvio al conteo esperado"; return false;
@@ -4063,7 +4063,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             int espRedo[4] = { vc2, vc3, vc4, vc5 };
             for (int u=0; u<4; ++u){
                 UndoRehacer();
-                char fase[24]; sprintf(fase, "redo%d", u+1);
+                char fase[24]; snprintf(fase, sizeof(fase), "redo%d", u+1);
                 if (m->vertexSize != espRedo[u]){
                     printf("      [vatest] %s: vc=%d esperado %d\n", fase, m->vertexSize, espRedo[u]);
                     err="redo no volvio al conteo esperado"; return false;
@@ -4753,7 +4753,6 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         }
         namespace gfx = w3dEngine;
         extern Viewport3D* Viewport3DActive;
-        double W3dNowMs();
         if (!rootViewport) { delete root; err = "presupuesto: no hay layout de viewports"; return false; }
         { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
         rootViewport->Render();
@@ -4848,7 +4847,6 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         const bool conSwap = (opt != "noswap");
         namespace gfx = w3dEngine;
         extern Viewport3D* Viewport3DActive;
-        double W3dNowMs();
         if (!rootViewport) { err = "bench: no hay layout de viewports"; return false; }
         // primer render del layout: puebla Viewport3DActive (UpdateViewOrbit lo setea) y
         // ejercita las cargas diferidas (texturas pendientes) fuera de la medicion
@@ -4977,7 +4975,6 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
               else if (opt.compare(0, 6, "tecla:") == 0) teclaHold = opt.substr(6); } }
         namespace gfx = w3dEngine;
         extern Viewport3D* Viewport3DActive;
-        double W3dNowMs();
         if (!rootViewport) { err = "benchjuego: no hay layout de viewports"; return false; }
         { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
         rootViewport->Render(); // puebla Viewport3DActive
@@ -5005,7 +5002,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // DIAGNOSTICO skinning (mismo contador que el log del N95): instalar un reloj ms y leer
         // g_skinPerf* para ver si el incremental corta o cae al camino COMPLETO en modo juego.
         extern unsigned int (*g_skinRelojMs)(); extern int g_skinPerfMs, g_skinPerfSkins, g_skinPerfCompletos;
-        struct RelojPC { static unsigned int Ms(){ double W3dNowMs(); return (unsigned int)W3dNowMs(); } };
+        struct RelojPC { static unsigned int Ms(){ return (unsigned int)W3dNowMs(); } };
         g_skinRelojMs = RelojPC::Ms; g_skinPerfMs = 0; g_skinPerfSkins = 0; g_skinPerfCompletos = 0;
         { extern double g_rutinasMs, g_uiMs; g_rutinasMs = g_uiMs = 0.0; double d[SIM_PERF_N]; SimPerfDesglose(d, true); }
         for (int i = 0; i < n; i++) {
@@ -5633,7 +5630,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             }
             const float z = (float)atof(t[0].c_str()), px = (float)atof(t[1].c_str()), py = (float)atof(t[2].c_str());
             if (mal) {
-                char b[160]; sprintf(b, "vpestado espera: camZoom=%.4f camPan=(%.4f, %.4f), se esperaba %.4f (%.4f, %.4f)",
+                char b[160]; snprintf(b, sizeof(b), "vpestado espera: camZoom=%.4f camPan=(%.4f, %.4f), se esperaba %.4f (%.4f, %.4f)",
                                      a[8], a[9], a[10], z, px, py);
                 err = b; return false;
             }
@@ -5645,7 +5642,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             vp->Render();
             printf("      [vpestado] marco %s NX=%.4f NY=%.4f\n", vp->camFrameOn ? "si" : "no", vp->camFrameNX, vp->camFrameNY);
             if (!vp->camFrameOn || fabsf(vp->camFrameNX - nx) > 0.01f || fabsf(vp->camFrameNY - ny) > 0.01f) {
-                char b[128]; sprintf(b, "vpestado marco: NX=%.4f NY=%.4f, se esperaba %.4f %.4f", vp->camFrameNX, vp->camFrameNY, nx, ny);
+                char b[128]; snprintf(b, sizeof(b), "vpestado marco: NX=%.4f NY=%.4f, se esperaba %.4f %.4f", vp->camFrameNX, vp->camFrameNY, nx, ny);
                 err = b; return false;
             }
             return true;
@@ -6913,7 +6910,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         float ex, ey, ez, tol;
         if (ss >> ex >> ey >> ez >> tol) {
             if (fabsf(v[0]-ex) > tol || fabsf(v[1]-ey) > tol || fabsf(v[2]-ez) > tol) {
-                char b[200]; sprintf(b, "vertrender: el vertice %d de '%s' esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", i, nombre.c_str(), v[0], v[1], v[2], ex, ey, ez); err = b; return false;
+                char b[200]; snprintf(b, sizeof(b), "vertrender: el vertice %d de '%s' esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", i, nombre.c_str(), v[0], v[1], v[2], ex, ey, ez); err = b; return false;
             }
         } else printf("      [vertrender] '%s' %d en (%.4f,%.4f,%.4f)\n", nombre.c_str(), i, v[0], v[1], v[2]);
         return true;
@@ -7903,7 +7900,6 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) { err = "modotiempo: no hay malla activa"; return false; }
         if (InteractionMode != ObjectMode) { err = "modotiempo: empezar en Object Mode"; return false; }
         Mesh* m = (Mesh*)ObjActivo;
-        double W3dNowMs();
         printf("      [modotiempo] '%s' %d verts %d caras recurso=%s\n", m->name.c_str(), m->vertexSize,
                m->facesSize, m->malla ? "si" : "no");
         for (int i = 0; i < n; i++) {
@@ -8091,13 +8087,13 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int idx = -1; ss >> idx;
         char b[96];
         if (what == "face") {
-            if (idx < 0 || idx >= e->NumFaces()) { sprintf(b, "cara %d fuera de rango (0..%d)", idx, e->NumFaces()-1); err = b; return false; }
+            if (idx < 0 || idx >= e->NumFaces()) { snprintf(b, sizeof(b), "cara %d fuera de rango (0..%d)", idx, e->NumFaces()-1); err = b; return false; }
             e->TogglearFace(idx, true);
         } else if (what == "vert" || what == "vertex") {
-            if (idx < 0 || idx >= e->NumVerts()) { sprintf(b, "vert %d fuera de rango (0..%d)", idx, e->NumVerts()-1); err = b; return false; }
+            if (idx < 0 || idx >= e->NumVerts()) { snprintf(b, sizeof(b), "vert %d fuera de rango (0..%d)", idx, e->NumVerts()-1); err = b; return false; }
             e->TogglearVert(idx, true);
         } else if (what == "edge") {
-            if (idx < 0 || idx >= e->NumEdges()) { sprintf(b, "edge %d fuera de rango (0..%d)", idx, e->NumEdges()-1); err = b; return false; }
+            if (idx < 0 || idx >= e->NumEdges()) { snprintf(b, sizeof(b), "edge %d fuera de rango (0..%d)", idx, e->NumEdges()-1); err = b; return false; }
             e->TogglearEdge(idx, true);
         } else { err = "select desconocido: '" + what + "' (all|none|face N|vert N|edge N)"; return false; }
         return true;
@@ -8114,7 +8110,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         m->EnsureEdit(); EditMesh* e = m->edit;
         if (!e) { err = "la malla no tiene edit mesh"; return false; }
         char b[96];
-        if (idx < 0 || idx >= e->NumEdges()) { sprintf(b, "edge %d fuera de rango (0..%d)", idx, e->NumEdges()-1); err = b; return false; }
+        if (idx < 0 || idx >= e->NumEdges()) { snprintf(b, sizeof(b), "edge %d fuera de rango (0..%d)", idx, e->NumEdges()-1); err = b; return false; }
         UndoCapturarSeleccionEdit(m); // Ctrl+Z: guarda la seleccion previa
         if      (what == "edge") { if (EditSelectMode == SelVertex) e->SeleccionarLoopEdgeVerts(idx, true); else e->SeleccionarLoopEdge(idx, true); }
         else if (what == "ring") e->SeleccionarRingEdge(idx, true);
@@ -8870,7 +8866,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (ss >> a[0] >> a[1] >> a[2] >> a[3] >> a[4] >> a[5]) {
             ss >> tol;
             const float r[6] = { mn.x, mn.y, mn.z, mx.x, mx.y, mx.z };
-            for (int k = 0; k < 6; k++) if (fabsf(r[k] - a[k]) > tol) { char b[200]; sprintf(b, "genbbox: caja (%.3f,%.3f,%.3f)..(%.3f,%.3f,%.3f), se esperaba (%.3f,%.3f,%.3f)..(%.3f,%.3f,%.3f)", r[0],r[1],r[2],r[3],r[4],r[5],a[0],a[1],a[2],a[3],a[4],a[5]); err = b; return false; }
+            for (int k = 0; k < 6; k++) if (fabsf(r[k] - a[k]) > tol) { char b[200]; snprintf(b, sizeof(b), "genbbox: caja (%.3f,%.3f,%.3f)..(%.3f,%.3f,%.3f), se esperaba (%.3f,%.3f,%.3f)..(%.3f,%.3f,%.3f)", r[0],r[1],r[2],r[3],r[4],r[5],a[0],a[1],a[2],a[3],a[4],a[5]); err = b; return false; }
         }
         return true;
     }
@@ -14031,7 +14027,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             Object* padre = NewMesh(MeshType(MeshType::cube), NULL, false); padre->SetNameObj("Papa");
             Object* h[3];
             for (int i = 0; i < 3; i++) { h[i] = NewMesh(MeshType(MeshType::cube), NULL, false);
-                                          char n[16]; sprintf(n, "H%d", i); h[i]->SetNameObj(n); }
+                                          char n[16]; snprintf(n, sizeof(n), "H%d", i); h[i]->SetNameObj(n); }
             UndoLimpiar();
             DeseleccionarTodo();
             for (int i = 0; i < 3; i++) h[i]->Seleccionar();
@@ -20213,7 +20209,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Mesh* m = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
         DeseleccionarTodo(); m->Seleccionar(); ObjActivo = m;
         for (int i = 0; i < 5; i++) {
-            char n[8]; sprintf(n, "V%d", i);
+            char n[8]; snprintf(n, sizeof(n), "V%d", i);
             NewActiveVertexAnimation(m, new VertexAnimation(m, n));
         }
         if (m->animations.size() != 5) { err = "vaproxima: no pude armar las 5 anims"; return false; }
@@ -20606,7 +20602,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             InitSceneAnimations();
             while ((int)SceneAnimations.size() < 4) NuevaEscena();
             if ((int)SceneAnimations.size() != 4) { err = "escenaborra: no pude armar las 4 escenas"; return false; }
-            for (int i = 0; i < 4; i++) { char n[8]; sprintf(n, "E%d", i); SceneAnimations[i]->name = n; }
+            for (int i = 0; i < 4; i++) { char n[8]; snprintf(n, sizeof(n), "E%d", i); SceneAnimations[i]->name = n; }
             ActiveAnimKind = 0; ActiveAnimArm = NULL; ActiveAnimMesh = NULL;  // la tarjeta muestra la ESCENA
             SceneAnimActiva = 2;
             UndoLimpiar();
@@ -20769,7 +20765,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Armature* a = new Armature(NULL, Vector3(0,0,0)); a->SetNameObj("RigOrden");
         CrearAnimacion(a); CrearAnimacion(a); CrearAnimacion(a); CrearAnimacion(a);
         if (a->animations.size() != 4) { err = "cliporden: no pude armar los 4 clips"; return false; }
-        for (int i = 0; i < 4; i++) { char n[8]; sprintf(n, "K%d", i); a->animations[i]->name = n; }
+        for (int i = 0; i < 4; i++) { char n[8]; snprintf(n, sizeof(n), "K%d", i); a->animations[i]->name = n; }
         a->animActiva = 1;
         UndoLimpiar();
 
@@ -20848,7 +20844,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                     s += "'" + an->name + "'[";
                     for (size_t k = 0; k < an->frames.size(); k++) {
                         char b[64];
-                        sprintf(b, "%sf%d:x%.0f", k ? ", " : "", an->frames[k]->frame,
+                        snprintf(b, sizeof(b), "%sf%d:x%.0f", k ? ", " : "", an->frames[k]->frame,
                                 an->frames[k]->positions ? (double)an->frames[k]->positions[0] : -1.0);
                         s += b;
                     }
@@ -20981,7 +20977,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 std::string s;
                 for (size_t i = 0; i < a->animations.size(); i++) {
                     char b[96];
-                    sprintf(b, "%s'%s'=%d", i ? " " : "", a->animations[i]->name.c_str(),
+                    snprintf(b, sizeof(b), "%s'%s'=%d", i ? " " : "", a->animations[i]->name.c_str(),
                             a->animations[i]->tracks.empty() ? -1 : a->animations[i]->tracks[0].bone);
                     s += b;
                 }
@@ -20998,7 +20994,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 Armature* a = new Armature(NULL, Vector3(0,0,0)); a->SetNameObj(nombre);
                 CrearAnimacion(a); CrearAnimacion(a); CrearAnimacion(a);
                 for (int i = 0; i < 3; i++) {
-                    char n[8]; sprintf(n, "C%d", i); a->animations[i]->name = n;
+                    char n[8]; snprintf(n, sizeof(n), "C%d", i); a->animations[i]->name = n;
                     BoneTrack t; t.bone = 10 + i; a->animations[i]->tracks.push_back(t);
                 }
                 return a;
@@ -21063,7 +21059,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 std::string s;
                 for (size_t i = 0; i < m->Arm2DAnims().size(); i++) {
                     char b[96];
-                    sprintf(b, "%s'%s'=%d", i ? " " : "", m->Arm2DAnims()[i]->name.c_str(),
+                    snprintf(b, sizeof(b), "%s'%s'=%d", i ? " " : "", m->Arm2DAnims()[i]->name.c_str(),
                             m->Arm2DAnims()[i]->tracks.empty() ? -1 : m->Arm2DAnims()[i]->tracks[0].bone);
                     s += b;
                 }
@@ -21081,7 +21077,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 m->Arm2DAgregar("Rig2D");
                 Arm2DCrearAnimacion(m); Arm2DCrearAnimacion(m); Arm2DCrearAnimacion(m);
                 for (int i = 0; i < 3 && i < (int)m->Arm2DAnims().size(); i++) {
-                    char n[8]; sprintf(n, "D%d", i); m->Arm2DAnims()[i]->name = n;
+                    char n[8]; snprintf(n, sizeof(n), "D%d", i); m->Arm2DAnims()[i]->name = n;
                     Bone2DTrack t; t.bone = 20 + i; m->Arm2DAnims()[i]->tracks.push_back(t);
                 }
                 return m;
@@ -21630,7 +21626,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             InteractionMode = ObjectMode; estado = editNavegacion;
             Armature* a = new Armature(NULL, Vector3(0,0,0)); a->SetNameObj("RigRen");
             for (int i = 0; i < 3; i++){
-                W3dBone b; char n[16]; sprintf(n, "H%d", i); b.name = n; b.select = true;
+                W3dBone b; char n[16]; snprintf(n, sizeof(n), "H%d", i); b.name = n; b.select = true;
                 a->bones.push_back(b);
             }
             CrearAnimacion(a);
@@ -21697,7 +21693,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             InteractionMode = ObjectMode; estado = editNavegacion;
             Armature* a = new Armature(NULL, Vector3(0,0,0)); a->SetNameObj("RigDope");
             for (int i = 0; i < 3; i++){
-                W3dBone b; char n[16]; sprintf(n, "H%d", i); b.name = n; b.select = true;
+                W3dBone b; char n[16]; snprintf(n, sizeof(n), "H%d", i); b.name = n; b.select = true;
                 a->bones.push_back(b);
             }
             CrearAnimacion(a);
@@ -21752,7 +21748,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             DeseleccionarTodo(); m->Seleccionar(); ObjActivo = m;
             std::vector<GLfloat> buf((size_t)m->vertexSize * 3, 1.0f);
             for (int k = 0; k < 2; k++){
-                char n[16]; sprintf(n, "VA%d", k);
+                char n[16]; snprintf(n, sizeof(n), "VA%d", k);
                 VertexAnimation* an = new VertexAnimation(m, n); an->target = m;
                 NewActiveVertexAnimation(m, an);
                 VertexAnimSetKey(*an, 1, &buf[0], NULL, NULL, KfLinear);
@@ -21805,7 +21801,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 W3dBone b; b.name = "H0"; b.select = true; a->bones.push_back(b);
                 for (int k = 0; k < nclips; k++){
                     CrearAnimacion(a);
-                    char n[16]; sprintf(n, "K%d", k); a->animations[k]->name = n;
+                    char n[16]; snprintf(n, sizeof(n), "K%d", k); a->animations[k]->name = n;
                     AnimProperty& ap = a->animations[k]->TrackDe(0).PropertyDe(AnimPosition, AnimX);
                     SetKeyCurva(ap, 1, 100.0f * (float)(k + 1));
                 }
@@ -22019,7 +22015,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 ObjSelects.clear(); ObjSelects.push_back(m);
                 std::vector<GLfloat> buf((size_t)m->vertexSize * 3, 1.0f);
                 for (int k = 0; k < 2; k++){
-                    char n[16]; sprintf(n, "VA%d", k);
+                    char n[16]; snprintf(n, sizeof(n), "VA%d", k);
                     VertexAnimation* an = new VertexAnimation(m, n); an->target = m;
                     NewActiveVertexAnimation(m, an);
                     VertexAnimSetKey(*an, 1, &buf[0], NULL, NULL, KfLinear);
@@ -24680,7 +24676,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         std::string ordenReal;
         for (int i = 0; i < 7 && ordenOk; i++) {
             Button* bo = uv->BarButtons[i + 1];
-            char tmp[16]; sprintf(tmp, "%d ", bo ? bo->rol : -1); ordenReal += tmp;
+            char tmp[16]; snprintf(tmp, sizeof(tmp), "%d ", bo ? bo->rol : -1); ordenReal += tmp;
             if (!bo || bo->rol != ordenEsperado[i]) ordenOk = false;
         }
         printf("      [uvcons] orden de la barra por rol: [%s] (esperado Modo/SelMode/Pivot/Cursor/View/Select/Add) %s\n",
@@ -26990,11 +26986,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             std::string e2; char cmdb[64]; bool armado = true;
             if (!W3dRunCommand("add cube", e2)) armado = false;
             if (!W3dRunCommand("add cube", e2)) armado = false;
-            sprintf(cmdb, "active %d", n0 + 1);      if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
+            snprintf(cmdb, sizeof(cmdb), "active %d", n0 + 1);      if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
             if (armado && !W3dRunCommand("objscale 0.5 2 0.5", e2)) armado = false;
-            sprintf(cmdb, "active %d", n0);          if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
+            snprintf(cmdb, sizeof(cmdb), "active %d", n0);          if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
             if (armado && !W3dRunCommand("modadd boolean", e2)) armado = false;
-            sprintf(cmdb, "modtarget %d", n0 + 1);   if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
+            snprintf(cmdb, sizeof(cmdb), "modtarget %d", n0 + 1);   if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
             Mesh* A2 = armado ? ScriptActiveMesh() : NULL;
             if (!A2) { printf("      [booltest] edit/apply: no se pudo armar la escena (%s) -> MAL\n", e2.c_str()); ok = false; }
             else {
@@ -27510,7 +27506,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int corners = 0; for (size_t f = 0; f < m->faces3d.size(); f++) corners += (int)m->faces3d[f].idx.size();
         printf("      [wpvisibles] %s: %d corners visibles de %d (oclusion=%s)%s\n", m->name.c_str(), n, corners, WPOclusionActiva(m) ? "si" : "no",
                esperado >= 0 ? ((n == esperado) ? " -> OK" : " -> MAL") : "");
-        if (esperado >= 0 && n != esperado) { char b[96]; sprintf(b, "wpvisibles: esperaba %d, hay %d", esperado, n); err = b; return false; }
+        if (esperado >= 0 && n != esperado) { char b[96]; snprintf(b, sizeof(b), "wpvisibles: esperaba %d, hay %d", esperado, n); err = b; return false; }
         return true;
     }
     // ---- shadetest : el shading por cara (Face > Shade Smooth/Flat) SOBREVIVE a las operaciones que
@@ -27702,7 +27698,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             static std::vector<std::string> Corte(const Mesh* m) { std::vector<std::string> v; std::map<std::string,int> vistos;
                 for (int i = 0; i < m->vertexSize; i++) { const float* q = m->vertex + i*3;
                     if (fabsf(fabsf(q[0])-1.0f) < 1e-3f && fabsf(fabsf(q[1])-1.0f) < 1e-3f && fabsf(fabsf(q[2])-1.0f) < 1e-3f) continue;
-                    char b[64]; sprintf(b, "%.2f,%.2f,%.2f", q[0], q[1], q[2]); if (vistos.insert(std::make_pair(std::string(b), 1)).second) v.push_back(b); }
+                    char b[64]; snprintf(b, sizeof(b), "%.2f,%.2f,%.2f", q[0], q[1], q[2]); if (vistos.insert(std::make_pair(std::string(b), 1)).second) v.push_back(b); }
                 std::sort(v.begin(), v.end()); return v; }
             static bool Igual(const std::vector<std::string>& a, const std::vector<std::string>& b) { return a == b; }
             static bool IgualF(const std::vector<float>& a, const std::vector<float>& b) { if (a.size() != b.size()) return false; for (size_t i = 0; i < a.size(); i++) if (fabsf(a[i]-b[i]) > 1e-3f) return false; return true; }
@@ -27759,7 +27755,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         std::map<std::string,int> vistos; printf("      [cutverts] %s:", m->name.c_str());
         for (int i = 0; i < m->vertexSize; i++) { const float* q = m->vertex + i*3;
             if (fabsf(fabsf(q[0])-1.0f) < 1e-3f && fabsf(fabsf(q[1])-1.0f) < 1e-3f && fabsf(fabsf(q[2])-1.0f) < 1e-3f) continue;
-            char b[64]; sprintf(b, "(%.2f,%.2f,%.2f)", q[0], q[1], q[2]); if (vistos.insert(std::make_pair(std::string(b), 1)).second) printf(" %s", b); }
+            char b[64]; snprintf(b, sizeof(b), "(%.2f,%.2f,%.2f)", q[0], q[1], q[2]); if (vistos.insert(std::make_pair(std::string(b), 1)).second) printf(" %s", b); }
         printf("\n");
         if (m->edit) { EditMesh* e = m->edit; printf("      [cutverts] aristas edit:"); for (int eg = 0; eg < e->NumEdges() && eg < 14; eg++) { int a = e->lineIdx[(size_t)eg*2], b = e->lineIdx[(size_t)eg*2+1];
             printf(" %d=(%.0f,%.0f,%.0f)-(%.0f,%.0f,%.0f)", eg, e->pos[(size_t)a*3], e->pos[(size_t)a*3+1], e->pos[(size_t)a*3+2], e->pos[(size_t)b*3], e->pos[(size_t)b*3+1], e->pos[(size_t)b*3+2]); } printf("\n"); }
@@ -31278,7 +31274,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                        mt ? mt->name.c_str() : "-", mt ? mt->diffuse[0] : 0.0f, mt ? mt->diffuse[1] : 0.0f, mt ? mt->diffuse[2] : 0.0f);
             } else printf("      [pegar] '%s'\n", o->name.c_str());
         }
-        if (q == "espera" && n != esp) { char b[80]; sprintf(b, "pegar: se pegaron %d objetos, se esperaban %d", n, esp); err = b; return false; }
+        if (q == "espera" && n != esp) { char b[80]; snprintf(b, sizeof(b), "pegar: se pegaron %d objetos, se esperaban %d", n, esp); err = b; return false; }
         return true;
     }
     // ---- objalfinal <nombre> : lo pasa al FINAL de los hijos de su padre (el ultimo del outliner: lo ultimo que se dibuja) ----
@@ -31475,7 +31471,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Viewport3D* vp = Viewport3DActive; if (!vp) { err = "tris3d: sin viewport 3D"; return false; }
         const int t = vp->statTrisFrame;
         printf("      [tris3d] %d (antes %d)\n", t, anterior);
-        if (hayDelta && anterior >= 0 && t - anterior != delta) { char b[120]; sprintf(b, "tris3d: %d -> %d (%+d), se esperaba %+d", anterior, t, t - anterior, delta); err = b; anterior = t; return false; }
+        if (hayDelta && anterior >= 0 && t - anterior != delta) { char b[120]; snprintf(b, sizeof(b), "tris3d: %d -> %d (%+d), se esperaba %+d", anterior, t, t - anterior, delta); err = b; anterior = t; return false; }
         anterior = t;
         return true;
     }
@@ -31487,7 +31483,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int vAgr = 0, vReal = 0, fLog = 0, fTri = 0;
         W3dContarMallas(SceneCollection, vAgr, vReal, fLog, fTri);
         printf("      [carastotal] %d (vertices %d)\n", fTri, vReal);
-        if (esperado >= 0 && fTri != esperado) { char b[120]; sprintf(b, "carastotal: %d, se esperaba %d", fTri, esperado); err = b; return false; }
+        if (esperado >= 0 && fTri != esperado) { char b[120]; snprintf(b, sizeof(b), "carastotal: %d, se esperaba %d", fTri, esperado); err = b; return false; }
         return true;
     }
     if (cmd == "statsvivo") {
@@ -32017,15 +32013,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- partcount : imprime la cantidad de mesh parts + los rangos de dibujado (start/count por parte) ----
     if (cmd == "partcount") {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
-        std::string s = "[parts] n="; { char b[32]; sprintf(b,"%d |",(int)m->materialsGroup.size()); s+=b; }
-        for (size_t g=0;g<m->materialsGroup.size();g++){ char b[48]; sprintf(b," [%d:start%d cnt%d]",(int)g,m->materialsGroup[g].startDrawn,m->materialsGroup[g].indicesDrawnCount); s+=b; }
+        std::string s = "[parts] n="; { char b[32]; snprintf(b, sizeof(b),"%d |",(int)m->materialsGroup.size()); s+=b; }
+        for (size_t g=0;g<m->materialsGroup.size();g++){ char b[48]; snprintf(b, sizeof(b)," [%d:start%d cnt%d]",(int)g,m->materialsGroup[g].startDrawn,m->materialsGroup[g].indicesDrawnCount); s+=b; }
         printf("      %s\n", s.c_str());
         return true;
     }
     // ---- modlist : imprime el stack (nombres en orden + el activo) ----
     if (cmd == "modlist") {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
-        std::string s = "[mods] activo="; { char b[16]; sprintf(b,"%d",m->modificadorActivo); s+=b; } s += " |";
+        std::string s = "[mods] activo="; { char b[16]; snprintf(b, sizeof(b),"%d",m->modificadorActivo); s+=b; } s += " |";
         for (int i=0;i<(int)m->modificadores.size();i++) s += " " + m->NombreModificador(i);
         printf("      %s\n", s.c_str());
         return true;
@@ -32103,7 +32099,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 for (int i = 0; i < m->vertexSize; i++) {
                     const float* v = &m->vertex[i*3];
                     const float mx = fabsf(v[0]) > fabsf(v[1]) ? (fabsf(v[0]) > fabsf(v[2]) ? fabsf(v[0]) : fabsf(v[2])) : (fabsf(v[1]) > fabsf(v[2]) ? fabsf(v[1]) : fabsf(v[2]));
-                    if (mx < lado - 1e-4f) { char b2[160]; sprintf(b2, "inset: el vertice %d (%.3f %.3f %.3f) quedo ADENTRO del cubo (la V)", i, v[0], v[1], v[2]); err = b2; return false; }
+                    if (mx < lado - 1e-4f) { char b2[160]; snprintf(b2, sizeof(b2), "inset: el vertice %d (%.3f %.3f %.3f) quedo ADENTRO del cubo (la V)", i, v[0], v[1], v[2]); err = b2; return false; }
                 }
         }
         int corners = 0;
@@ -32218,7 +32214,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [bevel] vertices=%d caras=%d corners=%d caras hacia adentro=%d\n", (int)pos.size(), (int)m->faces3d.size(), corners, alReves);
         if (alReves) { err = "bevel: hay caras mirando para adentro"; return false; }
         if (espV >= 0 && ((int)pos.size() != espV || (int)m->faces3d.size() != espC)) {
-            char b[120]; sprintf(b, "bevel: quedaron %d vertices y %d caras, se esperaban %d y %d", (int)pos.size(), (int)m->faces3d.size(), espV, espC);
+            char b[120]; snprintf(b, sizeof(b), "bevel: quedaron %d vertices y %d caras, se esperaban %d y %d", (int)pos.size(), (int)m->faces3d.size(), espV, espC);
             err = b; return false;
         }
         return true;
@@ -32341,10 +32337,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             char b[96];
             if (what == "matr") {
                 float val=0; ss >> val; float d=mat->diffuse[0]-val; if (d<0) d=-d;
-                if (d>0.01f) { sprintf(b,"esperaba matr=%.3f, hay %.3f", val, mat->diffuse[0]); err=b; return false; }
+                if (d>0.01f) { snprintf(b, sizeof(b),"esperaba matr=%.3f, hay %.3f", val, mat->diffuse[0]); err=b; return false; }
             } else {
                 int val=-1; ss >> val; int got=mat->chrome?1:0;
-                if (got!=val) { sprintf(b,"esperaba matchrome=%d, hay %d", val, got); err=b; return false; }
+                if (got!=val) { snprintf(b, sizeof(b),"esperaba matchrome=%d, hay %d", val, got); err=b; return false; }
             }
             return true;
         }
@@ -32527,14 +32523,14 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                islas, enrango ? "si" : "no", flips, angMax, angMed, area, bbox[0], bbox[1], bbox[2], bbox[3]);
         std::string tok; char b[160];
         while (ss >> tok) {
-            if (tok == "islas") { int n = 0; ss >> n; if (islas != n) { sprintf(b, "uvcheck: islas=%d, se esperaban %d", islas, n); err = b; return false; } }
+            if (tok == "islas") { int n = 0; ss >> n; if (islas != n) { snprintf(b, sizeof(b), "uvcheck: islas=%d, se esperaban %d", islas, n); err = b; return false; } }
             else if (tok == "enrango") { if (!enrango) { err = "uvcheck: hay UV fuera de [0,1]"; return false; } }
-            else if (tok == "sinflips") { if (flips) { sprintf(b, "uvcheck: %d triangulos dados vuelta", flips); err = b; return false; } }
-            else if (tok == "angmax") { double x = 0; ss >> x; if (angMax > x) { sprintf(b, "uvcheck: desvio de angulo %.3f > %.3f", angMax, x); err = b; return false; } }
-            else if (tok == "area") { double x = 0, tol = 0; ss >> x >> tol; if (fabs(area - x) > tol) { sprintf(b, "uvcheck: area %.4f, se esperaba %.4f (+-%.4f)", area, x, tol); err = b; return false; } }
-            else if (tok == "areamax") { double x = 0; ss >> x; if (area > x) { sprintf(b, "uvcheck: area %.4f > %.4f", area, x); err = b; return false; } }
-            else if (tok == "extension") { double x = 0, tol = 0; ss >> x >> tol; const double ext = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]); if (fabs(ext - x) > tol) { sprintf(b, "uvcheck: la caja ocupa %.4f, se esperaba %.4f", ext, x); err = b; return false; } }
-            else if (tok == "ancho") { double x = 0, tol = 0; ss >> x >> tol; const double w = bbox[2] - bbox[0]; if (fabs(w - x) > tol) { sprintf(b, "uvcheck: ancho %.4f, se esperaba %.4f", w, x); err = b; return false; } }
+            else if (tok == "sinflips") { if (flips) { snprintf(b, sizeof(b), "uvcheck: %d triangulos dados vuelta", flips); err = b; return false; } }
+            else if (tok == "angmax") { double x = 0; ss >> x; if (angMax > x) { snprintf(b, sizeof(b), "uvcheck: desvio de angulo %.3f > %.3f", angMax, x); err = b; return false; } }
+            else if (tok == "area") { double x = 0, tol = 0; ss >> x >> tol; if (fabs(area - x) > tol) { snprintf(b, sizeof(b), "uvcheck: area %.4f, se esperaba %.4f (+-%.4f)", area, x, tol); err = b; return false; } }
+            else if (tok == "areamax") { double x = 0; ss >> x; if (area > x) { snprintf(b, sizeof(b), "uvcheck: area %.4f > %.4f", area, x); err = b; return false; } }
+            else if (tok == "extension") { double x = 0, tol = 0; ss >> x >> tol; const double ext = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]); if (fabs(ext - x) > tol) { snprintf(b, sizeof(b), "uvcheck: la caja ocupa %.4f, se esperaba %.4f", ext, x); err = b; return false; } }
+            else if (tok == "ancho") { double x = 0, tol = 0; ss >> x >> tol; const double w = bbox[2] - bbox[0]; if (fabs(w - x) > tol) { snprintf(b, sizeof(b), "uvcheck: ancho %.4f, se esperaba %.4f", w, x); err = b; return false; } }
             else { err = "uvcheck: opcion desconocida '" + tok + "'"; return false; }
         }
         return true;
@@ -32589,7 +32585,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         float ex, ey, ez, tol;
         if (ss >> ex >> ey >> ez >> tol) {
             if (fabsf(px-ex) > tol || fabsf(py-ey) > tol || fabsf(pz-ez) > tol) {
-                char b[160]; sprintf(b, "vertat: el vert cerca de (%.2f,%.2f,%.2f) esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", x, y, z, px, py, pz, ex, ey, ez); err = b; return false;
+                char b[160]; snprintf(b, sizeof(b), "vertat: el vert cerca de (%.2f,%.2f,%.2f) esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", x, y, z, px, py, pz, ex, ey, ez); err = b; return false;
             }
         } else printf("      [vertat] vert %d en (%.4f,%.4f,%.4f)\n", mejor, px, py, pz);
         return true;
@@ -32613,7 +32609,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         float ex, ey, ez, tol;
         if (ss >> ex >> ey >> ez >> tol) {
             if (fabsf(o->pos.x-ex) > tol || fabsf(o->pos.y-ey) > tol || fabsf(o->pos.z-ez) > tol) {
-                char b[160]; sprintf(b, "objat: %s esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", nm.c_str(), o->pos.x, o->pos.y, o->pos.z, ex, ey, ez); err = b; return false;
+                char b[160]; snprintf(b, sizeof(b), "objat: %s esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", nm.c_str(), o->pos.x, o->pos.y, o->pos.z, ex, ey, ez); err = b; return false;
             }
         } else printf("      [objat] %s en (%.4f,%.4f,%.4f)\n", nm.c_str(), o->pos.x, o->pos.y, o->pos.z);
         return true;
@@ -32701,7 +32697,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (ruta.empty()) { err = "newtex: " + msg; return false; }
         Texture* t = TexturaBuscar(ruta);
         if (!t || !t->iID) { err = "newtex: la textura no quedo cargada: " + ruta; return false; }
-        if (t->ancho != w || t->alto != h) { char b[160]; sprintf(b, "newtex: tamano %dx%d, se esperaba %dx%d", t->ancho, t->alto, w, h); err = b; return false; }
+        if (t->ancho != w || t->alto != h) { char b[160]; snprintf(b, sizeof(b), "newtex: tamano %dx%d, se esperaba %dx%d", t->ancho, t->alto, w, h); err = b; return false; }
         // NO se asigna a ningun material (menos al de defecto): solo se muestra en el UV editor, en memoria ("*")
         if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
             Mesh* m = (Mesh*)ObjActivo;
@@ -32904,8 +32900,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (d > umbral) n++;
         }
         printf("      [rtdif] %d pixeles distintos (> %d) de %d\n", n, umbral, w * h);
-        if (n < mn) { char b[96]; sprintf(b, "rtdif: %d pixeles distintos, se esperaban al menos %d", n, mn); err = b; return false; }
-        if (mx >= 0 && n > mx) { char b[96]; sprintf(b, "rtdif: %d pixeles distintos, se esperaban como mucho %d", n, mx); err = b; return false; }
+        if (n < mn) { char b[96]; snprintf(b, sizeof(b), "rtdif: %d pixeles distintos, se esperaban al menos %d", n, mn); err = b; return false; }
+        if (mx >= 0 && n > mx) { char b[96]; snprintf(b, sizeof(b), "rtdif: %d pixeles distintos, se esperaban como mucho %d", n, mx); err = b; return false; }
         return true;
     }
     if (cmd == "rtpixel") {
@@ -32915,7 +32911,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int er, eg, eb, tol;
         if (ss >> er >> eg >> eb >> tol) {
             if (abs((int)p[0] - er) > tol || abs((int)p[1] - eg) > tol || abs((int)p[2] - eb) > tol) {
-                char b[160]; sprintf(b, "rtpixel (%d,%d): (%d,%d,%d), se esperaba (%d,%d,%d)", x, y, p[0], p[1], p[2], er, eg, eb); err = b; return false;
+                char b[160]; snprintf(b, sizeof(b), "rtpixel (%d,%d): (%d,%d,%d), se esperaba (%d,%d,%d)", x, y, p[0], p[1], p[2], er, eg, eb); err = b; return false;
             }
         } else w3dLogf("[rtpixel] (%d,%d) = (%d,%d,%d)", x, y, p[0], p[1], p[2]);
         return true;
@@ -33259,8 +33255,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (d > umbral) n++;
         }
         printf("      [vpdif] %d pixeles distintos (> %d) de %d\n", n, umbral, w * h);
-        if (n < mn) { char b[96]; sprintf(b, "vpdif: %d pixeles distintos, se esperaban al menos %d", n, mn); err = b; return false; }
-        if (mx >= 0 && n > mx) { char b[96]; sprintf(b, "vpdif: %d pixeles distintos, se esperaban como mucho %d", n, mx); err = b; return false; }
+        if (n < mn) { char b[96]; snprintf(b, sizeof(b), "vpdif: %d pixeles distintos, se esperaban al menos %d", n, mn); err = b; return false; }
+        if (mx >= 0 && n > mx) { char b[96]; snprintf(b, sizeof(b), "vpdif: %d pixeles distintos, se esperaban como mucho %d", n, mx); err = b; return false; }
         return true;
     }
     // ---- camdof <0|1> [fStop] [foco m] [objeto] : la PROFUNDIDAD DE CAMPO de la camara activa (Camera::dof); 'objeto' =
@@ -33491,7 +33487,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (x < 0 || y < 0 || x >= w || y >= h) { err = "uvexportalfa: fuera de la imagen"; return false; }
         const int a = rgba[((size_t)y * w + x) * 4 + 3];
         printf("      [uvexportalfa] (%d,%d) alfa=%d (%d caras)\n", x, y, a, caras);
-        if (abs(a - ea) > tol) { char b[96]; sprintf(b, "uvexportalfa: alfa %d, se esperaba %d", a, ea); err = b; return false; }
+        if (abs(a - ea) > tol) { char b[96]; snprintf(b, sizeof(b), "uvexportalfa: alfa %d, se esperaba %d", a, ea); err = b; return false; }
         return true;
     }
     // ---- uvexportdef w h : el tamano que propone el popup (textura mostrada / 512 en PC) tiene que ser w x h ----
@@ -33500,7 +33496,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Mesh* m = ScriptActiveMesh();
         int w = 0, h = 0; UVExportarTamDefecto(UVTexturaMostrada(m), w, h);
         printf("      [uvexportdef] %dx%d (nombre '%s')\n", w, h, UVExportarNombreDefecto(m, UVTexturaMostrada(m)).c_str());
-        if (w != ew || h != eh) { char b[96]; sprintf(b, "uvexportdef: %dx%d, se esperaba %dx%d", w, h, ew, eh); err = b; return false; }
+        if (w != ew || h != eh) { char b[96]; snprintf(b, sizeof(b), "uvexportdef: %dx%d, se esperaba %dx%d", w, h, ew, eh); err = b; return false; }
         return true;
     }
     // ---- uvexportpopup : abre el formulario "Export UV Layout" (para uishot / popupinfo) ----
@@ -33519,7 +33515,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         const Vector3 v = (cmd == "objscaleat") ? ObjActivo->scale : ObjActivo->rotEuler;
         printf("      [%s] (%.4f, %.4f, %.4f)\n", cmd.c_str(), v.x, v.y, v.z);
         if (fabsf(v.x - ex) > tol || fabsf(v.y - ey) > tol || fabsf(v.z - ez) > tol) {
-            char b[200]; sprintf(b, "%s: (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", cmd.c_str(), v.x, v.y, v.z, ex, ey, ez); err = b; return false;
+            char b[200]; snprintf(b, sizeof(b), "%s: (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", cmd.c_str(), v.x, v.y, v.z, ex, ey, ez); err = b; return false;
         }
         return true;
     }
@@ -33843,7 +33839,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         EV::Arrastre(cx, cy);
         const bool orbito = EV::Giro(r0, vp->viewRot) < 0.9999f, pivQuieto = (vp->pivot - p0).Length() < 1e-4f;
         const bool selQuieta = EV::Seleccionados(SceneCollection) == sel0;
-        sprintf(b, "      [altnav] Alt+arrastre: orbito=%d pivote_quieto=%d seleccion_igual=%d caja=%d\n", orbito, pivQuieto, selQuieta, BoxSelectActivo() ? 1 : 0);
+        snprintf(b, sizeof(b), "      [altnav] Alt+arrastre: orbito=%d pivote_quieto=%d seleccion_igual=%d caja=%d\n", orbito, pivQuieto, selQuieta, BoxSelectActivo() ? 1 : 0);
         printf("%s", b); if (!orbito || !pivQuieto || !selQuieta || BoxSelectActivo()) ok = false;
         // (2) Alt + Shift + arrastre: desplaza (el pivote se mueve) sin girar
         Quaternion r1 = vp->viewRot; Vector3 p1 = vp->pivot;
@@ -33884,7 +33880,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     if (cmd == "rttris") {
         int mn = -1; ss >> mn;
         const int n = RTHarnessTriangulos();
-        if (mn >= 0 && n < mn) { char b[96]; sprintf(b, "rttris: %d triangulos, se esperaban al menos %d", n, mn); err = b; return false; }
+        if (mn >= 0 && n < mn) { char b[96]; snprintf(b, sizeof(b), "rttris: %d triangulos, se esperaban al menos %d", n, mn); err = b; return false; }
         w3dLogf("[rttris] %d", n);
         return true;
     }
@@ -33900,7 +33896,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int er, eg, eb, tol;
         if (ss >> er >> eg >> eb >> tol) {
             if (abs((int)p[0] - er) > tol || abs((int)p[1] - eg) > tol || abs((int)p[2] - eb) > tol) {
-                char b[160]; sprintf(b, "texpixel (%.2f,%.2f): (%d,%d,%d), se esperaba (%d,%d,%d)", u, v, p[0], p[1], p[2], er, eg, eb); err = b; return false;
+                char b[160]; snprintf(b, sizeof(b), "texpixel (%.2f,%.2f): (%d,%d,%d), se esperaba (%d,%d,%d)", u, v, p[0], p[1], p[2], er, eg, eb); err = b; return false;
             }
         } else printf("      [texpixel] (%.2f,%.2f) = (%d,%d,%d,%d)\n", u, v, p[0], p[1], p[2], p[3]);
         return true;
@@ -33951,7 +33947,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         const double ms = W3dTexPaint3DTrazoMs((Viewport3D*)viewPortActive, n, radio);
         printf("      [texpaintrazo] %d toques: %.0f ms (%.2f ms por toque)\n", n, ms, ms / (n > 0 ? n : 1));
         if (ms < 0) { err = "texpaintrazo: no se pudo pintar"; return false; }
-        if (maxms > 0 && ms > maxms) { char b[96]; sprintf(b, "texpaintrazo: %.0f ms > %.0f", ms, maxms); err = b; return false; }
+        if (maxms > 0 && ms > maxms) { char b[96]; snprintf(b, sizeof(b), "texpaintrazo: %.0f ms > %.0f", ms, maxms); err = b; return false; }
         return true;
     }
     // ---- texcaras : para cada cara de la malla activa dice si mira a la camara y si su texel central esta pintado
@@ -34052,11 +34048,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      al principio, en el medio y al final del renglon, y que Buscar siga contando en el texto entero ----
     if (cmd == "idegrande") {
         namespace gfx = w3dEngine;
-        double W3dNowMs();
         std::string t = "-- idegrande\nlocal T = {";
         int esperadas = 0;
         for (int i = 0; (int)t.size() < 800000; i++) {
-            char b[16]; sprintf(b, "%d, ", i % 997); t += b;
+            char b[16]; snprintf(b, sizeof(b), "%d, ", i % 997); t += b;
             if (i % 997 == 996) esperadas++;
         }
         t += "0}\nprint(\"fin\")";
@@ -36507,7 +36502,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [simularsincorpus] %s (salteadas mientras estuvo simulado: %d)\n",
                v == 1 ? "corpus AUSENTE (simulado)" : "corpus normal", salteadas);
         if (esperado >= 0 && salteadas != esperado) {
-            char b[160]; sprintf(b, "simularsincorpus: se saltearon %d partes y se esperaban %d", salteadas, esperado);
+            char b[160]; snprintf(b, sizeof(b), "simularsincorpus: se saltearon %d partes y se esperaban %d", salteadas, esperado);
             err = b; return false;
         }
         return true;
@@ -38420,7 +38415,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             (void)vb;
             if (!W3dRunCommand("selmode vertex", e2)) { err = "delmarcas: " + e2; return false; }
             if (!W3dRunCommand("select none", e2))    { err = "delmarcas: " + e2; return false; }
-            char c[64]; sprintf(c, "select vert %d", va);
+            char c[64]; snprintf(c, sizeof(c), "select vert %d", va);
             if (!W3dRunCommand(c, e2))                { err = "delmarcas: " + e2; return false; }
             if (!W3dRunCommand("editdelete", e2))     { err = "delmarcas: " + e2; return false; }
             if (!W3dRunCommand("mode object", e2))    { err = "delmarcas: " + e2; return false; }
@@ -38559,7 +38554,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             std::vector<GLfloat> posAntes(m->vertex, m->vertex + (size_t)m->vertexSize * 3);
 
             if (!W3dRunCommand("modadd subsurf", e2)) { err = "modmarcas: " + e2; return false; }
-            char c[64]; sprintf(c, "modsub 1 %d", simple);
+            char c[64]; snprintf(c, sizeof(c), "modsub 1 %d", simple);
             if (!W3dRunCommand(c, e2))                { err = "modmarcas: " + e2; return false; }
             if (!W3dRunCommand("modapply", e2))       { err = "modmarcas: " + e2; return false; }
 
@@ -38631,7 +38626,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         //     la arista SIGUE existiendo, solo que en otro lugar) --------------
         if (!W3dRunCommand("selmode vertex", e2)) { err = "movmarcas: " + e2; return false; }
         if (!W3dRunCommand("select none", e2))    { err = "movmarcas: " + e2; return false; }
-        { char c[64]; sprintf(c, "select vert %d", va);
+        { char c[64]; snprintf(c, sizeof(c), "select vert %d", va);
           if (!W3dRunCommand(c, e2)) { err = "movmarcas: " + e2; return false; } }
         if (!W3dRunCommand("move 1.5", e2))       { err = "movmarcas: " + e2; return false; }
         const bool viveA = ((int)m->sharpEdges.size() == 1 && (int)m->seamEdges.size() == 1);

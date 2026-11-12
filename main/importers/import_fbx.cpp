@@ -700,7 +700,7 @@ static std::string MaterializarTexturaEmbebida(const std::string& fbxDir, const 
         else if (n >= 3 && b[0]==0xFF && b[1]==0xD8 && b[2]==0xFF)            ext = ".jpg";
         else if (n >= 2 && b[0]=='B'  && b[1]=='M')                           ext = ".bmp";
         else if (n >= 4 && b[0]=='D'  && b[1]=='D' && b[2]=='S' && b[3]==' ') ext = ".dds";
-        static int cont = 0; char buf[40]; sprintf(buf, "embedded_%d%s", cont++, ext); fn = buf;
+        static int cont = 0; char buf[40]; snprintf(buf, sizeof(buf), "embedded_%d%s", cont++, ext); fn = buf;
     }
     std::string ruta = w3dFileSystem::JoinPath(fbxDir, fn);
     if (w3dFileSystem::FileExists(ruta)) return ruta;          // ya existe (materializada antes o el autor la dejo)
