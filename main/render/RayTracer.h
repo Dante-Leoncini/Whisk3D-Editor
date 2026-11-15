@@ -72,6 +72,9 @@ double RTRayosPorSegundo();               // los rayos por segundo de la GPU mie
 bool RTRenderizarAPNG(Viewport3D* vp, int w, int h, const std::string& ruta, std::string& msg);
 // lo mismo a un buffer RGBA (filas de arriba hacia abajo), sin guardar (para post-procesarlo: el desenfoque de movimiento)
 bool RTRenderizarABuffer(Viewport3D* vp, int w, int h, std::vector<unsigned char>& rgba, std::string& msg);
+// EL TRAZADO POR FRANJAS directo al archivo (ver el .cpp): de a 'altoFranja' filas, de arriba hacia abajo, a 'fn'
+typedef bool (*W3dFranjaFn)(void* ctx, const unsigned char* rgba, int y0, int alto);
+bool RTRenderizarFranjas(Viewport3D* vp, int w, int h, int altoFranja, W3dFranjaFn fn, void* ctx, std::string& msg);
 
 // --- pruebas (harness): render sincronico a un buffer propio + lectura de pixeles ---
 bool RTHarnessRender(Viewport3D* vp, int w, int h, int pases);

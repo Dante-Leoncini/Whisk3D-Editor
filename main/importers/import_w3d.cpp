@@ -1826,6 +1826,19 @@ static bool CargarCurvaJson(JVal* cj, AnimProperty& ap) {
     { const int ca = JI(cj, "ca", 0), cd = JI(cj, "cd", 0);   // el modificador Repetir (ausente = no)
       ap.cicloAntes   = (ca >= KfCicloNo && ca <= KfCicloOffset) ? ca : KfCicloNo;
       ap.cicloDespues = (cd >= KfCicloNo && cd <= KfCicloOffset) ? cd : KfCicloNo; }
+    // la pila de MODIFICADORES (ver EscribirCurva): una fila de numeros por modificador; cota de 64
+    ap.mods.clear();
+    if (JVal* jm = JHijo(cj, "m", 5)) {
+        for (size_t i = 0; i < jm->lista.size() && i < 64; i++) {
+            JVal* row = jm->lista[i]; if (!row || row->tipo != 5) continue;
+            const int n = JFilaLen(row);
+            float f[KfModificador::NFloats];
+            for (int q = 0; q < KfModificador::NFloats; q++) f[q] = (q < n) ? JFilaNum(row, q, 0) : 0.0f;
+            KfModificador m; m.DeFloats(f, n < KfModificador::NFloats ? n : (int)KfModificador::NFloats);
+            ap.mods.push_back(m);
+        }
+    }
+    ap.RepetirAModificador();   // (el Repetir de los archivos de antes: queda como modificador Ciclos)
     JVal* ks = JHijo(cj, "k", 5);
     // COTA: ninguna cantidad del archivo se usa sin acotar. Un millon de keyframes en
     // UNA curva no es un proyecto, es un archivo roto (o hecho a mano): se cargan los
@@ -4556,6 +4569,24 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
         g_renderIni = rn ? JF(rn, "inicio", 0.0f) : 0.0f;
         g_renderFin = rn ? JF(rn, "fin", 0.0f) : 0.0f;
         g_renderFps = rn ? JF(rn, "fps", 0.0f) : 0.0f;
+        // el resto de la tarjeta Render (g_render): lo que no esta, el valor de fabrica. La carpeta, si existe aca
+        const W3dRenderOpc d;
+        W3dRenderOpc r;
+        if (rn) {
+            const std::string carpeta = JS(rn, "carpeta", "");
+            if (!carpeta.empty() && w3dFileSystem::IsDir(carpeta)) r.carpeta = carpeta;
+            r.nombre = JS(rn, "nombre", d.nombre.c_str());
+            r.w = JF(rn, "ancho", d.w); r.h = JF(rn, "alto", d.h);
+            r.formato = JI(rn, "formato", d.formato); r.calidad = JF(rn, "calidad", d.calidad);
+            r.zbuffer = JB(rn, "zbuffer", d.zbuffer); r.normal = JB(rn, "normal", d.normal); r.alfa = JB(rn, "alfa", d.alfa);
+            r.vectores = JB(rn, "vectores", d.vectores); r.desenfoque = JB(rn, "desenfoque", d.desenfoque);
+            r.obturador = JF(rn, "obturador", d.obturador);
+            r.final = JB(rn, "final", d.final); r.finalAlfa = JB(rn, "finalAlfa", d.finalAlfa); r.post = JB(rn, "post", d.post);
+            r.sonido = JB(rn, "sonido", d.sonido); r.audioFormato = JI(rn, "audio", d.audioFormato);
+            r.audioKbps = JF(rn, "audioKbps", d.audioKbps);
+        }
+        g_render = r;
+        g_renderGen++;
     }
     // MIX (opcional): el modo Mix del timeline + su rango + las capas de escena
     {
@@ -5332,6 +5363,11 @@ void ReiniciarEscena() {
     // parar el juego/simulacion y soltar los scripts
     extern bool SimActiva(); extern void SimStop();
     if (SimActiva()) SimStop();
+    // la TARJETA RENDER es del proyecto: el que viene trae la suya (o los valores de fabrica)
+    { extern float g_renderIni, g_renderFin, g_renderFps;
+      g_renderIni = g_renderFin = g_renderFps = 0.0f;
+      g_render = W3dRenderOpc(); g_renderGen++; }
+    g_w3dExternosFaltan.clear();   // (lo que faltaba es del proyecto de antes)
     // el STREAMING suelta lo que sus instancias retienen del almacen (antes de que el cierre olvide los recursos) y la
     // vista previa vuelve al default del proyecto nuevo
     W3dStreamingCerrarProyecto();

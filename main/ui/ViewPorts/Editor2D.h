@@ -4,6 +4,7 @@
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/WithBorder.h" // borde (verde si activo), igual que UV/Outliner
 #include "render/UIOverlay.h"     // dibujo compartido de la UI 2D (mismo que el viewport 3D)
+#include "ViewPorts/Gizmo.h"       // Gizmo2DCliente: el gizmo 2D sobre los elementos elegidos
 #include <vector>
 
 // ROLES estables de los botones de la barra del Editor 2D (dispatch por rol via BarRolBtn,
@@ -32,7 +33,7 @@ enum ToolbarRol2D {
 //  (1080x1920, un celular en vertical: el caso de los slots). Sobre esto
 //  se monta la edicion del objeto UI (widgets, imagenes, export).
 // =====================================================================
-class Editor2D : public ViewportBase, public WithBorder {
+class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DCliente {
     public:
         int ViewportKind() const { return 6; } // 1=3D 2=outliner 3=props 4=UV 5=timeline 6=2D
 
@@ -104,6 +105,16 @@ class Editor2D : public ViewportBase, public WithBorder {
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE;             // touch: 1 dedo panea
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // touch: 2 dedos zoom+paneo
+        bool event_finger_pinch(float cx, float cy, float panDx, float panDy,              // ...zoom anclado a los dedos
+                                float sepX0, float sepY0, float sepX1, float sepY1) W3D_OVERRIDE;
+        // ===== GIZMO 2D (Gizmo.h) sobre los elementos elegidos: arranca el MISMO G/R/S (IniciarXform2D), alrededor
+        // del pivote del menu Pivot (mediana / elemento activo / cursor 2D) =====
+        bool Gizmo2DPivote(float& lx, float& ly) W3D_OVERRIDE;
+        bool Gizmo2DEnZona(float lx, float ly) const W3D_OVERRIDE;
+        bool Gizmo2DIniciar(int modo, int eje) W3D_OVERRIDE;
+        void Gizmo2DAplicar(float dx, float dy, float ang, float f) W3D_OVERRIDE;
+        void Gizmo2DConfirmar() W3D_OVERRIDE;
+        void Gizmo2DCancelar() W3D_OVERRIDE;
 
         void Panear(float dx, float dy); // compartido PC/Symbian (flechas / touch)
         void ZoomCentro(int dir);        // zoom centrado (teclado / pinch)

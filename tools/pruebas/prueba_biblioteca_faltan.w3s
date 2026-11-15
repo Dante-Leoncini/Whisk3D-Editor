@@ -1,0 +1,20 @@
+# ==========================================================================
+#  LOS ARCHIVOS QUE FALTAN (biblioteca)
+#  "guardo y dice que un archivo externo no esta, pero no veo nada en la biblioteca": el ORIGEN de una malla importada
+#  (el .obj/.stl del que salio) que ya no esta en la maquina se lista en "Archivos que faltan" como HUERFANO. Es solo
+#  procedencia (la geometria viaja adentro del .w3d): "Purgar huerfanos" lo olvida y el guardado deja de avisar.
+# ==========================================================================
+escenadefecto
+borrararchivo /tmp/w3d_faltan_cubo.stl
+stl exportar /tmp/w3d_faltan_cubo.stl sel
+import /tmp/w3d_faltan_cubo.stl
+recursos faltan n 0
+# (el archivo de origen desaparece: un pendrive que se saco, un proyecto que vino de otra maquina)
+borrararchivo /tmp/w3d_faltan_cubo.stl
+guardarw3d /tmp/w3d_faltan.w3d
+entradaexiste /tmp/w3d_faltan.w3d EXTERNOS.txt 1
+recursos faltan n 1
+recpurgar faltan n 1
+recursos faltan n 0
+guardarw3d /tmp/w3d_faltan.w3d
+entradaexiste /tmp/w3d_faltan.w3d EXTERNOS.txt 0

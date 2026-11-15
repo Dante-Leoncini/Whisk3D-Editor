@@ -545,6 +545,9 @@ void Editor2D::Render() {
         gfx::VertexPointer2f(0, C2); gfx::DrawLines(4);
     }
 
+    // el GIZMO 2D sobre los elementos elegidos (no en la vista de juego ni jugando: ver Gizmo2DPivote)
+    if (chrome) Gizmo2DRender(this);
+
     // Shift+D: las copias recien ahora tienen posicion resuelta -> arrancar el mover
     if (moverTrasDuplicar) {
         moverTrasDuplicar = false;
@@ -789,6 +792,8 @@ void Editor2D::button_left() {
         return;
     }
 
+    // 0) el GIZMO 2D: apretar una manija la agarra (soltar sin arrastrar = el modo siguiente)
+    if (Gizmo2DDown(this, lastMx, lastMy)) { ViewPortClickDown = true; return; }
     // 1) puntos de agarre del elemento ACTIVO con rect (imagen/rectangulo): resize
     { float *ew, *eh;
       if (ObjActivo && UI2D_TamanoElem(ObjActivo, &ew, &eh)) {
@@ -1006,6 +1011,7 @@ void Editor2D::ZoomCentro(int dir) {
 }
 
 void Editor2D::event_mouse_motion(int mx, int my) {
+    if (Gizmo2DArrastrando()) { Gizmo2DMotion(this, mx, my); lastMx = mx; lastMy = my; return; }   // el gizmo 2D agarrado
     if (drag || xform) {
         // tipeando un valor exacto (NumInput): el mouse no interfiere (como el 3D)
         if (xform && !drag && NumInputActivo()) { lastMx = mx; lastMy = my; return; }
@@ -1074,6 +1080,60 @@ void Editor2D::event_finger_gesture(float zoomDelta, float panDx, float panDy) {
         g_redraw = true;
     }
     if (panDx != 0.0f || panDy != 0.0f) Panear(panDx, panDy);
+}
+
+// ================================================================== GIZMO 2D (Gizmo.h)
+bool Editor2D::Gizmo2DPivote(float& lx, float& ly) {
+    if (vistaJuego || xform || drag) return false;
+    { extern bool SimActiva(); extern bool PlayAnimation;
+      if (SimActiva() && PlayAnimation) return false; }   // jugando: el lienzo es del juego
+    bool hay = false;
+    for (size_t i = 0; i < posiciones.size() && !hay; i++) {
+        Object* o = posiciones[i].obj;
+        hay = o->select && UI2D_EsElemento2D(o) && LayoutDelPadre(o) == 0;   // (en filas/columnas no se mueve)
+    }
+    if (!hay) return false;
+    PivoteEnPantalla(&lx, &ly);
+    return true;
+}
+bool Editor2D::Gizmo2DEnZona(float lx, float ly) const {
+    return ly >= (float)BarTopOffset() && !const_cast<Editor2D*>(this)->OnToolbar(x + (int)lx, y + (int)ly);
+}
+bool Editor2D::Gizmo2DIniciar(int modo, int eje) {
+    IniciarXform2D(modo + 1);
+    if (!xform) return false;
+    xformEje = eje;
+    return true;
+}
+void Editor2D::Gizmo2DAplicar(float dx, float dy, float ang, float f) {
+    if (!xform) return;
+    acumX = dx; acumY = dy; acumAng = ang; acumFactor = f;   // (los acumuladores van en px de pantalla / radianes)
+    AplicarXform2D(0, 0);
+}
+void Editor2D::Gizmo2DConfirmar() { if (xform) ConfirmarXform2D(); }
+void Editor2D::Gizmo2DCancelar()  { if (xform) CancelarXform2D(); }
+
+// 2 DEDOS: paneo + zoom ANCLADO al punto medio de los dedos (lo que esta debajo se queda debajo), proporcional
+bool Editor2D::event_finger_pinch(float cx, float cy, float panDx, float panDy, float sx0, float sy0, float sx1, float sy1){
+    if (vistaJuego) return true;             // navegacion congelada (ver Panear)
+    if (panDx != 0.0f || panDy != 0.0f) Panear(panDx, panDy);
+    const float d0 = sqrtf(sx0*sx0 + sy0*sy0), d1 = sqrtf(sx1*sx1 + sy1*sy1);
+    const float minSep = 24.0f * (float)GlobalScale;
+    if (d0 >= minSep && d1 >= minSep) {
+        float f = d1 / d0;
+        float nz = zoom * f;
+        if (nz < 0.05f) nz = 0.05f;
+        if (nz > 50.0f) nz = 50.0f;
+        f = nz / zoom;
+        float lcx, lcy, s;
+        ParamsLienzo(lcx, lcy, s);
+        const float curX = cx - (float)x, curY = cy - (float)y;
+        panX += (curX - lcx) * (1.0f - f);
+        panY += (curY - lcy) * (1.0f - f);
+        zoom = nz;
+    }
+    g_redraw = true;
+    return true;
 }
 
 // VISTA DE JUEGO on/off (numpad 0 y menu View > "Game View"). Es POR VIEWPORT. No toca
@@ -1269,6 +1329,7 @@ void Editor2DBorrarSeleccion() {
 
 void Editor2D::mouse_button_up(int boton) {
     (void)boton;
+    if (Gizmo2DSoltar(this)) { ViewPortClickDown = false; g_redraw = true; return; }   // (confirma / modo siguiente)
     if (drag) UndoTransformConfirmar();   // Ctrl+Z: cierra el paso (no-op si no se movio)
     drag = 0; dragHandle = -1; dragObj = NULL;   // fin del arrastre
     ViewPortClickDown = false;

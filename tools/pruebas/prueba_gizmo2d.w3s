@@ -1,0 +1,15 @@
+# El GIZMO 2D (la misma logica que el del 3D) en las CURVAS del timeline, el DOPE SHEET y el editor UV: va sobre el
+# pivote del menu Pivot, las flechas mueven en un eje, el anillo rota, las puntas cuadradas escalan, un toque quieto
+# pasa al modo siguiente, soltar confirma y deshacer vuelve
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+gizmo2d

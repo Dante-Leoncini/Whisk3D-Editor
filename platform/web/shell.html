@@ -13,7 +13,12 @@
   /* el canvas ocupa el area VISIBLE. 100dvh (dynamic viewport height) = alto sin el toolbar del navegador:
      en iOS Safari 100vh incluye la zona bajo la barra de direcciones -> tapaba la UI de abajo (Propiedades
      en vertical). Con dvh el canvas sigue el area visible aunque el iPhone muestre/oculte el toolbar. */
-  #canvas { display:block; width:100vw; height:100vh; height:100dvh; border:0; outline:none; }
+  #canvas { display:block; width:100vw; height:100vh; height:100dvh; border:0; outline:none;
+            /* los gestos del dedo son del EDITOR, no del navegador: sin esto Safari (iOS ignora user-scalable=no)
+               hacia zoom de la pagina con el pinch, el rebote del scroll y el menu de la pulsacion larga */
+            touch-action:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
+            -webkit-tap-highlight-color:transparent; }
+  html, body { overscroll-behavior:none; }
 
   /* pantalla de carga: el editor precarga res/ (skins/fuentes) -> tarda un momento */
   #loader { position:fixed; inset:0; display:flex; flex-direction:column;
@@ -74,7 +79,26 @@
       setStatus: function (t) { if (statusEl && t) statusEl.textContent = t; },
       // cuando el runtime esta listo el editor ya arranco (main() NO retorna: usa
       // emscripten_set_main_loop) -> ocultamos el loader un toque despues del 1er frame
-      onRuntimeInitialized: function () { setTimeout(ocultarLoader, 400); }
+      onRuntimeInitialized: function () { setTimeout(ocultarLoader, 400); },
+      // AJUSTES QUE SOBREVIVEN A RECARGAR: la carpeta del usuario (SDL_GetPrefPath = /libsdl/Whisk3D/Whisk3D/:
+      // config.ini, atajos.ini, marcadores...) va sobre IndexedDB. Antes de arrancar main() se trae lo guardado
+      // (el editor lee el config.ini al arrancar, por eso la dependencia); el editor vuelca al guardar
+      // (W3dWebPersistir) y aca tambien al esconder/cerrar la pagina y cada tanto, por si algo escribio sin avisar.
+      preRun: [function () {
+        try {
+          FS.mkdir('/libsdl');
+          FS.mount((FS.filesystems && FS.filesystems.IDBFS) || IDBFS, {}, '/libsdl');
+          addRunDependency('w3d-idbfs');
+          FS.syncfs(true, function (err) {
+            if (err) console.warn('w3d: no se pudo leer IndexedDB', err);
+            removeRunDependency('w3d-idbfs');
+          });
+          var volcar = function () { try { FS.syncfs(false, function () {}); } catch (e) {} };
+          document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') volcar(); });
+          window.addEventListener('pagehide', volcar);
+          setInterval(volcar, 5000);
+        } catch (e) { console.warn('w3d: sin IndexedDB (los ajustes no se guardan al recargar)', e); }
+      }]
     };
 
     // red de seguridad: si por lo que sea onRuntimeInitialized no corre, igual lo sacamos

@@ -65,8 +65,8 @@ void UI2D_TamanoVentana(float* w, float* h) {
     // VISTA DE JUEGO con UI "igual que el render": la ventana es el rect util del viewport 2D
     if (gOvrVentanaDueno) { *w = gOvrVentanaW; *h = gOvrVentanaH; return; }
     // la fuente de verdad es el tamano del RENDER: editarlo se ve al instante en el Editor 2D
-    *w = PropsActivo ? PropsActivo->renderW : 640.0f;
-    *h = PropsActivo ? PropsActivo->renderH : 480.0f;
+    *w = g_render.w;
+    *h = g_render.h;
 #else
     *w = g_gameRenderW; *h = g_gameRenderH;
 #endif

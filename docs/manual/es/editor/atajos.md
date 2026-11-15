@@ -5,7 +5,7 @@ Todas las funciones de las tablas de abajo se pueden reasignar, y cada una puede
 ## Cómo cambiar un atajo
 
 1. Abrir **Propiedades → pestaña Archivo/Render → tarjeta Ajustes → Atajos de teclado…**
-2. Elegir el **Contexto** (General, Vista 3D, Durante una transformación, Editor UV, Línea de tiempo, Outliner, Editor 2D, Propiedades, Editor de scripts). Las flechas izquierda/derecha también lo cambian.
+2. Elegir la **Vista** (Todas las vistas, Vista 3D, Editor UV, Línea de tiempo, Outliner, Editor 2D, Propiedades, Editor de scripts) y, abajo, el **Contexto** dentro de esa vista: en la Vista 3D, cualquier modo, Modo Objeto, Modo Edición o durante una transformación; en el Editor UV, la línea de tiempo y el Editor 2D, general o durante una transformación. Los dos son desplegables. Las flechas izquierda/derecha cambian la vista.
 3. Elegir la función en la lista y tocar **Agregar atajo** (o tocar otra vez la fila elegida). Aparece "Apretá una tecla…".
 4. Apretar la combinación nueva (por ejemplo <kbd>Ctrl+M</kbd>). <kbd>Esc</kbd> cancela sin cambiar nada.
 
@@ -20,7 +20,9 @@ Los menús muestran al lado de cada opción el atajo **configurado**: si reasign
 
 Las combinaciones cambiadas se ven en verde. Cuando un atajo de fábrica se le saca a su función, esa tecla queda libre: ya no hace nada en ese contexto.
 
-Los atajos de cada contexto valen cuando el puntero está sobre ese panel; los de **General** valen en todos. Los de **Durante una transformación** valen mientras se mueve, rota o escala algo, y tienen prioridad. En el editor de scripts, las letras siempre escriben: ahí solo se pueden reasignar combinaciones con <kbd>Ctrl</kbd>, <kbd>Alt</kbd> o teclas F.
+La lista también tiene las **operaciones sin atajo de fábrica** (las de los menús: Origen a la geometría, Sombreado suave, Marcar costura, Mostrar manijas, Interpolación: lineal…): se les puede poner una combinación y hacen lo mismo que la opción del menú.
+
+Los atajos de cada contexto valen cuando el puntero está sobre ese panel; los de **Todas las vistas** valen en todos. En la Vista 3D, los de Modo Objeto o Modo Edición valen solo en ese modo y le ganan a los de cualquier modo. Los de **Durante una transformación** valen mientras se mueve, rota o escala algo, y tienen prioridad. En el editor de scripts, las letras siempre escriben: ahí solo se pueden reasignar combinaciones con <kbd>Ctrl</kbd>, <kbd>Alt</kbd> o teclas F.
 
 ## El archivo atajos.ini
 
@@ -60,7 +62,7 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Renderizar Imagen | <kbd>F12</kbd> | — | `global.render` |
 | Renderizar Animación | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
-### Vista 3D
+### Vista 3D (cualquier modo)
 
 | Función | Atajo de fábrica | Nokia N95 (teclado del teléfono) | Nombre en atajos.ini |
 |---|---|---|---|
@@ -70,7 +72,6 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Selección por caja | <kbd>B</kbd> | — | `3d.caja` |
 | Seleccionar Vinculado | <kbd>L</kbd> | — | `3d.vinculado` |
 | Añadir | <kbd>Shift+A</kbd> | — | `3d.agregar` |
-| Aplicar | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
 | Mover | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
 | Rotar | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
 | Escalar | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
@@ -81,9 +82,6 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Duplicar Vinculado | <kbd>Alt+D</kbd> | — | `3d.instancia` |
 | Borrar | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
 | Ocultar / Mostrar | <kbd>H</kbd> | — | `3d.ocultar` |
-| Unir | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
-| Insertar Keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
-| Insertar keyframe (todo) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
 | Edición Proporcional | <kbd>O</kbd> | — | `3d.proporcional` |
 | Superposiciones | <kbd>K</kbd> | — | `3d.overlays` |
 | Vista local | <kbd>/</kbd> | — | `3d.vistaLocal` |
@@ -95,10 +93,47 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Vista superior | <kbd>Num7</kbd> | <kbd>#+Arriba</kbd> | `3d.vistaArriba` |
 | Vista inferior | <kbd>Ctrl+Num7</kbd> | <kbd>#+Abajo</kbd> | `3d.vistaAbajo` |
 | Perspectiva / Ortográfica | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
+| Siguiente modo de vista | <kbd>Z</kbd> | <kbd>6</kbd> | `3d.modoVista` |
 | Girar vista a la izquierda | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
 | Girar vista a la derecha | <kbd>Num6</kbd> | — | `3d.rodarDer` |
 | Vista de cámara | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
 | Hacer cámara activa | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
+| Menú contextual | <kbd>W</kbd> | — | `3d.menuContexto` |
+| Bloquear Órbita | — | — | `3d.bloquearOrbita` |
+| Mover la cámara con la vista | — | — | `3d.bloquearCamara` |
+| Vista Render | — | — | `3d.verRender` |
+| Vista Material | — | — | `3d.verMaterial` |
+| Vista Sólido | — | — | `3d.verSolido` |
+| Vista Alámbrica | — | — | `3d.verAlambre` |
+
+### Vista 3D: Modo Objeto
+
+| Función | Atajo de fábrica | Nokia N95 (teclado del teléfono) | Nombre en atajos.ini |
+|---|---|---|---|
+| Aplicar | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
+| Unir | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
+| Insertar Keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
+| Insertar keyframe (todo) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
+| Cortar | <kbd>Ctrl+X</kbd> | — | `3d.cortar` |
+| Copiar | <kbd>Ctrl+C</kbd> | — | `3d.copiar` |
+| Pegar | <kbd>Ctrl+V</kbd> | — | `3d.pegar` |
+| Geometría al Origen | — | — | `3d.geoAOrigen` |
+| Origen a Geometría | — | — | `3d.origenAGeo` |
+| Origen al Cursor 3D | — | — | `3d.origenACursor` |
+| Aplicar posición | — | — | `3d.aplicarPos` |
+| Aplicar rotación | — | — | `3d.aplicarRot` |
+| Aplicar escala | — | — | `3d.aplicarEsc` |
+| Aplicar todas las transformaciones | — | — | `3d.aplicarTodo` |
+| Insertar keyframe de posición | — | — | `3d.keyPos` |
+| Insertar keyframe de rotación | — | — | `3d.keyRot` |
+| Insertar keyframe de escala | — | — | `3d.keyEsc` |
+| Crear prefab | — | — | `3d.crearPrefab` |
+| Desempaquetar prefab | — | — | `3d.desarmarPrefab` |
+
+### Vista 3D: Modo Edición
+
+| Función | Atajo de fábrica | Nokia N95 (teclado del teléfono) | Nombre en atajos.ini |
+|---|---|---|---|
 | Extruir | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
 | Nueva cara desde vértices | <kbd>F</kbd> | — | `3d.cara` |
 | Recalcular Normales | <kbd>Shift+N</kbd> | — | `3d.normales` |
@@ -108,9 +143,29 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Deslizar vértices | <kbd>Shift+V</kbd> | — | `3d.slide` |
 | Separar | <kbd>P</kbd> | — | `3d.separar` |
 | Fusionar | <kbd>M</kbd> | — | `3d.merge` |
-| Menú contextual | <kbd>W</kbd> | — | `3d.menuContexto` |
 | Triangular | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
 | Menú UV | <kbd>U</kbd> | — | `3d.menuUV` |
+| Insertar caras | <kbd>I</kbd> | — | `3d.inset` |
+| Biselar aristas | <kbd>Ctrl+B</kbd> | — | `3d.bisel` |
+| Biselar vértices | <kbd>Ctrl+Shift+B</kbd> | — | `3d.biselVert` |
+| Sombrear Suave | — | — | `3d.suave` |
+| Sombrear Plano | — | — | `3d.plano` |
+| Invertir Normales | — | — | `3d.voltearNormales` |
+| Marcar Afilado | — | — | `3d.marcarAfilado` |
+| Limpiar Afilado | — | — | `3d.limpiarAfilado` |
+| Marcar Costura | — | — | `3d.marcarCostura` |
+| Limpiar Costura | — | — | `3d.limpiarCostura` |
+| Fusionar en el centro | — | — | `3d.unirCentro` |
+| Fusionar en el cursor | — | — | `3d.unirCursor` |
+| Colapsar | — | — | `3d.colapsar` |
+| Fusionar por distancia | — | — | `3d.unirDistancia` |
+| Borrar vértices | — | — | `3d.borrarVerts` |
+| Borrar aristas | — | — | `3d.borrarAristas` |
+| Borrar caras | — | — | `3d.borrarCaras` |
+| Borrar loops de aristas | — | — | `3d.borrarLoops` |
+| Desplegar Basado en Ángulos | — | — | `3d.unwrap` |
+| Proyección UV Inteligente | — | — | `3d.smartUV` |
+| Proyectar desde Vista | — | — | `3d.proyVista` |
 
 ### Durante una transformación (mover / rotar / escalar)
 
@@ -145,6 +200,10 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Duplicar | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
 | Borrar | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
 | Encuadrar Selección | <kbd>Num.</kbd> | — | `uv.encuadrar` |
+| Encuadrar Todo | — | — | `uv.encuadrarTodo` |
+| Cursor a Selección | — | — | `uv.cursorASel` |
+| Selección a Cursor | — | — | `uv.selACursor` |
+| Cursor a Centro | — | — | `uv.cursorCentro` |
 
 ### Línea de tiempo
 
@@ -156,9 +215,13 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Mover | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
 | Escalar | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
 | Rotar manijas | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
-| Duplicar | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
+| Duplicar | <kbd>Ctrl+D</kbd>, <kbd>Shift+D</kbd> | — | `tl.duplicar` |
+| Cortar | <kbd>Ctrl+X</kbd> | — | `tl.cortar` |
+| Copiar | <kbd>Ctrl+C</kbd> | — | `tl.copiar` |
+| Pegar | <kbd>Ctrl+V</kbd> | — | `tl.pegar` |
 | Borrar | <kbd>X</kbd> | — | `tl.borrar` |
-| Interpolación | <kbd>T</kbd> | — | `tl.interp` |
+| Interpolación | <kbd>E</kbd>, <kbd>T</kbd> | — | `tl.interp` |
+| Suavizado | <kbd>Ctrl+E</kbd> | — | `tl.easing` |
 | Tipo de manija | <kbd>V</kbd> | — | `tl.handle` |
 | Encuadrar Selección | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
 | Fotograma anterior | <kbd>Left</kbd> | — | `tl.frameAnt` |
@@ -167,6 +230,20 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Keyframe siguiente | <kbd>Up</kbd> | — | `tl.keySig` |
 | Ir al inicio | <kbd>Home</kbd> | — | `tl.inicio` |
 | Ir al final | <kbd>End</kbd> | — | `tl.fin` |
+| Hoja de claves | — | — | `tl.verDope` |
+| Curvas | — | — | `tl.verCurvas` |
+| Mostrar panel | — | — | `tl.panel` |
+| Mostrar manijas | — | — | `tl.verHandles` |
+| Euler Inteligente | — | — | `tl.smartEuler` |
+| Interpolación: constante | — | — | `tl.interpConstante` |
+| Interpolación: lineal | — | — | `tl.interpLineal` |
+| Interpolación: Bezier | — | — | `tl.interpBezier` |
+| Manijas: libres | — | — | `tl.handleLibre` |
+| Manijas: alineadas | — | — | `tl.handleAlineado` |
+| Manijas: vector | — | — | `tl.handleVector` |
+| Manijas: automáticas | — | — | `tl.handleAuto` |
+| Manijas: auto limitadas | — | — | `tl.handleAutoLimite` |
+| Manijas: planas | — | — | `tl.handlePlano` |
 
 ### Outliner
 
@@ -197,6 +274,10 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Borrar | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
 | Encuadrar Selección | <kbd>Num.</kbd> | — | `2d.encuadrar` |
 | Vista de juego | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
+| Emparentar | — | — | `2d.emparentar` |
+| Desemparentar | — | — | `2d.desemparentar` |
+| Zoom 1:1 | — | — | `2d.zoom1` |
+| Zoom 2:1 | — | — | `2d.zoom2` |
 
 ### Propiedades (pasos de una rutina)
 

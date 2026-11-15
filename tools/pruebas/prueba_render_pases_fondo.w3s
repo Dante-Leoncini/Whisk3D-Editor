@@ -1,0 +1,24 @@
+# ==========================================================================
+#  LOS PASES DE ANALISIS DEL RENDER A ARCHIVO, CON SU FONDO
+#  Un proyecto con CONSTRUCTOR limpia solo, con su "Clear color" (aca, rosa). En la vista, los modos de analisis
+#  (Z-Buffer, Alfa, Normales) usan su fondo fijo y el "Clear" del proyecto solo limpia la profundidad. El render a
+#  archivo no lo hacia: el pase de alfa salia con el fondo rosa del proyecto en vez de negro.
+# ==========================================================================
+escenadefecto
+rutinaset Constructor 0 n 1 0 1 1
+renderpases 1 1 1
+borrararchivo /tmp/w3d_pases_0001.png
+borrararchivo /tmp/w3d_pases_alpha_0001.png
+borrararchivo /tmp/w3d_pases_zbuffer_0001.png
+borrararchivo /tmp/w3d_pases_normal_0001.png
+frame 1
+renderimage /tmp w3d_pases.png
+# el beauty si va con el fondo del proyecto
+pngpx /tmp/w3d_pases_0001.png 2 2 255 0 255
+# los de analisis, con el suyo: alfa y z-buffer negros, normal azul de normal-map
+pngpx /tmp/w3d_pases_alpha_0001.png 2 2 0 0 0
+pngpx /tmp/w3d_pases_zbuffer_0001.png 2 2 0 0 0
+pngpx /tmp/w3d_pases_normal_0001.png 2 2 128 128 255
+# y el cubo en el medio del alfa, blanco
+pngpx /tmp/w3d_pases_alpha_0001.png 640 360 255 255 255
+renderpases 0 0 0

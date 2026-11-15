@@ -1,0 +1,7 @@
+# El MENU DESPLEGABLE con el DEDO (eventos tactiles reales): apoyar no elige, deslizar resalta la opcion de abajo y
+# soltar la elige; soltar afuera cierra sin elegir; en un menu largo, el dedo en el borde lo scrollea solo; un toque
+# simple sigue eligiendo. Y las PESTANIAS de Propiedades: con la barra entera, deslizar las va mostrando; si no entra,
+# deslizar la scrollea.
+add cube
+selobj Cubo.001
+menudedo

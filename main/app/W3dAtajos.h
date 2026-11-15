@@ -27,6 +27,10 @@ enum W3dAtajoCtx {
     W3dATC_2D,          // editor 2D (UI de juegos)
     W3dATC_PROPS,       // panel de propiedades (pasos de una rutina)
     W3dATC_IDE,         // editor de scripts
+    // los MODOS de la vista 3D: lo que solo existe en Modo Objeto o en Modo Edicion (malla o huesos). La cadena del
+    // foco los pone ANTES de W3dATC_3D (lo comun a los dos modos): una combinacion del modo tapa a la comun.
+    W3dATC_3D_OBJ,      // vista 3D en Modo Objeto (y Pose)
+    W3dATC_3D_EDIT,     // vista 3D en Modo Edicion
     W3dATC_N
 };
 enum { W3dMOD_SHIFT = 1, W3dMOD_CTRL = 2, W3dMOD_ALT = 4 };
@@ -49,6 +53,11 @@ struct W3dAtajoDef {
     // (1/2/3 = mover/rotar/escalar, C = borrar...): mostrarle "Shift D" a alguien con un keypad no le sirve.
     const char* telefono; // la tecla del keypad que hace esto (NULL = ninguna)
     const char* bt;       // la del teclado Bluetooth del N95, que entiende solo algunas (NULL = no la entiende)
+    // OPERACIONES SIN TECLA DE FABRICA (las de los menus: "Origin to Geometry", "Shade Smooth"...): como ningun
+    // handler escucha una tecla para ellas, la combinacion que el usuario les asigne corre esto: "<despacho>:<id>",
+    // la accion del menu de donde salen con el id de su opcion (W3dAtajoRegistrarDespacho). NULL = la de siempre
+    // (se traduce a la tecla por defecto y la escucha el handler del viewport).
+    const char* accion;
 };
 
 int                          W3dAtajosCantidad();
@@ -58,6 +67,16 @@ std::string                  W3dAtajoTexto(int i);           // "G, Ctrl+M" ("" 
 int                          W3dAtajoBuscar(const char* id); // -1 = no existe
 bool                         W3dAtajoEsDefecto(int i);
 const char*                  W3dAtajoCtxNombre(int ctx);     // en ingles (T() al mostrarlo)
+// Dos contextos que se pisan: el mismo, o la vista 3D comun y uno de sus modos (una combinacion no puede estar en
+// los dos sin que uno tape al otro). Agregar una combinacion se la saca a las funciones del mismo alcance.
+bool                         W3dAtajoMismoAlcance(int ctxA, int ctxB);
+
+// LAS ACCIONES de las operaciones sin tecla de fabrica: cada parte del editor registra al arrancar la accion de sus
+// menus con un nombre ("obj" = LayoutAccionObject, "tlkey" = el menu Key del timeline...). La llama con el id.
+typedef void (*W3dAtajoDespacho)(int id);
+void W3dAtajoRegistrarDespacho(const char* nombre, W3dAtajoDespacho fn);
+bool W3dAtajoTieneDespacho(const char* accion);              // "obj:201": hay quien la corra
+bool W3dAtajoEjecutar(int i);                                // corre la accion de la funcion i (false = no tiene)
 
 // Cambios (cada uno guarda atajos.ini). Agregar quita la combinacion de las otras funciones del MISMO contexto:
 // *quitadaDe = la que la tenia (-1 = ninguna).
@@ -85,8 +104,9 @@ void        W3dAtajosRutaFijar(const std::string& ruta);     // harness: no toca
 
 // EL TRADUCTOR. ctxs = la cadena de contextos del foco (el mas especifico primero). Entra la combinacion APRETADA
 // y sale la que entiende el codigo. false = la combinacion quedo sin funcion: no hay que mandarla a ningun lado.
-bool W3dAtajoTraducir(const int* ctxs, int n, int& tecla, int& mods);
-// La cadena del foco actual (viewport activo + transform en curso). Devuelve cuantos contextos escribio (max 3).
+// repeticion = la tecla quedo apretada (auto-repeat): una funcion con accion propia NO se vuelve a correr.
+bool W3dAtajoTraducir(const int* ctxs, int n, int& tecla, int& mods, bool repeticion = false);
+// La cadena del foco actual (viewport activo + su modo + transform en curso). Devuelve cuantos contextos escribio (max 4).
 int  W3dAtajoContextos(int* ctxs);
 // Atajo de las dos de arriba con los modificadores sueltos (los flags LShiftPressed/LCtrlPressed/LAltPressed).
 int  W3dModsActuales();

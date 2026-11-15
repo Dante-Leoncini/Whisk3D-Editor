@@ -24,7 +24,7 @@ El gizmo aparece sobre el pivote en Modo Objeto y en Modo Edición (se prende y 
 |---|---|
 | Gizmo de mover | Flechas = un eje; cuadrados = un plano; círculo central = libre. |
 | Gizmo de rotar | Un semicírculo de color por eje, un anillo blanco para girar de cara a la vista, y el interior para girar libre. |
-| Gizmo de escalar | Puntas cuadradas por eje; el círculo central escala parejo. |
+| Gizmo de escalar | Puntas cuadradas por eje; el círculo central escala parejo. En Modo Objeto la escala es siempre local: el gizmo sigue los ejes del objeto aunque la orientación sea Global. |
 | Cambiar de gizmo | Un click con el mouse o un toque con el dedo sobre el gizmo, sin arrastrar, pasa de Mover a Rotar, a Escalar y vuelta a Mover. Funciona igual en PC, navegador y pantallas táctiles. |
 
 ## Ajustar la última operación

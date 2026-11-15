@@ -79,7 +79,10 @@ static bool GizmoBase(Vector3& c, Vector3 ejes[3]) {
         if (!ObjActivo || !ObjActivo->select) return false;
         if (ObjActivo->sinTransformacion) return false;   // (la Rutina: no tiene transformacion que mover)
         SetTransformPivotPoint(); c = TransformPivotPoint;
-        if (transformOrientation == LocalOrient) { ObjActivo->GetWorldMatrix(W); local = true; }
+        // la ESCALA de un objeto es SIEMPRE local (EjeOrientado, ObjectMode.cpp: no existe escalar en global): el
+        // gizmo de escalar va con los ejes del objeto aunque el menu diga Global, si no la flecha roja de un objeto
+        // girado apuntaba para un lado y el objeto se estiraba para otro
+        if (transformOrientation == LocalOrient || g_gizmoModo == GizmoModoEscalar) { ObjActivo->GetWorldMatrix(W); local = true; }
     } else if (InteractionMode == EditMode && g_editMesh && g_editMesh->getType() == ObjectType::mesh) {
         Mesh* m = (Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return false;
         float cx = 0, cy = 0, cz = 0;
@@ -260,7 +263,14 @@ static int GizmoHit(Viewport3D* vp, const Vector3& c, const Vector3 ejes[3], flo
     // 0) el circulo del centro PRIMERO: las flechas nacen pegadas a el y si se probaban antes, apretar el
     //    centro agarraba un eje (inusable como "G")
     { const float dx = lx - cx, dy = ly - cy; if (sqrtf(dx * dx + dy * dy) <= md.ring + md.hit * 0.5f) return GizmoCentro; }
-    // 1) cuadrados (planos): estan mas cerca del centro que las puntas, van antes que las flechas
+    // 1a) justo SOBRE la linea de una flecha: es la flecha, aunque un cuadrado se proyecte encima (con el objeto girado
+    //     y los ejes locales, el cuadrado de un plano puede caer sobre la flecha de otro eje y la tapaba)
+    for (int k = 0; k < 3; k++) {
+        float ax, ay, bx, by;
+        if (!vp->ProyectarPunto(c + ejes[k] * ((md.ring + md.hit) * upp), ax, ay) || !vp->ProyectarPunto(c + ejes[k] * (md.L * upp), bx, by)) continue;
+        if (DistSegmento(lx, ly, ax, ay, bx, by) <= 2.0f * GlobalScale) return GizmoEjeX + k;
+    }
+    // 1b) cuadrados (planos): estan mas cerca del centro que las puntas, van antes que las flechas
     for (int k = 0; k < 3; k++) {
         float sx, sy; if (!vp->ProyectarPunto(ManijaCentro(GizmoPlanoX + k, c, ejes, upp, md), sx, sy)) continue;
         const float dx = fabsf(sx - lx), dy = fabsf(sy - ly);
@@ -355,7 +365,9 @@ bool GizmoDown(ViewportBase* vb, int mx, int my) {
         g_gizmoAngPrev = g_gizmoRotPlano ? ang : AnguloPantalla(lx, ly, cx, cy);
     }
     // las manijas se dibujaron en Global o Local: View/Normal no tienen gizmo propio -> Global
-    if (eje != ViewAxis && transformOrientation != LocalOrient) transformOrientation = GlobalOrient;
+    // (la escala de un objeto es siempre local: ahi no se toca el menu)
+    if (eje != ViewAxis && transformOrientation != LocalOrient && !(est == EditScale && InteractionMode == ObjectMode))
+        transformOrientation = GlobalOrient;
     // ancla del arrastre 1:1: pivote, ejes y el punto de la restriccion bajo el puntero AHORA
     g_gizmoC0 = c; for (int k = 0; k < 3; k++) g_gizmoEjes0[k] = ejes[k];
     g_gizmoAplicado = Vector3(0, 0, 0);
@@ -457,12 +469,29 @@ void GizmoSoltar(Viewport3D* vp) {
 //  Dibujo
 // ---------------------------------------------------------------------------
 static void Empujar(std::vector<GLfloat>& v, const Vector3& p) { v.push_back(p.x); v.push_back(p.y); v.push_back(p.z); }
+// una linea GRUESA de verdad: dos triangulos de cara a la camara, de 'anchoPx' pixeles (upp = unidades de mundo por
+// pixel en el gizmo). glLineWidth no sirve: WebGL y casi todos los drivers de ES lo clavan en 1 pixel, y en un iPhone
+// con la escala x4 las lineas del gizmo quedaban finitas
+static void LineaGruesa(std::vector<GLfloat>& tri, const Vector3& a, const Vector3& b, const Vector3& haciaCam,
+                        float anchoPx, float upp) {
+    Vector3 n = Vector3::Cross(b - a, haciaCam);
+    const float l = n.Length(); if (l < 1e-9f) return;
+    n = n * (anchoPx * upp * 0.5f / l);
+    Empujar(tri, a + n); Empujar(tri, b + n); Empujar(tri, b - n);
+    Empujar(tri, a + n); Empujar(tri, b - n); Empujar(tri, a - n);
+}
+static void PintarTri3(std::vector<GLfloat>& tri) {
+    if (tri.empty()) return;
+    gfx::VertexPointer3f(0, &tri[0]);
+    gfx::DrawTrianglesArray((int)(tri.size() / 3));
+    tri.clear();
+}
 
 // ROTAR: un semicirculo de color por eje (la mitad que mira a la camara: se agarra para girar en ese eje), el anillo
 // blanco de afuera (girar sobre la vista) y un disco tenue adentro (arrastrar el interior = giro libre)
 static void RenderRotar(Viewport3D* vp, const Vector3& c, const Vector3 ejes[3], float upp, const GizmoMedidas& md,
                         const Vector3& camDer, const Vector3& camArr) {
-    static std::vector<GLfloat> lin, tri; static std::vector<GLushort> idx;
+    static std::vector<GLfloat> tri;
     const bool activo = g_gizmoArrastre;
     const Vector3 hc = HaciaCamara(vp, c);
     const int N = 64;
@@ -485,34 +514,31 @@ static void RenderRotar(Viewport3D* vp, const Vector3& c, const Vector3 ejes[3],
         const float* cl = ColEje(k);
         const bool esta = activo && (g_gizmoManija == GizmoEjeX + k);
         Vector3 u, v; BaseCirculo(ejes, k, u, v);
-        lin.clear(); idx.clear();
-        int ant = -1;
+        tri.clear();
+        bool hayAnt = false; Vector3 pAnt;
         for (int i = 0; i <= N; i++) {
             const float a = (float)i / N * 6.2831853f;
             const Vector3 dir = u * cosf(a) + v * sinf(a);
-            if (dir.Dot(hc) < -0.02f) { ant = -1; continue; }   // la mitad de atras no se dibuja
-            Empujar(lin, c + dir * (md.rotR * upp));
-            const int cur = (int)(lin.size() / 3) - 1;
-            if (ant >= 0) { idx.push_back((GLushort)ant); idx.push_back((GLushort)cur); }
-            ant = cur;
+            if (dir.Dot(hc) < -0.02f) { hayAnt = false; continue; }   // la mitad de atras no se dibuja
+            const Vector3 p = c + dir * (md.rotR * upp);
+            if (hayAnt) LineaGruesa(tri, pAnt, p, hc, (esta ? 4.0f : 3.0f) * GlobalScale, upp);
+            pAnt = p; hayAnt = true;
         }
-        if (idx.empty()) continue;
+        if (tri.empty()) continue;
         gfx::Color4f(cl[0], cl[1], cl[2], (activo && !esta) ? 0.3f : 1.0f);
-        gfx::LineWidth((esta ? 4.0f : 3.0f) * GlobalScale);
-        W3dDrawLinesF(&lin[0], &idx[0], (int)idx.size());
+        PintarTri3(tri);
     }
     // anillo blanco de la vista
     {
         const bool esta = activo && g_gizmoManija == GizmoAnilloVista;
-        lin.clear(); idx.clear();
+        tri.clear();
         for (int i = 0; i < N; i++) {
-            const float a = (float)i / N * 6.2831853f;
-            Empujar(lin, c + (camDer * cosf(a) + camArr * sinf(a)) * (md.rotVista * upp));
-            idx.push_back((GLushort)i); idx.push_back((GLushort)((i + 1) % N));
+            const float a0 = (float)i / N * 6.2831853f, a1 = (float)(i + 1) / N * 6.2831853f;
+            LineaGruesa(tri, c + (camDer * cosf(a0) + camArr * sinf(a0)) * (md.rotVista * upp),
+                             c + (camDer * cosf(a1) + camArr * sinf(a1)) * (md.rotVista * upp), hc, (esta ? 3.0f : 2.0f) * GlobalScale, upp);
         }
         gfx::Color4f(1, 1, 1, (activo && !esta) ? 0.3f : 0.8f);
-        gfx::LineWidth((esta ? 3.0f : 2.0f) * GlobalScale);
-        W3dDrawLinesF(&lin[0], &idx[0], (int)idx.size());
+        PintarTri3(tri);
     }
 }
 
@@ -541,20 +567,18 @@ void GizmoRender(Viewport3D* vp) {
         return;
     }
     const bool escalar = (g_gizmoModo == GizmoModoEscalar);
-    static std::vector<GLfloat> tri, lin; static std::vector<GLushort> idx; static std::vector<GLubyte> col;
+    static std::vector<GLfloat> tri; static std::vector<GLubyte> col;
+    const Vector3 hcEje = HaciaCamara(vp, c);
     const bool activo = g_gizmoArrastre;
     for (int k = 0; k < 3; k++) {
         const float* cl = ColEje(k);
         const bool esta = activo && (g_gizmoManija == GizmoEjeX + k);
         const float alfa = (activo && !esta) ? 0.35f : 1.0f;
-        // linea
-        lin.clear(); idx.clear();
-        Empujar(lin, c + ejes[k] * (md.r0 * upp)); Empujar(lin, c + ejes[k] * (md.base * upp));
-        idx.push_back(0); idx.push_back(1);
-        gfx::Color4f(cl[0], cl[1], cl[2], alfa);
-        gfx::LineWidth(esta ? 3.0f * GlobalScale : 2.0f * GlobalScale);
-        W3dDrawLinesF(&lin[0], &idx[0], 2);
+        // linea (gruesa de verdad: ver LineaGruesa)
         tri.clear();
+        LineaGruesa(tri, c + ejes[k] * (md.r0 * upp), c + ejes[k] * (md.base * upp), hcEje, (esta ? 3.0f : 2.0f) * GlobalScale, upp);
+        gfx::Color4f(cl[0], cl[1], cl[2], alfa);
+        PintarTri3(tri);
         if (escalar) {
             // ESCALAR: punta CUADRADA (un cubo) en vez de la piramide
             const float h = (md.L - md.base) * 0.45f;
@@ -593,12 +617,10 @@ void GizmoRender(Viewport3D* vp) {
         gfx::VertexPointer3f(0, &tri[0]);
         gfx::DrawTrianglesArray(6);
         // borde
-        lin.clear(); idx.clear();
-        Empujar(lin, cc - ea - eb); Empujar(lin, cc + ea - eb); Empujar(lin, cc + ea + eb); Empujar(lin, cc - ea + eb);
-        idx.push_back(0); idx.push_back(1); idx.push_back(1); idx.push_back(2); idx.push_back(2); idx.push_back(3); idx.push_back(3); idx.push_back(0);
+        { const Vector3 q[4] = { cc - ea - eb, cc + ea - eb, cc + ea + eb, cc - ea + eb };
+          for (int e = 0; e < 4; e++) LineaGruesa(tri, q[e], q[(e + 1) % 4], hcEje, 1.5f * GlobalScale, upp); }
         gfx::Color4f(cl[0], cl[1], cl[2], (activo && !esta) ? 0.4f : 1.0f);
-        gfx::LineWidth(1.5f * GlobalScale);
-        W3dDrawLinesF(&lin[0], &idx[0], 8);
+        PintarTri3(tri);
     }
     // circulo del centro: anillo blanco de borde blando (3 anillos: transparente -> blanco -> transparente), mirando a camara
     {
@@ -633,5 +655,272 @@ void GizmoRender(Viewport3D* vp) {
     gfx::Disable(gfx::Blend);
     gfx::Enable(gfx::CullFace);
     gfx::Enable(gfx::DepthTest);
+    gfx::Invalidate();
+}
+
+// ============================================================================
+//  GIZMO 2D (curvas / dope sheet del timeline, editor UV, editor 2D). Ver Gizmo.h.
+//  Todo en px LOCALES del viewport (Y abajo), que es el Ortho que ponen los tres editores.
+// ============================================================================
+#include "ui/ViewPorts/Timeline.h"
+#include "ui/ViewPorts/UVEditor.h"
+#include "ui/ViewPorts/Editor2D.h"
+
+static bool  g2Arrastre = false;
+static int   g2Manija = Gizmo2DNinguna;
+static int   g2Modo = GizmoModoMover;          // el modo de los editores 2D (aparte del 3D)
+static ViewportBase*   g2Vp = NULL;
+static Gizmo2DCliente* g2Cli = NULL;
+static int   g2DownX = 0, g2DownY = 0;          // donde se agarro (PANTALLA)
+static bool  g2SeMovio = false;                 // paso el umbral: el transform del editor ya arranco
+static float g2Px = 0.0f, g2Py = 0.0f;          // el pivote al agarrar (LOCAL): rotar y escalar giran alrededor de ESE
+static float g2AngPrev = 0.0f, g2AngAcum = 0.0f;
+static float g2Esc0 = 1.0f;
+
+Gizmo2DCliente* Gizmo2DClienteDe(ViewportBase* vp) {
+    if (!vp || !vp->isLeaf()) return NULL;
+    switch (vp->ViewportKind()) {
+        case 4: return static_cast<Gizmo2DCliente*>((UVEditor*)vp);
+        case 5: return static_cast<Gizmo2DCliente*>((Timeline*)vp);
+        case 6: return static_cast<Gizmo2DCliente*>((Editor2D*)vp);
+    }
+    return NULL;
+}
+// un G/R/S del TECLADO en curso en ese editor (ahi el gizmo no se dibuja ni se agarra, como en el 3D)
+static bool Xform2DTeclado(ViewportBase* vp) {
+    if (g2Arrastre && g2Vp == vp) return false;
+    if (vp->ViewportKind() == 5) return DopeXformActivo();
+    return vp->XformEnCurso();
+}
+// el modo que se ve en ESE editor: el compartido, o el siguiente que el editor acepte (el dope sheet no rota)
+static int Modo2DEn(Gizmo2DCliente* cli) {
+    const int puede = cli->Gizmo2DModos();
+    for (int k = 0; k < 3; k++) { const int m = (g2Modo + k) % 3; if (puede & (1 << m)) return m; }
+    return GizmoModoMover;
+}
+int  Gizmo2DModo() { return g2Modo; }
+void Gizmo2DSetModo(int m) { g2Modo = (m < 0 || m > 2) ? 0 : m; g_redraw = true; }
+static void Gizmo2DSiguienteModo(Gizmo2DCliente* cli) {
+    const int puede = cli->Gizmo2DModos();
+    int m = Modo2DEn(cli);
+    for (int k = 1; k <= 3; k++) { const int n = (m + k) % 3; if (puede & (1 << n)) { g2Modo = n; break; } }
+    g_redraw = true;
+}
+bool Gizmo2DArrastrando() { return g2Arrastre; }
+
+// medidas en px (las del 3D, para que se sientan iguales); con el dedo, mas grandes
+struct Gizmo2DMedidas { float L, r0, base, cono, ring, ringAncho, hit, rotR; };
+static Gizmo2DMedidas Medidas2D() {
+    const bool tactil = ToolbarUsaTactil();
+    const float s = (float)GlobalScale;
+    Gizmo2DMedidas m;
+    m.L         = (tactil ? 55.0f : 45.0f) * s;
+    m.r0        = 0.20f * m.L;
+    m.base      = 0.78f * m.L;
+    m.cono      = (tactil ? 0.11f : 0.08f) * m.L;
+    m.ring      = (tactil ? 0.19f : 0.15f) * m.L;
+    m.ringAncho = 2.0f * s;
+    m.hit       = (tactil ? 14.0f : 8.0f) * s;
+    m.rotR      = 0.80f * m.L;
+    return m;
+}
+// el gizmo de ese viewport: cliente + pivote (LOCAL). false = no hay gizmo
+static bool Base2D(ViewportBase* vp, Gizmo2DCliente*& cli, float& px, float& py) {
+    if (!g_gizmoOn || !vp || PopUpActive) return false;
+    cli = Gizmo2DClienteDe(vp);
+    if (!cli || Xform2DTeclado(vp)) return false;
+    if (g2Arrastre && g2Vp == vp && g2SeMovio && Modo2DEn(cli) != GizmoModoMover) { px = g2Px; py = g2Py; return true; }
+    return cli->Gizmo2DPivote(px, py);
+}
+static int Hit2D(Gizmo2DCliente* cli, float px, float py, float lx, float ly) {
+    const Gizmo2DMedidas md = Medidas2D();
+    const float dx = lx - px, dy = ly - py, d = sqrtf(dx * dx + dy * dy);
+    if (Modo2DEn(cli) == GizmoModoRotar) return (d <= md.rotR + md.hit) ? Gizmo2DAnillo : Gizmo2DNinguna;
+    if (d <= md.ring + md.hit * 0.5f) return Gizmo2DCentro;
+    if (DistSegmento(lx, ly, px + md.ring + md.hit, py, px + md.L, py) <= md.hit) return Gizmo2DEjeX;
+    if (cli->Gizmo2DConEjeY() && DistSegmento(lx, ly, px, py - md.ring - md.hit, px, py - md.L) <= md.hit) return Gizmo2DEjeY;
+    return Gizmo2DNinguna;
+}
+
+bool Gizmo2DManijaEnPantalla(ViewportBase* vp, int manija, float& lx, float& ly) {
+    Gizmo2DCliente* cli; float px, py;
+    if (!Base2D(vp, cli, px, py)) return false;
+    const Gizmo2DMedidas md = Medidas2D();
+    lx = px; ly = py;
+    if (manija == Gizmo2DEjeX)   { lx = px + (md.r0 + md.base) * 0.5f; return true; }
+    if (manija == Gizmo2DEjeY)   { if (!cli->Gizmo2DConEjeY()) return false; ly = py - (md.r0 + md.base) * 0.5f; return true; }
+    if (manija == Gizmo2DAnillo) { lx = px + md.rotR * 0.7071f; ly = py - md.rotR * 0.7071f; return true; }
+    return manija == Gizmo2DCentro;
+}
+
+bool Gizmo2DSobre(ViewportBase* vp, int mx, int my) {
+    Gizmo2DCliente* cli; float px, py;
+    if (!Base2D(vp, cli, px, py)) return false;
+    const float lx = (float)(mx - vp->x), ly = (float)(my - vp->y);
+    return cli->Gizmo2DEnZona(lx, ly) && Hit2D(cli, px, py, lx, ly) != Gizmo2DNinguna;
+}
+bool Gizmo2DDown(ViewportBase* vp, int mx, int my) {
+    if (g2Arrastre) return false;
+    Gizmo2DCliente* cli; float px, py;
+    if (!Base2D(vp, cli, px, py)) return false;
+    const float lx = (float)(mx - vp->x), ly = (float)(my - vp->y);
+    if (!cli->Gizmo2DEnZona(lx, ly)) return false;
+    const int manija = Hit2D(cli, px, py, lx, ly);
+    if (manija == Gizmo2DNinguna) return false;
+    // el transform del editor recien arranca al pasar el umbral (Gizmo2DMotion): un toque quieto no toca nada
+    // (en el editor UV, arrancar el transform de caras ya separa esquinas)
+    g2Arrastre = true; g2Manija = manija; g2Vp = vp; g2Cli = cli;
+    g2DownX = mx; g2DownY = my; g2SeMovio = false;
+    g2Px = px; g2Py = py;
+    g_redraw = true;
+    return true;
+}
+
+bool Gizmo2DMotion(ViewportBase* vp, int mx, int my) {
+    if (!g2Arrastre || vp != g2Vp || !g2Cli) return false;
+    const int modo = Modo2DEn(g2Cli);
+    if (!g2SeMovio) {
+        const int ddx = mx - g2DownX, ddy = my - g2DownY;
+        if ((ddx < 0 ? -ddx : ddx) + (ddy < 0 ? -ddy : ddy) <= 8 * GlobalScale) return true;   // todavia es un toque
+        const int eje = (g2Manija == Gizmo2DEjeX) ? 1 : (g2Manija == Gizmo2DEjeY) ? 2 : 0;
+        if (!g2Cli->Gizmo2DIniciar(modo, eje)) { g2Arrastre = false; g2Manija = Gizmo2DNinguna; g2Vp = NULL; g2Cli = NULL; return true; }
+        g2SeMovio = true;
+        const float ax = (float)(g2DownX - vp->x) - g2Px, ay = (float)(g2DownY - vp->y) - g2Py;
+        g2AngPrev = atan2f(ay, ax); g2AngAcum = 0.0f;
+        // ESCALAR: la medida del agarre (sobre el eje, o la distancia al pivote), con un minimo para no dividir por casi 0
+        const Gizmo2DMedidas md = Medidas2D();
+        const float minimo = md.L * 0.25f;
+        float e0 = (g2Manija == Gizmo2DEjeX) ? ax : (g2Manija == Gizmo2DEjeY) ? -ay : sqrtf(ax * ax + ay * ay);
+        if (fabsf(e0) < minimo) e0 = (e0 < 0.0f) ? -minimo : minimo;
+        g2Esc0 = e0;
+    }
+    const float lx = (float)(mx - vp->x), ly = (float)(my - vp->y);
+    float dx = 0.0f, dy = 0.0f, ang = 0.0f, f = 1.0f;
+    if (modo == GizmoModoRotar) {
+        const float a = atan2f(ly - g2Py, lx - g2Px);
+        float d = a - g2AngPrev;
+        while (d > 3.14159265f) d -= 6.2831853f; while (d < -3.14159265f) d += 6.2831853f;
+        g2AngAcum += d; g2AngPrev = a;
+        ang = g2AngAcum;
+    } else if (modo == GizmoModoEscalar) {
+        const float ax = lx - g2Px, ay = ly - g2Py;
+        f = (g2Manija == Gizmo2DEjeX) ? ax / g2Esc0 : (g2Manija == Gizmo2DEjeY) ? -ay / g2Esc0 : sqrtf(ax * ax + ay * ay) / g2Esc0;
+        if (fabsf(f) < 1e-3f) f = (f < 0.0f) ? -1e-3f : 1e-3f;
+    } else {
+        dx = (float)(mx - g2DownX); dy = (float)(my - g2DownY);
+        if (g2Manija == Gizmo2DEjeX) dy = 0.0f;
+        if (g2Manija == Gizmo2DEjeY) dx = 0.0f;
+    }
+    g2Cli->Gizmo2DAplicar(dx, dy, ang, f);
+    g_redraw = true;
+    return true;
+}
+
+bool Gizmo2DSoltar(ViewportBase* vp) {
+    if (!g2Arrastre || vp != g2Vp) return false;
+    Gizmo2DCliente* cli = g2Cli;
+    const bool movio = g2SeMovio;
+    g2Arrastre = false; g2Manija = Gizmo2DNinguna; g2Vp = NULL; g2Cli = NULL; g2SeMovio = false;
+    if (cli) { if (movio) cli->Gizmo2DConfirmar(); else Gizmo2DSiguienteModo(cli); }   // toque quieto: el modo siguiente
+    g_redraw = true;
+    return true;
+}
+
+void Gizmo2DOlvidarVp(ViewportBase* vp) {
+    if (g2Vp != vp) return;
+    g2Arrastre = false; g2Manija = Gizmo2DNinguna; g2Vp = NULL; g2Cli = NULL; g2SeMovio = false;
+}
+void Gizmo2DAbortar() {
+    if (!g2Arrastre) return;
+    Gizmo2DCliente* cli = g2Cli;
+    const bool movio = g2SeMovio;
+    g2Arrastre = false; g2Manija = Gizmo2DNinguna; g2Vp = NULL; g2Cli = NULL; g2SeMovio = false;
+    if (cli && movio) cli->Gizmo2DCancelar();
+    g_redraw = true;
+}
+
+// ---- dibujo (triangulos: el grosor de GL_LINES no es confiable en ES) ----
+static void Linea2D(std::vector<GLfloat>& b, float ax, float ay, float bx, float by, float w) {
+    const float dx = bx - ax, dy = by - ay, L = sqrtf(dx * dx + dy * dy);
+    if (L < 1e-4f) return;
+    const float nx = -dy / L * w * 0.5f, ny = dx / L * w * 0.5f;
+    const GLfloat q[12] = { ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny,
+                            ax + nx, ay + ny, bx - nx, by - ny, ax - nx, ay - ny };
+    b.insert(b.end(), q, q + 12);
+}
+static void Anillo2D(std::vector<GLfloat>& b, float cx, float cy, float r, float w, int N) {
+    for (int i = 0; i < N; i++) {
+        const float a0 = (float)i / N * 6.2831853f, a1 = (float)(i + 1) / N * 6.2831853f;
+        const float ri = r - w * 0.5f, ro = r + w * 0.5f;
+        const GLfloat q[12] = { cx + cosf(a0) * ri, cy + sinf(a0) * ri, cx + cosf(a1) * ri, cy + sinf(a1) * ri,
+                                cx + cosf(a1) * ro, cy + sinf(a1) * ro, cx + cosf(a0) * ri, cy + sinf(a0) * ri,
+                                cx + cosf(a1) * ro, cy + sinf(a1) * ro, cx + cosf(a0) * ro, cy + sinf(a0) * ro };
+        b.insert(b.end(), q, q + 12);
+    }
+}
+static void Pintar2D(std::vector<GLfloat>& b, float r, float g, float bl, float a) {
+    if (b.empty()) return;
+    gfx::Color4f(r, g, bl, a);
+    gfx::VertexPointer2f(0, &b[0]);
+    gfx::DrawTrianglesArray((int)(b.size() / 2));
+    b.clear();
+}
+
+void Gizmo2DRender(ViewportBase* vp) {
+    Gizmo2DCliente* cli; float px, py;
+    if (!Base2D(vp, cli, px, py)) return;
+    const Gizmo2DMedidas md = Medidas2D();
+    const int modo = Modo2DEn(cli);
+    const bool activo = g2Arrastre && g2Vp == vp && g2SeMovio;
+    gfx::Disable(gfx::Texture2D); gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting);
+    gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::ColorArray); gfx::DisableArray(gfx::NormalArray);
+    gfx::EnableArray(gfx::VertexArray);
+    gfx::Enable(gfx::Blend); gfx::BlendAlpha();
+    static std::vector<GLfloat> b;
+    b.clear();
+    const float s = (float)GlobalScale;
+    if (modo == GizmoModoRotar) {
+        const bool esta = activo && g2Manija == Gizmo2DAnillo;
+        // disco tenue (todo lo de adentro tambien gira) + el anillo azul (el eje Z, el que sale de la pantalla)
+        for (int i = 0; i < 48; i++) {
+            const float a0 = (float)i / 48 * 6.2831853f, a1 = (float)(i + 1) / 48 * 6.2831853f;
+            const GLfloat t[6] = { px, py, px + cosf(a0) * md.rotR, py + sinf(a0) * md.rotR, px + cosf(a1) * md.rotR, py + sinf(a1) * md.rotR };
+            b.insert(b.end(), t, t + 6);
+        }
+        Pintar2D(b, 1, 1, 1, esta ? 0.14f : 0.06f);
+        Anillo2D(b, px, py, md.rotR, (esta ? 4.0f : 3.0f) * s, 64);
+        Pintar2D(b, kColZ[0], kColZ[1], kColZ[2], 1.0f);
+        // el pivote: un punto blanco
+        Anillo2D(b, px, py, md.ring * 0.35f, md.ringAncho, 24);
+        Pintar2D(b, 1, 1, 1, 0.8f);
+    } else {
+        const bool escalar = (modo == GizmoModoEscalar);
+        const int nEjes = cli->Gizmo2DConEjeY() ? 2 : 1;
+        for (int k = 0; k < nEjes; k++) {
+            const float* cl = ColEje(k);
+            const bool esta = activo && g2Manija == (k == 0 ? Gizmo2DEjeX : Gizmo2DEjeY);
+            const float alfa = (activo && !esta) ? 0.35f : 1.0f;
+            const float ux = (k == 0) ? 1.0f : 0.0f, uy = (k == 0) ? 0.0f : -1.0f;   // X a la derecha, Y para ARRIBA
+            const float vx = -uy, vy = ux;                                          // perpendicular
+            Linea2D(b, px + ux * md.r0, py + uy * md.r0, px + ux * md.base, py + uy * md.base, (esta ? 3.0f : 2.0f) * s);
+            if (escalar) {   // punta CUADRADA
+                const float h = (md.L - md.base) * 0.45f, cx = px + ux * (md.L - h), cy = py + uy * (md.L - h);
+                const GLfloat q[12] = { cx - ux * h - vx * h, cy - uy * h - vy * h, cx + ux * h - vx * h, cy + uy * h - vy * h,
+                                        cx + ux * h + vx * h, cy + uy * h + vy * h, cx - ux * h - vx * h, cy - uy * h - vy * h,
+                                        cx + ux * h + vx * h, cy + uy * h + vy * h, cx - ux * h + vx * h, cy - uy * h + vy * h };
+                b.insert(b.end(), q, q + 12);
+            } else {         // punta de FLECHA
+                const float bx = px + ux * md.base, by = py + uy * md.base;
+                const GLfloat t[6] = { px + ux * md.L, py + uy * md.L, bx + vx * md.cono, by + vy * md.cono, bx - vx * md.cono, by - vy * md.cono };
+                b.insert(b.end(), t, t + 6);
+            }
+            Pintar2D(b, cl[0], cl[1], cl[2], alfa);
+        }
+        // el circulo del centro: libre (mover) / parejo (escalar)
+        const bool esta = activo && g2Manija == Gizmo2DCentro;
+        Anillo2D(b, px, py, md.ring, md.ringAncho * (esta ? 1.6f : 1.0f), 40);
+        Pintar2D(b, 1, 1, 1, (activo && !esta) ? 0.3f : 0.9f);
+    }
+    gfx::Color4f(1, 1, 1, 1);
     gfx::Invalidate();
 }

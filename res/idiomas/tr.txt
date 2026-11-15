@@ -8,6 +8,8 @@
 %d Push matrix without its Pop	Matrisi çıkar (pop) olmadan %d Matrisi it (push)
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Seçimin %d animasyon eğrisi artık hiçbir şeyi canlandırmıyor (Geri Al geri getirir)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d animasyon eğrisi nesnesiz kaldı (ilki: '%s'): whisk3d.log'a bakın
+%d curves selected	%d eğri seçili
+%d keyframes selected	%d anahtar kare seçili
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d ad sahne değişirken yeniden numaralandı (%s%s). Lua betiklerinizi kontrol edin.
 %d nodes | active node: %d	%d düğüm | etkin düğüm: %d
 %d object(s) got their own copy of the mesh	%d nesnenin artık kendi örgü kopyası var
@@ -78,6 +80,7 @@ Actions	Eylemler
 Active	Etkin
 Active Camera	Etkin Kamera
 Active Element	Etkin öğe
+Active Keyframe	Etkin anahtar kare
 Active camera	Etkin kamera
 Add	Ekle
 Add Circle	Daire Ekle
@@ -88,6 +91,7 @@ Add Cube	Küp Ekle
 Add Cylinder	Silindir Ekle
 Add Layer	Katman ekle
 Add Library...	Kütüphane ekle...
+Add Modifier	Değiştirici ekle
 Add Plane	Düzlem Ekle
 Add UV Group	UV Grubu Ekle
 Add UV Map	UV Haritası Ekle
@@ -105,6 +109,7 @@ Affect Move	Taşımayı Etkile
 Affect Rotate	Döndürmeyi Etkile
 Affect Scale	Ölçeklemeyi Etkile
 Affected	Etkilenen
+After Mode	Sonraki mod
 Align	Hizala
 Align X	X Hizala
 Align Y	Y Hizala
@@ -113,6 +118,7 @@ All	Tümü
 All Transforms	Tüm Dönüşümler
 All parts	Tüm parçalar
 All shortcuts restored	Kısayollar sıfırlandı
+All viewports	Tüm görünümler
 Allow	İzin ver
 Alpha	Alfa
 Alpha (normal)	Alfa (normal)
@@ -141,11 +147,16 @@ Animation rendered!	Animasyon render alındı!
 Animations	Animasyonlar
 Animations of	Animasyonlar:
 Antialiasing	Kenar yumuşatma
+Any mode	Her mod
 Any orientation	Tüm yönler
 Anywhere	Her yerde
 Apply	Uygula
+Apply All Transforms	Tüm dönüşümleri uygula
+Apply Location	Konumu uygula
 Apply Modifier	Değiştiriciyi Uygula
 Apply Modifiers	Değiştiricileri Uygula
+Apply Rotation	Dönmeyi uygula
+Apply Scale	Ölçeği uygula
 Apply Transforms	Dönüşümleri Uygula
 Apply: select mesh or armature object(s)	Uygula: örgü veya iskelet nesne(leri) seçin
 Arc	Yay
@@ -167,6 +178,9 @@ Att Constant	Att Sabit
 Att Linear	Att Doğrusal
 Att Quadratic	Att Karesel
 Audible range	Duyulma menzili
+Audio	Ses
+Audio format	Ses biçimi
+Audio rendered!	Ses işlendi!
 Auto	Oto
 Auto (active part)	Oto (etkin parça)
 Auto Clamped	Oto Sınırlı
@@ -193,6 +207,7 @@ Back View	Arka görünüm
 Background	Arka plan
 Base Color	Temel Renk
 Base velocity	Temel hız
+Before Mode	Önceki mod
 Bevel	Pah
 Bevel Edges	Kenarlara Pah Kır
 Bevel Vertices	Köşelere Pah Kır
@@ -203,10 +218,14 @@ Bevel: select vertices first	Pah: önce köşeleri seçin
 Bezier	Bezier
 Billboard	Billboard
 Bind texture	Dokuyu bağla
+Bitrate	Bit hızı
 Bits	Bit
 Black Letterbox	Siyah bantlar
 Blank	Düz
 Blend	Karışım
+Blend In	Yumuşak giriş
+Blend Out	Yumuşak çıkış
+Blend Type	Karışım türü
 Blend mode	Karışım modu
 Blending	Karışım
 Blending on/off	Karışım aç/kapat
@@ -408,6 +427,7 @@ Cursor to Selected	İmleç Seçilene
 Cursor to Selection	İmleç Seçime
 Cursor to World Origin	İmleç Dünya Orijinine
 Curve	Eğri
+Curve Modifiers	Eğri değiştiricileri
 Curves	Eğriler
 Custom	Özel
 Custom Normal	Özel Normal
@@ -415,6 +435,7 @@ Custom shader	Özel shader
 Custom: edit the curve	Özel: eğriyi düzenleyin
 Cut	Kes
 Cutoff	Kesim
+Cycles	Döngüler
 Cylinder	Silindir
 Cylinder Projection	Silindir İzdüşümü
 Debug mode	Hata ayıklama modu
@@ -426,8 +447,11 @@ Delete "%s" (%s) with all its objects?	"%s" (%s) tüm nesneleriyle silinsin mi?
 Delete "%s"?	"%s" silinsin mi?
 Delete %d objects?	%d nesne silinsin mi?
 Delete %d scenes, games or prefabs with all their objects?	%d sahne, oyun veya prefab tüm nesneleriyle silinsin mi?
+Delete Edge Loops	Kenar döngülerini sil
 Delete Edge Loops: select an edge loop first	Kenar Döngülerini Sil: önce bir kenar döngüsü seçin
 Delete Edge Loops: select an edge shared by two faces	Kenar Döngülerini Sil: iki yüzün paylaştığı bir kenar seçin
+Delete Edges	Kenarları sil
+Delete Faces	Yüzleri sil
 Delete Folder	Klasörü sil
 Delete Keyframe	Anahtar Kareyi Sil
 Delete Keyframe: no keyframe at the current frame	Anahtar kareyi sil: geçerli karede anahtar kare yok
@@ -435,6 +459,7 @@ Delete Keyframe: the animation needs at least one keyframe	Anahtar kareyi sil: a
 Delete Mesh Layer	Örgü katmanını sil
 Delete Normals Layer	Normal katmanını sil
 Delete Palette	Paleti sil
+Delete Vertices	Köşeleri sil
 Delete editing data	Düzenleme verilerini sil
 Delete mesh layer: select an object animation in the timeline	Örgü katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
 Delete normals layer: select an object animation in the timeline	Normal katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
@@ -531,6 +556,7 @@ Empty routine	Boş rutin
 Enable	Etkinleştir
 Enabled	Etkin
 End	Son
+End Frame	Bitiş karesi
 End color	Bitiş rengi
 End of frame	Kare sonu
 End:%d	Son:%d
@@ -538,6 +564,7 @@ Entry	Giriş
 Equal	Eşit
 Equirectangular (software)	Eşdikdörtgen (yazılım)
 Error rendering animation	Animasyon render alınırken hata
+Error rendering audio	Ses işlenirken hata
 Error: could not save the OBJ	Hata: OBJ kaydedilemedi
 Error: could not save the STL	Hata: STL kaydedilemedi
 Error: could not save the render	Hata: render kaydedilemedi
@@ -600,7 +627,9 @@ File size	Dosya boyutu
 Fill	Doldur
 Film grain	Film greni
 Filter	Filtre
+Filter Width	Filtre genişliği
 Filtering	Filtreleme
+Final composite	Son kompozisyon
 Find	Bul
 Find and Replace	Bul ve değiştir
 Find...	Bul...
@@ -690,6 +719,12 @@ Growth (size per second)	Büyüme (saniyede boyut)
 Growth kept per second	Saniyede kalan büyüme
 Handle Type	Tutamaç Türü
 Handle type	Tutamaç türü
+Handles: Aligned	Tutamaçlar: hizalı
+Handles: Auto Clamped	Tutamaçlar: oto sınırlı
+Handles: Automatic	Tutamaçlar: otomatik
+Handles: Flat	Tutamaçlar: düz
+Handles: Free	Tutamaçlar: serbest
+Handles: Vector	Tutamaçlar: vektör
 Harden Normals	Normalleri Sertleştir
 Height	Yükseklik
 Hide / Show	Gizle / Göster
@@ -735,7 +770,10 @@ Insert Keyframe	Anahtar Kare Ekle
 Insert Keyframe (all)	Anahtar kare ekle (tümü)
 Insert Keyframe: select an object animation in the timeline	Anahtar kare ekle: zaman çizelgesinde bir nesne animasyonu seçin
 Insert Keyframe: the mesh has no normals	Anahtar kare ekle: örgünün normalleri yok
+Insert Location Keyframe	Konum anahtar karesi ekle
 Insert Mesh Keyframe	Örgü Anahtar Karesi Ekle
+Insert Rotation Keyframe	Dönme anahtar karesi ekle
+Insert Scale Keyframe	Ölçek anahtar karesi ekle
 Insert UV keyframe: the mesh has no UV	UV anahtar karesi ekle: örgünün UV'si yok
 Inset Faces	Yüzleri İçe Kaydır
 Inset: enter Edit Mode first	İçe Kaydır: önce Düzenleme Moduna girin
@@ -750,6 +788,9 @@ Interpolate	Enterpole et
 Interpolate (mix)	Enterpole et (karışım)
 Interpolation	Enterpolasyon
 Interpolation Mode	Enterpolasyon Modu
+Interpolation: Bezier	Enterpolasyon: Bezier
+Interpolation: Constant	Enterpolasyon: sabit
+Interpolation: Linear	Enterpolasyon: doğrusal
 Intersect	Kesişim
 Intersection Type	Kesişim türü
 Inverse Square	Ters kare
@@ -770,6 +811,7 @@ It has no proyecto.json	proyecto.json yok
 It is a W3D proxy: choose its library element	Bir W3D proxy: kütüphanedeki öğesini seçin
 It is already linked	Zaten bağlantılı
 It is in use	Kullanımda
+It is not missing anymore	Artık eksik değil
 It is open: switch to another scene first	Açık: önce başka bir sahneye geçin
 It is read-only	Salt okunur
 It is the open project	Açık olan proje bu
@@ -795,6 +837,7 @@ Keyboard Shortcuts...	Klavye Kısayolları...
 Keyframe	Anahtar kare
 Keyframes	Anahtar kareler
 LOD	LOD
+Lacunarity	Boşluklılık
 Landscape only	Yalnızca yatay
 Language	Dil
 Last triangle	Son üçgen
@@ -805,6 +848,7 @@ Left	Sol
 Left Handle X	Sol Tutamaç X
 Left View	Sol görünüm
 Left soft	Sol soft
+Legacy Noise	Klasik gürültü
 Less	Küçük
 Less or equal	Küçük veya eşit
 Levels Viewport	Görünüm Seviyeleri
@@ -885,6 +929,7 @@ Loop Select: click an	Döngü Seç: tıklayın:
 Loop Slide	Döngüde Kaydır
 Loop forever	Sürekli tekrarla
 Loose (editable)	Ayrık (düzenlenebilir)
+MKV and MP4 need ffmpeg installed	MKV ve MP4 için ffmpeg kurulu olmalı
 Make External...	Harici Yap...
 Make Internal	Dahili Yap
 Make Single User	Tek Kullanıcılı Yap
@@ -920,6 +965,9 @@ Memory usage	Bellek kullanımı
 Menu bar	Menü çubuğu
 Merge	Kaynaştır
 Merge Distance	Kaynaştırma Mesafesi
+Merge at Center	Merkezde kaynaştır
+Merge at Cursor	İmleçte kaynaştır
+Merge by Distance	Mesafeye göre kaynaştır
 Mesh	Örgü
 Mesh Parts	Örgü Parçaları
 Mesh editable again	Örgü yeniden düzenlenebilir
@@ -941,6 +989,8 @@ Mirror Object	Ayna Nesnesi
 Mirror X	Ayna X
 Mirror Y	Ayna Y
 Mirror Z	Ayna Z
+Missing file	Eksik dosya
+Missing files	Eksik dosyalar
 Miter Inner	İç gönye
 Miter Outer	Dış gönye
 Mix	Karıştır
@@ -960,6 +1010,7 @@ Move	Taşı
 Move (reorder)	Taşı (yeniden sırala)
 Move Down	Aşağı taşı
 Move Up	Yukarı taşı
+Move the view	Görünümü taşı
 Move to	Hedef klasör
 Move to Folder	Klasöre taşı
 Move: %d frames	Taşı: %d kare
@@ -1014,6 +1065,7 @@ Next Viewport Shading	Sonraki görünüm gölgelemesi
 Next frame	Sonraki kare
 Next keyframe	Sonraki anahtar kare
 No	Hayır
+No Cycles	Döngü yok
 No Normal Map	Normal Haritası Yok
 No Properties panel	Özellikler paneli yok
 No Test, Write	Test yok, yazma var
@@ -1034,6 +1086,7 @@ No other scenes	Başka sahne yok
 No prefabs yet	Henüz prefab yok
 No results	Sonuç yok
 No source: this constraint does nothing.	Kaynak yok: bu kısıtlama hiçbir şey yapmaz.
+Noise	Gürültü
 None	Hiçbiri
 Normal	Normal
 Normal Map	Normal Haritası
@@ -1065,6 +1118,7 @@ Not saving: the animations of '%s' could not be read when opening and saving wou
 Not saving: the clips of '%s' could not be read when opening and saving would erase them	Kaydedilmiyor: '%s' klipleri açılırken okunamadı ve kaydetmek onları silerdi
 Not saving: the mesh '%s' could not be written (%s)	Kaydedilmiyor: '%s' örgüsü yazılamadı (%s)
 Nothing to paste	Yapıştırılacak bir şey yok
+Nothing to render: tick Final composite or a pass	İşlenecek bir şey yok: Son kompozisyon'u veya bir geçişi işaretleyin
 Nothing to save	Kaydedilecek bir şey yok
 Now click the second	Şimdi ikinciye tıklayın:
 Now external	Artık harici
@@ -1121,6 +1175,7 @@ Orientation	Yönelim
 Origin to 3D Cursor	Orijini 3D İmlece
 Origin to Geometry	Orijini Geometriye
 Original file forgotten	Orijinal dosya unutuldu
+Original file of an imported mesh (only where it came from: the mesh is inside the project)	İçe aktarılan bir ağın özgün dosyası (yalnızca kaynağı: ağ projenin içinde)
 Origins	Orijinler
 Orphan (no users)	Sahipsiz (kullanıcı yok)
 Orphans purged	Sahipsizler temizlendi
@@ -1173,6 +1228,7 @@ Per-Vertex uses one color per vertex: the colors of the other face corners are l
 Percent	Yüzde
 Perspective / Orthographic	Perspektif / Ortografik
 Perspective/Ortho	Perspektif/Orto
+Phase	Faz
 Physics	Fizik
 Pick Shortest Path	En Kısa Yolu Seç
 Pick Shortest Path: click the first	En Kısa Yol: ilkine tıklayın:
@@ -1243,6 +1299,7 @@ Push matrix	Matrisi it (push)
 Quad strip (simulated)	Dörtgen şeridi (benzetim)
 Quadratic	Karesel
 Quads (simulated)	Dörtgenler (benzetim)
+Quality	Kalite
 Quartic	4. derece
 Quaternion (WXYZ)	Kuaterniyon (WXYZ)
 Quintic	5. derece
@@ -1284,6 +1341,7 @@ Rename 3D Mesh	3D örgüyü yeniden adlandır
 Rename Material	Malzemeyi Yeniden Adlandır
 Render	Render
 Render Animation	Animasyon Render Al
+Render Audio	Sesi işle
 Render FPS	Render FPS
 Render Image	Görüntü Render Al
 Render Preview	Render Önizleme
@@ -1296,12 +1354,16 @@ Render to...	Render al...
 Renderable	Render alınabilir
 Rendered	Render
 Rendering animation...	Animasyon render alınıyor...
+Rendering audio...	Ses işleniyor...
 Rendering...	Render alınıyor...
 Repeat	Tekrarla
 Repeat After	Sonra tekrarla
 Repeat Before	Önce tekrarla
+Repeat Mirrored	Aynalı tekrarla
+Repeat Motion	Hareketi tekrarla
 Repeat Texture	Dokuyu Tekrarla
 Repeat with Offset	Ofsetle tekrarla
+Repeats	Tekrar sayısı
 Replace	Değiştir
 Replace all	Tümünü değiştir
 Replace...	Değiştir...
@@ -1314,6 +1376,7 @@ Reset: select faces first	Sıfırla: önce yüzleri seçin
 Resolution	Çözünürlük
 Resource	Kaynak
 Restart Whisk3D for this change to take effect	Bu değişikliğin etkili olması için Whisk3D'yi yeniden başlatın
+Restrict Frame Range	Kare aralığını sınırla
 Retarget	Retarget
 Reverb	Yankı
 Right	Sağ
@@ -1461,6 +1524,7 @@ Shortest Path (Fill Region)	En Kısa Yol (Bölgeyi Doldur)
 Shortest path selected	En kısa yol seçildi
 Shortest path: region filled	En kısa yol: bölge dolduruldu
 Show Chrome UV	Krom UV'yi göster
+Show Handles	Tutamaçları göster
 Show Overlays	Bindirmeleri Göster
 Show Panel	Paneli göster
 Show active	Etkini göster
@@ -1470,6 +1534,7 @@ Shrink/Fatten	Daralt/Şişir
 Shrink/Fatten / Clear Scale	Daralt/Şişir / Ölçeği Temizle
 Shutter	Obtüratör
 Shutter position	Obtüratör konumu
+Sigma	Sigma
 Simple	Basit
 Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Benzetim: OpenGL ES 1.1'de dörtgen ve çokgen yok. Üçgenlere dönüştürülürler (daha çok indeks, daha yavaş).
 Single line	Tek satır
@@ -1528,6 +1593,7 @@ Spread	Yayılım
 Square	Kare
 Start	Başlangıç
 Start / End / FPS	Başlangıç / Son / FPS
+Start Frame	Başlangıç karesi
 Start angle	Başlangıç açısı
 Start of frame	Kare başı
 Start time	Başlama zamanı
@@ -1538,6 +1604,8 @@ State	Durum
 Static	Statik
 Statistics	İstatistikler
 Stencil buffer	Stencil tamponu
+Step Size	Adım boyutu
+Stepped	Basamaklı
 Steps	Adımlar
 Steps Viewport	Görünüm Adımları
 Steps to skip	Atlanacak adım
@@ -1546,6 +1614,7 @@ Stop the game before changing the scene	Sahneyi değiştirmeden önce oyunu durd
 Stop the game first	Önce oyunu durdurun
 Stored	Saklama
 Streaming preview	Akış önizlemesi
+Strength	Güç
 Stretch	Ger
 Stretch (seconds of velocity)	Germe (hızın saniyesi)
 Stretch U	Germe U
@@ -1619,6 +1688,7 @@ The light '%s' was not loaded: the scene already has the maximum number of light
 The list of All	Tümü'nün listesi
 The mesh '%s' (no objects) could not be read: saving without it	'%s' örgüsü (nesnesiz) okunamadı: onsuz kaydediliyor
 The objects of the 3D meshes will be deleted too (Undo brings them back).	3D örgülerin nesneleri de silinecek (Geri Al geri getirir).
+The scene has no sounds	Sahnede ses yok
 The selected folders are deleted too if they end up empty.	Seçili klasörler boş kalırsa onlar da silinir.
 The shader does not compile	Shader derlenmiyor
 The sound couldn't be decoded	Ses çözülemedi
@@ -1627,6 +1697,7 @@ The texture couldn't be loaded	Doku yüklenemedi
 The undo history still uses it	Geri alma geçmişi halen kullanıyor
 There are no orphans	Sahipsiz yok
 There is no active camera	Etkin kamera yok
+There is no audio: the mixer did not start	Ses yok: karıştırıcı başlamadı
 There is no script editor (IDE) in the layout	Yerleşimde betik düzenleyici (IDE) yok
 There is no such prefab	Böyle bir prefab yok
 There is no such scene	Böyle bir sahne yok
@@ -1634,6 +1705,7 @@ Thickness	Kalınlık
 This animation has no keyframes in that layer	Bu animasyonun o katmanda anahtar karesi yok
 This animation has no normals layer	Bu animasyonun normal katmanı yok
 This file type can't be added	Bu dosya türü eklenemez
+This format needs ffmpeg installed	Bu biçim için ffmpeg kurulu olmalı
 This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	Bu grafik arka ucunda shader yok: @vertice bölümü CPU'da çalışır, malzemenin geri kalanı her zamanki gibi çizilir
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Bu grafik arka ucunda shader yok: malzeme her zamanki gibi çizilir (GLES 2.0 ve Vulkan'da var)
 This hierarchy clip only animates its root and its children	Bu hiyerarşi klibi yalnızca kökünü ve alt öğelerini canlandırır
@@ -1719,6 +1791,9 @@ Upright (does not tilt)	Dik (eğilmez)
 Upscaler	Büyütücü
 Upscaling	Büyütme
 Use	Kullan
+Use End Frame	Bitiş karesini kullan
+Use Influence	Etkiyi kullan
+Use Start Frame	Başlangıç karesini kullan
 Use camera focus	Kamera odağını kullan
 Use current folder	Geçerli klasörü kullan
 Use index	İndeks kullan
@@ -1736,6 +1811,7 @@ Value Y	Değer Y
 Variation	Varyasyon
 Vector	Vektör
 Velocity	Hız
+Version	Sürüm
 Version v%d saved: versiones/%s	v%d sürümü kaydedildi: versiones/%s
 Vertex	Köşe
 Vertex Animation	Köşe Animasyonu
@@ -1756,6 +1832,7 @@ View	Görünüm
 View in 3D	3D'de gör
 View options	Görünüm seçenekleri
 Viewpoint	Bakış Açısı
+Viewport	Görünüm
 Visibility icons	Görünürlük simgeleri
 Visibility test	Görünürlük testi
 Visible	Görünür
@@ -1776,8 +1853,10 @@ Windows .exe: not generated from this button yet. The EDITOR is built with platf
 Wireframe	Tel Kafes
 Wireframe Preview	Tel Kafes Önizleme
 Wireframe: Only Visible	Tel Kafes: Yalnızca Görünür
+With alpha (RGBA)	Alfa ile (RGBA)
 With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	Etki 0 ile 100 arasındayken billboard kameranın önünden geçerken 180 derece dönebilir. Önlemek için %100 kullanın.
 With its materials	Malzemeleriyle
+With sound	Sesli
 Wrap	Tekrar
 Write to	Yazılacak yer
 X Axis	X Ekseni
@@ -1806,6 +1885,7 @@ Zoom 4:1	Zoom 4:1
 [X: time]	[X: zaman]
 [Y: value]	[Y: değer]
 active	etkin
+active keyframe	etkin anahtar kare
 all	tümü
 all opaque	tamamen opak
 along	boyunca
@@ -1863,6 +1943,7 @@ last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or m
 list	liste
 local	yerel
 matrix stack too deep (%d levels, max %d)	matris yığını çok derin (%d seviye, en fazla %d)
+median point	orta nokta
 missing	eksik
 mono (1)	mono (1)
 new	yeni

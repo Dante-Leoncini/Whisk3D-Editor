@@ -8,6 +8,7 @@
 #include "WhiskUI/widgets/PopupMenu.h"
 #include "WhiskUI/core/UI.h"          // RenglonHeightGS, gapGS, borderGS (las filas del menu)
 #include "render/OpcionesRender.h"    // g_redraw
+#include "render/RayTracer.h"         // g_rt / RTInvalidar (vista3d trazado)
 #include "objects/Objects.h"          // g_editMesh, EditSelectMode (caras)
 #include "objects/Mesh.h"             // Mesh (caras)
 #include "edit/Modifier.h"            // Modifier (modeje)
@@ -34,6 +35,8 @@ Button* PropsAyudaEn(Properties* p, int mx, int my);   // el cartelito de ayuda 
 #include "importers/stl.h"         // ExportSTL (stl)
 #include "objects/ObjectMode.h"     // SetPosicion / SetRotacion / SetScale / CiclarEjeTransform (n95 transformar)
 #include "ViewPorts/Gizmo.h"         // GizmoManijaEnPantalla (capinfo: las manijas)
+#include "ViewPorts/Properties.h"    // PropsActivo y los tildes de los pases (renderpases / propsolvidar)
+#include "stb/stb_image.h"            // leer un PNG del render (pngpx; la implementacion esta en constructor.cpp)
 #include "importers/import_obj.h"   // CargarTodasTexturasPendientes (texturas)
 #include "undo/Undo.h"               // UndoConAgregar / UndoModAgregar (agregar)
 #include "ViewPorts/Outliner.h"      // las filas (capinfo)
@@ -553,6 +556,57 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         if (que == "up") gDedos.erase(id); else gDedos[id] = std::make_pair(x, y);
         return true;
     }
+    // 'dedotoque esquina <tipo>' / 'dedotoque item <opcion en ingles>': un TOQUE con el dedo (bajar y levantar, como
+    // 'dedo') en el boton de la esquina del primer viewport de ese tipo, o en una opcion del menu abierto
+    if (cmd == "dedotoque") {
+        std::string que; ss >> que;
+        int x = -1, y = -1;
+        if (que == "esquina") {
+            int kind = 0; ss >> kind;
+            ViewportBase* v = HojaDeTipo(rootViewport, kind);
+            if (v) { v->ActualizarBarra(); if (!v->BarButtons.empty()) { Button* b = v->BarButtons[0]; x = b->sx + b->width / 2; y = b->sy + b->height / 2; } }
+            if (x < 0) { err = "dedotoque: no hay un viewport de tipo " + std::to_string(kind) + " con su esquina"; return false; }
+        } else if (que == "item") {
+            const std::string t = T(Resto(ss).c_str());
+            extern PopupMenu* MenuAbierto;
+            PopupMenu* m = (MenuAbierto && MenuAbierto->abierto) ? MenuAbierto : NULL;
+            const int fila = RenglonHeightGS + gapGS;
+            if (m) for (int i = 0; i < (int)m->items.size(); i++) {
+                const int v = i - m->scroll;
+                if (m->items[i]->text != t || v < 0 || v >= m->FilasVisibles()) continue;
+                x = m->x + m->width / 2; y = m->y + borderGS + (m->titulo.empty() ? 0 : fila) + v * fila + RenglonHeightGS / 2;
+            }
+            if (x < 0) { err = "dedotoque: el menu abierto no tiene '" + t + "' a la vista"; return false; }
+        } else { err = "dedotoque: uso: dedotoque esquina <tipo> | dedotoque item <opcion>"; return false; }
+        Movio(SDL_TOUCH_MOUSEID, 0, x, y, x, y); Boton(SDL_TOUCH_MOUSEID, SDL_BUTTON_LEFT, true, x, y);
+        Dedo(SDL_FINGERDOWN, 1, x, y, x, y);
+        Cuadro();   // (un toque de verdad dura algunos cuadros: el editor dibuja con el dedo apoyado)
+        Boton(SDL_TOUCH_MOUSEID, SDL_BUTTON_LEFT, false, x, y);
+        Dedo(SDL_FINGERUP, 1, x, y, x, y);
+        gDedos.erase(1);
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'vptipo <tipo> <id>': el primer viewport de ese tipo pasa a ser otro, por la misma puerta que el menu de tipos (ids
+    // del menu: 0 Vista 3D, 1 Outliner, 2 Propiedades, 3 Editor UV, 4 Linea de tiempo, 5 2D, 6 Consola, 7 IDE, 8 Biblioteca)
+    if (cmd == "vptipo") {
+        int kind = 0, id = 0; ss >> kind >> id;
+        ViewportBase* v = HojaDeTipo(rootViewport, kind);
+        if (!v) { err = "vptipo: no hay un viewport de tipo " + std::to_string(kind); return false; }
+        extern void LayoutCambiarTipoViewport(ViewportBase* v, int aId);
+        LayoutCambiarTipoViewport(v, id);
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'raiz <tipo>': el viewport que ocupa toda la ventana es de ese tipo (1 = 3D, 5 = linea de tiempo...; 0 = el layout
+    // entero, sin nada maximizado)
+    if (cmd == "raiz") {
+        int kind = 0; ss >> kind;
+        const int hay = (rootViewport && rootViewport->isLeaf()) ? rootViewport->ViewportKind() : 0;
+        printf("      [raiz] %d\n", hay);
+        if (hay != kind) { err = "raiz: es de tipo " + std::to_string(hay) + ", se esperaba " + std::to_string(kind); return false; }
+        return true;
+    }
     // las teclas modificadoras MANTENIDAS mientras se usa el mouse: 'mod shift', 'mod alt shift', 'mod' (ninguna).
     // El viewport 3D las lee del estado de SDL (Shift + boton del medio = desplazar; Alt + izquierdo = orbitar), que
     // los eventos de tecla sintetizados no tocan
@@ -715,7 +769,16 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         else if (que == "gizmo" && (v == 0 || v == 1)) g_gizmoOn = (v == 1);   // (en el N95 arranca apagado)
         else if (que == "barra" && (v == 0 || v == 1)) { extern bool g_capturaSinBarra3D; g_capturaSinBarra3D = (v == 0); }
         else if (que == "overlays" && (v == 0 || v == 1)) vp->showOverlays = (v == 1);   // Superposiciones > Mostrar
-        else { err = "vista3d: uso: vista3d sombreado <n> | vista3d huesos <0|1> | vista3d gizmo <0|1> | vista3d barra <0|1> | vista3d overlays <0|1>"; return false; }
+        // 'vista3d trazado <0|1> [pases]': la vista Render con el TRAZADO DE RAYOS progresivo (el de Propiedades > Render);
+        // despues 'tick N' lo deja juntar pases (las capturas de la tienda: la imagen trazada adentro del editor)
+        else if (que == "trazado" && (v == 0 || v == 1)) {
+            int pases = 0; ss >> pases;
+            g_rt.on = (v == 1);
+            if (pases > 0) g_rt.pases = pases;
+            if (g_rt.on) vp->view = RenderType::Rendered;
+            RTInvalidar();
+        }
+        else { err = "vista3d: uso: vista3d sombreado <n> | vista3d huesos <0|1> | vista3d gizmo <0|1> | vista3d barra <0|1> | vista3d overlays <0|1> | vista3d trazado <0|1> [pases]"; return false; }
         g_redraw = true; Cuadro();
         return true;
     }
@@ -1077,6 +1140,173 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         return true;
     }
     // 'activo <nombre>': el objeto activo es ese
+    // 'propsolvidar': ningun panel de Propiedades es el activo (como recien abierto el editor, antes de tocar uno)
+    if (cmd == "propsolvidar") { PropsActivo = NULL; return true; }
+    // 'renderpases <zbuffer> <normal> <alfa>': los tildes de los pases extra de la tarjeta Render (0/1)
+    if (cmd == "renderpases") {
+        int z = 0, n = 0, a = 0; ss >> z >> n >> a;
+        g_render.zbuffer = (z != 0); g_render.normal = (n != 0); g_render.alfa = (a != 0);
+        extern void RenderFilasFormato(Properties* P); RenderFilasFormato(PropsActivo);
+        return true;
+    }
+    // 'renderformato <png|jpg|mkv|mp4> [calidad]': el formato de la tarjeta Render (como el menu Formato)
+    if (cmd == "renderformato") {
+        std::string f; float q = -1.0f; ss >> f >> q;
+        const int id = (f == "png") ? 0 : (f == "jpg") ? 1 : (f == "mkv") ? 2 : (f == "mp4") ? 3 : -1;
+        if (id < 0) { err = "renderformato: png|jpg|mkv|mp4"; return false; }
+        g_render.formato = id;
+        if (q > 0.0f) g_render.calidad = q;
+        extern void RenderFilasFormato(Properties* P); RenderFilasFormato(PropsActivo);
+        return true;
+    }
+    // 'renderaudio <wav|flac|mp3|aac|opus> [kbps] [sonido 0|1]': el formato de audio de la tarjeta Render (el del boton
+    // "Renderizar audio" y el del sonido de los videos) y el tilde "Con sonido"
+    if (cmd == "renderaudio") {
+        std::string f; float k = -1.0f; int so = -1; ss >> f >> k >> so;
+        const int id = (f == "wav") ? 0 : (f == "flac") ? 1 : (f == "mp3") ? 2 : (f == "aac") ? 3 : (f == "opus") ? 4 : -1;
+        if (id < 0) { err = "renderaudio: wav|flac|mp3|aac|opus"; return false; }
+        g_render.audioFormato = id;
+        if (k > 0.0f) g_render.audioKbps = k;
+        if (so >= 0) g_render.sonido = (so != 0);
+        extern void RenderFilasFormato(Properties* P); RenderFilasFormato(PropsActivo);
+        return true;
+    }
+    // 'renderaudioboton <carpeta> <nombre>': el boton "Renderizar audio" (con la ruta y el nombre del render)
+    if (cmd == "renderaudioboton") {
+        std::string d, n; ss >> d >> n;
+        if (!d.empty()) g_render.carpeta = d;
+        if (!n.empty()) g_render.nombre = n;
+        extern void W3dHarnessRenderAudio(); W3dHarnessRenderAudio();
+        return true;
+    }
+    // 'wavinfo <ruta> <segundos> [tol] [rms minimo]': un WAV de 16 bits estereo: cuanto dura y que no sea silencio
+    if (cmd == "wavinfo") {
+        std::string ruta; float seg = 0, tol = 0.02f, rmsMin = 50.0f; ss >> ruta >> seg >> tol >> rmsMin;
+        FILE* f = fopen(ruta.c_str(), "rb");
+        if (!f) { err = "wavinfo: no se puede abrir " + ruta; return false; }
+        unsigned char cab[44]; const bool leyo = fread(cab, 1, 44, f) == 44;
+        if (!leyo || memcmp(cab, "RIFF", 4) || memcmp(cab + 8, "WAVE", 4)) { fclose(f); err = "wavinfo: no es un WAV"; return false; }
+        const int rate = cab[24] | (cab[25] << 8) | (cab[26] << 16) | (cab[27] << 24);
+        const unsigned datos = cab[40] | (cab[41] << 8) | (cab[42] << 16) | ((unsigned)cab[43] << 24);
+        std::vector<short> m(datos / 2);
+        const size_t n = m.empty() ? 0 : fread(&m[0], 2, m.size(), f);
+        fclose(f);
+        double suma = 0; for (size_t i = 0; i < n; i++) suma += (double)m[i] * m[i];
+        const double rms = n ? sqrt(suma / n) : 0.0, dur = rate > 0 ? (double)datos / 4.0 / rate : 0.0;
+        printf("      [wavinfo] %s: %d Hz, %.3f s, rms %.1f\n", ruta.c_str(), rate, dur, rms);
+        if (fabs(dur - seg) > tol) { err = "wavinfo: no dura lo esperado"; return false; }
+        if (rms < rmsMin) { err = "wavinfo: es silencio"; return false; }
+        return true;
+    }
+    // 'mediapistas <ruta> <video 0|1> <audio 0|1> [segundos tol]': las pistas de un archivo (ffprobe). Sin ffmpeg en la
+    // maquina se SALTEA con "SIN FFMPEG:"
+    if (cmd == "mediapistas") {
+        std::string ruta; int v = 0, a = 0; float seg = -1, tol = 0.1f; ss >> ruta >> v >> a >> seg >> tol;
+        if (system("ffprobe -version >/dev/null 2>&1") != 0) { printf("      SIN FFMPEG: se saltea el control de %s\n", ruta.c_str()); return true; }
+        FILE* p = popen(("ffprobe -v error -show_entries stream=codec_type:format=duration -of csv=p=0 \"" + ruta + "\" 2>/dev/null").c_str(), "r");
+        if (!p) { err = "mediapistas: no se pudo correr ffprobe"; return false; }
+        char linea[256]; int hv = 0, ha = 0; double dur = -1;
+        while (fgets(linea, sizeof(linea), p)) {
+            if (strstr(linea, "video")) hv++; else if (strstr(linea, "audio")) ha++; else dur = atof(linea);
+        }
+        pclose(p);
+        printf("      [mediapistas] %s: %d de video, %d de audio, %.3f s\n", ruta.c_str(), hv, ha, dur);
+        if ((hv > 0) != (v != 0) || (ha > 0) != (a != 0)) { err = "mediapistas: las pistas no son las esperadas"; return false; }
+        if (seg >= 0 && fabs(dur - seg) > tol) { err = "mediapistas: no dura lo esperado"; return false; }
+        return true;
+    }
+    // 'renderfinal <composicion final> <con alfa> <postprocesado>': los tildes de la tarjeta Render (0/1)
+    if (cmd == "renderfinal") {
+        int f = 1, a = 0, po = 1; ss >> f >> a >> po;
+        g_render.final = (f != 0); g_render.finalAlfa = (a != 0); g_render.post = (po != 0);
+        extern void RenderFilasFormato(Properties* P); RenderFilasFormato(PropsActivo);
+        return true;
+    }
+    // 'videocuadros <ruta> <cuadros> <ancho> <alto>': el video que escribio ffmpeg (ffprobe cuenta sus cuadros). Sin ffmpeg
+    // en la maquina se SALTEA con "SIN FFMPEG:" (los videos del render son con el ffmpeg instalado)
+    if (cmd == "videocuadros") {
+        std::string ruta; int n = 0, w = 0, h = 0; ss >> ruta >> n >> w >> h;
+        FILE* p = popen(("ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames,width,height "
+                         "-of csv=p=0 \"" + ruta + "\" 2>/dev/null").c_str(), "r");
+        char linea[256] = { 0 };
+        const bool leyo = p && fgets(linea, sizeof(linea), p);
+        const int fin = p ? pclose(p) : -1;
+        if (!leyo && fin != 0 && system("ffprobe -version >/dev/null 2>&1") != 0) {
+            printf("      SIN FFMPEG: se saltea el control de %s\n", ruta.c_str());
+            return true;
+        }
+        int vw = 0, vh = 0, vn = 0;
+        if (!leyo || sscanf(linea, "%d,%d,%d", &vw, &vh, &vn) != 3) { err = "videocuadros: no se puede leer el video " + ruta; return false; }
+        printf("      [videocuadros] %s: %dx%d, %d cuadros\n", ruta.c_str(), vw, vh, vn);
+        if (vn != n || vw != w || vh != h) { err = "videocuadros: el video no es el esperado"; return false; }
+        return true;
+    }
+    // 'renderes <campo> <valor>': ASSERTA una opcion de la tarjeta Render (g_render): formato calidad ancho alto final
+    // finalAlfa post zbuffer normal alfa sonido audio kbps nombre
+    if (cmd == "renderes") {
+        std::string c, v; ss >> c; v = Resto(ss);
+        const W3dRenderOpc& r = g_render;
+        char b[64]; std::string hay;
+        if (c == "formato") { snprintf(b, sizeof b, "%d", r.formato); hay = b; }
+        else if (c == "calidad") { snprintf(b, sizeof b, "%g", r.calidad); hay = b; }
+        else if (c == "ancho") { snprintf(b, sizeof b, "%g", r.w); hay = b; }
+        else if (c == "alto") { snprintf(b, sizeof b, "%g", r.h); hay = b; }
+        else if (c == "kbps") { snprintf(b, sizeof b, "%g", r.audioKbps); hay = b; }
+        else if (c == "audio") { snprintf(b, sizeof b, "%d", r.audioFormato); hay = b; }
+        else if (c == "final") hay = r.final ? "1" : "0";
+        else if (c == "finalAlfa") hay = r.finalAlfa ? "1" : "0";
+        else if (c == "post") hay = r.post ? "1" : "0";
+        else if (c == "zbuffer") hay = r.zbuffer ? "1" : "0";
+        else if (c == "normal") hay = r.normal ? "1" : "0";
+        else if (c == "alfa") hay = r.alfa ? "1" : "0";
+        else if (c == "sonido") hay = r.sonido ? "1" : "0";
+        else if (c == "nombre") hay = r.nombre;
+        else { err = "renderes: campo desconocido " + c; return false; }
+        printf("      [renderes] %s = %s (esperado %s)\n", c.c_str(), hay.c_str(), v.c_str());
+        if (hay != v) { err = "renderes: " + c + " es " + hay + ", se esperaba " + v; return false; }
+        return true;
+    }
+    // 'rendertam <ancho> <alto>': el tamano del render a archivo (las filas Ancho / Alto de la tarjeta Render)
+    if (cmd == "rendertam") { float w = 0, h = 0; ss >> w >> h; if (w < 1 || h < 1) { err = "rendertam: <ancho> <alto>"; return false; } g_render.w = w; g_render.h = h; return true; }
+    // 'renderfranjas <0|1>': 0 = el render a archivo con la imagen entera en memoria (para comparar con las franjas)
+    if (cmd == "renderfranjas") { int v = 1; ss >> v; extern bool g_renderSinFranjas; g_renderSinFranjas = (v == 0); return true; }
+    // 'pngdif <a> <b> <media maxima> [maximo]': dos imagenes del mismo tamano: la diferencia media por canal (0..255) y la
+    // mayor. Rasterizadas por franjas y enteras tienen que ser iguales; trazadas, iguales salvo el ruido
+    if (cmd == "pngdif") {
+        std::string a, b; float mediaMax = 0, maxMax = 255; ss >> a >> b >> mediaMax >> maxMax;
+        int wa = 0, ha = 0, wb = 0, hb = 0, c = 0;
+        unsigned char* pa = stbi_load(a.c_str(), &wa, &ha, &c, 4);
+        unsigned char* pb = stbi_load(b.c_str(), &wb, &hb, &c, 4);
+        if (!pa || !pb || wa != wb || ha != hb) {
+            if (pa) stbi_image_free(pa); if (pb) stbi_image_free(pb);
+            err = "pngdif: no se pueden leer o no son del mismo tamano"; return false;
+        }
+        double suma = 0; int mx = 0;
+        const size_t n = (size_t)wa * ha;
+        for (size_t i = 0; i < n; i++) for (int k = 0; k < 3; k++) { const int d = abs((int)pa[i * 4 + k] - (int)pb[i * 4 + k]); suma += d; if (d > mx) mx = d; }
+        stbi_image_free(pa); stbi_image_free(pb);
+        const double media = suma / (n * 3.0);
+        printf("      [pngdif] %dx%d: media %.3f, mayor %d\n", wa, ha, media, mx);
+        if (media > mediaMax || mx > maxMax) { err = "pngdif: las imagenes son distintas"; return false; }
+        return true;
+    }
+    // 'pngpx <ruta> <x> <y> <r> <g> <b> [a|-] [tol]': el color de un pixel de un PNG guardado (x, y desde arriba a la
+    // izquierda), con tolerancia por canal (2 si no se dice). '-' = no mirar el alfa
+    if (cmd == "pngpx") {
+        std::string ruta, sa; int x = 0, y = 0, r = 0, g = 0, b = 0, tol = 2; ss >> ruta >> x >> y >> r >> g >> b >> sa >> tol;
+        int w = 0, h = 0, c = 0;
+        unsigned char* px = stbi_load(ruta.c_str(), &w, &h, &c, 4);
+        if (!px) { err = "pngpx: no se puede leer " + ruta; return false; }
+        if (x < 0 || y < 0 || x >= w || y >= h) { stbi_image_free(px); err = "pngpx: el pixel esta afuera de la imagen"; return false; }
+        const unsigned char* q = px + ((size_t)y * w + x) * 4;
+        const int hay[4] = { q[0], q[1], q[2], q[3] };
+        stbi_image_free(px);
+        printf("      [pngpx] %s (%d,%d) = %d %d %d %d (%dx%d, %d canales)\n", ruta.c_str(), x, y, hay[0], hay[1], hay[2], hay[3], w, h, c);
+        const int esp[3] = { r, g, b };
+        for (int k = 0; k < 3; k++) if (abs(hay[k] - esp[k]) > tol) { err = "pngpx: el color no es el esperado"; return false; }
+        if (!sa.empty() && sa != "-" && abs(hay[3] - atoi(sa.c_str())) > tol) { err = "pngpx: el alfa no es el esperado"; return false; }
+        return true;
+    }
     if (cmd == "activo") {
         const std::string nom = Resto(ss);
         const std::string hay = ObjActivo ? ObjActivo->name : std::string("(ninguno)");
@@ -1319,6 +1549,41 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         if (q == "loc") { ObjActivo->pos.x = ux; ObjActivo->pos.y = uz; ObjActivo->pos.z = uy; InsertarKeyframeObjeto(KfCanalLoc); }
         else if (q == "esc") { ObjActivo->scale.x = ux; ObjActivo->scale.y = uz; ObjActivo->scale.z = uy; InsertarKeyframeObjeto(KfCanalScl); }
         else { err = "keyponer: uso: keyponer <frame> loc|esc <x> <y> <z>"; return false; }
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'curvamod <loc|rot|esc> <x|y|z> <ciclos|ruido|escalon|suave> [campo valor]...': agrega un MODIFICADOR DE CURVA
+    // (Animation.h, KfModificador) a esa curva del objeto activo (Z arriba, como Propiedades), lo mismo que Agregar en la
+    // tarjeta "Modificadores de curva". Campos: fuerza, escala, fase, profundidad, paso, ancho, sigma, influencia y
+    // antes / despues (los ciclos: 0 sin ciclos, 1 repetir, 2 con desplazamiento, 3 en espejo)
+    if (cmd == "curvamod") {
+        std::string q, e, t; ss >> q >> e >> t;
+        if (!ObjActivo) { err = "curvamod: sin objeto activo"; return false; }
+        const int prop = (q == "loc") ? AnimPosition : (q == "rot") ? AnimRotation : (q == "esc") ? AnimScale : -1;
+        const int comp = (e == "x") ? AnimX : (e == "y") ? AnimZ : (e == "z") ? AnimY : -1;   // (Y de la UI = z interno)
+        const int tipo = (t == "ciclos") ? KfModCiclos : (t == "ruido") ? KfModRuido : (t == "escalon") ? KfModEscalon
+                       : (t == "suave") ? KfModSuave : -1;
+        if (prop < 0 || comp < 0 || tipo < 0) { err = "curvamod: uso: curvamod <loc|rot|esc> <x|y|z> <ciclos|ruido|escalon|suave> [campo valor]..."; return false; }
+        AnimProperty* ap = NULL;
+        for (size_t i = 0; i < AnimationObjects.size() && !ap; i++) {
+            if (AnimationObjects[i].obj != ObjActivo) continue;
+            for (size_t k = 0; k < AnimationObjects[i].Propertys.size(); k++) {
+                AnimProperty& c = AnimationObjects[i].Propertys[k];
+                if (c.Property == prop && c.component == comp) { ap = &c; break; }
+            }
+        }
+        if (!ap) { err = "curvamod: el objeto activo no tiene esa curva (keyframes primero)"; return false; }
+        KfModificador m(tipo);
+        std::string campo; float v = 0;
+        while (ss >> campo >> v) {
+            if (campo == "fuerza") m.fuerza = v; else if (campo == "escala") m.escala = v; else if (campo == "fase") m.fase = v;
+            else if (campo == "profundidad") m.profundidad = v; else if (campo == "paso") m.paso = v; else if (campo == "ancho") m.ancho = v;
+            else if (campo == "sigma") m.sigma = v; else if (campo == "antes") m.antesModo = (int)v; else if (campo == "despues") m.despuesModo = (int)v;
+            else if (campo == "influencia") { m.usarInfluencia = true; m.influencia = v; }
+            else { err = "curvamod: campo desconocido '" + campo + "'"; return false; }
+        }
+        ap->mods.push_back(m);
+        extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos();
         g_redraw = true; Cuadro();
         return true;
     }

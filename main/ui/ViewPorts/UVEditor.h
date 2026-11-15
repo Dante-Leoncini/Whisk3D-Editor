@@ -9,6 +9,7 @@
 
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/WithBorder.h" // borde (verde si activo) como Outliner/Properties
+#include "ViewPorts/Gizmo.h"     // Gizmo2DCliente: el gizmo 2D sobre los UVs elegidos
 
 class Mesh; // pick UV (la seleccion vive en Mesh::uvSelVert)
 
@@ -97,7 +98,7 @@ enum ToolbarRolUV {
 //  - Rueda del mouse = zoom; boton del MEDIO + arrastrar = paneo.
 //  - Menu del viewport (boton de icono): checkbox "Show Whole Mesh UV" (todo el
 //    mesh vs solo la parte activa) y "Repeat Texture" (tiling hasta el infinito).
-class UVEditor : public ViewportBase, public WithBorder {
+class UVEditor : public ViewportBase, public WithBorder, public Gizmo2DCliente {
     public:
         int ViewportKind() const { return 4; } // 1=3D 2=outliner 3=properties 4=UV
 
@@ -201,6 +202,16 @@ class UVEditor : public ViewportBase, public WithBorder {
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE;             // 1 dedo: panear la vista UV
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // 2 dedos: zoom + paneo
+        bool event_finger_pinch(float cx, float cy, float panDx, float panDy,              // ...zoom anclado a los dedos
+                                float sepX0, float sepY0, float sepX1, float sepY1) W3D_OVERRIDE;
+        // ===== GIZMO 2D (Gizmo.h) sobre los UVs elegidos (modo edicion): arranca el MISMO G/R/S (IniciarXform),
+        // alrededor del pivote del menu Pivot (la mediana, o el cursor 2D) =====
+        bool Gizmo2DPivote(float& lx, float& ly) W3D_OVERRIDE;
+        bool Gizmo2DEnZona(float lx, float ly) const W3D_OVERRIDE;
+        bool Gizmo2DIniciar(int modo, int eje) W3D_OVERRIDE;
+        void Gizmo2DAplicar(float dx, float dy, float ang, float f) W3D_OVERRIDE;
+        void Gizmo2DConfirmar() W3D_OVERRIDE;
+        void Gizmo2DCancelar() W3D_OVERRIDE;
         void button_left() W3D_OVERRIDE; // click izquierdo = seleccionar UV (o confirmar transform)
         void button_right() W3D_OVERRIDE; // click derecho = cancelar transform
         // pick en coords LOCALES del viewport (lx,ly); add=true -> toggle/sumar (shift), false -> reemplazar.

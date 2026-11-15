@@ -331,6 +331,26 @@ void W3dSonidosTickJuego() {
     }
 }
 
+// EL AUDIO DE LA ESCENA A UN ARCHIVO (tarjeta Render: "Renderizar audio" y el sonido de los videos): los sonidos como
+// si sonara la escena en el cuadro 'frame', con la CAMARA como oyente (la del render). 'primero' = las voces se ponen
+// en su lugar. Quien llama mezcla despues lo que dura el cuadro (W3dAudioGrabar, con el mixer en pausa)
+void W3dSonidosRenderCuadro(float frame, bool primero) {
+    std::vector<Sonido*> lista; Juntar(SceneCollection, lista);
+    gSaltoEscena = primero;
+    const float t = W3dSonidoSegDeFrame(frame);
+    Oyente oy = OyenteActual(true);
+    bool hayReverb = false;
+    for (size_t i = 0; i < lista.size(); i++) Actualizar(lista[i], true, t - lista[i]->inicio, oy, true, hayReverb);
+    if (hayReverb != gReverbPuesta) { w3dEngine::W3dAudioReverb(0.6f, 0.45f, hayReverb ? 1.0f : 0.0f); gReverbPuesta = hayReverb; }
+}
+// cuantos sonidos con archivo tiene la escena (sin ninguno, un video no lleva pista de audio)
+int W3dSonidosEnEscena() {
+    std::vector<Sonido*> lista; Juntar(SceneCollection, lista);
+    int n = 0;
+    for (size_t i = 0; i < lista.size(); i++) if (lista[i]->activo && !lista[i]->archivo.empty()) n++;
+    return n;
+}
+
 // el VOLUMEN / tono / reverb animados (canal AnimSonido del Core)
 static void AnimSonidoAplicar(Object* o, int comp, float v) {
     Sonido* s = (Sonido*)o;

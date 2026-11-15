@@ -5,5 +5,8 @@
 // inyecta el build system (define W3D_VERSION); si falta, se parsea de __DATE__. Se usa en el titulo de ventana y
 // en el header del .obj exportado, asi una captura de pantalla dice de que version es.
 const char* W3dVersion();
+// la version + la HORA de compilacion ("26.11.14 21:58"): dos builds del mismo dia se distinguen (Ajustes la muestra;
+// en la web, para saber si el navegador ya tiene la nueva)
+const char* W3dVersionCompilacion();
 
 #endif // W3D_VERSION_H

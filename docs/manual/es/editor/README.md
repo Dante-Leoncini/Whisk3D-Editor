@@ -29,6 +29,7 @@ Qué puede hacer **Whisk3D Editor**, ordenado por panel y por modo. Borrador par
    - [Otras funciones de la Vista 3D](otras-funciones.md)
 5. [Editor UV](editor-uv.md)
 6. [Línea de tiempo](linea-de-tiempo.md)
+   - [Modificadores de curva](modificadores-de-curva.md)
 7. [Outliner](outliner.md)
 8. [Propiedades](propiedades.md)
    - [Shaders escritos](shaders.md)

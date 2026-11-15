@@ -15,7 +15,7 @@ O que você seleciona no Outliner fica selecionado também na Viewport 3D, e vic
 
 Cada linha é um objeto. A **seta** recolhe ou expande o que ele tem dentro; o **ícone** diz o tipo dele (malha, câmera, luz, coleção...); depois vem o **nome**, em verde se for o ativo e em um verde mais escuro se estiver selecionado; e à direita, o **olho** e a **câmera**. Um objeto que está dentro de outro aparece mais à direita, pendurado nele, e uma linha apagada é um objeto oculto.
 
-Em um projeto novo, em cima fica o **Construtor**, uma rotina que prepara a tela, e embaixo a **Coleção** com a câmera, a luz e o cubo. Uma coleção é uma pasta para organizar.
+Em um projeto novo, em cima fica o **Construtor**, uma rotina que prepara a tela e roda uma única vez, quando o jogo começa. Uma linha preta o separa do que roda a cada quadro: primeiro **Limpar tela** e depois a **Coleção** com a câmera, a luz e o cubo. Uma coleção é uma pasta para organizar.
 
 ## Selecionar
 

@@ -1,0 +1,33 @@
+# ==========================================================================
+#  LA TARJETA RENDER SE GUARDA CON EL PROYECTO
+#  "puse que queria exportar en mp4 y cuando lo vuelvo a abrir dice png otra vez": el .w3d guarda el formato, la
+#  calidad, el tamano, los pases, la composicion final y el audio (bloque raiz "render"; solo lo que no es de fabrica).
+#  Un proyecto nuevo vuelve a los valores de fabrica.
+# ==========================================================================
+escenadefecto
+renderformato mp4 70
+rendertam 1920 1080
+renderpases 1 0 1
+renderfinal 0 0 0
+renderaudio mp3 256 0
+guardarw3d /tmp/w3d_render_guardado.w3d
+# (otro proyecto en el medio: vuelve todo a fabrica)
+escenadefecto
+abrirw3d /tmp/w3d_render_guardado.w3d
+renderes formato 3
+renderes calidad 70
+renderes ancho 1920
+renderes alto 1080
+renderes zbuffer 1
+renderes normal 0
+renderes alfa 1
+renderes final 0
+renderes post 0
+renderes audio 2
+renderes kbps 256
+renderes sonido 0
+# un proyecto NUEVO: los valores de fabrica
+escenadefecto
+renderes formato 0
+renderes ancho 1280
+renderes final 1

@@ -2777,7 +2777,7 @@ static int KFBuscar(const std::vector<KFCurva>& c, const KFId& id){
     return -1;
 }
 class KeyframesUndo : public UndoCmd {
-    struct KFGuardada { KFId id; W3dClaves kf; int ca, cd; KFGuardada() : ca(0), cd(0) {} };   // (una curva compacta se guarda compacta; ca/cd = Repetir)
+    struct KFGuardada { KFId id; W3dClaves kf; int ca, cd; std::vector<KfModificador> mods; KFGuardada() : ca(0), cd(0) {} };   // (una curva compacta se guarda compacta; ca/cd = Repetir; mods = su pila de modificadores)
     std::vector<KFGuardada> snap;
     KFLista lid;                 // de QUE lista de curvas salio el snapshot
     // snapshot de los FRAMES de vertices de la anim de objeto activa (kind 3). Se guarda
@@ -2801,7 +2801,7 @@ public:
         std::vector<KFCurva> c; KFResolver(lid, c, false);   // capturar solo lee
         snap.resize(c.size());
         for (size_t i = 0; i < c.size(); i++){ snap[i].id = c[i].id; snap[i].kf = *c[i].c;
-            snap[i].ca = c[i].ap->cicloAntes; snap[i].cd = c[i].ap->cicloDespues; }
+            snap[i].ca = c[i].ap->cicloAntes; snap[i].cd = c[i].ap->cicloDespues; snap[i].mods = c[i].ap->mods; }
         vfHay = false;
         VertexAnimation* van = VfAnim();
         if (van && van->target){ VertexAnimSerializar(*van, vfBlob); vfHay = true; }
@@ -2817,6 +2817,7 @@ public:
             const W3dClaves& viva = *c[k].c; const W3dClaves& g = snap[i].kf;
             if (viva.size() != g.size()) return true;
             if (c[k].ap->cicloAntes != snap[i].ca || c[k].ap->cicloDespues != snap[i].cd) return true;   // Repetir
+            if (c[k].ap->mods != snap[i].mods) return true;                                                  // modificadores
             for (size_t q = 0; q < g.size(); q++){
                 const keyFrame a = viva.Clave(q); const keyFrame b = g.Clave(q);   // (por valor: no expande)
                 // OJO: tambien la INTERPOLACION y los HANDLES. Curvar un tramo no mueve el keyframe (mismo frame y
@@ -2843,7 +2844,8 @@ public:
             visto[k] = 1;
             c[k].c->swap(snap[i].kf);                 // swap = sirve de ida (undo) y de vuelta (redo)
             { int t = c[k].ap->cicloAntes;   c[k].ap->cicloAntes   = snap[i].ca; snap[i].ca = t;
-              t = c[k].ap->cicloDespues;     c[k].ap->cicloDespues = snap[i].cd; snap[i].cd = t; }
+              t = c[k].ap->cicloDespues;     c[k].ap->cicloDespues = snap[i].cd; snap[i].cd = t;
+              c[k].ap->mods.swap(snap[i].mods); }
         }
         // curvas que NO estaban al capturar (las creo la operacion que se esta deshaciendo): se
         // vacian y su contenido queda en el snapshot, asi el redo las devuelve enteras.
@@ -2851,6 +2853,7 @@ public:
             if (visto[k] || c[k].c->empty()) continue;
             KFGuardada g; g.id = c[k].id; c[k].c->swap(g.kf);
             g.ca = c[k].ap->cicloAntes; g.cd = c[k].ap->cicloDespues; c[k].ap->cicloAntes = c[k].ap->cicloDespues = 0;
+            g.mods.swap(c[k].ap->mods);
             snap.push_back(g);
         }
         // la pose cacheada del rig que TOCAMOS (no la del que este activo) tiene que re-evaluarse

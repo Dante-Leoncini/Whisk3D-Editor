@@ -224,8 +224,8 @@ Viewport3D::Viewport3D(Vector3 pos){
     // Undo / Redo: SIEMPRE presentes (PC y tactil), primeros (izquierda) para que no se pierdan.
     // Flecha izquierda = deshacer (como el "atras" del navegador); derecha = rehacer.
     // (cuadrado = solo icono, ancho = alto: antes lo forzaba el layout de la toolbar a mano)
-    b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Undo; b->iconFlip = 1; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
-    b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Redo; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::deshacer); b->rol = TBR_Undo; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::rehacer); b->rol = TBR_Redo; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
     b = new Button("", (int)IconType::notifOk);    b->rol = TBR_Aceptar;  b->centrado = true; ToolButtons.push_back(b);
     // "Repeat" (solo en extrude): acepta el extrude y vuelve a extruir la seleccion, sin buscar el boton Extrude.
     b = new Button(T("Repeat")); b->rol = TBR_Repeat; b->centrado = true; ToolButtons.push_back(b);
@@ -3121,8 +3121,28 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
 #endif
     return ok;
 }
+// la imagen entera en memoria (las franjas, una debajo de la otra): para lo que necesita el cuadro entero (el
+// postprocesado, el desenfoque por vectores, el alfa de la composicion final, el JPG y los videos)
+namespace { struct W3dJuntarFranjas {
+    std::vector<unsigned char>* s; int w;
+    static bool Fn(void* c, const unsigned char* px, int y0, int n) {
+        W3dJuntarFranjas* j = (W3dJuntarFranjas*)c;
+        memcpy(&(*j->s)[(size_t)y0 * j->w * 4], px, (size_t)n * j->w * 4);
+        return true;
+    }
+}; }
 bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::vector<unsigned char>& salida, int progBase, int progTotal){
     if (outW <= 0 || outH <= 0 || !SceneCollection) return false;
+    salida.resize((size_t)outW * outH * 4);
+    W3dJuntarFranjas j; j.s = &salida; j.w = outW;
+    return RenderFranjas(outW, outH, pass, W3dJuntarFranjas::Fn, &j, progBase, progTotal);
+}
+// LAS FRANJAS: la imagen de outW x outH se dibuja por TILES (puede ser mas grande que la ventana) y se entrega de a
+// FRANJAS de arriba hacia abajo (una fila de tiles), con sus filas al derecho. Quien la recibe puede escribirla al
+// archivo y soltarla: asi la imagen entera no esta nunca en memoria (el N95 y el N8 renderizan en 4K escribiendo en la
+// tarjeta). false si fn falla (la escritura) o no hay escena
+bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFranjaFn fn, void* ctx, int progBase, int progTotal){
+    if (outW <= 0 || outH <= 0 || !SceneCollection || !fn) return false;
 
     // tope de tile = lo que entra seguro en el framebuffer (el viewport ya entra en la ventana).
     int capW = (width  > 0) ? width  : outW;
@@ -3131,8 +3151,9 @@ bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::v
     int tileH = (outH < capH) ? outH : capH;
     if (tileW <= 0 || tileH <= 0) return false;
 
-    unsigned char* full = new unsigned char[(size_t)outW * outH * 4];
+    unsigned char* franja = new unsigned char[(size_t)outW * tileH * 4];   // (una fila de tiles: lo unico entero en memoria)
     unsigned char* tile = new unsigned char[(size_t)tileW * tileH * 4];
+    bool ok = true;
 
     // extension del frustum de la imagen COMPLETA (aspect = outW/outH, NO el del viewport)
     float top, bottom, left, right;
@@ -3158,6 +3179,12 @@ bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::v
     w3dRenderLuces       = (pass == RenderType::Rendered);
     w3dRenderAlpha       = (pass == RenderType::Alpha);
     const bool paseVec   = (pass == RenderType::Vectores);
+    // los pases de ANALISIS van con SU fondo (el de abajo) aunque el proyecto limpie solo (CONSTRUCTOR + "Limpiar
+    // pantalla"): su "Clear" limpia la profundidad pero no el color, como en la vista (QUIEN LIMPIA, en Render). Sin
+    // esto el pase de alfa salia con el "Clear color" del proyecto (rosa) en vez de negro
+    const bool limpiarFijoPrev = g_w3dLimpiarColorFijo;
+    g_w3dLimpiarColorFijo = W3dHayConstructor() && (pass == RenderType::ZBuffer || pass == RenderType::Alpha ||
+                                                    pass == RenderType::NormalView || paseVec);
 
     // color de fondo del pase
     float bg[4];
@@ -3168,10 +3195,12 @@ bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::v
         bg[0]=g_renderBg[0]; bg[1]=g_renderBg[1]; bg[2]=g_renderBg[2]; bg[3]=g_renderBg[3]; // color de fondo GLOBAL del render
     } else { bg[0]=bg[1]=bg[2]=0.0f; bg[3]=0.0f; }                                       // resto: transparente (composicion)
 
-    // tiles en coords BOTTOM-LEFT (como GL); el flip vertical lo hace SavePNG al final
+    // las filas de tiles de ARRIBA hacia abajo ('arriba' = la primera fila de la franja contando desde arriba); cada
+    // tile en coords BOTTOM-LEFT (como GL: ty)
     int tileIdx = 0; // para la barra: frac = (progBase + tiles hechos) / progTotal
-    for (int ty = 0; ty < outH; ty += tileH){
-        int th = (ty + tileH <= outH) ? tileH : (outH - ty);
+    for (int arriba = 0; arriba < outH && ok; arriba += tileH){
+        const int th = (arriba + tileH <= outH) ? tileH : (outH - arriba);
+        const int ty = outH - arriba - th;
         for (int tx = 0; tx < outW; tx += tileW){
             int tw = (tx + tileW <= outW) ? tileW : (outW - tx);
 
@@ -3236,8 +3265,8 @@ bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::v
             }
 
             w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
-            for (int row = 0; row < th; row++){
-                memcpy(full + (size_t)((ty + row) * outW + tx) * 4,
+            for (int row = 0; row < th; row++){   // (GL lee de ABAJO hacia arriba: la franja va al derecho)
+                memcpy(franja + (size_t)((th - 1 - row) * outW + tx) * 4,
                        tile + (size_t)(row * tw) * 4,
                        (size_t)tw * 4);
             }
@@ -3246,21 +3275,19 @@ bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::v
             ++tileIdx;
             if (progTotal > 0) ProgresoActualizarFull((float)(progBase + tileIdx) / (float)progTotal);
         }
+        if (!fn(ctx, franja, arriba, th)) ok = false;
     }
 
     // restaurar el estado del viewport (los flags de pase se re-setean solos en el proximo Render,
     // pero los limpiamos ya por las dudas de que algo dibuje antes)
     view = viewPrev; showOverlays = overlaysPrev; ViewFromCameraActive = camPrev;
     w3dRenderAlpha = false; w3dRenderSinLuz = false; w3dRenderNormalColor = false;
+    g_w3dLimpiarColorFijo = limpiarFijoPrev;
     ReloadLights();
 
-    // (GL lee de ABAJO hacia arriba: las filas al derecho)
-    salida.resize((size_t)outW * outH * 4);
-    for (int row = 0; row < outH; row++)
-        memcpy(&salida[(size_t)row * outW * 4], full + (size_t)(outH - 1 - row) * outW * 4, (size_t)outW * 4);
-    delete[] full;
+    delete[] franja;
     delete[] tile;
-    return true;
+    return ok;
 }
 
 void Viewport3D::RenderFloor() {

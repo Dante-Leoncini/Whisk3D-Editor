@@ -8,6 +8,8 @@
 %d Push matrix without its Pop	%d Empilhar matriz sem o seu Desempilhar matriz
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d curva(s) de animação da seleção não animam mais nada (Desfazer as devolve)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d curva(s) de animação ficaram sem objeto (a primeira: '%s'): veja whisk3d.log
+%d curves selected	%d curvas selecionadas
+%d keyframes selected	%d keyframes selecionados
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d nome(s) renumerados ao mudar de cena (%s%s). Revise seus scripts Lua.
 %d nodes | active node: %d	%d nós | nó ativo: %d
 %d object(s) got their own copy of the mesh	%d objeto(s) passaram a ter sua própria cópia da malha
@@ -78,6 +80,7 @@ Actions	Ações
 Active	Ativo
 Active Camera	Câmera Ativa
 Active Element	Elemento ativo
+Active Keyframe	Keyframe ativo
 Active camera	Câmera ativa
 Add	Adicionar
 Add Circle	Adicionar Círculo
@@ -88,6 +91,7 @@ Add Cube	Adicionar Cubo
 Add Cylinder	Adicionar Cilindro
 Add Layer	Adicionar camada
 Add Library...	Adicionar biblioteca...
+Add Modifier	Adicionar modificador
 Add Plane	Adicionar Plano
 Add UV Group	Adicionar Grupo UV
 Add UV Map	Adicionar Mapa UV
@@ -105,6 +109,7 @@ Affect Move	Afetar Mover
 Affect Rotate	Afetar Rotacionar
 Affect Scale	Afetar Escalar
 Affected	Afetadas
+After Mode	Modo depois
 Align	Alinhar
 Align X	Alinhar X
 Align Y	Alinhar Y
@@ -113,6 +118,7 @@ All	Tudo
 All Transforms	Todas as Transformações
 All parts	Todas as partes
 All shortcuts restored	Atalhos restaurados
+All viewports	Todos os viewports
 Allow	Permitir
 Alpha	Alfa
 Alpha (normal)	Alfa (normal)
@@ -141,11 +147,16 @@ Animation rendered!	Animação renderizada!
 Animations	Animações
 Animations of	Animações de
 Antialiasing	Antialiasing
+Any mode	Qualquer modo
 Any orientation	Todas
 Anywhere	Em qualquer lugar
 Apply	Aplicar
+Apply All Transforms	Aplicar todas as transformações
+Apply Location	Aplicar posição
 Apply Modifier	Aplicar Modificador
 Apply Modifiers	Aplicar Modificadores
+Apply Rotation	Aplicar rotação
+Apply Scale	Aplicar escala
 Apply Transforms	Aplicar Transformações
 Apply: select mesh or armature object(s)	Aplicar: selecione malha(s) ou armação(ões)
 Arc	Arco
@@ -167,6 +178,9 @@ Att Constant	Att Constante
 Att Linear	Att Linear
 Att Quadratic	Att Quadrática
 Audible range	Alcance audível
+Audio	Áudio
+Audio format	Formato de áudio
+Audio rendered!	Áudio renderizado!
 Auto	Auto
 Auto (active part)	Auto (parte ativa)
 Auto Clamped	Auto Limitada
@@ -193,6 +207,7 @@ Back View	Vista traseira
 Background	Fundo
 Base Color	Cor Base
 Base velocity	Velocidade base
+Before Mode	Modo antes
 Bevel	Chanfro
 Bevel Edges	Chanfrar arestas
 Bevel Vertices	Chanfrar vértices
@@ -203,10 +218,14 @@ Bevel: select vertices first	Chanfro: selecione vértices primeiro
 Bezier	Bezier
 Billboard	Billboard
 Bind texture	Vincular textura
+Bitrate	Taxa de bits
 Bits	Bits
 Black Letterbox	Faixas pretas
 Blank	Liso
 Blend	Mistura
+Blend In	Entrada gradual
+Blend Out	Saída gradual
+Blend Type	Tipo de mistura
 Blend mode	Modo de mistura
 Blending	Mistura
 Blending on/off	Mistura liga/desliga
@@ -408,6 +427,7 @@ Cursor to Selected	Cursor para o selecionado
 Cursor to Selection	Cursor para Seleção
 Cursor to World Origin	Cursor para a origem do mundo
 Curve	Curva
+Curve Modifiers	Modificadores de curva
 Curves	Curvas
 Custom	Personalizado
 Custom Normal	Normal Personalizada
@@ -415,6 +435,7 @@ Custom shader	Shader personalizado
 Custom: edit the curve	Personalizado: edite a curva
 Cut	Cortar
 Cutoff	Corte
+Cycles	Ciclos
 Cylinder	Cilindro
 Cylinder Projection	Projeção de Cilindro
 Debug mode	Modo debug
@@ -426,8 +447,11 @@ Delete "%s" (%s) with all its objects?	Excluir "%s" (%s) com todos os seus objet
 Delete "%s"?	Excluir "%s"?
 Delete %d objects?	Excluir %d objetos?
 Delete %d scenes, games or prefabs with all their objects?	Excluir %d cenas, jogos ou prefabs com todos os seus objetos?
+Delete Edge Loops	Excluir loops de arestas
 Delete Edge Loops: select an edge loop first	Excluir Edge Loops: selecione um edge loop primeiro
 Delete Edge Loops: select an edge shared by two faces	Excluir Loops de Arestas: selecione uma aresta compartilhada por duas faces
+Delete Edges	Excluir arestas
+Delete Faces	Excluir faces
 Delete Folder	Excluir pasta
 Delete Keyframe	Excluir Keyframe
 Delete Keyframe: no keyframe at the current frame	Apagar keyframe: não há keyframe no quadro atual
@@ -435,6 +459,7 @@ Delete Keyframe: the animation needs at least one keyframe	Apagar keyframe: a an
 Delete Mesh Layer	Excluir camada da malha
 Delete Normals Layer	Excluir camada de normais
 Delete Palette	Apagar paleta
+Delete Vertices	Excluir vértices
 Delete editing data	Apagar dados de edição
 Delete mesh layer: select an object animation in the timeline	Excluir camada da malha: escolha uma animação do objeto na timeline
 Delete normals layer: select an object animation in the timeline	Apagar camada de normais: escolha uma animação do objeto na timeline
@@ -531,6 +556,7 @@ Empty routine	Rotina vazia
 Enable	Ativar
 Enabled	Habilitado
 End	Fim
+End Frame	Quadro final
 End color	Cor final
 End of frame	Fim do quadro
 End:%d	Fim:%d
@@ -538,6 +564,7 @@ Entry	Entrada
 Equal	Igual
 Equirectangular (software)	Equirretangular (software)
 Error rendering animation	Erro ao renderizar a animação
+Error rendering audio	Erro ao renderizar o áudio
 Error: could not save the OBJ	Erro: não foi possível salvar o OBJ
 Error: could not save the STL	Erro: não foi possível salvar o STL
 Error: could not save the render	Erro: não foi possível salvar o render
@@ -600,7 +627,9 @@ File size	Tamanho do arquivo
 Fill	Fundo
 Film grain	Grão de câmera
 Filter	Filtro
+Filter Width	Largura do filtro
 Filtering	Filtragem
+Final composite	Composição final
 Find	Localizar
 Find and Replace	Localizar e substituir
 Find...	Localizar...
@@ -690,6 +719,12 @@ Growth (size per second)	Crescimento (tamanho por segundo)
 Growth kept per second	Crescimento mantido por segundo
 Handle Type	Tipo de Alça
 Handle type	Tipo de alça
+Handles: Aligned	Alças: alinhadas
+Handles: Auto Clamped	Alças: auto limitadas
+Handles: Automatic	Alças: automáticas
+Handles: Flat	Alças: planas
+Handles: Free	Alças: livres
+Handles: Vector	Alças: vetor
 Harden Normals	Endurecer normais
 Height	Altura
 Hide / Show	Ocultar / Mostrar
@@ -735,7 +770,10 @@ Insert Keyframe	Inserir Keyframe
 Insert Keyframe (all)	Inserir keyframe (tudo)
 Insert Keyframe: select an object animation in the timeline	Inserir keyframe: escolha uma animação do objeto na timeline
 Insert Keyframe: the mesh has no normals	Inserir keyframe: a malha não tem normais
+Insert Location Keyframe	Inserir keyframe de posição
 Insert Mesh Keyframe	Inserir Keyframe de Malha
+Insert Rotation Keyframe	Inserir keyframe de rotação
+Insert Scale Keyframe	Inserir keyframe de escala
 Insert UV keyframe: the mesh has no UV	Inserir keyframe UV: a malha não tem UV
 Inset Faces	Inserir faces
 Inset: enter Edit Mode first	Inset: entre no Modo de Edição primeiro
@@ -750,6 +788,9 @@ Interpolate	Interpolar
 Interpolate (mix)	Interpolar (mistura)
 Interpolation	Interpolação
 Interpolation Mode	Modo de Interpolação
+Interpolation: Bezier	Interpolação: Bezier
+Interpolation: Constant	Interpolação: constante
+Interpolation: Linear	Interpolação: linear
 Intersect	Interseção
 Intersection Type	Tipo de interseção
 Inverse Square	Quadrado inverso
@@ -770,6 +811,7 @@ It has no proyecto.json	Não tem proyecto.json
 It is a W3D proxy: choose its library element	É um proxy W3D: escolha o elemento da sua biblioteca
 It is already linked	Já está vinculado
 It is in use	Está em uso
+It is not missing anymore	Não está mais faltando
 It is open: switch to another scene first	Está aberta: primeiro troque para outra cena
 It is read-only	É somente leitura
 It is the open project	É o projeto aberto
@@ -795,6 +837,7 @@ Keyboard Shortcuts...	Atalhos de teclado...
 Keyframe	Keyframe
 Keyframes	Keyframes
 LOD	LOD
+Lacunarity	Lacunaridade
 Landscape only	Só horizontal
 Language	Idioma
 Last triangle	Último triângulo
@@ -805,6 +848,7 @@ Left	Esquerda
 Left Handle X	Alça Esq. X
 Left View	Vista esquerda
 Left soft	Soft esq
+Legacy Noise	Ruído clássico
 Less	Menor
 Less or equal	Menor ou igual
 Levels Viewport	Níveis Viewport
@@ -885,6 +929,7 @@ Loop Select: click an	Loop Select: clique em uma
 Loop Slide	Deslizar pelo loop
 Loop forever	Repetir sempre
 Loose (editable)	Soltos (editáveis)
+MKV and MP4 need ffmpeg installed	MKV e MP4 precisam do ffmpeg instalado
 Make External...	Tornar Externa...
 Make Internal	Tornar Interna
 Make Single User	Tornar única
@@ -920,6 +965,9 @@ Memory usage	Uso de memória
 Menu bar	Barra de menu
 Merge	Mesclar
 Merge Distance	Distância de Mesclagem
+Merge at Center	Mesclar no centro
+Merge at Cursor	Mesclar no cursor
+Merge by Distance	Mesclar por distância
 Mesh	Malha
 Mesh Parts	Partes de Malha
 Mesh editable again	Malha editável de novo
@@ -941,6 +989,8 @@ Mirror Object	Objeto Espelho
 Mirror X	Espelho X
 Mirror Y	Espelho Y
 Mirror Z	Espelho Z
+Missing file	Arquivo faltando
+Missing files	Arquivos faltando
 Miter Inner	Meia-esquadria interna
 Miter Outer	Meia-esquadria externa
 Mix	Mix
@@ -960,6 +1010,7 @@ Move	Mover
 Move (reorder)	Mover (reordenar)
 Move Down	Descer
 Move Up	Subir
+Move the view	Mover a vista
 Move to	Mover para
 Move to Folder	Mover para pasta
 Move: %d frames	Mover: %d frames
@@ -1014,6 +1065,7 @@ Next Viewport Shading	Próximo modo de visualização
 Next frame	Próximo quadro
 Next keyframe	Próximo keyframe
 No	Não
+No Cycles	Sem ciclos
 No Normal Map	Sem Mapa de Normais
 No Properties panel	Nenhum painel de Propriedades
 No Test, Write	Sem teste, com escrita
@@ -1034,6 +1086,7 @@ No other scenes	Não há outras cenas
 No prefabs yet	Ainda não há prefabs
 No results	Sem resultados
 No source: this constraint does nothing.	Sem fonte: esta restrição não faz nada.
+Noise	Ruído
 None	Nenhum
 Normal	Normal
 Normal Map	Normal map
@@ -1065,6 +1118,7 @@ Not saving: the animations of '%s' could not be read when opening and saving wou
 Not saving: the clips of '%s' could not be read when opening and saving would erase them	Não salvo: os clipes de '%s' não puderam ser lidos ao abrir e salvar os apagaria
 Not saving: the mesh '%s' could not be written (%s)	Não salvo: a malha '%s' não pôde ser gravada (%s)
 Nothing to paste	Nada para colar
+Nothing to render: tick Final composite or a pass	Nada para renderizar: marque Composição final ou um passe
 Nothing to save	Nada para salvar
 Now click the second	Agora, segundo clique em
 Now external	Agora é externo
@@ -1121,6 +1175,7 @@ Orientation	Orientação
 Origin to 3D Cursor	Origem para Cursor 3D
 Origin to Geometry	Origem para Geometria
 Original file forgotten	Arquivo original esquecido
+Original file of an imported mesh (only where it came from: the mesh is inside the project)	Arquivo original de uma malha importada (só de onde veio: a malha está dentro do projeto)
 Origins	Origens
 Orphan (no users)	Órfão (sem usuários)
 Orphans purged	Órfãos purgados
@@ -1173,6 +1228,7 @@ Per-Vertex uses one color per vertex: the colors of the other face corners are l
 Percent	Porcentagem
 Perspective / Orthographic	Perspectiva / Ortográfica
 Perspective/Ortho	Perspectiva/Orto
+Phase	Fase
 Physics	Física
 Pick Shortest Path	Caminho Mais Curto
 Pick Shortest Path: click the first	Caminho mais curto: clique inicial em
@@ -1243,6 +1299,7 @@ Push matrix	Empilhar matriz
 Quad strip (simulated)	Faixa de quads (simulado)
 Quadratic	Quadrática
 Quads (simulated)	Quads (simulado)
+Quality	Qualidade
 Quartic	Quártica
 Quaternion (WXYZ)	Quaternion (WXYZ)
 Quintic	Quíntica
@@ -1284,6 +1341,7 @@ Rename 3D Mesh	Renomear malha 3D
 Rename Material	Renomear Material
 Render	Render
 Render Animation	Renderizar Animação
+Render Audio	Renderizar áudio
 Render FPS	FPS do render
 Render Image	Renderizar Imagem
 Render Preview	Prévia Render
@@ -1296,12 +1354,16 @@ Render to...	Renderizar em...
 Renderable	Renderizável
 Rendered	Render
 Rendering animation...	Renderizando animação...
+Rendering audio...	Renderizando áudio...
 Rendering...	Renderizando...
 Repeat	Repetir
 Repeat After	Repetir depois
 Repeat Before	Repetir antes
+Repeat Mirrored	Repetir espelhado
+Repeat Motion	Repetir movimento
 Repeat Texture	Repetir Textura
 Repeat with Offset	Repetir com deslocamento
+Repeats	Repetições
 Replace	Substituir
 Replace all	Substituir tudo
 Replace...	Substituir...
@@ -1314,6 +1376,7 @@ Reset: select faces first	Redefinir: selecione faces primeiro
 Resolution	Resolução
 Resource	Recurso
 Restart Whisk3D for this change to take effect	Reinicie o Whisk3D para que esta alteração tenha efeito
+Restrict Frame Range	Restringir intervalo de quadros
 Retarget	Retarget
 Reverb	Reverb
 Right	Direita
@@ -1461,6 +1524,7 @@ Shortest Path (Fill Region)	Caminho Mais Curto (Preencher Região)
 Shortest path selected	Caminho mais curto selecionado
 Shortest path: region filled	Caminho mais curto: região preenchida
 Show Chrome UV	Mostrar Chrome UV
+Show Handles	Mostrar alças
 Show Overlays	Mostrar Sobreposições
 Show Panel	Mostrar painel
 Show active	Mostrar o ativo
@@ -1470,6 +1534,7 @@ Shrink/Fatten	Encolher/Engrossar
 Shrink/Fatten / Clear Scale	Engordar / Limpar escala
 Shutter	Obturador
 Shutter position	Posição do obturador
+Sigma	Sigma
 Simple	Simples
 Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Simulado: OpenGL ES 1.1 não tem quads nem polígonos. São convertidos em triângulos (mais índices, mais lento).
 Single line	Uma linha
@@ -1528,6 +1593,7 @@ Spread	Dispersão
 Square	Quadrado
 Start	Início
 Start / End / FPS	Início / Fim / FPS
+Start Frame	Quadro inicial
 Start angle	Ângulo inicial
 Start of frame	Início do quadro
 Start time	Começa em
@@ -1538,6 +1604,8 @@ State	Estado
 Static	Estático
 Statistics	Estatísticas
 Stencil buffer	Buffer de estêncil
+Step Size	Tamanho do passo
+Stepped	Escalonado
 Steps	Passos
 Steps Viewport	Passos Viewport
 Steps to skip	Passos a pular
@@ -1546,6 +1614,7 @@ Stop the game before changing the scene	Pare o jogo antes de trocar de cena
 Stop the game first	Primeiro pare o jogo
 Stored	Armazenado
 Streaming preview	Pré-visualização do streaming
+Strength	Força
 Stretch	Esticar
 Stretch (seconds of velocity)	Estiramento (segundos de velocidade)
 Stretch U	Esticar U
@@ -1619,6 +1688,7 @@ The light '%s' was not loaded: the scene already has the maximum number of light
 The list of All	A de Tudo
 The mesh '%s' (no objects) could not be read: saving without it	A malha '%s' (sem objetos) não pôde ser lida: salvando sem ela
 The objects of the 3D meshes will be deleted too (Undo brings them back).	Os objetos das malhas 3D também serão excluídos (Desfazer os traz de volta).
+The scene has no sounds	A cena não tem sons
 The selected folders are deleted too if they end up empty.	As pastas selecionadas também são excluídas se ficarem vazias.
 The shader does not compile	O shader não compila
 The sound couldn't be decoded	Não foi possível decodificar o som
@@ -1627,6 +1697,7 @@ The texture couldn't be loaded	Não foi possível carregar a textura
 The undo history still uses it	O histórico de desfazer ainda o usa
 There are no orphans	Não há órfãos
 There is no active camera	Não há câmera ativa
+There is no audio: the mixer did not start	Não há áudio: o mixer não iniciou
 There is no script editor (IDE) in the layout	Não há um editor de scripts (IDE) no layout
 There is no such prefab	Esse prefab não existe
 There is no such scene	Essa cena não existe
@@ -1634,6 +1705,7 @@ Thickness	Espessura
 This animation has no keyframes in that layer	Esta animação não tem keyframes nessa camada
 This animation has no normals layer	Esta animação não tem camada de normais
 This file type can't be added	Este tipo de arquivo não pode ser adicionado
+This format needs ffmpeg installed	Este formato precisa do ffmpeg instalado
 This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	Este backend gráfico não tem shaders: a seção @vertice roda na CPU e o resto do material é desenhado como sempre
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Este backend gráfico não tem shaders: o material é desenhado como sempre (GLES 2.0 e Vulkan os têm)
 This hierarchy clip only animates its root and its children	Este clipe de hierarquia só anima sua raiz e seus filhos
@@ -1719,6 +1791,9 @@ Upright (does not tilt)	Vertical (não se inclina)
 Upscaler	Reescalador
 Upscaling	Reescalonamento
 Use	Usa
+Use End Frame	Usar quadro final
+Use Influence	Usar influência
+Use Start Frame	Usar quadro inicial
 Use camera focus	Usar o foco da câmera
 Use current folder	Usar pasta atual
 Use index	Usar índice
@@ -1736,6 +1811,7 @@ Value Y	Valor Y
 Variation	Variação
 Vector	Vetor
 Velocity	Velocidade
+Version	Versão
 Version v%d saved: versiones/%s	Versão v%d salva: versiones/%s
 Vertex	Vértice
 Vertex Animation	Animação de Vértices
@@ -1756,6 +1832,7 @@ View	Vista
 View in 3D	Ver em 3D
 View options	Opções de visualização
 Viewpoint	Ponto de Vista
+Viewport	Viewport
 Visibility icons	Ícones de visibilidade
 Visibility test	Teste de visibilidade
 Visible	Visível
@@ -1776,8 +1853,10 @@ Windows .exe: not generated from this button yet. The EDITOR is built with platf
 Wireframe	Aramado
 Wireframe Preview	Prévia Aramado
 Wireframe: Only Visible	Aramado: Só o Visível
+With alpha (RGBA)	Com alfa (RGBA)
 With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	Com influência entre 0 e 100 o billboard pode girar 180 graus ao cruzar a câmera. Com 100% não acontece.
 With its materials	Com seus materiais
+With sound	Com som
 Wrap	Repetição
 Write to	Escrever em
 X Axis	Eixo X
@@ -1806,6 +1885,7 @@ Zoom 4:1	Zoom 4:1
 [X: time]	[X: tempo]
 [Y: value]	[Y: valor]
 active	ativa
+active keyframe	keyframe ativo
 all	todas
 all opaque	todo opaco
 along	em
@@ -1863,6 +1943,7 @@ last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or m
 list	lista
 local	local
 matrix stack too deep (%d levels, max %d)	pilha de matrizes profunda demais (%d níveis, máximo %d)
+median point	ponto médio
 missing	faltando
 mono (1)	mono (1)
 new	novo

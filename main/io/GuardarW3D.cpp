@@ -449,6 +449,20 @@ static void EscribirCurva(std::string& s, const AnimProperty& ap) {
     s += ", \"c\": "; JInt(s, ap.component);
     if (ap.cicloAntes)   { s += ", \"ca\": "; JInt(s, ap.cicloAntes); }     // el modificador Repetir
     if (ap.cicloDespues) { s += ", \"cd\": "; JInt(s, ap.cicloDespues); }
+    // la PILA DE MODIFICADORES de la curva (Animation.h, KfModificador): una fila de numeros por modificador, en el
+    // orden de AFloats (agregar campos va al final: un archivo viejo trae menos y el resto queda en su default).
+    // Sin modificadores no se escribe nada: el archivo de una curva comun es el mismo de siempre.
+    if (!ap.mods.empty()) {
+        s += ", \"m\": [";
+        for (size_t i = 0; i < ap.mods.size(); i++) {
+            float f[KfModificador::NFloats]; ap.mods[i].AFloats(f);
+            if (i) s += ",";
+            s += "[";
+            for (int q = 0; q < KfModificador::NFloats; q++) { if (q) s += ","; JNum(s, f[q]); }
+            s += "]";
+        }
+        s += "]";
+    }
     s += ", \"k\": [";
     for (size_t i = 0; i < ap.keyframes.size(); i++) {
         const keyFrame k = ap.keyframes.Clave(i);   // (por valor: guardar no expande una curva compacta)
@@ -1227,12 +1241,43 @@ static void EscribirCapas(std::string& s, const std::vector<W3dCapaAnim>& capas,
 }
 
 // el bloque raiz "mix": el modo Mix del timeline, su rango y las capas de escena. Ausente = sin mix.
-// el rango PROPIO del render (tarjeta Render, Properties.cpp). Ausente = el del timeline.
+// LA TARJETA RENDER (Properties.cpp, g_render de render/OpcionesRender.h): el rango propio (0 = el del timeline), el
+// formato, el tamano, los pases, la composicion final y el audio. Se escribe solo lo que no es el valor de fabrica (sin
+// nada distinto, no hay bloque); la carpeta, solo si no es la de salida por defecto (una ruta de ESTA maquina)
 static void EscribirRender(std::string& s) {
     extern float g_renderIni, g_renderFin, g_renderFps;
-    if (g_renderIni <= 0.0f && g_renderFin <= 0.0f && g_renderFps <= 0.0f) return;
-    s += "  \"render\": { \"inicio\": "; JNum(s, g_renderIni); s += ", \"fin\": "; JNum(s, g_renderFin);
-    s += ", \"fps\": "; JNum(s, g_renderFps); s += " },\n";
+    const W3dRenderOpc d;
+    const W3dRenderOpc& r = g_render;
+    std::string c;
+    struct E {
+        static void F(std::string& c, const char* k, float v) { c += ", \""; c += k; c += "\": "; JNum(c, v); }
+        static void B(std::string& c, const char* k, bool v) { c += ", \""; c += k; c += "\": "; c += v ? "true" : "false"; }
+        static void I(std::string& c, const char* k, int v) { c += ", \""; c += k; c += "\": "; JInt(c, v); }
+        static void Tx(std::string& c, const char* k, const std::string& v) { c += ", \""; c += k; c += "\": "; JEsc(c, v); }
+    };
+    if (g_renderIni > 0.0f) E::F(c, "inicio", g_renderIni);
+    if (g_renderFin > 0.0f) E::F(c, "fin", g_renderFin);
+    if (g_renderFps > 0.0f) E::F(c, "fps", g_renderFps);
+    if (!r.carpeta.empty() && r.carpeta != w3dFileSystem::GetDefaultOutputDir()) E::Tx(c, "carpeta", r.carpeta);
+    if (r.nombre != d.nombre) E::Tx(c, "nombre", r.nombre);
+    if (r.w != d.w) E::F(c, "ancho", r.w);
+    if (r.h != d.h) E::F(c, "alto", r.h);
+    if (r.formato != d.formato) E::I(c, "formato", r.formato);
+    if (r.calidad != d.calidad) E::F(c, "calidad", r.calidad);
+    if (r.zbuffer != d.zbuffer) E::B(c, "zbuffer", r.zbuffer);
+    if (r.normal != d.normal) E::B(c, "normal", r.normal);
+    if (r.alfa != d.alfa) E::B(c, "alfa", r.alfa);
+    if (r.vectores != d.vectores) E::B(c, "vectores", r.vectores);
+    if (r.desenfoque != d.desenfoque) E::B(c, "desenfoque", r.desenfoque);
+    if (r.obturador != d.obturador) E::F(c, "obturador", r.obturador);
+    if (r.final != d.final) E::B(c, "final", r.final);
+    if (r.finalAlfa != d.finalAlfa) E::B(c, "finalAlfa", r.finalAlfa);
+    if (r.post != d.post) E::B(c, "post", r.post);
+    if (r.sonido != d.sonido) E::B(c, "sonido", r.sonido);
+    if (r.audioFormato != d.audioFormato) E::I(c, "audio", r.audioFormato);
+    if (r.audioKbps != d.audioKbps) E::F(c, "audioKbps", r.audioKbps);
+    if (c.empty()) return;
+    s += "  \"render\": { "; s += c.substr(2); s += " },\n";
 }
 
 static void EscribirMix(std::string& s) {
@@ -3538,6 +3583,7 @@ bool GuardarW3D(const std::string& ruta) {
         TexEditProyectoGuardado();   // las texturas que vivian en memoria ya estan adentro del .w3d
         { extern void W3dCambiosFoto(); W3dCambiosFoto(); }   // todo guardado: se apagan los '*' (CambiosProyecto)
         size_t nExt = esc.CantidadExternos(), nFaltan = esc.CantidadExternosQueFaltan();
+        esc.ExternosQueFaltan(g_w3dExternosFaltan);   // (la biblioteca: "Archivos que faltan")
         // (el texto sale en el idioma del editor: las traducciones en cirilico ocupan el doble de bytes, y el
         //  nombre del archivo no tiene cota -> el buffer se dimensiona con el formato traducido y el nombre)
         const std::string nomArch = Base(ruta);

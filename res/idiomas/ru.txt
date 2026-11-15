@@ -8,6 +8,8 @@
 %d Push matrix without its Pop	«Сохранить матрицу» без «Восстановить матрицу»: %d
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Кривые анимации выделения (%d) больше ничего не анимируют (Отмена вернёт их)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	Кривые анимации (%d) остались без объекта (первая: '%s'): см. whisk3d.log
+%d curves selected	Выбрано кривых: %d
+%d keyframes selected	Выбрано ключевых кадров: %d
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	Имена (%d) перенумерованы при смене сцены (%s%s). Проверьте свои скрипты Lua.
 %d nodes | active node: %d	Узлов: %d | активный узел: %d
 %d object(s) got their own copy of the mesh	Объекты (%d) получили свою копию меша
@@ -78,6 +80,7 @@ Actions	Действия
 Active	Активный
 Active Camera	Активная камера
 Active Element	Активный элемент
+Active Keyframe	Активный ключ
 Active camera	Активная камера
 Add	Добавить
 Add Circle	Добавить окружность
@@ -88,6 +91,7 @@ Add Cube	Добавить куб
 Add Cylinder	Добавить цилиндр
 Add Layer	Добавить слой
 Add Library...	Добавить библиотеку...
+Add Modifier	Добавить модификатор
 Add Plane	Добавить плоскость
 Add UV Group	Добавить UV-группу
 Add UV Map	Добавить UV-карту
@@ -105,6 +109,7 @@ Affect Move	Влиять на перемещение
 Affect Rotate	Влиять на вращение
 Affect Scale	Влиять на масштаб
 Affected	Затронутые
+After Mode	Режим после
 Align	Выровнять
 Align X	Выровнять X
 Align Y	Выровнять Y
@@ -113,6 +118,7 @@ All	Все
 All Transforms	Все трансформации
 All parts	Все части
 All shortcuts restored	Сочетания клавиш сброшены
+All viewports	Все вьюпорты
 Allow	Разрешить
 Alpha	Альфа
 Alpha (normal)	Альфа (обычное)
@@ -141,11 +147,16 @@ Animation rendered!	Анимация отрендерена!
 Animations	Анимации
 Animations of	Анимации объекта
 Antialiasing	Сглаживание
+Any mode	Любой режим
 Any orientation	Любая
 Anywhere	Где угодно
 Apply	Применить
+Apply All Transforms	Применить все трансформации
+Apply Location	Применить положение
 Apply Modifier	Применить модификатор
 Apply Modifiers	Применить модификаторы
+Apply Rotation	Применить вращение
+Apply Scale	Применить масштаб
 Apply Transforms	Применить трансформации
 Apply: select mesh or armature object(s)	Применить: выберите меши или арматуры
 Arc	Дуга
@@ -167,6 +178,9 @@ Att Constant	Затух. постоянное
 Att Linear	Затух. линейное
 Att Quadratic	Затух. квадратичное
 Audible range	Дальность слышимости
+Audio	Аудио
+Audio format	Формат аудио
+Audio rendered!	Аудио готово!
 Auto	Авто
 Auto (active part)	Авто (активная часть)
 Auto Clamped	Авто с ограничением
@@ -193,6 +207,7 @@ Back View	Вид сзади
 Background	Фон
 Base Color	Базовый цвет
 Base velocity	Базовая скорость
+Before Mode	Режим до
 Bevel	Фаска
 Bevel Edges	Фаска рёбер
 Bevel Vertices	Фаска вершин
@@ -203,10 +218,14 @@ Bevel: select vertices first	Фаска: сначала выберите вер�
 Bezier	Безье
 Billboard	Билборд
 Bind texture	Привязать текстуру
+Bitrate	Битрейт
 Bits	Биты
 Black Letterbox	Чёрные полосы
 Blank	Пустая
 Blend	Смешивание
+Blend In	Плавный вход
+Blend Out	Плавный выход
+Blend Type	Тип смешивания
 Blend mode	Режим смешивания
 Blending	Смешивание
 Blending on/off	Смешивание вкл/выкл
@@ -408,6 +427,7 @@ Cursor to Selected	Курсор к выделенному
 Cursor to Selection	Курсор к выделению
 Cursor to World Origin	Курсор в начало координат
 Curve	Кривая
+Curve Modifiers	Модификаторы кривой
 Curves	Кривые
 Custom	Свой
 Custom Normal	Своя нормаль
@@ -415,6 +435,7 @@ Custom shader	Свой шейдер
 Custom: edit the curve	Свой: измените кривую
 Cut	Вырезать
 Cutoff	Срез
+Cycles	Циклы
 Cylinder	Цилиндр
 Cylinder Projection	Цилиндрическая проекция
 Debug mode	Режим отладки
@@ -426,8 +447,11 @@ Delete "%s" (%s) with all its objects?	Удалить "%s" (%s) со всеми 
 Delete "%s"?	Удалить "%s"?
 Delete %d objects?	Удалить объекты (%d)?
 Delete %d scenes, games or prefabs with all their objects?	Удалить сцены, игры или префабы (%d) со всеми объектами?
+Delete Edge Loops	Удалить петли рёбер
 Delete Edge Loops: select an edge loop first	Удалить петли рёбер: сначала выберите петлю рёбер
 Delete Edge Loops: select an edge shared by two faces	Удалить петли рёбер: выберите ребро, общее для двух граней
+Delete Edges	Удалить рёбра
+Delete Faces	Удалить грани
 Delete Folder	Удалить папку
 Delete Keyframe	Удалить ключевой кадр
 Delete Keyframe: no keyframe at the current frame	Удалить ключевой кадр: на текущем кадре его нет
@@ -435,6 +459,7 @@ Delete Keyframe: the animation needs at least one keyframe	Удалить клю
 Delete Mesh Layer	Удалить слой меша
 Delete Normals Layer	Удалить слой нормалей
 Delete Palette	Удалить палитру
+Delete Vertices	Удалить вершины
 Delete editing data	Удалить данные редактирования
 Delete mesh layer: select an object animation in the timeline	Удалить слой меша: выберите анимацию объекта на таймлайне
 Delete normals layer: select an object animation in the timeline	Удалить слой нормалей: выберите анимацию объекта на таймлайне
@@ -531,6 +556,7 @@ Empty routine	Пустая процедура
 Enable	Включить
 Enabled	Включено
 End	Конец
+End Frame	Конечный кадр
 End color	Конечный цвет
 End of frame	Конец кадра
 End:%d	Конец:%d
@@ -538,6 +564,7 @@ Entry	Запись
 Equal	Равно
 Equirectangular (software)	Эквиректангулярная (программно)
 Error rendering animation	Ошибка рендера анимации
+Error rendering audio	Ошибка рендера аудио
 Error: could not save the OBJ	Ошибка: не удалось сохранить OBJ
 Error: could not save the STL	Ошибка: не удалось сохранить STL
 Error: could not save the render	Ошибка: не удалось сохранить рендер
@@ -600,7 +627,9 @@ File size	Размер файла
 Fill	Заливка
 Film grain	Зерно плёнки
 Filter	Фильтр
+Filter Width	Ширина фильтра
 Filtering	Фильтрация
+Final composite	Итоговая композиция
 Find	Найти
 Find and Replace	Найти и заменить
 Find...	Найти...
@@ -690,6 +719,12 @@ Growth (size per second)	Рост (размер в секунду)
 Growth kept per second	Остаток роста в секунду
 Handle Type	Тип рукоятки
 Handle type	Тип рукоятки
+Handles: Aligned	Рукоятки: выровненные
+Handles: Auto Clamped	Рукоятки: авто с ограничением
+Handles: Automatic	Рукоятки: автоматические
+Handles: Flat	Рукоятки: плоские
+Handles: Free	Рукоятки: свободные
+Handles: Vector	Рукоятки: вектор
 Harden Normals	Упрочнить нормали
 Height	Высота
 Hide / Show	Скрыть / Показать
@@ -735,7 +770,10 @@ Insert Keyframe	Вставить ключевой кадр
 Insert Keyframe (all)	Вставить ключевой кадр (всё)
 Insert Keyframe: select an object animation in the timeline	Вставить ключевой кадр: выберите анимацию объекта на таймлайне
 Insert Keyframe: the mesh has no normals	Вставить ключевой кадр: у меша нет нормалей
+Insert Location Keyframe	Вставить ключевой кадр положения
 Insert Mesh Keyframe	Вставить ключевой кадр меша
+Insert Rotation Keyframe	Вставить ключевой кадр вращения
+Insert Scale Keyframe	Вставить ключевой кадр масштаба
 Insert UV keyframe: the mesh has no UV	Вставить ключевой кадр UV: у меша нет UV
 Inset Faces	Вставить грани
 Inset: enter Edit Mode first	Вставка: сначала войдите в Режим редактирования
@@ -750,6 +788,9 @@ Interpolate	Интерполировать
 Interpolate (mix)	Интерполировать (смешать)
 Interpolation	Интерполяция
 Interpolation Mode	Режим интерполяции
+Interpolation: Bezier	Интерполяция: Безье
+Interpolation: Constant	Интерполяция: константа
+Interpolation: Linear	Интерполяция: линейная
 Intersect	Пересечение
 Intersection Type	Тип пересечения
 Inverse Square	Обратный квадрат
@@ -770,6 +811,7 @@ It has no proyecto.json	Нет proyecto.json
 It is a W3D proxy: choose its library element	Это прокси W3D: выберите его элемент библиотеки
 It is already linked	Уже связано
 It is in use	Используется
+It is not missing anymore	Уже не отсутствует
 It is open: switch to another scene first	Открыта: сначала переключитесь на другую сцену
 It is read-only	Только для чтения
 It is the open project	Это открытый проект
@@ -795,6 +837,7 @@ Keyboard Shortcuts...	Сочетания клавиш...
 Keyframe	Ключевой кадр
 Keyframes	Ключевые кадры
 LOD	LOD
+Lacunarity	Лакунарность
 Landscape only	Только альбомная
 Language	Язык
 Last triangle	Последний треугольник
@@ -805,6 +848,7 @@ Left	Слева
 Left Handle X	Лев. рукоятка X
 Left View	Вид слева
 Left soft	Лев. софт
+Legacy Noise	Классический шум
 Less	Меньше
 Less or equal	Меньше или равно
 Levels Viewport	Уровни во вьюпорте
@@ -885,6 +929,7 @@ Loop Select: click an	Выделить петлю — щелчок:
 Loop Slide	Сдвиг по петле
 Loop forever	Повторять всегда
 Loose (editable)	Отдельно (редактируемые)
+MKV and MP4 need ffmpeg installed	Для MKV и MP4 нужен установленный ffmpeg
 Make External...	Сделать внешней...
 Make Internal	Сделать внутренней
 Make Single User	Сделать уникальным
@@ -920,6 +965,9 @@ Memory usage	Использование памяти
 Menu bar	Строка меню
 Merge	Слить
 Merge Distance	Расстояние слияния
+Merge at Center	Слить в центре
+Merge at Cursor	Слить у курсора
+Merge by Distance	Слить по расстоянию
 Mesh	Меш
 Mesh Parts	Части меша
 Mesh editable again	Меш снова редактируемый
@@ -941,6 +989,8 @@ Mirror Object	Объект-зеркало
 Mirror X	Зеркало X
 Mirror Y	Зеркало Y
 Mirror Z	Зеркало Z
+Missing file	Отсутствующий файл
+Missing files	Отсутствующие файлы
 Miter Inner	Внутренний скос
 Miter Outer	Внешний скос
 Mix	Микс
@@ -960,6 +1010,7 @@ Move	Переместить
 Move (reorder)	Переместить (порядок)
 Move Down	Опустить
 Move Up	Поднять
+Move the view	Сдвинуть вид
 Move to	Переместить в
 Move to Folder	Переместить в папку
 Move: %d frames	Сдвиг: %d кадр.
@@ -1014,6 +1065,7 @@ Next Viewport Shading	Следующий режим затенения
 Next frame	Следующий кадр
 Next keyframe	Следующий ключевой кадр
 No	Нет
+No Cycles	Без циклов
 No Normal Map	Без карты нормалей
 No Properties panel	Нет панели Свойства
 No Test, Write	Без теста, с записью
@@ -1034,6 +1086,7 @@ No other scenes	Нет других сцен
 No prefabs yet	Пока нет префабов
 No results	Нет результатов
 No source: this constraint does nothing.	Нет источника: этот ограничитель ничего не делает.
+Noise	Шум
 None	Нет
 Normal	Нормаль
 Normal Map	Карта нормалей
@@ -1065,6 +1118,7 @@ Not saving: the animations of '%s' could not be read when opening and saving wou
 Not saving: the clips of '%s' could not be read when opening and saving would erase them	Не сохраняю: клипы '%s' не удалось прочитать при открытии, и сохранение бы их стёрло
 Not saving: the mesh '%s' could not be written (%s)	Не сохраняю: не удалось записать меш '%s' (%s)
 Nothing to paste	Нечего вставить
+Nothing to render: tick Final composite or a pass	Нечего рендерить: отметьте «Итоговая композиция» или проход
 Nothing to save	Нечего сохранять
 Now click the second	Теперь второй щелчок:
 Now external	Теперь внешний
@@ -1121,6 +1175,7 @@ Orientation	Ориентация
 Origin to 3D Cursor	Центр к 3D-курсору
 Origin to Geometry	Центр к геометрии
 Original file forgotten	Исходный файл забыт
+Original file of an imported mesh (only where it came from: the mesh is inside the project)	Исходный файл импортированной сетки (только происхождение: сетка уже в проекте)
 Origins	Центры объектов
 Orphan (no users)	Не используется
 Orphans purged	Неиспользуемые удалены
@@ -1173,6 +1228,7 @@ Per-Vertex uses one color per vertex: the colors of the other face corners are l
 Percent	Процент
 Perspective / Orthographic	Перспектива / Орто
 Perspective/Ortho	Перспектива/Орто
+Phase	Фаза
 Physics	Физика
 Pick Shortest Path	Кратчайший путь
 Pick Shortest Path: click the first	Кратчайший путь — первый щелчок:
@@ -1243,6 +1299,7 @@ Push matrix	Сохранить матрицу
 Quad strip (simulated)	Полоса квадов (симуляция)
 Quadratic	Квадратичная
 Quads (simulated)	Квады (симуляция)
+Quality	Качество
 Quartic	Квартичная
 Quaternion (WXYZ)	Кватернион (WXYZ)
 Quintic	Квинтичная
@@ -1284,6 +1341,7 @@ Rename 3D Mesh	Переименовать 3D-меш
 Rename Material	Переименовать материал
 Render	Рендер
 Render Animation	Рендер анимации
+Render Audio	Рендер аудио
 Render FPS	FPS рендера
 Render Image	Рендер изображения
 Render Preview	Предпросмотр рендера
@@ -1296,12 +1354,16 @@ Render to...	Рендер в...
 Renderable	Рендерить
 Rendered	Рендер
 Rendering animation...	Рендер анимации...
+Rendering audio...	Рендер аудио...
 Rendering...	Рендер...
 Repeat	Повтор
 Repeat After	Повтор после
 Repeat Before	Повтор до
+Repeat Mirrored	Повтор зеркально
+Repeat Motion	Повтор движения
 Repeat Texture	Повтор текстуры
 Repeat with Offset	Повтор со смещением
+Repeats	Повторы
 Replace	Заменить
 Replace all	Заменить все
 Replace...	Заменить...
@@ -1314,6 +1376,7 @@ Reset: select faces first	Сбросить: сначала выберите гр
 Resolution	Разрешение
 Resource	Ресурс
 Restart Whisk3D for this change to take effect	Перезапустите Whisk3D, чтобы изменение вступило в силу
+Restrict Frame Range	Ограничить диапазон кадров
 Retarget	Ретаргетинг
 Reverb	Реверб
 Right	Справа
@@ -1461,6 +1524,7 @@ Shortest Path (Fill Region)	Кратчайший путь (заливка обл
 Shortest path selected	Кратчайший путь выделен
 Shortest path: region filled	Кратчайший путь: область заполнена
 Show Chrome UV	Показать Chrome UV
+Show Handles	Показать рукоятки
 Show Overlays	Показать наложения
 Show Panel	Показать панель
 Show active	Показать активный
@@ -1470,6 +1534,7 @@ Shrink/Fatten	Сжать/раздуть
 Shrink/Fatten / Clear Scale	Сжать/раздуть / Сбросить масштаб
 Shutter	Затвор
 Shutter position	Положение затвора
+Sigma	Сигма
 Simple	Простое
 Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Симуляция: в OpenGL ES 1.1 нет квадов и многоугольников. Они преобразуются в треугольники (больше индексов, медленнее).
 Single line	Одна строка
@@ -1528,6 +1593,7 @@ Spread	Разброс
 Square	Квадрат
 Start	Начало
 Start / End / FPS	Начало / Конец / FPS
+Start Frame	Начальный кадр
 Start angle	Начальный угол
 Start of frame	Начало кадра
 Start time	Время начала
@@ -1538,6 +1604,8 @@ State	Состояние
 Static	Статический
 Statistics	Статистика
 Stencil buffer	Буфер трафарета
+Step Size	Размер шага
+Stepped	Ступенчатый
 Steps	Шаги
 Steps Viewport	Шаги во вьюпорте
 Steps to skip	Пропуск шагов
@@ -1546,6 +1614,7 @@ Stop the game before changing the scene	Остановите игру перед
 Stop the game first	Сначала остановите игру
 Stored	Хранение
 Streaming preview	Предпросмотр стриминга
+Strength	Сила
 Stretch	Растянуть
 Stretch (seconds of velocity)	Растяжение (секунды скорости)
 Stretch U	Растянуть U
@@ -1619,6 +1688,7 @@ The light '%s' was not loaded: the scene already has the maximum number of light
 The list of All	Список «Все»
 The mesh '%s' (no objects) could not be read: saving without it	Не удалось прочитать меш '%s' (без объектов): сохраняется без него
 The objects of the 3D meshes will be deleted too (Undo brings them back).	Объекты 3D-мешей тоже будут удалены (Отмена вернёт их).
+The scene has no sounds	В сцене нет звуков
 The selected folders are deleted too if they end up empty.	Выбранные папки тоже удаляются, если останутся пустыми.
 The shader does not compile	Шейдер не компилируется
 The sound couldn't be decoded	Не удалось декодировать звук
@@ -1627,6 +1697,7 @@ The texture couldn't be loaded	Не удалось загрузить текст
 The undo history still uses it	История отмен ещё использует его
 There are no orphans	Нет неиспользуемых
 There is no active camera	Нет активной камеры
+There is no audio: the mixer did not start	Нет звука: микшер не запустился
 There is no script editor (IDE) in the layout	В компоновке нет редактора скриптов (IDE)
 There is no such prefab	Такого префаба нет
 There is no such scene	Такой сцены нет
@@ -1634,6 +1705,7 @@ Thickness	Толщина
 This animation has no keyframes in that layer	У этой анимации нет ключевых кадров в этом слое
 This animation has no normals layer	У этой анимации нет слоя нормалей
 This file type can't be added	Этот тип файла нельзя добавить
+This format needs ffmpeg installed	Для этого формата нужен установленный ffmpeg
 This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	В этом графическом бэкенде нет шейдеров: секция @vertice выполняется на CPU, остальное рисуется как обычно
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	В этом графическом бэкенде нет шейдеров: материал рисуется как обычно (в GLES 2.0 и Vulkan они есть)
 This hierarchy clip only animates its root and its children	Этот клип иерархии анимирует только свой корень и его потомков
@@ -1719,6 +1791,9 @@ Upright (does not tilt)	Вертикально (без наклона)
 Upscaler	Апскейлер
 Upscaling	Апскейлинг
 Use	Использует
+Use End Frame	Использовать конечный кадр
+Use Influence	Использовать влияние
+Use Start Frame	Использовать начальный кадр
 Use camera focus	Использовать фокус камеры
 Use current folder	Использовать текущую папку
 Use index	Использовать индекс
@@ -1736,6 +1811,7 @@ Value Y	Значение Y
 Variation	Вариация
 Vector	Вектор
 Velocity	Скорость
+Version	Версия
 Version v%d saved: versiones/%s	Версия v%d сохранена: versiones/%s
 Vertex	Вершина
 Vertex Animation	Анимация вершин
@@ -1756,6 +1832,7 @@ View	Вид
 View in 3D	Показать в 3D
 View options	Параметры вида
 Viewpoint	Точка обзора
+Viewport	Вьюпорт
 Visibility icons	Иконки видимости
 Visibility test	Тест видимости
 Visible	Видимый
@@ -1776,8 +1853,10 @@ Windows .exe: not generated from this button yet. The EDITOR is built with platf
 Wireframe	Каркас
 Wireframe Preview	Каркасный вид
 Wireframe: Only Visible	Каркас: только видимое
+With alpha (RGBA)	С альфой (RGBA)
 With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	При влиянии от 0 до 100 билборд может развернуться на 180 градусов при пересечении камеры. Используйте 100%, чтобы этого избежать.
 With its materials	С его материалами
+With sound	Со звуком
 Wrap	Режим повтора
 Write to	Записать в
 X Axis	Ось X
@@ -1806,6 +1885,7 @@ Zoom 4:1	Масштаб 4:1
 [X: time]	[X: время]
 [Y: value]	[Y: значение]
 active	активная
+active keyframe	активный ключ
 all	все
 all opaque	всё непрозрачное
 along	вдоль
@@ -1863,6 +1943,7 @@ last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or m
 list	список
 local	локальная
 matrix stack too deep (%d levels, max %d)	стек матриц слишком глубокий (уровней: %d, макс. %d)
+median point	средняя точка
 missing	отсутствует
 mono (1)	моно (1)
 new	новый

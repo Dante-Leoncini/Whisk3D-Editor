@@ -23,3 +23,10 @@ existe /tmp/w3d_f12_0006.png
 existe /tmp/w3d_f12_0007.png
 renderrango 0 0
 atajoscheck
+# F12 recien abierto el editor (con un .w3d por doble click): todavia ningun panel de Propiedades es el activo (eso pasa
+# al tocarlo). El primer F12 decia "No hay un panel de Propiedades" y el segundo andaba: ahora toma el del layout
+borrararchivo /tmp/w3d_f12_0004.png
+propsolvidar
+frame 4
+teclareal 3d F12
+existe /tmp/w3d_f12_0004.png

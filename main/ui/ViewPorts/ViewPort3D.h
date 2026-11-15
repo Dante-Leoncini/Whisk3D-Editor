@@ -94,6 +94,10 @@ enum ToolbarRol3D {
 // apagarOverlays solo al INICIAR el juego)
 void JuegoPrepararViewports(bool apagarOverlays);
 
+// una FRANJA del render a archivo: 'alto' filas RGBA de arriba hacia abajo; 'y0' = la primera, contando desde arriba.
+// false = no se pudo escribir (corta el render)
+typedef bool (*W3dFranjaFn)(void* ctx, const unsigned char* rgba, int y0, int alto);
+
 class Viewport3D : public ViewportBase, public WithBorder {
     public:
         int ViewportKind() const { return 1; } // (menu de tipo)
@@ -230,6 +234,9 @@ class Viewport3D : public ViewportBase, public WithBorder {
                         int progBase = 0, int progTotal = 0);
         // lo mismo a un buffer RGBA de outW x outH con las filas de ARRIBA hacia abajo (sin guardar)
         bool RenderABuffer(int outW, int outH, RenderType::Enum pass, std::vector<unsigned char>& rgba,
+                           int progBase = 0, int progTotal = 0);
+        // LAS FRANJAS (ver el .cpp): la imagen de arriba hacia abajo, de a una fila de tiles, a 'fn' (sin la imagen entera)
+        bool RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFranjaFn fn, void* ctx,
                            int progBase = 0, int progTotal = 0);
         // la matriz PROYECCION x VISTA de la imagen entera de outW x outH de RenderAPNG (desde la camara activa si hay)
         void MatrizImagen(int outW, int outH, float* VP16);

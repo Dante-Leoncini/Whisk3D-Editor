@@ -1,0 +1,33 @@
+# ==========================================================================
+#  EL RENDER POR FRANJAS DIRECTO AL ARCHIVO
+#  En PNG, lo que no necesita la imagen entera se escribe a medida que se dibuja: de a una fila de tiles (rasterizado) o
+#  de a 32 filas (trazado por CPU). La imagen entera no esta nunca en memoria: el N95 y el N8 renderizan en 4K
+#  escribiendo en la tarjeta. Tiene que dar lo MISMO que con la imagen entera; la imagen es mas grande que la ventana
+#  (varias filas y columnas de tiles)
+# ==========================================================================
+escenadefecto
+rendertam 1500 1100
+renderpases 1 1 1
+frame 1
+# ---- rasterizada: por franjas y entera, identicas (la composicion final y los tres pases) ----
+borrararchivo /tmp/w3d_fr_a_0001.png
+borrararchivo /tmp/w3d_fr_b_0001.png
+renderimage /tmp w3d_fr_a.png
+renderfranjas 0
+renderimage /tmp w3d_fr_b.png
+renderfranjas 1
+pngdif /tmp/w3d_fr_a_0001.png /tmp/w3d_fr_b_0001.png 0 0
+pngdif /tmp/w3d_fr_a_alpha_0001.png /tmp/w3d_fr_b_alpha_0001.png 0 0
+pngdif /tmp/w3d_fr_a_zbuffer_0001.png /tmp/w3d_fr_b_zbuffer_0001.png 0 0
+pngdif /tmp/w3d_fr_a_normal_0001.png /tmp/w3d_fr_b_normal_0001.png 0 0
+renderpases 0 0 0
+# ---- trazada por CPU, de a 32 filas: igual salvo el ruido (cada franja tiene su semilla) ----
+rendertam 320 200
+rtopt 1 1 16 1
+renderimage /tmp w3d_fr_c.png
+renderfranjas 0
+renderimage /tmp w3d_fr_d.png
+renderfranjas 1
+pngdif /tmp/w3d_fr_c_0001.png /tmp/w3d_fr_d_0001.png 6 255
+rtopt 1 1 16 0
+rendertam 1280 720

@@ -158,6 +158,16 @@ class ViewportBase {
         // gesto de 2 dedos (web/movil): zoomDelta = pinch (abrir dedos = acercar); panDx/panDy = arrastre
         // del punto medio en pixeles. Default vacio; lo implementa el Viewport3D (zoom + paneo).
         virtual void event_finger_gesture(float zoomDelta, float panDx, float panDy);
+        // el MISMO gesto de 2 dedos con la GEOMETRIA completa, en pixeles de la ventana: (cx, cy) = el punto medio de los
+        // dedos; panDx/panDy = cuanto se corrio desde el evento anterior; (sepX0, sepY0) -> (sepX1, sepY1) = la separacion
+        // entre los dedos (dedo 2 - dedo 1) antes y ahora. Los editores 2D hacen con esto el zoom ANCLADO a los dedos y
+        // proporcional (lo que estaba debajo de los dedos se queda debajo), y por eje en las curvas. false = no lo usa:
+        // controles.cpp manda el event_finger_gesture de siempre.
+        virtual bool event_finger_pinch(float cx, float cy, float panDx, float panDy,
+                                        float sepX0, float sepY0, float sepX1, float sepY1) {
+            (void)cx; (void)cy; (void)panDx; (void)panDy; (void)sepX0; (void)sepY0; (void)sepX1; (void)sepY1;
+            return false;
+        }
         // arrastre de 1 dedo sobre un PANEL: scrollear (px/py = pos del dedo; dx/dy = delta). Devuelve
         // true si lo consumio (paneles + toolbar del viewport) -> ahi el mouse NO orbita/selecciona.
         virtual bool event_finger_scroll(int px, int py, int dx, int dy);

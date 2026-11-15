@@ -161,8 +161,8 @@ UVEditor::UVEditor() {
     // huesos en Huesos/Pose). Cursor/snap NO van aca: ya estan arriba. En modo PINTURA muestra los
     // controles del PINCEL (roles TBR_Pincel*/TBR_Grupo, los mismos que la toolbar del 3D en Weight
     // Paint) y en modo HUESOS las acciones de hueso (Extrude/Duplicate/Delete/Disconnect).
-    b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Undo; b->iconFlip = 1; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
-    b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Redo; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::deshacer); b->rol = TBR_Undo; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::rehacer); b->rol = TBR_Redo; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
     for (int i = 0; i < 3; i++){
         b = new Button(""); b->rol = TBR_UVHist + i; b->visible = false; ToolButtons.push_back(b);
     }
@@ -1481,6 +1481,8 @@ void UVEditor::Render() {
         lastMx >= x && lastMx < x + width && lastMy >= y && lastMy < y + height &&
         !OnBar(lastMx, lastMy) && !OnToolbar(lastMx, lastMy))
         BrushDibujarCirculo((float)(lastMx - x), (float)(lastMy - y), BrushGet().radioPx);
+    // el GIZMO 2D sobre los UVs elegidos (solo en modo edicion; ver Gizmo2DPivote)
+    Gizmo2DRender(this);
 
     gfx::Disable(gfx::ScissorTest);
     // RenderBar y DibujarBordes dibujan quads/bordes TEXTURIZADOS (iconos del atlas):
@@ -1506,6 +1508,7 @@ void UVEditor::event_mouse_motion(int mx, int my) {
     // si hay un popup modal (file browser, etc.) el UV editor CEDE el input: no transforma
     // ni panea (sino un transform activo seguia robando el mouse con el browser abierto).
     if (PopUpActive) { lastMx = mx; lastMy = my; return; }
+    if (Gizmo2DArrastrando()) { Gizmo2DMotion(this, mx, my); lastMx = mx; lastMy = my; return; }   // el gizmo 2D agarrado
     // BOX SELECT en curso: el arrastre agranda el rectangulo (el aplicar es al soltar).
     // Si el boton ya no esta apretado es un "up perdido" (se solto fuera del viewport): se
     // cierra igual, como hacen el trazo del pincel y el drag de huesos.
@@ -2046,6 +2049,7 @@ void UVEditor::Panear(float dx, float dy) { panX += dx; panY += dy; g_redraw = t
 
 // TOUCH: 1 dedo sobre el CONTENIDO = panear la vista UV. La barra la maneja el gesto lockeado.
 bool UVEditor::event_finger_scroll(int px, int py, int dx, int dy){
+    if (Gizmo2DArrastrando()) return false;   // el dedo tiene agarrado el gizmo: el arrastre es del gizmo, no panea
     Panear((float)dx, (float)dy);
     return true;
 }
@@ -2054,6 +2058,83 @@ void UVEditor::event_finger_gesture(float zoomDelta, float panDx, float panDy){
     if (zoomDelta > 1.0f)       ZoomCentro(1);
     else if (zoomDelta < -1.0f) ZoomCentro(-1);
     if (panDx != 0.0f || panDy != 0.0f) Panear(panDx, panDy);
+}
+
+// ================================================================== GIZMO 2D (Gizmo.h)
+static Mesh* UVMallaGizmo(const UVEditor* uv) {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m || !m->uv || (Object*)m != g_editMesh || uv->uvModo != UVModoEdicion) return NULL;
+    return m;
+}
+// el pivote del G/R/S (el mismo que IniciarXform): el cursor 2D con Pivot = "3D Cursor"; si no, la MEDIANA de las
+// posiciones UV elegidas (cada posicion una vez: los splits en el mismo lugar no pesan doble)
+bool UVEditor::Gizmo2DPivote(float& lx, float& ly) {
+    Mesh* m = UVMallaGizmo(this);
+    if (!m || uvBoxSel || uvBoxArmado || Bone2DXformActivo()) return false;
+    if ((int)m->uvSelVert.size() != m->vertexSize) return false;
+    std::set< std::pair<float,float> > unicos;
+    double su = 0, sv = 0;
+    for (int i = 0; i < m->vertexSize; i++) {
+        if (!m->uvSelVert[i]) continue;
+        std::pair<float,float> p(m->uv[i*2], m->uv[i*2+1]);
+        if (unicos.insert(p).second) { su += p.first; sv += p.second; }
+    }
+    if (unicos.empty()) return false;
+    float pu = (float)(su / (double)unicos.size()), pv = (float)(sv / (double)unicos.size());
+    if (g_transformPivot == PivotCursor3D) { pu = uvCursorU; pv = uvCursorV; }
+    float cx, cy, s; ParamsUV(cx, cy, s);
+    const float au = (g_uvAspU > 1e-6f) ? g_uvAspU : 1.0f, av = (g_uvAspV > 1e-6f) ? g_uvAspV : 1.0f;
+    lx = cx + (pu - 0.5f) * s * au;
+    ly = cy + (pv - 0.5f) * s * av;
+    return true;
+}
+bool UVEditor::Gizmo2DEnZona(float lx, float ly) const {
+    UVEditor* yo = const_cast<UVEditor*>(this);
+    const int gx = x + (int)lx, gy = y + (int)ly;
+    return ly >= (float)BarTopOffset() && !yo->OnToolbar(gx, gy) && !yo->OnBrushBar(gx, gy);
+}
+bool UVEditor::Gizmo2DIniciar(int modo, int eje) {
+    Mesh* m = UVMallaGizmo(this); if (!m) return false;
+    IniciarXform(m, modo + 1);
+    if (!uvXform) return false;
+    uvXAxis = eje;
+    return true;
+}
+void UVEditor::Gizmo2DAplicar(float dx, float dy, float ang, float f) {
+    Mesh* m = UVMallaGizmo(this); if (!m || !uvXform) return;
+    float cx, cy, s; ParamsUV(cx, cy, s);
+    const float au = (g_uvAspU > 1e-6f) ? g_uvAspU : 1.0f, av = (g_uvAspV > 1e-6f) ? g_uvAspV : 1.0f;
+    // (la V crece hacia ABAJO en pantalla, como la Y: el angulo de pantalla vale tal cual)
+    AplicarXformValores(m, dx / (s * au), dy / (s * av), ang, f);
+}
+void UVEditor::Gizmo2DConfirmar() { if (uvXform) ConfirmarXform(); }
+void UVEditor::Gizmo2DCancelar() {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (uvXform) CancelarXform(m);
+}
+
+// 2 DEDOS: paneo + zoom ANCLADO al punto medio de los dedos y proporcional a cuanto se abren (antes: pasos fijos de 5%
+// desde el centro, que el paneo de dos dedos disparaba solo)
+bool UVEditor::event_finger_pinch(float cx, float cy, float panDx, float panDy, float sx0, float sy0, float sx1, float sy1){
+    if (panDx != 0.0f || panDy != 0.0f) Panear(panDx, panDy);
+    const float d0 = sqrtf(sx0*sx0 + sy0*sy0), d1 = sqrtf(sx1*sx1 + sy1*sy1);
+    const float minSep = 24.0f * (float)GlobalScale;
+    if (d0 >= minSep && d1 >= minSep) {
+        float f = d1 / d0;
+        float nz = zoom * f;
+        if (nz < 0.05f) nz = 0.05f;
+        if (nz > 50.0f) nz = 50.0f;
+        f = nz / zoom;
+        const int top = BarTopOffset();
+        int ch = height - top; if (ch < 1) ch = 1;
+        const float uvCx = width * 0.5f + panX, uvCy = top + ch * 0.5f + panY;
+        const float curX = cx - (float)x, curY = cy - (float)y;   // el punto medio de los dedos, LOCAL
+        panX += (curX - uvCx) * (1.0f - f);
+        panY += (curY - uvCy) * (1.0f - f);
+        zoom = nz;
+    }
+    g_redraw = true;
+    return true;
 }
 
 // zoom CENTRADO en el viewport (sin cursor; para el teclado 0+arriba/abajo de Symbian). Es el zoom de la rueda
@@ -2225,6 +2306,7 @@ void UVEditor::event_mouse_wheel(float dy, int mx, int my) {
 // al mouse (sino el borde verde queda clavado aca y no se pueden mover los splitters).
 void UVEditor::mouse_button_up(int boton) {
     (void)boton;
+    if (Gizmo2DSoltar(this)) { ViewPortClickDown = false; g_redraw = true; return; }   // (confirma / modo siguiente)
     // BOX SELECT: el soltar CIERRA el rectangulo y aplica la seleccion
     if (uvBoxSel) {
         BoxSelectSoltar();
@@ -2315,6 +2397,8 @@ void UVEditor::button_left() {
         return;
     }
     if (uvXform) { XformConfirmar(); return; } // si hay transform en curso, el click lo CONFIRMA (con gate)
+    // el GIZMO 2D: apretar una manija la agarra (soltar sin arrastrar = el modo siguiente)
+    if (Gizmo2DDown(this, lastMx, lastMy)) { ViewPortClickDown = true; return; }
     bool add = LShiftPressed; // shift = sumar/toggle
     PickUV(m, lastMx - x, lastMy - y, add); // lastMx/My son GLOBALES; - origen del viewport = local
     g_redraw = true;

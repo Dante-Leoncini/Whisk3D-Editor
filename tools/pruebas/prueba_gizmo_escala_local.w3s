@@ -1,0 +1,5 @@
+# La ESCALA de un objeto es siempre local: con el objeto girado y el menu en Global, el gizmo de ESCALAR va con los
+# ejes del objeto (la flecha roja apunta a su X y arrastrarla estira solo su X). El de MOVER sigue el menu.
+add cube
+selobj Cubo.001
+gizmoescalalocal

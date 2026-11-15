@@ -13,14 +13,44 @@
 #include "WhiskUI/text/bitmapText.h"
 #include "ViewPorts/LayoutInput.h"          // LayoutKey
 #include "W3dAviso.h"                       // Notificar
+#include "objects/Textures.h"               // la fuente (el desplegable se dibuja aca)
 
 extern bool g_redraw;
 
 static AtajosPopup* gAt = NULL;
 static int gAtCtx = W3dATC_3D;   // el ultimo contexto mirado (al reabrir se vuelve ahi)
 
+// UNA COSA ES EL VIEWPORT Y OTRA EL CONTEXTO: arriba se elige el viewport (o "todos") y abajo, en que situacion de
+// ese viewport valen las combinaciones (un modo, o con un mover/rotar/escalar en curso). Los contextos de una misma
+// vista se pisan entre si de lo mas especifico a lo comun (W3dAtajoContextos). "Durante un transform" es el mismo
+// en la 3D, el UV, el timeline y el 2D: aparece en los cuatro.
+struct VistaAtajos { const char* nombre; int n; int ctx[4]; const char* nombreCtx[4]; };
+static const VistaAtajos kVistas[] = {
+    { "All viewports",  1, { W3dATC_GLOBAL },                                            { "Always" } },
+    { "3D Viewport",    4, { W3dATC_3D, W3dATC_3D_OBJ, W3dATC_3D_EDIT, W3dATC_XFORM },   { "Any mode", "Object Mode", "Edit Mode", "During a transform" } },
+    { "UV Editor",      2, { W3dATC_UV, W3dATC_XFORM },                                  { "General", "During a transform" } },
+    { "Timeline",       2, { W3dATC_TIMELINE, W3dATC_XFORM },                            { "General", "During a transform" } },
+    { "Outliner",       1, { W3dATC_OUTLINER },                                          { "General" } },
+    { "2D Editor",      2, { W3dATC_2D, W3dATC_XFORM },                                  { "General", "During a transform" } },
+    { "Properties",     1, { W3dATC_PROPS },                                             { "General" } },
+    { "Script Editor",  1, { W3dATC_IDE },                                               { "General" } },
+};
+static const int kNVistas = (int)(sizeof(kVistas) / sizeof(kVistas[0]));
+static int VistaDeCtx(int ctx, int preferida) {
+    if (preferida >= 0 && preferida < kNVistas)
+        for (int k = 0; k < kVistas[preferida].n; k++) if (kVistas[preferida].ctx[k] == ctx) return preferida;
+    for (int v = 0; v < kNVistas; v++) for (int k = 0; k < kVistas[v].n; k++) if (kVistas[v].ctx[k] == ctx) return v;
+    return 0;
+}
+static const char* NombreCtxEnVista(int v, int ctx) {
+    if (v < 0 || v >= kNVistas) return "?";
+    for (int k = 0; k < kVistas[v].n; k++) if (kVistas[v].ctx[k] == ctx) return kVistas[v].nombreCtx[k];
+    return kVistas[v].nombreCtx[0];
+}
+
 static void AtCerrar() { if (gAt) gAt->Cerrar(); }
-static void AtContexto() { if (gAt) gAt->CambiarContexto(+1); }
+static void AtVista() { if (gAt) gAt->AbrirDesplegable(0); }
+static void AtContexto() { if (gAt) gAt->AbrirDesplegable(1); }
 static void AtAgregar() {
     if (!gAt) return;
     const int i = gAt->Seleccionada();
@@ -52,11 +82,17 @@ static void AtRestablecerTodo() {
 }
 
 AtajosPopup::AtajosPopup()
-    : PopUpBase(T("Keyboard Shortcuts")), grupo(NULL), pContexto(NULL), pFila(NULL), pGeneral(NULL), lista(NULL),
-      ctx(gAtCtx), sel(0), scroll(0) {
+    : PopUpBase(T("Keyboard Shortcuts")), grupo(NULL), pVista(NULL), pContexto(NULL), pFila(NULL), pGeneral(NULL), lista(NULL),
+      desp(NULL), despQue(0), vista(0), ctx(gAtCtx), sel(0), scroll(0) {
+    vista = VistaDeCtx(ctx, -1);
     grupo = new GroupPropertie(T("Keyboard Shortcuts"));
     grupo->anchoValores = 0.62f;
     grupo->flecha = false;
+    pVista = new PropButton(T("Viewport"));
+    pVista->conLabel = true;
+    pVista->button->desplegable = true;
+    pVista->action = AtVista;
+    grupo->properties.push_back(pVista);
     pContexto = new PropButton(T("Context"));
     pContexto->conLabel = true;
     pContexto->button->desplegable = true;
@@ -78,22 +114,56 @@ AtajosPopup::AtajosPopup()
     ResizeGrupo();
     Reubicar();
 }
-AtajosPopup::~AtajosPopup() { delete grupo; delete lista; }
+AtajosPopup::~AtajosPopup() { delete grupo; delete lista; delete desp; }
 
 void AtajosPopup::ArmarFilas() {
     filas.clear();
     for (int i = 0; i < W3dAtajosCantidad(); i++) if (W3dAtajoInfo(i).ctx == ctx) filas.push_back(i);
     if (sel >= (int)filas.size()) sel = (int)filas.size() - 1;
     if (sel < 0) sel = 0;
-    if (pContexto) pContexto->button->text = T(W3dAtajoCtxNombre(ctx));
+    vista = VistaDeCtx(ctx, vista);
+    if (pVista) pVista->button->text = T(kVistas[vista].nombre);
+    if (pContexto) pContexto->button->text = T(NombreCtxEnVista(vista, ctx));
     AsegurarVisible();
 }
-void AtajosPopup::CambiarContexto(int paso) {
+void AtajosPopup::ElegirVista(int v) {
+    if (v < 0 || v >= kNVistas) return;
     g_atajoCapturando = -1;
-    ctx = (ctx + paso + W3dATC_N) % W3dATC_N;
-    gAtCtx = ctx;
+    vista = v; ctx = kVistas[v].ctx[0]; gAtCtx = ctx;
     sel = 0; scroll = 0;
     ArmarFilas();
+    g_redraw = true;
+}
+void AtajosPopup::ElegirContexto(int c) {
+    if (c < 0 || c >= kVistas[vista].n) return;
+    g_atajoCapturando = -1;
+    ctx = kVistas[vista].ctx[c]; gAtCtx = ctx;
+    sel = 0; scroll = 0;
+    ArmarFilas();
+    g_redraw = true;
+}
+void AtajosPopup::CambiarContexto(int paso) { ElegirVista((vista + paso + kNVistas) % kNVistas); }
+// los desplegables de arriba (Viewport / Contexto): un menu de los de siempre, pero lo dibuja y lo maneja ESTA ventana
+// (los menus globales del editor quedan debajo de una ventana modal)
+void AtajosPopup::AbrirDesplegable(int que) {
+    PropButton* pb = (que == 0) ? pVista : pContexto;
+    if (!pb) return;
+    if (!desp) desp = new PopupMenu();
+    desp->Limpiar();
+    despQue = que;
+    if (que == 0) for (int v = 0; v < kNVistas; v++) desp->Agregar(T(kVistas[v].nombre), v)->verde = (v == vista);
+    else for (int k = 0; k < kVistas[vista].n; k++) desp->Agregar(T(kVistas[vista].nombreCtx[k]), k)->verde = (kVistas[vista].ctx[k] == ctx);
+    desp->Resize();
+    // pegado abajo del boton, EN PANTALLA. La tarjeta se dibuja en coordenadas de la ventana y nadie le anota al
+    // boton donde quedo (sx/sy los llena el panel de Propiedades al dibujar las suyas): se calcula aca con el mismo
+    // recorrido de filas que el click. Antes quedaba en -10000 y el menu salia en la esquina de arriba a la izquierda.
+    int yRow = borderGS + RenglonHeightGS + gapGS;   // (la cabecera de la tarjeta)
+    for (size_t j = 0; j < grupo->properties.size() && grupo->properties[j] != pb; j++) yRow += grupo->properties[j]->Resize(grupo->width);
+    pb->Resize(grupo->width);
+    pb->button->sx = x + borderGS + borderGS + pb->ColBoton();
+    pb->button->sy = y + yRow;
+    desp->Abrir(pb->button->sx + pb->button->width - desp->width, pb->button->sy + pb->button->height - GlobalScale,
+                MenuPantallaW, MenuPantallaH);
     g_redraw = true;
 }
 int AtajosPopup::Seleccionada() const {
@@ -140,7 +210,8 @@ void AtajosPopup::Reubicar() {
 
 void AtajosPopup::Render() {
     if (!grupo) return;
-    pContexto->button->text = T(W3dAtajoCtxNombre(ctx));
+    pVista->button->text = T(kVistas[vista].nombre);
+    pContexto->button->text = T(NombreCtxEnVista(vista, ctx));
     const bool esperando = (g_atajoCapturando >= 0);
     pFila->botones[0]->text = esperando ? T("Press a key...") : T("Add shortcut");
     ResizeGrupo(); Reubicar();
@@ -195,9 +266,41 @@ void AtajosPopup::Render() {
     lista->Resize(lw, lh); lista->RenderBorder(false);
     w3dEngine::PopMatrix();
     endView();
+    // el DESPLEGABLE abierto, encima de todo (en coordenadas de PANTALLA, como los menus del editor)
+    if (desp && desp->abierto) {
+        w3dEngine::Viewport(0, 0, MenuPantallaW, MenuPantallaH);
+        w3dEngine::Disable(w3dEngine::ScissorTest);
+        w3dEngine::MatrixMode(w3dEngine::Projection);
+        w3dEngine::LoadIdentity();
+        w3dEngine::Ortho(0, MenuPantallaW, MenuPantallaH, 0, -1, 1);
+        w3dEngine::MatrixMode(w3dEngine::ModelView);
+        w3dEngine::LoadIdentity();
+        w3dEngine::Disable(w3dEngine::DepthTest);
+        w3dEngine::Enable(w3dEngine::Texture2D);
+        w3dEngine::Enable(w3dEngine::Blend);
+        w3dEngine::BlendAlpha();
+        w3dEngine::EnableArray(w3dEngine::VertexArray);
+        w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+        w3dEngine::DisableArray(w3dEngine::NormalArray);
+        if (!Textures.empty() && Textures[0]) w3dEngine::BindTexture(Textures[0]->iID);
+        desp->Render();
+    }
+}
+bool AtajosPopup::Motion(int mx, int my) {
+    if (desp && desp->abierto) { desp->MouseMove(mx, my); g_redraw = true; }
+    return true;
 }
 
 bool AtajosPopup::Click(int mx, int my) {
+    // el desplegable abierto se queda con el click: elegir una opcion, o cerrarlo tocando afuera
+    if (desp && desp->abierto) {
+        const bool adentro = desp->Contains(mx, my);
+        const int id = adentro ? desp->Click(mx, my) : -1;
+        desp->Cerrar();
+        if (id >= 0) { if (despQue == 0) ElegirVista(id); else ElegirContexto(id); }
+        g_redraw = true;
+        if (adentro || Contains(mx, my)) return true;
+    }
     if (!Contains(mx, my)) { g_atajoCapturando = -1; return false; }
     const int myL = my - y, lxL = mx - x;
     int lx, ly, lw, lh; ListaRect(lx, ly, lw, lh);
@@ -246,6 +349,19 @@ void AtajosPopup::Wheel(int delta) {
     g_redraw = true;
 }
 bool AtajosPopup::Tecla(int tecla) {
+    // con el desplegable abierto, las flechas lo recorren, OK elige y Esc lo cierra (sin cerrar la ventana)
+    if (desp && desp->abierto) {
+        switch (tecla) {
+            case LayoutKey::Up:   desp->button_up(); break;
+            case LayoutKey::Down: desp->button_down(); break;
+            case LayoutKey::Enter: { const int id = desp->Enter(); desp->Cerrar();
+                                     if (id >= 0) { if (despQue == 0) ElegirVista(id); else ElegirContexto(id); } break; }
+            case LayoutKey::Cancel: desp->Cerrar(); break;
+            default: break;
+        }
+        g_redraw = true;
+        return true;
+    }
     switch (tecla) {
         case LayoutKey::Up:    if (sel > 0) sel--; AsegurarVisible(); break;
         case LayoutKey::Down:  if (sel + 1 < (int)filas.size()) sel++; AsegurarVisible(); break;
@@ -260,6 +376,7 @@ bool AtajosPopup::Tecla(int tecla) {
 }
 void AtajosPopup::Cerrar() {
     g_atajoCapturando = -1;
+    if (desp) desp->Cerrar();
     PopUpBase::Cerrar();
     g_redraw = true;
 }

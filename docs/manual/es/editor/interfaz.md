@@ -80,7 +80,7 @@ El Outliner se queda con el lugar de Propiedades:
 
 Si el viewport es angosto, su barra de menús no entra entera. Lo mismo pasa con la barra de herramientas de abajo de la Vista 3D. Para ver el resto:
 
-- ![Android](../tutoriales/img/icono-android.svg) **Con el dedo:** arrastrala de costado.
+- ![Android](../tutoriales/img/icono-android.svg) **Con el dedo:** arrastrala de costado. Si la soltás con envión, sigue deslizando sola y frena de a poco, igual que el contenido de los paneles; un toque la para. En Propiedades, si las pestañas entran todas, deslizar el dedo por encima las va mostrando y la que queda al soltar es la elegida.
 - ![PC](../tutoriales/img/icono-pc.svg) **Con el mouse:** mantené apretado el click sobre la barra y arrastrá, o girá la **rueda** encima.
 - ![PC](../tutoriales/img/icono-pc.svg) ![Nokia](../tutoriales/img/icono-nokia.svg) **Con el teclado:** <kbd>M</kbd> en la PC, o la **soft izquierda** en el Nokia, entra a la barra del viewport activo. Con las flechas izquierda y derecha la recorrés, y cada menú se abre al llegar. Con arriba y abajo te movés por el menú, y con OK (<kbd>Enter</kbd> en la PC) elegís. La barra se desplaza sola para mostrar dónde estás.
 
@@ -91,6 +91,10 @@ Si el viewport es angosto, su barra de menús no entra entera. Lo mismo pasa con
 ![Nokia](../tutoriales/img/icono-nokia.svg) En un Nokia N95: la soft izquierda entra a la barra y las flechas la recorren.
 
 ![La interfaz del Nokia N95: la soft izquierda abre el menú Modo y la flecha derecha va pasando por los menús de la barra, que se desplaza sola](../tutoriales/img/viewports-barra-nokia.webp)
+
+## Los menús desplegables con el dedo
+
+![Android](../tutoriales/img/icono-android.svg) Apoyar el dedo sobre una opción no la elige: se resalta la que está abajo del dedo, y al **soltar** se elige esa. Así se puede deslizar hasta la opción que se quiere antes de levantar el dedo. Si el dedo sale del menú y se suelta afuera, el menú se cierra sin elegir nada. En un menú largo, llevar el dedo al borde de arriba o de abajo lo va desplazando solo. En la Vista 3D, la pulsación larga abre el menú contextual y el mismo dedo puede deslizar hasta la opción.
 
 ## Los tipos de viewport
 

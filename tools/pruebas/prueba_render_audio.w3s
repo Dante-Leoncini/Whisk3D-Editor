@@ -1,0 +1,40 @@
+# ==========================================================================
+#  EL AUDIO DE LA ESCENA A UN ARCHIVO (tarjeta Render)
+#  "Renderizar audio" guarda el sonido de la escena del rango del render (WAV lo escribe Whisk3D; FLAC, MP3, AAC y Opus,
+#  el ffmpeg de la maquina) y un video "Con sonido" lo lleva adentro. Cuadro por cuadro: los sonidos (tambien los 3D,
+#  con la camara de oyente) y lo que dura el cuadro mezclado sin la salida. Sin ffmpeg, lo que lo usa se saltea.
+# ==========================================================================
+escenadefecto
+sonido nuevo prueba_sonido.wav 0 0 0
+# (30 cuadros a 30 fps = 1 s)
+renderrango 1 30
+frame 1
+# ---- WAV ----
+borrararchivo /tmp/w3d_aud.wav
+renderaudio wav
+renderaudioboton /tmp w3d_aud.png
+wavinfo /tmp/w3d_aud.wav 1.0 0.002
+# ---- MP3 y AAC (ffmpeg) ----
+borrararchivo /tmp/w3d_aud.mp3
+borrararchivo /tmp/w3d_aud.m4a
+renderaudio mp3 128
+renderaudioboton /tmp w3d_aud.png
+mediapistas /tmp/w3d_aud.mp3 0 1 1.0 0.1
+renderaudio aac 192
+renderaudioboton /tmp w3d_aud.png
+mediapistas /tmp/w3d_aud.m4a 0 1 1.0 0.1
+# ---- el VIDEO con sonido (y sin) ----
+borrararchivo /tmp/w3d_aud.mp4
+renderformato mp4 70
+renderaudio aac 192 1
+teclareal 3d Ctrl+F12
+mediapistas /tmp/w3d_aud.mp4 1 1 1.0 0.1
+existe /tmp/w3d_aud.audio.tmp.wav no
+borrararchivo /tmp/w3d_aud.mp4
+renderaudio aac 192 0
+teclareal 3d Ctrl+F12
+mediapistas /tmp/w3d_aud.mp4 1 0
+# ---- sin sonidos en la escena, el video va mudo y el boton avisa ----
+renderaudio wav 192 1
+renderformato png
+renderrango 0 0

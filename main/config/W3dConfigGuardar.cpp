@@ -13,6 +13,25 @@
 
 // Donde escribirlo: la carpeta ESCRIBIBLE del usuario (SDL_GetPrefPath; main.cpp lo lee de ahi si existe). res/ puede
 // ser de solo lectura: el AppImage monta la imagen, el .deb instala en /usr/share, Android lo tiene adentro del APK.
+// WEB: la carpeta del usuario (SDL_GetPrefPath = /libsdl/Whisk3D/Whisk3D/) esta montada sobre IndexedDB (IDBFS, ver el
+// preRun de platform/web/shell.html). Escribir un archivo lo deja en la RAM de la pagina; esto lo vuelca a IndexedDB
+// (en un rato, juntando varias escrituras) para que sobreviva a recargar la URL. Fuera del navegador no hace nada.
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+void W3dWebPersistir(){
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        if (typeof FS === 'undefined' || !FS.syncfs) return;
+        if (Module.__w3dSync) clearTimeout(Module.__w3dSync);
+        Module.__w3dSync = setTimeout(function () {
+            Module.__w3dSync = 0;
+            FS.syncfs(false, function (err) { if (err) console.warn('w3d: no se pudo guardar en IndexedDB', err); });
+        }, 250);
+    });
+#endif
+}
+
 static std::string W3dConfigPath(){
     return w3dFileSystem::GetUserDataDir() + "/config.ini";
 }
@@ -50,5 +69,6 @@ bool W3dConfigGuardar(){
     // aparece en el FLUSH de fclose, y descartarlo devolvia true con el config a medio escribir
     bool ok = (ferror(f) == 0);
     if (fclose(f) != 0) ok = false;
+    W3dWebPersistir();   // web: que sobreviva a recargar la pagina
     return ok;
 }

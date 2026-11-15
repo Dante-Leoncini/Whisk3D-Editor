@@ -5,6 +5,18 @@ RenderType view = RenderType::MaterialPreview;
 
 // fondo del RENDER (pase Rendered): NEGRO por defecto, editable desde el menu Render (color picker).
 float g_renderBg[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+// (los valores de fabrica de la tarjeta Render)
+W3dRenderOpc::W3dRenderOpc()
+    : nombre("render.png"),
+#ifdef W3D_SYMBIAN
+      w(320.0f), h(240.0f),   // el N95 rinde a 240p (su pantalla; el trazado de rayos a mas ya no es "esperable")
+#else
+      w(1280.0f), h(720.0f),  // 720p en PC/Android/Web
+#endif
+      zbuffer(false), normal(false), alfa(false), vectores(false), desenfoque(false), obturador(0.5f),
+      formato(0), calidad(90.0f), final(true), finalAlfa(false), post(true), sonido(true), audioFormato(3), audioKbps(192.0f) {}
+W3dRenderOpc g_render;
+unsigned g_renderGen = 0;
 float g_renderAspect = 640.0f / 480.0f; // 4:3 por defecto (igual que el default del render 640x480)
 
 GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };

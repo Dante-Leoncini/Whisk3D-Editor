@@ -62,15 +62,15 @@ struct SinRaiz { SinRaiz() { g_undoSinRaiz++; } ~SinRaiz() { g_undoSinRaiz--; } 
 // ============================================================================
 static const char* const kClaves[W3D_VISTAS] = {
     "escena", "mallas", "materiales", "texturas", "animaciones", "prefabs", "escenas", "librerias",
-    "sonidos", "scripts", "fuentes", "videos", "shaders"
+    "sonidos", "scripts", "fuentes", "videos", "shaders", "faltan"
 };
 static const char* const kTitulos[W3D_VISTAS] = {
     "Scene", "3D Meshes", "Materials", "Textures", "Animations", "Prefabs", "Scenes", "Libraries",
-    "Sounds", "Scripts", "Fonts", "Videos", "Shaders"
+    "Sounds", "Scripts", "Fonts", "Videos", "Shaders", "Missing files"
 };
 static const char* const kSingular[W3D_VISTAS] = {
     "Scene", "3D Mesh", "Material", "Texture", "Animation", "Prefab", "Scene", "Library",
-    "Sound", "Script", "Font", "Video", "Shader"
+    "Sound", "Script", "Font", "Video", "Shader", "Missing file"
 };
 const char* W3dVistaClave(int v)    { return (v >= 0 && v < W3D_VISTAS) ? kClaves[v] : ""; }
 const char* W3dVistaTitulo(int v)   { return (v >= 0 && v < W3D_VISTAS) ? kTitulos[v] : ""; }
@@ -94,6 +94,7 @@ int W3dVistaIcono(int v) {
         case W3D_VISTA_FUENTES:     return (int)IconType::lista;    // (el de un texto 2D)
         case W3D_VISTA_VIDEOS:      return (int)IconType::video;
         case W3D_VISTA_SHADERS:     return (int)IconType::script;
+        case W3D_VISTA_FALTAN:      return (int)IconType::notifError;
     }
     return (int)IconType::archive;
 }
@@ -2177,12 +2178,86 @@ void W3dRecursosRevisarPurgados() {
 //  EL REGISTRO DE PROVEEDORES
 // ============================================================================
 static ProveedorMallas      gProvMallas;
+// ===== LOS ARCHIVOS QUE FALTAN =====
+// referencias a archivos de afuera que NO estan en esta maquina (las que el guardado avisa: "Guardado, pero N archivo(s)
+// externo(s) NO estan"). El ORIGEN de una malla importada (el .obj/.fbx del que salio) es solo procedencia: la geometria
+// ya viaja adentro del .w3d. Se lista HUERFANO: "Purgar huerfanos" (o Borrar) lo OLVIDA y se terminan los avisos. Lo
+// demas que falto en el ultimo guardado (una textura, un sonido de afuera) se lista EN USO por su dueno: se ve que es y
+// quien lo usa, y se arregla en el dueno (no se borra a ciegas desde aca)
+class ProveedorFaltan : public W3dProveedorRecursos {
+    static void Mallas(Object* o, std::vector<Mesh*>& out) {
+        if (!o) return;
+        if (o->getType() == ObjectType::mesh) out.push_back((Mesh*)o);
+        for (size_t i = 0; i < o->Childrens.size(); i++) Mallas(o->Childrens[i], out);
+    }
+    // las mallas con un origen que no esta, por origen
+    static void Origenes(std::map<std::string, std::vector<Mesh*> >& out) {
+        out.clear();
+        std::vector<Object*> raices; W3dRaicesVivas(raices);
+        std::vector<Mesh*> ms;
+        for (size_t r = 0; r < raices.size(); r++) Mallas(raices[r], ms);
+        for (size_t i = 0; i < ms.size(); i++)
+            if (!ms[i]->origen.empty() && !w3dFileSystem::FileExists(ms[i]->origen)) out[ms[i]->origen].push_back(ms[i]);
+    }
+    static std::string Base(const std::string& r) { const size_t b = r.find_last_of("/\\"); return b == std::string::npos ? r : r.substr(b + 1); }
+public:
+    void Listar(std::vector<W3dRecursoItem>& out) {
+        std::map<std::string, std::vector<Mesh*> > org; Origenes(org);
+        for (std::map<std::string, std::vector<Mesh*> >::iterator it = org.begin(); it != org.end(); ++it) {
+            W3dRecursoItem i;
+            i.id = "origen:" + it->first;
+            i.nombre = "? " + Base(it->first);
+            std::string quienes;
+            for (size_t k = 0; k < it->second.size(); k++) quienes += (k ? ", " : "") + it->second[k]->name;
+            i.info = std::string(T("Original file of an imported mesh (only where it came from: the mesh is inside the project)")) +
+                     "\n" + quienes + "\n" + it->first;
+            i.icono = (int)IconType::notifError;
+            i.usuarios = 0; i.renombrable = false; i.cargado = false;
+            out.push_back(i);
+        }
+        for (size_t e = 0; e < g_w3dExternosFaltan.size(); e++) {
+            const W3dExterno& x = g_w3dExternosFaltan[e];
+            if (!x.original.empty() && (org.count(x.original) || w3dFileSystem::FileExists(x.original))) continue;
+            bool esOrigen = false;   // (un origen que ya se olvido: el guardado viejo todavia lo nombra)
+            if (x.quien.compare(0, 7, "objeto ") == 0 && !x.original.empty()) {
+                std::vector<Object*> raices; W3dRaicesVivas(raices);
+                std::vector<Mesh*> ms; for (size_t r = 0; r < raices.size(); r++) Mallas(raices[r], ms);
+                esOrigen = true;
+                for (size_t k = 0; k < ms.size() && esOrigen; k++) if (ms[k]->origen == x.original) esOrigen = false;
+            }
+            if (esOrigen) continue;
+            W3dRecursoItem i;
+            i.id = "ext:" + x.ref;
+            i.nombre = "? " + Base(x.original.empty() ? x.ref : x.original);
+            i.info = x.quien + "\n" + (x.original.empty() ? x.ref : x.original);
+            i.icono = (int)IconType::notifError;
+            i.usuarios = 1; i.soloLectura = true; i.renombrable = false; i.cargado = false;
+            out.push_back(i);
+        }
+    }
+    bool FijarCarpeta(const std::string&, const std::string&) { return false; }
+    // OLVIDAR el origen (las mallas que lo nombran): no se toca la geometria
+    bool Borrar(const std::string& id, std::string* motivo) {
+        if (id.compare(0, 7, "origen:") != 0) { if (motivo) *motivo = "It is in use"; return false; }
+        const std::string ruta = id.substr(7);
+        std::map<std::string, std::vector<Mesh*> > org; Origenes(org);
+        std::map<std::string, std::vector<Mesh*> >::iterator it = org.find(ruta);
+        if (it == org.end()) { if (motivo) *motivo = "It is not missing anymore"; return false; }
+        for (size_t k = 0; k < it->second.size(); k++) {
+            w3dLogfW("[W3D] '%s': olvido su archivo de origen '%s' (falta; la geometria ya viaja adentro del .w3d)",
+                     it->second[k]->name.c_str(), ruta.c_str());
+            it->second[k]->origen.clear();
+        }
+        return true;
+    }
+};
 static ProveedorMateriales  gProvMateriales;
 static ProveedorTexturas    gProvTexturas;
 static ProveedorAnimaciones gProvAnimaciones;
+static ProveedorFaltan      gProvFaltan;
 static W3dProveedorRecursos* gProv[W3D_VISTAS] = {
     NULL, &gProvMallas, &gProvMateriales, &gProvTexturas, &gProvAnimaciones, NULL, NULL, NULL,
-    &gProvSonidos, &gProvScripts, &gProvFuentes, &gProvVideos, &gProvShaders
+    &gProvSonidos, &gProvScripts, &gProvFuentes, &gProvVideos, &gProvShaders, &gProvFaltan
 };
 
 void W3dRecursosVistaRegistrar(int vista, W3dProveedorRecursos* p) {
@@ -2219,7 +2294,8 @@ bool W3dVistaRecInfo(int vista, const std::string& id, W3dRecursoItem* out) {
 // el ORDEN de los tipos en el filtro (el de la lista de mas arriba del .h, sin los que no tienen datos)
 static const int kOrdenTipos[] = {
     W3D_VISTA_MALLAS, W3D_VISTA_MATERIALES, W3D_VISTA_TEXTURAS, W3D_VISTA_SONIDOS, W3D_VISTA_ANIMACIONES,
-    W3D_VISTA_PREFABS, W3D_VISTA_ESCENAS, W3D_VISTA_SCRIPTS, W3D_VISTA_SHADERS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS, W3D_VISTA_LIBRERIAS
+    W3D_VISTA_PREFABS, W3D_VISTA_ESCENAS, W3D_VISTA_SCRIPTS, W3D_VISTA_SHADERS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS, W3D_VISTA_LIBRERIAS,
+    W3D_VISTA_FALTAN
 };
 void W3dBibliotecaTipos(std::vector<int>& out) {
     out.clear();

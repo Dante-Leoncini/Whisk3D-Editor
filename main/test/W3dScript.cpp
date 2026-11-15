@@ -38,6 +38,7 @@
 #include "ViewPorts/PopUp/ExportarUVPopup.h"   // uvexportpopup / uvexportnow
 #include "ViewPorts/PopUp/GuardarComoPopup.h"  // guardarcomo
 #include "ViewPorts/PopUp/TransformRedoPanel.h"  // trpanel / trfijar / trboton / trinfo
+#include "ViewPorts/PopUp/TimelineRedoPanel.h"   // curvasedicion: la tarjeta de ajustar del timeline
 #include "io/TexturaEditada.h"       // texdab / texpixel / texsave / texext / texint / texlabel / texpaint3d     // prop / xform / vertat / objmove / objat       // unwrap / smartuv / lightmap / followquads / uvreset / unwraptest     // Nuevo/MoverMeshPart (funciones libres del editor)
 #include "edit/WeightPaint.h"  // wptest: pincel + escritura de pesos (fase 2 weight paint)
 #include "edit/BoneEdit.h"     // bonetest: Edit Mode de huesos (fase 3)
@@ -11714,12 +11715,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                    static int Visibles(Timeline* t){ int n = 0; for (size_t i = 0; i < t->ToolButtons.size(); i++) if (t->ToolButtons[i]->visible) n++; return n; }
                    static int Grupos(Timeline* t){ int n = 0; for (size_t i = 0; i < t->ToolButtons.size(); i++) if (t->ToolButtons[i]->visible && t->ToolButtons[i]->separador) n++; return n; } };
         tl->DopeSelectNone();
-        TLT_VER(!tl->ToolbarVisible(), "sin keyframes elegidos: no hay toolbar");
+        TLT_VER(!tl->ToolbarVisible(), "sin keyframes elegidos (con el mouse): no hay toolbar");
         // UNA clave: interpolacion + handles (sin tramo no hay ease)
         { const int ky = tl->y + (int)tl->ValueToY(ap->EvalF(10.0f, 0.0f));
           tl->CajaAplicar(tl->x + (int)tl->FrameToX(10.0f) - 4, ky - 4, tl->x + (int)tl->FrameToX(10.0f) + 4, ky + 4, false, false); }
         tl->ToolbarSincronizar();
-        TLT_VER(tl->ToolbarVisible() && B::Visibles(tl) == 19 && B::Grupos(tl) == 4, "una clave: curvas (3|7|3) | handles (19 iconos, 4 grupos)");
+        TLT_VER(tl->ToolbarVisible() && B::Visibles(tl) == 21 && B::Grupos(tl) == 4, "una clave: deshacer/rehacer + curvas (3|7|3) | handles (21 iconos, 4 grupos)");
         TLT_VER(B::Rol(tl, 400 + KfBezier)->tinte && B::Rol(tl, 420 + HPlano)->tinte && !B::Rol(tl, 420 + HAuto)->tinte
                 && !B::Rol(tl, 400 + KfBounce)->tinte,
                 "lo que tiene la clave queda en verde (Bezier, Flat)");
@@ -11731,6 +11732,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
           TLT_VER(h1 && h2 && !bh->hover, "pasar el mouse por un icono lo ilumina (y el cartelito lo ve)"); }
         TLT_VER(ayudas, "todos los iconos tienen su cartelito");
         bool iconos = true; for (size_t i = 0; i < tl->ToolButtons.size(); i++){ const int ic = tl->ToolButtons[i]->icon;
+            if (!tl->ToolButtons[i]->text.empty()) continue;   // (el Shift es un texto, como el del 3D)
             if (ic < 0 || ic >= (int)IconsUV.size() || !IconsUV[(size_t)ic]) iconos = false; }
         TLT_VER(iconos, "los iconos (los 6 de handles nuevos) estan en el atlas");
         // un click en el boton (el camino real: ToolbarClick por su rect)
@@ -11747,7 +11749,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // un TRAMO (sus dos puntas): aparece el grupo del ease
         tl->SetInterpolacionSel(KfBezier);
         tl->DopeSelectAll(); tl->ToolbarSincronizar();
-        TLT_VER(B::Visibles(tl) == 23 && B::Grupos(tl) == 5, "un tramo elegido: + ease (23 iconos, 5 grupos)");
+        TLT_VER(B::Visibles(tl) == 25 && B::Grupos(tl) == 5, "un tramo elegido: + ease (25 iconos, 5 grupos)");
         { tl->ToolbarActualizar(); Button* be = B::Rol(tl, 440 + KfEaseIn); tl->ToolbarClick(be->sx + be->width / 2, be->sy + be->height / 2); }
         TLT_VER(ap->keyframes[0].outDV == 0.0f && ap->keyframes[1].inDV != 0.0f, "click en Ease In: sale plano del primero");
         // el RELOJ: el frame actual arriba de todo
@@ -11762,12 +11764,267 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ok){ err = "tltoolbar: la toolbar del timeline no se comporta como se pidio"; return false; }
         return true;
     }
-    // tlciclos <fase>: el modificador REPETIR de las curvas (antes del 1er keyframe / despues del ultimo, con o sin
-    // offset). fase "armar": la matematica, el menu Modifiers del timeline, Ctrl+Z / Ctrl+Y, el 3D; deja la curva
-    // posX del objeto activo con Repeat with Offset despues. fase "leida": despues de guardar y reabrir, sigue.
+    // curvasedicion <fase>: lo que se pidio para editar curvas (2026-11-14). fase "armar" (curva posX con 3 claves en
+    // los frames 1, 10 y 20):
+    //   - los MODIFICADORES DE CURVA (Cycles / Noise / Stepped / Smooth, influencia y rango): la matematica, Ctrl+Z, y
+    //     deja uno puesto para la fase "leida" (despues de guardar y reabrir, sigue)
+    //   - los HANDLES: Vista > Mostrar handles, le ganan al gizmo, el dedo los edita en vez de mover la vista, y
+    //     escalar en Y los aplasta (uno y varios keyframes)
+    //   - la tarjeta "ajustar la ultima operacion" del timeline: re-hacer con otro valor y cancelar
+    //   - la SELECCION MULTIPLE: el valor tipeado va a todos; las tarjetas Curva / Keyframes dicen cuantos
+    if (cmd == "curvasedicion") {
+        extern bool leftMouseDown; extern int CurrentFrame; extern bool g_tlVerHandles; extern bool g_transformRedoAuto;
+        extern void UndoDeshacer(); extern void UndoRehacer();
+        std::string fase; ss >> fase;
+        bool ok = true;
+        #define CE_VER(cond, que) do { const bool _c = (cond); printf("      [curvasedicion] %-66s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        Object* o = ObjActivo;
+        if (fase == "leida" || !o)
+            for (size_t i = 0; i < AnimationObjects.size(); i++) if (AnimationObjects[i].obj){ o = AnimationObjects[i].obj; break; }
+        if (!o){ err = "curvasedicion: sin objeto animado"; return false; }
+        AnimProperty* pa = NULL;
+        for (size_t i = 0; i < AnimationObjects.size(); i++){ if (AnimationObjects[i].obj != o) continue;
+            for (size_t q = 0; q < AnimationObjects[i].Propertys.size(); q++){ AnimProperty& p = AnimationObjects[i].Propertys[q];
+                if (p.Property == AnimPosition && p.component == AnimX) pa = &p; } }
+        if (!pa || pa->keyframes.size() != 3){ err = "curvasedicion: la curva posX no tiene 3 claves"; return false; }
+        if (fase == "leida"){
+            CE_VER(pa->mods.size() == 2 && pa->mods[0].tipo == KfModEscalon && pa->mods[1].tipo == KfModRuido,
+                   "guardar y reabrir: siguen los dos modificadores (Stepped y Noise)");
+            CE_VER(pa->mods.size() == 2 && fabsf(pa->mods[0].paso - 4.0f) < 1e-5f && !pa->mods[1].activo && fabsf(pa->mods[1].fuerza - 2.5f) < 1e-5f,
+                   "...con sus valores (paso 4; ruido apagado, fuerza 2.5)");
+            CE_VER(fabsf(pa->EvalF(7.0f, 0.0f) - pa->EvalSinMods(4.0f, 0.0f)) < 1e-4f, "...y la curva escalonada de a 4 (el 7 vale lo del 4)");
+            if (!ok){ err = "curvasedicion: los modificadores no sobreviven al guardado"; return false; }
+            return true;
+        }
+        // ===== 1) MODIFICADORES: la matematica, sobre una curva aparte (0,0) -> (10,10) lineal =====
+        { AnimProperty c; c.Property = AnimPosition; c.component = AnimX;
+          SetKeyCurva(c, 0, 0.0f); SetKeyCurva(c, 10, 10.0f);
+          for (size_t i = 0; i < c.keyframes.size(); i++) c.keyframes[i].Interpolation = KfLinear;
+          KfModificador m(KfModEscalon); m.paso = 5.0f; c.mods.push_back(m);
+          CE_VER(fabsf(c.EvalF(7.0f, 0.0f) - 5.0f) < 1e-4f && fabsf(c.EvalF(4.0f, 0.0f) - 0.0f) < 1e-4f, "Stepped de a 5: el 7 vale 5, el 4 vale 0");
+          c.mods[0].usarInfluencia = true; c.mods[0].influencia = 0.5f;
+          CE_VER(fabsf(c.EvalF(7.0f, 0.0f) - 6.0f) < 1e-4f, "...con influencia 0.5: a mitad de camino (6)");
+          c.mods[0].usarInfluencia = false; c.mods[0].usarRango = true; c.mods[0].rangoIni = 0.0f; c.mods[0].rangoFin = 6.0f;
+          CE_VER(fabsf(c.EvalF(7.0f, 0.0f) - 7.0f) < 1e-4f && fabsf(c.EvalF(4.0f, 0.0f)) < 1e-4f, "...con el rango 0-6: afuera del rango no actua");
+          c.mods[0] = KfModificador(KfModCiclos);   // Repeat Motion antes y despues
+          CE_VER(fabsf(c.EvalF(12.0f, 0.0f) - 2.0f) < 1e-4f && fabsf(c.EvalF(-3.0f, 0.0f) - 7.0f) < 1e-4f, "Cycles Repeat Motion: 12 = 2, -3 = 7");
+          c.mods[0].despuesModo = KfCiclosOffset;
+          CE_VER(fabsf(c.EvalF(12.0f, 0.0f) - 12.0f) < 1e-4f, "Cycles Repeat with Offset: 12 = 12");
+          c.mods[0].despuesModo = KfCiclosEspejo;
+          CE_VER(fabsf(c.EvalF(12.0f, 0.0f) - 8.0f) < 1e-4f, "Cycles Repeat Mirrored: la vuelta va al reves (12 = 8)");
+          c.mods[0].despuesModo = KfCiclosRepite; c.mods[0].despuesCant = 1.0f;
+          CE_VER(fabsf(c.EvalF(12.0f, 0.0f) - 2.0f) < 1e-4f && fabsf(c.EvalF(25.0f, 0.0f) - 10.0f) < 1e-4f, "Cycles Count 1: una vuelta y se queda (25 = 10)");
+          c.mods[0] = KfModificador(KfModRuido); c.mods[0].fuerza = 2.0f;
+          const float r1 = c.EvalF(3.3f, 0.0f), r2 = c.EvalF(3.3f, 0.0f);
+          bool varia = false; for (int f = 0; f < 10; f++) if (fabsf(c.EvalF((float)f + 0.37f, 0.0f) - ((float)f + 0.37f)) > 1e-3f) varia = true;
+          CE_VER(r1 == r2 && varia, "Noise: mueve la curva y es siempre el mismo (determinista)");
+          c.mods[0].fuerza = 0.0f;
+          CE_VER(fabsf(c.EvalF(3.3f, 0.0f) - 3.3f) < 1e-4f, "Noise con fuerza 0: la curva tal cual");
+          c.mods[0].activo = false; c.mods[0].fuerza = 5.0f;
+          CE_VER(fabsf(c.EvalF(3.3f, 0.0f) - 3.3f) < 1e-4f, "un modificador APAGADO no hace nada");
+          c.mods[0] = KfModificador(KfModSuave);
+          for (size_t i = 0; i < c.keyframes.size(); i++) c.keyframes[i].Interpolation = KfConstant;   // un escalon en el 10
+          const float sv = c.EvalF(10.0f, 0.0f);
+          CE_VER(sv > 0.5f && sv < 9.5f, "Smooth: el escalon queda suavizado (el 10 entre 0 y 10)");
+          // el formato: ida y vuelta por la lista de numeros
+          KfModificador a(KfModRuido); a.fuerza = 3.5f; a.profundidad = 2.0f; a.usarRango = true; a.mezclaOut = 4.0f;
+          float f[KfModificador::NFloats]; a.AFloats(f); KfModificador b; b.DeFloats(f, KfModificador::NFloats);
+          CE_VER(a == b, "el formato de numeros va y vuelve igual"); }
+        // ...en la curva de la escena: un paso de Ctrl+Z para agregar (como lo hace la tarjeta)
+        { UndoKeyframesIniciar(); KfModificador m(KfModEscalon); m.paso = 4.0f; pa->mods.push_back(m); UndoKeyframesConfirmar();
+          UndoDeshacer();
+          CE_VER(pa->mods.empty(), "Ctrl+Z saca el modificador agregado");
+          UndoRehacer();
+          CE_VER(pa->mods.size() == 1 && fabsf(pa->mods[0].paso - 4.0f) < 1e-5f, "Ctrl+Y lo devuelve"); }
+        // ===== 2) HANDLES =====
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(1200, 500);
+        tl->CambiarModo(true); tl->ConstruirDopeRows(); tl->Render();
+        tl->VistaAplicar(40.0f, -2.0f, 20.0f, 5.0f);
+        const bool modsGuardados = true; (void)modsGuardados;
+        std::vector<KfModificador> modsAparte; modsAparte.swap(pa->mods);   // (que la curva dibujada sea la de las claves)
+        for (size_t i = 0; i < pa->keyframes.size(); i++){ pa->keyframes[i].Interpolation = KfBezier; pa->keyframes[i].handleType = HFree;
+            pa->keyframes[i].inDF = -2.0f; pa->keyframes[i].inDV = -1.0f; pa->keyframes[i].outDF = 2.0f; pa->keyframes[i].outDV = 1.0f; }
+        // elegir SOLO la del medio (frame 10)
+        tl->DopeSelectNone();
+        { const float kx = tl->FrameToX(10.0f), ky = tl->ValueToY(pa->keyframes[1].value);
+          tl->event_mouse_motion(tl->x + (int)kx, tl->y + (int)ky); leftMouseDown = true; tl->button_left(); leftMouseDown = false; tl->mouse_button_up(1); }
+        tl->Render();
+        float hx = 0, hy = 0; tl->HandlePos(pa, 1, true, hx, hy);
+        g_tlVerHandles = true;
+        CE_VER(tl->HandleBajo(tl->x + (int)hx, tl->y + (int)hy, false), "el handle de la clave elegida esta a la vista");
+        CE_VER(!tl->ArrastreMueveVista(tl->x + (int)hx, tl->y + (int)hy), "con el dedo sobre un handle, arrastrar lo edita (no mueve la vista)");
+        g_tlVerHandles = false;
+        CE_VER(!tl->HandleBajo(tl->x + (int)hx, tl->y + (int)hy, false), "Vista > Mostrar handles apagado: no se ven ni se agarran");
+        // el BORDE del panel izquierdo con el dedo: lo agarra (ni scrollea el panel ni mueve la vista)
+        if (tl->panelW > 0){
+            const int bx = tl->x + tl->panelW, by = tl->y + tl->height / 2;
+            CE_VER(!tl->PanelEn(bx - 1, by) && !tl->ArrastreMueveVista(bx + 1, by), "el borde del panel: el dedo lo agarra (no scrollea ni mueve la vista)");
+        }
+        g_tlVerHandles = true;
+        // el handle encima de la flecha X del gizmo: gana el handle
+        { const bool gizAntes = g_gizmoOn; g_gizmoOn = true; Gizmo2DSetModo(0); tl->Render();
+          float gx = 0, gy = 0;
+          if (Gizmo2DManijaEnPantalla(tl, Gizmo2DEjeX, gx, gy)){
+              const float kx = tl->FrameToX(10.0f), ky = tl->ValueToY(pa->keyframes[1].value);
+              pa->keyframes[1].outDF = (gx - kx) / tl->pxPerFrame; pa->keyframes[1].outDV = -(gy - ky) / tl->pxPerUnit;
+              tl->Render();
+              tl->event_mouse_motion(tl->x + (int)gx, tl->y + (int)gy); leftMouseDown = true; tl->button_left();
+              const bool handle = tl->HandleArrastrando() && !Gizmo2DArrastrando();
+              tl->event_mouse_motion(tl->x + (int)gx + 30, tl->y + (int)gy - 20);
+              leftMouseDown = false; tl->mouse_button_up(1);
+              CE_VER(handle, "un handle debajo de la flecha del gizmo: lo agarra el handle");
+          } else CE_VER(false, "el gizmo esta a la vista");
+          g_gizmoOn = gizAntes; }
+        // ESCALAR en Y a cero UNA clave: sus dos handles se aplastan (no cambia el tiempo)
+        { keyFrame& k = pa->keyframes[1]; k.handleType = HFree; k.inDF = -2.0f; k.inDV = -1.5f; k.outDF = 2.0f; k.outDV = 1.5f;
+          tl->DopeMoveStart(Timeline::DOPE_ESC); tl->DopeCiclarEje(Timeline::DOPE_EJE_Y); tl->DopeNumChar('0'); tl->DopeMoveConfirm();
+          const keyFrame& r = pa->keyframes[1];
+          CE_VER(fabsf(r.inDV) < 1e-4f && fabsf(r.outDV) < 1e-4f && fabsf(r.outDF - 2.0f) < 1e-3f && fabsf(r.inDF + 2.0f) < 1e-3f,
+                 "escalar en Y a 0 una clave: los handles quedan planos (el tiempo igual)"); }
+        // ...y VARIAS: las claves van al valor del pivote y todos los handles planos
+        { for (size_t i = 0; i < pa->keyframes.size(); i++){ pa->keyframes[i].handleType = HFree; pa->keyframes[i].inDV = -1.0f; pa->keyframes[i].outDV = 1.0f; }
+          tl->DopeSelectAll(); tl->DopeSetPivot(0);
+          tl->DopeMoveStart(Timeline::DOPE_ESC); tl->DopeCiclarEje(Timeline::DOPE_EJE_Y); tl->DopeNumChar('0'); tl->DopeMoveConfirm();
+          bool planos = true; const float v0 = pa->keyframes[0].value;
+          for (size_t i = 0; i < pa->keyframes.size(); i++){ const keyFrame& r = pa->keyframes[i];
+              if (fabsf(r.inDV) > 1e-4f || fabsf(r.outDV) > 1e-4f || fabsf(r.value - v0) > 1e-4f) planos = false; }
+          CE_VER(planos, "escalar en Y a 0 varias: la curva queda chata, handles incluidos");
+          UndoDeshacer(); UndoDeshacer(); tl->DopeSelectAll(); }
+        // ===== 3) LA TARJETA DE AJUSTAR (timeline) =====
+        { const bool autoAntes = g_transformRedoAuto; g_transformRedoAuto = true;
+          int f0[3]; for (int i = 0; i < 3; i++) f0[i] = pa->keyframes[(size_t)i].frame;
+          tl->DopeSelectAll();
+          tl->DopeMoveStart(Timeline::DOPE_MOV); tl->DopeCiclarEje(Timeline::DOPE_EJE_X); tl->DopeNumChar('3'); tl->DopeMoveConfirm();
+          CE_VER(TimelineRedoPanelAbierto() && pa->keyframes[0].frame == f0[0] + 3, "mover 3 frames: aparece la tarjeta para ajustarlo");
+          TimelineRedoFijar(0, 5.0f);
+          CE_VER(pa->keyframes[0].frame == f0[0] + 5 && pa->keyframes[2].frame == f0[2] + 5, "tarjeta: Frames = 5 -> las claves quedan corridas 5 (no 3+5)");
+          TimelineRedoBoton(false);
+          CE_VER(!TimelineRedoPanelAbierto() && pa->keyframes[0].frame == f0[0] && pa->keyframes[2].frame == f0[2], "Cancelar: vuelve todo como estaba");
+          tl->DopeSelectAll();
+          tl->DopeMoveStart(Timeline::DOPE_ESC); tl->DopeCiclarEje(Timeline::DOPE_EJE_Y); tl->DopeNumChar('0'); tl->DopeMoveConfirm();
+          TimelineRedoOp op; const bool hay = TimelineRedoLeer(op);
+          CE_VER(hay && op.modo == 2 && fabsf(op.escX - 1.0f) < 1e-5f && fabsf(op.escY) < 1e-5f, "escalar Y a 0: la tarjeta dice X 1 / Y 0");
+          TimelineRedoFijar(1, 1.0f);
+          CE_VER(fabsf(pa->keyframes[1].value - 10.0f) < 1e-3f, "tarjeta: Y = 1 -> la curva vuelve a su altura");
+          TimelineRedoBoton(true);
+          CE_VER(!TimelineRedoPanelAbierto(), "Aceptar la cierra");
+          UndoDeshacer();
+          CE_VER(fabsf(pa->keyframes[1].value - 10.0f) < 1e-3f && pa->keyframes[0].frame == f0[0], "...y queda UN paso de deshacer");
+          g_transformRedoAuto = autoAntes; }
+        // ===== 4) SELECCION MULTIPLE =====
+        { AnimProperty* py = NULL;
+          for (size_t i = 0; i < AnimationObjects.size(); i++) if (AnimationObjects[i].obj == o){
+              AnimProperty& c = PropertyDeLista(AnimationObjects[i].Propertys, AnimPosition, AnimY);
+              SetKeyCurva(c, 1, 3.0f); SetKeyCurva(c, 15, 4.0f); py = &c; }
+          tl->ConstruirDopeRows(); tl->Render(); tl->DopeSelectAll();
+          // (la curva X se re-busca: agregar la Y pudo mover el vector)
+          for (size_t i = 0; i < AnimationObjects.size(); i++) if (AnimationObjects[i].obj == o)
+              for (size_t q = 0; q < AnimationObjects[i].Propertys.size(); q++){ AnimProperty& p = AnimationObjects[i].Propertys[q];
+                  if (p.Property == AnimPosition && p.component == AnimX) pa = &p; if (p.Property == AnimPosition && p.component == AnimY) py = &p; }
+          std::vector<AnimProperty*> cs; std::vector<std::string> ns; std::vector<int> ix;
+          CE_VER(DopeCurvasElegidas(cs, &ns, false) == 2 && DopeKeysElegidas(cs, ix, false) == 5, "todo elegido: 2 curvas, 5 claves");
+          DopeKeysFijarValor(7.0f);
+          bool siete = true; for (size_t i = 0; i < pa->keyframes.size(); i++) if (pa->keyframes[i].value != 7.0f) siete = false;
+          for (size_t i = 0; i < py->keyframes.size(); i++) if (py->keyframes[i].value != 7.0f) siete = false;
+          CE_VER(siete, "el valor tipeado va a TODAS las claves elegidas");
+          UndoDeshacer();
+          CE_VER(fabsf(pa->keyframes[1].value - 10.0f) < 1e-3f && fabsf(py->keyframes[0].value - 3.0f) < 1e-3f, "...en un solo paso de deshacer");
+          DopeCurvasFijarInterp(KfLinear);
+          bool lin = true; for (size_t i = 0; i < py->keyframes.size(); i++) if (KfInterpBase(py->keyframes[i].Interpolation) != KfLinear) lin = false;
+          CE_VER(lin, "la tarjeta Curva: la interpolacion va a todas las claves de las curvas");
+          UndoDeshacer();
+          ScriptProps();   // (el panel del layout: PropsActivo se arma al interactuar)
+          CE_VER(PropsActivo != NULL, "hay un panel de propiedades");
+          if (PropsActivo){
+              const int pAntes = PropsActivo->pestaniaActiva;
+              PropsActivo->pestaniaActiva = 9; PropsActivo->ActualizarPestanias();
+              CE_VER(PropsActivo->propCurva && PropsActivo->propCurva->visible && PropsActivo->propCurva->name.find('2') != std::string::npos,
+                     "tarjeta Curva: dice que hay 2 curvas elegidas");
+              CE_VER(PropsActivo->propKeyframe && PropsActivo->propKeyframe->visible && PropsActivo->propKeyframe->name.find('5') != std::string::npos,
+                     "tarjeta Keyframes: dice que hay 5 claves elegidas");
+              // una sola curva elegida: la pestania de modificadores muestra SU pila
+              tl->DopeSelectNone();
+              { const float kx = tl->FrameToX(10.0f), ky = tl->ValueToY(pa->keyframes[1].value);
+                tl->event_mouse_motion(tl->x + (int)kx, tl->y + (int)ky); leftMouseDown = true; tl->button_left(); leftMouseDown = false; tl->mouse_button_up(1); }
+              PropsActivo->pestaniaActiva = 4; PropsActivo->ActualizarPestanias();
+              CE_VER(PropsActivo->pestaniaActiva == 4 && PropsActivo->propCurvaMods && PropsActivo->propCurvaMods->visible &&
+                     PropsActivo->propCurvaMods->name.find("X") != std::string::npos, "pestania Modifiers: la tarjeta de la curva activa, con su nombre");
+              PropsActivo->pestaniaActiva = pAntes; PropsActivo->ActualizarPestanias();
+          }
+          // sacar la Y (para que el guardado sea el de siempre)
+          for (size_t i = 0; i < AnimationObjects.size(); i++) if (AnimationObjects[i].obj == o)
+              for (size_t q = AnimationObjects[i].Propertys.size(); q-- > 0; )
+                  if (AnimationObjects[i].Propertys[q].Property == AnimPosition && AnimationObjects[i].Propertys[q].component == AnimY)
+                      AnimationObjects[i].Propertys.erase(AnimationObjects[i].Propertys.begin() + (long)q);
+          for (size_t i = 0; i < AnimationObjects.size(); i++) if (AnimationObjects[i].obj == o)
+              for (size_t q = 0; q < AnimationObjects[i].Propertys.size(); q++){ AnimProperty& p = AnimationObjects[i].Propertys[q];
+                  if (p.Property == AnimPosition && p.component == AnimX) pa = &p; } }
+        // el TIMELINE dibuja la curva modificada (no los tramos entre claves)
+        { tl->Render(); pa->mods.clear(); const int sin = tl->CurvaTrazo(pa, 1.0f);
+          KfModificador m(KfModRuido); m.fuerza = 3.0f; pa->mods.push_back(m);
+          const int con = tl->CurvaTrazo(pa, 1.0f); pa->mods.clear();
+          CE_VER(con > 0 && con != sin, "el timeline dibuja la curva con sus modificadores"); }
+        delete tl;
+        // para la fase "leida": Stepped de a 4 + un Noise apagado con fuerza 2.5
+        pa->mods.clear(); { KfModificador m(KfModEscalon); m.paso = 4.0f; pa->mods.push_back(m); }
+        { KfModificador m(KfModRuido); m.activo = false; m.fuerza = 2.5f; pa->mods.push_back(m); }
+        (void)modsAparte;
+        #undef CE_VER
+        if (!ok){ err = "curvasedicion: la edicion de curvas no se comporta como se pidio"; return false; }
+        return true;
+    }
+    // atajosacciones: las operaciones SIN tecla de fabrica (las de los menus) se pueden asignar y corren su accion; los
+    // modos de la vista 3D son contextos aparte; la ventana separa viewport y contexto
+    if (cmd == "atajosacciones") {
+        bool ok = true; std::string e2;
+        #define AA_VER(cond, que) do { const bool _c = (cond); printf("      [atajosacciones] %-62s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        const int iw = W3dAtajoBuscar("3d.verAlambre");
+        AA_VER(iw >= 0 && W3dAtajoCombos(iw).empty(), "Wireframe Preview esta en la lista, sin tecla de fabrica");
+        W3dAtajosFijar(iw, "Ctrl+Shift+W");
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        Viewport3D* v3 = (Viewport3D*)VK::Buscar(rootViewport, 1);
+        if (v3) v3->view = RenderType::Solid;
+        W3dRunCommand("teclareal 3d Ctrl+Shift+W", e2);
+        AA_VER(v3 && v3->view == RenderType::Wireframe, "Ctrl+Shift+W asignado: la vista 3D pasa a alambre");
+        W3dAtajosFijar(iw, "");
+        if (v3) v3->view = RenderType::Solid;
+        { int c[6]; ViewportBase* antes = viewPortActive; if (Viewport3DActive) viewPortActive = Viewport3DActive;
+          const int n = W3dAtajoContextos(c);
+          AA_VER(n >= 3 && c[0] == W3dATC_3D_OBJ && c[1] == W3dATC_3D && c[n - 1] == W3dATC_GLOBAL, "Modo Objeto: primero lo del modo, despues lo comun, al final lo global");
+          viewPortActive = antes; }
+        AA_VER(W3dAtajoInfo(W3dAtajoBuscar("3d.extruir")).ctx == W3dATC_3D_EDIT && W3dAtajoInfo(W3dAtajoBuscar("3d.unir")).ctx == W3dATC_3D_OBJ,
+               "Extrude es de Modo Edicion y Join de Modo Objeto");
+        extern void AbrirAtajosPopup(); AbrirAtajosPopup();
+        AtajosPopup* ap = AtajosPopupActual();
+        if (ap){
+            ap->ElegirVista(3);
+            bool hayHandles = false; for (size_t k = 0; k < ap->filas.size(); k++) if (!strcmp(W3dAtajoInfo(ap->filas[k]).id, "tl.verHandles")) hayHandles = true;
+            AA_VER(ap->ctx == W3dATC_TIMELINE && hayHandles, "ventana: Viewport = Timeline lista sus operaciones (Mostrar handles)");
+            ap->ElegirContexto(1);
+            AA_VER(ap->ctx == W3dATC_XFORM, "...y el Contexto 'durante un transform' es otro desplegable");
+            ap->AbrirDesplegable(0);
+            AA_VER(ap->desp && ap->desp->abierto && ap->desp->items.size() == 8, "el desplegable de viewports tiene los 8");
+            // ...y sale PEGADO a su boton (no en la esquina de la pantalla): justo abajo, adentro de la ventana
+            if (ap->desp && ap->pVista){ Button* b = ap->pVista->button;
+                AA_VER(b->sx >= ap->x && b->sy > ap->y && ap->desp->y >= b->sy + b->height - 2 * GlobalScale &&
+                       ap->desp->y <= b->sy + b->height + 2 * GlobalScale && ap->desp->x + ap->desp->width >= b->sx + b->width - 2 * GlobalScale,
+                       "el desplegable sale justo abajo de su boton"); }
+            ap->desp->Cerrar(); ap->AbrirDesplegable(1);
+            if (ap->desp && ap->pContexto){ Button* b = ap->pContexto->button;
+                AA_VER(ap->desp->abierto && b->sy > ap->pVista->button->sy && ap->desp->y >= b->sy + b->height - 2 * GlobalScale &&
+                       ap->desp->y <= b->sy + b->height + 2 * GlobalScale, "el de Contexto sale abajo de SU boton (el de abajo)"); }
+            ap->Cerrar(); PopUpActive = NULL;
+        } else AA_VER(false, "la ventana abre");
+        #undef AA_VER
+        if (!ok){ err = "atajosacciones: las operaciones sin tecla no se comportan como se pidio"; return false; }
+        return true;
+    }
+    // tlciclos <fase>: REPETIR la curva antes del 1er keyframe / despues del ultimo = el modificador CICLOS. fase "armar":
+    // la matematica, el Repetir VIEJO (el de los archivos de antes) pasa a Ciclos, el 3D; deja la curva posX con el
+    // Repetir viejo (con offset despues) para guardarla como un archivo de antes. fase "leida": al reabrir es un Ciclos.
     if (cmd == "tlciclos") {
-        extern void UndoDeshacer(); extern void UndoRehacer(); extern void AplicarAnimacionObjetos();
-        extern PopupMenu* MenuAbierto;
+        extern void AplicarAnimacionObjetos();
         std::string fase; ss >> fase;
         bool ok = true;
         #define TLY_VER(cond, que) do { const bool _c = (cond); printf("      [tlciclos] %-60s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
@@ -11781,47 +12038,41 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 if (p.Property == AnimPosition && p.component == AnimX) pa = &p; } }
         if (!pa || pa->keyframes.size() != 2){ err = "tlciclos: la curva posX no tiene 2 claves"; return false; }
         if (fase == "leida"){
-            TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloOffset, "guardar y reabrir: sigue Repeat with Offset despues");
+            // el archivo trae el Repetir VIEJO ("cd": con offset despues): al abrir queda como modificador Ciclos
+            TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloNo && pa->mods.size() == 1 && pa->mods[0].tipo == KfModCiclos &&
+                    pa->mods[0].antesModo == KfCiclosNo && pa->mods[0].despuesModo == KfCiclosOffset,
+                    "un archivo con el Repetir viejo abre con un modificador Ciclos (con offset despues)");
             TLY_VER(fabsf(pa->EvalF(30.0f, 0.0f) - 29.0f) < 1e-3f, "...y la curva sigue avanzando (frame 30 = 29)");
-            if (!ok){ err = "tlciclos: el modificador no sobrevive al guardado"; return false; }
+            if (!ok){ err = "tlciclos: el Repetir viejo no pasa a Ciclos al abrir"; return false; }
             return true;
         }
-        // 1) la MATEMATICA: claves (1, 0) y (11, 10), lineales: una vuelta = 10 frames, avanza 10
+        // 1) la MATEMATICA del modificador Ciclos: claves (1, 0) y (11, 10), lineales: una vuelta = 10 frames, avanza 10
         for (size_t i = 0; i < pa->keyframes.size(); i++) pa->keyframes[i].Interpolation = KfLinear;
+        pa->mods.clear();
         TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 10.0f) < 1e-4f, "sin modificador: despues del ultimo se queda (10)");
-        pa->cicloDespues = KfCicloRepite;
-        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 5.0f) < 1e-4f && fabsf(pa->EvalF(36.0f, 0.0f) - 5.0f) < 1e-4f, "Repeat: la vuelta se repite igual (16 y 36 = 5)");
-        pa->cicloDespues = KfCicloOffset;
-        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 15.0f) < 1e-4f && fabsf(pa->EvalF(36.0f, 0.0f) - 35.0f) < 1e-4f, "Repeat with Offset: cada vuelta sigue donde termino (15, 35)");
+        KfModificador c(KfModCiclos); c.antesModo = KfCiclosNo; c.despuesModo = KfCiclosRepite; pa->mods.push_back(c);
+        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 5.0f) < 1e-4f && fabsf(pa->EvalF(36.0f, 0.0f) - 5.0f) < 1e-4f, "Ciclos Repeat: la vuelta se repite igual (16 y 36 = 5)");
+        pa->mods[0].despuesModo = KfCiclosOffset;
+        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 15.0f) < 1e-4f && fabsf(pa->EvalF(36.0f, 0.0f) - 35.0f) < 1e-4f, "Ciclos with Offset: cada vuelta sigue donde termino (15, 35)");
         TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) - 0.0f) < 1e-4f, "...antes del primero no se toco: se queda (0)");
-        pa->cicloAntes = KfCicloOffset;
-        TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) + 5.0f) < 1e-4f, "Repeat with Offset ANTES: para atras baja (-4 = -5)");
-        pa->cicloAntes = KfCicloRepite;
+        pa->mods[0].antesModo = KfCiclosOffset;
+        TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) + 5.0f) < 1e-4f, "with Offset ANTES: para atras baja (-4 = -5)");
+        pa->mods[0].antesModo = KfCiclosRepite;
         TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) - 5.0f) < 1e-4f, "Repeat ANTES (-4 = 5)");
         TLY_VER(fabsf(pa->EvalF(6.0f, 0.0f) - 5.0f) < 1e-4f, "adentro del rango nada cambia (6 = 5)");
-        pa->cicloAntes = pa->cicloDespues = KfCicloNo;
-        // 2) el MENU Modifiers del timeline, sobre lo elegido; un paso de Ctrl+Z
-        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 400);
-        tl->CambiarModo(true); tl->ConstruirDopeRows(); tl->Render(); tl->DopeSelectAll();
-        tl->AbrirMenuMods(10, 10);
-        TLY_VER(MenuAbierto && MenuAbierto->items.size() == 3, "menu Modifiers: Repeat / Repeat with Offset / Remove Repeat");
-        if (MenuAbierto && MenuAbierto->action){ MenuAbierto->action(KfCicloOffset); }
-        TLY_VER(pa->cicloAntes == KfCicloOffset && pa->cicloDespues == KfCicloOffset, "Repeat with Offset: antes y despues");
-        UndoDeshacer();
-        TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloNo, "Ctrl+Z lo saca");
-        UndoRehacer();
-        TLY_VER(pa->cicloAntes == KfCicloOffset && pa->cicloDespues == KfCicloOffset, "Ctrl+Y lo devuelve");
-        tl->SetCicloSel(KfCicloNo, -1);   // (el panel de propiedades: un lado solo)
-        TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloOffset, "un lado solo (Repeat Before = None)");
+        // 2) el REPETIR VIEJO (lo que traen los archivos de antes) pasa a ser ese mismo modificador
+        pa->mods.clear(); pa->cicloAntes = KfCicloRepite; pa->cicloDespues = KfCicloOffset;
+        const float v16 = pa->EvalF(16.0f, 0.0f), vm4 = pa->EvalF(-4.0f, 0.0f);
+        pa->RepetirAModificador();
+        TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloNo && pa->mods.size() == 1 && pa->mods[0].tipo == KfModCiclos,
+                "el Repetir viejo queda como modificador Ciclos");
+        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - v16) < 1e-4f && fabsf(pa->EvalF(-4.0f, 0.0f) - vm4) < 1e-4f, "...y la curva da lo mismo que antes");
         // 3) el 3D: en el frame 36 el objeto esta donde dice la curva repetida
         CurrentFrame = 36; AplicarAnimacionObjetos();
         TLY_VER(fabsf(o->pos.x - 35.0f) < 1e-3f, "el objeto sigue la repeticion en el 3D (frame 36: x = 35)");
         CurrentFrame = 1; AplicarAnimacionObjetos();
-        // 4) el dibujo: la cola de la derecha sigue la curva (no es una linea horizontal)
-        { tl->Render(); const int nv = tl->CurvaTrazo(pa, 1.0f);
-          pa->cicloDespues = KfCicloNo; const int nv0 = tl->CurvaTrazo(pa, 1.0f); pa->cicloDespues = KfCicloOffset;
-          TLY_VER(nv > nv0, "en el timeline la cola dibuja la repeticion"); }
-        delete tl;
+        // 4) para la fase "leida": un archivo como los de ANTES (el Repetir viejo: solo con offset despues)
+        pa->mods.clear(); pa->cicloAntes = KfCicloNo; pa->cicloDespues = KfCicloOffset;
         #undef TLY_VER
         if (!ok){ err = "tlciclos: el modificador Repetir no se comporta como se pidio"; return false; }
         return true;
@@ -27958,6 +28209,372 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ok) { err = "gizmocamtest: el gizmo cambia de tamanio en pantalla mirando por la camara"; return false; }
         return true;
     }
+    // gizmo2d: el GIZMO 2D (Gizmo.h) en las CURVAS del timeline, el DOPE SHEET y el editor UV. Aparece sobre el pivote
+    // del menu Pivot; las flechas mueven en UN eje; el anillo rota; las puntas cuadradas escalan; un toque quieto pasa al
+    // modo siguiente; soltar confirma y deshacer vuelve. Escena: posX con claves en 1 / 10 / 20 (valores 0 / 10 / 0)
+    if (cmd == "gizmo2d") {
+        extern bool leftMouseDown; extern int CurrentFrame;
+        bool ok = true; std::string e2;
+        #define G2_VER(cond, que) do { const bool _c = (cond); printf("      [gizmo2d] %-70s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        const bool gizmoAntes = g_gizmoOn; g_gizmoOn = true;
+        struct G2 {
+            // apretar (lx, ly LOCALES), arrastrar (ddx, ddy) en 4 pasos y soltar
+            static void Arrastrar(ViewportBase* vp, float lx, float ly, float ddx, float ddy) {
+                const int mx = vp->x + (int)(lx + 0.5f), my = vp->y + (int)(ly + 0.5f);
+                vp->event_mouse_motion(mx, my);
+                leftMouseDown = true; vp->button_left();
+                for (int k = 1; k <= 4; k++) vp->event_mouse_motion(mx + (int)(ddx * k / 4.0f), my + (int)(ddy * k / 4.0f));
+                leftMouseDown = false; vp->mouse_button_up(1);
+            }
+            static std::string Claves(const AnimProperty* ap) {
+                char b[160]; b[0] = 0; std::string r;
+                for (size_t i = 0; i < ap->keyframes.size(); i++) { snprintf(b, sizeof b, "%s(%d, %.2f)", i ? " " : "", ap->keyframes[i].frame, ap->keyframes[i].value); r += b; }
+                return r;
+            }
+        };
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(1200, 500);
+        tl->CambiarModo(true); tl->ConstruirDopeRows(); tl->Render();
+        int rx = -1; for (size_t i = 0; i < tl->dopeRows.size(); i++) if (tl->dopeRows[i].propId == AnimPosition && tl->dopeRows[i].compId == AnimX) rx = (int)i;
+        AnimProperty* ap = rx >= 0 ? tl->CurvaDeFila(tl->dopeRows[(size_t)rx]) : NULL;
+        if (!ap || ap->keyframes.size() != 3) { delete tl; g_gizmoOn = gizmoAntes; err = "gizmo2d: la curva posX no tiene 3 claves"; return false; }
+        tl->VistaAplicar(40.0f, -2.0f, 20.0f, 5.0f);   // 40 px por frame desde el -2; 20 px por unidad, el 5 al medio
+        tl->DopeSetPivot(0); tl->DopeSelectAll(); tl->Render();
+        const std::string orig = G2::Claves(ap);
+        float lx = 0, ly = 0;
+        // 1) el gizmo esta en el CENTRO de las claves elegidas
+        { const bool hay = Gizmo2DManijaEnPantalla(tl, Gizmo2DCentro, lx, ly);
+          G2_VER(hay && fabsf(lx - tl->FrameToX(10.5f)) < 1.0f && fabsf(ly - tl->ValueToY(5.0f)) < 1.0f,
+                 "curvas: el gizmo esta en el centro de las claves (frame 10.5, valor 5)"); }
+        // 2) MOVER con la flecha X: +3 frames, el valor quieto; soltar confirma; deshacer vuelve
+        Gizmo2DSetModo(0);
+        { Gizmo2DManijaEnPantalla(tl, Gizmo2DEjeX, lx, ly);
+          G2::Arrastrar(tl, lx, ly, tl->pxPerFrame * 3.0f, 25.0f);
+          const bool bien = ap->keyframes[0].frame == 4 && ap->keyframes[1].frame == 13 && ap->keyframes[2].frame == 23 &&
+                            fabsf(ap->keyframes[1].value - 10.0f) < 1e-4f && !DopeXformActivo() && !Gizmo2DArrastrando();
+          printf("      [gizmo2d]   flecha X: %s\n", G2::Claves(ap).c_str());
+          G2_VER(bien, "flecha X (roja): +3 frames, el valor no cambia, soltar confirma");
+          W3dRunCommand("undo", e2);
+          G2_VER(G2::Claves(ap) == orig, "deshacer vuelve las claves");
+          tl->DopeSelectAll(); }   // (deshacer deja los keyframes sin elegir)
+        // 3) MOVER con la flecha Y: 40 px para arriba = +2 en el valor, los frames quietos
+        { tl->Render(); Gizmo2DManijaEnPantalla(tl, Gizmo2DEjeY, lx, ly);
+          G2::Arrastrar(tl, lx, ly, 15.0f, -40.0f);
+          const bool bien = ap->keyframes[0].frame == 1 && ap->keyframes[2].frame == 20 &&
+                            fabsf(ap->keyframes[0].value - 2.0f) < 1e-3f && fabsf(ap->keyframes[1].value - 12.0f) < 1e-3f;
+          printf("      [gizmo2d]   flecha Y: %s\n", G2::Claves(ap).c_str());
+          G2_VER(bien, "flecha Y (verde): +2 en el valor, los frames no cambian");
+          W3dRunCommand("undo", e2); tl->DopeSelectAll(); }
+        // 4) un TOQUE quieto sobre el gizmo pasa al modo siguiente (mover -> rotar) y no toca nada
+        { tl->Render(); Gizmo2DManijaEnPantalla(tl, Gizmo2DCentro, lx, ly);
+          G2::Arrastrar(tl, lx, ly, 0.0f, 0.0f);
+          G2_VER(Gizmo2DModo() == 1 && G2::Claves(ap) == orig && !DopeXformActivo(), "toque quieto en el centro: pasa a ROTAR sin mover nada"); }
+        // 5) ROTAR con el anillo: 20 grados alrededor del pivote (con un cuarto de vuelta dos claves caerian en el mismo
+        //    frame y se pisarian, como con la R)
+        { tl->Render(); float px, py; Gizmo2DManijaEnPantalla(tl, Gizmo2DCentro, px, py); Gizmo2DManijaEnPantalla(tl, Gizmo2DAnillo, lx, ly);
+          const int mx = tl->x + (int)lx, my = tl->y + (int)ly;
+          tl->event_mouse_motion(mx, my); leftMouseDown = true; tl->button_left();
+          const float r = sqrtf((lx - px) * (lx - px) + (ly - py) * (ly - py)), a0 = atan2f(ly - py, lx - px);
+          for (int k = 1; k <= 8; k++) { const float a = a0 + 0.3490659f * k / 8.0f;
+              tl->event_mouse_motion(tl->x + (int)(px + cosf(a) * r), tl->y + (int)(py + sinf(a) * r)); }
+          leftMouseDown = false; tl->mouse_button_up(1);
+          const bool giro = G2::Claves(ap) != orig && ap->keyframes.size() == 3;
+          printf("      [gizmo2d]   rotar: %s\n", G2::Claves(ap).c_str());
+          G2_VER(giro, "anillo (azul): rota las claves alrededor del pivote");
+          W3dRunCommand("undo", e2);
+          G2_VER(G2::Claves(ap) == orig, "deshacer vuelve las claves");
+          tl->DopeSelectAll(); }   // (deshacer deja los keyframes sin elegir)
+        // 6) ESCALAR con la punta cuadrada X: x2 en el tiempo desde el frame 10.5, el valor quieto
+        { Gizmo2DSetModo(2); tl->Render(); float px, py; Gizmo2DManijaEnPantalla(tl, Gizmo2DCentro, px, py); Gizmo2DManijaEnPantalla(tl, Gizmo2DEjeX, lx, ly);
+          G2::Arrastrar(tl, lx, ly, lx - px, 0.0f);
+          const bool bien = ap->keyframes[0].frame <= -7 && ap->keyframes[2].frame >= 29 && fabsf(ap->keyframes[1].value - 10.0f) < 1e-4f;
+          printf("      [gizmo2d]   escalar X: %s\n", G2::Claves(ap).c_str());
+          G2_VER(bien, "punta cuadrada X: x2 en el tiempo desde el pivote, el valor no cambia");
+          W3dRunCommand("undo", e2); tl->DopeSelectAll(); }
+        // 7) el menu PIVOT mueve el gizmo: Current Frame / Median Point
+        { CurrentFrame = 1; tl->DopeSetPivot(1); tl->Render(); Gizmo2DManijaEnPantalla(tl, Gizmo2DCentro, lx, ly);
+          G2_VER(fabsf(lx - tl->FrameToX(1.0f)) < 1.0f && fabsf(ly - tl->ValueToY(5.0f)) < 1.0f, "Pivot = Current Frame: el gizmo va al frame actual");
+          tl->DopeSetPivot(2); tl->Render(); Gizmo2DManijaEnPantalla(tl, Gizmo2DCentro, lx, ly);
+          G2_VER(fabsf(lx - tl->FrameToX(31.0f / 3.0f)) < 1.0f && fabsf(ly - tl->ValueToY(10.0f / 3.0f)) < 1.0f, "Pivot = Median Point: el promedio de las claves");
+          tl->DopeSetPivot(0); }
+        // 8) DOPE SHEET: sin eje Y ni rotar; la flecha X mueve en el tiempo
+        { tl->CambiarModo(false); tl->ConstruirDopeRows(); tl->DopeSelectAll(); Gizmo2DSetModo(1); tl->Render();
+          float yx, yy;
+          G2_VER(!Gizmo2DManijaEnPantalla(tl, Gizmo2DEjeY, yx, yy), "dope sheet: no hay flecha Y (solo el eje del tiempo)");
+          Gizmo2DSetModo(0); tl->Render(); Gizmo2DManijaEnPantalla(tl, Gizmo2DEjeX, lx, ly);
+          G2::Arrastrar(tl, lx, ly, tl->pxPerFrame * 2.0f, 0.0f);
+          G2_VER(ap->keyframes[0].frame == 3 && ap->keyframes[2].frame == 22, "dope sheet: la flecha X corre las claves 2 frames");
+          W3dRunCommand("undo", e2); tl->DopeSelectAll(); }
+        delete tl;
+        // 9) EDITOR UV: la flecha X mueve los UVs elegidos solo en U
+        { Mesh* m = ScriptActiveMesh();
+          if (!m || !m->uv) { ok = false; printf("      [gizmo2d] UV: sin malla con UVs MAL\n"); }
+          else {
+              W3dRunCommand("mode edit", e2); m->EnsureEdit();
+              if (m->edit) m->edit->SeleccionarTodo(true);
+              UVEditor* uv = new UVEditor(); uv->uvModo = UVModoEdicion; uv->x = 0; uv->y = 0; uv->Resize(900, 600);
+              uv->uvSelMode = SelVertex; uv->SincronizarFiltro3D(m);
+              for (int i = 0; i < m->vertexSize; i++) m->uvSelVert[i] = 1;
+              std::vector<float> antes(m->uv, m->uv + m->vertexSize * 2);
+              float cx, cy, sc; uv->ParamsUV(cx, cy, sc);
+              const bool hay = Gizmo2DManijaEnPantalla(uv, Gizmo2DEjeX, lx, ly);
+              Gizmo2DSetModo(0);
+              G2::Arrastrar(uv, lx, ly, sc * 0.25f, 30.0f);   // un cuarto de la textura a la derecha
+              bool soloU = hay;
+              for (int i = 0; i < m->vertexSize && soloU; i++)
+                  soloU = fabsf(m->uv[i*2] - (antes[i*2] + 0.25f)) < 0.01f && fabsf(m->uv[i*2+1] - antes[i*2+1]) < 1e-5f;
+              G2_VER(soloU && !uv->uvXform, "editor UV: la flecha X corre los UVs 1/4 en U, la V no cambia, soltar confirma");
+              W3dRunCommand("undo", e2);
+              bool volvio = true; for (int i = 0; i < m->vertexSize * 2 && volvio; i++) volvio = fabsf(m->uv[i] - antes[i]) < 1e-5f;
+              G2_VER(volvio, "editor UV: deshacer vuelve los UVs");
+              delete uv;
+              W3dRunCommand("mode object", e2);
+          } }
+        Gizmo2DSetModo(0); g_gizmoOn = gizmoAntes;
+        #undef G2_VER
+        if (!ok) { err = "gizmo2d: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // gizmoescalalocal: la ESCALA de un objeto es siempre local, asi que el gizmo de ESCALAR va con los ejes del objeto
+    // aunque el menu diga Global (un objeto girado 45 grados: la flecha roja apunta a SU X), y arrastrarla estira solo
+    // su X. Los de mover siguen el menu (Global: la X del mundo)
+    if (cmd == "gizmoescalalocal") {
+        bool ok = true; std::string e2;
+        Object* o = ObjActivo;
+        if (!o || !viewPortActive || viewPortActive->ViewportKind() != 1) { err = "gizmoescalalocal: sin objeto activo o sin vista 3D activa"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        const int orientAntes = transformOrientation; const int modoAntes = GizmoModo(); const bool onAntes = g_gizmoOn;
+        g_gizmoOn = true; transformOrientation = GlobalOrient;
+        o->SetRotAxisAngle(Vector3(0, 1, 0), 45.0f);
+        // direccion en pantalla de la flecha X del gizmo (del centro a la manija) contra la de un eje del mundo
+        struct GE { static bool Dir(Viewport3D* vp, const Vector3& c, const Vector3& e, float& ax, float& ay) {
+                        float x0, y0, x1, y1; if (!vp->ProyectarPunto(c, x0, y0) || !vp->ProyectarPunto(c + e, x1, y1)) return false;
+                        ax = x1 - x0; ay = y1 - y0; const float l = sqrtf(ax * ax + ay * ay); if (l < 1e-4f) return false; ax /= l; ay /= l; return true; }
+                    static float Grados(float ax, float ay, float bx, float by) { float d = ax * bx + ay * by; if (d > 1) d = 1; if (d < -1) d = -1; return acosf(d) * 57.29578f; } };
+        Matrix4 W; o->GetWorldMatrix(W);
+        const Vector3 xLocal = Vector3(W.m[0], W.m[1], W.m[2]).Normalized();
+        float cx, cy, hx, hy, lx, ly, gx, gy;
+        GizmoSetModo(GizmoModoEscalar);
+        const bool hay = GizmoManijaEnPantalla(vp, GizmoCentro, cx, cy) && GizmoManijaEnPantalla(vp, GizmoEjeX, hx, hy);
+        float fx = hx - cx, fy = hy - cy; { const float l = sqrtf(fx * fx + fy * fy); if (l > 1e-4f) { fx /= l; fy /= l; } }
+        const bool dl = GE::Dir(vp, o->pos, xLocal, lx, ly), dg = GE::Dir(vp, o->pos, Vector3(1, 0, 0), gx, gy);
+        const float aLocal = GE::Grados(fx, fy, lx, ly), aGlobal = GE::Grados(fx, fy, gx, gy);
+        const bool sigueLocal = hay && dl && dg && aLocal < 3.0f && aGlobal > 10.0f;
+        printf("      [gizmoescalalocal] escalar con el menu en Global: la flecha roja esta a %.1f grados de la X del objeto y a %.1f de la del mundo -> %s\n",
+               aLocal, aGlobal, sigueLocal ? "OK" : "MAL");
+        if (!sigueLocal) ok = false;
+        // arrastrar la flecha roja hacia afuera: crece SOLO la escala X del objeto
+        { const Vector3 s0 = o->scale;
+          const int mx = vp->x + (int)(hx + 0.5f), my = vp->y + (int)(hy + 0.5f);
+          const bool agarro = GizmoDown(vp, mx, my);
+          for (int k = 1; k <= 4; k++) GizmoMotion(vp, mx + (int)(fx * 15.0f * k), my + (int)(fy * 15.0f * k));
+          vp->mouse_button_up(1);
+          const Vector3 s1 = o->scale;
+          const bool soloX = agarro && s1.x > s0.x * 1.1f && fabsf(s1.y - s0.y) < 1e-4f && fabsf(s1.z - s0.z) < 1e-4f && estado == editNavegacion;
+          printf("      [gizmoescalalocal] arrastrar la flecha roja: escala (%.2f,%.2f,%.2f) -> (%.2f,%.2f,%.2f) -> %s\n",
+                 s0.x, s0.y, s0.z, s1.x, s1.y, s1.z, soloX ? "OK" : "MAL");
+          if (!soloX) ok = false;
+          W3dRunCommand("undo", e2); }
+        // MOVER sigue el menu: en Global, la X del mundo
+        { GizmoSetModo(GizmoModoMover);
+          GizmoManijaEnPantalla(vp, GizmoCentro, cx, cy); GizmoManijaEnPantalla(vp, GizmoEjeX, hx, hy);
+          float mx2 = hx - cx, my2 = hy - cy; const float l = sqrtf(mx2 * mx2 + my2 * my2); if (l > 1e-4f) { mx2 /= l; my2 /= l; }
+          const bool global = GE::Grados(mx2, my2, gx, gy) < 3.0f;
+          printf("      [gizmoescalalocal] mover con el menu en Global: la flecha roja sigue la X del mundo -> %s\n", global ? "OK" : "MAL");
+          if (!global) ok = false; }
+        transformOrientation = orientAntes; GizmoSetModo(modoAntes); g_gizmoOn = onAntes;
+        UndoLimpiar();
+        if (!ok) { err = "gizmoescalalocal: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // menudedo: el MENU DESPLEGABLE con el DEDO (eventos tactiles reales, la misma puerta que SDL): apoyar no elige; la
+    // opcion de abajo del dedo se resalta al deslizar y SOLTAR elige esa; soltar afuera cierra sin elegir; en un menu
+    // largo, el dedo en el borde de abajo lo scrollea solo; un toque simple sigue eligiendo.
+    // + las PESTANIAS de Propiedades: si la barra entra entera, deslizar el dedo las va mostrando; si no, la scrollea.
+    if (cmd == "menudedo") {
+        extern void InputUsuarioSDL3(SDL_Event&); extern void LayoutMenuToqueTick(unsigned);
+        bool ok = true;
+        #define MD_VER(cond, que) do { const bool _c = (cond); printf("      [menudedo] %-72s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        struct EV {
+            static void Boton(Uint32 tipo, int x, int y) {
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = tipo; ev.button.button = SDL_BUTTON_LEFT; ev.button.which = SDL_TOUCH_MOUSEID;
+                ev.button.x = x; ev.button.y = y; ev.button.clicks = 1; ev.button.state = (tipo == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+                InputUsuarioSDL3(ev); }
+            static void Mover(int x, int y, int rx, int ry) {
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEMOTION; ev.motion.which = SDL_TOUCH_MOUSEID; ev.motion.state = SDL_BUTTON_LMASK;
+                ev.motion.x = x; ev.motion.y = y; ev.motion.xrel = rx; ev.motion.yrel = ry; InputUsuarioSDL3(ev); }
+            static int& Elegido() { static int e = -1; return e; }   // (una clase local no puede tener estaticos propios)
+            static void Accion(int id) { Elegido() = id; }
+            static int FilaY(PopupMenu* m, int fila) { const int rowH = RenglonHeightGS + gapGS; const int oy = m->titulo.empty() ? 0 : rowH;
+                                                      return m->y + borderGS + oy + (fila - m->scroll) * rowH + rowH / 2; }
+            static void Arrastre(int x0, int y0, int x1, int y1) {   // en pasos, con su delta (como SDL)
+                int px = x0, py = y0;
+                for (int k = 1; k <= 6; k++) { const int x = x0 + (x1 - x0) * k / 6, y = y0 + (y1 - y0) * k / 6; Mover(x, y, x - px, y - py); px = x; py = y; } }
+        };
+        EV::Elegido() = -1;
+        PopupMenu* m = new PopupMenu(); m->action = EV::Accion;
+        for (int i = 0; i < 6; i++) { char b[16]; snprintf(b, sizeof b, "Opcion %d", i); m->Agregar(b, i); }
+        // 1) apoyar en la 1, deslizar a la 4, soltar: elige la 4 (y no la 1)
+        m->Abrir(200, 100, MenuPantallaW, MenuPantallaH); MenuAbierto = m;
+        { const int x = m->x + m->width / 2;
+          EV::Boton(SDL_MOUSEBUTTONDOWN, x, EV::FilaY(m, 1));
+          const bool nadaAlApoyar = EV::Elegido() == -1 && m->abierto && m->selectIndex == 1;
+          EV::Arrastre(x, EV::FilaY(m, 1), x, EV::FilaY(m, 4));
+          const bool resalta = m->selectIndex == 4 && EV::Elegido() == -1;
+          EV::Boton(SDL_MOUSEBUTTONUP, x, EV::FilaY(m, 4));
+          MD_VER(nadaAlApoyar, "apoyar el dedo sobre una opcion no la elige (solo la resalta)");
+          MD_VER(resalta, "deslizando, se resalta la opcion de abajo del dedo");
+          MD_VER(EV::Elegido() == 4 && !m->abierto, "soltar elige la opcion de abajo del dedo y cierra el menu"); }
+        // 2) apoyar adentro, salir del menu y soltar afuera: no elige y cierra
+        EV::Elegido() = -1; m->Abrir(200, 100, MenuPantallaW, MenuPantallaH); MenuAbierto = m;
+        { const int x = m->x + m->width / 2, xa = m->x + m->width + 80 * GlobalScale;
+          EV::Boton(SDL_MOUSEBUTTONDOWN, x, EV::FilaY(m, 2));
+          EV::Arrastre(x, EV::FilaY(m, 2), xa, EV::FilaY(m, 2));
+          const bool sinResaltar = m->selectIndex == -1;
+          EV::Boton(SDL_MOUSEBUTTONUP, xa, EV::FilaY(m, 2));
+          MD_VER(sinResaltar, "con el dedo afuera del menu no queda nada resaltado");
+          MD_VER(EV::Elegido() == -1 && !m->abierto && MenuAbierto == NULL, "soltar afuera cierra el menu sin elegir nada"); }
+        // 3) un toque simple sigue eligiendo
+        EV::Elegido() = -1; m->Abrir(200, 100, MenuPantallaW, MenuPantallaH); MenuAbierto = m;
+        { const int x = m->x + m->width / 2;
+          EV::Boton(SDL_MOUSEBUTTONDOWN, x, EV::FilaY(m, 3)); EV::Boton(SDL_MOUSEBUTTONUP, x, EV::FilaY(m, 3));
+          MD_VER(EV::Elegido() == 3, "un toque simple elige la opcion"); }
+        // 4) un menu LARGO: el dedo en el borde de abajo lo scrollea solo; soltar elige la que quedo abajo del dedo
+        { PopupMenu* l = new PopupMenu(); l->action = EV::Accion;
+          for (int i = 0; i < 200; i++) { char b[16]; snprintf(b, sizeof b, "Clip %d", i); l->Agregar(b, i); }
+          EV::Elegido() = -1; l->Abrir(200, 20, MenuPantallaW, MenuPantallaH); MenuAbierto = l;
+          const bool largo = l->MaxScroll() > 0;
+          const int x = l->x + l->width / 2, yAbajo = l->y + l->height - borderGS - 2;
+          EV::Boton(SDL_MOUSEBUTTONDOWN, x, EV::FilaY(l, 2));
+          EV::Arrastre(x, EV::FilaY(l, 2), x, yAbajo);
+          const int s0 = l->scroll;
+          for (int k = 1; k <= 20; k++) LayoutMenuToqueTick(1000u + (unsigned)k * 60u);
+          const int s1 = l->scroll, bajo = l->selectIndex;
+          EV::Boton(SDL_MOUSEBUTTONUP, x, yAbajo);
+          printf("      [menudedo]   menu largo: scroll %d -> %d, resaltada %d, elegida %d\n", s0, s1, bajo, EV::Elegido());
+          MD_VER(largo && s1 > s0 + 5, "menu largo: el dedo en el borde de abajo lo va scrolleando");
+          MD_VER(EV::Elegido() == bajo && bajo >= s1, "soltar elige la opcion que quedo abajo del dedo");
+          if (MenuAbierto == l) l->Cerrar();
+          delete l; }
+        if (MenuAbierto == m) m->Cerrar();
+        delete m;
+        // 5) PESTANIAS de Propiedades con el dedo
+        { ViewportBase* rootAntes = rootViewport; Properties* propsAntes = PropsActivo;
+          Properties* p = new Properties(); p->x = 0; p->y = 0; p->Resize(MenuPantallaW, 600);
+          rootViewport = p; p->Render();
+          std::vector<int> vis; for (size_t i = 0; i < p->BarTabs.size(); i++) if (p->BarTabs[i]->visible) vis.push_back((int)i);
+          if (vis.size() >= 3) {
+              Tab* ta = p->BarTabs[(size_t)vis[0]]; Tab* tb = p->BarTabs[(size_t)vis[1]]; Tab* tc = p->BarTabs[(size_t)vis[2]];
+              const int yb = ta->sy + ta->height / 2;
+              p->pestaniaActiva = vis[0];
+              EV::Boton(SDL_MOUSEBUTTONDOWN, ta->sx + ta->width / 2, yb);
+              EV::Arrastre(ta->sx + ta->width / 2, yb, tb->sx + tb->width / 2, yb);
+              const bool enB = p->pestaniaActiva == vis[1];
+              EV::Arrastre(tb->sx + tb->width / 2, yb, tc->sx + tc->width / 2, yb);
+              const bool enC = p->pestaniaActiva == vis[2];
+              EV::Boton(SDL_MOUSEBUTTONUP, tc->sx + tc->width / 2, yb);
+              MD_VER(enB && enC && p->pestaniaActiva == vis[2], "pestanias (la barra entra): deslizar las va mostrando y soltar deja la ultima");
+              // angosta: la barra no entra -> deslizar la scrollea (no cambia de pestania)
+              p->Resize(140 * GlobalScale, 600); p->Render();
+              Tab* t0 = NULL; for (size_t i = 0; i < p->BarTabs.size() && !t0; i++) if (p->BarTabs[i]->visible && p->BarTabs[i]->sx >= p->x && p->BarTabs[i]->sx + p->BarTabs[i]->width <= p->x + p->width) t0 = p->BarTabs[i];
+              const int antes = p->pestaniaActiva, scrollAntes = p->barScrollX;
+              if (t0) { const int y0 = t0->sy + t0->height / 2, x0 = t0->sx + t0->width / 2;
+                        EV::Boton(SDL_MOUSEBUTTONDOWN, x0, y0); EV::Arrastre(x0, y0, x0 - 60 * GlobalScale, y0); EV::Boton(SDL_MOUSEBUTTONUP, x0 - 60 * GlobalScale, y0); }
+              MD_VER(t0 && p->pestaniaActiva == antes && p->barScrollX != scrollAntes, "pestanias (la barra no entra): deslizar scrollea la barra");
+          } else MD_VER(false, "pestanias: hay por lo menos tres visibles");
+          rootViewport = rootAntes; PropsActivo = propsAntes;
+          delete p; }
+        #undef MD_VER
+        if (!ok) { err = "menudedo: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // tldedo: el TIMELINE con el dedo y el boton verde del frame. Eventos reales (la misma puerta que SDL):
+    //  - el boton VERDE del frame actual: arrastrarlo (con el mouse) corre el frame; un click sin arrastrar lo edita
+    //  - el PANEL de canales: un dedo lo scrollea en vertical y en horizontal
+    //  - el strip con el MONITOR de la toolbar (el de fabrica): un dedo mueve la vista; con la flecha de SELECCION
+    //    arma la caja, como con el mouse
+    //  - el Shift de la toolbar prende y apaga el Shift (un toque suma a la seleccion)
+    if (cmd == "tldedo") {
+        extern void InputUsuarioSDL3(SDL_Event&); extern TextField* g_textFieldActivo; extern int CurrentFrame;
+        bool ok = true;
+        #define TD_VER(cond, que) do { const bool _c = (cond); printf("      [tldedo] %-74s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        struct EV {
+            static void Boton(Uint32 tipo, int x, int y, bool dedo) {
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = tipo; ev.button.button = SDL_BUTTON_LEFT; ev.button.which = dedo ? SDL_TOUCH_MOUSEID : 0;
+                ev.button.x = x; ev.button.y = y; ev.button.clicks = 1; ev.button.state = (tipo == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+                InputUsuarioSDL3(ev); }
+            static void Mover(int x, int y, int rx, int ry, bool dedo) {
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEMOTION; ev.motion.which = dedo ? SDL_TOUCH_MOUSEID : 0; ev.motion.state = SDL_BUTTON_LMASK;
+                ev.motion.x = x; ev.motion.y = y; ev.motion.xrel = rx; ev.motion.yrel = ry; InputUsuarioSDL3(ev); }
+            // apoyar, esperar la espera anti-gesto, arrastrar en pasos y soltar
+            static void Arrastre(int x0, int y0, int x1, int y1, bool dedo) {
+                Mover(x0, y0, 0, 0, dedo); Boton(SDL_MOUSEBUTTONDOWN, x0, y0, dedo);
+                if (dedo) SDL_Delay(220);
+                int px = x0, py = y0;
+                for (int k = 1; k <= 8; k++) { const int x = x0 + (x1 - x0) * k / 8, y = y0 + (y1 - y0) * k / 8; Mover(x, y, x - px, y - py, dedo); px = x; py = y; }
+                Boton(SDL_MOUSEBUTTONUP, x1, y1, dedo); }
+        };
+        extern Uint32 g_lastFingerTicks; const Uint32 dedoAntes = g_lastFingerTicks;
+        g_lastFingerTicks = 0;   // (1: con el mouse; despues se pasa a una sesion con el dedo)
+        ViewportBase* rootAntes = rootViewport;
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 220);   // (bajo: las filas del panel no entran; la toolbar de abajo se come lo suyo)
+        rootViewport = tl;
+        tl->CambiarModo(false); tl->ConstruirDopeRows(); tl->Render();
+        // 1) el boton VERDE: arrastrarlo con el mouse corre el frame (antes abria la edicion y no se movia)
+        { CurrentFrame = 5; g_textFieldActivo = NULL; tl->Render();
+          const int bx = tl->x + tl->curBtnX + tl->curBtnW / 2, by = tl->y + tl->numY + tl->barH2 / 2;
+          EV::Arrastre(bx, by, bx + (int)(tl->pxPerFrame * 6.0f), by, false);
+          TD_VER(CurrentFrame == 11 && g_textFieldActivo == NULL, "boton verde: arrastrarlo con el mouse corre el frame (5 -> 11)");
+          tl->Render();
+          const int bx2 = tl->x + tl->curBtnX + tl->curBtnW / 2;
+          EV::Arrastre(bx2, by, bx2, by, false);
+          TD_VER(CurrentFrame == 11 && g_textFieldActivo != NULL, "boton verde: un click sin arrastrar edita el numero");
+          g_textFieldActivo = NULL; }
+        // (de aca en adelante, una sesion con el DEDO, como el telefono: la toolbar esta siempre)
+        g_lastFingerTicks = SDL_GetTicks();
+        // 2) el PANEL con un dedo: vertical (filas) y horizontal (el texto)
+        { tl->panelWUser = 40 * GlobalScale; tl->ConstruirDopeRows(); tl->Render();
+          const int py0 = tl->PosY, px0 = tl->panelPosX;
+          const int x0 = tl->x + tl->panelW / 2, y0 = tl->y + tl->stripY + tl->rowH + tl->rowH / 2;   // (sobre las filas, no la toolbar)
+          EV::Arrastre(x0, y0, x0, y0 - 60 * GlobalScale, true);
+          const bool vert = tl->PosY < py0;
+          EV::Arrastre(x0, y0, x0 - 30 * GlobalScale, y0, true);
+          const bool horiz = tl->panelPosX < px0;
+          printf("      [tldedo]   panel: PosY %d -> %d, texto %d -> %d (tope %d)\n", py0, tl->PosY, px0, tl->panelPosX, tl->PanelMaxX());
+          TD_VER(vert, "panel: un dedo lo scrollea en vertical");
+          TD_VER(horiz, "panel: un dedo lo scrollea en horizontal");
+          tl->panelWUser = 0; tl->ConstruirDopeRows(); tl->Render(); }
+        // 3) el strip con el MONITOR (de fabrica): un dedo mueve la vista, sin armar la caja
+        { g_tlModoVista = true; CurrentFrame = 300;   // (la linea del frame actual, lejos: agarrarla es el scrub)
+          tl->Render();
+          const float v0 = tl->viewStartF;
+          const int x0 = tl->x + tl->panelW + (tl->width - tl->panelW) / 2, y0 = tl->y + tl->stripY + (tl->height - tl->stripY) / 3;
+          EV::Arrastre(x0, y0, x0 + 80 * GlobalScale, y0, true);
+          TD_VER(tl->viewStartF < v0 - 1.0f && !BoxSelectActivo(), "monitor: arrastrar el strip con un dedo mueve la vista (sin caja)");
+          // 4) con la flecha de SELECCION: el mismo arrastre arma la caja (y no mueve la vista)
+          g_tlModoVista = false; tl->Render();
+          const float v1 = tl->viewStartF; bool cajaDurante = false;
+          const int xs = tl->x + (int)tl->FrameToX(15.0f);   // (entre dos rombos: apoyar cerca de uno lo agarra)
+          EV::Mover(xs, y0, 0, 0, true); EV::Boton(SDL_MOUSEBUTTONDOWN, xs, y0, true); SDL_Delay(220);
+          for (int k = 1; k <= 6; k++) { EV::Mover(xs + 4 * GlobalScale * k, y0 + 3 * k, 4 * GlobalScale, 3, true); cajaDurante = cajaDurante || BoxSelectActivo(); }
+          EV::Boton(SDL_MOUSEBUTTONUP, xs + 24 * GlobalScale, y0 + 18, true);
+          if (BoxSelectActivo()) { extern void TimelineCajaSoltar(bool, int, int, int, int, bool, bool); TimelineCajaSoltar(false, 0, 0, 0, 0, false, false); BoxSelectCancelar(); }
+          printf("      [tldedo]   seleccion: caja durante el arrastre %d, vista %.2f -> %.2f\n", cajaDurante ? 1 : 0, v1, tl->viewStartF);
+          TD_VER(cajaDurante && fabsf(tl->viewStartF - v1) < 1e-4f, "seleccion: el mismo arrastre arma la caja y no mueve la vista");
+          g_tlModoVista = true; CurrentFrame = 1; }
+        // 5) el Shift de la toolbar
+        { extern bool LShiftPressed; const bool antes = LShiftPressed;
+          tl->ToolbarAccionRol(462); const bool prendido = LShiftPressed != antes;
+          tl->ToolbarAccionRol(462);
+          TD_VER(prendido && LShiftPressed == antes, "el Shift de la toolbar prende y apaga el Shift");
+          tl->ToolbarAccionRol(463); const bool sel = !g_tlModoVista; tl->ToolbarAccionRol(464);
+          TD_VER(sel && g_tlModoVista, "seleccion / monitor: uno o el otro"); }
+        rootViewport = rootAntes;
+        delete tl;
+        g_lastFingerTicks = dedoAntes;
+        #undef TD_VER
+        if (!ok) { err = "tldedo: ver los MAL de arriba"; return false; }
+        return true;
+    }
     if (cmd == "gizmotest") {
         bool ok = true; std::string e2;
         if (!W3dRunCommand("add cube", e2)) { err = "gizmotest: " + e2; return false; }
@@ -31074,9 +31691,14 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         for (int i = 0; i < W3dAtajosCantidad(); i++) {
             const W3dAtajoDef& a = W3dAtajoInfo(i);
             std::vector<W3dCombo> v = W3dAtajoCombos(i);
-            if (v.empty()) { printf("      [atajoscheck] %s: el defecto '%s' no se pudo leer\n", a.id, a.defecto); malas++; }
+            // (las operaciones SIN tecla de fabrica -defecto ""- no tienen nada que leer, pero si una accion propia
+            //  y alguien registrado que la corra)
+            const bool sinTecla = !a.defecto || !a.defecto[0];
+            if (v.empty() && !sinTecla) { printf("      [atajoscheck] %s: el defecto '%s' no se pudo leer\n", a.id, a.defecto); malas++; }
+            if (sinTecla && !a.accion) { printf("      [atajoscheck] %s: sin tecla y sin accion (no haria nada)\n", a.id); malas++; }
+            if (a.accion && !W3dAtajoTieneDespacho(a.accion)) { printf("      [atajoscheck] %s: nadie corre '%s'\n", a.id, a.accion); malas++; }
             for (int j = 0; j < i; j++) {
-                if (W3dAtajoInfo(j).ctx != a.ctx) continue;
+                if (!W3dAtajoMismoAlcance(W3dAtajoInfo(j).ctx, a.ctx)) continue;
                 const std::vector<W3dCombo>& w = W3dAtajoCombos(j);
                 for (size_t x = 0; x < v.size(); x++) for (size_t y = 0; y < w.size(); y++)
                     if (v[x] == w[y]) { printf("      [atajoscheck] %s y %s comparten %s\n", a.id, W3dAtajoInfo(j).id, W3dComboTexto(v[x]).c_str()); malas++; }
@@ -33066,7 +33688,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!rootViewport) { err = "renderopc: sin layout"; return false; }
         rootViewport->Render(); ScriptProps();
         if (!PropsActivo) { err = "renderopc: sin panel de propiedades"; return false; }
-        PropsActivo->renderVectores = (v != 0); PropsActivo->renderDesenfoque = (d != 0); PropsActivo->renderObturador = ob;
+        g_render.vectores = (v != 0); g_render.desenfoque = (d != 0); g_render.obturador = ob;
         return true;
     }
     // ---- existe <ruta> [no] : el archivo esta (o NO esta, con 'no') ----
@@ -33291,8 +33913,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         rootViewport->Render();   // puebla Viewport3DActive
         ScriptProps();            // y el panel de propiedades (Path / Nombre / Render Image)
         std::string dir, nombre; ss >> dir >> nombre;   // opcionales: carpeta + nombre.png (los campos del panel)
-        if (PropsActivo && !dir.empty() && PropsActivo->propRenderPath) PropsActivo->propRenderPath->field.text = dir;
-        if (PropsActivo && !nombre.empty() && PropsActivo->propRenderOutput) PropsActivo->propRenderOutput->field.text = nombre;
+        if (!dir.empty()) g_render.carpeta = dir;
+        if (!nombre.empty()) g_render.nombre = nombre;
+        extern void SincronizarCamposRender(Properties* P); SincronizarCamposRender(PropsActivo);
         W3dHarnessRenderImage();
         return true;
     }

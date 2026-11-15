@@ -12,6 +12,14 @@ import org.libsdl.app.SDLActivity;
 // Actividad principal de Whisk3D. Extiende SDLActivity (SDL2). Antes de arrancar,
 // SDL carga las librerias nativas que devuelve getLibraries(): libSDL2.so + libmain.so.
 public class Whisk3DActivity extends SDLActivity {
+    // EL VIDEO DEL RENDER (W3dVideo: el codificador del telefono). Lo llama el codigo nativo por JNI (Properties.cpp,
+    // W3D_VIDEO_ANDROID): por la actividad, para que las clases se busquen con el class loader de la app
+    private final W3dVideo video = new W3dVideo();
+    public boolean videoAbrir(String ruta, int w, int h, int fps, int kbps) { return video.abrir(ruta, w, h, fps, kbps); }
+    public boolean videoCuadro(byte[] rgba, int w, int h) { return video.cuadro(rgba, w, h); }
+    public boolean videoCerrar(String wav, int kbpsAudio) { return video.cerrar(wav, kbpsAudio); }
+    public boolean audioAac(String wav, String salida, int kbps) { return W3dVideo.aacDeWav(wav, salida, kbps); }
+
     @Override
     protected String[] getLibraries() {
         return new String[]{
@@ -124,6 +132,25 @@ public class Whisk3DActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // ANDROID 15+ con targetSdk 35/36: la ventana va SIEMPRE de borde a borde. Sin esto, con la barra de estado a
+        // la vista (pantalla con notch) el editor se dibujaba DEBAJO de la barra y de la camara, y el teclado ya no
+        // achicaba la ventana (adjustResize ahora solo avisa): W3dTeclado.cpp lo detecta porque la ventana se achica.
+        // Se le da al contenido el margen de las barras del sistema, del recorte y del teclado. En pantalla completa
+        // las barras estan ocultas y su margen es 0.
+        if (Build.VERSION.SDK_INT >= 35) {
+            android.view.View contenido = getWindow().getDecorView().findViewById(android.R.id.content);
+            if (contenido != null) {
+                contenido.setOnApplyWindowInsetsListener(new android.view.View.OnApplyWindowInsetsListener() {
+                    @Override
+                    public android.view.WindowInsets onApplyWindowInsets(android.view.View v, android.view.WindowInsets wi) {
+                        android.graphics.Insets m = wi.getInsets(android.view.WindowInsets.Type.systemBars()
+                                | android.view.WindowInsets.Type.displayCutout() | android.view.WindowInsets.Type.ime());
+                        v.setPadding(m.left, m.top, m.right, m.bottom);
+                        return wi;
+                    }
+                });
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 try {

@@ -21,6 +21,31 @@
 #include <emscripten.h>
 #include <emscripten/html5.h> // tamano del canvas (resize) + cancelar el loop al salir
 #endif
+#ifdef __EMSCRIPTEN__
+// devicePixelRatio de la pagina (1 en un monitor comun, 2 en una Mac retina, 3 en un iPhone). Acotado: un valor raro no
+// puede dejar el canvas en cero ni pedir uno gigante
+static double W3dWebDpr() {
+    double d = emscripten_get_device_pixel_ratio();
+    if (!(d >= 1.0)) d = 1.0;
+    if (d > 4.0) d = 4.0;
+    return d;
+}
+// la escala de la UI de fabrica en la web (ver la carga del config): con el dedo, la de Android; con mouse, la del config
+// por el devicePixelRatio
+// la pantalla se usa con el DEDO (telefono, tablet): el puntero principal es "grueso"
+static bool W3dWebDedo() {
+    return EM_ASM_INT({ return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0; }) != 0;
+}
+static int W3dWebEscalaUI(int escalaConfig) {
+    const int dedo = W3dWebDedo() ? 1 : 0;
+    if (dedo) return 4;   // (en un iPhone 13, con 3 se ve bien pero las opciones quedan chicas para el dedo)
+    const int base = escalaConfig > 0 ? escalaConfig : 2;
+    int e = (int)floor((double)base * W3dWebDpr() + 0.5);
+    if (e < 1) e = 1;
+    if (e > 8) e = 8;
+    return e;
+}
+#endif
 #include "ViewPorts/LayoutInput.h" // ruteo compartido + overlay del menu
 #if !defined(W3D_SYMBIAN) // Desktop (Win/Linux) + Web + ANDROID: comparten el file browser interno + la
                         // carga por w3dEngine (import/export, browser, texturas, warp, swap). Symbian tiene lo suyo.
@@ -787,6 +812,11 @@ static void ProcesarEvento(SDL_Event& e) {
     }
 #endif
     if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
+#ifdef __EMSCRIPTEN__
+        // WEB: el SDL avisa el tamano CSS (sin el devicePixelRatio). El tamano de verdad lo pone MainLoopFrame en el
+        // proximo cuadro (ve que el canvas cambio): tomar este aca achicaba el layout un cuadro y lo volvia a agrandar
+        return;
+#endif
         winW = e.window.data1;
         winH = e.window.data2;
         W3dTecladoRedimension(winW, winH);   // Android: el teclado achica la ventana -> maximizar el viewport que lo pidio
@@ -930,11 +960,19 @@ static void MainLoopFrame() {
 #ifdef __EMSCRIPTEN__
     // el canvas puede cambiar de tamano (ventana del browser). SDL2/Emscripten no siempre emite el
     // WINDOWEVENT_RESIZED, asi que chequeamos el tamano del canvas cada frame y resincronizamos.
+    // PIXEL PERFECT: el canvas va a la resolucion REAL de la pantalla = tamano CSS x devicePixelRatio. Antes iba al
+    // tamano CSS y en un iPhone (devicePixelRatio 3) el navegador estiraba la imagen x3: todo borroso. El mouse de
+    // SDL se escala solo (ancho de la ventana / ancho CSS) y el dedo llega normalizado (0..1), asi que el resto del
+    // editor trabaja en pixeles del dispositivo sin enterarse. El tamano del ELEMENTO tambien se mira: el manejador
+    // de resize del propio SDL lo vuelve a poner en el tamano CSS cuando rota el telefono.
     {
         double cw = 0, ch = 0;
         emscripten_get_element_css_size("#canvas", &cw, &ch);
-        int nw = (int)cw, nh = (int)ch;
-        if (nw > 0 && nh > 0 && (nw != winW || nh != winH)) {
+        const double dpr = W3dWebDpr();
+        int nw = (int)floor(cw * dpr + 0.5), nh = (int)floor(ch * dpr + 0.5);
+        int ew = 0, eh = 0;
+        emscripten_get_canvas_element_size("#canvas", &ew, &eh);
+        if (nw > 0 && nh > 0 && (nw != winW || nh != winH || ew != nw || eh != nh)) {
             emscripten_set_canvas_element_size("#canvas", nw, nh); // resolucion = display (nitido)
             SDL_SetWindowSize(window, nw, nh);
             winW = nw; winH = nh;
@@ -955,7 +993,8 @@ static void MainLoopFrame() {
       // pausa que el bloque de UpdateAnimatedMaterials: congeladas no redibujan nada)
       bool _partAnim = !(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3 &&
                        W3dParticulasAnimando();
-      bool _animPre = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation ||
+      extern bool W3dInerciaActiva();   // un panel que sigue deslizando solo despues de soltarlo (controles.cpp)
+      bool _animPre = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation || W3dInerciaActiva() ||
                       _partAnim;
       if (!_animPre && !_needRender && !g_redraw && SDL_WaitEventTimeout(&e, 200)) ProcesarEvento(e); }
 #endif
@@ -1416,6 +1455,14 @@ int main(int argc, char* argv[]) {
     #endif
     #else
         cfg = loadConfig(hayUsuario ? cfgUsuario : w3dFileSystem::GetResDir() + "/config.ini");
+    #endif
+    #ifdef __EMSCRIPTEN__
+        // WEB: el canvas va a la resolucion REAL de la pantalla (CSS x devicePixelRatio, ver MainLoopFrame), asi que
+        // la escala de la UI se cuenta en pixeles del DISPOSITIVO. Con el dedo (iPhone, Android, iPad) 4; con mouse,
+        // la del config multiplicada por el devicePixelRatio (una Mac retina: 2 x 2 = 4), asi la interfaz mide lo
+        // mismo que antes pero nitida. Si el usuario eligio una escala en Ajustes, manda la suya.
+        if (!hayUsuario) cfg.scale = W3dWebEscalaUI(cfg.scale);
+        { extern bool g_w3dTelefono; g_w3dTelefono = W3dWebDedo(); }   // el layout de fabrica del telefono (LayoutPorDefecto)
     #endif
     }
     winW = cfg.width;  winH = cfg.height;  // aplicar el tamano del config a la ventana

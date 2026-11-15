@@ -6,7 +6,7 @@ Muestra cómo se apoya la textura sobre la malla. Para editar, la malla tiene qu
 
 | Función | Descripción | Cómo se usa |
 |---|---|---|
-| Zoom / Desplazar | Acerca hacia el puntero / mueve la vista. | Rueda / botón del medio o flechas; táctil: 1 dedo desplaza, 2 dedos zoom |
+| Zoom / Desplazar | Acerca hacia el puntero / mueve la vista. Con dos dedos, el zoom es alrededor de los dedos. | Rueda / botón del medio o flechas; táctil: 1 dedo desplaza, 2 dedos zoom |
 | Modo | Modo Objeto, Modo Edición, Pintura de pesos, Editar huesos y Modo Pose (estos dos si la malla tiene esqueleto 2D). | Botón de modo, <kbd>Tab</kbd> |
 | Vértice / Arista / Cara | Qué se selecciona en Modo Edición. | Botón |
 | Pivote | Cursor, orígenes individuales o punto medio. | Botón |
@@ -33,6 +33,7 @@ Click elige qué se edita: un esqueleto 2D (si se toca un hueso) o la geometría
 | Seleccionar vinculado | La isla UV bajo el puntero (<kbd>Shift</kbd> suma). | <kbd>L</kbd> |
 | Selección por caja | Rectángulo; <kbd>Shift</kbd> suma. | <kbd>B</kbd> |
 | Mover / Rotar / Escalar | Transforma los UV. <kbd>X</kbd> / <kbd>Y</kbd> bloquean un eje; se puede tipear el valor (1.0 = una baldosa). | <kbd>G</kbd> / <kbd>R</kbd> / <kbd>S</kbd> |
+| Gizmo | Aparece sobre el pivote de los UV elegidos (punto medio, o el cursor 2D). Mover: flecha roja = U, verde = V, círculo del centro = libre. Rotar: el anillo azul. Escalar: puntas cuadradas por eje, el círculo del centro escala parejo. Un toque sin arrastrar pasa al modo siguiente; soltar confirma. | Arrastrar el gizmo |
 | Ubicar el cursor 2D | Pone el cursor donde se clickea. | Click derecho |
 | Insertar keyframe | Guarda la capa UV en la animación de vértices activa. | <kbd>I</kbd> |
 

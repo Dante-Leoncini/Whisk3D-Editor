@@ -27,3 +27,11 @@ const char* W3dVersion() {
 #endif
     return ver;
 }
+
+const char* W3dVersionCompilacion() {
+    static char ver[32] = {0};
+    if (ver[0]) return ver;
+    const char* t = __TIME__;   // "HH:MM:SS" de cuando se compilo este archivo
+    snprintf(ver, sizeof(ver), "%s %c%c:%c%c", W3dVersion(), t[0], t[1], t[3], t[4]);
+    return ver;
+}

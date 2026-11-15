@@ -15,7 +15,7 @@ Ciò che selezioni nell'Outliner resta selezionato anche nella Vista 3D, e vicev
 
 Ogni riga è un oggetto. La **freccia** comprime o espande ciò che contiene; l'**icona** ne dice il tipo (mesh, camera, luce, collezione...); poi viene il **nome**, in verde se è l'attivo e in un verde più scuro se è selezionato; e a destra, l'**occhio** e la **camera**. Un oggetto che sta dentro un altro appare più a destra, appeso a lui, e una riga sbiadita è un oggetto nascosto.
 
-In un progetto nuovo, in alto c'è il **Costruttore**, una routine che prepara lo schermo, e sotto la **Collezione** con la camera, la luce e il cubo. Una collezione è una cartella per mettere in ordine.
+In un progetto nuovo, in alto c'è il **Costruttore**, una routine che prepara lo schermo e viene eseguita una sola volta, all'avvio del gioco. Una linea nera lo separa da ciò che viene eseguito a ogni fotogramma: prima **Pulisci schermo** e poi la **Collezione** con la camera, la luce e il cubo. Una collezione è una cartella per mettere in ordine.
 
 ## Selezionare
 

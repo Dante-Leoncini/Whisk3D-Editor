@@ -20,7 +20,8 @@ Las pestañas **cambian según el objeto activo**: cada tipo de objeto muestra s
 | Archivo / Render (el disquete) | Siempre, aunque no haya nada elegido. |
 | Objeto | Con cualquier objeto 3D: posición, rotación, escala, nombre y visibilidad. |
 | La del tipo de objeto | Material en una malla, Luz en una luz, Cámara en una cámara, y así con cada tipo. Su ícono cambia con el tipo. |
-| Malla 3D y Modificadores | Solo con una malla. |
+| Malla 3D | Solo con una malla. |
+| Modificadores | Con una malla, o con una curva activa en la línea de tiempo (sus [modificadores de curva](modificadores-de-curva.md)). |
 | Transformar | Solo con una malla en Modo Edición. |
 | Restricciones | Con cualquier objeto 3D. |
 | Scripts | Con cualquier objeto. |
@@ -173,7 +174,7 @@ Todas las pestañas y sus tarjetas están en el manual: [Propiedades](propiedade
 
 | Pestaña | Qué tiene |
 |---|---|
-| Archivo / Render (diskette) | **Archivo**: abrir, guardar, guardar como, guardar versión, extraer assets. **Render**: ruta, tamaño, pases extra, fondo, **Trazado de rayos** (rayos, muestras, pases), Renderizar imagen y Renderizar animación. **Juego**: plataforma (Windows, Symbian, Linux .deb, AppImage, WebGL, Android, Android 2.3), ventana, orientación, icono, física, sonido, volumen, **resolución** (el porcentaje de la pantalla al que dibuja el juego: en Android 2.3 el sistema lo estira, y en esos teléfonos dibujar menos píxeles da más cuadros) y Compilar juego (con un teléfono conectado por adb lo instala y lo abre). **Exportar**: OBJ, glTF, GLB, STL (solo los triángulos, para imprimir en 3D o pasar a un programa de CAD). **Ajustes**: idioma, antialiasing, gráficos, skin, logs, escala, **Atajos de teclado…** y Guardar cambios. |
+| Archivo / Render (diskette) | **Archivo**: abrir, guardar, guardar como, guardar versión, extraer assets. **Render**: ruta, nombre, **formato** (PNG, JPG, y MKV o MP4 si la computadora tiene ffmpeg) con su calidad, tamaño, pases extra, fondo, **Trazado de rayos** (rayos, muestras, pases), **Composición final** (con alfa en PNG y con postprocesado), Renderizar imagen, Renderizar animación (en video, **Con sonido**) y **Renderizar audio** (con su formato, **Audio**, y su **Bitrate**). **Juego**: plataforma (Windows, Symbian, Linux .deb, AppImage, WebGL, Android, Android 2.3), ventana, orientación, icono, física, sonido, volumen, **resolución** (el porcentaje de la pantalla al que dibuja el juego: en Android 2.3 el sistema lo estira, y en esos teléfonos dibujar menos píxeles da más cuadros) y Compilar juego (con un teléfono conectado por adb lo instala y lo abre). En el editor web no se compila: hacen falta las herramientas de la computadora, así que ahí la tarjeta solo tiene con qué escena arranca y el volumen. **Exportar**: OBJ, glTF, GLB, STL (solo los triángulos, para imprimir en 3D o pasar a un programa de CAD). **Ajustes**: idioma, antialiasing, gráficos, skin, logs, escala, **Atajos de teclado…** y Guardar cambios. |
 | Objeto | Posición, rotación (Euler, cuaternión o eje-ángulo), escala, nombre, visible, renderizar; animaciones y paleta del objeto. |
 | Contextual | Depende del tipo: partes de malla y **material** (textura, iluminación, color de vértice, transparencia, reflejos, normal map, mezcla, profundidad, capas de textura, **Avanzado: shader personalizado** — ver [Shaders escritos](shaders.md); Rugosidad, Metálico, Transmisión e IOR con trazado de rayos), luz, cámara, niebla, partículas, física, hitbox, esqueleto y huesos, elementos 2D, prefabs, rutinas. |
 | Malla 3D | La malla usada (y cuántos la comparten), mapas UV, capas de color, grupos de vértices, grupos UV. Con un recurso elegido en la Biblioteca: sus datos y su ubicación (dentro o fuera del .w3d). |
@@ -182,7 +183,7 @@ Todas las pestañas y sus tarjetas están en el manual: [Propiedades](propiedade
 | Esqueleto 2D | Esqueletos y huesos 2D de la malla. |
 | Restricciones | Copiar posición, Copiar rotación, Billboard (mirar a la cámara), Child Of. |
 | Scripts | Los scripts Lua del objeto y sus propiedades (ver el [documento de Lua](../lua/README.md)). |
-| Animación | La animación activa, capas de mezcla (Mix), valores exactos del keyframe elegido y cortes de cámara. |
+| Animación | La animación activa, capas de mezcla (Mix), las curvas elegidas (interpolación y manijas de todos sus keyframes), los keyframes elegidos con sus valores exactos y los cortes de cámara. Con varias curvas o keyframes elegidos, la tarjeta dice cuántos son, lo que no coincide entre ellos se ve con un guion y lo que se escribe va a todos. |
 
 ## Rutinas
 

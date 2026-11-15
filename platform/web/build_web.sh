@@ -101,6 +101,9 @@ EMFLAGS="$EMFLAGS -sMIN_SAFARI_VERSION=140100"
 #   -sEXPORTED_RUNTIME_METHODS=ccall,FS,UTF8ToString  el picker (EM_JS) usa ccall (llamar a C) y FS
 #                                        (leer/escribir archivos); la descarga usa UTF8ToString
 EMFLAGS="$EMFLAGS -sEXPORTED_RUNTIME_METHODS=ccall,FS,UTF8ToString"
+#   -lidbfs.js   IndexedDB como sistema de archivos: la carpeta del usuario (config.ini, atajos) sobrevive a recargar
+#                la pagina (el preRun de shell.html la monta; W3dWebPersistir vuelca al guardar)
+EMFLAGS="$EMFLAGS -lidbfs.js"
 EMFLAGS="$EMFLAGS --preload-file res@/res --shell-file platform/web/shell.html"
 
 echo "Compilando editor Whisk3D para WebGL ($(echo $SRC | wc -w) fuentes)..."

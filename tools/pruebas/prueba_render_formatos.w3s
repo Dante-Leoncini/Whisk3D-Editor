@@ -1,0 +1,70 @@
+# ==========================================================================
+#  EL FORMATO DEL RENDER A ARCHIVO (tarjeta Render)
+#  PNG y JPG: una imagen por pase y por cuadro. MKV y MP4: Render Animation hace un video por pase con el ffmpeg de la
+#  maquina (sin ffmpeg, los controles de los videos se saltean). La COMPOSICION FINAL se puede no guardar; con ella, con
+#  ALFA (PNG RGBA: el alfa sale del pase de alfa) y con el POSTPROCESADO.
+# ==========================================================================
+escenadefecto
+rutinaset Constructor 0 n 1 0 1 1
+frame 1
+# ---- JPG ----
+borrararchivo /tmp/w3d_fmt_0001.jpg
+borrararchivo /tmp/w3d_fmt_0001.png
+renderformato jpg 95
+renderimage /tmp w3d_fmt.png
+existe /tmp/w3d_fmt_0001.jpg
+existe /tmp/w3d_fmt_0001.png no
+pngpx /tmp/w3d_fmt_0001.jpg 4 4 255 0 255 - 6
+# ---- PNG con ALFA: el fondo transparente, el cubo opaco ----
+borrararchivo /tmp/w3d_fmt_0001.png
+renderformato png
+renderfinal 1 1 1
+renderimage /tmp w3d_fmt.png
+pngpx /tmp/w3d_fmt_0001.png 2 2 255 0 255 0
+pngpx /tmp/w3d_fmt_0001.png 640 360 0 0 0 255 255
+# ---- SIN la composicion final: solo los pases tildados ----
+borrararchivo /tmp/w3d_fmt_0001.png
+borrararchivo /tmp/w3d_fmt_alpha_0001.png
+renderfinal 0 0 1
+renderpases 0 0 1
+renderimage /tmp w3d_fmt.png
+existe /tmp/w3d_fmt_0001.png no
+existe /tmp/w3d_fmt_alpha_0001.png
+pngpx /tmp/w3d_fmt_alpha_0001.png 2 2 0 0 0
+renderpases 0 0 0
+renderfinal 1 0 1
+# ---- VIDEOS: Ctrl+F12 = Render Animation. UN video, la composicion final: sin pases (aunque esten tildados) y aunque
+#      la composicion final este destildada (los pases son de las secuencias de imagenes) ----
+borrararchivo /tmp/w3d_fmt.mp4
+borrararchivo /tmp/w3d_fmt_alpha.mp4
+borrararchivo /tmp/w3d_fmt_alpha_0001.png
+borrararchivo /tmp/w3d_fmt.mkv
+renderrango 1 3
+renderformato mp4 80
+renderpases 1 1 1
+renderfinal 0 0 1
+teclareal 3d Ctrl+F12
+videocuadros /tmp/w3d_fmt.mp4 3 1280 720
+existe /tmp/w3d_fmt_alpha.mp4 no
+existe /tmp/w3d_fmt_alpha_0001.png no
+renderpases 0 0 0
+renderfinal 1 0 1
+renderformato mkv 100
+teclareal 3d Ctrl+F12
+videocuadros /tmp/w3d_fmt.mkv 3 1280 720
+# (Render Image con un formato de video: la imagen en PNG)
+borrararchivo /tmp/w3d_fmt_0001.png
+frame 1
+teclareal 3d F12
+existe /tmp/w3d_fmt_0001.png
+renderrango 0 0
+renderformato png
+# ---- SIN PANEL DE PROPIEDADES NI VISTA 3D en la pantalla: F12 renderiza igual (las opciones son del programa) ----
+renderformato png
+vptipo 3 4
+vptipo 1 3
+borrararchivo /tmp/w3d_fmt_0002.png
+frame 2
+teclareal uv F12
+existe /tmp/w3d_fmt_0002.png
+pngpx /tmp/w3d_fmt_0002.png 2 2 255 0 255

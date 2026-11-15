@@ -2,6 +2,19 @@ apply plugin: 'com.android.application'
 
 // Version = fecha de compilacion YY.MM.DD (mismo criterio que el .deb / .exe).
 def buildDate = new Date().format('yy.MM.dd')
+// El NUMERO de version (versionCode) tambien sale de la fecha: Google Play pide que crezca en cada subida (antes era
+// siempre 1). yyMMddHH y un digito mas con los minutos de a 6 (dos AAB en la misma hora no repiten el numero):
+// 261112004 = 12/11/26 a las 00:24. Entra de sobra en el maximo (2100000000).
+def ahora = new Date()
+def buildCode = Integer.parseInt(ahora.format('yyMMddHH')) * 10 + Integer.parseInt(ahora.format('mm')).intdiv(6)
+// EL AAB DE GOOGLE PLAY (bundleRelease) pide Android 7.0 (API 24) como minimo: lo exige la proteccion automatica de
+// Play. El APK de la pagina (assembleDebug) sigue desde Android 5.0 (API 21).
+def paraPlay = gradle.startParameter.taskNames.any { it.toLowerCase().contains('bundle') }
+
+// LA CLAVE DE SUBIDA a Google Play: Play no acepta nada firmado con la clave de debug. La clave y sus contrasenias
+// son PRIVADAS y no estan en el repo: las da ~/.gradle/gradle.properties (W3D_SUBIDA_*). Sin ellas, el release se
+// firma con la de debug como antes (sirve para probar, no para Play).
+def hayClaveSubida = project.hasProperty('W3D_SUBIDA_STORE_FILE') && file(project.property('W3D_SUBIDA_STORE_FILE')).exists()
 
 // Las mismas ABIs que compila jni/Application.mk (no 'x86': no se genera .so).
 // Una sola fuente de verdad: se usan para abiFilters Y para el nombre del APK, asi
@@ -9,25 +22,37 @@ def buildDate = new Date().format('yy.MM.dd')
 def supportedAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
 
 android {
-    compileSdkVersion 34
+    // 36 = Android 16: Google Play lo pide para apps nuevas y actualizaciones desde el 31/08/2026. Desde la 35 la
+    // ventana va de borde a borde (Whisk3DActivity le da el margen de las barras, del notch y del teclado)
+    compileSdkVersion 36
     defaultConfig {
         applicationId "com.whisk3d"
-        minSdkVersion 21
-        targetSdkVersion 34
-        versionCode 1
+        minSdkVersion paraPlay ? 24 : 21
+        targetSdkVersion 36
+        versionCode buildCode
         versionName buildDate
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters(*supportedAbis)
         }
     }
+    signingConfigs {
+        if (hayClaveSubida) {
+            subida {
+                storeFile file(project.property('W3D_SUBIDA_STORE_FILE'))
+                storePassword project.property('W3D_SUBIDA_STORE_PASSWORD')
+                keyAlias project.property('W3D_SUBIDA_KEY_ALIAS')
+                keyPassword project.property('W3D_SUBIDA_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // firmar con el keystore de debug (~/.android/debug.keystore, AGP lo crea/usa
-            // solo): no subimos el keystore real y el APK queda instalable directo.
-            signingConfig signingConfigs.debug
+            // el AAB para Google Play (./gradlew bundleRelease): con la clave de subida. Sin ella, la de debug
+            // (~/.android/debug.keystore, AGP la crea/usa sola). El APK de la pagina sigue siendo el de assembleDebug.
+            signingConfig hayClaveSubida ? signingConfigs.subida : signingConfigs.debug
         }
     }
     namespace 'com.whisk3d'

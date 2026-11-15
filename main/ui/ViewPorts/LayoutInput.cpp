@@ -154,6 +154,13 @@ static ViewportBase* LayoutCrearViewport(int aId) {
 //  hacia abajo y lo que se elige ahi es lo que muestra el panel de abajo.
 //  El timeline no necesita alto: 12 % alcanza para la barra y el dope.
 // ====================================================================
+// la pantalla es de un TELEFONO o una tablet que se usa con el dedo: Android siempre; en la web, si el puntero principal
+// del navegador es el dedo (main.cpp lo averigua al arrancar). Decide el layout de fabrica de abajo
+#ifdef __ANDROID__
+bool g_w3dTelefono = true;
+#else
+bool g_w3dTelefono = false;
+#endif
 ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut) {
     Viewport3D* vp3d = new Viewport3D();
     if (vp3dOut) *vp3dOut = vp3d;
@@ -167,8 +174,8 @@ ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut) {
         // vertical (N95 240x320): 3D arriba / Propiedades abajo
         return new ViewportColumn(vp3d, new Properties(), 0.7f);
     }
-#ifdef __ANDROID__
-    // ANDROID: el espacio del telefono es oro. Sin outliner (la biblioteca/escena se abre cambiando el tipo de un
+    if (g_w3dTelefono) {
+    // TELEFONO (Android, o el navegador de un telefono): el espacio es oro. Sin outliner (la biblioteca/escena se abre cambiando el tipo de un
     // viewport cuando hace falta) y, parado, sin timeline: solo el visor 3D arriba y las propiedades abajo.
     //     vertical               horizontal
     //     +-------------+        +-------------------+---------+
@@ -178,7 +185,7 @@ ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut) {
     //     +-------------+        +-------------------+---------+
     if (h > w) return new ViewportColumn(vp3d, new Properties(), 0.58f);
     return new ViewportRow(new ViewportColumn(vp3d, new Timeline(), 0.86f), new Properties(), 0.68f);
-#endif
+    }
     if (h > w) {
         // VERTICAL con pantalla grande (un telefono parado): el mismo reparto pero apilado. El layout
         // apaisado (columna a la derecha) en vertical dejaba outliner y propiedades aplastados y sin texto.
@@ -555,7 +562,9 @@ static void LayoutAccionTipo(int aId) {
     gMenuTipoDe = NULL;
     if (aId >= 100) return; // ids de los checkbox del UV editor: el item los togglea solo
     // acciones de layout: ids ALTOS para no chocar con los tipos de viewport (0..9 = tipos)
-    if (aId == 23) { LayoutMaximizar(); return; }         // Maximize / Minimize (fullscreen del activo)
+    // Maximize / Minimize: el viewport del MENU (no el activo: con el dedo, el toque en la opcion ya hizo activo al
+    // viewport que esta debajo de ella -la Linea de tiempo- y se maximizaba ese)
+    if (aId == 23) { if (!g_rootGuardado) viewPortActive = vp; LayoutMaximizar(); return; }
     if (aId == 20) { LayoutExpandir(vp); return; }
     if (aId == 21) { LayoutDividir(vp, true); return; }   // en columnas (lado a lado)
     if (aId == 22) { LayoutDividir(vp, false); return; }  // en filas (apilados)
@@ -2995,8 +3004,8 @@ static void LayoutAbrirMenuIDEEditar(IDE* ide, int x, int y) {
     gIDEEditarDe = ide;
     if (!gMenuIDEEditar) { gMenuIDEEditar = new PopupMenu(); gMenuIDEEditar->action = LayoutAccionIDEEditar; }
     gMenuIDEEditar->Limpiar();
-    gMenuIDEEditar->Agregar(T("Undo"), IDEE_Deshacer)->atajo = "@ide.deshacer";
-    gMenuIDEEditar->Agregar(T("Redo"), IDEE_Rehacer)->atajo = "@ide.rehacer";
+    gMenuIDEEditar->Agregar(T("Undo"), IDEE_Deshacer, (int)IconType::deshacer)->atajo = "@ide.deshacer";
+    gMenuIDEEditar->Agregar(T("Redo"), IDEE_Rehacer, (int)IconType::rehacer)->atajo = "@ide.rehacer";
     gMenuIDEEditar->Agregar(T("Cut"), IDEE_Cortar, IconType::tijera)->atajo = "@ide.cortar";
     gMenuIDEEditar->Agregar(T("Copy"), IDEE_Copiar, IconType::copiar)->atajo = "@ide.copiar";
     gMenuIDEEditar->Agregar(T("Paste"), IDEE_Pegar, IconType::pegar)->atajo = "@ide.pegar";
@@ -3805,11 +3814,43 @@ void LayoutMenuArmEdit(int mx, int my) {
 //   Edit Mode   -> el contexto de la MALLA segun el sub-modo (Vertex / Edge / Face), o el de
 //                  huesos si se esta editando un armature
 //   Pose Mode   -> "Pose"
+// el menu CONTEXTUAL lleva arriba DESHACER y REHACER (las flechas curvas). El menu de base es el MISMO que abre el
+// boton de la barra: para no meterle esas dos opciones al de la barra, el contextual es una COPIA (cada opcion con su
+// id, su accion, su submenu y su atajo: elegirla hace exactamente lo mismo) con las dos flechas arriba
+static PopupMenu* g_menuCtxConDeshacer = NULL;
+static bool g_ctxHayUndo = false, g_ctxHayRedo = false;
+static void CtxDeshacer() { extern void RebindMaterialMeshPart(); UndoDeshacer(); RebindMaterialMeshPart(); g_redraw = true; }
+static void CtxRehacer()  { extern void RebindMaterialMeshPart(); UndoRehacer();  RebindMaterialMeshPart(); g_redraw = true; }
+static void ContextoConDeshacer(int mx, int my) {
+    PopupMenu* base = LayoutMenuAbierto() ? MenuAbierto : NULL;
+    if (!base) return;
+    if (!g_menuCtxConDeshacer) g_menuCtxConDeshacer = new PopupMenu();
+    PopupMenu* c = g_menuCtxConDeshacer;
+    if (base == c) return;
+    c->Limpiar();
+    c->titulo = base->titulo; c->action = base->action;
+    g_ctxHayUndo = UndoHayAlgo(); g_ctxHayRedo = UndoHayRedo();
+    const int idUndo = 900001, idRedo = 900002;   // (no chocan con los de ningun menu)
+    MenuItem* u = c->Agregar(T("Undo"), idUndo, (int)IconType::deshacer); u->accion = CtxDeshacer; u->atajo = "@global.deshacer"; u->gris = &g_ctxHayUndo;
+    MenuItem* r = c->Agregar(T("Redo"), idRedo, (int)IconType::rehacer);  r->accion = CtxRehacer;  r->atajo = "@global.rehacer";  r->gris = &g_ctxHayRedo;
+    for (size_t i = 0; i < base->items.size(); i++) {
+        const MenuItem* o = base->items[i];
+        MenuItem* n = c->Agregar(o->text, o->id, o->icon, o->submenu);
+        n->checkbox = o->checkbox; n->gris = o->gris; n->accion = o->accion; n->atajo = o->atajo; n->verde = o->verde;
+        n->valorFloat = o->valorFloat; n->vmin = o->vmin; n->vmax = o->vmax;
+        n->lineaArriba = o->lineaArriba || i == 0;   // (una linea entre las flechas y el menu de siempre)
+    }
+    base->Cerrar();
+    c->Resize();
+    c->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = c;
+}
 void LayoutMenuContexto3D(int mx, int my) {
     if (MenuAbierto) MenuAbierto->Cerrar();
     if (InteractionMode == EditMode) {
         if (BoneEditActivo()) LayoutMenuArmEdit(mx, my);
         else                  LayoutMenuEditContexto(mx, my);
+        ContextoConDeshacer(mx, my);
         return;
     }
     PopupMenu* m = NULL;
@@ -3826,6 +3867,7 @@ void LayoutMenuContexto3D(int mx, int my) {
     m->Resize();
     m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = m;
+    ContextoConDeshacer(mx, my);
     g_redraw = true;
 }
 
@@ -5153,6 +5195,99 @@ bool LayoutMenuDragArrancar(int mx, int my){
     g_menuDrag = sc; g_menuDragY0 = my; g_menuDragScroll0 = sc->scroll; g_menuDragMoved = false;
     return true;
 }
+// ============================================================================================================
+//  EL MENU DESPLEGABLE CON EL DEDO: mantener, deslizar y soltar. Apoyar el dedo sobre un menu abierto NO elige: la
+//  opcion de abajo del dedo se RESALTA mientras se desliza (y una que abre un submenu lo abre, como el hover del mouse)
+//  y SOLTAR elige esa. Soltar AFUERA del menu lo cierra sin elegir nada. En un menu largo (con barra de scroll), llevar
+//  el dedo al borde de arriba o de abajo lo va scrolleando solo (mas rapido cuanto mas al borde).
+//  Lo arranca controles.cpp con el down de un dedo. La pulsacion larga del 3D abre el menu contextual con el dedo
+//  todavia apoyado: ahi soltar sin haberlo movido deja el menu abierto (para tocar la opcion despues).
+//  El mouse sigue como siempre (click elige).
+// ============================================================================================================
+extern void MenuLimpiarGuardAbrir();   // PopupMenu.cpp
+static bool g_mtActivo = false;
+static bool g_mtLargo = false;     // lo abrio una pulsacion larga (ver arriba)
+static bool g_mtMovio = false;
+static int  g_mtX0 = 0, g_mtY0 = 0, g_mtX = 0, g_mtY = 0;
+static unsigned g_mtUltScroll = 0;
+// el menu abierto mas hondo que contiene el punto (se dibuja encima de los otros)
+static PopupMenu* MenuMasHondoEn(int mx, int my){
+    PopupMenu* t = NULL;
+    for (PopupMenu* m = MenuAbierto; m && m->abierto; m = m->submenuAbierto) if (m->Contains(mx, my)) t = m;
+    return t;
+}
+static int FilaDeMenu(PopupMenu* m, int my){
+    const int oy = m->titulo.empty() ? 0 : (RenglonHeightGS + gapGS);
+    return m->scroll + (my - m->y - borderGS - oy) / (RenglonHeightGS + gapGS);
+}
+static void MenuToqueResaltar(int mx, int my){
+    if (!MenuAbierto) return;
+    if (MenuAbierto->ContieneConSubmenus(mx, my)) { MenuAbierto->MouseMove(mx, my); return; }   // (resalta + submenus)
+    // afuera: nada resaltado (soltar no elige)
+    PopupMenu* d = MenuAbierto;
+    while (d->submenuAbierto && d->submenuAbierto->abierto) d = d->submenuAbierto;
+    d->selectIndex = -1;
+}
+bool LayoutMenuToqueArrancar(int mx, int my, bool desdeLargo){
+    g_mtActivo = false;
+    if (!LayoutMenuAbierto()) return false;
+    const bool adentro = MenuAbierto->ContieneConSubmenus(mx, my);
+    if (!adentro && !desdeLargo) return false;   // afuera: el click de siempre lo cierra (LayoutClickUI)
+    // una fila SLIDER (un valor con su barra) sigue con su arrastre de siempre
+    PopupMenu* m = adentro ? MenuMasHondoEn(mx, my) : NULL;
+    if (m) { const int f = FilaDeMenu(m, my);
+             if (f >= 0 && f < (int)m->items.size() && m->items[f]->valorFloat) return false; }
+    g_mtActivo = true; g_mtLargo = desdeLargo; g_mtMovio = false;
+    g_mtX0 = g_mtX = mx; g_mtY0 = g_mtY = my; g_mtUltScroll = 0;
+    if (adentro) MenuToqueResaltar(mx, my);
+    g_redraw = true;
+    return true;
+}
+bool LayoutMenuToqueActivo(){
+    if (g_mtActivo && !LayoutMenuAbierto()) g_mtActivo = false;   // (el menu se cerro por otro lado)
+    return g_mtActivo;
+}
+void LayoutMenuToqueMover(int mx, int my){
+    if (!LayoutMenuToqueActivo()) return;
+    g_mtX = mx; g_mtY = my;
+    if (abs(mx - g_mtX0) + abs(my - g_mtY0) > 8 * GlobalScale) g_mtMovio = true;
+    MenuToqueResaltar(mx, my);
+    g_redraw = true;
+}
+void LayoutMenuToqueSoltar(int mx, int my){
+    if (!LayoutMenuToqueActivo()) { g_mtActivo = false; return; }
+    g_mtActivo = false;
+    g_redraw = true;
+    if (g_mtLargo && !g_mtMovio) return;   // el dedo de la pulsacion larga: el menu queda abierto
+    PopupMenu* m = MenuAbierto;
+    if (!m->ContieneConSubmenus(mx, my)) { m->Cerrar(); return; }   // soltado afuera: se cierra sin elegir
+    MenuLimpiarGuardAbrir();   // (soltar es deliberado: elige aunque el submenu se haya abierto con este mismo dedo)
+    const int id = m->Click(mx, my);
+    if (id >= 0) m->Ejecutar(id);
+}
+void LayoutMenuToqueCancelar(){ g_mtActivo = false; }   // (un 2do dedo)
+// cada cuadro: el dedo en el borde de arriba o de abajo de un menu largo lo va scrolleando
+void LayoutMenuToqueTick(unsigned ahoraMs){
+    if (!LayoutMenuToqueActivo()) return;
+    PopupMenu* m = MenuMasHondoEn(g_mtX, g_mtY);
+    if (!m || m->MaxScroll() <= 0) return;
+    const int rowH = RenglonHeightGS + gapGS;
+    const int oy = m->titulo.empty() ? 0 : rowH;
+    const int arriba = m->y + borderGS + oy, abajo = m->y + m->height - borderGS;
+    int dir = 0, prof = 0;
+    if (g_mtY < arriba + rowH)      { dir = -1; prof = arriba + rowH - g_mtY; }
+    else if (g_mtY > abajo - rowH)  { dir = +1; prof = g_mtY - (abajo - rowH); }
+    if (!dir) return;
+    g_redraw = true;   // (mientras el dedo este en el borde, el loop no duerme)
+    // recien entrado al borde: una fila cada 160 ms; pegado al borde: cada 50
+    int intervalo = 160 - prof * 110 / (rowH > 0 ? rowH : 1);
+    if (intervalo < 50) intervalo = 50; if (intervalo > 160) intervalo = 160;
+    if (g_mtUltScroll != 0 && ahoraMs - g_mtUltScroll < (unsigned)intervalo) return;
+    g_mtUltScroll = ahoraMs;
+    int s = m->scroll + dir;
+    if (s < 0) s = 0; if (s > m->MaxScroll()) s = m->MaxScroll();
+    if (s != m->scroll) { m->scroll = s; g_mtMovio = true; MenuToqueResaltar(g_mtX, g_mtY); }
+}
 // llamado en el UP: si NO se arrastro (fue un tap), selecciona el item bajo el cursor. true = consumido.
 bool LayoutMenuDragSoltar(int mx, int my){
     if (!g_menuDrag) return false;
@@ -5831,9 +5966,9 @@ bool LayoutTeclaViewport(int tecla, bool repeticion, bool traducir){
     if (!viewPortActive || tecla == W3dK_NADA) return false;
     W3dModsTemporales mods;
     if (traducir) {
-        int ctx[4]; const int n = W3dAtajoContextos(ctx);
+        int ctx[6]; const int n = W3dAtajoContextos(ctx);
         const int m0 = W3dModsActuales(); int m = m0;
-        if (!W3dAtajoTraducir(ctx, n, tecla, m)) return true;   // combinacion sin funcion: se traga
+        if (!W3dAtajoTraducir(ctx, n, tecla, m, repeticion)) return true;   // combinacion sin funcion (o corrio su accion): se traga
         if (m != m0) mods.Fijar(m);
     }
     viewPortActive->event_key_down(tecla, repeticion);
@@ -6134,3 +6269,37 @@ void W3dAyudaRender(int screenW, int screenH) {
     RenderBitmapText(txt);
     w3dEngine::PopMatrix();
 }
+
+// ============================================================================
+// ATAJOS DE LAS OPERACIONES SIN TECLA DE FABRICA (app/W3dAtajos.h): las de los menus de la vista 3D, el editor UV y
+// el 2D. La combinacion que el usuario les asigna corre la MISMA accion que la opcion del menu, sobre el viewport
+// que tiene el foco (el que recibe el teclado).
+// ============================================================================
+static UVEditor* AtajoUV() {
+    return (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 4) ? (UVEditor*)viewPortActive : NULL;
+}
+static Editor2D* Atajo2D() {
+    return (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 6) ? (Editor2D*)viewPortActive : NULL;
+}
+static void AtajoUVVista(int id)  { UVEditor* uv = AtajoUV(); if (!uv) return; gMenuUVDe = uv; LayoutAccionUVView(id); g_redraw = true; }
+static void AtajoUVCursor(int id) { UVEditor* uv = AtajoUV(); if (!uv) return; gUVSnapTarget = uv; LayoutAccionUVSnap(id); g_redraw = true; }
+static void Atajo2DObjeto(int id) { Editor2D* ed = Atajo2D(); if (!ed) return; gEditor2DMenu = ed; LayoutAccion2DObject(id); g_redraw = true; }
+static void Atajo2DVista(int id)  { Editor2D* ed = Atajo2D(); if (!ed) return; gEditor2DView = ed; LayoutAccion2DView(id); g_redraw = true; }
+// (las acciones de los menus de la 3D operan sobre Viewport3DActive: que sea la vista que recibe el teclado)
+static void AtajoFoco3D() {
+    if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 1) Viewport3DActive = (Viewport3D*)viewPortActive;
+}
+static void AtajoObjeto(int id)   { AtajoFoco3D(); LayoutAccionObject(id); g_redraw = true; }
+static void AtajoVista3D(int id)  { AtajoFoco3D(); LayoutAccionView(id); g_redraw = true; }
+static void AtajoSombreado(int id){ AtajoFoco3D(); LayoutAccionRender(id); g_redraw = true; }
+static struct RegistroAtajosLayout {
+    RegistroAtajosLayout() {
+        W3dAtajoRegistrarDespacho("obj", AtajoObjeto);
+        W3dAtajoRegistrarDespacho("vista3d", AtajoVista3D);
+        W3dAtajoRegistrarDespacho("sombreado", AtajoSombreado);
+        W3dAtajoRegistrarDespacho("uvvista", AtajoUVVista);
+        W3dAtajoRegistrarDespacho("uvcursor", AtajoUVCursor);
+        W3dAtajoRegistrarDespacho("2dobj", Atajo2DObjeto);
+        W3dAtajoRegistrarDespacho("2dvista", Atajo2DVista);
+    }
+} sRegistroAtajosLayout;

@@ -339,13 +339,17 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
         RUNTIME DESTINATION bin
     )
 
+    # (las TRADUCCIONES, res/idiomas/*.txt, y la fuente .w3dfnt tambien: sin ellas el editor instalado salia en ingles)
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/res/
         DESTINATION share/Whisk3d/res
         FILES_MATCHING
         PATTERN "*.png"
         PATTERN "*.svg"
         PATTERN "*.ini"
+        PATTERN "*.txt"
+        PATTERN "*.w3dfnt"
         PATTERN "Skins/*"
+        PATTERN "installer" EXCLUDE
     )
 
     install(FILES ${CMAKE_SOURCE_DIR}/platform/linux/whisk3d.desktop

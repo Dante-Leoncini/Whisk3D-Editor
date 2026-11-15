@@ -23,8 +23,11 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
+    <!-- enableOnBackInvokedCallback=false: con targetSdk 36 el "atras predictivo" viene prendido y Android deja de
+         llamar a onBackPressed, que es por donde SDL (SDLActivity) le pasa la tecla Atras al editor -->
     <application
         android:requestLegacyExternalStorage="true"
+        android:enableOnBackInvokedCallback="false"
         android:allowBackup="true"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"

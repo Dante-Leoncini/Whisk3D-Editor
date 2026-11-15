@@ -475,6 +475,9 @@ static void ArmarEscena(RTEscena& e) {
 // lente / foco: la PROFUNDIDAD DE CAMPO de la camara (Camera::dof): el radio de la lente (m, 0 = agujerito: todo nitido) y
 // la distancia enfocada (m)
 struct RTCamara { RTV pos, der, arr, adel; float sx, sy, zoom, panX, panY; bool orto; float lente, foco; };
+// EL RENDER POR FRANJAS (RTRenderizarFranjas): la imagen que se traza es una FRANJA de alto h que empieza en la fila
+// g_rtFranjaY0 de una imagen de g_rtFranjaAlto filas (0 = la imagen entera). La camara es la misma, mirando ese pedazo
+static int g_rtFranjaY0 = 0, g_rtFranjaAlto = 0;
 // 'vista' = lo que se ve en el viewport (su lente tal cual: el marco de la camara, el zoom y el pan); si no, el render
 // a archivo: la imagen entera de w x h con la camara (o la vista), sin inspeccion
 static void CamaraDe(Viewport3D* vp, int w, int h, RTCamara& c, bool vista) {
@@ -489,8 +492,12 @@ static void CamaraDe(Viewport3D* vp, int w, int h, RTCamara& c, bool vista) {
     if (vista) { c.sx = L.sx; c.sy = L.sy; c.zoom = L.zoom; c.panX = L.panX; c.panY = L.panY; return; }
     float t = tanf((camFrame ? CameraActive->fov : fovDeg) * 0.5f * 3.14159265f / 180.0f);
     if (c.orto) { t *= vp->orbitDistance; if (t < 0.001f) t = 0.001f; }
-    c.sy = t; c.sx = t * ((h > 0) ? (float)w / (float)h : 1.0f);
+    const int hTot = (g_rtFranjaAlto > 0) ? g_rtFranjaAlto : h;
+    c.sy = t; c.sx = t * ((hTot > 0) ? (float)w / (float)hTot : 1.0f);
     c.zoom = 1.0f; c.panX = c.panY = 0.0f;
+    // una FRANJA (filas y0..y0+h de hTot): su alto es la parte que le toca del alto de la imagen y se corre hacia arriba
+    // o hacia abajo (fila py de la franja = fila y0 + py de la imagen)
+    if (g_rtFranjaAlto > 0 && h > 0) { c.sy = t * (float)h / (float)hTot; c.panY = -(float)(hTot - 2 * g_rtFranjaY0 - h) / (float)h; }
 }
 // LA LENTE: el rayo sale de un punto al azar del disco de la lente hacia el MISMO punto del plano enfocado (lo que esta a
 // esa distancia queda nitido; lo de mas cerca y mas lejos, desparramado en un disco que crece con la distancia al foco)
@@ -903,7 +910,8 @@ struct RTRender {
     // la SEMILLA del ruido de una imagen nueva: con "otro ruido en cada imagen" cambia (si no, 0: la misma siempre)
     unsigned int semilla;
     void NuevaSemilla() { static unsigned int cont = 0; semilla = g_rt.semillaVariable ? ++cont : 0u; }
-    void Iniciar(Viewport3D* vp, int W, int H, bool conPreview) {
+    // reusarEscena: la escena ya armada (las franjas de un mismo render: el BVH una sola vez)
+    void Iniciar(Viewport3D* vp, int W, int H, bool conPreview, bool reusarEscena = false) {
         NuevaSemilla();
         w = W; h = H; tilesX = (w + kTile - 1) / kTile; tilesY = (h + kTile - 1) / kTile;
         acum.assign((size_t)w * h * 3, 0.0f); img.assign((size_t)w * h * 4, 255);
@@ -915,10 +923,11 @@ struct RTRender {
         if (denoiser) { aovAlb.assign((size_t)w * h * 3, 0.0f); aovNrm.assign((size_t)w * h * 3, 0.0f); }
         else { aovAlb.clear(); aovNrm.clear(); }
         const double tp0 = W3dNowMs();
-        ArmarEscena(esc); CamaraDe(vp, w, h, cam, conPreview);
+        if (!reusarEscena) ArmarEscena(esc);
+        CamaraDe(vp, w, h, cam, conPreview);
         const double tp1 = W3dNowMs();
         // LA GPU: la escena sube una vez; los pases son tan rapidos que no hace falta la escalera de preview
-        gpu = g_rt.gpu && RTGpuDisponible() && EscenaAGpu(esc) && RTGpuImagen(w, h);
+        gpu = g_rt.gpu && RTGpuDisponible() && ((reusarEscena && g_rtGpuDuenio == this) || EscenaAGpu(esc)) && RTGpuImagen(w, h);
         if (g_rtPerfil) w3dLogf("[rt perfil] armar %.1f ms, a la gpu %.1f ms (%d tris, %d texturas)", tp1 - tp0, W3dNowMs() - tp1,
                                              (int)esc.tris.size(), (int)esc.texs.size());
         aovGpu = false;
@@ -1504,18 +1513,20 @@ static void PaseMovimiento(RTRender& r, void* ctx) {
     MovimientoEn(r, mv, mv.t0 + (mv.t1 - mv.t0) * t);
 }
 
-static bool RenderCompleto(Viewport3D* vp, int w, int h, int pases, bool progreso) {
+// (prog0..prog1: la parte de la barra de progreso que le toca, para las franjas)
+static bool RenderCompleto(Viewport3D* vp, int w, int h, int pases, bool progreso, bool reusarEscena = false,
+                           float prog0 = 0.0f, float prog1 = 1.0f) {
     if (!vp || w <= 0 || h <= 0) return false;
     if (!g_rtOff) g_rtOff = new RTRender();
     const int pasesPrev = g_rt.pases; g_rt.pases = (pases > 0) ? pases : g_rt.pases;
-    g_rtOff->Iniciar(vp, w, h, false);   // a archivo: sin preview, directo a resolucion completa
+    g_rtOff->Iniciar(vp, w, h, false, reusarEscena);   // a archivo: sin preview, directo a resolucion completa
     if (g_rt.desenfoque && g_rt.obturador > 0.0f) {
         MovimientoArmar(*g_rtOff, vp, w, h, g_rtMov);
         g_rtOff->antesDelPase = PaseMovimiento; g_rtOff->antesCtx = &g_rtMov;
     }
     while (!g_rtOff->Terminado()) {
         g_rtOff->Avanzar(0.0);
-        if (progreso) ProgresoActualizar((float)g_rtOff->paso / (float)g_rt.pases);
+        if (progreso) ProgresoActualizar(prog0 + (prog1 - prog0) * (float)g_rtOff->paso / (float)g_rt.pases);
     }
     if (g_rtOff->antesDelPase) { OlvidarPoses(g_rtOff->esc); PosesAlCuadro(g_rtOff->esc); }   // (la pose del cuadro, otra vez)
     g_rtOff->antesDelPase = NULL; g_rtOff->antesCtx = NULL;
@@ -1527,6 +1538,24 @@ bool RTRenderizarAPNG(Viewport3D* vp, int w, int h, const std::string& ruta, std
     if (!w3dEngine::SavePNG(ruta.c_str(), &g_rtOff->img[0], w, h, false)) { msg = "Ray Tracing: could not save"; return false; }
     msg.clear();
     return true;
+}
+// EL TRAZADO POR FRANJAS DIRECTO AL ARCHIVO: la imagen de w x h de a franjas de 'altoFranja' filas, cada una a 'fn' en
+// cuanto termina (todos sus pases). En memoria hay solo una franja: el N95 y el N8 trazan en 4K escribiendo en la
+// tarjeta. La escena se arma una vez
+bool RTRenderizarFranjas(Viewport3D* vp, int w, int h, int altoFranja, W3dFranjaFn fn, void* ctx, std::string& msg) {
+    if (!vp || w <= 0 || h <= 0 || !fn) { msg = "Ray Tracing: nothing to render"; return false; }
+    if (altoFranja < 1) altoFranja = 32;
+    bool ok = true;
+    for (int y0 = 0; y0 < h && ok; y0 += altoFranja) {
+        const int bh = (y0 + altoFranja <= h) ? altoFranja : (h - y0);
+        g_rtFranjaY0 = y0; g_rtFranjaAlto = h;
+        const bool hecho = RenderCompleto(vp, w, bh, 0, true, y0 > 0, (float)y0 / (float)h, (float)(y0 + bh) / (float)h);
+        g_rtFranjaY0 = 0; g_rtFranjaAlto = 0;
+        if (!hecho) { msg = "Ray Tracing: nothing to render"; return false; }
+        if (!fn(ctx, &g_rtOff->img[0], y0, bh)) { msg = "Ray Tracing: could not save"; ok = false; }
+    }
+    if (ok) msg.clear();
+    return ok;
 }
 bool RTRenderizarABuffer(Viewport3D* vp, int w, int h, std::vector<unsigned char>& rgba, std::string& msg) {
     if (!RenderCompleto(vp, w, h, 0, true)) { msg = "Ray Tracing: nothing to render"; return false; }

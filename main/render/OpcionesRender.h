@@ -8,6 +8,7 @@
 #endif
 
 #include <iostream>
+#include <string>
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
 #else
@@ -96,5 +97,27 @@ extern float g_autoMergeThreshold;
 
 // Declaración de función
 RenderType StringToRenderType(const std::string& s);
+
+// LAS OPCIONES DEL RENDER A ARCHIVO (tarjeta Render): son del PROGRAMA, no de un panel. F12 / Ctrl+F12 y los botones
+// renderizan con esto aunque no haya ningun panel de Propiedades; los paneles solo lo muestran y lo editan
+struct W3dRenderOpc {
+    std::string carpeta, nombre;      // la salida (carpeta vacia = la de salida por defecto: en Android, Descargas)
+    float w, h;                       // el tamano en pixeles (puede ser mayor que la ventana: va por tiles)
+    bool zbuffer, normal, alfa;       // los pases extra
+    bool vectores, desenfoque;        // el pase de vectores de movimiento y el desenfoque de movimiento del beauty
+    float obturador;
+    int formato;                      // 0 PNG, 1 JPG, 2 MKV, 3 MP4 (los videos con el ffmpeg de la maquina)
+    float calidad;                    // JPG y video, 1..100 (100 = sin perdida en video)
+    bool final, finalAlfa, post;      // la COMPOSICION FINAL (se puede no guardar), con alfa (PNG RGBA) y postprocesado
+    // EL AUDIO DE LA ESCENA: el video "con sonido" y el boton "Renderizar audio". Formato 0 WAV, 1 FLAC, 2 MP3, 3 AAC,
+    // 4 Opus (el WAV lo escribe Whisk3D; los demas, el ffmpeg de la maquina); el bitrate es de los que pierden
+    bool sonido;
+    int audioFormato;
+    float audioKbps;
+    W3dRenderOpc();
+};
+extern W3dRenderOpc g_render;
+// sube cuando las opciones cambian de golpe (se abrio un proyecto): los paneles rearman sus filas
+extern unsigned g_renderGen;
 
 #endif // OPCIONESRENDER_H

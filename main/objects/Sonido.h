@@ -66,6 +66,9 @@ void W3dSonidosTickEditor();
 void W3dSonidosTickJuego();
 // calla todos (cerrar el proyecto, parar)
 void W3dSonidosCallar();
+// el audio de la escena a un archivo (tarjeta Render): los sonidos en el cuadro 'frame', con la camara de oyente
+void W3dSonidosRenderCuadro(float frame, bool primero);
+int W3dSonidosEnEscena();   // los sonidos con archivo de la escena
 // quien ESCUCHA en el editor: la vista 3D activa (la instala el viewport). Sin el, la camara activa
 extern bool (*W3dSonidoOyenteHook)(Vector3& pos, Vector3& der, Vector3& adel);
 // el tiempo de la ESCENA (segundos) de un frame del timeline: (frame - 1) / fps

@@ -161,6 +161,7 @@ extern void WP3DPinturaCancelarPendiente();   // ViewPort3D.cpp: un trazo que es
 float lastDistance = 0.0f;
 float PINCHposY = 0.0f;
 float lastCentroidX = 0.0f, lastCentroidY = 0.0f; // 2 dedos: punto medio anterior (para el paneo)
+static float lastSepX = 0.0f, lastSepY = 0.0f;    // 2 dedos: separacion anterior por eje (el zoom por eje de las curvas)
 bool g_fingerScrolling = false; // 1 dedo esta scrolleando un panel/toolbar -> el UP no debe seleccionar
 // GESTO de scroll LOCKEADO: apenas el dedo se mueve, el scroll queda "pegado" a ese viewport (barra o
 // contenido) para todo el arrastre. Sin esto, al salir de la barra/viewport empezaba a orbitar y al
@@ -205,6 +206,10 @@ Uint32 g_lastFingerTicks = 0;       // ultimo evento de DEDO: filtra los mouse F
 // mover = el menu contextual). Mientras tanto, arrastrar el dedo sigue siendo SCROLL (lo normal). El agarre queda en
 // g_outAgarre hasta levantar el dedo: el motion va derecho al outliner (no scrollea) y el up lo suelta ahi.
 static const Uint32 kPulsacionLargaMs = 500;
+// el dedo se ALEJO del punto donde se apoyo (mas que el umbral de un toque). Una pulsacion larga es un dedo QUIETO:
+// un arrastre rapido que entra entero en la espera anti-gesto (kEsperaGestoMs) no limpiaba lo pendiente y, con el
+// dedo parado despues, abria el menu contextual
+static bool g_tapMovio = false;
 // el AGARRE de la biblioteca / el outliner: un SEGUNDO quieto (mas corto se confundia con empezar a scrollear) y el
 // telefono vibra: recien ahi arrastrar mueve el elemento; antes, arrastrar es scroll
 static const Uint32 kAgarreOutlinerMs = 1000;
@@ -215,10 +220,136 @@ static bool g_contentTapTactil = false;   // el toque de contenido pendiente es 
 // DOBLE TAP (tactil): dos toques cortos seguidos en el mismo lugar = el doble click (renombrar en el outliner)
 static Uint32 g_ultimoTapTicks = 0;
 static int g_ultimoTapX = -1000, g_ultimoTapY = -1000;
+
+// ============================================================================================================
+//  SCROLL CON INERCIA (tactil): el contenido que se scrolleaba con el dedo SIGUE DESLIZANDO al soltarlo, y frena solo
+//  (como en el telefono). Mientras el dedo arrastra se guardan los ultimos movimientos; al levantarlo, si venia rapido,
+//  ese envion se sigue aplicando cuadro a cuadro con rozamiento. Vale para lo que scrollea con un dedo: el contenido
+//  de los paneles (Propiedades, outliner, biblioteca, consola, codigo), las barras de botones y el paneo del UV.
+//  Un toque nuevo lo FRENA en seco, y ese toque no elige nada (es para parar, como en el telefono).
+// ============================================================================================================
+struct MuestraScroll { Uint32 t; float dx, dy; };
+static const int kMuestrasScroll = 8;
+static MuestraScroll g_inMuestras[kMuestrasScroll];
+static int g_inMuestrasN = 0, g_inMuestrasPos = 0;
+static ViewportBase* g_inVp = NULL;      // el viewport que sigue deslizando (NULL = nada)
+static bool  g_inBarra = false;          // la barra de botones (horizontal) o el contenido
+static float g_inVx = 0.0f, g_inVy = 0.0f;           // velocidad (pixeles por milisegundo)
+static float g_inRestoX = 0.0f, g_inRestoY = 0.0f;   // fraccion de pixel que todavia no se aplico
+static Uint32 g_inUltimo = 0;
+static int g_inPx = 0, g_inPy = 0;       // donde se levanto el dedo (event_finger_scroll lo recibe)
+static int g_inQuieto = 0;               // cuadros seguidos sin que el contenido se mueva (llego al tope)
+static bool g_inFrenoToque = false;      // el toque en curso freno una inercia: al soltarlo no es un tap
+static void InerciaMuestrasLimpiar() { g_inMuestrasN = 0; g_inMuestrasPos = 0; }
+static void InerciaMuestra(int dx, int dy) {
+    MuestraScroll& m = g_inMuestras[g_inMuestrasPos];
+    m.t = SDL_GetTicks(); m.dx = (float)dx; m.dy = (float)dy;
+    g_inMuestrasPos = (g_inMuestrasPos + 1) % kMuestrasScroll;
+    if (g_inMuestrasN < kMuestrasScroll) g_inMuestrasN++;
+}
+static void InerciaParar() {
+    if (!g_inVp) return;
+    g_inVp = NULL;
+    if (!g_inBarra) PropertiesTouchScrollFin();   // el latch de la lista que se scrolleaba (Propiedades) se suelta ahora
+    g_inVx = g_inVy = 0.0f;
+}
+bool W3dInerciaActiva() { return g_inVp != NULL; }
+// al levantar el dedo: la velocidad de los ultimos ~100 ms. true = arranco a deslizar solo
+static bool InerciaArrancar(ViewportBase* vp, bool barra, int px, int py) {
+    InerciaParar();
+    if (!vp || g_inMuestrasN == 0) return false;
+    const Uint32 ahora = SDL_GetTicks();
+    const int ult = (g_inMuestrasPos + kMuestrasScroll - 1) % kMuestrasScroll;
+    if (ahora - g_inMuestras[ult].t > 60) { InerciaMuestrasLimpiar(); return false; }   // el dedo ya estaba quieto
+    float sx = 0.0f, sy = 0.0f; Uint32 t0 = ahora;
+    for (int k = 0; k < g_inMuestrasN; k++) {
+        const MuestraScroll& m = g_inMuestras[(g_inMuestrasPos + kMuestrasScroll - 1 - k) % kMuestrasScroll];
+        if (ahora - m.t > 100) break;
+        sx += m.dx; sy += m.dy; t0 = m.t;
+    }
+    InerciaMuestrasLimpiar();
+    float dt = (float)(ahora - t0); if (dt < 16.0f) dt = 16.0f;
+    float vx = sx / dt, vy = sy / dt;
+    if (barra) vy = 0.0f;
+    const float gs = (float)(GlobalScale > 0 ? GlobalScale : 1);
+    const float vMax = 6.0f * gs;                            // tope: un manotazo no tira la lista a la luna
+    const float v = sqrtf(vx * vx + vy * vy);
+    if (v < 0.12f * gs) return false;                        // soltado despacio: se queda donde esta
+    if (v > vMax) { vx *= vMax / v; vy *= vMax / v; }
+    g_inVp = vp; g_inBarra = barra; g_inVx = vx; g_inVy = vy;
+    g_inRestoX = g_inRestoY = 0.0f; g_inUltimo = ahora; g_inPx = px; g_inPy = py; g_inQuieto = 0;
+    g_redraw = true;
+    return true;
+}
+// PESTANIAS DE PROPIEDADES con el dedo: si la barra ENTRA ENTERA (no hay nada que scrollear), deslizar el dedo por las
+// pestanias las va mostrando (la que esta abajo del dedo se activa al pasar) y soltar deja la ultima. Si la barra no
+// entra, deslizar la scrollea como siempre.
+static Properties* g_tabDeslizar = NULL;
+static bool BarraEntraEntera(ViewportBase* v) {
+    if (!v || v->barScrollX != 0) return false;
+    int der = 0;
+    for (size_t i = 0; i < v->BarButtons.size(); i++) { Button* b = v->BarButtons[i];
+        if (b->visible && b->sx > -9000 && b->sx + b->width > der) der = b->sx + b->width; }
+    for (size_t i = 0; i < v->BarTabs.size(); i++) { Tab* t = v->BarTabs[i];
+        if (t->visible && t->sx + t->width > der) der = t->sx + t->width; }
+    return der <= v->x + v->width;
+}
+// la pestania de abajo del dedo (por X: el dedo puede irse un poco de la barra para arriba o para abajo)
+static void TabDeslizarEn(int mx) {
+    if (!g_tabDeslizar) return;
+    for (size_t i = 0; i < g_tabDeslizar->BarTabs.size(); i++) { Tab* t = g_tabDeslizar->BarTabs[i];
+        if (!t->visible || mx < t->sx || mx >= t->sx + t->width) continue;
+        if ((int)i != g_tabDeslizar->pestaniaActiva) { g_tabDeslizar->ClickTab(mx, t->sy + t->height / 2); g_redraw = true; }
+        // el HOVER sigue al dedo (si no, la pestania donde se apoyo quedaba iluminada junto con la nueva)
+        g_tabDeslizar->BarHover(mx, t->sy + t->height / 2);
+        return; }
+}
+static bool TabBajo(ViewportBase* v, int mx, int my) {
+    for (size_t i = 0; i < v->BarTabs.size(); i++) if (v->BarTabs[i]->visible && v->BarTabs[i]->Contains(mx, my)) return true;
+    return false;
+}
+// el MENU DESPLEGABLE con el dedo: mantener, deslizar y soltar (LayoutInput.cpp)
+extern bool LayoutMenuToqueArrancar(int mx, int my, bool desdeLargo);
+extern bool LayoutMenuToqueActivo();
+extern void LayoutMenuToqueMover(int mx, int my);
+extern void LayoutMenuToqueSoltar(int mx, int my);
+extern void LayoutMenuToqueCancelar();
+extern void LayoutMenuToqueTick(unsigned ahoraMs);
+// un cuadro de la inercia (lo llama ControlesTick)
+static void InerciaTick() {
+    if (!g_inVp) return;
+    if (!fingers.empty() || leftMouseDown) { InerciaParar(); return; }   // (un dedo apoyado la frena: ver el down)
+    const Uint32 ahora = SDL_GetTicks();
+    float dt = (float)(ahora - g_inUltimo); g_inUltimo = ahora;
+    if (dt <= 0.0f) { g_redraw = true; return; }
+    if (dt > 50.0f) dt = 50.0f;                              // un cuadro trabado no da un salto
+    // ROZAMIENTO: la velocidad cae a la mitad cada ~350 ms (el ritmo del scroll de los telefonos)
+    const float f = powf(0.998f, dt);
+    g_inVx *= f; g_inVy *= f;
+    g_inRestoX += g_inVx * dt; g_inRestoY += g_inVy * dt;
+    const int ix = (int)g_inRestoX, iy = (int)g_inRestoY;
+    g_inRestoX -= (float)ix; g_inRestoY -= (float)iy;
+    if (ix || iy) {
+        // (el tope se mide con el scroll del panel; la vista del timeline -frames y valor- no tiene tope que medir asi)
+        Scrollable* sc = (g_inBarra || g_inVp->ViewportKind() == 5) ? NULL : g_inVp->ComoScrollable();
+        const int px0 = sc ? sc->PosX : 0, py0 = sc ? sc->PosY : 0;
+        if (g_inBarra) g_inVp->BarScrollBy(ix);
+        else           g_inVp->event_finger_scroll(g_inPx, g_inPy, ix, iy);
+        // llego al tope: ya no se mueve -> se corta (no seguir redibujando un panel quieto)
+        if (sc && sc->PosX == px0 && sc->PosY == py0) { if (++g_inQuieto >= 3) { InerciaParar(); g_redraw = true; return; } }
+        else g_inQuieto = 0;
+    }
+    const float gs = (float)(GlobalScale > 0 ? GlobalScale : 1);
+    if (sqrtf(g_inVx * g_inVx + g_inVy * g_inVy) < 0.02f * gs) InerciaParar();
+    g_redraw = true;
+}
+
 void ControlesTick() {
+    InerciaTick();
+    LayoutMenuToqueTick(SDL_GetTicks());   // el dedo en el borde de un menu largo lo scrollea
     // PULSACION LARGA sobre la VISTA 3D (tactil): el dedo quieto medio segundo es el click DERECHO de la PC: abre el
     // menu contextual donde esta el dedo (Objeto en el Modo Objeto; el de la malla en Edicion; Pose). Vibra.
-    if (g_view3dTapPending && g_view3dTapTactil && fingers.size() <= 1 && estado == editNavegacion &&
+    if (g_view3dTapPending && g_view3dTapTactil && fingers.size() == 1 && !g_tapMovio && estado == editNavegacion &&
         g_barTapView && g_barTapView->isLeaf() && g_barTapView->ViewportKind() == 1) {
         if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }   // (sigue esperando)
         g_view3dTapPending = false;      // ya no es un toque: al levantar no selecciona
@@ -227,7 +358,26 @@ void ControlesTick() {
         w3dEngine::Vibrar(w3dEngine::VibGolpe);
         extern void LayoutMenuContexto3D(int mx, int my);
         LayoutMenuContexto3D(g_tapStartX, g_tapStartY);
+        // el MISMO dedo puede deslizar hasta una opcion y soltar ahi (soltarlo quieto deja el menu abierto)
+        if (LayoutMenuToqueArrancar(g_tapStartX, g_tapStartY, true)) g_view3dMenuLargo = false;
         g_redraw = true;
+        return;
+    }
+    // PULSACION LARGA sobre el TIMELINE (el dedo quieto medio segundo en el strip): el menu de los keyframes, el mismo
+    // del click derecho. El dedo puede deslizar hasta una opcion y soltar ahi
+    // (un dedo APOYADO -si el soltar se perdio, no hay dedo y no es pulsacion larga- y QUIETO desde que se apoyo)
+    if (g_tlTapPending && fingers.size() == 1 && !g_tapMovio && g_tlTapView && g_tlTapView->isLeaf() && g_tlTapView->ViewportKind() == 5) {
+        static Uint32 intento = 0;
+        if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }
+        if (intento != g_tapStartTicks) {
+            intento = g_tapStartTicks;
+            if (((Timeline*)g_tlTapView)->MenuContexto(g_tapStartX, g_tapStartY)) {
+                g_tlTapPending = false; ViewPortClickDown = false;
+                w3dEngine::Vibrar(w3dEngine::VibGolpe);
+                LayoutMenuToqueArrancar(g_tapStartX, g_tapStartY, true);
+                g_redraw = true;
+            }
+        }
         return;
     }
     if (!g_contentTapPending || !g_contentTapTactil || g_outAgarre || fingers.size() > 1) return;
@@ -287,6 +437,9 @@ static ViewportBase* g_toqueJuegoVp = NULL;
 // (LayoutArbol.h). El gesto se pierde; el puntero colgado seria un crash al levantar el dedo.
 static void ControlesOlvidarViewport(ViewportBase* vp) {
     if (g_scrollView == vp)    g_scrollView = NULL;
+    if (g_inVp == vp)          InerciaParar();
+    Gizmo2DOlvidarVp(vp);      // (el gizmo 2D agarrado en ese viewport)
+    if ((ViewportBase*)g_tabDeslizar == vp) g_tabDeslizar = NULL;
     if (g_barTapView == vp)    g_barTapView = NULL;
     if (g_cornerVp == vp)    { g_cornerVp = NULL; g_cornerResizing = false; }
     if (g_tlTapView == vp)   { g_tlTapView = NULL; g_tlTapPending = false; }
@@ -452,6 +605,10 @@ void InputUsuarioSDL3(SDL_Event &e){
                 // sintetizado) y cancelamos el gesto de 1 dedo a medio decidir (tap/scroll/slider).
                 if (g_popupFinger) { if (PopUpActive) PopUpActive->Soltar(); g_popupFinger = false; }
                 if (g_ideGestoVp) { g_ideGestoVp->GestoTactilFin(); g_ideGestoVp = NULL; }   // 2do dedo: era zoom/scroll
+                Gizmo2DAbortar();   // el gizmo 2D agarrado con el 1er dedo (UV / 2D): era un pinch, no un transform
+                LayoutMenuToqueCancelar();   // (el dedo sobre un menu: no elige nada)
+                g_tabDeslizar = NULL;
+                InerciaParar();
                 leftMouseDown = middleMouseDown = ViewPortClickDown = false;
                 g_barTapPending = g_contentTapPending = g_slideNum = false;
                 g_view3dTapPending = false; // 2do dedo (pan/zoom): NO seleccionar al soltar
@@ -534,10 +691,15 @@ void InputUsuarioSDL3(SDL_Event &e){
                           lastDistance = dist; lastCentroidX = cx; lastCentroidY = cy;
                           break;
                       } }
-                    viewPortActive->event_finger_gesture(zoomDelta, panDx, panDy);
+                    // los editores 2D (timeline/curvas, UV, 2D) usan la geometria completa: zoom anclado a los dedos.
+                    // (Los dedos llegan normalizados a la VENTANA: a pixeles se pasa con su tamano, no el del viewport)
+                    int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+                    if (!viewPortActive->event_finger_pinch(cx * ww, cy * hh, (cx - lastCentroidX) * ww, (cy - lastCentroidY) * hh,
+                                                            lastSepX * ww, lastSepY * hh, ex * ww, ey * hh))
+                        viewPortActive->event_finger_gesture(zoomDelta, panDx, panDy);
                     g_redraw = true;
                 }
-                lastDistance = dist; lastCentroidX = cx; lastCentroidY = cy;
+                lastDistance = dist; lastCentroidX = cx; lastCentroidY = cy; lastSepX = ex; lastSepY = ey;
             }
 		
             // (el gesto de 2 dedos ya se aplico arriba con event_finger_gesture)
@@ -572,6 +734,11 @@ void InputUsuarioSDL3(SDL_Event &e){
     // viewports (timeline, paneles) el editor sigue normal; SPACE pausa. (g_toqueJuegoVp: file-scope arriba)
 
     if (e.type == SDL_EVENT_MOUSE_MOTION){
+        if (e.motion.which == SDL_TOUCH_MOUSEID && leftMouseDown && !g_tapMovio) {
+            int ddx = (int)e.motion.x - g_tapStartX; if (ddx < 0) ddx = -ddx;
+            int ddy = (int)e.motion.y - g_tapStartY; if (ddy < 0) ddy = -ddy;
+            if (ddx + ddy >= 8 * GlobalScale) g_tapMovio = true;
+        }
         // MOUSE-OVER del juego: en PLAY, alimentar la posicion del mouse (SIN clic) al script para
         // resaltar la opcion bajo el cursor (raton()). El clic sigue por el flujo de toque de abajo.
         { extern bool SimActiva();
@@ -608,6 +775,9 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         int mx = e.motion.x;
         int my = e.motion.y;
+
+        // el dedo sobre un MENU DESPLEGABLE: resalta la opcion de abajo (soltar la elige)
+        if (LayoutMenuToqueActivo()) { LayoutMenuToqueMover(mx, my); GuardarMousePos(); return; }
 
         // hover de la 'x' de las notificaciones (estan encima de todo)
         NotificacionesMotion(mx, my);
@@ -682,9 +852,11 @@ void InputUsuarioSDL3(SDL_Event &e){
                         GuardarMousePos();
                         return;
                     }
-                    // sigue de largo: es la ORBITA (o el paneo). Arranca en cero desde aca, sin el salto del umbral
-                    // ni el delta viejo de antes del toque
-                    dx = 0; dy = 0; lastMouseX = mx; lastMouseY = my;
+                    // sigue de largo: es la ORBITA (o el paneo). Este primer paso gira TODO lo que el dedo ya se movio
+                    // desde que se apoyo (la espera y el umbral no se pierden: antes arrancaba en cero y el dedo se
+                    // adelantaba a la vista). Se mide desde el punto del toque, no desde el mouse de antes: el salto
+                    // del touchStart (el mouse virtual se teletransporta al dedo) no cuenta
+                    dx = mx - g_tapStartX; dy = my - g_tapStartY; lastMouseX = mx; lastMouseY = my;
                 }
             }
             // ESQUINA (boton de menu): si se ARRASTRA, redimensiona el viewport (borde izq + sup). Un TAP
@@ -703,6 +875,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                     g_fingerScrolling = true; g_redraw = true; return;
                 }
             }
+            if (g_tabDeslizar) { TabDeslizarEn(mx); g_fingerScrolling = true; GuardarMousePos(); return; }   // (pestanias)
             if (g_slideNum) {                                        // slider numerico lockeado -> el arrastre EDITA
                 if (g_barTapView) g_barTapView->TouchSliderMover(e.motion.xrel);
                 g_fingerScrolling = true; g_redraw = true; return;
@@ -710,6 +883,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             if (g_scrollView) {                                      // scroll lockeado (barra o contenido)
                 if (g_scrollBar) g_scrollView->BarScrollBy(e.motion.xrel);
                 else             g_scrollView->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel);
+                if (e.motion.which == SDL_TOUCH_MOUSEID) InerciaMuestra(e.motion.xrel, e.motion.yrel);   // (el envion al soltar)
                 g_fingerScrolling = true; g_redraw = true; return;
             }
             // gesto SIN decidir (down sobre barra o contenido de panel): sigue siendo TAP hasta pasar el
@@ -720,15 +894,41 @@ void InputUsuarioSDL3(SDL_Event &e){
                 int tdy = my - g_tapStartY; if (tdy < 0) tdy = -tdy;
                 if (tdx + tdy < 8 * GlobalScale) { g_redraw = true; return; } // aun es tap
                 g_tlTapPending = false;
+                // el DEDO sobre el PANEL de canales lo scrollea (vertical y horizontal); en el strip, con el MONITOR de la
+                // toolbar prendido (el de fabrica), arrastrar MUEVE LA VISTA. El primer paso trae todo lo que el dedo ya
+                // se movio desde que se apoyo (la espera y el umbral no se pierden), y al soltar sigue con inercia
+                if (g_tlTapView && e.motion.which == SDL_TOUCH_MOUSEID) {
+                    Timeline* tlv = (Timeline*)g_tlTapView;
+                    const bool panel = tlv->PanelEn(g_tapStartX, g_tapStartY);
+                    if (panel || (g_tlModoVista && tlv->ArrastreMueveVista(g_tapStartX, g_tapStartY))) {
+                        TimelineDedoPanel(panel ? tlv : NULL);
+                        g_scrollView = tlv; g_scrollBar = false;
+                        const int pdx = mx - g_tapStartX, pdy = my - g_tapStartY;
+                        tlv->event_finger_scroll(mx, my, pdx, pdy);
+                        InerciaMuestrasLimpiar(); InerciaMuestra(e.motion.xrel, e.motion.yrel);
+                        g_fingerScrolling = true; g_redraw = true; GuardarMousePos(); return;
+                    }
+                }
                 // el timeline mira SU ultima posicion de mouse: primero se le pasa la del toque (donde se apreto), despues el click
                 if (g_tlTapView) { viewPortActive = g_tlTapView; g_tlTapView->event_mouse_motion(g_tapStartX, g_tapStartY); g_tlTapView->button_left(); g_tlTapView->event_mouse_motion(mx, my); }
                 g_redraw = true; GuardarMousePos(); return;
             }
             if (g_barTapPending || g_contentTapPending) {
-                if (e.motion.which == SDL_TOUCH_MOUSEID && SDL_GetTicks() - g_tapStartTicks < kEsperaGestoMs) { g_redraw = true; return; }   // espera anti-gesto
+                // (sin la espera anti-gesto del 3D y el timeline: los paneles y las barras no tienen gesto de 2 dedos, y
+                //  esperar 180 ms antes de mover el contenido hacia que el scroll respondiera tarde y se sintiera trabado)
                 int ddx = mx - g_tapStartX; if (ddx < 0) ddx = -ddx;
                 int ddy = my - g_tapStartY; if (ddy < 0) ddy = -ddy;
                 if (ddx + ddy < 8 * GlobalScale) { g_redraw = true; return; } // aun es tap
+                InerciaMuestrasLimpiar();
+                if (e.motion.which == SDL_TOUCH_MOUSEID) InerciaMuestra(e.motion.xrel, e.motion.yrel);
+                if (g_barTapPending && e.motion.which == SDL_TOUCH_MOUSEID && g_barTapView && g_barTapView->isLeaf() &&
+                    g_barTapView->ViewportKind() == 3 && BarraEntraEntera(g_barTapView) &&
+                    TabBajo(g_barTapView, g_tapStartX, g_tapStartY)) {   // PESTANIAS (la barra entra entera): ir mostrandolas
+                    g_barTapPending = false;
+                    g_tabDeslizar = (Properties*)g_barTapView;
+                    TabDeslizarEn(mx);
+                    g_fingerScrolling = true; g_redraw = true; GuardarMousePos(); return;
+                }
                 if (g_barTapPending) {                               // BARRA -> scroll horizontal (mouse o touch)
                     g_barTapPending = false;
                     g_scrollView = g_barTapView; g_scrollBar = true;
@@ -756,6 +956,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 viewPortActive->ViewportKind() == 4 &&
                 viewPortActive->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel)) {
                 g_scrollView = viewPortActive; g_scrollBar = false;
+                InerciaMuestrasLimpiar(); InerciaMuestra(e.motion.xrel, e.motion.yrel);
                 g_fingerScrolling = true; g_redraw = true; return;
             }
             // ni barra ni contenido diferido (viewport 3D) -> sigue de largo al event_mouse_motion -> orbita
@@ -782,7 +983,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
 
         // GIZMO: el punto agarrado sigue al puntero en ABSOLUTO (GizmoMotion): envolver el cursor lo haria saltar
-        if (GizmoArrastrando()) { ViewPortClickDown = true; }
+        if (GizmoArrastrando() || Gizmo2DArrastrando()) { ViewPortClickDown = true; }
         else if ((leftMouseDown || middleMouseDown) && viewPortActive && !viewPortActive->SinEnvolverCursor()) {
             CheckWarpMouseInViewport(mx, my, viewPortActive);
         }
@@ -982,8 +1183,27 @@ void InputUsuarioSDL3(SDL_Event &e){
             bool esTouch = (e.button.which == SDL_TOUCH_MOUSEID);
             g_ultimoDownTactil = esTouch;   // el arrastre que sigue es de un dedo (el 3D orbita con 1 dedo)
             // gesto NUEVO: limpiar lo que quedo del anterior (scroll lockeado, tap a medio decidir, slider)
-            g_fingerScrolling = false; g_scrollView = NULL; g_slideNum = false;
+            g_fingerScrolling = false; g_scrollView = NULL; g_slideNum = false; g_tabDeslizar = NULL;
+            // (y los toques pendientes del timeline / la 3D: si el mouse-up que SDL sintetiza del dedo se perdio -pasa
+            //  con toques rapidos-, quedaban prendidos con la hora del toque VIEJO y el proximo evento abria el menu de
+            //  la pulsacion larga en el acto. Los vuelve a armar su rama de abajo, con la hora de ESTE toque)
+            g_tlTapPending = false; g_view3dTapPending = false; g_tapMovio = false;
+            TimelineDedoPanel(NULL);
+            g_inFrenoToque = false;
             g_barTapPending = false; g_contentTapPending = false;
+            // un toque sobre un panel que sigue DESLIZANDO solo (inercia) lo frena en seco; si se suelta sin arrastrar,
+            // no elige nada de lo que pasaba por abajo (como en el telefono)
+            if (g_inVp) {
+                ViewportBase* vpFreno = FindViewportUnderMouse(rootViewport, (int)e.button.x, (int)e.button.y);
+                if (esTouch && vpFreno == g_inVp) g_inFrenoToque = true;
+                InerciaParar();
+            }
+            InerciaMuestrasLimpiar();
+            // MENU DESPLEGABLE abierto + DEDO: apoyar no elige; la opcion de abajo se resalta y soltar la elige
+            if (esTouch && !clickEnPopup && LayoutMenuToqueArrancar((int)e.button.x, (int)e.button.y, false)) {
+                GuardarMousePos();
+                return;
+            }
             // si habia un transform activo, este click lo ACEPTA y NO
             // debe ademas cambiar la seleccion (como en Symbian)
             extern int g_poseModo; // Pose Mode: transform de huesos (G/R/S) en curso -> el click lo CONFIRMA igual
@@ -1241,6 +1461,14 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        // el dedo sobre un MENU DESPLEGABLE: soltar elige la opcion de abajo (afuera: cierra sin elegir)
+        if (LayoutMenuToqueActivo()) {
+            LayoutMenuToqueSoltar((int)e.button.x, (int)e.button.y);
+            leftMouseDown = false; ViewPortClickDown = false;
+            g_barTapPending = g_contentTapPending = false;
+            GuardarMousePos();
+            return;
+        }
         // el dedo que abrio el menu contextual con la pulsacion larga: se levanta sin elegir nada (la opcion se toca)
         if (g_view3dMenuLargo) { g_view3dMenuLargo = false; ViewPortClickDown = false; GuardarMousePos(); return; }
         if (g_ideGestoVp) {     // IDE: se solto la lupa / la agarradera (el cursor y la seleccion quedan ahi)
@@ -1310,8 +1538,22 @@ void InputUsuarioSDL3(SDL_Event &e){
         bool wasContentTap = g_contentTapPending; // tap sobre CONTENIDO de panel (touch) -> togglea/selecciona/edita
         g_barTapPending = false;
         g_contentTapPending = false;
+        // (la pestania que quedo abajo del dedo ya esta activa). El dedo NO tiene hover: al soltar no queda
+        // ninguna pestania/boton de la barra iluminado (antes quedaba la del toque inicial y la elegida)
+        if (g_tabDeslizar) g_tabDeslizar->BarHover(-99999, -99999);
+        g_tabDeslizar = NULL;
+        // INERCIA: si venia scrolleando con el dedo y lo solto con envion, el contenido sigue deslizando solo
+        bool inercia = false;
+        if (g_fingerScrolling && g_scrollView && e.button.which == SDL_TOUCH_MOUSEID && !g_slideNum && !g_cornerResizing)
+            inercia = InerciaArrancar(g_scrollView, g_scrollBar, (int)e.button.x, (int)e.button.y);
         g_scrollView = NULL;
-        PropertiesTouchScrollFin(); // fin del gesto: libera el latch del scroll tactil de listas
+        if (!inercia) PropertiesTouchScrollFin(); // fin del gesto: libera el latch del scroll tactil de listas
+                                                  // (con inercia sigue scrolleando la misma lista: lo suelta InerciaParar)
+        // el toque que FRENO una inercia: si se solto sin arrastrar, no es un tap (no elige lo que pasaba por abajo)
+        if (g_inFrenoToque) {
+            g_inFrenoToque = false;
+            if (wasBarTap || wasContentTap) { ViewPortClickDown = false; g_contentTapTactil = false; GuardarMousePos(); return; }
+        }
         // slider numerico tactil: el arrastre YA edito el valor; soltar NO es un click (no abre el editor)
         // (estos caminos consumen el up SIN pasar por mouse_button_up del viewport, que es quien
         //  normalmente apaga ViewPortClickDown: se libera aca, sino el foco de teclado por hover
@@ -1396,8 +1638,8 @@ void InputUsuarioSDL3(SDL_Event &e){
             const SDL_Keycode fisica = e.key.keysym.sym;
             int t = W3dTeclaDesdeSDL(fisica), m = W3dModsDesdeSDL(e.key.keysym.mod);
             const int t0 = t, m0 = m;
-            int ctx[4]; const int nctx = W3dAtajoContextos(ctx);
-            if (!W3dAtajoTraducir(ctx, nctx, t, m)) return;   // era el atajo de fabrica de algo reasignado: libre
+            int ctx[6]; const int nctx = W3dAtajoContextos(ctx);
+            if (!W3dAtajoTraducir(ctx, nctx, t, m, e.key.repeat != 0)) return;   // era el atajo de fabrica de algo reasignado: libre (o corrio su accion)
             if (t != t0 || m != m0) {
                 const SDL_Keycode nueva = W3dTeclaASDL(t);
                 if (nueva != SDLK_UNKNOWN) {

@@ -15,7 +15,7 @@ Outliner'da seçtiğin şey 3D Görünüm'de de seçili olur, tersi de geçerlid
 
 Her satır bir nesnedir. **Ok**, içindekileri katlar ya da açar; **simge** türünü söyler (örgü, kamera, ışık, koleksiyon...); ardından **ad** gelir: etkin nesneyse yeşil, seçiliyse daha koyu bir yeşil olur; sağda da **göz** ve **kamera** vardır. Başka bir nesnenin içindeki nesne daha sağda, ona bağlı olarak görünür; soluk bir satır gizli bir nesnedir.
 
-Yeni bir projede en üstte, ekranı hazırlayan bir rutin olan **Yapıcı**, altında da kamera, ışık ve küple birlikte **Koleksiyon** bulunur. Koleksiyon, düzen için bir klasördür.
+Yeni bir projede en üstte, ekranı hazırlayan ve oyun başlarken yalnızca bir kez çalışan bir rutin olan **Yapıcı** bulunur. Siyah bir çizgi onu her karede çalışan şeylerden ayırır: önce **Ekranı temizle**, sonra kamera, ışık ve küple birlikte **Koleksiyon**. Koleksiyon, düzen için bir klasördür.
 
 ## Seçme
 

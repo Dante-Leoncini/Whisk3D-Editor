@@ -48,7 +48,7 @@ static const W3dAtajoDef kAtajos[] = {
     { "3d.caja",              W3dATC_3D,       "Box Select",                 "B" },
     { "3d.vinculado",         W3dATC_3D,       "Select Linked",              "L" },
     { "3d.agregar",           W3dATC_3D,       "Add",                        "Shift+A" },
-    { "3d.aplicar",           W3dATC_3D,       "Apply",                      "Ctrl+A" },
+    { "3d.aplicar",           W3dATC_3D_OBJ,   "Apply",                      "Ctrl+A" },
     { "3d.mover",             W3dATC_3D,       "Move",                       "G", "1", "G" },
     { "3d.rotar",             W3dATC_3D,       "Rotate",                     "R", "2", "R" },
     { "3d.escalar",           W3dATC_3D,       "Scale",                      "S", "3", "S" },
@@ -59,9 +59,9 @@ static const W3dAtajoDef kAtajos[] = {
     { "3d.instancia",         W3dATC_3D,       "Duplicate Linked",           "Alt+D", NULL, "Alt D" },
     { "3d.borrar",            W3dATC_3D,       "Delete",                     "X, Delete", "C", "X" },
     { "3d.ocultar",           W3dATC_3D,       "Hide / Show",                "H" },
-    { "3d.unir",              W3dATC_3D,       "Join",                       "Ctrl+J" },
-    { "3d.keyframe",          W3dATC_3D,       "Insert Keyframe",            "I" },
-    { "3d.keyframeTodo",      W3dATC_3D,       "Insert Keyframe (all)",      "Shift+I" },
+    { "3d.unir",              W3dATC_3D_OBJ,   "Join",                       "Ctrl+J" },
+    { "3d.keyframe",          W3dATC_3D_OBJ,   "Insert Keyframe",            "I" },
+    { "3d.keyframeTodo",      W3dATC_3D_OBJ,   "Insert Keyframe (all)",      "Shift+I" },
     { "3d.proporcional",      W3dATC_3D,       "Proportional Editing",       "O" },
     { "3d.overlays",          W3dATC_3D,       "Overlays",                   "K" },
     { "3d.vistaLocal",        W3dATC_3D,       "Local View",                 "/" },
@@ -78,18 +78,63 @@ static const W3dAtajoDef kAtajos[] = {
     { "3d.rodarDer",          W3dATC_3D,       "Roll Right",                 "Num6" },
     { "3d.vistaCamara",       W3dATC_3D,       "Camera View",                "Num0", "8", NULL },
     { "3d.camaraActiva",      W3dATC_3D,       "Set Active Camera",          "Ctrl+Num0" },
-    { "3d.extruir",           W3dATC_3D,       "Extrude",                    "E", "7", NULL },
-    { "3d.cara",              W3dATC_3D,       "New Face from Vertices",     "F" },
-    { "3d.normales",          W3dATC_3D,       "Recalculate Normals",        "Shift+N" },
-    { "3d.loopcut",           W3dATC_3D,       "Loop Cut and Slide",         "Ctrl+R", "8", NULL },
-    { "3d.conectar",          W3dATC_3D,       "Connect Vertex Path",        "J" },
-    { "3d.rip",               W3dATC_3D,       "Rip",                        "V" },
-    { "3d.slide",             W3dATC_3D,       "Vertex Slide",               "Shift+V" },
-    { "3d.separar",           W3dATC_3D,       "Separate",                   "P" },
-    { "3d.merge",             W3dATC_3D,       "Merge",                      "M" },
+    { "3d.extruir",           W3dATC_3D_EDIT,  "Extrude",                    "E", "7", NULL },
+    { "3d.cara",              W3dATC_3D_EDIT,  "New Face from Vertices",     "F" },
+    { "3d.normales",          W3dATC_3D_EDIT,  "Recalculate Normals",        "Shift+N" },
+    { "3d.loopcut",           W3dATC_3D_EDIT,  "Loop Cut and Slide",         "Ctrl+R", "8", NULL },
+    { "3d.conectar",          W3dATC_3D_EDIT,  "Connect Vertex Path",        "J" },
+    { "3d.rip",               W3dATC_3D_EDIT,  "Rip",                        "V" },
+    { "3d.slide",             W3dATC_3D_EDIT,  "Vertex Slide",               "Shift+V" },
+    { "3d.separar",           W3dATC_3D_EDIT,  "Separate",                   "P" },
+    { "3d.merge",             W3dATC_3D_EDIT,  "Merge",                      "M" },
     { "3d.menuContexto",      W3dATC_3D,       "Context menu",               "W" },
-    { "3d.triangular",        W3dATC_3D,       "Triangulate",                "Ctrl+T" },
-    { "3d.menuUV",            W3dATC_3D,       "UV menu",                    "U" },
+    { "3d.triangular",        W3dATC_3D_EDIT,  "Triangulate",                "Ctrl+T" },
+    { "3d.menuUV",            W3dATC_3D_EDIT,  "UV menu",                    "U" },
+    // ---- vista 3D: lo que hacia falta y sale del teclado del handler (estaba solo como texto en el menu) ----
+    { "3d.inset",             W3dATC_3D_EDIT,  "Inset Faces",                "I" },
+    { "3d.bisel",             W3dATC_3D_EDIT,  "Bevel Edges",                "Ctrl+B" },
+    { "3d.biselVert",         W3dATC_3D_EDIT,  "Bevel Vertices",             "Ctrl+Shift+B" },
+    { "3d.cortar",            W3dATC_3D_OBJ,   "Cut",                        "Ctrl+X" },
+    { "3d.copiar",            W3dATC_3D_OBJ,   "Copy",                       "Ctrl+C" },
+    { "3d.pegar",             W3dATC_3D_OBJ,   "Paste",                      "Ctrl+V" },
+
+    // ---- vista 3D: operaciones SIN tecla de fabrica (las de los menus; el usuario les pone una si quiere) ----
+    { "3d.geoAOrigen",        W3dATC_3D_OBJ,   "Geometry to Origin",         "", NULL, NULL, "obj:200" },
+    { "3d.origenAGeo",        W3dATC_3D_OBJ,   "Origin to Geometry",         "", NULL, NULL, "obj:201" },
+    { "3d.origenACursor",     W3dATC_3D_OBJ,   "Origin to 3D Cursor",        "", NULL, NULL, "obj:202" },
+    { "3d.aplicarPos",        W3dATC_3D_OBJ,   "Apply Location",             "", NULL, NULL, "obj:220" },
+    { "3d.aplicarRot",        W3dATC_3D_OBJ,   "Apply Rotation",             "", NULL, NULL, "obj:221" },
+    { "3d.aplicarEsc",        W3dATC_3D_OBJ,   "Apply Scale",                "", NULL, NULL, "obj:222" },
+    { "3d.aplicarTodo",       W3dATC_3D_OBJ,   "Apply All Transforms",       "", NULL, NULL, "obj:223" },
+    { "3d.keyPos",            W3dATC_3D_OBJ,   "Insert Location Keyframe",   "", NULL, NULL, "obj:531" },
+    { "3d.keyRot",            W3dATC_3D_OBJ,   "Insert Rotation Keyframe",   "", NULL, NULL, "obj:532" },
+    { "3d.keyEsc",            W3dATC_3D_OBJ,   "Insert Scale Keyframe",      "", NULL, NULL, "obj:533" },
+    { "3d.crearPrefab",       W3dATC_3D_OBJ,   "Create Prefab",              "", NULL, NULL, "obj:700" },
+    { "3d.desarmarPrefab",    W3dATC_3D_OBJ,   "Unpack Prefab",              "", NULL, NULL, "obj:701" },
+    { "3d.suave",             W3dATC_3D_EDIT,  "Shade Smooth",               "", NULL, NULL, "obj:320" },
+    { "3d.plano",             W3dATC_3D_EDIT,  "Shade Flat",                 "", NULL, NULL, "obj:321" },
+    { "3d.voltearNormales",   W3dATC_3D_EDIT,  "Flip Normals",               "", NULL, NULL, "obj:324" },
+    { "3d.marcarAfilado",     W3dATC_3D_EDIT,  "Mark Sharp",                 "", NULL, NULL, "obj:330" },
+    { "3d.limpiarAfilado",    W3dATC_3D_EDIT,  "Clear Sharp",                "", NULL, NULL, "obj:331" },
+    { "3d.marcarCostura",     W3dATC_3D_EDIT,  "Mark Seam",                  "", NULL, NULL, "obj:358" },
+    { "3d.limpiarCostura",    W3dATC_3D_EDIT,  "Clear Seam",                 "", NULL, NULL, "obj:359" },
+    { "3d.unirCentro",        W3dATC_3D_EDIT,  "Merge at Center",            "", NULL, NULL, "obj:380" },
+    { "3d.unirCursor",        W3dATC_3D_EDIT,  "Merge at Cursor",            "", NULL, NULL, "obj:381" },
+    { "3d.colapsar",          W3dATC_3D_EDIT,  "Collapse",                   "", NULL, NULL, "obj:382" },
+    { "3d.unirDistancia",     W3dATC_3D_EDIT,  "Merge by Distance",          "", NULL, NULL, "obj:383" },
+    { "3d.borrarVerts",       W3dATC_3D_EDIT,  "Delete Vertices",            "", NULL, NULL, "obj:361" },
+    { "3d.borrarAristas",     W3dATC_3D_EDIT,  "Delete Edges",               "", NULL, NULL, "obj:362" },
+    { "3d.borrarCaras",       W3dATC_3D_EDIT,  "Delete Faces",               "", NULL, NULL, "obj:363" },
+    { "3d.borrarLoops",       W3dATC_3D_EDIT,  "Delete Edge Loops",          "", NULL, NULL, "obj:364" },
+    { "3d.unwrap",            W3dATC_3D_EDIT,  "Unwrap Angle Based",         "", NULL, NULL, "obj:350" },
+    { "3d.smartUV",           W3dATC_3D_EDIT,  "Smart UV Project",           "", NULL, NULL, "obj:351" },
+    { "3d.proyVista",         W3dATC_3D_EDIT,  "Project from View",          "", NULL, NULL, "obj:356" },
+    { "3d.bloquearOrbita",    W3dATC_3D,       "Lock Orbit",                 "", NULL, NULL, "vista3d:421" },
+    { "3d.bloquearCamara",    W3dATC_3D,       "Lock the camera to the view", "", NULL, NULL, "vista3d:423" },
+    { "3d.verRender",         W3dATC_3D,       "Render Preview",             "", NULL, NULL, "sombreado:0" },
+    { "3d.verMaterial",       W3dATC_3D,       "Material Preview",           "", NULL, NULL, "sombreado:1" },
+    { "3d.verSolido",         W3dATC_3D,       "Solid Preview",              "", NULL, NULL, "sombreado:2" },
+    { "3d.verAlambre",        W3dATC_3D,       "Wireframe Preview",          "", NULL, NULL, "sombreado:3" },
 
     // ---- con un transform en curso ----
     { "xf.confirmar",         W3dATC_XFORM,    "Confirm",                    "Enter, NumEnter", "OK", "Enter" },
@@ -118,6 +163,10 @@ static const W3dAtajoDef kAtajos[] = {
     { "uv.duplicar",          W3dATC_UV,       "Duplicate",                  "Shift+D" },
     { "uv.borrar",            W3dATC_UV,       "Delete",                     "X, Delete" },
     { "uv.encuadrar",         W3dATC_UV,       "Frame Selected",             "Num." },
+    { "uv.encuadrarTodo",     W3dATC_UV,       "Frame All",                  "", NULL, NULL, "uvvista:11" },
+    { "uv.cursorASel",        W3dATC_UV,       "Cursor to Selection",        "", NULL, NULL, "uvcursor:0" },
+    { "uv.selACursor",        W3dATC_UV,       "Selection to Cursor",        "", NULL, NULL, "uvcursor:1" },
+    { "uv.cursorCentro",      W3dATC_UV,       "Cursor to Center",           "", NULL, NULL, "uvcursor:2" },
 
     // ---- timeline ----
     { "tl.seleccionarTodo",   W3dATC_TIMELINE, "Select All",                 "A" },
@@ -141,6 +190,20 @@ static const W3dAtajoDef kAtajos[] = {
     { "tl.keySig",            W3dATC_TIMELINE, "Next keyframe",              "Up" },
     { "tl.inicio",            W3dATC_TIMELINE, "Go to start",                "Home" },
     { "tl.fin",               W3dATC_TIMELINE, "Go to end",                  "End" },
+    { "tl.verDope",           W3dATC_TIMELINE, "Dope Sheet",                 "", NULL, NULL, "tlvista:6" },
+    { "tl.verCurvas",         W3dATC_TIMELINE, "Curves",                     "", NULL, NULL, "tlvista:7" },
+    { "tl.panel",             W3dATC_TIMELINE, "Show Panel",                 "", NULL, NULL, "tlvista:100" },
+    { "tl.verHandles",        W3dATC_TIMELINE, "Show Handles",               "", NULL, NULL, "tlvista:101" },
+    { "tl.smartEuler",        W3dATC_TIMELINE, "Smart Euler",                "", NULL, NULL, "tlkey:2" },
+    { "tl.interpConstante",   W3dATC_TIMELINE, "Interpolation: Constant",    "", NULL, NULL, "tlkey:20" },
+    { "tl.interpLineal",      W3dATC_TIMELINE, "Interpolation: Linear",      "", NULL, NULL, "tlkey:21" },
+    { "tl.interpBezier",      W3dATC_TIMELINE, "Interpolation: Bezier",      "", NULL, NULL, "tlkey:22" },
+    { "tl.handleLibre",       W3dATC_TIMELINE, "Handles: Free",              "", NULL, NULL, "tlkey:40" },
+    { "tl.handleAlineado",    W3dATC_TIMELINE, "Handles: Aligned",           "", NULL, NULL, "tlkey:41" },
+    { "tl.handleVector",      W3dATC_TIMELINE, "Handles: Vector",            "", NULL, NULL, "tlkey:42" },
+    { "tl.handleAuto",        W3dATC_TIMELINE, "Handles: Automatic",         "", NULL, NULL, "tlkey:43" },
+    { "tl.handleAutoLimite",  W3dATC_TIMELINE, "Handles: Auto Clamped",      "", NULL, NULL, "tlkey:44" },
+    { "tl.handlePlano",       W3dATC_TIMELINE, "Handles: Flat",              "", NULL, NULL, "tlkey:45" },
 
     // ---- outliner ----
     { "out.seleccionarTodo",  W3dATC_OUTLINER, "Select All",                 "A" },
@@ -165,6 +228,10 @@ static const W3dAtajoDef kAtajos[] = {
     { "2d.borrar",            W3dATC_2D,       "Delete",                     "X, Delete" },
     { "2d.encuadrar",         W3dATC_2D,       "Frame Selected",             "Num." },
     { "2d.vistaJuego",        W3dATC_2D,       "Game View",                  "Num0" },
+    { "2d.emparentar",        W3dATC_2D,       "Set Parent",                 "", NULL, NULL, "2dobj:40" },
+    { "2d.desemparentar",     W3dATC_2D,       "Clear Parent",               "", NULL, NULL, "2dobj:41" },
+    { "2d.zoom1",             W3dATC_2D,       "Zoom 1:1",                   "", NULL, NULL, "2dvista:1" },
+    { "2d.zoom2",             W3dATC_2D,       "Zoom 2:1",                   "", NULL, NULL, "2dvista:2" },
 
     // ---- propiedades (lista de pasos de una rutina) ----
     { "props.agarrar",        W3dATC_PROPS,    "Grab step",                  "G" },
@@ -385,8 +452,58 @@ const char* W3dAtajoCtxNombre(int ctx) {
         case W3dATC_2D:       return "2D Editor";
         case W3dATC_PROPS:    return "Properties";
         case W3dATC_IDE:      return "Script Editor";
+        case W3dATC_3D_OBJ:   return "Object Mode";
+        case W3dATC_3D_EDIT:  return "Edit Mode";
     }
     return "?";
+}
+
+bool W3dAtajoMismoAlcance(int a, int b) {
+    if (a == b) return true;
+    const bool modoA = (a == W3dATC_3D_OBJ || a == W3dATC_3D_EDIT), modoB = (b == W3dATC_3D_OBJ || b == W3dATC_3D_EDIT);
+    return (a == W3dATC_3D && modoB) || (b == W3dATC_3D && modoA);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+//  Las acciones de las operaciones sin tecla de fabrica. Una tabla chica de nombre -> funcion (la llenan los que
+//  arman los menus, una vez al arrancar). Vive en una funcion para no depender del orden de inicializacion.
+// ---------------------------------------------------------------------------------------------------------------
+struct DespachoAtajo { char nombre[16]; W3dAtajoDespacho fn; };
+static DespachoAtajo* Despachos(int*& n) {
+    static DespachoAtajo tabla[24];
+    static int cant = 0;
+    n = &cant;
+    return tabla;
+}
+void W3dAtajoRegistrarDespacho(const char* nombre, W3dAtajoDespacho fn) {
+    int* n; DespachoAtajo* t = Despachos(n);
+    if (!nombre) return;
+    for (int i = 0; i < *n; i++) if (strcmp(t[i].nombre, nombre) == 0) { t[i].fn = fn; return; }
+    if (*n >= 24) return;
+    strncpy(t[*n].nombre, nombre, 15); t[*n].nombre[15] = 0;
+    t[*n].fn = fn;
+    (*n)++;
+}
+// "obj:201" -> la funcion de "obj" y el 201
+static W3dAtajoDespacho BuscarDespacho(const char* accion, int& id) {
+    id = 0;
+    if (!accion) return NULL;
+    const char* dp = strchr(accion, ':');
+    if (!dp) return NULL;
+    const size_t largo = (size_t)(dp - accion);
+    id = atoi(dp + 1);
+    int* n; DespachoAtajo* t = Despachos(n);
+    for (int i = 0; i < *n; i++)
+        if (strlen(t[i].nombre) == largo && strncmp(t[i].nombre, accion, largo) == 0) return t[i].fn;
+    return NULL;
+}
+bool W3dAtajoTieneDespacho(const char* accion) { int id; return BuscarDespacho(accion, id) != NULL; }
+bool W3dAtajoEjecutar(int i) {
+    if (i < 0 || i >= kNAtajos || !kAtajos[i].accion) return false;
+    int id; W3dAtajoDespacho fn = BuscarDespacho(kAtajos[i].accion, id);
+    if (!fn) return false;
+    fn(id);
+    return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -397,7 +514,7 @@ bool W3dAtajoAgregar(int i, W3dCombo c, int* quitadaDe) {
     if (quitadaDe) *quitadaDe = -1;
     if (i < 0 || i >= kNAtajos || c.Vacia() || W3dEsTeclaModificador(c.tecla)) return false;
     for (int j = 0; j < kNAtajos; j++) {
-        if (j == i || kAtajos[j].ctx != kAtajos[i].ctx) continue;
+        if (j == i || !W3dAtajoMismoAlcance(kAtajos[j].ctx, kAtajos[i].ctx)) continue;
         std::vector<W3dCombo>& v = gActual[(size_t)j];
         for (size_t k = 0; k < v.size(); k++) if (v[k] == c) { v.erase(v.begin() + (long)k); if (quitadaDe) *quitadaDe = j; break; }
     }
@@ -419,7 +536,7 @@ void W3dAtajoRestablecer(int i) {
     // las por defecto vuelven a su funcion: si otra del mismo contexto las habia tomado, se las saca
     const std::vector<W3dCombo>& d = gDefecto[(size_t)i];
     for (int j = 0; j < kNAtajos; j++) {
-        if (j == i || kAtajos[j].ctx != kAtajos[i].ctx) continue;
+        if (j == i || !W3dAtajoMismoAlcance(kAtajos[j].ctx, kAtajos[i].ctx)) continue;
         std::vector<W3dCombo>& v = gActual[(size_t)j];
         for (size_t k = 0; k < v.size();) {
             bool choca = false;
@@ -494,6 +611,7 @@ bool W3dAtajosGuardar() {
         if (!W3dAtajoEsDefecto(i)) fprintf(f, "%s = %s\n", kAtajos[i].id, W3dAtajoTexto(i).c_str());
     bool ok = (ferror(f) == 0);
     if (fclose(f) != 0) ok = false;
+    extern void W3dWebPersistir(); W3dWebPersistir();   // web: IndexedDB (W3dConfigGuardar.cpp)
     return ok;
 }
 
@@ -505,7 +623,7 @@ static bool Tiene(const std::vector<W3dCombo>& v, const W3dCombo& c) {
     return false;
 }
 
-bool W3dAtajoTraducir(const int* ctxs, int n, int& tecla, int& mods) {
+bool W3dAtajoTraducir(const int* ctxs, int n, int& tecla, int& mods, bool repeticion) {
     if (!gCargado) W3dAtajosCargar();
     if (tecla == W3dK_NADA || W3dEsTeclaModificador(tecla) || n <= 0) return true;
     // en el editor de scripts lo que se tipea es TEXTO: solo se traducen las combinaciones con Ctrl/Alt y las F
@@ -517,7 +635,12 @@ bool W3dAtajoTraducir(const int* ctxs, int n, int& tecla, int& mods) {
     for (int c = 0; c < n; c++) {
         for (int i = 0; i < kNAtajos; i++) {
             if (kAtajos[i].ctx != ctxs[c] || !Tiene(gActual[(size_t)i], p)) continue;
-            if (gDefecto[(size_t)i].empty()) return true;
+            if (gDefecto[(size_t)i].empty()) {
+                // sin tecla de fabrica: ningun handler la escucha -> corre la accion del menu (y la tecla no sigue)
+                if (repeticion && kAtajos[i].accion) return false;   // mantenerla apretada no la repite
+                if (W3dAtajoEjecutar(i)) return false;
+                return true;
+            }
             tecla = gDefecto[(size_t)i][0].tecla;
             mods  = gDefecto[(size_t)i][0].mods;
             return true;
@@ -553,7 +676,10 @@ int W3dAtajoContextos(int* c) {
     else if (kind == 5) xf = DopeXformActivo();
     if (xf) c[n++] = W3dATC_XFORM;
     switch (kind) {
-        case 1: c[n++] = W3dATC_3D; break;
+        case 1:
+            // el MODO primero (lo suyo tapa a lo comun): Edicion de malla o de huesos, si no Objeto (y Pose)
+            c[n++] = (InteractionMode == EditMode || BoneEditActivo()) ? W3dATC_3D_EDIT : W3dATC_3D_OBJ;
+            c[n++] = W3dATC_3D; break;
         case 2: case 9: c[n++] = W3dATC_OUTLINER; break;   // (la biblioteca es un outliner)
         case 3: c[n++] = W3dATC_PROPS; break;
         case 4: c[n++] = W3dATC_UV; break;

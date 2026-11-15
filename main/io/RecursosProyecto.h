@@ -76,6 +76,7 @@ enum W3dVistaRec {
     W3D_VISTA_FUENTES,        // archivos de fuentes/ (.ttf, .otf, .w3dfnt)
     W3D_VISTA_VIDEOS,         // archivos de videos/
     W3D_VISTA_SHADERS,        // archivos .glsl de shaders/ (los shaders escritos de los materiales)
+    W3D_VISTA_FALTAN,         // los ARCHIVOS QUE FALTAN: referencias a archivos de afuera que no estan en esta maquina
     W3D_VISTAS                // tope
 };
 const char* W3dVistaClave(int vista);                 // "escena", "mallas", "materiales"...

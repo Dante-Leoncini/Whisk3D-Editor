@@ -214,7 +214,11 @@ struct W3dExterno {
     std::string ref;     // "ext:/ruta/Texturas/piso.png"
     std::string quien;   // "material \"Piso\"" / "escena \"Menu\""
     bool existe;
+    std::string original;   // la ruta EN MEMORIA (antes de reescribirla): la biblioteca la cruza con sus duenos
 };
+// lo que FALTABA en el ultimo guardado (las referencias externas que no estan en esta maquina): la biblioteca lo muestra
+// en "Archivos que faltan" (io/RecursosProyecto.cpp). Se vacia al abrir otro proyecto
+extern std::vector<W3dExterno> g_w3dExternosFaltan;
 
 class W3dContenedorEscritor {
 public:
@@ -294,6 +298,7 @@ public:
     void EscribirExternos();
     size_t CantidadExternos() const { return externos.size(); }
     size_t CantidadExternosQueFaltan() const;
+    void ExternosQueFaltan(std::vector<W3dExterno>& out) const;
 
     // vuelca el zip a 'rutaTmpZip' en orden determinista. false = no se escribio
     // (el archivo anterior queda INTACTO porque el caller todavia no renombro).
@@ -307,7 +312,7 @@ private:
     W3dContenedorEscritor& operator=(const W3dContenedorEscritor&);
 
     std::string NombreLibre(const char* categoria, const std::string& base);
-    void RegistrarExterno(const std::string& ref, const std::string& quien, bool existe);
+    void RegistrarExterno(const std::string& ref, const std::string& quien, bool existe, const std::string& original = std::string());
     // los bytes REALES de una entrada ya anotada (sea cual sea su origen). false =
     // no se pudieron releer.
     bool BytesDeEntrada(size_t idx, std::vector<unsigned char>& out) const;

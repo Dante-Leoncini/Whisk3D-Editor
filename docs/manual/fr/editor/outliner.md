@@ -15,7 +15,7 @@ Ce que vous sélectionnez dans l'Outliner est aussi sélectionné dans la Vue 3D
 
 Chaque ligne est un objet. La **flèche** replie ou déplie ce qu'il contient ; l'**icône** indique son type (maillage, caméra, lumière, collection...) ; vient ensuite le **nom**, en vert s'il est actif et dans un vert plus foncé s'il est sélectionné ; et à droite, l'**œil** et la **caméra**. Un objet placé dans un autre apparaît plus à droite, suspendu à lui, et une ligne pâle est un objet masqué.
 
-Dans un nouveau projet, on trouve en haut le **Constructeur**, une routine qui prépare l'écran, et en dessous la **Collection** avec la caméra, la lumière et le cube. Une collection est un dossier pour ranger.
+Dans un nouveau projet, on trouve en haut le **Constructeur**, une routine qui prépare l'écran et ne s'exécute qu'une seule fois, au lancement du jeu. Une ligne noire le sépare de ce qui s'exécute à chaque image : d'abord **Effacer l'écran**, puis la **Collection** avec la caméra, la lumière et le cube. Une collection est un dossier pour ranger.
 
 ## Sélectionner
 

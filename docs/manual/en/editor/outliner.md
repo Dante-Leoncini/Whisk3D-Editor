@@ -15,7 +15,7 @@ Whatever you select in the Outliner is also selected in the 3D Viewport, and vic
 
 Each row is an object. The **arrow** collapses or expands what's inside it; the **icon** tells its type (mesh, camera, light, collection...); then comes the **name**, in green if it's the active object and in a darker green if it's selected; and on the right, the **eye** and the **camera**. An object that's inside another appears further to the right, hanging from it, and a faded row is a hidden object.
 
-In a new project, at the top is the **Constructor**, a routine that prepares the screen, and below it the **Collection** with the camera, the light and the cube. A collection is a folder for keeping things organized.
+In a new project, at the top is the **Constructor**, a routine that prepares the screen and runs only once, when the game starts. A black line separates it from what runs every frame: first **Clear screen** and then the **Collection** with the camera, the light and the cube. A collection is a folder for keeping things organized.
 
 ## Select
 

@@ -115,6 +115,7 @@ static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
 #include <string.h> // memcpy (en Linux llegaba por <filesystem>, que el build de Symbian no incluye)
 #include <string>
 #include <set> // centro UV de la seleccion (posiciones UV unicas, tarjeta "Transform UV")
+#include <map> // los videos del render (un ffmpeg por pase)
 #ifdef W3D_SYMBIAN
 extern int W3dPantallaAlto; // flip de Y (glesdraw.cpp)
 #endif
@@ -1851,7 +1852,9 @@ static PopupMenu* MenuBackend = NULL;
 // EL BACKEND GRAFICO (Ajustes > Graphics): con varios en el ejecutable (la PC, graphics/w3dBackend.h) se elige al ARRANCAR;
 // el boton dice el elegido y, si todavia corre otro (falta reiniciar, o el elegido no anda aca), cual esta corriendo
 static std::string TextoBackend(){
-#ifdef W3D_MULTIBACKEND
+#if defined(__EMSCRIPTEN__)
+    return "WebGL";   // en el navegador hay UNO solo (graphics/gles2 sobre WebGL): no hay nada que elegir
+#elif defined(W3D_MULTIBACKEND)
     const int pedido = w3dEngine::BackendDeNombre(cfg.graphicsAPI.c_str());
     const int activo = w3dEngine::BackendActivo();
     std::string t = w3dEngine::BackendNombre(pedido >= 0 ? pedido : activo);
@@ -1862,7 +1865,9 @@ static std::string TextoBackend(){
 #endif
 }
 static void AccionBackendElegido(int id){
-#ifdef W3D_MULTIBACKEND
+#if defined(__EMSCRIPTEN__)
+    (void)id;   // WebGL es el unico
+#elif defined(W3D_MULTIBACKEND)
     if (!w3dEngine::BackendDisponible(id)) return;
     cfg.graphicsAPI = w3dEngine::BackendNombre(id);
     W3dConfigGuardar();
@@ -1878,7 +1883,9 @@ static void AccionMenuBackend(){
     if (!PropsActivo || !PropsActivo->propAjBackend) return;
     if (!MenuBackend){ MenuBackend = new PopupMenu(); MenuBackend->action = AccionBackendElegido; }
     MenuBackend->Limpiar();
-#ifdef W3D_MULTIBACKEND
+#if defined(__EMSCRIPTEN__)
+    { MenuItem* it = MenuBackend->Agregar("WebGL", 0); if (it) it->verde = true; }
+#elif defined(W3D_MULTIBACKEND)
     const int pedido = w3dEngine::BackendDeNombre(cfg.graphicsAPI.c_str());
     for (int b = 0; b < w3dEngine::Backends_; b++) {
         if (!w3dEngine::BackendDisponible(b)) continue;
@@ -2535,6 +2542,14 @@ static void AccionJuegoResolucion(){
 }
 // refresca los numeros mostrados desde g_proyCompilar (lo llama import_w3d al abrir un .w3d con el bloque guardado)
 void W3dJuegoVolRefUI(){ g_juegoVolF = (float)g_proyCompilar.volumen; g_juegoResF = (float)g_proyCompilar.resolucion; }
+// el editor WEB no puede compilar juegos (sin cmake/emcc/gradle ni procesos en el navegador): esconde esas filas
+static bool JuegoSinCompilador() {
+#ifdef __EMSCRIPTEN__
+    return true;
+#else
+    return false;
+#endif
+}
 // Compilar juego: exporta + genera + compila EN SEGUNDO PLANO (worker): el editor no
 // se congela; el progreso (etapa + %) lo muestra la barra overlay de abajo y el
 // resultado llega por notificacion. Si ya hay un build corriendo, CompilarJuego avisa
@@ -2623,7 +2638,7 @@ static PopupMenu* MenuPlat = NULL;
 static void AccionPlatElegida(int id){
     g_proyCompilar.plataforma = id;   // queda en el .w3d al guardar el proyecto
     if (PropsActivo && PropsActivo->propJuegoPlat) PropsActivo->propJuegoPlat->button->text = NombrePlat(id);
-    if (PropsActivo && PropsActivo->propJuegoUID) PropsActivo->propJuegoUID->oculto = (id != 5); // UID: solo cuando Symbian esta elegido
+    if (PropsActivo && PropsActivo->propJuegoUID) PropsActivo->propJuegoUID->oculto = (id != 5) || JuegoSinCompilador(); // UID: solo con Symbian
     if (PropsActivo && PropsActivo->propJuegoBackend) PropsActivo->propJuegoBackend->button->text = NombreBackendJuego();
     g_redraw = true;
 }
@@ -4313,24 +4328,484 @@ static void AccionBrowseExport(){
 // base del render = Path/FileName-sin-extension (seteada por AccionRenderImage); RenderFileNamePNG
 // le agrega "[_tag]_0001.png". El _0001 es CurrentFrame (para secuencias mas adelante).
 static std::string g_pendingRenderBase;
+// los campos RUTA y NOMBRE de la tarjeta Render y g_render: mientras se edita un campo, el campo manda; si no, lo que
+// dice g_render (lo puede haber cambiado el formato, el explorador u otro panel)
+void RenderFilasFormato(Properties* P);
+void SincronizarCamposRender(Properties* P){
+    if (!P) return;
+    if (g_render.carpeta.empty()) g_render.carpeta = w3dFileSystem::GetDefaultOutputDir();   // (un proyecto sin carpeta)
+    if (P->renderGenVisto != g_renderGen) { P->renderGenVisto = g_renderGen; RenderFilasFormato(P); }
+    PropText* c[2] = { P->propRenderPath, P->propRenderOutput };
+    std::string* v[2] = { &g_render.carpeta, &g_render.nombre };
+    for (int i = 0; i < 2; i++) {
+        if (!c[i]) continue;
+        if (g_textFieldActivo == &c[i]->field) *v[i] = c[i]->field.text;
+        else if (c[i]->field.text != *v[i]) c[i]->field.SetText(*v[i]);
+    }
+}
+// los VIDEOS segun la plataforma: en la PC, el ffmpeg de la maquina; en Android, el codificador del telefono
+#if (defined(__linux__) && !defined(__ANDROID__)) || defined(_WIN32) || defined(__APPLE__)
+#define W3D_VIDEO_FFMPEG 1
+#elif defined(__ANDROID__)
+#define W3D_VIDEO_ANDROID 1
+#endif
+// ===== EL FORMATO DEL RENDER A ARCHIVO (tarjeta Render) =====
+// PNG y JPG: una imagen por pase y por cuadro (base_pase_0001.png). MKV y MP4: Render Animation hace UN video por pase
+// (base_pase.mp4) con el ffmpeg instalado en la maquina (H.264 si lo trae; no se distribuye ningun codificador con
+// patentes). Render Image con un formato de video guarda la imagen en PNG.
+static const char* const kRenderFormatos[] = { "PNG", "JPG", "MKV", "MP4" };
+static const int kRenderFormatosN = 4;
+static bool g_renderSecuenciaVideo = false;   // Render Animation esta escribiendo videos (no imagenes sueltas)
+static int RenderFormato() {
+#ifdef W3D_SYMBIAN
+    return 0;   // (el N95: PNG)
+#else
+    const int f = g_render.formato;
+#ifdef W3D_VIDEO_ANDROID
+    if (f == 2) return 3;   // (Android no escribe MKV: MP4)
+#endif
+    return (f >= 0 && f < kRenderFormatosN) ? f : 0;
+#endif
+}
+static int RenderCalidad() {
+    int q = (int)(g_render.calidad + 0.5f);
+    return q < 1 ? 1 : (q > 100 ? 100 : q);
+}
+// UN VIDEO es solo la composicion final (con el postprocesado si esta tildado): sin pases. Los pases son de las
+// secuencias de imagenes (PNG / JPG)
+static bool RenderEsVideo() { return RenderFormato() >= 2; }
+static bool RenderConFinal() { return RenderEsVideo() || g_render.final; }
+static bool RenderPaseZ()   { return !RenderEsVideo() && g_render.zbuffer; }
+static bool RenderPaseN()   { return !RenderEsVideo() && g_render.normal; }
+static bool RenderPaseA()   { return !RenderEsVideo() && g_render.alfa; }
+static bool RenderPaseVec() { return !RenderEsVideo() && g_render.vectores; }
+// la composicion final va con ALFA (RGBA): PNG con el tilde (el alfa sale del pase de alfa)
+static bool RenderFinalConAlfa() {
+#ifdef W3D_SYMBIAN
+    return false;
+#else
+    return g_render.final && g_render.finalAlfa && RenderFormato() == 0;
+#endif
+}
 static std::string RenderFileNamePNG(const char* tag){
     std::string base = g_pendingRenderBase;
     if (base.empty()) base = "render";
     if (tag && tag[0]) { base += "_"; base += tag; }
+    const int fmt = RenderFormato();
+    if (g_renderSecuenciaVideo && fmt >= 2) return base + (fmt == 2 ? ".mkv" : ".mp4");   // (el video: la composicion final)
     int frame = 0;
 #ifndef W3D_SYMBIAN
     extern int CurrentFrame; // frame de animacion actual (Animation.cpp; en N95 no se linkea todavia)
     frame = CurrentFrame;
 #endif
     char suf[24];
-    snprintf(suf, sizeof(suf), "_%04d.png", frame);
+    snprintf(suf, sizeof(suf), "_%04d.%s", frame, fmt == 1 ? "jpg" : "png");
     base += suf;
     return base;
 }
-// arma g_pendingRenderBase (Path/FileName-sin-ext) desde los dos campos.
+
+static std::string g_renderAudioTmp;   // el audio de la escena ya renderizado (WAV) que va adentro del video
+// ===== LOS VIDEOS: en la PC, ffmpeg recibe los cuadros crudos (RGBA) por un pipe; en Android, el codificador del
+// telefono (W3dVideo.java). Sin ninguno de los dos (la web, las consolas, Symbian por ahora): PNG y JPG =====
+#ifdef W3D_VIDEO_FFMPEG
+#ifdef _WIN32
+#define W3D_POPEN _popen
+#define W3D_PCLOSE _pclose
+#define W3D_POPEN_W "wb"
+#define W3D_NULO " 2>NUL"
+#else
+#include <signal.h>
+#define W3D_POPEN popen
+#define W3D_PCLOSE pclose
+#define W3D_POPEN_W "w"
+#define W3D_NULO " 2>/dev/null"
+#endif
+struct W3dVideoSalida { FILE* p; int w, h; bool ok; };
+static std::string Comillas(const std::string& r);
+static std::string AudioArgsFfmpeg(int f, bool mp4);
+static int AudioFormato();
+static std::map<std::string, W3dVideoSalida> g_videos;   // pase -> su ffmpeg abierto
+// lo que sabe hacer el ffmpeg de la maquina: -1 = no se pregunto; 0 = no hay; 1 = hay; 2 = hay y trae H.264. Sus
+// codificadores quedan en g_ffmpegCod (los de audio: libmp3lame, aac, libopus, flac...)
+static std::set<std::string> g_ffmpegCod;
+static int FfmpegEstado() {
+    static int estado = -1;
+    if (estado >= 0) return estado;
+    estado = 0;
+    FILE* p = W3D_POPEN("ffmpeg -hide_banner -encoders" W3D_NULO, "r");
+    if (!p) return estado;
+    char linea[512];
+    bool alguna = false;
+    while (fgets(linea, sizeof(linea), p)) {
+        alguna = true;
+        char marcas[32], nombre[128];   // " V....D libx264   libx264 H.264 ..."
+        if (sscanf(linea, " %31s %127s", marcas, nombre) == 2 && strlen(marcas) == 6) g_ffmpegCod.insert(nombre);
+    }
+    const int fin = W3D_PCLOSE(p);
+    if (alguna && fin == 0) estado = g_ffmpegCod.count("libx264") ? 2 : 1;
+    return estado;
+}
+static bool FfmpegTiene(const char* cod) { return FfmpegEstado() > 0 && g_ffmpegCod.count(cod) > 0; }
+// corre ffmpeg con 'args' y espera a que termine; true si salio bien
+static bool FfmpegCorrer(const std::string& args) {
+    const std::string cmd = "ffmpeg -hide_banner -loglevel error -y " + args + W3D_NULO;
+    w3dLogf("[render] %s", cmd.c_str());
+    FILE* p = W3D_POPEN(cmd.c_str(), "r");
+    if (!p) return false;
+    char b[256]; while (fgets(b, sizeof(b), p)) {}
+    return W3D_PCLOSE(p) == 0;
+}
+static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h) {
+    const std::string clave = tag ? tag : "";
+    std::map<std::string, W3dVideoSalida>::iterator it = g_videos.find(clave);
+    if (it == g_videos.end()) {
+        // el primer cuadro de este pase: arranca su ffmpeg
+        extern int AnimFPS;
+        extern float g_renderFps;
+        const int fps = (g_renderFps > 0.0f) ? (int)(g_renderFps + 0.5f) : (AnimFPS > 0 ? AnimFPS : 24);
+        const int q = RenderCalidad();
+        std::string ruta = RenderFileNamePNG(tag), seguro;
+        for (size_t i = 0; i < ruta.size(); i++) { if (ruta[i] == '"') seguro += '\\'; seguro += ruta[i]; }
+        // calidad 100 = sin perdida; si no, el CRF de 35 (1) a 15 (99). Sin H.264 en ese ffmpeg: MPEG-4 parte 2
+        char cod[96];
+        if (FfmpegEstado() == 2) snprintf(cod, sizeof(cod), "-c:v libx264 -preset medium -crf %d", q >= 100 ? 0 : 35 - q / 5);
+        else                     snprintf(cod, sizeof(cod), "-c:v mpeg4 -q:v %d", q >= 100 ? 1 : 31 - (q * 30) / 100);
+        // CON SONIDO: el audio de la escena (ya renderizado a un WAV) entra como segunda fuente
+        const bool mp4 = RenderFormato() == 3;
+        std::string audio;
+        if (!g_renderAudioTmp.empty())
+            audio = " -i " + Comillas(g_renderAudioTmp) + " -map 0:v:0 -map 1:a:0 " + AudioArgsFfmpeg(AudioFormato(), mp4) + " -shortest";
+        char cmd[4096];
+        snprintf(cmd, sizeof(cmd), "ffmpeg -hide_banner -loglevel error -y -f rawvideo -pix_fmt rgba -s %dx%d -framerate %d "
+                 "-i -%s -vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2\" %s -pix_fmt yuv420p%s \"%s\"", w, h, fps, audio.c_str(), cod,
+                 mp4 ? " -movflags +faststart" : "", seguro.c_str());
+        w3dLogf("[render] video: %s", cmd);
+        W3dVideoSalida v; v.w = w; v.h = h; v.ok = true;
+        v.p = W3D_POPEN(cmd, W3D_POPEN_W);
+        if (!v.p) return false;
+        it = g_videos.insert(std::make_pair(clave, v)).first;
+    }
+    W3dVideoSalida& v = it->second;
+    if (!v.ok || v.w != w || v.h != h) { v.ok = false; return false; }
+#ifndef _WIN32
+    void (*antes)(int) = signal(SIGPIPE, SIG_IGN);   // (si ffmpeg se cae, escribir no tiene que tirar el editor)
+#endif
+    const size_t n = (size_t)w * h * 4;
+    if (fwrite(rgba, 1, n, v.p) != n) v.ok = false;
+#ifndef _WIN32
+    signal(SIGPIPE, antes);
+#endif
+    return v.ok;
+}
+// cierra los videos de la secuencia (ffmpeg termina de escribir); cuenta los que fallaron
+static void VideosCerrar(int& fallos) {
+#ifndef _WIN32
+    void (*antes)(int) = signal(SIGPIPE, SIG_IGN);
+#endif
+    for (std::map<std::string, W3dVideoSalida>::iterator it = g_videos.begin(); it != g_videos.end(); ++it) {
+        const int r = W3D_PCLOSE(it->second.p);
+        if (!it->second.ok || r != 0) { fallos++; w3dLogfE("[render] el video '%s' fallo (ffmpeg devolvio %d)", it->first.c_str(), r); }
+    }
+#ifndef _WIN32
+    signal(SIGPIPE, antes);
+#endif
+    g_videos.clear();
+}
+#endif // W3D_VIDEO_FFMPEG
+
+#ifdef W3D_VIDEO_ANDROID
+// ANDROID: H.264 y AAC con el codificador del TELEFONO (MediaCodec), por JNI a la actividad (Whisk3DActivity.video*,
+// W3dVideo.java). Solo MP4 (MediaMuxer no escribe MKV)
+#include <jni.h>
+#include <SDL2/SDL.h>
+static int AudioKbps();
+static void RenderRango(int& f0, int& f1, int& fps);
+namespace {
+struct W3dJni {   // el JNIEnv del hilo de SDL y la actividad, con sus referencias locales liberadas al salir
+    JNIEnv* env; jobject act; jclass cls;
+    W3dJni() : env((JNIEnv*)SDL_AndroidGetJNIEnv()), act(NULL), cls(NULL) {
+        if (env) { act = (jobject)SDL_AndroidGetActivity(); if (act) cls = env->GetObjectClass(act); }
+    }
+    ~W3dJni() {
+        if (!env) return;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (cls) env->DeleteLocalRef(cls);
+        if (act) env->DeleteLocalRef(act);
+    }
+    jmethodID M(const char* n, const char* f) { jmethodID m = cls ? env->GetMethodID(cls, n, f) : NULL; if (env && env->ExceptionCheck()) { env->ExceptionClear(); m = NULL; } return m; }
+    bool Bien(jboolean r) { if (env->ExceptionCheck()) { env->ExceptionClear(); return false; } return r != JNI_FALSE; }
+};
+}
+static bool g_videoAndroidAbierto = false, g_videoAndroidOk = true;
+static jbyteArray g_videoAndroidCuadro = NULL;   // (referencia global: el mismo arreglo para todos los cuadros)
+static int g_videoAndroidBytes = 0;
+// el bitrate del video segun la Calidad (bits por pixel de 0.02 a 0.30)
+static int VideoKbps(int w, int h, int fps) {
+    const double bpp = 0.02 + 0.28 * RenderCalidad() / 100.0;
+    long k = (long)((double)w * h * fps * bpp / 1000.0);
+    return (int)(k < 500 ? 500 : (k > 100000 ? 100000 : k));
+}
+static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h) {
+    (void)tag;   // (un video es la composicion final)
+    W3dJni j;
+    if (!j.cls) return false;
+    if (!g_videoAndroidAbierto) {
+        int f0, f1, fps; RenderRango(f0, f1, fps);
+        jstring r = j.env->NewStringUTF(RenderFileNamePNG("").c_str());
+        jmethodID m = j.M("videoAbrir", "(Ljava/lang/String;IIII)Z");
+        g_videoAndroidOk = m && j.Bien(j.env->CallBooleanMethod(j.act, m, r, (jint)w, (jint)h, (jint)fps, (jint)VideoKbps(w, h, fps)));
+        j.env->DeleteLocalRef(r);
+        g_videoAndroidAbierto = true;
+    }
+    if (!g_videoAndroidOk) return false;
+    const int n = w * h * 4;
+    if (!g_videoAndroidCuadro || g_videoAndroidBytes != n) {
+        if (g_videoAndroidCuadro) j.env->DeleteGlobalRef(g_videoAndroidCuadro);
+        jbyteArray loc = j.env->NewByteArray(n);
+        g_videoAndroidCuadro = loc ? (jbyteArray)j.env->NewGlobalRef(loc) : NULL;
+        if (loc) j.env->DeleteLocalRef(loc);
+        g_videoAndroidBytes = g_videoAndroidCuadro ? n : 0;
+        if (!g_videoAndroidCuadro) { g_videoAndroidOk = false; return false; }
+    }
+    j.env->SetByteArrayRegion(g_videoAndroidCuadro, 0, n, (const jbyte*)rgba);
+    jmethodID m = j.M("videoCuadro", "([BII)Z");
+    g_videoAndroidOk = m && j.Bien(j.env->CallBooleanMethod(j.act, m, g_videoAndroidCuadro, (jint)w, (jint)h));
+    return g_videoAndroidOk;
+}
+static void VideosCerrar(int& fallos) {
+    if (!g_videoAndroidAbierto) return;
+    bool ok = false;
+    W3dJni j;
+    if (j.cls) {
+        jstring wav = j.env->NewStringUTF(g_renderAudioTmp.c_str());
+        jmethodID m = j.M("videoCerrar", "(Ljava/lang/String;I)Z");
+        ok = m && j.Bien(j.env->CallBooleanMethod(j.act, m, wav, (jint)AudioKbps()));
+        j.env->DeleteLocalRef(wav);
+        if (g_videoAndroidCuadro) { j.env->DeleteGlobalRef(g_videoAndroidCuadro); g_videoAndroidCuadro = NULL; g_videoAndroidBytes = 0; }
+    }
+    if (!ok || !g_videoAndroidOk) fallos++;
+    g_videoAndroidAbierto = false; g_videoAndroidOk = true;
+}
+// "Renderizar audio" en AAC: el WAV de la escena al codificador del telefono
+static bool AndroidAudioAac(const std::string& wav, const std::string& salida) {
+    W3dJni j;
+    if (!j.cls) return false;
+    jstring a = j.env->NewStringUTF(wav.c_str()), b = j.env->NewStringUTF(salida.c_str());
+    jmethodID m = j.M("audioAac", "(Ljava/lang/String;Ljava/lang/String;I)Z");
+    const bool ok = m && j.Bien(j.env->CallBooleanMethod(j.act, m, a, b, (jint)AudioKbps()));
+    j.env->DeleteLocalRef(a); j.env->DeleteLocalRef(b);
+    return ok;
+}
+#endif // W3D_VIDEO_ANDROID
+
+#if defined(W3D_VIDEO_FFMPEG) || defined(W3D_VIDEO_ANDROID)
+#define W3D_VIDEO 1
+#endif
+// lo que esta maquina sabe hacer: los videos (MKV con ffmpeg; MP4 con ffmpeg o con el telefono) y los formatos de
+// audio (WAV siempre; FLAC, MP3 y Opus con ffmpeg; AAC con ffmpeg o con el telefono)
+static bool VideoDisponible() {
+#if defined(W3D_VIDEO_FFMPEG)
+    return FfmpegEstado() > 0;
+#elif defined(W3D_VIDEO_ANDROID)
+    return true;
+#else
+    return false;
+#endif
+}
+static bool FormatoOfrecido(int f) {
+    if (f <= 1) return true;
+#if defined(W3D_VIDEO_FFMPEG)
+    return true;
+#elif defined(W3D_VIDEO_ANDROID)
+    return f == 3;
+#else
+    return false;
+#endif
+}
+static bool AudioOfrecido(int f) {
+    if (f == 0) return true;
+#if defined(W3D_VIDEO_FFMPEG)
+    return true;
+#elif defined(W3D_VIDEO_ANDROID)
+    return f == 3;
+#else
+    return false;
+#endif
+}
+
+// ===== EL AUDIO DE LA ESCENA ("Renderizar audio" y el sonido de los videos) =====
+// el WAV lo escribe Whisk3D (en todos lados, tambien el N95); FLAC, MP3, AAC y Opus, el ffmpeg de la maquina
+static const char* const kAudioFormatos[] = { "WAV", "FLAC", "MP3", "AAC", "Opus" };
+static const char* const kAudioExt[] = { ".wav", ".flac", ".mp3", ".m4a", ".opus" };
+static const int kAudioFormatosN = 5;
+// (un formato que esta maquina no tiene -el AAC de fabrica en la web o en el N95- va en WAV)
+static int AudioFormato() { const int f = g_render.audioFormato; return (f >= 0 && f < kAudioFormatosN && AudioOfrecido(f)) ? f : 0; }
+static bool AudioConBitrate(int f) { return f >= 2; }   // (WAV y FLAC no pierden: no tienen bitrate)
+static int AudioKbps() { int k = (int)(g_render.audioKbps + 0.5f); return k < 32 ? 32 : (k > 512 ? 512 : k); }
+#ifdef W3D_VIDEO_FFMPEG
+// el codificador de ffmpeg para el formato de audio (en un video MP4, el WAV va sin perdida como ALAC)
+static std::string AudioCodecFfmpeg(int f, bool mp4) {
+    switch (f) {
+        case 0: return mp4 ? "alac" : "pcm_s16le";
+        case 1: return "flac";
+        case 2: return FfmpegTiene("libmp3lame") ? "libmp3lame" : "libshine";
+        case 3: return "aac";
+        default: return FfmpegTiene("libopus") ? "libopus" : "opus";
+    }
+}
+static std::string AudioArgsFfmpeg(int f, bool mp4) {
+    char b[64]; b[0] = 0;
+    if (AudioConBitrate(f)) snprintf(b, sizeof(b), " -b:a %dk", AudioKbps());
+    return "-c:a " + AudioCodecFfmpeg(f, mp4) + b + " -strict -2";
+}
+static std::string Comillas(const std::string& r) {
+    std::string s = "\"";
+    for (size_t i = 0; i < r.size(); i++) { if (r[i] == '"') s += '\\'; s += r[i]; }
+    return s + "\"";
+}
+#endif
+namespace w3dEngine { int W3dAudioRate(); bool W3dAudioGrabar(short* out, int frames); void W3dAudioPause(bool pausa); bool W3dAudioPaused(); }
+// el RANGO de la secuencia (Inicio/Fin propios de la tarjeta Render, o los del timeline) y sus FPS
+static void RenderRango(int& f0, int& f1, int& fps) {
+    extern int StartFrame, EndFrame, AnimFPS;
+    extern float g_renderIni, g_renderFin, g_renderFps;
+    f0 = (g_renderIni > 0.0f) ? (int)g_renderIni : StartFrame;
+    f1 = (g_renderFin > 0.0f) ? (int)g_renderFin : EndFrame;
+    if (f1 < f0) { int t = f0; f0 = f1; f1 = t; }
+    fps = (g_renderFps > 0.0f) ? (int)(g_renderFps + 0.5f) : (AnimFPS > 0 ? AnimFPS : 24);
+}
+// el audio de la escena de f0 a f1 en un WAV (PCM de 16 bits estereo, al rate del mixer). Cuadro por cuadro: la
+// animacion en ese cuadro (los sonidos 3D y la camara se mueven), los sonidos como si sonara la escena y lo que dura
+// el cuadro mezclado sin la salida (el mixer en pausa: no se escucha nada mientras tanto). false si no hay mixer
+static void WavU32(unsigned char* p, unsigned v) { p[0] = (unsigned char)v; p[1] = (unsigned char)(v >> 8); p[2] = (unsigned char)(v >> 16); p[3] = (unsigned char)(v >> 24); }
+static bool RenderAudioWav(const std::string& ruta, int f0, int f1, int fps) {
+    const int rate = w3dEngine::W3dAudioRate();
+    if (rate <= 0 || fps <= 0) return false;
+    FILE* f = fopen(ruta.c_str(), "wb");
+    if (!f) return false;
+    unsigned char cab[44] = { 'R','I','F','F', 0,0,0,0, 'W','A','V','E', 'f','m','t',' ', 16,0,0,0, 1,0, 2,0,
+                              0,0,0,0, 0,0,0,0, 4,0, 16,0, 'd','a','t','a', 0,0,0,0 };
+    WavU32(cab + 24, (unsigned)rate); WavU32(cab + 28, (unsigned)rate * 4);
+    bool ok = fwrite(cab, 1, 44, f) == 44;
+    extern int CurrentFrame; extern void AplicarAnimacionObjetos();
+    const int guardado = CurrentFrame;
+    const bool pausa = w3dEngine::W3dAudioPaused();
+    w3dEngine::W3dAudioPause(true);
+    W3dSonidosCallar();
+    std::vector<short> buf;
+    std::vector<unsigned char> le;
+    long hechos = 0;
+    for (int fr = f0; fr <= f1 && ok; fr++) {
+        CurrentFrame = fr; AplicarAnimacionObjetos();
+        W3dSonidosRenderCuadro((float)fr, fr == f0);
+        const long hasta = (long)((double)(fr - f0 + 1) * rate / fps + 0.5);
+        int n = (int)(hasta - hechos);
+        while (n > 0 && ok) {
+            const int k = n > 4096 ? 4096 : n;
+            buf.resize((size_t)k * 2);
+            if (!w3dEngine::W3dAudioGrabar(&buf[0], k)) { ok = false; break; }
+            le.resize((size_t)k * 4);   // (el WAV es little endian, en cualquier maquina)
+            for (int i = 0; i < k * 2; i++) { le[(size_t)i * 2] = (unsigned char)(buf[(size_t)i] & 0xFF); le[(size_t)i * 2 + 1] = (unsigned char)((buf[(size_t)i] >> 8) & 0xFF); }
+            if (fwrite(&le[0], 1, le.size(), f) != le.size()) ok = false;
+            n -= k;
+        }
+        hechos = hasta;
+    }
+    W3dSonidosCallar();
+    w3dEngine::W3dAudioPause(pausa);
+    CurrentFrame = guardado; AplicarAnimacionObjetos();
+    const unsigned datos = (unsigned)hechos * 4;
+    WavU32(cab + 4, 36 + datos); WavU32(cab + 40, datos);
+    if (ok && fseek(f, 0, SEEK_SET) == 0) ok = fwrite(cab, 1, 44, f) == 44; else ok = false;
+    if (fclose(f) != 0) ok = false;
+    return ok;
+}
+static void CalcularRenderBase();
+// EL RENDER POR FRANJAS DIRECTO AL ARCHIVO: el PNG se escribe a medida que se dibuja, sin la imagen entera en memoria (el
+// N95 y el N8 renderizan en 4K escribiendo en la tarjeta; en la PC, menos memoria). Va cuando el formato es PNG y lo que
+// se guarda no necesita la imagen entera: un pase, o la composicion final sin postprocesado, sin desenfoque por vectores
+// y sin el alfa del pase de alfa (los tres miran pixeles de alrededor o juntan dos imagenes). JPG y video, con la
+// imagen entera (en la PC y en Android sobra memoria)
+static void WebBajar(const std::string& ruta);
+bool g_renderSinFranjas = false;   // (el harness: la imagen entera, para comparar con las franjas)
+static bool RenderFranjasPosible() { return RenderFormato() == 0 && !g_renderSecuenciaVideo && !g_renderSinFranjas; }
+static bool FranjaAlPng(void* c, const unsigned char* px, int y0, int n) { (void)y0; return w3dEngine::PNGFranjasFilas(*(w3dEngine::PNGFranjas*)c, px, n); }
+// lo que se traza por CPU va de a franjas de 32 filas (con la GPU de Vulkan, de 256: cada franja sube su imagen)
+static int RTAltoFranja() { return g_rt.gpu ? 256 : 32; }
+// un pase rasterizado (o la composicion final, trazada o no) directo a su PNG por franjas
+static bool PaseAlArchivo(Viewport3D* vp, int w, int h, RenderType::Enum t, const char* tag, bool trazado, int base, int progTotal) {
+    w3dEngine::PNGFranjas png;
+    const std::string ruta = RenderFileNamePNG(tag);
+    if (!w3dEngine::PNGFranjasAbrir(png, ruta.c_str(), w, h, false)) return false;
+    std::string msg;
+    const bool ok = trazado ? RTRenderizarFranjas(vp, w, h, RTAltoFranja(), FranjaAlPng, &png, msg)
+                            : vp->RenderFranjas(w, h, t, FranjaAlPng, &png, base, progTotal);
+    const bool cerro = w3dEngine::PNGFranjasCerrar(png);
+    if (ok && cerro) WebBajar(ruta);
+    return ok && cerro;
+}
+// "RENDERIZAR AUDIO": el audio de la escena del rango del render, en el formato elegido (base + .wav/.flac/.mp3/.m4a/.opus)
+static void AccionRenderAudio() {
+    CalcularRenderBase();
+    if (W3dSonidosEnEscena() == 0) { Notificar(T("The scene has no sounds"), true); return; }
+    if (w3dEngine::W3dAudioRate() <= 0) { Notificar(T("There is no audio: the mixer did not start"), true); return; }
+    int f0, f1, fps; RenderRango(f0, f1, fps);
+    const int fmt = AudioFormato();
+    const std::string ruta = g_pendingRenderBase + kAudioExt[fmt];
+    bool ok;
+    ProgresoIniciar(T("Rendering audio..."));
+    if (fmt == 0) ok = RenderAudioWav(ruta, f0, f1, fps);
+    else {
+        const std::string tmp = g_pendingRenderBase + ".audio.tmp.wav";
+#if defined(W3D_VIDEO_FFMPEG)
+        if (FfmpegEstado() == 0) { ProgresoFin(); Notificar(T("This format needs ffmpeg installed"), true); return; }
+        ok = RenderAudioWav(tmp, f0, f1, fps) && FfmpegCorrer("-i " + Comillas(tmp) + " " + AudioArgsFfmpeg(fmt, false) + " " + Comillas(ruta));
+#elif defined(W3D_VIDEO_ANDROID)
+        ok = RenderAudioWav(tmp, f0, f1, fps) && AndroidAudioAac(tmp, ruta);
+#else
+        ok = false;
+#endif
+        remove(tmp.c_str());
+    }
+    ProgresoFin();
+    if (ok) WebBajar(ruta);
+    if (ok) Notificar(T("Audio rendered!"), false);
+    else    Notificar(T("Error rendering audio"), true);
+}
+void W3dHarnessRenderAudio() { AccionRenderAudio(); }   // (el harness: el boton)
+
+// la WEB: lo que se guarda en el sistema de archivos del navegador (virtual) se baja al disco de la persona
+#ifdef __EMSCRIPTEN__
+extern "C" void WebDescargarArchivo(const char* path, const char* name);   // main.cpp (EM_JS)
+static void WebBajar(const std::string& ruta) { WebDescargarArchivo(ruta.c_str(), SoloNombre(ruta).c_str()); }
+#else
+static void WebBajar(const std::string&) {}
+#endif
+// GUARDA una imagen del render (el pase 'tag'; "" = la composicion final) en el formato de la tarjeta. 'rgba' de arriba
+// hacia abajo. 'conAlfa' = PNG RGBA
+static bool GuardarImagenRender(const char* tag, const unsigned char* rgba, int w, int h, bool conAlfa) {
+#ifndef W3D_SYMBIAN
+    const int fmt = RenderFormato();
+#ifdef W3D_VIDEO
+    if (g_renderSecuenciaVideo && fmt >= 2) return VideoCuadro(tag, rgba, w, h);
+#endif
+    const std::string ruta = RenderFileNamePNG(tag);
+    bool ok;
+    if (fmt == 1) ok = w3dEngine::SaveJPG(ruta.c_str(), rgba, w, h, RenderCalidad(), false);
+    else if (conAlfa) ok = w3dEngine::SavePNGRGBA(ruta.c_str(), rgba, w, h, false);
+    else ok = w3dEngine::SavePNG(ruta.c_str(), rgba, w, h, false);
+    if (ok) WebBajar(ruta);
+    return ok;
+#else
+    (void)conAlfa;
+    return w3dEngine::SavePNG(RenderFileNamePNG(tag).c_str(), rgba, w, h, false);
+#endif
+}
+// arma g_pendingRenderBase (Path/FileName-sin-ext) desde la carpeta y el nombre del render (g_render: los campos Ruta y
+// Nombre de la tarjeta los editan, pero no hace falta ningun panel)
 static void CalcularRenderBase(){
-    std::string dir = (PropsActivo && PropsActivo->propRenderPath) ? PropsActivo->propRenderPath->field.text : std::string();
-    std::string nm  = (PropsActivo && PropsActivo->propRenderOutput) ? PropsActivo->propRenderOutput->field.text : std::string("render.png");
+    std::string dir = g_render.carpeta.empty() ? w3dFileSystem::GetDefaultOutputDir() : g_render.carpeta;
+    std::string nm  = g_render.nombre;
     std::string full = W3dRutaSalidaCampos(dir, nm, "render.png");
     // sacar la extension -> queda dir/nombre
     size_t dot = full.find_last_of('.'), sl = full.find_last_of("/\\");
@@ -4344,15 +4819,11 @@ static void CalcularRenderBase(){
 }
 // carpeta elegida para el render -> al campo Path
 static void RenderFolderElegido(const std::string& elegido){
-    if (!PropsActivo || !PropsActivo->propRenderPath) return;
     // igual que el export: se pregunta al disco, no por la extension
     bool esPng = !elegido.empty() && !w3dFileSystem::IsDir(elegido);
-    if (esPng) {
-        PropsActivo->propRenderPath->field.SetText(w3dFileSystem::ParentPath(elegido));
-        if (PropsActivo->propRenderOutput) PropsActivo->propRenderOutput->field.SetText(SoloNombre(elegido));
-    } else {
-        PropsActivo->propRenderPath->field.SetText(elegido);
-    }
+    if (esPng) { g_render.carpeta = w3dFileSystem::ParentPath(elegido); g_render.nombre = SoloNombre(elegido); }
+    else g_render.carpeta = elegido;
+    if (PropsActivo) SincronizarCamposRender(PropsActivo);
 }
 static void AccionBrowseRender(){
     AbrirFileBrowser(T("Render to..."), T("Use this file"), ".png", RenderFolderElegido, true);
@@ -4371,15 +4842,14 @@ static void RegenerarModsEscena(Object* nodo){
 // al cambiar Width/Height del render -> actualiza el aspecto global (la geometria de las camaras lo sigue,
 // responsive: 1:1 cuadrada, 4:3 en 4:3, etc.). onChange de propRenderW/propRenderH.
 static void ActualizarAspectoRender(){
-    if (!PropsActivo) return;
-    float w = PropsActivo->renderW, h = PropsActivo->renderH;
+    float w = g_render.w, h = g_render.h;
     g_renderAspect = (h > 0.5f) ? (w / h) : 1.0f;
 }
 
 // pases activos a guardar: beauty (siempre) + los tildados (zbuffer/normal/alpha) + el de vectores (tambien si solo
 // se usa para el desenfoque)
 // (con el trazado de rayos y SU desenfoque, el de los vectores no va: el trazado ya sale desenfocado)
-static bool DesenfoqueVectores(){ return PropsActivo->renderDesenfoque && PropsActivo->renderObturador > 0.0f && !(g_rt.on && g_rt.desenfoque); }
+static bool DesenfoqueVectores(){ return g_render.desenfoque && g_render.obturador > 0.0f && !(g_rt.on && g_rt.desenfoque); }
 // (el desenfoque de movimiento del POSTPROCESADO tambien lee los vectores)
 // EL POSTPROCESADO del render a imagen: los objetos Postproceso del arbol, en su orden, sobre la imagen entera (el render
 // a archivo va por tiles: no se puede cortar a mitad del recorrido como en el viewport)
@@ -4393,9 +4863,18 @@ static bool PostArchivo(int que) {   // 0 = alguno hace algo, 1 = alguno lee la 
     W3dPostUsar(NULL);
     return r;
 }
-static bool ConVectores(){ return PropsActivo->renderVectores || DesenfoqueVectores() || PostArchivo(2); }
+// el POSTPROCESADO de la composicion final: con su tilde y algun objeto Postproceso que haga algo
+static bool PostFinal(){ return RenderConFinal() && g_render.post && PostArchivo(0); }
+// (el desenfoque y el postprocesado son de la composicion final: sin ella, los vectores solo si se pide su pase)
+static bool ConVectores(){
+    return RenderPaseVec() ||
+           (RenderConFinal() && (DesenfoqueVectores() || (g_render.post && PostArchivo(2))));
+}
+// el pase de alfa se renderiza para guardarlo y/o para el alfa de la composicion final (PNG RGBA)
+static bool ConAlfa(){ return RenderPaseA() || RenderFinalConAlfa(); }
 static int PasesActivos(){
-    return 1 + (PropsActivo->renderZbuffer?1:0) + (PropsActivo->renderNormal?1:0) + (PropsActivo->renderAlpha?1:0) + (ConVectores()?1:0);
+    return (RenderConFinal()?1:0) + (RenderPaseZ()?1:0) + (RenderPaseN()?1:0) +
+           (ConAlfa()?1:0) + (ConVectores()?1:0);
 }
 // LOS VECTORES necesitan el cuadro ANTERIOR: la escena en f-1 (con el nivel de render de los modificadores), recordada
 static void RecordarCuadro(Viewport3D* vp, int w, int h){
@@ -4418,30 +4897,44 @@ static void PrepararAnterior(Viewport3D* vp, int w, int h, int frame){
 // TILES). Devuelve cuantos tiles consumio (para que el caller acumule el base entre frames). Suma a 'fallos'.
 // El 'total' NO se resetea aca -> Render Image usa 1 frame; Render Animation usa frames x pases x tiles.
 static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int progTotal, int& fallos){
-    bool doZ = PropsActivo->renderZbuffer, doN = PropsActivo->renderNormal, doA = PropsActivo->renderAlpha;
+    const bool doZ = RenderPaseZ(), doN = RenderPaseN(), doA = RenderPaseA();
+    const bool final = RenderConFinal(), alfaFinal = RenderFinalConAlfa();
     int tpp = vp->TilesNecesarios(w, h);
     // Subdivision (y cualquier modificador con nivel de render): regenerar con el nivel de RENDER antes de renderizar
     extern bool g_modRenderMode;
     g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
     int base = progBase;
-    // los VECTORES DE MOVIMIENTO primero (desde lo recordado del cuadro anterior): el pase _vectores y/o el desenfoque
-    const bool desenfocar = DesenfoqueVectores();
-    std::vector<unsigned char> vec;
-    if (ConVectores()) {
-        if (!vp->RenderABuffer(w, h, RenderType::Vectores, vec, base, progTotal)) { fallos++; vec.clear(); }
-        else if (PropsActivo->renderVectores && !w3dEngine::SavePNG(RenderFileNamePNG("vectores").c_str(), &vec[0], w, h, false)) fallos++;
+    // un pase de ANALISIS a su archivo (Z-Buffer, Normal, Alfa): al buffer y de ahi al formato de la tarjeta
+    // (sin 'quiero' -la imagen no hace falta en memoria- y en PNG, va POR FRANJAS directo al archivo)
+    struct P { static void Pase(Viewport3D* vp, int w, int h, RenderType::Enum t, const char* tag, std::vector<unsigned char>& buf,
+                                bool quiero, int& base, int tpp, int progTotal, int& fallos) {
+        if (tag && !quiero && RenderFranjasPosible()) { if (!PaseAlArchivo(vp, w, h, t, tag, false, base, progTotal)) fallos++; }
+        else if (!vp->RenderABuffer(w, h, t, buf, base, progTotal) || buf.size() != (size_t)w * h * 4) { fallos++; buf.clear(); }
+        else if (tag && !GuardarImagenRender(tag, &buf[0], w, h, false)) fallos++;
         base += tpp;
-    }
-    // EL POSTPROCESADO (tarjeta "Post Processing"): la misma pila que la vista Rendered, por CPU sobre la imagen entera
-    const bool post = PostArchivo(0);
-    if ((desenfocar && !vec.empty()) || post) {
-        // el beauty a memoria, desenfocado por CPU a lo largo de sus vectores y/o postprocesado, y recien ahi al PNG
+    } };
+    // los VECTORES DE MOVIMIENTO primero (desde lo recordado del cuadro anterior): el pase _vectores y/o el desenfoque
+    const bool desenfocar = final && DesenfoqueVectores();
+    std::vector<unsigned char> vec;
+    const bool post = final && PostFinal();
+    if (ConVectores()) P::Pase(vp, w, h, RenderType::Vectores, RenderPaseVec() ? "vectores" : NULL, vec, desenfocar || post, base, tpp, progTotal, fallos);
+    // el ALFA: su pase y/o el canal alfa de la composicion final (PNG RGBA)
+    std::vector<unsigned char> alfa;
+    if (ConAlfa()) P::Pase(vp, w, h, RenderType::Alpha, doA ? "alpha" : NULL, alfa, alfaFinal, base, tpp, progTotal, fallos);
+    // LA COMPOSICION FINAL (el beauty): rasterizada o trazada, desenfocada a lo largo de sus vectores, con el
+    // POSTPROCESADO (tarjeta "Post Processing", la misma pila que la vista Rendered, por CPU sobre la imagen entera) y
+    // con el alfa del pase de alfa
+    if (final && RenderFranjasPosible() && !desenfocar && !post && !alfaFinal) {
+        // por FRANJAS directo al PNG (trazada o rasterizada)
+        if (!PaseAlArchivo(vp, w, h, RenderType::Rendered, "", g_rt.on, base, progTotal)) fallos++;
+        base += tpp;
+    } else if (final) {
         std::vector<unsigned char> img; std::string msg;
         const bool ok = g_rt.on ? RTRenderizarABuffer(vp, w, h, img, msg) : vp->RenderABuffer(w, h, RenderType::Rendered, img, base, progTotal);
         if (!ok || img.size() != (size_t)w * h * 4) fallos++;
         else {
             if (desenfocar && img.size() == vec.size())
-                W3dDesenfoqueMovimiento(&img[0], &vec[0], w, h, PropsActivo->renderObturador, 12, &img[0]);
+                W3dDesenfoqueMovimiento(&img[0], &vec[0], w, h, g_render.obturador, 12, &img[0]);
             if (post) {
                 // la PROFUNDIDAD de cada pixel (m) sale del pase ZBuffer: la niebla lineal de nearClip (blanco) a 40 m
                 std::vector<float> prof; std::vector<unsigned char> zb;
@@ -4460,17 +4953,14 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
                 }
                 W3dPostUsar(NULL);
             }
-            if (!w3dEngine::SavePNG(RenderFileNamePNG("").c_str(), &img[0], w, h, false)) fallos++;
+            if (alfaFinal && alfa.size() == img.size())
+                for (size_t i = 0; i < (size_t)w * h; i++) img[i * 4 + 3] = alfa[i * 4];   // (el matte: blanco = opaco)
+            if (!GuardarImagenRender("", &img[0], w, h, alfaFinal && alfa.size() == img.size())) fallos++;
         }
-    } else if (g_rt.on) {
-        // TRAZADO DE RAYOS: el pase beauty lo hace la CPU (todos los pases, con la barra de progreso)
-        std::string msg;
-        if (!RTRenderizarAPNG(vp, w, h, RenderFileNamePNG(""), msg)) fallos++;
-    } else if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG("").c_str(), base, progTotal)) fallos++;
-    base += tpp;
-    if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG("zbuffer").c_str(), base, progTotal)) fallos++; base += tpp; }
-    if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG("normal").c_str(),  base, progTotal)) fallos++; base += tpp; }
-    if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG("alpha").c_str(),   base, progTotal)) fallos++; base += tpp; }
+        base += tpp;
+    }
+    if (doZ) { std::vector<unsigned char> b; P::Pase(vp, w, h, RenderType::ZBuffer,    "zbuffer", b, false, base, tpp, progTotal, fallos); }
+    if (doN) { std::vector<unsigned char> b; P::Pase(vp, w, h, RenderType::NormalView, "normal",  b, false, base, tpp, progTotal, fallos); }
     if (ConVectores()) RecordarCuadro(vp, w, h);   // este cuadro es el "anterior" del que sigue (Render Animation)
     g_modRenderMode = false; RegenerarModsEscena(SceneCollection); // volver al nivel de VIEWPORT
     return base - progBase; // tiles consumidos por este frame (nPases * tpp)
@@ -4479,7 +4969,7 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
 // "Motion blur": la fila del obturador solo con el tilde puesto
 static void AccionRenderDesenfoque(){
     if (!PropsActivo || !PropsActivo->propRenderObturador) return;
-    PropsActivo->propRenderObturador->value = PropsActivo->renderDesenfoque ? &PropsActivo->renderObturador : NULL;
+    PropsActivo->propRenderObturador->value = g_render.desenfoque ? &g_render.obturador : NULL;
     PropertiesLayoutDirty = true;
 }
 // "Ray Tracing" (tarjeta Render): con el tilde se muestran Rays/Samples/Passes; sin el, las filas no ocupan lugar.
@@ -4739,6 +5229,84 @@ static void AccionMenuDenoiser() {
     }
     AbrirMenuBajoBoton(MenuDenoiser, PropsActivo->propRTDenoiser->button);
 }
+// las filas que dependen del FORMATO y de la COMPOSICION FINAL: la calidad (JPG y video), el alfa RGBA (PNG) y el
+// postprocesado. Sin la composicion final, solo se guardan los pases tildados. Un VIDEO es solo la composicion final:
+// sin los tildes de los pases ni el de la composicion (queda el postprocesado)
+void RenderFilasFormato(Properties* P){
+    if (!P || !P->propRenderFormato) return;
+    if (g_render.formato < 0 || g_render.formato >= kRenderFormatosN) g_render.formato = 0;
+    const bool video = g_render.formato >= 2;
+    P->propRenderFormato->button->text = kRenderFormatos[g_render.formato];
+    P->propRenderCalidad->value = (g_render.formato != 0) ? &g_render.calidad : NULL;
+    if (P->propRenderZbuffer)  P->propRenderZbuffer->value  = video ? NULL : &g_render.zbuffer;
+    if (P->propRenderNormal)   P->propRenderNormal->value   = video ? NULL : &g_render.normal;
+    if (P->propRenderAlpha)    P->propRenderAlpha->value    = video ? NULL : &g_render.alfa;
+    if (P->propRenderVectores) P->propRenderVectores->value = video ? NULL : &g_render.vectores;
+    P->propRenderFinal->value = video ? NULL : &g_render.final;
+#ifdef W3D_SYMBIAN
+    P->propRenderFinalAlfa->value = NULL;   // (el N95 guarda PNG sin alfa)
+#else
+    P->propRenderFinalAlfa->value = (g_render.final && g_render.formato == 0) ? &g_render.finalAlfa : NULL;
+#endif
+    P->propRenderPost->value = (video || g_render.final) ? &g_render.post : NULL;
+    // el AUDIO: "Con sonido" es de los videos; el formato y el bitrate, del sonido del video y de "Renderizar audio"
+    if (P->propRenderSonido) P->propRenderSonido->value = video ? &g_render.sonido : NULL;
+    if (P->propRenderAudioFmt) P->propRenderAudioFmt->button->text = kAudioFormatos[AudioFormato()];
+    if (P->propRenderAudioKbps) P->propRenderAudioKbps->value = AudioConBitrate(AudioFormato()) ? &g_render.audioKbps : NULL;
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+static void AccionRenderFinal(){ RenderFilasFormato(PropsActivo); }
+// el menu del FORMATO DE AUDIO (WAV siempre; los demas con el ffmpeg de la maquina)
+static PopupMenu* MenuAudioFormato = NULL;
+static void AccionAudioFormatoElegido(int id){
+    if (id < 0 || id >= kAudioFormatosN) return;
+    if (!AudioOfrecido(id)) return;
+#ifdef W3D_VIDEO_FFMPEG
+    if (id > 0 && FfmpegEstado() == 0) { Notificar(T("This format needs ffmpeg installed"), true); return; }
+#endif
+    g_render.audioFormato = id;
+    RenderFilasFormato(PropsActivo);
+}
+static void AccionMenuAudioFormato(){
+    if (!PropsActivo || !PropsActivo->propRenderAudioFmt) return;
+    if (!MenuAudioFormato) { MenuAudioFormato = new PopupMenu(); MenuAudioFormato->action = AccionAudioFormatoElegido; }
+    MenuAudioFormato->Limpiar();
+    MenuAudioFormato->titulo = T("Audio format");
+    for (int i = 0; i < kAudioFormatosN; i++) {
+        if (!AudioOfrecido(i)) continue;
+        MenuItem* it = MenuAudioFormato->Agregar(kAudioFormatos[i], i); if (it) it->verde = (AudioFormato() == i);
+    }
+    AbrirMenuBajoBoton(MenuAudioFormato, PropsActivo->propRenderAudioFmt->button);
+}
+static PopupMenu* MenuRenderFormato = NULL;
+static void AccionRenderFormatoElegido(int id){
+    if (!PropsActivo || id < 0 || id >= kRenderFormatosN) return;
+    if (!FormatoOfrecido(id)) return;
+    if (id >= 2 && !VideoDisponible()) { Notificar(T("MKV and MP4 need ffmpeg installed"), true); return; }
+    g_render.formato = id;
+    // el NOMBRE del archivo sigue al formato (render.png -> render.jpg)
+    {
+        std::string n = g_render.nombre;
+        const size_t pto = n.find_last_of('.');
+        static const char* const kExt[] = { ".png", ".jpg", ".mkv", ".mp4" };
+        if (pto != std::string::npos) n = n.substr(0, pto);
+        if (!n.empty()) g_render.nombre = n + kExt[id];
+    }
+    SincronizarCamposRender(PropsActivo);
+    RenderFilasFormato(PropsActivo);
+}
+static void AccionMenuRenderFormato(){
+    if (!PropsActivo || !PropsActivo->propRenderFormato) return;
+    if (!MenuRenderFormato) { MenuRenderFormato = new PopupMenu(); MenuRenderFormato->action = AccionRenderFormatoElegido; }
+    MenuRenderFormato->Limpiar();
+    MenuRenderFormato->titulo = T("Format");
+    for (int i = 0; i < kRenderFormatosN; i++) {
+        if (!FormatoOfrecido(i)) continue;   // (los videos: con ffmpeg en la PC; MP4 con el telefono en Android)
+        MenuItem* it = MenuRenderFormato->Agregar(kRenderFormatos[i], i); if (it) it->verde = (RenderFormato() == i);
+    }
+    AbrirMenuBajoBoton(MenuRenderFormato, PropsActivo->propRenderFormato->button);
+}
 static void AccionRTToggle(){
     RTFilasPanel(PropsActivo);
     RebindMaterialMeshPart(); // Roughness / Metallic de la tarjeta Material se ven solo con el tilde puesto
@@ -4753,14 +5321,33 @@ static void AccionRTValores(){
     g_rt.capas = (int)(P->rtCapas + 0.5f); if (g_rt.capas < 1) g_rt.capas = 1; if (g_rt.capas > 64) g_rt.capas = 64;
     RTInvalidar();
 }
+// LA VISTA con la que se renderiza (su camara, o su vista si no hay camara): la Vista 3D activa; si no hay, la primera
+// del layout; y si el layout no tiene ninguna, una propia que no se ve (el render a archivo dibuja por tiles fuera de la
+// pantalla: no necesita que la vista este a la vista)
+static void RenderVistaBuscar(ViewportBase* n, Viewport3D*& out){
+    if (!n || out) return;
+    if (!n->isLeaf()) { RenderVistaBuscar(((ViewportColumn*)n)->childA, out); RenderVistaBuscar(((ViewportColumn*)n)->childB, out); return; }
+    if (n->ViewportKind() == 1) out = (Viewport3D*)n;
+}
+static Viewport3D* RenderVista(){
+    if (Viewport3DActive) return Viewport3DActive;
+    Viewport3D* v = NULL;
+    extern ViewportBase* LayoutRaizCompleta();
+    RenderVistaBuscar(LayoutRaizCompleta(), v);
+    if (v) return v;
+    static Viewport3D* oculta = NULL;
+    if (!oculta) oculta = new Viewport3D();
+    const int w = rootViewport ? rootViewport->width : 640, h = rootViewport ? rootViewport->height : 480;
+    if (oculta->width != w || oculta->height != h) { oculta->x = 0; oculta->y = 0; oculta->Resize(w, h); }
+    return oculta;
+}
 // hace el render REAL de UNA imagen (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
 static void HacerRenderImage(){
-    if (!PropsActivo) return;
-    Viewport3D* vp = Viewport3DActive;
-    if (!vp) { Notificar(T("No active 3D viewport"), true); return; }
-    int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
-    int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
+    Viewport3D* vp = RenderVista();
+    int w = (int)(g_render.w + 0.5f); if (w < 1) w = 1;
+    int h = (int)(g_render.h + 0.5f); if (h < 1) h = 1;
     int total = PasesActivos() * vp->TilesNecesarios(w, h); // 1 frame: PASES x TILES
+    if (total <= 0) { Notificar(T("Nothing to render: tick Final composite or a pass"), true); return; }
     ProgresoIniciar(T("Rendering..."));
     int fallos = 0;
     extern int CurrentFrame;
@@ -4813,13 +5400,22 @@ void SincronizarAnimFps(){
     }
 }
 // harness: el boton "Render Image" sin confirmacion de sobrescritura (prueba del trazado de rayos a PNG)
-void W3dHarnessRenderImage(){ if (PropsActivo && Viewport3DActive) { CalcularRenderBase(); HacerRenderImage(); } }
+void W3dHarnessRenderImage(){ CalcularRenderBase(); HacerRenderImage(); }
+// el PRIMER archivo que va a escribir el render (la composicion final o, sin ella, el primer pase tildado): el de la
+// pregunta de "ya existe". "" = no hay nada que renderizar
+static std::string RenderPrimerArchivo(){
+    if (RenderConFinal()) return RenderFileNamePNG("");
+    if (RenderPaseVec()) return RenderFileNamePNG("vectores");
+    if (RenderPaseA()) return RenderFileNamePNG("alpha");
+    if (RenderPaseZ()) return RenderFileNamePNG("zbuffer");
+    if (RenderPaseN()) return RenderFileNamePNG("normal");
+    return std::string();
+}
 static void AccionRenderImage(){
-    if (!PropsActivo) return;
-    if (!Viewport3DActive) { Notificar(T("No active 3D viewport"), true); return; }
     CalcularRenderBase(); // setea g_pendingRenderBase desde los campos Path + File name
+    if (RenderPrimerArchivo().empty()) { Notificar(T("Nothing to render: tick Final composite or a pass"), true); return; }
 #ifndef W3D_SYMBIAN
-    std::string beauty = RenderFileNamePNG(""); // el pase principal
+    std::string beauty = RenderPrimerArchivo(); // (con un formato de video, la imagen va en PNG)
     if (w3dFileSystem::FileExists(beauty)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
         confirmarPopup->Abrir(std::string(T("The file \"")) + SoloNombre(beauty) + T("\" already exists. Do you want to replace it?"), HacerRenderImage);
@@ -4841,13 +5437,12 @@ float g_renderIni = 0.0f, g_renderFin = 0.0f, g_renderFps = 0.0f;
 static bool RenderEsJuego(){ return ActiveAnimKind == 2 && AnimEsJuego; }
 
 static void HacerRenderAnimation(){
-    if (!PropsActivo || !Viewport3DActive) return;
     if (RenderEsJuego()) return;   // (el boton esta en gris: un juego no tiene animacion)
-    Viewport3D* vp = Viewport3DActive;
+    Viewport3D* vp = RenderVista();
     extern int CurrentFrame, StartFrame, EndFrame;
     extern void AplicarAnimacionObjetos();
-    int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
-    int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
+    int w = (int)(g_render.w + 0.5f); if (w < 1) w = 1;
+    int h = (int)(g_render.h + 0.5f); if (h < 1) h = 1;
     // el rango PROPIO del render (tarjeta Render); 0 = el del timeline
     int f0 = (g_renderIni > 0.0f) ? (int)g_renderIni : StartFrame;
     int f1 = (g_renderFin > 0.0f) ? (int)g_renderFin : EndFrame;
@@ -4858,6 +5453,23 @@ static void HacerRenderAnimation(){
     int total = nFrames * PasesActivos() * vp->TilesNecesarios(w, h);
     int guardado = CurrentFrame;
     CalcularRenderBase();
+    if (PasesActivos() == 0) { Notificar(T("Nothing to render: tick Final composite or a pass"), true); return; }
+    // MKV / MP4: un video por pase, con el ffmpeg de la maquina
+    if (RenderFormato() >= 2) {
+#ifdef W3D_VIDEO
+        if (!VideoDisponible()) { Notificar(T("MKV and MP4 need ffmpeg installed"), true); return; }
+        // CON SONIDO (y la escena tiene sonidos): su audio primero, a un WAV que ffmpeg mete en el video
+        g_renderAudioTmp.clear();
+        if (g_render.sonido && W3dSonidosEnEscena() > 0 && w3dEngine::W3dAudioRate() > 0) {
+            int a0, a1, afps; RenderRango(a0, a1, afps);
+            g_renderAudioTmp = g_pendingRenderBase + ".audio.tmp.wav";
+            if (!RenderAudioWav(g_renderAudioTmp, a0, a1, afps)) { remove(g_renderAudioTmp.c_str()); g_renderAudioTmp.clear(); Notificar(T("Error rendering audio"), true); return; }
+        }
+        g_renderSecuenciaVideo = true;
+#else
+        Notificar(T("MKV and MP4 need ffmpeg installed"), true); return;
+#endif
+    }
     ProgresoIniciar(T("Rendering animation..."));
     int fallos = 0, base = 0;
     PrepararAnterior(vp, w, h, f0);   // (los vectores del primer cuadro: desde f0-1; los demas, del que se acaba de renderizar)
@@ -4866,6 +5478,12 @@ static void HacerRenderAnimation(){
         AplicarAnimacionObjetos(); // transform de objetos al frame f
         base += RenderPasesFrame(vp, w, h, base, total, fallos); // rendea el frame; avanza la barra GLOBAL
     }
+#ifdef W3D_VIDEO
+    if (g_renderSecuenciaVideo) {
+        VideosCerrar(fallos); g_renderSecuenciaVideo = false;
+        if (!g_renderAudioTmp.empty()) { remove(g_renderAudioTmp.c_str()); g_renderAudioTmp.clear(); }
+    }
+#endif
     ProgresoFin();
     CurrentFrame = guardado;
     AplicarAnimacionObjetos(); // volver la escena al frame que estaba
@@ -4874,15 +5492,12 @@ static void HacerRenderAnimation(){
     g_redraw = true;
 }
 static void AccionRenderAnimation(){
-    if (!PropsActivo) return;
-    if (!Viewport3DActive) { Notificar(T("No active 3D viewport"), true); return; }
     CalcularRenderBase();   // (Path + File name: la secuencia usa la misma base que Render Image)
     HacerRenderAnimation();
 }
-// los atajos F12 / Ctrl+F12 (app/W3dAtajos.cpp): lo mismo que los botones, aunque el panel de propiedades no este a
-// la vista (usa los valores del ultimo activo)
+// los atajos F12 / Ctrl+F12 (app/W3dAtajos.cpp): lo mismo que los botones, con o sin panel de Propiedades (las opciones
+// del render son de g_render; antes hacia falta un panel ACTIVO y recien abierto el editor no habia ninguno)
 void W3dAtajoRender(bool animacion){
-    if (!PropsActivo) { Notificar(T("No Properties panel"), true); return; }
     if (animacion) {
         if (RenderEsJuego()) { Notificar(T("A game has no animation to render"), true); return; }
         AccionRenderAnimation();
@@ -6492,39 +7107,8 @@ static float g_kfFrame = 0.0f, g_kfValor = 0.0f;
 static float g_kfInDF = 0.0f, g_kfInDV = 0.0f, g_kfOutDF = 0.0f, g_kfOutDV = 0.0f;
 static PropFloat *gKfFrame=NULL, *gKfValor=NULL, *gKfInDF=NULL, *gKfInDV=NULL, *gKfOutDF=NULL, *gKfOutDV=NULL;
 static PropButton *gKfInterp=NULL, *gKfHandle=NULL;
-static PropButton *gKfCicloA=NULL, *gKfCicloD=NULL;   // el modificador REPETIR de la curva (antes / despues)
-static PopupMenu* g_menuKfCiclo = NULL; static int g_kfCicloLado = 0;   // 0 = antes, 1 = despues
 static void KfAplicado();   // (abajo)
-static const char* KfNombreCiclo(int m){ return m == KfCicloRepite ? "Repeat" : m == KfCicloOffset ? "Repeat with Offset" : "None"; }
-static void AccionMenuKfCiclo(int id){
-    if (id >= KfCicloNo && id <= KfCicloOffset){
-        extern bool TimelineSetCiclo(int antes, int despues);
-        // con keyframes elegidos en el timeline: todas sus curvas (como el menu Modifiers); si no, la del activo
-        if (!TimelineSetCiclo(g_kfCicloLado == 0 ? id : -1, g_kfCicloLado == 1 ? id : -1)){
-            int i; AnimProperty* ap = DopeKeyframeActivo(&i);
-            if (ap){ UndoKeyframesIniciar();
-                     if (g_kfCicloLado == 0) ap->cicloAntes = id; else ap->cicloDespues = id;
-                     UndoKeyframesConfirmar(); }
-        }
-        KfAplicado();
-    }
-    if (g_menuKfCiclo && MenuAbierto == g_menuKfCiclo) g_menuKfCiclo->Cerrar();
-}
-static void AbrirMenuKfCiclo(int lado){
-    PropButton* pb = lado == 0 ? gKfCicloA : gKfCicloD; if (!pb) return;
-    g_kfCicloLado = lado;
-    if (!g_menuKfCiclo){ g_menuKfCiclo = new PopupMenu(); g_menuKfCiclo->action = AccionMenuKfCiclo; }
-    int i; AnimProperty* ap = DopeKeyframeActivo(&i, false);
-    const int act = ap ? (lado == 0 ? ap->cicloAntes : ap->cicloDespues) : -1;
-    g_menuKfCiclo->Limpiar();
-    g_menuKfCiclo->titulo = T(lado == 0 ? "Repeat Before" : "Repeat After");
-    for (int m = KfCicloNo; m <= KfCicloOffset; m++) g_menuKfCiclo->Agregar(T(KfNombreCiclo(m)), m)->verde = (m == act);
-    if (MenuAbierto && MenuAbierto != g_menuKfCiclo) MenuAbierto->Cerrar();
-    g_menuKfCiclo->Abrir(pb->button->sx, pb->button->sy + pb->button->height, MenuPantallaW, MenuPantallaH);
-    MenuAbierto = g_menuKfCiclo;
-}
-static void AccionKfBtnCicloA(){ AbrirMenuKfCiclo(0); }
-static void AccionKfBtnCicloD(){ AbrirMenuKfCiclo(1); }
+static void CfDelActivo();  // (abajo: enlaza las filas del panel en uso)
 static PopupMenu* g_menuKfInterp = NULL;
 static PopupMenu* g_menuKfHandle = NULL;
 
@@ -6535,7 +7119,10 @@ static const char* KfNombreHandle(int h){
 }
 static void KfAplicado(){ AplicarAnimacionObjetos(); InvalidarAnimYRedraw(); }
 
+// VARIOS keyframes elegidos: lo que se tipea va a todos (Timeline.cpp, DopeKeysFijar*)
+static int KfCantElegidos(){ std::vector<AnimProperty*> c; std::vector<int> i; return DopeKeysElegidas(c, i, false); }
 static void AccionKfFrame(){
+    if (KfCantElegidos() > 1){ DopeKeysFijarFrame((int)floorf(g_kfFrame + 0.5f)); KfAplicado(); return; }
     int i; AnimProperty* ap = DopeKeyframeActivo(&i); if (!ap) return;
     int nf = (int)floorf(g_kfFrame + 0.5f);
     if (nf == ap->keyframes[i].frame) return;
@@ -6550,6 +7137,7 @@ static void AccionKfFrame(){
     UndoKeyframesConfirmar(); KfAplicado();
 }
 static void AccionKfValor(){
+    if (KfCantElegidos() > 1){ DopeKeysFijarValor(g_kfValor); KfAplicado(); return; }
     int i; AnimProperty* ap = DopeKeyframeActivo(&i); if (!ap) return;
     if (ap->keyframes[i].value == g_kfValor) return;
     UndoKeyframesIniciar(); ap->keyframes[i].value = g_kfValor; UndoKeyframesConfirmar(); KfAplicado();
@@ -6563,7 +7151,17 @@ static void AccionKfHandles(){
     k.inDF = g_kfInDF; k.inDV = g_kfInDV; k.outDF = g_kfOutDF; k.outDV = g_kfOutDV;
     UndoKeyframesConfirmar(); KfAplicado();
 }
+// cada campo de handle por separado: con varios elegidos solo cambia ESE campo en todos
+static void AccionKfHandleCampo(int lado, int eje, float v){
+    if (KfCantElegidos() > 1){ DopeKeysFijarHandle(lado, eje, v); KfAplicado(); return; }
+    AccionKfHandles();
+}
+static void AccionKfInDF(){ AccionKfHandleCampo(0, 0, g_kfInDF); }
+static void AccionKfInDV(){ AccionKfHandleCampo(0, 1, g_kfInDV); }
+static void AccionKfOutDF(){ AccionKfHandleCampo(1, 0, g_kfOutDF); }
+static void AccionKfOutDV(){ AccionKfHandleCampo(1, 1, g_kfOutDV); }
 static void AccionMenuKfInterp(int id){
+    if (id >= 0 && KfCantElegidos() > 1){ DopeKeysFijarInterp(id); KfAplicado(); id = -1; }
     if (id >= 0){ int i; AnimProperty* ap = DopeKeyframeActivo(&i);
         if (ap){ UndoKeyframesIniciar();
                  int& in = ap->keyframes[i].Interpolation;
@@ -6579,6 +7177,7 @@ static void AccionMenuKfInterp(int id){
     if (g_menuKfInterp && MenuAbierto == g_menuKfInterp) g_menuKfInterp->Cerrar();
 }
 static void AccionMenuKfHandle(int id){
+    if (id >= 0 && KfCantElegidos() > 1){ DopeKeysFijarHandleTipo(id); KfAplicado(); id = -1; }
     if (id >= 0){ int i; AnimProperty* ap = DopeKeyframeActivo(&i);
         if (ap){ UndoKeyframesIniciar();
                  keyFrame& k = ap->keyframes[i];
@@ -6593,6 +7192,7 @@ static void AccionMenuKfHandle(int id){
     if (g_menuKfHandle && MenuAbierto == g_menuKfHandle) g_menuKfHandle->Cerrar();
 }
 static void AccionKfBtnInterp(){
+    CfDelActivo();
     if (!gKfInterp) return;
     if (!g_menuKfInterp){ g_menuKfInterp = new PopupMenu(); g_menuKfInterp->action = AccionMenuKfInterp;
                           g_menuKfInterp->titulo = T("Interpolation"); }
@@ -6612,6 +7212,7 @@ static void AccionKfBtnInterp(){
     MenuAbierto = g_menuKfInterp;
 }
 static void AccionKfBtnHandle(){
+    CfDelActivo();
     if (!gKfHandle) return;
     if (!g_menuKfHandle){ g_menuKfHandle = new PopupMenu(); g_menuKfHandle->action = AccionMenuKfHandle;
                           g_menuKfHandle->titulo = T("Handle Type"); }
@@ -6626,6 +7227,265 @@ static void AccionKfBtnHandle(){
     g_menuKfHandle->Abrir(gKfHandle->button->sx, gKfHandle->button->sy + gKfHandle->button->height,
                           MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_menuKfHandle;
+}
+
+// ============================================================================
+//  Tarjeta "Curva" (pestania Animacion): las CURVAS elegidas en el timeline (las que tienen keyframes elegidos).
+//  Interpolacion y tipo de handle de TODOS sus keyframes + el Repetir (antes y despues). Con varias curvas lo que no
+//  coincide se ve "-", y lo que se elige va a todas.
+// ============================================================================
+static PropButton *gCuInterp = NULL, *gCuHandle = NULL;
+static PopupMenu* g_menuCu = NULL; static int g_menuCuQue = 0;   // 0 = interpolacion, 1 = tipo de handle
+static void AccionMenuCu(int id){
+    if (id >= 0){ if (g_menuCuQue == 0) DopeCurvasFijarInterp(id); else DopeCurvasFijarHandleTipo(id); KfAplicado(); }
+    if (g_menuCu && MenuAbierto == g_menuCu) g_menuCu->Cerrar();
+}
+// lo que tienen TODAS las curvas elegidas (sin contar la ultima clave de cada una: su tramo no existe); -1 = distintos
+static int CuComun(int que){
+    std::vector<AnimProperty*> cs; DopeCurvasElegidas(cs, NULL, false);
+    int r = -2;
+    for (size_t c = 0; c < cs.size(); c++){
+        const size_t n = cs[c]->keyframes.size();
+        for (size_t i = 0; i < n; i++){
+            if (n > 1 && i + 1 == n && que == 0) continue;
+            const keyFrame k = cs[c]->keyframes.Clave(i);
+            const int v = (que == 0) ? k.Interpolation : k.handleType;
+            if (r == -2) r = v; else if (r != v) return -1;
+        }
+    }
+    return r < 0 ? -1 : r;
+}
+static void AbrirMenuCu(int que){
+    PropButton* pb = (que == 0) ? gCuInterp : gCuHandle; if (!pb) return;
+    g_menuCuQue = que;
+    if (!g_menuCu){ g_menuCu = new PopupMenu(); g_menuCu->action = AccionMenuCu; }
+    const int act = CuComun(que);
+    g_menuCu->Limpiar();
+    if (que == 0){ g_menuCu->titulo = T("Interpolation"); W3dMenuInterpolaciones(g_menuCu, 0, act); }
+    else {
+        g_menuCu->titulo = T("Handle Type");
+        const int ids[6] = { HFree, HAligned, HVector, HAuto, HAutoClamped, HPlano };
+        const int ics[6] = { (int)IconType::handle_free, (int)IconType::handle_aligned, (int)IconType::handle_vector,
+                             (int)IconType::handle_auto, (int)IconType::handle_autoclamped, (int)IconType::handle_flat };
+        for (int k = 0; k < 6; k++) g_menuCu->Agregar(T(KfNombreHandle(ids[k])), ids[k], ics[k])->verde = (ids[k] == act);
+    }
+    if (MenuAbierto && MenuAbierto != g_menuCu) MenuAbierto->Cerrar();
+    AbrirMenuBajoBoton(g_menuCu, pb->button);
+}
+static void AccionCuBtnInterp(){ CfDelActivo(); AbrirMenuCu(0); }
+static void AccionCuBtnHandle(){ CfDelActivo(); AbrirMenuCu(1); }
+
+// ============================================================================
+//  MODIFICADORES DE CURVA (pestania Modifiers): la pila de la curva ACTIVA del timeline (la del keyframe activo, o
+//  la unica elegida). Como los del objeto: la lista + Add / Remove / Move, y abajo el elegido con sus valores. Los
+//  campos apuntan a una COPIA (g_cm): cada cambio la escribe en la curva viva con su paso de undo (la curva se puede
+//  reemplazar entera por un Ctrl+Z, apuntarle directo dejaria campos colgando).
+// ============================================================================
+static int g_cmActivo = 0;
+static KfModificador g_cm;
+static PropBool *gCmOn = NULL, *gCmViejo = NULL, *gCmUsarIni = NULL, *gCmUsarFin = NULL, *gCmUsarInf = NULL, *gCmUsarRango = NULL;
+static PropButton *gCmAntesModo = NULL, *gCmDespModo = NULL, *gCmMezcla = NULL;
+static PropFloat *gCmAntesCant = NULL, *gCmDespCant = NULL;
+static PropFloat *gCmEscala = NULL, *gCmFuerza = NULL, *gCmOffset = NULL, *gCmFase = NULL, *gCmProf = NULL, *gCmLac = NULL, *gCmRug = NULL;
+static PropFloat *gCmPaso = NULL, *gCmPasoOfs = NULL, *gCmIni = NULL, *gCmFin = NULL;
+static PropFloat *gCmSigma = NULL, *gCmAncho = NULL;
+static PropFloat *gCmInf = NULL, *gCmRIni = NULL, *gCmRFin = NULL, *gCmMIn = NULL, *gCmMOut = NULL;
+static PropButtonRow *gCmFilaAdd = NULL, *gCmFilaMover = NULL;
+// LAS FILAS SON DE CADA PANEL (ver prueba_propsarm2d.w3s): los punteros de arriba (y los gKf* de la tarjeta Keyframe)
+// se enlazan al panel que se refresca o que se esta usando. Uno que se libera los suelta si eran los suyos.
+struct CurvaFilasUI {
+    PropFloat *kfFrame, *kfValor, *kfInDF, *kfInDV, *kfOutDF, *kfOutDV;
+    PropButton *kfInterp, *kfHandle, *cuInterp, *cuHandle;
+    PropBool *cmOn, *cmViejo, *cmUsarIni, *cmUsarFin, *cmUsarInf, *cmUsarRango;
+    PropButton *cmAntesModo, *cmDespModo, *cmMezcla;
+    PropFloat *cmAntesCant, *cmDespCant, *cmEscala, *cmFuerza, *cmOffset, *cmFase, *cmProf, *cmLac, *cmRug;
+    PropFloat *cmPaso, *cmPasoOfs, *cmIni, *cmFin, *cmSigma, *cmAncho, *cmInf, *cmRIni, *cmRFin, *cmMIn, *cmMOut;
+    PropButtonRow *cmFilaAdd, *cmFilaMover;
+};
+static CurvaFilasUI* g_cfEnlazado = NULL;
+// (gKf* estan declarados mas arriba, con la tarjeta Keyframe)
+#define CF_CAMPOS(X) \
+    X(kfFrame, gKfFrame) X(kfValor, gKfValor) X(kfInDF, gKfInDF) X(kfInDV, gKfInDV) X(kfOutDF, gKfOutDF) X(kfOutDV, gKfOutDV) \
+    X(kfInterp, gKfInterp) X(kfHandle, gKfHandle) X(cuInterp, gCuInterp) X(cuHandle, gCuHandle) \
+    X(cmOn, gCmOn) X(cmViejo, gCmViejo) X(cmUsarIni, gCmUsarIni) X(cmUsarFin, gCmUsarFin) X(cmUsarInf, gCmUsarInf) X(cmUsarRango, gCmUsarRango) \
+    X(cmAntesModo, gCmAntesModo) X(cmDespModo, gCmDespModo) X(cmMezcla, gCmMezcla) \
+    X(cmAntesCant, gCmAntesCant) X(cmDespCant, gCmDespCant) X(cmEscala, gCmEscala) X(cmFuerza, gCmFuerza) X(cmOffset, gCmOffset) \
+    X(cmFase, gCmFase) X(cmProf, gCmProf) X(cmLac, gCmLac) X(cmRug, gCmRug) X(cmPaso, gCmPaso) X(cmPasoOfs, gCmPasoOfs) \
+    X(cmIni, gCmIni) X(cmFin, gCmFin) X(cmSigma, gCmSigma) X(cmAncho, gCmAncho) X(cmInf, gCmInf) X(cmRIni, gCmRIni) \
+    X(cmRFin, gCmRFin) X(cmMIn, gCmMIn) X(cmMOut, gCmMOut) X(cmFilaAdd, gCmFilaAdd) X(cmFilaMover, gCmFilaMover)
+static CurvaFilasUI* CfCapturar() {   // las recien construidas (las de este panel) -> su struct
+    CurvaFilasUI* f = new CurvaFilasUI();
+    #define CF_CAP(campo, glob) f->campo = glob;
+    CF_CAMPOS(CF_CAP)
+    #undef CF_CAP
+    g_cfEnlazado = f;
+    return f;
+}
+static void CfEnlazar(CurvaFilasUI* f) {   // NULL = ninguno (el panel enlazado se libero)
+    #define CF_EN(campo, glob) glob = f ? f->campo : NULL;
+    CF_CAMPOS(CF_EN)
+    #undef CF_EN
+    g_cfEnlazado = f;
+}
+static void CfDelActivo() { if (PropsActivo && PropsActivo->curvaFilas) CfEnlazar(PropsActivo->curvaFilas); }
+static AnimProperty* CmCurva(bool editar){ return DopeCurvaActiva(NULL, editar); }
+static const char* CmNombreCiclos(int m){
+    switch (m){ case KfCiclosRepite: return "Repeat Motion"; case KfCiclosOffset: return "Repeat with Offset";
+                case KfCiclosEspejo: return "Repeat Mirrored"; default: return "No Cycles"; }
+}
+static const char* CmNombreMezcla(int m){
+    switch (m){ case KfRuidoSuma: return "Add"; case KfRuidoResta: return "Subtract"; case KfRuidoMultiplica: return "Multiply"; default: return "Replace"; }
+}
+static void CmAplicado(){ KfAplicado(); PropertiesLayoutDirty = true; g_redraw = true; }
+// la copia -> la curva viva (un paso de undo)
+static void AccionCmCambio(){
+    AnimProperty* ap = CmCurva(true);
+    if (!ap || g_cmActivo < 0 || g_cmActivo >= (int)ap->mods.size()) return;
+    if (ap->mods[(size_t)g_cmActivo] == g_cm) return;
+    UndoKeyframesIniciar();
+    ap->mods[(size_t)g_cmActivo] = g_cm;
+    UndoKeyframesConfirmar();
+    CmAplicado();
+}
+static PopupMenu* g_menuCmAdd = NULL;
+static void AccionCmAddElegido(int tipo){
+    AnimProperty* ap = CmCurva(true);
+    if (ap && tipo >= 0 && tipo < KfModTipos){
+        UndoKeyframesIniciar();
+        ap->mods.push_back(KfModificador(tipo));
+        UndoKeyframesConfirmar();
+        g_cmActivo = (int)ap->mods.size() - 1;
+        CmAplicado();
+    }
+    if (g_menuCmAdd && MenuAbierto == g_menuCmAdd) g_menuCmAdd->Cerrar();
+}
+static void AccionCmAdd(){
+    CfDelActivo();
+    if (!g_menuCmAdd){ g_menuCmAdd = new PopupMenu(); g_menuCmAdd->action = AccionCmAddElegido; }
+    g_menuCmAdd->Limpiar();
+    g_menuCmAdd->titulo = T("Add Modifier");
+    for (int t = 0; t < KfModTipos; t++) g_menuCmAdd->Agregar(T(KfModNombre(t)), t);
+    if (MenuAbierto && MenuAbierto != g_menuCmAdd) MenuAbierto->Cerrar();
+    if (gCmFilaAdd && !gCmFilaAdd->botones.empty()) AbrirMenuBajoBoton(g_menuCmAdd, gCmFilaAdd->botones[0]);
+}
+static void AccionCmQuitar(){
+    AnimProperty* ap = CmCurva(true);
+    if (!ap || g_cmActivo < 0 || g_cmActivo >= (int)ap->mods.size()) return;
+    UndoKeyframesIniciar();
+    ap->mods.erase(ap->mods.begin() + g_cmActivo);
+    UndoKeyframesConfirmar();
+    if (g_cmActivo >= (int)ap->mods.size()) g_cmActivo = (int)ap->mods.size() - 1;
+    CmAplicado();
+}
+static void CmMover(int dir){
+    AnimProperty* ap = CmCurva(true);
+    if (!ap) return;
+    const int j = g_cmActivo + dir;
+    if (g_cmActivo < 0 || j < 0 || j >= (int)ap->mods.size()) return;
+    UndoKeyframesIniciar();
+    std::swap(ap->mods[(size_t)g_cmActivo], ap->mods[(size_t)j]);
+    UndoKeyframesConfirmar();
+    g_cmActivo = j;
+    CmAplicado();
+}
+static void AccionCmSubir(){ CmMover(-1); }
+static void AccionCmBajar(){ CmMover(+1); }
+// los desplegables de modo (antes / despues de los ciclos, la mezcla del ruido)
+static PopupMenu* g_menuCmModo = NULL; static int g_cmModoQue = 0;   // 0 antes, 1 despues, 2 mezcla
+static void AccionCmModoElegido(int id){
+    if (id >= 0){
+        if (g_cmModoQue == 0) g_cm.antesModo = id; else if (g_cmModoQue == 1) g_cm.despuesModo = id; else g_cm.mezcla = id;
+        AccionCmCambio();
+    }
+    if (g_menuCmModo && MenuAbierto == g_menuCmModo) g_menuCmModo->Cerrar();
+}
+static void AbrirMenuCmModo(int que){
+    PropButton* pb = (que == 0) ? gCmAntesModo : (que == 1) ? gCmDespModo : gCmMezcla; if (!pb) return;
+    g_cmModoQue = que;
+    if (!g_menuCmModo){ g_menuCmModo = new PopupMenu(); g_menuCmModo->action = AccionCmModoElegido; }
+    g_menuCmModo->Limpiar();
+    g_menuCmModo->titulo = "";
+    if (que < 2){
+        const int act = (que == 0) ? g_cm.antesModo : g_cm.despuesModo;
+        for (int m = KfCiclosNo; m <= KfCiclosEspejo; m++) g_menuCmModo->Agregar(T(CmNombreCiclos(m)), m)->verde = (m == act);
+    } else {
+        for (int m = KfRuidoReemplaza; m <= KfRuidoMultiplica; m++) g_menuCmModo->Agregar(T(CmNombreMezcla(m)), m)->verde = (m == g_cm.mezcla);
+    }
+    if (MenuAbierto && MenuAbierto != g_menuCmModo) MenuAbierto->Cerrar();
+    AbrirMenuBajoBoton(g_menuCmModo, pb->button);
+}
+static void AccionCmAntesModo(){ CfDelActivo(); AbrirMenuCmModo(0); }
+static void AccionCmDespModo(){ CfDelActivo(); AbrirMenuCmModo(1); }
+static void AccionCmMezcla(){ CfDelActivo(); AbrirMenuCmModo(2); }
+// la lista (PropListMeshParts modo 16)
+static int CmCantidad(){ AnimProperty* ap = CmCurva(false); return ap ? (int)ap->mods.size() : 0; }
+static std::string CmTexto(int i){
+    AnimProperty* ap = CmCurva(false);
+    if (!ap || i < 0 || i >= (int)ap->mods.size()) return std::string();
+    const KfModificador& m = ap->mods[(size_t)i];
+    return std::string(T(KfModNombre(m.tipo))) + (m.activo ? "" : std::string(" (") + T("off") + ")");
+}
+static void CmElegir(int i){ g_cmActivo = i; PropertiesLayoutDirty = true; g_redraw = true; }
+struct RegistrarCurvaModsLista { RegistrarCurvaModsLista(){ CurvaModFilasCount = CmCantidad; CurvaModFilaTexto = CmTexto; CurvaModFilaSeleccionar = CmElegir; } };
+static RegistrarCurvaModsLista gRegistrarCurvaModsLista;
+// un PropFloat de la tarjeta del modificador (mismo formato en todas las filas)
+static PropFloat* CmFloat(GroupPropertie* g, const char* nombre, float mn, float mx, float fino, float grueso, float drag, bool entero = false){
+    PropFloat* f = new PropFloat(T(nombre));
+    f->SetRango(mn, mx); f->stepFino = fino; f->stepGrueso = grueso; f->dragStep = drag; f->entero = entero;
+    f->onChange = AccionCmCambio;
+    g->properties.push_back(f);
+    return f;
+}
+static PropBool* CmBool(GroupPropertie* g, const char* nombre){
+    PropBool* b = new PropBool(T(nombre)); b->onChange = AccionCmCambio; g->properties.push_back(b); return b;
+}
+static PropButton* CmBoton(GroupPropertie* g, const char* nombre, void (*accion)()){
+    PropButton* b = new PropButton(T(nombre));
+    b->conLabel = true; b->button->desplegable = true; b->action = accion;
+    g->properties.push_back(b);
+    return b;
+}
+// las filas del modificador ELEGIDO: solo las de su tipo (value = NULL / oculto esconde las otras)
+static void CmFilas(Properties* P, AnimProperty* ap){
+    const bool hay = ap && g_cmActivo >= 0 && g_cmActivo < (int)ap->mods.size();
+    const int t = hay ? g_cm.tipo : -1;
+    const bool cic = (t == KfModCiclos), rui = (t == KfModRuido), esc = (t == KfModEscalon), sua = (t == KfModSuave);
+    if (gCmOn) gCmOn->value = hay ? &g_cm.activo : NULL;
+    if (gCmAntesModo){ gCmAntesModo->oculto = !cic; if (cic) gCmAntesModo->button->text = T(CmNombreCiclos(g_cm.antesModo)); }
+    if (gCmAntesCant) gCmAntesCant->value = cic ? &g_cm.antesCant : NULL;
+    if (gCmDespModo){ gCmDespModo->oculto = !cic; if (cic) gCmDespModo->button->text = T(CmNombreCiclos(g_cm.despuesModo)); }
+    if (gCmDespCant) gCmDespCant->value = cic ? &g_cm.despuesCant : NULL;
+    if (gCmMezcla){ gCmMezcla->oculto = !rui; if (rui) gCmMezcla->button->text = T(CmNombreMezcla(g_cm.mezcla)); }
+    if (gCmEscala) gCmEscala->value = rui ? &g_cm.escala : NULL;
+    if (gCmFuerza) gCmFuerza->value = rui ? &g_cm.fuerza : NULL;
+    if (gCmOffset) gCmOffset->value = rui ? &g_cm.offset : NULL;
+    if (gCmFase)   gCmFase->value   = rui ? &g_cm.fase : NULL;
+    if (gCmProf)   gCmProf->value   = rui ? &g_cm.profundidad : NULL;
+    if (gCmViejo)  gCmViejo->value  = rui ? &g_cm.ruidoViejo : NULL;
+    if (gCmLac)    gCmLac->value    = (rui && !g_cm.ruidoViejo) ? &g_cm.lacunaridad : NULL;
+    if (gCmRug)    gCmRug->value    = (rui && !g_cm.ruidoViejo) ? &g_cm.rugosidad : NULL;
+    if (gCmPaso)    gCmPaso->value    = esc ? &g_cm.paso : NULL;
+    if (gCmPasoOfs) gCmPasoOfs->value = esc ? &g_cm.pasoOffset : NULL;
+    if (gCmUsarIni) gCmUsarIni->value = esc ? &g_cm.usarIni : NULL;
+    if (gCmIni)     gCmIni->value     = (esc && g_cm.usarIni) ? &g_cm.ini : NULL;
+    if (gCmUsarFin) gCmUsarFin->value = esc ? &g_cm.usarFin : NULL;
+    if (gCmFin)     gCmFin->value     = (esc && g_cm.usarFin) ? &g_cm.fin : NULL;
+    if (gCmSigma) gCmSigma->value = sua ? &g_cm.sigma : NULL;
+    if (gCmAncho) gCmAncho->value = sua ? &g_cm.ancho : NULL;
+    if (gCmUsarInf)   gCmUsarInf->value   = hay ? &g_cm.usarInfluencia : NULL;
+    if (gCmInf)       gCmInf->value       = (hay && g_cm.usarInfluencia) ? &g_cm.influencia : NULL;
+    if (gCmUsarRango) gCmUsarRango->value = hay ? &g_cm.usarRango : NULL;
+    if (gCmRIni) gCmRIni->value = (hay && g_cm.usarRango) ? &g_cm.rangoIni : NULL;
+    if (gCmRFin) gCmRFin->value = (hay && g_cm.usarRango) ? &g_cm.rangoFin : NULL;
+    if (gCmMIn)  gCmMIn->value  = (hay && g_cm.usarRango) ? &g_cm.mezclaIn : NULL;
+    if (gCmMOut) gCmMOut->value = (hay && g_cm.usarRango) ? &g_cm.mezclaOut : NULL;
+    const int n = ap ? (int)ap->mods.size() : 0;
+    if (gCmFilaAdd && gCmFilaAdd->botones.size() >= 2) VisibleSiCambia(gCmFilaAdd->botones[1], n >= 1);
+    if (gCmFilaMover && gCmFilaMover->botones.size() >= 2){
+        VisibleSiCambia(gCmFilaMover->botones[0], n >= 2);
+        VisibleSiCambia(gCmFilaMover->botones[1], n >= 2);
+    }
+    if (P && P->propListCurvaMods){ P->propListCurvaMods->selectIndex = g_cmActivo; P->propListCurvaMods->AjustarVentana(); }
 }
 
 // ===== tarjeta ARCHIVO: abrir/guardar el proyecto .w3d (v3: JSON plano + archivos externos) =====
@@ -6728,7 +7588,7 @@ void ProyectoSincronizarCampos() {
     if (PropsActivo->propJuegoOrient)   PropsActivo->propJuegoOrient->button->text   = NombreOrientacion(g_proyCompilar.orientacion);
     if (PropsActivo->propJuegoAssets)   PropsActivo->propJuegoAssets->button->text   = NombreAssetsModo(g_proyCompilar.assetsModo);
     if (PropsActivo->propJuegoUID)    { PropsActivo->propJuegoUID->button->text      = NombreUID();
-                                        PropsActivo->propJuegoUID->oculto = (g_proyCompilar.plataforma != 5); }
+                                        PropsActivo->propJuegoUID->oculto = (g_proyCompilar.plataforma != 5) || JuegoSinCompilador(); }
     g_redraw = true;
 }
 
@@ -8888,42 +9748,56 @@ void Properties::ConstruirGrupos(){
     propRender->anchoValores = 0.62f; // columna de valor ANCHA (paths)
     // salida partida en dos campos: Path (carpeta) + File name (nombre.png).
     // Default del path: carpeta de salida por defecto (Android = Descargas).
-    propRenderPath = new PropText(T("Path"), w3dFileSystem::GetDefaultOutputDir());
+    if (g_render.carpeta.empty()) g_render.carpeta = w3dFileSystem::GetDefaultOutputDir();
+    propRenderPath = new PropText(T("Path"), g_render.carpeta);
     propRenderPath->onClick = AccionBrowseRender; // el campo Path ES el "Browse folder": al clickear abre el explorador
     propRender->properties.push_back(propRenderPath);
-    propRenderOutput = new PropText(T("Name"), "render.png");
+    propRenderOutput = new PropText(T("Name"), g_render.nombre);
     propRender->properties.push_back(propRenderOutput);
-    // resolucion editable. Puede ser MAYOR que la ventana: se rinde por tiles.
+    // el FORMATO: PNG, JPG y (con el ffmpeg de la maquina) los videos MKV y MP4 de Render Animation; la CALIDAD, del
+    // JPG y de los videos (100 = sin perdida)
+    propRenderFormato = new PropButton(T("Format"));
+    propRenderFormato->conLabel = true;
+    propRenderFormato->button->desplegable = true;
+    propRenderFormato->action = AccionMenuRenderFormato;
+    propRenderFormato->enColumna = true;   // (alineado con Nombre y Ancho: misma columna, mismo ancho)
 #ifdef W3D_SYMBIAN
-    renderW = 320.0f; renderH = 240.0f;   // el N95 rinde a 240p por defecto (su pantalla; el ray tracing a mas ya no es "esperable")
-#else
-    renderW = 1280.0f; renderH = 720.0f;  // 720p por defecto en PC/Android/Web
+    propRenderFormato->oculto = true;   // (el N95: PNG)
 #endif
-    g_renderAspect = renderW / renderH; // arranca con el aspecto por defecto
+    propRender->properties.push_back(propRenderFormato);
+    propRenderCalidad = new PropFloat(T("Quality"));
+    propRenderCalidad->SetRango(1.0f, 100.0f); propRenderCalidad->entero = true;
+    propRenderCalidad->stepFino = 1.0f; propRenderCalidad->stepGrueso = 10.0f; propRenderCalidad->dragStep = 1.0f;
+    propRenderCalidad->value = NULL;   // (solo JPG y video: RenderFilasFormato)
+    propRender->properties.push_back(propRenderCalidad);
+    // un VIDEO puede llevar el AUDIO de la escena (los objetos Sonido, tambien los 3D, con la camara de oyente)
+    propRenderSonido = new PropBool(T("With sound")); propRenderSonido->value = NULL;   // (solo video)
+    propRender->properties.push_back(propRenderSonido);
+    propRenderAudioFmt = NULL; propRenderAudioKbps = NULL;   // (mas abajo, junto a "Renderizar audio")
+    // resolucion editable. Puede ser MAYOR que la ventana: se rinde por tiles.
+    g_renderAspect = g_render.w / g_render.h; // arranca con el aspecto por defecto
     propRenderW = new PropFloat(T("Width"));
     propRenderW->SetRango(1.0f, 8192.0f); propRenderW->entero = true;
     propRenderW->stepFino = 1.0f; propRenderW->stepGrueso = 16.0f; propRenderW->dragStep = 1.0f;
-    propRenderW->value = &renderW; propRenderW->onChange = ActualizarAspectoRender; // geometria de camaras responsive
+    propRenderW->value = &g_render.w; propRenderW->onChange = ActualizarAspectoRender; // geometria de camaras responsive
     propRender->properties.push_back(propRenderW);
     propRenderH = new PropFloat(T("Height"));
     propRenderH->SetRango(1.0f, 8192.0f); propRenderH->entero = true;
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
-    propRenderH->value = &renderH; propRenderH->onChange = ActualizarAspectoRender;
+    propRenderH->value = &g_render.h; propRenderH->onChange = ActualizarAspectoRender;
     propRender->properties.push_back(propRenderH);
     // (el FPS de reproduccion se movio a la tarjeta Animation, junto a Start/End)
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
-    renderZbuffer = false; renderNormal = false; renderAlpha = false;
-    propRenderZbuffer = new PropBool(T("Z-Buffer")); propRenderZbuffer->value = &renderZbuffer;
+    propRenderZbuffer = new PropBool(T("Z-Buffer")); propRenderZbuffer->value = &g_render.zbuffer;
     propRender->properties.push_back(propRenderZbuffer);
-    propRenderNormal = new PropBool(T("Normal")); propRenderNormal->value = &renderNormal;
+    propRenderNormal = new PropBool(T("Normal")); propRenderNormal->value = &g_render.normal;
     propRender->properties.push_back(propRenderNormal);
-    propRenderAlpha = new PropBool(T("Alpha")); propRenderAlpha->value = &renderAlpha;
+    propRenderAlpha = new PropBool(T("Alpha")); propRenderAlpha->value = &g_render.alfa;
     propRender->properties.push_back(propRenderAlpha);
     // VECTORES DE MOVIMIENTO (base_vectores_0001.png) y DESENFOQUE DE MOVIMIENTO del beauty, con su obturador (0..1)
-    renderVectores = false; renderDesenfoque = false; renderObturador = 0.5f;
-    propRenderVectores = new PropBool(T("Motion vectors")); propRenderVectores->value = &renderVectores;
+    propRenderVectores = new PropBool(T("Motion vectors")); propRenderVectores->value = &g_render.vectores;
     propRender->properties.push_back(propRenderVectores);
-    propRenderDesenfoque = new PropBool(T("Motion blur")); propRenderDesenfoque->value = &renderDesenfoque;
+    propRenderDesenfoque = new PropBool(T("Motion blur")); propRenderDesenfoque->value = &g_render.desenfoque;
     propRenderDesenfoque->onChange = AccionRenderDesenfoque;
     propRender->properties.push_back(propRenderDesenfoque);
     propRenderObturador = new PropFloat(T("Shutter")); propRenderObturador->SetRango(0.0f, 1.0f);
@@ -8950,6 +9824,7 @@ void Properties::ConstruirGrupos(){
     propRTEscala->conLabel = true;
     propRTEscala->button->desplegable = true;
     propRTEscala->action = AccionMenuRTEscala;
+    propRTEscala->enColumna = true;   // (alineado con los numeros de la tarjeta)
     propRender->properties.push_back(propRTEscala);
     propRTReesc = new PropButton(T("Upscaler"));
     propRTReesc->conLabel = true;
@@ -9012,10 +9887,20 @@ void Properties::ConstruirGrupos(){
       pg->value = &g_renderMallasSoloGPU;
       pg->onChange = AccionMallasSoloGPU;
       propRender->properties.push_back(pg); }
+    // LA COMPOSICION FINAL (la imagen de la escena, el "beauty"): sin el tilde solo se guardan los pases. Con el:
+    // con ALFA (PNG RGBA: el alfa sale del pase de alfa) y con el POSTPROCESADO (los objetos Postproceso)
+    propRenderFinal = new PropBool(T("Final composite")); propRenderFinal->value = &g_render.final;
+    propRenderFinal->onChange = AccionRenderFinal;
+    propRender->properties.push_back(propRenderFinal);
+    propRenderFinalAlfa = new PropBool(T("With alpha (RGBA)")); propRenderFinalAlfa->value = NULL;
+    propRender->properties.push_back(propRenderFinalAlfa);
+    propRenderPost = new PropBool(T("Post Processing")); propRenderPost->value = NULL;
+    propRender->properties.push_back(propRenderPost);
+    RenderFilasFormato(this);
     // boton con action real (antes era no-op)
     PropButton* pbRenderImg = new PropButton(T("Render Image"), IconType::foto); // foto: renderiza una imagen
     pbRenderImg->action = AccionRenderImage;
-    propRender->properties.push_back(pbRenderImg);
+    // (el boton va abajo de todo, con Renderizar Animacion y Renderizar audio: ver propBtnAnimRender)
     // la SECUENCIA: rango y fps PROPIOS del render (0 = los del timeline). Antes el render usaba el rango de la
     // animacion activa, que es de EDICION: ahora la tarjeta Animacion vive en su pestania y el render tiene el suyo.
     propRenderIni = new PropFloat(T("Start"));
@@ -9175,9 +10060,26 @@ void Properties::ConstruirGrupos(){
     propClipRetarget->action = AccionMenuClipRetarget;
     propClipRetarget->oculto = true;
     propAnimation->properties.push_back(propClipRetarget);
+    // EL AUDIO DE LA ESCENA: el formato (WAV; FLAC, MP3, AAC y Opus con el ffmpeg de la maquina) y el bitrate valen para
+    // el sonido de los videos y para "Renderizar audio" (el rango del render, a un archivo)
+    propRenderAudioFmt = new PropButton(T("Audio"));   // (el formato del audio)
+    propRenderAudioFmt->conLabel = true;
+    propRenderAudioFmt->button->desplegable = true;
+    propRenderAudioFmt->action = AccionMenuAudioFormato;
+    propRenderAudioFmt->enColumna = true;   // (alineado con el Bitrate de abajo)
+    propRender->properties.push_back(propRenderAudioFmt);
+    propRenderAudioKbps = new PropFloat(T("Bitrate"));   // (del audio, en kbps)
+    propRenderAudioKbps->SetRango(32.0f, 512.0f); propRenderAudioKbps->entero = true;
+    propRenderAudioKbps->stepFino = 8.0f; propRenderAudioKbps->stepGrueso = 32.0f; propRenderAudioKbps->dragStep = 1.0f;
+    propRender->properties.push_back(propRenderAudioKbps);
+    // LOS TRES BOTONES juntos, abajo de todo: Renderizar Imagen, Renderizar Animacion (la secuencia es del RENDER) y
+    // Renderizar audio
+    propRender->properties.push_back(pbRenderImg);
     propBtnAnimRender = new PropButton(T("Render Animation"), IconType::camera);
     propBtnAnimRender->action = AccionRenderAnimation;
-    propRender->properties.push_back(propBtnAnimRender);   // la secuencia es del RENDER (tarjeta Render)
+    propRender->properties.push_back(propBtnAnimRender);
+    { PropButton* pa = new PropButton(T("Render Audio"), IconType::sonido); pa->action = AccionRenderAudio; propRender->properties.push_back(pa); }
+    RenderFilasFormato(this);
     GroupProperties.push_back(propAnimation);
 
     // ===== MIX (pestania Animacion): el arbol de capas + la capa elegida =====
@@ -9296,6 +10198,7 @@ void Properties::ConstruirGrupos(){
       pR->SetRango(25.0f, 100.0f); pR->entero = true;
       pR->stepFino = 5.0f; pR->stepGrueso = 25.0f; pR->dragStep = 1.0f;
       g_juegoResF = (float)g_proyCompilar.resolucion; pR->value = &g_juegoResF; pR->onChange = AccionJuegoResolucion;
+      if (JuegoSinCompilador()) pR->value = NULL;   // (una fila de numero sin valor no ocupa lugar)
       propJuego->properties.push_back(pR); }
     // modo debug: tildado = W3D_DEV_LOG=1 (log + ring + depurar()); destildado
     // (default) = produccion, W3D_DEV_LOG=0 (sin mensajes de debug ni ring)
@@ -9305,11 +10208,37 @@ void Properties::ConstruirGrupos(){
     propJuegoCompilar = new PropButton(T("Build game"), IconType::gamepad);
     propJuegoCompilar->action = AccionCompilarJuego;
     propJuego->properties.push_back(propJuegoCompilar);
+    // EDITOR WEB: compilar un juego necesita cmake / emcc / gradle EN LA MAQUINA, y el navegador no los tiene ni puede
+    // correr programas: el boton fallaba siempre. Quedan las dos filas que tambien valen jugando adentro del editor
+    // (con que escena arranca y el volumen); la configuracion de compilar viaja igual con el proyecto
+    if (JuegoSinCompilador()) {
+        PropButton* soloCompilar[] = { propJuegoPlat, propJuegoBackend, propJuegoModoVent, propJuegoOrient, propJuegoIcono,
+                                       propJuegoAssets, propJuegoUID, propJuegoCompilar };
+        for (size_t k = 0; k < sizeof(soloCompilar) / sizeof(soloCompilar[0]); k++) soloCompilar[k]->oculto = true;
+        // (las casillas sin valor no ocupan fila)
+        propJuegoFisica->value = NULL; propJuegoSonido->value = NULL; propJuegoDebug->value = NULL;
+    }
     GroupProperties.push_back(propJuego);
+
+    // ===== Tarjeta "Curva": las curvas elegidas en el timeline (pestania Animacion, entre Animacion y Keyframe) =====
+    propCurva = new GroupPropertie(T("Curve"));
+    propCurva->icono = (int)IconType::interp_bezier;
+    propCurva->anchoValores = 0.55f;
+    gCuInterp = new PropButton(T("Interpolation"));
+    gCuInterp->button->desplegable = true; gCuInterp->button->caretMenu = true;
+    gCuInterp->action = AccionCuBtnInterp;
+    propCurva->properties.push_back(gCuInterp);
+    gCuHandle = new PropButton(T("Handle Type"));
+    gCuHandle->button->desplegable = true; gCuHandle->button->caretMenu = true;
+    gCuHandle->action = AccionCuBtnHandle;
+    propCurva->properties.push_back(gCuHandle);
+    // (el Repetir antes / despues NO va aca: es un MODIFICADOR -Ciclos-, en la pestania Modificadores)
+    GroupProperties.push_back(propCurva);
 
     // ===== Tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos =====
     // Aparece SOLO cuando hay uno elegido. X = frame (entero), Y = valor. Los handles son puntos (offset desde el
     // keyframe) y solo se pueden tipear si el tipo los guarda (Free/Aligned); con los calculados quedan grises.
+    // Con VARIOS elegidos: "N keyframes seleccionados", lo que no coincide se ve "-" y lo que se tipea va a todos.
     propKeyframe = new GroupPropertie(T("Keyframe"));
     propKeyframe->icono = (int)IconType::keyframe;   // el rombo, igual que el del timeline
     propKeyframe->anchoValores = 0.55f;
@@ -9329,27 +10258,18 @@ void Properties::ConstruirGrupos(){
     gKfHandle->button->desplegable = true; gKfHandle->button->caretMenu = true;
     gKfHandle->action = AccionKfBtnHandle;
     propKeyframe->properties.push_back(gKfHandle);
-    // el modificador REPETIR de la curva: que hace antes del primer keyframe y despues del ultimo
-    gKfCicloA = new PropButton(T("Repeat Before"));
-    gKfCicloA->button->desplegable = true; gKfCicloA->button->caretMenu = true;
-    gKfCicloA->action = AccionKfBtnCicloA;
-    propKeyframe->properties.push_back(gKfCicloA);
-    gKfCicloD = new PropButton(T("Repeat After"));
-    gKfCicloD->button->desplegable = true; gKfCicloD->button->caretMenu = true;
-    gKfCicloD->action = AccionKfBtnCicloD;
-    propKeyframe->properties.push_back(gKfCicloD);
     propKeyframe->properties.push_back(new PropGap(""));
     { PropFloat* p1 = new PropFloat(T("Left Handle X"));
-      p1->value = &g_kfInDF; p1->onChange = AccionKfHandles; gKfInDF = p1;
+      p1->value = &g_kfInDF; p1->onChange = AccionKfInDF; gKfInDF = p1;
       propKeyframe->properties.push_back(p1); }
     { PropFloat* p1 = new PropFloat("Y");
-      p1->value = &g_kfInDV; p1->onChange = AccionKfHandles; gKfInDV = p1;
+      p1->value = &g_kfInDV; p1->onChange = AccionKfInDV; gKfInDV = p1;
       propKeyframe->properties.push_back(p1); }
     { PropFloat* p1 = new PropFloat(T("Right Handle X"));
-      p1->value = &g_kfOutDF; p1->onChange = AccionKfHandles; gKfOutDF = p1;
+      p1->value = &g_kfOutDF; p1->onChange = AccionKfOutDF; gKfOutDF = p1;
       propKeyframe->properties.push_back(p1); }
     { PropFloat* p1 = new PropFloat("Y");
-      p1->value = &g_kfOutDV; p1->onChange = AccionKfHandles; gKfOutDV = p1;
+      p1->value = &g_kfOutDV; p1->onChange = AccionKfOutDV; gKfOutDV = p1;
       propKeyframe->properties.push_back(p1); }
     GroupProperties.push_back(propKeyframe);
 
@@ -9397,6 +10317,10 @@ void Properties::ConstruirGrupos(){
     // ===== tarjeta "Ajustes" (ABAJO DE TODO en la pestania Render): el config.ini editable desde adentro =====
     propAjustes = new GroupPropertie(T("Settings"));
     propAjustes->anchoValores = 0.62f;
+    // la VERSION (fecha + hora de compilacion): asi se sabe que build se esta usando (en la web, si el navegador
+    // ya cargo la nueva)
+    { extern const char* W3dVersionCompilacion();
+      propAjustes->properties.push_back(new PropLabel(std::string(T("Version")) + " " + W3dVersionCompilacion())); }
 
     propAjIdioma = new PropButton(T("Language"));   // label a la izquierda, el valor a la derecha
     propAjIdioma->conLabel = true;
@@ -9440,11 +10364,15 @@ void Properties::ConstruirGrupos(){
     // El que compila juegos pega aca la ruta a la carpeta del repo (la que tiene libs/Whisk3DCore) y con
     // "Save Changes" queda guardada en el config. Vacio = el editor la busca sola subiendo de carpetas.
     propAjRepo = new PropText(T("Repo"), cfg.repoPath.c_str());
+    propAjRepo->oculto = JuegoSinCompilador();   // en el navegador no se compila nada: no hay repo que buscar
     propAjustes->properties.push_back(propAjRepo);
 
     // el NOMBRE de este dispositivo en la red: el que ven los demas al buscar partidas (por defecto, el del equipo).
     // Se guarda al tipearlo (red.txt, junto a los permisos de la red)
     propAjDispositivo = new PropText(T("Device name"), RedDispositivo().c_str());
+#ifdef __EMSCRIPTEN__
+    propAjDispositivo->oculto = true;   // el navegador no juega en red (W3dRed sin red): el nombre no lo ve nadie
+#endif
     propAjustes->properties.push_back(propAjDispositivo);
 
     // la ESCALA del editor, en vivo (x1 = N95, x3 = default PC)
@@ -9826,6 +10754,62 @@ void Properties::ConstruirGrupos(){
     propBtnApplyMod->action = AccionAplicarModificador;
     propModifierProps->properties.push_back(propBtnApplyMod);
     GroupProperties.push_back(propModifierProps);
+
+    // ===== MODIFICADORES DE CURVA (pestania Modifiers): la pila de la curva activa del timeline + el elegido =====
+    propCurvaMods = new GroupPropertie(T("Curve Modifiers"));
+    propCurvaMods->icono = (int)IconType::interp_bezier;
+    propCurvaMods->anchoValores = 0.30f;
+    propListCurvaMods = new PropListMeshParts(T("Modifiers"));
+    propListCurvaMods->modo = 16;
+    propCurvaMods->properties.push_back(propListCurvaMods);
+    gCmFilaAdd = new PropButtonRow();
+    { Button* b = gCmFilaAdd->Agregar(T("Add"), AccionCmAdd); if (b) b->desplegable = true; }
+    gCmFilaAdd->Agregar(T("Remove"), AccionCmQuitar);
+    propCurvaMods->properties.push_back(gCmFilaAdd);
+    gCmFilaMover = new PropButtonRow();
+    gCmFilaMover->Agregar(T("Move Up"), AccionCmSubir);
+    gCmFilaMover->Agregar(T("Move Down"), AccionCmBajar);
+    propCurvaMods->properties.push_back(gCmFilaMover);
+    GroupProperties.push_back(propCurvaMods);
+    propCurvaModProps = new GroupPropertie(T("Modifier"));
+    propCurvaModProps->anchoValores = 0.55f;
+    gCmOn = CmBool(propCurvaModProps, "Enabled");
+    // Cycles
+    gCmAntesModo = CmBoton(propCurvaModProps, "Before Mode", AccionCmAntesModo);
+    gCmAntesCant = CmFloat(propCurvaModProps, "Repeats", 0.0f, 100000.0f, 1.0f, 10.0f, 0.2f, true);
+    gCmDespModo  = CmBoton(propCurvaModProps, "After Mode", AccionCmDespModo);
+    gCmDespCant  = CmFloat(propCurvaModProps, "Repeats", 0.0f, 100000.0f, 1.0f, 10.0f, 0.2f, true);
+    // Noise
+    gCmMezcla = CmBoton(propCurvaModProps, "Blend Type", AccionCmMezcla);
+    gCmEscala = CmFloat(propCurvaModProps, "Scale", -100000.0f, 100000.0f, 0.1f, 1.0f, 0.01f);
+    gCmFuerza = CmFloat(propCurvaModProps, "Strength", -100000.0f, 100000.0f, 0.1f, 1.0f, 0.01f);
+    gCmOffset = CmFloat(propCurvaModProps, "Offset", -100000.0f, 100000.0f, 1.0f, 10.0f, 0.1f);
+    gCmFase   = CmFloat(propCurvaModProps, "Phase", -100000.0f, 100000.0f, 0.1f, 1.0f, 0.01f);
+    gCmProf   = CmFloat(propCurvaModProps, "Depth", 0.0f, 16.0f, 1.0f, 1.0f, 0.1f, true);
+    gCmViejo  = CmBool(propCurvaModProps, "Legacy Noise");
+    gCmLac    = CmFloat(propCurvaModProps, "Lacunarity", 0.0f, 100.0f, 0.1f, 1.0f, 0.01f);
+    gCmRug    = CmFloat(propCurvaModProps, "Roughness", 0.0f, 100.0f, 0.05f, 0.5f, 0.005f);
+    // Stepped
+    gCmPaso    = CmFloat(propCurvaModProps, "Step Size", -100000.0f, 100000.0f, 1.0f, 5.0f, 0.1f);
+    gCmPasoOfs = CmFloat(propCurvaModProps, "Offset", -100000.0f, 100000.0f, 1.0f, 10.0f, 0.1f);
+    gCmUsarIni = CmBool(propCurvaModProps, "Use Start Frame");
+    gCmIni     = CmFloat(propCurvaModProps, "Start Frame", -1000000.0f, 1000000.0f, 1.0f, 10.0f, 0.2f);
+    gCmUsarFin = CmBool(propCurvaModProps, "Use End Frame");
+    gCmFin     = CmFloat(propCurvaModProps, "End Frame", -1000000.0f, 1000000.0f, 1.0f, 10.0f, 0.2f);
+    // Smooth
+    gCmSigma = CmFloat(propCurvaModProps, "Sigma", 0.01f, 10.0f, 0.01f, 0.1f, 0.005f);
+    gCmAncho = CmFloat(propCurvaModProps, "Filter Width", 1.0f, 64.0f, 1.0f, 2.0f, 0.2f, true);
+    // de todos: influencia y rango de frames
+    propCurvaModProps->properties.push_back(new PropGap(""));
+    gCmUsarInf   = CmBool(propCurvaModProps, "Use Influence");
+    gCmInf       = CmFloat(propCurvaModProps, "Influence", 0.0f, 1.0f, 0.05f, 0.25f, 0.005f);
+    gCmUsarRango = CmBool(propCurvaModProps, "Restrict Frame Range");
+    gCmRIni = CmFloat(propCurvaModProps, "Start", -1000000.0f, 1000000.0f, 1.0f, 10.0f, 0.2f);
+    gCmRFin = CmFloat(propCurvaModProps, "End", -1000000.0f, 1000000.0f, 1.0f, 10.0f, 0.2f);
+    gCmMIn  = CmFloat(propCurvaModProps, "Blend In", 0.0f, 1000000.0f, 1.0f, 10.0f, 0.2f);
+    gCmMOut = CmFloat(propCurvaModProps, "Blend Out", 0.0f, 1000000.0f, 1.0f, 10.0f, 0.2f);
+    GroupProperties.push_back(propCurvaModProps);
+    curvaFilas = CfCapturar();   // las filas de Keyframe / Curva / Modificadores de curva de ESTE panel
 
     // ===== pestania "Constraints" (tab 7): selector del stack + Add/Remove + Move Up/Down =====
     // Calcada de Modifiers a proposito (el dueno ya sabe usar esa): misma disposicion, mismos
@@ -10900,6 +11884,7 @@ static void SincronizarRenderJuego(Properties* P){
 
 void Properties::RefreshTargetProperties(){
     SincronizarAnimFps(); // el campo "FPS" refleja el AnimFPS real (el import lo pone al fps del archivo)
+    SincronizarCamposRender(this);   // Ruta y Nombre del render <-> g_render
     SincronizarRenderJuego(this);   // un juego no tiene animacion: sin rango y Render Animation en gris
     // al cerrarse el picker, la fila del color pierde el borde verde
     if (gColorAbierto && !PopUpActive) {
@@ -11878,6 +12863,7 @@ Properties::Properties() : ViewportBase() {
     propCulling = NULL; propCullMetodo = NULL; propCullActivo = NULL; propCullSoloCam = NULL; // objeto Culling unificado
     propCullOrdenCerca = NULL;
     propCamActiva = NULL; propCamActivaSel = NULL; propCamActivaKey = NULL;
+    propCurva = NULL; propCurvaMods = NULL; propCurvaModProps = NULL; propListCurvaMods = NULL; curvaFilas = NULL;
     propLimpiarZ = NULL; propLzActivo = NULL; propRecorte = NULL; propRcActivo = NULL; propRcX = NULL; propRcY = NULL;
     propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
     propRutina = NULL; propRuLista = NULL; propRuUsar = NULL; propRuPasos = NULL; propRuFilaAdd = NULL;
@@ -11948,6 +12934,7 @@ Properties::Properties() : ViewportBase() {
     propLightRTRadio = NULL; propLightRTRayos = NULL;
     propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL; propRTCapas = NULL; propRTGpu = NULL; propRTSoloFinal = NULL; propRTSemilla = NULL;
     propRTDesenfoque = NULL; propRTObturador = NULL; propRTObtPos = NULL;
+    renderGenVisto = 0;
     propPost = NULL; propPostOn = NULL; propPostCPU = NULL; propListPost = NULL; propRowPost = NULL; propRowPostMove = NULL;
     propPostActivo = NULL; propPostGranoInt = NULL; propPostGranoTam = NULL; propPostGranoColor = NULL;
     propPostFocoDist = NULL; propPostFocoRango = NULL; propPostFocoDesenf = NULL; propPostFocoCam = NULL; propPostMovObt = NULL; for (int k = 0; k < 6; k++) propPostBloom[k] = NULL; propPostBloomColor = NULL; propPostBloomRapido = NULL; propRTEscala = NULL; propRTReesc = NULL; propRTDenoiser = NULL;
@@ -12064,6 +13051,7 @@ Properties::Properties() : ViewportBase() {
 // segun el objeto activo y la pestania elegida: que tab se ve, cual esta
 // activa, y que grupo de propiedades se muestra
 void Properties::ActualizarPestanias(){
+    if (curvaFilas) CfEnlazar(curvaFilas);   // las filas de las tarjetas de curvas: las de ESTE panel
     // espejo del checkbox Mipmaps de la tarjeta Render: el proyecto abierto pudo
     // cambiar el global (cabecera `mipmaps:` del .w3d)
     g_renderMipmaps = w3dEngine::MipmapsGlobal();
@@ -12161,7 +13149,9 @@ void Properties::ActualizarPestanias(){
         BarTabs[3]->visible = esMesh || hayRec;
         BarTabs[3]->icon = hayRec ? W3dVistaIcono(recVista) : (int)IconType::mesh;
     }
-    if (BarTabs.size() >= 5) BarTabs[4]->visible = esMesh; // pestaña Modifiers: SOLO meshes
+    // pestaña Modifiers: los de la MALLA activa y/o los de la CURVA activa del timeline (los modificadores de curva)
+    const bool hayCurvaMods = (DopeCurvaActiva(NULL, false) != NULL);
+    if (BarTabs.size() >= 5) BarTabs[4]->visible = esMesh || hayCurvaMods;
     // pestana 5 "Transformar": SOLO en Edit Mode con malla activa (la seleccion a transformar
     // vive en la edit mesh). Su icono es el del modo de seleccion (selVertex/selEdge/selFace).
     bool transTabOk = esMesh && InteractionMode == EditMode && g_editMesh == (Object*)ObjActivo;
@@ -12189,7 +13179,7 @@ void Properties::ActualizarPestanias(){
     if (BarTabs.size() >= 10) BarTabs[9]->visible = true;   // Animacion: siempre (como Render)
     if (pestaniaActiva == 2 && !hayTab3) pestaniaActiva = 1;
     if (pestaniaActiva == 3 && !esMesh && !hayRec) pestaniaActiva = 1;
-    if (pestaniaActiva == 4 && !esMesh)  pestaniaActiva = 1;
+    if (pestaniaActiva == 4 && !esMesh && !hayCurvaMods) pestaniaActiva = 1;
     if (pestaniaActiva == 5 && !transTabOk) pestaniaActiva = 1; // salir de Edit Mode cae a Objeto
     // salir de la edicion de huesos 2D (o del Edit Mode) parado en la 6 cae a Objeto, como la 5
     if (pestaniaActiva == 6 && !arm2dMesh) pestaniaActiva = 1;
@@ -12254,28 +13244,84 @@ void Properties::ActualizarPestanias(){
         if (propCamActiva->visible)
             propCamActivaSel->button->text = CameraActive ? CameraActive->name : std::string(T("(none)"));
     }
+    // tarjeta CURVA: las curvas con keyframes elegidos (con varias, "-" donde no coinciden)
+    if (propCurva){
+        std::vector<AnimProperty*> cs; std::vector<std::string> ns;
+        const int nc = (pestaniaActiva == 9) ? DopeCurvasElegidas(cs, &ns, false) : 0;
+        propCurva->visible = (nc > 0);
+        if (nc > 0){
+            if (nc == 1) propCurva->name = std::string(T("Curve")) + (ns[0].empty() ? std::string() : std::string(" - ") + ns[0]);
+            else { char b[96]; snprintf(b, sizeof b, T("%d curves selected"), nc); propCurva->name = b; }
+            const int in = CuComun(0), ht = CuComun(1);
+            if (gCuInterp) gCuInterp->button->text = (in < 0) ? std::string("-") : std::string(KfNombreInterp(in));
+            if (gCuHandle) gCuHandle->button->text = (ht < 0) ? std::string("-") : std::string(T(KfNombreHandle(ht)));
+        }
+    }
+    // MODIFICADORES DE CURVA (pestania Modifiers): la pila de la curva activa y el modificador elegido
+    if (propCurvaMods){
+        std::string canal;
+        AnimProperty* cap = (pestaniaActiva == 4) ? DopeCurvaActiva(&canal, false) : NULL;
+        propCurvaMods->visible = (cap != NULL);
+        const bool hayMod = cap && !cap->mods.empty();
+        if (cap){
+            propCurvaMods->name = std::string(T("Curve Modifiers")) + (canal.empty() ? std::string() : std::string(" - ") + canal);
+            if (g_cmActivo >= (int)cap->mods.size()) g_cmActivo = (int)cap->mods.size() - 1;
+            if (g_cmActivo < 0 && !cap->mods.empty()) g_cmActivo = 0;
+            if (hayMod) g_cm = cap->mods[(size_t)g_cmActivo];   // la copia que editan los campos
+        }
+        if (propCurvaModProps){
+            propCurvaModProps->visible = hayMod;
+            if (hayMod) propCurvaModProps->name = std::string(T(KfModNombre(g_cm.tipo))) + (canal.empty() ? std::string() : std::string(" - ") + canal);
+        }
+        CmFilas(this, cap);
+    }
     if (propKeyframe){
+        // los ELEGIDOS en el timeline: uno muestra el suyo; varios, el activo (o el primero) con "-" donde difieren
+        std::vector<AnimProperty*> kc; std::vector<int> kix;
+        const int nk = (pestaniaActiva == 9) ? DopeKeysElegidas(kc, kix, false) : 0;
         int ki; AnimProperty* kap = DopeKeyframeActivo(&ki, false);   // solo MUESTRA: un clip compartido no se copia
+        if (!kap && nk > 0){ kap = kc[0]; ki = kix[0]; }
         propKeyframe->visible = (pestaniaActiva == 9) && kap != NULL;   // keyframe elegido: pestania Animacion
         if (propKeyframe->visible){
             const keyFrame& k = kap->keyframes[ki];
             std::string canal = DopeKeyframeActivoCanal();
-            propKeyframe->name = canal.empty() ? std::string(T("Keyframe")) : (std::string(T("Keyframe")) + " - " + canal);
+            if (nk > 1){ char b[96]; snprintf(b, sizeof b, T("%d keyframes selected"), nk); propKeyframe->name = b; }
+            else propKeyframe->name = canal.empty() ? std::string(T("Keyframe")) : (std::string(T("Keyframe")) + " - " + canal);
             if (g_propFloatEditando != gKfFrame) g_kfFrame = (float)k.frame;
             if (g_propFloatEditando != gKfValor) g_kfValor = k.value;
             if (g_propFloatEditando != gKfInDF)  g_kfInDF  = k.inDF;
             if (g_propFloatEditando != gKfInDV)  g_kfInDV  = k.inDV;
             if (g_propFloatEditando != gKfOutDF) g_kfOutDF = k.outDF;
             if (g_propFloatEditando != gKfOutDV) g_kfOutDV = k.outDV;
-            if (gKfInterp) gKfInterp->button->text = KfNombreInterp(k.Interpolation);
-            if (gKfHandle) gKfHandle->button->text = T(KfNombreHandle(k.handleType));
-            if (gKfCicloA) gKfCicloA->button->text = T(KfNombreCiclo(kap->cicloAntes));
-            if (gKfCicloD) gKfCicloD->button->text = T(KfNombreCiclo(kap->cicloDespues));
+            // que coincide entre TODOS los elegidos (lo que no, se ve "-")
+            bool mFr = false, mVa = false, mIn = false, mHt = false, mH[4] = { false, false, false, false };
+            bool bezTodos = true, bezAlguno = false, editTodos = true;
+            for (size_t q = 0; q < kix.size(); q++){
+                const keyFrame o = kc[q]->keyframes.Clave((size_t)kix[q]);
+                if (o.frame != k.frame) mFr = true;
+                if (o.value != k.value) mVa = true;
+                if (o.Interpolation != k.Interpolation) mIn = true;
+                if (o.handleType != k.handleType) mHt = true;
+                if (o.inDF != k.inDF) mH[0] = true; if (o.inDV != k.inDV) mH[1] = true;
+                if (o.outDF != k.outDF) mH[2] = true; if (o.outDV != k.outDV) mH[3] = true;
+                const bool b = (o.Interpolation == KfBezier) || (kix[q] > 0 && kc[q]->keyframes.Clave((size_t)kix[q] - 1).Interpolation == KfBezier);
+                if (b) bezAlguno = true; else bezTodos = false;
+                if (!(b && (o.handleType == HFree || o.handleType == HAligned))) editTodos = false;
+            }
+            if (gKfFrame) gKfFrame->mixto = mFr;
+            if (gKfValor) gKfValor->mixto = mVa;
+            if (gKfInDF)  gKfInDF->mixto  = mH[0];
+            if (gKfInDV)  gKfInDV->mixto  = mH[1];
+            if (gKfOutDF) gKfOutDF->mixto = mH[2];
+            if (gKfOutDV) gKfOutDV->mixto = mH[3];
+            if (gKfInterp) gKfInterp->button->text = mIn ? std::string("-") : std::string(KfNombreInterp(k.Interpolation));
+            if (gKfHandle) gKfHandle->button->text = mHt ? std::string("-") : std::string(T(KfNombreHandle(k.handleType)));
             // los handles SOLO existen si el tramo es bezier, y solo se pueden tipear si el TIPO los guarda
             // (con Vector/Automatic/Auto Clamped los calcula la curva sola: mostrarlos editables seria mentir).
             // value = NULL OCULTA la fila: es el idioma del panel (Resize la mide en 0 y el teclado la saltea).
             bool bez = (k.Interpolation == KfBezier) || (ki > 0 && kap->keyframes[ki-1].Interpolation == KfBezier);
             bool editables = bez && (k.handleType == HFree || k.handleType == HAligned);
+            if (nk > 1){ bez = bezAlguno; editables = bezTodos && editTodos; }
             if (gKfInDF)  gKfInDF->value  = editables ? &g_kfInDF  : NULL;
             if (gKfInDV)  gKfInDV->value  = editables ? &g_kfInDV  : NULL;
             if (gKfOutDF) gKfOutDF->value = editables ? &g_kfOutDF : NULL;
@@ -13004,6 +14050,7 @@ void Properties::ClickTab(int mx, int my){
 // sin esto la tarjeta del recurso quedaba vacia, porque elegirlo suelta la escena)
 bool Properties::PestaniaGlobal() const {
     if (pestaniaActiva == 0 || pestaniaActiva == 9) return true;
+    if (pestaniaActiva == 4 && DopeCurvaActiva(NULL, false)) return true;   // los modificadores de la curva activa
     return pestaniaActiva == 3 && W3dRecursoActivo(NULL, NULL);
 }
 
@@ -14143,8 +15190,6 @@ static void PropsOlvidarFila(PropertieBase* p) {
         if ((PropertieBase*)*pfs[i] == p) *pfs[i] = NULL;
     if ((PropertieBase*)gKfInterp == p) gKfInterp = NULL;
     if ((PropertieBase*)gKfHandle == p) gKfHandle = NULL;
-    if ((PropertieBase*)gKfCicloA == p) gKfCicloA = NULL;
-    if ((PropertieBase*)gKfCicloD == p) gKfCicloD = NULL;
     if ((PropertieBase*)gListaScrollLista == p) gListaScrollLista = NULL;
     if ((PropertieBase*)gTouchScrollLista == p) gTouchScrollLista = NULL;
     if ((PropertieBase*)gColorAbierto == p) gColorAbierto = NULL;
@@ -14155,6 +15200,8 @@ Properties::~Properties() {
     // (dangling) y cualquier lectura de PropsActivo crashea (ej. al reemplazar este
     // panel por un UV Editor, que lee la parte activa via PropsActivo).
     if (PropsActivo == this) PropsActivo = NULL;
+    // las filas de las tarjetas de curvas: si los punteros eran de este panel, se sueltan (ver CurvaFilasUI)
+    if (curvaFilas) { if (g_cfEnlazado == curvaFilas) CfEnlazar(NULL); delete curvaFilas; curvaFilas = NULL; }
     // LAS TARJETAS SON DEL PANEL. ConstruirGrupos las arma en el ctor (una por grupo, cada una
     // duena de sus filas: ~GroupPropertie las libera) y nadie las soltaba: mientras el layout
     // vivia para siempre daba igual, pero abrir un proyecto ahora libera el layout anterior y

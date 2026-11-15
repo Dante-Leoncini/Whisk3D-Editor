@@ -207,7 +207,7 @@ Todos los atajos del editor están en [Atajos de teclado](atajos.md).
 | Zoom | Acerca o aleja. | Rueda del mouse. |
 | Seleccionar | Elige lo que está bajo el puntero (se decide al soltar). | Click izquierdo; <kbd>Shift</kbd>+click suma o quita. |
 | Selección por caja | Arrastrar sobre el fondo marca un rectángulo. | Arrastrar con el botón izquierdo, o <kbd>B</kbd>. |
-| Menú contextual | Abre el menú del modo en el puntero (durante un transform, lo cancela). | Click derecho. |
+| Menú contextual | Abre el menú del modo en el puntero (durante un transform, lo cancela). Arriba de todo están **Deshacer** y **Rehacer**. Con el dedo, la pulsación larga lo abre. | Click derecho. |
 | Bloquear órbita | Lo que orbitaba pasa a desplazar: la vista queda como un tablero 2D. | Menú Vista → Bloquear Órbita. |
 | Mover la cámara con la vista | Mirando por la cámara activa, navegar mueve la cámara: así se acomoda la toma. | Click en el candado (abajo, en la vista de cámara), o Menú Vista → Mover la cámara con la vista. |
 

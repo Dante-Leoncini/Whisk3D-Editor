@@ -554,10 +554,15 @@ size_t W3dContenedorEscritor::BuscarPorContenido(const std::string& huella,
     return (size_t)-1;
 }
 
-void W3dContenedorEscritor::RegistrarExterno(const std::string& ref, const std::string& quien, bool existe) {
+std::vector<W3dExterno> g_w3dExternosFaltan;
+void W3dContenedorEscritor::ExternosQueFaltan(std::vector<W3dExterno>& out) const {
+    out.clear();
+    for (size_t i = 0; i < externos.size(); i++) if (!externos[i].existe) out.push_back(externos[i]);
+}
+void W3dContenedorEscritor::RegistrarExterno(const std::string& ref, const std::string& quien, bool existe, const std::string& original) {
     for (size_t i = 0; i < externos.size(); i++)
         if (externos[i].ref == ref) return;
-    W3dExterno e; e.ref = ref; e.quien = quien; e.existe = existe;
+    W3dExterno e; e.ref = ref; e.quien = quien; e.existe = existe; e.original = original;
     externos.push_back(e);
 }
 
@@ -590,7 +595,7 @@ std::string W3dContenedorEscritor::Ingerir(std::string& ruta, const char* catego
         if (W3dRutaBajoCarpeta(ruta, dirDestino, tmp)) rel = tmp;
         std::string escrito = "ext:" + rel;
         bool hay = w3dFileSystem::FileExists(ruta);
-        RegistrarExterno(escrito, quien, hay);
+        RegistrarExterno(escrito, quien, hay, original);
         yaResueltas[original] = escrito;
         return escrito;
     }
@@ -723,7 +728,7 @@ std::string W3dContenedorEscritor::Ingerir(std::string& ruta, const char* catego
         std::string rel = ruta, tmp;
         if (W3dRutaBajoCarpeta(ruta, dirDestino, tmp)) rel = tmp;
         std::string escrito = "ext:" + rel;
-        RegistrarExterno(escrito, quien, false);
+        RegistrarExterno(escrito, quien, false, original);
         W3dRefExternaMarcar(ruta);
         yaResueltas[original] = escrito;
         w3dLogfW("[W3D] no pude leer %s (%s): queda como referencia externa", ruta.c_str(), quien.c_str());

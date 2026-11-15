@@ -618,6 +618,19 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propRenderFin;
         PropFloat* propRenderFps;
         GroupPropertie* propKeyframe;  // tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos
+        // tarjeta "Curva" (pestania Animacion, entre Animacion y Keyframe): las curvas elegidas en el timeline (las que
+        // tienen keyframes elegidos): interpolacion y handles de TODOS sus keyframes + el Repetir. Con varias, lo que
+        // no coincide se ve "-" y lo que se elige va a todas
+        GroupPropertie* propCurva;
+        // las filas de las tarjetas Keyframe / Curva / Modificadores de curva de ESTE panel (las acciones y el refresco
+        // trabajan sobre unos punteros estaticos que se re-enlazan al panel que se refresca o se usa: con dos paneles,
+        // o uno que se libera, no quedan apuntando a filas de otro)
+        struct CurvaFilasUI* curvaFilas;
+        // pestania Modifiers: los MODIFICADORES DE LA CURVA activa (Cycles / Noise / Stepped / Smooth): la pila y el
+        // elegido (como los del objeto). El titulo dice de que curva son ("X Location")
+        GroupPropertie* propCurvaMods;
+        GroupPropertie* propCurvaModProps;
+        PropListMeshParts* propListCurvaMods;
         // tarjeta "Camara activa" (pestania Animacion, animacion de ESCENA): elegir la camara activa + insertar un
         // CORTE (keyframe de la pista SceneAnimation::camPista) en el frame actual. Los cortes se mueven/borran en el
         // dope sheet (fila "Camara activa", con una camara seleccionada).
@@ -791,10 +804,12 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propRenderW; PropFloat* propRenderH;         // ancho/alto del render en pixeles (editable)
         PropBool*  propRenderZbuffer; PropBool* propRenderNormal; PropBool* propRenderAlpha; // pases extra
         PropColor* propRenderBg;     // color de fondo del render (global g_renderBg, solo pase Rendered)
-        float renderW; float renderH;          // valores del render (default 640 x 480)
-        bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
+        // (las OPCIONES del render no son del panel: son de g_render, render/OpcionesRender.h. Las filas las editan)
+        PropButton* propRenderFormato; PropFloat* propRenderCalidad;
+        PropBool* propRenderFinal; PropBool* propRenderFinalAlfa; PropBool* propRenderPost;
+        PropBool* propRenderSonido; PropButton* propRenderAudioFmt; PropFloat* propRenderAudioKbps;   // el audio
+        unsigned renderGenVisto;   // la g_renderGen de las filas de la tarjeta Render (otra = se abrio un proyecto: rearmarlas)
         // VECTORES DE MOVIMIENTO (el pase _vectores) y el DESENFOQUE DE MOVIMIENTO del beauty (render/VectoresMovimiento.h)
-        bool  renderVectores; bool renderDesenfoque; float renderObturador;
         PropBool* propRenderVectores; PropBool* propRenderDesenfoque; PropFloat* propRenderObturador;
         PropBool*  propRT;           // "Ray Tracing": el pase Rendered se traza por CPU (render/RayTracer)
         PropFloat* propRTRayos; PropFloat* propRTSamples; PropFloat* propRTPases; // solo visibles con Ray Tracing tildado

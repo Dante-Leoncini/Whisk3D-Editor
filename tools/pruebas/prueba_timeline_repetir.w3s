@@ -1,6 +1,6 @@
-# El modificador REPETIR de las curvas (menu Modifiers del timeline y la tarjeta Keyframe de propiedades): antes
-# del primer keyframe y despues del ultimo la curva se repite, igual o CORRIDA (cada vuelta arranca donde termino la
-# anterior). La matematica, el menu, Ctrl+Z, el 3D, el dibujo y que sobreviva a guardar y reabrir.
+# REPETIR la curva antes del primer keyframe y despues del ultimo, igual o CORRIDA (cada vuelta arranca donde termino
+# la anterior): es el modificador CICLOS (Propiedades > Modificadores). La matematica, el 3D, y que el Repetir VIEJO
+# de los archivos de antes se abra como un modificador Ciclos.
 ventana 1280 720
 add cube
 frame 1

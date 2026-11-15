@@ -12,6 +12,7 @@
 #include "ViewPorts/ScrollBar.h"            // Scrollable: LA barra de scroll del editor (la misma del Outliner)
 #include "WhiskUI/Propieties/PropFloat.h"   // edicion numerica de Start/End/Frame (reusa NumEdit)
 #include "WhiskUI/widgets/Button.h"                  // controles de transporte + campos = Buttons de la barra
+#include "ViewPorts/Gizmo.h"                // Gizmo2DCliente: el gizmo 2D sobre los keyframes elegidos
 #include <string>
 
 class AnimProperty; // animation/Animation.h (una CURVA: propiedad + componente). Lo incluye el .cpp
@@ -60,7 +61,7 @@ std::string DopeIdDueno(const Object* o);
 //  lineas van del piso hasta tocar la barra negra; el playhead (frame
 //  actual) es una linea VERDE. Todo opera sobre los globales de
 //  animacion (StartFrame/EndFrame/CurrentFrame/PlayAnimation).
-class Timeline : public ViewportBase, public WithBorder, public Scrollable {
+class Timeline : public ViewportBase, public WithBorder, public Scrollable, public Gizmo2DCliente {
     public:
         int ViewportKind() const { return 5; } // 1=3D 2=outliner 3=properties 4=UV 5=timeline
         // el dope sheet scrollea en vertical: con esto hereda hover, agarre, arrastre y touch del ruteo generico
@@ -93,7 +94,6 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         Button* btnSelect; // dope sheet: menu Select (All / None / Invert). Al FINAL de la barra; solo con filas
         Button* btnView;   // dope sheet: menu View (Frame Selected)
         Button* btnKey;    // menu Key: Transform (Move/Rotate/Scale) + Duplicate + Delete
-        Button* btnMods;   // menu Modifiers: los modificadores de las CURVAS elegidas (Repetir / con offset)
         Button* btnPivot;  // dope sheet: menu Pivot (Center / Current Frame) = desde donde escala la 's'
 
         int stripY;        // Y (local) del CUERPO (bandas/lineas)
@@ -112,6 +112,8 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void button_left() W3D_OVERRIDE;
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE;             // 1 dedo: panear
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // 2 dedos: zoom + paneo
+        bool event_finger_pinch(float cx, float cy, float panDx, float panDy,              // ...con los dedos: zoom anclado
+                                float sepX0, float sepY0, float sepX1, float sepY1) W3D_OVERRIDE; // y por eje (curvas)
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
         void event_key_up(int tecla) W3D_OVERRIDE;   // soltar el CERO sin flechas = Frame Selected (Symbian)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
@@ -135,6 +137,23 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void StepKeyframe(int d);       // proximo (+1) / anterior (-1) keyframe del objeto activo
         void ZoomBy(float factor, int centerXlocal); // zoom HORIZONTAL manteniendo fijo el frame bajo centerX
         void ZoomVBy(float factor);     // zoom VERTICAL (solo curvas) desde el centro del strip
+        void ZoomVEn(float factor, float lyLocal); // zoom VERTICAL manteniendo fijo el valor bajo lyLocal (los dedos)
+        // ===== GIZMO 2D (Gizmo.h) sobre los keyframes elegidos: en CURVAS mueve/rota/escala en tiempo y valor; en el
+        // DOPE SHEET mueve/escala en el tiempo. Arranca el MISMO transform de G/R/S (DopeMoveStart) =====
+        bool Gizmo2DPivote(float& lx, float& ly) W3D_OVERRIDE;
+        int  Gizmo2DModos() const W3D_OVERRIDE;
+        bool Gizmo2DConEjeY() const W3D_OVERRIDE { return modo == TL_MODO_CURVAS; }
+        bool Gizmo2DEnZona(float lx, float ly) const W3D_OVERRIDE;
+        bool Gizmo2DIniciar(int modoG, int eje) W3D_OVERRIDE;
+        // ===== el DEDO en el timeline (controles.cpp decide, pasada la espera anti-gesto) =====
+        bool PanelEn(int mx, int my) const;            // (mx,my) cae en el PANEL de canales (la lista de la izquierda)
+        void PanelScrollBy(int dx, int dy);            // scrollea ese panel: filas (vertical) y texto (horizontal)
+        // modo VISTA (el monitor de la toolbar): arrastrar desde ahi MUEVE LA VISTA. No: la banda de los numeros y la
+        // linea del frame actual (scrub), el gizmo, la toolbar y el panel
+        bool ArrastreMueveVista(int mx, int my);
+        void Gizmo2DAplicar(float dx, float dy, float ang, float f) W3D_OVERRIDE;
+        void Gizmo2DConfirmar() W3D_OVERRIDE;
+        void Gizmo2DCancelar() W3D_OVERRIDE;
         // ===== LA VISTA DEL TIMELINE VIAJA CON EL PROYECTO =====
         // Reporte del dueno: "falta guardar el zoom y posicion del visor en el timeline en dope sheet y curvas".
         // Los CUATRO campos de arriba (pxPerFrame/viewStartF + pxPerUnit/viewCenterV) se escriben como props de
@@ -233,10 +252,6 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void SetEasingSel(int ease);         // Ctrl+E: el easing (KfEaseAuto/In/Out/InOut) de las curvas de easing elegidas
         void CambiarModo(bool curvas);       // Dope Sheet <-> Curves (menu View)
         void AbrirMenuEasing(int mx, int my);
-        void AbrirMenuMods(int mx, int my);  // menu Modifiers (Repeat / Repeat with Offset / Remove Repeat)
-        // el modificador REPETIR de las curvas con algun keyframe elegido: antes del 1ro / despues del ultimo
-        // (KfCicloNo / KfCicloRepite / KfCicloOffset; -1 = ese lado no se toca). Un paso de Ctrl+Z.
-        void SetCicloSel(int antes, int despues);
         // Transform de keyframes. En DOPE SHEET solo existe el eje TIEMPO (rotar no significa nada y no hay ejes
         // que elegir); en CURVAS hay tiempo y VALOR, y ahi si se rota y se puede limitar a un eje.
         enum { DOPE_MOV = 1, DOPE_ESC = 2, DOPE_ROT = 3 };
@@ -250,7 +265,7 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         bool DopeNumChar(int c);             // tecla durante el transform: arma el valor numerico. true si la consumio
         void DopeMoveConfirm(); void DopeMoveCancel();
         void DestruirEstadoTimeline();       // ~Timeline: apaga el transform/handle a medio hacer
-        void DopeSetPivot(int p);            // menu Pivot: 0 = Center, 1 = Current Frame
+        void DopeSetPivot(int p);            // menu Pivot: 0 = Center, 1 = Current Frame, 2 = Median Point, 3 = Active Keyframe
         bool DopeRangoSeleccion(int& mn, int& mx) const; // 1er/ultimo frame seleccionado. false = no hay ninguno
         void DopeFrameSelected();            // menu View: encuadra los keyframes seleccionados (1ro a la izq, ultimo a la der;
                                              // uno solo -> al medio, sin tocar el zoom). En curvas encuadra los DOS ejes.
@@ -268,6 +283,7 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         long long CurvaTrazoCosto();         // vertices de TODAS las curvas sin dibujar (mide el costo por frame)
         void DopeSelKeysDeFilasSel();        // los keyframes de las filas seleccionadas = "seleccionar esa curva"
         bool CurvaClickStrip(int mx, int my);// click en curvas: primero handles, despues keyframes. true si consumio
+        bool HandleBajo(int mx, int my, bool agarrar); // hay un handle a la vista en el punto (agarrar: lo toma)
         void CurvaFrameSelected();           // View > Frame Selected en modo curva (encuadra tiempo Y valor)
         // RANGO que ocupa lo que se ve en el editor de curvas, en DATOS (frames y valores). Es el nucleo del
         // encuadre, separado del zoom para poder testearlo sin ventana. soloSel=true mide SOLO los keyframes
@@ -355,6 +371,12 @@ void InvalidarAnimYRedraw();
 // Hay un transform de keyframes (g/s/r) en curso? Lo pregunta controles.cpp para ENVOLVER el cursor dentro del
 // timeline, como al panear: asi se puede seguir escalando/rotando aunque el mouse llegue al borde.
 bool DopeXformActivo();
+// el DEDO arrastra el PANEL de canales de ESE timeline (event_finger_scroll lo scrollea en vez de mover la vista).
+// NULL = ninguno. Lo fija controles.cpp al decidir el gesto; vale hasta el proximo toque (sigue con la inercia)
+void TimelineDedoPanel(Timeline* t);
+// la TOOLBAR del timeline con el DEDO: el monitor (true, de fabrica) = arrastrar mueve la vista; la flecha de
+// seleccion (false) = arrastrar arma la caja de seleccion y agarra keyframes, como con el mouse
+extern bool g_tlModoVista;
 bool TL_TogglePlay();   // barra de espacio: play/pausa sin tener el timeline enfocado. false = no hay timeline.
 // Lapiz (+flechas) de Symbian sobre el TIMELINE: navega KEYFRAMES en vez de cambiar la seleccion de objetos.
 // dir: 0=lapiz solo (saca el actual y avanza) 1=derecha 2=izquierda 3=arriba(todos) 4=abajo(ninguno).
@@ -419,6 +441,20 @@ void DopeSoltarVertexAnim();
 // COMPARTIDO pasa antes a clips propios. El refresco de la tarjeta (solo muestra) pasa false.
 AnimProperty* DopeKeyframeActivo(int* idx, bool editar = true);
 std::string   DopeKeyframeActivoCanal();          // nombre del canal ("X Location", ...) para el titulo
+// SELECCION MULTIPLE (tarjetas Curva / Keyframes de propiedades): las curvas con keyframes elegidos (con su nombre de
+// canal) y cada keyframe elegido como (curva, indice). La curva ACTIVA = la del keyframe activo, o la unica elegida.
+int           DopeCurvasElegidas(std::vector<AnimProperty*>& curvas, std::vector<std::string>* nombres, bool editar = true);
+int           DopeKeysElegidas(std::vector<AnimProperty*>& curvas, std::vector<int>& idx, bool editar = true);
+AnimProperty* DopeCurvaActiva(std::string* nombre, bool editar = true);
+// editar la seleccion desde las tarjetas (un paso de undo cada uno): los keyframes elegidos...
+void DopeKeysFijarValor(float v);
+void DopeKeysFijarFrame(int frame);
+void DopeKeysFijarHandle(int lado, int eje, float v);   // lado 0 izq / 1 der; eje 0 X / 1 Y
+void DopeKeysFijarInterp(int id);                        // id >= 100: el easing (id - 100)
+void DopeKeysFijarHandleTipo(int tipo);
+// ...y todos los keyframes de las curvas elegidas
+void DopeCurvasFijarInterp(int id);
+void DopeCurvasFijarHandleTipo(int tipo);
 void          DopeKeyframeActivoReFrame(int nuevoFrame); // el frame cambio: seguirlo (y mover la seleccion)
 // Aceptar / cancelar ese transform desde AFUERA: el click izq/der de PC, el OK/backspace de Symbian y el Tab
 // (que cambia de viewport por encima del ruteo del timeline). Un solo par de funciones para todas las plataformas.
@@ -428,4 +464,15 @@ void DopeXformAceptar();
 // Regla de pertenencia fila padre -> canal (ownerKey). La expone el test 'dopecubre'.
 bool W3dScriptDopeCubre(const std::string& padre, const std::string& hijo);
 
+
+// AJUSTAR LA ULTIMA OPERACION del timeline (PopUp/TimelineRedoPanel.cpp): lo que se hizo al mover / rotar / escalar
+// keyframes, para editarlo despues de soltar. modo: 0 mover, 1 rotar, 2 escalar.
+struct TimelineRedoOp { int modo; bool curvas; int pivote; float frames, valor, angulo, escX, escY; };
+bool      TimelineRedoLeer(TimelineRedoOp& op);           // false = no hay operacion para ajustar
+bool      TimelineRedoReaplicar(const TimelineRedoOp& op); // la vuelve a hacer con estos valores (mismo paso de undo)
+void      TimelineRedoCancelar();                          // la deshace
+void      TimelineRedoOlvidar();
+bool      TimelineRedoReaplicando();
+Timeline* TimelineRedoVista();
+int       TimelineToolbarAlto(const Timeline* t);
 #endif // TIMELINE_H

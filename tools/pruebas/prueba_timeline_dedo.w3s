@@ -1,0 +1,15 @@
+# El TIMELINE con el dedo y el boton verde del frame actual: arrastrar el boton verde corre el frame (un click lo
+# edita); un dedo scrollea el panel de canales en los dos sentidos; con el monitor de la toolbar (el de fabrica) un dedo
+# mueve la vista y con la flecha de seleccion arma la caja; el Shift de la toolbar prende y apaga el Shift.
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+tldedo
