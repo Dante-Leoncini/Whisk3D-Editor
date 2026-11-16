@@ -225,7 +225,7 @@ const char* kLuaControl =
 // ---------------------------------------------------------------------------
 //  AYUDAS
 // ---------------------------------------------------------------------------
-std::string Ent(long n) { char b[32]; sprintf(b, "%ld", n); return b; }
+std::string Ent(long n) { char b[32]; snprintf(b, sizeof(b), "%ld", n); return b; }
 bool Escribir(const std::string& ruta, const char* texto) {
     FILE* f = fopen(ruta.c_str(), "wb");
     if (!f) return false;
@@ -275,7 +275,7 @@ long HeapKb() {
     return -1;
 #endif
 }
-std::string JsonNumTextoLocal(float v) { char b[32]; sprintf(b, "%g", (double)v); return b; }
+std::string JsonNumTextoLocal(float v) { char b[32]; snprintf(b, sizeof(b), "%g", (double)v); return b; }
 InstanciaPrefab* Inst(const std::string& n, std::string& err, const char* quien) {
     Object* o = SceneCollection ? FindObjectByName(SceneCollection, n) : NULL;
     if (!o || !W3dEsTipoInstancia(o->getType())) { err = std::string(quien) + ": no hay una instancia ni un proxy '" + n + "'"; return NULL; }
@@ -343,7 +343,7 @@ bool CmdStreamCrear(std::istringstream& ss, std::string& err) {
         if ((cx + cz) % 2 == 0) { ip = W3dProxyCrear(lib, W3D_LIB_PREFAB, "Personaje", NULL, p, 0.0f); proxies++; }
         else { ip = W3dPrefabCrearInstancia("Poste", NULL, p, 0.0f); postes++; }
         if (!ip) { err = "streamcrear: no pude crear la instancia " + Ent(i); return false; }
-        char n[16]; sprintf(n, "S%03d", i);
+        char n[16]; snprintf(n, sizeof(n), "S%03d", i);
         ip->SetNameObj(n);
         ip->carga = siempre ? W3D_CARGA_SIEMPRE : W3D_CARGA_DISTANCIA;
         ip->distancia = dist;
@@ -755,7 +755,7 @@ bool CmdStreamBench(std::istringstream& ss, std::string& err) {
            TexturasPendientes(), TexturasDormidasCantidad(), SimActiva() ? "activa" : "SIN partida");
     if (!etiqueta.empty()) gBenchs[etiqueta] = b;
     if (cotaPeor > 0.0 && b.peor > cotaPeor) {
-        char m[160]; sprintf(m, "streambench: el peor frame tardo %.2f ms (cota %.1f ms)", b.peor, cotaPeor); err = m; return false;
+        char m[160]; snprintf(m, sizeof(m), "streambench: el peor frame tardo %.2f ms (cota %.1f ms)", b.peor, cotaPeor); err = m; return false;
     }
     // (con un ASIGNADOR INSTRUMENTADO -ASan: mallinfo2 da 0 y lo liberado queda en cuarentena, el RSS solo crece- la
     //  memoria no se puede asertar: se informa y se sigue)
@@ -763,13 +763,13 @@ bool CmdStreamBench(std::istringstream& ss, std::string& err) {
     if (!medible && (cotaHeap >= 0 || !como.empty()))
         printf("      [streambench] el heap no se puede medir aca (asignador instrumentado): sin cotas de memoria\n");
     if (medible && cotaHeap >= 0 && b.heapFin - b.heap0 > cotaHeap) {
-        char m[160]; sprintf(m, "streambench: el heap en uso crecio %ld KB (cota %ld KB)", b.heapFin - b.heap0, cotaHeap); err = m; return false;
+        char m[160]; snprintf(m, sizeof(m), "streambench: el heap en uso crecio %ld KB (cota %ld KB)", b.heapFin - b.heap0, cotaHeap); err = m; return false;
     }
     if (medible && !como.empty()) {
         std::map<std::string, Bench>::iterator it = gBenchs.find(como);
         if (it == gBenchs.end()) { err = "streambench: no hay una corrida '" + como + "'"; return false; }
         if (b.rssMax > it->second.rssMax + margenRss) {
-            char m[200]; sprintf(m, "streambench: el RSS maximo (%ld KB) paso el de '%s' (%ld KB) por mas de %ld KB", b.rssMax,
+            char m[200]; snprintf(m, sizeof(m), "streambench: el RSS maximo (%ld KB) paso el de '%s' (%ld KB) por mas de %ld KB", b.rssMax,
                                  como.c_str(), it->second.rssMax, margenRss);
             err = m; return false;
         }

@@ -63,7 +63,7 @@ static int GlifoDe(char c) {
 static std::string RotuloCelda(int fila, int col) {
     std::string letras; int f = fila;
     do { letras.insert(letras.begin(), (char)('A' + f % 26)); f = f / 26 - 1; } while (f >= 0);
-    char num[16]; sprintf(num, "%d", col + 1);
+    char num[16]; snprintf(num, sizeof(num), "%d", col + 1);
     return letras + num;
 }
 // pixel (ux,uy) en unidades de glifo del rotulo (cada glifo 5 de ancho + 1 de gap, 7 de alto)

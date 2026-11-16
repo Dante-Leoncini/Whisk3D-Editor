@@ -55,7 +55,7 @@ static bool PathEnUso(const std::string& p) {
 static std::string NombreInternoLibre(const std::string& nombre) {
     const std::string base = "texturas/" + W3dSlugEntrada(nombre);
     std::string ruta = base + ".png";
-    for (int k = 2; PathEnUso(ruta) && k < 10000; k++) { char b[16]; sprintf(b, "_%d", k); ruta = base + b + ".png"; }
+    for (int k = 2; PathEnUso(ruta) && k < 10000; k++) { char b[16]; snprintf(b, sizeof(b), "_%d", k); ruta = base + b + ".png"; }
     return ruta;
 }
 Texture* TexEditCrear(const std::string& nombre, const std::vector<unsigned char>& rgba, int w, int h, bool alpha) {

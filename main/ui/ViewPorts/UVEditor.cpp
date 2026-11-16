@@ -1106,7 +1106,7 @@ void UVEditor::SyncBarra() {
                   int tw = 0, th = 0;
                   w3dEngine::TextureSize(tid, tw, th);
                   for (int k = 0; k < niv; k++) { if (tw > 1) tw /= 2; if (th > 1) th /= 2; }
-                  char buf[32]; sprintf(buf, "Mip: %dx%d", tw, th);
+                  char buf[32]; snprintf(buf, sizeof(buf), "Mip: %dx%d", tw, th);
                   bMip->text = buf;
               }
           }

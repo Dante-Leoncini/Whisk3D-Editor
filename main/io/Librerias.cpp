@@ -149,7 +149,7 @@ std::string W3dLibsNombreLibre(const std::string& base0, const std::string& ruta
     if (base.empty()) base = "Libreria";
     std::string n = base;
     for (int k = 1; NombreUsado(n, ruta); k++) {
-        char b[16]; sprintf(b, ".%03d", k);
+        char b[16]; snprintf(b, sizeof(b), ".%03d", k);
         n = base + b;
     }
     return n;
@@ -511,7 +511,7 @@ std::string W3dLibsAnidada(const std::string& de, const std::string& nombre) {
     if (g.empty()) {
         const std::string base = de + "~" + nombre;
         g = base;
-        for (int k = 1; NombreUsado(g); k++) { char b[16]; sprintf(b, ".%03d", k); g = base + b; }
+        for (int k = 1; NombreUsado(g); k++) { char b[16]; snprintf(b, sizeof(b), ".%03d", k); g = base + b; }
         LibMontada& N = gMontadas[g];
         N.oculta = true;
         N.ruta = ruta;

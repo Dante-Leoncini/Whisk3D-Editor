@@ -53,12 +53,12 @@ void ColorPicker::OlvidarDueno(){
 int ColorPickerUnidad = 0;
 
 // "0.000".."1.000" sin %f (la estlib de Symbian no lo tiene)
-static void FormatoFloat3(char* buf, float v) {
+static void FormatoFloat3(char* buf, int bufLen, float v) {
     int mil = (int)(v * 1000.0f + 0.5f);
     if (mil >= 1000) {
         buf[0] = '1'; buf[1] = '.'; buf[2] = buf[3] = buf[4] = '0'; buf[5] = 0;
     } else {
-        sprintf(buf, "0.%03d", mil);
+        snprintf(buf, (size_t)bufLen, "0.%03d", mil);
     }
 }
 
@@ -658,7 +658,7 @@ void ColorPicker::Render() {
             filaCard->Render(false);
             w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
             if (fila == 0) filaCard->RenderBorder(false);
-            sprintf(buf, "%02X%02X%02X%02X",
+            snprintf(buf, sizeof(buf), "%02X%02X%02X%02X",
                     (int)(target[0] * 255.0f + 0.5f),
                     (int)(target[1] * 255.0f + 0.5f),
                     (int)(target[2] * 255.0f + 0.5f),
@@ -712,9 +712,9 @@ void ColorPicker::Render() {
                 // etiqueta izquierda + valor a la DERECHA
                 const char* etiqueta = (pestania == 0) ? EtiquetasRGB[i]
                                                        : EtiquetasHSV[i];
-                if (pestania == 1) FormatoFloat3(buf, vals[i]);
-                else if (ColorPickerUnidad) sprintf(buf, "%d%%", (int)(vals[i] * 100.0f + 0.5f));
-                else sprintf(buf, "%d", (int)(vals[i] * 255.0f + 0.5f));
+                if (pestania == 1) FormatoFloat3(buf, (int)sizeof(buf), vals[i]);
+                else if (ColorPickerUnidad) snprintf(buf, sizeof(buf), "%d%%", (int)(vals[i] * 100.0f + 0.5f));
+                else snprintf(buf, sizeof(buf), "%d", (int)(vals[i] * 255.0f + 0.5f));
                 w3dEngine::PushMatrix();
                 w3dEngine::Translatef((GLfloat)(gapGS * 2), (GLfloat)slotY, 0);
                 if (i == fila) w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
@@ -754,7 +754,7 @@ void ColorPicker::Render() {
             }
             // el alpha SIEMPRE es flotante 0..1, en RGB y en HSV por
             // igual (es el mismo valor: 0.540 aca y alla)
-            FormatoFloat3(buf, vals[3]);
+            FormatoFloat3(buf, (int)sizeof(buf), vals[3]);
             w3dEngine::PushMatrix();
             w3dEngine::Translatef((GLfloat)(gapGS * 2), (GLfloat)GlobalScale, 0);
             if (fila == 3) w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
@@ -849,7 +849,7 @@ bool ColorPicker::HexAplicar(const std::string& t) {
 void ColorPicker::HexEditar() {
     if (!target) return;
     char buf[16];
-    sprintf(buf, "%02X%02X%02X%02X", (int)(target[0] * 255.0f + 0.5f), (int)(target[1] * 255.0f + 0.5f),
+    snprintf(buf, sizeof(buf), "%02X%02X%02X%02X", (int)(target[0] * 255.0f + 0.5f), (int)(target[1] * 255.0f + 0.5f),
             (int)(target[2] * 255.0f + 0.5f), (int)(target[3] * 255.0f + 0.5f));
     hexCampo.SetText(buf);
     hexCampo.SelectAll();          // tipear reemplaza todo (como renombrar)
@@ -937,8 +937,8 @@ bool ColorPicker::Click(int mx, int my) {
     if (pestania == 2 && btnCopiar->Contains(mx, my)) {
         if (target) {
             char b[16]; const int a = (int)(target[3] * 255.0f + 0.5f);
-            if (a >= 255) sprintf(b, "#%02X%02X%02X", (int)(target[0]*255.0f+0.5f), (int)(target[1]*255.0f+0.5f), (int)(target[2]*255.0f+0.5f));
-            else sprintf(b, "#%02X%02X%02X%02X", (int)(target[0]*255.0f+0.5f), (int)(target[1]*255.0f+0.5f), (int)(target[2]*255.0f+0.5f), a);
+            if (a >= 255) snprintf(b, sizeof(b), "#%02X%02X%02X", (int)(target[0]*255.0f+0.5f), (int)(target[1]*255.0f+0.5f), (int)(target[2]*255.0f+0.5f));
+            else snprintf(b, sizeof(b), "#%02X%02X%02X%02X", (int)(target[0]*255.0f+0.5f), (int)(target[1]*255.0f+0.5f), (int)(target[2]*255.0f+0.5f), a);
             w3dEngine::W3dClipboardSet(b);
             Notificar(std::string(T("Copied")) + " " + b, false);
         }

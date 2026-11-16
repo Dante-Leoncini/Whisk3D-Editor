@@ -30,10 +30,10 @@ std::string W3dFmtFloat(float v, int dec){
     long mul = 1; for (int i = 0; i < dec; i++) mul *= 10;
     int frac = (int)((av - (float)ent) * (float)mul + 0.5f);
     if (frac >= (int)mul) { ent++; frac -= (int)mul; }
-    sprintf(buf, "%s%d", neg ? "-" : "", ent);
+    snprintf(buf, sizeof(buf), "%s%d", neg ? "-" : "", ent);
     std::string r = buf;
     if (dec > 0){
-        sprintf(buf, "%d", frac);
+        snprintf(buf, sizeof(buf), "%d", frac);
         std::string fs = buf;
         while ((int)fs.size() < dec) fs = "0" + fs;
         r += "." + fs;

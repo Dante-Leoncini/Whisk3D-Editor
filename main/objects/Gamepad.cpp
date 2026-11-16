@@ -79,7 +79,7 @@ void MandosSymbianTick() {
         if (hay && !gConectado[i]) {
             const bool ps = (e.tipo == w3dEngine::MandoPS3 || e.tipo == w3dEngine::MandoPS4);
             char nombre[32];
-            sprintf(nombre, "%s %d", e.tipo == w3dEngine::MandoPS3 ? "DualShock 3" :
+            snprintf(nombre, sizeof(nombre), "%s %d", e.tipo == w3dEngine::MandoPS3 ? "DualShock 3" :
                                      e.tipo == w3dEngine::MandoPS4 ? "DualShock 4" : "Joystick", i + 1);
             W3dControlAlta(0, id, nombre, ps ? "playstation" : "generico");
         } else if (!hay && gConectado[i]) {

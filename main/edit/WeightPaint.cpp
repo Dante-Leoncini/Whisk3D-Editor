@@ -1065,8 +1065,8 @@ void WeightPaintMenuUVGroup(Mesh* m, int sx, int syTop) {
 // los 3 labels del PINCEL (compartidos: el pincel es uno solo)
 static void BrushLabels(std::string& tam, std::string& fuerza, std::string& modo) {
     char b[32];
-    sprintf(b, "%dpx", (int)(g_brush.radioPx + 0.5f));          tam = b;
-    sprintf(b, "%d%%", (int)(g_brush.fuerza * 100.0f + 0.5f));  fuerza = b;
+    snprintf(b, sizeof(b), "%dpx", (int)(g_brush.radioPx + 0.5f));          tam = b;
+    snprintf(b, sizeof(b), "%d%%", (int)(g_brush.fuerza * 100.0f + 0.5f));  fuerza = b;
     modo = (g_brush.modo == WPIgualar) ? "=" : (g_brush.modo == WPRestar) ? "-" : "+";
 }
 

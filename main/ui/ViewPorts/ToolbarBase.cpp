@@ -407,7 +407,7 @@ void ViewportBase::RenderBrushBar(){
     int yLocal = height - BBaltoToolbar(this) - h;   // local al viewport (la toolbar queda abajo)
     if (BBmodoProp(this)){   // BARRA DE INFLUENCIA del proportional editing: una sola barra a todo el ancho
         int sx, sw; BBceldaProp(this, sx, sw);
-        char num[48]; sprintf(num, "%.2f", g_prop.radio);
+        char num[48]; snprintf(num, sizeof(num), "%.2f", g_prop.radio);
         const std::string txt = std::string(T("Proportional Size")) + ": " + num + " m";
         w3dEngine::PushMatrix();
         w3dEngine::Translatef(0, (GLfloat)yLocal, 0);

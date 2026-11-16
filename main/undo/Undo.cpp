@@ -2193,7 +2193,7 @@ void UndoBorrarClip2D(Mesh* m) {
     const int i = arm ? m->Arm2DAnimActiva() : -1;
     if (arm && i >= 0 && i < (int)m->Arm2DAnims().size()) {
         UndoListaBorrada(W3dDestClip2D(m, arm, i));
-        char sa[48]; sprintf(sa, "/a%d/k", m->armature2dActivo);
+        char sa[48]; snprintf(sa, sizeof(sa), "/a%d/k", m->armature2dActivo);
         DopeRemapIndiceClave("arm2d:" + DopeIdDueno(m) + sa, i, -1);
     }
     Arm2DBorrarAnimacionActiva(m);

@@ -518,7 +518,7 @@ static bool CmdCargaBench(std::istringstream& ss, std::string& err) {
         else if (c == "derivadas") tiene = ult.f.mallasDerivadas;
         else if (c == "maxms") {
             if (total > v) {
-                char b[160]; sprintf(b, "cargabench: total %.1f ms supera la cota %.1f ms", total, v);
+                char b[160]; snprintf(b, sizeof(b), "cargabench: total %.1f ms supera la cota %.1f ms", total, v);
                 err = b; return false;
             }
             continue;
@@ -529,7 +529,7 @@ static bool CmdCargaBench(std::istringstream& ss, std::string& err) {
             if (med.size() < 3) { err = "cargabench: fugakb necesita n >= 3 (la primera vuelta se descarta)"; return false; }
             if ((double)fugaKB > v) {
                 char b[200];
-                sprintf(b, "cargabench: cada reapertura deja %ld KB de heap vivo (cota %.0f KB): algo del "
+                snprintf(b, sizeof(b), "cargabench: cada reapertura deja %ld KB de heap vivo (cota %.0f KB): algo del "
                            "proyecto no se libera al cerrarlo", fugaKB, v);
                 err = b; return false;
             }
@@ -537,7 +537,7 @@ static bool CmdCargaBench(std::istringstream& ss, std::string& err) {
         }
         else { err = "cargabench: assert desconocido '" + c + "'"; return false; }
         if ((long)tiene != (long)v) {
-            char b[160]; sprintf(b, "cargabench: %s=%ld y se esperaba %ld", c.c_str(), (long)tiene, (long)v);
+            char b[160]; snprintf(b, sizeof(b), "cargabench: %s=%ld y se esperaba %ld", c.c_str(), (long)tiene, (long)v);
             err = b; return false;
         }
     }
@@ -553,20 +553,20 @@ static bool CmdCargaBench(std::istringstream& ss, std::string& err) {
     {
         char b[260];
         if (!(ult.f.jsonMs > 0.0)) {
-            sprintf(b, "cargabench: el reparto no midio la fase json (%.3f ms): el reloj del lector no "
+            snprintf(b, sizeof(b), "cargabench: el reparto no midio la fase json (%.3f ms): el reloj del lector no "
                        "esta instalado o el lector dejo de acumular", ult.f.jsonMs);
             err = b; return false;
         }
         if (cnt.mallas > 0 && !(ult.f.mallasMs > 0.0)) {
-            sprintf(b, "cargabench: el arbol tiene %d mallas y la fase mallas midio %.3f ms", cnt.mallas, ult.f.mallasMs);
+            snprintf(b, sizeof(b), "cargabench: el arbol tiene %d mallas y la fase mallas midio %.3f ms", cnt.mallas, ult.f.mallasMs);
             err = b; return false;
         }
         if (cnt.armatures > 0 && !(ult.f.clipsMs > 0.0)) {
-            sprintf(b, "cargabench: el arbol tiene %d armatures y la fase clips midio %.3f ms", cnt.armatures, ult.f.clipsMs);
+            snprintf(b, sizeof(b), "cargabench: el arbol tiene %d armatures y la fase clips midio %.3f ms", cnt.armatures, ult.f.clipsMs);
             err = b; return false;
         }
         if (ult.f.mallas != cnt.mallas || ult.f.armatures != cnt.armatures || ult.f.clips != cnt.clips) {
-            sprintf(b, "cargabench: el reparto conto %d mallas/%d armatures/%d clips y el arbol tiene %d/%d/%d",
+            snprintf(b, sizeof(b), "cargabench: el reparto conto %d mallas/%d armatures/%d clips y el arbol tiene %d/%d/%d",
                     ult.f.mallas, ult.f.armatures, ult.f.clips, cnt.mallas, cnt.armatures, cnt.clips);
             err = b; return false;
         }
@@ -650,7 +650,7 @@ static bool CmdHeapUso(std::istringstream& ss, std::string& err) {
         if (!(ss >> v)) { err = "heapuso: falta el valor de '" + clave + "'"; return false; }
         if (clave != "max") { err = "heapuso: assert desconocido '" + clave + "' (uso: heapuso [max KB])"; return false; }
         if (kb >= 0 && (double)delta > v) {
-            char b[160]; sprintf(b, "heapuso: el heap crecio %ld KB desde la medida anterior (cota %.0f KB)", delta, v);
+            char b[160]; snprintf(b, sizeof(b), "heapuso: el heap crecio %ld KB desde la medida anterior (cota %.0f KB)", delta, v);
             err = b; return false;
         }
     }
@@ -682,7 +682,7 @@ static bool CmdCachesProyecto(std::istringstream& ss, std::string& err) {
         else if (clave == "tex2d") tiene = nTex;
         else { err = "cachesproyecto: assert desconocido '" + clave + "' (sonidos|tex2d)"; return false; }
         if (alMenos ? (tiene < v) : (tiene != v)) {
-            char b[160]; sprintf(b, "cachesproyecto: %s=%d y se esperaba %s", clave.c_str(), tiene, op.c_str());
+            char b[160]; snprintf(b, sizeof(b), "cachesproyecto: %s=%d y se esperaba %s", clave.c_str(), tiene, op.c_str());
             err = b; return false;
         }
     }
@@ -875,7 +875,7 @@ static bool CmdViewports(std::istringstream& ss, std::string& err) {
            Viewport3DActive ? (v3dOk ? "hoja" : "AJENO") : "NULL",
            PropsActivo ? (propsOk ? "hoja" : "AJENO") : "NULL");
     if (vivos != (int)todos.size()) {
-        char b[200]; sprintf(b, "viewports: hay %d viewports vivos y el arbol tiene %d (un layout quedo huerfano)",
+        char b[200]; snprintf(b, sizeof(b), "viewports: hay %d viewports vivos y el arbol tiene %d (un layout quedo huerfano)",
                              vivos, (int)todos.size());
         err = b; return false;
     }
@@ -888,7 +888,7 @@ static bool CmdViewports(std::istringstream& ss, std::string& err) {
         if (!(ss >> v)) { err = "viewports: falta el valor de '" + clave + "'"; return false; }
         if (clave != "hojas") { err = "viewports: assert desconocido '" + clave + "' (uso: viewports [hojas N])"; return false; }
         if ((int)hojas.size() != v) {
-            char b[120]; sprintf(b, "viewports: hojas=%d y se esperaba %d", (int)hojas.size(), v);
+            char b[120]; snprintf(b, sizeof(b), "viewports: hojas=%d y se esperaba %d", (int)hojas.size(), v);
             err = b; return false;
         }
     }
@@ -1016,7 +1016,7 @@ static bool CmdPropsArm2D(std::istringstream& ss, std::string& err) {
     }
     if (paneles == 0) { err = "propsarm2d: no hay paneles de propiedades en el layout"; return false; }
     if (panelesEsperados >= 0 && paneles != panelesEsperados) {
-        char b[120]; sprintf(b, "propsarm2d: hay %d paneles y se esperaban %d", paneles, panelesEsperados);
+        char b[120]; snprintf(b, sizeof(b), "propsarm2d: hay %d paneles y se esperaban %d", paneles, panelesEsperados);
         err = b; return false;
     }
     if (!ok) {
@@ -1055,7 +1055,7 @@ static bool CmdIconosPkg(std::string& err) {
     int faltaPng = 0, malTam = 0, faltaPkg = 0, sobraPkg = 0;
     for (int i = 0; i < (int)ICON_TOTAL; i++) {
         const std::string n = IconoNombre(i);
-        if (n.empty()) { char b[80]; sprintf(b, "iconospkg: el icono %d no tiene nombre (KNombres)", i); err = b; return false; }
+        if (n.empty()) { char b[80]; snprintf(b, sizeof(b), "iconospkg: el icono %d no tiene nombre (KNombres)", i); err = b; return false; }
         const std::string png = dirIconos + n + ".png";
         if (!w3dFileSystem::FileExists(png)) {
             printf("      [iconospkg] '%s': falta %s\n", n.c_str(), png.c_str()); faltaPng++;
@@ -1146,7 +1146,7 @@ static bool CmdLogCargaMallas(std::istringstream& ss, std::string& err) {
         }
         printf("      [logcargamallas] .w3db=%d .w3dm=%d rechazadas=%d\n", b, t, r);
         if (b != bin || t != tex || r != rech) {
-            char x[160]; sprintf(x, "logcargamallas: el log dice .w3db=%d .w3dm=%d rechazadas=%d y se esperaba %d %d %d", b, t, r, bin, tex, rech);
+            char x[160]; snprintf(x, sizeof(x), "logcargamallas: el log dice .w3db=%d .w3dm=%d rechazadas=%d y se esperaba %d %d %d", b, t, r, bin, tex, rech);
             err = x; return false;
         }
         return true;
@@ -1215,11 +1215,11 @@ static bool CmdW3dbInfo(std::istringstream& ss, std::string& err) {
         char b[200];
         if (c == "w3db" || c == "w3dm") {
             const int esp = atoi(v.c_str()), hay = (c == "w3db") ? nBin : nTxt;
-            if (hay != esp) { sprintf(b, "w3dbinfo: %s=%d y se esperaba %d", c.c_str(), hay, esp); err = b; return false; }
+            if (hay != esp) { snprintf(b, sizeof(b), "w3dbinfo: %s=%d y se esperaba %d", c.c_str(), hay, esp); err = b; return false; }
         } else if (c == "tiene" || c == "notiene") {
             const int n = conBloque.count(v) ? conBloque[v] : 0;
-            if (c == "tiene" && n != nBin) { sprintf(b, "w3dbinfo: el bloque '%s' esta en %d de %d .w3db", v.c_str(), n, nBin); err = b; return false; }
-            if (c == "notiene" && n != 0)  { sprintf(b, "w3dbinfo: el bloque '%s' aparece en %d .w3db", v.c_str(), n); err = b; return false; }
+            if (c == "tiene" && n != nBin) { snprintf(b, sizeof(b), "w3dbinfo: el bloque '%s' esta en %d de %d .w3db", v.c_str(), n, nBin); err = b; return false; }
+            if (c == "notiene" && n != 0)  { snprintf(b, sizeof(b), "w3dbinfo: el bloque '%s' aparece en %d .w3db", v.c_str(), n); err = b; return false; }
         } else { err = "w3dbinfo: assert desconocido '" + c + "'"; return false; }
     }
     return true;
@@ -1367,7 +1367,7 @@ static void PrFotoCuadro(Mesh* m, int f, PrCampos& c) {
         PrHash h;
         if (m->skinVertex) h.Bytes(m->skinVertex, (size_t)nV * 12);
         if (m->skinNormals) h.Bytes(m->skinNormals, (size_t)nV * 3);
-        sprintf(k, "skin@%d", f); c[k] = h;
+        snprintf(k, sizeof(k), "skin@%d", f); c[k] = h;
         CurrentFrame = antes;
     }
     for (size_t a = 0; a < m->animations.size() && nV > 0; a++) {
@@ -1383,7 +1383,7 @@ static void PrFotoCuadro(Mesh* m, int f, PrCampos& c) {
         h.Bytes(m->vertex, (size_t)nV * 12);
         if (m->normals) h.Bytes(m->normals, (size_t)nV * 3);
         if (m->uv) h.Bytes(m->uv, (size_t)nV * 8);
-        sprintf(k, "va%d@%d", (int)a, f); c[k] = h;
+        snprintf(k, sizeof(k), "va%d@%d", (int)a, f); c[k] = h;
         memcpy(m->vertex, &pv[0], pv.size() * 4);
         if (m->normals && !nv.empty()) memcpy(m->normals, &nv[0], nv.size());
         if (m->uv && !uv.empty()) memcpy(m->uv, &uv[0], uv.size() * 4);
@@ -1464,7 +1464,7 @@ static bool CmdMallaFotoIgual(std::istringstream& ss, std::string& err) {
             PrCampos::const_iterator d = o->second.find(c->first);
             if (d == o->second.end()) { dif.push_back("'" + it->first + "'." + c->first + " falta en " + b); continue; }
             if (!c->second.Igual(d->second)) {
-                char buf[64]; sprintf(buf, " (%lu B contra %lu B)", c->second.n, d->second.n);
+                char buf[64]; snprintf(buf, sizeof(buf), " (%lu B contra %lu B)", c->second.n, d->second.n);
                 dif.push_back("'" + it->first + "'." + c->first + buf);
             }
         }
@@ -1950,7 +1950,7 @@ static bool CmdFormatoMallasUI(std::istringstream& ss, std::string& err) {
             const int proy = (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO) ? 1 : 0;
             printf("      [formatomallasui] tilde=%d proyecto=%s ('%s')\n", hay, proy ? "texto" : "binario", pb->name.c_str());
             if (hay != proy) { err = "formatomallasui: el tilde no refleja la opcion del proyecto"; return false; }
-            if (quiero != hay) { char b[120]; sprintf(b, "formatomallasui: tilde=%d y se esperaba %d", hay, quiero); err = b; return false; }
+            if (quiero != hay) { char b[120]; snprintf(b, sizeof(b), "formatomallasui: tilde=%d y se esperaba %d", hay, quiero); err = b; return false; }
         } else { err = "formatomallasui: uso: formatomallasui [clic] [tilde 0|1]..."; return false; }
     }
     return true;
@@ -2001,7 +2001,7 @@ static bool CmdZipCrc(std::string& err) {
     const double ms = W3dNowMs() - t0;
     printf("      [zipcrc] vectores de control + %d largos/alineaciones contra la definicion: %s | "
            "%.0f MB/s (acc %08X)\n", 9 * 301 + 1, malos ? "MAL" : "OK", ms > 0.0 ? 16.0 / (ms / 1000.0) : 0.0, acc);
-    if (malos) { char b[80]; sprintf(b, "zipcrc: %d CRC distintos de la definicion", malos); err = b; return false; }
+    if (malos) { char b[80]; snprintf(b, sizeof(b), "zipcrc: %d CRC distintos de la definicion", malos); err = b; return false; }
     return true;
 }
 

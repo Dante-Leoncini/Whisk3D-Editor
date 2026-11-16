@@ -32,13 +32,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---------------------------------------------------
-# MSVC
+# Compiler warnings
 # ---------------------------------------------------
-
-if(MSVC)
-    add_compile_options(/W0)
-endif()
-
+# Warning policy belongs to our executable, not to vendored dependencies.
+# Keep MSVC diagnostics enabled instead of globally silencing the entire tree.
 # ---------------------------------------------------
 # Debug flags
 # ---------------------------------------------------
@@ -187,6 +184,10 @@ endif()
 # ---------------------------------------------------
 
 add_executable(whisk3d ${SRC_FILES})
+
+if(MSVC)
+    target_compile_options(whisk3d PRIVATE /W4)
+endif()
 
 # el header de version se regenera antes de compilar (ver el bloque de arriba)
 add_dependencies(whisk3d w3dversion)

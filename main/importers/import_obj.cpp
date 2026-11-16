@@ -29,13 +29,13 @@ static std::string FloatStr(float v) {
     int ent = (int)av;
     int frac = (int)((av - (float)ent) * 1000000.0f + 0.5f); // 6 decimales
     if (frac >= 1000000) { ent++; frac -= 1000000; }
-    sprintf(buf, "%s%d.%06d", neg ? "-" : "", ent, frac);
+    snprintf(buf, sizeof(buf), "%s%d.%06d", neg ? "-" : "", ent, frac);
     return std::string(buf);
 }
 
 // int -> string (para los indices de las caras del export). SSO (sin heap para enteros chicos).
 static std::string IntStr(int n) {
-    char buf[16]; sprintf(buf, "%d", n); return std::string(buf);
+    char buf[16]; snprintf(buf, sizeof(buf), "%d", n); return std::string(buf);
 }
 
 // ===== APPEND directo al buffer del export, SIN sprintf (era el cuello: ~2.6M sprintf para 200k verts = ~7s) ni

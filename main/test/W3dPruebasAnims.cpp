@@ -204,7 +204,7 @@ bool AssertInt(const char* cmd, const std::string& k, const std::string& v, long
     const long quiere = atol(v.c_str());
     if (quiere == tiene) return true;
     char b[200];
-    sprintf(b, "%s: %s = %ld, se esperaba %ld", cmd, k.c_str(), tiene, quiere);
+    snprintf(b, sizeof(b), "%s: %s = %ld, se esperaba %ld", cmd, k.c_str(), tiene, quiere);
     err = b;
     return false;
 }
@@ -276,7 +276,7 @@ bool CmdRec(std::istringstream& ss, std::string& err) {
         if (k == "nada") { if (r) { err = "animsetrec: hay un recurso con id '" + id + "'"; return false; } continue; }
         if (k == "refs") {
             long v = -1; ss >> v;
-            if (!r || (long)r->refTotal != v) { char b[160]; sprintf(b, "animsetrec: refs = %d, se esperaba %ld", r ? (int)r->refTotal : -1, v); err = b; return false; }
+            if (!r || (long)r->refTotal != v) { char b[160]; snprintf(b, sizeof(b), "animsetrec: refs = %d, se esperaba %ld", r ? (int)r->refTotal : -1, v); err = b; return false; }
             continue;
         }
         err = "animsetrec: assert desconocido '" + k + "'"; return false;
@@ -341,7 +341,7 @@ bool CmdClip(std::istringstream& ss, std::string& err) {
             if (c->name != v) { err = "animsetclip: nombre = '" + c->name + "', se esperaba '" + v + "'"; return false; }
         } else if (k == "keys") {
             long v = -1; ss >> v;
-            if (KeysDe(c) != v) { char b[96]; sprintf(b, "animsetclip: keys = %ld, se esperaba %ld", KeysDe(c), v); err = b; return false; }
+            if (KeysDe(c) != v) { char b[96]; snprintf(b, sizeof(b), "animsetclip: keys = %ld, se esperaba %ld", KeysDe(c), v); err = b; return false; }
         } else if (k == "mismo") {
             const std::string n2 = LeerPalabra(ss);
             int j = -1, quiere = -1; ss >> j >> quiere;
@@ -687,7 +687,7 @@ bool CmdPistas(std::istringstream& ss, std::string& err) {
     }
     std::string lista;
     for (std::map<std::string, long>::const_iterator it = porHueso.begin(); it != porHueso.end(); ++it) {
-        char b[32]; sprintf(b, "=%ld", it->second);
+        char b[32]; snprintf(b, sizeof(b), "=%ld", it->second);
         lista += (lista.empty() ? "" : " ") + it->first + b;
     }
     printf("      [animsetpistas] %s %s: %d clips, pistas por hueso: %s\n", ruta.c_str(), ent.c_str(),
@@ -771,7 +771,7 @@ std::string HashPose(const Armature* a) {
     }
     unsigned h1, h2;
     W3dAnimSetHuella((const unsigned char*)s.data(), s.size(), h1, h2);
-    char b[40]; sprintf(b, "%08x%08x", h1, h2);
+    char b[40]; snprintf(b, sizeof(b), "%08x%08x", h1, h2);
     return b;
 }
 
@@ -810,7 +810,7 @@ bool CmdPoseFoto(std::istringstream& ss, std::string& err) {
                 ActiveAnimKind = 1; ActiveAnimArm = a;
                 a->lastPoseFrame = -999999; a->lastPoseAnim = -999; a->poseDirty = false;
                 EvaluarPoseEsqueleto(a, fr[q]);
-                char b[64]; sprintf(b, "|%d|f%d|", (int)ci, fr[q]);
+                char b[64]; snprintf(b, sizeof(b), "|%d|f%d|", (int)ci, fr[q]);
                 out += a->name + b + c->name + "|" + HashPose(a) + "\n";
                 nPoses++;
             }
@@ -822,7 +822,7 @@ bool CmdPoseFoto(std::istringstream& ss, std::string& err) {
                     a->juegoFrame = jf[q];
                     a->lastPoseFrame = -999999; a->lastPoseAnim = -999; a->lastPoseFrameF = -999999.0f; a->poseDirty = false;
                     EvaluarPoseEsqueleto(a, 0);
-                    char b[80]; sprintf(b, "|%d|j%.3f|", (int)ci, jf[q]);
+                    char b[80]; snprintf(b, sizeof(b), "|%d|j%.3f|", (int)ci, jf[q]);
                     out += a->name + b + c->name + "|" + HashPose(a) + "\n";
                     nPoses++;
                 }
@@ -1164,7 +1164,7 @@ bool SellosVerificar(std::string* motivo, int* nClips) {
                 if (it != gSellos.end() && it->second != h && ok) {
                     ok = false;
                     if (motivo) {
-                        char b[96]; sprintf(b, "' (clip %d%s) ", (int)k, v >= 0 ? " de una variante" : "");
+                        char b[96]; snprintf(b, sizeof(b), "' (clip %d%s) ", (int)k, v >= 0 ? " de una variante" : "");
                         *motivo = "el clip COMPARTIDO '" + lista[k]->name + b + "del animset '" + s->nombre +
                                   "' cambio en memoria: algo lo escribio sin copy-on-write (W3dArmatureAnimsPropias)";
                     }
@@ -1222,7 +1222,7 @@ bool CmdSellos(std::istringstream& ss, std::string& err) {
     const bool ok = SellosVerificar(&motivo, &n);
     printf("      [animsetsellos] %d clips compartidos verificados: %s\n", n, ok ? "INTACTOS" : "ALGUNO CAMBIO");
     if (!ok) { err = "animsetsellos: " + motivo; return false; }
-    if (quiere >= 0 && quiere != n) { char b[96]; sprintf(b, "animsetsellos: clips = %d, se esperaba %ld", n, quiere); err = b; return false; }
+    if (quiere >= 0 && quiere != n) { char b[96]; snprintf(b, sizeof(b), "animsetsellos: clips = %d, se esperaba %ld", n, quiere); err = b; return false; }
     return true;
 }
 
@@ -1475,7 +1475,7 @@ bool CmdUsuarios(std::istringstream& ss, std::string& err) {
     std::string lista;
     for (size_t i = 0; i < us.size(); i++) lista += (i ? ", " : "") + us[i]->name;
     printf("      [animsetusuarios] '%s': %d (%s)\n", n.c_str(), k, lista.c_str());
-    if (quiere >= 0 && quiere != k) { char b[128]; sprintf(b, "animsetusuarios: %d usuarios, se esperaban %ld", k, quiere); err = b; return false; }
+    if (quiere >= 0 && quiere != k) { char b[128]; snprintf(b, sizeof(b), "animsetusuarios: %d usuarios, se esperaban %ld", k, quiere); err = b; return false; }
     return true;
 }
 bool CmdRenombrarSet(std::istringstream& ss, std::string& err) {
@@ -1513,7 +1513,7 @@ bool CmdPurgar(std::istringstream& ss, std::string& err) {
     std::string lista;
     for (size_t i = 0; i < fuera.size(); i++) lista += (i ? ", " : "") + fuera[i];
     printf("      [animsetpurgar] %d huerfanos fuera del registro (%s)\n", k, lista.c_str());
-    if (quiere >= 0 && quiere != k) { char b[128]; sprintf(b, "animsetpurgar: %d, se esperaban %ld", k, quiere); err = b; return false; }
+    if (quiere >= 0 && quiere != k) { char b[128]; snprintf(b, sizeof(b), "animsetpurgar: %d, se esperaban %ld", k, quiere); err = b; return false; }
     return true;
 }
 
@@ -1738,7 +1738,7 @@ bool CmdClavesInfo(std::istringstream& ss, std::string& err) {
         if (k == "marca") { gClavesMarca = st.expansiones; continue; }
         if (k == "maxbpc") {
             double v = 0.0; ss >> v;
-            if (bpc > v) { char b[128]; sprintf(b, "clavesinfo: %.2f B por clave compacta, se esperaban <= %.2f", bpc, v); err = b; return false; }
+            if (bpc > v) { char b[128]; snprintf(b, sizeof(b), "clavesinfo: %.2f B por clave compacta, se esperaban <= %.2f", bpc, v); err = b; return false; }
             continue;
         }
         long v = -1; ss >> v;
@@ -1746,7 +1746,7 @@ bool CmdClavesInfo(std::istringstream& ss, std::string& err) {
         if      (k == "compactas") tiene = st.compactas;
         else if (k == "nuevas")    tiene = st.expansiones - gClavesMarca;
         else { err = "clavesinfo: assert desconocido '" + k + "'"; return false; }
-        if (tiene != v) { char b[160]; sprintf(b, "clavesinfo %s: hay %ld, se esperaban %ld", k.c_str(), tiene, v); err = b; return false; }
+        if (tiene != v) { char b[160]; snprintf(b, sizeof(b), "clavesinfo %s: hay %ld, se esperaban %ld", k.c_str(), tiene, v); err = b; return false; }
     }
     return true;
 }
@@ -1797,7 +1797,7 @@ bool CmdClavesComparar(std::istringstream& ss, std::string& err) {
                 for (size_t i = 0; i < ap.keyframes.size(); i++) v.push_back(ap.keyframes.Clave(i));
                 AnimProperty comun; comun.Property = ap.Property; comun.component = ap.component;
                 comun.keyframes = v;
-                char donde[96]; sprintf(donde, "pista %d curva %d", (int)l, (int)p);
+                char donde[96]; snprintf(donde, sizeof(donde), "pista %d curva %d", (int)l, (int)p);
                 if (!ap.keyframes.MismosBits(comun.keyframes) || !comun.keyframes.MismosBits(ap.keyframes)) {
                     if (!malas++) primera = std::string(donde) + ": las claves no son las mismas";
                 }
@@ -1820,7 +1820,7 @@ bool CmdClavesComparar(std::istringstream& ss, std::string& err) {
                     evals++;
                     if (!MismosBitsF(r, x) || !MismosBitsF(r, y)) {
                         if (!malas++) {
-                            char b[200]; sprintf(b, ": EvalF(%.6f) antes=%.9g compacta=%.9g comun=%.9g", fs[q], r, x, y);
+                            char b[200]; snprintf(b, sizeof(b), ": EvalF(%.6f) antes=%.9g compacta=%.9g comun=%.9g", fs[q], r, x, y);
                             primera = std::string(donde) + b;
                         }
                     }
@@ -1851,7 +1851,7 @@ bool CmdClavesComparar(std::istringstream& ss, std::string& err) {
     if (malas) { err = "clavescomparar: " + primera; return false; }
     if (st1.expansiones != st0.expansiones) { err = "clavescomparar: mirar las curvas EXPANDIO alguna compacta"; return false; }
     if (quiere >= 0 && quiere != compactas) {
-        char b[128]; sprintf(b, "clavescomparar: %ld curvas compactas, se esperaban %ld", compactas, quiere); err = b; return false;
+        char b[128]; snprintf(b, sizeof(b), "clavescomparar: %ld curvas compactas, se esperaban %ld", compactas, quiere); err = b; return false;
     }
     return true;
 }
@@ -1921,7 +1921,7 @@ bool CmdClavesEditar(std::istringstream& ss, std::string& err) {
            "compactas, se ve %s, Ctrl+Z %s, Ctrl+Y %s\n", a->name.c_str(), clip, op.c_str(), (int)t, (int)p, (int)n0, nuevas,
            comun ? "COMUN" : "compacta", otrasDespues, otras, seVe ? "SI" : "NO", deshecho ? "OK (compacta)" : "MAL",
            rehecho ? "OK" : "MAL");
-    if (nuevas != 1) { char b[96]; sprintf(b, "claveseditar: se expandieron %ld curvas (tiene que ser SOLO la editada)", nuevas); err = b; return false; }
+    if (nuevas != 1) { char b[96]; snprintf(b, sizeof(b), "claveseditar: se expandieron %ld curvas (tiene que ser SOLO la editada)", nuevas); err = b; return false; }
     if (!comun || otrasDespues != otras) { err = "claveseditar: la curva editada no quedo comun o se expandio otra del clip"; return false; }
     if (!seVe) { err = "claveseditar: la edicion no se ve en la curva"; return false; }
     if (!deshecho) { err = "claveseditar: Ctrl+Z no devolvio las mismas claves (compactas)"; return false; }

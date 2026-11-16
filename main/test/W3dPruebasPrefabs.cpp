@@ -214,7 +214,7 @@ void Script(Object* o, const char* ruta) {
 void Ref(Object* o, const std::string& prop, const std::string& valor) {
     o->scriptDatos->scripts.back().refs.push_back(std::make_pair(prop, valor));
 }
-std::string Ent(long n) { char b[32]; sprintf(b, "%ld", n); return b; }
+std::string Ent(long n) { char b[32]; snprintf(b, sizeof(b), "%ld", n); return b; }
 
 SkeletalAnimation* Clip(const char* nombre, int hueso, int comp, float a, float b, int fin) {
     SkeletalAnimation* c = new SkeletalAnimation(nombre);

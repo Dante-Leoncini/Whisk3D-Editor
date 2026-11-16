@@ -170,7 +170,7 @@ const char* kLuaDirector =
     "  end\n"
     "end\n";
 
-std::string Ent(long n) { char b[32]; sprintf(b, "%ld", n); return b; }
+std::string Ent(long n) { char b[32]; snprintf(b, sizeof(b), "%ld", n); return b; }
 int TipoDe(const std::string& t) { return t == "escena" ? W3D_LIB_ESCENA : W3D_LIB_PREFAB; }
 
 bool Copiar(const std::string& de, const std::string& a) {

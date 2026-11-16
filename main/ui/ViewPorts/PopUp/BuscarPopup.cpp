@@ -28,7 +28,7 @@ static bool gMayus = false, gPalabra = false;
 static int gAnclaLin = 0, gAnclaCol = 0;   // desde donde se busca mientras se tipea (el cursor al abrir)
 static IdeBusqueda gActiva;
 
-static std::string Num(int n) { char b[16]; sprintf(b, "%d", n); return b; }
+static std::string Num(int n) { char b[16]; snprintf(b, sizeof(b), "%d", n); return b; }
 
 static void AccAnterior()  { if (gBP && gBP->ide) { gBP->Sincronizar(); gBP->ide->IrACoincidencia(gTexto, gMayus, gPalabra, -1); } }
 static void AccSiguiente() { if (gBP && gBP->ide) { gBP->Sincronizar(); gBP->ide->IrACoincidencia(gTexto, gMayus, gPalabra, +1); } }

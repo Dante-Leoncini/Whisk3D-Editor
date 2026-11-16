@@ -49,7 +49,8 @@ inline void W3dAvisof(bool error, const char* fmt, ...) {
     char buf[512];
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt ? fmt : "", ap);
+    if (fmt) vsnprintf(buf, sizeof(buf), fmt, ap);
+    else buf[0] = '\0';
     va_end(ap);
     buf[sizeof(buf) - 1] = '\0';   // algunas libc viejas no terminan al truncar
     Notificar(std::string(buf), error);

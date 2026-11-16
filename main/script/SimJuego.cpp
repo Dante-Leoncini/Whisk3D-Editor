@@ -195,7 +195,12 @@ void SimLuaPerfTop(char* buf, int bufLen, int frames) {
         if (mejor >= gLuaMsAcum.size() || mms <= 0.0) break;
         char nom[13]; size_t nl = gScripted[mejor]->name.size(); if (nl > 12) nl = 12;
         memcpy(nom, gScripted[mejor]->name.c_str(), nl); nom[nl] = 0;
-        p += sprintf(p, "%s%s:%d", k ? " " : "", nom, (int)(mms / frames + 0.5));
+        const int quedan = bufLen - (int)(p - buf);
+        const int escritos = snprintf(p, (size_t)quedan, "%s%s:%d",
+                                      k ? " " : "", nom, (int)(mms / frames + 0.5));
+        if (escritos < 0) break;
+        if (escritos >= quedan) { p = buf + bufLen - 1; break; }
+        p += escritos;
         gLuaMsAcum[mejor] = 0.0;
     }
     for (size_t i = 0; i < gLuaMsAcum.size(); i++) gLuaMsAcum[i] = 0.0;
