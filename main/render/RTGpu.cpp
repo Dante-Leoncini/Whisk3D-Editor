@@ -324,6 +324,7 @@ static BufG gB[BCant];
 static int gW = 0, gH = 0, gNLuces = 0, gNNodos = 0;
 static bool gTransp = false;
 static float gBg[3] = { 0, 0, 0 };
+static int gEnvMat = -1;   // el material extra del fondo 360 (-1 = el color)
 static VkDescriptorSet gSet = VK_NULL_HANDLE;
 template <class T> static bool SubirVec(BufG& b, const std::vector<T>& v) { return SubirA(b, v.empty() ? (const void*)&gBg : (const void*)&v[0], v.size() * sizeof(T)); }
 // ---- LAS ESTRUCTURAS DE ACELERACION (con los nucleos de trazado): la escena entera es UN BLAS (los triangulos en el
@@ -400,6 +401,7 @@ bool RTGpuCargarEscena(const RTGpuEscena& e) {
     gNLuces = (int)(e.luces.size() / 20); gNNodos = (int)(e.nodos.size() / 12);
     gTransp = e.hayTransparentes;
     gBg[0] = e.bg[0]; gBg[1] = e.bg[1]; gBg[2] = e.bg[2];
+    gEnvMat = e.envMat;
     gSet = VK_NULL_HANDLE;   // (los buffers pudieron cambiar)
     return true;
 }
@@ -450,14 +452,16 @@ static bool SetTrazar() {
     return true;
 }
 struct PCTrazar { float camPos[4], camDer[4], camArr[4], camAdel[4]; int dims[4], info[4]; float bg[4], lente[4]; };
-bool RTGpuPase(const RTGpuCamara& c, int paso, int samples, bool aov, int capas) {
+bool RTGpuPase(const RTGpuCamara& c, int paso, int samples, bool aov, int capas, int rebotes) {
     if (gEstado != 1 || !gW || !SetTrazar()) return false;
     PCTrazar pc;
     for (int k = 0; k < 3; k++) { pc.camPos[k] = c.pos[k]; pc.camDer[k] = c.der[k]; pc.camArr[k] = c.arr[k]; pc.camAdel[k] = c.adel[k]; pc.bg[k] = gBg[k]; }
     pc.camPos[3] = c.sx; pc.camDer[3] = c.sy; pc.camArr[3] = c.zoom; pc.camAdel[3] = c.orto ? 1.0f : 0.0f; pc.bg[3] = c.lente;
     pc.lente[0] = c.panX; pc.lente[1] = c.panY; pc.lente[2] = (float)(c.semilla & 0xFFFFFu); pc.lente[3] = c.foco;
-    pc.dims[0] = gW; pc.dims[1] = gH; pc.dims[2] = paso; pc.dims[3] = samples;
-    pc.info[0] = gNLuces; pc.info[1] = gNNodos; pc.info[2] = gTransp ? (capas < 1 ? 1 : capas) : 0; pc.info[3] = aov ? 1 : 0;
+    // (las muestras y los REBOTES de la luz en el mismo entero: el bloque de 128 bytes esta lleno)
+    pc.dims[0] = gW; pc.dims[1] = gH; pc.dims[2] = paso; pc.dims[3] = (samples & 255) | ((rebotes & 255) << 8);
+    pc.info[0] = gNLuces; pc.info[1] = gNNodos; pc.info[2] = gTransp ? (capas < 1 ? 1 : capas) : 0;
+    pc.info[3] = (aov ? 1 : 0) | ((gEnvMat + 1) << 1);   // (el denoiser y el material del fondo 360 + 1, juntos)
     VkCommandBuffer cb = Empezar();
     vkCmdBindPipeline_(cb, VK_PIPELINE_BIND_POINT_COMPUTE, gPipeTrazar);
     vkCmdBindDescriptorSets_(cb, VK_PIPELINE_BIND_POINT_COMPUTE, gLayTrazar, 0, 1, &gSet, 0, 0);
@@ -589,7 +593,7 @@ bool RTGpuCargarEscena(const RTGpuEscena&) { return false; }
 bool RTGpuImagen(int, int) { return false; }
 bool RTGpuActualizarGeometria(const std::vector<float>&, const std::vector<float>&) { return false; }
 bool RTGpuActualizarLuces(const std::vector<float>&) { return false; }
-bool RTGpuPase(const RTGpuCamara&, int, int, bool, int) { return false; }
+bool RTGpuPase(const RTGpuCamara&, int, int, bool, int, int) { return false; }
 bool RTGpuLeer(unsigned char*, float*, float*, float*, int) { return false; }
 bool RTGpuDenoisear(const float*, const float*, const float*, int, int, float*, std::string* err) { if (err) *err = "sin GPU"; return false; }
 bool RTGpuDenoisearLoAcumulado(int) { return false; }

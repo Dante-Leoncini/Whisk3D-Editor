@@ -78,5 +78,7 @@ extern void (*W3dCambiosNuevoHook)();
 extern bool (*W3dCambiosGuardarHook)();   // false = no se guardo (no sigue)
 // modo harness: el cartel no se muestra nunca (el comando 'cambios' lo consulta y lo prueba)
 extern bool g_w3dCambiosSinCartel;
+// el cartel "Se perderan los cambios en:" esta APAGADO en el producto (pedido del dueno); el harness lo prende para probarlo
+extern bool g_w3dCambiosCartelActivo;
 
 #endif

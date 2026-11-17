@@ -7,8 +7,10 @@ Las imagenes de la ficha de Whisk3D en GOOGLE PLAY, generadas con el editor de v
     captura-01..08.png           las capturas de pantalla (1920x1080, 16:9)
 
 Uso:
-    python3 tools/capturas/play.py [carpeta]          (por defecto ~/Escritorio/google-play)
+    python3 tools/capturas/play.py [carpeta]          (por defecto ~/Escritorio/google-play): todo, en los 9 idiomas
     python3 tools/capturas/play.py [carpeta] render   solo las que tienen "render" en el nombre
+    python3 tools/capturas/play.py [carpeta] --idiomas=en,pt   solo esos idiomas
+Cada idioma va en su carpeta ("en-US English"...: el codigo de la ficha de Play) con las capturas y el destacado.
 
 Necesita el build de Linux (o W3D_BIN), Pillow y Google Chrome (el icono sale del .svg con Chrome sin ventana).
 Las escenas se arman con los comandos del harness (main/test/W3dCapturas.cpp): 'vista3d trazado' (el trazado de
@@ -28,6 +30,31 @@ EJEMPLOS = os.path.join(RAIZ, "examples", "assets")
 W, H, ESCALA = 1920, 1080, 3       # 16:9; escala 3 = como se ve en un telefono (se lee en las miniaturas de Play)
 
 
+# los IDIOMAS del editor (capturas.IDIOMAS) con su codigo de Google Play y el nombre de su carpeta
+IDIOMAS_PLAY = [("es", "es-419", "Español"), ("en", "en-US", "English"), ("pt", "pt-BR", "Português"),
+                ("fr", "fr-FR", "Français"), ("it", "it-IT", "Italiano"), ("tr", "tr-TR", "Türkçe"),
+                ("de", "de-DE", "Deutsch"), ("pl", "pl-PL", "Polski"), ("ru", "ru-RU", "Русский")]
+
+# los nombres de los objetos de las escenas, en cada idioma (los de la escena de fabrica los traduce el editor)
+NOMBRES = {
+    "es": dict(pelota="Pelota", piso="Piso", esfera="Esfera", oro="Oro", dron="Dron"),
+    "en": dict(pelota="Ball", piso="Floor", esfera="Sphere", oro="Gold", dron="Drone"),
+    "pt": dict(pelota="Bola", piso="Chão", esfera="Esfera", oro="Ouro", dron="Drone"),
+    "fr": dict(pelota="Balle", piso="Sol", esfera="Sphère", oro="Or", dron="Drone"),
+    "it": dict(pelota="Palla", piso="Pavimento", esfera="Sfera", oro="Oro", dron="Drone"),
+    "tr": dict(pelota="Top", piso="Zemin", esfera="Küre", oro="Altın", dron="Dron"),
+    "de": dict(pelota="Ball", piso="Boden", esfera="Kugel", oro="Gold", dron="Drohne"),
+    "pl": dict(pelota="Piłka", piso="Podłoga", esfera="Kula", oro="Złoto", dron="Dron"),
+    "ru": dict(pelota="Мяч", piso="Пол", esfera="Сфера", oro="Золото", dron="Дрон"),
+}
+
+
+def guion(idioma, w, h, esc):
+    g = Guion(idioma, w=w, h=h, escala=esc)
+    g.nombres = dict(NOMBRES[idioma], cubo=T(idioma, "Cube"), luz=T(idioma, "Light"))
+    return g
+
+
 def guardar(g, ruta):
     g.sin_puntero()
     g.foto(puntero=False)
@@ -35,7 +62,8 @@ def guardar(g, ruta):
     print("  ", os.path.basename(ruta))
 
 
-def lineas(g, texto, nombres=None):
+def lineas(g, texto):
+    nombres = getattr(g, "nombres", None)   # ({cubo}, {pelota}...: los nombres en el idioma del guion)
     if nombres:
         texto = texto.format(**nombres)
     for l in texto.strip().split("\n"):
@@ -99,7 +127,7 @@ def icono(carpeta):
 # ---- las escenas -----------------------------------------------------------------------------------------------------------
 def escena_animacion(idioma="es", w=W, h=H, esc=ESCALA):
     """Una pelota que pica (con estirar y aplastar) y la Linea de tiempo grande en el editor de CURVAS."""
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     lineas(g, """
         selobj {cubo}
         delete
@@ -148,13 +176,36 @@ def escena_animacion(idioma="es", w=W, h=H, esc=ESCALA):
     return g
 
 
+COMENTARIOS = {
+    "es": ("Personaje: camina con las flechas, salta con Espacio", "y junta las monedas que toca su hitbox",
+           "velocidad vertical (el salto)", "salto: sube, la gravedad lo baja y no pasa del piso"),
+    "en": ("Character: walks with the arrows, jumps with Space", "and collects the coins its hitbox touches",
+           "vertical speed (the jump)", "jump: goes up, gravity brings it down, never below the floor"),
+    "pt": ("Personagem: anda com as setas, pula com Espaço", "e junta as moedas que o seu hitbox toca",
+           "velocidade vertical (o pulo)", "pulo: sobe, a gravidade o traz de volta e não passa do chão"),
+    "fr": ("Personnage : marche avec les flèches, saute avec Espace", "et ramasse les pièces que touche sa hitbox",
+           "vitesse verticale (le saut)", "saut : il monte, la gravité le fait redescendre, jamais sous le sol"),
+    "it": ("Personaggio: cammina con le frecce, salta con Spazio", "e raccoglie le monete che tocca la sua hitbox",
+           "velocità verticale (il salto)", "salto: sale, la gravità lo riporta giù e non passa il pavimento"),
+    "tr": ("Karakter: oklarla yürür, Boşluk ile zıplar", "ve hitbox'ının dokunduğu paraları toplar",
+           "dikey hız (zıplama)", "zıplama: yükselir, yerçekimi indirir, zeminin altına geçmez"),
+    "de": ("Figur: läuft mit den Pfeiltasten, springt mit Leertaste", "und sammelt die Münzen, die ihre Hitbox berührt",
+           "vertikale Geschwindigkeit (der Sprung)", "Sprung: steigt, die Schwerkraft zieht sie runter, nie unter den Boden"),
+    "pl": ("Postać: chodzi strzałkami, skacze Spacją", "i zbiera monety, których dotknie jej hitbox",
+           "prędkość pionowa (skok)", "skok: wznosi się, grawitacja ściąga w dół, nie schodzi pod podłogę"),
+    "ru": ("Персонаж: ходит стрелками, прыгает пробелом", "и собирает монеты, которых касается его хитбокс",
+           "вертикальная скорость (прыжок)", "прыжок: вверх, гравитация тянет вниз, не ниже пола"),
+}
+
+
 def escena_codigo(idioma="es", w=W, h=H, esc=ESCALA):
     """El Editor de scripts con el script de un personaje (del manual de Lua) y sus propiedades en el panel."""
-    codigo = """-- Personaje: camina con las flechas, salta con Espacio
--- y junta las monedas que toca su hitbox
+    c = COMENTARIOS[idioma]
+    codigo = """-- %s
+-- %s
 propiedades = { velocidad = 4, salto = 6 }
 
-local vz = 0        -- velocidad vertical (el salto)
+local vz = 0        -- %s
 local monedas = 0
 
 function actualizar(dt)
@@ -167,7 +218,7 @@ function actualizar(dt)
   if tecla("abajo")     then dy = dy + 1 end
   mover(yo_, dx * v * dt, dy * v * dt, 0)
 
-  -- salto: sube, la gravedad lo baja y no pasa del piso
+  -- %s
   local x, y, z = posicion(yo_)
   if teclaApretada("espacio") and z <= 0 then
     vz = propiedad("salto")
@@ -186,9 +237,9 @@ function alEntrar(otro, miHitbox, suHitbox)
     sonido("sonidos/moneda.wav")
   end
 end
-"""
+""" % c
     d = rs.proyecto(idioma, codigo=codigo, archivo="personaje.lua")
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     g.linea("abrirw3d " + os.path.join(d, "girar.w3d"))
     lineas(g, """
         timeline pause
@@ -212,7 +263,7 @@ end
 
 def escena_render(idioma="es", w=W, h=H, esc=ESCALA, oro=True):
     """El TRAZADO DE RAYOS adentro de la Vista 3D: sombras suaves y una esfera de oro que refleja."""
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     lineas(g, """
         selobj {cubo}
         objpos 0.3 1 -2
@@ -268,7 +319,7 @@ def escena_render(idioma="es", w=W, h=H, esc=ESCALA, oro=True):
 
 def escena_modelado(idioma="es", w=W, h=H, esc=ESCALA, pestania=4):
     """Un jarron hecho con extruir y escalar sobre un cubo con Subdivision Surface, en el Modo Edicion."""
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     lineas(g, """
         selobj {cubo}
         matnew
@@ -307,7 +358,7 @@ def escena_modelado(idioma="es", w=W, h=H, esc=ESCALA, pestania=4):
 
 def escena_uv(idioma="es", w=W, h=H, esc=ESCALA):
     """Una cabeza de mono con la textura de prueba y sus islas UV (Smart UV Project) en el Editor UV."""
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     g.linea("selobj " + T(idioma, "Cube"))
     g.linea("delete")
     g.linea("import " + os.path.join(EJEMPLOS, "monkey.obj"))
@@ -342,7 +393,7 @@ def escena_uv(idioma="es", w=W, h=H, esc=ESCALA):
 
 def escena_pintura(idioma="es", w=W, h=H, esc=ESCALA):
     """Pintura de vertices: una pelota con trazos de colores (arrastrando el pincel, como una persona)."""
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     lineas(g, """
         selobj {cubo}
         delete
@@ -383,7 +434,7 @@ def escena_pintura(idioma="es", w=W, h=H, esc=ESCALA):
 
 def escena_modificadores(idioma="es", w=W, h=H, esc=ESCALA):
     """Los MODIFICADORES DE CURVA: un dron que flota, con Ruido en su altura (la curva con su ruido, en el timeline)."""
-    g = Guion(idioma, w=w, h=h, escala=esc)
+    g = guion(idioma, w, h, esc)
     lineas(g, """
         selobj {cubo}
         objname {dron}
@@ -451,18 +502,33 @@ CAPTURAS = [
 
 
 def main(argv):
-    carpeta = os.path.expanduser(argv[1]) if len(argv) > 1 else os.path.expanduser("~/Escritorio/google-play")
-    filtro = argv[2] if len(argv) > 2 else ""
+    """play.py [carpeta] [filtro] [--idiomas es,en,...]: una carpeta por idioma ("en-US English"...) con el destacado y
+    las 8 capturas; el icono (el mismo para todos) va afuera."""
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    idiomas = [i for i, _, _ in IDIOMAS_PLAY]
+    for a in argv[1:]:
+        if a.startswith("--idiomas="):
+            idiomas = a.split("=", 1)[1].split(",")
+    carpeta = os.path.expanduser(args[0]) if args else os.path.expanduser("~/Escritorio/google-play")
+    filtro = args[1] if len(args) > 1 else ""
     os.makedirs(carpeta, exist_ok=True)
     if not filtro or "icono" in filtro:
         icono(carpeta)
-    if not filtro or "destacado" in filtro:
-        # el elemento grafico destacado: el trazado de rayos, a 1024x500 (escala 2)
-        guardar(escena_render(1024, 500, 2, oro=False), os.path.join(carpeta, "destacado-1024x500.png"))
-    for nombre, fn in CAPTURAS:
-        if filtro and filtro not in nombre:
+        if filtro == "icono":
+            return
+    for idioma, codigo, nombre in IDIOMAS_PLAY:
+        if idioma not in idiomas:
             continue
-        guardar(fn(), os.path.join(carpeta, nombre))
+        sub = os.path.join(carpeta, "%s %s" % (codigo, nombre))
+        os.makedirs(sub, exist_ok=True)
+        print(sub)
+        if not filtro or "destacado" in filtro:
+            # el elemento grafico destacado: el trazado de rayos, a 1024x500 (escala 2)
+            guardar(escena_render(idioma, 1024, 500, 2, oro=False), os.path.join(sub, "destacado-1024x500.png"))
+        for archivo, fn in CAPTURAS:
+            if filtro and filtro not in archivo:
+                continue
+            guardar(fn(idioma), os.path.join(sub, archivo))
 
 
 if __name__ == "__main__":

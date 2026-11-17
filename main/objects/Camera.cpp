@@ -86,6 +86,17 @@ static RegistrarHooksCamara gRegistrarHooksCamara;
 
 // ------------------- MÉTODOS -------------------
 
+Vector3 CamaraRotMirando(const Vector3& desde, const Vector3& hacia) {
+    Vector3 d = hacia - desde;
+    if (d.Length() < 1e-6f) return Vector3(0, 0, 0);
+    d = d.Normalized();
+    // con R = Ry(yaw) * Rx(pitch), el -Z local termina en (-cos p sin y, sin p, -cos p cos y)
+    const float aGrados = 180.0f / 3.14159265f;
+    const float pitch = asinf(d.y < -1.0f ? -1.0f : d.y > 1.0f ? 1.0f : d.y) * aGrados;
+    const float yaw = atan2f(-d.x, -d.z) * aGrados;
+    return Vector3(pitch, yaw, 0.0f);
+}
+
 Camera::Camera(Object* parent, Vector3 pos, Vector3 Rot)
     : Object(parent, T("Camera"), pos, Rot), offsetRiel(0), Riel(NULL), rielNodo(-1.0f),
       usarRotacionDelRiel(false), rielIndice(-1.0f),

@@ -17,6 +17,7 @@ Una **cámara** es un punto de vista puesto en la escena. La **cámara activa** 
 
 | Propiedad | Qué hace |
 |---|---|
+| Cámara activa ◆ | Tildada, esta cámara es la activa (la del juego y los renders); tildarla en otra cámara la cambia. Es lo mismo que la tarjeta **Cámara activa** de la pestaña Animación: su rombo pone un **corte** con esta cámara en el frame actual. Destildarla deja la escena sin cámara activa. |
 | Ortográfica | Sin perspectiva: lo lejano no se achica y las líneas paralelas no se juntan. Ver [Perspectiva y ortográfica](../tutoriales/navegacion.md#perspectiva-y-ortográfica). |
 | FOV ◆ | El ángulo de visión, en grados (de arriba abajo). Más chico es como un teleobjetivo: entra menos y se ve más de cerca. Más grande es un gran angular: entra más y la perspectiva se exagera. Arranca en 45. |
 | Cerca ◆ | La distancia mínima de dibujado: lo que está más cerca de la cámara no se dibuja. Arranca en 0.01. |
@@ -50,8 +51,8 @@ La escena puede tener varias cámaras, pero una sola activa. Para cambiarla:
 |---|---|
 | ![PC](../tutoriales/img/icono-pc.svg) PC | Seleccionar la cámara y <kbd>Ctrl</kbd> + <kbd>Num 0</kbd> |
 | Menú | Vista → Cámaras → Objeto Activo como Cámara |
-| Propiedades | Pestaña Animación → tarjeta **Cámara activa** |
+| Propiedades | Pestaña de la cámara → tarjeta Cámara → **Cámara activa**, o pestaña Animación → tarjeta **Cámara activa** |
 
-En la tarjeta Cámara activa, el rombo arma **cortes de cámara**: pasar de una cámara a otra en un frame. Ver [Línea de tiempo](linea-de-tiempo.md).
+En la tarjeta Cámara activa, el rombo arma **cortes de cámara**: pasar de una cámara a otra en un frame. Ver [Línea de tiempo](linea-de-tiempo.md). El rombo de la casilla **Cámara activa** de cada cámara es el mismo: blanco si esa cámara no tiene cortes, verde oscuro si tiene alguno y verde en el frame de un corte suyo. Mientras no haya cortes, la cámara activa se cambia cuando quieras y ningún rombo se pinta.
 
 Para mirar por la cámara activa y acomodar la toma navegando, ver [La cámara activa](../tutoriales/navegacion.md#la-cámara-activa) en el tutorial de navegación.

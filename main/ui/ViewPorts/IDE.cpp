@@ -1,4 +1,5 @@
 #include "io/W3dWeb.h"   // navegador: guardar = descargar
+#include "ViewPorts/PopUp/NumPad.h"   // TecladoTextoAbrir / TecladoNumeroAbrir: el teclado en pantalla (Ajustes)
 #include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "ViewPorts/PopUp/ConfirmarPopup.h"   // Guardar/Refresh preguntan antes de pisar o descartar
 #include "ViewPorts/PopUp/BuscarPopup.h"      // Buscar/Reemplazar: lo que se resalta
@@ -1215,7 +1216,7 @@ void IDE::ClickContenido(int mx, int my, bool shift) {
     // TACTIL (Android): el teclado del celular NO aparece solo. En PC SDL deja la entrada de texto prendida desde
     // el arranque; en Android hay que pedirlo. Un TAP sobre el codigo lo levanta (como los campos de texto del panel).
 #ifndef W3D_SYMBIAN
-    { extern bool g_uiTapEnCurso; if (g_uiTapEnCurso) W3dTecladoAbrir(); }
+    { extern bool g_uiTapEnCurso; if (g_uiTapEnCurso) TecladoIDEAbrir(this); }
 #endif
     g_redraw = true;
 }

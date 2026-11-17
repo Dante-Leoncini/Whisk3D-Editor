@@ -54,6 +54,7 @@ static int W3dWebEscalaUI(int escalaConfig) {
 #include "lectura-escritura.h"      // abrir(): dialogo + ImportOBJ
 #include "ViewPorts/PopUp/FileBrowser.h" // explorador de archivos COMPARTIDO
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
+#include "ViewPorts/PopUp/ConfirmarPopup.h" // Android: "Atras" pregunta si cerrar Whisk3D
 #include "W3dDock.h"                       // barra de progreso en el icono del dock (Linux; no-op en el resto)
 #include "io/CompilarJuego.h"            // build de juegos en 2do plano (Tick + barra overlay)
 #include "io/W3dContenedor.h"            // W3dImportarAsset: importar = copiar adentro del .w3d
@@ -491,6 +492,20 @@ static SDL_Window* CrearVentanaVulkan(const char* titulo, int w, int h, Uint32 f
 #endif
 
 // Función simple para leer el ini
+#ifdef __ANDROID__
+// el archivo ENTERO de un SDL_RWops, terminado en 0 (y lo cierra). Sin SDL_RWsize: en el SDL 2.0.7 del APK de Android 2.3
+// da -1 con un archivo comun (el config.ini del usuario, no los del APK): el buffer quedaba vacio, SDL_RWread copiaba el
+// archivo a un puntero nulo y el editor se cerraba al arrancar (el Galaxy Ace, apenas se guardaba algo en Ajustes)
+static std::vector<char> W3dLeerRW(SDL_RWops* rw) {
+    std::vector<char> b;
+    char trozo[4096];
+    size_t n;
+    while ((n = SDL_RWread(rw, trozo, 1, sizeof(trozo))) > 0) b.insert(b.end(), trozo, trozo + n);
+    SDL_RWclose(rw);
+    b.push_back(0);
+    return b;
+}
+#endif
 Config loadConfig(const std::string& filename) {
     Config cfg;
 
@@ -517,10 +532,7 @@ Config loadConfig(const std::string& filename) {
             return cfg;
         }
 
-        Sint64 size = SDL_RWsize(rw);
-        std::vector<char> buffer(size + 1, 0);
-        SDL_RWread(rw, buffer.data(), 1, size);
-        SDL_RWclose(rw);
+        std::vector<char> buffer = W3dLeerRW(rw);
 
         std::istringstream iss(buffer.data());
     #else
@@ -556,6 +568,7 @@ Config loadConfig(const std::string& filename) {
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
             else if (key == "repoPath") cfg.repoPath = value;   // raiz del repo para Compilar (editor instalado)
             else if (key == "logs") cfg.logs = std::stoi(value);   // nivel de los logs del editor (Ajustes > Logs)
+            else if (key == "tecladoSistema") cfg.tecladoSistema = (value == "true" || value == "1");   // Ajustes > teclado
             else if (key == "idioma") {
                 // "auto" (o ausente) = seguir al sistema. Cualquier otra cosa FUERZA ese idioma.
                 if (value != "auto" && !value.empty()) { g_idioma = W3dIdiomaDe(value.c_str()); g_idiomaForzado = true; }
@@ -611,10 +624,7 @@ bool loadColors(const std::string& filename) {
             return false;
         }
 
-        Sint64 size = SDL_RWsize(rw);
-        std::vector<char> buffer(size + 1, 0);
-        SDL_RWread(rw, buffer.data(), 1, size);
-        SDL_RWclose(rw);
+        std::vector<char> buffer = W3dLeerRW(rw);
 
         fileStream.str(buffer.data());
     #else
@@ -727,6 +737,10 @@ bool g_didRender = false; // el ultimo MainLoopFrame DIBUJO? -> el loop de escri
 // los cambios en:" en vez de salir; el cartel sale (o guarda y sale) con estos ganchos
 static void CambiosSalir() { running = false; }
 static void CambiosAbrir(const std::string& ruta) { extern std::string g_proyAbrirPendiente; g_proyAbrirPendiente = ruta; g_redraw = true; }
+#ifdef __ANDROID__
+// "Cerrar" en la pregunta de ATRAS (sin nada sin guardar): se cierra
+static void AtrasCerrarConfirmado() { running = false; }
+#endif
 static bool CambiosGuardar() {
     extern std::string w3dPath;
     extern bool GuardarW3D(const std::string&);
@@ -750,7 +764,26 @@ static bool EventoBloqueadoAlCompilar(const SDL_Event& e) {
         default: return false;
     }
 }
+// LA VENTANA REPARTIDA: el layout y el area de los popups (MenuPantalla*) van en lo que NO tapa un teclado. El del
+// sistema achica la ventana (Android con adjustResize) o la tapa sin achicarla (en pantalla completa: lo avisa Java,
+// W3dTecladoTapado); el de Whisk3D abierto para el IDE se queda abajo y el IDE maximizado arriba. W3dPantallaAlto
+// sigue siendo el alto de la ventana (las cuentas de GL)
+static void VentanaReacomodar() {
+    const int tapado = W3dTecladoTapado();
+    const int hUtil = winH - tapado;
+    W3dTecladoRedimension(winW, winH, tapado);   // un teclado del sistema abierto -> maximizar el viewport que lo pidio
+    W3dPantallaAlto = winH;
+    MenuPantallaW = winW;
+    MenuPantallaH = hUtil;
+    if (rootViewport) rootViewport->Resize(winW, hUtil - W3dTecladoIDEAltoActual());
+    // el TELEFONO girado: el layout de la otra orientacion (cada una tiene el suyo: LayoutInput.cpp). Con un teclado
+    // abierto no: la parte de arriba de un telefono parado puede ser mas ancha que alta y no se giro nada
+    if (!W3dTecladoVisible() && !W3dTecladoIDEAltoActual()) { extern void LayoutTamanoPantalla(int, int); LayoutTamanoPantalla(winW, winH); }
+}
+
 static void ProcesarEvento(SDL_Event& e) {
+    // lo que tapa el teclado del sistema cambio (Android en pantalla completa: ver W3dTecladoTapado)
+    if (W3dTecladoEsEvento(e)) { VentanaReacomodar(); g_redraw = true; return; }
     {   extern bool CompilarJuegoEnCurso();
         if (CompilarJuegoEnCurso() && EventoBloqueadoAlCompilar(e)) {
             if (e.type == SDL_QUIT) { extern void Notificar(const std::string&, bool); Notificar(T("Wait for the build to finish"), false); }
@@ -791,6 +824,23 @@ static void ProcesarEvento(SDL_Event& e) {
 #endif
         return;
     }
+#ifdef __ANDROID__
+    // ATRAS (la tecla o el gesto de Android; SDL la atrapa: SDL_HINT_ANDROID_TRAP_BACK_BUTTON). Con algo abierto (un
+    // menu, un cartel, la pantalla de inicio) lo cierra, como Esc. Si no, es CERRAR LA VENTANA de la PC: con algo sin
+    // guardar, el cartel de lo no guardado (guardar y salir / salir sin guardar / cancelar); sin nada, pregunta si cerrar
+    // Whisk3D. Aca SI se puede preguntar: lo pide el usuario desde el editor (el que no espera es el cierre del SISTEMA,
+    // el SDL_QUIT de arriba). (Antes Android mandaba la app al fondo y no se cerraba nunca)
+    if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && e.key.keysym.sym == SDLK_AC_BACK) {
+        if (e.type == SDL_KEYUP || e.key.repeat) return;
+        if (PopUpActive) PopUpActive->Tecla(LayoutKey::Cancel);
+        else if (!W3dCambiosPreguntar(W3D_CAMBIOS_SALIR, std::string())) {
+            if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+            confirmarPopup->Preguntar(T("Close Whisk3D?"), T("Close"), T("Cancel"), AtrasCerrarConfirmado, NULL);
+        }
+        g_redraw = true;
+        return;
+    }
+#endif
 #if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
     // un ARCHIVO soltado desde el explorador del sistema (Windows / Linux / Mac): al viewport que queda bajo el puntero
     // (el 3D importa el modelo o le pone la imagen a la malla; la biblioteca lo guarda en el proyecto: ver
@@ -819,11 +869,7 @@ static void ProcesarEvento(SDL_Event& e) {
 #endif
         winW = e.window.data1;
         winH = e.window.data2;
-        W3dTecladoRedimension(winW, winH);   // Android: el teclado achica la ventana -> maximizar el viewport que lo pidio
-        W3dPantallaAlto = winH;
-        MenuPantallaW = winW;
-        MenuPantallaH = winH;
-        rootViewport->Resize(winW, winH);
+        VentanaReacomodar();
     } else {
         InputUsuarioSDL3(e);
     }
@@ -844,15 +890,8 @@ static void MainLoopFrame() {
 #endif
     // apertura de proyecto DIFERIDA (tarjeta Archivo): se procesa aca, con el
     // stack limpio, porque el boton que la pidio vive en el layout a destruir
-    {
-        extern std::string g_proyAbrirPendiente;
-        extern void AbrirProyectoAhora(const std::string&);
-        if (!g_proyAbrirPendiente.empty()) {
-            std::string r = g_proyAbrirPendiente;
-            g_proyAbrirPendiente.clear();
-            AbrirProyectoAhora(r);
-        }
-    }
+    // (y el NUEVO PROYECTO de la tarjeta Archivo / la pantalla de inicio, igual: import_w3d.cpp)
+    { extern void ProcesarProyectoPendiente(); ProcesarProyectoPendiente(); }
     Contadores();
     // EL TITULO de la ventana dice el proyecto y un '*' si hay algo sin guardar (cada medio segundo: listar lo
     // sucio recorre la biblioteca)
@@ -1200,11 +1239,14 @@ static void MainLoopFrame() {
 #ifdef W3D_PSP
         w3dEngine::GuCuadroEmpezar();                      // (la PSP: la lista del GE de este cuadro)
 #endif
+        { extern void TecladosVigilar(); TecladosVigilar(); }   // (el teclado de Whisk3D del IDE se fue: el IDE vuelve)
         if (rootViewport){
             rootViewport->Render();
         }
         // popups y desplegables (los dibuja el modulo compartido)
         LayoutRenderMenu(winW, winH);
+        { extern void TecladoSistemaCampoRender(); TecladoSistemaCampoRender(); }   // el campo, arriba del teclado del sistema
+        { extern void CargaDedoRender(int, int); CargaDedoRender(winW, winH); }   // el circulo de carga de la pulsacion larga
         NotificacionesRender(winW, winH); // toasts ENCIMA de todo
         // barra del build de "Compilar juego": overlay NO modal (el MISMO widget que la
         // barra del export de modelos) anclado abajo; muestra la etapa + el porcentaje
@@ -1290,6 +1332,9 @@ int main(int argc, char* argv[]) {
     // a abrir se relanzaba main() con los globals C++ estaticos vivos -> ConstructUniversal duplicaba la escena (otro
     // cubo/camara/luz) y las texturas quedaban negras (contexto GL nuevo). Junto con launchMode=singleTask del manifest.
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
+    // ATRAS llega como tecla (SDLK_AC_BACK): la maneja ProcesarEvento (pregunta si cerrar). Sin esto Android la usaba
+    // para mandar la app al fondo
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
     // ICONO EN EL DOCK (Linux): GNOME matchea el app-id de la ventana contra el
@@ -1646,9 +1691,11 @@ int main(int argc, char* argv[]) {
     MenuPantallaW = winW;
     MenuPantallaH = winH;
     rootViewport->Resize(winW, winH);
+    { extern void LayoutTamanoPantalla(int, int); LayoutTamanoPantalla(winW, winH); }   // (la orientacion con la que arranca)
 
     // los ganchos del cartel de lo no guardado (salir, abrir otro proyecto, guardar)
     W3dCambiosSalirHook = CambiosSalir;
+    g_ventanaReacomodarHook = VentanaReacomodar;   // (los teclados de Whisk3D: el del IDE, ver NumPad.cpp)
     W3dCambiosAbrirHook = CambiosAbrir;
     W3dCambiosGuardarHook = CambiosGuardar;
     W3dCambiosFoto();   // el proyecto de arranque esta "guardado" (no hay nada que perder todavia)
@@ -1663,6 +1710,10 @@ int main(int argc, char* argv[]) {
             { const char* tmp = "/tmp/w3d_prueba_usuario"; mkdir(tmp, 0755); w3dFileSystem::SetUserDataDir(tmp); }   // (config.ini y demas del usuario: no se tocan)
             #endif
             { extern void W3dAtajosRutaFijar(const std::string&); W3dAtajosRutaFijar("/tmp/w3d_prueba_atajos.ini"); }   // (los atajos de fabrica; el atajos.ini del usuario no se toca)
+            { extern void W3dLayoutsRutaFijar(const std::string&); remove("/tmp/w3d_prueba_layouts.txt");   // (los layouts guardados
+              W3dLayoutsRutaFijar("/tmp/w3d_prueba_layouts.txt"); }                                        //  del usuario no se tocan)
+            { extern void W3dRecientesRutaFijar(const std::string&); remove("/tmp/w3d_prueba_recientes.txt");   // (los archivos recientes
+              W3dRecientesRutaFijar("/tmp/w3d_prueba_recientes.txt"); }                                         //  del usuario no se tocan; arranca vacia)
             { extern void W3dScriptSemillaFija(bool); W3dScriptSemillaFija(true); }   // (el mismo script juega siempre igual: las capturas se comparan)
             bool ok = W3dRunScript(argv[ai + 1]);
             SDL_Quit();
@@ -1727,6 +1778,20 @@ int main(int argc, char* argv[]) {
             ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1;
             PlayAnimation = true; g_redraw = true;
         }
+    }
+
+    // LA PANTALLA DE INICIO (ui/ViewPorts/PopUp/InicioPopup.h): arriba, con el engranaje girando, Nuevo archivo, los
+    // archivos recientes y Abrir... Solo si el editor arranco SIN un archivo (ni un .w3d por doble click o --open, ni
+    // un modelo, ni el modo juego): el que abrio algo ya sabe que quiere hacer
+    {
+        bool conArchivo = (argc > 1 && argv[1][0] != '-');
+        for (int ai = 1; ai < argc; ai++) {
+            const std::string a = argv[ai];
+            if (a == "--open" || a == "--juego") conArchivo = true;
+        }
+        extern std::string w3dPath;
+        extern bool g_modoJuego;
+        if (!conArchivo && w3dPath.empty() && !g_modoJuego) { extern void InicioPopupAbrir(); InicioPopupAbrir(); }
     }
 
 #ifdef __EMSCRIPTEN__

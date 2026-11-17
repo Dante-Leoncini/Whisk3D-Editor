@@ -587,10 +587,16 @@ static std::vector<std::string> g_sesSeleccion; // nombres de los objetos selecc
 // W3dRaices.h). "" = la del bloque. La seleccion de arriba es de ESA raiz.
 static std::string g_sesRaiz;
 static int g_sesRaizTipo = W3D_RAIZ_ESCENA;
+// QUE MIRABA LA LINEA DE TIEMPO si no era una animacion de escena ("animTipo": armature / objeto / armature2d /
+// flipbook; 0 = la de escena, que ya repone "animaciones"."activa"), de QUIEN (por nombre) y, en una malla, que clip
+static int g_sesAnimTipo = 0;
+static std::string g_sesAnimObjeto;
+static int g_sesAnimClip = -1;
 
 static void SesionReset() {
     g_sesFrame = -1; g_sesActivo.clear(); g_sesSeleccion.clear();
     g_sesRaiz.clear(); g_sesRaizTipo = W3D_RAIZ_ESCENA;
+    g_sesAnimTipo = 0; g_sesAnimObjeto.clear(); g_sesAnimClip = -1;
 }
 
 // APLICA lo leido. Se llama en el pie de AbrirW3D, con los nombres ya definitivos.
@@ -612,7 +618,21 @@ static void SesionAplicar() {
         w3dLogfW("[W3D] sesion: 'frame' vale %d, fuera de [0..%d] -> se acota", f, kFrameMax);
         f = kFrameMax;
     }
+#ifndef W3D_SIN_EDITOR
+    // la ANIMACION de la linea de tiempo va ANTES del frame: elegirla carga SU rango y acota el frame a el
+    extern bool g_animMix;
+    if (g_sesAnimTipo != 0 && !g_animMix) {
+        extern bool AnimSelRestaurar(int tipo, Object* o, const std::string& nombre, int clip);
+        Object* o = (!g_sesAnimObjeto.empty() && SceneCollection) ? FindObjectByName(SceneCollection, g_sesAnimObjeto) : NULL;
+        if (!AnimSelRestaurar(g_sesAnimTipo, o, g_sesAnimObjeto, g_sesAnimClip))
+            w3dLogfW("[W3D] sesion: la animacion de '%s' ya no esta -> queda la de escena", g_sesAnimObjeto.c_str());
+    }
+#endif
     CurrentFrame = f;
+#ifndef W3D_SIN_EDITOR
+    // la pose de ESE cuadro ya (como al arrastrar el cabezal): un clip de un juego deja a sus objetos en el estado base
+    if (g_sesAnimTipo != 0) { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
+#endif
     DeseleccionarTodo();
     ObjActivo = NULL;
     int perdidos = 0;
@@ -710,6 +730,19 @@ static UI* CargarUIProyecto(const std::string& ruta, const std::string& refRel =
 // con el pipeline probado del formato viejo (Tokenize + ParseNode + BuildLayout).
 // Un nombre corto ("2d", archivos guardados antes de que el layout vivo se
 // persistiera) o vacio cae al template estandar de siempre.
+#ifndef W3D_SIN_EDITOR
+// un arbol NUEVO de viewports desde el texto "Layout { ... }" (los layouts guardados del programa, el de cada orientacion
+// del telefono). No toca rootViewport: lo instala quien lo pide. NULL = el texto no arma nada
+ViewportBase* W3dLayoutDesdeTexto(const std::string& texto) {
+    if (texto.compare(0, 6, "Layout") != 0) return NULL;
+    std::vector<std::string> tokens = Tokenize(texto.c_str());
+    size_t i = 0;
+    Node* layout = ParseNode(tokens, i);
+    ViewportBase* r = (layout && !layout->children.empty()) ? BuildLayout(layout->children[0]) : NULL;
+    FreeNode(layout);
+    return r;
+}
+#endif
 static void AplicarLayoutTexto(const std::string& cual) {
 #ifdef W3D_SIN_EDITOR
     (void)cual;   // el juego compilado no tiene layout de viewports (ver W3D_SIN_EDITOR arriba)
@@ -3704,6 +3737,7 @@ static bool W3dMismoMaterial(const Material* v, const Material& n, const std::st
     if (v->lineas != n.lineas || !W3dMatCasi(v->grosorLinea, n.grosorLinea)) return false;
     if (v->porPixel != n.porPixel) return false;
     if (!W3dMatCasi(v->ior, n.ior) || !W3dMatCasi(v->transmision, n.transmision)) return false;
+    if (v->ssr != n.ssr) return false;
     if (v->shaderOn != n.shaderOn || v->shaderArchivo != n.shaderArchivo) return false;
     for (int k = 0; k < W3D_MAPAS; k++) if (v->uvMapa[k] != n.uvMapa[k] || v->mapaConTextura[k] != n.mapaConTextura[k]) return false;
     if (W3dMatRutaTex(v) != texPath) return false;
@@ -3725,7 +3759,7 @@ static void W3dCopiarMaterial(const Material& src, Material* dst) {
     dst->orden_pasada = src.orden_pasada; dst->mezcla = src.mezcla; dst->mezclaB = src.mezclaB; dst->toon = src.toon; dst->contorno = src.contorno;
     dst->lineas = src.lineas; dst->grosorLinea = src.grosorLinea;
     dst->porPixel = src.porPixel;
-    dst->ior = src.ior; dst->transmision = src.transmision;
+    dst->ior = src.ior; dst->transmision = src.transmision; dst->ssr = src.ssr;
     if (dst->shaderArchivo != src.shaderArchivo) { dst->shaderId = 0; dst->shaderEstado = 0; }   // (se compila al dibujar)
     dst->shaderOn = src.shaderOn; dst->shaderArchivo = src.shaderArchivo;
     for (int k = 0; k < W3D_MAPAS; k++) { dst->uvMapa[k] = src.uvMapa[k]; dst->mapaConTextura[k] = src.mapaConTextura[k]; }
@@ -3784,6 +3818,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
         // LINEAS (aristas por material). Ausentes en lo guardado hasta hoy -> default apagado.
         tmp.lineas        = JB(e, "lineas",           tmp.lineas);
         tmp.porPixel      = JB(e, "luzPorPixel",      tmp.porPixel);   // (ausente = por vertice)
+        tmp.ssr           = JB(e, "reflejosPantalla", tmp.ssr);        // (ausente = sin reflejos en pantalla)
         tmp.grosorLinea   = JF(e, "grosorLinea",      tmp.grosorLinea);
         if (tmp.grosorLinea < 1.0f) tmp.grosorLinea = 1.0f;
         if (tmp.orden_pasada < 0) tmp.orden_pasada = 0;
@@ -3973,7 +4008,9 @@ bool W3dLibRegistrarRecursos(const std::string& lib, JVal* raiz) {
 //  mano (el formato se vende como editable) meta cien mil escenas de animacion
 //  y deje el editor inusable sin un solo aviso.
 // ===========================================================================
-enum { kAnimMaxEscenas = 1024, kAnimMaxObjetos = 100000, kAnimMaxCurvas = 4096 };
+// (las ESCENAS de animacion: 1024 era poco -- un proyecto con mas perdia las que sobraban al abrir y el guardado
+//  siguiente ya no las escribia. 65536 sigue debajo de los ids especiales del selector (Properties.cpp, ANIM_ID_*))
+enum { kAnimMaxEscenas = 65536, kAnimMaxObjetos = 100000, kAnimMaxCurvas = 4096 };
 
 // BUSQUEDA POR NOMBRE RESPETANDO EL SCOPE. Los nombres son unicos POR ESCENA
 // (W3dNombreScopeDe), asi que buscar en todo el arbol podria devolver el widget
@@ -4530,6 +4567,7 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
             g_rt.obturadorPos = JI(t, "obturadorPos", g_rt.obturadorPos);
             if (g_rt.obturador < 0.01f) g_rt.obturador = 0.01f; if (g_rt.obturador > 1.0f) g_rt.obturador = 1.0f;
             if (g_rt.obturadorPos < 0 || g_rt.obturadorPos > 2) g_rt.obturadorPos = 0;
+            g_rt.rebotes = JI(t, "rebotes", g_rt.rebotes); if (g_rt.rebotes < 0) g_rt.rebotes = 0; if (g_rt.rebotes > 8) g_rt.rebotes = 8;
         }
         RTInvalidar();
     }
@@ -4562,13 +4600,10 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // config de la tarjeta Juego (opcional): modo ventana, orientacion, flags,
     // assets y plataforma del juego COMPILADO. Ausente = defaults del editor.
     AplicarCompilar(JHijo(raiz, "compilar", 4));
-    // RENDER (opcional): el rango propio de la secuencia (tarjeta Render). Ausente = el del timeline.
+    // RENDER (opcional): la tarjeta Render. (Su "inicio"/"fin"/"fps" de los .w3d viejos -un rango propio de la secuencia-
+    // se ignoran: el render usa el rango y los fps de la escena / animacion activa)
     {
-        extern float g_renderIni, g_renderFin, g_renderFps;
         JVal* rn = JHijo(raiz, "render", 4);
-        g_renderIni = rn ? JF(rn, "inicio", 0.0f) : 0.0f;
-        g_renderFin = rn ? JF(rn, "fin", 0.0f) : 0.0f;
-        g_renderFps = rn ? JF(rn, "fps", 0.0f) : 0.0f;
         // el resto de la tarjeta Render (g_render): lo que no esta, el valor de fabrica. La carpeta, si existe aca
         const W3dRenderOpc d;
         W3dRenderOpc r;
@@ -4584,6 +4619,22 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
             r.final = JB(rn, "final", d.final); r.finalAlfa = JB(rn, "finalAlfa", d.finalAlfa); r.post = JB(rn, "post", d.post);
             r.sonido = JB(rn, "sonido", d.sonido); r.audioFormato = JI(rn, "audio", d.audioFormato);
             r.audioKbps = JF(rn, "audioKbps", d.audioKbps);
+            // EL FONDO: color, color o textura 360, rotacion y las texturas de fondo (en orden: la pista animable las
+            // nombra por su lugar; una que no carga deja su lugar vacio)
+            { Vector3 f(0, 0, 0); JVec3(rn, "fondo", f); g_renderBg[0] = f.x; g_renderBg[1] = f.y; g_renderBg[2] = f.z; g_renderBg[3] = 1.0f; }
+            { Vector3 f(0, 0, 0); JVec3(rn, "fondoRot", f); g_renderBgRot[0] = f.x; g_renderBgRot[1] = f.y; g_renderBgRot[2] = f.z; }
+            g_renderBgModo = JI(rn, "fondoModo", 0) == 1 ? 1 : 0;
+            JVal* ft = JHijo(rn, "fondoTexturas", 5);
+            if (ft) {
+                for (size_t i = 0; i < ft->lista.size(); i++) {
+                    Texture* t = NULL;
+                    if (ft->lista[i] && ft->lista[i]->tipo == 2 && !ft->lista[i]->str.empty())
+                        t = TexturaTomar(RutaJson(ft->lista[i]->str, base));
+                    g_renderBgTexs.push_back(t);   // (con la referencia de TexturaTomar: la suelta W3dFondoLimpiar)
+                }
+                const int sel = JI(rn, "fondoTextura", 0);
+                g_renderBgTex = (sel >= 1 && sel <= (int)g_renderBgTexs.size()) ? g_renderBgTexs[(size_t)(sel - 1)] : NULL;
+            }
         }
         g_render = r;
         g_renderGen++;
@@ -4610,6 +4661,13 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
                 g_sesFrame = 0;
             }
             g_sesActivo = JS(ses, "activo", "");
+            {   // la animacion de la linea de tiempo (ausente = la de escena)
+                const std::string t = JS(ses, "animTipo", "");
+                g_sesAnimTipo = t == "armature" ? 1 : t == "objeto" ? 3 : t == "armature2d" ? 4 : t == "flipbook" ? 5 :
+                                t == "escena" ? 10 : 0;   // (10: una animacion de escena de un JUEGO, que abre en "Juego")
+                g_sesAnimObjeto = JS(ses, "animObjeto", "");
+                g_sesAnimClip = JI(ses, "animClip", -1);
+            }
             // la raiz que se estaba editando (ausente = la escena del bloque)
             g_sesRaiz = JS(ses, "raiz", "");
             g_sesRaizTipo = W3dRaizTipoDeClave(JS(ses, "raizTipo", "escena"), W3D_RAIZ_ESCENA);
@@ -5364,9 +5422,7 @@ void ReiniciarEscena() {
     extern bool SimActiva(); extern void SimStop();
     if (SimActiva()) SimStop();
     // la TARJETA RENDER es del proyecto: el que viene trae la suya (o los valores de fabrica)
-    { extern float g_renderIni, g_renderFin, g_renderFps;
-      g_renderIni = g_renderFin = g_renderFps = 0.0f;
-      g_render = W3dRenderOpc(); g_renderGen++; }
+    { g_render = W3dRenderOpc(); g_renderGen++; }
     g_w3dExternosFaltan.clear();   // (lo que faltaba es del proyecto de antes)
     // el STREAMING suelta lo que sus instancias retienen del almacen (antes de que el cierre olvide los recursos) y la
     // vista previa vuelve al default del proyecto nuevo
@@ -5378,7 +5434,11 @@ void ReiniciarEscena() {
     // Properties::ActualizarPestanias crasheaba al abrir un proyecto con una vertex anim
     // activa). Volver a modo ESCENA sin objetivo.
     { extern int ActiveAnimKind; extern Mesh* ActiveAnimMesh; extern Armature* ActiveAnimArm;
-      ActiveAnimKind = 0; ActiveAnimMesh = NULL; ActiveAnimArm = NULL; }
+      ActiveAnimKind = 0; ActiveAnimMesh = NULL; ActiveAnimArm = NULL;
+#ifndef W3D_SIN_EDITOR
+      { extern bool g_animEscenaElegidaEnJuego; g_animEscenaElegidaEnJuego = false; }
+#endif
+    }
     // salir de Edit Mode: abrir un proyecto en Edit Mode dejaba g_editMesh COLGANDO al
     // borrar la escena (mismo crash que ActiveAnimMesh). Volver a Modo Objeto sin malla.
     { extern int InteractionMode; extern Object* g_editMesh;
@@ -5453,6 +5513,9 @@ void ReiniciarEscena() {
     // Sin esto un proyecto NUEVO (que no pasa por CargarFlipbooksEscena) heredaba los del anterior y los guardaba
     SceneFlipbooksLimpiar();
 
+    // el FONDO del render (color, textura 360, rotacion): es del proyecto. Suelta sus texturas ANTES de liberar las de
+    // la escena (sus referencias las retenian)
+    W3dFondoLimpiar();
     // ---- TEXTURAS: liberar de verdad (reporte del dueno) ----------------------
     // Hasta hoy ReiniciarEscena() no tocaba `Textures` ni una vez: abrir un
     // proyecto tras otro dejaba TODAS las texturas del anterior en la GPU y en
@@ -5525,6 +5588,7 @@ void AbrirProyectoAhora(const std::string& ruta) {
     // import de modelos: el usuario ve que avanza (y si se traba, en que % quedo).
     extern void ProgresoIniciar(const std::string&); extern void ProgresoFin();
     ProgresoIniciar(T("Opening project..."));
+    { extern void InicioPopupCerrar(); InicioPopupCerrar(); }   // (la pantalla de inicio, si seguia abierta)
     ReiniciarEscena();
     // EL LAYOUT ANTERIOR SE LIBERA. Antes quedaba huerfano ("el viejo queda"): ~0,2 MB de heap
     // por apertura, fijos (las tarjetas del panel de propiedades, las barras...). El proyecto trae
@@ -5572,9 +5636,65 @@ std::string g_proyAbrirPendiente;
 // Hace que al abrir el proyecto se full-screene el viewport 3D (el juego se ve solo).
 bool g_modoJuego = false;
 void AbrirProyectoDesde(const std::string& ruta) {
-    // con algo SIN GUARDAR se pregunta primero ("Se perderan los cambios en:"); el cartel abre despues
+    // con algo SIN GUARDAR se pregunta primero ("Se perderan los cambios en:"); el cartel abre el proyecto si el usuario sigue
     { extern bool W3dCambiosPreguntar(int, const std::string&); if (W3dCambiosPreguntar(1 /*W3D_CAMBIOS_ABRIR*/, ruta)) return; }
     g_proyAbrirPendiente = ruta;
+    g_redraw = true;
+}
+
+// ===========================================================================
+//  NUEVO PROYECTO (tarjeta Archivo y la pantalla de inicio): la misma escena y el mismo layout con los que arranca el
+//  editor sin archivo (W3dCrearEscenaPorDefecto + LayoutPorDefecto), sin ruta. Como abrir, va DIFERIDO al inicio del
+//  proximo frame: el boton que lo pide vive en el layout que se reemplaza. Con algo SIN GUARDAR pregunta primero (el
+//  cartel "Se perderan los cambios en:", como abrir otro proyecto): guardar y seguir, seguir sin guardar o cancelar.
+// ===========================================================================
+bool g_proyNuevoPendiente = false;
+void NuevoProyectoAhora();
+// lo pedido por un boton (abrir / nuevo), con el stack limpio: el main al inicio de cada frame (y el harness)
+void ProcesarProyectoPendiente() {
+    if (!g_proyAbrirPendiente.empty()) {
+        const std::string r = g_proyAbrirPendiente;
+        g_proyAbrirPendiente.clear();
+        AbrirProyectoAhora(r);
+    }
+    if (g_proyNuevoPendiente) { g_proyNuevoPendiente = false; NuevoProyectoAhora(); }
+#ifndef W3D_SIN_EDITOR
+    { extern void LayoutProcesarPendiente(); LayoutProcesarPendiente(); }   // un layout elegido en el menu (LayoutInput.cpp)
+#endif
+}
+static void NuevoProyectoPendiente() {
+    g_proyNuevoPendiente = true;
+    g_redraw = true;
+}
+void NuevoProyectoDesde() {
+    extern void (*W3dCambiosNuevoHook)();
+    extern bool W3dCambiosPreguntar(int, const std::string&);
+    W3dCambiosNuevoHook = NuevoProyectoPendiente;   // (lo que hace el cartel si el usuario sigue)
+    if (W3dCambiosPreguntar(2 /*W3D_CAMBIOS_NUEVO*/, std::string())) return;
+    NuevoProyectoPendiente();
+}
+void NuevoProyectoAhora() {
+    { extern void InicioPopupCerrar(); InicioPopupCerrar(); }   // (la pantalla de inicio, si seguia abierta)
+    ReiniciarEscena();
+    ViewportBase* layoutViejo = LayoutRaizCompleta();
+    rootViewport = NULL;
+    w3dPath.clear();
+    W3dCompilarReset();   // la tarjeta Juego vuelve a los valores de fabrica (abrir los toma del archivo)
+    { extern void W3dCrearEscenaPorDefecto(); W3dCrearEscenaPorDefecto(); }
+    extern int MenuPantallaW, MenuPantallaH;
+    Viewport3D* vp3d = NULL;
+    rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, &vp3d);
+    if (rootViewport && MenuPantallaW > 0 && MenuPantallaH > 0) rootViewport->Resize(MenuPantallaW, MenuPantallaH);
+    // (lo mismo que AbrirProyectoAhora con el arbol nuevo: soltar el viejo y re-anclar los activos)
+    { extern void LayoutResetMaximizado(); LayoutResetMaximizado();
+      if (layoutViejo != rootViewport) ViewportBorrarArbol(layoutViejo);
+      LayoutAnclarActivos();
+      if (vp3d) viewPortActive = vp3d;
+      extern void (*LayoutArbolCambiado)(); if (LayoutArbolCambiado) LayoutArbolCambiado(); }
+    extern void ProyectoSincronizarCampos();
+    ProyectoSincronizarCampos();
+    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
+    { extern void W3dCambiosFoto(); W3dCambiosFoto(); }   // recien hecho: nada sin guardar
     g_redraw = true;
 }
 

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Leer texturas/modelos del almacenamiento (Descargas, etc.). READ_EXTERNAL_STORAGE
-         vale hasta API 32; en API 33+ para imagenes se usa READ_MEDIA_IMAGES. El pedido en
-         runtime lo hace la app (SDL_AndroidRequestPermission). -->
+    <!-- Leer texturas/modelos del almacenamiento (Descargas, etc.) en Android <=10: el pedido en runtime lo hace
+         main.cpp (SDL_AndroidRequestPermission, solo API<=29). Desde Android 11 todo pasa por MANAGE_EXTERNAL_STORAGE.
+         NO va READ_MEDIA_IMAGES: nadie lo pedia en runtime (no servia de nada; las texturas se leen con "All files
+         access") y Google Play obliga a justificar los permisos de fotos y videos o usar el selector de fotos. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- Escribir el OBJ/MTL exportado y el render PNG. WRITE_EXTERNAL_STORAGE es no-op
          en API 30+ (scoped storage); con requestLegacyExternalStorage vale en API<=29,
          que es donde el file browser escribe a /sdcard por fopen. -->

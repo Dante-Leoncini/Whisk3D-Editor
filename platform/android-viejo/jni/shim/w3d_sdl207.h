@@ -28,13 +28,31 @@ static inline SDL_GameControllerType SDL_GameControllerGetType(SDL_GameControlle
 
 #if !SDL_VERSION_ATLEAST(2, 0, 14)
 typedef struct { const char* language; const char* country; } SDL_Locale;
-static inline SDL_Locale* SDL_GetPreferredLocales(void) { return NULL; }
+// EL IDIOMA DEL SISTEMA (SDL 2.0.14 lo trae; en 2.0.7 no existe y sin esto el editor quedaba siempre en ingles): Android
+// 2.3 a 4.4 lo guarda en persist.sys.language (y el de fabrica en ro.product.locale.language). Como el de SDL: una lista
+// terminada en {NULL, NULL} que se libera con SDL_free
+#include <sys/system_properties.h>
+static inline SDL_Locale* SDL_GetPreferredLocales(void) {
+    static char lang[PROP_VALUE_MAX], pais[PROP_VALUE_MAX];
+    if (__system_property_get("persist.sys.language", lang) <= 0 &&
+        __system_property_get("ro.product.locale.language", lang) <= 0) return NULL;
+    if (__system_property_get("persist.sys.country", pais) <= 0) pais[0] = 0;
+    SDL_Locale* l = (SDL_Locale*)SDL_malloc(2 * sizeof(SDL_Locale));
+    if (!l) return NULL;
+    l[0].language = lang; l[0].country = pais[0] ? pais : NULL;
+    l[1].language = NULL; l[1].country = NULL;
+    return l;
+}
 static inline SDL_bool SDL_AndroidRequestPermission(const char*) { return SDL_TRUE; }
 #endif
 
 // (pistas de versiones nuevas: SDL 2.0.7 no las conoce y pedirlas no hace nada)
 #ifndef SDL_HINT_ANDROID_BLOCK_ON_PAUSE
 #define SDL_HINT_ANDROID_BLOCK_ON_PAUSE "SDL_ANDROID_BLOCK_ON_PAUSE"
+#endif
+// (2.0.9: Atras llega como SDLK_AC_BACK y no cierra la app. En 2.0.7 Atras ya llega como tecla: el hint no hace nada)
+#ifndef SDL_HINT_ANDROID_TRAP_BACK_BUTTON
+#define SDL_HINT_ANDROID_TRAP_BACK_BUTTON "SDL_ANDROID_TRAP_BACK_BUTTON"
 #endif
 
 #if !SDL_VERSION_ATLEAST(2, 0, 10)

@@ -6,6 +6,11 @@
 #include "WhiskUI/theme/colores.h"
 #include "WhiskUI/draw/glesdraw.h" // W3dPantallaAlto (flip de Y, 4 OS)
 
+// LAS TARJETAS DE LA ULTIMA OPERACION (mover/rotar/escalar, la del timeline, la de la malla) mientras se ARRASTRA uno de
+// sus valores con el dedo o el mouse: la tarjeta entera se dibuja con este alfa (w3dEngine::g_alfaColor) para ver detras
+// como va quedando el cambio, y la fila que se edita (su nombre y su campo) va opaca encima (GroupPropertie::RenderFila)
+const float kAlfaTarjetaArrastre = 0.4f;
+
 // base de los popups modales (selector de color, etc). El ruteo de
 // entrada compartido (LayoutInput) les da prioridad sobre todo lo demas.
 /**
@@ -46,6 +51,9 @@ class PopUpBase {
         // SEMI-MODAL: si es true, una accion del viewport (orbitar, r/g/s,
         // click) con el mouse AFUERA del popup lo cierra y deja pasar la accion
         // Por defecto los popups son modales.
+        // Enter (enter = true) o Esc con SU caja de texto enfocada: true = lo tomo (aceptar / cancelar de una, como la
+        // ventanita del nombre). false = lo de siempre: la caja se desenfoca y el popup sigue abierto
+        virtual bool TeclaEnTexto(bool enter) { (void)enter; return false; }
         virtual bool CierraConViewport() { return false; }
         // SEGUIR TRABAJANDO: el usuario usa el viewport AFUERA del popup (la rueda, orbitar) sin contestarle. Solo los
         // paneles de ajustar la ultima operacion (abajo a la izquierda: mover, escalar, inset...) se resuelven solos:

@@ -445,7 +445,7 @@ static void UndoMatCreadoAplicar(void* d) {
 static void UndoMatCreadoLiberar(void* d) { delete (UndoMatCreado*)d; }
 // un material NUEVO de la biblioteca (copia de 'de', o uno en blanco), con su paso de undo
 static Material* MaterialNuevoConUndo(const std::string& base, const Material* de) {
-    Material* n = new Material(MaterialNombreLibre(W3dNombreNormalizar(base, "Material"), NULL));
+    Material* n = MaterialDeFabrica(new Material(MaterialNombreLibre(W3dNombreNormalizar(base, "Material"), NULL)));
     if (de) {
         const std::string nombre = n->name;
         *n = *de;                  // (las texturas se COMPARTEN: cada ranura de la copia retiene la suya)
@@ -582,7 +582,7 @@ public:
     bool BorrarEnUso(const std::string& id, std::string* motivo) {
         Material* mat = MaterialDeNombre(id);
         if (!mat) { if (motivo) *motivo = "It doesn't exist anymore"; return false; }
-        if (!MaterialDefecto) MaterialDefecto = new Material("Default Material", true);
+        if (!MaterialDefecto) MaterialDefecto = MaterialDeFabrica(new Material("Default Material", true));
         UndoMatSacado* u = new UndoMatSacado();
         u->m = mat; u->sacado = false;
         std::vector<Object*> objs;
@@ -2251,6 +2251,19 @@ public:
         return true;
     }
 };
+static void MallasDe(Object* o, std::vector<Mesh*>& out) {
+    if (!o) return;
+    if (o->getType() == ObjectType::mesh) out.push_back((Mesh*)o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) MallasDe(o->Childrens[i], out);
+}
+bool W3dRutaEsOrigenDeMalla(const std::string& ruta) {
+    if (ruta.empty()) return false;
+    std::vector<Object*> raices; W3dRaicesVivas(raices);
+    std::vector<Mesh*> ms;
+    for (size_t r = 0; r < raices.size(); r++) MallasDe(raices[r], ms);
+    for (size_t i = 0; i < ms.size(); i++) if (ms[i]->origen == ruta) return true;
+    return false;
+}
 static ProveedorMateriales  gProvMateriales;
 static ProveedorTexturas    gProvTexturas;
 static ProveedorAnimaciones gProvAnimaciones;

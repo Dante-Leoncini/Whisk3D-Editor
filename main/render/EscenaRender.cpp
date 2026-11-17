@@ -19,6 +19,10 @@
 #include "graphics/w3dTexture.h"
 #include <math.h>
 #include <map>
+#include <vector>
+#ifndef W3D_SIN_EDITOR
+#include "io/TexturaEditada.h"     // los pixeles CPU del fondo 360 (su copia borrosa)
+#endif
 
 namespace gfx = w3dEngine;
 
@@ -149,6 +153,224 @@ void W3dEscena3DModo(int vista) {
 }
 
 // ---------------------------------------------------------------------------
+//  EL CIELO: el fondo como TEXTURA 360 (equirectangular). Una esfera alrededor de la camara, vista de adentro, sin
+//  escribir ni mirar la profundidad (queda detras de todo). Las UV de una esfera de latitud / longitud SON las de una
+//  imagen equirectangular: anda igual en el pipeline fijo (el N95), en GLES2 y en Vulkan. Gira con la rotacion del fondo
+//  (la misma cuenta que W3dFondoDireccionUV: los reflejos y el trazado de rayos ven lo mismo)
+// ---------------------------------------------------------------------------
+static void DibujarCielo() {
+    if (!W3dFondoConTextura()) return;
+    // (en una GPU chica -la de los Android 2.3- la mitad de las divisiones: el cielo esta lejos y se ve igual)
+    const bool chica = gfx::GpuLimitada();
+    const int kLat = chica ? 12 : 24, kLon = chica ? 24 : 48;
+    enum { kLatMax = 24, kLonMax = 48 };
+    static float pos[(kLatMax + 1) * (kLonMax + 1) * 3], uv[(kLatMax + 1) * (kLonMax + 1) * 2];
+    static unsigned short idx[kLatMax * kLonMax * 6];
+    static int armado = 0;   // (las divisiones con que se armo)
+    if (armado != kLat) {
+        armado = kLat;
+        for (int i = 0; i <= kLat; i++)
+            for (int j = 0; j <= kLon; j++) {
+                const float th = 3.14159265f * (float)i / (float)kLat;          // 0 = arriba (+Z)
+                const float ph = -3.14159265f + 6.2831853f * (float)j / (float)kLon;
+                const int k = i * (kLon + 1) + j;
+                pos[k * 3 + 0] = sinf(th) * cosf(ph); pos[k * 3 + 1] = sinf(th) * sinf(ph); pos[k * 3 + 2] = cosf(th);
+                uv[k * 2 + 0] = (float)j / (float)kLon; uv[k * 2 + 1] = (float)i / (float)kLat;
+            }
+        int n = 0;
+        for (int i = 0; i < kLat; i++)
+            for (int j = 0; j < kLon; j++) {
+                const unsigned short a = (unsigned short)(i * (kLon + 1) + j), b = (unsigned short)(a + kLon + 1);
+                idx[n++] = a; idx[n++] = b; idx[n++] = (unsigned short)(a + 1);
+                idx[n++] = (unsigned short)(a + 1); idx[n++] = b; idx[n++] = (unsigned short)(b + 1);
+            }
+    }
+    // (adentro del frustum: entre el plano cercano y el lejano, sin importar la escala de la escena)
+    const float r = (g_renderCamNear + g_renderCamFar) * 0.5f;
+    gfx::PushMatrix();
+    gfx::Translatef(g_renderCamPos.x, g_renderCamPos.y, g_renderCamPos.z);
+    gfx::Rotatef(g_renderBgRot[2], 0.0f, 0.0f, 1.0f);
+    gfx::Rotatef(g_renderBgRot[1], 0.0f, 1.0f, 0.0f);
+    gfx::Rotatef(g_renderBgRot[0], 1.0f, 0.0f, 0.0f);
+    gfx::Scalef(r, r, r);
+    gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Blend); gfx::Disable(gfx::CullFace); gfx::Disable(gfx::DepthTest);
+    gfx::DepthMask(false);
+    gfx::Enable(gfx::Texture2D);
+    gfx::BindTexture(g_renderBgTex->iID);
+    gfx::TexFilter(true); gfx::TexWrap(true);
+    gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+    gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
+    gfx::EnableArray(gfx::VertexArray); gfx::EnableArray(gfx::TexCoordArray);
+    gfx::VertexPointer3f(0, pos); gfx::TexCoordPointer2f(0, uv);
+    gfx::DrawElements16(gfx::PrimTriangulos, kLat * kLon * 6, idx);
+    gfx::DisableArray(gfx::TexCoordArray);
+    gfx::DepthMask(true); gfx::Enable(gfx::DepthTest);
+    gfx::PopMatrix();
+}
+
+// UNA COPIA REDUCIDA del fondo 360: sus pixeles (W x H, RGBA), cada uno el promedio de su zona; con 'pasadas' de
+// desenfoque que da la vuelta a lo ancho (la imagen es un cilindro). Sale de los pixeles de la CPU: en el juego compilado
+// (sin ellos) no hay copias y se usa la imagen misma
+static bool ReducirFondo(int W, int H, int pasadas, std::vector<unsigned char>& px) {
+#ifndef W3D_SIN_EDITOR
+    if (!g_renderBgTex || !g_renderBgTex->iID) return false;
+    TexturaEditable* te = TexEditObtener(g_renderBgTex);
+    if (!te || te->w <= 0 || te->h <= 0) return false;
+    std::vector<float> a((size_t)W * H * 3, 0.0f);
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            const int x0 = x * te->w / W, x1 = (x + 1) * te->w / W, y0 = y * te->h / H, y1 = (y + 1) * te->h / H;
+            double sm[3] = { 0, 0, 0 }; int n = 0;
+            for (int yy = y0; yy < (y1 > y0 ? y1 : y0 + 1); yy++)
+                for (int xx = x0; xx < (x1 > x0 ? x1 : x0 + 1); xx++) {
+                    const unsigned char* p = &te->rgba[((size_t)yy * te->w + xx) * 4];
+                    sm[0] += p[0]; sm[1] += p[1]; sm[2] += p[2]; n++;
+                }
+            for (int k = 0; k < 3; k++) a[((size_t)y * W + x) * 3 + k] = n ? (float)(sm[k] / n) : 0.0f;
+        }
+    for (int pasada = 0; pasada < pasadas; pasada++) {   // (caja 5x3: a lo ancho da la vuelta, a lo alto se corta en los polos)
+        std::vector<float> b(a.size(), 0.0f);
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++) {
+                float sm[3] = { 0, 0, 0 }; int n = 0;
+                for (int dy = -1; dy <= 1; dy++) {
+                    const int yy = y + dy; if (yy < 0 || yy >= H) continue;
+                    for (int dx = -2; dx <= 2; dx++) {
+                        const int xx = (x + dx + W) % W;
+                        for (int k = 0; k < 3; k++) sm[k] += a[((size_t)yy * W + xx) * 3 + k];
+                        n++;
+                    }
+                }
+                for (int k = 0; k < 3; k++) b[((size_t)y * W + x) * 3 + k] = sm[k] / n;
+            }
+        a.swap(b);
+    }
+    px.assign((size_t)W * H * 4, 255);
+    for (size_t i = 0; i < (size_t)W * H; i++)
+        for (int k = 0; k < 3; k++) { const float v = a[i * 3 + k]; px[i * 4 + k] = (unsigned char)(v < 0 ? 0 : v > 255 ? 255 : v + 0.5f); }
+    return true;
+#else
+    (void)W; (void)H; (void)pasadas; (void)px;
+    return false;
+#endif
+}
+struct EntornoCopia { unsigned int tex, de; };
+static unsigned int EntornoReducido(EntornoCopia& c, int W, int H, int pasadas) {
+    if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
+    if (c.tex && c.de == g_renderBgTex->iID) return c.tex;
+    std::vector<unsigned char> px;
+    if (!ReducirFondo(W, H, pasadas, px)) return 0;
+    if (c.tex) gfx::DeleteTexture(c.tex);
+    c.tex = gfx::UploadRGBA(&px[0], W, H, true, pasadas == 0, false, pasadas == 0);   // (la nitida: con piramide y 16 bits)
+    c.de = g_renderBgTex->iID;
+    return c.tex;
+}
+// LA BORROSA (la luz difusa y los reflejos rugosos de la luz por pixel): 64x32 y cuatro pasadas
+static EntornoCopia gEnvBorrosa = { 0, 0 };
+static unsigned int EntornoBorroso() { return EntornoReducido(gEnvBorrosa, 64, 32, 4); }
+// LA NITIDA DE UNA GPU CHICA sin cubemaps: 256x128 en vez de la imagen entera (los reflejos leen el 360 salteado y la
+// imagen grande no entraba en el cache de texturas)
+static EntornoCopia gEnvChica = { 0, 0 };
+static unsigned int EntornoNitido() {
+    if (!g_renderBgTex) return 0;
+    if (gfx::GpuLimitada() && (g_renderBgTex->ancho > 256 || g_renderBgTex->alto > 128)) {
+        const unsigned int t = EntornoReducido(gEnvChica, 256, 128, 0);
+        if (t) return t;
+    }
+    return g_renderBgTex->iID;
+}
+// EL ENTORNO COMO CUBEMAP (las GPU chicas, gfx::EntornoCubo): la imagen 360 (rgba, w x h) pasada a 6 caras de lado x lado.
+// Cada texel de una cara es una DIRECCION (la de GL para esa cara) y toma el pixel de la imagen en esa direccion, con la
+// misma cuenta que el shader y el cielo (u = 0.5 + atan2(y,x)/2pi, v = acos(z)/pi; la fila 0, arriba). En la VideoCore IV
+// la imagen 360 costaba un atan y un acos por pixel en cada lectura (unos 15 ms por cuadro en el Galaxy Ace)
+static unsigned int CuboDe(EntornoCopia& c, int lado, const unsigned char* rgba, int w, int h) {
+    std::vector<unsigned char> caras[6];
+    const unsigned char* ptr[6];
+    for (int f = 0; f < 6; f++) {
+        caras[f].resize((size_t)lado * lado * 4);
+        for (int j = 0; j < lado; j++)
+            for (int i = 0; i < lado; i++) {
+                const float a = 2.0f * ((float)i + 0.5f) / (float)lado - 1.0f, b = 2.0f * ((float)j + 0.5f) / (float)lado - 1.0f;
+                float d[3];
+                switch (f) {   // (las caras de GL: +X -X +Y -Y +Z -Z)
+                    case 0:  d[0] =  1; d[1] = -b; d[2] = -a; break;
+                    case 1:  d[0] = -1; d[1] = -b; d[2] =  a; break;
+                    case 2:  d[0] =  a; d[1] =  1; d[2] =  b; break;
+                    case 3:  d[0] =  a; d[1] = -1; d[2] = -b; break;
+                    case 4:  d[0] =  a; d[1] = -b; d[2] =  1; break;
+                    default: d[0] = -a; d[1] = -b; d[2] = -1; break;
+                }
+                const float l = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                const float z = d[2] / l;
+                const float u = 0.5f + atan2f(d[1], d[0]) * 0.15915494f, v = acosf(z < -1.0f ? -1.0f : z > 1.0f ? 1.0f : z) * 0.31830989f;
+                // bilineal: a lo ancho da la vuelta, a lo alto se corta en los polos
+                const float fx = u * (float)w - 0.5f, fy = v * (float)h - 0.5f;
+                int x0 = (int)floorf(fx), y0 = (int)floorf(fy);
+                const float tx = fx - (float)x0, ty = fy - (float)y0;
+                int x1 = x0 + 1, y1 = y0 + 1;
+                x0 = ((x0 % w) + w) % w; x1 = ((x1 % w) + w) % w;
+                if (y0 < 0) y0 = 0; if (y1 < 0) y1 = 0; if (y0 >= h) y0 = h - 1; if (y1 >= h) y1 = h - 1;
+                unsigned char* o = &caras[f][((size_t)j * lado + i) * 4];
+                for (int k = 0; k < 3; k++) {
+                    const float p00 = rgba[((size_t)y0 * w + x0) * 4 + k], p10 = rgba[((size_t)y0 * w + x1) * 4 + k];
+                    const float p01 = rgba[((size_t)y1 * w + x0) * 4 + k], p11 = rgba[((size_t)y1 * w + x1) * 4 + k];
+                    const float vv = (p00 * (1 - tx) + p10 * tx) * (1 - ty) + (p01 * (1 - tx) + p11 * tx) * ty;
+                    o[k] = (unsigned char)(vv + 0.5f);
+                }
+                o[3] = 255;
+            }
+        ptr[f] = &caras[f][0];
+    }
+    if (c.tex) gfx::DeleteTexture(c.tex);
+    c.tex = gfx::SubirCubo(ptr, lado);
+    c.de = g_renderBgTex->iID;
+    return c.tex;
+}
+static EntornoCopia gCuboNitido = { 0, 0 }, gCuboBorroso = { 0, 0 };
+// el NITIDO: 64 por cara (en una esfera de un telefono, un texel por pixel), desde la imagen entera
+static unsigned int EntornoCuboNitido() {
+#ifndef W3D_SIN_EDITOR
+    if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
+    if (gCuboNitido.tex && gCuboNitido.de == g_renderBgTex->iID) return gCuboNitido.tex;
+    TexturaEditable* te = TexEditObtener(g_renderBgTex);
+    if (!te || te->w <= 0 || te->h <= 0) return 0;
+    return CuboDe(gCuboNitido, 64, &te->rgba[0], te->w, te->h);
+#else
+    return 0;
+#endif
+}
+// el BORROSO: 16 por cara, desde la copia borrosa de 64x32
+static unsigned int EntornoCuboBorroso() {
+    if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
+    if (gCuboBorroso.tex && gCuboBorroso.de == g_renderBgTex->iID) return gCuboBorroso.tex;
+    std::vector<unsigned char> px;
+    if (!ReducirFondo(64, 32, 4, px)) return 0;
+    return CuboDe(gCuboBorroso, 16, &px[0], 64, 32);
+}
+// el ENTORNO para la luz por pixel: la matriz ojo -> imagen (la vista de ESTE pase invertida por la rotacion del fondo)
+static void EntornoPase() {
+    if (!w3dRenderLuces || !W3dFondoConTextura()) { gfx::Entorno(0, 0, NULL); return; }
+    float V[16]; gfx::GetMatrix(gfx::ModelView, V);   // (la vista de la camara: el pase todavia no movio la matriz)
+    float M[9]; W3dFondoMatriz(M);
+    float C[9];   // C = M * Rv^T (Rv: la rotacion de la vista, mundo -> ojo; V esta por columnas)
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            C[i * 3 + j] = M[i * 3 + 0] * V[0 * 4 + j] + M[i * 3 + 1] * V[1 * 4 + j] + M[i * 3 + 2] * V[2 * 4 + j];
+    if (gfx::GpuLimitada()) {   // (una GPU chica: el entorno como cubemap, sin las cuentas de la imagen 360)
+        const unsigned int cn = EntornoCuboNitido(), cb = EntornoCuboBorroso();
+        if (cn && cb) { gfx::EntornoCubo(cn, cb, C); return; }
+    }
+    gfx::Entorno(EntornoNitido(), EntornoBorroso(), C);
+}
+
+// el cielo se vuelve a dibujar cuando una RUTINA limpia el color de la pantalla en medio del pase (la "Limpiar pantalla"
+// de la escena de fabrica lo borraba: el cielo se dibuja antes que la escena). Solo adentro del pase con las luces
+static bool gCieloEnPase = false;
+void W3dEscena3DCieloTrasLimpiar() { if (gCieloEnPase) DibujarCielo(); }
+extern void (*g_cieloTrasLimpiarHook)();   // (objects/Rutina.cpp)
+static struct CieloGancho { CieloGancho() { g_cieloTrasLimpiarHook = W3dEscena3DCieloTrasLimpiar; } } gCieloGancho;
+
+// ---------------------------------------------------------------------------
 //  EL PASE
 // ---------------------------------------------------------------------------
 void W3dEscena3DPasada() {
@@ -167,6 +389,9 @@ void W3dEscena3DPasada() {
     if (!(g_w3dSoloJuego && W3dHayConstructor())) gfx::Invalidate();
     w3dLoteStamp++;              // sello del pase: las Collection con lote marcan a sus horneadas
     W3dNieblaReiniciar();               // la NIEBLA la prende el objeto Niebla del arbol (desde ahi en adelante)
+    gCieloEnPase = w3dRenderLuces;
+    EntornoPase();                      // el fondo 360 para los reflejos y la luz por pixel (o apagado)
+    if (w3dRenderLuces) DibujarCielo();  // el FONDO 360 (Rendered / el juego): antes que todo, detras de todo
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
 #ifndef W3D_SIN_EDITOR
@@ -185,6 +410,8 @@ void W3dEscena3DPasada() {
     W3dLucesDibujarPendientes();
     // PARTICULAS translucidas al final, con el z-buffer de la escena ya escrito.
     W3dParticulasDibujarPendientes();
+    gCieloEnPase = false;
+    gfx::Entorno(0, 0, NULL);           // (lo que se dibuja despues -overlays, HUD- no refleja el fondo)
     W3dNieblaReiniciar();               // nada de niebla para lo que se dibuja despues (overlays, HUD, UI)
     gfx::EstadoBase();                  // ni el alpha test, el sesgo o la matriz de textura que dejo la escena
     W3dCapturasHacer();                 // las capturas que pidio lua: la imagen 3D sola (el HUD todavia no)

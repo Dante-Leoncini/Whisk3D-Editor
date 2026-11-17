@@ -1,0 +1,70 @@
+# ==========================================================================
+#  EL TECLADO EN PANTALLA ES SIEMPRE EL MISMO (Ajustes > "Use system keyboard")
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_teclados.w3s
+#
+#  EL CASO. Destildado (default): los teclados de Whisk3D en TODOS lados. Antes
+#  el nombre de un layout salia con el teclado del sistema y el resto con el de
+#  Whisk3D; y el NUMERO de un mapa del material (Rugosidad, Metalico, Alfa)
+#  abria el teclado de TEXTO. Tildado: el del sistema en todos lados.
+#    1. un toque en el numero de Rugosidad: el teclado NUMERICO, y su OK aplica
+#    2. "Save layout...": el QWERTY, y su OK guarda el layout
+#    3. con el del sistema: ningun teclado de Whisk3D
+# ==========================================================================
+
+ventana 1200 1800
+escala 2
+selobj Cubo
+propstab 2
+tick
+propclic New Material
+tick
+menuelegir New Material
+tick
+matver rugosidad 0.5
+esperar 600
+
+# ---- 1) el numero de un mapa: el NUMERICO ----
+teclado whisk3d
+propdedo Roughness
+dedo up
+tick
+tecladoabierto numpad
+tecladotocar DEL 0 . 2 5 OK
+tick
+tecladoabierto ninguno
+matver rugosidad 0.25
+undo
+matver rugosidad 0.5
+# (X cancela: queda el valor de antes)
+esperar 600
+propdedo Roughness
+dedo up
+tick
+tecladoabierto numpad
+tecladotocar DEL 9 X
+tick
+matver rugosidad 0.5
+
+# ---- 2) el nombre de un layout: el QWERTY ----
+layout cuantos 1
+layout menu guardar
+tecladoabierto qwerty
+tecladotocar OK
+tick
+tecladoabierto ninguno
+layout cuantos 2
+
+# ---- 3) con el teclado del sistema: ninguno de Whisk3D ----
+teclado sistema
+esperar 600
+propdedo Roughness
+dedo up
+tick
+tecladoabierto ninguno
+tecla Escape
+layout menu guardar
+tecladoabierto ninguno
+tecla Escape
+teclado whisk3d

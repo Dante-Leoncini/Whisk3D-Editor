@@ -45,6 +45,8 @@ Button* PropsAyudaEn(Properties* p, int mx, int my);   // el cartelito de ayuda 
 #include "ViewPorts/Timeline.h"      // la linea de tiempo (tl, tlframes)
 #include "ViewPorts/Properties.h"    // las tarjetas y filas (capinfo)
 #include "ViewPorts/PopUp/NumPad.h"  // NumPadTeclaCentro (capinfo)
+#include "ViewPorts/LayoutInput.h"   // LayoutKey (tecladotocar: el OK del QWERTY)
+#include "WhiskUI/draw/icons.h"     // IconoIndice (dedotoque boton <icono>)
 #include "WhiskUI/widgets/Tab.h"
 #include "WhiskUI/Propieties/GroupPropertie.h"
 extern int OutlinerFilaDeObjeto(Object* o);   // Outliner.cpp: la fila visible de un objeto en la escena (-1)
@@ -536,7 +538,11 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         return true;
     }
     if (cmd == "dedo") {
-        std::string que; int x = 0, y = 0, id = 1; ss >> que >> x >> y; if (!(ss >> id)) id = 1;
+        std::string que; int x = -1, y = -1, id = 1; ss >> que >> x >> y; if (!(ss >> id)) id = 1;
+        // 'dedo up' sin lugar: donde esta ese dedo (el que apoyo 'propdedo', por ejemplo)
+        if (x < 0 && y < 0 && que == "up" && gDedos.count(id)) { x = gDedos[id].first; y = gDedos[id].second; }
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
         // el orden de SDL: primero el mouse sintetizado (which = SDL_TOUCH_MOUSEID), despues el del dedo. SDL
         // sintetiza el mouse solo con el PRIMER dedo (id 1): los demas (dos dedos = zoom y paneo) son solo dedo
         const bool primero = (id == 1);
@@ -558,6 +564,16 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
     }
     // 'dedotoque esquina <tipo>' / 'dedotoque item <opcion en ingles>': un TOQUE con el dedo (bajar y levantar, como
     // 'dedo') en el boton de la esquina del primer viewport de ese tipo, o en una opcion del menu abierto
+    // 'menuadd <x> <y>': abre el menu Anadir (el MISMO de la barra del 3D) en ese lugar, como Shift+A
+    if (cmd == "menuadd") {
+        int x = 0, y = 0; ss >> x >> y;
+        extern void LayoutMenuAdd(int, int); LayoutMenuAdd(x, y);
+        extern PopupMenu* MenuAbierto;
+        printf("      [menuadd] abierto en (%d, %d) ancho %d (pantalla %d)\n", MenuAbierto ? MenuAbierto->x : -1,
+               MenuAbierto ? MenuAbierto->y : -1, MenuAbierto ? MenuAbierto->width : -1, MenuPantallaW);
+        g_redraw = true; Cuadro();
+        return true;
+    }
     if (cmd == "dedotoque") {
         std::string que; ss >> que;
         int x = -1, y = -1;
@@ -566,18 +582,29 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
             ViewportBase* v = HojaDeTipo(rootViewport, kind);
             if (v) { v->ActualizarBarra(); if (!v->BarButtons.empty()) { Button* b = v->BarButtons[0]; x = b->sx + b->width / 2; y = b->sy + b->height / 2; } }
             if (x < 0) { err = "dedotoque: no hay un viewport de tipo " + std::to_string(kind) + " con su esquina"; return false; }
-        } else if (que == "item") {
-            const std::string t = T(Resto(ss).c_str());
-            extern PopupMenu* MenuAbierto;
+        } else if (que == "boton") {   // 'dedotoque boton <icono> [tipo]': el boton de la barra con ese icono ("mas" = Anadir)
+            std::string ic; int kind = 1; ss >> ic; if (!(ss >> kind)) kind = 1;
+            ViewportBase* v = HojaDeTipo(rootViewport, kind);
+            const int idx = IconoIndice(ic.c_str());
+            if (v) { v->ActualizarBarra();
+                     for (size_t i = 0; i < v->BarButtons.size() && x < 0; i++)
+                         if (v->BarButtons[i] && v->BarButtons[i]->icon == idx) { Button* b = v->BarButtons[i]; x = b->sx + b->width / 2; y = b->sy + b->height / 2; } }
+            if (x < 0) { err = "dedotoque: no hay un boton '" + ic + "' en la barra del viewport de tipo " + std::to_string(kind); return false; }
+        } else if (que == "item" || que == "itemizq" || que == "subitem") {   // itemizq: sobre el TEXTO (a la izquierda), como
+            const std::string t = T(Resto(ss).c_str());                         // el dedo de verdad; subitem: en el submenu
+            extern PopupMenu* MenuAbierto;                                      // abierto mas hondo
             PopupMenu* m = (MenuAbierto && MenuAbierto->abierto) ? MenuAbierto : NULL;
+            if (que == "subitem") while (m && m->submenuAbierto && m->submenuAbierto->abierto) m = m->submenuAbierto;
             const int fila = RenglonHeightGS + gapGS;
             if (m) for (int i = 0; i < (int)m->items.size(); i++) {
                 const int v = i - m->scroll;
                 if (m->items[i]->text != t || v < 0 || v >= m->FilasVisibles()) continue;
-                x = m->x + m->width / 2; y = m->y + borderGS + (m->titulo.empty() ? 0 : fila) + v * fila + RenglonHeightGS / 2;
+                x = (que == "itemizq") ? m->x + IconSizeGS * 3 : m->x + m->width / 2;
+                y = m->y + borderGS + (m->titulo.empty() ? 0 : fila) + v * fila + RenglonHeightGS / 2;
             }
             if (x < 0) { err = "dedotoque: el menu abierto no tiene '" + t + "' a la vista"; return false; }
-        } else { err = "dedotoque: uso: dedotoque esquina <tipo> | dedotoque item <opcion>"; return false; }
+        } else { err = "dedotoque: uso: dedotoque esquina <tipo> | dedotoque boton <icono> [tipo] | dedotoque item|itemizq <opcion>"; return false; }
+        printf("      [dedotoque] %s en (%d, %d)\n", que.c_str(), x, y);
         Movio(SDL_TOUCH_MOUSEID, 0, x, y, x, y); Boton(SDL_TOUCH_MOUSEID, SDL_BUTTON_LEFT, true, x, y);
         Dedo(SDL_FINGERDOWN, 1, x, y, x, y);
         Cuadro();   // (un toque de verdad dura algunos cuadros: el editor dibuja con el dedo apoyado)
@@ -1348,6 +1375,206 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         }
         if (!FilaPropiedades(t, x, y, NULL)) { err = "propclic: no se ve la fila '" + t + "' en Propiedades"; return false; }
         ClickEn(x, y, 1);
+        return true;
+    }
+    // 'propclicder <fila en ingles>': un click DERECHO de verdad en esa fila de Propiedades (su menu contextual:
+    // restablecer, copiar, pegar, los keyframes). 'propdedo <fila>': el DEDO apoyado ahi (y no se levanta: despues
+    // 'esperar' + 'tick' es la pulsacion larga, y 'dedo up' lo suelta)
+    if (cmd == "propclicder" || cmd == "propdedo" || cmd == "propdedoarrastrar") {
+        int dxArr = 0;
+        if (cmd == "propdedoarrastrar") ss >> dxArr;   // 'propdedoarrastrar <dx> <fila>': apoyar, correr dx y soltar
+        const std::string t = T(Resto(ss).c_str());
+        int x = 0, y = 0;
+        // (como propclic: si la fila esta fuera de la vista, se desplaza Propiedades con la rueda hasta que se vea BIEN:
+        // con el centro en el ultimo renglon, el toque caia en el borde del panel)
+        Properties* P = (Properties*)HojaDeTipo(rootViewport, 3);
+        for (int vuelta = 0; vuelta < 40; vuelta++) {
+            PropertieBase* pb = NULL;
+            if (FilaPropiedades(t, x, y, &pb) && P && y < P->y + P->height - RenglonHeightGS) break;
+            if (!pb || !P) break;
+            P->event_mouse_wheel(y > P->y + P->height / 2 ? -1.0f : 1.0f, P->x + P->width / 2, P->y + P->height / 2);
+            Cuadro();
+        }
+        PropertieBase* fila = NULL;
+        if (!FilaPropiedades(t, x, y, &fila)) { err = cmd + ": no se ve la fila '" + t + "' en Propiedades"; return false; }
+        // una fila BOTON con su numero en el medio (los mapas del material): el dedo, sobre el numero
+        if (fila && fila->GetType() == PropertyType::Button && P) {
+            PropButton* pb = (PropButton*)fila;
+            if (pb->colExtras > pb->colPrefijo) x = P->x + P->PosX + borderGS * 2 + (pb->colPrefijo + pb->colExtras) / 2;
+        }
+        if (cmd == "propclicder") {
+            if (x != gRatonX || y != gRatonY) Movio(0, gRatonBotones, x, y, gRatonX, gRatonY);
+            gRatonX = x; gRatonY = y;
+            Boton(0, SDL_BUTTON_RIGHT, true, x, y);
+            Boton(0, SDL_BUTTON_RIGHT, false, x, y);
+        } else {
+            Movio(SDL_TOUCH_MOUSEID, 0, x, y, x, y); Boton(SDL_TOUCH_MOUSEID, SDL_BUTTON_LEFT, true, x, y);
+            Dedo(SDL_FINGERDOWN, 1, x, y, x, y);
+            gDedos[1] = std::make_pair(x, y);
+            if (cmd == "propdedoarrastrar") {   // de a 4 pasos, como un dedo de verdad, y se levanta al final
+                int px = x;
+                for (int k = 1; k <= 4; k++) {
+                    const int nx = x + dxArr * k / 4;
+                    Movio(SDL_TOUCH_MOUSEID, SDL_BUTTON_LMASK, nx, y, px, y); Dedo(SDL_FINGERMOTION, 1, nx, y, px, y);
+                    px = nx;
+                }
+                Boton(SDL_TOUCH_MOUSEID, SDL_BUTTON_LEFT, false, px, y); Dedo(SDL_FINGERUP, 1, px, y, px, y);
+                gDedos.erase(1);
+            }
+        }
+        printf("      [%s] '%s' en (%d, %d)\n", cmd.c_str(), t.c_str(), x, y);
+        Cuadro();
+        return true;
+    }
+    // 'propvalor <valor> <fila en ingles>': el valor que muestra esa fila (un numero, o 0/1 de una casilla)
+    if (cmd == "propvalor") {
+        float esperado = 0; ss >> esperado;
+        const std::string t = T(Resto(ss).c_str());
+        int x = 0, y = 0; PropertieBase* pb = NULL;
+        FilaPropiedades(t, x, y, &pb);
+        float hay = -12345.0f;
+        if (pb && pb->GetType() == PropertyType::Float && ((PropFloat*)pb)->value) hay = *((PropFloat*)pb)->value;
+        else if (pb && pb->GetType() == PropertyType::Bool && ((PropBool*)pb)->value) hay = *((PropBool*)pb)->value ? 1.0f : 0.0f;
+        printf("      [propvalor] '%s' = %g (esperaba %g)\n", t.c_str(), hay, esperado);
+        if (fabsf(hay - esperado) > 1e-4f) { err = "propvalor: '" + t + "' no tiene el valor esperado"; return false; }
+        return true;
+    }
+    // 'layout <sub>': LOS LAYOUTS (la esquina de un viewport -> Layout; config/W3dLayouts.h) y Rotar:
+    //    layout estructura <forma>   el arbol como texto corto: F(a,b) = fila (lado a lado), C(a,b) = columna (apilados);
+    //                                hojas: 3D, TL (timeline), OUT, BIB, PROP, UV, 2D, CON, IDE
+    //    layout guardar <nombre>     guarda el actual (lo mismo que la ventanita del nombre)
+    //    layout poner <nombre|default>   lo pide y lo pone (como el menu: al empezar el cuadro)
+    //    layout borrar <nombre> | layout cuantos <n>
+    //    layout rotar <tipo>         Rotar en el primer viewport de ese tipo (1 = 3D, 5 = timeline...)
+    //    layout telefono 0|1         como si fuera un telefono (un layout por orientacion) o no
+    //    layout pantalla <w> <h>     la ventana cambia de tamano (girar el telefono)
+    if (cmd == "layout") {
+        std::string sub; ss >> sub;
+        if (sub == "estructura") {
+            std::string esp; ss >> esp;
+            struct F { static std::string De(ViewportBase* v) {
+                if (!v) return "?";
+                if (!v->isLeaf()) {
+                    ViewportBase* a = (v->ContainerKind() == 1) ? ((ViewportRow*)v)->childA : ((ViewportColumn*)v)->childA;
+                    ViewportBase* b = (v->ContainerKind() == 1) ? ((ViewportRow*)v)->childB : ((ViewportColumn*)v)->childB;
+                    return std::string(v->ContainerKind() == 1 ? "F(" : "C(") + De(a) + "," + De(b) + ")";
+                }
+                switch (v->ViewportKind()) { case 1: return "3D"; case 2: return "OUT"; case 3: return "PROP"; case 4: return "UV";
+                    case 5: return "TL"; case 6: return "2D"; case 7: return "CON"; case 8: return "IDE"; case 9: return "BIB"; }
+                return "?"; } };
+            extern ViewportBase* LayoutRaizCompleta();
+            const std::string hay = F::De(LayoutRaizCompleta());
+            printf("      [layout] estructura %s (esperaba %s)\n", hay.c_str(), esp.c_str());
+            if (!esp.empty() && hay != esp) { err = "layout estructura: es " + hay; return false; }
+            return true;
+        }
+        if (sub == "guardar" || sub == "poner" || sub == "borrar") {
+            std::string n = Resto(ss);
+            extern void LayoutPedir(const std::string&); extern void ProcesarProyectoPendiente();
+            extern std::string W3dLayoutTextoDe(ViewportBase*);
+            extern bool W3dLayoutGuardar(const std::string&, const std::string&); extern bool W3dLayoutBorrar(const std::string&);
+            if (sub == "guardar") { if (!W3dLayoutGuardar(n, W3dLayoutTextoDe(NULL))) { err = "layout guardar: no se guardo"; return false; } }
+            else if (sub == "borrar") { if (!W3dLayoutBorrar(n)) { err = "layout borrar: no existe '" + n + "'"; return false; } }
+            else { LayoutPedir(n == "default" ? std::string() : n); ProcesarProyectoPendiente(); Cuadro(); }
+            return true;
+        }
+        if (sub == "cuantos") {
+            int esp = -1; ss >> esp;
+            extern std::vector<std::string> W3dLayoutsNombres();
+            std::vector<std::string> ns = W3dLayoutsNombres();
+            std::string l; for (size_t i = 0; i < ns.size(); i++) l += (i ? ", " : "") + ns[i];
+            printf("      [layout] %d guardados: %s\n", (int)ns.size(), l.c_str());
+            if (esp >= 0 && (int)ns.size() != esp) { err = "layout cuantos: no son los esperados"; return false; }
+            return true;
+        }
+        if (sub == "rotar") {
+            int kind = 1; ss >> kind;
+            ViewportBase* v = HojaDeTipo(rootViewport, kind);
+            if (!v) { err = "layout rotar: no hay un viewport de ese tipo"; return false; }
+            extern void LayoutRotarViewport(ViewportBase*); LayoutRotarViewport(v); Cuadro();
+            return true;
+        }
+        if (sub == "telefono") {
+            int v = 1; ss >> v;
+            extern bool g_w3dTelefono; g_w3dTelefono = (v != 0);
+            extern void LayoutOrientacionOlvidar(); LayoutOrientacionOlvidar();
+            extern void LayoutTamanoPantalla(int, int); LayoutTamanoPantalla(MenuPantallaW, MenuPantallaH);   // (la de ahora)
+            return true;
+        }
+        if (sub == "pantalla") {
+            int w = 0, h = 0; ss >> w >> h;
+            if (w <= 0 || h <= 0) { err = "layout pantalla <w> <h>"; return false; }
+            extern int W3dPantallaAlto;
+            if (window) SDL_SetWindowSize(window, w, h);
+            MenuPantallaW = w; MenuPantallaH = h; W3dPantallaAlto = h;
+            rootViewport->Resize(w, h);
+            extern void LayoutTamanoPantalla(int, int); LayoutTamanoPantalla(w, h);
+            Cuadro();
+            return true;
+        }
+        if (sub == "menu") {   // 'layout menu guardar|borrar': esa opcion del submenu Layout (la ventanita / la lista)
+            std::string q; ss >> q;
+            extern void LayoutMenuLayoutsAccion(int); LayoutMenuLayoutsAccion(q == "borrar" ? 901 : 900); Cuadro();
+            return true;
+        }
+        err = "layout: uso: layout estructura|guardar|poner|borrar|cuantos|rotar|telefono|pantalla|menu"; return false;
+    }
+    // EL TECLADO EN PANTALLA (Ajustes > "Use system keyboard"):
+    //  'teclado sistema|whisk3d'               la opcion (sin guardar el config)
+    //  'tecladoabierto qwerty|numpad|ninguno'  el teclado de Whisk3D que quedo abierto (el popup activo)
+    //  'tecladotocar <tecla>...'               toca esas teclas del teclado abierto ("0" "." "2" "OK"...; QWERTY: solo OK)
+    if (cmd == "teclado") {
+        std::string q; ss >> q;
+        if (q != "sistema" && q != "whisk3d") { err = "teclado: uso: teclado sistema|whisk3d"; return false; }
+        cfg.tecladoSistema = (q == "sistema");
+        return true;
+    }
+    if (cmd == "tecladoabierto") {
+        std::string q; ss >> q;
+        const std::string hay = !PopUpActive ? std::string("ninguno") : PopUpActive->name == "Qwerty" ? std::string("qwerty")
+                              : PopUpActive->name == "NumPad" ? std::string("numpad") : std::string("otro (") + PopUpActive->name + ")";
+        printf("      [tecladoabierto] %s\n", hay.c_str());
+        const bool esTeclado = PopUpActive && PopUpActive->EsTeclado();
+        if (q == "ninguno" ? esTeclado : hay != q) { err = "tecladoabierto: esta abierto '" + hay + "', se esperaba '" + q + "'"; return false; }
+        return true;
+    }
+    if (cmd == "tecladotocar") {
+        std::string t;
+        while (ss >> t) {
+            if (!PopUpActive || !PopUpActive->EsTeclado()) { err = "tecladotocar: no hay un teclado de Whisk3D abierto"; return false; }
+            if (PopUpActive->name == "Qwerty") {
+                if (t != "OK") { err = "tecladotocar: en el QWERTY solo se toca OK"; return false; }
+                PopUpActive->Tecla(LayoutKey::Accept);   // (Enter = Aceptar)
+            } else {
+                int cx = 0, cy = 0;
+                if (!NumPadTeclaCentro(t.c_str(), cx, cy)) { err = "tecladotocar: el teclado no tiene la tecla '" + t + "'"; return false; }
+                PopUpActive->Click(cx, cy);
+            }
+            Cuadro();
+        }
+        return true;
+    }
+    // 'rombo camactiva|camchk [toggle] [<estado>]': el rombo de la CAMARA ACTIVA como lo ve el panel (W3dKeyframeEstado):
+    // camactiva = el de la tarjeta Camara activa de la animacion; camchk = el de la casilla "Camara activa" de la camara
+    // activa en Propiedades. 'toggle' es el click en el rombo. Estado: 0 nada, 1 verde oscuro, 2 verde, 3 cambio sin guardar
+    if (cmd == "rombo") {
+        std::string que, q2; ss >> que;
+        const int comp = (que == "camchk") ? AnimY : AnimX;
+        int esp = -1;
+        if (ss >> q2) { if (q2 == "toggle") { if (W3dKeyframeToggle) W3dKeyframeToggle(AnimCamActiva, comp); ss >> esp; } else esp = atoi(q2.c_str()); }
+        const int hay = W3dKeyframeEstado ? W3dKeyframeEstado(AnimCamActiva, comp) : -1;
+        printf("      [rombo] %s = %d (esperaba %d)\n", que.c_str(), hay, esp);
+        if (esp >= 0 && hay != esp) { err = "rombo: el estado no es el esperado"; return false; }
+        return true;
+    }
+    // 'canalestado <prop> <comp> <estado>': el keyframe del canal del objeto activo en el frame actual (como el rombo):
+    // 0 sin animacion, 1 animado sin key aca, 2 key aca. prop: 0 posicion, 1 rotacion, 2 escala, 3 visible...
+    if (cmd == "canalestado") {
+        int prop = 0, comp = 0, esp = 0; ss >> prop >> comp >> esp;
+        extern int AnimCanalEstado(Object*, int, int, int); extern int CurrentFrame;
+        const int hay = AnimCanalEstado(ObjActivo, prop, comp, CurrentFrame);
+        printf("      [canalestado] %d %d en el frame %d = %d (esperaba %d)\n", prop, comp, CurrentFrame, hay, esp);
+        if (hay != esp) { err = "canalestado: el estado no es el esperado"; return false; }
         return true;
     }
     // 'propboton <fila en ingles> | <texto>': lo que dice el boton de esa fila (el eje del Tornillo: 'Eje | Z')

@@ -27,7 +27,7 @@ puerto 47023 en su router).
 
 Un proyecto que crea, busca o se une a partidas no sale a la red hasta que el usuario lo deja. Al abrirlo (o al darle
 Play, si empezó a usar la red después) el editor pregunta **una sola vez** por archivo y recuerda la respuesta. Se
-cambia después en la tarjeta **Archivo**: *Acceso a la red*. Sin permiso, el juego corre igual y `redDisponible()`
+cambia después en la tarjeta **Juego**: *Acceso a la red*. Sin permiso, el juego corre igual y `redDisponible()`
 devuelve `false, "sin permiso"`: mostrá un mensaje en vez de la opción de jugar en red.
 
 ## Un ejemplo: la sala

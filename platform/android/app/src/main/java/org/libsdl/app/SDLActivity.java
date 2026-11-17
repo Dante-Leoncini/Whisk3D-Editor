@@ -816,8 +816,12 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
                                 }
                                 SDLActivity.mFullscreenModeActive = false;
                             }
-                            if (Build.VERSION.SDK_INT >= 28 /* Android 9 (Pie) */) {
-                                window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                            // (WHISK3D) Android 15 deprecó LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES y DEFAULT, y Google Play
+                            // avisa "APIs obsoletas para la vista de extremo a extremo". El reemplazo es ALWAYS (Android 11+):
+                            // en un telefono es lo mismo que SHORT_EDGES (el recorte siempre cae en un borde corto). En
+                            // Android 9 y 10 queda el modo por defecto del sistema, sin tocarlo.
+                            if (Build.VERSION.SDK_INT >= 30 /* Android 11 (R) */) {
+                                window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
                             }
                         }
                     } else {

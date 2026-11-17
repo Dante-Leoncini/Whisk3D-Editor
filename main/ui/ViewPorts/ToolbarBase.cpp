@@ -305,7 +305,7 @@ void BrushBarDragSoltar(){
         PropFloat* pf = BBprop(gBBidx);
         if (pf){
             pf->IniciarEdicionTexto();
-            if (ToolbarUsaTactil()) NumPadAbrir();
+            if (ToolbarUsaTactil()) TecladoNumeroAbrir();
         }
     }
     gBBvp = NULL; gBBidx = -1; gBBmovio = false;

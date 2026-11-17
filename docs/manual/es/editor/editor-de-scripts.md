@@ -1,6 +1,6 @@
 # Editor de scripts (IDE)
 
-Editor de texto para los scripts Lua y los [shaders escritos](shaders.md) (`.glsl`), con números de línea, colores de sintaxis, guías de sangría y soporte para la ñ y las tildes. Mientras tiene el foco, las letras escriben (no disparan atajos del editor). En Android, tocar el texto abre el teclado. En el N95 se escribe con T9.
+Editor de texto para los scripts Lua y los [shaders escritos](shaders.md) (`.glsl`), con números de línea, colores de sintaxis, guías de sangría y soporte para la ñ y las tildes. Mientras tiene el foco, las letras escriben (no disparan atajos del editor). En Android, tocar el texto abre el teclado: el de Whisk3D (su **Enter** hace un salto de línea; con el teclado abierto podés seguir tocando el código para mover el cursor o elegir una palabra, y se cierra con Atrás), o el del teléfono si en Ajustes está tildado **Usar teclado del sistema**. Con cualquiera de los dos, el editor se **maximiza** y ocupa toda la pantalla menos el teclado, que queda abajo; al cerrarlo vuelve el layout de antes. En el N95 se escribe con T9.
 
 | Función | Descripción | Atajo |
 |---|---|---|

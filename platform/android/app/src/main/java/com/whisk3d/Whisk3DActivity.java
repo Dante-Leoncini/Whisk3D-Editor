@@ -129,9 +129,55 @@ public class Whisk3DActivity extends SDLActivity {
         return false;
     }
 
+    // CERRAR DE VERDAD. Cuando main() termina (el usuario eligio "Cerrar" despues de Atras, o el sistema destruyo la
+    // actividad) SDL cierra la actividad pero el PROCESO sigue vivo con los globales de C++ del .so: al volver a abrir,
+    // main() arrancaria otra vez con la escena de antes cargada (se duplicaba). Asi que, cerrada la actividad, se
+    // termina el proceso (despues de que Android termine de destruirla)
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (isFinishing()) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() { System.exit(0); }
+            });
+        }
+    }
+
+    // EL TECLADO DEL SISTEMA: cuanto de la superficie de SDL tapa, en pixeles (W3dTeclado.cpp). En pantalla completa
+    // Android no achica la ventana con el teclado: sin esto el editor no se enteraba y el campo quedaba debajo. Con la
+    // ventana achicada da 0 (ya no tapa nada). Se avisa solo cuando cambia
+    private static native void nativeTecladoTapado(int px);
+    private int tapadoAvisado = -1;
+    private void vigilarTeclado() {
+        final android.view.View decor = getWindow().getDecorView();
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                if (mSurface == null) return;
+                android.graphics.Rect r = new android.graphics.Rect();
+                decor.getWindowVisibleDisplayFrame(r);
+                int[] p = new int[2];
+                mSurface.getLocationOnScreen(p);
+                int h = mSurface.getHeight();
+                int tapado = p[1] + h - r.bottom;
+                if (tapado < h * 15 / 100) tapado = 0;   // (la barra de navegacion no es el teclado)
+                if (tapado == tapadoAvisado) return;
+                try { nativeTecladoTapado(tapado); tapadoAvisado = tapado; } catch (Throwable t) { /* (sin libmain todavia) */ }
+            }
+        });
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        vigilarTeclado();
+        // Android 10+: sin la capa semitransparente de "contraste" que el sistema pone sobre la barra de navegacion
+        // (con el tema claro salia blanquecina). El fondo de las barras es el negro de la ventana (styles.xml). La de
+        // estado no lleva esa capa por defecto (y su setStatusBarContrastEnforced quedo obsoleto en Android 15).
+        if (Build.VERSION.SDK_INT >= 29) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
         // ANDROID 15+ con targetSdk 35/36: la ventana va SIEMPRE de borde a borde. Sin esto, con la barra de estado a
         // la vista (pantalla con notch) el editor se dibujaba DEBAJO de la barra y de la camara, y el teclado ya no
         // achicaba la ventana (adjustResize ahora solo avisa): W3dTeclado.cpp lo detecta porque la ventana se achica.

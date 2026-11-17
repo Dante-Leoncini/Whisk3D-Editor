@@ -109,6 +109,8 @@ struct RTEscena {
     std::vector<RTNodo> nodos;
     std::vector<int> orden;               // indices de triangulos, en el orden de las hojas
     float bg[3];
+    int   bgTex;      // el FONDO como textura 360 (equirectangular): su lugar en 'texs' (-1 = el color 'bg')
+    float bgRot[9];   // la rotacion del fondo (mundo -> imagen, ver W3dFondoMatriz)
     bool hayTransparentes;                // algun material transparente: los rayos de sombra atraviesan (sin any-hit)
     // LAS MALLAS (sin modificadores): donde quedaron sus vertices y con que matriz / pose. Cuando solo se MUEVEN (la
     // pose de un esqueleto, o la posicion: el publico que salta) se renuevan sus vertices y se reajustan las cajas del
@@ -465,6 +467,12 @@ static void ArmarEscena(RTEscena& e) {
     RecorrerEscena(e, SceneCollection, vistos);
     AgregarLuces(e);
     e.bg[0] = g_renderBg[0]; e.bg[1] = g_renderBg[1]; e.bg[2] = g_renderBg[2];
+    // el FONDO 360: sus pixeles CPU (los de la textura) y su rotacion
+    e.bgTex = -1; W3dFondoMatriz(e.bgRot);
+    if (W3dFondoConTextura()) {
+        TexturaEditable* tf = TexEditObtener(g_renderBgTex);
+        if (tf && tf->w > 0 && tf->h > 0) { RTTextura tx; tx.px = &tf->rgba[0]; tx.w = tf->w; tx.h = tf->h; tx.filtrado = true; e.texs.push_back(tx); e.bgTex = (int)e.texs.size() - 1; }
+    }
     BVHArmar(e);
 }
 
@@ -574,6 +582,18 @@ static inline float VentanaDistancia(float d, float D) {
     const float x = d / D; if (x >= 1.0f) return 0.0f;
     const float x2 = x * x, w = 1.0f - x2 * x2; return w * w;
 }
+// EL FONDO en una direccion: el color, o el punto de la textura 360 (la misma cuenta que W3dFondoDireccionUV)
+static void FondoEn(const RTEscena& e, const RTV& d, float* out) {
+    if (e.bgTex < 0) { out[0] = e.bg[0]; out[1] = e.bg[1]; out[2] = e.bg[2]; return; }
+    const float* m = e.bgRot;
+    const float x = m[0] * d.x + m[1] * d.y + m[2] * d.z, y = m[3] * d.x + m[4] * d.y + m[5] * d.z;
+    float z = m[6] * d.x + m[7] * d.y + m[8] * d.z;
+    if (z > 1.0f) z = 1.0f; if (z < -1.0f) z = -1.0f;
+    float u = 0.5f + atan2f(y, x) * 0.15915494f, v = acosf(z) * 0.31830989f;
+    if (u >= 1.0f) u -= 1.0f; if (u < 0.0f) u += 1.0f;
+    float rgba[4]; Muestrear(e.texs[(size_t)e.bgTex], u, v, rgba);
+    out[0] = rgba[0]; out[1] = rgba[1]; out[2] = rgba[2];
+}
 static float Visibilidad(const RTEscena& e, const RTV& o, const RTV& d, float tMax) {
     RTHit h;
     if (!e.hayTransparentes) return Trazar(e, o, d, 1e-4f, tMax, true, h) ? 0.0f : 1.0f;
@@ -666,7 +686,7 @@ static void Radiancia(const RTEscena& e, const RTV& o0, const RTV& d0, RTRng& rn
     // (lo TOTALMENTE transparente en ese punto no gasta capa: ver Visibilidad)
     for (int capa = 0, vuelta = 0; capa < g_rt.capas && vuelta < 256; vuelta++) {
         RTHit h;
-        if (!Trazar(e, o, d, tMin, 1e30f, false, h, excl)) { out[0] += peso * e.bg[0]; out[1] += peso * e.bg[1]; out[2] += peso * e.bg[2]; return; }
+        if (!Trazar(e, o, d, tMin, 1e30f, false, h, excl)) { float f[3]; FondoEn(e, d, f); out[0] += peso * f[0]; out[1] += peso * f[1]; out[2] += peso * f[2]; return; }
         const RTTri& T = e.tris[(size_t)h.tri];
         const RTMaterial m = MaterialEn(e, h, e.mats[(size_t)T.mat]);   // (con los mapas leidos en el impacto)
         const float b0 = 1.0f - h.b1 - h.b2;
@@ -714,6 +734,24 @@ static void Radiancia(const RTEscena& e, const RTV& o0, const RTV& d0, RTRng& rn
                 }
                 float refl[3]; Radiancia(e, p + n * 1e-3f, r, rng, profundidad + 1, refl);
                 for (int c = 0; c < 3; c++) col[c] += m.metalico * alb[c] * refl[c];
+            }
+            // LA LUZ DEL FONDO 360 sin rebotes: un rayo al cielo pesado por el coseno; si no lo tapa nada, trae lo que se ve
+            // de la imagen en esa direccion (el cielo alumbra de arriba, el piso de la imagen de abajo). Con rebotes, el
+            // rebote que no pega en nada ya trae el fondo
+            if (e.bgTex >= 0 && g_rt.rebotes == 0 && !m.sinLuz && m.metalico < 1.0f && !g_rtPreviewRapida) {
+                RTV dir = Norm(n + DirAzarEsfera(rng));
+                if (Dot(dir, n) <= 0.0f) dir = n;
+                const float vis = Visibilidad(e, p + n * 1e-3f, dir, 1e30f);
+                if (vis > 0.0f) { float f[3]; FondoEn(e, dir, f); for (int c = 0; c < 3; c++) col[c] += vis * (1.0f - m.metalico) * alb[c] * f[c]; }
+            }
+            // REBOTES DE LA LUZ (g_rt.rebotes): la parte difusa sigue en UNA direccion al azar pesada por el coseno (n +
+            // un punto de la esfera) y trae lo que ve alla (su luz directa, su emision, el fondo y sus propios rebotes).
+            // Con ese reparto el aporte es albedo * lo que llega (los pases lo promedian). No en la vista previa rapida
+            if (g_rt.rebotes > 0 && profundidad < g_rt.rebotes && !m.sinLuz && !g_rtPreviewRapida && m.metalico < 1.0f) {
+                RTV dir = Norm(n + DirAzarEsfera(rng));
+                if (Dot(dir, n) <= 0.0f) dir = n;
+                float ind[3]; Radiancia(e, p + n * 1e-3f, dir, rng, profundidad + 1, ind);
+                for (int c = 0; c < 3; c++) col[c] += (1.0f - m.metalico) * alb[c] * ind[c];
             }
             if (m.aditivo) { for (int c = 0; c < 3; c++) out[c] += peso * col[c]; }   // suma y no tapa
             else           { for (int c = 0; c < 3; c++) out[c] += peso * alfa * (1.0f - m.trans) * col[c]; if (m.trans <= 0.0f) peso *= (1.0f - alfa); }
@@ -773,7 +811,7 @@ static void PrimerImpacto(const RTEscena& e, const RTV& o, const RTV& d, float* 
     RTHit h;
     float tMin = 1e-4f; int excl = -1;
     for (int capa = 0; ; capa++) {
-        if (!Trazar(e, o, d, tMin, 1e30f, false, h, excl)) { alb[0] = e.bg[0]; alb[1] = e.bg[1]; alb[2] = e.bg[2]; return; }
+        if (!Trazar(e, o, d, tMin, 1e30f, false, h, excl)) { FondoEn(e, d, alb); return; }
         // (la que tapa al menos la mitad; lo transparente y lo recortado se atraviesa: si no, el denoiser borroneaba
         // lo que se ve a traves de un vidrio o de las hojas)
         if (!e.hayTransparentes || capa + 1 >= g_rt.capas || OpacidadEn(e, h) >= 0.5f) break;
@@ -828,6 +866,15 @@ static bool EscenaAGpu(const RTEscena& e) {
         d[12] = (float)m.tex; d[13] = (float)m.nmTex; d[14] = (float)m.emTex; d[15] = (float)m.rugTex;
         d[11] = m.ior;
         d[16] = (float)m.metTex; d[17] = (float)m.alfaTex; d[18] = m.recorte; d[19] = m.trans;
+    }
+    // el FONDO 360: un material extra al final (la rotacion en d[0..8], la textura en d[12]); ningun triangulo lo usa
+    g.envMat = -1;
+    if (e.bgTex >= 0) {
+        g.envMat = (int)e.mats.size();
+        g.mats.resize(g.mats.size() + 20, 0.0f);
+        float* d = &g.mats[(size_t)g.envMat * 20];
+        for (int k = 0; k < 9; k++) d[k] = e.bgRot[k];
+        d[12] = (float)e.bgTex;
     }
     LucesAGpu(e, g.luces);
     NodosAGpu(e, g.nodos);
@@ -962,7 +1009,7 @@ struct RTRender {
             c.lente = cam.lente; c.foco = cam.foco;
             c.semilla = semilla;
             const double tq = W3dNowMs();
-            const bool ok = RTGpuPase(c, paso, ns, denoiser && paso == 0, g_rt.capas);
+            const bool ok = RTGpuPase(c, paso, ns, denoiser && paso == 0, g_rt.capas, g_rt.rebotes);
             msPases += W3dNowMs() - tq;
             if (g_rtPerfil) w3dLogf("[rt perfil] pase %d: %.1f ms", paso, W3dNowMs() - tq);
             if (!ok) { gpu = false; g_rtUltimoEnGpu = false; paso = 0; acum.assign(acum.size(), 0.0f); return true; }
@@ -1216,6 +1263,8 @@ static double FirmaVista(Viewport3D* vp) {
     S::Rec(SceneCollection, f);
     f += (double)Lights.size() * 9.1;   // (cuantas: agregar o borrar una arma de nuevo)
     if (g_localViewActivo && g_localViewVisibles) f += 77.7 + (double)g_localViewVisibles->size() * 1.31;   // (la vista local)
+    f += g_rt.rebotes * 5.3;   // (los rebotes de la luz)
+    f += g_renderBgModo * 3.7 + (g_renderBgTex ? g_renderBgTex->iID * 0.023 : 0.0) + g_renderBgRot[0] * 0.011 + g_renderBgRot[1] * 0.013 + g_renderBgRot[2] * 0.017;   // (el fondo 360)
     f += (g_rt.semillaVariable ? 0.33 : 0.0) + g_rt.samples * 0.101 + g_rt.rayos * 0.047 + g_rt.pases * 0.0071 + g_renderBg[0] + g_renderBg[1] * 2 + g_renderBg[2] * 3 + g_rt.denoiser * 17.3 + (g_rt.gpu ? 23.9 : 0.0);
     for (size_t i = 0; i < Materials.size(); i++) if (Materials[i]) { Material* mt = Materials[i];
         f += mt->diffuse[0] * 0.21 + mt->diffuse[1] * 0.23 + mt->diffuse[2] * 0.29 + mt->diffuse[3] * 0.37 + (mt->transparent ? 1.7 : 0.0) + mt->mezcla * 0.13 + mt->rtRugosidad * 0.41 + mt->rtMetalico * 0.43 + mt->emission[0] + mt->emission[1] + mt->emission[2] + (mt->lighting ? 0.3 : 0.0) + (mt->textureOn ? 0.9 : 0.0) + (mt->texture ? mt->texture->iID * 0.011 : 0.0) + (mt->normalMap ? 2.3 : 0.0) + (mt->normalTexture ? mt->normalTexture->iID * 0.017 : 0.0);

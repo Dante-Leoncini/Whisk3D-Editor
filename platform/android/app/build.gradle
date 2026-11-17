@@ -48,8 +48,12 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8: achica, optimiza y ofusca el Java del AAB (Play lo mide como "optimizacion de codigo DEX"; con
+            // minifyEnabled false salia "baja"). 'proguard-android-optimize.txt' y no 'proguard-android.txt': esa
+            // trae -dontoptimize. Lo que el C/C++ llama por JNI se guarda en proguard-rules.pro.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // el AAB para Google Play (./gradlew bundleRelease): con la clave de subida. Sin ella, la de debug
             // (~/.android/debug.keystore, AGP la crea/usa sola). El APK de la pagina sigue siendo el de assembleDebug.
             signingConfig hayClaveSubida ? signingConfigs.subida : signingConfigs.debug
@@ -66,7 +70,9 @@ android {
         }
     }
 }
+// SIN androidx: SDLActivity extiende la Activity de Android y el tema es el del sistema (styles.xml). appcompat 1.1.0
+// solo ponia el padre del tema y traia fragment 1.1.0, activity 1.0.0, core, lifecycle... que Google Play marca como
+// versiones obsoletas. Si algun dia hace falta una libreria androidx, que sea una version actual.
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'androidx.appcompat:appcompat:1.1.0'
 }

@@ -51,8 +51,10 @@ struct OutFilaRec {
     long bytes;            // recurso: cuanto ocupa (-1 = no se sabe)
     bool cargado;          // recurso: esta en memoria (false: guardado, sin cargar -> la carpeta azul)
     int  tilde;            // recurso: su casilla (-1 = no tiene, 0 / 1): las escenas abiertas en el editor
+    bool externo;          // recurso: su archivo vive AFUERA del .w3d (la flecha de acceso directo sobre el icono)
     OutFilaRec() : carpeta(false), tipo(0), prof(0), icono(-1), usuarios(0), plegada(false), soloLectura(false),
-                   renombrable(true), parte(false), sucio(false), atras(false), bytes(-1), cargado(true), tilde(-1) {}
+                   renombrable(true), parte(false), sucio(false), atras(false), bytes(-1), cargado(true), tilde(-1),
+                   externo(false) {}
 };
 
 // "Select Users" de la biblioteca (el menu del outliner y el boton de la tarjeta del recurso de

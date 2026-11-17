@@ -148,8 +148,13 @@ raizinfo n 1 tipo escena
 raizmodo kind 0 juego 0
 
 # ---- el guardado de arriba (hecho editando el clip "Salto") tiene al juego en su frame 1 ----
+# (2026-11-16: abrir VUELVE a lo que se estaba editando -- el clip "Salto" en su frame 11 -- y "Juego" devuelve el
+#  estado base que se guardo)
 abrirw3d /tmp/w3d_f6_juego_clip.w3d
 raizinfo activa Game tipo juego
+raizmodo kind 0 juego 0
+objat Jugador 10 0 0 0.01
+raizanim juego
 raizmodo kind 2 juego 1
 objat Jugador 0 0 0 0.001
 raizanim Salto

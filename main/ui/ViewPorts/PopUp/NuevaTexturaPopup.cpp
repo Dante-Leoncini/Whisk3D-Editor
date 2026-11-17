@@ -202,7 +202,7 @@ bool NuevaTexturaPopup::Click(int mx, int my) {
                 g_textFieldActivo = NULL;
                 p->EditPropertie();
                 #ifndef W3D_SYMBIAN
-                if (ToolbarUsaTactil()) W3dTecladoAbrir();
+                if (ToolbarUsaTactil()) TecladoTextoAbrir();
                 #endif
             } else if (tipo == PropertyType::Color) {
                 if (!colorPicker) colorPicker = new ColorPicker();
@@ -311,7 +311,7 @@ void NuevaTexturaPopup::Soltar() {
     if (pickerAbierto && colorPicker) { colorPicker->Soltar(); return; }
     if (dragField && !dragMoved && dragField->value) {
         dragField->IniciarEdicionTexto();            // mouse: se escribe directo en el campo
-        if (ToolbarUsaTactil()) NumPadAbrir();       // tactil: ademas el teclado en pantalla (se abre abajo; el popup sube)
+        if (ToolbarUsaTactil()) TecladoNumeroAbrir();       // tactil: ademas el teclado en pantalla (se abre abajo; el popup sube)
     }
     dragField = NULL;
 }

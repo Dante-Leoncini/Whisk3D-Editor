@@ -1,0 +1,35 @@
+# ==========================================================================
+#  TOCAR UNA OPCION CON SUBMENU NO ELIGE LA PRIMERA OPCION DEL SUBMENU
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_menu_submenu_dedo.w3s
+#
+#  EL CASO (Android, el menu Anadir de la barra del 3D). Tocar "Malla" con el
+#  dedo y soltar agregaba un PLANO: el dedo apoyado abre el submenu (como el
+#  hover del mouse) con su primera opcion resaltada, y al soltar el click caia
+#  en la fila "Malla" y PopupMenu::Enter() se lo pasaba al submenu abierto (la
+#  navegacion con el teclado), que elegia lo resaltado. Ahora la fila con
+#  submenu solo lo abre; elegir es tocar la opcion (o deslizar hasta ella).
+#  Con eventos de dedo reales (el mouse sintetizado + el dedo, como SDL). La
+#  causa de fondo: SDL manda el movimiento del mouse hasta el punto del toque
+#  ANTES del down, y con el menu abierto ese movimiento hacia de HOVER (abria
+#  el submenu debajo del dedo antes de apoyarlo). Un dedo no tiene hover.
+# ==========================================================================
+
+ventana 606 1280
+escala 2
+escenadefecto
+esperar 600
+menuadd 155 100
+menuabierto si
+dedotoque itemizq Mesh
+tick
+menuabierto si
+fail selobj Plano
+fail selobj Plane
+# (el submenu quedo abierto ENCIMA de "Malla": lo que ahora se ve debajo del dedo son sus opciones)
+# ahora si: tocar la opcion del submenu la elige
+dedotoque subitem Plane
+tick
+menuabierto no
+selobj Plano

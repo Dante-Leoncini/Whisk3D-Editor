@@ -46,7 +46,7 @@ Un ejemplo de cada uno, en video, está en el tutorial [El Modo Objeto](../tutor
 
 ## El imán
 
-![El botón del imán](../tutoriales/img/boton-vista3d-iman.webp) Con el **imán** prendido, lo que se mueve se pega a algo: a los vértices, las aristas o las caras de otros objetos, o a sus centros. El botón se pone verde cuando está prendido.
+![El botón del imán](../tutoriales/img/boton-vista3d-iman.webp) Con el **imán** prendido, lo que se mueve se pega a algo: a los vértices, las aristas o las caras de otros objetos, o a sus centros. El botón se pone verde cuando está prendido. Un recuadro verde marca dónde se está pegando. Con el dedo, alcanza con pasar cerca del punto (la zona crece con la escala de la interfaz) y el recuadro es más grande, para que se vea al lado del dedo.
 
 ![El menú Imán: Activar, Base de Snap, Destino de Snap y las casillas Afectar Mover, Rotar, Escalar e Incluir Activo, Editado y No Editado](../tutoriales/img/vista-3d-menu-iman.webp)
 

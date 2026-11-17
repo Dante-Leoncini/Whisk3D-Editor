@@ -1,11 +1,19 @@
 <resources>
 
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
-        <item name="colorPrimary">#000000</item>
-        <item name="colorPrimaryDark">#191919</item> <!-- este es la barra superior -->
-        <item name="colorAccent">#000000</item>
+    <!-- El tema de la app: el OSCURO de Android, sin barra de titulo (Material: Android 5.0 en adelante, el minimo de
+         la app). Antes era Theme.AppCompat.Light.DarkActionBar, que obligaba a usar la libreria appcompat solo para
+         esto (y traia versiones de androidx que Google Play marca como obsoletas). SDLActivity es una Activity comun. -->
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+        <!-- LAS BARRAS DEL SISTEMA EN NEGRO (la de estado arriba y la de navegacion abajo), con los iconos claros:
+             - Android 15+: la ventana va de borde a borde. Whisk3DActivity le deja al editor el margen de las barras y
+               lo que se ve DETRAS de ellas es el fondo de la ventana: windowBackground (con el tema claro de antes era
+               BLANCO, y los iconos blancos tambien: no se veia nada).
+             - Android 14 o menos: el tema oscuro pinta la barra de estado con colorPrimaryDark y la de navegacion
+               negra. NO van statusBarColor / navigationBarColor: Android 15 los deprecó y Google Play avisa. -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorPrimary">#000000</item>
+        <item name="android:colorPrimaryDark">#000000</item>
+        <item name="android:colorAccent">#00FF00</item>
     </style>
 
 </resources>

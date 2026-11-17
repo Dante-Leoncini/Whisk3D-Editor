@@ -103,7 +103,9 @@ void W3dNewSceneInit() {
         Light* l = Light::Create(CollectionActive, 0, 0, 0);
         if (l) { l->pos = Vector3(3.0f, 4.0f, 2.0f); }
         // camara default, misma pose que el constructor de PC
-        new Camera(CollectionActive, Vector3(-3.0f, 2.5f, 1.8f), Vector3(-35.0f, -45.0f, 0.0f));
+        // (la misma camara que el editor de la PC: main/app/constructor.cpp, mirando al cubo)
+        { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
+          new Camera(CollectionActive, posCam, CamaraRotMirando(posCam, Vector3(0.0f, 0.0f, 0.0f))); }
         // el cubo se crea ULTIMO y arranca seleccionado
         Object* cubo = NewMesh(MeshType::cube, CollectionActive, false);
         if (cubo) {

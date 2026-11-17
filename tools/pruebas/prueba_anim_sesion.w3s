@@ -1,0 +1,42 @@
+# ==========================================================================
+#  LA ANIMACION QUE SE ESTABA EDITANDO VUELVE AL ABRIR EL PROYECTO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_anim_sesion.w3s
+#
+#  EL CASO. Con un clip de un armature elegido en la linea de tiempo, guardar,
+#  cerrar y abrir volvia a la animacion de ESCENA: con cientos de clips habia
+#  que buscar otra vez el que se estaba editando. Ahora la sesion del .w3d
+#  guarda que mira la linea de tiempo (animTipo / animObjeto), se repone al
+#  abrir (con su rango y el cuadro donde estaba) y el selector marca el clip
+#  en VERDE (abre scrolleado a el).
+# ==========================================================================
+
+ventana 900 700
+personajesmin /tmp/w3d_animsesion 1
+clipmenu Quieto
+animactiva armature Personaje Quieto
+frame 3
+guardarw3d /tmp/w3d_animsesion/sesion.w3d
+jsontiene /tmp/w3d_animsesion/sesion.w3d "animTipo": "armature"
+abrirw3d /tmp/w3d_animsesion/sesion.w3d
+animactiva armature Personaje Quieto frame 3
+# el otro clip, por las dudas (no es "el primero")
+clipmenu Saludo
+animactiva armature Personaje Saludo
+guardarw3d /tmp/w3d_animsesion/sesion.w3d
+abrirw3d /tmp/w3d_animsesion/sesion.w3d
+animactiva armature Personaje Saludo
+# de vuelta a una animacion de escena: en un JUEGO (abre en "Juego") tambien se nombra
+clipmenu Scene
+animactiva escena
+guardarw3d /tmp/w3d_animsesion/sesion.w3d
+jsontiene /tmp/w3d_animsesion/sesion.w3d "animTipo": "escena"
+abrirw3d /tmp/w3d_animsesion/sesion.w3d
+animactiva escena
+# en una ESCENA comun la animacion de escena es lo de siempre: no se escribe nada (un .w3d de antes abre igual)
+escenadefecto
+guardarw3d /tmp/w3d_animsesion/comun.w3d
+jsontiene /tmp/w3d_animsesion/comun.w3d "animTipo" 0
+abrirw3d /tmp/w3d_animsesion/comun.w3d
+animactiva escena

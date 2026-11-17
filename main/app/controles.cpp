@@ -16,6 +16,10 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 #include "ViewPorts/UVEditor.h"    // UVEditorTomaTab (Tab sobre el UV = entrar/salir de huesos 2D)
 #include "ViewPorts/Outliner.h"    // el menu contextual de las vistas de recursos (click derecho)
 #include "WhiskUI/draw/glesdraw.h"        // W3dPantallaAlto
+#include "WhiskUI/widgets/card.h"         // CardUV: el circulo de carga de la pulsacion larga
+#include "WhiskUI/theme/colores.h"        // SetColorID
+#include "objects/Textures.h"             // el atlas de la UI
+#include <cmath>
 #include "controles.h"
 #include "Undo.h" // Ctrl+Z
 #include "objects/Gamepad.h"    // axisState/buttonState: se sueltan al desenchufar el mando
@@ -210,9 +214,27 @@ static const Uint32 kPulsacionLargaMs = 500;
 // un arrastre rapido que entra entero en la espera anti-gesto (kEsperaGestoMs) no limpiaba lo pendiente y, con el
 // dedo parado despues, abria el menu contextual
 static bool g_tapMovio = false;
-// el AGARRE de la biblioteca / el outliner: un SEGUNDO quieto (mas corto se confundia con empezar a scrollear) y el
-// telefono vibra: recien ahi arrastrar mueve el elemento; antes, arrastrar es scroll
-static const Uint32 kAgarreOutlinerMs = 1000;
+// el AGARRE de la biblioteca / el outliner: medio segundo con el dedo QUIETO (como el menu de la vista 3D y del
+// timeline; con un segundo tardaba mucho) y el telefono vibra: recien ahi arrastrar mueve el elemento; antes, arrastrar
+// es scroll. Que no se confunda con empezar a scrollear lo cuida g_tapMovio (el dedo se alejo: ya no es agarre)
+static const Uint32 kAgarreOutlinerMs = 500;
+// DONDE va el circulo de carga de la pulsacion larga y donde se abre su menu: arriba y a la izquierda del dedo (el dedo
+// tapa donde se apoya); pegado a un borde, del otro lado
+static void CargaDedoLugar(int px, int py, int& cx, int& cy) {
+    const int gs = GlobalScale > 0 ? GlobalScale : 1;
+    const int r = 9 * gs;
+    cx = px - 22 * gs; cy = py - 36 * gs;
+    if (cx - r < 0) cx = px + 22 * gs;
+    if (cy - r < 0) cy = py + 36 * gs;
+}
+// el aviso de que la pulsacion larga ya esta: 45 ms (el VibGolpe de 32 ms casi no se sentia). Solo el telefono: un mando
+// conectado no tiene por que vibrar por tocar la pantalla
+static void VibrarPulsacionLarga() {
+    void (*mandos)(int, float) = W3dScriptMandosVibrarHook;
+    W3dScriptMandosVibrarHook = NULL;
+    w3dEngine::VibrarMs(45, 1.0f);
+    W3dScriptMandosVibrarHook = mandos;
+}
 // IDE TACTIL: la lupa (pulsacion larga) o una agarradera de la seleccion en curso; mientras dura, el dedo es de el
 static IDE* g_ideGestoVp = NULL;
 static bool g_outAgarre = false;
@@ -355,9 +377,9 @@ void ControlesTick() {
         g_view3dTapPending = false;      // ya no es un toque: al levantar no selecciona
         g_view3dMenuLargo = true;
         ViewPortClickDown = false;
-        w3dEngine::Vibrar(w3dEngine::VibGolpe);
+        VibrarPulsacionLarga();
         extern void LayoutMenuContexto3D(int mx, int my);
-        LayoutMenuContexto3D(g_tapStartX, g_tapStartY);
+        { int mx, my; CargaDedoLugar(g_tapStartX, g_tapStartY, mx, my); LayoutMenuContexto3D(mx, my); }   // (donde estaba el circulo)
         // el MISMO dedo puede deslizar hasta una opcion y soltar ahi (soltarlo quieto deja el menu abierto)
         if (LayoutMenuToqueArrancar(g_tapStartX, g_tapStartY, true)) g_view3dMenuLargo = false;
         g_redraw = true;
@@ -371,9 +393,10 @@ void ControlesTick() {
         if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }
         if (intento != g_tapStartTicks) {
             intento = g_tapStartTicks;
-            if (((Timeline*)g_tlTapView)->MenuContexto(g_tapStartX, g_tapStartY)) {
+            int mx, my; CargaDedoLugar(g_tapStartX, g_tapStartY, mx, my);   // (el menu, donde estaba el circulo)
+            if (((Timeline*)g_tlTapView)->MenuContexto(g_tapStartX, g_tapStartY, mx, my)) {
                 g_tlTapPending = false; ViewPortClickDown = false;
-                w3dEngine::Vibrar(w3dEngine::VibGolpe);
+                VibrarPulsacionLarga();
                 LayoutMenuToqueArrancar(g_tapStartX, g_tapStartY, true);
                 g_redraw = true;
             }
@@ -394,15 +417,100 @@ void ControlesTick() {
         }
         return;
     }
-    if (!g_barTapView || !g_barTapView->isLeaf() || !VpEsOutliner(g_barTapView)) return;
+    // PROPERTIES: el dedo quieto medio segundo sobre una fila de valor = el click derecho: su menu (restablecer, copiar,
+    // pegar, los keyframes). Mientras espera, arriba del dedo gira el circulo de carga (CargaDedoRender). El dedo
+    // puede deslizar hasta una opcion y soltar ahi
+    if (g_barTapView && g_barTapView->isLeaf() && g_barTapView->ViewportKind() == 3) {
+        if (g_tapMovio) return;
+        if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }   // (sigue esperando)
+        static Uint32 intento = 0;
+        if (intento != g_tapStartTicks) {
+            intento = g_tapStartTicks;
+            int mx, my; CargaDedoLugar(g_tapStartX, g_tapStartY, mx, my);   // (el menu, donde estaba el circulo)
+            if (((Properties*)g_barTapView)->MenuContexto(g_tapStartX, g_tapStartY, mx, my)) {
+                g_contentTapPending = false;   // ya no es ni tap ni scroll
+                ViewPortClickDown = false;
+                VibrarPulsacionLarga();
+                LayoutMenuToqueArrancar(g_tapStartX, g_tapStartY, true);
+                g_redraw = true;
+            }
+        }
+        return;
+    }
+    if (!g_barTapView || !g_barTapView->isLeaf() || !VpEsOutliner(g_barTapView) || g_tapMovio) return;
     if (SDL_GetTicks() - g_tapStartTicks < kAgarreOutlinerMs) { g_redraw = true; return; }   // (sigue esperando)
     if (LayoutPulsacionLargaUI(g_tapStartX, g_tapStartY)) {
-        w3dEngine::Vibrar(w3dEngine::VibGolpe);   // el aviso: ya esta agarrado, ahora se arrastra
+        VibrarPulsacionLarga();   // el aviso: ya esta agarrado, ahora se arrastra
         g_contentTapPending = false;   // ya no es ni tap ni scroll: es un agarre
         g_outAgarre = true;
         ViewPortClickDown = true;
         g_redraw = true;
     }
+}
+
+// ============================================================================
+//  EL CIRCULO DE CARGA arriba del dedo (tactil): mientras una PULSACION LARGA espera (el dedo quieto sobre Properties,
+//  la biblioteca / el outliner, el timeline o la vista 3D) gira arriba y a la izquierda del dedo un circulo de
+//  cuadraditos -pixelado, como la letra de la UI-: puntos blancos que se van poniendo verdes hasta que sale el menu
+//  (ahi mismo) o el agarre. Un toque corto no lo muestra
+//  (aparece a los 120 ms) y se va si el dedo se mueve o se levanta. Lo dibuja main.cpp encima de todo.
+// ============================================================================
+static bool PulsacionLargaEnEspera(int& px, int& py, float& frac) {
+    if (fingers.size() != 1 || g_tapMovio) return false;
+    Uint32 umbral = 0;
+    if (g_view3dTapPending && g_view3dTapTactil && estado == editNavegacion && g_barTapView && g_barTapView->isLeaf() &&
+        g_barTapView->ViewportKind() == 1) umbral = kPulsacionLargaMs;
+    else if (g_tlTapPending && g_tlTapView && g_tlTapView->isLeaf() && g_tlTapView->ViewportKind() == 5) umbral = kPulsacionLargaMs;
+    else if (g_contentTapPending && g_contentTapTactil && !g_outAgarre && g_barTapView && g_barTapView->isLeaf()) {
+        if (g_barTapView->ViewportKind() == 3) umbral = kPulsacionLargaMs;
+        else if (VpEsOutliner(g_barTapView)) umbral = kAgarreOutlinerMs;
+    }
+    if (!umbral) return false;
+    const Uint32 t = SDL_GetTicks() - g_tapStartTicks;
+    if (t < 120 || t >= umbral) return false;
+    px = g_tapStartX; py = g_tapStartY;
+    frac = (float)(t - 120) / (float)(umbral - 120);
+    return true;
+}
+void CargaDedoRender(int screenW, int screenH) {
+    int px, py; float frac;
+    if (!PulsacionLargaEnEspera(px, py, frac) || Textures.empty() || !Textures[0]) return;
+    w3dEngine::Viewport(0, 0, screenW, screenH);
+    w3dEngine::Disable(w3dEngine::ScissorTest);
+    w3dEngine::MatrixMode(w3dEngine::Projection); w3dEngine::LoadIdentity();
+    w3dEngine::Ortho(0, screenW, screenH, 0, -1, 1);
+    w3dEngine::MatrixMode(w3dEngine::ModelView); w3dEngine::LoadIdentity();
+    w3dEngine::Disable(w3dEngine::DepthTest);
+    w3dEngine::Disable(w3dEngine::Lighting);
+    w3dEngine::Enable(w3dEngine::Texture2D);
+    w3dEngine::Enable(w3dEngine::Blend);
+    w3dEngine::BlendAlpha();
+    w3dEngine::EnableArray(w3dEngine::VertexArray);
+    w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+    w3dEngine::DisableArray(w3dEngine::NormalArray);
+    w3dEngine::BindTexture(Textures[0]->iID);
+    const int gs = GlobalScale > 0 ? GlobalScale : 1;
+    const int n = 12;                       // los cuadraditos de la ronda
+    const float radio = 9.0f * gs;
+    const int lado = 3 * gs;                // (la grilla de la UI: se ve pixelado, como las letras)
+    int cx, cy;
+    CargaDedoLugar(px, py, cx, cy);         // ARRIBA y a la IZQUIERDA del dedo (ahi mismo se abre el menu)
+    const float giro = (float)SDL_GetTicks() * 0.006f;
+    const int llenos = (int)(frac * n + 0.5f);
+    const GLfloat u = CardUV[5 * 2], v = CardUV[5 * 2 + 1];   // un texel del relleno de la tarjeta: un color liso
+    GLfloat uv[8] = { u, v, u, v, u, v, u, v };
+    for (int i = 0; i < n; i++) {
+        const float a = giro + 6.2831853f * (float)i / (float)n;
+        int qx = cx + (int)(cosf(a) * radio) - lado / 2;
+        int qy = cy + (int)(sinf(a) * radio) - lado / 2;
+        qx -= qx % gs; qy -= qy % gs;
+        // puntos BLANCOS que se van poniendo VERDES hasta completar la ronda (y ahi sale el menu)
+        if (i < llenos) SetColorID(ColorID::accent); else SetColorID(ColorID::blanco, 0.9f);
+        GLshort q[8] = { (GLshort)qx, (GLshort)qy, (GLshort)(qx + lado), (GLshort)qy,
+                         (GLshort)qx, (GLshort)(qy + lado), (GLshort)(qx + lado), (GLshort)(qy + lado) };
+        W3dDrawStrip4(q, uv);
+    }
+    g_redraw = true;   // sigue girando
 }
 
 void Contadores(){
@@ -722,10 +830,26 @@ void InputUsuarioSDL3(SDL_Event &e){
     // se DESINCRONIZA con toques rapidos (deja de mandar mouse-down y el explorador quedaba "atrapado").
     // Aca se DESCARTAN los mouse SINTETIZADOS del touch mientras hay un popup: el dedo ya lo maneja, y asi
     // no hay doble proceso. (El mouse REAL de escritorio -which != TOUCH- sigue manejando el popup normal.)
+    // SALVO el SEMI-MODAL (la tarjeta de la ultima operacion: mover/rotar/escalar, la del timeline, la de la malla):
+    // un toque AFUERA de el lo ACEPTA aca mismo, en el down sintetizado (llega ANTES del FINGERDOWN), y el toque
+    // sigue su camino como si no hubiera popup: orbitar, elegir un objeto o un vertice, tocar otro viewport...
+    // Antes se descartaba y el FINGERDOWN solo cerraba la tarjeta: el primer toque se perdia (como el click del mouse
+    // de escritorio, que ya aceptaba y seguia: LayoutClickUI).
+    if (PopUpActive && e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.which == SDL_TOUCH_MOUSEID &&
+        PopUpActive->CierraConViewport() && !PopUpActive->Arrastrando() &&
+        !PopUpActive->Contains((int)e.button.x, (int)e.button.y))
+        PopUpActive->Cerrar();
+    // (un popup NO MODAL -Buscar del IDE, el teclado de Whisk3D escribiendo en el IDE- deja pasar el toque de AFUERA:
+    //  es del viewport de abajo, como si el popup no estuviera. Sin esto, con el teclado abierto no se podia tocar el
+    //  codigo para mover el cursor ni elegir una palabra)
     if (PopUpActive) {
-        if (e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which == SDL_TOUCH_MOUSEID) return;
-        if ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
-            e.button.which == SDL_TOUCH_MOUSEID) return;
+        const bool esBoton = (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP);
+        const int px = esBoton ? (int)e.button.x : (int)e.motion.x, py = esBoton ? (int)e.button.y : (int)e.motion.y;
+        const bool afueraNoModal = PopUpActive->NoModal() && !PopUpActive->Contains(px, py);
+        if (!afueraNoModal) {
+            if (e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which == SDL_TOUCH_MOUSEID) return;
+            if (esBoton && e.button.which == SDL_TOUCH_MOUSEID) return;
+        }
     }
 
     // ---- MODO JUEGO con el DEDO/MOUSE: mientras el juego esta en PLAY, tocar el
@@ -775,9 +899,16 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         int mx = e.motion.x;
         int my = e.motion.y;
+        { extern bool g_cursorEsDedo; g_cursorEsDedo = (e.motion.which == SDL_TOUCH_MOUSEID); }   // (ver CheckWarpMouseInViewport)
 
         // el dedo sobre un MENU DESPLEGABLE: resalta la opcion de abajo (soltar la elige)
         if (LayoutMenuToqueActivo()) { LayoutMenuToqueMover(mx, my); GuardarMousePos(); return; }
+        // UN DEDO NO TIENE HOVER: SDL manda el movimiento del mouse sintetizado hasta el punto del toque ANTES del down
+        // (sin boton apretado). Con un menu abierto ese movimiento lo tomaba como el hover del mouse: tocar "Malla" del
+        // menu Anadir ya le abria el submenu debajo del dedo antes de apoyarlo, el toque empezaba y terminaba ADENTRO
+        // del submenu y soltar elegia su primera opcion (agregaba un Plano). El resaltado con el dedo lo hace el down
+        // (LayoutMenuToqueArrancar) y el arrastre (LayoutMenuToqueMover)
+        if (e.motion.which == SDL_TOUCH_MOUSEID && e.motion.state == 0 && LayoutMenuAbierto()) { GuardarMousePos(); return; }
 
         // hover de la 'x' de las notificaciones (estan encima de todo)
         NotificacionesMotion(mx, my);
@@ -969,7 +1100,11 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         // arbol en coordenadas ARRIBA-izquierda (como Symbian): el mouse
         // de SDL ya viene asi, sin flip
-        if (!ViewPortClickDown){
+        // UN DEDO APOYADO NO CAMBIA DE VIEWPORT: orbitar, panear, scrollear, el pinch de 2 dedos o un transform siguen en
+        // el viewport donde empezo el gesto aunque el dedo (o los dedos) salgan de el. Con el mouse el cursor se envuelve
+        // en el borde; el dedo no se puede teletransportar. (Un toque nuevo elige su viewport al apoyarse)
+        const bool dedoApoyado = (e.motion.which == SDL_TOUCH_MOUSEID) && (leftMouseDown || middleMouseDown || !fingers.empty());
+        if (!ViewPortClickDown && !dedoApoyado){
             // NO perder el foco al cruzar un GAP/SEPARADOR: si el mouse virtual (touch) cae entre viewports
             // FindViewportUnderMouse devuelve NULL. Antes eso dejaba viewPortActive=NULL y, con ViewPortClickDown
             // trabado, el 'if (!viewPortActive) return' de mas abajo bloqueaba TODOS los clicks (no se podia
@@ -1450,6 +1585,12 @@ void InputUsuarioSDL3(SDL_Event &e){
                     ((Timeline*)vpDer)->MenuContexto((int)e.button.x, (int)e.button.y)) {
                     GuardarMousePos(); return;
                 }
+                // PROPERTIES: el derecho sobre una fila de valor abre su menu (restablecer, copiar, pegar y, si es
+                // animable, los keyframes)
+                if (vpDer && vpDer->isLeaf() && vpDer->ViewportKind() == 3 &&
+                    ((Properties*)vpDer)->MenuContexto((int)e.button.x, (int)e.button.y)) {
+                    g_redraw = true; GuardarMousePos(); return;
+                }
                 // OUTLINER en una vista de RECURSOS: el derecho elige la fila y abre el menu de
                 // acciones (carpetas, renombrar, mover, borrar huerfanos) en el mouse
                 if (vpDer && vpDer->isLeaf() && VpEsOutliner(vpDer) &&
@@ -1692,6 +1833,9 @@ void InputUsuarioSDL3(SDL_Event &e){
             // desenfoca (el dueno confirma al perder el foco) y ESC lo devuelve al texto de ANTES y
             // desenfoca: el dueno ve su valor de siempre y no confirma nada (TextFieldCancelar).
             TextFieldSeguirFoco();   // el texto de antes, si el foco se puso a mano y no hubo teclas
+            // (un popup que toma el Enter / Esc de su caja: la ventanita del nombre acepta o cancela de una)
+            if ((k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_ESCAPE) && PopUpActive &&
+                PopUpActive->TeclaEnTexto(k != SDLK_ESCAPE)) { g_redraw = true; return; }
             if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) { NumEditCommit(); NumEditSalirDelPanel(); } else g_textFieldActivo = NULL; }
             else if (k == SDLK_ESCAPE) { if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) { NumEditCancel(); NumEditSalirDelPanel(); } else TextFieldCancelar(); }
             else if (k == SDLK_LEFT)  { g_textFieldActivo->CaretIzq();  g_redraw = true; }

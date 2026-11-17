@@ -3052,7 +3052,7 @@ static void TL_menuCtxAction(int id){
     }
     g_redraw = true;
 }
-bool Timeline::MenuContexto(int mx, int my){
+bool Timeline::MenuContexto(int mx, int my, int menuX, int menuY){
     if (dopeRows.empty() || g_dopeMov) return false;
     const int lx = mx - x, ly = my - y;
     if (lx < panelW || lx >= width || ly < stripY || ly >= height) return false;   // solo el strip
@@ -3074,7 +3074,7 @@ bool Timeline::MenuContexto(int mx, int my){
     it = g_tlMenuCtx->Agregar(T("Duplicate"), TL_KEY_DUP); it->atajo = "@tl.duplicar"; it->gris = &sHaySel; it->lineaArriba = true;
     it = g_tlMenuCtx->Agregar(T("Delete"), TL_KEY_DEL);   it->atajo = "@tl.borrar";   it->gris = &sHaySel;
     if (MenuAbierto && MenuAbierto != g_tlMenuCtx) MenuAbierto->Cerrar();
-    g_tlMenuCtx->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    g_tlMenuCtx->Abrir(menuX >= 0 ? menuX : mx, menuY >= 0 ? menuY : my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_tlMenuCtx;
     g_redraw = true;
     return true;

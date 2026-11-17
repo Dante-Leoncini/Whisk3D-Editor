@@ -25,7 +25,9 @@ struct RTGpuEscena {
     std::vector<int> texInfo;    // por textura 4: desde, w, h, 0
     std::vector<uint32_t> texels;// todas las texturas RGBA8 seguidas
     float bg[3];
+    int   envMat;    // el FONDO 360: un material extra al final de 'mats' (rotacion + textura); -1 = el color 'bg'
     bool hayTransparentes;
+    RTGpuEscena() : envMat(-1), hayTransparentes(false) { bg[0] = bg[1] = bg[2] = 0.0f; }
 };
 // la lente del viewport (RayTracer.cpp: RTCamara): ndc = (e.xy / (sx, sy)) [/ ez] * zoom + pan
 struct RTGpuCamara { float pos[3], der[3], arr[3], adel[3]; float sx, sy, zoom, panX, panY; bool orto;
@@ -44,7 +46,7 @@ bool RTGpuActualizarGeometria(const std::vector<float>& verts, const std::vector
 bool RTGpuActualizarLuces(const std::vector<float>& luces);   // solo las luces (20 floats cada una)
 // un PASE: 'samples' muestras por pixel sumadas al acumulador. 'paso' = pases ya hechos (semilla y promedio); con aov
 // calcula ademas el albedo y la normal del primer impacto (para el denoiser)
-bool RTGpuPase(const RTGpuCamara& c, int paso, int samples, bool aov, int capas);   // capas: las transparentes que se atraviesan
+bool RTGpuPase(const RTGpuCamara& c, int paso, int samples, bool aov, int capas, int rebotes = 0);   // rebotes: los de la luz (g_rt.rebotes)   // capas: las transparentes que se atraviesan
 // lo acumulado: la imagen de 8 bits (el promedio de 'pasos'), y si se piden, el color medio y los AOV (3 floats/px)
 bool RTGpuLeer(unsigned char* rgba, float* colorMedio, float* alb, float* nrm, int pasos);
 unsigned long long RTGpuRayos();   // los rayos trazados desde la ultima vez (primarios, de sombra, reflejos)

@@ -393,6 +393,7 @@ static bool CmdOutFila(std::istringstream& ss, std::string& err, bool negada) {
         }
         else if (k == "tipo") ok = (!f.carpeta && W3dVistaClave(f.tipo) == v);
         else if (k == "sucio") ok = (f.sucio == (v == "1"));
+        else if (k == "externo") ok = (f.externo == (v == "1"));   // la flecha de acceso directo (afuera del .w3d)
         else { err = "outfila: no entiendo '" + k + "'"; return false; }
         if (!ok) { err = "outfila: '" + n + "' no cumple " + k + " " + v; return false; }
     }
@@ -2018,13 +2019,24 @@ static bool CmdCartel(std::istringstream& ss, std::string& err) {
     W3dCambiosSalirHook = CartelSalirPrueba;
     W3dCambiosAbrirHook = CartelAbrirPrueba;
     gCartelSalio = gCartelAbrio = 0;
-    g_w3dCambiosSinCartel = false;
+    // (el harness no muestra el cartel solo: aca se prende a proposito para probarlo)
+    const bool sinAntes = g_w3dCambiosSinCartel, activoAntes = g_w3dCambiosCartelActivo;
+    g_w3dCambiosSinCartel = false; g_w3dCambiosCartelActivo = true;
     const bool abrio = W3dCambiosPreguntar(acc, "otro.w3d");
-    g_w3dCambiosSinCartel = true;
+    g_w3dCambiosSinCartel = sinAntes; g_w3dCambiosCartelActivo = activoAntes;
     const bool popup = PopUpActive != NULL;
     printf("      [cartel] %s: %s%s\n", a.c_str(), abrio ? "ABIERTO" : "no hacia falta", popup ? " (popup a la vista)" : "");
     if (abrio) { rootViewport->Render(); LayoutRenderMenu(MenuPantallaW, MenuPantallaH); }   // (se dibuja: la lista)
     if ((esp == "abre") != abrio) { err = std::string("cartel: ") + (abrio ? "se abrio" : "no se abrio"); return false; }
+    return true;
+}
+// cartelprender si|no: el cartel de lo no guardado como en el producto (si) o como en el harness (no: nunca aparece).
+// Para probar los botones de verdad ("Nuevo proyecto" de la tarjeta Archivo) con el cartel en el medio
+static bool CmdCartelPrender(std::istringstream& ss, std::string& err) {
+    std::string sn; ss >> sn;
+    if (sn != "si" && sn != "no") { err = "cartelprender si|no"; return false; }
+    g_w3dCambiosSinCartel = (sn == "no");
+    g_w3dCambiosCartelActivo = true;
     return true;
 }
 static bool CmdCartelResponder(std::istringstream& ss, std::string& err) {
@@ -2400,6 +2412,15 @@ bool W3dPruebasOutlinerCmd(const std::string& cmd, std::istringstream& ss, std::
     if (cmd == "outteclapc")      return CmdOutTeclaPC(ss, err);
     if (cmd == "outbarra")        return CmdOutBarra(ss, err);
     if (cmd == "outmenu")         return CmdOutMenu(ss, err);
+    // bibafuera <carpeta>: contesta el explorador que abrio "Extract to a folder..." de la biblioteca con esa carpeta
+    if (cmd == "bibafuera") {
+        std::string c; ss >> c;
+        if (c.empty()) { err = "bibafuera: uso: bibafuera <carpeta>"; return false; }
+        extern void OutlinerRecAfueraElegido(const std::string&);
+        if (PopUpActive) PopUpActive->Cerrar();   // (el explorador)
+        OutlinerRecAfueraElegido(c);
+        return true;
+    }
     if (cmd == "outescribir")     return CmdOutEscribir(ss, err);
     if (cmd == "outconfirmar")    return CmdOutConfirmar(ss, err);
     if (cmd == "outrender")       return CmdOutRender(err);
@@ -2459,6 +2480,7 @@ bool W3dPruebasOutlinerCmd(const std::string& cmd, std::istringstream& ss, std::
     if (cmd == "cambiosucio")     return CmdCambioSucio(ss, err);
     if (cmd == "cambioraiz")      return CmdCambioRaiz(ss, err);
     if (cmd == "cartel")          return CmdCartel(ss, err);
+    if (cmd == "cartelprender")   return CmdCartelPrender(ss, err);
     if (cmd == "cartelresponder") return CmdCartelResponder(ss, err);
     if (cmd == "mallasrecurso")   return CmdMallasRecurso(ss, err);
     if (cmd == "outmover")        return CmdOutMover(ss, err);

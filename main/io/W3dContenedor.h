@@ -299,6 +299,7 @@ public:
     size_t CantidadExternos() const { return externos.size(); }
     size_t CantidadExternosQueFaltan() const;
     void ExternosQueFaltan(std::vector<W3dExterno>& out) const;
+    const std::vector<W3dExterno>& Externos() const { return externos; }
 
     // vuelca el zip a 'rutaTmpZip' en orden determinista. false = no se escribio
     // (el archivo anterior queda INTACTO porque el caller todavia no renombro).

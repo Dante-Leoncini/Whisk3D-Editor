@@ -1,0 +1,53 @@
+# prueba_layouts.w3s — LOS LAYOUTS (la esquina de un viewport -> Layout; config/W3dLayouts.h) y ROTAR:
+#   - "Por defecto" es el del arranque; "Animacion" (3D arriba, linea de tiempo abajo) viene con el programa y se borra
+#   - guardar el actual con un nombre (es del programa, no del proyecto: layouts.txt en la carpeta del usuario)
+#   - Rotar: la fila pasa a ser columna y al reves
+#   - en el TELEFONO, cada orientacion tiene su layout: al girar vuelve el de la otra
+#   (el harness usa /tmp/w3d_prueba_layouts.txt, que arranca sin existir)
+ventana 960 540
+escala 2
+layout estructura F(C(3D,TL),C(OUT,PROP))
+layout cuantos 1
+layout poner Animación
+layout estructura C(3D,TL)
+# rotar: la columna pasa a ser fila, y de vuelta
+layout rotar 1
+layout estructura F(3D,TL)
+layout rotar 5
+layout estructura C(3D,TL)
+# guardar el actual con un nombre, volver al de fabrica y ponerlo otra vez
+layout rotar 1
+layout guardar Lado a lado
+layout cuantos 2
+layout poner default
+layout estructura F(C(3D,TL),C(OUT,PROP))
+layout poner Lado a lado
+layout estructura F(3D,TL)
+# la ventanita del nombre (Guardar layout...): se escribe y Enter
+layout menu guardar
+texto Personal
+tecla Return
+layout cuantos 3
+# borrar (tambien el que viene con el programa); sin guardados no hay nada que borrar
+layout borrar Animación
+layout borrar Lado a lado
+layout borrar Personal
+layout cuantos 0
+fail layout borrar Animación
+# el menu de la esquina: Rotar y Layout
+layout poner default
+vpmenutipo 1
+menuitem Rotate
+menuitem Layout
+tecla Escape
+# TELEFONO: un layout para cada orientacion
+layout telefono 1
+layout pantalla 540 960
+layout estructura C(3D,PROP)
+layout rotar 1
+layout estructura F(3D,PROP)
+layout pantalla 960 540
+layout estructura F(C(3D,TL),C(OUT,PROP))
+layout pantalla 540 960
+layout estructura F(3D,PROP)
+layout telefono 0

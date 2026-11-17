@@ -1,0 +1,25 @@
+# ==========================================================================
+#  EL ESTADO QUE FIJA UN CONSTRUCTOR NO LE LLEGA A LA INTERFAZ (shaders)
+#  Correr DESDE ESTA CARPETA, con el backend de shaders:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_constructor_ui.w3s
+#  (con OpenGL, el pipeline fijo, termina en 'sombreadopixel': ahi ya andaba)
+#
+#  EL CASO (un juego 2D, ghz1.w3d, abierto en la PC con Vulkan): el Constructor
+#  fija "Modo de textura: reemplazar" y despues de dibujar la escena TODA la
+#  interfaz salia blanca (las barras, las tarjetas, el boton verde del cuadro).
+#  El cierre del pase de escena (EstadoBase) del backend de shaders (GLES2 /
+#  WebGL / Vulkan) no reponia el modo de textura; el del pipeline fijo si.
+# ==========================================================================
+
+ventana 1280 720
+sombreadopixel
+escenadefecto
+rutina Modo Constructor
+rutinapaso Modo texturaModo modo=1
+tick
+tick
+uishot /tmp/w3d_constructor_ui.png
+# el fondo de la barra de la Vista 3D (entre botones) y el de Propiedades: oscuros, no blancos
+pngpx /tmp/w3d_constructor_ui.png 800 22 20 20 20 - 30
+pngpx /tmp/w3d_constructor_ui.png 1100 400 31 31 31 - 30

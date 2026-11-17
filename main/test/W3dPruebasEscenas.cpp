@@ -1313,6 +1313,43 @@ static bool CmdClipMenu(std::istringstream& ss, std::string& err) {
     return true;
 }
 
+// animactiva escena | armature <objeto> <clip> [frame F]: lo que mira la LINEA DE TIEMPO (lo que guarda la sesion del
+// .w3d) y que el selector de animaciones lo marque en VERDE (con cientos de clips abre scrolleado a el)
+static bool CmdAnimActiva(std::istringstream& ss, std::string& err) {
+    std::string tipo; ss >> tipo;
+    std::string obj, clip;
+    bool ok = true;
+    if (tipo == "armature") {
+        ss >> obj >> clip;
+        const bool hay = ActiveAnimKind == 1 && ActiveAnimArm && ActiveAnimArm->animActiva >= 0 &&
+                         ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size();
+        const std::string o = hay ? ActiveAnimArm->name : std::string("-");
+        const std::string c = (hay && ActiveAnimArm->animations[(size_t)ActiveAnimArm->animActiva]) ?
+                              ActiveAnimArm->animations[(size_t)ActiveAnimArm->animActiva]->name : std::string("-");
+        printf("      [animactiva] kind %d, armature '%s', clip '%s'\n", ActiveAnimKind, o.c_str(), c.c_str());
+        ok = hay && o == obj && c == clip;
+    } else if (tipo == "escena") {
+        printf("      [animactiva] kind %d\n", ActiveAnimKind);
+        ok = ActiveAnimKind == 0;
+    } else { err = "animactiva: uso: animactiva escena | armature <objeto> <clip> [frame F]"; return false; }
+    if (!ok) { err = "animactiva: la linea de tiempo no esta en esa animacion"; return false; }
+    std::string k; int f = 0;
+    if (ss >> k >> f && k == "frame" && CurrentFrame != f) { err = "animactiva: el cuadro es " + EsEntero(CurrentFrame) + ", se esperaba " + EsEntero(f); return false; }
+    if (tipo == "armature") {   // el selector: la opcion verde es ese clip, y la entrada de su submenu tambien
+        PopupMenu m; m.action = AnimSelPorId;
+        ConstruirMenuAnim(&m);
+        std::string verde, padre;
+        for (size_t i = 0; i < m.items.size(); i++) {
+            MenuItem* it = m.items[i];
+            if (!it || !it->submenu) continue;
+            for (size_t j = 0; j < it->submenu->items.size(); j++)
+                if (it->submenu->items[j] && it->submenu->items[j]->verde) { verde = it->submenu->items[j]->text; padre = it->verde ? it->text : std::string("(sin verde)"); }
+        }
+        printf("      [animactiva] el selector marca '%s' en '%s'\n", verde.c_str(), padre.c_str());
+        if (verde != clip || padre != obj) { err = "animactiva: el selector no marca ese clip en verde"; return false; }
+    }
+    return true;
+}
 static bool CmdClipNombre(std::istringstream& ss, std::string& err) {
     std::string n; ss >> n;
     if (n.empty()) { err = "clipnombre: uso: clipnombre <nombre>"; return false; }
@@ -1999,10 +2036,12 @@ static bool CmdEscenaTildar(std::istringstream& ss, std::string& err) {
     const int i = EscenaIdx(n, err, "escenatildar"); if (i < 0) return false;
     const bool abrir = (modo == "abrir");
     const bool cartel = (modo == "cerrarcartel");
-    if (cartel) g_w3dCambiosSinCartel = false;
+    // (el cartel esta apagado en el producto: aca se prende a proposito para probarlo)
+    const bool sinAntes = g_w3dCambiosSinCartel, activoAntes = g_w3dCambiosCartelActivo;
+    if (cartel) { g_w3dCambiosSinCartel = false; g_w3dCambiosCartelActivo = true; }
     std::string motivo;
     const bool ok = W3dRaizTildar(i, abrir, &motivo);
-    g_w3dCambiosSinCartel = true;
+    g_w3dCambiosSinCartel = sinAntes; g_w3dCambiosCartelActivo = activoAntes;
     const bool popup = W3dCambiosCartelAbierto();
     printf("      [escenatildar] %s '%s' -> %s%s%s%s; abiertas: %s\n", modo.c_str(), n.c_str(), ok ? "si" : "NO",
            motivo.empty() ? "" : ": ", motivo.c_str(), popup ? " (pregunta por los cambios)" : "", AbiertasTexto().c_str());
@@ -2184,6 +2223,7 @@ bool W3dPruebasEscenasCmd(const std::string& cmd, std::istringstream& ss, std::s
     if (cmd == "animcurva")       return CmdAnimCurva(ss, err);
     if (cmd == "clipinfo")        return CmdClipInfo(ss, err);
     if (cmd == "clipmenu")        return CmdClipMenu(ss, err);
+    if (cmd == "animactiva")      return CmdAnimActiva(ss, err);
     if (cmd == "clipnombre")      return CmdClipNombre(ss, err);
     if (cmd == "jerlib")          return CmdJerLib(ss, err);
     if (cmd == "jerinfo")         return CmdJerInfo(ss, err);

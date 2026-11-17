@@ -5,6 +5,8 @@
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
 #include "app/W3dAtajos.h" // atajos reasignados: la tecla apretada -> la de la funcion
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
+#include "ViewPorts/PopUp/NombrePopup.h"    // "Guardar layout": el nombre
+#include "config/W3dLayouts.h"              // los layouts guardados (del programa, no del proyecto)
 #include "ViewPorts/LayoutInput.h"
 #include "ViewPorts/LayoutArbol.h" // aviso de destruccion de viewports + borrar un arbol entero
 #include "edit/MeshEdit.h"
@@ -467,6 +469,91 @@ static void LayoutDividir(ViewportBase* aVp, bool aEnFila) {
     LayoutRescan(aVp, w, h);
 }
 
+// ROTAR: la fila (lado a lado) que tiene a este viewport pasa a ser una columna (apilados) y al reves, con los mismos
+// dos paneles y la misma proporcion
+static void LayoutRotar(ViewportBase* aVp) {
+    ViewportBase* padre = rootViewport ? LayoutPadreDe(rootViewport, aVp) : NULL;
+    if (!padre) return;
+    const int w = rootViewport->width, h = rootViewport->height;
+    ViewportBase* nuevo = NULL;
+    if (padre->ContainerKind() == 1) { ViewportRow* r = (ViewportRow*)padre; nuevo = new ViewportColumn(r->childA, r->childB, r->splitFrac); }
+    else                             { ViewportColumn* c = (ViewportColumn*)padre; nuevo = new ViewportRow(c->childA, c->childB, c->splitFrac); }
+    if (padre == rootViewport) rootViewport = nuevo;
+    else if (!LayoutReemplazarEnArbol(rootViewport, padre, nuevo)) {   // (no deberia pasar) nada cambia
+        if (nuevo->ContainerKind() == 1) { ((ViewportRow*)nuevo)->childA = NULL; ((ViewportRow*)nuevo)->childB = NULL; }
+        else { ((ViewportColumn*)nuevo)->childA = NULL; ((ViewportColumn*)nuevo)->childB = NULL; }
+        delete nuevo;
+        return;
+    }
+    // el contenedor viejo se va SIN sus paneles (ahora son del nuevo)
+    if (padre->ContainerKind() == 1) { ((ViewportRow*)padre)->childA = NULL; ((ViewportRow*)padre)->childB = NULL; }
+    else { ((ViewportColumn*)padre)->childA = NULL; ((ViewportColumn*)padre)->childB = NULL; }
+    delete padre;
+    LayoutRescan(aVp, w, h);
+}
+// (harness) el Rotar por la misma puerta que el menu
+void LayoutRotarViewport(ViewportBase* v) { LayoutRotar(v); }
+
+// INSTALAR un arbol de viewports ENTERO (el de fabrica, un layout guardado, el de la otra orientacion del telefono):
+// reemplaza al actual y lo libera, como al abrir un proyecto (import_w3d.cpp, AbrirProyectoAhora)
+static void LayoutInstalar(ViewportBase* nuevo) {
+    if (!nuevo) return;
+    ViewportBase* viejo = LayoutRaizCompleta();
+    LayoutResetMaximizado();
+    rootViewport = nuevo;
+    rootViewport->x = 0; rootViewport->y = 0;
+    if (MenuPantallaW > 0 && MenuPantallaH > 0) rootViewport->Resize(MenuPantallaW, MenuPantallaH);
+    if (viejo && viejo != nuevo) ViewportBorrarArbol(viejo);
+    LayoutAnclarActivos();
+    { ViewportBase* v3 = LayoutPrimer3D(rootViewport); viewPortActive = v3 ? v3 : rootViewport; }
+    if (LayoutArbolCambiado) LayoutArbolCambiado();
+    g_redraw = true;
+}
+
+// el LAYOUT ELEGIDO en el menu se pone al empezar el proximo cuadro (como abrir un proyecto: el menu se abrio desde
+// un viewport del arbol que se va a liberar). Lo llama ProcesarProyectoPendiente (import_w3d.cpp)
+static int gLayoutPendiente = 0;           // 0 nada, 1 el de fabrica, 2 uno guardado (gLayoutPendienteNombre)
+static std::string gLayoutPendienteNombre;
+extern ViewportBase* W3dLayoutDesdeTexto(const std::string& texto);   // import_w3d.cpp
+extern std::string W3dLayoutTextoDe(ViewportBase* raiz);              // io/GuardarW3D.cpp (NULL = el actual)
+void LayoutProcesarPendiente() {
+    const int que = gLayoutPendiente;
+    gLayoutPendiente = 0;
+    if (que == 1) LayoutInstalar(LayoutPorDefecto(MenuPantallaW, MenuPantallaH, NULL));
+    else if (que == 2) {
+        ViewportBase* n = W3dLayoutDesdeTexto(W3dLayoutTexto(gLayoutPendienteNombre));
+        if (n) LayoutInstalar(n);
+        else Notificar(std::string(T("Could not load the layout")) + ": " + gLayoutPendienteNombre, true);
+    }
+}
+// (harness y el menu) pedir un layout: "" = el de fabrica
+void LayoutPedir(const std::string& nombre) {
+    gLayoutPendiente = nombre.empty() ? 1 : 2;
+    gLayoutPendienteNombre = nombre;
+    g_redraw = true;
+}
+
+// TELEFONO: un layout para cada ORIENTACION (parado / acostado). Al girar la pantalla, el de la orientacion que se deja
+// queda anotado y vuelve el de la otra; la primera vez, el de fabrica de esa orientacion (LayoutPorDefecto ya arma uno
+// distinto para cada una). Lo llama main.cpp al cambiar el tamano de la ventana (y al arrancar, para saber cual es).
+// En la PC no hace nada: achicar la ventana no es girar un telefono
+static int gOrientacion = -1;                 // 0 parado, 1 acostado (-1: todavia no se midio)
+static std::string gLayoutDeOrientacion[2];   // el texto "Layout { ... }" de cada una
+void LayoutTamanoPantalla(int w, int h) {
+    extern bool g_w3dTelefono;
+    if (!g_w3dTelefono || w <= 0 || h <= 0 || !rootViewport) return;
+    const int o = (w > h) ? 1 : 0;
+    if (gOrientacion < 0) { gOrientacion = o; return; }
+    if (o == gOrientacion) return;
+    gLayoutDeOrientacion[gOrientacion] = W3dLayoutTextoDe(NULL);
+    gOrientacion = o;
+    ViewportBase* n = gLayoutDeOrientacion[o].empty() ? NULL : W3dLayoutDesdeTexto(gLayoutDeOrientacion[o]);
+    if (!n) n = LayoutPorDefecto(w, h, NULL);
+    LayoutInstalar(n);
+}
+// (harness) olvidar la orientacion (cada prueba arranca de cero)
+void LayoutOrientacionOlvidar() { gOrientacion = -1; gLayoutDeOrientacion[0].clear(); gLayoutDeOrientacion[1].clear(); }
+
 // ====================================================================
 // menus desplegables compartidos
 // ====================================================================
@@ -569,6 +656,8 @@ static void LayoutAccionTipo(int aId) {
     if (aId == 21) { LayoutDividir(vp, true); return; }   // en columnas (lado a lado)
     if (aId == 22) { LayoutDividir(vp, false); return; }  // en filas (apilados)
     if (aId == 24) { LayoutIntercambiar(vp); return; }    // Swap: con su hermano de la fila / columna
+    if (aId == 25) { LayoutRotar(vp); return; }           // Rotar: la fila pasa a ser columna y al reves
+    if (aId == 26) return;                                // (el submenu Layout: lo suyo lo hace LayoutAccionLayouts)
     if (vp->ViewportKind() == aId + 1) return; // ya es de ese tipo
     int w = rootViewport->width;
     int h = rootViewport->height;
@@ -605,8 +694,14 @@ static void TrasCrearAdd(Object* nuevo){
     if (nuevo->getType() == ObjectType::mesh && W3dMallaNacioHook) W3dMallaNacioHook();
     // editando un PREFAB lo nuevo va adentro de su objeto raiz: suelto al lado no lo generaria ninguna instancia
     W3dPrefabAdoptarNuevo(nuevo);
+    // Ctrl+Z SACA lo creado (y devuelve la seleccion de antes) y Ctrl+Y lo devuelve: UN paso, como pegar o duplicar.
+    // (Antes crear no era un paso: deshacer se salteaba el objeto nuevo y deshacia lo de antes, y el objeto quedaba)
+    UndoGrupoIniciar();
+    UndoCapturarSeleccion();
     DeseleccionarTodo();
     nuevo->Seleccionar();
+    UndoCapturarCreacion();
+    UndoGrupoFin();
     if (nuevo->getType() == ObjectType::mesh && ((Mesh*)nuevo)->meshTipo >= 0)
         AbrirRedoMeshPanel((Mesh*)nuevo);
 }
@@ -1228,7 +1323,11 @@ bool SnapBuscarTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& 
     float lmx = (float)mx - (float)vp->x, lmy = (float)my - (float)vp->y; // a coords del viewport (ProyectarPunto)
     std::vector<Mesh*> meshes; SnapRecolectar(SceneCollection, meshes);
     if (meshes.empty()) return false;
-    const float RAD = 18.0f; // radio de enganche en pantalla (px)
+    // radio de enganche en pantalla (px): crece con la escala de la UI (en la PC a escala 2 son los 18 de siempre) y con
+    // el DEDO mucho mas (la yema tapa el vertice: con 18 px fijos en un telefono era casi imposible enganchar)
+    extern bool ToolbarUsaTactil();
+    const float gsSnap = (float)(GlobalScale > 0 ? GlobalScale : 1);
+    const float RAD = (ToolbarUsaTactil() ? 24.0f : 9.0f) * gsSnap;
     float bestD = RAD*RAD; bool found = false;
     // en modo edicion no se snapea a la PROPIA seleccion que se mueve (sino se pega a si misma)
     Mesh* em = (InteractionMode==EditMode) ? (Mesh*)g_editMesh : NULL;
@@ -2094,6 +2193,75 @@ static void LayoutAccionSelMode(int aId) {
     }
 }
 
+// ---- el submenu LAYOUT (la esquina de cada viewport): "Por defecto", los guardados (config/W3dLayouts.h), y separados
+//      con una linea "Guardar layout..." y "Borrar layout..." ----
+enum { LAY_DEFECTO = 0, LAY_GUARDADO0 = 1, LAY_GUARDAR = 900, LAY_BORRAR = 901, LAY_BORRAR0 = 1000 };
+static PopupMenu* gMenuLayouts = NULL;
+static PopupMenu* gMenuBorrarLayout = NULL;
+static std::vector<std::string> gLayoutsMenu;    // los nombres, en el orden del menu (los ids LAY_GUARDADO0 + i)
+static std::string gLayoutABorrar;
+static void LayoutAccionLayouts(int id);
+static void LayoutArmarMenuLayouts() {
+    if (!gMenuLayouts) { gMenuLayouts = new PopupMenu(); gMenuLayouts->action = LayoutAccionLayouts; }
+    gMenuLayouts->Limpiar();
+    gMenuLayouts->Agregar(T("Default"), LAY_DEFECTO, (int)IconType::cuadricula);
+    gLayoutsMenu = W3dLayoutsNombres();
+    for (size_t i = 0; i < gLayoutsMenu.size(); i++) gMenuLayouts->Agregar(gLayoutsMenu[i], LAY_GUARDADO0 + (int)i, (int)IconType::cuadricula);
+    { MenuItem* it = gMenuLayouts->Agregar(T("Save layout..."), LAY_GUARDAR, (int)IconType::guardar); if (it) it->lineaArriba = true; }
+    gMenuLayouts->Agregar(T("Delete layout..."), LAY_BORRAR, (int)IconType::borrar);
+}
+static void LayoutGuardarConNombre(const std::string& nombre) {
+    const bool existia = !W3dLayoutTexto(nombre).empty();
+    if (W3dLayoutGuardar(nombre, W3dLayoutTextoDe(NULL)))
+        Notificar(std::string(T(existia ? "Layout replaced" : "Layout saved")) + ": " + nombre, false);
+    else Notificar(T("Could not save the layout"), true);
+}
+static void LayoutBorrarConfirmado() {
+    if (W3dLayoutBorrar(gLayoutABorrar)) Notificar(std::string(T("Layout deleted")) + ": " + gLayoutABorrar, false);
+    gLayoutABorrar.clear();
+}
+static void LayoutAccionBorrarElegido(int id) {
+    const int i = id - LAY_BORRAR0;
+    if (i < 0 || i >= (int)gLayoutsMenu.size()) return;
+    gLayoutABorrar = gLayoutsMenu[(size_t)i];
+    if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+    confirmarPopup->Abrir(std::string(T("Delete the layout")) + " \"" + gLayoutABorrar + "\"?", LayoutBorrarConfirmado);
+}
+static void LayoutAccionLayouts(int id) {
+    if (id == LAY_DEFECTO) { LayoutPedir(std::string()); return; }
+    if (id == LAY_GUARDAR) {
+        // la ventanita del nombre (con uno que se pueda pisar si ya existe: "Layout 1", "Layout 2"...)
+        std::string prop;
+        for (int k = 1; k < 1000; k++) {
+            char b[48]; snprintf(b, sizeof(b), "%s %d", T("Layout"), k);
+            if (W3dLayoutTexto(b).empty()) { prop = b; break; }
+        }
+        AbrirNombrePopup(T("Save layout"), T("Save"), prop, LayoutGuardarConNombre);
+        return;
+    }
+    if (id == LAY_BORRAR) {
+        gLayoutsMenu = W3dLayoutsNombres();
+        if (gLayoutsMenu.empty()) { Notificar(T("There are no saved layouts to delete"), false); return; }
+        // la lista de los guardados ("Por defecto" no esta: no se borra), donde estaba el menu
+        if (!gMenuBorrarLayout) { gMenuBorrarLayout = new PopupMenu(); gMenuBorrarLayout->action = LayoutAccionBorrarElegido; }
+        gMenuBorrarLayout->Limpiar();
+        gMenuBorrarLayout->titulo = T("Delete layout");
+        for (size_t i = 0; i < gLayoutsMenu.size(); i++) gMenuBorrarLayout->Agregar(gLayoutsMenu[i], LAY_BORRAR0 + (int)i, (int)IconType::borrar);
+        int mx = MenuPantallaW / 3, my = MenuPantallaH / 4;
+        if (gMenuLayouts) { mx = gMenuLayouts->x; my = gMenuLayouts->y; }
+        if (MenuAbierto && MenuAbierto != gMenuBorrarLayout) MenuAbierto->Cerrar();
+        gMenuBorrarLayout->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+        MenuAbierto = gMenuBorrarLayout;
+        g_redraw = true;
+        return;
+    }
+    const int i = id - LAY_GUARDADO0;
+    if (i >= 0 && i < (int)gLayoutsMenu.size()) LayoutPedir(gLayoutsMenu[(size_t)i]);
+}
+
+// (harness) una opcion del submenu Layout por la misma puerta que el menu: 900 = Guardar layout..., 901 = Borrar layout...
+void LayoutMenuLayoutsAccion(int id) { LayoutArmarMenuLayouts(); LayoutAccionLayouts(id); }
+
 // abre el menu de TIPO/split del viewport (boton [0] de la barra), por codigo
 // (sin hit-test). Lo usan el click en la flechita Y la navegacion por teclado
 // (soft-izq en outliner/propiedades, o izquierda desde Select en el 3D).
@@ -2130,6 +2298,11 @@ void LayoutAbrirMenuTipo(ViewportBase* aVp) {
         // (con un hermano en su fila o columna: los dos cambian de lugar)
         if (aVp != rootViewport) gMenuTipo->Agregar(T("Swap"), 24, (int)IconType::intercambiar);
         if (aVp != rootViewport) gMenuTipo->Agregar(T("Maximize"), 23, (int)IconType::maximizar); // fullscreen del viewport activo
+        // (dentro de una fila o columna: la fila pasa a ser columna y al reves)
+        if (aVp != rootViewport) gMenuTipo->Agregar(T("Rotate"), 25, (int)IconType::rehacer);
+        // LAYOUT: elegir uno (el de fabrica o uno guardado), guardar el actual, borrar uno guardado
+        LayoutArmarMenuLayouts();
+        { MenuItem* it = gMenuTipo->Agregar(T("Layout"), 26, (int)IconType::cuadricula, gMenuLayouts); if (it) it->lineaArriba = true; }
     }
     gMenuTipoDe = aVp;
     if (MenuAbierto && MenuAbierto != gMenuTipo) MenuAbierto->Cerrar();
@@ -5210,6 +5383,10 @@ static bool g_mtLargo = false;     // lo abrio una pulsacion larga (ver arriba)
 static bool g_mtMovio = false;
 static int  g_mtX0 = 0, g_mtY0 = 0, g_mtX = 0, g_mtY = 0;
 static unsigned g_mtUltScroll = 0;
+// el menu (el mas hondo) donde se APOYO el dedo. Un TOQUE (sin deslizar) solo elige en ESE menu: tocar "Mallas" del
+// menu Anadir abre su submenu y en un telefono angosto el submenu cae justo debajo del dedo -> soltar elegia su
+// primera opcion sin querer. Elegir en un submenu que se abrio con este mismo dedo es solo deslizando hasta la opcion
+static PopupMenu* g_mtMenu0 = NULL;
 // el menu abierto mas hondo que contiene el punto (se dibuja encima de los otros)
 static PopupMenu* MenuMasHondoEn(int mx, int my){
     PopupMenu* t = NULL;
@@ -5239,6 +5416,7 @@ bool LayoutMenuToqueArrancar(int mx, int my, bool desdeLargo){
              if (f >= 0 && f < (int)m->items.size() && m->items[f]->valorFloat) return false; }
     g_mtActivo = true; g_mtLargo = desdeLargo; g_mtMovio = false;
     g_mtX0 = g_mtX = mx; g_mtY0 = g_mtY = my; g_mtUltScroll = 0;
+    g_mtMenu0 = m;   // (ANTES de resaltar: resaltar puede abrir un submenu encima del dedo)
     if (adentro) MenuToqueResaltar(mx, my);
     g_redraw = true;
     return true;
@@ -5261,7 +5439,9 @@ void LayoutMenuToqueSoltar(int mx, int my){
     if (g_mtLargo && !g_mtMovio) return;   // el dedo de la pulsacion larga: el menu queda abierto
     PopupMenu* m = MenuAbierto;
     if (!m->ContieneConSubmenus(mx, my)) { m->Cerrar(); return; }   // soltado afuera: se cierra sin elegir
-    MenuLimpiarGuardAbrir();   // (soltar es deliberado: elige aunque el submenu se haya abierto con este mismo dedo)
+    // UN TOQUE que abrio un submenu encima del dedo: el submenu queda abierto y no se elige nada (ver g_mtMenu0)
+    if (!g_mtMovio && MenuMasHondoEn(mx, my) != g_mtMenu0) return;
+    MenuLimpiarGuardAbrir();   // (deslizar y soltar es deliberado: elige aunque el submenu se abrio con este mismo dedo)
     const int id = m->Click(mx, my);
     if (id >= 0) m->Ejecutar(id);
 }

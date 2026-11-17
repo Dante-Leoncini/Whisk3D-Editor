@@ -30,7 +30,9 @@ export LD_LIBRARY_PATH="$VIEJO/host/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
                        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
 echo "== nativo (ndk-build)"
-"$NDK/ndk-build" -j"$(nproc)" NDK_PROJECT_PATH="$AQUI" APP_BUILD_SCRIPT="$AQUI/jni/Android.mk" \
+# -j ACOTADO (como platform/android/build_android.sh): con $(nproc) pelado el OOM killer cierra la sesion entera
+W3D_JOBS="${W3D_JOBS:-$(( $(nproc) / 2 ))}"; [ "$W3D_JOBS" -ge 1 ] 2>/dev/null || W3D_JOBS=1
+"$NDK/ndk-build" -j"$W3D_JOBS" NDK_PROJECT_PATH="$AQUI" APP_BUILD_SCRIPT="$AQUI/jni/Android.mk" \
     NDK_APPLICATION_MK="$AQUI/jni/Application.mk" NDK_OUT="$B/obj" NDK_LIBS_OUT="$B/lib" \
     SDL_DIR="$SDL" W3D_RAIZ="$RAIZ" > "$B.ndk.log" 2>&1 || { grep -m20 -E "error|Error" "$B.ndk.log"; echo "(ver $B.ndk.log)"; exit 1; }
 

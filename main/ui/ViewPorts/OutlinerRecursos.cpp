@@ -60,6 +60,7 @@
 #include "render/OpcionesRender.h"           // g_redraw
 #include "ViewPorts/PopUp/ConfirmarPopup.h"  // confirmar un borrado
 #include "ViewPorts/PopUp/FileBrowser.h"     // "Link .w3d...": el explorador de archivos de siempre
+#include "ViewPorts/PopUp/NumPad.h"   // TecladoTextoAbrir / TecladoNumeroAbrir: el teclado en pantalla (Ajustes)
 #include "ViewPorts/Notificaciones.h"
 #include "config/W3dLang.h"
 #include "io/RecursosProyecto.h"
@@ -150,6 +151,7 @@ static OutFilaRec FilaDeItem(const W3dRecursoItem* it, const std::string& carpet
     f.bytes = it->bytes;
     f.cargado = it->cargado;
     f.tilde = it->tilde;
+    f.externo = !libExt && W3dVistaRecUbicacion(it->tipo, it->id) == 1;
     return f;
 }
 // arma las filas de 'carpeta' (sus subcarpetas primero, despues sus recursos) con su sangria. Las PARTES de un
@@ -749,7 +751,64 @@ static void ArmarMenuVista(Outliner* o) {
 // ---- OBJETO (Escena: el objeto activo / la seleccion; Biblioteca: el cursor / la seleccion) ----
 enum { OBJ_BORRAR = 1, OBJ_RENOMBRAR, OBJ_MOVER, OBJ_OCULTAR, OBJ_DUPLICAR, OBJ_DUPLICAR_VINC,
        REC_BORRAR, REC_RENOMBRAR, REC_DUPLICAR, REC_USUARIOS, REC_PURGAR, REC_NUEVA_CARPETA,
-       OBJ_CREAR_PREFAB, OBJ_DESEMPAQUETAR };
+       OBJ_CREAR_PREFAB, OBJ_DESEMPAQUETAR, REC_ADENTRO, REC_AFUERA };
+// DENTRO / FUERA del .w3d desde la biblioteca: los recursos elegidos (el cursor o la seleccion) que tienen archivo
+// propio (texturas, sonidos, scripts, fuentes, videos, shaders) y que todavia NO estan donde se los quiere llevar
+// (0 = adentro, 1 = afuera). Siguen en la MISMA carpeta de la biblioteca (la carpeta viaja con la ruta nueva)
+static void UbicablesElegidos(Outliner* o, int destino, std::vector<std::pair<int, std::string> >& out) {
+    out.clear();
+    if (!o || o->VistaSoloLectura()) return;
+    std::vector<std::string> rec, car;
+    o->Objetivo(rec, car, false);
+    if (rec.empty()) return;
+    std::set<std::string> rs(rec.begin(), rec.end());
+    std::vector<W3dRecursoItem> items;
+    W3dBibliotecaListar(-1, items);
+    for (size_t i = 0; i < items.size(); i++) {
+        if (items[i].soloLectura || !rs.count(W3dBibClave(items[i].tipo, items[i].id))) continue;
+        const int u = W3dVistaRecUbicacion(items[i].tipo, items[i].id);
+        if (u >= 0 && u != destino) out.push_back(std::make_pair(items[i].tipo, items[i].id));
+    }
+}
+// lleva 'ls' a 'destino' (afuera: 'carpeta' elegida en el explorador; vacia = al lado del .w3d). UN Ctrl+Z para todo
+static void MudarUbicables(const std::vector<std::pair<int, std::string> >& ls, int destino, const std::string& carpeta) {
+    if (ls.empty()) return;
+    int hechos = 0;
+    std::string ultimo, error;
+    UndoGrupoIniciar();
+    for (size_t i = 0; i < ls.size(); i++) {
+        std::string ruta;
+        if (destino == 1 && !carpeta.empty()) {
+            // el archivo se llama como su entrada ("texturas/piso.png" -> <carpeta elegida>/piso.png)
+            std::string base = ls[i].second, ext;
+            const size_t b = base.find_last_of("/\\");
+            if (b != std::string::npos) base = base.substr(b + 1);
+            const size_t p = base.rfind('.');
+            if (p != std::string::npos && p > 0) { ext = base.substr(p); base = base.substr(0, p); }
+            ruta = W3dRutaDeSalida(carpeta, base, ext);
+        } else if (destino == 1) ruta = W3dVistaRecRutaExternaSugerida(ls[i].first, ls[i].second);
+        std::string nuevo, motivo;
+        if (W3dVistaRecFijarUbicacion(ls[i].first, ls[i].second, destino, ruta, &nuevo, &motivo)) { hechos++; ultimo = nuevo; }
+        else if (error.empty()) error = ls[i].second + ": " + T(motivo.c_str());
+    }
+    UndoGrupoFin();
+    if (!error.empty()) Notificar(std::string(T("Not moved")) + ": " + error, true);
+    else if (hechos == 1) Notificar(std::string(T(destino == 1 ? "Now external" : "Now inside the .w3d")) + ": " + ultimo, false);
+    else if (hechos > 1) {
+        char b[160];
+        snprintf(b, sizeof(b), T(destino == 1 ? "%d files are now external" : "%d files are now inside the .w3d"), hechos);
+        Notificar(b, false);
+    }
+    if (hechos > 0) { W3dRecursosVistaInvalidar(); g_redraw = true; }
+}
+// "Extract to a folder...": lo elegido al ABRIR el explorador (mientras esta abierto se puede tocar otra cosa)
+static std::vector<std::pair<int, std::string> > gAfueraPendientes;
+static void AfueraCarpetaElegida(const std::string& elegido) {
+    const std::vector<std::pair<int, std::string> > ls = gAfueraPendientes;
+    gAfueraPendientes.clear();
+    MudarUbicables(ls, 1, elegido);
+}
+void OutlinerRecAfueraElegido(const std::string& carpeta) { AfueraCarpetaElegida(carpeta); }   // (harness)
 static void AccionMoverElegida(int id) {
     if (!gMenuDe) return;
     if (id == 100) gMenuDe->AccionMover(std::string());
@@ -795,6 +854,12 @@ static void AccionObjetoElegida(int id) {
         case REC_USUARIOS: o->AccionSeleccionarUsuarios(); break;
         case REC_PURGAR:   o->AccionPurgar(true); break;
         case REC_NUEVA_CARPETA: o->AccionNuevaCarpeta(); break;
+        case REC_ADENTRO: { std::vector<std::pair<int, std::string> > ls; UbicablesElegidos(o, 0, ls); MudarUbicables(ls, 0, std::string()); break; }
+        case REC_AFUERA:
+            UbicablesElegidos(o, 1, gAfueraPendientes);
+            if (!gAfueraPendientes.empty())
+                AbrirFileBrowser(T("Extract to a folder..."), T("Save"), "", AfueraCarpetaElegida, true);
+            break;
         default: AccionMoverElegida(id); break;   // el submenu "Move to Folder"
     }
     g_redraw = true;
@@ -906,6 +971,17 @@ static void ArmarMenuObjeto(Outliner* o) {
     Gris(it, ro || rec.empty() || W3dBibObjetosUsuarios(rec) == 0);
     it = gMenuObjeto->Agregar(T("Purge Orphans"), REC_PURGAR, IconType::notifError);
     Gris(it, ro);
+    // DENTRO / FUERA del .w3d: solo si lo elegido tiene archivo propio (los externos llevan la flecha de acceso directo)
+    std::vector<std::pair<int, std::string> > adentro, afuera;
+    UbicablesElegidos(o, 0, adentro);
+    UbicablesElegidos(o, 1, afuera);
+    if (!adentro.empty() || !afuera.empty()) {
+        it = gMenuObjeto->Agregar(T("Pack into the .w3d"), REC_ADENTRO, IconType::archive);
+        if (it) it->lineaArriba = true;
+        Gris(it, adentro.empty());
+        it = gMenuObjeto->Agregar(T("Extract to a folder..."), REC_AFUERA, IconType::atajo);
+        Gris(it, afuera.empty());
+    }
 }
 
 // ---- SELECCION (vale en las dos vistas) ----
@@ -1177,6 +1253,12 @@ static void IconoEn(int icono, int px, int py, int sz, bool espejado) {
     W3dDrawStrip4(IconMesh, uv);
     w3dEngine::PopMatrix();
 }
+// la FLECHA DE ACCESO DIRECTO de un recurso EXTERNO (su archivo vive afuera del .w3d), en (px, py) a 'sz' px. El
+// arte trae su caja NEGRA opaca: con el tinte blanco se lee arriba de cualquier miniatura
+static void MarcaExterno(int px, int py, int sz) {
+    SetColorID(ColorID::blanco);
+    IconoEn((int)IconType::atajo, px, py, sz, false);
+}
 // una ESCENA no esta "en uso" ni "huerfana" (se abre, no la usa nadie): sin tilde/cruz ni cuenta de usuarios
 static bool SinEstadoDeUso(const OutFilaRec& f) { return f.carpeta || f.tipo == W3D_VISTA_ESCENAS; }
 // el MARCO de un rectangulo (4 lados de 'g' px)
@@ -1316,6 +1398,11 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
             }
             w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
             if (f.icono >= 0 && f.icono < (int)IconsUV.size()) W3dDrawStrip4(IconMesh, IconsUV[(size_t)f.icono]->uvs);
+            if (f.externo && !f.carpeta) {   // EXTERNO: la flecha de acceso directo, chica, abajo a la izquierda del icono
+                const int sz = IconSizeGS / 2;   // (la mitad: un texel = medio pixel de la escala, nitido en 2x y 4x)
+                MarcaExterno(-GlobalScale, IconSizeGS - sz + GlobalScale, sz);
+                Colorear::Fila(this, f, (int)i == fc, arrastrada);
+            }
             w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
             const bool enRename = renombrando && !renombreObjeto && renombreVista == vista && f.carpeta == renombreCarpeta && f.clave == renombreClave;
             if (enRename) {
@@ -1462,6 +1549,8 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
                 W3dDrawStrip4(IconMesh, IconsUV[(size_t)(f.usuarios > 0 ? IconType::notifOk : IconType::notifError)]->uvs);
                 w3dEngine::PopMatrix();
             }
+            // EXTERNO: la flecha de acceso directo abajo a la izquierda del cuadrado
+            if (f.externo && !f.carpeta) MarcaExterno(rx + GlobalScale, ry + lado - IconSizeGS - GlobalScale, IconSizeGS);
             // el NOMBRE, debajo del cuadrado y centrado
             if (f.atras) SetColorID(ColorID::grisUI);
             else Colorear::Fila(this, f, (int)i == fc, arrastrada);
@@ -2319,6 +2408,16 @@ bool Outliner::AccionNuevoMaterial() {
     return true;
 }
 
+// TACTIL (Android/Symbian): el teclado QWERTY en pantalla, el de los campos de texto de Properties. Con usar el tactil
+// alcanza (antes pedia un toque EN CURSO: el rename casi siempre viene del menu de mantener apretado -> "Renombrar", y
+// para entonces el dedo ya se habia levantado, asi que en Android no salia ningun teclado y no se podia renombrar)
+static void RenombreTeclado() {
+#if !defined(__EMSCRIPTEN__)
+    extern bool g_uiTapEnCurso; extern bool ToolbarUsaTactil();
+    if (g_uiTapEnCurso || ToolbarUsaTactil()) TecladoTextoAbrir();
+#endif
+}
+
 // la vista Escena: el nombre del objeto se vuelve un campo EN SU FILA (doble click, F2, "Rename")
 bool Outliner::RenombrarObjetoEnLinea(Object* o) {
     if (!o) return false;
@@ -2332,9 +2431,7 @@ bool Outliner::RenombrarObjetoEnLinea(Object* o) {
     renombre.SetText(o->name);
     renombre.SelectAll();
     TextFieldEnfocar(&renombre);   // Esc vuelve a este texto: el rename no cambia nada
-#if !defined(__EMSCRIPTEN__)
-    { extern bool g_uiTapEnCurso; extern void QwertyAbrir(); if (g_uiTapEnCurso) QwertyAbrir(); }
-#endif
+    RenombreTeclado();
     g_redraw = true;
     return true;
 }
@@ -2360,10 +2457,7 @@ bool Outliner::AccionRenombrar() {
     renombre.SelectAll();   // tipear reemplaza el nombre entero
     TextFieldEnfocar(&renombre);   // Esc vuelve a este texto: el rename no cambia nada
     AsegurarVisibleFila(fc);
-#if !defined(__EMSCRIPTEN__)
-    // TACTIL (Android/Symbian): el teclado QWERTY en pantalla, como los renames de Properties
-    { extern bool g_uiTapEnCurso; extern void QwertyAbrir(); if (g_uiTapEnCurso) QwertyAbrir(); }
-#endif
+    RenombreTeclado();
     g_redraw = true;
     return true;
 }

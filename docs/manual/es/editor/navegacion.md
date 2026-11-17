@@ -19,7 +19,7 @@ Orbitar es girar la vista alrededor de la escena, como si caminaras alrededor de
 
 ![El puntero sobre la Vista 3D: con el botón del medio apretado, el arrastre gira la vista alrededor del cubo](../tutoriales/img/navegacion-orbitar-raton.webp)
 
-![Android](../tutoriales/img/icono-android.svg) **Con el dedo:** arrastrá un dedo sobre la Vista 3D. Empezá sobre el fondo: si lo apoyás sobre el gizmo (las flechas de colores del objeto), lo vas a mover.
+![Android](../tutoriales/img/icono-android.svg) **Con el dedo:** arrastrá un dedo sobre la Vista 3D. Empezá sobre el fondo: si lo apoyás sobre el gizmo (las flechas de colores del objeto), lo vas a mover. Si el dedo se sale de la Vista 3D mientras arrastrás, la vista sigue girando: el gesto termina recién cuando levantás el dedo.
 
 ![Un dedo se arrastra sobre el fondo de la Vista 3D y la vista gira alrededor del cubo](../tutoriales/img/navegacion-orbitar-dedo.webp)
 
@@ -35,7 +35,7 @@ Desplazar (o *panear*) corre la vista para un costado, para arriba o para abajo,
 
 ![Con Shift y el botón del medio apretados, el puntero hace un círculo y la vista se desplaza con él](../tutoriales/img/navegacion-panear-raton.webp)
 
-![Android](../tutoriales/img/icono-android.svg) **Con los dedos:** apoyá **dos dedos** y movelos juntos para el mismo lado.
+![Android](../tutoriales/img/icono-android.svg) **Con los dedos:** apoyá **dos dedos** y movelos juntos para el mismo lado. Aunque salgan de la Vista 3D, sigue desplazándose.
 
 ![Dos dedos se mueven juntos en círculo y la vista se desplaza](../tutoriales/img/navegacion-panear-dedo.webp)
 

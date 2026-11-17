@@ -1,0 +1,59 @@
+# ==========================================================================
+#  ADENTRO / AFUERA DEL .w3d DESDE LA BIBLIOTECA + EL AVISO DEL GUARDADO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_biblioteca_externos.w3s
+#
+#  1. el menu de un recurso de la biblioteca: "Extract to a folder..." lo pasa
+#     a un archivo de afuera (la fila lleva la flecha de acceso directo) y
+#     "Pack into the .w3d" lo vuelve a meter; en los dos casos SIGUE en la misma
+#     carpeta de la biblioteca, y cada cosa es un Ctrl+Z.
+#  2. el aviso del guardado NOMBRA el archivo que falta (antes: "1 archivo
+#     externo NO esta (ver EXTERNOS.txt)", y en Android no hay como abrirlo).
+#  3. el original de una malla importada que ya no esta NO es un error del
+#     guardado (es solo procedencia: la geometria viaja adentro).
+# ==========================================================================
+
+ventana 1280 720
+borrararchivo /tmp/dosmats-b.png
+escenadefecto
+selobj Cubo
+guardarw3d /tmp/prueba_biblioteca_externos.w3d
+abrirw3d /tmp/prueba_biblioteca_externos.w3d
+texentrada dosmats-b.png
+outvista biblioteca
+carpetanueva - Mias
+recmover texturas texturas/dosmats-b.png Mias
+outfila dosmats-b.png tipo texturas carpeta Mias externo 0
+
+# ---- 1) afuera y adentro desde el menu del recurso ----
+outclick dosmats-b.png
+outmenu Extract to a folder...
+bibafuera /tmp
+existe /tmp/dosmats-b.png
+outfila dosmats-b.png tipo texturas carpeta Mias externo 1
+recubicacion texturas /tmp/dosmats-b.png fuera
+undo
+outfila dosmats-b.png tipo texturas carpeta Mias externo 0
+redo
+outfila dosmats-b.png tipo texturas carpeta Mias externo 1
+outclick dosmats-b.png
+outmenu Pack into the .w3d
+outfila dosmats-b.png tipo texturas carpeta Mias externo 0
+recubicacion texturas texturas/dosmats-b.png dentro
+# (ya esta adentro: "Pack" queda gris)
+outclick dosmats-b.png
+fail outmenu Pack into the .w3d
+
+# ---- 2) afuera y el archivo desaparece: el guardado lo nombra ----
+outclick dosmats-b.png
+outmenu Extract to a folder...
+bibafuera /tmp
+borrararchivo /tmp/dosmats-b.png
+notif limpiar
+guardarw3d /tmp/prueba_biblioteca_externos.w3d
+notif tiene dosmats-b.png
+
+# ---- 3) el original de una malla importada que falta: no es un error ----
+escenadefecto
+olvidorigen

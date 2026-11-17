@@ -489,8 +489,17 @@ void SetGlobalScale(int scale){
 }
 
 #ifndef W3D_SYMBIAN
+// el movimiento que se esta procesando es de un DEDO (controles.cpp lo marca en cada motion): un dedo no se puede
+// teletransportar como el cursor del mouse, asi que no se envuelve en el borde. Queda el delta real y el gesto (orbitar,
+// panear, transformar) sigue aunque el dedo salga del viewport
+bool g_cursorEsDedo = false;
 void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     if (!vp) return;
+    if (g_cursorEsDedo) {
+        dx = mx - lastMouseX; dy = my - lastMouseY;
+        lastMouseX = mx; lastMouseY = my;
+        return;
+    }
 
     int vx = vp->x;
     int vy = vp->y;
@@ -544,6 +553,7 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
 // sale por un borde del viewport y aparece por el otro: se puede seguir moviendo/rotando sin quedarse sin pantalla); el
 // cursor lo mueve la plataforma (W3dRatonTeletransportar). Un dedo no se puede teletransportar: queda solo el delta.
 #include "app/W3dRatonEditor.h"
+bool g_cursorEsDedo = false;   // (lo marca controles.cpp; aca decide W3dEventoRaton: el dedo nunca se envuelve)
 void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     if (vp && W3dEventoRaton() && W3dRatonTeletransportar) {
         const int left = vp->x + borderGS, right = vp->x + vp->width - borderGS;

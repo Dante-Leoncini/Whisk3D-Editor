@@ -801,8 +801,9 @@ struct Grupo {
     // (huerfano) su entrada no se pudo leer (falta en el contenedor o esta rota): no se escribe
     // ni se registra, y el proyecto se guarda igual (con un aviso)
     bool perdido;
+    bool texto;                  // se escribe en TEXTO (.w3dm) y no en binario (.w3db): W3dMallaRecursoEnTexto
     Grupo() : rec(0), contenidoDelRecurso(false), primero(0), huerfano(false), origen(0),
-              juntable(false), perdido(false) {}
+              juntable(false), perdido(false), texto(false) {}
 };
 struct PorPrimero {
     const std::vector<Grupo>* gs;
@@ -814,7 +815,6 @@ static std::vector<Grupo> gPlan;
 static std::vector<size_t> gOrden;                 // gPlan en el orden del registro
 static std::map<const Mesh*, size_t> gPlanDe;      // malla -> su grupo
 static bool gPlanListo = false;
-static bool gPlanTexto = false;                    // el plan escribio .w3dm (formato de texto)
 // RE-HORNEAR: fuerza a TODAS las mallas por el camino de serializacion (PASADA B), ignorando la copia del
 // contenido del recurso sin tocar. Lo usa el guardado de "optimizar para juego" (convertir a no-editable):
 // el .w3db sale re-escrito con el skinning agrupado COMPACTO horneado, aunque el render no haya cambiado.
@@ -1133,13 +1133,14 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
     PorPrimero cmp; cmp.gs = &gPlan;
     std::stable_sort(gOrden.begin(), gOrden.end(), cmp);
 
-    // LAS ENTRADAS: una por grupo, "mallas/<slug(nombre)>.w3db" (-2, -3 si el slug choca); en el
-    // formato de TEXTO la misma entrada en .w3dm (el registro y la dedup son los mismos)
-    gPlanTexto = (W3dFormatoMallas() == W3D_MALLAS_TEXTO);
-    const char* ext = gPlanTexto ? ".w3dm" : ".w3db";
+    // LAS ENTRADAS: una por grupo, "mallas/<slug(nombre)>.w3db" (-2, -3 si el slug choca); una malla en
+    // TEXTO lleva la misma entrada en .w3dm (el registro y la dedup son los mismos). El formato es DE CADA
+    // MALLA (su tarjeta Recurso: W3dMallaRecursoEnTexto); una que se separo de otra hereda el de esa
     for (size_t o = 0; o < gOrden.size(); o++) {
         Grupo& g = gPlan[gOrden[o]];
         if (g.perdido) continue;
+        g.texto = W3dMallaRecursoEnTexto(g.rec ? g.rec : g.origen);
+        const char* ext = g.texto ? ".w3dm" : ".w3db";
         const std::string base = W3dSlugEntrada(g.nombre.empty() ? std::string("malla") : g.nombre);
         std::string nom = "mallas/" + base + ext;
         for (int k = 2; esc->Tiene(nom); k++) {
@@ -1172,7 +1173,7 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
                 continue;
             }
         }
-        if (gPlanTexto) {
+        if (g.texto) {
             // TEXTO: desde un objeto del grupo (la malla tal como se ve) o, si es huerfana, desde
             // sus bytes. La copia BINARIA del grupo (si la hay) queda para la memoria: al confirmar
             // es el cache de la conversion del .w3dm recien escrito (no se vuelve a convertir).
@@ -1387,7 +1388,7 @@ void W3dMallasGuardarConfirmar() {
             }
             if (!r->nombre.empty() && r->nombre != g.nombre) r->nombre = g.nombre;
         }
-        if (gPlanTexto) {
+        if (g.texto) {
             // TEXTO: la entrada es un .w3dm. Los bytes binarios que ya estan en memoria (los del
             // grupo, o los que el recurso tenia) son el CACHE de su conversion: no se vuelve a leer
             // el texto para dibujar ni para materializar.
@@ -1398,6 +1399,7 @@ void W3dMallasGuardarConfirmar() {
             r->bytes.clear();
             r->bytesDeTexto = false;
         }
+        r->formato = -1;   // (lo elegido en su tarjeta ya es lo que dice su entrada)
         r->modificado = false;
         if (!g.mats.empty() && g.mats.size() == r->partes.size()) r->materiales = g.mats;
         // los objetos del grupo pasan a usar ESTE recurso (los sueltos y los tocados comparten
@@ -1434,4 +1436,21 @@ static void MarcarSueltas(Object* o) {
 }
 void W3dMallasMarcarSueltasDelArchivo() {
     if (SceneCollection) MarcarSueltas(SceneCollection);
+}
+
+// EL FORMATO DE UNA MALLA AL GUARDARLA (su tarjeta Recurso, "Malla en texto"): lo elegido y todavia sin guardar
+// (formato 0/1); si no, el de su entrada (.w3dm = texto); una malla nueva sin entrada, el default del proyecto (los
+// proyectos viejos con "formatoMallas": "texto"). El forzado del harness manda sobre todo.
+bool W3dMallaRecursoEnTexto(const MallaRecurso* r) {
+    if (g_w3dFormatoMallasForzado >= 0) return g_w3dFormatoMallasForzado == W3D_MALLAS_TEXTO;
+    if (r && r->formato >= 0) return r->formato == 1;
+    if (r && r->entrada.size() > 5) return r->entrada.compare(r->entrada.size() - 5, 5, ".w3dm") == 0;
+    return g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO;
+}
+void W3dMallaRecursoFijarTexto(MallaRecurso* r, bool texto) {
+    if (!r) return;
+    r->formato = texto ? 1 : 0;
+    // si es lo mismo que ya dice su entrada, no hay nada pendiente (sacarlo y volverlo a poner no es un cambio)
+    const int pend = r->formato; r->formato = -1;
+    if (W3dMallaRecursoEnTexto(r) != texto) r->formato = pend;
 }

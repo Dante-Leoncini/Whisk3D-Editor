@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>                  // el reloj del perfil sin el perfilador: clock()
+// el FONDO 360 vuelve a dibujarse despues de que una rutina limpia el color (lo instala render/EscenaRender.cpp)
+void (*g_cieloTrasLimpiarHook)() = 0;
 
 namespace gfx = w3dEngine;
 
@@ -1001,6 +1003,9 @@ static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
             gfx::Scissor(g_w3dRecorteVista[0], g_w3dRecorteVista[1], g_w3dRecorteVista[2], g_w3dRecorteVista[3]);
         }
         if (bits) gfx::Clear(bits);
+        // el FONDO 360 (si lo hay) vuelve atras de lo que se dibuje despues: limpiar el color lo borraba
+        // (por un gancho: el juego 2D compila las rutinas pero no el pase 3D, que es quien lo instala)
+        if ((bits & gfx::ColorBuffer) && g_cieloTrasLimpiarHook) g_cieloTrasLimpiarHook();
         break;
     }
     // ---- mezcla ----

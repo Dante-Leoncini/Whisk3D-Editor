@@ -409,6 +409,9 @@ void RedoMeshPanel::Render(){
     // cada popup arma su propio ortho/viewport/scissor local (patron FileBrowser).
     // grupo->Render() dibuja en coords locales: (0,0) = esquina sup-izq del panel.
     initView();
+    // ARRASTRANDO un valor: la tarjeta translucida (se ve detras el cambio) y la fila que se edita opaca, al final
+    const int filaArrastre = (dragField && dragMoved) ? grupo->IndiceDe(dragField) : -1;
+    if (filaArrastre >= 0) w3dEngine::g_alfaColor = kAlfaTarjetaArrastre;
     w3dEngine::PushMatrix();
     grupo->Render();
     w3dEngine::PopMatrix();
@@ -416,6 +419,8 @@ void RedoMeshPanel::Render(){
     const float* verde = ListaColores[static_cast<int>(ColorID::accent)];
     w3dEngine::Color4f(verde[0], verde[1], verde[2], 1.0f);
     grupo->card->RenderBorder(false);
+    w3dEngine::g_alfaColor = 1.0f;
+    if (filaArrastre >= 0) grupo->RenderFila(filaArrastre);
     endView();
 }
 
@@ -514,7 +519,7 @@ void RedoMeshPanel::Soltar(){
     // texto/formula. El numpad restaura ESTE panel al cerrar (prevPopup), y su onChange re-corta en vivo.
     if (dragField && !dragMoved && dragField->value){
         dragField->IniciarEdicionTexto();
-        NumPadAbrir();
+        TecladoNumeroAbrir();
     }
     dragField = NULL;
 }

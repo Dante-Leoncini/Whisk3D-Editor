@@ -1,0 +1,18 @@
+# ==========================================================================
+#  LA MALLA SKINNEADA NO DESAPARECE AL ARRASTRAR RAPIDO LA LINEA DE TIEMPO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_skin_salto.w3s
+#
+#  EL CASO (el personaje de ssbn_PlMrNr con "EscapeB", en Android). Arrastrar
+#  el cabezal rapido: el personaje se iba de la vista y al volver se veia el
+#  esqueleto pero NO la malla, que aparecia un rato despues. El autocull por
+#  frustum probaba la malla con la caja de su ULTIMA pose (fuera de cuadro) y
+#  sin dibujarla no la volvia a skinnear hasta 30 cuadros despues.
+#  Ahora, en pausa, cualquier cambio de cuadro re-skinnea antes de probar, y
+#  reproduciendo, un salto de mas de 2 cuadros tambien (la vuelta del loop).
+# ==========================================================================
+
+ventana 640 480
+personajesmin /tmp/w3d_skinsalto 1
+skincull

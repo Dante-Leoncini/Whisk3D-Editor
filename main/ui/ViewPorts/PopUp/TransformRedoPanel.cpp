@@ -325,6 +325,9 @@ void TransformRedoPanel::Render() {
     if (listaAbierta) { int lx, ly, lw, lh; ListaRect(lx, ly, lw, lh); if (ly - dz.scroll < top) top = ly - dz.scroll; }
     const int y0 = y; y += top; popUpWindow->Resize(popUpWindow->width, popUpWindow->height - top);
     initView();
+    // ARRASTRANDO un valor: la tarjeta translucida (se ve detras el cambio) y la fila que se edita opaca, al final
+    const int filaArrastre = (dragField && dragMoved) ? grupo->IndiceDe(dragField) : -1;
+    if (filaArrastre >= 0) w3dEngine::g_alfaColor = kAlfaTarjetaArrastre;
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(0, (GLfloat)(-top - dz.scroll), 0);
     grupo->Render();
@@ -368,6 +371,13 @@ void TransformRedoPanel::Render() {
         w3dEngine::PopMatrix();
     }
     w3dEngine::PopMatrix();
+    w3dEngine::g_alfaColor = 1.0f;
+    if (filaArrastre >= 0) {
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef(0, (GLfloat)(-top - dz.scroll), 0);   // (la misma base que el grupo)
+        grupo->RenderFila(filaArrastre);
+        w3dEngine::PopMatrix();
+    }
     endView();
     y = y0;
 }
@@ -462,7 +472,7 @@ void TransformRedoPanel::Soltar() {
     if (dragField) {
         if (!dragMoved && dragField->value) {
             dragField->IniciarEdicionTexto();            // mouse: se escribe el valor exacto
-            if (ToolbarUsaTactil()) NumPadAbrir();       // tactil: el teclado numerico en pantalla
+            if (ToolbarUsaTactil()) TecladoNumeroAbrir();       // tactil: el teclado numerico en pantalla
         }
         dragField = NULL;
         return;

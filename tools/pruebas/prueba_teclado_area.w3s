@@ -1,0 +1,13 @@
+# ============================================================================
+#  EL AREA UTIL CON UN TECLADO ABIERTO (app/W3dTeclado.h, ViewPorts/PopUp/NumPad.cpp)
+#   1) el QWERTY de Whisk3D en el IDE: el IDE se MAXIMIZA y ocupa todo lo de arriba del teclado; al cerrarlo vuelve
+#      el layout de antes, a todo el alto
+#   2) el teclado del SISTEMA que tapa la ventana sin achicarla (Android en pantalla completa: lo avisa Java; aca se
+#      fuerza): los popups y el panel que lo pidio terminan arriba del teclado, y el campo que se edita se dibuja en
+#      una franja justo arriba (la captura)
+#  Correr: cd tools/pruebas && ../../platform/linux/build/whisk3d --script prueba_teclado_area.w3s
+# ============================================================================
+ventana 640 480
+escenadefecto
+vpkind 1 7
+tecladoarea /tmp/w3d_teclado_campo.png

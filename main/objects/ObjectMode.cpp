@@ -286,6 +286,10 @@ static float CanalValorActual(Object* o, int prop, int comp){
 	}
 	if (prop == AnimVisible)   return o->visible      ? 1.0f : 0.0f;
 	if (prop == AnimRender)    return o->renderizable ? 1.0f : 0.0f;
+	// el FONDO del render (sus curvas viven en la coleccion de la escena): color, rotacion y QUE fondo
+	if (prop == AnimFondo)     return (comp >= 0 && comp < 3) ? g_renderBg[comp] : 0.0f;
+	if (prop == AnimFondoRot)  return (comp >= 0 && comp < 3) ? g_renderBgRot[comp] : 0.0f;
+	if (prop == AnimFondoTex)  return g_renderBgModo == 1 ? (float)W3dFondoIndiceTextura(g_renderBgTex) : 0.0f;
 	// CAMARA: fov + distancias de dibujado (near/far)
 	if (prop == AnimFov)  return (o->getType()==ObjectType::camera) ? ((Camera*)o)->fov : 45.0f;
 	if (prop == AnimCamFoco) return (o->getType()==ObjectType::camera) ? ((Camera*)o)->focoDist : 5.0f;
@@ -343,6 +347,24 @@ void AnimCanalToggle(Object* o, int prop, int comp, int frame){
 	}
 	// lo GENERADO por una instancia de prefab no se anima (sus curvas no se guardan: se anima el prefab)
 	if (W3dPrefabEsGeneradoAviso(o, true)) return;
+	// EL FONDO: el rombo de su fila keyea JUNTOS el color (R/G/B) y QUE fondo es (el color o una textura 360, en escalon)
+	if (prop == AnimFondo){
+		int est = AnimCanalEstado(o, AnimFondo, AnimX, frame);
+		for (int cc = AnimX; cc <= AnimZ; cc++){
+			AnimProperty& ap = PropertyDeLista(CurvasActivas(o), AnimFondo, cc);
+			if (est == 2) BorrarKeyframeManteniendoForma(ap, frame);
+			else          SetKeyCurva(ap, frame, CanalValorActual(o, AnimFondo, cc), HPlano);
+		}
+		AnimProperty& tx = PropertyDeLista(CurvasActivas(o), AnimFondoTex, AnimX);
+		if (est == 2) BorrarKeyframeManteniendoForma(tx, frame);
+		else {
+			SetKeyCurva(tx, frame, CanalValorActual(o, AnimFondoTex, AnimX), HPlano);
+			for (size_t k = 0; k < tx.keyframes.size(); k++)
+				if (tx.keyframes[k].frame == frame){ tx.keyframes[k].Interpolation = KfConstant; break; }
+		}
+		g_redraw = true;
+		return;
+	}
 	// COLOR (diffuse/ambient/specular): UN solo rombo para las 3 curvas R/G/B -> se keyean/borran
 	// JUNTAS con el valor de cada componente. El estado se mide por la curva representante (AnimX).
 	if (prop == AnimColor || prop == AnimAmbient || prop == AnimSpecular){
@@ -369,6 +391,77 @@ void AnimCanalToggle(Object* o, int prop, int comp, int frame){
 		}
 	}
 	g_redraw = true;
+}
+
+// ---- el MENU CONTEXTUAL de una propiedad (Properties: mantener apretado / click derecho): insertar, borrar todos,
+//      copiar y pegar el keyframe del canal, sin el "pone o saca" del rombo ----
+// las curvas de un rombo: un COLOR (diffuse/ambient/specular) son sus 3 curvas R/G/B juntas; lo demas, la suya
+static int CompsDeCanal(int prop, int comp, int* out){
+	if (prop == AnimColor || prop == AnimAmbient || prop == AnimSpecular){ out[0]=AnimX; out[1]=AnimY; out[2]=AnimZ; return 3; }
+	out[0] = comp; return 1;
+}
+// se puede keyar este objeto aca? (lo mismo que mira el rombo, con sus avisos)
+static bool CanalEditable(Object* o){
+	if (!o || KeysEnJuego()) return false;
+	if (!W3dAnimObjetoPermitido(o)) { Notificar(T("This hierarchy clip only animates its root and its children"), true); return false; }
+	if (W3dPrefabEsGeneradoAviso(o, true)) return false;
+	return true;
+}
+// visible/render/el on de un paso son SI/NO: su key es un ESCALON (como en el rombo)
+static void KeyEscalonSiVa(AnimProperty& ap, int prop, int comp, int frame){
+	if (!(prop == AnimVisible || prop == AnimRender || prop == AnimLightMisc ||
+	      (prop == AnimPaso && comp % AnimPasoCampos == AnimPasoOn))) return;
+	for (size_t k=0;k<ap.keyframes.size();k++)
+		if (ap.keyframes[k].frame==frame){ ap.keyframes[k].Interpolation = KfConstant; break; }
+}
+bool AnimCanalInsertarKey(Object* o, int prop, int comp, int frame){
+	if (!CanalEditable(o)) return false;
+	int cs[3]; const int n = CompsDeCanal(prop, comp, cs);
+	for (int i = 0; i < n; i++){
+		AnimProperty& ap = PropertyDeLista(CurvasActivas(o), prop, cs[i]);
+		SetKeyCurva(ap, frame, CanalValorActual(o, prop, cs[i]), HPlano);   // (si ya habia uno, lo actualiza)
+		KeyEscalonSiVa(ap, prop, cs[i], frame);
+	}
+	g_redraw = true;
+	return true;
+}
+bool AnimCanalBorrarTodos(Object* o, int prop, int comp){
+	if (!CanalEditable(o)) return false;
+	int cs[3]; const int n = CompsDeCanal(prop, comp, cs);
+	std::vector<AnimProperty>& P = CurvasActivas(o);
+	bool algo = false;
+	for (int i = 0; i < n; i++)
+		for (size_t k = 0; k < P.size(); k++)
+			if (P[k].Property == prop && P[k].component == cs[i] && !P[k].keyframes.empty()){ P[k].keyframes.clear(); algo = true; }
+	g_redraw = true;
+	return algo;   // (el objeto se queda con el valor que tenia: ya no hay curva que lo mueva)
+}
+bool AnimCanalCopiarKey(Object* o, int prop, int comp, int frame, std::vector<keyFrame>& out){
+	out.clear();
+	if (!o) return false;
+	int cs[3]; const int n = CompsDeCanal(prop, comp, cs);
+	for (int i = 0; i < n; i++){
+		const AnimProperty* c = CurvaDe(o, prop, cs[i]);
+		bool hay = false;
+		if (c) for (size_t k = 0; k < c->keyframes.size(); k++)
+			if (c->keyframes.Frame(k) == frame){ out.push_back(c->keyframes.Clave(k)); hay = true; break; }
+		if (!hay){ out.clear(); return false; }
+	}
+	return true;
+}
+bool AnimCanalPegarKey(Object* o, int prop, int comp, int frame, const std::vector<keyFrame>& in){
+	int cs[3]; const int n = CompsDeCanal(prop, comp, cs);
+	if ((int)in.size() != n || !CanalEditable(o)) return false;
+	for (int i = 0; i < n; i++){
+		AnimProperty& ap = PropertyDeLista(CurvasActivas(o), prop, cs[i]);
+		SetKeyCurva(ap, frame, in[(size_t)i].value, HPlano);
+		for (size_t k = 0; k < ap.keyframes.size(); k++)
+			if (ap.keyframes[k].frame == frame){ keyFrame kf = in[(size_t)i]; kf.frame = frame; ap.keyframes[k] = kf; break; }
+	}
+	// el objeto toma el valor pegado (AplicarAnimacionObjetos solo aplica al CAMBIAR de frame: aca no cambio)
+	W3dAplicarCurvasEnFrame(o, CurvasActivas(o), frame);
+	g_redraw = true;
+	return true;
 }
 
 // ---- los PASOS de una RUTINA (canal AnimPaso: componente = id del paso * 8 + campo) ----

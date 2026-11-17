@@ -33,6 +33,11 @@ class Camera;
 
 extern Camera* CameraActive;
 
+// la ROTACION (grados, la del constructor de Object: Ry * Rx * Rz) para que una camara en 'desde' MIRE a 'hacia' derecho,
+// sin rolido (la vertical, para arriba). La camara mira a su -Z local. (La de la escena de arranque se escribia a mano,
+// (-35, -45, 0), y no apuntaba al cubo)
+Vector3 CamaraRotMirando(const Vector3& desde, const Vector3& hacia);
+
 class Camera : public Object, public Target {
     public:
         std::string RielName;   // (inicializados en el constructor: C++03)

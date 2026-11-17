@@ -66,7 +66,7 @@ El orden de la lista se puede cambiar, y un objeto se puede meter **adentro** de
 
 ![La fila de Luz se arrastra arriba de Cámara y la línea verde la deja primera; después Cámara se suelta en el medio de la fila de Cubo y queda adentro, corrida a la derecha](../tutoriales/img/outliner-mover-raton.webp)
 
-![Android](../tutoriales/img/icono-android.svg) **Con el dedo:** mantené el dedo quieto sobre la fila un segundo, hasta que el teléfono vibre: la fila queda agarrada. Después arrastrala y soltala igual que con el mouse. Si la soltás sin moverla, se abre el menú del objeto. Sin esa espera, arrastrar el dedo desplaza la lista.
+![Android](../tutoriales/img/icono-android.svg) **Con el dedo:** mantené el dedo quieto sobre la fila medio segundo (arriba del dedo gira un círculo de carga), hasta que el teléfono vibre: la fila queda agarrada. Después arrastrala y soltala igual que con el mouse. Si la soltás sin moverla, se abre el menú del objeto. Sin esa espera, arrastrar el dedo desplaza la lista.
 
 ![Nokia](../tutoriales/img/icono-nokia.svg) **En el Nokia N95:** elegí la fila con las flechas y apretá <kbd>1</kbd>. La fila se pone verde, y ahora las flechas la mueven:
 
@@ -97,7 +97,7 @@ En una escena grande la lista es larga, y elegir algo en la Vista 3D no la mueve
 | | Cómo se renombra |
 |---|---|
 | ![PC](../tutoriales/img/icono-pc.svg) PC | Doble click en el nombre, o <kbd>F2</kbd> para el activo: la fila se vuelve un campo de texto. Escribí el nombre nuevo y confirmá con <kbd>Enter</kbd> o con un click afuera; <kbd>Esc</kbd> lo deja como estaba. |
-| ![Android](../tutoriales/img/icono-android.svg) Pantalla táctil | Doble toque en el nombre: se abre el teclado de la pantalla. |
+| ![Android](../tutoriales/img/icono-android.svg) Pantalla táctil | Doble toque en el nombre, o **Renombrar** en el menú de la fila: se abre el teclado de la pantalla. |
 | ![Nokia](../tutoriales/img/icono-nokia.svg) Nokia N95 | Con la soft izquierda entrás a la barra y con la flecha derecha llegás a Elemento → Renombrar. Escribí con el T9 y confirmá con <kbd>OK</kbd>. |
 | Menú | Elemento → Renombrar |
 
@@ -141,7 +141,8 @@ Los **recursos** del proyecto (mallas, materiales, texturas, animaciones, sonido
 | Arrastrar un recurso | A una carpeta (lo mueve), a la Vista 3D (malla = objeto nuevo, material o textura = se asigna a lo tocado, prefab = instancia) o a un desplegable de Propiedades. |
 | Carpeta nueva / Mover a carpeta | Organizar (las carpetas son solo para ordenar). |
 | Duplicar recurso / Seleccionar usuarios / Purgar huérfanos | Copiar, encontrar quién lo usa, borrar lo que nadie usa. |
-| Dentro del .w3d / Externo | Desde Propiedades (tarjeta Recurso): mueve el recurso adentro o afuera del proyecto. |
+| Externos | Una textura, un sonido, un script, una fuente, un video o un shader cuyo archivo vive **afuera** del .w3d lleva una **flecha de acceso directo** sobre su ícono. |
+| Meter en el .w3d / Extraer a una carpeta... | En el menú del recurso (click derecho, o mantener el dedo): **Meter en el .w3d** lo copia adentro del proyecto; **Extraer a una carpeta...** lo saca a la carpeta que elijas y el proyecto pasa a usar ese archivo. El recurso sigue en la misma carpeta de la Biblioteca, y cada cambio se deshace con <kbd>Ctrl+Z</kbd>. También desde Propiedades (tarjeta Recurso). |
 
 ## Escenas, juegos y prefabs
 

@@ -371,6 +371,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propLightRTRadio; // trazado de rayos: tamano de la lampara (0 = puntual, sombra dura)
         PropFloat*  propLightRTRayos; // trazado de rayos: rayos de sombra hacia esta lampara (0 = global)
         GroupPropertie* propCamera;  // pestania de camara: lente (fov/orto) + target (look-at)
+        PropBool*   propCamActivaChk; // "Camara activa": la misma pista que la tarjeta Camara activa (animable)
         PropBool*   propCamOrtho;    // proyeccion ortografica vs perspectiva
         PropFloat*  propCamFov;      // campo de vision (grados), animable (AnimFov)
         PropFloat*  propCamNear;     // distancia minima de dibujado, animable (AnimClip/X)
@@ -588,13 +589,14 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propArchivo;
         PropText*   propProyCarpeta;  // carpeta del proyecto
         PropText*   propProyNombre;   // nombre.w3d
+        PropButton* propProyNuevo;  // "Nuevo proyecto": la escena de arranque, sin archivo (NuevoProyectoAhora)
         PropButton* propProyAbrir;
         PropButton* propProyGuardar;
         PropButton* propProyVersion; // "Guardar version vN" (guardado por versiones; N real segun versiones/)
         PropButton* propProyComo;
-        PropButton* propProyExtraer; // "Extraer assets": saca lo de adentro del .w3d a una carpeta
-        PropBool*   propProyMallasTexto; // "Meshes as text": la opcion "formatoMallas" del proyecto
-        PropBool*   propProyRed;    // "Network access": el permiso de la red de este archivo (W3dRedPermisos.h)
+        // (extraer los assets y el formato de las mallas ya no son del proyecto: son de cada recurso, en su tarjeta
+        // Recurso -propRecExtraer, propRecMallaTexto-)
+        PropBool*   propProyRed;    // "Network access" (tarjeta JUEGO): el permiso de la red de este archivo (W3dRedPermisos.h)
         GroupPropertie* propRender;  // pestania RENDER: tarjeta "Render" (output)
         GroupPropertie* propAnimation; // pestania ANIMACION (9): tarjeta "Animation" (selector + New/Delete)
         // ===== pestania ANIMACION (9): el MIX de animaciones (capas estilo Maya) =====
@@ -803,7 +805,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropText* propRenderOutput;  // campo editable "File name" del render (solo el nombre + .png)
         PropFloat* propRenderW; PropFloat* propRenderH;         // ancho/alto del render en pixeles (editable)
         PropBool*  propRenderZbuffer; PropBool* propRenderNormal; PropBool* propRenderAlpha; // pases extra
-        PropColor* propRenderBg;     // color de fondo del render (global g_renderBg, solo pase Rendered)
+        PropButton* propRenderBg;    // el FONDO del render: color o textura 360 (el boton de la derecha cambia)
+        PropFloat*  propRenderBgRot[3];   // la rotacion de la textura 360 del fondo (grados)
         // (las OPCIONES del render no son del panel: son de g_render, render/OpcionesRender.h. Las filas las editan)
         PropButton* propRenderFormato; PropFloat* propRenderCalidad;
         PropBool* propRenderFinal; PropBool* propRenderFinalAlfa; PropBool* propRenderPost;
@@ -814,6 +817,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*  propRT;           // "Ray Tracing": el pase Rendered se traza por CPU (render/RayTracer)
         PropFloat* propRTRayos; PropFloat* propRTSamples; PropFloat* propRTPases; // solo visibles con Ray Tracing tildado
         PropFloat* propRTCapas;   // las capas transparentes que atraviesa un rayo
+        PropFloat* propRTRebotes; // los REBOTES de la luz (luz indirecta): 0 = solo la directa
         PropButton* propRTGpu;
         PropBool* propRTSoloFinal;   // ver solo la imagen terminada (g_rt.soloFinal)
         PropBool* propRTSemilla;     // otro ruido en cada imagen (g_rt.semillaVariable)
@@ -831,7 +835,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propRTReesc;     // COMO se agranda (g_rt.reescalador: lineal o FSR 1); solo con el reescalado puesto
         PropButton* propRTEscala;    // el reescalado del viewport (g_rt.escala: Off, x2, x3, x4)       // DONDE se traza: CPU o la GPU (render/RTGpu.h); solo si hay una GPU con Vulkan
         PropButton* propRTDenoiser;  // el DENOISER (desplegable: los que hay en esta maquina; render/Denoiser.h)
-        float rtRayos, rtSamples, rtPases, rtCapas;     // espejos float de g_rt (los PropFloat bindean float*)
+        float rtRayos, rtSamples, rtPases, rtCapas, rtRebotes;     // espejos float de g_rt (los PropFloat bindean float*)
         PropText* propExportPath;    // campo editable "Path" del export (carpeta de salida)
         PropText* propExportName;    // campo editable "File name" del export (solo el nombre + extension del formato)
         PropButton* propExportFormat;// dropdown de formato de export (OBJ / FBX / glTF / GLB)
@@ -871,6 +875,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propMapa[8];
         PropFloat*  propMatIOR;      // indice de refraccion (trazado de rayos)
         PropFloat*  propMatTrans;    // TRANSMISION 0..1 (trazado de rayos): lo que es vidrio
+        PropBool*   propMatSSR;      // REFLEJOS EN PANTALLA (luz por pixel)
         // SHADER ESCRITO (objects/ShaderEscrito.h): el tilde, el archivo, Compile (+ el lapiz: editar en el IDE) y el resultado
         PropBool*   propMatShaderOn;
         PropButton* propBtnShader;
@@ -901,6 +906,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropLabel*  propRecEntrada;    // su entrada del contenedor / su ruta (WRAP)
         std::vector<PropLabel*> propRecDatos;   // los DATOS del tipo, una fila cada uno ("Resolution: 256 x 256")
         PropButton* propRecUbicacion;  // desplegable: "Inside the .w3d" / "External" (los que tienen archivo)
+        PropBool*   propRecMallaTexto; // (malla 3D) "Mesh as text": se guarda .w3dm (texto) o .w3db (binario)
+        PropButton* propRecExtraer;    // "Extract": una COPIA de su archivo de adentro del .w3d a una carpeta
         PropImagen* propRecPreview;    // vista previa de una textura
         PropButtonRow* propRecAcciones; // Select Users | Delete (en uso: avisa cuantos lo usan)
         PropButtonRow* propRecAcciones2; // sonido: Play | Stop; escena/prefab: Open; script: Open in IDE
@@ -988,6 +995,11 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // click: plegar/desplegar el grupo cuyo titulo este bajo el mouse
         // (compartido; en PC se cablea a mouse_button_up)
         void ClickEn(int mx, int my);
+        // la fila bajo (mx,my) (NULL = cabecera / hueco / afuera) y su MENU CONTEXTUAL (mantener apretado o click
+        // derecho): restablecer / copiar / pegar y, si es animable, los keyframes. false = ahi no hay una fila de valor
+        PropertieBase* PropEnPunto(int mx, int my);
+        // (menuX/menuY: donde abrir el menu, si no es en el punto: la pulsacion larga lo abre arriba del dedo)
+        bool MenuContexto(int mx, int my, int menuX = -1, int menuY = -1);
 
         // touch: (mx,my) cae sobre el VALUE BOX de un PropFloat? -> ahi el arrastre horizontal EDITA (slider);
         // en el label / otras filas el arrastre SCROLLEA. Lo usa el ruteo tactil en controles.cpp.
@@ -997,6 +1009,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void TouchSliderSoltar() W3D_OVERRIDE;
         // PropFloat cuyo value box cae bajo (mx,my), o NULL (recorrido de filas comun a lo de arriba)
         PropFloat* PropFloatEnValueBox(int mx, int my);
+        int MapaNumeroEn(int mx, int my);   // el numero de un mapa del material bajo el punto (su k, o -1)
         // mini-listado (PropListMeshParts) bajo la coordenada py, o NULL (para el scroll tactil de la lista)
         PropListMeshParts* ListaBajoY(int py);
 

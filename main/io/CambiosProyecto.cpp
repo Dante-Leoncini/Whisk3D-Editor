@@ -119,6 +119,7 @@ static std::string FirmaMalla(const MallaRecurso* r) {
     std::string s = r->nombre + "\x01";
     Num(s, r->version);
     s += r->modificado ? 'M' : '-';
+    s += r->formato < 0 ? '-' : r->formato ? 'T' : 'B';   // el formato elegido en su tarjeta, sin guardar
     return s;
 }
 
@@ -328,13 +329,16 @@ static int gAccion = W3D_CAMBIOS_SALIR;
 static std::string gRutaAbrir;
 static std::string gEscenaCerrar;   // W3D_CAMBIOS_CERRAR_ESCENA: cual
 extern void CambiosPopupAbrir(int accion);   // ui/ViewPorts/PopUp/CambiosPopup.cpp
-// SIN CARTEL en el telefono Symbian y en las consolas (3DS, PSP, PS Vita): salir, abrir otro proyecto, empezar uno nuevo
-// o cerrar una escena lo hacen directo, sin guardar (pedido del dueno: "se cierra y punto"; en las consolas el cartel al
-// cerrar colgaba todo: el que cierra es el sistema -HOME, el boton PS- y no espera). El cartel queda para PC, la web y
-// Android (donde el cierre del sistema tampoco pregunta: main.cpp)
+// SIN CARTEL en el telefono Symbian y en las consolas (3DS, PSP, PS Vita): ni compilado (en las consolas el cartel al
+// cerrar colgaba todo: el que cierra es el sistema -HOME, el boton PS- y no espera)
 #if defined(W3D_SYMBIAN) || defined(W3D_3DS) || defined(W3D_PSP) || defined(W3D_VITA)
 #define W3D_CAMBIOS_SIN_CARTEL 1
 #endif
+// En PC, la web y Android el cartel ESTA: salir, abrir otro proyecto, empezar uno nuevo ("Nuevo proyecto" de la tarjeta
+// Archivo) o cerrar una escena con algo sin guardar preguntan primero. (Estuvo apagado unas horas el 2026-11-15 y el dueno
+// lo pidio de vuelta: "Nuevo proyecto" con el cubo movido borraba todo de una.) false lo apaga en todos lados; no es
+// g_w3dCambiosSinCartel: ese es el "sin preguntas" del harness, que tambien saltea el permiso de la red.
+bool g_w3dCambiosCartelActivo = true;
 void (*W3dCambiosCerrarEscenaHook)(const std::string& nombre) = 0;
 void W3dCambiosOlvidarRaiz(const Object* raiz) { if (raiz && gTocadas.erase(raiz)) gVersion++; }
 bool W3dCambiosPreguntarCerrarEscena(const std::string& nombre) {
@@ -342,7 +346,7 @@ bool W3dCambiosPreguntarCerrarEscena(const std::string& nombre) {
     (void)nombre;
     return false;
 #endif
-    if (g_w3dCambiosSinCartel) return false;
+    if (g_w3dCambiosSinCartel || !g_w3dCambiosCartelActivo) return false;
     if (!W3dCambiosRaizSucia(W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre))) return false;
     gCartel = true;
     gAccion = W3D_CAMBIOS_CERRAR_ESCENA;
@@ -360,7 +364,7 @@ bool W3dCambiosPreguntar(int accion, const std::string& ruta) {
     (void)accion; (void)ruta;
     return false;
 #endif
-    if (g_w3dCambiosSinCartel) return false;
+    if (g_w3dCambiosSinCartel || !g_w3dCambiosCartelActivo) return false;
     if (!W3dCambiosHay()) return false;
     gCartel = true;
     gAccion = accion;

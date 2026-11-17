@@ -9,6 +9,8 @@
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d curva(s) de animação da seleção não animam mais nada (Desfazer as devolve)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d curva(s) de animação ficaram sem objeto (a primeira: '%s'): veja whisk3d.log
 %d curves selected	%d curvas selecionadas
+%d files are now external	%d arquivos agora são externos
+%d files are now inside the .w3d	%d arquivos agora estão dentro do .w3d
 %d keyframes selected	%d keyframes selecionados
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d nome(s) renumerados ao mudar de cena (%s%s). Revise seus scripts Lua.
 %d nodes | active node: %d	%d nós | nó ativo: %d
@@ -339,11 +341,13 @@ Clipping	Recorte
 Clips	Clipes
 Clone screen	Clonar tela
 Close	Fechar
+Close Whisk3D?	Fechar o Whisk3D?
 Close without saving	Fechar sem salvar
 Closest	Mais Próximo
 Collapse	Colapsar
 Collection	Coleção
 Color	Cor
+Color / Texture	Cor / Textura
 Color Grid	Grade de Cores
 Color Layers	Camadas de cor
 Color Mode	Modo de Cor
@@ -387,6 +391,7 @@ Convert to Scene	Converter em cena
 Convert to editable mesh	Converter em malha editável
 Copied	Copiado
 Copy	Copiar
+Copy Keyframe	Copiar keyframe
 Copy X	Copiar X
 Copy Y	Copiar Y
 Copy Z	Copiar Z
@@ -398,14 +403,17 @@ Correct UVs	Corrigir UVs
 Could not copy the objects	Não foi possível copiar os objetos
 Could not create a viewport on the external display: cloning the screen	Não foi possível criar um viewport na tela externa: a tela será clonada
 Could not encode the PNG	Não foi possível codificar o PNG
+Could not extract	Não foi possível extrair
 Could not import	Não foi possível importar
 Could not link the copy of '%s' to its mesh	Não consegui vincular a cópia de '%s' à sua malha
+Could not load the layout	Não foi possível carregar o layout
 Could not load the mesh '%s'	Não consegui carregar a malha '%s'
 Could not read the STL file	Não foi possível ler o arquivo STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Não consegui ler as animações de '%s' (%s): ficam VAZIAS e não vou salvar por cima (veja whisk3d.log)
 Could not read the file	Não foi possível ler o arquivo
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Não consegui ler os frames da animação '%s' de '%s': fica VAZIA e não vou salvar por cima (veja whisk3d.log)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Não consegui ler a geometria de '%s': fica VAZIA e não vou salvar por cima (veja whisk3d.log)
+Could not save the layout	Não foi possível salvar o layout
 Could not write config.ini	Não foi possível gravar config.ini
 Could not write the file	Não foi possível gravar o arquivo
 Count	Cópias
@@ -441,12 +449,14 @@ Cylinder Projection	Projeção de Cilindro
 Debug mode	Modo debug
 Decal	Decalque
 Decimals	Decimais
+Default	Padrão
 Default Material	Material Padrão
 Delete	Excluir
 Delete "%s" (%s) with all its objects?	Excluir "%s" (%s) com todos os seus objetos?
 Delete "%s"?	Excluir "%s"?
 Delete %d objects?	Excluir %d objetos?
 Delete %d scenes, games or prefabs with all their objects?	Excluir %d cenas, jogos ou prefabs com todos os seus objetos?
+Delete All Keyframes	Apagar todos os keyframes
 Delete Edge Loops	Excluir loops de arestas
 Delete Edge Loops: select an edge loop first	Excluir Edge Loops: selecione um edge loop primeiro
 Delete Edge Loops: select an edge shared by two faces	Excluir Loops de Arestas: selecione uma aresta compartilhada por duas faces
@@ -461,10 +471,13 @@ Delete Normals Layer	Excluir camada de normais
 Delete Palette	Apagar paleta
 Delete Vertices	Excluir vértices
 Delete editing data	Apagar dados de edição
+Delete layout	Apagar layout
+Delete layout...	Apagar layout...
 Delete mesh layer: select an object animation in the timeline	Excluir camada da malha: escolha uma animação do objeto na timeline
 Delete normals layer: select an object animation in the timeline	Apagar camada de normais: escolha uma animação do objeto na timeline
 Delete selected?	Excluir a seleção?
 Delete step	Apagar passo
+Delete the layout	Apagar o layout
 Delete the orphan resource	Excluir o recurso órfão
 Delete the orphan resources	Excluir os recursos órfãos
 Deleted	Excluído
@@ -587,9 +600,13 @@ Exporting model...	Exportando modelo...
 External	Externo
 External (choose where)...	Externo (escolher onde)...
 External display	Tela externa
+Extract	Extrair
 Extract assets	Extrair assets
 Extract the assets to...	Extrair os assets para...
+Extract to a folder...	Extrair para uma pasta...
+Extract to...	Extrair para...
 Extract: save the project first (the assets live inside the .w3d)	Extrair: salve o projeto primeiro (os assets ficam dentro do .w3d)
+Extracted	Extraído
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Extraídos %d arquivo(s). São CÓPIAS: para que uma alteração volte ao projeto é preciso importá-la de novo
 Extracted %d file(s); %d failed (see the log)	Extraídos %d arquivo(s); %d falharam (veja o log)
 Extrude	Extrudar
@@ -808,6 +825,7 @@ It couldn't be copied into the .w3d	Não foi possível copiá-lo para dentro do 
 It doesn't exist anymore	Não existe mais
 It has no checkbox	Não tem caixa de seleção
 It has no proyecto.json	Não tem proyecto.json
+It is a COPY: for a change to go back into the project you have to import it again	É uma CÓPIA: para que uma alteração volte ao projeto é preciso importá-la de novo
 It is a W3D proxy: choose its library element	É um proxy W3D: escolha o elemento da sua biblioteca
 It is already linked	Já está vinculado
 It is in use	Está em uso
@@ -844,6 +862,9 @@ Last triangle	Último triângulo
 Layer	Camada
 Layer On	Camada ativa
 Layout	Layout
+Layout deleted	Layout apagado
+Layout replaced	Layout substituído
+Layout saved	Layout salvo
 Left	Esquerda
 Left Handle X	Alça Esq. X
 Left View	Vista esquerda
@@ -859,6 +880,7 @@ Library not readable	Biblioteca ilegível
 Library unlinked	Biblioteca desvinculada
 Lifetime	Vida
 Light	Luz
+Light bounces	Rebotes de luz
 Light color	Cor da luz
 Light on/off	Luz liga/desliga
 Light position	Posição da luz
@@ -970,6 +992,7 @@ Merge at Cursor	Mesclar no cursor
 Merge by Distance	Mesclar por distância
 Mesh	Malha
 Mesh Parts	Partes de Malha
+Mesh as text	Malha em texto
 Mesh editable again	Malha editável de novo
 Mesh layer deleted	Camada da malha excluída
 Mesh made single user	A malha agora é única
@@ -1049,6 +1072,7 @@ New Texture: invalid size	Nova Textura: tamanho inválido
 New UV Map	Novo mapa UV
 New W3D proxy of this element	Novo proxy W3D deste elemento
 New controller detected: %s	Novo controle detectado: %s
+New file	Novo arquivo
 New instance of this prefab	Nova instância deste prefab
 New instance of this scene	Nova instância desta cena
 New material with this shader	Material novo com este shader
@@ -1056,6 +1080,7 @@ New material with this texture	Material novo com esta textura
 New noise each image	Outro ruído em cada imagem
 New object with this 3D mesh	Novo objeto com esta malha 3D
 New paint texture	Nova textura para pintar
+New project	Novo projeto
 New shader	Novo shader
 New sound object here	Novo objeto de som aqui
 Next	Próximo
@@ -1164,6 +1189,7 @@ Open in IDE	Abrir no IDE
 Open normal map	Abrir Mapa de Normais
 Open project	Abrir projeto
 Open without saving	Abrir sem salvar
+Open...	Abrir...
 Opening project...	Abrindo projeto...
 Operation	Operação
 Optimize Vertex Groups	Otimizar Grupos de Vértices
@@ -1189,6 +1215,7 @@ Overrides	Overrides
 Own	Próprio
 PVS recalculated	PVS recalculado
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: falta <modelo>.pvs.json junto ao .obj de origem
+Pack into the .w3d	Colocar dentro do .w3d
 Packaging .deb (cpack)	Empacotando .deb (cpack)
 Packaging AppImage	Empacotando AppImage
 Packed (protected)	Empacotados (protegidos)
@@ -1213,6 +1240,7 @@ Parts	Partes
 Pass Order	Ordem de passe
 Passes	Passes
 Paste	Colar
+Paste Keyframe	Colar keyframe
 Pasted	Colado
 Patch	Remendo
 Path	Caminho
@@ -1283,7 +1311,7 @@ Project from View	Projetar da Vista
 Project from View (Bounds)	Projetar da Vista (Limites)
 Project from View: select faces first	Projetar da Vista: selecione faces primeiro
 Project saved: 	Projeto salvo: 
-Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Projeto salvo: %s (%d referência(s) externa(s), veja EXTERNOS.txt)
+Project saved: %s (%d external file(s), marked with an arrow in the Library)	Projeto salvo: %s (%d arquivo(s) externo(s), marcados com uma seta na Biblioteca)
 Properties	Propriedades
 Properties viewport	Viewport de propriedades
 Proportional Editing	Edição Proporcional
@@ -1320,6 +1348,7 @@ Ray traced motion blur	Desfoque traçado
 Rays	Raios
 Recalculate	Recalcular
 Recalculate Normals	Recalcular Normais
+Recent files	Arquivos recentes
 Rectangle	Retângulo
 Red	Vermelho
 Redo	Refazer
@@ -1430,6 +1459,8 @@ Save and continue	Salvar e continuar
 Save and open	Salvar e abrir
 Save and quit	Salvar e sair
 Save inside the .w3d	Salvar no w3d
+Save layout	Salvar layout
+Save layout...	Salvar layout...
 Save outside the .w3d...	Salvar fora do w3d...
 Save project	Salvar projeto
 Save script	Salvar script
@@ -1440,7 +1471,8 @@ Save: could not replace the file (the previous version was kept):	Salvar: não f
 Save: incomplete write. The file was not touched:	Salvar: gravação incompleta. O arquivo não foi alterado:
 Saved (note: %d curve(s) without a source file are not saved)	Salvo (atenção: %d curva(s) sem arquivo de origem não são salvas)
 Saved OK, but copying version v%d failed (see the log)	Salvo, mas a cópia da versão v%d falhou (veja o log)
-Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Salvo, mas %d arquivo(s) externo(s) NÃO estão (veja EXTERNOS.txt). Se for o original de uma malha importada: Objeto > Definir Origem > Esquecer Arquivo Original
+Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Salvo, mas faltam %s e mais %d arquivo(s) (fora do .w3d). Biblioteca > Arquivos faltando
+Saved, but %s is missing (it is outside the .w3d). Library > Missing files	Salvo, mas falta %s (está fora do .w3d). Biblioteca > Arquivos faltando
 Saved: 	Salvo: 
 Scale	Escalar
 Scale Only	Somente Escala
@@ -1458,6 +1490,7 @@ Scenes	Cenas
 Screen	Tela
 Screen (lightens)	Tela (clareia)
 Screen Rect	Recorte
+Screen Space Reflections	Reflexos em tela
 Screw	Parafuso
 Script	Script
 Script Editor	Editor de scripts
@@ -1696,6 +1729,7 @@ The sound couldn't be read	Não foi possível ler o som
 The texture couldn't be loaded	Não foi possível carregar a textura
 The undo history still uses it	O histórico de desfazer ainda o usa
 There are no orphans	Não há órfãos
+There are no saved layouts to delete	Não há layouts salvos para apagar
 There is no active camera	Não há câmera ativa
 There is no audio: the mixer did not start	Não há áudio: o mixer não iniciou
 There is no script editor (IDE) in the layout	Não há um editor de scripts (IDE) no layout
@@ -1800,6 +1834,7 @@ Use index	Usar índice
 Use new viewport	Usar novo viewport
 Use physics engine	Usar motor de física
 Use sound	Usar som
+Use system keyboard	Usar teclado do sistema
 Use the material's UV index	Usar o índice UV do material
 Use this file	Usar este ficheiro
 Use this folder	Usar esta pasta

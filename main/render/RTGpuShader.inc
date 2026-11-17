@@ -312,6 +312,18 @@ vec3 NormalEn(Hit h, vec3 d) {
 
 static const char* kRTGpuTrazar = R"GLSL(
 // un rayo de camara con sus capas transparentes; los REFLEJOS del metal van a una pila (hasta 4 rebotes)
+int gRebotes = 0;   // los rebotes de la luz (pc.dims.w >> 8)
+int gEnvMat = -1;   // el material extra del FONDO 360 ((pc.info.w >> 1) - 1; -1 = el color de fondo)
+// EL FONDO en una direccion: el color, o el punto de la textura 360 (como RayTracer.cpp: FondoEn)
+vec3 Fondo(vec3 d) {
+    if (gEnvMat < 0) return pc.bg.rgb;
+    Mat r = mats[gEnvMat];
+    float x = r.m0.x * d.x + r.m0.y * d.y + r.m0.z * d.z;
+    float y = r.m0.w * d.x + r.m1.x * d.y + r.m1.y * d.z;
+    float z = clamp(r.m1.z * d.x + r.m1.w * d.y + r.m2.x * d.z, -1.0, 1.0);
+    vec2 uv = vec2(fract(0.5 + atan(y, x) * 0.15915494), acos(z) * 0.31830989);
+    return Muestrear(int(r.m3.x), uv).rgb;
+}
 vec3 Radiancia(vec3 o0, vec3 d0) {
     vec3 total = vec3(0.0);
     vec3 pO[8]; vec3 pD[8]; vec3 pT[8]; int pP[8]; int sp = 0;
@@ -326,7 +338,7 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
         int capa = 0;
         for (int vuelta = 0; vuelta < 256 && capa < capas; vuelta++) {
             Hit h;
-            if (!Trazar(o, d, tMin, 1e30, false, h, excl)) { total += thr * peso * pc.bg.rgb; break; }
+            if (!Trazar(o, d, tMin, 1e30, false, h, excl)) { total += thr * peso * Fondo(d); break; }
             ivec4 T = tris[h.tri];
             M m = MaterialEn(h);
             float b0 = 1.0 - h.b1 - h.b2;
@@ -351,6 +363,13 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
                     }
                 }
                 vec3 col = LuzEn(p, n, -d, alb, m);
+                // LA LUZ DEL FONDO 360 sin rebotes: un rayo al cielo pesado por el coseno (si no lo tapa nada)
+                if (gEnvMat >= 0 && gRebotes == 0 && !m.sinLuz && m.met < 1.0) {
+                    vec3 sd = normalize(n + DirAzarEsfera());
+                    if (dot(sd, n) <= 0.0) sd = n;
+                    Hit hs;
+                    if (!Trazar(p + n * 1e-3, sd, 1e-4, 1e30, true, hs, -1)) col += (1.0 - m.met) * alb * Fondo(sd);
+                }
                 float w = m.aditivo ? peso : peso * alfa * (1.0 - m.trans);
                 total += thr * w * col;
                 if (m.met > 0.0 && prof < 4 && sp < 8) {
@@ -360,6 +379,12 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
                         if (dot(r, n) <= 0.0) r = normalize(r - n * (2.0 * dot(r, n)));
                     }
                     pO[sp] = p + n * 1e-3; pD[sp] = r; pT[sp] = thr * w * m.met * alb; pP[sp] = prof + 1; sp++;
+                }
+                // REBOTES DE LA LUZ (como RayTracer.cpp): la parte difusa sigue en una direccion pesada por el coseno
+                if (gRebotes > 0 && prof < gRebotes && !m.sinLuz && m.met < 1.0 && sp < 8) {
+                    vec3 r = normalize(n + DirAzarEsfera());
+                    if (dot(r, n) <= 0.0) r = n;
+                    pO[sp] = p + n * 1e-3; pD[sp] = r; pT[sp] = thr * w * (1.0 - m.met) * alb; pP[sp] = prof + 1; sp++;
                 }
                 if (!m.aditivo && m.trans <= 0.0) peso *= (1.0 - alfa);
             }
@@ -423,7 +448,9 @@ void main() {
     int i = q.y * pc.dims.x + q.x;
     gRng = uint(q.x * 1973 + q.y * 9277 + pc.dims.z * 26699 + 1) ^ (uint(pc.lente.z) * 2654435761u);
     if (gRng == 0u) gRng = 0x9E3779B9u;
-    int ns = max(pc.dims.w, 1);
+    int ns = max(pc.dims.w & 255, 1);
+    gRebotes = (pc.dims.w >> 8) & 255;
+    gEnvMat = (pc.info.w >> 1) - 1;
     vec3 c = vec3(0.0);
     for (int s = 0; s < ns; s++) {
         vec3 o, d; RayoPixel(float(q.x) + Azar(), float(q.y) + Azar(), o, d); RayoLente(o, d);
@@ -432,7 +459,7 @@ void main() {
     vec4 a = (pc.dims.z == 0 ? vec4(0.0) : acum[i]) + vec4(c / float(ns), 0.0);
     acum[i] = a;
     img[i] = packUnorm4x8(vec4(clamp(a.rgb / float(pc.dims.z + 1), 0.0, 1.0), 1.0));
-    if (pc.info.w != 0) {   // el ALBEDO y la NORMAL del primer impacto (para el denoiser)
+    if ((pc.info.w & 1) != 0) {   // el ALBEDO y la NORMAL del primer impacto (para el denoiser)
         vec3 o, d; RayoPixel(float(q.x) + 0.5, float(q.y) + 0.5, o, d);
         // (la primera superficie que TAPA al menos la mitad: lo transparente y lo recortado se atraviesa, si no el
         // denoiser borroneaba lo que se ve a traves de un vidrio o de las hojas)
@@ -442,7 +469,7 @@ void main() {
             if (!hay || pc.info.z == 0 || capa + 1 >= pc.info.z || OpacidadEn(h) >= 0.5) break;
             tMin = h.t * (1.0 - 1e-5); excl = h.tri;
         }
-        if (!hay) { aovAlb[i] = vec4(pc.bg.rgb, 0.0); aovNrm[i] = vec4(0.0); }
+        if (!hay) { aovAlb[i] = vec4(Fondo(d), 0.0); aovNrm[i] = vec4(0.0); }
         else {
             M m = MaterialEn(h);
             vec3 alb = m.dif;

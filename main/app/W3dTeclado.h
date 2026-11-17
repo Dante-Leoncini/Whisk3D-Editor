@@ -13,9 +13,27 @@
 // ============================================================================
 struct SDL_Window;
 void W3dTecladoAbrir();
-// del SDL_WINDOWEVENT_RESIZED, ANTES de redimensionar el layout
-void W3dTecladoRedimension(int w, int h);
+// al repartir la ventana (main.cpp), ANTES de redimensionar el layout: el alto de la VENTANA y lo que tapa el teclado
+void W3dTecladoRedimension(int w, int h, int tapado);
 bool W3dTecladoVisible();
+// Ajustes > "Use system keyboard" (cfg.tecladoSistema): true = el teclado del sistema; false = los de Whisk3D. Lo
+// consultan TecladoTextoAbrir / TecladoNumeroAbrir (ViewPorts/PopUp/NumPad.h), por donde pasan todos los campos
+bool W3dTecladoDelSistema();
 // Android: consulta si la pantalla tiene notch y, si no tiene, pone la ventana en pantalla completa
 void W3dPantallaCompletaAuto(SDL_Window* win);
+// ---- EL AREA UTIL CON UN TECLADO ABIERTO ----
+// Lo que el teclado del SISTEMA tapa abajo de la ventana SIN achicarla (Android en pantalla completa, el Galaxy Ace: SDL
+// 2.0.7 no sale de pantalla completa y ahi Android no achica la ventana). Lo mide Java (Whisk3DActivity, lo que el
+// teclado le tapa a la superficie de SDL) y lo avisa con un evento (W3dTecladoEsEvento). 0 = no tapa nada (la ventana
+// se achico, o no hay teclado). La ventana se reparte con esto: ver W3dVentanaReacomodar en main.cpp
+union SDL_Event;
+int  W3dTecladoTapado();
+void W3dTecladoTapadoForzar(int px);   // (el harness: -1 = el de verdad)
+bool W3dTecladoEsEvento(const SDL_Event& e);
+// el alto del teclado de WHISK3D abierto para el IDE (0 = cerrado): el IDE se maximiza y ocupa lo de arriba
+void W3dTecladoIDEAlto(int h);
+int  W3dTecladoIDEAltoActual();
+// volver a repartir la ventana (el layout y el area de los popups) con lo que tapan los teclados ahora. Lo pone main.cpp
+extern void (*g_ventanaReacomodarHook)();
+void W3dTecladoReacomodar();
 #endif // W3DTECLADO_H

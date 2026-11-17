@@ -1,0 +1,21 @@
+# prueba_add_deshacer.w3s — lo que se CREA con el menu Agregar (Agregar > Plano, Cubo, Camara...) es UN paso de deshacer:
+#   Ctrl+Z lo saca (y vuelve la seleccion de antes) y Ctrl+Y lo devuelve. Antes crear no era un paso: deshacer se
+#   salteaba el objeto nuevo y deshacia lo de antes, y el objeto quedaba
+ventana 960 540
+escala 2
+selobj Cubo
+objpos 1 0 0
+addmenu plane
+selobj Plano
+undo
+fail selobj Plano
+selobj Cubo
+redo
+selobj Plano
+undo
+fail selobj Plano
+# otra camara por el menu: lo mismo
+addmenu camera
+selobj Cámara.001
+undo
+fail selobj Cámara.001

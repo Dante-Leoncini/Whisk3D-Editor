@@ -56,6 +56,10 @@ struct Config {
     // LOGS del editor (Ajustes > Logs): 3 = todo, 2 = avisos y errores, 1 = solo errores, 0 = nada.
     // Apagados el editor va mas rapido (cada linea abre, escribe y cierra el archivo).
     int logs;
+    // EL TECLADO EN PANTALLA (Ajustes > "Use system keyboard"). false (default) = los de Whisk3D en TODOS lados: el
+    // QWERTY para texto y el numerico para numeros. true = el del sistema (Android) en todos lados. Antes cada campo
+    // elegia por su cuenta (el nombre de un layout salia con el del sistema y el resto con el de Whisk3D)
+    bool tecladoSistema;
     Config()
         : fullscreen(false), enableAntialiasing(false), mipmaps(true),
           width(800), height(600), displayIndex(0),
@@ -65,7 +69,7 @@ struct Config {
           scale(3), nuevoUsuario(true),
 #endif
           autoKey(false),
-          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath(""), logs(3) {}
+          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath(""), logs(3), tecladoSistema(false) {}
 };
 extern Config cfg;
 

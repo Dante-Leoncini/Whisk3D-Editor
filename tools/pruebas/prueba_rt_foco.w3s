@@ -2,8 +2,10 @@
 # abierta (f/0.1, una lente de 15 cm) y enfocada en el cubo de cerca, el de lejos sale desenfocado y el de cerca casi igual. Enfocando el de
 # lejos (por objeto: el foco lo sigue solo) se desenfoca el de cerca. Con la profundidad de campo apagada, igual que
 # antes. En la CPU y en la GPU
+# (el de lejos: a 12 de la camara de la escena de arranque -el cubo esta a 5,5-, en la direccion en que mira y corrido a la derecha
+#  para que el de cerca no lo tape. La camara de arranque mira al cubo desde el 2026-11-15)
 add cube
-objpos 0 0 -12
+objpos 6.9 -3.8 1.1
 objname Lejos
 deselectall
 vpcamara on

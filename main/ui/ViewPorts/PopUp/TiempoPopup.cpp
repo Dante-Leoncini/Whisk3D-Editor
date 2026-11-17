@@ -109,7 +109,7 @@ bool TiempoPopup::Tecla(int tecla) {
         case LayoutKey::Enter:
             sel->IniciarEdicionTexto();
             #ifndef W3D_SYMBIAN
-            if (ToolbarUsaTactil()) NumPadAbrir();
+            if (ToolbarUsaTactil()) TecladoNumeroAbrir();
             #endif
             break;
         case LayoutKey::Cancel: Cerrar(); return true;
@@ -120,7 +120,7 @@ bool TiempoPopup::Tecla(int tecla) {
 void TiempoPopup::Soltar() {
     if (dragField && !dragMoved && dragField->value) {
         dragField->IniciarEdicionTexto();            // mouse: se escribe directo en el campo
-        if (ToolbarUsaTactil()) NumPadAbrir();       // tactil: ademas el teclado en pantalla
+        if (ToolbarUsaTactil()) TecladoNumeroAbrir();       // tactil: ademas el teclado en pantalla
     }
     dragField = NULL;
 }

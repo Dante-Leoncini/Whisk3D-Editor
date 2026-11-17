@@ -562,7 +562,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
     // una malla de un RECURSO con la edicion pendiente se materializa para escribirla y despues
     // la suelta (no hay por que dejar en memoria las caras de mil arboles por un guardado)
     const bool edicionPrestada = m->malla && !m->edicionPendiente.empty();
-    const bool pideBinario = (W3dFormatoMallas() == W3D_MALLAS_BINARIO);
+    const bool pideBinario = !W3dMallaRecursoEnTexto(m->malla);   // (el formato es de cada malla: su tarjeta Recurso)
     const bool noEntra = !W3dMallaBinIndicesAlcanzan(nRV) || (g_w3dIndices16Simulado && nRV > 65535);
     const bool binario = pideBinario && !noEntra;
     const char* ext = binario ? ".w3db" : ".w3dm";
@@ -768,6 +768,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         if (mt->orden_pasada != 0)  { s += ", \"ordenPasada\": ";      JNum(s, (float)mt->orden_pasada); }
         if (mt->mezcla != 0)        { s += ", \"mezcla\": ";           JNum(s, (float)mt->mezcla); }
         if (mt->porPixel) s += ", \"luzPorPixel\": true";   // (sombreado por pixel: solo si esta prendido)
+        if (mt->ssr) s += ", \"reflejosPantalla\": true";   // (reflejos en pantalla: solo si estan prendidos)
         // LINEAS (aristas por material): solo si esta prendido (mismo criterio que decal)
         if (mt->lineas) {
             s += ", \"lineas\": true";
@@ -1138,6 +1139,16 @@ static std::string LayoutSerializarVivo() {
     s += "}";
     return s;
 }
+// el de un arbol cualquiera (los layouts guardados del programa: config/W3dLayouts.h, y el de cada orientacion del
+// telefono). NULL = el actual entero (si hay uno maximizado, el arbol completo)
+std::string W3dLayoutTextoDe(ViewportBase* raiz) {
+    if (!raiz) { extern ViewportBase* LayoutRaizCompleta(); raiz = LayoutRaizCompleta(); }
+    if (!raiz) return std::string();
+    std::string s = "Layout {\n";
+    LayoutEscribirNodo(s, raiz, 1);
+    s += "}";
+    return s;
+}
 
 // ---------------------------------------------------------------------------
 //  BLOQUE "sesion": DONDE ESTABA TRABAJANDO EL USUARIO EN ESTE PROYECTO
@@ -1200,6 +1211,31 @@ static void EscribirSesion(std::string& s) {
             s += ", \"raizTipo\": "; JEsc(s, W3dRaizTipoClave(W3dRaizTipoDe(act)));
         }
     }
+    // QUE MIRA LA LINEA DE TIEMPO, si no es una animacion de escena (esa ya la nombra "animaciones"."activa"): un clip
+    // de un armature (cual clip: su "animActiva"), la animacion de una malla, un clip de su armature 2D o un flipbook.
+    // Sin esto, al abrir volvia a la animacion de escena: con cientos de clips habia que buscar otra vez el que se
+    // estaba editando. Por NOMBRE (como "activo"); el de una malla, ademas, su indice
+    {
+        extern Flipbook* g_flipActivo; extern bool g_animEscenaElegidaEnJuego;
+        const char* tipo = NULL; std::string obj; int clip = -1;
+        if (ActiveAnimKind == 1 && ActiveAnimArm && EnLaEscena(SceneCollection, ActiveAnimArm)) {
+            tipo = "armature"; obj = ActiveAnimArm->name;
+        } else if (ActiveAnimKind == 3 && ActiveAnimMesh && EnLaEscena(SceneCollection, ActiveAnimMesh)) {
+            VertexAnimationActive* va = FindTargetAnim(ActiveAnimMesh);
+            tipo = "objeto"; obj = ActiveAnimMesh->name; clip = va ? va->currentAnim : -1;
+        } else if (ActiveAnimKind == 4 && ActiveAnimMesh && EnLaEscena(SceneCollection, ActiveAnimMesh)) {
+            tipo = "armature2d"; obj = ActiveAnimMesh->name;
+        } else if (ActiveAnimKind == 5 && g_flipActivo) {
+            tipo = "flipbook"; obj = g_flipActivo->nombre;
+        } else if (ActiveAnimKind == 0 && W3dRaizActivaEsJuego() && g_animEscenaElegidaEnJuego) {
+            tipo = "escena";   // (un JUEGO abre en "Juego": el clip de escena que se ELIGIO para editar se nombra)
+        }
+        if (tipo) {
+            s += ",\n    \"animTipo\": "; JEsc(s, std::string(tipo));
+            s += ", \"animObjeto\": "; JEsc(s, obj);
+            if (clip >= 0) { s += ", \"animClip\": "; JInt(s, clip); }
+        }
+    }
     s += "\n";
     s += "  },\n";
 }
@@ -1241,11 +1277,10 @@ static void EscribirCapas(std::string& s, const std::vector<W3dCapaAnim>& capas,
 }
 
 // el bloque raiz "mix": el modo Mix del timeline, su rango y las capas de escena. Ausente = sin mix.
-// LA TARJETA RENDER (Properties.cpp, g_render de render/OpcionesRender.h): el rango propio (0 = el del timeline), el
+// LA TARJETA RENDER (Properties.cpp, g_render de render/OpcionesRender.h): el
 // formato, el tamano, los pases, la composicion final y el audio. Se escribe solo lo que no es el valor de fabrica (sin
 // nada distinto, no hay bloque); la carpeta, solo si no es la de salida por defecto (una ruta de ESTA maquina)
-static void EscribirRender(std::string& s) {
-    extern float g_renderIni, g_renderFin, g_renderFps;
+static void EscribirRender(std::string& s, CtxGuardar* cx) {
     const W3dRenderOpc d;
     const W3dRenderOpc& r = g_render;
     std::string c;
@@ -1255,9 +1290,6 @@ static void EscribirRender(std::string& s) {
         static void I(std::string& c, const char* k, int v) { c += ", \""; c += k; c += "\": "; JInt(c, v); }
         static void Tx(std::string& c, const char* k, const std::string& v) { c += ", \""; c += k; c += "\": "; JEsc(c, v); }
     };
-    if (g_renderIni > 0.0f) E::F(c, "inicio", g_renderIni);
-    if (g_renderFin > 0.0f) E::F(c, "fin", g_renderFin);
-    if (g_renderFps > 0.0f) E::F(c, "fps", g_renderFps);
     if (!r.carpeta.empty() && r.carpeta != w3dFileSystem::GetDefaultOutputDir()) E::Tx(c, "carpeta", r.carpeta);
     if (r.nombre != d.nombre) E::Tx(c, "nombre", r.nombre);
     if (r.w != d.w) E::F(c, "ancho", r.w);
@@ -1276,6 +1308,23 @@ static void EscribirRender(std::string& s) {
     if (r.sonido != d.sonido) E::B(c, "sonido", r.sonido);
     if (r.audioFormato != d.audioFormato) E::I(c, "audio", r.audioFormato);
     if (r.audioKbps != d.audioKbps) E::F(c, "audioKbps", r.audioKbps);
+    // EL FONDO (antes no se guardaba: volvia a negro al abrir): el color, color o textura 360, la rotacion y las texturas
+    // que se usaron de fondo (la pista animable de QUE fondo las nombra por su lugar en esta lista)
+    if (g_renderBg[0] != 0.0f || g_renderBg[1] != 0.0f || g_renderBg[2] != 0.0f) {
+        c += ", \"fondo\": ["; JNum(c, g_renderBg[0]); c += ", "; JNum(c, g_renderBg[1]); c += ", "; JNum(c, g_renderBg[2]); c += "]"; }
+    if (g_renderBgModo != 0) E::I(c, "fondoModo", g_renderBgModo);
+    if (g_renderBgRot[0] != 0.0f || g_renderBgRot[1] != 0.0f || g_renderBgRot[2] != 0.0f) {
+        c += ", \"fondoRot\": ["; JNum(c, g_renderBgRot[0]); c += ", "; JNum(c, g_renderBgRot[1]); c += ", "; JNum(c, g_renderBgRot[2]); c += "]"; }
+    if (!g_renderBgTexs.empty()) {
+        c += ", \"fondoTexturas\": [";
+        for (size_t i = 0; i < g_renderBgTexs.size(); i++) {
+            if (i) c += ", ";
+            Texture* t = g_renderBgTexs[i];
+            if (t && !t->path.empty()) JEsc(c, Asset(cx, t->path)); else JEsc(c, std::string());
+        }
+        c += "]";
+        if (W3dFondoIndiceTextura(g_renderBgTex)) E::I(c, "fondoTextura", W3dFondoIndiceTextura(g_renderBgTex));
+    }
     if (c.empty()) return;
     s += "  \"render\": { "; s += c.substr(2); s += " },\n";
 }
@@ -3295,7 +3344,8 @@ bool GuardarW3D(const std::string& ruta) {
         if (g_rt.on != def.on || g_rt.rayos != def.rayos || g_rt.samples != def.samples || g_rt.pases != def.pases ||
             g_rt.denoiser != def.denoiser || g_rt.gpu != def.gpu || g_rt.soloFinal != def.soloFinal || g_rt.escala != def.escala ||
             g_rt.capas != def.capas || g_rt.semillaVariable != def.semillaVariable || g_rt.reescalador != def.reescalador ||
-            g_rt.desenfoque != def.desenfoque || g_rt.obturador != def.obturador || g_rt.obturadorPos != def.obturadorPos) {
+            g_rt.desenfoque != def.desenfoque || g_rt.obturador != def.obturador || g_rt.obturadorPos != def.obturadorPos ||
+            g_rt.rebotes != def.rebotes) {
             s += "  \"trazado\": { \"on\": "; s += g_rt.on ? "true" : "false";
             s += ", \"rayos\": "; JInt(s, g_rt.rayos); s += ", \"samples\": "; JInt(s, g_rt.samples);
             s += ", \"pases\": "; JInt(s, g_rt.pases); s += ", \"denoiser\": "; JInt(s, g_rt.denoiser);
@@ -3306,6 +3356,7 @@ bool GuardarW3D(const std::string& ruta) {
             s += ", \"semillaVariable\": "; s += g_rt.semillaVariable ? "true" : "false";
             s += ", \"desenfoque\": "; s += g_rt.desenfoque ? "true" : "false";
             s += ", \"obturador\": "; JNum(s, g_rt.obturador); s += ", \"obturadorPos\": "; JInt(s, g_rt.obturadorPos);
+            if (g_rt.rebotes != def.rebotes) { s += ", \"rebotes\": "; JInt(s, g_rt.rebotes); }
             s += " },\n";
         }
     }
@@ -3477,7 +3528,7 @@ bool GuardarW3D(const std::string& ruta) {
     W3dLibreriasGuardarJson(s);   // las librerias externas vinculadas (la biblioteca del outliner)
     // SESION: donde estaba trabajando el usuario EN ESTE proyecto. Va DESPUES de la escena
     // porque nombra objetos (ver el comentario grande de EscribirSesion).
-    EscribirRender(s);
+    EscribirRender(s, &cx);
     // (el Mix de escenas es de la escena del BLOQUE; el modo y el rango, del proyecto)
     if (W3dRaizActiva() != W3dRaizBloque()) { W3dRaizUsar(W3dRaizBloque()); EscribirMix(s); W3dRaizUsar(volverARaiz.idx); }
     else EscribirMix(s);
@@ -3582,22 +3633,37 @@ bool GuardarW3D(const std::string& ruta) {
         W3dRecursosVistaGuardado();  // lo purgado ya no esta; el listado del contenedor cambio
         TexEditProyectoGuardado();   // las texturas que vivian en memoria ya estan adentro del .w3d
         { extern void W3dCambiosFoto(); W3dCambiosFoto(); }   // todo guardado: se apagan los '*' (CambiosProyecto)
-        size_t nExt = esc.CantidadExternos(), nFaltan = esc.CantidadExternosQueFaltan();
         esc.ExternosQueFaltan(g_w3dExternosFaltan);   // (la biblioteca: "Archivos que faltan")
+        // EL ORIGINAL DE UNA MALLA IMPORTADA (el .glb/.obj de donde vino) es SOLO PROCEDENCIA: la geometria, las
+        // texturas y las animaciones ya viajan adentro. Que no este (el .w3d se abrio en otro telefono) no pierde
+        // nada -> no es un error del guardado ni cuenta como "externo" (estaba en la biblioteca, en "Archivos que
+        // faltan", con su "olvidar"). El aviso rojo queda para lo que el proyecto NECESITA y no esta, y NOMBRA el
+        // archivo: "1 archivo externo NO esta (ver EXTERNOS.txt)" no decia cual, y en Android no hay como abrirlo
+        size_t nExt = 0;
+        std::vector<const W3dExterno*> faltan;
+        {
+            const std::vector<W3dExterno>& ex = esc.Externos();
+            for (size_t k = 0; k < ex.size(); k++) {
+                if (W3dRutaEsOrigenDeMalla(ex[k].original)) continue;
+                nExt++;
+                if (!ex[k].existe) faltan.push_back(&ex[k]);
+            }
+        }
         // (el texto sale en el idioma del editor: las traducciones en cirilico ocupan el doble de bytes, y el
         //  nombre del archivo no tiene cota -> el buffer se dimensiona con el formato traducido y el nombre)
         const std::string nomArch = Base(ruta);
-        if (nFaltan > 0) {
-            // EL AVISO TIENE QUE DECIR COMO APAGARLO. El caso comun de lejos es el .obj/.fbx
-            // del que se importo una malla: la geometria ya viaja horneada adentro, o sea que
-            // ese renglon es SOLO procedencia y el aviso, sin salida, era ruido para siempre.
-            const char* fmt = T("Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). "
-                                "If it is the original of an imported mesh: Object > Set Origin > Clear Original File");
-            std::vector<char> b(strlen(fmt) + 64);
-            snprintf(&b[0], b.size(), fmt, (int)nFaltan);
+        if (!faltan.empty()) {
+            const W3dExterno& x = *faltan[0];
+            std::string falta = Base(x.original.empty() ? x.ref.substr(x.ref.compare(0, 4, "ext:") == 0 ? 4 : 0) : x.original);
+            const char* fmt = faltan.size() == 1
+                ? T("Saved, but %s is missing (it is outside the .w3d). Library > Missing files")
+                : T("Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files");
+            std::vector<char> b(strlen(fmt) + falta.size() + 64);
+            if (faltan.size() == 1) snprintf(&b[0], b.size(), fmt, falta.c_str());
+            else snprintf(&b[0], b.size(), fmt, falta.c_str(), (int)faltan.size() - 1);
             Notificar(&b[0], true);
         } else if (nExt > 0) {
-            const char* fmt = T("Project saved: %s (%d external reference(s), see EXTERNOS.txt)");
+            const char* fmt = T("Project saved: %s (%d external file(s), marked with an arrow in the Library)");
             std::vector<char> b(strlen(fmt) + nomArch.size() + 64);
             snprintf(&b[0], b.size(), fmt, nomArch.c_str(), (int)nExt);
             Notificar(&b[0], false);

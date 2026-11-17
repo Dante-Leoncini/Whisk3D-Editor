@@ -4,6 +4,7 @@
 //  coordenadas LOCALES al popup en el hit-test. La lista de carpetas del proyecto se dibuja encima, pegada a la fila.
 // ============================================================================
 #include "w3dGraphics.h"
+#include "ViewPorts/PopUp/NumPad.h"   // TecladoTextoAbrir / TecladoNumeroAbrir: el teclado en pantalla (Ajustes)
 #include "W3dLang.h"
 #include "GuardarComoPopup.h"
 #include "WhiskUI/Propieties/PropText.h"
@@ -200,7 +201,7 @@ bool GuardarComoPopup::Click(int mx, int my) {
                 g_textFieldActivo = NULL;
                 p->EditPropertie();
                 #ifndef W3D_SYMBIAN
-                if (ToolbarUsaTactil()) W3dTecladoAbrir();
+                if (ToolbarUsaTactil()) TecladoTextoAbrir();
                 #endif
             } else if (tipo == PropertyType::Bool || tipo == PropertyType::Button) {
                 GCleerCampos();

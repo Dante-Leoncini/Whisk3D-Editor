@@ -1,0 +1,40 @@
+# ==========================================================================
+#  EL VIDRIO Y LOS REFLEJOS EN PANTALLA (luz por pixel con shaders)
+#  Correr DESDE ESTA CARPETA, con el backend de shaders:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_vidrio_ssr.w3s
+#  (con OpenGL, el pipeline fijo, termina en 'sombreadopixel')
+#
+#  - un piso METALICO liso refleja el CIELO del fondo 360 (la normal mira a la camara: de las dos caras)
+#  - con REFLEJOS EN PANTALLA el piso se dibuja al final, sobre la copia de la pantalla (lejos de todo, sigue el cielo)
+#  - una esfera de VIDRIO (transmision) muestra lo de atras refractado y, rugosa, esmerilado
+# ==========================================================================
+
+ventana 640 480
+sombreadopixel
+escenadefecto
+fondo textura fondo360_prueba.png
+add cube
+objpos 0 0 -1.05
+objscale 8 8 0.05
+matnew
+matrt 0.05 1
+vista3d sombreado 2
+vista3d gizmo 0
+tick 5
+uishot /tmp/w3d_piso.png
+pngpx /tmp/w3d_piso.png 150 330 55 105 235 - 20
+matssr 1
+tick 5
+uishot /tmp/w3d_piso_ssr.png
+pngpx /tmp/w3d_piso_ssr.png 150 330 55 105 235 - 20
+add uvsphere
+objpos -1.6 1.3 0.9
+matnew
+mattrans 1
+matrt 0.0 0
+tick 5
+uishot /tmp/w3d_vidrio_liso.png
+matrt 0.7 0
+tick 5
+uishot /tmp/w3d_vidrio_rugoso.png

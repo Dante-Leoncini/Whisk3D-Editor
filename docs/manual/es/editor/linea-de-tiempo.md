@@ -8,7 +8,7 @@ Muestra y edita la animación: hoja de keyframes (dope sheet) o editor de curvas
 |---|---|
 | Transporte | Ir al inicio, keyframe anterior, fotograma anterior, reproducir hacia atrás, reproducir / pausa, fotograma siguiente, keyframe siguiente, ir al final. |
 | Inicio / Fin / FPS | Rango y velocidad de la animación (click para tipear). |
-| Animación | Qué animación se edita (escena, clips, esqueletos, objetos, flipbooks, Juego, Mix) y crear nuevas. |
+| Animación | Qué animación se edita (escena, clips, esqueletos, objetos, flipbooks, Juego, Mix) y crear nuevas. La que se está editando sale en **verde**, y una lista larga (un esqueleto con cientos de clips) se abre mostrándola. Se guarda con el proyecto: al abrirlo, la línea de tiempo vuelve a esa animación. |
 | Auto Key | En rojo: cada transform graba keyframes solo. |
 | Curvas / Dope Sheet | Cambia entre la hoja de keyframes y el editor de curvas. |
 | Seleccionar, Key, Vista, Pivote | Menús de selección, operaciones sobre keyframes, encuadre y panel lateral, y el pivote de la <kbd>S</kbd>, la <kbd>R</kbd> y el gizmo: centro, punto medio (el promedio de los keyframes elegidos), frame actual o keyframe activo. |
@@ -58,7 +58,7 @@ Después de mover, rotar o escalar keyframes (con el teclado, el gizmo o arrastr
 | Rotar | El ángulo (solo en curvas). |
 | Escalar | X (el tiempo) y, en curvas, Y (el valor). |
 
-Abajo dice con qué pivote se hizo. **Cancelar** deshace la operación; **Aceptar**, un click afuera o <kbd>Esc</kbd> la dejan como está.
+Abajo dice con qué pivote se hizo. **Cancelar** deshace la operación; **Aceptar**, un click o un toque afuera o <kbd>Esc</kbd> la dejan como está (el toque de afuera además le llega a lo que tocaste). Mientras arrastrás un valor, la tarjeta se vuelve translúcida y solo queda opaca la fila que estás editando.
 
 ## Barra de herramientas
 

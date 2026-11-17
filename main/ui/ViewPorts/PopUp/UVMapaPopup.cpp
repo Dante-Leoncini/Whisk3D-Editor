@@ -334,7 +334,7 @@ void UVMapaPopup::Wheel(int delta) {
 void UVMapaPopup::Soltar() {
     if (dragField && !dragMoved && dragField->value) {   // un click sin arrastrar: se ESCRIBE el valor
         dragField->IniciarEdicionTexto();
-        if (ToolbarUsaTactil()) NumPadAbrir();
+        if (ToolbarUsaTactil()) TecladoNumeroAbrir();
     }
     dragField = NULL;
 }

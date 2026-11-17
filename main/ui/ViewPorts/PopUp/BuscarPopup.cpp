@@ -3,6 +3,7 @@
 //  el hit-test, con el desplazamiento de PanelDesplazable cuando no entra en la mitad de la pantalla.
 // ============================================================================
 #include "w3dGraphics.h"
+#include "ViewPorts/PopUp/NumPad.h"   // TecladoTextoAbrir / TecladoNumeroAbrir: el teclado en pantalla (Ajustes)
 #include "W3dLang.h"
 #include "BuscarPopup.h"
 #include "ViewPorts/IDE.h"
@@ -188,7 +189,7 @@ void BuscarPopup::ClickEnFila(int mx, int my) {
                 g_textFieldActivo = NULL;
                 p->EditPropertie();
 #ifndef W3D_SYMBIAN
-                if (ToolbarUsaTactil()) W3dTecladoAbrir();
+                if (ToolbarUsaTactil()) TecladoTextoAbrir();
 #endif
             } else if (tipo == PropertyType::Bool || tipo == PropertyType::Button) {
                 g_textFieldActivo = NULL;
@@ -278,7 +279,7 @@ void IDEAbrirBuscar(IDE* ide, bool reemplazar) {
     gBP->pBuscar->field.SelectAll();
     gBP->buscarEnfocado = true;
 #ifndef W3D_SYMBIAN
-    if (ToolbarUsaTactil()) W3dTecladoAbrir();
+    if (ToolbarUsaTactil()) TecladoTextoAbrir();
 #endif
     g_redraw = true;
 }

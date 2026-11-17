@@ -182,6 +182,8 @@ SOURCE          W3dRatonEditor.cpp // el mouse Bluetooth -> SDL_Event -> control
 SOURCEPATH      ..\..\..\main\config
 SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
 SOURCE          W3dConfigGuardar.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
+SOURCE          W3dRecientes.cpp     // los ultimos proyectos abiertos/guardados (recientes.txt)
+SOURCE          W3dLayouts.cpp       // los layouts guardados de los viewports (layouts.txt)
 SOURCE          W3dRedPermisos.cpp   // el permiso de la red de cada proyecto y el nombre del dispositivo
 SOURCE          W3dProfile.cpp // reloj de pared + tiempos por categoria del frame (overlay Statistics)
 SOURCEPATH      ..\..\..\main\undo
@@ -197,7 +199,7 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 
 // pila de UI de PC (fase outliner real)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
-SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp TimelineRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp UVMapaPopup.cpp TiempoPopup.cpp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp TimelineRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp UVMapaPopup.cpp TiempoPopup.cpp InicioPopup.cpp NombrePopup.cpp
 SOURCE          FalloffEditor.cpp // popup del editor de curva de falloff del pincel
 SOURCE          CambiosPopup.cpp // el cartel "Se perderan los cambios en:" (al salir / abrir otro proyecto)
 

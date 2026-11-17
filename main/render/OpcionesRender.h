@@ -33,6 +33,28 @@ extern RenderType view;
 // color de FONDO del RENDER (pase Rendered). GLOBAL y en un solo lugar: es SOLO para el render view (el
 // menu Render lo edita). El fondo del viewport en solid/wireframe/material es OTRO color (por-viewport).
 extern float g_renderBg[4];
+// EL FONDO como TEXTURA 360 (equirectangular): en vez del color, una imagen que rodea la escena, se refleja en lo que
+// brilla y alumbra (GLES2 / Vulkan / web y el trazado de rayos). Como un mapa del material: el boton de la derecha de
+// la fila "Fondo" cambia entre color y textura. La rotacion (grados, X/Y/Z; Z es arriba) gira la imagen. El color, la
+// rotacion y QUE fondo se animan (canales AnimFondo / AnimFondoRot / AnimFondoTex en la coleccion de la escena)
+class Texture;
+extern int      g_renderBgModo;      // 0 = color, 1 = textura
+extern Texture* g_renderBgTex;       // la textura 360 elegida (NULL = ninguna: se ve el color)
+extern float    g_renderBgRot[3];    // grados
+// las texturas que se usaron de fondo: la pista animable de QUE fondo guarda indice + 1 en esta lista (0 = el color).
+// Cada una tiene su referencia (no la libera la purga mientras el proyecto la nombre)
+#include <vector>
+extern std::vector<Texture*> g_renderBgTexs;
+bool W3dFondoConTextura();                       // en modo textura y con una textura cargada
+void W3dFondoPonerTextura(Texture* t);           // la elige (la agrega a la lista con su referencia); NULL = ninguna
+int  W3dFondoIndiceTextura(Texture* t);          // su lugar + 1 en la lista (0 = no esta / ninguna)
+void W3dFondoAplicarCanal(int prop, int comp, float v);   // el gancho de la animacion (g_animFondoHook)
+// una DIRECCION de mundo (normalizada) -> el punto de la textura 360, con la rotacion del fondo (u 0..1, v 0..1 de
+// arriba a abajo). El cielo de la vista, los reflejos y el trazado de rayos usan esta MISMA cuenta
+void W3dFondoDireccionUV(const float d[3], float* u, float* v);
+// la MATRIZ de la rotacion del fondo (3x3, filas): mundo -> espacio de la imagen
+void W3dFondoMatriz(float m[9]);
+void W3dFondoLimpiar();   // al abrir otro proyecto: color negro, sin textura, sin rotacion, lista vacia
 
 // ASPECTO del render (ancho/alto). La GEOMETRIA de las camaras (el rectangulo del "film" + el triangulito de
 // arriba) se adapta a esto: 1:1 = cuadrada, 4:3 = 4:3, etc. Se actualiza al cambiar Width/Height del render.

@@ -134,6 +134,9 @@ void TimelineRedoPanel::Render() {
     if (!grupo) return;
     ResizeGrupo(); Reubicar();
     initView();
+    // ARRASTRANDO un valor: la tarjeta translucida (se ve detras el cambio) y la fila que se edita opaca, al final
+    const int filaArrastre = (dragField && dragMoved) ? grupo->IndiceDe(dragField) : -1;
+    if (filaArrastre >= 0) w3dEngine::g_alfaColor = kAlfaTarjetaArrastre;
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(0, (GLfloat)(-dz.scroll), 0);
     grupo->Render();
@@ -149,6 +152,13 @@ void TimelineRedoPanel::Render() {
         marco->Resize(2 * GlobalScale, alto); marco->RenderObject(false);
     }
     w3dEngine::PopMatrix();
+    w3dEngine::g_alfaColor = 1.0f;
+    if (filaArrastre >= 0) {
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef(0, (GLfloat)(-dz.scroll), 0);   // (la misma base que el grupo)
+        grupo->RenderFila(filaArrastre);
+        w3dEngine::PopMatrix();
+    }
     endView();
 }
 
@@ -220,7 +230,7 @@ void TimelineRedoPanel::Soltar() {
     if (dragField) {
         if (!dragMoved && dragField->value) {
             dragField->IniciarEdicionTexto();            // mouse: se escribe el valor exacto
-            if (ToolbarUsaTactil()) NumPadAbrir();       // tactil: el teclado numerico en pantalla
+            if (ToolbarUsaTactil()) TecladoNumeroAbrir();       // tactil: el teclado numerico en pantalla
         }
         dragField = NULL;
         return;

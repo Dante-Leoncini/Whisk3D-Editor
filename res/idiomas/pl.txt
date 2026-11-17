@@ -9,6 +9,8 @@
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Krzywe animacji zaznaczenia (%d) już nic nie animują (Cofnij je przywróci)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	Krzywe animacji (%d) zostały bez obiektu (pierwsza: '%s'): zobacz whisk3d.log
 %d curves selected	Zaznaczone krzywe: %d
+%d files are now external	%d plików jest teraz zewnętrznych
+%d files are now inside the .w3d	%d plików jest teraz w .w3d
 %d keyframes selected	Zaznaczone klatki kluczowe: %d
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	Nazwy (%d) przenumerowane przy zmianie sceny (%s%s). Sprawdź swoje skrypty Lua.
 %d nodes | active node: %d	Węzły: %d | aktywny węzeł: %d
@@ -339,11 +341,13 @@ Clipping	Przycinanie
 Clips	Klipy
 Clone screen	Klonuj ekran
 Close	Zamknij
+Close Whisk3D?	Zamknąć Whisk3D?
 Close without saving	Zamknij bez zapisu
 Closest	Najbliższy
 Collapse	Zwiń
 Collection	Kolekcja
 Color	Kolor
+Color / Texture	Kolor / Tekstura
 Color Grid	Kolorowa kratka
 Color Layers	Warstwy koloru
 Color Mode	Tryb koloru
@@ -387,6 +391,7 @@ Convert to Scene	Konwertuj na scenę
 Convert to editable mesh	Konwertuj na edytowalną siatkę
 Copied	Skopiowano
 Copy	Kopiuj
+Copy Keyframe	Kopiuj klatkę kluczową
 Copy X	Kopiuj X
 Copy Y	Kopiuj Y
 Copy Z	Kopiuj Z
@@ -398,14 +403,17 @@ Correct UVs	Popraw UV
 Could not copy the objects	Nie udało się skopiować obiektów
 Could not create a viewport on the external display: cloning the screen	Nie udało się utworzyć widoku na ekranie zewnętrznym: klonowanie ekranu
 Could not encode the PNG	Nie udało się zakodować PNG
+Could not extract	Nie udało się wyodrębnić
 Could not import	Nie udało się zaimportować
 Could not link the copy of '%s' to its mesh	Nie udało się powiązać kopii '%s' z jej siatką
+Could not load the layout	Nie udało się wczytać układu
 Could not load the mesh '%s'	Nie udało się wczytać siatki '%s'
 Could not read the STL file	Nie udało się odczytać pliku STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Nie udało się odczytać animacji '%s' (%s): zostają PUSTE i nie zostanie nadpisany (zobacz whisk3d.log)
 Could not read the file	Nie udało się odczytać pliku
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Nie udało się odczytać klatek animacji '%s' obiektu '%s': zostaje PUSTA i nie zostanie nadpisana (zobacz whisk3d.log)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Nie udało się odczytać geometrii '%s': zostaje PUSTA i nie zostanie nadpisana (zobacz whisk3d.log)
+Could not save the layout	Nie udało się zapisać układu
 Could not write config.ini	Nie udało się zapisać config.ini
 Could not write the file	Nie udało się zapisać pliku
 Count	Liczba
@@ -441,12 +449,14 @@ Cylinder Projection	Rzut walcowy
 Debug mode	Tryb debug
 Decal	Naklejka
 Decimals	Dziesiętne
+Default	Domyślny
 Default Material	Materiał domyślny
 Delete	Usuń
 Delete "%s" (%s) with all its objects?	Usunąć "%s" (%s) ze wszystkimi obiektami?
 Delete "%s"?	Usunąć "%s"?
 Delete %d objects?	Usunąć obiekty (%d)?
 Delete %d scenes, games or prefabs with all their objects?	Usunąć sceny, gry lub prefaby (%d) ze wszystkimi obiektami?
+Delete All Keyframes	Usuń wszystkie klatki kluczowe
 Delete Edge Loops	Usuń pętle krawędzi
 Delete Edge Loops: select an edge loop first	Usuń pętle krawędzi: najpierw zaznacz pętlę krawędzi
 Delete Edge Loops: select an edge shared by two faces	Usuń pętle krawędzi: zaznacz krawędź wspólną dla dwóch ścian
@@ -461,10 +471,13 @@ Delete Normals Layer	Usuń warstwę normalnych
 Delete Palette	Usuń paletę
 Delete Vertices	Usuń wierzchołki
 Delete editing data	Usuń dane edycji
+Delete layout	Usuń układ
+Delete layout...	Usuń układ...
 Delete mesh layer: select an object animation in the timeline	Usuń warstwę siatki: wybierz animację obiektu na osi czasu
 Delete normals layer: select an object animation in the timeline	Usuń warstwę normalnych: wybierz animację obiektu na osi czasu
 Delete selected?	Usunąć zaznaczone?
 Delete step	Usuń krok
+Delete the layout	Usunąć układ
 Delete the orphan resource	Usunąć osierocony zasób
 Delete the orphan resources	Usunąć osierocone zasoby
 Deleted	Usunięto
@@ -587,9 +600,13 @@ Exporting model...	Eksportowanie modelu...
 External	Zewnętrzny
 External (choose where)...	Zewnętrzny (wybierz gdzie)...
 External display	Ekran zewnętrzny
+Extract	Wyodrębnij
 Extract assets	Wyodrębnij assety
 Extract the assets to...	Wyodrębnij assety do...
+Extract to a folder...	Wyodrębnij do folderu...
+Extract to...	Wyodrębnij do...
 Extract: save the project first (the assets live inside the .w3d)	Wyodrębnij: najpierw zapisz projekt (assety są w pliku .w3d)
+Extracted	Wyodrębniono
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Wyodrębniono plików: %d. To są KOPIE: aby zmiana wróciła do projektu, trzeba ją ponownie zaimportować
 Extracted %d file(s); %d failed (see the log)	Wyodrębniono plików: %d; nieudanych: %d (zobacz log)
 Extrude	Wyciągnij
@@ -808,6 +825,7 @@ It couldn't be copied into the .w3d	Nie udało się skopiować do .w3d
 It doesn't exist anymore	Już nie istnieje
 It has no checkbox	Nie ma pola wyboru
 It has no proyecto.json	Brak proyecto.json
+It is a COPY: for a change to go back into the project you have to import it again	To jest KOPIA: aby zmiana wróciła do projektu, trzeba ją ponownie zaimportować
 It is a W3D proxy: choose its library element	To proxy W3D: wybierz jego element biblioteki
 It is already linked	Już powiązane
 It is in use	Jest w użyciu
@@ -844,6 +862,9 @@ Last triangle	Ostatni trójkąt
 Layer	Warstwa
 Layer On	Warstwa wł.
 Layout	Układ
+Layout deleted	Układ usunięty
+Layout replaced	Układ zastąpiony
+Layout saved	Układ zapisany
 Left	Lewo
 Left Handle X	Lewy uchwyt X
 Left View	Widok z lewej
@@ -859,6 +880,7 @@ Library not readable	Nie można odczytać biblioteki
 Library unlinked	Odłączono bibliotekę
 Lifetime	Czas życia
 Light	Światło
+Light bounces	Odbicia światła
 Light color	Kolor światła
 Light on/off	Światło wł./wył.
 Light position	Pozycja światła
@@ -970,6 +992,7 @@ Merge at Cursor	Scal przy kursorze
 Merge by Distance	Scal wg odległości
 Mesh	Siatka
 Mesh Parts	Części siatki
+Mesh as text	Siatka jako tekst
 Mesh editable again	Siatka znów edytowalna
 Mesh layer deleted	Usunięto warstwę siatki
 Mesh made single user	Siatka ma teraz 1 użytkownika
@@ -1049,6 +1072,7 @@ New Texture: invalid size	Nowa tekstura: nieprawidłowy rozmiar
 New UV Map	Nowa mapa UV
 New W3D proxy of this element	Nowe proxy W3D tego elementu
 New controller detected: %s	Wykryto nowy kontroler: %s
+New file	Nowy plik
 New instance of this prefab	Nowa instancja tego prefabu
 New instance of this scene	Nowa instancja tej sceny
 New material with this shader	Nowy materiał z tym shaderem
@@ -1056,6 +1080,7 @@ New material with this texture	Nowy materiał z tą teksturą
 New noise each image	Nowy szum w każdym obrazie
 New object with this 3D mesh	Nowy obiekt z tą siatką 3D
 New paint texture	Nowa tekstura do malowania
+New project	Nowy projekt
 New shader	Nowy shader
 New sound object here	Nowy obiekt dźwięku tutaj
 Next	Dalej
@@ -1164,6 +1189,7 @@ Open in IDE	Otwórz w IDE
 Open normal map	Otwórz mapę normalnych
 Open project	Otwórz projekt
 Open without saving	Otwórz bez zapisu
+Open...	Otwórz...
 Opening project...	Otwieranie projektu...
 Operation	Operacja
 Optimize Vertex Groups	Optymalizuj grupy wierzchołków
@@ -1189,6 +1215,7 @@ Overrides	Nadpisania
 Own	Własny
 PVS recalculated	Przeliczono PVS
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: brak <model>.pvs.json obok źródłowego .obj
+Pack into the .w3d	Spakuj do .w3d
 Packaging .deb (cpack)	Pakowanie .deb (cpack)
 Packaging AppImage	Pakowanie AppImage
 Packed (protected)	Spakowane (chronione)
@@ -1213,6 +1240,7 @@ Parts	Części
 Pass Order	Kolejność przebiegu
 Passes	Przebiegi
 Paste	Wklej
+Paste Keyframe	Wklej klatkę kluczową
 Pasted	Wklejono
 Patch	Łatka
 Path	Ścieżka
@@ -1283,7 +1311,7 @@ Project from View	Rzut z widoku
 Project from View (Bounds)	Rzut z widoku (granice)
 Project from View: select faces first	Rzut z widoku: najpierw zaznacz ściany
 Project saved: 	Zapisano projekt: 
-Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Zapisano projekt: %s (odwołania zewnętrzne: %d, zobacz EXTERNOS.txt)
+Project saved: %s (%d external file(s), marked with an arrow in the Library)	Zapisano projekt: %s (%d plik(ów) zewnętrznych, oznaczonych strzałką w Bibliotece)
 Properties	Właściwości
 Properties viewport	Edytor właściwości
 Proportional Editing	Edycja proporcjonalna
@@ -1320,6 +1348,7 @@ Ray traced motion blur	Rozmycie ruchu (RT)
 Rays	Promienie
 Recalculate	Przelicz
 Recalculate Normals	Przelicz normalne
+Recent files	Ostatnie pliki
 Rectangle	Prostokąt
 Red	Czerwony
 Redo	Ponów
@@ -1430,6 +1459,8 @@ Save and continue	Zapisz i kontynuuj
 Save and open	Zapisz i otwórz
 Save and quit	Zapisz i wyjdź
 Save inside the .w3d	Zapisz w .w3d
+Save layout	Zapisz układ
+Save layout...	Zapisz układ...
 Save outside the .w3d...	Zapisz poza .w3d...
 Save project	Zapisz projekt
 Save script	Zapisz skrypt
@@ -1440,7 +1471,8 @@ Save: could not replace the file (the previous version was kept):	Zapis: nie uda
 Save: incomplete write. The file was not touched:	Zapis: niepełny zapis. Plik nie został zmieniony:
 Saved (note: %d curve(s) without a source file are not saved)	Zapisano (uwaga: krzywe bez pliku źródłowego (%d) nie są zapisywane)
 Saved OK, but copying version v%d failed (see the log)	Zapisano, ale kopiowanie wersji v%d się nie powiodło (zobacz log)
-Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Zapisano, ale zewnętrznych plików (%d) NIE MA (zobacz EXTERNOS.txt). Jeśli to oryginał zaimportowanej siatki: Obiekt > Ustaw początek > Zapomnij plik oryginalny
+Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Zapisano, ale brakuje %s i %d innych plików (poza .w3d). Biblioteka > Brakujące pliki
+Saved, but %s is missing (it is outside the .w3d). Library > Missing files	Zapisano, ale brakuje %s (jest poza .w3d). Biblioteka > Brakujące pliki
 Saved: 	Zapisano: 
 Scale	Skaluj
 Scale Only	Tylko skala
@@ -1458,6 +1490,7 @@ Scenes	Sceny
 Screen	Ekran
 Screen (lightens)	Ekran (rozjaśnia)
 Screen Rect	Wycinek ekranu
+Screen Space Reflections	Odbicia w przestrzeni ekranu
 Screw	Śruba
 Script	Skrypt
 Script Editor	Edytor skryptów
@@ -1696,6 +1729,7 @@ The sound couldn't be read	Nie udało się odczytać dźwięku
 The texture couldn't be loaded	Nie udało się wczytać tekstury
 The undo history still uses it	Historia cofania nadal tego używa
 There are no orphans	Brak osieroconych
+There are no saved layouts to delete	Brak zapisanych układów do usunięcia
 There is no active camera	Brak aktywnej kamery
 There is no audio: the mixer did not start	Brak dźwięku: mikser się nie uruchomił
 There is no script editor (IDE) in the layout	W układzie nie ma edytora skryptów (IDE)
@@ -1800,6 +1834,7 @@ Use index	Użyj indeksu
 Use new viewport	Użyj nowego widoku
 Use physics engine	Użyj silnika fizyki
 Use sound	Użyj dźwięku
+Use system keyboard	Używaj klawiatury systemowej
 Use the material's UV index	Użyj indeksu UV materiału
 Use this file	Użyj tego pliku
 Use this folder	Użyj tego folderu

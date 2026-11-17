@@ -1,0 +1,17 @@
+# El panel de la ultima operacion (abajo a la izquierda, tras mover / rotar / escalar) con el DEDO: tocar AFUERA lo
+# acepta y el toque sigue siendo de lo que se toco. Arrastrar en la Vista 3D ya orbita con el primer toque, y un toque
+# en otro viewport es de ese viewport (antes el primer toque solo cerraba el panel y se perdia).
+trpanel on
+add cube
+selobj Cubo.001
+objmove 1 0 0
+trinfo mover
+trtactil orbitar
+trinfo cerrado
+objat Cubo.001 1 0 0 0.001
+# otra vez, ahora tocando otro viewport
+objmove 0 1 0
+trinfo mover
+trtactil otro
+trinfo cerrado
+objat Cubo.001 1 1 0 0.001

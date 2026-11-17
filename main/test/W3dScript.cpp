@@ -38,6 +38,7 @@
 #include "ViewPorts/PopUp/ExportarUVPopup.h"   // uvexportpopup / uvexportnow
 #include "ViewPorts/PopUp/GuardarComoPopup.h"  // guardarcomo
 #include "ViewPorts/PopUp/TransformRedoPanel.h"  // trpanel / trfijar / trboton / trinfo
+#include "ViewPorts/PopUp/InicioPopup.h"         // inicio (la pantalla de inicio)
 #include "ViewPorts/PopUp/TimelineRedoPanel.h"   // curvasedicion: la tarjeta de ajustar del timeline
 #include "io/TexturaEditada.h"       // texdab / texpixel / texsave / texext / texint / texlabel / texpaint3d     // prop / xform / vertat / objmove / objat       // unwrap / smartuv / lightmap / followquads / uvreset / unwraptest     // Nuevo/MoverMeshPart (funciones libres del editor)
 #include "edit/WeightPaint.h"  // wptest: pincel + escritura de pesos (fase 2 weight paint)
@@ -1519,8 +1520,22 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
 
     // ---- add <cube|plane|circle|uvsphere|cone|cylinder|vertex> ----
+    // ---- addmenu plane|cube|circle|empty|camera|light : Agregar por la MISMA funcion que el menu (TrasCrearAdd: con su
+    //      paso de deshacer y el panel de la primitiva) ----
+    if (cmd == "addmenu") {
+        std::string q; ss >> q;
+        extern void AddPlane(); extern void AddCube(); extern void AddCircle(); extern void AddEmpty();
+        extern void AddCamera(); extern void AddLight();
+        if (q == "plane") AddPlane(); else if (q == "cube") AddCube(); else if (q == "circle") AddCircle();
+        else if (q == "empty") AddEmpty(); else if (q == "camera") AddCamera(); else if (q == "light") AddLight();
+        else { err = "addmenu plane|cube|circle|empty|camera|light"; return false; }
+        return true;
+    }
     if (cmd == "add") {
         std::string prim; ss >> prim;
+        // (no son mallas: Agregar > Camara / Luz, como el menu, en el cursor 3D)
+        if (prim == "camera") { extern void AddCamera(); AddCamera(); return true; }
+        if (prim == "light")  { extern void AddLight();  AddLight();  return true; }
         MeshType::Enum tipo;
         if (!MeshTypeFromName(prim, tipo)) { err = "primitiva desconocida: '" + prim + "'"; return false; }
         Object* o = NewMesh(MeshType(tipo), NULL, false);
@@ -8054,6 +8069,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // los popups y los desplegables se dibujan APARTE del arbol de viewports (van encima de
         // todo): sin esta llamada la captura no mostraba el popup que se queria mirar.
         LayoutRenderMenu(w, h);
+        { extern void CargaDedoRender(int, int); CargaDedoRender(w, h); }   // (el circulo de carga de la pulsacion larga)
         w3dEngine::Finish();
         if (w < 1 || h < 1) { err = "uishot: pantalla sin tamano"; return false; }
         std::vector<unsigned char> px((size_t)w * h * 4, 0);
@@ -28390,6 +28406,65 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // opcion de abajo del dedo se resalta al deslizar y SOLTAR elige esa; soltar afuera cierra sin elegir; en un menu
     // largo, el dedo en el borde de abajo lo scrollea solo; un toque simple sigue eligiendo.
     // + las PESTANIAS de Propiedades: si la barra entra entera, deslizar el dedo las va mostrando; si no, la scrollea.
+    // skincull: la MALLA SKINNEADA no desaparece despues de un SALTO de cuadro (arrastrar la linea de tiempo rapido).
+    //  El autocull la probaba con la caja de la pose de ANTES: si esa caja estaba fuera de cuadro (el personaje se
+    //  habia ido de la vista) la descartaba sin re-skinnearla, y recien 30 cuadros despues volvia (se veia el
+    //  esqueleto y no la malla). Arma el caso a mano con la primera malla skinneada de la escena:
+    //    1) en PAUSA, la caja vieja lejisimo + saltar 7 cuadros: la malla se dibuja EN ESE cuadro
+    //    2) reproduciendo, avanzar UNO con la caja vieja: no se re-skinnea (el ahorro del N95 sigue)
+    //    3) reproduciendo, un salto de 5 (la vuelta del loop): se dibuja
+    if (cmd == "skincull") {
+        namespace gfx = w3dEngine;
+        extern bool PlayAnimation; extern int CurrentFrame;
+        Mesh* m = NULL;
+        struct B { static Mesh* Buscar(Object* o) {
+            if (!o) return NULL;
+            if (o->getType() == ObjectType::mesh && ((Mesh*)o)->skinArmature) return (Mesh*)o;
+            for (size_t i = 0; i < o->Childrens.size(); i++) { Mesh* r = Buscar(o->Childrens[i]); if (r) return r; }
+            return NULL; } };
+        m = B::Buscar(SceneCollection);
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) {   // (el layout del juego minimo no deja uno activo: el primero del arbol)
+            struct R { static Viewport3D* Rec(ViewportBase* v) {
+                if (!v) return NULL;
+                const int ck = v->ContainerKind();
+                if (ck == 1) { Viewport3D* r = Rec(((ViewportRow*)v)->childA); return r ? r : Rec(((ViewportRow*)v)->childB); }
+                if (ck == 2) { Viewport3D* r = Rec(((ViewportColumn*)v)->childA); return r ? r : Rec(((ViewportColumn*)v)->childB); }
+                return v->ViewportKind() == 1 ? (Viewport3D*)v : NULL; } };
+            vp = R::Rec(rootViewport);
+        }
+        if (!m) { err = "skincull: no hay malla skinneada en la escena"; return false; }
+        if (!vp) { err = "skincull: no hay viewport 3D en el layout"; return false; }
+        bool ok = true;
+        #define SC_VER(cond, que) do { const bool _c = (cond); printf("      [skincull] %-70s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        const bool playAntes = PlayAnimation; const int frameAntes = CurrentFrame;
+        struct L { static void Lejos(Mesh* mm) {
+            mm->skinAabbMin = Vector3(5000.0f, 5000.0f, 5000.0f); mm->skinAabbMax = Vector3(5001.0f, 5001.0f, 5001.0f);
+            mm->skinAabbOk = true; mm->skinCullSeguidos = 0;
+            mm->skinIncOk = false; } };   // (y la pose de ANTES era otra: la caja vieja es de esa, no de la de ahora)
+        PlayAnimation = false; CurrentFrame = 10;
+        rootViewport->Render(); vp->Render();   // (pose + caja de este cuadro)
+        gfx::StatsReset(); vp->Render(); const int base = gfx::g_statMeshes;
+        // 1) pausa + salto
+        L::Lejos(m); CurrentFrame = 17;
+        gfx::StatsReset(); vp->Render(); const int tras = gfx::g_statMeshes;
+        printf("      [skincull]   mallas dibujadas: %d de base, %d tras el salto (caja %.1f..%.1f)\n", base, tras, m->skinAabbMin.x, m->skinAabbMax.x);
+        SC_VER(base >= 1, "la malla skinneada se ve de entrada");
+        SC_VER(tras == base && m->skinAabbMin.x < 1000.0f, "pausa: tras un salto de cuadro la malla se dibuja en ESE cuadro");
+        // 2) reproduciendo, un cuadro: sigue el ahorro (no re-skinnea con la caja vieja)
+        PlayAnimation = true;
+        L::Lejos(m); CurrentFrame = 18;
+        gfx::StatsReset(); vp->Render(); const int uno = gfx::g_statMeshes;
+        SC_VER(uno == base - 1 && m->skinAabbMin.x > 1000.0f, "reproduciendo de a un cuadro: no re-skinnea fuera de cuadro (ahorro)");
+        // 3) reproduciendo, un salto (la vuelta del loop)
+        CurrentFrame = 23;
+        gfx::StatsReset(); vp->Render(); const int salto = gfx::g_statMeshes;
+        SC_VER(salto == base && m->skinAabbMin.x < 1000.0f, "reproduciendo, un salto de cuadros: se dibuja en ese cuadro");
+        PlayAnimation = playAntes; CurrentFrame = frameAntes;
+        #undef SC_VER
+        if (!ok) { err = "skincull: ver los MAL de arriba"; return false; }
+        return true;
+    }
     if (cmd == "menudedo") {
         extern void InputUsuarioSDL3(SDL_Event&); extern void LayoutMenuToqueTick(unsigned);
         bool ok = true;
@@ -28438,6 +28513,27 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         { const int x = m->x + m->width / 2;
           EV::Boton(SDL_MOUSEBUTTONDOWN, x, EV::FilaY(m, 3)); EV::Boton(SDL_MOUSEBUTTONUP, x, EV::FilaY(m, 3));
           MD_VER(EV::Elegido() == 3, "un toque simple elige la opcion"); }
+        // 3b) TELEFONO ANGOSTO: tocar una opcion con SUBMENU ("Mallas" del menu Anadir) abre el submenu ENCIMA del dedo;
+        //     soltar no elige su primera opcion (queda abierto). Despues, un toque en el submenu elige
+        { PopupMenu* sub = new PopupMenu(); sub->action = EV::Accion;
+          for (int i = 0; i < 4; i++) { char b[16]; snprintf(b, sizeof b, "Malla %d", i); sub->Agregar(b, 10 + i); }
+          PopupMenu* p = new PopupMenu(); p->action = EV::Accion;
+          p->Agregar("Vacio", 0); p->Agregar("Mallas", 0, IconType::mesh, sub); p->Agregar("Luz", 2);
+          const int wAntes = MenuPantallaW;
+          EV::Elegido() = -1; p->Abrir(0, 100, MenuPantallaW, MenuPantallaH); MenuAbierto = p;
+          MenuPantallaW = p->width + 4 * GlobalScale;   // (el submenu no entra ni a la derecha ni a la izquierda)
+          const int x = p->x + p->width * 2 / 3, y = EV::FilaY(p, 1);
+          EV::Boton(SDL_MOUSEBUTTONDOWN, x, y);
+          const bool encima = sub->abierto && sub->Contains(x, y);
+          EV::Boton(SDL_MOUSEBUTTONUP, x, y);
+          MD_VER(encima, "angosto: el submenu de \"Mallas\" se abre encima del dedo");
+          MD_VER(EV::Elegido() == -1 && sub->abierto && MenuAbierto == p, "un toque en \"Mallas\": soltar no elige la opcion del submenu de abajo del dedo");
+          { const int xs = sub->x + sub->width / 2, ys = EV::FilaY(sub, 2);
+            EV::Boton(SDL_MOUSEBUTTONDOWN, xs, ys); EV::Boton(SDL_MOUSEBUTTONUP, xs, ys); }
+          MD_VER(EV::Elegido() == 12, "despues, un toque en el submenu elige esa opcion");
+          MenuPantallaW = wAntes;
+          if (MenuAbierto == p) p->Cerrar();
+          delete p; delete sub; }
         // 4) un menu LARGO: el dedo en el borde de abajo lo scrollea solo; soltar elige la que quedo abajo del dedo
         { PopupMenu* l = new PopupMenu(); l->action = EV::Accion;
           for (int i = 0; i < 200; i++) { char b[16]; snprintf(b, sizeof b, "Clip %d", i); l->Agregar(b, i); }
@@ -28642,6 +28738,69 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- tactiltest : la pantalla tactil de las plataformas SIN SDL (Symbian), por TactilDedo del Core (pixeles por dedo)
     //      del Core -> los mismos eventos que SDL en Android -> controles.cpp. Es exactamente lo que hace el N8/5800: si esto
     //      pasa en la PC, los gestos del telefono son los de Android. ----
+    // ---- dedofuera : UN DEDO QUE SALE DEL VIEWPORT (controles.cpp, CheckWarpMouseInViewport). Con el mouse el cursor se
+    //      envuelve en el borde del viewport; un dedo no se puede teletransportar: el gesto que arranco en la Vista 3D
+    //      (orbitar con 1 dedo, panear con 2) sigue en ella aunque los dedos pasen a otro panel, sin saltos. Necesita la
+    //      Vista 3D activa y otro panel a su derecha (el layout de fabrica) ----
+    if (cmd == "dedofuera") {
+        using namespace w3dEngine;
+        bool ok = true;
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "dedofuera: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+        if (ww <= 0 || hh <= 0) { err = "dedofuera: sin ventana"; return false; }
+        // (arranca en el fondo vacio, abajo a la izquierda: en el medio esta el cubo y apoyar ahi no es orbitar)
+        const int y0 = vp->y + vp->height * 2 / 3;
+        const int x0 = vp->x + vp->width / 8, xFin = vp->x + vp->width + (MenuPantallaW - vp->x - vp->width) / 2;   // (hasta el medio del panel de al lado)
+        if (xFin <= vp->x + vp->width + 10) { err = "dedofuera: no hay un panel a la derecha de la Vista 3D"; return false; }
+        ViewportBase* otro = FindViewportUnderMouse(rootViewport, xFin, y0);
+        printf("      [dedofuera] la Vista 3D en (%d, %d) %dx%d, la ventana %dx%d (pantalla %dx%d); a la derecha (%d, %d): %s\n",
+               vp->x, vp->y, vp->width, vp->height, ww, hh, MenuPantallaW, MenuPantallaH, xFin, y0,
+               otro ? (otro == (ViewportBase*)vp ? "la misma Vista 3D" : "otro panel") : "nada");
+        struct D { static void Dedo(int id, int fase, int x, int y, int w, int h) { TactilDedo(id, fase, x, y, w, h); }
+                   static float Rot(const Quaternion& a, const Quaternion& b) { return fabsf(a.w - b.w) + fabsf(a.x - b.x) + fabsf(a.y - b.y) + fabsf(a.z - b.z); } };
+        #define DFU_VER(cond, que) do { const bool _c = (cond); printf("      [dedofuera] %-60s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        DFU_VER(otro && otro != (ViewportBase*)vp, "a la derecha de la Vista 3D hay otro panel");
+        // (1) ORBITAR con 1 dedo: arranca en el medio de la Vista 3D y se va hasta el panel de al lado, de a pasos iguales
+        const int pasos = 24, paso = (xFin - x0) / pasos;
+        float maxPaso = 0.0f, sumaPaso = 0.0f; int pasosAfuera = 0; float giroAfuera = 0.0f; bool siempre3D = true;
+        D::Dedo(0, DedoAbajo, x0, y0, ww, hh); SDL_Delay(220);   // (pasada la espera anti-gesto: es un arrastre)
+        Quaternion antes = vp->viewRot;
+        for (int i = 1; i <= pasos; i++) {
+            const int x = x0 + i * paso;
+            D::Dedo(0, DedoMovio, x, y0, ww, hh);
+            const float d = D::Rot(vp->viewRot, antes); antes = vp->viewRot;
+            if (i > 2) { if (d > maxPaso) maxPaso = d; sumaPaso += d; }   // (los primeros arrancan el gesto)
+            if (x > vp->x + vp->width) { pasosAfuera++; giroAfuera += d; }
+            if (viewPortActive != (ViewportBase*)vp) siempre3D = false;
+        }
+        D::Dedo(0, DedoArriba, x0 + pasos * paso, y0, ww, hh);
+        const float medio = sumaPaso / (float)(pasos - 2);
+        char linea[160];
+        DFU_VER(siempre3D, "1 dedo: la Vista 3D sigue activa con el dedo en el otro panel");
+        snprintf(linea, sizeof(linea), "1 dedo: sigue orbitando afuera (%d pasos, giro %.4f)", pasosAfuera, giroAfuera);
+        DFU_VER(pasosAfuera > 3 && giroAfuera > 1e-3f, linea);
+        snprintf(linea, sizeof(linea), "1 dedo: sin saltos al cruzar el borde (paso max %.4f, medio %.4f)", maxPaso, medio);
+        DFU_VER(medio > 0.0f && maxPaso < medio * 3.0f, linea);
+        // (2) PANEAR con 2 dedos: arrancan en la Vista 3D y los dos se van al panel de al lado
+        { const Vector3 piv0 = vp->pivot; bool siempre = true;
+          D::Dedo(0, DedoAbajo, x0 - 20, y0, ww, hh); D::Dedo(1, DedoAbajo, x0 + 20, y0, ww, hh);
+          for (int i = 1; i <= pasos; i++) {
+              D::Dedo(0, DedoMovio, x0 - 20 + i * paso, y0, ww, hh); D::Dedo(1, DedoMovio, x0 + 20 + i * paso, y0, ww, hh);
+              if (viewPortActive != (ViewportBase*)vp) siempre = false;
+          }
+          D::Dedo(1, DedoArriba, x0 + 20 + pasos * paso, y0, ww, hh); D::Dedo(0, DedoArriba, x0 - 20 + pasos * paso, y0, ww, hh);
+          const float mov = fabsf(vp->pivot.x - piv0.x) + fabsf(vp->pivot.y - piv0.y) + fabsf(vp->pivot.z - piv0.z);
+          DFU_VER(siempre, "2 dedos: la Vista 3D sigue activa con los dedos en el otro panel");
+          snprintf(linea, sizeof(linea), "2 dedos: paneo la Vista 3D (el centro se movio %.3f)", mov);
+          DFU_VER(mov > 1e-3f, linea); }
+        // (3) un toque NUEVO en el otro panel si lo elige (el candado es solo mientras dura el gesto)
+        D::Dedo(0, DedoAbajo, xFin, y0, ww, hh); D::Dedo(0, DedoArriba, xFin, y0, ww, hh);
+        DFU_VER(viewPortActive == otro, "un toque nuevo en el otro panel lo deja activo");
+        #undef DFU_VER
+        if (!ok) { err = "dedofuera: el gesto con el dedo afuera del viewport no se comporta como se pidio"; return false; }
+        return true;
+    }
     if (cmd == "tactiltest") {
         using namespace w3dEngine;
         bool ok = true; std::string e2;
@@ -31942,6 +32101,76 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if ((esp == "si" && !sel) || (esp == "no" && sel)) { err = "clicobj: la seleccion no es la esperada"; return false; }
         return true;
     }
+    // trtactil orbitar|otro: el panel de la ultima operacion con el DEDO. Tocar AFUERA del panel lo acepta y el toque
+    // SIGUE siendo del viewport: 'orbitar' = arrastrar en la Vista 3D ya orbita con el PRIMER toque; 'otro' = un toque
+    // en otro viewport (el outliner) es de ese viewport. Antes el primer toque solo cerraba el panel y se perdia (el
+    // mouse sintetizado del touch se descartaba con un popup abierto y el FINGERDOWN lo consumia al cerrarlo).
+    // Los eventos van en el orden de SDL: el mouse sintetizado (which = SDL_TOUCH_MOUSEID) y despues el del dedo.
+    if (cmd == "trtactil") {
+        std::string que; ss >> que;
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        struct Toque {
+            static void Mandar(SDL_Event& e) { extern void InputUsuarioSDL3(SDL_Event&); InputUsuarioSDL3(e); }
+            static void Raton(Uint32 tipo, int x, int y, int px, int py) {
+                SDL_Event e; memset(&e, 0, sizeof(e)); e.type = tipo;
+                if (tipo == SDL_MOUSEMOTION) { e.motion.which = SDL_TOUCH_MOUSEID; e.motion.state = SDL_BUTTON_LMASK;
+                    e.motion.x = x; e.motion.y = y; e.motion.xrel = x - px; e.motion.yrel = y - py; }
+                else { e.button.which = SDL_TOUCH_MOUSEID; e.button.button = SDL_BUTTON_LEFT; e.button.clicks = 1;
+                    e.button.state = (tipo == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED; e.button.x = x; e.button.y = y; }
+                if (window) SDL_WarpMouseInWindow(window, (float)x, (float)y);
+                Mandar(e);
+            }
+            static void Dedo(Uint32 tipo, int x, int y, int px, int py) {
+                int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+                if (ww <= 0 || hh <= 0) { ww = MenuPantallaW; hh = MenuPantallaH; }
+                SDL_Event e; memset(&e, 0, sizeof(e)); e.type = tipo; e.tfinger.fingerId = 1;
+                e.tfinger.x = ((float)x + 0.5f) / (float)ww; e.tfinger.y = ((float)y + 0.5f) / (float)hh;
+                e.tfinger.dx = (float)(x - px) / (float)ww;  e.tfinger.dy = (float)(y - py) / (float)hh;
+                e.tfinger.pressure = (tipo == SDL_FINGERUP) ? 0.0f : 1.0f;
+                Mandar(e);
+            }
+            static void Abajo(int x, int y)  { Raton(SDL_MOUSEBUTTONDOWN, x, y, x, y); Dedo(SDL_FINGERDOWN, x, y, x, y); }
+            static void Mover(int x, int y, int px, int py) { Raton(SDL_MOUSEMOTION, x, y, px, py); Dedo(SDL_FINGERMOTION, x, y, px, py); }
+            static void Arriba(int x, int y) { Raton(SDL_MOUSEBUTTONUP, x, y, x, y); Dedo(SDL_FINGERUP, x, y, x, y); }
+        };
+        bool ok = true;
+        #define TRT_VER(cond, que) do { const bool _c = (cond); printf("      [trtactil] %-62s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        if (!rootViewport) { err = "trtactil: sin layout"; return false; }
+        rootViewport->Render();
+        if (TransformRedoTipo() < 0 || !PopUpActive) { err = "trtactil: el panel de la ultima operacion no esta abierto"; return false; }
+        if (que == "orbitar") {
+            Viewport3D* v3 = (Viewport3D*)VK::Buscar(rootViewport, 1);
+            if (!v3) { err = "trtactil: sin Vista 3D"; return false; }
+            // un punto de la Vista 3D lejos del panel (el panel va abajo a la izquierda)
+            const int x0 = v3->x + v3->width * 3 / 4, y0 = v3->y + v3->height / 3;
+            if (PopUpActive->Contains(x0, y0)) { err = "trtactil: el punto de prueba cae sobre el panel"; return false; }
+            const Quaternion antes = v3->viewRot;
+            const int paso = 25 * GlobalScale;
+            Toque::Abajo(x0, y0);
+            SDL_Delay(220);   // la ventana anti-gesto del tactil (kEsperaGestoMs = 180 en controles.cpp): antes no arrastra
+            int px = x0, py = y0;
+            for (int k = 1; k <= 4; k++) { const int x = x0 + k * paso, y = y0 + k * paso / 3; Toque::Mover(x, y, px, py); px = x; py = y; }
+            Toque::Arriba(px, py);
+            const Quaternion r = v3->viewRot;
+            const float d = fabsf(r.w - antes.w) + fabsf(r.x - antes.x) + fabsf(r.y - antes.y) + fabsf(r.z - antes.z);
+            printf("      [trtactil] la vista giro %.4f\n", d);
+            TRT_VER(TransformRedoTipo() < 0, "arrastrar el dedo en la Vista 3D acepta el panel");
+            TRT_VER(d > 1e-3f, "...y el PRIMER toque ya orbita (no se pierde)");
+        } else if (que == "otro") {
+            ViewportBase* otro = VK::Buscar(rootViewport, 2);   // el outliner
+            if (!otro) otro = VK::Buscar(rootViewport, 3);
+            if (!otro) { err = "trtactil: hace falta el outliner o las propiedades"; return false; }
+            const int x0 = otro->x + otro->width / 2, y0 = otro->y + otro->height / 2;
+            Toque::Abajo(x0, y0);
+            TRT_VER(TransformRedoTipo() < 0, "un toque en otro viewport acepta el panel");
+            TRT_VER(viewPortActive == otro, "...y el toque es de ESE viewport");
+            Toque::Arriba(x0, y0);
+        } else { err = "trtactil: uso: trtactil orbitar|otro"; return false; }
+        #undef TRT_VER
+        if (!ok) { err = "trtactil: el primer toque con el panel abierto no hace lo que se toco"; return false; }
+        return true;
+    }
     // trfoco: con el panel de la ultima operacion abierto (semi-modal), el viewport ACTIVO sigue al mouse por los
     // eventos reales (antes quedaba clavado en el 3D) y un click en OTRO viewport confirma el panel y el click es
     // de ese viewport (antes el 3D seguia activo y le envolvia el cursor: saltaba a la esquina opuesta)
@@ -31982,6 +32211,65 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Ev::Boton(SDL_MOUSEBUTTONUP, cox + 3, coy + 2);
         #undef TRF_VER
         if (!ok) { err = "trfoco: el panel de la ultima operacion traba el viewport activo"; return false; }
+        return true;
+    }
+    // ---- tecladoarea : EL AREA UTIL CON UN TECLADO ABIERTO (app/W3dTeclado.h). 1) el QWERTY de Whisk3D para el IDE:
+    //      el IDE MAXIMIZADO arriba del teclado (todo el alto menos el del teclado) y, al cerrarlo, el layout de antes.
+    //      2) el teclado del SISTEMA que tapa sin achicar la ventana (lo que avisa Java en Android, aca forzado): los
+    //      popups y el layout terminan arriba del teclado, el panel que lo pidio se maximiza y el campo que se edita se
+    //      dibuja ahi ('tecladoarea captura.png' la saca con el campo a la vista). Necesita un IDE en el layout ----
+    if (cmd == "tecladoarea") {
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        std::string ruta; ss >> ruta;
+        IDE* ide = (IDE*)VK::Buscar(rootViewport, 8);
+        if (!ide) { err = "tecladoarea: no hay IDE en el layout (vpkind 1 7)"; return false; }
+        extern void QwertyAbrirIDE(IDE*); extern void W3dTecladoReacomodar(); extern void W3dTecladoTapadoForzar(int);
+        extern int W3dTecladoIDEAltoActual(); extern bool W3dTecladoVisible();
+        extern int winW, winH;
+        bool ok = true;
+        #define TKA_VER(cond, que) do { const bool _c = (cond); printf("      [tecladoarea] %-56s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        ViewportBase* raizAntes = rootViewport;
+        TKA_VER(rootViewport != (ViewportBase*)ide, "el IDE comparte la ventana con otro panel");
+        // 1) el QWERTY de Whisk3D
+        QwertyAbrirIDE(ide);
+        const int altoQ = W3dTecladoIDEAltoActual();
+        char linea[160];
+        TKA_VER(PopUpActive && PopUpActive->EsTeclado(), "el QWERTY de Whisk3D esta abierto");
+        TKA_VER(rootViewport == (ViewportBase*)ide, "el IDE se maximizo");
+        snprintf(linea, sizeof(linea), "el IDE ocupa lo de arriba del teclado (%d = %d - %d)", ide->height, winH, altoQ);
+        TKA_VER(altoQ > 0 && ide->y == 0 && ide->height == winH - altoQ && ide->width == winW, linea);
+        TKA_VER(PopUpActive && PopUpActive->y == winH - altoQ, "el teclado queda abajo, pegado al IDE");
+        PopUpActive->Cerrar();
+        TKA_VER(rootViewport == raizAntes && W3dTecladoIDEAltoActual() == 0, "al cerrarlo vuelve el layout de antes");
+        TKA_VER(rootViewport->height == winH, "y a todo el alto");
+        // 2) el del sistema que tapa sin achicar la ventana: el campo que se edita, arriba del teclado
+        static TextField campo; campo.SetText("Escribiendo en un campo"); TextFieldEnfocar(&campo);
+        viewPortActive = (ViewportBase*)ide;
+        const int tapado = winH * 45 / 100;
+        W3dTecladoTapadoForzar(tapado); W3dTecladoReacomodar();
+        TKA_VER(W3dTecladoVisible(), "el teclado del sistema cuenta como abierto");
+        TKA_VER(MenuPantallaH == winH - tapado, "los popups van arriba del teclado (MenuPantallaH)");
+        TKA_VER(rootViewport == (ViewportBase*)ide && rootViewport->height == winH - tapado, "el panel que lo pidio, maximizado arriba");
+        if (!ruta.empty()) {   // la captura con la franja del campo (como uishot; abajo, negro: ahi esta el teclado)
+            extern int W3dPantallaAlto;
+            const int w = MenuPantallaW, h = W3dPantallaAlto;
+            w3dEngine::Disable(w3dEngine::ScissorTest); w3dEngine::Viewport(0, 0, w, h);
+            w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f); w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
+            rootViewport->Render();
+            LayoutRenderMenu(w, h);
+            { extern void TecladoSistemaCampoRender(); TecladoSistemaCampoRender(); }
+            w3dEngine::Finish();
+            std::vector<unsigned char> px((size_t)w * h * 4, 0);
+            w3dEngine::ReadPixelsRGBA(0, 0, w, h, &px[0]);
+            if (!w3dEngine::SavePNG(ruta.c_str(), &px[0], w, h, true)) { err = "tecladoarea: no se pudo escribir " + ruta; ok = false; }
+            else printf("      [tecladoarea] captura %dx%d -> %s\n", w, h, ruta.c_str());
+        }
+        W3dTecladoTapadoForzar(-1); W3dTecladoReacomodar();
+        g_textFieldActivo = NULL;
+        TKA_VER(!W3dTecladoVisible() && MenuPantallaH == winH && rootViewport == raizAntes, "cerrado: todo como antes");
+        #undef TKA_VER
+        if (!ok) { err = "tecladoarea: el area con el teclado no es la que se pidio"; return false; }
         return true;
     }
     if (cmd == "idetactil") {
@@ -33594,6 +33882,39 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (k == "mayorque" && !(r > lim)) { err = "rtruido: hay menos ruido del esperado"; return false; }
         return true;
     }
+    // ---- fondo color R G B | fondo textura <ruta> | fondo modo 0|1 | fondo rot X Y Z
+    //      fondo ver color R G B | ver rot X Y Z [tol] | ver modo N | ver textura <nombre|-> | ver lista N
+    //      EL FONDO del render (tarjeta Render): color o textura 360 (equirectangular), su rotacion. 'ver' asserta ----
+    if (cmd == "fondo") {
+        std::string q; ss >> q;
+        if (q == "color") { float r = 0, g = 0, b = 0; ss >> r >> g >> b; g_renderBg[0] = r; g_renderBg[1] = g; g_renderBg[2] = b; g_renderBgModo = 0; }
+        else if (q == "modo") { int m = 0; ss >> m; g_renderBgModo = m ? 1 : 0; }
+        else if (q == "rot") { ss >> g_renderBgRot[0] >> g_renderBgRot[1] >> g_renderBgRot[2]; }
+        else if (q == "textura") {
+            std::string ruta; ss >> ruta;
+            extern std::string W3dImportarAsset(const std::string&, const char*);
+            Texture* t = TexturaTomar(W3dImportarAsset(ruta, 0));
+            if (!t) { err = "fondo: no pude cargar " + ruta; return false; }
+            W3dFondoPonerTextura(t); TexturaSoltar(t); g_renderBgModo = 1;
+        } else if (q == "ver") {
+            std::string k; ss >> k;
+            if (k == "color") { float r = 0, g = 0, b = 0; ss >> r >> g >> b;
+                printf("      [fondo] color %g %g %g\n", g_renderBg[0], g_renderBg[1], g_renderBg[2]);
+                if (fabsf(g_renderBg[0] - r) > 1e-3f || fabsf(g_renderBg[1] - g) > 1e-3f || fabsf(g_renderBg[2] - b) > 1e-3f) { err = "fondo: el color no es el esperado"; return false; } }
+            else if (k == "rot") { float x = 0, y = 0, z = 0, tol = 1e-3f; ss >> x >> y >> z; if (!(ss >> tol)) tol = 1e-3f;
+                printf("      [fondo] rot %g %g %g\n", g_renderBgRot[0], g_renderBgRot[1], g_renderBgRot[2]);
+                if (fabsf(g_renderBgRot[0] - x) > tol || fabsf(g_renderBgRot[1] - y) > tol || fabsf(g_renderBgRot[2] - z) > tol) { err = "fondo: la rotacion no es la esperada"; return false; } }
+            else if (k == "modo") { int m = 0; ss >> m; printf("      [fondo] modo %d\n", g_renderBgModo); if (g_renderBgModo != m) { err = "fondo: el modo no es el esperado"; return false; } }
+            else if (k == "lista") { int n = 0; ss >> n; printf("      [fondo] %d textura(s) de fondo\n", (int)g_renderBgTexs.size()); if ((int)g_renderBgTexs.size() != n) { err = "fondo: la lista no es la esperada"; return false; } }
+            else if (k == "textura") { std::string n; ss >> n;
+                const std::string hay = g_renderBgTex ? g_renderBgTex->path : std::string("-");
+                printf("      [fondo] textura '%s'\n", hay.c_str());
+                if (n == "-" ? g_renderBgTex != NULL : hay.find(n) == std::string::npos) { err = "fondo: la textura no es la esperada"; return false; } }
+            else { err = "fondo: ver color|rot|modo|lista|textura"; return false; }
+        } else { err = "fondo: uso: fondo color R G B | textura <ruta> | modo 0|1 | rot X Y Z | ver ..."; return false; }
+        RTInvalidar(); g_redraw = true;
+        return true;
+    }
     if (cmd == "rtopt") {
         int r = 1, sm = 1, ps = 16, on = -1; ss >> r >> sm >> ps >> on;
         g_rt.rayos = r < 1 ? 1 : r; g_rt.samples = sm < 1 ? 1 : sm; g_rt.pases = ps < 1 ? 1 : ps;
@@ -33730,10 +34051,49 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         remove(ruta.c_str());
         return true;
     }
-    // ---- renderrango ini fin : el rango propio de Render Animation (tarjeta Render; 0 0 = el del timeline) ----
+    // ---- rendercampos ver <ini> <fin> <fps> | rendercampos fijar ini|fin|fps <v> : los campos Inicio / Fin / FPS de la
+    //      tarjeta Render. 'ver': muestran el rango y los fps de la escena / animacion activa (ERROR si no). 'fijar': se
+    //      escribe en el campo como en la UI (su onChange) y la animacion activa tiene que quedar con ese valor ----
+    if (cmd == "rendercampos") {
+        Properties* P = ScriptProps();
+        if (!P || !P->propRenderIni || !P->propRenderFin || !P->propRenderFps) { err = "rendercampos: no hay tarjeta Render"; return false; }
+        extern int StartFrame, EndFrame, AnimFPS;
+        std::string q; ss >> q;
+        P->RefreshTargetProperties();
+        if (q == "ver") {
+            float a = 0, b = 0, c = 0; ss >> a >> b >> c;
+            const float vi = P->propRenderIni->value ? *P->propRenderIni->value : -1.0f;
+            const float vf = P->propRenderFin->value ? *P->propRenderFin->value : -1.0f;
+            const float vp = P->propRenderFps->value ? *P->propRenderFps->value : -1.0f;
+            printf("      [rendercampos] Inicio %g Fin %g FPS %g (animacion: %d %d %d)\n", vi, vf, vp, StartFrame, EndFrame, AnimFPS);
+            if (vi != a || vf != b || vp != c) { err = "rendercampos ver: los campos no son los esperados"; return false; }
+            return true;
+        }
+        if (q == "fijar") {
+            std::string k; float v = 0; ss >> k >> v;
+            PropFloat* pf = (k == "ini") ? P->propRenderIni : (k == "fin") ? P->propRenderFin : (k == "fps") ? P->propRenderFps : NULL;
+            if (!pf || !pf->value) { err = "rendercampos fijar ini|fin|fps <v>"; return false; }
+            *pf->value = v;
+            if (pf->onChange) pf->onChange();
+            const int real = (k == "ini") ? StartFrame : (k == "fin") ? EndFrame : AnimFPS;
+            printf("      [rendercampos] %s = %g -> animacion %d\n", k.c_str(), v, real);
+            if (real != (int)v) { err = "rendercampos fijar: la animacion activa no cambio"; return false; }
+            return true;
+        }
+        err = "rendercampos ver <ini> <fin> <fps> | fijar ini|fin|fps <v>"; return false;
+    }
+    // ---- renderrango ini fin : el rango de Render Animation, que es el de la escena / animacion activa (la tarjeta
+    //      Render y el timeline muestran el mismo). 0 0 = vuelve al que habia antes del primer renderrango ----
     if (cmd == "renderrango") {
-        extern float g_renderIni, g_renderFin;
-        ss >> g_renderIni >> g_renderFin;
+        static int antesIni = -1, antesFin = -1;
+        extern int StartFrame, EndFrame;
+        int a = 0, b = 0; ss >> a >> b;
+        if (a <= 0 && b <= 0) {
+            if (antesIni >= 0) { AnimSetStart(antesIni); AnimSetEnd(antesFin); antesIni = antesFin = -1; }
+            return true;
+        }
+        if (antesIni < 0) { antesIni = StartFrame; antesFin = EndFrame; }
+        AnimSetStart(a); AnimSetEnd(b);
         return true;
     }
     // ---- fsr : el REESCALADO FSR 1 (render/ReescaladoFSR.h) sobre imagenes sinteticas x2: lo parejo queda parejo y un
@@ -33945,12 +34305,34 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- matrt rugosidad metalico : los campos del trazado de rayos del material activo ----
+    // ---- matver rugosidad|metalico|alfa <v> | matver emision|base <r> <g> <b> : ASSERTEA el valor del material activo ----
+    if (cmd == "matver") {
+        std::string q; ss >> q;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matver: no hay material activo"; return false; }
+        float e[3] = { 0, 0, 0 }; ss >> e[0] >> e[1] >> e[2];
+        const float* v = (q == "rugosidad") ? &mat->rtRugosidad : (q == "metalico") ? &mat->rtMetalico :
+                         (q == "alfa") ? &mat->diffuse[3] : (q == "emision") ? mat->emission : (q == "base") ? mat->diffuse : NULL;
+        if (!v) { err = "matver rugosidad|metalico|alfa|emision|base"; return false; }
+        const int n = (q == "emision" || q == "base") ? 3 : 1;
+        printf("      [matver] %s = %g %g %g\n", q.c_str(), v[0], n > 1 ? v[1] : 0.0f, n > 1 ? v[2] : 0.0f);
+        for (int i = 0; i < n; i++) if (fabsf(v[i] - e[i]) > 1e-3f) { err = "matver: " + q + " no es el esperado"; return false; }
+        return true;
+    }
     if (cmd == "matrt") {
         float rug = 0.5f, met = 0.0f; ss >> rug >> met;
         Material* mat = ScriptActiveMaterial();
         if (!mat) { err = "matrt: no hay material activo"; return false; }
         mat->rtRugosidad = rug; mat->rtMetalico = met;
         RTInvalidar();
+        return true;
+    }
+    // ---- matssr 0|1 : los REFLEJOS EN PANTALLA del material activo ----
+    if (cmd == "matssr") {
+        int v = 0; ss >> v;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matssr: no hay material activo"; return false; }
+        mat->ssr = (v != 0);
         return true;
     }
     // ---- mattrans t : la TRANSMISION del material activo (trazado de rayos: lo que es vidrio, 0..1) ----
@@ -34162,6 +34544,85 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- trfijar campo valor : edita un valor del panel abierto (re-hace la operacion) ----
     // ---- trboton 1|0 : Aceptar / Cancelar del panel ----
     // ---- trinfo tipo : el panel tiene que estar abierto con esa operacion (mover|rotar|escalar|cerrado) ----
+    // ---- inicio abrir | cerrar | textura si|no | recientes <n> | fila <n> <nombre> | tocar <fila> : LA PANTALLA DE INICIO
+    //      (ui/ViewPorts/PopUp/InicioPopup.h). 'cerrar' ademas exige que haya liberado las texturas del logo; 'tocar' es un
+    //      toque de verdad en esa fila (apoyar + soltar: se elige al soltar). 0 = Nuevo archivo, 1..N los recientes,
+    //      N+1 = Abrir... ----
+    if (cmd == "inicio") {
+        extern void InicioPopupAbrir(); extern void InicioPopupCerrar(); extern bool InicioPopupAbierta();
+        extern InicioPopup* inicioPopup;
+        std::string q; ss >> q;
+        if (q == "abrir") { InicioPopupAbrir(); if (rootViewport) rootViewport->Render(); inicioPopup->Render(); }
+        else if (q == "cerrar") {
+            InicioPopupCerrar();
+            if (InicioPopupAbierta()) { err = "inicio cerrar: sigue abierta"; return false; }
+            if (inicioPopup && !inicioPopup->LogoLiberado()) { err = "inicio cerrar: no libero las texturas del logo"; return false; }
+        } else {
+            if (!inicioPopup || !InicioPopupAbierta()) { err = "inicio " + q + ": la pantalla de inicio no esta abierta"; return false; }
+            if (q == "textura") {
+                std::string e; ss >> e;
+                const bool hay = inicioPopup->LogoCargado();
+                if ((e == "si") != hay) { err = std::string("inicio textura: ") + (hay ? "estan cargadas" : "no estan cargadas"); return false; }
+            } else if (q == "recientes") {
+                int n = -1; ss >> n;
+                if ((int)inicioPopup->recientes.size() != n) {
+                    char b[96]; snprintf(b, sizeof(b), "inicio recientes: hay %d y se esperaban %d", (int)inicioPopup->recientes.size(), n);
+                    err = b; return false;
+                }
+            } else if (q == "fila") {
+                int f = -1; std::string nom; ss >> f >> nom;
+                if (f < 1 || f > (int)inicioPopup->recientes.size()) { err = "inicio fila: no hay esa fila de recientes"; return false; }
+                const std::string& r = inicioPopup->recientes[(size_t)(f - 1)];
+                if (r.size() < nom.size() || r.compare(r.size() - nom.size(), nom.size(), nom) != 0) { err = "inicio fila: es " + r; return false; }
+            } else if (q == "tocar") {
+                int f = -1; ss >> f;
+                if (f < 0 || f >= inicioPopup->Filas()) { err = "inicio tocar: no hay esa fila"; return false; }
+                inicioPopup->Layout();
+                const int mx = inicioPopup->x + inicioPopup->ancho / 2;
+                const int my = inicioPopup->y + inicioPopup->FilaY(f) + inicioPopup->altoFila / 2;
+                if (!inicioPopup->Click(mx, my)) { err = "inicio tocar: el toque cayo afuera"; return false; }
+                inicioPopup->Soltar();
+            } else { err = "inicio: uso: inicio abrir|cerrar|textura si|no|recientes <n>|fila <n> <nombre>|tocar <fila>"; return false; }
+        }
+        printf("      [inicio] %s: %s", q.c_str(), InicioPopupAbierta() ? "abierta" : "cerrada");
+        if (inicioPopup && InicioPopupAbierta()) {
+            printf(", logo %s, %d reciente(s)", inicioPopup->LogoCargado() ? "cargado" : "SIN CARGAR", (int)inicioPopup->recientes.size());
+            for (size_t i = 0; i < inicioPopup->recientes.size(); i++) printf(" [%s]", inicioPopup->recientes[i].c_str());
+        }
+        printf("\n");
+        return true;
+    }
+    // ---- recextraer mallas|texturas <id> <carpeta> : "Extraer" de la tarjeta del RECURSO (antes "Extract assets" de la
+    //      tarjeta Archivo, que sacaba todo): una COPIA de su archivo de adentro del .w3d a esa carpeta. ERROR si no
+    //      quedo el archivo ----
+    if (cmd == "recextraer") {
+        std::string vistaNom, id, carpeta; ss >> vistaNom >> id >> carpeta;
+        const int vista = (vistaNom == "mallas") ? W3D_VISTA_MALLAS : (vistaNom == "texturas") ? W3D_VISTA_TEXTURAS : -1;
+        W3dRecursoItem it;
+        if (vista < 0 || !W3dVistaRecInfo(vista, id, &it)) { err = "recextraer: no hay un recurso '" + id + "' en " + vistaNom; return false; }
+        if (it.entrada.empty()) { err = "recextraer: '" + id + "' no tiene entrada en el .w3d (sin guardar)"; return false; }
+        { std::string c = "mkdir -p '" + carpeta + "'"; if (system(c.c_str()) != 0) { err = "recextraer: no pude crear la carpeta"; return false; } }
+        extern std::string RecursoExtraerEntrada(const std::string&, const std::string&);
+        const std::string destino = RecursoExtraerEntrada(it.entrada, carpeta);
+        printf("      [recextraer] %s '%s' (%s) -> %s\n", vistaNom.c_str(), id.c_str(), it.entrada.c_str(), destino.empty() ? "NADA" : destino.c_str());
+        if (destino.empty() || !w3dFileSystem::FileExists(destino)) { err = "recextraer: no quedo el archivo"; return false; }
+        return true;
+    }
+    // ---- proyectopendiente [sinarchivo|<nombre>] : lo que pidio un boton (Abrir / Nuevo proyecto), como al empezar el
+    //      proximo cuadro. Con 'sinarchivo' ERROR si el editor quedo con un archivo (Nuevo proyecto no tiene); con un
+    //      nombre, ERROR si el archivo abierto no termina asi ----
+    if (cmd == "proyectopendiente") {
+        std::string esp; ss >> esp;
+        extern void ProcesarProyectoPendiente(); ProcesarProyectoPendiente();
+        extern std::string w3dPath;
+        printf("      [proyectopendiente] proyecto: '%s'\n", w3dPath.c_str());
+        if (esp == "sinarchivo" && !w3dPath.empty()) { err = "proyectopendiente: quedo con un archivo: " + w3dPath; return false; }
+        if (!esp.empty() && esp != "sinarchivo" &&
+            (w3dPath.size() < esp.size() || w3dPath.compare(w3dPath.size() - esp.size(), esp.size(), esp) != 0)) {
+            err = "proyectopendiente: el proyecto es '" + w3dPath + "'"; return false;
+        }
+        return true;
+    }
     if (cmd == "trpanel") { std::string v; ss >> v; extern bool g_transformRedoAuto; g_transformRedoAuto = (v != "off" && v != "0"); return true; }
     if (cmd == "trfijar") { int c = 0; float v = 0; ss >> c >> v; if (!TransformRedoFijar(c, v)) { err = "trfijar: el panel no esta abierto"; return false; } return true; }
     if (cmd == "trboton") { int a = 1; ss >> a; TransformRedoBoton(a != 0); return true; }
@@ -40843,7 +41304,19 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // 1) el guardado deja constancia de que FALTA (y ese es el cartel eterno)
         const std::string proy = dir + "/proy.w3d";
         w3dPath = "";
+        { extern void NotificacionesLimpiar(); NotificacionesLimpiar(); }
         if (!GuardarW3D(proy)) { err = "olvidorigen: fallo el guardado"; return false; }
+        // ...pero NO es un error del guardado: el original es solo procedencia (la geometria viaja adentro). Antes salia
+        // "Guardado, pero 1 archivo externo NO esta (ver EXTERNOS.txt)" y el usuario no sabia cual (en Android no hay
+        // como abrir EXTERNOS.txt)
+        {
+            extern bool NotificacionVisible(const std::string&);
+            const bool rojo = NotificacionVisible("piramide.obj");   // (el aviso rojo NOMBRA el archivo que falta)
+            const bool guardado = NotificacionVisible(T("Project saved: "));
+            printf("      [olvidorigen] 1b) el aviso del guardado: %s\n",
+                   rojo ? "dice que FALTA un archivo <-- MAL (es solo el original)" : guardado ? "Project saved OK" : "ninguno <-- MAL");
+            if (rojo || !guardado) ok = false;
+        }
         {
             std::vector<W3dZipEntrada> ents; std::string ext;
             if (!W3dZipLeer(proy, &ents)) { err = "olvidorigen: no pude leer el .w3d"; return false; }
@@ -40861,9 +41334,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (W3dZipLeer(proy, &ents))
                 for (size_t i = 0; i < ents.size(); i++) {
                     const std::string& n = ents[i].nombre;
-                    if (n.size() > 5 && n.compare(n.size() - 5, 5, ".w3dm") == 0) { hayMalla = true; bytes += ents[i].datos.size(); }
+                    if (n.size() > 5 && (n.compare(n.size() - 5, 5, ".w3dm") == 0 || n.compare(n.size() - 5, 5, ".w3db") == 0)) { hayMalla = true; bytes += ents[i].datos.size(); }
                 }
-            printf("      [olvidorigen] la geometria viaja ADENTRO del .w3d (.w3dm): %s (%d bytes)\n",
+            printf("      [olvidorigen] la geometria viaja ADENTRO del .w3d (.w3dm/.w3db): %s (%d bytes)\n",
                    hayMalla ? "si OK" : "NO <-- MAL", (int)bytes);
             if (!hayMalla) ok = false;
         }
@@ -40886,7 +41359,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 if (ents[i].nombre == "EXTERNOS.txt")
                     ext.assign(ents[i].datos.empty() ? "" : (const char*)&ents[i].datos[0], ents[i].datos.size());
                 const std::string& n = ents[i].nombre;
-                if (n.size() > 5 && n.compare(n.size() - 5, 5, ".w3dm") == 0) hayMalla = true;
+                if (n.size() > 5 && (n.compare(n.size() - 5, 5, ".w3dm") == 0 || n.compare(n.size() - 5, 5, ".w3db") == 0)) hayMalla = true;
             }
             const bool limpio = ext.find("piramide.obj") == std::string::npos;
             printf("      [olvidorigen] 3) el .w3d nuevo NO nombra el .obj: %s | y la geometria sigue adentro: %s\n",

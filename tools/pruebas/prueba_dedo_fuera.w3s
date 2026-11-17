@@ -1,0 +1,6 @@
+# UN DEDO QUE SALE DEL VIEWPORT: el gesto que arranco en la Vista 3D (orbitar con 1 dedo, panear con 2) sigue en ella
+# aunque los dedos pasen a otro panel, sin el salto del cursor envuelto (eso es del mouse). Ver dedofuera (W3dScript.cpp)
+# Correr: cd tools/pruebas && ../../platform/linux/build/whisk3d --script prueba_dedo_fuera.w3s
+ventana 640 480
+escenadefecto
+dedofuera

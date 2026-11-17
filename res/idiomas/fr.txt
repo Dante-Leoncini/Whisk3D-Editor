@@ -9,6 +9,8 @@
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d courbe(s) d'animation de la sélection n'animent plus rien (Annuler les restaure)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d courbe(s) d'animation sont restées sans objet (la première : '%s') : voir whisk3d.log
 %d curves selected	%d courbes sélectionnées
+%d files are now external	%d fichiers sont maintenant externes
+%d files are now inside the .w3d	%d fichiers sont maintenant dans le .w3d
 %d keyframes selected	%d images clés sélectionnées
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d nom(s) renumérotés en changeant de scène (%s%s). Vérifiez vos scripts Lua.
 %d nodes | active node: %d	%d nœuds | nœud actif : %d
@@ -339,11 +341,13 @@ Clipping	Découpage
 Clips	Clips
 Clone screen	Cloner l'écran
 Close	Fermer
+Close Whisk3D?	Fermer Whisk3D ?
 Close without saving	Fermer sans enregistrer
 Closest	Plus proche
 Collapse	Effondrer
 Collection	Collection
 Color	Couleur
+Color / Texture	Couleur / Texture
 Color Grid	Grille de couleurs
 Color Layers	Calques de couleur
 Color Mode	Mode de couleur
@@ -387,6 +391,7 @@ Convert to Scene	Convertir en scène
 Convert to editable mesh	Convertir en maillage éditable
 Copied	Copié
 Copy	Copier
+Copy Keyframe	Copier la clé
 Copy X	Copier X
 Copy Y	Copier Y
 Copy Z	Copier Z
@@ -398,14 +403,17 @@ Correct UVs	Corriger UV
 Could not copy the objects	Impossible de copier les objets
 Could not create a viewport on the external display: cloning the screen	Impossible de créer une vue sur l'écran externe : clonage de l'écran
 Could not encode the PNG	Impossible d'encoder le PNG
+Could not extract	Impossible d'extraire
 Could not import	Impossible d'importer
 Could not link the copy of '%s' to its mesh	Impossible de lier la copie de '%s' à son maillage
+Could not load the layout	Impossible de charger la disposition
 Could not load the mesh '%s'	Impossible de charger le maillage '%s'
 Could not read the STL file	Impossible de lire le fichier STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Impossible de lire les animations de '%s' (%s) : elles restent VIDES et je ne l'enregistrerai pas par-dessus (voir whisk3d.log)
 Could not read the file	Impossible de lire le fichier
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Impossible de lire les frames de l'animation '%s' de '%s' : elle reste VIDE et je ne l'enregistrerai pas par-dessus (voir whisk3d.log)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Impossible de lire la géométrie de '%s' : elle reste VIDE et je ne l'enregistrerai pas par-dessus (voir whisk3d.log)
+Could not save the layout	Impossible d'enregistrer la disposition
 Could not write config.ini	Impossible d'écrire config.ini
 Could not write the file	Impossible d'écrire le fichier
 Count	Nombre
@@ -441,12 +449,14 @@ Cylinder Projection	Projection cylindre
 Debug mode	Mode debug
 Decal	Décalque
 Decimals	Décimales
+Default	Par défaut
 Default Material	Matériau par défaut
 Delete	Supprimer
 Delete "%s" (%s) with all its objects?	Supprimer "%s" (%s) avec tous ses objets ?
 Delete "%s"?	Supprimer "%s" ?
 Delete %d objects?	Supprimer %d objets ?
 Delete %d scenes, games or prefabs with all their objects?	Supprimer %d scènes, jeux ou prefabs avec tous leurs objets ?
+Delete All Keyframes	Supprimer toutes les clés
 Delete Edge Loops	Supprimer les boucles d'arêtes
 Delete Edge Loops: select an edge loop first	Supprimer boucles d'arêtes : sélectionnez d'abord une boucle d'arêtes
 Delete Edge Loops: select an edge shared by two faces	Supprimer boucles d'arêtes : sélectionnez une arête partagée par deux faces
@@ -461,10 +471,13 @@ Delete Normals Layer	Supprimer calque de normales
 Delete Palette	Supprimer palette
 Delete Vertices	Supprimer les sommets
 Delete editing data	Supprimer données d'édition
+Delete layout	Supprimer une disposition
+Delete layout...	Supprimer une disposition...
 Delete mesh layer: select an object animation in the timeline	Supprimer calque du maillage : choisissez une animation de l'objet dans la timeline
 Delete normals layer: select an object animation in the timeline	Supprimer calque de normales : choisissez une animation de l'objet dans la timeline
 Delete selected?	Supprimer la sélection ?
 Delete step	Supprimer étape
+Delete the layout	Supprimer la disposition
 Delete the orphan resource	Supprimer la ressource orpheline
 Delete the orphan resources	Supprimer les ressources orphelines
 Deleted	Supprimé
@@ -587,9 +600,13 @@ Exporting model...	Export du modèle...
 External	Externe
 External (choose where)...	Externe (choisir où)...
 External display	Écran externe
+Extract	Extraire
 Extract assets	Extraire assets
 Extract the assets to...	Extraire les assets vers...
+Extract to a folder...	Extraire dans un dossier...
+Extract to...	Extraire vers...
 Extract: save the project first (the assets live inside the .w3d)	Extraire : enregistrez d'abord le projet (les assets sont dans le .w3d)
+Extracted	Extrait
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	%d fichier(s) extrait(s). Ce sont des COPIES : pour qu'une modification revienne dans le projet, il faut la réimporter
 Extracted %d file(s); %d failed (see the log)	%d fichier(s) extrait(s) ; %d en échec (voir le journal)
 Extrude	Extruder
@@ -808,6 +825,7 @@ It couldn't be copied into the .w3d	Impossible de le copier dans le .w3d
 It doesn't exist anymore	N'existe plus
 It has no checkbox	N'a pas de case à cocher
 It has no proyecto.json	Pas de proyecto.json
+It is a COPY: for a change to go back into the project you have to import it again	C'est une COPIE : pour qu'une modification revienne dans le projet, il faut la réimporter
 It is a W3D proxy: choose its library element	C'est un proxy W3D : choisissez l'élément de sa bibliothèque
 It is already linked	Déjà lié
 It is in use	Il est utilisé
@@ -844,6 +862,9 @@ Last triangle	Dernier triangle
 Layer	Calque
 Layer On	Calque actif
 Layout	Layout
+Layout deleted	Disposition supprimée
+Layout replaced	Disposition remplacée
+Layout saved	Disposition enregistrée
 Left	Gauche
 Left Handle X	Poignée gauche X
 Left View	Vue de gauche
@@ -859,6 +880,7 @@ Library not readable	Bibliothèque illisible
 Library unlinked	Bibliothèque déliée
 Lifetime	Durée de vie
 Light	Lumière
+Light bounces	Rebonds de lumière
 Light color	Couleur lumière
 Light on/off	Lumière on/off
 Light position	Position lumière
@@ -970,6 +992,7 @@ Merge at Cursor	Fusionner au curseur
 Merge by Distance	Fusionner par distance
 Mesh	Maillage
 Mesh Parts	Parties de maillage
+Mesh as text	Maillage en texte
 Mesh editable again	Maillage de nouveau éditable
 Mesh layer deleted	Calque du maillage supprimé
 Mesh made single user	Maillage rendu unique
@@ -1049,6 +1072,7 @@ New Texture: invalid size	Nouvelle texture : taille invalide
 New UV Map	Nouvelle carte UV
 New W3D proxy of this element	Nouveau proxy W3D de cet élément
 New controller detected: %s	Nouvelle manette détectée : %s
+New file	Nouveau fichier
 New instance of this prefab	Nouvelle instance de ce prefab
 New instance of this scene	Nouvelle instance de cette scène
 New material with this shader	Nouveau matériau avec ce shader
@@ -1056,6 +1080,7 @@ New material with this texture	Nouveau matériau avec cette texture
 New noise each image	Nouveau bruit à chaque image
 New object with this 3D mesh	Nouvel objet avec ce maillage 3D
 New paint texture	Nouvelle texture à peindre
+New project	Nouveau projet
 New shader	Nouveau shader
 New sound object here	Nouvel objet son ici
 Next	Suivant
@@ -1164,6 +1189,7 @@ Open in IDE	Ouvrir dans l'IDE
 Open normal map	Ouvrir carte de normales
 Open project	Ouvrir projet
 Open without saving	Ouvrir sans enregistrer
+Open...	Ouvrir...
 Opening project...	Ouverture du projet...
 Operation	Opération
 Optimize Vertex Groups	Optimiser groupes de sommets
@@ -1189,6 +1215,7 @@ Overrides	Overrides
 Own	Propre
 PVS recalculated	PVS recalculé
 PVS: <model>.pvs.json is missing next to the source .obj	PVS : <modèle>.pvs.json manquant à côté du .obj source
+Pack into the .w3d	Intégrer dans le .w3d
 Packaging .deb (cpack)	Empaquetage .deb (cpack)
 Packaging AppImage	Empaquetage de l'AppImage
 Packed (protected)	Empaquetés (protégés)
@@ -1213,6 +1240,7 @@ Parts	Parties
 Pass Order	Ordre de passe
 Passes	Passes
 Paste	Coller
+Paste Keyframe	Coller la clé
 Pasted	Collé
 Patch	Patch
 Path	Chemin
@@ -1283,7 +1311,7 @@ Project from View	Projeter depuis la vue
 Project from View (Bounds)	Projeter depuis la vue (limites)
 Project from View: select faces first	Projeter depuis la vue : sélectionnez d'abord des faces
 Project saved: 	Projet enregistré : 
-Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Projet enregistré : %s (%d référence(s) externe(s), voir EXTERNOS.txt)
+Project saved: %s (%d external file(s), marked with an arrow in the Library)	Projet enregistré : %s (%d fichier(s) externe(s), marqués d'une flèche dans la Bibliothèque)
 Properties	Propriétés
 Properties viewport	Éditeur de propriétés
 Proportional Editing	Édition proportionnelle
@@ -1320,6 +1348,7 @@ Ray traced motion blur	Flou cinétique par rayons
 Rays	Rayons
 Recalculate	Recalculer
 Recalculate Normals	Recalculer normales
+Recent files	Fichiers récents
 Rectangle	Rectangle
 Red	Rouge
 Redo	Rétablir
@@ -1430,6 +1459,8 @@ Save and continue	Enregistrer et continuer
 Save and open	Enregistrer et ouvrir
 Save and quit	Enregistrer et quitter
 Save inside the .w3d	Enregistrer dans le .w3d
+Save layout	Enregistrer la disposition
+Save layout...	Enregistrer la disposition...
 Save outside the .w3d...	Enregistrer hors du .w3d...
 Save project	Enregistrer projet
 Save script	Enregistrer script
@@ -1440,7 +1471,8 @@ Save: could not replace the file (the previous version was kept):	Enregistrer : 
 Save: incomplete write. The file was not touched:	Enregistrer : écriture incomplète. Le fichier n'a pas été modifié :
 Saved (note: %d curve(s) without a source file are not saved)	Enregistré (attention : %d courbe(s) sans fichier source ne sont pas enregistrées)
 Saved OK, but copying version v%d failed (see the log)	Enregistré, mais la copie de la version v%d a échoué (voir le journal)
-Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Enregistré, mais %d fichier(s) externe(s) sont ABSENTS (voir EXTERNOS.txt). S'il s'agit de l'original d'un maillage importé : Objet > Définir l'origine > Oublier fichier original
+Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Enregistré, mais %s et %d autre(s) fichier(s) sont manquants (hors du .w3d). Bibliothèque > Fichiers manquants
+Saved, but %s is missing (it is outside the .w3d). Library > Missing files	Enregistré, mais %s est manquant (il est hors du .w3d). Bibliothèque > Fichiers manquants
 Saved: 	Enregistré : 
 Scale	Échelle
 Scale Only	Échelle seulement
@@ -1458,6 +1490,7 @@ Scenes	Scènes
 Screen	Écran
 Screen (lightens)	Écran (éclaircit)
 Screen Rect	Rectangle écran
+Screen Space Reflections	Réflexions en espace écran
 Screw	Vis
 Script	Script
 Script Editor	Éditeur de scripts
@@ -1696,6 +1729,7 @@ The sound couldn't be read	Impossible de lire le son
 The texture couldn't be loaded	Impossible de charger la texture
 The undo history still uses it	L'historique d'annulation l'utilise encore
 There are no orphans	Aucun orphelin
+There are no saved layouts to delete	Aucune disposition enregistrée à supprimer
 There is no active camera	Aucune caméra active
 There is no audio: the mixer did not start	Pas d'audio : le mixeur n'a pas démarré
 There is no script editor (IDE) in the layout	Aucun éditeur de scripts (IDE) dans le layout
@@ -1800,6 +1834,7 @@ Use index	Utiliser index
 Use new viewport	Utiliser nouvelle vue
 Use physics engine	Utiliser moteur physique
 Use sound	Utiliser le son
+Use system keyboard	Utiliser le clavier du système
 Use the material's UV index	Utiliser l'index UV du matériau
 Use this file	Utiliser ce fichier
 Use this folder	Utiliser ce dossier

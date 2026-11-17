@@ -96,9 +96,9 @@
 //        escena NUEVA con una malla de cada caso del formato (capas, parts, marcas, grupos,
 //        forma, UV group, sueltos, noEditable, rig con clip, vertex anim, Mirror, flipbook);
 //        'grande' agrega una esfera de mas de 65535 render-verts.
-//    formatomallasui [clic] [tilde 0|1]...
-//        el tilde "Meshes as text" de la tarjeta Archivo: 'clic' lo toca como un
-//        click (EditPropertie) y 'tilde' asserta lo que muestra (espejo de la opcion del proyecto).
+//    formatomallasui <malla> [clic] [tilde 0|1]...
+//        el tilde "Mesh as text" de la tarjeta del RECURSO de esa malla: 'clic' lo toca como un
+//        click (EditPropertie) y 'tilde' asserta lo que muestra (el formato con que se guarda ESA malla).
 //    zipcrc
 //        el CRC32 del contenedor (de a 8 bytes) contra los vectores de control y contra la
 //        definicion bit a bit en todos los largos/alineaciones; informa MB/s.
@@ -1104,7 +1104,8 @@ static bool CmdIconosPkg(std::string& err) {
 //  LA MALLA BINARIA (.w3db, io/W3dMallaBin.h): formato, equivalencia y robustez
 // ============================================================================
 
-// ---- formatomallas [texto|binario] | proyecto [texto|binario] | es texto|binario ----
+// ---- formatomallas [texto|binario] | proyecto [texto|binario] | es texto|binario | todas texto|binario ----
+// 'todas': el tilde "Mesh as text" de CADA malla del proyecto (lo mismo que tocarlo en la tarjeta de cada una)
 static bool CmdFormatoMallas(std::istringstream& ss, std::string& err) {
     std::string a, b; ss >> a >> b;
     if (a == "texto")        g_w3dFormatoMallasForzado = W3D_MALLAS_TEXTO;
@@ -1121,7 +1122,13 @@ static bool CmdFormatoMallas(std::istringstream& ss, std::string& err) {
             err = std::string("formatomallas: el formato vigente es ") + (W3dFormatoMallas() == W3D_MALLAS_TEXTO ? "texto" : "binario");
             return false;
         }
-    } else if (!a.empty()) { err = "formatomallas: uso: formatomallas [texto|binario|proyecto [texto|binario]|es texto|binario]"; return false; }
+    } else if (a == "todas") {
+        if (b != "texto" && b != "binario") { err = "formatomallas: uso: formatomallas todas texto|binario"; return false; }
+        const std::vector<MallaRecurso*>& reg = W3dMallasRegistro();
+        int n = 0;
+        for (size_t i = 0; i < reg.size(); i++) if (!reg[i]->borrado) { W3dMallaRecursoFijarTexto(reg[i], b == "texto"); n++; }
+        printf("      [formatomallas] %d malla(s) a %s\n", n, b.c_str());
+    } else if (!a.empty()) { err = "formatomallas: uso: formatomallas [texto|binario|proyecto [texto|binario]|es texto|binario|todas texto|binario]"; return false; }
     printf("      [formatomallas] vigente=%s (proyecto=%s, forzado=%s)\n",
            W3dFormatoMallas() == W3D_MALLAS_TEXTO ? "texto" : "binario",
            g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO ? "texto" : "binario",
@@ -1919,39 +1926,48 @@ static bool CmdMallaRica(std::istringstream& ss, std::string& err) {
 }
 
 // ============================================================================
-//  formatomallasui: el TILDE de la tarjeta Archivo ("Meshes as text")
+//  formatomallasui <malla>: el TILDE "Mesh as text" de la tarjeta del RECURSO (cada malla)
 // ============================================================================
-// La opcion del proyecto "formatoMallas" tiene su control en la UI: un PropBool en la
-// tarjeta Archivo que es ESPEJO de g_w3dFormatoMallasProyecto. 'clic' lo toca por la
-// MISMA puerta que un click (EditPropertie: da vuelta el bool y llama al onChange);
-// 'tilde 0|1' asserta lo que muestra, despues de refrescar como en cada frame
-// (Properties::Render -> ActualizarPestanias), y que coincide con el formato vigente.
+// El formato con que se guarda una malla es DE ESA MALLA (antes era una opcion de todo el
+// proyecto en la tarjeta Archivo). Se elige la malla en la biblioteca (W3dRecursoActivar, lo
+// mismo que un click en el outliner por recursos) y se mira su tarjeta como en cada frame
+// (Properties::ActualizarPestanias, pestania 3). 'clic' toca el tilde por la MISMA puerta que
+// un click (EditPropertie: da vuelta el bool y llama al onChange); 'tilde 0|1' asserta lo que
+// muestra y que coincide con el formato con que se va a guardar esa malla.
 static bool CmdFormatoMallasUI(std::istringstream& ss, std::string& err) {
     Properties* P = PropsActivo;
     if (!P) {   // el primer panel de propiedades del layout (el activo puede ser otro viewport)
         ViewportBase* h = PrPrimeraHoja(3);
         P = h ? (Properties*)h : NULL;
     }
-    if (!P || !P->propProyMallasTexto || !P->propProyMallasTexto->value) {
-        err = "formatomallasui: no hay panel de propiedades con el tilde del formato de las mallas"; return false;
+    std::string malla; ss >> malla;
+    MallaRecurso* r = W3dMallaRecursoPorNombre(malla);
+    if (!P || !P->propRecMallaTexto) {
+        err = "formatomallasui: no hay panel de propiedades con el tilde del formato de la malla"; return false;
     }
-    PropBool* pb = P->propProyMallasTexto;
+    if (!r) { err = "formatomallasui: no hay una malla '" + malla + "'"; return false; }
+    W3dRecursoActivar(W3D_VISTA_MALLAS, malla);
+    PropBool* pb = P->propRecMallaTexto;
+    struct Ver { static void Refrescar(Properties* P) { P->pestaniaActiva = 3; P->ActualizarPestanias(); } };
     std::string t;
     while (ss >> t) {
         if (t == "clic") {
-            P->ActualizarPestanias();   // lo que la UI mostraba justo antes del click
+            Ver::Refrescar(P);   // lo que la UI mostraba justo antes del click
+            if (!pb->value) { err = "formatomallasui: el tilde no se ve en la tarjeta de la malla"; return false; }
             pb->EditPropertie();
-            printf("      [formatomallasui] clic -> tilde=%d proyecto=%s\n", *pb->value ? 1 : 0,
-                   g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO ? "texto" : "binario");
+            printf("      [formatomallasui] %s: clic -> tilde=%d se guarda en %s\n", malla.c_str(), *pb->value ? 1 : 0,
+                   W3dMallaRecursoEnTexto(r) ? "texto" : "binario");
         } else if (t == "tilde") {
             int quiero = -1; ss >> quiero;
-            P->ActualizarPestanias();
+            Ver::Refrescar(P);
+            if (!pb->value) { err = "formatomallasui: el tilde no se ve en la tarjeta de la malla"; return false; }
             const int hay = *pb->value ? 1 : 0;
-            const int proy = (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO) ? 1 : 0;
-            printf("      [formatomallasui] tilde=%d proyecto=%s ('%s')\n", hay, proy ? "texto" : "binario", pb->name.c_str());
-            if (hay != proy) { err = "formatomallasui: el tilde no refleja la opcion del proyecto"; return false; }
+            const int fmt = W3dMallaRecursoEnTexto(r) ? 1 : 0;
+            printf("      [formatomallasui] %s: tilde=%d se guarda en %s (entrada '%s')\n", malla.c_str(), hay,
+                   fmt ? "texto" : "binario", r->entrada.c_str());
+            if (hay != fmt) { err = "formatomallasui: el tilde no refleja el formato de la malla"; return false; }
             if (quiero != hay) { char b[120]; sprintf(b, "formatomallasui: tilde=%d y se esperaba %d", hay, quiero); err = b; return false; }
-        } else { err = "formatomallasui: uso: formatomallasui [clic] [tilde 0|1]..."; return false; }
+        } else { err = "formatomallasui: uso: formatomallasui <malla> [clic] [tilde 0|1]..."; return false; }
     }
     return true;
 }

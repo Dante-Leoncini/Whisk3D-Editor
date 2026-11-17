@@ -9,6 +9,8 @@
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Кривые анимации выделения (%d) больше ничего не анимируют (Отмена вернёт их)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	Кривые анимации (%d) остались без объекта (первая: '%s'): см. whisk3d.log
 %d curves selected	Выбрано кривых: %d
+%d files are now external	Внешних файлов теперь: %d
+%d files are now inside the .w3d	Файлов внутри .w3d теперь: %d
 %d keyframes selected	Выбрано ключевых кадров: %d
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	Имена (%d) перенумерованы при смене сцены (%s%s). Проверьте свои скрипты Lua.
 %d nodes | active node: %d	Узлов: %d | активный узел: %d
@@ -339,11 +341,13 @@ Clipping	Обрезка
 Clips	Клипы
 Clone screen	Клонировать экран
 Close	Закрыть
+Close Whisk3D?	Закрыть Whisk3D?
 Close without saving	Закрыть без сохранения
 Closest	Ближайший
 Collapse	Схлопнуть
 Collection	Коллекция
 Color	Цвет
+Color / Texture	Цвет / Текстура
 Color Grid	Цветная сетка
 Color Layers	Слои цвета
 Color Mode	Режим цвета
@@ -387,6 +391,7 @@ Convert to Scene	Преобразовать в сцену
 Convert to editable mesh	Преобразовать в редактируемый меш
 Copied	Скопировано
 Copy	Копировать
+Copy Keyframe	Копировать ключевой кадр
 Copy X	Копировать X
 Copy Y	Копировать Y
 Copy Z	Копировать Z
@@ -398,14 +403,17 @@ Correct UVs	Корректировать UV
 Could not copy the objects	Не удалось скопировать объекты
 Could not create a viewport on the external display: cloning the screen	Не удалось создать вьюпорт на внешнем экране: экран клонируется
 Could not encode the PNG	Не удалось закодировать PNG
+Could not extract	Не удалось извлечь
 Could not import	Не удалось импортировать
 Could not link the copy of '%s' to its mesh	Не удалось связать копию '%s' с её мешем
+Could not load the layout	Не удалось загрузить раскладку
 Could not load the mesh '%s'	Не удалось загрузить меш '%s'
 Could not read the STL file	Не удалось прочитать файл STL
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать анимации '%s' (%s): они остаются ПУСТЫМИ, и сохранять поверх я не буду (см. whisk3d.log)
 Could not read the file	Не удалось прочитать файл
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать кадры анимации '%s' объекта '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать геометрию '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
+Could not save the layout	Не удалось сохранить раскладку
 Could not write config.ini	Не удалось записать config.ini
 Could not write the file	Не удалось записать файл
 Count	Количество
@@ -441,12 +449,14 @@ Cylinder Projection	Цилиндрическая проекция
 Debug mode	Режим отладки
 Decal	Декаль
 Decimals	Десятичные
+Default	По умолчанию
 Default Material	Материал по умолчанию
 Delete	Удалить
 Delete "%s" (%s) with all its objects?	Удалить "%s" (%s) со всеми объектами?
 Delete "%s"?	Удалить "%s"?
 Delete %d objects?	Удалить объекты (%d)?
 Delete %d scenes, games or prefabs with all their objects?	Удалить сцены, игры или префабы (%d) со всеми объектами?
+Delete All Keyframes	Удалить все ключевые кадры
 Delete Edge Loops	Удалить петли рёбер
 Delete Edge Loops: select an edge loop first	Удалить петли рёбер: сначала выберите петлю рёбер
 Delete Edge Loops: select an edge shared by two faces	Удалить петли рёбер: выберите ребро, общее для двух граней
@@ -461,10 +471,13 @@ Delete Normals Layer	Удалить слой нормалей
 Delete Palette	Удалить палитру
 Delete Vertices	Удалить вершины
 Delete editing data	Удалить данные редактирования
+Delete layout	Удалить раскладку
+Delete layout...	Удалить раскладку...
 Delete mesh layer: select an object animation in the timeline	Удалить слой меша: выберите анимацию объекта на таймлайне
 Delete normals layer: select an object animation in the timeline	Удалить слой нормалей: выберите анимацию объекта на таймлайне
 Delete selected?	Удалить выделенное?
 Delete step	Удалить шаг
+Delete the layout	Удалить раскладку
 Delete the orphan resource	Удалить неиспользуемый ресурс
 Delete the orphan resources	Удалить неиспользуемые ресурсы
 Deleted	Удалено
@@ -587,9 +600,13 @@ Exporting model...	Экспорт модели...
 External	Внешний
 External (choose where)...	Внешний (выбрать где)...
 External display	Внешний экран
+Extract	Извлечь
 Extract assets	Извлечь ассеты
 Extract the assets to...	Извлечь ассеты в...
+Extract to a folder...	Извлечь в папку...
+Extract to...	Извлечь в...
 Extract: save the project first (the assets live inside the .w3d)	Извлечь: сначала сохраните проект (ассеты хранятся внутри .w3d)
+Extracted	Извлечено
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Извлечено файлов: %d. Это КОПИИ: чтобы изменение вернулось в проект, его нужно импортировать снова
 Extracted %d file(s); %d failed (see the log)	Извлечено файлов: %d; с ошибкой: %d (см. лог)
 Extrude	Выдавить
@@ -808,6 +825,7 @@ It couldn't be copied into the .w3d	Не удалось скопировать �
 It doesn't exist anymore	Больше не существует
 It has no checkbox	У него нет флажка
 It has no proyecto.json	Нет proyecto.json
+It is a COPY: for a change to go back into the project you have to import it again	Это КОПИЯ: чтобы изменение вернулось в проект, его нужно импортировать снова
 It is a W3D proxy: choose its library element	Это прокси W3D: выберите его элемент библиотеки
 It is already linked	Уже связано
 It is in use	Используется
@@ -844,6 +862,9 @@ Last triangle	Последний треугольник
 Layer	Слой
 Layer On	Слой вкл.
 Layout	Компоновка
+Layout deleted	Раскладка удалена
+Layout replaced	Раскладка заменена
+Layout saved	Раскладка сохранена
 Left	Слева
 Left Handle X	Лев. рукоятка X
 Left View	Вид слева
@@ -859,6 +880,7 @@ Library not readable	Библиотека не читается
 Library unlinked	Библиотека отвязана
 Lifetime	Время жизни
 Light	Свет
+Light bounces	Отскоки света
 Light color	Цвет света
 Light on/off	Свет вкл/выкл
 Light position	Позиция света
@@ -970,6 +992,7 @@ Merge at Cursor	Слить у курсора
 Merge by Distance	Слить по расстоянию
 Mesh	Меш
 Mesh Parts	Части меша
+Mesh as text	Меш текстом
 Mesh editable again	Меш снова редактируемый
 Mesh layer deleted	Слой меша удалён
 Mesh made single user	Меш стал уникальным
@@ -1049,6 +1072,7 @@ New Texture: invalid size	Новая текстура: неверный разм
 New UV Map	Новая UV-карта
 New W3D proxy of this element	Новый прокси W3D этого элемента
 New controller detected: %s	Обнаружен новый контроллер: %s
+New file	Новый файл
 New instance of this prefab	Новый экземпляр этого префаба
 New instance of this scene	Новый экземпляр этой сцены
 New material with this shader	Новый материал с этим шейдером
@@ -1056,6 +1080,7 @@ New material with this texture	Новый материал с этой текс�
 New noise each image	Новый шум в каждом кадре
 New object with this 3D mesh	Новый объект с этим 3D-мешем
 New paint texture	Новая текстура для рисования
+New project	Новый проект
 New shader	Новый шейдер
 New sound object here	Новый звуковой объект здесь
 Next	Следующее
@@ -1164,6 +1189,7 @@ Open in IDE	Открыть в IDE
 Open normal map	Открыть карту нормалей
 Open project	Открыть проект
 Open without saving	Открыть без сохранения
+Open...	Открыть...
 Opening project...	Открытие проекта...
 Operation	Операция
 Optimize Vertex Groups	Оптимизировать группы вершин
@@ -1189,6 +1215,7 @@ Overrides	Переопределения
 Own	Своя
 PVS recalculated	PVS пересчитан
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: нет <модель>.pvs.json рядом с исходным .obj
+Pack into the .w3d	Упаковать в .w3d
 Packaging .deb (cpack)	Упаковка .deb (cpack)
 Packaging AppImage	Упаковка AppImage
 Packed (protected)	Упаковано (защищено)
@@ -1213,6 +1240,7 @@ Parts	Части
 Pass Order	Порядок прохода
 Passes	Проходы
 Paste	Вставить
+Paste Keyframe	Вставить ключевой кадр
 Pasted	Вставлено
 Patch	Патч
 Path	Путь
@@ -1283,7 +1311,7 @@ Project from View	Проекция из вида
 Project from View (Bounds)	Проекция из вида (границы)
 Project from View: select faces first	Проекция из вида: сначала выберите грани
 Project saved: 	Проект сохранён: 
-Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Проект сохранён: %s (внешних ссылок: %d, см. EXTERNOS.txt)
+Project saved: %s (%d external file(s), marked with an arrow in the Library)	Проект сохранён: %s (внешних файлов: %d, отмечены стрелкой в Библиотеке)
 Properties	Свойства
 Properties viewport	Вьюпорт свойств
 Proportional Editing	Пропорциональное редактирование
@@ -1320,6 +1348,7 @@ Ray traced motion blur	Трассир. размытие движения
 Rays	Лучи
 Recalculate	Пересчитать
 Recalculate Normals	Пересчитать нормали
+Recent files	Недавние файлы
 Rectangle	Прямоугольник
 Red	Красный
 Redo	Повторить
@@ -1430,6 +1459,8 @@ Save and continue	Сохранить и продолжить
 Save and open	Сохранить и открыть
 Save and quit	Сохранить и выйти
 Save inside the .w3d	Сохранить внутри .w3d
+Save layout	Сохранить раскладку
+Save layout...	Сохранить раскладку...
 Save outside the .w3d...	Сохранить вне .w3d...
 Save project	Сохранить проект
 Save script	Сохранить скрипт
@@ -1440,7 +1471,8 @@ Save: could not replace the file (the previous version was kept):	Сохране
 Save: incomplete write. The file was not touched:	Сохранение: запись не завершена. Файл не тронут:
 Saved (note: %d curve(s) without a source file are not saved)	Сохранено (внимание: кривые без исходного файла (%d) не сохраняются)
 Saved OK, but copying version v%d failed (see the log)	Сохранено, но копирование версии v%d не удалось (см. лог)
-Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Сохранено, но внешних файлов (%d) НЕТ (см. EXTERNOS.txt). Если это исходник импортированного меша: Объект > Задать центр > Забыть исходный файл
+Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Сохранено, но нет %s и ещё %d файл(ов) (вне .w3d). Библиотека > Отсутствующие файлы
+Saved, but %s is missing (it is outside the .w3d). Library > Missing files	Сохранено, но нет файла %s (он вне .w3d). Библиотека > Отсутствующие файлы
 Saved: 	Сохранено: 
 Scale	Масштаб
 Scale Only	Только масштаб
@@ -1458,6 +1490,7 @@ Scenes	Сцены
 Screen	Экран
 Screen (lightens)	Экран (осветляет)
 Screen Rect	Область экрана
+Screen Space Reflections	Экранные отражения
 Screw	Винт
 Script	Скрипт
 Script Editor	Редактор скриптов
@@ -1696,6 +1729,7 @@ The sound couldn't be read	Не удалось прочитать звук
 The texture couldn't be loaded	Не удалось загрузить текстуру
 The undo history still uses it	История отмен ещё использует его
 There are no orphans	Нет неиспользуемых
+There are no saved layouts to delete	Нет сохранённых раскладок для удаления
 There is no active camera	Нет активной камеры
 There is no audio: the mixer did not start	Нет звука: микшер не запустился
 There is no script editor (IDE) in the layout	В компоновке нет редактора скриптов (IDE)
@@ -1800,6 +1834,7 @@ Use index	Использовать индекс
 Use new viewport	Использовать новый вьюпорт
 Use physics engine	Физический движок
 Use sound	Использовать звук
+Use system keyboard	Использовать системную клавиатуру
 Use the material's UV index	Использовать UV-индекс материала
 Use this file	Использовать этот файл
 Use this folder	Использовать эту папку

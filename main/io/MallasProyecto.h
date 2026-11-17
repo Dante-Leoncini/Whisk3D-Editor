@@ -116,5 +116,9 @@ void W3dMallasGuardarMateriales(std::vector<Material*>& out);
 void W3dMallasGuardarConfirmar();
 // el guardado no salio (o termino): se descarta el plan
 void W3dMallasGuardarDescartar();
+// EL FORMATO DE CADA MALLA al guardarla: texto (.w3dm) o binario (.w3db). Lo elige su tarjeta Recurso ("Malla en
+// texto"); sin elegir, el de su entrada (o, si es nueva, el del proyecto). NULL = una malla nueva.
+bool W3dMallaRecursoEnTexto(const MallaRecurso* r);
+void W3dMallaRecursoFijarTexto(MallaRecurso* r, bool texto);
 
 #endif

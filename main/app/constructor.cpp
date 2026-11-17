@@ -26,7 +26,11 @@ void W3dCrearEscenaPorDefecto() {
                          ListaColores[static_cast<int>(ColorID::background)]);
     CollectionActive = new Collection(SceneCollection);
 
-    new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(-35.0f, -45.0f, 0.0f));
+    // la CAMARA mira al cubo (el origen) desde arriba y al costado, a 5,5 unidades: con sus 45 grados el cubo entra entero
+    // en el render (antes, a 4,3, se cortaban las puntas) y la camara se ve en la vista 3D. La rotacion se CALCULA: era
+    // (-35, -45, 0) escrita a mano y no apuntaba al cubo
+    { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
+      new Camera(CollectionActive, posCam, CamaraRotMirando(posCam, Vector3(0, 0, 0))); }
     Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
     L->SetNameObj(T("Light"));   // el Core la llama "Light"; el nombre lo pone el editor en su idioma (como Agregar > Luz)
     L->SetDiffuse(1, 1, 1); // luz BLANCA por defecto (antes era roja)
@@ -42,7 +46,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     W3dInitGraphics();
 
     // Siempre un material por defecto
-    MaterialDefecto = new Material("Default", true);
+    MaterialDefecto = MaterialDeFabrica(new Material("Default", true));   // (con shaders: por pixel)
 
 
     // Tamaño de las texturas

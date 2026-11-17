@@ -274,6 +274,9 @@ int  W3dVistaRecUbicacion(int vista, const std::string& id);
 bool W3dVistaRecFijarUbicacion(int vista, const std::string& id, int ubicacion, const std::string& rutaExterna,
                                std::string* idNuevo, std::string* motivo);
 std::string W3dVistaRecRutaExternaSugerida(int vista, const std::string& id);
+// true si 'ruta' es el ARCHIVO ORIGINAL de alguna malla importada (Mesh::origen): solo procedencia (la geometria
+// viaja adentro del .w3d). Que falte no pierde nada: el guardado no lo trata como un archivo que falta
+bool W3dRutaEsOrigenDeMalla(const std::string& ruta);
 
 // ---------------------------------------------------------------------------
 //  LO PURGADO QUE VUELVE: un material purgado queda en su cementerio y una textura purgada EN

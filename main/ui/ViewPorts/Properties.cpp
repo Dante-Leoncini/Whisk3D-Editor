@@ -38,6 +38,7 @@
 #include "io/UI2DFormato.h"    // guardar/cargar interfaces (.w3dui)
 #include "io/W3dContenedor.h"  // importar un asset = COPIARLO adentro del .w3d (ver el header)
 #include "io/MallasProyecto.h"   // tarjeta "3D Mesh": la malla como recurso (hacer unica, elegir, copiar)
+#include "config/W3dRecientes.h" // los archivos recientes (pantalla de inicio): se anotan al abrir / guardar
 #include "PopUp/UVMapaPopup.h"   // la capa UV de un mapa del material (el boton de la malla)
 #include "io/CambiosProyecto.h"  // el '*' de lo no guardado (el selector de malla, el recurso, el proyecto)
 #include "io/RaicesEditor.h"     // "Open" de una escena / un prefab de la biblioteca
@@ -54,10 +55,11 @@
 #include "objects/ObjectMode.h" // MoverSeleccionEditLocal (aplicar los campos X/Y/Z a la seleccion)
 #include "WhiskUI/draw/glesdraw.h"
 #include "WhiskUI/widgets/PopupMenu.h"
+#include "input/W3dClipboard.h"   // el menu contextual de una propiedad: copiar / pegar un numero con otras apps
 #include "PopUp/ColorPicker.h"
 #include "PopUp/FileBrowser.h" // explorador para elegir la carpeta de export
 #include "PopUp/ConfirmarPopup.h" // confirmacion de sobrescritura (render / export)
-#include "config/W3dRedPermisos.h" // la casilla de la red (tarjeta File) y el nombre del dispositivo (Ajustes)
+#include "config/W3dRedPermisos.h" // la casilla de la red (tarjeta Juego) y el nombre del dispositivo (Ajustes)
 #include "ViewPorts/TransformUI.h" // TbVerdeBg: la operacion activa del Boolean se pinta como toggle
 #include "w3dFilesystem.h" // FileExists / GetDefaultOutputDir / JoinPath (rutas de salida)
 #include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
@@ -81,6 +83,8 @@
 static void AccionRTToggle();   // tilde "Ray Tracing" (tarjeta Render)
 void RTFilasPanel(Properties* P); // muestra/oculta Rays/Samples/Passes segun g_rt.on
 static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
+static void AccionMatTransmision();   // (la Transmision de la tarjeta Material: ver abajo)
+static void AccionFondoModo(); static void AccionFondoPrincipal(); static void AccionFondoRot();   // (el FONDO: ver abajo)
 #include "objects/Mirror.h"   // pestania del Mirror (target + ejes + rect)
 #include "objects/Instance.h" // selector de target de instance/array/mirror
 #include "objects/LOD.h"      // tarjeta del objeto LOD (umbrales de distancia)
@@ -144,6 +148,9 @@ void RebindMaterialMeshPart(); // (definida mas abajo)
 static void AccionRecSeleccionarUsuarios(); // la tarjeta del RECURSO de la biblioteca (definidas junto a Rebind)
 static void AccionRecBorrar();
 static void AccionMenuRecUbicacion();
+static void AccionRecMallaTexto();
+static void AccionRecExtraer();
+static bool g_recMallaTexto = false;   // espejo del tilde "Mesh as text" de la malla elegida (ActualizarTarjetaRecurso)
 static void AccionRecAccionTipo();
 static void AccionRecParar();
 
@@ -164,7 +171,7 @@ static PopupMenu* MenuMateriales = NULL;
 // el selector de textura de una.
 Material* NuevoMaterialEnMeshPart(Mesh* mesh, int idx){
     if (!mesh || idx < 0 || idx >= (int)mesh->materialsGroup.size()) return NULL;
-    Material* mat = new Material(NombreMaterialLibre());
+    Material* mat = MaterialDeFabrica(new Material(NombreMaterialLibre()));
     mesh->materialsGroup[idx].material = mat;
     return mat;
 }
@@ -183,11 +190,11 @@ static void AccionMaterialElegido(int id){
 
     if (id == 0) {
         // nombre clasico del programa: Material, Material.001, ...
-        mesh->materialsGroup[idx].material = new Material(NombreMaterialLibre());
+        mesh->materialsGroup[idx].material = MaterialDeFabrica(new Material(NombreMaterialLibre()));
     } else if (id == 1) {
         // el material por defecto (fuera de la lista global Materials:
         // no aparece entre los "existentes")
-        if (!MaterialDefecto) MaterialDefecto = new Material("Default Material", true);
+        if (!MaterialDefecto) MaterialDefecto = MaterialDeFabrica(new Material("Default Material", true));
         mesh->materialsGroup[idx].material = MaterialDefecto;
     } else if (id >= 2 && id - 2 < (int)Materials.size()) {
         mesh->materialsGroup[idx].material = Materials[id - 2];
@@ -520,9 +527,7 @@ static void RenameIniciar(Button* boton, std::string* destino, std::string (*uni
     g_textFieldActivo = &g_renameField;
     // TACTIL (Android/Symbian): abrir el teclado QWERTY, igual que al tocar un campo de texto (antes el rename
     // enfocaba el campo pero no salia teclado -> inconsistente con render/export). En PC/web sigue el camino normal.
-#if !defined(__EMSCRIPTEN__)
-    { extern bool g_uiTapEnCurso; void QwertyAbrir(); if (g_uiTapEnCurso) QwertyAbrir(); }
-#endif
+    { extern bool g_uiTapEnCurso; void TecladoTextoAbrir(); if (g_uiTapEnCurso) TecladoTextoAbrir(); }
 }
 static void AccionRenameMeshPart(){ // las PARTES tambien son unicas dentro de la malla
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx < 0 || !PropsActivo) return;
@@ -1205,9 +1210,8 @@ static void MapaNumEditar(int k) {
     g_mapaNum.SelectAll();                     // (la 1ra tecla reemplaza)
     b->button->editField = &g_mapaNum;
     TextFieldEnfocar(&g_mapaNum);
-#if !defined(__EMSCRIPTEN__)
-    { extern bool g_uiTapEnCurso; void QwertyAbrir(); if (g_uiTapEnCurso) QwertyAbrir(); }
-#endif
+    // (es un NUMERO: el teclado numerico, no el de texto)
+    { extern bool g_uiTapEnCurso; void TecladoNumeroCampoAbrir(const std::string&); if (g_uiTapEnCurso) TecladoNumeroCampoAbrir(b->name); }
     g_redraw = true;
 }
 // (cada cuadro, Properties::Render) el campo del numero perdio el foco: se aplica lo tipeado (Esc ya lo restauro)
@@ -1860,13 +1864,15 @@ static std::string TextoBackend(){
     std::string t = w3dEngine::BackendNombre(pedido >= 0 ? pedido : activo);
     if (pedido >= 0 && pedido != activo) t += std::string(" (") + T("running") + ": " + w3dEngine::BackendNombre(activo) + ")";
     return t;
+#elif defined(__ANDROID__)
+    return "OpenGL ES 2.0";   // el APK trae uno solo (graphics/gles2: Android.mk). Antes decia "opengl"/"opengles"
 #else
     return cfg.graphicsAPI;
 #endif
 }
 static void AccionBackendElegido(int id){
-#if defined(__EMSCRIPTEN__)
-    (void)id;   // WebGL es el unico
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    (void)id;   // WebGL / OpenGL ES 2.0 es el unico
 #elif defined(W3D_MULTIBACKEND)
     if (!w3dEngine::BackendDisponible(id)) return;
     cfg.graphicsAPI = w3dEngine::BackendNombre(id);
@@ -1885,6 +1891,9 @@ static void AccionMenuBackend(){
     MenuBackend->Limpiar();
 #if defined(__EMSCRIPTEN__)
     { MenuItem* it = MenuBackend->Agregar("WebGL", 0); if (it) it->verde = true; }
+#elif defined(__ANDROID__)
+    // (el APK trae uno solo: ES 2.0. Antes ofrecia "OpenGL" y "OpenGL ES", y elegir no cambiaba nada)
+    { MenuItem* it = MenuBackend->Agregar("OpenGL ES 2.0", 0); if (it) it->verde = true; }
 #elif defined(W3D_MULTIBACKEND)
     const int pedido = w3dEngine::BackendDeNombre(cfg.graphicsAPI.c_str());
     for (int b = 0; b < w3dEngine::Backends_; b++) {
@@ -1953,6 +1962,12 @@ static void AccionMenuSkin(){
 static void AccionAntialias(){
     Notificar(T("Restart Whisk3D for this change to take effect"), false);
     g_redraw = true;
+}
+
+// Ajustes > "Use system keyboard" (cfg.tecladoSistema): el teclado en pantalla de TODOS los campos (NumPad.h,
+// TecladoTextoAbrir). Se guarda al tocarlo (como el Auto Key): es una costumbre, no algo que se prueba y se descarta
+static void AccionTecladoSistema() {
+    W3dConfigGuardar();
 }
 
 // MIPMAPPING global del editor (Ajustes; cfg.mipmaps ya lo escribio el PropBool). Se
@@ -3872,6 +3887,19 @@ static void AccionMenuFocoObj(){
     AbrirMenuBajoBoton(MenuFocoObj, PropsActivo->propBtnCamFocoObj->button);
 }
 static void AccionCamDof(){ PropertiesLayoutDirty = true; RTInvalidar(); g_redraw = true; }
+// la casilla "CAMARA ACTIVA" de la tarjeta Camara: tildada = esta camara es la activa (la de "Ver por la camara", la del
+// render, la del juego). Es LO MISMO que la tarjeta "Camara activa" de la animacion: su rombo keya el corte de la pista
+// con ESTA camara en el frame actual (ver CamCheckEstado / CamCheckToggle). Destildarla deja la escena sin camara activa
+static bool g_camEsActiva = false;   // el espejo: lo pone SincronizarCamActivaChk en cada cuadro
+static void AccionCamActivaChk(){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::camera) return;
+    if (g_camEsActiva) CameraActive = static_cast<Camera*>(ObjActivo);
+    else if (CameraActive == static_cast<Camera*>(ObjActivo)) CameraActive = NULL;
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void SincronizarCamActivaChk(){
+    g_camEsActiva = ObjActivo && ObjActivo->getType() == ObjectType::camera && CameraActive == static_cast<Camera*>(ObjActivo);
+}
 static void AccionCamDofOn(){
     // (tildar "Depth of field": la apertura, el foco y el objeto aparecen YA; el bind corre solo al cambiar de objeto)
     if (PropsActivo) { PropsActivo->target = NULL; PropsActivo->RefreshTargetProperties(); }
@@ -4461,8 +4489,7 @@ static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h
     if (it == g_videos.end()) {
         // el primer cuadro de este pase: arranca su ffmpeg
         extern int AnimFPS;
-        extern float g_renderFps;
-        const int fps = (g_renderFps > 0.0f) ? (int)(g_renderFps + 0.5f) : (AnimFPS > 0 ? AnimFPS : 24);
+        const int fps = AnimFPS > 0 ? AnimFPS : 24;   // (los de la animacion activa: los de la tarjeta Render)
         const int q = RenderCalidad();
         std::string ruta = RenderFileNamePNG(tag), seguro;
         for (size_t i = 0; i < ruta.size(); i++) { if (ruta[i] == '"') seguro += '\\'; seguro += ruta[i]; }
@@ -4665,14 +4692,13 @@ static std::string Comillas(const std::string& r) {
 }
 #endif
 namespace w3dEngine { int W3dAudioRate(); bool W3dAudioGrabar(short* out, int frames); void W3dAudioPause(bool pausa); bool W3dAudioPaused(); }
-// el RANGO de la secuencia (Inicio/Fin propios de la tarjeta Render, o los del timeline) y sus FPS
+// el RANGO de la secuencia y sus FPS: los de la escena / animacion activa (los mismos que muestra la tarjeta Render)
 static void RenderRango(int& f0, int& f1, int& fps) {
     extern int StartFrame, EndFrame, AnimFPS;
-    extern float g_renderIni, g_renderFin, g_renderFps;
-    f0 = (g_renderIni > 0.0f) ? (int)g_renderIni : StartFrame;
-    f1 = (g_renderFin > 0.0f) ? (int)g_renderFin : EndFrame;
+    f0 = StartFrame;
+    f1 = EndFrame;
     if (f1 < f0) { int t = f0; f0 = f1; f1 = t; }
-    fps = (g_renderFps > 0.0f) ? (int)(g_renderFps + 0.5f) : (AnimFPS > 0 ? AnimFPS : 24);
+    fps = AnimFPS > 0 ? AnimFPS : 24;
 }
 // el audio de la escena de f0 a f1 en un WAV (PCM de 16 bits estereo, al rate del mixer). Cuadro por cuadro: la
 // animacion en ese cuadro (los sonidos 3D y la camara se mueven), los sonidos como si sonara la escena y lo que dura
@@ -4976,7 +5002,9 @@ static void AccionRenderDesenfoque(){
 void RTFilasPanel(Properties* P){
     if (!P || !P->propRT || !P->propRTRayos) return;
     P->rtRayos = (float)g_rt.rayos; P->rtSamples = (float)g_rt.samples; P->rtPases = (float)g_rt.pases; P->rtCapas = (float)g_rt.capas;
+    P->rtRebotes = (float)g_rt.rebotes;
     if (P->propRTCapas) P->propRTCapas->value = g_rt.on ? &P->rtCapas : NULL;
+    if (P->propRTRebotes) P->propRTRebotes->value = g_rt.on ? &P->rtRebotes : NULL;
     P->propRTRayos->value   = g_rt.on ? &P->rtRayos   : NULL;
     P->propRTSamples->value = g_rt.on ? &P->rtSamples : NULL;
     P->propRTPases->value   = g_rt.on ? &P->rtPases   : NULL;
@@ -5014,7 +5042,12 @@ void RTFilasPanel(Properties* P){
         P->propRTGpu->button->text = (g_rt.gpu && RTGpuDisponible()) ? std::string("GPU (") + RTGpuNombre() + (RTGpuConNucleosRT() ? ", RTX)" : ")") : std::string("CPU");
     }
     if (P->propRTDenoiser) {
-        if (P->propRTDenoiser->oculto != !g_rt.on) { P->propRTDenoiser->oculto = !g_rt.on; PropertiesLayoutDirty = true; }
+        // (solo si en ESTA maquina hay alguno ademas de "Ninguno": en Symbian, la web o un Android sin el de la GPU la
+        //  opcion no lleva a nada. Cada uno se prueba una vez: preguntar en cada cuadro no cuesta)
+        bool hay = false;
+        for (int d = W3D_DENOISER_NINGUNO + 1; d < W3D_DENOISERS && !hay; d++) hay = W3dDenoiserDisponible(d);
+        const bool ver = g_rt.on && hay;
+        if (P->propRTDenoiser->oculto != !ver) { P->propRTDenoiser->oculto = !ver; PropertiesLayoutDirty = true; }
         P->propRTDenoiser->button->text = T(W3dDenoiserNombre(g_rt.denoiser));
     }
 }
@@ -5319,6 +5352,7 @@ static void AccionRTValores(){
     g_rt.samples = (int)(P->rtSamples + 0.5f); if (g_rt.samples < 1) g_rt.samples = 1;
     g_rt.pases = (int)(P->rtPases + 0.5f); if (g_rt.pases < 1) g_rt.pases = 1;
     g_rt.capas = (int)(P->rtCapas + 0.5f); if (g_rt.capas < 1) g_rt.capas = 1; if (g_rt.capas > 64) g_rt.capas = 64;
+    g_rt.rebotes = (int)(P->rtRebotes + 0.5f); if (g_rt.rebotes < 0) g_rt.rebotes = 0; if (g_rt.rebotes > 8) g_rt.rebotes = 8;
     RTInvalidar();
 }
 // LA VISTA con la que se renderiza (su camara, o su vista si no hay camara): la Vista 3D activa; si no hay, la primera
@@ -5428,9 +5462,14 @@ static void AccionRenderImage(){
 // "Render Animation": rendea la SECUENCIA de PNGs de StartFrame..EndFrame (loop del timeline). Cada frame evalua la
 // animacion (esqueleto + transform de objetos) y guarda base_0001.png, base_0002.png, ... (RenderFileNamePNG usa
 // CurrentFrame). Se restaura el frame al terminar.
-// RANGO DEL RENDER (tarjeta Render): propio, independiente del timeline. 0 = usar el del timeline.
-// Se guarda en el .w3d (raiz "render").
-float g_renderIni = 0.0f, g_renderFin = 0.0f, g_renderFps = 0.0f;
+// RANGO DEL RENDER (tarjeta Render): Inicio, Fin y FPS son LOS MISMOS de la escena / animacion activa (StartFrame,
+// EndFrame, AnimFPS: los del timeline y la tarjeta Animacion). Cambiarlos en un lado los cambia en el otro. (Antes el
+// render tenia un rango propio, 0 = el del timeline, y los campos se veian en cero: lo de los .w3d viejos se ignora.)
+// Espejos float propios: cada campo se sincroniza con los globales salvo mientras se lo edita (SincronizarRenderJuego)
+static float g_renderIniF = 1.0f, g_renderFinF = 250.0f, g_renderFpsF = 30.0f;
+static void AccionRenderIni(){ int v = (int)(g_renderIniF + 0.5f); if (v < 0) v = 0; AnimSetStart(v); g_redraw = true; }
+static void AccionRenderFin(){ int v = (int)(g_renderFinF + 0.5f); if (v < 1) v = 1; AnimSetEnd(v); g_redraw = true; }
+static void AccionRenderFps(){ int f = (int)(g_renderFpsF + 0.5f); if (f < 1) f = 1; if (f > 120) f = 120; AnimSetFps(f); g_renderFpsF = (float)f; g_redraw = true; }
 
 // el timeline en "Juego" (ver W3dRaices.h): un juego no tiene keyframes ni graba su pasado, asi que no hay
 // animacion que renderizar. Solo Render Image (el cuadro actual); Render Animation queda en gris.
@@ -5443,9 +5482,9 @@ static void HacerRenderAnimation(){
     extern void AplicarAnimacionObjetos();
     int w = (int)(g_render.w + 0.5f); if (w < 1) w = 1;
     int h = (int)(g_render.h + 0.5f); if (h < 1) h = 1;
-    // el rango PROPIO del render (tarjeta Render); 0 = el del timeline
-    int f0 = (g_renderIni > 0.0f) ? (int)g_renderIni : StartFrame;
-    int f1 = (g_renderFin > 0.0f) ? (int)g_renderFin : EndFrame;
+    // el rango de la escena / animacion activa (el de la tarjeta Render)
+    int f0 = StartFrame;
+    int f1 = EndFrame;
     if (f1 < f0){ int t=f0; f0=f1; f1=t; }
     int nFrames = f1 - f0 + 1;
     // barra de progreso UNICA para TODA la secuencia: total = FRAMES x PASES x TILES. Cada imagen (frame+pase)
@@ -5568,10 +5607,12 @@ static void AccionAnimDown() { Armature* a = ArmActiva(); if (a) { UndoMoverClip
 // todas las animaciones de escena, y un submenu por ARMADURA (con el nombre del esqueleto) con SUS clips. Asi las
 // animaciones de todas las armaduras estan disponibles sin tener que seleccionar el objeto.
 // ids: [0..) = escena; [BASE + armIdx*STRIDE + clipIdx] = clip. armIdx indexa g_animMenuArms (llenado al construir).
-static const int ANIM_CLIP_BASE = 100000;
-static const int ANIM_CLIP_STRIDE = 1000; // hasta 1000 clips por armadura
-static const int ANIM_VERT_BASE = 200000;   // vertex anims: [BASE + meshIdx*STRIDE + animIdx]
-static const int ANIM_ARM2D_BASE = 300000;  // clips del ARMATURE 2D: [BASE + meshIdx*STRIDE + clipIdx]
+// (STRIDE 1000 se pisaba: el clip 1000 de un armature salia como el clip 0 del siguiente, y del armature 100 en
+//  adelante se metia en las vertex anims. Ahora: 100000 clips por armature y 1000 armatures/mallas por base)
+static const int ANIM_CLIP_BASE = 100000000;
+static const int ANIM_CLIP_STRIDE = 100000; // hasta 100000 clips por armadura
+static const int ANIM_VERT_BASE = 200000000;   // vertex anims: [BASE + meshIdx*STRIDE + animIdx]
+static const int ANIM_ARM2D_BASE = 300000000;  // clips del ARMATURE 2D: [BASE + meshIdx*STRIDE + clipIdx]
 static std::vector<Mesh*> g_animMenuMeshes; // mallas (con vertex anims) en el orden del menu
 static std::vector<Mesh*> g_animMenu2D;     // mallas (con clips de armature 2D) en el orden del menu
 static std::vector<int>   g_animMenu2DArm;  // paralelo: QUE armature 2D de esa malla es cada entrada
@@ -5679,8 +5720,8 @@ static PopupMenu* AnimSubmenuPool(size_t i){ while (g_animSubmenus.size() <= i) 
 #define ANIM_ID_NEW_ARM2D  99993
 #define ANIM_ID_NEW_FLIP   99994
 #define ANIM_ID_NEW_CLIPOBJ 99995   // un CLIP DE JERARQUIA nuevo del objeto activo (animation/W3dAnimSet.h)
-static const int ANIM_FLIP_BASE = 400000;  // seleccionar un FLIPBOOK con nombre: [BASE + idx en SceneFlipbooks]
-static const int ANIM_JER_BASE  = 500000;  // un CLIP DE JERARQUIA de una raiz: [BASE + idx en g_animMenuJer]
+static const int ANIM_FLIP_BASE = 400000000;  // seleccionar un FLIPBOOK con nombre: [BASE + idx en SceneFlipbooks]
+static const int ANIM_JER_BASE  = 500000000;  // un CLIP DE JERARQUIA de una raiz: [BASE + idx en g_animMenuJer]
 // los clips de jerarquia que ofrece el selector: (raiz, clip, serie). Se rearma con el menu.
 struct AnimMenuJer { Object* raiz; W3dClipJer* clip; unsigned serie; };
 static std::vector<AnimMenuJer> g_animMenuJer;
@@ -5721,6 +5762,22 @@ static void AnimSelClipJer(int k){
     SetEscenaActiva(idx);
 }
 
+static int AnimSelIdActual();   // (mas abajo)
+// LA ANIMACION ACTIVA en VERDE (y la entrada de su submenu): con cientos de clips, el submenu abre scrolleado a ella
+// (PopupMenu::Abrir) en vez de arrancar siempre desde arriba
+static void AnimMenuMarcarActiva(PopupMenu* menu){
+    const int act = AnimSelIdActual();
+    if (act < 0) return;
+    for (size_t i=0;i<menu->items.size();i++){
+        MenuItem* it = menu->items[i];
+        if (!it) continue;
+        if (!it->submenu){ if (it->id == act) it->verde = true; continue; }
+        for (size_t k=0;k<it->submenu->items.size();k++){
+            MenuItem* s = it->submenu->items[k];
+            if (s && !s->submenu && s->id == act){ s->verde = true; it->verde = true; }
+        }
+    }
+}
 void ConstruirMenuAnim(PopupMenu* menu){
     menu->Limpiar();
     InitSceneAnimations();
@@ -5820,6 +5877,7 @@ void ConstruirMenuAnim(PopupMenu* menu){
             subN->Agregar(T("2D Armature Animation"), ANIM_ID_NEW_ARM2D, IconType::armature);
         menu->Agregar(T("New Animation"), 0, IconType::mas, subN);
     }
+    AnimMenuMarcarActiva(menu);
 }
 
 // selecciona una VERTEX ANIM en el timeline (kind 3): el rango del timeline pasa a
@@ -5891,7 +5949,14 @@ void MixEntrar();   // mas abajo (el modo Mix)
 void AnimSelPorId(int id);
 // el "Juego" del selector por su nombre (quien no conoce los ids del menu: el harness, las raices)
 void AnimSelJuego(){ AnimSelPorId(ANIM_ID_JUEGO); }
+// en un JUEGO, el usuario ELIGIO una animacion de escena (uno de sus clips) en el selector: la sesion del .w3d la nombra
+// para volver a ella al abrir. Una animacion de escena que quedo de fabrica en un juego (nunca se eligio) no cuenta: el
+// juego abre en "Juego", como siempre (y su Play corre la simulacion, no el clip)
+bool g_animEscenaElegidaEnJuego = false;
 void AnimSelPorId(int id){
+    if (id == ANIM_ID_JUEGO || id == ANIM_ID_MIX) g_animEscenaElegidaEnJuego = false;
+    else if (id < ANIM_ID_MIX || id == ANIM_ID_NEW_ESCENA || id == ANIM_ID_NEW_CLIPOBJ || id >= ANIM_JER_BASE)
+        g_animEscenaElegidaEnJuego = W3dRaizActivaEsJuego();
     // "Juego" en una ESCENA: no hay simulacion que mostrar (se convierte desde el selector de raiz)
     if (id == ANIM_ID_JUEGO && !W3dRaizActivaEsJuego() && ActiveAnimKind != 2){
         Notificar(T("This is a scene: convert it to a game to simulate it"), true);
@@ -6066,6 +6131,47 @@ static int AnimSelIdActual(){
     }
     if (ActiveAnimKind == 0) return SceneAnimActiva;
     return -1;
+}
+
+// LA SESION GUARDADA (import_w3d.cpp, al abrir): vuelve a poner en la linea de tiempo lo que se estaba editando, por
+// el MISMO camino que elegirlo en el selector (rango, pose, salir del Mix...). tipo: 1 = el clip ACTIVO de un armature
+// (su animActiva ya vino en el archivo), 3 = la animacion 'clip' de una malla, 4 = el clip activo del armature 2D
+// activo de una malla, 5 = el flipbook 'nombre'. false = ya no esta (queda la animacion de escena)
+bool AnimSelRestaurar(int tipo, Object* o, const std::string& nombre, int clip){
+    std::vector<int> ids; AnimSelIdsPlanos(ids);   // (refresca los registros g_animMenu* con los que se arma el id)
+    if (tipo == 1 && o && o->getType() == ObjectType::armature){
+        Armature* a = (Armature*)o;
+        if (a->animActiva < 0 || a->animActiva >= (int)a->animations.size()) return false;
+        for (size_t k=0;k<g_animMenuArms.size();k++)
+            if (g_animMenuArms[k] == a){ AnimSelPorId(ANIM_CLIP_BASE + (int)k*ANIM_CLIP_STRIDE + a->animActiva); return true; }
+        return false;
+    }
+    if (tipo == 3 && o && o->getType() == ObjectType::mesh){
+        Mesh* m = (Mesh*)o;
+        if (clip < 0 || clip >= (int)m->animations.size()) return false;
+        for (size_t k=0;k<g_animMenuMeshes.size();k++)
+            if (g_animMenuMeshes[k] == m){ AnimSelPorId(ANIM_VERT_BASE + (int)k*ANIM_CLIP_STRIDE + clip); return true; }
+        return false;
+    }
+    if (tipo == 4 && o && o->getType() == ObjectType::mesh){
+        Mesh* m = (Mesh*)o;
+        for (size_t k=0;k<g_animMenu2D.size();k++)
+            if (g_animMenu2D[k] == m && g_animMenu2DArm[k] == m->armature2dActivo && m->Arm2DAnimActiva() >= 0){
+                AnimSelPorId(ANIM_ARM2D_BASE + (int)k*ANIM_CLIP_STRIDE + m->Arm2DAnimActiva()); return true; }
+        return false;
+    }
+    if (tipo == 5){
+        for (size_t i=0;i<SceneFlipbooks.size();i++)
+            if (SceneFlipbooks[i] && SceneFlipbooks[i]->nombre == nombre){ AnimSelPorId(ANIM_FLIP_BASE + (int)i); return true; }
+        return false;
+    }
+    if (tipo == 10){   // la animacion de ESCENA activa de un juego (su indice ya lo repuso "animaciones"."activa")
+        if (ActiveAnimKind == 0) return true;
+        if (SceneAnimActiva < 0 || SceneAnimActiva >= (int)SceneAnimations.size()) return false;
+        AnimSelPorId(SceneAnimActiva);
+        return ActiveAnimKind == 0;
+    }
+    return false;
 }
 
 // salta a la animacion siguiente (dir>0) o anterior (dir<0) del selector, con wrap.
@@ -7527,20 +7633,6 @@ static void AccionBrowseProyCarpeta() {
     AbrirFileBrowser(T("Project folder"), T("Use this file"), ".w3d", ProyCarpetaElegida, true);
 }
 
-// FORMATO DE LAS MALLAS del proyecto (la opcion "formatoMallas" del proyecto.json, ver
-// import_w3d.h). Destildado = .w3db BINARIO, el default: abrir es leer la entrada + memcpy.
-// Tildado = .w3dm de TEXTO, para quien quiere diffs legibles. El tilde es un ESPEJO de
-// g_w3dFormatoMallasProyecto: el proyecto que se abre lo fija (ReiniciarEscena lo vuelve al
-// default) y ProyectoSincronizarCampos / ActualizarPestanias refrescan el tilde. Tocarlo
-// cambia el formato del PROXIMO guardado; el forzado del harness no se toca.
-static bool g_proyMallasTexto = false;
-static void MallasTextoRefrescar() {
-    g_proyMallasTexto = (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO);
-}
-static void AccionMallasTexto() {
-    g_w3dFormatoMallasProyecto = g_proyMallasTexto ? W3D_MALLAS_TEXTO : W3D_MALLAS_BINARIO;
-}
-
 // "Network access": el permiso de ESTE archivo para jugar en red. Lo pregunta el editor al abrir un proyecto que
 // usa la red; aca se cambia despues. No viaja con el proyecto (un archivo no se da permiso a si mismo): queda en el
 // editor (red.txt de la carpeta del usuario). Ver config/W3dRedPermisos.h
@@ -7562,8 +7654,9 @@ static void SincronizarDispositivoCampo(PropText* pt) {
 
 // llena los campos de la tarjeta desde w3dPath (al abrir/guardar/cambiar)
 void ProyectoSincronizarCampos() {
-    MallasTextoRefrescar();   // el formato de las mallas viaja con el proyecto
     RedRefrescar();           // el permiso de la red es de este archivo
+    // los ARCHIVOS RECIENTES de la pantalla de inicio: el editor quedo con este archivo (se abrio o se guardo)
+    if (!w3dPath.empty()) W3dRecientesAgregar(w3dPath);
     if (!PropsActivo) return;
     std::string dir, nom;
     if (!w3dPath.empty()) {
@@ -7599,6 +7692,13 @@ static void AccionProyAbrirElegido(const std::string& ruta) {
 static void AccionProyAbrir() {
     AbrirFileBrowser(T("Open project"), T("Open"), ".w3d", AccionProyAbrirElegido);
 }
+// el mismo explorador de "Abrir proyecto", para la pantalla de inicio ("Abrir...")
+void ProyectoAbrirDialogo() { AccionProyAbrir(); }
+// NUEVO PROYECTO: diferido al proximo frame, como abrir (import_w3d.cpp, NuevoProyectoAhora)
+static void AccionProyNuevo() {
+    extern void NuevoProyectoDesde();
+    NuevoProyectoDesde();
+}
 // valida que el proyecto tenga NOMBRE antes de guardar. Si falta, marca el campo en rojo
 // (PropText::error) + avisa por toast, y devuelve false: el caller NO guarda (antes, sin
 // nombre, caia silenciosamente en el explorador de "Guardar como" -> parecia que no pasaba nada).
@@ -7630,47 +7730,6 @@ static void AccionProyVersion() {
     ProyectoSincronizarCampos();   // el boton pasa a "Guardar version v(N+1)"
 }
 
-// ===== EXTRAER LOS ASSETS: sacar lo de adentro del .w3d a una carpeta del disco
-//  para editarlo con otro programa (Krita, Audacity, un editor de texto).
-//
-//  Es la contraparte de "importar": importar mete lo de afuera adentro; extraer
-//  saca una copia hacia afuera. NO cambia nada del proyecto (el .w3d queda igual
-//  y las referencias siguen siendo internas): lo que sale es una COPIA, y para
-//  que un cambio vuelva hay que volver a importarlo. Se dice asi en el toast,
-//  porque lo contrario ("edito el png extraido y el juego cambia solo") seria la
-//  expectativa razonable y es justo lo que NO pasa.
-//
-//  Si lo que queres es que un archivo viva AFUERA de forma permanente (una
-//  textura que editas todo el tiempo con otro programa), eso es otra cosa: se
-//  referencia como externa y el .w3d guarda la ruta (ver W3dRefExternaMarcar en
-//  io/W3dContenedor.h). Ahi si, editar el archivo cambia el proyecto.
-static void ProyExtraerCarpetaElegida(const std::string& elegido) {
-    if (elegido.empty()) return;
-    std::string dir = w3dFileSystem::IsDir(elegido) ? elegido : w3dFileSystem::ParentPath(elegido);
-    if (dir.empty()) return;
-    std::vector<std::string> ents;
-    W3dContenedorListarCarpeta("", ents);      // "" = todas las entradas
-    int sacados = 0, fallados = 0;
-    for (size_t i = 0; i < ents.size(); i++) {
-        if (W3dEsEntradaDeServicio(ents[i])) continue;   // mimetype/LEEME/EXTERNOS: no son assets
-        // W3dContenedorExtraer crea las carpetas del destino ("texturas/") solo
-        if (W3dContenedorExtraer(ents[i], dir + "/" + ents[i])) { sacados++; W3dDescargarSiWeb(dir + "/" + ents[i]); } else fallados++;
-    }
-    char b[512];   // (las traducciones en cirilico ocupan el doble de bytes)
-    if (fallados)
-        snprintf(b, sizeof(b), T("Extracted %d file(s); %d failed (see the log)"), sacados, fallados);
-    else
-        snprintf(b, sizeof(b), T("Extracted %d file(s). They are COPIES: for a change to go back into the "
-                                 "project you have to import it again"), sacados);
-    Notificar(b, fallados != 0);
-}
-static void AccionProyExtraer() {
-    if (!W3dContenedorHayMontado()) {
-        Notificar(T("Extract: save the project first (the assets live inside the .w3d)"), true);
-        return;
-    }
-    AbrirFileBrowser(T("Extract the assets to..."), T("Use this file"), "", ProyExtraerCarpetaElegida, true);
-}
 
 
 // ROMBO de keyframe del panel: opera sobre el OBJETO ACTIVO en el FRAME ACTUAL.
@@ -7679,10 +7738,48 @@ static void AccionProyExtraer() {
 static int CamActivaEstado(){
     AnimProperty* ap = W3dCamPista(SceneAnimActiva, false);
     const char* pista = W3dCamEnFrame(SceneAnimActiva, CurrentFrame);
-    if (!ap || !pista) return CameraActive ? 3 : 0;          // sin pista: cualquier camara es un "cambio" a guardar
+    // SIN PISTA (lo de siempre al arrancar: ninguna camara activa esta animada) no hay nada que marcar. Antes salia en
+    // verde "cambio sin guardar" como si hubiera un keyframe; la camara activa se cambia cuando se quiera
+    if (!ap || ap->keyframes.empty() || !pista) return 0;
     if (!CameraActive || CameraActive->name != pista) return 3;
     for (size_t i = 0; i < ap->keyframes.size(); i++) if (ap->keyframes[i].frame == CurrentFrame) return 2;
     return 1;
+}
+// el rombo de la casilla "Camara activa" de UNA camara (la tarjeta Camara): 0 = la pista no la nombra nunca; 1 = tiene
+// algun corte (verde oscuro); 2 = hay un corte con ella en este frame (verde); 3 = la casilla no dice lo que dice la
+// pista en este frame (cambio sin guardar: un click lo keya)
+static int CamCheckEstado(Object* o){
+    AnimProperty* ap = W3dCamPista(SceneAnimActiva, false);
+    if (!o || o->getType() != ObjectType::camera || !ap || ap->keyframes.empty()) return 0;
+    const char* pista = W3dCamEnFrame(SceneAnimActiva, CurrentFrame);
+    const bool esActiva = CameraActive == static_cast<Camera*>(o);
+    const bool laPistaDiceEsta = pista && o->name == pista;
+    for (size_t i = 0; i < ap->keyframes.size(); i++)
+        if (ap->keyframes[i].frame == CurrentFrame && laPistaDiceEsta) return esActiva ? 2 : 3;
+    if (esActiva != laPistaDiceEsta) return 3;
+    for (size_t i = 0; i < ap->keyframes.size(); i++) {
+        const char* n = W3dCamEnFrame(SceneAnimActiva, ap->keyframes[i].frame);
+        if (n && o->name == n) return 1;
+    }
+    return 0;
+}
+// su rombo: con un corte de ESTA camara en este frame, lo saca; si no, la hace la activa y pone el corte aca
+static void CamCheckToggle(Object* o){
+    if (!o || o->getType() != ObjectType::camera) return;
+    if (ActiveAnimKind == 2) { Notificar(T("A game has no keyframes: choose one of its clips in the timeline to animate"), true); return; }
+    UndoKeyframesIniciar();
+    AnimProperty* ap = W3dCamPista(SceneAnimActiva, false);
+    bool saco = false;
+    if (ap) for (size_t i = 0; i < ap->keyframes.size(); i++) {
+        if (ap->keyframes[i].frame != CurrentFrame) continue;
+        const char* n = W3dCamEnFrame(SceneAnimActiva, CurrentFrame);
+        if (n && o->name == n) { ap->keyframes.erase(ap->keyframes.begin() + i); saco = true; }
+        break;
+    }
+    if (saco) W3dCamActivaAplicar(SceneAnimActiva, CurrentFrame);   // la pista vuelve a mandar
+    else { CameraActive = static_cast<Camera*>(o); W3dCamKey(SceneAnimActiva, CurrentFrame, o->name); }
+    UndoKeyframesConfirmar();
+    PropertiesLayoutDirty = true; g_redraw = true;
 }
 static void CamActivaToggle(){
     // "Juego" no tiene keyframes (ver KeysEnJuego en ObjectMode.cpp): el corte iba a parar al ultimo clip elegido
@@ -7703,13 +7800,20 @@ static void CamActivaToggle(){
 }
 static int PropKeyEstadoHook(int prop, int comp){
     if (ActiveAnimKind == 2) return 0;   // "Juego": los rombos no muestran keyframes (no tiene)
-    if (prop == AnimCamActiva) return CamActivaEstado();
+    if (prop == AnimCamActiva) return comp == AnimY ? CamCheckEstado(ObjActivo) : CamActivaEstado();
     extern int AnimCanalEstado(Object*, int, int, int);
+    // el FONDO (tarjeta Render): sus curvas son de la COLECCION de la escena, no del objeto elegido
+    if (prop == AnimFondo || prop == AnimFondoRot || prop == AnimFondoTex)
+        return SceneCollection ? AnimCanalEstado(SceneCollection, prop, prop == AnimFondo ? AnimX : comp, CurrentFrame) : 0;
     return ObjActivo ? AnimCanalEstado(ObjActivo, prop, comp, CurrentFrame) : 0;
 }
 static void PropKeyToggleHook(int prop, int comp){
-    if (prop == AnimCamActiva) { CamActivaToggle(); return; }
+    if (prop == AnimCamActiva) { if (comp == AnimY) CamCheckToggle(ObjActivo); else CamActivaToggle(); return; }
     extern void AnimCanalToggle(Object*, int, int, int);
+    if (prop == AnimFondo || prop == AnimFondoRot || prop == AnimFondoTex) {   // el FONDO: en la coleccion de la escena
+        if (SceneCollection) { AnimCanalToggle(SceneCollection, prop, comp, CurrentFrame); PropertiesLayoutDirty = true; g_redraw = true; RTInvalidar(); }
+        return;
+    }
     if (ObjActivo){ AnimCanalToggle(ObjActivo, prop, comp, CurrentFrame);
                     PropertiesLayoutDirty = true; g_redraw = true; }
 }
@@ -8917,6 +9021,18 @@ void Properties::ConstruirGrupos(){
     propRecUbicacion->action = AccionMenuRecUbicacion;
     propRecUbicacion->oculto = true;
     propRecurso->properties.push_back(propRecUbicacion);
+    // (MALLA 3D) en que formato se guarda: tildado = texto (.w3dm, legible: diffs), destildado = binario (.w3db, el
+    // default: abrir es leer y copiar). Antes era una opcion de todo el proyecto en la tarjeta Archivo
+    propRecMallaTexto = new PropBool(T("Mesh as text"));
+    propRecMallaTexto->value = NULL;   // (un PropBool sin valor no ocupa fila: se le da al elegir una malla)
+    propRecMallaTexto->onChange = AccionRecMallaTexto;
+    propRecurso->properties.push_back(propRecMallaTexto);
+    // EXTRAER: una copia de su archivo (el de adentro del .w3d) a una carpeta, para editarlo afuera. Antes era
+    // "Extract assets" de la tarjeta Archivo (sacaba todos)
+    propRecExtraer = new PropButton(T("Extract"), IconType::carpeta);
+    propRecExtraer->action = AccionRecExtraer;
+    propRecExtraer->oculto = true;
+    propRecurso->properties.push_back(propRecExtraer);
     propRecPreview = new PropImagen(T("Preview"));
     propRecurso->properties.push_back(propRecPreview);
     // lo del tipo: escuchar/parar un sonido, abrir una escena/prefab, abrir un script en el IDE
@@ -8998,9 +9114,13 @@ void Properties::ConstruirGrupos(){
         // TRANSMISION: cuanto de la superficie es vidrio (la luz pasa doblada por el IOR); va arriba del IOR
         propMatTrans = new PropFloat(T("Transmission")); propMatTrans->SetRango(0.0f, 1.0f);
         propMatTrans->stepFino = 0.05f; propMatTrans->stepGrueso = 0.1f; propMatTrans->dragStep = 0.01f;
-        propMatTrans->onChange = AccionRTValores;
+        propMatTrans->onChange = AccionMatTransmision;
         propMaterial->properties.push_back(propMatTrans);
         propMaterial->properties.push_back(propMatIOR);
+        // REFLEJOS EN PANTALLA: lo dibujado se refleja (segun la rugosidad, el metalico y el angulo). Con shaders
+        propMatSSR = new PropBool(T("Screen Space Reflections"));
+        propMatSSR->onChange = AccionRTValores;
+        propMaterial->properties.push_back(propMatSSR);
     }
     // Se CONSTRUYE todo primero (el bind es por member, no importa el orden de construccion); el PUSH define el
     // orden VISUAL, que se reorganizo: Lighting arriba de todo, Vertex Color sobre Base Color, y los
@@ -9219,6 +9339,13 @@ void Properties::ConstruirGrupos(){
     // pestania de CAMARA: lente (ortografica/perspectiva + fov) + target (look-at)
     propCamera = new GroupPropertie(T("Camera"));
     propCamera->reservaKeyBtn = true;   // columna del rombo de keyframe (el fov es animable)
+    // CAMARA ACTIVA (animable: el rombo keya el corte de la pista "Camara activa" con ESTA camara; animComp = AnimY dice
+    // "esta camara", la tarjeta de la animacion usa AnimX = "la activa")
+    propCamActivaChk = new PropBool(T("Active camera"));
+    propCamActivaChk->value = &g_camEsActiva;
+    propCamActivaChk->onChange = AccionCamActivaChk;
+    propCamActivaChk->animProp = AnimCamActiva; propCamActivaChk->animComp = AnimY;
+    propCamera->properties.push_back(propCamActivaChk);
     propCamOrtho = new PropBool(T("Orthographic"));
     propCamera->properties.push_back(propCamOrtho);
     propCamFov = new PropFloat(T("FOV"));
@@ -9699,6 +9826,10 @@ void Properties::ConstruirGrupos(){
     // ===== tarjeta ARCHIVO (pestania Render, PRIMERA): el proyecto .w3d =====
     propArchivo = new GroupPropertie(T("File"));
     propArchivo->anchoValores = 0.62f;   // columna ancha (paths)
+    // NUEVO PROYECTO: la escena con la que arranca el editor, sin archivo (con algo sin guardar pregunta primero)
+    propProyNuevo = new PropButton(T("New project"), IconType::mas);
+    propProyNuevo->action = AccionProyNuevo;
+    propArchivo->properties.push_back(propProyNuevo);
     propProyAbrir = new PropButton(T("Open project"), IconType::carpeta);
     propProyAbrir->action = AccionProyAbrir;
     propArchivo->properties.push_back(propProyAbrir);
@@ -9724,23 +9855,8 @@ void Properties::ConstruirGrupos(){
     propProyComo = new PropButton(T("Save As"), IconType::guardar);
     propProyComo->action = AccionProyComo;
     propArchivo->properties.push_back(propProyComo);
-    // EXTRAER: los assets de adentro del .w3d a una carpeta, para editarlos afuera
-    propProyExtraer = new PropButton(T("Extract assets"), IconType::carpeta);
-    propProyExtraer->action = AccionProyExtraer;
-    propArchivo->properties.push_back(propProyExtraer);
-    // como se GUARDAN las mallas del proyecto: binario (.w3db, destildado) o texto (.w3dm).
-    // Viaja con el proyecto ("formatoMallas" del proyecto.json); ver AccionMallasTexto.
-    propProyMallasTexto = new PropBool(T("Meshes as text"));
-    MallasTextoRefrescar();
-    propProyMallasTexto->value = &g_proyMallasTexto;
-    propProyMallasTexto->onChange = AccionMallasTexto;
-    propArchivo->properties.push_back(propProyMallasTexto);
-    // el permiso de la RED de este archivo (lo pregunta el editor al abrirlo; aca se cambia despues)
-    propProyRed = new PropBool(T("Network access"));
-    RedRefrescar();
-    propProyRed->value = &g_proyRed;
-    propProyRed->onChange = AccionProyRed;
-    propArchivo->properties.push_back(propProyRed);
+    // (EXTRAER los assets y MALLAS EN TEXTO se fueron de aca: son de cada recurso, en su tarjeta Recurso. El permiso
+    // de la RED se fue a la tarjeta Juego.)
     GroupProperties.push_back(propArchivo);
 
 
@@ -9820,6 +9936,11 @@ void Properties::ConstruirGrupos(){
     propRTCapas = new PropFloat(T("Transparency layers")); propRTCapas->SetRango(1.0f, 64.0f); propRTCapas->entero = true;
     propRTCapas->stepFino = 1.0f; propRTCapas->stepGrueso = 4.0f; propRTCapas->dragStep = 1.0f; propRTCapas->onChange = AccionRTValores;
     propRender->properties.push_back(propRTCapas);
+    // los REBOTES DE LA LUZ: 0 (de fabrica) = solo la luz directa; con mas, la luz rebota en varias superficies antes
+    // de ir a la luz (cada rebote suma ruido: hacen falta mas pases)
+    propRTRebotes = new PropFloat(T("Light bounces")); propRTRebotes->SetRango(0.0f, 8.0f); propRTRebotes->entero = true;
+    propRTRebotes->stepFino = 1.0f; propRTRebotes->stepGrueso = 1.0f; propRTRebotes->dragStep = 1.0f; propRTRebotes->onChange = AccionRTValores;
+    propRender->properties.push_back(propRTRebotes);
     propRTEscala = new PropButton(T("Upscaling"));
     propRTEscala->conLabel = true;
     propRTEscala->button->desplegable = true;
@@ -9863,10 +9984,27 @@ void Properties::ConstruirGrupos(){
     propRTDenoiser->action = AccionMenuDenoiser;
     propRender->properties.push_back(propRTDenoiser);
     RTFilasPanel(this); // bindea (o esconde) las filas segun el estado inicial
-    // color de FONDO del render (global g_renderBg, solo para el pase Rendered). Se edita con el color picker.
-    propRenderBg = new PropColor(T("Background"));
-    propRenderBg->value = g_renderBg; // el array global decae a puntero (igual que los colores de material/luz)
+    // EL FONDO del render (la vista Render, el render a archivo y el trazado de rayos): un COLOR o una TEXTURA 360
+    // (equirectangular), con el boton de la derecha, como un mapa del material. Con textura, su ROTACION. Todo se anima:
+    // el rombo del fondo keyea el color y QUE fondo es; los de la rotacion, cada eje (las curvas son de la coleccion)
+    propRender->reservaKeyBtn = true;
+    propRenderBg = new PropButton(T("Background"));
+    propRenderBg->conLabel = true;
+    propRenderBg->AgregarExtra(IconType::numero, AccionFondoModo, "Color / Texture");
+    propRenderBg->action = AccionFondoPrincipal;
+    propRenderBg->animProp = AnimFondo; propRenderBg->animComp = AnimX;
     propRender->properties.push_back(propRenderBg);
+    { const char* ejes[3] = { "Rotation X", "Y", "Z" };
+      for (int k = 0; k < 3; k++) {
+          PropFloat* pr = new PropFloat(T(ejes[k]), "\xC2\xB0");
+          pr->value = &g_renderBgRot[k];
+          pr->stepFino = 1.0f; pr->stepGrueso = 15.0f; pr->dragStep = 1.0f;
+          pr->onChange = AccionFondoRot;
+          pr->animProp = AnimFondoRot; pr->animComp = AnimX + k;
+          pr->value = NULL;   // (se ve solo con textura: SincronizarFondo)
+          propRenderBgRot[k] = pr;
+          propRender->properties.push_back(pr);
+      } }
     // MIPMAPPING del PROYECTO: el estado vigente (el .w3d lo declara en su cabecera y
     // GuardarW3D escribe `mipmaps: false` si esta apagado). ActualizarPropiedades lo
     // sincroniza con MipmapsGlobal al cambiar de proyecto.
@@ -9901,16 +10039,19 @@ void Properties::ConstruirGrupos(){
     PropButton* pbRenderImg = new PropButton(T("Render Image"), IconType::foto); // foto: renderiza una imagen
     pbRenderImg->action = AccionRenderImage;
     // (el boton va abajo de todo, con Renderizar Animacion y Renderizar audio: ver propBtnAnimRender)
-    // la SECUENCIA: rango y fps PROPIOS del render (0 = los del timeline). Antes el render usaba el rango de la
-    // animacion activa, que es de EDICION: ahora la tarjeta Animacion vive en su pestania y el render tiene el suyo.
+    // la SECUENCIA: el rango y los fps de la escena / animacion activa (los mismos del timeline y de la tarjeta
+    // Animacion: cambiar uno cambia el otro)
     propRenderIni = new PropFloat(T("Start"));
-    propRenderIni->SetRango(0.0f, 100000.0f); propRenderIni->entero = true; propRenderIni->value = &g_renderIni;
+    propRenderIni->SetRango(0.0f, 100000.0f); propRenderIni->entero = true; propRenderIni->value = &g_renderIniF;
+    propRenderIni->stepFino = 1; propRenderIni->stepGrueso = 10; propRenderIni->dragStep = 1; propRenderIni->onChange = AccionRenderIni;
     propRender->properties.push_back(propRenderIni);
     propRenderFin = new PropFloat(T("End"));
-    propRenderFin->SetRango(0.0f, 100000.0f); propRenderFin->entero = true; propRenderFin->value = &g_renderFin;
+    propRenderFin->SetRango(1.0f, 100000.0f); propRenderFin->entero = true; propRenderFin->value = &g_renderFinF;
+    propRenderFin->stepFino = 1; propRenderFin->stepGrueso = 10; propRenderFin->dragStep = 1; propRenderFin->onChange = AccionRenderFin;
     propRender->properties.push_back(propRenderFin);
     propRenderFps = new PropFloat(T("FPS"));
-    propRenderFps->SetRango(0.0f, 240.0f); propRenderFps->entero = true; propRenderFps->value = &g_renderFps;
+    propRenderFps->SetRango(1.0f, 120.0f); propRenderFps->entero = true; propRenderFps->value = &g_renderFpsF;
+    propRenderFps->stepFino = 1; propRenderFps->stepGrueso = 5; propRenderFps->dragStep = 1; propRenderFps->onChange = AccionRenderFps;
     propRender->properties.push_back(propRenderFps);
     GroupProperties.push_back(propRender);
 
@@ -10187,6 +10328,13 @@ void Properties::ConstruirGrupos(){
     propJuegoSonido = new PropBool(T("Use sound"));
     propJuegoSonido->value = &g_proyCompilar.usarSonido;
     propJuego->properties.push_back(propJuegoSonido);
+    // el permiso de la RED de este archivo para jugar en red (lo pregunta el editor al abrirlo; aca se cambia despues).
+    // Antes estaba en la tarjeta Archivo
+    propProyRed = new PropBool(T("Network access"));
+    RedRefrescar();
+    propProyRed->value = &g_proyRed;
+    propProyRed->onChange = AccionProyRed;
+    propJuego->properties.push_back(propProyRed);
     // volumen del gameplay 0..100 (audio del juego): baja/sube en vivo (onChange aplica la ganancia al mixer).
     { PropFloat* pV = new PropFloat(T("Volume"), "%");
       pV->SetRango(0.0f, 100.0f); pV->entero = true;
@@ -10359,6 +10507,15 @@ void Properties::ConstruirGrupos(){
     propAjLogs->button->desplegable = true;
     propAjLogs->action = AccionMenuLogs;
     propAjustes->properties.push_back(propAjLogs);
+
+    // EL TECLADO EN PANTALLA: destildado = los de Whisk3D en todos lados (texto y numeros); tildado = el del sistema
+    { PropBool* pk = new PropBool(T("Use system keyboard"));
+      pk->value = &cfg.tecladoSistema;
+      pk->onChange = AccionTecladoSistema;
+#ifdef W3D_SYMBIAN
+      pk->oculto = true;   // (el N95 no tiene teclado del sistema en pantalla)
+#endif
+      propAjustes->properties.push_back(pk); }
 
     // RAIZ DEL REPO para Compilar: solo hace falta cuando el editor corre INSTALADO (sin el repo al lado).
     // El que compila juegos pega aca la ruta a la carpeta del repo (la que tiene libs/Whisk3DCore) y con
@@ -11014,6 +11171,60 @@ static void RecBorrarConfirmado() {
 }
 // "Delete": un huerfano se confirma; uno EN USO avisa CUANTOS lo usan y ofrece borrarlo igual (sus usuarios
 // quedan sin el, con Ctrl+Z) o cancelar
+// MALLA EN TEXTO (tarjeta del recurso): el formato con que se guarda ESA malla. Queda pendiente hasta guardar
+// (el '*' del titulo lo marca: io/CambiosProyecto.cpp, FirmaMalla)
+static void AccionRecMallaTexto() {
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id) || v != W3D_VISTA_MALLAS) return;
+    W3dMallaRecursoFijarTexto(W3dMallaRecursoPorNombre(id), g_recMallaTexto);
+    g_redraw = true;
+}
+// ===== EXTRAER (tarjeta del recurso): sacar su archivo de adentro del .w3d a una carpeta del disco
+//  para editarlo con otro programa (Krita, Audacity, un editor de texto).
+//
+//  Es la contraparte de "importar": importar mete lo de afuera adentro; extraer
+//  saca una copia hacia afuera. NO cambia nada del proyecto (el .w3d queda igual
+//  y las referencias siguen siendo internas): lo que sale es una COPIA, y para
+//  que un cambio vuelva hay que volver a importarlo. Se dice asi en el toast,
+//  porque lo contrario ("edito el png extraido y el juego cambia solo") seria la
+//  expectativa razonable y es justo lo que NO pasa.
+//
+//  Si lo que queres es que un archivo viva AFUERA de forma permanente (una
+//  textura que editas todo el tiempo con otro programa), eso es otra cosa: se
+//  referencia como externa y el .w3d guarda la ruta (ver W3dRefExternaMarcar en
+//  io/W3dContenedor.h). Ahi si, editar el archivo cambia el proyecto.
+//  (Antes era "Extract assets" de la tarjeta Archivo y sacaba TODO; ahora es de cada recurso.)
+static std::string gRecExtraerEntrada;
+// saca la entrada 'entrada' del .w3d montado a la carpeta de 'elegido' (una carpeta, o un archivo de esa carpeta) con
+// su mismo nombre. Devuelve la ruta escrita ("" = no se pudo). Tambien la usa el harness (recextraer)
+std::string RecursoExtraerEntrada(const std::string& entrada, const std::string& elegido) {
+    if (elegido.empty() || entrada.empty()) return std::string();
+    const std::string dir = w3dFileSystem::IsDir(elegido) ? elegido : w3dFileSystem::ParentPath(elegido);
+    if (dir.empty()) return std::string();
+    const size_t b = entrada.find_last_of('/');
+    const std::string destino = dir + "/" + (b == std::string::npos ? entrada : entrada.substr(b + 1));
+    if (!W3dContenedorExtraer(entrada, destino)) {
+        Notificar(std::string(T("Could not extract")) + ": " + entrada, true);
+        return std::string();
+    }
+    W3dDescargarSiWeb(destino);
+    Notificar(std::string(T("Extracted")) + ": " + destino + ". " +
+              T("It is a COPY: for a change to go back into the project you have to import it again"), false);
+    return destino;
+}
+static void RecExtraerCarpetaElegida(const std::string& elegido) { RecursoExtraerEntrada(gRecExtraerEntrada, elegido); }
+static void AccionRecExtraer() {
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) return;
+    W3dRecursoItem it;
+    if (!W3dVistaRecInfo(v, id, &it)) return;
+    if (!W3dContenedorHayMontado() || it.entrada.empty()) {
+        Notificar(T("Extract: save the project first (the assets live inside the .w3d)"), true);
+        return;
+    }
+    gRecExtraerEntrada = it.entrada;
+    AbrirFileBrowser(T("Extract to..."), T("Use this file"), "", RecExtraerCarpetaElegida, true);
+}
 static void AccionRecBorrar() {
     int v = -1; std::string id;
     if (!W3dRecursoActivo(&v, &id)) return;
@@ -11213,6 +11424,20 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
         if (p->propRecUbicacion->oculto != o) { p->propRecUbicacion->oculto = o; PropertiesLayoutDirty = true; }
         const std::string t = u == 1 ? T("External") : T("Inside the .w3d");
         if (p->propRecUbicacion->button->text != t) { p->propRecUbicacion->button->text = t; g_redraw = true; }
+    }
+    // MALLA EN TEXTO: solo las mallas 3D del proyecto (una de libreria no la escribe este proyecto)
+    if (p->propRecMallaTexto) {
+        MallaRecurso* mr = (vista == W3D_VISTA_MALLAS) ? W3dMallaRecursoPorNombre(id) : NULL;
+        const bool o = !mr || it.soloLectura || !mr->libreria.empty();
+        bool* v = o ? NULL : &g_recMallaTexto;   // (sin valor = oculto: no ocupa fila)
+        if (p->propRecMallaTexto->value != v) { p->propRecMallaTexto->value = v; PropertiesLayoutDirty = true; }
+        if (mr) { const bool t = W3dMallaRecursoEnTexto(mr); if (g_recMallaTexto != t) { g_recMallaTexto = t; g_redraw = true; } }
+    }
+    // EXTRAER: los que tienen su archivo ADENTRO del .w3d guardado (uno externo ya esta afuera)
+    if (p->propRecExtraer) {
+        const bool o = vista == W3D_VISTA_MATERIALES || it.entrada.empty() || !W3dContenedorHayMontado() ||
+                       W3dVistaRecUbicacion(vista, id) == 1;
+        if (p->propRecExtraer->oculto != o) { p->propRecExtraer->oculto = o; PropertiesLayoutDirty = true; }
     }
     if (p->propRecPreview) {
         Texture* t = (vista == W3D_VISTA_TEXTURAS) ? W3dRecursoActivoTextura() : NULL;
@@ -11728,7 +11953,9 @@ void Properties::Rebind(){
     // LOS MAPAS del trazado de rayos: solo con "Ray Tracing" prendido (sin el, lo que se ve es lo que GL ES 1.1 puede
     // dibujar). El icono del primer boton chico dice que usa (numero o textura); el boton grande, la textura o el numero
     {
-        const bool rt = g_rt.on && !esDefault && material;
+        // (la TRANSMISION y su IOR ya no son solo del trazado de rayos: la luz PBR de los shaders -GLES2, WebGL, Vulkan- los
+        //  usa, y el pipeline fijo baja la opacidad con la transmision. Se ven siempre)
+        const bool rt = !esDefault && material;
         const bool hayMat = !esDefault && material;
         for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) {
             PropButton* b = propMapa[k];
@@ -11770,6 +11997,7 @@ void Properties::Rebind(){
         // el IOR: con transmision (la parte de vidrio) o con lo transparente por alfa (como antes de la transmision)
         if (propMatIOR) propMatIOR->value = (!rt || !(material->transmision > 0.0f || material->transparent)) ? NULL : &material->ior;
         if (propMatTrans) propMatTrans->value = rt ? &material->transmision : NULL;
+        if (propMatSSR) propMatSSR->value = (rt && w3dEngine::SombreadoPorPixelSoportado()) ? &material->ssr : NULL;
     }
     // CAPAS DE TEXTURA: una fila por capa + la de "Add Layer" (si quedan filas); el resto oculto
     if (propCapasTitulo) {
@@ -11866,12 +12094,17 @@ static PropColor* gColorAbierto = NULL;
 static int gColorSelSx = 0, gColorSelSy = 0;
 
 // la tarjeta Render en un JUEGO (timeline en "Juego"): no hay animacion que renderizar, asi que no hay rango
-// (Inicio/Fin se ocultan) y Render Animation queda en gris; solo Render Image. Fuera del juego, el rango de siempre.
+// (Inicio/Fin se ocultan) y Render Animation queda en gris; solo Render Image. Fuera del juego, el rango de la escena /
+// animacion activa: Inicio, Fin y FPS siguen a StartFrame, EndFrame y AnimFPS (salvo el campo que se esta editando)
 static void SincronizarRenderJuego(Properties* P){
     if (!P || !P->propRenderIni || !P->propRenderFin) return;
+    extern int StartFrame, EndFrame, AnimFPS;
+    if (g_propFloatEditando != P->propRenderIni) g_renderIniF = (float)StartFrame;
+    if (g_propFloatEditando != P->propRenderFin) g_renderFinF = (float)EndFrame;
+    if (P->propRenderFps && g_propFloatEditando != P->propRenderFps) g_renderFpsF = (float)AnimFPS;
     const bool juego = RenderEsJuego();
-    float* vIni = juego ? NULL : &g_renderIni;
-    float* vFin = juego ? NULL : &g_renderFin;
+    float* vIni = juego ? NULL : &g_renderIniF;
+    float* vFin = juego ? NULL : &g_renderFinF;
     if (P->propRenderIni->value != vIni || P->propRenderFin->value != vFin) {
         P->propRenderIni->value = vIni; P->propRenderFin->value = vFin;
         PropertiesLayoutDirty = true; g_redraw = true;
@@ -11886,6 +12119,7 @@ void Properties::RefreshTargetProperties(){
     SincronizarAnimFps(); // el campo "FPS" refleja el AnimFPS real (el import lo pone al fps del archivo)
     SincronizarCamposRender(this);   // Ruta y Nombre del render <-> g_render
     SincronizarRenderJuego(this);   // un juego no tiene animacion: sin rango y Render Animation en gris
+    SincronizarCamActivaChk();      // la casilla "Camara activa" de la tarjeta Camara (la pista la puede cambiar)
     // al cerrarse el picker, la fila del color pierde el borde verde
     if (gColorAbierto && !PopUpActive) {
         gColorAbierto->editando = false;
@@ -12853,7 +13087,7 @@ Properties::Properties() : ViewportBase() {
     propS9EscBorde = NULL; propS9Rot = NULL; propS9Ancla = NULL; propS9Opac = NULL;
     propS9Color = NULL; propImgFiltro = NULL; propS9Filtro = NULL;
     propCamera = NULL;
-    propCamOrtho = NULL; propCamFov = NULL; propCamNear = NULL; propCamFar = NULL;
+    propCamActivaChk = NULL; propCamOrtho = NULL; propCamFov = NULL; propCamNear = NULL; propCamFar = NULL;
     propCamDof = NULL; propCamFStop = NULL; propCamFoco = NULL; propBtnCamFocoObj = NULL;
     propInstance = NULL;
     propLOD = NULL; propLodDist = NULL;           // objeto LOD (umbrales de distancia)
@@ -12923,7 +13157,7 @@ Properties::Properties() : ViewportBase() {
     propBtnTextura = NULL;
     propBtnNormalTex = NULL; // (faltaba: normal map UI)
     for (int k = 0; k < 8; k++) propMapa[k] = NULL;
-    propMatIOR = NULL; propMatTrans = NULL;
+    propMatIOR = NULL; propMatTrans = NULL; propMatSSR = NULL;
     propMatShaderOn = NULL; propBtnShader = NULL; propBtnShaderComp = NULL; propMatShaderMsg = NULL;
     propBtnTexB = NULL; propMatMezclaB = NULL;   // (mezcla de texturas)
     propBtnReflectMode = NULL; // dropdown del modo de Reflection
@@ -12932,13 +13166,14 @@ Properties::Properties() : ViewportBase() {
     propLightDir = NULL; propLightTipo = NULL; propLightIgnOrden = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
     propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightIntens = NULL; propLightSpotExp = NULL; propLightDist = NULL;
     propLightRTRadio = NULL; propLightRTRayos = NULL;
-    propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL; propRTCapas = NULL; propRTGpu = NULL; propRTSoloFinal = NULL; propRTSemilla = NULL;
+    propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL; propRTCapas = NULL; propRTRebotes = NULL; propRTGpu = NULL; propRTSoloFinal = NULL; propRTSemilla = NULL;
     propRTDesenfoque = NULL; propRTObturador = NULL; propRTObtPos = NULL;
     renderGenVisto = 0;
     propPost = NULL; propPostOn = NULL; propPostCPU = NULL; propListPost = NULL; propRowPost = NULL; propRowPostMove = NULL;
     propPostActivo = NULL; propPostGranoInt = NULL; propPostGranoTam = NULL; propPostGranoColor = NULL;
     propPostFocoDist = NULL; propPostFocoRango = NULL; propPostFocoDesenf = NULL; propPostFocoCam = NULL; propPostMovObt = NULL; for (int k = 0; k < 6; k++) propPostBloom[k] = NULL; propPostBloomColor = NULL; propPostBloomRapido = NULL; propRTEscala = NULL; propRTReesc = NULL; propRTDenoiser = NULL;
     rtRayos = (float)g_rt.rayos; rtSamples = (float)g_rt.samples; rtPases = (float)g_rt.pases; rtCapas = (float)g_rt.capas;
+    rtRebotes = (float)g_rt.rebotes;
     propEditItem = NULL; editPosX = editPosY = editPosZ = 0.0f;
     propUVTransform = NULL; uvPosU = uvPosV = 0.0f; // tarjeta "Transform UV" (pestania Transformar)
     propUVMaps = NULL; propColorLayers = NULL; propVertexGroups = NULL; propUVGroups = NULL; propModifiers = NULL;
@@ -12982,6 +13217,7 @@ Properties::Properties() : ViewportBase() {
     propMaterial = NULL; propBtnRenameMat = NULL;
     propRecurso = NULL; propRecNombre = NULL; propRecCarpeta = NULL; propRecTipo = NULL;   // pestania RECURSO
     propRecEntrada = NULL; propRecUbicacion = NULL; propRecPreview = NULL; propRecAcciones = NULL; propRecAcciones2 = NULL;
+    propRecMallaTexto = NULL; propRecExtraer = NULL;
     recVersionBind = 0;
     propBtnRenameUV = NULL; propBtnRenameColor = NULL; propNameObj = NULL;
     propRowPartOps = NULL; propRowDelRen = NULL; propRowPartMove = NULL;
@@ -13058,7 +13294,6 @@ void Properties::ActualizarPestanias(){
     g_renderTex16 = w3dEngine::Texturas16Siempre();
     g_renderMallasSoloGPU = W3dMallasSoloGPUActiva();
     // idem el tilde del formato de las mallas (tarjeta Archivo): lo fija el proyecto abierto
-    MallasTextoRefrescar();
     RedRefrescar();   // (y el de la red: lo cambia la pregunta al abrir)
     // la 1ra pestania ("Objeto") siempre esta (transforms). La 2da depende del
     // tipo del objeto activo: Mesh -> mesh parts (icono material); Light ->
@@ -13243,6 +13478,8 @@ void Properties::ActualizarPestanias(){
         if (ap != propCamActivaSel->animProp) { propCamActivaSel->animProp = ap; PropertiesLayoutDirty = true; }
         if (propCamActiva->visible)
             propCamActivaSel->button->text = CameraActive ? CameraActive->name : std::string(T("(none)"));
+        // la casilla "Camara activa" de la tarjeta Camara: el mismo rombo, en los mismos casos
+        if (propCamActivaChk && propCamActivaChk->animProp != ap) { propCamActivaChk->animProp = ap; PropertiesLayoutDirty = true; }
     }
     // tarjeta CURVA: las curvas con keyframes elegidos (con varias, "-" donde no coinciden)
     if (propCurva){
@@ -14092,8 +14329,84 @@ void Properties::Resize(int newW, int newH){
     ResizeScrollbar(newW, newH, 0, -contenidoH, BarTopOffset());
 }
 
+// ---- EL FONDO del render (tarjeta Render): color o textura 360 ----
+static void FondoCambio() { RTInvalidar(); PropertiesLayoutDirty = true; g_redraw = true; }
+static void AccionFondoRot() { FondoCambio(); }
+static void AccionFondoModo() { g_renderBgModo = g_renderBgModo == 1 ? 0 : 1; FondoCambio(); }
+static PopupMenu* MenuTexturasFondo = NULL;
+static void FondoTexturaElegida(const std::string& elegido) {
+    const std::string path = W3dImportarAsset(elegido);   // (importar = copiar adentro del proyecto)
+    Texture* t = TexturaTomar(path);
+    if (!t) { Notificar(T("The texture couldn't be loaded"), true); return; }
+    W3dFondoPonerTextura(t);
+    TexturaSoltar(t);   // (la lista del fondo retuvo la suya)
+    g_renderBgModo = 1;
+    FondoCambio();
+}
+static void AccionTexturaFondoElegida(int id) {
+    if (id == 0) { g_renderBgTex = NULL; FondoCambio(); return; }
+    if (id == 1) { AbrirFileBrowser(T("Load Texture"), T("Open"), ".png .jpg .jpeg .bmp .tga .hdr", FondoTexturaElegida); return; }
+    const size_t i = 5 + (size_t)(id - 2);
+    if (i < Textures.size()) { W3dFondoPonerTextura(Textures[i]); g_renderBgModo = 1; FondoCambio(); }
+}
+static void AccionFondoPrincipal() {
+    if (!PropsActivo || !PropsActivo->propRenderBg) return;
+    Button* b = PropsActivo->propRenderBg->button;
+    if (g_renderBgModo != 1) {   // el COLOR: su selector
+        if (!colorPicker) colorPicker = new ColorPicker();
+        colorPicker->Abrir(g_renderBg, b->sx, b->sy + b->height);
+        return;
+    }
+    // la TEXTURA 360: ninguna, cargar una, o una de las que ya estan
+    if (!MenuTexturasFondo) { MenuTexturasFondo = new PopupMenu(); MenuTexturasFondo->action = AccionTexturaFondoElegida; }
+    MenuTexturasFondo->Limpiar();
+    MenuTexturasFondo->Agregar(T("None"), 0);
+    MenuTexturasFondo->Agregar(T("Load Texture"), 1, IconType::archive);
+    for (size_t i = 5; i < Textures.size(); i++) {
+        MenuItem* it = MenuTexturasFondo->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
+        if (it && Textures[i] == g_renderBgTex) it->verde = true;
+    }
+    AbrirMenuBajoBoton(MenuTexturasFondo, b);
+}
+// cada cuadro: el boton del fondo (el color o el nombre de la textura, el icono del boton de la derecha) y las filas de
+// la rotacion (solo con textura). Sigue a la animacion, a un Ctrl+Z y al abrir otro proyecto
+static void SincronizarFondo(Properties* p) {
+    if (!p || !p->propRenderBg) return;
+    PropButton* b = p->propRenderBg;
+    const bool tex = g_renderBgModo == 1;
+    if (b->nExtras > 0) b->extras[0]->icon = tex ? (int)IconType::textura : (int)IconType::numero;
+    b->button->desplegable = tex; b->button->caretMenu = tex;
+    b->button->relleno = tex ? NULL : g_renderBg;
+    const std::string t = tex ? (g_renderBgTex ? NombreDeTextura(g_renderBgTex) : std::string(T("None"))) : std::string();
+    if (b->button->text != t) { b->button->text = t; g_redraw = true; }
+    for (int k = 0; k < 3; k++) {
+        float* quiero = tex ? &g_renderBgRot[k] : NULL;
+        if (p->propRenderBgRot[k] && p->propRenderBgRot[k]->value != quiero) { p->propRenderBgRot[k]->value = quiero; PropertiesLayoutDirty = true; }
+    }
+}
+// la TRANSMISION desde la tarjeta: la primera vez que deja de ser 0 con el IOR todavia en 1 (el de fabrica: sin
+// refraccion, lo que corresponde a lo transparente por alfa), el IOR pasa a 1.5 (vidrio, como en Blender). Con IOR 1 el
+// vidrio no dobla nada y parecia que la transmision no hacia nada
+static void AccionMatTransmision(){
+    Material* m = MaterialActivoUI();
+    if (m && m->transmision > 0.0f && m->ior == 1.0f) m->ior = 1.5f;
+    AccionRTValores();
+}
+// EL IOR se ve con transmision (la parte de vidrio) o con lo transparente por alfa. Se mira CADA CUADRO: subir la
+// Transmision de 0 a 1 lo tiene que mostrar en el momento (Rebind lo decidia solo al cambiar de objeto o de material:
+// el IOR recien aparecia al elegir otra cosa y volver). Tambien sigue a un Ctrl+Z o a una Transmision animada
+static void SincronizarIOR(Properties* p){
+    if (!p || !p->propMatIOR || !p->propMatTrans) return;
+    Material* m = MaterialActivoUI();
+    float* quiero = NULL;
+    if (m && p->propMatTrans->value == &m->transmision && (m->transmision > 0.0f || m->transparent)) quiero = &m->ior;
+    if (p->propMatIOR->value != quiero) { p->propMatIOR->value = quiero; PropertiesLayoutDirty = true; g_redraw = true; }
+}
+
 void Properties::Render(){
     MapaNumSeguir();
+    SincronizarIOR(this);
+    SincronizarFondo(this);
     // Ctrl+Z: al soltar el mouse, pushea el cambio de material (si difiere). Con un numero EDITANDOSE POR TEXTO
     // (click sin arrastrar o OK del teclado sobre Shininess / Alpha Test / ...) espera a que termine (Enter, Esc o
     // un click afuera): antes la foto del click se commiteaba vacia al soltar y lo tipeado quedaba sin Ctrl+Z.
@@ -14918,11 +15231,7 @@ void Properties::ClickEn(int mx, int my) {
                                 PropColorPal* pp = (PropColorPal*)pc;
                                 if (pp->nom) pp->field.SetText(*pp->nom);
                                 TextFieldEnfocar(&pp->field);   // (Esc vuelve al nombre de antes)
-#ifdef __EMSCRIPTEN__
-                                if (g_uiTapEnCurso) W3dTecladoAbrir();
-#else
-                                if (g_uiTapEnCurso) QwertyAbrir();
-#endif
+                                if (g_uiTapEnCurso) TecladoTextoAbrir();
                                 g_redraw = true;
                                 return;
                             }
@@ -14978,6 +15287,9 @@ void Properties::ClickEn(int mx, int my) {
                             for (int k = W3D_MAPA_RUGOSIDAD; k <= W3D_MAPA_ALFA && mm; k++) {
                                 if (pb != propMapa[k] || mm->mapaConTextura[k] || !MaterialEditableUI(mm)) continue;
                                 PropsActivo = this;
+                                // el DEDO: el toque se ejecuta al soltar, asi que no hay arrastre que armar (el arrastre del
+                                // dedo es el deslizador tactil, TouchSliderArmar): un toque es escribirlo con el teclado
+                                { extern bool g_uiTapEnCurso; if (g_uiTapEnCurso) { MapaNumEditar(k); return; } }
                                 gMapaDragK = k; gMapaDragMat = mm; gMapaDragMovio = false; gMapaDragMx = mx;
                                 gMapaDragX0 = pb->button->sx; gMapaDragW = pb->button->width;
                                 return;
@@ -15066,7 +15378,7 @@ void Properties::ClickEn(int mx, int my) {
                         // NUMERICO de Whisk3D (popup abajo). Con mouse (PC) y en Symbian sigue el camino clasico.
                         if (pf->value && g_uiTapEnCurso) {
                             pf->IniciarEdicionTexto(); editando = true; ViewPortClickDown = true;
-                            NumPadAbrir();
+                            TecladoNumeroAbrir();
                             return;
                         }
 #endif
@@ -15080,11 +15392,7 @@ void Properties::ClickEn(int mx, int my) {
                         // campo todavia esta vacio -> lo poblamos ACA (al empezar a editar) con el nombre actual.
                         if (pt == propNameObj && ObjActivo) pt->field.SetText(ObjActivo->name);
                         prop->EditPropertie(); // ENFOCA la caja: el texto entra por SDL_TEXTINPUT
-#ifdef __EMSCRIPTEN__
-                        if (g_uiTapEnCurso) W3dTecladoAbrir(); // solo en TAP tactil: levanta el teclado del celu
-#else
-                        if (g_uiTapEnCurso) QwertyAbrir(); // TAP TACTIL (Android/Symbian): teclado QWERTY de Whisk3D
-#endif
+                        if (g_uiTapEnCurso) TecladoTextoAbrir(); // TAP TACTIL: el teclado en pantalla (Ajustes elige cual)
                     }
                     return;
                 }
@@ -15130,17 +15438,281 @@ PropFloat* Properties::PropFloatEnValueBox(int mx, int my){
     return NULL;
 }
 
-bool Properties::PuntoEnCampoNumerico(int mx, int my){ return PropFloatEnValueBox(mx, my) != NULL; }
+bool Properties::PuntoEnCampoNumerico(int mx, int my){ return PropFloatEnValueBox(mx, my) != NULL || MapaNumeroEn(mx, my) >= 0; }
+// el NUMERO de un mapa del material (rugosidad, metalico, alfa: sin textura) bajo (mx,my): su k, o -1. Lo mismo que
+// mira ClickEn (la zona del boton grande, entre el nombre y los botones chicos)
+int Properties::MapaNumeroEn(int mx, int my){
+    PropertieBase* p = PropEnPunto(mx, my);
+    Material* mm = MaterialActivoUI();
+    if (!p || !mm || !MaterialEditableUI(mm) || p->GetType() != PropertyType::Button) return -1;
+    PropButton* pb = (PropButton*)p;
+    for (int k = W3D_MAPA_RUGOSIDAD; k <= W3D_MAPA_ALFA; k++) {
+        if (pb != propMapa[k] || mm->mapaConTextura[k]) continue;
+        const int lx = mx - (x + PosX + borderGS + borderGS);
+        return (lx >= pb->colPrefijo && lx < pb->colExtras) ? k : -1;
+    }
+    return -1;
+}
 
+// la fila (de cualquier tipo) bajo (mx,my), o NULL (una cabecera, un hueco, afuera). Mismo recorrido de filas que ClickEn
+PropertieBase* Properties::PropEnPunto(int mx, int my){
+    if ((!ObjActivo && !PestaniaGlobal()) || !Contains(mx, my) || OnBar(mx, my)) return NULL;
+    int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
+    for (size_t i = 0; i < GroupProperties.size(); i++) {
+        GroupPropertie* g = GroupProperties[i];
+        if (!g->visible) continue;
+        int hCabecera = borderGS + RenglonHeightGS + gapGS;
+        if (my >= yCursor && my < yCursor + hCabecera) return NULL;
+        if (g->open) {
+            int yFila = yCursor + hCabecera;
+            for (size_t j = 0; j < g->properties.size(); j++) {
+                PropertieBase* prop = g->properties[j];
+                int hFila = prop->Resize(g->width);
+                if (hFila > 0 && prop->GetType() != PropertyType::Gap && prop->Seleccionable() &&
+                    my >= yFila && my < yFila + hFila) return prop;
+                yFila += hFila;
+            }
+        }
+        yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    return NULL;
+}
+
+// ============================================================================
+//  EL MENU CONTEXTUAL DE UNA PROPIEDAD: mantener apretado (tactil, controles.cpp) o click derecho (mouse) sobre una
+//  fila de VALOR (numero, casilla o color):
+//      Restablecer (el valor de fabrica, si se sabe) / Copiar / Pegar
+//      ---- (si es animable: tiene el rombo de keyframe)
+//      Insertar keyframe / Borrar todos los keyframes / Copiar keyframe / Pegar keyframe
+//  Los keyframes son los del OBJETO ACTIVO en el FRAME ACTUAL (como el rombo); un color son sus 3 curvas juntas.
+// ============================================================================
+enum { PCTX_RESET = 1, PCTX_COPIAR, PCTX_PEGAR, PCTX_KEY_INSERTAR, PCTX_KEY_BORRAR, PCTX_KEY_COPIAR, PCTX_KEY_PEGAR };
+static PropertieBase* gCtxProp = NULL;   // la fila del menu abierto
+// la fila de un MAPA del material: el numero (rugosidad, metalico, alfa) o el color (emision; el color base, en la fila
+// de la textura). -1 = una fila comun
+static int gCtxMapa = -1;
+static Material* gCtxMat = NULL;
+static float* CtxMapaValor(){
+    if (gCtxMapa < 0 || !gCtxMat) return NULL;
+    if (gCtxMapa == W3D_MAPA_BASE) return gCtxMat->diffuse;
+    if (gCtxMapa == W3D_MAPA_EMISION) return gCtxMat->emission;
+    return ValorDeMapa(gCtxMat, gCtxMapa);
+}
+static bool CtxMapaEsColor(){ return gCtxMapa == W3D_MAPA_BASE || gCtxMapa == W3D_MAPA_EMISION; }
+// el de fabrica de un mapa (los del constructor de Material)
+static bool CtxMapaDefecto(float* v){
+    switch (gCtxMapa) {
+        case W3D_MAPA_BASE:      v[0] = v[1] = v[2] = 1.0f; return true;
+        case W3D_MAPA_EMISION:   v[0] = v[1] = v[2] = 0.0f; return true;
+        case W3D_MAPA_RUGOSIDAD: v[0] = 0.5f; return true;
+        case W3D_MAPA_METALICO:  v[0] = 0.0f; return true;
+        case W3D_MAPA_ALFA:      v[0] = 1.0f; return true;
+    }
+    return false;
+}
+// pone el numero / el color (solo RGB: el alfa del color base es la fila Alfa) en el mapa, con Ctrl+Z
+static void CtxMapaAsignar(const float* v){
+    float* d = CtxMapaValor();
+    if (!d) return;
+    UndoMaterialModIniciar(gCtxMat);
+    if (CtxMapaEsColor()) { d[0] = v[0]; d[1] = v[1]; d[2] = v[2]; }
+    else { float n = v[0]; if (n < 0.0f) n = 0.0f; if (n > 1.0f) n = 1.0f; *d = n; }
+    if (gCtxMapa == W3D_MAPA_ALFA) TransparenteDesdeAlfa(gCtxMat);
+    UndoMaterialModCommit();
+    RTInvalidar();
+    RebindMaterialMeshPart();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static PopupMenu* gMenuPropCtx = NULL;
+// el PORTAPAPELES de valores: el tipo de la fila (Float / Bool / Color) y hasta 4 numeros. Un numero va ademas como
+// texto al portapapeles del sistema: se puede pegar en otra app, o pegar aca uno copiado de otra app
+static int gPortaTipo = -1;
+static float gPortaVal[4];
+// el de KEYFRAMES: las claves del canal en el frame (1, o 3 en un color)
+static std::vector<keyFrame> gPortaKeys;
+
+// el valor de FABRICA, si se sabe: el transform (0 / 0 / 1) y visible / renderizable (si). El resto no lo guarda nadie
+static bool PropDefecto(PropertieBase* p, float& v){
+    const int ap = p->AnimProp();
+    if (ap == AnimPosition || ap == AnimRotation) { v = 0.0f; return true; }
+    if (ap == AnimScale) { v = 1.0f; return true; }
+    if (ap == AnimVisible || ap == AnimRender) { v = 1.0f; return true; }
+    return false;
+}
+static bool PropEsTransform(PropertieBase* p){
+    const int ap = p->AnimProp();
+    return ap == AnimPosition || ap == AnimRotation || ap == AnimScale;
+}
+// un numero del portapapeles del SISTEMA (copiado de otra app): "1,5" tambien vale
+static bool NumeroDelSistema(float& v){
+    std::string t = w3dEngine::W3dClipboardGet();
+    size_t a = t.find_first_not_of(" \t\r\n"), b = t.find_last_not_of(" \t\r\n");
+    if (a == std::string::npos) return false;
+    t = t.substr(a, b - a + 1);
+    for (size_t i = 0; i < t.size(); i++) if (t[i] == ',') t[i] = '.';
+    char* fin = NULL;
+    const double d = strtod(t.c_str(), &fin);
+    if (!fin || *fin != '\0' || fin == t.c_str()) return false;
+    v = (float)d;
+    return true;
+}
+// pone 'v' en la fila como si se la editara (con su rango y su onChange), con Ctrl+Z si es del transform
+static void PropAsignar(PropertieBase* p, const float* v){
+    const bool tr = PropEsTransform(p);
+    if (tr) UndoTransformIniciar();
+    if (p->GetType() == PropertyType::Float) {
+        PropFloat* pf = (PropFloat*)p;
+        if (pf->value) pf->Set(v[0]);
+    } else if (p->GetType() == PropertyType::Bool) {
+        PropBool* pb = (PropBool*)p;
+        if (pb->value) { *pb->value = v[0] != 0.0f; if (pb->onChange) pb->onChange(); }
+    } else if (p->GetType() == PropertyType::Color) {
+        PropColor* pc = (PropColor*)p;
+        if (pc->value) for (int i = 0; i < 4; i++) pc->value[i] = v[i];
+    }
+    if (tr) UndoTransformConfirmar();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionPropCtx(int id){
+    PropertieBase* p = gCtxProp;
+    // la fila de un MAPA del material: su numero o su color
+    if (gCtxMapa >= 0) {
+        float* d = CtxMapaValor();
+        if (!d) return;
+        const int tipo = CtxMapaEsColor() ? (int)PropertyType::Color : (int)PropertyType::Float;
+        if (id == PCTX_RESET) { float v[4]; if (CtxMapaDefecto(v)) CtxMapaAsignar(v); }
+        else if (id == PCTX_COPIAR) {
+            gPortaTipo = tipo;
+            for (int i = 0; i < 4; i++) gPortaVal[i] = (tipo == PropertyType::Color || i == 0) ? d[i] : 0.0f;
+            if (tipo == PropertyType::Float) { char b[48]; snprintf(b, sizeof(b), "%g", d[0]); w3dEngine::W3dClipboardSet(b); }
+            Notificar(T("Copied"), false);
+        } else if (id == PCTX_PEGAR) {
+            float v[4] = { gPortaVal[0], gPortaVal[1], gPortaVal[2], gPortaVal[3] };
+            if (tipo == PropertyType::Float && NumeroDelSistema(v[0])) CtxMapaAsignar(v);
+            else if (gPortaTipo == tipo) CtxMapaAsignar(v);
+        }
+        return;
+    }
+    if (!p || !p->Seleccionable()) return;
+    const int tipo = (int)p->GetType();
+    const int ap = p->AnimProp(), ac = p->AnimComp();
+    switch (id) {
+        case PCTX_RESET: { float v[4] = { 0, 0, 0, 0 }; if (PropDefecto(p, v[0])) PropAsignar(p, v); break; }
+        case PCTX_COPIAR: {
+            gPortaTipo = tipo;
+            if (tipo == PropertyType::Float) {
+                gPortaVal[0] = *((PropFloat*)p)->value;
+                char b[48]; snprintf(b, sizeof(b), "%g", gPortaVal[0]);
+                w3dEngine::W3dClipboardSet(b);   // (tambien para otra app)
+            } else if (tipo == PropertyType::Bool) gPortaVal[0] = *((PropBool*)p)->value ? 1.0f : 0.0f;
+            else for (int i = 0; i < 4; i++) gPortaVal[i] = ((PropColor*)p)->value[i];
+            Notificar(T("Copied"), false);
+            break;
+        }
+        case PCTX_PEGAR: {
+            float v[4] = { gPortaVal[0], gPortaVal[1], gPortaVal[2], gPortaVal[3] };
+            if (tipo == PropertyType::Float && NumeroDelSistema(v[0])) { PropAsignar(p, v); break; }   // (el texto manda: puede venir de otra app)
+            if (gPortaTipo == tipo) PropAsignar(p, v);
+            break;
+        }
+        case PCTX_KEY_INSERTAR:
+            UndoKeyframesIniciar(); AnimCanalInsertarKey(ObjActivo, ap, ac, CurrentFrame); UndoKeyframesConfirmar(); break;
+        case PCTX_KEY_BORRAR:
+            UndoKeyframesIniciar(); AnimCanalBorrarTodos(ObjActivo, ap, ac); UndoKeyframesConfirmar(); break;
+        case PCTX_KEY_COPIAR:
+            if (AnimCanalCopiarKey(ObjActivo, ap, ac, CurrentFrame, gPortaKeys)) Notificar(T("Copied"), false);
+            break;
+        case PCTX_KEY_PEGAR:
+            UndoKeyframesIniciar(); AnimCanalPegarKey(ObjActivo, ap, ac, CurrentFrame, gPortaKeys); UndoKeyframesConfirmar(); break;
+    }
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+// cuantas curvas tiene el canal de un rombo (un color: 3) -> el keyframe copiado se puede pegar ahi?
+static size_t CurvasDelCanal(int ap){ return (ap == AnimColor || ap == AnimAmbient || ap == AnimSpecular) ? 3 : 1; }
+
+bool Properties::MenuContexto(int mx, int my, int menuX, int menuY){
+    PropertieBase* p = PropEnPunto(mx, my);
+    if (!p) return false;
+    int tipo = (int)p->GetType();
+    // la fila de un MAPA del material (un boton con su numero o su color): sin textura y en un material editable
+    gCtxMapa = -1; gCtxMat = NULL;
+    if (tipo == PropertyType::Button) {
+        Material* mm = MaterialActivoUI();
+        if (mm && MaterialEditableUI(mm)) {
+            if (p == propBtnTextura) gCtxMapa = W3D_MAPA_BASE;
+            for (int k = W3D_MAPA_EMISION; k <= W3D_MAPA_ALFA; k++) if (p == propMapa[k] && !mm->mapaConTextura[k]) gCtxMapa = k;
+        }
+        if (gCtxMapa < 0) return false;
+        gCtxMat = mm;
+        tipo = CtxMapaEsColor() ? (int)PropertyType::Color : (int)PropertyType::Float;
+    }
+    if (tipo != PropertyType::Float && tipo != PropertyType::Bool && tipo != PropertyType::Color) return false;
+    PropsActivo = this;
+    gCtxProp = p;
+    if (!gMenuPropCtx) { gMenuPropCtx = new PopupMenu(); gMenuPropCtx->action = AccionPropCtx; }
+    gMenuPropCtx->Limpiar();
+    gMenuPropCtx->titulo = (gCtxMapa == W3D_MAPA_BASE) ? std::string(T("Base Color")) : p->name;
+    // (los items en gris: 'gris' apunta a "se puede")
+    static bool sReset, sPegar, sKeyBorrar, sKeyCopiar, sKeyPegar, sSi = true;
+    float d = 0;
+    { float dm[4]; sReset = (gCtxMapa >= 0) ? CtxMapaDefecto(dm) : PropDefecto(p, d); }
+    float n = 0;
+    sPegar = (gPortaTipo == tipo) || (tipo == PropertyType::Float && NumeroDelSistema(n));
+    MenuItem* it;
+    it = gMenuPropCtx->Agregar(T("Reset"), PCTX_RESET, (int)IconType::deshacer); it->gris = &sReset;
+    it = gMenuPropCtx->Agregar(T("Copy"), PCTX_COPIAR, (int)IconType::copiar);  it->gris = &sSi;
+    it = gMenuPropCtx->Agregar(T("Paste"), PCTX_PEGAR, (int)IconType::pegar);   it->gris = &sPegar;
+    // ANIMACION: solo si la fila es un canal (tiene rombo) y hay un objeto activo (la camara activa es otra cosa)
+    const int ap = p->AnimProp(), ac = p->AnimComp();
+    if (gCtxMapa < 0 && ap >= 0 && ap != AnimCamActiva && ObjActivo) {
+        const int est = AnimCanalEstado(ObjActivo, ap, ac, CurrentFrame);
+        sKeyBorrar = est != 0;
+        sKeyCopiar = est == 2;
+        sKeyPegar = !gPortaKeys.empty() && gPortaKeys.size() == CurvasDelCanal(ap);
+        it = gMenuPropCtx->Agregar(T("Insert Keyframe"), PCTX_KEY_INSERTAR, (int)IconType::keyframe); it->gris = &sSi;
+        it->lineaArriba = true;
+        it = gMenuPropCtx->Agregar(T("Delete All Keyframes"), PCTX_KEY_BORRAR, (int)IconType::borrar); it->gris = &sKeyBorrar;
+        it = gMenuPropCtx->Agregar(T("Copy Keyframe"), PCTX_KEY_COPIAR, (int)IconType::copiar); it->gris = &sKeyCopiar;
+        it = gMenuPropCtx->Agregar(T("Paste Keyframe"), PCTX_KEY_PEGAR, (int)IconType::pegar); it->gris = &sKeyPegar;
+    }
+    if (MenuAbierto && MenuAbierto != gMenuPropCtx) MenuAbierto->Cerrar();
+    gMenuPropCtx->Abrir(menuX >= 0 ? menuX : mx, menuY >= 0 ? menuY : my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuPropCtx;
+    g_redraw = true;
+    return true;
+}
+
+// (el deslizador tactil sobre el NUMERO de un mapa: el dedo es la posicion en la barra, como con el mouse)
+static bool gTouchMapa = false;
+static int gTouchMapaX = 0;
 bool Properties::TouchSliderArmar(int mx, int my){
     PropFloat* pf = PropFloatEnValueBox(mx, my);
     gTouchSlide = (pf && pf->value) ? pf : NULL;
-    return gTouchSlide != NULL;
+    gTouchMapa = false;
+    if (!gTouchSlide) {
+        const int k = MapaNumeroEn(mx, my);
+        PropButton* pb = (k >= 0) ? propMapa[k] : NULL;
+        if (pb) {
+            PropsActivo = this;
+            gMapaDragK = k; gMapaDragMat = MaterialActivoUI(); gMapaDragMovio = false; gMapaDragMx = mx;
+            gMapaDragX0 = pb->button->sx; gMapaDragW = pb->button->width;
+            gTouchMapa = true; gTouchMapaX = mx;
+        }
+    }
+    return gTouchSlide != NULL || gTouchMapa;
 }
 void Properties::TouchSliderMover(int dx){
+    if (gTouchMapa) { gTouchMapaX += dx; MapaDragMover(gTouchMapaX); return; }
     if (gTouchSlide && gTouchSlide->value) gTouchSlide->Set(*gTouchSlide->value + dx * gTouchSlide->dragStep);
 }
-void Properties::TouchSliderSoltar(){ gTouchSlide = NULL; }
+void Properties::TouchSliderSoltar(){
+    gTouchSlide = NULL;
+    if (gTouchMapa) {   // (soltar el deslizador no lo deja escribir: eso es un toque)
+        gTouchMapa = false;
+        if (gMapaDragK >= 0 && gMapaDragMovio) UndoMaterialModCommit();
+        gMapaDragK = -1; gMapaDragMovio = false;
+    }
+}
 
 void Properties::key_down_return(){
     PropsActivo = this; // este panel pasa a ser el activo

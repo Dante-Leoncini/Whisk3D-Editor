@@ -42,6 +42,12 @@ void W3dAplicarCurvasEnFrame(Object* o, std::vector<AnimProperty>& props, int fr
 int  AnimCanalEstado(class Object* o, int prop, int comp, int frame);
 // pone o QUITA (toggle) un key del canal en 'frame', con el valor actual del objeto
 void AnimCanalToggle(class Object* o, int prop, int comp, int frame);
+// el MENU CONTEXTUAL de una propiedad: insertar el key (sin sacarlo si ya estaba), borrar TODOS los del canal, y copiar /
+// pegar el key del frame (un color son sus 3 curvas). false = no se pudo (y se aviso por que, si hace falta)
+bool AnimCanalInsertarKey(class Object* o, int prop, int comp, int frame);
+bool AnimCanalBorrarTodos(class Object* o, int prop, int comp);
+bool AnimCanalCopiarKey(class Object* o, int prop, int comp, int frame, std::vector<class keyFrame>& out);
+bool AnimCanalPegarKey(class Object* o, int prop, int comp, int frame, const std::vector<class keyFrame>& in);
 void Eliminar(bool IncluirCollecciones = false);
 
 // ===== NOMBRES UNICOS de OBJETO (ver el bloque grande al final de ObjectMode.cpp) =====

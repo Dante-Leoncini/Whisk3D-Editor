@@ -1,0 +1,61 @@
+# ==========================================================================
+#  EL FONDO DEL RENDER: COLOR O TEXTURA 360 (equirectangular), ROTACION, ANIMACION
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_fondo360.w3s
+#
+#  1. la vista Render muestra la imagen 360 alrededor de la escena (arriba el cielo azul, abajo el suelo marron)
+#  2. se guarda y se abre con el proyecto (antes el fondo ni se guardaba: volvia a negro)
+#  3. la rotacion se anima con su rombo (las curvas viven en la coleccion de la escena)
+# ==========================================================================
+
+ventana 640 480
+escenadefecto
+selobj Cubo
+objpos 0 0 -40
+vista3d sombreado 2
+vista3d gizmo 0
+fondo textura fondo360_prueba.png
+fondo ver modo 1
+fondo ver lista 1
+tick 10
+# (la vista mira hacia abajo: se ve el SUELO de la imagen; girada 180 grados en Y, el CIELO. La rutina "Limpiar
+#  pantalla" de la escena de fabrica borra la pantalla: el cielo se vuelve a dibujar despues)
+uishot /tmp/w3d_fondo_vista.png
+pngpx /tmp/w3d_fondo_vista.png 200 300 120 80 40 - 12
+fondo rot 0 180 0
+tick 3
+uishot /tmp/w3d_fondo_vista.png
+pngpx /tmp/w3d_fondo_vista.png 200 300 40 90 220 - 12
+# el TRAZADO DE RAYOS ve lo mismo (la misma cuenta de la direccion a la imagen)
+vista3d trazado 1 2
+tick 30
+uishot /tmp/w3d_fondo_rt.png
+pngpx /tmp/w3d_fondo_rt.png 200 300 40 90 220 - 12
+vista3d trazado 0
+fondo rot 0 0 0
+
+# ---- 2) guardar y abrir ----
+fondo rot 0 0 30
+guardarw3d /tmp/w3d_fondo360.w3d
+jsontiene /tmp/w3d_fondo360.w3d "fondoTexturas"
+escenadefecto
+fondo ver modo 0
+fondo ver lista 0
+abrirw3d /tmp/w3d_fondo360.w3d
+fondo ver modo 1
+fondo ver lista 1
+fondo ver textura fondo360_prueba
+fondo ver rot 0 0 30
+
+# ---- 3) la rotacion animada (rombo de "Rotacion Z" del fondo: AnimFondoRot = 21, Z = 2) ----
+frame 1
+fondo rot 0 0 0
+keyrombo 21 2
+frame 11
+fondo rot 0 0 90
+keyrombo 21 2
+frame 6
+fondo ver rot 0 0 45 15
+frame 11
+fondo ver rot 0 0 90 0.01

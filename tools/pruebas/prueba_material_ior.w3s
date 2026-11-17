@@ -1,0 +1,36 @@
+# ==========================================================================
+#  EL IOR APARECE APENAS LA TRANSMISION DEJA DE SER 0
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_material_ior.w3s
+#
+#  EL CASO. Transmision en 1 y no estaba el IOR: la fila se decidia solo al
+#  armar el panel (elegir otro objeto o material). Ahora se mira cada cuadro:
+#  aparece con la transmision (o con lo transparente por alfa) y se va sin ella.
+# ==========================================================================
+
+ventana 1200 1800
+escala 2
+selobj Cubo
+propstab 2
+tick
+propclic New Material
+tick
+menuelegir New Material
+tick
+rtopt 1 1 4 1
+tick
+fail propvalor 1 IOR
+mattrans 1
+tick
+propvalor 1 IOR
+mattrans 0
+tick
+fail propvalor 1 IOR
+# desde la tarjeta (tipeando la Transmision): el IOR de fabrica (1, sin refraccion) pasa a 1.5, el vidrio
+propclic Transmission
+texto 1
+tecla Return
+tick
+propvalor 1 Transmission
+propvalor 1.5 IOR

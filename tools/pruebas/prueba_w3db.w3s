@@ -152,13 +152,18 @@ escenasintetica 40 ../debug/w3db_sint.w3d
 w3dbinfo ../debug/w3db_sint.w3d w3db 1 w3dm 0
 cargabench ../debug/w3db_sint.w3d 3 mallas 40 mallasbin 40 derivadas 0 fugakb 32
 
-# --- F: la opcion del PROYECTO. Sin el forzado del harness manda el proyecto:
-#     un .w3d sin la clave es binario; "texto" se guarda en proyecto.json, se lee
-#     al abrir, y el guardado migra las entradas (las del otro formato se van) ---
+# --- F: el FORMATO ES DE CADA MALLA (su tilde "Mesh as text" de la tarjeta Recurso; sin
+#     tocarlo, el de su entrada). Sin el forzado del harness: pasarlas a texto y guardar
+#     migra las entradas (las del otro formato se van). La opcion del PROYECTO
+#     ("formatoMallas" de proyecto.json, de los archivos de antes) sigue viajando y solo
+#     decide las mallas NUEVAS ---
 formatomallas proyecto
 abrirw3d ../debug/w3db_rica_b.w3d
 formatomallas es binario
 formatomallas proyecto texto
+guardarw3d ../debug/w3db_rica_opt0.w3d
+w3dbinfo ../debug/w3db_rica_opt0.w3d w3db 7 w3dm 0
+formatomallas todas texto
 guardarw3d ../debug/w3db_rica_opt.w3d
 w3dbinfo ../debug/w3db_rica_opt.w3d w3db 0 w3dm 7
 abrirw3d ../debug/w3db_rica_opt.w3d
@@ -166,6 +171,7 @@ formatomallas es texto
 guardarw3d ../debug/w3db_rica_opt2.w3d
 w3diguales ../debug/w3db_rica_opt.w3d ../debug/w3db_rica_opt2.w3d
 formatomallas proyecto binario
+formatomallas todas binario
 guardarw3d ../debug/w3db_rica_opt3.w3d
 w3dbinfo ../debug/w3db_rica_opt3.w3d w3db 7 w3dm 0
 abrirw3d ../debug/w3db_rica_opt3.w3d
@@ -216,21 +222,23 @@ w3dbjuego ../debug/w3db_juego.w3d
 w3dbajenos ../debug/w3db_ajen
 
 # --- H: el control de la UI, el registro de nombres y el CRC del contenedor ------
-#     el tilde "Meshes as text" de la tarjeta Archivo refleja el proyecto que se
-#     abre, un click cambia el formato del proximo guardado, y un proyecto nuevo
-#     arranca destildado (binario)
+#     el formato es de CADA MALLA (antes era de todo el proyecto, en la tarjeta Archivo):
+#     el tilde "Mesh as text" de su tarjeta Recurso dice el de su entrada (.w3dm = texto),
+#     un click cambia SOLO esa malla en el proximo guardado (las demas siguen como
+#     estaban), sacarlo y volverlo a poner no deja nada pendiente, y al reabrir el tilde
+#     sale de la entrada nueva
 abrirw3d ../debug/w3db_rica_opt.w3d
-formatomallasui tilde 1
-formatomallasui clic tilde 0
-formatomallas es binario
+formatomallasui Onda tilde 1
+formatomallasui Onda clic tilde 0
+formatomallasui Cuerpo tilde 1
 guardarw3d ../debug/w3db_rica_ui.w3d
-w3dbinfo ../debug/w3db_rica_ui.w3d w3db 7 w3dm 0
-formatomallasui clic tilde 1
-formatomallas es texto
-escenadefecto
-formatomallasui tilde 0
+w3dbinfo ../debug/w3db_rica_ui.w3d w3db 1 w3dm 6
+formatomallasui Onda tilde 0
+formatomallasui Onda clic tilde 1
+formatomallasui Onda clic tilde 0
 abrirw3d ../debug/w3db_rica_ui.w3d
-formatomallasui tilde 0
+formatomallasui Onda tilde 0
+formatomallasui Cuerpo tilde 1
 # el codigo, formato/bloques.tsv (filas w3db:) y formato/w3db.md dicen lo mismo, y
 # todo bloque que el motor escribe esta registrado (sin formato/: SIN CORPUS)
 w3dbregistro ../debug/w3db_rica_b2.w3d

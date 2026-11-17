@@ -9,6 +9,8 @@
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Seçimin %d animasyon eğrisi artık hiçbir şeyi canlandırmıyor (Geri Al geri getirir)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d animasyon eğrisi nesnesiz kaldı (ilki: '%s'): whisk3d.log'a bakın
 %d curves selected	%d eğri seçili
+%d files are now external	%d dosya artık harici
+%d files are now inside the .w3d	%d dosya artık .w3d içinde
 %d keyframes selected	%d anahtar kare seçili
 %d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	%d ad sahne değişirken yeniden numaralandı (%s%s). Lua betiklerinizi kontrol edin.
 %d nodes | active node: %d	%d düğüm | etkin düğüm: %d
@@ -339,11 +341,13 @@ Clipping	Kırpma
 Clips	Klipler
 Clone screen	Ekranı klonla
 Close	Kapat
+Close Whisk3D?	Whisk3D kapatılsın mı?
 Close without saving	Kaydetmeden kapat
 Closest	En Yakın
 Collapse	Çökert
 Collection	Koleksiyon
 Color	Renk
+Color / Texture	Renk / Doku
 Color Grid	Renk Izgarası
 Color Layers	Renk katmanları
 Color Mode	Renk Modu
@@ -387,6 +391,7 @@ Convert to Scene	Sahneye dönüştür
 Convert to editable mesh	Düzenlenebilir örgüye dönüştür
 Copied	Kopyalandı
 Copy	Kopyala
+Copy Keyframe	Anahtar kareyi kopyala
 Copy X	X Kopyala
 Copy Y	Y Kopyala
 Copy Z	Z Kopyala
@@ -398,14 +403,17 @@ Correct UVs	UV'leri Düzelt
 Could not copy the objects	Nesneler kopyalanamadı
 Could not create a viewport on the external display: cloning the screen	Harici ekranda görünüm oluşturulamadı: ekran klonlanıyor
 Could not encode the PNG	PNG kodlanamadı
+Could not extract	Çıkarılamadı
 Could not import	İçe aktarılamadı
 Could not link the copy of '%s' to its mesh	'%s' kopyası örgüsüne bağlanamadı
+Could not load the layout	Düzen yüklenemedi
 Could not load the mesh '%s'	'%s' örgüsü yüklenemedi
 Could not read the STL file	STL dosyası okunamadı
 Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	'%s' animasyonları okunamadı (%s): BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
 Could not read the file	Dosya okunamadı
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	'%s' animasyonunun kareleri okunamadı ('%s' nesnesi): BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	'%s' geometrisi okunamadı: BOŞ kalıyor ve üzerine kaydedilmeyecek (whisk3d.log'a bakın)
+Could not save the layout	Düzen kaydedilemedi
 Could not write config.ini	config.ini yazılamadı
 Could not write the file	Dosya yazılamadı
 Count	Adet
@@ -441,12 +449,14 @@ Cylinder Projection	Silindir İzdüşümü
 Debug mode	Hata ayıklama modu
 Decal	Çıkartma
 Decimals	Ondalık
+Default	Varsayılan
 Default Material	Varsayılan Malzeme
 Delete	Sil
 Delete "%s" (%s) with all its objects?	"%s" (%s) tüm nesneleriyle silinsin mi?
 Delete "%s"?	"%s" silinsin mi?
 Delete %d objects?	%d nesne silinsin mi?
 Delete %d scenes, games or prefabs with all their objects?	%d sahne, oyun veya prefab tüm nesneleriyle silinsin mi?
+Delete All Keyframes	Tüm anahtar kareleri sil
 Delete Edge Loops	Kenar döngülerini sil
 Delete Edge Loops: select an edge loop first	Kenar Döngülerini Sil: önce bir kenar döngüsü seçin
 Delete Edge Loops: select an edge shared by two faces	Kenar Döngülerini Sil: iki yüzün paylaştığı bir kenar seçin
@@ -461,10 +471,13 @@ Delete Normals Layer	Normal katmanını sil
 Delete Palette	Paleti sil
 Delete Vertices	Köşeleri sil
 Delete editing data	Düzenleme verilerini sil
+Delete layout	Düzeni sil
+Delete layout...	Düzeni sil...
 Delete mesh layer: select an object animation in the timeline	Örgü katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
 Delete normals layer: select an object animation in the timeline	Normal katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
 Delete selected?	Seçilenler silinsin mi?
 Delete step	Adımı sil
+Delete the layout	Düzen silinsin mi:
 Delete the orphan resource	Sahipsiz kaynağı sil:
 Delete the orphan resources	Sahipsiz kaynakları sil
 Deleted	Silindi
@@ -587,9 +600,13 @@ Exporting model...	Model dışa aktarılıyor...
 External	Harici
 External (choose where)...	Harici (yer seç)...
 External display	Harici ekran
+Extract	Çıkar
 Extract assets	Varlıkları çıkar
 Extract the assets to...	Varlıkları şuraya çıkar...
+Extract to a folder...	Bir klasöre çıkar...
+Extract to...	Şuraya çıkar...
 Extract: save the project first (the assets live inside the .w3d)	Çıkar: önce projeyi kaydedin (varlıklar .w3d içinde durur)
+Extracted	Çıkarıldı
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	%d dosya çıkarıldı. Bunlar KOPYA: bir değişikliğin projeye dönmesi için yeniden içe aktarılması gerekir
 Extracted %d file(s); %d failed (see the log)	%d dosya çıkarıldı; %d başarısız (günlüğe bakın)
 Extrude	Ekstrüde
@@ -808,6 +825,7 @@ It couldn't be copied into the .w3d	.w3d içine kopyalanamadı
 It doesn't exist anymore	Artık yok
 It has no checkbox	Onay kutusu yok
 It has no proyecto.json	proyecto.json yok
+It is a COPY: for a change to go back into the project you have to import it again	Bu bir KOPYA: bir değişikliğin projeye dönmesi için yeniden içe aktarılması gerekir
 It is a W3D proxy: choose its library element	Bir W3D proxy: kütüphanedeki öğesini seçin
 It is already linked	Zaten bağlantılı
 It is in use	Kullanımda
@@ -844,6 +862,9 @@ Last triangle	Son üçgen
 Layer	Katman
 Layer On	Katman açık
 Layout	Yerleşim
+Layout deleted	Düzen silindi
+Layout replaced	Düzen değiştirildi
+Layout saved	Düzen kaydedildi
 Left	Sol
 Left Handle X	Sol Tutamaç X
 Left View	Sol görünüm
@@ -859,6 +880,7 @@ Library not readable	Kütüphane okunamıyor
 Library unlinked	Kütüphane bağlantısı kesildi
 Lifetime	Ömür
 Light	Işık
+Light bounces	Işık sekmeleri
 Light color	Işık rengi
 Light on/off	Işık aç/kapat
 Light position	Işık konumu
@@ -970,6 +992,7 @@ Merge at Cursor	İmleçte kaynaştır
 Merge by Distance	Mesafeye göre kaynaştır
 Mesh	Örgü
 Mesh Parts	Örgü Parçaları
+Mesh as text	Metin olarak örgü
 Mesh editable again	Örgü yeniden düzenlenebilir
 Mesh layer deleted	Örgü katmanı silindi
 Mesh made single user	Örgü artık tek kullanıcılı
@@ -1049,6 +1072,7 @@ New Texture: invalid size	Yeni Doku: geçersiz boyut
 New UV Map	Yeni UV haritası
 New W3D proxy of this element	Bu öğenin yeni W3D proxy'si
 New controller detected: %s	Yeni oyun kumandası algılandı: %s
+New file	Yeni dosya
 New instance of this prefab	Bu prefabın yeni örneği
 New instance of this scene	Bu sahnenin yeni örneği
 New material with this shader	Bu shader ile yeni malzeme
@@ -1056,6 +1080,7 @@ New material with this texture	Bu doku ile yeni malzeme
 New noise each image	Her görüntüde yeni gürültü
 New object with this 3D mesh	Bu 3D örgü ile yeni nesne
 New paint texture	Yeni boyama dokusu
+New project	Yeni proje
 New shader	Yeni shader
 New sound object here	Buraya yeni ses nesnesi
 Next	Sonraki
@@ -1164,6 +1189,7 @@ Open in IDE	IDE'de aç
 Open normal map	Normal haritası aç
 Open project	Proje aç
 Open without saving	Kaydetmeden aç
+Open...	Aç...
 Opening project...	Proje açılıyor...
 Operation	İşlem
 Optimize Vertex Groups	Köşe Gruplarını Optimize Et
@@ -1189,6 +1215,7 @@ Overrides	Override'lar
 Own	Kendi
 PVS recalculated	PVS yeniden hesaplandı
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: kaynak .obj'nin yanında <model>.pvs.json eksik
+Pack into the .w3d	.w3d içine koy
 Packaging .deb (cpack)	.deb paketleniyor (cpack)
 Packaging AppImage	AppImage paketleniyor
 Packed (protected)	Paketli (korumalı)
@@ -1213,6 +1240,7 @@ Parts	Parçalar
 Pass Order	Geçiş sırası
 Passes	Geçişler
 Paste	Yapıştır
+Paste Keyframe	Anahtar kareyi yapıştır
 Pasted	Yapıştırıldı
 Patch	Yama
 Path	Yol
@@ -1283,7 +1311,7 @@ Project from View	Görünümden Yansıt
 Project from View (Bounds)	Görünümden Yansıt (Sınırlar)
 Project from View: select faces first	Görünümden Yansıt: önce yüzleri seçin
 Project saved: 	Proje kaydedildi: 
-Project saved: %s (%d external reference(s), see EXTERNOS.txt)	Proje kaydedildi: %s (%d harici başvuru, EXTERNOS.txt'ye bakın)
+Project saved: %s (%d external file(s), marked with an arrow in the Library)	Proje kaydedildi: %s (%d harici dosya, Kütüphane'de okla işaretli)
 Properties	Özellikler
 Properties viewport	Özellikler görünümü
 Proportional Editing	Orantılı Düzenleme
@@ -1320,6 +1348,7 @@ Ray traced motion blur	Işın izlemeli bulanıklık
 Rays	Işınlar
 Recalculate	Yeniden hesapla
 Recalculate Normals	Normalleri Yeniden Hesapla
+Recent files	Son dosyalar
 Rectangle	Dikdörtgen
 Red	Kırmızı
 Redo	Yinele
@@ -1430,6 +1459,8 @@ Save and continue	Kaydet ve devam et
 Save and open	Kaydet ve aç
 Save and quit	Kaydet ve çık
 Save inside the .w3d	.w3d içine kaydet
+Save layout	Düzeni kaydet
+Save layout...	Düzeni kaydet...
 Save outside the .w3d...	.w3d dışına kaydet...
 Save project	Projeyi kaydet
 Save script	Betiği kaydet
@@ -1440,7 +1471,8 @@ Save: could not replace the file (the previous version was kept):	Kaydet: dosya 
 Save: incomplete write. The file was not touched:	Kaydet: yazma eksik kaldı. Dosyaya dokunulmadı:
 Saved (note: %d curve(s) without a source file are not saved)	Kaydedildi (dikkat: kaynak dosyası olmayan %d eğri kaydedilmez)
 Saved OK, but copying version v%d failed (see the log)	Kaydedildi, ancak v%d sürümünün kopyalanması başarısız oldu (günlüğe bakın)
-Saved, but %d external file(s) are NOT there (see EXTERNOS.txt). If it is the original of an imported mesh: Object > Set Origin > Clear Original File	Kaydedildi, ancak %d harici dosya YOK (EXTERNOS.txt'ye bakın). İçe aktarılmış bir örgünün orijinaliyse: Nesne > Orijini Ayarla > Orijinal Dosyayı Unut
+Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Kaydedildi, ancak %s ve %d dosya daha eksik (.w3d dışında). Kütüphane > Eksik dosyalar
+Saved, but %s is missing (it is outside the .w3d). Library > Missing files	Kaydedildi, ancak %s eksik (.w3d dışında). Kütüphane > Eksik dosyalar
 Saved: 	Kaydedildi: 
 Scale	Ölçekle
 Scale Only	Yalnızca Ölçek
@@ -1458,6 +1490,7 @@ Scenes	Sahneler
 Screen	Ekran
 Screen (lightens)	Ekran (açıklaştırır)
 Screen Rect	Ekran Kırpma
+Screen Space Reflections	Ekran alanı yansımaları
 Screw	Vida
 Script	Betik
 Script Editor	Betik Düzenleyici
@@ -1696,6 +1729,7 @@ The sound couldn't be read	Ses okunamadı
 The texture couldn't be loaded	Doku yüklenemedi
 The undo history still uses it	Geri alma geçmişi halen kullanıyor
 There are no orphans	Sahipsiz yok
+There are no saved layouts to delete	Silinecek kayıtlı düzen yok
 There is no active camera	Etkin kamera yok
 There is no audio: the mixer did not start	Ses yok: karıştırıcı başlamadı
 There is no script editor (IDE) in the layout	Yerleşimde betik düzenleyici (IDE) yok
@@ -1800,6 +1834,7 @@ Use index	İndeks kullan
 Use new viewport	Yeni görünüm kullan
 Use physics engine	Fizik motorunu kullan
 Use sound	Ses kullan
+Use system keyboard	Sistem klavyesini kullan
 Use the material's UV index	Malzemenin UV indeksini kullan
 Use this file	Bu dosyayı kullan
 Use this folder	Bu klasörü kullan

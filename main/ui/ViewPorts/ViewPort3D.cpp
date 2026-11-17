@@ -2747,14 +2747,18 @@ void Viewport3D::RenderSnapIndicador(){
     gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Texture2D);
     gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
     gfx::EnableArray(gfx::VertexArray);
-    float h = 6.0f; // recuadro de ~12px (6 de medio)
-    float x0 = g_snapSx - h, x1 = g_snapSx + h, y0 = g_snapSy - h, y1 = g_snapSy + h;
+    // el recuadro crece con la escala de la UI (a escala 2, 16 px) y con el DEDO es mas grande todavia: chico, con la yema
+    // encima, ni se veia. El borde, de GlobalScale px (varios recuadros pegados: LineWidth > 1 no anda en todos los GLES)
+    extern bool ToolbarUsaTactil();
+    const int gs = GlobalScale > 0 ? GlobalScale : 1;
+    const float h = (float)((ToolbarUsaTactil() ? 9 : 4) * gs);   // medio lado
     gfx::Color4f(0.15f, 1.0f, 0.2f, 1.0f); // verde
-    gfx::LineWidth(2.0f);
-    GLfloat b[] = { x0,y0, x1,y0,  x1,y0, x1,y1,  x1,y1, x0,y1,  x0,y1, x0,y0 };
-    gfx::VertexPointer2f(0, b);
-    gfx::DrawLines(8);
-    gfx::LineWidth(1.0f);
+    for (int k = 0; k < gs; k++) {
+        const float x0 = g_snapSx - h - k, x1 = g_snapSx + h + k, y0 = g_snapSy - h - k, y1 = g_snapSy + h + k;
+        GLfloat b[] = { x0,y0, x1,y0,  x1,y0, x1,y1,  x1,y1, x0,y1,  x0,y1, x0,y0 };
+        gfx::VertexPointer2f(0, b);
+        gfx::DrawLines(8);
+    }
     gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray);
     gfx::Invalidate();
 }

@@ -148,7 +148,7 @@ bool ExportarUVPopup::Click(int mx, int my) {
                 p->EditPropertie();   // la carpeta abre el explorador (cierra este formulario); el nombre se edita
                 if (esCarpeta) return true;
                 #ifndef W3D_SYMBIAN
-                if (ToolbarUsaTactil()) W3dTecladoAbrir();
+                if (ToolbarUsaTactil()) TecladoTextoAbrir();
                 #endif
             } else if (tipo == PropertyType::ButtonRow) {
                 // las celdas por geometria (los botones no guardan su rect al dibujarse dentro del popup)
@@ -222,7 +222,7 @@ bool ExportarUVPopup::Tecla(int tecla) {
 void ExportarUVPopup::Soltar() {
     if (dragField && !dragMoved && dragField->value) {
         dragField->IniciarEdicionTexto();            // mouse: se escribe directo en el campo
-        if (ToolbarUsaTactil()) NumPadAbrir();       // tactil: ademas el teclado en pantalla (el formulario sube)
+        if (ToolbarUsaTactil()) TecladoNumeroAbrir();       // tactil: ademas el teclado en pantalla (el formulario sube)
     }
     dragField = NULL;
 }

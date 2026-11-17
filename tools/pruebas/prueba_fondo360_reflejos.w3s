@@ -1,0 +1,24 @@
+# ==========================================================================
+#  EL FONDO 360 SE REFLEJA Y ALUMBRA EN LA LUZ POR PIXEL (shaders)
+#  Correr DESDE ESTA CARPETA, con el backend de shaders:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_fondo360_reflejos.w3s
+#  (con OpenGL, el pipeline fijo, termina en 'sombreadopixel')
+#
+#  Una esfera METALICA y lisa refleja el fondo: arriba el cielo azul de la imagen, abajo el suelo marron (sin el
+#  fondo 360 un metal sin entorno queda oscuro). La imagen tambien alumbra lo difuso (la copia borrosa).
+# ==========================================================================
+
+ventana 640 480
+sombreadopixel
+escenadefecto
+selobj Cubo
+objpos 0 0 -40
+add uvsphere
+matnew
+matrt 0.05 1
+vista3d sombreado 2
+vista3d gizmo 0
+fondo textura fondo360_prueba.png
+tick 5
+uishot /tmp/w3d_reflejos.png

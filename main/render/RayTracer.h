@@ -45,12 +45,16 @@ struct W3dRTOpciones {
     bool  desenfoque;
     float obturador;     // la fraccion del cuadro que queda abierto (0.01 .. 1; 0.5 = el clasico de 180 grados)
     int   obturadorPos;  // DONDE se abre: 0 = centrado en el cuadro, 1 = empieza en el cuadro, 2 = termina en el cuadro
+    // REBOTES DE LA LUZ (luz indirecta): 0 = solo la luz directa (como siempre). N > 0: en cada impacto el rayo sigue
+    // rebotando en una direccion al azar (difusa) hasta N superficies, y en cada una junta la luz de las lamparas: un
+    // piso rojo tine la pared de al lado, un rincon a la sombra se aclara con lo que le llega de rebote
+    int   rebotes;
 #ifdef W3D_SYMBIAN
     W3dRTOpciones() : on(false), rayos(1), samples(1), pases(8), hilos(1), denoiser(0), gpu(false), soloFinal(false), escala(1), reescalador(0), capas(8), semillaVariable(true),
-                      desenfoque(false), obturador(0.5f), obturadorPos(0) {}
+                      desenfoque(false), obturador(0.5f), obturadorPos(0), rebotes(0) {}
 #else
     W3dRTOpciones() : on(false), rayos(1), samples(1), pases(16), hilos(0), denoiser(0), gpu(true), soloFinal(false), escala(1), reescalador(1), capas(8), semillaVariable(true),
-                      desenfoque(false), obturador(0.5f), obturadorPos(0) {}
+                      desenfoque(false), obturador(0.5f), obturadorPos(0), rebotes(0) {}
 #endif
 };
 extern W3dRTOpciones g_rt;

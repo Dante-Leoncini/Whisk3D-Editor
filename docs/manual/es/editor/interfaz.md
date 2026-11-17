@@ -53,6 +53,8 @@ Arriba están los **tipos de viewport**: elegir uno convierte el viewport en ese
 | Dividir en columnas | Lo parte en dos, uno al lado del otro. |
 | Dividir en filas | Lo parte en dos, uno arriba del otro. |
 | Maximizar | Lo agranda a toda la ventana. Mientras está maximizado, el menú tiene solo **Minimizar**, que lo devuelve a su lugar. |
+| Rotar | Si está en una fila con otro viewport (uno al lado del otro), la fila pasa a ser una columna (uno arriba del otro), y al revés. Los dos viewports y su tamaño quedan. |
+| Layout | Los repartos de viewports guardados: ver [Layouts](#layouts). |
 
 ### Cambiar el tipo
 
@@ -75,6 +77,21 @@ El Outliner se queda con el lugar de Propiedades:
 ### Maximizar y minimizar
 
 ![La Vista 3D se maximiza a toda la ventana y después, con Minimizar, vuelve a su lugar](../tutoriales/img/viewports-maximizar.webp)
+
+### Layouts
+
+Un **layout** es cómo están repartidos los viewports. En **Layout** (el menú de la esquina de cualquier viewport):
+
+| Opción | Qué hace |
+|---|---|
+| Por defecto | Saca el reparto de ahora y pone el de cuando se abre el programa. |
+| Animación y los guardados | Pone ese reparto. **Animación** (la Vista 3D arriba y la Línea de tiempo abajo) viene con el programa, pero se puede borrar. |
+| Guardar layout... | Pide un nombre y guarda el reparto de ahora con ese nombre (con un nombre que ya existe, lo reemplaza). |
+| Borrar layout... | Muestra los guardados para elegir cuál borrar. **Por defecto** no se borra. Si no hay ninguno guardado, lo avisa. |
+
+Los layouts son del programa, no del proyecto: están en cualquier proyecto que abras.
+
+![Android](../tutoriales/img/icono-android.svg) En el teléfono, la pantalla parada y la acostada tienen cada una su reparto: si lo cambiás con el teléfono parado y lo girás, vuelve el que tenías acostado, y al pararlo de nuevo, el tuyo.
 
 ## Cuando no se ven todas las opciones de la barra de menús
 
@@ -123,4 +140,4 @@ Whisk3D sigue creciendo: con el tiempo se van a sumar viewports nuevos y los de 
 | Pantalla completa | Entra y sale de pantalla completa. | <kbd>F11</kbd>. En Android es automática si el teléfono no tiene notch. |
 | Reproducir / Pausa | Reproduce la animación (o el juego) desde cualquier panel. | <kbd>Espacio</kbd> o el botón Play de la línea de tiempo. |
 
-![Android](../tutoriales/img/icono-android.svg) **En Android**: en vertical el layout es Vista 3D arriba y Propiedades abajo; en horizontal se suma la línea de tiempo. Cuando se abre el teclado en pantalla (por ejemplo en el editor de scripts), el viewport activo se maximiza en la parte visible y vuelve a su lugar al cerrarlo.
+![Android](../tutoriales/img/icono-android.svg) **En Android**: en vertical el layout es Vista 3D arriba y Propiedades abajo; en horizontal se suma la línea de tiempo. El teclado en pantalla es el de Whisk3D en todos lados (el de letras para texto, el numérico para números); con **Usar teclado del sistema** tildado en Ajustes es el del teléfono, y cuando se abre, el viewport activo se maximiza en la parte que el teclado no tapa y vuelve a su lugar al cerrarlo. Lo que estás escribiendo se ve en una franja justo arriba del teclado, aunque el campo haya quedado tapado. En el [editor de scripts](editor-de-scripts.md) pasa lo mismo con los dos teclados.

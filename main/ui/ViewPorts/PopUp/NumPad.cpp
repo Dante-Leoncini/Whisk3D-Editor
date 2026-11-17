@@ -10,6 +10,7 @@
 #include "WhiskUI/text/bitmapText.h"
 #include "WhiskUI/text/font.h"                   // WhiskFont->getMeshTri (barra de espacio: guion estirado)
 #include "W3dLang.h"                             // T(): el titulo y los softkeys del popup de simbolos
+#include "app/W3dTeclado.h"                      // el teclado del sistema y el area que deja (el IDE arriba del teclado)
 #include <cstdio>   // snprintf (resultado -> texto)
 #include <cstdlib>  // strtod (evaluador)
 #include <cstring>  // strcmp (tokens de tecla: "OK" "DEL" "<" ">")
@@ -93,6 +94,7 @@ bool NumPadTeclaCentro(const char* texto, int& cx, int& cy){
 NumPad::NumPad(bool transform) : PopUpBase("NumPad") {
     modoTransform = transform;
     prevPopup = NULL;
+    campo = NULL;
     keyCard = new Card(NULL, 10, 10);
     keyW = keyH = dispH = 0;
     Reubicar();
@@ -130,10 +132,17 @@ void NumPad::Reubicar(){
     popUpWindow->Resize(w, h);
 }
 
+TextField* NumPad::CampoEditado(){
+    if (campo) return campo;
+    return g_propFloatEditando ? &g_propFloatEditando->field : NULL;
+}
+
 void NumPad::Render(){
     // la edicion pudo terminar por OTRO camino: el teclado se va solo.
     if (modoTransform){
         if (!NumInputTransformEnCurso()){ CerrarRestaurando(); g_redraw = true; return; }
+    } else if (campo) {
+        if (g_textFieldActivo != campo){ CerrarRestaurando(); g_redraw = true; return; }   // (Enter fisico, otro foco)
     } else {
         if (!g_propFloatEditando){ Cerrar(); return; } // Enter fisico / click que commiteo
     }
@@ -161,17 +170,17 @@ void NumPad::Render(){
     // ---- display: label del campo a la IZQ + valor (con caret) a la DER ----
     // Solo en modo float. El valor se ancla al borde DERECHO (no al centro) para
     // que un valor largo se extienda hacia la izquierda SIN pisar el label.
-    if (!modoTransform && g_propFloatEditando){
+    if (!modoTransform && CampoEditado()){
         int colLabel = popUpWindow->width / 2 - borderGS - gapGS * 2;
         int ty = borderGS + gapGS;
         w3dEngine::PushMatrix();
         w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)ty, 0);
         w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
-        RenderBitmapText(g_propFloatEditando->name, textAlign::left, colLabel);
+        RenderBitmapText(campo ? campoEtiqueta : g_propFloatEditando->name, textAlign::left, colLabel);
         w3dEngine::PopMatrix();
 
         // ---- CAJA de input (fondo oscuro + borde claro, como en Properties) con el valor a la DERECHA ----
-        TextField& f = g_propFloatEditando->field;
+        TextField& f = *CampoEditado();
         int boxX = popUpWindow->width / 2;
         int boxW = popUpWindow->width - borderGS - gapGS - boxX;
         int boxH = RenglonHeightGS + gapGS;
@@ -237,11 +246,11 @@ void NumPad::AccionTecla(int fila, int col){
     if (!strcmp(t, "DEL"))  { Feed(8); }                         // retroceso
     else if (!strcmp(t, "<")){                                   // flecha izquierda
         if (modoTransform) NumInputLeft();
-        else if (g_propFloatEditando) g_propFloatEditando->field.CaretIzq();
+        else if (CampoEditado()) CampoEditado()->CaretIzq();
     }
     else if (!strcmp(t, ">")){                                   // flecha derecha
         if (modoTransform) NumInputRight();
-        else if (g_propFloatEditando) g_propFloatEditando->field.CaretDer();
+        else if (CampoEditado()) CampoEditado()->CaretDer();
     }
     else                    { Feed(t[0]); }                      // digito / . / operador
     g_redraw = true;
@@ -267,6 +276,12 @@ bool NumPad::Tecla(int tecla){
 
 void NumPad::Aceptar(){
     if (modoTransform){ NumInputConfirmar(); CerrarRestaurando(); g_redraw = true; return; }
+    if (campo){   // el numero suelto: el resultado de la expresion queda en el campo y el dueno lo aplica al soltar el foco
+        double v = 0.0;
+        if (EvaluarExpresion(campo->text, &v)){ char buf[32]; snprintf(buf, sizeof(buf), "%g", v); campo->SetText(buf); }
+        if (g_textFieldActivo == campo) g_textFieldActivo = NULL;
+        CerrarRestaurando(); g_redraw = true; return;
+    }
     if (g_propFloatEditando){
         double v = 0.0;
         if (EvaluarExpresion(g_propFloatEditando->field.text, &v)){
@@ -283,6 +298,11 @@ void NumPad::Aceptar(){
 
 void NumPad::Cancelar(){
     if (modoTransform){ NumInputCancelar(); CerrarRestaurando(); g_redraw = true; return; }
+    if (campo){   // vuelve el valor de antes (el dueno no cambia nada)
+        campo->SetText(campoAntes);
+        if (g_textFieldActivo == campo) g_textFieldActivo = NULL;
+        CerrarRestaurando(); g_redraw = true; return;
+    }
     NumEditCancel();
     NumEditSalirDelPanel();
     CerrarRestaurando();
@@ -292,6 +312,7 @@ void NumPad::Cancelar(){
 void NumPad::Cerrar(){
     // cerrado desde AFUERA (tap fuera del popup).
     if (modoTransform){ CerrarRestaurando(); g_redraw = true; return; } // deja el transform como quedo (valores ya aplicados en vivo)
+    if (campo){ Aceptar(); return; }   // el numero suelto: como el Enter
     // modo float: commitea lo tipeado, igual que la edicion inline
     if (g_propFloatEditando){ NumEditCommit(); NumEditSalirDelPanel(); }
     CerrarRestaurando();
@@ -306,6 +327,14 @@ void NumPadAbrir(){
     gNumPad->prevPopup = prev;
     PopUpActive = gNumPad;
     g_redraw = true;
+}
+
+void NumPadAbrirCampo(const std::string& etiqueta){
+    if (!g_textFieldActivo) return;
+    NumPadAbrir();
+    gNumPad->campo = g_textFieldActivo;
+    gNumPad->campoAntes = g_textFieldActivo->text;
+    gNumPad->campoEtiqueta = etiqueta;
 }
 
 void NumPadAbrirTransform(){
@@ -349,13 +378,14 @@ static const QKey* QpFila(bool simbolos, int fila){ return simbolos ? kFilasSimb
 
 QwertyPad::QwertyPad() : PopUpBase("Qwerty") {
     prevPopup = NULL;
+    ide = NULL;
     keyCard = new Card(NULL, 10, 10);
     keyH = dispH = 0; caps = false;
     Reubicar();
 }
 
 void QwertyPad::Reubicar(){
-    dispH = RenglonHeightGS + gapGS * 3;          // caja de input (texto que se edita)
+    dispH = ide ? 0 : RenglonHeightGS + gapGS * 3;   // caja de input (texto que se edita); el IDE se ve arriba
     keyH  = RenglonHeightGS * 2;                   // alto de tecla (dedos); 4 filas
     int w = MenuPantallaW;
     int h = borderGS * 2 + dispH + (keyH + gapGS) * QP_FILAS;
@@ -364,7 +394,55 @@ void QwertyPad::Reubicar(){
     popUpWindow->Resize(w, h);
 }
 
+// el IDE sigue en el layout (no se cerro ni se cambio el tipo de su viewport). No se mira el viewport ACTIVO: el dedo
+// sobre el teclado puede moverlo al viewport de abajo y el teclado igual escribe en el IDE que lo abrio
+static bool QpEnArbol(ViewportBase* v, ViewportBase* buscado){
+    if (!v) return false;
+    if (v == buscado) return true;
+    if (v->ContainerKind() == 1) return QpEnArbol(((ViewportRow*)v)->childA, buscado) || QpEnArbol(((ViewportRow*)v)->childB, buscado);
+    if (v->ContainerKind() == 2) return QpEnArbol(((ViewportColumn*)v)->childA, buscado) || QpEnArbol(((ViewportColumn*)v)->childB, buscado);
+    return false;
+}
+static IDE* QpIDE(IDE* ide){
+    return (ide && QpEnArbol(rootViewport, (ViewportBase*)ide) && ((ViewportBase*)ide)->ViewportKind() == 8) ? ide : NULL;
+}
+// el renglon del cursor del IDE queda ARRIBA del teclado (el teclado de Whisk3D no achica la ventana como el del
+// sistema en Android: sin esto se escribia debajo de las teclas)
+static void QpIDECursorVisible(IDE* ide, int yTeclado){
+    if (!ide) return;   // (cada edicion del IDE ya acomoda el scroll a su alto; aca, ademas, sobre el teclado)
+    int cx = 0, cy = 0;
+    ide->TextoAPunto(ide->curLin, ide->curCol, &cx, &cy);
+    const int sobra = cy + RenglonHeightGS * 2 - yTeclado;
+    if (sobra > 0){
+        ide->PosY -= sobra;
+        if (ide->PosY < ide->MaxPosY) ide->PosY = ide->MaxPosY;
+    }
+}
+// EL IDE CON EL TECLADO DE WHISK3D: se MAXIMIZA y ocupa todo lo de arriba del teclado (como con el del sistema, que
+// achica la ventana). Al cerrarse vuelve el layout de antes (si lo maximizo el teclado; si ya estaba solo, queda asi)
+static bool gIDEMaxPorTeclado = false;
+static void QpIDEAcomodar(IDE* ide, int altoTeclado){
+    if (ide && altoTeclado > 0){
+        ViewportBase* v = (ViewportBase*)ide;
+        if (rootViewport != v){
+            if (LayoutEstaMaximizado()) LayoutMaximizar();   // (otro panel maximizado: primero vuelve el layout)
+            viewPortActive = v;
+            LayoutMaximizar();
+            gIDEMaxPorTeclado = LayoutEstaMaximizado();
+        }
+        W3dTecladoIDEAlto(altoTeclado);
+        W3dTecladoReacomodar();
+        return;
+    }
+    if (!W3dTecladoIDEAltoActual() && !gIDEMaxPorTeclado) return;
+    W3dTecladoIDEAlto(0);
+    W3dTecladoReacomodar();                       // (el IDE a todo el alto: el layout se restaura con ese tamanio)
+    if (gIDEMaxPorTeclado && LayoutEstaMaximizado()) LayoutMaximizar();
+    gIDEMaxPorTeclado = false;
+    W3dTecladoReacomodar();
+}
 void QwertyPad::FeedStr(const char* s){
+    if (ide){ IDE* i = QpIDE(ide); if (i){ i->InsertarTipeado(s); QpIDECursorVisible(i, y); } g_redraw = true; return; }
     if (!g_textFieldActivo) return;
     for (const char* p = s; *p; p++) g_textFieldActivo->InsertChar((unsigned char)*p); // byte a byte (ñ = 2 bytes)
     g_redraw = true;
@@ -386,7 +464,10 @@ static int QpRowGeom(bool simbolos, int fila, int fullW, int kx[12], int kw[12])
 }
 
 void QwertyPad::Render(){
-    if (!g_textFieldActivo){ Cerrar(); return; } // la edicion termino por otro camino -> el teclado se va solo
+    if (ide ? !QpIDE(ide) : !g_textFieldActivo){ Cerrar(); return; } // la edicion termino por otro camino -> el teclado se va solo
+    // el formulario sobre el que se abrio (el nombre de un layout, de una textura...) sigue a la vista ARRIBA del
+    // teclado: ese popup se corre hacia arriba solo (mira que PopUpActive es otro), como con el numerico
+    if (prevPopup) prevPopup->Render();
     Reubicar();
 
     const float* gris   = ListaColores[static_cast<int>(ColorID::gris)];
@@ -403,7 +484,7 @@ void QwertyPad::Render(){
     popUpWindow->RenderBorder(false);
 
     // ---- caja de INPUT (fondo oscuro + borde claro, como en Properties) con el texto + caret ----
-    {
+    if (!ide) {
         int boxH = RenglonHeightGS + gapGS;
         int boxW = popUpWindow->width - 2 * (borderGS + gapGS);
         w3dEngine::PushMatrix();
@@ -448,7 +529,7 @@ void QwertyPad::Render(){
                 RenderBitmapText("_", textAlign::left, 1000000); // sin recorte
                 w3dEngine::PopMatrix();
             } else {
-                const char* lbl = t; char up[3] = {0,0,0};
+                const char* lbl = (ide && !strcmp(t, "OK")) ? "Enter" : t; char up[3] = {0,0,0};
                 if (caps){
                     if (t[1]=='\0' && t[0]>='a' && t[0]<='z'){ up[0]=(char)(t[0]-32); lbl=up; }
                     else if (!strcmp(t, "\xC3\xB1")){ up[0]='\xC3'; up[1]='\x91'; lbl=up; } // Ñ
@@ -467,6 +548,15 @@ void QwertyPad::AccionTecla(int fila, int col){
     int n = 0; for (; row[n].t; n++) {}
     if (col < 0 || col >= n) return;
     const char* t = row[col].t;
+    if (ide){   // EL IDE: OK es un salto de linea; borrar y las flechas van al cursor del codigo (cerrar: tocar afuera / Atras)
+        IDE* i = QpIDE(ide);
+        if (i){
+            if      (!strcmp(t, "OK"))  { i->Enter();               QpIDECursorVisible(i, y); g_redraw = true; return; }
+            else if (!strcmp(t, "DEL")) { i->Backspace();           QpIDECursorVisible(i, y); g_redraw = true; return; }
+            else if (!strcmp(t, "<"))   { i->MoverCursor(0, -1, false); QpIDECursorVisible(i, y); g_redraw = true; return; }
+            else if (!strcmp(t, ">"))   { i->MoverCursor(0, 1, false);  QpIDECursorVisible(i, y); g_redraw = true; return; }
+        }
+    }
     if (!strcmp(t, "OK")) { Aceptar(); return; }
     if (!strcmp(t, "123") || !strcmp(t, "ABC")) { gQwertySimbolos = !gQwertySimbolos; g_redraw = true; return; }
     if (!strcmp(t, "Aa")) { caps = !caps; g_redraw = true; return; }
@@ -499,16 +589,26 @@ bool QwertyPad::Tecla(int tecla){
 }
 
 void QwertyPad::Aceptar(){
+    if (ide){ if (PopUpActive == this) PopUpActive = prevPopup; QpIDEAcomodar(NULL, 0); g_redraw = true; return; }
+    // un FORMULARIO abajo (el nombre de un layout): OK es su Enter -> acepta el formulario de una
+    PopUpBase* prev = prevPopup;
+    if (prev && g_textFieldActivo){
+        if (PopUpActive == this) PopUpActive = prev;
+        if (prev->TeclaEnTexto(true)){ g_redraw = true; return; }
+        if (PopUpActive == prev) PopUpActive = this;   // (no lo tomo: sigue el camino de siempre)
+    }
     if (RenameActivo()) RenameCommit(); else g_textFieldActivo = NULL; // el texto ya esta en field (live)
     if (PopUpActive == this) PopUpActive = prevPopup;
     g_redraw = true;
 }
 void QwertyPad::Cancelar(){
+    if (ide){ if (PopUpActive == this) PopUpActive = prevPopup; QpIDEAcomodar(NULL, 0); g_redraw = true; return; }
     if (RenameActivo()) RenameCancel(); else g_textFieldActivo = NULL;
     if (PopUpActive == this) PopUpActive = prevPopup;
     g_redraw = true;
 }
 void QwertyPad::Cerrar(){ // click AFUERA = commit (igual que el Enter fisico)
+    if (ide){ if (PopUpActive == this) PopUpActive = prevPopup; QpIDEAcomodar(NULL, 0); g_redraw = true; return; }
     if (RenameActivo()) RenameCommit(); else g_textFieldActivo = NULL;
     if (PopUpActive == this) PopUpActive = prevPopup;
     g_redraw = true;
@@ -517,11 +617,92 @@ void QwertyPad::Cerrar(){ // click AFUERA = commit (igual que el Enter fisico)
 void QwertyAbrir(){
     PopUpBase* prev = PopUpActive;
     if (prev == gQwerty) prev = NULL;
-    if (gQwerty){ delete gQwerty; gQwerty = NULL; }
+    if (gQwerty){ if (gQwerty->ide) QpIDEAcomodar(NULL, 0); delete gQwerty; gQwerty = NULL; }
     gQwerty = new QwertyPad();
     gQwerty->prevPopup = prev;
     PopUpActive = gQwerty;
     g_redraw = true;
+}
+void QwertyAbrirIDE(IDE* ide){
+    if (!ide) return;
+    if (gQwerty && PopUpActive == gQwerty && gQwerty->ide == ide){   // ya esta abierto para ESE IDE (otro toque en el codigo)
+        QpIDECursorVisible(ide, MenuPantallaH - gQwerty->popUpWindow->height);
+        return;
+    }
+    QwertyAbrir();
+    gQwerty->ide = ide;
+    gQwerty->prevPopup = (gQwerty->prevPopup && gQwerty->prevPopup->NoModal()) ? gQwerty->prevPopup : NULL;   // (Buscar del IDE)
+    const int alto = gQwerty->Alto();
+    QpIDEAcomodar(ide, alto);   // el IDE maximizado arriba del teclado
+    QpIDECursorVisible(ide, MenuPantallaH - alto);
+}
+
+// ---- EL TECLADO EN PANTALLA, SIEMPRE EL MISMO (Ajustes > "Use system keyboard"; ver NumPad.h) ----
+void TecladoTextoAbrir(){
+    if (W3dTecladoDelSistema()) W3dTecladoAbrir();
+    else if (g_textFieldActivo) QwertyAbrir();
+}
+void TecladoNumeroAbrir(){
+    if (W3dTecladoDelSistema()) W3dTecladoAbrir();
+    else NumPadAbrir();
+}
+void TecladoNumeroCampoAbrir(const std::string& etiqueta){
+    if (W3dTecladoDelSistema()) W3dTecladoAbrir();
+    else NumPadAbrirCampo(etiqueta);
+}
+void TecladoIDEAbrir(IDE* ide){
+    if (W3dTecladoDelSistema()) W3dTecladoAbrir();
+    else QwertyAbrirIDE(ide);
+}
+void TecladosVigilar(){
+    if (!W3dTecladoIDEAltoActual() && !gIDEMaxPorTeclado) return;
+    if (!(gQwerty && gQwerty->ide && PopUpActive == gQwerty)) QpIDEAcomodar(NULL, 0);
+}
+
+// ---- EL CAMPO QUE SE EDITA, ARRIBA DEL TECLADO DEL SISTEMA ----
+// El de Android tapa media pantalla: el campo puede quedar debajo, en un panel que no se ve, o se escribe sin saber
+// donde. Mientras esta abierto, el texto (con su cursor) va en una franja justo arriba del teclado, con la misma caja
+// que el QWERTY de Whisk3D. El IDE no la necesita: se ve entero arriba del teclado
+class CampoSobreTeclado : public PopUpBase {
+    public:
+        Card* caja;
+        CampoSobreTeclado() : PopUpBase("CampoSobreTeclado") { caja = new Card(NULL, 10, 10); }
+        void Render() W3D_OVERRIDE {
+            if (!g_textFieldActivo) return;
+            const int boxH = RenglonHeightGS + gapGS;
+            const int h = boxH + 2 * (borderGS + gapGS);
+            x = 0; y = MenuPantallaH - h;   // (MenuPantallaH: lo que no tapa el teclado)
+            popUpWindow->Resize(MenuPantallaW, h);
+            const float* gris   = ListaColores[static_cast<int>(ColorID::gris)];
+            const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
+            const float* blanco = ListaColores[static_cast<int>(ColorID::blanco)];
+            const float* negro  = ListaColores[static_cast<int>(ColorID::negro)];
+            const float* grisUI = ListaColores[static_cast<int>(ColorID::grisUI)];
+            initView();
+            w3dEngine::Color4f(gris[0], gris[1], gris[2], 0.98f);
+            popUpWindow->RenderObject(false);
+            w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f);
+            popUpWindow->RenderBorder(false);
+            const int boxW = popUpWindow->width - 2 * (borderGS + gapGS);
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)(borderGS + gapGS), 0);
+            w3dEngine::Color4f(negro[0], negro[1], negro[2], 1.0f);
+            caja->Resize(boxW, boxH); caja->RenderObject(false);
+            w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
+            caja->RenderBorder(false);
+            w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)((boxH - RenglonHeightGS) / 2), 0);
+            w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+            RenderTextField(*g_textFieldActivo, true, textAlign::left, boxW - gapGS * 2);
+            w3dEngine::PopMatrix();
+            endView();
+        }
+};
+static CampoSobreTeclado* gCampoSobreTeclado = NULL;
+void TecladoSistemaCampoRender(){
+    if (!W3dTecladoVisible() || !g_textFieldActivo) return;
+    if (PopUpActive && PopUpActive->EsTeclado()) return;   // (uno de Whisk3D ya muestra su caja)
+    if (!gCampoSobreTeclado) gCampoSobreTeclado = new CampoSobreTeclado();
+    gCampoSobreTeclado->Render();
 }
 
 // ============================================================================

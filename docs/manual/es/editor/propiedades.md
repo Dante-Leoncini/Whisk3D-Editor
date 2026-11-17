@@ -87,6 +87,26 @@ La mayoría de las filas son **números**: el nombre a la izquierda y el valor a
 
 ![Un dedo apoyado sobre Posición X se arrastra a la derecha y a la izquierda, y el cubo se mueve con el número](../tutoriales/img/propiedades-arrastrar-dedo.webp)
 
+### El menú de una propiedad
+
+Sobre un número, una casilla o un color se abre un menú con el nombre de la fila arriba:
+
+| Opción | Qué hace |
+|---|---|
+| Restablecer | Vuelve al valor de fábrica: la posición y la rotación en 0, la escala en 1, **Visible** y **Renderizable** tildadas. En las filas que no tienen un valor de fábrica queda en gris. |
+| Copiar | Guarda el valor. Un número también va al portapapeles del sistema, para pegarlo en otra aplicación. |
+| Pegar | Pone el valor copiado en una fila del mismo tipo. En un número también pega uno copiado de otra aplicación. |
+| Insertar keyframe | Guarda el valor en el cuadro actual (si ya había un keyframe ahí, lo actualiza). |
+| Borrar todos los keyframes | Saca toda la animación de ese valor; el valor de ahora queda. |
+| Copiar keyframe / Pegar keyframe | Copia el keyframe del cuadro actual y lo pega en el cuadro actual, en la misma fila o en otra. |
+
+Las cuatro de animación, separadas con una línea, aparecen solo en las filas que se pueden animar (las que tienen el rombo).
+
+| | Cómo se abre |
+|---|---|
+| ![PC](../tutoriales/img/icono-pc.svg) PC | Click derecho sobre la fila. |
+| ![Android](../tutoriales/img/icono-android.svg) Pantalla táctil | Dejá el dedo quieto sobre la fila: arriba y a la izquierda del dedo gira un círculo de puntos blancos que se van poniendo verdes; cuando se completa (medio segundo), el teléfono vibra y el menú aparece ahí. Podés deslizar el dedo hasta una opción y soltarlo ahí. |
+
 ## Los desplegables
 
 Un **desplegable** es un botón que muestra la opción elegida, como el **Tipo** de una luz (Puntual, Sol o Foco) o el **Modo** de la rotación. Al activarlo se abre la lista de opciones, con la actual en verde; al elegir otra, la lista se cierra.
@@ -174,10 +194,10 @@ Todas las pestañas y sus tarjetas están en el manual: [Propiedades](propiedade
 
 | Pestaña | Qué tiene |
 |---|---|
-| Archivo / Render (diskette) | **Archivo**: abrir, guardar, guardar como, guardar versión, extraer assets. **Render**: ruta, nombre, **formato** (PNG, JPG, y MKV o MP4 si la computadora tiene ffmpeg) con su calidad, tamaño, pases extra, fondo, **Trazado de rayos** (rayos, muestras, pases), **Composición final** (con alfa en PNG y con postprocesado), Renderizar imagen, Renderizar animación (en video, **Con sonido**) y **Renderizar audio** (con su formato, **Audio**, y su **Bitrate**). **Juego**: plataforma (Windows, Symbian, Linux .deb, AppImage, WebGL, Android, Android 2.3), ventana, orientación, icono, física, sonido, volumen, **resolución** (el porcentaje de la pantalla al que dibuja el juego: en Android 2.3 el sistema lo estira, y en esos teléfonos dibujar menos píxeles da más cuadros) y Compilar juego (con un teléfono conectado por adb lo instala y lo abre). En el editor web no se compila: hacen falta las herramientas de la computadora, así que ahí la tarjeta solo tiene con qué escena arranca y el volumen. **Exportar**: OBJ, glTF, GLB, STL (solo los triángulos, para imprimir en 3D o pasar a un programa de CAD). **Ajustes**: idioma, antialiasing, gráficos, skin, logs, escala, **Atajos de teclado…** y Guardar cambios. |
+| Archivo / Render (diskette) | **Archivo**: nuevo proyecto, abrir, guardar, guardar como, guardar versión. **Render**: ruta, nombre, **formato** (PNG, JPG, y MKV o MP4 si la computadora tiene ffmpeg) con su calidad, tamaño, pases extra, **fondo** (color o textura 360, con su rotación), **Trazado de rayos** (rayos, muestras, pases, **rebotes de luz**), **Composición final** (con alfa en PNG y con postprocesado), Renderizar imagen, Renderizar animación (en video, **Con sonido**) y **Renderizar audio** (con su formato, **Audio**, y su **Bitrate**). **Juego**: plataforma (Windows, Symbian, Linux .deb, AppImage, WebGL, Android, Android 2.3), ventana, orientación, icono, física, sonido, **acceso a la red**, volumen, **resolución** (el porcentaje de la pantalla al que dibuja el juego: en Android 2.3 el sistema lo estira, y en esos teléfonos dibujar menos píxeles da más cuadros) y Compilar juego (con un teléfono conectado por adb lo instala y lo abre). En el editor web no se compila: hacen falta las herramientas de la computadora, así que ahí la tarjeta solo tiene con qué escena arranca y el volumen. **Exportar**: OBJ, glTF, GLB, STL (solo los triángulos, para imprimir en 3D o pasar a un programa de CAD). **Ajustes**: idioma, antialiasing, gráficos, skin, logs, **Usar teclado del sistema** (destildado, el de fábrica: los teclados de Whisk3D en todos lados, el de letras para texto y el numérico para números; tildado: el del teléfono en todos lados), escala, **Atajos de teclado…** y Guardar cambios. |
 | Objeto | Posición, rotación (Euler, cuaternión o eje-ángulo), escala, nombre, visible, renderizar; animaciones y paleta del objeto. |
-| Contextual | Depende del tipo: partes de malla y **material** (textura, iluminación, color de vértice, transparencia, reflejos, normal map, mezcla, profundidad, capas de textura, **Avanzado: shader personalizado** — ver [Shaders escritos](shaders.md); Rugosidad, Metálico, Transmisión e IOR con trazado de rayos), luz, cámara, niebla, partículas, física, hitbox, esqueleto y huesos, elementos 2D, prefabs, rutinas. |
-| Malla 3D | La malla usada (y cuántos la comparten), mapas UV, capas de color, grupos de vértices, grupos UV. Con un recurso elegido en la Biblioteca: sus datos y su ubicación (dentro o fuera del .w3d). |
+| Contextual | Depende del tipo: partes de malla y **material** (textura, iluminación, color de vértice, transparencia, reflejos, normal map, mezcla, profundidad, capas de textura, **Avanzado: shader personalizado** — ver [Shaders escritos](shaders.md); Rugosidad, Metálico, Transmisión e IOR, que se ven en el trazado de rayos y en la luz por píxel), luz, cámara, niebla, partículas, física, hitbox, esqueleto y huesos, elementos 2D, prefabs, rutinas. |
+| Malla 3D | La malla usada (y cuántos la comparten), mapas UV, capas de color, grupos de vértices, grupos UV. Con un recurso elegido en la Biblioteca: sus datos, su ubicación (dentro o fuera del .w3d), **Extraer** (una copia de su archivo a una carpeta) y, si es una malla, **Malla en texto**. |
 | Modificadores | Ver [Modificadores](objeto-malla.md#la-pestaña-modificadores). |
 | Transformar | Solo en Modo Edición: centro de la selección y de sus UV, editables. |
 | Esqueleto 2D | Esqueletos y huesos 2D de la malla. |
