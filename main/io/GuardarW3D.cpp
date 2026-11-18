@@ -66,6 +66,7 @@
 #include "objects/Sonido.h"            // objeto Sonido (audio puesto en la escena)
 #include "objects/Recorte.h"           // LimpiarZ / Recorte
 #include "objects/Hitbox.h"            // HITBOX (sus campos los escribe objects/Hitbox.cpp)
+#include "objects/SondaLuz.h"   // la sonda de luz (sus campos)
 #include "objects/InstanciaPrefab.h"   // INSTANCIA DE PREFAB: se escribe el nodo (prefab + overrides), NO lo que genera
 #include "objects/ProxyW3d.h"         // PROXY W3D: el nodo (libreria + elemento + overrides); lo que genera es de la libreria
 #include "io/Librerias.h"             // las referencias a una LIBRERIA que no esta (se escriben tal cual)
@@ -383,7 +384,12 @@ static std::string Asset(CtxGuardar* cx, std::string& rutaDisco) {
     if (gSeco || !cx->esc) return rutaDisco;   // (en seco: la ruta tal cual esta en memoria)
     { std::string png;   // textura interna que solo vive en memoria (generada / pintada sin guardar): sus bytes
       if (TexEditBytesParaGuardar(rutaDisco, png)) { cx->esc->AgregarBytes(rutaDisco, png, true); return rutaDisco; } }
-    return cx->esc->Ingerir(rutaDisco, NULL, gQuien);
+    const std::string antes = rutaDisco;
+    const std::string e = cx->esc->Ingerir(rutaDisco, NULL, gQuien);
+    // (un archivo de DISCO que entro adentro recien ahora -un proyecto que no se habia guardado-: su origen, para
+    //  "Actualizar textura")
+    if (!e.empty() && e != antes && !W3dEsNombreDeEntrada(antes) && !W3dRefEsExterna(antes)) W3dAssetOrigenAnotar(e, antes);
+    return e;
 }
 
 // la textura de un paso "Bind texture" de una Rutina: entra al .w3d como la de un material
@@ -701,14 +707,16 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
 // ---------------------------------------------------------------------------
 static std::vector<Material*> gMats;
 
+static void MatRegistrarUno(Material* mat) {
+    if (!mat) return;
+    if (!mat->libreria.empty()) return;   // (uno de una LIBRERIA: se nombra, no se escribe)
+    for (size_t i = 0; i < gMats.size(); i++) if (gMats[i] == mat) return;
+    gMats.push_back(mat);
+}
 static void MatRegistrar(Mesh* m) {
     for (size_t g = 0; g < m->materialsGroup.size(); g++) {
-        Material* mat = m->materialsGroup[g].material;
-        if (!mat) continue;
-        if (!mat->libreria.empty()) continue;   // (uno de una LIBRERIA: se nombra, no se escribe)
-        bool ya = false;
-        for (size_t i = 0; i < gMats.size() && !ya; i++) if (gMats[i] == mat) ya = true;
-        if (!ya) gMats.push_back(mat);
+        MatRegistrarUno(m->materialsGroup[g].material);
+        for (size_t c = 0; c < m->materialsGroup[g].capasMat.size(); c++) MatRegistrarUno(m->materialsGroup[g].capasMat[c]);   // (las capas de encima)
     }
 }
 
@@ -768,6 +776,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         if (mt->orden_pasada != 0)  { s += ", \"ordenPasada\": ";      JNum(s, (float)mt->orden_pasada); }
         if (mt->mezcla != 0)        { s += ", \"mezcla\": ";           JNum(s, (float)mt->mezcla); }
         if (mt->porPixel) s += ", \"luzPorPixel\": true";   // (sombreado por pixel: solo si esta prendido)
+        if (mt->luzIndirecta) s += ", \"luzIndirecta\": true";   // (la luz de una sonda por vertice en el pipeline fijo)
         if (mt->ssr) s += ", \"reflejosPantalla\": true";   // (reflejos en pantalla: solo si estan prendidos)
         // LINEAS (aristas por material): solo si esta prendido (mismo criterio que decal)
         if (mt->lineas) {
@@ -796,7 +805,8 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         std::string nrm = MatTextura(cx, mt->normalTexture);
         if (nrm.empty() && dz && !dz->normal.empty()) nrm = Asset(cx, dz->normal);
         if (!nrm.empty()) { s += ",\n      \"normalTextura\": "; JEsc(s, nrm); }
-        // MEZCLA DE TEXTURAS (Material::texturaB / mezclaB): la textura B (como el normal map) y cuanto de ella
+        // LA TEXTURA B (Material::texturaB): la RAMPA del toon. La mezcla de texturas de antes ahora es una capa con la
+        // mezcla Mix y su factor (al abrir, import_w3d la convierte); una que quedo de una sesion vieja se guarda igual
         std::string tb = MatTextura(cx, mt->texturaB);
         if (tb.empty() && dz && !dz->texB.empty()) tb = Asset(cx, dz->texB);
         if (!tb.empty()) { s += ",\n      \"texturaB\": "; JEsc(s, tb); s += ", \"mezclaB\": "; JNum(s, mt->mezclaB); }
@@ -848,11 +858,15 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
                 const int mezcla = dormida ? dz->capas[c].mezcla : mt->capas[c - nDorm].blend;
                 const int uvCapa = dormida ? dz->capas[c].uv : mt->capas[c - nDorm].uvMapa;
                 const bool on = dormida ? dz->capas[c].on : mt->capas[c - nDorm].on;
+                const float fuerza = dormida ? dz->capas[c].fuerza : mt->capas[c - nDorm].fuerza;
+                const bool horneada = dormida ? dz->capas[c].horneada : mt->capas[c - nDorm].horneada;
                 if (!primera) s += ",";
                 primera = false;
                 s += " { \"textura\": "; JEsc(s, ct);
                 s += ", \"mezcla\": "; JNum(s, (float)mezcla);
                 if (uvCapa != 0) { s += ", \"uv\": "; JNum(s, (float)uvCapa); }   // solo si no es la base (diffs estables)
+                if (fuerza != 1.0f) { s += ", \"fuerza\": "; JNum(s, fuerza); }   // el factor de la mezcla (ausente = 1)
+                if (horneada) s += ", \"horneada\": true";   // (la luz horneada: el material sin luz de tiempo real)
                 s += ", \"on\": "; s += on ? "true" : "false"; s += " }";
             }
             s += " ]";
@@ -1313,6 +1327,7 @@ static void EscribirRender(std::string& s, CtxGuardar* cx) {
     if (g_renderBg[0] != 0.0f || g_renderBg[1] != 0.0f || g_renderBg[2] != 0.0f) {
         c += ", \"fondo\": ["; JNum(c, g_renderBg[0]); c += ", "; JNum(c, g_renderBg[1]); c += ", "; JNum(c, g_renderBg[2]); c += "]"; }
     if (g_renderBgModo != 0) E::I(c, "fondoModo", g_renderBgModo);
+    if (g_renderLuzFondo != 1.0f) E::F(c, "fondoLuz", g_renderLuzFondo);   // (la luz del fondo; ausente = 100%)
     if (g_renderBgRot[0] != 0.0f || g_renderBgRot[1] != 0.0f || g_renderBgRot[2] != 0.0f) {
         c += ", \"fondoRot\": ["; JNum(c, g_renderBgRot[0]); c += ", "; JNum(c, g_renderBgRot[1]); c += ", "; JNum(c, g_renderBgRot[2]); c += "]"; }
     if (!g_renderBgTexs.empty()) {
@@ -2125,6 +2140,11 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         CamposComunes(s, ind + 1, o);
         HitboxEscribirCampos(s, ind + 1, (Hitbox*)o);
     }
+    else if (t == ObjectType::sondaluz) {   // SONDA DE LUZ: la caja, la grilla y la luz horneada (objects/SondaLuz.cpp)
+        JSang(s, ind + 1); s += "\"tipo\": \"sondaluz\",\n";
+        CamposComunes(s, ind + 1, o);
+        SondaLuzEscribirCampos(s, ind + 1, (SondaLuz*)o);
+    }
     else if (t == ObjectType::prefab) {
         // INSTANCIA DE PREFAB: el nodo, su prefab y sus overrides (sus hijos NO: ver EscribirHijos)
         JSang(s, ind + 1); s += "\"tipo\": \"prefab\",\n";
@@ -2403,6 +2423,28 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         if (m->noEditable) { s += ",\n"; JSang(s, ind + 1); s += "\"noEditable\": true"; }
         if (m->soloRutina) { s += ",\n"; JSang(s, ind + 1); s += "\"soloRutina\": true"; }
         if (m->bloquearNormales) { s += ",\n"; JSang(s, ind + 1); s += "\"bloquearNormales\": true"; }
+        // LAS CAPAS DE MATERIAL de encima de cada parte (MaterialGroup::capasMat), POR NOMBRE: la capa 1 es la de siempre
+        // (el bloque PARTMAT de la malla); estas van con el objeto
+        { bool hay = false;
+          for (size_t g = 0; g < m->materialsGroup.size() && !hay; g++) if (!m->materialsGroup[g].capasMat.empty()) hay = true;
+          if (hay) {
+              s += ",\n"; JSang(s, ind + 1); s += "\"capasMaterial\": [";
+              bool primero = true;
+              for (size_t g = 0; g < m->materialsGroup.size(); g++) {
+                  const std::vector<Material*>& cm = m->materialsGroup[g].capasMat;
+                  if (cm.empty()) continue;
+                  s += primero ? " " : ", "; primero = false;
+                  s += "{ \"parte\": "; JNum(s, (float)g); s += ", \"materiales\": [";
+                  bool p1 = true;
+                  for (size_t c = 0; c < cm.size(); c++) {
+                      if (!cm[c]) continue;
+                      if (!p1) s += ", "; p1 = false;
+                      JEsc(s, cm[c]->name);
+                  }
+                  s += "] }";
+              }
+              s += " ]";
+          } }
         // el UV PERSONALIZADO de los mapas de sus materiales (Mesh::uvPersonal): material, mapa y la capa UV por nombre
         // (por NOMBRE de su capa UV, o un INDICE propio)
         if (!m->uvPersonal.empty() || !m->uvPersonalIdx.empty()) {
@@ -3533,6 +3575,21 @@ bool GuardarW3D(const std::string& ruta) {
     if (W3dRaizActiva() != W3dRaizBloque()) { W3dRaizUsar(W3dRaizBloque()); EscribirMix(s); W3dRaizUsar(volverARaiz.idx); }
     else EscribirMix(s);
     EscribirSesion(s);
+    // EL ORIGEN de los assets importados (entrada -> el archivo de disco del que se copio): "Actualizar textura" vuelve a
+    // leerlo cuando se edito afuera. Va al FINAL: lo que este guardado acaba de meter adentro (Asset) ya esta anotado.
+    // Solo las entradas que lleva el .w3d nuevo
+    {
+        std::vector<std::pair<std::string, std::string> > og;
+        W3dAssetOrigenesListar(og);
+        bool hay = false;
+        for (size_t i = 0; i < og.size(); i++) {
+            if (gEsc && !gEsc->Tiene(og[i].first)) continue;
+            s += hay ? ",\n    " : "  \"origenes\": {\n    ";
+            JEsc(s, og[i].first); s += ": "; JEsc(s, og[i].second);
+            hay = true;
+        }
+        if (hay) s += "\n  },\n";
+    }
     // LAYOUT: el arbol VIVO (tipos + splits). Los .w3d guardados con el literal
     // "2d" siguen abriendo por el template estandar (ver AplicarLayoutTexto).
     {

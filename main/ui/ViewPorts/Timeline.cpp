@@ -930,17 +930,63 @@ static void DopeCanales2D(const std::vector<AnimProperty>& props, std::vector<Ti
     }
 }
 
+// el nombre de un canal como lo lista DopeCanales ("X Location", con la Y y la Z como se ven: Z arriba), o "" si es
+// uno que no tiene nombre ahi
+static std::string DopeNombreCanal(int prop, int comp){
+    // (por la componente INTERNA: la X es la X, la Y interna se ve como Z y la Z interna como Y)
+    static const char* nP[3] = {"X Location","Z Location","Y Location"};
+    static const char* nR[3] = {"X Euler Rotation","Z Euler Rotation","Y Euler Rotation"};
+    static const char* nS[3] = {"X Scale","Z Scale","Y Scale"};
+    if (comp < 0 || comp > 2) return std::string();
+    if (prop == AnimPosition) return T(nP[comp]);
+    if (prop == AnimRotation) return T(nR[comp]);
+    if (prop == AnimScale)    return T(nS[comp]);
+    if (prop == AnimVisible && comp == AnimX) return T("Visible");
+    if (prop == AnimRender && comp == AnimX)  return T("Renderable");
+    return std::string();
+}
+
 void Timeline::ConstruirDopeRows(){
-    dopeRows.clear(); panelW = 0;
+    dopeRows.clear(); dopeVisibles = 0; panelW = 0;
     rowH = RenglonHeightGS;
     // "JUEGO" (el estado base de un juego, ver W3dRaices.h): un juego NO tiene keyframes propios (el cabezal
     // lo lleva la simulacion); las curvas se ven eligiendo uno de sus CLIPS en el selector de animacion.
     if (ActiveAnimKind == 2) return;
     std::vector<DopeRow> filas;
+    std::vector<DopeRow> fantasmas;   // (los canales que no se listan: ver DopeRow::fantasma)
     SkeletalAnimation* clip = ClipActivo();
     if (clip){
         // ---- ARMATURE: SOLO en Pose Mode y SOLO los huesos SELECCIONADOS (sino es un caos) ----
         Armature* a = ActiveAnimArm;
+        if (a && InteractionMode != PoseMode && a->select && modo == TL_MODO_DOPE){
+            // ...y FUERA de Pose Mode, con el armature SELECCIONADO: UNA fila con los keyframes de TODOS sus huesos
+            // (sin el detalle de cada uno). Son keyframes como cualquiera: se eligen, se arrastran, se borran y se
+            // escalan, y lo que se hace en un frame lo hacen todos los huesos que tienen un keyframe ahi. Sus
+            // canales van como filas FANTASMA (no se listan). En CURVAS no: ahi cada curva es de un hueso (Pose Mode)
+            const std::string pref = DopePrefArm();
+            DopeRow r; r.tipo=1; r.nivel=0; r.nombre=a->name; r.icono=(int)IconType::armature;
+            r.claveFila = pref; r.ownerKey = pref; r.propId=-1; r.compId=-1;
+            for (size_t t=0;t<clip->tracks.size();t++){
+                const BoneTrack& tr = clip->tracks[t];
+                char sb[24]; snprintf(sb,sizeof sb,"/b%d",tr.bone);
+                for (size_t p=0;p<tr.Propertys.size();p++){
+                    const AnimProperty& ap = tr.Propertys[p];
+                    if (ap.keyframes.empty()) continue;
+                    DopeRow c; c.tipo=3; c.nivel=1; c.icono=-1; c.fantasma=true;
+                    c.ownerKey = pref + sb; c.propId = ap.Property; c.compId = ap.component;
+                    // (el nombre no se ve en el panel, pero lo usan la tarjeta Keyframe y la lista de curvas elegidas)
+                    c.nombre = (tr.bone >= 0 && tr.bone < (int)a->bones.size()) ? a->bones[(size_t)tr.bone].name : std::string("?");
+                    { const std::string cn = DopeNombreCanal(ap.Property, ap.component); if (!cn.empty()) c.nombre += " \xC2\xB7 " + cn; }
+                    char cb[32]; snprintf(cb,sizeof cb,"|p%d|c%d", ap.Property, ap.component);
+                    c.claveFila = c.ownerKey + cb;
+                    for (size_t k=0;k<ap.keyframes.size();k++) c.keys.push_back(ap.keyframes.Frame(k));
+                    std::sort(c.keys.begin(), c.keys.end()); c.keys.erase(std::unique(c.keys.begin(), c.keys.end()), c.keys.end());
+                    DopeUnir(r.keys, c.keys);
+                    fantasmas.push_back(c);
+                }
+            }
+            if (!r.keys.empty()) filas.push_back(r); else fantasmas.clear();
+        }
         if (a && InteractionMode == PoseMode){
             std::vector<int> huesos;
             for (size_t b=0;b<a->bones.size();b++){
@@ -1156,16 +1202,22 @@ void Timeline::ConstruirDopeRows(){
     dopeRows.push_back(s);
     if (!DopeColapsado("summary"))
         for (size_t i=0;i<filas.size();i++) dopeRows.push_back(filas[i]);
+    dopeVisibles = dopeRows.size();
+    for (size_t i=0;i<fantasmas.size();i++) dopeRows.push_back(fantasmas[i]);   // (al final: no corren a nadie)
 
     // OJO: cada fila esta oculta si le apagaron el suyo o el de alguno de sus PADRES (el padre de un canal es su
     // hueso/objeto, y el de todos es el Summary). Se resuelve aca, una vez: el resto del codigo solo lee 'oculto'.
+    // (primero las que tienen el ojo apagado -casi nunca hay- y cada fila se compara solo con esas: comparar todas
+    //  contra todas, con los cientos de canales de un armature, era mucho para cada cuadro)
+    std::vector<size_t> apagadas;
+    for (size_t i=0;i<dopeRows.size();i++) if (DopeOjoOff(dopeRows[i].claveFila)) apagadas.push_back(i);
     for (size_t i=0;i<dopeRows.size();i++){
         DopeRow& d = dopeRows[i];
-        bool off = DopeOjoOff(d.claveFila);
-        if (!off) for (size_t j=0;j<dopeRows.size() && !off;j++){
-            const DopeRow& p2 = dopeRows[j];
-            if (&p2 == &d || !DopeOjoOff(p2.claveFila)) continue;
-            if (p2.tipo == 0) off = true;                       // el Summary cubre todo
+        bool off = false;
+        for (size_t j=0;j<apagadas.size() && !off;j++){
+            const DopeRow& p2 = dopeRows[apagadas[j]];
+            if (apagadas[j] == i) off = true;
+            else if (p2.tipo == 0) off = true;                  // el Summary cubre todo
             else if (p2.propId < 0 && DopeCubre(p2.ownerKey, d.ownerKey)) off = true;
         }
         d.oculto = off;
@@ -1174,7 +1226,7 @@ void Timeline::ConstruirDopeRows(){
     // ancho del panel = la fila mas larga. MISMAS distancias que el Outliner: solo se reserva el hueco de la
     // flecha si la fila es desplegable y el del icono si tiene icono (sino el texto se corre a la izquierda).
     int maxw = 0;
-    for (size_t i=0;i<dopeRows.size();i++){
+    for (size_t i=0;i<dopeVisibles;i++){
         const DopeRow& d = dopeRows[i];
         int w = marginGS + d.nivel*(IconSizeGS+gapGS);
         if (!d.claveDespliegue.empty()) w += IconSizeGS + gapGS;
@@ -1301,7 +1353,7 @@ Timeline::Timeline(){
     viewCenterV = 0.0f;                    // el CENTRO del strip es el CERO
     scrubbing = false; lastMx = lastMy = 0;
     stripY = numY = barH2 = 0; curBtnX = curBtnW = 0;
-    panelW = 0; panelWUser = 0; panelResize = false; rowH = RenglonHeightGS; hoverRow = -1;
+    panelW = 0; panelWUser = 0; panelResize = false; rowH = RenglonHeightGS; hoverRow = -1; dopeVisibles = 0;
     panelBordeHover = false; panelPosX = 0; panelContW = 0; panelBarraH = false; panelPaneo = 0; // dope sheet (panelW=0 -> timeline clasico)
     fStart=(float)StartFrame; fEnd=(float)EndFrame; fCur=(float)CurrentFrame;
 
@@ -1596,7 +1648,7 @@ void Timeline::Render(){
     // KEYFRAMES. Con dope sheet: un rombo por FILA, a la altura de su renglon (scrolleable en vertical).
     // Sin dope sheet (nada seleccionado/animado): la fila unica clasica abajo, igual que siempre.
     else if (!dopeRows.empty()){
-        for (size_t r=0; r<dopeRows.size(); r++){
+        for (size_t r=0; r<dopeVisibles; r++){
             int ry0 = stripY + (int)r*rowH + PosY;   // las filas arrancan DEBAJO de los numeros
             if (ry0 + rowH < stripY || ry0 > height) continue;      // fuera de vista
             float ry = (float)ry0 + rowH*0.5f;
@@ -1619,7 +1671,8 @@ void Timeline::Render(){
                 // alguno de los canales que cubren tiene ese frame seleccionado.
                 bool sel = false;
                 if (dr.propId >= 0) sel = g_dopeKeySel.count(DopeKeyId(dr.ownerKey, dr.propId, dr.compId, ks[i])) > 0;
-                else for (size_t c=0;c<dopeRows.size() && !sel;c++){ const DopeRow& cc=dopeRows[c]; if (cc.propId<0) continue;
+                else if (!g_dopeKeySel.empty())   // (sin nada elegido no hace falta recorrer los canales que cubre)
+                    for (size_t c=0;c<dopeRows.size() && !sel;c++){ const DopeRow& cc=dopeRows[c]; if (cc.propId<0) continue;
                         if (!DopeCubre(dr.ownerKey, cc.ownerKey)) continue;
                         sel = g_dopeKeySel.count(DopeKeyId(cc.ownerKey, cc.propId, cc.compId, ks[i])) > 0; }
                 if (sel)                   SetCol(ColorID::accent, 1.0f);
@@ -1821,7 +1874,7 @@ static bool HandleVisible(const AnimProperty* ap, size_t i, bool salida){
 // Una fila aporta una CURVA al dibujo? (es un canal Y tiene el ojo prendido). La comparten el render y el
 // contador de costo: cuando cada uno filtraba por su lado, agregar el ojo a uno solo hizo que el contador midiera
 // curvas que el render ya no dibujaba.
-static bool FilaEsCurvaVisible(const Timeline::DopeRow& d){ return d.propId >= 0 && !d.oculto; }
+static bool FilaEsCurvaVisible(const Timeline::DopeRow& d){ return d.propId >= 0 && !d.oculto && !d.fantasma; }
 
 // Arma el TRAZO de UNA curva en g_curvaBuf (coords locales). Devuelve la cantidad de VERTICES.
 // Recorre por TRAMOS, no por pixel: un tramo lineal o constante queda definido por sus extremos y no necesita ni
@@ -2140,7 +2193,7 @@ void Timeline::RenderDopePanel(){
 
     // fondo de fila: SELECCIONADA (accent) / HOVER (mas clara). Fase sin textura.
     // (la parte del STRIP de la fila seleccionada la pinta el bloque de keyframes -> el renglon cruza TODO)
-    for (size_t r=0; r<dopeRows.size(); r++){
+    for (size_t r=0; r<dopeVisibles; r++){
         int ry = stripY + (int)r*rowH + PosY;
         if (ry + rowH < stripY || ry > height) continue;
         bool sel = g_dopeRowSel.count(dopeRows[r].claveFila) > 0;
@@ -2161,7 +2214,7 @@ void Timeline::RenderDopePanel(){
       if (lw < 0) lw = 0; if (lh < 0) lh = 0;
       gfx::Enable(gfx::ScissorTest);
       gfx::Scissor(x, W3dPantallaAlto - y - stripY - lh, lw, lh); }
-    for (size_t r=0; r<dopeRows.size(); r++){
+    for (size_t r=0; r<dopeVisibles; r++){
         int ry = stripY + (int)r*rowH + PosY;
         if (ry + rowH < stripY || ry > height) continue;  // culling vertical
         DopeRow& d = dopeRows[r];
@@ -2203,7 +2256,7 @@ void Timeline::RenderDopePanel(){
     gfx::Disable(gfx::ScissorTest); // fin del recorte del texto del panel
 
     // ---- OJOS (mismo icono y misma columna que el Outliner): apagarlo oculta la curva ----
-    for (size_t r=0; r<dopeRows.size(); r++){
+    for (size_t r=0; r<dopeVisibles; r++){
         int ry = stripY + (int)r*rowH + PosY;
         if (ry + rowH < stripY || ry > height) continue;   // culling vertical
         const DopeRow& d = dopeRows[r];
@@ -2254,7 +2307,7 @@ bool Timeline::DopeClickPanel(int mx, int my){
       } }
     if (lx < 0 || lx >= panelW || ly < stripY || ly >= height) return false;
     int r = (ly - stripY - PosY) / (rowH>0?rowH:1);
-    if (r < 0 || r >= (int)dopeRows.size()) return true; // dentro del panel pero sin fila: igual consumido
+    if (r < 0 || r >= (int)dopeVisibles) return true; // dentro del panel pero sin fila: igual consumido
     DopeRow& d = dopeRows[r];
     // OJO: primero, que esta pegado al borde derecho del panel (y ahi no hay ni flecha ni nombre)
     if (lx >= DopeOjoX() - gapGS){
@@ -2283,7 +2336,7 @@ void Timeline::DopeSelKeysDeFilasSel(){
     g_dopeKeySel.clear();
     for (size_t r=0;r<dopeRows.size();r++){
         const DopeRow& d = dopeRows[r];
-        if (!g_dopeRowSel.count(d.claveFila)) continue;
+        if (d.fantasma || !g_dopeRowSel.count(d.claveFila)) continue;
         if (d.propId >= 0){                        // fila de CANAL: es una curva
             for (size_t i=0;i<d.keys.size();i++) g_dopeKeySel.insert(DopeKeyId(d.ownerKey,d.propId,d.compId,d.keys[i]));
         } else {                                   // fila PADRE (objeto / hueso / Summary): las curvas que cubre
@@ -2303,7 +2356,7 @@ bool Timeline::DopeClickStrip(int mx, int my){
     int lx = mx - x, ly = my - y;
     if (lx < panelW || ly < stripY || ly >= height) return false;
     int r = (ly - stripY - PosY) / (rowH>0?rowH:1);
-    if (r < 0 || r >= (int)dopeRows.size()) return false;
+    if (r < 0 || r >= (int)dopeVisibles) return false;
     const DopeRow& d = dopeRows[r];
     if (d.oculto) return false;                           // ojo apagado: no se puede clickear lo que no se ve
     // OJO: 'mejor' es un NUMERO DE FRAME (puede ser negativo): el "hubo hit" va
@@ -2799,7 +2852,7 @@ void Timeline::DopeHover(int mx, int my){
     int lx = mx - x, ly = my - y, h = -1;
     if (!dopeRows.empty() && lx >= 0 && lx < panelW && ly >= stripY && ly < height){
         int r = (ly - stripY - PosY) / (rowH>0?rowH:1);
-        if (r >= 0 && r < (int)dopeRows.size()) h = r;
+        if (r >= 0 && r < (int)dopeVisibles) h = r;
     }
     if (h != hoverRow){ hoverRow = h; g_redraw = true; }
 }
@@ -2818,7 +2871,7 @@ void Timeline::DopeFilasNav(std::vector<int>& out) const {
     for (size_t r=0;r<dopeRows.size();r++){
         const DopeRow& d = dopeRows[r];
         if (d.propId < 0 || d.oculto) continue;
-        if (g_dopeRowSel.count(d.claveFila)) out.push_back((int)r);
+        if (!d.fantasma && g_dopeRowSel.count(d.claveFila)) out.push_back((int)r);
     }
     if (!out.empty()) return;              // hay curvas elegidas: se trabaja sobre ESAS
     // si no, TODAS las de canal (sus frames son los del summary: la union)
@@ -4614,7 +4667,7 @@ void Timeline::CajaAplicar(int sx0, int sy0, int sx1, int sy1, bool tocar, bool 
     if (!agregar) g_dopeKeySel.clear();
     std::vector<float> xy;
     for (size_t r=0; r<dopeRows.size(); r++){
-        const DopeRow& d = dopeRows[r];
+        const DopeRow& d = dopeRows[r]; if (d.fantasma && modo != TL_MODO_CURVAS) continue;
         if (modo == TL_MODO_CURVAS){
             if (d.propId < 0 || d.oculto) continue;
             static AnimProperty s_vtxTmp;
@@ -5123,7 +5176,7 @@ int Timeline::TiraEn(int mx, int my, Sonido** out) {
     const int lx = mx - x, ly = my - y;
     if (lx < panelW || ly < stripY || ly >= height) return TIRA_NADA;
     const int r = (ly - stripY - PosY) / (rowH > 0 ? rowH : 1);
-    if (r < 0 || r >= (int)dopeRows.size()) return TIRA_NADA;
+    if (r < 0 || r >= (int)dopeVisibles) return TIRA_NADA;
     const DopeRow& d = dopeRows[r];
     if (!d.sonido || d.oculto) return TIRA_NADA;
     Sonido* s = (Sonido*)d.sonido;

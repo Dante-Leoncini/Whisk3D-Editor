@@ -203,11 +203,18 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable, publ
             Object* sonido;      // la fila de un objeto SONIDO: en el strip va su TIRA (se mueve y se recorta)
             int tiraFilas;       // la tira ocupa esta fila y 'tiraFilas' mas (con la forma de onda o el volumen a la
                                  // vista: mas alta); -1 = es una de esas filas de CONTINUACION (sin nombre)
+            bool fantasma;       // un CANAL que NO SE LISTA: no tiene renglon (ni se dibuja ni se toca), pero esta para
+                                 // que lo alcance lo de siempre (elegir por la fila padre, la caja, A, mover, borrar,
+                                 // escalar, interpolar, Ctrl+Z). Los huesos de un armature en Object Mode: se ve UNA
+                                 // fila con sus keyframes y se mueven todos juntos. Van AL FINAL de dopeRows
+                                 // (desde dopeVisibles): asi la fila r sigue estando en la altura r
             // los campos que NO son de canal arrancan en "no soy un canal": armar una fila padre y olvidarse de
             // propId/compId dejaba basura adentro
-            DopeRow() : tipo(0), nivel(0), propId(-1), compId(-1), icono(-1), oculto(false), sonido(NULL), tiraFilas(0) {}
+            DopeRow() : tipo(0), nivel(0), propId(-1), compId(-1), icono(-1), oculto(false), sonido(NULL), tiraFilas(0),
+                        fantasma(false) {}
         };
         std::vector<DopeRow> dopeRows;
+        size_t dopeVisibles; // las filas que SE VEN (las primeras de dopeRows); de ahi en adelante, las fantasma
         int panelW;      // ancho del panel (0 = sin dope sheet -> timeline clasico)
         int panelWUser;  // ancho FIJADO por el usuario arrastrando el borde (0 = automatico segun el texto)
         bool panelResize;// arrastrando el borde del panel
@@ -341,7 +348,7 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable, publ
         void TiraConfirmar(); void TiraCancelar();
         bool TiraActiva() const;
         void TiraSoltar();                   // soltar el boton: el arrastre termina
-        int  DopeAltoContenido() const { return (int)dopeRows.size()*rowH; }
+        int  DopeAltoContenido() const { return (int)dopeVisibles*rowH; }   // (las fantasma no ocupan lugar)
 
         // espejos float <- globales + texto/visibilidad de los botones de la barra. Va SIEMPRE despues de
         // ConstruirDopeRows (la barra depende de las filas); Render llama a los dos, en ese orden.

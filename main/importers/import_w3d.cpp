@@ -51,6 +51,7 @@
 #include "objects/Sonido.h"      // objeto Sonido (audio puesto en la escena)
 #include "objects/Recorte.h"     // LimpiarZ / Recorte (composicion de la pantalla en el arbol)
 #include "objects/Hitbox.h"      // HITBOX: caja de deteccion con eventos lua
+#include "objects/SondaLuz.h"   // la sonda de luz
 #include "objects/InstanciaPrefab.h" // INSTANCIA DE PREFAB ("tipo":"prefab"): sus hijos se generan (io/Prefabs.h)
 #include "io/Prefabs.h"          // la definicion de cada prefab y la generacion de sus instancias
 #include "objects/ProxyW3d.h"    // PROXY W3D ("tipo":"proxy"): un prefab o una escena de una LIBRERIA externa
@@ -3043,6 +3044,21 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
             if (g_w3dCargaReloj) g_w3dCargaFases.mallaDerivadosMs += CargaAhora() - tMalla;
         }
         JsonComunes(j, mesh);   // nombre/transform del PROYECTO (manda sobre el "nombre" del .w3dm)
+        // LAS CAPAS DE MATERIAL de encima de cada parte (MaterialGroup::capasMat), por nombre (los materiales ya cargaron)
+        { JVal* jc = JHijo(j, "capasMaterial", 5);
+          if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
+              JVal* e = jc->lista[c]; if (!e || e->tipo != 4) continue;
+              const int parte = JI(e, "parte", -1);
+              JVal* lm = JHijo(e, "materiales", 5);
+              if (!lm || parte < 0 || parte >= (int)mesh->materialsGroup.size()) continue;
+              std::vector<Material*>& cm = mesh->materialsGroup[(size_t)parte].capasMat;
+              cm.clear();
+              for (size_t k = 0; k < lm->lista.size(); k++) {
+                  if (!lm->lista[k] || lm->lista[k]->tipo != 2) continue;
+                  Material* mt = MaterialPorNombre(lm->lista[k]->str);
+                  if (mt) cm.push_back(mt);
+              }
+          } }
         // ORIGEN: el .obj/.fbx que trajo el usuario. Externo a proposito (lo edita otro programa).
         std::string org = JS(j, "origen", "");
         if (!org.empty()) {
@@ -3285,6 +3301,12 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         JVal* col = JHijo(j, "color", 5);
         if (col) for (size_t i = 0; i < col->lista.size() && i < 4; i++) rc->color[i] = (float)col->lista[i]->num;
         return rc;
+    }
+    if (tipo == "sondaluz") {  // SONDA DE LUZ: la grilla con la luz indirecta horneada (objects/SondaLuz.cpp)
+        SondaLuz* sl = new SondaLuz(parent);
+        JsonComunes(j, sl);
+        SondaLuzLeerCampos(j, sl);
+        return sl;
     }
     if (tipo == "hitbox") {    // HITBOX: caja de deteccion con eventos lua (los campos: objects/Hitbox.cpp)
         Hitbox* hb = new Hitbox(parent);
@@ -3736,6 +3758,7 @@ static bool W3dMismoMaterial(const Material* v, const Material& n, const std::st
     if (!W3dMatCasi(v->mezclaB, n.mezclaB) || v->toon != n.toon || !W3dMatCasi(v->contorno, n.contorno)) return false;
     if (v->lineas != n.lineas || !W3dMatCasi(v->grosorLinea, n.grosorLinea)) return false;
     if (v->porPixel != n.porPixel) return false;
+    if (v->luzIndirecta != n.luzIndirecta) return false;
     if (!W3dMatCasi(v->ior, n.ior) || !W3dMatCasi(v->transmision, n.transmision)) return false;
     if (v->ssr != n.ssr) return false;
     if (v->shaderOn != n.shaderOn || v->shaderArchivo != n.shaderArchivo) return false;
@@ -3759,6 +3782,7 @@ static void W3dCopiarMaterial(const Material& src, Material* dst) {
     dst->orden_pasada = src.orden_pasada; dst->mezcla = src.mezcla; dst->mezclaB = src.mezclaB; dst->toon = src.toon; dst->contorno = src.contorno;
     dst->lineas = src.lineas; dst->grosorLinea = src.grosorLinea;
     dst->porPixel = src.porPixel;
+    dst->luzIndirecta = src.luzIndirecta;
     dst->ior = src.ior; dst->transmision = src.transmision; dst->ssr = src.ssr;
     if (dst->shaderArchivo != src.shaderArchivo) { dst->shaderId = 0; dst->shaderEstado = 0; }   // (se compila al dibujar)
     dst->shaderOn = src.shaderOn; dst->shaderArchivo = src.shaderArchivo;
@@ -3818,6 +3842,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
         // LINEAS (aristas por material). Ausentes en lo guardado hasta hoy -> default apagado.
         tmp.lineas        = JB(e, "lineas",           tmp.lineas);
         tmp.porPixel      = JB(e, "luzPorPixel",      tmp.porPixel);   // (ausente = por vertice)
+        tmp.luzIndirecta  = JB(e, "luzIndirecta",     tmp.luzIndirecta);   // (la sonda de luz por vertice; ausente = no)
         tmp.ssr           = JB(e, "reflejosPantalla", tmp.ssr);        // (ausente = sin reflejos en pantalla)
         tmp.grosorLinea   = JF(e, "grosorLinea",      tmp.grosorLinea);
         if (tmp.grosorLinea < 1.0f) tmp.grosorLinea = 1.0f;
@@ -3841,6 +3866,15 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
         }
         std::string texPath = JS(e, "textura", "");
         if (!texPath.empty()) texPath = RutaJson(texPath, base);
+        // LA TEXTURA B de antes (la mezcla de texturas, "texturaB" + "mezclaB") ahora es una CAPA DE TEXTURA Mix con su
+        // factor: entra ADELANTE de las capas (se ve igual: la unidad 1 tambien la mezclaba con la base ya iluminada).
+        // Con toon no: ahi la textura B es la rampa
+        std::string texBMigrada; float factorBMigrado = 0.0f;
+        if (tmp.toon == 0) {
+            const std::string tbm = JS(e, "texturaB", "");
+            if (!tbm.empty()) { texBMigrada = RutaJson(tbm, base); factorBMigrado = tmp.mezclaB; }
+            tmp.mezclaB = 0.0f;
+        }
         // CARPETA cosmetica (outliner por recursos): ausente = la raiz
         const std::string carpeta = W3dMallaCarpetaNormalizar(JS(e, "carpeta", ""));
         // UN MATERIAL DE LIBRERIA: uno por nombre con prefijo en toda la sesion (si la libreria se vuelve a
@@ -3858,7 +3892,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
             std::string nrm = JS(e, "normalTextura", "");
             if (!nrm.empty()) dz.normal = RutaJson(nrm, base);
             std::string tb = JS(e, "texturaB", "");
-            if (!tb.empty()) dz.texB = RutaJson(tb, base);
+            if (!tb.empty() && texBMigrada.empty() && tmp.toon != 0) dz.texB = RutaJson(tb, base);
             for (int k = 0; k < W3D_MAPAS; k++) dz.mapas[k] = mapaTexs[k];
             JVal* jc = JHijo(e, "capas", 5);
             if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
@@ -3867,7 +3901,12 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
                 if (ct.empty()) continue;
                 TexCapaDormida cd; cd.textura = RutaJson(ct, base); cd.mezcla = JI(ce, "mezcla", 0); cd.on = JB(ce, "on", true);
                 cd.uv = JI(ce, "uv", 0);
+                cd.fuerza = JF(ce, "fuerza", 1.0f); cd.horneada = JB(ce, "horneada", false);
                 dz.capas.push_back(cd);
+            }
+            if (!texBMigrada.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
+                TexCapaDormida cd; cd.textura = texBMigrada; cd.mezcla = W3D_CAPA_MIX; cd.fuerza = factorBMigrado;
+                dz.capas.insert(dz.capas.begin(), cd);
             }
             TexturasDormir(dz);   // (despiertan cuando una malla generada por un proxy los usa)
             continue;
@@ -3890,7 +3929,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
         std::string nrm = JS(e, "normalTextura", "");
         if (!nrm.empty()) dz.normal = RutaJson(nrm, base);
         std::string tb = JS(e, "texturaB", "");
-        if (!tb.empty()) dz.texB = RutaJson(tb, base);
+        if (!tb.empty() && texBMigrada.empty() && tmp.toon != 0) dz.texB = RutaJson(tb, base);
         for (int k = 0; k < W3D_MAPAS; k++) dz.mapas[k] = mapaTexs[k];
         JVal* jc = JHijo(e, "capas", 5);
         if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
@@ -3899,7 +3938,12 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
             if (ct.empty()) continue;
             TexCapaDormida cd; cd.textura = RutaJson(ct, base); cd.mezcla = JI(ce, "mezcla", 0); cd.on = JB(ce, "on", true);
             cd.uv = JI(ce, "uv", 0);   // capa UV de la malla con la que se dibuja (ausente = 0, la base)
+            cd.fuerza = JF(ce, "fuerza", 1.0f); cd.horneada = JB(ce, "horneada", false);   // el factor de la mezcla (ausente = 1)
             dz.capas.push_back(cd);
+        }
+        if (!texBMigrada.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
+            TexCapaDormida cd; cd.textura = texBMigrada; cd.mezcla = W3D_CAPA_MIX; cd.fuerza = factorBMigrado;
+            dz.capas.insert(dz.capas.begin(), cd);
         }
         TexturasDormir(dz);
         if (viejo) w3dLogfW("[W3D] ya habia un material '%s' con OTRO contenido -> se creo '%s'",
@@ -4543,6 +4587,11 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // binario (.w3db); "texto" = .w3dm para quien quiere diffs legibles.
     g_w3dFormatoMallasProyecto = (JS(raiz, "formatoMallas", "binario") == "texto") ? W3D_MALLAS_TEXTO
                                                                                    : W3D_MALLAS_BINARIO;
+    // EL ORIGEN de los assets importados (ver W3dContenedor.h): de que archivo de disco salio cada entrada
+    W3dAssetOrigenesLimpiar();
+    if (JVal* jo = JHijo(raiz, "origenes", 4))
+        for (std::map<std::string, JVal*>::const_iterator it = jo->obj.begin(); it != jo->obj.end(); ++it)
+            if (it->second && it->second->tipo == 2) W3dAssetOrigenAnotar(it->first, it->second->str);
     // PIXELADO GLOBAL (ver la rama de texto arriba y w3dGraphics.h). Ausente =
     // false: nada de lo que ya andaba cambia de aspecto.
     w3dEngine::SetPixeladoGlobal(JB(raiz, "pixelado", false));
@@ -4624,6 +4673,8 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
             { Vector3 f(0, 0, 0); JVec3(rn, "fondo", f); g_renderBg[0] = f.x; g_renderBg[1] = f.y; g_renderBg[2] = f.z; g_renderBg[3] = 1.0f; }
             { Vector3 f(0, 0, 0); JVec3(rn, "fondoRot", f); g_renderBgRot[0] = f.x; g_renderBgRot[1] = f.y; g_renderBgRot[2] = f.z; }
             g_renderBgModo = JI(rn, "fondoModo", 0) == 1 ? 1 : 0;
+            g_renderLuzFondo = JF(rn, "fondoLuz", 1.0f);   // (la luz del fondo: 1 = 100%)
+            if (g_renderLuzFondo < 0.0f) g_renderLuzFondo = 0.0f;
             JVal* ft = JHijo(rn, "fondoTexturas", 5);
             if (ft) {
                 for (size_t i = 0; i < ft->lista.size(); i++) {
@@ -5649,6 +5700,9 @@ void AbrirProyectoDesde(const std::string& ruta) {
 //  cartel "Se perderan los cambios en:", como abrir otro proyecto): guardar y seguir, seguir sin guardar o cancelar.
 // ===========================================================================
 bool g_proyNuevoPendiente = false;
+// el LAYOUT con el que arranca el proyecto nuevo: "" = el de fabrica (LayoutPorDefecto); si no, uno guardado
+// (config/W3dLayouts.h). Lo elige la lista de "Nuevo proyecto" (tarjeta Archivo) y la de "Nuevo archivo" (inicio)
+static std::string g_proyNuevoLayout;
 void NuevoProyectoAhora();
 // lo pedido por un boton (abrir / nuevo), con el stack limpio: el main al inicio de cada frame (y el harness)
 void ProcesarProyectoPendiente() {
@@ -5666,13 +5720,15 @@ static void NuevoProyectoPendiente() {
     g_proyNuevoPendiente = true;
     g_redraw = true;
 }
-void NuevoProyectoDesde() {
+void NuevoProyectoConLayout(const std::string& layout) {
     extern void (*W3dCambiosNuevoHook)();
     extern bool W3dCambiosPreguntar(int, const std::string&);
+    g_proyNuevoLayout = layout;
     W3dCambiosNuevoHook = NuevoProyectoPendiente;   // (lo que hace el cartel si el usuario sigue)
     if (W3dCambiosPreguntar(2 /*W3D_CAMBIOS_NUEVO*/, std::string())) return;
     NuevoProyectoPendiente();
 }
+void NuevoProyectoDesde() { NuevoProyectoConLayout(std::string()); }
 void NuevoProyectoAhora() {
     { extern void InicioPopupCerrar(); InicioPopupCerrar(); }   // (la pantalla de inicio, si seguia abierta)
     ReiniciarEscena();
@@ -5680,16 +5736,29 @@ void NuevoProyectoAhora() {
     rootViewport = NULL;
     w3dPath.clear();
     W3dCompilarReset();   // la tarjeta Juego vuelve a los valores de fabrica (abrir los toma del archivo)
+    W3dAssetOrigenesLimpiar();   // (los origenes de los assets eran del proyecto de antes)
     { extern void W3dCrearEscenaPorDefecto(); W3dCrearEscenaPorDefecto(); }
     extern int MenuPantallaW, MenuPantallaH;
     Viewport3D* vp3d = NULL;
-    rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, &vp3d);
+    rootViewport = NULL;
+#ifndef W3D_SIN_EDITOR
+    if (!g_proyNuevoLayout.empty()) {   // uno guardado: como elegirlo en el menu Layout (LayoutInput.cpp, LayoutInstalar)
+        extern std::string W3dLayoutTexto(const std::string&);
+        rootViewport = W3dLayoutDesdeTexto(W3dLayoutTexto(g_proyNuevoLayout));
+        if (!rootViewport) { extern void Notificar(const std::string&, bool);
+                             Notificar(std::string(T("Could not load the layout")) + ": " + g_proyNuevoLayout, true); }
+        else { extern Viewport3D* LayoutPrimer3DDe(ViewportBase*); vp3d = LayoutPrimer3DDe(rootViewport); }
+    }
+#endif
+    g_proyNuevoLayout.clear();
+    if (!rootViewport) rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, &vp3d);
+    if (rootViewport) { rootViewport->x = 0; rootViewport->y = 0; }
     if (rootViewport && MenuPantallaW > 0 && MenuPantallaH > 0) rootViewport->Resize(MenuPantallaW, MenuPantallaH);
     // (lo mismo que AbrirProyectoAhora con el arbol nuevo: soltar el viejo y re-anclar los activos)
     { extern void LayoutResetMaximizado(); LayoutResetMaximizado();
       if (layoutViejo != rootViewport) ViewportBorrarArbol(layoutViejo);
       LayoutAnclarActivos();
-      if (vp3d) viewPortActive = vp3d;
+      viewPortActive = vp3d ? (ViewportBase*)vp3d : rootViewport;   // (un layout sin Vista 3D: el arbol entero)
       extern void (*LayoutArbolCambiado)(); if (LayoutArbolCambiado) LayoutArbolCambiado(); }
     extern void ProyectoSincronizarCampos();
     ProyectoSincronizarCampos();

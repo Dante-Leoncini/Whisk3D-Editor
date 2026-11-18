@@ -192,6 +192,7 @@ FileBrowser::FileBrowser(const std::string& title, const std::string& accionLabe
     btnBack = new Button("", (int)IconType::arrowRight, false); btnBack->iconFlip = 1; btnBack->centrado = true;
     btnFwd  = new Button("", (int)IconType::arrowRight, false); btnFwd->centrado = true;
     btnUp   = new Button("", (int)IconType::arrow, false);      btnUp->iconFlip = 2; btnUp->centrado = true;
+    btnRefresh = new Button("", (int)IconType::recargar, false); btnRefresh->centrado = true;
     btnView = new Button("", (int)IconType::lista, false);      btnView->centrado = true;
     btnBmAdd = new Button("+", -1, false); btnBmAdd->centrado = true;
     btnBmDel = new Button("-", -1, false); btnBmDel->centrado = true;
@@ -204,7 +205,7 @@ FileBrowser::FileBrowser(const std::string& title, const std::string& accionLabe
 
 FileBrowser::~FileBrowser() {
     delete card; delete pane;
-    delete btnBack; delete btnFwd; delete btnUp; delete btnView;
+    delete btnBack; delete btnFwd; delete btnUp; delete btnRefresh; delete btnView;
     delete btnBmAdd; delete btnBmDel; delete btnCancel; delete btnAction;
 }
 
@@ -250,6 +251,15 @@ void FileBrowser::Recargar() {
     entries.clear();
     for (size_t i = 0; i < todas.size(); i++) if (PasaFiltro(todas[i])) entries.push_back(todas[i]);
     selected = -1; PosY = 0;
+}
+void FileBrowser::Actualizar() {
+    const std::string elegido = (selected >= 0 && selected < (int)entries.size()) ? entries[selected].name : std::string();
+    const int y = PosY;
+    FBLiberarThumbs();   // (las miniaturas se rehacen: una imagen editada afuera se ve como quedo)
+    Recargar();          // (deja selected = -1 y el scroll arriba)
+    for (int i = 0; i < (int)entries.size(); i++) if (!elegido.empty() && entries[i].name == elegido) { selected = i; break; }
+    const int maxY = ContentH() - fileH;
+    PosY = (y < 0) ? 0 : (maxY > 0 && y > maxY) ? maxY : (maxY <= 0 ? 0 : y);
 }
 void FileBrowser::Navegar(const std::string& dir, bool pushHistory) {
     std::vector<w3dFileSystem::DirEntry> prueba;
@@ -400,8 +410,8 @@ void FileBrowser::Render() {
     // como hover; el accent de archivos/accesos solo se ve en su zona (o con
     // el mouse). Asi solo hay UNA cosa resaltada donde apuntan las flechas.
     if (focoZona == FZ_TOP) {
-        Button* nav[4] = { btnBack, btnFwd, btnUp, btnView };
-        if (focoIdx >= 0 && focoIdx < 4) nav[focoIdx]->hover = true;
+        Button* nav[5] = { btnBack, btnFwd, btnUp, btnRefresh, btnView };
+        if (focoIdx >= 0 && focoIdx < 5) nav[focoIdx]->hover = true;
     } else if (focoZona == FZ_BMBTN) {
         (focoIdx == 0 ? btnBmAdd : btnBmDel)->hover = true;
     } else if (focoZona == FZ_BOTTOM) {
@@ -416,13 +426,13 @@ void FileBrowser::Render() {
     // --- barra superior: nav + toggle + URL ---
     int m = gapGS, navSz = RenglonHeightGS + bordersGS, ny = m;
     bool puedeAtras = histPos > 0, puedeAdel = histPos + 1 < (int)history.size();
-    Button* nav[4] = { btnBack, btnFwd, btnUp, btnView };
+    Button* nav[5] = { btnBack, btnFwd, btnUp, btnRefresh, btnView };
     int nx = m;
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < 5; k++) {
         Button* b = nav[k];
         b->Resize(navSz); b->width = navSz; b->height = navSz; b->card->Resize(navSz, navSz);
         b->sx = nx; b->sy = ny;
-        if (k == 3) b->icon = gridView ? (int)IconType::lista : (int)IconType::cuadricula;
+        if (k == 4) b->icon = gridView ? (int)IconType::lista : (int)IconType::cuadricula;
         w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)nx, (GLfloat)ny, 0); b->Render(); w3dEngine::PopMatrix();
         nx += navSz + m;
     }
@@ -585,6 +595,7 @@ bool FileBrowser::Click(int mx, int my) {
     if (btnBack->Contains(mx, my)) { Atras(); return true; }
     if (btnFwd->Contains(mx, my)) { Adelante(); return true; }
     if (btnUp->Contains(mx, my)) { Arriba(); return true; }
+    if (btnRefresh->Contains(mx, my)) { Actualizar(); return true; }
     if (btnView->Contains(mx, my)) { gridView = !gridView; PosY = 0; return true; }
     if (btnCancel->Contains(mx, my)) { Cerrar(); return true; }
     if (btnAction->Contains(mx, my)) { Aceptar(); return true; }
@@ -625,6 +636,7 @@ bool FileBrowser::Motion(int mx, int my) {
     hoverBm = BookmarkAt(mx, my);
     btnBack->hover = btnBack->Contains(mx, my); btnFwd->hover = btnFwd->Contains(mx, my);
     btnUp->hover = btnUp->Contains(mx, my); btnView->hover = btnView->Contains(mx, my);
+    btnRefresh->hover = btnRefresh->Contains(mx, my);
     btnBmAdd->hover = btnBmAdd->Contains(mx, my); btnBmDel->hover = btnBmDel->Contains(mx, my);
     btnCancel->hover = btnCancel->Contains(mx, my); btnAction->hover = btnAction->Contains(mx, my);
     return true;
@@ -656,7 +668,7 @@ void FileBrowser::EnsureVisible(int idx) {
 // limpia todos los hovers de mouse (las flechas toman el control del foco)
 void FileBrowser::LimpiarHoverMouse() {
     hover = -1; hoverBm = -1;
-    btnBack->hover = btnFwd->hover = btnUp->hover = btnView->hover = false;
+    btnBack->hover = btnFwd->hover = btnUp->hover = btnRefresh->hover = btnView->hover = false;
     btnBmAdd->hover = btnBmDel->hover = false;
     btnCancel->hover = btnAction->hover = false;
 }
@@ -685,7 +697,7 @@ void FileBrowser::MoverFoco(int dir) {
     switch (focoZona) {
     case FZ_TOP:
         if (dir == LayoutKey::Left)       { if (focoIdx > 0) focoIdx--; }
-        else if (dir == LayoutKey::Right) { if (focoIdx < 3) focoIdx++; }
+        else if (dir == LayoutKey::Right) { if (focoIdx < 4) focoIdx++; }
         else if (dir == LayoutKey::Down) {
             if (horizontal && focoIdx == 0) { focoZona = FZ_BOOKMARKS; selBm = bookmarks.empty() ? -1 : 0; }
             else { focoZona = FZ_FILES; if (selected < 0) selected = 0; EnsureVisible(selected); }
@@ -750,6 +762,7 @@ void FileBrowser::ActivarFoco() {
         if (focoIdx == 0) Atras();
         else if (focoIdx == 1) Adelante();
         else if (focoIdx == 2) Arriba();
+        else if (focoIdx == 3) Actualizar();
         else { gridView = !gridView; PosY = 0; }
         break;
     case FZ_BOOKMARKS:

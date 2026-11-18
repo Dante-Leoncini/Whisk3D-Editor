@@ -238,7 +238,11 @@ static void JuntarMateriales(Object* o, std::set<Material*>& out) {
         if (!h) continue;
         if (h->getType() == ObjectType::mesh) {
             const Mesh* m = (const Mesh*)h;
-            for (size_t g = 0; g < m->materialsGroup.size(); g++) if (m->materialsGroup[g].material) out.insert(m->materialsGroup[g].material);
+            for (size_t g = 0; g < m->materialsGroup.size(); g++) {
+                if (m->materialsGroup[g].material) out.insert(m->materialsGroup[g].material);
+                for (size_t c = 0; c < m->materialsGroup[g].capasMat.size(); c++)   // (las capas de material de encima)
+                    if (m->materialsGroup[g].capasMat[c]) out.insert(m->materialsGroup[g].capasMat[c]);
+            }
             for (size_t g = 0; g < m->genMaterialsGroup.size(); g++) if (m->genMaterialsGroup[g].material) out.insert(m->genMaterialsGroup[g].material);
         }
         JuntarMateriales(h, out);

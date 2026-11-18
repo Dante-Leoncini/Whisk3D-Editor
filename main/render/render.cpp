@@ -411,6 +411,31 @@ static void DibujarIconoSonido3D(Object* obj){
     for (size_t c = 0; c < obj->Childrens.size(); c++) DibujarIconoSonido3D(obj->Childrens[c]);
     w3dEngine::PopMatrix();
 }
+// la SONDA DE LUZ: su icono (sonda.png del skin, una esfera con su brillo). Seleccionada dibuja ademas su caja y sus
+// esferas (objects/SondaLuz.cpp)
+static void DibujarIconoSonda3D(Object* obj){
+    if (!obj->visible || FueraDeVistaLocal(obj)) return;
+    w3dEngine::PushMatrix();
+    Matrix4 local; obj->GetMatrix(local);
+    w3dEngine::MultMatrix(local.m);
+    if (obj->getType() == ObjectType::sondaluz){
+        if (ObjActivo == obj && obj->select)  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+        else if (obj->select)                 w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
+        else                                  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+        w3dEngine::DrawPoints(1);
+    }
+    for (size_t c = 0; c < obj->Childrens.size(); c++) DibujarIconoSonda3D(obj->Childrens[c]);
+    w3dEngine::PopMatrix();
+}
+static unsigned int TexSonda(){
+    static bool probado = false; static unsigned int id = 0;
+    if (!probado){
+        probado = true;
+        extern std::string g_skinDir;
+        if (!w3dEngine::LoadTexture((g_skinDir + "sonda.png").c_str(), id)) id = 0;
+    }
+    return id;
+}
 static unsigned int TexParlante(){
     static bool probado = false; static unsigned int id = 0;
     if (!probado){
@@ -454,6 +479,16 @@ void RenderIcons3D(){
 #endif
           w3dEngine::PointSize((float)IconSizeGS * 16.0f / 10.0f);
           for (size_t r = 0; r < raices.size(); r++) DibujarIconoSonido3D(raices[r]);
+      } }
+    // las SONDAS DE LUZ: su icono (la caja y las esferas, solo seleccionada: SondaLuz::RenderObject)
+    { const unsigned int ts = TexSonda();
+      if (ts){
+          w3dEngine::BindTexture(ts);
+#ifndef W3D_SYMBIAN
+          w3dEngine::TexFilter(false);
+#endif
+          w3dEngine::PointSize((float)IconSizeGS * 16.0f / 10.0f);
+          for (size_t r = 0; r < raices.size(); r++) DibujarIconoSonda3D(raices[r]);
       } }
 
     w3dEngine::PointSpriteCoordReplace(false);

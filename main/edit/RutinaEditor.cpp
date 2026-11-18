@@ -293,7 +293,9 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
             motivo = buf; return -1;
         }
         const bool cajaEnMemoria = (p.tipo == PasoVisible && p.ref.empty() && p.n[1].p);   // (la caja, 6 numeros de una memoria)
-        if (rt != RefNada && rt != RefFuncion && rt != RefShader && !p.ptr && !(p.tipo == PasoMatcap && !p.on) && !cajaEnMemoria) {   // (apagar el matcap: sin malla)
+        const bool limpiarSinFondo = (p.tipo == PasoLimpiar && p.modo != LimpiarFondoPropio);   // (la imagen, solo con el fondo propio)
+        if (rt != RefNada && rt != RefFuncion && rt != RefShader && !p.ptr && !(p.tipo == PasoMatcap && !p.on) && !cajaEnMemoria &&
+            !limpiarSinFondo) {   // (apagar el matcap: sin malla)
             if (p.ref.empty()) snprintf(buf, sizeof buf, T("step %d (%s): nothing chosen"), num, T(W3dPasoEtiqueta(p.tipo)));
             else snprintf(buf, sizeof buf, T("step %d (%s): '%s' not found"), num, T(W3dPasoEtiqueta(p.tipo)), p.ref.c_str());
             motivo = buf; return -1;

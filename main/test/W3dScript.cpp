@@ -65,6 +65,7 @@ extern int W3dDedosActivos();       // (controles.cpp) dedos apoyados segun el e
 #include "ViewPorts/Outliner.h"     // uvarm2d: la fila VIRTUAL "Armature 2D" del outliner
 #include "ViewPorts/Parent.h"       // reparentundo: AccionSetParent/AccionClearParent (el menu del Ctrl+P)
 #include "ViewPorts/PopUp/PopUpBase.h" // vatest: cerrar el panel redo del loop cut antes de la tecla I
+#include "objects/SondaLuz.h"   // sonda: la sonda de luz
 #include "ViewPorts/PopUp/FileBrowser.h" // fbcarpeta: modo "elegir carpeta" + armado de la ruta de salida
 #include "ViewPorts/Editor2D.h"     // uvbar: toolbar del Editor 2D (roles TBR_2DHist)
 #include "ViewPorts/IDE.h"          // idetest: el editor de texto lua (buffer/lexer/guardado/selector)
@@ -6439,6 +6440,90 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                mt->texturaB ? mt->texturaB->path.c_str() : "(ninguna)", mt->mezclaB, w3dEngine::MezclaTexturasSoportada() ? "si" : "no");
         return true;
     }
+    // ---- sonda add | sonda tam X Y Z | sonda puntos X Y Z | sonda rayos N | sonda hornear : la SONDA DE LUZ activa
+    //      (objects/SondaLuz.h). 'add' la crea en el cursor 3D (como Add > Light Probe); los tamanos van en ejes INTERNOS ----
+    if (cmd == "sonda") {
+        std::string q; ss >> q;
+        if (q == "add") { extern void AddSondaLuz(); AddSondaLuz(); return true; }
+        SondaLuz* sl = (ObjActivo && ObjActivo->getType() == ObjectType::sondaluz) ? (SondaLuz*)ObjActivo : NULL;
+        if (!sl) { err = "sonda: el objeto activo no es una sonda de luz"; return false; }
+        if (q == "tam") { ss >> sl->tam[0] >> sl->tam[1] >> sl->tam[2]; sl->sh.clear(); }
+        else if (q == "puntos") { ss >> sl->puntos[0] >> sl->puntos[1] >> sl->puntos[2]; sl->sh.clear(); }
+        else if (q == "rayos") { ss >> sl->rayos; }
+        else if (q == "ver") {   // la luz interpolada en un punto del mundo (x y z internos): arriba, abajo y promedio
+            float p[3] = { 0, 0, 0 }; ss >> p[0] >> p[1] >> p[2];
+            float sh[27];
+            if (!SondaLuzEn(p, sh)) { printf("      [sonda] (%g %g %g): ninguna sonda lo alcanza\n", p[0], p[1], p[2]); return true; }
+            // la luz que llega a una normal hacia ARRIBA (+y) y hacia ABAJO (-y)
+            float arr[3], aba[3];
+            for (int k = 0; k < 3; k++) {
+                const float c0 = sh[k] * 0.282095f, c1 = sh[3 + k] * 0.488603f, c6 = sh[18 + k] * 0.315392f;
+                arr[k] = c0 + c1 - c6; aba[k] = c0 - c1 - c6;
+            }
+            printf("      [sonda] (%g %g %g): promedio %.3f %.3f %.3f  arriba %.3f %.3f %.3f  abajo %.3f %.3f %.3f\n", p[0], p[1], p[2],
+                   sh[0] * 0.282095f, sh[1] * 0.282095f, sh[2] * 0.282095f, arr[0], arr[1], arr[2], aba[0], aba[1], aba[2]);
+            return true;
+        }
+        else if (q == "hornear") {
+            std::string motivo;
+            if (!SondaLuzHornear(sl, &motivo)) { err = "sonda: no se horneo: " + motivo; return false; }
+            int mejor = 0; float mx = -1.0f;
+            for (int i = 0; i < sl->Cantidad(); i++) { const float g = sl->sh[(size_t)i * 27 + 1]; if (g > mx) { mx = g; mejor = i; } }
+            printf("      [sonda] horneada: %d puntos; el mas iluminado (%d) promedio %.3f %.3f %.3f\n", sl->Cantidad(), mejor,
+                   sl->sh[(size_t)mejor * 27] * 0.282095f, sl->sh[(size_t)mejor * 27 + 1] * 0.282095f, sl->sh[(size_t)mejor * 27 + 2] * 0.282095f);
+        }
+        else { err = "sonda: subcomando desconocido '" + q + "'"; return false; }
+        g_redraw = true;
+        return true;
+    }
+    // ---- matluzind 0|1 : la LUZ INDIRECTA POR VERTICE del material activo (Material::luzIndirecta) ----
+    if (cmd == "matluzind") {
+        int v = 1; ss >> v;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matluzind: no hay material activo"; return false; }
+        mat->luzIndirecta = (v != 0);
+        g_redraw = true;
+        return true;
+    }
+    // ---- hornearluz <ancho> <alto> [muestras] : PRECALCULAR LA ILUMINACION de la malla activa en una textura NUEVA de ese
+    //      tamano (la tarjeta "Bake Lighting", de una vez): la luz de lo estatico en su capa UV activa ----
+    if (cmd == "hornearluz") {
+        int w = 256, h = 256, mu = 32; ss >> w >> h >> mu;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "hornearluz: no hay malla activa"; return false; }
+        extern std::string W3dCrearTexturaProyecto(const std::string&, int, int, int, const float*, bool, std::string&);
+        static const float blanco[4] = { 1, 1, 1, 1 };
+        std::string msg;
+        const std::string ruta = W3dCrearTexturaProyecto("Iluminacion", 0, w, h, blanco, false, msg);
+        Texture* t = ruta.empty() ? NULL : TexturaBuscar(ruta);
+        if (!t) { err = "hornearluz: no pude crear la textura: " + msg; return false; }
+        extern bool PropsHorneadoAhora(Mesh*, Texture*, int, int, std::string*);
+        extern unsigned int w3dGetTicks();
+        const unsigned int t0 = w3dGetTicks();
+        std::string motivo;
+        if (!PropsHorneadoAhora(m, t, -1, mu, &motivo)) { err = "hornearluz: " + motivo; return false; }
+        printf("      [hornearluz] '%s' en %dx%d con %d muestras: %u ms\n", m->name.c_str(), w, h, mu, w3dGetTicks() - t0);
+        return true;
+    }
+    // ---- mallarep : el agrupamiento de la malla activa (posRep) contra sus posiciones distintas (cuantizadas a 1e-4) ----
+    if (cmd == "mallarep") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "mallarep: no hay malla activa"; return false; }
+        const int nV = m->vertexSize;
+        std::set<int> reps; std::set<std::string> pos;
+        for (int i = 0; i < nV; i++) {
+            if ((int)m->posRep.size() == nV) reps.insert(m->posRep[(size_t)i]);
+            int q[3]; for (int k = 0; k < 3; k++) q[k] = (int)floorf(m->vertex[i * 3 + k] * 10000.0f + 0.5f);
+            pos.insert(std::string((const char*)q, 12));
+        }
+        printf("      [mallarep] '%s' %d render-verts, posRep %d (%d grupos), %d posiciones distintas, %d caras, gen %s\n",
+               m->name.c_str(), nV, (int)m->posRep.size(), (int)reps.size(), (int)pos.size(), (int)m->faces3d.size(),
+               m->genValido ? "si" : "no");
+        for (size_t u = 0; u < m->uvMaps.size(); u++)
+            printf("      [mallarep]   capa UV %d '%s'%s (render: %s)\n", (int)u, m->uvMaps[u] ? m->uvMaps[u]->nombre.c_str() : "?",
+                   (int)u == m->uvMapActivo ? " (activa)" : "", m->UVDeCapa((int)u) ? "si" : "no");
+        for (size_t g = 0; g < m->materialsGroup.size(); g++)
+            printf("      [mallarep]   parte %d material '%s'\n", (int)g, m->materialsGroup[g].material ? m->materialsGroup[g].material->name.c_str() : "-");
+        return true;
+    }
     if (cmd == "matcapa") {
         std::string nombre, sub; ss >> nombre >> sub;
         Material* mt = BuscarMaterialPorNombre(nombre);
@@ -6462,14 +6547,21 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (op == "tex") { std::string ruta; ss >> ruta; Texture* t = TexturaTomar(ruta);
                 if (!t) { err = "matcapa: no pude cargar '" + ruta + "'"; return false; } cap.tex = t; }
             else if (op == "uv")     { int k = 0; ss >> k; cap.uvMapa = k < 0 ? 0 : k; }
+            else if (op == "fuerza") { float f = 1.0f; ss >> f; cap.fuerza = f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f); }
             else if (op == "mezcla") { int m2 = 0; ss >> m2; if (m2 < 0 || m2 >= W3D_CAPA_MEZCLAS) { err = "matcapa: mezcla invalida"; return false; } cap.blend = m2; }
             else if (op == "on")     cap.on = true;
             else if (op == "off")    cap.on = false;
             else if (op == "del")    mt->capas.erase(mt->capas.begin() + n);
+            else if (op == "delundo") {   // (como el boton de la tarjeta: con su paso de deshacer)
+                UndoMaterialModIniciar(mt);
+                Texture* t = cap.tex; mt->capas.erase(mt->capas.begin() + n); if (t) TexturaSoltar(t);
+                UndoMaterialModCommit();
+            }
             else if (op == "es") {
                 std::string q; int esperado;
                 while (ss >> q >> esperado) {
-                    int real = (q == "uv") ? cap.uvMapa : (q == "mezcla") ? cap.blend : (q == "on") ? (cap.on ? 1 : 0) : -999;
+                    int real = (q == "uv") ? cap.uvMapa : (q == "mezcla") ? cap.blend : (q == "on") ? (cap.on ? 1 : 0) :
+                               (q == "fuerza100") ? (int)(cap.fuerza * 100.0f + 0.5f) : -999;
                     if (real != esperado) {
                         char b[160]; snprintf(b, sizeof b, "matcapa: capa %d %s=%d y se esperaba %d", n, q.c_str(), real, esperado);
                         err = b; return false;
@@ -33882,7 +33974,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (k == "mayorque" && !(r > lim)) { err = "rtruido: hay menos ruido del esperado"; return false; }
         return true;
     }
-    // ---- fondo color R G B | fondo textura <ruta> | fondo modo 0|1 | fondo rot X Y Z
+    // ---- fondo color R G B | fondo textura <ruta> | fondo modo 0|1 | fondo rot X Y Z | fondo luz <factor>
     //      fondo ver color R G B | ver rot X Y Z [tol] | ver modo N | ver textura <nombre|-> | ver lista N
     //      EL FONDO del render (tarjeta Render): color o textura 360 (equirectangular), su rotacion. 'ver' asserta ----
     if (cmd == "fondo") {
@@ -33890,6 +33982,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (q == "color") { float r = 0, g = 0, b = 0; ss >> r >> g >> b; g_renderBg[0] = r; g_renderBg[1] = g; g_renderBg[2] = b; g_renderBgModo = 0; }
         else if (q == "modo") { int m = 0; ss >> m; g_renderBgModo = m ? 1 : 0; }
         else if (q == "rot") { ss >> g_renderBgRot[0] >> g_renderBgRot[1] >> g_renderBgRot[2]; }
+        else if (q == "luz") { float f = 1.0f; ss >> f; g_renderLuzFondo = f < 0.0f ? 0.0f : f; }   // (la luz del fondo: 1 = 100%)
         else if (q == "textura") {
             std::string ruta; ss >> ruta;
             extern std::string W3dImportarAsset(const std::string&, const char*);
@@ -34277,6 +34370,49 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!nombre.empty()) g_render.nombre = nombre;
         extern void SincronizarCamposRender(Properties* P); SincronizarCamposRender(PropsActivo);
         W3dHarnessRenderImage();
+        return true;
+    }
+    // ---- matpase 0|1|2 : el PASE del material de la parte 0 de la malla activa (opacos / calcomanias / transparentes) ----
+    if (cmd == "matpase") {
+        int k = 0; ss >> k;
+        Mesh* m = ScriptActiveMesh(); if (!m || m->materialsGroup.empty() || !m->materialsGroup[0].material) { err = "matpase: sin material"; return false; }
+        m->materialsGroup[0].material->orden_pasada = k < 0 ? 0 : (k > 2 ? 2 : k);
+        return true;
+    }
+    // ---- listadobleclick : doble click del MOUSE (eventos SDL de verdad) en la primera fila de partes de malla: ERROR si
+    //      no quedo renombrando ----
+    if (cmd == "listadobleclick") {
+        if (!ScriptProps() || !PropsActivo->propMeshParts) { err = "listadobleclick: sin panel"; return false; }
+        Properties* P = PropsActivo;
+        PropListMeshParts* lp = (PropListMeshParts*)P->propMeshParts->properties[0];
+        int yTop = -1;
+        for (int yy = P->y; yy < P->y + P->height && yTop < 0; yy++) { int t = 0, h = 0; GroupPropertie* g = NULL;
+            if (P->ListaEn(yy, &t, &h, &g) == lp) yTop = t; }
+        if (yTop < 0) { err = "listadobleclick: no encuentro la lista"; return false; }
+        const int x = P->x + P->PosX + borderGS * 2 + 30, y = yTop + borderGS + (RenglonHeightGS + gapGS) / 2;
+        extern void InputUsuarioSDL3(SDL_Event&); extern bool RenameActivo();
+        for (int c = 1; c <= 2; c++) {
+            SDL_Event ev; memset(&ev, 0, sizeof(ev));
+            ev.type = SDL_MOUSEMOTION; ev.motion.x = x; ev.motion.y = y; InputUsuarioSDL3(ev);
+            memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEBUTTONDOWN; ev.button.button = SDL_BUTTON_LEFT; ev.button.x = x; ev.button.y = y;
+            ev.button.clicks = (Uint8)c; ev.button.state = SDL_PRESSED; InputUsuarioSDL3(ev);
+            printf("      [listadobleclick] click %d (down): renombrando=%s\n", c, RenameActivo() ? "si" : "no");
+            ev.type = SDL_MOUSEBUTTONUP; ev.button.state = SDL_RELEASED; InputUsuarioSDL3(ev);
+            { extern TextField* g_textFieldActivo;
+              printf("      [listadobleclick] click %d (up):   renombrando=%s, teclado en el campo=%s\n", c, RenameActivo() ? "si" : "no",
+                     g_textFieldActivo ? "si" : "no"); }
+            if (rootViewport) rootViewport->Render();
+        }
+        if (!RenameActivo()) { err = "listadobleclick: con 2 clicks no quedo renombrando"; return false; }
+        return true;
+    }
+    // ---- partslistaalto px : la lista de partes de malla con ese alto (como arrastrar su linea de abajo) ----
+    if (cmd == "partslistaalto") {
+        int px = 0; ss >> px;
+        if (!ScriptProps() || !PropsActivo->propMeshParts || PropsActivo->propMeshParts->properties.empty()) { err = "partslistaalto: sin la lista"; return false; }
+        PropListMeshParts* l = (PropListMeshParts*)PropsActivo->propMeshParts->properties[0];
+        l->altoPx = px; l->altoFijo = true; l->filasMax = l->FilasAlto(); l->AjustarVentana();
+        { extern void PropsLayoutSucio(); PropsLayoutSucio(); }
         return true;
     }
     // ---- propstab n : pestania del panel de propiedades (0 = Render/Archivo, 1 = Objeto, 2 = contextual) ----
@@ -36322,6 +36458,51 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- fbactualizar <carpeta> : abre el explorador en la carpeta, elige el primer archivo, crea uno nuevo AFUERA y
+    //      aprieta ACTUALIZAR: el nuevo aparece y el elegido sigue elegido (queda abierto para un uishot)
+    if (cmd == "fbactualizar") {
+        std::string dir; ss >> dir;
+        if (dir.empty()) { err = "fbactualizar: falta la carpeta"; return false; }
+        AbrirFileBrowser("Load Texture", "Open", "", ScriptFBElegido, false);
+        FileBrowser* fb = (FileBrowser*)PopUpActive;
+        if (!fb) { err = "fbactualizar: el explorador no quedo abierto"; return false; }
+        fb->Navegar(dir, true);
+        int prim = -1;
+        for (int i = 0; i < (int)fb->entries.size() && prim < 0; i++) if (!fb->entries[i].isDir) prim = i;
+        fb->selected = prim;
+        const std::string elegido = prim >= 0 ? fb->entries[(size_t)prim].name : std::string();
+        const size_t antes = fb->entries.size();
+        const std::string nuevo = dir + "/zz_nuevo_de_afuera.txt";
+        w3dFileSystem::WriteTextFile(nuevo, "x");
+        fb->Actualizar();
+        const size_t despues = fb->entries.size();
+        const bool sigue = fb->selected >= 0 && fb->entries[(size_t)fb->selected].name == elegido;
+        printf("      [fbactualizar] %d -> %d entradas, el elegido ('%s') sigue elegido: %s\n",
+               (int)antes, (int)despues, elegido.c_str(), sigue ? "si" : "NO");
+        remove(nuevo.c_str());
+        if (despues != antes + 1 || (prim >= 0 && !sigue)) { err = "fbactualizar: no actualizo bien"; return false; }
+        return true;
+    }
+    // ---- texactualizar <ruta> [copiar <otra>] : "Reload Texture" de la textura cargada con esa ruta (la vuelve a leer
+    //      del disco). Con 'copiar', antes pisa el archivo con <otra> (la edicion "de afuera")
+    if (cmd == "texactualizar") {
+        std::string ruta, q, otra; ss >> ruta >> q >> otra;
+        if (q == "copiar" && !otra.empty()) {
+            std::vector<unsigned char> d;
+            if (!w3dFileSystem::ReadFileBytes(otra, d) || d.empty()) { err = "texactualizar: no pude leer " + otra; return false; }
+            FILE* f = fopen(ruta.c_str(), "wb");
+            if (!f) { err = "texactualizar: no pude escribir " + ruta; return false; }
+            fwrite(&d[0], 1, d.size(), f); fclose(f);
+        }
+        Texture* t = NULL;
+        for (size_t i = 0; i < Textures.size() && !t; i++) if (Textures[i] && Textures[i]->path == ruta) t = Textures[i];
+        if (!t) { err = "texactualizar: no hay una textura cargada con la ruta " + ruta; return false; }
+        std::string motivo, detalle;
+        const bool ok = W3dTexturaActualizar(W3dTexturaClave(t), &motivo, &detalle);
+        printf("      [texactualizar] %s %s %s\n", ok ? "OK" : "FALLO", motivo.c_str(), detalle.c_str());
+        if (!ok) { err = "texactualizar: " + motivo; return false; }
+        return true;
+    }
     // ---- fbcarpeta : el explorador en modo "elegir carpeta" (boton "Usar carpeta actual")
     //      y el armado de la RUTA DE SALIDA (carpeta + nombre + extension). Sin GL: se
     //      usa la API publica del popup (Navegar / EtiquetaAccion / Tecla(Accept)).

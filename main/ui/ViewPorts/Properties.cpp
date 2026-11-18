@@ -85,6 +85,13 @@ void RTFilasPanel(Properties* P); // muestra/oculta Rays/Samples/Passes segun g_
 static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
 static void AccionMatTransmision();   // (la Transmision de la tarjeta Material: ver abajo)
 static void AccionFondoModo(); static void AccionFondoPrincipal(); static void AccionFondoRot();   // (el FONDO: ver abajo)
+// LA LUZ DEL FONDO en % para su fila (g_renderLuzFondo va de 0 a 2)
+static float gLuzFondoPct = 100.0f;
+static void AccionLuzFondo() {
+    g_renderLuzFondo = gLuzFondoPct < 0.0f ? 0.0f : gLuzFondoPct * 0.01f;
+    RTInvalidar();
+    g_redraw = true;
+}
 #include "objects/Mirror.h"   // pestania del Mirror (target + ejes + rect)
 #include "objects/Instance.h" // selector de target de instance/array/mirror
 #include "objects/LOD.h"      // tarjeta del objeto LOD (umbrales de distancia)
@@ -176,6 +183,28 @@ Material* NuevoMaterialEnMeshPart(Mesh* mesh, int idx){
     return mat;
 }
 
+// LA CAPA DE MATERIAL elegida en la lista de la tarjeta Material (0 = la capa 1: MaterialGroup::material; k = capasMat[k-1])
+static int gCapaMatSel = 0;
+static int CapaMatCuantas(Mesh* m, int idx) {
+    if (!m || idx < 0 || idx >= (int)m->materialsGroup.size()) return 0;
+    return 1 + (int)m->materialsGroup[(size_t)idx].capasMat.size();
+}
+static int CapaMatElegida(Mesh* m, int idx) {
+    // (otra malla u otra parte: arranca en la capa 1)
+    static Mesh* ultM = NULL; static int ultI = -1;
+    if (m != ultM || idx != ultI) { ultM = m; ultI = idx; gCapaMatSel = 0; }
+    const int n = CapaMatCuantas(m, idx);
+    if (gCapaMatSel >= n) gCapaMatSel = n - 1;
+    if (gCapaMatSel < 0) gCapaMatSel = 0;
+    return n ? gCapaMatSel : -1;
+}
+// el lugar del material de la capa k de la parte idx (NULL = no existe)
+static Material** CapaMatLugar(Mesh* m, int idx, int k) {
+    if (!m || idx < 0 || idx >= (int)m->materialsGroup.size() || k < 0) return NULL;
+    MaterialGroup& g = m->materialsGroup[(size_t)idx];
+    if (k == 0) return &g.material;
+    return (k - 1 < (int)g.capasMat.size()) ? &g.capasMat[(size_t)(k - 1)] : NULL;
+}
 static void AccionMaterialElegido(int id){
     if (!PropsActivo) return;
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
@@ -186,18 +215,23 @@ static void AccionMaterialElegido(int id){
     int idx = lista->selectIndex;
     if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
 
-    UndoCapturarMaterial(mesh, idx); // Ctrl+Z: guarda el Material* previo del mesh part
+    // (el material va en la CAPA elegida de la lista de la tarjeta: la 1 es la de siempre; las de encima, capasMat)
+    const int capa = CapaMatElegida(mesh, idx);
+    if (capa <= 0) UndoCapturarMaterial(mesh, idx); // Ctrl+Z: guarda el Material* previo del mesh part
+    else UndoCapturarMallaGeo(mesh);                // (una capa de encima: la foto de las partes, con sus capas)
+    Material** lugar = CapaMatLugar(mesh, idx, capa > 0 ? capa : 0);
+    if (!lugar) return;
 
     if (id == 0) {
         // nombre clasico del programa: Material, Material.001, ...
-        mesh->materialsGroup[idx].material = MaterialDeFabrica(new Material(NombreMaterialLibre()));
+        *lugar = MaterialDeFabrica(new Material(NombreMaterialLibre()));
     } else if (id == 1) {
         // el material por defecto (fuera de la lista global Materials:
         // no aparece entre los "existentes")
         if (!MaterialDefecto) MaterialDefecto = MaterialDeFabrica(new Material("Default Material", true));
-        mesh->materialsGroup[idx].material = MaterialDefecto;
+        *lugar = MaterialDefecto;
     } else if (id >= 2 && id - 2 < (int)Materials.size()) {
-        mesh->materialsGroup[idx].material = Materials[id - 2];
+        *lugar = Materials[id - 2];
     }
     RebindMaterialMeshPart();
 }
@@ -233,7 +267,8 @@ static Material* MaterialActivoUI(){
     if (rec) return rec;
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m);
     if (!m || idx < 0 || idx >= (int)m->materialsGroup.size()) return NULL;
-    return m->materialsGroup[idx].material;
+    Material** l = CapaMatLugar(m, idx, CapaMatElegida(m, idx));   // (el de la CAPA elegida)
+    return l ? *l : m->materialsGroup[idx].material;
 }
 static void SelEnListaMeshPart(int idx){
     if (!PropsActivo) return;
@@ -512,8 +547,12 @@ void RenameCancel(){ RenameLimpiar(); g_redraw = true; } // CANCELAR: no escribe
 // tenia default NULL y caia en W3dDestNombre(destino), o sea un 'Directo' con el puntero pelado:
 // para un elemento de lista -grupo, capa, clip- eso da un paso de undo MUDO, que no restaura nada
 // y no avisa. Con el parametro sin default, una tarjeta nueva no puede "olvidarse" de declararlo.
+// RENOMBRAR EN LA FILA de una lista (doble click / el menu de la fila): el que lo pide deja aca el campo de la lista y
+// el "Rename" de esa tarjeta lo usa en vez de su boton (que ya no esta en la tarjeta, salvo con teclado: Symbian)
+static Button* g_listaRenBoton = NULL;
 static void RenameIniciar(Button* boton, std::string* destino, std::string (*uniq)(const std::string&, std::string*),
                           void (*despues)(), const W3dRenameDest* dest){
+    if (g_listaRenBoton) { boton = g_listaRenBoton; g_listaRenBoton = NULL; }
     if (!boton || !destino || !dest) return;
     g_renameTarget = destino;
     g_renameDest = *dest;
@@ -825,6 +864,10 @@ static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton);
 // tarjeta HITBOX (ViewPorts/PropsHitbox.cpp)
 void PropsHitboxConstruir(Properties* p);
 void PropsHitboxActualizar(Properties* p, bool visible);
+void PropsSondaLuzConstruir(Properties* p);
+void PropsSondaLuzActualizar(Properties* p, bool visible);
+void PropsHorneadoConstruir(Properties* p);
+void PropsHorneadoActualizar(Properties* p, bool visible);
 void PropsRutinaConstruir(Properties* p);
 void PropsRutinaActualizar(Properties* p, bool visible);
 // la LISTA DE PASOS de la rutina: el checkbox de la derecha, arrastrar para mover, las teclas (X/Supr, G)
@@ -1278,6 +1321,9 @@ static void AccionColorBase() {
 // ARRASTRAR el numero de un mapa (rugosidad, metalico, alfa): de izquierda a derecha va de 0 a 1; soltar sin moverlo
 // lo deja escribir con el teclado
 static int gMapaDragK = -1;
+// arrastrando la barra de un mapa (rugosidad, metalico...): el cursor NO se envuelve en el borde del viewport. La barra
+// sigue la X del mouse: pasado el borde queda en el tope (antes el cursor saltaba al otro lado y el 100% volvia a 0)
+bool Properties::SinEnvolverCursor() const { return gMapaDragK >= 0; }
 static int gMapaDragX0 = 0, gMapaDragW = 1, gMapaDragMx = 0;
 static bool gMapaDragMovio = false;
 static Material* gMapaDragMat = NULL;
@@ -1414,7 +1460,7 @@ static void AccionMenuTexturasB(){
         MenuTexturasB->action = AccionTexBElegida;
     }
     MenuTexturasB->Limpiar();
-    MenuTexturasB->Agregar(T("No Texture B"), 0, IconType::notifError);
+    MenuTexturasB->Agregar(T("No Toon Ramp"), 0, IconType::notifError);
     MenuTexturasB->Agregar(T("Load Texture"), 1, IconType::archive);
     for (size_t i = 5; i < Textures.size(); i++) {
         MenuTexturasB->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
@@ -1423,16 +1469,17 @@ static void AccionMenuTexturasB(){
 }
 
 // ===========================================================================
-//  CAPAS DE TEXTURA (TexLayer, objects/Materials.h): hasta 4 filas en la tarjeta Material, cada una con su
-//  textura, la capa UV de la malla con la que se dibuja y la mezcla. La fila que sigue a la ultima capa es
-//  la de "Add Layer": elegir una textura ahi CREA la capa; "No Texture" en una capa la BORRA. Los tres
-//  desplegables comparten menu; gCapaMenu dice sobre que fila se abrio.
+//  CAPAS DE TEXTURA (TexLayer, objects/Materials.h): hasta 4, en una LISTA como la de las partes de malla (el tacho
+//  de cada fila la borra, se arrastran para reordenar, click derecho = menu). Abajo, lo de la capa ELEGIDA: su
+//  textura, la capa UV de la malla con la que se dibuja, la mezcla y si esta prendida. "Add Layer" (abajo de la
+//  lista): elegir una textura CREA la capa. Los desplegables comparten menu; gCapaMenu dice sobre que capa se abrio.
 // ===========================================================================
 static const int kCapasUI = 4;
 static PopupMenu* MenuCapaTex = NULL;
 static PopupMenu* MenuCapaUV = NULL;
 static PopupMenu* MenuCapaMezcla = NULL;
 static int gCapaMenu = 0;
+static int gCapaSel = 0;       // la capa elegida en la lista (la que muestran los campos de abajo)
 int gCargarTexturaCapa = -1;   // "Load Texture" de una capa: main.cpp deja la imagen en esa capa (-1 = base/normal)
 // la malla del mesh part que edita la tarjeta (para nombrar sus capas UV); NULL con el material de un recurso
 static Mesh* MallaActivaUI() {
@@ -1451,36 +1498,92 @@ static void AccionCapaTexElegida(int id) {
     const int n = gCapaMenu;
     if (id == 0) {                                     // "No Texture": la capa se va (y suelta su textura)
         if (n < (int)mat->capas.size()) {
+            UndoMaterialModIniciar(mat);
             Texture* t = mat->capas[(size_t)n].tex;
             mat->capas.erase(mat->capas.begin() + n);
             TexturaSoltar(t);
+            UndoMaterialModCommit();
         }
     } else if (id == 1) {                              // cargar archivo: el MISMO browser, con la capa como destino
         if (DialogoCargarTextura) { gCargarTexturaComoNormal = false; gCargarTexturaCapa = n; DialogoCargarTextura(mat); return; }
     } else if (5 + id - 2 < (int)Textures.size()) {    // una ya cargada (la ranura de la capa la retiene)
+        UndoMaterialModIniciar(mat);
         if (n >= (int)mat->capas.size()) mat->capas.resize((size_t)n + 1);
         TexturaPonerEn(mat->capas[(size_t)n].tex, Textures[5 + id - 2]);
+        UndoMaterialModCommit();
+        gCapaSel = n;                                  // (la nueva queda elegida)
     }
     RebindMaterialMeshPart();
 }
+// la lista: cuantas hay, el nombre de cada una (su textura), elegir y cual esta elegida
+static int CapaTexCuantas() { Material* mat = MaterialActivoUI(); return (mat && mat != MaterialDefecto) ? (int)mat->capas.size() : 0; }
+static int CapaTexElegida() { const int n = CapaTexCuantas(); if (gCapaSel >= n) gCapaSel = n - 1; if (gCapaSel < 0) gCapaSel = 0; return n ? gCapaSel : -1; }
+// EL FACTOR de la capa elegida, en % para la fila (la capa lo guarda de 0 a 1). El deshacer lo toma la edicion de la fila
+// (como toda la tarjeta Material)
+static float gCapaFuerzaPct = 100.0f;
+static void OnCapaFuerza() {
+    Material* mat = MaterialActivoUI(); const int n = CapaTexElegida();
+    if (!mat || n < 0 || n >= (int)mat->capas.size()) return;
+    float f = gCapaFuerzaPct * 0.01f; if (f < 0.0f) f = 0.0f; if (f > 1.0f) f = 1.0f;
+    mat->capas[(size_t)n].fuerza = f;
+    RTInvalidar();
+    g_redraw = true;
+}
+static std::string CapaTexNombre(int i) {
+    Material* mat = MaterialActivoUI();
+    if (!mat || i < 0 || i >= (int)mat->capas.size()) return std::string();
+    return NombreDeTextura(mat->capas[(size_t)i].tex);
+}
+static void CapaTexElegir(int i) { gCapaSel = i; RebindMaterialMeshPart(); }
+static void AccionCapaBorrar() {
+    Material* mat = MaterialActivoUI(); const int n = CapaTexElegida();
+    if (!mat || n < 0) return;
+    UndoMaterialModIniciar(mat);   // (Ctrl+Z la devuelve: el paso guarda la lista de capas)
+    Texture* t = mat->capas[(size_t)n].tex;
+    mat->capas.erase(mat->capas.begin() + n);
+    TexturaSoltar(t);
+    UndoMaterialModCommit();
+    RebindMaterialMeshPart(); g_redraw = true;
+}
+static void CapaMover(int d) {
+    Material* mat = MaterialActivoUI(); const int n = CapaTexElegida();
+    if (!mat || n < 0 || n + d < 0 || n + d >= (int)mat->capas.size()) return;
+    UndoMaterialModIniciar(mat);
+    std::swap(mat->capas[(size_t)n], mat->capas[(size_t)(n + d)]);   // (el orden es el de dibujado: la de abajo, encima)
+    UndoMaterialModCommit();
+    gCapaSel = n + d;
+    RebindMaterialMeshPart(); g_redraw = true;
+}
+static void AccionCapaSubir() { CapaMover(-1); }
+static void AccionCapaBajar() { CapaMover(1); }
+static struct CapaTexGanchos { CapaTexGanchos() { CapaTexFilasCount = CapaTexCuantas; CapaTexFilaTexto = CapaTexNombre;
+    CapaTexFilaSeleccionar = CapaTexElegir; CapaTexFilaActiva = CapaTexElegida; } } gCapaTexGanchos;
 static void AccionMenuCapaTex(int n) {
     if (!PropsActivo || !MaterialActivoUI()) return;
+    // (los campos de abajo de la lista -la fila 0- son los de la capa ELEGIDA; n = -1: "Add Layer", una capa nueva)
+    Button* boton = PropsActivo->propCapaTex[0]->button;
+    if (n < 0) { n = CapaTexCuantas(); if (PropsActivo->propCapaAdd) boton = PropsActivo->propCapaAdd->button; }
+    else n = CapaTexElegida();
+    if (n < 0 || n >= kCapasUI) return;
     gCapaMenu = n;
     if (!MenuCapaTex) { MenuCapaTex = new PopupMenu(); MenuCapaTex->action = AccionCapaTexElegida; }
     MenuCapaTex->Limpiar();
     MenuCapaTex->Agregar(T("No Texture"), 0, IconType::notifError);
     MenuCapaTex->Agregar(T("Load Texture"), 1, IconType::archive);
     for (size_t i = 5; i < Textures.size(); i++) MenuCapaTex->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
-    AbrirMenuBajoBoton(MenuCapaTex, PropsActivo->propCapaTex[n]->button);
+    AbrirMenuBajoBoton(MenuCapaTex, boton);
 }
 static void AccionCapaUVElegida(int id) {
     Material* mat = MaterialActivoUI();
     if (!mat || gCapaMenu >= (int)mat->capas.size() || id < 0) return;
+    UndoMaterialModIniciar(mat);
     mat->capas[(size_t)gCapaMenu].uvMapa = id;
+    UndoMaterialModCommit();
     RebindMaterialMeshPart();
 }
 static void AccionMenuCapaUV(int n) {
     if (!PropsActivo || !MaterialActivoUI()) return;
+    n = CapaTexElegida(); if (n < 0) return;
     gCapaMenu = n;
     if (!MenuCapaUV) { MenuCapaUV = new PopupMenu(); MenuCapaUV->action = AccionCapaUVElegida; }
     MenuCapaUV->Limpiar();
@@ -1489,21 +1592,24 @@ static void AccionMenuCapaUV(int n) {
     if (m && (int)m->uvExtra.size() > cuantas) cuantas = (int)m->uvExtra.size();   // importadas sin capa del editor
     if (cuantas < 2) cuantas = 2;
     for (int k = 0; k < cuantas && k < 8; k++) MenuCapaUV->Agregar(NombreCapaUV(k), k, IconType::material);
-    AbrirMenuBajoBoton(MenuCapaUV, PropsActivo->propCapaUV[n]->button);
+    AbrirMenuBajoBoton(MenuCapaUV, PropsActivo->propCapaUV[0]->button);
 }
 static void AccionCapaMezclaElegida(int id) {
     Material* mat = MaterialActivoUI();
     if (!mat || gCapaMenu >= (int)mat->capas.size() || id < 0 || id >= W3D_CAPA_MEZCLAS) return;
+    UndoMaterialModIniciar(mat);
     mat->capas[(size_t)gCapaMenu].blend = id;
+    UndoMaterialModCommit();
     RebindMaterialMeshPart();
 }
 static void AccionMenuCapaMezcla(int n) {
     if (!PropsActivo || !MaterialActivoUI()) return;
+    n = CapaTexElegida(); if (n < 0) return;
     gCapaMenu = n;
     if (!MenuCapaMezcla) { MenuCapaMezcla = new PopupMenu(); MenuCapaMezcla->action = AccionCapaMezclaElegida; }
     MenuCapaMezcla->Limpiar();
     for (int k = 0; k < W3D_CAPA_MEZCLAS; k++) MenuCapaMezcla->Agregar(T(W3dCapaMezclaNombre(k)), k, IconType::material);
-    AbrirMenuBajoBoton(MenuCapaMezcla, PropsActivo->propCapaMezcla[n]->button);
+    AbrirMenuBajoBoton(MenuCapaMezcla, PropsActivo->propCapaMezcla[0]->button);
 }
 // los botones no reciben argumentos: una accion por fila
 static void AccionCapaTex0() { AccionMenuCapaTex(0); }  static void AccionCapaTex1() { AccionMenuCapaTex(1); }
@@ -1512,6 +1618,7 @@ static void AccionCapaUV0()  { AccionMenuCapaUV(0); }   static void AccionCapaUV
 static void AccionCapaUV2()  { AccionMenuCapaUV(2); }   static void AccionCapaUV3()  { AccionMenuCapaUV(3); }
 static void AccionCapaMz0()  { AccionMenuCapaMezcla(0); } static void AccionCapaMz1() { AccionMenuCapaMezcla(1); }
 static void AccionCapaMz2()  { AccionMenuCapaMezcla(2); } static void AccionCapaMz3() { AccionMenuCapaMezcla(3); }
+static void AccionCapaAdd() { AccionMenuCapaTex(-1); }
 static void (*const kAccionCapaTex[4])() = { AccionCapaTex0, AccionCapaTex1, AccionCapaTex2, AccionCapaTex3 };
 static void (*const kAccionCapaUV[4])()  = { AccionCapaUV0,  AccionCapaUV1,  AccionCapaUV2,  AccionCapaUV3 };
 static void (*const kAccionCapaMz[4])()  = { AccionCapaMz0,  AccionCapaMz1,  AccionCapaMz2,  AccionCapaMz3 };
@@ -1702,7 +1809,6 @@ static void AccionMenuReflectMode(){
 // espejos de UI (los Prop* editan un bool/float suelto y el onChange lo baja al material)
 static float g_matSesgo = 0.0f;
 static float g_matSesgoM = 0.0f;
-static float g_matOrden = 0.0f;
 
 static void OnMatSesgoChange() {
     Material* mat = MaterialActivoUI();
@@ -1716,12 +1822,29 @@ static void OnMatSesgoMChange() {
     mat->sesgo_metros = g_matSesgoM;
     g_redraw = true;
 }
-static void OnMatOrdenChange() {
+// EL PASE del material (Material::orden_pasada): la escena se dibuja en tres pases, cada uno recorriendo el arbol en
+// orden (el del outliner y el de las partes de malla): primero lo OPACO, despues las CALCOMANIAS y al final lo
+// TRANSPARENTE (ver g_w3dPaseDibujo en Mesh.cpp)
+static const char* const kNombresPase[3] = { "Opaque pass", "Decal pass", "Transparent pass" };
+static PopupMenu* MenuPase = NULL;
+static void AccionPaseElegido(int id) {
+    Mesh* me = MaterialMesh();
     Material* mat = MaterialActivoUI();
-    if (!mat || mat == MaterialDefecto) return;
-    int v = (int)(g_matOrden + 0.5f); if (v < 0) v = 0; if (v > 2) v = 2;
-    mat->orden_pasada = v;
-    RebindMaterialMeshPart();   // el tilde "Decal" depende de esto
+    if (!mat || mat == MaterialDefecto || id < 0 || id > 2) return;
+    UndoCapturarMaterial(me, MeshPartActivoIdx(me));
+    mat->orden_pasada = id;
+    RebindMaterialMeshPart();
+}
+static void AccionMenuPase() {
+    if (!PropsActivo || !PropsActivo->propMatOrden) return;
+    if (!MenuPase) { MenuPase = new PopupMenu(); MenuPase->action = AccionPaseElegido; }
+    MenuPase->Limpiar();
+    Material* mat = MaterialActivoUI();
+    for (int i = 0; i < 3; i++) {
+        MenuItem* it = MenuPase->Agregar(T(kNombresPase[i]), i, IconType::material);
+        if (it && mat && mat->orden_pasada == i) it->verde = true;
+    }
+    AbrirMenuBajoBoton(MenuPase, PropsActivo->propMatOrden->button);
 }
 
 // --- LINEAS: dibujar las aristas de la malla con el material (checkbox) + el
@@ -2037,9 +2160,31 @@ static void SincronizarRepoCampo(PropText* pt){
     }
 }
 
+static void ArmarMenuMateriales();
 static void AccionMenuMateriales(){
     if (!PropsActivo) return;
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    ArmarMenuMateriales();
+    AbrirMenuBajoBoton(MenuMateriales, PropsActivo->propBtnNewMaterial->button);
+}
+// la FLECHA de una capa de la lista: el menu de materiales, ahi (lo que se elija va a esa capa)
+static int gMenuMatX = 0, gMenuMatY = 0;
+static void AccionCambiarMaterialCapa(){
+    if (!PropsActivo || !ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    ArmarMenuMateriales();
+    if (MenuAbierto && MenuAbierto != MenuMateriales) MenuAbierto->Cerrar();
+    MenuMateriales->Abrir(gMenuMatX, gMenuMatY, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = MenuMateriales;
+    g_redraw = true;
+}
+void PropsMenuMaterialesEn(int x, int y) { gMenuMatX = x; gMenuMatY = y; AccionCambiarMaterialCapa(); }
+// "Cambiar material" (abajo de la lista): el material de la capa elegida, de la lista de materiales
+static void AccionBotonCambiarMaterial(){
+    if (!PropsActivo || !PropsActivo->propCapaMatCambiar || !ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    ArmarMenuMateriales();
+    AbrirMenuBajoBoton(MenuMateriales, PropsActivo->propCapaMatCambiar->button);
+}
+static void ArmarMenuMateriales(){
     if (!MenuMateriales) {
         MenuMateriales = new PopupMenu();
         MenuMateriales->action = AccionMaterialElegido;
@@ -2050,8 +2195,51 @@ static void AccionMenuMateriales(){
     for (size_t i = 0; i < Materials.size(); i++) {
         MenuMateriales->Agregar(Materials[i]->name, 2 + (int)i, IconType::material);
     }
-    AbrirMenuBajoBoton(MenuMateriales, PropsActivo->propBtnNewMaterial->button);
 }
+// ---- LAS CAPAS DE MATERIAL (la lista de arriba de la tarjeta Material) ----
+static int CapaMatFilas() { Mesh* m = MaterialMesh(); return CapaMatCuantas(m, MeshPartActivoIdx(m)); }
+static std::string CapaMatTexto(int k) {
+    Mesh* m = MaterialMesh(); Material** l = CapaMatLugar(m, MeshPartActivoIdx(m), k);
+    if (!l) return std::string();
+    return (*l && *l != MaterialDefecto) ? (*l)->name : std::string(T("Default Material"));
+}
+static void CapaMatElegir(int k) { gCapaMatSel = k; RebindMaterialMeshPart(); }
+static int CapaMatActiva() { Mesh* m = MaterialMesh(); return CapaMatElegida(m, MeshPartActivoIdx(m)); }
+static struct CapaMatGanchos { CapaMatGanchos() { CapaMatFilasCount = CapaMatFilas; CapaMatFilaTexto = CapaMatTexto;
+    CapaMatFilaSeleccionar = CapaMatElegir; CapaMatFilaActiva = CapaMatActiva; } } gCapaMatGanchos;
+// "Nuevo material" (+): una capa NUEVA arriba de todo, con un material nuevo, y queda elegida
+static void AccionCapaMatNueva() {
+    Mesh* m = MaterialMesh(); const int idx = MeshPartActivoIdx(m);
+    if (!m || idx < 0 || W3dMallaSoloLecturaAviso(m, true)) return;
+    UndoCapturarMallaGeo(m);
+    m->materialsGroup[(size_t)idx].capasMat.push_back(MaterialDeFabrica(new Material(NombreMaterialLibre())));
+    gCapaMatSel = (int)m->materialsGroup[(size_t)idx].capasMat.size();
+    RebindMaterialMeshPart(); PropertiesLayoutDirty = true; g_redraw = true;
+}
+// borrar la capa elegida (queda siempre una: la de abajo pasa a ser la 1)
+static void AccionCapaMatBorrar() {
+    Mesh* m = MaterialMesh(); const int idx = MeshPartActivoIdx(m);
+    const int k = CapaMatElegida(m, idx);
+    if (!m || k < 0 || CapaMatCuantas(m, idx) <= 1 || W3dMallaSoloLecturaAviso(m, true)) return;
+    UndoCapturarMallaGeo(m);
+    MaterialGroup& g = m->materialsGroup[(size_t)idx];
+    if (k == 0) { g.material = g.capasMat[0]; g.capasMat.erase(g.capasMat.begin()); }
+    else g.capasMat.erase(g.capasMat.begin() + (k - 1));
+    if (gCapaMatSel > 0 && gCapaMatSel >= CapaMatCuantas(m, idx)) gCapaMatSel = CapaMatCuantas(m, idx) - 1;
+    RebindMaterialMeshPart(); PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void CapaMatMover(int d) {
+    Mesh* m = MaterialMesh(); const int idx = MeshPartActivoIdx(m);
+    const int k = CapaMatElegida(m, idx);
+    Material** a = CapaMatLugar(m, idx, k); Material** b = CapaMatLugar(m, idx, k + d);
+    if (!a || !b || W3dMallaSoloLecturaAviso(m, true)) return;
+    UndoCapturarMallaGeo(m);
+    Material* t = *a; *a = *b; *b = t;
+    gCapaMatSel = k + d;
+    RebindMaterialMeshPart(); g_redraw = true;
+}
+static void AccionCapaMatSubir() { CapaMatMover(-1); }
+static void AccionCapaMatBajar() { CapaMatMover(1); }
 
 // ====================================================================
 // STACK de MODIFICADORES: menu "Add" (los 5 tipos) + acciones Add/Remove/Move. El stack vive en el Mesh
@@ -7694,10 +7882,33 @@ static void AccionProyAbrir() {
 }
 // el mismo explorador de "Abrir proyecto", para la pantalla de inicio ("Abrir...")
 void ProyectoAbrirDialogo() { AccionProyAbrir(); }
-// NUEVO PROYECTO: diferido al proximo frame, como abrir (import_w3d.cpp, NuevoProyectoAhora)
+// NUEVO PROYECTO: diferido al proximo frame, como abrir (import_w3d.cpp, NuevoProyectoAhora). Con layouts guardados
+// (config/W3dLayouts.h) primero una LISTA abajo del boton para arrancar con el que se quiera: "Por defecto" (el de
+// fabrica) y los guardados, como en el menu Layout de la esquina de cada viewport. Sin ninguno guardado, directo
+static PopupMenu* gMenuProyNuevo = NULL;
+static std::vector<std::string> gProyNuevoLayouts;   // los nombres, en el orden de la lista (id 1 + i; 0 = Por defecto)
+static void AccionMenuProyNuevo(int id) {
+    std::string nombre;
+    if (id >= 1 && id <= (int)gProyNuevoLayouts.size()) nombre = gProyNuevoLayouts[(size_t)(id - 1)];
+    else if (id != 0) return;
+    extern void NuevoProyectoConLayout(const std::string&);
+    NuevoProyectoConLayout(nombre);
+}
 static void AccionProyNuevo() {
-    extern void NuevoProyectoDesde();
-    NuevoProyectoDesde();
+    extern std::vector<std::string> W3dLayoutsNombres();
+    gProyNuevoLayouts = W3dLayoutsNombres();
+    PropButton* b = PropsActivo ? PropsActivo->propProyNuevo : NULL;
+    if (gProyNuevoLayouts.empty() || !b) { extern void NuevoProyectoDesde(); NuevoProyectoDesde(); return; }
+    if (!gMenuProyNuevo) { gMenuProyNuevo = new PopupMenu(); gMenuProyNuevo->action = AccionMenuProyNuevo; }
+    gMenuProyNuevo->Limpiar();
+    gMenuProyNuevo->titulo = T("New project");
+    gMenuProyNuevo->Agregar(T("Default"), 0, (int)IconType::cuadricula);
+    for (size_t i = 0; i < gProyNuevoLayouts.size(); i++)
+        gMenuProyNuevo->Agregar(gProyNuevoLayouts[i], 1 + (int)i, (int)IconType::cuadricula);
+    if (MenuAbierto && MenuAbierto != gMenuProyNuevo) MenuAbierto->Cerrar();
+    gMenuProyNuevo->Abrir(b->button->sx, b->button->sy + b->button->height, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuProyNuevo;
+    g_redraw = true;
 }
 // valida que el proyecto tenga NOMBRE antes de guardar. Si falta, marca el campo en rojo
 // (PropText::error) + avisa por toast, y devuelve false: el caller NO guarda (antes, sin
@@ -8969,8 +9180,18 @@ void Properties::ConstruirGrupos(){
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
     propMeshParts = new GroupPropertie(T("Mesh Parts"));
     propMeshParts->anchoValores = 0.30f;
-    propMeshParts->properties.push_back(new PropListMeshParts(T("Mesh Parts"))); // [0] selector (lo lee Rebind)
-    PropButton* pbNewPart = new PropButton(T("New Mesh Part"), IconType::mesh);
+    { PropListMeshParts* lp = new PropListMeshParts(T("Mesh Parts"));
+      // (la fila: el tacho -con mas de una parte-, doble click = renombrar, arrastrar = reordenar, click derecho = menu;
+      //  asignar / seleccionar / deseleccionar, solo en Edicion)
+      lp->opBorrar = AccionBorrarMeshPart; lp->opRenombrar = AccionRenameMeshPart;
+      lp->opSubir = AccionMeshPartUp; lp->opBajar = AccionMeshPartDown; lp->minItems = 1;
+      lp->filasMax = 3; lp->minFilas = 3; lp->botonesLado = true;   // (3 renglones y, a la derecha, subir / bajar / opciones)
+      lp->AgregarExtra("Assign", AccionAssignMeshPart, (int)IconType::mesh, true);
+      lp->AgregarExtra("Select", AccionSelectMeshPart, (int)IconType::seleccion, true);
+      lp->AgregarExtra("Deselect", AccionDeselectMeshPart, (int)IconType::seleccion, true);
+      propMeshParts->properties.push_back(lp); } // [0] selector (lo lee Rebind)
+    propMeshParts->icono = (int)IconType::mesh;
+    PropButton* pbNewPart = new PropButton(T("New Mesh Part"), IconType::mas);
     pbNewPart->action = AccionNuevoMeshPart;      propMeshParts->properties.push_back(pbNewPart);
     propBtnNewPart = pbNewPart;   // (se oculta con una malla de una libreria)
     // fila: Assign | Select | Deselect (sin icono, 33% c/u, auto-ancho con gap)
@@ -8983,13 +9204,19 @@ void Properties::ConstruirGrupos(){
     propRowDelRen = new PropButtonRow();
     propRowDelRen->Agregar(T("Delete"), AccionBorrarMeshPart);
     propRowDelRen->Agregar(T("Rename"), AccionRenameMeshPart); // el boton Rename se vuelve input al apretarlo
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propMeshParts->properties.push_back(propRowDelRen);
+#endif
+
     // fila: Move Up | Move Down (oculta si hay 1 sola parte). El ORDEN del mesh part = ORDEN DE DIBUJADO
     // (dibujar los solidos primero y los transparentes al final).
     propRowPartMove = new PropButtonRow();
     propRowPartMove->Agregar(T("Move Up"),   AccionMeshPartUp);
     propRowPartMove->Agregar(T("Move Down"), AccionMeshPartDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propMeshParts->properties.push_back(propRowPartMove);
+#endif
+
     GroupProperties.push_back(propMeshParts);
 
     // ===== Tarjeta APARTE "Material". Orden: New Material + Rename Material (las opciones
@@ -9048,14 +9275,35 @@ void Properties::ConstruirGrupos(){
     GroupProperties.push_back(propRecurso);
 
     propMaterial = new GroupPropertie(T("Material"));
+    propMaterial->icono = (int)IconType::material;   // (el icono a la izquierda del titulo)
     propMaterial->anchoValores = 0.30f;
-    propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);   // (el selector: icono de material; el "+" es solo la opcion "New Material" de su lista)
+    // LAS CAPAS DE MATERIAL del mesh part: una lista con el material ADENTRO (la capa 1 arranca en el por defecto y
+    // siempre queda una). Cada fila: doble click = renombrar el material, la FLECHA = cambiarlo por otro, el TACHO =
+    // borrar la capa. A la derecha subir / bajar / opciones. Abajo "Nuevo material". Lo de mas abajo en la tarjeta
+    // edita el material de la capa elegida
+    propListCapasMat = new PropListMeshParts(T("Material")); propListCapasMat->modo = 18;
+    propListCapasMat->filasMax = 3; propListCapasMat->minFilas = 3; propListCapasMat->botonesLado = true;
+    propListCapasMat->minItems = 1;
+    propListCapasMat->opBorrar = AccionCapaMatBorrar; propListCapasMat->opRenombrar = AccionRenameMaterial;
+    propListCapasMat->opSubir = AccionCapaMatSubir; propListCapasMat->opBajar = AccionCapaMatBajar;
+    propListCapasMat->opCambiar = AccionCambiarMaterialCapa;
+    propMaterial->properties.push_back(propListCapasMat);
+    propCapaMatAdd = new PropButton(T("New Material"), IconType::mas);
+    propCapaMatAdd->action = AccionCapaMatNueva;
+    propMaterial->properties.push_back(propCapaMatAdd);
+    propCapaMatCambiar = new PropButton(T("Change Material"), IconType::material);   // (el de la capa elegida)
+    propCapaMatCambiar->button->desplegable = true;
+    propCapaMatCambiar->action = AccionBotonCambiarMaterial;
+    propMaterial->properties.push_back(propCapaMatCambiar);
+    propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);   // (el selector viejo: solo en Symbian, sin mouse)
     propBtnNewMaterial->button->desplegable = true;
     propBtnNewMaterial->action = AccionMenuMateriales;
-    propMaterial->properties.push_back(propBtnNewMaterial);
     propBtnRenameMat = new PropButton(T("Rename Material"), -1); // ANTES de la textura, SIN icono
     propBtnRenameMat->action = AccionRenameMaterial; // se vuelve input al apretarlo; oculto si es el default
+#ifdef W3D_SYMBIAN
+    propMaterial->properties.push_back(propBtnNewMaterial);
     propMaterial->properties.push_back(propBtnRenameMat);
+#endif
     // aviso cuando el mesh part usa el material POR DEFECTO (oculto si tiene uno propio). 1 label WRAP: se
     // adapta al ancho (salto de linea en los espacios) -> se lee entero aunque se achique el panel.
     propMsgDefault = new PropLabel(T("The default material can not be edited. Create a new material."), true /*wrap*/);
@@ -9164,11 +9412,10 @@ void Properties::ConstruirGrupos(){
     propMatSesgoM->SetRango(-2.0f, 2.0f);
     propMatSesgoM->stepFino = 0.01f; propMatSesgoM->stepGrueso = 0.05f; propMatSesgoM->dragStep = 0.005f;
     propMatSesgoM->onChange = OnMatSesgoMChange;
-    propMatOrden = new PropFloat(T("Pass Order"));
-    propMatOrden->SetRango(0.0f, 2.0f);
-    propMatOrden->entero = true;
-    propMatOrden->stepFino = 1.0f; propMatOrden->stepGrueso = 1.0f; propMatOrden->dragStep = 1.0f;
-    propMatOrden->onChange = OnMatOrdenChange;
+    propMatOrden = new PropButton(T("Pass"));   // (desplegable: pase de opacos / calcomanias / transparentes)
+    propMatOrden->conLabel = true;
+    propMatOrden->button->desplegable = true;
+    propMatOrden->action = AccionMenuPase;
     // --- LINEAS: aristas de la malla con este material + grosor en px ---
     propMatLineas = new PropBool(T("Lines"));
     propMatLineas->onChange = OnMatLineasChange;
@@ -9195,6 +9442,11 @@ void Properties::ConstruirGrupos(){
     // --- ORDEN VISUAL ---
     propMaterial->properties.push_back(propMatChk[3]);  // Lighting  (ARRIBA DE TODO)
     propMaterial->properties.push_back(propBtnSombreado); // por vertice / por pixel (solo con shaders y Lighting ON)
+    // LUZ INDIRECTA POR VERTICE (Material::luzIndirecta): con una sonda de luz, en el pipeline fijo (el N95) la CPU calcula
+    // la luz de cada vertice. Con la luz por pixel no hace falta (la sonda ya entra)
+    propMatLuzInd = new PropBool(T("Indirect light"));
+    propMatLuzInd->onChange = RebindMaterialMeshPart;
+    propMaterial->properties.push_back(propMatLuzInd);
     // SHADER ESCRITO (al FINAL de la tarjeta: es lo avanzado): el tilde; con el, el archivo (su boton chico lo abre en el
     // IDE), "Compile" y lo que dijo el compilador
     propMatShaderOn = new PropBool(T("Advanced: custom shader"));
@@ -9225,11 +9477,31 @@ void Properties::ConstruirGrupos(){
     propMaterial->properties.push_back(propBtnMezcla);  // modo de mezcla (visible si Transparent ON)
     propMaterial->properties.push_back(propBtnTexB);    // Texture B (mezcla de texturas en una pasada)
     propMaterial->properties.push_back(propMatMezclaB); // Texture mix (cuanto de B; visible con una textura B)
+    // (LINEAS, CULLING y lo de la PROFUNDIDAD -test, los dos sesgos, el orden de pase- arriba de las capas de textura)
+    propMaterial->properties.push_back(propMatLineas);      // Lines (aristas por material)
+    propMaterial->properties.push_back(propMatGrosorLinea); // Line Width (visible con Lines ON)
+    propMaterial->properties.push_back(propMatChk[5]);  // Culling
+    propMaterial->properties.push_back(propBtnProfundidad); // Depth Test/Write (desplegable)
+    propMaterial->properties.push_back(propMatSesgo);       // Depth Bias
+    // (el sesgo EN METROS ya no esta en la tarjeta: un solo sesgo, el del z-buffer. Un proyecto que lo traia lo sigue
+    //  aplicando: Material::sesgo_metros se lee y se guarda igual)
+    propMaterial->properties.push_back(propMatOrden);       // el pase (opacos / calcomanias / transparentes)
     // --- CAPAS DE TEXTURA: titulo + hasta 4 filas [textura | UV | mezcla | on] (ver el bloque de arriba) ---
     propCapasTitulo = new PropLabel(T("Texture Layers"));
     propMaterial->properties.push_back(propCapasTitulo);
+    // (la lista: una fila por capa, con su tacho; se arrastran para reordenar. Abajo, "Add Layer" y lo de la elegida)
+    propListCapas = new PropListMeshParts(T("Texture Layers")); propListCapas->modo = 17;
+    propListCapas->filasMax = 3; propListCapas->minFilas = 3; propListCapas->mostrarVacia = true;   // (3 renglones, siempre)
+    propListCapas->botonesLado = true;                                                                // subir / bajar / opciones
+    propListCapas->opBorrar = AccionCapaBorrar; propListCapas->opSubir = AccionCapaSubir; propListCapas->opBajar = AccionCapaBajar;
+    propMaterial->properties.push_back(propListCapas);
+    propCapaAdd = new PropButton(T("Add Layer"), IconType::mas);
+    propCapaAdd->button->desplegable = true;
+    propCapaAdd->action = AccionCapaAdd;
+    propMaterial->properties.push_back(propCapaAdd);
     for (int i = 0; i < kCapasUI; i++) {
-        propCapaTex[i] = new PropButton(T("Add Layer"), IconType::textura);
+        propCapaTex[i] = new PropButton(T("Texture"), IconType::textura);
+        propCapaTex[i]->conLabel = true;
         propCapaTex[i]->button->desplegable = true;
         propCapaTex[i]->action = kAccionCapaTex[i];
         propCapaUV[i] = new PropButton("UV 1", IconType::material);
@@ -9240,21 +9512,20 @@ void Properties::ConstruirGrupos(){
         propCapaMezcla[i]->conLabel = true;
         propCapaMezcla[i]->button->desplegable = true;
         propCapaMezcla[i]->action = kAccionCapaMz[i];
+        propCapaFuerza[i] = new PropFloat(T("Factor"), "%");   // (el % de la capa: TexLayer::fuerza va de 0 a 1)
+        propCapaFuerza[i]->SetRango(0.0f, 100.0f);
+        propCapaFuerza[i]->entero = true;   // ("50%", no "50.0000%")
+        propCapaFuerza[i]->stepFino = 1.0f; propCapaFuerza[i]->stepGrueso = 10.0f; propCapaFuerza[i]->dragStep = 0.5f;
+        propCapaFuerza[i]->onChange = OnCapaFuerza;
         propCapaOn[i] = new PropBool(T("Layer On"));
         propCapaOn[i]->onChange = RebindMaterialMeshPart;
         propMaterial->properties.push_back(propCapaTex[i]);
         propMaterial->properties.push_back(propCapaUV[i]);
         propMaterial->properties.push_back(propCapaMezcla[i]);
+        propMaterial->properties.push_back(propCapaFuerza[i]);
         propMaterial->properties.push_back(propCapaOn[i]);
     }
-    propMaterial->properties.push_back(propMatLineas);      // Lines (aristas por material)
-    propMaterial->properties.push_back(propMatGrosorLinea); // Line Width (visible con Lines ON)
-    propMaterial->properties.push_back(propMatChk[5]);  // Culling    (ABAJO DE TODO: pro)
-    // los "pro" de calcomania (profundidad, sesgo, orden de pasada): al final, debajo de Culling
-    propMaterial->properties.push_back(propBtnProfundidad); // Depth Test/Write (desplegable)
-    propMaterial->properties.push_back(propMatSesgo);       // Depth Bias
-    propMaterial->properties.push_back(propMatSesgoM);      // Depth Bias (m)
-    propMaterial->properties.push_back(propMatOrden);       // Pass Order
+    // (Lineas, Culling, la profundidad, los sesgos y el orden de pase van arriba de las capas de textura: ver mas arriba)
     // el viejo checkbox "Depth Test" queda OCULTO: lo reemplaza el desplegable de arriba,
     // que ademas expone la escritura de z (la mitad que faltaba).
     propMaterial->properties.push_back(propMatChk[6]);
@@ -9263,6 +9534,7 @@ void Properties::ConstruirGrupos(){
     propMaterial->properties.push_back(propBtnShaderComp);
     propMaterial->properties.push_back(propMatShaderMsg);
     GroupProperties.push_back(propMaterial);
+    PropsHorneadoConstruir(this);   // PRECALCULAR LA ILUMINACION, debajo de la tarjeta Material (PropsHorneado.cpp)
 
     // pestania de LUZ: TODAS las propiedades editables de la luz de OpenGL. Se ve solo si el
     // objeto activo es una luz. OpenGL = UN tipo de luz configurable: Direccional / Puntual / Spot (ver Light.h).
@@ -9560,6 +9832,7 @@ void Properties::ConstruirGrupos(){
     GroupProperties.push_back(propRecorte);
     // HITBOX: caja de deteccion (la tarjeta entera vive en PropsHitbox.cpp)
     PropsHitboxConstruir(this);
+    PropsSondaLuzConstruir(this);   // LA SONDA DE LUZ (PropsSondaLuz.cpp)
     PropsRutinaConstruir(this);
     PropsPrefabConstruir(this);   // la tarjeta de una instancia de prefab (y de lo que genera)
 
@@ -10005,6 +10278,14 @@ void Properties::ConstruirGrupos(){
           propRenderBgRot[k] = pr;
           propRender->properties.push_back(pr);
       } }
+    // LA LUZ DEL FONDO: el fondo es la luz ambiente (el color, o la irradiancia del 360) por este factor
+    propRenderLuzFondo = new PropFloat(T("Background light"), "%");
+    propRenderLuzFondo->SetRango(0.0f, 200.0f);
+    propRenderLuzFondo->entero = true;
+    propRenderLuzFondo->stepFino = 1.0f; propRenderLuzFondo->stepGrueso = 10.0f; propRenderLuzFondo->dragStep = 0.5f;
+    propRenderLuzFondo->onChange = AccionLuzFondo;
+    propRenderLuzFondo->value = &gLuzFondoPct;
+    propRender->properties.push_back(propRenderLuzFondo);
     // MIPMAPPING del PROYECTO: el estado vigente (el .w3d lo declara en su cabecera y
     // GuardarW3D escribe `mipmaps: false` si esta apagado). ActualizarPropiedades lo
     // sincroniza con MipmapsGlobal al cambiar de proyecto.
@@ -10570,6 +10851,12 @@ void Properties::ConstruirGrupos(){
     // "Vertex Groups" va PRIMERA: es la mas importante (huesos del rig, pesos para deformar la malla).
     propVertexGroups = new GroupPropertie(T("Vertex Groups"));
     propListVertGroups = new PropListMeshParts(T("Vertex Groups")); propListVertGroups->modo = 4;
+    propListVertGroups->opBorrar = AccionVertDelGroup; propListVertGroups->opRenombrar = AccionRenameGroup;
+    propListVertGroups->opSubir = AccionVertGroupUp; propListVertGroups->opBajar = AccionVertGroupDown;
+    propListVertGroups->AgregarExtra("Assign", AccionVertGroupAssign, (int)IconType::mesh, true);
+    propListVertGroups->AgregarExtra("Remove", AccionVertGroupRemove, (int)IconType::mesh, true);
+    propListVertGroups->AgregarExtra("Select", AccionVertGroupSelect, (int)IconType::seleccion, true);
+    propListVertGroups->AgregarExtra("Deselect", AccionVertGroupDeselect, (int)IconType::seleccion, true);
     propVertexGroups->properties.push_back(propListVertGroups);
     PropButton* pbAddGrp = new PropButton(T("Add Vertex Group"), IconType::mesh);
     pbAddGrp->action = AccionVertAddGroup;
@@ -10577,7 +10864,10 @@ void Properties::ConstruirGrupos(){
     propBtnAddVG = pbAddGrp;
     propBtnRenameGroup = new PropButton(T("Rename"), -1); // renombra el grupo activo (nombre unico por malla)
     propBtnRenameGroup->action = AccionRenameGroup;
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propVertexGroups->properties.push_back(propBtnRenameGroup);
+#endif
+
     // fila Delete | Move Up | Move Down (Delete si hay >=1; Move si hay >=2)
     // fila Assign | Remove: los VERTICES seleccionados en Edit Mode entran (peso 1) o salen del
     // grupo activo. Es LA operacion que faltaba para armar un vertex group sin pincel.
@@ -10594,7 +10884,10 @@ void Properties::ConstruirGrupos(){
     propRowGroupOps->Agregar(T("Delete"),    AccionVertDelGroup);
     propRowGroupOps->Agregar(T("Move Up"),   AccionVertGroupUp);
     propRowGroupOps->Agregar(T("Move Down"), AccionVertGroupDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propVertexGroups->properties.push_back(propRowGroupOps);
+#endif
+
     GroupProperties.push_back(propVertexGroups);
 
     // "UV Groups": la OTRA entidad de pesos (por CORNER; la pinta el editor UV y la bindea por
@@ -10604,6 +10897,8 @@ void Properties::ConstruirGrupos(){
     // pegadas hace obvio que son dos cosas distintas. Mismo patron de tarjeta que Vertex Groups.
     propUVGroups = new GroupPropertie(T("UV Groups"));
     propListUVGroups = new PropListMeshParts(T("UV Groups")); propListUVGroups->modo = 9;
+    propListUVGroups->opBorrar = AccionUVDelGroup; propListUVGroups->opRenombrar = AccionRenameUVGroup;
+    propListUVGroups->opSubir = AccionUVGroupUp; propListUVGroups->opBajar = AccionUVGroupDown;
     propUVGroups->properties.push_back(propListUVGroups);
     PropButton* pbAddUVGrp = new PropButton(T("Add UV Group"), IconType::mesh);
     pbAddUVGrp->action = AccionUVAddGroup;
@@ -10611,7 +10906,10 @@ void Properties::ConstruirGrupos(){
     propBtnAddUVG = pbAddUVGrp;
     propBtnRenameUVGroup = new PropButton(T("Rename"), -1);
     propBtnRenameUVGroup->action = AccionRenameUVGroup;
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propUVGroups->properties.push_back(propBtnRenameUVGroup);
+#endif
+
     // MISMAS dos filas que Vertex Groups (mismo orden y mismos labels), pero POR CORNER y sobre
     // la seleccion del editor UV: se aprende una vez y sirve para las dos tarjetas.
     propRowUVGroupAsig = new PropButtonRow();
@@ -10626,13 +10924,19 @@ void Properties::ConstruirGrupos(){
     propRowUVGroupOps->Agregar(T("Delete"),    AccionUVDelGroup);
     propRowUVGroupOps->Agregar(T("Move Up"),   AccionUVGroupUp);
     propRowUVGroupOps->Agregar(T("Move Down"), AccionUVGroupDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propUVGroups->properties.push_back(propRowUVGroupOps);
+#endif
+
     GroupProperties.push_back(propUVGroups);
 
     // ===== pestania ARMATURE: tarjeta "Animation" (lista de clips del esqueleto + Add / Rename / Delete / Move) =====
     // MISMO componente que la lista de vertex groups (PropListMeshParts), pero en modo 5 (lee arm->animations).
     propArmAnim = new GroupPropertie(T("Animation"));
     propListAnims = new PropListMeshParts(T("Animation")); propListAnims->modo = 5;
+    propListAnims->opBorrar = AccionAnimDel; propListAnims->opRenombrar = AccionRenameAnim;
+    propListAnims->opSubir = AccionAnimUp; propListAnims->opBajar = AccionAnimDown;
+    propListAnims->AgregarExtra("Duplicate", AccionAnimDup, (int)IconType::copiar, false);
     propArmAnim->properties.push_back(propListAnims);
     PropButton* pbAddAnim = new PropButton(T("New Animation"), IconType::armature); // crea un clip vacio en pose reset
     pbAddAnim->action = AccionAnimAdd;
@@ -10642,13 +10946,19 @@ void Properties::ConstruirGrupos(){
     propArmAnim->properties.push_back(propBtnDupAnim);
     propBtnRenameAnim = new PropButton(T("Rename"), -1); // renombra el clip activo (nombre unico por armature)
     propBtnRenameAnim->action = AccionRenameAnim;
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propArmAnim->properties.push_back(propBtnRenameAnim);
+#endif
+
     // fila Delete | Move Up | Move Down (Delete si hay >=1; Move si hay >=2)
     propRowAnimOps = new PropButtonRow();
     propRowAnimOps->Agregar(T("Delete"),    AccionAnimDel);
     propRowAnimOps->Agregar(T("Move Up"),   AccionAnimUp);
     propRowAnimOps->Agregar(T("Move Down"), AccionAnimDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propArmAnim->properties.push_back(propRowAnimOps);
+#endif
+
     GroupProperties.push_back(propArmAnim);
 
     // ===== pestania ARMATURE: tarjeta "Bones": lista de huesos + Name editable + Parent desplegable
@@ -10729,6 +11039,8 @@ void Properties::ConstruirGrupos(){
 
     propUVMaps = new GroupPropertie(T("UV Maps"));
     propListUV = new PropListMeshParts(T("UV Maps")); propListUV->modo = 1;
+    propListUV->opBorrar = AccionVertDelUVMap; propListUV->opRenombrar = AccionRenameUVMap;
+    propListUV->opSubir = AccionVertUVMapUp; propListUV->opBajar = AccionVertUVMapDown; propListUV->minItems = 1;
     propUVMaps->properties.push_back(propListUV);
     PropButton* pbAddUV = new PropButton(T("Add UV Map"), IconType::mesh);
     pbAddUV->action = AccionVertAddUVMap;
@@ -10736,17 +11048,25 @@ void Properties::ConstruirGrupos(){
     propBtnAddUV = pbAddUV;
     propBtnRenameUV = new PropButton(T("Rename"), -1); // renombra la UV map activa (nombre unico por malla)
     propBtnRenameUV->action = AccionRenameUVMap;
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propUVMaps->properties.push_back(propBtnRenameUV);
+#endif
+
     // fila Delete | Move Up | Move Down (toda la fila oculta con 1 sola UV map)
     propRowUVOps = new PropButtonRow();
     propRowUVOps->Agregar(T("Delete"),    AccionVertDelUVMap);
     propRowUVOps->Agregar(T("Move Up"),   AccionVertUVMapUp);
     propRowUVOps->Agregar(T("Move Down"), AccionVertUVMapDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propUVMaps->properties.push_back(propRowUVOps);
+#endif
+
     GroupProperties.push_back(propUVMaps);
 
     propColorLayers = new GroupPropertie(T("Color"));
     propListColor = new PropListMeshParts(T("Color")); propListColor->modo = 2;
+    propListColor->opBorrar = AccionVertDelColor; propListColor->opRenombrar = AccionRenameColor;
+    propListColor->opSubir = AccionVertColorUp; propListColor->opBajar = AccionVertColorDown; propListColor->minItems = 1;
     propColorLayers->properties.push_back(propListColor);
     PropButton* pbAddCol = new PropButton(T("Add Color Layer"), IconType::mesh);
     pbAddCol->action = AccionVertAddColor;
@@ -10757,13 +11077,19 @@ void Properties::ConstruirGrupos(){
     propColorLayers->properties.push_back(propBtnColorMode);
     propBtnRenameColor = new PropButton(T("Rename"), -1); // renombra la capa de color activa (nombre unico)
     propBtnRenameColor->action = AccionRenameColor;
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propColorLayers->properties.push_back(propBtnRenameColor);
+#endif
+
     // fila Delete | Move Up | Move Down (toda la fila oculta con 1 sola capa de color)
     propRowColorOps = new PropButtonRow();
     propRowColorOps->Agregar(T("Delete"),    AccionVertDelColor);
     propRowColorOps->Agregar(T("Move Up"),   AccionVertColorUp);
     propRowColorOps->Agregar(T("Move Down"), AccionVertColorDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propColorLayers->properties.push_back(propRowColorOps);
+#endif
+
     GroupProperties.push_back(propColorLayers);
 
     // (la vieja tarjeta "Vertex Animation (coming soon)" se fue: las animaciones
@@ -10775,18 +11101,25 @@ void Properties::ConstruirGrupos(){
     propModifiers->anchoValores = 0.30f;
     propListModifiers = new PropListMeshParts(T("Modifiers"));
     propListModifiers->modo = 3;                              // 3 = stack de modificadores (mesh->modificadores)
+    propListModifiers->opBorrar = AccionRemoveModifier;
+    propListModifiers->opSubir = AccionModifierUp; propListModifiers->opBajar = AccionModifierDown;
     propModifiers->properties.push_back(propListModifiers);   // [0] selector (el mismo componente de UV/parts)
     // fila: Add (desplegable: abre el menu de tipos) | Remove (oculto si no hay modificadores)
     propRowMod = new PropButtonRow();
     Button* bAddMod = propRowMod->Agregar(T("Add"), AccionMenuAddModifier);
     bAddMod->desplegable = true;
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propRowMod->Agregar(T("Remove"), AccionRemoveModifier);
+#endif
     propModifiers->properties.push_back(propRowMod);
     // fila: Move Up | Move Down (toda la fila oculta si hay < 2 -> el orden solo importa con 2+)
     propRowModMove = new PropButtonRow();
     propRowModMove->Agregar(T("Move Up"),   AccionModifierUp);
     propRowModMove->Agregar(T("Move Down"), AccionModifierDown);
+#ifdef W3D_SYMBIAN   // (con teclado y sin mouse: los botones de siempre; en el resto, el tacho, el menu y el arrastre de la lista)
     propModifiers->properties.push_back(propRowModMove);
+#endif
+
     // (lo que genera un PROXY: sus modificadores son de la libreria; se ve solo entonces)
     propLblModsLib = new PropLabel(T("It belongs to a library (read-only): open the library to edit it"), true /*wrap*/);
     propLblModsLib->oculto = true;
@@ -11089,6 +11422,80 @@ static int gPasoDesde = -1, gPasoY0 = 0, gPasoTope = 0;
 static bool gPasoMovio = false;
 static int gListaScrollY0 = 0;   // my del press
 static int gListaScroll0 = 0;    // scrollFila al empezar el arrastre
+// ARRASTRAR UNA FILA de cualquier lista con operaciones (PropListMeshParts::Reordenable): la fila sigue al mouse (o al
+// dedo, despues de mantenerlo apretado) y una linea marca donde cae. En los bordes de arriba y de abajo la lista
+// scrollea sola. Soltar la mueve con el Subir / Bajar de su tarjeta (los mismos de siempre: con su Ctrl+Z)
+static void ListaRenombrar(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g);
+static int ListaFilaEn(Properties* p, int mx, int my, PropListMeshParts** lista, int* yTop, GroupPropertie** grupo);
+// LA BARRITA DE SCROLL de una lista bajo el puntero (NULL = ninguna); deja la y de arriba de su riel en pantalla
+static PropListMeshParts* gListaSbDrag = NULL;
+static Button* gLadoResaltado = NULL;   // (el boton del costado resaltado: se suelta al levantar el dedo)
+static int gListaSbTop = 0;
+static PropListMeshParts* ListaSbEn(Properties* p, int mx, int my, int* top) {
+    int yTop = 0, hF = 0; GroupPropertie* g = NULL;
+    PropListMeshParts* l = p->ListaEn(my, &yTop, &hF, &g);
+    int track = 0, th = 0;
+    if (!l || !g || !l->ScrollGeo(&track, &th, NULL)) return NULL;
+    const int cx = p->x + p->PosX + borderGS * 2 + gapGS;   // (donde arranca el texto de las filas)
+    const int x1 = cx + l->width - gapGS * 3 + GlobalScale * 3, x0 = x1 - GlobalScale * 9;
+    const int y0 = yTop + borderGS;
+    if (mx < x0 || mx > x1 + GlobalScale * 2 || my < y0 || my > y0 + track) return NULL;
+    if (top) *top = y0;
+    return l;
+}
+static void ListaMenuDeFila(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g, int menuX, int menuY);
+static PropListMeshParts* gFilaArrastre = NULL;
+static int gFilaDesde = -1, gFilaY0 = 0, gFilaTope = 0, gFilaUltY = 0;
+static bool gFilaMovio = false, gFilaDedo = false;
+static unsigned gFilaScrollMs = 0;
+static PropListMeshParts* gListaResizeLista = NULL;   // la lista cuyo borde de abajo se arrastra
+static bool gTouchResize = false; static float gTouchResizeAcc = 0.0f;
+static void FilaArrastreDestino(int my) {
+    if (!gFilaArrastre) return;
+    const int rowH = RenglonHeightGS + gapGS;
+    const int n = gFilaArrastre->ListaCount();
+    int d = gFilaArrastre->scrollFila + (my - gFilaTope + rowH / 2) / rowH;
+    if (d < 0) d = 0;
+    if (d > n) d = n;
+    if (d != gFilaArrastre->filaDestino) { gFilaArrastre->filaDestino = d; g_redraw = true; }
+}
+// cada cuadro mientras se arrastra: con el puntero pegado al borde de arriba o de abajo de la lista, scrollea una fila
+// cada tanto (y sigue redibujando para que siga)
+static void FilaArrastreTick() {
+    if (!gFilaArrastre || !gFilaMovio) return;
+    PropListMeshParts* l = gFilaArrastre;
+    const int rowH = RenglonHeightGS + gapGS;
+    const int n = l->ListaCount(), vis = n < l->filasMax ? n : l->filasMax;
+    if (n <= vis) return;
+    const int abajo = gFilaTope + vis * rowH;
+    int paso = 0;
+    if (gFilaUltY < gFilaTope + rowH / 2 && l->scrollFila > 0) paso = -1;
+    else if (gFilaUltY > abajo - rowH / 2 && l->scrollFila < n - vis) paso = 1;
+    if (!paso) return;
+    extern double W3dNowMs();
+    const unsigned ahora = (unsigned)W3dNowMs();
+    if (ahora - gFilaScrollMs >= 140u) { gFilaScrollMs = ahora; l->scrollFila += paso; FilaArrastreDestino(gFilaUltY); }
+    g_redraw = true;
+}
+// soltar: la fila 'desde' cae ARRIBA de la fila 'hasta' (hasta = n: al final)
+static void FilaArrastreSoltar() {
+    PropListMeshParts* l = gFilaArrastre;
+    gFilaArrastre = NULL;
+    if (!l) return;
+    const int hasta = l->filaDestino;
+    l->filaDestino = -1;
+    g_redraw = true;
+    if (!gFilaMovio || hasta < 0 || !l->Reordenable()) return;
+    const int n = l->ListaCount();
+    if (gFilaDesde < 0 || gFilaDesde >= n) return;
+    int pasos = (hasta > gFilaDesde) ? hasta - gFilaDesde - 1 : hasta - gFilaDesde;   // (+ baja, - sube)
+    if (!pasos) return;
+    l->ListaSeleccionar(gFilaDesde);
+    for (; pasos > 0; pasos--) l->opBajar();
+    for (; pasos < 0; pasos++) l->opSubir();
+    l->AjustarVentana();
+    PropertiesLayoutDirty = true;
+}
 
 // arrastre de un PropFloat con el mouse: click + mover horizontal acumula el
 // delta 'dx' en el valor. NULL = no se esta arrastrando.
@@ -11608,8 +12015,32 @@ bool PropsOjoScriptCentro(Properties* p, int fila, int* cx, int* cy) {
     }
     return false;
 }
+// EL BOTON DEL COSTADO de una lista (subir / bajar / opciones) bajo el puntero: su numero (0..2, -1 = ninguno), la lista
+// y donde quedo en pantalla (deja sx/sy del boton al dia). El MISMO lugar donde lo dibuja PropListMeshParts
+static int ListaBotonLadoEn(Properties* p, int mx, int my, PropListMeshParts** lo) {
+    if (lo) *lo = NULL;
+    if (!p || !p->Contains(mx, my)) return -1;
+    int yTop = 0, hF = 0; GroupPropertie* g = NULL;
+    PropListMeshParts* l = p->ListaEn(my, &yTop, &hF, &g);
+    if (!l || !g || !l->botonesLado) return -1;
+    const int bh = l->ladoBtn[0]->height > 0 ? l->ladoBtn[0]->height : RenglonHeightGS;
+    for (int k = 0; k < 3; k++) {
+        Button* b = l->ladoBtn[k];
+        const int bw = b->width > 0 ? b->width : RenglonHeightGS;
+        const int bx = p->x + p->PosX + borderGS * 2 + l->width + l->AnchoLado() - bw;
+        const int by = yTop - GlobalScale + k * (bh + gapGS);
+        b->sx = bx; b->sy = by;
+        if (mx >= bx && mx < bx + bw && my >= by && my < by + bh) { if (lo) *lo = l; return k; }
+    }
+    return -1;
+}
 Button* PropsAyudaEn(Properties* p, int mx, int my) {
     if (!p || !p->Contains(mx, my)) return NULL;
+    {   // los botones del costado de una lista: "Subir", "Bajar", "Opciones"
+        PropListMeshParts* l = NULL;
+        const int k = ListaBotonLadoEn(p, mx, my, &l);
+        if (k >= 0 && l) return l->ladoBtn[k];
+    }
     {   // el OJO de la lista de scripts: "Prender o apagar el script" (un boton que no se dibuja: solo lleva el
         // texto y el lugar, como los de la barra que muestra W3dAyudaRender)
         int ox, oy, ow, oh;
@@ -11810,8 +12241,12 @@ void Properties::Rebind(){
         if (!mesh || mesh->materialsGroup.empty()) return;
         int idx = lista->selectIndex;
         if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
-        material = mesh->materialsGroup[idx].material;
+        Material** l = CapaMatLugar(mesh, idx, CapaMatElegida(mesh, idx));   // (la CAPA elegida en la lista)
+        material = l ? *l : mesh->materialsGroup[idx].material;
     }
+    if (propListCapasMat) propListCapasMat->mostrarVacia = (recMat == NULL);
+    if (propCapaMatAdd) propCapaMatAdd->oculto = (recMat != NULL);
+    if (propCapaMatCambiar) propCapaMatCambiar->oculto = (recMat != NULL);
 
     // Tarjeta "Material" (propMaterial): el bind es POR MEMBER (propMatChk/propMatCol/...),
     // reordenar la tarjeta no rompe nada. El material POR DEFECTO no se edita: se ocultan
@@ -11825,6 +12260,8 @@ void Properties::Rebind(){
     if (mesh && mesh->malla && !mesh->malla->libreria.empty()) deLibreria = true;
     for (Object* q = mesh ? W3dInstanciaDe(mesh) : NULL; q && !deLibreria; q = W3dInstanciaDe(q)) deLibreria = (q->getType() == ObjectType::proxy);
     if (deLibreria && propBtnNewMaterial) propBtnNewMaterial->oculto = true;
+    if (deLibreria && propCapaMatAdd) propCapaMatAdd->oculto = true;
+    if (deLibreria && propCapaMatCambiar) propCapaMatCambiar->oculto = true;
     bool esDefault = (!material || material == MaterialDefecto || deLibreria);
     if (propMsgDefault) {
         propMsgDefault->oculto = !esDefault; // aviso: con el material por defecto o uno de una libreria
@@ -11832,7 +12269,7 @@ void Properties::Rebind(){
                                          : "The default material can not be edited. Create a new material.");
         if (propMsgDefault->name != aviso) { propMsgDefault->name = aviso; PropertiesLayoutDirty = true; }
     }
-    if (propSepMat)     propSepMat->oculto     = esDefault;  // separador: OCULTO con el default (sino linea huerfana)
+    if (propSepMat)     propSepMat->oculto     = true;   // (sin la linea entre "Cambiar material" y "Color")
     if (propBtnRenameMat) propBtnRenameMat->oculto = esDefault; // el material por defecto NO se renombra
     if (propBtnTextura) {
         propBtnTextura->oculto = esDefault;
@@ -11866,6 +12303,7 @@ void Properties::Rebind(){
     if (propBtnSombreado) {
         propBtnSombreado->oculto = (esDefault || !material->lighting || !w3dEngine::SombreadoPorPixelSoportado());
         propBtnSombreado->button->text = T(NombreSombreado(material && material->porPixel));
+    if (propMatLuzInd) propMatLuzInd->value = (esDefault || !material || !material->lighting) ? NULL : &material->luzIndirecta;
     }
     // SHADER ESCRITO: el archivo y Compile solo con el tilde; el mensaje dice si compilo, el error, o que este backend
     // no tiene shaders (el material se dibuja como siempre)
@@ -11908,8 +12346,8 @@ void Properties::Rebind(){
         propMatSesgoM->value = (esDefault || !material || !material->depth_test) ? NULL : &g_matSesgoM;
     }
     if (propMatOrden) {
-        g_matOrden = esDefault ? 0.0f : (float)material->orden_pasada;
-        propMatOrden->value = (esDefault || !material || !material->depth_test) ? NULL : &g_matOrden;
+        propMatOrden->oculto = esDefault || !material;
+        if (material) { int k = material->orden_pasada; if (k < 0) k = 0; if (k > 2) k = 2; propMatOrden->button->text = T(kNombresPase[k]); }
     }
     // --- LINEAS: el tilde + su grosor (el grosor solo se ve con el tilde puesto) ---
     if (propMatLineas) {
@@ -11922,12 +12360,13 @@ void Properties::Rebind(){
     }
     // --- ALPHA TEST: directo al campo del material (el material por defecto no se edita) ---
     if (propMatAlfa) propMatAlfa->value = esDefault ? NULL : &material->alphaTest;
-    // --- MEZCLA DE TEXTURAS: el desplegable de la textura B siempre (con el nombre de la suya) y el numero solo con B ---
+    // --- LA RAMPA DEL TOON (Material::texturaB): solo con el sombreado toon. La mezcla de texturas de antes ahora es una
+    //     CAPA DE TEXTURA Mix con su factor (al abrir un proyecto viejo se convierte sola) ---
     if (propBtnTexB) {
-        propBtnTexB->oculto = esDefault;
-        propBtnTexB->button->text = (material && material->texturaB) ? NombreDeTextura(material->texturaB) : std::string(T("No Texture B"));
+        propBtnTexB->oculto = esDefault || !material || material->toon == 0;
+        propBtnTexB->button->text = (material && material->texturaB) ? NombreDeTextura(material->texturaB) : std::string(T("No Toon Ramp"));
     }
-    if (propMatMezclaB) propMatMezclaB->value = (esDefault || !material || !material->texturaB) ? NULL : &material->mezclaB;
+    if (propMatMezclaB) propMatMezclaB->value = NULL;   // (el toon no usa la mezcla; la de las capas es su Factor)
     // el desplegable de MEZCLA solo tiene sentido con Transparent ON (sin blend, el modo no
     // se aplica); el de PROFUNDIDAD siempre, que es la mitad que el checkbox no mostraba.
     if (propBtnMezcla) {
@@ -12003,20 +12442,22 @@ void Properties::Rebind(){
     if (propCapasTitulo) {
         const int nCapas = (esDefault || !material) ? 0 : (int)material->capas.size();
         propCapasTitulo->oculto = esDefault;
+        if (propListCapas) propListCapas->oculto = esDefault;   // (el material por defecto no se edita: sin la lista)
+        if (propCapaAdd) propCapaAdd->oculto = esDefault || nCapas >= kCapasUI;   // (hasta 4 capas)
+        const int sel = CapaTexElegida();   // (los campos son los de la capa elegida en la lista: la fila 0)
         for (int i = 0; i < kCapasUI; i++) {
-            const bool hay = !esDefault && i < nCapas;
-            const bool agregar = !esDefault && i == nCapas;      // la fila libre que crea una capa nueva
-            propCapaTex[i]->oculto = !(hay || agregar);
+            const bool hay = !esDefault && i == 0 && sel >= 0 && sel < nCapas;
+            propCapaTex[i]->oculto = !hay;
             propCapaUV[i]->oculto = !hay;
             propCapaMezcla[i]->oculto = !hay;
-            propCapaOn[i]->value = hay ? &material->capas[(size_t)i].on : NULL;
+            propCapaFuerza[i]->value = hay ? &gCapaFuerzaPct : NULL;
+            if (hay && !(g_propFloatEditando == propCapaFuerza[i])) gCapaFuerzaPct = material->capas[(size_t)sel].fuerza * 100.0f;
+            propCapaOn[i]->value = hay ? &material->capas[(size_t)sel].on : NULL;
             if (hay) {
-                const TexLayer& cap = material->capas[(size_t)i];
+                const TexLayer& cap = material->capas[(size_t)sel];
                 propCapaTex[i]->button->text = NombreDeTextura(cap.tex);
                 propCapaUV[i]->button->text = NombreCapaUV(cap.uvMapa);
                 propCapaMezcla[i]->button->text = T(W3dCapaMezclaNombre(cap.blend));
-            } else if (agregar) {
-                propCapaTex[i]->button->text = T("Add Layer");
             }
         }
     }
@@ -12036,6 +12477,7 @@ void Properties::Rebind(){
         for (size_t q = 0; q < v.size(); q++) {
             PropertieBase* p = v[q];
             if (p == propBtnNewMaterial || p == propBtnRenameMat || p == propMatShaderOn || p == propBtnShader ||
+                p == propListCapasMat || p == propCapaMatAdd || p == propCapaMatCambiar ||
                 p == propBtnShaderComp || p == propMatShaderMsg) continue;
             switch (p->GetType()) {
                 case PropertyType::Bool:   ((PropBool*)p)->value = NULL; break;
@@ -12045,6 +12487,7 @@ void Properties::Rebind(){
                 default:
                     if (p == propSepMat) propSepMat->oculto = true;
                     else if (p == propMsgDefault || p == propCapasTitulo) ((PropLabel*)p)->oculto = true;
+                    else if (p == propListCapas) propListCapas->oculto = true;   // (con el shader: sin las capas de textura)
                     break;
             }
         }
@@ -13099,7 +13542,11 @@ Properties::Properties() : ViewportBase() {
     propCamActiva = NULL; propCamActivaSel = NULL; propCamActivaKey = NULL;
     propCurva = NULL; propCurvaMods = NULL; propCurvaModProps = NULL; propListCurvaMods = NULL; curvaFilas = NULL;
     propLimpiarZ = NULL; propLzActivo = NULL; propRecorte = NULL; propRcActivo = NULL; propRcX = NULL; propRcY = NULL;
+    propMatLuzInd = NULL;
     propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
+    propSonda = NULL; propSlRayos = NULL; propSlHornear = NULL; propSlEstado = NULL;
+    propHorneado = NULL; propHornTex = NULL; propHornUV = NULL; propHornMuestras = NULL; propHornIndirecta = NULL; propHornRebotes = NULL; propHornDenoiser = NULL; propHornBoton = NULL; propHornBarra = NULL; propHornAviso = NULL;
+    for (int k = 0; k < 3; k++) { propSlTam[k] = NULL; propSlPuntos[k] = NULL; }
     propRutina = NULL; propRuLista = NULL; propRuUsar = NULL; propRuPasos = NULL; propRuFilaAdd = NULL;
     propRuOn = NULL; propRuRef = NULL; propRuEntero = NULL; propRuMotivo = NULL;
     propRuRef2 = NULL; propRuTexto = NULL; propRuAviso = NULL; propRuColor = NULL; propRuColorNum = NULL;
@@ -13153,7 +13600,7 @@ Properties::Properties() : ViewportBase() {
     propFisCajaX = NULL; propFisCajaY = NULL; propFisCajaZ = NULL;
     propFisCenX = NULL; propFisCenY = NULL; propFisCenZ = NULL;
     propFisFriccion = NULL; propFisRebote = NULL; propFisQuitar = NULL;
-    propBtnNewMaterial = NULL;
+    propBtnNewMaterial = NULL; propListCapasMat = NULL; propCapaMatAdd = NULL; propCapaMatCambiar = NULL;
     propBtnTextura = NULL;
     propBtnNormalTex = NULL; // (faltaba: normal map UI)
     for (int k = 0; k < 8; k++) propMapa[k] = NULL;
@@ -13326,6 +13773,7 @@ void Properties::ActualizarPestanias(){
     bool esPost = (tipo == (int)ObjectType::postproceso);
     bool esRc = (tipo == (int)ObjectType::recorte);
     bool esHb = (tipo == (int)ObjectType::hitbox);
+    bool esSl = (tipo == (int)ObjectType::sondaluz);   // la sonda de luz (PropsSondaLuz.cpp)
     bool esRu = (tipo == (int)ObjectType::rutina);
     bool esPf = (tipo == (int)ObjectType::prefab);   // instancia de prefab (su tarjeta: PropsPrefab.cpp)
     bool esPx = (tipo == (int)ObjectType::proxy);    // proxy W3D (la misma tarjeta, con su libreria y su elemento)
@@ -13333,7 +13781,7 @@ void Properties::ActualizarPestanias(){
     bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esVacio || esLz || esRc || esHb || esPf || esPx || esRu || esPost;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esVacio || esLz || esRc || esHb || esSl || esPf || esPx || esRu || esPost;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -13364,6 +13812,7 @@ void Properties::ActualizarPestanias(){
         else if (esPost) icono = (int)IconType::monitor;
         else if (esRc) icono = (int)IconType::recorte;
         else if (esHb) icono = (int)IconType::hitbox;
+        else if (esSl) icono = (int)IconType::esfera;
         else if (esRu) icono = (int)IconType::lista;
         else if (esPf) icono = (int)IconType::prefab;
         else if (esPx) icono = (int)IconType::libreria;
@@ -13751,7 +14200,8 @@ void Properties::ActualizarPestanias(){
         const bool ro = W3dMallaSoloLectura(mp, true);
         const bool mas = mp->materialsGroup.size() > 1;
         OcultoSiCambia(propBtnNewPart, ro);
-        if (propRowPartOps) for (size_t b = 0; b < propRowPartOps->botones.size(); b++) VisibleSiCambia(propRowPartOps->botones[b], !ro);
+        // (asignar / seleccionar / deseleccionar caras: solo tienen sentido en Edicion)
+        if (propRowPartOps) for (size_t b = 0; b < propRowPartOps->botones.size(); b++) VisibleSiCambia(propRowPartOps->botones[b], !ro && InteractionMode == EditMode);
         if (propRowDelRen && propRowDelRen->botones.size() >= 2) {
             VisibleSiCambia(propRowDelRen->botones[0], !ro && mas);
             VisibleSiCambia(propRowDelRen->botones[1], !ro);
@@ -13791,6 +14241,8 @@ void Properties::ActualizarPestanias(){
     if (propLimpiarZ)  propLimpiarZ->visible  = (pestaniaActiva == 2 && esLz);
     if (propRecorte)   propRecorte->visible   = (pestaniaActiva == 2 && esRc);
     PropsHitboxActualizar(this, pestaniaActiva == 2 && esHb);   // visibilidad + bindeo + textos
+    PropsSondaLuzActualizar(this, pestaniaActiva == 2 && esSl);
+    PropsHorneadoActualizar(this, pestaniaActiva == 2 && esMesh);
     PropsRutinaActualizar(this, pestaniaActiva == 2 && esRu);   // los pasos de la rutina
     PropsPrefabActualizar(this, pestaniaActiva);                 // (instancia: pestania 2; lo generado: la 1)
     if (propCollection) propCollection->visible = (pestaniaActiva == 2 && esColl);
@@ -14207,9 +14659,9 @@ void Properties::ActualizarPestanias(){
         }
         // Assign/Remove y Select/Deselect: solo con un grupo activo (sin grupo no hay a que asignar)
         if (propRowGroupAsig && propRowGroupAsig->botones.size() >= 2)
-            for (int b = 0; b < 2; b++) propRowGroupAsig->botones[b]->visible = hayGrp;
+            for (int b = 0; b < 2; b++) propRowGroupAsig->botones[b]->visible = hayGrp && InteractionMode == EditMode;
         if (propRowGroupSel && propRowGroupSel->botones.size() >= 2)
-            for (int b = 0; b < 2; b++) propRowGroupSel->botones[b]->visible = hayGrp;
+            for (int b = 0; b < 2; b++) propRowGroupSel->botones[b]->visible = hayGrp && InteractionMode == EditMode;
         // UV Groups: MISMA regla que Vertex Groups (pueden ser 0)
         bool hayUVG = !mv->uvGroups.empty();
         if (propBtnRenameUVGroup) propBtnRenameUVGroup->oculto = !hayUVG;
@@ -14383,6 +14835,8 @@ static void SincronizarFondo(Properties* p) {
         float* quiero = tex ? &g_renderBgRot[k] : NULL;
         if (p->propRenderBgRot[k] && p->propRenderBgRot[k]->value != quiero) { p->propRenderBgRot[k]->value = quiero; PropertiesLayoutDirty = true; }
     }
+    // (la luz del fondo: sigue al proyecto abierto, menos mientras se edita)
+    if (p->propRenderLuzFondo && g_propFloatEditando != p->propRenderLuzFondo) gLuzFondoPct = g_renderLuzFondo * 100.0f;
 }
 // la TRANSMISION desde la tarjeta: la primera vez que deja de ser 0 con el IOR todavia en 1 (el de fabrica: sin
 // refraccion, lo que corresponde a lo transparente por alfa), el IOR pasa a 1.5 (vidrio, como en Blender). Con IOR 1 el
@@ -14404,6 +14858,9 @@ static void SincronizarIOR(Properties* p){
 }
 
 void Properties::Render(){
+    // (sin puntero -se levanto el dedo, el mouse salio de la ventana-: nada queda resaltado)
+    { extern int g_ratonHoverX; if (g_ratonHoverX < -9000 && gLadoResaltado) { gLadoResaltado->hover = false; gLadoResaltado = NULL; g_redraw = true; } }
+    FilaArrastreTick();   // (arrastrando una fila contra el borde de su lista: scrollea)
     MapaNumSeguir();
     SincronizarIOR(this);
     SincronizarFondo(this);
@@ -14635,6 +15092,10 @@ void Properties::mouse_button_up(int boton){
     }
     gFloatDrag = NULL; gFloatDragMoved = false; gFloatDragAccum = 0.0f;
     gListaScrollLista = NULL; // fin del drag-scroll de la lista
+    if (gListaResizeLista) gListaResizeLista->asaEstado = 0;
+    gListaResize = false; gListaResizeLista = NULL;
+    if (gListaSbDrag) { gListaSbDrag->sbEstado = 0; gListaSbDrag = NULL; }
+    if (gFilaArrastre && !gFilaDedo) FilaArrastreSoltar();   // (la fila arrastrada con el mouse cae donde marca la linea)
     // fin del arrastre de un paso de rutina: cae ARRIBA de la fila marcada
     if (gPasoArrastre && gPasoMovio && g_rutinaFilaDestino >= 0) PropsRutinaMoverPaso(gPasoDesde, g_rutinaFilaDestino);
     gPasoArrastre = NULL; g_rutinaFilaDestino = -1;
@@ -14735,6 +15196,7 @@ static float gTouchScrollAccum = 0.0f;
 void PropertiesTouchScrollFin(){ // llamada desde controles.cpp al soltar (fin del gesto tactil)
     gTouchScrollLista = NULL; gTouchScrollDecidido = false; gTouchScrollAccum = 0.0f;
     gListaScrollLista = NULL; // por las dudas, tambien el latch de mouse
+    if (gTouchResize) { gTouchResize = false; if (gListaResizeLista) gListaResizeLista->asaEstado = 0; gListaResizeLista = NULL; }
 }
 
 bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
@@ -14742,10 +15204,30 @@ bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
     if (!gTouchScrollDecidido) {
         gTouchScrollDecidido = true;
         gTouchScrollAccum = 0.0f;
+        // el dedo empezo en la FRANJA DE ABAJO de una lista (su linea): la agranda / la achica
+        gTouchResize = false; gTouchResizeAcc = 0.0f;
+        { int yTop = 0, hF = 0; GroupPropertie* gg = NULL;
+          PropListMeshParts* la = ListaEn(py, &yTop, &hF, &gg);
+          if (la && py >= yTop + hF - gapGS - borderGS - PropListMeshParts::Asa() - GlobalScale * 3) {
+              gTouchResize = true; gListaResizeLista = la; } }
         PropListMeshParts* l = ListaBajoY(py);
         if (l) { int n = l->ListaCount(); int vis = n < l->filasMax ? n : l->filasMax;
                  gTouchScrollLista = (n > vis) ? l : NULL; }
         else gTouchScrollLista = NULL;
+    }
+    if (gTouchResize && gListaResizeLista) {
+        PropListMeshParts* la = gListaResizeLista;
+        const int rowH = RenglonHeightGS + gapGS;
+        int px = la->AltoFilasPx() + dy;
+        const int mn = (la->minFilas > 0 ? la->minFilas : 1) * rowH - gapGS;
+        if (px < mn) px = mn;
+        if (px > 24 * rowH) px = 24 * rowH;
+        la->altoPx = px; la->altoFijo = true; la->filasMax = la->FilasAlto(); la->asaEstado = 2;
+        la->AjustarVentana();
+        PropertiesLayoutDirty = true;
+        Resize(width, height);
+        g_redraw = true;
+        return true;
     }
     if (gTouchScrollLista) {
         int n = gTouchScrollLista->ListaCount();
@@ -14769,7 +15251,9 @@ bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
 }
 
 void Properties::event_mouse_motion(int mx, int my) {
-    if (gMapaDragK >= 0) { if (leftMouseDown) MapaDragMover(mx); return; }   // (el numero de un mapa del material)
+    // (el numero de un mapa del material: la barra sigue al mouse en ABSOLUTO; el viewport queda activo aunque el mouse
+    //  salga, y el cursor NO se envuelve: SinEnvolverCursor)
+    if (gMapaDragK >= 0) { if (leftMouseDown) { ViewPortClickDown = true; MapaDragMover(mx); } return; }
     // arrastre de un PropFloat (posicion/rotacion/escala/shininess): mover el
     // mouse en horizontal cambia el valor. Va ANTES del check de 'editando'.
     if (gFloatDrag) {
@@ -14795,23 +15279,96 @@ void Properties::event_mouse_motion(int mx, int my) {
     if (editando) return;
 
     if (gListaResize) {
-        if (!leftMouseDown) {
-            gListaResize = false;
-        } else if (propMeshParts && !propMeshParts->properties.empty()) {
-            // arrastrar el borde inferior: 1..10 filas visibles
-            PropListMeshParts* lista =
-                (PropListMeshParts*)propMeshParts->properties[0];
-            int filas = gListaFilas0 +
-                        (my - gListaResizeY0) / (RenglonHeightGS + gapGS);
-            if (filas < 1) filas = 1;
-            if (filas > 10) filas = 10;
-            if (filas != lista->filasMax) {
-                lista->filasMax = filas;
+        if (!leftMouseDown || !gListaResizeLista) {
+            if (gListaResizeLista) gListaResizeLista->asaEstado = 0;
+            gListaResize = false; gListaResizeLista = NULL;
+        } else {
+            // arrastrar la linea de abajo: el alto sigue al mouse DE A PIXEL (no de a renglon); puede sobrar lugar
+            PropListMeshParts* lista = gListaResizeLista;
+            const int rowH = RenglonHeightGS + gapGS;
+            int px = gListaFilas0 + (my - gListaResizeY0);
+            const int mn = (lista->minFilas > 0 ? lista->minFilas : 1) * rowH - gapGS;
+            if (px < mn) px = mn;
+            if (px > 24 * rowH) px = 24 * rowH;
+            if (px != lista->altoPx || !lista->altoFijo) {
+                lista->altoPx = px; lista->altoFijo = true;
+                lista->filasMax = lista->FilasAlto();
                 lista->AjustarVentana();
+                PropertiesLayoutDirty = true;   // (las tarjetas de abajo se reacomodan)
                 Resize(width, height);
+                g_redraw = true;
             }
+            ViewPortClickDown = true;
         }
         return;
+    }
+    // el puntero sobre un BOTON DEL COSTADO de una lista: se resalta (apagado, no)
+    {
+        Button*& resaltado = gLadoResaltado;
+        Button* ahora = NULL;
+        if (!leftMouseDown && !middleMouseDown) {
+            PropListMeshParts* lb = NULL;
+            const int k = ListaBotonLadoEn(this, mx, my, &lb);
+            if (k >= 0 && lb && lb->LadoHabilitado(k)) ahora = lb->ladoBtn[k];
+        }
+        if (ahora != resaltado) {
+            if (resaltado) resaltado->hover = false;
+            if (ahora) ahora->hover = true;
+            resaltado = ahora; g_redraw = true;
+        }
+    }
+    // el puntero sobre la LINEA de abajo de una lista: se pone blanca (ahi se agarra para agrandarla / achicarla)
+    {
+        static PropListMeshParts* sobre = NULL;
+        PropListMeshParts* ahora = NULL;
+        if (!leftMouseDown && !middleMouseDown) {
+            int yTop = 0, hF = 0; GroupPropertie* gg = NULL;
+            PropListMeshParts* la = ListaEn(my, &yTop, &hF, &gg);
+            if (la && gg && mx >= x + PosX && mx <= x + PosX + gg->width + borderGS * 2 &&
+                my >= yTop + hF - gapGS - borderGS - PropListMeshParts::Asa()) ahora = la;
+        }
+        if (ahora != sobre) {
+            if (sobre && sobre->asaEstado == 1) sobre->asaEstado = 0;
+            if (ahora) ahora->asaEstado = 1;
+            sobre = ahora; g_redraw = true;
+        }
+    }
+
+    // LA BARRITA DE SCROLL de una lista, agarrada: sigue al puntero
+    if (gListaSbDrag) {
+        if (leftMouseDown) { gListaSbDrag->ScrollDesdeY(my - gListaSbTop); ViewPortClickDown = true; g_redraw = true; return; }
+        gListaSbDrag->sbEstado = 0; gListaSbDrag = NULL; g_redraw = true;
+    }
+    // LA FILA de una lista con el puntero encima: su texto en blanco
+    {
+        static PropListMeshParts* sobreL = NULL;
+        PropListMeshParts* l = NULL; int fila = -1;
+        if (!leftMouseDown && !middleMouseDown) fila = ListaFilaEn(this, mx, my, &l, NULL, NULL);
+        if (fila < 0) l = NULL;
+        if (sobreL && (sobreL != l)) { if (sobreL->hoverFila >= 0) { sobreL->hoverFila = -1; g_redraw = true; } }
+        if (l && l->hoverFila != fila) { l->hoverFila = fila; g_redraw = true; }
+        sobreL = l;
+    }
+    // ...y con el puntero encima, mas ancha y blanca
+    {
+        static PropListMeshParts* sobreSb = NULL;
+        PropListMeshParts* ahora = (!leftMouseDown && !middleMouseDown) ? ListaSbEn(this, mx, my, NULL) : NULL;
+        if (ahora != sobreSb) {
+            if (sobreSb && sobreSb->sbEstado == 1) sobreSb->sbEstado = 0;
+            if (ahora) ahora->sbEstado = 1;
+            sobreSb = ahora; g_redraw = true;
+        }
+    }
+    // UNA FILA arrastrada (cualquier lista): mas de media fila de movimiento = arrastre; la linea marca donde cae
+    if (gFilaArrastre) {
+        if (!leftMouseDown && !gFilaDedo) { gFilaArrastre->filaDestino = -1; gFilaArrastre = NULL; g_redraw = true; }
+        else {
+            const int rowH = RenglonHeightGS + gapGS;
+            gFilaUltY = my;
+            if (gFilaMovio || abs(my - gFilaY0) >= rowH / 2) { gFilaMovio = true; FilaArrastreDestino(my); }
+            ViewPortClickDown = true;
+            return;
+        }
     }
 
     // un PASO DE RUTINA arrastrado: la linea marca la fila donde cae (mas de media fila de movimiento = arrastre)
@@ -15319,19 +15876,39 @@ void Properties::ClickEn(int mx, int my) {
                     }
                     else if (prop->GetType() == PropertyType::List) {
                         PropListMeshParts* lista = (PropListMeshParts*)prop;
-                        if (my >= yFila + hFila - gapGS - borderGS) {
+                        // LOS TRES BOTONES de la derecha (las capas): subir / bajar / opciones de la fila elegida
+                        if (lista->botonesLado && mx >= x + PosX + borderGS * 2 + lista->width) {
+                            PropListMeshParts* lb = NULL;
+                            const int k = ListaBotonLadoEn(this, mx, my, &lb);
+                            const int sel = lista->selectIndex;
+                            if (k >= 0 && lb == lista && lista->LadoHabilitado(k)) {
+                                if (k == 0 && lista->opSubir) lista->opSubir();
+                                else if (k == 1 && lista->opBajar) lista->opBajar();
+                                else if (k == 2) ListaMenuDeFila(this, lista, sel, yFila, g, mx, my);
+                                lista->AjustarVentana();
+                                PropertiesLayoutDirty = true; g_redraw = true;
+                            }
+                            return;
+                        }
+                        if (my >= yFila + hFila - gapGS - borderGS - PropListMeshParts::Asa()) {
                             // agarre del BORDE INFERIOR: arrastrar cambia
                             // el alto de la lista (1..10 filas)
                             gListaResize = true;
+                            gListaResizeLista = lista;
                             gListaResizeY0 = my;
-                            gListaFilas0 = lista->filasMax;
+                            gListaFilas0 = lista->AltoFilasPx();   // (desde el alto que se ve, en pixeles)
+                            lista->asaEstado = 2;
                             return;
                         }
+                        // LA BARRITA DE SCROLL de la lista: el agarre salta a donde se apreto y queda agarrado
+                        { int top = 0; PropListMeshParts* ls = ListaSbEn(this, mx, my, &top);
+                          if (ls == lista) { gListaSbDrag = lista; gListaSbTop = top; lista->sbEstado = 2;
+                                             lista->ScrollDesdeY(my - top); ViewPortClickDown = true; g_redraw = true; return; } }
                         // item clickeado (la ventana arranca en scrollFila)
                         int item = lista->scrollFila +
                                    (my - yFila - borderGS) / (RenglonHeightGS + gapGS);
                         int n = lista->ListaCount(); // parts / uv maps / colors segun el modo
-                        if (item >= n) item = n - 1;
+                        if (item >= n) item = -1;   // (un renglon en blanco: nada)
                         // los PASOS de una rutina: el checkbox de la derecha prende/apaga el paso sin elegirlo; en el
                         // resto de la fila se elige y, arrastrando, se mueve (en vez del drag-scroll de la lista)
                         if (lista->modo == 14 && item >= 0 && item < n) {
@@ -15355,6 +15932,22 @@ void Properties::ClickEn(int mx, int my) {
                         if (item >= 0 && n > 0) {
                             lista->ListaSeleccionar(item); // setea el activo + re-bind/re-bake
                             lista->AjustarVentana();
+                        }
+                        // DOBLE CLICK en la fila (dos clicks seguidos ahi, aunque el primero haya sido el que la eligio):
+                        // renombrarla. Va aca y no por el doble click de la ventana: ese pedia un click de mas
+                        if (item >= 0 && item < n && lista->opRenombrar && !g_uiTapEnCurso) {
+                            extern double W3dNowMs();
+                            static PropListMeshParts* ultL = NULL; static int ultF = -1; static double ultMs = 0;
+                            const double ahora = W3dNowMs();
+                            const bool doble = (ultL == lista && ultF == item && ahora - ultMs < 550.0);
+                            ultL = lista; ultF = item; ultMs = doble ? 0 : ahora;
+                            if (doble) { ListaRenombrar(this, lista, item, yFila, g); return; }
+                        }
+                        // con el MOUSE, arrastrar una fila la reordena (el dedo: mantener apretado, ListaAgarrar)
+                        if (item >= 0 && item < n && lista->Reordenable() && !g_uiTapEnCurso) {
+                            gFilaArrastre = lista; gFilaDesde = item; gFilaY0 = my; gFilaUltY = my;
+                            gFilaTope = yFila + borderGS; gFilaMovio = false; gFilaDedo = false;
+                            return;
                         }
                         // armar el drag-scroll tactil de ESTA lista (si se arrastra vertical, scrollea la lista)
                         gListaScrollLista = lista;
@@ -15486,8 +16079,10 @@ PropertieBase* Properties::PropEnPunto(int mx, int my){
 //      Insertar keyframe / Borrar todos los keyframes / Copiar keyframe / Pegar keyframe
 //  Los keyframes son los del OBJETO ACTIVO en el FRAME ACTUAL (como el rombo); un color son sus 3 curvas juntas.
 // ============================================================================
-enum { PCTX_RESET = 1, PCTX_COPIAR, PCTX_PEGAR, PCTX_KEY_INSERTAR, PCTX_KEY_BORRAR, PCTX_KEY_COPIAR, PCTX_KEY_PEGAR };
+enum { PCTX_RESET = 1, PCTX_COPIAR, PCTX_PEGAR, PCTX_KEY_INSERTAR, PCTX_KEY_BORRAR, PCTX_KEY_COPIAR, PCTX_KEY_PEGAR,
+       PCTX_ACTUALIZAR_TEX };
 static PropertieBase* gCtxProp = NULL;   // la fila del menu abierto
+static Texture* gCtxTex = NULL;          // la TEXTURA de la fila (base, mapa, normal map, capa): "Reload Texture"
 // la fila de un MAPA del material: el numero (rugosidad, metalico, alfa) o el color (emision; el color base, en la fila
 // de la textura). -1 = una fila comun
 static int gCtxMapa = -1;
@@ -15575,6 +16170,13 @@ static void PropAsignar(PropertieBase* p, const float* v){
 }
 static void AccionPropCtx(int id){
     PropertieBase* p = gCtxProp;
+    if (id == PCTX_ACTUALIZAR_TEX) {   // (se edito afuera: se vuelve a leer de su archivo)
+        const std::string c = W3dTexturaClave(gCtxTex);
+        if (!c.empty()) { std::vector<std::string> v(1, c); W3dTexturasActualizarAvisando(v); }
+        RebindMaterialMeshPart();
+        PropertiesLayoutDirty = true; g_redraw = true;
+        return;
+    }
     // la fila de un MAPA del material: su numero o su color
     if (gCtxMapa >= 0) {
         float* d = CtxMapaValor();
@@ -15630,20 +16232,201 @@ static void AccionPropCtx(int id){
 // cuantas curvas tiene el canal de un rombo (un color: 3) -> el keyframe copiado se puede pegar ahi?
 static size_t CurvasDelCanal(int ap){ return (ap == AnimColor || ap == AnimAmbient || ap == AnimSpecular) ? 3 : 1; }
 
+// la lista bajo 'py', con donde empieza su fila en pantalla, su alto y su tarjeta (el mismo recorrido que ClickEn)
+PropListMeshParts* Properties::ListaEn(int py, int* yTop, int* hFilaOut, GroupPropertie** grupo) {
+    if (!ObjActivo && !PestaniaGlobal()) return NULL;
+    int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
+    for (size_t i = 0; i < GroupProperties.size(); i++) {
+        GroupPropertie* g = GroupProperties[i];
+        if (!g->visible) continue;
+        const int hCabecera = borderGS + RenglonHeightGS + gapGS;
+        if (g->open) {
+            int yFila = yCursor + hCabecera;
+            for (size_t j = 0; j < g->properties.size(); j++) {
+                PropertieBase* prop = g->properties[j];
+                const int hFila = prop->Resize(g->width);
+                if (hFila > 0 && prop->GetType() == PropertyType::List && py >= yFila && py < yFila + hFila) {
+                    if (yTop) *yTop = yFila; if (hFilaOut) *hFilaOut = hFila; if (grupo) *grupo = g;
+                    return (PropListMeshParts*)prop;
+                }
+                yFila += hFila;
+            }
+        }
+        yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    return NULL;
+}
+// la FILA de una lista bajo el punto (-1 = ninguna: el borde, la franja de abajo); deja la lista y donde esta
+static int ListaFilaEn(Properties* p, int mx, int my, PropListMeshParts** lista, int* yTop, GroupPropertie** grupo) {
+    int yF = 0, hF = 0; GroupPropertie* g = NULL;
+    PropListMeshParts* l = p->ListaEn(my, &yF, &hF, &g);
+    if (lista) *lista = l;
+    if (!l || !g) return -1;
+    if (mx < p->x + p->PosX || mx > p->x + p->PosX + g->width + borderGS * 2) return -1;
+    if (my < yF + borderGS || my >= yF + hF - gapGS - borderGS - PropListMeshParts::Asa()) return -1;
+    const int fila = l->scrollFila + (my - yF - borderGS) / (RenglonHeightGS + gapGS);
+    if (fila < 0 || fila >= l->ListaCount()) return -1;
+    if (yTop) *yTop = yF; if (grupo) *grupo = g;
+    return fila;
+}
+// RENOMBRAR la fila en su lugar: el campo de la lista toma el lugar del texto (y el "Rename" de la tarjeta lo usa)
+static void ListaRenombrarFila(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g) {
+    if (!l || !l->opRenombrar || fila < 0 || (l->opSoloLectura && l->opSoloLectura())) return;
+    PropsActivo = p;
+    l->ListaSeleccionar(fila);
+    l->AjustarVentana();
+    l->renFila = fila;
+    Button* b = l->renBoton;
+    b->sx = p->x + p->PosX + borderGS * 2;
+    b->sy = yTop + borderGS + (fila - l->scrollFila) * (RenglonHeightGS + gapGS) - GlobalScale;
+    b->altoRenglon = true;
+    b->Resize(g ? g->width - bordersGS : 100);
+    g_listaRenBoton = b;
+    l->opRenombrar();
+    g_listaRenBoton = NULL;   // (si el "Rename" no llego a usarlo)
+    g_redraw = true;
+}
+// EL MENU DE UNA FILA (click derecho; con el dedo, mantener y soltar): renombrar, subir, bajar, borrar y lo propio de la
+// lista (asignar / seleccionar: solo en Edicion)
+static PopupMenu* gMenuFila = NULL;
+static PropListMeshParts* gMenuFilaLista = NULL;
+static Properties* gMenuFilaPanel = NULL;
+static int gMenuFilaFila = -1, gMenuFilaY = 0;
+static GroupPropertie* gMenuFilaGrupo = NULL;
+enum { FILA_RENOMBRAR = 1, FILA_SUBIR, FILA_BAJAR, FILA_BORRAR, FILA_CAMBIAR, FILA_EXTRA0 = 10 };
+static int gMenuFilaX = 0, gMenuFilaY2 = 0;   // (donde se abrio: el menu de "cambiar" sale ahi)
+static void AccionMenuFila(int id) {
+    PropListMeshParts* l = gMenuFilaLista;
+    if (!l || !gMenuFilaPanel) return;
+    PropsActivo = gMenuFilaPanel;
+    if (gMenuFilaFila >= 0 && gMenuFilaFila < l->ListaCount()) l->ListaSeleccionar(gMenuFilaFila);
+    if (id == FILA_RENOMBRAR) { ListaRenombrarFila(gMenuFilaPanel, l, gMenuFilaFila, gMenuFilaY, gMenuFilaGrupo); return; }
+    if (id == FILA_SUBIR && l->opSubir) l->opSubir();
+    else if (id == FILA_BAJAR && l->opBajar) l->opBajar();
+    else if (id == FILA_BORRAR && l->opBorrar) l->opBorrar();
+    else if (id == FILA_CAMBIAR && l->opCambiar) { extern void PropsMenuMaterialesEn(int, int); PropsMenuMaterialesEn(gMenuFilaX, gMenuFilaY2); return; }
+    else if (id >= FILA_EXTRA0 && id < FILA_EXTRA0 + l->nExtras && l->extras[id - FILA_EXTRA0].accion) l->extras[id - FILA_EXTRA0].accion();
+    l->AjustarVentana();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static bool AbrirMenuFila(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g, int mx, int my, int menuX, int menuY);
+static bool ListaMenuFila(Properties* p, int mx, int my, int menuX, int menuY) {
+    PropListMeshParts* l = NULL; int yTop = 0; GroupPropertie* g = NULL;
+    const int fila = ListaFilaEn(p, mx, my, &l, &yTop, &g);
+    if (fila < 0 || !l) return false;
+    return AbrirMenuFila(p, l, fila, yTop, g, mx, my, menuX, menuY);
+}
+static void ListaMenuDeFila(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g, int menuX, int menuY) {
+    AbrirMenuFila(p, l, fila, yTop, g, menuX, menuY, menuX, menuY);
+}
+static void ListaRenombrar(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g) {
+    if (gFilaArrastre) { gFilaArrastre->filaDestino = -1; gFilaArrastre = NULL; }
+    if (!RenameActivo()) ListaRenombrarFila(p, l, fila, yTop, g);
+}
+static bool AbrirMenuFila(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g, int mx, int my, int menuX, int menuY) {
+    if (!l->opBorrar && !l->opRenombrar && !l->opSubir && !l->nExtras) return false;
+    PropsActivo = p;
+    l->ListaSeleccionar(fila);
+    l->AjustarVentana();
+    const bool ro = l->opSoloLectura && l->opSoloLectura();
+    const int n = l->ListaCount();
+    if (!gMenuFila) { gMenuFila = new PopupMenu(); gMenuFila->action = AccionMenuFila; }
+    gMenuFila->Limpiar();
+    gMenuFila->titulo = l->ListaNombre(fila);
+    static bool sSi = true, sRen = true, sSube = true, sBaja = true, sBorra = true;
+    sRen = !ro; sSube = !ro && fila > 0; sBaja = !ro && fila < n - 1; sBorra = !ro && n > l->minItems;
+    MenuItem* it;
+    if (l->opCambiar) { it = gMenuFila->Agregar(T("Change Material"), FILA_CAMBIAR, (int)IconType::material); it->gris = &sRen; }
+    if (l->opRenombrar) { it = gMenuFila->Agregar(T("Rename"), FILA_RENOMBRAR, (int)IconType::script); it->gris = &sRen; }
+    if (l->opSubir) { it = gMenuFila->Agregar(T("Move Up"), FILA_SUBIR, (int)IconType::arrow); it->gris = &sSube; }
+    if (l->opBajar) { it = gMenuFila->Agregar(T("Move Down"), FILA_BAJAR, (int)IconType::arrow); it->gris = &sBaja; }
+    if (l->opBorrar) { it = gMenuFila->Agregar(T("Delete"), FILA_BORRAR, (int)IconType::borrar); it->gris = &sBorra; }
+    bool primera = true;
+    for (int k = 0; k < l->nExtras; k++) {
+        if (l->extras[k].soloEdit && InteractionMode != EditMode) continue;   // (asignar / seleccionar: solo en Edicion)
+        it = gMenuFila->Agregar(T(l->extras[k].texto), FILA_EXTRA0 + k, l->extras[k].icono); it->gris = &sSi;
+        if (primera) { it->lineaArriba = true; primera = false; }
+    }
+    gMenuFilaLista = l; gMenuFilaPanel = p; gMenuFilaFila = fila; gMenuFilaY = yTop; gMenuFilaGrupo = g;
+    gMenuFilaX = menuX >= 0 ? menuX : mx; gMenuFilaY2 = menuY >= 0 ? menuY : my;
+    if (MenuAbierto && MenuAbierto != gMenuFila) MenuAbierto->Cerrar();
+    gMenuFila->Abrir(menuX >= 0 ? menuX : mx, menuY >= 0 ? menuY : my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuFila;
+    g_redraw = true;
+    return true;
+}
+// DOBLE CLICK / doble toque sobre una fila: renombrarla ahi mismo
+bool Properties::DobleClick(int mx, int my) {
+    PropListMeshParts* l = NULL; int yTop = 0; GroupPropertie* g = NULL;
+    const int fila = ListaFilaEn(this, mx, my, &l, &yTop, &g);
+    if (fila < 0 || !l || !l->opRenombrar) return false;
+    ListaRenombrar(this, l, fila, yTop, g);
+    return true;
+}
+// TACTIL: el dedo quieto medio segundo sobre una fila la AGARRA (controles.cpp vibra): arrastrar la reordena y soltar
+// sin haberla movido abre su menu. false = ahi no hay una fila con operaciones
+bool Properties::ListaTieneFila(int mx, int my) {
+    PropListMeshParts* l = NULL;
+    const int fila = ListaFilaEn(this, mx, my, &l, NULL, NULL);
+    return fila >= 0 && l && (l->opBorrar || l->opRenombrar || l->opSubir || l->nExtras);
+}
+bool Properties::ListaAgarrar(int mx, int my) {
+    PropListMeshParts* l = NULL; int yTop = 0; GroupPropertie* g = NULL;
+    const int fila = ListaFilaEn(this, mx, my, &l, &yTop, &g);
+    if (fila < 0 || !l || !(l->opBorrar || l->opRenombrar || l->opSubir || l->nExtras)) return false;
+    PropsActivo = this;
+    l->ListaSeleccionar(fila);
+    l->AjustarVentana();
+    gFilaArrastre = l; gFilaDesde = fila; gFilaY0 = my; gFilaUltY = my;
+    gFilaTope = yTop + borderGS; gFilaMovio = false; gFilaDedo = true;
+    g_redraw = true;
+    return true;
+}
+void Properties::ListaAgarreSoltar(int mx, int my, int menuX, int menuY) {
+    if (!gFilaArrastre) return;
+    const bool movio = gFilaMovio;
+    const int x0 = mx; (void)x0;
+    if (movio) { gFilaDedo = false; FilaArrastreSoltar(); return; }
+    gFilaArrastre->filaDestino = -1; gFilaArrastre = NULL; gFilaDedo = false;
+    ListaMenuFila(this, mx, gFilaY0, menuX, menuY);   // (sin moverla: sus opciones)
+}
+
 bool Properties::MenuContexto(int mx, int my, int menuX, int menuY){
+    if (ListaMenuFila(this, mx, my, menuX, menuY)) return true;   // (una fila de una lista: su menu)
     PropertieBase* p = PropEnPunto(mx, my);
     if (!p) return false;
     int tipo = (int)p->GetType();
     // la fila de un MAPA del material (un boton con su numero o su color): sin textura y en un material editable
-    gCtxMapa = -1; gCtxMat = NULL;
+    gCtxMapa = -1; gCtxMat = NULL; gCtxTex = NULL;
     if (tipo == PropertyType::Button) {
         Material* mm = MaterialActivoUI();
         if (mm && MaterialEditableUI(mm)) {
             if (p == propBtnTextura) gCtxMapa = W3D_MAPA_BASE;
             for (int k = W3D_MAPA_EMISION; k <= W3D_MAPA_ALFA; k++) if (p == propMapa[k] && !mm->mapaConTextura[k]) gCtxMapa = k;
+            // LA TEXTURA que muestra la fila (Reload Texture: se edito afuera)
+            if (p == propBtnTextura && mm->textureOn) gCtxTex = mm->texture;
+            for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (p == propMapa[k] && mm->mapaConTextura[k]) gCtxTex = mm->mapaTex[k];
+            if (p == propBtnNormalTex && mm->normalMap) gCtxTex = mm->normalTexture;
+            if (p == propBtnTexB) gCtxTex = mm->texturaB;
+            if (p == propCapaTex[0]) { const int sel = CapaTexElegida();
+                                       if (sel >= 0 && sel < (int)mm->capas.size()) gCtxTex = mm->capas[(size_t)sel].tex; }
+            if (gCtxTex && W3dTexturaClave(gCtxTex).empty()) gCtxTex = NULL;
         }
-        if (gCtxMapa < 0) return false;
+        if (gCtxMapa < 0 && !gCtxTex) return false;
         gCtxMat = mm;
+        if (gCtxMapa < 0) {   // (una fila que es SOLO una textura: su menu es actualizarla)
+            PropsActivo = this;
+            gCtxProp = p;
+            if (!gMenuPropCtx) { gMenuPropCtx = new PopupMenu(); gMenuPropCtx->action = AccionPropCtx; }
+            gMenuPropCtx->Limpiar();
+            gMenuPropCtx->titulo = NombreDeTextura(gCtxTex);
+            gMenuPropCtx->Agregar(T("Reload Texture"), PCTX_ACTUALIZAR_TEX, (int)IconType::recargar);
+            if (MenuAbierto && MenuAbierto != gMenuPropCtx) MenuAbierto->Cerrar();
+            gMenuPropCtx->Abrir(menuX >= 0 ? menuX : mx, menuY >= 0 ? menuY : my, MenuPantallaW, MenuPantallaH);
+            MenuAbierto = gMenuPropCtx;
+            g_redraw = true;
+            return true;
+        }
         tipo = CtxMapaEsColor() ? (int)PropertyType::Color : (int)PropertyType::Float;
     }
     if (tipo != PropertyType::Float && tipo != PropertyType::Bool && tipo != PropertyType::Color) return false;
@@ -15662,6 +16445,10 @@ bool Properties::MenuContexto(int mx, int my, int menuX, int menuY){
     it = gMenuPropCtx->Agregar(T("Reset"), PCTX_RESET, (int)IconType::deshacer); it->gris = &sReset;
     it = gMenuPropCtx->Agregar(T("Copy"), PCTX_COPIAR, (int)IconType::copiar);  it->gris = &sSi;
     it = gMenuPropCtx->Agregar(T("Paste"), PCTX_PEGAR, (int)IconType::pegar);   it->gris = &sPegar;
+    if (gCtxTex) {   // (la fila del color base con su textura: tambien actualizarla)
+        it = gMenuPropCtx->Agregar(T("Reload Texture"), PCTX_ACTUALIZAR_TEX, (int)IconType::recargar);
+        it->lineaArriba = true;
+    }
     // ANIMACION: solo si la fila es un canal (tiene rombo) y hay un objeto activo (la camara activa es otra cosa)
     const int ap = p->AnimProp(), ac = p->AnimComp();
     if (gCtxMapa < 0 && ap >= 0 && ap != AnimCamActiva && ObjActivo) {

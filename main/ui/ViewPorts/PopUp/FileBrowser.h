@@ -44,7 +44,7 @@ class FileBrowser : public PopUpBase, public Scrollable {
         // Enter/OK lo activa. Mover el mouse vuelve a FZ_NONE.
         enum FocoZona { FZ_NONE = 0, FZ_TOP, FZ_FILES, FZ_BOOKMARKS, FZ_BMBTN, FZ_BOTTOM };
         int focoZona;
-        int focoIdx;    // boton dentro de TOP(0-3) / BMBTN(0-1) / BOTTOM(0-1)
+        int focoIdx;    // boton dentro de TOP(0-4) / BMBTN(0-1) / BOTTOM(0-1)
 
         Card* card;       // tarjeta reusable (entries / bookmarks / url)
         ViewportBase* pane; // adaptador para el Scrollable (area de archivos)
@@ -52,6 +52,7 @@ class FileBrowser : public PopUpBase, public Scrollable {
         Button* btnBack;
         Button* btnFwd;
         Button* btnUp;
+        Button* btnRefresh; // ACTUALIZAR: vuelve a leer la carpeta (cambios de afuera: archivos nuevos, imagenes editadas)
         Button* btnView;
         Button* btnCancel;
         Button* btnAction;  // verde (tinte accent + texto negro), apagado si no hay archivo
@@ -77,6 +78,9 @@ class FileBrowser : public PopUpBase, public Scrollable {
         std::string EtiquetaAccion() const;
         void Navegar(const std::string& dir, bool pushHistory = true);
         void Recargar();
+        // ACTUALIZAR (el boton de la barra): Recargar dejando elegido el MISMO archivo y el scroll donde estaba,
+        // y rehaciendo las miniaturas (una imagen editada afuera se ve como quedo)
+        void Actualizar();
         void Layout();
 
         void Render();

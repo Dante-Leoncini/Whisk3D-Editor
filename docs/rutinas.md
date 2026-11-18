@@ -28,7 +28,7 @@ El outliner tiene dos partes separadas por una línea negra de 3 píxeles:
   luces 1..7 se prenden en la rutina de cada cuadro.
 - **Abajo, la RUTINA** de cada cuadro. Todo proyecto nuevo trae primero **Limpiar pantalla** ("Clear" de color y
   profundidad), afuera del constructor y antes de la colección: limpiar es de cada cuadro. El color de limpieza
-  ("Clear color", el fondo del tema) lo pone el constructor una vez. Un proyecto de antes que traía la limpieza
+  ("Clear color", en **Auto**) lo pone el constructor una vez. Un proyecto de antes que traía la limpieza
   adentro del constructor la saca afuera al abrirse.
 
 ### Limpiar la pantalla es del proyecto
@@ -38,6 +38,18 @@ casilla por buffer: color, profundidad, estencil (la máscara de glClear: limpia
 llamada). Un proyecto con constructor limpia **solo** con sus pasos, también en el editor: sin un "Clear" no se
 limpia nada (queda la estela del cuadro anterior); con "Clear" solo de profundidad, el color no se toca. Un "Clear"
 en el medio de la lista borra lo dibujado antes.
+
+Los dos arrancan en **Auto**, que sigue al **fondo del render** (la tarjeta Render: un color o una imagen 360):
+
+- **Clear color** (el desplegable **Modo**): en **Auto** toma el color del fondo. En el editor, fuera de la vista
+  Render, toma el fondo del visor (el mismo con que limpia un proyecto sin constructor); en la vista Render y en el
+  juego, el del render. Con un fondo 360 no hace nada: lo tapa el cielo. Con **Usar color personalizado** aparece el
+  selector y ese color **pisa** el fondo (cada escena tiene su constructor: cada una puede tener el suyo).
+- **Clear** (el desplegable **Fondo**), sobre el buffer de color: en **Auto** limpia con el color y, si el fondo es
+  una imagen 360, dibuja el cielo (en la vista Render y en el juego, donde se ve el fondo). **Limpiar con el color**
+  solo limpia, sin cielo. **Dibujar fondo personalizado** dibuja como cielo **la imagen del paso** (una equirectangular,
+  elegida o cargada con **Cargar textura**) con su giro (Rotación X, Y, Z: animables y de memoria, como cualquier
+  número), en cualquier vista que no sea de análisis. Sin la casilla de color no se hace nada de esto.
 
 - El editor no limpia el viewport: deja el **scissor** en su rectángulo mientras se dibuja la escena (un "Clear" del
   proyecto no borra el resto de la ventana) y dibuja la **grilla después** de la escena (contra su z). Si en un
@@ -168,8 +180,9 @@ por tipo:
 ```lua
 function dibujar()
   paso("array", "normales", false)          -- (o "Normals"; vértices, uv, colores)
-  paso("colorLimpieza", 0, 0, 0, 1)
+  paso("colorLimpieza", 0, 0, 0, 1)         -- (con números: ese color; sin números, Auto)
   paso("limpiar", "color", "profundidad")   -- (o la máscara: 1 color, 2 profundidad, 4 estencil)
+  -- paso("limpiar", "color", "profundidad", "cielo.png", 0, 0, 90)   -- un fondo 360 propio, girado 90° en Z
   paso("punteroVertices", "Cubo")
   paso("color", 0.2, 0.6, 1, 1)
   paso("apilar")
@@ -205,7 +218,9 @@ on/off" los que puedan estar prendidos. Una subrutina hereda y devuelve el estad
 (oculta: una librería, como las de material) se valida sin suponer nada y se vuelve a validar en el contexto de
 quien la llama.
 
-**Archivos viejos.** El .w3d guarda `"version": 2` en cada rutina. Una sin versión (la 1: los punteros prendían su
+**Archivos viejos.** El .w3d guarda `"version": 3` en cada rutina. Antes de la 3 el "Clear color" era siempre su
+color: al abrir, el que traía el fondo del tema (el de un proyecto nuevo) pasa a Auto y otro queda como color
+personalizado. Una sin versión (la 1: los punteros prendían su
 array y el "Clear" llevaba el color) se convierte al abrir: cada puntero prendido pasa a "Array on" + puntero (apagado
 si la malla no tiene ese array), uno apagado a "Array off", y el "Clear" viejo a "Clear color" + "Clear"; los "Saltar
 si" se recuentan.

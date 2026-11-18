@@ -102,6 +102,8 @@ vec4 Fragmento() {
 | `w3d_colorVertice` | `vec4` | El color de vértice (si la malla tiene y el material usa **Color de vértice**). |
 | `w3d_rugosidad`, `w3d_metalico` | `float` | La **Rugosidad** y el **Metálico** del material. |
 | `w3d_ior`, `w3d_transmision` | `float` | El **IOR** y la **Transmisión** del material (los del trazado de rayos). |
+| `w3d_Fresnel()` | `float` | El **efecto Fresnel** del punto: cuánto refleja según el ángulo. Mirando de frente da poco (lo que marca el **IOR** del material) y hacia los bordes sube hasta 1. Sirve para mezclar lo que se ve a través con el reflejo, como en el agua. |
+| `w3d_FresnelF0(f0)` | `float` | Lo mismo, pero con el reflejo de frente que le pases (`f0`, de 0 a 1) en vez del IOR. |
 | `w3d_tiempo` | `float` | Los segundos, para animar. En el editor es el tiempo de la **línea de tiempo** (el cuadro actual ÷ los FPS): con pausa queda quieto, con **Play** avanza y arrastrando la línea de tiempo ves cualquier momento. En el juego exportado es el tiempo desde que arrancó. |
 | `w3d_PuntoPantalla()` | `vec2` | Dónde está el píxel en la vista: (0,0) abajo a la izquierda, (1,1) arriba a la derecha. |
 | `w3d_Pixel()` | `vec2` | Lo que mide un píxel en esas mismas unidades. |

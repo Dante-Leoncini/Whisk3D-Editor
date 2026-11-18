@@ -196,6 +196,7 @@ static void DespertarUna(const TexDormida& d) {
         Texture* t = TexturaTomar(d.capas[c].textura);
         if (!t) { w3dLogfW("[W3D] no pude cargar la textura '%s'", d.capas[c].textura.c_str()); continue; }
         TexLayer tl; tl.tex = t; tl.blend = d.capas[c].mezcla; tl.uvMapa = d.capas[c].uv; tl.on = d.capas[c].on;
+        tl.fuerza = d.capas[c].fuerza; tl.horneada = d.capas[c].horneada;
         capas.push_back(tl);
     }
     if (!capas.empty()) m->capas.insert(m->capas.begin(), capas.begin(), capas.end());
@@ -243,6 +244,7 @@ bool TexturasAdormecer(Material* m) {
         for (size_t c = 0; c < m->capas.size(); c++) {
             TexCapaDormida cd;
             cd.textura = m->capas[c].tex->path; cd.mezcla = m->capas[c].blend; cd.uv = m->capas[c].uvMapa; cd.on = m->capas[c].on;
+            cd.fuerza = m->capas[c].fuerza; cd.horneada = m->capas[c].horneada;
             d.capas.push_back(cd);
             sueltas.push_back(m->capas[c].tex);
         }

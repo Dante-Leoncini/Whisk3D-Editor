@@ -437,7 +437,12 @@ static int LPaso(lua_State* L) {
                 const int bit = (s == "color") ? (int)LimpiarColor :
                                 (s == "profundidad" || s == "z" || s == "depth") ? (int)LimpiarProfundidad :
                                 (s == "estencil" || s == "stencil") ? (int)LimpiarStencil : 0;
-                if (!bit) return luaL_error(L, "paso('limpiar'): '%s' no es un buffer (color, profundidad, estencil)", s.c_str());
+                if (!bit) {   // si no es un buffer: la opcion ("auto"...) o la imagen de un fondo propio
+                    const int o = opcPuesta ? -1 : OpcionLua(t, s);
+                    if (o >= 0) { p.modo = o; opcPuesta = true; continue; }
+                    if (!refPuesta) { p.ref = s; refPuesta = true; if (!opcPuesta) p.modo = LimpiarFondoPropio; continue; }
+                    return luaL_error(L, "paso('limpiar'): '%s' no es un buffer (color, profundidad, estencil)", s.c_str());
+                }
                 if (!enteroPuesto) { p.entero = 0; enteroPuesto = true; }
                 p.entero |= bit;
                 continue;
@@ -465,6 +470,8 @@ static int LPaso(lua_State* L) {
             continue;
         }
     }
+    // ("colorLimpieza" con sus numeros: ESE color, como glClearColor; sin numeros ni opcion, el Auto)
+    if (t == PasoColorLimpieza && k > 0 && !opcPuesta) p.modo = ColorLimpiezaPropio;
     std::string error;
     if (!W3dRutinaPasoDesdeLua(p, error)) return luaL_error(L, "paso('%s'): %s", nombre, error.c_str());
     return 0;
@@ -587,18 +594,36 @@ static std::string RutaTexturaScript(lua_State* L, const char* s) {
     }
     return res;
 }
+// LA TEXTURA B AHORA ES UNA CAPA DE TEXTURA Mix con su factor (al abrir un proyecto viejo se convierte): sin toon,
+// setTexturaB / setMezclaTextura / mezclaTextura van a la PRIMERA capa Mix del material (la crean adelante si no hay).
+// Con toon, a la textura B de siempre (la rampa). Asi un juego hecho antes sigue andando con el proyecto ya convertido
+static TexLayer* CapaMixScript(Material* mt, bool crear) {
+    if (!mt || mt->toon != 0) return NULL;
+    for (size_t c = 0; c < mt->capas.size(); c++) if (mt->capas[c].blend == W3D_CAPA_MIX) return &mt->capas[c];
+    if (!crear) return NULL;
+    TexLayer tl; tl.blend = W3D_CAPA_MIX; tl.fuerza = mt->mezclaB;
+    mt->capas.insert(mt->capas.begin(), tl);
+    return &mt->capas[0];
+}
 static int LSetTexturaB(lua_State* L) {
     Material* mt = BuscarMaterialPorNombre(luaL_checkstring(L, 1));
     const char* s = lua_tostring(L, 2);
     if (!mt) { lua_pushboolean(L, 0); return 1; }
-    if (!s || !*s) { TexturaPonerEn(mt->texturaB, NULL); g_redraw = true; lua_pushboolean(L, 1); return 1; }
+    if (!s || !*s) {
+        if (mt->toon == 0) {   // (la capa Mix se va)
+            for (size_t c = 0; c < mt->capas.size(); c++)
+                if (mt->capas[c].blend == W3D_CAPA_MIX) { TexturaPonerEn(mt->capas[c].tex, NULL); mt->capas.erase(mt->capas.begin() + (long)c); break; }
+        } else TexturaPonerEn(mt->texturaB, NULL);
+        g_redraw = true; lua_pushboolean(L, 1); return 1;
+    }
     Texture* t = TexturaBuscar(s);                  // (ya cargada con esa ruta tal cual: la del .w3d)
     std::string res;
     if (!t) { res = RutaTexturaScript(L, s); t = TexturaBuscar(res); }
     bool tomada = false;
     if (!t) { t = TexturaTomar(res); tomada = true; }
     if (!t) { lua_pushboolean(L, 0); return 1; }
-    TexturaPonerEn(mt->texturaB, t);
+    TexLayer* cap = CapaMixScript(mt, true);
+    TexturaPonerEn(cap ? cap->tex : mt->texturaB, t);
     if (tomada) TexturaSoltar(t);   // (la ranura ya tiene su referencia)
     g_redraw = true;
     lua_pushboolean(L, 1);
@@ -610,12 +635,15 @@ static int LSetMezclaTextura(lua_State* L) {
     float k = (float)luaL_checknumber(L, 2);
     if (k < 0.0f) k = 0.0f;
     if (k > 1.0f) k = 1.0f;
-    if (mt->mezclaB != k) { mt->mezclaB = k; g_redraw = true; }
+    TexLayer* cap = CapaMixScript(mt, false);
+    float& v = cap ? cap->fuerza : mt->mezclaB;
+    if (v != k) { v = k; g_redraw = true; }
     return 0;
 }
 static int LMezclaTextura(lua_State* L) {
     Material* mt = BuscarMaterialPorNombre(luaL_checkstring(L, 1));
-    lua_pushnumber(L, mt ? mt->mezclaB : 0.0);
+    TexLayer* cap = CapaMixScript(mt, false);
+    lua_pushnumber(L, cap ? cap->fuerza : (mt ? mt->mezclaB : 0.0));
     return 1;
 }
 // setFlipbook(objeto, cuadros, fps [, cols [, filas [, desfase [, ancho, alto, u0, v0]]]]):

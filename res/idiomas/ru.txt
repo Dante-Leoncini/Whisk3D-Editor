@@ -22,6 +22,7 @@
 %d repeated name(s) renumbered (%s%s). The original did NOT change: whatever pointed to it by name still points there.	Повторяющиеся имена (%d) перенумерованы (%s%s). Оригинал НЕ изменился: то, что ссылалось на него по имени, ссылается туда же.
 %d resources are in use (%d users). Delete them anyway? Their users will be left without them.	Ресурсы (%d) используются (пользователей: %d). Всё равно удалить? Пользователи останутся без них.
 %d script reference(s) and %d target(s) updated	Обновлено ссылок скриптов: %d и целей: %d
+%d textures reloaded	Перезагружено текстур: %d
 %s: does not compile	%s: не компилируется
 '%s' already exists -> '%s'	'%s' уже существует -> '%s'
 '%s' has more than 65535 vertices: saving it as text (.w3dm), not binary	В '%s' больше 65535 вершин: сохраняю как текст (.w3dm), а не в двоичном виде
@@ -207,6 +208,12 @@ Back	Сзади
 Back (overshoot)	С откатом
 Back View	Вид сзади
 Background	Фон
+Background light	Свет фона
+Bake	Запечь
+Bake Lighting	Запечь освещение
+Bake canceled	Запекание отменено
+Baked: %d points	Запечён: точек %d
+Bakes the light of the static objects into the texture, through the UV of the mesh	Запекает свет статических объектов в текстуру по UV сетки
 Base Color	Базовый цвет
 Base velocity	Базовая скорость
 Before Mode	Режим до
@@ -223,7 +230,6 @@ Bind texture	Привязать текстуру
 Bitrate	Битрейт
 Bits	Биты
 Black Letterbox	Чёрные полосы
-Blank	Пустая
 Blend	Смешивание
 Blend In	Плавный вход
 Blend Out	Плавный выход
@@ -249,6 +255,7 @@ Bottom View	Вид снизу
 Bottom-Left	Снизу слева
 Bottom-Right	Снизу справа
 Bounce	Отскок
+Bounces	Отскоки
 Boundary	Граница
 Box (memory)	Бокс (память)
 Box Select	Выделение рамкой
@@ -304,12 +311,15 @@ Center X	Центр X
 Center Y	Центр Y
 Center Z	Центр Z
 Center of frame	Середина кадра
+Change Material	Сменить материал
 Changes will be lost in:	Изменения будут потеряны в:
 Channels	Каналы
 Character	Персонаж
 Child Of	Дочерний объект
 Children	Дочерние
 Choose a shader	Выберите шейдер
+Choose a texture	Выберите текстуру
+Choose a texture to bake into	Выберите текстуру для запекания
 Choose file	Выбрать файл
 Choose...	Выбрать...
 Circle	Окружность
@@ -334,6 +344,7 @@ Clear and Keep Transformation	Снять с сохранением трансф�
 Clear color	Цвет очистки
 Clear depth	Очистить Z
 Clear screen	Очистить экран
+Clear with color	Очищать цветом
 Click the game to capture the mouse (Esc releases it)	Щёлкните по игре, чтобы захватить мышь (Esc — отпустить)
 Clip default	Как в клипе
 Clip to rect	Обрезать по прямоугольнику
@@ -413,6 +424,7 @@ Could not read the animations of '%s' (%s): they stay EMPTY and I will not save 
 Could not read the file	Не удалось прочитать файл
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать кадры анимации '%s' объекта '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать геометрию '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
+Could not read the image	Не удалось прочитать изображение
 Could not save the layout	Не удалось сохранить раскладку
 Could not write config.ini	Не удалось записать config.ini
 Could not write the file	Не удалось записать файл
@@ -448,6 +460,7 @@ Cylinder	Цилиндр
 Cylinder Projection	Цилиндрическая проекция
 Debug mode	Режим отладки
 Decal	Декаль
+Decal pass	Проход декалей
 Decimals	Десятичные
 Default	По умолчанию
 Default Material	Материал по умолчанию
@@ -523,6 +536,7 @@ Drag (speed kept per second)	Сопротивление (остаток скор
 Drag the points, click to add	Перетаскивайте точки, клик — добавить
 Draw	Рисовать
 Draw children	Рисовать дочерние
+Draw custom background	Рисовать свой фон
 Draw elements	Рисовать элементы
 Draw in outliner order	Рисовать в порядке аутлайнера
 Draw mesh	Рисовать меш
@@ -656,6 +670,7 @@ Fit	Подгонка
 Flags	Флаги
 Flags (memory)	Флаги (память)
 Flat	Плоская
+Flat color	Сплошной цвет
 Flip	Перевернуть
 Flip Normals	Перевернуть нормали
 Flipbook	Флипбук
@@ -778,6 +793,7 @@ Include Edited	Включая редактируемые
 Include Non-Edited	Включая нередактируемые
 Index	Индекс
 Indices	Индексы
+Indirect light	Непрямой свет
 Individual	Индивидуально
 Individual Elements	Отдельные элементы
 Individual Origins	Индивидуальные центры
@@ -880,11 +896,14 @@ Library not readable	Библиотека не читается
 Library unlinked	Библиотека отвязана
 Lifetime	Время жизни
 Light	Свет
+Light Probe	Световой зонд
 Light bounces	Отскоки света
 Light color	Цвет света
 Light on/off	Свет вкл/выкл
 Light position	Позиция света
+Light probe baked: %d points	Световой зонд запечён: точек %d
 Lighting	Освещение
+Lighting baked	Освещение запечено
 Lighting on/off	Освещение вкл/выкл
 Lightmap Pack	Упаковка лайтмапа
 Lightmap Pack: select faces first	Упаковка лайтмапа: сначала выберите грани
@@ -1096,6 +1115,7 @@ No Properties panel	Нет панели Свойства
 No Test, Write	Без теста, с записью
 No Texture	Без текстуры
 No Texture B	Без текстуры B
+No Toon Ramp	Без тун-градиента
 No UV Group for this bone	У этой кости нет UV-группы
 No UV map with this name in this 3D mesh	В этом 3D-меше нет UV-карты с таким именем
 No UVs to export	Нет UV для экспорта
@@ -1125,6 +1145,7 @@ Normal pointer	Указатель нормалей
 Normals	Нормали
 Normals layer deleted	Слой нормалей удалён
 Not assigned	Не назначено
+Not baked	Не запечён
 Not deleted	Не удалено
 Not enough space: uninstalling the previous version (its data on the phone is lost)	Недостаточно места: удаляется предыдущая версия (её данные на телефоне теряются)
 Not linked	Не связано
@@ -1142,6 +1163,7 @@ Not saving: the UI scene '%s' could not be read when opening and saving would re
 Not saving: the animations of '%s' could not be read when opening and saving would erase them	Не сохраняю: анимации '%s' не удалось прочитать при открытии, и сохранение бы их стёрло
 Not saving: the clips of '%s' could not be read when opening and saving would erase them	Не сохраняю: клипы '%s' не удалось прочитать при открытии, и сохранение бы их стёрло
 Not saving: the mesh '%s' could not be written (%s)	Не сохраняю: не удалось записать меш '%s' (%s)
+Nothing to bake	Нечего запекать
 Nothing to paste	Нечего вставить
 Nothing to render: tick Final composite or a pass	Нечего рендерить: отметьте «Итоговая композиция» или проход
 Nothing to save	Нечего сохранять
@@ -1184,6 +1206,7 @@ Only the final image	Только итоговое изображение
 Opacity	Непрозрачность
 Opaque (ONE, ZERO)	Непрозрачное (ONE, ZERO)
 Opaque (one, zero)	Непрозрачное (one, zero)
+Opaque pass	Проход непрозрачных
 Open	Открыть
 Open in IDE	Открыть в IDE
 Open normal map	Открыть карту нормалей
@@ -1193,6 +1216,7 @@ Open...	Открыть...
 Opening project...	Открытие проекта...
 Operation	Операция
 Optimize Vertex Groups	Оптимизировать группы вершин
+Options	Параметры
 Orbit locked	Орбита заблокирована
 Orbit unlocked	Орбита разблокирована
 Orbital	Орбитальный
@@ -1201,6 +1225,7 @@ Orientation	Ориентация
 Origin to 3D Cursor	Центр к 3D-курсору
 Origin to Geometry	Центр к геометрии
 Original file forgotten	Исходный файл забыт
+Original file not found	Исходный файл не найден
 Original file of an imported mesh (only where it came from: the mesh is inside the project)	Исходный файл импортированной сетки (только происхождение: сетка уже в проекте)
 Origins	Центры объектов
 Orphan (no users)	Не используется
@@ -1237,6 +1262,7 @@ Particle Shape	Форма и флипбук
 Particle Size	Размер
 Particles	Частицы
 Parts	Части
+Pass	Проход
 Pass Order	Порядок прохода
 Passes	Проходы
 Paste	Вставить
@@ -1272,6 +1298,9 @@ Play once (dies at the end)	Один раз (гибнет в конце)
 Point	Точечный
 Point size	Размер точки
 Points	Точки
+Points X	Точки X
+Points Y	Точки Y
+Points Z	Точки Z
 Polygon (simulated)	Многоугольник (симуляция)
 Pop matrix	Восстановить матрицу
 Portrait only	Только книжная
@@ -1359,6 +1388,7 @@ Refresh	Обновить
 Refresh:	Обновление:
 Relationship Lines	Линии связей
 Relative Offset	Относительное смещение
+Reload Texture	Перезагрузить текстуру
 Reload the project to generate mipmaps	Перезагрузите проект, чтобы создать mipmap
 Reload the project to upload the textures again	Перезагрузите проект, чтобы снова загрузить текстуры
 Remove	Убрать
@@ -1683,8 +1713,10 @@ Texture filter	Фильтр текстуры
 Texture layers	Слои текстур
 Texture mix	Доля второй текстуры
 Texture mode	Режим текстуры
+Texture not reloaded	Текстура не перезагружена
 Texture of	Текстура материала
 Texture on/off	Текстура вкл/выкл
+Texture reloaded	Текстура перезагружена
 Texture saved	Текстура сохранена
 Texture wrap	Режим повтора текстуры
 Textures	Текстуры
@@ -1694,6 +1726,7 @@ The Object tab shows the BASE transform (the one that gets saved). Constraints m
 The Script object '%s' no longer exists: it was migrated to an empty object with its scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated.	Объекта Script '%s' больше нет: он перенесён в пустой объект со своими скриптами. Его жёстко заданная физика (скорость/гравитация/пределы) НЕ переносится.
 The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	Не удалось прочитать UI-сцену '%s': проект открывается без неё, и сохранять поверх него я НЕ буду (см. whisk3d.log)
 The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	Нет UI-сцены '%s': проект открывается без неё, и сохранять поверх него я НЕ буду (см. whisk3d.log)
+The UV does not cover the texture	UV не попадает в текстуру
 The armature has its own clips	У арматуры свои клипы
 The button's function failed	Функция кнопки не сработала
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	Вызовы cambiarEscena() в его .lua всё ещё указывают на первую: исправьте их вручную.
@@ -1720,7 +1753,10 @@ The library's proyecto.json can't be read	Не удаётся прочитать
 The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	Источник света '%s' не загружен: в сцене уже максимум источников света (%d).
 The list of All	Список «Все»
 The mesh '%s' (no objects) could not be read: saving without it	Не удалось прочитать меш '%s' (без объектов): сохраняется без него
+The mesh has no UV	У сетки нет UV
+The mesh has no faces	У сетки нет граней
 The objects of the 3D meshes will be deleted too (Undo brings them back).	Объекты 3D-мешей тоже будут удалены (Отмена вернёт их).
+The original file of the texture is not known	Исходный файл текстуры неизвестен
 The scene has no sounds	В сцене нет звуков
 The selected folders are deleted too if they end up empty.	Выбранные папки тоже удаляются, если останутся пустыми.
 The shader does not compile	Шейдер не компилируется
@@ -1775,6 +1811,7 @@ Translation	Перемещение
 Transmission	Пропускание
 Transparency layers	Слои прозрачности
 Transparent	Прозрачный
+Transparent pass	Проход прозрачных
 Triangle fan	Веер треугольников
 Triangle strip	Полоса треугольников
 Triangles	Треугольники
@@ -1830,6 +1867,7 @@ Use Influence	Использовать влияние
 Use Start Frame	Использовать начальный кадр
 Use camera focus	Использовать фокус камеры
 Use current folder	Использовать текущую папку
+Use custom color	Использовать свой цвет
 Use index	Использовать индекс
 Use new viewport	Использовать новый вьюпорт
 Use physics engine	Физический движок

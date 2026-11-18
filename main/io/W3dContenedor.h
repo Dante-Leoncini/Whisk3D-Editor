@@ -126,6 +126,14 @@ bool W3dContenedorExtraer(const std::string& entrada, const std::string& rutaDis
 // sea que el editor sigue funcionando igual con los proyectos viejos.
 // 'categoria' NULL = la que le toca por extension.
 std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria = 0);
+// EL ORIGEN de un asset importado: el archivo de disco del que se copio adentro (lo anota W3dImportarAsset y se guarda
+// en proyecto.json, "origenes"). "Actualizar textura" lo vuelve a leer de ahi cuando se edito afuera. Sobrevive al
+// desmontaje (guardar desmonta y vuelve a montar): lo vacia abrir o crear otro proyecto
+void        W3dAssetOrigenAnotar(const std::string& entrada, const std::string& rutaDisco);
+std::string W3dAssetOrigen(const std::string& entrada);                 // "" = no se sabe
+void        W3dAssetOrigenMudar(const std::string& vieja, const std::string& nueva);   // (la entrada se renombro)
+void        W3dAssetOrigenesLimpiar();
+void        W3dAssetOrigenesListar(std::vector<std::pair<std::string, std::string> >& out);   // (entrada, ruta)
 
 // ---------------------------------------------------------------------------
 //  REFERENCIAS EXTERNAS ("ext:")

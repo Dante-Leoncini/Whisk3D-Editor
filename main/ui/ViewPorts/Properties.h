@@ -134,7 +134,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // sesgo, el orden de pasada y un tilde "Decal" que aplica la receta entera.
         PropFloat* propMatSesgo;   // sesgoProfundidad (glPolygonOffset; negativo = hacia el ojo)
         PropFloat* propMatSesgoM;  // sesgoMetros (sesgo de profundidad en metros: + aleja, - acerca)
-        PropFloat* propMatOrden;   // ordenPasada 0 opaco / 1 decal / 2 transparente
+        PropButton* propMatOrden;  // EL PASE del material (desplegable): opacos / calcomanias / transparentes
         PropBool*  propMatLineas;      // LINEAS: dibujar las aristas de la malla con el material
         PropFloat* propMatGrosorLinea; // grosor de esas lineas en px (glLineWidth); visible con Lines ON
         PropFloat* propMatAlfa;        // ALPHA TEST: Material::alphaTest 0..1 (0 = apagado; clave "alfaCorte" del .w3d)
@@ -465,6 +465,24 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // tarjeta HITBOX (objects/Hitbox.h): la arman, la bindean y sincronizan sus textos
         // PropsHitboxConstruir / PropsHitboxActualizar (ViewPorts/PropsHitbox.cpp)
         GroupPropertie* propHitbox;
+        // LA SONDA DE LUZ (ViewPorts/PropsSondaLuz.cpp): tamano, puntos, rayos, "Bake" y el estado
+        GroupPropertie* propSonda;
+        // PRECALCULAR LA ILUMINACION (ViewPorts/PropsHorneado.cpp): debajo de la tarjeta Material
+        GroupPropertie* propHorneado;
+        PropButton* propHornTex;
+        PropButton* propHornUV;
+        PropFloat*  propHornMuestras;
+        PropBool*   propHornIndirecta;
+        PropFloat*  propHornRebotes;
+        PropBool*   propHornDenoiser;
+        PropButton* propHornBoton;
+        PropButton* propHornBarra;
+        PropLabel*  propHornAviso;
+        PropFloat*  propSlTam[3];
+        PropFloat*  propSlPuntos[3];
+        PropFloat*  propSlRayos;
+        PropButton* propSlHornear;
+        PropLabel*  propSlEstado;
         PropBool*   propHbActivo;
         PropFloat*  propHbTam[3];       // ancho X / alto Y / largo Z (locales)
         PropFloat*  propHbCentro[3];
@@ -807,6 +825,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*  propRenderZbuffer; PropBool* propRenderNormal; PropBool* propRenderAlpha; // pases extra
         PropButton* propRenderBg;    // el FONDO del render: color o textura 360 (el boton de la derecha cambia)
         PropFloat*  propRenderBgRot[3];   // la rotacion de la textura 360 del fondo (grados)
+        PropFloat*  propRenderLuzFondo;   // LA LUZ DEL FONDO: cuanto ilumina (0 a 200%: g_renderLuzFondo)
         // (las OPCIONES del render no son del panel: son de g_render, render/OpcionesRender.h. Las filas las editan)
         PropButton* propRenderFormato; PropFloat* propRenderCalidad;
         PropBool* propRenderFinal; PropBool* propRenderFinalAlfa; PropBool* propRenderPost;
@@ -882,13 +901,20 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnShaderComp;
         PropLabel*  propMatShaderMsg;
         PropButton* propBtnReflectMode; // dropdown del MODO de Reflection (Matcap/Sphere Map/Equirect; visible si Reflection ON)
-        PropButton* propBtnSombreado;   // dropdown del SOMBREADO: por vertice / por pixel (solo con shaders y Lighting ON)
+        PropButton* propBtnSombreado;
+        PropBool*   propMatLuzInd;      // "Indirect light": la sonda de luz por vertice en el pipeline fijo (Material::luzIndirecta)   // dropdown del SOMBREADO: por vertice / por pixel (solo con shaders y Lighting ON)
         // ---- CAPAS DE TEXTURA (TexLayer): hasta 4 filas de [textura | UV | mezcla | on]. La fila que sigue a la
         //      ultima capa es la de "Add Layer" (elegir una textura ahi crea la capa); "No Texture" la borra. ----
         PropLabel*  propCapasTitulo;
+        PropListMeshParts* propListCapas;   // las capas de textura, en una lista (como las partes de malla)
+        PropListMeshParts* propListCapasMat;   // LAS CAPAS DE MATERIAL del mesh part (arriba de la tarjeta Material)
+        PropButton* propCapaMatAdd;            // "New Material" (+): una capa nueva con un material nuevo
+        PropButton* propCapaMatCambiar;        // "Change Material": el material de la capa elegida
+        PropButton* propCapaAdd;            // "Add Layer": elegir una textura crea la capa
         PropButton* propCapaTex[4];
         PropButton* propCapaUV[4];
         PropButton* propCapaMezcla[4];
+        PropFloat*  propCapaFuerza[4];  // el FACTOR de la mezcla de la capa elegida (0 a 100%: TexLayer::fuerza)
         PropBool*   propCapaOn[4];
         PropButton* propBtnMezcla;      // dropdown del MODO DE MEZCLA (Alpha/Aditivo/Multiply/...; visible si Transparent ON)
         PropButton* propBtnProfundidad; // dropdown del TEST DE PROFUNDIDAD (test + escritura de z, en 4 combinaciones)
@@ -975,6 +1001,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void Cancel();
         void FindMouseOver(int mx, int my);
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        bool SinEnvolverCursor() const W3D_OVERRIDE;   // (arrastrando la barra de un mapa del material: Properties.cpp)
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll vertical
         // tarjeta "Ajustes" (pestania Render): el config.ini editable desde adentro del programa.
         // FUERA del #ifndef: son DATOS de la tarjeta, no metodos de SDL. La tarjeta se arma igual en el telefono
@@ -1012,6 +1039,12 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         int MapaNumeroEn(int mx, int my);   // el numero de un mapa del material bajo el punto (su k, o -1)
         // mini-listado (PropListMeshParts) bajo la coordenada py, o NULL (para el scroll tactil de la lista)
         PropListMeshParts* ListaBajoY(int py);
+        // las LISTAS con operaciones (tacho, menu de la fila, renombrar con doble click, arrastrar): Properties.cpp
+        PropListMeshParts* ListaEn(int py, int* yTop, int* hFila, GroupPropertie** grupo);
+        bool DobleClick(int mx, int my);
+        bool ListaTieneFila(int mx, int my);
+        bool ListaAgarrar(int mx, int my);
+        void ListaAgarreSoltar(int mx, int my, int menuX, int menuY);
 
         void key_down_return();
 };

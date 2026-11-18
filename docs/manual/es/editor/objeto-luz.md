@@ -12,7 +12,7 @@ Una **luz** ilumina la escena: los materiales que tienen Iluminación prendida s
 | **Sol** | Con rayos paralelos que vienen todos del mismo lado. Importa hacia dónde apunta, no dónde está. | La luz del día en exteriores. |
 | **Foco** | En un cono, como una linterna. | Linternas, faros de un auto, reflectores de un escenario. |
 
-Añadir → Luz crea una luz Puntual; Añadir → Sol y Añadir → Foco crean directo los otros dos. El tipo se puede cambiar después en la propiedad **Tipo**.
+Las luces están en el submenú Añadir → Luces: **Luz** crea una luz Puntual; **Sol** y **Foco** crean directo los otros dos. Ahí también está la [Sonda de luz](objeto-sonda-luz.md). El tipo se puede cambiar después en la propiedad **Tipo**.
 
 El sol y el foco se orientan rotando el objeto. El sol dibuja siempre una línea hasta el piso, hacia donde alumbra; con la luz seleccionada, el foco muestra su cono y la puntual una esfera del tamaño de su **Distancia**.
 

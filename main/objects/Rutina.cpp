@@ -13,13 +13,15 @@
 #include "render/EscenaRender.h"         // las capturas de pantalla ("Copy screen" y las texturas "pantalla:")
 #include "w3dlog.h"
 #include "objects/ShaderEscrito.h"     // el paso "Shader" (un shader escrito por su archivo)
+#include "WhiskUI/theme/colores.h"   // el fondo del tema: un "Clear color" viejo con ese color pasa a Auto
 #include <map>
 #include <math.h>                  // cosf / sinf (el giro de "Matriz del objeto")
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>                  // el reloj del perfil sin el perfilador: clock()
 // el FONDO 360 vuelve a dibujarse despues de que una rutina limpia el color (lo instala render/EscenaRender.cpp)
-void (*g_cieloTrasLimpiarHook)() = 0;
+void (*g_cieloTrasLimpiarHook)(Texture*, const float*) = 0;   // (NULL = el fondo del render; si no, esa imagen y su giro)
+bool (*g_w3dFondoAutoHook)(float*) = 0;   // el color de "Clear color" en Auto (render/OpcionesRender.cpp); false = ninguno
 
 namespace gfx = w3dEngine;
 
@@ -92,8 +94,8 @@ static const PasoInfo kPasos[PasoN] = {
     { "sesgoZ",          "Depth bias",        GrupoProfundidad, 2, RefNada,    EnteroNada,   OpcNada,          true,  "On", { "Factor", "Units" } },
     { "sesgoMetros",     "Depth shift (m)",   GrupoProfundidad, 1, RefNada,    EnteroNada,   OpcNada,          false, 0, { "Meters" } },
     { "rangoZ",          "Depth range",       GrupoProfundidad, 2, RefNada,    EnteroNada,   OpcNada,          false, 0, { "Near", "Far" } },
-    { "colorLimpieza",   "Clear color",       GrupoProfundidad, 4, RefNada,    EnteroNada,   OpcNada,          false, 0, { "R", "G", "B", "A" } },
-    { "limpiar",         "Clear",             GrupoProfundidad, 0, RefNada,    EnteroBuffers, OpcNada,         false, 0, { 0 } },
+    { "colorLimpieza",   "Clear color",       GrupoProfundidad, 4, RefNada,    EnteroNada,   OpcColorLimpieza, false, 0, { "R", "G", "B", "A" } },
+    { "limpiar",         "Clear",             GrupoProfundidad, 0, RefTextura, EnteroBuffers, OpcLimpiarFondo, false, 0, { 0 } },
     { "mezclaActiva",    "Blending on/off",   GrupoMezcla,      0, RefNada,    EnteroNada,   OpcNada,          true,  "On", { 0 } },
     { "mezclaModo",      "Blend mode",        GrupoMezcla,      0, RefNada,    EnteroNada,   OpcMezclaModo,    false, 0, { 0 } },
     { "caras",           "Face culling",      GrupoCaras,       0, RefNada,    EnteroNada,   OpcNada,          true,  "On", { 0 } },
@@ -132,6 +134,8 @@ static const char* const kOpcArray[]   = { "Vertices", "Normals", "UV", "Colors"
 static const char* const kOpcMatriz[]  = { "Multiply", "Load (camera x object)" };
 static const char* const kOpcMezclaTex[] = { "Interpolate (mix)", "Multiply (lightmap)", "Multiply 2x" };   // gfx::MezclaTexturas modo
 static const char* const kOpcRiel[] = { "The camera rides it", "The camera does not ride it" };   // PasoSaltarRiel
+static const char* const kOpcColorLimp[] = { "Auto", "Use custom color" };                        // W3dColorLimpiezaModo
+static const char* const kOpcLimpFondo[] = { "Auto", "Clear with color", "Draw custom background" }; // W3dLimpiarFondoModo
 struct OpcInfo { const char* titulo; const char* const* opciones; int n; };
 static const OpcInfo kOpc[OpcN] = {
     { "", NULL, 0 },
@@ -149,6 +153,8 @@ static const OpcInfo kOpc[OpcN] = {
     { "Mode",      kOpcMatriz,  2 },
     { "Mode",      kOpcMezclaTex, 3 },
     { "Skip when", kOpcRiel, 2 },
+    { "Mode", kOpcColorLimp, 2 },
+    { "Background", kOpcLimpFondo, 3 },
 };
 // la primitiva en el .w3d (por nombre: un numero no dice nada al leer el archivo)
 static const char* const kPrimNombre[RPrimN] = { "puntos", "lineas", "tiraLineas", "lazoLineas", "triangulos", "tira",
@@ -180,10 +186,12 @@ static int PrimitivaDesdeNombre(const std::string& n) {
 int W3dPasoNumeros(const W3dPaso& p) {
     // "Dibujar elementos": manual = [primero, ultimo]; array = [primero, ultimo, "@array"] (el manual se guarda igual)
     if (p.tipo == PasoDibujar) return p.sub == RangoManual ? 2 : (p.sub == RangoArray ? 4 : 0);
+    if (p.tipo == PasoLimpiar) return p.modo == LimpiarFondoPropio ? 3 : 0;   // (el giro de su fondo 360)
     return p.tipo < PasoN ? kPasos[p.tipo].numeros : 0;
 }
 const char* W3dPasoNumeroNombre(const W3dPaso& p, int i) {
     if (p.tipo == PasoDibujar) return i == 0 ? "First triangle" : (i == 1 ? "Last triangle" : (i == 2 ? "Array" : "Flags"));
+    if (p.tipo == PasoLimpiar) return i == 0 ? "Rotation X" : (i == 1 ? "Rotation Y" : (i == 2 ? "Rotation Z" : ""));
     return (p.tipo < PasoN && i >= 0 && i < kPasos[p.tipo].numeros) ? kPasos[p.tipo].campos[i] : "";
 }
 int W3dPasoDesdeNombre(const std::string& n) {
@@ -989,7 +997,13 @@ static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
     case PasoSesgoMetros: gfx::SesgoMetros(p.n[0].Valor()); break;   // (la proyeccion corrida: estado de gfx)
     case PasoRangoZ: gfx::DepthRange(p.n[0].Valor(), p.n[1].Valor()); break;
     case PasoColorLimpieza:
-        if (!g_w3dLimpiarColorFijo) gfx::ClearColor(p.n[0].Valor(), p.n[1].Valor(), p.n[2].Valor(), p.n[3].Valor());
+        if (g_w3dLimpiarColorFijo) break;
+        if (p.modo == ColorLimpiezaAuto && g_w3dFondoAutoHook) {
+            // AUTO: el fondo (el del render; en el editor, fuera de la vista Render, el del visor). Con un fondo 360 no
+            // hace nada: lo tapa el cielo que dibuja el "Clear"
+            float c[4];
+            if (g_w3dFondoAutoHook(c)) gfx::ClearColor(c[0], c[1], c[2], c[3]);
+        } else gfx::ClearColor(p.n[0].Valor(), p.n[1].Valor(), p.n[2].Valor(), p.n[3].Valor());
         break;
     case PasoLimpiar: {
         // glClear de lo elegido. Respeta el scissor (en el editor: el rectangulo del viewport). La profundidad se limpia
@@ -1003,9 +1017,15 @@ static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
             gfx::Scissor(g_w3dRecorteVista[0], g_w3dRecorteVista[1], g_w3dRecorteVista[2], g_w3dRecorteVista[3]);
         }
         if (bits) gfx::Clear(bits);
-        // el FONDO 360 (si lo hay) vuelve atras de lo que se dibuje despues: limpiar el color lo borraba
+        // el FONDO 360 atras de lo que se dibuje despues (limpiar el color lo borraba): en AUTO el del render, si hay uno;
+        // con un fondo PROPIO, su imagen con su giro. "Limpiar con el color": nada mas
         // (por un gancho: el juego 2D compila las rutinas pero no el pase 3D, que es quien lo instala)
-        if ((bits & gfx::ColorBuffer) && g_cieloTrasLimpiarHook) g_cieloTrasLimpiarHook();
+        if ((bits & gfx::ColorBuffer) && p.modo != LimpiarFondoColor && g_cieloTrasLimpiarHook) {
+            if (p.modo == LimpiarFondoPropio) {
+                const float giro[3] = { p.n[0].Valor(), p.n[1].Valor(), p.n[2].Valor() };
+                if (p.ptr) g_cieloTrasLimpiarHook((Texture*)p.ptr, giro);
+            } else g_cieloTrasLimpiarHook(NULL, NULL);
+        }
         break;
     }
     // ---- mezcla ----
@@ -1280,8 +1300,9 @@ bool W3dRutinaPasoDesdeLua(W3dPaso& p, std::string& error) {
 //  "Dibujar elementos" guarda la primitiva por NOMBRE ("primitiva": "tira") y el rango ("rango": 1 manual, 2 array).
 // ---------------------------------------------------------------------------
 // la version de los pasos: 1 = los punteros prendian su array y "limpiar" llevaba el color; 2 = "Array on/off" y
-// "Clear color" son pasos aparte (lo de la 1 se convierte al leer: LeerLista)
-static const int kVersionPasos = 2;
+// "Clear color" son pasos aparte (lo de la 1 se convierte al leer: LeerLista); 3 = "Clear color" tiene modo (Auto o un
+// color propio): el de antes era siempre propio
+static const int kVersionPasos = 3;
 static const char* const kModos[Rutina::ModoN] = { "defecto", "solido", "material", "render", "alambre", "zbuffer" };
 const char* W3dRutinaModoNombre(int m) { return (m >= 0 && m < Rutina::ModoN) ? kModos[m] : "defecto"; }
 static int ModoDesdeNombre(const std::string& n) {
@@ -1395,6 +1416,17 @@ static W3dPaso PasoArrayV1(int k, bool on, bool segunLaMalla) {
     p.modo = k; p.on = on; p.sub = segunLaMalla ? 1 : 0;
     return p;
 }
+// (antes de la version 3) un "Clear color" era SIEMPRE su color. El que traia el fondo del tema (el que ponia un proyecto
+// nuevo, sin que nadie lo eligiera) pasa a Auto; uno que alguien cambio sigue siendo suyo
+static int ColorLimpiezaViejo(const W3dNum num[5]) {
+    const float* tema = ListaColores[static_cast<int>(ColorID::background)];
+    for (int k = 0; k < 3; k++) {
+        if (!num[k].ref.empty()) return ColorLimpiezaPropio;   // (de una memoria: lo maneja el juego)
+        const float d = num[k].v - tema[k];
+        if (d > 0.003f || d < -0.003f) return ColorLimpiezaPropio;
+    }
+    return ColorLimpiezaAuto;
+}
 static void LeerLista(JVal* l, std::vector<W3dPaso>& L, std::string (*refTextura)(const std::string&, void*), void* ctx,
                       int version) {
     L.clear();
@@ -1459,9 +1491,11 @@ static void LeerLista(JVal* l, std::vector<W3dPaso>& L, std::string (*refTextura
         }
         if (refTextura && (W3dPasoRef(t) == RefTextura || W3dPasoRef(t) == RefShader) && !p.ref.empty()) p.ref = refTextura(p.ref, ctx);
         if (n) for (size_t k = 0; k < 5 && k < JFilaLen(n); k++) p.n[k] = num[k];
+        if (version < 3 && t == PasoColorLimpieza) p.modo = ColorLimpiezaViejo(num);
         if (version < 2 && t == PasoLimpiar) {
             // (version 1) un solo "Clear": on = el color (con sus 4 numeros), entero = la profundidad
-            if (on) { W3dPaso c = W3dPasoNuevo(PasoColorLimpieza); for (int k = 0; k < 4; k++) c.n[k] = num[k]; it.push_back(c); }
+            if (on) { W3dPaso c = W3dPasoNuevo(PasoColorLimpieza); for (int k = 0; k < 4; k++) c.n[k] = num[k];
+                      c.modo = ColorLimpiezaViejo(num); it.push_back(c); }
             W3dPaso q = W3dPasoNuevo(PasoLimpiar);
             q.entero = (on ? (int)LimpiarColor : 0) | (entero ? (int)LimpiarProfundidad : 0);
             it.push_back(q);

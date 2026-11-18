@@ -41,11 +41,20 @@ class Texture;
 extern int      g_renderBgModo;      // 0 = color, 1 = textura
 extern Texture* g_renderBgTex;       // la textura 360 elegida (NULL = ninguna: se ve el color)
 extern float    g_renderBgRot[3];    // grados
+// LA LUZ DEL FONDO: cuanto ilumina el fondo (0 = nada, 1 = 100%, hasta 2 = 200%). El fondo es la luz AMBIENTE de la vista
+// Render y del juego: con un color, ese color; con una textura 360, su irradiancia (EscenaRender.cpp). Tambien el
+// trazado de rayos la usa para la luz del cielo. Lo que se VE del fondo no cambia
+extern float    g_renderLuzFondo;
 // las texturas que se usaron de fondo: la pista animable de QUE fondo guarda indice + 1 en esta lista (0 = el color).
 // Cada una tiene su referencia (no la libera la purga mientras el proyecto la nombre)
 #include <vector>
 extern std::vector<Texture*> g_renderBgTexs;
 bool W3dFondoConTextura();                       // en modo textura y con una textura cargada
+// el color del "Clear color" en AUTO (objects/Rutina.h): el fondo del render; con un fondo 360 que se ve (el pase con las
+// luces: Render y el juego) ninguno (false: lo tapa el cielo). El visor 3D del editor, fuera de la vista Render, pone el
+// suyo mientras dibuja (W3dFondoAutoFijar(su color) ... W3dFondoAutoFijar(NULL))
+bool W3dFondoAutoColor(float c[4]);
+void W3dFondoAutoFijar(const float* c);
 void W3dFondoPonerTextura(Texture* t);           // la elige (la agrega a la lista con su referencia); NULL = ninguna
 int  W3dFondoIndiceTextura(Texture* t);          // su lugar + 1 en la lista (0 = no esta / ninguna)
 void W3dFondoAplicarCanal(int prop, int comp, float v);   // el gancho de la animacion (g_animFondoHook)

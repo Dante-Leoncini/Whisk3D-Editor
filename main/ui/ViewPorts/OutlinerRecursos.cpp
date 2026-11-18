@@ -751,7 +751,17 @@ static void ArmarMenuVista(Outliner* o) {
 // ---- OBJETO (Escena: el objeto activo / la seleccion; Biblioteca: el cursor / la seleccion) ----
 enum { OBJ_BORRAR = 1, OBJ_RENOMBRAR, OBJ_MOVER, OBJ_OCULTAR, OBJ_DUPLICAR, OBJ_DUPLICAR_VINC,
        REC_BORRAR, REC_RENOMBRAR, REC_DUPLICAR, REC_USUARIOS, REC_PURGAR, REC_NUEVA_CARPETA,
-       OBJ_CREAR_PREFAB, OBJ_DESEMPAQUETAR, REC_ADENTRO, REC_AFUERA };
+       OBJ_CREAR_PREFAB, OBJ_DESEMPAQUETAR, REC_ADENTRO, REC_AFUERA, REC_ACTUALIZAR_TEX };
+// las TEXTURAS elegidas (el cursor o la seleccion): las que "Reload Texture" vuelve a leer de su archivo
+static void TexturasElegidas(Outliner* o, std::vector<std::string>& out) {
+    out.clear();
+    std::vector<std::string> rec, car;
+    o->Objetivo(rec, car, false);
+    for (size_t i = 0; i < rec.size(); i++) {
+        int tipo = -1; std::string id;
+        if (W3dBibDeClave(rec[i], &tipo, &id) && tipo == W3D_VISTA_TEXTURAS) out.push_back(id);
+    }
+}
 // DENTRO / FUERA del .w3d desde la biblioteca: los recursos elegidos (el cursor o la seleccion) que tienen archivo
 // propio (texturas, sonidos, scripts, fuentes, videos, shaders) y que todavia NO estan donde se los quiere llevar
 // (0 = adentro, 1 = afuera). Siguen en la MISMA carpeta de la biblioteca (la carpeta viaja con la ruta nueva)
@@ -854,6 +864,7 @@ static void AccionObjetoElegida(int id) {
         case REC_USUARIOS: o->AccionSeleccionarUsuarios(); break;
         case REC_PURGAR:   o->AccionPurgar(true); break;
         case REC_NUEVA_CARPETA: o->AccionNuevaCarpeta(); break;
+        case REC_ACTUALIZAR_TEX: { std::vector<std::string> ts; TexturasElegidas(o, ts); W3dTexturasActualizarAvisando(ts); break; }
         case REC_ADENTRO: { std::vector<std::pair<int, std::string> > ls; UbicablesElegidos(o, 0, ls); MudarUbicables(ls, 0, std::string()); break; }
         case REC_AFUERA:
             UbicablesElegidos(o, 1, gAfueraPendientes);
@@ -971,6 +982,9 @@ static void ArmarMenuObjeto(Outliner* o) {
     Gris(it, ro || rec.empty() || W3dBibObjetosUsuarios(rec) == 0);
     it = gMenuObjeto->Agregar(T("Purge Orphans"), REC_PURGAR, IconType::notifError);
     Gris(it, ro);
+    // ACTUALIZAR TEXTURA: solo si entre lo elegido hay texturas (se editaron afuera: se vuelven a leer de su archivo)
+    { std::vector<std::string> ts; if (!ro) TexturasElegidas(o, ts);
+      if (!ts.empty()) gMenuObjeto->Agregar(T("Reload Texture"), REC_ACTUALIZAR_TEX, IconType::recargar); }
     // DENTRO / FUERA del .w3d: solo si lo elegido tiene archivo propio (los externos llevan la flecha de acceso directo)
     std::vector<std::pair<int, std::string> > adentro, afuera;
     UbicablesElegidos(o, 0, adentro);

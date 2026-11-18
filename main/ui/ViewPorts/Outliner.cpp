@@ -63,6 +63,7 @@ size_t IconoDeObjeto(Object* o) {
         case ObjectType::postproceso: return (size_t)IconType::monitor;
         case ObjectType::recorte:    return (size_t)IconType::recorte;
         case ObjectType::hitbox:     return (size_t)IconType::hitbox;    // Hitbox: caja de deteccion
+        case ObjectType::sondaluz:   return (size_t)IconType::esfera;    // Sonda de luz: la luz indirecta horneada
         case ObjectType::prefab:     // instancia de prefab (sus hijos: generados); la de una ESCENA, el icono de escena
             return W3dPrefabEsEscena(((InstanciaPrefab*)o)->prefab) ? (size_t)IconType::camera : (size_t)IconType::prefab;
         case ObjectType::proxy:      return (size_t)IconType::libreria;  // proxy W3D: lo que genera es de una libreria

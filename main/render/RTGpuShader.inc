@@ -313,7 +313,8 @@ vec3 NormalEn(Hit h, vec3 d) {
 static const char* kRTGpuTrazar = R"GLSL(
 // un rayo de camara con sus capas transparentes; los REFLEJOS del metal van a una pila (hasta 4 rebotes)
 int gRebotes = 0;   // los rebotes de la luz (pc.dims.w >> 8)
-int gEnvMat = -1;   // el material extra del FONDO 360 ((pc.info.w >> 1) - 1; -1 = el color de fondo)
+int gEnvMat = -1;   // el material extra del FONDO 360 (((pc.info.w >> 1) & 0x7FFF) - 1; -1 = el color de fondo)
+float gLuzFondo = 1.0;   // LA LUZ DEL FONDO (pc.info.w >> 16, en %): cuanto ilumina el fondo
 // EL FONDO en una direccion: el color, o el punto de la textura 360 (como RayTracer.cpp: FondoEn)
 vec3 Fondo(vec3 d) {
     if (gEnvMat < 0) return pc.bg.rgb;
@@ -338,7 +339,7 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
         int capa = 0;
         for (int vuelta = 0; vuelta < 256 && capa < capas; vuelta++) {
             Hit h;
-            if (!Trazar(o, d, tMin, 1e30, false, h, excl)) { total += thr * peso * Fondo(d); break; }
+            if (!Trazar(o, d, tMin, 1e30, false, h, excl)) { total += thr * peso * Fondo(d) * (prof > 0 ? gLuzFondo : 1.0); break; }
             ivec4 T = tris[h.tri];
             M m = MaterialEn(h);
             float b0 = 1.0 - h.b1 - h.b2;
@@ -364,11 +365,11 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
                 }
                 vec3 col = LuzEn(p, n, -d, alb, m);
                 // LA LUZ DEL FONDO 360 sin rebotes: un rayo al cielo pesado por el coseno (si no lo tapa nada)
-                if (gEnvMat >= 0 && gRebotes == 0 && !m.sinLuz && m.met < 1.0) {
+                if ((gEnvMat >= 0 || dot(pc.bg.rgb, vec3(1.0)) > 0.0) && gLuzFondo > 0.0 && gRebotes == 0 && !m.sinLuz && m.met < 1.0) {
                     vec3 sd = normalize(n + DirAzarEsfera());
                     if (dot(sd, n) <= 0.0) sd = n;
                     Hit hs;
-                    if (!Trazar(p + n * 1e-3, sd, 1e-4, 1e30, true, hs, -1)) col += (1.0 - m.met) * alb * Fondo(sd);
+                    if (!Trazar(p + n * 1e-3, sd, 1e-4, 1e30, true, hs, -1)) col += (1.0 - m.met) * alb * Fondo(sd) * gLuzFondo;
                 }
                 float w = m.aditivo ? peso : peso * alfa * (1.0 - m.trans);
                 total += thr * w * col;
@@ -450,7 +451,8 @@ void main() {
     if (gRng == 0u) gRng = 0x9E3779B9u;
     int ns = max(pc.dims.w & 255, 1);
     gRebotes = (pc.dims.w >> 8) & 255;
-    gEnvMat = (pc.info.w >> 1) - 1;
+    gEnvMat = ((pc.info.w >> 1) & 0x7FFF) - 1;
+    gLuzFondo = float(pc.info.w >> 16) * 0.01;
     vec3 c = vec3(0.0);
     for (int s = 0; s < ns; s++) {
         vec3 o, d; RayoPixel(float(q.x) + Azar(), float(q.y) + Azar(), o, d); RayoLente(o, d);

@@ -6,7 +6,9 @@
 //    - arriba, en NEGRO: el logo con el ENGRANAJE GIRANDO (el emblema del medio queda quieto), a su derecha el texto
 //      "Whisk3D" (negro con borde blanco y la geometria del 3, res/inicio/texto.png) y abajo la pagina (whisk3d.com.ar, a la izquierda) y el
 //      numero de version (a la derecha)
-//    - "Nuevo archivo" (la escena de arranque, como el "Nuevo proyecto" de la tarjeta Archivo)
+//    - "Nuevo archivo" (la escena de arranque, como el "Nuevo proyecto" de la tarjeta Archivo). Con layouts guardados
+//      (config/W3dLayouts.h) la tarjeta pasa a mostrar LA LISTA DE LAYOUTS para arrancar con el que se quiera: el rotulo
+//      "Nuevo archivo", "Por defecto", los guardados e "Ir atras" (Esc tambien vuelve). Sin ninguno guardado, directo
 //    - "Abrir..." (el explorador, como "Abrir proyecto" de la tarjeta Archivo)
 //    - "Archivos recientes": los ultimos 5 abiertos o guardados (config/W3dRecientes.h); un toque lo abre. Si no hay
 //      ninguno no aparece ni el rotulo: quedan "Nuevo archivo" y "Abrir..."
@@ -32,9 +34,14 @@ class InicioPopup : public PopUpBase {
         void Cerrar() W3D_OVERRIDE;
 
         // las FILAS que se eligen: 0 = Nuevo archivo, 1..N = los recientes, N+1 = Abrir...
-        int Filas() const { return 2 + (int)recientes.size(); }
+        // En la lista de layouts: 0 = Por defecto, 1..L = los guardados, L+1 = Ir atras
+        int Filas() const { return 2 + (int)(verLayouts ? layouts.size() : recientes.size()); }
         int FilaEn(int mx, int my) const;      // la fila elegible bajo el punto (-1 = ninguna)
-        void Elegir(int fila);
+        void Elegir(int fila, bool teclado = false);   // teclado: la lista de layouts abre con la primera resaltada
+        void VerLayouts(bool ver, bool teclado = false);
+
+        bool verLayouts;                       // la tarjeta muestra la lista de layouts (despues de "Nuevo archivo")
+        std::vector<std::string> layouts;      // los guardados (sin "Por defecto"), en el orden de la lista
 
         std::vector<std::string> recientes;
         // el engranaje, como en la intro de las demos: el reflejo QUIETO, la mascara GIRANDO que lo recorta

@@ -69,7 +69,7 @@ El material decide cómo se ve la parte: su color, su textura y cómo le pega la
 | Metálico, Rugosidad, Emisión, Normal, Alfa | Cada uno puede ser un número o una textura (el botón **Número / textura**). Con la luz **Por píxel** el metálico y la rugosidad se ven en la Vista 3D como en el trazado de rayos: lo metálico pierde el color difuso y su brillo toma el color del material, y lo rugoso abre el brillo (sin el trazado, un metal no refleja la escena: se ve oscuro con su brillo). Alfa es la transparencia: con menos de 1, o con una textura de alfa, el material pasa a ser transparente. El número se arrastra de costado (con el mouse o con el dedo) y un toque lo deja escribir. Mantener apretado (o el click derecho) da **Restablecer**, **Copiar** y **Pegar**, también para el color de la Emisión y el color base. |
 | Recorte alfa | Corta lo que tiene alfa bajo, sin mezclar: para rejas, alambrados u hojas. 0 lo apaga. |
 | Transmisión, IOR | Vidrio. La **Transmisión** (0 a 1) es cuánto del material es vidrio; el **IOR** (aparece con transmisión) es cuánto dobla la luz: 1 no la dobla, 1.33 es agua, 1.5 vidrio. Al subir la transmisión con el IOR en 1, pasa solo a 1.5. Con el **Trazado de rayos** el vidrio refracta lo de atrás; en la Vista 3D con luz **Por píxel** (OpenGL ES 2.0, Vulkan, la web), en la **Vista Material** y en la **Vista Render**, también se ve lo de atrás corrido por el IOR y borroso según la **Rugosidad**, y refleja más de costado. En una placa chica (la de los Android 2.3) lo que no entra se va sacando solo: primero el reflejo del fondo 360, después el vidrio; la malla se sigue viendo. Sin shaders (OpenGL, el N95) baja la opacidad. |
-| Reflejos en pantalla | Con luz **Por píxel**: lo que ya está dibujado se refleja en el material (un piso mojado, un metal pulido), más con poca rugosidad, con el metálico y mirando de costado. Es una aproximación (no conoce la profundidad): lo que no está en la pantalla, o queda hacia la cámara, se toma del fondo 360. |
+| Reflejos en pantalla | Con luz **Por píxel**: lo que ya está dibujado se refleja en el material (un piso mojado, un metal pulido), más con poca rugosidad, con el metálico y mirando de costado. En la PC usa también la profundidad de la pantalla: sigue el rayo reflejado hasta lo que toca, así que funciona como un espejo (lo que está arriba de un piso sale dado vuelta, a su distancia). En Android y en la web es una aproximación, porque no puede leer la profundidad. Lo que no está en la pantalla, o queda hacia la cámara, se toma del fondo 360. |
 | Iluminación | Si las luces de la escena le pegan. Apagada, el color se ve plano, siempre igual. Si el backend gráfico tiene shaders, aparece **Sombreado**: Por vértice o Por píxel. Con shaders (OpenGL ES 2.0, Vulkan, la web), un material nuevo y el material por defecto arrancan **Por píxel**. |
 | Color de Vértice | Usa los colores pintados en la malla (ver [Pintura de vértices](pintura.md#pintura-de-vértices)) en vez del color base. |
 | Filtrado / Repetir | Suaviza la textura de cerca (destildado se ven los píxeles) / la repite como un mosaico. |
@@ -81,6 +81,26 @@ El material decide cómo se ve la parte: su color, su textura y cómo le pega la
 | Avanzado: shader personalizado | Un archivo que dibuja el material a medida: ver [Shaders escritos](shaders.md). |
 
 Si el objeto tiene física (Añadir → Física), su tarjeta **Física** aparece también en esta pestaña.
+
+### Precalcular iluminación
+
+Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a la malla: la de las lámparas (con las **sombras** de lo que haya en el medio) y la **luz indirecta** (el fondo y lo que rebota). Solo cuentan los objetos tildados como **Estático**. Es lo que se usa para un escenario: la luz se calcula una vez y después no cuesta nada, ni en el N95.
+
+| Propiedad | Qué hace |
+|---|---|
+| Textura | Dónde se escribe la luz. Una textura del proyecto, o **Nueva textura…**, que pide su tamaño y su nombre. Sin textura no se puede hornear. |
+| UV | La capa UV de la malla que dice dónde cae cada cara en la textura. Conviene una capa propia, sin caras encimadas (por ejemplo "IluminacionUV"). |
+| Luz indirecta | La luz que rebota: la del fondo y la que rebota en lo que hay alrededor. Apagada, solo las lámparas y sus sombras. |
+| Muestras | Cuántos rayos de luz indirecta se tiran por cada píxel. Más muestras, menos granulado, más tiempo. |
+| Rebotes | Cuántas veces rebota la luz (de 1 a 8). Con más rebotes las sombras reciben la luz que rebota en lo que las tapa (la sombra de un cubo no queda negra), y se tarda más. |
+| Denoiser | Suaviza la luz indirecta para que no quede granulada. Las sombras de las lámparas quedan nítidas igual. |
+| Hornear | Calcula la luz. Mientras trabaja, la barra muestra el avance y el botón dice **Cancelar**. |
+
+Solo se pisan los píxeles de las caras de la malla en esa UV (y dos de margen alrededor); el resto de la textura queda como estaba. Se puede deshacer con Ctrl+Z.
+
+Al terminar, la textura queda como **capa de textura de luz horneada** (mezcla *Multiply 2x*, con esa UV) en todos los materiales de la malla. Mientras esa capa esté prendida, el material no usa la luz de tiempo real (la luz ya está en la textura y se sumaría dos veces); si sacás o apagás la capa, vuelve la luz de siempre. Si movés una lámpara o un objeto estático, volvé a hornear.
+
+Los objetos **no estáticos** (los que se mueven) no se hornean: toman la luz de una [Sonda de luz](objeto-sonda-luz.md).
 
 ## La pestaña Malla 3D
 

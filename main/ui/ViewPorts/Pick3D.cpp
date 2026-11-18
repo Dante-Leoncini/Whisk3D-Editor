@@ -45,6 +45,7 @@
 #include "ViewPorts/Pick3D.h"
 #include "edit/BoxSelect.h"   // la caja compartida + sus predicados
 #include "objects/Hitbox.h"   // el pick de un hitbox es su ALAMBRE (HitboxAristas)
+#include "objects/SondaLuz.h"   // la sonda de luz se elige por su icono (SondaLuzSeDibuja)
 #include "W3dRaices.h"         // las otras escenas abiertas: el click tambien las elige
 #include "io/RaicesEditor.h"   // W3dActivarRaizDe: lo elegido en otra escena abierta la activa
 #include "script/W3dScript.h"  // (jugando no: el Play dibuja su base y sus capas)
@@ -68,10 +69,11 @@ static bool PickSeleccionable(Object* obj) {
     if (t == ObjectType::empty  && !g_showEmpty)  return false;
     { extern bool g_showSonidos; if (t == ObjectType::sonido && !g_showSonidos) return false; }   // (overlay "Sounds")
     if (t == ObjectType::hitbox && !HitboxSeDibuja()) return false;   // la MISMA regla que su dibujo
+    if (t == ObjectType::sondaluz && !SondaLuzSeDibuja()) return false;
     return t == ObjectType::mesh || t == ObjectType::camera ||
            t == ObjectType::light || t == ObjectType::empty ||
            t == ObjectType::instance || t == ObjectType::armature ||
-           t == ObjectType::hitbox || t == ObjectType::sonido;
+           t == ObjectType::hitbox || t == ObjectType::sonido || t == ObjectType::sondaluz;
 }
 // pick en 2 pasadas: primero NO-armatures (con z-buffer), despues armatures (XRAY, sin z, encima de todo)
 // para que el esqueleto se pickee EXACTAMENTE como se ve. 'armaturePass' filtra que se pinta/cuenta en cada pasada.

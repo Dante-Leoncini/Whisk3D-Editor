@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "render/RTGpuShader.inc"
+#include "render/OpcionesRender.h"   // g_renderLuzFondo (la luz del fondo, en las constantes)
 
 #define RTG_GLOBAL(X) X(vkCreateInstance)
 #define RTG_INST(X) X(vkDestroyInstance) X(vkEnumeratePhysicalDevices) X(vkGetPhysicalDeviceProperties) \
@@ -461,7 +462,10 @@ bool RTGpuPase(const RTGpuCamara& c, int paso, int samples, bool aov, int capas,
     // (las muestras y los REBOTES de la luz en el mismo entero: el bloque de 128 bytes esta lleno)
     pc.dims[0] = gW; pc.dims[1] = gH; pc.dims[2] = paso; pc.dims[3] = (samples & 255) | ((rebotes & 255) << 8);
     pc.info[0] = gNLuces; pc.info[1] = gNNodos; pc.info[2] = gTransp ? (capas < 1 ? 1 : capas) : 0;
-    pc.info[3] = (aov ? 1 : 0) | ((gEnvMat + 1) << 1);   // (el denoiser y el material del fondo 360 + 1, juntos)
+    // (el denoiser, el material del fondo 360 + 1 y LA LUZ DEL FONDO en % -arriba del bit 16-, juntos: las constantes ya
+    //  ocupan los 128 bytes)
+    { int pct = (int)(g_renderLuzFondo * 100.0f + 0.5f); if (pct < 0) pct = 0; if (pct > 32767) pct = 32767;
+      pc.info[3] = (aov ? 1 : 0) | (((gEnvMat + 1) & 0x7FFF) << 1) | (pct << 16); }
     VkCommandBuffer cb = Empezar();
     vkCmdBindPipeline_(cb, VK_PIPELINE_BIND_POINT_COMPUTE, gPipeTrazar);
     vkCmdBindDescriptorSets_(cb, VK_PIPELINE_BIND_POINT_COMPUTE, gLayTrazar, 0, 1, &gSet, 0, 0);

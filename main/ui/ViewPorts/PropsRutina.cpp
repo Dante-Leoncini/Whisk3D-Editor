@@ -26,6 +26,8 @@
 #include "objects/MallaRecurso.h"
 #include "objects/MallaFlujos.h"
 #include "io/RecursosProyecto.h"   // el paso "Shader": los .glsl de la biblioteca
+#include "io/W3dContenedor.h"      // W3dImportarAsset: una textura cargada de afuera entra al proyecto
+#include "ViewPorts/PopUp/FileBrowser.h"   // "Cargar textura": el explorador
 #include "W3dLang.h"
 #include "WhiskUI/widgets/PopupMenu.h"
 #include "ViewPorts/W3dInput.h"   // W3dK_*: las teclas de la lista de pasos
@@ -90,8 +92,10 @@ static const W3dPaso* RuFila(Object* o, int i) {
     return (L && i >= 0 && i < (int)L->size()) ? &(*L)[i] : NULL;
 }
 // un color de numeros fijos (con alguna memoria se muestran los numeros: el color cambia jugando)
+// un "Clear color" en AUTO no tiene color propio (toma el fondo): ni cuadro ni numeros
+static bool ColorAuto(const W3dPaso& p) { return p.tipo == PasoColorLimpieza && p.modo == ColorLimpiezaAuto; }
 static bool ColorFijo(const W3dPaso& p) {
-    if (!W3dPasoEsColor(p.tipo)) return false;
+    if (!W3dPasoEsColor(p.tipo) || ColorAuto(p)) return false;
     for (int k = 0; k < 4; k++) if (!p.n[k].ref.empty()) return false;
     return true;
 }
@@ -109,12 +113,17 @@ static std::string RuFilaTexto(Object* o, int i) {
         const size_t k = t.rfind(" on/off");
         if (k != std::string::npos && k + 7 == t.size()) t.erase(k);
     }
-    if (p.tipo == PasoLimpiar) {   // "Clear color + depth"
+    if (p.tipo == PasoLimpiar) {   // "Clear color + depth" (y con el color: que hace, si no es Auto)
         static const char* const kBuf[3] = { "color", "depth", "stencil" };
         std::string q;
         for (int k = 0; k < 3; k++) if (p.entero & (1 << k)) q += std::string(q.empty() ? " " : " + ") + T(kBuf[k]);
-        return t + (q.empty() ? std::string(" (") + T("nothing") + ")" : q);
+        if (q.empty()) return t + " (" + T("nothing") + ")";
+        if ((p.entero & LimpiarColor) && p.modo == LimpiarFondoColor) q += std::string(" (") + T("Clear with color") + ")";
+        if ((p.entero & LimpiarColor) && p.modo == LimpiarFondoPropio)
+            q += " (" + (p.ref.empty() ? std::string(T("Draw custom background")) : Base(p.ref)) + ")";
+        return t + q;
     }
+    if (p.tipo == PasoColorLimpieza && ColorAuto(p)) return t + " (" + T("Auto") + ")";
     if (W3dPasoEntero(p.tipo) == EnteroLuz) { snprintf(b, sizeof b, " %d", p.entero); t += b; }
     if (!p.ref.empty()) t += " " + ((W3dPasoRef(p.tipo) == RefTextura || W3dPasoRef(p.tipo) == RefShader) ? Base(p.ref) : p.ref);
     if (UsaPartes(p.tipo) && p.entero >= 0) { snprintf(b, sizeof b, " [%d]", p.entero); t += b; }
@@ -378,7 +387,10 @@ static void ArmarMallas(PopupMenu* raiz, const W3dPaso& p, bool conPartes) {
         }
     }
 }
+enum { kRefCargarTextura = 700000 };   // (el id de "Cargar textura" en el menu de las texturas)
 static void ArmarTexturas(PopupMenu* raiz, const W3dPaso& p) {
+    // arriba, CARGAR una de afuera (una imagen 360 para el fondo, una textura que todavia no usa nadie)
+    { MenuItem* it = raiz->Agregar(T("Load Texture"), kRefCargarTextura, (int)IconType::archive); (void)it; }
     std::vector<std::string> rutas;
     for (size_t i = 0; i < Textures.size(); i++)
         if (Textures[i] && !Textures[i]->path.empty()) rutas.push_back(Textures[i]->path);
@@ -417,8 +429,25 @@ static void ArmarObjetos(PopupMenu* raiz, Rutina* r, int rt, const std::string& 
     const int ico = rt == RefRutina ? (int)IconType::lista : (int)IconType::object;
     for (size_t i = 0; i < v.size(); i++) raiz->Agregar(v[i], Opcion(v[i], 0), ico)->verde = (v[i] == actual);
 }
+// "Cargar textura": la imagen elegida entra al proyecto y queda en el paso (la retiene la rutina al resolverlo)
+static void RefTexturaCargada(const std::string& elegido) {
+    Rutina* r = RuActiva(); W3dPaso* p = RuPaso(r);
+    if (!r || !p || W3dPasoRef(p->tipo) != RefTextura) return;
+    const std::string ruta = W3dImportarAsset(elegido);   // (importar = copiar adentro del proyecto)
+    Texture* t = TexturaTomar(ruta);
+    if (!t) { extern void Notificar(const std::string&, bool); Notificar(T("The texture couldn't be loaded"), true); return; }
+    p->ref = t->path;
+    Cambio(r);
+    r->Resolver();      // (la rutina toma su referencia antes de soltar la de la carga)
+    TexturaSoltar(t);
+    PropsLayoutSucio();
+}
 static void AccionRefElegida(int id) {
     Rutina* r = RuActiva(); W3dPaso* p = RuPaso(r);
+    if (p && id == kRefCargarTextura && !gRefEsSegunda) {
+        AbrirFileBrowser(T("Load Texture"), T("Open"), ".png .jpg .jpeg .bmp .tga .hdr", RefTexturaCargada);
+        return;
+    }
     if (!p || id < 0 || id >= (int)gRefOpc.size()) return;
     if (gRefEsSegunda) p->ref2 = gRefOpc[(size_t)id].ref;
     else {
@@ -686,10 +715,11 @@ void PropsRutinaActualizar(Properties* p, bool visible) {
 
     // la referencia: un desplegable con lo que hay de ese tipo (las mallas y las texturas, por carpetas)
     const int rt = paso ? W3dPasoRef(t) : RefNada;
-    p->propRuRef->oculto = (rt == RefNada || rt == RefFuncion);
+    // ("Clear": la imagen, solo con el fondo personalizado)
+    p->propRuRef->oculto = (rt == RefNada || rt == RefFuncion || (t == PasoLimpiar && paso->modo != LimpiarFondoPropio));
     if (!p->propRuRef->oculto) {
         firma |= 1;
-        p->propRuRef->name = T(EtiquetaRef(t, rt));
+        p->propRuRef->name = T(t == PasoLimpiar ? "Image" : EtiquetaRef(t, rt));
         p->propRuRef->button->icon = IconoRef(rt);
         std::string txt = paso->ref.empty() ? std::string(T("(choose)")) : ((rt == RefTextura || rt == RefShader) ? Base(paso->ref) : paso->ref);
         if (UsaPartes(t) && !paso->ref.empty()) {
@@ -762,7 +792,7 @@ void PropsRutinaActualizar(Properties* p, bool visible) {
     p->propRuOn->value = (paso && W3dPasoUsaOn(t)) ? &paso->on : NULL;
     if (p->propRuOn->value) { firma |= 16; p->propRuOn->name = T(W3dPasoEtiquetaOn(t)); }
     // los COLORES: el selector de color (o los 4 numeros, para usar memorias)
-    const bool esColor = paso && W3dPasoEsColor(t);
+    const bool esColor = paso && W3dPasoEsColor(t) && !ColorAuto(*paso);   // ("Clear color" en Auto: sin color)
     static float colEsp[4], colUlt[4];
     static bool colHay = false;
     static bool numEsp = false, numUlt = false, numReal = false;
@@ -828,7 +858,7 @@ void PropsRutinaActualizar(Properties* p, bool visible) {
     }
     // los numeros: un numero o "@memoria[i]" (el ultimo triangulo, ademas, "max"). Los colores, solo en modo numeros
     int nn = !paso ? 0 : dib ? (manual ? 2 : 0) : W3dPasoNumeros(*paso);
-    if (esColor && !conNumeros) nn = 0;
+    if ((esColor && !conNumeros) || (paso && ColorAuto(*paso))) nn = 0;
     for (int k = 0; k < 5; k++) {
         PropText* f = p->propRuNum[k];
         const bool usa = k < nn || (dib && paso->sub == RangoArray && k == 3);   // (el array: sus banderas, opcional)

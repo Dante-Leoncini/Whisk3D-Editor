@@ -98,6 +98,7 @@ PopupMenu* MenuPrefabsAdd = NULL; // submenu "Add > Prefab": los prefabs del pro
 PopupMenu* MenuEscenasAdd = NULL; // submenu "Add > Scene": las otras escenas instanciadas (io/PrefabsEditor.h)
 PopupMenu* MenuCore = NULL;      // submenu "Add > Core": las RUTINAS (objetos avanzados: pasos del render)
 PopupMenu* MenuModificadores = NULL;   // submenu "Add > Modifier Objects": espejo, array, instancia
+PopupMenu* MenuLucesAdd = NULL;        // submenu "Add > Lights": luz, sol, foco y la sonda de luz
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuAnimation = NULL; // "Animation": keyframes del objeto + Motion Trail (solo con seleccion)
@@ -275,6 +276,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuEscenasAdd = new PopupMenu();
         MenuCore = new PopupMenu();
         MenuModificadores = new PopupMenu();
+        MenuLucesAdd = new PopupMenu();
         extern void LayoutConstruirMenuAdd();
         LayoutConstruirMenuAdd();
         MenuAdd->titulo = T("Add");   // el boton es un icono sin texto -> el menu lleva titulo
@@ -2196,6 +2198,11 @@ void Viewport3D::Render() {
     const bool proyectoLimpia = W3dHayConstructor() && W3dEscena3DActiva();   // (lua dibujar3D(false): no corre)
     const bool limpiaElProyecto = proyectoLimpia && !modoAnalisis;
     g_w3dLimpiarColorFijo = proyectoLimpia && modoAnalisis;
+    // el "Clear color" del proyecto en AUTO: en la vista Render (y jugando) el fondo del render; en las otras, el fondo de
+    // este visor (con el que lo limpiaria un proyecto sin constructor). Se suelta despues del pase de la escena
+    if (limpiaElProyecto && view != RenderType::Rendered && !g_juegoPuro)
+        W3dFondoAutoFijar(bgSolido[3] >= 0.0f ? bgSolido : ListaColores[static_cast<int>(ColorID::background)]);
+    else W3dFondoAutoFijar(NULL);
     // (una mitad de la pantalla dividida recorta siempre: el "Clear" del proyecto no borra la otra)
     const bool recortarEscena = proyectoLimpia && (!g_juegoPuro || gVistaPartida);
     const bool pisoDespues = limpiaElProyecto;
@@ -2373,6 +2380,7 @@ void Viewport3D::Render() {
           const bool conUI = !soloEscena && (camFrameOn || g_juegoPuro || AnimEsJuego);
           if (conUI) { gVpUI = this; gVpUIglY = glY; g_uiEnArbol = UIEnArbol; }
           W3dEscena3DPasada();
+          W3dFondoAutoFijar(NULL);   // (el color de Auto de este visor: lo que se dibuje despues usa el del render)
           if (conPost) { gVpPost = NULL; g_postEnArbol = 0; }
           if (conUI) { gVpUI = NULL; g_uiEnArbol = 0; }
       }

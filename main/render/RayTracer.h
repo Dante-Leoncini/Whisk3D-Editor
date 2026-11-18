@@ -67,6 +67,27 @@ bool RTRenderEstado(Viewport3D* vp);      // el texto "Ray tracing: 3/16" (con l
 // el cartel de arriba a la izquierda (el mismo lugar que el del trazado): "Local View" mientras dura la vista local
 void W3dVistaCartel(Viewport3D* vp, const char* texto);
 void RTInvalidar();                       // la escena cambio: el proximo frame arranca de cero
+// LA SONDA DE LUZ (main/objects/SondaLuz.h): la luz que LLEGA a cada punto (x,y,z del mundo, uno detras de otro) desde
+// todas las direcciones -el fondo y lo que se ve iluminado alrededor-, con 'rayos' rayos por punto (repartidos parejo
+// en la esfera). Sale como armonicos esfericos de orden 2 ya con la convolucion del coseno: 27 floats por punto (la luz
+// difusa que le llega a una normal n del mundo es sum c_i * Y_i(n)). false = no hay escena
+#include <vector>
+// 'valido' (opcional): 0 en los puntos que quedaron ADENTRO de una malla (muchos rayos pegan en caras de espaldas)
+bool RTHornearSondas(const std::vector<float>& pos, int rayos, std::vector<float>& sh, std::vector<unsigned char>* valido = NULL);
+// PRECALCULAR LA ILUMINACION (el lightmap): la luz que le llega a cada texel de la malla 'm' en su capa UV 'uvCapa'
+// (w x h; la fila es v * alto), con las lamparas (y sus sombras) y la luz indirecta ('muestras' rayos por texel). Solo
+// con lo estatico. Se hace de a pedazos: Empezar, despues Paso en cada cuadro (devuelve el progreso, 1 = listo), y el
+// resultado queda en Luz (rgb por texel, 1 = blanco) y Cubierto (1 = el texel es de una cara)
+#include <string>
+class Mesh;
+// indirecta: la luz que rebota (el fondo y lo de alrededor), con 'rebotes' rebotes (1 a 8); denoiser: la indirecta suavizada
+bool  RTHorneadoEmpezar(Mesh* m, int uvCapa, int w, int h, int muestras, std::string* motivo,
+                        bool indirecta = true, int rebotes = 3, bool denoiser = true);
+float RTHorneadoPaso(int msPresupuesto);
+bool  RTHorneadoActivo();
+void  RTHorneadoCancelar();
+const std::vector<float>& RTHorneadoLuz();
+const std::vector<unsigned char>& RTHorneadoCubierto();
 bool RTActivoEn(const Viewport3D* vp);    // hay un render progresivo de ese viewport (para seguir redibujando)
 float RTImagenesPorSegundo();
 const char* RTReescaladorNombre(int r);  // "Linear" / "FSR 1 (AMD)"             // las imagenes trazadas TERMINADAS por segundo (lo que de verdad se ve)

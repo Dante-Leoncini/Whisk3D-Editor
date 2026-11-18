@@ -239,6 +239,7 @@ SOURCEPATH      ..\..\..\main\objects
 SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp Niebla.cpp Recorte.cpp Sonido.cpp PostprocesoObj.cpp
 SOURCE          Rutina.cpp // objeto Rutina: lista de pasos del render (C++03)
 SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
+SOURCE          SondaLuz.cpp   // objeto Sonda de luz (la luz indirecta horneada)
 SOURCEPATH      ..\..\..\main\render
 SOURCE          UIOverlay.cpp RayTracer.cpp Denoiser.cpp RTGpu.cpp VectoresMovimiento.cpp ReescaladoFSR.cpp Postproceso.cpp   // Postproceso: la pila de efectos (por CPU en el N95); VectoresMovimiento: el pase de vectores (GL 1.1) y el desenfoque por CPU; RayTracer: trazado de rayos por CPU (un hilo en el N95); Denoiser y RTGpu: vacios en Symbian
 // audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
@@ -443,6 +444,7 @@ SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderOb
 SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
 SOURCE PropsHitbox.cpp           // tarjeta "Hitbox" del panel de propiedades
+SOURCE PropsSondaLuz.cpp         // tarjeta "Light Probe" (la sonda de luz) del panel de propiedades
 SOURCE PropsRutina.cpp           // tarjeta "Routine" del panel de propiedades (los pasos de una rutina)
 SOURCE OutlinerRecursos.cpp      // las vistas de recursos del outliner (selector de vista, carpetas, en uso/huerfano)
 SOURCE SoltarRecurso.cpp         // soltar un recurso de la biblioteca en el 3D (malla/material/textura/animset)

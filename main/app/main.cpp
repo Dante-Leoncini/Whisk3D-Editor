@@ -151,11 +151,14 @@ static void TexturaElegida(const std::string& pathElegido) {
             W3dMaterialPonerMapa(gTexMat, t, gCargarTexturaMapa);
             TexturaSoltar(t);   // (la del cache: la ranura ya retuvo la suya)
         } else if (gCargarTexturaCapa >= 0) {   // a una CAPA de textura (se crea si es la fila "Add Layer")
+            extern void UndoMaterialModIniciar(Material*); extern void UndoMaterialModCommit();
+            UndoMaterialModIniciar(gTexMat);   // (Ctrl+Z la saca: el paso guarda la lista de capas)
             const size_t n = (size_t)gCargarTexturaCapa;
             if (n >= gTexMat->capas.size()) gTexMat->capas.resize(n + 1);
             Texture* anterior = gTexMat->capas[n].tex;
             gTexMat->capas[n].tex = t;
             if (anterior && anterior != t) TexturaSoltar(anterior);
+            UndoMaterialModCommit();
         } else if (gCargarTexturaComoB) {   // a la TEXTURA B (mezcla de texturas en una pasada)
             Texture* anterior = gTexMat->texturaB;
             gTexMat->texturaB = t;
@@ -1355,6 +1358,11 @@ int main(int argc, char* argv[]) {
             if (!SDL_getenv("SDL_AUDIODRIVER")) SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);   // y sin sonido
             break;
         }
+#endif
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    // VULKAN SIN VENTANA en Linux: el driver 'offscreen' de SDL no da superficie de Vulkan, asi que una prueba con Vulkan
+    // va por X11 (SDL_VIDEODRIVER=x11). Con W3D_VENTANA_OCULTA=1 esa ventana se crea OCULTA: no aparece en el escritorio
+    if (SDL_getenv("W3D_VENTANA_OCULTA")) g_ventanaOculta = true;
 #endif
 #ifdef _WIN32
     // lo mismo en Windows: el driver 'offscreen' de SDL necesita EGL (no hay), asi que la ventana se crea OCULTA

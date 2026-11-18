@@ -53,6 +53,7 @@ extern PopupMenu* MenuImports;  // submenu "Add > Imports": OBJ / FBX / glTF / G
 extern PopupMenu* MenuMallas;   // submenu "Add > Mesh": las primitivas (plano, cubo, esfera...)
 extern PopupMenu* MenuCore;     // submenu "Add > Core": las rutinas (pasos del render)
 extern PopupMenu* MenuModificadores;   // submenu "Add > Modifier Objects": espejo, array, instancia
+extern PopupMenu* MenuLucesAdd;        // submenu "Add > Lights": luz, sol, foco y la sonda de luz
 extern PopupMenu* MenuPrefabsAdd; // submenu "Add > Prefab": los prefabs del proyecto (se rearma al abrir el Add)
 extern PopupMenu* MenuEscenasAdd; // submenu "Add > Scene": las otras escenas del proyecto (se rearma al abrir el Add)
 extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"

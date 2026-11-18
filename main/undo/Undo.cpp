@@ -12,7 +12,8 @@ extern bool g_redraw;   // el frame se redibuja cuando un undo/redo/borrado camb
 #include "w3dlog.h"             // w3dLogfW: los re-uniquificados del undo quedan registrados
 #include "W3dAviso.h"           // W3dAvisof: la curva huerfana que vuelve en una escena RECREADA se avisa
 #include "objects/Light.h"       // Lights (global): el borrado de luces lo des/re-registra
-#include "objects/Materials.h"    // Materials (lista global): destino de rename por INDICE (W3dDestGlobal)
+#include "objects/Materials.h"
+#include "objects/Textures.h"     // TexturaRetener / TexturaSoltar: las capas de textura del deshacer de un material    // Materials (lista global): destino de rename por INDICE (W3dDestGlobal)
 #include "edit/Modifier.h"       // Modifier (limpiar target de Armature/Mirror/Boolean al borrar el objeto apuntado)
 #include "io/TexturaEditada.h"   // TexturaPintadaUndo: los pixeles de una textura pintada
 #include "objects/Armature.h"    // Armature (cast correcto Object*<->Armature* al limpiar/restaurar skinArmature)
@@ -969,6 +970,17 @@ class MaterialModUndo : public UndoCmd {
         bool Igual(const Mapas& o) const { for (int k = 0; k < W3D_MAPAS; k++) if (ct[k] != o.ct[k] || uv[k] != o.uv[k]) return false;
                                            return rug == o.rug && met == o.met && alfa == o.alfa && ior == o.ior; } };
     Mapas mapas;
+    // LAS CAPAS DE TEXTURA (borrar, agregar, subir/bajar, la mezcla, la UV, el factor, prendida, la luz horneada): una copia
+    // de la lista con su PROPIA referencia de cada textura (asi no se libera mientras el paso exista). Aplicar
+    // INTERCAMBIA la lista viva con la guardada: cada una sigue duena de sus referencias
+    std::vector<TexLayer> capas;
+    static bool CapasIguales(const std::vector<TexLayer>& a, const std::vector<TexLayer>& b) {
+        if (a.size() != b.size()) return false;
+        for (size_t i = 0; i < a.size(); i++)
+            if (a[i].tex != b[i].tex || a[i].blend != b[i].blend || a[i].uvMapa != b[i].uvMapa || a[i].on != b[i].on ||
+                a[i].fuerza != b[i].fuerza || a[i].horneada != b[i].horneada) return false;
+        return true;
+    }
     static void Leer(Material* s, bool* bo, int& rm, float& sh, float& gl, float& ac, float& mb) {
         bo[0]=s->textureOn; bo[1]=s->filtrado; bo[2]=s->transparent; bo[3]=s->vertexColor;
         bo[4]=s->lighting; bo[5]=s->repeat; bo[6]=s->uv8bit; bo[7]=s->culling;
@@ -982,13 +994,21 @@ class MaterialModUndo : public UndoCmd {
         s->reflectMode=rm; s->shininess=sh; s->grosorLinea=gl; s->alphaTest=ac; s->mezclaB=mb;
     }
 public:
-    MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0), glinea(1.0f), acorte(0.0f), mezb(0.0f) { if (mat) { Leer(mat, b, rmode, shin, glinea, acorte, mezb); mapas.Leer(mat); } }
+    MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0), glinea(1.0f), acorte(0.0f), mezb(0.0f) {
+        if (mat) {
+            Leer(mat, b, rmode, shin, glinea, acorte, mezb); mapas.Leer(mat);
+            capas = mat->capas;
+            for (size_t i = 0; i < capas.size(); i++) if (capas[i].tex) TexturaRetener(capas[i].tex);
+        }
+    }
+    ~MaterialModUndo() { for (size_t i = 0; i < capas.size(); i++) if (capas[i].tex) TexturaSoltar(capas[i].tex); }
     Material* Mat() const { return mat; }
     bool Difiere() const {
         if (!MaterialVivo(mat)) return false;
         bool cb[NFLAGS]; int crm; GLfloat cs, cg, ca, cm; Leer(mat, cb, crm, cs, cg, ca, cm);
         for (int i=0;i<NFLAGS;i++) if (cb[i]!=b[i]) return true;
         Mapas cmp; cmp.Leer(mat); if (!cmp.Igual(mapas)) return true;
+        if (!CapasIguales(mat->capas, capas)) return true;
         return crm != rmode || cs != shin || cg != glinea || ca != acorte || cm != mezb;
     }
     void Aplicar() {
@@ -999,6 +1019,7 @@ public:
         mapas.Escribir(mat);
         for (int i=0;i<NFLAGS;i++) b[i]=cb[i]; rmode=crm; shin=cs; glinea=cg; acorte=ca; mezb=cm; // guarda lo vivo (para rehacer)
         mapas = vivos;
+        mat->capas.swap(capas);   // (las capas: la guardada vuelve, la viva queda para rehacer)
     }
     // b[NFLAGS] es un arreglo FIJO de flags del material, NO un vector paralelo a una lista.
     W3D_UNDO_SIN_INDICES // mat: (a) Material* REVALIDADO al aplicar (MaterialVivo); b/rmode/shin/glinea/acorte: (d) valores propios

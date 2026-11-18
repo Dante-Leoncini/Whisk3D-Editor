@@ -189,6 +189,14 @@ void W3dBibliotecaTipos(std::vector<int>& out);
 std::string W3dBibClave(int tipo, const std::string& id);
 // al reves; false = no es una clave de item
 bool        W3dBibDeClave(const std::string& clave, int* tipo, std::string* id);
+// ACTUALIZAR TEXTURA: vuelve a leer la imagen 'clave' (su id en la biblioteca) del archivo de disco del que salio y la
+// sube de nuevo (se edito afuera). false si no se pudo: 'motivo' en INGLES (la UI lo pasa por T()) y 'detalle' la ruta
+bool W3dTexturaActualizar(const std::string& clave, std::string* motivo, std::string* detalle = NULL);
+// lo mismo desde la UI: actualiza cada una y avisa como salio (una notificacion)
+void W3dTexturasActualizarAvisando(const std::vector<std::string>& claves);
+// la clave de biblioteca de una textura cargada ("" = ninguna)
+class Texture;
+std::string W3dTexturaClave(const Texture* t);
 
 // ---------------------------------------------------------------------------
 //  CARPETAS (cosmeticas, UN arbol para todos los tipos)

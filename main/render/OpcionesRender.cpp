@@ -2,6 +2,7 @@
 #include "objects/Textures.h"      // el fondo 360: Texture, su referencia (TexturaRetener / TexturaSoltar)
 #include "animation/Animation.h"   // AnimFondo / AnimFondoRot / AnimFondoTex
 #include <math.h>
+#include "w3dGraphics.h"            // w3dRenderLuces: el pase con las luces (donde se ve el fondo 360)
 
 // Definición de variables
 RenderType view = RenderType::MaterialPreview;
@@ -11,8 +12,25 @@ float g_renderBg[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 int      g_renderBgModo = 0;
 Texture* g_renderBgTex = NULL;
 float    g_renderBgRot[3] = { 0.0f, 0.0f, 0.0f };
+float    g_renderLuzFondo = 1.0f;
 std::vector<Texture*> g_renderBgTexs;
 bool W3dFondoConTextura() { return g_renderBgModo == 1 && g_renderBgTex && g_renderBgTex->iID; }
+static float gFondoAuto[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+static bool gFondoAutoVisor = false;
+void W3dFondoAutoFijar(const float* c) {
+    gFondoAutoVisor = (c != NULL);
+    if (c) for (int k = 0; k < 4; k++) gFondoAuto[k] = c[k];
+}
+bool W3dFondoAutoColor(float c[4]) {
+    if (gFondoAutoVisor) { for (int k = 0; k < 4; k++) c[k] = gFondoAuto[k]; return true; }
+    if (W3dFondoConTextura() && w3dRenderLuces) return false;
+    for (int k = 0; k < 3; k++) c[k] = g_renderBg[k];
+    c[3] = 1.0f;
+    return true;
+}
+// el gancho del "Clear color" en Auto (objects/Rutina.cpp): lo instala el arranque, como el de la animacion de abajo
+extern bool (*g_w3dFondoAutoHook)(float*);
+static struct FondoAutoGancho { FondoAutoGancho() { g_w3dFondoAutoHook = W3dFondoAutoColor; } } gFondoAutoGancho;
 int W3dFondoIndiceTextura(Texture* t) {
     if (!t) return 0;
     for (size_t i = 0; i < g_renderBgTexs.size(); i++) if (g_renderBgTexs[i] == t) return (int)i + 1;
@@ -33,7 +51,11 @@ void W3dFondoAplicarCanal(int prop, int comp, float v) {
     }
 }
 void W3dFondoMatriz(float m[9]) {
-    // R = Rz * Ry * Rx (los grados del fondo) y se usa su TRANSPUESTA: girar la imagen +a es mirar la direccion -a
+    // R = Rz * Ry * Rx (los grados del fondo) y se usa su TRANSPUESTA: girar la imagen +a es mirar la direccion -a.
+    // LA IMAGEN 360 TIENE LA Z ARRIBA (v = acos(z)) y el motor, la Y: antes de girar, la direccion del mundo pasa a la
+    // de la imagen (x, -z, y), un giro de 90 grados en X. Sin eso el fondo quedaba ACOSTADO: mirando al horizonte se
+    // veia el suelo, y un piso espejo reflejaba el suelo en vez del cielo. (Lo usan todos: los reflejos, la luz del
+    // entorno y el trazado de rayos; el cielo dibujado hace el mismo giro en DibujarCielo)
     const float k = 3.14159265f / 180.0f;
     const float cx = cosf(g_renderBgRot[0] * k), sx = sinf(g_renderBgRot[0] * k);
     const float cy = cosf(g_renderBgRot[1] * k), sy = sinf(g_renderBgRot[1] * k);
@@ -41,7 +63,10 @@ void W3dFondoMatriz(float m[9]) {
     const float r[9] = { cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx,
                          sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx,
                          -sy,     cy * sx,                cy * cx };
-    for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) m[i * 3 + j] = r[j * 3 + i];
+    float t[9];
+    for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) t[i * 3 + j] = r[j * 3 + i];
+    // m = R^T * S, con S (mundo -> imagen) = (x, -z, y): sus columnas, la x, la z y la -y de R^T
+    for (int i = 0; i < 3; i++) { m[i * 3 + 0] = t[i * 3 + 0]; m[i * 3 + 1] = t[i * 3 + 2]; m[i * 3 + 2] = -t[i * 3 + 1]; }
 }
 void W3dFondoDireccionUV(const float d[3], float* u, float* v) {
     float m[9]; W3dFondoMatriz(m);
@@ -58,6 +83,7 @@ void W3dFondoLimpiar() {
     g_renderBg[0] = g_renderBg[1] = g_renderBg[2] = 0.0f; g_renderBg[3] = 1.0f;
     g_renderBgModo = 0; g_renderBgTex = NULL;
     g_renderBgRot[0] = g_renderBgRot[1] = g_renderBgRot[2] = 0.0f;
+    g_renderLuzFondo = 1.0f;
     for (size_t i = 0; i < g_renderBgTexs.size(); i++) TexturaSoltar(g_renderBgTexs[i]);
     g_renderBgTexs.clear();
 }

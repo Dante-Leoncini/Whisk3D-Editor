@@ -30,6 +30,7 @@
 extern bool g_redraw;
 
 static NuevaTexturaPopup* gNT = NULL;
+extern void (*g_nuevaTexturaCreadaHook)(const std::string& ruta);
 static float gNTancho = 256.0f, gNTalto = 256.0f;
 static float gNTcolor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 static bool  gNTalpha = true;
@@ -39,10 +40,19 @@ static void NTcerrar() { if (gNT) gNT->Cerrar(); }
 static void NTcancelar() { NTcerrar(); }
 static void NTcrear();
 static void NTabrirLista() { if (gNT) gNT->AbrirLista(); }
+// el COLOR y el ALFA son del "Color plano" (las grillas tienen los suyos): con otro tipo no se ven
+static void NTFilasDelTipo() {
+    if (!gNT) return;
+    const bool plano = (gNTtipo == TexGenBlank);
+    if (gNT->pColor) gNT->pColor->value = plano ? gNTcolor : NULL;
+    if (gNT->pAlpha) gNT->pAlpha->value = plano ? &gNTalpha : NULL;
+}
 static void NTsetTipo(int tipo) {
     if (tipo < 0 || tipo >= TexGenTipos) return;
     gNTtipo = tipo;
     if (gNT && gNT->pTipo) gNT->pTipo->button->text = T(TexGenTipoNombre(gNTtipo));
+    NTFilasDelTipo();
+    if (gNT) { gNT->ResizeGrupo(); gNT->Reubicar(); }
     g_redraw = true;
 }
 
@@ -330,15 +340,20 @@ static void NTcrear() {
     if (nombre.find_first_not_of(" \t") == std::string::npos) { if (gNT->pNombre) gNT->pNombre->error = true; g_redraw = true; return; }
     const int w = (int)(gNTancho + 0.5f), h = (int)(gNTalto + 0.5f);
     std::string msg;
-    const std::string ruta = W3dCrearTexturaProyecto(nombre, gNTtipo, w, h, gNTcolor, gNTalpha, msg);
+    const std::string ruta = W3dCrearTexturaProyecto(nombre, gNTtipo, w, h, gNTcolor, gNTtipo == TexGenBlank && gNTalpha, msg);
     if (ruta.empty()) { Notificar(T(msg.c_str()), true); return; }
     Notificar(std::string(T("New Texture")) + ": " + nombre, false);
+    if (g_nuevaTexturaCreadaHook) { void (*h)(const std::string&) = g_nuevaTexturaCreadaHook; g_nuevaTexturaCreadaHook = NULL; h(ruta); }
     NTcerrar();
 }
 
+// quien abrio el popup quiere la textura nueva (la tarjeta "Bake Lighting"): se llama una vez, al crearla
+void (*g_nuevaTexturaCreadaHook)(const std::string& ruta) = NULL;
 void AbrirNuevaTexturaPopup() {
     if (gNT) { if (PopUpActive == gNT) PopUpActive = NULL; delete gNT; gNT = NULL; }
     gNT = new NuevaTexturaPopup();
+    NTFilasDelTipo();
+    gNT->ResizeGrupo(); gNT->Reubicar();
     PopUpActive = gNT;
     g_redraw = true;
 }

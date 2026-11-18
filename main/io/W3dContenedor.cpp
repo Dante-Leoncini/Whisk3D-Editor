@@ -286,6 +286,30 @@ bool W3dContenedorEs(const std::string& ruta) {
 }
 
 // ---------------------------------------------------------------------------
+//  EL ORIGEN de cada asset importado (ver W3dContenedor.h)
+// ---------------------------------------------------------------------------
+static std::map<std::string, std::string> gOrigenes;
+void W3dAssetOrigenAnotar(const std::string& entrada, const std::string& rutaDisco) {
+    if (entrada.empty() || rutaDisco.empty() || !W3dEsNombreDeEntrada(entrada)) return;
+    gOrigenes[entrada] = rutaDisco;
+}
+std::string W3dAssetOrigen(const std::string& entrada) {
+    std::map<std::string, std::string>::const_iterator it = gOrigenes.find(entrada);
+    return it == gOrigenes.end() ? std::string() : it->second;
+}
+void W3dAssetOrigenMudar(const std::string& vieja, const std::string& nueva) {
+    std::map<std::string, std::string>::iterator it = gOrigenes.find(vieja);
+    if (it == gOrigenes.end() || vieja == nueva) return;
+    const std::string r = it->second;
+    gOrigenes.erase(it);
+    gOrigenes[nueva] = r;
+}
+void W3dAssetOrigenesLimpiar() { gOrigenes.clear(); }
+void W3dAssetOrigenesListar(std::vector<std::pair<std::string, std::string> >& out) {
+    out.assign(gOrigenes.begin(), gOrigenes.end());
+}
+
+// ---------------------------------------------------------------------------
 //  IMPORTAR: la copia adentro pasa AHORA, no al guardar (ver W3dContenedor.h)
 // ---------------------------------------------------------------------------
 std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria) {
@@ -313,7 +337,7 @@ std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria
             std::vector<unsigned char> otro;
             if (!gAlmacen->Leer(todas[i], otro) || otro.size() != datos.size()) continue;
             unsigned c2 = otro.empty() ? 0u : Crc32(&otro[0], otro.size());
-            if (c2 == crc && otro == datos) return todas[i];
+            if (c2 == crc && otro == datos) { W3dAssetOrigenAnotar(todas[i], rutaDisco); return todas[i]; }
         }
     }
     // nombre de entrada libre ("texturas/piso.png", "texturas/piso-2.png"...)
@@ -330,6 +354,7 @@ std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria
         cand = std::string(categoria) + "/" + raiz + s + sufijo;
     }
     gAlmacen->editadas[cand] = datos;
+    W3dAssetOrigenAnotar(cand, rutaDisco);
     w3dLogf("[W3D] importado %s -> %s (%u bytes, adentro del proyecto)",
             rutaDisco.c_str(), cand.c_str(), tam);
     return cand;

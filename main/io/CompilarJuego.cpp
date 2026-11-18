@@ -3046,6 +3046,7 @@ static bool EsObjeto3D(Object* o) {
         case ObjectType::niebla:
         case ObjectType::limpiarz:   case ObjectType::recorte:
         case ObjectType::hitbox:     case ObjectType::prefab:
+        case ObjectType::sondaluz:   // (la luz indirecta de lo 3D)
         case ObjectType::proxy:      // (un proxy de una libreria: lo que genera es contenido 3D)
         case ObjectType::rutina:     // (una rutina dibuja 3D)
             return true;

@@ -10,7 +10,7 @@
 #include <string.h>
 #include <math.h>
 
-static const char* kTipoNombres[TexGenTipos] = { "Blank", "UV Grid", "Color Grid" };
+static const char* kTipoNombres[TexGenTipos] = { "Flat color", "UV Grid", "Color Grid" };   // (Flat color: todo de un color)
 const char* TexGenTipoNombre(int tipo) { return (tipo >= 0 && tipo < TexGenTipos) ? kTipoNombres[tipo] : ""; }
 
 // ---------------------------------------------------------------------------

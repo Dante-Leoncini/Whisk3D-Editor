@@ -10,6 +10,7 @@
 #include "objects/Mesh.h"        // w3dLoteStamp + los diferidos (calcomanias / luces aditivas)
 #include "objects/Particulas.h"  // particulas diferidas (billboards translucidos)
 #include "objects/Light.h"        // MAX_LIGHTS: apagar los GL lights antes del pase
+#include "objects/SondaLuz.h"     // SondaLuzNuevoPase: las sondas de luz del pase
 #include "W3dRaices.h"              // las escenas abiertas a la vez en el editor
 #include "script/W3dScript.h"       // W3dScriptHayPartida: jugando solo se ve la base
 #include "render/OpcionesRender.h"// RenderType + la luz de los modos de preview
@@ -100,20 +101,43 @@ void W3dEscena3DCamara(const W3dVista3D& v, const Vector3& luzPos, const Vector3
 // ---------------------------------------------------------------------------
 //  MODO DE DIBUJO (flags del Core + luz del pase) a partir del RenderType
 // ---------------------------------------------------------------------------
+// la LUZ FRONTAL de los modos de preview (Material / Solid) quedo prendida en el slot 0
+static bool gLuzPreviewPuesta = false;
+// LA LUZ AMBIENTE de la vista Render y del juego: la del FONDO (mas abajo, con la irradiancia del 360)
+static void AmbienteDelFondo();
 void W3dEscena3DLuces(int vista) {
     const RenderType::Enum v = (RenderType::Enum)vista;
     // un proyecto con CONSTRUCTOR (el modo avanzado) en Rendered: las luces son de sus rutinas (rutinas.md), el pase no
-    // las toca. Apagar las 8 en cada cuadro eran 8 llamadas por cuadro despues de cualquier Invalidate
-    if (v == RenderType::Rendered && W3dHayConstructor()) return;
+    // las toca. Apagar las 8 en cada cuadro eran 8 llamadas por cuadro despues de cualquier Invalidate.
+    // Menos la luz frontal que dejo prendida un modo de preview (este viewport antes de pasar a Render, u otro viewport
+    // en Material en el mismo cuadro): esa se apaga, antes de que la rutina y las luces de la escena pongan las suyas.
+    // Si no, borrar la ultima luz de la escena dejaba el objeto iluminado igual
+    // Y los canales que prendieron las luces de la escena (Light.h): las que siguen en la escena los vuelven a prender
+    // al dibujarse; los de una luz BORRADA (viva para el Ctrl+Z) u oculta quedaban prendidos iluminando
+    if (v == RenderType::Rendered && W3dHayConstructor()) {
+        AmbienteDelFondo();   // (antes de la rutina: un paso "Ambient light" la puede pisar)
+        if (gLuzPreviewPuesta) { gfx::SetLightEnabled(GL_LIGHT0, false); gLuzPreviewPuesta = false; }
+        for (int i = 0; i < MAX_LIGHTS; i++)
+            if (g_w3dLucesEscenaPrendidas & (1u << i)) gfx::SetLightEnabled(GL_LIGHT0 + i, false);
+        g_w3dLucesEscenaPrendidas = 0;
+        return;
+    }
+    gLuzPreviewPuesta = false;   // (abajo se apagan las 8; la de preview se vuelve a prender si es su modo)
+    // EL AMBIENTE: en Render, la luz del fondo; en el resto el de GL de siempre (si no, el negro de un Render en otro
+    // viewport oscurecia la vista previa)
+    if (v == RenderType::Rendered) AmbienteDelFondo();
+    else { static const float kAmb[4] = { 0.2f, 0.2f, 0.2f, 1.0f }; gfx::LightModelAmbient(kAmb); }
     // apagar los 8 GL lights: si una luz de escena cambio de slot, el viejo quedaba
     // prendido (luz "fantasma"). Cada Light enciende el suyo al dibujarse.
     for (int i = 0; i < MAX_LIGHTS; i++) gfx::SetLightEnabled(GL_LIGHT0 + i, false);
+    g_w3dLucesEscenaPrendidas = 0;   // (las luces de la escena vuelven a anotar el suyo al dibujarse)
     switch (v) {
         // Solid usa la MISMA luz que Material Preview (se ven igual; la unica
         // diferencia es que Solid no usa texturas ni los materiales reales)
         case RenderType::MaterialPreview:
         case RenderType::Solid:
             gfx::Enable(gfx::Light0);
+            gLuzPreviewPuesta = true;
             gfx::Light0fv(gfx::LightDiffuse,  MaterialPreviewDiffuse);
             gfx::Light0fv(gfx::LightAmbient,  MaterialPreviewAmbient);
             gfx::Light0fv(gfx::LightSpecular, MaterialPreviewSpecular);
@@ -158,8 +182,12 @@ void W3dEscena3DModo(int vista) {
 //  imagen equirectangular: anda igual en el pipeline fijo (el N95), en GLES2 y en Vulkan. Gira con la rotacion del fondo
 //  (la misma cuenta que W3dFondoDireccionUV: los reflejos y el trazado de rayos ven lo mismo)
 // ---------------------------------------------------------------------------
-static void DibujarCielo() {
-    if (!W3dFondoConTextura()) return;
+static void DibujarCielo(Texture* tex = NULL, const float* giro = NULL) {
+    // (sin imagen: el fondo del render, con su giro; si no, la del paso "Clear" con fondo propio)
+    if (!tex) { if (!W3dFondoConTextura()) return; tex = g_renderBgTex; giro = g_renderBgRot; }
+    if (!tex || !tex->iID) return;
+    static const float kSinGiro[3] = { 0.0f, 0.0f, 0.0f };
+    if (!giro) giro = kSinGiro;
     // (en una GPU chica -la de los Android 2.3- la mitad de las divisiones: el cielo esta lejos y se ve igual)
     const bool chica = gfx::GpuLimitada();
     const int kLat = chica ? 12 : 24, kLon = chica ? 24 : 48;
@@ -189,14 +217,15 @@ static void DibujarCielo() {
     const float r = (g_renderCamNear + g_renderCamFar) * 0.5f;
     gfx::PushMatrix();
     gfx::Translatef(g_renderCamPos.x, g_renderCamPos.y, g_renderCamPos.z);
-    gfx::Rotatef(g_renderBgRot[2], 0.0f, 0.0f, 1.0f);
-    gfx::Rotatef(g_renderBgRot[1], 0.0f, 1.0f, 0.0f);
-    gfx::Rotatef(g_renderBgRot[0], 1.0f, 0.0f, 0.0f);
+    gfx::Rotatef(-90.0f, 1.0f, 0.0f, 0.0f);   // (la esfera tiene la Z arriba y el motor la Y: ver W3dFondoMatriz)
+    gfx::Rotatef(giro[2], 0.0f, 0.0f, 1.0f);
+    gfx::Rotatef(giro[1], 0.0f, 1.0f, 0.0f);
+    gfx::Rotatef(giro[0], 1.0f, 0.0f, 0.0f);
     gfx::Scalef(r, r, r);
     gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Blend); gfx::Disable(gfx::CullFace); gfx::Disable(gfx::DepthTest);
     gfx::DepthMask(false);
     gfx::Enable(gfx::Texture2D);
-    gfx::BindTexture(g_renderBgTex->iID);
+    gfx::BindTexture(tex->iID);
     gfx::TexFilter(true); gfx::TexWrap(true);
     gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
     gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
@@ -254,6 +283,88 @@ static bool ReducirFondo(int W, int H, int pasadas, std::vector<unsigned char>& 
     return false;
 #endif
 }
+// LA IRRADIANCIA DEL FONDO 360: la luz difusa que le llega a una superficie segun hacia donde mira, como el ambiente de
+// Blender o la "ambient probe" de Unity. Se PRECALCULA una vez por imagen: los armonicos esfericos de orden 2 (9
+// coeficientes por color; Ramamoorthi y Hanrahan, 2001) sobre una grilla de 128 x 64 de la imagen (cada punto pesado por
+// su angulo solido), evaluados en una imagen chica equirectangular de 64 x 32 (la que lee el shader para la luz difusa y
+// los reflejos rugosos). 'prom' es el promedio: el ambiente de lo que no tiene luz por pixel (pipeline fijo, el N95)
+struct IrrFondo { unsigned int de; bool ok; float prom[3]; std::vector<unsigned char> px; };
+static IrrFondo gIrr;
+static const int kIrrW = 64, kIrrH = 32;
+static const IrrFondo* IrradianciaDelFondo() {
+#ifndef W3D_SIN_EDITOR
+    if (!g_renderBgTex || !g_renderBgTex->iID) return NULL;
+    if (gIrr.ok && gIrr.de == g_renderBgTex->iID) return &gIrr;
+    TexturaEditable* te = TexEditObtener(g_renderBgTex);
+    if (!te || te->w <= 0 || te->h <= 0) return NULL;
+    const int SW = 128, SHh = 64;
+    const double PI = 3.14159265358979;
+    double c[9][3]; for (int i = 0; i < 9; i++) c[i][0] = c[i][1] = c[i][2] = 0.0;
+    for (int y = 0; y < SHh; y++) {
+        const double th = (y + 0.5) / SHh * PI, st = sin(th), ct = cos(th);
+        const double dw = (2.0 * PI / SW) * (PI / SHh) * st;   // (el angulo solido del punto)
+        const int y0 = y * te->h / SHh, y1t = (y + 1) * te->h / SHh, y1 = y1t > y0 ? y1t : y0 + 1;
+        const int pasoY = (y1 - y0) > 8 ? (y1 - y0) / 8 : 1;
+        for (int x = 0; x < SW; x++) {
+            const double ph = ((x + 0.5) / SW - 0.5) * 2.0 * PI;
+            const double dx = st * cos(ph), dy = st * sin(ph), dz = ct;
+            const int x0 = x * te->w / SW, x1t = (x + 1) * te->w / SW, x1 = x1t > x0 ? x1t : x0 + 1;
+            const int pasoX = (x1 - x0) > 8 ? (x1 - x0) / 8 : 1;
+            double col[3] = { 0, 0, 0 }; int n = 0;   // (el promedio de su zona, salteado hasta 8 x 8)
+            for (int yy = y0; yy < y1; yy += pasoY)
+                for (int xx = x0; xx < x1; xx += pasoX) {
+                    const unsigned char* p = &te->rgba[((size_t)yy * te->w + xx) * 4];
+                    col[0] += p[0]; col[1] += p[1]; col[2] += p[2]; n++;
+                }
+            if (n) { col[0] /= n; col[1] /= n; col[2] /= n; }
+            const double Y[9] = { 0.282095, 0.488603 * dy, 0.488603 * dz, 0.488603 * dx, 1.092548 * dx * dy,
+                                  1.092548 * dy * dz, 0.315392 * (3.0 * dz * dz - 1.0), 1.092548 * dx * dz,
+                                  0.546274 * (dx * dx - dy * dy) };
+            for (int i = 0; i < 9; i++)
+                for (int k = 0; k < 3; k++) c[i][k] += col[k] * Y[i] * dw;
+        }
+    }
+    // la luz difusa (Lambert) de una superficie que mira hacia n: sum (A_l / pi) c_lm Y_lm(n), A/pi = 1, 2/3, 1/4
+    static const double kA[9] = { 1.0, 2.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0, 0.25, 0.25, 0.25, 0.25, 0.25 };
+    gIrr.px.assign((size_t)kIrrW * kIrrH * 4, 255);
+    for (int y = 0; y < kIrrH; y++) {
+        const double th = (y + 0.5) / kIrrH * PI, st = sin(th), ct = cos(th);
+        for (int x = 0; x < kIrrW; x++) {
+            const double ph = ((x + 0.5) / kIrrW - 0.5) * 2.0 * PI;
+            const double dx = st * cos(ph), dy = st * sin(ph), dz = ct;
+            const double Y[9] = { 0.282095, 0.488603 * dy, 0.488603 * dz, 0.488603 * dx, 1.092548 * dx * dy,
+                                  1.092548 * dy * dz, 0.315392 * (3.0 * dz * dz - 1.0), 1.092548 * dx * dz,
+                                  0.546274 * (dx * dx - dy * dy) };
+            for (int k = 0; k < 3; k++) {
+                double v = 0.0;
+                for (int i = 0; i < 9; i++) v += kA[i] * c[i][k] * Y[i];
+                gIrr.px[((size_t)y * kIrrW + x) * 4 + k] = (unsigned char)(v < 0.0 ? 0 : v > 255.0 ? 255 : (int)(v + 0.5));
+            }
+        }
+    }
+    for (int k = 0; k < 3; k++) { const double m = c[0][k] * 0.282095 / 255.0; gIrr.prom[k] = (float)(m < 0.0 ? 0.0 : m); }
+    gIrr.de = g_renderBgTex->iID; gIrr.ok = true;
+    return &gIrr;
+#else
+    return NULL;   // (el juego compilado no tiene los pixeles: el ambiente es el color del fondo)
+#endif
+}
+// EL AMBIENTE del pase con las luces (Render y el juego): el FONDO por su luz (g_renderLuzFondo). Con un color, ese
+// color; con el 360, el promedio de su irradiancia. El ALFA lleva el factor: el shader PBR lo multiplica por la
+// irradiancia del 360 en la direccion de la normal (w3dGraphicsGLES2.cpp)
+static float gAmbPase[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
+static void AmbienteDelFondo() {
+    const float f = g_renderLuzFondo < 0.0f ? 0.0f : g_renderLuzFondo;
+    float c[4] = { g_renderBg[0] * f, g_renderBg[1] * f, g_renderBg[2] * f, f };
+    if (W3dFondoConTextura()) {
+        const IrrFondo* irr = IrradianciaDelFondo();
+        if (irr) for (int k = 0; k < 3; k++) c[k] = irr->prom[k] * f;
+    }
+    for (int k = 0; k < 4; k++) gAmbPase[k] = c[k];
+    gfx::LightModelAmbient(c);
+}
+// el ambiente del fondo de este pase (la sonda de luz lo repone al terminar un objeto que iluminaba)
+void W3dAmbientePase(float c[4]) { for (int k = 0; k < 4; k++) c[k] = gAmbPase[k]; }
 struct EntornoCopia { unsigned int tex, de; };
 static unsigned int EntornoReducido(EntornoCopia& c, int W, int H, int pasadas) {
     if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
@@ -265,9 +376,18 @@ static unsigned int EntornoReducido(EntornoCopia& c, int W, int H, int pasadas) 
     c.de = g_renderBgTex->iID;
     return c.tex;
 }
-// LA BORROSA (la luz difusa y los reflejos rugosos de la luz por pixel): 64x32 y cuatro pasadas
+// LA BORROSA (la luz difusa y los reflejos rugosos de la luz por pixel): la IRRADIANCIA precalculada (64 x 32)
 static EntornoCopia gEnvBorrosa = { 0, 0 };
-static unsigned int EntornoBorroso() { return EntornoReducido(gEnvBorrosa, 64, 32, 4); }
+static unsigned int EntornoBorroso() {
+    if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
+    if (gEnvBorrosa.tex && gEnvBorrosa.de == g_renderBgTex->iID) return gEnvBorrosa.tex;
+    const IrrFondo* irr = IrradianciaDelFondo();
+    if (!irr) return 0;
+    if (gEnvBorrosa.tex) gfx::DeleteTexture(gEnvBorrosa.tex);
+    gEnvBorrosa.tex = gfx::UploadRGBA(&irr->px[0], kIrrW, kIrrH, true, false, false, false);
+    gEnvBorrosa.de = g_renderBgTex->iID;
+    return gEnvBorrosa.tex;
+}
 // LA NITIDA DE UNA GPU CHICA sin cubemaps: 256x128 en vez de la imagen entera (los reflejos leen el 360 salteado y la
 // imagen grande no entraba en el cache de texturas)
 static EntornoCopia gEnvChica = { 0, 0 };
@@ -343,12 +463,17 @@ static unsigned int EntornoCuboNitido() {
 static unsigned int EntornoCuboBorroso() {
     if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
     if (gCuboBorroso.tex && gCuboBorroso.de == g_renderBgTex->iID) return gCuboBorroso.tex;
-    std::vector<unsigned char> px;
-    if (!ReducirFondo(64, 32, 4, px)) return 0;
-    return CuboDe(gCuboBorroso, 16, &px[0], 64, 32);
+    const IrrFondo* irr = IrradianciaDelFondo();   // (la irradiancia, como la borrosa de arriba)
+    if (!irr) return 0;
+    return CuboDe(gCuboBorroso, 16, &irr->px[0], kIrrW, kIrrH);
 }
 // el ENTORNO para la luz por pixel: la matriz ojo -> imagen (la vista de ESTE pase invertida por la rotacion del fondo)
+// LA VISTA DE ESTE PASE al reves (ojo -> mundo, 3x3 por columnas): la sonda de luz evalua su luz con la normal en el
+// mundo (objects/SondaLuz.cpp). Se toma aca: el pase todavia no movio la matriz (es la de la camara)
+float g_w3dOjoAMundo[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
 static void EntornoPase() {
+    { float V[16]; gfx::GetMatrix(gfx::ModelView, V);
+      for (int c = 0; c < 3; c++) for (int r = 0; r < 3; r++) g_w3dOjoAMundo[c * 3 + r] = V[r * 4 + c]; }
     if (!w3dRenderLuces || !W3dFondoConTextura()) { gfx::Entorno(0, 0, NULL); return; }
     float V[16]; gfx::GetMatrix(gfx::ModelView, V);   // (la vista de la camara: el pase todavia no movio la matriz)
     float M[9]; W3dFondoMatriz(M);
@@ -364,10 +489,15 @@ static void EntornoPase() {
 }
 
 // el cielo se vuelve a dibujar cuando una RUTINA limpia el color de la pantalla en medio del pase (la "Limpiar pantalla"
-// de la escena de fabrica lo borraba: el cielo se dibuja antes que la escena). Solo adentro del pase con las luces
+// de la escena de fabrica lo borraba: el cielo se dibuja antes que la escena). El del render, solo adentro del pase con
+// las luces (Render y el juego: donde se ve el fondo); uno PROPIO del paso (su imagen, su giro), en cualquier pase
 static bool gCieloEnPase = false;
-void W3dEscena3DCieloTrasLimpiar() { if (gCieloEnPase) DibujarCielo(); }
-extern void (*g_cieloTrasLimpiarHook)();   // (objects/Rutina.cpp)
+static bool gEnPase = false;
+void W3dEscena3DCieloTrasLimpiar(Texture* tex, const float* giro) {
+    if (tex) { if (gEnPase) DibujarCielo(tex, giro); }
+    else if (gCieloEnPase) DibujarCielo();
+}
+extern void (*g_cieloTrasLimpiarHook)(Texture*, const float*);   // (objects/Rutina.cpp)
 static struct CieloGancho { CieloGancho() { g_cieloTrasLimpiarHook = W3dEscena3DCieloTrasLimpiar; } } gCieloGancho;
 
 // ---------------------------------------------------------------------------
@@ -390,7 +520,9 @@ void W3dEscena3DPasada() {
     w3dLoteStamp++;              // sello del pase: las Collection con lote marcan a sus horneadas
     W3dNieblaReiniciar();               // la NIEBLA la prende el objeto Niebla del arbol (desde ahi en adelante)
     gCieloEnPase = w3dRenderLuces;
+    gEnPase = true;
     EntornoPase();                      // el fondo 360 para los reflejos y la luz por pixel (o apagado)
+    if (w3dRenderLuces) SondaLuzNuevoPase();   // (las sondas de luz que se dibujen en este pase iluminan)
     if (w3dRenderLuces) DibujarCielo();  // el FONDO 360 (Rendered / el juego): antes que todo, detras de todo
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
@@ -411,6 +543,7 @@ void W3dEscena3DPasada() {
     // PARTICULAS translucidas al final, con el z-buffer de la escena ya escrito.
     W3dParticulasDibujarPendientes();
     gCieloEnPase = false;
+    gEnPase = false;
     gfx::Entorno(0, 0, NULL);           // (lo que se dibuja despues -overlays, HUD- no refleja el fondo)
     W3dNieblaReiniciar();               // nada de niebla para lo que se dibuja despues (overlays, HUD, UI)
     gfx::EstadoBase();                  // ni el alpha test, el sesgo o la matriz de textura que dejo la escena

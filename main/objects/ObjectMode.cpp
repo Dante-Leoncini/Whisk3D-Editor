@@ -1049,6 +1049,7 @@ void SetPosicion(){
 #include "Recorte.h" // idem LimpiarZ / Recorte
 #include "PostprocesoObj.h" // idem Postproceso
 #include "Hitbox.h"  // W3dDuplicarUno: copiar tamano/centro/etiqueta/filtro del hitbox
+#include "SondaLuz.h"  // W3dDuplicarUno: la caja, la grilla y la luz horneada de la sonda de luz
 #include "InstanciaPrefab.h" // W3dDuplicarUno: otra instancia del mismo prefab (con sus overrides)
 #include "ProxyW3d.h"        // W3dDuplicarUno: otro proxy del mismo elemento de la libreria
 #include "io/Prefabs.h"      // ...que genera lo suyo
@@ -1263,6 +1264,9 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
     }
     else if (src->getType() == ObjectType::hitbox) {
         nuevo = HitboxDuplicar((Hitbox*)src);   // los campos propios (la lista vive en Hitbox.cpp)
+    }
+    else if (src->getType() == ObjectType::sondaluz) {
+        nuevo = SondaLuzDuplicar((SondaLuz*)src);   // (la caja, la grilla y la luz horneada)
     }
     else if (src->getType() == ObjectType::rutina) {
         // RUTINA: las listas y que lista usa cada modo (los punteros se vuelven a resolver: sucia)

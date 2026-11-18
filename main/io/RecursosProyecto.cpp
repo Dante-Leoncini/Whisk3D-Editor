@@ -399,6 +399,10 @@ static void UsuariosMateriales(std::map<const Material*, int>& cuenta) {
         for (size_t g = 0; g < m->materialsGroup.size(); g++) {
             const Material* mat = m->materialsGroup[g].material;
             if (mat && vistos.insert(mat).second) cuenta[mat]++;
+            for (size_t c = 0; c < m->materialsGroup[g].capasMat.size(); c++) {   // (las capas de encima tambien lo usan)
+                const Material* mc = m->materialsGroup[g].capasMat[c];
+                if (mc && vistos.insert(mc).second) cuenta[mc]++;
+            }
         }
     }
     const std::vector<MallaRecurso*>& reg = W3dMallasRegistro();
@@ -566,8 +570,13 @@ public:
         for (size_t i = 0; i < objs.size(); i++) {
             if (objs[i]->getType() != ObjectType::mesh) continue;
             const Mesh* m = (const Mesh*)objs[i];
-            for (size_t g = 0; g < m->materialsGroup.size(); g++)
-                if (m->materialsGroup[g].material == mat) { out.push_back(objs[i]); break; }
+            bool usa = false;
+            for (size_t g = 0; g < m->materialsGroup.size() && !usa; g++) {
+                if (m->materialsGroup[g].material == mat) usa = true;
+                for (size_t c = 0; c < m->materialsGroup[g].capasMat.size() && !usa; c++)
+                    if (m->materialsGroup[g].capasMat[c] == mat) usa = true;   // (como capa de encima)
+            }
+            if (usa) out.push_back(objs[i]);
         }
     }
     bool Duplicar(const std::string& id, std::string* idNuevo, std::string* motivo) {
@@ -590,8 +599,12 @@ public:
         for (size_t i = 0; i < objs.size(); i++) {
             if (objs[i]->getType() != ObjectType::mesh) continue;
             Mesh* m = (Mesh*)objs[i];
-            for (size_t g = 0; g < m->materialsGroup.size(); g++)
+            for (size_t g = 0; g < m->materialsGroup.size(); g++) {
                 if (m->materialsGroup[g].material == mat) { u->mallas.push_back(m); u->partes.push_back((int)g); }
+                // como CAPA de encima: la capa se va (no puede quedar apuntando a un material borrado)
+                std::vector<Material*>& cm = m->materialsGroup[g].capasMat;
+                for (size_t c = 0; c < cm.size(); ) { if (cm[c] == mat) cm.erase(cm.begin() + (long)c); else c++; }
+            }
         }
         UndoMatSacadoAplicar(u);   // (deja las partes en el por defecto y purga el material)
         UndoExterno f; f.aplicar = UndoMatSacadoAplicar; f.desvincular = UndoMatSacadoDesvincular; f.liberar = UndoMatSacadoLiberar;
@@ -1049,6 +1062,55 @@ static void CambiarRutaTextura(Texture* t, const std::string& viejo, const std::
     OlvidarFalloVistaPrevia();
     W3dRecursosVistaInvalidar();   // el listado de entradas del contenedor cambio
 }
+// ACTUALIZAR TEXTURA (la biblioteca y el click derecho en el material): la imagen se edito afuera y se vuelve a leer.
+// Adentro del .w3d: del archivo de disco del que se copio (W3dAssetOrigen), que pisa la copia de adentro; afuera: de su
+// ruta. La textura cargada se sube de nuevo en el lugar (los materiales que la usan la ven cambiada).
+// false + motivo (en INGLES, la UI lo pasa por T()) si no se pudo
+bool W3dTexturaActualizar(const std::string& clave, std::string* motivo, std::string* detalle) {
+    if (clave.empty()) return false;
+    if (W3dEsNombreDeEntrada(clave) && W3dContenedorExiste(clave)) {
+        const std::string fuente = W3dAssetOrigen(clave);
+        if (fuente.empty()) { if (motivo) *motivo = "The original file of the texture is not known"; return false; }
+        std::vector<unsigned char> d;
+        if (!w3dFileSystem::ReadFileBytes(fuente, d) || d.empty()) {
+            if (motivo) *motivo = "Original file not found";
+            if (detalle) *detalle = fuente;
+            return false;
+        }
+        if (!W3dContenedorEscribirEntrada(clave, &d[0], d.size())) { if (motivo) *motivo = "Could not read the image"; return false; }
+    } else if (!w3dFileSystem::FileExists(clave)) {
+        if (motivo) *motivo = "Original file not found";
+        if (detalle) *detalle = clave;
+        return false;
+    }
+    Texture* t = TexturaCargadaDe(clave);
+    if (t && !TexturaReleer(t)) { if (motivo) *motivo = "Could not read the image"; return false; }
+    SoltarVistaPreviaDe(clave);   // (la vista previa de la biblioteca y lo leido del archivo se rehacen)
+    gInfoArch = InfoArchivo();
+    { extern void RTInvalidar(); RTInvalidar(); }   // (el trazado de rayos la vuelve a leer)
+    { extern bool g_redraw; g_redraw = true; }
+    return true;
+}
+
+// la clave de biblioteca de una textura cargada ("" = ninguna)
+std::string W3dTexturaClave(const Texture* t) { return (t && !t->path.empty()) ? ClaveTextura(t->path) : std::string(); }
+// ACTUALIZAR desde la UI (la biblioteca, el click derecho en el material): actualiza cada una y avisa como salio
+void W3dTexturasActualizarAvisando(const std::vector<std::string>& claves) {
+    int ok = 0;
+    std::string ultima, error;
+    for (size_t i = 0; i < claves.size(); i++) {
+        std::string motivo, detalle;
+        if (W3dTexturaActualizar(claves[i], &motivo, &detalle)) { ok++; ultima = claves[i]; continue; }
+        if (error.empty()) {
+            error = std::string(T("Texture not reloaded")) + ": " + W3dNombreCorto(BaseDeRuta(claves[i])) + ". " + T(motivo.c_str());
+            if (!detalle.empty()) error += ": " + detalle;
+        }
+    }
+    if (!error.empty()) { Notificar(error, true); return; }
+    if (ok == 1) Notificar(std::string(T("Texture reloaded")) + ": " + W3dNombreCorto(BaseDeRuta(ultima)), false);
+    else if (ok > 1) { char b[96]; snprintf(b, sizeof(b), T("%d textures reloaded"), ok); Notificar(b, false); }
+}
+
 // LA MUDANZA (exacta: 'nuevo' ya viene libre). La usan el rename y su undo (que muda de vuelta).
 static bool MudarTextura(const std::string& viejo, const std::string& nuevo) {
     if (viejo == nuevo || !TexturaRenombrable(viejo) || !W3dEsNombreDeEntrada(nuevo)) return false;
@@ -1074,6 +1136,7 @@ static bool MudarTextura(const std::string& viejo, const std::string& nuevo) {
     // 2) la entrada vieja deja de ser del proyecto (el guardado no la conserva); la nueva si
     gTexPurgadas.insert(viejo);
     gTexPurgadas.erase(nuevo);
+    W3dAssetOrigenMudar(viejo, nuevo);   // (el archivo del que salio sigue siendo el mismo: Actualizar textura)
     if (!jsonViejo.empty()) { gTexPurgadas.insert(jsonViejo); gTexPurgadas.erase(jsonNuevo); }
     // 3) TODOS los que la nombran y su carpeta
     CambiarRutaTextura(t, viejo, nuevo);

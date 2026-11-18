@@ -422,6 +422,34 @@ void ControlesTick() {
     // puede deslizar hasta una opcion y soltar ahi
     if (g_barTapView && g_barTapView->isLeaf() && g_barTapView->ViewportKind() == 3) {
         if (g_tapMovio) return;
+        // UNA FILA DE UNA LISTA (partes de malla, modificadores, capas...): mantener apretado la AGARRA. Mientras espera
+        // el telefono VIBRA; cuando deja de vibrar ya esta agarrada: arrastrar la reordena y soltar ahi abre sus opciones
+        Properties* pp = (Properties*)g_barTapView;
+        const bool enFila = pp->ListaTieneFila(g_tapStartX, g_tapStartY);
+        if (enFila) {
+            static Uint32 vibrando = 0;
+            const Uint32 pasado = SDL_GetTicks() - g_tapStartTicks;
+            if (pasado >= 150 && vibrando != g_tapStartTicks) {
+                vibrando = g_tapStartTicks;
+                void (*mandos)(int, float) = W3dScriptMandosVibrarHook;
+                W3dScriptMandosVibrarHook = NULL;
+                w3dEngine::VibrarMs((int)(kPulsacionLargaMs - 150), 0.6f);
+                W3dScriptMandosVibrarHook = mandos;
+            }
+            if (pasado < kPulsacionLargaMs) { g_redraw = true; return; }
+            static Uint32 agarre = 0;
+            if (agarre != g_tapStartTicks) {
+                agarre = g_tapStartTicks;
+                if (pp->ListaAgarrar(g_tapStartX, g_tapStartY)) {
+                    g_contentTapPending = false;   // ya no es ni tap ni scroll: es un agarre
+                    g_outAgarre = true;
+                    viewPortActive = pp;
+                    ViewPortClickDown = true;
+                    g_redraw = true;
+                }
+            }
+            return;
+        }
         if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }   // (sigue esperando)
         static Uint32 intento = 0;
         if (intento != g_tapStartTicks) {
@@ -737,6 +765,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         case SDL_FINGERUP:
             fingers.erase(e.tfinger.fingerId);
+            if (fingers.empty()) { extern int g_ratonHoverX, g_ratonHoverY; g_ratonHoverX = g_ratonHoverY = -10000; }   // (sin dedo: sin cartelito ni resaltado)
             g_lastFingerTicks = SDL_GetTicks();
             lastDistance = 0.0f; // reset
             if (g_dosDedosTicks != 0 && fingers.empty()) {   // se levantaron los dos: ¿fue un TAP de 2 dedos?
@@ -858,6 +887,7 @@ void InputUsuarioSDL3(SDL_Event &e){
     // viewports (timeline, paneles) el editor sigue normal; SPACE pausa. (g_toqueJuegoVp: file-scope arriba)
 
     if (e.type == SDL_EVENT_MOUSE_MOTION){
+        { extern int g_ratonHoverX, g_ratonHoverY; g_ratonHoverX = (int)e.motion.x; g_ratonHoverY = (int)e.motion.y; }   // (el cartelito de ayuda)
         if (e.motion.which == SDL_TOUCH_MOUSEID && leftMouseDown && !g_tapMovio) {
             int ddx = (int)e.motion.x - g_tapStartX; if (ddx < 0) ddx = -ddx;
             int ddy = (int)e.motion.y - g_tapStartY; if (ddy < 0) ddy = -ddy;
@@ -1637,6 +1667,11 @@ void InputUsuarioSDL3(SDL_Event &e){
             g_contentTapPending = false; g_contentTapTactil = false;
             leftMouseDown = false;
             ViewPortClickDown = false;
+            if (g_barTapView && g_barTapView->isLeaf() && g_barTapView->ViewportKind() == 3) {
+                // (una fila de una lista de Propiedades: cae donde marca la linea; sin moverla, sus opciones)
+                int cx, cy; CargaDedoLugar((int)e.button.x, (int)e.button.y, cx, cy);
+                ((Properties*)g_barTapView)->ListaAgarreSoltar((int)e.button.x, (int)e.button.y, cx, cy);
+            } else
             LayoutSoltar((int)e.button.x, (int)e.button.y);
             GuardarMousePos();
             g_redraw = true;

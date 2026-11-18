@@ -2609,6 +2609,18 @@ void ConstruirPolyMesh(Mesh* m, PolyMesh& W) {
             uv.push_back(m->uv?m->uv[gi*2]:0.0f); uv.push_back(m->uv?m->uv[gi*2+1]:0.0f);
             for (int q=0;q<4;q++) col.push_back(m->vertexColor?m->vertexColor[gi*4+q]:(unsigned char)255);
         }
+        // CORNERS REPETIDOS seguidos (el mismo vertice topologico dos veces: el polo de una esfera UV es un quad con un
+        // lado colapsado) -> uno solo. Para Catmull-Clark esa arista de largo cero rompia el polo (salia en punta);
+        // como triangulo se suaviza bien, como en Blender
+        { std::vector<int> f2; std::vector<float> u2; std::vector<unsigned char> c2;
+          for (size_t c = 0; c < face.size(); c++) {
+              if (!f2.empty() && face[c] == f2.back()) continue;   // (igual al anterior: se saltea)
+              f2.push_back(face[c]); u2.push_back(uv[c*2]); u2.push_back(uv[c*2+1]);
+              for (int q=0;q<4;q++) c2.push_back(col[c*4+q]);
+          }
+          // (y el ultimo, si es igual al primero)
+          while (f2.size() > 1 && f2.back() == f2.front()) { f2.pop_back(); u2.resize(u2.size()-2); c2.resize(c2.size()-4); }
+          face.swap(f2); uv.swap(u2); col.swap(c2); }
         if (face.size()<3) continue;
         W.F.push_back(face); W.Fmat.push_back(m->faces3d[f].mat); W.Fsmooth.push_back(m->faces3d[f].smooth); W.Fuv.push_back(uv); W.Fcol.push_back(col);
     }
@@ -4832,6 +4844,12 @@ void Mesh::CornerNormalConSharp(){
     // 2) por cada borde compartido (key por posicion) unir los corners de las 2 caras en
     //    cada extremo, SALVO que sea sharp (o la malla flat = todo sharp -> nunca une)
     std::map<std::string, std::pair<int,int> > visto; // key -> (cornerEnBajo, cornerEnAlto) de la 1er cara
+    // EL BORDE COMPARTIDO se reconoce por la TOPOLOGIA (posRep: la posicion cuantizada a 1e-4), no por los bits exactos:
+    // la costura de una esfera UV tiene los dos lados en "el mismo lugar" pero con floats distintos (sin(2 pi) no es 0) y
+    // quedaba cortada (un salto en el sombreado al orbitar). La clave EXACTA sigue para los bordes sharp (asi se guardan)
+    const bool hayRep = ((int)posRep.size() == vertexSize);
+    std::map<std::pair<int,int>, std::pair<int,int> > vistoT;   // (rep bajo, rep alto) -> corners de la 1er cara
+    std::map<std::pair<int,int>, std::string> ekPrimera;        // (y la clave exacta de su borde, por si es sharp)
     L = 0;
     // las CLAVES salen de PosicionesReposo (donde viven sharpEdges), NO de vertex[]: con la
     // malla POSADA por una vertex anim ninguna clave matcheaba y los bordes filosos se
@@ -4848,10 +4866,27 @@ void Mesh::CornerNormalConSharp(){
             if (ia<0||ia>=vertexSize||ib<0||ib>=vertexSize) continue;
             std::string pkA = PosKey12(&PK[ia*3]);
             std::string pkB = PosKey12(&PK[ib*3]);
-            if (pkA == pkB) continue;                // arista degenerada
+            const int ta = hayRep ? posRep[ia] : ia, tb = hayRep ? posRep[ib] : ib;
+            // ARISTA DEGENERADA (las dos puntas en el mismo lugar: el polo de una esfera UV, un quad con un lado
+            // colapsado): sus dos corners son el MISMO vertice -> mismo grupo. Antes se salteaba y cada corner del polo
+            // quedaba con solo dos caras: el polo salia en punta (una estrella)
+            if (hayRep ? (ta == tb) : (pkA == pkB)) { UFUnion(uf, ca, cb); continue; }
             int loC, hiC; std::string ek;
-            if (pkA < pkB){ loC=ca; hiC=cb; ek = pkA + pkB; }
-            else          { loC=cb; hiC=ca; ek = pkB + pkA; }
+            if (pkA < pkB){ ek = pkA + pkB; } else { ek = pkB + pkA; }
+            if (hayRep) { if (ta < tb) { loC=ca; hiC=cb; } else { loC=cb; hiC=ca; } }
+            else if (pkA < pkB){ loC=ca; hiC=cb; } else { loC=cb; hiC=ca; }
+            if (hayRep) {
+                const std::pair<int,int> kt(ta < tb ? ta : tb, ta < tb ? tb : ta);
+                std::map<std::pair<int,int>, std::pair<int,int> >::iterator it = vistoT.find(kt);
+                if (it == vistoT.end()) { vistoT[kt] = std::make_pair(loC, hiC); ekPrimera[kt] = ek; }
+                else {
+                    int fOtra = cornerFace[it->second.first];
+                    bool sharp = (sharpEdges.find(ek) != sharpEdges.end()) || (sharpEdges.find(ekPrimera[kt]) != sharpEdges.end()) ||
+                                 faceFlat[f] || (fOtra>=0 && faceFlat[fOtra]);
+                    if (!sharp) { UFUnion(uf, it->second.first, loC); UFUnion(uf, it->second.second, hiC); }
+                }
+                continue;
+            }
             std::map<std::string, std::pair<int,int> >::iterator it = visto.find(ek);
             if (it == visto.end()) { visto[ek] = std::make_pair(loC, hiC); }
             else {

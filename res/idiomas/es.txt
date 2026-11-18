@@ -22,6 +22,7 @@
 %d repeated name(s) renumbered (%s%s). The original did NOT change: whatever pointed to it by name still points there.	%d nombre(s) repetidos renumerados (%s%s). El original NO cambió: lo que apuntaba por nombre sigue apuntando ahí.
 %d resources are in use (%d users). Delete them anyway? Their users will be left without them.	%d recursos están en uso (%d usuarios). ¿Borrarlos igual? Sus usuarios quedarán sin ellos.
 %d script reference(s) and %d target(s) updated	%d referencia(s) de script y %d target(s) actualizados
+%d textures reloaded	%d texturas actualizadas
 %s: does not compile	%s: no compiló
 '%s' already exists -> '%s'	'%s' ya existe -> '%s'
 '%s' has more than 65535 vertices: saving it as text (.w3dm), not binary	'%s' tiene más de 65535 vértices: la guardo en texto (.w3dm), no en binario
@@ -207,6 +208,12 @@ Back	Posterior
 Back (overshoot)	Retroceso
 Back View	Vista trasera
 Background	Fondo
+Background light	Luz del fondo
+Bake	Hornear
+Bake Lighting	Precalcular iluminación
+Bake canceled	Precálculo cancelado
+Baked: %d points	Horneada: %d puntos
+Bakes the light of the static objects into the texture, through the UV of the mesh	Precalcula la luz de los objetos estáticos en la textura, por la UV de la malla
 Base Color	Color Base
 Base velocity	Velocidad base
 Before Mode	Modo antes
@@ -223,7 +230,6 @@ Bind texture	Fijar textura
 Bitrate	Bitrate
 Bits	Bits
 Black Letterbox	Bandas negras
-Blank	Liso
 Blend	Mezcla
 Blend In	Entrada gradual
 Blend Out	Salida gradual
@@ -249,6 +255,7 @@ Bottom View	Vista inferior
 Bottom-Left	Abajo-Izquierda
 Bottom-Right	Abajo-Derecha
 Bounce	Rebote
+Bounces	Rebotes
 Boundary	Borde
 Box (memory)	Caja (memoria)
 Box Select	Selección por caja
@@ -304,12 +311,15 @@ Center X	Centro X
 Center Y	Centro Y
 Center Z	Centro Z
 Center of frame	Centro del cuadro
+Change Material	Cambiar material
 Changes will be lost in:	Se perderán los cambios en:
 Channels	Canales
 Character	Personaje
 Child Of	Hijo De
 Children	Hijos
 Choose a shader	Elegí un shader
+Choose a texture	Elegí una textura
+Choose a texture to bake into	Elegí una textura donde precalcular
 Choose file	Elegir archivo
 Choose...	Elegir...
 Circle	Círculo
@@ -334,6 +344,7 @@ Clear and Keep Transformation	Limpiar y Mantener Transformación
 Clear color	Color de limpieza
 Clear depth	Limpiar Z
 Clear screen	Limpiar pantalla
+Clear with color	Limpiar con el color
 Click the game to capture the mouse (Esc releases it)	Hacé click en el juego para capturar el mouse (Esc lo suelta)
 Clip default	Por defecto del clip
 Clip to rect	Recortar al rectángulo
@@ -413,6 +424,7 @@ Could not read the animations of '%s' (%s): they stay EMPTY and I will not save 
 Could not read the file	No se pudo leer el archivo
 Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	No pude leer los frames de la animación '%s' de '%s': queda VACÍA y no la voy a guardar encima (ver whisk3d.log)
 Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	No pude leer la geometría de '%s': queda VACÍA y no la voy a guardar encima (ver whisk3d.log)
+Could not read the image	No se pudo leer la imagen
 Could not save the layout	No se pudo guardar el layout
 Could not write config.ini	No se pudo escribir config.ini
 Could not write the file	No se pudo escribir el archivo
@@ -448,6 +460,7 @@ Cylinder	Cilindro
 Cylinder Projection	Proyección de Cilindro
 Debug mode	Modo debug
 Decal	Calcomanía
+Decal pass	Pase de calcomanías
 Decimals	Decimales
 Default	Por defecto
 Default Material	Material por Defecto
@@ -523,6 +536,7 @@ Drag (speed kept per second)	Arrastre (velocidad que queda por segundo)
 Drag the points, click to add	Arrastrá los puntos, click para agregar
 Draw	Dibujar
 Draw children	Dibujar hijos
+Draw custom background	Dibujar fondo personalizado
 Draw elements	Dibujar elementos
 Draw in outliner order	Dibujar en el orden del outliner
 Draw mesh	Dibujar malla
@@ -656,6 +670,7 @@ Fit	Ajuste
 Flags	Banderas
 Flags (memory)	Banderas (memoria)
 Flat	Plano
+Flat color	Color plano
 Flip	Voltear
 Flip Normals	Invertir Normales
 Flipbook	Flipbook
@@ -778,6 +793,7 @@ Include Edited	Incluir Editado
 Include Non-Edited	Incluir No Editado
 Index	Índice
 Indices	Índices
+Indirect light	Luz indirecta
 Individual	Individual
 Individual Elements	Elementos individuales
 Individual Origins	Orígenes individuales
@@ -880,11 +896,14 @@ Library not readable	No se puede leer la librería
 Library unlinked	Librería desvinculada
 Lifetime	Vida
 Light	Luz
+Light Probe	Sonda de luz
 Light bounces	Rebotes de luz
 Light color	Color de luz
 Light on/off	Luz on/off
 Light position	Posición de luz
+Light probe baked: %d points	Sonda de luz horneada: %d puntos
 Lighting	Iluminación
+Lighting baked	Iluminación precalculada
 Lighting on/off	Iluminación on/off
 Lightmap Pack	Empaquetar Lightmap
 Lightmap Pack: select faces first	Empaquetar Lightmap: selecciona caras primero
@@ -1060,7 +1079,7 @@ New Folder	Carpeta nueva
 New Game	Nuevo juego
 New Library	Biblioteca nueva
 New Material	Nuevo Material
-New Mesh Part	Nueva Parte
+New Mesh Part	Nueva parte de malla
 New Palette	Nueva paleta
 New Prefab	Nuevo prefab
 New Scene	Nueva escena
@@ -1096,6 +1115,7 @@ No Properties panel	No hay panel de Propiedades
 No Test, Write	Sin test, con escritura
 No Texture	Sin Textura
 No Texture B	Sin segunda textura
+No Toon Ramp	Sin rampa toon
 No UV Group for this bone	Este hueso no tiene UV Group
 No UV map with this name in this 3D mesh	No existe un UV con este nombre en esta malla 3D
 No UVs to export	No hay UV para exportar
@@ -1125,6 +1145,7 @@ Normal pointer	Puntero de normales
 Normals	Normales
 Normals layer deleted	Capa de normales borrada
 Not assigned	No se asignó
+Not baked	Sin hornear
 Not deleted	No se borró
 Not enough space: uninstalling the previous version (its data on the phone is lost)	Falta lugar: se desinstala la versión anterior (sus datos en el teléfono se pierden)
 Not linked	No se vinculó
@@ -1142,6 +1163,7 @@ Not saving: the UI scene '%s' could not be read when opening and saving would re
 Not saving: the animations of '%s' could not be read when opening and saving would erase them	No guardo: las animaciones de '%s' no se pudieron leer al abrir y guardarlo las borraría
 Not saving: the clips of '%s' could not be read when opening and saving would erase them	No guardo: los clips de '%s' no se pudieron leer al abrir y guardarlo los borraría
 Not saving: the mesh '%s' could not be written (%s)	No guardo: la malla '%s' no se pudo escribir (%s)
+Nothing to bake	No hay nada que hornear
 Nothing to paste	No hay nada para pegar
 Nothing to render: tick Final composite or a pass	Nada que renderizar: tildá Composición final o un pase
 Nothing to save	No hay nada para guardar
@@ -1184,6 +1206,7 @@ Only the final image	Solo la imagen final
 Opacity	Opacidad
 Opaque (ONE, ZERO)	Opaco (ONE, ZERO)
 Opaque (one, zero)	Opaco (one, zero)
+Opaque pass	Pase de opacos
 Open	Abrir
 Open in IDE	Abrir en el IDE
 Open normal map	Abrir Mapa de Normales
@@ -1193,6 +1216,7 @@ Open...	Abrir...
 Opening project...	Abriendo proyecto...
 Operation	Operación
 Optimize Vertex Groups	Optimizar Grupos de Vértices
+Options	Opciones
 Orbit locked	Órbita bloqueada
 Orbit unlocked	Órbita desbloqueada
 Orbital	Orbital
@@ -1201,6 +1225,7 @@ Orientation	Orientación
 Origin to 3D Cursor	Origen al Cursor 3D
 Origin to Geometry	Origen a Geometría
 Original file forgotten	Archivo original olvidado
+Original file not found	No se encontró el archivo original
 Original file of an imported mesh (only where it came from: the mesh is inside the project)	Archivo original de una malla importada (solo de dónde vino: la malla está adentro del proyecto)
 Origins	Orígenes
 Orphan (no users)	Huérfano (sin usuarios)
@@ -1237,6 +1262,7 @@ Particle Shape	Forma y flipbook
 Particle Size	Tamaño
 Particles	Partículas
 Parts	Partes
+Pass	Pase
 Pass Order	Orden de pase
 Passes	Pases
 Paste	Pegar
@@ -1272,6 +1298,9 @@ Play once (dies at the end)	Una sola vez (muere al terminar)
 Point	Puntual
 Point size	Tamaño de punto
 Points	Puntos
+Points X	Puntos X
+Points Y	Puntos Y
+Points Z	Puntos Z
 Polygon (simulated)	Polígono (simulado)
 Pop matrix	Desapilar matriz
 Portrait only	Solo vertical
@@ -1359,6 +1388,7 @@ Refresh	Refrescar
 Refresh:	Refrescar:
 Relationship Lines	Líneas de Relación
 Relative Offset	Desplazamiento relativo
+Reload Texture	Actualizar textura
 Reload the project to generate mipmaps	Recargá el proyecto para generar los mipmaps
 Reload the project to upload the textures again	Recargá el proyecto para volver a subir las texturas
 Remove	Quitar
@@ -1683,8 +1713,10 @@ Texture filter	Filtro de textura
 Texture layers	Capas de textura
 Texture mix	Cuánto se ve la segunda textura
 Texture mode	Modo de textura
+Texture not reloaded	No se actualizó la textura
 Texture of	Textura de
 Texture on/off	Textura on/off
+Texture reloaded	Textura actualizada
 Texture saved	Textura guardada
 Texture wrap	Repetición de textura
 Textures	Texturas
@@ -1694,6 +1726,7 @@ The Object tab shows the BASE transform (the one that gets saved). Constraints m
 The Script object '%s' no longer exists: it was migrated to an empty object with its scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated.	El objeto Script '%s' ya no existe: se migró a un objeto vacío con sus scripts. Su física hardcodeada (velocidad/gravedad/límites) NO se migra.
 The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	La escena UI '%s' no se pudo leer: el proyecto abre sin ella y NO lo voy a guardar encima (ver whisk3d.log)
 The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	Falta la escena UI '%s': el proyecto abre sin ella y NO lo voy a guardar encima (ver whisk3d.log)
+The UV does not cover the texture	La UV no cae en la textura
 The armature has its own clips	El armature tiene clips propios
 The button's function failed	Falló la función del botón
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	Los cambiarEscena() de su .lua siguen apuntando a la primera: editalos a mano.
@@ -1720,7 +1753,10 @@ The library's proyecto.json can't be read	No se puede leer el proyecto.json de l
 The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	La luz '%s' no se cargó: la escena ya tiene el máximo de luces (%d).
 The list of All	La de Todo
 The mesh '%s' (no objects) could not be read: saving without it	La malla '%s' (sin objetos) no se pudo leer: se guarda sin ella
+The mesh has no UV	La malla no tiene UV
+The mesh has no faces	La malla no tiene caras
 The objects of the 3D meshes will be deleted too (Undo brings them back).	Los objetos de las mallas 3D también se borran (Deshacer los devuelve).
+The original file of the texture is not known	No se sabe de qué archivo salió la textura
 The scene has no sounds	La escena no tiene sonidos
 The selected folders are deleted too if they end up empty.	Las carpetas elegidas también se borran si quedan vacías.
 The shader does not compile	El shader no compila
@@ -1775,6 +1811,7 @@ Translation	Traslación
 Transmission	Transmisión
 Transparency layers	Capas transparentes
 Transparent	Transparente
+Transparent pass	Pase de transparentes
 Triangle fan	Abanico de triángulos
 Triangle strip	Tira de triángulos
 Triangles	Triángulos
@@ -1830,6 +1867,7 @@ Use Influence	Usar influencia
 Use Start Frame	Usar cuadro inicial
 Use camera focus	Usar el foco de la cámara
 Use current folder	Usar carpeta actual
+Use custom color	Usar color personalizado
 Use index	Usar índice
 Use new viewport	Usar nuevo viewport
 Use physics engine	Usar motor de física

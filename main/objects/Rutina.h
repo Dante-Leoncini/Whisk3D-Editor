@@ -17,6 +17,11 @@
 //  - LIMPIAR tambien: "Clear color" fija el color (glClearColor) y "Clear" limpia
 //    los buffers elegidos (glClear). Un proyecto con constructor limpia SOLO con
 //    sus pasos: sin un "Clear" no se limpia nada (tambien en el editor).
+//    Los dos arrancan en AUTO: "Clear color" toma el fondo del render (la tarjeta
+//    Render; en el editor, fuera de la vista Render, el fondo del visor) y con un
+//    fondo 360 no hace nada; "Clear" limpia con ese color o, con un fondo 360,
+//    dibuja el cielo. Si no: un color propio (que pisa el fondo: cada escena el
+//    suyo), solo limpiar con el color, o un fondo 360 propio (su imagen y su giro).
 //  - Puede tener un SCRIPT (lua cambia sus pasos jugando: setPaso(rutina, 4, "on", false)) y sus pasos se ANIMAN
 //    con las animaciones de escena (canal AnimPaso: el paso por su 'id', que no cambia al moverlo; al borrarlo se
 //    borran sus curvas).
@@ -127,7 +132,16 @@ enum W3dPasoOpciones { OpcNada = 0, OpcNieblaModo, OpcTexturaModo, OpcFuncionZ, 
                        OpcLuzTipo, OpcPrimitiva, OpcFiltro, OpcRepetir, OpcMaterialComp, OpcArray, OpcMatriz,
                        OpcMezclaTex,   // "Texture mix": Interpolate / Multiply (lightmap) / Multiply 2x
                        OpcRiel,        // "Skip if camera riel": si va por el / si no va
+                       OpcColorLimpieza,   // "Clear color": Auto / Usar color personalizado (W3dColorLimpiezaModo)
+                       OpcLimpiarFondo,    // "Clear": Auto / Limpiar con el color / Dibujar fondo personalizado
                        OpcN };
+// "Clear color": de donde sale el color (el campo 'modo')
+enum W3dColorLimpiezaModo { ColorLimpiezaAuto = 0,   // el fondo del render (con un fondo 360: nada, lo tapa el cielo)
+                            ColorLimpiezaPropio };   // los 4 numeros del paso (pisan el fondo)
+// "Clear": que se hace con el COLOR (el campo 'modo'; los buffers siguen en 'entero')
+enum W3dLimpiarFondoModo { LimpiarFondoAuto = 0,     // limpia con el color y, con un fondo 360, dibuja el cielo
+                           LimpiarFondoColor,        // solo limpia con el color (sin cielo)
+                           LimpiarFondoPropio };     // dibuja el fondo 360 del paso ('ref': la imagen; n[0..2]: su giro)
 // el RANGO de "Dibujar elementos" (campo 'sub'): la parte entera, triangulos a mano o los rangos de un array
 enum W3dDibujarRango { RangoParte = 0, RangoManual, RangoArray };
 

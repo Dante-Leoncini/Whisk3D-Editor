@@ -113,6 +113,22 @@ void Scrollable::ScrollByTouch(int dx, int dy){
     PosX += dx; if (PosX > 0) PosX = 0; if (MaxPosX > PosX) PosX = MaxPosX;
 }
 
+void Scrollable::TeletransportarY(int myLocal, int altoVp){
+    if (!scrollY || MaxPosY >= 0 || scrollDragFactor <= 0.0f) return;
+    const float alto = (float)(altoVp - scrollTopOffset);
+    const float rango = (float)(-MaxPosY) / scrollDragFactor;   // lo que recorre el agarre
+    const float largo = alto - rango;                            // el largo del agarre
+    const float arriba = (float)(-PosY) * scrollPosFactor;       // donde esta ahora
+    const float y = (float)(myLocal - scrollTopOffset);
+    if (y >= arriba && y <= arriba + largo) return;              // (sobre el agarre: se arrastra desde donde esta)
+    float nuevo = y - largo * 0.5f;
+    if (nuevo < 0.0f) nuevo = 0.0f;
+    if (nuevo > rango) nuevo = rango;
+    PosY = -(int)(nuevo * scrollDragFactor);
+    if (PosY > 0) PosY = 0;
+    if (MaxPosY > PosY) PosY = MaxPosY;
+}
+
 // ------------------ Mouse Over ------------------
 void Scrollable::ScrollMouseOver(ViewportBase* current, int mx, int my){
     // (mx, my vienen LOCALES al viewport)

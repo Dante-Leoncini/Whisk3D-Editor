@@ -58,6 +58,7 @@
 #include "objects/Recorte.h" // Add > Clear Depth / Screen Rect
 #include "objects/PostprocesoObj.h" // Add > Post Processing
 #include "objects/Hitbox.h"  // Add > Hitbox (caja de deteccion con eventos lua)
+#include "objects/SondaLuz.h"   // Add > Light Probe
 #include "io/PrefabsEditor.h"   // Add > Prefab (una instancia en el cursor 3D) + "Create Prefab" / "Unpack"
 #include "objects/InstanciaPrefab.h"
 #include "objects/ProxyW3d.h"   // Add > Proxy W3D (un prefab o una escena de una libreria externa)
@@ -270,6 +271,8 @@ static Viewport3D* LayoutPrimer3D(ViewportBase* aNodo) {
     if (r) return r;
     return LayoutPrimer3D(b);
 }
+// (el proyecto nuevo con un layout guardado: import_w3d.cpp, NuevoProyectoAhora) la primera Vista 3D de un arbol
+Viewport3D* LayoutPrimer3DDe(ViewportBase* aNodo) { return LayoutPrimer3D(aNodo); }
 
 // recolecta las hojas (viewports con borde) en orden DFS izquierda->derecha
 static void LayoutRecolectarHojas(ViewportBase* aNodo, std::vector<ViewportBase*>& out) {
@@ -957,6 +960,10 @@ void AddFisica(){
 // ---- Add > Hitbox: caja de deteccion (objects/Hitbox.h) ----------------------
 // Con un objeto 3D ACTIVO nace como su HIJO y del tamano de sus mallas (el trigger de una
 // puerta, el sensor de un enemigo); sin activo, suelta en el cursor 3D con el cubo unitario.
+// ---- Add > Light Probe: la sonda de luz (objects/SondaLuz.h), en el cursor 3D. Se hornea desde su tarjeta ----
+void AddSondaLuz(){
+    TrasCrearAdd(new SondaLuz(NULL, cursor3D.pos));
+}
 void AddHitbox(){
     Object* padre = (ObjActivo && ObjActivo->select && HitboxPadreValido(ObjActivo)) ? ObjActivo : NULL;
     TrasCrearAdd(padre ? (Object*)HitboxCrearAjustado(padre) : (Object*)new Hitbox(NULL, cursor3D.pos));
@@ -1162,6 +1169,14 @@ static const MenuDef ADD_MODIFICADORES[] = {
     { "Instance",   AddDuplicateLinked, NULL, ICONO(IconType::instance) },
 };
 
+// submenu Lights: las luces y la sonda de luz (la luz indirecta horneada)
+static const MenuDef ADD_LUCES[] = {
+    { "Light",       AddLight,          NULL, ICONO(IconType::light) },
+    { "Sun",         AddLuzSol,         NULL, ICONO(IconType::light) },
+    { "Spot",        AddLuzFoco,        NULL, ICONO(IconType::light) },
+    { "Light Probe", AddSondaLuz,       NULL, ICONO(IconType::esfera) },
+};
+
 // EL MENU ADD, de una mirada: texto + accion + icono por fila. Agregar una primitiva = una linea en
 // ADD_MESHES, y ya queda conectada (no hay switch que actualizar ni id que inventar).
 static const MenuDef ADD[] = {
@@ -1177,9 +1192,7 @@ static const MenuDef ADD[] = {
     { "Path",       AddPath,            NULL, ICONO(IconType::curve) },
     { "Armature",   AddArmature,        NULL, ICONO(IconType::armature) },
     { "Camera",     AddCamera,          NULL, ICONO(IconType::camera) },
-    { "Light",      AddLight,           NULL, ICONO(IconType::light) },
-    { "Sun",        AddLuzSol,          NULL, ICONO(IconType::light) },
-    { "Spot",       AddLuzFoco,         NULL, ICONO(IconType::light) },
+    { "Lights",     NULL,               NULL, ICONO(IconType::light),  &MenuLucesAdd },   // luz, sol, foco y la sonda de luz
     { "Sound",      AddSonido,          NULL, ICONO(IconType::sonido) },
     { "Fog",        AddNiebla,          NULL, ICONO(IconType::niebla) },
     { "Clear Depth", AddLimpiarZ,       NULL, ICONO(IconType::limpiarz) },
@@ -1206,6 +1219,8 @@ void LayoutConstruirMenuAdd(){
     MenuMallas->Construir(ADD_MESHES, (int)(sizeof(ADD_MESHES)/sizeof(ADD_MESHES[0])));
     if (MenuModificadores)
         MenuModificadores->Construir(ADD_MODIFICADORES, (int)(sizeof(ADD_MODIFICADORES)/sizeof(ADD_MODIFICADORES[0])));
+    if (MenuLucesAdd)
+        MenuLucesAdd->Construir(ADD_LUCES, (int)(sizeof(ADD_LUCES)/sizeof(ADD_LUCES[0])));
     if (MenuCore) W3dRutinaMenuPasos(MenuCore, gSubsCore, AddRutinaCon, true);
     MenuAdd->Construir(ADD, (int)(sizeof(ADD)/sizeof(ADD[0])));
 }
@@ -5303,6 +5318,7 @@ static void SoltarDragOutliners(ViewportBase* aNodo, int mx, int my) {
 
 void LayoutSoltar(int mx, int my) {
     MenuSliderDragSoltar(); // fin del drag del item-slider de un menu (si habia)
+    MenuScrollDragSoltar(); // ...y el de la barra de scroll de un menu
     BrushBarDragSoltar();   // fin del gesto en la fila de barras del pincel; sin arrastre = tap -> editar
     // Symbian (tap-agarra / tap-suelta): el up del MISMO tap que agarro (down+up
     // en ~8ms) no suelta, solo si hubo movimiento. En PC (hold-drag) el up SIEMPRE
@@ -5533,6 +5549,11 @@ bool LayoutMotionUI(int mx, int my) {
             }
             MenuSliderDragSoltar(); // up perdido (solto fuera de la ventana): cortar el drag
         }
+        // la BARRA DE SCROLL de un menu largo, agarrada: sigue al puntero (mouse o dedo) hasta soltar
+        if (MenuScrollDragActivo()) {
+            if (leftMouseDown) { MenuScrollDragMover(my); g_redraw = true; return true; }
+            MenuScrollDragSoltar();
+        }
         // DRAG-SCROLL: si el boton esta apretado sobre un menu scrollable, arrastrar mueve la LISTA (no resalta ni
         // cambia de menu). Un umbral chico distingue drag de tap.
         if (g_menuDrag) {
@@ -5680,7 +5701,7 @@ bool LayoutClickUI(int mx, int my) {
                 gScrollMovio = false; // el up del MISMO tap no la suelta
                 gScrollPrevX = mx;
                 gScrollPrevY = my;
-                if (zonaV) sc->mouseOverScrollYpress = true;
+                if (zonaV) { sc->mouseOverScrollYpress = true; sc->TeletransportarY(my - under->y, under->height); g_redraw = true; }
                 else sc->mouseOverScrollXpress = true;
                 return true;
             }
@@ -5711,6 +5732,7 @@ bool LayoutDobleClickUI(int mx, int my) {
     ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
     if (!under || !under->isLeaf()) return false;
     if (VpEsOutliner(under)) return ((Outliner*)under)->DobleClick(mx, my);
+    if (under->ViewportKind() == 3) return ((Properties*)under)->DobleClick(mx, my);   // (una fila de una lista: renombrarla)
     return false;
 }
 // PULSACION LARGA (tactil: el dedo quieto ~0,5 s sobre un panel): el outliner AGARRA la fila (despues se
@@ -6378,6 +6400,10 @@ static LayoutEngancharOlvido g_layoutEngancheOlvido;
 //  segundos o al salir. Con un menu o un popup abierto no sale (el menu abierto ya lleva su titulo). Se dibuja
 //  encima de todo: lo llama NotificacionesRender, que corre al final del cuadro en todas las plataformas
 // ============================================================================
+// DONDE ESTA EL PUNTERO AHORA (lo deja controles.cpp en cada movimiento; -10000 = no hay: se levanto el dedo). El
+// cartelito de los botones de adentro de Propiedades miraba lastMouseX/Y, que hoverando no se actualiza: el cartel quedaba
+// clavado aunque el mouse ya se hubiera ido
+int g_ratonHoverX = -10000, g_ratonHoverY = -10000;
 static Button* AyudaBotonBajoMouse(ViewportBase* n) {
     if (!n) return NULL;
     if (n->isLeaf()) {
@@ -6392,7 +6418,7 @@ static Button* AyudaBotonBajoMouse(ViewportBase* n) {
                 if (b && b->visible && b->hover && !b->ayuda.empty()) return b;
             }
         // (Properties: los botones chicos de los mapas del material, adentro de sus filas)
-        if (n->ViewportKind() == 3) { extern Button* PropsAyudaEn(Properties* p, int mx, int my); return PropsAyudaEn((Properties*)n, lastMouseX, lastMouseY); }
+        if (n->ViewportKind() == 3) { extern Button* PropsAyudaEn(Properties* p, int mx, int my); return PropsAyudaEn((Properties*)n, g_ratonHoverX, g_ratonHoverY); }
         return NULL;
     }
     ViewportBase* a = NULL; ViewportBase* c = NULL;

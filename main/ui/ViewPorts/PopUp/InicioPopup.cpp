@@ -13,6 +13,7 @@
 #include "objects/Textures.h"
 #include "render/OpcionesRender.h"   // g_redraw
 #include "config/W3dRecientes.h"
+#include "config/W3dLayouts.h"        // los layouts guardados: la lista de "Nuevo archivo"
 #include "config/W3dProfile.h"       // W3dNowMs (el giro del engranaje)
 #include "config/w3dVersion.h"
 #include "w3dFilesystem.h"
@@ -29,6 +30,7 @@ InicioPopup::InicioPopup() : PopUpBase("Inicio") {
     texReflejo = texMascara = texBorde = texCentro = texTexto = 0;
     texTextoW = texTextoH = 0;
     sel = 0; apretada = -1; t0 = 0;
+    verLayouts = false;
     rect = new Card(NULL, 1, 1);
     ancho = alto = altoCabecera = ladoLogo = altoFila = yFilas = yTituloRecientes = 0;
     yLogo = colX = colW = 0;
@@ -48,6 +50,7 @@ static unsigned int CargarLogo(const char* nombre, int* pw = NULL, int* ph = NUL
 
 void InicioPopup::Abrir() {
     recientes = W3dRecientes(kRecientes);
+    verLayouts = false;
     if (!texReflejo) texReflejo = CargarLogo("reflejo.png");
     if (!texMascara) texMascara = CargarLogo("mascara.png");
     if (!texBorde) texBorde = CargarLogo("borde.png");
@@ -66,6 +69,8 @@ void InicioPopup::Cerrar() {
     for (int i = 0; i < 4; i++) if (*tex[i]) { w3dEngine::DeleteTexture(*tex[i]); *tex[i] = 0; }
     if (texTexto) { w3dEngine::DeleteTexture(texTexto); texTexto = 0; }
     std::vector<std::string>().swap(recientes);
+    std::vector<std::string>().swap(layouts);
+    verLayouts = false;
     apretada = -1;
     g_redraw = true;
 }
@@ -98,7 +103,8 @@ void InicioPopup::Layout() {
     colX = 0; colW = ancho;
     const int pad = borderGS + gapGS * 2;
     const int pie = gapGS * 2 + RenglonHeightGS + pad;                // abajo del logo: la pagina y la version
-    const int filasAlto = (Filas() + (recientes.empty() ? 0 : 1)) * altoFila + borderGS;   // (+ el rotulo de recientes)
+    const int rotulos = verLayouts ? 1 : (recientes.empty() ? 0 : 1);   // el de recientes, o "Nuevo archivo" en la de layouts
+    const int filasAlto = (Filas() + rotulos) * altoFila + borderGS;
     // el LOGO: tres filas de alto, o lo que deje la pantalla (un telefono acostado, una ventana chica), con un minimo;
     // y a lo ancho, que deje lugar al texto de la derecha
     const int disponible = MenuPantallaH - 8 * gapGS;
@@ -119,15 +125,20 @@ void InicioPopup::Layout() {
 // EL ORDEN en pantalla: Nuevo archivo, Abrir... y despues el rotulo "Archivos recientes" con la lista (los numeros de
 // fila no cambian: 0 = Nuevo archivo, 1..N = los recientes, N+1 = Abrir...)
 int InicioPopup::FilaY(int fila) const {
+    if (verLayouts) return yFilas + altoFila + (fila < 0 ? 0 : fila) * altoFila;   // abajo del rotulo "Nuevo archivo"
     const int n = (int)recientes.size();
     if (fila <= 0) return yFilas;
     if (fila > n) return yFilas + altoFila;                          // Abrir..., abajo de Nuevo archivo
     return yTituloRecientes + altoFila + (fila - 1) * altoFila;      // los recientes, abajo de su rotulo
 }
-int InicioPopup::UltimaFila() const { return recientes.empty() ? 1 : (int)recientes.size(); }   // la de mas abajo
+int InicioPopup::UltimaFila() const {   // la de mas abajo
+    if (verLayouts) return Filas() - 1;    // (Ir atras)
+    return recientes.empty() ? 1 : (int)recientes.size();
+}
 // las filas en el orden en que se ven (las flechas del teclado van asi)
-static int OrdenVisual(int fila, int n) { return fila == 0 ? 0 : (fila == n + 1 ? 1 : fila + 1); }
-static int FilaDeOrden(int orden, int n) { return orden == 0 ? 0 : (orden == 1 ? n + 1 : orden - 1); }
+// (la lista de layouts ya va en orden)
+static int OrdenVisual(int fila, int n, bool lay) { return lay ? fila : (fila == 0 ? 0 : (fila == n + 1 ? 1 : fila + 1)); }
+static int FilaDeOrden(int orden, int n, bool lay) { return lay ? orden : (orden == 0 ? 0 : (orden == 1 ? n + 1 : orden - 1)); }
 int InicioPopup::FilaEn(int mx, int my) const {
     if (!Contains(mx, my) || mx < x + colX || mx >= x + colX + colW) return -1;   // (solo en la columna)
     const int ly = my - y;
@@ -138,9 +149,31 @@ int InicioPopup::FilaEn(int mx, int my) const {
     return -1;
 }
 
-void InicioPopup::Elegir(int fila) {
+// la LISTA DE LAYOUTS (o de vuelta a la tarjeta de siempre). Se lee layouts.txt cada vez: uno recien guardado aparece
+void InicioPopup::VerLayouts(bool ver, bool teclado) {
+    verLayouts = ver;
+    if (ver) layouts = W3dLayoutsNombres();
+    else std::vector<std::string>().swap(layouts);
+    // (por teclado queda resaltada la primera: Por defecto, o Nuevo archivo al volver; con el dedo, ninguna)
+    sel = teclado ? 0 : -1;
+    apretada = -1;
+    g_redraw = true;
+}
+
+void InicioPopup::Elegir(int fila, bool teclado) {
+    if (verLayouts) {
+        const int L = (int)layouts.size();
+        if (fila == L + 1) { VerLayouts(false, teclado); return; }   // Ir atras
+        if (fila < 0 || fila > L) return;
+        const std::string nombre = (fila == 0) ? std::string() : layouts[(size_t)(fila - 1)];
+        Cerrar();
+        extern void NuevoProyectoConLayout(const std::string&);
+        NuevoProyectoConLayout(nombre);
+        return;
+    }
     const int n = (int)recientes.size();
     if (fila < 0 || fila > n + 1) return;
+    if (fila == 0 && !W3dLayoutsNombres().empty()) { VerLayouts(true, teclado); return; }   // a elegir el layout
     std::string ruta;
     if (fila >= 1 && fila <= n) ruta = recientes[(size_t)(fila - 1)];
     Cerrar();   // (libera el logo; lo que sigue abre otra cosa)
@@ -288,7 +321,9 @@ void InicioPopup::Render() {
             SetColorID(ColorID::accent, f == apretada ? 0.5f : 0.25f);
             RectLiso(0, fy, colW, altoFila);
         }
-        const int icono = (f == 0) ? (int)IconType::mas : (f <= n) ? (int)IconType::archive : (int)IconType::carpeta;
+        const int L = (int)layouts.size();
+        const int icono = verLayouts ? (f <= L ? (int)IconType::cuadricula : (int)IconType::deshacer)
+                        : (f == 0) ? (int)IconType::mas : (f <= n) ? (int)IconType::archive : (int)IconType::carpeta;
         const int ty = fy + (altoFila - IconSizeGS) / 2;
         w3dEngine::PushMatrix();
         w3dEngine::Translatef((GLfloat)pad, (GLfloat)ty, 0);
@@ -297,7 +332,11 @@ void InicioPopup::Render() {
         w3dEngine::PopMatrix();
         w3dEngine::PushMatrix();
         w3dEngine::Translatef((GLfloat)colTexto, (GLfloat)(fy + (altoFila - LetterHeightGS) / 2), 0);
-        if (f == 0 || f == n + 1) {
+        if (verLayouts) {   // Por defecto, los guardados e Ir atras
+            SetColorID(ColorID::blanco);
+            const std::string t = (f == 0) ? std::string(T("Default")) : (f <= L) ? layouts[(size_t)(f - 1)] : std::string(T("Go back"));
+            RenderBitmapText(t, textAlign::left, wTxt);
+        } else if (f == 0 || f == n + 1) {
             SetColorID(ColorID::blanco);
             RenderBitmapText(T(f == 0 ? "New file" : "Open..."), textAlign::left, wTxt);
         } else {
@@ -318,8 +357,17 @@ void InicioPopup::Render() {
         w3dEngine::PopMatrix();
         if (f != UltimaFila()) Fila::Linea(fy + altoFila - 1, colW);   // (la de mas abajo no: abajo ya esta el borde)
     }
+    // la lista de layouts: arriba, el rotulo "Nuevo archivo" (lo que se esta por hacer)
+    if (verLayouts) {
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)pad, (GLfloat)(yFilas + (altoFila - LetterHeightGS) / 2), 0);
+        SetColorID(ColorID::grisUI);
+        RenderBitmapText(T("New file"), textAlign::left, colW - 2 * pad);
+        w3dEngine::PopMatrix();
+        Fila::Linea(yFilas + altoFila - 1, colW);
+    }
     // despues de "Abrir...": el rotulo de los recientes (si no hay ninguno, ni el rotulo)
-    if (n > 0) {
+    else if (n > 0) {
         w3dEngine::PushMatrix();
         w3dEngine::Translatef((GLfloat)pad, (GLfloat)(yTituloRecientes + (altoFila - LetterHeightGS) / 2), 0);
         SetColorID(ColorID::grisUI);
@@ -361,17 +409,17 @@ bool InicioPopup::Tecla(int tecla) {
         case LayoutKey::Up:
         case LayoutKey::Down: {   // en el orden en que se ven: Nuevo archivo, Abrir..., los recientes
             const int n = (int)recientes.size();
-            int o = (sel < 0) ? -1 : OrdenVisual(sel, n);
+            int o = (sel < 0) ? -1 : OrdenVisual(sel, n, verLayouts);
             o += (tecla == LayoutKey::Down) ? 1 : -1;
             if (o < 0) o = 0;
             if (o > Filas() - 1) o = Filas() - 1;
-            sel = FilaDeOrden(o, n);
+            sel = FilaDeOrden(o, n, verLayouts);
             g_redraw = true;
             return true;
         }
         case LayoutKey::Enter:
-        case LayoutKey::Accept: if (sel >= 0) Elegir(sel); return true;
-        case LayoutKey::Cancel: Cerrar(); return true;
+        case LayoutKey::Accept: if (sel >= 0) Elegir(sel, true); return true;
+        case LayoutKey::Cancel: if (verLayouts) VerLayouts(false, true); else Cerrar(); return true;   // (de la lista, vuelve)
     }
     return true;
 }
