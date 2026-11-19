@@ -12,8 +12,93 @@
 #ifdef __ANDROID__
     #include <jni.h>
 #endif
+#ifdef __EMSCRIPTEN__
+    #include <emscripten.h>
+    #include <string.h>
+#endif
 
 extern bool g_redraw;
+
+#ifdef __EMSCRIPTEN__
+// ============================================================================
+//  EL TECLADO DEL NAVEGADOR en un telefono o una tablet (Safari, Chrome de Android). En la web SDL_StartTextInput no
+//  muestra nada: el teclado del sistema solo sale al ENFOCAR una caja de texto de la pagina. Se usa una ESCONDIDA: lo
+//  que se tipea en ella llega a la app como el texto del teclado (SDL_TEXTINPUT), borrar como Backspace y el Enter
+//  como Enter. Safari solo abre el teclado si la caja se enfoca DENTRO de un toque: si el primer intento no lo abre, el
+//  proximo toque en la pantalla la enfoca, mientras la app lo siga pidiendo (W3dTecladoWebVigilar lo suelta)
+// ============================================================================
+extern "C" EMSCRIPTEN_KEEPALIVE void W3dWebTecladoTexto(const char* utf8) {
+    if (!utf8 || !*utf8) return;
+    // (de a pedazos: el texto de un evento SDL tiene lugar para 31 bytes; sin cortar una letra UTF-8 al medio)
+    const size_t n = strlen(utf8);
+    size_t i = 0;
+    while (i < n) {
+        size_t k = n - i < 31 ? n - i : 31;
+        while (k > 0 && i + k < n && (((unsigned char)utf8[i + k]) & 0xC0) == 0x80) k--;
+        if (k == 0) k = 1;
+        SDL_Event e; SDL_zero(e); e.type = SDL_TEXTINPUT;
+        memcpy(e.text.text, utf8 + i, k); e.text.text[k] = 0;
+        SDL_PushEvent(&e);
+        i += k;
+    }
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void W3dWebTecladoTecla(int enter) {
+    SDL_Event e; SDL_zero(e);
+    e.type = SDL_KEYDOWN; e.key.state = SDL_PRESSED;
+    e.key.keysym.sym = enter ? SDLK_RETURN : SDLK_BACKSPACE;
+    e.key.keysym.scancode = enter ? SDL_SCANCODE_RETURN : SDL_SCANCODE_BACKSPACE;
+    SDL_PushEvent(&e);
+    e.type = SDL_KEYUP; e.key.state = SDL_RELEASED;
+    SDL_PushEvent(&e);
+}
+EM_JS(void, W3dWebTecladoPedir, (int abrir), {
+  var inp = Module.w3dTecladoInput;
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'text';
+    inp.setAttribute('autocapitalize', 'off'); inp.setAttribute('autocomplete', 'off');
+    inp.setAttribute('autocorrect', 'off'); inp.setAttribute('spellcheck', 'false');
+    // (16px: con menos Safari agranda la pagina al enfocarla)
+    inp.style.cssText = 'position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0;font-size:16px;border:0;padding:0;margin:0;';
+    inp.value = ' ';
+    document.body.appendChild(inp);
+    Module.w3dTecladoInput = inp;
+    var reponer = function() { inp.value = ' '; try { inp.setSelectionRange(1, 1); } catch (e) {} };
+    // lo tipeado: lo que hay despues del espacio de guardia; si el espacio se borro, fue un Backspace
+    inp.addEventListener('input', function(e) {
+      var v = inp.value;
+      if (v.length === 0) Module.ccall('W3dWebTecladoTecla', null, ['number'], [0]);
+      else if (v.length > 1) Module.ccall('W3dWebTecladoTexto', null, ['string'], [v.substring(1)]);
+      reponer();
+      e.stopPropagation();
+    });
+    // (las teclas de la caja no le llegan tambien a SDL: si no, un teclado fisico escribiria dos veces)
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { Module.ccall('W3dWebTecladoTecla', null, ['number'], [1]); e.preventDefault(); }
+      else if (e.key === 'Backspace' && inp.value === ' ') { Module.ccall('W3dWebTecladoTecla', null, ['number'], [0]); e.preventDefault(); }
+      e.stopPropagation();
+    });
+    inp.addEventListener('keyup', function(e) { e.stopPropagation(); });
+    inp.addEventListener('keypress', function(e) { e.stopPropagation(); });
+    var foco = function() { if (Module.w3dTecladoQuiere && document.activeElement !== inp) { reponer(); inp.focus(); } };
+    document.addEventListener('touchend', foco, true);
+    document.addEventListener('mouseup', foco, true);
+  }
+  Module.w3dTecladoQuiere = !!abrir;
+  if (abrir) { if (document.activeElement !== inp) { inp.value = ' '; try { inp.focus(); inp.setSelectionRange(1, 1); } catch (e) {} } }
+  else if (document.activeElement === inp) inp.blur();
+});
+static bool gWebTecladoPedido = false;
+// (solo con pantalla tactil: en una PC con teclado fisico la caja escondida no hace falta)
+static bool WebConTactil() {
+    return EM_ASM_INT({ return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0; }) != 0;
+}
+void W3dTecladoWebVigilar(bool hayCampo) {
+    if (gWebTecladoPedido && !hayCampo) { W3dWebTecladoPedir(0); gWebTecladoPedido = false; }
+}
+#else
+void W3dTecladoWebVigilar(bool) {}
+#endif
 
 static int  gAnchoRef = 0;          // ancho de la ventana con el que se midio el alto completo (rotar = de nuevo)
 static int  gAltoCompleto = 0;      // alto de la ventana SIN teclado
@@ -68,6 +153,9 @@ void W3dTecladoAbrir() {
 #else
 #ifdef __ANDROID__
     if (gFullAuto && !gSalioDeFull && gVentana) { SDL_SetWindowFullscreen(gVentana, 0); gSalioDeFull = true; }
+#endif
+#ifdef __EMSCRIPTEN__
+    if (WebConTactil()) { W3dWebTecladoPedir(1); gWebTecladoPedido = true; }   // (el del navegador: ver arriba)
 #endif
     SDL_StartTextInput();
 #endif
@@ -147,4 +235,5 @@ void W3dTecladoIDEAlto(int) {}
 int  W3dTecladoIDEAltoActual() { return 0; }
 void (*g_ventanaReacomodarHook)() = 0;
 void W3dTecladoReacomodar() {}
+void W3dTecladoWebVigilar(bool) {}
 #endif // !W3D_SYMBIAN

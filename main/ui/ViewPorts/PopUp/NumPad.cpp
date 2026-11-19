@@ -385,7 +385,7 @@ QwertyPad::QwertyPad() : PopUpBase("Qwerty") {
 }
 
 void QwertyPad::Reubicar(){
-    dispH = ide ? 0 : RenglonHeightGS + gapGS * 3;   // caja de input (texto que se edita); el IDE se ve arriba
+    dispH = RenglonHeightGS + gapGS * 3;   // caja de input (texto que se edita; el IDE se ve arriba) + la CRUZ de cerrar
     keyH  = RenglonHeightGS * 2;                   // alto de tecla (dedos); 4 filas
     int w = MenuPantallaW;
     int h = borderGS * 2 + dispH + (keyH + gapGS) * QP_FILAS;
@@ -483,10 +483,24 @@ void QwertyPad::Render(){
     w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f);
     popUpWindow->RenderBorder(false);
 
+    // ---- LA CRUZ ROJA de arriba a la derecha: CIERRA el teclado (en un navegador no hay boton Atras: sin ella quedaba
+    //      abierto para siempre). Como tocar afuera: lo escrito queda ----
+    {
+        const int boxH = RenglonHeightGS + gapGS;
+        const int cx = popUpWindow->width - borderGS - gapGS - boxH;
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)cx, (GLfloat)(borderGS + gapGS), 0);
+        w3dEngine::Color4f(0.80f, 0.18f, 0.18f, 1.0f);
+        keyCard->Resize(boxH, boxH); keyCard->RenderObject(false);
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        w3dEngine::Translatef(0, (GLfloat)((boxH - LetterHeightGS) / 2), 0);
+        RenderBitmapText("X", textAlign::center, boxH);
+        w3dEngine::PopMatrix();
+    }
     // ---- caja de INPUT (fondo oscuro + borde claro, como en Properties) con el texto + caret ----
     if (!ide) {
         int boxH = RenglonHeightGS + gapGS;
-        int boxW = popUpWindow->width - 2 * (borderGS + gapGS);
+        int boxW = popUpWindow->width - 2 * (borderGS + gapGS) - boxH - gapGS;   // (a la derecha, la cruz)
         w3dEngine::PushMatrix();
         w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)(borderGS + gapGS), 0);
         w3dEngine::Color4f(negro[0], negro[1], negro[2], 1.0f);
@@ -572,7 +586,12 @@ void QwertyPad::AccionTecla(int fila, int col){
 bool QwertyPad::Click(int mx, int my){
     if (!Contains(mx, my)) return false; // afuera: LayoutClickUI cierra (Cerrar commitea)
     int ly = my - y - borderGS - dispH;
-    if (ly < 0) return true;             // caja de input: consumir sin accion
+    if (ly < 0) {                        // caja de input: consumir sin accion... salvo la CRUZ, que cierra
+        const int boxH = RenglonHeightGS + gapGS;
+        const int cx = x + popUpWindow->width - borderGS - gapGS - boxH;
+        if (mx >= cx - gapGS && mx <= cx + boxH + gapGS) Cerrar();
+        return true;
+    }
     int fila = ly / (keyH + gapGS); if (fila < 0) fila = 0; if (fila > QP_FILAS - 1) fila = QP_FILAS - 1;
     int kx[12], kw[12];
     int n = QpRowGeom(gQwertySimbolos, fila, popUpWindow->width, kx, kw);
@@ -655,6 +674,8 @@ void TecladoIDEAbrir(IDE* ide){
     else QwertyAbrirIDE(ide);
 }
 void TecladosVigilar(){
+    // (la web en un telefono: el teclado del navegador sigue mientras escribe un campo o el IDE activo)
+    W3dTecladoWebVigilar(g_textFieldActivo != NULL || (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 8));
     if (!W3dTecladoIDEAltoActual() && !gIDEMaxPorTeclado) return;
     if (!(gQwerty && gQwerty->ide && PopUpActive == gQwerty)) QpIDEAcomodar(NULL, 0);
 }

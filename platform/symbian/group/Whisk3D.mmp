@@ -170,6 +170,7 @@ SOURCE          RutinaEditor.cpp // validacion de las rutinas antes de dibujarla
 SOURCEPATH      ..\..\..\main\render
 SOURCE          render.cpp OpcionesRender.cpp
 SOURCE          EscenaRender.cpp // el pase 3D compartido con el runtime de los juegos
+SOURCE          SombrasTiempoReal.cpp // las sombras en tiempo real (en el N95: la sombra proyectada por la CPU)
 
 SOURCEPATH      ..\..\..\main\app
 SOURCE          variables.cpp
@@ -266,7 +267,7 @@ SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\input
 SOURCE          W3dClipboardSymbian.cpp
-SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: la rama de escritorio, sin vibrador)
+SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: CHWRMVibra)
 SOURCE          W3dTactil.cpp W3dTactilSymbian.cpp // la pantalla tactil (S60 5th: 1 dedo; Symbian^3: multitactil)
 SOURCE          W3dMandosSymbian.cpp // los joysticks Bluetooth (DualShock 3/4) del driver bthid-s60, cargado en runtime
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
@@ -384,6 +385,7 @@ LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
 LIBRARY         eikcoctl.lib estlib.lib fbscli.lib
 LIBRARY         efsrv.lib
 LIBRARY         hal.lib // HAL::Get(EMemoryRAMFree): la RAM libre en el log ([mem], w3dlog.cpp)
+LIBRARY         hwrmvibraclient.lib // CHWRMVibra: el vibrador del telefono (W3dVibrar.cpp: el OK mantenido, vibrar() de lua)
 LIBRARY         ImageConversion.lib
 LIBRARY         mediaclientaudiostream.lib // CMdaAudioOutputStream: salida de audio del Core
 #ifdef W3D_MMP_GLES2
@@ -445,6 +447,9 @@ SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
 SOURCE PropsHitbox.cpp           // tarjeta "Hitbox" del panel de propiedades
 SOURCE PropsSondaLuz.cpp         // tarjeta "Light Probe" (la sonda de luz) del panel de propiedades
+SOURCE PropsHorneado.cpp         // tarjeta "Bake Lighting" (precalcular la iluminacion) del panel de propiedades
+SOURCE PropsSombras.cpp          // tarjeta "Real-time shadows" de la pestania Render
+SOURCE MenuTexto.cpp            // el menu del texto (Cortar / Copiar / Pegar / Seleccionar todo)
 SOURCE PropsRutina.cpp           // tarjeta "Routine" del panel de propiedades (los pasos de una rutina)
 SOURCE OutlinerRecursos.cpp      // las vistas de recursos del outliner (selector de vista, carpetas, en uso/huerfano)
 SOURCE SoltarRecurso.cpp         // soltar un recurso de la biblioteca en el 3D (malla/material/textura/animset)

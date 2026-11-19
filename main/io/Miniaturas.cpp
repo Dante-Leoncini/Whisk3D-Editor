@@ -5,6 +5,7 @@
 //  una FIRMA (si el recurso cambio, se rehace).
 // ============================================================================
 #include "io/Miniaturas.h"
+#include "W3dLang.h"   // T(): el aviso de que no hay memoria para las vistas previas
 #include "io/RecursosProyecto.h"
 #include "io/CambiosProyecto.h"         // la version de lo editado (una escena se rehace si se toco)
 #include "io/MallasProyecto.h"          // W3dMallasPublicarPendientesDe: la edicion diferida antes de mirar el recurso
@@ -47,6 +48,44 @@ struct TexChica { std::vector<unsigned char> px; int w, h; TexChica() : w(0), h(
 }
 static std::map<std::string, TexChica> gTexChicas;
 
+// LA MEMORIA: con poca RAM libre las vistas previas son lo primero que se va. Antes de generar una se mira la libre; si
+// no alcanza se sueltan las que hay, POR PRIORIDAD (lo que menos sirve primero: sonidos, texturas, mallas 3D, materiales,
+// prefabs, escenas) y, si sigue sin alcanzar, no se genera: la biblioteca avisa "No hay memoria para cargar las vistas
+// previas" y muestra los iconos
+static long kMiniMinLibreKB = 12 * 1024;   // (lo que se deja libre para el resto del editor; el harness lo cambia)
+void W3dMiniaturasMinimoKB(long kb) { kMiniMinLibreKB = kb; }
+static bool gSinMemoria = false;
+extern long W3dMemoriaLibreKB();                 // (OutlinerRecursos.cpp: -1 = la plataforma no lo dice)
+extern void Notificar(const std::string& msg, bool error);
+static void SoltarTipo(int tipo) {
+    const std::string pre = W3dBibClave(tipo, std::string());
+    for (std::map<std::string, Mini>::iterator it = gCache.begin(); it != gCache.end(); ) {
+        if (it->first.compare(0, pre.size(), pre) == 0) {
+            if (it->second.propia && it->second.tex) w3dEngine::DeleteTexture(it->second.tex);
+            gCache.erase(it++);
+        } else ++it;
+    }
+    if (tipo == W3D_VISTA_TEXTURAS) gTexChicas.clear();   // (las texturas chicas de las esferas de los materiales)
+}
+static bool HayMemoriaParaMiniaturas() {
+    long libre = W3dMemoriaLibreKB();
+    if (libre < 0 || libre >= kMiniMinLibreKB) {
+        if (gSinMemoria) { gSinMemoria = false; g_redraw = true; }
+        return true;
+    }
+    static const int orden[] = { W3D_VISTA_SONIDOS, W3D_VISTA_TEXTURAS, W3D_VISTA_MALLAS, W3D_VISTA_MATERIALES,
+                                 W3D_VISTA_PREFABS, W3D_VISTA_ESCENAS };
+    for (size_t k = 0; k < sizeof(orden) / sizeof(orden[0]) && libre < kMiniMinLibreKB; k++) {
+        SoltarTipo(orden[k]);
+        libre = W3dMemoriaLibreKB();
+    }
+    if (libre >= kMiniMinLibreKB) return true;
+    if (!gSinMemoria) Notificar(T("There is no memory to load the previews"), true);
+    gSinMemoria = true;
+    g_redraw = true;
+    return false;
+}
+bool W3dMiniaturasSinMemoria() { return gSinMemoria; }
 void W3dMiniaturasCuadro() { gPresupuesto = 2; gPendientes = 0; }
 int  W3dMiniaturasEnCache() { return (int)gCache.size(); }
 int  W3dMiniaturasPendientes() { return gPendientes; }
@@ -438,6 +477,7 @@ unsigned int W3dMiniatura(int tipo, const std::string& id, int* w, int* h) {
         }
     }
     if (gPresupuesto <= 0) { gPendientes++; g_redraw = true; return it != gCache.end() ? it->second.tex : 0; }
+    if (!HayMemoriaParaMiniaturas()) return 0;   // (sin memoria: el icono del tipo)
     gPresupuesto--;
     std::vector<unsigned char> px; int pw = 0, ph = 0;
     Mini& m = gCache[clave];

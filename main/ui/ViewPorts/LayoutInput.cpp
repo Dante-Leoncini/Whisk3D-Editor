@@ -63,6 +63,7 @@
 #include "objects/InstanciaPrefab.h"
 #include "objects/ProxyW3d.h"   // Add > Proxy W3D (un prefab o una escena de una libreria externa)
 #include "io/Librerias.h"
+#include "io/BibliotecaExterna.h"   // W3dLibreriaVincular: Add > Proxy W3D vincula el .w3d elegido
 #include "objects/Particulas.h" // Add > Particles (emisor de particulas del Core)
 #include "objects/UI.h"
 #include "objects/Texto2D.h"
@@ -1015,17 +1016,47 @@ void AddCollection(){
     TrasCrearAdd(new Collection(CollectionActive ? CollectionActive : SceneCollection));
 }
 // ---- Add > Proxy W3D: un PROXY de una libreria externa en el cursor 3D (objects/ProxyW3d.h) -------------
-// Con librerias vinculadas nace generando el primer prefab de la primera que tenga (la libreria y el elemento se
-// cambian en su tarjeta, Properties); sin ninguna nace vacio (la tarjeta tiene "Add Library...")
-void AddProxyW3d(){
-    std::string lib, elem;
-    for (int i = 0; i < W3dLibsCantidad() && elem.empty(); i++) {
-        std::vector<std::string> ps;
-        W3dLibsElementos(W3dLibsFila(i).nombre, W3D_LIB_PREFAB, ps);
-        if (!ps.empty()) { lib = W3dLibsFila(i).nombre; elem = ps[0]; }
-    }
+// Primero el EXPLORADOR DE ARCHIVOS: el .w3d que es el proxy (se vincula como libreria; si ya estaba, se usa esa). Despues
+// el .w3d POR DENTRO (AbrirFileBrowserLibreria): sus escenas se recorren como carpetas hasta el objeto (o la coleccion)
+// que se quiere traer, con todo lo que cuelga de el; o un prefab, o una escena entera. El proxy nace en el cursor 3D
+static std::string gPxAddLib;
+static Vector3 gPxAddPos;
+// lo elegido adentro de la libreria ("prefab:X", "escena:X", "Escena#Padre/Hijo") -> el proxy
+bool LayoutProxyDeElegido(const std::string& lib, const std::string& elegido, int* tipo, std::string* elem) {
+    if (lib.empty() || elegido.empty()) return false;
+    if (elegido.compare(0, 7, "prefab:") == 0) { *tipo = W3D_LIB_PREFAB; *elem = elegido.substr(7); }
+    else if (elegido.compare(0, 7, "escena:") == 0) { *tipo = W3D_LIB_ESCENA; *elem = elegido.substr(7); }
+    else { *tipo = W3D_LIB_ESCENA; *elem = elegido; }   // (un objeto de una escena)
+    return !elem->empty();
+}
+static void ProxyAddElegido(const std::string& elegido) {
+    int tipo = W3D_LIB_PREFAB; std::string elem;
+    if (!LayoutProxyDeElegido(gPxAddLib, elegido, &tipo, &elem)) return;
     std::string motivo;
-    if (!W3dProxyAgregar(lib, W3D_LIB_PREFAB, elem, cursor3D.pos, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
+    if (!W3dProxyAgregar(gPxAddLib, tipo, elem, gPxAddPos, &motivo)) { Notificar(std::string(T(motivo.c_str())), true); return; }
+    // (se llama como lo que trae: el objeto, el prefab o la escena)
+    const size_t d = elem.find_last_of("/#");
+    if (ObjActivo && ObjActivo->getType() == ObjectType::proxy) ObjActivo->SetNameObj(d == std::string::npos ? elem : elem.substr(d + 1));
+    g_redraw = true;
+}
+// el .w3d elegido: vinculado (o el que ya estaba) -> su contenido
+static void ProxyAddW3dElegido(const std::string& ruta) {
+    std::string lib;
+    for (int i = 0; i < W3dLibsCantidad() && lib.empty(); i++) if (W3dLibsRutaDisco(i) == ruta) lib = W3dLibsFila(i).nombre;
+    if (lib.empty()) {
+        std::string motivo;
+        if (!W3dLibreriaVincular(ruta, &motivo)) { Notificar(std::string(T("Not linked")) + ": " + T(motivo.c_str()), true); return; }
+        if (W3dLibsCantidad() > 0) lib = W3dLibsFila(W3dLibsCantidad() - 1).nombre;
+    }
+    if (lib.empty()) return;
+    gPxAddLib = lib;
+    AbrirFileBrowserLibreria(T("Proxy W3D"), T("Add"), lib, ProxyAddElegido);
+}
+// (el harness: como si el explorador hubiera elegido ese .w3d)
+void LayoutProxyW3dDesde(const std::string& ruta) { gPxAddPos = cursor3D.pos; ProxyAddW3dElegido(ruta); }
+void AddProxyW3d(){
+    gPxAddPos = cursor3D.pos;
+    AbrirFileBrowser(T("Proxy W3D"), T("Open"), ".w3d", ProxyAddW3dElegido, false);
 }
 // ---- Add > Modifier Objects: objetos que dibujan OTRO objeto (su target: el activo al crearlos, o ninguno; se cambia
 // en su tarjeta) -------------------------------------------------------------------------------------------------
@@ -3001,7 +3032,7 @@ static const int kIDECargarLua = 100000;
 static void IDECargarLuaElegido(const std::string& elegido) {
     IDE* ide = gIDEMenuDe;
     if (!ide || elegido.empty()) return;
-    const std::string ruta = W3dImportarAsset(elegido);
+    const std::string ruta = W3dCargarExterno(elegido);
     if (ide->sucio && ruta != ide->archivo) {   // con cambios sin guardar avisa antes de descartarlos
         gIDECambiarA = ruta;
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
@@ -4033,6 +4064,67 @@ static void ContextoConDeshacer(int mx, int my) {
     c->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = c;
 }
+// ============================================================================
+//  EL MENU CONTEXTUAL POR TECLADO (el OK MANTENIDO del N95, como mantener apretado el dedo): el del elemento que tiene
+//  el foco en el viewport activo -la fila de Propiedades, la fila del Outliner o de la Biblioteca, los keyframes del
+//  Timeline, el objeto activo en la Vista 3D-. LayoutMenuContextoTecladoPosible dice si el OK que se acaba de apretar
+//  PUEDE terminar en un menu (si no, el OK hace lo de siempre en el acto: no hay por que esperar)
+// ============================================================================
+bool LayoutMenuContextoTecladoPosible() {
+    if (LayoutMenuAbierto() || PopUpActive || g_textFieldActivo) return false;
+    if (!viewPortActive || !viewPortActive->isLeaf()) return false;
+    const int k = viewPortActive->ViewportKind();
+    if (k == 3) { Properties* p = (Properties*)viewPortActive; return !p->focoEnTabs && !p->editando; }
+    if (VpEsOutliner(viewPortActive)) { Outliner* o = (Outliner*)viewPortActive; return !o->ModoMover() && !o->moviendoRec; }
+    if (k == 5) return true;
+    if (k == 1) {
+        Viewport3D* v = (Viewport3D*)viewPortActive;
+        // (el foco en la barra del 3D: el OK aprieta ese boton)
+        return estado == editNavegacion && v->barFocusIndex < 0 && (ObjActivo || InteractionMode == EditMode);
+    }
+    return false;
+}
+bool LayoutMenuContextoTeclado() {
+    if (!LayoutMenuContextoTecladoPosible()) return false;
+    const int k = viewPortActive->ViewportKind();
+    if (k == 3) return ((Properties*)viewPortActive)->MenuContextoTeclado();
+    if (VpEsOutliner(viewPortActive)) return ((Outliner*)viewPortActive)->MenuContextoTeclado();
+    if (k == 5) return ((Timeline*)viewPortActive)->MenuContextoTeclado();
+    if (k == 1) {
+        // en el objeto activo (su origen en la pantalla); si no se ve, en el medio de la vista
+        Viewport3D* v = (Viewport3D*)viewPortActive;
+        int mx = v->x + v->width / 2, my = v->y + v->height / 2;
+        if (ObjActivo) {
+            Matrix4 W; ObjActivo->GetWorldMatrix(W);
+            float sx = 0, sy = 0;
+            if (v->ProyectarPunto(Vector3(W.m[12], W.m[13], W.m[14]), sx, sy) && sx >= 0 && sy >= 0 && sx < v->width && sy < v->height) {
+                mx = v->x + (int)sx; my = v->y + (int)sy;
+            }
+        }
+        LayoutMenuContexto3D(mx, my);
+        return LayoutMenuAbierto();
+    }
+    return false;
+}
+
+// el MISMO menu en un punto (el OK mantenido con el MOUSE VIRTUAL del N95 quieto: como el click derecho de la PC): el
+// del viewport que esta abajo (Vista 3D, Timeline, Propiedades, Outliner / Biblioteca)
+bool LayoutMenuContextoEn(int mx, int my) {
+    if (LayoutMenuAbierto() || PopUpActive) return false;
+    ViewportBase* v = FindViewportUnderMouse(rootViewport, mx, my);
+    if (!v || !v->isLeaf() || v->OnBar(mx, my)) return false;
+    const int k = v->ViewportKind();
+    if (k == 1) {
+        if (v->OnToolbar(mx, my) || v->OnBrushBar(mx, my) || estado != editNavegacion) return false;
+        LayoutMenuContexto3D(mx, my);
+        return LayoutMenuAbierto();
+    }
+    if (k == 5) return ((Timeline*)v)->MenuContexto(mx, my);
+    if (k == 3) return ((Properties*)v)->MenuContexto(mx, my);
+    if (VpEsOutliner(v)) return ((Outliner*)v)->MenuContexto(mx, my);
+    return false;
+}
+
 void LayoutMenuContexto3D(int mx, int my) {
     if (MenuAbierto) MenuAbierto->Cerrar();
     if (InteractionMode == EditMode) {

@@ -37,7 +37,7 @@ No entiende matrices, arreglos, `while` ni `#define`: si los usás, el error lo 
 3. En **Shader** elegís el archivo:
    - los `.glsl` que ya están en el proyecto;
    - **Shader nuevo**: otro archivo con la plantilla;
-   - **Cargar del disco...**: un `.glsl` de tu computadora. Se copia adentro del proyecto, como las texturas y los scripts.
+   - **Cargar del disco...**: un `.glsl` de tu computadora. Queda afuera, como las texturas y los scripts que se cargan de un archivo (para meterlo adentro del .w3d: la Biblioteca).
 4. El botoncito a la derecha de **Shader** abre el archivo en el **IDE** (hace falta un IDE en el layout).
 5. Escribís, y **Ctrl+S** guarda y compila. También podés tocar **Compilar** en el material o en la barra del IDE (aparece al lado del nombre del archivo cuando es un `.glsl`).
 6. Debajo de **Compilar** queda el resultado: **Compilado**, o el error en rojo con su renglón.

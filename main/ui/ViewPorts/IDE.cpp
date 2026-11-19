@@ -28,6 +28,7 @@
 #include "objects/ShaderEscrito.h"
 #include "objects/ShaderCPU.h"            // (sin shaders: Compilar prueba el @vertice de la CPU)
 #include <stdio.h>                       // guardado atomico: fopen/fwrite/rename
+#include <map>                           // los borradores (lo escrito sin guardar, por archivo)
 #include <string.h>                      // strncmp: las keywords del lexer
 #include <math.h>                        // cosf/sinf: las agarraderas
 
@@ -349,10 +350,51 @@ IDE::IDE() {
     AbrirPrimerScript();
 }
 
-IDE::~IDE() {}
+// ---------------------------------------------------------------------------------------------------------------
+//  LO QUE SE ESCRIBE NO SE PIERDE (cambiar el viewport destruye este IDE y al volver nace otro):
+//   - un SCRIPT NUEVO existe apenas se escribe: entra al .w3d (en memoria, hasta guardar el proyecto) con un nombre
+//     libre ("scripts/script.lua", "script-2.lua"...). Aparece en la biblioteca y ya se le puede poner a un objeto
+//   - lo que se escribe en un script de ADENTRO del .w3d va a su entrada (la memoria del proyecto) en el cuadro
+//   - uno de AFUERA (un archivo del disco) no se escribe solo: sus cambios sin guardar quedan como BORRADOR en memoria
+//     y el IDE que lo vuelve a abrir los recupera (sin proyecto montado, un script nuevo tambien queda de borrador)
+//   - el IDE que nace abre el ULTIMO script que se estaba editando (no el primero de la lista)
+// ---------------------------------------------------------------------------------------------------------------
+static std::map<std::string, std::string> gIdeBorradores;   // archivo ("" = nuevo sin proyecto) -> texto sin guardar
+static std::string gIdeUltimo;                               // el ultimo script abierto / creado en un IDE
+static std::string IdeEntradaLibre() {
+    std::string e = "scripts/script.lua";
+    for (int n = 2; W3dContenedorExiste(e); n++) { char b[48]; snprintf(b, sizeof(b), "scripts/script-%d.lua", n); e = b; }
+    return e;
+}
+void IDE::SincronizarMemoria() {
+    if (!sucio) return;
+    if (archivo.empty()) {
+        if (!W3dContenedorHayMontado()) return;   // (sin proyecto: queda en el buffer; al cerrar, de borrador)
+        archivo = IdeEntradaLibre();
+        gIdeUltimo = archivo;
+        hayTextoDisco = false;
+        gIdeBorradores.erase(std::string());
+        { extern void W3dRecursosVistaInvalidar(); W3dRecursosVistaInvalidar(); }   // (aparece en la biblioteca)
+    }
+    if (!W3dEsNombreDeEntrada(archivo)) return;   // (los de afuera se guardan con Guardar)
+    const std::string t = GetTexto();
+    if (!W3dContenedorEscribirEntrada(archivo, t.empty() ? "" : t.c_str(), t.size())) return;
+    sucio = false;
+    textoDisco = t; hayTextoDisco = true;
+    g_redraw = true;
+}
+IDE::~IDE() {
+    SincronizarMemoria();
+    if (sucio && !W3dEsNombreDeEntrada(archivo)) gIdeBorradores[archivo] = GetTexto();   // (de afuera / sin proyecto)
+}
 
 void IDE::AbrirPrimerScript() {
     if (!archivo.empty()) return;
+    // el ULTIMO que se estaba editando (si sigue existiendo); si no, un script nuevo a medio escribir; si no, el primero
+    if (!gIdeUltimo.empty() && (W3dEsNombreDeEntrada(gIdeUltimo) ? W3dContenedorExiste(gIdeUltimo) : w3dFileSystem::FileExists(gIdeUltimo)) &&
+        AbrirArchivo(gIdeUltimo)) return;
+    std::map<std::string, std::string>::iterator nuevo = gIdeBorradores.find(std::string());
+    if (nuevo != gIdeBorradores.end()) { SetTexto(nuevo->second); return; }
     std::vector<std::string> rutas;
     IDEColectarScripts(&rutas);
     if (!rutas.empty()) AbrirArchivo(rutas[0]);
@@ -476,6 +518,10 @@ bool IDE::AbrirArchivo(const std::string& ruta) {
     archivo = ruta;
     sucio = false;
     textoDisco = crudo; hayTextoDisco = true;
+    gIdeUltimo = ruta;
+    // un BORRADOR (lo que se habia escrito y no se guardo antes de cerrar el IDE): vuelve, sin guardar
+    { std::map<std::string, std::string>::iterator b = gIdeBorradores.find(ruta);
+      if (b != gIdeBorradores.end()) { IdePartirEnLineas(b->second, &lineas); sucio = true; gIdeBorradores.erase(b); } }
     curLin = 0; curCol = 0; haySel = false; selDrag = false;
     PosX = 0; PosY = 0;
     pilaUndo.clear(); pilaRedo.clear(); undoUltimaOp = 0;
@@ -591,6 +637,7 @@ bool IDE::Guardar(bool forzar) {
     }
     sucio = false;
     textoDisco = t; hayTextoDisco = true;
+    gIdeBorradores.erase(archivo);
     W3dDescargarSiWeb(archivo);   // navegador: el .lua externo guardado baja a la PC
     if (!silencioso) Notificar(IDENombreScript(archivo) + " " + T("saved"), false);
     IdeShaderGuardado(archivo);
@@ -1464,6 +1511,7 @@ static void IdeDibujarTramo(const std::string& s, const std::vector<unsigned cha
 }
 
 void IDE::Render() {
+    SincronizarMemoria();   // (lo escrito en un script del .w3d -o uno nuevo- ya esta en el proyecto: ver arriba)
     SincronizarBarra();
     const int glY = W3dPantallaAlto - y - height;
 
@@ -1766,6 +1814,24 @@ static void IDEMudarEn(ViewportBase* n, const std::string& viejo, const std::str
 void IDEArchivoMudado(const std::string& viejo, const std::string& nuevo) {
     if (viejo != nuevo) IDEMudarEn(LayoutRaizCompleta(), viejo, nuevo);
 }
+
+// GUARDAR un script desde afuera del IDE (el boton Guardar de la tarjeta Recurso): los IDE que lo tienen abierto con
+// cambios lo escriben (a su entrada del .w3d o a su archivo). false = ninguno lo tenia con cambios
+static bool IDEGuardarEn(ViewportBase* n, const std::string& ruta) {
+    if (!n) return false;
+    if (n->isLeaf()) {
+        if (n->ViewportKind() != 8) return false;
+        IDE* ide = (IDE*)n;
+        return ide->archivo == ruta && ide->sucio && ide->Guardar();
+    }
+    if (n->ContainerKind() == 1) {
+        const bool a = IDEGuardarEn(((ViewportRow*)n)->childA, ruta);
+        return IDEGuardarEn(((ViewportRow*)n)->childB, ruta) || a;
+    }
+    const bool a = IDEGuardarEn(((ViewportColumn*)n)->childA, ruta);
+    return IDEGuardarEn(((ViewportColumn*)n)->childB, ruta) || a;
+}
+bool IDEGuardarScript(const std::string& ruta) { return IDEGuardarEn(LayoutRaizCompleta(), ruta); }
 
 bool IDEAbrirScript(const std::string& ruta) {
     IDE* ide = PrimerIDE(LayoutRaizCompleta());

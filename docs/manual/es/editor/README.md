@@ -34,6 +34,7 @@ Qué puede hacer **Whisk3D Editor**, ordenado por panel y por modo. Borrador par
 7. [Outliner](outliner.md)
 8. [Propiedades](propiedades.md)
    - [Shaders escritos](shaders.md)
+   - [Sombras en tiempo real](sombras-tiempo-real.md)
 9. [Editor 2D](editor-2d.md)
 10. [Editor de scripts (IDE)](editor-de-scripts.md)
 11. [Consola](consola.md)

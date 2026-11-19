@@ -1342,6 +1342,8 @@ static std::string RutaExternaDe(const std::string& id) {
     if (!d.empty() && d[d.size() - 1] != '/' && d[d.size() - 1] != '\\') d += '/';
     return d + BaseDeRuta(id);
 }
+// PISAR el archivo de afuera si ya existe (Guardar como: el explorador ya pregunto "Sobrescribir archivo?")
+bool g_w3dUbicacionPisar = false;
 static bool FijarUbicacionArchivo(int tipo, const std::string& id, int ubic, const std::string& rutaExt,
                                   std::string* idNuevo, std::string* motivo) {
     if (idNuevo) *idNuevo = id;
@@ -1358,10 +1360,11 @@ static bool FijarUbicacionArchivo(int tipo, const std::string& id, int ubic, con
         const std::string ruta = rutaExt.empty() ? RutaExternaDe(id) : rutaExt;
         if (ruta.empty()) { if (motivo) *motivo = "Save the project first"; return false; }
         std::vector<unsigned char> hay;
-        if (w3dFileSystem::FileExists(ruta) && (!w3dFileSystem::ReadFileBytes(ruta, hay) || hay != datos)) {
+        if (!g_w3dUbicacionPisar && w3dFileSystem::FileExists(ruta) && (!w3dFileSystem::ReadFileBytes(ruta, hay) || hay != datos)) {
             if (motivo) *motivo = "A different file already exists there";
             return false;
         }
+        if (g_w3dUbicacionPisar) hay.clear();   // (se escribe encima)
         if (hay.empty()) {
             FILE* f = fopen(ruta.c_str(), "wb");
             if (!f) { if (motivo) *motivo = "The file couldn't be written"; return false; }
@@ -1395,12 +1398,11 @@ static bool FijarUbicacionArchivo(int tipo, const std::string& id, int ubic, con
 // las filas de "adentro / afuera" y "falta el archivo" de un archivo del proyecto
 static void DatosUbicacion(const std::string& id, std::vector<W3dRecursoDato>& out) {
     const int u = UbicacionDeRuta(id);
+    // (DONDE esta no va en los datos: lo dice el desplegable Ubicacion de la tarjeta, justo arriba)
     if (u == 0) {
-        out.push_back(W3dRecursoDato(T("Stored"), T("Inside the .w3d")));
         const long tam = TamArchivo(id);
         if (tam >= 0) out.push_back(W3dRecursoDato(T("In the .w3d"), W3dBytesTexto((double)tam)));
     } else if (u == 1) {
-        out.push_back(W3dRecursoDato(T("Stored"), T("External")));
         out.push_back(W3dRecursoDato(T("Path"), id));
         const long tam = TamArchivo(id);
         if (tam < 0) out.push_back(W3dRecursoDato(T("Warning"), T("The external file is missing")));
@@ -1838,7 +1840,6 @@ public:
             std::string a = SiNo(im.alfa);
             if (im.alfa && im.alfaTipo == 1) a += std::string(" (") + T("binary") + ")";
             else if (im.alfa && im.alfaTipo == 2) a += std::string(" (") + T("with transparency") + ")";
-            else if (im.alfa && im.alfaTipo == 0) a += std::string(" (") + T("all opaque") + ")";
             out.push_back(W3dRecursoDato(T("Alpha channel"), a));
         }
         if (ia.bytes > 0) out.push_back(W3dRecursoDato(T("Bytes"), W3dBytesTexto((double)ia.bytes)));
@@ -2970,7 +2971,30 @@ static void SoltarVistaPreviaDe(const std::string& clave) {
 }
 // las entradas cambiaron de nombre: la que no cargo puede cargar ahora
 static void OlvidarFalloVistaPrevia() { gPrevFallo.clear(); }
+extern int W3dLibreriasCantidad();   // (io/BibliotecaExterna.h)
+static int gExtLib = -1;            // el recurso de una LIBRERIA elegido (W3dRecursoExtActivar): -1 = ninguno
+static W3dRecursoItem gExtItem;
+static std::string gExtGlobal;
+static unsigned int gExtObjSerial = 0, gExtSelSerial = 0;
+void W3dRecursoExtActivar(int lib, const W3dRecursoItem& it, const std::string& idGlobal) {
+    W3dRecursoDesactivar();
+    gExtLib = lib; gExtItem = it; gExtGlobal = idGlobal;
+    gExtObjSerial = ObjActivo ? ObjActivo->serial : 0;
+    gExtSelSerial = W3dSeleccionSerial;
+    gActVersion++;
+}
+bool W3dRecursoExtActivo(int* lib, W3dRecursoItem* it, std::string* idGlobal) {
+    if (gExtLib < 0) return false;
+    if ((ObjActivo ? ObjActivo->serial : 0) != gExtObjSerial || W3dSeleccionSerial != gExtSelSerial || gExtLib >= W3dLibreriasCantidad()) {
+        gExtLib = -1; gActVersion++; return false;
+    }
+    if (lib) *lib = gExtLib;
+    if (it) *it = gExtItem;
+    if (idGlobal) *idGlobal = gExtGlobal;
+    return true;
+}
 void W3dRecursoActivar(int vista, const std::string& id) {
+    if (gExtLib >= 0) { gExtLib = -1; gActVersion++; }
     if (vista != gActVista || id != gActId) { SoltarVistaPrevia(); gActVersion++; }
     gActVista = vista;
     gActId = id;
@@ -2978,7 +3002,8 @@ void W3dRecursoActivar(int vista, const std::string& id) {
     gActSelSerial = W3dSeleccionSerial;
 }
 void W3dRecursoDesactivar() {
-    if (gActVista >= 0) gActVersion++;
+    if (gActVista >= 0 || gExtLib >= 0) gActVersion++;
+    gExtLib = -1;
     SoltarVistaPrevia();
     gActVista = -1;
     gActId.clear();

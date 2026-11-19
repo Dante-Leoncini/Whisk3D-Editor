@@ -147,6 +147,7 @@ public:
 
 static AlmacenContenedor* gAlmacen = NULL;
 static std::string  gRutaMontada;
+std::string W3dContenedorRutaMontada() { return gRutaMontada; }
 
 bool W3dContenedorHayMontado() { return gAlmacen != NULL; }
 W3dZipLector* W3dContenedorLector() { return gAlmacen ? &gAlmacen->zip.Lector() : NULL; }
@@ -358,6 +359,18 @@ std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria
     w3dLogf("[W3D] importado %s -> %s (%u bytes, adentro del proyecto)",
             rutaDisco.c_str(), cand.c_str(), tam);
     return cand;
+}
+
+std::string W3dCargarExterno(const std::string& rutaDisco, const char* categoria) {
+    if (rutaDisco.empty() || W3dEsNombreDeEntrada(rutaDisco)) return rutaDisco;   // (ya es del proyecto)
+#ifdef __EMSCRIPTEN__
+    return W3dImportarAsset(rutaDisco, categoria);
+#else
+    (void)categoria;
+    if (gAlmacen) W3dRefExternaMarcar(rutaDisco);   // (proyecto v3, sin contenedor: todo es suelto igual)
+    w3dLogf("[W3D] cargado %s (queda afuera: referencia externa)", rutaDisco.c_str());
+    return rutaDisco;
+#endif
 }
 
 // ===========================================================================

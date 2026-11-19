@@ -76,7 +76,11 @@ struct RTRng { unsigned int s; RTRng(unsigned int seed) : s(seed ? seed : 0x9E37
 // ---------------------------------------------------------------------------
 //  escena plana
 // ---------------------------------------------------------------------------
-struct RTTri { int v0, v1, v2; int mat; };
+// fl: LO QUE HACE EL OBJETO CON LA LUZ (Object::proyectaSombra / rebotaLuz / recibeSombra / captaSombras). Un rayo de
+// SOMBRA solo ve lo que PROYECTA; un rayo de REBOTE (la luz indirecta, el reflejo) solo lo que REBOTA: lo demas le pasa
+// de largo, como si no estuviera. RECIBE: en su superficie las lamparas hacen sombra. Los rayos de la camara ven todo
+enum { RT_PROYECTA = 1, RT_REBOTA = 2, RT_RECIBE = 4, RT_TODO = 7 };
+struct RTTri { int v0, v1, v2; int mat; unsigned char fl; RTTri() : v0(0), v1(0), v2(0), mat(0), fl(RT_TODO) {} };
 // transparente: alpha = alpha del color x alpha de la textura (mezcla 0). Con mezcla ADITIVA (2) el color se SUMA
 // a lo de atras y no tapa nada. Lo transparente deja pasar la luz en proporcion: alpha 0 = no proyecta sombra.
 // metalico 0..1: esa fraccion del color es REFLEJO de la escena (teñido por el color del material), el resto difuso;
@@ -248,7 +252,8 @@ static inline bool RayoCaja(const float* bmin, const float* bmax, const RTV& o, 
 // el mas cercano (sombra=false) o CUALQUIERA antes de tMax (sombra=true). Con tMin/excluido se sigue el MISMO rayo
 // detras de una superficie transparente: no se avanza el origen (eso saltaba una cara opaca coplanar, p.ej. una
 // calcomania pegada a una pared), se descarta solo el triangulo ya atravesado.
-static bool Trazar(const RTEscena& e, const RTV& o, const RTV& d, float tMin, float tMax, bool sombra, RTHit& mejor, int excluido = -1) {
+static bool Trazar(const RTEscena& e, const RTV& o, const RTV& d, float tMin, float tMax, bool sombra, RTHit& mejor, int excluido = -1,
+                   unsigned char mascara = 0) {
     if (e.nodos.empty()) return false;
     const RTV invD = V3(1.0f / (fabsf(d.x) > 1e-12f ? d.x : 1e-12f), 1.0f / (fabsf(d.y) > 1e-12f ? d.y : 1e-12f), 1.0f / (fabsf(d.z) > 1e-12f ? d.z : 1e-12f));
     int pila[64]; int sp = 0; pila[sp++] = 0;
@@ -260,6 +265,7 @@ static bool Trazar(const RTEscena& e, const RTV& o, const RTV& d, float tMin, fl
             for (int i = 0; i < n.cantidad; i++) {
                 const int tri = e.orden[(size_t)(n.primero + i)];
                 if (tri == excluido) continue;
+                if ((e.tris[(size_t)tri].fl & mascara) != mascara) continue;   // (le pasa de largo: ver RTTri::fl)
                 RTHit h;
                 if (RayoTri(e, tri, o, d, tMin, mejor.t, h)) { mejor = h; hay = true; if (sombra) return true; }
             }
@@ -424,6 +430,14 @@ static void AgregarMalla(RTEscena& e, Mesh* m, std::vector<Material*>& vistos) {
             }
         }
     }
+    // lo que hace con la luz (ver RTTri::fl): un CAPTADOR DE SOMBRAS solo las recibe (no tapa ni rebota)
+    {
+        unsigned char fl = 0;
+        if (m->proyectaSombra && !m->captaSombras) fl |= RT_PROYECTA;
+        if (m->rebotaLuz && !m->captaSombras) fl |= RT_REBOTA;
+        if (m->recibeSombra) fl |= RT_RECIBE;
+        for (size_t t = trisAntes; t < e.tris.size(); t++) e.tris[t].fl = fl;
+    }
     AgregarMallaFin(e, base, nV, trisAntes);
 }
 // (cierre de AgregarMalla: tangentes si hace falta) -> ver AgregarMallaFin
@@ -438,6 +452,9 @@ extern const std::set<Object*>* g_localViewVisibles;
 // EL HORNEADO DE LAS SONDAS DE LUZ (RTHornearSondas) arma la escena solo con lo ESTATICO (Object::estatico): lo que se
 // mueve -un personaje, una pelota- no tapa ni rebota luz en la sonda, solo la recibe (como el "static" de Unity)
 static bool g_rtSoloEstaticos = false;
+// SIN SOMBRAS: la luz directa del punto que se esta sombreando no prueba si algo tapa las lamparas (un objeto que no
+// recibe sombras; el horneado de uno que no las recibe)
+static bool g_rtSinSombras = false;
 static void RecorrerEscena(RTEscena& e, Object* o, std::vector<Material*>& vistos) {
     if (!o) return;
     if (o != (Object*)SceneCollection && (!o->visible || !o->renderizable)) return;
@@ -552,7 +569,12 @@ struct RTHorneado {
     std::vector<float> ind, nrm;   // la luz INDIRECTA aparte (se suaviza al terminar) y la normal de cada texel
     bool indirecta, denoiser; int rebotes, rebotesAntes;
     std::vector<int> rayosDirecta, rayosRebote;   // los rayos de sombra de cada lampara: en la luz del texel y en los rebotes
-    RTHorneado() : activo(false), sig(0), w(0), h(0), muestras(16), rng(4242u), indirecta(true), denoiser(true), rebotes(3), rebotesAntes(0) {}
+    // LO QUE HACE LA MALLA HORNEADA CON LA LUZ (sus banderas al empezar): sin sombras = no recibe sombras (la directa le
+    // llega entera); captador = la textura sale BLANCA con solo las sombras (directa con sombras / sin sombras) por la
+    // oclusion ambiental (lo que la tapa alrededor, a menos de un metro)
+    bool sinSombras, captador;
+    RTHorneado() : activo(false), sig(0), w(0), h(0), muestras(16), rng(4242u), indirecta(true), denoiser(true), rebotes(3), rebotesAntes(0),
+                   sinSombras(false), captador(false) {}
 };
 static RTHorneado gHorn;
 bool RTHorneadoActivo() { return gHorn.activo; }
@@ -562,6 +584,7 @@ void RTHorneadoCancelar() {
 }
 const std::vector<float>& RTHorneadoLuz() { return gHorn.luz; }
 const std::vector<unsigned char>& RTHorneadoCubierto() { return gHorn.cubierto; }
+bool RTHorneadoCaptador() { return gHorn.captador; }
 bool RTHorneadoEmpezar(Mesh* m, int uvCapa, int w, int h, int muestras, std::string* motivo, bool indirecta, int rebotes, bool denoiser) {
     RTHorneadoCancelar();
     if (!m || !m->vertex || !m->normals || !m->faces || m->facesSize < 3 || w < 1 || h < 1) { if (motivo) *motivo = "The mesh has no faces"; return false; }
@@ -587,6 +610,8 @@ bool RTHorneadoEmpezar(Mesh* m, int uvCapa, int w, int h, int muestras, std::str
         }
     }
     gHorn.indirecta = indirecta; gHorn.denoiser = denoiser;
+    gHorn.sinSombras = !m->recibeSombra;
+    gHorn.captador = m->captaSombras;
     gHorn.rebotes = rebotes < 1 ? 1 : (rebotes > 8 ? 8 : rebotes);
     gHorn.luz.assign((size_t)w * h * 3, 0.0f);
     gHorn.ind.assign((size_t)w * h * 3, 0.0f);
@@ -653,10 +678,39 @@ float RTHorneadoPaso(int msPresupuesto) {
     while (gHorn.sig < gHorn.tx.size()) {
         const RTHornTexel& T = gHorn.tx[gHorn.sig++];
         for (size_t i = 0; i < gHorn.e.luces.size(); i++) gHorn.e.luces[i].rayos = gHorn.rayosDirecta[i];
-        float dir[3]; LuzEn(gHorn.e, T.p, T.n, T.n, uno, blanco, gHorn.rng, dir);
+        float dir[3];
+        g_rtSinSombras = gHorn.sinSombras;
+        LuzEn(gHorn.e, T.p, T.n, T.n, uno, blanco, gHorn.rng, dir);
+        g_rtSinSombras = false;
+        const RTV o = T.p + T.n * 1e-3f;
+        if (gHorn.captador) {
+            // CAPTADOR DE SOMBRAS: cuanto de la luz directa le tapan (con sombras / sin sombras) y la oclusion ambiental.
+            // Gris: la textura es blanca donde no le cae nada
+            float sin[3];
+            g_rtSinSombras = true;
+            LuzEn(gHorn.e, T.p, T.n, T.n, uno, blanco, gHorn.rng, sin);
+            g_rtSinSombras = false;
+            const float lc = dir[0] * 0.299f + dir[1] * 0.587f + dir[2] * 0.114f, ls = sin[0] * 0.299f + sin[1] * 0.587f + sin[2] * 0.114f;
+            float r = (ls > 1e-5f) ? lc / ls : 1.0f;
+            if (r < 0.0f) r = 0.0f; if (r > 1.0f) r = 1.0f;
+            const int nAO = gHorn.muestras < 16 ? 16 : gHorn.muestras;
+            int tapados = 0;
+            for (int s = 0; s < nAO; s++) {
+                RTV d = Norm(T.n + DirAzarEsfera(gHorn.rng));   // (pesado por el coseno)
+                if (Dot(d, T.n) <= 0.0f) d = T.n;
+                RTHit hh;
+                if (Trazar(gHorn.e, o, d, 1e-4f, 1.0f, true, hh, -1, RT_PROYECTA)) tapados++;
+            }
+            const float ao = 1.0f - (float)tapados / (float)nAO;
+            float* out = &gHorn.luz[(size_t)T.idx * 3];
+            float* oi = &gHorn.ind[(size_t)T.idx * 3];
+            out[0] = out[1] = out[2] = r;
+            oi[0] = oi[1] = oi[2] = ao;
+            if ((++hechos & 15) == 0 && (int)(w3dGetTicks() - t0) >= msPresupuesto) break;
+            continue;
+        }
         for (size_t i = 0; i < gHorn.e.luces.size(); i++) gHorn.e.luces[i].rayos = gHorn.rayosRebote[i];
         float ind[3] = { 0, 0, 0 };
-        const RTV o = T.p + T.n * 1e-3f;
         for (int s = 0; gHorn.indirecta && s < gHorn.muestras; s++) {
             RTV d = Norm(T.n + DirAzarEsfera(gHorn.rng));   // (pesado por el coseno)
             if (Dot(d, T.n) <= 0.0f) d = T.n;
@@ -674,7 +728,7 @@ float RTHorneadoPaso(int msPresupuesto) {
         // LA INDIRECTA SUAVIZADA: con pocos rayos por texel sale granulada. Se promedia con los vecinos que miran para el
         // mismo lado (asi no cruza de una cara a otra); la DIRECTA (las sombras) queda nitida
         const int w = gHorn.w, h = gHorn.h;
-        for (int pasada = 0; gHorn.denoiser && gHorn.indirecta && pasada < 3; pasada++) {
+        for (int pasada = 0; gHorn.denoiser && (gHorn.indirecta || gHorn.captador) && pasada < 3; pasada++) {
             std::vector<float> I2(gHorn.ind);
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++) {
@@ -697,7 +751,9 @@ float RTHorneadoPaso(int msPresupuesto) {
                 }
             gHorn.ind.swap(I2);
         }
-        for (size_t i = 0; i < gHorn.luz.size(); i++) gHorn.luz[i] += gHorn.ind[i];
+        // (el captador: las sombras POR la oclusion ambiental; si no, la directa MAS la indirecta)
+        if (gHorn.captador) for (size_t i = 0; i < gHorn.luz.size(); i++) gHorn.luz[i] *= gHorn.ind[i];
+        else                for (size_t i = 0; i < gHorn.luz.size(); i++) gHorn.luz[i] += gHorn.ind[i];
         g_rt.rebotes = gHorn.rebotesAntes;
         gHorn.activo = false; gHorn.e.Limpiar();
         return 1.0f;
@@ -825,12 +881,12 @@ static void FondoEn(const RTEscena& e, const RTV& d, float* out) {
 }
 static float Visibilidad(const RTEscena& e, const RTV& o, const RTV& d, float tMax) {
     RTHit h;
-    if (!e.hayTransparentes) return Trazar(e, o, d, 1e-4f, tMax, true, h) ? 0.0f : 1.0f;
+    if (!e.hayTransparentes) return Trazar(e, o, d, 1e-4f, tMax, true, h, -1, RT_PROYECTA) ? 0.0f : 1.0f;
     float vis = 1.0f; float tMin = 1e-4f; int excl = -1;
     // (lo que en ese punto es TOTALMENTE transparente no gasta capa: el pelo son muchas tarjetas superpuestas y el rayo
     // se quedaba sin capas en los huecos, lo de atras salia negro. 'vuelta' es el tope por si nada tapa nunca)
     for (int capa = 0, vuelta = 0; capa < g_rt.capas && vuelta < 256; vuelta++) {
-        if (!Trazar(e, o, d, tMin, tMax, false, h, excl)) return vis;
+        if (!Trazar(e, o, d, tMin, tMax, false, h, excl, RT_PROYECTA)) return vis;
         const float op = OpacidadEn(e, h);
         if (op > 0.0f) capa++;
         vis *= (1.0f - op);
@@ -886,7 +942,7 @@ static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haci
                 if (sd < L.spotCos) continue;
                 if (L.spotExpo > 0.0f) cono = powf(sd, L.spotExpo);
             }
-            const float vis = Visibilidad(e, po, ldir, dist) * cono;   // 0..1: lo transparente deja pasar parte de la luz
+            const float vis = (g_rtSinSombras ? 1.0f : Visibilidad(e, po, ldir, dist)) * cono;   // 0..1: lo transparente deja pasar parte de la luz
             if (vis <= 0.0f) continue;
             lambert += nl * vis;
             if (pesoBrillo > 0.0f) {   // Blinn-Phong: (n . h)^expo, normalizado para que el pulido concentre la misma energia
@@ -915,7 +971,7 @@ static void Radiancia(const RTEscena& e, const RTV& o0, const RTV& d0, RTRng& rn
     // (lo TOTALMENTE transparente en ese punto no gasta capa: ver Visibilidad)
     for (int capa = 0, vuelta = 0; capa < g_rt.capas && vuelta < 256; vuelta++) {
         RTHit h;
-        if (!Trazar(e, o, d, tMin, 1e30f, false, h, excl)) {   // (un REBOTE que llega al fondo trae su luz: por el factor)
+        if (!Trazar(e, o, d, tMin, 1e30f, false, h, excl, profundidad > 0 ? (unsigned char)RT_REBOTA : (unsigned char)0)) {   // (un REBOTE que llega al fondo trae su luz: por el factor)
             float f[3]; FondoEn(e, d, f); const float s = profundidad > 0 ? e.luzFondo : 1.0f;
             out[0] += peso * f[0] * s; out[1] += peso * f[1] * s; out[2] += peso * f[2] * s; return; }
         const RTTri& T = e.tris[(size_t)h.tri];
@@ -953,7 +1009,10 @@ static void Radiancia(const RTEscena& e, const RTV& o0, const RTV& d0, RTRng& rn
                     if (Dot(np, np) > 1e-12f) n = Norm(np);
                 }
             }
-            float col[3]; LuzEn(e, p, n, d * -1.0f, alb, m, rng, col);
+            float col[3];
+            g_rtSinSombras = !(T.fl & RT_RECIBE);   // (un objeto que no recibe sombras: las lamparas le llegan enteras)
+            LuzEn(e, p, n, d * -1.0f, alb, m, rng, col);
+            g_rtSinSombras = false;
             // METALICO: reflejo de la escena (hasta 4 rebotes), teñido por el color; la rugosidad desparrama la
             // direccion reflejada (un rayo por muestra: los pases lo promedian)
             if (m.metalico > 0.0f && profundidad < 4) {

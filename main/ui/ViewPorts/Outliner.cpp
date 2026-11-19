@@ -256,6 +256,14 @@ bool OutlinerActivarEscenaDe(Object* o) {
 static Object* W3dObjetoEnFila(int fila, int* profOut = 0); // profOut (opcional) = profundidad del objeto
 static bool W3dFilaEnArbol(int fila, OutFila& out);         // fila -> objeto real o fila virtual (false = vacio)
 static int W3dFilaDe(Object* objetivo);                     // fila visible de un objeto (-1 si esta plegado)
+// la Y (desde el tope del contenido) de la fila del objeto ACTIVO; -1 = no tiene fila (plegado). El menu por teclado
+int OutlinerYDelActivo() {
+    if (!ObjActivo) return -1;
+    const int f = W3dFilaDe(ObjActivo);
+    if (f < 0) return -1;
+    OutCortesArmar();
+    return OutYDeFila(f);
+}
 
 Outliner::Outliner() : ViewportBase() {
     Renglon = new Rec2D();
@@ -277,6 +285,7 @@ Outliner::Outliner() : ViewportBase() {
     // LA BIBLIOTECA (OutlinerRecursos.cpp): arranca en la ESCENA, el arbol de siempre
     vista = OUT_VISTA_ESCENA;
     filtro = -1;
+    soloSinUso = false;
     cuadricula = false;
     verMemoria = true;
     celdaZoom = 1.0f;
@@ -334,7 +343,7 @@ Outliner::Outliner() : ViewportBase() {
     btnFiltro = new Button("", (int)IconType::filtro);
     btnFiltro->rol = 5;
     btnFiltro->desplegable = true;
-    btnFiltro->caretMenu = true;
+    btnFiltro->cuadrado = true;   // (solo el icono, cuadrado y sin la flechita: como el resto de la barra)
     btnFiltro->visible = false;
     BarButtons.push_back(btnFiltro);
     btnCuadricula = new Button("", (int)IconType::cuadricula);
@@ -843,7 +852,17 @@ void Outliner::mouse_button_up(int boton){
     FindMouseOver(lastMouseX,lastMouseY);
 }
 
-// ZOOM de la CUADRICULA (la rueda / dos dedos): el tamanio de las celdas, entre la mitad y cuatro veces el de siempre
+// ZOOM de la CUADRICULA (Ctrl + rueda / dos dedos / la fila Zoom del menu Vista): el tamanio de las celdas, entre 60% y
+// cuatro veces el de siempre
+void OutlinerZoomCeldas(Outliner* o, float z) {
+    if (z < 0.6f) z = 0.6f;
+    if (z > 4.0f) z = 4.0f;
+    if (z == o->celdaZoom) return;
+    o->celdaZoom = z;
+    o->lastContentRows = -1;
+    o->Resize(o->width, o->height);
+    g_redraw = true;
+}
 static void ZoomCeldas(Outliner* o, float factor) {
     float z = o->celdaZoom * factor;
     if (z < 0.6f) z = 0.6f;
@@ -861,8 +880,9 @@ void Outliner::event_finger_gesture(float zoomDelta, float panDx, float panDy){
 void Outliner::event_mouse_wheel(float dy, int mx, int my){
     {
       if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; } // sobre la barra -> horizontal
-    // la CUADRICULA: la rueda agranda / achica las celdas (se scrollea con la barra o arrastrando)
-    if (EnBiblioteca() && cuadricula) { ZoomCeldas(this, dy > 0 ? 1.12f : 1.0f / 1.12f); return; }
+    // la CUADRICULA: la rueda SCROLLEA, como en todos lados; Ctrl + rueda agranda / achica las celdas
+    extern bool LCtrlPressed;
+    if (EnBiblioteca() && cuadricula && LCtrlPressed) { ZoomCeldas(this, dy > 0 ? 1.12f : 1.0f / 1.12f); return; }
     MouseWheel = true;
     ScrollY(dy*6*GlobalScale);
     MouseWheel = false;

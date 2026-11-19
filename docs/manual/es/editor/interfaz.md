@@ -113,6 +113,16 @@ Si el viewport es angosto, su barra de menús no entra entera. Lo mismo pasa con
 
 ![Android](../tutoriales/img/icono-android.svg) Apoyar el dedo sobre una opción no la elige: se resalta la que está abajo del dedo, y al **soltar** se elige esa. Así se puede deslizar hasta la opción que se quiere antes de levantar el dedo. Si el dedo sale del menú y se suelta afuera, el menú se cierra sin elegir nada. En un menú largo, llevar el dedo al borde de arriba o de abajo lo va desplazando solo. En la Vista 3D, la pulsación larga abre el menú contextual y el mismo dedo puede deslizar hasta la opción.
 
+## El menú contextual
+
+Sobre una propiedad, un objeto de la Vista 3D, una fila del Outliner o de la Biblioteca, o los keyframes del Timeline hay un **menú contextual** con lo que se puede hacer con eso.
+
+![PC](../tutoriales/img/icono-pc.svg) Click derecho.
+
+![Android](../tutoriales/img/icono-android.svg) Mantené el dedo quieto medio segundo, hasta que el teléfono vibre.
+
+![Nokia](../tutoriales/img/icono-nokia.svg) Mantené apretado <kbd>OK</kbd> sobre lo que tiene el foco (la fila elegida con las flechas, el objeto activo en la Vista 3D): el teléfono vibra y, cuando termina de vibrar, sale el menú. Un <kbd>OK</kbd> corto hace lo de siempre. Con el mouse virtual, mantené <kbd>OK</kbd> sin mover el cursor: el menú sale ahí, como el click derecho.
+
 ## Los tipos de viewport
 
 | Viewport | Para qué sirve |
@@ -140,4 +150,18 @@ Whisk3D sigue creciendo: con el tiempo se van a sumar viewports nuevos y los de 
 | Pantalla completa | Entra y sale de pantalla completa. | <kbd>F11</kbd>. En Android es automática si el teléfono no tiene notch. |
 | Reproducir / Pausa | Reproduce la animación (o el juego) desde cualquier panel. | <kbd>Espacio</kbd> o el botón Play de la línea de tiempo. |
 
-![Android](../tutoriales/img/icono-android.svg) **En Android**: en vertical el layout es Vista 3D arriba y Propiedades abajo; en horizontal se suma la línea de tiempo. El teclado en pantalla es el de Whisk3D en todos lados (el de letras para texto, el numérico para números); con **Usar teclado del sistema** tildado en Ajustes es el del teléfono, y cuando se abre, el viewport activo se maximiza en la parte que el teclado no tapa y vuelve a su lugar al cerrarlo. Lo que estás escribiendo se ve en una franja justo arriba del teclado, aunque el campo haya quedado tapado. En el [editor de scripts](editor-de-scripts.md) pasa lo mismo con los dos teclados.
+![Android](../tutoriales/img/icono-android.svg) **En Android**: en vertical el layout es Vista 3D arriba y Propiedades abajo; en horizontal se suma la línea de tiempo. El teclado en pantalla es el de Whisk3D en todos lados (el de letras para texto, el numérico para números); con **Usar teclado del sistema** tildado en Ajustes es el del teléfono, y cuando se abre, el viewport activo se maximiza en la parte que el teclado no tapa y vuelve a su lugar al cerrarlo. Lo que estás escribiendo se ve en una franja justo arriba del teclado, aunque el campo haya quedado tapado. En el [editor de scripts](editor-de-scripts.md) pasa lo mismo con los dos teclados. El teclado de Whisk3D se cierra con la **cruz roja** de arriba a la derecha (o con Atrás). En el editor web desde un teléfono o una tablet, **Usar teclado del sistema** abre el teclado del navegador; en el iPhone y el iPad, si no sale al primer toque, tocá el campo otra vez.
+
+### Escribir en una caja de texto
+
+Las cajas de texto (un nombre, un número que se tipea, el nombre de un archivo, los datos de un recurso) se editan como en cualquier programa:
+
+| Qué | Cómo |
+|---|---|
+| Poner el cursor | Un click (o un toque) en el texto. |
+| Seleccionar | Arrastrar sobre el texto; <kbd>Shift</kbd> + flechas; <kbd>Shift</kbd> + click; doble click selecciona todo. |
+| Moverse | Flechas; <kbd>Ctrl</kbd> + flechas de a palabras; <kbd>Inicio</kbd> / <kbd>Fin</kbd> (con <kbd>Shift</kbd>, seleccionando). |
+| Todo / copiar / cortar / pegar | <kbd>Ctrl+A</kbd> / <kbd>Ctrl+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd>, con el portapapeles del sistema. |
+| El menú del texto | ![PC](../tutoriales/img/icono-pc.svg) Click derecho sobre la caja. ![Android](../tutoriales/img/icono-android.svg) Mantené el dedo sobre la caja. Tiene Cortar, Copiar, Pegar y Seleccionar todo. |
+
+Una caja que muestra un dato (los datos de un recurso en la Biblioteca) no se puede cambiar, pero sí seleccionar y copiar.

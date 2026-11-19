@@ -1720,6 +1720,7 @@ static const char* kFuentes3D[] = {
     "${CORE}/io/W3dAlmacen.cpp",
     "${W3DROOT}/main/render/OpcionesRender.cpp",  // g_renderBg + los flags de dibujo del Core
     "${W3DROOT}/main/render/EscenaRender.cpp",    // EL pase 3D compartido con el viewport del editor
+    "${W3DROOT}/main/render/SombrasTiempoReal.cpp",   // las sombras en tiempo real (el pase las arma antes de la escena)
     "${W3DROOT}/main/importers/import_w3d.cpp",   // EL MISMO lector de proyecto que el editor
     "${W3DROOT}/main/importers/import_obj.cpp",   // carga diferida de texturas + materiales
     "${W3DROOT}/main/importers/import_wobj.cpp",  // mallas .obj referenciadas (proyectos viejos)
@@ -1738,6 +1739,7 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/render/Postproceso.cpp",     // su pila de efectos
     "${W3DROOT}/main/render/VectoresMovimiento.cpp",  // el desenfoque de movimiento del postproceso (en la CPU)
     "${W3DROOT}/main/objects/Hitbox.cpp",         // Hitbox: caja de deteccion (el motor esta en el Core)
+    "${W3DROOT}/main/objects/SondaLuz.cpp",       // la sonda de luz: la luz indirecta horneada (el lector y el pase la usan)
     "${W3DROOT}/main/objects/VisZona.cpp",
     "${W3DROOT}/main/objects/Collection.cpp",
     "${W3DROOT}/main/objects/Mirror.cpp",

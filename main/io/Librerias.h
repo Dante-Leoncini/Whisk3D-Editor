@@ -142,6 +142,10 @@ bool W3dLibsTieneElemento(const std::string& lib, int tipo, const std::string& e
 // "lib:<lib>/prefab/<elem>" o "lib:<lib>/escena/<elem>". La usan el proxy (su 'prefab') y los prefabs anidados
 // de adentro de una libreria.
 std::string W3dLibsClave(const std::string& lib, int tipo, const std::string& elem);
+// LOS OBJETOS DE UNA ESCENA de la libreria (el explorador del proxy: la escena se recorre como una carpeta). Un proxy puede
+// generar UN OBJETO de una escena con todo lo que cuelga de el: su elemento es "Escena#Padre/Hijo" (tipo escena)
+struct W3dLibObjeto { std::string nombre, tipo; bool conHijos; W3dLibObjeto() : conHijos(false) {} };
+bool W3dLibsObjetosDeEscena(const std::string& lib, const std::string& escena, const std::string& ruta, std::vector<W3dLibObjeto>& out);
 bool W3dLibsDeClave(const std::string& clave, std::string* lib, int* tipo, std::string* elem);
 // lee la DEFINICION de un elemento: devuelve el documento (el que llama es su dueno) y en *raizObj el objeto
 // que se genera (un prefab: su "raiz"; una escena: un vacio con el nombre de la escena que tiene como hijos sus

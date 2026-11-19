@@ -1,3 +1,4 @@
+#include "ViewPorts/MenuTexto.h"   // el menu del texto sobre la caja que se esta tipeando
 #include "objects/Empty.h"   // el dibujo del Vacio (su tarjeta)
 #include "io/W3dWeb.h"   // navegador: guardar = descargar
 #include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
@@ -40,6 +41,8 @@
 #include "io/MallasProyecto.h"   // tarjeta "3D Mesh": la malla como recurso (hacer unica, elegir, copiar)
 #include "config/W3dRecientes.h" // los archivos recientes (pantalla de inicio): se anotan al abrir / guardar
 #include "PopUp/UVMapaPopup.h"   // la capa UV de un mapa del material (el boton de la malla)
+#include "io/BibliotecaExterna.h"   // la tarjeta de un recurso de una libreria vinculada
+#include "io/TexturaEditada.h"   // Guardar / Guardar como de una textura pintada (la tarjeta Recurso)
 #include "io/CambiosProyecto.h"  // el '*' de lo no guardado (el selector de malla, el recurso, el proyecto)
 #include "io/RaicesEditor.h"     // "Open" de una escena / un prefab de la biblioteca
 #include "objects/MallaRecurso.h"
@@ -156,7 +159,7 @@ static void AccionRecSeleccionarUsuarios(); // la tarjeta del RECURSO de la bibl
 static void AccionRecBorrar();
 static void AccionMenuRecUbicacion();
 static void AccionRecMallaTexto();
-static void AccionRecExtraer();
+static void AccionRecGuardar();
 static bool g_recMallaTexto = false;   // espejo del tilde "Mesh as text" de la malla elegida (ActualizarTarjetaRecurso)
 static void AccionRecAccionTipo();
 static void AccionRecParar();
@@ -867,6 +870,9 @@ void PropsHitboxActualizar(Properties* p, bool visible);
 void PropsSondaLuzConstruir(Properties* p);
 void PropsSondaLuzActualizar(Properties* p, bool visible);
 void PropsHorneadoConstruir(Properties* p);
+void PropsSombrasConstruir(Properties* p);
+static void AccionRecGuardarComo();   // (la Biblioteca: Guardar como..., mas abajo)
+void PropsSombrasActualizar(Properties* p, bool visible);
 void PropsHorneadoActualizar(Properties* p, bool visible);
 void PropsRutinaConstruir(Properties* p);
 void PropsRutinaActualizar(Properties* p, bool visible);
@@ -893,7 +899,7 @@ static Particulas* PartActiva(){
 // callback del file browser: importa (copia al .w3d) y aplica la ruta a la particula
 static void PartTexturaElegida(const std::string& rutaElegida){
     Particulas* pt = PartActiva(); if (!pt) return;
-    const std::string ruta = W3dImportarAsset(rutaElegida);   // COPIA adentro del proyecto
+    const std::string ruta = W3dCargarExterno(rutaElegida);   // (queda afuera: referencia externa)
     pt->textura = ruta;
     TexturaTomar(ruta);   // la registra en Textures[] para que aparezca en el dropdown la proxima vez
     if (PropsActivo && PropsActivo->propPartTextura)
@@ -1709,7 +1715,7 @@ static void AccionShaderDiscoElegido(const std::string& ruta) {
     Material* mat = MaterialActivoUI();
     if (!mat || ruta.empty()) return;
     // (como los scripts: lo elegido del disco se copia adentro del proyecto; sin proyecto queda la ruta del disco)
-    ShaderAsignar(mat, W3dImportarAsset(ruta, "shaders"));
+    ShaderAsignar(mat, W3dCargarExterno(ruta, "shaders"));
 }
 static void AccionShaderElegido(int id) {
     Material* mat = MaterialActivoUI();
@@ -2569,10 +2575,10 @@ static void AccionMenuT2dAlignV(){
 // FUENTE: la de Whisk3D o un .ttf elegido con el file browser (se hornea al vuelo, ver Fuente2D)
 static void T2dFuenteElegida(const std::string& rutaElegida){
     Texto2D* t = T2dActivo(); if (!t) return;
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     t->fuente = ruta;
     if (PropsActivo && PropsActivo->propT2dFuente) PropsActivo->propT2dFuente->button->text = Fuente2DNombre(ruta);
     g_redraw = true;
@@ -2638,10 +2644,10 @@ static void AccionMenuImgAncla(){
 // TEXTURA: elegir el archivo con el file browser; una imagen recien creada toma su tamano natural
 static void ImgTexturaElegida(const std::string& rutaElegida){
     Imagen2D* im = Img2dActiva(); if (!im) return;
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     im->textura = ruta;
     int w = 0, h = 0;
     if (Textura2DObtener(ruta, &w, &h) && w > 0 && h > 0) { im->ancho = (float)w; im->alto = (float)h; }
@@ -2954,10 +2960,10 @@ static std::string NombreIconoJuego(){
     return (s == std::string::npos) ? g_proyIcono : g_proyIcono.substr(s + 1);
 }
 static void AccionIconoElegido(const std::string& rutaElegida){
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     std::string r = ruta;
     // relativa al .w3d si el archivo cae bajo su carpeta (asi el proyecto viaja entero)
     if (!w3dPath.empty()){
@@ -3344,10 +3350,10 @@ static void AccionMenuVidAncla(){
 }
 static void VidArchivoElegido(const std::string& rutaElegida){
     Video2D* v = Vid2dActivo(); if (!v) return;
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     v->video = ruta;
     const VideoPreview* pv = Video2DPreview(ruta);   // extrae la preview + tamano real
     if (pv && pv->anchoReal > 0 && v->tamModo != TAM2D_FRACCION) {
@@ -3384,10 +3390,10 @@ static void ScriptElegido(const std::string& rutaElegida) {
     // lo GENERADO por una instancia de prefab: sus scripts son los del prefab (uno agregado o cambiado no se
     // guarda y corria los valores de los demas al guardar sus overrides). Se edita el prefab
     if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) { g_scriptCambiarIdx = -1; return; }
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     if (!ObjActivo->scriptDatos) ObjActivo->scriptDatos = new W3dScriptDatos();
     if (g_scriptCambiarIdx >= 0 && g_scriptCambiarIdx < (int)ObjActivo->scriptDatos->scripts.size()) {
         ObjActivo->scriptDatos->scripts[g_scriptCambiarIdx].ruta = ruta;
@@ -3844,10 +3850,10 @@ static void AccionMenuBtnAncla(){
 }
 static void BtnTexElegida(const std::string& rutaElegida){
     Boton2D* b = Btn2dActivo(); if (!b) return;
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     b->texturaFondo = ruta;
     if (PropsActivo && PropsActivo->propBtnTex)
         PropsActivo->propBtnTex->button->text = ruta.empty() ? std::string(T("Choose..."))
@@ -3861,10 +3867,10 @@ static void AccionBtnTex(){
 }
 static void BtnIconoElegido(const std::string& rutaElegida){
     Boton2D* b = Btn2dActivo(); if (!b) return;
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     b->icono = ruta;
     if (PropsActivo && PropsActivo->propBtnIcono)
         PropsActivo->propBtnIcono->button->text = ruta.empty() ? std::string(T("Choose..."))
@@ -3936,10 +3942,10 @@ static void AccionMenuS9Ancla(){
 }
 static void S9TexturaElegida(const std::string& rutaElegida){
     Slice9* s9 = S9Activo(); if (!s9) return;
-    // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
-    // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
+    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
+    // (W3dCargarExterno); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
-    const std::string ruta = W3dImportarAsset(rutaElegida);
+    const std::string ruta = W3dCargarExterno(rutaElegida);
     s9->textura = ruta;
     int w = 0, h = 0;
     if (Textura2DObtener(ruta, &w, &h) && w > 0 && h > 0 && s9->tamModo != TAM2D_FRACCION) {
@@ -8303,11 +8309,11 @@ static void AccionMenuVacioForma(){
 // EL ARCHIVO del Sonido: los sonidos del proyecto (soltar un .wav en la biblioteca o en la vista 3D los agrega)
 static PopupMenu* MenuSonArchivo = NULL;
 static std::vector<std::string> gSonArchivos;
-// el .wav elegido en el explorador: COPIA adentro del proyecto (como una textura) y es el del Sonido activo
+// el .wav elegido en el explorador: queda afuera (referencia externa, como una textura) y es el del Sonido activo
 static void SonArchivoDelExplorador(const std::string& rutaElegida){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::sonido) return;
     Sonido* s = static_cast<Sonido*>(ObjActivo);
-    s->archivo = W3dImportarAsset(rutaElegida);
+    s->archivo = W3dCargarExterno(rutaElegida);
     W3dRecursosVistaInvalidar();
     extern void W3dCambiosTocado(); W3dCambiosTocado();
     g_redraw = true;
@@ -8451,6 +8457,17 @@ void Properties::ConstruirGrupos(){
     // el gate de propTransform (pestaniaActiva==1 && !es2D) la deja 3D-only. Solo importa dentro de un Culling.
     propObjEstatico = new PropBool(T("Static"));
     propTransform->properties.push_back(propObjEstatico);
+    // LAS SOMBRAS EN TIEMPO REAL (la tarjeta de la pestania Render): si la malla tapa la luz y si se oscurece. Solo las
+    // mallas (en el resto la fila no tiene valor y no ocupa lugar)
+    propObjProySombra = new PropBool(T("Cast shadows"));
+    propTransform->properties.push_back(propObjProySombra);
+    propObjRecSombra = new PropBool(T("Receive shadows"));
+    propTransform->properties.push_back(propObjRecSombra);
+    // LA LUZ PRECALCULADA: si la luz le rebota (la indirecta) y si es un captador de sombras (solo las recibe)
+    propObjRebota = new PropBool(T("Light bounce"));
+    propTransform->properties.push_back(propObjRebota);
+    propObjCaptador = new PropBool(T("Shadow catcher"));
+    propTransform->properties.push_back(propObjCaptador);
     GroupProperties.push_back(propTransform);
 
     // ===== pestania OBJETO: tarjeta "Animacion" — las animaciones DEL objeto
@@ -9225,52 +9242,82 @@ void Properties::ConstruirGrupos(){
     // ===== Tarjeta "Resource" (pestania "Malla 3D", la 3): el recurso elegido en la BIBLIOTECA del outliner.
     // Va ANTES de la tarjeta Material: con un material elegido, la de abajo es su tarjeta Material.
     propRecurso = new GroupPropertie(T("Resource"));
-    propRecurso->anchoValores = 0.30f;
+    propRecurso->anchoValores = 0.56f;   // (los datos van en cajas: la columna del valor ancha; las etiquetas -Triangulos- enteras)
     propRecurso->icono = (int)IconType::carpeta;
+    // LA VISTA PREVIA arriba de todo (una textura), debajo del titulo
+    propRecPreview = new PropImagen(T("Preview"));
+    propRecurso->properties.push_back(propRecPreview);
     propRecNombre = new PropText(T("Name"));
     propRecurso->properties.push_back(propRecNombre);
     propRecCarpeta = new PropText(T("Folder"));
     propRecurso->properties.push_back(propRecCarpeta);
-    propRecTipo = new PropLabel("", true /*wrap*/);
-    propRecurso->properties.push_back(propRecTipo);
-    propRecEntrada = new PropLabel("", true /*wrap*/);
-    propRecurso->properties.push_back(propRecEntrada);
-    // los DATOS POR TIPO (una fila cada uno; las que sobran se ocultan)
-    for (int k = 0; k < 14; k++) {
-        PropLabel* l = new PropLabel("", true /*wrap*/);
-        l->oculto = true;
-        propRecDatos.push_back(l);
-        propRecurso->properties.push_back(l);
-    }
-    // DENTRO / FUERA del .w3d (solo los que tienen archivo propio: texturas, sonidos, scripts...)
-    propRecUbicacion = new PropButton(T("Inside the .w3d"), IconType::archive);
+    propRecTipo = NULL;   // (antes una linea con todo junto: ahora cada dato en su caja)
+    // USUARIOS (0 en rojo: nadie lo usa), TIPO y GUARDADO: cajas de solo lectura como las de un valor
+    propRecUsuarios = new PropText(T("Users"));
+    propRecUsuarios->field.soloLectura = true;
+    propRecurso->properties.push_back(propRecUsuarios);
+    propRecTipoCaja = new PropText(T("Type"));
+    propRecTipoCaja->field.soloLectura = true;
+    propRecurso->properties.push_back(propRecTipoCaja);
+    propRecGuardado = new PropText(T("Saved"));
+    propRecGuardado->field.soloLectura = true;
+    propRecurso->properties.push_back(propRecGuardado);
+    // (con cambios sin guardar: en el lugar de la caja, el boton Guardar)
+    propRecGuardar = new PropButton(T("Saved"), IconType::guardar);
+    propRecGuardar->conLabel = true;
+    propRecGuardar->enColumna = true;
+    propRecGuardar->button->text = T("Save");
+    propRecGuardar->action = AccionRecGuardar;
+    propRecGuardar->oculto = true;
+    propRecurso->properties.push_back(propRecGuardar);
+    // DONDE VIVE (solo los que tienen archivo propio: texturas, sonidos, scripts...): un desplegable con donde esta y lo
+    // que se puede hacer: "Extraer..." (de adentro del .w3d a un archivo de afuera) o "Importar..." (al reves)
+    propRecUbicacion = new PropButton(T("Storage"), IconType::archive);
+    propRecUbicacion->conLabel = true;
+    propRecUbicacion->enColumna = true;
+    propRecUbicacion->button->text = T("Inside the .w3d");
     propRecUbicacion->button->desplegable = true;
     propRecUbicacion->action = AccionMenuRecUbicacion;
     propRecUbicacion->oculto = true;
     propRecurso->properties.push_back(propRecUbicacion);
+    // LA ENTRADA y LOS DATOS POR TIPO: cada uno una caja como las de un valor (de solo lectura: se puede seleccionar y
+    // copiar). Una fila cada uno; las que sobran se ocultan
+    propRecEntrada = new PropText(T("Entry"));
+    propRecEntrada->field.soloLectura = true;
+    propRecEntrada->oculto = true;
+    propRecurso->properties.push_back(propRecEntrada);
+    for (int k = 0; k < 14; k++) {
+        PropText* l = new PropText("");
+        l->field.soloLectura = true;
+        l->oculto = true;
+        propRecDatos.push_back(l);
+        propRecurso->properties.push_back(l);
+    }
     // (MALLA 3D) en que formato se guarda: tildado = texto (.w3dm, legible: diffs), destildado = binario (.w3db, el
     // default: abrir es leer y copiar). Antes era una opcion de todo el proyecto en la tarjeta Archivo
     propRecMallaTexto = new PropBool(T("Mesh as text"));
     propRecMallaTexto->value = NULL;   // (un PropBool sin valor no ocupa fila: se le da al elegir una malla)
     propRecMallaTexto->onChange = AccionRecMallaTexto;
     propRecurso->properties.push_back(propRecMallaTexto);
-    // EXTRAER: una copia de su archivo (el de adentro del .w3d) a una carpeta, para editarlo afuera. Antes era
-    // "Extract assets" de la tarjeta Archivo (sacaba todos)
-    propRecExtraer = new PropButton(T("Extract"), IconType::carpeta);
-    propRecExtraer->action = AccionRecExtraer;
-    propRecExtraer->oculto = true;
-    propRecurso->properties.push_back(propRecExtraer);
-    propRecPreview = new PropImagen(T("Preview"));
-    propRecurso->properties.push_back(propRecPreview);
+    // GUARDAR COMO: una COPIA de su archivo afuera, eligiendo carpeta y nombre. El recurso sigue donde estaba
+    propRecGuardarComo = new PropButton(T("Save As..."), IconType::guardar);
+    propRecGuardarComo->action = AccionRecGuardarComo;
+    propRecGuardarComo->oculto = true;
+    propRecurso->properties.push_back(propRecGuardarComo);
+    propRecExtraer = NULL;   // (era una copia afuera: lo mismo que Guardar como)
     // lo del tipo: escuchar/parar un sonido, abrir una escena/prefab, abrir un script en el IDE
     propRecAcciones2 = new PropButtonRow();
     propRecAcciones2->Agregar(T("Play"), AccionRecAccionTipo);
     propRecAcciones2->Agregar(T("Stop"), AccionRecParar);
     propRecurso->properties.push_back(propRecAcciones2);
-    propRecAcciones = new PropButtonRow();
-    propRecAcciones->Agregar(T("Select Users"), AccionRecSeleccionarUsuarios);
-    propRecAcciones->Agregar(T("Delete"), AccionRecBorrar);
-    propRecurso->properties.push_back(propRecAcciones);
+    // abajo de todo: SELECCIONAR USUARIOS (el icono de los usuarios) y BORRAR (el tacho), una fila cada uno
+    propRecAcciones = NULL;
+    propRecSelUsuarios = new PropButton(T("Select Users"), IconType::usuarios);
+    propRecSelUsuarios->action = AccionRecSeleccionarUsuarios;
+    propRecurso->properties.push_back(propRecSelUsuarios);
+    propRecBorrar = new PropButton(T("Delete"), IconType::borrar);
+    propRecBorrar->action = AccionRecBorrar;
+    propRecurso->properties.push_back(propRecBorrar);
     propRecurso->visible = false;
     GroupProperties.push_back(propRecurso);
 
@@ -10335,6 +10382,7 @@ void Properties::ConstruirGrupos(){
     propRenderFps->stepFino = 1; propRenderFps->stepGrueso = 5; propRenderFps->dragStep = 1; propRenderFps->onChange = AccionRenderFps;
     propRender->properties.push_back(propRenderFps);
     GroupProperties.push_back(propRender);
+    PropsSombrasConstruir(this);   // LAS SOMBRAS EN TIEMPO REAL, debajo de la tarjeta Render (PropsSombras.cpp)
 
     // tarjeta "Post Processing" (debajo de Render): la pila de efectos de la vista Rendered y del render a archivo
     propPost = new GroupPropertie(T("Post Processing"));
@@ -11557,6 +11605,9 @@ static void SincronizarRecurso(Properties* p) {
 extern int OutlinerSeleccionarUsuarios(const std::vector<std::string>& claves);
 static void AccionRecSeleccionarUsuarios() {
     int v = -1; std::string id;
+    // (uno de una libreria: sus usuarios en este proyecto, por su id global)
+    { int lib = -1; W3dRecursoItem it; std::string g;
+      if (W3dRecursoExtActivo(&lib, &it, &g)) { OutlinerSeleccionarUsuarios(std::vector<std::string>(1, W3dBibClave(it.tipo, g))); g_redraw = true; return; } }
     if (!W3dRecursoActivo(&v, &id)) return;
     OutlinerSeleccionarUsuarios(std::vector<std::string>(1, W3dBibClave(v, id)));
     PropertiesLayoutDirty = true;
@@ -11601,7 +11652,6 @@ static void AccionRecMallaTexto() {
 //  referencia como externa y el .w3d guarda la ruta (ver W3dRefExternaMarcar en
 //  io/W3dContenedor.h). Ahi si, editar el archivo cambia el proyecto.
 //  (Antes era "Extract assets" de la tarjeta Archivo y sacaba TODO; ahora es de cada recurso.)
-static std::string gRecExtraerEntrada;
 // saca la entrada 'entrada' del .w3d montado a la carpeta de 'elegido' (una carpeta, o un archivo de esa carpeta) con
 // su mismo nombre. Devuelve la ruta escrita ("" = no se pudo). Tambien la usa el harness (recextraer)
 std::string RecursoExtraerEntrada(const std::string& entrada, const std::string& elegido) {
@@ -11618,19 +11668,6 @@ std::string RecursoExtraerEntrada(const std::string& entrada, const std::string&
     Notificar(std::string(T("Extracted")) + ": " + destino + ". " +
               T("It is a COPY: for a change to go back into the project you have to import it again"), false);
     return destino;
-}
-static void RecExtraerCarpetaElegida(const std::string& elegido) { RecursoExtraerEntrada(gRecExtraerEntrada, elegido); }
-static void AccionRecExtraer() {
-    int v = -1; std::string id;
-    if (!W3dRecursoActivo(&v, &id)) return;
-    W3dRecursoItem it;
-    if (!W3dVistaRecInfo(v, id, &it)) return;
-    if (!W3dContenedorHayMontado() || it.entrada.empty()) {
-        Notificar(T("Extract: save the project first (the assets live inside the .w3d)"), true);
-        return;
-    }
-    gRecExtraerEntrada = it.entrada;
-    AbrirFileBrowser(T("Extract to..."), T("Use this file"), "", RecExtraerCarpetaElegida, true);
 }
 static void AccionRecBorrar() {
     int v = -1; std::string id;
@@ -11657,11 +11694,14 @@ static void AccionRecBorrar() {
     }
     confirmarPopup->Abrir(std::string(T("Delete the orphan resource")) + " \"" + it.nombre + "\"?", RecBorrarConfirmado);
 }
-// DENTRO / FUERA del .w3d
+// ===== DONDE VIVE EL RECURSO: el desplegable "Ubicacion" dice donde esta y ofrece pasarlo al otro lado
+//   - adentro del .w3d -> "Extraer...": el EXPLORADOR DEL DISCO con la barra del nombre; queda en ese archivo (externo)
+//   - externo          -> "Importar...": el explorador del PROYECTO POR DENTRO (las carpetas de la biblioteca) con la
+//                         barra del nombre; queda adentro del .w3d, en esa carpeta y con ese nombre
+//  En los dos se elige el nombre y el lugar. Un Ctrl+Z deshace todo el paso.
 static PopupMenu* MenuRecUbicacion = NULL;
-// "External (choose where)...": el EXPLORADOR elige la carpeta (o el archivo a pisar, si tiene el mismo
-// contenido). El recurso que se pasa afuera es el que estaba activo al abrir el explorador (se recuerda:
-// mientras el explorador esta abierto se puede elegir otra cosa en la biblioteca)
+// el recurso que se esta llevando: el que estaba activo al abrir el explorador (mientras esta abierto se puede elegir
+// otra cosa en la biblioteca)
 static int gRecExtVista = -1;
 static std::string gRecExtId;
 void PropsRecExternoElegido(const std::string& elegido) {
@@ -11687,33 +11727,69 @@ void PropsRecExternoElegido(const std::string& elegido) {
     PropertiesLayoutDirty = true;
     g_redraw = true;
 }
-// el recurso ACTIVO pasa a "External (choose where)..." (el harness elige la carpeta con PropsRecExternoElegido)
+// el recurso ACTIVO es el que se va a llevar (el harness elige el destino con PropsRecExternoElegido)
 void PropsRecExternoPreparar() {
     int v = -1; std::string rid;
     if (!W3dRecursoActivo(&v, &rid)) { gRecExtVista = -1; gRecExtId.clear(); return; }
     gRecExtVista = v; gRecExtId = rid;
 }
-static void AccionRecUbicacionElegida(int id) {
+// el nombre de archivo de un recurso, partido en base y extension ("texturas/piso.png" -> "piso", ".png")
+static void RecBaseExt(const std::string& rid, std::string& base, std::string& ext) {
+    base = rid; ext.clear();
+    { const size_t b = base.find_last_of("/\\"); if (b != std::string::npos) base = base.substr(b + 1); }
+    { const size_t p = base.rfind('.'); if (p != std::string::npos && p > 0) { ext = base.substr(p); base = base.substr(0, p); } }
+}
+// EXTRAER: el explorador del disco con el nombre (arranca con el de su entrada, en la carpeta del proyecto). Si ese
+// archivo ya existia, el explorador pregunto "Sobrescribir archivo?" antes
+extern bool g_w3dUbicacionPisar;   // (io/RecursosProyecto.cpp)
+static void PropsRecExtraerElegido(const std::string& ruta) {
+    g_w3dUbicacionPisar = w3dFileSystem::FileExists(ruta);
+    PropsRecExternoElegido(ruta);
+    g_w3dUbicacionPisar = false;
+}
+static void AccionRecExtraerA() {
     int v = -1; std::string rid;
     if (!W3dRecursoActivo(&v, &rid)) return;
-    if (id == 2) {
-        PropsRecExternoPreparar();
-        const size_t p = rid.rfind('.'), b = rid.find_last_of("/\\");
-        const std::string ext = (p != std::string::npos && (b == std::string::npos || p > b)) ? rid.substr(p) : std::string();
-        AbrirFileBrowser(T("External (choose where)..."), T("Save"), ext, PropsRecExternoElegido, true);
-        return;
-    }
+    PropsRecExternoPreparar();
+    std::string base, ext; RecBaseExt(rid, base, ext);
+    AbrirFileBrowserGuardarComo(T("Extract"), T("Extract"), ext, base, g_w3dDirProyecto, PropsRecExtraerElegido);
+}
+// IMPORTAR: el explorador del PROYECTO por dentro. 'ruta' = "carpeta/de/la/biblioteca/nombre" (sin carpeta: la raiz)
+void PropsRecImportarElegido(const std::string& ruta) {
+    const int v = gRecExtVista;
+    const std::string rid = gRecExtId;
+    gRecExtVista = -1; gRecExtId.clear();
+    if (v < 0 || rid.empty() || !W3dVistaRecInfo(v, rid, NULL)) return;
+    const std::string carpeta = W3dCarpetaPadre(ruta), nombre = W3dCarpetaHoja(ruta);
+    UndoGrupoIniciar();   // (adentro + nombre + carpeta: un solo Ctrl+Z)
     std::string nuevo, motivo;
-    const std::string ruta = (id == 1) ? W3dVistaRecRutaExternaSugerida(v, rid) : std::string();
-    if (!W3dVistaRecFijarUbicacion(v, rid, id, ruta, &nuevo, &motivo)) {
-        // (al lado del .w3d ya hay OTRO archivo con ese nombre, por ejemplo: se dice que se puede elegir otro lugar)
-        Notificar(std::string(T("Not moved")) + ": " + T(motivo.c_str()) +
-                  (id == 1 ? std::string(" - ") + T("External (choose where)...") : std::string()), true);
-        return;
+    const bool ok = W3dVistaRecFijarUbicacion(v, rid, 0, std::string(), &nuevo, &motivo);
+    if (ok) {
+        W3dRecursoItem it;
+        std::string fin;
+        if (!nombre.empty() && W3dVistaRecInfo(v, nuevo, &it) && it.nombre != nombre && W3dVistaRecRenombrar(v, nuevo, nombre, &fin))
+            nuevo = fin;
+        if (W3dVistaRecInfo(v, nuevo, &it) && it.carpeta != carpeta) W3dVistaRecMover(v, nuevo, carpeta);
     }
-    Notificar(id == 1 ? std::string(T("Now external")) + ": " + nuevo : std::string(T("Now inside the .w3d")) + ": " + nuevo, false);
+    UndoGrupoFin();
+    if (!ok) { Notificar(std::string(T("Not moved")) + ": " + T(motivo.c_str()), true); return; }
+    Notificar(std::string(T("Now inside the .w3d")) + ": " + nuevo, false);
     PropertiesLayoutDirty = true;
     g_redraw = true;
+}
+static void AccionRecImportar() {
+    int v = -1; std::string rid;
+    if (!W3dRecursoActivo(&v, &rid)) return;
+    W3dRecursoItem it;
+    if (!W3dVistaRecInfo(v, rid, &it)) return;
+    if (!W3dContenedorHayMontado()) { Notificar(std::string(T("Not moved")) + ": " + T("Save the project first"), true); return; }
+    PropsRecExternoPreparar();
+    std::string base, ext; RecBaseExt(it.nombre.empty() ? rid : it.nombre, base, ext);
+    AbrirFileBrowserProyecto(T("Import"), T("Import"), v, ext, base, it.carpeta, PropsRecImportarElegido);
+}
+static void AccionRecUbicacionElegida(int id) {
+    if (id == 2) AccionRecExtraerA();
+    else if (id == 3) AccionRecImportar();
 }
 static void AccionMenuRecUbicacion() {
     if (!PropsActivo || !PropsActivo->propRecUbicacion) return;
@@ -11722,12 +11798,67 @@ static void AccionMenuRecUbicacion() {
     const int u = W3dVistaRecUbicacion(v, id);
     if (!MenuRecUbicacion) { MenuRecUbicacion = new PopupMenu(); MenuRecUbicacion->action = AccionRecUbicacionElegida; }
     MenuRecUbicacion->Limpiar();
-    MenuItem* a = MenuRecUbicacion->Agregar(T("Inside the .w3d"), 0, IconType::archive);
-    if (a) a->verde = (u == 0);
-    MenuItem* b = MenuRecUbicacion->Agregar(T("External"), 1, IconType::carpeta);   // al lado del .w3d
-    if (b) b->verde = (u == 1);
-    MenuRecUbicacion->Agregar(T("External (choose where)..."), 2, IconType::carpeta);   // con el explorador
+    MenuRecUbicacion->titulo = T("Storage");
+    // (donde esta, en verde; y lo que lo lleva al otro lado)
+    MenuItem* a = MenuRecUbicacion->Agregar(u == 1 ? T("External") : T("Inside the .w3d"), 0, u == 1 ? IconType::atajo : IconType::archive);
+    if (a) a->verde = true;
+    if (u == 1) MenuRecUbicacion->Agregar(T("Import..."), 3, IconType::archive);
+    else        MenuRecUbicacion->Agregar(T("Extract..."), 2, IconType::atajo);
     AbrirMenuBajoBoton(MenuRecUbicacion, PropsActivo->propRecUbicacion->button);
+}
+// ===== GUARDAR COMO: una COPIA de su archivo afuera (el recurso no cambia: sigue donde estaba). Una textura pintada se
+// copia como se ve (con lo que no se guardo)
+static int gRecCopiaVista = -1;
+static std::string gRecCopiaId;
+// escribe la copia del recurso 'id' en 'ruta'. Tambien la usa el harness (recguardarcomo)
+bool RecursoGuardarCopia(int v, const std::string& id, const std::string& ruta, std::string* motivo) {
+    std::vector<unsigned char> datos;
+    Texture* t = (v == W3D_VISTA_TEXTURAS) ? W3dTexturaCargadaDe(id) : NULL;
+    if (!(t && TexEditPNGActual(t, datos)) && (!w3dFileSystem::ReadFileBytes(id, datos) || datos.empty())) {
+        if (motivo) *motivo = "Its file couldn't be read";
+        return false;
+    }
+    FILE* f = fopen(ruta.c_str(), "wb");
+    if (!f) { if (motivo) *motivo = "The file couldn't be written"; return false; }
+    const size_t w = fwrite(&datos[0], 1, datos.size(), f);
+    fclose(f);
+    if (w != datos.size()) { if (motivo) *motivo = "The file couldn't be written"; return false; }
+    return true;
+}
+static void PropsRecCopiaElegida(const std::string& ruta) {
+    const int v = gRecCopiaVista;
+    const std::string id = gRecCopiaId;
+    gRecCopiaVista = -1; gRecCopiaId.clear();
+    if (v < 0 || id.empty()) return;
+    std::string motivo;
+    if (!RecursoGuardarCopia(v, id, ruta, &motivo)) { Notificar(std::string(T("Not saved")) + ": " + T(motivo.c_str()), true); return; }
+    W3dDescargarSiWeb(ruta);
+    Notificar(std::string(T("Saved")) + ": " + ruta, false);
+}
+static void AccionRecGuardarComo() {
+    int v = -1; std::string rid;
+    if (!W3dRecursoActivo(&v, &rid)) return;
+    gRecCopiaVista = v; gRecCopiaId = rid;
+    std::string base, ext; RecBaseExt(rid, base, ext);
+    const std::string carpeta = (W3dVistaRecUbicacion(v, rid) == 1) ? w3dFileSystem::ParentPath(rid) : g_w3dDirProyecto;
+    AbrirFileBrowserGuardarComo(T("Save As..."), T("Save"), ext, base, carpeta, PropsRecCopiaElegida);
+}
+// ===== GUARDAR (con cambios sin guardar): lo propio del recurso se escribe en su lugar -una textura pintada en su entrada
+// o en su PNG de afuera, un script abierto en el IDE en su archivo-; si sigue sin guardar (vive en el .w3d, o el proyecto
+// todavia no lo nombra) se guarda el PROYECTO
+static void AccionRecGuardar() {
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) return;
+    if (v == W3D_VISTA_TEXTURAS) {
+        Texture* t = W3dTexturaCargadaDe(id);
+        TexturaEditable* te = t ? TexEditBuscar(t) : NULL;
+        std::string msg;
+        if (te && TexEditSinGuardar(t) && !TexEditGuardar(te, msg)) { Notificar(T(msg.c_str()), true); return; }
+    }
+    if (v == W3D_VISTA_SCRIPTS || v == W3D_VISTA_SHADERS) { extern bool IDEGuardarScript(const std::string&); IDEGuardarScript(id); }
+    if (W3dCambiosRecursoSucio(v, id) && W3dCambiosGuardarHook) W3dCambiosGuardarHook();
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
 }
 // (audio/W3dAudio.h, declarado a mano: evita meter el dir de audio al include path de todas las plataformas)
 namespace w3dEngine {
@@ -11776,6 +11907,15 @@ static void RecLabel(PropLabel* l, const std::string& t) {
     const bool ocultar = t.empty();
     if (l->name != t || l->oculto != ocultar) { l->name = t; l->oculto = ocultar; PropertiesLayoutDirty = true; g_redraw = true; }
 }
+// una CAJA de solo lectura (etiqueta | valor): NULL = oculta. Mientras se esta seleccionando el texto no se toca
+static void RecCaja(PropText* c, const char* etiqueta, const std::string& valor) {
+    if (!c) return;
+    const bool ocultar = (etiqueta == NULL);
+    if (c->oculto != ocultar) { c->oculto = ocultar; PropertiesLayoutDirty = true; g_redraw = true; }
+    if (ocultar) { if (g_textFieldActivo == &c->field) g_textFieldActivo = NULL; return; }
+    if (c->name != etiqueta) { c->name = etiqueta; g_redraw = true; }
+    if (c->field.text != valor && g_textFieldActivo != &c->field) { c->field.SetText(valor); g_redraw = true; }
+}
 static void RecBoton(Button* b, bool ver, const char* texto) {
     if (!b) return;
     const std::string t = texto ? T(texto) : std::string();
@@ -11798,39 +11938,60 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
     W3dRecursoItem it;
     if (!W3dVistaRecInfo(vista, id, &it)) return;
     p->propRecurso->icono = W3dVistaIcono(vista);
-    char b[32]; sprintf(b, "%d", it.usuarios);
-    std::string tipo = std::string(T(W3dVistaSingular(vista))) + " - ";
-    if (it.usuarios > 0) tipo += std::string(T("In use")) + " (" + T("Users") + ": " + b + ")";
-    else tipo += T("Orphan (no users)");
-    if (it.soloLectura) tipo += std::string(" - ") + T("read-only");
-    if (W3dCambiosRecursoSucio(vista, id)) tipo += std::string(" - ") + T("not saved") + " *";
-    RecLabel(p->propRecTipo, tipo);
+    if (p->propRecNombre) p->propRecNombre->field.soloLectura = false;   // (el de una libreria no se edita)
+    // USUARIOS: cuantos lo usan (0 = en ROJO, nadie). Una escena no se "usa" (se abre): sin la fila
+    {
+        const bool sinFila = (vista == W3D_VISTA_ESCENAS);
+        char b[32]; sprintf(b, "%d", it.usuarios);
+        RecCaja(p->propRecUsuarios, sinFila ? NULL : T("Users"), b);
+        const bool rojo = !sinFila && it.usuarios == 0;
+        if (p->propRecUsuarios && p->propRecUsuarios->rojo != rojo) { p->propRecUsuarios->rojo = rojo; g_redraw = true; }
+    }
+    // TIPO (y si es de solo lectura: lo de una libreria vinculada)
+    {
+        std::string tipo = T(W3dVistaSingular(vista));
+        if (it.soloLectura) tipo += std::string(" (") + T("read-only") + ")";
+        RecCaja(p->propRecTipoCaja, T("Type"), tipo);
+    }
+    // GUARDADO: "Si", o el boton Guardar si tiene cambios sin guardar (lo de solo lectura no se guarda: sin la fila)
+    {
+        const bool sucio = !it.soloLectura && W3dCambiosRecursoSucio(vista, id);
+        RecCaja(p->propRecGuardado, (sucio || it.soloLectura) ? NULL : T("Saved"), T("Yes"));
+        if (p->propRecGuardar && p->propRecGuardar->oculto != !sucio) { p->propRecGuardar->oculto = !sucio; PropertiesLayoutDirty = true; g_redraw = true; }
+    }
     // la ENTRADA del contenedor (los materiales no tienen: viajan adentro de proyecto.json)
-    if (vista == W3D_VISTA_MATERIALES) RecLabel(p->propRecEntrada, std::string());
-    else RecLabel(p->propRecEntrada, it.entrada.empty() ? std::string(T("Not saved in the project yet"))
-                                                        : std::string(T("Entry")) + ": " + it.entrada);
-    // los DATOS DEL TIPO (en el idioma de la UI): una fila cada uno ("Resolution: 256 x 256")
+    if (vista == W3D_VISTA_MATERIALES) RecCaja(p->propRecEntrada, NULL, std::string());
+    else RecCaja(p->propRecEntrada, T("Entry"), it.entrada.empty() ? std::string(T("Not saved in the project yet")) : it.entrada);
+    // los DATOS DEL TIPO (en el idioma de la UI): una caja cada uno (Resolucion | 256 x 256)
     std::vector<W3dRecursoDato> datos;
     W3dVistaRecDatos(vista, id, datos);
+    // (los Usuarios ya estan arriba, en su caja)
+    for (size_t k = 0; k < datos.size(); k++) if (datos[k].etiqueta == T("Users")) { datos.erase(datos.begin() + k); k--; }
     for (size_t k = 0; k < p->propRecDatos.size(); k++)
-        RecLabel(p->propRecDatos[k], k < datos.size() ? datos[k].etiqueta + ": " + datos[k].valor : std::string());
+        RecCaja(p->propRecDatos[k], k < datos.size() ? datos[k].etiqueta.c_str() : NULL, k < datos.size() ? datos[k].valor : std::string());
     if (p->propRecNombre) {
         const bool o = !it.renombrable || it.soloLectura;
         if (p->propRecNombre->oculto != o) { p->propRecNombre->oculto = o; PropertiesLayoutDirty = true; }
     }
     // la CARPETA no se muestra (pedido del dueno: "no tiene sentido" en las propiedades de un recurso); su carpeta se
-    // cambia en el outliner, arrastrandolo o con Move to Folder
+    // cambia en el outliner, arrastrandolo o con Move to Folder (o al importarlo: el explorador del proyecto)
     const bool sinCarpeta = true;
     if (p->propRecCarpeta && p->propRecCarpeta->oculto != sinCarpeta) {
         p->propRecCarpeta->oculto = sinCarpeta; PropertiesLayoutDirty = true;
     }
-    // DENTRO / FUERA: solo los que tienen archivo propio
-    if (p->propRecUbicacion) {
+    // UBICACION y GUARDAR COMO: solo los que tienen archivo propio
+    {
         const int u = W3dVistaRecUbicacion(vista, id);
         const bool o = (u < 0) || it.soloLectura;
-        if (p->propRecUbicacion->oculto != o) { p->propRecUbicacion->oculto = o; PropertiesLayoutDirty = true; }
-        const std::string t = u == 1 ? T("External") : T("Inside the .w3d");
-        if (p->propRecUbicacion->button->text != t) { p->propRecUbicacion->button->text = t; g_redraw = true; }
+        if (p->propRecUbicacion) {
+            if (p->propRecUbicacion->oculto != o) { p->propRecUbicacion->oculto = o; PropertiesLayoutDirty = true; }
+            const std::string t = u == 1 ? T("External") : T("Inside the .w3d");
+            const int ic = u == 1 ? (int)IconType::atajo : (int)IconType::archive;
+            if (p->propRecUbicacion->button->text != t || p->propRecUbicacion->button->icon != ic) {
+                p->propRecUbicacion->button->text = t; p->propRecUbicacion->button->icon = ic; g_redraw = true;
+            }
+        }
+        if (p->propRecGuardarComo && p->propRecGuardarComo->oculto != o) { p->propRecGuardarComo->oculto = o; PropertiesLayoutDirty = true; }
     }
     // MALLA EN TEXTO: solo las mallas 3D del proyecto (una de libreria no la escribe este proyecto)
     if (p->propRecMallaTexto) {
@@ -11839,12 +12000,6 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
         bool* v = o ? NULL : &g_recMallaTexto;   // (sin valor = oculto: no ocupa fila)
         if (p->propRecMallaTexto->value != v) { p->propRecMallaTexto->value = v; PropertiesLayoutDirty = true; }
         if (mr) { const bool t = W3dMallaRecursoEnTexto(mr); if (g_recMallaTexto != t) { g_recMallaTexto = t; g_redraw = true; } }
-    }
-    // EXTRAER: los que tienen su archivo ADENTRO del .w3d guardado (uno externo ya esta afuera)
-    if (p->propRecExtraer) {
-        const bool o = vista == W3D_VISTA_MATERIALES || it.entrada.empty() || !W3dContenedorHayMontado() ||
-                       W3dVistaRecUbicacion(vista, id) == 1;
-        if (p->propRecExtraer->oculto != o) { p->propRecExtraer->oculto = o; PropertiesLayoutDirty = true; }
     }
     if (p->propRecPreview) {
         Texture* t = (vista == W3D_VISTA_TEXTURAS) ? W3dRecursoActivoTextura() : NULL;
@@ -11858,22 +12013,73 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
                  sonido ? "Play" : raiz ? "Open" : script ? "Open in IDE" : NULL);
         RecBoton(p->propRecAcciones2->botones[1], sonido, NULL);
     }
-    if (p->propRecAcciones && p->propRecAcciones->botones.size() >= 2) {
-        // "Select Users" solo si alguno de sus usuarios es un OBJETO (una malla huerfana, un script o un
-        // flipbook cuentan, pero no hay nada que seleccionar)
+    // "Select Users" solo si alguno de sus usuarios es un OBJETO (una malla huerfana, un script o un flipbook cuentan,
+    // pero no hay nada que seleccionar); "Delete" si se puede borrar
+    {
         const bool usuarios = it.usuarios > 0 && W3dVistaRecObjetosUsuarios(vista, std::vector<std::string>(1, id)) > 0;
         const bool borrar = !it.soloLectura && (it.usuarios == 0 || !it.padre.empty() || W3dVistaRecSabeBorrarEnUso(vista));
-        if (p->propRecAcciones->botones[0]->visible != usuarios || p->propRecAcciones->botones[1]->visible != borrar) {
-            p->propRecAcciones->botones[0]->visible = usuarios;
-            p->propRecAcciones->botones[1]->visible = borrar;
-            PropertiesLayoutDirty = true;
-        }
+        if (p->propRecSelUsuarios && p->propRecSelUsuarios->oculto != !usuarios) { p->propRecSelUsuarios->oculto = !usuarios; PropertiesLayoutDirty = true; }
+        if (p->propRecBorrar && p->propRecBorrar->oculto != !borrar) { p->propRecBorrar->oculto = !borrar; PropertiesLayoutDirty = true; }
     }
     // un MATERIAL: su tarjeta Material de siempre, bindeada a el (re-bind al cambiar de recurso)
     const bool esMat = (vista == W3D_VISTA_MATERIALES);   // (su visibilidad la decide ActualizarPestanias)
     const unsigned ver = W3dRecursoActivoVersion() + 1u;   // +1: 0 queda para "sin bindear"
     if (esMat && p->recVersionBind != ver) { p->recVersionBind = ver; p->Rebind(); }
     if (!esMat && p->recVersionBind != 0) { p->recVersionBind = 0; if (p->propBtnNewMaterial) p->propBtnNewMaterial->oculto = false; }
+}
+
+// LA TARJETA DE UN RECURSO DE UNA LIBRERIA VINCULADA (de solo lectura): lo que es, de que libreria, y lo que ESTE proyecto
+// sabe de el por su id global (si lo usa, si esta cargado, sus datos si esta registrado)
+static void ActualizarTarjetaRecursoExt(Properties* p, bool ver, int lib, const W3dRecursoItem& it, const std::string& idGlobal) {
+    if (!p || !p->propRecurso) return;
+    if (p->propRecurso->visible != ver) { p->propRecurso->visible = ver; PropertiesLayoutDirty = true; }
+    if (p->recVersionBind != 0) { p->recVersionBind = 0; if (p->propBtnNewMaterial) p->propBtnNewMaterial->oculto = false; }
+    if (!ver) { if (p->propRecPreview) p->propRecPreview->tex = NULL; return; }
+    const int vista = it.tipo;
+    p->propRecurso->icono = it.icono >= 0 ? it.icono : W3dVistaIcono(vista);
+    W3dRecursoItem g;
+    const bool conocido = !idGlobal.empty() && W3dVistaRecInfo(vista, idGlobal, &g);
+    if (p->propRecPreview) {
+        Texture* t = (vista == W3D_VISTA_TEXTURAS && conocido) ? W3dTexturaCargadaDe(idGlobal) : NULL;
+        if (p->propRecPreview->tex != t) { p->propRecPreview->tex = t; PropertiesLayoutDirty = true; }
+    }
+    if (p->propRecNombre) {
+        p->propRecNombre->field.soloLectura = true;
+        if (p->propRecNombre->oculto) { p->propRecNombre->oculto = false; PropertiesLayoutDirty = true; }
+        if (p->propRecNombre->field.text != it.nombre && g_textFieldActivo != &p->propRecNombre->field) { p->propRecNombre->field.SetText(it.nombre); g_redraw = true; }
+    }
+    if (p->propRecCarpeta && !p->propRecCarpeta->oculto) { p->propRecCarpeta->oculto = true; PropertiesLayoutDirty = true; }
+    {
+        const int us = conocido ? g.usuarios : 0;
+        char b[32]; sprintf(b, "%d", us);
+        RecCaja(p->propRecUsuarios, vista == W3D_VISTA_ESCENAS ? NULL : T("Users"), b);
+        const bool rojo = vista != W3D_VISTA_ESCENAS && us == 0;
+        if (p->propRecUsuarios && p->propRecUsuarios->rojo != rojo) { p->propRecUsuarios->rojo = rojo; g_redraw = true; }
+    }
+    RecCaja(p->propRecTipoCaja, T("Type"), std::string(T(W3dVistaSingular(vista))) + " (" + T("read-only") + ")");
+    RecCaja(p->propRecGuardado, NULL, std::string());
+    if (p->propRecGuardar && !p->propRecGuardar->oculto) { p->propRecGuardar->oculto = true; PropertiesLayoutDirty = true; }
+    if (p->propRecUbicacion && !p->propRecUbicacion->oculto) { p->propRecUbicacion->oculto = true; PropertiesLayoutDirty = true; }
+    if (p->propRecGuardarComo && !p->propRecGuardarComo->oculto) { p->propRecGuardarComo->oculto = true; PropertiesLayoutDirty = true; }
+    RecCaja(p->propRecEntrada, it.entrada.empty() ? NULL : T("Entry"), it.entrada);
+    // los datos: de que libreria, si esta cargado y (si este proyecto ya lo registro) los de su tipo
+    std::vector<W3dRecursoDato> datos;
+    datos.push_back(W3dRecursoDato(T("Linked library"), W3dLibreriaNombre(lib)));
+    datos.push_back(W3dRecursoDato(T("Loaded"), T(conocido && g.cargado ? "Yes" : "No")));
+    if (conocido) {
+        std::vector<W3dRecursoDato> d2;
+        W3dVistaRecDatos(vista, idGlobal, d2);
+        for (size_t k = 0; k < d2.size(); k++) if (d2[k].etiqueta != T("Users")) datos.push_back(d2[k]);
+    }
+    for (size_t k = 0; k < p->propRecDatos.size(); k++)
+        RecCaja(p->propRecDatos[k], k < datos.size() ? datos[k].etiqueta.c_str() : NULL, k < datos.size() ? datos[k].valor : std::string());
+    if (p->propRecMallaTexto && p->propRecMallaTexto->value) { p->propRecMallaTexto->value = NULL; PropertiesLayoutDirty = true; }
+    if (p->propRecAcciones2) for (size_t k = 0; k < p->propRecAcciones2->botones.size(); k++) RecBoton(p->propRecAcciones2->botones[k], false, NULL);
+    {
+        const bool usuarios = conocido && g.usuarios > 0 && W3dVistaRecObjetosUsuarios(vista, std::vector<std::string>(1, idGlobal)) > 0;
+        if (p->propRecSelUsuarios && p->propRecSelUsuarios->oculto != !usuarios) { p->propRecSelUsuarios->oculto = !usuarios; PropertiesLayoutDirty = true; }
+        if (p->propRecBorrar && !p->propRecBorrar->oculto) { p->propRecBorrar->oculto = true; PropertiesLayoutDirty = true; }
+    }
 }
 
 // ============================================================================
@@ -12212,7 +12418,7 @@ void PropsIrARecurso(){
     if (!PropsActivo) LayoutAnclarActivos();
     Properties* p = PropsActivo;
     if (!p || p->BarTabs.size() < 4) return;
-    if (!W3dRecursoActivo(NULL, NULL)) return;
+    if (!W3dRecursoActivo(NULL, NULL) && !W3dRecursoExtActivo(NULL, NULL, NULL)) return;
     if (g_textFieldActivo == &p->propRecNombre->field || g_textFieldActivo == &p->propRecCarpeta->field)
         g_textFieldActivo = NULL;   // cambiar de recurso termina la edicion de su nombre/carpeta
     p->pestaniaActiva = 3;          // la pestania "Malla 3D" muestra el recurso (no hay una aparte)
@@ -12676,6 +12882,11 @@ void Properties::RefreshTargetProperties(){
     if (propObjRender)  propObjRender->value  = &ObjActivo->renderizable;
     if (propObjRelLines) propObjRelLines->value = &ObjActivo->showRelantionshipsLines;
     if (propObjEstatico) propObjEstatico->value = &ObjActivo->estatico;
+    { const bool malla = ObjActivo->getType() == ObjectType::mesh;
+      if (propObjProySombra) propObjProySombra->value = malla ? &ObjActivo->proyectaSombra : NULL;
+      if (propObjRecSombra)  propObjRecSombra->value  = malla ? &ObjActivo->recibeSombra : NULL;
+      if (propObjRebota)     propObjRebota->value     = malla ? &ObjActivo->rebotaLuz : NULL;
+      if (propObjCaptador)   propObjCaptador->value   = malla ? &ObjActivo->captaSombras : NULL; }
 
     //Mesh Parts
     RefreshPropMeshParts();
@@ -13536,6 +13747,10 @@ Properties::Properties() : ViewportBase() {
     propLOD = NULL; propLodDist = NULL;           // objeto LOD (umbrales de distancia)
     propObjRelLines = NULL;                                            // lineas parentales (tarjeta generica)
     propObjEstatico = NULL;                                            // estatico/dinamico (tarjeta generica, culling grid)
+    propObjProySombra = NULL; propObjRecSombra = NULL; propObjRebota = NULL; propObjCaptador = NULL;                 // las sombras en tiempo real (solo mallas)
+    propSombras = NULL; propSomOn = NULL; propSomDist = NULL; propSomCascadas = NULL; propSomBorde = NULL; propSomDesenf = NULL;
+    propSomRes = NULL; propSomSuaves = NULL; propSomInt = NULL; propSomSesgo = NULL; propSomEstado = NULL;
+    for (int k = 0; k < 3; k++) propSomCorte[k] = NULL;
     propLodSoloCam = NULL;                                             // objeto LOD (camara de medida)
     propCulling = NULL; propCullMetodo = NULL; propCullActivo = NULL; propCullSoloCam = NULL; // objeto Culling unificado
     propCullOrdenCerca = NULL;
@@ -13545,7 +13760,7 @@ Properties::Properties() : ViewportBase() {
     propMatLuzInd = NULL;
     propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
     propSonda = NULL; propSlRayos = NULL; propSlHornear = NULL; propSlEstado = NULL;
-    propHorneado = NULL; propHornTex = NULL; propHornUV = NULL; propHornMuestras = NULL; propHornIndirecta = NULL; propHornRebotes = NULL; propHornDenoiser = NULL; propHornBoton = NULL; propHornBarra = NULL; propHornAviso = NULL;
+    propHorneado = NULL; propHornTex = NULL; propHornUV = NULL; propHornMuestras = NULL; propHornIndirecta = NULL; propHornRebotes = NULL; propHornDenoiser = NULL; propHornBoton = NULL; propHornBarra = NULL; propHornCancelar = NULL; propHornAviso = NULL;
     for (int k = 0; k < 3; k++) { propSlTam[k] = NULL; propSlPuntos[k] = NULL; }
     propRutina = NULL; propRuLista = NULL; propRuUsar = NULL; propRuPasos = NULL; propRuFilaAdd = NULL;
     propRuOn = NULL; propRuRef = NULL; propRuEntero = NULL; propRuMotivo = NULL;
@@ -13664,7 +13879,9 @@ Properties::Properties() : ViewportBase() {
     propMaterial = NULL; propBtnRenameMat = NULL;
     propRecurso = NULL; propRecNombre = NULL; propRecCarpeta = NULL; propRecTipo = NULL;   // pestania RECURSO
     propRecEntrada = NULL; propRecUbicacion = NULL; propRecPreview = NULL; propRecAcciones = NULL; propRecAcciones2 = NULL;
-    propRecMallaTexto = NULL; propRecExtraer = NULL;
+    propRecMallaTexto = NULL; propRecExtraer = NULL; propRecGuardarComo = NULL;
+    propRecUsuarios = NULL; propRecTipoCaja = NULL; propRecGuardado = NULL; propRecGuardar = NULL;
+    propRecSelUsuarios = NULL; propRecBorrar = NULL;
     recVersionBind = 0;
     propBtnRenameUV = NULL; propBtnRenameColor = NULL; propNameObj = NULL;
     propRowPartOps = NULL; propRowDelRen = NULL; propRowPartMove = NULL;
@@ -13828,7 +14045,12 @@ void Properties::ActualizarPestanias(){
     // pestania 3 "MALLA 3D": la malla del objeto (sus tarjetas: la malla 3D que usa, edicion, UV, capas,
     // grupos) o el RECURSO elegido en la biblioteca del outliner (con su icono)
     int recVista = -1; std::string recId;
-    const bool hayRec = W3dRecursoActivo(&recVista, &recId);
+    const bool hayRecProy = W3dRecursoActivo(&recVista, &recId);
+    // (o uno de una LIBRERIA vinculada: se muestra de solo lectura)
+    int extLib = -1; W3dRecursoItem extIt; std::string extGlobal;
+    const bool hayExt = !hayRecProy && W3dRecursoExtActivo(&extLib, &extIt, &extGlobal);
+    if (hayExt) recVista = extIt.tipo;
+    const bool hayRec = hayRecProy || hayExt;
     if (BarTabs.size() >= 4) {
         BarTabs[3]->visible = esMesh || hayRec;
         BarTabs[3]->icon = hayRec ? W3dVistaIcono(recVista) : (int)IconType::mesh;
@@ -13910,6 +14132,7 @@ void Properties::ActualizarPestanias(){
     // no hay nada que exportar).
     if (propArchivo) propArchivo->visible = (pestaniaActiva == 0);
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
+    PropsSombrasActualizar(this, pestaniaActiva == 0);   // (la tarjeta de las sombras en tiempo real, debajo)
     // Post Processing: la tarjeta del OBJETO Postproceso (pestania del objeto)
     if (propPost)      propPost->visible      = (pestaniaActiva == 2 && ObjActivo && ObjActivo->getType() == ObjectType::postproceso);
     if (propAnimation) propAnimation->visible = (pestaniaActiva == 9); // tarjeta Animation: su propia pestania
@@ -14702,7 +14925,8 @@ void Properties::ActualizarPestanias(){
             btn->button->text = tgt->target ? tgt->target->name : std::string(T("None"));
     }
 
-    ActualizarTarjetaRecurso(this, hayRec && pestaniaActiva == 3, recVista, recId);
+    if (hayExt) ActualizarTarjetaRecursoExt(this, pestaniaActiva == 3, extLib, extIt, extGlobal);
+    else ActualizarTarjetaRecurso(this, hayRec && pestaniaActiva == 3, recVista, recId);
 }
 
 // (declarada en Properties.h) el editor UV la llama al ENTRAR a la edicion de huesos 2D (Tab, menu
@@ -14740,7 +14964,7 @@ void Properties::ClickTab(int mx, int my){
 bool Properties::PestaniaGlobal() const {
     if (pestaniaActiva == 0 || pestaniaActiva == 9) return true;
     if (pestaniaActiva == 4 && DopeCurvaActiva(NULL, false)) return true;   // los modificadores de la curva activa
-    return pestaniaActiva == 3 && W3dRecursoActivo(NULL, NULL);
+    return pestaniaActiva == 3 && (W3dRecursoActivo(NULL, NULL) || W3dRecursoExtActivo(NULL, NULL, NULL));   // (uno de una libreria: tambien)
 }
 
 void Properties::Resize(int newW, int newH){
@@ -14787,7 +15011,7 @@ static void AccionFondoRot() { FondoCambio(); }
 static void AccionFondoModo() { g_renderBgModo = g_renderBgModo == 1 ? 0 : 1; FondoCambio(); }
 static PopupMenu* MenuTexturasFondo = NULL;
 static void FondoTexturaElegida(const std::string& elegido) {
-    const std::string path = W3dImportarAsset(elegido);   // (importar = copiar adentro del proyecto)
+    const std::string path = W3dCargarExterno(elegido);   // (cargar de afuera = queda afuera, externo)
     Texture* t = TexturaTomar(path);
     if (!t) { Notificar(T("The texture couldn't be loaded"), true); return; }
     W3dFondoPonerTextura(t);
@@ -15471,6 +15695,28 @@ void Properties::event_key_down(int tecla, bool repeticion){
 // rect en pantalla del boton de la fila seleccionada (para abrir su desplegable
 // alineado por teclado). Igual recorrido que CentrarSeleccion + igual cuenta de
 // sx que ClickEn (x + PosX + 2*borderGS) y sy = y + BarTop + PosY + offset.
+bool Properties::MenuContextoTeclado(){
+    if (focoEnTabs || selectIndex < 0 || selectIndex >= (int)GroupProperties.size()) return false;
+    GroupPropertie* gsel = GroupProperties[selectIndex];
+    if (!gsel->visible || !gsel->open || gsel->selectIndex < 0 || gsel->selectIndex >= (int)gsel->properties.size()) return false;
+    // (la misma cuenta que SetRectFilaSeleccionada y PropEnPunto)
+    int yFila = borderGS + RenglonHeightGS + gapGS;
+    for (int i = 0; i < (int)GroupProperties.size() && i <= selectIndex; i++) {
+        GroupPropertie* g = GroupProperties[i];
+        if (!g->visible) continue;
+        if (i == selectIndex) {
+            yFila += borderGS + RenglonHeightGS + gapGS;
+            for (int j = 0; j < gsel->selectIndex; j++) yFila += g->properties[j]->Resize(g->width);
+            break;
+        }
+        yFila += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    const int h = gsel->properties[gsel->selectIndex]->Resize(gsel->width);
+    const int my = y + BarTopOffset() + PosY + yFila + (h > 0 ? h / 2 : 0);
+    const int mx = x + width - width / 4;   // (la columna de los valores)
+    return MenuContexto(mx, my, mx, my);
+}
+
 void Properties::SetRectFilaSeleccionada(){
     if (selectIndex < 0 || selectIndex >= (int)GroupProperties.size()) return;
     GroupPropertie* gsel = GroupProperties[selectIndex];
@@ -16392,6 +16638,7 @@ void Properties::ListaAgarreSoltar(int mx, int my, int menuX, int menuY) {
 }
 
 bool Properties::MenuContexto(int mx, int my, int menuX, int menuY){
+    if (MenuTextoEnCampo(mx, my, menuX, menuY)) return true;   // (sobre el numero o el texto que se esta tipeando: su menu)
     if (ListaMenuFila(this, mx, my, menuX, menuY)) return true;   // (una fila de una lista: su menu)
     PropertieBase* p = PropEnPunto(mx, my);
     if (!p) return false;

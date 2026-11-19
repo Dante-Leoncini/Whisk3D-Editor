@@ -36,4 +36,6 @@ int  W3dTecladoIDEAltoActual();
 // volver a repartir la ventana (el layout y el area de los popups) con lo que tapan los teclados ahora. Lo pone main.cpp
 extern void (*g_ventanaReacomodarHook)();
 void W3dTecladoReacomodar();
+// (la web en un telefono) en cada cuadro: sin nada que escriba (ni un campo ni el IDE), el teclado del navegador se va
+void W3dTecladoWebVigilar(bool hayCampo);
 #endif // W3DTECLADO_H

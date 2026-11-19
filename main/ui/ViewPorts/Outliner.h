@@ -193,6 +193,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         // ================================================================================
         int vista;                 // OUT_VISTA_* (se guarda en el layout como "vista: <clave>")
         int filtro;                // el filtro de la biblioteca: un tipo (W3dVistaRec) o -1 = todo
+        bool soloSinUso;           // el filtro "Sin uso": solo los recursos que nadie usa (se suma al del tipo)
         bool cuadricula;           // la biblioteca como CUADRICULA de miniaturas (false = lista)
         bool verMemoria;           // la biblioteca: la fila de abajo con la memoria (RAM / video) usada y libre
         bool verTamanos;           // la biblioteca: cuanto ocupa cada recurso (la columna / la etiqueta de la celda)
@@ -301,6 +302,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         int  BotonDelMenuAbierto() const;        // indice del boton cuyo menu esta abierto (-1 = ninguno)
         bool ClickBarra(int mx, int my);         // lo directo de la barra: el boton lista/cuadricula
         bool MenuContexto(int mx, int my);       // click derecho / pulsacion larga: elige la fila y abre Objeto ahi
+        bool MenuContextoTeclado();              // el mismo, de la fila del CURSOR (el OK mantenido del N95)
         bool DobleClick(int mx, int my);         // doble click / doble tap: renombrar el nombre de la fila
         bool PulsacionLarga(int mx, int my);     // tactil: mantener apretado agarra la fila (o menu al soltar)
         bool TeclaRecursos(int tecla);           // LayoutKey (flechas/OK/C del keypad del N95)
@@ -311,6 +313,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void ElegirFila(const OutFilaRec& f, bool abrirProps); // cursor + recurso activo (suelta la escena)
         // acciones (menus, teclas y harness): operan sobre el cursor / la seleccion
         bool AccionNuevaCarpeta();
+        bool AccionNuevaCarpetaEn(const std::string& padre);   // (el click derecho: en la carpeta de lo que estaba abajo)
+        void CambiarSinUso(bool on);
         bool AccionNuevoMaterial();
         bool AccionRenombrar();                  // en las dos vistas (en linea)
         bool AccionBorrar(bool confirmar);

@@ -7,9 +7,10 @@
 | Abrir proyecto | Abre un .w3d (también con doble click desde el sistema). | Propiedades → Archivo/Render → Archivo |
 | Guardar / Guardar como | Guarda en la carpeta y con el nombre de la tarjeta; Guardar como pide otro. Si falta el nombre, el campo se pone rojo. | Tarjeta Archivo, <kbd>Ctrl+S</kbd> |
 | Guardar versión | Guarda y además deja una copia numerada (`proyecto_v03.w3d`). | Tarjeta Archivo |
-| Extraer | Copia el archivo de un recurso (una malla, una textura, un sonido...) de adentro del proyecto a una carpeta. La copia no cambia el proyecto: para que un cambio vuelva hay que importarlo de nuevo. | Tarjeta Recurso (elegirlo en la Biblioteca) |
+| Guardar como (un recurso) | Una copia del archivo de un recurso (una textura, un sonido, un script...) donde elijas y con el nombre que quieras. La copia no cambia el proyecto: el recurso sigue donde estaba. | Tarjeta Recurso (elegirlo en la Biblioteca) |
+| Extraer / Importar | Lleva el archivo de un recurso afuera del .w3d (Extraer: el proyecto pasa a usar ese archivo) o adentro (Importar: eligiendo la carpeta de la Biblioteca y el nombre). | Tarjeta Recurso, desplegable **Ubicación** |
 | Malla en texto | Guarda esa malla como texto legible (.w3dm) en vez de binario (.w3db). Es de cada malla. | Tarjeta Recurso de la malla |
-| Importar | OBJ, FBX, glTF, GLB e interfaces .w3dui. Lo importado se copia adentro del proyecto (sin duplicados). | Vista 3D → Añadir → Importar |
+| Importar | OBJ, FBX, glTF, GLB e interfaces .w3dui. La malla importada viaja adentro del proyecto. Una textura, un sonido, un script o una fuente que se carga de un archivo queda **afuera**: el proyecto guarda su ruta (para meterlo adentro: la Biblioteca). | Vista 3D → Añadir → Importar |
 | Exportar | OBJ, glTF o GLB del objeto seleccionado (con o sin modificadores y transformaciones). | Propiedades → Exportar |
 | Cambios sin guardar | Lo editado y no guardado (scripts, texturas pintadas) se marca con `*`, también en el título de la ventana. Al cerrar, abrir otro proyecto o empezar uno nuevo con algo sin guardar aparece el cartel **Se perderán los cambios en:** con la lista, para guardar, seguir sin guardar o cancelar. | Automático |
 | Cerrar en Android | El botón (o el gesto) **Atrás** cierra lo que esté abierto (un menú, un cartel, la pantalla de inicio). Si no hay nada abierto, es cerrar Whisk3D: con algo sin guardar aparece el cartel **Se perderán los cambios en:**; si no, pregunta **¿Cerrar Whisk3D?**. Cerrarlo desde el administrador de aplicaciones de Android no pregunta: lo no guardado se pierde. | Atrás |
@@ -23,7 +24,7 @@ El guardado nunca deja el archivo a medias: primero escribe una copia temporal y
 El navegador no deja que una página lea ni escriba los archivos de la PC por su cuenta. Por eso, en la versión web:
 
 - **Abrir proyecto**, **Importar** y elegir una textura abren el explorador de archivos del navegador: aparece un cartel con el botón **Elegir archivo**. Para un OBJ se eligen juntos el .obj, su .mtl y sus texturas; para un glTF, el .gltf y su .bin.
-- **Guardar** (<kbd>Ctrl+S</kbd>), **Guardar como**, **Guardar versión** y **Extraer** descargan el archivo a la carpeta de descargas del navegador. Lo mismo pasa con **Exportar** (el OBJ baja con su .mtl y sus texturas al lado), el render, el mapa UV, las texturas pintadas guardadas afuera y los scripts externos.
+- **Guardar** (<kbd>Ctrl+S</kbd>), **Guardar como**, **Guardar versión**, **Extraer** y el **Guardar como** de un recurso descargan el archivo a la carpeta de descargas del navegador. Lo mismo pasa con **Exportar** (el OBJ baja con su .mtl y sus texturas al lado), el render, el mapa UV, las texturas pintadas guardadas afuera y los scripts externos.
 - Cuando el editor pide una carpeta para guardar, no se abre ningún explorador: el archivo se descarga directamente.
 - Si el navegador pregunta si la página puede descargar varios archivos, hay que aceptar. Si no, solo baja el primero.
 - Lo abierto vive en la memoria de la página: al recargarla se pierde todo lo que no se descargó.

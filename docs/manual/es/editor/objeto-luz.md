@@ -14,6 +14,8 @@ Una **luz** ilumina la escena: los materiales que tienen Iluminación prendida s
 
 Las luces están en el submenú Añadir → Luces: **Luz** crea una luz Puntual; **Sol** y **Foco** crean directo los otros dos. Ahí también está la [Sonda de luz](objeto-sonda-luz.md). El tipo se puede cambiar después en la propiedad **Tipo**.
 
+El primer **Sol** de la escena es el que da las [sombras en tiempo real](sombras-tiempo-real.md), si están prendidas.
+
 El sol y el foco se orientan rotando el objeto. El sol dibuja siempre una línea hasta el piso, hacia donde alumbra; con la luz seleccionada, el foco muestra su cono y la puntual una esfera del tamaño de su **Distancia**.
 
 ## Las pestañas

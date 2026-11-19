@@ -1704,6 +1704,56 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         g_redraw = true; Cuadro();
         return true;
     }
+    // 'proxyw3d <archivo.w3d>': Add > Proxy W3D como si el explorador hubiera elegido ese .w3d (queda abierto el .w3d por
+    // dentro). 'fbentrar <nombre>': en el explorador abierto, entra a esa carpeta o elige ese archivo. 'fbaceptar': el
+    // boton verde. 'fbver': lo que muestra (la ruta, las entradas y el boton)
+    if (cmd == "proxyw3d") {
+        std::string r; ss >> r;
+        extern void LayoutProxyW3dDesde(const std::string&);
+        LayoutProxyW3dDesde(r);
+        if (!PopUpActive) { err = "proxyw3d: no se abrio el explorador de la libreria"; return false; }
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    if (cmd == "fbentrar" || cmd == "fbaceptar" || cmd == "fbver") {
+        FileBrowser* fb = dynamic_cast<FileBrowser*>(PopUpActive);
+        if (!fb) { err = cmd + ": no hay un explorador abierto"; return false; }
+        if (cmd == "fbentrar") { const std::string n = Resto(ss); if (!fb->EntrarNombre(n)) { err = "fbentrar: no hay '" + n + "'"; return false; } }
+        else if (cmd == "fbaceptar") fb->AceptarAhora();
+        else {
+            printf("      [fbver] '%s':", fb->currentPath.c_str());
+            for (size_t i = 0; i < fb->entries.size(); i++) printf(" [%s%s]", fb->entries[i].name.c_str(), fb->entries[i].isDir ? "/" : "");
+            printf(" -> boton '%s'\n", fb->EtiquetaAccion().c_str());
+        }
+        g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'minimemoria <KB>': la RAM libre que las vistas previas de la biblioteca dejan (con una enorme: "no hay memoria")
+    if (cmd == "minimemoria") {
+        long kb = 0; ss >> kb;
+        extern void W3dMiniaturasMinimoKB(long);
+        W3dMiniaturasMinimoKB(kb);
+        return true;
+    }
+    // 'menuteclado <3d|outliner|props|timeline> [abajos]': el OK MANTENIDO del N95 en ese viewport (lo hace activo): el
+    // menu contextual de su elemento con foco (antes, 'abajos' veces la flecha abajo del N95). Imprime sus opciones
+    if (cmd == "menuteclado") {
+        std::string q; int abajos = 0; ss >> q >> abajos;
+        const int kind = q == "3d" ? 1 : q == "outliner" ? 2 : q == "props" ? 3 : q == "timeline" ? 5 : q == "biblioteca" ? 9 : -1;
+        if (kind < 0) { err = "menuteclado: 3d|outliner|biblioteca|props|timeline"; return false; }
+        ViewportBase* vp = HojaDeTipo(rootViewport, kind);
+        if (!vp) { err = "menuteclado: no hay ese viewport en el layout"; return false; }
+        viewPortActive = vp;
+        { extern bool LayoutTeclaPanelActivo(int tecla); for (int i = 0; i < abajos; i++) LayoutTeclaPanelActivo(1); }
+        extern bool LayoutMenuContextoTeclado();
+        extern PopupMenu* MenuAbierto;
+        if (!LayoutMenuContextoTeclado() || !MenuAbierto) { err = "menuteclado: no se abrio ningun menu"; return false; }
+        printf("      [menuteclado] %s: '%s' en %d,%d:", q.c_str(), MenuAbierto->titulo.c_str(), MenuAbierto->x, MenuAbierto->y);
+        for (size_t i = 0; i < MenuAbierto->items.size(); i++) printf(" [%s]", MenuAbierto->items[i]->text.c_str());
+        printf("\n");
+        g_redraw = true; Cuadro();
+        return true;
+    }
     // 'menuelegir <texto en ingles>': elige esa opcion del menu abierto, como Enter sobre ella (Shift+S y despues
     // "Cursor to Selected")
     if (cmd == "menuelegir") {

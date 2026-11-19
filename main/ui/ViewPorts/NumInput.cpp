@@ -1,6 +1,7 @@
 // ===================================================================================================
 //  ENTRADA NUMERICA / FORMULAS durante un transform (compartida 4 OS). Extraido de LayoutInput (Fase 2).
 // ===================================================================================================
+#include "input/W3dClipboard.h"   // el portapapeles del sistema (Ctrl+C / Ctrl+V de las cajas de texto)
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
@@ -129,6 +130,33 @@ bool TextFieldCancelar(){
     g_textFieldRestaurado = g_textFieldActivo;   // los duenos EN VIVO lo re-escriben este cuadro
     g_textFieldActivo = NULL;
     gFocoDe = NULL;
+    g_redraw = true;
+    return true;
+}
+// EL PORTAPAPELES del campo enfocado (el del sistema: se comparte con el navegador, las notas, el IDE)
+bool TextFieldCopiar(){
+    if (!g_textFieldActivo) return false;
+    if (g_textFieldActivo->HaySeleccion()) w3dEngine::W3dClipboardSet(g_textFieldActivo->Seleccionado());
+    return true;
+}
+bool TextFieldCortar(){
+    if (!g_textFieldActivo) return false;
+    TextFieldSeguirFoco();
+    if (g_textFieldActivo->HaySeleccion()) { w3dEngine::W3dClipboardSet(g_textFieldActivo->Seleccionado()); g_textFieldActivo->BorrarSeleccion(); }
+    g_redraw = true;
+    return true;
+}
+bool TextFieldPegar(){
+    if (!g_textFieldActivo) return false;
+    TextFieldSeguirFoco();
+    const std::string t = w3dEngine::W3dClipboardGet();
+    if (!t.empty()) g_textFieldActivo->InsertarTexto(t);
+    g_redraw = true;
+    return true;
+}
+bool TextFieldSeleccionarTodo(){
+    if (!g_textFieldActivo) return false;
+    g_textFieldActivo->SelectAll();
     g_redraw = true;
     return true;
 }

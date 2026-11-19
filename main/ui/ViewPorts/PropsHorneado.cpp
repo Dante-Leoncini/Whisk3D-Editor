@@ -129,11 +129,14 @@ static void Terminar() {
             }
         L.swap(L2); c.swap(c2);
     }
+    // UN CAPTADOR DE SOMBRAS: la textura es la sombra (blanco = nada), para una capa Multiply comun
+    const bool captador = RTHorneadoCaptador();
+    const int modo = captador ? W3D_CAPA_MULTIPLY : W3D_CAPA_MULTIPLY2X;
     UndoTexturaIniciar(te);
     for (int i = 0; i < w * h; i++) {
         if (!c[(size_t)i]) continue;
         for (int k = 0; k < 3; k++) {   // (la mitad: la capa es Multiply 2x, asi entra luz de hasta el doble de blanco)
-            const float v = L[(size_t)i * 3 + k] * 0.5f;
+            const float v = L[(size_t)i * 3 + k] * (captador ? 1.0f : 0.5f);
             te->rgba[(size_t)i * 4 + k] = (unsigned char)(v <= 0.0f ? 0 : v >= 1.0f ? 255 : (int)(v * 255.0f + 0.5f));
         }
         te->rgba[(size_t)i * 4 + 3] = 255;
@@ -148,10 +151,10 @@ static void Terminar() {
         UndoMaterialModIniciar(mat);
         bool hay = false;
         for (size_t k = 0; k < mat->capas.size(); k++)
-            if (mat->capas[k].tex == te->tex) { mat->capas[k].blend = W3D_CAPA_MULTIPLY2X; mat->capas[k].uvMapa = gHornUVUsada;
+            if (mat->capas[k].tex == te->tex) { mat->capas[k].blend = modo; mat->capas[k].uvMapa = gHornUVUsada;
                                                 mat->capas[k].on = true; mat->capas[k].horneada = true; hay = true; }
         if (!hay) {
-            TexLayer tl; tl.blend = W3D_CAPA_MULTIPLY2X; tl.uvMapa = gHornUVUsada; tl.fuerza = 1.0f; tl.horneada = true;
+            TexLayer tl; tl.blend = modo; tl.uvMapa = gHornUVUsada; tl.fuerza = 1.0f; tl.horneada = true;
             TexturaPonerEn(tl.tex, te->tex);
             mat->capas.push_back(tl);
         }
@@ -163,8 +166,12 @@ static void Terminar() {
     Notificar(T("Lighting baked"), false);
     g_redraw = true;
 }
+static void AccionCancelar() {
+    if (!RTHorneadoActivo()) return;
+    RTHorneadoCancelar(); gHornMalla = NULL; gHornTe = NULL; Notificar(T("Bake canceled"), true); PropsLayoutSucio(); g_redraw = true;
+}
 static void AccionHornear() {
-    if (RTHorneadoActivo()) { RTHorneadoCancelar(); gHornMalla = NULL; gHornTe = NULL; Notificar(T("Bake canceled"), true); g_redraw = true; return; }
+    if (RTHorneadoActivo()) { AccionCancelar(); return; }
     Mesh* m = MallaActiva();
     if (!m) return;
     if (!TexturaViva(gHornTex)) { Notificar(T("Choose a texture to bake into"), true); return; }
@@ -226,6 +233,11 @@ void PropsHorneadoConstruir(Properties* p) {
     p->propHornBarra = new PropButton("0%");   // (la barra del progreso, solo mientras hornea)
     p->propHornBarra->button->barra = 0.0f;
     p->propHorneado->properties.push_back(p->propHornBarra);
+    // CANCELAR (la cruz), abajo de la barra: solo mientras hornea (el boton Bake se esconde)
+    p->propHornCancelar = new PropButton(T("Cancel"), IconType::cerrar);
+    p->propHornCancelar->action = AccionCancelar;
+    p->propHornCancelar->oculto = true;
+    p->propHorneado->properties.push_back(p->propHornCancelar);
     p->propHornAviso = new PropLabel(T("Bakes the light of the static objects into the texture, through the UV of the mesh"), true);
     p->propHorneado->properties.push_back(p->propHornAviso);
     p->GroupProperties.push_back(p->propHorneado);
@@ -256,9 +268,17 @@ void PropsHorneadoActualizar(Properties* p, bool visible) {
     p->propHornMuestras->value = (trabajando || !gHornIndirecta) ? NULL : &gHornMuestras;
     p->propHornRebotes->value = (trabajando || !gHornIndirecta) ? NULL : &gHornRebotes;
     p->propHornDenoiser->value = (trabajando || !gHornIndirecta) ? NULL : &gHornDenoiser;
-    const std::string tb = trabajando ? std::string(T("Cancel")) : std::string(T("Bake"));
-    if (p->propHornBoton->button->text != tb) { p->propHornBoton->button->text = tb; PropsLayoutSucio(); }
-    p->propHornBarra->oculto = !trabajando;
+    // MIENTRAS HORNEA: sin la textura ni la capa UV (no se cambian a mitad de camino) ni el boton Bake; la barra y abajo
+    // Cancelar
+    {
+        bool cambio = false;
+        if (p->propHornTex->oculto != trabajando) { p->propHornTex->oculto = trabajando; cambio = true; }
+        if (p->propHornUV->oculto != trabajando) { p->propHornUV->oculto = trabajando; cambio = true; }
+        if (p->propHornBoton->oculto != trabajando) { p->propHornBoton->oculto = trabajando; cambio = true; }
+        if (p->propHornBarra->oculto != !trabajando) { p->propHornBarra->oculto = !trabajando; cambio = true; }
+        if (p->propHornCancelar && p->propHornCancelar->oculto != !trabajando) { p->propHornCancelar->oculto = !trabajando; cambio = true; }
+        if (cambio) PropsLayoutSucio();
+    }
     if (trabajando) {
         char b[32]; snprintf(b, sizeof(b), "%d%%", (int)(gHornProgreso * 100.0f));
         p->propHornBarra->button->text = b;

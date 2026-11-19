@@ -433,7 +433,7 @@ static void ArmarObjetos(PopupMenu* raiz, Rutina* r, int rt, const std::string& 
 static void RefTexturaCargada(const std::string& elegido) {
     Rutina* r = RuActiva(); W3dPaso* p = RuPaso(r);
     if (!r || !p || W3dPasoRef(p->tipo) != RefTextura) return;
-    const std::string ruta = W3dImportarAsset(elegido);   // (importar = copiar adentro del proyecto)
+    const std::string ruta = W3dCargarExterno(elegido);   // (cargar de afuera = queda afuera, externo)
     Texture* t = TexturaTomar(ruta);
     if (!t) { extern void Notificar(const std::string&, bool); Notificar(T("The texture couldn't be loaded"), true); return; }
     p->ref = t->path;

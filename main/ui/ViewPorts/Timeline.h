@@ -252,7 +252,8 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable, publ
         bool DopeCopiarSeleccion();          // Ctrl+C: los keyframes elegidos al portapapeles (false = no habia)
         void DopeCortarSeleccion();          // Ctrl+X: copiar + borrar
         void DopePegar();                    // Ctrl+V: los del portapapeles desde el frame ACTUAL (quedan elegidos)
-        bool MenuContexto(int mx, int my, int menuX = -1, int menuY = -1);   // click derecho en el strip: Cortar / Copiar / Pegar / Duplicar / Borrar (menuX/Y: donde abrirlo)
+        bool MenuContexto(int mx, int my, int menuX = -1, int menuY = -1);
+        bool MenuContextoTeclado();   // el mismo, en el playhead (el OK mantenido del N95: los keyframes elegidos)   // click derecho en el strip: Cortar / Copiar / Pegar / Duplicar / Borrar (menuX/Y: donde abrirlo)
         bool CabezalEn(int mx, int my) const;  // (pantalla) sobre la LINEA del frame actual (se arrastra)
         bool CurvaTramoEn(int mx, int my, bool agregar); // click sobre la linea de una curva: elige su tramo A-B
         void CajaAplicar(int x0, int y0, int x1, int y1, bool tocar, bool agregar); // box select (pantalla)

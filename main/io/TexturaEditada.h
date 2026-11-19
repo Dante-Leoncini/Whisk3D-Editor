@@ -41,6 +41,9 @@ bool TexEditHacerInterna(TexturaEditable* te, std::string& msg);
 bool TexEditGuardarComoInterna(TexturaEditable* te, const std::string& nombre, bool forzar, bool* existe, std::string& msg);
 std::string TexEditEtiqueta(const Texture* t);                   // nombre de archivo + "*" si esta sin guardar
 bool TexEditSinGuardar(const Texture* t);
+// el PNG de lo que se VE ahora (con lo pintado sin guardar): "Guardar como..." de la biblioteca escribe ESO. false = la
+// textura no esta en edicion (sus bytes son los de su archivo)
+bool TexEditPNGActual(const Texture* t, std::vector<unsigned char>& png);
 // guardado del proyecto: el PNG de una interna que solo vive en memoria (true = usar estos bytes)
 bool TexEditBytesParaGuardar(const std::string& path, std::string& png);
 void TexEditProyectoGuardado();                                  // el .w3d se escribio: lo que era memoria ya esta adentro

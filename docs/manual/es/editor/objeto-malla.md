@@ -34,7 +34,11 @@ Es igual para todos los tipos de objeto: cámaras, luces, esqueletos y sonidos t
 | Visible ◆ | Si el objeto se ve. Es el mismo ojo del Outliner. |
 | Renderizar ◆ | Si sale en los renders. Destildado, se sigue viendo en la Vista 3D pero no aparece en la imagen ni en el video. |
 | Líneas de Relación | La línea que une al objeto con su padre. Sirve apagarla cuando un objeto tiene muchos hijos y las líneas tapan la vista. |
-| Estático | Marca que el objeto no se mueve nunca. Solo importa adentro de un objeto Culling con el método de grilla: un objeto estático se ubica en su celda una sola vez, en vez de medirlo en cada cuadro. |
+| Estático | Marca que el objeto no se mueve nunca. Adentro de un objeto Culling con el método de grilla, un objeto estático se ubica en su celda una sola vez, en vez de medirlo en cada cuadro. También lo usan la [luz precalculada](#precalcular-iluminación), la [Sonda de luz](objeto-sonda-luz.md) y las [sombras en tiempo real](sombras-tiempo-real.md). |
+| Proyectar sombras | Solo en las mallas: la malla tapa la luz del sol en las [sombras en tiempo real](sombras-tiempo-real.md). Viene tildada. |
+| Recibir sombras | Solo en las mallas: la malla se oscurece donde algo le tapa el sol. Viene tildada. |
+| Rebote de luz | Solo en las mallas, para la [luz precalculada](#precalcular-iluminación) y el render con rayos: la luz que le llega rebota y alumbra lo de alrededor. Destildada, los rayos de luz indirecta le pasan de largo como si no estuviera. Es aparte de **Proyectar sombras**: una malla puede no hacer sombra y que igual le rebote la luz. Viene tildada. |
+| Captador de sombras | Solo en las mallas: la malla **solo recibe** sombras. No tapa la luz ni la rebota, y al precalcular su iluminación la textura sale **blanca**, con solo las sombras y la oclusión ambiental que le caen encima (un piso para apoyar un modelo). |
 
 ### Animación y Paleta
 
@@ -88,19 +92,26 @@ Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a l
 
 | Propiedad | Qué hace |
 |---|---|
-| Textura | Dónde se escribe la luz. Una textura del proyecto, o **Nueva textura…**, que pide su tamaño y su nombre. Sin textura no se puede hornear. |
+| Textura | Dónde se escribe la luz. Una textura del proyecto, o **Nueva textura…**, que pide su tamaño y su nombre. Sin textura no se puede hornear. Mientras calcula no se muestra (igual que **UV**). |
 | UV | La capa UV de la malla que dice dónde cae cada cara en la textura. Conviene una capa propia, sin caras encimadas (por ejemplo "IluminacionUV"). |
 | Luz indirecta | La luz que rebota: la del fondo y la que rebota en lo que hay alrededor. Apagada, solo las lámparas y sus sombras. |
 | Muestras | Cuántos rayos de luz indirecta se tiran por cada píxel. Más muestras, menos granulado, más tiempo. |
 | Rebotes | Cuántas veces rebota la luz (de 1 a 8). Con más rebotes las sombras reciben la luz que rebota en lo que las tapa (la sombra de un cubo no queda negra), y se tarda más. |
 | Denoiser | Suaviza la luz indirecta para que no quede granulada. Las sombras de las lámparas quedan nítidas igual. |
-| Hornear | Calcula la luz. Mientras trabaja, la barra muestra el avance y el botón dice **Cancelar**. |
+| Hornear | Calcula la luz. Mientras trabaja, la barra muestra el avance y abajo de la barra está **Cancelar** (la cruz). |
 
 Solo se pisan los píxeles de las caras de la malla en esa UV (y dos de margen alrededor); el resto de la textura queda como estaba. Se puede deshacer con Ctrl+Z.
 
 Al terminar, la textura queda como **capa de textura de luz horneada** (mezcla *Multiply 2x*, con esa UV) en todos los materiales de la malla. Mientras esa capa esté prendida, el material no usa la luz de tiempo real (la luz ya está en la textura y se sumaría dos veces); si sacás o apagás la capa, vuelve la luz de siempre. Si movés una lámpara o un objeto estático, volvé a hornear.
 
 Los objetos **no estáticos** (los que se mueven) no se hornean: toman la luz de una [Sonda de luz](objeto-sonda-luz.md).
+
+Cada objeto decide, en su pestaña **Objeto**, qué hace con la luz al hornear:
+
+- **Proyectar sombras** destildado: no hace sombra en lo que se hornea (pero, si tiene **Rebote de luz**, la luz le sigue rebotando).
+- **Recibir sombras** destildado: al hornearlo, la luz de las lámparas le llega entera, sin las sombras de lo que hay en el medio.
+- **Rebote de luz** destildado: no suma a la luz indirecta; los rayos que rebotan le pasan de largo.
+- **Captador de sombras**: al hornearlo la textura sale blanca, con solo las sombras de las lámparas y la oclusión ambiental (lo que lo tapa alrededor, a menos de un metro). La capa queda con mezcla *Multiply* (no *2x*): donde no le cae nada, el material se ve como es. Para los demás no existe: no tapa ni rebota.
 
 ## La pestaña Malla 3D
 

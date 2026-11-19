@@ -71,6 +71,7 @@ A prefab can't be converted	Um prefab não pode ser convertido
 A prefab can't contain itself	Um prefab não pode conter a si mesmo
 A prefab instance only has what its prefab generates	Uma instância de prefab só tem o que seu prefab gera
 A project needs at least one scene	Um projeto precisa de pelo menos uma cena
+A resource with that name already exists	Já existe um recurso com esse nome
 A scene can't contain itself	Uma cena não pode conter a si mesma
 A scene with that name already existed, renamed:	Já existia uma cena com esse nome, renomeada:
 A texture with that name already exists	Já existe uma textura com esse nome
@@ -225,6 +226,7 @@ Bevel: move away from the center = width, wheel / up-down = segments, V = vertic
 Bevel: select edges first	Chanfro: selecione arestas primeiro
 Bevel: select vertices first	Chanfro: selecione vértices primeiro
 Bezier	Bezier
+Bias	Viés
 Billboard	Billboard
 Bind texture	Vincular textura
 Bitrate	Taxa de bits
@@ -305,6 +307,8 @@ Cameras	Câmeras
 Cancel	Cancelar
 Cancelled	Cancelado
 Cargar textura (imagen)	Carregar textura (imagem)
+Cascades	Cascatas
+Cast shadows	Projetar sombras
 Cell size	Tamanho da célula
 Center	Centro
 Center X	Centro X
@@ -431,6 +435,7 @@ Could not write the file	Não foi possível gravar o arquivo
 Count	Cópias
 Cover	Cobrir
 Create	Criar
+Create Folder	Criar pasta
 Create Prefab	Criar prefab
 Cross	Cruz
 Cube	Cubo
@@ -601,6 +606,7 @@ Exclude X (plane)	Excluir X (plano)
 Exclude Y (plane)	Excluir Y (plano)
 Exclude Z (plane)	Excluir Z (plano)
 Expand	Expandir
+Explore...	Explorar...
 Exponential	Exponencial
 Exponential squared	Exponencial ao quadrado
 Export	Exportar
@@ -619,6 +625,7 @@ Extract assets	Extrair assets
 Extract the assets to...	Extrair os assets para...
 Extract to a folder...	Extrair para uma pasta...
 Extract to...	Extrair para...
+Extract...	Extrair...
 Extract: save the project first (the assets live inside the .w3d)	Extrair: salve o projeto primeiro (os assets ficam dentro do .w3d)
 Extracted	Extraído
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Extraídos %d arquivo(s). São CÓPIAS: para que uma alteração volte ao projeto é preciso importá-la de novo
@@ -645,12 +652,14 @@ Faces	Faces
 Faces triangulated	Faces trianguladas
 Factor	Fator
 Factor X	Fator X
+Fade border	Borda final
 Fade in	Aparece em
 Fade out	Desvanecer
 Falloff	Queda
 Far	Longe
 Far fade from	Longe: inteira até
 Far fade to	Longe: invisível desde
+Far shadow blur	Desfoque distante
 Fast Mode	Modo rápido
 File	Arquivo
 File name	Nome do arquivo
@@ -774,6 +783,7 @@ IOR	IOR
 Icon	Ícone
 Ignore order	Ignorar ordem
 Image	Imagem
+Import	Importar
 Import 3D model	Importar modelo 3D
 Import FBX	Importar FBX
 Import GLB	Importar GLB
@@ -781,6 +791,7 @@ Import OBJ	Importar OBJ
 Import STL	Importar STL
 Import glTF	Importar glTF
 Import w3dui	Importar w3dui
+Import...	Importar...
 Imported	Importado
 Importing FBX...	Importando FBX...
 Importing glTF...	Importando glTF...
@@ -897,6 +908,7 @@ Library unlinked	Biblioteca desvinculada
 Lifetime	Vida
 Light	Luz
 Light Probe	Sonda de luz
+Light bounce	Rebote de luz
 Light bounces	Rebotes de luz
 Light color	Cor da luz
 Light on/off	Luz liga/desliga
@@ -918,6 +930,7 @@ Lines	Linhas
 Link	Vincular
 Link .w3d...	Vincular .w3d...
 Linked	Vinculado
+Linked library	Biblioteca
 Linking	Vinculando
 List	Lista
 Load (camera x object)	Carregar (câmera x objeto)
@@ -1131,6 +1144,7 @@ No other scenes	Não há outras cenas
 No prefabs yet	Ainda não há prefabs
 No results	Sem resultados
 No source: this constraint does nothing.	Sem fonte: esta restrição não faz nada.
+No sun light in the scene: shadows come from the first sun light	Não há luz solar na cena: as sombras vêm da primeira luz solar
 Noise	Ruído
 None	Nenhum
 Normal	Normal
@@ -1151,6 +1165,7 @@ Not enough space: uninstalling the previous version (its data on the phone is lo
 Not linked	Não vinculado
 Not moved	Não movido
 Not opened	Não aberto
+Not saved	Não foi salvo
 Not saved in the project yet	Ainda não foi salvo no projeto
 Not saving '%s': %s	Não salvo '%s': %s
 Not saving '%s': could not read its faces and saving would erase them	Não salvo '%s': não consegui ler suas faces e salvar as apagaria
@@ -1213,6 +1228,7 @@ Open normal map	Abrir Mapa de Normais
 Open project	Abrir projeto
 Open without saving	Abrir sem salvar
 Open...	Abrir...
+OpenGL ES 1.1: the GPU and the CPU compute them (not real time)	OpenGL ES 1.1: a GPU e a CPU as calculam (não em tempo real)
 Opening project...	Abrindo projeto...
 Operation	Operação
 Optimize Vertex Groups	Otimizar Grupos de Vértices
@@ -1237,6 +1253,8 @@ Overflow X	Transbordo X
 Overflow Y	Transbordo Y
 Overlays	Sobreposições
 Overrides	Overrides
+Overwrite	Substituir
+Overwrite file?	Substituir o arquivo?
 Own	Próprio
 PVS recalculated	PVS recalculado
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: falta <modelo>.pvs.json junto ao .obj de origem
@@ -1375,8 +1393,10 @@ Rate	Quantidade
 Ray Tracing	Ray Tracing
 Ray traced motion blur	Desfoque traçado
 Rays	Raios
+Real-time shadows	Sombras em tempo real
 Recalculate	Recalcular
 Recalculate Normals	Recalcular Normais
+Receive shadows	Receber sombras
 Recent files	Arquivos recentes
 Rectangle	Retângulo
 Red	Vermelho
@@ -1499,6 +1519,7 @@ Save version v%d	Salvar versão v%d
 Save version: the project has no location (use Save first)	Salvar versão: o projeto não tem local (use Salvar primeiro)
 Save: could not replace the file (the previous version was kept):	Salvar: não foi possível substituir o arquivo (a versão anterior foi mantida):
 Save: incomplete write. The file was not touched:	Salvar: gravação incompleta. O arquivo não foi alterado:
+Saved	Salvo
 Saved (note: %d curve(s) without a source file are not saved)	Salvo (atenção: %d curva(s) sem arquivo de origem não são salvas)
 Saved OK, but copying version v%d failed (see the log)	Salvo, mas a cópia da versão v%d falhou (veja o log)
 Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Salvo, mas faltam %s e mais %d arquivo(s) (fora do .w3d). Biblioteca > Arquivos faltando
@@ -1577,6 +1598,8 @@ Shader	Shader
 Shader of	Shader de
 Shaders	Shaders
 Shading	Sombreamento
+Shadow catcher	Captador de sombras
+Shadow strength	Intensidade
 Shape	Forma
 Shape keys	Shape keys
 Sharp	Agudo
@@ -1631,6 +1654,7 @@ Snap menu	Menu de ímã (Snap)
 Snap: OFF	Ímã: desligado
 Snap: ON	Ímã: ligado
 Soft Knee	Joelho suave
+Soft shadows	Sombras suaves
 Solid	Sólido
 Solid Preview	Prévia Sólido
 Sort by camera	Ordenar pela câmera
@@ -1647,6 +1671,9 @@ Sphere Projection	Projeção de Esfera
 Spin	Giro
 Spin Y	Giro em Y
 Spin random	Giro aleatório (±)
+Split 1	Divisão 1
+Split 2	Divisão 2
+Split 3	Divisão 3
 Split in Columns	Dividir em colunas
 Split in Rows	Dividir em linhas
 Spot	Foco
@@ -1675,6 +1702,7 @@ Steps to skip	Passos a pular
 Stop	Parar
 Stop the game before changing the scene	Pare o jogo antes de trocar de cena
 Stop the game first	Primeiro pare o jogo
+Storage	Local
 Stored	Armazenado
 Streaming preview	Pré-visualização do streaming
 Strength	Força
@@ -1768,6 +1796,7 @@ There are no orphans	Não há órfãos
 There are no saved layouts to delete	Não há layouts salvos para apagar
 There is no active camera	Não há câmera ativa
 There is no audio: the mixer did not start	Não há áudio: o mixer não iniciou
+There is no memory to load the previews	Não há memória para carregar as pré-visualizações
 There is no script editor (IDE) in the layout	Não há um editor de scripts (IDE) no layout
 There is no such prefab	Esse prefab não existe
 There is no such scene	Essa cena não existe
@@ -1852,6 +1881,7 @@ Unlink	Desvincular
 Unloaded	Descarregada
 Unpack	Desempacotar
 Unpack Prefab	Desempacotar prefab
+Unused	Sem uso
 Unwrap	Desdobrar
 Unwrap Angle Based	Desdobrar Baseado em Ângulos
 Unwrap Conformal	Desdobrar Conforme
@@ -1951,6 +1981,7 @@ Z Scale	Z Escala
 Z axis	Eixo Z
 Z-Buffer	Z-Buffer
 ZBuffer Preview	Prévia ZBuffer
+Zoom	Zoom
 Zoom 1:1	Zoom 1:1
 Zoom 2:1	Zoom 2:1
 Zoom 3:1	Zoom 3:1

@@ -304,6 +304,12 @@ void W3dRecursoActivar(int vista, const std::string& id);
 void W3dRecursoDesactivar();
 // false = no hay (o dejo de valer). 'vista'/'id' opcionales.
 bool W3dRecursoActivo(int* vista, std::string* id);
+// UN RECURSO DE UNA LIBRERIA VINCULADA (la Biblioteca mirando otro .w3d): Propiedades lo MUESTRA, de solo lectura (su
+// tipo, si este proyecto lo usa, si esta cargado...). 'lib' = el indice de la libreria; 'idGlobal' = con el que lo nombra
+// este proyecto (W3dLibreriaIdGlobal: "Lib/Cuerpo", "lib:Lib/texturas/piel.png", la clave de un proxy). Se suelta igual
+// que el activo (al elegir un objeto, otro recurso o al cerrar)
+void W3dRecursoExtActivar(int lib, const W3dRecursoItem& it, const std::string& idGlobal);
+bool W3dRecursoExtActivo(int* lib, W3dRecursoItem* it, std::string* idGlobal);
 // el renombre de un recurso arrastra al activo (lo llama W3dVistaRecRenombrar)
 void W3dRecursoActivoRenombrado(int vista, const std::string& viejo, const std::string& nuevo);
 Material*     W3dRecursoActivoMaterial();    // NULL si el activo no es un material

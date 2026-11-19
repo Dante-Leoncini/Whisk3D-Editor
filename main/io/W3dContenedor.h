@@ -52,6 +52,8 @@ class W3dZipLector;
 bool W3dContenedorMontar(const std::string& rutaW3d);
 void W3dContenedorDesmontar();
 bool W3dContenedorHayMontado();
+// la ruta del .w3d montado ("" = ninguno): el explorador del proyecto por dentro muestra su nombre
+std::string W3dContenedorRutaMontada();
 // el lector del contenedor montado (NULL si no hay). Lo usa el guardado
 // incremental para reenvasar byte a byte lo que no cambio.
 W3dZipLector* W3dContenedorLector();
@@ -126,6 +128,12 @@ bool W3dContenedorExtraer(const std::string& entrada, const std::string& rutaDis
 // sea que el editor sigue funcionando igual con los proyectos viejos.
 // 'categoria' NULL = la que le toca por extension.
 std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria = 0);
+// CARGAR UN ARCHIVO DE AFUERA (el explorador de archivos, soltar un archivo en el editor): QUEDA AFUERA, referenciado por
+// su ruta ("ext:" en el .w3d). Lo que se carga de afuera es externo; adentro del .w3d vive lo que se CREA en el programa
+// (una textura nueva, un script nuevo) o lo que el usuario mete con la Biblioteca (Guardado: adentro). Devuelve la ruta
+// a usar. En el NAVEGADOR no hay un "afuera" que dure (el archivo subido vive en la memoria de la pagina): ahi se copia
+// adentro como antes
+std::string W3dCargarExterno(const std::string& rutaDisco, const char* categoria = 0);
 // EL ORIGEN de un asset importado: el archivo de disco del que se copio adentro (lo anota W3dImportarAsset y se guarda
 // en proyecto.json, "origenes"). "Actualizar textura" lo vuelve a leer de ahi cuando se edito afuera. Sobrevive al
 // desmontaje (guardar desmonta y vuelve a montar): lo vacia abrir o crear otro proyecto

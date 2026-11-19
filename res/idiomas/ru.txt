@@ -71,6 +71,7 @@ A prefab can't be converted	Префаб нельзя конвертироват
 A prefab can't contain itself	Префаб не может содержать сам себя
 A prefab instance only has what its prefab generates	Экземпляр префаба содержит только то, что создаёт его префаб
 A project needs at least one scene	В проекте нужна хотя бы одна сцена
+A resource with that name already exists	Ресурс с таким именем уже есть
 A scene can't contain itself	Сцена не может содержать саму себя
 A scene with that name already existed, renamed:	Сцена с таким именем уже была, новое имя:
 A texture with that name already exists	Текстура с таким именем уже есть
@@ -225,6 +226,7 @@ Bevel: move away from the center = width, wheel / up-down = segments, V = vertic
 Bevel: select edges first	Фаска: сначала выберите рёбра
 Bevel: select vertices first	Фаска: сначала выберите вершины
 Bezier	Безье
+Bias	Смещение
 Billboard	Билборд
 Bind texture	Привязать текстуру
 Bitrate	Битрейт
@@ -305,6 +307,8 @@ Cameras	Камеры
 Cancel	Отмена
 Cancelled	Отменено
 Cargar textura (imagen)	Загрузить текстуру (изображение)
+Cascades	Каскады
+Cast shadows	Отбрасывать тени
 Cell size	Размер ячейки
 Center	Центр
 Center X	Центр X
@@ -431,6 +435,7 @@ Could not write the file	Не удалось записать файл
 Count	Количество
 Cover	Заполнить
 Create	Создать
+Create Folder	Создать папку
 Create Prefab	Создать префаб
 Cross	Крест
 Cube	Куб
@@ -601,6 +606,7 @@ Exclude X (plane)	Исключить X (плоскость)
 Exclude Y (plane)	Исключить Y (плоскость)
 Exclude Z (plane)	Исключить Z (плоскость)
 Expand	Раскрыть
+Explore...	Обзор...
 Exponential	Экспоненциальная
 Exponential squared	Квадратичная экспонента
 Export	Экспорт
@@ -619,6 +625,7 @@ Extract assets	Извлечь ассеты
 Extract the assets to...	Извлечь ассеты в...
 Extract to a folder...	Извлечь в папку...
 Extract to...	Извлечь в...
+Extract...	Извлечь...
 Extract: save the project first (the assets live inside the .w3d)	Извлечь: сначала сохраните проект (ассеты хранятся внутри .w3d)
 Extracted	Извлечено
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Извлечено файлов: %d. Это КОПИИ: чтобы изменение вернулось в проект, его нужно импортировать снова
@@ -645,12 +652,14 @@ Faces	Грани
 Faces triangulated	Грани триангулированы
 Factor	Коэффициент
 Factor X	Коэффициент X
+Fade border	Край затухания
 Fade in	Появление
 Fade out	Угасание
 Falloff	Спад
 Far	Дальняя
 Far fade from	Вдали: целиком до
 Far fade to	Вдали: невидимо с
+Far shadow blur	Размытие дальних
 Fast Mode	Быстрый режим
 File	Файл
 File name	Имя файла
@@ -774,6 +783,7 @@ IOR	IOR
 Icon	Иконка
 Ignore order	Игнорировать порядок
 Image	Изображение
+Import	Импортировать
 Import 3D model	Импорт 3D-модели
 Import FBX	Импорт FBX
 Import GLB	Импорт GLB
@@ -781,6 +791,7 @@ Import OBJ	Импорт OBJ
 Import STL	Импорт STL
 Import glTF	Импорт glTF
 Import w3dui	Импорт w3dui
+Import...	Импортировать...
 Imported	Импортировано
 Importing FBX...	Импорт FBX...
 Importing glTF...	Импорт glTF...
@@ -897,6 +908,7 @@ Library unlinked	Библиотека отвязана
 Lifetime	Время жизни
 Light	Свет
 Light Probe	Световой зонд
+Light bounce	Отражение света
 Light bounces	Отскоки света
 Light color	Цвет света
 Light on/off	Свет вкл/выкл
@@ -918,6 +930,7 @@ Lines	Линии
 Link	Связать
 Link .w3d...	Связать .w3d...
 Linked	Связано
+Linked library	Библиотека
 Linking	Компоновка
 List	Список
 Load (camera x object)	Загрузить (камера x объект)
@@ -1131,6 +1144,7 @@ No other scenes	Нет других сцен
 No prefabs yet	Пока нет префабов
 No results	Нет результатов
 No source: this constraint does nothing.	Нет источника: этот ограничитель ничего не делает.
+No sun light in the scene: shadows come from the first sun light	В сцене нет солнечного света: тени даёт первый солнечный свет
 Noise	Шум
 None	Нет
 Normal	Нормаль
@@ -1151,6 +1165,7 @@ Not enough space: uninstalling the previous version (its data on the phone is lo
 Not linked	Не связано
 Not moved	Не перемещено
 Not opened	Не открыто
+Not saved	Не сохранено
 Not saved in the project yet	Ещё не сохранено в проекте
 Not saving '%s': %s	Не сохраняю '%s': %s
 Not saving '%s': could not read its faces and saving would erase them	Не сохраняю '%s': не удалось прочитать его грани, и сохранение бы их стёрло
@@ -1213,6 +1228,7 @@ Open normal map	Открыть карту нормалей
 Open project	Открыть проект
 Open without saving	Открыть без сохранения
 Open...	Открыть...
+OpenGL ES 1.1: the GPU and the CPU compute them (not real time)	OpenGL ES 1.1: их считают GPU и CPU (не в реальном времени)
 Opening project...	Открытие проекта...
 Operation	Операция
 Optimize Vertex Groups	Оптимизировать группы вершин
@@ -1237,6 +1253,8 @@ Overflow X	Переполнение X
 Overflow Y	Переполнение Y
 Overlays	Наложения
 Overrides	Переопределения
+Overwrite	Перезаписать
+Overwrite file?	Перезаписать файл?
 Own	Своя
 PVS recalculated	PVS пересчитан
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: нет <модель>.pvs.json рядом с исходным .obj
@@ -1375,8 +1393,10 @@ Rate	Частота
 Ray Tracing	Трассировка лучей
 Ray traced motion blur	Трассир. размытие движения
 Rays	Лучи
+Real-time shadows	Тени в реальном времени
 Recalculate	Пересчитать
 Recalculate Normals	Пересчитать нормали
+Receive shadows	Принимать тени
 Recent files	Недавние файлы
 Rectangle	Прямоугольник
 Red	Красный
@@ -1499,6 +1519,7 @@ Save version v%d	Сохранить версию v%d
 Save version: the project has no location (use Save first)	Сохранить версию: у проекта нет места (сначала Сохранить)
 Save: could not replace the file (the previous version was kept):	Сохранение: не удалось заменить файл (осталась прежняя версия):
 Save: incomplete write. The file was not touched:	Сохранение: запись не завершена. Файл не тронут:
+Saved	Сохранено
 Saved (note: %d curve(s) without a source file are not saved)	Сохранено (внимание: кривые без исходного файла (%d) не сохраняются)
 Saved OK, but copying version v%d failed (see the log)	Сохранено, но копирование версии v%d не удалось (см. лог)
 Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Сохранено, но нет %s и ещё %d файл(ов) (вне .w3d). Библиотека > Отсутствующие файлы
@@ -1577,6 +1598,8 @@ Shader	Шейдер
 Shader of	Шейдер материала
 Shaders	Шейдеры
 Shading	Затенение
+Shadow catcher	Ловец теней
+Shadow strength	Интенсивность
 Shape	Форма
 Shape keys	Ключи формы
 Sharp	Резкий
@@ -1631,6 +1654,7 @@ Snap menu	Меню привязки
 Snap: OFF	Привязка: выкл.
 Snap: ON	Привязка: вкл.
 Soft Knee	Мягкое колено
+Soft shadows	Мягкие тени
 Solid	Сплошной
 Solid Preview	Сплошной вид
 Sort by camera	Сортировать по камере
@@ -1647,6 +1671,9 @@ Sphere Projection	Сферическая проекция
 Spin	Кручение
 Spin Y	Кручение по Y
 Spin random	Разброс кручения
+Split 1	Граница 1
+Split 2	Граница 2
+Split 3	Граница 3
 Split in Columns	Разделить на столбцы
 Split in Rows	Разделить на строки
 Spot	Прожектор
@@ -1675,6 +1702,7 @@ Steps to skip	Пропуск шагов
 Stop	Стоп
 Stop the game before changing the scene	Остановите игру перед сменой сцены
 Stop the game first	Сначала остановите игру
+Storage	Расположение
 Stored	Хранение
 Streaming preview	Предпросмотр стриминга
 Strength	Сила
@@ -1768,6 +1796,7 @@ There are no orphans	Нет неиспользуемых
 There are no saved layouts to delete	Нет сохранённых раскладок для удаления
 There is no active camera	Нет активной камеры
 There is no audio: the mixer did not start	Нет звука: микшер не запустился
+There is no memory to load the previews	Недостаточно памяти для превью
 There is no script editor (IDE) in the layout	В компоновке нет редактора скриптов (IDE)
 There is no such prefab	Такого префаба нет
 There is no such scene	Такой сцены нет
@@ -1852,6 +1881,7 @@ Unlink	Отвязать
 Unloaded	Выгружено
 Unpack	Распаковать
 Unpack Prefab	Распаковать префаб
+Unused	Не используются
 Unwrap	Развернуть
 Unwrap Angle Based	Развернуть (по углам)
 Unwrap Conformal	Развернуть (конформно)
@@ -1951,6 +1981,7 @@ Z Scale	Масштаб Z
 Z axis	Ось Z
 Z-Buffer	Z-буфер
 ZBuffer Preview	Вид Z-буфера
+Zoom	Масштаб
 Zoom 1:1	Масштаб 1:1
 Zoom 2:1	Масштаб 2:1
 Zoom 3:1	Масштаб 3:1

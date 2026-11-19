@@ -416,6 +416,52 @@ static TBool gHeldUp = EFalse, gHeldDown = EFalse, gHeldLeft = EFalse, gHeldRigh
 // tecla VERDE mantenida: + flechas = agrandar/achicar el viewport activo.
 // gGreenUsado = se uso como modificador (entonces al soltar NO cicla viewport).
 static TBool gGreenHeld = EFalse, gGreenUsado = EFalse;
+// EL OK MANTENIDO = el menu CONTEXTUAL (como mantener el dedo en un tactil, o el click derecho de la PC). Sobre algo que
+// tiene menu -una fila de Propiedades, del Outliner o de la Biblioteca, los keyframes del Timeline, el objeto activo en
+// la Vista 3D- el OK no hace nada al bajar: soltarlo enseguida es el OK de siempre (al soltar); mantenerlo, el telefono
+// VIBRA y cuando termina de vibrar sale el menu del elemento con foco. Con el MOUSE VIRTUAL el OK hace su click al bajar
+// (como siempre) y, si se mantiene sin mover el cursor, sale el menu ahi (el click derecho).
+static TBool gOkEsperando = EFalse;   // el OK esta apretado y todavia no se decidio (corto o largo)
+static TBool gOkConMouse = EFalse;    // ...con el mouse virtual (el click ya se hizo)
+static TBool gOkVibrando = EFalse;
+static TBool gOkLargoHecho = EFalse;  // ya salio el menu: soltar el OK no hace nada mas
+static TUint gOkTick = 0;
+static TInt  gOkMx = 0, gOkMy = 0;    // (con el mouse virtual: donde estaba el cursor)
+static const TUint kOkVibrarMs = 150, kOkLargoMs = 500;   // (los de la pulsacion larga del tactil)
+static TUint OkTicksAMs(TUint t) {
+#ifdef __WINS__
+    return t * 5;   // (el emulador cuenta a 200 Hz)
+#else
+    return t;       // (el N95 a 1000 Hz: ms)
+#endif
+}
+extern bool LayoutMenuContextoTecladoPosible();
+extern bool LayoutMenuContextoTeclado();
+extern bool LayoutMenuContextoEn(int mx, int my);
+namespace w3dEngine { void VibrarMs(int ms, float fuerza); }
+// (cada cuadro, DrawCallBack): vibra mientras espera y, al cumplirse el tiempo, abre el menu
+static void OkLargoTick() {
+    if (!gOkEsperando) return;
+    extern bool mouseVisible;
+    extern GLshort mouseX, mouseY;
+    // con el mouse virtual, mover el cursor (un arrastre) lo cancela: queda el click que ya se hizo
+    if (gOkConMouse && (!mouseVisible || mouseX != gOkMx || mouseY != gOkMy)) { gOkEsperando = EFalse; return; }
+    const TUint ms = OkTicksAMs(User::NTickCount() - gOkTick);
+    if (!gOkVibrando && ms >= kOkVibrarMs) {
+        gOkVibrando = ETrue;
+        w3dEngine::VibrarMs((int)(kOkLargoMs - kOkVibrarMs), 0.6f);
+    }
+    if (ms < kOkLargoMs) { g_redraw = true; return; }
+    gOkEsperando = EFalse;
+    gOkLargoHecho = ETrue;
+    if (gOkConMouse) {
+        W3dLayoutSoltarViewport(gOkMx, gOkMy);   // (suelta el click del OK antes de abrir el menu)
+        LayoutMenuContextoEn(gOkMx, gOkMy);
+    } else {
+        LayoutMenuContextoTeclado();
+    }
+    g_redraw = true;
+}
 // mouse virtual (w3dmouse.cpp): si esta visible, las flechas/OK del telefono lo manejan
 extern bool mouseVisible;
 extern GLshort mouseX, mouseY; // pos del cursor virtual a nivel de archivo (el OK del loop cut la usa)
@@ -963,10 +1009,20 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					// Asi el timeline se entera (curvas, keyframes, handles) sin que nadie reimplemente el click
 					// afuera, y mantener el OK queda como arrastre solo (el cursor ya emite event_mouse_motion).
 					// El 3D es la excepcion: su button_left() todavia es stub en el telefono -> su pick va aparte.
+					// (mantenerlo quieto despues: el menu contextual ahi, ver OkLargoTick)
+					gOkEsperando = ETrue; gOkConMouse = ETrue; gOkVibrando = EFalse; gOkLargoHecho = EFalse;
+					gOkTick = User::NTickCount(); gOkMx = mouseX; gOkMy = mouseY;
 					if (!W3dLayoutMouseSobre3D(mouseX, mouseY) && W3dLayoutClickViewport(mouseX, mouseY)){
 						return EKeyWasConsumed;
 					}
 					iWhisk3D->ClickSelect();
+					return EKeyWasConsumed;
+				}
+				// SIN MOUSE: sobre algo con menu contextual el OK ESPERA (corto = el OK de siempre al soltar; mantenido =
+				// vibra y sale el menu: OkLargoTick)
+				if (LayoutMenuContextoTecladoPosible()){
+					gOkEsperando = ETrue; gOkConMouse = EFalse; gOkVibrando = EFalse; gOkLargoHecho = EFalse;
+					gOkTick = User::NTickCount();
 					return EKeyWasConsumed;
 				}
 				// OK al panel ACTIVO (propiedades/outliner) por teclado, sin mouse
@@ -1047,6 +1103,14 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			if (usc == EStdKeyNo){ return EKeyWasConsumed; } // tecla ROJA (end): consumida, no cierra la app
 			// soltar el OK = soltar el boton del mouse: cierra el arrastre (y su undo) del viewport que lo recibio
 			if (usc == EStdKeyDevice3 || usc == EStdKeyEnter){
+				if (usc == EStdKeyDevice3 && gOkLargoHecho){ gOkLargoHecho = EFalse; return EKeyWasConsumed; }   // (ya salio el menu)
+				if (usc == EStdKeyDevice3 && gOkEsperando && !gOkConMouse){
+					// CORTO, sin mouse: el OK de siempre (el que no se hizo al bajar)
+					gOkEsperando = EFalse;
+					if (!W3dLayoutTeclaPanel(EStdKeyDevice3)) W3dLayoutTecla(EStdKeyDevice3, 0, 0);
+					return EKeyWasConsumed;
+				}
+				gOkEsperando = EFalse;
 				if (mouseVisible) W3dLayoutSoltarViewport(mouseX, mouseY);
 				return EKeyWasConsumed;
 			}
@@ -1194,6 +1258,7 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     {
     CWhisk3DContainer* instance = (CWhisk3DContainer*) aInstance;
     instance->iFrame++;
+    OkLargoTick();   // el OK mantenido: vibrar y, al terminar, el menu contextual
 
     // APERTURA DE PROYECTO DIFERIDA (tarjeta Archivo / abrir un .w3d en el explorador ->
     // AbrirProyectoDesde solo encola g_proyAbrirPendiente). Se procesa ACA, con el stack

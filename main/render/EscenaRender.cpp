@@ -11,6 +11,7 @@
 #include "objects/Particulas.h"  // particulas diferidas (billboards translucidos)
 #include "objects/Light.h"        // MAX_LIGHTS: apagar los GL lights antes del pase
 #include "objects/SondaLuz.h"     // SondaLuzNuevoPase: las sondas de luz del pase
+#include "render/SombrasTiempoReal.h"   // las sombras en tiempo real: los mapas antes de la escena
 #include "W3dRaices.h"              // las escenas abiertas a la vez en el editor
 #include "script/W3dScript.h"       // W3dScriptHayPartida: jugando solo se ve la base
 #include "render/OpcionesRender.h"// RenderType + la luz de los modos de preview
@@ -523,6 +524,7 @@ void W3dEscena3DPasada() {
     gEnPase = true;
     EntornoPase();                      // el fondo 360 para los reflejos y la luz por pixel (o apagado)
     if (w3dRenderLuces) SondaLuzNuevoPase();   // (las sondas de luz que se dibujen en este pase iluminan)
+    W3dSombrasPase();                   // LAS SOMBRAS EN TIEMPO REAL: sus mapas, con la vista de la camara (antes del cielo)
     if (w3dRenderLuces) DibujarCielo();  // el FONDO 360 (Rendered / el juego): antes que todo, detras de todo
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
@@ -544,6 +546,7 @@ void W3dEscena3DPasada() {
     W3dParticulasDibujarPendientes();
     gCieloEnPase = false;
     gEnPase = false;
+    W3dSombrasFin();                    // (lo que se dibuja despues -overlays, HUD- no tiene sombras)
     gfx::Entorno(0, 0, NULL);           // (lo que se dibuja despues -overlays, HUD- no refleja el fondo)
     W3dNieblaReiniciar();               // nada de niebla para lo que se dibuja despues (overlays, HUD, UI)
     gfx::EstadoBase();                  // ni el alpha test, el sesgo o la matriz de textura que dejo la escena

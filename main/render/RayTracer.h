@@ -88,6 +88,9 @@ bool  RTHorneadoActivo();
 void  RTHorneadoCancelar();
 const std::vector<float>& RTHorneadoLuz();
 const std::vector<unsigned char>& RTHorneadoCubierto();
+// la malla horneada era un CAPTADOR DE SOMBRAS (Object::captaSombras al empezar): su luz es la sombra por la oclusion
+// ambiental, de 0 a 1 (blanco = no le cae nada), para una capa Multiply (1x)
+bool RTHorneadoCaptador();
 bool RTActivoEn(const Viewport3D* vp);    // hay un render progresivo de ese viewport (para seguir redibujando)
 float RTImagenesPorSegundo();
 const char* RTReescaladorNombre(int r);  // "Linear" / "FSR 1 (AMD)"             // las imagenes trazadas TERMINADAS por segundo (lo que de verdad se ve)

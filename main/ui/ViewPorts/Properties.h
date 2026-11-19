@@ -102,6 +102,10 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool* propObjVisible;   // visible en el viewport (animable)
         PropBool* propObjRender;    // sale en el render final (animable)
         PropBool* propObjEstatico;  // ESTATICO vs DINAMICO (culling por grilla): true=celda cacheada / false=por-frame
+        PropBool* propObjProySombra;  // SOMBRAS EN TIEMPO REAL: proyecta (tapa la luz) / recibe. Solo en las mallas
+        PropBool* propObjRecSombra;
+        PropBool* propObjRebota;      // LA LUZ PRECALCULADA: rebota la luz (la indirecta) / captador de sombras (solo las recibe)
+        PropBool* propObjCaptador;
         PropBool* propObjRelLines;  // dibujar la linea al padre. Va en la tarjeta GENERICA:
                                     // es una opcion UNIVERSAL de todos los objetos.
         // tarjeta "Animacion" del OBJETO (pestania Objeto): animaciones del objeto
@@ -477,12 +481,26 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propHornDenoiser;
         PropButton* propHornBoton;
         PropButton* propHornBarra;
+        PropButton* propHornCancelar;   // Cancelar (la cruz), abajo de la barra mientras hornea
         PropLabel*  propHornAviso;
         PropFloat*  propSlTam[3];
         PropFloat*  propSlPuntos[3];
         PropFloat*  propSlRayos;
         PropButton* propSlHornear;
         PropLabel*  propSlEstado;
+        // LAS SOMBRAS EN TIEMPO REAL (ViewPorts/PropsSombras.cpp): debajo de la tarjeta Render
+        GroupPropertie* propSombras;
+        PropBool*   propSomOn;
+        PropFloat*  propSomDist;
+        PropFloat*  propSomCascadas;
+        PropFloat*  propSomCorte[3];
+        PropFloat*  propSomBorde;
+        PropFloat*  propSomDesenf;
+        PropButton* propSomRes;
+        PropBool*   propSomSuaves;
+        PropFloat*  propSomInt;
+        PropFloat*  propSomSesgo;
+        PropLabel*  propSomEstado;
         PropBool*   propHbActivo;
         PropFloat*  propHbTam[3];       // ancho X / alto Y / largo Z (locales)
         PropFloat*  propHbCentro[3];
@@ -928,14 +946,21 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propRecurso;
         PropText*   propRecNombre;     // Name: renombrar el recurso (lo ven todos sus usuarios)
         PropText*   propRecCarpeta;    // Folder: su carpeta cosmetica ("" = la raiz)
-        PropLabel*  propRecTipo;       // el tipo + EN USO (N usuarios) / HUERFANO
-        PropLabel*  propRecEntrada;    // su entrada del contenedor / su ruta (WRAP)
-        std::vector<PropLabel*> propRecDatos;   // los DATOS del tipo, una fila cada uno ("Resolution: 256 x 256")
+        PropLabel*  propRecTipo;       // (ya no se muestra: los datos van en cajas -Usuarios, Tipo, Guardado-)
+        PropText*   propRecUsuarios;   // Usuarios | N (0 = en ROJO: nadie lo usa)
+        PropText*   propRecTipoCaja;   // Tipo | Textura (y "solo lectura" si es de una libreria)
+        PropText*   propRecGuardado;   // Guardado | Si (guardado en el proyecto o en su archivo)
+        PropButton* propRecGuardar;    // Guardado | [Guardar] (en vez de la caja, cuando tiene cambios sin guardar)
+        PropText*   propRecEntrada;    // su entrada del contenedor (una caja de solo lectura: se selecciona y se copia)
+        std::vector<PropText*> propRecDatos;    // los DATOS del tipo, una fila cada uno (Resolucion | 256 x 256), de solo lectura
         PropButton* propRecUbicacion;  // desplegable: "Inside the .w3d" / "External" (los que tienen archivo)
         PropBool*   propRecMallaTexto; // (malla 3D) "Mesh as text": se guarda .w3dm (texto) o .w3db (binario)
-        PropButton* propRecExtraer;    // "Extract": una COPIA de su archivo de adentro del .w3d a una carpeta
+        PropButton* propRecGuardarComo;   // "Save As...": una COPIA de su archivo afuera (nombre y carpeta); el recurso no cambia
+        PropButton* propRecExtraer;    // (ya no se muestra: lo hace Guardar como)
         PropImagen* propRecPreview;    // vista previa de una textura
-        PropButtonRow* propRecAcciones; // Select Users | Delete (en uso: avisa cuantos lo usan)
+        PropButtonRow* propRecAcciones; // (ya no se muestra: Seleccionar usuarios y Borrar van en su fila cada uno)
+        PropButton* propRecSelUsuarios; // "Select Users" (el icono de los usuarios): los objetos que lo usan
+        PropButton* propRecBorrar;      // "Delete" (el tacho; en uso: avisa cuantos lo usan)
         PropButtonRow* propRecAcciones2; // sonido: Play | Stop; escena/prefab: Open; script: Open in IDE
         unsigned    recVersionBind;    // W3dRecursoActivoVersion con la que se bindeo la tarjeta
         PropSeparator* propSepMat; // separador del card Material (se oculta con el material por defecto)
@@ -1027,6 +1052,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropertieBase* PropEnPunto(int mx, int my);
         // (menuX/menuY: donde abrir el menu, si no es en el punto: la pulsacion larga lo abre arriba del dedo)
         bool MenuContexto(int mx, int my, int menuX = -1, int menuY = -1);
+        // el MISMO menu, de la fila elegida con el TECLADO (el OK mantenido del N95): en el medio de esa fila
+        bool MenuContextoTeclado();
 
         // touch: (mx,my) cae sobre el VALUE BOX de un PropFloat? -> ahi el arrastre horizontal EDITA (slider);
         // en el label / otras filas el arrastre SCROLLEA. Lo usa el ruteo tactil en controles.cpp.

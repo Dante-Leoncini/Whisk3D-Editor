@@ -223,8 +223,13 @@ void Outliner::FilasRecursos(std::vector<OutFilaRec>& out) {
         std::vector<W3dRecursoItem> todos;
         W3dBibliotecaListar(-1, todos);
         W3dCarpetasBiblioteca(todos, carpetas);
-        if (filtro < 0) items.swap(todos);
-        else for (size_t i = 0; i < todos.size(); i++) if (todos[i].tipo == filtro) items.push_back(todos[i]);
+        // "Sin uso": los que nadie usa (una escena no se "usa": se abre, no cuenta)
+        if (filtro < 0 && !soloSinUso) items.swap(todos);
+        else for (size_t i = 0; i < todos.size(); i++) {
+            if (filtro >= 0 && todos[i].tipo != filtro) continue;
+            if (soloSinUso && (todos[i].usuarios > 0 || todos[i].tipo == W3D_VISTA_ESCENAS)) continue;
+            items.push_back(todos[i]);
+        }
     }
     std::map<std::string, std::vector<std::string> > hijas;
     for (size_t i = 0; i < carpetas.size(); i++) hijas[W3dCarpetaPadre(carpetas[i])].push_back(carpetas[i]);
@@ -546,7 +551,7 @@ void Outliner::SincronizarBarraVista() {
         if (btnFiltro->visible != bib) { btnFiltro->visible = bib; g_redraw = true; }
         // solo el icono: el embudo (todo) o el del tipo filtrado
         if (!btnFiltro->text.empty()) { btnFiltro->text.clear(); g_redraw = true; }
-        btnFiltro->icon = filtro < 0 ? (int)IconType::filtro : W3dVistaIcono(filtro);
+        btnFiltro->icon = filtro >= 0 ? W3dVistaIcono(filtro) : soloSinUso ? (int)IconType::usuarios : (int)IconType::filtro;
         btnFiltro->ayuda = "Filter";
     }
     if (btnCuadricula) {
@@ -589,6 +594,16 @@ void Outliner::CambiarFiltro(int f) {
     if (f != -1 && (f <= W3D_VISTA_ESCENA || f >= W3D_VISTAS)) return;
     if (moviendoRec) MoverRecCancelar();
     filtro = f;
+    PosY = 0;
+    lastContentRows = -1;
+    SincronizarBarraVista();
+    if (width > 0 && height > 0) Resize(width, height);
+    g_redraw = true;
+}
+void Outliner::CambiarSinUso(bool on) {
+    if (soloSinUso == on) return;
+    if (moviendoRec) MoverRecCancelar();
+    soloSinUso = on;
     PosY = 0;
     lastContentRows = -1;
     SincronizarBarraVista();
@@ -694,12 +709,15 @@ static void AccionVistaElegida(int id) {
 // ---- el OJO de la barra: COMO se ve lo que se ve. Biblioteca: lista / cuadricula, la fila de memoria y los tamanos;
 //      escena: el Constructor, las rutinas y las columnas de ojo y camara ----
 static PopupMenu* gMenuOpciones = NULL;
-enum { OPC_LISTA = 870, OPC_CUADRICULA, OPC_MEMORIA, OPC_TAMANOS, OPC_TIPO, OPC_USOS };
+enum { OPC_LISTA = 870, OPC_CUADRICULA, OPC_MEMORIA, OPC_TAMANOS, OPC_TIPO, OPC_USOS, OPC_ZOOM };
+static float gZoomPct = 100.0f;   // (la fila Zoom del menu: el tamanio de las celdas en %)
+void OutlinerZoomCeldas(Outliner* o, float zoom);   // (Outliner.cpp)
 static void AccionOpcionElegida(int id) {
     Outliner* o = gMenuDe;
     if (!o) return;
     if (id == OPC_LISTA)      { o->CambiarCuadricula(false); return; }
     if (id == OPC_CUADRICULA) { o->CambiarCuadricula(true); return; }
+    if (id == OPC_ZOOM)       { OutlinerZoomCeldas(o, gZoomPct * 0.01f); return; }
     o->lastContentRows = -1;   // (la fila de memoria y la columna del tamano cambian lo que hay que scrollear)
     o->Resize(o->width, o->height);
     g_redraw = true;   // (los checks ya cambiaron su bool)
@@ -713,6 +731,12 @@ static void ArmarMenuOpciones(Outliner* o) {
         if (it) it->verde = !o->cuadricula;
         it = gMenuOpciones->Agregar(T("Grid"), OPC_CUADRICULA, IconType::cuadricula);
         if (it) it->verde = o->cuadricula;
+        // EL ZOOM de la cuadricula, con numeros: - y + de a 10% (o arrastrando la barra). Tambien Ctrl + rueda y dos dedos
+        if (o->cuadricula) {
+            gZoomPct = (float)(int)(o->celdaZoom * 100.0f + 0.5f);
+            it = gMenuOpciones->AgregarFloat(T("Zoom"), OPC_ZOOM, &gZoomPct, 60.0f, 400.0f);
+            if (it) { it->paso = 10.0f; it->entero = true; it->unidad = "%"; }
+        }
         gMenuOpciones->AgregarCheck(T("Memory usage"), OPC_MEMORIA, &o->verMemoria);
         // las COLUMNAS (en la lista; en la cuadricula, el tamanio va debajo del nombre y los usos en el icono)
         gMenuOpciones->AgregarCheck(T("Type"), OPC_TIPO, &o->verTipo);
@@ -752,6 +776,10 @@ static void ArmarMenuVista(Outliner* o) {
 enum { OBJ_BORRAR = 1, OBJ_RENOMBRAR, OBJ_MOVER, OBJ_OCULTAR, OBJ_DUPLICAR, OBJ_DUPLICAR_VINC,
        REC_BORRAR, REC_RENOMBRAR, REC_DUPLICAR, REC_USUARIOS, REC_PURGAR, REC_NUEVA_CARPETA,
        OBJ_CREAR_PREFAB, OBJ_DESEMPAQUETAR, REC_ADENTRO, REC_AFUERA, REC_ACTUALIZAR_TEX };
+// "New Folder" del CLICK DERECHO: en la carpeta de lo que estaba abajo del mouse (una carpeta: adentro; un recurso: al
+// lado; el hueco: la raiz)
+static bool gNuevaCarpetaCtx = false;
+static std::string gNuevaCarpetaPadre;
 // las TEXTURAS elegidas (el cursor o la seleccion): las que "Reload Texture" vuelve a leer de su archivo
 static void TexturasElegidas(Outliner* o, std::vector<std::string>& out) {
     out.clear();
@@ -863,7 +891,7 @@ static void AccionObjetoElegida(int id) {
         case REC_DUPLICAR: o->AccionDuplicarRecurso(); break;
         case REC_USUARIOS: o->AccionSeleccionarUsuarios(); break;
         case REC_PURGAR:   o->AccionPurgar(true); break;
-        case REC_NUEVA_CARPETA: o->AccionNuevaCarpeta(); break;
+        case REC_NUEVA_CARPETA: if (gNuevaCarpetaCtx) o->AccionNuevaCarpetaEn(gNuevaCarpetaPadre); else o->AccionNuevaCarpeta(); break;
         case REC_ACTUALIZAR_TEX: { std::vector<std::string> ts; TexturasElegidas(o, ts); W3dTexturasActualizarAvisando(ts); break; }
         case REC_ADENTRO: { std::vector<std::pair<int, std::string> > ls; UbicablesElegidos(o, 0, ls); MudarUbicables(ls, 0, std::string()); break; }
         case REC_AFUERA:
@@ -1070,7 +1098,12 @@ static void AccionNuevaElegida(int id) {
 }
 
 // ---- FILTRO ----
-static void AccionFiltroElegido(int id) { if (gMenuDe) gMenuDe->CambiarFiltro(id == 0 ? -1 : id); }
+enum { FILTRO_SIN_USO = 9100 };
+static void AccionFiltroElegido(int id) {
+    if (!gMenuDe) return;
+    if (id == FILTRO_SIN_USO) { gMenuDe->CambiarSinUso(!gMenuDe->soloSinUso); return; }
+    gMenuDe->CambiarFiltro(id == 0 ? -1 : id);
+}
 static void ArmarMenuFiltro(Outliner* o) {
     if (!gMenuFiltro) { gMenuFiltro = new PopupMenu(); gMenuFiltro->action = AccionFiltroElegido; }
     gMenuFiltro->Limpiar();
@@ -1082,6 +1115,11 @@ static void ArmarMenuFiltro(Outliner* o) {
     for (size_t i = 0; i < tipos.size(); i++) {
         it = gMenuFiltro->Agregar(T(W3dVistaTitulo(tipos[i])), tipos[i], W3dVistaIcono(tipos[i]));
         if (it) it->verde = (o->filtro == tipos[i]);
+    }
+    // SIN USO: se suma al del tipo (las texturas sin uso, por ejemplo). Una libreria vinculada no lleva la cuenta
+    if (!o->VistaSoloLectura()) {
+        it = gMenuFiltro->Agregar(T("Unused"), FILTRO_SIN_USO, IconType::usuarios);
+        if (it) { it->verde = o->soloSinUso; it->lineaArriba = true; }
     }
 }
 
@@ -1189,20 +1227,48 @@ bool Outliner::MenuContexto(int mx, int my) {
         std::vector<OutFilaRec> filas;
         FilasRecursos(filas);
         const int fila = FilaEnPunto(filas, mx, my);
+        gNuevaCarpetaPadre.clear();
         if (fila >= 0) {
             // sobre una fila de la SELECCION: el menu es de toda la seleccion; si no, queda sola
             if (!FilaEnSeleccion(filas[(size_t)fila])) SeleccionSolo(filas[(size_t)fila]);
             ElegirFila(filas[(size_t)fila], false);
+            gNuevaCarpetaPadre = filas[(size_t)fila].carpeta ? filas[(size_t)fila].clave : filas[(size_t)fila].carpetaDe;
         }
     }
     gMenuDe = this;
     ArmarMenuObjeto(this);
+    gNuevaCarpetaCtx = false;
+    // la BIBLIOTECA: crear una carpeta ahi mismo (lo natural del click derecho, como en un explorador)
+    if (vista != OUT_VISTA_ESCENA && !VistaSoloLectura()) {
+        MenuItem* it = gMenuObjeto->Agregar(T("Create Folder"), REC_NUEVA_CARPETA, IconType::carpeta);
+        if (it) it->lineaArriba = true;
+        gNuevaCarpetaCtx = true;
+    }
     gMenuObjeto->titulo = T("Object");
     if (MenuAbierto && MenuAbierto != gMenuObjeto) MenuAbierto->Cerrar();
     gMenuObjeto->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenuObjeto;
     g_redraw = true;
     return true;
+}
+
+// el MISMO menu desde el TECLADO (el OK mantenido del N95): el de la fila del cursor (la biblioteca) o del objeto
+// activo (la escena), abierto en esa fila
+bool Outliner::MenuContextoTeclado() {
+    if (vista == OUT_VISTA_ESCENA) {
+        int my = y + height / 2;
+        extern int OutlinerYDelActivo();
+        const int yf = OutlinerYDelActivo();
+        if (yf >= 0) my = y + borderGS + PosY + BarTopOffset() + yf + (int)RenglonHeightGS / 2;
+        return MenuContexto(x + width / 3, my);
+    }
+    std::vector<OutFilaRec> filas;
+    FilasRecursos(filas);
+    const int fc = FilaDelCursor(filas);
+    if (fc < 0) return MenuContexto(x + width / 3, y + height - (int)RenglonHeightGS);   // (sin cursor: el menu igual, en el hueco)
+    int mx = x + width / 3;
+    if (cuadricula) { int rx, ry, rw, rh; RectFila(filas, fc, rx, ry, rw, rh); mx = x + rx + rw / 2; }
+    return MenuContexto(mx, FilaRecursoY(fc));
 }
 
 // ============================================================================
@@ -1239,7 +1305,13 @@ void Outliner::ResizeRecursos() {
 unsigned int Outliner::MiniaturaDeFila(const OutFilaRec& f, int* w, int* h) const {
     if (w) *w = 0;
     if (h) *h = 0;
-    if (f.carpeta || VistaSoloLectura()) return 0;
+    if (f.carpeta) return 0;
+    // UNA LIBRERIA vinculada: con el id que tiene en ESTE proyecto (el de la libreria, "Lib/Cuerpo"), asi no se confunde
+    // con un recurso del proyecto que se llame igual (para eso la libreria se monta: sus recursos quedan registrados)
+    if (VistaSoloLectura()) {
+        const std::string g = W3dLibreriaIdGlobal(vista - OUT_VISTA_LIBEXT, f.tipo, f.id);
+        return g.empty() ? 0 : W3dMiniatura(f.tipo, g, w, h);
+    }
     return W3dMiniatura(f.tipo, f.id, w, h);
 }
 
@@ -1338,12 +1410,14 @@ static void MemoriaProcesoKB(long& usadaKB, long& libreKB) {
     if (f) { char l[128]; while (fgets(l, sizeof l, f)) { unsigned long v = 0; if (sscanf(l, "MemAvailable: %lu", &v) == 1) { libreKB = (long)v; break; } } fclose(f); }
 #endif
 }
+long W3dMemoriaLibreKB() { long u = 0, l = 0; MemoriaProcesoKB(u, l); return l; }   // (las miniaturas: io/Miniaturas.cpp)
 static std::string MemoriaTexto() {
     long usada = 0, libre = 0; MemoriaProcesoKB(usada, libre);
     const w3dEngine::MemoriaTexturas mt = w3dEngine::TexturasMemoria();
     std::string s = std::string(T("RAM")) + ": " + (usada >= 0 ? W3dBytesTexto((double)usada * 1024.0) : std::string("?"));
     if (libre >= 0) s += " (" + W3dBytesTexto((double)libre * 1024.0) + " " + T("free") + ")";
     s += "   " + std::string(T("Video")) + ": " + W3dBytesTexto((double)mt.bytes);
+    if (W3dMiniaturasSinMemoria()) s = std::string(T("There is no memory to load the previews")) + " - " + s;
     return s;
 }
 int Outliner::AltoFilaMemoria() const {
@@ -1565,6 +1639,12 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
             }
             // EXTERNO: la flecha de acceso directo abajo a la izquierda del cuadrado
             if (f.externo && !f.carpeta) MarcaExterno(rx + GlobalScale, ry + lado - IconSizeGS - GlobalScale, IconSizeGS);
+            // LO SELECCIONADO: un borde VERDE encima del cuadrado (una miniatura cuadrada tapa todo el fondo: sin el borde no
+            // se notaba que estaba elegida)
+            if (!f.atras && ((int)i == fc || enSel)) {
+                SetColorID(enSel ? ColorID::accent : ColorID::grisUI);
+                Marco(rx, ry, lado, lado, 2 * GlobalScale);
+            }
             // el NOMBRE, debajo del cuadrado y centrado
             if (f.atras) SetColorID(ColorID::grisUI);
             else Colorear::Fila(this, f, (int)i == fc, arrastrada);
@@ -1729,6 +1809,16 @@ void Outliner::ElegirFila(const OutFilaRec& f, bool abrirProps) {
     if (!f.carpeta && !f.soloLectura) {
         W3dRecursoActivar(f.tipo, f.id);
         if (abrirProps) PropsIrARecurso();
+    } else if (!f.carpeta && VistaSoloLectura()) {
+        // UNO DE UNA LIBRERIA vinculada: Propiedades lo muestra de solo lectura (que es, si este proyecto lo usa, si esta
+        // cargado)
+        const int li = vista - OUT_VISTA_LIBEXT;
+        std::vector<W3dRecursoItem> todos; std::vector<std::string> cs;
+        W3dLibreriaListar(li, todos, cs, NULL);
+        W3dRecursoItem it; bool hay = false;
+        for (size_t i = 0; i < todos.size() && !hay; i++) if (todos[i].tipo == f.tipo && todos[i].id == f.id) { it = todos[i]; hay = true; }
+        if (hay) { W3dRecursoExtActivar(li, it, W3dLibreriaIdGlobal(li, f.tipo, f.id)); if (abrirProps) PropsIrARecurso(); }
+        else W3dRecursoDesactivar();
     } else W3dRecursoDesactivar();
     g_redraw = true;
 }
@@ -2385,6 +2475,10 @@ bool Outliner::AccionNuevaCarpeta() {
     const int fc = FilaDelCursor(filas);
     std::string padre;
     if (fc >= 0) padre = filas[(size_t)fc].carpeta ? filas[(size_t)fc].clave : filas[(size_t)fc].carpetaDe;
+    return AccionNuevaCarpetaEn(padre);
+}
+bool Outliner::AccionNuevaCarpetaEn(const std::string& padre) {
+    if (VistaSoloLectura()) return false;
     std::string ruta;
     if (!W3dCarpetaNueva(padre, T("New Folder"), &ruta)) return false;
     for (std::string c = padre; !c.empty(); c = W3dCarpetaPadre(c)) plegadas.erase(c);
@@ -2738,20 +2832,15 @@ static void CancelarModosMoverRec() {
 static bool gGanchoUndoOk = (W3dVistaRecGrupoCancelarHook = CancelarModosMoverRec, true);
 
 // "Select Users" (el menu del outliner y el boton de la tarjeta de Properties: los dos hacen lo mismo). Los
-// usuarios se ven en la ESCENA: los outliners que miraban la biblioteca vuelven al arbol, centrados en la
-// seleccion. Sin OBJETOS que seleccionar se avisa y no se toca nada.
+// usuarios quedan seleccionados en la ESCENA (el 3D los muestra); la biblioteca SIGUE SIENDO BIBLIOTECA (pedido del
+// dueno): solo los outliners que ya miraban la escena se centran en ellos. Sin OBJETOS que seleccionar se avisa.
 int OutlinerSeleccionarUsuarios(const std::vector<std::string>& claves) {
     if (claves.empty()) return 0;
     const int n = W3dBibSeleccionarUsuarios(claves);   // la UNION de los usuarios
     if (n == 0) { Notificar(T("No object of the scene uses it"), true); return 0; }
     std::vector<Outliner*> outs;
     JuntarOutliners(LayoutRaizCompleta(), outs);
-    for (size_t i = 0; i < outs.size(); i++) {
-        if (outs[i]->vista == OUT_VISTA_ESCENA) continue;
-        outs[i]->CambiarVista(OUT_VISTA_ESCENA);
-        outs[i]->Resize(outs[i]->width, outs[i]->height);
-        outs[i]->CentrarSeleccion();
-    }
+    for (size_t i = 0; i < outs.size(); i++) if (outs[i]->vista == OUT_VISTA_ESCENA) outs[i]->CentrarSeleccion();
     char b[32]; sprintf(b, "%d", n);
     Notificar(std::string(T("Users selected")) + ": " + b, false);
     g_redraw = true;

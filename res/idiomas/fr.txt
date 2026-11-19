@@ -71,6 +71,7 @@ A prefab can't be converted	Un prefab ne peut pas être converti
 A prefab can't contain itself	Un prefab ne peut pas se contenir lui-même
 A prefab instance only has what its prefab generates	Une instance de prefab n'a que ce que génère son prefab
 A project needs at least one scene	Un projet nécessite au moins une scène
+A resource with that name already exists	Une ressource porte déjà ce nom
 A scene can't contain itself	Une scène ne peut pas se contenir elle-même
 A scene with that name already existed, renamed:	Une scène de ce nom existait déjà, renommée :
 A texture with that name already exists	Une texture de ce nom existe déjà
@@ -225,6 +226,7 @@ Bevel: move away from the center = width, wheel / up-down = segments, V = vertic
 Bevel: select edges first	Biseau : sélectionnez d'abord des arêtes
 Bevel: select vertices first	Biseau : sélectionnez d'abord des sommets
 Bezier	Bézier
+Bias	Biais
 Billboard	Billboard
 Bind texture	Lier texture
 Bitrate	Débit
@@ -305,6 +307,8 @@ Cameras	Caméras
 Cancel	Annuler
 Cancelled	Annulé
 Cargar textura (imagen)	Charger texture (image)
+Cascades	Cascades
+Cast shadows	Projeter des ombres
 Cell size	Taille de cellule
 Center	Centre
 Center X	Centre X
@@ -431,6 +435,7 @@ Could not write the file	Impossible d'écrire le fichier
 Count	Nombre
 Cover	Couvrir
 Create	Créer
+Create Folder	Créer un dossier
 Create Prefab	Créer prefab
 Cross	Croix
 Cube	Cube
@@ -601,6 +606,7 @@ Exclude X (plane)	Exclure X (plan)
 Exclude Y (plane)	Exclure Y (plan)
 Exclude Z (plane)	Exclure Z (plan)
 Expand	Développer
+Explore...	Explorer...
 Exponential	Exponentielle
 Exponential squared	Exponentielle au carré
 Export	Exporter
@@ -619,6 +625,7 @@ Extract assets	Extraire assets
 Extract the assets to...	Extraire les assets vers...
 Extract to a folder...	Extraire dans un dossier...
 Extract to...	Extraire vers...
+Extract...	Extraire...
 Extract: save the project first (the assets live inside the .w3d)	Extraire : enregistrez d'abord le projet (les assets sont dans le .w3d)
 Extracted	Extrait
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	%d fichier(s) extrait(s). Ce sont des COPIES : pour qu'une modification revienne dans le projet, il faut la réimporter
@@ -645,12 +652,14 @@ Faces	Faces
 Faces triangulated	Faces triangulées
 Factor	Facteur
 Factor X	Facteur X
+Fade border	Bordure finale
 Fade in	Fondu entrant
 Fade out	Fondu sortant
 Falloff	Atténuation
 Far	Loin
 Far fade from	Loin : visible jusqu'à
 Far fade to	Loin : invisible dès
+Far shadow blur	Flou lointain
 Fast Mode	Mode rapide
 File	Fichier
 File name	Nom de fichier
@@ -774,6 +783,7 @@ IOR	IOR
 Icon	Icône
 Ignore order	Ignorer l'ordre
 Image	Image
+Import	Importer
 Import 3D model	Importer modèle 3D
 Import FBX	Importer FBX
 Import GLB	Importer GLB
@@ -781,6 +791,7 @@ Import OBJ	Importer OBJ
 Import STL	Importer STL
 Import glTF	Importer glTF
 Import w3dui	Importer w3dui
+Import...	Importer...
 Imported	Importé
 Importing FBX...	Import FBX...
 Importing glTF...	Import glTF...
@@ -897,6 +908,7 @@ Library unlinked	Bibliothèque déliée
 Lifetime	Durée de vie
 Light	Lumière
 Light Probe	Sonde de lumière
+Light bounce	Rebond de lumière
 Light bounces	Rebonds de lumière
 Light color	Couleur lumière
 Light on/off	Lumière on/off
@@ -918,6 +930,7 @@ Lines	Lignes
 Link	Lier
 Link .w3d...	Lier .w3d...
 Linked	Lié
+Linked library	Bibliothèque
 Linking	Édition des liens
 List	Liste
 Load (camera x object)	Charger (caméra x objet)
@@ -1131,6 +1144,7 @@ No other scenes	Aucune autre scène
 No prefabs yet	Pas encore de prefabs
 No results	Aucun résultat
 No source: this constraint does nothing.	Aucune source : cette contrainte ne fait rien.
+No sun light in the scene: shadows come from the first sun light	Aucune lumière solaire dans la scène : les ombres viennent de la première lumière solaire
 Noise	Bruit
 None	Aucun
 Normal	Normal
@@ -1151,6 +1165,7 @@ Not enough space: uninstalling the previous version (its data on the phone is lo
 Not linked	Non lié
 Not moved	Non déplacé
 Not opened	Non ouvert
+Not saved	Non enregistré
 Not saved in the project yet	Pas encore enregistré dans le projet
 Not saving '%s': %s	Je n'enregistre pas '%s' : %s
 Not saving '%s': could not read its faces and saving would erase them	Je n'enregistre pas '%s' : impossible de lire ses faces et l'enregistrer les effacerait
@@ -1213,6 +1228,7 @@ Open normal map	Ouvrir carte de normales
 Open project	Ouvrir projet
 Open without saving	Ouvrir sans enregistrer
 Open...	Ouvrir...
+OpenGL ES 1.1: the GPU and the CPU compute them (not real time)	OpenGL ES 1.1 : le GPU et le CPU les calculent (pas en temps réel)
 Opening project...	Ouverture du projet...
 Operation	Opération
 Optimize Vertex Groups	Optimiser groupes de sommets
@@ -1237,6 +1253,8 @@ Overflow X	Débordement X
 Overflow Y	Débordement Y
 Overlays	Superpositions
 Overrides	Overrides
+Overwrite	Écraser
+Overwrite file?	Écraser le fichier ?
 Own	Propre
 PVS recalculated	PVS recalculé
 PVS: <model>.pvs.json is missing next to the source .obj	PVS : <modèle>.pvs.json manquant à côté du .obj source
@@ -1375,8 +1393,10 @@ Rate	Taux
 Ray Tracing	Lancer de rayons
 Ray traced motion blur	Flou cinétique par rayons
 Rays	Rayons
+Real-time shadows	Ombres en temps réel
 Recalculate	Recalculer
 Recalculate Normals	Recalculer normales
+Receive shadows	Recevoir des ombres
 Recent files	Fichiers récents
 Rectangle	Rectangle
 Red	Rouge
@@ -1499,6 +1519,7 @@ Save version v%d	Enregistrer version v%d
 Save version: the project has no location (use Save first)	Enregistrer version : le projet n'a pas d'emplacement (utilisez d'abord Enregistrer)
 Save: could not replace the file (the previous version was kept):	Enregistrer : impossible de remplacer le fichier (version précédente conservée) :
 Save: incomplete write. The file was not touched:	Enregistrer : écriture incomplète. Le fichier n'a pas été modifié :
+Saved	Enregistré
 Saved (note: %d curve(s) without a source file are not saved)	Enregistré (attention : %d courbe(s) sans fichier source ne sont pas enregistrées)
 Saved OK, but copying version v%d failed (see the log)	Enregistré, mais la copie de la version v%d a échoué (voir le journal)
 Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Enregistré, mais %s et %d autre(s) fichier(s) sont manquants (hors du .w3d). Bibliothèque > Fichiers manquants
@@ -1577,6 +1598,8 @@ Shader	Shader
 Shader of	Shader de
 Shaders	Shaders
 Shading	Ombrage
+Shadow catcher	Capteur d'ombres
+Shadow strength	Intensité
 Shape	Forme
 Shape keys	Clés de forme
 Sharp	Pointu
@@ -1631,6 +1654,7 @@ Snap menu	Menu aimantation (Snap)
 Snap: OFF	Aimantation : désactivée
 Snap: ON	Aimantation : activée
 Soft Knee	Genou doux
+Soft shadows	Ombres douces
 Solid	Solide
 Solid Preview	Aperçu solide
 Sort by camera	Trier par caméra
@@ -1647,6 +1671,9 @@ Sphere Projection	Projection sphère
 Spin	Giration
 Spin Y	Rotation Y
 Spin random	Giration aléatoire
+Split 1	Séparation 1
+Split 2	Séparation 2
+Split 3	Séparation 3
 Split in Columns	Diviser en colonnes
 Split in Rows	Diviser en lignes
 Spot	Spot
@@ -1675,6 +1702,7 @@ Steps to skip	Étapes à sauter
 Stop	Arrêter
 Stop the game before changing the scene	Arrêtez le jeu avant de changer de scène
 Stop the game first	Arrêtez d'abord le jeu
+Storage	Emplacement
 Stored	Stocké
 Streaming preview	Aperçu du streaming
 Strength	Force
@@ -1768,6 +1796,7 @@ There are no orphans	Aucun orphelin
 There are no saved layouts to delete	Aucune disposition enregistrée à supprimer
 There is no active camera	Aucune caméra active
 There is no audio: the mixer did not start	Pas d'audio : le mixeur n'a pas démarré
+There is no memory to load the previews	Pas assez de mémoire pour charger les aperçus
 There is no script editor (IDE) in the layout	Aucun éditeur de scripts (IDE) dans le layout
 There is no such prefab	Ce prefab n'existe pas
 There is no such scene	Cette scène n'existe pas
@@ -1852,6 +1881,7 @@ Unlink	Délier
 Unloaded	Déchargée
 Unpack	Dépaqueter
 Unpack Prefab	Dépaqueter prefab
+Unused	Inutilisés
 Unwrap	Déplier
 Unwrap Angle Based	Déplier par angles
 Unwrap Conformal	Déplier conforme
@@ -1951,6 +1981,7 @@ Z Scale	Z Échelle
 Z axis	Axe Z
 Z-Buffer	Z-Buffer
 ZBuffer Preview	Aperçu ZBuffer
+Zoom	Zoom
 Zoom 1:1	Zoom 1:1
 Zoom 2:1	Zoom 2:1
 Zoom 3:1	Zoom 3:1

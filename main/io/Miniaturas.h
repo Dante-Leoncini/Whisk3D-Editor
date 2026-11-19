@@ -28,5 +28,7 @@ int  W3dMiniaturasEnCache();
 int  W3dMiniaturasPendientes();
 // suelta todas (cierre del proyecto; las texturas GL se borran)
 void W3dMiniaturasOlvidar();
+// no hay RAM libre para generar vistas previas (se soltaron las que habia, por prioridad: ver Miniaturas.cpp)
+bool W3dMiniaturasSinMemoria();
 
 #endif

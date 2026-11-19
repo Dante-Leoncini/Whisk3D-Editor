@@ -171,6 +171,15 @@ bool TexEditSinGuardar(const Texture* t) {
         if (g_tex[i]->tex == t) return g_tex[i]->modificada || (g_tex[i]->enMemoria && g_tex[i]->pngGuardado.empty());
     return false;
 }
+bool TexEditPNGActual(const Texture* t, std::vector<unsigned char>& png) {
+    png.clear();
+    for (size_t i = 0; i < g_tex.size(); i++) {
+        if (g_tex[i]->tex != t) continue;
+        Codificar(g_tex[i], png);
+        return !png.empty();
+    }
+    return false;
+}
 std::string TexEditEtiqueta(const Texture* t) {
     if (!t) return std::string();
     std::string lbl = t->path;

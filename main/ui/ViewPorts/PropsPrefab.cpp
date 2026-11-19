@@ -115,9 +115,23 @@ static void AccionPxLibMenu() {
     gMenuPxLib->Abrir(b->sx + b->width - gMenuPxLib->width, b->sy + b->height - GlobalScale, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenuPxLib;
 }
+// "Explore...": la libreria POR DENTRO (sus escenas como carpetas, sus objetos y sus prefabs): lo elegido pasa a ser el
+// elemento del proxy (un objeto de una escena, con todo lo que cuelga de el)
+static void PxExplorarElegido(const std::string& elegido) {
+    ProxyW3d* px = PxActivo();
+    if (!px) return;
+    extern bool LayoutProxyDeElegido(const std::string&, const std::string&, int*, std::string*);
+    int tipo = W3D_LIB_PREFAB; std::string elem;
+    if (!LayoutProxyDeElegido(px->Libreria(), elegido, &tipo, &elem)) return;
+    std::string motivo;
+    if (!W3dProxyCambiar(px, px->Libreria(), tipo, elem, &motivo) && !motivo.empty()) Notificar(std::string(T(motivo.c_str())), true);
+    PropsLayoutSucio();
+    g_redraw = true;
+}
 // el desplegable del ELEMENTO de un proxy (usa el de la instancia: propPfSel)
 static void AccionPxElemElegido(int id) {
     ProxyW3d* px = PxActivo();
+    if (id == 9000) { if (px && !px->Libreria().empty()) AbrirFileBrowserLibreria(T("Proxy W3D"), T("Use"), px->Libreria(), PxExplorarElegido); return; }
     if (!px || id < 1 || id > (int)gMenuPxElem.size()) return;
     std::string lib, elem; int tipo = W3D_LIB_PREFAB;
     if (!W3dLibsDeClave(gMenuPxElem[(size_t)(id - 1)], &lib, &tipo, &elem)) return;
@@ -146,6 +160,8 @@ static void AccionPxElemMenu(ProxyW3d* px) {
         }
     }
     if (gMenuPxElem.empty()) gMenuPxElemPop->Agregar(T("No prefabs yet"), 0, -1);
+    // (un OBJETO de una escena, o ver todo lo que tiene: el .w3d por dentro)
+    if (!lib.empty()) { MenuItem* ex = gMenuPxElemPop->Agregar(T("Explore..."), 9000, (int)IconType::carpeta); if (ex) ex->lineaArriba = true; }
     Button* b = PropsActivo->propPfSel->button;
     gMenuPxElemPop->Resize();
     gMenuPxElemPop->Abrir(b->sx + b->width - gMenuPxElemPop->width, b->sy + b->height - GlobalScale, MenuPantallaW, MenuPantallaH);

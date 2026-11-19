@@ -15,6 +15,12 @@
 #include "io/Video2DCache.h"  // Video2DFramePng (un frame del video para el thumb)
 #endif
 #include "variables.h"
+#include "io/Librerias.h"         // una libreria por dentro (el proxy W3D: sus escenas, objetos y prefabs)
+#include "io/RecursosProyecto.h"   // el proyecto por dentro: las carpetas de la biblioteca y los recursos de un tipo
+#include "io/Miniaturas.h"         // (sus miniaturas: las de la biblioteca)
+#include "io/W3dContenedor.h"      // (el nombre del .w3d en la barra)
+#include "ViewPorts/Notificaciones.h"
+#include <algorithm>
 #include <cstring>
 #include <map>
 
@@ -173,6 +179,30 @@ static int  gListPressY     = 0;     // Y del press (umbral tap/arrastre)
 static int  gListLastY      = 0;     // ultimo Y para el delta de scroll
 static bool gListDragging   = false;
 
+// la MINIATURA de la entrada i: del disco (imagenes, videos, fuentes) o, en el proyecto por dentro, la de la biblioteca
+static const FBThumb* FBThumbDe(const FileBrowser* fb, int i) {
+    if (i < 0 || i >= (int)fb->entries.size() || fb->entries[(size_t)i].isDir) return 0;
+    if (!fb->libExplorar.empty()) return 0;   // (una libreria: los iconos de cada cosa)
+    if (fb->vistaProyecto >= 0) {
+        static FBThumb t;   // (la textura es de la biblioteca: no se guarda ni se libera aca)
+        if (i >= (int)fb->idsProyecto.size() || fb->idsProyecto[(size_t)i].empty()) return 0;
+        t.w = t.h = 0;
+        t.tex = W3dMiniatura(fb->vistaProyecto, fb->idsProyecto[(size_t)i], &t.w, &t.h);
+        if (t.w <= 0 || t.h <= 0) t.w = t.h = 1;
+        return t.tex ? &t : 0;
+    }
+    const std::string& n = fb->entries[(size_t)i].name;
+    if (!(EsImagen(n) || EsVideo(n) || EsFuente(n))) return 0;
+    return FBObtenerThumb(w3dFileSystem::JoinPath(fb->currentPath, n));
+}
+// el nombre del .w3d abierto (la barra de la ruta del proyecto por dentro)
+static std::string NombreProyectoUrl() {
+    std::string r = W3dContenedorRutaMontada();
+    const size_t b = r.find_last_of("/\\");
+    if (b != std::string::npos) r = r.substr(b + 1);
+    return r.empty() ? std::string(T("Project")) : r;
+}
+
 // ============================================================================
 
 FileBrowser::FileBrowser(const std::string& title, const std::string& accionLabel,
@@ -180,6 +210,8 @@ FileBrowser::FileBrowser(const std::string& title, const std::string& accionLabe
     : PopUpBase(title) {
     onAccept = accept; actionLabel = accionLabel; filterExt = filtro;
     modoGuardar = false;
+    conNombre = false; confirmando = false; nomX = nomY = nomW = nomH = 0;
+    vistaProyecto = -1;
     histPos = -1; selected = -1; hover = -1; hoverBm = -1; selBm = -1;
     gridView = true; horizontal = true;
     focoZona = FZ_NONE; focoIdx = 0;
@@ -199,6 +231,9 @@ FileBrowser::FileBrowser(const std::string& title, const std::string& accionLabe
     btnCancel = new Button(T("Cancel"), -1, false); btnCancel->centrado = true;
     btnAction = new Button(accionLabel, -1, false); btnAction->centrado = true;
     btnAction->colorTexto = COL(ColorID::negro); // texto negro sobre el verde
+    btnPisar = new Button(T("Overwrite"), -1, false); btnPisar->centrado = true;
+    btnPisar->colorTexto = COL(ColorID::negro);
+    btnNoPisar = new Button(T("Cancel"), -1, false); btnNoPisar->centrado = true;
 
     w3dFileSystem::GetBookmarks(bookmarks);
 }
@@ -207,6 +242,8 @@ FileBrowser::~FileBrowser() {
     delete card; delete pane;
     delete btnBack; delete btnFwd; delete btnUp; delete btnRefresh; delete btnView;
     delete btnBmAdd; delete btnBmDel; delete btnCancel; delete btnAction;
+    delete btnPisar; delete btnNoPisar;
+    if (g_textFieldActivo == &nombre) g_textFieldActivo = NULL;   // (la barra del nombre se va con el explorador)
 }
 
 bool FileBrowser::archivoSeleccionado() const {
@@ -217,11 +254,29 @@ bool FileBrowser::archivoSeleccionado() const {
 // seleccionado) confirma ESA carpeta -> "Usar carpeta actual"; si tocaste un archivo pasa
 // a la accion del caller (Guardar/Elegir = sobrescribir ese archivo).
 std::string FileBrowser::EtiquetaAccion() const {
+    if (conNombre) return actionLabel;
+    if (!libExplorar.empty()) {   // (la libreria: dice QUE se va a agregar)
+        std::string e = ElegidoLibreria();
+        if (e.empty()) return actionLabel;
+        const size_t d = e.find_last_of("/#:");
+        return actionLabel + ": " + (d == std::string::npos ? e : e.substr(d + 1));
+    }
     if (modoGuardar && !archivoSeleccionado()) return std::string(T(kUsarCarpetaActual));
     return actionLabel;
 }
 
+// el nombre tipeado, limpio: solo el ultimo tramo (sin carpetas) y sin espacios al borde
+static std::string NombreDeBarra(const std::string& t) {
+    std::string n = t;
+    const size_t b = n.find_last_of("/\\");
+    if (b != std::string::npos) n = n.substr(b + 1);
+    while (!n.empty() && (n[0] == ' ' || n[0] == '\t')) n.erase(0, 1);
+    while (!n.empty() && (n[n.size() - 1] == ' ' || n[n.size() - 1] == '\t')) n.erase(n.size() - 1);
+    return n;
+}
 bool FileBrowser::seleccionValida() const {
+    if (conNombre) return !NombreDeBarra(nombre.text).empty();
+    if (!libExplorar.empty()) return !ElegidoLibreria().empty();
     if (modoGuardar) return true; // guardar: el boton "elige la carpeta actual" (siempre activo)
     return archivoSeleccionado();
 }
@@ -245,7 +300,74 @@ void FileBrowser::Abrir(const std::string& startDir) {
     std::string dir = startDir.empty() ? w3dFileSystem::GetHomeDir() : startDir;
     history.clear(); histPos = -1; Navegar(dir, true);
 }
+// las sub-carpetas de la biblioteca de 'dir' y los recursos del tipo 'vista' que estan en ella (las partes de otro, no)
+static void FBListarProyecto(int vista, const std::string& dir, std::vector<w3dFileSystem::DirEntry>& out,
+                             std::vector<std::string>& ids) {
+    out.clear(); ids.clear();
+    std::vector<std::string> carpetas;
+    W3dCarpetasTodas(carpetas);
+    std::vector<std::string> hijas;
+    for (size_t i = 0; i < carpetas.size(); i++) if (!carpetas[i].empty() && W3dCarpetaPadre(carpetas[i]) == dir) hijas.push_back(W3dCarpetaHoja(carpetas[i]));
+    std::sort(hijas.begin(), hijas.end());
+    hijas.erase(std::unique(hijas.begin(), hijas.end()), hijas.end());
+    for (size_t i = 0; i < hijas.size(); i++) {
+        w3dFileSystem::DirEntry e; e.name = hijas[i]; e.isDir = true;
+        out.push_back(e); ids.push_back(std::string());
+    }
+    std::vector<W3dRecursoItem> items;
+    W3dVistaRecListar(vista, items);
+    for (size_t i = 0; i < items.size(); i++) {
+        if (items[i].carpeta != dir || !items[i].padre.empty()) continue;
+        if (W3dVistaRecUbicacion(vista, items[i].id) == 1) continue;   // (lo externo no esta ADENTRO del .w3d)
+        w3dFileSystem::DirEntry e; e.name = items[i].nombre; e.isDir = false;
+        out.push_back(e); ids.push_back(items[i].id);
+    }
+}
+// UNA LIBRERIA POR DENTRO: en la raiz sus escenas (carpetas) y sus prefabs; adentro de una escena, sus objetos (los que
+// tienen hijos tambien son carpetas). Los objetos llevan el CUBO (no se confunden con una malla); luces y camaras, el suyo
+static void FBListarLibreria(const std::string& lib, const std::string& dir, std::vector<w3dFileSystem::DirEntry>& out,
+                             std::vector<int>& iconos) {
+    out.clear(); iconos.clear();
+    if (dir.empty()) {
+        std::vector<std::string> es, ps;
+        W3dLibsElementos(lib, W3D_LIB_ESCENA, es);
+        W3dLibsElementos(lib, W3D_LIB_PREFAB, ps);
+        for (size_t i = 0; i < es.size(); i++) { w3dFileSystem::DirEntry e; e.name = es[i]; e.isDir = true; out.push_back(e); iconos.push_back((int)IconType::camera); }
+        for (size_t i = 0; i < ps.size(); i++) { w3dFileSystem::DirEntry e; e.name = ps[i]; e.isDir = false; out.push_back(e); iconos.push_back((int)IconType::prefab); }
+        return;
+    }
+    const size_t b = dir.find('/');
+    const std::string escena = (b == std::string::npos) ? dir : dir.substr(0, b);
+    std::vector<W3dLibObjeto> os;
+    W3dLibsObjetosDeEscena(lib, escena, b == std::string::npos ? std::string() : dir.substr(b + 1), os);
+    for (size_t i = 0; i < os.size(); i++) {
+        w3dFileSystem::DirEntry e; e.name = os[i].nombre; e.isDir = os[i].conHijos;
+        out.push_back(e);
+        const std::string& t = os[i].tipo;
+        iconos.push_back(t == "luz" ? (int)IconType::light : t == "camara" ? (int)IconType::camera :
+                         t == "esqueleto" || t == "armature" ? (int)IconType::armature : (int)IconType::object);
+    }
+}
+std::string FileBrowser::ElegidoLibreria() const {
+    if (libExplorar.empty()) return std::string();
+    const size_t b = currentPath.find('/');
+    const std::string escena = (b == std::string::npos) ? currentPath : currentPath.substr(0, b);
+    const std::string resto = (b == std::string::npos) ? std::string() : currentPath.substr(b + 1);
+    if (archivoSeleccionado()) {
+        const std::string& n = entries[(size_t)selected].name;
+        if (currentPath.empty()) return "prefab:" + n;
+        return escena + "#" + (resto.empty() ? n : resto + "/" + n);
+    }
+    if (currentPath.empty()) return std::string();   // (en la raiz sin nada elegido no hay que agregar)
+    return resto.empty() ? "escena:" + escena : escena + "#" + resto;
+}
+std::string FileBrowser::Unir(const std::string& dir, const std::string& nombre) const {
+    if (!Virtual()) return w3dFileSystem::JoinPath(dir, nombre);
+    return dir.empty() ? nombre : dir + "/" + nombre;
+}
 void FileBrowser::Recargar() {
+    if (!libExplorar.empty()) { FBListarLibreria(libExplorar, currentPath, entries, iconosEntrada); idsProyecto.clear(); selected = -1; PosY = 0; return; }
+    if (vistaProyecto >= 0) { FBListarProyecto(vistaProyecto, currentPath, entries, idsProyecto); selected = -1; PosY = 0; return; }
     std::vector<w3dFileSystem::DirEntry> todas;
     w3dFileSystem::ListDir(currentPath, todas);
     entries.clear();
@@ -263,7 +385,7 @@ void FileBrowser::Actualizar() {
 }
 void FileBrowser::Navegar(const std::string& dir, bool pushHistory) {
     std::vector<w3dFileSystem::DirEntry> prueba;
-    if (!w3dFileSystem::ListDir(dir, prueba)) return;
+    if (!Virtual() && !w3dFileSystem::ListDir(dir, prueba)) return;
     FBLiberarThumbs(); // cambiar de carpeta libera TODAS las miniaturas (no acumular RAM/VRAM)
     currentPath = dir;
     if (pushHistory) {
@@ -287,21 +409,74 @@ void FileBrowser::Navegar(const std::string& dir, bool pushHistory) {
 void FileBrowser::Atras()    { if (histPos > 0) { histPos--; Navegar(history[histPos], false); } }
 void FileBrowser::Adelante() { if (histPos + 1 < (int)history.size()) { histPos++; Navegar(history[histPos], false); } }
 // con ruta sin '/' ParentPath ahora devuelve "" (carpeta actual): no navegamos a una ruta vacia
-void FileBrowser::Arriba()   { std::string p = w3dFileSystem::ParentPath(currentPath); if (!p.empty() && p != currentPath) Navegar(p, true); }
+void FileBrowser::Arriba()   {
+    if (Virtual()) { if (!currentPath.empty()) Navegar(W3dCarpetaPadre(currentPath), true); return; }   // (hasta la raiz del proyecto)
+    std::string p = w3dFileSystem::ParentPath(currentPath); if (!p.empty() && p != currentPath) Navegar(p, true);
+}
 void FileBrowser::AbrirEntrada(int idx) {
     if (idx < 0 || idx >= (int)entries.size()) return;
     if (entries[idx].isDir) {
-        Navegar(w3dFileSystem::JoinPath(currentPath, entries[idx].name), true);
+        Navegar(Unir(currentPath, entries[idx].name), true);
     } else if (selected == idx) {
         // segundo click sobre el archivo YA seleccionado = doble click =
         // importar / cargar (no hace falta ir al boton verde de abajo)
         Aceptar();
     } else {
         selected = idx; // primer click: solo seleccionar
+        if (conNombre) nombre.SetText(entries[idx].name);   // (guardar como: su nombre, para pisarlo o cambiarlo)
     }
+}
+bool FileBrowser::EntrarNombre(const std::string& n) {
+    for (int i = 0; i < (int)entries.size(); i++) if (entries[(size_t)i].name == n) { AbrirEntrada(i); return true; }
+    return false;
 }
 void FileBrowser::Aceptar() {
     std::string full;
+    if (!libExplorar.empty()) {
+        full = ElegidoLibreria();
+        if (full.empty()) return;
+        void (*cb)(const std::string&) = onAccept;
+        Cerrar(); if (cb) cb(full);
+        return;
+    }
+    if (conNombre) {
+        // GUARDAR COMO: la carpeta + el nombre de la barra (+ la extension, si no la tiene)
+        std::string n = NombreDeBarra(nombre.text);
+        if (n.empty()) return;
+        if (!extNombre.empty()) {
+            std::string bajo = n; for (size_t i = 0; i < bajo.size(); i++) bajo[i] = (char)tolower((unsigned char)bajo[i]);
+            std::string e = extNombre; for (size_t i = 0; i < e.size(); i++) e[i] = (char)tolower((unsigned char)e[i]);
+            if (!TerminaEn(bajo, e.c_str())) n += extNombre;
+        }
+        full = Unir(currentPath, n);
+        // ADENTRO DEL PROYECTO: un recurso de ese tipo que ya se llama asi no se pisa (sus usuarios lo perderian): se avisa
+        // y se puede cambiar el nombre
+        if (vistaProyecto >= 0) {
+            std::vector<W3dRecursoItem> items;
+            W3dVistaRecListar(vistaProyecto, items);
+            std::string bajo = n; for (size_t i = 0; i < bajo.size(); i++) bajo[i] = (char)tolower((unsigned char)bajo[i]);
+            for (size_t i = 0; i < items.size(); i++) {
+                if (W3dVistaRecUbicacion(vistaProyecto, items[i].id) == 1) continue;   // (uno externo no ocupa el nombre adentro)
+                std::string o = items[i].nombre; for (size_t k = 0; k < o.size(); k++) o[k] = (char)tolower((unsigned char)o[k]);
+                if (o == bajo) { Notificar(std::string(T("A resource with that name already exists")) + ": " + n, true); return; }
+            }
+            if (g_textFieldActivo == &nombre) g_textFieldActivo = NULL;
+            void (*cb)(const std::string&) = onAccept;
+            Cerrar(); if (cb) cb(full);
+            return;
+        }
+        // ya existe: primero el cartel (Sobrescribir / Cancelar)
+        if (!confirmando && w3dFileSystem::FileExists(full)) {
+            confirmando = true; rutaPisar = full;
+            if (g_textFieldActivo == &nombre) g_textFieldActivo = NULL;
+            return;
+        }
+        confirmando = false;
+        if (g_textFieldActivo == &nombre) g_textFieldActivo = NULL;
+        void (*cb)(const std::string&) = onAccept;
+        Cerrar(); if (cb) cb(full);
+        return;
+    }
     if (modoGuardar) {
         // guardar: si hay un archivo sel -> su ruta (sobrescribir); si no -> la carpeta actual
         if (archivoSeleccionado())
@@ -317,6 +492,7 @@ void FileBrowser::Aceptar() {
     Cerrar(); if (cb) cb(full);
 }
 void FileBrowser::AgregarBookmark() {
+    if (Virtual()) return;   // (el proyecto por dentro: sus accesos no son del disco)
     w3dFileSystem::Bookmark b; size_t s = currentPath.find_last_of('/');
     b.name = (s == std::string::npos) ? currentPath : currentPath.substr(s + 1);
     if (b.name.empty()) b.name = currentPath;
@@ -326,6 +502,7 @@ void FileBrowser::AgregarBookmark() {
     w3dFileSystem::SaveUserBookmarks(bookmarks); // queda guardado en disco (entre sesiones)
 }
 void FileBrowser::QuitarBookmark() {
+    if (Virtual()) return;
     if (selBm >= 0 && selBm < (int)bookmarks.size()) {
         if (!bookmarks[selBm].user) return; // Home/drives/carpetas NO se borran (se regeneran)
         bookmarks.erase(bookmarks.begin() + selBm); selBm = -1;
@@ -345,6 +522,7 @@ void FileBrowser::Layout() {
     horizontal = (winW >= winH);
     int barH = RenglonHeightGS + bordersGS, m = gapGS;
     topH = barH + 2 * m; botH = barH + 2 * m;
+    if (conNombre) botH += barH + m;   // (guardar como: la barra del NOMBRE arriba de los botones)
     int bodyY = topH, bodyH = winH - topH - botH;
     int pmin = 80 * GlobalScale;
     if (horizontal) {
@@ -442,7 +620,8 @@ void FileBrowser::Render() {
     w3dEngine::PushMatrix();
     w3dEngine::Translatef((GLfloat)(urlX + gapGS + borderGS), (GLfloat)(ny + (navSz - LetterHeightGS) / 2), 0);
     w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-    RenderBitmapText(currentPath, textAlign::left, urlW - 2 * (gapGS + borderGS));
+    RenderBitmapText(!libExplorar.empty() ? libExplorar + ".w3d/" + currentPath : vistaProyecto >= 0 ? NombreProyectoUrl() + "/" + currentPath : currentPath,
+                     textAlign::left, urlW - 2 * (gapGS + borderGS));
     w3dEngine::PopMatrix();
 
     // --- panel de bookmarks (card oscura con margen) + items ---
@@ -473,8 +652,10 @@ void FileBrowser::Render() {
     btnBmDel->Resize(half); btnBmDel->width = half; btnBmDel->card->Resize(half, btnBmDel->height);
     btnBmAdd->sx = panelX + gapGS;             btnBmAdd->sy = byBot;
     btnBmDel->sx = panelX + gapGS + half + gapGS; btnBmDel->sy = byBot;
-    w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)btnBmAdd->sx, (GLfloat)byBot, 0); btnBmAdd->Render(); w3dEngine::PopMatrix();
-    w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)btnBmDel->sx, (GLfloat)byBot, 0); btnBmDel->Render(); w3dEngine::PopMatrix();
+    if (!Virtual()) {   // (el proyecto por dentro no guarda accesos)
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)btnBmAdd->sx, (GLfloat)byBot, 0); btnBmAdd->Render(); w3dEngine::PopMatrix();
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)btnBmDel->sx, (GLfloat)byBot, 0); btnBmDel->Render(); w3dEngine::PopMatrix();
+    }
 
     // --- area de archivos (card oscura) + entradas (cards) + scroll ---
     TarjetaEn(fileX, fileY, fileW, fileH, fondo, NULL);
@@ -501,11 +682,10 @@ void FileBrowser::Render() {
         else if (i == hover) TarjetaEn(ex, ey, ew, eh, hov, NULL);
 
         const float* iconCol = entries[i].isDir ? kFolder : grisUI;
-        int iconIdx = IconoEntrada(entries[i]);
+        int iconIdx = (i < (int)iconosEntrada.size() && iconosEntrada[(size_t)i] >= 0) ? iconosEntrada[(size_t)i] : IconoEntrada(entries[i]);
         if (gridView) {
             int isz = 26 * GlobalScale, ix = cx + (cw - isz) / 2, iy = cy + gapGS * 2;
-            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsVideo(entries[i].name) || EsFuente(entries[i].name)))
-                ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
+            const FBThumb* thmb = FBThumbDe(this, i);
             if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
             else
             {
@@ -527,8 +707,7 @@ void FileBrowser::Render() {
             }
         } else {
             int isz = IconSizeGS, iy = cy + (ch - isz) / 2, ix = ex + gapGS;
-            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsVideo(entries[i].name) || EsFuente(entries[i].name)))
-                ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
+            const FBThumb* thmb = FBThumbDe(this, i);
             if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
             else
             {
@@ -547,8 +726,27 @@ void FileBrowser::Render() {
     // la barra de scroll REAL (misma textura/comportamiento que el outliner)
     w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)fileX, (GLfloat)fileY, 0); DibujarScrollbar(pane); w3dEngine::PopMatrix();
 
+    // --- GUARDAR COMO: la barra "Nombre de archivo" (la caja es una caja de texto: tocarla la enfoca) ---
+    if (conNombre) {
+        const int barH = RenglonHeightGS + bordersGS, ny = winH - botH + m;
+        const std::string et = std::string(T("File name")) + ":";
+        const int ew = (CharCount(et) + 1) * CharacterWidthGS;
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)m, (GLfloat)(ny + (barH - LetterHeightGS) / 2), 0);
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        RenderBitmapText(et, textAlign::left, ew);
+        w3dEngine::PopMatrix();
+        nomX = m + ew; nomY = ny; nomW = winW - nomX - m; nomH = barH;
+        const bool foco = (g_textFieldActivo == &nombre);
+        TarjetaEn(nomX, nomY, nomW, nomH, COL(ColorID::negro), foco ? accent : grisUI);
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)(nomX + gapGS * 2), (GLfloat)(nomY + (barH - LetterHeightGS) / 2), 0);
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        RenderTextField(nombre, foco, 0, nomW - gapGS * 4);
+        w3dEngine::PopMatrix();
+    }
     // --- barra inferior: Cancelar (50%) + Accion (50%, verde si valida) ---
-    int by = winH - botH + m, botW = (winW - 2 * m - m) / 2;
+    int by = winH - botH + m + (conNombre ? RenglonHeightGS + bordersGS + m : 0), botW = (winW - 2 * m - m) / 2;
     if (modoGuardar) btnAction->text = EtiquetaAccion(); // "Usar carpeta actual" / la accion
     if (seleccionValida()) { // listo: verde, texto negro, borde normal
         btnAction->tinte = accent; btnAction->colorTexto = COL(ColorID::negro); btnAction->colorBorde = NULL;
@@ -561,6 +759,33 @@ void FileBrowser::Render() {
     btnAction->sx = m + botW + m;   btnAction->sy = by;
     w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)m, (GLfloat)by, 0); btnCancel->Render(); w3dEngine::PopMatrix();
     w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(m + botW + m), (GLfloat)by, 0); btnAction->Render(); w3dEngine::PopMatrix();
+
+    // --- EL CARTEL: "Sobrescribir archivo?" con el nombre, Sobrescribir (verde) / Cancelar ---
+    if (confirmando) {
+        const int barH = RenglonHeightGS + bordersGS;
+        std::string arch = rutaPisar; { const size_t b = arch.find_last_of("/\\"); if (b != std::string::npos) arch = arch.substr(b + 1); }
+        const std::string tit = T("Overwrite file?");
+        int cw = (CharCount(arch) > CharCount(tit) ? CharCount(arch) : CharCount(tit)) * CharacterWidthGS + 6 * gapGS;
+        if (cw < 200 * GlobalScale) cw = 200 * GlobalScale;
+        if (cw > winW - 4 * m) cw = winW - 4 * m;
+        const int ch = 2 * (LetterHeightGS + gapGS) + barH + 5 * gapGS;
+        const int cx = (winW - cw) / 2, cy = (winH - ch) / 2;
+        TarjetaEn(cx, cy, cw, ch, fondo, accent);
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(cx + 3 * gapGS), (GLfloat)(cy + 2 * gapGS), 0);
+        RenderBitmapText(tit, textAlign::left, cw - 6 * gapGS); w3dEngine::PopMatrix();
+        w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);   // (el nombre del archivo, en el gris claro de la UI)
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(cx + 3 * gapGS), (GLfloat)(cy + 3 * gapGS + LetterHeightGS), 0);
+        RenderBitmapText(arch, textAlign::left, cw - 6 * gapGS); w3dEngine::PopMatrix();
+        const int bw = (cw - 3 * 2 * gapGS) / 2, bby = cy + ch - barH - 2 * gapGS;
+        btnNoPisar->Resize(bw); btnNoPisar->width = bw; btnNoPisar->card->Resize(bw, btnNoPisar->height);
+        btnPisar->Resize(bw); btnPisar->width = bw; btnPisar->card->Resize(bw, btnPisar->height);
+        btnPisar->tinte = accent; btnPisar->colorTexto = COL(ColorID::negro);
+        btnNoPisar->sx = cx + 2 * gapGS; btnNoPisar->sy = bby;
+        btnPisar->sx = cx + cw - 2 * gapGS - bw; btnPisar->sy = bby;
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)btnNoPisar->sx, (GLfloat)bby, 0); btnNoPisar->Render(); w3dEngine::PopMatrix();
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)btnPisar->sx, (GLfloat)bby, 0); btnPisar->Render(); w3dEngine::PopMatrix();
+    }
 
     endView();
 }
@@ -592,6 +817,20 @@ int FileBrowser::BookmarkAt(int mx, int my) {
 }
 
 bool FileBrowser::Click(int mx, int my) {
+    // el cartel de sobrescribir: solo sus dos botones
+    if (confirmando) {
+        if (btnPisar->Contains(mx, my)) { Aceptar(); return true; }
+        if (btnNoPisar->Contains(mx, my)) {   // (Cancelar: de vuelta a la barra, con el nombre elegido para cambiarlo)
+            confirmando = false; TextFieldEnfocar(&nombre); nombre.SelectAll(); return true;
+        }
+        return true;
+    }
+    // la caja del nombre: la enfoca (adentro de ella, el cursor lo pone controles: TextFieldMouseAbajo)
+    if (conNombre && mx >= nomX && mx < nomX + nomW && my >= nomY && my < nomY + nomH) {
+        if (g_textFieldActivo != &nombre) { TextFieldEnfocar(&nombre); nombre.SelectAll(); }
+        return true;
+    }
+    if (conNombre && g_textFieldActivo == &nombre) g_textFieldActivo = NULL;   // (tocar otra cosa suelta la barra)
     if (btnBack->Contains(mx, my)) { Atras(); return true; }
     if (btnFwd->Contains(mx, my)) { Adelante(); return true; }
     if (btnUp->Contains(mx, my)) { Arriba(); return true; }
@@ -639,6 +878,7 @@ bool FileBrowser::Motion(int mx, int my) {
     btnRefresh->hover = btnRefresh->Contains(mx, my);
     btnBmAdd->hover = btnBmAdd->Contains(mx, my); btnBmDel->hover = btnBmDel->Contains(mx, my);
     btnCancel->hover = btnCancel->Contains(mx, my); btnAction->hover = btnAction->Contains(mx, my);
+    btnPisar->hover = confirmando && btnPisar->Contains(mx, my); btnNoPisar->hover = confirmando && btnNoPisar->Contains(mx, my);
     return true;
 }
 
@@ -793,6 +1033,13 @@ bool FileBrowser::Tecla(int tecla) {
     return true;
 }
 
+// Enter en la barra del nombre = guardar; Esc = cerrar el explorador
+bool FileBrowser::TeclaEnTexto(bool enter) {
+    if (!conNombre || g_textFieldActivo != &nombre) return false;
+    if (enter) Aceptar(); else Cerrar();
+    return true;
+}
+
 void FileBrowser::Cerrar() {
     FBLiberarThumbs(); // cerrar el explorador libera TODAS las miniaturas
     if (PopUpActive == this) { PopUpActive = NULL; delete this; }
@@ -823,6 +1070,65 @@ void AbrirFileBrowser(const std::string& title, const std::string& accionLabel,
     fb->modoGuardar = guardar;
     PopUpActive = fb;
     fb->Abrir(w3dFileSystem::GetHomeDir());
+}
+
+void AbrirFileBrowserGuardarComo(const std::string& title, const std::string& accionLabel, const std::string& ext,
+                                 const std::string& nombre, const std::string& carpeta, void (*accept)(const std::string&)) {
+#ifdef __EMSCRIPTEN__
+    // (el navegador: se guarda en /descargas con ese nombre y cada punto de escritura lo descarga)
+    if (PopUpActive) PopUpActive->Cerrar();
+    accept(w3dFileSystem::JoinPath(W3dWebCarpetaDescargas(), nombre + ext));
+    return;
+#endif
+    if (PopUpActive) PopUpActive->Cerrar();
+    FileBrowser* fb = new FileBrowser(title, accionLabel, ext, accept);
+    fb->modoGuardar = true;
+    fb->conNombre = true;
+    fb->extNombre = ext;
+    fb->nombre.SetText(nombre);
+    PopUpActive = fb;
+    fb->Abrir((!carpeta.empty() && w3dFileSystem::IsDir(carpeta)) ? carpeta : w3dFileSystem::GetHomeDir());
+#ifndef W3D_SYMBIAN
+    TextFieldEnfocar(&fb->nombre);   // (listo para tipear: el nombre entero seleccionado)
+    fb->nombre.SelectAll();
+#endif
+}
+
+void AbrirFileBrowserProyecto(const std::string& title, const std::string& accionLabel, int vista, const std::string& ext,
+                              const std::string& nombre, const std::string& carpeta, void (*accept)(const std::string&)) {
+    // (tambien en el navegador: lo que se recorre es el proyecto, no el disco)
+    if (PopUpActive) PopUpActive->Cerrar();
+    FileBrowser* fb = new FileBrowser(title, accionLabel, std::string(), accept);
+    fb->vistaProyecto = vista;
+    fb->modoGuardar = true;
+    fb->conNombre = true;
+    fb->extNombre = ext;
+    fb->nombre.SetText(nombre);
+    // UN acceso: la raiz del proyecto (los del disco no van aca)
+    fb->bookmarks.clear();
+    w3dFileSystem::Bookmark b; b.name = NombreProyectoUrl(); b.path = std::string(); b.user = false;
+    fb->bookmarks.push_back(b);
+    PopUpActive = fb;
+    fb->history.clear(); fb->histPos = -1;
+    fb->Navegar(W3dCarpetaNormalizar(carpeta), true);
+#ifndef W3D_SYMBIAN
+    TextFieldEnfocar(&fb->nombre);
+    fb->nombre.SelectAll();
+#endif
+}
+
+void AbrirFileBrowserLibreria(const std::string& title, const std::string& accionLabel, const std::string& lib,
+                              void (*accept)(const std::string&)) {
+    if (PopUpActive) PopUpActive->Cerrar();
+    FileBrowser* fb = new FileBrowser(title, accionLabel, std::string(), accept);
+    fb->libExplorar = lib;
+    fb->modoGuardar = true;   // (aceptar sin nada elegido = la carpeta actual: la escena entera o el objeto con hijos)
+    fb->bookmarks.clear();
+    w3dFileSystem::Bookmark b; b.name = lib + ".w3d"; b.path = std::string(); b.user = false;
+    fb->bookmarks.push_back(b);
+    PopUpActive = fb;
+    fb->history.clear(); fb->histPos = -1;
+    fb->Navegar(std::string(), true);
 }
 
 // ============================================================================

@@ -6,7 +6,9 @@
 #include "objects/Mesh.h"           // la malla que se dibuja: su centro (el gancho de la sonda)
 #include "objects/RenderColors.h"   // el color de seleccion
 #include "io/JsonW3d.h"             // JVal / JsonNumTexto: los campos del .w3d
-#include "render/RayTracer.h"       // RTHornearSondas: el horneado
+#ifndef W3D_SIN_EDITOR
+#include "render/RayTracer.h"       // RTHornearSondas: el horneado (solo el editor: el juego trae la sonda horneada)
+#endif
 #include <math.h>
 
 namespace gfx = w3dEngine;
@@ -258,7 +260,11 @@ bool SondaLuzHornear(SondaLuz* s, std::string* motivo) {
             }
     std::vector<float> sh;
     std::vector<unsigned char> ok;
+#ifdef W3D_SIN_EDITOR
+    (void)ok; if (motivo) *motivo = "Nothing to bake"; return false;   // (el juego no hornea: usa la sonda horneada del .w3d)
+#else
     if (!RTHornearSondas(pos, s->rayos, sh, &ok)) { if (motivo) *motivo = "Nothing to bake"; return false; }
+#endif
     // LOS PUNTOS ADENTRO DE ALGO (una pared, el piso, la malla misma) no ven la luz: toman el promedio de sus vecinos
     // validos de la grilla, pasada tras pasada, hasta que no queda ninguno sin llenar (o no hay de donde)
     const int nx = s->puntos[0], ny = s->puntos[1], nz = s->puntos[2];

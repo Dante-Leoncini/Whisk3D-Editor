@@ -102,6 +102,7 @@
 #include "ViewPorts/PopUp/FileBrowser.h"
 #include "ViewPorts/PopUp/ConfirmarPopup.h"  // "Guardar como": confirmar antes de pisar un .w3d
 #include "render/OpcionesRender.h"
+#include "render/SombrasTiempoReal.h"   // g_sombras: la tarjeta "Sombras en tiempo real"
 #include "render/RayTracer.h"   // g_rt: el trazado de rayos del proyecto
 #include "render/Postproceso.h"   // los efectos del objeto Postproceso
 #include "objects/PostprocesoObj.h"
@@ -401,6 +402,12 @@ static void CamposComunes(std::string& s, int ind, Object* o) {
     // ESTATICO: solo se escribe cuando es DINAMICO (default true = estatico), asi los proyectos que no lo
     // tocan quedan igual. Lo usa W3dGridCull (celda cacheada vs re-evaluada por frame).
     if (!o->estatico) { JSang(s, ind); s += "\"estatico\": false,\n"; }
+    // LAS SOMBRAS EN TIEMPO REAL: solo lo apagado (de fabrica proyecta y recibe)
+    if (!o->proyectaSombra) { JSang(s, ind); s += "\"proyectaSombra\": false,\n"; }
+    if (!o->recibeSombra) { JSang(s, ind); s += "\"recibeSombra\": false,\n"; }
+    // LA LUZ PRECALCULADA: solo lo que no es de fabrica (rebota; no es captador de sombras)
+    if (!o->rebotaLuz) { JSang(s, ind); s += "\"rebotaLuz\": false,\n"; }
+    if (o->captaSombras) { JSang(s, ind); s += "\"captaSombras\": true,\n"; }
     // LINEAS PARENTALES: solo se escribe cuando se APAGO (el default es true), asi los
     // proyectos que no la tocan quedan byte a byte como antes.
     if (!o->showRelantionshipsLines) { JSang(s, ind); s += "\"lineasParentales\": false,\n"; }
@@ -1328,6 +1335,19 @@ static void EscribirRender(std::string& s, CtxGuardar* cx) {
         c += ", \"fondo\": ["; JNum(c, g_renderBg[0]); c += ", "; JNum(c, g_renderBg[1]); c += ", "; JNum(c, g_renderBg[2]); c += "]"; }
     if (g_renderBgModo != 0) E::I(c, "fondoModo", g_renderBgModo);
     if (g_renderLuzFondo != 1.0f) E::F(c, "fondoLuz", g_renderLuzFondo);   // (la luz del fondo; ausente = 100%)
+    // LAS SOMBRAS EN TIEMPO REAL (la tarjeta de abajo de Render): lo que no es de fabrica
+    { const W3dSombrasOpc so = g_sombras, sd;
+      if (so.on != sd.on) E::B(c, "sombras", so.on);
+      if (so.distancia != sd.distancia) E::F(c, "sombraDistancia", so.distancia);
+      if (so.cascadas != sd.cascadas) E::I(c, "sombraCascadas", so.cascadas);
+      if (so.cortes[0] != sd.cortes[0] || so.cortes[1] != sd.cortes[1] || so.cortes[2] != sd.cortes[2]) {
+          c += ", \"sombraCortes\": ["; JNum(c, so.cortes[0]); c += ", "; JNum(c, so.cortes[1]); c += ", "; JNum(c, so.cortes[2]); c += "]"; }
+      if (so.borde != sd.borde) E::F(c, "sombraBorde", so.borde);
+      if (so.desenfoque != sd.desenfoque) E::F(c, "sombraDesenfoque", so.desenfoque);
+      if (so.resolucion != sd.resolucion) E::I(c, "sombraResolucion", so.resolucion);
+      if (so.suaves != sd.suaves) E::B(c, "sombraSuaves", so.suaves);
+      if (so.intensidad != sd.intensidad) E::F(c, "sombraIntensidad", so.intensidad);
+      if (so.sesgo != sd.sesgo) E::F(c, "sombraSesgo", so.sesgo); }
     if (g_renderBgRot[0] != 0.0f || g_renderBgRot[1] != 0.0f || g_renderBgRot[2] != 0.0f) {
         c += ", \"fondoRot\": ["; JNum(c, g_renderBgRot[0]); c += ", "; JNum(c, g_renderBgRot[1]); c += ", "; JNum(c, g_renderBgRot[2]); c += "]"; }
     if (!g_renderBgTexs.empty()) {

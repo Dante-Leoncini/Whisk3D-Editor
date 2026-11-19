@@ -138,9 +138,9 @@ extern int  gCargarTexturaCapa;       // Properties.cpp: >= 0 = el "Load Texture
 extern int  gCargarTexturaMapa;       // Properties.cpp: >= 0 = el "Load Texture" de ESE mapa del material (W3dMatMapa)
 static void TexturaElegida(const std::string& pathElegido) {
     if (!gTexMat) return;
-    // IMPORTAR = COPIAR ADENTRO: la textura elegida del disco pasa a ser del
-    // proyecto y se referencia como INTERNA (ver io/W3dContenedor.h)
-    const std::string path = W3dImportarAsset(pathElegido);
+    // CARGAR = QUEDA AFUERA: la textura elegida del disco se referencia como EXTERNA (W3dCargarExterno, ver
+    // io/W3dContenedor.h); a meterla adentro del .w3d se la pasa desde la Biblioteca
+    const std::string path = W3dCargarExterno(pathElegido);
     // por el CACHE por ruta: elegir dos veces la misma imagen (para dos
     // materiales) NO la sube dos veces a la GPU. Y la anterior se suelta, asi
     // el refcount baja y esa textura se puede liberar de verdad.

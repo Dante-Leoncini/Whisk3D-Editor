@@ -552,8 +552,8 @@ bool W3dSoltarArchivo(const std::string& ruta0, int mx, int my, std::string* que
         w3dLogf("[biblioteca] '%s' soltado: prefab '%s'", ruta.c_str(), nom.c_str());
         return true;
     }
-    // un ARCHIVO del proyecto: se copia adentro del .w3d (en memoria hasta guardar)
-    const std::string entrada = W3dImportarAsset(ruta, cat.c_str());
+    // un ARCHIVO de afuera: queda afuera (referencia externa); a meterlo adentro del .w3d, desde la Biblioteca
+    const std::string entrada = W3dCargarExterno(ruta, cat.c_str());
     if (entrada.empty()) { if (que) *que = std::string(T("Could not import")) + ": " + HojaDe(ruta); return false; }
     if (cat == "texturas") {
         Texture* tex = TexturaTomar(entrada);   // (cargada: la biblioteca la conserva aunque nadie la use todavia)

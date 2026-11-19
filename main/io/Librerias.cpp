@@ -561,9 +561,12 @@ void W3dLibsElementos(const std::string& lib, int tipo, std::vector<std::string>
     out = (tipo == W3D_LIB_ESCENA) ? L.escenas : L.prefabs;
 }
 bool W3dLibsTieneElemento(const std::string& lib, int tipo, const std::string& elem) {
+    // (un OBJETO de una escena: "Escena#Padre/Hijo" -> la escena tiene que estar; el objeto lo busca la generacion)
+    const size_t h = (tipo == W3D_LIB_ESCENA) ? elem.find('#') : std::string::npos;
+    const std::string e = (h == std::string::npos) ? elem : elem.substr(0, h);
     std::vector<std::string> v;
     W3dLibsElementos(lib, tipo, v);
-    for (size_t i = 0; i < v.size(); i++) if (v[i] == elem) return true;
+    for (size_t i = 0; i < v.size(); i++) if (v[i] == e) return true;
     return false;
 }
 
@@ -611,8 +614,81 @@ static JVal* Arrancar(JVal* o, const char* clave) {
 }
 static JVal* Texto(const std::string& t) { JVal* v = new JVal(); v->tipo = 2; v->str = t; return v; }
 
-JVal* W3dLibsLeerElemento(const std::string& lib, int tipo, const std::string& elem, JVal** raizObj) {
+// UN OBJETO de una lista de objetos del .w3d por su RUTA de nombres ("Padre/Hijo"): se SACA de la lista (pasa a ser de
+// quien lo pide). NULL = no esta
+static JVal* ArrancarObjeto(JVal* lista, const std::string& ruta) {
+    if (!lista || lista->tipo != 5 || ruta.empty()) return NULL;
+    const size_t b = ruta.find('/');
+    const std::string nom = (b == std::string::npos) ? ruta : ruta.substr(0, b);
+    for (size_t i = 0; i < lista->lista.size(); i++) {
+        JVal* o = lista->lista[i];
+        if (!o || o->tipo != 4) continue;
+        std::map<std::string, JVal*>::iterator n = o->obj.find("nombre");
+        if (n == o->obj.end() || !n->second || n->second->str != nom) continue;
+        if (b == std::string::npos) { lista->lista.erase(lista->lista.begin() + (long)i); return o; }
+        std::map<std::string, JVal*>::iterator h = o->obj.find("hijos");
+        return (h == o->obj.end()) ? NULL : ArrancarObjeto(h->second, ruta.substr(b + 1));
+    }
+    return NULL;
+}
+// los objetos de primer nivel de la escena 'escena' de la libreria (NULL = no se pudo leer). Es de quien la pide
+static JVal* ObjetosDeEscena(const std::string& lib, const std::string& entrada) {
+    JVal* doc = Parsear("lib:" + lib + "/" + (entrada.empty() ? std::string("proyecto.json") : entrada));
+    if (!doc) return NULL;
+    JVal* objs = NULL;
+    if (entrada.empty()) { JVal* esc = JHijo(doc, "escena", 4); objs = Arrancar(esc, "objetos"); }
+    else objs = Arrancar(doc, "objetos");
+    delete doc;
+    return objs;
+}
+// los nombres (y si tienen hijos) de los objetos de una escena de la libreria en la ruta 'ruta' ("" = los de primer nivel)
+static void JuntarObjetos(JVal* lista, const std::string& ruta, std::vector<W3dLibObjeto>& out) {
+    if (!lista || lista->tipo != 5) return;
+    const size_t b = ruta.find('/');
+    const std::string nom = (b == std::string::npos) ? ruta : ruta.substr(0, b);
+    for (size_t i = 0; i < lista->lista.size(); i++) {
+        JVal* o = lista->lista[i];
+        if (!o || o->tipo != 4) continue;
+        std::map<std::string, JVal*>::iterator n = o->obj.find("nombre");
+        const std::string nombre = (n != o->obj.end() && n->second) ? n->second->str : std::string();
+        std::map<std::string, JVal*>::iterator h = o->obj.find("hijos");
+        JVal* hijos = (h != o->obj.end() && h->second && h->second->tipo == 5) ? h->second : NULL;
+        if (ruta.empty()) {
+            W3dLibObjeto lo; lo.nombre = nombre;
+            std::map<std::string, JVal*>::iterator t = o->obj.find("tipo");
+            lo.tipo = (t != o->obj.end() && t->second) ? t->second->str : std::string("objeto");
+            lo.conHijos = hijos && !hijos->lista.empty();
+            out.push_back(lo);
+        } else if (nombre == nom) {
+            JuntarObjetos(hijos, b == std::string::npos ? std::string() : ruta.substr(b + 1), out);
+            return;
+        }
+    }
+}
+bool W3dLibsObjetosDeEscena(const std::string& lib, const std::string& escena, const std::string& ruta, std::vector<W3dLibObjeto>& out) {
+    out.clear();
+    std::string motivo;
+    if (!W3dLibsAsegurar(lib, &motivo)) return false;
+    const LibMontada& L = gMontadas[lib];
+    int k = -1;
+    for (size_t i = 0; i < L.escenas.size(); i++) if (L.escenas[i] == escena) { k = (int)i; break; }
+    if (k < 0) return false;
+    JVal* objs = ObjetosDeEscena(lib, L.escenaEntradas[(size_t)k]);
+    if (!objs) return false;
+    JuntarObjetos(objs, ruta, out);
+    delete objs;
+    return true;
+}
+
+JVal* W3dLibsLeerElemento(const std::string& lib, int tipo, const std::string& elem0, JVal** raizObj) {
     if (raizObj) *raizObj = NULL;
+    // UN OBJETO de una escena ("Escena#Padre/Hijo"): ese objeto con todo lo que cuelga de el (sus hijos, su malla, sus
+    // materiales, su esqueleto y sus animaciones, que se buscan por nombre en la libreria)
+    std::string elem = elem0, rutaObj;
+    if (tipo == W3D_LIB_ESCENA) {
+        const size_t h = elem0.find('#');
+        if (h != std::string::npos) { elem = elem0.substr(0, h); rutaObj = elem0.substr(h + 1); }
+    }
     std::string motivo;
     if (!W3dLibsAsegurar(lib, &motivo)) {
         w3dLogfW("[librerias] '%s/%s': %s", lib.c_str(), elem.c_str(), motivo.c_str());
@@ -639,12 +715,17 @@ JVal* W3dLibsLeerElemento(const std::string& lib, int tipo, const std::string& e
     }
     // UNA ESCENA: sus objetos de primer nivel cuelgan de un VACIO con el nombre de la escena (lo que genera el
     // proxy es UN objeto raiz, como un prefab: los overrides por ruta y la frontera de scope andan igual)
-    JVal* doc = Parsear("lib:" + lib + "/" + (entrada.empty() ? std::string("proyecto.json") : entrada));
-    if (!doc) return NULL;
-    JVal* objs = NULL;
-    if (entrada.empty()) { JVal* esc = JHijo(doc, "escena", 4); objs = Arrancar(esc, "objetos"); }
-    else objs = Arrancar(doc, "objetos");
-    delete doc;
+    JVal* objs = ObjetosDeEscena(lib, entrada);
+    if (!objs) return NULL;
+    if (!rutaObj.empty()) {
+        JVal* o = ArrancarObjeto(objs, rutaObj);
+        delete objs;
+        if (!o) { w3dLogfW("[librerias] la escena '%s/%s' no tiene el objeto '%s'", lib.c_str(), elem.c_str(), rutaObj.c_str()); return NULL; }
+        JVal* nuevo = new JVal(); nuevo->tipo = 4;
+        nuevo->obj["raiz"] = o;
+        if (raizObj) *raizObj = o;
+        return nuevo;
+    }
     JVal* nuevo = new JVal(); nuevo->tipo = 4;
     JVal* r = new JVal(); r->tipo = 4;
     r->obj["tipo"] = Texto("objeto");

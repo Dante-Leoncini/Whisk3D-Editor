@@ -8,6 +8,7 @@
 #include "WhiskUI/widgets/card.h"
 #include "ViewPorts/ScrollBar.h" // Scrollable: el MISMO scroll que el outliner
 #include "w3dFilesystem.h"
+#include "WhiskUI/widgets/TextField.h"   // la barra del NOMBRE del archivo (guardar como)
 
 // ============================================================================
 //  File browser COMPARTIDO (4 OS) — modal a pantalla completa, .
@@ -24,6 +25,33 @@ class FileBrowser : public PopUpBase, public Scrollable {
                                    // y devuelve currentPath. Si ademas seleccionaste un archivo
                                    // el boton pasa a la accion del caller y devuelve ESE archivo
                                    // (sobrescribir). El caller arma la ruta con W3dRutaDeSalida.
+        // GUARDAR CON NOMBRE (AbrirFileBrowserGuardarComo): arriba de los botones, la barra "Nombre de archivo".
+        // Aceptar devuelve carpeta + nombre (+ extNombre si no la tiene); si ese archivo ya existe pregunta
+        // "Sobrescribir archivo?" (Cancelar vuelve a la barra para cambiar el nombre)
+        bool conNombre;
+        TextField nombre;
+        std::string extNombre;
+        bool confirmando;          // el cartel de sobrescribir esta abierto
+        std::string rutaPisar;     // el archivo que se pisaria
+        Button* btnPisar;
+        Button* btnNoPisar;
+        int nomX, nomY, nomW, nomH;   // la caja del nombre (layout)
+        bool TeclaEnTexto(bool enter);
+
+        // EL PROYECTO POR DENTRO (AbrirFileBrowserProyecto, "Importar..." de la tarjeta Recurso): en vez del disco se
+        // navegan las CARPETAS de la biblioteca y se ven los recursos de un tipo. currentPath = la carpeta ("" = la raiz
+        // del proyecto). Aceptar devuelve "carpeta/nombre"; si ya hay un recurso con ese nombre, avisa y no cierra
+        int vistaProyecto;                      // -1 = el disco
+        std::vector<std::string> idsProyecto;   // el id del recurso de cada entrada (su miniatura); "" = carpeta
+        std::string Unir(const std::string& dir, const std::string& nombre) const;
+        // UNA LIBRERIA POR DENTRO (AbrirFileBrowserLibreria, el proxy W3D): en la raiz sus escenas (se recorren como
+        // carpetas: sus objetos, y los que tienen hijos tambien se recorren) y sus prefabs. Aceptar devuelve lo elegido:
+        // "prefab:<nombre>", "escena:<nombre>" (la escena entera: aceptar adentro de ella sin nada elegido) o
+        // "<escena>#<Padre/Hijo>" (un objeto, con todo lo que cuelga de el)
+        std::string libExplorar;                // "" = no es una libreria
+        std::vector<int> iconosEntrada;         // el icono de cada entrada (-1 = el de siempre)
+        std::string ElegidoLibreria() const;
+        bool Virtual() const { return vistaProyecto >= 0 || !libExplorar.empty(); }
 
         std::string currentPath;
         std::vector<w3dFileSystem::DirEntry> entries;
@@ -90,6 +118,9 @@ class FileBrowser : public PopUpBase, public Scrollable {
         void Wheel(int delta);
         void Soltar();
         void Cerrar();
+        // (el harness) entrar a la carpeta / elegir el archivo que se llama asi, y apretar el boton verde
+        bool EntrarNombre(const std::string& n);
+        void AceptarAhora() { Aceptar(); }
 
     private:
         // true si hay un ARCHIVO (no carpeta) seleccionado en la lista
@@ -118,6 +149,19 @@ class FileBrowser : public PopUpBase, public Scrollable {
 void AbrirFileBrowser(const std::string& title, const std::string& accionLabel,
                       const std::string& filtro, void (*accept)(const std::string&),
                       bool guardar = false); // guardar=true: elegir carpeta destino
+// GUARDAR COMO: el explorador con la barra del NOMBRE del archivo (arranca con 'nombre', sin la extension, en
+// 'carpeta' o en la del proyecto). Devuelve la ruta COMPLETA (carpeta + nombre + ext); si ya existe, antes pregunta
+void AbrirFileBrowserGuardarComo(const std::string& title, const std::string& accionLabel, const std::string& ext,
+                                 const std::string& nombre, const std::string& carpeta, void (*accept)(const std::string&));
+
+// IMPORTAR AL PROYECTO: el explorador del .w3d POR DENTRO (las carpetas de la biblioteca y los recursos del tipo 'vista')
+// con la barra del nombre (arranca con 'nombre' en la carpeta 'carpeta' de la biblioteca). Devuelve "carpeta/nombre" (+ ext
+// si le falta); "" de carpeta = la raiz
+void AbrirFileBrowserProyecto(const std::string& title, const std::string& accionLabel, int vista, const std::string& ext,
+                              const std::string& nombre, const std::string& carpeta, void (*accept)(const std::string&));
+// UNA LIBRERIA POR DENTRO (el proxy W3D): ver FileBrowser::libExplorar
+void AbrirFileBrowserLibreria(const std::string& title, const std::string& accionLabel, const std::string& lib,
+                              void (*accept)(const std::string&));
 
 // texto del boton verde cuando no hay archivo seleccionado en modo guardar, en INGLES: el boton muestra
 // T(kUsarCarpetaActual) (lo comparte el test del harness para no duplicar el literal)

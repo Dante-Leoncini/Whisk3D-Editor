@@ -71,6 +71,7 @@ A prefab can't be converted	Prefab dönüştürülemez
 A prefab can't contain itself	Prefab kendini içeremez
 A prefab instance only has what its prefab generates	Prefab örneği yalnızca prefabının ürettiklerini içerir
 A project needs at least one scene	Projenin en az bir sahnesi olmalı
+A resource with that name already exists	Bu adda bir kaynak zaten var
 A scene can't contain itself	Sahne kendini içeremez
 A scene with that name already existed, renamed:	Bu adda bir sahne zaten vardı, yeni adı:
 A texture with that name already exists	Bu adda bir doku zaten var
@@ -225,6 +226,7 @@ Bevel: move away from the center = width, wheel / up-down = segments, V = vertic
 Bevel: select edges first	Pah: önce kenarları seçin
 Bevel: select vertices first	Pah: önce köşeleri seçin
 Bezier	Bezier
+Bias	Sapma
 Billboard	Billboard
 Bind texture	Dokuyu bağla
 Bitrate	Bit hızı
@@ -305,6 +307,8 @@ Cameras	Kameralar
 Cancel	İptal
 Cancelled	İptal edildi
 Cargar textura (imagen)	Doku yükle (görüntü)
+Cascades	Kademeler
+Cast shadows	Gölge düşür
 Cell size	Hücre boyutu
 Center	Merkez
 Center X	Merkez X
@@ -431,6 +435,7 @@ Could not write the file	Dosya yazılamadı
 Count	Adet
 Cover	Kapla
 Create	Oluştur
+Create Folder	Klasör oluştur
 Create Prefab	Prefab oluştur
 Cross	Haç
 Cube	Küp
@@ -601,6 +606,7 @@ Exclude X (plane)	X hariç (düzlem)
 Exclude Y (plane)	Y hariç (düzlem)
 Exclude Z (plane)	Z hariç (düzlem)
 Expand	Genişlet
+Explore...	Göz at...
 Exponential	Üstel
 Exponential squared	Üstel kare
 Export	Dışa Aktar
@@ -619,6 +625,7 @@ Extract assets	Varlıkları çıkar
 Extract the assets to...	Varlıkları şuraya çıkar...
 Extract to a folder...	Bir klasöre çıkar...
 Extract to...	Şuraya çıkar...
+Extract...	Çıkar...
 Extract: save the project first (the assets live inside the .w3d)	Çıkar: önce projeyi kaydedin (varlıklar .w3d içinde durur)
 Extracted	Çıkarıldı
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	%d dosya çıkarıldı. Bunlar KOPYA: bir değişikliğin projeye dönmesi için yeniden içe aktarılması gerekir
@@ -645,12 +652,14 @@ Faces	Yüzler
 Faces triangulated	Yüzler üçgenlendi
 Factor	Faktör
 Factor X	Faktör X
+Fade border	Son kenar
 Fade in	Belirme
 Fade out	Solma
 Falloff	Azalma
 Far	Uzak
 Far fade from	Uzak solma başı
 Far fade to	Uzak solma sonu
+Far shadow blur	Uzak bulanıklık
 Fast Mode	Hızlı mod
 File	Dosya
 File name	Dosya adı
@@ -774,6 +783,7 @@ IOR	IOR
 Icon	Simge
 Ignore order	Sırayı yoksay
 Image	Görüntü
+Import	İçe aktar
 Import 3D model	3D Model İçe Aktar
 Import FBX	FBX İçe Aktar
 Import GLB	GLB İçe Aktar
@@ -781,6 +791,7 @@ Import OBJ	OBJ İçe Aktar
 Import STL	STL İçe Aktar
 Import glTF	glTF İçe Aktar
 Import w3dui	w3dui İçe Aktar
+Import...	İçe aktar...
 Imported	İçe aktarıldı
 Importing FBX...	FBX içe aktarılıyor...
 Importing glTF...	glTF içe aktarılıyor...
@@ -897,6 +908,7 @@ Library unlinked	Kütüphane bağlantısı kesildi
 Lifetime	Ömür
 Light	Işık
 Light Probe	Işık sondası
+Light bounce	Işık sekmesi
 Light bounces	Işık sekmeleri
 Light color	Işık rengi
 Light on/off	Işık aç/kapat
@@ -918,6 +930,7 @@ Lines	Çizgiler
 Link	Bağla
 Link .w3d...	.w3d bağla...
 Linked	Bağlantılı
+Linked library	Kitaplık
 Linking	Bağlanıyor
 List	Liste
 Load (camera x object)	Yükle (kamera x nesne)
@@ -1131,6 +1144,7 @@ No other scenes	Başka sahne yok
 No prefabs yet	Henüz prefab yok
 No results	Sonuç yok
 No source: this constraint does nothing.	Kaynak yok: bu kısıtlama hiçbir şey yapmaz.
+No sun light in the scene: shadows come from the first sun light	Sahnede güneş ışığı yok: gölgeleri ilk güneş ışığı verir
 Noise	Gürültü
 None	Hiçbiri
 Normal	Normal
@@ -1151,6 +1165,7 @@ Not enough space: uninstalling the previous version (its data on the phone is lo
 Not linked	Bağlanmadı
 Not moved	Taşınmadı
 Not opened	Açılmadı
+Not saved	Kaydedilmedi
 Not saved in the project yet	Henüz projeye kaydedilmedi
 Not saving '%s': %s	'%s' kaydedilmiyor: %s
 Not saving '%s': could not read its faces and saving would erase them	'%s' kaydedilmiyor: yüzleri okunamadı ve kaydetmek onları silerdi
@@ -1213,6 +1228,7 @@ Open normal map	Normal haritası aç
 Open project	Proje aç
 Open without saving	Kaydetmeden aç
 Open...	Aç...
+OpenGL ES 1.1: the GPU and the CPU compute them (not real time)	OpenGL ES 1.1: GPU ve CPU hesaplar (gerçek zamanlı değil)
 Opening project...	Proje açılıyor...
 Operation	İşlem
 Optimize Vertex Groups	Köşe Gruplarını Optimize Et
@@ -1237,6 +1253,8 @@ Overflow X	Taşma X
 Overflow Y	Taşma Y
 Overlays	Bindirmeler
 Overrides	Override'lar
+Overwrite	Üzerine yaz
+Overwrite file?	Dosyanın üzerine yazılsın mı?
 Own	Kendi
 PVS recalculated	PVS yeniden hesaplandı
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: kaynak .obj'nin yanında <model>.pvs.json eksik
@@ -1375,8 +1393,10 @@ Rate	Miktar
 Ray Tracing	Işın İzleme
 Ray traced motion blur	Işın izlemeli bulanıklık
 Rays	Işınlar
+Real-time shadows	Gerçek zamanlı gölgeler
 Recalculate	Yeniden hesapla
 Recalculate Normals	Normalleri Yeniden Hesapla
+Receive shadows	Gölge al
 Recent files	Son dosyalar
 Rectangle	Dikdörtgen
 Red	Kırmızı
@@ -1499,6 +1519,7 @@ Save version v%d	Sürüm kaydet v%d
 Save version: the project has no location (use Save first)	Sürüm kaydet: projenin konumu yok (önce Kaydet'i kullanın)
 Save: could not replace the file (the previous version was kept):	Kaydet: dosya değiştirilemedi (önceki sürüm korundu):
 Save: incomplete write. The file was not touched:	Kaydet: yazma eksik kaldı. Dosyaya dokunulmadı:
+Saved	Kaydedildi
 Saved (note: %d curve(s) without a source file are not saved)	Kaydedildi (dikkat: kaynak dosyası olmayan %d eğri kaydedilmez)
 Saved OK, but copying version v%d failed (see the log)	Kaydedildi, ancak v%d sürümünün kopyalanması başarısız oldu (günlüğe bakın)
 Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Kaydedildi, ancak %s ve %d dosya daha eksik (.w3d dışında). Kütüphane > Eksik dosyalar
@@ -1577,6 +1598,8 @@ Shader	Shader
 Shader of	Shader:
 Shaders	Shader'lar
 Shading	Gölgeleme
+Shadow catcher	Gölge yakalayıcı
+Shadow strength	Yoğunluk
 Shape	Şekil
 Shape keys	Şekil anahtarları
 Sharp	Keskin
@@ -1631,6 +1654,7 @@ Snap menu	Mıknatıs menüsü (Snap)
 Snap: OFF	Mıknatıs: kapalı
 Snap: ON	Mıknatıs: açık
 Soft Knee	Yumuşak diz
+Soft shadows	Yumuşak gölgeler
 Solid	Katı
 Solid Preview	Katı Önizleme
 Sort by camera	Kameraya göre sırala
@@ -1647,6 +1671,9 @@ Sphere Projection	Küre İzdüşümü
 Spin	Dönüş
 Spin Y	Y'de dönüş
 Spin random	Rastgele dönüş (±)
+Split 1	Bölme 1
+Split 2	Bölme 2
+Split 3	Bölme 3
 Split in Columns	Sütunlara böl
 Split in Rows	Satırlara böl
 Spot	Spot
@@ -1675,6 +1702,7 @@ Steps to skip	Atlanacak adım
 Stop	Durdur
 Stop the game before changing the scene	Sahneyi değiştirmeden önce oyunu durdurun
 Stop the game first	Önce oyunu durdurun
+Storage	Konum
 Stored	Saklama
 Streaming preview	Akış önizlemesi
 Strength	Güç
@@ -1768,6 +1796,7 @@ There are no orphans	Sahipsiz yok
 There are no saved layouts to delete	Silinecek kayıtlı düzen yok
 There is no active camera	Etkin kamera yok
 There is no audio: the mixer did not start	Ses yok: karıştırıcı başlamadı
+There is no memory to load the previews	Önizlemeleri yüklemek için bellek yok
 There is no script editor (IDE) in the layout	Yerleşimde betik düzenleyici (IDE) yok
 There is no such prefab	Böyle bir prefab yok
 There is no such scene	Böyle bir sahne yok
@@ -1852,6 +1881,7 @@ Unlink	Bağlantıyı kes
 Unloaded	Yüklü değil
 Unpack	Paketten Çıkar
 Unpack Prefab	Prefabı paketten çıkar
+Unused	Kullanılmayan
 Unwrap	Açılım
 Unwrap Angle Based	Açılım (Açı Tabanlı)
 Unwrap Conformal	Açılım (Konformal)
@@ -1951,6 +1981,7 @@ Z Scale	Z Ölçeği
 Z axis	Z ekseni
 Z-Buffer	Z-Buffer
 ZBuffer Preview	ZBuffer Önizleme
+Zoom	Yakınlaştırma
 Zoom 1:1	Zoom 1:1
 Zoom 2:1	Zoom 2:1
 Zoom 3:1	Zoom 3:1

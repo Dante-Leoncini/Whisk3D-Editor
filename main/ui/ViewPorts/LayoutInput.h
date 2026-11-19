@@ -68,6 +68,12 @@ void LayoutModoElegir(int modo);
 // menu CONTEXTUAL del viewport 3D (click derecho): abre en (mx,my) el menu del modo actual
 // (Object / contexto de malla en Edit / Pose). Es el MISMO menu que el boton de la barra.
 void LayoutMenuContexto3D(int mx, int my);
+// el menu contextual del elemento con el FOCO DE TECLADO del viewport activo (el OK mantenido del N95). Posible = el OK
+// que se apreto puede terminar en un menu (si no, hace lo suyo en el acto)
+bool LayoutMenuContextoTecladoPosible();
+bool LayoutMenuContextoTeclado();
+// el menu contextual del viewport que esta en (mx, my), como el click derecho (el OK mantenido con el mouse virtual)
+bool LayoutMenuContextoEn(int mx, int my);
 
 bool LayoutClickUI(int mx, int my);
 // DOBLE CLICK / DOBLE TAP (renombrar en linea en el outliner) y PULSACION LARGA (tactil: agarrar una fila del

@@ -1344,24 +1344,38 @@ static bool CmdOutDragSobre(std::istringstream& ss, std::string& err) {
 // Play de un sonido, Open de una escena / prefab, Open in IDE de un script; 'parar' = Stop del sonido)
 static bool CmdRecBoton(std::istringstream& ss, std::string& err) {
     Properties* p = ElPanel();
-    if (!p || !p->propRecAcciones || p->propRecAcciones->botones.size() < 2) { err = "recboton: sin la tarjeta Recurso"; return false; }
+    if (!p || !p->propRecSelUsuarios || !p->propRecBorrar) { err = "recboton: sin la tarjeta Recurso"; return false; }
     std::string q, m; ss >> q >> m;
     const bool delTipo = (q == "accion" || q == "parar");
     const int k = (q == "usuarios" || q == "accion") ? 0 : (q == "borrar" || q == "parar") ? 1 : -1;
     if (k < 0) { err = "recboton: usuarios|borrar|accion|parar"; return false; }
-    PropButtonRow* fila = delTipo ? p->propRecAcciones2 : p->propRecAcciones;
-    if (!fila || fila->botones.size() <= (size_t)k) { err = "recboton: sin esa fila de botones"; return false; }
     p->RefreshTargetProperties();
     p->ActualizarPestanias();
-    const bool visible = fila->botones[(size_t)k]->visible && p->propRecurso && p->propRecurso->visible;
-    printf("      [recboton] %s ('%s'): %s\n", q.c_str(), fila->botones[(size_t)k]->text.c_str(), visible ? "visible" : "oculto");
+    // (Seleccionar usuarios y Borrar: una fila cada uno; lo del tipo: la fila de dos botones)
+    std::string texto;
+    bool visible = false;
+    void (*accion)() = NULL;
+    if (delTipo) {
+        PropButtonRow* fila = p->propRecAcciones2;
+        if (!fila || fila->botones.size() <= (size_t)k) { err = "recboton: sin esa fila de botones"; return false; }
+        texto = fila->botones[(size_t)k]->text;
+        visible = fila->botones[(size_t)k]->visible;
+        accion = fila->acciones[(size_t)k];
+    } else {
+        PropButton* b = (k == 0) ? p->propRecSelUsuarios : p->propRecBorrar;
+        texto = b->button->text;
+        visible = !b->oculto;
+        accion = b->action;
+    }
+    visible = visible && p->propRecurso && p->propRecurso->visible;
+    printf("      [recboton] %s ('%s'): %s\n", q.c_str(), texto.c_str(), visible ? "visible" : "oculto");
     if (m == "oculto") {
         if (visible) { err = "recboton: '" + q + "' se ofrece y no debia"; return false; }
         return true;
     }
     if (!visible) { err = "recboton: '" + q + "' no se ofrece"; return false; }
     PropsActivo = p;
-    fila->acciones[(size_t)k]();
+    if (accion) accion();
     return true;
 }
 // recdatos <clave> <id> <en|es|pt> <texto...>: los DATOS del recurso (los de la tarjeta Recurso) en ese
@@ -1546,10 +1560,18 @@ static bool CmdOutMantener(std::istringstream& ss, std::string& err) {
     }
     return true;
 }
-// outfiltro <todo|tipo>: el FILTRO de la biblioteca por su menu
+// outfiltro <todo|tipo|sinuso>: el FILTRO de la biblioteca por su menu ('sinuso' alterna "Unused": los que nadie usa)
 static bool CmdOutFiltro(std::istringstream& ss, std::string& err) {
     Outliner* o = ElOutliner(err, "outfiltro"); if (!o) return false;
     std::string c; ss >> c;
+    if (c == "sinuso") {
+        if (!o->EnBiblioteca()) { err = "outfiltro: el outliner no esta en la biblioteca"; return false; }
+        const bool antes = o->soloSinUso;
+        if (!ElegirEnMenuBarra(o, o->btnFiltro, 9100, err, "outfiltro")) return false;
+        printf("      [outfiltro] sin uso: %s\n", o->soloSinUso ? "si" : "no");
+        if (o->soloSinUso == antes) { err = "outfiltro: 'Unused' no cambio"; return false; }
+        return true;
+    }
     const int f = (c == "todo") ? 0 : W3dVistaDeClave(c);
     if (f < 0) { err = "outfiltro: tipo desconocido '" + c + "'"; return false; }
     if (!o->EnBiblioteca()) { err = "outfiltro: el outliner no esta en la biblioteca"; return false; }
@@ -1750,6 +1772,28 @@ static bool CmdRecExterno(std::istringstream& ss, std::string& err) {
     W3dRecursoActivo(&va, &ahora);
     printf("      [recexterno] '%s' -> %s: ahora '%s' (%s)\n", id.c_str(), ruta.c_str(), ahora.c_str(),
            W3dVistaRecUbicacion(v, ahora) == 1 ? "fuera" : "dentro");
+    return true;
+}
+// recguardarcomo <ruta>: "Save As..." de la tarjeta del recurso ACTIVO con ese archivo (una COPIA: el recurso no cambia
+// de lugar). Asserta que el archivo quedo escrito y que el recurso sigue donde estaba
+static bool CmdRecGuardarComo(std::istringstream& ss, std::string& err) {
+    std::string ruta; ss >> ruta;
+    if (ruta.empty()) { err = "recguardarcomo: falta la ruta"; return false; }
+    if (ruta[0] != '/') { char b[4096]; if (getcwd(b, sizeof(b))) ruta = std::string(b) + "/" + ruta; }
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) { err = "recguardarcomo: no hay un recurso activo"; return false; }
+    const int antes = W3dVistaRecUbicacion(v, id);
+    extern bool RecursoGuardarCopia(int, const std::string&, const std::string&, std::string*);
+    std::string motivo;
+    if (!RecursoGuardarCopia(v, id, ruta, &motivo)) { err = "recguardarcomo: " + motivo; return false; }
+    std::vector<unsigned char> b;
+    const bool hay = w3dFileSystem::ReadFileBytes(ruta, b) && !b.empty();
+    std::string ahora; int va = -1;
+    W3dRecursoActivo(&va, &ahora);
+    printf("      [recguardarcomo] '%s' -> %s (%u bytes); el recurso sigue '%s' (%s)\n", id.c_str(), ruta.c_str(), (unsigned)b.size(),
+           ahora.c_str(), W3dVistaRecUbicacion(v, ahora) == 1 ? "fuera" : "dentro");
+    if (!hay) { err = "recguardarcomo: no quedo el archivo"; return false; }
+    if (ahora != id || W3dVistaRecUbicacion(v, ahora) != antes) { err = "recguardarcomo: el recurso cambio de lugar"; return false; }
     return true;
 }
 // archivomover <de> <a>: mueve (renombra) un archivo del DISCO, por fuera de Whisk3D (como el usuario que
@@ -2487,6 +2531,7 @@ bool W3dPruebasOutlinerCmd(const std::string& cmd, std::istringstream& ss, std::
     if (cmd == "cambiosmarca")    return CmdCambiosMarca(ss, err);
     if (cmd == "recubicar")       return CmdRecUbicar(ss, err);
     if (cmd == "recubicacion")    return CmdRecUbicacion(ss, err);
+    if (cmd == "recguardarcomo")  return CmdRecGuardarComo(ss, err);
     if (cmd == "recduplicar")     return CmdRecDuplicar(ss, err);
     if (cmd == "recborrarforzado") return CmdRecBorrarForzado(ss, err);
     if (cmd == "recdato")         return CmdRecDato(ss, err);

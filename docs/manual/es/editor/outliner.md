@@ -128,6 +128,8 @@ Desde el Outliner, la copia queda justo encima del original, sin seguir al mouse
 
 ![Android](../tutoriales/img/icono-android.svg) Con el dedo, mantené la fila hasta que vibre y soltala sin moverla: se abre el mismo menú.
 
+![Nokia](../tutoriales/img/icono-nokia.svg) En el N95, mantené <kbd>OK</kbd> sobre la fila elegida: vibra y sale el mismo menú ([El menú contextual](interfaz.md#el-menú-contextual)).
+
 ## La Biblioteca
 
 Los **recursos** del proyecto (mallas, materiales, texturas, animaciones, sonidos, scripts, prefabs...) no están en el Outliner: tienen su propio viewport, la **Biblioteca**, que se elige con el botón de la esquina. Muestra miniaturas en carpetas, dice qué recursos se usan y cuáles no, y un recurso se puede arrastrar a la Vista 3D: una malla crea un objeto, y un material se le pone a lo que queda debajo. Está explicada en [Vista Biblioteca](outliner.md#vista-biblioteca); el resto del Outliner, en su [manual](outliner.md) y en [Atajos](atajos.md#outliner).
@@ -137,12 +139,30 @@ Los **recursos** del proyecto (mallas, materiales, texturas, animaciones, sonido
 | Función | Descripción |
 |---|---|
 | Recursos | Mallas, materiales, texturas, animaciones, prefabs, escenas, sonidos, scripts, [shaders](shaders.md), fuentes y videos, en carpetas. Un material o un shader arrastrado sobre una malla del 3D se ve en la parte bajo el puntero antes de soltarlo. Tilde verde = en uso; cruz roja = huérfano; `*` = sin guardar. |
-| Filtro / Lista o cuadrícula | Mostrar un solo tipo; ver miniaturas. |
+| Filtro / Lista o cuadrícula | Mostrar un solo tipo (el embudo de la barra); ver miniaturas. Lo elegido lleva un **borde verde** encima de su miniatura. **Sin uso** (al final del filtro) deja solo lo que nadie usa, y se suma al tipo: por ejemplo, las texturas sin uso. Con ese filtro el embudo muestra el ícono de los usuarios. |
+| Zoom de la cuadrícula | En **Vista** (el ojo), la fila **Zoom**: con **−** y **+** de a 10%, o arrastrando la barra (de 60% a 400%). ![PC](../tutoriales/img/icono-pc.svg) La rueda del mouse desplaza la lista; <kbd>Ctrl</kbd> + rueda cambia el zoom. ![Android](../tutoriales/img/icono-android.svg) Con dos dedos, como una foto. |
 | Arrastrar un recurso | A una carpeta (lo mueve), a la Vista 3D (malla = objeto nuevo, material o textura = se asigna a lo tocado, prefab = instancia) o a un desplegable de Propiedades. |
-| Carpeta nueva / Mover a carpeta | Organizar (las carpetas son solo para ordenar). |
-| Duplicar recurso / Seleccionar usuarios / Purgar huérfanos | Copiar, encontrar quién lo usa, borrar lo que nadie usa. |
-| Externos | Una textura, un sonido, un script, una fuente, un video o un shader cuyo archivo vive **afuera** del .w3d lleva una **flecha de acceso directo** sobre su ícono. |
-| Meter en el .w3d / Extraer a una carpeta... | En el menú del recurso (click derecho, o mantener el dedo): **Meter en el .w3d** lo copia adentro del proyecto; **Extraer a una carpeta...** lo saca a la carpeta que elijas y el proyecto pasa a usar ese archivo. El recurso sigue en la misma carpeta de la Biblioteca, y cada cambio se deshace con <kbd>Ctrl+Z</kbd>. También desde Propiedades (tarjeta Recurso). |
+| Carpeta nueva / Mover a carpeta | Organizar (las carpetas son solo para ordenar). La carpeta nueva sale del **+** de la barra, o del click derecho (**Crear carpeta**): sobre una carpeta se crea adentro; sobre un recurso, al lado; en el hueco, en la raíz. |
+| Duplicar recurso / Seleccionar usuarios / Purgar huérfanos | Copiar, encontrar quién lo usa, borrar lo que nadie usa. **Seleccionar usuarios** elige en la escena los objetos que lo usan (se ven en la Vista 3D); la Biblioteca sigue mostrando la Biblioteca. |
+| Externos | Una textura, un sonido, un script, una fuente, un video o un shader cuyo archivo vive **afuera** del .w3d lleva una **flecha de acceso directo** sobre su ícono. **Lo que se carga de afuera queda afuera** (el explorador de archivos, soltar un archivo en el editor): el proyecto guarda su ruta. Adentro del .w3d vive lo que se crea en el programa (una textura nueva, un script nuevo) o lo que se mete a propósito con **Meter en el .w3d**. En el editor web se copia adentro, porque el navegador no deja usar un archivo de la computadora después. |
+| Meter en el .w3d / Extraer a una carpeta... | En el menú del recurso (click derecho, o mantener el dedo), para varios a la vez: **Meter en el .w3d** los copia adentro del proyecto; **Extraer a una carpeta...** los saca a la carpeta que elijas y el proyecto pasa a usar esos archivos. Siguen en la misma carpeta de la Biblioteca, y cada cambio se deshace con <kbd>Ctrl+Z</kbd>. |
+
+### La tarjeta Recurso
+
+Al elegir un recurso en la Biblioteca, Propiedades muestra su tarjeta **Recurso**. De arriba hacia abajo:
+
+| Fila | Qué es |
+|---|---|
+| Vista previa | La textura, arriba de todo. |
+| Nombre | Se puede cambiar (lo ven todos los que lo usan). |
+| Usuarios | Cuántos lo usan. **0** sale en rojo: nadie lo usa. |
+| Tipo | Textura, Sonido, Script... (y "solo lectura" si es de una librería vinculada). |
+| Guardado | **Sí**, o un botón **Guardar** si tiene cambios sin guardar. Guardar escribe lo pintado de una textura o lo tipeado en un script en su lugar y, si el recurso vive adentro del .w3d, guarda el proyecto. |
+| Ubicación | Dónde vive su archivo: **Dentro del .w3d** o **Externo** (con la flecha de acceso directo). El desplegable ofrece llevarlo al otro lado, eligiendo **nombre y lugar**: **Extraer...** (si está adentro) abre el explorador del disco con la barra **Nombre de archivo**, y el recurso pasa a ese archivo, afuera; **Importar...** (si es externo) abre el explorador del **proyecto por dentro** (las carpetas de la Biblioteca y lo que ya hay adentro de ese tipo), y el recurso entra al .w3d en esa carpeta y con ese nombre. Un <kbd>Ctrl+Z</kbd> deshace el paso entero. |
+| Los datos | La entrada en el .w3d, el formato, la resolución, la memoria... cada uno en su caja, como un valor. No se editan, pero se pueden seleccionar y copiar. |
+| Guardar como... | Una **copia** de su archivo afuera (con lo que tenga sin guardar, como se ve): el explorador con la barra **Nombre de archivo**. El recurso **no cambia**: sigue donde estaba. Si ya hay un archivo con ese nombre pregunta **¿Sobrescribir archivo?**: **Cancelar** vuelve a la barra para cambiar el nombre. |
+| Seleccionar usuarios | Los objetos que lo usan quedan elegidos en la escena. Solo aparece si alguno de sus usuarios es un objeto. |
+| Borrar | El tacho. Si está en uso avisa cuántos lo usan y pregunta antes. |
 
 ## Escenas, juegos y prefabs
 

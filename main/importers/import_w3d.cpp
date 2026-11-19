@@ -3,6 +3,7 @@
 #include "objects/ObjectMode.h"   // W3dNombresRepararEscena (duplicados de archivos ya guardados)
 #include <math.h>                    // sqrtf: normal de la clave geometrica de los UV groups
 #include "render/OpcionesRender.h"
+#include "render/SombrasTiempoReal.h"   // g_sombras: la tarjeta "Sombras en tiempo real"
 #include "render/Postproceso.h"   // los efectos del postprocesado
 #include "objects/PostprocesoObj.h"
 #include "render/RayTracer.h"   // g_rt: el trazado de rayos del proyecto   // RenderType / g_redraw: son del editor
@@ -1793,6 +1794,10 @@ static void JsonComunes(JVal* j, Object* o) {
     o->name = JS(j, "nombre", o->name);
     o->visible = JB(j, "visible", true);
     o->estatico = JB(j, "estatico", true); // GridCull: false = dinamico (se re-evalua su celda por frame)
+    o->proyectaSombra = JB(j, "proyectaSombra", true);   // (las sombras en tiempo real)
+    o->recibeSombra = JB(j, "recibeSombra", true);
+    o->rebotaLuz = JB(j, "rebotaLuz", true);         // (la luz precalculada: la indirecta)
+    o->captaSombras = JB(j, "captaSombras", false);  // (captador de sombras)
     o->showRelantionshipsLines = JB(j, "lineasParentales", true); // ausente = true (archivos viejos)
     o->paleta = JS(j, "paleta", "");   // seleccion de paleta ("" = hereda del padre)
     JVal* v;
@@ -4653,6 +4658,7 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // se ignoran: el render usa el rango y los fps de la escena / animacion activa)
     {
         JVal* rn = JHijo(raiz, "render", 4);
+        g_sombras = W3dSombrasOpc();   // (sin la tarjeta en el archivo: las de fabrica)
         // el resto de la tarjeta Render (g_render): lo que no esta, el valor de fabrica. La carpeta, si existe aca
         const W3dRenderOpc d;
         W3dRenderOpc r;
@@ -4675,6 +4681,21 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
             g_renderBgModo = JI(rn, "fondoModo", 0) == 1 ? 1 : 0;
             g_renderLuzFondo = JF(rn, "fondoLuz", 1.0f);   // (la luz del fondo: 1 = 100%)
             if (g_renderLuzFondo < 0.0f) g_renderLuzFondo = 0.0f;
+            // LAS SOMBRAS EN TIEMPO REAL (lo que no esta: de fabrica)
+            { const W3dSombrasOpc sd; W3dSombrasOpc so;
+              so.on = JB(rn, "sombras", sd.on);
+              so.distancia = JF(rn, "sombraDistancia", sd.distancia);
+              so.cascadas = JI(rn, "sombraCascadas", sd.cascadas);
+              { Vector3 ct(sd.cortes[0], sd.cortes[1], sd.cortes[2]); JVec3(rn, "sombraCortes", ct);
+                so.cortes[0] = ct.x; so.cortes[1] = ct.y; so.cortes[2] = ct.z; }
+              so.borde = JF(rn, "sombraBorde", sd.borde);
+              so.desenfoque = JF(rn, "sombraDesenfoque", sd.desenfoque);
+              so.resolucion = JI(rn, "sombraResolucion", sd.resolucion);
+              so.suaves = JB(rn, "sombraSuaves", sd.suaves);
+              so.intensidad = JF(rn, "sombraIntensidad", sd.intensidad);
+              so.sesgo = JF(rn, "sombraSesgo", sd.sesgo);
+              if (so.cascadas < 1) so.cascadas = 1; if (so.cascadas > 4) so.cascadas = 4;
+              g_sombras = so; }
             JVal* ft = JHijo(rn, "fondoTexturas", 5);
             if (ft) {
                 for (size_t i = 0; i < ft->lista.size(); i++) {

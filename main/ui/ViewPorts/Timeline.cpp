@@ -3105,6 +3105,11 @@ static void TL_menuCtxAction(int id){
     }
     g_redraw = true;
 }
+bool Timeline::MenuContextoTeclado(){
+    // (un punto del strip: el menu obra sobre los keyframes ELEGIDOS, no sobre el punto)
+    const int mx = x + panelW + (width - panelW) / 2, my = y + stripY + (height - stripY) / 2;
+    return MenuContexto(mx, my, mx, my);
+}
 bool Timeline::MenuContexto(int mx, int my, int menuX, int menuY){
     if (dopeRows.empty() || g_dopeMov) return false;
     const int lx = mx - x, ly = my - y;

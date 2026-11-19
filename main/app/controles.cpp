@@ -13,6 +13,7 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 #include "ViewPorts/Editor2D.h"    // Editor2DXformActivo (envolver el cursor en G/R/S 2D)
 #include "ViewPorts/TransformUI.h" // TransformUIClickBarra (tap en la barra de info -> teclado numerico)
 #include "ViewPorts/IDE.h"         // IDETecladoCaptura/IDETextoTexto (el IDE captura el teclado)
+#include "ViewPorts/MenuTexto.h"   // el menu del texto (click derecho / mantener apretado)
 #include "ViewPorts/UVEditor.h"    // UVEditorTomaTab (Tab sobre el UV = entrar/salir de huesos 2D)
 #include "ViewPorts/Outliner.h"    // el menu contextual de las vistas de recursos (click derecho)
 #include "WhiskUI/draw/glesdraw.h"        // W3dPantallaAlto
@@ -888,6 +889,8 @@ void InputUsuarioSDL3(SDL_Event &e){
 
     if (e.type == SDL_EVENT_MOUSE_MOTION){
         { extern int g_ratonHoverX, g_ratonHoverY; g_ratonHoverX = (int)e.motion.x; g_ratonHoverY = (int)e.motion.y; }   // (el cartelito de ayuda)
+        // arrastrar sobre la caja de texto enfocada: selecciona (con el boton apretado desde que se apreto ahi)
+        if ((e.motion.state & SDL_BUTTON_LMASK) && TextFieldMouseArrastrar((int)e.motion.x)) { g_redraw = true; return; }
         if (e.motion.which == SDL_TOUCH_MOUSEID && leftMouseDown && !g_tapMovio) {
             int ddx = (int)e.motion.x - g_tapStartX; if (ddx < 0) ddx = -ddx;
             int ddy = (int)e.motion.y - g_tapStartY; if (ddy < 0) ddy = -ddy;
@@ -1304,8 +1307,21 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (PickPathGuiado() && e.button.button == SDL_BUTTON_RIGHT) { LayoutPickPathCancelar(); GuardarMousePos(); return; }
         // Select Linked / Loop Select guiados (1 click): click DERECHO cancela (el izquierdo lo maneja el pick)
         if (GuiadoUnClickActivo() && e.button.button == SDL_BUTTON_RIGHT) { LayoutGuiadoCancelar(); GuardarMousePos(); return; }
+        // LA CAJA DE TEXTO ENFOCADA: el mouse (o el dedo) pone el cursor ahi, con Shift extiende la seleccion, arrastrar
+        // selecciona y el doble click selecciona todo. El click DERECHO abre el menu del texto (Cortar, Copiar, Pegar,
+        // Seleccionar todo), tambien sobre el codigo del IDE. Con un menu abierto el click es del menu
+        if (!LayoutMenuAbierto()) {
+            if (e.button.button == SDL_BUTTON_LEFT && g_textFieldActivo &&
+                TextFieldMouseAbajo((int)e.button.x, (int)e.button.y, (SDL_GetModState() & KMOD_SHIFT) != 0, e.button.clicks >= 2)) {
+                g_redraw = true; GuardarMousePos(); return;
+            }
+            if (e.button.button == SDL_BUTTON_RIGHT && MenuTextoClickDerecho((int)e.button.x, (int)e.button.y)) {
+                g_redraw = true; GuardarMousePos(); return;
+            }
+        }
         // rename de mesh part / material en curso: click IZQ ACEPTA, click DER CANCELA. Consume el click.
-        if (RenameActivo()) {
+        // (no si el click es del menu del texto: Pegar pega en el nombre)
+        if (RenameActivo() && !MenuTextoAbierto()) {
             if (e.button.button == SDL_BUTTON_LEFT)       RenameCommit();
             else if (e.button.button == SDL_BUTTON_RIGHT) RenameCancel();
             GuardarMousePos();
@@ -1317,7 +1333,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         // edicion numerica por texto: un click en cualquier lado APLICA lo tipeado (no consume el click -> si fue
         // sobre otro campo, ese arranca su propia edicion en el mouse-up).
         // (adentro de un popup que NO es el teclado -otro campo, un boton- tambien se aplica: lo tipeado no se pierde)
-        if (NumEditActivo() && !(clickEnPopup && PopUpActive->EsTeclado())) { NumEditCommit(); NumEditSalirDelPanel(); }
+        if (NumEditActivo() && !MenuTextoAbierto() && !(clickEnPopup && PopUpActive->EsTeclado())) { NumEditCommit(); NumEditSalirDelPanel(); }
         // MODO JUEGO: el click IZQUIERDO sobre el visor (2D o 3D) es del JUEGO
         { extern bool SimActiva();
           // SOLO durante PLAY: el click sobre el visor es del JUEGO. En PAUSA el
@@ -1632,6 +1648,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        if (e.button.button == SDL_BUTTON_LEFT) TextFieldMouseArriba();   // (termina el arrastre que selecciona texto)
         // el dedo sobre un MENU DESPLEGABLE: soltar elige la opcion de abajo (afuera: cierra sin elegir)
         if (LayoutMenuToqueActivo()) {
             LayoutMenuToqueSoltar((int)e.button.x, (int)e.button.y);
@@ -1643,11 +1660,15 @@ void InputUsuarioSDL3(SDL_Event &e){
         // el dedo que abrio el menu contextual con la pulsacion larga: se levanta sin elegir nada (la opcion se toca)
         if (g_view3dMenuLargo) { g_view3dMenuLargo = false; ViewPortClickDown = false; GuardarMousePos(); return; }
         if (g_ideGestoVp) {     // IDE: se solto la lupa / la agarradera (el cursor y la seleccion quedan ahi)
-            g_ideGestoVp->GestoTactilFin();
+            // (la LUPA soltada sin mover el dedo: el menu del texto, como en los telefonos)
+            IDE* ide = g_ideGestoVp;
+            const bool menu = ide->gestoTactil == 1 && !g_tapMovio;
+            ide->GestoTactilFin();
             g_ideGestoVp = NULL;
             leftMouseDown = false;
             ViewPortClickDown = false;
             g_contentTapPending = false;
+            if (menu) MenuTextoIDE(ide, (int)e.button.x, (int)e.button.y);
             GuardarMousePos();
             return;
         }
@@ -1871,10 +1892,19 @@ void InputUsuarioSDL3(SDL_Event &e){
             // (un popup que toma el Enter / Esc de su caja: la ventanita del nombre acepta o cancela de una)
             if ((k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_ESCAPE) && PopUpActive &&
                 PopUpActive->TeclaEnTexto(k != SDLK_ESCAPE)) { g_redraw = true; return; }
+            const bool ctrl = (e.key.keysym.mod & KMOD_CTRL) != 0, shift = (e.key.keysym.mod & KMOD_SHIFT) != 0;
             if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) { NumEditCommit(); NumEditSalirDelPanel(); } else g_textFieldActivo = NULL; }
             else if (k == SDLK_ESCAPE) { if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) { NumEditCancel(); NumEditSalirDelPanel(); } else TextFieldCancelar(); }
-            else if (k == SDLK_LEFT)  { g_textFieldActivo->CaretIzq();  g_redraw = true; }
-            else if (k == SDLK_RIGHT) { g_textFieldActivo->CaretDer();  g_redraw = true; }
+            // EL PORTAPAPELES y TODO (como el IDE): Ctrl+A / Ctrl+C / Ctrl+X / Ctrl+V. Shift + flechas selecciona una
+            // parte; Ctrl + flechas salta palabras; Inicio / Fin
+            else if (ctrl && k == SDLK_a) TextFieldSeleccionarTodo();
+            else if (ctrl && k == SDLK_c) TextFieldCopiar();
+            else if (ctrl && k == SDLK_x) TextFieldCortar();
+            else if (ctrl && k == SDLK_v) TextFieldPegar();
+            else if (k == SDLK_LEFT)  { if (ctrl) g_textFieldActivo->PalabraIzq(shift); else g_textFieldActivo->CaretIzq(shift);  g_redraw = true; }
+            else if (k == SDLK_RIGHT) { if (ctrl) g_textFieldActivo->PalabraDer(shift); else g_textFieldActivo->CaretDer(shift);  g_redraw = true; }
+            else if (k == SDLK_HOME)  { g_textFieldActivo->Inicio(shift); g_redraw = true; }
+            else if (k == SDLK_END)   { g_textFieldActivo->Fin(shift); g_redraw = true; }
             else if (k == SDLK_BACKSPACE) { g_textFieldActivo->Backspace();  g_redraw = true; }
             else if (k == SDLK_DELETE)    { g_textFieldActivo->DelForward(); g_redraw = true; }
             return; // consume el keydown (no cae al viewport)

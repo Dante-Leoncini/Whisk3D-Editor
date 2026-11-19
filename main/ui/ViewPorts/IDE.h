@@ -131,6 +131,9 @@ class IDE : public ViewportBase, public WithBorder, public Scrollable {
         // el resto (acentos, multibyte) se ignora (la fuente pixel del editor es ASCII).
         void TextoTipeado(const char* utf8);
         void ClickContenido(int mx, int my, bool shift); // click posiciona el cursor (coords de ventana)
+        // lo escrito pasa al proyecto: un script nuevo se crea adentro del .w3d (en memoria) y uno de adentro se
+        // actualiza (cada cuadro y al destruirse el IDE). Ver IDE.cpp
+        void SincronizarMemoria();
 
         // ---- LEXER lua por linea. Clasifica CADA caracter de la linea:
         //   0 = normal, 1 = comentario, 2 = string, 3 = keyword, 4 = numero

@@ -1432,6 +1432,10 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         nuevo->pos = src->pos;
         nuevo->SetRotSnapshot(src->Rot(), src->rotEuler);   // copia exacta (con las vueltas del euler)
         nuevo->scale = src->scale;
+        // las banderas del objeto que no son de un tipo: estatico y las sombras en tiempo real
+        nuevo->estatico = src->estatico;
+        nuevo->proyectaSombra = src->proyectaSombra; nuevo->recibeSombra = src->recibeSombra;
+        nuevo->rebotaLuz = src->rebotaLuz; nuevo->captaSombras = src->captaSombras;
         // nombre UNICO (antes pegaba ".001" a mano y duplicar dos veces daba DOS "Cubo.001")
         nuevo->SetNameObj(src->name);
         // EL STACK DE CONSTRAINTS. Va en el bloque COMUN y no en cada rama: es una

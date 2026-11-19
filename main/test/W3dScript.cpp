@@ -44,6 +44,7 @@
 #include "edit/WeightPaint.h"  // wptest: pincel + escritura de pesos (fase 2 weight paint)
 #include "edit/BoneEdit.h"     // bonetest: Edit Mode de huesos (fase 3)
 #include "render/OpcionesRender.h" // bonetest: g_transformPivot (pivote de los R/S de huesos)
+#include "render/SombrasTiempoReal.h"   // el comando "sombras"
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
 #include "input/W3dTactil.h"        // tactiltest: la pantalla tactil del Core (Symbian: dedos -> eventos SDL)
@@ -6476,6 +6477,39 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         g_redraw = true;
         return true;
     }
+    // ---- sombras on|off | dist <m> | cascadas <n> | cortes <a> <b> <c> | borde <m> | desenf <0..1> | res <n> |
+    //      suaves 0|1 | int <0..1> | sesgo <x> | estado : LAS SOMBRAS EN TIEMPO REAL (la tarjeta de la pestania Render) ----
+    if (cmd == "sombras") {
+        std::string q; ss >> q;
+        if (q == "on" || q == "off") g_sombras.on = (q == "on");
+        else if (q == "dist") ss >> g_sombras.distancia;
+        else if (q == "cascadas") { ss >> g_sombras.cascadas; if (g_sombras.cascadas < 1) g_sombras.cascadas = 1; if (g_sombras.cascadas > 4) g_sombras.cascadas = 4; }
+        else if (q == "cortes") ss >> g_sombras.cortes[0] >> g_sombras.cortes[1] >> g_sombras.cortes[2];
+        else if (q == "borde") ss >> g_sombras.borde;
+        else if (q == "desenf") ss >> g_sombras.desenfoque;
+        else if (q == "res") ss >> g_sombras.resolucion;
+        else if (q == "suaves") { int v = 1; ss >> v; g_sombras.suaves = v != 0; }
+        else if (q == "int") ss >> g_sombras.intensidad;
+        else if (q == "sesgo") ss >> g_sombras.sesgo;
+        else if (q == "estado") printf("      [sombras] %s, estado %d, %s\n", g_sombras.on ? "prendidas" : "apagadas", W3dSombrasEstado(),
+                                       W3dSombrasConShaders() ? "cascadas (GPU)" : "proyectada (CPU)");
+        else { err = "sombras: subcomando desconocido '" + q + "'"; return false; }
+        g_redraw = true;
+        return true;
+    }
+    // ---- objsombra proyecta|recibe|rebota|captador 0|1 : las banderas de las sombras (y de la luz precalculada) del
+    //      objeto activo ----
+    if (cmd == "objsombra") {
+        std::string q; int v = 1; ss >> q >> v;
+        if (!ObjActivo) { err = "objsombra: no hay objeto activo"; return false; }
+        if (q == "proyecta") ObjActivo->proyectaSombra = v != 0;
+        else if (q == "recibe") ObjActivo->recibeSombra = v != 0;
+        else if (q == "rebota") ObjActivo->rebotaLuz = v != 0;
+        else if (q == "captador") ObjActivo->captaSombras = v != 0;
+        else { err = "objsombra: proyecta|recibe|rebota|captador"; return false; }
+        g_redraw = true;
+        return true;
+    }
     // ---- matluzind 0|1 : la LUZ INDIRECTA POR VERTICE del material activo (Material::luzIndirecta) ----
     if (cmd == "matluzind") {
         int v = 1; ss >> v;
@@ -6487,8 +6521,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- hornearluz <ancho> <alto> [muestras] : PRECALCULAR LA ILUMINACION de la malla activa en una textura NUEVA de ese
     //      tamano (la tarjeta "Bake Lighting", de una vez): la luz de lo estatico en su capa UV activa ----
+    //      (con [archivo.png] al final, la textura horneada queda escrita ahi para mirarla)
     if (cmd == "hornearluz") {
         int w = 256, h = 256, mu = 32; ss >> w >> h >> mu;
+        std::string salida; ss >> salida;
         Mesh* m = ScriptActiveMesh(); if (!m) { err = "hornearluz: no hay malla activa"; return false; }
         extern std::string W3dCrearTexturaProyecto(const std::string&, int, int, int, const float*, bool, std::string&);
         static const float blanco[4] = { 1, 1, 1, 1 };
@@ -6502,6 +6538,13 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         std::string motivo;
         if (!PropsHorneadoAhora(m, t, -1, mu, &motivo)) { err = "hornearluz: " + motivo; return false; }
         printf("      [hornearluz] '%s' en %dx%d con %d muestras: %u ms\n", m->name.c_str(), w, h, mu, w3dGetTicks() - t0);
+        if (!salida.empty()) {
+            std::vector<unsigned char> png;
+            if (!TexEditPNGActual(t, png)) { err = "hornearluz: no pude codificar la textura"; return false; }
+            FILE* f = fopen(salida.c_str(), "wb");
+            if (!f) { err = "hornearluz: no pude escribir " + salida; return false; }
+            fwrite(&png[0], 1, png.size(), f); fclose(f);
+        }
         return true;
     }
     // ---- mallarep : el agrupamiento de la malla activa (posRep) contra sus posiciones distintas (cuantizadas a 1e-4) ----
@@ -32079,6 +32122,62 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- textoreal <vista> <texto> : texto TIPEADO por la misma puerta que el teclado (SDL_TEXTINPUT), con el foco en
     //      el viewport <vista> (3d uv timeline outliner 2d props ide) ----
+    // ---- evraton abajo|arriba|mover <x> <y> [izq|der] [clicks] : un evento de mouse REAL por la entrada de siempre
+    //      (InputUsuarioSDL3), en coordenadas de la ventana ----
+    if (cmd == "evraton") {
+        std::string q, b = "izq"; int x = 0, y = 0, clicks = 1; ss >> q >> x >> y >> b >> clicks;
+        extern void InputUsuarioSDL3(SDL_Event&);
+        SDL_Event ev; memset(&ev, 0, sizeof(ev));
+        const Uint8 boton = (b == "der") ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        if (q == "mover") { ev.type = SDL_MOUSEMOTION; ev.motion.x = x; ev.motion.y = y; ev.motion.state = SDL_BUTTON_LMASK; }
+        else { ev.type = (q == "abajo") ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP; ev.button.x = x; ev.button.y = y;
+               ev.button.button = boton; ev.button.clicks = (Uint8)clicks; ev.button.state = (q == "abajo") ? SDL_PRESSED : SDL_RELEASED; }
+        InputUsuarioSDL3(ev);
+        if (rootViewport) rootViewport->Render();
+        if (PopUpActive) PopUpActive->Render();
+        return true;
+    }
+    // ---- campo [enfocar-nombre] : el campo de texto ENFOCADO (texto, cursor, seleccion) y donde se dibujo ----
+    if (cmd == "campo") {
+        std::string q; ss >> q;
+        if (q == "nombre") {   // (enfoca la fila Nombre del objeto activo, como tocarla)
+            Properties* P = ScriptProps(); if (!P) { err = "campo: sin panel"; return false; }
+            PropText* pt = NULL;
+            for (size_t g = 0; g < P->GroupProperties.size() && !pt; g++)
+                for (size_t k = 0; k < P->GroupProperties[g]->properties.size(); k++) {
+                    PropertieBase* pb = P->GroupProperties[g]->properties[k];
+                    if (pb->GetType() == PropertyType::Text && pb->name == T("Name")) { pt = (PropText*)pb; break; }
+                }
+            if (!pt) { err = "campo: no encontre la fila Nombre"; return false; }
+            TextFieldEnfocar(&pt->field);
+            if (rootViewport) rootViewport->Render();
+        }
+        if (!g_textFieldActivo) { printf("      [campo] ninguno\n"); return true; }
+        int a = 0, b2 = 0; g_textFieldActivo->Seleccion(a, b2);
+        printf("      [campo] '%s' cursor %d, seleccion %s [%d,%d] '%s'%s\n", g_textFieldActivo->text.c_str(), g_textFieldActivo->caret,
+               g_textFieldActivo->HaySeleccion() ? "si" : "no", a, b2, g_textFieldActivo->Seleccionado().c_str(),
+               g_textFieldActivo->soloLectura ? " (solo lectura)" : "");
+        return true;
+    }
+    // ---- menuver : las opciones del menu desplegable abierto (y donde esta) ----
+    if (cmd == "menuver") {
+        if (!MenuAbierto || !MenuAbierto->abierto) { printf("      [menuver] ninguno\n"); return true; }
+        printf("      [menuver] '%s' en %d,%d (%dx%d):", MenuAbierto->titulo.c_str(), MenuAbierto->x, MenuAbierto->y, MenuAbierto->width, MenuAbierto->height);
+        for (size_t i = 0; i < MenuAbierto->items.size(); i++)
+            printf(" [%s%s]", MenuAbierto->items[i]->text.c_str(), (MenuAbierto->items[i]->gris && !*MenuAbierto->items[i]->gris) ? " gris" : "");
+        printf("\n");
+        return true;
+    }
+    // ---- fbguardarcomo <carpeta> <nombre> <ext> : el explorador de GUARDAR COMO (la barra del nombre); el elegido sale
+    //      en el log ----
+    if (cmd == "fbguardarcomo") {
+        std::string carpeta, nombre, ext; ss >> carpeta >> nombre >> ext;
+        struct Cb { static void Elegido(const std::string& r) { printf("      [fbguardarcomo] elegido '%s'\n", r.c_str()); } };
+        AbrirFileBrowserGuardarComo("Save As...", "Save", ext, nombre, carpeta, Cb::Elegido);
+        if (rootViewport) rootViewport->Render();
+        if (PopUpActive) PopUpActive->Render();
+        return true;
+    }
     if (cmd == "textoreal") {
         std::string vista; ss >> vista;
         std::string t; std::getline(ss, t); while (!t.empty() && t[0] == ' ') t.erase(0, 1);
@@ -34427,8 +34526,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         std::string cual; int abierta = 1; ss >> cual >> abierta;
         Properties* P = ScriptProps();
         if (!P) { err = "propcard: sin panel de propiedades"; return false; }
-        GroupPropertie* g = (cual == "archivo") ? P->propArchivo : (cual == "render") ? P->propRender : NULL;
-        if (!g) { err = "propcard: tarjeta desconocida (archivo|render)"; return false; }
+        GroupPropertie* g = (cual == "archivo") ? P->propArchivo : (cual == "render") ? P->propRender
+                          : (cual == "sombras") ? P->propSombras : NULL;
+        if (!g) { err = "propcard: tarjeta desconocida (archivo|render|sombras)"; return false; }
         g->open = (abierta != 0);
         return true;
     }
