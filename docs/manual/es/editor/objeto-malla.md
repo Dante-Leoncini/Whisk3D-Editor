@@ -39,6 +39,7 @@ Es igual para todos los tipos de objeto: cámaras, luces, esqueletos y sonidos t
 | Recibir sombras | Solo en las mallas: la malla se oscurece donde algo le tapa el sol. Viene tildada. |
 | Rebote de luz | Solo en las mallas, para la [luz precalculada](#precalcular-iluminación) y el render con rayos: la luz que le llega rebota y alumbra lo de alrededor. Destildada, los rayos de luz indirecta le pasan de largo como si no estuviera. Es aparte de **Proyectar sombras**: una malla puede no hacer sombra y que igual le rebote la luz. Viene tildada. |
 | Captador de sombras | Solo en las mallas: la malla **solo recibe** sombras. No tapa la luz ni la rebota, y al precalcular su iluminación la textura sale **blanca**, con solo las sombras y la oclusión ambiental que le caen encima (un piso para apoyar un modelo). |
+| Se ve en las sondas | Solo en las mallas: las [sondas de reflejo](objeto-sonda-reflejo.md) (la horneada y la de tiempo real) y las [sondas de luz](objeto-sonda-luz.md) la ven. Destildada no existe para ellas: sirve para la sonda que va **adentro** de algo, como la de un auto que lo sigue, que si no vería la carrocería por dentro (negro). Viene tildada. |
 
 ### Animación y Paleta
 
@@ -92,7 +93,7 @@ Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a l
 
 | Propiedad | Qué hace |
 |---|---|
-| Textura | Dónde se escribe la luz. Una textura del proyecto, o **Nueva textura…**, que pide su tamaño y su nombre. Sin textura no se puede hornear. Mientras calcula no se muestra (igual que **UV**). |
+| Textura | Dónde se escribe la luz. Una textura del proyecto, o **Nueva textura…**, que pide su tamaño y su nombre. Sin textura no se puede hornear. Cada objeto recuerda la suya (al principio, la de su luz ya horneada). Si esa textura ya tiene la luz de **otro** objeto, avisa: hornear ahí pisa donde se cruzan sus UV. Mientras calcula no se muestra (igual que **UV**). |
 | UV | La capa UV de la malla que dice dónde cae cada cara en la textura. Conviene una capa propia, sin caras encimadas (por ejemplo "IluminacionUV"). |
 | Luz indirecta | La luz que rebota: la del fondo y la que rebota en lo que hay alrededor. Apagada, solo las lámparas y sus sombras. |
 | Muestras | Cuántos rayos de luz indirecta se tiran por cada píxel. Más muestras, menos granulado, más tiempo. |
@@ -102,7 +103,7 @@ Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a l
 
 Solo se pisan los píxeles de las caras de la malla en esa UV (y dos de margen alrededor); el resto de la textura queda como estaba. Se puede deshacer con Ctrl+Z.
 
-Al terminar, la textura queda como **capa de textura de luz horneada** (mezcla *Multiply 2x*, con esa UV) en todos los materiales de la malla. Mientras esa capa esté prendida, el material no usa la luz de tiempo real (la luz ya está en la textura y se sumaría dos veces); si sacás o apagás la capa, vuelve la luz de siempre. Si movés una lámpara o un objeto estático, volvé a hornear.
+Al terminar, la textura queda como **capa de textura de luz horneada** (mezcla *Multiply 2x*, con esa UV) en todos los materiales de la malla, y **reemplaza** la luz que tenían horneada en otra textura (no se multiplican las dos). Mientras esa capa esté prendida, el material no usa la luz de tiempo real (la luz ya está en la textura y se sumaría dos veces); si sacás o apagás la capa, vuelve la luz de siempre. Si movés una lámpara o un objeto estático, volvé a hornear.
 
 Los objetos **no estáticos** (los que se mueven) no se hornean: toman la luz de una [Sonda de luz](objeto-sonda-luz.md).
 

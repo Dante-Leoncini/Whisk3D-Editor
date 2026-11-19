@@ -1050,6 +1050,7 @@ void SetPosicion(){
 #include "PostprocesoObj.h" // idem Postproceso
 #include "Hitbox.h"  // W3dDuplicarUno: copiar tamano/centro/etiqueta/filtro del hitbox
 #include "SondaLuz.h"  // W3dDuplicarUno: la caja, la grilla y la luz horneada de la sonda de luz
+#include "SondaReflejo.h"  // W3dDuplicarUno: la sonda de reflejo
 #include "InstanciaPrefab.h" // W3dDuplicarUno: otra instancia del mismo prefab (con sus overrides)
 #include "ProxyW3d.h"        // W3dDuplicarUno: otro proxy del mismo elemento de la libreria
 #include "io/Prefabs.h"      // ...que genera lo suyo
@@ -1268,6 +1269,9 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
     else if (src->getType() == ObjectType::sondaluz) {
         nuevo = SondaLuzDuplicar((SondaLuz*)src);   // (la caja, la grilla y la luz horneada)
     }
+    else if (src->getType() == ObjectType::sondareflejo) {
+        nuevo = SondaReflejoDuplicar((SondaReflejo*)src);   // (la caja, la captura y su imagen 360)
+    }
     else if (src->getType() == ObjectType::rutina) {
         // RUTINA: las listas y que lista usa cada modo (los punteros se vuelven a resolver: sucia)
         Rutina* s = (Rutina*)src;
@@ -1435,7 +1439,7 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         // las banderas del objeto que no son de un tipo: estatico y las sombras en tiempo real
         nuevo->estatico = src->estatico;
         nuevo->proyectaSombra = src->proyectaSombra; nuevo->recibeSombra = src->recibeSombra;
-        nuevo->rebotaLuz = src->rebotaLuz; nuevo->captaSombras = src->captaSombras;
+        nuevo->rebotaLuz = src->rebotaLuz; nuevo->captaSombras = src->captaSombras; nuevo->enSondas = src->enSondas;
         // nombre UNICO (antes pegaba ".001" a mano y duplicar dos veces daba DOS "Cubo.001")
         nuevo->SetNameObj(src->name);
         // EL STACK DE CONSTRAINTS. Va en el bloque COMUN y no en cada rama: es una

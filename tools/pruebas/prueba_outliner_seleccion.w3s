@@ -168,7 +168,7 @@ outfilas n 3
 outclick Cubo
 outclick Cubo.002 ctrl
 outmenu Select Users
-outvista es escena
+outvista es mallas
 seleccion n 3 tiene Cubo tiene Cubo.001 tiene Cubo.002
 
 # ---- G) CARPETAS que se MUEVEN adentro de otras ----

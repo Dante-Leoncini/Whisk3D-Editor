@@ -124,8 +124,8 @@ void OlvidarTexturasPendientes();
 // no las espera y el juego compilado no las carga nunca. Sus RUTAS siguen siendo del material: el
 // guardado las escribe (TexturaPendienteRefDe + TexturasDormidasDe), el outliner por recursos las
 // cuenta como usuarios y el rename de una textura las sigue.
-struct TexCapaDormida { std::string textura; int mezcla; int uv; bool on; float fuerza; bool horneada;
-                        TexCapaDormida() : mezcla(0), uv(0), on(true), fuerza(1.0f), horneada(false) {} };
+struct TexCapaDormida { std::string textura; int mezcla; int uv; bool on; float fuerza; bool horneada; bool mascaraSol;
+                        TexCapaDormida() : mezcla(0), uv(0), on(true), fuerza(1.0f), horneada(false), mascaraSol(false) {} };
 struct TexDormida {
     Material* mat;
     std::string base;                    // "" = sin textura base

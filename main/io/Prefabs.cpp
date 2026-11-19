@@ -465,6 +465,13 @@ void W3dPrefabAplicarOverrides(InstanciaPrefab* ip) {
     }
     for (std::map<std::string, std::string>::const_iterator it = ip->overProps.begin(); it != ip->overProps.end(); ++it)
         for (size_t i = 0; i < ip->Childrens.size(); i++) PonerPropRec(ip->Childrens[i], it->first, it->second);
+    // los CAMPOS (posicion, rotacion, escala, las casillas) cambiados en este proyecto
+    for (std::map<std::string, std::map<std::string, float> >::const_iterator it = ip->overCampos.begin(); it != ip->overCampos.end(); ++it) {
+        Object* n = W3dJerNodo(raiz, it->first);
+        if (n) W3dCamposInstPoner(n, it->second);
+        else if (!RutaPorAnidadaDescargada(raiz, it->first))
+            w3dLogfW("[prefabs] '%s': el override de '%s' no encuentra ese hijo", ip->name.c_str(), it->first.c_str());
+    }
 }
 
 void W3dPrefabOverrideProp(InstanciaPrefab* ip, const std::string& prop, const std::string& valor) {
@@ -489,6 +496,7 @@ static void JuntarScope(Object* o, std::vector<Object*>& out) {
 static InstanciaBase BaseDe(Object* o, Object* raiz) {
     InstanciaBase b;
     b.o = o; b.serial = o->serial; b.visible = o->visible;
+    for (int k = 0; k < W3D_CAMPOS_INST; k++) b.campos[k] = W3dCampoInstLeer(o, k);
     if (raiz) b.ruta = W3dJerRuta(raiz, o);
     if (o->scriptDatos)
         for (size_t k = 0; k < o->scriptDatos->scripts.size(); k++) {
@@ -532,6 +540,19 @@ static bool ValorDe(const std::vector<std::pair<std::string, std::string> >& ref
     return false;
 }
 // 'o' lo genero 'ip' (directamente, o una instancia anidada adentro de lo que genero)?
+bool W3dPrefabCampoAlterado(Object* o, int k) {
+    if (!o || k < 0 || k >= W3D_CAMPOS_INST) return false;
+    // (la instancia de AFUERA de todo: su base tiene todo lo que genera, tambien lo de las anidadas)
+    Object* top = W3dInstanciaDe(o);
+    if (!top) return false;
+    for (Object* i = W3dInstanciaDe(top); i; i = W3dInstanciaDe(i)) top = i;
+    const InstanciaPrefab* ip = (const InstanciaPrefab*)top;
+    for (size_t i = 0; i < ip->base.size(); i++) {
+        const InstanciaBase& b = ip->base[i];
+        if (b.o == o && b.serial == o->serial) return W3dCampoInstLeer(o, k) != b.campos[k];
+    }
+    return false;
+}
 static bool GeneradoPor(const Object* o, const InstanciaPrefab* ip) {
     for (Object* i = W3dInstanciaDe(o); i; i = W3dInstanciaDe(i)) if (i == (const Object*)ip) return true;
     return false;
@@ -555,6 +576,7 @@ bool W3dPrefabSincronizarOverrides(InstanciaPrefab* ip) {
     Object* raiz = ip->RaizGenerada();
     std::map<std::string, bool> vis;
     std::map<std::string, std::string> props;
+    std::map<std::string, std::map<std::string, float> > campos;
     for (size_t i = 0; i < ip->base.size(); i++) {
         const InstanciaBase& b = ip->base[i];
         if (!W3dObjetoVivoSerial(b.o, b.serial)) {
@@ -564,6 +586,8 @@ bool W3dPrefabSincronizarOverrides(InstanciaPrefab* ip) {
             if (!b.ruta.empty()) {
                 std::map<std::string, bool>::const_iterator ov = ip->overVisible.find(b.ruta);
                 if (ov != ip->overVisible.end()) vis[ov->first] = ov->second;
+                std::map<std::string, std::map<std::string, float> >::const_iterator oc = ip->overCampos.find(b.ruta);
+                if (oc != ip->overCampos.end()) campos[oc->first] = oc->second;
             }
             for (size_t k = 0; k < b.refs.size(); k++)
                 for (size_t r = 0; r < b.refs[k].size(); r++) {
@@ -576,6 +600,24 @@ bool W3dPrefabSincronizarOverrides(InstanciaPrefab* ip) {
         if (b.o->visible != b.visible && raiz) {
             const std::string ruta = W3dJerRuta(raiz, b.o);
             if (!ruta.empty()) vis[ruta] = b.o->visible;
+        }
+        // los CAMPOS que difieren de como se genero (lo que se cambio en este proyecto). Lo que mueve una ANIMACION (el
+        // playhead lo poso) o el JUEGO corriendo no es un cambio del usuario: esos campos quedan como estaban
+        if (raiz) {
+            const std::string ruta = W3dJerRuta(raiz, b.o);
+            const bool movido = b.o->posadoPorCurvas || b.o->posadoPorClip || (AnimEsJuego && PlayAnimation);
+            std::map<std::string, std::map<std::string, float> >::const_iterator antes = ip->overCampos.find(ruta);
+            for (int k = 0; k < W3D_CAMPOS_INST && !ruta.empty(); k++) {
+                if (movido && k < 10) {   // (la transformacion y Renderizable: lo que escriben los clips)
+                    if (antes != ip->overCampos.end()) {
+                        std::map<std::string, float>::const_iterator c = antes->second.find(W3dCampoInstNombre(k));
+                        if (c != antes->second.end()) campos[ruta][c->first] = c->second;
+                    }
+                    continue;
+                }
+                const float v = W3dCampoInstLeer(b.o, k);
+                if (v != b.campos[k]) campos[ruta][W3dCampoInstNombre(k)] = v;
+            }
         }
         if (!b.o->scriptDatos) continue;
         const std::vector<W3dScriptEntrada>& scripts = b.o->scriptDatos->scripts;
@@ -595,13 +637,16 @@ bool W3dPrefabSincronizarOverrides(InstanciaPrefab* ip) {
     if (raiz) {
         for (std::map<std::string, bool>::const_iterator it = ip->overVisible.begin(); it != ip->overVisible.end(); ++it)
             if (!vis.count(it->first) && RutaPorAnidadaDescargada(raiz, it->first)) vis[it->first] = it->second;
+        for (std::map<std::string, std::map<std::string, float> >::const_iterator it = ip->overCampos.begin(); it != ip->overCampos.end(); ++it)
+            if (!campos.count(it->first) && RutaPorAnidadaDescargada(raiz, it->first)) campos[it->first] = it->second;
         if (TieneAnidadaDescargada(ip))
             for (std::map<std::string, std::string>::const_iterator it = ip->overProps.begin(); it != ip->overProps.end(); ++it)
                 if (!props.count(it->first)) props[it->first] = it->second;
     }
-    const bool cambio = (vis != ip->overVisible) || (props != ip->overProps);
+    const bool cambio = (vis != ip->overVisible) || (props != ip->overProps) || (campos != ip->overCampos);
     ip->overVisible.swap(vis);
     ip->overProps.swap(props);
+    ip->overCampos.swap(campos);
     return cambio;
 }
 

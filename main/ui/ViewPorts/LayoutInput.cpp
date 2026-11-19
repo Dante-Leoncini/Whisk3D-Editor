@@ -59,6 +59,7 @@
 #include "objects/PostprocesoObj.h" // Add > Post Processing
 #include "objects/Hitbox.h"  // Add > Hitbox (caja de deteccion con eventos lua)
 #include "objects/SondaLuz.h"   // Add > Light Probe
+#include "objects/SondaReflejo.h"   // Add > Reflection Probe
 #include "io/PrefabsEditor.h"   // Add > Prefab (una instancia en el cursor 3D) + "Create Prefab" / "Unpack"
 #include "objects/InstanciaPrefab.h"
 #include "objects/ProxyW3d.h"   // Add > Proxy W3D (un prefab o una escena de una libreria externa)
@@ -962,6 +963,9 @@ void AddFisica(){
 // Con un objeto 3D ACTIVO nace como su HIJO y del tamano de sus mallas (el trigger de una
 // puerta, el sensor de un enemigo); sin activo, suelta en el cursor 3D con el cubo unitario.
 // ---- Add > Light Probe: la sonda de luz (objects/SondaLuz.h), en el cursor 3D. Se hornea desde su tarjeta ----
+void AddSondaReflejo(){   // la sonda de reflejo (objects/SondaReflejo.h): se hornea desde su tarjeta
+    TrasCrearAdd(new SondaReflejo(NULL, cursor3D.pos));
+}
 void AddSondaLuz(){
     TrasCrearAdd(new SondaLuz(NULL, cursor3D.pos));
 }
@@ -1206,6 +1210,7 @@ static const MenuDef ADD_LUCES[] = {
     { "Sun",         AddLuzSol,         NULL, ICONO(IconType::light) },
     { "Spot",        AddLuzFoco,        NULL, ICONO(IconType::light) },
     { "Light Probe", AddSondaLuz,       NULL, ICONO(IconType::esfera) },
+    { "Reflection Probe", AddSondaReflejo, NULL, ICONO(IconType::foto) },
 };
 
 // EL MENU ADD, de una mirada: texto + accion + icono por fila. Agregar una primitiva = una linea en

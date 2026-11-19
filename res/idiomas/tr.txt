@@ -55,6 +55,7 @@
 2D Editor	2D Düzenleyici
 2D armature animation: the mesh has no 2D armature	2D iskelet animasyonu: örgünün 2D iskeleti yok
 2D bone(s)	2D kemik
+360 Image	360 görüntü
 3D Cursor	3D İmleç
 3D Mesh	3D Örgü
 3D Mesh of	3D Örgü:
@@ -63,6 +64,7 @@
 3D grid	3D ızgara
 : baked	: pişirildi
 A W3D proxy is read-only: it can't be unpacked	W3D proxy salt okunur: paketten çıkarılamaz
+A custom probe uses the image you choose	Özel sonda seçtiğiniz görüntüyü kullanır
 A different file already exists there	Orada farklı bir dosya zaten var
 A flipbook uses it	Bir flipbook kullanıyor
 A game has no animation to render	Oyunun render alınacak animasyonu yok
@@ -71,6 +73,7 @@ A prefab can't be converted	Prefab dönüştürülemez
 A prefab can't contain itself	Prefab kendini içeremez
 A prefab instance only has what its prefab generates	Prefab örneği yalnızca prefabının ürettiklerini içerir
 A project needs at least one scene	Projenin en az bir sahnesi olmalı
+A realtime probe is drawn by the GPU	Gerçek zamanlı probu GPU çizer
 A resource with that name already exists	Bu adda bir kaynak zaten var
 A scene can't contain itself	Sahne kendini içeremez
 A scene with that name already existed, renamed:	Bu adda bir sahne zaten vardı, yeni adı:
@@ -209,12 +212,16 @@ Back	Arka
 Back (overshoot)	Geri tepme
 Back View	Arka görünüm
 Background	Arka plan
+Background Color	Renkli arka plan
 Background light	Arka plan ışığı
 Bake	Pişir
 Bake Lighting	Aydınlatmayı pişir
 Bake canceled	Pişirme iptal edildi
+Bake the reflection probe first	Önce yansıma sondasını hesaplayın
+Baked	Önceden hesaplanmış
 Baked: %d points	Pişirildi: %d nokta
 Bakes the light of the static objects into the texture, through the UV of the mesh	Statik nesnelerin ışığını, ağın UV'si üzerinden dokuya pişirir
+Baking here overwrites where their UVs overlap	Burada hesaplamak UV'lerin çakıştığı yerlerin üzerine yazar
 Base Color	Temel Renk
 Base velocity	Temel hız
 Before Mode	Önceki mod
@@ -260,6 +267,7 @@ Bounce	Sekme
 Bounces	Sekmeler
 Boundary	Sınır
 Box (memory)	Kutu (bellek)
+Box Projection	Kutu izdüşümü
 Box Select	Kutu Seçimi
 Box X	Kutu X
 Box Y	Kutu Y
@@ -405,11 +413,13 @@ Convert to Game	Oyuna dönüştür
 Convert to Scene	Sahneye dönüştür
 Convert to editable mesh	Düzenlenebilir örgüye dönüştür
 Copied	Kopyalandı
+Copied to %d selected object(s)	%d seçili nesneye kopyalandı
 Copy	Kopyala
 Copy Keyframe	Anahtar kareyi kopyala
 Copy X	X Kopyala
 Copy Y	Y Kopyala
 Copy Z	Z Kopyala
+Copy to Selected	Seçilenlere kopyala
 Copying libmain.so (jniLibs)	libmain.so kopyalanıyor (jniLibs)
 Copying results	Sonuçlar kopyalanıyor
 Copying the Android template	Android şablonu kopyalanıyor
@@ -417,6 +427,7 @@ Core (advanced)	Çekirdek (gelişmiş)
 Correct UVs	UV'leri Düzelt
 Could not copy the objects	Nesneler kopyalanamadı
 Could not create a viewport on the external display: cloning the screen	Harici ekranda görünüm oluşturulamadı: ekran klonlanıyor
+Could not create the texture	Doku oluşturulamadı
 Could not encode the PNG	PNG kodlanamadı
 Could not extract	Çıkarılamadı
 Could not import	İçe aktarılamadı
@@ -792,6 +803,7 @@ Import STL	STL İçe Aktar
 Import glTF	glTF İçe Aktar
 Import w3dui	w3dui İçe Aktar
 Import...	İçe aktar...
+Importance	Önem
 Imported	İçe aktarıldı
 Importing FBX...	FBX içe aktarılıyor...
 Importing glTF...	glTF içe aktarılıyor...
@@ -837,6 +849,7 @@ Interpolation: Constant	Enterpolasyon: sabit
 Interpolation: Linear	Enterpolasyon: doğrusal
 Intersect	Kesişim
 Intersection Type	Kesişim türü
+Invalid size	Geçersiz boyut
 Inverse Square	Ters kare
 Invert	Tersine çevir
 Invert Selection	Seçimi tersine çevir
@@ -1080,6 +1093,7 @@ Near	Yakın
 Near fade from	Yakın solma başı
 Near fade to	Yakın solma sonu
 Nearest (pixelated)	En yakın (pikselli)
+Nearest probe (automatic)	En yakın sonda (otomatik)
 Network access	Ağ erişimi
 New	Yeni
 New Animation	Yeni Animasyon
@@ -1290,6 +1304,7 @@ Patch	Yama
 Path	Yol
 Pause	Duraklat
 Pencil+Up	Kalem+Yukarı
+Penumbra	Yarı gölge
 Per Pixel Shading	Piksel Başına Gölgeleme
 Per Vertex Shading	Köşe Başına Gölgeleme
 Per pixel	Piksel başına
@@ -1350,6 +1365,9 @@ Previous Keyframe	Önceki Anahtar
 Previous frame	Önceki kare
 Previous keyframe	Önceki anahtar kare
 Primitive	İlkel
+Probe Origin X	Orijin X
+Probe Origin Y	Orijin Y
+Probe Origin Z	Orijin Z
 Profile Shape	Profil şekli
 Profile Type	Profil türü
 Project	Proje
@@ -1394,8 +1412,10 @@ Ray Tracing	Işın İzleme
 Ray traced motion blur	Işın izlemeli bulanıklık
 Rays	Işınlar
 Real-time shadows	Gerçek zamanlı gölgeler
+Realtime	Gerçek zamanlı
 Recalculate	Yeniden hesapla
 Recalculate Normals	Normalleri Yeniden Hesapla
+Recalculated by the editor (the game uses the last one)	Düzenleyici yeniden hesaplar (oyun sonuncuyu kullanır)
 Receive shadows	Gölge al
 Recent files	Son dosyalar
 Rectangle	Dikdörtgen
@@ -1404,6 +1424,9 @@ Redo	Yinele
 Reference	Referans
 Reflect children	Alt öğeleri yansıt
 Reflection	Yansıma
+Reflection Probe	Yansıma sondası
+Reflection Probes	Yansıma sondaları
+Reflection probe baked (%u ms)	Yansıma sondası hesaplandı (%u ms)
 Refresh	Yenile
 Refresh:	Yenile:
 Relationship Lines	İlişki Çizgileri
@@ -1599,6 +1622,7 @@ Shader of	Shader:
 Shaders	Shader'lar
 Shading	Gölgeleme
 Shadow catcher	Gölge yakalayıcı
+Shadow color	Gölge rengi
 Shadow strength	Yoğunluk
 Shape	Şekil
 Shape keys	Şekil anahtarları
@@ -1780,6 +1804,7 @@ The library isn't linked	Kütüphane bağlantılı değil
 The library's proyecto.json can't be read	Kütüphanenin proyecto.json dosyası okunamıyor
 The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	'%s' ışığı yüklenmedi: sahnede zaten en fazla sayıda ışık var (%d).
 The list of All	Tümü'nün listesi
+The material is shared with other objects: this one got its own copy	Malzeme başka nesnelerle paylaşılıyor: bu nesne kendi kopyasını aldı
 The mesh '%s' (no objects) could not be read: saving without it	'%s' örgüsü (nesnesiz) okunamadı: onsuz kaydediliyor
 The mesh has no UV	Ağın UV'si yok
 The mesh has no faces	Ağın yüzü yok
@@ -1817,6 +1842,7 @@ This resource can't be renamed	Bu kaynak yeniden adlandırılamaz
 This resource type can't be deleted	Bu kaynak türü silinemez
 This resource type can't be duplicated	Bu kaynak türü çoğaltılamaz
 This step has nothing to animate	Bu adımda canlandırılacak bir şey yok
+This texture already has the baked light of	Bu doku zaten şunun önceden hesaplanmış ışığını içeriyor
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Bu işlem köşe gruplarını değiştirip köşe başına 1 kemiğe indirger (daha hızlı skinning). Bazı veriler kaybolabilir.
 Threshold	Eşik
 Timeline	Zaman Çizelgesi
@@ -1888,6 +1914,7 @@ Unwrap Conformal	Açılım (Konformal)
 Unwrap Minimum Stretch	Açılım (En Az Germe)
 Unwrap: closed surface, mark seams first	Açılım: kapalı yüzey, önce dikiş işaretleyin
 Unwrap: select faces first	Açılım: önce yüzleri seçin
+Update every	Şu sürede güncelle
 Upright (does not tilt)	Dik (eğilmez)
 Upscaler	Büyütücü
 Upscaling	Büyütme
@@ -1908,6 +1935,7 @@ Use this file	Bu dosyayı kullan
 Use this folder	Bu klasörü kullan
 Users	Kullanıcılar
 Users selected	Seçilen kullanıcılar
+Uses the 360 image you choose	Seçtiğiniz 360 görüntüyü kullanır
 V Location	V Konumu
 Value	Değer
 Value Y	Değer Y
@@ -1939,6 +1967,7 @@ Viewport	Görünüm
 Visibility icons	Görünürlük simgeleri
 Visibility test	Görünürlük testi
 Visible	Görünür
+Visible in probes	Problarda görünür
 Volume	Ses düzeyi
 Volume line	Ses düzeyi çizgisi
 Wait for the build to finish	Derlemenin bitmesini bekleyin

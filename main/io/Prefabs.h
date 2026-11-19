@@ -80,6 +80,9 @@ void W3dPrefabAplicarOverrides(InstanciaPrefab* ip);
 // instancia), la tarjeta de la instancia (para contarlos) y todo lo que regenera o copia una instancia (antes de
 // soltar lo generado: regenerar, Shift+D, cambiar el prefab). true = cambiaron
 bool W3dPrefabSincronizarOverrides(InstanciaPrefab* ip);
+// el campo 'k' (W3dCampoInstNombre) de un objeto GENERADO por una instancia o un proxy difiere de como lo genero: lo
+// cambio este proyecto (un override). Propiedades lo pinta de amarillo. false = no es generado o esta como vino
+bool W3dPrefabCampoAlterado(Object* o, int k);
 // un override de PROPIEDAD de script: lo anota en la instancia y lo escribe en todos sus scripts que la
 // declaran. "" = quitarlo (vuelve el valor del prefab al regenerar)
 void W3dPrefabOverrideProp(InstanciaPrefab* ip, const std::string& prop, const std::string& valor);

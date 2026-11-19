@@ -96,11 +96,16 @@ Sobre un número, una casilla o un color se abre un menú con el nombre de la fi
 | Restablecer | Vuelve al valor de fábrica: la posición y la rotación en 0, la escala en 1, **Visible** y **Renderizable** tildadas. En las filas que no tienen un valor de fábrica queda en gris. |
 | Copiar | Guarda el valor. Un número también va al portapapeles del sistema, para pegarlo en otra aplicación. |
 | Pegar | Pone el valor copiado en una fila del mismo tipo. En un número también pega uno copiado de otra aplicación. |
+| Copiar a los seleccionados | Pone ese valor en los **otros objetos seleccionados**, en la misma fila: tildar **Estático** en veinte objetos de una vez, darles la misma escala o la misma altura. Aparece si hay más de un objeto seleccionado y el valor es del objeto (su transformación, las casillas de la pestaña Objeto, lo de su luz o su cámara). Lo que es de un tipo (una luz) va solo a los del mismo tipo. Se deshace con <kbd>Ctrl+Z</kbd>, todo junto. |
 | Insertar keyframe | Guarda el valor en el cuadro actual (si ya había un keyframe ahí, lo actualiza). |
 | Borrar todos los keyframes | Saca toda la animación de ese valor; el valor de ahora queda. |
 | Copiar keyframe / Pegar keyframe | Copia el keyframe del cuadro actual y lo pega en el cuadro actual, en la misma fila o en otra. |
 
 Las cuatro de animación, separadas con una línea, aparecen solo en las filas que se pueden animar (las que tienen el rombo).
+
+### Los valores en amarillo
+
+En un objeto que trae un [Proxy W3D](modo-objeto.md#proxy-w3d) o una instancia de un prefab, un número o una casilla en **amarillo** es un valor **cambiado en este proyecto**: no es el del original. Se guarda en este proyecto (el original no se toca) y vuelve cada vez que se abre. Se pueden cambiar así la posición, la rotación, la escala y las casillas de la pestaña Objeto (Renderizable, Estático, las sombras, Rebote de luz, Captador de sombras, Se ve en las sondas); el ojo del Outliner y las propiedades de sus scripts también.
 
 | | Cómo se abre |
 |---|---|

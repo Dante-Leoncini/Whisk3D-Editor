@@ -55,6 +55,7 @@
 2D Editor	Edytor 2D
 2D armature animation: the mesh has no 2D armature	Animacja szkieletu 2D: siatka nie ma szkieletu 2D
 2D bone(s)	kość(i) 2D
+360 Image	Obraz 360
 3D Cursor	Kursor 3D
 3D Mesh	Siatka 3D
 3D Mesh of	Siatka 3D obiektu
@@ -63,6 +64,7 @@
 3D grid	Kratka 3D
 : baked	: wypalone
 A W3D proxy is read-only: it can't be unpacked	Proxy W3D jest tylko do odczytu: nie można go rozpakować
+A custom probe uses the image you choose	Własna sonda używa wybranego obrazu
 A different file already exists there	Jest tam już inny plik
 A flipbook uses it	W użyciu przez flipbook
 A game has no animation to render	Gra nie ma animacji do renderowania
@@ -71,6 +73,7 @@ A prefab can't be converted	Prefabu nie można przekonwertować
 A prefab can't contain itself	Prefab nie może zawierać samego siebie
 A prefab instance only has what its prefab generates	Instancja prefabu ma tylko to, co generuje jej prefab
 A project needs at least one scene	Projekt potrzebuje co najmniej jednej sceny
+A realtime probe is drawn by the GPU	Sondę czasu rzeczywistego rysuje GPU
 A resource with that name already exists	Zasób o tej nazwie już istnieje
 A scene can't contain itself	Scena nie może zawierać samej siebie
 A scene with that name already existed, renamed:	Scena o tej nazwie już istniała, nowa nazwa:
@@ -209,12 +212,16 @@ Back	Tył
 Back (overshoot)	Cofnięcie
 Back View	Widok z tyłu
 Background	Tło
+Background Color	Kolorowe tło
 Background light	Światło tła
 Bake	Wypal
 Bake Lighting	Wypal oświetlenie
 Bake canceled	Wypalanie anulowane
+Bake the reflection probe first	Najpierw wypal sondę odbić
+Baked	Wypalona
 Baked: %d points	Wypalona: punkty %d
 Bakes the light of the static objects into the texture, through the UV of the mesh	Wypala światło obiektów statycznych w teksturze, przez UV siatki
+Baking here overwrites where their UVs overlap	Wypalanie tutaj nadpisze miejsca, gdzie ich UV się nakładają
 Base Color	Kolor bazowy
 Base velocity	Prędkość bazowa
 Before Mode	Tryb przed
@@ -260,6 +267,7 @@ Bounce	Odbijanie
 Bounces	Odbicia
 Boundary	Granica
 Box (memory)	Pudełko (pamięć)
+Box Projection	Projekcja pudełkowa
 Box Select	Zaznaczanie prostokątem
 Box X	Pudełko X
 Box Y	Pudełko Y
@@ -405,11 +413,13 @@ Convert to Game	Konwertuj na grę
 Convert to Scene	Konwertuj na scenę
 Convert to editable mesh	Konwertuj na edytowalną siatkę
 Copied	Skopiowano
+Copied to %d selected object(s)	Skopiowano do %d zaznaczonych obiektów
 Copy	Kopiuj
 Copy Keyframe	Kopiuj klatkę kluczową
 Copy X	Kopiuj X
 Copy Y	Kopiuj Y
 Copy Z	Kopiuj Z
+Copy to Selected	Kopiuj do zaznaczonych
 Copying libmain.so (jniLibs)	Kopiowanie libmain.so (jniLibs)
 Copying results	Kopiowanie wyników
 Copying the Android template	Kopiowanie szablonu Android
@@ -417,6 +427,7 @@ Core (advanced)	Rdzeń (zaawansowane)
 Correct UVs	Popraw UV
 Could not copy the objects	Nie udało się skopiować obiektów
 Could not create a viewport on the external display: cloning the screen	Nie udało się utworzyć widoku na ekranie zewnętrznym: klonowanie ekranu
+Could not create the texture	Nie udało się utworzyć tekstury
 Could not encode the PNG	Nie udało się zakodować PNG
 Could not extract	Nie udało się wyodrębnić
 Could not import	Nie udało się zaimportować
@@ -792,6 +803,7 @@ Import STL	Importuj STL
 Import glTF	Importuj glTF
 Import w3dui	Importuj w3dui
 Import...	Importuj...
+Importance	Ważność
 Imported	Zaimportowano
 Importing FBX...	Importowanie FBX...
 Importing glTF...	Importowanie glTF...
@@ -837,6 +849,7 @@ Interpolation: Constant	Interpolacja: stała
 Interpolation: Linear	Interpolacja: liniowa
 Intersect	Przecięcie
 Intersection Type	Typ przecięcia
+Invalid size	Nieprawidłowy rozmiar
 Inverse Square	Odwrotny kwadrat
 Invert	Odwróć
 Invert Selection	Odwróć zaznaczenie
@@ -1080,6 +1093,7 @@ Near	Blisko
 Near fade from	Blisko: niewidoczne do
 Near fade to	Blisko: w pełni od
 Nearest (pixelated)	Najbliższy (pikselowy)
+Nearest probe (automatic)	Najbliższa sonda (automatycznie)
 Network access	Dostęp do sieci
 New	Nowy
 New Animation	Nowa animacja
@@ -1290,6 +1304,7 @@ Patch	Łatka
 Path	Ścieżka
 Pause	Pauza
 Pencil+Up	Ołówek+Góra
+Penumbra	Półcień
 Per Pixel Shading	Cieniowanie na piksel
 Per Vertex Shading	Cieniowanie na wierzchołek
 Per pixel	Na piksel
@@ -1350,6 +1365,9 @@ Previous Keyframe	Poprzednia klatka kluczowa
 Previous frame	Poprzednia klatka
 Previous keyframe	Poprzednia klatka kluczowa
 Primitive	Prymityw
+Probe Origin X	Początek X
+Probe Origin Y	Początek Y
+Probe Origin Z	Początek Z
 Profile Shape	Kształt profilu
 Profile Type	Typ profilu
 Project	Projekt
@@ -1394,8 +1412,10 @@ Ray Tracing	Śledzenie promieni
 Ray traced motion blur	Rozmycie ruchu (RT)
 Rays	Promienie
 Real-time shadows	Cienie w czasie rzeczywistym
+Realtime	Czas rzeczywisty
 Recalculate	Przelicz
 Recalculate Normals	Przelicz normalne
+Recalculated by the editor (the game uses the last one)	Przeliczana przez edytor (gra używa ostatniej)
 Receive shadows	Odbieraj cienie
 Recent files	Ostatnie pliki
 Rectangle	Prostokąt
@@ -1404,6 +1424,9 @@ Redo	Ponów
 Reference	Odniesienie
 Reflect children	Odbijaj dzieci
 Reflection	Odbicie
+Reflection Probe	Sonda odbić
+Reflection Probes	Sondy odbić
+Reflection probe baked (%u ms)	Sonda odbić wypalona (%u ms)
 Refresh	Odśwież
 Refresh:	Odśwież:
 Relationship Lines	Linie relacji
@@ -1599,6 +1622,7 @@ Shader of	Shader materiału
 Shaders	Shadery
 Shading	Cieniowanie
 Shadow catcher	Łapacz cieni
+Shadow color	Kolor cienia
 Shadow strength	Intensywność
 Shape	Kształt
 Shape keys	Klucze kształtu
@@ -1780,6 +1804,7 @@ The library isn't linked	Biblioteka nie jest powiązana
 The library's proyecto.json can't be read	Nie można odczytać proyecto.json biblioteki
 The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	Nie wczytano światła '%s': scena ma już maksymalną liczbę świateł (%d).
 The list of All	Lista trybu Wszystko
+The material is shared with other objects: this one got its own copy	Materiał jest współdzielony z innymi obiektami: ten dostał własną kopię
 The mesh '%s' (no objects) could not be read: saving without it	Nie udało się odczytać siatki '%s' (bez obiektów): zapis bez niej
 The mesh has no UV	Siatka nie ma UV
 The mesh has no faces	Siatka nie ma ścian
@@ -1817,6 +1842,7 @@ This resource can't be renamed	Nie można zmienić nazwy tego zasobu
 This resource type can't be deleted	Nie można usunąć tego typu zasobu
 This resource type can't be duplicated	Nie można duplikować tego typu zasobu
 This step has nothing to animate	Ten krok nie ma nic do animowania
+This texture already has the baked light of	Ta tekstura ma już wypalone światło z
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	To zmieni grupy wierzchołków i uprości je do 1 kości na wierzchołek (szybszy skinning). Część danych może zostać utracona.
 Threshold	Próg
 Timeline	Oś czasu
@@ -1888,6 +1914,7 @@ Unwrap Conformal	Rozłóż konforemnie
 Unwrap Minimum Stretch	Rozłóż z min. rozciąganiem
 Unwrap: closed surface, mark seams first	Rozłóż: zamknięta powierzchnia, najpierw oznacz szwy
 Unwrap: select faces first	Rozłóż: najpierw zaznacz ściany
+Update every	Aktualizuj co
 Upright (does not tilt)	Pionowo (bez przechyłu)
 Upscaler	Upscaler
 Upscaling	Upscaling
@@ -1908,6 +1935,7 @@ Use this file	Użyj tego pliku
 Use this folder	Użyj tego folderu
 Users	Użytkownicy
 Users selected	Zaznaczono użytkowników
+Uses the 360 image you choose	Używa wybranego obrazu 360
 V Location	Położenie V
 Value	Wartość
 Value Y	Wartość Y
@@ -1939,6 +1967,7 @@ Viewport	Widok
 Visibility icons	Ikony widoczności
 Visibility test	Test widoczności
 Visible	Widoczny
+Visible in probes	Widoczny w sondach
 Volume	Głośność
 Volume line	Linia głośności
 Wait for the build to finish	Poczekaj na zakończenie budowania

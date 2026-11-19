@@ -11,6 +11,7 @@
 #include "objects/Particulas.h"  // particulas diferidas (billboards translucidos)
 #include "objects/Light.h"        // MAX_LIGHTS: apagar los GL lights antes del pase
 #include "objects/SondaLuz.h"     // SondaLuzNuevoPase: las sondas de luz del pase
+#include "objects/SondaReflejo.h" // las sondas de reflejo de tiempo real: las dibuja la GPU antes del pase
 #include "render/SombrasTiempoReal.h"   // las sombras en tiempo real: los mapas antes de la escena
 #include "W3dRaices.h"              // las escenas abiertas a la vez en el editor
 #include "script/W3dScript.h"       // W3dScriptHayPartida: jugando solo se ve la base
@@ -292,29 +293,26 @@ static bool ReducirFondo(int W, int H, int pasadas, std::vector<unsigned char>& 
 struct IrrFondo { unsigned int de; bool ok; float prom[3]; std::vector<unsigned char> px; };
 static IrrFondo gIrr;
 static const int kIrrW = 64, kIrrH = 32;
-static const IrrFondo* IrradianciaDelFondo() {
-#ifndef W3D_SIN_EDITOR
-    if (!g_renderBgTex || !g_renderBgTex->iID) return NULL;
-    if (gIrr.ok && gIrr.de == g_renderBgTex->iID) return &gIrr;
-    TexturaEditable* te = TexEditObtener(g_renderBgTex);
-    if (!te || te->w <= 0 || te->h <= 0) return NULL;
+// la IRRADIANCIA de una imagen 360 cualquiera (RGBA, tw x th): la de 64 x 32 en 'px' y el promedio en 'prom' (0..1).
+// La usan el fondo y las SONDAS DE REFLEJO (su copia borrosa: la luz difusa y los reflejos rugosos del PBR)
+static void IrradianciaDe(const unsigned char* rgba, int tw, int th, std::vector<unsigned char>& px, float prom[3]) {
     const int SW = 128, SHh = 64;
     const double PI = 3.14159265358979;
     double c[9][3]; for (int i = 0; i < 9; i++) c[i][0] = c[i][1] = c[i][2] = 0.0;
     for (int y = 0; y < SHh; y++) {
-        const double th = (y + 0.5) / SHh * PI, st = sin(th), ct = cos(th);
+        const double th0 = (y + 0.5) / SHh * PI, st = sin(th0), ct = cos(th0);
         const double dw = (2.0 * PI / SW) * (PI / SHh) * st;   // (el angulo solido del punto)
-        const int y0 = y * te->h / SHh, y1t = (y + 1) * te->h / SHh, y1 = y1t > y0 ? y1t : y0 + 1;
+        const int y0 = y * th / SHh, y1t = (y + 1) * th / SHh, y1 = y1t > y0 ? y1t : y0 + 1;
         const int pasoY = (y1 - y0) > 8 ? (y1 - y0) / 8 : 1;
         for (int x = 0; x < SW; x++) {
             const double ph = ((x + 0.5) / SW - 0.5) * 2.0 * PI;
             const double dx = st * cos(ph), dy = st * sin(ph), dz = ct;
-            const int x0 = x * te->w / SW, x1t = (x + 1) * te->w / SW, x1 = x1t > x0 ? x1t : x0 + 1;
+            const int x0 = x * tw / SW, x1t = (x + 1) * tw / SW, x1 = x1t > x0 ? x1t : x0 + 1;
             const int pasoX = (x1 - x0) > 8 ? (x1 - x0) / 8 : 1;
             double col[3] = { 0, 0, 0 }; int n = 0;   // (el promedio de su zona, salteado hasta 8 x 8)
-            for (int yy = y0; yy < y1; yy += pasoY)
-                for (int xx = x0; xx < x1; xx += pasoX) {
-                    const unsigned char* p = &te->rgba[((size_t)yy * te->w + xx) * 4];
+            for (int yy = y0; yy < y1 && yy < th; yy += pasoY)
+                for (int xx = x0; xx < x1 && xx < tw; xx += pasoX) {
+                    const unsigned char* p = &rgba[((size_t)yy * tw + xx) * 4];
                     col[0] += p[0]; col[1] += p[1]; col[2] += p[2]; n++;
                 }
             if (n) { col[0] /= n; col[1] /= n; col[2] /= n; }
@@ -327,9 +325,9 @@ static const IrrFondo* IrradianciaDelFondo() {
     }
     // la luz difusa (Lambert) de una superficie que mira hacia n: sum (A_l / pi) c_lm Y_lm(n), A/pi = 1, 2/3, 1/4
     static const double kA[9] = { 1.0, 2.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0, 0.25, 0.25, 0.25, 0.25, 0.25 };
-    gIrr.px.assign((size_t)kIrrW * kIrrH * 4, 255);
+    px.assign((size_t)kIrrW * kIrrH * 4, 255);
     for (int y = 0; y < kIrrH; y++) {
-        const double th = (y + 0.5) / kIrrH * PI, st = sin(th), ct = cos(th);
+        const double th0 = (y + 0.5) / kIrrH * PI, st = sin(th0), ct = cos(th0);
         for (int x = 0; x < kIrrW; x++) {
             const double ph = ((x + 0.5) / kIrrW - 0.5) * 2.0 * PI;
             const double dx = st * cos(ph), dy = st * sin(ph), dz = ct;
@@ -339,11 +337,19 @@ static const IrrFondo* IrradianciaDelFondo() {
             for (int k = 0; k < 3; k++) {
                 double v = 0.0;
                 for (int i = 0; i < 9; i++) v += kA[i] * c[i][k] * Y[i];
-                gIrr.px[((size_t)y * kIrrW + x) * 4 + k] = (unsigned char)(v < 0.0 ? 0 : v > 255.0 ? 255 : (int)(v + 0.5));
+                px[((size_t)y * kIrrW + x) * 4 + k] = (unsigned char)(v < 0.0 ? 0 : v > 255.0 ? 255 : (int)(v + 0.5));
             }
         }
     }
-    for (int k = 0; k < 3; k++) { const double m = c[0][k] * 0.282095 / 255.0; gIrr.prom[k] = (float)(m < 0.0 ? 0.0 : m); }
+    for (int k = 0; k < 3; k++) { const double m = c[0][k] * 0.282095 / 255.0; prom[k] = (float)(m < 0.0 ? 0.0 : m); }
+}
+static const IrrFondo* IrradianciaDelFondo() {
+#ifndef W3D_SIN_EDITOR
+    if (!g_renderBgTex || !g_renderBgTex->iID) return NULL;
+    if (gIrr.ok && gIrr.de == g_renderBgTex->iID) return &gIrr;
+    TexturaEditable* te = TexEditObtener(g_renderBgTex);
+    if (!te || te->w <= 0 || te->h <= 0) return NULL;
+    IrradianciaDe(&te->rgba[0], te->w, te->h, gIrr.px, gIrr.prom);
     gIrr.de = g_renderBgTex->iID; gIrr.ok = true;
     return &gIrr;
 #else
@@ -472,10 +478,78 @@ static unsigned int EntornoCuboBorroso() {
 // LA VISTA DE ESTE PASE al reves (ojo -> mundo, 3x3 por columnas): la sonda de luz evalua su luz con la normal en el
 // mundo (objects/SondaLuz.cpp). Se toma aca: el pase todavia no movio la matriz (es la de la camara)
 float g_w3dOjoAMundo[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+static bool gEnPase = false;
+// EL ENTORNO DE LA ESCENA de este pase (el que pone EntornoPase): el de cada malla PBR que no tiene una sonda de reflejo
+// vuelve a este (EntornoObjeto)
+static unsigned int gEnvEscTex = 0, gEnvEscTexB = 0;
+static bool gEnvEscCubo = false;
+static float gEnvEscC[9];
+static const SondaReflejo* gEnvSonda = NULL;   // la sonda puesta ahora (NULL = el de la escena)
+static void EntornoEscena(unsigned int tex, unsigned int texB, const float* C, bool cubo) {
+    gEnvEscTex = tex; gEnvEscTexB = texB; gEnvEscCubo = cubo && tex;
+    for (int i = 0; i < 9; i++) gEnvEscC[i] = C ? C[i] : 0.0f;
+    gEnvSonda = NULL;
+    if (gEnvEscCubo) gfx::EntornoCubo(tex, texB, gEnvEscC); else gfx::Entorno(tex, texB, tex ? gEnvEscC : NULL);
+}
+// LA COPIA BORROSA de la imagen de una sonda de reflejo (la irradiancia, 64 x 32): la luz difusa y los reflejos rugosos
+// del PBR, como la del fondo. Se rehace cuando la sonda cambia de imagen (version). Sin los pixeles (el juego compilado)
+// queda la imagen misma
+static unsigned int SondaBorrosa(SondaReflejo* s, Texture* t) {
+    if (s->texBorrosa && s->versionBorrosa == s->version) return s->texBorrosa;   // (la de tiempo real la deja lista)
+#ifndef W3D_SIN_EDITOR
+    TexturaEditable* te = TexEditObtener(t);
+    if (!te || te->w <= 0 || te->h <= 0 || (int)te->rgba.size() < te->w * te->h * 4) return 0;
+    std::vector<unsigned char> px; float prom[3];
+    IrradianciaDe(&te->rgba[0], te->w, te->h, px, prom);
+    if (s->texBorrosa) gfx::DeleteTexture(s->texBorrosa);
+    s->texBorrosa = gfx::UploadRGBA(&px[0], kIrrW, kIrrH, true, false, false, false);
+    s->versionBorrosa = s->version;
+    return s->texBorrosa;
+#else
+    (void)s; (void)t; return 0;
+#endif
+}
+// EL ENTORNO DE UNA MALLA PBR (Mesh::AplicarMaterial, por el gancho): LA SONDA DE REFLEJO que la contiene -la de mas
+// importancia- le da los reflejos y la luz difusa del entorno, como en Unity (sin elegirla en el material). Afuera de
+// todas, el fondo de la escena. (Las GPU chicas, con el entorno en cubemap, siguen con el fondo)
+static bool gCapturandoSonda = false;   // dibujando las caras de una sonda de tiempo real (mas abajo)
+static void EntornoObjeto(Object* o) {
+    if (!gEnPase || !o || gfx::GpuLimitada()) return;
+    if (gCapturandoSonda) return;   // (lo que ve la sonda refleja el fondo: no se ve a si misma)
+    Matrix4 W; o->GetWorldMatrix(W);
+    Vector3 cl(0, 0, 0);   // (el centro de la malla; con esqueleto, el de su ultima pose: ver SondaLuz.cpp)
+    if (o->getType() == ObjectType::mesh) {
+        const Mesh* me = (const Mesh*)o;
+        if (me->skinArmature && me->skinAabbOk) cl = (me->skinAabbMin + me->skinAabbMax) * 0.5f;
+        else if (me->aabbOk) cl = (me->aabbMin + me->aabbMax) * 0.5f;
+    }
+    const Vector3 cw = W * cl;
+    const float p[3] = { cw.x, cw.y, cw.z };
+    SondaReflejo* s = SondaReflejoPara(p, true);
+    Texture* t = s ? s->Imagen() : NULL;
+    if (!t || !t->iID) {
+        if (gEnvSonda) EntornoEscena(gEnvEscTex, gEnvEscTexB, gEnvEscC, gEnvEscCubo);
+        return;
+    }
+    // la imagen de la sonda: u = 0.5 + atan2(z, y... del mundo (z, x)) / 2pi, v = acos(y) / pi (SondaReflejo.h). El
+    // shader lee q = C * d (d en OJO) con u = atan2(q.y, q.x), v = acos(q.z): C = P * (ojo -> mundo), P = (x, z, y)
+    static const float P[9] = { 1, 0, 0,  0, 0, 1,  0, 1, 0 };
+    float C[9];
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            C[i * 3 + j] = P[i * 3 + 0] * g_w3dOjoAMundo[j * 3 + 0] + P[i * 3 + 1] * g_w3dOjoAMundo[j * 3 + 1] +
+                           P[i * 3 + 2] * g_w3dOjoAMundo[j * 3 + 2];
+    const unsigned int b = SondaBorrosa(s, t);
+    gfx::Entorno(t->iID, b ? b : t->iID, C);
+    gEnvSonda = s;
+}
+extern void (*g_w3dEntornoObjetoHook)(Object*);   // (objects/Mesh.cpp)
+namespace { struct InstalarEntornoObjeto { InstalarEntornoObjeto() { g_w3dEntornoObjetoHook = EntornoObjeto; } }; }
+static InstalarEntornoObjeto gInstalarEntornoObjeto;
 static void EntornoPase() {
     { float V[16]; gfx::GetMatrix(gfx::ModelView, V);
       for (int c = 0; c < 3; c++) for (int r = 0; r < 3; r++) g_w3dOjoAMundo[c * 3 + r] = V[r * 4 + c]; }
-    if (!w3dRenderLuces || !W3dFondoConTextura()) { gfx::Entorno(0, 0, NULL); return; }
+    if (!w3dRenderLuces || !W3dFondoConTextura()) { EntornoEscena(0, 0, NULL, false); return; }
     float V[16]; gfx::GetMatrix(gfx::ModelView, V);   // (la vista de la camara: el pase todavia no movio la matriz)
     float M[9]; W3dFondoMatriz(M);
     float C[9];   // C = M * Rv^T (Rv: la rotacion de la vista, mundo -> ojo; V esta por columnas)
@@ -484,16 +558,15 @@ static void EntornoPase() {
             C[i * 3 + j] = M[i * 3 + 0] * V[0 * 4 + j] + M[i * 3 + 1] * V[1 * 4 + j] + M[i * 3 + 2] * V[2 * 4 + j];
     if (gfx::GpuLimitada()) {   // (una GPU chica: el entorno como cubemap, sin las cuentas de la imagen 360)
         const unsigned int cn = EntornoCuboNitido(), cb = EntornoCuboBorroso();
-        if (cn && cb) { gfx::EntornoCubo(cn, cb, C); return; }
+        if (cn && cb) { EntornoEscena(cn, cb, C, true); return; }
     }
-    gfx::Entorno(EntornoNitido(), EntornoBorroso(), C);
+    EntornoEscena(EntornoNitido(), EntornoBorroso(), C, false);
 }
 
 // el cielo se vuelve a dibujar cuando una RUTINA limpia el color de la pantalla en medio del pase (la "Limpiar pantalla"
 // de la escena de fabrica lo borraba: el cielo se dibuja antes que la escena). El del render, solo adentro del pase con
 // las luces (Render y el juego: donde se ve el fondo); uno PROPIO del paso (su imagen, su giro), en cualquier pase
 static bool gCieloEnPase = false;
-static bool gEnPase = false;
 void W3dEscena3DCieloTrasLimpiar(Texture* tex, const float* giro) {
     if (tex) { if (gEnPase) DibujarCielo(tex, giro); }
     else if (gCieloEnPase) DibujarCielo();
@@ -502,10 +575,169 @@ extern void (*g_cieloTrasLimpiarHook)(Texture*, const float*);   // (objects/Rut
 static struct CieloGancho { CieloGancho() { g_cieloTrasLimpiarHook = W3dEscena3DCieloTrasLimpiar; } } gCieloGancho;
 
 // ---------------------------------------------------------------------------
+//  LAS SONDAS DE REFLEJO DE TIEMPO REAL: LAS DIBUJA LA GPU
+//  Sin rayos: la escena se dibuja desde el centro de la sonda con el MISMO pase de siempre (las luces, el fondo, el PBR,
+//  lo que se mueve), una vez por cada cara de un cubo (90 grados) en una imagen fuera de pantalla (gfx::CapturaEmpezar).
+//  Se lee y se arma la imagen 360 (la misma que la horneada: u = 0.5 + atan2(z, x) / 2pi, v = acos(y) / pi) y su copia
+//  borrosa para el PBR. Cada 'cadaSeg' segundos (0 = cada cuadro). Sin sombras en tiempo real (costarian un mapa por
+//  cara), sin las rutinas (ponen su camara) y sin lo que no sale en las sondas (Object::enSondas). Sin la captura (el
+//  pipeline fijo, la PSP, la 3DS, las GPU chicas) queda la ultima imagen
+// ---------------------------------------------------------------------------
+extern unsigned int w3dGetTicks();
+static std::vector<unsigned char> gCapPx, gCapIrr;
+// LA TABLA de la imagen 360 (un tamanio): de cada pixel, el de abajo a la izquierda de sus 4 en las caras (base: el
+// indice en la imagen de las 6 caras), si el de al lado y el de arriba existen (dx, dy: 0 en el borde de la cara) y los
+// pesos (0..256)
+struct TablaSonda {
+    struct Px { unsigned base; unsigned char dx, dy; unsigned short wx, wy; };
+    int W, H, cara; std::vector<Px> px;
+    TablaSonda() : W(0), H(0), cara(0) {}
+};
+static TablaSonda gTablaSonda;
+static TablaSonda& TablaDe(int W, int H, int cara, const Vector3* ejeR, const Vector3* ejeU, const Vector3* ejeF) {
+    TablaSonda& tb = gTablaSonda;
+    if (tb.W == W && tb.H == H && tb.cara == cara && !tb.px.empty()) return tb;
+    tb.W = W; tb.H = H; tb.cara = cara; tb.px.resize((size_t)W * H);
+    const int AW = cara * 3;
+    for (int y = 0; y < H; y++) {
+        const float te = W3D_PI * ((float)y + 0.5f) / (float)H, st = sinf(te), ct = cosf(te);
+        for (int x = 0; x < W; x++) {
+            const float fi = 2.0f * W3D_PI * (((float)x + 0.5f) / (float)W - 0.5f);
+            const Vector3 d(st * cosf(fi), ct, st * sinf(fi));
+            int f = 0; float mejor = -2.0f;
+            for (int k = 0; k < 6; k++) { const float p = d.x * ejeF[k].x + d.y * ejeF[k].y + d.z * ejeF[k].z; if (p > mejor) { mejor = p; f = k; } }
+            if (mejor < 1e-6f) mejor = 1e-6f;
+            const float a = (d.x * ejeR[f].x + d.y * ejeR[f].y + d.z * ejeR[f].z) / mejor;
+            const float b = (d.x * ejeU[f].x + d.y * ejeU[f].y + d.z * ejeU[f].z) / mejor;
+            float fx = (a * 0.5f + 0.5f) * cara - 0.5f, fy = (b * 0.5f + 0.5f) * cara - 0.5f;   // (filas de abajo)
+            if (fx < 0.0f) fx = 0.0f; if (fy < 0.0f) fy = 0.0f;
+            if (fx > cara - 1.0f) fx = cara - 1.0f; if (fy > cara - 1.0f) fy = cara - 1.0f;
+            const int x0 = (int)fx, y0 = (int)fy;
+            TablaSonda::Px& t = tb.px[(size_t)y * W + x];
+            t.base = (unsigned)(((f / 3) * cara + y0) * AW + (f % 3) * cara + x0);
+            t.dx = (unsigned char)(x0 + 1 < cara ? 1 : 0); t.dy = (unsigned char)(y0 + 1 < cara ? 1 : 0);
+            t.wx = (unsigned short)((fx - x0) * 256.0f + 0.5f); t.wy = (unsigned short)((fy - y0) * 256.0f + 0.5f);
+        }
+    }
+    return tb;
+}
+// las 6 caras: hacia donde mira (F) y su arriba (U)
+static const float kCaraF[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+static const float kCaraU[6][3] = { { 0, 1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 }, { 0, 1, 0 }, { 0, 1, 0 } };
+static bool CapturarSonda(SondaReflejo* s) {
+    const int W = s->resolucion < 64 ? 64 : (s->resolucion > 1024 ? 1024 : s->resolucion), H = W / 2;
+    const int cara = W / 4;   // (el ecuador de la imagen: un cuarto del ancho por cara)
+    if (!gfx::CapturaEmpezar(cara * 3, cara * 2)) return false;
+    float c[3]; s->CentroMundo(c);
+    // LO QUE EL PASE TOCA y se repone: las matrices, la vista publicada al Core (el culling, el chrome), la luz del
+    // normal map y los modos del render
+    float P0[16], M0[16]; gfx::GetMatrix(gfx::Projection, P0); gfx::GetMatrix(gfx::ModelView, M0);
+    const Vector3 camPos = g_renderCamPos, camR = g_renderCamRight, camU = g_renderCamUp, camF = g_renderCamForward;
+    const Quaternion camRot = g_renderCamRot;
+    const float fov0 = g_renderCamFov, near0 = g_renderCamNear, far0 = g_renderCamFar, asp0 = g_renderCamAspect;
+    const float alto0 = g_renderImagenAltoPx; const bool orto0 = g_renderCamOrto, bind0 = g_vistaBindeada;
+    float marco0[4]; for (int k = 0; k < 4; k++) marco0[k] = g_renderMarco[k];
+    const Vector3 luzP = g_renderLightPos, luzC = g_renderLightColor;
+    const bool ov0 = w3dRenderOverlays, fin0 = gfx::w3dRenderFinal;
+    w3dRenderOverlays = false; gfx::w3dRenderFinal = true; gfx::w3dPaseSonda = true; gCapturandoSonda = true;
+    gfx::ClearColor(g_renderBg[0], g_renderBg[1], g_renderBg[2], 1.0f);
+    gfx::Enable(gfx::ScissorTest);
+    Vector3 ejeR[6], ejeU[6], ejeF[6];
+    for (int f = 0; f < 6; f++) {
+        const int x = (f % 3) * cara, y = (f / 3) * cara;
+        gfx::Viewport(x, y, cara, cara); gfx::Scissor(x, y, cara, cara);
+        gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer);
+        const Vector3 F(kCaraF[f][0], kCaraF[f][1], kCaraF[f][2]), U(kCaraU[f][0], kCaraU[f][1], kCaraU[f][2]);
+        const Vector3 R(F.y * U.z - F.z * U.y, F.z * U.x - F.x * U.z, F.x * U.y - F.y * U.x);   // (F x U)
+        Matrix4 B; B.Identity();   // la rotacion de la camara: sus ejes (x = R, y = U, z = -F) en el mundo, por columnas
+        B.m[0] = R.x; B.m[1] = R.y; B.m[2] = R.z; B.m[4] = U.x; B.m[5] = U.y; B.m[6] = U.z;
+        B.m[8] = -F.x; B.m[9] = -F.y; B.m[10] = -F.z;
+        W3dVista3D v;
+        v.fov = 90.0f; v.nearC = s->cerca > 0.01f ? s->cerca : 0.01f;
+        v.farC = far0 > v.nearC * 2.0f ? far0 : 1000.0f;
+        v.aspectoVista = v.aspectoImagen = 1.0f; v.altoImagenPx = (float)cara;
+        v.cam.pos = Vector3(c[0], c[1], c[2]); v.cam.rot = Quaternion::FromMatrix(B);
+        v.cam.fov = v.fov; v.cam.nearZ = v.nearC; v.cam.farZ = v.farC;
+        // (los ejes de lo que se dibujo, de la rotacion misma: la imagen 360 los lee igual)
+        ejeR[f] = v.cam.rot * Vector3(1, 0, 0); ejeU[f] = v.cam.rot * Vector3(0, 1, 0); ejeF[f] = v.cam.rot * Vector3(0, 0, -1);
+        W3dEscena3DProyeccion(v);
+        W3dEscena3DCamara(v, luzP, luzC);
+        W3dEscena3DPasada();
+    }
+    gfx::Disable(gfx::ScissorTest);
+    gCapPx.resize((size_t)cara * 3 * cara * 2 * 4);
+    gfx::ReadPixelsRGBA(0, 0, cara * 3, cara * 2, &gCapPx[0]);
+    gfx::CapturaTerminar();   // (el viewport, el recorte y el color de borrado de antes)
+    w3dRenderOverlays = ov0; gfx::w3dRenderFinal = fin0; gfx::w3dPaseSonda = false; gCapturandoSonda = false;
+    gfx::MatrixMode(gfx::Projection); gfx::LoadMatrix(P0);
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadMatrix(M0);
+    { CameraBase cb; cb.pos = camPos; cb.rot = camRot; W3dVistaBind(cb); }
+    g_renderCamRight = camR; g_renderCamUp = camU; g_renderCamForward = camF; g_vistaBindeada = bind0;
+    g_renderCamFov = fov0; g_renderCamNear = near0; g_renderCamFar = far0; g_renderCamAspect = asp0;
+    g_renderCamOrto = orto0; g_renderImagenAltoPx = alto0;
+    for (int k = 0; k < 4; k++) g_renderMarco[k] = marco0[k];
+    g_renderLightPos = luzP; g_renderLightColor = luzC;
+    // LA IMAGEN 360: de cada pixel, la cara que mas lo mira y su punto (bilineal, sin salirse de la cara). La cuenta de
+    // las direcciones (senos, cosenos, la cara) es la misma en cada cuadro: queda en una TABLA por tamanio
+    const int AW = cara * 3;
+    TablaSonda& tb = TablaDe(W, H, cara, ejeR, ejeU, ejeF);
+    const unsigned in = (unsigned)((s->intensidad < 0.0f ? 0.0f : (s->intensidad > 16.0f ? 16.0f : s->intensidad)) * 256.0f + 0.5f);
+    std::vector<unsigned char>& eq = s->vivoPx;
+    eq.resize((size_t)W * H * 4);
+    for (size_t i = 0; i < (size_t)W * H; i++) {
+        const TablaSonda::Px& t = tb.px[i];
+        const unsigned char* p00 = &gCapPx[(size_t)t.base * 4];
+        const unsigned char* p10 = p00 + t.dx * 4;
+        const unsigned char* p01 = p00 + (size_t)t.dy * AW * 4;
+        const unsigned char* p11 = p01 + t.dx * 4;
+        const unsigned wx = t.wx, wy = t.wy, ux = 256 - wx, uy = 256 - wy;
+        unsigned char* o = &eq[i * 4];
+        for (int k = 0; k < 3; k++) {
+            const unsigned v = ((p00[k] * ux + p10[k] * wx) * uy + (p01[k] * ux + p11[k] * wx) * wy) >> 8;   // (x 256)
+            const unsigned vi = (v * in) >> 16;
+            o[k] = (unsigned char)(vi > 255 ? 255 : vi);
+        }
+        o[3] = 255;
+    }
+    if (s->vivo.iID && (s->vivo.ancho != W || s->vivo.alto != H)) { gfx::DeleteTexture(s->vivo.iID); s->vivo.iID = 0; }
+    if (!s->vivo.iID) {
+        s->vivo.iID = gfx::UploadRGBA(&eq[0], W, H, true, false);
+        s->vivo.ancho = W; s->vivo.alto = H; s->vivo.path = "sonda:" + s->name;
+    } else gfx::UpdateRGBA(s->vivo.iID, 0, 0, W, H, &eq[0], false);
+    // (la copia borrosa: la luz difusa y los reflejos rugosos del PBR)
+    float prom[3];
+    IrradianciaDe(&eq[0], W, H, gCapIrr, prom);
+    if (!s->texBorrosa) s->texBorrosa = gfx::UploadRGBA(&gCapIrr[0], kIrrW, kIrrH, true, false, false, false);
+    else gfx::UpdateRGBA(s->texBorrosa, 0, 0, kIrrW, kIrrH, &gCapIrr[0], false);
+    s->version++; s->versionBorrosa = s->version;
+    return true;
+}
+static void SondasDeTiempoReal() {
+    if (gCapturandoSonda || gfx::GpuLimitada()) return;
+    // (solo en las vistas con la luz de la escena -Render, el juego- o Material: en Solido o alambre no se usan)
+    if (w3dRenderWireframe || w3dRenderSolido || w3dRenderNormalColor || w3dRenderSinLuz || w3dRenderAlpha) return;
+    std::vector<SondaReflejo*> ss; SondaReflejoListar(ss);
+    const unsigned ahora = w3dGetTicks();
+    for (size_t i = 0; i < ss.size(); i++) {
+        SondaReflejo* s = ss[i];
+        if (!s || !s->visible || s->tipo != W3D_REFLEJO_TIEMPO_REAL) continue;
+        // (cada 'cadaSeg'; 0 = cada cuadro, hasta 60 por segundo: varios viewports en el mismo cuadro la dibujan una vez)
+        unsigned cada = (unsigned)((s->cadaSeg > 0.0f ? s->cadaSeg : 0.0f) * 1000.0f);
+        if (cada < 15) cada = 15;
+        if (s->vivo.iID && s->ultimoMs && ahora - s->ultimoMs < cada) continue;
+        // (sin pedir otro cuadro: se dibuja cuando el editor redibuja -algo cambio- y en cada cuadro del juego; la
+        //  imagen nueva ya la usa el pase que la pidio. Si no se pudo, no lo vuelve a intentar en cada cuadro)
+        CapturarSonda(s);
+        s->ultimoMs = ahora ? ahora : 1;
+    }
+}
+
+// ---------------------------------------------------------------------------
 //  EL PASE
 // ---------------------------------------------------------------------------
 void W3dEscena3DPasada() {
     if (!SceneCollection || !W3dEscena3DActiva()) return;
+    SondasDeTiempoReal();   // (antes que nada: las de tiempo real que tocan, con el mismo pase, fuera de pantalla)
     g_w3dPase++;   // (Mesh::paseDibujado: lo que una rutina dibujo en este cuadro)
     gfx::StatScope cat(gfx::StatCatEscena);   // (el contador de llamadas: esto es la escena)
     // por si un pase anterior dejo anotados sin dibujar
@@ -524,7 +756,7 @@ void W3dEscena3DPasada() {
     gEnPase = true;
     EntornoPase();                      // el fondo 360 para los reflejos y la luz por pixel (o apagado)
     if (w3dRenderLuces) SondaLuzNuevoPase();   // (las sondas de luz que se dibujen en este pase iluminan)
-    W3dSombrasPase();                   // LAS SOMBRAS EN TIEMPO REAL: sus mapas, con la vista de la camara (antes del cielo)
+    if (!gCapturandoSonda) W3dSombrasPase();   // LAS SOMBRAS EN TIEMPO REAL: sus mapas, con la vista de la camara (antes del cielo)
     if (w3dRenderLuces) DibujarCielo();  // el FONDO 360 (Rendered / el juego): antes que todo, detras de todo
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
@@ -548,9 +780,10 @@ void W3dEscena3DPasada() {
     gEnPase = false;
     W3dSombrasFin();                    // (lo que se dibuja despues -overlays, HUD- no tiene sombras)
     gfx::Entorno(0, 0, NULL);           // (lo que se dibuja despues -overlays, HUD- no refleja el fondo)
+    gEnvSonda = NULL;
     W3dNieblaReiniciar();               // nada de niebla para lo que se dibuja despues (overlays, HUD, UI)
     gfx::EstadoBase();                  // ni el alpha test, el sesgo o la matriz de textura que dejo la escena
-    W3dCapturasHacer();                 // las capturas que pidio lua: la imagen 3D sola (el HUD todavia no)
+    if (!gCapturandoSonda) W3dCapturasHacer();   // las capturas que pidio lua: la imagen 3D sola (el HUD todavia no)
 }
 
 // ---------------------------------------------------------------------------

@@ -1112,6 +1112,9 @@ static void PrecargarMallas(std::vector<W3dPaso>& L, int prof) {
 
 void Rutina::RenderObject() {
     ejecutada = false;
+    // (las caras de una sonda de reflejo de tiempo real: una rutina pone su camara, limpia la pantalla o corre su codigo
+    //  una vez por cuadro; la sonda dibuja la escena desde su centro, sin ellas)
+    if (gfx::w3dPaseSonda) return;
     if (sucia) Resolver();
     // el EDITOR no ejecuta una rutina mal armada (el nucleo, si: es responsabilidad de quien la armo). Valida con los
     // arrays como estan en este punto del cuadro

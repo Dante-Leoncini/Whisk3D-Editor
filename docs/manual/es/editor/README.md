@@ -20,6 +20,7 @@ Qué puede hacer **Whisk3D Editor**, ordenado por panel y por modo. Borrador par
      - [Cámara](objeto-camara.md)
      - [Luz](objeto-luz.md)
      - [Sonda de luz](objeto-sonda-luz.md)
+     - [Sonda de reflejo](objeto-sonda-reflejo.md)
      - [Esqueleto](objeto-esqueleto.md)
      - [Sonido](objeto-sonido.md)
      - [Vacío](objeto-vacio.md)

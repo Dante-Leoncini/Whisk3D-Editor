@@ -467,6 +467,9 @@ static Material* MaterialNuevoConUndo(const std::string& base, const Material* d
     return n;
 }
 Material* W3dBibliotecaNuevoMaterial() { SinRaiz sr; return MaterialNuevoConUndo("Material", NULL); }
+// una COPIA de 'de' con nombre libre a partir de 'base' (con Ctrl+Z): el horneado de la luz la usa para no ponerle la luz de
+// una malla a un material que comparten otras
+Material* W3dMaterialCopiaConUndo(const Material* de, const std::string& base) { SinRaiz sr; return MaterialNuevoConUndo(base, de); }
 
 // el paso de undo del borrado de un material EN USO: las partes que lo usaban vuelven a el (y el
 // material vuelve de su cementerio: W3dRecursosRevisarPurgados). Rehacer las vuelve a dejar sin el.

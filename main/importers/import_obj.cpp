@@ -16,6 +16,7 @@
 #include <cerrno>  // errno del ofstream fallido (diagnostico del export en Android)
 #include <cstring> // strerror
 #include "graphics/w3dGraphics.h" // gfx::MezclaAdd: la palabra ADITIVO del .mtl
+#include "graphics/w3dTexture.h"  // TexAlfaDescartar: la luz horneada con la mascara del sol, opaca en el pipeline fijo
 #include "io/W3dMallaBin.h"       // W3dMallaBinMaterializarEdicion: las caras pendientes de una malla de un recurso
 #include "objects/MallaRecurso.h" // W3dMallaSoltarEdicion: y vuelven a quedar pendientes al terminar
 #include "io/W3dWeb.h"            // W3dDescargarSiWeb: en el navegador las texturas del export bajan a la PC
@@ -193,10 +194,15 @@ static void DespertarUna(const TexDormida& d) {
         }
     std::vector<TexLayer> capas;
     for (size_t c = 0; c < d.capas.size(); c++) {
+        // (la LUZ HORNEADA con la mascara del sol en el alfa: donde no hay sombras por shader -el pipeline fijo: N95,
+        //  PSP, 3DS, Dreamcast- el alfa no sirve y la textura sube OPACA, en 16 bits como siempre)
+        const bool sinAlfa = d.capas[c].mascaraSol && !w3dEngine::SombrasSoportadas();
+        if (sinAlfa) w3dEngine::TexAlfaDescartar(true);
         Texture* t = TexturaTomar(d.capas[c].textura);
+        if (sinAlfa) w3dEngine::TexAlfaDescartar(false);
         if (!t) { w3dLogfW("[W3D] no pude cargar la textura '%s'", d.capas[c].textura.c_str()); continue; }
         TexLayer tl; tl.tex = t; tl.blend = d.capas[c].mezcla; tl.uvMapa = d.capas[c].uv; tl.on = d.capas[c].on;
-        tl.fuerza = d.capas[c].fuerza; tl.horneada = d.capas[c].horneada;
+        tl.fuerza = d.capas[c].fuerza; tl.horneada = d.capas[c].horneada; tl.mascaraSol = d.capas[c].mascaraSol;
         capas.push_back(tl);
     }
     if (!capas.empty()) m->capas.insert(m->capas.begin(), capas.begin(), capas.end());

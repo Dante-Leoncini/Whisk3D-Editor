@@ -15,6 +15,8 @@
 #include "io/RaicesEditor.h"   // el estado BASE de un juego (volver a "Juego" desde uno de sus clips)
 #include "io/PrefabsEditor.h"  // soltar un prefab sobre el selector de una instancia; overrides de lo generado
 #include "objects/InstanciaPrefab.h"
+#include "objects/SondaReflejo.h"   // el submenu de las sondas de reflejo (el reflejo del material)
+#include "io/Prefabs.h"   // W3dPrefabCampoAlterado: lo alterado de un objeto generado (en amarillo)
 #include "objects/ProxyW3d.h"      // PROXY W3D: su tarjeta (PropsPrefab.cpp) y soltarle un elemento de una libreria
 #include "io/Librerias.h"
 #include "script/SimJuego.h"   // el CACHE de la simulacion: lo que se renderiza de un juego
@@ -869,6 +871,8 @@ void PropsHitboxConstruir(Properties* p);
 void PropsHitboxActualizar(Properties* p, bool visible);
 void PropsSondaLuzConstruir(Properties* p);
 void PropsSondaLuzActualizar(Properties* p, bool visible);
+void PropsSondaReflejoConstruir(Properties* p);
+void PropsSondaReflejoActualizar(Properties* p, bool visible);
 void PropsHorneadoConstruir(Properties* p);
 void PropsSombrasConstruir(Properties* p);
 static void AccionRecGuardarComo();   // (la Biblioteca: Guardar como..., mas abajo)
@@ -1043,7 +1047,33 @@ static void AccionTexturaElegida(int id){
     } else if (5 + id - 2 < (int)Textures.size()) {
         TexturaPonerEn(mat->texture, Textures[5 + id - 2]);
         mat->textureOn = true;
+        mat->reflejoSonda = false;   // (una textura elegida a mano: ya no es "la sonda mas cercana")
     }
+    RebindMaterialMeshPart();
+}
+// LAS SONDAS DE REFLEJO (el submenu del selector de la textura): la imagen 360 de una sonda como REFLEJO del material
+// (prende el reflejo en "Equirectangular 360"), o "La sonda mas cercana": cada malla usa la de su lugar
+static PopupMenu* MenuTexSondas = NULL;
+static std::vector<SondaReflejo*> gMenuSondas;
+static void AccionTexSondaElegida(int id) {
+    Material* mat = MaterialActivoUI();
+    if (!mat) return;
+    SondaReflejo* s = NULL;
+    if (id == 0) {   // la mas cercana: la textura queda la de la sonda de la malla activa (o la primera), por si no hay gancho
+        float p[3] = { 0, 0, 0 };
+        if (ObjActivo) { Matrix4 W; ObjActivo->GetWorldMatrix(W); p[0] = W.m[12]; p[1] = W.m[13]; p[2] = W.m[14]; }
+        s = SondaReflejoPara(p);
+    } else if (id - 1 < (int)gMenuSondas.size()) s = gMenuSondas[(size_t)(id - 1)];
+    Texture* t = s ? s->Imagen() : NULL;
+    if (!t) { Notificar(T("Bake the reflection probe first"), true); return; }
+    UndoMaterialModIniciar(mat);
+    TexturaPonerEn(mat->texture, t);
+    mat->textureOn = true;
+    mat->chrome = true;
+    mat->reflectMode = 2;   // (la imagen de la sonda es un 360)
+    mat->reflejoSonda = (id == 0);
+    UndoMaterialModCommit();
+    PropertiesLayoutDirty = true;
     RebindMaterialMeshPart();
 }
 
@@ -1159,9 +1189,27 @@ static void AccionMenuTexturas(){
     MenuTexturas->Limpiar(); // las texturas cargadas van cambiando
     MenuTexturas->Agregar(T("None"), 0);   // sin textura (como el normal map)
     MenuTexturas->Agregar(T("Load Texture"), 1, IconType::archive);
+    // (las imagenes de las sondas de reflejo van aparte, en su submenu: no se mezclan con las texturas)
     for (size_t i = 5; i < Textures.size(); i++) {
+        if (SondaReflejoEsSuya(Textures[i])) continue;
         MenuTexturas->Agregar(NombreDeTextura(Textures[i]),
                               2 + (int)(i - 5), IconType::textura);
+    }
+    SondaReflejoListar(gMenuSondas);
+    if (!gMenuSondas.empty()) {
+        if (!MenuTexSondas) { MenuTexSondas = new PopupMenu(); MenuTexSondas->action = AccionTexSondaElegida; }
+        MenuTexSondas->Limpiar();
+        MenuTexSondas->titulo = T("Reflection Probes");
+        Material* mat = MaterialActivoUI();
+        MenuItem* it = MenuTexSondas->Agregar(T("Nearest probe (automatic)"), 0, IconType::foto);
+        if (it && mat) it->verde = mat->chrome && mat->reflejoSonda;
+        for (size_t k = 0; k < gMenuSondas.size(); k++) {
+            it = MenuTexSondas->Agregar(gMenuSondas[k]->name, 1 + (int)k, IconType::foto);
+            if (it && mat) it->verde = mat->chrome && !mat->reflejoSonda && mat->texture && !gMenuSondas[k]->textura.empty() &&
+                                       mat->texture->path == gMenuSondas[k]->textura;
+        }
+        MenuItem* sm = MenuTexturas->Agregar(T("Reflection Probes"), 999999, IconType::foto, MenuTexSondas);   // (id que no elige nada)
+        if (sm) sm->lineaArriba = true;
     }
     AbrirMenuBajoBoton(MenuTexturas, PropsActivo->propBtnTextura->button);
 }
@@ -8468,6 +8516,9 @@ void Properties::ConstruirGrupos(){
     propTransform->properties.push_back(propObjRebota);
     propObjCaptador = new PropBool(T("Shadow catcher"));
     propTransform->properties.push_back(propObjCaptador);
+    // LAS SONDAS: si lo ven (apagado: la sonda de un auto, que va adentro, no ve la carroceria)
+    propObjEnSondas = new PropBool(T("Visible in probes"));
+    propTransform->properties.push_back(propObjEnSondas);
     GroupProperties.push_back(propTransform);
 
     // ===== pestania OBJETO: tarjeta "Animacion" — las animaciones DEL objeto
@@ -9880,6 +9931,7 @@ void Properties::ConstruirGrupos(){
     // HITBOX: caja de deteccion (la tarjeta entera vive en PropsHitbox.cpp)
     PropsHitboxConstruir(this);
     PropsSondaLuzConstruir(this);   // LA SONDA DE LUZ (PropsSondaLuz.cpp)
+    PropsSondaReflejoConstruir(this);   // LA SONDA DE REFLEJO (PropsSondaReflejo.cpp)
     PropsRutinaConstruir(this);
     PropsPrefabConstruir(this);   // la tarjeta de una instancia de prefab (y de lo que genera)
 
@@ -12886,7 +12938,8 @@ void Properties::RefreshTargetProperties(){
       if (propObjProySombra) propObjProySombra->value = malla ? &ObjActivo->proyectaSombra : NULL;
       if (propObjRecSombra)  propObjRecSombra->value  = malla ? &ObjActivo->recibeSombra : NULL;
       if (propObjRebota)     propObjRebota->value     = malla ? &ObjActivo->rebotaLuz : NULL;
-      if (propObjCaptador)   propObjCaptador->value   = malla ? &ObjActivo->captaSombras : NULL; }
+      if (propObjCaptador)   propObjCaptador->value   = malla ? &ObjActivo->captaSombras : NULL;
+      if (propObjEnSondas)   propObjEnSondas->value   = malla ? &ObjActivo->enSondas : NULL; }
 
     //Mesh Parts
     RefreshPropMeshParts();
@@ -13747,9 +13800,9 @@ Properties::Properties() : ViewportBase() {
     propLOD = NULL; propLodDist = NULL;           // objeto LOD (umbrales de distancia)
     propObjRelLines = NULL;                                            // lineas parentales (tarjeta generica)
     propObjEstatico = NULL;                                            // estatico/dinamico (tarjeta generica, culling grid)
-    propObjProySombra = NULL; propObjRecSombra = NULL; propObjRebota = NULL; propObjCaptador = NULL;                 // las sombras en tiempo real (solo mallas)
+    propObjProySombra = NULL; propObjRecSombra = NULL; propObjRebota = NULL; propObjCaptador = NULL; propObjEnSondas = NULL;                 // las sombras en tiempo real (solo mallas)
     propSombras = NULL; propSomOn = NULL; propSomDist = NULL; propSomCascadas = NULL; propSomBorde = NULL; propSomDesenf = NULL;
-    propSomRes = NULL; propSomSuaves = NULL; propSomInt = NULL; propSomSesgo = NULL; propSomEstado = NULL;
+    propSomRes = NULL; propSomSuaves = NULL; propSomInt = NULL; propSomColor = NULL; propSomSesgo = NULL; propSomEstado = NULL;
     for (int k = 0; k < 3; k++) propSomCorte[k] = NULL;
     propLodSoloCam = NULL;                                             // objeto LOD (camara de medida)
     propCulling = NULL; propCullMetodo = NULL; propCullActivo = NULL; propCullSoloCam = NULL; // objeto Culling unificado
@@ -13760,7 +13813,11 @@ Properties::Properties() : ViewportBase() {
     propMatLuzInd = NULL;
     propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
     propSonda = NULL; propSlRayos = NULL; propSlHornear = NULL; propSlEstado = NULL;
-    propHorneado = NULL; propHornTex = NULL; propHornUV = NULL; propHornMuestras = NULL; propHornIndirecta = NULL; propHornRebotes = NULL; propHornDenoiser = NULL; propHornBoton = NULL; propHornBarra = NULL; propHornCancelar = NULL; propHornAviso = NULL;
+    propSondaRef = NULL; propSrTipo = NULL; propSrImportancia = NULL; propSrIntensidad = NULL; propSrCaja = NULL;
+    for (int k = 0; k < 3; k++) { propSrTam[k] = NULL; propSrOrigen[k] = NULL; }
+    propSrRes = NULL; propSrCerca = NULL; propSrCada = NULL; propSrImagen = NULL; propSrMuestras = NULL; propSrRebotes = NULL;
+    propSrHornear = NULL; propSrEstado = NULL;
+    propHorneado = NULL; propHornTex = NULL; propHornUV = NULL; propHornMuestras = NULL; propHornIndirecta = NULL; propHornRebotes = NULL; propHornDenoiser = NULL; propHornBoton = NULL; propHornBarra = NULL; propHornCancelar = NULL; propHornAvisoTex = NULL; propHornAviso = NULL;
     for (int k = 0; k < 3; k++) { propSlTam[k] = NULL; propSlPuntos[k] = NULL; }
     propRutina = NULL; propRuLista = NULL; propRuUsar = NULL; propRuPasos = NULL; propRuFilaAdd = NULL;
     propRuOn = NULL; propRuRef = NULL; propRuEntero = NULL; propRuMotivo = NULL;
@@ -13991,6 +14048,7 @@ void Properties::ActualizarPestanias(){
     bool esRc = (tipo == (int)ObjectType::recorte);
     bool esHb = (tipo == (int)ObjectType::hitbox);
     bool esSl = (tipo == (int)ObjectType::sondaluz);   // la sonda de luz (PropsSondaLuz.cpp)
+    bool esSr = (tipo == (int)ObjectType::sondareflejo);   // la sonda de reflejo (PropsSondaReflejo.cpp)
     bool esRu = (tipo == (int)ObjectType::rutina);
     bool esPf = (tipo == (int)ObjectType::prefab);   // instancia de prefab (su tarjeta: PropsPrefab.cpp)
     bool esPx = (tipo == (int)ObjectType::proxy);    // proxy W3D (la misma tarjeta, con su libreria y su elemento)
@@ -13998,7 +14056,7 @@ void Properties::ActualizarPestanias(){
     bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esVacio || esLz || esRc || esHb || esSl || esPf || esPx || esRu || esPost;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esVacio || esLz || esRc || esHb || esSl || esPf || esPx || esRu || esPost || esSr;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -14030,6 +14088,7 @@ void Properties::ActualizarPestanias(){
         else if (esRc) icono = (int)IconType::recorte;
         else if (esHb) icono = (int)IconType::hitbox;
         else if (esSl) icono = (int)IconType::esfera;
+        else if (esSr) icono = (int)IconType::foto;
         else if (esRu) icono = (int)IconType::lista;
         else if (esPf) icono = (int)IconType::prefab;
         else if (esPx) icono = (int)IconType::libreria;
@@ -14465,6 +14524,7 @@ void Properties::ActualizarPestanias(){
     if (propRecorte)   propRecorte->visible   = (pestaniaActiva == 2 && esRc);
     PropsHitboxActualizar(this, pestaniaActiva == 2 && esHb);   // visibilidad + bindeo + textos
     PropsSondaLuzActualizar(this, pestaniaActiva == 2 && esSl);
+    PropsSondaReflejoActualizar(this, pestaniaActiva == 2 && esSr);
     PropsHorneadoActualizar(this, pestaniaActiva == 2 && esMesh);
     PropsRutinaActualizar(this, pestaniaActiva == 2 && esRu);   // los pasos de la rutina
     PropsPrefabActualizar(this, pestaniaActiva);                 // (instancia: pestania 2; lo generado: la 1)
@@ -14927,6 +14987,25 @@ void Properties::ActualizarPestanias(){
 
     if (hayExt) ActualizarTarjetaRecursoExt(this, pestaniaActiva == 3, extLib, extIt, extGlobal);
     else ActualizarTarjetaRecurso(this, hayRec && pestaniaActiva == 3, recVista, recId);
+    // LO ALTERADO EN ESTE PROYECTO (un objeto que genera un proxy o una instancia, con un valor cambiado: un override):
+    // sus numeros y sus casillas en amarillo
+    {
+        Object* o = (ObjActivo && W3dInstanciaDe(ObjActivo)) ? ObjActivo : NULL;
+        for (size_t g = 0; g < GroupProperties.size(); g++) {
+            GroupPropertie* gp = GroupProperties[g];
+            if (!gp || !gp->visible) continue;
+            for (size_t k = 0; k < gp->properties.size(); k++) {
+                PropertieBase* pb = gp->properties[k];
+                if (!pb) continue;
+                const void* ptr = NULL;
+                if (pb->GetType() == PropertyType::Float) ptr = ((PropFloat*)pb)->value;
+                else if (pb->GetType() == PropertyType::Bool) ptr = ((PropBool*)pb)->value;
+                bool alt = false;
+                if (o && ptr) { const int c = W3dCampoInstDePtr(o, ptr); alt = c >= 0 && W3dPrefabCampoAlterado(o, c); }
+                if (pb->alterado != alt) { pb->alterado = alt; g_redraw = true; }
+            }
+        }
+    }
 }
 
 // (declarada en Properties.h) el editor UV la llama al ENTRAR a la edicion de huesos 2D (Tab, menu
@@ -16326,7 +16405,7 @@ PropertieBase* Properties::PropEnPunto(int mx, int my){
 //  Los keyframes son los del OBJETO ACTIVO en el FRAME ACTUAL (como el rombo); un color son sus 3 curvas juntas.
 // ============================================================================
 enum { PCTX_RESET = 1, PCTX_COPIAR, PCTX_PEGAR, PCTX_KEY_INSERTAR, PCTX_KEY_BORRAR, PCTX_KEY_COPIAR, PCTX_KEY_PEGAR,
-       PCTX_ACTUALIZAR_TEX };
+       PCTX_ACTUALIZAR_TEX, PCTX_A_SELECCION };
 static PropertieBase* gCtxProp = NULL;   // la fila del menu abierto
 static Texture* gCtxTex = NULL;          // la TEXTURA de la fila (base, mapa, normal map, capa): "Reload Texture"
 // la fila de un MAPA del material: el numero (rugosidad, metalico, alfa) o el color (emision; el color base, en la fila
@@ -16414,8 +16493,103 @@ static void PropAsignar(PropertieBase* p, const float* v){
     if (tr) UndoTransformConfirmar();
     PropertiesLayoutDirty = true; g_redraw = true;
 }
+// ============================================================================
+//  COPIAR A LOS SELECCIONADOS (el menu de una fila): el valor de la fila pasa a los OTROS objetos seleccionados, el mismo
+//  campo en cada uno (tildar "Estatico" en veinte objetos de una vez, la misma escala, la misma posicion en Z). El valor
+//  tiene que vivir ADENTRO del objeto activo (su posicion, su rotacion, su escala, las casillas de la pestania Objeto, lo
+//  de su luz o su camara): lo de un material, de la escena o lo que el panel muestra de otro lado no se ofrece. Lo de la
+//  clase de un tipo (una luz) solo va a los del MISMO tipo. Un Ctrl+Z para todos.
+// ============================================================================
+static size_t TamanoObjeto(Object* o) {
+    switch (o->getType().v) {
+        case ObjectType::mesh:     return sizeof(Mesh);
+        case ObjectType::light:    return sizeof(Light);
+        case ObjectType::camera:   return sizeof(Camera);
+        case ObjectType::empty:    return sizeof(Empty);
+        case ObjectType::armature: return sizeof(Armature);
+        default: break;
+    }
+    return sizeof(Object);
+}
+// el campo de la fila: donde esta adentro del objeto activo y cuanto mide (false = no vive en el objeto)
+static bool CampoDeFila(PropertieBase* p, size_t& off, size_t& tam) {
+    if (!p || !ObjActivo) return false;
+    const char* ptr = NULL;
+    if (p->GetType() == PropertyType::Float) { ptr = (const char*)((PropFloat*)p)->value; tam = sizeof(float); }
+    else if (p->GetType() == PropertyType::Bool) { ptr = (const char*)((PropBool*)p)->value; tam = sizeof(bool); }
+    else if (p->GetType() == PropertyType::Color) { ptr = (const char*)((PropColor*)p)->value; tam = 4 * sizeof(float); }
+    const char* base = (const char*)ObjActivo;
+    if (!ptr || ptr < base) return false;
+    off = (size_t)(ptr - base);
+    return off + tam <= TamanoObjeto(ObjActivo);
+}
+// los otros seleccionados que tienen ese campo
+static void DestinosDeCopia(size_t off, size_t tam, std::vector<Object*>& out) {
+    out.clear();
+    for (size_t i = 0; i < ObjSelects.size(); i++) {
+        Object* o = ObjSelects[i];
+        if (!o || o == ObjActivo) continue;
+        if (off + tam <= sizeof(Object) || o->getType() == ObjActivo->getType()) out.push_back(o);
+    }
+}
+// la ROTACION se edita en sus displays (euler, quaternion, eje y angulo): despues de copiar, la puerta que corresponde
+static void SincronizarRotDe(Object* o, size_t off) {
+    const char* b = (const char*)o;
+    const size_t e = (size_t)((const char*)&o->rotEuler - b), q = (size_t)((const char*)&o->rotQuat - b);
+    const size_t ax = (size_t)((const char*)&o->rotAxis - b), an = (size_t)((const char*)&o->rotAngle - b);
+    if (off >= e && off < e + sizeof(Vector3)) o->SetRotEuler(o->rotEuler);
+    else if (off >= q && off < q + sizeof(Quaternion)) o->SetRot(o->rotQuat);
+    else if ((off >= ax && off < ax + sizeof(Vector3)) || off == an) o->SetRotAxisAngle(o->rotAxis, o->rotAngle);
+}
+namespace {
+struct UndoCopiaSel {
+    std::vector<Object*> o; std::vector<unsigned> serial;
+    size_t off, tam;
+    std::vector<unsigned char> otros;   // lo que hay que poner al aplicar (antes / despues, se alternan)
+};
+}
+static void UndoCopiaSelAplicar(void* d) {
+    UndoCopiaSel* u = (UndoCopiaSel*)d;
+    std::vector<unsigned char> ahora(u->otros.size());
+    for (size_t i = 0; i < u->o.size(); i++) {
+        if (!W3dObjetoVivoSerial(u->o[i], u->serial[i])) continue;
+        char* dst = (char*)u->o[i] + u->off;
+        memcpy(&ahora[i * u->tam], dst, u->tam);
+        memcpy(dst, &u->otros[i * u->tam], u->tam);
+        SincronizarRotDe(u->o[i], u->off);
+    }
+    u->otros.swap(ahora);
+    g_redraw = true;
+}
+static void UndoCopiaSelLiberar(void* d) { delete (UndoCopiaSel*)d; }
+static void CopiarASeleccion(PropertieBase* p) {
+    size_t off = 0, tam = 0;
+    if (!CampoDeFila(p, off, tam)) return;
+    std::vector<Object*> ds;
+    DestinosDeCopia(off, tam, ds);
+    if (ds.empty()) return;
+    UndoCopiaSel* u = new UndoCopiaSel();
+    u->off = off; u->tam = tam;
+    u->otros.resize(ds.size() * tam);
+    const char* src = (const char*)ObjActivo + off;
+    for (size_t i = 0; i < ds.size(); i++) {
+        char* dst = (char*)ds[i] + off;
+        memcpy(&u->otros[i * tam], dst, tam);   // (lo de antes: lo que vuelve con Ctrl+Z)
+        memcpy(dst, src, tam);
+        SincronizarRotDe(ds[i], off);
+        u->o.push_back(ds[i]); u->serial.push_back(ds[i]->serial);
+    }
+    UndoExterno f; f.aplicar = UndoCopiaSelAplicar; f.liberar = UndoCopiaSelLiberar;
+    UndoPushExterno(f, u);
+    char b[96]; snprintf(b, sizeof(b), T("Copied to %d selected object(s)"), (int)ds.size());
+    Notificar(b, false);
+    RTInvalidar();
+    g_redraw = true;
+}
+
 static void AccionPropCtx(int id){
     PropertieBase* p = gCtxProp;
+    if (id == PCTX_A_SELECCION) { CopiarASeleccion(p); PropertiesLayoutDirty = true; return; }
     if (id == PCTX_ACTUALIZAR_TEX) {   // (se edito afuera: se vuelve a leer de su archivo)
         const std::string c = W3dTexturaClave(gCtxTex);
         if (!c.empty()) { std::vector<std::string> v(1, c); W3dTexturasActualizarAvisando(v); }
@@ -16692,6 +16866,16 @@ bool Properties::MenuContexto(int mx, int my, int menuX, int menuY){
     it = gMenuPropCtx->Agregar(T("Reset"), PCTX_RESET, (int)IconType::deshacer); it->gris = &sReset;
     it = gMenuPropCtx->Agregar(T("Copy"), PCTX_COPIAR, (int)IconType::copiar);  it->gris = &sSi;
     it = gMenuPropCtx->Agregar(T("Paste"), PCTX_PEGAR, (int)IconType::pegar);   it->gris = &sPegar;
+    // COPIAR A LOS SELECCIONADOS: solo si el valor es del objeto y hay otros seleccionados que lo tienen
+    if (gCtxMapa < 0) {
+        size_t off = 0, tam = 0;
+        std::vector<Object*> ds;
+        if (CampoDeFila(p, off, tam)) DestinosDeCopia(off, tam, ds);
+        static bool sSel; sSel = !ds.empty();
+        if (CampoDeFila(p, off, tam) && ObjSelects.size() > 1) {
+            it = gMenuPropCtx->Agregar(T("Copy to Selected"), PCTX_A_SELECCION, (int)IconType::seleccion); it->gris = &sSel;
+        }
+    }
     if (gCtxTex) {   // (la fila del color base con su textura: tambien actualizarla)
         it = gMenuPropCtx->Agregar(T("Reload Texture"), PCTX_ACTUALIZAR_TEX, (int)IconType::recargar);
         it->lineaArriba = true;

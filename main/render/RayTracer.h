@@ -87,10 +87,17 @@ float RTHorneadoPaso(int msPresupuesto);
 bool  RTHorneadoActivo();
 void  RTHorneadoCancelar();
 const std::vector<float>& RTHorneadoLuz();
+// LA MASCARA DEL SOL del horneado terminado: de cada texel, que fraccion de su luz es la directa del sol (0..1). Va al alfa
+// de la textura (Materials.h TexLayer::mascaraSol)
+const std::vector<float>& RTHorneadoSol();
 const std::vector<unsigned char>& RTHorneadoCubierto();
 // la malla horneada era un CAPTADOR DE SOMBRAS (Object::captaSombras al empezar): su luz es la sombra por la oclusion
 // ambiental, de 0 a 1 (blanco = no le cae nada), para una capa Multiply (1x)
 bool RTHorneadoCaptador();
+// LA SONDA DE REFLEJO HORNEADA: la imagen 360 (w x h, RGBA) de lo que se ve desde 'pos' (objects/SondaReflejo.h), con lo
+// estatico, el fondo de la escena, 'muestras' rayos por pixel y 'rebotes' de la luz
+bool RTHornearReflejo(const float pos[3], int w, int h, float cerca, int muestras, int rebotes, float intensidad,
+                      std::vector<unsigned char>& rgba, std::string* motivo);
 bool RTActivoEn(const Viewport3D* vp);    // hay un render progresivo de ese viewport (para seguir redibujando)
 float RTImagenesPorSegundo();
 const char* RTReescaladorNombre(int r);  // "Linear" / "FSR 1 (AMD)"             // las imagenes trazadas TERMINADAS por segundo (lo que de verdad se ve)

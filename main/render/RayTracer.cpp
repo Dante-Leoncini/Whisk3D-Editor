@@ -29,6 +29,7 @@
 #include "WhiskUI/theme/colores.h"   // SetColorID
 #include "io/TexturaEditada.h"      // los pixeles CPU de una textura (para muestrearla)
 #include "render/OpcionesRender.h"  // g_renderBg
+#include "render/SombrasTiempoReal.h"   // g_sombras: el color de la sombra del sol (tambien se hornea)
 #include "app/variables.h"          // fovDeg, SceneCollection
 #include "config/W3dProfile.h"      // W3dNowMs
 #include "W3dLang.h"
@@ -100,7 +101,8 @@ struct RTTextura { const unsigned char* px; int w, h; bool filtrado; };   // fil
 // spotCos: el coseno del corte del cono (-1 = sin cono, luz puntual); spotDir: hacia donde alumbra; spotExpo: lo
 // concentrado del haz (como GL: (cos)^expo adentro del cono)
 struct RTLuz { RTV pos; RTV dir; bool direccional; float color[3]; float ambiente[3]; float radio; int rayos; float attC, attL, attQ;
-               float spotCos, spotExpo; RTV spotDir; float distancia; };   // distancia: 0 = sin limite (Light::distancia)
+               float spotCos, spotExpo; RTV spotDir; float distancia;   // distancia: 0 = sin limite (Light::distancia)
+               const void* fuente; };   // (la lampara de la escena: el horneado busca cual es el SOL)
 struct RTNodo { float bmin[3], bmax[3]; int izq, der; int primero, cantidad; };   // hoja: cantidad > 0
 
 struct RTEscena {
@@ -452,15 +454,24 @@ extern const std::set<Object*>* g_localViewVisibles;
 // EL HORNEADO DE LAS SONDAS DE LUZ (RTHornearSondas) arma la escena solo con lo ESTATICO (Object::estatico): lo que se
 // mueve -un personaje, una pelota- no tapa ni rebota luz en la sonda, solo la recibe (como el "static" de Unity)
 static bool g_rtSoloEstaticos = false;
+// EL HORNEADO DE UNA SONDA (de luz o de reflejo): lo que no sale en las sondas (Object::enSondas) no entra en la escena
+static bool g_rtParaSonda = false;
 // SIN SOMBRAS: la luz directa del punto que se esta sombreando no prueba si algo tapa las lamparas (un objeto que no
 // recibe sombras; el horneado de uno que no las recibe)
 static bool g_rtSinSombras = false;
+// EL SOL APARTE (el horneado de la luz, RTHorneadoPaso): la luz difusa directa de la lampara g_rtLuzSol (un indice de
+// e.luces; -1 = nada) se suma ademas en g_rtSolLuz
+static int g_rtLuzSol = -1;
+static float g_rtSolLuz[3] = { 0, 0, 0 };
+// LA SOMBRA DEL SOL CON SU COLOR: donde algo tapa al sol llega igual esta parte de su luz (el color de las sombras en
+// tiempo real por su intensidad). Asi la sombra horneada tiene el mismo tono que la de lo que se mueve sobre ella
+static float g_rtColorSombraSol[3] = { 0, 0, 0 };
 static void RecorrerEscena(RTEscena& e, Object* o, std::vector<Material*>& vistos) {
     if (!o) return;
     if (o != (Object*)SceneCollection && (!o->visible || !o->renderizable)) return;
     if (o != (Object*)SceneCollection && W3dVistaLocalOculta(o)) return;
     if (o->getType() == ObjectType::mesh && (o == (Object*)SceneCollection || !W3dVistaLocalSoloPaso(o)) &&
-        !(g_rtSoloEstaticos && !o->estatico)) AgregarMalla(e, (Mesh*)o, vistos);
+        !(g_rtSoloEstaticos && !o->estatico) && !(g_rtParaSonda && !o->enSondas)) AgregarMalla(e, (Mesh*)o, vistos);
     for (size_t i = 0; i < o->Childrens.size(); i++) RecorrerEscena(e, o->Childrens[i], vistos);
 }
 static void AgregarLuces(RTEscena& e) {
@@ -480,6 +491,7 @@ static void AgregarLuces(RTEscena& e) {
         L.spotCos = (!l->direccional && l->spotCutoff < 179.9f) ? cosf(l->spotCutoff * 3.14159265f / 180.0f) : -1.0f;
         L.spotExpo = l->spotExponent;
         L.spotDir = Norm(V3(-W.m[8], -W.m[9], -W.m[10]));
+        L.fuente = l;
         e.luces.push_back(L);
     }
 }
@@ -511,8 +523,9 @@ bool RTHornearSondas(const std::vector<float>& pos, int rayos, std::vector<float
     if (rayos < 16) rayos = 16;
     RTEscena e;
     g_rtSoloEstaticos = true;    // (solo lo estatico ilumina la sonda)
+    g_rtParaSonda = true;
     ArmarEscena(e);
-    g_rtSoloEstaticos = false;
+    g_rtSoloEstaticos = false; g_rtParaSonda = false;
     w3dLogf("[sonda] hornear: %d puntos x %d rayos (la escena: %d triangulos, %d luces)", n, rayos, (int)e.tris.size(), (int)e.luces.size());
     sh.assign((size_t)n * 27, 0.0f);
     if (valido) valido->assign((size_t)n, 1);
@@ -573,8 +586,13 @@ struct RTHorneado {
     // llega entera); captador = la textura sale BLANCA con solo las sombras (directa con sombras / sin sombras) por la
     // oclusion ambiental (lo que la tapa alrededor, a menos de un metro)
     bool sinSombras, captador;
+    // LA MASCARA DEL SOL (TexLayer::mascaraSol): de cada texel, la luz directa del SOL (la lampara que da las sombras en
+    // tiempo real: la primera direccional) -su brillo; en un captador, que parte de la directa es del sol- y al terminar,
+    // que fraccion de toda su luz es esa (0..1)
+    int solIdx;
+    std::vector<float> solL, frac;
     RTHorneado() : activo(false), sig(0), w(0), h(0), muestras(16), rng(4242u), indirecta(true), denoiser(true), rebotes(3), rebotesAntes(0),
-                   sinSombras(false), captador(false) {}
+                   sinSombras(false), captador(false), solIdx(-1) {}
 };
 static RTHorneado gHorn;
 bool RTHorneadoActivo() { return gHorn.activo; }
@@ -583,6 +601,16 @@ void RTHorneadoCancelar() {
     gHorn.activo = false; gHorn.e.Limpiar(); gHorn.tx.clear();
 }
 const std::vector<float>& RTHorneadoLuz() { return gHorn.luz; }
+const std::vector<float>& RTHorneadoSol() { return gHorn.frac; }
+// EL SOL de la escena: la primera lampara direccional prendida, recorriendo el arbol (la misma que elige
+// SombrasTiempoReal.cpp para las sombras en tiempo real)
+static Light* SolDeLaEscena(Object* o) {
+    if (!o) return NULL;
+    if (o != (Object*)SceneCollection && (!o->visible || W3dVistaLocalOculta(o))) return NULL;
+    if (o->getType() == ObjectType::light) { Light* l = (Light*)o; if (l->direccional && l->intensidad > 0.0f) return l; }
+    for (size_t i = 0; i < o->Childrens.size(); i++) { Light* l = SolDeLaEscena(o->Childrens[i]); if (l) return l; }
+    return NULL;
+}
 const std::vector<unsigned char>& RTHorneadoCubierto() { return gHorn.cubierto; }
 bool RTHorneadoCaptador() { return gHorn.captador; }
 bool RTHorneadoEmpezar(Mesh* m, int uvCapa, int w, int h, int muestras, std::string* motivo, bool indirecta, int rebotes, bool denoiser) {
@@ -615,6 +643,14 @@ bool RTHorneadoEmpezar(Mesh* m, int uvCapa, int w, int h, int muestras, std::str
     gHorn.rebotes = rebotes < 1 ? 1 : (rebotes > 8 ? 8 : rebotes);
     gHorn.luz.assign((size_t)w * h * 3, 0.0f);
     gHorn.ind.assign((size_t)w * h * 3, 0.0f);
+    gHorn.solL.assign((size_t)w * h, 0.0f);
+    gHorn.frac.assign((size_t)w * h, 0.0f);
+    gHorn.solIdx = -1;
+    { const Light* sol = SolDeLaEscena(SceneCollection);
+      for (size_t i = 0; i < gHorn.e.luces.size() && sol; i++) if (gHorn.e.luces[i].fuente == sol) { gHorn.solIdx = (int)i; break; } }
+    // (con las sombras en tiempo real prendidas: la que llega igual es 1 - intensidad * (1 - color), como en el shader)
+    { const float in = g_sombras.intensidad < 0.0f ? 0.0f : (g_sombras.intensidad > 1.0f ? 1.0f : g_sombras.intensidad);
+      for (int c = 0; c < 3; c++) g_rtColorSombraSol[c] = g_sombras.on ? 1.0f - in * (1.0f - g_sombras.color[c]) : 0.0f; }
     gHorn.nrm.assign((size_t)w * h * 3, 0.0f);
     gHorn.cubierto.assign((size_t)w * h, 0);
     Matrix4 W; m->GetWorldMatrix(W);
@@ -680,8 +716,11 @@ float RTHorneadoPaso(int msPresupuesto) {
         for (size_t i = 0; i < gHorn.e.luces.size(); i++) gHorn.e.luces[i].rayos = gHorn.rayosDirecta[i];
         float dir[3];
         g_rtSinSombras = gHorn.sinSombras;
+        g_rtLuzSol = gHorn.solIdx; g_rtSolLuz[0] = g_rtSolLuz[1] = g_rtSolLuz[2] = 0.0f;   // (el sol, aparte)
         LuzEn(gHorn.e, T.p, T.n, T.n, uno, blanco, gHorn.rng, dir);
+        g_rtLuzSol = -1;
         g_rtSinSombras = false;
+        const float solLum = g_rtSolLuz[0] * 0.299f + g_rtSolLuz[1] * 0.587f + g_rtSolLuz[2] * 0.114f;
         const RTV o = T.p + T.n * 1e-3f;
         if (gHorn.captador) {
             // CAPTADOR DE SOMBRAS: cuanto de la luz directa le tapan (con sombras / sin sombras) y la oclusion ambiental.
@@ -691,6 +730,7 @@ float RTHorneadoPaso(int msPresupuesto) {
             LuzEn(gHorn.e, T.p, T.n, T.n, uno, blanco, gHorn.rng, sin);
             g_rtSinSombras = false;
             const float lc = dir[0] * 0.299f + dir[1] * 0.587f + dir[2] * 0.114f, ls = sin[0] * 0.299f + sin[1] * 0.587f + sin[2] * 0.114f;
+            gHorn.solL[(size_t)T.idx] = (lc > 1e-5f) ? solLum / lc : 0.0f;   // (el captador: que parte de su directa es del sol)
             float r = (ls > 1e-5f) ? lc / ls : 1.0f;
             if (r < 0.0f) r = 0.0f; if (r > 1.0f) r = 1.0f;
             const int nAO = gHorn.muestras < 16 ? 16 : gHorn.muestras;
@@ -722,6 +762,7 @@ float RTHorneadoPaso(int msPresupuesto) {
         float* oi = &gHorn.ind[(size_t)T.idx * 3];
         out[0] = dir[0]; out[1] = dir[1]; out[2] = dir[2];
         oi[0] = ind[0] * k; oi[1] = ind[1] * k; oi[2] = ind[2] * k;
+        gHorn.solL[(size_t)T.idx] = solLum;
         if ((++hechos & 15) == 0 && (int)(w3dGetTicks() - t0) >= msPresupuesto) break;
     }
     if (gHorn.sig >= gHorn.tx.size()) {
@@ -754,11 +795,91 @@ float RTHorneadoPaso(int msPresupuesto) {
         // (el captador: las sombras POR la oclusion ambiental; si no, la directa MAS la indirecta)
         if (gHorn.captador) for (size_t i = 0; i < gHorn.luz.size(); i++) gHorn.luz[i] *= gHorn.ind[i];
         else                for (size_t i = 0; i < gHorn.luz.size(); i++) gHorn.luz[i] += gHorn.ind[i];
+        // LA MASCARA DEL SOL: que fraccion de la luz de cada texel es la directa del sol (el captador ya la tiene)
+        for (size_t i = 0; i < gHorn.frac.size(); i++) {
+            float f;
+            if (gHorn.captador) f = gHorn.solL[i];
+            else {
+                const float* l = &gHorn.luz[i * 3];
+                const float tot = l[0] * 0.299f + l[1] * 0.587f + l[2] * 0.114f;
+                f = (tot > 1e-5f) ? gHorn.solL[i] / tot : 0.0f;
+            }
+            gHorn.frac[i] = f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+        }
         g_rt.rebotes = gHorn.rebotesAntes;
         gHorn.activo = false; gHorn.e.Limpiar();
         return 1.0f;
     }
     return (float)gHorn.sig / (float)gHorn.tx.size();
+}
+
+// ---------------------------------------------------------------------------
+//  LA SONDA DE REFLEJO (objects/SondaReflejo.h): lo que se ve desde 'pos' en todas las direcciones, en una imagen 360
+//  equirectangular de w x h (w = 2h), con la MISMA convencion que el reflejo "Equirectangular 360" del material (mundo, Y
+//  arriba: u = 0.5 + atan2(z, x) / 2pi, v = acos(y) / pi; la fila 0 es la de arriba). Cada pixel: 4 rayos de camara (con
+//  las lamparas, sus sombras, los rebotes y el fondo, como el render). soloEstaticos: lo que se mueve no se ve (horneada)
+// ---------------------------------------------------------------------------
+bool RTHornearReflejo(const float pos[3], int w, int h, float cerca, int muestras, int rebotes, float intensidad,
+                      std::vector<unsigned char>& rgba, std::string* motivo) {
+    if (w < 2 || h < 1) { if (motivo) *motivo = "Invalid size"; return false; }
+    RTEscena e;
+    g_rtSoloEstaticos = true;   // (como Unity: la horneada ve solo lo ESTATICO, y nada de lo que no sale en las sondas)
+    g_rtParaSonda = true;
+    ArmarEscena(e);
+    g_rtSoloEstaticos = false; g_rtParaSonda = false;
+    rgba.assign((size_t)w * h * 4, 255);
+    RTRng rng(7919u);
+    const RTV o = V3(pos[0], pos[1], pos[2]);
+    // CON LA LUZ QUE REBOTA, como la luz precalculada: con los rebotes del render (0 en muchas escenas) la cara de algo
+    // que no ve el sol salia NEGRA en el reflejo (en la escena se ve clara: su textura horneada tiene los rebotes). Los
+    // REBOTES y las MUESTRAS por pixel son de la sonda (de fabrica 3 y 32: con 4 la penumbra de un sol con radio salia
+    // granulada)
+    const int rebAntes = g_rt.rebotes;
+    g_rt.rebotes = rebotes < 0 ? 0 : (rebotes > 8 ? 8 : rebotes);
+    const int ns = muestras < 1 ? 1 : (muestras > 1024 ? 1024 : muestras);
+    std::vector<float> img((size_t)w * h * 3, 0.0f);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            float acc[3] = { 0, 0, 0 };
+            for (int s = 0; s < ns; s++) {
+                const float jx = (ns == 1) ? 0.5f : (ns == 4) ? ((s & 1) ? 0.75f : 0.25f) : rng.F();
+                const float jy = (ns == 1) ? 0.5f : (ns == 4) ? ((s & 2) ? 0.75f : 0.25f) : rng.F();
+                const float u = ((float)x + jx) / (float)w, v = ((float)y + jy) / (float)h;
+                const float fi = (u - 0.5f) * 6.2831853f, te = v * 3.14159265f;
+                const RTV d = V3(sinf(te) * cosf(fi), cosf(te), sinf(te) * sinf(fi));
+                float L[3]; Radiancia(e, o + d * (cerca > 0.0f ? cerca : 0.0f), d, rng, 0, L);
+                acc[0] += L[0]; acc[1] += L[1]; acc[2] += L[2];
+            }
+            for (int c = 0; c < 3; c++) img[((size_t)y * w + x) * 3 + c] = acc[c] / (float)ns * intensidad;
+        }
+    g_rt.rebotes = rebAntes;
+    // EL GRANULADO de los rebotes: un promedio con los vecinos de COLOR PARECIDO (5 x 5, da la vuelta a lo ancho; los
+    // bordes de un objeto contra la pared quedan netos)
+    std::vector<float> out(img);
+    if (ns > 1)
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                const float* c0 = &img[((size_t)y * w + x) * 3];
+                float sm[3] = { 0, 0, 0 }, peso = 0.0f;
+                for (int dy = -2; dy <= 2; dy++) {
+                    const int yy = y + dy; if (yy < 0 || yy >= h) continue;
+                    for (int dx = -2; dx <= 2; dx++) {
+                        const int xx = (x + dx + w) % w;
+                        const float* c1 = &img[((size_t)yy * w + xx) * 3];
+                        const float d0 = c1[0] - c0[0], d1 = c1[1] - c0[1], d2 = c1[2] - c0[2];
+                        const float wgt = expf(-(d0 * d0 + d1 * d1 + d2 * d2) * 30.0f);
+                        sm[0] += c1[0] * wgt; sm[1] += c1[1] * wgt; sm[2] += c1[2] * wgt; peso += wgt;
+                    }
+                }
+                for (int c = 0; c < 3; c++) out[((size_t)y * w + x) * 3 + c] = sm[c] / peso;
+            }
+    for (size_t i = 0; i < (size_t)w * h; i++)
+        for (int c = 0; c < 3; c++) {
+            const float val = out[i * 3 + c];
+            rgba[i * 4 + c] = (unsigned char)(val <= 0.0f ? 0 : val >= 1.0f ? 255 : (int)(val * 255.0f + 0.5f));
+        }
+    e.Limpiar();
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -920,7 +1041,8 @@ static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haci
     for (size_t i = 0; i < e.luces.size(); i++) {
         const RTLuz& L = e.luces[i];
         luz[0] += L.ambiente[0]; luz[1] += L.ambiente[1]; luz[2] += L.ambiente[2];
-        float lambert = 0.0f, spec = 0.0f, att = 1.0f;
+        float lambert = 0.0f, spec = 0.0f, att = 1.0f, tapado = 0.0f;
+        const bool solHorneado = (int)i == g_rtLuzSol && L.direccional;
         const int nRayos = g_rtPreviewRapida ? 1 : L.rayos;
         for (int r = 0; r < nRayos; r++) {
             RTV ldir; float dist;
@@ -943,6 +1065,7 @@ static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haci
                 if (L.spotExpo > 0.0f) cono = powf(sd, L.spotExpo);
             }
             const float vis = (g_rtSinSombras ? 1.0f : Visibilidad(e, po, ldir, dist)) * cono;   // 0..1: lo transparente deja pasar parte de la luz
+            if (solHorneado) tapado += nl * (cono - vis);
             if (vis <= 0.0f) continue;
             lambert += nl * vis;
             if (pesoBrillo > 0.0f) {   // Blinn-Phong: (n . h)^expo, normalizado para que el pulido concentre la misma energia
@@ -951,11 +1074,15 @@ static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haci
                 if (nh > 0.0f) spec += powf(nh, expo) * (expo + 2.0f) * 0.125f * vis;
             }
         }
+        // (la parte tapada del sol entra con el color de la sombra; la mascara del sol -g_rtSolLuz- es solo la que llega)
+        if (solHorneado && tapado > 0.0f)
+            for (int c = 0; c < 3; c++) luz[c] += L.color[c] * tapado / (float)nRayos * g_rtColorSombraSol[c];
         if (lambert <= 0.0f && spec <= 0.0f) continue;
         lambert /= (float)nRayos; spec /= (float)nRayos;
         if (!L.direccional) { const float dd = Largo(L.pos - po); att = 1.0f / (L.attC + L.attL * dd + L.attQ * dd * dd); if (att > 1.0f) att = 1.0f;
             att *= VentanaDistancia(dd, L.distancia); }
         for (int c = 0; c < 3; c++) { luz[c] += L.color[c] * lambert * att; brillo[c] += L.color[c] * spec * att; }
+        if ((int)i == g_rtLuzSol) for (int c = 0; c < 3; c++) g_rtSolLuz[c] += L.color[c] * lambert * att;
     }
     const float difusoPeso = 1.0f - m.metalico;   // el metal no tiene difuso: todo es reflejo
     for (int c = 0; c < 3; c++) out[c] = alb[c] * luz[c] * difusoPeso + colBrillo[c] * brillo[c] * pesoBrillo + m.emision[c];

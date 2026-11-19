@@ -67,6 +67,7 @@
 #include "objects/Recorte.h"           // LimpiarZ / Recorte
 #include "objects/Hitbox.h"            // HITBOX (sus campos los escribe objects/Hitbox.cpp)
 #include "objects/SondaLuz.h"   // la sonda de luz (sus campos)
+#include "objects/SondaReflejo.h"   // la sonda de reflejo (sus campos)
 #include "objects/InstanciaPrefab.h"   // INSTANCIA DE PREFAB: se escribe el nodo (prefab + overrides), NO lo que genera
 #include "objects/ProxyW3d.h"         // PROXY W3D: el nodo (libreria + elemento + overrides); lo que genera es de la libreria
 #include "io/Librerias.h"             // las referencias a una LIBRERIA que no esta (se escriben tal cual)
@@ -408,6 +409,7 @@ static void CamposComunes(std::string& s, int ind, Object* o) {
     // LA LUZ PRECALCULADA: solo lo que no es de fabrica (rebota; no es captador de sombras)
     if (!o->rebotaLuz) { JSang(s, ind); s += "\"rebotaLuz\": false,\n"; }
     if (o->captaSombras) { JSang(s, ind); s += "\"captaSombras\": true,\n"; }
+    if (!o->enSondas) { JSang(s, ind); s += "\"enSondas\": false,\n"; }   // (las sondas no lo ven)
     // LINEAS PARENTALES: solo se escribe cuando se APAGO (el default es true), asi los
     // proyectos que no la tocan quedan byte a byte como antes.
     if (!o->showRelantionshipsLines) { JSang(s, ind); s += "\"lineasParentales\": false,\n"; }
@@ -772,6 +774,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         s += ",\n      \"brillo\": "; JNum(s, mt->shininess);
         s += ", \"interpolacion\": "; JNum(s, (float)mt->interpolacion);
         s += ", \"reflejoModo\": "; JNum(s, (float)mt->reflectMode);
+        if (mt->reflejoSonda) s += ", \"reflejoSonda\": true";
         // TRAZADO DE RAYOS: solo si se apartan del default (0.5 / 0), mismo criterio que decal
         if (mt->rtRugosidad != 0.5f) { s += ", \"rugosidad\": "; JNum(s, mt->rtRugosidad); }
         if (mt->rtMetalico != 0.0f)  { s += ", \"metalico\": ";  JNum(s, mt->rtMetalico); }
@@ -867,6 +870,11 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
                 const bool on = dormida ? dz->capas[c].on : mt->capas[c - nDorm].on;
                 const float fuerza = dormida ? dz->capas[c].fuerza : mt->capas[c - nDorm].fuerza;
                 const bool horneada = dormida ? dz->capas[c].horneada : mt->capas[c - nDorm].horneada;
+                // (la mascara vive en el alfa de la textura: una EXTERNA horneada y sin guardar todavia tiene la imagen de
+                //  antes en el disco, sin alfa; la marca va recien cuando se guarde la textura)
+                const Texture* tCapa = dormida ? NULL : mt->capas[c - nDorm].tex;
+                const bool mascaraSol = dormida ? dz->capas[c].mascaraSol
+                                                : (mt->capas[c - nDorm].mascaraSol && !(tCapa && TexEditEsExterna(tCapa) && TexEditSinGuardar(tCapa)));
                 if (!primera) s += ",";
                 primera = false;
                 s += " { \"textura\": "; JEsc(s, ct);
@@ -874,6 +882,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
                 if (uvCapa != 0) { s += ", \"uv\": "; JNum(s, (float)uvCapa); }   // solo si no es la base (diffs estables)
                 if (fuerza != 1.0f) { s += ", \"fuerza\": "; JNum(s, fuerza); }   // el factor de la mezcla (ausente = 1)
                 if (horneada) s += ", \"horneada\": true";   // (la luz horneada: el material sin luz de tiempo real)
+                if (horneada && mascaraSol) s += ", \"mascaraSol\": true";   // (su alfa: cuanto de la luz es del sol)
                 s += ", \"on\": "; s += on ? "true" : "false"; s += " }";
             }
             s += " ]";
@@ -1347,7 +1356,9 @@ static void EscribirRender(std::string& s, CtxGuardar* cx) {
       if (so.resolucion != sd.resolucion) E::I(c, "sombraResolucion", so.resolucion);
       if (so.suaves != sd.suaves) E::B(c, "sombraSuaves", so.suaves);
       if (so.intensidad != sd.intensidad) E::F(c, "sombraIntensidad", so.intensidad);
-      if (so.sesgo != sd.sesgo) E::F(c, "sombraSesgo", so.sesgo); }
+      if (so.sesgo != sd.sesgo) E::F(c, "sombraSesgo", so.sesgo);
+      if (so.color[0] != sd.color[0] || so.color[1] != sd.color[1] || so.color[2] != sd.color[2]) {
+          c += ", \"sombraColor\": ["; JNum(c, so.color[0]); c += ", "; JNum(c, so.color[1]); c += ", "; JNum(c, so.color[2]); c += "]"; } }
     if (g_renderBgRot[0] != 0.0f || g_renderBgRot[1] != 0.0f || g_renderBgRot[2] != 0.0f) {
         c += ", \"fondoRot\": ["; JNum(c, g_renderBgRot[0]); c += ", "; JNum(c, g_renderBgRot[1]); c += ", "; JNum(c, g_renderBgRot[2]); c += "]"; }
     if (!g_renderBgTexs.empty()) {
@@ -2164,6 +2175,11 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         JSang(s, ind + 1); s += "\"tipo\": \"sondaluz\",\n";
         CamposComunes(s, ind + 1, o);
         SondaLuzEscribirCampos(s, ind + 1, (SondaLuz*)o);
+    }
+    else if (t == ObjectType::sondareflejo) {   // SONDA DE REFLEJO: la caja, la captura y su imagen 360 (objects/SondaReflejo.cpp)
+        JSang(s, ind + 1); s += "\"tipo\": \"sondareflejo\",\n";
+        CamposComunes(s, ind + 1, o);
+        SondaReflejoEscribirCampos(s, ind + 1, (SondaReflejo*)o);
     }
     else if (t == ObjectType::prefab) {
         // INSTANCIA DE PREFAB: el nodo, su prefab y sus overrides (sus hijos NO: ver EscribirHijos)

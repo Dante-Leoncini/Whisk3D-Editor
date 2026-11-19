@@ -55,6 +55,7 @@
 2D Editor	Éditeur 2D
 2D armature animation: the mesh has no 2D armature	Animation d'armature 2D : le maillage n'a pas d'armature 2D
 2D bone(s)	os 2D
+360 Image	Image 360
 3D Cursor	Curseur 3D
 3D Mesh	Maillage 3D
 3D Mesh of	Maillage 3D de
@@ -63,6 +64,7 @@
 3D grid	Grille 3D
 : baked	: précalculé
 A W3D proxy is read-only: it can't be unpacked	Un proxy W3D est en lecture seule : impossible de le dépaqueter
+A custom probe uses the image you choose	Une sonde personnalisée utilise l'image choisie
 A different file already exists there	Un autre fichier existe déjà ici
 A flipbook uses it	Utilisé par un flipbook
 A game has no animation to render	Un jeu n'a pas d'animation à rendre
@@ -71,6 +73,7 @@ A prefab can't be converted	Un prefab ne peut pas être converti
 A prefab can't contain itself	Un prefab ne peut pas se contenir lui-même
 A prefab instance only has what its prefab generates	Une instance de prefab n'a que ce que génère son prefab
 A project needs at least one scene	Un projet nécessite au moins une scène
+A realtime probe is drawn by the GPU	Une sonde en temps réel est dessinée par le GPU
 A resource with that name already exists	Une ressource porte déjà ce nom
 A scene can't contain itself	Une scène ne peut pas se contenir elle-même
 A scene with that name already existed, renamed:	Une scène de ce nom existait déjà, renommée :
@@ -209,12 +212,16 @@ Back	Arrière
 Back (overshoot)	Recul
 Back View	Vue arrière
 Background	Fond
+Background Color	Fond de couleur
 Background light	Lumière du fond
 Bake	Précalculer
 Bake Lighting	Précalculer l'éclairage
 Bake canceled	Précalcul annulé
+Bake the reflection probe first	Précalculez d'abord la sonde de réflexion
+Baked	Précalculée
 Baked: %d points	Précalculée : %d points
 Bakes the light of the static objects into the texture, through the UV of the mesh	Précalcule la lumière des objets statiques dans la texture, via les UV du maillage
+Baking here overwrites where their UVs overlap	Précalculer ici écrase là où leurs UV se chevauchent
 Base Color	Couleur de base
 Base velocity	Vitesse de base
 Before Mode	Mode avant
@@ -260,6 +267,7 @@ Bounce	Rebond
 Bounces	Rebonds
 Boundary	Limite
 Box (memory)	Boîte (mémoire)
+Box Projection	Projection en boîte
 Box Select	Sélection par boîte
 Box X	Boîte X
 Box Y	Boîte Y
@@ -405,11 +413,13 @@ Convert to Game	Convertir en jeu
 Convert to Scene	Convertir en scène
 Convert to editable mesh	Convertir en maillage éditable
 Copied	Copié
+Copied to %d selected object(s)	Copié vers %d objet(s) sélectionné(s)
 Copy	Copier
 Copy Keyframe	Copier la clé
 Copy X	Copier X
 Copy Y	Copier Y
 Copy Z	Copier Z
+Copy to Selected	Copier vers la sélection
 Copying libmain.so (jniLibs)	Copie de libmain.so (jniLibs)
 Copying results	Copie des résultats
 Copying the Android template	Copie du modèle Android
@@ -417,6 +427,7 @@ Core (advanced)	Noyau (avancé)
 Correct UVs	Corriger UV
 Could not copy the objects	Impossible de copier les objets
 Could not create a viewport on the external display: cloning the screen	Impossible de créer une vue sur l'écran externe : clonage de l'écran
+Could not create the texture	Impossible de créer la texture
 Could not encode the PNG	Impossible d'encoder le PNG
 Could not extract	Impossible d'extraire
 Could not import	Impossible d'importer
@@ -792,6 +803,7 @@ Import STL	Importer STL
 Import glTF	Importer glTF
 Import w3dui	Importer w3dui
 Import...	Importer...
+Importance	Importance
 Imported	Importé
 Importing FBX...	Import FBX...
 Importing glTF...	Import glTF...
@@ -837,6 +849,7 @@ Interpolation: Constant	Interpolation : constante
 Interpolation: Linear	Interpolation : linéaire
 Intersect	Intersection
 Intersection Type	Type d'intersection
+Invalid size	Taille invalide
 Inverse Square	Carré inverse
 Invert	Inverser
 Invert Selection	Inverser la sélection
@@ -1080,6 +1093,7 @@ Near	Près
 Near fade from	Près : invisible jusqu'à
 Near fade to	Près : visible dès
 Nearest (pixelated)	Plus proche (pixelisé)
+Nearest probe (automatic)	La sonde la plus proche (automatique)
 Network access	Accès réseau
 New	Nouveau
 New Animation	Nouvelle animation
@@ -1290,6 +1304,7 @@ Patch	Patch
 Path	Chemin
 Pause	Pause
 Pencil+Up	Crayon+Haut
+Penumbra	Pénombre
 Per Pixel Shading	Ombrage par pixel
 Per Vertex Shading	Ombrage par sommet
 Per pixel	Par pixel
@@ -1350,6 +1365,9 @@ Previous Keyframe	Clé précédente
 Previous frame	Image précédente
 Previous keyframe	Image clé précédente
 Primitive	Primitive
+Probe Origin X	Origine X
+Probe Origin Y	Origine Y
+Probe Origin Z	Origine Z
 Profile Shape	Forme du profil
 Profile Type	Type de profil
 Project	Projet
@@ -1394,8 +1412,10 @@ Ray Tracing	Lancer de rayons
 Ray traced motion blur	Flou cinétique par rayons
 Rays	Rayons
 Real-time shadows	Ombres en temps réel
+Realtime	Temps réel
 Recalculate	Recalculer
 Recalculate Normals	Recalculer normales
+Recalculated by the editor (the game uses the last one)	Recalculée par l'éditeur (le jeu utilise la dernière)
 Receive shadows	Recevoir des ombres
 Recent files	Fichiers récents
 Rectangle	Rectangle
@@ -1404,6 +1424,9 @@ Redo	Rétablir
 Reference	Référence
 Reflect children	Refléter les enfants
 Reflection	Réflexion
+Reflection Probe	Sonde de réflexion
+Reflection Probes	Sondes de réflexion
+Reflection probe baked (%u ms)	Sonde de réflexion précalculée (%u ms)
 Refresh	Actualiser
 Refresh:	Actualiser :
 Relationship Lines	Lignes de relation
@@ -1599,6 +1622,7 @@ Shader of	Shader de
 Shaders	Shaders
 Shading	Ombrage
 Shadow catcher	Capteur d'ombres
+Shadow color	Couleur de l'ombre
 Shadow strength	Intensité
 Shape	Forme
 Shape keys	Clés de forme
@@ -1780,6 +1804,7 @@ The library isn't linked	La bibliothèque n'est pas liée
 The library's proyecto.json can't be read	Impossible de lire le proyecto.json de la bibliothèque
 The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	La lumière '%s' n'a pas été chargée : la scène a déjà le maximum de lumières (%d).
 The list of All	Celle de Tout
+The material is shared with other objects: this one got its own copy	Le matériau est partagé avec d'autres objets : celui-ci a reçu sa propre copie
 The mesh '%s' (no objects) could not be read: saving without it	Le maillage '%s' (sans objets) n'a pas pu être lu : enregistrement sans lui
 The mesh has no UV	Le maillage n'a pas d'UV
 The mesh has no faces	Le maillage n'a pas de faces
@@ -1817,6 +1842,7 @@ This resource can't be renamed	Cette ressource ne peut pas être renommée
 This resource type can't be deleted	Ce type de ressource ne peut pas être supprimé
 This resource type can't be duplicated	Ce type de ressource ne peut pas être dupliqué
 This step has nothing to animate	Cette étape n'a rien à animer
+This texture already has the baked light of	Cette texture contient déjà la lumière précalculée de
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Cela va modifier les groupes de sommets et les simplifier à 1 os par sommet (skinning plus rapide). Des données peuvent être perdues.
 Threshold	Seuil
 Timeline	Timeline
@@ -1888,6 +1914,7 @@ Unwrap Conformal	Déplier conforme
 Unwrap Minimum Stretch	Déplier étirement minimal
 Unwrap: closed surface, mark seams first	Déplier : surface fermée, marquez d'abord des coutures
 Unwrap: select faces first	Déplier : sélectionnez d'abord des faces
+Update every	Mettre à jour toutes les
 Upright (does not tilt)	Vertical (ne s'incline pas)
 Upscaler	Upscaler
 Upscaling	Upscaling
@@ -1908,6 +1935,7 @@ Use this file	Utiliser ce fichier
 Use this folder	Utiliser ce dossier
 Users	Utilisateurs
 Users selected	Utilisateurs sélectionnés
+Uses the 360 image you choose	Utilise l'image 360 que vous choisissez
 V Location	V Position
 Value	Valeur
 Value Y	Valeur Y
@@ -1939,6 +1967,7 @@ Viewport	Vue
 Visibility icons	Icônes de visibilité
 Visibility test	Test de visibilité
 Visible	Visible
+Visible in probes	Visible dans les sondes
 Volume	Volume
 Volume line	Ligne de volume
 Wait for the build to finish	Attendez la fin de la compilation

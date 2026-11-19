@@ -21,6 +21,7 @@
 #include "undo/Undo.h"
 #include "W3dLang.h"
 #include <stdio.h>
+#include <map>
 
 extern void Notificar(const std::string& texto, bool error);
 extern void PropsLayoutSucio();
@@ -28,8 +29,27 @@ extern void RebindMaterialMeshPart();
 extern void (*g_nuevaTexturaCreadaHook)(const std::string& ruta);   // (NuevaTexturaPopup.cpp)
 void PropsAbrirMenuBajoBoton(PopupMenu* menu, Button* boton);       // (Properties.cpp: el estandar de los desplegables)
 
-static Texture* gHornTex = NULL;     // la textura elegida (se valida contra Textures en cada uso)
-static int      gHornUV = -1;        // la capa UV (-1 = la activa de la malla)
+// LA TEXTURA Y LA CAPA UV DE CADA MALLA (por su serial): cada objeto hornea en la SUYA. Antes eran una sola para todos y,
+// al pasar a otro objeto, seguia elegida la del anterior: el escenario se horneaba sin querer en la textura del cubo (y sus
+// materiales quedaban con las dos capas de luz). La primera vez arranca con la de su luz ya horneada, si tiene
+struct HornElegido { Texture* tex; int uv; bool listo; HornElegido() : tex(NULL), uv(-1), listo(false) {} };
+static std::map<unsigned int, HornElegido> gHornPorMalla;
+static Mesh* MallaActiva();
+static HornElegido& ElegidoDe(Mesh* m) {
+    static HornElegido nada;
+    if (!m) { nada = HornElegido(); return nada; }
+    HornElegido& e = gHornPorMalla[m->serial];
+    if (!e.listo) {
+        e.listo = true;
+        for (size_t g = 0; g < m->materialsGroup.size() && !e.tex; g++) {
+            Material* mat = m->materialsGroup[g].material;
+            if (!mat || mat == MaterialDefecto) continue;
+            for (size_t k = 0; k < mat->capas.size(); k++)
+                if (mat->capas[k].horneada && mat->capas[k].tex) { e.tex = mat->capas[k].tex; e.uv = mat->capas[k].uvMapa; break; }
+        }
+    }
+    return e;
+}
 static float    gHornMuestras = 32.0f;
 static bool     gHornIndirecta = true;   // la luz que rebota (el fondo y lo de alrededor)
 static float    gHornRebotes = 3.0f;     // cuantas veces rebota (con mas, la sombra recibe la luz que rebota en lo que la tapa)
@@ -60,13 +80,13 @@ static std::string NombreTex(const Texture* t) {
 static void AccionTexElegida(int id) {
     if (id == 1) {   // "New Texture...": el popup de siempre; al crearla queda elegida
         g_nuevaTexturaCreadaHook = NULL;
-        struct H { static void Creada(const std::string& ruta) { Texture* t = TexturaBuscar(ruta); if (t) gHornTex = t; g_redraw = true; } };
+        struct H { static void Creada(const std::string& ruta) { Texture* t = TexturaBuscar(ruta); if (t && MallaActiva()) ElegidoDe(MallaActiva()).tex = t; g_redraw = true; } };
         g_nuevaTexturaCreadaHook = H::Creada;
         AbrirNuevaTexturaPopup();
         return;
     }
     const size_t i = (size_t)(id - 2) + 5;
-    if (id >= 2 && i < Textures.size()) gHornTex = Textures[i];
+    if (id >= 2 && i < Textures.size() && MallaActiva()) ElegidoDe(MallaActiva()).tex = Textures[i];
     g_redraw = true;
 }
 static void AccionMenuTex() {
@@ -79,7 +99,7 @@ static void AccionMenuTex() {
     PropsAbrirMenuBajoBoton(gMenuHornTex, PropsActivo->propHornTex->button);
 }
 // ---- la capa UV ----
-static void AccionUVElegida(int id) { gHornUV = id; g_redraw = true; }
+static void AccionUVElegida(int id) { if (MallaActiva()) ElegidoDe(MallaActiva()).uv = id; g_redraw = true; }
 static void AccionMenuUV() {
     Mesh* m = MallaActiva();
     if (!m || !PropsActivo || !PropsActivo->propHornUV) return;
@@ -92,11 +112,22 @@ static void AccionMenuUV() {
 }
 static int UVElegida(const Mesh* m) {
     if (!m) return 0;
-    if (gHornUV >= 0 && gHornUV < (int)m->uvMaps.size()) return gHornUV;
+    const int uv = ElegidoDe(const_cast<Mesh*>(m)).uv;
+    if (uv >= 0 && uv < (int)m->uvMaps.size()) return uv;
     return m->uvMapActivo >= 0 ? m->uvMapActivo : 0;
 }
 
 // ---- hornear ----
+// otra malla de la escena (que no es 'm') usa 'mat' en alguna de sus partes
+static bool MaterialDeOtraMalla(Object* o, Material* mat, Mesh* m) {
+    if (!o) return false;
+    if (o->getType() == ObjectType::mesh && o != (Object*)m) {
+        Mesh* me = (Mesh*)o;
+        for (size_t g = 0; g < me->materialsGroup.size(); g++) if (me->materialsGroup[g].material == mat) return true;
+    }
+    for (size_t i = 0; i < o->Childrens.size(); i++) if (MaterialDeOtraMalla(o->Childrens[i], mat, m)) return true;
+    return false;
+}
 static void Terminar() {
     Mesh* m = gHornMalla;
     TexturaEditable* te = gHornTe;
@@ -109,25 +140,30 @@ static void Terminar() {
     // los texels de las caras + DOS de margen (el promedio de los vecinos cubiertos): el filtro bilineal lee la orilla
     std::vector<float> L(luz);
     std::vector<unsigned char> c(cub);
+    // LA MASCARA DEL SOL (al alfa): que fraccion de la luz de cada texel es la directa del sol (RTHorneadoSol)
+    std::vector<float> S(RTHorneadoSol());
+    const bool conSol = (int)S.size() == w * h;
+    if (!conSol) S.assign((size_t)w * h, 0.0f);
     for (int pasada = 0; pasada < 2; pasada++) {
-        std::vector<float> L2(L); std::vector<unsigned char> c2(c);
+        std::vector<float> L2(L); std::vector<unsigned char> c2(c); std::vector<float> S2(S);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
                 const int id = y * w + x;
                 if (c[(size_t)id]) continue;
-                float acc[3] = { 0, 0, 0 }; int n = 0;
+                float acc[3] = { 0, 0, 0 }; float accS = 0.0f; int n = 0;
                 for (int dy = -1; dy <= 1; dy++)
                     for (int dx = -1; dx <= 1; dx++) {
                         const int xx = x + dx, yy = y + dy;
                         if (xx < 0 || yy < 0 || xx >= w || yy >= h || !c[(size_t)(yy * w + xx)]) continue;
                         const float* q = &L[(size_t)(yy * w + xx) * 3];
-                        acc[0] += q[0]; acc[1] += q[1]; acc[2] += q[2]; n++;
+                        acc[0] += q[0]; acc[1] += q[1]; acc[2] += q[2]; accS += S[(size_t)(yy * w + xx)]; n++;
                     }
                 if (!n) continue;
                 for (int k = 0; k < 3; k++) L2[(size_t)id * 3 + k] = acc[k] / (float)n;
+                S2[(size_t)id] = accS / (float)n;
                 c2[(size_t)id] = 1;
             }
-        L.swap(L2); c.swap(c2);
+        L.swap(L2); c.swap(c2); S.swap(S2);
     }
     // UN CAPTADOR DE SOMBRAS: la textura es la sombra (blanco = nada), para una capa Multiply comun
     const bool captador = RTHorneadoCaptador();
@@ -139,28 +175,80 @@ static void Terminar() {
             const float v = L[(size_t)i * 3 + k] * (captador ? 1.0f : 0.5f);
             te->rgba[(size_t)i * 4 + k] = (unsigned char)(v <= 0.0f ? 0 : v >= 1.0f ? 255 : (int)(v * 255.0f + 0.5f));
         }
-        te->rgba[(size_t)i * 4 + 3] = 255;
+        // (el ALFA: la mascara del sol. La capa no lo usa como transparencia: ver TexLayer::mascaraSol)
+        const float sf = S[(size_t)i];
+        te->rgba[(size_t)i * 4 + 3] = conSol ? (unsigned char)(sf <= 0.0f ? 0 : sf >= 1.0f ? 255 : (int)(sf * 255.0f + 0.5f)) : 255;
     }
+    if (conSol) te->alpha = true;   // (el PNG guarda el alfa: la mascara del sol)
     te->modificada = true;
+    // (una textura del proyecto viaja con el proximo guardado del .w3d: la luz horneada -y su mascara- no se pierde por
+    //  no haber guardado la textura aparte. Una externa se guarda con su boton, como siempre)
+    if (!TexEditEsExterna(te->tex)) te->enMemoria = true;
     TexEditSubir(te, 0, 0, w, h);
     UndoTexturaConfirmar(true);
+    // UN MATERIAL QUE USAN OTRAS MALLAS: la luz horneada es de ESTA malla (cae por su UV). Puesta en un material compartido,
+    // todas las que lo usan la mostraban con sus UV: la luz de otro objeto (el plano nuevo con el material "Default" se
+    // veia con la luz del cubo, como una sombra que no era). Esta malla pasa a una COPIA suya del material (con Ctrl+Z)
+    UndoGrupoIniciar();
+    {
+        std::map<Material*, Material*> copias;
+        std::vector<std::string> copiados;
+        for (size_t g = 0; g < m->materialsGroup.size(); g++) {
+            Material* mat = m->materialsGroup[g].material;
+            if (!mat || mat == MaterialDefecto || !MaterialDeOtraMalla(SceneCollection, mat, m)) continue;
+            Material*& c = copias[mat];
+            if (!c) {
+                extern Material* W3dMaterialCopiaConUndo(const Material*, const std::string&);
+                c = W3dMaterialCopiaConUndo(mat, mat->name + " " + m->name);
+                // (la copia no se queda con la luz que el compartido tenia de otra malla)
+                for (size_t k = c->capas.size(); k-- > 0; )
+                    if (c->capas[k].horneada) { TexturaPonerEn(c->capas[k].tex, NULL); c->capas.erase(c->capas.begin() + (long)k); }
+                // ...y el compartido suelta la luz de ESTA textura: se la habia dejado un horneado de esta malla (antes de
+                // esta copia) y las otras la mostraban con sus UV
+                bool tiene = false;
+                for (size_t k = 0; k < mat->capas.size() && !tiene; k++) tiene = mat->capas[k].horneada && mat->capas[k].tex == te->tex;
+                if (tiene) {
+                    UndoMaterialModIniciar(mat);
+                    for (size_t k = mat->capas.size(); k-- > 0; )
+                        if (mat->capas[k].horneada && mat->capas[k].tex == te->tex) { TexturaPonerEn(mat->capas[k].tex, NULL); mat->capas.erase(mat->capas.begin() + (long)k); }
+                    UndoMaterialModCommit();
+                }
+                copiados.push_back(mat->name);
+            }
+            UndoCapturarMaterial(m, (int)g);
+            m->materialsGroup[g].material = c;
+        }
+        if (!copiados.empty()) {
+            std::string l;
+            for (size_t i = 0; i < copiados.size(); i++) l += (i ? ", " : "") + copiados[i];
+            Notificar(std::string(T("The material is shared with other objects: this one got its own copy")) + " (" + l + ")", false);
+        }
+    }
     // LA TEXTURA COMO CAPA de los materiales de la malla, y sin la luz de tiempo real
     for (size_t g = 0; g < m->materialsGroup.size(); g++) {
         Material* mat = m->materialsGroup[g].material;
         if (!mat || mat == MaterialDefecto) continue;
         UndoMaterialModIniciar(mat);
+        // (la luz NUEVA reemplaza a la que tenia horneada en otra textura: si no, se multiplicaban las dos)
+        for (size_t k = mat->capas.size(); k-- > 0; )
+            if (mat->capas[k].horneada && mat->capas[k].tex != te->tex) {
+                TexturaPonerEn(mat->capas[k].tex, NULL);   // (suelta su referencia a la textura)
+                mat->capas.erase(mat->capas.begin() + (long)k);
+            }
         bool hay = false;
         for (size_t k = 0; k < mat->capas.size(); k++)
             if (mat->capas[k].tex == te->tex) { mat->capas[k].blend = modo; mat->capas[k].uvMapa = gHornUVUsada;
-                                                mat->capas[k].on = true; mat->capas[k].horneada = true; hay = true; }
+                                                mat->capas[k].on = true; mat->capas[k].horneada = true;
+                                                mat->capas[k].mascaraSol = conSol; hay = true; }
         if (!hay) {
-            TexLayer tl; tl.blend = modo; tl.uvMapa = gHornUVUsada; tl.fuerza = 1.0f; tl.horneada = true;
+            TexLayer tl; tl.blend = modo; tl.uvMapa = gHornUVUsada; tl.fuerza = 1.0f; tl.horneada = true; tl.mascaraSol = conSol;
             TexturaPonerEn(tl.tex, te->tex);
             mat->capas.push_back(tl);
         }
         // (la capa es de LUZ HORNEADA: mientras este prendida el material va sin la luz de tiempo real. Sacarla la devuelve)
         UndoMaterialModCommit();
     }
+    UndoGrupoFin();
     RebindMaterialMeshPart();
     RTInvalidar();
     Notificar(T("Lighting baked"), false);
@@ -174,8 +262,9 @@ static void AccionHornear() {
     if (RTHorneadoActivo()) { AccionCancelar(); return; }
     Mesh* m = MallaActiva();
     if (!m) return;
-    if (!TexturaViva(gHornTex)) { Notificar(T("Choose a texture to bake into"), true); return; }
-    TexturaEditable* te = TexEditObtener(gHornTex);
+    Texture* tex = ElegidoDe(m).tex;
+    if (!TexturaViva(tex)) { Notificar(T("Choose a texture to bake into"), true); return; }
+    TexturaEditable* te = TexEditObtener(tex);
     if (!te || te->w <= 0 || te->h <= 0) { Notificar(T("Could not read the image"), true); return; }
     const int uv = UVElegida(m);
     std::string motivo;
@@ -208,6 +297,9 @@ void PropsHorneadoConstruir(Properties* p) {
     p->propHornTex->button->desplegable = true;
     p->propHornTex->action = AccionMenuTex;
     p->propHorneado->properties.push_back(p->propHornTex);
+    p->propHornAvisoTex = new PropLabel("", true);
+    p->propHornAvisoTex->oculto = true;
+    p->propHorneado->properties.push_back(p->propHornAvisoTex);
     p->propHornUV = new PropButton(T("UV"), IconType::material);
     p->propHornUV->conLabel = true;
     p->propHornUV->button->desplegable = true;
@@ -243,6 +335,22 @@ void PropsHorneadoConstruir(Properties* p) {
     p->GroupProperties.push_back(p->propHorneado);
 }
 
+// las OTRAS mallas de la escena que ya tienen la luz horneada en 't' (una capa de luz de sus materiales): hornear 'm' en la
+// misma textura pisa lo que se cruce con sus UV
+static void MallasConLuzEn(Object* o, Mesh* m, Texture* t, std::vector<std::string>& out) {
+    if (!o || out.size() >= 4) return;
+    if (o->getType() == ObjectType::mesh && o != (Object*)m) {
+        Mesh* me = (Mesh*)o;
+        bool usa = false;
+        for (size_t g = 0; g < me->materialsGroup.size() && !usa; g++) {
+            Material* mat = me->materialsGroup[g].material;
+            if (!mat) continue;
+            for (size_t k = 0; k < mat->capas.size() && !usa; k++) usa = mat->capas[k].horneada && mat->capas[k].tex == t;
+        }
+        if (usa) out.push_back(o->name);
+    }
+    for (size_t i = 0; i < o->Childrens.size(); i++) MallasConLuzEn(o->Childrens[i], m, t, out);
+}
 void PropsHorneadoActualizar(Properties* p, bool visible) {
     if (!p || !p->propHorneado) return;
     // EL TRABAJO avanza una vez por cuadro (aunque haya varios paneles): ~25 ms por cuadro, el editor sigue andando
@@ -257,9 +365,24 @@ void PropsHorneadoActualizar(Properties* p, bool visible) {
     Mesh* m = visible ? MallaActiva() : NULL;
     p->propHorneado->visible = (m != NULL);
     if (!m) return;
-    if (!TexturaViva(gHornTex)) gHornTex = NULL;
+    HornElegido& el = ElegidoDe(m);
+    if (!TexturaViva(el.tex)) el.tex = NULL;
     const bool trabajando = RTHorneadoActivo();
-    std::string t = NombreTex(gHornTex);
+    // EL AVISO: esa textura ya tiene la luz de otro objeto
+    if (p->propHornAvisoTex) {
+        std::string av;
+        if (el.tex && !trabajando) {
+            std::vector<std::string> otras;
+            MallasConLuzEn(SceneCollection, m, el.tex, otras);
+            for (size_t i = 0; i < otras.size(); i++) av += (i ? ", " : "") + otras[i];
+            if (!av.empty()) av = std::string(T("This texture already has the baked light of")) + ": " + av + ". " +
+                                  T("Baking here overwrites where their UVs overlap");
+        }
+        if (p->propHornAvisoTex->name != av || p->propHornAvisoTex->oculto != av.empty()) {
+            p->propHornAvisoTex->name = av; p->propHornAvisoTex->oculto = av.empty(); PropsLayoutSucio();
+        }
+    }
+    std::string t = NombreTex(el.tex);
     if (p->propHornTex->button->text != t) { p->propHornTex->button->text = t; PropsLayoutSucio(); }
     const int uv = UVElegida(m);
     std::string tu = (uv >= 0 && uv < (int)m->uvMaps.size() && m->uvMaps[(size_t)uv]) ? m->uvMaps[(size_t)uv]->nombre : std::string("UV");

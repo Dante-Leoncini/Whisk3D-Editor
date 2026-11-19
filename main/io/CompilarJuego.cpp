@@ -1740,6 +1740,7 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/render/VectoresMovimiento.cpp",  // el desenfoque de movimiento del postproceso (en la CPU)
     "${W3DROOT}/main/objects/Hitbox.cpp",         // Hitbox: caja de deteccion (el motor esta en el Core)
     "${W3DROOT}/main/objects/SondaLuz.cpp",       // la sonda de luz: la luz indirecta horneada (el lector y el pase la usan)
+    "${W3DROOT}/main/objects/SondaReflejo.cpp",   // la sonda de reflejo: su imagen 360 (los materiales la usan)
     "${W3DROOT}/main/objects/VisZona.cpp",
     "${W3DROOT}/main/objects/Collection.cpp",
     "${W3DROOT}/main/objects/Mirror.cpp",
@@ -3049,6 +3050,7 @@ static bool EsObjeto3D(Object* o) {
         case ObjectType::limpiarz:   case ObjectType::recorte:
         case ObjectType::hitbox:     case ObjectType::prefab:
         case ObjectType::sondaluz:   // (la luz indirecta de lo 3D)
+        case ObjectType::sondareflejo:   // (los reflejos de lo 3D)
         case ObjectType::proxy:      // (un proxy de una libreria: lo que genera es contenido 3D)
         case ObjectType::rutina:     // (una rutina dibuja 3D)
             return true;

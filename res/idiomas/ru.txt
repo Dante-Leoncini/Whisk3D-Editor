@@ -55,6 +55,7 @@
 2D Editor	2D-редактор
 2D armature animation: the mesh has no 2D armature	Анимация 2D-арматуры: у меша нет 2D-арматуры
 2D bone(s)	2D-кость(и)
+360 Image	Изображение 360
 3D Cursor	3D-курсор
 3D Mesh	3D-меш
 3D Mesh of	3D-меш объекта
@@ -63,6 +64,7 @@
 3D grid	3D-сетка
 : baked	: запечено
 A W3D proxy is read-only: it can't be unpacked	Прокси W3D только для чтения: распаковать нельзя
+A custom probe uses the image you choose	Свой зонд использует выбранное изображение
 A different file already exists there	Там уже есть другой файл
 A flipbook uses it	Используется флипбуком
 A game has no animation to render	У игры нет анимации для рендера
@@ -71,6 +73,7 @@ A prefab can't be converted	Префаб нельзя конвертироват
 A prefab can't contain itself	Префаб не может содержать сам себя
 A prefab instance only has what its prefab generates	Экземпляр префаба содержит только то, что создаёт его префаб
 A project needs at least one scene	В проекте нужна хотя бы одна сцена
+A realtime probe is drawn by the GPU	Зонд реального времени рисует GPU
 A resource with that name already exists	Ресурс с таким именем уже есть
 A scene can't contain itself	Сцена не может содержать саму себя
 A scene with that name already existed, renamed:	Сцена с таким именем уже была, новое имя:
@@ -209,12 +212,16 @@ Back	Сзади
 Back (overshoot)	С откатом
 Back View	Вид сзади
 Background	Фон
+Background Color	Цветной фон
 Background light	Свет фона
 Bake	Запечь
 Bake Lighting	Запечь освещение
 Bake canceled	Запекание отменено
+Bake the reflection probe first	Сначала запеките зонд отражений
+Baked	Запечённый
 Baked: %d points	Запечён: точек %d
 Bakes the light of the static objects into the texture, through the UV of the mesh	Запекает свет статических объектов в текстуру по UV сетки
+Baking here overwrites where their UVs overlap	Запекание сюда перезапишет места, где пересекаются их UV
 Base Color	Базовый цвет
 Base velocity	Базовая скорость
 Before Mode	Режим до
@@ -260,6 +267,7 @@ Bounce	Отскок
 Bounces	Отскоки
 Boundary	Граница
 Box (memory)	Бокс (память)
+Box Projection	Проекция в коробку
 Box Select	Выделение рамкой
 Box X	Бокс X
 Box Y	Бокс Y
@@ -405,11 +413,13 @@ Convert to Game	Преобразовать в игру
 Convert to Scene	Преобразовать в сцену
 Convert to editable mesh	Преобразовать в редактируемый меш
 Copied	Скопировано
+Copied to %d selected object(s)	Скопировано в %d выделенных объект(а/ов)
 Copy	Копировать
 Copy Keyframe	Копировать ключевой кадр
 Copy X	Копировать X
 Copy Y	Копировать Y
 Copy Z	Копировать Z
+Copy to Selected	Копировать в выделенные
 Copying libmain.so (jniLibs)	Копирование libmain.so (jniLibs)
 Copying results	Копирование результатов
 Copying the Android template	Копирование шаблона Android
@@ -417,6 +427,7 @@ Core (advanced)	Ядро (дополнительно)
 Correct UVs	Корректировать UV
 Could not copy the objects	Не удалось скопировать объекты
 Could not create a viewport on the external display: cloning the screen	Не удалось создать вьюпорт на внешнем экране: экран клонируется
+Could not create the texture	Не удалось создать текстуру
 Could not encode the PNG	Не удалось закодировать PNG
 Could not extract	Не удалось извлечь
 Could not import	Не удалось импортировать
@@ -792,6 +803,7 @@ Import STL	Импорт STL
 Import glTF	Импорт glTF
 Import w3dui	Импорт w3dui
 Import...	Импортировать...
+Importance	Важность
 Imported	Импортировано
 Importing FBX...	Импорт FBX...
 Importing glTF...	Импорт glTF...
@@ -837,6 +849,7 @@ Interpolation: Constant	Интерполяция: константа
 Interpolation: Linear	Интерполяция: линейная
 Intersect	Пересечение
 Intersection Type	Тип пересечения
+Invalid size	Неверный размер
 Inverse Square	Обратный квадрат
 Invert	Инвертировать
 Invert Selection	Инвертировать выделение
@@ -1080,6 +1093,7 @@ Near	Ближняя
 Near fade from	Вблизи: невидимо до
 Near fade to	Вблизи: целиком с
 Nearest (pixelated)	Ближайший (пиксели)
+Nearest probe (automatic)	Ближайший зонд (автоматически)
 Network access	Доступ к сети
 New	Новый
 New Animation	Новая анимация
@@ -1290,6 +1304,7 @@ Patch	Патч
 Path	Путь
 Pause	Пауза
 Pencil+Up	Карандаш+Вверх
+Penumbra	Полутень
 Per Pixel Shading	Попиксельное затенение
 Per Vertex Shading	Повершинное затенение
 Per pixel	Попиксельно
@@ -1350,6 +1365,9 @@ Previous Keyframe	Предыдущий ключ
 Previous frame	Предыдущий кадр
 Previous keyframe	Предыдущий ключевой кадр
 Primitive	Примитив
+Probe Origin X	Начало X
+Probe Origin Y	Начало Y
+Probe Origin Z	Начало Z
 Profile Shape	Форма профиля
 Profile Type	Тип профиля
 Project	Проект
@@ -1394,8 +1412,10 @@ Ray Tracing	Трассировка лучей
 Ray traced motion blur	Трассир. размытие движения
 Rays	Лучи
 Real-time shadows	Тени в реальном времени
+Realtime	В реальном времени
 Recalculate	Пересчитать
 Recalculate Normals	Пересчитать нормали
+Recalculated by the editor (the game uses the last one)	Пересчитывается редактором (игра использует последнее)
 Receive shadows	Принимать тени
 Recent files	Недавние файлы
 Rectangle	Прямоугольник
@@ -1404,6 +1424,9 @@ Redo	Повторить
 Reference	Ссылка
 Reflect children	Отражать дочерние
 Reflection	Отражение
+Reflection Probe	Зонд отражений
+Reflection Probes	Зонды отражений
+Reflection probe baked (%u ms)	Зонд отражений запечён (%u мс)
 Refresh	Обновить
 Refresh:	Обновление:
 Relationship Lines	Линии связей
@@ -1599,6 +1622,7 @@ Shader of	Шейдер материала
 Shaders	Шейдеры
 Shading	Затенение
 Shadow catcher	Ловец теней
+Shadow color	Цвет тени
 Shadow strength	Интенсивность
 Shape	Форма
 Shape keys	Ключи формы
@@ -1780,6 +1804,7 @@ The library isn't linked	Библиотека не связана
 The library's proyecto.json can't be read	Не удаётся прочитать proyecto.json библиотеки
 The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	Источник света '%s' не загружен: в сцене уже максимум источников света (%d).
 The list of All	Список «Все»
+The material is shared with other objects: this one got its own copy	Материал общий с другими объектами: этот получил собственную копию
 The mesh '%s' (no objects) could not be read: saving without it	Не удалось прочитать меш '%s' (без объектов): сохраняется без него
 The mesh has no UV	У сетки нет UV
 The mesh has no faces	У сетки нет граней
@@ -1817,6 +1842,7 @@ This resource can't be renamed	Этот ресурс нельзя переиме
 This resource type can't be deleted	Этот тип ресурса нельзя удалить
 This resource type can't be duplicated	Этот тип ресурса нельзя дублировать
 This step has nothing to animate	В этом шаге нечего анимировать
+This texture already has the baked light of	В этой текстуре уже запечён свет
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Группы вершин будут изменены и упрощены до 1 кости на вершину (более быстрый скиннинг). Часть данных может быть потеряна.
 Threshold	Порог
 Timeline	Таймлайн
@@ -1888,6 +1914,7 @@ Unwrap Conformal	Развернуть (конформно)
 Unwrap Minimum Stretch	Развернуть (мин. растяжение)
 Unwrap: closed surface, mark seams first	Развернуть: замкнутая поверхность, сначала пометьте швы
 Unwrap: select faces first	Развернуть: сначала выберите грани
+Update every	Обновлять каждые
 Upright (does not tilt)	Вертикально (без наклона)
 Upscaler	Апскейлер
 Upscaling	Апскейлинг
@@ -1908,6 +1935,7 @@ Use this file	Использовать этот файл
 Use this folder	Использовать эту папку
 Users	Пользователи
 Users selected	Пользователи выделены
+Uses the 360 image you choose	Использует выбранное изображение 360
 V Location	Положение V
 Value	Значение
 Value Y	Значение Y
@@ -1939,6 +1967,7 @@ Viewport	Вьюпорт
 Visibility icons	Иконки видимости
 Visibility test	Тест видимости
 Visible	Видимый
+Visible in probes	Видим в зондах
 Volume	Громкость
 Volume line	Линия громкости
 Wait for the build to finish	Дождитесь окончания сборки

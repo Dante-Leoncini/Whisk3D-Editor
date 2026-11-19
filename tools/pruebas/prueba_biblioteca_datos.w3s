@@ -40,7 +40,7 @@ recdato texturas texturas/dosmats.png Format = PNG
 recdato texturas texturas/dosmats.png Resolution = 64 x 64
 recdato texturas texturas/dosmats.png Alpha channel = Yes (binary)
 recdato texturas texturas/particula.png Alpha channel = Yes (with transparency)
-recdato texturas texturas/dosmats-b.png Alpha channel = Yes (all opaque)
+recdato texturas texturas/dosmats-b.png Alpha channel = Yes
 recdato texturas texturas/dosmats.png Memory = 16.0 KB (21.3 KB with mipmaps)
 recdato texturas texturas/particula.png Bytes = 132 B
 recdato sonidos sonidos/bip.wav Format = WAV
@@ -116,7 +116,8 @@ recdato texturas prueba_biblioteca_rt_particula.png File size = 132 B
 fail recdato texturas prueba_biblioteca_rt_particula.png Warning = The external file is missing
 archivomover prueba_biblioteca_rt_particula.png prueba_biblioteca_rt_particula_movida.png
 recdato texturas prueba_biblioteca_rt_particula.png Warning = The external file is missing
-recdato texturas prueba_biblioteca_rt_particula.png Stored = External
+# (donde vive no es un dato: lo dice el desplegable Ubicacion de la tarjeta)
+recubicacion texturas prueba_biblioteca_rt_particula.png fuera
 archivomover prueba_biblioteca_rt_bip.wav prueba_biblioteca_rt_bip_movido.wav
 recdato sonidos prueba_biblioteca_rt_bip.wav Warning = The external file is missing
 # (sin su archivo no se puede meter adentro)

@@ -294,14 +294,14 @@ outbarra c menu ninguno
 recboton usuarios oculto
 # elegir un recurso de la biblioteca DESELECCIONA la escena (fase 4b: o se eligen objetos o recursos)
 seleccion n 0
-# el boton de Properties: selecciona Y el outliner vuelve a la escena, como el menu
+# el boton de Properties: selecciona, como el menu (la biblioteca SIGUE en la biblioteca: no vuelve a la escena)
 selobj Cubo
 matnew
 mallasrecurso
 outvista mallas
 outclick Cubo
 recboton usuarios
-outvista es escena
+outvista es mallas
 seleccion n 1 tiene Cubo
 
 # ---- J) un script nombra una textura solo si nombra su archivo ENTERO ----

@@ -418,7 +418,7 @@ static void DibujarIconoSonda3D(Object* obj){
     w3dEngine::PushMatrix();
     Matrix4 local; obj->GetMatrix(local);
     w3dEngine::MultMatrix(local.m);
-    if (obj->getType() == ObjectType::sondaluz){
+    if (obj->getType() == ObjectType::sondaluz || obj->getType() == ObjectType::sondareflejo){
         if (ObjActivo == obj && obj->select)  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
         else if (obj->select)                 w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
         else                                  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);

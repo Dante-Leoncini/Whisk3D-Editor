@@ -28,12 +28,15 @@ W3dSombrasOpc::W3dSombrasOpc()
     : on(false), distancia(50.0f), cascadas(2), borde(5.0f), desenfoque(0.0f), resolucion(1024), suaves(true),
       intensidad(1.0f), sesgo(1.0f) {
     cortes[0] = 10.0f; cortes[1] = 25.0f; cortes[2] = 40.0f;
+    color[0] = color[1] = color[2] = 0.0f; color[3] = 1.0f;
 }
 W3dSombrasOpc g_sombras;
 static int gEstado = 0;
 int W3dSombrasEstado() { return gEstado; }
 bool W3dSombrasConShaders() { return gfx::SombrasSoportadas(); }
 
+void SkinearMesh(Mesh* m);    // (animation/SkeletalAnimation.cpp: la pose del esqueleto en este cuadro, cacheada)
+void W3dPoseAlDia(Mesh* m);   // (animation/VertexAnimation.cpp: la animacion por vertice / las formas, idem)
 namespace {
 struct V3 { float x, y, z; };
 inline V3 Mk(float x, float y, float z) { V3 v; v.x = x; v.y = y; v.z = z; return v; }
@@ -78,6 +81,10 @@ void Recorrer(Object* o, std::vector<Pieza>& out) {
     if (o != SceneCollection && (!o->visible || W3dVistaLocalOculta(o))) return;
     if (o->getType() == ObjectType::mesh && (o->proyectaSombra || o->recibeSombra) && !W3dVistaLocalSoloPaso(o)) {
         Mesh* m = (Mesh*)o;
+        // LA POSE DE ESTE CUADRO: el esqueleto (o la animacion por vertice) se ponia al dia recien al DIBUJAR la malla, que
+        // es despues de este pase: la sombra se hacia con la pose del cuadro ANTERIOR y una malla animada se tapaba a si
+        // misma con su pose vieja (partes negras que parpadeaban). Queda cacheada: el dibujo de la malla no la repite
+        if (m->skinArmature) SkinearMesh(m); else W3dPoseAlDia(m);
         Geo g;
         if (m->DibujaAlgo() && GeoDe(m, g)) {
             Pieza p; p.m = m; m->GetWorldMatrix(p.W);
@@ -224,6 +231,12 @@ bool PaseCascadas(Light* sol, const std::vector<Pieza>& piezas) {
     gfx::MatrixMode(gfx::ModelView); gfx::PushMatrix();
 
     memset(gDatos, 0, sizeof(gDatos));
+    // LAS DOS PROFUNDIDADES (ver el shader, W3D_P_SOMBRA): primero TODO lo que proyecta en RG; despues, con el z-buffer
+    // limpio, solo lo que SE MUEVE en BA (si hay luz horneada que lo reciba). Sobre lo horneado cuenta solo BA
+    bool hayHorneada = false;
+    for (size_t k = 0; k < piezas.size() && !hayHorneada; k++) hayHorneada = piezas[k].recibe && piezas[k].horneada;
+    Matrix4 mLuz[4]; std::vector<int> selDe[4]; bool hayDinamico = false;
+    gfx::ColorMask(true, true, false, false);
     float ant = cerca;
     for (int i = 0; i < n; i++) {
         V3 es[8]; EsquinasTramo(Pm, Vinv, ant, corte[i], es);
@@ -256,16 +269,16 @@ bool PaseCascadas(Light* sol, const std::vector<Pieza>& piezas) {
         { const float r0[4] = { lx.x / R, lx.y / R, lx.z / R, -cx / R };
           const float r1[4] = { ly.x / R, ly.y / R, ly.z / R, -cy / R };
           const float r2[4] = { -2.0f * lz.x / zr, -2.0f * lz.y / zr, -2.0f * lz.z / zr, 2.0f * zMax / zr - 1.0f };
-          Matrix4 Ml; DeFilas(Ml, r0, r1, r2);
-          gfx::MatrixMode(gfx::Projection); gfx::LoadMatrix(Ml.m); gfx::MatrixMode(gfx::ModelView); }
+          DeFilas(mLuz[i], r0, r1, r2);
+          gfx::MatrixMode(gfx::Projection); gfx::LoadMatrix(mLuz[i].m); gfx::MatrixMode(gfx::ModelView); }
         const int tx = i % 2, ty = i / 2;
         gfx::SombraMapaCaja(tx * res, ty * res, res, res);
-        // (el alfa del color: lo que se mueve -1- o es estatico -0-; sobre la luz horneada solo tapa lo que se mueve)
         for (size_t k = 0; k < sel.size(); k++) {
             const Pieza& p = piezas[(size_t)sel[k]];
-            gfx::Color4f(1.0f, 1.0f, 1.0f, p.m->estatico ? 0.0f : 1.0f);
+            if (!p.m->estatico) hayDinamico = true;
             DibujarProyector(p);
         }
+        selDe[i].swap(sel);
         // LO QUE RECIBE: OJO -> (u, v, profundidad) del pedazo de esta cascada, con el sesgo de la profundidad adentro
         const float sesgoZ = texel * 1.0f * o.sesgo / zr;
         const float su = 0.5f / (R * (float)cols), sv = 0.5f / (R * (float)filas);
@@ -278,8 +291,25 @@ bool PaseCascadas(Light* sol, const std::vector<Pieza>& piezas) {
         gDatos[64 + i * 4 + 0] = (float)tx / (float)cols; gDatos[64 + i * 4 + 1] = (float)ty / (float)filas;
         gDatos[64 + i * 4 + 2] = (float)(tx + 1) / (float)cols; gDatos[64 + i * 4 + 3] = (float)(ty + 1) / (float)filas;
         gDatos[80 + i] = corte[i];
-        gDatos[84 + i] = o.desenfoque * 6.0f;                 // (en texeles a la distancia maxima: crece con la distancia)
+        // LA PENUMBRA DE CONTACTO: los texeles de penumbra por unidad de profundidad (0..1 de la cascada): la distancia
+        // entre lo que tapa y lo que recibe (zr metros) por la tangente del tamanio del sol, en texeles
+        { float d = o.desenfoque < 0.0f ? 0.0f : (o.desenfoque > 1.0f ? 1.0f : o.desenfoque);
+          gDatos[84 + i] = zr * (d * 0.1f) / texel; }
         gDatos[88 + i] = texel * 1.5f * o.sesgo;              // (el corrimiento por la normal)
+    }
+    // LO QUE SE MUEVE, aparte (BA): sin esta pasada BA queda "lejos" (el borrado) y lo horneado no recibe nada
+    if (hayHorneada && hayDinamico) {
+        gfx::SombraMapaCaja(0, 0, W, H);
+        gfx::ColorMask(false, false, true, true);
+        gfx::Clear(gfx::DepthBuffer);
+        for (int i = 0; i < n; i++) {
+            gfx::MatrixMode(gfx::Projection); gfx::LoadMatrix(mLuz[i].m); gfx::MatrixMode(gfx::ModelView);
+            gfx::SombraMapaCaja((i % 2) * res, (i / 2) * res, res, res);
+            for (size_t k = 0; k < selDe[i].size(); k++) {
+                const Pieza& p = piezas[(size_t)selDe[i][k]];
+                if (!p.m->estatico) DibujarProyector(p);
+            }
+        }
     }
     // las que no hay: copias de la ultima (no se eligen: la ultima ya llega a la distancia)
     for (int i = n; i < 4; i++) {
@@ -291,13 +321,16 @@ bool PaseCascadas(Light* sol, const std::vector<Pieza>& piezas) {
     float borde = o.borde; if (borde < 0.0f) borde = 0.0f; if (borde > dist) borde = dist;
     gDatos[94] = dist - borde; gDatos[95] = dist;
     gDatos[96] = o.intensidad < 0.0f ? 0.0f : (o.intensidad > 1.0f ? 1.0f : o.intensidad);
-    gDatos[97] = (float)n; gDatos[98] = 0.0f; gDatos[99] = o.suaves ? 1.0f : 0.0f;
+    // (Q.y: la penumbra MAXIMA en texeles, la busqueda de lo que tapa llega hasta ahi)
+    gDatos[97] = (o.desenfoque > 0.0f) ? 4.0f + 20.0f * (o.desenfoque > 1.0f ? 1.0f : o.desenfoque) : 0.0f;
+    gDatos[98] = 0.0f; gDatos[99] = o.suaves ? 1.0f : 0.0f;
+    gDatos[101] = o.color[0]; gDatos[102] = o.color[1]; gDatos[103] = o.color[2];
     gDatos[100] = (float)((int)sol->LightID - (int)GL_LIGHT0);
 
     gfx::MatrixMode(gfx::Projection); gfx::PopMatrix();
     gfx::MatrixMode(gfx::ModelView); gfx::PopMatrix();
-    gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
     gfx::SombraMapaTerminar();
+    gfx::ColorMask(true, true, true, true);
     if (antCull) gfx::Enable(gfx::CullFace);
     if (antBlend) gfx::Enable(gfx::Blend);
     if (antTex) gfx::Enable(gfx::Texture2D);
@@ -390,7 +423,7 @@ bool PaseProyectado(Light* sol, const std::vector<Pieza>& piezas) {
     unsigned firma = 2166136261u;
     Mezclar(firma, &lx, sizeof(lx)); Mezclar(firma, &ly, sizeof(ly));
     { const float caja[6] = { x0, x1, y0, y1, z0, z1 }; Mezclar(firma, caja, sizeof(caja)); }
-    { const float op[3] = { o.intensidad, o.suaves ? 1.0f : 0.0f, (float)(tw * 4096 + th) }; Mezclar(firma, op, sizeof(op)); }
+    { const float op[6] = { o.intensidad, o.suaves ? 1.0f : 0.0f, (float)(tw * 4096 + th), o.color[0], o.color[1], o.color[2] }; Mezclar(firma, op, sizeof(op)); }
     for (size_t i = 0; i < piezas.size(); i++) {
         const Pieza& p = piezas[i];
         Mezclar(firma, &p.m, sizeof(p.m)); Mezclar(firma, p.W.m, sizeof(p.W.m));
@@ -465,9 +498,9 @@ bool PaseProyectado(Light* sol, const std::vector<Pieza>& piezas) {
     for (std::map<Mesh*, Mascara>::iterator it = gMascaras.begin(); it != gMascaras.end(); ++it) it->second.activa = false;
     const float sx = (float)tw / (x1 - x0), sy = (float)th / (y1 - y0);
     const float inten = o.intensidad < 0.0f ? 0.0f : (o.intensidad > 1.0f ? 1.0f : o.intensidad);
-    // (sobre la luz horneada hasta un 75%, como los shaders: la luz indirecta tambien esta en la textura)
-    const unsigned char oscuroRT = (unsigned char)((1.0f - inten) * 255.0f + 0.5f);
-    const unsigned char oscuroHorn = (unsigned char)((1.0f - 0.75f * inten) * 255.0f + 0.5f);
+    // (la mascara marca la sombra ENTERA -0-; el color y la intensidad se ponen al pasarla a la textura, como los shaders:
+    //  sobre la luz horneada queda al menos un 25%, la luz indirecta tambien esta en la textura)
+    const unsigned char oscuroRT = 0, oscuroHorn = 0;
     for (size_t i = 0; i < piezas.size(); i++) {
         const Pieza& p = piezas[i];
         if (!p.recibe) continue;
@@ -508,7 +541,16 @@ bool PaseProyectado(Light* sol, const std::vector<Pieza>& piezas) {
             for (int y = 0; y < mh; y++) { gMas[(size_t)y * mw] = 255; gMas[(size_t)y * mw + mw - 1] = 255; }
         }
         gTmp.resize((size_t)mw * mh * 4);
-        for (int t = 0; t < mw * mh; t++) { gTmp[(size_t)t * 4] = gTmp[(size_t)t * 4 + 1] = gTmp[(size_t)t * 4 + 2] = gMas[(size_t)t]; gTmp[(size_t)t * 4 + 3] = 255; }
+        {   // el COLOR de la sombra por la intensidad: de la luz entera (255) al color, segun cuanto tapa
+            const float piso = p.horneada ? 0.25f : 0.0f;
+            float c[3];
+            for (int k = 0; k < 3; k++) { const float cc = o.color[k] < 0.0f ? 0.0f : (o.color[k] > 1.0f ? 1.0f : o.color[k]); c[k] = piso + (1.0f - piso) * cc; }
+            for (int t = 0; t < mw * mh; t++) {
+                const float a = (1.0f - gMas[(size_t)t] / 255.0f) * inten;   // (cuanto tapa)
+                for (int k = 0; k < 3; k++) gTmp[(size_t)t * 4 + k] = (unsigned char)((1.0f + (c[k] - 1.0f) * a) * 255.0f + 0.5f);
+                gTmp[(size_t)t * 4 + 3] = 255;
+            }
+        }
         Mascara& m = gMascaras[p.m];
         if (m.tex && m.w == mw && m.h == mh) gfx::UpdateRGBA(m.tex, 0, 0, mw, mh, &gTmp[0], false);
         else {

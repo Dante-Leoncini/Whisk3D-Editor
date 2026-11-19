@@ -61,6 +61,58 @@ static void IpEsc(std::string& s, const std::string& v) {   // mismo escape que 
 
 // "prefab" siempre; "overrides" solo si hay alguno (una instancia sin tocar sale en una linea). Los
 // mapas estan ordenados por clave: el guardado es determinista (mismos bytes al re-guardar)
+// ---- LOS CAMPOS que se pueden cambiar en lo generado (ver InstanciaPrefab.h) ----
+static const char* kCamposInst[W3D_CAMPOS_INST] = {
+    "pos.x", "pos.y", "pos.z", "rot.x", "rot.y", "rot.z", "esc.x", "esc.y", "esc.z",
+    "render", "estatico", "proyectaSombra", "recibeSombra", "rebotaLuz", "captaSombras", "enSondas"
+};
+const char* W3dCampoInstNombre(int k) { return (k >= 0 && k < W3D_CAMPOS_INST) ? kCamposInst[k] : ""; }
+int W3dCampoInstDeNombre(const std::string& n) {
+    for (int k = 0; k < W3D_CAMPOS_INST; k++) if (n == kCamposInst[k]) return k;
+    return -1;
+}
+static float* CampoFloat(Object* o, int k) {
+    switch (k) {
+        case 0: return &o->pos.x; case 1: return &o->pos.y; case 2: return &o->pos.z;
+        case 3: return &o->rotEuler.x; case 4: return &o->rotEuler.y; case 5: return &o->rotEuler.z;
+        case 6: return &o->scale.x; case 7: return &o->scale.y; case 8: return &o->scale.z;
+    }
+    return 0;
+}
+static bool* CampoBool(Object* o, int k) {
+    switch (k) {
+        case 9: return &o->renderizable; case 10: return &o->estatico; case 11: return &o->proyectaSombra;
+        case 12: return &o->recibeSombra; case 13: return &o->rebotaLuz; case 14: return &o->captaSombras;
+        case 15: return &o->enSondas;
+    }
+    return 0;
+}
+float W3dCampoInstLeer(Object* o, int k) {
+    if (!o) return 0.0f;
+    if (float* f = CampoFloat(o, k)) return *f;
+    if (bool* b = CampoBool(o, k)) return *b ? 1.0f : 0.0f;
+    return 0.0f;
+}
+int W3dCampoInstDePtr(Object* o, const void* ptr) {
+    if (!o || !ptr) return -1;
+    for (int k = 0; k < W3D_CAMPOS_INST; k++)
+        if ((const void*)CampoFloat(o, k) == ptr || (const void*)CampoBool(o, k) == ptr) return k;
+    return -1;
+}
+// pone los campos 'cs' (nombre -> valor) en 'o' (la rotacion por su puerta: el euler manda, ver Object::SetRotEuler)
+void W3dCamposInstPoner(Object* o, const std::map<std::string, float>& cs) {
+    if (!o) return;
+    Vector3 e = o->rotEuler; bool rot = false;
+    for (std::map<std::string, float>::const_iterator it = cs.begin(); it != cs.end(); ++it) {
+        const int k = W3dCampoInstDeNombre(it->first);
+        if (k < 0) continue;
+        if (k >= 3 && k <= 5) { (k == 3 ? e.x : k == 4 ? e.y : e.z) = it->second; rot = true; continue; }
+        if (float* f = CampoFloat(o, k)) *f = it->second;
+        else if (bool* b = CampoBool(o, k)) *b = it->second != 0.0f;
+    }
+    if (rot) o->SetRotEuler(e);
+}
+
 void InstanciaPrefabEscribirCampos(std::string& s, int ind, const InstanciaPrefab* ip) {
     if (!ip) return;
     s += ",\n"; IpSang(s, ind); s += "\"prefab\": "; IpEsc(s, ip->prefab);
@@ -70,7 +122,7 @@ void InstanciaPrefabEscribirCampos(std::string& s, int ind, const InstanciaPrefa
         s += ",\n"; IpSang(s, ind); s += "\"distancia\": "; s += JsonNumTexto(ip->distancia);
         if (!ip->objetivo.empty()) { s += ",\n"; IpSang(s, ind); s += "\"objetivo\": "; IpEsc(s, ip->objetivo); }
     }
-    if (ip->overProps.empty() && ip->overVisible.empty()) return;
+    if (ip->overProps.empty() && ip->overVisible.empty() && ip->overCampos.empty()) return;
     s += ",\n"; IpSang(s, ind); s += "\"overrides\": {";
     bool primero = true;
     if (!ip->overProps.empty()) {
@@ -92,6 +144,24 @@ void InstanciaPrefabEscribirCampos(std::string& s, int ind, const InstanciaPrefa
             IpEsc(s, it->first); s += ": "; s += it->second ? "true" : "false";
         }
         s += " }";
+        primero = false;
+    }
+    // los CAMPOS cambiados en lo generado: { "ruta": { "pos.x": 1.5, "estatico": 0 } }
+    if (!ip->overCampos.empty()) {
+        if (!primero) s += ",";
+        s += " \"campos\": {";
+        bool p1 = true;
+        for (std::map<std::string, std::map<std::string, float> >::const_iterator it = ip->overCampos.begin(); it != ip->overCampos.end(); ++it) {
+            s += p1 ? " " : ", "; p1 = false;
+            IpEsc(s, it->first); s += ": {";
+            bool p2 = true;
+            for (std::map<std::string, float>::const_iterator c = it->second.begin(); c != it->second.end(); ++c) {
+                s += p2 ? " " : ", "; p2 = false;
+                IpEsc(s, c->first); s += ": "; s += JsonNumTexto(c->second);
+            }
+            s += " }";
+        }
+        s += " }";
     }
     s += " }";
 }
@@ -107,6 +177,7 @@ void InstanciaPrefabLeerCampos(JVal* j, InstanciaPrefab* ip) {
     ip->objetivo = JS(j, "objetivo", "");
     ip->overProps.clear();
     ip->overVisible.clear();
+    ip->overCampos.clear();
     JVal* ov = JHijo(j, "overrides", 4);
     if (!ov) return;
     JVal* pr = JHijo(ov, "propiedades", 4);
@@ -122,4 +193,14 @@ void InstanciaPrefabLeerCampos(JVal* j, InstanciaPrefab* ip) {
     if (vi)
         for (std::map<std::string, JVal*>::iterator it = vi->obj.begin(); it != vi->obj.end(); ++it)
             if (it->second && it->second->tipo == 3) ip->overVisible[it->first] = it->second->b;
+    JVal* ca = JHijo(ov, "campos", 4);
+    if (ca)
+        for (std::map<std::string, JVal*>::iterator it = ca->obj.begin(); it != ca->obj.end(); ++it) {
+            if (!it->second || it->second->tipo != 4) continue;
+            for (std::map<std::string, JVal*>::iterator c = it->second->obj.begin(); c != it->second->obj.end(); ++c) {
+                if (!c->second || W3dCampoInstDeNombre(c->first) < 0) continue;
+                if (c->second->tipo == 1) ip->overCampos[it->first][c->first] = (float)c->second->num;
+                else if (c->second->tipo == 3) ip->overCampos[it->first][c->first] = c->second->b ? 1.0f : 0.0f;
+            }
+        }
 }

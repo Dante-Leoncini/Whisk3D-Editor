@@ -52,7 +52,7 @@ Trae a la escena algo de **otro .w3d**: un objeto (con todo lo que cuelga de él
 2. Después se abre **ese .w3d por dentro**: en la raíz están sus escenas (se recorren como carpetas) y sus prefabs. Adentro de una escena están sus objetos; los que tienen hijos también se recorren. Los objetos llevan el ícono del **cubo** (no se confunden con una malla 3D); las luces y las cámaras, el suyo.
 3. Elegí un objeto (o un prefab) y apretá **Añadir**. Sin nada elegido, **Añadir** trae lo que estás mirando: la escena entera o el objeto con todos sus hijos.
 
-El proxy nace en el cursor 3D y se llama como lo que trae. Moverlo, rotarlo o animarlo es del proyecto que lo llama: esas animaciones quedan en este .w3d y no tocan el original. En la tarjeta del proxy (Propiedades), el desplegable del elemento tiene **Explorar...**, que abre el mismo explorador para cambiar lo que trae.
+El proxy nace en el cursor 3D y se llama como lo que trae. Moverlo, rotarlo o animarlo es del proyecto que lo llama: esas animaciones quedan en este .w3d y no tocan el original. A lo que trae adentro también se le puede cambiar la posición, la rotación, la escala y las casillas de la pestaña Objeto: lo cambiado se ve en [amarillo](propiedades.md#los-valores-en-amarillo) y se guarda en este proyecto. En la tarjeta del proxy (Propiedades), el desplegable del elemento tiene **Explorar...**, que abre el mismo explorador para cambiar lo que trae.
 
 ### Los recursos de una librería
 

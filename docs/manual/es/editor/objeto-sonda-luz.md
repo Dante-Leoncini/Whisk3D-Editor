@@ -25,6 +25,8 @@ La sonda ilumina **solo a lo que no es estático**. Lo estático precalcula su p
 
 La luz rebotada toma el color de lo que la rebota y se multiplica por el color del material que la recibe: sobre un piso rojo, una esfera blanca se tiñe de rojo abajo; una esfera verde pura no, porque el verde no refleja nada de rojo.
 
+Con shaders llega a **todos** los materiales con luz, con la luz por píxel o por vértice (un personaje importado suele venir por vértice): cada vértice recibe la luz de la sonda según hacia dónde mira. En un personaje con **esqueleto**, la sonda toma la luz de donde está su pose en ese momento, así lo sigue mientras camina por la escena.
+
 ## Consejos
 
 - Poné la caja de manera que **envuelva** los objetos que se mueven (personajes, cosas que se caen) y las zonas donde la luz cambia mucho.

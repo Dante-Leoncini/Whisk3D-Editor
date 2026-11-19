@@ -12,7 +12,7 @@ Una **luz** ilumina la escena: los materiales que tienen Iluminación prendida s
 | **Sol** | Con rayos paralelos que vienen todos del mismo lado. Importa hacia dónde apunta, no dónde está. | La luz del día en exteriores. |
 | **Foco** | En un cono, como una linterna. | Linternas, faros de un auto, reflectores de un escenario. |
 
-Las luces están en el submenú Añadir → Luces: **Luz** crea una luz Puntual; **Sol** y **Foco** crean directo los otros dos. Ahí también está la [Sonda de luz](objeto-sonda-luz.md). El tipo se puede cambiar después en la propiedad **Tipo**.
+Las luces están en el submenú Añadir → Luces: **Luz** crea una luz Puntual; **Sol** y **Foco** crean directo los otros dos. Ahí también están la [Sonda de luz](objeto-sonda-luz.md) y la [Sonda de reflejo](objeto-sonda-reflejo.md). El tipo se puede cambiar después en la propiedad **Tipo**.
 
 El primer **Sol** de la escena es el que da las [sombras en tiempo real](sombras-tiempo-real.md), si están prendidas.
 

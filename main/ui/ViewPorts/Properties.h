@@ -106,6 +106,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool* propObjRecSombra;
         PropBool* propObjRebota;      // LA LUZ PRECALCULADA: rebota la luz (la indirecta) / captador de sombras (solo las recibe)
         PropBool* propObjCaptador;
+        PropBool* propObjEnSondas;    // lo ven las sondas (de reflejo y de luz): apagado, la sonda que va adentro no lo ve
         PropBool* propObjRelLines;  // dibujar la linea al padre. Va en la tarjeta GENERICA:
                                     // es una opcion UNIVERSAL de todos los objetos.
         // tarjeta "Animacion" del OBJETO (pestania Objeto): animaciones del objeto
@@ -482,12 +483,20 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propHornBoton;
         PropButton* propHornBarra;
         PropButton* propHornCancelar;   // Cancelar (la cruz), abajo de la barra mientras hornea
+        PropLabel*  propHornAvisoTex;   // la textura elegida ya tiene la luz de OTRO objeto (hornear ahi pisa lo que se cruce)
         PropLabel*  propHornAviso;
         PropFloat*  propSlTam[3];
         PropFloat*  propSlPuntos[3];
         PropFloat*  propSlRayos;
         PropButton* propSlHornear;
         PropLabel*  propSlEstado;
+        // LA SONDA DE REFLEJO (PropsSondaReflejo.cpp, objects/SondaReflejo.h)
+        GroupPropertie* propSondaRef;
+        PropButton* propSrTipo; PropFloat* propSrImportancia; PropFloat* propSrIntensidad; PropBool* propSrCaja;
+        PropFloat* propSrTam[3]; PropFloat* propSrOrigen[3]; PropButton* propSrRes;
+        PropFloat* propSrCerca; PropFloat* propSrCada; PropButton* propSrImagen;
+        PropFloat* propSrMuestras; PropFloat* propSrRebotes;   // (la horneada: el trazado de rayos)
+        PropButton* propSrHornear; PropLabel* propSrEstado;
         // LAS SOMBRAS EN TIEMPO REAL (ViewPorts/PropsSombras.cpp): debajo de la tarjeta Render
         GroupPropertie* propSombras;
         PropBool*   propSomOn;
@@ -499,6 +508,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propSomRes;
         PropBool*   propSomSuaves;
         PropFloat*  propSomInt;
+        PropColor*  propSomColor;   // el color de la sombra
         PropFloat*  propSomSesgo;
         PropLabel*  propSomEstado;
         PropBool*   propHbActivo;

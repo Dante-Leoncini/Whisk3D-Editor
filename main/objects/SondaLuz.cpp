@@ -223,8 +223,13 @@ void HookSonda(Object* o, bool empieza) {
         if (o->estatico) return;
         Mesh* me = (Mesh*)o;
         Vector3 cl(0, 0, 0);
-        if (me->aabbOk) cl = Vector3(0.5f * (me->aabbMin.x + me->aabbMax.x), 0.5f * (me->aabbMin.y + me->aabbMax.y),
-                                     0.5f * (me->aabbMin.z + me->aabbMax.z));
+        // (con ESQUELETO, el centro de la ULTIMA POSE: el de reposo se queda donde se modelo y la luz no seguia al
+        //  personaje que el esqueleto lleva por la escena -el proxy de un personaje animado-)
+        if (me->skinArmature && me->skinAabbOk)
+            cl = Vector3(0.5f * (me->skinAabbMin.x + me->skinAabbMax.x), 0.5f * (me->skinAabbMin.y + me->skinAabbMax.y),
+                         0.5f * (me->skinAabbMin.z + me->skinAabbMax.z));
+        else if (me->aabbOk) cl = Vector3(0.5f * (me->aabbMin.x + me->aabbMax.x), 0.5f * (me->aabbMin.y + me->aabbMax.y),
+                                          0.5f * (me->aabbMin.z + me->aabbMax.z));
         Matrix4 W; o->GetWorldMatrix(W);
         const Vector3 cw = W * cl;
         const float p[3] = { cw.x, cw.y, cw.z };

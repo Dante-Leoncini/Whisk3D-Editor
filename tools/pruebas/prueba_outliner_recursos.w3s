@@ -121,11 +121,11 @@ recprops tab 1
 # el OK en una vista de recursos NUNCA cae al Edit Mode del 3D
 seleccion modo objeto
 
-# ---- F) "Select Users": selecciona en la escena a los que lo usan (y vuelve a la escena) ----
+# ---- F) "Select Users": selecciona en la escena a los que lo usan (la biblioteca sigue en la biblioteca) ----
 outvista mallas
 outclick Cubo
 outmenu Select Users
-outvista es escena
+outvista es mallas
 seleccion n 2 tiene Cubo tiene Cubo.001
 undo
 outvista animaciones

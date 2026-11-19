@@ -49,6 +49,18 @@ enum { W3D_STREAM_DESCARGADA = 0, W3D_STREAM_PIDIENDO = 1, W3D_STREAM_CARGADA = 
 // la biblioteca puede purgar una textura, o el cierre olvidar todo, con el pedido todavia en la instancia)
 struct W3dPedidoStream { W3dRecurso* r; unsigned serie; W3dPedidoStream() : r(0), serie(0) {} };
 
+// LOS CAMPOS que una instancia (o un proxy) puede cambiarle a lo que genera, ademas del visible y de las propiedades de
+// sus scripts: la posicion, la rotacion (el euler, con sus vueltas), la escala y las casillas de la pestania Objeto. Lo que
+// se cambia queda como OVERRIDE de la instancia (InstanciaPrefab::overCampos), se guarda en el proyecto que la usa y no
+// toca el original; Propiedades lo muestra en AMARILLO
+enum { W3D_CAMPOS_INST = 16 };
+const char* W3dCampoInstNombre(int k);            // "pos.x", "rot.z", "esc.y", "estatico"... (como se guarda)
+int         W3dCampoInstDeNombre(const std::string& n);
+float       W3dCampoInstLeer(Object* o, int k);   // (las casillas: 0 / 1)
+// el campo 'k' al que apunta 'ptr' (la fila de Propiedades) adentro de 'o'; -1 = ninguno
+int         W3dCampoInstDePtr(Object* o, const void* ptr);
+void        W3dCamposInstPoner(Object* o, const std::map<std::string, float>& campos);
+
 // lo GENERADO como salio de la definicion (antes de aplicarle los overrides): los overrides son lo que difiere
 // de esto (W3dPrefabSincronizarOverrides, io/Prefabs.h). Un objeto por entrada, por serial (se puede liberar).
 // Entra TODO lo generado, tambien lo de las instancias anidadas (es parte de lo que el prefab trae adentro).
@@ -61,7 +73,8 @@ struct InstanciaBase {
                                       // RUTA, no por indice (uno agregado o quitado no corre a los demas)
     std::string ruta;                 // su ruta desde el objeto raiz generado (la de los overrides de visible): si
                                       // deja de existir (una anidada que el streaming descargo) su override sigue
-    InstanciaBase() : o(0), serial(0), visible(true) {}
+    float campos[W3D_CAMPOS_INST];    // los CAMPOS como se genero (ver W3dCampoInstNombre)
+    InstanciaBase() : o(0), serial(0), visible(true) { for (int k = 0; k < W3D_CAMPOS_INST; k++) campos[k] = 0.0f; }
 };
 
 class InstanciaPrefab : public Object {
@@ -69,6 +82,7 @@ public:
     std::string prefab;                           // el prefab que genera (su nombre en el registro "prefabs")
     std::map<std::string, std::string> overProps; // OVERRIDE: propiedad de script -> valor (como texto)
     std::map<std::string, bool> overVisible;      // OVERRIDE: ruta del hijo generado -> visible
+    std::map<std::string, std::map<std::string, float> > overCampos;   // OVERRIDE: ruta del hijo -> campo -> valor
     unsigned versionGenerada;                     // la version de la definicion con la que se generaron los
                                                   // hijos (0 = nunca se genero; ver io/Prefabs.h)
     bool noGenerada;                              // el prefab no existe (o no se pudo leer): la instancia queda

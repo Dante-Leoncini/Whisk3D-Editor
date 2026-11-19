@@ -24,10 +24,12 @@ struct W3dSombrasOpc {
     int   cascadas;     // 1..4
     float cortes[3];    // hasta donde llega cada cascada (m): las que haya menos la ultima, que llega a la distancia
     float borde;        // el tramo del final donde se desvanecen (m)
-    float desenfoque;   // 0..1: cuanto se borronean las lejanas (crece con la distancia)
+    float desenfoque;   // 0..1: la PENUMBRA (el tamanio del sol): la sombra es nitida donde toca lo que la proyecta y se
+                        // difumina a medida que se aleja (PCSS). 0 = nitida siempre. (Se llamaba "desenfoque lejano")
     int   resolucion;   // texeles de cada cascada (256..4096)
     bool  suaves;       // bordes suaves (filtro de 2x2) o duras
     float intensidad;   // 0..1: que tan oscura es la sombra
+    float color[4];     // el COLOR de la sombra (negro = sin la luz del sol; un azul = la luz del cielo que llega igual)
     float sesgo;        // multiplica el sesgo automatico (contra el "acne": la superficie que se hace sombra a si misma)
     W3dSombrasOpc();
 };

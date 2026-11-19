@@ -40,6 +40,7 @@
 #include "ViewPorts/PopUp/TransformRedoPanel.h"  // trpanel / trfijar / trboton / trinfo
 #include "ViewPorts/PopUp/InicioPopup.h"         // inicio (la pantalla de inicio)
 #include "ViewPorts/PopUp/TimelineRedoPanel.h"   // curvasedicion: la tarjeta de ajustar del timeline
+#include "objects/SondaReflejo.h"   // sondareflejo / matsonda
 #include "io/TexturaEditada.h"       // texdab / texpixel / texsave / texext / texint / texlabel / texpaint3d     // prop / xform / vertat / objmove / objat       // unwrap / smartuv / lightmap / followquads / uvreset / unwraptest     // Nuevo/MoverMeshPart (funciones libres del editor)
 #include "edit/WeightPaint.h"  // wptest: pincel + escritura de pesos (fase 2 weight paint)
 #include "edit/BoneEdit.h"     // bonetest: Edit Mode de huesos (fase 3)
@@ -6490,6 +6491,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         else if (q == "res") ss >> g_sombras.resolucion;
         else if (q == "suaves") { int v = 1; ss >> v; g_sombras.suaves = v != 0; }
         else if (q == "int") ss >> g_sombras.intensidad;
+        else if (q == "color") ss >> g_sombras.color[0] >> g_sombras.color[1] >> g_sombras.color[2];   // (el color de la sombra)
         else if (q == "sesgo") ss >> g_sombras.sesgo;
         else if (q == "estado") printf("      [sombras] %s, estado %d, %s\n", g_sombras.on ? "prendidas" : "apagadas", W3dSombrasEstado(),
                                        W3dSombrasConShaders() ? "cascadas (GPU)" : "proyectada (CPU)");
@@ -6497,8 +6499,28 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         g_redraw = true;
         return true;
     }
-    // ---- objsombra proyecta|recibe|rebota|captador 0|1 : las banderas de las sombras (y de la luz precalculada) del
+    // ---- objsombra proyecta|recibe|rebota|captador|sondas 0|1 : las banderas de las sombras (y de la luz precalculada) del
     //      objeto activo ----
+    // ---- objflags [estatico 0|1] : las banderas del objeto activo (estatico, proyecta, recibe, rebota, captador); con
+    //      "estatico v" ASSERTEA esa ----
+    if (cmd == "objflags") {
+        std::string q; int v = -1; ss >> q >> v;
+        if (!ObjActivo) { err = "objflags: no hay objeto activo"; return false; }
+        Object* o = ObjActivo;
+        printf("      [objflags] '%s' estatico=%d proyecta=%d recibe=%d rebota=%d captador=%d sondas=%d\n", o->name.c_str(),
+               (int)o->estatico, (int)o->proyectaSombra, (int)o->recibeSombra, (int)o->rebotaLuz, (int)o->captaSombras,
+               (int)o->enSondas);
+        if (q == "estatico" && v >= 0 && (int)o->estatico != (v != 0)) { err = "objflags: estatico no es el esperado"; return false; }
+        return true;
+    }
+    // ---- objver 0|1 : PONE la visibilidad del objeto activo (el ojo del outliner) ----
+    if (cmd == "objver") {
+        int v = 1; ss >> v;
+        if (!ObjActivo) { err = "objver: no hay objeto activo"; return false; }
+        ObjActivo->visible = (v != 0);
+        g_redraw = true;
+        return true;
+    }
     if (cmd == "objsombra") {
         std::string q; int v = 1; ss >> q >> v;
         if (!ObjActivo) { err = "objsombra: no hay objeto activo"; return false; }
@@ -6506,7 +6528,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         else if (q == "recibe") ObjActivo->recibeSombra = v != 0;
         else if (q == "rebota") ObjActivo->rebotaLuz = v != 0;
         else if (q == "captador") ObjActivo->captaSombras = v != 0;
-        else { err = "objsombra: proyecta|recibe|rebota|captador"; return false; }
+        else if (q == "sondas") ObjActivo->enSondas = v != 0;
+        else { err = "objsombra: proyecta|recibe|rebota|captador|sondas"; return false; }
         g_redraw = true;
         return true;
     }
@@ -6545,6 +6568,122 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (!f) { err = "hornearluz: no pude escribir " + salida; return false; }
             fwrite(&png[0], 1, png.size(), f); fclose(f);
         }
+        return true;
+    }
+    // ---- hornearen <archivo de la textura> [muestras] [archivo.png] : PRECALCULAR LA ILUMINACION de la malla activa en una
+    //      textura que YA EXISTE (la que se elige en la tarjeta: por su nombre de archivo, "textura2.png"). Con archivo.png,
+    //      la textura horneada queda escrita ahi ----
+    if (cmd == "hornearen") {
+        std::string nom, salida; int mu = 16; ss >> nom >> mu >> salida;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "hornearen: no hay malla activa"; return false; }
+        Texture* t = NULL;
+        for (size_t i = 0; i < Textures.size() && !t; i++) {
+            if (!Textures[i]) continue;
+            const std::string& pth = Textures[i]->path;
+            const size_t b = pth.find_last_of("/\\");
+            if ((b == std::string::npos ? pth : pth.substr(b + 1)) == nom) t = Textures[i];
+        }
+        if (!t) { err = "hornearen: no hay una textura '" + nom + "'"; return false; }
+        extern bool PropsHorneadoAhora(Mesh*, Texture*, int, int, std::string*);
+        std::string motivo;
+        if (!PropsHorneadoAhora(m, t, -1, mu, &motivo)) { err = "hornearen: " + motivo; return false; }
+        printf("      [hornearen] '%s' en '%s' (%s)\n", m->name.c_str(), nom.c_str(), t->path.c_str());
+        if (!salida.empty()) {
+            std::vector<unsigned char> png;
+            if (TexEditPNGActual(t, png)) { FILE* f = fopen(salida.c_str(), "wb"); if (f) { fwrite(&png[0], 1, png.size(), f); fclose(f); } }
+        }
+        return true;
+    }
+    // ---- sondareflejo <x> <y> <z> <res> [archivo.png] : una SONDA DE REFLEJO ahi (Z arriba, como el panel), horneada; con
+    //      archivo.png su imagen 360 queda escrita ahi ----
+    if (cmd == "sondareflejo") {
+        float x = 0, y = 0, z = 0; int res = 256; std::string salida; ss >> x >> y >> z >> res >> salida;
+        SondaReflejo* sr = new SondaReflejo(NULL, Vector3(x, z, y));
+        sr->resolucion = res;
+        extern unsigned int w3dGetTicks();
+        const unsigned t0 = w3dGetTicks();
+        std::string motivo;
+        if (!SondaReflejoHornear(sr, &motivo)) { err = "sondareflejo: " + motivo; return false; }
+        printf("      [sondareflejo] '%s' horneada en %u ms -> %s\n", sr->name.c_str(), w3dGetTicks() - t0, sr->textura.c_str());
+        if (!salida.empty()) {
+            std::vector<unsigned char> png;
+            if (sr->Imagen() && TexEditPNGActual(sr->Imagen(), png)) { FILE* f = fopen(salida.c_str(), "wb"); if (f) { fwrite(&png[0], 1, png.size(), f); fclose(f); } }
+        }
+        return true;
+    }
+    // ---- srtipo horneada|personalizada|tiempoReal [cerca] [cadaSeg] : el TIPO de la sonda de reflejo activa (y lo que la
+    //      tapa de cerca, cada cuanto se redibuja la de tiempo real) ----
+    if (cmd == "srtipo") {
+        std::string t; float cerca = -1.0f, cada = -1.0f; ss >> t >> cerca >> cada;
+        if (!ObjActivo || ObjActivo->getType() != ObjectType::sondareflejo) { err = "srtipo: el activo no es una sonda de reflejo"; return false; }
+        SondaReflejo* sr = (SondaReflejo*)ObjActivo;
+        sr->tipo = t == "tiempoReal" ? W3D_REFLEJO_TIEMPO_REAL : t == "personalizada" ? W3D_REFLEJO_PERSONALIZADA : W3D_REFLEJO_HORNEADA;
+        if (cerca >= 0.0f) sr->cerca = cerca;
+        if (cada >= 0.0f) sr->cadaSeg = cada;
+        sr->ultimoMs = 0;
+        printf("      [srtipo] '%s' tipo %d cerca %.3f cadaSeg %.3f\n", sr->name.c_str(), sr->tipo, sr->cerca, sr->cadaSeg);
+        g_redraw = true;
+        return true;
+    }
+    // ---- srvolcar <archivo.png> : la IMAGEN 360 que dibujo la GPU (la sonda de tiempo real activa) a un png ----
+    if (cmd == "srvolcar") {
+        std::string salida; ss >> salida;
+        if (!ObjActivo || ObjActivo->getType() != ObjectType::sondareflejo) { err = "srvolcar: el activo no es una sonda de reflejo"; return false; }
+        SondaReflejo* sr = (SondaReflejo*)ObjActivo;
+        if (sr->vivoPx.empty() || !sr->vivo.iID) { err = "srvolcar: la GPU todavia no la dibujo"; return false; }
+        printf("      [srvolcar] '%s' %dx%d (version %u)\n", sr->name.c_str(), sr->vivo.ancho, sr->vivo.alto, sr->version);
+        if (!w3dEngine::SavePNG(salida.c_str(), &sr->vivoPx[0], sr->vivo.ancho, sr->vivo.alto, false)) { err = "srvolcar: no pude escribir"; return false; }
+        return true;
+    }
+    // ---- matsonda <material> : el reflejo del material es el de LA SONDA DE REFLEJO MAS CERCANA ----
+    if (cmd == "matsonda") {
+        std::string n; ss >> n;
+        Material* m = NULL;
+        for (size_t i = 0; i < Materials.size() && !m; i++) if (Materials[i] && Materials[i]->name == n) m = Materials[i];
+        if (!m) { err = "matsonda: no hay un material '" + n + "'"; return false; }
+        std::vector<SondaReflejo*> v; SondaReflejoListar(v);
+        Texture* t = v.empty() ? NULL : v[0]->Imagen();
+        if (!t) { err = "matsonda: no hay una sonda horneada"; return false; }
+        TexturaPonerEn(m->texture, t); m->textureOn = true; m->chrome = true; m->reflectMode = 2; m->reflejoSonda = true;
+        g_redraw = true;
+        return true;
+    }
+    // ---- matcapasver : cada material con su textura, sus CAPAS (textura, mezcla, capa UV, prendida, horneada) y las mallas
+    //      que lo usan ----
+    if (cmd == "matcapasver") {
+        for (size_t i = 0; i < Materials.size(); i++) {
+            Material* mm = Materials[i]; if (!mm) continue;
+            std::string us;
+            struct R { static void Buscar(Object* o, Material* mm, std::string& us) {
+                if (!o) return;
+                if (o->getType() == ObjectType::mesh) { Mesh* me = (Mesh*)o;
+                    for (size_t g = 0; g < me->materialsGroup.size(); g++) if (me->materialsGroup[g].material == mm) { us += " " + o->name; break; } }
+                for (size_t k = 0; k < o->Childrens.size(); k++) Buscar(o->Childrens[k], mm, us); } };
+            R::Buscar(SceneCollection, mm, us);
+            printf("      [matcapasver] '%s'%s tex=%s usuarios:%s\n", mm->name.c_str(), mm == MaterialDefecto ? " (DEFECTO)" : "",
+                   mm->texture ? mm->texture->path.c_str() : "-", us.c_str());
+            for (size_t k = 0; k < mm->capas.size(); k++)
+                printf("      [matcapasver]    capa %d: %s mezcla %d uv %d %s%s\n", (int)k, mm->capas[k].tex ? mm->capas[k].tex->path.c_str() : "-",
+                       mm->capas[k].blend, mm->capas[k].uvMapa, mm->capas[k].on ? "on" : "off", mm->capas[k].horneada ? (mm->capas[k].mascaraSol ? " horneada mascaraSol" : " horneada") : "");
+        }
+        return true;
+    }
+    // ---- texvolcar <archivo de la textura> <archivo.png> : los pixeles de esa textura (los que tiene en memoria) a un png ----
+    if (cmd == "texvolcar") {
+        std::string nom, salida; ss >> nom >> salida;
+        Texture* t = NULL;
+        for (size_t i = 0; i < Textures.size() && !t; i++) {
+            if (!Textures[i]) continue;
+            const std::string& pth = Textures[i]->path;
+            const size_t b = pth.find_last_of("/\\");
+            if ((b == std::string::npos ? pth : pth.substr(b + 1)) == nom) t = Textures[i];
+        }
+        if (!t) { err = "texvolcar: no hay una textura '" + nom + "'"; return false; }
+        TexturaEditable* te = TexEditObtener(t);
+        std::vector<unsigned char> png;
+        if (!te || !TexEditPNGActual(t, png)) { err = "texvolcar: no pude leerla"; return false; }
+        FILE* f = fopen(salida.c_str(), "wb"); if (f) { fwrite(&png[0], 1, png.size(), f); fclose(f); }
+        printf("      [texvolcar] '%s' (%s, iID %u) -> %s\n", nom.c_str(), t->path.c_str(), (unsigned)t->iID, salida.c_str());
         return true;
     }
     // ---- mallarep : el agrupamiento de la malla activa (posRep) contra sus posiciones distintas (cuantizadas a 1e-4) ----

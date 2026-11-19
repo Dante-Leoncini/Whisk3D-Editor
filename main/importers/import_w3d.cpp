@@ -53,6 +53,7 @@
 #include "objects/Recorte.h"     // LimpiarZ / Recorte (composicion de la pantalla en el arbol)
 #include "objects/Hitbox.h"      // HITBOX: caja de deteccion con eventos lua
 #include "objects/SondaLuz.h"   // la sonda de luz
+#include "objects/SondaReflejo.h"   // la sonda de reflejo
 #include "objects/InstanciaPrefab.h" // INSTANCIA DE PREFAB ("tipo":"prefab"): sus hijos se generan (io/Prefabs.h)
 #include "io/Prefabs.h"          // la definicion de cada prefab y la generacion de sus instancias
 #include "objects/ProxyW3d.h"    // PROXY W3D ("tipo":"proxy"): un prefab o una escena de una LIBRERIA externa
@@ -1798,6 +1799,7 @@ static void JsonComunes(JVal* j, Object* o) {
     o->recibeSombra = JB(j, "recibeSombra", true);
     o->rebotaLuz = JB(j, "rebotaLuz", true);         // (la luz precalculada: la indirecta)
     o->captaSombras = JB(j, "captaSombras", false);  // (captador de sombras)
+    o->enSondas = JB(j, "enSondas", true);           // (lo ven las sondas de reflejo y de luz)
     o->showRelantionshipsLines = JB(j, "lineasParentales", true); // ausente = true (archivos viejos)
     o->paleta = JS(j, "paleta", "");   // seleccion de paleta ("" = hereda del padre)
     JVal* v;
@@ -3307,6 +3309,12 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         if (col) for (size_t i = 0; i < col->lista.size() && i < 4; i++) rc->color[i] = (float)col->lista[i]->num;
         return rc;
     }
+    if (tipo == "sondareflejo") {   // SONDA DE REFLEJO: su imagen 360 (objects/SondaReflejo.cpp)
+        SondaReflejo* sr = new SondaReflejo(parent);
+        JsonComunes(j, sr);
+        SondaReflejoLeerCampos(j, sr);
+        return sr;
+    }
     if (tipo == "sondaluz") {  // SONDA DE LUZ: la grilla con la luz indirecta horneada (objects/SondaLuz.cpp)
         SondaLuz* sl = new SondaLuz(parent);
         JsonComunes(j, sl);
@@ -3753,6 +3761,7 @@ static bool W3dMismoMaterial(const Material* v, const Material& n, const std::st
     if (!W3dMatCasi(v->shininess, n.shininess)) return false;
     if (v->interpolacion != n.interpolacion) return false;
     if (v->reflectMode   != n.reflectMode)   return false;
+    if (v->reflejoSonda  != n.reflejoSonda)  return false;
     if (!W3dMatCasi(v->rtRugosidad, n.rtRugosidad) || !W3dMatCasi(v->rtMetalico, n.rtMetalico)) return false;
     if (v->textureOn != n.textureOn || v->filtrado != n.filtrado || v->repeat != n.repeat ||
         v->transparent != n.transparent || v->lighting != n.lighting || v->vertexColor != n.vertexColor ||
@@ -3778,6 +3787,7 @@ static void W3dCopiarMaterial(const Material& src, Material* dst) {
     }
     dst->shininess = src.shininess; dst->interpolacion = src.interpolacion;
     dst->reflectMode = src.reflectMode;
+    dst->reflejoSonda = src.reflejoSonda;
     dst->rtRugosidad = src.rtRugosidad; dst->rtMetalico = src.rtMetalico;
     dst->textureOn = src.textureOn; dst->filtrado = src.filtrado; dst->repeat = src.repeat;
     dst->transparent = src.transparent; dst->lighting = src.lighting; dst->vertexColor = src.vertexColor;
@@ -3815,6 +3825,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
         tmp.shininess     = JF(e, "brillo", tmp.shininess);
         tmp.interpolacion = JI(e, "interpolacion", tmp.interpolacion);
         tmp.reflectMode   = JI(e, "reflejoModo", tmp.reflectMode);
+        tmp.reflejoSonda  = JB(e, "reflejoSonda", false);   // (el reflejo de la sonda de reflejo mas cercana)
         tmp.rtRugosidad   = JF(e, "rugosidad", tmp.rtRugosidad);   // trazado de rayos (ausentes = default)
         tmp.rtMetalico    = JF(e, "metalico",  tmp.rtMetalico);
         // DECAL / mezcla. Ausentes en TODO lo guardado hasta hoy -> el default deja el material igual.
@@ -3907,6 +3918,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
                 TexCapaDormida cd; cd.textura = RutaJson(ct, base); cd.mezcla = JI(ce, "mezcla", 0); cd.on = JB(ce, "on", true);
                 cd.uv = JI(ce, "uv", 0);
                 cd.fuerza = JF(ce, "fuerza", 1.0f); cd.horneada = JB(ce, "horneada", false);
+                cd.mascaraSol = JB(ce, "mascaraSol", false);
                 dz.capas.push_back(cd);
             }
             if (!texBMigrada.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
@@ -3944,6 +3956,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
             TexCapaDormida cd; cd.textura = RutaJson(ct, base); cd.mezcla = JI(ce, "mezcla", 0); cd.on = JB(ce, "on", true);
             cd.uv = JI(ce, "uv", 0);   // capa UV de la malla con la que se dibuja (ausente = 0, la base)
             cd.fuerza = JF(ce, "fuerza", 1.0f); cd.horneada = JB(ce, "horneada", false);   // el factor de la mezcla (ausente = 1)
+            cd.mascaraSol = JB(ce, "mascaraSol", false);   // (el alfa de la luz horneada: cuanto es del sol)
             dz.capas.push_back(cd);
         }
         if (!texBMigrada.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
@@ -4694,6 +4707,8 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
               so.suaves = JB(rn, "sombraSuaves", sd.suaves);
               so.intensidad = JF(rn, "sombraIntensidad", sd.intensidad);
               so.sesgo = JF(rn, "sombraSesgo", sd.sesgo);
+              { Vector3 cc(sd.color[0], sd.color[1], sd.color[2]); JVec3(rn, "sombraColor", cc);
+                so.color[0] = cc.x; so.color[1] = cc.y; so.color[2] = cc.z; so.color[3] = 1.0f; }
               if (so.cascadas < 1) so.cascadas = 1; if (so.cascadas > 4) so.cascadas = 4;
               g_sombras = so; }
             JVal* ft = JHijo(rn, "fondoTexturas", 5);

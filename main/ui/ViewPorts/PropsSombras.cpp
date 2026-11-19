@@ -77,7 +77,7 @@ void PropsSombrasConstruir(Properties* p) {
     }
     p->propSomBorde = FilaMetros("Fade border", 0.0f, 100000.0f);
     p->propSombras->properties.push_back(p->propSomBorde);
-    p->propSomDesenf = new PropFloat(T("Far shadow blur"), "%");
+    p->propSomDesenf = new PropFloat(T("Penumbra"), "%");   // (la penumbra de contacto: nitida al pie, difusa lejos)
     p->propSomDesenf->SetRango(0.0f, 100.0f);
     p->propSomDesenf->entero = true;
     p->propSomDesenf->stepFino = 5.0f; p->propSomDesenf->stepGrueso = 25.0f; p->propSomDesenf->dragStep = 0.5f;
@@ -92,6 +92,8 @@ void PropsSombrasConstruir(Properties* p) {
     p->propSomSuaves = new PropBool(T("Soft shadows"));
     p->propSomSuaves->onChange = Cambio;
     p->propSombras->properties.push_back(p->propSomSuaves);
+    p->propSomColor = new PropColor(T("Shadow color"));   // (negro = sin la luz del sol; un azul = la luz del cielo)
+    p->propSombras->properties.push_back(p->propSomColor);
     p->propSomInt = new PropFloat(T("Shadow strength"), "%");
     p->propSomInt->SetRango(0.0f, 100.0f);
     p->propSomInt->entero = true;
@@ -133,6 +135,7 @@ void PropsSombrasActualizar(Properties* p, bool visible) {
     Bindear(p->propSomDesenf, on ? &gDesenfPct : NULL);
     BindearB(p->propSomSuaves, on ? &g_sombras.suaves : NULL);
     Bindear(p->propSomInt, on ? &gIntPct : NULL);
+    if (p->propSomColor && p->propSomColor->value != (on ? g_sombras.color : NULL)) { p->propSomColor->value = on ? g_sombras.color : NULL; PropsLayoutSucio(); }
     Bindear(p->propSomSesgo, on ? &g_sombras.sesgo : NULL);
     if (p->propSomRes) {
         if (p->propSomRes->oculto != !on) { p->propSomRes->oculto = !on; PropsLayoutSucio(); }
