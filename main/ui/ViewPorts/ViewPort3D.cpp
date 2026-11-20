@@ -2833,10 +2833,15 @@ void Viewport3D::RenderCamPassepartout(){
 // ============================================================================
 // cuantos TILES hacen falta para un render de outW x outH (para el total de la barra de progreso).
 // Mismo tope de tile que RenderAPNG (el tamano del viewport).
+// EL ANTIALIASING del render rasterizado (g_render.antialias): cada tile se dibuja 'S' veces mas grande y se promedia
+static int SuperMuestreo() { const int s = g_render.antialias; return s < 1 ? 1 : (s > 4 ? 4 : s); }
 int Viewport3D::TilesNecesarios(int outW, int outH) const {
     if (outW <= 0 || outH <= 0) return 0;
-    int capW = (width  > 0) ? width  : outW;
-    int capH = (height > 0) ? height : outH;
+    const int S = SuperMuestreo();
+    int capW = (width  > 0) ? width / S : outW;
+    int capH = (height > 0) ? height / S : outH;
+    if (capW < 1) capW = 1;
+    if (capH < 1) capH = 1;
     int tileW = (outW < capW) ? outW : capW;
     int tileH = (outH < capH) ? outH : capH;
     if (tileW <= 0 || tileH <= 0) return 0;
@@ -3177,15 +3182,20 @@ bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::v
 bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFranjaFn fn, void* ctx, int progBase, int progTotal){
     if (outW <= 0 || outH <= 0 || !SceneCollection || !fn) return false;
 
-    // tope de tile = lo que entra seguro en el framebuffer (el viewport ya entra en la ventana).
-    int capW = (width  > 0) ? width  : outW;
-    int capH = (height > 0) ? height : outH;
+    // tope de tile = lo que entra seguro en el framebuffer (el viewport ya entra en la ventana). Con ANTIALIASING ('S'
+    // muestras por lado; no en los vectores, que son datos) cada tile se dibuja S veces mas grande y se promedia
+    const int S = (pass == RenderType::Vectores) ? 1 : SuperMuestreo();
+    int capW = (width  > 0) ? width / S : outW;
+    int capH = (height > 0) ? height / S : outH;
+    if (capW < 1) capW = 1;
+    if (capH < 1) capH = 1;
     int tileW = (outW < capW) ? outW : capW;
     int tileH = (outH < capH) ? outH : capH;
     if (tileW <= 0 || tileH <= 0) return false;
 
     unsigned char* franja = new unsigned char[(size_t)outW * tileH * 4];   // (una fila de tiles: lo unico entero en memoria)
     unsigned char* tile = new unsigned char[(size_t)tileW * tileH * 4];
+    unsigned char* grande = (S > 1) ? new unsigned char[(size_t)tileW * S * tileH * S * 4] : NULL;   // (el tile sin promediar)
     bool ok = true;
 
     // extension del frustum de la imagen COMPLETA (aspect = outW/outH, NO el del viewport)
@@ -3232,7 +3242,7 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
     // las filas de tiles de ARRIBA hacia abajo ('arriba' = la primera fila de la franja contando desde arriba); cada
     // tile en coords BOTTOM-LEFT (como GL: ty)
     int tileIdx = 0; // para la barra: frac = (progBase + tiles hechos) / progTotal
-    for (int arriba = 0; arriba < outH && ok; arriba += tileH){
+    for (int arriba = 0; arriba < outH && ok && !ProgresoCancelado(); arriba += tileH){
         const int th = (arriba + tileH <= outH) ? tileH : (outH - arriba);
         const int ty = outH - arriba - th;
         for (int tx = 0; tx < outW; tx += tileW){
@@ -3244,13 +3254,13 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
             float t = bottom + (top    - bottom) * (float)(ty + th) / (float)outH;
 
             // (en el N95, la franja en una superficie APARTE: dibujada en la ventana se veia entre la barra de progreso)
-            const bool fueraTile = W3dFueraDePantallaEmpezar && W3dFueraDePantallaEmpezar(tileW, tileH);
+            const bool fueraTile = W3dFueraDePantallaEmpezar && W3dFueraDePantallaEmpezar(tileW * S, tileH * S);
             w3dEngine::MatrixMode(w3dEngine::Projection);
             w3dEngine::LoadIdentity();
             if (lOrto) w3dEngine::Ortho(l, r, b, t, lNear, lFar);
             else       w3dEngine::Frustum(l, r, b, t, lNear, lFar);
 
-            w3dEngine::Viewport(0, 0, tw, th); // el tile en la esquina del framebuffer
+            w3dEngine::Viewport(0, 0, tw * S, th * S); // el tile en la esquina del framebuffer (S veces mas grande con antialiasing)
 
             w3dEngine::MatrixMode(w3dEngine::ModelView);
             w3dEngine::LoadIdentity();
@@ -3306,7 +3316,21 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
             if (imagenFinal) { W3dSombrasFin(); W3dEscena3DFondoArchivoFin(); }   // (como en la vista: despues de las calcomanias y las particulas)
             }
 
-            w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
+            if (S > 1) {
+                // el ANTIALIASING: cada pixel, el promedio de sus S x S muestras
+                w3dEngine::ReadPixelsRGBA(0, 0, tw * S, th * S, grande);
+                const int gw = tw * S, n = S * S;
+                for (int y = 0; y < th; y++)
+                    for (int x = 0; x < tw; x++) {
+                        unsigned int acc[4] = { 0, 0, 0, 0 };
+                        for (int sy = 0; sy < S; sy++) {
+                            const unsigned char* q = grande + ((size_t)(y * S + sy) * gw + (size_t)x * S) * 4;
+                            for (int sx = 0; sx < S; sx++, q += 4) { acc[0] += q[0]; acc[1] += q[1]; acc[2] += q[2]; acc[3] += q[3]; }
+                        }
+                        unsigned char* o = tile + ((size_t)y * tw + x) * 4;
+                        for (int k = 0; k < 4; k++) o[k] = (unsigned char)((acc[k] + (unsigned)n / 2) / (unsigned)n);
+                    }
+            } else w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
             if (fueraTile) W3dFueraDePantallaTerminar();   // (la barra de progreso, en la ventana)
             for (int row = 0; row < th; row++){   // (GL lee de ABAJO hacia arriba: la franja va al derecho)
                 memcpy(franja + (size_t)((th - 1 - row) * outW + tx) * 4,
@@ -3330,6 +3354,7 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
 
     delete[] franja;
     delete[] tile;
+    delete[] grande;
     return ok;
 }
 

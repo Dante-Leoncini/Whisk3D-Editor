@@ -862,6 +862,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool* propRenderFinal; PropBool* propRenderFinalAlfa; PropBool* propRenderPost;
         PropBool* propRenderSonido; PropButton* propRenderAudioFmt; PropFloat* propRenderAudioKbps;   // el audio
         PropButton* propRenderVideoCodec; PropFloat* propRenderVideoKbps;   // el video: codec y bitrate
+        PropButton* propRenderAntialias;   // el antialiasing del render rasterizado (sin trazado de rayos)
         unsigned renderGenVisto;   // la g_renderGen de las filas de la tarjeta Render (otra = se abrio un proyecto: rearmarlas)
         // VECTORES DE MOVIMIENTO (el pase _vectores) y el DESENFOQUE DE MOVIMIENTO del beauty (render/VectoresMovimiento.h)
         PropBool* propRenderVectores; PropBool* propRenderDesenfoque; PropFloat* propRenderObturador;

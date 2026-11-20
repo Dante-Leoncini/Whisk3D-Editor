@@ -2189,3 +2189,11 @@ The phone could not encode the sound to AAC: the video has no sound	Das Telefon 
 Codec	Codec
 Video bitrate	Video-Bitrate
 The video "	Das Video "
+Frame %d of %d	Bild %d von %d
+Last: 	Letztes: 
+Average: 	Durchschnitt: 
+Remaining: ~	Verbleibend: ~
+This frame: 	Dieses Bild: 
+Cancel (right key)	Abbrechen (rechte Taste)
+Cancel (Esc)	Abbrechen (Esc)
+Render cancelled	Rendern abgebrochen

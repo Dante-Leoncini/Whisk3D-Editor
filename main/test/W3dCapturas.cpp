@@ -1298,6 +1298,8 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         return true;
     }
     // 'rendertam <ancho> <alto>': el tamano del render a archivo (las filas Ancho / Alto de la tarjeta Render)
+    // ---- renderaa <1..4> : el ANTIALIASING del render rasterizado (supermuestreo; 1 = apagado) ----
+    if (cmd == "renderaa") { int v = 1; ss >> v; g_render.antialias = v < 1 ? 1 : (v > 4 ? 4 : v); return true; }
     if (cmd == "rendertam") { float w = 0, h = 0; ss >> w >> h; if (w < 1 || h < 1) { err = "rendertam: <ancho> <alto>"; return false; } g_render.w = w; g_render.h = h; return true; }
     // 'renderfranjas <0|1>': 0 = el render a archivo con la imagen entera en memoria (para comparar con las franjas)
     if (cmd == "renderfranjas") { int v = 1; ss >> v; extern bool g_renderSinFranjas; g_renderSinFranjas = (v == 0); return true; }

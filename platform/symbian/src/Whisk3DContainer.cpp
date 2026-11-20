@@ -45,6 +45,20 @@ extern void (*LayoutSwapBuffers)();
 static EGLDisplay gSwapDisplay = NULL;
 static EGLSurface gSwapSurface = NULL;
 // (antes del swap, lo que el motor tiene JUNTADO sin dibujar: el swap es EGL directo y no lo manda. Como PCSwapBuffers)
+// MIENTRAS UN RENDER LARGO BLOQUEA (la barra de progreso): una espera anidada CORTA deja llegar las teclas pendientes a
+// OfferKeyEventL (la derecha, la C o Escape cancelan; el resto se descarta) y vuelve sola con un CIdle (prioridad
+// minima: corre despues de todo lo pendiente). El DrawCallBack no dibuja mientras haya barra
+static TInt ProgresoParar(TAny* p) { CActiveSchedulerWait* w = (CActiveSchedulerWait*)p; if (w->IsStarted()) w->AsyncStop(); return 0; }
+static void ProgresoSondearSymbian() {
+    static TBool dentro = EFalse;
+    if (dentro) return;
+    dentro = ETrue;
+    CActiveSchedulerWait* w = new CActiveSchedulerWait;
+    CIdle* idle = w ? CIdle::New(CActive::EPriorityIdle) : NULL;
+    if (w && idle) { idle->Start(TCallBack(ProgresoParar, w)); w->Start(); }
+    delete idle; delete w;
+    dentro = EFalse;
+}
 static void W3dProgresoSwap() { w3dEngine::DibujarPendiente(); if (gSwapDisplay) eglSwapBuffers(gSwapDisplay, gSwapSurface); }
 
 // ---- DIBUJAR FUERA DE LA PANTALLA (render/OpcionesRender.h): un PBUFFER del tamanio mas grande que se haya pedido. En el
@@ -421,6 +435,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     gFueraCfg = Config; gFueraCtx = iEglContext;
     if (gFueraSirve) { W3dFueraDePantallaEmpezar = FueraEmpezar; W3dFueraDePantallaTerminar = FueraTerminar; }
     LayoutSwapBuffers = W3dProgresoSwap;
+    { extern void (*W3dProgresoSondear)(); W3dProgresoSondear = ProgresoSondearSymbian; }   // (Cancelar en la barra)
 
 #ifdef W3D_GLES2
     // backend de shaders: compila el uber-shader y arma los VBOs. TIENE que ir antes de AppInit (que ya dibuja
@@ -849,6 +864,13 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 	// EEventKey (auto-repeat) se ignora: las flechas mantenidas las aplica el
 	// loop de frame (gHeld* + AplicarFlechas3D), no el repeat lento del telefono.
 	if (aType == EEventKey) return EKeyWasConsumed;
+	// UN RENDER EN CURSO (la barra de progreso): la tecla derecha, la C o Escape lo cancelan; nada mas se atiende
+	{ extern bool ProgresoActivo(); extern void ProgresoCancelar();
+	  if (ProgresoActivo()) {
+		const TInt sc0 = aKeyEvent.iScanCode;
+		if (aType == EEventKeyDown && (sc0 == EStdKeyDevice1 || sc0 == EStdKeyBackspace || sc0 == EStdKeyEscape)) ProgresoCancelar();
+		return EKeyWasConsumed;
+	  } }
 	g_redraw = true; // cualquier tecla del telefono (down/up) -> redibujar
 	switch( aType )
 		{
@@ -1544,6 +1566,8 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // ESPERANDO AL CODIFICADOR DE VIDEO (render a MP4): su espera anidada deja correr este CPeriodic; no se dibuja ni se
     // toca nada hasta que vuelva (w3dvideoenc.cpp)
     { extern TBool W3dVideoSymbianOcupado(); if (W3dVideoSymbianOcupado()) return 0; }
+    // (un render con su barra de progreso: la espera corta de la barra deja correr este CPeriodic; no se dibuja)
+    { extern bool ProgresoActivo(); if (ProgresoActivo()) return 0; }
     instance->iFrame++;
     OkLargoTick();   // el OK mantenido: vibrar y, al terminar, el menu contextual
     InclinarTick();  // el lapiz mantenido en un transform: inclinar el telefono

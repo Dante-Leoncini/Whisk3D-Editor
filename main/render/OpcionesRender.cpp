@@ -97,7 +97,7 @@ W3dRenderOpc::W3dRenderOpc()
 #endif
       zbuffer(false), normal(false), alfa(false), vectores(false), desenfoque(false), obturador(0.5f),
       formato(0), calidad(90.0f), final(true), finalAlfa(false), post(true), sonido(true), audioFormato(3), audioKbps(192.0f),
-      videoCodec(0),
+      videoCodec(0), antialias(1),
 #ifdef W3D_SYMBIAN
       videoKbps(1000.0f)   // (240p: lo que el RealPlayer del N95 reproduce bien)
 #else

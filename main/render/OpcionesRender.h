@@ -148,6 +148,9 @@ struct W3dRenderOpc {
     // EL VIDEO (MKV / MP4): el codec (0 H.264, 1 MPEG-4 parte 2; si la maquina no tiene el elegido, el otro) y su bitrate
     int videoCodec;
     float videoKbps;
+    // ANTIALIASING del render rasterizado (sin trazado de rayos): cada pixel sale de antialias x antialias muestras
+    // (supermuestreo: se dibuja mas grande y se promedia). 1 = apagado
+    int antialias;
     W3dRenderOpc();
 };
 extern W3dRenderOpc g_render;

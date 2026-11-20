@@ -2085,6 +2085,7 @@ static bool RenderCompleto(Viewport3D* vp, int w, int h, int pases, bool progres
     while (!g_rtOff->Terminado()) {
         g_rtOff->Avanzar(0.0);
         if (progreso) ProgresoActualizar(prog0 + (prog1 - prog0) * (float)g_rtOff->paso / (float)g_rt.pases);
+        if (progreso && ProgresoCancelado()) break;   // (el boton Cancelar de la barra)
     }
     if (g_rtOff->antesDelPase) { OlvidarPoses(g_rtOff->esc); PosesAlCuadro(g_rtOff->esc); }   // (la pose del cuadro, otra vez)
     g_rtOff->antesDelPase = NULL; g_rtOff->antesCtx = NULL;
@@ -2104,7 +2105,7 @@ bool RTRenderizarFranjas(Viewport3D* vp, int w, int h, int altoFranja, W3dFranja
     if (!vp || w <= 0 || h <= 0 || !fn) { msg = "Ray Tracing: nothing to render"; return false; }
     if (altoFranja < 1) altoFranja = 32;
     bool ok = true;
-    for (int y0 = 0; y0 < h && ok; y0 += altoFranja) {
+    for (int y0 = 0; y0 < h && ok && !ProgresoCancelado(); y0 += altoFranja) {
         const int bh = (y0 + altoFranja <= h) ? altoFranja : (h - y0);
         g_rtFranjaY0 = y0; g_rtFranjaAlto = h;
         const bool hecho = RenderCompleto(vp, w, bh, 0, true, y0 > 0, (float)y0 / (float)h, (float)(y0 + bh) / (float)h);

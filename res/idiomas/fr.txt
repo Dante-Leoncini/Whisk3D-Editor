@@ -2189,3 +2189,11 @@ The phone could not encode the sound to AAC: the video has no sound	Le télépho
 Codec	Codec
 Video bitrate	Débit vidéo
 The video "	La vidéo "
+Frame %d of %d	Image %d sur %d
+Last: 	Dernière : 
+Average: 	Moyenne : 
+Remaining: ~	Restant : ~
+This frame: 	Cette image : 
+Cancel (right key)	Annuler (touche droite)
+Cancel (Esc)	Annuler (Échap)
+Render cancelled	Rendu annulé

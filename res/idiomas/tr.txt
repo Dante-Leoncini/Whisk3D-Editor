@@ -2189,3 +2189,11 @@ The phone could not encode the sound to AAC: the video has no sound	Telefon sesi
 Codec	Codec
 Video bitrate	Video bit hızı
 The video "	Video "
+Frame %d of %d	Kare %d / %d
+Last: 	Son: 
+Average: 	Ortalama: 
+Remaining: ~	Kalan: ~
+This frame: 	Bu kare: 
+Cancel (right key)	İptal (sağ tuş)
+Cancel (Esc)	İptal (Esc)
+Render cancelled	Render iptal edildi

@@ -102,6 +102,23 @@ static void W3dVsync(int intervalo) {
 // hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
 static SDL_Window* g_swapWindow = NULL;
 static void PCSwapBuffers() { w3dEngine::DibujarPendiente(); if (g_swapWindow) W3dPresentar(g_swapWindow); }
+// mientras un render largo bloquea (la barra de progreso): Escape o el boton "Cancelar" lo cortan; cerrar la ventana
+// tambien (y el cierre vuelve a la cola, para que el editor pregunte al terminar). El resto de la entrada se descarta
+static void PCProgresoSondear() {
+    extern void ProgresoCancelar(); extern bool ProgresoBotonCancelarEn(int, int);
+    SDL_Event e;
+    bool salir = false;
+    while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_QUIT) { salir = true; ProgresoCancelar(); }
+        else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) ProgresoCancelar();
+        else if (e.type == SDL_MOUSEBUTTONDOWN && ProgresoBotonCancelarEn(e.button.x, e.button.y)) ProgresoCancelar();
+        else if (e.type == SDL_FINGERDOWN && g_swapWindow) {
+            int ww = 0, hh = 0; SDL_GetWindowSize(g_swapWindow, &ww, &hh);
+            if (ProgresoBotonCancelarEn((int)(e.tfinger.x * ww), (int)(e.tfinger.y * hh))) ProgresoCancelar();
+        }
+    }
+    if (salir) { SDL_Event q; memset(&q, 0, sizeof(q)); q.type = SDL_QUIT; SDL_PushEvent(&q); }
+}
 
 #include "ViewPorts/Properties.h" // DialogoCargarTextura
 #include "objects/Textures.h"
@@ -1665,6 +1682,7 @@ int main(int argc, char* argv[]) {
     DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
+    { extern void (*W3dProgresoSondear)(); W3dProgresoSondear = PCProgresoSondear; }   // (Cancelar en la barra)
 #endif
 #ifdef __ANDROID__
     // Android: import OBJ + "Load Texture" usan el MISMO file browser interno que PC
@@ -1677,6 +1695,7 @@ int main(int argc, char* argv[]) {
     LayoutImportStl = PCImportStl;
     DialogoCargarTextura = PCCargarTexturaEn;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers;
+    { extern void (*W3dProgresoSondear)(); W3dProgresoSondear = PCProgresoSondear; }   // (Cancelar en la barra)
 #endif
 #ifdef __EMSCRIPTEN__
     // en web pisamos import/textura con el SELECTOR DEL NAVEGADOR (el browser interno solo ve el FS

@@ -1344,6 +1344,7 @@ static void EscribirRender(std::string& s, CtxGuardar* cx) {
     if (r.audioKbps != d.audioKbps) E::F(c, "audioKbps", r.audioKbps);
     if (r.videoCodec != d.videoCodec) E::I(c, "videoCodec", r.videoCodec);
     if (r.videoKbps != d.videoKbps) E::F(c, "videoKbps", r.videoKbps);
+    if (r.antialias != d.antialias) E::I(c, "antialias", r.antialias);
     // EL FONDO (antes no se guardaba: volvia a negro al abrir): el color, color o textura 360, la rotacion y las texturas
     // que se usaron de fondo (la pista animable de QUE fondo las nombra por su lugar en esta lista)
     if (g_renderBg[0] != 0.0f || g_renderBg[1] != 0.0f || g_renderBg[2] != 0.0f) {

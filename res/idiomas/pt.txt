@@ -2189,3 +2189,11 @@ The phone could not encode the sound to AAC: the video has no sound	O telefone n
 Codec	Codec
 Video bitrate	Bitrate de vídeo
 The video "	O vídeo "
+Frame %d of %d	Quadro %d de %d
+Last: 	Último: 
+Average: 	Média: 
+Remaining: ~	Falta: ~
+This frame: 	Este quadro: 
+Cancel (right key)	Cancelar (tecla direita)
+Cancel (Esc)	Cancelar (Esc)
+Render cancelled	Render cancelado

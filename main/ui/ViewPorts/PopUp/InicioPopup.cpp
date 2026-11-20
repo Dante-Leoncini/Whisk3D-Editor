@@ -424,9 +424,12 @@ bool InicioPopup::Tecla(int tecla) {
         case LayoutKey::Down: {   // en el orden en que se ven: Nuevo archivo, Abrir..., los recientes
             const int n = (int)recientes.size();
             int o = (sel < 0) ? -1 : OrdenVisual(sel, n, verLayouts);
-            o += (tecla == LayoutKey::Down) ? 1 : -1;
-            if (o < 0) o = 0;
-            if (o > Filas() - 1) o = Filas() - 1;
+            // (sin nada elegido: abajo = el primero, arriba = el ultimo)
+            if (o < 0) o = (tecla == LayoutKey::Down) ? 0 : Filas() - 1;
+            else o += (tecla == LayoutKey::Down) ? 1 : -1;
+            // DA LA VUELTA: arriba desde el primero va al ultimo reciente, abajo desde el ultimo vuelve al primero
+            if (o < 0) o = Filas() - 1;
+            if (o > Filas() - 1) o = 0;
             sel = FilaDeOrden(o, n, verLayouts);
             g_redraw = true;
             return true;

@@ -4881,9 +4881,13 @@ static bool AndroidAudioAac(const std::string& wav, const std::string& salida) {
 #endif // W3D_VIDEO_ANDROID
 
 #ifdef W3D_VIDEO_SYMBIAN
-// SYMBIAN: el codificador del telefono (platform/symbian/src/w3dvideoenc.cpp) y el contenedor (io/W3dMp4.h). El
-// SONIDO: el WAV del render a AAC con el conversor de audio del telefono (w3daac.dll), su pista al MP4
+// SYMBIAN: el codificador del telefono (platform/symbian/src/w3dvideoenc.cpp: MPEG-4 hasta 720x576) o el PROPIO
+// (io/W3dH264.h: H.264 a cualquier resolucion), y el contenedor (io/W3dMp4.h). El SONIDO: el AAC propio (io/W3dAac.h)
 #include <e32def.h>
+#include "io/W3dH264.h"
+#include "io/W3dMp4.h"
+#include "io/W3dAac.h"
+#include <cstdio>
 TBool W3dVideoSymbianHay();
 TInt W3dVideoSymbianCodecs();   // 1 = H.264, 2 = MPEG-4 (los que tiene el telefono)
 TBool W3dVideoSymbianCuadro(const char* ruta, const unsigned char* rgba, TInt w, TInt h, TInt fps, TInt kbps, TInt codec);
@@ -4896,13 +4900,61 @@ static void RenderRango(int& f0, int& f1, int& fps);
 static bool g_videoSymbianAbierto = false;
 // el bitrate del video: el de la tarjeta
 static int VideoKbps(int, int, int) { return VideoKbpsElegido(); }
+// EL CODIFICADOR PROPIO (io/W3dH264.h): H.264 a CUALQUIER resolucion (720p, 1080p, 4K), sin el del telefono -que es
+// MPEG-4 hasta 720x576-. Mas lento, pero sale. El sonido, con el AAC propio (io/W3dAac.h)
+struct W3dVideoPropio {
+    W3dH264Codificador cod; W3dMp4Escritor mp4; std::vector<unsigned char> nal; bool fallo;
+    W3dVideoPropio() : fallo(false) {}
+};
+static W3dVideoPropio* g_videoPropio = NULL;
+static bool VideoPropioCuadro(const unsigned char* rgba, int w, int h) {
+    if (!g_videoPropio) {
+        int f0, f1, fps; RenderRango(f0, f1, fps);
+        g_videoPropio = new W3dVideoPropio();
+        if (!g_videoPropio->cod.Abrir(w, h, fps, VideoKbpsElegido(), fps) ||
+            !g_videoPropio->mp4.Abrir(RenderFileNamePNG(""), W3D_MP4_H264, w & ~1, h & ~1, fps)) g_videoPropio->fallo = true;
+        w3dLogf("[video] H.264 propio: %dx%d a %d fps, %d kbps", w, h, fps, VideoKbpsElegido());
+    }
+    W3dVideoPropio* v = g_videoPropio;
+    if (v->fallo) return false;
+    if (!v->cod.Cuadro(rgba, v->nal) || v->nal.empty() || !v->mp4.Cuadro(&v->nal[0], v->nal.size())) { v->fallo = true; return false; }
+    return true;
+}
+static bool VideoPropioCerrar() {
+    W3dVideoPropio* v = g_videoPropio;
+    if (!v) return true;
+    g_videoPropio = NULL;
+    bool ok = !v->fallo;
+    if (v->mp4.Abierto()) {
+        // el sonido: el WAV del render a AAC (el codificador propio)
+        if (!g_renderAudioTmp.empty()) {
+            std::vector<unsigned char> wav;
+            FILE* f = fopen(g_renderAudioTmp.c_str(), "rb");
+            if (f) { unsigned char b[16384]; size_t n; while ((n = fread(b, 1, sizeof b, f)) > 0) wav.insert(wav.end(), b, b + n); fclose(f); }
+            W3dAacCodificador aac; int fr = 0, ch = 0;
+            if (!wav.empty() && W3dAacDesdeWav(wav, AudioKbps(), aac, fr, ch))
+                v->mp4.AudioAac(aac.asc, aac.datos, aac.tamanios, fr, ch, AudioKbps(), aac.retardo, aac.muestras);
+            else w3dLogf("[video] el sonido no se pudo codificar: %s", aac.error.c_str());
+        }
+        w3dLogf("[video] H.264 propio: %d cuadros al MP4", v->mp4.Cuadros());
+        if (!v->mp4.Cerrar()) { w3dLogf("[video] el MP4 no se escribio: %s", v->mp4.error.c_str()); ok = false; }
+    }
+    delete v;
+    return ok;
+}
+// el telefono codifica MPEG-4 hasta 720x576 (DevVideoRecord); H.264 o algo mas grande, el propio
+static bool VideoUsaPropio(int w, int h) {
+    return VideoCodec() == 0 || w > 720 || h > 576 || !(W3dVideoSymbianCodecs() & 2);
+}
 static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h) {
     (void)tag;
+    if (g_videoPropio || VideoUsaPropio(w, h)) return VideoPropioCuadro(rgba, w, h);
     int f0, f1, fps; RenderRango(f0, f1, fps);
     g_videoSymbianAbierto = true;
-    return W3dVideoSymbianCuadro(RenderFileNamePNG("").c_str(), rgba, w, h, fps, VideoKbps(w, h, fps), VideoCodec()) ? true : false;
+    return W3dVideoSymbianCuadro(RenderFileNamePNG("").c_str(), rgba, w, h, fps, VideoKbps(w, h, fps), 1) ? true : false;
 }
 static void VideosCerrar(int& fallos) {
+    if (g_videoPropio && !VideoPropioCerrar()) fallos++;
     if (!g_videoSymbianAbierto) return;
     g_videoSymbianAbierto = false;
     // el sonido (si "Con sonido" dejo su WAV): a AAC y a la pista del MP4. Si el telefono no puede, el video sale igual
@@ -4924,7 +4976,7 @@ static bool VideoDisponible() {
 #elif defined(W3D_VIDEO_ANDROID)
     return true;
 #elif defined(W3D_VIDEO_SYMBIAN)
-    return W3dVideoSymbianHay() ? true : false;
+    return true;   // (el H.264 propio sirve siempre; el del telefono, si lo tiene)
 #else
     return false;
 #endif
@@ -4945,7 +4997,7 @@ static bool VideoCodecOfrecido(int c) {
 #elif defined(W3D_VIDEO_ANDROID)
     return c == 0;                          // (MediaCodec: H.264)
 #elif defined(W3D_VIDEO_SYMBIAN)
-    return (W3dVideoSymbianCodecs() & (c == 0 ? 1 : 2)) != 0;
+    return c == 0 || (W3dVideoSymbianCodecs() & 2) != 0;   // (H.264: el propio; MPEG-4: el del telefono)
 #else
     (void)c; return false;
 #endif
@@ -5259,11 +5311,16 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
     // con el alfa del pase de alfa
     if (final && RenderFranjasPosible() && !desenfocar && !post && !alfaFinal) {
         // por FRANJAS directo al PNG (trazada o rasterizada)
+        // (trazada: el trazador cuenta de 0 a 1 SU imagen; la barra, su parte de todo el render)
+        if (g_rt.on && progTotal > 0) ProgresoRango((float)base / progTotal, (float)(base + tpp) / progTotal);
         if (!PaseAlArchivo(vp, w, h, RenderType::Rendered, "", g_rt.on, base, progTotal)) fallos++;
+        ProgresoRango(0.0f, 1.0f);
         base += tpp;
     } else if (final) {
         std::vector<unsigned char> img; std::string msg;
+        if (g_rt.on && progTotal > 0) ProgresoRango((float)base / progTotal, (float)(base + tpp) / progTotal);
         const bool ok = g_rt.on ? RTRenderizarABuffer(vp, w, h, img, msg) : vp->RenderABuffer(w, h, RenderType::Rendered, img, base, progTotal);
+        ProgresoRango(0.0f, 1.0f);
         if (!ok || img.size() != (size_t)w * h * 4) fallos++;
         else {
             if (desenfocar && img.size() == vec.size())
@@ -5308,6 +5365,7 @@ static void AccionRenderDesenfoque(){
 // "Ray Tracing" (tarjeta Render): con el tilde se muestran Rays/Samples/Passes; sin el, las filas no ocupan lugar.
 void RTFilasPanel(Properties* P){
     if (!P || !P->propRT || !P->propRTRayos) return;
+    if (P->propRenderAntialias) { P->propRenderAntialias->oculto = g_rt.on; PropertiesLayoutDirty = true; }   // (sin trazado)
     P->rtRayos = (float)g_rt.rayos; P->rtSamples = (float)g_rt.samples; P->rtPases = (float)g_rt.pases; P->rtCapas = (float)g_rt.capas;
     P->rtRebotes = (float)g_rt.rebotes;
     if (P->propRTCapas) P->propRTCapas->value = g_rt.on ? &P->rtCapas : NULL;
@@ -5571,6 +5629,7 @@ static void AccionMenuDenoiser() {
 // las filas que dependen del FORMATO y de la COMPOSICION FINAL: la calidad (JPG y video), el alfa RGBA (PNG) y el
 // postprocesado. Sin la composicion final, solo se guardan los pases tildados. Un VIDEO es solo la composicion final:
 // sin los tildes de los pases ni el de la composicion (queda el postprocesado)
+static const char* AntialiasTexto(int s);   // (el menu del antialiasing: mas abajo)
 void RenderFilasFormato(Properties* P){
     if (!P || !P->propRenderFormato) return;
     if (g_render.formato < 0 || g_render.formato >= kRenderFormatosN) g_render.formato = 0;
@@ -5579,6 +5638,8 @@ void RenderFilasFormato(Properties* P){
     P->propRenderCalidad->value = (RenderFormato() == 1) ? &g_render.calidad : NULL;   // (JPG; el video va por su bitrate)
     if (P->propRenderVideoCodec) { P->propRenderVideoCodec->oculto = !video; P->propRenderVideoCodec->button->text = kVideoCodecs[VideoCodec()]; }
     if (P->propRenderVideoKbps) P->propRenderVideoKbps->value = video ? &g_render.videoKbps : NULL;
+    // el ANTIALIASING: solo sin trazado de rayos (el trazado ya promedia sus muestras)
+    if (P->propRenderAntialias) { P->propRenderAntialias->oculto = g_rt.on; P->propRenderAntialias->button->text = AntialiasTexto(g_render.antialias); }
     if (P->propRenderZbuffer)  P->propRenderZbuffer->value  = video ? NULL : &g_render.zbuffer;
     if (P->propRenderNormal)   P->propRenderNormal->value   = video ? NULL : &g_render.normal;
     if (P->propRenderAlpha)    P->propRenderAlpha->value    = video ? NULL : &g_render.alfa;
@@ -5624,6 +5685,22 @@ static void AccionMenuAudioFormato(){
         MenuItem* it = MenuAudioFormato->Agregar(kAudioFormatos[i], i); if (it) it->verde = (AudioFormato() == i);
     }
     AbrirMenuBajoBoton(MenuAudioFormato, PropsActivo->propRenderAudioFmt->button);
+}
+// el menu del ANTIALIASING (supermuestreo del render rasterizado: no / 2x / 3x / 4x)
+static PopupMenu* MenuAntialias = NULL;
+static const char* AntialiasTexto(int s) { static const char* const t[] = { "", "", "2x", "3x", "4x" }; return (s >= 2 && s <= 4) ? t[s] : T("Off"); }
+static void AccionAntialiasElegido(int id){
+    if (id < 1 || id > 4) return;
+    g_render.antialias = id;
+    RenderFilasFormato(PropsActivo);
+}
+static void AccionMenuAntialias(){
+    if (!PropsActivo || !PropsActivo->propRenderAntialias) return;
+    if (!MenuAntialias) { MenuAntialias = new PopupMenu(); MenuAntialias->action = AccionAntialiasElegido; }
+    MenuAntialias->Limpiar();
+    MenuAntialias->titulo = T("Antialiasing");
+    for (int i = 1; i <= 4; i++) { MenuItem* it = MenuAntialias->Agregar(AntialiasTexto(i), i); if (it) it->verde = (g_render.antialias == i || (i == 1 && g_render.antialias < 1)); }
+    AbrirMenuBajoBoton(MenuAntialias, PropsActivo->propRenderAntialias->button);
 }
 // el menu del CODEC del video (los que esta maquina tiene)
 static PopupMenu* MenuVideoCodec = NULL;
@@ -5717,12 +5794,15 @@ static void HacerRenderImage(){
     int total = PasesActivos() * vp->TilesNecesarios(w, h); // 1 frame: PASES x TILES
     if (total <= 0) { Notificar(T("Nothing to render: tick Final composite or a pass"), true); return; }
     ProgresoIniciar(T("Rendering..."));
+    ProgresoConCancelar(true);
     int fallos = 0;
     extern int CurrentFrame;
     PrepararAnterior(vp, w, h, CurrentFrame);   // (los vectores: el movimiento desde el cuadro anterior)
     RenderPasesFrame(vp, w, h, 0, total, fallos);
+    const bool cancelado = ProgresoCancelado();
     ProgresoFin();
-    if (fallos == 0) Notificar(T("Render saved!"), false);
+    if (cancelado) Notificar(T("Render cancelled"), false);
+    else if (fallos == 0) Notificar(T("Render saved!"), false);
     else             Notificar(T("Error: could not save the render"), true);
 }
 // boton "Render Image": arma Path + File name; si el PNG (pase beauty) ya existe, pide confirmacion.
@@ -5847,9 +5927,13 @@ static void HacerRenderAnimation(){
 #endif
     }
     ProgresoIniciar(T("Rendering animation..."));
+    ProgresoConCancelar(true);
     int fallos = 0, base = 0;
+    bool cancelado = false;
     PrepararAnterior(vp, w, h, f0);   // (los vectores del primer cuadro: desde f0-1; los demas, del que se acaba de renderizar)
     for (int f = f0; f <= f1; f++){
+        ProgresoCuadro(f - f0 + 1, nFrames);   // "Cuadro N de M", lo que tarda cada uno y lo que falta
+        if (ProgresoCancelado()) { cancelado = true; break; }
         CurrentFrame = f;
         AplicarAnimacionObjetos(); // transform de objetos al frame f
         base += RenderPasesFrame(vp, w, h, base, total, fallos); // rendea el frame; avanza la barra GLOBAL
@@ -5860,11 +5944,13 @@ static void HacerRenderAnimation(){
         if (!g_renderAudioTmp.empty()) { remove(g_renderAudioTmp.c_str()); g_renderAudioTmp.clear(); }
     }
 #endif
+    if (ProgresoCancelado()) cancelado = true;
     ProgresoFin();
     CurrentFrame = guardado;
     AplicarAnimacionObjetos(); // volver la escena al frame que estaba
-    if (fallos == 0) Notificar(T("Animation rendered!"), false);
-    else             Notificar(T("Error rendering animation"), true);
+    if (cancelado)        Notificar(T("Render cancelled"), false);   // (el video queda con lo que se llego a hacer)
+    else if (fallos == 0) Notificar(T("Animation rendered!"), false);
+    else                  Notificar(T("Error rendering animation"), true);
     g_redraw = true;
 }
 static void AccionRenderAnimation(){
@@ -10369,6 +10455,13 @@ void Properties::ConstruirGrupos(){
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
     propRenderH->value = &g_render.h; propRenderH->onChange = ActualizarAspectoRender;
     propRender->properties.push_back(propRenderH);
+    // el ANTIALIASING del render rasterizado (no / 2x / 3x / 4x: supermuestreo)
+    propRenderAntialias = new PropButton(T("Antialiasing"));
+    propRenderAntialias->conLabel = true;
+    propRenderAntialias->button->desplegable = true;
+    propRenderAntialias->action = AccionMenuAntialias;
+    propRenderAntialias->enColumna = true;
+    propRender->properties.push_back(propRenderAntialias);
     // el FORMATO: PNG, JPG y (con el ffmpeg de la maquina) los videos MKV y MP4 de Render Animation; la CALIDAD, del
     // JPG y de los videos (100 = sin perdida)
     propRenderFormato = new PropButton(T("Format"));

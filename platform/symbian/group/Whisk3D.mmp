@@ -227,7 +227,7 @@ SOURCEPATH      ..\..\..\main
 SOURCE          W3dEscena.cpp
 SOURCE          W3dRaices.cpp   // las ESCENAS 3D y los PREFABS del proyecto (raices, carga perezosa, cambiarEscena)
 SOURCEPATH      ..\..\..\main\io
-SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp UVExportar.cpp TexturaEditada.cpp W3dWeb.cpp W3dMp4.cpp W3dAac.cpp
+SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp UVExportar.cpp TexturaEditada.cpp W3dWeb.cpp W3dMp4.cpp W3dAac.cpp W3dH264.cpp
 SOURCE          MallasProyecto.cpp // editor: publicar/hacer unica/duplicar y el guardado de las mallas como recurso
 SOURCE          W3dNodos.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
 SOURCE          GuardarAnimSets.cpp   // el guardado de los ANIMSETS (.w3da): plan + dedup por clip (lo llama GuardarW3D)

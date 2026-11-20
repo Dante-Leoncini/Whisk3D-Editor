@@ -2,6 +2,7 @@
 #define PROGRESSPOPUP_H
 
 #include <string>
+#include <vector>
 #include "PopUpBase.h"
 
 class Card;
@@ -15,6 +16,9 @@ class ProgressPopup : public PopUpBase {
     public:
         std::string mensaje; // "Exporting model..." / "Importing model..."
         float frac;          // 0..1
+        std::vector<std::string> lineas;   // los renglones de abajo (cuadro N de M, tiempos, lo que falta)
+        bool conCancelar;    // el boton "Cancelar" (un render largo)
+        int cancX, cancY, cancW, cancH;    // donde quedo el boton (en pantalla)
         Card* barBg;         // tarjeta de la barra (fondo + borde), IGUAL que un slider del color picker
         Rec2D* rect;         // relleno verde proporcional (accent @ 0.55), mismo Rec2D que el slider del color
 
@@ -40,6 +44,20 @@ void ProgresoActualizarFull(float frac);      // como Actualizar pero redibuja e
                                               // para operaciones que PISAN el framebuffer (render por tiles)
 void ProgresoFin();                           // cierra la barra
 bool ProgresoActivo();                        // true entre Iniciar y Fin (lo usa la red de seguridad del dock)
+// EL RANGO de la barra para lo que sigue: ProgresoActualizar(f) muestra a + (b - a) * f (un cuadro de una animacion
+// trazada: el trazador cuenta de 0 a 1 su cuadro, la barra muestra el avance de TODA la animacion). (0, 1) = normal
+void ProgresoRango(float a, float b);
+// UNA ANIMACION: el cuadro que empieza ('actual' desde 1) de 'total'. Con eso la barra muestra "Cuadro N de M", lo que
+// tardo el ultimo, el promedio y cuanto falta (aproximado)
+void ProgresoCuadro(int actual, int total);
+// CANCELAR: el boton (y Escape en la PC, la tecla derecha o la C en el telefono). Lo largo pregunta Cancelado() y corta
+void ProgresoConCancelar(bool si);
+void ProgresoCancelar();
+bool ProgresoCancelado();
+bool ProgresoBotonCancelarEn(int x, int y);   // (el click de la PC)
+// hook de PLATAFORMA: atender la entrada pendiente mientras algo largo bloquea (PC: los eventos de SDL; Symbian: las
+// teclas, con una espera anidada). Se llama desde la barra, a lo sumo cada 1/5 de segundo
+extern void (*W3dProgresoSondear)();
 
 // ---- overlay NO MODAL (el build de "Compilar juego") ----
 // El MISMO widget/estetica que la barra modal del export, pero dibujado DENTRO del

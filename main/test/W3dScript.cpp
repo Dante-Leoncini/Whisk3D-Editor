@@ -1,5 +1,6 @@
 #include "io/W3dMp4.h"   // mp4armar: el contenedor MP4
 #include "io/W3dAac.h"   // aaccodificar: el codificador AAC propio
+#include "io/W3dH264.h"   // h264prueba: el codificador H.264 propio
 #include "ViewPorts/PopUp/AtajosPopup.h"
 #include "script/SimJuego.h"   // SimPerfDesglose (benchjuego)
 #include "WhiskUI/widgets/PopupMenu.h"
@@ -6652,6 +6653,51 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- aaccodificar <entrada.wav> <kbps> <salida.m4a> : el CODIFICADOR AAC propio (io/W3dAac.h) a un .m4a ----
+    // ---- h264prueba <ancho> <alto> <cuadros> <kbps> <salida.mp4> [rec.yuv] : el CODIFICADOR H.264 propio (io/W3dH264.h)
+    //      con cuadros de prueba (degradados, un circulo que se mueve, la imagen que se corre: hay movimiento de camara);
+    //      rec.yuv = lo que reconstruye el codificador (recortado), para comparar bit a bit con un decodificador ----
+    if (cmd == "h264prueba") {
+        int w = 320, h = 240, n = 30, kbps = 2000; std::string sal, recSal;
+        ss >> w >> h >> n >> kbps >> sal >> recSal;
+        W3dH264Codificador cod;
+        if (!cod.Abrir(w, h, 30, kbps, 30)) { err = "h264prueba: no abrio"; return false; }
+        W3dMp4Escritor mp4;
+        if (!mp4.Abrir(sal, W3D_MP4_H264, w & ~1, h & ~1, 30)) { err = "h264prueba: " + mp4.error; return false; }
+        FILE* fr = recSal.empty() ? NULL : fopen(recSal.c_str(), "wb");
+        std::vector<unsigned char> rgba((size_t)w * h * 4), nal;
+        extern unsigned int w3dGetTicks();
+        const unsigned t0 = w3dGetTicks();
+        long total = 0;
+        for (int f = 0; f < n; f++) {
+            const int cx = w / 4 + (f * 5) % (w / 2), cy = h / 2 + (int)(h / 4 * sin(f * 0.2)), rad = h / 6;
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+                unsigned char* q = &rgba[((size_t)y * w + x) * 4];
+                const int xs = x + f * 3;   // (todo se corre: movimiento de camara)
+                q[0] = (unsigned char)((xs * 255 / (w + 1)) & 255); q[1] = (unsigned char)(y * 255 / h);
+                q[2] = (unsigned char)(((xs / 16 + y / 16) & 1) ? 200 : 60); q[3] = 255;
+                const int dx = x - cx, dy = y - cy;
+                if (dx * dx + dy * dy < rad * rad) { q[0] = 250; q[1] = 240; q[2] = 30; }
+            }
+            if (!cod.Cuadro(&rgba[0], nal)) { err = "h264prueba: fallo un cuadro"; if (fr) fclose(fr); return false; }
+            total += (long)nal.size();
+            if (!mp4.Cuadro(&nal[0], nal.size())) { err = "h264prueba: el mp4: " + mp4.error; if (fr) fclose(fr); return false; }
+            if (fr) {   // la reconstruccion recortada a w x h (Y, U, V)
+                const std::vector<unsigned char>& r = cod.Reconstruido();
+                const int PW = cod.AnchoRelleno(), PH = cod.AltoRelleno(), ww = w & ~1, hh = h & ~1;
+                for (int y = 0; y < hh; y++) fwrite(&r[(size_t)y * PW], 1, ww, fr);
+                for (int c = 0; c < 2; c++) {
+                    const size_t base = (size_t)PW * PH + (size_t)c * (PW / 2) * (PH / 2);
+                    for (int y = 0; y < hh / 2; y++) fwrite(&r[base + (size_t)y * (PW / 2)], 1, ww / 2, fr);
+                }
+            }
+        }
+        if (fr) fclose(fr);
+        if (!mp4.Cerrar()) { err = "h264prueba: " + mp4.error; return false; }
+        const unsigned ms = w3dGetTicks() - t0;
+        printf("      [h264prueba] %dx%d, %d cuadros, %ld bytes (%.0f kbps), QP final %d, %u ms (%.1f ms por cuadro) -> %s\n",
+               w, h, n, total, total * 8.0 * 30 / n / 1000.0, cod.Qp(), ms, (double)ms / n, sal.c_str());
+        return true;
+    }
     if (cmd == "aaccodificar") {
         std::string ent, sal; int kbps = 128; ss >> ent >> kbps >> sal;
         FILE* f = fopen(ent.c_str(), "rb");
