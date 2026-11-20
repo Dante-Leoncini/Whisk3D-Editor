@@ -39,6 +39,11 @@
 "..\..\..\res\idiomas\de.txt"   -"!:\private\A00D021D\idiomas\de.txt"
 "..\..\..\res\idiomas\pl.txt"   -"!:\private\A00D021D\idiomas\pl.txt"
 "..\..\..\res\idiomas\ru.txt"   -"!:\private\A00D021D\idiomas\ru.txt"
+"..\..\..\res\inicio\reflejo.png"   -"!:\private\A00D021D\inicio\reflejo.png"
+"..\..\..\res\inicio\mascara.png"   -"!:\private\A00D021D\inicio\mascara.png"
+"..\..\..\res\inicio\borde.png"   -"!:\private\A00D021D\inicio\borde.png"
+"..\..\..\res\inicio\centro.png"   -"!:\private\A00D021D\inicio\centro.png"
+"..\..\..\res\inicio\texto.png"   -"!:\private\A00D021D\inicio\texto.png"
 "..\..\..\res\Skins\Whisk3D\skin.ini"   -"!:\private\A00D021D\skin.ini"
 ; atlas de iconos (arte dinamico, igual que PC): sin esto Symbian usa la tabla legacy de font.png
 ; (disquete de guardar = archivador, keyframe recortado). Ver W3dInitUI/SkinAtlasArmar.
@@ -128,6 +133,7 @@
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\recargar.png"   -"!:\private\A00D021D\atlas\iconos\recargar.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\usuarios.png"   -"!:\private\A00D021D\atlas\iconos\usuarios.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\cerrar.png"   -"!:\private\A00D021D\atlas\iconos\cerrar.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\raton.png"   -"!:\private\A00D021D\atlas\iconos\raton.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\handle_free.png"   -"!:\private\A00D021D\atlas\iconos\handle_free.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\handle_aligned.png"   -"!:\private\A00D021D\atlas\iconos\handle_aligned.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\handle_vector.png"   -"!:\private\A00D021D\atlas\iconos\handle_vector.png"

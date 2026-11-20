@@ -217,6 +217,7 @@ Background light	Lumière du fond
 Bake	Précalculer
 Bake Lighting	Précalculer l'éclairage
 Bake canceled	Précalcul annulé
+Another probe is baking	Une autre sonde est en cours de précalcul
 Bake the reflection probe first	Précalculez d'abord la sonde de réflexion
 Baked	Précalculée
 Baked: %d points	Précalculée : %d points
@@ -2175,3 +2176,16 @@ with mipmaps	avec mipmaps
 with transparency	avec transparence
 without mipmaps	sans mipmaps
 you want to select (Esc to cancel)	à sélectionner (Esc pour annuler)
+Exit Whisk3D?	Quitter Whisk3D ?
+Exit	Quitter
+Both	Les deux
+Curve segment	Segment de courbe
+Select with click and pencil	Ce que choisissent le clic et le crayon
+This phone has no video encoder for MP4	Ce téléphone n'a pas d'encodeur vidéo pour MP4
+Audio scrubbing	Écouter en déplaçant (scrubbing)
+Cut the sound at the current frame (trim)	Couper le son à l'image actuelle (trim)
+Move the current frame inside the sound to cut it	Placez l'image actuelle dans le son pour le couper
+The phone could not encode the sound to AAC: the video has no sound	Le téléphone n'a pas pu encoder le son en AAC : la vidéo n'a pas de son
+Codec	Codec
+Video bitrate	Débit vidéo
+The video "	La vidéo "

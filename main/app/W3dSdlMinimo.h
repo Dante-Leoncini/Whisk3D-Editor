@@ -48,7 +48,7 @@ enum { SDL_RELEASED = 0, SDL_PRESSED = 1 };
 #define W3D_SDLK_SC(x) ((SDL_Keycode)((x) | (1 << 30)))
 enum {
     SDLK_UNKNOWN = 0, SDLK_BACKSPACE = 8, SDLK_TAB = 9, SDLK_RETURN = 13, SDLK_ESCAPE = 27, SDLK_SPACE = ' ',
-    SDLK_0 = '0', SDLK_a = 'a', SDLK_g = 'g', SDLK_m = 'm', SDLK_p = 'p', SDLK_s = 's', SDLK_t = 't', SDLK_w = 'w',
+    SDLK_0 = '0', SDLK_a = 'a', SDLK_c = 'c', SDLK_v = 'v', SDLK_g = 'g', SDLK_m = 'm', SDLK_p = 'p', SDLK_s = 's', SDLK_t = 't', SDLK_w = 'w',
     SDLK_x = 'x', SDLK_y = 'y', SDLK_z = 'z', SDLK_DELETE = 127
 };
 #define SDLK_F1        W3D_SDLK_SC(58)

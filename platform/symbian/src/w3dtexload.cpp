@@ -235,6 +235,9 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     unsigned char* rgba = NULL;
     int w = 0, h = 0;
     if (!DecodeImage(path, &rgba, &w, &h)) { return false; }
+    // el tamano que se INFORMA es el del archivo: antes se tomaba despues de llevarla a potencia de dos y una imagen de
+    // 256x44 (el "Whisk3D" de la pantalla de inicio) se informaba 256x64 -> quien arma la proporcion la estiraba
+    const int origW = w, origH = h;
     const bool pot = ((w & (w - 1)) == 0) && ((h & (h - 1)) == 0) && w <= 1024 && h <= 1024;
     if (!pot) {
         int pw = 0, ph = 0;
@@ -248,7 +251,6 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     // (el browser se cerraba y la textura nunca aparecia) aunque el upload hubiera salido bien.
     // el PROYECTO pidio sus texturas a la MITAD en el telefono (TexturasMitadDesde: un proyecto pensado para PC no
     // entra en la memoria). Se informa el tamano de antes (las UV van de 0 a 1: el dibujo no cambia)
-    const int origW = w, origH = h;
     const int mitad = TexturasMitadDesde();
     if (mitad > 0 && (w > mitad || h > mitad)) {
         int mw = 0, mh = 0;
@@ -269,11 +271,32 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
 
 // SAVE (firma del motor): EncodePNG (portable, w3dTexture.cpp) + escritura con RFile. En PC/Web
 // SavePNG usa stdio (w3dTexture.cpp); aca es el sink de N95. Sin leaves: usa codigos de retorno.
+static TInt EscribirArchivo(const char* path, const unsigned char* datos, int len);
 bool SavePNG(const char* path, const unsigned char* rgba, int w, int h, bool flipY) {
     if (!path) { return false; }
     int len = 0;
     unsigned char* png = EncodePNG(rgba, w, h, flipY, &len); // buffer PNG en el heap
     if (!png) { return false; }
+    const TInt err = EscribirArchivo(path, png, len);
+    w3dLogf("SavePNG: '%s' %dx%d %d bytes err=%d", path, w, h, len, (TInt)err);
+    delete[] png;
+    return (err == KErrNone);
+}
+// el JPG del render (la tarjeta Render: Formato JPG): stb_image_write a memoria + la misma escritura con RFile
+bool SaveJPG(const char* path, const unsigned char* rgba, int w, int h, int calidad, bool flipY) {
+    if (!path) { return false; }
+    std::vector<unsigned char> jpg;
+    if (!EncodeJPG(rgba, w, h, calidad, flipY, jpg)) { return false; }
+    const TInt err = EscribirArchivo(path, &jpg[0], (int)jpg.size());
+    w3dLogf("SaveJPG: '%s' %dx%d calidad %d, %d bytes err=%d", path, w, h, calidad, (TInt)jpg.size(), (TInt)err);
+    return (err == KErrNone);
+}
+static TInt EscribirArchivo(const char* path, const unsigned char* datos, int len);
+} // namespace w3dEngine
+// (el MP4 del render a video: w3dvideoenc.cpp)
+TInt W3dEscribirArchivo(const char* path, const unsigned char* datos, int len) { return w3dEngine::EscribirArchivo(path, datos, len); }
+namespace w3dEngine {
+static TInt EscribirArchivo(const char* path, const unsigned char* datos, int len) {
 
     // char* -> TFileName (los slashes de unix -> backslash de Symbian)
     TFileName nombre;
@@ -290,15 +313,13 @@ bool SavePNG(const char* path, const unsigned char* rgba, int w, int h, bool fli
         RFile file;
         err = file.Replace(fs, nombre, EFileWrite); // crea/sobrescribe
         if (err == KErrNone) {
-            TPtrC8 ptr((const TUint8*)png, len);
+            TPtrC8 ptr((const TUint8*)datos, len);
             err = file.Write(ptr);
             file.Close();
         }
         FsCloseCompat(fs); // cierre de RFs compatible (fscompat.h)
     }
-    w3dLogf("SavePNG: '%s' %dx%d %d bytes err=%d", path, w, h, len, (TInt)err);
-    delete[] png;
-    return (err == KErrNone);
+    return err;
 }
 
 } // namespace w3dEngine

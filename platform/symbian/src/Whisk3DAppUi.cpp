@@ -33,6 +33,21 @@ static void SalirConfirmado(){
     CWhisk3DAppUi* ui = static_cast<CWhisk3DAppUi*>(CEikonEnv::Static()->EikAppUi());
     if (ui) ui->Exit();
 }
+// LA TECLA ROJA: con algo sin guardar, el cartel de los cambios (Guardar y salir / Salir sin guardar / Cancelar); sin
+// nada, "Salir de Whisk3D?". Minimizar es la tecla del menu
+#include "ViewPorts/PopUp/ConfirmarPopup.h"
+#include "W3dLang.h"
+bool W3dCambiosCartelAbierto();
+static void PreguntarSalir(){
+
+    if (W3dCambiosCartelAbierto()) return;                                   // (ya esta preguntando)
+    if (confirmarPopup && (PopUpBase*)confirmarPopup == PopUpActive) return;
+    W3dCambiosSalirHook = SalirConfirmado;
+    if (W3dCambiosPreguntar(0 /*W3D_CAMBIOS_SALIR*/, std::string())) return;  // (hay cambios: el cartel)
+    if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+    confirmarPopup->Preguntar(T("Exit Whisk3D?"), T("Exit"), T("Cancel"), SalirConfirmado, NULL);
+    extern bool g_redraw; g_redraw = true;
+}
 
 // ---- VIGIA DEL CIERRE ---------------------------------------------------------------------------------------
 // Un hilo chico espera a que termine el hilo principal y deja en el log COMO termino: un panic con su categoria y
@@ -361,6 +376,18 @@ void CWhisk3DAppUi::HandleForegroundEventL( TBool aForeground )
     {
     CAknAppUi::HandleForegroundEventL( aForeground );
     if ( iAppContainer ) iAppContainer->SetPrimerPlano( aForeground );
+    }
+
+#include <avkon.hrh>   // KAknUidValueEndKeyCloseEvent
+void CWhisk3DAppUi::HandleWsEventL( const TWsEvent& aEvent, CCoeControl* aDestination )
+    {
+    if ( aEvent.Type() == KAknUidValueEndKeyCloseEvent )
+        {
+        w3dLog("tecla roja: pregunta antes de salir");
+        PreguntarSalir();
+        return;   // (NO al framework: el cerraria la app)
+        }
+    CAknAppUi::HandleWsEventL( aEvent, aDestination );
     }
 
 void CWhisk3DAppUi::HandleCommandL(TInt aCommand){

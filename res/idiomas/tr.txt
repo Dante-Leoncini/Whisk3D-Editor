@@ -217,6 +217,7 @@ Background light	Arka plan ışığı
 Bake	Pişir
 Bake Lighting	Aydınlatmayı pişir
 Bake canceled	Pişirme iptal edildi
+Another probe is baking	Başka bir sonda pişiriliyor
 Bake the reflection probe first	Önce yansıma sondasını hesaplayın
 Baked	Önceden hesaplanmış
 Baked: %d points	Pişirildi: %d nokta
@@ -2175,3 +2176,16 @@ with mipmaps	mipmap ile
 with transparency	saydamlıklı
 without mipmaps	mipmap'siz
 you want to select (Esc to cancel)	seçilecek (İptal için Esc)
+Exit Whisk3D?	Whisk3D'den çıkılsın mı?
+Exit	Çık
+Both	İkisi de
+Curve segment	Eğri parçası
+Select with click and pencil	Tiklama ve kalemin sectigi
+This phone has no video encoder for MP4	Bu telefonda MP4 için video kodlayıcı yok
+Audio scrubbing	Kaydırırken dinle (scrubbing)
+Cut the sound at the current frame (trim)	Sesi mevcut karede kes (trim)
+Move the current frame inside the sound to cut it	Kesmek için mevcut kareyi sesin içine getirin
+The phone could not encode the sound to AAC: the video has no sound	Telefon sesi AAC olarak kodlayamadı: videoda ses yok
+Codec	Codec
+Video bitrate	Video bit hızı
+The video "	Video "

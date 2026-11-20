@@ -13,9 +13,9 @@
 #ifndef W3D_SYMBIAN
 #include "GeometriaUI/GeometriaUI.h" // LineaLightVertex/LineaEdge (gizmo de la luz; PC)
 #include "variables.h"               // showOverlayGlobal
+#endif
 #include "W3dRaices.h"               // las otras escenas abiertas: sus iconos tambien
 #include "script/W3dScript.h"        // (jugando no: el Play dibuja su base y sus capas)
-#endif
 
 // angulo (rad) en el vertice p del triangulo p-q-r (pondera la normal de cara en el vertex-normal)
 static float AnguloEnVertice(const float* p, const float* q, const float* r) {

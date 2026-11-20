@@ -78,7 +78,8 @@ ViewportBase::ViewportBase()
     barScrollManual = 0;
     barCard = NULL;
     barLinea = NULL;
-    toolScroll = 0;    // toolbar compartida (ToolbarBase.cpp): sin scroll ni gesto al nacer
+    toolScroll = 0;
+    toolFoco = -1;    // (sin foco de teclado en la barra de abajo)    // toolbar compartida (ToolbarBase.cpp): sin scroll ni gesto al nacer
     toolGesto = false;
     s_viewportsVivos++;
 }

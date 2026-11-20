@@ -55,6 +55,11 @@ class PopUpBase {
         // ventanita del nombre). false = lo de siempre: la caja se desenfoca y el popup sigue abierto
         virtual bool TeclaEnTexto(bool enter) { (void)enter; return false; }
         virtual bool CierraConViewport() { return false; }
+        // PLEGABLE (los paneles de ajustar la ultima operacion): plegado se ve solo el titulo y NO se queda con el teclado
+        // (el N95 sigue trabajando con el panel a la vista); el lapiz lo despliega para editarlo y lo vuelve a plegar
+        virtual bool Plegable() { return false; }
+        virtual bool Plegado() { return false; }
+        virtual void Desplegar(bool abrir) { (void)abrir; }
         // SEGUIR TRABAJANDO: el usuario usa el viewport AFUERA del popup (la rueda, orbitar) sin contestarle. Solo los
         // paneles de ajustar la ultima operacion (abajo a la izquierda: mover, escalar, inset...) se resuelven solos:
         // la operacion ya esta hecha, seguir trabajando la deja asi -> se cierran y la accion pasa al viewport. Los que

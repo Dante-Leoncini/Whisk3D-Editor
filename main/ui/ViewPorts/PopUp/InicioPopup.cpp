@@ -41,7 +41,13 @@ InicioPopup::~InicioPopup() { delete rect; }
 static unsigned int CargarLogo(const char* nombre, int* pw = NULL, int* ph = NULL) {
     unsigned int id = 0;
     int w = 0, h = 0;
+#ifdef W3D_SYMBIAN
+    // (Symbian: GetResDir() es "": todo va en la carpeta privada, la de la skin -> <privada>\inicio\, ver los .pkg)
+    extern std::string g_skinDir;
+    const std::string ruta = g_skinDir + "inicio\\" + nombre;
+#else
     const std::string ruta = w3dFileSystem::GetResDir() + "/inicio/" + nombre;
+#endif
     if (!w3dEngine::LoadTexture(ruta.c_str(), id, &w, &h)) return 0;
     if (pw) *pw = w;
     if (ph) *ph = h;
@@ -56,7 +62,14 @@ void InicioPopup::Abrir() {
     if (!texBorde) texBorde = CargarLogo("borde.png");
     if (!texCentro) texCentro = CargarLogo("centro.png");
     if (!texTexto) texTexto = CargarLogo("texto.png", &texTextoW, &texTextoH);
-    sel = -1; apretada = -1;   // (sin resaltado al abrir: en un telefono parecia apretado)
+    // "Nuevo archivo" RESALTADO al abrir: con el teclado se arranca con un OK / Enter. Con el DEDO (Android, un Symbian
+    // tactil: InicioPopupSinResaltar) sin resaltado, que parecia apretado
+#if defined(__ANDROID__)
+    sel = -1;
+#else
+    sel = 0;
+#endif
+    apretada = -1;
     t0 = W3dNowMs();
     PopUpActive = this;
     g_redraw = true;
@@ -82,6 +95,7 @@ void InicioPopupAbrir() {
 }
 void InicioPopupCerrar() { if (inicioPopup && PopUpActive == inicioPopup) inicioPopup->Cerrar(); }
 bool InicioPopupAbierta() { return inicioPopup && PopUpActive == inicioPopup; }
+void InicioPopupSinResaltar() { if (inicioPopup) { inicioPopup->sel = -1; g_redraw = true; } }
 
 // un RECTANGULO LISO (las lineas finas y el resaltado). Card es un 9-slice con esquinas de 2*GlobalScale: mas fino
 // que eso se rompe (las lineas salian gruesas y claras). Las 4 esquinas toman el texel del medio de la tarjeta.

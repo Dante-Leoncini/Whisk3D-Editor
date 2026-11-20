@@ -217,6 +217,7 @@ Background light	Luz del fondo
 Bake	Hornear
 Bake Lighting	Precalcular iluminación
 Bake canceled	Precálculo cancelado
+Another probe is baking	Otra sonda se está precalculando
 Bake the reflection probe first	Primero horneá la sonda de reflejo
 Baked	Horneada
 Baked: %d points	Horneada: %d puntos
@@ -2175,3 +2176,16 @@ with mipmaps	con mipmaps
 with transparency	con transparencias
 without mipmaps	sin mipmaps
 you want to select (Esc to cancel)	a seleccionar (Esc para cancelar)
+Exit Whisk3D?	¿Salir de Whisk3D?
+Exit	Salir
+Both	Ambos
+Curve segment	Tramo de curva
+Select with click and pencil	Que se elige con el click y el lapiz
+This phone has no video encoder for MP4	Este teléfono no tiene un codificador de video para MP4
+Audio scrubbing	Escuchar al mover (scrubbing)
+Cut the sound at the current frame (trim)	Cortar el sonido en el frame actual (trim)
+Move the current frame inside the sound to cut it	Poné el frame actual dentro del sonido para cortarlo
+The phone could not encode the sound to AAC: the video has no sound	El teléfono no pudo pasar el sonido a AAC: el video queda sin sonido
+Codec	Códec
+Video bitrate	Bitrate de video
+The video "	El video "

@@ -3776,7 +3776,45 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
 // Abre el PRIMER menu visible (saltea el icono de tipo, B[0]) SIN preseleccionar
 // item (Abrir deja selectIndex=-1): asi izq/der cambian de menu y recien abajo
 // se entra al desplegable. Si ya hay un menu abierto, lo cierra (toggle).
+// EL SOFTKEY DERECHO (un toque): entra / sale del foco de la barra de HERRAMIENTAS (abajo) del viewport activo (la
+// Vista 3D, el Timeline, el editor UV...). false = ese viewport no tiene barra de herramientas a la vista
+bool LayoutToolbarFocoToggle() {
+    ViewportBase* vp = viewPortActive;
+    if (!vp || !vp->isLeaf()) return false;
+    if (vp->toolFoco >= 0) { vp->toolFoco = -1; g_redraw = true; return true; }
+    // UNA barra con foco a la vez: el softkey derecho SALTA desde la de arriba (y su menu, las pestanias de Propiedades,
+    // el panel de curvas del timeline) a la de herramientas
+    if (LayoutMenuAbierto()) { if (MenuAbierto) MenuAbierto->Cerrar(); }
+    vp->barFocusIndex = -1;
+    if (vp->ViewportKind() == 3) ((Properties*)vp)->focoEnTabs = false;
+    if (vp->ViewportKind() == 5) ((Timeline*)vp)->panelFoco = -1;
+    return vp->ToolbarFocoMover(+1);
+}
+bool LayoutToolbarFocoActivo() {
+    ViewportBase* vp = viewPortActive;
+    if (!vp || !vp->isLeaf() || vp->toolFoco < 0) return false;
+    if (vp->ToolButtons.empty() || !vp->ToolbarVisible()) { vp->toolFoco = -1; return false; }
+    return true;
+}
+void LayoutToolbarSoltarFoco() { if (viewPortActive && viewPortActive->toolFoco >= 0) { viewPortActive->toolFoco = -1; g_redraw = true; } }
+// con el foco en la barra de abajo: izq/der recorren, OK aprieta, C o arriba salen
+bool LayoutToolbarTecla(int tecla) {
+    if (!LayoutToolbarFocoActivo()) return false;
+    ViewportBase* vp = viewPortActive;
+    switch (tecla) {
+        case LayoutKey::Left:   vp->ToolbarFocoMover(-1); return true;
+        case LayoutKey::Right:  vp->ToolbarFocoMover(+1); return true;
+        case LayoutKey::Enter:  vp->ToolbarFocoActivar(); return true;
+        case LayoutKey::Up:
+        case LayoutKey::Cancel: vp->toolFoco = -1; g_redraw = true; return true;
+        case LayoutKey::Down:   return true;
+    }
+    return false;
+}
+
 void LayoutToggleBarraViewportActivo() {
+    // UNA barra con foco a la vez: el softkey izquierdo SALTA desde la de herramientas (abajo) a la de arriba
+    if (viewPortActive && viewPortActive->toolFoco >= 0) { viewPortActive->toolFoco = -1; g_redraw = true; }
     if (LayoutMenuAbierto()) { if (MenuAbierto) MenuAbierto->Cerrar(); return; }
     ViewportBase* vp = viewPortActive;
     if (!vp || !vp->isLeaf()) return;
@@ -4079,7 +4117,7 @@ bool LayoutMenuContextoTecladoPosible() {
     if (LayoutMenuAbierto() || PopUpActive || g_textFieldActivo) return false;
     if (!viewPortActive || !viewPortActive->isLeaf()) return false;
     const int k = viewPortActive->ViewportKind();
-    if (k == 3) { Properties* p = (Properties*)viewPortActive; return !p->focoEnTabs && !p->editando; }
+    if (k == 3) { Properties* p = (Properties*)viewPortActive; return !p->focoEnTabs && (!p->editando || p->ListaTeclado(NULL, NULL)); }
     if (VpEsOutliner(viewPortActive)) { Outliner* o = (Outliner*)viewPortActive; return !o->ModoMover() && !o->moviendoRec; }
     if (k == 5) return true;
     if (k == 1) {
@@ -6081,6 +6119,17 @@ bool LayoutTeclaPanelActivo(int tecla) {
             const bool usada = out->TeclaRecursos(tecla);
             return usada || tecla != LayoutKey::Cancel;
         }
+        // DOS OK SEGUIDOS (como el doble click): renombrar el objeto activo en su fila. El primero sigue su camino
+        if (tecla == LayoutKey::Enter) {
+            static unsigned int sUltimoMs = 0;
+            extern unsigned int w3dGetTicks();
+            const unsigned int ahora = w3dGetTicks();
+            if (sUltimoMs && ahora - sUltimoMs < 450 && ObjActivo) {
+                sUltimoMs = 0;
+                if (out->RenombrarObjetoEnLinea(ObjActivo)) return true;
+            }
+            sUltimoMs = ahora;
+        }
         switch (tecla) {
             case LayoutKey::Up:    changeSelect(SelectMode::PrevSingle, true); out->AsegurarVisible(); return true;
             case LayoutKey::Down:  changeSelect(SelectMode::NextSingle, true); out->AsegurarVisible(); return true;
@@ -6152,11 +6201,28 @@ bool LayoutTeclaPanelActivo(int tecla) {
                 AnimSelCiclar(tecla == LayoutKey::Down ? +1 : -1);
                 return true;
             }
+            // ARRIBA / ABAJO en la barra (play, atras...): al PANEL DE CURVAS, a navegarlo como el outliner
+            if ((tecla == LayoutKey::Up || tecla == LayoutKey::Down) && tl->PanelFocoEntrar(tecla == LayoutKey::Down ? +1 : -1)) { g_redraw = true; return true; }
             switch (tecla) {
                 case LayoutKey::Left:   LayoutTimelineBarMover(-1); return true;
                 case LayoutKey::Right:  LayoutTimelineBarMover(+1); return true;
                 case LayoutKey::Enter:  LayoutTimelineBarActivar(); return true;
                 case LayoutKey::Cancel: tl->barFocusIndex = -1; g_redraw = true; return true;
+            }
+            return false;
+        }
+        // EL FOCO EN EL PANEL DE CURVAS: arriba/abajo recorren (arriba de la primera vuelve a la barra), izq/der
+        // pliegan / despliegan, OK sale (la fila queda elegida). La C sigue de largo: borra lo elegido
+        if (tl->panelFoco >= 0) {
+            switch (tecla) {
+                // pasandose de la primera o de la ultima: a la BARRA (la fila queda elegida); otra vez, al otro extremo
+                case LayoutKey::Up:
+                case LayoutKey::Down:
+                    if (!tl->PanelFocoMover(tecla == LayoutKey::Down ? +1 : -1)) { tl->panelFoco = -1; tl->barFocusIndex = 0; LayoutTimelineBarMover(+1); }
+                    return true;
+                case LayoutKey::Left:  tl->PanelFocoPlegar(true); return true;
+                case LayoutKey::Right: tl->PanelFocoPlegar(false); return true;
+                case LayoutKey::Enter: tl->panelFoco = -1; g_redraw = true; return true;
             }
             return false;
         }
@@ -6284,13 +6350,32 @@ bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode) {
     Timeline* tl = (Timeline*)viewPortActive;
     if (tl->barFocusIndex >= 0) return false; // foco de barra activo (soft-izq): las flechas navegan la barra, no scrollean
     if (panMode) {                                       // * + flechas = panear la vista
-        if (dx) tl->PanFrames((float)dx * 1.5f);         // horizontal: frames
+        // ARRANCA LENTO y va acelerando mientras se mantiene (como mover / rotar / escalar con las flechas): un cuarto
+        // de la velocidad de antes al principio, 2.5 veces al segundo y medio. Se reinicia al soltar (un rato sin llamadas)
+        static unsigned int sUltimo = 0; static int sRampa = 0;
+        extern unsigned int w3dGetTicks();
+        const unsigned int ahora = w3dGetTicks();
+        if (ahora - sUltimo > 150) sRampa = 0;
+        sUltimo = ahora;
+        float t = (float)sRampa / 45.0f; if (t > 1.0f) t = 1.0f;
+        const float f = 0.25f + 2.25f * t * t;
+        sRampa++;
+        if (dx) tl->PanFrames((float)dx * 1.5f * f);     // horizontal: frames
         // vertical: en CURVAS panea el VALOR; en dope sheet scrollea las filas. Antes arriba/abajo con * no
         // hacia NADA (solo se miraba dx).
         if (dy){
-            if (tl->modo == Timeline::TL_MODO_CURVAS)
-                tl->PanValor((float)dy * 8.0f / (tl->pxPerUnit > 1e-6f ? tl->pxPerUnit : 1e-6f));
-            else { tl->PosY += dy * 8; if (tl->PosY > 0) tl->PosY = 0; g_redraw = true; }
+            if (tl->modo == Timeline::TL_MODO_CURVAS)   // (arriba = ver valores mas altos: estaba al reves)
+                tl->PanValor(-(float)dy * 8.0f * f / (tl->pxPerUnit > 1e-6f ? tl->pxPerUnit : 1e-6f));
+            else {
+                // KEYFRAMES (dope sheet): las FILAS (curvas, sonidos) para arriba / abajo, con la misma rampa y sin pasarse
+                // del final (antes iba al reves y se podia correr sin limite)
+                tl->PosY -= (int)((float)dy * 8.0f * f);
+                const int total = (int)tl->dopeVisibles * tl->rowH, alto = tl->height - tl->stripY;
+                const int minimo = alto < total ? alto - total : 0;
+                if (tl->PosY < minimo) tl->PosY = minimo;
+                if (tl->PosY > 0) tl->PosY = 0;
+                g_redraw = true;
+            }
         }
     } else if (zoomMode) {                               // 0 + flechas = zoom
         // los DOS ejes por separado: izq/der = tiempo, arriba/abajo = VALOR (solo en curvas, que es donde el eje
@@ -6336,6 +6421,7 @@ void LayoutTimelineBarMover(int dir) {
 }
 void LayoutTimelineBarToggle() {
     Timeline* tl = TimelineActivoPtr(); if (!tl) return;
+    if (tl->panelFoco >= 0) { tl->panelFoco = -1; g_redraw = true; return; }   // (del panel: sale del todo)
     if (tl->barFocusIndex >= 0) tl->barFocusIndex = -1;   // salir del modo foco
     else { tl->barFocusIndex = 0; LayoutTimelineBarMover(+1); } // entrar: primer boton de transporte (izq llega al [0] tipo)
     g_redraw = true;

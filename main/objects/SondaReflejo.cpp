@@ -211,7 +211,7 @@ bool SondaReflejoEsSuya(const Texture* t) {
     return false;
 }
 
-bool SondaReflejoHornear(SondaReflejo* s, std::string* motivo) {
+bool SondaReflejoHornearEmpezar(SondaReflejo* s, std::string* motivo) {
 #ifdef W3D_SIN_EDITOR
     (void)s; if (motivo) *motivo = "Nothing to bake"; return false;   // (el juego no hornea: usa la imagen del .w3d)
 #else
@@ -222,9 +222,20 @@ bool SondaReflejoHornear(SondaReflejo* s, std::string* motivo) {
     const int w = s->resolucion < 32 ? 32 : (s->resolucion > 2048 ? 2048 : s->resolucion);
     const int h = w / 2;
     float c[3]; s->CentroMundo(c);
-    std::vector<unsigned char> rgba;
     // (el FONDO es el de la escena, tal cual: el color o el 360)
-    if (!RTHornearReflejo(c, w, h, s->cerca, s->muestras, s->rebotes, s->intensidad, rgba, motivo)) return false;
+    return RTSondaEmpezarReflejo(c, w, h, s->cerca, s->muestras, s->rebotes, s->intensidad, motivo);
+#endif
+}
+
+bool SondaReflejoHornearTerminar(SondaReflejo* s, std::string* motivo) {
+#ifdef W3D_SIN_EDITOR
+    (void)s; (void)motivo; return false;
+#else
+    if (!s) return false;
+    const int w = s->resolucion < 32 ? 32 : (s->resolucion > 2048 ? 2048 : s->resolucion);
+    const int h = w / 2;
+    std::vector<unsigned char> rgba;
+    if (!RTSondaTomarReflejo(rgba) || (int)rgba.size() != w * h * 4) { if (motivo) *motivo = "Nothing to bake"; return false; }
     // LA TEXTURA: la misma si ya tenia una del mismo tamanio; si no, una nueva del proyecto (en memoria hasta guardar)
     Texture* t = s->textura.empty() ? NULL : TexturaBuscar(s->textura);
     TexturaEditable* te = t ? TexEditObtener(t) : NULL;
@@ -243,6 +254,15 @@ bool SondaReflejoHornear(SondaReflejo* s, std::string* motivo) {
     g_redraw = true;
     return true;
 #endif
+}
+
+// DE UNA SOLA VEZ (el harness)
+bool SondaReflejoHornear(SondaReflejo* s, std::string* motivo) {
+    if (!SondaReflejoHornearEmpezar(s, motivo)) return false;
+#ifndef W3D_SIN_EDITOR
+    while (RTSondaActiva()) RTSondaPaso(100000);
+#endif
+    return SondaReflejoHornearTerminar(s, motivo);
 }
 
 SondaReflejo* SondaReflejoDuplicar(SondaReflejo* src) {

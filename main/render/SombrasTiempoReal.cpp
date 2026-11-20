@@ -446,8 +446,11 @@ bool PaseProyectado(Light* sol, const std::vector<Pieza>& piezas) {
     gfx::Disable(gfx::CullFace); gfx::Disable(gfx::Blend); gfx::Disable(gfx::Texture2D); gfx::Disable(gfx::Lighting);
     gfx::Disable(gfx::Fog); gfx::Disable(gfx::ColorMaterial);
     gfx::Enable(gfx::DepthTest); gfx::DepthFunc(gfx::DepthLEqual); gfx::DepthMask(true); gfx::ColorMask(true, true, true, true);
-    gfx::Viewport(vp[0], vp[1], tw, th);
-    gfx::Scissor(vp[0], vp[1], tw, th); gfx::Enable(gfx::ScissorTest);
+    // (en el N95, en una superficie APARTE: dibujado en la ventana se veia -los colores planos- antes del swap)
+    const bool fuera = W3dFueraDePantallaEmpezar && W3dFueraDePantallaEmpezar(tw, th);
+    const int ox = fuera ? 0 : vp[0], oy = fuera ? 0 : vp[1];
+    gfx::Viewport(ox, oy, tw, th);
+    gfx::Scissor(ox, oy, tw, th); gfx::Enable(gfx::ScissorTest);
     gfx::ClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer);
     gfx::UnbindVBOs();
@@ -469,12 +472,13 @@ bool PaseProyectado(Light* sol, const std::vector<Pieza>& piezas) {
     gfx::MatrixMode(gfx::ModelView); gfx::PopMatrix();
     // ---- 2. LA CPU: los pixeles ----
     gIds.resize((size_t)tw * th * 4);
-    gfx::ReadPixelsRGBA(vp[0], vp[1], tw, th, &gIds[0]);
+    gfx::ReadPixelsRGBA(ox, oy, tw, th, &gIds[0]);
     // la pantalla como estaba: el fondo del render y la profundidad al fondo (el cielo 360, si hay, se dibuja encima)
     { float bg[4] = { 0, 0, 0, 1 };
       if (!W3dFondoAutoColor(bg)) { bg[0] = g_renderBg[0]; bg[1] = g_renderBg[1]; bg[2] = g_renderBg[2]; bg[3] = 1.0f; }
       gfx::ClearColor(bg[0], bg[1], bg[2], bg[3]);
       gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer); }
+    if (fuera) W3dFueraDePantallaTerminar();   // (de vuelta a la ventana)
     gfx::Viewport(vp[0], vp[1], vp[2], vp[3]);
     if (!antSc) gfx::Disable(gfx::ScissorTest);
     if (antDither) gfx::Enable(gfx::Dither);
@@ -552,6 +556,11 @@ bool PaseProyectado(Light* sol, const std::vector<Pieza>& piezas) {
             }
         }
         Mascara& m = gMascaras[p.m];
+#ifdef W3D_SYMBIAN
+        // (el MBX del N95 dibuja en diferido: pisar la mascara que el cuadro anterior todavia lee daba parpadeos por
+        // baldosas. Se espera a que termine: mas lento, sin parpadeos)
+        if (m.tex && m.w == mw && m.h == mh) gfx::Finish();
+#endif
         if (m.tex && m.w == mw && m.h == mh) gfx::UpdateRGBA(m.tex, 0, 0, mw, mh, &gTmp[0], false);
         else {
             if (m.tex) gfx::DeleteTexture(m.tex);

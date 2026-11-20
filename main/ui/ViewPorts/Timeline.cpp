@@ -62,11 +62,12 @@ void InvalidarAnimYRedraw(){
 // roles de los botones de la barra (para el dispatch del click; no chocan con los BR_* del 3D)
 enum { TL_ROL_T0 = 300, TL_ROL_START = 320, TL_ROL_END = 321, TL_ROL_ANIM = 322, TL_ROL_SELECT = 323, TL_ROL_PIVOT = 324,
        TL_ROL_VIEW = 325, TL_ROL_MODO = 326, TL_ROL_KEY = 327, TL_ROL_AUTOKEY = 328, TL_ROL_FPS = 329,
-       TL_ROL_TIEMPO = 330,
+       TL_ROL_TIEMPO = 330, TL_ROL_SELMODO = 331,
        // la TOOLBAR de abajo: + KfConstant..KfElastic (todas las curvas) | + HFree..HPlano | + KfEaseAuto..InOut
        TL_TB_INTERP0 = 400, TL_TB_HANDLE0 = 420, TL_TB_EASE0 = 440,
        // ...y los de siempre (a la izquierda): deshacer / rehacer y, con el dedo, el Shift y el modo del arrastre
-       TL_TB_UNDO = 460, TL_TB_REDO = 461, TL_TB_SHIFT = 462, TL_TB_SELEC = 463, TL_TB_VISTA = 464 };
+       TL_TB_UNDO = 460, TL_TB_REDO = 461, TL_TB_SHIFT = 462, TL_TB_SELEC = 463, TL_TB_VISTA = 464,
+       TL_TB_TRIM = 465 };
 bool g_tlModoVista = true;   // (Timeline.h) con el dedo, arrastrar mueve la vista; false = caja de seleccion
 static Timeline* g_tlDedoPanel = NULL;
 void TimelineDedoPanel(Timeline* t) { g_tlDedoPanel = t; }
@@ -523,6 +524,14 @@ void DopeSoltarVertexAnim(){
 //  DopeCiclarEje, que son publicos. Tenerlos aca adentro obligaba a los llamadores a pasar numeros sueltos.)
 enum { DOPE_PIV_CENTER = 0, DOPE_PIV_CURFRAME = 1, DOPE_PIV_MEDIAN = 2, DOPE_PIV_ACTIVE = 3 };
 static int  g_dopePivot = DOPE_PIV_CENTER;
+// QUE SE ELIGE con el click / el dedo / el lapiz (el boton del MOUSE de la barra):
+//   AMBOS    el click toma el keyframe mas cercano y, si no hay, el TRAMO de curva que toco; el lapiz, de keyframe en keyframe
+//   CURVA    el click toma el TRAMO (el pedazo de curva entre dos keyframes: quedan elegidos los dos) y el lapiz recorre
+//            los tramos uno por uno. Asi en el telefono se elige un tramo y se le cambia la interpolacion o se lo mueve
+//   KEYFRAME el click solo toma keyframes; el lapiz, de keyframe en keyframe (lo de siempre)
+enum { TL_SEL_AMBOS = 0, TL_SEL_CURVA = 1, TL_SEL_KEYFRAME = 2 };
+static int  g_tlSelModo = TL_SEL_AMBOS;
+static int  g_tramoFila = -1, g_tramoI = -1;   // el tramo que recorre el lapiz (fila de dopeRows, keyframe de la izquierda)
 static bool g_dopeMov = false;
 static int  g_dopeMovModo = 0;        // DOPE_MOV / DOPE_ESC / DOPE_ROT
 static int  g_dopeMovEje = Timeline::DOPE_EJE_LIBRE;
@@ -1271,7 +1280,7 @@ static void TL_menuSelAction(int id){
 }
 // menu View del dope sheet: encuadrar los keyframes seleccionados
 enum { TL_VIEW_FRAMESEL = 0, TL_VIEW_AUTOFRAME = 1, TL_VIEW_PANEL = 2, TL_VIEW_SOLOSEL = 3, TL_VIEW_ONDA = 4, TL_VIEW_VOLUMEN = 5,
-       TL_VIEW_DOPE = 6, TL_VIEW_CURVAS = 7, TL_VIEW_HANDLES = 8 };
+       TL_VIEW_DOPE = 6, TL_VIEW_CURVAS = 7, TL_VIEW_HANDLES = 8, TL_VIEW_GIZMO = 9, TL_VIEW_SCRUB = 10 };
 static void TL_menuViewAction(int id){
     // el CHECKBOX ya lo toggleo PopupMenu::Click, que a proposito NO cierra el menu (asi se prenden/apagan
     // varios de una). Cerrarlo aca romperia eso.
@@ -1280,6 +1289,8 @@ static void TL_menuViewAction(int id){
     if (id == TL_VIEW_SOLOSEL){ g_redraw = true; return; } // idem: las filas se re-arman solas con el filtro
     if (id == TL_VIEW_ONDA || id == TL_VIEW_VOLUMEN){ g_redraw = true; return; }
     if (id == TL_VIEW_HANDLES){ g_redraw = true; return; }   // (el checkbox ya toco g_tlVerHandles)
+    if (id == TL_VIEW_GIZMO){ g_redraw = true; return; }     // (el checkbox ya toco g_gizmoOn)
+    if (id == TL_VIEW_SCRUB){ g_redraw = true; return; }     // (el checkbox ya toco g_sonidoScrub)
     if (g_tlActivo && id == TL_VIEW_FRAMESEL) g_tlActivo->DopeFrameSelected();
     if (g_tlActivo && (id == TL_VIEW_DOPE || id == TL_VIEW_CURVAS)) g_tlActivo->CambiarModo(id == TL_VIEW_CURVAS);
     TL_CerrarMenu(g_tlMenuView);
@@ -1354,6 +1365,7 @@ Timeline::Timeline(){
     scrubbing = false; lastMx = lastMy = 0;
     stripY = numY = barH2 = 0; curBtnX = curBtnW = 0;
     panelW = 0; panelWUser = 0; panelResize = false; rowH = RenglonHeightGS; hoverRow = -1; dopeVisibles = 0;
+    panelFoco = -1;
     panelBordeHover = false; panelPosX = 0; panelContW = 0; panelBarraH = false; panelPaneo = 0; // dope sheet (panelW=0 -> timeline clasico)
     fStart=(float)StartFrame; fEnd=(float)EndFrame; fCur=(float)CurrentFrame;
 
@@ -1414,6 +1426,9 @@ Timeline::Timeline(){
     btnPivot = new Button("", (int)IconType::pivotMedian); btnPivot->rol = TL_ROL_PIVOT; btnPivot->desplegable = true; // solo el icono
     btnPivot->visible = false;
     BarButtons.push_back(btnPivot);
+    btnSelModo = new Button("", (int)IconType::raton); btnSelModo->rol = TL_ROL_SELMODO; btnSelModo->desplegable = true;
+    btnSelModo->ayuda = "Select with click and pencil"; btnSelModo->visible = false;
+    BarButtons.push_back(btnSelModo);
     // ---- TOOLBAR de abajo (estilo Inkscape): solo iconos, con su cartelito; cada GRUPO arranca con una linea ----
     { struct B { static Button* Nuevo(std::vector<Button*>& v, int icono, int rol, const char* ayuda, bool sep){
           Button* b = new Button("", icono); b->rol = rol; b->cuadrado = true; b->centrado = true; b->ayuda = ayuda;
@@ -1426,6 +1441,8 @@ Timeline::Timeline(){
       { Button* sh = B::Nuevo(ToolButtons, -1, TL_TB_SHIFT, "Shift", true); sh->text = "Shift"; sh->cuadrado = false; }
       B::Nuevo(ToolButtons, IconType::seleccion, TL_TB_SELEC, "Select", false);
       B::Nuevo(ToolButtons, IconType::monitor,   TL_TB_VISTA, "Move the view", false);
+      // la TIJERA: corta el sonido elegido en el frame actual (queda en dos: el original y su copia)
+      B::Nuevo(ToolButtons, IconType::tijera,    TL_TB_TRIM,  "Cut the sound at the current frame (trim)", true);
       B::Nuevo(ToolButtons, IconType::interp_constant, TL_TB_INTERP0 + KfConstant, "Constant", true);
       B::Nuevo(ToolButtons, IconType::interp_linear,   TL_TB_INTERP0 + KfLinear,   "Linear", false);
       B::Nuevo(ToolButtons, IconType::interp_bezier,   TL_TB_INTERP0 + KfBezier,   "Bezier", false);
@@ -1587,6 +1604,7 @@ void Timeline::SyncFields(){
     // las cosas.
     btnKey->visible    = true;
     btnPivot->visible  = hayFilas;          // menu Pivot: idem (sin keyframes no hay nada que escalar)
+    btnSelModo->visible = hayFilas;         // el MOUSE: que se elige (sin keyframes no hay nada)
     btnPivot->icon = (g_dopePivot == DOPE_PIV_CURFRAME) ? (int)IconType::pivotCursor :
                      (g_dopePivot == DOPE_PIV_ACTIVE)   ? (int)IconType::pivotActive : (int)IconType::pivotMedian;
 }
@@ -2470,6 +2488,8 @@ bool Timeline::CurvaClickStrip(int mx, int my){
         return true;
       } }
     // 2) KEYFRAMES (hit-test 2D). Igual que los handles: gana el MAS CERCANO, no el primero que caiga en el radio.
+    //    (en el modo CURVA el click no toma keyframes: toma el tramo, mas abajo)
+    if (g_tlSelModo != TL_SEL_CURVA)
     //    Con varias curvas encimadas, cortar en el primero hacia ganar siempre a la fila de mas arriba aunque su
     //    keyframe estuviera bastante mas lejos del mouse que el de otra.
     { float mejorD = 1e30f; bool hay = false; std::string bId;
@@ -2503,6 +2523,23 @@ bool Timeline::CurvaClickStrip(int mx, int my){
         }
         g_redraw = true; return true;
       } }
+    // 3) EL TRAMO de curva bajo el click (modo CURVA, o AMBOS sin keyframe cerca): sus dos keyframes quedan elegidos
+    if (g_tlSelModo != TL_SEL_KEYFRAME){
+      const float fClick = XToFrame((float)lx);
+      float mejorD = rKey * 1.5f; int bFila = -1; size_t bI = 0;
+      for (size_t r=0; r<dopeRows.size(); r++){
+        const DopeRow& d = dopeRows[r]; if (d.propId < 0 || d.oculto || d.fantasma || DopeVertexAnimDe(d.ownerKey)) continue;
+        AnimProperty* ap = DopeResolverProp(d.ownerKey, d.propId, d.compId, false);
+        if (!ap || ap->keyframes.size() < 2) continue;
+        for (size_t i=0; i+1<ap->keyframes.size(); i++){
+            if (fClick < (float)ap->keyframes[i].frame || fClick > (float)ap->keyframes[i+1].frame) continue;
+            const float dy = fabsf(ValueToY(ap->EvalF(fClick, 0.0f)) - (float)ly);
+            if (dy < mejorD){ mejorD = dy; bFila = (int)r; bI = i; }
+            break;
+        }
+      }
+      if (bFila >= 0){ DopeTramoElegir(bFila, (int)bI, LShiftPressed); g_dopeDragPend = true; g_dopeDragX0 = mx; g_dopeDragY0 = my; return true; }
+    }
     return false;
 }
 
@@ -2670,7 +2707,8 @@ int Timeline::SmartEulerSel(){
 // Los grupos de la interpolacion / los handles / el ease, solo con keyframes elegidos (ver ToolbarSincronizar)
 bool Timeline::ToolbarVisible() const {
     if (g_dopeMov) return false;
-    return ToolbarUsaTactil() || (!g_dopeKeySel.empty() && !dopeRows.empty());
+    // (tambien con un SONIDO elegido: ahi esta la tijera)
+    return ToolbarUsaTactil() || (!g_dopeKeySel.empty() && !dopeRows.empty()) || TiraElegida() != NULL;
 }
 void Timeline::ToolbarSincronizar(){
     // lo que tienen los keyframes elegidos: si TODOS comparten la interpolacion / el handle / el ease, ese boton
@@ -2704,6 +2742,7 @@ void Timeline::ToolbarSincronizar(){
             b->tinte = NULL; b->colorTexto = hay ? ListaColores[(int)ColorID::blanco] : ListaColores[(int)ColorID::grisUI];
             continue;
         }
+        if (r == TL_TB_TRIM){ b->visible = (TiraElegida() != NULL); b->tinte = NULL; b->colorTexto = NULL; continue; }
         if (r == TL_TB_SHIFT || r == TL_TB_SELEC || r == TL_TB_VISTA){
             b->visible = tactil;
             on = (r == TL_TB_SHIFT) ? LShiftPressed : (r == TL_TB_VISTA) ? g_tlModoVista : !g_tlModoVista;
@@ -2726,6 +2765,7 @@ void Timeline::ToolbarAccionRol(int rol){
     if (rol == TL_TB_SHIFT){ LShiftPressed = !LShiftPressed; g_redraw = true; return; }   // (el mismo Shift del 3D)
     if (rol == TL_TB_SELEC){ g_tlModoVista = false; g_redraw = true; return; }
     if (rol == TL_TB_VISTA){ g_tlModoVista = true; g_redraw = true; return; }
+    if (rol == TL_TB_TRIM){ TiraCortar(); g_redraw = true; return; }
     if (rol >= TL_TB_EASE0)          SetEasingSel(rol - TL_TB_EASE0);
     else if (rol >= TL_TB_HANDLE0)   SetHandleTypeSel(rol - TL_TB_HANDLE0);
     else if (rol >= TL_TB_INTERP0)   SetInterpolacionSel(rol - TL_TB_INTERP0);
@@ -2871,7 +2911,13 @@ void Timeline::DopeFilasNav(std::vector<int>& out) const {
     for (size_t r=0;r<dopeRows.size();r++){
         const DopeRow& d = dopeRows[r];
         if (d.propId < 0 || d.oculto) continue;
-        if (!d.fantasma && g_dopeRowSel.count(d.claveFila)) out.push_back((int)r);
+        if (!d.fantasma && g_dopeRowSel.count(d.claveFila)) { out.push_back((int)r); continue; }
+        // una FILA PADRE elegida (el objeto, un hueso, "Object Transforms"): las curvas que cubre. El Summary: todas
+        for (size_t p=0;p<dopeRows.size();p++){
+            const DopeRow& q = dopeRows[p];
+            if (q.propId >= 0 || q.fantasma || !g_dopeRowSel.count(q.claveFila)) continue;
+            if (q.tipo == 0 || DopeCubre(q.ownerKey, d.ownerKey)) { out.push_back((int)r); break; }
+        }
     }
     if (!out.empty()) return;              // hay curvas elegidas: se trabaja sobre ESAS
     // si no, TODAS las de canal (sus frames son los del summary: la union)
@@ -2911,6 +2957,7 @@ void Timeline::DopeSelFrame(int f, bool on){
 
 // lapiz+flechas: avanza el keyframe ACTIVO. extender = mantiene lo que ya estaba elegido.
 bool Timeline::DopeSelAvanzar(int paso, bool extender){
+    if (g_tlSelModo == TL_SEL_CURVA) return DopeTramoAvanzar(paso, extender);
     std::vector<int> fr; DopeFramesNav(fr);
     if (fr.empty()) return false;
     // el frame de partida: el activo, o el primero elegido, o el mas cercano al frame actual
@@ -3925,12 +3972,51 @@ bool DopeNumInputChar(int c){
 // Hay un transform de keyframes en curso? Lo pregunta controles.cpp para ENVOLVER el cursor dentro del timeline
 // (como al panear): sin eso, al llegar al borde de la pantalla te quedas sin recorrido y no podes seguir escalando.
 bool DopeXformActivo(){ return g_dopeMov; }
+// ---- EL TRANSFORM DE KEYFRAMES CON EL TECLADO DEL TELEFONO (flechas / inclinar), sin el cursor virtual. Con el cursor
+// el escalar es la razon de distancias al pivote (cruzarlo daba la vuelta por cero: -inf..0..+inf) y arriba/abajo no
+// llegaban. Aca: MOVER = izq/der el tiempo, arriba/abajo el valor (respeta el eje del 1 / 2); ESCALAR = multiplicar
+// (derecha / arriba agranda, nunca pasa por cero); ROTAR = grados. dx/dy en PIXELES de pantalla (con la aceleracion
+// del que llama)
+int DopeXformModo(){ return !g_dopeMov ? 0 : (g_dopeMovModo == Timeline::DOPE_ESC ? 3 : g_dopeMovModo == Timeline::DOPE_ROT ? 2 : 1); }
+void DopeXformTecla(float dx, float dy){
+    if (!g_dopeMov || !g_tlActivo || g_dopeNumOn) return;
+    Timeline* tl = g_tlActivo;
+    const bool curvas = (tl->modo == Timeline::TL_MODO_CURVAS);
+    if (g_dopeMovModo == Timeline::DOPE_ESC){
+        // LINEAL: pasa por 0 y sigue a negativo (invertir la curva: escalar a -1). Con el cursor era la razon de
+        // distancias y no se podia cruzar; multiplicando, nunca llegaba a 0
+        g_dopeMovVal += (dx - dy) * 0.005f;
+    } else if (g_dopeMovModo == Timeline::DOPE_ROT){
+        g_dopeMovVal += (dx - dy) * 0.5f;
+    } else {
+        if (g_dopeMovEje != Timeline::DOPE_EJE_Y) g_dopeMovVal += dx / (tl->pxPerFrame > 0.01f ? tl->pxPerFrame : 0.01f);
+        if (curvas && g_dopeMovEje != Timeline::DOPE_EJE_X) g_dopeMovValV -= dy / (tl->pxPerUnit > 1e-6f ? tl->pxPerUnit : 1e-6f);
+    }
+    tl->DopeXformAplicar();
+    g_redraw = true;
+}
+// el angulo de una (rotar inclinando el telefono)
+void DopeXformFijarGrados(float g){
+    if (!g_dopeMov || !g_tlActivo || g_dopeMovModo != Timeline::DOPE_ROT || g_dopeNumOn) return;
+    g_dopeMovVal = g; g_tlActivo->DopeXformAplicar(); g_redraw = true;
+}
+// 1 / 2 durante el transform: el eje X (tiempo) / Y (valor), como en la Vista 3D (de nuevo = libre)
+void DopeXformEjeTecla(int n){
+    if (!g_dopeMov || !g_tlActivo) return;
+    if (n == 1) g_tlActivo->DopeCiclarEje(Timeline::DOPE_EJE_X);
+    else if (n == 2) g_tlActivo->DopeCiclarEje(Timeline::DOPE_EJE_Y);
+    g_redraw = true;
+}
 // barra de espacio: play/pausa desde CUALQUIER viewport (no hace falta tener el timeline enfocado)
 bool TL_TogglePlay(){ if (!g_tlActivo) return false; g_tlActivo->TogglePlay(+1); return true; }
 // ---- lapiz (+flechas) de Symbian sobre el TIMELINE: navega KEYFRAMES. Devuelve false si el timeline no esta
 // activo, para que el llamador siga con lo suyo (ciclar objetos/huesos).
 bool DopeNavTecla(int dir){
     if (!g_tlActivo || !viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 5) return false;
+    // LAS TIRAS DE SONIDO: el lapiz recorre punta izquierda / el sonido entero / punta derecha (y el que sigue). Antes,
+    // sin keyframes que recorrer, el lapiz caia al ciclado de OBJETOS y cambiaba el objeto activo
+    if (dir == 0 && g_tlActivo->TiraNavPrefiere()) return g_tlActivo->TiraSelAvanzar(+1);
+    if (dir == 0 && g_tlActivo->TiraHay() && g_tlActivo->DopeSinKeysNav()) return true;   // (nada que recorrer: no cambia el objeto)
     switch (dir){
         case 0: return g_tlActivo->DopeSelAvanzar(1, false);  // lapiz solo: saca el actual y pasa al siguiente
         case 1: return g_tlActivo->DopeSelAvanzar(1, true);   // + derecha: mantiene y suma el siguiente
@@ -4495,11 +4581,17 @@ void Timeline::AbrirMenuView(int mx, int my){
     g_tlMenuView->AgregarCheck(T("Show Panel"), TL_VIEW_PANEL, &g_dopePanelOn);
     if (modo == TL_MODO_CURVAS) g_tlMenuView->AgregarCheck(T("Show Handles"), TL_VIEW_HANDLES, &g_tlVerHandles);
     g_tlMenuView->AgregarCheck(T("Auto frame"), TL_VIEW_AUTOFRAME, &g_dopeAutoFrame);
+    // el GIZMO 2D sobre los keyframes elegidos: el MISMO interruptor que el de la Vista 3D (Overlays > Gizmo). Con el
+    // teclado del telefono no suma nada y tapa los keyframes: se apaga desde aca tambien
+    { extern bool g_gizmoOn; g_tlMenuView->AgregarCheck(T("Gizmo"), TL_VIEW_GIZMO, &g_gizmoOn); }
     // toggle "Solo vertices seleccionados" (dope Y curvas: es el MISMO menu View). Con la
     // malla en Edit Mode filtra las filas de vertex anim y hace el move por mascara.
     g_tlMenuView->AgregarCheck(T("Only selected vertices"), TL_VIEW_SOLOSEL, &g_dopeSoloSelVerts);
-    g_tlMenuView->AgregarCheck(T("Waveform"), TL_VIEW_ONDA, &g_tlVerOnda);         // las tiras de sonido
-    g_tlMenuView->AgregarCheck(T("Volume line"), TL_VIEW_VOLUMEN, &g_tlVerVolumen);
+    // LO DEL SONIDO, juntos y separados con una linea, con el PARLANTE: la forma de onda y la linea del volumen de las
+    // tiras, y el AUDIO SCRUBBING (con la animacion quieta, mover el frame hace sonar ese pedacito)
+    { MenuItem* it = g_tlMenuView->AgregarCheck(T("Waveform"), TL_VIEW_ONDA, &g_tlVerOnda, IconType::sonido); if (it) it->lineaArriba = true; }
+    g_tlMenuView->AgregarCheck(T("Volume line"), TL_VIEW_VOLUMEN, &g_tlVerVolumen, IconType::sonido);
+    { extern bool g_sonidoScrub; g_tlMenuView->AgregarCheck(T("Audio scrubbing"), TL_VIEW_SCRUB, &g_sonidoScrub, IconType::sonido); }
     if (MenuAbierto && MenuAbierto != g_tlMenuView) MenuAbierto->Cerrar();
     g_tlMenuView->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_tlMenuView;
@@ -4543,6 +4635,7 @@ bool Timeline::AbrirMenuDeBarra(int mx, int my){
     if (btnView->visible   && btnView->Contains(mx,my)){   AbrirMenuView(btnView->sx, btnView->sy + btnView->height); return true; }
     if (btnKey->visible    && btnKey->Contains(mx,my)){    AbrirMenuKey(btnKey->sx, btnKey->sy + btnKey->height); return true; }
     if (btnPivot->visible  && btnPivot->Contains(mx,my)){  AbrirMenuPivot(btnPivot->sx, btnPivot->sy + btnPivot->height); return true; }
+    if (btnSelModo->visible && btnSelModo->Contains(mx,my)){ AbrirMenuSelModo(btnSelModo->sx, btnSelModo->sy + btnSelModo->height); return true; }
     if (btnAnim->visible   && btnAnim->Contains(mx,my)){   AbrirMenuAnim(btnAnim->sx, btnAnim->sy + btnAnim->height); return true; }
     return false;
 }
@@ -5062,6 +5155,10 @@ bool g_tiraArrancada = false; // arrastre: paso el umbral (un click limpio no co
 int  g_tiraX0 = 0, g_tiraY0 = 0;
 std::vector<TiraOrig> g_tiraOrig;
 Sonido* g_tiraHoverS = NULL; int g_tiraHoverB = 0;   // la punta bajo el mouse (TIRA_RECINI / TIRA_RECFIN)
+// LO ELEGIDO CON EL LAPIZ (el teclado del telefono): el sonido y la parte (TIRA_RECINI / TIRA_MOVER / TIRA_RECFIN).
+// El 1 (la 'g') agarra esa parte y las flechas la corren (g_tiraTeclaAcum: los pixeles que se llevan corridos)
+Sonido* g_tiraSelS = NULL; int g_tiraSelParte = TIRA_MOVER;
+float g_tiraTeclaAcum = 0.0f;
 // el ANCHO de la zona que agarra una punta: generoso, para el dedo (y nunca menos que media fila)
 int TiraZonaBorde(int rowH) { int z = GlobalScale * 10; if (z < rowH / 2) z = rowH / 2; return z; }
 // el UNDO de una tira: intercambia lo vivo con lo guardado (undo y redo son el mismo toggle)
@@ -5156,12 +5253,19 @@ void Timeline::DibujarTira(const DopeRow& d, int ry0) {
                 gfx::VertexPointer2f(0, &g_curvaBuf[0]); gfx::DrawTrianglesArray((int)(g_curvaBuf.size() / 2));
             }
         }
+        // EL SONIDO ENTERO elegido con el lapiz: un borde blanco arriba y abajo
+        if (k == 0 && g_tiraSelS == s && g_tiraSelParte == TIRA_MOVER && !(g_tiraModo == TIRA_MOVER && g_tiraGrab)) {
+            gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+            FillRect((int)ca, y0, (int)(cb - ca), GlobalScale);
+            FillRect((int)ca, y0 + h - GlobalScale, (int)(cb - ca), GlobalScale);
+        }
         // las PUNTAS (se agarran para recortar): solo en la primera pasada. Arrastrandola = VERDE; con el mouse
         // encima = BLANCA (y mas ancha); si no, celeste apagado
         if (k == 0) {
             for (int lado = TIRA_RECINI; lado <= TIRA_RECFIN; lado++) {
                 const bool arrastre = (g_tiraModo == lado && !g_tiraOrig.empty() && g_tiraOrig[0].s == s);
-                const bool hover = !arrastre && g_tiraModo == TIRA_NADA && g_tiraHoverS == s && g_tiraHoverB == lado;
+                const bool hover = !arrastre && ((g_tiraModo == TIRA_NADA && g_tiraHoverS == s && g_tiraHoverB == lado) ||
+                                                 (g_tiraSelS == s && g_tiraSelParte == lado));   // (o la elegida con el lapiz)
                 const int an = GlobalScale * ((arrastre || hover) ? 3 : 2);
                 if (arrastre)   gfx::Color4f(TL_VERDE_LINEA[0], TL_VERDE_LINEA[1], TL_VERDE_LINEA[2], 1.0f);
                 else if (hover) gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
@@ -5226,6 +5330,14 @@ bool Timeline::TiraClick(int mx, int my) {
 }
 bool Timeline::TiraGrabStart() {
     g_tiraOrig.clear();
+    g_tiraTeclaAcum = 0.0f;
+    // con una parte elegida con el lapiz: SOLO ese sonido, y lo que se mueve es esa parte (recortar o correr)
+    if (g_tiraSelS && TiraFilaDe(g_tiraSelS) >= 0) {
+        Sonido* so = g_tiraSelS; TiraOrig t = { so, so->inicio, so->recorteIni, so->recorteFin }; g_tiraOrig.push_back(t);
+        g_tiraModo = g_tiraSelParte; g_tiraGrab = true; g_tiraArrancada = true; g_tiraX0 = lastMx; g_tiraY0 = lastMy;
+        g_redraw = true;
+        return true;
+    }
     for (size_t r = 0; r < dopeRows.size(); r++) {
         Object* o = dopeRows[r].sonido;
         if (!o || dopeRows[r].oculto) continue;
@@ -5350,3 +5462,255 @@ bool W3dScriptTiraPrueba(Timeline* t, std::string& err) {
     if (fabsf(s->inicio - ini0) > 1e-5f || fabsf(s->recorteIni - ri0) > 1e-5f) { err = "tira: el Ctrl+Z no la devolvio"; return false; }
     return true;
 }
+
+// ---- EL PANEL DE CURVAS CON EL TECLADO (el N95): como el outliner. Ver Timeline.h (panelFoco) ----
+// una fila que se puede enfocar: las que se ven, menos las de continuacion de la tira de un sonido
+static bool PanelFilaEnfocable(const Timeline* tl, int r){
+    return r >= 0 && r < (int)tl->dopeVisibles && tl->dopeRows[(size_t)r].tiraFilas >= 0;
+}
+// la fila enfocada pasa a ser LA elegida (sus keyframes quedan elegidos) y se ve
+static void PanelFocoElegir(Timeline* tl){
+    if (!PanelFilaEnfocable(tl, tl->panelFoco)) return;
+    const Timeline::DopeRow& d = tl->dopeRows[(size_t)tl->panelFoco];
+    g_dopeRowSel.clear();
+    if (!d.claveFila.empty()) g_dopeRowSel.insert(d.claveFila);
+    tl->DopeSelKeysDeFilasSel();
+    g_dopeActHay = false;
+    // que se vea: el scroll vertical del panel
+    const int rh = tl->rowH > 0 ? tl->rowH : 1;
+    const int ry = tl->panelFoco * rh + tl->PosY;           // (relativo al comienzo de las filas)
+    const int alto = tl->height - tl->stripY;
+    if (ry < 0) tl->PosY -= ry;
+    else if (ry + rh > alto) tl->PosY -= (ry + rh - alto);
+    if (tl->PosY > 0) tl->PosY = 0;
+    g_redraw = true;
+}
+bool Timeline::PanelFocoEntrar(int dir){
+    ConstruirDopeRows();
+    if (dopeVisibles == 0) { panelFoco = -1; return false; }
+    // como una lista que DA LA VUELTA pasando por la barra: bajando se entra por la primera (el Summary), subiendo por
+    // la ultima
+    int r = -1;
+    if (dir >= 0) { for (size_t i=0;i<dopeVisibles && r<0;i++) if (PanelFilaEnfocable(this, (int)i)) r = (int)i; }
+    else          { for (int i=(int)dopeVisibles-1;i>=0 && r<0;i--) if (PanelFilaEnfocable(this, i)) r = i; }
+    if (r < 0) { panelFoco = -1; return false; }
+    panelFoco = r;
+    barFocusIndex = -1;
+    PanelFocoElegir(this);
+    return true;
+}
+bool Timeline::PanelFocoMover(int dir){
+    if (dopeVisibles == 0) { panelFoco = -1; return false; }
+    int r = panelFoco;
+    for (;;) {
+        r += dir;
+        if (r < 0 || r >= (int)dopeVisibles) return false;        // arriba de la primera / abajo de la ultima: a la barra
+        if (PanelFilaEnfocable(this, r)) break;
+    }
+    panelFoco = r;
+    PanelFocoElegir(this);
+    return true;
+}
+void Timeline::PanelFocoPlegar(bool plegar){
+    if (!PanelFilaEnfocable(this, panelFoco)) return;
+    const std::string k = dopeRows[(size_t)panelFoco].claveDespliegue;
+    if (k.empty()) return;
+    if (plegar) g_dopeColapsado.insert(k); else g_dopeColapsado.erase(k);
+    const std::string clave = dopeRows[(size_t)panelFoco].claveFila;
+    ConstruirDopeRows();
+    // (las filas cambiaron: el foco sigue a la misma)
+    for (size_t i=0;i<dopeVisibles;i++) if (dopeRows[i].claveFila == clave) { panelFoco = (int)i; break; }
+    if (panelFoco >= (int)dopeVisibles) panelFoco = (int)dopeVisibles - 1;
+    g_redraw = true;
+}
+void Timeline::PanelFocoOjo(){
+    if (!PanelFilaEnfocable(this, panelFoco)) return;
+    const std::string& k = dopeRows[(size_t)panelFoco].claveFila;
+    if (k.empty()) return;
+    if (DopeOjoOff(k)) g_dopeOjoOff.erase(k); else g_dopeOjoOff.insert(k);
+    g_redraw = true;
+}
+// (el ruteo del keypad, LayoutInput.cpp / el N95)
+bool TimelinePanelFocoActivo(){
+    return g_tlActivo && viewPortActive == (ViewportBase*)g_tlActivo && g_tlActivo->panelFoco >= 0;
+}
+// el 2 del N95 (como ocultar un objeto en el outliner): el OJO de la fila enfocada
+void TimelinePanelOjo(){ if (TimelinePanelFocoActivo()) g_tlActivo->PanelFocoOjo(); }
+// VERDE + izquierda/derecha con el foco en el panel (el N95): el ANCHO del panel, como arrastrar su borde. En el
+// telefono ocupaba mucho y sin mouse no habia como achicarlo
+void TimelinePanelAncho(int dx){
+    if (!TimelinePanelFocoActivo() || dx == 0) return;
+    Timeline* tl = g_tlActivo;
+    int w = (tl->panelWUser > 0 ? tl->panelWUser : tl->panelW) + dx * GlobalScale * 3;
+    const int minimo = IconSizeGS * 2, maximo = tl->width - IconSizeGS * 4;
+    if (w < minimo) w = minimo; if (maximo > minimo && w > maximo) w = maximo;
+    tl->panelWUser = w;
+    g_redraw = true;
+}
+
+// ---- EL MODO DE SELECCION (el boton del MOUSE) y los TRAMOS de curva ----
+static PopupMenu* g_tlMenuSelModo = NULL;
+static void TL_menuSelModoAction(int id){
+    if (id >= TL_SEL_AMBOS && id <= TL_SEL_KEYFRAME) { g_tlSelModo = id; g_tramoFila = -1; g_tramoI = -1; }
+    g_redraw = true;
+}
+void Timeline::AbrirMenuSelModo(int mx, int my){
+    if (!g_tlMenuSelModo){ g_tlMenuSelModo = new PopupMenu(); g_tlMenuSelModo->titulo = T("Select"); g_tlMenuSelModo->action = TL_menuSelModoAction; }
+    g_tlMenuSelModo->Limpiar();
+    g_tlMenuSelModo->Agregar(T("Both"), TL_SEL_AMBOS, IconType::raton)->verde = (g_tlSelModo == TL_SEL_AMBOS);
+    g_tlMenuSelModo->Agregar(T("Curve segment"), TL_SEL_CURVA, IconType::interp_bezier)->verde = (g_tlSelModo == TL_SEL_CURVA);
+    g_tlMenuSelModo->Agregar(T("Keyframe"), TL_SEL_KEYFRAME, IconType::keyframe)->verde = (g_tlSelModo == TL_SEL_KEYFRAME);
+    if (MenuAbierto && MenuAbierto != g_tlMenuSelModo) MenuAbierto->Cerrar();
+    g_tlMenuSelModo->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = g_tlMenuSelModo;
+}
+// elegir el TRAMO i (entre el keyframe i y el i+1) de la fila: sus dos keyframes; el de la izquierda queda ACTIVO
+// (la tarjeta Keyframe y la interpolacion del tramo son de el). sumar = Shift: se agrega a lo que habia
+void Timeline::DopeTramoElegir(int fila, int i, bool sumar){
+    if (fila < 0 || fila >= (int)dopeRows.size()) return;
+    const DopeRow& d = dopeRows[(size_t)fila];
+    AnimProperty* ap = DopeResolverProp(d.ownerKey, d.propId, d.compId, false);
+    if (!ap || i < 0 || i + 1 >= (int)ap->keyframes.size()) return;
+    if (!sumar) g_dopeKeySel.clear();
+    const int f0 = ap->keyframes[(size_t)i].frame, f1 = ap->keyframes[(size_t)i + 1].frame;
+    g_dopeKeySel.insert(DopeKeyId(d.ownerKey, d.propId, d.compId, f0));
+    g_dopeKeySel.insert(DopeKeyId(d.ownerKey, d.propId, d.compId, f1));
+    g_dopeActOwner = d.ownerKey; g_dopeActProp = d.propId; g_dopeActComp = d.compId; g_dopeActFrame = f0; g_dopeActHay = true;
+    g_tramoFila = fila; g_tramoI = i;
+    g_redraw = true;
+}
+// el lapiz en modo CURVA: el tramo siguiente / anterior de las curvas que se recorren (las elegidas en el panel; sin
+// ninguna, todas): curva por curva, de izquierda a derecha
+bool Timeline::DopeTramoAvanzar(int paso, bool extender){
+    std::vector<int> filas; DopeFilasNav(filas);
+    std::vector<std::pair<int,int> > tramos;
+    for (size_t k=0;k<filas.size();k++){
+        const DopeRow& d = dopeRows[(size_t)filas[k]];
+        if (d.fantasma || DopeVertexAnimDe(d.ownerKey)) continue;
+        AnimProperty* ap = DopeResolverProp(d.ownerKey, d.propId, d.compId, false);
+        if (!ap) continue;
+        for (size_t i=0; i+1<ap->keyframes.size(); i++) tramos.push_back(std::make_pair(filas[k], (int)i));
+    }
+    if (tramos.empty()) return false;
+    int act = -1;
+    for (size_t t=0;t<tramos.size();t++) if (tramos[t].first == g_tramoFila && tramos[t].second == g_tramoI){ act = (int)t; break; }
+    int sig = (act < 0) ? 0 : act + paso;
+    if (sig < 0) sig = (int)tramos.size() - 1;
+    if (sig >= (int)tramos.size()) sig = 0;
+    DopeTramoElegir(tramos[(size_t)sig].first, tramos[(size_t)sig].second, extender);
+    return true;
+}
+
+// ---- LAS TIRAS DE SONIDO CON EL TECLADO (el lapiz, el 1 y las flechas del telefono) y la TIJERA ----
+int Timeline::TiraFilaDe(const Sonido* s) const {
+    if (!s) return -1;
+    for (size_t r = 0; r < dopeVisibles && r < dopeRows.size(); r++)
+        if (dopeRows[r].sonido == (const Object*)s && dopeRows[r].tiraFilas >= 0 && !dopeRows[r].oculto) return (int)r;
+    return -1;
+}
+bool Timeline::TiraHay() const {
+    for (size_t r = 0; r < dopeVisibles && r < dopeRows.size(); r++)
+        if (dopeRows[r].sonido && dopeRows[r].tiraFilas >= 0 && !dopeRows[r].oculto) return true;
+    return false;
+}
+bool Timeline::DopeSinKeysNav() const { std::vector<int> fr; DopeFramesNav(fr); return fr.empty(); }
+// el lapiz va a las tiras: hay tiras y (ya hay una parte elegida, o la fila elegida en el panel es de un sonido, o no
+// hay keyframes que recorrer)
+bool Timeline::TiraNavPrefiere() const {
+    if (!TiraHay()) return false;
+    if (g_tiraSelS && TiraFilaDe(g_tiraSelS) >= 0) return true;
+    for (size_t r = 0; r < dopeVisibles && r < dopeRows.size(); r++)
+        if (dopeRows[r].sonido && g_dopeRowSel.count(dopeRows[r].claveFila)) return true;
+    return DopeSinKeysNav();
+}
+// punta izquierda -> el sonido entero -> punta derecha -> (el sonido que sigue) ...
+bool Timeline::TiraSelAvanzar(int paso) {
+    std::vector<Sonido*> ss;
+    // UN SOLO SONIDO si su fila esta elegida en el panel (como una curva); con el Summary o nada elegido, todos
+    Object* soloEste = NULL;
+    for (size_t r = 0; r < dopeVisibles && r < dopeRows.size() && !soloEste; r++)
+        if (dopeRows[r].sonido && g_dopeRowSel.count(dopeRows[r].claveFila)) soloEste = dopeRows[r].sonido;
+    for (size_t r = 0; r < dopeVisibles && r < dopeRows.size(); r++) {
+        const DopeRow& d = dopeRows[r];
+        if (!d.sonido || d.tiraFilas < 0 || d.oculto) continue;
+        if (soloEste && d.sonido != soloEste) continue;
+        bool ya = false; for (size_t i = 0; i < ss.size(); i++) ya = ya || (ss[i] == (Sonido*)d.sonido);
+        if (!ya) ss.push_back((Sonido*)d.sonido);
+    }
+    if (ss.empty()) return false;
+    static const int kPartes[3] = { TIRA_RECINI, TIRA_MOVER, TIRA_RECFIN };
+    int act = -1;
+    for (size_t i = 0; i < ss.size() && act < 0; i++)
+        for (int k = 0; k < 3; k++) if (ss[i] == g_tiraSelS && kPartes[k] == g_tiraSelParte) act = (int)i * 3 + k;
+    const int n = (int)ss.size() * 3;
+    int sig = (act < 0) ? 0 : act + paso;
+    if (sig < 0) sig = n - 1; if (sig >= n) sig = 0;
+    g_tiraSelS = ss[(size_t)(sig / 3)]; g_tiraSelParte = kPartes[sig % 3];
+    g_dopeKeySel.clear(); g_dopeActHay = false;   // (el 1 agarra la tira, no keyframes)
+    g_redraw = true;
+    return true;
+}
+// las flechas con la tira agarrada: la corren / recortan como si se arrastrara (dx en pixeles de pantalla)
+void TimelineTiraTecla(float dx) {
+    if (!g_tlActivo || !g_tlActivo->TiraActiva()) return;
+    g_tiraTeclaAcum += dx;
+    g_tlActivo->TiraAplicar(g_tiraX0 + (int)g_tiraTeclaAcum);
+}
+bool TimelineTiraActiva() { return g_tlActivo && g_tlActivo->TiraActiva() && g_tiraGrab; }
+// el sonido que corta la TIJERA: el elegido con el lapiz, o el unico sonido seleccionado; y que el frame actual caiga
+// adentro de su tira (si no, no hay nada que cortar)
+// el SONIDO elegido: el de la parte elegida con el lapiz, o el objeto activo si es un sonido con su tira a la vista
+Sonido* Timeline::TiraElegida() const {
+    if (g_tiraSelS && TiraFilaDe(g_tiraSelS) >= 0) return g_tiraSelS;
+    if (ObjActivo && ObjActivo->getType() == ObjectType::sonido && TiraFilaDe((Sonido*)ObjActivo) >= 0) return (Sonido*)ObjActivo;
+    return NULL;
+}
+Sonido* Timeline::TiraParaCortar() const {
+    Sonido* s = TiraElegida();
+    if (!s) return NULL;
+    const float t = W3dSonidoSegDeFrame((float)CurrentFrame);
+    const float enEsc = s->DuracionEnEscena();
+    if (enEsc <= 0.0f || t <= s->inicio + 0.01f || t >= s->inicio + enEsc - 0.01f) return NULL;
+    return s;
+}
+// LA TIJERA (trim): el sonido queda en DOS en el frame actual. El original termina ahi; su COPIA (otro objeto Sonido,
+// con todo lo mismo) arranca ahi y sigue con el resto. Un solo Ctrl+Z deshace los dos pasos
+bool Timeline::TiraCortar() {
+    Sonido* s = TiraParaCortar();
+    if (!s) {
+        if (TiraElegida()) { extern void Notificar(const std::string&, bool); Notificar(T("Move the current frame inside the sound to cut it"), true); }
+        return false;
+    }
+    const float t = W3dSonidoSegDeFrame((float)CurrentFrame);
+    const float tono = s->tono > 0.05f ? s->tono : 0.05f;
+    const float dur = s->DuracionArchivo();
+    const float corte = s->recorteIni + (t - s->inicio) * tono;   // (en segundos del ARCHIVO)
+    if (dur <= 0.0f || corte <= s->recorteIni || corte >= dur - s->recorteFin) return false;
+    const float rfOrig = s->recorteFin;   // (la copia termina donde terminaba el original)
+    UndoGrupoIniciar();
+    // el ORIGINAL: termina en el corte (su undo: el de las tiras)
+    { UndoTira* u = new UndoTira(); TiraOrig o = { s, s->inicio, s->recorteIni, s->recorteFin }; u->v.push_back(o);
+      UndoExterno f; f.aplicar = UndoTiraAplicar; f.desvincular = UndoTiraDesvincular; f.liberar = UndoTiraLiberar;
+      s->recorteFin = dur - corte;
+      UndoPushExterno(f, u); }
+    // la COPIA: arranca en el corte
+    extern Object* W3dDuplicarUno(Object* src, bool vinculado);
+    Sonido* c = (Sonido*)W3dDuplicarUno(s, false);
+    if (c) {
+        c->recorteIni = corte;
+        c->recorteFin = rfOrig;
+        c->inicio = t;
+        DeseleccionarTodo();
+        c->Seleccionar();
+        UndoCapturarCreacion();   // (solo la copia es "creada": el Ctrl+Z la saca)
+        // LOS DOS quedan elegidos (el timeline muestra lo elegido: con solo la copia, el original desaparecia y parecia
+        // borrado). La copia queda ACTIVA
+        s->Seleccionar(); c->Seleccionar();
+        g_tiraSelS = c; g_tiraSelParte = TIRA_MOVER;
+    }
+    UndoGrupoFin();
+    ConstruirDopeRows();
+    g_redraw = true;
+    return true;
+}
+

@@ -49,6 +49,11 @@ public:
 
 // HORNEAR: la luz que llega a cada punto (el trazado de rayos de la CPU). false + motivo en INGLES si no se pudo
 bool SondaLuzHornear(SondaLuz* s, std::string* motivo);
+// DE A PEDAZOS (la barra de Propiedades): Empezar arma el trabajo (RTSondaPaso lo avanza) y Terminar, cuando
+// RTSondaActiva() da false, rellena los puntos de adentro de algo y la deja horneada
+bool SondaLuzHornearEmpezar(SondaLuz* s, std::string* motivo);
+bool SondaLuzHornearTerminar(SondaLuz* s);
+bool SondaLuzViva(const SondaLuz* s);   // existe todavia (no la borraron mientras se horneaba)
 // las 12 aristas de la caja (como HitboxAristas): el dibujo y el pick
 void SondaLuzAristas(const SondaLuz* s, float out[72]);
 // la LUZ INDIRECTA en un punto del MUNDO: la de la sonda que lo contiene (o la mas cercana, si esta cerca de su caja),

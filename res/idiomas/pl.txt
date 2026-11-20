@@ -217,6 +217,7 @@ Background light	Światło tła
 Bake	Wypal
 Bake Lighting	Wypal oświetlenie
 Bake canceled	Wypalanie anulowane
+Another probe is baking	Inna sonda jest właśnie wypiekana
 Bake the reflection probe first	Najpierw wypal sondę odbić
 Baked	Wypalona
 Baked: %d points	Wypalona: punkty %d
@@ -2175,3 +2176,16 @@ with mipmaps	z mipmapami
 with transparency	z przezroczystością
 without mipmaps	bez mipmap
 you want to select (Esc to cancel)	do zaznaczenia (Esc anuluje)
+Exit Whisk3D?	Zamknąć Whisk3D?
+Exit	Zamknij
+Both	Oba
+Curve segment	Odcinek krzywej
+Select with click and pencil	Co wybiera klik i olowek
+This phone has no video encoder for MP4	Ten telefon nie ma kodera wideo dla MP4
+Audio scrubbing	Odsłuch przy przesuwaniu (scrubbing)
+Cut the sound at the current frame (trim)	Przytnij dźwięk w bieżącej klatce (trim)
+Move the current frame inside the sound to cut it	Ustaw bieżącą klatkę wewnątrz dźwięku, aby go przyciąć
+The phone could not encode the sound to AAC: the video has no sound	Telefon nie mógł zakodować dźwięku do AAC: wideo nie ma dźwięku
+Codec	Kodek
+Video bitrate	Bitrate wideo
+The video "	Wideo "

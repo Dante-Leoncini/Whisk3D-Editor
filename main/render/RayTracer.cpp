@@ -517,53 +517,199 @@ static void ArmarEscena(RTEscena& e) {
 //  por su factor de luz (g_renderLuzFondo), como la luz que rebota en el render
 // ---------------------------------------------------------------------------
 static void Radiancia(const RTEscena& e, const RTV& o0, const RTV& d0, RTRng& rng, int profundidad, float* out);
-bool RTHornearSondas(const std::vector<float>& pos, int rayos, std::vector<float>& sh, std::vector<unsigned char>* valido) {
+// HORNEAR UNA SONDA DE A PEDAZOS (ver RayTracer.h): la escena se arma UNA vez al empezar y RTSondaPaso avanza unos
+// puntos (la de luz) o unas filas de la imagen 360 (la de reflejo) por cuadro, asi el editor muestra la barra
+struct RTSondaTrabajo {
+    int tipo;                              // 0 = nada, 1 = sonda de luz, 2 = sonda de reflejo
+    bool listo;                            // termino: espera que lo tomen (RTSondaTomar*)
+    RTEscena e;
+    RTRng rng;
+    // la de LUZ
+    std::vector<float> pos, sh;
+    std::vector<unsigned char> ok;
+    int rayos, sig, n;
+    // la de REFLEJO
+    float o[3], cerca, intensidad;
+    int w, h, ns, rebotes, fila;
+    std::vector<float> img;
+    RTSondaTrabajo() : tipo(0), listo(false), rng(12345u), rayos(0), sig(0), n(0), cerca(0), intensidad(1), w(0), h(0), ns(1),
+                       rebotes(0), fila(0) { o[0] = o[1] = o[2] = 0.0f; }
+};
+static RTSondaTrabajo gSonda;
+static void SondaArmarEscena() {
+    gSonda.e.Limpiar();
+    g_rtSoloEstaticos = true;    // (solo lo estatico ilumina la sonda / sale en el reflejo, como Unity)
+    g_rtParaSonda = true;
+    ArmarEscena(gSonda.e);
+    g_rtSoloEstaticos = false; g_rtParaSonda = false;
+}
+bool RTSondaActiva() { return gSonda.tipo != 0 && !gSonda.listo; }
+int  RTSondaTipo() { return gSonda.tipo; }
+void RTSondaCancelar() {
+    gSonda.tipo = 0; gSonda.listo = false;
+    gSonda.e.Limpiar();
+    std::vector<float>().swap(gSonda.pos); std::vector<float>().swap(gSonda.sh); std::vector<float>().swap(gSonda.img);
+    std::vector<unsigned char>().swap(gSonda.ok);
+}
+
+bool RTSondaEmpezarLuz(const std::vector<float>& pos, int rayos) {
     const int n = (int)(pos.size() / 3);
     if (n <= 0) return false;
-    if (rayos < 16) rayos = 16;
-    RTEscena e;
-    g_rtSoloEstaticos = true;    // (solo lo estatico ilumina la sonda)
-    g_rtParaSonda = true;
-    ArmarEscena(e);
-    g_rtSoloEstaticos = false; g_rtParaSonda = false;
-    w3dLogf("[sonda] hornear: %d puntos x %d rayos (la escena: %d triangulos, %d luces)", n, rayos, (int)e.tris.size(), (int)e.luces.size());
-    sh.assign((size_t)n * 27, 0.0f);
-    if (valido) valido->assign((size_t)n, 1);
+    RTSondaCancelar();
+    gSonda.tipo = 1; gSonda.listo = false;
+    gSonda.pos = pos; gSonda.n = n; gSonda.sig = 0;
+    gSonda.rayos = rayos < 16 ? 16 : rayos;
+    gSonda.rng = RTRng(12345u);
+    SondaArmarEscena();
+    w3dLogf("[sonda] hornear: %d puntos x %d rayos (la escena: %d triangulos, %d luces)", n, gSonda.rayos, (int)gSonda.e.tris.size(), (int)gSonda.e.luces.size());
+    gSonda.sh.assign((size_t)n * 27, 0.0f);
+    gSonda.ok.assign((size_t)n, 1);
+    return true;
+}
+static void SondaLuzPunto(int pt) {
+    const RTEscena& e = gSonda.e;
+    const int rayos = gSonda.rayos;
     static const float kA[9] = { 1.0f, 2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f };
     const float w = 4.0f * 3.14159265f / (float)rayos;   // (el angulo solido de cada rayo)
-    RTRng rng(12345u);
-    for (int pt = 0; pt < n; pt++) {
-        const RTV o = V3(pos[(size_t)pt * 3], pos[(size_t)pt * 3 + 1], pos[(size_t)pt * 3 + 2]);
-        double c[9][3]; for (int i = 0; i < 9; i++) c[i][0] = c[i][1] = c[i][2] = 0.0;
-        int espaldas = 0;
-        for (int r = 0; r < rayos; r++) {
-            const float z = 1.0f - 2.0f * ((float)r + 0.5f) / (float)rayos;
-            const float rr = sqrtf(z < 1.0f ? 1.0f - z * z : 0.0f), ph = (float)r * 2.39996323f;
-            const float dx = rr * cosf(ph), dy = rr * sinf(ph), dz = z;
-            const RTV d = V3(dx, dy, dz);
-            // ADENTRO DE ALGO: el rayo pega en una cara DE ESPALDAS (sale de la superficie desde adentro). Un punto con
-            // muchos asi esta adentro de una malla (o debajo del piso): su luz no vale (la rellenan los vecinos)
-            if (valido) {
-                RTHit h;
-                if (Trazar(e, o, d, 1e-4f, 1e30f, false, h, -1)) {
-                    const RTTri& T = e.tris[(size_t)h.tri];
-                    const float b0 = 1.0f - h.b1 - h.b2;
-                    const float nx = e.nrm[(size_t)T.v0*3]*b0 + e.nrm[(size_t)T.v1*3]*h.b1 + e.nrm[(size_t)T.v2*3]*h.b2;
-                    const float ny = e.nrm[(size_t)T.v0*3+1]*b0 + e.nrm[(size_t)T.v1*3+1]*h.b1 + e.nrm[(size_t)T.v2*3+1]*h.b2;
-                    const float nz = e.nrm[(size_t)T.v0*3+2]*b0 + e.nrm[(size_t)T.v1*3+2]*h.b1 + e.nrm[(size_t)T.v2*3+2]*h.b2;
-                    if (nx * dx + ny * dy + nz * dz > 0.0f) espaldas++;
-                }
-            }
-            float L[3]; Radiancia(e, o, d, rng, 1, L);
-            const float Y[9] = { 0.282095f, 0.488603f * dy, 0.488603f * dz, 0.488603f * dx, 1.092548f * dx * dy,
-                                 1.092548f * dy * dz, 0.315392f * (3.0f * dz * dz - 1.0f), 1.092548f * dx * dz,
-                                 0.546274f * (dx * dx - dy * dy) };
-            for (int i = 0; i < 9; i++) for (int k = 0; k < 3; k++) c[i][k] += (double)(L[k] * Y[i] * w);
+    const std::vector<float>& pos = gSonda.pos;
+    const RTV o = V3(pos[(size_t)pt * 3], pos[(size_t)pt * 3 + 1], pos[(size_t)pt * 3 + 2]);
+    double c[9][3]; for (int i = 0; i < 9; i++) c[i][0] = c[i][1] = c[i][2] = 0.0;
+    int espaldas = 0;
+    for (int r = 0; r < rayos; r++) {
+        const float z = 1.0f - 2.0f * ((float)r + 0.5f) / (float)rayos;
+        const float rr = sqrtf(z < 1.0f ? 1.0f - z * z : 0.0f), ph = (float)r * 2.39996323f;
+        const float dx = rr * cosf(ph), dy = rr * sinf(ph), dz = z;
+        const RTV d = V3(dx, dy, dz);
+        // ADENTRO DE ALGO: el rayo pega en una cara DE ESPALDAS (sale de la superficie desde adentro). Un punto con
+        // muchos asi esta adentro de una malla (o debajo del piso): su luz no vale (la rellenan los vecinos)
+        RTHit h;
+        if (Trazar(e, o, d, 1e-4f, 1e30f, false, h, -1)) {
+            const RTTri& T = e.tris[(size_t)h.tri];
+            const float b0 = 1.0f - h.b1 - h.b2;
+            const float nx = e.nrm[(size_t)T.v0*3]*b0 + e.nrm[(size_t)T.v1*3]*h.b1 + e.nrm[(size_t)T.v2*3]*h.b2;
+            const float ny = e.nrm[(size_t)T.v0*3+1]*b0 + e.nrm[(size_t)T.v1*3+1]*h.b1 + e.nrm[(size_t)T.v2*3+1]*h.b2;
+            const float nz = e.nrm[(size_t)T.v0*3+2]*b0 + e.nrm[(size_t)T.v1*3+2]*h.b1 + e.nrm[(size_t)T.v2*3+2]*h.b2;
+            if (nx * dx + ny * dy + nz * dz > 0.0f) espaldas++;
         }
-        for (int i = 0; i < 9; i++) for (int k = 0; k < 3; k++) sh[(size_t)pt * 27 + i * 3 + k] = (float)c[i][k] * kA[i];
-        if (valido && espaldas > rayos / 5) (*valido)[(size_t)pt] = 0;
+        float L[3]; Radiancia(e, o, d, gSonda.rng, 1, L);
+        const float Y[9] = { 0.282095f, 0.488603f * dy, 0.488603f * dz, 0.488603f * dx, 1.092548f * dx * dy,
+                             1.092548f * dy * dz, 0.315392f * (3.0f * dz * dz - 1.0f), 1.092548f * dx * dz,
+                             0.546274f * (dx * dx - dy * dy) };
+        for (int i = 0; i < 9; i++) for (int k = 0; k < 3; k++) c[i][k] += (double)(L[k] * Y[i] * w);
     }
+    for (int i = 0; i < 9; i++) for (int k = 0; k < 3; k++) gSonda.sh[(size_t)pt * 27 + i * 3 + k] = (float)c[i][k] * kA[i];
+    if (espaldas > rayos / 5) gSonda.ok[(size_t)pt] = 0;
+}
+
+bool RTSondaEmpezarReflejo(const float pos[3], int w, int h, float cerca, int muestras, int rebotes, float intensidad,
+                           std::string* motivo) {
+    if (w < 2 || h < 1) { if (motivo) *motivo = "Invalid size"; return false; }
+    RTSondaCancelar();
+    gSonda.tipo = 2; gSonda.listo = false;
+    for (int k = 0; k < 3; k++) gSonda.o[k] = pos[k];
+    gSonda.w = w; gSonda.h = h; gSonda.cerca = cerca; gSonda.intensidad = intensidad; gSonda.fila = 0;
+    // CON LA LUZ QUE REBOTA, como la luz precalculada: con los rebotes del render (0 en muchas escenas) la cara de algo
+    // que no ve el sol salia NEGRA en el reflejo (en la escena se ve clara: su textura horneada tiene los rebotes). Los
+    // REBOTES y las MUESTRAS por pixel son de la sonda (de fabrica 3 y 32: con 4 la penumbra de un sol con radio salia
+    // granulada)
+    gSonda.rebotes = rebotes < 0 ? 0 : (rebotes > 8 ? 8 : rebotes);
+    gSonda.ns = muestras < 1 ? 1 : (muestras > 1024 ? 1024 : muestras);
+    gSonda.rng = RTRng(7919u);
+    gSonda.img.assign((size_t)w * h * 3, 0.0f);
+    SondaArmarEscena();
     return true;
+}
+static void SondaReflejoFila(int y) {
+    const int w = gSonda.w, h = gSonda.h, ns = gSonda.ns;
+    const RTV o = V3(gSonda.o[0], gSonda.o[1], gSonda.o[2]);
+    const float cerca = gSonda.cerca;
+    RTRng& rng = gSonda.rng;
+    for (int x = 0; x < w; x++) {
+        float acc[3] = { 0, 0, 0 };
+        for (int s = 0; s < ns; s++) {
+            const float jx = (ns == 1) ? 0.5f : (ns == 4) ? ((s & 1) ? 0.75f : 0.25f) : rng.F();
+            const float jy = (ns == 1) ? 0.5f : (ns == 4) ? ((s & 2) ? 0.75f : 0.25f) : rng.F();
+            const float u = ((float)x + jx) / (float)w, v = ((float)y + jy) / (float)h;
+            const float fi = (u - 0.5f) * 6.2831853f, te = v * 3.14159265f;
+            const RTV d = V3(sinf(te) * cosf(fi), cosf(te), sinf(te) * sinf(fi));
+            float L[3]; Radiancia(gSonda.e, o + d * (cerca > 0.0f ? cerca : 0.0f), d, rng, 0, L);
+            acc[0] += L[0]; acc[1] += L[1]; acc[2] += L[2];
+        }
+        for (int c = 0; c < 3; c++) gSonda.img[((size_t)y * w + x) * 3 + c] = acc[c] / (float)ns * gSonda.intensidad;
+    }
+}
+
+float RTSondaPaso(int msPresupuesto) {
+    if (gSonda.tipo == 0) return 0.0f;
+    if (gSonda.listo) return 1.0f;
+    extern unsigned int w3dGetTicks();
+    const unsigned int t0 = w3dGetTicks();
+    if (gSonda.tipo == 1) {
+        while (gSonda.sig < gSonda.n) {
+            SondaLuzPunto(gSonda.sig++);
+            if ((int)(w3dGetTicks() - t0) >= msPresupuesto) break;
+        }
+        if (gSonda.sig >= gSonda.n) { gSonda.listo = true; gSonda.e.Limpiar(); }
+        return gSonda.n > 0 ? (float)gSonda.sig / (float)gSonda.n : 1.0f;
+    }
+    const int rebAntes = g_rt.rebotes;
+    g_rt.rebotes = gSonda.rebotes;
+    while (gSonda.fila < gSonda.h) {
+        SondaReflejoFila(gSonda.fila++);
+        if ((int)(w3dGetTicks() - t0) >= msPresupuesto) break;
+    }
+    g_rt.rebotes = rebAntes;
+    if (gSonda.fila >= gSonda.h) { gSonda.listo = true; gSonda.e.Limpiar(); }
+    return gSonda.h > 0 ? (float)gSonda.fila / (float)gSonda.h : 1.0f;
+}
+
+bool RTSondaTomarLuz(std::vector<float>& sh, std::vector<unsigned char>* valido) {
+    if (gSonda.tipo != 1 || !gSonda.listo) return false;
+    sh.swap(gSonda.sh);
+    if (valido) valido->swap(gSonda.ok);
+    RTSondaCancelar();
+    return true;
+}
+
+bool RTSondaTomarReflejo(std::vector<unsigned char>& rgba) {
+    if (gSonda.tipo != 2 || !gSonda.listo) return false;
+    const int w = gSonda.w, h = gSonda.h, ns = gSonda.ns;
+    const std::vector<float>& img = gSonda.img;
+    rgba.assign((size_t)w * h * 4, 255);
+    // EL GRANULADO de los rebotes: un promedio con los vecinos de COLOR PARECIDO (5 x 5, da la vuelta a lo ancho; los
+    // bordes de un objeto contra la pared quedan netos)
+    std::vector<float> out(img);
+    if (ns > 1)
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                const float* c0 = &img[((size_t)y * w + x) * 3];
+                float sm[3] = { 0, 0, 0 }, peso = 0.0f;
+                for (int dy = -2; dy <= 2; dy++) {
+                    const int yy = y + dy; if (yy < 0 || yy >= h) continue;
+                    for (int dx = -2; dx <= 2; dx++) {
+                        const int xx = (x + dx + w) % w;
+                        const float* c1 = &img[((size_t)yy * w + xx) * 3];
+                        const float d0 = c1[0] - c0[0], d1 = c1[1] - c0[1], d2 = c1[2] - c0[2];
+                        const float wgt = expf(-(d0 * d0 + d1 * d1 + d2 * d2) * 30.0f);
+                        sm[0] += c1[0] * wgt; sm[1] += c1[1] * wgt; sm[2] += c1[2] * wgt; peso += wgt;
+                    }
+                }
+                for (int c = 0; c < 3; c++) out[((size_t)y * w + x) * 3 + c] = sm[c] / peso;
+            }
+    for (size_t i = 0; i < (size_t)w * h; i++)
+        for (int c = 0; c < 3; c++) {
+            const float val = out[i * 3 + c];
+            rgba[i * 4 + c] = (unsigned char)(val <= 0.0f ? 0 : val >= 1.0f ? 255 : (int)(val * 255.0f + 0.5f));
+        }
+    RTSondaCancelar();
+    return true;
+}
+
+// DE UNA SOLA VEZ (el harness, lo que no muestra barra): el mismo trabajo hasta terminar
+bool RTHornearSondas(const std::vector<float>& pos, int rayos, std::vector<float>& sh, std::vector<unsigned char>* valido) {
+    if (!RTSondaEmpezarLuz(pos, rayos)) return false;
+    while (RTSondaActiva()) RTSondaPaso(100000);
+    return RTSondaTomarLuz(sh, valido);
 }
 
 // ---------------------------------------------------------------------------
@@ -669,8 +815,8 @@ bool RTHorneadoEmpezar(Mesh* m, int uvCapa, int w, int h, int muestras, std::str
         if (!ok) continue;
         const float den = (py[1] - py[2]) * (px[0] - px[2]) + (px[2] - px[1]) * (py[0] - py[2]);
         if (fabsf(den) < 1e-12f) continue;
-        int x0 = (int)floorf(std::min(px[0], std::min(px[1], px[2]))) - 1, x1 = (int)ceilf(std::max(px[0], std::max(px[1], px[2]))) + 1;
-        int y0 = (int)floorf(std::min(py[0], std::min(py[1], py[2]))) - 1, y1 = (int)ceilf(std::max(py[0], std::max(py[1], py[2]))) + 1;
+        int x0 = (int)floorf((std::min)(px[0], (std::min)(px[1], px[2]))) - 1, x1 = (int)ceilf((std::max)(px[0], (std::max)(px[1], px[2]))) + 1;
+        int y0 = (int)floorf((std::min)(py[0], (std::min)(py[1], py[2]))) - 1, y1 = (int)ceilf((std::max)(py[0], (std::max)(py[1], py[2]))) + 1;
         if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > w - 1) x1 = w - 1; if (y1 > h - 1) y1 = h - 1;
         for (int y = y0; y <= y1; y++)
             for (int x = x0; x <= x1; x++) {
@@ -821,65 +967,9 @@ float RTHorneadoPaso(int msPresupuesto) {
 // ---------------------------------------------------------------------------
 bool RTHornearReflejo(const float pos[3], int w, int h, float cerca, int muestras, int rebotes, float intensidad,
                       std::vector<unsigned char>& rgba, std::string* motivo) {
-    if (w < 2 || h < 1) { if (motivo) *motivo = "Invalid size"; return false; }
-    RTEscena e;
-    g_rtSoloEstaticos = true;   // (como Unity: la horneada ve solo lo ESTATICO, y nada de lo que no sale en las sondas)
-    g_rtParaSonda = true;
-    ArmarEscena(e);
-    g_rtSoloEstaticos = false; g_rtParaSonda = false;
-    rgba.assign((size_t)w * h * 4, 255);
-    RTRng rng(7919u);
-    const RTV o = V3(pos[0], pos[1], pos[2]);
-    // CON LA LUZ QUE REBOTA, como la luz precalculada: con los rebotes del render (0 en muchas escenas) la cara de algo
-    // que no ve el sol salia NEGRA en el reflejo (en la escena se ve clara: su textura horneada tiene los rebotes). Los
-    // REBOTES y las MUESTRAS por pixel son de la sonda (de fabrica 3 y 32: con 4 la penumbra de un sol con radio salia
-    // granulada)
-    const int rebAntes = g_rt.rebotes;
-    g_rt.rebotes = rebotes < 0 ? 0 : (rebotes > 8 ? 8 : rebotes);
-    const int ns = muestras < 1 ? 1 : (muestras > 1024 ? 1024 : muestras);
-    std::vector<float> img((size_t)w * h * 3, 0.0f);
-    for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++) {
-            float acc[3] = { 0, 0, 0 };
-            for (int s = 0; s < ns; s++) {
-                const float jx = (ns == 1) ? 0.5f : (ns == 4) ? ((s & 1) ? 0.75f : 0.25f) : rng.F();
-                const float jy = (ns == 1) ? 0.5f : (ns == 4) ? ((s & 2) ? 0.75f : 0.25f) : rng.F();
-                const float u = ((float)x + jx) / (float)w, v = ((float)y + jy) / (float)h;
-                const float fi = (u - 0.5f) * 6.2831853f, te = v * 3.14159265f;
-                const RTV d = V3(sinf(te) * cosf(fi), cosf(te), sinf(te) * sinf(fi));
-                float L[3]; Radiancia(e, o + d * (cerca > 0.0f ? cerca : 0.0f), d, rng, 0, L);
-                acc[0] += L[0]; acc[1] += L[1]; acc[2] += L[2];
-            }
-            for (int c = 0; c < 3; c++) img[((size_t)y * w + x) * 3 + c] = acc[c] / (float)ns * intensidad;
-        }
-    g_rt.rebotes = rebAntes;
-    // EL GRANULADO de los rebotes: un promedio con los vecinos de COLOR PARECIDO (5 x 5, da la vuelta a lo ancho; los
-    // bordes de un objeto contra la pared quedan netos)
-    std::vector<float> out(img);
-    if (ns > 1)
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++) {
-                const float* c0 = &img[((size_t)y * w + x) * 3];
-                float sm[3] = { 0, 0, 0 }, peso = 0.0f;
-                for (int dy = -2; dy <= 2; dy++) {
-                    const int yy = y + dy; if (yy < 0 || yy >= h) continue;
-                    for (int dx = -2; dx <= 2; dx++) {
-                        const int xx = (x + dx + w) % w;
-                        const float* c1 = &img[((size_t)yy * w + xx) * 3];
-                        const float d0 = c1[0] - c0[0], d1 = c1[1] - c0[1], d2 = c1[2] - c0[2];
-                        const float wgt = expf(-(d0 * d0 + d1 * d1 + d2 * d2) * 30.0f);
-                        sm[0] += c1[0] * wgt; sm[1] += c1[1] * wgt; sm[2] += c1[2] * wgt; peso += wgt;
-                    }
-                }
-                for (int c = 0; c < 3; c++) out[((size_t)y * w + x) * 3 + c] = sm[c] / peso;
-            }
-    for (size_t i = 0; i < (size_t)w * h; i++)
-        for (int c = 0; c < 3; c++) {
-            const float val = out[i * 3 + c];
-            rgba[i * 4 + c] = (unsigned char)(val <= 0.0f ? 0 : val >= 1.0f ? 255 : (int)(val * 255.0f + 0.5f));
-        }
-    e.Limpiar();
-    return true;
+    if (!RTSondaEmpezarReflejo(pos, w, h, cerca, muestras, rebotes, intensidad, motivo)) return false;
+    while (RTSondaActiva()) RTSondaPaso(100000);
+    return RTSondaTomarReflejo(rgba);
 }
 
 // ---------------------------------------------------------------------------

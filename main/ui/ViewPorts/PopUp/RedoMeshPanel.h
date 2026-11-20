@@ -23,7 +23,7 @@ class RedoMeshPanel : public PopUpBase {
         bool Motion(int mx, int my) W3D_OVERRIDE;
         bool Tecla(int tecla) W3D_OVERRIDE;
         void Soltar() W3D_OVERRIDE;
-        bool CierraConViewport() W3D_OVERRIDE { return true; } // se cierra al tocar el viewport
+        bool CierraConViewport() W3D_OVERRIDE { return true; } bool Plegable() W3D_OVERRIDE { return grupo != 0; } bool Plegado() W3D_OVERRIDE { return grupo && !grupo->open; } void Desplegar(bool abrir) W3D_OVERRIDE { if (grupo) grupo->open = abrir; } // se cierra al tocar el viewport
         void Plegar();   // nace PLEGADO: solo la flecha y el titulo (ver RedoMeshPanel.cpp)
 
     private:

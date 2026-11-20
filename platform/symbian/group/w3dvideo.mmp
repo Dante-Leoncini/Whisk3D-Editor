@@ -1,0 +1,28 @@
+// ============================================================================
+//  w3dvideo.mmp - w3dvideo.dll: el codificador de video del telefono (DevVideoRecord) para el render a MP4.
+//  Aparte del exe a proposito (ver inc/w3dvideodll.h): Whisk3D la carga con RLibrary; si al telefono le falta algo de
+//  devvideo.dll, ESTA no carga y el editor sigue andando. Solo euser + devvideo: sin STL, sin libc, sin datos globales.
+// ============================================================================
+TARGET          w3dvideo.dll
+TARGETTYPE      dll
+UID             0x1000008d 0xA00D0220
+VENDORID        0
+EXPORTUNFROZEN
+// las MISMAS capacidades que whisk3D.exe (Whisk3D.mmp): un proceso no carga una DLL con menos (err -46)
+CAPABILITY      ReadUserData WriteUserData NetworkServices
+
+ALWAYS_BUILD_AS_ARM
+OPTION_REPLACE  ARMCC --cpu 6
+OPTION_REPLACE  ARMCC -O2 -Otime
+
+SOURCEPATH      ..\src
+SOURCE          w3dvideodll.cpp
+
+USERINCLUDE     ..\inc
+SYSTEMINCLUDE   \epoc32\include
+SYSTEMINCLUDE   \epoc32\include\mw
+SYSTEMINCLUDE   \epoc32\include\platform
+SYSTEMINCLUDE   \epoc32\include\platform\mw
+
+LIBRARY         euser.lib
+LIBRARY         devvideo.lib

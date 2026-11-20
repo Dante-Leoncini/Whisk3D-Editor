@@ -73,6 +73,9 @@ static int IconoEntrada(const w3dFileSystem::DirEntry& e) {
     if (EsImagen(e.name)) return (int)IconType::foto;
     if (EsVideo(e.name))  return (int)IconType::camera;  // video (mientras carga su preview)
     if (EsFuente(e.name)) return (int)IconType::lista;   // fuente (mientras carga su preview)
+    // los SONIDOS con el parlante (el mismo icono que el objeto Sonido y la vista de sonidos de la biblioteca)
+    if (TerminaEn(e.name, ".wav") || TerminaEn(e.name, ".ogg") || TerminaEn(e.name, ".mp3") || TerminaEn(e.name, ".flac") ||
+        TerminaEn(e.name, ".opus") || TerminaEn(e.name, ".aac") || TerminaEn(e.name, ".m4a") || TerminaEn(e.name, ".amr")) return (int)IconType::sonido;
     return (int)IconType::archive;
 }
 

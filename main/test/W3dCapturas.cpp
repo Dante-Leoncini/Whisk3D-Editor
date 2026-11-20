@@ -49,6 +49,10 @@ Button* PropsAyudaEn(Properties* p, int mx, int my);   // el cartelito de ayuda 
 #include "WhiskUI/draw/icons.h"     // IconoIndice (dedotoque boton <icono>)
 #include "WhiskUI/widgets/Tab.h"
 #include "WhiskUI/Propieties/GroupPropertie.h"
+#ifdef _MSC_VER   // (ffprobe de mediapistas / videocuadros: en Visual C++ popen se llama _popen)
+#define popen  _popen
+#define pclose _pclose
+#endif
 extern int OutlinerFilaDeObjeto(Object* o);   // Outliner.cpp: la fila visible de un objeto en la escena (-1)
 extern int OutlinerYDeFila(int fila);         // Outliner.cpp: su Y desde arriba del arbol (con los cortes del constructor)
 

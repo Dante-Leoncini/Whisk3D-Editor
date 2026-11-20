@@ -329,9 +329,10 @@ static int gAccion = W3D_CAMBIOS_SALIR;
 static std::string gRutaAbrir;
 static std::string gEscenaCerrar;   // W3D_CAMBIOS_CERRAR_ESCENA: cual
 extern void CambiosPopupAbrir(int accion);   // ui/ViewPorts/PopUp/CambiosPopup.cpp
-// SIN CARTEL en el telefono Symbian y en las consolas (3DS, PSP, PS Vita): ni compilado (en las consolas el cartel al
-// cerrar colgaba todo: el que cierra es el sistema -HOME, el boton PS- y no espera)
-#if defined(W3D_SYMBIAN) || defined(W3D_3DS) || defined(W3D_PSP) || defined(W3D_VITA)
+// SIN CARTEL en las consolas (3DS, PSP, PS Vita): ni compilado (el cartel al cerrar colgaba todo: el que cierra es el
+// sistema -HOME, el boton PS- y no espera). Symbian SI lo tiene: la tecla ROJA ya no cierra sola (Whisk3DAppUi.cpp
+// la intercepta y pregunta); el administrador de tareas cierra de una sin preguntar (EEikCmdExit)
+#if defined(W3D_3DS) || defined(W3D_PSP) || defined(W3D_VITA)
 #define W3D_CAMBIOS_SIN_CARTEL 1
 #endif
 // En PC, la web y Android el cartel ESTA: salir, abrir otro proyecto, empezar uno nuevo ("Nuevo proyecto" de la tarjeta

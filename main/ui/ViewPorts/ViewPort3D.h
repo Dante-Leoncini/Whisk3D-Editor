@@ -240,6 +240,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFranjaFn fn, void* ctx,
                            int progBase = 0, int progTotal = 0);
         // la matriz PROYECCION x VISTA de la imagen entera de outW x outH de RenderAPNG (desde la camara activa si hay)
+        void LenteImagen(bool& orto, float& fov, float& n, float& f) const;   // el lente del render (la camara activa)
         void MatrizImagen(int outW, int outH, float* VP16);
         void VistaVectores();   // la vista "Motion Vectors": la escena con el color de su movimiento desde el cuadro anterior
         void VistaMovimiento(bool datos, float lejos);   // (la de arriba, o el pase de DATOS del postprocesado: + profundidad)

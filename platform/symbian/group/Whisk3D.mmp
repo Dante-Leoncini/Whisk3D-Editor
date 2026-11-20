@@ -78,6 +78,7 @@ SOURCE          w3dt9.cpp // entrada de texto multi-tap (T9) del keypad
 // Fase 3c: puente al modelo nuevo (unico TU de symbian que ve el core)
 SOURCE          w3dnewscene.cpp
 SOURCE          w3dtexload.cpp
+SOURCE          w3dvideoenc.cpp // los codificadores de video del telefono (DevVideoRecord): el render a MP4
 SOURCE          w3dmouse.cpp // cursor virtual de Symbian
 SOURCE          w3dinput.cpp // input propio del telefono (teclado/keypad)
 SOURCE          w3dpantallas.cpp // pantallas externas (TV-out RCA / HDMI): deteccion + superficie EGL propia
@@ -226,7 +227,7 @@ SOURCEPATH      ..\..\..\main
 SOURCE          W3dEscena.cpp
 SOURCE          W3dRaices.cpp   // las ESCENAS 3D y los PREFABS del proyecto (raices, carga perezosa, cambiarEscena)
 SOURCEPATH      ..\..\..\main\io
-SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp UVExportar.cpp TexturaEditada.cpp W3dWeb.cpp
+SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp UVExportar.cpp TexturaEditada.cpp W3dWeb.cpp W3dMp4.cpp W3dAac.cpp
 SOURCE          MallasProyecto.cpp // editor: publicar/hacer unica/duplicar y el guardado de las mallas como recurso
 SOURCE          W3dNodos.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
 SOURCE          GuardarAnimSets.cpp   // el guardado de los ANIMSETS (.w3da): plan + dedup por clip (lo llama GuardarW3D)
@@ -269,6 +270,7 @@ SOURCE          W3dConfig.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\input
 SOURCE          W3dClipboardSymbian.cpp
 SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: CHWRMVibra)
+SOURCE          W3dInclinacion.cpp W3dInclinacionSymbian.cpp // el acelerometro (RRSensorApi.dll, en runtime): rotar inclinando
 SOURCE          W3dTactil.cpp W3dTactilSymbian.cpp // la pantalla tactil (S60 5th: 1 dedo; Symbian^3: multitactil)
 SOURCE          W3dMandosSymbian.cpp // los joysticks Bluetooth (DualShock 3/4) del driver bthid-s60, cargado en runtime
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw

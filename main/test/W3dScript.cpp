@@ -1,3 +1,5 @@
+#include "io/W3dMp4.h"   // mp4armar: el contenedor MP4
+#include "io/W3dAac.h"   // aaccodificar: el codificador AAC propio
 #include "ViewPorts/PopUp/AtajosPopup.h"
 #include "script/SimJuego.h"   // SimPerfDesglose (benchjuego)
 #include "WhiskUI/widgets/PopupMenu.h"
@@ -6596,6 +6598,80 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- sondareflejo <x> <y> <z> <res> [archivo.png] : una SONDA DE REFLEJO ahi (Z arriba, como el panel), horneada; con
     //      archivo.png su imagen 360 queda escrita ahi ----
+    // ---- mp4armar <entrada> <h264|mpeg4> <ancho> <alto> <fps> <salida.mp4> : el CONTENEDOR MP4 (io/W3dMp4.h) con un
+    //      video ya codificado en crudo (H.264 Annex B o MPEG-4 parte 2, como los da un codificador cuadro a cuadro). Se
+    //      parte en cuadros como llegarian del codificador y se arma el .mp4 ----
+    if (cmd == "mp4armar") {
+        std::string ent, cod, sal, aud; int w = 0, h = 0, fps = 0;
+        ss >> ent >> cod >> w >> h >> fps >> sal >> aud;   // (aud: un .m4a / .mp4 / .aac con el sonido AAC, opcional)
+        FILE* f = fopen(ent.c_str(), "rb");
+        if (!f) { err = "mp4armar: no se pudo abrir " + ent; return false; }
+        std::vector<unsigned char> d;
+        { unsigned char b[65536]; size_t n; while ((n = fread(b, 1, sizeof(b), f)) > 0) d.insert(d.end(), b, b + n); }
+        fclose(f);
+        const bool h264 = (cod == "h264");
+        W3dMp4Escritor mp4;
+        if (!mp4.Abrir(sal, h264 ? W3D_MP4_H264 : W3D_MP4_MPEG4, w, h, fps)) { err = "mp4armar: " + mp4.error; return false; }
+        // los codigos de inicio
+        std::vector<size_t> ini;
+        for (size_t i = 0; i + 3 < d.size(); i++) if (d[i] == 0 && d[i + 1] == 0 && d[i + 2] == 1) { ini.push_back(i > 0 && d[i - 1] == 0 ? i - 1 : i); i += 2; }
+        ini.push_back(d.size());
+        // los cortes de cuadro: H.264 = antes de cada NAL de imagen (1 / 5) junto con los de configuracion que lo
+        // preceden; MPEG-4 = cada VOP (B6) con los encabezados que lo preceden
+        size_t desde = ini.empty() ? 0 : ini[0];
+        int cuadros = 0;
+        for (size_t k = 0; k + 1 < ini.size(); k++) {
+            size_t p = ini[k]; while (p < d.size() && d[p] == 0) p++; p++;   // (despues del 01)
+            if (p >= d.size()) break;
+            const bool imagen = h264 ? (((d[p] & 0x1F) == 1) || ((d[p] & 0x1F) == 5)) : (d[p] == 0xB6);
+            if (!imagen) continue;
+            const size_t hasta = ini[k + 1];
+            if (!mp4.Cuadro(&d[desde], hasta - desde)) { err = "mp4armar: " + mp4.error; return false; }
+            cuadros++;
+            desde = hasta;
+        }
+        if (!aud.empty()) {
+            FILE* fa = fopen(aud.c_str(), "rb");
+            if (!fa) { err = "mp4armar: no se pudo abrir " + aud; return false; }
+            std::vector<unsigned char> ab; { unsigned char b[65536]; size_t n; while ((n = fread(b, 1, sizeof(b), fa)) > 0) ab.insert(ab.end(), b, b + n); }
+            fclose(fa);
+            std::vector<unsigned char> asc, ad; std::vector<unsigned int> at; int fr = 0, ch = 0; std::string e2;
+            if (ab.size() > 12 && memcmp(&ab[8], "WAVE", 4) == 0) {   // (un WAV: con el codificador AAC propio)
+                W3dAacCodificador cod;
+                if (!W3dAacDesdeWav(ab, 128, cod, fr, ch)) { err = "mp4armar: el audio: " + cod.error; return false; }
+                printf("      [mp4armar] audio WAV -> AAC propio: %d cuadros, %d Hz, %d canales\n", (int)cod.tamanios.size(), fr, ch);
+                mp4.AudioAac(cod.asc, cod.datos, cod.tamanios, fr, ch, 128, cod.retardo, cod.muestras);
+            } else {
+                if (!W3dMp4LeerAac(ab, asc, ad, at, fr, ch, &e2) && !W3dAdtsLeerAac(ab, asc, ad, at, fr, ch, &e2)) { err = "mp4armar: el audio: " + e2; return false; }
+                printf("      [mp4armar] audio AAC: %d cuadros, %d Hz, %d canales, config de %d bytes\n", (int)at.size(), fr, ch, (int)asc.size());
+                mp4.AudioAac(asc, ad, at, fr, ch, 128);
+            }
+        }
+        if (!mp4.Cerrar()) { err = "mp4armar: " + mp4.error; return false; }
+        printf("      [mp4armar] %d cuadros -> %s\n", cuadros, sal.c_str());
+        return true;
+    }
+    // ---- aaccodificar <entrada.wav> <kbps> <salida.m4a> : el CODIFICADOR AAC propio (io/W3dAac.h) a un .m4a ----
+    if (cmd == "aaccodificar") {
+        std::string ent, sal; int kbps = 128; ss >> ent >> kbps >> sal;
+        FILE* f = fopen(ent.c_str(), "rb");
+        if (!f) { err = "aaccodificar: no se pudo abrir " + ent; return false; }
+        std::vector<unsigned char> d; { unsigned char b[65536]; size_t n; while ((n = fread(b, 1, sizeof(b), f)) > 0) d.insert(d.end(), b, b + n); }
+        fclose(f);
+        extern unsigned int w3dGetTicks();
+        const unsigned t0 = w3dGetTicks();
+        W3dAacCodificador cod; int fr = 0, ch = 0;
+        if (!W3dAacDesdeWav(d, kbps, cod, fr, ch)) { err = "aaccodificar: " + cod.error; return false; }
+        const unsigned ms = w3dGetTicks() - t0;
+        W3dMp4Escritor mp4;
+        mp4.Abrir(sal, W3D_MP4_SOLO_AUDIO, 0, 0, 0);
+        mp4.AudioAac(cod.asc, cod.datos, cod.tamanios, fr, ch, kbps, cod.retardo, cod.muestras);
+        if (!mp4.Cerrar()) { err = "aaccodificar: " + mp4.error; return false; }
+        printf("      [aaccodificar] %ld muestras, %d Hz, %d canales -> %d cuadros, %d bytes (%.1f kbps) en %u ms -> %s\n",
+               cod.muestras, fr, ch, (int)cod.tamanios.size(), (int)cod.datos.size(),
+               cod.muestras > 0 ? cod.datos.size() * 8.0 * fr / cod.muestras / 1000.0 : 0.0, ms, sal.c_str());
+        return true;
+    }
     if (cmd == "sondareflejo") {
         float x = 0, y = 0, z = 0; int res = 256; std::string salida; ss >> x >> y >> z >> res >> salida;
         SondaReflejo* sr = new SondaReflejo(NULL, Vector3(x, z, y));
@@ -32961,6 +33037,32 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             int e = 1, tol = 0; ss >> e >> tol;
             printf("      [sonido] frame=%d (esperado %d +-%d)\n", CurrentFrame, e, tol);
             if (CurrentFrame < e - tol || CurrentFrame > e + tol) { err = "sonido: el timeline no va con el audio"; return false; }
+            return true;
+        }
+        // 'sonido cortar': la TIJERA del timeline en el frame actual sobre el sonido activo (quedan dos: el original termina
+        // en el corte y la copia arranca ahi) + el Ctrl+Z, que tiene que dejar uno solo como estaba
+        if (sub == "cortar") {
+            struct VK { static ViewportBase* Buscar(ViewportBase* n) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == 5 ? n : NULL;
+                            ViewportBase* a = Buscar(((ViewportColumn*)n)->childA); if (a) return a; return Buscar(((ViewportColumn*)n)->childB); } };
+            Timeline* t = (Timeline*)VK::Buscar(rootViewport);
+            if (!t) { err = "sonido cortar: no hay timeline"; return false; }
+            if (rootViewport) rootViewport->Render();
+            t->ConstruirDopeRows();
+            Sonido* s0 = (ObjActivo && ObjActivo->getType() == ObjectType::sonido) ? (Sonido*)ObjActivo : NULL;
+            if (!s0) { err = "sonido cortar: el activo no es un sonido"; return false; }
+            const float ini0 = s0->inicio, ri0 = s0->recorteIni, rf0 = s0->recorteFin, dur = s0->DuracionArchivo();
+            if (!t->TiraCortar()) { err = "sonido cortar: la tijera no corto (el frame cae fuera del sonido?)"; return false; }
+            Sonido* c = (ObjActivo && ObjActivo->getType() == ObjectType::sonido && ObjActivo != s0) ? (Sonido*)ObjActivo : NULL;
+            if (!c) { err = "sonido cortar: no quedo la copia como activa"; return false; }
+            printf("      [cortar] original: inicio %.3f tramo %.3f..%.3f | copia: inicio %.3f tramo %.3f..%.3f\n",
+                   s0->inicio, s0->recorteIni, dur - s0->recorteFin, c->inicio, c->recorteIni, dur - c->recorteFin);
+            const float finOrig = s0->inicio + (dur - s0->recorteIni - s0->recorteFin);
+            if (fabsf(finOrig - c->inicio) > 1e-3f || fabsf((dur - s0->recorteFin) - c->recorteIni) > 1e-3f || fabsf(c->recorteFin - rf0) > 1e-4f) {
+                err = "sonido cortar: los dos pedazos no empalman"; return false; }
+            UndoDeshacer();
+            if (fabsf(s0->inicio - ini0) > 1e-5f || fabsf(s0->recorteIni - ri0) > 1e-5f || fabsf(s0->recorteFin - rf0) > 1e-5f) {
+                err = "sonido cortar: el Ctrl+Z no dejo el original como estaba"; return false; }
+            printf("      [cortar] Ctrl+Z: el original vuelve a %.3f..%.3f\n", s0->recorteIni, dur - s0->recorteFin);
             return true;
         }
         if (sub == "tira") {   // el MOUSE sobre la tira del primer timeline: hover de las puntas, recortar / mover con Ctrl, undo

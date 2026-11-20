@@ -62,7 +62,8 @@ static int  gNotifMx = -1, gNotifMy = -1; // mouse (para el hover de la 'x')
 static bool gNotifSobreX = false;         // estaba sobre alguna 'x' el frame previo
 
 void Notificar(const std::string& msg, bool error) {
-    w3dLog(msg.c_str());  // tambien al log de diagnostico
+    // tambien al log de diagnostico (y a la Consola: los errores en rojo, para leerlos si el cartel ya se fue)
+    if (error) w3dLogE(msg.c_str()); else w3dLog(msg.c_str());
     Notif n; n.msg = msg; n.error = error; n.hint = false;
     // TODAS las plataformas: se auto-cierran con un timer (como Symbian). El error dura mas para alcanzar
     // a leerlo. Ademas se pueden cerrar tocando el mensaje (NotificacionesClick). (exito 6s, error 10s).
@@ -99,6 +100,10 @@ void NotificacionesLimpiar() {
 }
 
 void NotificacionesTick(float dt) {
+    // (un cuadro BLOQUEADO -un render, una carga: mas de un segundo- no se come el cartel de golpe: alcanza a leerse
+    // despues. Un cuadro lento normal -el N95 con una escena pesada- cuenta entero: si no, los carteles duraban
+    // muchisimo y mientras hay uno el editor se redibuja sin parar)
+    if (dt > 1.0f) dt = 0.0f;
     bool hayTimer = false;
     for (size_t i = 0; i < gNotifs.size(); ) {
         // ttl > 0 = se auto-cierra (exito siempre; error solo en Symbian, donde no hay

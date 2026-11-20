@@ -14,4 +14,8 @@
 class UI;
 
 bool CompilarJuego(UI*, int, int, int, bool, bool, bool, bool) { return false; }
+// la tarjeta Juego de Propiedades: sin "Compilar juego" en el telefono el boton queda gris, y el menu "Empieza con"
+// lista las raices 3D (el editor del telefono es 3D)
+bool CompilarJuegoHayJuego() { return false; }
+bool CompilarJuegoEs3D() { return true; }
 

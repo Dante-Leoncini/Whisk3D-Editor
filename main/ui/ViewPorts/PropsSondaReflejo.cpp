@@ -13,6 +13,7 @@
 #include "objects/SondaReflejo.h"
 #include "objects/Textures.h"
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
+#include "render/RayTracer.h"   // RTSonda*: hornear de a pedazos (la barra)
 #include <stdio.h>
 
 extern void Notificar(const std::string& texto, bool error);
@@ -91,15 +92,40 @@ static void AccionMenuImg() {
     }
     PropsAbrirMenuBajoBoton(gMenuImg, PropsActivo->propSrImagen->button);
 }
+// HORNEAR DE A PEDAZOS: la barra del progreso y Cancelar, como el horneado de la luz (PropsHorneado.cpp). El trabajo
+// avanza en PropsSondaReflejoActualizar, una vez por cuadro
+static SondaReflejo* gSrHorneando = NULL;
+static float gSrProgreso = 0.0f;
+static unsigned int gSrT0 = 0;
+extern unsigned int w3dGetTicks();
+static bool SrViva(const SondaReflejo* s) {
+    std::vector<SondaReflejo*> v; SondaReflejoListar(v);
+    for (size_t i = 0; i < v.size(); i++) if (v[i] == s) return true;
+    return false;
+}
+static void AccionCancelar() {
+    if (RTSondaTipo() != 2) return;
+    RTSondaCancelar(); gSrHorneando = NULL;
+    Notificar(T("Bake canceled"), true); PropsLayoutSucio(); g_redraw = true;
+}
 static void AccionHornear() {
+    if (RTSondaTipo() == 2) { AccionCancelar(); return; }
     SondaReflejo* s = SrActiva();
     if (!s) return;
+    if (RTSondaActiva()) { Notificar(T("Another probe is baking"), true); return; }
     std::string motivo;
-    extern unsigned int w3dGetTicks();
-    const unsigned t0 = w3dGetTicks();
-    if (!SondaReflejoHornear(s, &motivo)) { Notificar(std::string(T("Not baked")) + ": " + T(motivo.c_str()), true); return; }
-    char b[96]; snprintf(b, sizeof(b), T("Reflection probe baked (%u ms)"), w3dGetTicks() - t0);
-    Notificar(b, false);
+    gSrT0 = w3dGetTicks();
+    if (!SondaReflejoHornearEmpezar(s, &motivo)) { Notificar(std::string(T("Not baked")) + ": " + T(motivo.c_str()), true); return; }
+    gSrHorneando = s; gSrProgreso = 0.0f;
+    PropsLayoutSucio();
+    g_redraw = true;
+}
+static void Terminar() {
+    SondaReflejo* s = gSrHorneando; gSrHorneando = NULL;
+    std::string motivo;
+    if (!s || !SrViva(s)) { RTSondaCancelar(); Notificar(T("Not baked"), true); }
+    else if (!SondaReflejoHornearTerminar(s, &motivo)) Notificar(std::string(T("Not baked")) + ": " + T(motivo.c_str()), true);
+    else { char b[96]; snprintf(b, sizeof(b), T("Reflection probe baked (%u ms)"), w3dGetTicks() - gSrT0); Notificar(b, false); }
     PropsLayoutSucio();
     g_redraw = true;
 }
@@ -156,6 +182,14 @@ void PropsSondaReflejoConstruir(Properties* p) {
     p->propSrHornear = new PropButton(T("Bake"), IconType::foto);
     p->propSrHornear->action = AccionHornear;
     p->propSondaRef->properties.push_back(p->propSrHornear);
+    p->propSrBarra = new PropButton("0%");   // (la barra del progreso, solo mientras hornea)
+    p->propSrBarra->button->barra = 0.0f;
+    p->propSrBarra->oculto = true;
+    p->propSondaRef->properties.push_back(p->propSrBarra);
+    p->propSrCancelar = new PropButton(T("Cancel"), IconType::cerrar);
+    p->propSrCancelar->action = AccionCancelar;
+    p->propSrCancelar->oculto = true;
+    p->propSondaRef->properties.push_back(p->propSrCancelar);
     p->propSrEstado = new PropLabel(T("Not baked"), true);
     p->propSondaRef->properties.push_back(p->propSrEstado);
     p->GroupProperties.push_back(p->propSondaRef);
@@ -167,6 +201,16 @@ static void Ocultar(PropButton* b, bool o) { if (b && b->oculto != o) { b->ocult
 
 void PropsSondaReflejoActualizar(Properties* p, bool visible) {
     if (!p || !p->propSondaRef) return;
+    // EL TRABAJO avanza una vez por cuadro (aunque haya varios paneles): ~25 ms por cuadro, el editor sigue andando
+    if (RTSondaTipo() == 2 && gSrHorneando) {
+        static unsigned int ultimo = 0;
+        if (w3dGetTicks() - ultimo >= 10) {
+            ultimo = w3dGetTicks();
+            gSrProgreso = RTSondaPaso(25);
+            if (!RTSondaActiva()) Terminar();
+            g_redraw = true;
+        }
+    }
     SondaReflejo* s = visible ? SrActiva() : NULL;
     p->propSondaRef->visible = (s != NULL);
     if (!s) {
@@ -203,7 +247,16 @@ void PropsSondaReflejoActualizar(Properties* p, bool visible) {
     }
     // HORNEAR y su estado: solo la horneada (la de tiempo real la dibuja la GPU; la personalizada usa su imagen)
     const bool vivo = s->tipo == W3D_REFLEJO_TIEMPO_REAL;
-    Ocultar(p->propSrHornear, !horneable || vivo);
+    // MIENTRAS HORNEA (esta sonda): sin el boton, la barra y Cancelar
+    const bool trabajando = s == gSrHorneando && RTSondaTipo() == 2;
+    Ocultar(p->propSrHornear, !horneable || vivo || trabajando);
+    Ocultar(p->propSrBarra, !trabajando);
+    Ocultar(p->propSrCancelar, !trabajando);
+    if (trabajando && p->propSrBarra) {
+        char b[32]; snprintf(b, sizeof(b), "%d%%", (int)(gSrProgreso * 100.0f));
+        p->propSrBarra->button->text = b;
+        p->propSrBarra->button->barra = gSrProgreso;
+    }
     if (p->propSrEstado) {
         const bool oc = vivo || s->tipo == W3D_REFLEJO_PERSONALIZADA;
         if (p->propSrEstado->oculto != oc) { p->propSrEstado->oculto = oc; PropsLayoutSucio(); }

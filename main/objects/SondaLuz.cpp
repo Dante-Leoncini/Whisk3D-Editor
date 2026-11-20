@@ -53,7 +53,12 @@ void SondaLuzAristas(const SondaLuz* s, float out[72]) {
 // horneada (cada vertice con la luz que le llega a una superficie que mira para ese lado): se ve como iluminaria a un
 // objeto en ese lugar. Sin hornear, grises. Sin seleccionar solo el icono (render.cpp: RenderIcons3D). El juego no la
 // dibuja, pero igual se anota en el pase (asi ilumina)
+#ifdef W3D_SYMBIAN
+// (el telefono: una esfera por PUNTO de la sonda, muchas a la vez -> 80 triangulos en vez de 252; el color se lee igual)
+static const int kEsfSeg = 8, kEsfAnillos = 5;
+#else
 static const int kEsfSeg = 14, kEsfAnillos = 9;
+#endif
 static std::vector<float> gEsfN;          // la esfera unitaria: normales (= posiciones)
 static std::vector<MeshIndex> gEsfIdx;    // sus triangulos
 static void ArmarEsferaUnidad() {
@@ -250,7 +255,7 @@ struct RegistrarSonda { RegistrarSonda() { g_w3dSondaObjetoHook = HookSonda; } }
 }
 
 // ---- HORNEAR ----
-bool SondaLuzHornear(SondaLuz* s, std::string* motivo) {
+bool SondaLuzHornearEmpezar(SondaLuz* s, std::string* motivo) {
     if (!s) return false;
     for (int e = 0; e < 3; e++) { if (s->puntos[e] < 2) s->puntos[e] = 2; if (s->puntos[e] > 16) s->puntos[e] = 16; }
     Matrix4 W; s->GetWorldMatrix(W);
@@ -263,12 +268,23 @@ bool SondaLuzHornear(SondaLuz* s, std::string* motivo) {
                 const Vector3 w = W * Vector3(p[0], p[1], p[2]);
                 pos.push_back(w.x); pos.push_back(w.y); pos.push_back(w.z);
             }
+#ifdef W3D_SIN_EDITOR
+    if (motivo) *motivo = "Nothing to bake"; return false;   // (el juego no hornea: usa la sonda horneada del .w3d)
+#else
+    if (!RTSondaEmpezarLuz(pos, s->rayos)) { if (motivo) *motivo = "Nothing to bake"; return false; }
+    return true;
+#endif
+}
+
+bool SondaLuzHornearTerminar(SondaLuz* s) {
+    if (!s) return false;
     std::vector<float> sh;
     std::vector<unsigned char> ok;
 #ifdef W3D_SIN_EDITOR
-    (void)ok; if (motivo) *motivo = "Nothing to bake"; return false;   // (el juego no hornea: usa la sonda horneada del .w3d)
+    return false;
 #else
-    if (!RTHornearSondas(pos, s->rayos, sh, &ok)) { if (motivo) *motivo = "Nothing to bake"; return false; }
+    if (!RTSondaTomarLuz(sh, &ok)) return false;
+    if (sh.size() != (size_t)s->Cantidad() * 27 || ok.size() != (size_t)s->Cantidad()) return false;   // (cambio la grilla)
 #endif
     // LOS PUNTOS ADENTRO DE ALGO (una pared, el piso, la malla misma) no ven la luz: toman el promedio de sus vecinos
     // validos de la grilla, pasada tras pasada, hasta que no queda ninguno sin llenar (o no hay de donde)
@@ -297,6 +313,21 @@ bool SondaLuzHornear(SondaLuz* s, std::string* motivo) {
         if (!falta || !lleno) break;
     }
     s->sh.swap(sh);
+    return true;
+}
+
+bool SondaLuzViva(const SondaLuz* s) {
+    for (size_t i = 0; i < gSondas.size(); i++) if (gSondas[i] == s) return true;
+    return false;
+}
+
+// DE UNA SOLA VEZ (el harness)
+bool SondaLuzHornear(SondaLuz* s, std::string* motivo) {
+    if (!SondaLuzHornearEmpezar(s, motivo)) return false;
+#ifndef W3D_SIN_EDITOR
+    while (RTSondaActiva()) RTSondaPaso(100000);
+#endif
+    if (!SondaLuzHornearTerminar(s)) { if (motivo) *motivo = "Nothing to bake"; return false; }
     return true;
 }
 

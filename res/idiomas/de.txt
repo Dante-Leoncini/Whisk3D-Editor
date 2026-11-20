@@ -217,6 +217,7 @@ Background light	Hintergrundlicht
 Bake	Backen
 Bake Lighting	Beleuchtung backen
 Bake canceled	Backen abgebrochen
+Another probe is baking	Eine andere Sonde wird gerade vorberechnet
 Bake the reflection probe first	Zuerst die Reflexionssonde backen
 Baked	Gebacken
 Baked: %d points	Gebacken: %d Punkte
@@ -2175,3 +2176,16 @@ with mipmaps	mit Mipmaps
 with transparency	mit Transparenz
 without mipmaps	ohne Mipmaps
 you want to select (Esc to cancel)	zum Auswählen (Esc zum Abbrechen)
+Exit Whisk3D?	Whisk3D beenden?
+Exit	Beenden
+Both	Beide
+Curve segment	Kurvenabschnitt
+Select with click and pencil	Was Klick und Stift auswaehlen
+This phone has no video encoder for MP4	Dieses Telefon hat keinen Video-Encoder für MP4
+Audio scrubbing	Beim Bewegen hören (Scrubbing)
+Cut the sound at the current frame (trim)	Ton am aktuellen Frame schneiden (Trim)
+Move the current frame inside the sound to cut it	Setze den aktuellen Frame in den Ton, um ihn zu schneiden
+The phone could not encode the sound to AAC: the video has no sound	Das Telefon konnte den Ton nicht in AAC kodieren: das Video hat keinen Ton
+Codec	Codec
+Video bitrate	Video-Bitrate
+The video "	Das Video "

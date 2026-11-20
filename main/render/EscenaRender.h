@@ -98,6 +98,10 @@ void W3dEscena3DLuces(int vista);
 // editor viene usando (calcomanias -> luces aditivas -> particulas). No limpia
 // la pantalla ni toca la proyeccion: eso lo decide el que llama.
 void W3dEscena3DPasada();
+// EL FONDO de una imagen del render a archivo (las franjas de ViewPort3D::RenderFranjas, que dibujan la escena por su
+// cuenta): el entorno de los reflejos y el CIELO 360, como el pase de la vista. Fin: lo apaga (despues de la escena)
+void W3dEscena3DFondoArchivo();
+void W3dEscena3DFondoArchivoFin();
 
 // BANDAS del encuadre (letterbox/pillarbox) sobre un rect de 'W'x'H' pixeles.
 // 'opaco' = negro pleno (lo que ve el jugador en el aparato: el RUNTIME siempre

@@ -217,6 +217,7 @@ Background light	Свет фона
 Bake	Запечь
 Bake Lighting	Запечь освещение
 Bake canceled	Запекание отменено
+Another probe is baking	Другой зонд сейчас запекается
 Bake the reflection probe first	Сначала запеките зонд отражений
 Baked	Запечённый
 Baked: %d points	Запечён: точек %d
@@ -2175,3 +2176,16 @@ with mipmaps	с mipmap
 with transparency	с прозрачностью
 without mipmaps	без mipmap
 you want to select (Esc to cancel)	для выделения (Esc — отмена)
+Exit Whisk3D?	Выйти из Whisk3D?
+Exit	Выйти
+Both	Оба
+Curve segment	Участок кривой
+Select with click and pencil	Что выбирают щелчок и карандаш
+This phone has no video encoder for MP4	В этом телефоне нет видеокодера для MP4
+Audio scrubbing	Слышать при перемотке (скраббинг)
+Cut the sound at the current frame (trim)	Разрезать звук на текущем кадре (trim)
+Move the current frame inside the sound to cut it	Поставьте текущий кадр внутрь звука, чтобы разрезать его
+The phone could not encode the sound to AAC: the video has no sound	Телефон не смог закодировать звук в AAC: видео без звука
+Codec	Кодек
+Video bitrate	Битрейт видео
+The video "	Видео "

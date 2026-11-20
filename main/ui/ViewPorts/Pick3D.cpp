@@ -1232,6 +1232,16 @@ void LoopCutOrientConfirmarTeclado(){
     LoopCutHint(); // ayuda de la fase de cortes
 }
 
+// OK del TELEFONO (sin mouse) en la fase de orientacion: la direccion elegida con las flechas, aplicada de una + el panel
+// (cortes/slide), como el toque de un punto. Antes el OK tomaba el punto mas cercano al cursor ESCONDIDO.
+void LoopCutOrientAplicarElegida(){
+    if (!gLoopCutOrientando) return;
+    gLoopCutOrientando=false; gLoopCutOrientNPts=0; gLoopCutSegs2.clear();
+    gLoopCutEdge = gLoopCutOrientEdge[gLoopCutOrient];
+    LoopCutAplicarYPanel();
+    g_redraw=true;
+}
+
 void LoopCutMotion(int mx, int my){
     if (!gLoopCutOn) return;
     if (!g_editMesh){ LoopCutCancelar(); return; } // se salio de Edit Mode con el corte activo
@@ -1264,7 +1274,10 @@ void LoopCutTecla(int dir){
     if (gLoopCutOrientando){
         gLoopCutOrient = (dir==1 || dir==3) ? 1 : 0;
         gLoopCutEdge = gLoopCutOrientEdge[gLoopCutOrient];
-        gLoopCutSegs.clear(); m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+        // gLoopCutSegs = la elegida, gLoopCutSegs2 = la OTRA (antes Segs2 quedaba fija en la direccion 1: elegida la 0
+        // se veian las dos -una cruz- y elegida la 1, las dos encimadas)
+        gLoopCutSegs.clear();  m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+        gLoopCutSegs2.clear(); m->LoopCutPreview(gLoopCutOrientEdge[1 - gLoopCutOrient], gLoopCutCortes, 0.0f, gLoopCutSegs2);
         g_redraw=true;
         return;
     }
@@ -1380,11 +1393,16 @@ void LoopCutRenderPreview(){
     w3dEngine::EnableArray(w3dEngine::VertexArray);
 
     if (gLoopCutOrientando){
-        // FASE ORIENTACION (quad): los DOS cortes posibles en amarillo 0.5 + 4 PUNTOS grandes 100% opacos.
-        w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 0.5f); // amarillo semitransparente
+        // FASE ORIENTACION (quad): + 4 PUNTOS grandes 100% opacos. Con el DEDO, los DOS cortes posibles en amarillo
+        // 0.5 (se toca el punto de la que se quiere). Con TECLADO (flechas + Enter) UNA sola linea: la elegida.
         w3dEngine::LineWidth(3.0f);
+        if (LoopCutTactil()){
+            w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 0.5f); // amarillo semitransparente
+            if (!gLoopCutSegs2.empty()){ w3dEngine::VertexPointer3f(0, &gLoopCutSegs2[0]); w3dEngine::DrawLines((int)(gLoopCutSegs2.size()/3)); }
+        } else {
+            w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // la elegida, opaca
+        }
         if (!gLoopCutSegs.empty()){  w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);  w3dEngine::DrawLines((int)(gLoopCutSegs.size()/3)); }
-        if (!gLoopCutSegs2.empty()){ w3dEngine::VertexPointer3f(0, &gLoopCutSegs2[0]); w3dEngine::DrawLines((int)(gLoopCutSegs2.size()/3)); }
         w3dEngine::LineWidth(1.0f);
         if (gLoopCutOrientNPts > 0){ // los puntos que se tocan para elegir la direccion
             w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo opaco

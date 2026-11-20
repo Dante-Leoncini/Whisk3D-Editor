@@ -228,6 +228,9 @@ class ViewportBase {
         // ToolButtons no tiene toolbar (OnToolbar/Render devuelven que no hay). ----
         std::vector<Button*> ToolButtons; // botones persistentes (con ->rol)
         int  toolScroll;                  // scroll horizontal manual de la toolbar
+        int  toolFoco;                    // TECLADO (el softkey derecho del N95): el boton enfocado (-1 = ninguno)
+        bool ToolbarFocoMover(int dir);   // al visible anterior / siguiente (false = no hay barra o botones)
+        bool ToolbarFocoActivar();        // OK: la accion del enfocado (el mismo camino que el click)
         bool toolGesto;                   // el gesto de arrastre arranco sobre la toolbar (no la barra de arriba)
         virtual bool ToolbarVisible() const;   // default: hay botones. Cada editor lo restringe (contexto)
         int  ToolbarHeight() const;            // = BarHeight()

@@ -686,6 +686,19 @@ TBool W3dLayoutMenuAbierto() {
 TBool W3dLayoutPopupActivo() {
     return PopUpActive ? ETrue : EFalse;
 }
+// EL PANEL DE LA ULTIMA OPERACION (abajo a la izquierda: mover, extruir, keyframes...): no es modal (CierraConViewport)
+TBool W3dLayoutPopupSemimodal() { return (PopUpActive && PopUpActive->CierraConViewport()) ? ETrue : EFalse; }
+TAny* W3dLayoutPopupPtr() { return (TAny*)PopUpActive; }
+// aceptarlo y cerrarlo (lo mismo que tocar afuera): la tecla sigue su camino
+void W3dLayoutPopupSeguir() { if (PopUpActive) PopUpActive->SeguirTrabajando(); g_redraw = true; }
+// plegado (solo el titulo a la vista): el teclado NO es suyo. El lapiz lo despliega / pliega
+TBool W3dLayoutPopupPlegado() { return (PopUpActive && PopUpActive->Plegable() && PopUpActive->Plegado()) ? ETrue : EFalse; }
+TBool W3dLayoutPopupPlegarToggle() {
+    if (!PopUpActive || !PopUpActive->Plegable()) return EFalse;
+    PopUpActive->Desplegar(PopUpActive->Plegado());
+    g_redraw = true;
+    return ETrue;
+}
 
 // tecla verde de llamada: cicla el viewport activo (borde verde) sin mouse.
 void W3dLayoutCiclarViewport(TInt aDir) {
@@ -848,7 +861,56 @@ TBool W3dLayoutTecla(TInt aScan, TInt aMx, TInt aMy) {
 // W3dNumEditActivo dice si hay una edicion numerica en curso; W3dTextFieldChar mete un caracter (0-9, '.', 8=borrar).
 extern bool NumEditActivo();        // WhiskUI/PropFloat.cpp
 extern bool TextFieldInputChar(int c); // main/ViewPorts/LayoutInput.cpp (declarada en TextField.h)
-TBool W3dNumEditActivo() { return NumEditActivo() ? ETrue : EFalse; }
+// ROTAR INCLINANDO EL TELEFONO: la vista 3D GIRA sobre su eje igual que el objeto (el telefono inclinado + la vista
+// girada al reves = la escena se ve derecha y el objeto, rotado). Se guarda como estaba y al terminar el transform vuelve.
+static TBool gRollGuardado = EFalse;
+static Quaternion gRollViewRot;
+static Viewport3D* gRollVp = 0;
+void W3dVistaRollFijar(float aGrados) {
+    Viewport3D* vp = Viewport3DActive ? Viewport3DActive : gView3D;
+    if (!vp || vp->ViewFromCameraActive) return;   // (mirando por la camara de la escena: esa no se toca)
+    if (!gRollGuardado || gRollVp != vp) { gRollGuardado = ETrue; gRollVp = vp; gRollViewRot = vp->viewRot; }
+    vp->viewRot = gRollViewRot;
+    vp->RollOrbit(aGrados);
+    g_redraw = true;
+}
+void W3dVistaRollRestaurar() {
+    if (!gRollGuardado) return;
+    gRollGuardado = EFalse;
+    if (gRollVp) { gRollVp->viewRot = gRollViewRot; gRollVp->RollOrbit(0.0f); }
+    gRollVp = 0;
+    g_redraw = true;
+}
+// se esta rotando sobre el eje de la VISTA (sin 1/2/3): el unico en que la vista puede acompaniar al objeto
+TBool W3dXformRotaEnVista() {
+    extern int axisSelect;   // (variables.h: X, Y, Z, XYZ = 3, ViewAxis = 4, ..., OrbitalAxis = 8)
+    return (axisSelect == 3 || axisSelect == 4 || axisSelect == 8) ? ETrue : EFalse;
+}
+
+// EL SOFTKEY DERECHO: un toque = el foco en la barra de herramientas (abajo) del viewport activo; con el foco puesto,
+// las flechas / OK / C son de la barra (W3dLayoutToolbarTecla)
+extern bool LayoutToolbarFocoToggle();
+extern bool LayoutToolbarFocoActivo();
+extern bool LayoutToolbarTecla(int tecla);
+TBool W3dLayoutToolbarToggle() { return LayoutToolbarFocoToggle() ? ETrue : EFalse; }
+TBool W3dLayoutToolbarTecla(TInt aScan) {
+    if (!LayoutToolbarFocoActivo()) return EFalse;
+    int k = -1;
+    switch (aScan) {
+        case EStdKeyUpArrow:    k = LayoutKey::Up; break;
+        case EStdKeyDownArrow:  k = LayoutKey::Down; break;
+        case EStdKeyLeftArrow:  k = LayoutKey::Left; break;
+        case EStdKeyRightArrow: k = LayoutKey::Right; break;
+        case EStdKeyDevice3:
+        case EStdKeyEnter:      k = LayoutKey::Enter; break;
+        case EStdKeyBackspace:
+        case EStdKeyEscape:     k = LayoutKey::Cancel; break;
+    }
+    if (k < 0) return EFalse;
+    return LayoutToolbarTecla(k) ? ETrue : EFalse;
+}
+
+TBool W3dNumEditActivo() { return (NumEditActivo() || (g_textFieldActivo && g_textFieldActivo->numerico)) ? ETrue : EFalse; }
 void  W3dTextFieldChar(TInt c) { TextFieldInputChar((int)c); }
 
 // flecha MANTENIDA (frame-based) al popup activo: SOLO ajusta valores (color picker: R/G/B/A o circulo/

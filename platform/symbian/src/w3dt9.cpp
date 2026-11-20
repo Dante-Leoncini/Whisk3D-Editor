@@ -68,6 +68,9 @@ static const char* Ciclo(TInt sc) {
 
 TBool W3dT9Activo() { return (g_textFieldActivo != 0 || IDEEdit()) ? ETrue : EFalse; }
 
+// el campo enfocado es un NUMERO (un PropFloat o un TextField marcado): sin letras
+static bool CampoNumerico() { return NumEditActivo() || (!IDEEdit() && g_textFieldActivo && g_textFieldActivo->numerico); }
+
 TBool W3dT9HayPendiente() { return (gKey >= 0 && (g_textFieldActivo || IDEEdit())) ? ETrue : EFalse; }
 
 void W3dT9Reset() { gKey = -1; gTap = 0; }
@@ -96,7 +99,7 @@ void W3dT9Tick() {
 
 const char* W3dT9ModoTexto() {
     if (!g_textFieldActivo && !IDEEdit()) return "";
-    if (gModo == 3 || NumEditActivo()) return "123";
+    if (gModo == 3 || CampoNumerico()) return "123";
     if (gModo == 1) return "abc";
     if (gModo == 2) return "ABC";
     return "Abc";
@@ -104,6 +107,19 @@ const char* W3dT9ModoTexto() {
 
 TBool W3dT9Tecla(TInt aScan, TBool aDown) {
     if (!g_textFieldActivo && !IDEEdit()) return EFalse;
+
+    // CAMPO NUMERICO: el '#' es la MATEMATICA, multi-tap como una letra: - + * / ( ) (el punto es el '*' del keypad)
+    if (aScan == EStdKeyHash && CampoNumerico()) {
+        if (aDown) {
+            static const char kOps[] = "-+*/()";
+            const TUint ahora = User::NTickCount();
+            if (gKey == EStdKeyHash && ahora - gTick < kTimeout) { SinkBorrar(); gTap = (gTap + 1) % 6; }
+            else gTap = 0;
+            gKey = EStdKeyHash; gTick = ahora;
+            SinkInsertar((int)kOps[gTap]);
+        }
+        return ETrue;
+    }
 
     // '#': tap = cicla modo (Abc->abc->ABC); mantenido = 123. Se resuelve al SOLTAR.
     if (aScan == EStdKeyHash) {
@@ -126,8 +142,9 @@ TBool W3dT9Tecla(TInt aScan, TBool aDown) {
         return ETrue;
     }
 
-    // MODO NUMERICO (o campo PropFloat): los digitos van directo, sin multi-tap
-    if (gModo == 3 || NumEditActivo()) {
+    // MODO NUMERICO (o un campo numerico: PropFloat, el valor de un mapa del material): los digitos van directo, sin
+    // multi-tap. Antes el metalico era un campo de TEXTO: mantener el "1" daba el punto
+    if (gModo == 3 || CampoNumerico()) {
         if (aScan >= '0' && aScan <= '9') { W3dT9Reset(); SinkInsertar((int)aScan); return ETrue; }
         return EFalse;
     }

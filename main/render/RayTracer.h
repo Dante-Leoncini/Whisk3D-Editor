@@ -74,6 +74,18 @@ void RTInvalidar();                       // la escena cambio: el proximo frame 
 #include <vector>
 // 'valido' (opcional): 0 en los puntos que quedaron ADENTRO de una malla (muchos rayos pegan en caras de espaldas)
 bool RTHornearSondas(const std::vector<float>& pos, int rayos, std::vector<float>& sh, std::vector<unsigned char>* valido = NULL);
+// HORNEAR UNA SONDA DE A PEDAZOS (la barra del progreso en Propiedades, como el horneado de la luz): Empezar arma la
+// escena, RTSondaPaso avanza unos milisegundos (puntos de la de luz, filas del 360 de la de reflejo) y devuelve cuanto va
+// (0..1); al terminar, Tomar entrega el resultado. Uno a la vez: empezar otro cancela el anterior
+bool  RTSondaEmpezarLuz(const std::vector<float>& pos, int rayos);
+bool  RTSondaEmpezarReflejo(const float pos[3], int w, int h, float cerca, int muestras, int rebotes, float intensidad,
+                            std::string* motivo);
+float RTSondaPaso(int msPresupuesto);
+bool  RTSondaActiva();                  // trabajando (todavia no termino)
+int   RTSondaTipo();                    // 0 = ninguna, 1 = de luz, 2 = de reflejo (tambien terminada y sin tomar)
+void  RTSondaCancelar();
+bool  RTSondaTomarLuz(std::vector<float>& sh, std::vector<unsigned char>* valido);
+bool  RTSondaTomarReflejo(std::vector<unsigned char>& rgba);
 // PRECALCULAR LA ILUMINACION (el lightmap): la luz que le llega a cada texel de la malla 'm' en su capa UV 'uvCapa'
 // (w x h; la fila es v * alto), con las lamparas (y sus sombras) y la luz indirecta ('muestras' rayos por texel). Solo
 // con lo estatico. Se hace de a pedazos: Empezar, despues Paso en cada cuadro (devuelve el progreso, 1 = listo), y el

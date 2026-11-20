@@ -78,6 +78,10 @@ public:
 
 // HORNEAR (el editor: el trazado de rayos). Crea o actualiza su textura. false + motivo en INGLES si no se pudo
 bool SondaReflejoHornear(SondaReflejo* s, std::string* motivo);
+// DE A PEDAZOS (la barra de Propiedades): Empezar arma el trabajo (RTSondaPaso lo avanza) y Terminar, cuando
+// RTSondaActiva() da false, guarda la imagen en su textura
+bool SondaReflejoHornearEmpezar(SondaReflejo* s, std::string* motivo);
+bool SondaReflejoHornearTerminar(SondaReflejo* s, std::string* motivo);
 // las 12 aristas de la caja (el dibujo y el pick)
 void SondaReflejoAristas(const SondaReflejo* s, float out[72]);
 // la sonda que le toca a un punto del MUNDO: la de mas importancia que lo contiene; si ninguna, la mas cercana (con

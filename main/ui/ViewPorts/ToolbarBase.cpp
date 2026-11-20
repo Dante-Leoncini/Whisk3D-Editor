@@ -100,6 +100,45 @@ void ViewportBase::ToolbarActualizar(){
     }
 }
 
+// EL FOCO DE TECLADO de la barra (el softkey derecho del N95, como el izquierdo con la barra de arriba): izq/der
+// recorren los botones visibles, OK hace lo del click y la barra se corre para que el enfocado se vea
+bool ViewportBase::ToolbarFocoMover(int dir){
+    if (ToolButtons.empty() || !ToolbarVisible()) { toolFoco = -1; return false; }
+    ToolbarActualizar();
+    const int n = (int)ToolButtons.size();
+    int i = toolFoco;
+    if (i < 0 || i >= n || !ToolButtons[(size_t)i]->visible) {   // sin foco: el primero (o el ultimo) visible
+        i = dir >= 0 ? -1 : n;
+    }
+    for (int k = 0; k < n; k++) {
+        i += dir >= 0 ? 1 : -1;
+        if (i < 0) i = n - 1; if (i >= n) i = 0;
+        if (ToolButtons[(size_t)i]->visible) break;
+    }
+    if (i < 0 || i >= n || !ToolButtons[(size_t)i]->visible) { toolFoco = -1; return false; }
+    toolFoco = i;
+    // que se vea: correr el scroll hasta que entre entero
+    Button* b = ToolButtons[(size_t)i];
+    if (b->sx < x + gapGS) toolScroll -= (x + gapGS) - b->sx;
+    else if (b->sx + b->width > x + width - gapGS) toolScroll += (b->sx + b->width) - (x + width - gapGS);
+    if (toolScroll < 0) toolScroll = 0;
+    ToolbarActualizar();
+    g_redraw = true;
+    return true;
+}
+bool ViewportBase::ToolbarFocoActivar(){
+    if (toolFoco < 0 || toolFoco >= (int)ToolButtons.size() || !ToolbarVisible()) { toolFoco = -1; return false; }
+    ToolbarActualizar();
+    Button* b = ToolButtons[(size_t)toolFoco];
+    if (!b->visible) { toolFoco = -1; return false; }
+    ToolbarAccionRol(b->rol);
+    // (la accion pudo cambiar los botones: el foco queda en uno que se vea, o se va)
+    ToolbarActualizar();
+    if (toolFoco >= (int)ToolButtons.size() || !ToolButtons[(size_t)toolFoco]->visible) ToolbarFocoMover(+1);
+    g_redraw = true;
+    return true;
+}
+
 bool ViewportBase::ToolbarClick(int mx, int my){
     if (!OnToolbar(mx, my)) return false;
     ToolbarActualizar(); // sx/sy frescos
@@ -486,6 +525,8 @@ void ViewportBase::RenderToolbar(){
         btn->alpha = barAlpha;   // misma translucidez que el fondo de la barra
         gfx::PushMatrix();
         gfx::Translatef((GLfloat)(btn->sx - x), (GLfloat)(btn->sy - y - (height - barH)), 0);
+        // el enfocado con el teclado (softkey derecho): resaltado IGUAL que el de la barra de arriba (focoMenu)
+        btn->focoMenu = (this == viewPortActive && (int)i == toolFoco);
         btn->Render();
         gfx::PopMatrix();
     }

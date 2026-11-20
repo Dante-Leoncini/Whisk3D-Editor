@@ -96,7 +96,14 @@ W3dRenderOpc::W3dRenderOpc()
       w(1280.0f), h(720.0f),  // 720p en PC/Android/Web
 #endif
       zbuffer(false), normal(false), alfa(false), vectores(false), desenfoque(false), obturador(0.5f),
-      formato(0), calidad(90.0f), final(true), finalAlfa(false), post(true), sonido(true), audioFormato(3), audioKbps(192.0f) {}
+      formato(0), calidad(90.0f), final(true), finalAlfa(false), post(true), sonido(true), audioFormato(3), audioKbps(192.0f),
+      videoCodec(0),
+#ifdef W3D_SYMBIAN
+      videoKbps(1000.0f)   // (240p: lo que el RealPlayer del N95 reproduce bien)
+#else
+      videoKbps(8000.0f)   // (720p)
+#endif
+      {}
 W3dRenderOpc g_render;
 unsigned g_renderGen = 0;
 float g_renderAspect = 640.0f / 480.0f; // 4:3 por defecto (igual que el default del render 640x480)
@@ -153,3 +160,7 @@ RenderType StringToRenderType(const std::string& s){
               << "' → usando RenderType::Solid" << std::endl;
     return RenderType::Solid; // fallback seguro
 }
+
+// (ver OpcionesRender.h: la plataforma que necesita dibujar aparte lo pone; NULL = en la ventana)
+bool (*W3dFueraDePantallaEmpezar)(int w, int h) = 0;
+void (*W3dFueraDePantallaTerminar)() = 0;

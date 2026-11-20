@@ -94,6 +94,7 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable, publ
         Button* btnSelect; // dope sheet: menu Select (All / None / Invert). Al FINAL de la barra; solo con filas
         Button* btnView;   // dope sheet: menu View (Frame Selected)
         Button* btnKey;    // menu Key: Transform (Move/Rotate/Scale) + Duplicate + Delete
+        Button* btnSelModo;   // el MOUSE: que elige el click / el dedo / el lapiz (ambos, el tramo de curva, el keyframe)
         Button* btnPivot;  // dope sheet: menu Pivot (Center / Current Frame) = desde donde escala la 's'
 
         int stripY;        // Y (local) del CUERPO (bandas/lineas)
@@ -226,6 +227,15 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable, publ
         int  PanelMaxX() const;            // tope del scroll horizontal del panel (<= 0)
         bool PanelBarraH(int& bx, int& by, int& bw, int& bh, int& tx, int& tw) const; // barra horizontal del panel
         bool PanelEnBorde(int lx, int ly) const; // (lx, ly) sobre el borde que cambia el ancho del panel
+        // EL PANEL CON EL TECLADO (el N95): la fila enfocada (-1 = el foco no esta en el panel). Desde la barra de arriba
+        // (softkey izquierdo), arriba/abajo entran; las flechas recorren las filas (y la eligen: sus keyframes quedan
+        // elegidos, asi el lapiz recorre los de ESA curva), izq/der pliegan/despliegan, el 2 la oculta / muestra, la C
+        // borra lo elegido y el 0 lo encuadra
+        int panelFoco;
+        bool PanelFocoEntrar(int dir = +1);  // desde la barra: abajo = la primera fila (Summary), arriba = la ultima. false = no hay filas
+        bool PanelFocoMover(int dir);      // false = se paso de la primera o de la ultima (vuelve a la barra)
+        void PanelFocoPlegar(bool plegar);
+        void PanelFocoOjo();
         int rowH;        // alto de fila
         int hoverRow;    // fila bajo el mouse (-1 = ninguna) para el mouse-over
 
@@ -317,6 +327,18 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable, publ
         bool AbrirMenuDeBarra(int mx, int my) W3D_OVERRIDE;
         void AbrirMenuSelect(int mx, int my);   // menu Select (All / None / Invert)
         void AbrirMenuPivot(int mx, int my);    // menu Pivot (Center / Current Frame)
+        void AbrirMenuSelModo(int mx, int my);  // menu del MOUSE: Ambos / Curva (el tramo) / Keyframe
+        // las TIRAS DE SONIDO con el teclado (el lapiz elige punta izquierda / entera / derecha) y la TIJERA
+        int  TiraFilaDe(const Sonido* s) const;
+        bool TiraHay() const;
+        bool DopeSinKeysNav() const;
+        bool TiraNavPrefiere() const;
+        bool TiraSelAvanzar(int paso);
+        Sonido* TiraElegida() const;     // el sonido elegido (con el lapiz, o el activo)
+        Sonido* TiraParaCortar() const;
+        bool TiraCortar();
+        void DopeTramoElegir(int fila, int i, bool sumar);   // el TRAMO i de la fila (sus dos keyframes)
+        bool DopeTramoAvanzar(int paso, bool extender);      // el lapiz en modo Curva: tramo por tramo
         void AbrirMenuAnim(int mx, int my);     // dropdown de animacion
         void AbrirMenuView(int mx, int my);     // menu View (Frame Selected + Auto frame)
         void AbrirMenuKey(int mx, int my);      // menu Key

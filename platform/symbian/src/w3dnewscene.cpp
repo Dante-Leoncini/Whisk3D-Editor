@@ -89,30 +89,36 @@ unsigned int W3dNewWhiteTex() {
 
 // (gizmos/grilla/billboards del puente: borrados, los dibuja render.cpp real)
 
+// LA ESCENA POR DEFECTO del telefono (la version Symbian de la de main/app/constructor.cpp, que no entra en este
+// build): la usan el arranque (abajo) y Nuevo proyecto (import_w3d.cpp NuevoProyectoAhora)
+void W3dCrearEscenaPorDefecto() {
+    // arriba de todo el CONSTRUCTOR y, afuera de el, el "Limpiar pantalla" de cada cuadro (igual que el de PC)
+    W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
+                         ListaColores[static_cast<int>(ColorID::background)]);
+    // todo cuelga de una "Collection" (igual que el constructor de PC)
+    CollectionActive = new Collection(SceneCollection);
+    // luz de escena default: arriba-derecha-atras
+    Light* l = Light::Create(CollectionActive, 0, 0, 0);
+    if (l) { l->pos = Vector3(3.0f, 4.0f, 2.0f); }
+    // camara default, misma pose que el constructor de PC
+    // (la misma camara que el editor de la PC: main/app/constructor.cpp, mirando al cubo)
+    { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
+      new Camera(CollectionActive, posCam, CamaraRotMirando(posCam, Vector3(0.0f, 0.0f, 0.0f))); }
+    // el cubo se crea ULTIMO y arranca seleccionado
+    Object* cubo = NewMesh(MeshType::cube, CollectionActive, false);
+    if (cubo) {
+        DeseleccionarTodo();
+        cubo->Seleccionar();
+    }
+    // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (igual que la de PC)
+    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
+}
+
 // raiz (SceneCollection) + escena default, como ConstructUniversal de PC
 void W3dNewSceneInit() {
     W3dModelInit();
 
-    if (SceneCollection && SceneCollection->Childrens.empty()) {
-        // arriba de todo el CONSTRUCTOR y, afuera de el, el "Limpiar pantalla" de cada cuadro (igual que el de PC)
-        W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
-                             ListaColores[static_cast<int>(ColorID::background)]);
-        // todo cuelga de una "Collection" (igual que el constructor de PC)
-        CollectionActive = new Collection(SceneCollection);
-        // luz de escena default: arriba-derecha-atras
-        Light* l = Light::Create(CollectionActive, 0, 0, 0);
-        if (l) { l->pos = Vector3(3.0f, 4.0f, 2.0f); }
-        // camara default, misma pose que el constructor de PC
-        // (la misma camara que el editor de la PC: main/app/constructor.cpp, mirando al cubo)
-        { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
-          new Camera(CollectionActive, posCam, CamaraRotMirando(posCam, Vector3(0.0f, 0.0f, 0.0f))); }
-        // el cubo se crea ULTIMO y arranca seleccionado
-        Object* cubo = NewMesh(MeshType::cube, CollectionActive, false);
-        if (cubo) {
-            DeseleccionarTodo();
-            cubo->Seleccionar();
-        }
-    }
+    if (SceneCollection && SceneCollection->Childrens.empty()) W3dCrearEscenaPorDefecto();
     // (los grupos de propiedades los construye cada panel en su ctor)
     // el importador de PC cuelga lo que importa de CollectionActive
     if (!CollectionActive) {
@@ -161,7 +167,19 @@ TBool W3dNewTransformStart(TInt aMode) {
     return ETrue;
 }
 
+// un mover/rotar/escalar de OBJETOS que arranco OTRO (duplicar -Shift+D o el menu-, la barra de herramientas, un menu):
+// el codigo compartido pone 'estado' sin pasar por W3dNewTransformStart. gTMode sigue a 'estado': sin esto, despues de
+// duplicar las flechas orbitaban la vista en vez de mover la copia
+static void SeguirEstadoObjetos() {
+    if (InteractionMode != ObjectMode) return;
+    if (estado == translacion)    gTMode = 1;
+    else if (estado == rotacion)  gTMode = 2;
+    else if (estado == EditScale) gTMode = 3;
+    else                          gTMode = 0;
+}
+
 TBool W3dNewTransformActive() {
+    SeguirEstadoObjetos();
     // un transform de EDICION de malla (lo arranca G/R/S del keypad, extrude o duplicar)
     // tambien cuenta como activo -> la maquinaria de Symbian (flechas/BT move, accept/
     // cancel, todo gateado por esta funcion) lo maneja igual que el de objetos.
@@ -169,11 +187,14 @@ TBool W3dNewTransformActive() {
     // idem el transform de KEYFRAMES del timeline (g/s/r del dope sheet / editor de curvas): asi el backspace
     // lo CANCELA y el OK lo ACEPTA por el mismo camino, sin duplicar el ruteo de teclas.
     if (DopeXformActivo()) return ETrue;
+    // idem una TIRA DE SONIDO agarrada con el 1 (la 'g' del timeline): OK acepta, C cancela, las flechas la corren
+    { extern bool TimelineTiraActiva(); if (TimelineTiraActiva()) return ETrue; }
     return gTMode != 0;
 }
 
 // 0 nada, 1 mover, 2 rotar, 3 escalar (para el paso de las flechas)
 TInt W3dNewTransformModo() {
+    SeguirEstadoObjetos();
     if (InteractionMode == EditMode && EditXformActivo()) {
         if (estado == rotacion)  return 2;
         if (estado == EditScale) return 3;
@@ -196,6 +217,7 @@ void W3dNewTransformMove(TInt aDx, TInt aDy) {
         else                          EditXformTraslacion(aDx, aDy, velMov);
         return;
     }
+    SeguirEstadoObjetos();
     if (!gTMode) return;
     // OBJECT MODE: transform COMPARTIDO con PC (respeta axisSelect/orientacion: 1/2/3=X/Y/Z,
     // direccion relativa a la vista, etc.). Lo usan el mouse BT y las flechas.
@@ -239,8 +261,9 @@ void W3dNewZoom(TInt aDelta) { if (Viewport3DActive) Viewport3DActive->Zoom((flo
 void W3dNewPan(TInt aDx, TInt aDy)  { if (Viewport3DActive) Viewport3DActive->PanFlecha(-aDx, -aDy); } // invertido (Dante: las flechas iban al reves)
 
 void W3dNewTransformEnd(TBool aCancel) {
-    // TIMELINE: el transform de keyframes se acepta/cancela solo (no toca gTMode ni estado)
-    if (DopeXformActivo()) {
+    // TIMELINE: el transform de keyframes (o de una tira de sonido) se acepta/cancela solo (no toca gTMode ni estado)
+    extern bool TimelineTiraActiva();
+    if (DopeXformActivo() || TimelineTiraActiva()) {
         if (aCancel) DopeXformCancelar(); else DopeXformAceptar();
         w3dLogf("transform KEYFRAMES: fin (cancel=%d)", (TInt)aCancel);
         return;

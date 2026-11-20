@@ -24,5 +24,6 @@ void NumInputBegin();                 // activa la entrada
 void NumInputConfirmar();             // OK del teclado tactil
 void NumInputCancelar();              // X del teclado tactil
 bool NumInputTransformEnCurso();      // hay un transform activo
+void NumInputFijar(float v);          // el valor ENTERO de una (como si se hubiera tipeado): rotar inclinando el telefono
 
 #endif

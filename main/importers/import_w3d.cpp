@@ -4687,6 +4687,7 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
             r.final = JB(rn, "final", d.final); r.finalAlfa = JB(rn, "finalAlfa", d.finalAlfa); r.post = JB(rn, "post", d.post);
             r.sonido = JB(rn, "sonido", d.sonido); r.audioFormato = JI(rn, "audio", d.audioFormato);
             r.audioKbps = JF(rn, "audioKbps", d.audioKbps);
+            r.videoCodec = JI(rn, "videoCodec", d.videoCodec); r.videoKbps = JF(rn, "videoKbps", d.videoKbps);
             // EL FONDO: color, color o textura 360, rotacion y las texturas de fondo (en orden: la pista animable las
             // nombra por su lugar; una que no carga deja su lugar vacio)
             { Vector3 f(0, 0, 0); JVec3(rn, "fondo", f); g_renderBg[0] = f.x; g_renderBg[1] = f.y; g_renderBg[2] = f.z; g_renderBg[3] = 1.0f; }

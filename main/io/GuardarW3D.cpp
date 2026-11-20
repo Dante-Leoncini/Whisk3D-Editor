@@ -1073,7 +1073,11 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
             { "showCamera", v3->showCamera, true }, { "showEmpty", v3->showEmpty, true },
             { "showParticulas", v3->showParticulas, true }, { "showCurvas", v3->showCurvas, true },
             { "showHitbox", v3->showHitbox, true }, { "showSonidos", v3->showSonidos, true },
-            { "ShowRelantionshipsLines", v3->ShowRelantionshipsLines, true } };
+            { "ShowRelantionshipsLines", v3->ShowRelantionshipsLines, true },
+            // el PISO, los EJES X / Y, los ORIGENES y el CURSOR 3D: el lector los entendia y tampoco se escribian (apagar el
+            // piso o los ejes volvia a prenderse al abrir el proyecto)
+            { "showFloor", v3->showFloor, true }, { "showXaxis", v3->showXaxis, true }, { "showYaxis", v3->showYaxis, true },
+            { "showOrigins", v3->showOrigins, true }, { "show3DCursor", v3->show3DCursor, true } };
         for (size_t k = 0; k < sizeof(ov) / sizeof(ov[0]); k++)
             if (ov[k].v != ov[k].def) { JSang(s, ind + 1); s += ov[k].k; s += ": "; s += ov[k].v ? "true" : "false"; s += "\n"; }
         // MIRAR POR LA CAMARA, el MODO de sombreado y el FAR: el lector (ApplyViewport3DProps) ya los entendia pero
@@ -1338,6 +1342,8 @@ static void EscribirRender(std::string& s, CtxGuardar* cx) {
     if (r.sonido != d.sonido) E::B(c, "sonido", r.sonido);
     if (r.audioFormato != d.audioFormato) E::I(c, "audio", r.audioFormato);
     if (r.audioKbps != d.audioKbps) E::F(c, "audioKbps", r.audioKbps);
+    if (r.videoCodec != d.videoCodec) E::I(c, "videoCodec", r.videoCodec);
+    if (r.videoKbps != d.videoKbps) E::F(c, "videoKbps", r.videoKbps);
     // EL FONDO (antes no se guardaba: volvia a negro al abrir): el color, color o textura 360, la rotacion y las texturas
     // que se usaron de fondo (la pista animable de QUE fondo las nombra por su lugar en esta lista)
     if (g_renderBg[0] != 0.0f || g_renderBg[1] != 0.0f || g_renderBg[2] != 0.0f) {

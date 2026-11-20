@@ -17,3 +17,5 @@ gnumakefile Icons_scalable_dc.mk
 Whisk3D.mmp
 // variante OpenGL ES 2.0 (N8): mismas fuentes, otro backend de graficos (ver el encabezado de Whisk3D.mmp)
 Whisk3D_gles2.mmp
+w3dvolumen.mmp   // las teclas de volumen del costado (RemCon: una DLL aparte)
+w3dvideo.mmp   // el codificador de video del telefono (una DLL aparte: ver inc/w3dvideodll.h)

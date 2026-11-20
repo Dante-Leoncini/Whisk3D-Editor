@@ -9,6 +9,7 @@
 #include "ViewPorts/Properties.h"
 #include "objects/SondaLuz.h"
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
+#include "render/RayTracer.h"   // RTSonda*: hornear de a pedazos (la barra)
 #include <stdio.h>
 
 extern void Notificar(const std::string& texto, bool error);
@@ -39,13 +40,31 @@ static void AccionRayos() {
     int n = (int)(gRayos + 0.5f); if (n < 16) n = 16; if (n > 8192) n = 8192;
     s->rayos = n;
 }
+// HORNEAR DE A PEDAZOS: la barra del progreso y Cancelar, como el horneado de la luz (PropsHorneado.cpp). El trabajo
+// avanza en PropsSondaLuzActualizar, una vez por cuadro
+static SondaLuz* gSlHorneando = NULL;
+static float gSlProgreso = 0.0f;
+static void AccionCancelar() {
+    if (RTSondaTipo() != 1) return;
+    RTSondaCancelar(); gSlHorneando = NULL;
+    Notificar(T("Bake canceled"), true); PropsLayoutSucio(); g_redraw = true;
+}
 static void AccionHornear() {
+    if (RTSondaTipo() == 1) { AccionCancelar(); return; }
     SondaLuz* s = SlActiva();
     if (!s) return;
+    if (RTSondaActiva()) { Notificar(T("Another probe is baking"), true); return; }
     std::string motivo;
-    if (!SondaLuzHornear(s, &motivo)) { Notificar(std::string(T("Not baked")) + ": " + T(motivo.c_str()), true); return; }
-    char b[96]; snprintf(b, sizeof(b), T("Light probe baked: %d points"), s->Cantidad());
-    Notificar(b, false);
+    if (!SondaLuzHornearEmpezar(s, &motivo)) { Notificar(std::string(T("Not baked")) + ": " + T(motivo.c_str()), true); return; }
+    gSlHorneando = s; gSlProgreso = 0.0f;
+    PropsLayoutSucio();
+    g_redraw = true;
+}
+static void Terminar() {
+    SondaLuz* s = gSlHorneando; gSlHorneando = NULL;
+    if (!s || !SondaLuzViva(s) || !SondaLuzHornearTerminar(s)) { RTSondaCancelar(); Notificar(T("Not baked"), true); }
+    else { char b[96]; snprintf(b, sizeof(b), T("Light probe baked: %d points"), s->Cantidad()); Notificar(b, false); }
+    PropsLayoutSucio();
     g_redraw = true;
 }
 
@@ -77,6 +96,14 @@ void PropsSondaLuzConstruir(Properties* p) {
     p->propSlHornear = new PropButton(T("Bake"), IconType::esfera);
     p->propSlHornear->action = AccionHornear;
     p->propSonda->properties.push_back(p->propSlHornear);
+    p->propSlBarra = new PropButton("0%");   // (la barra del progreso, solo mientras hornea)
+    p->propSlBarra->button->barra = 0.0f;
+    p->propSlBarra->oculto = true;
+    p->propSonda->properties.push_back(p->propSlBarra);
+    p->propSlCancelar = new PropButton(T("Cancel"), IconType::cerrar);
+    p->propSlCancelar->action = AccionCancelar;
+    p->propSlCancelar->oculto = true;
+    p->propSonda->properties.push_back(p->propSlCancelar);
     p->propSlEstado = new PropLabel(T("Not baked"), true);
     p->propSonda->properties.push_back(p->propSlEstado);
     p->GroupProperties.push_back(p->propSonda);
@@ -84,6 +111,17 @@ void PropsSondaLuzConstruir(Properties* p) {
 
 void PropsSondaLuzActualizar(Properties* p, bool visible) {
     if (!p || !p->propSonda) return;
+    // EL TRABAJO avanza una vez por cuadro (aunque haya varios paneles): ~25 ms por cuadro, el editor sigue andando
+    if (RTSondaTipo() == 1 && gSlHorneando) {
+        static unsigned int ultimo = 0;
+        extern unsigned int w3dGetTicks();
+        if (w3dGetTicks() - ultimo >= 10) {
+            ultimo = w3dGetTicks();
+            gSlProgreso = RTSondaPaso(25);
+            if (!RTSondaActiva()) Terminar();
+            g_redraw = true;
+        }
+    }
     SondaLuz* s = visible ? SlActiva() : NULL;
     p->propSonda->visible = (s != NULL);
     for (int k = 0; k < 3; k++) {
@@ -97,7 +135,21 @@ void PropsSondaLuzActualizar(Properties* p, bool visible) {
         p->propSlRayos->value = s ? &gRayos : NULL;
         if (s && g_propFloatEditando != p->propSlRayos) gRayos = (float)s->rayos;
     }
-    if (p->propSlHornear) p->propSlHornear->oculto = (s == NULL);
+    // MIENTRAS HORNEA (esta sonda): sin el boton, la barra y Cancelar
+    const bool trabajando = s && s == gSlHorneando && RTSondaTipo() == 1;
+    {
+        bool cambio = false;
+        const bool ocHornear = (s == NULL) || trabajando;
+        if (p->propSlHornear && p->propSlHornear->oculto != ocHornear) { p->propSlHornear->oculto = ocHornear; cambio = true; }
+        if (p->propSlBarra && p->propSlBarra->oculto != !trabajando) { p->propSlBarra->oculto = !trabajando; cambio = true; }
+        if (p->propSlCancelar && p->propSlCancelar->oculto != !trabajando) { p->propSlCancelar->oculto = !trabajando; cambio = true; }
+        if (cambio) PropsLayoutSucio();
+        if (trabajando && p->propSlBarra) {
+            char b[32]; snprintf(b, sizeof(b), "%d%%", (int)(gSlProgreso * 100.0f));
+            p->propSlBarra->button->text = b;
+            p->propSlBarra->button->barra = gSlProgreso;
+        }
+    }
     if (p->propSlEstado) {
         p->propSlEstado->oculto = (s == NULL);
         std::string t;

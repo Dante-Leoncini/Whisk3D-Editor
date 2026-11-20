@@ -41,6 +41,7 @@
 #include "WhiskUI/theme/colores.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
 #include "ViewPorts/NumInput.h"
+#include <cstdio>          // sprintf (NumInputFijar)
 
 // ====================================================================
 //  ENTRADA NUMERICA / FORMULAS durante un transform (COMPARTIDA 4 OS)
@@ -96,6 +97,9 @@ static bool EvalExpr(const std::string& str, float& out){
 }
 // mismo parser, expuesto: lo usa la entrada numerica del TIMELINE (mover/escalar keyframes con matematica)
 bool W3dEvalExpr(const std::string& str, float& out){ return EvalExpr(str, out); }
+// el Enter de un PropFloat evalua la cuenta con este mismo parser (WhiskUI no conoce al editor: va por puntero)
+extern bool (*g_propFloatEval)(const std::string&, float&);
+static struct EnganchePropFloatEval { EnganchePropFloatEval() { g_propFloatEval = W3dEvalExpr; } } sEnganchePropFloatEval;
 
 // CAJA DE TEXTO EDITABLE: el campo enfocado + el ruteo de caracteres (compartido).
 // (g_textFieldActivo vive en WhiskUI: text/bitmapText.cpp)
@@ -165,7 +169,10 @@ bool TextFieldInputChar(int c){
     TextFieldSeguirFoco();                 // antes de la PRIMERA tecla: el texto de antes
     if (c == 8)       g_textFieldActivo->Backspace();
     else if (c == 127)g_textFieldActivo->DelForward();
-    else if (c >= 32 && c < 127) g_textFieldActivo->InsertChar(c); // ASCII imprimible
+    else if (c >= 32 && c < 127) {   // ASCII imprimible
+        if (g_textFieldActivo->numerico && !TextField::CharNumerico(c)) return true;   // un numero: sin letras (se traga)
+        g_textFieldActivo->InsertChar(c);
+    }
     else return false;
     g_redraw = true;
     return true;
@@ -232,6 +239,21 @@ bool NumInputChar(int c){
 
 // El teclado tactil (NumPad en modo transform) llama a estas para editar el transform
 // que se muestra ARRIBA (sin popup/textinput propio), igual que un teclado fisico en PC.
+// el valor de una, como si se hubiera tipeado (con un decimal: es lo que se ve en la barra). Lo usa el telefono al
+// ROTAR INCLINANDOLO: el angulo girado desde que se apreto el lapiz es el angulo del objeto
+void NumInputFijar(float v){
+    char buf[32];
+    const bool neg = v < 0.0f;
+    float a = neg ? -v : v;
+    const int ent = (int)a, dec = (int)((a - (float)ent) * 10.0f + 0.5f);
+    if (dec >= 10) sprintf(buf, "%d", ent + 1);
+    else if (dec > 0) sprintf(buf, "%d.%d", ent, dec);
+    else sprintf(buf, "%d", ent);
+    gNumBuf = buf; gNumCaret = (int)gNumBuf.size(); gNumNegar = neg; gNumActivo = true;
+    NumInputAplicar();
+    g_redraw = true;
+}
+
 void NumInputBegin(){ // marca la entrada activa asi la barra muestra "[|]" apenas se abre el teclado
     if (!gNumActivo){ gNumBuf.clear(); gNumCaret=0; gNumNegar=false; gNumActivo=true; }
     g_redraw = true;

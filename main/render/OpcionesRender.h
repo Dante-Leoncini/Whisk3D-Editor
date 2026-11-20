@@ -145,10 +145,20 @@ struct W3dRenderOpc {
     bool sonido;
     int audioFormato;
     float audioKbps;
+    // EL VIDEO (MKV / MP4): el codec (0 H.264, 1 MPEG-4 parte 2; si la maquina no tiene el elegido, el otro) y su bitrate
+    int videoCodec;
+    float videoKbps;
     W3dRenderOpc();
 };
 extern W3dRenderOpc g_render;
 // sube cuando las opciones cambian de golpe (se abrio un proyecto): los paneles rearman sus filas
 extern unsigned g_renderGen;
 
+// DIBUJAR FUERA DE LA PANTALLA: lo que se dibuja para LEERLO y nunca se muestra (el pase de colores de las sombras en
+// tiempo real, las franjas del render a archivo). NULL = en la ventana (la PC, Android: nada se ve hasta el swap). En el
+// N95 lo dibujado en la ventana SE VEIA antes del swap -los colores planos de las sombras, las franjas del render en la
+// barra de progreso-: ahi va a una superficie aparte (pbuffer). Se puede anidar (una franja con sombras adentro).
+// Empezar devuelve false si no hay superficie aparte (entonces se dibuja en la ventana, como siempre)
+extern bool (*W3dFueraDePantallaEmpezar)(int w, int h);
+extern void (*W3dFueraDePantallaTerminar)();
 #endif // OPCIONESRENDER_H

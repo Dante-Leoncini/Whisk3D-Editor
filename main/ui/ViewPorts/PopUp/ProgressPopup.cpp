@@ -123,6 +123,14 @@ void ProgressPopup::RenderBar() {
 // dibuja el popup COMPLETO sobre un fondo limpio (clear) + swap. Solo al INICIAR.
 static void ProgresoDibujarTodo() {
     if (!progressPopup) return;
+    // (entre franja y franja de un render: la escena dejo luces, niebla, profundidad, texturas... -en el N95 por GL
+    // crudo, que el cache de estado no ve-. El popup salia BLANCO o parpadeaba: el estado de base, de verdad)
+    w3dEngine::Invalidate();
+    w3dEngine::EstadoBase();
+    w3dEngine::Disable(w3dEngine::Lighting); w3dEngine::Disable(w3dEngine::Fog);
+    w3dEngine::Disable(w3dEngine::DepthTest); w3dEngine::Disable(w3dEngine::CullFace);
+    w3dEngine::DisableArray(w3dEngine::NormalArray); w3dEngine::DisableArray(w3dEngine::ColorArray);
+    w3dEngine::DepthMask(true);
     w3dEngine::Disable(w3dEngine::ScissorTest);
     w3dEngine::Viewport(0, 0, MenuPantallaW, MenuPantallaH);
     // limpiar a NEGRO: asi el popup resalta y NO se ve nada viejo (file browser/escena)

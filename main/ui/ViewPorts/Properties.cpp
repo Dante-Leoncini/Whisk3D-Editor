@@ -1304,6 +1304,7 @@ static void MapaNumEditar(int k) {
     if (!v || !b || !MaterialEditableUI(mat)) return;
     g_mapaNumBoton = b->button; g_mapaNumK = k; g_mapaNumMat = mat;
     g_mapaNum.SetText(NumMapaTexto(*v));
+    g_mapaNum.numerico = true;                 // (solo numeros y la matematica: el keypad escribe digitos)
     g_mapaNum.SelectAll();                     // (la 1ra tecla reemplaza)
     b->button->editField = &g_mapaNum;
     TextFieldEnfocar(&g_mapaNum);
@@ -1321,7 +1322,8 @@ static void MapaNumSeguir() {
     for (size_t i = 0; i < Materials.size() && !vivo; i++) vivo = (Materials[i] == mat);
     float* v = vivo ? ValorDeMapa(mat, g_mapaNumK) : NULL;
     float n = 0.0f;
-    if (v && NumMapaLeer(g_mapaNum.text, n)) {
+    extern bool W3dEvalExpr(const std::string&, float&);
+    if (v && (NumMapaLeer(g_mapaNum.text, n) || W3dEvalExpr(g_mapaNum.text, n))) {   // (un numero, o una cuenta: "1/3")
         if (n < 0.0f) n = 0.0f;
         if (n > 1.0f) n = 1.0f;
         if (n != *v) { UndoMaterialModIniciar(mat); *v = n; if (g_mapaNumK == W3D_MAPA_ALFA) TransparenteDesdeAlfa(mat); UndoMaterialModCommit(); RTInvalidar(); }
@@ -2016,6 +2018,9 @@ static void AccionIdiomaElegido(int id){
     W3dIdiomaSet((W3dIdioma)id);
     extern bool g_idiomaForzado;
     g_idiomaForzado = true;   // lo eligio el usuario: el idioma del SO ya no manda
+    // SE GUARDA YA (como la escala y el backend): el aviso dice "reinicia" y antes, si no se apretaba "Guardar
+    // cambios", al reiniciar volvia el del sistema (el config seguia en "auto")
+    if (!W3dConfigGuardar()) { Notificar(T("Could not write config.ini"), true); g_redraw = true; return; }
     Notificar(T("Restart Whisk3D for this change to take effect"), false);
     g_redraw = true;
 }
@@ -4618,6 +4623,8 @@ void SincronizarCamposRender(Properties* P){
 #define W3D_VIDEO_FFMPEG 1
 #elif defined(__ANDROID__)
 #define W3D_VIDEO_ANDROID 1
+#elif defined(W3D_SYMBIAN)
+#define W3D_VIDEO_SYMBIAN 1   // el codificador del telefono (DevVideoRecord: H.264 o MPEG-4) + el contenedor W3dMp4
 #endif
 // ===== EL FORMATO DEL RENDER A ARCHIVO (tarjeta Render) =====
 // PNG y JPG: una imagen por pase y por cuadro (base_pase_0001.png). MKV y MP4: Render Animation hace UN video por pase
@@ -4628,7 +4635,8 @@ static const int kRenderFormatosN = 4;
 static bool g_renderSecuenciaVideo = false;   // Render Animation esta escribiendo videos (no imagenes sueltas)
 static int RenderFormato() {
 #ifdef W3D_SYMBIAN
-    return 0;   // (el N95: PNG)
+    // (el telefono: PNG, JPG y MP4 con su codificador; MKV no)
+    return g_render.formato == 1 ? 1 : (g_render.formato >= 2 ? 3 : 0);
 #else
     const int f = g_render.formato;
 #ifdef W3D_VIDEO_ANDROID
@@ -4641,6 +4649,15 @@ static int RenderCalidad() {
     int q = (int)(g_render.calidad + 0.5f);
     return q < 1 ? 1 : (q > 100 ? 100 : q);
 }
+// EL VIDEO: el codec que esta maquina sabe hacer (0 H.264, 1 MPEG-4) y el bitrate de la tarjeta
+static bool VideoCodecOfrecido(int c);
+static int VideoCodec() {
+    const int c = g_render.videoCodec == 1 ? 1 : 0;
+    if (VideoCodecOfrecido(c)) return c;
+    return VideoCodecOfrecido(1 - c) ? 1 - c : c;
+}
+static int VideoKbpsElegido() { int k = (int)(g_render.videoKbps + 0.5f); return k < 64 ? 64 : (k > 100000 ? 100000 : k); }
+static const char* const kVideoCodecs[] = { "H.264", "MPEG-4" };
 // UN VIDEO es solo la composicion final (con el postprocesado si esta tildado): sin pases. Los pases son de las
 // secuencias de imagenes (PNG / JPG)
 static bool RenderEsVideo() { return RenderFormato() >= 2; }
@@ -4732,13 +4749,13 @@ static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h
         // el primer cuadro de este pase: arranca su ffmpeg
         extern int AnimFPS;
         const int fps = AnimFPS > 0 ? AnimFPS : 24;   // (los de la animacion activa: los de la tarjeta Render)
-        const int q = RenderCalidad();
         std::string ruta = RenderFileNamePNG(tag), seguro;
         for (size_t i = 0; i < ruta.size(); i++) { if (ruta[i] == '"') seguro += '\\'; seguro += ruta[i]; }
-        // calidad 100 = sin perdida; si no, el CRF de 35 (1) a 15 (99). Sin H.264 en ese ffmpeg: MPEG-4 parte 2
-        char cod[96];
-        if (FfmpegEstado() == 2) snprintf(cod, sizeof(cod), "-c:v libx264 -preset medium -crf %d", q >= 100 ? 0 : 35 - q / 5);
-        else                     snprintf(cod, sizeof(cod), "-c:v mpeg4 -q:v %d", q >= 100 ? 1 : 31 - (q * 30) / 100);
+        // el CODEC y el BITRATE de la tarjeta (H.264 si ese ffmpeg trae libx264; si no, MPEG-4 parte 2)
+        char cod[128];
+        const int kb = VideoKbpsElegido();
+        if (VideoCodec() == 0) snprintf(cod, sizeof(cod), "-c:v libx264 -preset medium -b:v %dk -maxrate %dk -bufsize %dk", kb, kb * 2, kb * 2);
+        else                   snprintf(cod, sizeof(cod), "-c:v mpeg4 -b:v %dk -maxrate %dk -bufsize %dk", kb, kb * 2, kb * 2);
         // CON SONIDO: el audio de la escena (ya renderizado a un WAV) entra como segunda fuente
         const bool mp4 = RenderFormato() == 3;
         std::string audio;
@@ -4808,12 +4825,8 @@ struct W3dJni {   // el JNIEnv del hilo de SDL y la actividad, con sus referenci
 static bool g_videoAndroidAbierto = false, g_videoAndroidOk = true;
 static jbyteArray g_videoAndroidCuadro = NULL;   // (referencia global: el mismo arreglo para todos los cuadros)
 static int g_videoAndroidBytes = 0;
-// el bitrate del video segun la Calidad (bits por pixel de 0.02 a 0.30)
-static int VideoKbps(int w, int h, int fps) {
-    const double bpp = 0.02 + 0.28 * RenderCalidad() / 100.0;
-    long k = (long)((double)w * h * fps * bpp / 1000.0);
-    return (int)(k < 500 ? 500 : (k > 100000 ? 100000 : k));
-}
+// el bitrate del video: el de la tarjeta
+static int VideoKbps(int, int, int) { return VideoKbpsElegido(); }
 static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h) {
     (void)tag;   // (un video es la composicion final)
     W3dJni j;
@@ -4867,7 +4880,40 @@ static bool AndroidAudioAac(const std::string& wav, const std::string& salida) {
 }
 #endif // W3D_VIDEO_ANDROID
 
-#if defined(W3D_VIDEO_FFMPEG) || defined(W3D_VIDEO_ANDROID)
+#ifdef W3D_VIDEO_SYMBIAN
+// SYMBIAN: el codificador del telefono (platform/symbian/src/w3dvideoenc.cpp) y el contenedor (io/W3dMp4.h). El
+// SONIDO: el WAV del render a AAC con el conversor de audio del telefono (w3daac.dll), su pista al MP4
+#include <e32def.h>
+TBool W3dVideoSymbianHay();
+TInt W3dVideoSymbianCodecs();   // 1 = H.264, 2 = MPEG-4 (los que tiene el telefono)
+TBool W3dVideoSymbianCuadro(const char* ruta, const unsigned char* rgba, TInt w, TInt h, TInt fps, TInt kbps, TInt codec);
+TBool W3dVideoSymbianAudio(const char* wav, TInt frecuencia, TInt kbps);
+TBool W3dAudioSymbianAac(const char* wav, const char* salida, TInt frecuencia, TInt kbps);
+TBool W3dVideoSymbianCerrar();
+namespace w3dEngine { int W3dAudioRate(); }
+static int AudioKbps();
+static void RenderRango(int& f0, int& f1, int& fps);
+static bool g_videoSymbianAbierto = false;
+// el bitrate del video: el de la tarjeta
+static int VideoKbps(int, int, int) { return VideoKbpsElegido(); }
+static bool VideoCuadro(const char* tag, const unsigned char* rgba, int w, int h) {
+    (void)tag;
+    int f0, f1, fps; RenderRango(f0, f1, fps);
+    g_videoSymbianAbierto = true;
+    return W3dVideoSymbianCuadro(RenderFileNamePNG("").c_str(), rgba, w, h, fps, VideoKbps(w, h, fps), VideoCodec()) ? true : false;
+}
+static void VideosCerrar(int& fallos) {
+    if (!g_videoSymbianAbierto) return;
+    g_videoSymbianAbierto = false;
+    // el sonido (si "Con sonido" dejo su WAV): a AAC y a la pista del MP4. Si el telefono no puede, el video sale igual
+    if (!g_renderAudioTmp.empty() &&
+        !W3dVideoSymbianAudio(g_renderAudioTmp.c_str(), w3dEngine::W3dAudioRate(), AudioKbps()))
+        Notificar(T("The phone could not encode the sound to AAC: the video has no sound"), true);
+    if (!W3dVideoSymbianCerrar()) fallos++;
+}
+#endif
+
+#if defined(W3D_VIDEO_FFMPEG) || defined(W3D_VIDEO_ANDROID) || defined(W3D_VIDEO_SYMBIAN)
 #define W3D_VIDEO 1
 #endif
 // lo que esta maquina sabe hacer: los videos (MKV con ffmpeg; MP4 con ffmpeg o con el telefono) y los formatos de
@@ -4877,6 +4923,8 @@ static bool VideoDisponible() {
     return FfmpegEstado() > 0;
 #elif defined(W3D_VIDEO_ANDROID)
     return true;
+#elif defined(W3D_VIDEO_SYMBIAN)
+    return W3dVideoSymbianHay() ? true : false;
 #else
     return false;
 #endif
@@ -4885,17 +4933,28 @@ static bool FormatoOfrecido(int f) {
     if (f <= 1) return true;
 #if defined(W3D_VIDEO_FFMPEG)
     return true;
-#elif defined(W3D_VIDEO_ANDROID)
+#elif defined(W3D_VIDEO_ANDROID) || defined(W3D_VIDEO_SYMBIAN)
     return f == 3;
 #else
     return false;
+#endif
+}
+static bool VideoCodecOfrecido(int c) {
+#if defined(W3D_VIDEO_FFMPEG)
+    return c == 1 || FfmpegEstado() == 2;   // (MPEG-4 lo trae cualquier ffmpeg; H.264, con libx264)
+#elif defined(W3D_VIDEO_ANDROID)
+    return c == 0;                          // (MediaCodec: H.264)
+#elif defined(W3D_VIDEO_SYMBIAN)
+    return (W3dVideoSymbianCodecs() & (c == 0 ? 1 : 2)) != 0;
+#else
+    (void)c; return false;
 #endif
 }
 static bool AudioOfrecido(int f) {
     if (f == 0) return true;
 #if defined(W3D_VIDEO_FFMPEG)
     return true;
-#elif defined(W3D_VIDEO_ANDROID)
+#elif defined(W3D_VIDEO_ANDROID) || defined(W3D_VIDEO_SYMBIAN)
     return f == 3;
 #else
     return false;
@@ -4908,7 +4967,9 @@ static const char* const kAudioFormatos[] = { "WAV", "FLAC", "MP3", "AAC", "Opus
 static const char* const kAudioExt[] = { ".wav", ".flac", ".mp3", ".m4a", ".opus" };
 static const int kAudioFormatosN = 5;
 // (un formato que esta maquina no tiene -el AAC de fabrica en la web o en el N95- va en WAV)
-static int AudioFormato() { const int f = g_render.audioFormato; return (f >= 0 && f < kAudioFormatosN && AudioOfrecido(f)) ? f : 0; }
+static int AudioFormato() {
+    const int f = g_render.audioFormato; return (f >= 0 && f < kAudioFormatosN && AudioOfrecido(f)) ? f : 0;
+}
 static bool AudioConBitrate(int f) { return f >= 2; }   // (WAV y FLAC no pierden: no tienen bitrate)
 static int AudioKbps() { int k = (int)(g_render.audioKbps + 0.5f); return k < 32 ? 32 : (k > 512 ? 512 : k); }
 #ifdef W3D_VIDEO_FFMPEG
@@ -5030,6 +5091,8 @@ static void AccionRenderAudio() {
         ok = RenderAudioWav(tmp, f0, f1, fps) && FfmpegCorrer("-i " + Comillas(tmp) + " " + AudioArgsFfmpeg(fmt, false) + " " + Comillas(ruta));
 #elif defined(W3D_VIDEO_ANDROID)
         ok = RenderAudioWav(tmp, f0, f1, fps) && AndroidAudioAac(tmp, ruta);
+#elif defined(W3D_VIDEO_SYMBIAN)
+        ok = RenderAudioWav(tmp, f0, f1, fps) && W3dAudioSymbianAac(tmp.c_str(), ruta.c_str(), w3dEngine::W3dAudioRate(), AudioKbps());
 #else
         ok = false;
 #endif
@@ -5066,6 +5129,8 @@ static bool GuardarImagenRender(const char* tag, const unsigned char* rgba, int 
     return ok;
 #else
     (void)conAlfa;
+    if (g_renderSecuenciaVideo && RenderFormato() >= 2) return VideoCuadro(tag, rgba, w, h);
+    if (RenderFormato() == 1) return w3dEngine::SaveJPG(RenderFileNamePNG(tag).c_str(), rgba, w, h, RenderCalidad(), false);
     return w3dEngine::SavePNG(RenderFileNamePNG(tag).c_str(), rgba, w, h, false);
 #endif
 }
@@ -5377,9 +5442,8 @@ void PostFilasPanel(Properties* P) {
         if (P->propPostCPU->oculto != !ver) { P->propPostCPU->oculto = !ver; PropertiesLayoutDirty = true; }
     }
     if (P->propListPost) { P->propListPost->selectIndex = g_post.activo; P->propListPost->AjustarVentana(); }
-    if (P->propRowPost && P->propRowPost->botones.size() >= 2) {
+    if (P->propRowPost && !P->propRowPost->botones.empty()) {
         VisibleSiCambia(P->propRowPost->botones[0], g_post.on);
-        VisibleSiCambia(P->propRowPost->botones[1], g_post.on && n >= 1);
     }
     if (P->propRowPostMove && P->propRowPostMove->botones.size() >= 2) {
         VisibleSiCambia(P->propRowPostMove->botones[0], g_post.on && n >= 2);
@@ -5512,7 +5576,9 @@ void RenderFilasFormato(Properties* P){
     if (g_render.formato < 0 || g_render.formato >= kRenderFormatosN) g_render.formato = 0;
     const bool video = g_render.formato >= 2;
     P->propRenderFormato->button->text = kRenderFormatos[g_render.formato];
-    P->propRenderCalidad->value = (g_render.formato != 0) ? &g_render.calidad : NULL;
+    P->propRenderCalidad->value = (RenderFormato() == 1) ? &g_render.calidad : NULL;   // (JPG; el video va por su bitrate)
+    if (P->propRenderVideoCodec) { P->propRenderVideoCodec->oculto = !video; P->propRenderVideoCodec->button->text = kVideoCodecs[VideoCodec()]; }
+    if (P->propRenderVideoKbps) P->propRenderVideoKbps->value = video ? &g_render.videoKbps : NULL;
     if (P->propRenderZbuffer)  P->propRenderZbuffer->value  = video ? NULL : &g_render.zbuffer;
     if (P->propRenderNormal)   P->propRenderNormal->value   = video ? NULL : &g_render.normal;
     if (P->propRenderAlpha)    P->propRenderAlpha->value    = video ? NULL : &g_render.alfa;
@@ -5527,7 +5593,12 @@ void RenderFilasFormato(Properties* P){
     // el AUDIO: "Con sonido" es de los videos; el formato y el bitrate, del sonido del video y de "Renderizar audio"
     if (P->propRenderSonido) P->propRenderSonido->value = video ? &g_render.sonido : NULL;
     if (P->propRenderAudioFmt) P->propRenderAudioFmt->button->text = kAudioFormatos[AudioFormato()];
-    if (P->propRenderAudioKbps) P->propRenderAudioKbps->value = AudioConBitrate(AudioFormato()) ? &g_render.audioKbps : NULL;
+    // (el bitrate: el del formato elegido; en el telefono, tambien el del sonido de su MP4, que va siempre en AAC)
+    bool conKbps = AudioConBitrate(AudioFormato());
+#if defined(W3D_VIDEO_ANDROID) || defined(W3D_VIDEO_SYMBIAN)
+    if (video) conKbps = true;
+#endif
+    if (P->propRenderAudioKbps) P->propRenderAudioKbps->value = conKbps ? &g_render.audioKbps : NULL;
     PropertiesLayoutDirty = true;
     g_redraw = true;
 }
@@ -5554,10 +5625,31 @@ static void AccionMenuAudioFormato(){
     }
     AbrirMenuBajoBoton(MenuAudioFormato, PropsActivo->propRenderAudioFmt->button);
 }
+// el menu del CODEC del video (los que esta maquina tiene)
+static PopupMenu* MenuVideoCodec = NULL;
+static void AccionVideoCodecElegido(int id){
+    if (id < 0 || id > 1 || !VideoCodecOfrecido(id)) return;
+    g_render.videoCodec = id;
+    RenderFilasFormato(PropsActivo);
+}
+static void AccionMenuVideoCodec(){
+    if (!PropsActivo || !PropsActivo->propRenderVideoCodec) return;
+    if (!MenuVideoCodec) { MenuVideoCodec = new PopupMenu(); MenuVideoCodec->action = AccionVideoCodecElegido; }
+    MenuVideoCodec->Limpiar();
+    MenuVideoCodec->titulo = T("Codec");
+    for (int i = 0; i < 2; i++) {
+        if (!VideoCodecOfrecido(i)) continue;
+        MenuItem* it = MenuVideoCodec->Agregar(kVideoCodecs[i], i); if (it) it->verde = (VideoCodec() == i);
+    }
+    AbrirMenuBajoBoton(MenuVideoCodec, PropsActivo->propRenderVideoCodec->button);
+}
 static PopupMenu* MenuRenderFormato = NULL;
 static void AccionRenderFormatoElegido(int id){
     if (!PropsActivo || id < 0 || id >= kRenderFormatosN) return;
     if (!FormatoOfrecido(id)) return;
+#ifdef W3D_VIDEO_SYMBIAN
+    if (id >= 2 && !VideoDisponible()) { Notificar(T("This phone has no video encoder for MP4"), true); return; }
+#endif
     if (id >= 2 && !VideoDisponible()) { Notificar(T("MKV and MP4 need ffmpeg installed"), true); return; }
     g_render.formato = id;
     // el NOMBRE del archivo sigue al formato (render.png -> render.jpg)
@@ -5738,6 +5830,9 @@ static void HacerRenderAnimation(){
     // MKV / MP4: un video por pase, con el ffmpeg de la maquina
     if (RenderFormato() >= 2) {
 #ifdef W3D_VIDEO
+#ifdef W3D_VIDEO_SYMBIAN
+        if (!VideoDisponible()) { Notificar(T("This phone has no video encoder for MP4"), true); return; }
+#endif
         if (!VideoDisponible()) { Notificar(T("MKV and MP4 need ffmpeg installed"), true); return; }
         // CON SONIDO (y la escena tiene sonidos): su audio primero, a un WAV que ffmpeg mete en el video
         g_renderAudioTmp.clear();
@@ -5774,6 +5869,15 @@ static void HacerRenderAnimation(){
 }
 static void AccionRenderAnimation(){
     CalcularRenderBase();   // (Path + File name: la secuencia usa la misma base que Render Image)
+    // UN VIDEO que ya existe: preguntar antes de pisarlo (Si = se reemplaza; Cancelar = nada)
+    if (RenderFormato() >= 2 && !RenderEsJuego()) {
+        const std::string video = g_pendingRenderBase + (RenderFormato() == 2 ? ".mkv" : ".mp4");
+        if (w3dFileSystem::FileExists(video)) {
+            if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+            confirmarPopup->Abrir(std::string(T("The video \"")) + SoloNombre(video) + T("\" already exists. Do you want to replace it?"), HacerRenderAnimation);
+            return;
+        }
+    }
     HacerRenderAnimation();
 }
 // los atajos F12 / Ctrl+F12 (app/W3dAtajos.cpp): lo mismo que los botones, con o sin panel de Propiedades (las opciones
@@ -8358,20 +8462,30 @@ static void AccionMenuVacioForma(){
 static PopupMenu* MenuSonArchivo = NULL;
 static std::vector<std::string> gSonArchivos;
 // el .wav elegido en el explorador: queda afuera (referencia externa, como una textura) y es el del Sonido activo
+// la tarjeta Sonido se arma cuando CAMBIA el objeto activo: elegir otro archivo no la rearmaba y seguia diciendo
+// "Ninguno". Se la olvida para que se rearme ya (como al tildar Posicional)
+static void SonRefrescarTarjeta(){
+    if (PropsActivo) { PropsActivo->target = NULL; PropsActivo->RefreshTargetProperties(); }
+    PropertiesLayoutDirty = true;
+}
 static void SonArchivoDelExplorador(const std::string& rutaElegida){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::sonido) return;
     Sonido* s = static_cast<Sonido*>(ObjActivo);
     s->archivo = W3dCargarExterno(rutaElegida);
     W3dRecursosVistaInvalidar();
     extern void W3dCambiosTocado(); W3dCambiosTocado();
+    SonRefrescarTarjeta();
     g_redraw = true;
 }
+static const int kSonCargarId = 1000000;   // (lejos de los sonidos: 1..N)
 static void AccionSonArchivoElegido(int id){
-    if (id == -2) { AbrirFileBrowser(T("Load sound"), T("Open"), ".wav", SonArchivoDelExplorador); return; }
+    // (el "Cargar..." va con un id POSITIVO: los menus no ejecutan los negativos -con -2 no abria el explorador-)
+    if (id == kSonCargarId) { AbrirFileBrowser(T("Load sound"), T("Open"), ".wav", SonArchivoDelExplorador); return; }
     if (id < 0 || !ObjActivo || ObjActivo->getType() != ObjectType::sonido) return;
     Sonido* s = static_cast<Sonido*>(ObjActivo);
     s->archivo = (id >= 1 && id <= (int)gSonArchivos.size()) ? gSonArchivos[(size_t)id - 1] : std::string();
     W3dRecursosVistaInvalidar();
+    SonRefrescarTarjeta();
     g_redraw = true;
 }
 static void AccionMenuSonArchivo(){
@@ -8390,7 +8504,7 @@ static void AccionMenuSonArchivo(){
         if (m) m->verde = (it[i].id == actual);
     }
     // (separado con una linea) CARGAR uno del disco con el explorador: entra al proyecto como cualquier asset
-    MenuItem* cargar = MenuSonArchivo->Agregar(T("Load sound from the file browser..."), -2, IconType::carpeta);
+    MenuItem* cargar = MenuSonArchivo->Agregar(T("Load sound from the file browser..."), kSonCargarId, IconType::carpeta);
     if (cargar) cargar->lineaArriba = true;
     AbrirMenuBajoBoton(MenuSonArchivo, PropsActivo->propSonArchivo->button);
 }
@@ -9399,7 +9513,8 @@ void Properties::ConstruirGrupos(){
     propBtnRenameMat = new PropButton(T("Rename Material"), -1); // ANTES de la textura, SIN icono
     propBtnRenameMat->action = AccionRenameMaterial; // se vuelve input al apretarlo; oculto si es el default
 #ifdef W3D_SYMBIAN
-    propMaterial->properties.push_back(propBtnNewMaterial);
+    // (el selector viejo ya NO va: mostraba "Material por defecto" y hacia lo mismo que "Cambiar material", que con
+    // el teclado tambien se abre con OK. Queda solo para refrescar su texto)
     propMaterial->properties.push_back(propBtnRenameMat);
 #endif
     // aviso cuando el mesh part usa el material POR DEFECTO (oculto si tiene uno propio). 1 label WRAP: se
@@ -10242,26 +10357,6 @@ void Properties::ConstruirGrupos(){
     propRender->properties.push_back(propRenderPath);
     propRenderOutput = new PropText(T("Name"), g_render.nombre);
     propRender->properties.push_back(propRenderOutput);
-    // el FORMATO: PNG, JPG y (con el ffmpeg de la maquina) los videos MKV y MP4 de Render Animation; la CALIDAD, del
-    // JPG y de los videos (100 = sin perdida)
-    propRenderFormato = new PropButton(T("Format"));
-    propRenderFormato->conLabel = true;
-    propRenderFormato->button->desplegable = true;
-    propRenderFormato->action = AccionMenuRenderFormato;
-    propRenderFormato->enColumna = true;   // (alineado con Nombre y Ancho: misma columna, mismo ancho)
-#ifdef W3D_SYMBIAN
-    propRenderFormato->oculto = true;   // (el N95: PNG)
-#endif
-    propRender->properties.push_back(propRenderFormato);
-    propRenderCalidad = new PropFloat(T("Quality"));
-    propRenderCalidad->SetRango(1.0f, 100.0f); propRenderCalidad->entero = true;
-    propRenderCalidad->stepFino = 1.0f; propRenderCalidad->stepGrueso = 10.0f; propRenderCalidad->dragStep = 1.0f;
-    propRenderCalidad->value = NULL;   // (solo JPG y video: RenderFilasFormato)
-    propRender->properties.push_back(propRenderCalidad);
-    // un VIDEO puede llevar el AUDIO de la escena (los objetos Sonido, tambien los 3D, con la camara de oyente)
-    propRenderSonido = new PropBool(T("With sound")); propRenderSonido->value = NULL;   // (solo video)
-    propRender->properties.push_back(propRenderSonido);
-    propRenderAudioFmt = NULL; propRenderAudioKbps = NULL;   // (mas abajo, junto a "Renderizar audio")
     // resolucion editable. Puede ser MAYOR que la ventana: se rinde por tiles.
     g_renderAspect = g_render.w / g_render.h; // arranca con el aspecto por defecto
     propRenderW = new PropFloat(T("Width"));
@@ -10274,6 +10369,48 @@ void Properties::ConstruirGrupos(){
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
     propRenderH->value = &g_render.h; propRenderH->onChange = ActualizarAspectoRender;
     propRender->properties.push_back(propRenderH);
+    // el FORMATO: PNG, JPG y (con el ffmpeg de la maquina) los videos MKV y MP4 de Render Animation; la CALIDAD, del
+    // JPG y de los videos (100 = sin perdida)
+    propRenderFormato = new PropButton(T("Format"));
+    propRenderFormato->conLabel = true;
+    propRenderFormato->button->desplegable = true;
+    propRenderFormato->action = AccionMenuRenderFormato;
+    propRenderFormato->enColumna = true;   // (alineado con Nombre y Ancho: misma columna, mismo ancho)
+    propRender->properties.push_back(propRenderFormato);
+    propRenderCalidad = new PropFloat(T("Quality"));
+    propRenderCalidad->SetRango(1.0f, 100.0f); propRenderCalidad->entero = true;
+    propRenderCalidad->stepFino = 1.0f; propRenderCalidad->stepGrueso = 10.0f; propRenderCalidad->dragStep = 1.0f;
+    propRenderCalidad->value = NULL;   // (solo JPG: RenderFilasFormato)
+    propRender->properties.push_back(propRenderCalidad);
+    // EL VIDEO: el codec (H.264 / MPEG-4: los que tiene la maquina) y el bitrate (solo con MKV / MP4)
+    propRenderVideoCodec = new PropButton(T("Codec"));
+    propRenderVideoCodec->conLabel = true;
+    propRenderVideoCodec->button->desplegable = true;
+    propRenderVideoCodec->action = AccionMenuVideoCodec;
+    propRenderVideoCodec->enColumna = true;
+    propRenderVideoCodec->oculto = true;
+    propRender->properties.push_back(propRenderVideoCodec);
+    propRenderVideoKbps = new PropFloat(T("Video bitrate"));   // (en kbps)
+    propRenderVideoKbps->SetRango(64.0f, 100000.0f); propRenderVideoKbps->entero = true;
+    propRenderVideoKbps->stepFino = 50.0f; propRenderVideoKbps->stepGrueso = 500.0f; propRenderVideoKbps->dragStep = 10.0f;
+    propRenderVideoKbps->value = NULL;
+    propRender->properties.push_back(propRenderVideoKbps);
+    // un VIDEO puede llevar el AUDIO de la escena (los objetos Sonido, tambien los 3D, con la camara de oyente)
+    propRenderSonido = new PropBool(T("With sound")); propRenderSonido->value = NULL;   // (solo video)
+    propRender->properties.push_back(propRenderSonido);
+    // EL AUDIO DE LA ESCENA: el formato (WAV; FLAC, MP3, AAC y Opus con el ffmpeg de la maquina) y el bitrate (justo
+    // debajo de "Con sonido") valen para el sonido de los videos y para "Renderizar audio" (el rango del render, a un
+    // archivo). En el telefono: WAV o AAC; el sonido de su MP4 va siempre en AAC
+    propRenderAudioFmt = new PropButton(T("Audio"));   // (el formato del audio)
+    propRenderAudioFmt->conLabel = true;
+    propRenderAudioFmt->button->desplegable = true;
+    propRenderAudioFmt->action = AccionMenuAudioFormato;
+    propRenderAudioFmt->enColumna = true;   // (alineado con el Bitrate de abajo)
+    propRender->properties.push_back(propRenderAudioFmt);
+    propRenderAudioKbps = new PropFloat(T("Bitrate"));   // (del audio, en kbps)
+    propRenderAudioKbps->SetRango(32.0f, 512.0f); propRenderAudioKbps->entero = true;
+    propRenderAudioKbps->stepFino = 8.0f; propRenderAudioKbps->stepGrueso = 32.0f; propRenderAudioKbps->dragStep = 1.0f;
+    propRender->properties.push_back(propRenderAudioKbps);
     // (el FPS de reproduccion se movio a la tarjeta Animation, junto a Start/End)
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
     propRenderZbuffer = new PropBool(T("Z-Buffer")); propRenderZbuffer->value = &g_render.zbuffer;
@@ -10443,17 +10580,20 @@ void Properties::ConstruirGrupos(){
     propPostCPU = new PropLabel(T("Done by CPU on this graphics backend (slow)"), true);   // (GLES 1.1: sin shaders)
     propPostCPU->oculto = true;
     propPost->properties.push_back(propPostCPU);
+    // LA LISTA DE EFECTOS, IGUAL que la de las capas de material: subir / bajar / opciones al costado, el tacho en cada
+    // fila, su menu (click derecho, mantener el dedo, el OK mantenido o la derecha en el telefono) y arrastrar para
+    // reordenar. Abajo, "Agregar" (como "Nuevo material"). Antes eran dos filas de botones aparte
     propListPost = new PropListMeshParts(T("Effects"));
     propListPost->modo = 15;
+    propListPost->filasMax = 3; propListPost->minFilas = 3; propListPost->botonesLado = true;
+    propListPost->minItems = 0;
+    propListPost->opBorrar = AccionQuitarPost;
+    propListPost->opSubir = AccionPostSubir; propListPost->opBajar = AccionPostBajar;
     propPost->properties.push_back(propListPost);
     propRowPost = new PropButtonRow();
     { Button* b = propRowPost->Agregar(T("Add"), AccionMenuAddPost); if (b) b->desplegable = true; }
-    propRowPost->Agregar(T("Remove"), AccionQuitarPost);
     propPost->properties.push_back(propRowPost);
-    propRowPostMove = new PropButtonRow();
-    propRowPostMove->Agregar(T("Move Up"), AccionPostSubir);
-    propRowPostMove->Agregar(T("Move Down"), AccionPostBajar);
-    propPost->properties.push_back(propRowPostMove);
+    propRowPostMove = NULL;
     propPostActivo = new PropBool(T("Enabled")); propPostActivo->onChange = AccionPostCambio;
     propPost->properties.push_back(propPostActivo);
     // GRANO
@@ -10582,18 +10722,6 @@ void Properties::ConstruirGrupos(){
     propClipRetarget->action = AccionMenuClipRetarget;
     propClipRetarget->oculto = true;
     propAnimation->properties.push_back(propClipRetarget);
-    // EL AUDIO DE LA ESCENA: el formato (WAV; FLAC, MP3, AAC y Opus con el ffmpeg de la maquina) y el bitrate valen para
-    // el sonido de los videos y para "Renderizar audio" (el rango del render, a un archivo)
-    propRenderAudioFmt = new PropButton(T("Audio"));   // (el formato del audio)
-    propRenderAudioFmt->conLabel = true;
-    propRenderAudioFmt->button->desplegable = true;
-    propRenderAudioFmt->action = AccionMenuAudioFormato;
-    propRenderAudioFmt->enColumna = true;   // (alineado con el Bitrate de abajo)
-    propRender->properties.push_back(propRenderAudioFmt);
-    propRenderAudioKbps = new PropFloat(T("Bitrate"));   // (del audio, en kbps)
-    propRenderAudioKbps->SetRango(32.0f, 512.0f); propRenderAudioKbps->entero = true;
-    propRenderAudioKbps->stepFino = 8.0f; propRenderAudioKbps->stepGrueso = 32.0f; propRenderAudioKbps->dragStep = 1.0f;
-    propRender->properties.push_back(propRenderAudioKbps);
     // LOS TRES BOTONES juntos, abajo de todo: Renderizar Imagen, Renderizar Animacion (la secuencia es del RENDER) y
     // Renderizar audio
     propRender->properties.push_back(pbRenderImg);
@@ -10894,9 +11022,11 @@ void Properties::ConstruirGrupos(){
       pk->value = &cfg.tecladoSistema;
       pk->onChange = AccionTecladoSistema;
 #ifdef W3D_SYMBIAN
-      pk->oculto = true;   // (el N95 no tiene teclado del sistema en pantalla)
+      delete pk;   // (el N95 no tiene teclado del sistema en pantalla: la fila no va; PropBool no tiene 'oculto')
+#else
+      propAjustes->properties.push_back(pk);
 #endif
-      propAjustes->properties.push_back(pk); }
+    }
 
     // RAIZ DEL REPO para Compilar: solo hace falta cuando el editor corre INSTALADO (sin el repo al lado).
     // El que compila juegos pega aca la ruta a la carpeta del repo (la que tiene libs/Whisk3DCore) y con
@@ -13584,7 +13714,7 @@ void Properties::RefreshTargetProperties(){
         Sonido* so = (ObjActivo->getType() == ObjectType::sonido) ? static_cast<Sonido*>(ObjActivo) : NULL;
         if (propSonArchivo->oculto != !so) { propSonArchivo->oculto = !so; PropertiesLayoutDirty = true; }
         if (so) {
-            std::string t = so->archivo.empty() ? std::string(T("None")) : so->archivo.substr(so->archivo.find_last_of('/') + 1);
+            std::string t = so->archivo.empty() ? std::string(T("None")) : so->archivo.substr(so->archivo.find_last_of("/\\") + 1);   // (el telefono: '\')
             const float d = so->DuracionArchivo();
             if (d > 0.0f) { char b[32]; snprintf(b, sizeof b, " (%.2f s)", d); t += b; }
             propSonArchivo->button->text = t;
@@ -13812,11 +13942,11 @@ Properties::Properties() : ViewportBase() {
     propLimpiarZ = NULL; propLzActivo = NULL; propRecorte = NULL; propRcActivo = NULL; propRcX = NULL; propRcY = NULL;
     propMatLuzInd = NULL;
     propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
-    propSonda = NULL; propSlRayos = NULL; propSlHornear = NULL; propSlEstado = NULL;
+    propSonda = NULL; propSlRayos = NULL; propSlHornear = NULL; propSlEstado = NULL; propSlBarra = NULL; propSlCancelar = NULL;
     propSondaRef = NULL; propSrTipo = NULL; propSrImportancia = NULL; propSrIntensidad = NULL; propSrCaja = NULL;
     for (int k = 0; k < 3; k++) { propSrTam[k] = NULL; propSrOrigen[k] = NULL; }
     propSrRes = NULL; propSrCerca = NULL; propSrCada = NULL; propSrImagen = NULL; propSrMuestras = NULL; propSrRebotes = NULL;
-    propSrHornear = NULL; propSrEstado = NULL;
+    propSrHornear = NULL; propSrEstado = NULL; propSrBarra = NULL; propSrCancelar = NULL;
     propHorneado = NULL; propHornTex = NULL; propHornUV = NULL; propHornMuestras = NULL; propHornIndirecta = NULL; propHornRebotes = NULL; propHornDenoiser = NULL; propHornBoton = NULL; propHornBarra = NULL; propHornCancelar = NULL; propHornAvisoTex = NULL; propHornAviso = NULL;
     for (int k = 0; k < 3; k++) { propSlTam[k] = NULL; propSlPuntos[k] = NULL; }
     propRutina = NULL; propRuLista = NULL; propRuUsar = NULL; propRuPasos = NULL; propRuFilaAdd = NULL;
@@ -15360,6 +15490,8 @@ void Properties::button_left(){
         PropertieBase* p = PropFilaSeleccionada(GroupProperties, selectIndex);
         // keyframe enfocado: IZQUIERDA vuelve al valor de la propiedad
         if (p && g_kfFocoProp == (void*)p){ g_kfFocoProp = 0; g_redraw = true; return; }
+        // fila de un MAPA del material (color / numero-textura / UV): izquierda pasa al boton anterior de la fila
+        if (p && p->GetType() == PropertyType::Button && ((PropButton*)p)->KbMover(-1)) { g_redraw = true; return; }
         // si la fila seleccionada es una FILA DE BOTONES, mover entre ellos (NO colapsar la tarjeta)
         if (p && p->GetType() == PropertyType::ButtonRow) { p->button_left(); return; }
         SetOpenGroup(false);
@@ -15372,8 +15504,15 @@ void Properties::button_left(){
 void Properties::button_right(){
     PropsActivo = this; // este panel pasa a ser el activo
     if (focoEnTabs){ CambiarTab(+1); return; }
+    // UNA LISTA (capas, mesh parts, UV, grupos...): derecha abre las OPCIONES de la fila elegida (subir, bajar, renombrar,
+    // borrar, cambiar el material...), adentro o afuera de la lista. Antes la derecha no hacia nada y sin mouse no se
+    // llegaba a los botones del costado ni al tacho
+    if (ListaMenuTeclado()) return;
     if (!editando){
         PropertieBase* p = PropFilaSeleccionada(GroupProperties, selectIndex);
+        // fila de un MAPA del material: DERECHA recorre sus botones chicos (el color, numero / textura, la capa UV).
+        // Antes la derecha no llegaba: sin mouse no se podia elegir el color ni la UV
+        if (p && p->GetType() == PropertyType::Button && g_kfFocoProp != (void*)p && ((PropButton*)p)->KbMover(+1)) { g_redraw = true; return; }
         // fila animable: DERECHA salta al KEYFRAME (borde blanco). OK/Enter lo toggla.
         if (p && p->AnimProp() >= 0 && g_kfFocoProp != (void*)p){ g_kfFocoProp = (void*)p; g_redraw = true; return; }
         if (p && p->GetType() == PropertyType::ButtonRow) { p->button_right(); return; }
@@ -15774,8 +15913,59 @@ void Properties::event_key_down(int tecla, bool repeticion){
 // rect en pantalla del boton de la fila seleccionada (para abrir su desplegable
 // alineado por teclado). Igual recorrido que CentrarSeleccion + igual cuenta de
 // sx que ClickEn (x + PosX + 2*borderGS) y sy = y + BarTop + PosY + offset.
+static void ListaRenombrar(Properties* p, PropListMeshParts* l, int fila, int yTop, GroupPropertie* g);
+PropListMeshParts* Properties::ListaTeclado(int* yTopOut, GroupPropertie** grupo) {
+    if (focoEnTabs || selectIndex < 0 || selectIndex >= (int)GroupProperties.size()) return NULL;
+    GroupPropertie* gsel = GroupProperties[selectIndex];
+    if (!gsel->visible || !gsel->open || gsel->selectIndex < 0 || gsel->selectIndex >= (int)gsel->properties.size()) return NULL;
+    PropertieBase* prop = gsel->properties[gsel->selectIndex];
+    if (prop->GetType() != PropertyType::List) return NULL;
+    PropListMeshParts* l = (PropListMeshParts*)prop;
+    if (l->oculto || l->ListaCount() <= 0) return NULL;
+    // (la misma cuenta que ListaEn: donde empieza la lista en pantalla)
+    int yFila = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
+    for (int i = 0; i < (int)GroupProperties.size() && i <= selectIndex; i++) {
+        GroupPropertie* g = GroupProperties[i];
+        if (!g->visible) continue;
+        if (i == selectIndex) {
+            yFila += borderGS + RenglonHeightGS + gapGS;
+            for (int j = 0; j < gsel->selectIndex; j++) yFila += g->properties[j]->Resize(g->width);
+            break;
+        }
+        yFila += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    if (yTopOut) *yTopOut = yFila;
+    if (grupo) *grupo = gsel;
+    return l;
+}
+bool Properties::ListaMenuTeclado() {
+    int yTop = 0; GroupPropertie* g = NULL;
+    PropListMeshParts* l = ListaTeclado(&yTop, &g);
+    if (!l || !(l->opBorrar || l->opRenombrar || l->opSubir || l->nExtras)) return false;
+    int fila = l->selectIndex;
+    if (fila < 0 || fila >= l->ListaCount()) fila = 0;
+    l->AjustarVentana();
+    // el menu sale a la derecha de la fila elegida
+    const int my = yTop + borderGS + (fila - l->scrollFila) * (RenglonHeightGS + gapGS) + RenglonHeightGS / 2;
+    const int mx = x + PosX + borderGS * 2 + l->width;
+    ListaMenuDeFila(this, l, fila, yTop, g, mx, my);
+    return MenuAbierto != NULL;
+}
+bool Properties::ListaRenombrarTeclado() {
+    int yTop = 0; GroupPropertie* g = NULL;
+    PropListMeshParts* l = ListaTeclado(&yTop, &g);
+    if (!l || !l->opRenombrar) return false;
+    int fila = l->selectIndex;
+    if (fila < 0 || fila >= l->ListaCount()) return false;
+    editando = false; g->editando = false;   // (sale de la lista: el teclado va al nombre)
+    l->editando = false;
+    ListaRenombrar(this, l, fila, yTop, g);
+    return true;
+}
+
 bool Properties::MenuContextoTeclado(){
     if (focoEnTabs || selectIndex < 0 || selectIndex >= (int)GroupProperties.size()) return false;
+    if (ListaMenuTeclado()) return true;   // (una lista: el menu de la fila ELEGIDA, no el de la del medio de la caja)
     GroupPropertie* gsel = GroupProperties[selectIndex];
     if (!gsel->visible || !gsel->open || gsel->selectIndex < 0 || gsel->selectIndex >= (int)gsel->properties.size()) return false;
     // (la misma cuenta que SetRectFilaSeleccionada y PropEnPunto)
@@ -15841,10 +16031,40 @@ void Properties::SetRectFilaSeleccionada(){
 
 void Properties::EnterPropertieSelect(){
     PropsActivo = this; // este panel pasa a ser el activo
+    // DOS OK SEGUIDOS sobre una lista (como el doble click): renombrar la fila elegida. El primero entra / sale de la
+    // lista como siempre; el segundo, si llega enseguida, renombra
+    {
+        static unsigned int sUltimoMs = 0;
+        static PropListMeshParts* sUltimaLista = NULL;
+        extern unsigned int w3dGetTicks();
+        PropListMeshParts* l = ListaTeclado(NULL, NULL);
+        const unsigned int ahora = w3dGetTicks();
+        if (l && l == sUltimaLista && ahora - sUltimoMs < 450 && l->opRenombrar) {
+            sUltimaLista = NULL;
+            if (ListaRenombrarTeclado()) return;
+        }
+        sUltimaLista = l; sUltimoMs = ahora;
+    }
     // keyframe enfocado por teclado: OK/Enter pone/saca el keyframe (no edita el valor)
     { PropertieBase* p = PropFilaSeleccionada(GroupProperties, selectIndex);
       if (p && p->AnimProp() >= 0 && g_kfFocoProp == (void*)p && W3dKeyframeToggle){
           W3dKeyframeToggle(p->AnimProp(), p->AnimComp());
+          return;
+      }
+      // un boton CHICO de la fila con el foco (flechas): su accion, con el desplegable debajo de EL
+      if (p && p->GetType() == PropertyType::Button && ((PropButton*)p)->focoKb != -1) {
+          PropButton* pb = (PropButton*)p;
+          SetRectFilaSeleccionada();
+          const int x0 = pb->button->sx - pb->ColBoton();   // el borde izquierdo del renglon
+          if (pb->focoKb >= 0 && pb->focoKb < pb->nExtras && pb->extras[pb->focoKb]) {
+              pb->extras[pb->focoKb]->sx = x0 + pb->ExtraX(pb->focoKb);
+              pb->extras[pb->focoKb]->sy = pb->button->sy;
+              if (pb->accionExtra[pb->focoKb]) pb->accionExtra[pb->focoKb]();
+          } else if (pb->focoKb == -2 && pb->prefijo) {
+              pb->prefijo->sx = x0 + pb->colPrefijo; pb->prefijo->sy = pb->button->sy;
+              if (pb->accionPrefijo) pb->accionPrefijo();
+          }
+          g_redraw = true;
           return;
       } }
     SetRectFilaSeleccionada(); // desplegable alineado al botón / pos de la fila (nav por teclado)
@@ -15920,6 +16140,12 @@ void Properties::CentrarSeleccion(){
     if (PosY < MaxPosY) PosY = MaxPosY;
 }
 
+// al cambiar de fila con el teclado, el foco de la que se deja vuelve a su boton grande
+static void KbSoltarFocoFilaDe(std::vector<GroupPropertie*>& grupos, int sel) {
+    PropertieBase* p = PropFilaSeleccionada(grupos, sel);
+    if (p && p->GetType() == PropertyType::Button) ((PropButton*)p)->focoKb = -1;
+}
+
 void Properties::button_up(){
     PropsActivo = this; // este panel pasa a ser el activo
     if (focoEnTabs){ // en las pestañas: ARRIBA hace wrap a la ultima propiedad (simetrico a bajar desde la ultima)
@@ -15929,6 +16155,7 @@ void Properties::button_up(){
     }
     if (!editando){
         g_kfFocoProp = 0;                   // al moverse de fila, el foco del keyframe se suelta
+        KbSoltarFocoFilaDe(GroupProperties, selectIndex);
         PrevSelect();                       // en el tope setea focoEnTabs
         if (!focoEnTabs) CentrarSeleccion();
     }
@@ -15946,6 +16173,7 @@ void Properties::button_down(){
     }
     if (!editando){
         g_kfFocoProp = 0;                   // al moverse de fila, el foco del keyframe se suelta
+        KbSoltarFocoFilaDe(GroupProperties, selectIndex);
         NextSelect();
         CentrarSeleccion();
     }

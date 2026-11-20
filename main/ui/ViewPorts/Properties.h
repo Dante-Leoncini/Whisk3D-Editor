@@ -489,6 +489,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propSlPuntos[3];
         PropFloat*  propSlRayos;
         PropButton* propSlHornear;
+        PropButton* propSlBarra;        // el progreso mientras hornea (como el horneado de la luz)
+        PropButton* propSlCancelar;     // Cancelar, abajo de la barra
         PropLabel*  propSlEstado;
         // LA SONDA DE REFLEJO (PropsSondaReflejo.cpp, objects/SondaReflejo.h)
         GroupPropertie* propSondaRef;
@@ -497,6 +499,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propSrCerca; PropFloat* propSrCada; PropButton* propSrImagen;
         PropFloat* propSrMuestras; PropFloat* propSrRebotes;   // (la horneada: el trazado de rayos)
         PropButton* propSrHornear; PropLabel* propSrEstado;
+        PropButton* propSrBarra; PropButton* propSrCancelar;   // el progreso mientras hornea y Cancelar
         // LAS SOMBRAS EN TIEMPO REAL (ViewPorts/PropsSombras.cpp): debajo de la tarjeta Render
         GroupPropertie* propSombras;
         PropBool*   propSomOn;
@@ -858,6 +861,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propRenderFormato; PropFloat* propRenderCalidad;
         PropBool* propRenderFinal; PropBool* propRenderFinalAlfa; PropBool* propRenderPost;
         PropBool* propRenderSonido; PropButton* propRenderAudioFmt; PropFloat* propRenderAudioKbps;   // el audio
+        PropButton* propRenderVideoCodec; PropFloat* propRenderVideoKbps;   // el video: codec y bitrate
         unsigned renderGenVisto;   // la g_renderGen de las filas de la tarjeta Render (otra = se abrio un proyecto: rearmarlas)
         // VECTORES DE MOVIMIENTO (el pase _vectores) y el DESENFOQUE DE MOVIMIENTO del beauty (render/VectoresMovimiento.h)
         PropBool* propRenderVectores; PropBool* propRenderDesenfoque; PropFloat* propRenderObturador;
@@ -1064,6 +1068,11 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         bool MenuContexto(int mx, int my, int menuX = -1, int menuY = -1);
         // el MISMO menu, de la fila elegida con el TECLADO (el OK mantenido del N95): en el medio de esa fila
         bool MenuContextoTeclado();
+        // LAS LISTAS CON EL TECLADO (el N95): la lista de la fila elegida (con su y de arriba en pantalla y su tarjeta),
+        // el menu de SU fila elegida (derecha / el OK mantenido) y renombrarla (dos OK seguidos)
+        PropListMeshParts* ListaTeclado(int* yTop, GroupPropertie** grupo);
+        bool ListaMenuTeclado();
+        bool ListaRenombrarTeclado();
 
         // touch: (mx,my) cae sobre el VALUE BOX de un PropFloat? -> ahi el arrastre horizontal EDITA (slider);
         // en el label / otras filas el arrastre SCROLLEA. Lo usa el ruteo tactil en controles.cpp.

@@ -735,6 +735,18 @@ static void SondasDeTiempoReal() {
 // ---------------------------------------------------------------------------
 //  EL PASE
 // ---------------------------------------------------------------------------
+void W3dEscena3DFondoArchivo() {
+    gCieloEnPase = w3dRenderLuces;
+    gEnPase = true;
+    EntornoPase();                       // el fondo 360 para los reflejos y la luz por pixel
+    if (w3dRenderLuces) DibujarCielo();  // el CIELO: antes que todo, detras de todo (sin esto el render salia negro)
+}
+void W3dEscena3DFondoArchivoFin() {
+    gCieloEnPase = false;
+    gEnPase = false;
+    gfx::Entorno(0, 0, NULL);
+    gEnvSonda = NULL;
+}
 void W3dEscena3DPasada() {
     if (!SceneCollection || !W3dEscena3DActiva()) return;
     SondasDeTiempoReal();   // (antes que nada: las de tiempo real que tocan, con el mismo pase, fuera de pantalla)

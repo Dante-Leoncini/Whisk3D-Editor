@@ -832,9 +832,9 @@ void SimbolosPopup::Render(){
             SimbCelda(celda, borderGS + col * (celW + gapGS), gridY + fila * (celH + gapGS), celW, celH, textoY,
                       kSimbolos[fila][col], focoFila == fila && focoCol == col);
     // barra de abajo: "aceptar" (softkey IZQUIERDO) a la izq, "cancelar" (softkey DERECHO) a la der. '*' tambien cierra.
-    { const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
+    { const float* bla = ListaColores[static_cast<int>(ColorID::blanco)];   // (en blanco, como los textos de los botones)
       int barTY = barraY + (celH - RenglonHeightGS) / 2;
-      w3dEngine::Color4f(acc[0], acc[1], acc[2], 1.0f);
+      w3dEngine::Color4f(bla[0], bla[1], bla[2], 1.0f);
       w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)barTY, 0);
       RenderBitmapText(std::string(T("Accept")), textAlign::left, popUpWindow->width / 2); w3dEngine::PopMatrix();
       w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(popUpWindow->width - borderGS - gapGS), (GLfloat)barTY, 0);

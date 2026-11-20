@@ -1,3 +1,5 @@
+#include "objects/SondaLuz.h"            // SondaLuzNuevoPase: las sondas de luz tambien en el render a archivo
+#include "render/SombrasTiempoReal.h"    // W3dSombrasPase / Fin: las sombras en tiempo real en el render a archivo
 #include "objects/Rutina.h"   // g_w3dSoloJuego / W3dHayConstructor: quien limpia la pantalla
 #include "W3dEscena.h"        // W3dEscena3DActiva (lua dibujar3D(false): el "Clear" del proyecto no corre)
 #include "io/RaicesEditor.h"   // el selector de escena/prefab de la barra (BR_Raiz)
@@ -2874,11 +2876,24 @@ static void MatProyeccion(bool orto, float l, float r, float b, float t, float n
         m[10] = -(f + n) / (f - n); m[11] = -1.0f; m[14] = -2.0f * f * n / (f - n);
     }
 }
+// EL LENTE de la imagen del render: el de la CAMARA activa (su fov, ortografica, distancias minima y maxima: lo mismo
+// que la vista al mirar por ella, CargarProyeccionVista); sin camara, el del visor. Antes el render usaba siempre el
+// del visor (lejos = 1000): lo que la camara dibujaba mas lejos -el cielo de un escenario- salia negro en el archivo
+void Viewport3D::LenteImagen(bool& orto, float& fov, float& n, float& f) const {
+    if (CameraActive) {
+        orto = CameraActive->orthographic; fov = CameraActive->fov;
+        n = CameraActive->nearClip; f = CameraActive->farClip;
+    } else { orto = orthographic; fov = fovDeg; n = nearClip; f = farClip; }
+    if (n <= 0.0f) n = 0.001f;
+    if (f <= n) f = n + 1.0f;
+    if (orto) f += orbitDistance;   // (far corrido: no cortar el objeto al alejar)
+}
 void Viewport3D::MatrizImagen(int outW, int outH, float* VP16){
     float left, right, bottom, top;
-    ExtensionImagen(orthographic, fovDeg, orbitDistance, nearClip, outW > 0 ? outW : 1, outH > 0 ? outH : 1, left, right, bottom, top);
+    bool lOrto; float lFov, lNear, lFar; LenteImagen(lOrto, lFov, lNear, lFar);
+    ExtensionImagen(lOrto, lFov, orbitDistance, lNear, outW > 0 ? outW : 1, outH > 0 ? outH : 1, left, right, bottom, top);
     float P[16], V[16];
-    MatProyeccion(orthographic, left, right, bottom, top, nearClip, orthographic ? orbitDistance + farClip : farClip, P);
+    MatProyeccion(lOrto, left, right, bottom, top, lNear, lFar, P);
     const bool camPrev = ViewFromCameraActive;
     if (CameraActive) ViewFromCameraActive = true;   // (como RenderAPNG: desde la camara activa)
     w3dEngine::MatrixMode(w3dEngine::ModelView);
@@ -3097,6 +3112,12 @@ void Viewport3D::PostProcesar(int glY) {
         tw = pw; th = ph;
     }
     if (!tex) { gfx::Disable(gfx::ScissorTest); return; }
+#ifdef W3D_SYMBIAN
+    // EL MBX DEL N95 dibuja en diferido (por baldosas, terminando el cuadro anterior mientras la CPU sigue): pisar la
+    // textura que todavia esta leyendo dejaba baldosas con la imagen vieja y otras con la nueva -los PARPADEOS de una
+    // parte de la pantalla mientras se mueve-. Se espera a que termine (mas lento, sin parpadeos: lo pidio el dueno)
+    gfx::Finish();
+#endif
     gfx::UpdateRGBA(tex, 0, 0, w, h, &img[0], false);
     gfx::Viewport(rx, ry, w, h);   // (el quad, sobre el marco)
     gfx::MatrixMode(gfx::Projection); gfx::PushMatrix(); gfx::LoadIdentity();
@@ -3169,7 +3190,8 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
 
     // extension del frustum de la imagen COMPLETA (aspect = outW/outH, NO el del viewport)
     float top, bottom, left, right;
-    ExtensionImagen(orthographic, fovDeg, orbitDistance, nearClip, outW, outH, left, right, bottom, top);
+    bool lOrto; float lFov, lNear, lFar; LenteImagen(lOrto, lFov, lNear, lFar);   // (el de la camara activa)
+    ExtensionImagen(lOrto, lFov, orbitDistance, lNear, outW, outH, left, right, bottom, top);
     // el pase de VECTORES cuenta en pixeles de la imagen entera: su matriz (desde la misma camara)
     float VPimagen[16];
     if (pass == RenderType::Vectores) MatrizImagen(outW, outH, VPimagen);
@@ -3221,10 +3243,12 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
             float b = bottom + (top    - bottom) * (float)ty        / (float)outH;
             float t = bottom + (top    - bottom) * (float)(ty + th) / (float)outH;
 
+            // (en el N95, la franja en una superficie APARTE: dibujada en la ventana se veia entre la barra de progreso)
+            const bool fueraTile = W3dFueraDePantallaEmpezar && W3dFueraDePantallaEmpezar(tileW, tileH);
             w3dEngine::MatrixMode(w3dEngine::Projection);
             w3dEngine::LoadIdentity();
-            if (orthographic) w3dEngine::Ortho(l, r, b, t, nearClip, orbitDistance + farClip); // far corrido: no cortar el objeto al alejar
-            else              w3dEngine::Frustum(l, r, b, t, nearClip, farClip);
+            if (lOrto) w3dEngine::Ortho(l, r, b, t, lNear, lFar);
+            else       w3dEngine::Frustum(l, r, b, t, lNear, lFar);
 
             w3dEngine::Viewport(0, 0, tw, th); // el tile en la esquina del framebuffer
 
@@ -3242,7 +3266,7 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
 
             if (pass == RenderType::ZBuffer){
                 w3dEngine::Enable(w3dEngine::Fog); w3dEngine::FogMode(true);
-                w3dEngine::FogStart(nearClip); w3dEngine::FogEnd(40.0f);
+                w3dEngine::FogStart(lNear); w3dEngine::FogEnd(40.0f);
                 GLfloat fz[4] = {0.0f, 0.0f, 0.0f, 1.0f}; w3dEngine::FogColor(fz);
             } else {
                 w3dEngine::Disable(w3dEngine::Fog);
@@ -3260,6 +3284,11 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
     W3dLucesLimpiarPendientes();     // idem las chispas/halos aditivos
             w3dEngine::Invalidate(); // (P1) resync una vez por pase, como en el viewport
             w3dLoteStamp++;          // (P4) sello del pase (lote estatico)
+            // LA IMAGEN FINAL lleva lo mismo que la vista (render/EscenaRender.cpp, W3dEscena3DPasada): las SONDAS DE LUZ
+            // y las SOMBRAS EN TIEMPO REAL. Sin esto el render a archivo (PNG, JPG, el MP4 del telefono) salia sin ellas.
+            // (Los pases de analisis -profundidad, normales, alfa- no: son datos)
+            const bool imagenFinal = (pass == RenderType::Rendered);
+            if (imagenFinal) { SondaLuzNuevoPase(); W3dSombrasPase(); W3dEscena3DFondoArchivo(); }
             W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
             SceneCollection->Render();
             W3dLucesPrepaseFin();
@@ -3274,9 +3303,11 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
     W3dDecalesDibujarPendientes();
     W3dLucesDibujarPendientes();        // chispas/halos aditivos (tambien en el render a PNG)
     W3dParticulasDibujarPendientes();   // translucidas despues de los opacos (tambien en el render a PNG)
+            if (imagenFinal) { W3dSombrasFin(); W3dEscena3DFondoArchivoFin(); }   // (como en la vista: despues de las calcomanias y las particulas)
             }
 
             w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
+            if (fueraTile) W3dFueraDePantallaTerminar();   // (la barra de progreso, en la ventana)
             for (int row = 0; row < th; row++){   // (GL lee de ABAJO hacia arriba: la franja va al derecho)
                 memcpy(franja + (size_t)((th - 1 - row) * outW + tx) * 4,
                        tile + (size_t)(row * tw) * 4,

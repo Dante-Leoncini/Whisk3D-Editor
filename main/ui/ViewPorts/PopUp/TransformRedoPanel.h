@@ -37,7 +37,7 @@ class TransformRedoPanel : public PopUpBase {
         bool Tecla(int tecla) W3D_OVERRIDE;
         void Soltar() W3D_OVERRIDE;
         bool Arrastrando() W3D_OVERRIDE;
-        bool CierraConViewport() W3D_OVERRIDE { return true; }   // click afuera = aceptar (y el click sigue)
+        bool CierraConViewport() W3D_OVERRIDE { return true; } bool Plegable() W3D_OVERRIDE { return grupo != 0; } bool Plegado() W3D_OVERRIDE { return grupo && !grupo->open; } void Desplegar(bool abrir) W3D_OVERRIDE { if (grupo) grupo->open = abrir; }   // click afuera = aceptar (y el click sigue)
         void Wheel(int delta) W3D_OVERRIDE;
         void Cerrar() W3D_OVERRIDE;
 

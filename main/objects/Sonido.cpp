@@ -31,6 +31,8 @@ namespace w3dEngine {
     int   W3dSoundPlayEnv(W3dSound* s, float volume, bool loop, float pitch, float pan, double enSeg,
                           const W3dEnvolvente* env, float envioReverb);
     void  W3dSoundStopFade(int voice, float fadeSeg);
+    int   W3dSoundPlayPitch(W3dSound* s, float volume, bool loop, float pitch);
+    void  W3dSoundStopFadeAt(int voice, float fadeSeg, double enSeg);   // (el audio scrubbing)
     void  W3dSoundSetVolume(int voice, float volume);
     void  W3dSoundSetPitch(int voice, float pitch);
     void  W3dSoundSetPan(int voice, float pan);
@@ -271,6 +273,35 @@ void W3dSonidosCallar() {
     for (std::set<Sonido*>::iterator it = gVivos.begin(); it != gVivos.end(); ++it) { (*it)->Callar(); (*it)->tJuego0 = -1.0; }
 }
 
+// AUDIO SCRUBBING (Timeline > Vista): con la animacion QUIETA, cada vez que cambia el frame (las flechas, arrastrar la
+// linea de tiempo) suena ese pedacito de cada sonido: un frame de largo (y no menos de 60 ms, para que se entienda).
+// Sirve para sincronizar una voz con la boca
+bool g_sonidoScrub = false;
+static void ScrubSonar(const std::vector<Sonido*>& lista, float t) {
+    static std::vector<int> voces;
+    for (size_t i = 0; i < voces.size(); i++) w3dEngine::W3dSoundStopFade(voces[i], 0.01f);
+    voces.clear();
+    const double reloj = w3dEngine::W3dAudioReloj();
+    float dur = 1.0f / (float)(AnimFPS > 0 ? AnimFPS : 30);
+    if (dur < 0.06f) dur = 0.06f;
+    for (size_t i = 0; i < lista.size(); i++) {
+        Sonido* s = lista[i];
+        if (!s->activo || s->archivo.empty()) continue;
+        const float enEsc = s->DuracionEnEscena();
+        float local = t - s->inicio;
+        if (local < 0.0f || enEsc <= 0.0f) continue;
+        if (local >= enEsc) { if (!s->bucle) continue; local = fmodf(local, enEsc); }
+        w3dEngine::W3dSound* snd = W3dSonidoCargar(s->archivo);
+        if (!snd) continue;
+        const float tono = s->tono > 0.05f ? s->tono : 0.05f;
+        const int v = w3dEngine::W3dSoundPlayPitch(snd, s->volumen, false, tono);
+        if (v <= 0) continue;
+        w3dEngine::W3dSoundSetPos(v, s->recorteIni + local * tono);
+        w3dEngine::W3dSoundStopFadeAt(v, 0.01f, (reloj > 0.0 ? reloj : 0.0) + dur);
+        voces.push_back(v);
+    }
+}
+
 void W3dSonidosTickEditor() {
     if (AnimEsJuego) return;   // (el juego tiene su tick: W3dSonidosTickJuego)
     static int ultimoFrame = -1000000;
@@ -308,6 +339,7 @@ void W3dSonidosTickEditor() {
     } else {
         relojOn = false;
         gSaltoEscena = (CurrentFrame - ultimoFrame) > 2 || CurrentFrame < ultimoFrame;
+        if (g_sonidoScrub && !PlayAnimation && CurrentFrame != ultimoFrame && ultimoFrame > -1000000) ScrubSonar(lista, t);
     }
     ultimoFrame = CurrentFrame;
     Oyente oy = OyenteActual(false);
