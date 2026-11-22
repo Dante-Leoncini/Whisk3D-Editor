@@ -45,6 +45,7 @@
 #include "animation/SkeletalAnimation.h" // EvaluatePoseSkeleton (pose al reproducir)
 #include "animation/Animation.h"          // CurrentFrame
 #include "w3dlog.h"                      // w3dLogMemory: la memoria antes / despues de las texturas del Play
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 // la sim del juego (scripts lua) esta cargada? (play O pausa; false tras Stop)
 static bool GameSimActive() { extern bool SimActive(); return SimActive(); }
 // dibujando una MITAD de la pantalla dividida (RenderSplit): la mitad es la imagen entera (sin encuadre ni bandas)

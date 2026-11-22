@@ -26,6 +26,7 @@
 #ifndef W3D_NO_EDITOR
 #include "io/EditedTexture.h"     // los pixeles CPU del fondo 360 (su copia borrosa)
 #endif
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 namespace gfx = w3dEngine;
 

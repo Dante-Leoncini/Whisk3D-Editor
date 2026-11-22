@@ -211,5 +211,7 @@ void W3dParticlesTick(float dt);
 // true si algun emisor tiene particulas vivas o esta emitiendo: mantiene vivo
 // el redibujado del editor (mismo rol que HasAnimationActive para materiales)
 bool W3dParticlesAnimating();
+// true si algun emisor visible tiene particulas VIVAS (el render a archivo precalienta si no hay ninguna)
+bool W3dParticlesAlive();
 
 #endif

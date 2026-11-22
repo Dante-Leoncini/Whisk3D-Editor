@@ -31,6 +31,7 @@
 #include <map>                           // los borradores (lo escrito sin guardar, por archivo)
 #include <string.h>                      // strncmp: las keywords del lexer
 #include <math.h>                        // cosf/sinf: las agarraderas
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 namespace gfx = w3dEngine;
 

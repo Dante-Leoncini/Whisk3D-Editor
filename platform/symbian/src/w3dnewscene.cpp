@@ -224,7 +224,7 @@ void W3dNewTransformMove(TInt aDx, TInt aDy) {
     if (gTMode == 1)      SetTranslationObjects(aDx, aDy, velMov);
     else if (gTMode == 2) {
         if (axisSelect == OrbitalAxis) RotateOrbital(aDx, aDy); // orbital: camUp/camRight
-        else                           BeginRotate(aDx, aDy);
+        else                           SetRotation(aDx, aDy);
     }
     else if (gTMode == 3) SetScale(aDx, aDy, 0.001f);
 }

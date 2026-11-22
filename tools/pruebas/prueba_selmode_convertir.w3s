@@ -1,0 +1,42 @@
+# CAMBIAR EL MODO DE SELECCION (el menu Vertex / Edge / Face): la seleccion PASA al modo nuevo, como en Blender.
+# Un quad del cubo -> sus 4 aristas -> sus 4 vertices -> de vuelta el mismo quad. Y el BEVEL desde el modo cara
+# (el menu Face): bisela los bordes de las caras elegidas.
+window 1280 720
+selname Cubo
+mode edit
+selmode face ui
+select none
+select face 0
+selcount 1
+selmode edge ui
+selcount 4
+selmode vertex ui
+selcount 4
+selmode face ui
+selcount 1
+selmode edge ui
+selmode face ui
+selcount 1
+# desde vertices: una arista sola (sus 2 puntas) no hace ninguna cara
+selmode edge ui
+seledgepos 1 1 1 1 1 -1
+selcount 1
+selmode vertex ui
+selcount 2
+selmode face ui
+selcount 0
+# (como en Blender: pasar por caras sin ninguna completa deja la seleccion vacia)
+selmode vertex ui
+selcount 0
+# todo el cubo: 8 vertices, 12 aristas, 6 caras
+select all
+selmode edge ui
+selcount 12
+selmode face ui
+selcount 6
+# BEVEL de una cara (sus 4 bordes): 4 vertices nuevos por arista biselada -> la malla crece
+select none
+select face 0
+bevel begin
+bevel arrows 20
+bevel state 1 0.001

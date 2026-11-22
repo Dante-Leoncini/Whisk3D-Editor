@@ -19,6 +19,7 @@
 #include <math.h>
 #include <sstream>
 #include <algorithm> // std::replace (parseo "r, g, b, a")
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 namespace gfx = w3dEngine;
 
@@ -494,6 +495,17 @@ void W3dParticlesTick(float dt) {
     }
 }
 
+bool W3dParticlesAlive() {
+    if (!SceneCollection) return false;
+    std::vector<Object*> st; st.push_back(SceneCollection);
+    while (!st.empty()) {
+        Object* o = st.back(); st.pop_back();
+        if (!o->visible) continue;
+        if (o->getType() == ObjectType::particles && !((Particles*)o)->sys.parts.empty()) return true;
+        for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
+    }
+    return false;
+}
 bool W3dParticlesAnimating() {
     if (!SceneCollection) return false;
     std::vector<Object*> st; st.push_back(SceneCollection);

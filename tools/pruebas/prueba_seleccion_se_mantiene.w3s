@@ -1,0 +1,25 @@
+# MARCAR AFILADO / SHADE / NORMALES no cambian la SELECCION (antes quedaba elegida toda la malla, o las aristas
+# y caras de mas que salian de los vertices)
+window 1280 720
+selname Cubo
+mode edit
+selmode edge ui
+select none
+seledgepos 1 1 1 1 1 -1
+seledgepos 1 1 1 -1 1 1 add
+selcount 2
+sharp mark
+selcount 2
+sharp clear
+selcount 2
+# (desde los vertices: las 2 aristas comparten una esquina -> 3 vertices; una 3ra arista no puede aparecer)
+selmode face ui
+select none
+select face 0
+selcount 1
+shadesel smooth
+selcount 1
+shadesel flat
+selcount 1
+sharp mark
+selcount 1

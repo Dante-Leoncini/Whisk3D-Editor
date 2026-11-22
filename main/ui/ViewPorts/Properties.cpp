@@ -5906,8 +5906,17 @@ static Viewport3D* RenderView(){
     if (hidden->width != w || hidden->height != h) { hidden->x = 0; hidden->y = 0; hidden->Resize(w, h); }
     return hidden;
 }
+// LAS PARTICULAS antes de renderizar: si no hay ninguna viva (se abrio el proyecto y se renderiza sin haber mirado la
+// escena andando), unos segundos de simulacion para que lo que emite este en marcha (el fuego ya prendido)
+extern int AnimFPS;
+static float RenderFrameDt(){ return 1.0f / (float)(AnimFPS > 0 ? AnimFPS : 30); }
+static void RenderPreheatParticles(){
+    if (W3dParticlesAlive()) return;
+    for (int i = 0; i < 90; i++) W3dParticlesTick(RenderFrameDt());
+}
 // hace el render REAL de UNA imagen (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
 static void DoRenderImage(){
+    RenderPreheatParticles();
     Viewport3D* vp = RenderView();
     int w = (int)(g_render.w + 0.5f); if (w < 1) w = 1;
     int h = (int)(g_render.h + 0.5f); if (h < 1) h = 1;
@@ -6162,11 +6171,15 @@ static void DoRenderAnimation(){
     int failed = 0, base = 0;
     bool canceled = false;
     PreparePrev(vp, w, h, f0);   // (los vectores del primer cuadro: desde f0-1; los demas, del que se acaba de renderizar)
+    // LAS PARTICULAS van con el reloj de la ANIMACION: un paso de 1/fps por cuadro (en la ventana las mueve el tiempo
+    // real, y aca cada cuadro tarda lo que tarda: sin esto salian congeladas)
+    RenderPreheatParticles();
     for (int f = f0; f <= f1; f++){
         ProgressFrame(f - f0 + 1, nFrames);   // "Cuadro N de M", lo que tarda cada uno y lo que falta
         if (ProgressCanceled()) { canceled = true; break; }
         CurrentFrame = f;
         ApplyAnimationObjects(); // transform de objetos al frame f
+        if (f > f0) W3dParticlesTick(RenderFrameDt());
         base += RenderPassesFrame(vp, w, h, base, total, failed); // rendea el frame; avanza la barra GLOBAL
     }
 #ifdef W3D_VIDEO

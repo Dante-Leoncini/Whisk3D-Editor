@@ -731,6 +731,18 @@ static void ApplyArrows3D(){
 	} }
 	// (el foco en la barra de herramientas: las flechas son de ella, una por pulsacion)
 	{ extern bool LayoutToolbarFocusActive(); if (LayoutToolbarFocusActive()) return; }
+	// INSERTAR CARAS / BEVEL: izq/der (y en el inset tambien arr/ab) agrandan / achican el valor, en PIXELES de pantalla
+	// por frame: arranca en 1 px (un ajuste fino) y en ~3 s llega a 12 px por frame
+	if (MeshModalActive()){
+		extern void MeshModalArrowPx(float);
+		float t = (float)gMouseAccel / 45.0f; if (t > 1.0f) t = 1.0f;
+		const float f = 1.0f + 11.0f * t * t;
+		gMouseAccel++;
+		TInt d = dx; if (InsetActive()) d -= dy;   // (en el inset arriba = mas)
+		if (d > 1) d = 1; if (d < -1) d = -1;
+		if (d) MeshModalArrowPx((float)d * f);
+		return;
+	}
 	// MOVIENDO KEYFRAMES con * o 0 mantenidos: la VISTA del timeline (paneo / zoom), para ver donde quedan antes del OK
 	if (DopeXformActive() && (g0Held || gStarHeld)){
 		if (W3dLayoutTimelineNav(dx, dy, g0Held, gStarHeld)){ if (g0Held) g0ArrowUsed = ETrue; return; }
@@ -945,14 +957,16 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// tiene que recibir las teclas. Antes caian al T9: las flechas movian el caret, los softkeys no lo cerraban y
 			// el '*' lo volvia a abrir -> quedaba arriba de todo y la app no se podia usar mas.
 			// EL PANEL DE LA ULTIMA OPERACION (abajo a la izquierda, despues de mover / extruir / mover keyframes): nace
-			// PLEGADO (solo su titulo) y queda A LA VISTA, pero plegado NO se queda con el teclado: las teclas siguen su
-			// camino de siempre (antes se tragaba todo: apretabas algo y no pasaba nada). El LAPIZ lo despliega para
-			// editarlo (ahi las flechas / OK / C son de el) y otro lapiz lo vuelve a plegar. Con el dedo o el mouse, un toque
-			// en el panel, como siempre
+			// PLEGADO (solo su titulo) y queda A LA VISTA. SOLO el SOFTKEY DERECHO lo despliega (ahi las flechas / OK / C
+			// son de el) y otro softkey derecho lo vuelve a plegar. Plegado, CUALQUIER OTRA tecla (OK, flechas para orbitar,
+			// el 0 del zoom, el softkey izquierdo del menu...) lo ACEPTA y lo CIERRA, y la tecla sigue su camino de siempre:
+			// antes quedaba a la vista orbitando / haciendo zoom, el OK lo abria y el softkey izq abria el menu CON la
+			// tarjeta. (Pedido Dante.) Con el dedo o el mouse, un toque en el panel, como siempre
 			{ extern TBool W3dLayoutPopupSemimodal(); extern TBool W3dLayoutCollapsedPopup(); extern TBool W3dLayoutPopupCollapseToggle();
+			  extern void W3dLayoutPopupContinue();
 			  if (W3dLayoutPopupSemimodal() && !W3dT9Active() && !W3dLayoutOpenMenu()){
-				if ((sc == EStdKeyLeftShift || sc == EStdKeyRightShift) && W3dLayoutPopupCollapseToggle()) return EKeyWasConsumed;
-				if (W3dLayoutCollapsedPopup()) gCollapsedFreePanel = ETrue;   // (la tecla NO va al panel: sigue abajo)
+				if (sc == 165 && W3dLayoutPopupCollapseToggle()) return EKeyWasConsumed;   // abrir / plegar
+				if (W3dLayoutCollapsedPopup()) W3dLayoutPopupContinue();   // aceptar y cerrar: la tecla sigue abajo
 			  }
 			}
 			extern bool SymbolsActive();
@@ -1093,10 +1107,18 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					return EKeyWasConsumed;
 				}
 				// INSERTAR CARAS / BEVEL: las flechas agrandan / achican el valor (en el bevel arriba / abajo = segmentos)
+				// El valor se MANTIENE: la flecha queda apretada (gHeld*) y ApplyArrows3D lo cambia cada frame, arrancando
+				// lento y acelerando (antes era de a saltos de 10 px por pulsacion). Arriba / abajo del bevel = segmentos,
+				// uno por pulsacion.
 				if (MeshModalActive()){
-					const int k = (sc == EStdKeyLeftArrow) ? W3dK_LEFT : (sc == EStdKeyRightArrow) ? W3dK_RIGHT :
-					              (sc == EStdKeyUpArrow) ? W3dK_UP : W3dK_DOWN;
-					if (InsetActive()) InsetKey(k); else BevelKey(k);
+					if (BevelActive() && (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow)){
+						BevelKey(sc == EStdKeyUpArrow ? W3dK_UP : W3dK_DOWN);
+						return EKeyWasConsumed;
+					}
+					if (sc == EStdKeyLeftArrow)       gHeldLeft = ETrue;
+					else if (sc == EStdKeyRightArrow) gHeldRight = ETrue;
+					else if (sc == EStdKeyUpArrow)    gHeldUp = ETrue;
+					else                              gHeldDown = ETrue;
 					return EKeyWasConsumed;
 				}
 				// LOOP SELECT (modal de direccion desde una cara): las flechas alternan el sentido
@@ -1698,8 +1720,8 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     GamepadsSymbianTick();
     // el mouse Bluetooth: el apretar que esperaba por si era el boton del medio (izquierdo + derecho juntos), en la
     // pantalla donde esta el cursor (el telefono o la externa)
-    extern void W3dMouseTick();
-    W3dMouseTick();
+    extern void W3dMouseTickSymbian();   // (w3dmouse.cpp: la pantalla del mouse y el tick del editor)
+    W3dMouseTickSymbian();
     // se perdio el foco con dedos apoyados (FocusChanged): se levantan aca, fuera de cualquier otro evento
     if (instance->iReleaseFingers) { instance->iReleaseFingers = EFalse; w3dEngine::TouchReleaseAll(); }
     // flechas MANTENIDAS: aplicar CADA frame (orbitar/mover/rotar/escalar

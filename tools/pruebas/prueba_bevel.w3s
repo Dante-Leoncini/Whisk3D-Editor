@@ -73,3 +73,13 @@ undo
 selmode edge
 seledgepos 1 1 1 1 1 -1
 bevel modal 40
+undo
+# LAS FLECHAS MANTENIDAS (Symbian): de a poco sin el iman; con el IMAN el ancho va de paso redondo en paso redondo
+seledgepos 1 1 1 1 1 -1
+bevel begin
+bevel arrows 40
+bevel cancel
+seledgepos 1 1 1 1 1 -1
+bevel begin
+bevel arrows 40 snap
+bevel state 1 0.001

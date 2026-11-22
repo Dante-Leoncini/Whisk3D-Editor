@@ -1032,7 +1032,11 @@ void Mesh::MarkSharpEdit(bool sharp) {
     int marked = 0;
     for (size_t i = 0; i < selEdges.size(); i++)
         if (MarkOneEdge(this, e, selEdges[i], sharpEdges, sharp)) marked++;
-    if (marked > 0) GenerateRender(); // recomputa las normales con los bordes nuevos
+    if (marked > 0) {
+        EditSelSnap keep; e->SaveSelection(keep);   // la MISMA seleccion despues (antes quedaba elegida toda la malla)
+        GenerateRender(); // recomputa las normales con los bordes nuevos
+        EnsureEdit(); if (edit) edit->RestoreSelection(keep);
+    }
 }
 
 // SEAM (costura UV): igual que sharp pero edita seamEdges. NO toca el shading (no GenerateRender);
@@ -2036,10 +2040,10 @@ bool Mesh::RecalculateOrientationEdit(bool inside) {
     }
     #undef RREP
 
-    std::vector<Vector3> posSel = CapturePosSel(selRep); // restaurar por POSICION (re-merge)
+    EditSelSnap keep; e->SaveSelection(keep);   // la MISMA seleccion (exacta: aristas y caras, no derivada de los verts)
     RecalculateNormals(); // normales del nuevo winding (posiciones sin cambiar -> posRep OK)
     GenerateRender();     // re-merge + render (re-triangula + materialsGroup + ComputeBorders)
-    RebuildEditSelByPos(posSel);
+    EnsureEdit(); if (edit) edit->RestoreSelection(keep);
     return true;
 }
 
@@ -2079,10 +2083,10 @@ bool Mesh::FlipNormalsEdit() {
         Loff += mc2;
     }
     #undef FREP
-    std::vector<Vector3> posSel = CapturePosSel(selRep);
+    EditSelSnap keep; e->SaveSelection(keep);   // la MISMA seleccion
     RecalculateNormals();
     GenerateRender();
-    RebuildEditSelByPos(posSel);
+    EnsureEdit(); if (edit) edit->RestoreSelection(keep);
     return true;
 }
 
@@ -2124,9 +2128,9 @@ bool Mesh::ShadeEdit(bool smooth) {
 
     UndoCaptureMeshGeo(this); // Ctrl+Z: snapshot ANTES de tocar los flags (el swap revierte faces3d entero)
     for (size_t f=0;f<faces3d.size();f++) if (selFace[f]) faces3d[f].smooth = smooth ? 1 : 0; // shading POR CARA
-    std::vector<Vector3> posSel = CapturePosSel(isSel);
+    EditSelSnap keep; e->SaveSelection(keep);   // la MISMA seleccion
     GenerateRender();                  // recalcula normales por-cara (ConSharp) + re-mergea/splittea segun el flag
-    RebuildEditSelByPos(posSel);
+    EnsureEdit(); if (edit) edit->RestoreSelection(keep);
     return true;
 }
 
@@ -5778,13 +5782,30 @@ bool Mesh::BevelSelection(std::vector<char>& selRep, std::vector<std::pair<int,i
     if (!edit || !vertex || vertexSize <= 0) return false;
     EditMesh* e = edit;
     const int nV = vertexSize;
-    for (size_t k = 0; k < e->editVerts.size(); k++)
-        if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1;
-    // las aristas: en modo borde, las elegidas; sino, las que tienen las dos puntas elegidas
+    const int nEV = (int)e->editVerts.size();
+    // las aristas de las CARAS elegidas (modo cara: se biselan todos sus bordes, como en Blender)
+    std::vector<char> faceEdge(e->lineIdx.size() / 2, 0);
+    if (EditSelectMode == SelFace) {
+        for (size_t f = 0; f < e->faces.size(); f++) { if (f >= e->faceSel.size() || !e->faceSel[f]) continue;
+            const std::vector<int>& p = e->faces[f];
+            for (size_t c = 0; c < p.size(); c++) if (p[c] >= 0 && p[c] < nEV && e->editVerts[p[c]] >= 0 && e->editVerts[p[c]] < nV) selRep[e->editVerts[p[c]]] = 1;
+            if (f < e->faceEdges.size()) { const std::vector<int>& fe = e->faceEdges[f];
+                for (size_t c = 0; c < fe.size(); c++) if (fe[c] >= 0 && fe[c] < (int)faceEdge.size()) faceEdge[fe[c]] = 1; } }
+    } else if (EditSelectMode == SelEdge) {
+        // (los vertices: las puntas de las aristas elegidas, no la seleccion del modo vertice, que es otra)
+        for (size_t eg = 0; eg * 2 + 1 < e->lineIdx.size(); eg++) { if (eg >= e->edgeSel.size() || !e->edgeSel[eg]) continue;
+            for (int s = 0; s < 2; s++) { const int k = e->lineIdx[eg*2+s];
+                if (k >= 0 && k < nEV && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1; } }
+    } else {
+        for (size_t k = 0; k < e->editVerts.size(); k++)
+            if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1;
+    }
+    // las aristas: en modo borde, las elegidas; en modo cara, las de las caras; en vertice, las de dos puntas elegidas
     for (size_t eg = 0; eg * 2 + 1 < e->lineIdx.size(); eg++) {
         const int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
-        if (ea < 0 || eb < 0 || ea >= (int)e->editVerts.size() || eb >= (int)e->editVerts.size()) continue;
+        if (ea < 0 || eb < 0 || ea >= nEV || eb >= nEV) continue;
         const bool sel = (EditSelectMode == SelEdge) ? (eg < e->edgeSel.size() && e->edgeSel[eg] != 0)
+                       : (EditSelectMode == SelFace) ? (faceEdge[eg] != 0)
                                                      : (selRep[e->editVerts[ea]] && selRep[e->editVerts[eb]]);
         if (sel) selEdges.push_back(std::make_pair(e->editVerts[ea], e->editVerts[eb]));
     }

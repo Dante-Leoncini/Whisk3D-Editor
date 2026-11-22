@@ -9,6 +9,7 @@
 #ifdef W3D_SYMBIAN
 #include "variables.h" // showOverlayGlobal / ViewFromCameraActiveGlobal: gate del gizmo (bloque Symbian de abajo)
 #endif
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 // Geometría de la cámara
 GLfloat CameraVertices[CameraVertexSize] = {    
@@ -577,6 +578,7 @@ Camera::~Camera() {
 #include "script/BindsGame.h"
 #include "objects/CameraBase.h"     // View/ProjectionMatrix para proyectar mundo -> lienzo
 #include "objects/Curve.h"
+#include "app/W3dNoNearFar.h"   // (otra vez: estos headers pueden traer windows.h por primera vez)
 
 namespace {
 

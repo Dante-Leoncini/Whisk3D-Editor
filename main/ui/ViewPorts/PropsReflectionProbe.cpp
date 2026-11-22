@@ -15,6 +15,7 @@
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "render/RayTracer.h"   // RTSonda*: hornear de a pedazos (la barra)
 #include <stdio.h>
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 extern void Notify(const std::string& text, bool error);
 extern void PropsLayoutDirty();

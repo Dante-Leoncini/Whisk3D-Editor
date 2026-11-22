@@ -4,6 +4,7 @@
 #include "objects/Textures.h"   // Texture: la imagen viva de la de tiempo real
 #include <vector>
 #include <string>
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 struct JVal;   // io/JsonW3d.h
 

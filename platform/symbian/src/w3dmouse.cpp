@@ -451,7 +451,7 @@ TBool W3dMouseFrameCursor() {
 }
 
 // una vez por cuadro (container): el apretar que esperaba por si era el boton del medio, en la pantalla donde esta
-void W3dMouseTick() {
+void W3dMouseTickSymbian() {
 	MouseVerifyScreen();
 	TInExternalScreen in(ETrue, W3dAnyMousePressed());   // (el apretar demorado puede pickear)
 	TLooksXform looks;

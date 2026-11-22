@@ -42,9 +42,9 @@ static unsigned int LoadLogo(const char* name, int* pw = NULL, int* ph = NULL) {
     unsigned int id = 0;
     int w = 0, h = 0;
 #ifdef W3D_SYMBIAN
-    // (Symbian: GetResDir() es "": todo va en la carpeta privada, la de la skin -> <privada>\inicio\, ver los .pkg)
+    // (Symbian: GetResDir() es "": todo va en la carpeta privada, la de la skin -> <privada>\home\, ver los .pkg)
     extern std::string g_skinDir;
-    const std::string path = g_skinDir + "inicio\\" + name;
+    const std::string path = g_skinDir + "home\\" + name;
 #else
     const std::string path = w3dFileSystem::GetResDir() + "/home/" + name;
 #endif

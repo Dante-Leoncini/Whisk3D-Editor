@@ -8,6 +8,7 @@
 #include "graphics/w3dTexture.h"              // ReserveScreen / CopyScreen
 #include <math.h>
 #include <string.h>
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 static W3dPostOptions gEmptyPost;
 static const W3dPostOptions* gPostCur = &gEmptyPost;

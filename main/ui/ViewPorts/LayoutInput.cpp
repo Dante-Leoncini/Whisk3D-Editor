@@ -1279,7 +1279,19 @@ static void LayoutActionSelect(int aId) {
 
 // reconstruye el menu Select segun el modo: All/None/Invert siempre; en Edit Mode agrega el
 // Loop Select del sub-modo (en BORDE aclara el tipo: Edge Loop vs Edge Ring).
-static void LayoutRebuildMenuSelect() {
+static void LayoutFillMenuSelect(PopupMenu* MenuSelect);
+static void LayoutRebuildMenuSelect() { LayoutFillMenuSelect(MenuSelect); }
+// el submenu "Select" de los menus de contexto Vertex / Edge / Face (W): lo MISMO que el boton Select de la barra, para
+// elegir rapido un loop, lo vinculado, el camino mas corto... sin ir hasta arriba. Se rearma al abrirlos (depende del
+// sub-modo: el loop de cara, de borde o de vertice)
+static PopupMenu* gMenuCtxSelect = NULL;
+static void LayoutActionSelect(int aId);
+static PopupMenu* LayoutCtxSelectMenu() {
+    if (!gMenuCtxSelect) { gMenuCtxSelect = new PopupMenu(); gMenuCtxSelect->title = T("Select"); gMenuCtxSelect->action = LayoutActionSelect; }
+    LayoutFillMenuSelect(gMenuCtxSelect);
+    return gMenuCtxSelect;
+}
+static void LayoutFillMenuSelect(PopupMenu* MenuSelect) {
     if (!MenuSelect) return;
     MenuSelect->Clear();
     MenuSelect->Add(T("All"), 0)->shortcut = "@3d.seleccionarTodo";
@@ -2229,13 +2241,16 @@ static void LayoutRebuildMenuMode() {
 static void LayoutActionSelMode(int aId) {
     // malla SIN caras (un path/riel en edicion): el modo Face no existe
     if (aId == SelFace && g_editMesh && ((Mesh*)g_editMesh)->facesSize == 0) return;
+    const int prev = EditSelectMode;
     EditSelectMode = aId; // SelVertex/SelEdge/SelFace
     if (g_editMesh) {
         Mesh* m = (Mesh*)g_editMesh;
         m->EnsureEdit();
-        if (m->edit) { m->edit->activeIdx = -1; m->edit->Recolor(); }
+        // la seleccion PASA al modo nuevo (un quad -> sus 4 aristas -> sus 4 vertices)
+        if (m->edit) { m->edit->ConvertSelection(prev, aId); m->edit->activeIdx = -1; m->edit->Recolor(); }
     }
 }
+void LayoutSetSelMode(int aId) { LayoutActionSelMode(aId); }   // (lo mismo que elegirlo en el menu: los scripts)
 
 // ---- el submenu LAYOUT (la esquina de cada viewport): "Por defecto", los guardados (config/W3dLayouts.h), y separados
 //      con una linea "Guardar layout..." y "Borrar layout..." ----
@@ -2503,9 +2518,10 @@ static UVEditor*  gUVModeTarget = NULL;
 static void LayoutActionUVSelMode(int id) {
     if (!gUVModeTarget) return;
     if (gUVModeTarget->syncSelection) {   // sincronizado: cambia el modo del 3D (espeja)
+        const int prev = EditSelectMode;
         EditSelectMode = id;
         if (g_editMesh) { Mesh* m = (Mesh*)g_editMesh; m->EnsureEdit();
-            if (m->edit) { m->edit->activeIdx = -1; m->edit->Recolor(); } }
+            if (m->edit) { m->edit->ConvertSelection(prev, id); m->edit->activeIdx = -1; m->edit->Recolor(); } }
     } else {
         gUVModeTarget->uvSelMode = id;    // independiente del 3D
     }
@@ -3717,6 +3733,7 @@ bool LayoutOpenBarMenu(ViewportBase* vp, int mx, int my) {
         // Edit Mode: menu "Mesh" (Transform/Snap/Delete), comun a vertice/borde/cara.
         target = MenuMesh; button = bMesh;
         if (!MenuMesh->action) MenuMesh->action = LayoutActionMesh;
+        LayoutCtxSelectMenu();   // (Vertex / Edge / Face > Select, segun el sub-modo de ahora)
     } else if (MenuAnimation && bAnim && bAnim->visible && bAnim->Contains(mx, my)) {
         // menu "Animation": keyframes del objeto + Motion Trail. Es su PROPIO boton de la barra -> rama propia
         // (estaba anidado adentro del Contains de "Object": pedia el cursor sobre los DOS botones a la vez y no
@@ -4207,8 +4224,10 @@ void LayoutMenuContext3D(int mx, int my) {
 PopupMenu* LayoutSubmenuEditFace() {
     if (!gMenuFace) {
         gMenuFace = new PopupMenu(); gMenuFace->title = T("Face"); gMenuFace->action = LayoutActionObject;
+        gMenuFace->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());   // (loop, vinculado, camino... ver LayoutCtxSelectMenu)
         gMenuFace->Add(T("Extrude Faces"), 300)->shortcut = "@3d.extruir";
         gMenuFace->Add(T("Inset Faces"), 344)->shortcut = "I";   // (texto: la I del 3D es Insert Keyframe en la tabla)
+        gMenuFace->Add(T("Bevel"), 345)->shortcut = "Ctrl+B";      // (los bordes de las caras elegidas)
         gMenuFace->Add(T("Loop Cut and Slide"), 340)->shortcut = "@3d.loopcut";
         gMenuFace->Add(T("Rip"), 341)->shortcut = "@3d.rip";
         gMenuFace->Add(T("Shade Smooth"), 320);
@@ -4222,6 +4241,7 @@ PopupMenu* LayoutSubmenuEditFace() {
 PopupMenu* LayoutSubmenuEditEdge() {
     if (!gMenuEdge) {
         gMenuEdge = new PopupMenu(); gMenuEdge->title = T("Edge"); gMenuEdge->action = LayoutActionObject;
+        gMenuEdge->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());
         gMenuEdge->Add(T("Extrude Edges"), 300)->shortcut = "@3d.extruir";
         gMenuEdge->Add(T("Loop Cut and Slide"), 340)->shortcut = "@3d.loopcut";
         gMenuEdge->Add(T("Bevel Edges"), 345)->shortcut = "Ctrl+B";
@@ -4237,6 +4257,7 @@ PopupMenu* LayoutSubmenuEditEdge() {
 PopupMenu* LayoutSubmenuEditVertex() {
     if (!gMenuVertex) {
         gMenuVertex = new PopupMenu(); gMenuVertex->title = T("Vertex"); gMenuVertex->action = LayoutActionObject;
+        gMenuVertex->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());
         gMenuVertex->Add(T("New Edge/Face from Vertices"), 310)->shortcut = "@3d.cara";
         gMenuVertex->Add(T("Connect Vertex Path"), 342)->shortcut = "@3d.conectar";
         gMenuVertex->Add(T("Extrude Vertices"), 300)->shortcut = "@3d.extruir";
@@ -4251,6 +4272,7 @@ void LayoutMenuEditContext(int mx, int my) {
     if (InteractionMode != EditMode) return;
     PopupMenu* m = (EditSelectMode == SelFace) ? LayoutSubmenuEditFace()
                  : (EditSelectMode == SelEdge) ? LayoutSubmenuEditEdge() : LayoutSubmenuEditVertex();
+    LayoutCtxSelectMenu();   // (el submenu Select, segun el sub-modo de ahora)
     if (OpenMenu) OpenMenu->Close();
     m->Open(mx, my, MenuScreenW, MenuScreenH);
     OpenMenu = m;

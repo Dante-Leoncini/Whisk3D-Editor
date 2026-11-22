@@ -34,6 +34,7 @@
 #include "render/SceneRender.h"     // captureScreen / captureUV
 #include "base/W3dConfig.h"            // ConfigMute(): mute global del Core
 #include "W3dNotice.h"                 // W3dAvisof: el aviso de control conectado/desconectado
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 extern "C" {
 #include "lua.h"

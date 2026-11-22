@@ -18,6 +18,7 @@
 #elif defined(W3D_DREAMCAST)
     #include <dc/flashrom.h>
 #endif
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 W3dLanguage g_language = W3dLangEN;
 bool g_languageForced = false;
@@ -221,7 +222,7 @@ static void Load(W3dLanguage id){
 
 void W3dLanguageFolder(const std::string& skinDir){
     // res/Skins/<skin>/ -> res/languages/ (PC, web, Android, 3DS, Dreamcast: res/ entero va con el programa).
-    // Symbian instala todo en la carpeta privada, plana -> <privada>\idiomas\ (ver los .pkg).
+    // Symbian instala todo en la carpeta privada -> <privada>\languages\ (ver los .pkg).
     const char sep = skinDir.empty() ? '/' : skinDir[skinDir.size() - 1];
     const std::string mark = std::string(1, sep) + "Skins" + sep;
     const size_t p = skinDir.rfind(mark);

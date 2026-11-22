@@ -18,6 +18,7 @@
 #include <string.h>
 #include <vector>
 #include <map>
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 namespace gfx = w3dEngine;
 

@@ -11,6 +11,7 @@
 #include <map>
 #include <math.h>
 #include <string.h>
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 // lo RECORDADO del cuadro anterior: las posiciones en el MUNDO de cada malla (las que dibujo) y la matriz de la camara
 // DOS RANURAS: 0 = la del render a PNG (Render Animation la arrastra de un cuadro al otro), 1 = la de la vista "Motion

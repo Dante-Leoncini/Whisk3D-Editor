@@ -53,6 +53,7 @@
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
 #include "input/W3dTouch.h"        // tactiltest: la pantalla tactil del Core (Symbian: dedos -> eventos SDL)
 #include "app/W3dTouchEditor.h"    // W3dEventTouch
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 extern int W3dActiveFingers();     // (controls.cpp) dedos apoyados segun el editor
 #include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva
 #include "ViewPorts/Pick3D.h"              // test 'boxtest': BoxSelectApply3D
@@ -102,6 +103,7 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Image2
 #include "io/W3dContainer.h" // contenedor/migrar: el .w3d v4 (montaje, refs externas, hook de test)
 #include "objects/VisSet.h"    // vissettest: el dato de visibilidad por triangulo (formato/w3dvis.md)
 #include "io/JsonW3d.h"        // presupuesto/vissettest: parser JSON compartido (JParser/JChild/JI/JF)
+#include <set>                 // bevel arrows: los anchos distintos
 #include <algorithm>           // vissettest: std::sort (comparar sets del bitset)
 #include "io/W3dStore.h"       // zipidx/montaje: lector por indice + contenedor montado (formato v4)
 #include "io/UI2DFormat.h"     // ziphard: guardar/streamLoad un .w3dui (prefijo de las rutas relativas)
@@ -8498,12 +8500,28 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     }
 
     // ---- selmode <vertex|edge|face> ----
+    // selmode <vertex|edge|face> [ui]: con 'ui', como elegirlo en el menu (la seleccion PASA al modo nuevo)
     if (cmd == "selmode") {
-        std::string sm; ss >> sm;
-        if      (sm == "vertex" || sm == "vert") EditSelectMode = SelVertex;
-        else if (sm == "edge")                   EditSelectMode = SelEdge;
-        else if (sm == "face")                   EditSelectMode = SelFace;
+        std::string sm, ui; ss >> sm >> ui;
+        int id;
+        if      (sm == "vertex" || sm == "vert") id = SelVertex;
+        else if (sm == "edge")                   id = SelEdge;
+        else if (sm == "face")                   id = SelFace;
         else { err = "selmode desconocido: '" + sm + "' (vertex|edge|face)"; return false; }
+        if (ui == "ui") { extern void LayoutSetSelMode(int); LayoutSetSelMode(id); }
+        else EditSelectMode = id;
+        return true;
+    }
+    // selcount N: cuantos elementos del modo de seleccion ACTUAL estan elegidos
+    if (cmd == "selcount") {
+        int want = -1; ss >> want;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        m->EnsureEdit(); if (!m->edit) { err = "sin edit mesh"; return false; }
+        const std::vector<unsigned char>& v = (EditSelectMode == SelFace) ? m->edit->faceSel :
+                                              (EditSelectMode == SelEdge) ? m->edit->edgeSel : m->edit->vertSel;
+        int n = 0; for (size_t i = 0; i < v.size(); i++) if (v[i]) n++;
+        printf("      [selcount] %s: %d elegidos\n", EditSelectMode == SelFace ? "caras" : EditSelectMode == SelEdge ? "aristas" : "vertices", n);
+        if (want >= 0 && n != want) { char b[96]; sprintf(b, "selcount: %d elegidos, se esperaban %d", n, want); err = b; return false; }
         return true;
     }
 
@@ -33593,6 +33611,24 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
             std::string v; ss >> v;
             BevelStart(640, 360, v == "vertices" ? 0 : 1);
             if (!BevelActive()) { err = "bevel begin: el modal no arranco"; return false; }
+            return true;
+        }
+        // LAS FLECHAS MANTENIDAS del telefono: N frames de 1 px cada uno (MeshModalArrowPx). Con 'snap' el IMAN prendido:
+        // el ancho tiene que ir de paso redondo en paso redondo (pocos valores distintos), sin el, uno por frame
+        if (a == "cancel") { BevelCancel(); return true; }
+        if (a == "arrows") {
+            extern void MeshModalArrowPx(float);
+            int n = 30; std::string t; ss >> n; const bool snap = (ss >> t) && t == "snap";
+            if (!BevelActive()) { err = "bevel arrows: el modal no esta abierto"; return false; }
+            const bool was = g_snap.enabled; g_snap.enabled = snap;
+            std::set<float> vals;
+            for (int i = 0; i < n; i++) { MeshModalArrowPx(1.0f); vals.insert(BevelCurrentOptions().width); }
+            g_snap.enabled = was;
+            printf("      [bevel] flechas %d px %s: ancho %.4f, %d valores distintos\n", n, snap ? "con iman" : "sin iman",
+                   (double)BevelCurrentOptions().width, (int)vals.size());
+            if (BevelCurrentOptions().width <= 0.0f) { err = "bevel arrows: las flechas no dieron ancho"; return false; }
+            if (snap && (int)vals.size() > n / 4) { err = "bevel arrows: con el iman el ancho no va de a pasos redondos"; return false; }
+            if (!snap && (int)vals.size() < n / 2) { err = "bevel arrows: sin el iman el ancho no se mueve de a poco"; return false; }
             return true;
         }
         if (a == "state") {

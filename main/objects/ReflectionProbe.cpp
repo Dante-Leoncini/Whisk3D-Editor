@@ -13,6 +13,7 @@
 #include "render/RenderOptions.h"  // g_redraw
 #endif
 #include <math.h>
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 namespace gfx = w3dEngine;
 extern unsigned int w3dGetTicks();

@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <string>
+#include <set>
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
 #else
@@ -18,6 +19,18 @@
 #include "crossplatform.h" // MeshIndex (16 bits N95 / 32 bits escritorio)
 
 class Mesh;
+
+// LA SELECCION EXACTA de la malla de edicion, por POSICION: vertices, aristas, caras (las tres) y el activo. Sobrevive a
+// un GenerateRender (que rearma la malla de edicion y re-numera todo) cuando la op NO mueve vertices: marcar afilado,
+// costuras, shade smooth / flat, recalcular / dar vuelta normales. (Restaurar desde los VERTICES -RebuildEditSelByPos-
+// sumaba aristas y caras que no estaban elegidas: dos aristas de una cara traian la tercera.)
+struct EditSelSnap {
+    std::set<std::vector<int> > v, e, f;   // las claves (posiciones redondeadas) de lo elegido
+    std::vector<int> active;               // la clave del activo (del modo de seleccion de ese momento)
+    int activeMode;
+    bool has;
+    EditSelSnap() : activeMode(0), has(false) {}
+};
 
 // ===================================================
 //  EditMesh: la malla de EDICION (separada de la malla de render de Whisk3DCore).
@@ -77,6 +90,12 @@ class EditMesh {
 
         // seleccion del sub-elemento ACTIVO (EditSelectMode: vertex/edge/face)
         void SelectAll(bool sel);
+        void SaveSelection(EditSelSnap& s) const;      // (ver EditSelSnap)
+        void RestoreSelection(const EditSelSnap& s);   // + Recolor
+        // al CAMBIAR el modo de seleccion (vertex/edge/face) la seleccion PASA al modo nuevo, como en Blender: las caras
+        // dan sus aristas / sus vertices, las aristas sus puntas, y hacia arriba quedan las aristas / caras que tienen
+        // TODO adentro (un quad elegido -> sus 4 aristas -> sus 4 vertices, y de vuelta el mismo quad)
+        void ConvertSelection(int fromMode, int toMode);
         void Invert();
         void ToggleVert(int k, bool onlyThis); // pick de vertice (onlyThis=sin shift)
         void ToggleEdge(int e, bool onlyThis); // pick de arista

@@ -191,7 +191,7 @@ SOURCE          W3dProfile.cpp // reloj de pared + tiempos por categoria del fra
 SOURCEPATH      ..\..\..\main\undo
 SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
 
-SOURCEPATH      ..\..\..\main\ui\GeometriaUI
+SOURCEPATH      ..\..\..\main\ui\GeometryUI
 SOURCE          GeometryUI.cpp Floor.cpp
 
 SOURCEPATH      ..\..\..\libs\WhiskUI\Propieties
@@ -350,7 +350,7 @@ USERINCLUDE     ..\..\..\thirdparty\lua\src
 USERINCLUDE     ..\..\..\main
 USERINCLUDE     ..\..\..\main\ui
 USERINCLUDE     ..\..\..\main\ui\ViewPorts
-USERINCLUDE     ..\..\..\main\ui\GeometriaUI
+USERINCLUDE     ..\..\..\main\ui\GeometryUI
 // main/ reorganizado por tema: cada carpeta es include dir para que "variables.h" / "Undo.h" / "W3dLang.h"
 // resuelvan sin reescribir cada #include (mismo criterio que el CMake de PC)
 USERINCLUDE     ..\..\..\main\app

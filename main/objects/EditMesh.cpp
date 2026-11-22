@@ -5,6 +5,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (sin GL directo)
 #include "WhiskUI/theme/colors.h"  // ColorList(Ubyte) + ColorID
 #include "ui/W3dColors.h"     // W3dColorsUbyte: colores del editor (piso, normales)
+#include <algorithm>         // std::sort (EditSelSnap: la clave de una cara)
 #include <map>
 #include <set>
 #include <string>
@@ -473,6 +474,111 @@ void EditMesh::SelectAll(bool sel) {
     else                                vertSel.assign(editVerts.size(), v);
     activeIdx = -1; // "todo"/"nada" no deja un activo
     Recolor();
+}
+
+// las claves de EditSelSnap: la posicion redondeada a 1e-4 (la op no mueve nada: es la MISMA posicion)
+static void EsVertKey(const EditMesh* m, int k, std::vector<int>& out) {
+    for (int a = 0; a < 3; a++) { const float x = m->pos[k*3+a] * 10000.0f; out.push_back((int)(x + (x >= 0.0f ? 0.5f : -0.5f))); }
+}
+static std::vector<int> EsEdgeKey(const EditMesh* m, int eg) {
+    std::vector<int> a, b; EsVertKey(m, m->lineIdx[eg*2], a); EsVertKey(m, m->lineIdx[eg*2+1], b);
+    if (b < a) a.swap(b);
+    a.insert(a.end(), b.begin(), b.end()); return a;
+}
+static std::vector<int> EsFaceKey(const EditMesh* m, int f) {
+    std::vector<std::vector<int> > vs;
+    const std::vector<int>& p = m->faces[f];
+    for (size_t c = 0; c < p.size(); c++) { std::vector<int> k; EsVertKey(m, p[c], k); vs.push_back(k); }
+    std::sort(vs.begin(), vs.end());
+    std::vector<int> r; for (size_t i = 0; i < vs.size(); i++) r.insert(r.end(), vs[i].begin(), vs[i].end());
+    return r;
+}
+static bool EsVertOk(const EditMesh* m, int k) { return k >= 0 && (size_t)(k*3+2) < m->pos.size(); }
+static bool EsEdgeOk(const EditMesh* m, int eg) {
+    return eg >= 0 && (size_t)(eg*2+1) < m->lineIdx.size() && EsVertOk(m, m->lineIdx[eg*2]) && EsVertOk(m, m->lineIdx[eg*2+1]); }
+static bool EsFaceOk(const EditMesh* m, int f) {
+    if (f < 0 || f >= (int)m->faces.size() || m->faces[f].empty()) return false;
+    for (size_t c = 0; c < m->faces[f].size(); c++) if (!EsVertOk(m, m->faces[f][c])) return false;
+    return true;
+}
+
+void EditMesh::SaveSelection(EditSelSnap& s) const {
+    s.v.clear(); s.e.clear(); s.f.clear(); s.active.clear();
+    for (size_t k = 0; k < vertSel.size(); k++) if (vertSel[k] && EsVertOk(this, (int)k)) { std::vector<int> key; EsVertKey(this, (int)k, key); s.v.insert(key); }
+    for (size_t k = 0; k < edgeSel.size(); k++) if (edgeSel[k] && EsEdgeOk(this, (int)k)) s.e.insert(EsEdgeKey(this, (int)k));
+    for (size_t k = 0; k < faceSel.size(); k++) if (faceSel[k] && EsFaceOk(this, (int)k)) s.f.insert(EsFaceKey(this, (int)k));
+    s.activeMode = EditSelectMode;
+    if (activeIdx >= 0) {
+        if (EditSelectMode == SelFace && EsFaceOk(this, activeIdx)) s.active = EsFaceKey(this, activeIdx);
+        else if (EditSelectMode == SelEdge && EsEdgeOk(this, activeIdx)) s.active = EsEdgeKey(this, activeIdx);
+        else if (EditSelectMode == SelVertex && EsVertOk(this, activeIdx)) EsVertKey(this, activeIdx, s.active);
+    }
+    s.has = true;
+}
+
+void EditMesh::RestoreSelection(const EditSelSnap& s) {
+    if (!s.has) return;
+    const int nV = (int)editVerts.size(), nE = (int)(lineIdx.size() / 2), nF = (int)faces.size();
+    vertSel.assign(nV, 0); edgeSel.assign(nE, 0); faceSel.assign(nF, 0);
+    activeIdx = -1;
+    for (int k = 0; k < nV; k++) { if (!EsVertOk(this, k)) continue; std::vector<int> key; EsVertKey(this, k, key);
+        if (s.v.count(key)) vertSel[k] = 1;
+        if (s.activeMode == SelVertex && EditSelectMode == SelVertex && key == s.active) activeIdx = k; }
+    for (int k = 0; k < nE; k++) { if (!EsEdgeOk(this, k)) continue; const std::vector<int> key = EsEdgeKey(this, k);
+        if (s.e.count(key)) edgeSel[k] = 1;
+        if (s.activeMode == SelEdge && EditSelectMode == SelEdge && key == s.active) activeIdx = k; }
+    for (int k = 0; k < nF; k++) { if (!EsFaceOk(this, k)) continue; const std::vector<int> key = EsFaceKey(this, k);
+        if (s.f.count(key)) faceSel[k] = 1;
+        if (s.activeMode == SelFace && EditSelectMode == SelFace && key == s.active) activeIdx = k; }
+    Recolor();
+}
+
+void EditMesh::ConvertSelection(int fromMode, int toMode) {
+    if (fromMode == toMode) return;
+    const int nV = (int)editVerts.size();
+    const int nE = (int)(lineIdx.size() / 2);
+    const int nF = (int)faces.size();
+    vertSel.resize(nV, 0); edgeSel.resize(nE, 0); faceSel.resize(nF, 0);
+    // 1) lo elegido en el modo de ANTES, como vertices (y, si venia de aristas o caras, las aristas exactas)
+    std::vector<unsigned char> v(nV, 0), e(nE, 0);
+    bool haveEdges = false;
+    if (fromMode == SelFace) {
+        for (int f = 0; f < nF; f++) { if (!faceSel[f]) continue;
+            const std::vector<int>& p = faces[f];
+            for (size_t c = 0; c < p.size(); c++) if (p[c] >= 0 && p[c] < nV) v[p[c]] = 1;
+            if (f < (int)faceEdges.size()) { const std::vector<int>& fe = faceEdges[f];
+                for (size_t c = 0; c < fe.size(); c++) if (fe[c] >= 0 && fe[c] < nE) e[fe[c]] = 1; } }
+        haveEdges = true;
+    } else if (fromMode == SelEdge) {
+        for (int k = 0; k < nE; k++) { if (!edgeSel[k]) continue; e[k] = 1;
+            const int a = lineIdx[k*2], b = lineIdx[k*2+1];
+            if (a >= 0 && a < nV) v[a] = 1; if (b >= 0 && b < nV) v[b] = 1; }
+        haveEdges = true;
+    } else {
+        for (int k = 0; k < nV; k++) v[k] = vertSel[k] ? 1 : 0;
+    }
+    // (desde vertices: las aristas con las DOS puntas elegidas)
+    if (!haveEdges) for (int k = 0; k < nE; k++) {
+        const int a = lineIdx[k*2], b = lineIdx[k*2+1];
+        e[k] = (a >= 0 && a < nV && b >= 0 && b < nV && v[a] && v[b]) ? 1 : 0; }
+    // 2) el modo NUEVO
+    if (toMode == SelVertex) vertSel = v;
+    else if (toMode == SelEdge) edgeSel = e;
+    else {   // caras: las que tienen TODAS sus aristas (sin la lista de aristas, todos sus vertices)
+        for (int f = 0; f < nF; f++) {
+            bool all = true;
+            if (f < (int)faceEdges.size() && !faceEdges[f].empty()) {
+                const std::vector<int>& fe = faceEdges[f];
+                for (size_t c = 0; c < fe.size() && all; c++) all = fe[c] >= 0 && fe[c] < nE && e[fe[c]];
+            } else {
+                const std::vector<int>& p = faces[f];
+                for (size_t c = 0; c < p.size() && all; c++) all = p[c] >= 0 && p[c] < nV && v[p[c]];
+                if (p.empty()) all = false;
+            }
+            faceSel[f] = all ? 1 : 0;
+        }
+    }
+    activeIdx = -1;
 }
 
 void EditMesh::Invert() {

@@ -1589,6 +1589,27 @@ static float gInPxByU = 100.0f;            // pixeles por unidad (local) alreded
 static float gInDistBase = 0, gInValueBase = 0;
 static bool  gInProf = false;              // el mouse maneja la profundidad (Ctrl)
 static bool  gInDepthDrag = false;         // ...o el boton "Profundidad" de la barra (tactil, sin Ctrl)
+// el valor SIN redondear (el mouse / las flechas lo mueven): con el IMAN prendido lo que se aplica es este valor llevado
+// al paso redondo mas cercano (ModalSnap); sin esto un paso chico de flecha nunca llegaba al proximo
+static float gInRawThick = 0.0f, gInRawDepth = 0.0f;
+
+// EL IMAN en insertar caras / bevel: no hay geometria a la que pegarse (el valor es un ancho, no una posicion), asi que
+// el iman lo lleva a pasos REDONDOS, como la grilla: 0.1 / 1 / 10... segun el zoom (cada paso entre 3 y 30 px de
+// pantalla). En Percent, de a 1 / 10 %. Sin iman, el valor tal cual
+static float ModalSnap(float v, float pxByU, bool percent) {
+    if (!g_snap.enabled || pxByU <= 0.0f) return v;
+    float unitPx = percent ? pxByU / 100.0f : pxByU;   // (pixeles por unidad del valor)
+    if (unitPx <= 0.0f) return v;
+    float step = 1.0f;   // (sin pow/log10: el exe del N95 no importa nada nuevo de la libm)
+    for (int i = 0; i < 12 && step * unitPx > 30.0f; i++) step *= 0.1f;
+    for (int i = 0; i < 12 && step * unitPx < 3.0f; i++) step *= 10.0f;
+    const float q = v / step;
+    return (float)(int)(q + (q >= 0.0f ? 0.5f : -0.5f)) * step;
+}
+static void InsetSetRaw() {
+    gInsetOp.thickness = ModalSnap(gInRawThick, gInPxByU, false); if (gInsetOp.thickness < 0.0f) gInsetOp.thickness = 0.0f;
+    gInsetOp.depth = ModalSnap(gInRawDepth, gInPxByU, false);
+}
 
 static void InsetSave(Mesh* m) {
     InsetSnap& s = gInSnap;
@@ -1672,6 +1693,7 @@ void InsetStart(int mx, int my) {
     InsetSave(m);
     gInsetSel = sel;
     gInsetOp.thickness = 0.0f; gInsetOp.depth = 0.0f;   // (las tildes quedan como se usaron la ultima vez)
+    gInRawThick = 0.0f; gInRawDepth = 0.0f;
     gInProf = false; gInDepthDrag = false;
     NumInputReset();
     float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
@@ -1695,8 +1717,9 @@ void InsetMotion(int mx, int my) {
     const float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
     if ((LCtrlPressed || gInDepthDrag) != gInProf) InsetGrab(mx, my);   // cambia lo que maneja el mouse
     const float v = gInValueBase + (gInDistBase - d) / gInPxByU;   // acercarse al centro = mas
-    if (gInProf) gInsetOp.depth = v;
-    else         gInsetOp.thickness = v > 0.0f ? v : 0.0f;
+    if (gInProf) gInRawDepth = v;
+    else         gInRawThick = v > 0.0f ? v : 0.0f;
+    InsetSetRaw();
     InsetApply();
 }
 
@@ -1705,8 +1728,8 @@ void InsetMotion(int mx, int my) {
 void InsetNumber() {
     float v = 0.0f;
     if (!gInsetOn || !NumInputValue(v)) return;
-    if (gInProf) gInsetOp.depth = v;
-    else         gInsetOp.thickness = v > 0.0f ? v : 0.0f;
+    if (gInProf) gInsetOp.depth = gInRawDepth = v;   // (tipeado: el numero exacto, sin iman)
+    else         gInsetOp.thickness = gInRawThick = v > 0.0f ? v : 0.0f;
     InsetApply();
 }
 
@@ -1749,8 +1772,12 @@ bool InsetKey(int key) {
         case W3dK_UP: case W3dK_RIGHT: case W3dK_DOWN: case W3dK_LEFT: {
             const float step = ((key == W3dK_UP || key == W3dK_RIGHT) ? 10.0f : -10.0f) / gInPxByU;
             NumInputReset();
-            if (gInProf) gInsetOp.depth += step;
-            else { gInsetOp.thickness += step; if (gInsetOp.thickness < 0.0f) gInsetOp.thickness = 0.0f; }
+            if (gInProf) gInRawDepth = gInsetOp.depth + step;
+            else { gInRawThick = gInsetOp.thickness + step; if (gInRawThick < 0.0f) gInRawThick = 0.0f; }
+            // con el iman, al menos UN paso redondo por pulsacion
+            if (g_snap.enabled) { float& r = gInProf ? gInRawDepth : gInRawThick; const float cur = gInProf ? gInsetOp.depth : gInsetOp.thickness;
+                for (int i = 0; i < 1000 && ModalSnap(r, gInPxByU, false) == cur; i++) r += step; }
+            InsetSetRaw();
             InsetApply(); return true;
         }
     }
@@ -1772,6 +1799,12 @@ static std::vector<Vector3> gBvCenters;                   // los centros de las 
 static BevelOptions gBevelOp;
 static float gBvCx = 0, gBvCy = 0, gBvPxByU = 100.0f, gBvDistBase = 0, gBvValueBase = 0;
 static bool gBvHasSnap = false;
+static float gBvRawWidth = 0.0f;   // el ancho sin redondear (ver gInRawThick)
+static void BevelSetRaw() {
+    if (gBvRawWidth < 0.0f) gBvRawWidth = 0.0f;
+    gBevelOp.width = ModalSnap(gBvRawWidth, gBvPxByU, gBevelOp.widthType == 3);
+    if (gBevelOp.width < 0.0f) gBevelOp.width = 0.0f;
+}
 
 bool BevelActive() { return gBevelOn; }
 BevelOptions& BevelCurrentOptions() { return gBevelOp; }
@@ -1827,6 +1860,7 @@ void BevelStart(int mx, int my, int affects) {
     gBvHasSnap = true;
     gBvSelRep = selRep; gBvEdges = edges;
     gBevelOp.affects = affects; gBevelOp.width = 0.0f;   // (el resto queda como se uso la ultima vez)
+    gBvRawWidth = 0.0f;
     const float d = sqrtf(((float)mx-gBvCx)*((float)mx-gBvCx) + ((float)my-gBvCy)*((float)my-gBvCy));
     gBvDistBase = d; gBvValueBase = 0.0f;
     NumInputReset();
@@ -1847,14 +1881,15 @@ void BevelMotion(int mx, int my) {
     float v = (d - gBvDistBase) / gBvPxByU;   // alejarse del centro = mas ancho
     if (gBevelOp.widthType == 3) v *= 100.0f;   // (Percent: en por ciento)
     v += gBvValueBase;
-    gBevelOp.width = v > 0.0f ? v : 0.0f;
+    gBvRawWidth = v > 0.0f ? v : 0.0f;
+    BevelSetRaw();
     BevelApply();
 }
 // el valor TIPEADO (la barra de estado, el teclado numerico, el lapiz de Symbian): el ancho
 void BevelNumber() {
     float v = 0.0f;
     if (!gBevelOn || !NumInputValue(v)) return;
-    gBevelOp.width = v > 0.0f ? v : 0.0f;
+    gBevelOp.width = gBvRawWidth = v > 0.0f ? v : 0.0f;   // (tipeado: el numero exacto, sin iman)
     BevelApply();
 }
 void BevelWheel(int dir) {
@@ -1890,6 +1925,22 @@ void BevelConfirm() {
     g_redraw = true;
 }
 
+// LAS FLECHAS MANTENIDAS del telefono (ApplyArrows3D, con aceleracion): 'px' pixeles de pantalla (signo = agrandar /
+// achicar) sobre lo que maneja el modal: el ancho del bevel, o el grosor / la profundidad del inset. Va sobre el valor
+// SIN redondear: con el iman, el aplicado salta de paso redondo en paso redondo mientras se mantiene
+void MeshModalArrowPx(float px) {
+    if (gBevelOn) {
+        float step = px / gBvPxByU; if (gBevelOp.widthType == 3) step *= 100.0f;
+        NumInputReset();
+        gBvRawWidth += step; BevelSetRaw(); BevelApply();
+    } else if (gInsetOn) {
+        const float step = px / gInPxByU;
+        NumInputReset();
+        if (gInProf) gInRawDepth += step; else { gInRawThick += step; if (gInRawThick < 0.0f) gInRawThick = 0.0f; }
+        InsetSetRaw(); InsetApply();
+    }
+}
+
 bool BevelKey(int key) {
     if (!gBevelOn) return false;
     switch (key) {
@@ -1902,7 +1953,10 @@ bool BevelKey(int key) {
             float step = (key == W3dK_RIGHT ? 10.0f : -10.0f) / gBvPxByU;
             if (gBevelOp.widthType == 3) step *= 100.0f;
             NumInputReset();
-            gBevelOp.width += step; if (gBevelOp.width < 0.0f) gBevelOp.width = 0.0f;
+            gBvRawWidth = gBevelOp.width + step;
+            if (g_snap.enabled) { const float cur = gBevelOp.width;   // con el iman, al menos UN paso redondo por pulsacion
+                for (int i = 0; i < 1000 && gBvRawWidth > 0.0f && ModalSnap(gBvRawWidth, gBvPxByU, gBevelOp.widthType == 3) == cur; i++) gBvRawWidth += step; }
+            BevelSetRaw();
             BevelApply(); return true;
         }
         case W3dK_V: gBevelOp.affects = gBevelOp.affects ? 0 : 1; BevelApply(); return true;

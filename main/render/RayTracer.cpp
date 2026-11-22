@@ -52,6 +52,7 @@
     #include <thread>
     #include <atomic>
 #endif
+#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 extern bool g_redraw;
 W3dRTOptions g_rt;
