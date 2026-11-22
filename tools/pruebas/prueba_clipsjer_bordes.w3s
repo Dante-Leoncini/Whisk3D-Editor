@@ -21,10 +21,10 @@
 #       T()) y deja el objeto como estaba: el proyecto se sigue pudiendo guardar.
 # ==========================================================================
 
-ventana 1280 720
+window 1280 720
 
 # ==== A) borrar la raiz con su vista abierta ====
-escenadefecto
+scenedefault
 add cube
 objname Auto
 add cube
@@ -32,42 +32,42 @@ objname Puerta
 parent Puerta Auto
 selobj Auto
 clipmenu Hierarchy Clip
-clipnombre abrir
-animrango 1 11
-animcurva Auto:abrir Puerta ry 1 0 11 90
-animcurva Auto:abrir . y 1 0 11 2
-dupjerarquia copia Auto +hijos
-jerinfo Auto.001 lib Auto pistas abrir 2
+clipname abrir
+animrange 1 11
+animcurve Auto:abrir Puerta ry 1 0 11 90
+animcurve Auto:abrir . y 1 0 11 2
+duphierarchy copy Auto +hijos
+hierinfo Auto.001 lib Auto tracks abrir 2
 selobj Auto
 delete
 # (la vista de Auto quedo sin su raiz: el clip compartido sigue entero para Auto.001)
-jerinfo Auto.001 lib Auto pistas abrir 2
+hierinfo Auto.001 lib Auto tracks abrir 2
 undo
-jerinfo Auto lib Auto pistas abrir 2
+hierinfo Auto lib Auto tracks abrir 2
 redo
-jerinfo Auto.001 lib Auto pistas abrir 2
-guardarw3d /tmp/w3d_f6_bordes/a.w3d
+hierinfo Auto.001 lib Auto tracks abrir 2
+savew3d /tmp/w3d_f6_bordes/a.w3d
 # (guardar con la raiz borrada no le cambia la animacion elegida: el Ctrl+Z la devuelve editandose)
 undo
-animlista activa Auto:abrir
-jerinfo Auto lib Auto pistas abrir 2
+animlist active Auto:abrir
+hierinfo Auto lib Auto tracks abrir 2
 frame 6
 objat Auto 0 1 0 0.001
-abrirw3d /tmp/w3d_f6_bordes/a.w3d
-jerinfo Auto.001 lib Auto pistas abrir 2
+openw3d /tmp/w3d_f6_bordes/a.w3d
+hierinfo Auto.001 lib Auto tracks abrir 2
 
 # ==== B) renombrar el clip que se edita con la raiz posada ====
-escenadefecto
+scenedefault
 add cube
 objname Auto
 selobj Auto
 clipmenu Hierarchy Clip
-clipnombre abrir
-animrango 1 11
-animcurva Auto:abrir . y 1 0 11 2
+clipname abrir
+animrange 1 11
+animcurve Auto:abrir . y 1 0 11 2
 frame 6
 objat Auto 0 1 0 0.001
-recrenombrar animaciones Auto/abrir cerrar Auto/cerrar
+recrename animations Auto/abrir cerrar Auto/cerrar
 frame 1
 frame 6
 objat Auto 0 1 0 0.001
@@ -80,100 +80,100 @@ redo
 frame 1
 frame 6
 objat Auto 0 1 0 0.001
-raizanim Scene
+rootanim Scene
 frame 1
-guardarw3d /tmp/w3d_f6_bordes/b.w3d
-abrirw3d /tmp/w3d_f6_bordes/b.w3d
+savew3d /tmp/w3d_f6_bordes/b.w3d
+openw3d /tmp/w3d_f6_bordes/b.w3d
 objat Auto 0 0 0 0.001
 
 # ==== C) guardar en el Mix: una raiz que solo tiene una capa ====
-escenadefecto
+scenedefault
 add cube
 objname Auto
 selobj Auto
 clipmenu Hierarchy Clip
-clipnombre Clip
-animrango 1 11
-animcurva Auto:Clip . y 1 0 11 2
-raizanim Scene
+clipname Clip
+animrange 1 11
+animcurve Auto:Clip . y 1 0 11 2
+rootanim Scene
 add cube
 objname Moto
 selobj Moto
 objpos 5 0 0
-jerlib Moto Auto
+hierlib Moto Auto
 clipmenu Mix
-mixjer Auto Clip
-jercapa Moto 1 Clip
+mixhier Auto Clip
+hierlayer Moto 1 Clip
 frame 11
 objat Moto 5 2 0 0.001
-guardarw3d /tmp/w3d_f6_bordes/c.w3d
+savew3d /tmp/w3d_f6_bordes/c.w3d
 # (el guardado no la movio: sigue mostrando la mezcla)
 objat Moto 5 2 0 0.001
-abrirw3d /tmp/w3d_f6_bordes/c.w3d
-jermix soltar
+openw3d /tmp/w3d_f6_bordes/c.w3d
+hiermix release
 objat Moto 5 0 0 0.001
 objat Auto 0 0 0 0.001
 # ...y re-guardado y reabierto no acumula la pista de la raiz
-jermix frame 11
+hiermix frame 11
 objat Moto 5 2 0 0.001
-guardarw3d /tmp/w3d_f6_bordes/c2.w3d
-abrirw3d /tmp/w3d_f6_bordes/c2.w3d
-jermix soltar
+savew3d /tmp/w3d_f6_bordes/c2.w3d
+openw3d /tmp/w3d_f6_bordes/c2.w3d
+hiermix release
 objat Moto 5 0 0 0.001
 
 # ==== D) dos bibliotecas iguales se juntan al guardar: la vista que se edita sigue viva ====
-escenadefecto
+scenedefault
 add cube
 objname A
 add cube
 objname B
 selobj A
 clipmenu Hierarchy Clip
-raizanim Scene
+rootanim Scene
 selobj B
 clipmenu Hierarchy Clip
-animlista activa B:Clip
-guardarw3d /tmp/w3d_f6_bordes/d.w3d
-jerinfo B lib A
-animlista activa B:Clip
+animlist active B:Clip
+savew3d /tmp/w3d_f6_bordes/d.w3d
+hierinfo B lib A
+animlist active B:Clip
 selobj B
 frame 1
-raizkey
-jerinfo B pistas Clip 1
-guardarw3d /tmp/w3d_f6_bordes/d.w3d
-abrirw3d /tmp/w3d_f6_bordes/d.w3d
-jerinfo B lib A pistas Clip 1
+rootkey
+hierinfo B tracks Clip 1
+savew3d /tmp/w3d_f6_bordes/d.w3d
+openw3d /tmp/w3d_f6_bordes/d.w3d
+hierinfo B lib A tracks Clip 1
 
 # ==== E) velocidades y frames enormes: el tick no se cuelga ====
-escenadefecto
+scenedefault
 add cube
 objname Auto
 selobj Auto
 clipmenu Hierarchy Clip
-clipnombre abrir
-animrango 1 11
-animcurva Auto:abrir . y 1 0 11 2
-raizanim Scene
-jerplay Auto abrir loop 1
-jervel Auto 1000000000
-jertick 0.0166667 3
-jervel Auto -1000000000
-jertick 0.0166667 3
-jervel Auto 1e38
-jertick 0.0166667 2
-jerreset
+clipname abrir
+animrange 1 11
+animcurve Auto:abrir . y 1 0 11 2
+rootanim Scene
+hierplay Auto abrir loop 1
+hiervel Auto 1000000000
+hiertick 0.0166667 3
+hiervel Auto -1000000000
+hiertick 0.0166667 3
+hiervel Auto 1e38
+hiertick 0.0166667 2
+hierreset
 add cube
 objname Moto
-jerlib Moto Auto
-jercapa Moto 1 abrir vel 1000000000
-jermix tick 0.0166667 3
-jercapa Moto 1 abrir frame 1e30
-jermix tick 0.0166667 2
-jercapa Moto 1 -
+hierlib Moto Auto
+hierlayer Moto 1 abrir vel 1000000000
+hiermix tick 0.0166667 3
+hierlayer Moto 1 abrir frame 1e30
+hiermix tick 0.0166667 2
+hierlayer Moto 1 -
 
 # ==== F) "Juego": el rombo y Delete/Clear Keyframe no tocan el clip elegido ====
-escenadefecto
-raizmenu 3d New Game
+scenedefault
+rootmenu 3d New Game
 add cube
 objname Auto
 add cube
@@ -181,30 +181,30 @@ objname Puerta
 parent Puerta Auto
 selobj Auto
 clipmenu Hierarchy Clip
-animcurva Auto:Clip Puerta x 1 1 11 3
-raizanim juego
-raizmodo kind 2 juego 1
+animcurve Auto:Clip Puerta x 1 1 11 3
+rootanim game
+rootmode kind 2 game 1
 selobj Auto
 frame 1
-notif limpiar
-keyrombo 0 1 estado 0
-notif tiene A game has no keyframes: choose one of its clips in the timeline to animate
-jerinfo Auto pistas Clip 1
+notif clear
+keydiamond 0 1 state 0
+notif has A game has no keyframes: choose one of its clips in the timeline to animate
+hierinfo Auto tracks Clip 1
 selobj Puerta
-keyrombo 0 0 estado 0
-menuobjeto 511
-menuobjeto 512
-jerinfo Auto pistas Clip 1
+keydiamond 0 0 state 0
+menuobject 511
+menuobject 512
+hierinfo Auto tracks Clip 1
 # (fuera de "Juego", en la vista del clip, el rombo si keyea: el clip gana la pista ".")
 clipmenu Auto: Clip
 selobj Auto
-keyrombo 0 1 estado 2
-jerinfo Auto pistas Clip 2
-guardarw3d /tmp/w3d_f6_bordes/f.w3d
-jerinfo Auto pistas Clip 2
+keydiamond 0 1 state 2
+hierinfo Auto tracks Clip 2
+savew3d /tmp/w3d_f6_bordes/f.w3d
+hierinfo Auto tracks Clip 2
 
 # ==== G) el rombo sobre un objeto de FUERA de la jerarquia avisa ====
-escenadefecto
+scenedefault
 add cube
 objname Auto
 add cube
@@ -215,36 +215,36 @@ objname Suelto
 selobj Auto
 clipmenu Hierarchy Clip
 selobj Suelto
-notif limpiar
-keyrombo 0 0 estado 0
-notif tiene This hierarchy clip only animates its root and its children
-jerinfo Auto pistas Clip 0
+notif clear
+keydiamond 0 0 state 0
+notif has This hierarchy clip only animates its root and its children
+hierinfo Auto tracks Clip 0
 selobj Puerta
-notif limpiar
-keyrombo 0 0 estado 2
+notif clear
+keydiamond 0 0 state 2
 notif no This hierarchy clip only animates its root and its children
-jerinfo Auto pistas Clip 1
+hierinfo Auto tracks Clip 1
 
 # ==== H) una biblioteca rota en el desplegable "Clips" ====
-escenadefecto
+scenedefault
 add cube
 objname Auto
 add cube
 objname Moto
 selobj Auto
 clipmenu Hierarchy Clip
-animcurva Auto:Clip . y 1 0 11 2
-raizanim Scene
-guardarw3d /tmp/w3d_f6_bordes/h.w3d
+animcurve Auto:Clip . y 1 0 11 2
+rootanim Scene
+savew3d /tmp/w3d_f6_bordes/h.w3d
 # Auto la suelta: la biblioteca queda HUERFANA en el registro (se conserva tal cual)
-jerlibmenu Auto (none)
-guardarw3d /tmp/w3d_f6_bordes/h.w3d
-animsetromper /tmp/w3d_f6_bordes/h.w3d /tmp/w3d_f6_bordes/h_roto.w3d corte
-abrirw3d /tmp/w3d_f6_bordes/h_roto.w3d
-notif limpiar
-jerlibmenu Moto Auto
-notif tiene The clip library could not be read
-jerinfo Moto lib -
+hierlibmenu Auto (none)
+savew3d /tmp/w3d_f6_bordes/h.w3d
+animsetbreak /tmp/w3d_f6_bordes/h.w3d /tmp/w3d_f6_bordes/h_roto.w3d cut
+openw3d /tmp/w3d_f6_bordes/h_roto.w3d
+notif clear
+hierlibmenu Moto Auto
+notif has The clip library could not be read
+hierinfo Moto lib -
 # (sin paso de undo: no cambio nada)
-guardarw3d /tmp/w3d_f6_bordes/h2.w3d
+savew3d /tmp/w3d_f6_bordes/h2.w3d
 

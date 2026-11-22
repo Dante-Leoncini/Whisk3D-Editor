@@ -13,7 +13,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -22,10 +22,10 @@ Whisk3D {
             z: 2.0
         }
 
-        VisZona {
+        VisZone {
             name: "Zona"
-            modo: "curva"
-            objetivo: "MallaVis"
+            mode: "curve"
+            target: "MallaVis"
         }
 
         Wavefront {
@@ -35,8 +35,8 @@ Whisk3D {
             ref_malla: "MallaVis"
             ref_zona: "Zona"
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
             }
         }
     }

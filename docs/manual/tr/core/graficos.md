@@ -31,12 +31,12 @@ Core sabit boru hattının dilini konuşur. Shader arka ucu bunu, OpenGL ES 1.1 
 
 Neredeyse her zaman **derlerken**: her sistem tek bir arka uç derler ve çağrılar hiçbir ek maliyet olmadan doğrudan gider.
 
-İstisna PC'dir (Windows ve Linux). Orada çalıştırılabilir dosya OpenGL, OpenGL ES 2.0 ve Vulkan'ı birlikte taşır ve seçim **açılışta** yapılır, **Özellikler → Ayarlar → Grafik** içinden (yeniden başlatınca geçerli olur; bkz. [Diğer işlevler](../editor/otras-funciones.md)). Her arka uç kendi namespace'inde derlenir (`w3dEngine::gl`, `w3dEngine::es2`, `w3dEngine::vk`) ve kendi fonksiyonlarıyla bir **dağıtım tablosunu** (`w3dBackendTabla.h`) doldurur. Her `w3dEngine` fonksiyonu, etkin arka ucun fonksiyonunu çağırır:
+İstisna PC'dir (Windows ve Linux). Orada çalıştırılabilir dosya OpenGL, OpenGL ES 2.0 ve Vulkan'ı birlikte taşır ve seçim **açılışta** yapılır, **Özellikler → Ayarlar → Grafik** içinden (yeniden başlatınca geçerli olur; bkz. [Diğer işlevler](../editor/otras-funciones.md)). Her arka uç kendi namespace'inde derlenir (`w3dEngine::gl`, `w3dEngine::es2`, `w3dEngine::vk`) ve kendi fonksiyonlarıyla bir **dağıtım tablosunu** (`w3dBackendTable.h`) doldurur. Her `w3dEngine` fonksiyonu, etkin arka ucun fonksiyonunu çağırır:
 
 ```cpp
-// graphics/w3dDespacho.inc, tools/generar_despacho.py tarafından üretilir
-void Enable(Cap c) { W3D_TABLA()->Enable(c); }
-void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTriangles(count, indices); }
+// graphics/w3dDispatch.inc, tools/generar_despacho.py tarafından üretilir
+void Enable(Cap c) { W3D_TABLE()->Enable(c); }
+void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLE()->DrawTriangles(count, indices); }
 ```
 
 Seçilen arka uç o makinede çalışmazsa OpenGL'de kalınır. Vulkan; sürücüyü, GPU'yu ve çalıştırılabilir dosyanın yanında `shaderc_shared` shader derleyicisini gerektirir ve 32 bitlik derlemelerde kapalı gelir. macOS'ta çalıştırılabilir dosya yalnızca OpenGL taşır.
@@ -60,13 +60,13 @@ Her GPU aynı şeyleri yapamaz ve Core bunu gizlemez: her arka uç neye sahip ol
 
 | Soru | Hayır derse ne olur |
 |---|---|
-| `VBOSoportado()` | Mesh'ler RAM'de dizi olarak gider (Dreamcast, Vita) |
-| `EstencilBits()` | Su yansıması düzlemle kırpmaya düşer |
-| `PlanosRecorteMax()` | Yansıma düzlemler olmadan halledilir (PVR'da yoktur) |
-| `MezclaTexturasSoportada()` | Bir materyalin katmanları birkaç geçişte çizilir |
-| `TieneTexGen()` | Küresel yansıma yazılımla ya da doku matrisiyle hesaplanır (`TexMatrixMatcap`, N95'te çalışır) |
-| `SombreadoPorPixelSoportado()` | Işık köşe başına kalır ve editör seçeneği sunmaz bile |
-| `ShadersEscritos()` | Kendi shader'ı olan materyal her zamanki gibi çizilir (bkz. [Yazılan shader'lar](../editor/shaders.md)) |
+| `VBOSupported()` | Mesh'ler RAM'de dizi olarak gider (Dreamcast, Vita) |
+| `StencilBits()` | Su yansıması düzlemle kırpmaya düşer |
+| `PlanesClipMax()` | Yansıma düzlemler olmadan halledilir (PVR'da yoktur) |
+| `MixTexturesSupported()` | Bir materyalin katmanları birkaç geçişte çizilir |
+| `HasTexGen()` | Küresel yansıma yazılımla ya da doku matrisiyle hesaplanır (`TexMatrixMatcap`, N95'te çalışır) |
+| `ShadingPerPixelSupported()` | Işık köşe başına kalır ve editör seçeneği sunmaz bile |
+| `ShadersWritten()` | Kendi shader'ı olan materyal her zamanki gibi çizilir (bkz. [Yazılan shader'lar](../editor/shaders.md)) |
 
 ## Durum önbelleği
 
@@ -81,13 +81,13 @@ Her durum değişikliği sürücüye bir maliyet getirir. Core neyin ayarlı old
 - **Dreamcast:** 8'den 1024'e ikinin kuvveti, 16 bit (565 ya da 4444), mipmap'siz.
 - **N95:** yalnızca ikinin kuvveti; diğerleri yüklenmeden önce yeniden örneklenir.
 
-Bir proje **16 bitlik** dokular (belleğin yarısı) isteyebilir ve, yalnızca N95'te, belirli bir boyuttan itibaren onları **yarı boyutta** yükleyebilir (`texturasMitadDesde`). `.w3dt` formatı GPU'ya hazır bir dokuyu mipmap'leriyle birlikte saklar: onu yüklemek, okuyup GPU'ya göndermekten ibarettir.
+Bir proje **16 bitlik** dokular (belleğin yarısı) isteyebilir ve, yalnızca N95'te, belirli bir boyuttan itibaren onları **yarı boyutta** yükleyebilir (`texturesHalfFrom`). `.w3dt` formatı GPU'ya hazır bir dokuyu mipmap'leriyle birlikte saklar: onu yüklemek, okuyup GPU'ya göndermekten ibarettir.
 
 Dürüst bir ayrıntı: doku yükleme ve ışıklar hâlâ iki üç OpenGL fonksiyonunu doğrudan çağırıyor. OpenGL'i olmayan konsollarda arka uç, bunları uygulayan küçük bir katman getirir (`gu/w3dGLgu.cpp`, `citro3d/w3dGLc3d.cpp`).
 
 ## Ekran ve güvenli alan
 
-`PantallaSetTam` ve `PantallaEsVertical`, ekranın dik mi yatık mı olduğunu (yatay = genişliği yüksekliğinden fazla) tek bir kez kaydeder; böylece motorun herhangi bir parçası bunu sorabilir. **Güvenli alan** (`SafeAreaGet`), her kenardan kaç pikselin arayüz için kullanılamayacağını söyler: çentik, hareket çubuğu, cep telefonu tarayıcısının çubukları. Arka plan tüm pencereye, arayüz ise güvenli alanın içine çizilir. PC'de, Symbian'da ve konsollarda kenarlar 0'dır; tarayıcıda ölçülür.
+`ScreenSetSize` ve `ScreenIsVertical`, ekranın dik mi yatık mı olduğunu (yatay = genişliği yüksekliğinden fazla) tek bir kez kaydeder; böylece motorun herhangi bir parçası bunu sorabilir. **Güvenli alan** (`SafeAreaGet`), her kenardan kaç pikselin arayüz için kullanılamayacağını söyler: çentik, hareket çubuğu, cep telefonu tarayıcısının çubukları. Arka plan tüm pencereye, arayüz ise güvenli alanın içine çizilir. PC'de, Symbian'da ve konsollarda kenarlar 0'dır; tarayıcıda ölçülür.
 
 ## En küçüğün sınırları
 
@@ -96,7 +96,7 @@ Core için yazılan şey, en sınırlı makineye sığmalıdır. Hissedilen sın
 | Sınır | Nerede | Core nasıl ele alır |
 |---|---|---|
 | 16 bitlik indeksler (mesh başına en fazla 65.535 köşe) | Symbian | `MeshIndex` orada 16, diğerlerinde 32 bittir; içe aktarıcı sığmayanı reddeder |
-| Aynı anda 8 ışık | Hepsi (`LucesMax`) | Shader arka ucu onları aynı hesapla taklit eder; PSP donanımla 4 yapar, Android 2.3 en fazla 4 kullanır |
+| Aynı anda 8 ışık | Hepsi (`LightsMax`) | Shader arka ucu onları aynı hesapla taklit eder; PSP donanımla 4 yapar, Android 2.3 en fazla 4 kullanır |
 | Shader yok | Sabit arka uçlar | Shader fonksiyonları hayır der ve materyal her zamanki gibi çizilir |
 | 16 bitlik Z | PSP | Yakın düzlem, N95'teki gibi yörünge mesafesine göre ayarlanır |
 | Her şey için 16 MB | Dreamcast | `-Os` ile derlenir ve bağlayıcı kullanılmayanı atar; dokular 16 bit gider |

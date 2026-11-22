@@ -13,46 +13,46 @@
 #  eje de la linea (~2 px: adentro con grosor 6, afuera con grosor 1).
 #  Vista de arriba (vporbita pitch 90), fondo de escena = 13,13,13.
 # ==========================================================================
-abrirw3d prueba_mat_lineas.w3d
+openw3d prueba_mat_lineas.w3d
 loadtex
-vpvista material
-vporbita 0 0 0 12 90 0
+vpview material
+vporbit 0 0 0 12 90 0
 
 # el .mtl (formato de texto) dejo el material con lineas + grosor 6
 matflags cuerda
 
 # --- 1) EL CAMINO SE DIBUJA: el punto medio de cada tramo es la linea roja
-escenapx -2 0 0 es 255 51 25 10
-escenapx  0 0 2 es 255 51 25 10
-escenapx  2 0 0 es 255 51 25 10
+scenepx -2 0 0 es 255 51 25 10
+scenepx  0 0 2 es 255 51 25 10
+scenepx  2 0 0 es 255 51 25 10
 # ...y el "interior" del triangulo degenerado NO pinta nada (no hay relleno)
-escenapx -2 0 1.5 es 13 13 13 8
+scenepx -2 0 1.5 es 13 13 13 8
 
 # --- 2) EL GROSOR ES REAL: a 0.02 u (~2 px) del eje del tramo horizontal,
 #     con grosor 6 (mitad ~3 px) el pixel sigue siendo linea...
-escenapx 0 0 2.02 es 255 51 25 10
+scenepx 0 0 2.02 es 255 51 25 10
 # ...con grosor 1 ya es fondo (la linea quedo de 1 px), y el eje sigue pintado
 # (con 1 px de grosor el multisample reparte la cobertura: se pide "no fondo",
 #  no el color pleno)
-matflags cuerda set lineas 1
-escenapx 0 0 2.02 es 13 13 13 8
-escenapx 0 0 2 noes 13 13 13 30
+matflags cuerda set lines 1
+scenepx 0 0 2.02 es 13 13 13 8
+scenepx 0 0 2 noes 13 13 13 30
 # apagar el checkbox apaga el trazo entero
-matflags cuerda set nolineas
-escenapx 0 0 2 es 13 13 13 8
+matflags cuerda set nolines
+scenepx 0 0 2 es 13 13 13 8
 # y volver a prenderlo con grosor 6 lo trae de vuelta (los setters del harness
 # son la misma logica que el checkbox Lines + Line Width del panel)
-matflags cuerda set lineas 6
-escenapx 0 0 2 es 255 51 25 10
+matflags cuerda set lines 6
+scenepx 0 0 2 es 255 51 25 10
 
 # --- 3) ROUND-TRIP v4: lineas + grosorLinea viajan en el proyecto.json
-guardarw3d prueba_mat_lineas_v4.w3d
-abrirw3d prueba_mat_lineas_v4.w3d
+savew3d prueba_mat_lineas_v4.w3d
+openw3d prueba_mat_lineas_v4.w3d
 loadtex
-vpvista material
-vporbita 0 0 0 12 90 0
+vpview material
+vporbit 0 0 0 12 90 0
 matflags cuerda
-escenapx  0 0 2 es 255 51 25 10
-escenapx  0 0 2.02 es 255 51 25 10
+scenepx  0 0 2 es 255 51 25 10
+scenepx  0 0 2.02 es 255 51 25 10
 # (el layout reabierto trae la grilla del piso: el punto vacio esquiva sus lineas)
-escenapx -1.8 0 1.2 es 13 13 13 8
+scenepx -1.8 0 1.2 es 13 13 13 8

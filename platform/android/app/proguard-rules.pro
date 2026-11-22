@@ -89,7 +89,7 @@
 
 # --- Whisk3D: lo que el C++ llama sobre la actividad (GetMethodID sobre la clase de la actividad) ---
 #     videoAbrir/videoCuadro/videoCerrar/audioAac: main/ui/ViewPorts/Properties.cpp (exportar video)
-#     tieneNotch: main/app/W3dTeclado.cpp   -   vibrar: libs/Whisk3DCore/input/W3dVibrar.cpp
+#     tieneNotch: main/app/W3dKeyboard.cpp   -   vibrar: libs/Whisk3DCore/input/W3dVibrate.cpp
 -keep,includedescriptorclasses class com.whisk3d.Whisk3DActivity {
     boolean videoAbrir(java.lang.String, int, int, int, int);
     boolean videoCuadro(byte[], int, int);
@@ -98,7 +98,7 @@
     boolean tieneNotch();
     void vibrar(int);
 }
-# (y el aviso del teclado que el C++ exporta como Java_com_whisk3d_Whisk3DActivity_nativeTecladoTapado: W3dTeclado.cpp)
+# (y el aviso del teclado que el C++ exporta como Java_com_whisk3d_Whisk3DActivity_nativeTecladoTapado: W3dKeyboard.cpp)
 -keepclasseswithmembernames,includedescriptorclasses class com.whisk3d.Whisk3DActivity {
     native <methods>;
 }

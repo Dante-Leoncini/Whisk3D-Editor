@@ -20,36 +20,36 @@
 # ==========================================================================
 
 # ventana ANCHA (mas que 40:27): el caso que rompia las listas por nodo
-ventana 900 300
+window 900 300
 
 # --- parte A: `aspecto:` declarado EN LA CAMARA -----------------------------
-abrirw3d prueba_encuadre.w3d
+openw3d prueba_encuadre.w3d
 loadtex
-vpcamara on
-juego on
+vpcamera on
+game on
 
 # A.1) DEFAULT del editor (bandas atenuadas): el cartel del costado, fuera del
 #      40:27 pero dentro de la ventana, SE VE (atenuado): su pixel NO es negro.
-escenapx 9.5 0 -10 noes 0 0 0 10
+scenepx 9.5 0 -10 noes 0 0 0 10
 # el del centro (dentro del encuadre) se dibuja pleno, como siempre
-escenapx 0 0 -10 noes 0 0 0 10
+scenepx 0 0 -10 noes 0 0 0 10
 
 # A.2) PREVIEW DEL DISPOSITIVO (toggle): bandas negro opaco + el cartel del
 #      costado desaparece bajo la banda (lo que ve el jugador en el aparato).
-letterboxnegro on
-encuadrepx 9.5 0 -10
-escenapx 0 0 -10 noes 0 0 0 10
+letterboxblack on
+framingpx 9.5 0 -10
+scenepx 0 0 -10 noes 0 0 0 10
 # vuelta al default y el costado se ve de nuevo: el toggle no deja nada pegado
-letterboxnegro off
-escenapx 9.5 0 -10 noes 0 0 0 10
-juego off
+letterboxblack off
+scenepx 9.5 0 -10 noes 0 0 0 10
+game off
 
 # --- parte B: el encuadre HEREDADO de la cabecera `aspecto` del .cap --------
-abrirw3d prueba_encuadre_riel.w3d
+openw3d prueba_encuadre_riel.w3d
 loadtex
-vpcamara on
-juego on
-letterboxnegro on
-encuadrepx 9.5 0 -10
-escenapx 0 0 -10 noes 0 0 0 10
-juego off
+vpcamera on
+game on
+letterboxblack on
+framingpx 9.5 0 -10
+scenepx 0 0 -10 noes 0 0 0 10
+game off

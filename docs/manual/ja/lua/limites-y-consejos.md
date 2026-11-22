@@ -3,8 +3,8 @@
 ## Luaで使えない機能
 
 - `string`、`table`、`math`と、基本関数（`print`、`pairs`、`ipairs`、`type`、`tostring`、`tonumber`、`pcall`、`assert`…）は使えます。
-- `io`と`os`は**ありません**（ゲームはディスク上のファイルに触れないため、`os.time`もありません）。`require`、`coroutine`、`utf8`、`debug`もありません。データを保存するには`config` / `guardarConfig`を使ってください。
-- 各スクリプトは独立していて、ほかのスクリプトの変数は見えません。やり取りには`setCompartido` / `compartido`を使います。
+- `io`と`os`は**ありません**（ゲームはディスク上のファイルに触れないため、`os.time`もありません）。`require`、`coroutine`、`utf8`、`debug`もありません。データを保存するには`getConfig` / `saveConfig`を使ってください。
+- 各スクリプトは独立していて、ほかのスクリプトの変数は見えません。やり取りには`setShared` / `getShared`を使います。
 
 ## エラー
 
@@ -14,16 +14,16 @@
 
 ## 気をつけること
 
-- `actualizar`は、アクティブなシーンで**表示されている**オブジェクトでだけ実行されます。オブジェクトを隠すと、そのロジックも止まります。
-- `destruir`、`cambiarEscena`、`reproducirEscena`は、その場ではなく、フレームの終わりに適用されます。
+- `update`は、アクティブなシーンで**表示されている**オブジェクトでだけ実行されます。オブジェクトを隠すと、そのロジックも止まります。
+- `destroy`、`changeScene`、`playScene`は、その場ではなく、フレームの終わりに適用されます。
 - ゲーム内テキストのフォントは、アクセント記号やñを描画できません。`"MENÚ"`ではなく`"MENU"`と書いてください。
-- `areaSegura`、`cajaUI`、`resolucion`は、最初のフレームが描画されたあとで初めて正しい値になります。`inicio`では使わないでください。
+- `safeArea`、`uiBox`、`resolution`は、最初のフレームが描画されたあとで初めて正しい値になります。`start`では使わないでください。
 - WebとAndroidでは、**最初の**ライトだけが照らします。
-- Nokia N95にはゲームパッドもマウスもありません。電話のキーパッドの名前で`tecla`を使ってください。整数は32ビットです。
+- Nokia N95にはゲームパッドもマウスもありません。電話のキーパッドの名前で`key`を使ってください。整数は32ビットです。
 
 ## 高速に動かすために（特に電話で）
 
-- オブジェクトは`inicio`で一度だけ探し、`local`変数に保存してください。
+- オブジェクトは`start`で一度だけ探し、`local`変数に保存してください。
 - 1つずつ処理する関数を何千回も呼ぶ代わりに、まとめて処理する版（`setVertices`、`setVerticesColor`）を使ってください。
-- Luaで計算するよりも、エンジンの関数（`desplazarUV`、`lineaPunto`、順序を指定した`setRotacion`）を優先してください。
-- やみくもに最適化する前に、`perfilLua`と`relojMs`で計測してください。
+- Luaで計算するよりも、エンジンの関数（`scrollUV`、`linePoint`、順序を指定した`setRotation`）を優先してください。
+- やみくもに最適化する前に、`luaProfile`と`clockMs`で計測してください。

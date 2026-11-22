@@ -2,44 +2,44 @@
 #   el color base: un color) en el menu contextual (restablecer / copiar / pegar, con Ctrl+Z) y con el DEDO: arrastrar de
 #   costado el numero lo cambia (antes el toque se ejecutaba al soltar y el arrastre quedaba armado: no pasaba nada)
 #   (una ventana alta: la tarjeta Material entera a la vista)
-ventana 1200 1800
-escala 2
+window 1200 1800
+scale 2
 selobj Cubo
 propstab 2
 tick
-propclic New Material
+propclick New Material
 tick
-menuelegir New Material
+menupick New Material
 tick
-matver rugosidad 0.5
-propclicder Roughness
-menuabierto si
+matshow roughness 0.5
+proprightclick Roughness
+menuopen si
 menuitem Reset
 menuitem Copy
 menuitem Paste
 fail menuitem Insert Keyframe
-menuelegir Copy
+menupick Copy
 matrt 0.2 0
 tick
-propclicder Roughness
-menuelegir Paste
-matver rugosidad 0.5
+proprightclick Roughness
+menupick Paste
+matshow roughness 0.5
 matrt 0.9 0
 tick
-propclicder Roughness
-menuelegir Reset
-matver rugosidad 0.5
+proprightclick Roughness
+menupick Reset
+matshow roughness 0.5
 undo
-matver rugosidad 0.9
-propclicder Emission
-menuabierto si
-menuelegir Copy
-propclicder Emission
-menuelegir Reset
-matver emision 0 0 0
+matshow roughness 0.9
+proprightclick Emission
+menuopen si
+menupick Copy
+proprightclick Emission
+menupick Reset
+matshow emission 0 0 0
 # el DEDO: arrastrar de costado el numero de la rugosidad lo lleva hasta el tope (1)
-esperar 600
-propdedoarrastrar 2000 Roughness
-matver rugosidad 1
+wait 600
+propfingerdrag 2000 Roughness
+matshow roughness 1
 undo
-matver rugosidad 0.9
+matshow roughness 0.9

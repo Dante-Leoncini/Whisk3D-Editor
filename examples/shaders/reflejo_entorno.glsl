@@ -8,7 +8,7 @@
 //   Color        el tinte del reflejo (un metal dorado refleja dorado)
 //   Metalico     0 = plastico (refleja poco, mas de costado), 1 = metal (todo es reflejo)
 
-@fragmento
+@fragment
 const float PI = 3.14159265;
 
 // una direccion del MUNDO -> donde cae en la foto panoramica
@@ -18,20 +18,20 @@ vec2 Panorama(vec3 d) {
     return vec2(u, v);
 }
 
-vec4 Fragmento() {
+vec4 Fragment() {
     vec3 n = w3d_Normal();
-    vec3 ojo = w3d_HaciaCamara();
+    vec3 ojo = w3d_ToCamera();
 
     // hacia donde REBOTA la mirada (en el espacio de la camara) y esa direccion en el MUNDO: el entorno queda quieto
     // aunque la camara gire
     vec3 r = reflect(-ojo, n);
-    vec3 entorno = w3d_Textura(Panorama(normalize(w3d_AMundo(r)))).rgb;
+    vec3 entorno = w3d_Texture(Panorama(normalize(w3d_ToWorld(r)))).rgb;
 
     // de costado todo refleja mas (Fresnel); un metal refleja siempre
     float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(n, ojo), 0.0), 5.0);
-    float cuanto = mix(fresnel, 1.0, w3d_metalico);
+    float cuanto = mix(fresnel, 1.0, w3d_metallic);
 
-    vec3 superficie = w3d_color.rgb * w3d_Luz(n);
-    vec3 reflejo = entorno * mix(vec3(1.0), w3d_color.rgb, w3d_metalico);
+    vec3 superficie = w3d_color.rgb * w3d_Light(n);
+    vec3 reflejo = entorno * mix(vec3(1.0), w3d_color.rgb, w3d_metallic);
     return vec4(mix(superficie, reflejo, cuanto), 1.0);
 }

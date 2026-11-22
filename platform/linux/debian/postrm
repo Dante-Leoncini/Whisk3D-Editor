@@ -1,6 +1,6 @@
 #!/bin/sh
 # postrm de whisk3d: al desinstalar, refresca las bases de MIME/desktop/iconos
-# para que no quede el tipo application/vnd.whisk3d.proyecto+zip (ni su alias
+# para que no quede el tipo application/vnd.whisk3d.project+zip (ni su alias
 # viejo application/x-whisk3d) ni el icono colgados.
 # Mismo criterio que el postinst: los triggers de dpkg ya lo cubren, esto es
 # red de seguridad y nunca hace fallar al paquete.

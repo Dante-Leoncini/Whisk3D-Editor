@@ -14,9 +14,9 @@
 // =====================================================================
 //  Console — viewport que muestra el LOG del motor y los ERRORES de lua.
 // =====================================================================
-//  Lee el ring buffer en memoria del log del Core (w3dLogRingLinea /
+//  Lee el ring buffer en memoria del log del Core (w3dLogRingLine /
 //  w3dLogRingCount): las ultimas N lineas de w3dLog/w3dLogf, con su nivel.
-//  Ademas muestra BIEN VISIBLE el ultimo error de lua (W3dScriptUltimoError),
+//  Ademas muestra BIEN VISIBLE el ultimo error de lua (W3dScriptLastError),
 //  que hasta ahora se llenaba pero no se mostraba en ningun lado de la UI.
 //
 //  Colores por nivel: [ERROR] rojo, [WARN] amarillo, [INFO] gris claro.
@@ -30,12 +30,12 @@ class Console : public ViewportBase, public WithBorder, public Scrollable {
         // 1=3D 2=outliner 3=props 4=UV 5=timeline 6=2D 7=console
         int ViewportKind() const { return 7; }
         // engancha el ruteo compartido de scrollbars (hover/agarre/arrastre/touch)
-        Scrollable* ComoScrollable() { return this; }
+        Scrollable* AsScrollable() { return this; }
 
         // metricas del contenido la ultima vez que se midio (para recalcular el
         // rango de scroll SOLO cuando cambia algo, como lastContentRows del Outliner)
         int lastCount;    // lineas del ring buffer
-        int lastMaxAncho; // ancho (px) de la linea mas larga
+        int lastMaxWidth; // ancho (px) de la linea mas larga
         int lastBannerH;  // alto del banner del ultimo error de lua (0 si no hay)
 
         Console();
@@ -45,14 +45,14 @@ class Console : public ViewportBase, public WithBorder, public Scrollable {
         void Resize(int newW, int newH) W3D_OVERRIDE;
         void button_left() W3D_OVERRIDE;
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE; // drag con boton = scroll del contenido
-        void mouse_button_up(int boton) W3D_OVERRIDE;         // libera ViewPortClickDown (foco por hover; Symbian: con el dedo)
+        void mouse_button_up(int button) W3D_OVERRIDE;        // libera ViewPortClickDown (foco por hover; Symbian: con el dedo)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll v/h
 
     private:
         // recalcula el scrollbar con las metricas guardadas, manteniendo el
         // autoscroll: si estabas pegado al final, el final nuevo te sigue
-        void RecalcularScroll();
+        void RecalculateScroll();
 };
 
 #endif // CONSOLE_H

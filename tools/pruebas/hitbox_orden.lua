@@ -5,48 +5,48 @@
 --  primeros; _dentro = hitboxDentro(yo()) al ultimo alEntrar. Con apagarEn = N
 --  el script apaga su hitbox en el tick N (el tick siguiente llegan los alSalir).
 -- ==========================================================================
-propiedades = { prefijo = "x", apagarEn = 0 }
+properties = { prefijo = "x", apagarEn = 0 }
 
 local p = "x"
 local t = 0
 local nq = 0
-local function anotar(c, o)
+local function annotate(c, o)
   local k = p .. "_" .. c
-  setCompartido(k, (compartido(k) or "") .. nombre(o) .. ";")
+  setShared(k, (getShared(k) or "") .. getName(o) .. ";")
 end
 
-function inicio()
-  p = propiedad("prefijo")
-  setCompartido(p .. "_entrar", "")
-  setCompartido(p .. "_quedarse", "")
-  setCompartido(p .. "_salir", "")
-  setCompartido(p .. "_tocar", "")
-  setCompartido(p .. "_dentro", "")
+function start()
+  p = property("prefijo")
+  setShared(p .. "_entrar", "")
+  setShared(p .. "_quedarse", "")
+  setShared(p .. "_salir", "")
+  setShared(p .. "_tocar", "")
+  setShared(p .. "_dentro", "")
 end
 
-function alEntrar(otro, mio, suyo)
-  anotar("entrar", otro)
-  local l = hitboxDentro(yo())
+function onEnter(other, mine, own)
+  annotate("entrar", other)
+  local l = hitboxInside(self())
   local s = ""
-  for i = 1, #l do s = s .. nombre(l[i]) .. ";" end
-  setCompartido(p .. "_dentro", s)
+  for i = 1, #l do s = s .. getName(l[i]) .. ";" end
+  setShared(p .. "_dentro", s)
 end
 
-function alQuedarse(otro, mio, suyo)
+function onStay(other, mine, own)
   nq = nq + 1
-  if nq <= 2 then anotar("quedarse", otro) end
+  if nq <= 2 then annotate("quedarse", other) end
 end
 
-function alSalir(otro, mio, suyo)
-  anotar("salir", otro)
+function onExit(other, mine, own)
+  annotate("salir", other)
 end
 
-function alTocar(otro, impulso, x, y, z, nx, ny, nz)
-  anotar("tocar", otro)
+function onTouch(other, impulse, x, y, z, nx, ny, nz)
+  annotate("tocar", other)
 end
 
-function actualizar(dt)
+function update(dt)
   t = t + 1
-  local n = tonumber(propiedad("apagarEn")) or 0
-  if n > 0 and t == n then setHitboxActivo(yo(), false) end
+  local n = tonumber(property("apagarEn")) or 0
+  if n > 0 and t == n then setHitboxActive(self(), false) end
 end

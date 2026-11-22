@@ -25,35 +25,35 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_bsp_mundo.w3s
 # ===========================================================================
-abrirw3d prueba_bsp_mundo.w3d
+openw3d prueba_bsp_mundo.w3d
 loadtex
 
 # cluster 0 (X = -2): hojas 0 y 1
-bspinfo MundoBsp cluster 0 pvs 0 hojas 2 caras 2 draws 2
-escenapx -2 0 -0.5 es 128 0 0 16
-escenapx 0 0 -0.5 es 0 255 0 16
-escenapx 2 0 -0.5 es 13 13 13 10
-escenapx 4.6 0.6 -0.5 es 13 13 13 10
+bspinfo MundoBsp cluster 0 pvs 0 leaves 2 faces 2 draws 2
+scenepx -2 0 -0.5 es 128 0 0 16
+scenepx 0 0 -0.5 es 0 255 0 16
+scenepx 2 0 -0.5 es 13 13 13 10
+scenepx 4.6 0.6 -0.5 es 13 13 13 10
 
 # cluster 3 (X = 4): hojas 2 y 3, el cubo dinamico pasa
 selobj CamBsp
 objmove 6 0 0
 objat CamBsp 4 0 10 0.001
-bspinfo MundoBsp cluster 3 pvs 1 hojas 2 caras 2 draws 2
-escenapx 4.6 0.6 -0.5 es 255 255 0 16
-escenapx -2 0 -0.5 es 13 13 13 10
+bspinfo MundoBsp cluster 3 pvs 1 leaves 2 faces 2 draws 2
+scenepx 4.6 0.6 -0.5 es 255 255 0 16
+scenepx -2 0 -0.5 es 13 13 13 10
 
 # Culling apagado: el mundo entero, sin PVS
-cullactivo MundoBsp off
-bspinfo MundoBsp hojas 4 caras 4 draws 4
-escenapx -2 0 -0.5 es 128 0 0 16
-cullactivo MundoBsp on
-bspinfo MundoBsp cluster 3 hojas 2 draws 2
+cullactive MundoBsp off
+bspinfo MundoBsp leaves 4 faces 4 draws 4
+scenepx -2 0 -0.5 es 128 0 0 16
+cullactive MundoBsp on
+bspinfo MundoBsp cluster 3 leaves 2 draws 2
 
 # round-trip: el mundo y sus texturas sobreviven al guardado
-guardarw3d /tmp/w3d_prueba_bsp_mundo.w3d
-abrirw3d /tmp/w3d_prueba_bsp_mundo.w3d
+savew3d /tmp/w3d_prueba_bsp_mundo.w3d
+openw3d /tmp/w3d_prueba_bsp_mundo.w3d
 loadtex
-bspinfo MundoBsp cluster 3 pvs 1 hojas 2 draws 2
-escenapx 4.6 0.6 -0.5 es 255 255 0 16
-escenapx 2 0 -0.5 es 0 0 255 16
+bspinfo MundoBsp cluster 3 pvs 1 leaves 2 draws 2
+scenepx 4.6 0.6 -0.5 es 255 255 0 16
+scenepx 2 0 -0.5 es 0 0 255 16

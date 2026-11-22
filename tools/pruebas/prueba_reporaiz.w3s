@@ -13,11 +13,11 @@
 #  (el camino que la da depende del build: no se exige salvo con Ajustes/entorno).
 # ==========================================================================
 
-reporaiz ../..
+reporoot ../..
 # Ajustes manda si es el repo; si no lo es, se saltea
-reporaiz ../.. ajustes ../.. via ajustes
-reporaiz ../.. ajustes /tmp/w3d_no_es_un_repo entorno -
+reporoot ../.. settings ../.. via settings
+reporoot ../.. settings /tmp/w3d_no_es_un_repo environment -
 # la variable de entorno, detras de Ajustes
-reporaiz ../.. ajustes - entorno ../.. via entorno
-reporaiz ../.. ajustes ../.. entorno /tmp via ajustes
-reporaiz ../.. ajustes /tmp/w3d_no_es_un_repo entorno /tmp/w3d_tampoco
+reporoot ../.. settings - environment ../.. via environment
+reporoot ../.. settings ../.. environment /tmp via settings
+reporoot ../.. settings /tmp/w3d_no_es_un_repo environment /tmp/w3d_tampoco

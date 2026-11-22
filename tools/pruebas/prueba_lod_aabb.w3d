@@ -14,7 +14,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.02, 0.02, 0.03, 1.0"
 
         // la camara de la ESCENA queda parada al lado de la punta de la barra:
@@ -33,7 +33,7 @@ Whisk3D {
         // LOD normal: mide desde la VISTA QUE DIBUJA (la orbita del viewport)
         LOD {
             name: "LodBarra"
-            distancias: "8"
+            distances: "8"
             Wavefront { name: "BarraFina"   filePath: lod-barra-fina.obj }
             Wavefront { name: "BarraGruesa" filePath: lod-barra-gruesa.obj }
         }
@@ -42,8 +42,8 @@ Whisk3D {
         // el viewport desde donde se mire (el mismo flag que ya tiene el Culling).
         LOD {
             name: "LodBarraCam"
-            distancias: "8"
-            soloCamaraActiva: true
+            distances: "8"
+            activeCameraOnly: true
             Wavefront { name: "BarraFinaCam"   filePath: lod-barra-fina.obj   z: 3.0 }
             Wavefront { name: "BarraGruesaCam" filePath: lod-barra-gruesa.obj z: 3.0 }
         }
@@ -56,8 +56,8 @@ Whisk3D {
         // se mire el viewport desde donde se mire.
         Culling {
             name: "CullBarras"
-            activo: true
-            soloCamaraActiva: true
+            active: true
+            activeCameraOnly: true
             Wavefront { name: "Cull0" filePath: lod-barra-fina.obj x:    0.0 y:   0.0 scale: 0.05 }
             Wavefront { name: "Cull1" filePath: lod-barra-fina.obj x:    2.0 y:   0.0 scale: 0.05 }
             Wavefront { name: "Cull2" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 200.0 scale: 0.05 }

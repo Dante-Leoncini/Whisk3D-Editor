@@ -1,0 +1,2210 @@
+" already exists. Do you want to replace it?	" уже существует. Заменить?
+"%s" is in use by %d user(s). Delete it anyway? Its users will be left without it.	"%s" используется (пользователей: %d). Всё равно удалить? Пользователи останутся без него.
+"%s" is used by %d object(s). Delete it anyway?	"%s" используется объектами (%d). Всё равно удалить?
+#+Down	#+Вниз
+#+Left/Right	#+Влево/Вправо
+#+Up	#+Вверх
+%d %s '%s' -> '%s' (binding by name)	%d %s: '%s' -> '%s' (привязка по имени)
+%d Push matrix without its Pop	«Сохранить матрицу» без «Восстановить матрицу»: %d
+%d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Кривые анимации выделения (%d) больше ничего не анимируют (Отмена вернёт их)
+%d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	Кривые анимации (%d) остались без объекта (первая: '%s'): см. whisk3d.log
+%d curves selected	Выбрано кривых: %d
+%d files are now external	Внешних файлов теперь: %d
+%d files are now inside the .w3d	Файлов внутри .w3d теперь: %d
+%d keyframes selected	Выбрано ключевых кадров: %d
+%d name(s) renumbered when changing scene (%s%s). Check your Lua scripts.	Имена (%d) перенумерованы при смене сцены (%s%s). Проверьте свои скрипты Lua.
+%d nodes | active node: %d	Узлов: %d | активный узел: %d
+%d object(s) got their own copy of the mesh	Объекты (%d) получили свою копию меша
+%d object(s) of the project use 3D meshes of "%s": each one gets its own copy (Ctrl+Z undoes it). Unlink it?	Объекты проекта (%d) используют 3D-меши из "%s": каждый получит свою копию (Ctrl+Z отменяет). Отвязать?
+%d object(s) with vertex anims keep the previous mesh: '%s'	Объекты с vertex anims (%d) остаются с прежним мешем: '%s'
+%d old constraint(s) without a target: they did nothing, nothing was migrated	Старые ограничители без цели (%d): они ничего не делали, ничего не перенесено
+%d reference(s) of the unpacked objects now find another object with the same name	Ссылки распакованных объектов (%d) теперь находят другой объект с тем же именем
+%d repeated name(s) renumbered (%s%s). The original did NOT change: whatever pointed to it by name still points there.	Повторяющиеся имена (%d) перенумерованы (%s%s). Оригинал НЕ изменился: то, что ссылалось на него по имени, ссылается туда же.
+%d resources are in use (%d users). Delete them anyway? Their users will be left without them.	Ресурсы (%d) используются (пользователей: %d). Всё равно удалить? Пользователи останутся без них.
+%d script reference(s) and %d target(s) updated	Обновлено ссылок скриптов: %d и целей: %d
+%d textures reloaded	Перезагружено текстур: %d
+%s: does not compile	%s: не компилируется
+'%s' already exists -> '%s'	'%s' уже существует -> '%s'
+'%s' has more than 65535 vertices: saving it as text (.w3dm), not binary	В '%s' больше 65535 вершин: сохраняю как текст (.w3dm), а не в двоичном виде
+'%s' is a 2D element: it can only hang from its UI scene or from another 2D element (it was not moved).	'%s' — 2D-элемент: он может висеть только на своей UI-сцене или на другом 2D-элементе (не перемещён).
+'%s' pointed to another constraint ('%s'): it could not be migrated	'%s' указывал на другой ограничитель ('%s'): перенести не удалось
+'%s' uses the animations '%s' from a missing library: no clips until you link it	'%s' использует анимации '%s' из отсутствующей библиотеки: клипов нет, пока её не привязать
+'%s' uses the mesh '%s' from a missing library: it stays empty until you link it	'%s' использует меш '%s' из отсутствующей библиотеки: остаётся пустым, пока её не привязать
+'%s' was a constraint: it is now an Empty, its %d child(ren) stayed where they were	'%s' был ограничителем: теперь это Пустышка, его дочерние объекты (%d) остались на месте
+'%s' was opened WITH ERRORS (truncated file): when saving, whatever was missing is lost	'%s' был открыт С ОШИБКАМИ (обрезанный файл): при сохранении недостающее теряется
+'%s': %s (and more: see whisk3d.log)	'%s': %s (и ещё: см. whisk3d.log)
+'%s': could not load its clips (%s)	'%s': не удалось загрузить его клипы (%s)
+(Esc to cancel)	(Esc — отмена)
+(choose)	(выбрать)
+(coming soon)	(скоро)
+(default)	(по умолчанию)
+(empty)	(пусто)
+(inherited)	(унаследованная)
+(no .lua scripts or .glsl shaders in the project)	(в проекте нет скриптов .lua и шейдеров .glsl)
+(no .lua scripts)	(нет скриптов .lua)
+(no properties yet)	(пока нет свойств)
+(none)	(нет)
+(not shared)	(не общий)
+(nothing to choose)	(нечего выбрать)
+(root)	(корень)
+(this routine)	(эта процедура)
+(unnamed)	(без имени)
+16-bit textures	16-битные текстуры
+2D Armature Animation	Анимация 2D-арматуры
+2D Cursor	2D-курсор
+2D Editor	2D-редактор
+2D armature animation: the mesh has no 2D armature	Анимация 2D-арматуры: у меша нет 2D-арматуры
+2D bone(s)	2D-кость(и)
+360 Image	Изображение 360
+3D Cursor	3D-курсор
+3D Mesh	3D-меш
+3D Mesh of	3D-меш объекта
+3D Meshes	3D-меши
+3D Viewport	3D-вьюпорт
+3D grid	3D-сетка
+: baked	: запечено
+A W3D proxy is read-only: it can't be unpacked	Прокси W3D только для чтения: распаковать нельзя
+A custom probe uses the image you choose	Свой зонд использует выбранное изображение
+A different file already exists there	Там уже есть другой файл
+A flipbook uses it	Используется флипбуком
+A game has no animation to render	У игры нет анимации для рендера
+A game has no keyframes: choose one of its clips in the timeline to animate	У игры нет ключевых кадров: выберите один из её клипов на таймлайне
+A prefab can't be converted	Префаб нельзя конвертировать
+A prefab can't contain itself	Префаб не может содержать сам себя
+A prefab instance only has what its prefab generates	Экземпляр префаба содержит только то, что создаёт его префаб
+A project needs at least one scene	В проекте нужна хотя бы одна сцена
+A realtime probe is drawn by the GPU	Зонд реального времени рисует GPU
+A resource with that name already exists	Ресурс с таким именем уже есть
+A scene can't contain itself	Сцена не может содержать саму себя
+A scene with that name already existed, renamed:	Сцена с таким именем уже была, новое имя:
+A texture with that name already exists	Текстура с таким именем уже есть
+APK (aapt, signing)	APK (aapt, подпись)
+Above: once at start. Below: every frame.	Сверху: один раз при старте. Снизу: каждый кадр.
+Absolute	Абсолютная
+Acceleration	Ускорение
+Accept	Принять
+Actions	Действия
+Active	Активный
+Active Camera	Активная камера
+Active Element	Активный элемент
+Active Keyframe	Активный ключ
+Active camera	Активная камера
+Add	Добавить
+Add Circle	Добавить окружность
+Add Color	Добавить цвет
+Add Color Layer	Добавить слой цвета
+Add Cone	Добавить конус
+Add Cube	Добавить куб
+Add Cylinder	Добавить цилиндр
+Add Layer	Добавить слой
+Add Library...	Добавить библиотеку...
+Add Modifier	Добавить модификатор
+Add Plane	Добавить плоскость
+Add UV Group	Добавить UV-группу
+Add UV Map	Добавить UV-карту
+Add UV Sphere	Добавить UV-сферу
+Add Vertex Group	Добавить группу вершин
+Add shortcut	Добавить сочетание
+Added to the library	Добавлено в библиотеку
+Additive	Аддитивное
+Additive (ADITIVO)	Аддитивное (ADITIVO)
+Additive (by alpha)	Аддитивное (по альфе)
+Additive by alpha	Аддитивное по альфе
+Advanced: custom shader	Дополнительно: свой шейдер
+Affect	Воздействие
+Affect Move	Влиять на перемещение
+Affect Rotate	Влиять на вращение
+Affect Scale	Влиять на масштаб
+Affected	Затронутые
+After Mode	Режим после
+Align	Выровнять
+Align X	Выровнять X
+Align Y	Выровнять Y
+Aligned	Выровненная
+All	Все
+All Transforms	Все трансформации
+All parts	Все части
+All shortcuts restored	Сочетания клавиш сброшены
+All viewports	Все вьюпорты
+Allow	Разрешить
+Alpha	Альфа
+Alpha (normal)	Альфа (обычное)
+Alpha Map	Карта альфы
+Alpha Preview	Просмотр альфы
+Alpha Test	Альфа-отсечение
+Alpha channel	Альфа-канал
+Alpha kept per second	Остаток альфы в секунду
+Alpha only	Только альфа
+Alpha order	Порядок по альфе
+Alpha reference	Порог альфы
+Alpha test	Альфа-тест
+Alpha test on/off	Альфа-тест вкл/выкл
+Always	Всегда
+Ambient	Фоновый
+Ambient light	Фоновый свет
+An animated material uses it	Используется анимированным материалом
+Anamorphic Ratio	Анаморфность
+Anchor	Якорь
+Angle	Угол
+Angle random	Разброс угла
+Animation	Анимация
+Animation deleted: 	Анимация удалена: 
+Animation recovered in a new scene: '%s'	Анимация восстановлена в новой сцене: '%s'
+Animation rendered!	Анимация отрендерена!
+Animations	Анимации
+Animations of	Анимации объекта
+Another probe is baking	Другой зонд сейчас запекается
+Antialiasing	Сглаживание
+Any mode	Любой режим
+Any orientation	Любая
+Anywhere	Где угодно
+Apply	Применить
+Apply All Transforms	Применить все трансформации
+Apply Location	Применить положение
+Apply Modifier	Применить модификатор
+Apply Modifiers	Применить модификаторы
+Apply Rotation	Применить вращение
+Apply Scale	Применить масштаб
+Apply Transforms	Применить трансформации
+Apply: select mesh or armature object(s)	Применить: выберите меши или арматуры
+Arc	Дуга
+Armature	Арматура
+Armature 2D	Арматура 2D
+Armature Animation	Анимация арматуры
+Array	Массив
+Array on/off	Массив вкл/выкл
+Array: a memory @name[i] = count, then first/last triangle pairs (last -1 = max). Empty = the parts.	Массив: память @имя[i] = количество, затем пары первый/последний треугольник (последний -1 = макс.). Пусто = части.
+Array: a memory @name[i] = count, then first/last triangle pairs (last -1 = max). Empty = the whole part.	Массив: память @имя[i] = количество, затем пары первый/последний треугольник (последний -1 = макс.). Пусто = вся часть.
+Aspect	Соотношение
+Assets	Ассеты
+Assign	Назначить
+At Center	В центре
+At Cursor	У курсора
+At least one scene stays open	Хотя бы одна сцена должна оставаться открытой
+Atlas	Атлас
+Att Constant	Затух. постоянное
+Att Linear	Затух. линейное
+Att Quadratic	Затух. квадратичное
+Audible range	Дальность слышимости
+Audio	Аудио
+Audio format	Формат аудио
+Audio rendered!	Аудио готово!
+Audio scrubbing	Слышать при перемотке (скраббинг)
+Auto	Авто
+Auto (active part)	Авто (активная часть)
+Auto Clamped	Авто с ограничением
+Auto Fit	Вписать в область
+Auto Key	Автоключ
+Auto Keyframe	Автоключ
+Auto Keyframe: Off	Автоключ: выкл.
+Auto Keyframe: On	Автоключ: вкл.
+Auto Merge	Автослияние
+Auto frame	Автокадрирование
+Automatic	Автоматическая
+Automatic Easing	Автоплавность
+Automatic UVs were generated to paint	Созданы автоматические UV для рисования
+Average: 	В среднем: 
+Axis	Ось
+Axis Angle	Ось-угол
+Axis X	Ось X
+Axis Y	Ось Y
+Axis Z	Ось Z
+BSP (pending)	BSP (ожидает)
+BSP: the .w3dbsp file is missing (Culling.bsp)	BSP: нет файла .w3dbsp (Culling.bsp)
+Back	Сзади
+Back (overshoot)	С откатом
+Back View	Вид сзади
+Background	Фон
+Background Color	Цветной фон
+Background light	Свет фона
+Bake	Запечь
+Bake Lighting	Запечь освещение
+Bake canceled	Запекание отменено
+Bake the reflection probe first	Сначала запеките зонд отражений
+Baked	Запечённый
+Baked: %d points	Запечён: точек %d
+Bakes the light of the static objects into the texture, through the UV of the mesh	Запекает свет статических объектов в текстуру по UV сетки
+Baking here overwrites where their UVs overlap	Запекание сюда перезапишет места, где пересекаются их UV
+Base Color	Базовый цвет
+Base velocity	Базовая скорость
+Before Mode	Режим до
+Bevel	Фаска
+Bevel Edges	Фаска рёбер
+Bevel Vertices	Фаска вершин
+Bevel: enter Edit Mode first	Фаска: сначала войдите в Режим редактирования
+Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm	Фаска: от центра = ширина, колесо / вверх-вниз = сегменты, V = вершины/рёбра, клик = подтвердить
+Bevel: select edges first	Фаска: сначала выберите рёбра
+Bevel: select vertices first	Фаска: сначала выберите вершины
+Bezier	Безье
+Bias	Смещение
+Billboard	Билборд
+Bind texture	Привязать текстуру
+Bitrate	Битрейт
+Bits	Биты
+Black Letterbox	Чёрные полосы
+Blend	Смешивание
+Blend In	Плавный вход
+Blend Out	Плавный выход
+Blend Type	Тип смешивания
+Blend mode	Режим смешивания
+Blending	Смешивание
+Blending on/off	Смешивание вкл/выкл
+Bloom	Свечение
+Blue	Синий
+Blur	Размытие
+Bone	Кость
+Bones	Кости
+Boolean	Булев
+Boolean Object	Объект булева
+Border	Рамка
+Border Color	Цвет рамки
+Border Scale	Масштаб рамки
+Border X	Рамка X
+Border Y	Рамка Y
+Borderless	Без рамки
+Both	Оба
+Bottom	Снизу
+Bottom View	Вид снизу
+Bottom-Left	Снизу слева
+Bottom-Right	Снизу справа
+Bounce	Отскок
+Bounces	Отскоки
+Boundary	Граница
+Box (memory)	Бокс (память)
+Box Projection	Проекция в коробку
+Box Select	Выделение рамкой
+Box X	Бокс X
+Box Y	Бокс Y
+Box Z	Бокс Z
+Branch %d	Ветвь %d
+Branches	Ветви
+Branches: %d (all)	Ветви: %d (все)
+Branches: %d/%d	Ветви: %d/%d
+Build game	Собрать игру
+Build: Symbian packs the saved project: save it first (File > Save)	Сборка: Symbian упаковывает сохранённый проект: сначала сохраните его (Файл > Сохранить)
+Build: a build is already running	Сборка: сборка уже идёт
+Build: a library uses files by absolute path; they do not travel with the game	Сборка: библиотека использует файлы по абсолютному пути; они не попадут в игру
+Build: compilation failed (see platform-build/%s/build.log)	Сборка: компиляция не удалась (см. platform-build/%s/build.log)
+Build: could not copy the result to build/%s	Сборка: не удалось скопировать результат в build/%s
+Build: could not generate CMakeLists.txt	Сборка: не удалось создать CMakeLists.txt
+Build: could not generate main.cpp	Сборка: не удалось создать main.cpp
+Build: could not generate the Android script	Сборка: не удалось создать скрипт для Android
+Build: could not generate the AppImage script	Сборка: не удалось создать скрипт AppImage
+Build: could not generate the Makefile	Сборка: не удалось создать Makefile
+Build: could not generate the Symbian project	Сборка: не удалось создать проект Symbian
+Build: could not open the library	Сборка: не удалось открыть библиотеку
+Build: could not pack the assets	Сборка: не удалось упаковать ассеты
+Build: could not read the icon; continuing without it	Сборка: не удалось прочитать иконку; сборка без неё
+Build: could not write a scene (.w3dui)	Сборка: не удалось записать сцену (.w3dui)
+Build: could not write the .w3dui	Сборка: не удалось записать .w3dui
+Build: error in a Lua script: 	Сборка: ошибка в скрипте Lua: 
+Build: the Whisk3D repo (runtime sources) was not found. Set the repo folder in Settings (or build from the source tree).	Сборка: не найден репозиторий Whisk3D (исходники рантайма). Укажите папку репозитория в Настройках (или собирайте из дерева исходников).
+Build: the project has no game (a Game scene, or a UI with scripts)	Сборка: в проекте нет игры (сцены «Игра» или UI со скриптами)
+Build: the project has no scripts (add them to a Script object)	Сборка: в проекте нет скриптов (добавьте их в объект Script)
+Build: there are external references outside the project folder; they do not travel with the game	Сборка: есть внешние ссылки вне папки проекта; они не попадут в игру
+Build: there is no UI in the scene	Сборка: в сцене нет UI
+Button	Кнопка
+By Distance	По расстоянию
+By words	По словам
+Bytes	Байты
+C+Left	C+Влево
+C+Right	C+Вправо
+COULD NOT INSTALL on the phone (low on space?): the APK stays in build/android23	НЕ УДАЛОСЬ УСТАНОВИТЬ на телефон (мало места?): APK остаётся в build/android23
+CPU memory	Память CPU
+Call Lua	Вызвать Lua
+Call routine	Вызвать процедуру
+Camera	Камера
+Camera View	Вид из камеры
+Cameras	Камеры
+Cancel	Отмена
+Cancel (Esc)	Отмена (Esc)
+Cancel (right key)	Отмена (правая клавиша)
+Cancelled	Отменено
+Cargar textura (imagen)	Загрузить текстуру (изображение)
+Cascades	Каскады
+Cast shadows	Отбрасывать тени
+Cell size	Размер ячейки
+Center	Центр
+Center X	Центр X
+Center Y	Центр Y
+Center Z	Центр Z
+Center of frame	Середина кадра
+Change Material	Сменить материал
+Changes will be lost in:	Изменения будут потеряны в:
+Channels	Каналы
+Character	Персонаж
+Child Of	Дочерний объект
+Children	Дочерние
+Choose a shader	Выберите шейдер
+Choose a texture	Выберите текстуру
+Choose a texture to bake into	Выберите текстуру для запекания
+Choose file	Выбрать файл
+Choose...	Выбрать...
+Circle	Окружность
+Circular	Круговая
+Clamp	Ограничение
+Clamp Overlap	Ограничить перекрытие
+Clear	Очистить
+Clear Depth	Очистить Z
+Clear Inverse	Сбросить инверсию
+Clear Keyframe	Очистить ключевые кадры
+Clear Location (Pose)	Сбросить положение (поза)
+Clear Original File	Забыть исходный файл
+Clear Parent	Снять родителя
+Clear Parent Inverse	Сбросить инверсию родителя
+Clear Rotation (Pose)	Сбросить вращение (поза)
+Clear Screen	Очистить экран
+Clear Seam	Снять шов
+Clear Sharp	Снять острое
+Clear Transform	Сбросить трансформацию
+Clear UV Group Weights	Очистить веса UV-группы
+Clear and Keep Transformation	Снять с сохранением трансформации
+Clear color	Цвет очистки
+Clear depth	Очистить Z
+Clear screen	Очистить экран
+Clear with color	Очищать цветом
+Click the game to capture the mouse (Esc releases it)	Щёлкните по игре, чтобы захватить мышь (Esc — отпустить)
+Clip default	Как в клипе
+Clip to rect	Обрезать по прямоугольнику
+Clipping	Обрезка
+Clips	Клипы
+Clone screen	Клонировать экран
+Close	Закрыть
+Close Viewport	Закрыть вьюпорт
+Close Whisk3D?	Закрыть Whisk3D?
+Close without saving	Закрыть без сохранения
+Closest	Ближайший
+Codec	Кодек
+Collapse	Схлопнуть
+Collection	Коллекция
+Color	Цвет
+Color / Texture	Цвет / Текстура
+Color Grid	Цветная сетка
+Color Layers	Слои цвета
+Color Mode	Режим цвета
+Color at death	Цвет при гибели
+Color buffer	Буфер цвета
+Color pointer	Указатель цветов
+Colored grain	Цветное зерно
+Colors	Цвета
+Columns	Столбцы
+Compile	Компилировать
+Compiled	Скомпилировано
+Compiling (%s)	Компиляция (%s)
+Complete	Полный
+Component	Компонент
+Cone	Конус
+Configuring (cmake)	Настройка (cmake)
+Confirm	Подтвердить
+Connect Vertex Path	Соединить путь вершин
+Connect: no path between the vertices	Соединить: нет пути между вершинами
+Connect: select exactly 2 vertices	Соединить: выберите ровно 2 вершины
+Connect: the line leaves the surface	Соединить: линия выходит за поверхность
+Connect: the vertices are already connected	Соединить: вершины уже соединены
+Connect: the vertices are not visible	Соединить: вершины не видны
+Connected	Соединённый
+Connected Only	Только связанные
+Console	Консоль
+Constant	Константа
+Constant Offset	Постоянное смещение
+Constraint	Ограничитель
+Constraints	Ограничители
+Constructor	Конструктор
+Contain	Вписать
+Container	Контейнер
+Context	Контекст
+Context menu	Контекстное меню
+Continue without saving	Продолжить без сохранения
+Control	Управление
+Controller disconnected: %s	Контроллер отключён: %s
+Convert to Game	Преобразовать в игру
+Convert to Scene	Преобразовать в сцену
+Convert to editable mesh	Преобразовать в редактируемый меш
+Copied	Скопировано
+Copied to %d selected object(s)	Скопировано в %d выделенных объект(а/ов)
+Copy	Копировать
+Copy Keyframe	Копировать ключевой кадр
+Copy X	Копировать X
+Copy Y	Копировать Y
+Copy Z	Копировать Z
+Copy to Selected	Копировать в выделенные
+Copying libmain.so (jniLibs)	Копирование libmain.so (jniLibs)
+Copying results	Копирование результатов
+Copying the Android template	Копирование шаблона Android
+Core (advanced)	Ядро (дополнительно)
+Correct UVs	Корректировать UV
+Could not copy the objects	Не удалось скопировать объекты
+Could not create a viewport on the external display: cloning the screen	Не удалось создать вьюпорт на внешнем экране: экран клонируется
+Could not create the texture	Не удалось создать текстуру
+Could not encode the PNG	Не удалось закодировать PNG
+Could not encode the sound to AAC: the video has no sound	Не удалось закодировать звук в AAC: видео без звука
+Could not extract	Не удалось извлечь
+Could not import	Не удалось импортировать
+Could not link the copy of '%s' to its mesh	Не удалось связать копию '%s' с её мешем
+Could not load the layout	Не удалось загрузить раскладку
+Could not load the mesh '%s'	Не удалось загрузить меш '%s'
+Could not read the STL file	Не удалось прочитать файл STL
+Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать анимации '%s' (%s): они остаются ПУСТЫМИ, и сохранять поверх я не буду (см. whisk3d.log)
+Could not read the file	Не удалось прочитать файл
+Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать кадры анимации '%s' объекта '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
+Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)	Не удалось прочитать геометрию '%s': она остаётся ПУСТОЙ, и сохранять поверх я не буду (см. whisk3d.log)
+Could not read the image	Не удалось прочитать изображение
+Could not save the layout	Не удалось сохранить раскладку
+Could not write config.ini	Не удалось записать config.ini
+Could not write the file	Не удалось записать файл
+Count	Количество
+Cover	Заполнить
+Create	Создать
+Create Folder	Создать папку
+Create Prefab	Создать префаб
+Cross	Крест
+Cube	Куб
+Cube Projection	Кубическая проекция
+Cubic	Кубическая
+Culling	Отсечение
+Current Frame	Текущий кадр
+Current node	Текущий узел
+Cursor	Курсор
+Cursor to Active	Курсор к активному
+Cursor to Center	Курсор в центр
+Cursor to Grid	Курсор к сетке
+Cursor to Selected	Курсор к выделенному
+Cursor to Selection	Курсор к выделению
+Cursor to World Origin	Курсор в начало координат
+Curve	Кривая
+Curve Modifiers	Модификаторы кривой
+Curve segment	Участок кривой
+Curves	Кривые
+Custom	Свой
+Custom Normal	Своя нормаль
+Custom shader	Свой шейдер
+Custom: edit the curve	Свой: измените кривую
+Cut	Вырезать
+Cut the sound at the current frame (trim)	Разрезать звук на текущем кадре (trim)
+Cutoff	Срез
+Cycles	Циклы
+Cylinder	Цилиндр
+Cylinder Projection	Цилиндрическая проекция
+Debug mode	Режим отладки
+Decal	Декаль
+Decal pass	Проход декалей
+Decimals	Десятичные
+Default	По умолчанию
+Default Material	Материал по умолчанию
+Delete	Удалить
+Delete "%s" (%s) with all its objects?	Удалить "%s" (%s) со всеми объектами?
+Delete "%s"?	Удалить "%s"?
+Delete %d objects?	Удалить объекты (%d)?
+Delete %d scenes, games or prefabs with all their objects?	Удалить сцены, игры или префабы (%d) со всеми объектами?
+Delete All Keyframes	Удалить все ключевые кадры
+Delete Edge Loops	Удалить петли рёбер
+Delete Edge Loops: select an edge loop first	Удалить петли рёбер: сначала выберите петлю рёбер
+Delete Edge Loops: select an edge shared by two faces	Удалить петли рёбер: выберите ребро, общее для двух граней
+Delete Edges	Удалить рёбра
+Delete Faces	Удалить грани
+Delete Folder	Удалить папку
+Delete Keyframe	Удалить ключевой кадр
+Delete Keyframe: no keyframe at the current frame	Удалить ключевой кадр: на текущем кадре его нет
+Delete Keyframe: the animation needs at least one keyframe	Удалить ключевой кадр: анимации нужен хотя бы один ключевой кадр
+Delete Mesh Layer	Удалить слой меша
+Delete Normals Layer	Удалить слой нормалей
+Delete Palette	Удалить палитру
+Delete Vertices	Удалить вершины
+Delete editing data	Удалить данные редактирования
+Delete layout	Удалить раскладку
+Delete layout...	Удалить раскладку...
+Delete mesh layer: select an object animation in the timeline	Удалить слой меша: выберите анимацию объекта на таймлайне
+Delete normals layer: select an object animation in the timeline	Удалить слой нормалей: выберите анимацию объекта на таймлайне
+Delete selected?	Удалить выделенное?
+Delete step	Удалить шаг
+Delete the layout	Удалить раскладку
+Delete the orphan resource	Удалить неиспользуемый ресурс
+Delete the orphan resources	Удалить неиспользуемые ресурсы
+Deleted	Удалено
+Denoiser	Шумоподавление
+Density	Плотность
+Depth	Глубина
+Depth & clear	Глубина и очистка
+Depth Bias	Смещение глубины
+Depth Bias (m)	Смещение глубины (м)
+Depth Test	Тест глубины
+Depth bias	Смещение глубины
+Depth buffer	Буфер глубины
+Depth function	Функция глубины
+Depth of field	Глубина резкости
+Depth range	Диапазон глубины
+Depth shift (m)	Сдвиг глубины (м)
+Depth test	Тест глубины
+Depth write	Запись глубины
+Deselect	Снять выделение
+Deselect All	Снять всё выделение
+Detect bodies	Обнаруживать тела
+Device	Устройство
+Device name	Имя устройства
+Dies below alpha	Гибнет при альфе ниже
+Difference	Разность
+Diffuse	Диффузный
+Diffusion	Диффузия
+Directional	Направленный
+Discard the unsaved changes of	Сбросить несохранённые изменения в
+Disconnect	Отсоединить
+Disconnect Bone	Отсоединить кость
+Display in Edit Mode	Показ в Режиме редактирования
+Display in Viewport	Показывать во вьюпорте
+Distance	Расстояние
+Distance X	Расстояние X
+Distances	Расстояния
+Distribution	Распределение
+Don't allow	Не разрешать
+Done	Готово
+Done by CPU on this graphics backend (slow)	На этом графическом бэкенде делается на CPU (медленно)
+Dope Sheet	Лист экспозиции
+Drag (speed kept per second)	Сопротивление (остаток скорости в секунду)
+Drag the points, click to add	Перетаскивайте точки, клик — добавить
+Draw	Рисовать
+Draw children	Рисовать дочерние
+Draw custom background	Рисовать свой фон
+Draw elements	Рисовать элементы
+Draw in outliner order	Рисовать в порядке аутлайнера
+Draw mesh	Рисовать меш
+Drop a .wav on the library or on the 3D view	Перетащите .wav в библиотеку или в 3D-вид
+Drop an element of a library	Перетащите элемент библиотеки
+Drop it on a character with an armature	Перетащите на персонажа с арматурой
+Drop it on a compatible selector	Перетащите на совместимый селектор
+Drop it on a mesh	Перетащите на меш
+Drop the library, not a clip	Перетащите библиотеку, а не клип
+Duplicate	Дублировать
+Duplicate Linked	Дублировать связанно
+Duplicate Objects	Дублировать объекты
+Duplicate Resource	Дублировать ресурс
+Duplicated	Дублировано
+Duration	Длительность
+During a transform	Во время трансформации
+Dynamic	Динамический
+Ease In	Плавный вход
+Ease In and Out	Плавный вход и выход
+Ease Out	Плавный выход
+Easing Type	Плавность
+Edge	Ребро
+Edge Center	Центр ребра
+Edge Loops	Петли рёбер
+Edge Rail	Вдоль рёбер
+Edges	Рёбра
+Edit	Правка
+Edit Bones	Редактировать кости
+Edit Mode	Режим редактирования
+Edit Prefab	Редактировать префаб
+Edit Scene	Редактировать сцену
+Edit in the IDE	Редактировать в IDE
+Editing	Редактирование
+Editing data deleted (mesh not editable)	Данные редактирования удалены (меш не редактируемый)
+Effects	Эффекты
+Elastic	Упругая
+Elegir archivo	Выбрать файл
+Element	Элемент
+Element of	Элемент объекта
+Emission	Излучение
+Emission Map	Карта излучения
+Empty	Пустышка
+Empty routine	Пустая процедура
+Enable	Включить
+Enabled	Включено
+End	Конец
+End Frame	Конечный кадр
+End color	Конечный цвет
+End of frame	Конец кадра
+End:%d	Конец:%d
+Entry	Запись
+Equal	Равно
+Equirectangular (software)	Эквиректангулярная (программно)
+Error rendering animation	Ошибка рендера анимации
+Error rendering audio	Ошибка рендера аудио
+Error: could not save the OBJ	Ошибка: не удалось сохранить OBJ
+Error: could not save the STL	Ошибка: не удалось сохранить STL
+Error: could not save the render	Ошибка: не удалось сохранить рендер
+Errors only	Только ошибки
+Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Это изменит группу вершин и упростит её до 1 кости на вершину (скиннинг быстрее). Возможна потеря данных.
+Exclude X (plane)	Исключить X (плоскость)
+Exclude Y (plane)	Исключить Y (плоскость)
+Exclude Z (plane)	Исключить Z (плоскость)
+Exit	Выйти
+Exit Whisk3D?	Выйти из Whisk3D?
+Expand	Раскрыть
+Explore...	Обзор...
+Exponential	Экспоненциальная
+Exponential squared	Квадратичная экспонента
+Export	Экспорт
+Export UI	Экспорт UI
+Export UI to...	Экспорт UI в...
+Export UV Layout	Экспорт UV-развёртки
+Export UV Layout...	Экспорт UV-развёртки...
+Export to...	Экспорт в...
+Exporting glTF...	Экспорт glTF...
+Exporting model...	Экспорт модели...
+External	Внешний
+External (choose where)...	Внешний (выбрать где)...
+External display	Внешний экран
+Extract	Извлечь
+Extract assets	Извлечь ассеты
+Extract the assets to...	Извлечь ассеты в...
+Extract to a folder...	Извлечь в папку...
+Extract to...	Извлечь в...
+Extract...	Извлечь...
+Extract: save the project first (the assets live inside the .w3d)	Извлечь: сначала сохраните проект (ассеты хранятся внутри .w3d)
+Extracted	Извлечено
+Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Извлечено файлов: %d. Это КОПИИ: чтобы изменение вернулось в проект, его нужно импортировать снова
+Extracted %d file(s); %d failed (see the log)	Извлечено файлов: %d; с ошибкой: %d (см. лог)
+Extrude	Выдавить
+Extrude Bone	Выдавить кость
+Extrude Edges	Выдавить рёбра
+Extrude Faces	Выдавить грани
+Extrude Vertices	Выдавить вершины
+F-stop	Диафрагма (f)
+FBX export: not available yet	Экспорт FBX: пока недоступен
+FBX imported successfully!	FBX импортирован!
+FOV	FOV
+FPS	FPS
+Face	Грань
+Face Center	Центр грани
+Face Nearest	Ближайшая грань
+Face Normal	Нормаль грани
+Face Project	Проекция на грань
+Face Strength	Сила грани
+Face culling	Отсечение граней
+Face the camera	Смотреть на камеру
+Faces	Грани
+Faces triangulated	Грани триангулированы
+Factor	Коэффициент
+Factor X	Коэффициент X
+Fade border	Край затухания
+Fade in	Появление
+Fade out	Угасание
+Falloff	Спад
+Far	Дальняя
+Far fade from	Вдали: целиком до
+Far fade to	Вдали: невидимо с
+Far shadow blur	Размытие дальних
+Fast Mode	Быстрый режим
+File	Файл
+File name	Имя файла
+File size	Размер файла
+Fill	Заливка
+Film grain	Зерно плёнки
+Filter	Фильтр
+Filter Width	Ширина фильтра
+Filtering	Фильтрация
+Final composite	Итоговая композиция
+Find	Найти
+Find and Replace	Найти и заменить
+Find...	Найти...
+Finish the current transform first	Сначала завершите текущую трансформацию
+First triangle	Первый треугольник
+Fit	Подгонка
+Flags	Флаги
+Flags (memory)	Флаги (память)
+Flat	Плоская
+Flat color	Сплошной цвет
+Flip	Перевернуть
+Flip Normals	Перевернуть нормали
+Flipbook	Флипбук
+Flipbook frames	Кадры флипбука
+Flipbooks	Флипбуки
+Float	Дробное
+Floor	Пол
+Focus distance	Дистанция фокуса
+Focus object	Объект фокуса
+Fog	Туман
+Fog color	Цвет тумана
+Fog density	Плотность тумана
+Fog end	Конец тумана
+Fog mode	Режим тумана
+Fog on/off	Туман вкл/выкл
+Fog start	Начало тумана
+Folder	Папка
+Folders	Папки
+Follow Active Quads	По активным квадам
+Follow Active Quads: no neighbouring quads	По активным квадам: нет соседних квадов
+Follow Active Quads: select faces first	По активным квадам: сначала выберите грани
+Follow Active Quads: the active face must be a selected quad	По активным квадам: активная грань должна быть выделенным квадом
+Font	Шрифт
+Fonts	Шрифты
+Format	Формат
+Fraction	Доля
+Frame	Кадр
+Frame %d of %d	Кадр %d из %d
+Frame All	Показать всё
+Frame Selected	Показать выделенное
+Frame X	Кадр X
+Frame rate (0 = whole life)	Кадров в секунду (0 = вся жизнь)
+Frames	Кадры
+Free	Свободная
+Freely	Свободно
+Friction	Трение
+Front	Спереди
+Front View	Вид спереди
+Front to back	Спереди назад
+Frustum (AABB)	Frustum (AABB)
+Full volume radius	Радиус полной громкости
+Fullscreen	Полный экран
+Function	Функция
+GL Calls	Вызовы GL
+GL Light	Свет GL
+GLB saved successfully!	GLB сохранён!
+GPU (A-Trous)	GPU (A-Trous)
+GPU memory	Память GPU
+GPU-only meshes	Меши только в GPU
+Game	Игра
+Game UID generated (saved with the project)	UID игры создан (сохраняется с проектом)
+Game View	Вид игры
+Game built: %s	Игра собрана: %s
+Game icon	Иконка игры
+Gap	Зазор
+General	Общие
+Generate	Сгенерировать
+Generated by	Создано
+Geometry to Origin	Геометрию к центру
+Give the project a name to save it	Дайте проекту имя, чтобы сохранить
+Gizmo	Гизмо
+Global	Глобальная
+Go back	Назад
+Go to end	В конец
+Go to start	В начало
+Grab step	Захватить шаг
+Grain size	Размер зерна
+Graphics	Графика
+Graphics backend	Графический бэкенд
+Gravity	Гравитация
+Green	Зелёный
+Green+Left soft	Зелёная+Лев. софт
+Grid	Сетка
+Grid (cells)	Сетка (ячейки)
+Grid Cull	Grid Cull
+Grid Fill	Заполнить сеткой
+Group	Группа
+Growth (size per second)	Рост (размер в секунду)
+Growth kept per second	Остаток роста в секунду
+Handle Type	Тип рукоятки
+Handle type	Тип рукоятки
+Handles: Aligned	Рукоятки: выровненные
+Handles: Auto Clamped	Рукоятки: авто с ограничением
+Handles: Automatic	Рукоятки: автоматические
+Handles: Flat	Рукоятки: плоские
+Handles: Free	Рукоятки: свободные
+Handles: Vector	Рукоятки: вектор
+Harden Normals	Упрочнить нормали
+Height	Высота
+Hide / Show	Скрыть / Показать
+Hide/Show	Скрыть/Показать
+Hierarchy Clip	Клип иерархии
+Hierarchy Clips	Клипы иерархии
+Hitbox	Хитбокс
+Hover	Наведение
+Hue	Тон
+IDE: could not read	IDE: не удалось прочитать
+IDE: could not save inside the project:	IDE: не удалось сохранить внутри проекта:
+IDE: could not write	IDE: не удалось записать
+IDE: saving failed:	IDE: ошибка сохранения:
+IOR	IOR
+Icon	Иконка
+Ignore order	Игнорировать порядок
+Image	Изображение
+Import	Импортировать
+Import 3D model	Импорт 3D-модели
+Import FBX	Импорт FBX
+Import GLB	Импорт GLB
+Import OBJ	Импорт OBJ
+Import STL	Импорт STL
+Import glTF	Импорт glTF
+Import w3dui	Импорт w3dui
+Import...	Импортировать...
+Importance	Важность
+Imported	Импортировано
+Importing FBX...	Импорт FBX...
+Importing glTF...	Импорт glTF...
+Importing model...	Импорт модели...
+Imports	Импорт
+In the .w3d	В .w3d
+In use	Используется
+Include Active	Включая активный
+Include Edited	Включая редактируемые
+Include Non-Edited	Включая нередактируемые
+Index	Индекс
+Indices	Индексы
+Indirect light	Непрямой свет
+Individual	Индивидуально
+Individual Elements	Отдельные элементы
+Individual Origins	Индивидуальные центры
+Influence	Влияние
+Info	Инфо
+Insert Keyframe	Вставить ключевой кадр
+Insert Keyframe (all)	Вставить ключевой кадр (всё)
+Insert Keyframe: select an object animation in the timeline	Вставить ключевой кадр: выберите анимацию объекта на таймлайне
+Insert Keyframe: the mesh has no normals	Вставить ключевой кадр: у меша нет нормалей
+Insert Location Keyframe	Вставить ключевой кадр положения
+Insert Mesh Keyframe	Вставить ключевой кадр меша
+Insert Rotation Keyframe	Вставить ключевой кадр вращения
+Insert Scale Keyframe	Вставить ключевой кадр масштаба
+Insert UV keyframe: the mesh has no UV	Вставить ключевой кадр UV: у меша нет UV
+Inset Faces	Вставить грани
+Inset: enter Edit Mode first	Вставка: сначала войдите в Режим редактирования
+Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm	Вставка: к центру = толщина, Ctrl = глубина, I/B/O = отдельно/граница/наружу, клик = подтвердить
+Inset: select faces first	Вставка: сначала выберите грани
+Inside	Внутрь
+Inside the .w3d	Внутри .w3d
+Installing on the phone	Установка на телефон
+Instance	Экземпляр
+Intensity	Интенсивность
+Interpolate	Интерполировать
+Interpolate (mix)	Интерполировать (смешать)
+Interpolation	Интерполяция
+Interpolation Mode	Режим интерполяции
+Interpolation: Bezier	Интерполяция: Безье
+Interpolation: Constant	Интерполяция: константа
+Interpolation: Linear	Интерполяция: линейная
+Intersect	Пересечение
+Intersection Type	Тип пересечения
+Invalid size	Неверный размер
+Inverse Square	Обратный квадрат
+Invert	Инвертировать
+Invert Selection	Инвертировать выделение
+It already has physics	Уже есть физика
+It belongs to a library (read-only): open the library to edit it	Принадлежит библиотеке (только чтение): откройте библиотеку для правки
+It belongs to a prefab instance: edit the prefab or unpack the instance	Принадлежит экземпляру префаба: правьте префаб или распакуйте экземпляр
+It can't be converted	Нельзя конвертировать
+It can't be deleted	Нельзя удалить
+It can't be deleted: the reflection probe "%s" is using it	Нельзя удалить: её использует зонд отражений "%s"
+It can't be linked	Нельзя связать
+It can't be opened	Нельзя открыть
+It could not be loaded	Не удалось загрузить
+It couldn't be copied into the .w3d	Не удалось скопировать внутрь .w3d
+It doesn't exist anymore	Больше не существует
+It has no checkbox	У него нет флажка
+It has no proyecto.json	Нет proyecto.json
+It is a COPY: for a change to go back into the project you have to import it again	Это КОПИЯ: чтобы изменение вернулось в проект, его нужно импортировать снова
+It is a W3D proxy: choose its library element	Это прокси W3D: выберите его элемент библиотеки
+It is already linked	Уже связано
+It is in use	Используется
+It is not missing anymore	Уже не отсутствует
+It is open: switch to another scene first	Открыта: сначала переключитесь на другую сцену
+It is read-only	Только для чтения
+It is the open project	Это открытый проект
+It isn't a .w3d project	Это не проект .w3d
+It isn't linked	Не связано
+It isn't saved in the project yet	Ещё не сохранено в проекте
+Its file couldn't be read	Не удалось прочитать его файл
+Its geometry couldn't be read	Не удалось прочитать его геометрию
+Its objects couldn't be deleted	Не удалось удалить его объекты
+Its objects will be deleted too (Undo brings them back).	Его объекты тоже будут удалены (Отмена вернёт их).
+Its own list	Свой список
+Its proyecto.json can't be read	Его proyecto.json не читается
+Join	Объединить
+Join: no active mesh object	Объединить: нет активного меша
+Join: select 2+ mesh objects (active is the target)	Объединить: выберите 2+ меша (активный — цель)
+Joined into	Объединено в
+Jump to End	В конец
+Jump to Start	В начало
+Keep Offset	Сохранить смещение
+Key	Ключ
+Keyboard Shortcuts	Сочетания клавиш
+Keyboard Shortcuts...	Сочетания клавиш...
+Keyframe	Ключевой кадр
+Keyframes	Ключевые кадры
+LOD	LOD
+Lacunarity	Лакунарность
+Landscape only	Только альбомная
+Language	Язык
+Last triangle	Последний треугольник
+Last: 	Последний: 
+Layer	Слой
+Layer On	Слой вкл.
+Layout	Компоновка
+Layout deleted	Раскладка удалена
+Layout replaced	Раскладка заменена
+Layout saved	Раскладка сохранена
+Left	Слева
+Left Handle X	Лев. рукоятка X
+Left View	Вид слева
+Left soft	Лев. софт
+Legacy Noise	Классический шум
+Less	Меньше
+Less or equal	Меньше или равно
+Levels Viewport	Уровни во вьюпорте
+Libraries	Библиотеки
+Library	Библиотека
+Library linked	Библиотека связана
+Library not readable	Библиотека не читается
+Library unlinked	Библиотека отвязана
+Lifetime	Время жизни
+Light	Свет
+Light Probe	Световой зонд
+Light bounce	Отражение света
+Light bounces	Отскоки света
+Light color	Цвет света
+Light on/off	Свет вкл/выкл
+Light position	Позиция света
+Light probe baked: %d points	Световой зонд запечён: точек %d
+Lighting	Освещение
+Lighting baked	Освещение запечено
+Lighting on/off	Освещение вкл/выкл
+Lightmap Pack	Упаковка лайтмапа
+Lightmap Pack: select faces first	Упаковка лайтмапа: сначала выберите грани
+Lights	Источники света
+Line (trail)	Линия (след)
+Line Width	Толщина линии
+Line loop	Замкнутая линия
+Line strip	Ломаная
+Line width	Толщина линии
+Linear	Линейная
+Lines	Линии
+Link	Связать
+Link .w3d...	Связать .w3d...
+Linked	Связано
+Linked library	Библиотека
+Linking	Компоновка
+List	Список
+Load (camera x object)	Загрузить (камера x объект)
+Load .lua...	Загрузить .lua...
+Load Texture	Загрузить текстуру
+Load UI	Загрузить UI
+Load font	Загрузить шрифт
+Load from disk...	Загрузить с диска...
+Load image	Загрузить изображение
+Load normal map	Загрузить карту нормалей
+Load script	Загрузить скрипт
+Load shader	Загрузить шейдер
+Load sound	Загрузить звук
+Load sound from the file browser...	Загрузить звук из обозревателя файлов...
+Load video	Загрузить видео
+Loaded	Загружено
+Loading %d texture(s) before Play...	Загрузка текстур (%d) перед запуском...
+Loading mode	Загрузка
+Loading...	Загрузка...
+Local	Локальная
+Local View	Локальный вид
+Location	Положение
+Location Only	Только положение
+Location X	Положение X
+Lock Normals	Блокировать нормали
+Lock Orbit	Блокировать орбиту
+Lock the camera to the view	Привязать камеру к виду
+Logs	Логи
+Longest clip	Самый длинный клип
+Loop	Цикл
+Loop (smpl)	Цикл (smpl)
+Loop Cut	Петлевой разрез
+Loop Cut and Slide	Петлевой разрез и сдвиг
+Loop Cut: enter Edit Mode first	Петлевой разрез: сначала войдите в Режим редактирования
+Loop Cut: move = slide, Enter to confirm, Esc = center	Петлевой разрез: движение = сдвиг, Enter = подтвердить, Esc = центр
+Loop Cut: no active edge (click an edge first)	Петлевой разрез: нет активного ребра (сначала щёлкните по ребру)
+Loop Cut: no active face (click a face first)	Петлевой разрез: нет активной грани (сначала щёлкните по грани)
+Loop Cut: scroll = number of cuts, Enter to confirm	Петлевой разрез: колесо = число разрезов, Enter = подтвердить
+Loop Cut: select an edge (2 verts) or a quad (4 verts)	Петлевой разрез: выберите ребро (2 верш.) или квад (4 верш.)
+Loop Cut: select the 4 vertices of one quad	Петлевой разрез: выберите 4 вершины одного квада
+Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)	Петлевой разрез: коснитесь жёлтой точки для выбора направления (или стрелки + Enter)
+Loop Cut: the 2 selected vertices are not an edge	Петлевой разрез: 2 выбранные вершины не образуют ребро
+Loop Cut: the active face has no edges	Петлевой разрез: у активной грани нет рёбер
+Loop Cut: the active face is not a quad	Петлевой разрез: активная грань не квад
+Loop Select	Выделить петлю
+Loop Select (Edge Loop)	Выделить петлю (петля рёбер)
+Loop Select (Edge Ring)	Выделить петлю (кольцо рёбер)
+Loop Select: arrows = direction, Enter to confirm	Выделить петлю: стрелки = направление, Enter = подтвердить
+Loop Select: click an	Выделить петлю — щелчок:
+Loop Slide	Сдвиг по петле
+Loop forever	Повторять всегда
+Loose (editable)	Отдельно (редактируемые)
+MKV and MP4 need ffmpeg installed	Для MKV и MP4 нужен установленный ffmpeg
+Make External...	Сделать внешней...
+Make Internal	Сделать внутренней
+Make Single User	Сделать уникальным
+Manual range	Ручной диапазон
+Margin	Отступ
+Margin bottom	Отступ снизу
+Margin left	Отступ слева
+Margin right	Отступ справа
+Margin top	Отступ сверху
+Mark Seam	Пометить шов
+Mark Seams	Пометить швы
+Mark Sharp	Пометить острое
+Mass	Масса
+Matcap	Matcap
+Matcap (hardware)	Matcap (аппаратно)
+Match case	Учитывать регистр
+Match render	Как в рендере
+Material	Материал
+Material Index	Индекс материала
+Material Preview	Просмотр материала
+Material color	Цвет материала
+Material index	Индекс материала
+Material of	Материал объекта
+Materials	Материалы
+Max (last triangle of the mesh)	Макс. (последний треугольник меша)
+Max (last triangle of the part)	Макс. (последний треугольник части)
+Max distance	Макс. расстояние
+Maximize	Максимизировать
+Median	Медиана
+Median Point	Средняя точка
+Memory	Память
+Memory usage	Использование памяти
+Menu bar	Строка меню
+Merge	Слить
+Merge Distance	Расстояние слияния
+Merge at Center	Слить в центре
+Merge at Cursor	Слить у курсора
+Merge by Distance	Слить по расстоянию
+Mesh	Меш
+Mesh Parts	Части меша
+Mesh as text	Меш текстом
+Mesh editable again	Меш снова редактируемый
+Mesh layer deleted	Слой меша удалён
+Mesh made single user	Меш стал уникальным
+Mesh not editable (Convert to editable mesh, Mesh card)	Меш не редактируемый (Преобразовать в редактируемый меш, карточка Меш)
+Mesh part	Часть меша
+Meshes as text	Меши текстом
+Metallic	Металличность
+Metallic Map	Карта металличности
+Meters	Метры
+Method	Метод
+Minimize	Свернуть
+Minimum	Минимум
+Mipmap	Mipmap
+Mipmaps	Mipmaps
+Mirror	Зеркало
+Mirror Object	Объект-зеркало
+Mirror X	Зеркало X
+Mirror Y	Зеркало Y
+Mirror Z	Зеркало Z
+Missing file	Отсутствующий файл
+Missing files	Отсутствующие файлы
+Miter Inner	Внутренний скос
+Miter Outer	Внешний скос
+Mix	Микс
+Mix end	Конец микса
+Mix start	Начало микса
+Mode	Режим
+Model too big for the N95: more than 65535 vertices (16-bit limit)	Модель слишком большая для N95: больше 65535 вершин (предел 16 бит)
+Modifier	Модификатор
+Modifier Objects	Объекты-модификаторы
+Modifier applied	Модификатор применён
+Modifiers	Модификаторы
+Modulate	Модуляция
+Motion Trail	След движения
+Motion blur	Размытие движения
+Motion vectors	Векторы движения
+Move	Переместить
+Move (reorder)	Переместить (порядок)
+Move Down	Опустить
+Move Up	Поднять
+Move the current frame inside the sound to cut it	Поставьте текущий кадр внутрь звука, чтобы разрезать его
+Move the view	Сдвинуть вид
+Move to	Переместить в
+Move to Folder	Переместить в папку
+Move: %d frames	Сдвиг: %d кадр.
+Move: %d frames, %.3f value%s	Сдвиг: %d кадр., значение %.3f%s
+Multiply	Умножение
+Multiply (darkens)	Умножение (затемняет)
+Multiply (lightmap)	Умножение (лайтмап)
+Multiply 2x	Умножение 2x
+NRD (real time)	NRD (реальное время)
+Name	Имя
+Near	Ближняя
+Near fade from	Вблизи: невидимо до
+Near fade to	Вблизи: целиком с
+Nearest (pixelated)	Ближайший (пиксели)
+Nearest probe (automatic)	Ближайший зонд (автоматически)
+Network access	Доступ к сети
+New	Новый
+New Animation	Новая анимация
+New Color Layer	Новый слой цвета
+New Copy	Новая копия
+New Edge/Face from Vertices	Новое ребро/грань из вершин
+New Face from Vertices	Новая грань из вершин
+New Flipbook	Новый флипбук
+New Folder	Новая папка
+New Game	Новая игра
+New Library	Новая библиотека
+New Material	Новый материал
+New Mesh Part	Новая часть
+New Palette	Новая палитра
+New Prefab	Новый префаб
+New Scene	Новая сцена
+New Texture	Новая текстура
+New Texture...	Новая текстура...
+New Texture: could not load	Новая текстура: не удалось загрузить
+New Texture: could not save	Новая текстура: не удалось сохранить
+New Texture: invalid size	Новая текстура: неверный размер
+New UV Map	Новая UV-карта
+New W3D proxy of this element	Новый прокси W3D этого элемента
+New controller detected: %s	Обнаружен новый контроллер: %s
+New file	Новый файл
+New instance of this prefab	Новый экземпляр этого префаба
+New instance of this scene	Новый экземпляр этой сцены
+New material with this shader	Новый материал с этим шейдером
+New material with this texture	Новый материал с этой текстурой
+New noise each image	Новый шум в каждом кадре
+New object with this 3D mesh	Новый объект с этим 3D-мешем
+New paint texture	Новая текстура для рисования
+New project	Новый проект
+New shader	Новый шейдер
+New sound object here	Новый звуковой объект здесь
+Next	Следующее
+Next Frame	Следующий кадр
+Next Keyframe	Следующий ключ
+Next Viewport Shading	Следующий режим затенения
+Next frame	Следующий кадр
+Next keyframe	Следующий ключевой кадр
+No	Нет
+No Cycles	Без циклов
+No Normal Map	Без карты нормалей
+No Properties panel	Нет панели Свойства
+No Test, Write	Без теста, с записью
+No Texture	Без текстуры
+No Texture B	Без текстуры B
+No Toon Ramp	Без тун-градиента
+No UV Group for this bone	У этой кости нет UV-группы
+No UV map with this name in this 3D mesh	В этом 3D-меше нет UV-карты с таким именем
+No UVs to export	Нет UV для экспорта
+No active 3D viewport	Нет активного 3D-вьюпорта
+No active object	Нет активного объекта
+No axes: this constraint does nothing.	Нет осей: этот ограничитель ничего не делает.
+No file	Нет файла
+No library	Нет библиотеки
+No mipmaps (off or NPOT texture)	Без mipmap (выкл. или текстура NPOT)
+No object of the scene uses it	Не используется объектами сцены
+No original file to forget	Нет исходного файла, который можно забыть
+No other scenes	Нет других сцен
+No prefabs yet	Пока нет префабов
+No results	Нет результатов
+No source: this constraint does nothing.	Нет источника: этот ограничитель ничего не делает.
+No sun light in the scene: shadows come from the first sun light	В сцене нет солнечного света: тени даёт первый солнечный свет
+Noise	Шум
+None	Нет
+Normal	Нормаль
+Normal Map	Карта нормалей
+Normal Map of	Карта нормалей материала
+Normal Mapping	Карты нормалей
+Normal Size	Размер нормалей
+Normal View	Вид нормалей
+Normal map	Карта нормалей
+Normal map (DOT3)	Карта нормалей (DOT3)
+Normal pointer	Указатель нормалей
+Normals	Нормали
+Normals layer deleted	Слой нормалей удалён
+Not assigned	Не назначено
+Not baked	Не запечён
+Not deleted	Не удалено
+Not enough space: uninstalling the previous version (its data on the phone is lost)	Недостаточно места: удаляется предыдущая версия (её данные на телефоне теряются)
+Not linked	Не связано
+Not moved	Не перемещено
+Not opened	Не открыто
+Not saved	Не сохранено
+Not saved in the project yet	Ещё не сохранено в проекте
+Not saving '%s': %s	Не сохраняю '%s': %s
+Not saving '%s': could not read its faces and saving would erase them	Не сохраняю '%s': не удалось прочитать его грани, и сохранение бы их стёрло
+Not saving '%s': its geometry could not be read when opening and saving would erase it	Не сохраняю '%s': его геометрию не удалось прочитать при открытии, и сохранение её бы стёрло
+Not saving '%s': its mesh needs the block '%s' from a newer version of Whisk3D	Не сохраняю '%s': его мешу нужен блок '%s' из более новой версии Whisk3D
+Not saving '%s': the frames of its animation '%s' could not be read when opening and saving would erase them	Не сохраняю '%s': кадры его анимации '%s' не удалось прочитать при открытии, и сохранение бы их стёрло
+Not saving: '%s' could not be read and saving would leave it empty	Не сохраняю: '%s' не удалось прочитать, и сохранение оставило бы его пустым
+Not saving: could not read the mesh '%s'	Не сохраняю: не удалось прочитать меш '%s'
+Not saving: the UI scene '%s' could not be read when opening and saving would remove it from the project	Не сохраняю: UI-сцену '%s' не удалось прочитать при открытии, и сохранение убрало бы её из проекта
+Not saving: the animations of '%s' could not be read when opening and saving would erase them	Не сохраняю: анимации '%s' не удалось прочитать при открытии, и сохранение бы их стёрло
+Not saving: the clips of '%s' could not be read when opening and saving would erase them	Не сохраняю: клипы '%s' не удалось прочитать при открытии, и сохранение бы их стёрло
+Not saving: the mesh '%s' could not be written (%s)	Не сохраняю: не удалось записать меш '%s' (%s)
+Nothing to bake	Нечего запекать
+Nothing to paste	Нечего вставить
+Nothing to render: tick Final composite or a pass	Нечего рендерить: отметьте «Итоговая композиция» или проход
+Nothing to save	Нечего сохранять
+Now click the second	Теперь второй щелчок:
+Now external	Теперь внешний
+Now inside the .w3d	Теперь внутри .w3d
+Number	Целое
+Number / Texture	Число / текстура
+Number of Cuts	Число разрезов
+Numbers / memories	Числа / память
+OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?	OBJ не хранит арматуру и анимации: будет экспортирован только меш (группы вершин, арматура и клипы будут потеряны). Существующий файл будет перезаписан. Продолжить?
+OBJ imported successfully!	OBJ импортирован!
+OBJ saved successfully!	OBJ сохранён!
+OK	ОК
+Object	Объект
+Object (Keep Transform Without Inverse)	Объект (сохр. трансф. без инверсии)
+Object (Keep Transform)	Объект (сохр. трансформацию)
+Object (Without Inverse)	Объект (без инверсии)
+Object / Edit Mode	Объект / Редактирование
+Object Animation	Анимация объекта
+Object Mode	Объектный режим
+Object Offset	Объект смещения
+Object Transforms	Трансформации объекта
+Object animation: meshes only for now	Анимация объекта: пока только меши
+Object index	Индекс объекта
+Object matrix	Матрица объекта
+Objects	Объекты
+Off	Выкл.
+Off (no test, no write)	Выкл. (без теста и записи)
+Offset	Смещение
+Offset Even	Равномерное смещение
+Offset Relative	Относительное смещение
+On	Вкл.
+Only active camera	Только активная камера
+Only external display (faster)	Только внешний экран (быстрее)
+Only in Object Mode	Только в Объектном режиме
+Only its visibility and script values are saved	Сохраняются только видимость и значения скриптов
+Only selected vertices	Только выделенные вершины
+Only the final image	Только итоговое изображение
+Opacity	Непрозрачность
+Opaque (ONE, ZERO)	Непрозрачное (ONE, ZERO)
+Opaque (one, zero)	Непрозрачное (one, zero)
+Opaque pass	Проход непрозрачных
+Open	Открыть
+Open in IDE	Открыть в IDE
+Open normal map	Открыть карту нормалей
+Open project	Открыть проект
+Open without saving	Открыть без сохранения
+Open...	Открыть...
+OpenGL ES 1.1: the GPU and the CPU compute them (not real time)	OpenGL ES 1.1: их считают GPU и CPU (не в реальном времени)
+Opening project...	Открытие проекта...
+Operation	Операция
+Optimize Vertex Groups	Оптимизировать группы вершин
+Options	Параметры
+Orbit locked	Орбита заблокирована
+Orbit unlocked	Орбита разблокирована
+Orbital	Орбитальный
+Orient	Ориент.
+Orientation	Ориентация
+Origin to 3D Cursor	Центр к 3D-курсору
+Origin to Geometry	Центр к геометрии
+Original file forgotten	Исходный файл забыт
+Original file not found	Исходный файл не найден
+Original file of an imported mesh (only where it came from: the mesh is inside the project)	Исходный файл импортированной сетки (только происхождение: сетка уже в проекте)
+Origins	Центры объектов
+Orphan (no users)	Не используется
+Orphans purged	Неиспользуемые удалены
+Orthographic	Ортографическая
+Outliner	Аутлайнер
+Outset	Наружу
+Overflow X	Переполнение X
+Overflow Y	Переполнение Y
+Overlays	Наложения
+Overrides	Переопределения
+Overwrite	Перезаписать
+Overwrite file?	Перезаписать файл?
+Own	Своя
+PVS recalculated	PVS пересчитан
+PVS: <model>.pvs.json is missing next to the source .obj	PVS: нет <модель>.pvs.json рядом с исходным .obj
+Pack into the .w3d	Упаковать в .w3d
+Packaging .deb (cpack)	Упаковка .deb (cpack)
+Packaging AppImage	Упаковка AppImage
+Packed (protected)	Упаковано (защищено)
+Pad bottom	Поле снизу
+Pad left	Поле слева
+Pad right	Поле справа
+Pad top	Поле сверху
+Padding	Поля
+Paint background	Рисовать фон
+Palette	Палитра
+Palettes	Палитры
+Pan	Панорама
+Parent	Родитель
+Part (-1 = all)	Часть (-1 = все)
+Particle Color	Цвет и альфа
+Particle Motion	Движение
+Particle Rotation	Вращение
+Particle Shape	Форма и флипбук
+Particle Size	Размер
+Particles	Частицы
+Parts	Части
+Pass	Проход
+Pass Order	Порядок прохода
+Passes	Проходы
+Paste	Вставить
+Paste Keyframe	Вставить ключевой кадр
+Pasted	Вставлено
+Patch	Патч
+Path	Путь
+Pause	Пауза
+Pencil+Up	Карандаш+Вверх
+Penumbra	Полутень
+Per Pixel Shading	Попиксельное затенение
+Per Vertex Shading	Повершинное затенение
+Per pixel	Попиксельно
+Per vertex	Повершинно
+Per-Corner	По углам
+Per-Vertex	По вершинам
+Per-Vertex uses one color per vertex: the colors of the other face corners are lost when painting. Continue?	Режим «По вершинам» хранит один цвет на вершину: цвета других углов граней теряются при рисовании. Продолжить?
+Percent	Процент
+Perspective / Orthographic	Перспектива / Орто
+Perspective/Ortho	Перспектива/Орто
+Phase	Фаза
+Physics	Физика
+Pick Shortest Path	Кратчайший путь
+Pick Shortest Path: click the first	Кратчайший путь — первый щелчок:
+Pitch	Высота тона
+Pivot	Опорная точка
+Pixels	Пиксели
+Plane	Плоскость
+Platform	Платформа
+Play	Воспроизвести
+Play / Pause	Пуск / Пауза
+Play Reverse	Воспроизвести назад
+Play once (dies at the end)	Один раз (гибнет в конце)
+Point	Точечный
+Point size	Размер точки
+Points	Точки
+Points X	Точки X
+Points Y	Точки Y
+Points Z	Точки Z
+Polygon (simulated)	Многоугольник (симуляция)
+Pop matrix	Восстановить матрицу
+Portrait only	Только книжная
+Pos X	Поз. X
+Pos Y	Поз. Y
+Pos Z	Поз. Z
+Pose	Поза
+Pose Mode	Режим позы
+Position	Позиция
+Positional (3D)	Позиционный (3D)
+Post Processing	Постобработка
+Prefab	Префаб
+Prefab "%s": %d object(s) are outside its root object and its instances don't show them	Префаб "%s": объекты (%d) вне его корневого объекта, экземпляры их не показывают
+Prefab Instance	Экземпляр префаба
+Prefab created	Префаб создан
+Prefab instances come with the prefabs phase	Экземпляры префабов появятся с фазой префабов
+Prefab of	Префаб объекта
+Prefabs	Префабы
+Premultiplied alpha	Предумноженная альфа
+Preparing Android (template)	Подготовка Android (шаблон)
+Preparing Android 2.3	Подготовка Android 2.3
+Preparing the Android 2.3 project	Подготовка проекта Android 2.3
+Press a key...	Нажмите клавишу...
+Preview	Предпросмотр
+Preview animation	Просмотр анимации
+Previous	Предыдущее
+Previous Frame	Предыдущий кадр
+Previous Keyframe	Предыдущий ключ
+Previous frame	Предыдущий кадр
+Previous keyframe	Предыдущий ключевой кадр
+Primitive	Примитив
+Probe Origin X	Начало X
+Probe Origin Y	Начало Y
+Probe Origin Z	Начало Z
+Profile Shape	Форма профиля
+Profile Type	Тип профиля
+Project	Проект
+Project folder	Папка проекта
+Project from View	Проекция из вида
+Project from View (Bounds)	Проекция из вида (границы)
+Project from View: select faces first	Проекция из вида: сначала выберите грани
+Project saved: 	Проект сохранён: 
+Project saved: %s (%d external file(s), marked with an arrow in the Library)	Проект сохранён: %s (внешних файлов: %d, отмечены стрелкой в Библиотеке)
+Properties	Свойства
+Properties viewport	Вьюпорт свойств
+Proportional Editing	Пропорциональное редактирование
+Proportional Editing: off	Пропорц. редактирование: выкл.
+Proportional Editing: on	Пропорц. редактирование: вкл.
+Proportional Size	Пропорциональный размер
+Proportional radius +	Пропорциональный радиус +
+Proportional radius -	Пропорциональный радиус -
+Proxy W3D	Прокси W3D
+Purge Orphans	Удалить неиспользуемые
+Purge orphans	Удалить неиспользуемые
+Push matrix	Сохранить матрицу
+Quad strip (simulated)	Полоса квадов (симуляция)
+Quadratic	Квадратичная
+Quads (simulated)	Квады (симуляция)
+Quality	Качество
+Quartic	Квартичная
+Quaternion (WXYZ)	Кватернион (WXYZ)
+Quintic	Квинтичная
+Quit without saving	Выйти без сохранения
+RAM	ОЗУ
+Radius	Радиус
+Radius 1	Радиус 1
+Radius 2	Радиус 2
+Rail (nodes)	Рельс (узлы)
+Random	Случайный
+Random angle (0-360)	Случайный угол (0-360)
+Random spin direction	Случайное направление вращения
+Random velocity	Случайная скорость
+Ranges (memory)	Диапазоны (память)
+Rate	Частота
+Ray Tracing	Трассировка лучей
+Ray traced motion blur	Трассир. размытие движения
+Rays	Лучи
+Real-time shadows	Тени в реальном времени
+Realtime	В реальном времени
+Recalculate	Пересчитать
+Recalculate Normals	Пересчитать нормали
+Recalculated by the editor (the game uses the last one)	Пересчитывается редактором (игра использует последнее)
+Receive shadows	Принимать тени
+Recent files	Недавние файлы
+Rectangle	Прямоугольник
+Red	Красный
+Redo	Повторить
+Reference	Ссылка
+Reflect children	Отражать дочерние
+Reflection	Отражение
+Reflection Probe	Зонд отражений
+Reflection Probes	Зонды отражений
+Reflection probe baked (%u ms)	Зонд отражений запечён (%u мс)
+Refresh	Обновить
+Refresh:	Обновление:
+Relationship Lines	Линии связей
+Relative Offset	Относительное смещение
+Reload Texture	Перезагрузить текстуру
+Reload the project to generate mipmaps	Перезагрузите проект, чтобы создать mipmap
+Reload the project to upload the textures again	Перезагрузите проект, чтобы снова загрузить текстуры
+Remaining: ~	Осталось: ~
+Remove	Убрать
+Remove Repeat	Убрать повтор
+Remove physics	Убрать физику
+Remove script	Убрать скрипт
+Rename	Переименовать
+Rename 3D Mesh	Переименовать 3D-меш
+Rename Material	Переименовать материал
+Render	Рендер
+Render Animation	Рендер анимации
+Render Audio	Рендер аудио
+Render FPS	FPS рендера
+Render Image	Рендер изображения
+Render Preview	Предпросмотр рендера
+Render cancelled	Рендер отменён
+Render end	Конец рендера
+Render icons	Рендер иконок
+Render mode	Режим рендера
+Render saved!	Рендер сохранён!
+Render start	Начало рендера
+Render to...	Рендер в...
+Renderable	Рендерить
+Rendered	Рендер
+Rendering animation...	Рендер анимации...
+Rendering audio...	Рендер аудио...
+Rendering...	Рендер...
+Repeat	Повтор
+Repeat After	Повтор после
+Repeat Before	Повтор до
+Repeat Mirrored	Повтор зеркально
+Repeat Motion	Повтор движения
+Repeat Texture	Повтор текстуры
+Repeat with Offset	Повтор со смещением
+Repeats	Повторы
+Replace	Заменить
+Replace all	Заменить все
+Replace...	Заменить...
+Repo	Репозиторий
+Reset	Сбросить
+Reset Overrides	Сбросить переопределения
+Reset Pose	Сбросить позу
+Reset all	Сбросить всё
+Reset: select faces first	Сбросить: сначала выберите грани
+Resolution	Разрешение
+Resource	Ресурс
+Restart Whisk3D for this change to take effect	Перезапустите Whisk3D, чтобы изменение вступило в силу
+Restrict Frame Range	Ограничить диапазон кадров
+Retarget	Ретаргетинг
+Reverb	Реверб
+Right	Справа
+Right Handle X	Прав. рукоятка X
+Right View	Вид справа
+Rings	Кольца
+Rip	Разорвать
+Rip: mesh separated	Разрыв: меш разделён
+Rip: the selection does not separate the mesh	Разрыв: выделение не разделяет меш
+Roll Left	Крен влево
+Roll Right	Крен вправо
+Root	Корень
+Rot X	Вращ. X
+Rot Y	Вращ. Y
+Rot Z	Вращ. Z
+Rotate	Вращать
+Rotate handles	Вращать рукоятки
+Rotate: %.1f deg  (pivot %s)	Вращение: %.1f град.  (опора %s)
+Rotation	Вращение
+Rotation Only	Только вращение
+Rotation W	Вращение W
+Rotation X	Вращение X
+Rotations only	Только вращения
+Roughness	Шероховатость
+Roughness Map	Карта шероховатости
+Routine	Процедура
+Routine loop	Цикл процедуры
+Routines	Процедуры
+Rows	Строки
+STL imported successfully!	STL импортирован!
+STL only stores the triangles: the skeleton, animations, UVs and materials will be lost. It will overwrite the file if it already exists. Continue?	STL хранит только треугольники: арматура, анимации, UV и материалы будут потеряны. Существующий файл будет перезаписан. Продолжить?
+STL saved successfully!	STL сохранён!
+STL: nothing to import	STL: нечего импортировать
+Same as	Как в режиме
+Same as parent	Как у родителя
+Same scale as the editor	Масштаб как в редакторе
+Sample rate	Частота дискретизации
+Samples	Сэмплы
+Saturation	Насыщенность
+Save	Сохранить
+Save As	Сохранить как
+Save As...	Сохранить как...
+Save CANCELLED: missing inside the project:	Сохранение ОТМЕНЕНО: внутри проекта нет:
+Save Changes	Сохранить изменения
+Save Texture	Сохранить текстуру
+Save Texture: could not encode	Сохранить текстуру: не удалось закодировать
+Save Texture: could not write	Сохранить текстуру: не удалось записать
+Save Texture: no texture	Сохранить текстуру: нет текстуры
+Save and close	Сохранить и закрыть
+Save and continue	Сохранить и продолжить
+Save and open	Сохранить и открыть
+Save and quit	Сохранить и выйти
+Save inside the .w3d	Сохранить внутри .w3d
+Save layout	Сохранить раскладку
+Save layout...	Сохранить раскладку...
+Save outside the .w3d...	Сохранить вне .w3d...
+Save project	Сохранить проект
+Save script	Сохранить скрипт
+Save the project first	Сначала сохраните проект
+Save version v%d	Сохранить версию v%d
+Save version: the project has no location (use Save first)	Сохранить версию: у проекта нет места (сначала Сохранить)
+Save: could not replace the file (the previous version was kept):	Сохранение: не удалось заменить файл (осталась прежняя версия):
+Save: incomplete write. The file was not touched:	Сохранение: запись не завершена. Файл не тронут:
+Saved	Сохранено
+Saved (note: %d curve(s) without a source file are not saved)	Сохранено (внимание: кривые без исходного файла (%d) не сохраняются)
+Saved OK, but copying version v%d failed (see the log)	Сохранено, но копирование версии v%d не удалось (см. лог)
+Saved, but %s and %d more file(s) are missing (outside the .w3d). Library > Missing files	Сохранено, но нет %s и ещё %d файл(ов) (вне .w3d). Библиотека > Отсутствующие файлы
+Saved, but %s is missing (it is outside the .w3d). Library > Missing files	Сохранено, но нет файла %s (он вне .w3d). Библиотека > Отсутствующие файлы
+Saved: 	Сохранено: 
+Scale	Масштаб
+Scale Only	Только масштаб
+Scale U	Масштаб U
+Scale V	Масштаб V
+Scale X	Масштаб X
+Scale Y	Масштаб Y
+Scale Z	Масштаб Z
+Scale: %.2fx  (pivot %s)%s	Масштаб: %.2fx  (опора %s)%s
+Scaled	Масштабировано
+Scene	Сцена
+Scene Animation	Анимация сцены
+Scene Instance	Экземпляр сцены
+Scenes	Сцены
+Screen	Экран
+Screen (lightens)	Экран (осветляет)
+Screen Rect	Область экрана
+Screen Space Reflections	Экранные отражения
+Screw	Винт
+Script	Скрипт
+Script Editor	Редактор скриптов
+Script of	Скрипт объекта
+Scripts	Скрипты
+Scripts that name the file	Скрипты, упоминающие файл
+Scripts that name the texture	Скрипты, упоминающие текстуру
+Scroll	Прокрутка
+Scroll X	Прокрутка X
+Scroll Y	Прокрутка Y
+Segments	Сегменты
+Select	Выделить
+Select All	Выделить всё
+Select Folder	Выбрать папку
+Select Instance	Выбрать экземпляр
+Select Linked	Выделить связанное
+Select Linked: click the	Выделить связанное — щелчок:
+Select Linked: select a UV first (or press L over the island)	Выделить связанное: сначала выберите UV (или L над островом)
+Select Linked: select a bone first	Выделить связанное: сначала выберите кость
+Select Mode	Режим выделения
+Select Outer	Выделить внешнее
+Select Users	Выделить пользователей
+Select a prefab instance	Выберите экземпляр префаба
+Select an object first	Сначала выберите объект
+Select faces with more than 3 sides to triangulate	Выберите грани с более чем 3 сторонами для триангуляции
+Select objects first	Сначала выберите объекты
+Select symbol	Выбор символа
+Select the objects of the prefab	Выберите объекты префаба
+Select with click and pencil	Что выбирают щелчок и карандаш
+Selected only	Только выделенные
+Selection to Active	Выделение к активному
+Selection to Cursor	Выделение к курсору
+Selection to Cursor (Keep Offset)	Выделение к курсору (со смещением)
+Selection to Grid	Выделение к сетке
+Separate	Разделить
+Separate: new mesh created	Разделить: создан новый меш
+Separate: no faces selected	Разделить: грани не выбраны
+Separate: select only some faces	Разделить: выберите только часть граней
+Set Active Camera	Сделать активной камерой
+Set Active Camera: the active object is not a camera	Активная камера: активный объект не камера
+Set Active Object as Camera	Активный объект как камера
+Set Inverse	Задать инверсию
+Set Keyframe Easing Type	Тип плавности
+Set Keyframe Handle Type	Задать тип рукоятки
+Set Keyframe Interpolation	Тип интерполяции
+Set Origin	Задать центр
+Set Parent	Задать родителя
+Set Parent To	Сделать родителем
+Set as Start Scene	Сделать стартовой сценой
+Settings	Настройки
+Settings saved	Настройки сохранены
+Shade Flat	Плоское затенение
+Shade Smooth	Гладкое затенение
+Shader	Шейдер
+Shader of	Шейдер материала
+Shaders	Шейдеры
+Shading	Затенение
+Shadow catcher	Ловец теней
+Shadow color	Цвет тени
+Shadow strength	Интенсивность
+Shape	Форма
+Shape keys	Ключи формы
+Sharp	Резкий
+Sharp range	Зона резкости
+Sharper	Резче
+Shininess	Блеск
+Shortest Path (Fill Region)	Кратчайший путь (заливка области)
+Shortest path selected	Кратчайший путь выделен
+Shortest path: region filled	Кратчайший путь: область заполнена
+Show Chrome UV	Показать Chrome UV
+Show Handles	Показать рукоятки
+Show Overlays	Показать наложения
+Show Panel	Показать панель
+Show active	Показать активный
+Show in Edit Mode	Показ в Режиме редактирования
+Show selection	Показать выделение
+Shrink/Fatten	Сжать/раздуть
+Shrink/Fatten / Clear Scale	Сжать/раздуть / Сбросить масштаб
+Shutter	Затвор
+Shutter position	Положение затвора
+Sigma	Сигма
+Simple	Простое
+Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Симуляция: в OpenGL ES 1.1 нет квадов и многоугольников. Они преобразуются в треугольники (больше индексов, медленнее).
+Single line	Одна строка
+Sinusoidal	Синусоидальная
+Size	Размер
+Size X	Размер X
+Size Y	Размер Y
+Size Z	Размер Z
+Sizes	Размеры
+Skin	Тема
+Skinned	Со скиннингом
+Skip if hidden	Пропустить, если скрыт
+Skip if no flag	Пропустить, если нет флага
+Skip if zero	Пропустить, если ноль
+Slide Vertices	Сдвиг вершин
+Smart Euler	Умный Эйлер
+Smart UV Project	Умная UV-проекция
+Smart UV Project: select faces first	Умная UV-проекция: сначала выберите грани
+Smooth	Гладкий
+Smooth Shading	Гладкое затенение
+Smooth shading	Гладкое затенение
+Smooth texture	Сглаженная текстура
+Smoother	Глаже
+Snap	Привязка
+Snap Base	Основа привязки
+Snap Base:	Основа привязки:
+Snap Target	Цель привязки
+Snap Target for Individual Elements	Цель привязки для отдельных элементов
+Snap Target:	Цель привязки:
+Snap menu	Меню привязки
+Snap: OFF	Привязка: выкл.
+Snap: ON	Привязка: вкл.
+Soft Knee	Мягкое колено
+Soft shadows	Мягкие тени
+Solid	Сплошной
+Solid Preview	Сплошной вид
+Sort by camera	Сортировать по камере
+Sort once (active camera)	Сортировать один раз (активная камера)
+Sound	Звук
+Sounds	Звуки
+Source	Источник
+Spawn box	Область появления
+Specular	Зеркальный
+Speed	Скорость
+Sphere	Сфера
+Sphere Map (software)	Сферическая карта (программно)
+Sphere Projection	Сферическая проекция
+Spin	Кручение
+Spin Y	Кручение по Y
+Spin random	Разброс кручения
+Split 1	Граница 1
+Split 2	Граница 2
+Split 3	Граница 3
+Split in Columns	Разделить на столбцы
+Split in Rows	Разделить на строки
+Spot	Прожектор
+Spot Cutoff	Угол прожектора
+Spot Exponent	Экспонента прожектора
+Spread	Разброс
+Square	Квадрат
+Start	Начало
+Start / End / FPS	Начало / Конец / FPS
+Start Frame	Начальный кадр
+Start angle	Начальный угол
+Start of frame	Начало кадра
+Start time	Время начала
+Start:%d	Начало:%d
+Starts at frame	Начинается с кадра
+Starts with	Начинается с
+State	Состояние
+Static	Статический
+Statistics	Статистика
+Stencil buffer	Буфер трафарета
+Step Size	Размер шага
+Stepped	Ступенчатый
+Steps	Шаги
+Steps Viewport	Шаги во вьюпорте
+Steps to skip	Пропуск шагов
+Stop	Стоп
+Stop the game before changing the scene	Остановите игру перед сменой сцены
+Stop the game first	Сначала остановите игру
+Storage	Расположение
+Stored	Хранение
+Streaming preview	Предпросмотр стриминга
+Strength	Сила
+Stretch	Растянуть
+Stretch (seconds of velocity)	Растяжение (секунды скорости)
+Stretch U	Растянуть U
+Stretch V	Растянуть V
+Stretched	Растянутая
+String	Строка
+Subdivision Surface	Подразделение поверхности
+Subtract	Вычитание
+Subtract (darkens)	Вычитание (затемняет)
+Summary	Сводка
+Sun	Солнце
+Superellipse	Суперэллипс
+Swap	Поменять местами
+Switch to 0-100%	Переключить на 0-100%
+Switch to 0-255	Переключить на 0-255
+Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: эта цель ещё не подключена к этой кнопке.
+Symbian project ready: %s (build it on Windows with build_symbian.bat)	Проект Symbian готов: %s (соберите его в Windows с помощью build_symbian.bat)
+Sync Selection	Синхронизировать выделение
+Tag	Тег
+Target	Цель
+Test	Тест
+Test + Write (opaque)	Тест + запись (непрозрачное)
+Test, no Write (decal)	Тест, без записи (декаль)
+Text	Текст
+Text Color	Цвет текста
+Texture	Текстура
+Texture %d	Текстура %d
+Texture B	Текстура B
+Texture Layers	Слои текстур
+Texture Paint	Рисование текстуры
+Texture Paint: the active part has no texture	Рисование текстуры: у активной части нет текстуры
+Texture filter	Фильтр текстуры
+Texture layers	Слои текстур
+Texture mix	Доля второй текстуры
+Texture mode	Режим текстуры
+Texture not reloaded	Текстура не перезагружена
+Texture of	Текстура материала
+Texture on/off	Текстура вкл/выкл
+Texture reloaded	Текстура перезагружена
+Texture saved	Текстура сохранена
+Texture wrap	Режим повтора текстуры
+Textures	Текстуры
+Texturing	Текстурирование
+The 3D mesh couldn't be loaded	Не удалось загрузить 3D-меш
+The Object tab shows the BASE transform (the one that gets saved). Constraints modify it when drawing, so the object can appear elsewhere.	Вкладка Объект показывает БАЗОВУЮ трансформацию (ту, что сохраняется). Ограничители меняют её при отрисовке, поэтому объект может оказаться в другом месте.
+The Script object '%s' no longer exists: it was migrated to an empty object with its scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated.	Объекта Script '%s' больше нет: он перенесён в пустой объект со своими скриптами. Его жёстко заданная физика (скорость/гравитация/пределы) НЕ переносится.
+The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)	Не удалось прочитать UI-сцену '%s': проект открывается без неё, и сохранять поверх него я НЕ буду (см. whisk3d.log)
+The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)	Нет UI-сцены '%s': проект открывается без неё, и сохранять поверх него я НЕ буду (см. whisk3d.log)
+The UV does not cover the texture	UV не попадает в текстуру
+The armature has its own clips	У арматуры свои клипы
+The button's function failed	Функция кнопки не сработала
+The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	Вызовы cambiarEscena() в его .lua всё ещё указывают на первую: исправьте их вручную.
+The clip library could not be read	Не удалось прочитать библиотеку клипов
+The clipboard has no hex color	В буфере обмена нет hex-цвета
+The default material can not be edited. Create a new material.	Материал по умолчанию нельзя редактировать. Создайте новый материал.
+The default material can't be edited	Материал по умолчанию не редактируется
+The editor has unsaved changes. Discard them and reload the file?	В редакторе есть несохранённые изменения. Отменить их и перезагрузить файл?
+The external file is missing	Нет внешнего файла
+The file "	Файл "
+The file already exists. Do you want to replace it?	Файл уже существует. Заменить?
+The file couldn't be written	Не удалось записать файл
+The file was changed outside the editor. Overwrite it?	Файл изменён вне редактора. Перезаписать?
+The file was not touched:	Файл не тронут:
+The folder isn't empty	Папка не пуста
+The instance could not be unpacked	Не удалось распаковать экземпляр
+The instance has nothing to unpack	Экземпляру нечего распаковывать
+The library file can't be opened	Не удаётся открыть файл библиотеки
+The library has no proyecto.json	В библиотеке нет proyecto.json
+The library has no such element	В библиотеке нет такого элемента
+The library is read-only	Библиотека только для чтения
+The library isn't linked	Библиотека не связана
+The library's proyecto.json can't be read	Не удаётся прочитать proyecto.json библиотеки
+The light '%s' was not loaded: the scene already has the maximum number of lights (%d).	Источник света '%s' не загружен: в сцене уже максимум источников света (%d).
+The list of All	Список «Все»
+The material is shared with other objects: this one got its own copy	Материал общий с другими объектами: этот получил собственную копию
+The mesh '%s' (no objects) could not be read: saving without it	Не удалось прочитать меш '%s' (без объектов): сохраняется без него
+The mesh has no UV	У сетки нет UV
+The mesh has no faces	У сетки нет граней
+The objects of the 3D meshes will be deleted too (Undo brings them back).	Объекты 3D-мешей тоже будут удалены (Отмена вернёт их).
+The original file of the texture is not known	Исходный файл текстуры неизвестен
+The phone could not encode the sound to AAC: the video has no sound	Телефон не смог закодировать звук в AAC: видео без звука
+The scene has no sounds	В сцене нет звуков
+The selected folders are deleted too if they end up empty.	Выбранные папки тоже удаляются, если останутся пустыми.
+The shader does not compile	Шейдер не компилируется
+The sound couldn't be decoded	Не удалось декодировать звук
+The sound couldn't be read	Не удалось прочитать звук
+The texture couldn't be loaded	Не удалось загрузить текстуру
+The undo history still uses it	История отмен ещё использует его
+The video "	Видео "
+There are no orphans	Нет неиспользуемых
+There are no saved layouts to delete	Нет сохранённых раскладок для удаления
+There is no active camera	Нет активной камеры
+There is no audio: the mixer did not start	Нет звука: микшер не запустился
+There is no memory to load the previews	Недостаточно памяти для превью
+There is no script editor (IDE) in the layout	В компоновке нет редактора скриптов (IDE)
+There is no such prefab	Такого префаба нет
+There is no such scene	Такой сцены нет
+Thickness	Толщина
+This animation has no keyframes in that layer	У этой анимации нет ключевых кадров в этом слое
+This animation has no normals layer	У этой анимации нет слоя нормалей
+This browser cannot encode MP4 video	Этот браузер не умеет кодировать видео MP4
+This file type can't be added	Этот тип файла нельзя добавить
+This format needs ffmpeg installed	Для этого формата нужен установленный ffmpeg
+This frame: 	Этот кадр: 
+This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	В этом графическом бэкенде нет шейдеров: секция @vertice выполняется на CPU, остальное рисуется как обычно
+This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	В этом графическом бэкенде нет шейдеров: материал рисуется как обычно (в GLES 2.0 и Vulkan они есть)
+This hierarchy clip only animates its root and its children	Этот клип иерархии анимирует только свой корень и его потомков
+This is a scene: convert it to a game to simulate it	Это сцена: преобразуйте её в игру для симуляции
+This mesh does not have this array: do not draw with the array on	В этом меше нет такого массива: не рисуйте с включённым массивом
+This phone can only clone the screen on the external display	Этот телефон может только клонировать экран на внешний дисплей
+This phone has no video encoder for MP4	В этом телефоне нет видеокодера для MP4
+This project uses the network (LAN, Wi-Fi or the Internet) to play with others. Allow it?	Этот проект использует сеть (LAN, Wi-Fi или Интернет) для игры с другими. Разрешить?
+This resource can't be dropped in the 3D view	Этот ресурс нельзя перетащить в 3D-вид
+This resource can't be renamed	Этот ресурс нельзя переименовать
+This resource type can't be deleted	Этот тип ресурса нельзя удалить
+This resource type can't be duplicated	Этот тип ресурса нельзя дублировать
+This step has nothing to animate	В этом шаге нечего анимировать
+This texture already has the baked light of	В этой текстуре уже запечён свет
+This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Группы вершин будут изменены и упрощены до 1 кости на вершину (более быстрый скиннинг). Часть данных может быть потеряна.
+Threshold	Порог
+Timeline	Таймлайн
+Times	Время
+Timing	Тайминг
+Toggle Snap	Вкл/выкл привязку
+Top	Сверху
+Top View	Вид сверху
+Top-Left	Сверху слева
+Top-Right	Сверху справа
+Tracks	Дорожки
+Trail points	Точки следа
+Trail step	Шаг следа
+Transform	Трансформация
+Transform Mesh	Трансформировать меш
+Transform Orientations	Ориентации трансформации
+Transform Pivot Point	Опорная точка
+Transform UV	Трансформировать UV
+Translate	Переместить
+Translation	Перемещение
+Transmission	Пропускание
+Transparency layers	Слои прозрачности
+Transparent	Прозрачный
+Transparent pass	Проход прозрачных
+Triangle fan	Веер треугольников
+Triangle strip	Полоса треугольников
+Triangles	Треугольники
+Triangles (PVS)	Треугольники (PVS)
+Triangulate	Триангулировать
+Triangulate Faces	Триангулировать грани
+Trim end	Обрезка конца
+Trim start	Обрезка начала
+Turbulence	Турбулентность
+Turn the script on or off	Включить или выключить скрипт
+Type	Тип
+U Location	Положение U
+UI	UI
+UV	UV
+UV Editor	UV-редактор
+UV Grid	UV-сетка
+UV Group	UV-группа
+UV Groups	UV-группы
+UV Map	UV-карта
+UV Maps	UV-карты
+UV Sphere	UV-сфера
+UV array	массив UV
+UV group(s)	UV-группа(ы)
+UV layer (0 = active)	UV-слой (0 = активный)
+UV layout saved	UV-развёртка сохранена
+UV menu	Меню UV
+UV offset	Смещение UV
+UV pointer	Указатель UV
+UV: projected from view	UV: проецированы из вида
+UV: projected from view (bounds)	UV: проецированы из вида (границы)
+UVSphere	UV-сфера
+Undo	Отменить
+Uniform	Равномерно
+Union	Объединение
+Unit	Единица
+Units	Единицы
+Unlink	Отвязать
+Unloaded	Выгружено
+Unpack	Распаковать
+Unpack Prefab	Распаковать префаб
+Unused	Не используются
+Unwrap	Развернуть
+Unwrap Angle Based	Развернуть (по углам)
+Unwrap Conformal	Развернуть (конформно)
+Unwrap Minimum Stretch	Развернуть (мин. растяжение)
+Unwrap: closed surface, mark seams first	Развернуть: замкнутая поверхность, сначала пометьте швы
+Unwrap: select faces first	Развернуть: сначала выберите грани
+Update every	Обновлять каждые
+Upright (does not tilt)	Вертикально (без наклона)
+Upscaler	Апскейлер
+Upscaling	Апскейлинг
+Use	Использует
+Use End Frame	Использовать конечный кадр
+Use Influence	Использовать влияние
+Use Start Frame	Использовать начальный кадр
+Use camera focus	Использовать фокус камеры
+Use current folder	Использовать текущую папку
+Use custom color	Использовать свой цвет
+Use index	Использовать индекс
+Use new viewport	Использовать новый вьюпорт
+Use physics engine	Физический движок
+Use sound	Использовать звук
+Use system keyboard	Использовать системную клавиатуру
+Use the material's UV index	Использовать UV-индекс материала
+Use this file	Использовать этот файл
+Use this folder	Использовать эту папку
+Users	Пользователи
+Users selected	Пользователи выделены
+Uses the 360 image you choose	Использует выбранное изображение 360
+V Location	Положение V
+Value	Значение
+Value Y	Значение Y
+Variation	Вариация
+Vector	Вектор
+Velocity	Скорость
+Version	Версия
+Version v%d saved: versiones/%s	Версия v%d сохранена: versiones/%s
+Vertex	Вершина
+Vertex Animation	Анимация вершин
+Vertex Color	Цвет вершин
+Vertex Groups	Группы вершин
+Vertex Normal	Нормаль вершины
+Vertex Paint	Раскраска вершин
+Vertex Slide	Сдвиг вершин
+Vertex color	Цвет вершин
+Vertex groups	Группы вершин
+Vertex groups optimized (1 bone/vertex)	Группы вершин оптимизированы (1 кость/вершина)
+Vertex pointer	Указатель вершин
+Vertices	Вершины
+Vertices connected	Вершины соединены
+Video	Видео
+Video bitrate	Битрейт видео
+Videos	Видео
+View	Вид
+View in 3D	Показать в 3D
+View options	Параметры вида
+Viewpoint	Точка обзора
+Viewport	Вьюпорт
+Visibility icons	Иконки видимости
+Visibility test	Тест видимости
+Visible	Видимый
+Visible in probes	Видим в зондах
+Volume	Громкость
+Volume line	Линия громкости
+Wait for the build to finish	Дождитесь окончания сборки
+Warning	Внимание
+Warnings and errors	Предупреждения и ошибки
+Waveform	Форма волны
+Weight	Вес
+Weight Paint	Рисование весов
+Whole word	Слово целиком
+Width	Ширина
+Width Type	Тип ширины
+Window	Окно
+Window mode	Оконный режим
+Windows .exe: not generated from this button yet. The EDITOR is built with platform/windows/build_windows.bat.	Windows .exe: пока не создаётся этой кнопкой. РЕДАКТОР собирается через platform/windows/build_windows.bat.
+Wireframe	Каркас
+Wireframe Preview	Каркасный вид
+Wireframe: Only Visible	Каркас: только видимое
+With alpha (RGBA)	С альфой (RGBA)
+With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	При влиянии от 0 до 100 билборд может развернуться на 180 градусов при пересечении камеры. Используйте 100%, чтобы этого избежать.
+With its materials	С его материалами
+With sound	Со звуком
+Wrap	Режим повтора
+Write to	Записать в
+X Axis	Ось X
+X Euler Rotation	Вращение Эйлера X
+X Location	Положение X
+X Scale	Масштаб X
+X axis	Ось X
+X-Ray	Рентген
+XYZ Euler	Эйлер XYZ
+Y Axis	Ось Y
+Y Euler Rotation	Вращение Эйлера Y
+Y Location	Положение Y
+Y Scale	Масштаб Y
+Y axis	Ось Y
+Yes	Да
+Z Euler Rotation	Вращение Эйлера Z
+Z Location	Положение Z
+Z Scale	Масштаб Z
+Z axis	Ось Z
+Z-Buffer	Z-буфер
+ZBuffer Preview	Вид Z-буфера
+Zoom	Масштаб
+Zoom 1:1	Масштаб 1:1
+Zoom 2:1	Масштаб 2:1
+Zoom 3:1	Масштаб 3:1
+Zoom 4:1	Масштаб 4:1
+[X: time]	[X: время]
+[Y: value]	[Y: значение]
+active	активная
+active keyframe	активный ключ
+all	все
+all opaque	всё непрозрачное
+along	вдоль
+binary	бинарная
+bone	кость
+bone(s)	кость(и)
+bones	костей
+center	центр
+clip	клип
+clips	клипов
+color	цвет
+color array	массив цветов
+compiled	скомпилирован
+compiling Lua is not available on Symbian	компиляция Lua недоступна на Symbian
+could not load %s	не удалось загрузить %s
+could not read %s	не удалось прочитать %s
+could not read its faces	не удалось прочитать его грани
+could not read the mesh	не удалось прочитать меш
+could not rename %s -> %s	не удалось переименовать %s -> %s
+could not write %s	не удалось записать %s
+could not write pak.cpp	не удалось записать pak.cpp
+cube	куб
+current frame	текущий кадр
+cylinder	цилиндр
+deg	град.
+deleted or renamed	удалён или переименован
+depth	глубина
+done	готово
+edge	ребро
+edge of a face	ребро грани
+face	грань
+faces: %d/%d	грани: %d/%d
+first triangle %d does not exist: the part of '%s' has %d triangles (0..%d)	первого треугольника %d нет: в части '%s' треугольников: %d (0..%d)
+frames	кадр.
+free	свободно
+game	игра
+glTF imported successfully!	glTF импортирован!
+glTF saved successfully!	glTF сохранён!
+glTF: could not open the file	glTF: не удалось открыть файл
+glTF: could not write the file	glTF: не удалось записать файл
+glTF: invalid JSON	glTF: неверный JSON
+glTF: nothing to export	glTF: нечего экспортировать
+glTF: nothing to import	glTF: нечего импортировать
+global	глобальная
+hierarchy	иерархия
+hierarchy clip	клип иерархии
+hierarchy clips	клипов иерархии
+islands	островов
+it has more than 65535 vertices and this platform uses 16-bit indices	в нём больше 65535 вершин, а эта платформа использует 16-битные индексы
+its geometry could not be read when opening	его геометрию не удалось прочитать при открытии
+its mesh cannot be written	его меш нельзя записать
+its mesh needs the block '%s' from a newer version	его мешу нужен блок '%s' из более новой версии
+last triangle %d is before the first one (%d)	последний треугольник %d раньше первого (%d)
+last triangle %d is past the end: the part of '%s' has %d triangles (0..%d, or max)	последний треугольник %d за концом: в части '%s' треугольников: %d (0..%d или макс.)
+list	список
+local	локальная
+matrix stack too deep (%d levels, max %d)	стек матриц слишком глубокий (уровней: %d, макс. %d)
+median point	средняя точка
+missing	отсутствует
+mono (1)	моно (1)
+new	новый
+no data (whole mesh)	нет данных (весь меш)
+no new changes in the file	в файле нет новых изменений
+normal array	массив нормалей
+not loaded	не загружено
+not saved	не сохранено
+not uploaded	не в GPU
+nothing	ничего
+object	объект
+object(s) reloaded live	объект(ов) перезагружено вживую
+objects	объектов
+of	из
+off	выкл.
+on	вкл.
+open	открыто
+out of memory for the Lua state	не хватает памяти для состояния Lua
+part	часть
+parts	частей
+prefab	префаб
+preview	предпросмотр
+projection	проекция
+quads	квадов
+read-only	только чтение
+read-only library	библиотека только для чтения
+reloaded from the file	перезагружено из файла
+removed from	убрано из
+replacements	замен
+results	результатов
+root	корень
+routine '%s' calls itself (cycle)	процедура '%s' вызывает саму себя (цикл)
+running	работает
+saved	сохранено
+saved (save the project so it stays in the .w3d)	сохранено (сохраните проект, чтобы осталось в .w3d)
+saved in the project (in memory). Save the project, or the script as a file, so you don't lose it	сохранено в проекте (в памяти). Сохраните проект или скрипт как файл, чтобы не потерять его
+saved in the project. Save or download the project so you don't lose it	сохранено в проекте. Сохраните или скачайте проект, чтобы не потерять его
+saved inside the .w3d	сохранено внутри .w3d
+saved outside the .w3d	сохранено вне .w3d
+scene	сцена
+scene '%s' -> '%s': check the cambiarEscena("%s") calls in your .lua files	сцена '%s' -> '%s': проверьте вызовы cambiarEscena("%s") в своих файлах .lua
+see whisk3d.log	см. whisk3d.log
+select a mesh object first	сначала выберите объект-меш
+sidecar not loaded (Recalculate)	файл PVS не загружен (Пересчитать)
+skip %d	пропуск %d
+soon	скоро
+sphere	сфера
+start	стартовая
+stencil	трафарет
+step %d (%s): '%s' is not a mesh object with a library mesh	шаг %d (%s): '%s' — не объект-меш с мешем из библиотеки
+step %d (%s): '%s' not found	шаг %d (%s): '%s' не найден
+step %d (%s): bad memory reference '%s' (use @name[0..%d])	шаг %d (%s): неверная ссылка на память '%s' (используйте @имя[0..%d])
+step %d (%s): light %d does not exist (0..%d)	шаг %d (%s): источника света %d нет (0..%d)
+step %d (%s): nothing chosen	шаг %d (%s): ничего не выбрано
+step %d (%s): object '%s' not found	шаг %d (%s): объект '%s' не найден
+step %d (%s): option %d does not exist (0..%d)	шаг %d (%s): варианта %d нет (0..%d)
+step %d (%s): write the name of the Lua function	шаг %d (%s): введите имя функции Lua
+step %d (Draw elements): %s	шаг %d (Рисовать элементы): %s
+step %d (Draw elements): a manual range or an array needs the Triangles primitive	шаг %d (Рисовать элементы): ручному диапазону или массиву нужен примитив «Треугольники»
+step %d (Draw elements): array %s says %d ranges (0..%d fit from there)	шаг %d (Рисовать элементы): массив %s указывает диапазонов: %d (оттуда помещается 0..%d)
+step %d (Draw elements): array %s, range %d: %s	шаг %d (Рисовать элементы): массив %s, диапазон %d: %s
+step %d (Draw elements): array %s, range %d: flag %d out of %s	шаг %d (Рисовать элементы): массив %s, диапазон %d: флаг %d вне %s
+step %d (Draw elements): choose the array (a memory: @name[i])	шаг %d (Рисовать элементы): выберите массив (память: @имя[i])
+step %d (Draw elements): primitive %d does not exist	шаг %d (Рисовать элементы): примитива %d нет
+step %d (Draw elements): the %s ('%s', %d vertices) has fewer vertices than the Vertex pointer ('%s', %d)	шаг %d (Рисовать элементы): в «%s» ('%s', вершин: %d) меньше вершин, чем в «Указатель вершин» ('%s', %d)
+step %d (Draw elements): the %s is on but its pointer's mesh ('%s') has no %s (turn the array off with Array on/off)	шаг %d (Рисовать элементы): %s включён, но в меше его указателя ('%s') отсутствует %s (выключите массив шагом «Массив вкл/выкл»)
+step %d (Draw elements): the %s is on but this routine did not point it: add a %s before (or turn the array off with Array on/off)	шаг %d (Рисовать элементы): %s включён, но эта процедура его не указала: добавьте перед ним «%s» (или выключите массив шагом «Массив вкл/выкл»)
+step %d (Draw elements): the %s may be on (it depends on what was drawn before): turn it on or off with Array on/off before drawing	шаг %d (Рисовать элементы): %s может быть включён (зависит от того, что рисовалось раньше): включите или выключите его шагом «Массив вкл/выкл» перед рисованием
+step %d (Draw elements): the flags have to be a memory (@name[i])	шаг %d (Рисовать элементы): флаги должны быть памятью (@имя[i])
+step %d (Draw elements): the part uses vertices up to %d but the vertex pointer ('%s') has %d	шаг %d (Рисовать элементы): часть использует вершины до %d, а в указателе вершин ('%s') их %d
+step %d (Draw elements): the vertex array is off (Array on/off)	шаг %d (Рисовать элементы): массив вершин выключен (Массив вкл/выкл)
+step %d (Draw elements): there is no Vertex pointer before it	шаг %d (Рисовать элементы): перед ним нет шага «Указатель вершин»
+step %d (Draw elements): unknown range %d	шаг %d (Рисовать элементы): неизвестный диапазон %d
+step %d (UV pointer): mesh '%s' has no UV layer %d (0 = its render UV)	шаг %d (Указатель UV): у меша '%s' нет UV-слоя %d (0 = его UV для рендера)
+step %d (Visibility test): 'Write to' has to be a memory (@name[i])	шаг %d (Тест видимости): «Записать в» должно быть памятью (@имя[i])
+step %d (Visibility test): part %d does not exist (-1 = the whole mesh)	шаг %d (Тест видимости): части %d нет (-1 = весь меш)
+step %d: Pop matrix without its Push	шаг %d: «Восстановить матрицу» без своего «Сохранить матрицу»
+step %d: mesh '%s' has %d parts (part %d does not exist; -1 = all)	шаг %d: у меша '%s' частей: %d (части %d нет; -1 = все)
+step %d: mesh '%s' has no geometry loaded	шаг %d: у меша '%s' не загружена геометрия
+step %d: skips %d steps but only %d follow	шаг %d: пропускает шагов: %d, но дальше их только %d
+step %d: the steps a 'Skip if zero' can skip leave the matrix stack unbalanced	шаг %d: шаги, которые может пропустить «Пропустить, если ноль», нарушают баланс стека матриц
+step %d: unknown type	шаг %d: неизвестный тип
+stereo (2)	стерео (2)
+the bytecode dump of %s failed	не удалось выгрузить байт-код %s
+there are no game files to pack	нет файлов игры для упаковки
+too many nested routines	слишком много вложенных процедур
+track	дорожка
+tracks	дорожек
+triangle	треугольник
+triangles	треугольников
+unsaved	не сохранено
+vertex	вершина
+vertex group(s)	группа(ы) вершин
+vertex: %d/%d	вершины: %d/%d
+vertices	вершин
+view	вид
+with mipmaps	с mipmap
+with transparency	с прозрачностью
+without mipmaps	без mipmap
+you want to select (Esc to cancel)	для выделения (Esc — отмена)
+Desktop	Рабочий стол
+Documents	Документы
+Downloads	Загрузки
+Pictures	Изображения
+Music	Музыка

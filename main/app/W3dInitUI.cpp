@@ -5,11 +5,11 @@
 #include "W3dLang.h"                       // idioma del sistema (los textos salen traducidos desde el primer frame)
 
 #include "objects/Textures.h"          // Textures (vector global)
-#include "objects/Materials.h"         // MaterialesFijarBase (marca base del registro de materiales)
+#include "objects/Materials.h"         // MaterialsSetBase (marca base del registro de materiales)
 #include "w3dTexture.h"                // w3dEngine::LoadTexture
 #include "w3dGraphics.h"               // w3dEngine: estado de graficos
 #include "WhiskUI/text/font.h"                   // Font, WhiskFont
-#include "WhiskUI/draw/icons.h"                  // CrearIconos, SetIconScale
+#include "WhiskUI/draw/icons.h"                  // CreateIcons, SetIconScale
 #include "WhiskUI/widgets/card.h"                   // CalcCardUV
 #include "WhiskUI/core/UI.h"                     // GlobalScale
 #include "ViewPorts/WithBorder.h"      // CalcBorderUV
@@ -26,27 +26,27 @@ void W3dInitUI(const std::string& skinDir) {
     g_skinDir = skinDir;
     // El IDIOMA va primero: la UI que se arma abajo ya pide sus textos con T(), asi que tiene que estar resuelto
     // antes. Aca y no en cada plataforma: este init lo comparten las cinco, y el detector ya sabe preguntarle a
-    // cada SO por su lado. Las traducciones estan en disco (res/idiomas/): T() carga la del idioma elegido la
+    // cada SO por su lado. Las traducciones estan en disco (res/languages/): T() carga la del idioma elegido la
     // primera vez que la necesita, y solo esa.
-    W3dIdiomaCarpeta(skinDir);
-    W3dIdiomaDetectar();
+    W3dLanguageFolder(skinDir);
+    W3dLanguageDetect();
     // los menus declarativos se traducen solos: el toolkit llama este hook. Aca es donde el editor se lo presta.
-    { extern const char* (*W3dMenuTraducir)(const char*); W3dMenuTraducir = T; }
+    { extern const char* (*W3dMenuTranslate)(const char*); W3dMenuTranslate = T; }
     // los hints de atajo de los menus salen de la tabla de atajos (lo configurado, o la tecla del telefono)
-    { extern std::string (*W3dMenuAtajoTexto)(const std::string&); extern std::string W3dAtajoEtiquetaMenu(const std::string&);
-      W3dMenuAtajoTexto = W3dAtajoEtiquetaMenu; }
+    { extern std::string (*W3dMenuShortcutText)(const std::string&); extern std::string W3dShortcutMenuLabel(const std::string&);
+      W3dMenuShortcutText = W3dShortcutMenuLabel; }
 
     // mismo ORDEN que esperan el resto de los modulos (constructor.cpp de PC):
     // 0=font (atlas), 1=origen, 2=cursor3d, 3=relationshipLine, 4=lampara
-    static const char* archivos[5] = {
-        "font.png", "origen.png", "cursor3d.png", "relationshipLine.png", "lamp.png"
+    static const char* files[5] = {
+        "font.png", "origin.png", "cursor3d.png", "relationshipLine.png", "lamp.png"
     };
 
     int atlasW = 128, atlasH = 128; // tamano del atlas (font.png); fallback 128
     for (int i = 0; i < 5; i++) {
-        Texture* t = new Texture(archivos[i]);
+        Texture* t = new Texture(files[i]);
         // skinDir ya trae el separador final (cada OS pone el suyo: '/' o '\')
-        std::string path = skinDir + archivos[i];
+        std::string path = skinDir + files[i];
         unsigned int id = 0;
         int w = 0, h = 0;
         if (w3dEngine::LoadTexture(path.c_str(), id, &w, &h)) {
@@ -56,14 +56,14 @@ void W3dInitUI(const std::string& skinDir) {
         Textures.push_back(t);
     }
 
-    // ATLAS DINAMICO: si el skin trae iconos individuales (atlas/iconos/*.png) se arma
+    // ATLAS DINAMICO: si el skin trae iconos individuales (atlas/icons/*.png) se arma
     // UNA textura al vuelo: font.png entero en el (0,0) -que deja validas las coords de
     // siempre de borde/cards/scroll/glifos- y cada icono empaquetado en el espacio libre.
     // Agregar un icono = tirar el png y listo. Sin la carpeta: el camino clasico intacto.
     IconRect rectsAtlas[ICON_TOTAL];
     unsigned texAtlas = 0; int aw = 0, ah = 0;
-    bool atlasDinamico = SkinAtlasArmar(skinDir, &texAtlas, &aw, &ah, rectsAtlas);
-    if (atlasDinamico) {
+    bool atlasDynamic = SkinAtlasBuild(skinDir, &texAtlas, &aw, &ah, rectsAtlas);
+    if (atlasDynamic) {
         Textures[0]->iID = texAtlas;
         atlasW = aw; atlasH = ah;
     }
@@ -73,22 +73,22 @@ void W3dInitUI(const std::string& skinDir) {
     // Fijarlas le dice al cache de texturas que este prefijo NO se libera ni se
     // reordena aunque se cierre el proyecto. Va JUSTO aca: lo que se cargue
     // despues ya es contenido.
-    TexturasFijarBase();
-    TexturasConservarHuerfanas(true);   // el EDITOR: una textura sin usuarios sigue en la biblioteca (Purge Orphans la saca)
+    TexturesSetBase();
+    TexturesSetKeepOrphans(true);   // el EDITOR: una textura sin usuarios sigue en la biblioteca (Purge Orphans la saca)
     // ...y lo MISMO con los materiales: los que existan a esta altura son del
     // editor y no se podan al cerrar un proyecto (ver Materials.h). Sin esta marca
     // no habia forma de podar `Materials`, y reabrir un proyecto en el mismo
     // proceso duplicaba TODOS sus materiales con sufijo ".001".
-    MaterialesFijarBase();
-    { extern bool g_shaderTiempoLineaDeTiempo; g_shaderTiempoLineaDeTiempo = true; }   // (w3d_tiempo = la linea de tiempo)
+    MaterialsSetBase();
+    { extern bool g_shaderTimeTimeLine; g_shaderTimeTimeLine = true; }   // (w3d_time = la linea de tiempo)
 
     // UI armada sobre el atlas: UVs del 9-patch, scrollbar, tarjetas, iconos y la fuente
     CalcBorderUV(atlasW, atlasH);
     CalcScrollUV(atlasW, atlasH);
     CalcCardUV(atlasW, atlasH);
     CalcColorWheelUV(atlasW, atlasH);
-    if (atlasDinamico) CrearIconosDesde(rectsAtlas, atlasW, atlasH);
-    else               CrearIconos(atlasW, atlasH);
+    if (atlasDynamic) CreateIconsFrom(rectsAtlas, atlasW, atlasH);
+    else               CreateIcons(atlasW, atlasH);
     W3dFontSetTexSize(atlasW, atlasH);
     SetIconScale(GlobalScale);
 
@@ -96,7 +96,7 @@ void W3dInitUI(const std::string& skinDir) {
     WhiskFont->SetScale(GlobalScale);
     // el atlas EXTENDIDO (acentos que no estan en font.png, ss, l con barra, el cirilico...): se carga recien cuando
     // un texto lo necesita. En ingles o en espaniol puede no cargarse nunca (ver tools/fuente_ext.py)
-    WhiskFont->SetAtlasExtendido(skinDir + "font-ext.png");
+    WhiskFont->SetAtlasExtended(skinDir + "font-ext.png");
 }
 
 void W3dInitGraphics() {

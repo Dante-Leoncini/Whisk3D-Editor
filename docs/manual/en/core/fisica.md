@@ -5,7 +5,7 @@ All homemade, in C++03, with no external engine and no memory allocation every f
 - **W3dFisica:** velocity and bouncing of axis-aligned boxes. Nothing more.
 - **W3dRigido:** oriented boxes with mass, gravity, impulses with friction and bounce, raycasts and contact events.
 - **W3dColMalla:** walking on a level's triangles (ramps, steps) with walls that stop you, using a grid so it doesn't have to check thousands of triangles.
-- **W3dHitbox:** boxes that only report (`alEntrar`, `alQuedarse`, `alSalir`, `alTocar`).
+- **W3dHitbox:** boxes that only report (`onEnter`, `onRemain`, `onExit`, `onTouch`).
 - **W3dRagdoll:** ragdolls, plus two-bone inverse kinematics and FABRIK.
 - **W3dNav:** the path from one point to another over a grid on the floor (A* and then string pulling).
 

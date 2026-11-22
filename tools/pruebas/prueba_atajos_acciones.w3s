@@ -1,5 +1,5 @@
 # ATAJOS DE LAS OPERACIONES SIN TECLA (las de los menus): se les puede asignar una combinacion y corren la misma
 # accion que la opcion del menu. Los modos de la vista 3D (Objeto / Edicion) son contextos aparte, y la ventana de
 # atajos separa el VIEWPORT del CONTEXTO en dos desplegables.
-ventana 1280 720
-atajosacciones
+window 1280 720
+shortcutsactions

@@ -20,10 +20,10 @@
 # ==========================================================================
 # tamano de ventana FIJO: sin esto los pixeles dependen del config.ini de la
 # maquina (con 1920x1080 el eje Y de la grilla pasa bajo la tarjeta del boton)
-ventana 1280 720
-abrirw3d prueba_ui_estado.w3d
+window 1280 720
+openw3d prueba_ui_estado.w3d
 loadtex
-juego on
+game on
 simplay 2
 
 # el cache fino sigue coherente durante el pase de escena (0 desyncs): el bug
@@ -41,4 +41,4 @@ vppx 30 -20 es 27 27 27 5
 vppx 60 -20 es 27 27 27 5
 
 simstop
-juego off
+game off

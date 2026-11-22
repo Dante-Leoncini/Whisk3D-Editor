@@ -9,37 +9,37 @@
 //    - cuadros clave (IDR) con macrobloques Intra 16x16 (prediccion vertical, horizontal o DC) y el croma en DC;
 //    - el resto, cuadros P de 16x16 con busqueda de movimiento de pixel entero (y P_Skip donde no cambia nada);
 //    - un slice por cuadro, sin filtro de bloques (deblocking apagado), QP por cuadro segun el bitrate pedido.
-//  Lo que sale son NAL en "Annex B" (00 00 00 01 + NAL): van directo a W3dMp4Escritor::Cuadro.
-//  Lo que el decodificador reconstruye es BIT A BIT lo que el codificador reconstruye (Reconstruido()): asi se prueba.
+//  Lo que sale son NAL en "Annex B" (00 00 00 01 + NAL): van directo a W3dMp4Writer::Cuadro.
+//  Lo que el decodificador reconstruye es BIT A BIT lo que el codificador reconstruye (Rebuilt()): asi se prueba.
 // ============================================================================
 #include <vector>
 
-class W3dH264Codificador {
+class W3dH264Encoder {
 public:
-    W3dH264Codificador();
+    W3dH264Encoder();
     // ancho y alto (pares; se rellena hasta multiplos de 16 y se recorta en el SPS), cuadros por segundo, bitrate
     // pedido (kbps) y cada cuantos cuadros va uno clave (IDR)
-    bool Abrir(int w, int h, int fps, int kbps, int gop);
+    bool Open(int w, int h, int fps, int kbps, int gop);
     // UN CUADRO RGBA (de arriba hacia abajo, 'w' x 'h' del Abrir): lo deja codificado en 'salida' (Annex B; el
     // primero lleva SPS y PPS adelante)
-    bool Cuadro(const unsigned char* rgba, std::vector<unsigned char>& salida);
+    bool Frame(const unsigned char* rgba, std::vector<unsigned char>& output);
     // el ultimo cuadro reconstruido (YUV 4:2:0 planar del tamanio relleno: Y de anchoMb*16 x altoMb*16, U y V a la
     // mitad), para comparar con lo que decodifica un reproductor
-    const std::vector<unsigned char>& Reconstruido() const { return ref; }   // (despues de Cuadro, la referencia)
-    int AnchoRelleno() const { return mbW * 16; }
-    int AltoRelleno() const { return mbH * 16; }
+    const std::vector<unsigned char>& Rebuilt() const { return ref; }   // (despues de Cuadro, la referencia)
+    int FillWidth() const { return mbW * 16; }
+    int FillHeight() const { return mbH * 16; }
     int Qp() const { return qp; }
 
 private:
-    int w, h, wSrc, fps, kbps, gop, mbW, mbH, qp, nCuadro, idrId;
-    long bytesMeta, bytesHechos;
+    int w, h, wSrc, fps, kbps, gop, mbW, mbH, qp, nFrame, idrId;
+    long bytesMeta, doneBytes;
     std::vector<unsigned char> cur, rec, ref;           // YUV 4:2:0 planar (relleno): el cuadro, su reconstruccion, la anterior
     std::vector<signed char> nzL, nzU, nzV;              // los coeficientes no nulos de cada bloque 4x4 (para el nC)
     std::vector<short> mvx, mvy;                         // el movimiento de cada macrobloque (en cuartos de pixel)
-    std::vector<unsigned char> esSalto;
-    bool Cerrar();
-    void ConvertirRgba(const unsigned char* rgba);
-    void CodificarCuadro(bool idr, std::vector<unsigned char>& nal);
+    std::vector<unsigned char> isJump;
+    bool Close();
+    void ConvertRgba(const unsigned char* rgba);
+    void EncodeFrame(bool idr, std::vector<unsigned char>& nal);
 };
 
 #endif

@@ -5,13 +5,13 @@ trpanel on
 add cube
 selobj Cubo.001
 objmove 1 0 0
-trinfo mover
-trtactil orbitar
-trinfo cerrado
+trinfo move
+trtouch orbit
+trinfo closed
 objat Cubo.001 1 0 0 0.001
 # otra vez, ahora tocando otro viewport
 objmove 0 1 0
-trinfo mover
-trtactil otro
-trinfo cerrado
+trinfo move
+trtouch other
+trinfo closed
 objat Cubo.001 1 1 0 0.001

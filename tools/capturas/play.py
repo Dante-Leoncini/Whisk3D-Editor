@@ -13,7 +13,7 @@ Uso:
 Cada idioma va en su carpeta ("en-US English"...: el codigo de la ficha de Play) con las capturas y el destacado.
 
 Necesita el build de Linux (o W3D_BIN), Pillow y Google Chrome (el icono sale del .svg con Chrome sin ventana).
-Las escenas se arman con los comandos del harness (main/test/W3dCapturas.cpp): 'vista3d trazado' (el trazado de
+Las escenas se arman con los comandos del harness (main/test/W3dCaptures.cpp): 'vista3d trazado' (el trazado de
 rayos en la Vista 3D) y 'curvamod' (los modificadores de curva) existen para estas capturas.
 """
 import math, os, subprocess, sys, tempfile
@@ -203,51 +203,51 @@ def escena_codigo(idioma="es", w=W, h=H, esc=ESCALA):
     c = COMENTARIOS[idioma]
     codigo = """-- %s
 -- %s
-propiedades = { velocidad = 4, salto = 6 }
+properties = { speed = 4, jump = 6 }
 
 local vz = 0        -- %s
 local monedas = 0
 
-function actualizar(dt)
-  local yo_ = yo()
-  local v = propiedad("velocidad")
+function update(dt)
+  local yo_ = self()
+  local v = property("speed")
   local dx, dy = 0, 0
-  if tecla("izquierda") then dx = dx - 1 end
-  if tecla("derecha")   then dx = dx + 1 end
-  if tecla("arriba")    then dy = dy - 1 end
-  if tecla("abajo")     then dy = dy + 1 end
-  mover(yo_, dx * v * dt, dy * v * dt, 0)
+  if key("left") then dx = dx - 1 end
+  if key("right")   then dx = dx + 1 end
+  if key("up")    then dy = dy - 1 end
+  if key("down")     then dy = dy + 1 end
+  move(yo_, dx * v * dt, dy * v * dt, 0)
 
   -- %s
-  local x, y, z = posicion(yo_)
-  if teclaApretada("espacio") and z <= 0 then
-    vz = propiedad("salto")
+  local x, y, z = getPosition(yo_)
+  if keyPressed("space") and z <= 0 then
+    vz = property("jump")
   end
   vz = vz - 9.8 * dt
   z = z + vz * dt
   if z < 0 then z = 0; vz = 0 end
-  setPosicion(yo_, x, y, z)
+  setPosition(yo_, x, y, z)
 end
 
-function alEntrar(otro, miHitbox, suHitbox)
-  if string.sub(nombre(otro), 1, 6) == "Moneda" then
-    destruir(otro)
+function onEnter(other, myHitbox, otherHitbox)
+  if string.sub(getName(other), 1, 6) == "Moneda" then
+    destroy(other)
     monedas = monedas + 1
-    setCompartido("monedas", monedas)
-    sonido("sonidos/moneda.wav")
+    setShared("monedas", monedas)
+    sound("sounds/moneda.wav")
   end
 end
 """ % c
     d = rs.proyecto(idioma, codigo=codigo, archivo="personaje.lua")
     g = guion(idioma, w, h, esc)
-    g.linea("abrirw3d " + os.path.join(d, "girar.w3d"))
+    g.linea("openw3d " + os.path.join(d, "rotate.w3d"))
     lineas(g, """
         timeline pause
         layoutpordefecto
         division 0.7
         divisionde %d 0.36
         vpkind %d %d""" % (LINEA_DE_TIEMPO, LINEA_DE_TIEMPO, MENU_TIPO(IDE)))
-    g.linea("idecargar " + os.path.join(d, "personaje.lua"))
+    g.linea("ideload " + os.path.join(d, "personaje.lua"))
     lineas(g, """
         raiztipo juego
         selobj %s
@@ -312,7 +312,7 @@ def escena_render(idioma="es", w=W, h=H, esc=ESCALA, oro=True):
         vista3d overlays 0
         vista3d trazado 1 48""")
     for _ in range(80):                    # el trazado avanza con el TIEMPO (hilos): esperar y dibujar
-        g.linea("esperar 150")
+        g.linea("wait 150")
         g.linea("tick 1")
     return g
 
@@ -362,9 +362,9 @@ def escena_uv(idioma="es", w=W, h=H, esc=ESCALA):
     g.linea("selobj " + T(idioma, "Cube"))
     g.linea("delete")
     g.linea("import " + os.path.join(EJEMPLOS, "monkey.obj"))
-    g.linea("texturas")
+    g.linea("textures")
     g.linea("matnew")
-    g.linea("matmapa base textura " + os.path.join(EJEMPLOS, "UV_Texture.png"))
+    g.linea("matmap base texture " + os.path.join(EJEMPLOS, "UV_Texture.png"))
     lineas(g, """
         texturas
         modo edicion
@@ -414,20 +414,20 @@ def escena_pintura(idioma="es", w=W, h=H, esc=ESCALA):
     cx, cy = v["x"] + v["w"] // 2, v["y"] + v["barra"] + (v["h"] - v["barra"]) // 2
     r = int(min(v["w"], v["h"]) * 0.30)
     def trazo(puntos, pasos=24):
-        g.linea("raton move %d %d" % puntos[0])
-        g.linea("raton down %d %d izq" % puntos[0])
+        g.linea("mouse move %d %d" % puntos[0])
+        g.linea("mouse down %d %d left" % puntos[0])
         for a, b in zip(puntos, puntos[1:]):
             for k in range(1, pasos + 1):
                 t = k / pasos
-                g.linea("raton move %d %d" % (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
-        g.linea("raton up %d %d izq" % puntos[-1])
+                g.linea("mouse move %d %d" % (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+        g.linea("mouse up %d %d left" % puntos[-1])
     for col, dy in (("0.95 0.25 0.2", -0.55), ("1 0.8 0.15", -0.2), ("0.25 0.8 0.35", 0.15), ("0.2 0.5 0.95", 0.5)):
         g.linea("brushcolor %s 1 1" % col)
         y = cy + int(dy * r)
         pts = [(cx - r - 40 + i * (2 * r + 80) // 6, y + int(math.sin(i * 1.3) * 20)) for i in range(7)]
         trazo(pts)
         trazo([(px, py + int(0.12 * r)) for (px, py) in pts])
-    g.linea("raton move %d %d" % (cx + r + 120, cy - r))
+    g.linea("mouse move %d %d" % (cx + r + 120, cy - r))
     g.linea("tick 2")
     return g
 

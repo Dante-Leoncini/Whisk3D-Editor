@@ -116,17 +116,17 @@ class CWhisk3D : public MHidObserver
         // lapiz + OK con el mouse virtual: loop select en la posicion del cursor
         void ClickLoopSelect();
 
-        void SetRotacion( void );
-        void SetEscala( void );
-        void SetPosicion( void );
-        void ChangeEje ( void );
+        void BeginRotate( void );
+        void BeginScale( void );
+        void BeginTranslate( void );
+        void ChangeAxis ( void );
 
         
 
         //nueva forma de editar vertices
 
         void SetMouse();
-        void TecladoNumerico(TInt numero);
+        void NumericKeyboard(TInt number);
 
 
 

@@ -14,66 +14,66 @@
 #       su referencia (W3dUndoTexturaDuenos) y vaciar el historial no deja a la ranura sin la suya.
 # ==========================================================================
 
-ventana 1280 720
+window 1280 720
 
 # --- A) purgar la textura que un paso de undo se llevo ---
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-texasignar Cubo dosmats.png
-guardarw3d /tmp/w3d_f9_rev2a.w3d
-abrirw3d /tmp/w3d_f9_rev2a.w3d
-texentrada dosmats-b.png
-outvista texturas
-outsoltar dosmats-b.png 3d 0 0
+objtexture Cubo dosmats.png
+savew3d /tmp/w3d_f9_rev2a.w3d
+openw3d /tmp/w3d_f9_rev2a.w3d
+texentry dosmats-b.png
+outview textures
+outrelease dosmats-b.png 3d 0 0
 # (la textura de antes la tiene el paso de undo: una referencia mas que las ranuras)
 streamtexrefs
-recborrar texturas texturas/dosmats.png
-escenadefecto
-streamtexrefs exacto
+recdelete textures textures/dosmats.png
+scenedefault
+streamtexrefs exact
 
 # --- B) un material animado: soltar otra textura y vaciar el historial ---
-escenadefecto
-guardarw3d /tmp/w3d_f9_rev2b.w3d
-abrirw3d /tmp/w3d_f9_rev2b.w3d
-texentrada alfa_reja.png
+scenedefault
+savew3d /tmp/w3d_f9_rev2b.w3d
+openw3d /tmp/w3d_f9_rev2b.w3d
+texentry alfa_reja.png
 streamanimmat Cubo dosmats.png dosmats-b.png
 streamanimtick 1
-streamtexrefs exacto
+streamtexrefs exact
 streamanimtick 1
-streamtexrefs exacto
-outvista texturas
-outsoltar alfa_reja.png 3d 0 0
-streamundolimpiar
+streamtexrefs exact
+outview textures
+outrelease alfa_reja.png 3d 0 0
+streamundoclear
 # (los usuarios de las texturas se recorren -los cuadros del material animado siguen vivos-)
-outvista escena
-outvista texturas
+outview scene
+outview textures
 streamanimtick 3
-streamtexrefs exacto
+streamtexrefs exact
 selobj Cubo
 undo
 redo
-streamundolimpiar
+streamundoclear
 streamanimtick 2
-streamtexrefs exacto
-escenadefecto
+streamtexrefs exact
+scenedefault
 
 # --- C) borrar EN USO la textura que guarda un paso, Ctrl+Z (revive) y vaciar el historial ---
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-texasignar Cubo dosmats.png
-guardarw3d /tmp/w3d_f9_rev2c.w3d
-abrirw3d /tmp/w3d_f9_rev2c.w3d
-texentrada dosmats-b.png
-outvista texturas
-outsoltar dosmats-b.png 3d 0 0
-outsoltar dosmats.png 3d 0 0
+objtexture Cubo dosmats.png
+savew3d /tmp/w3d_f9_rev2c.w3d
+openw3d /tmp/w3d_f9_rev2c.w3d
+texentry dosmats-b.png
+outview textures
+outrelease dosmats-b.png 3d 0 0
+outrelease dosmats.png 3d 0 0
 # (dosmats.png: la ranura + el primer paso; dosmats-b.png: el segundo paso)
 streamtexrefs
-recborrarforzado texturas texturas/dosmats.png
+recdeleteforced textures textures/dosmats.png
 undo
 streamtexrefs
-streamundolimpiar
-streamtexrefs exacto
-escenadefecto
+streamundoclear
+streamtexrefs exact
+scenedefault

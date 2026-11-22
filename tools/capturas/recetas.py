@@ -302,7 +302,7 @@ def escena_llena(g, idioma):
     return elegido
 
 
-LEJOS_LLENA = "vporbita 0 0.5 -1.5 15"     # la escena llena entera a la vista
+LEJOS_LLENA = "vporbit 0 0.5 -1.5 15"     # la escena llena entera a la vista
 
 
 def vista_pc(g):
@@ -332,7 +332,7 @@ def orbitar_raton(idioma):
     x0, y0 = cx + 30, cy + 30
     g.raton_mover(x0, y0)
     g.foto(dur=700)
-    g.raton_abajo(x0, y0, "medio")
+    g.raton_abajo(x0, y0, "middle")
     g.foto(dur=300)
     n = 30
     for k in range(1, n + 1):
@@ -342,7 +342,7 @@ def orbitar_raton(idioma):
     # el editor aplica el delta de cada movimiento en el siguiente: uno mas en el mismo lugar cierra el recorrido
     g.raton_mover(x0, y0)
     g.foto(dur=250)
-    g.raton_arriba("medio")
+    g.raton_arriba("middle")
     g.foto(dur=600)
     return g.cuadros(recorte=rec, calidad=68)
 
@@ -409,7 +409,7 @@ def panear_raton(idioma):
     g.foto(dur=600)
     g.mod("Shift")
     g.foto(dur=350)
-    g.raton_abajo(x0, y0, "medio")
+    g.raton_abajo(x0, y0, "middle")
     g.foto(dur=250)
     n, r = 26, 85
     for k in range(1, n + 1):
@@ -419,7 +419,7 @@ def panear_raton(idioma):
     # el editor aplica el delta de cada movimiento en el siguiente: uno mas en el mismo lugar cierra el recorrido
     g.raton_mover(x0, y0)
     g.foto(dur=250)
-    g.raton_arriba("medio")
+    g.raton_arriba("middle")
     g.mod()
     g.foto(dur=500)
     return g.cuadros(recorte=rec, calidad=68)
@@ -505,7 +505,7 @@ def zoom_nokia(idioma):
 
 
 # -- encuadrar --
-LEJOS = "vporbita 9 2 -7 42"       # la vista lejos y corrida: el cubo queda chiquito en una punta
+LEJOS = "vporbit 9 2 -7 42"       # la vista lejos y corrida: el cubo queda chiquito en una punta
 
 
 @receta("navegacion-encuadrar")
@@ -537,7 +537,7 @@ def encuadrar_edicion(idioma):
     g.linea("objscale 2 2 2")
     g.linea("mode edit")
     # un parche de seis caras que mira a la camara (cara = anillo * 16 + segmento)
-    g.linea("caras " + " ".join(str(16 * anillo + seg) for anillo in (3, 4) for seg in (2, 3, 4)))
+    g.linea("faces " + " ".join(str(16 * anillo + seg) for anillo in (3, 4) for seg in (2, 3, 4)))
     con_tecla(g, lambda: g.tecla("Keypad_."), "Num .")
     return g.cuadros(recorte=rec)
 
@@ -603,7 +603,7 @@ def vistas_nokia(idioma):
 
 
 # -- perspectiva y ortografica --
-PERSPECTIVA = "vporbita 0 0.8 -4.5 15 -14 30"     # un poco de arriba y de costado, mirando a lo largo de las filas
+PERSPECTIVA = "vporbit 0 0.8 -4.5 15 -14 30"     # un poco de arriba y de costado, mirando a lo largo de las filas
 
 
 def escena_filas(g, idioma):
@@ -696,7 +696,7 @@ def escena_plano(g, idioma):
         g.linea("objpos %g %g %g" % (x, sy, z))
         g.linea("objscale %g %g %g" % (sx, sy, sz))
     g.linea("deselectall")
-    g.linea("vporbita 0 0 0 13")
+    g.linea("vporbit 0 0 0 13")
     g.tecla("Keypad_7")                 # de arriba...
     g.tecla("Keypad_5")                 # ...y en ortografica
 
@@ -752,13 +752,13 @@ def bloquear_orbita_raton(idioma):
     g.clic(ix, iy)
     g.foto(dur=700)
     ir_con_el_raton(g, ix, iy, cx, cy, pasos=6)
-    g.raton_abajo(cx, cy, "medio")
+    g.raton_abajo(cx, cy, "middle")
     g.foto(dur=250)
     for x, y in circulo(26, 90, cx, cy):
         g.raton_mover(x, y)
         g.foto(dur=60)
     g.raton_mover(cx, cy)               # (cierra el recorrido: el delta va en el movimiento siguiente)
-    g.raton_arriba("medio")
+    g.raton_arriba("middle")
     g.foto(dur=900)
     return g.cuadros(recorte=rec, calidad=72)
 
@@ -827,13 +827,13 @@ def camara_bloquear_raton(idioma):
     g.clic(lx, ly)
     g.foto(dur=800)
     ir_con_el_raton(g, lx, ly, cx, cy, pasos=6)
-    g.raton_abajo(cx, cy, "medio")
+    g.raton_abajo(cx, cy, "middle")
     g.foto(dur=200)
     for k in range(1, 11):              # la gira hasta que el cubo queda en el medio...
         g.raton_mover(cx - 7 * k, cy)
         g.foto(dur=60)
     g.raton_mover(cx - 70, cy)
-    g.raton_arriba("medio")
+    g.raton_arriba("middle")
     g.foto(dur=400)
     for _ in range(4):                  # ...y la aleja para que entre entero
         g.rueda(-1, cx - 70, cy)

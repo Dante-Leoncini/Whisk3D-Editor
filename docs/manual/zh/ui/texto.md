@@ -2,7 +2,7 @@
 
 ## 位图字体
 
-界面的字体是在 `font.png` 中手绘的。每个字符是一个 **5x11** 像素的格子，前进宽度为 **6**（`CharacterWidth`）。一行高 **12**（`RenglonHeight`）。它是等宽字体：所有字符占用的宽度相同。缩放时，所有数值都乘以 `GlobalScale`。
+界面的字体是在 `font.png` 中手绘的。每个字符是一个 **5x11** 像素的格子，前进宽度为 **6**（`CharacterWidth`）。一行高 **12**（`RowHeight`）。它是等宽字体：所有字符占用的宽度相同。缩放时，所有数值都乘以 `GlobalScale`。
 
 `Font`（`text/font.h`）保存每个字符的坐标。只有一个，全局的：`WhiskFont`。用图集的尺寸和它的纹理来创建（[直接使用 UI](empezar.md)）。
 
@@ -24,18 +24,18 @@
 - `;`、`^`、`~`、`` ` ``、`±`、`«`、`»`、`–`、`—` 和 `…`，
 - **西里尔字母**。与拉丁字母相同的那些（`А В Е К М Н О Р С Т Х` 和 `а е о р с у х`）使用 `font.png` 中的字形。
 
-它直到某段文本第一次需要时才加载：`SetAtlasExtendido` 只保存路径。在英语或西班牙语中，它可能永远不会被加载，而在 N95 上，内存很宝贵。如果缺少这个文件，组合字母会显示为没有符号的样子，扩展图集中的字符会显示为 `?`。
+它直到某段文本第一次需要时才加载：`SetAtlasExtended` 只保存路径。在英语或西班牙语中，它可能永远不会被加载，而在 N95 上，内存很宝贵。如果缺少这个文件，组合字母会显示为没有符号的样子，扩展图集中的字符会显示为 `?`。
 
-这些表（每个字符在哪个格子、每个字母如何组合）在 `text/FuenteExt.h` 中。不要手工编辑：它们由 `tools/fuente_ext.py` 生成，这个工具也会绘制 PNG，位于编辑器的仓库中。
+这些表（每个字符在哪个格子、每个字母如何组合）在 `text/FontExt.h` 中。不要手工编辑：它们由 `tools/fuente_ext.py` 生成，这个工具也会绘制 PNG，位于编辑器的仓库中。
 
-有了这两张纹理，可以显示西班牙语、葡萄牙语、法语、德语、意大利语、波兰语、土耳其语和俄语。日语、中文和印地语则不行：任何图集中都没有的字符会显示为 `?`。`WhiskFont->Soporta(cp)` 告诉你某个字符能否绘制。
+有了这两张纹理，可以显示西班牙语、葡萄牙语、法语、德语、意大利语、波兰语、土耳其语和俄语。日语、中文和印地语则不行：任何图集中都没有的字符会显示为 `?`。`WhiskFont->Supports(cp)` 告诉你某个字符能否绘制。
 
 文本使用 UTF-8。`UTF8_Char` 读取 1 到 3 字节的序列。4 字节的序列（例如表情符号）无法读取：会显示为问号。
 
 ## 绘制文本
 
 ```cpp
-SetColorID(ColorID::blanco);
+SetColorID(ColorID::white);
 RenderBitmapText("Hola", textAlign::left, 200);   // 200：最大宽度，以像素为单位
 ```
 
@@ -43,7 +43,7 @@ RenderBitmapText("Hola", textAlign::left, 200);   // 200：最大宽度，以像
 
 ## 测量和截断
 
-文本的宽度等于字母数乘以 `CharacterWidthGS`。`UTF8_Largo(texto)` 统计的是字母而不是字节：一个 `ñ` 占两个字节，但只算一个。
+文本的宽度等于字母数乘以 `CharacterWidthGS`。`UTF8_Length(text)` 统计的是字母而不是字节：一个 `ñ` 占两个字节，但只算一个。
 
 如果超出最大宽度，`RenderBitmapText` 会截断它：
 
@@ -53,33 +53,33 @@ RenderBitmapText("Hola", textAlign::left, 200);   // 200：最大宽度，以像
 | `textAlign::right` | 在原点结束 | 开头：在输入框中能看到最后输入的内容 |
 | `textAlign::center` | 在最大宽度内居中 | 结尾 |
 
-`RenderBitmapEtiqueta(texto, ancho)` 用于行的标签：它右对齐，但如果放不下，会截掉结尾并加上 `..`（“Motion vecto..”）。
+`RenderBitmapLabel(text, width)` 用于行的标签：它右对齐，但如果放不下，会截掉结尾并加上 `..`（“Motion vecto..”）。
 
-`RenderBitmapFloat(valor, alineación, ancho, unidad)` 绘制一个带四位小数、后面紧跟单位的数字：`90.0000°`。它不使用 `%f`，因为 Symbian 的 `printf` 不能格式化 `float`。
+`RenderBitmapFloat(value, alineación, width, unit)` 绘制一个带四位小数、后面紧跟单位的数字：`90.0000°`。它不使用 `%f`，因为 Symbian 的 `printf` 不能格式化 `float`。
 
 ## 使用 TTF 字体的文本
 
 如果需要任意大小的字母，可以用 `w3dui::W3dTextAtlas`（`text/W3dTextAtlas.h`）。它只有一个头文件。它绘制一种已经烘焙到图集中的 TTF 字体，每个字母都会自行缩放和定位：适用于标题、分数和动画文字。它不会在运行时光栅化 TTF。
 
-图集在 PC 上用 `text/bake_atlas.py` 烘焙，需要 Pillow：`bake_atlas.py <fuente.ttf> <lado del atlas> <alto de letra> <salida>`。图集的边长为 128、256、512 或 1024。它烘焙 ASCII 和 `áéíóúÁÉÍÓÚñÑüÜ¿¡`。输出 `<salida>.png`（灰度覆盖率，无 alpha）和 `<salida>.w3dfnt`（每个字母的尺寸）。
+图集在 PC 上用 `text/bake_atlas.py` 烘焙，需要 Pillow：`bake_atlas.py <source.ttf> <side of atlas> <height of letter> <output>`。图集的边长为 128、256、512 或 1024。它烘焙 ASCII 和 `áéíóúÁÉÍÓÚñÑüÜ¿¡`。输出 `<output>.png`（灰度覆盖率，无 alpha）和 `<output>.w3dfnt`（每个字母的尺寸）。
 
 ```cpp
 #include "WhiskUI/text/W3dTextAtlas.h"
 #include "io/w3dFilesystem.h"
 
 std::vector<unsigned char> fnt, png;
-w3dFileSystem::ReadFileBytes("fuentes/titulo.w3dfnt", fnt);
-w3dFileSystem::ReadFileBytes("fuentes/titulo.png", png);
+w3dFileSystem::ReadFileBytes("fonts/titulo.w3dfnt", fnt);
+w3dFileSystem::ReadFileBytes("fonts/titulo.png", png);
 
-w3dui::W3dTextAtlas titulo;
-titulo.Load(&fnt[0], fnt.size(), &png[0], png.size());
+w3dui::W3dTextAtlas title;
+title.Load(&fnt[0], fnt.size(), &png[0], png.size());
 
-titulo.Begin();                                                // 图集、混合和状态
-titulo.DrawText("Puntaje: 120", 10, 10, 24, 1, 1, 1, 1);      // x、y、高度、r、g、b、a
-float ancho = titulo.TextWidth("Puntaje: 120", 24);
+title.Begin();                                                // 图集、混合和状态
+title.DrawText("Puntaje: 120", 10, 10, 24, 1, 1, 1, 1);      // x、y、高度、r、g、b、a
+float width = title.TextWidth("Puntaje: 120", 24);
 ```
 
-`(x, y)` 是这一行的顶部，Y 轴向下。`DrawText` 把所有字母合并成一次绘制。`DrawGlyph` 只绘制一个字母，用于大小或颜色不同的字母。`LineHeight(alto)` 给出一行的高度。默认使用预乘 alpha 混合（`MezclaPremult`）：文本可以是任何颜色。
+`(x, y)` 是这一行的顶部，Y 轴向下。`DrawText` 把所有字母合并成一次绘制。`DrawGlyph` 只绘制一个字母，用于大小或颜色不同的字母。`LineHeight(height)` 给出一行的高度。默认使用预乘 alpha 混合（`MixPremult`）：文本可以是任何颜色。
 
 ## 不涉及 GPU 的表
 

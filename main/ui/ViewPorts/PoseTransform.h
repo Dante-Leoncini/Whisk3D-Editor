@@ -10,19 +10,19 @@
  */
 #include "math/Vector3.h"
 
-void PoseXformStart(int modo);      // G/R/S: arranca el transform (1=mover 2=rotar 3=escalar)
+void PoseXformStart(int mode);      // G/R/S: arranca el transform (1=mover 2=rotar 3=escalar)
 void PoseXformMotion(int mx, int my);
-void PoseXformNumValor(float v);    // valor numerico exacto tipeado
+void PoseXformNumValue(float v);    // valor numerico exacto tipeado
 void PoseXformConfirm();            // click/Enter/tick
 void PoseXformCancel();             // Esc/click-der/cruz
-void PoseCiclarEje(int eje);        // X/Y/Z: constrinie a un eje
-void PoseCiclarPlano(int eje);      // Shift+X/Y/Z: al plano
-void PoseCiclarOrient();            // "R de nuevo": Global->Local->View
-bool PoseEjesMundo(Vector3& ex, Vector3& ey, Vector3& ez);
-int  PoseHeaderModo();              // 0=none 1=grab 2=rotate 3=scale (para la barra de estado)
-void PoseInsertKeyframe(int canales = 0); // canales = mascara KfCanal* (0 = Loc+Rot+Scl)
-void PoseBorrarKeyframe();   // Animation > Delete Keyframe en el Modo Pose: los del frame actual de los huesos elegidos
-void PoseLimpiarKeyframes(); // Animation > Clear Keyframe en el Modo Pose: todos los de los huesos elegidos
+void PoseCycleAxis(int axis);       // X/Y/Z: constrinie a un eje
+void PoseCyclePlane(int axis);      // Shift+X/Y/Z: al plano
+void PoseCycleOrient();             // "R de nuevo": Global->Local->View
+bool PoseAxesWorld(Vector3& ex, Vector3& ey, Vector3& ez);
+int  PoseHeaderMode();              // 0=none 1=grab 2=rotate 3=scale (para la barra de estado)
+void PoseInsertKeyframe(int channels = 0); // canales = mascara KfCanal* (0 = Loc+Rot+Scl)
+void PoseDeleteKeyframe(); // Animation > Delete Keyframe en el Modo Pose: los del frame actual de los huesos elegidos
+void PoseClearKeyframes(); // Animation > Clear Keyframe en el Modo Pose: todos los de los huesos elegidos
 void PoseClearTransform(int what);
 void PoseClearTransformAll();
 
@@ -33,9 +33,9 @@ void PoseClearTransformAll();
 //  - Delta: ABSOLUTO desde el arranque -> grab usa (du,dv); rotate el angulo (grados, alrededor de Z);
 //    scale el factor (X e Y; Z queda 1). Se puede llamar por cada motion (no acumula drift).
 //  - Confirm/Cancel: mismos efectos que el 3D (undo por drag + Auto Key si esta prendido).
-void Pose2DStart(int modo);
-bool Pose2DActivo();
-int  Pose2DModo();                          // 0=nada 1=grab 2=rotate 3=scale
+void Pose2DStart(int mode);
+bool Pose2DActive();
+int  Pose2DMode();                          // 0=nada 1=grab 2=rotate 3=scale
 void Pose2DDelta(float du, float dv, float angDeg, float factor);
 void Pose2DConfirm();
 void Pose2DCancel();

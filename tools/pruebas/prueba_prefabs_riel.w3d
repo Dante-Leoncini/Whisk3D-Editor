@@ -5,7 +5,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.02, 0.02, 0.03, 1.0"
 
         Curve { name: "RielA" filePath: riel-a.cap }
@@ -23,8 +23,8 @@ Whisk3D {
         Camera {
             name: "Camara"
             fov: 45.0
-            riel: "RielA"
-            offsetRiel: 0
+            rail: "RielA"
+            railOffset: 0
         }
     }
 }

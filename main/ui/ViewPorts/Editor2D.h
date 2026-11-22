@@ -4,12 +4,12 @@
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/WithBorder.h" // borde (verde si activo), igual que UV/Outliner
 #include "render/UIOverlay.h"     // dibujo compartido de la UI 2D (mismo que el viewport 3D)
-#include "ViewPorts/Gizmo.h"       // Gizmo2DCliente: el gizmo 2D sobre los elementos elegidos
+#include "ViewPorts/Gizmo.h"       // Gizmo2DClient: el gizmo 2D sobre los elementos elegidos
 #include <vector>
 
-// ROLES estables de los botones de la barra del Editor 2D (dispatch por rol via BarRolBtn,
+// ROLES estables de los botones de la barra del Editor 2D (dispatch por rol via BarRoleBtn,
 // NO por indice: agregar/reordenar botones no rompe nada; mismo esquema que el 3D y el UV).
-enum BarRol2D {
+enum BarRole2D {
     BR2D_Select = 1, // todo / nada / invertir
     BR2D_Add,        // crear elementos 2D
     BR2D_Object,     // transformar / duplicar / emparentar / borrar
@@ -18,7 +18,7 @@ enum BarRol2D {
 };
 
 // ROLES de la TOOLBAR inferior del Editor 2D (mecanismo compartido de ViewportBase).
-enum ToolbarRol2D {
+enum ToolbarRole2D {
     TBR_2DHist = 1   // .. TBR_2DHist+2: historial MRU (Move/Rotate/Scale de elementos)
 };
 
@@ -33,12 +33,12 @@ enum ToolbarRol2D {
 //  (1080x1920, un celular en vertical: el caso de los slots). Sobre esto
 //  se monta la edicion del objeto UI (widgets, imagenes, export).
 // =====================================================================
-class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DCliente {
+class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DClient {
     public:
         int ViewportKind() const { return 6; } // 1=3D 2=outliner 3=props 4=UV 5=timeline 6=2D
 
         float zoom;           // px de pantalla por px de lienzo (arranca ajustado al viewport)
-        bool  zoomInicializado; // el primer Render calcula el zoom "que entre comodo" UNA vez
+        bool  zoomInitialized; // el primer Render calcula el zoom "que entre comodo" UNA vez
         float panX, panY;     // desplazamiento de la vista, en pixeles de viewport
         int   lastMx, lastMy; // para el delta del paneo con boton del medio
 
@@ -49,25 +49,25 @@ class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DCliente {
         // Mientras dura, el zoom y el paneo se CONGELAN (no se pisan: al salir vuelve el
         // encuadre exacto que habia). Es POR VIEWPORT (como ViewFromCameraActive del 3D),
         // no global: se puede tener un viewport 2D editando y otro mostrando el juego.
-        bool  vistaJuego;
+        bool  gameView;
 
         // CURSOR 2D (en px de lienzo): pivote opcional + referencia. Shift+click lo coloca.
         float cursor2DX, cursor2DY;
-        bool  cursorColocado;   // false = sigue el centro de la ventana
+        bool  cursorPlaced;   // false = sigue el centro de la ventana
         // PIVOTE de transformacion: desde donde se gira. 0=centro de la seleccion (mediana),
         // 1=elemento activo, 2=cursor 2D. Se elige en el boton de la barra.
-        int   pivotModo;
+        int   pivotMode;
 
         // TRANSFORM 2D en curso (G = mover, R = rotar, S = escalar; X/Y restringen el eje)
-        int   xform;          // 0=nada 1=mover 2=rotar 3=escalar
-        int   xformEje;       // 0=libre 1=solo X 2=solo Y
+        int   xform;           // 0=nada 1=mover 2=rotar 3=escalar
+        int   xformAxis;       // 0=libre 1=solo X 2=solo Y
         int   xformMx, xformMy;                 // mouse al iniciar (pantalla)
         std::vector<Object*> xformObjs;         // los elementos que se estan transformando
         std::vector<Vector3> xformOrig;         // su pos original (para aplicar/cancelar)
         std::vector<float>   xformRotOrig;      // su rot2d original
-        std::vector<float>   xformTamOrig;      // escalar: tam (texto) / ancho (imagen) original
-        std::vector<float>   xformTamOrig2;     // escalar: alto original (imagen)
-        std::vector<UI2DPos> xformResueltas;    // su posicion en PANTALLA al iniciar
+        std::vector<float>   xformOrigSize;     // escalar: tam (texto) / ancho (imagen) original
+        std::vector<float>   xformOrigSize2;    // escalar: alto original (imagen)
+        std::vector<UI2DPos> resolvedXform;     // su posicion en PANTALLA al iniciar
         float xformPivX, xformPivY;             // pivote en px de PANTALLA (al iniciar)
 
         // ARRASTRE directo con el mouse: mover un elemento agarrandolo, redimensionar una
@@ -78,7 +78,7 @@ class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DCliente {
         Vector3 dragOrigPos;   // su pos al iniciar
         float dragOrigW, dragOrigH;   // ancho/alto originales (imagen o lienzo)
         int   dragMx, dragMy;         // mouse al iniciar (pantalla)
-        bool  dragPaso;               // el mover ya supero el umbral anti-accidente
+        bool  dragStep;               // el mover ya supero el umbral anti-accidente
         std::vector<Object*> dragObjs;   // mover: TODA la seleccion 2D
         std::vector<Vector3> dragOrigs;
         std::vector<float>   dragRefW;   // rect de referencia de cada uno (pos = RELATIVA a el)
@@ -87,15 +87,15 @@ class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DCliente {
 
         // ACUMULADORES wrap-safe: el cursor se envuelve en los bordes (como el 3D) y ese
         // salto no debe sumar. Las acciones usan esto, nunca (mouse - inicio).
-        float acumX, acumY;   // delta acumulado, en px de pantalla
-        float acumAng;        // angulo acumulado alrededor del pivote (radianes)
-        float acumFactor;     // factor de escala acumulado (multiplicativo)
-        bool  accionPrimerMov; // el 1er motion tras iniciar no suma (lastMx puede estar viejo)
-        bool  moverTrasDuplicar; // Shift+D: el proximo Render arranca el mover de las copias
+        float accumX, accumY;   // delta acumulado, en px de pantalla
+        float accumAng;         // angulo acumulado alrededor del pivote (radianes)
+        float accumFactor;      // factor de escala acumulado (multiplicativo)
+        bool  actionFirstMov; // el 1er motion tras iniciar no suma (lastMx puede estar viejo)
+        bool  moveAfterDuplicate; // Shift+D: el proximo Render arranca el mover de las copias
 
         // estado del ultimo Render (para pasar de pantalla a lienzo fuera del dibujo)
         float lastFx, lastFy, lastEsc;
-        std::vector<UI2DPos> posiciones;        // posicion resuelta de cada elemento (pantalla)
+        std::vector<UI2DPos> positions;        // posicion resuelta de cada elemento (pantalla)
 
         Editor2D();
         virtual ~Editor2D();
@@ -107,70 +107,70 @@ class Editor2D : public ViewportBase, public WithBorder, public Gizmo2DCliente {
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // touch: 2 dedos zoom+paneo
         bool event_finger_pinch(float cx, float cy, float panDx, float panDy,              // ...zoom anclado a los dedos
                                 float sepX0, float sepY0, float sepX1, float sepY1) W3D_OVERRIDE;
-        // ===== GIZMO 2D (Gizmo.h) sobre los elementos elegidos: arranca el MISMO G/R/S (IniciarXform2D), alrededor
+        // ===== GIZMO 2D (Gizmo.h) sobre los elementos elegidos: arranca el MISMO G/R/S (StartXform2D), alrededor
         // del pivote del menu Pivot (mediana / elemento activo / cursor 2D) =====
-        bool Gizmo2DPivote(float& lx, float& ly) W3D_OVERRIDE;
-        bool Gizmo2DEnZona(float lx, float ly) const W3D_OVERRIDE;
-        bool Gizmo2DIniciar(int modo, int eje) W3D_OVERRIDE;
-        void Gizmo2DAplicar(float dx, float dy, float ang, float f) W3D_OVERRIDE;
-        void Gizmo2DConfirmar() W3D_OVERRIDE;
-        void Gizmo2DCancelar() W3D_OVERRIDE;
+        bool Gizmo2DPivot(float& lx, float& ly) W3D_OVERRIDE;
+        bool Gizmo2DInZone(float lx, float ly) const W3D_OVERRIDE;
+        bool Gizmo2DStart(int mode, int axis) W3D_OVERRIDE;
+        void Gizmo2DApply(float dx, float dy, float ang, float f) W3D_OVERRIDE;
+        void Gizmo2DConfirm() W3D_OVERRIDE;
+        void Gizmo2DCancel() W3D_OVERRIDE;
 
-        void Panear(float dx, float dy); // compartido PC/Symbian (flechas / touch)
-        void ZoomCentro(int dir);        // zoom centrado (teclado / pinch)
+        void Pan(float dx, float dy); // compartido PC/Symbian (flechas / touch)
+        void ZoomCenter(int dir);     // zoom centrado (teclado / pinch)
         void button_left() W3D_OVERRIDE;     // confirmar transform / Shift+click = colocar el cursor 2D
         void button_right() W3D_OVERRIDE;    // cancelar transform
         // transform 2D
-        void IniciarXform2D(int modo);   // 1=mover 2=rotar (captura seleccion + pivote)
-        void AplicarXform2D(int mx, int my);
-        void ConfirmarXform2D();
-        void CancelarXform2D();
+        void StartXform2D(int mode);   // 1=mover 2=rotar (captura seleccion + pivote)
+        void ApplyXform2D(int mx, int my);
+        void ConfirmXform2D();
+        void CancelXform2D();
         // ---- hooks del TRANSFORM UI COMPARTIDO (TransformUI.cpp): barra de info, entrada
         // numerica exacta (en px de LIENZO), warp del cursor y tilde/cruz/X/Y de la toolbar.
         // Mismo mecanismo que el 3D y el UV editor, sin duplicar codigo. ----
-        bool XformEnCurso() const W3D_OVERRIDE { return xform != 0; }
-        void XformNumValor(float v) W3D_OVERRIDE;   // v en px de lienzo (mover) / grados / factor
-        void XformConfirmar() W3D_OVERRIDE;         // gate: expresion invalida NO confirma
-        void XformCancelar() W3D_OVERRIDE;
-        void XformToggleEje(int eje) W3D_OVERRIDE;  // teclas X/Y y botones de la toolbar
-        std::string XformTextoBarra() W3D_OVERRIDE; // texto de la barra de info (px)
-        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // flechas = paneo
+        bool XformInProgress() const W3D_OVERRIDE { return xform != 0; }
+        void XformNumValue(float v) W3D_OVERRIDE;   // v en px de lienzo (mover) / grados / factor
+        void XformConfirm() W3D_OVERRIDE;           // gate: expresion invalida NO confirma
+        void XformCancel() W3D_OVERRIDE;
+        void XformToggleAxis(int axis) W3D_OVERRIDE; // teclas X/Y y botones de la toolbar
+        std::string XformTextBar() W3D_OVERRIDE;     // texto de la barra de info (px)
+        void event_key_down(int keyCode, bool repeat) W3D_OVERRIDE; // flechas = paneo
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         // IMPRESCINDIBLE: resetear ViewPortClickDown al soltar (sino viewPortActive se congela
         // y el borde verde/resize dejan de andar; mismo gotcha documentado en UVEditor).
-        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void mouse_button_up(int button) W3D_OVERRIDE;
         // toolbar inferior compartida (ToolbarBase): Mover/Rotar/Escalar de elementos (MRU).
         // Oculta en vista de juego y durante el Play (el juego se mira limpio, como el 3D).
         bool ToolbarVisible() const W3D_OVERRIDE;
-        void ToolbarSincronizar() W3D_OVERRIDE;
-        void ToolbarAccionRol(int rol) W3D_OVERRIDE;
-        // mapeo lienzo->pantalla (centro cx,cy del marco y escala s), igual que usa Render.
-        void ParamsLienzo(float& cx, float& cy, float& s) const;
+        void ToolbarSync() W3D_OVERRIDE;
+        void ToolbarActionRole(int role) W3D_OVERRIDE;
+        // mapeo canvas->screen (centro cx,cy del marco y escala s), igual que usa Render.
+        void ParamsCanvas(float& cx, float& cy, float& s) const;
         // rect UTIL del viewport (todo MENOS la barra de menu), en coords LOCALES del viewport
-        void RectUtil(int* uy, int* uh) const;
-        // VISTA DE JUEGO: fija (o limpia) el override del tamano de ventana (UI2D_OverrideVentana)
+        void UsefulRect(int* uy, int* uh) const;
+        // VISTA DE JUEGO: fija (o limpia) el override del tamano de ventana (UI2D_OverrideWindow)
         // para que el LIENZO sea el rect util de ESTE viewport. Lo llaman Render (cada frame:
-        // sigue los resize) y SimJuego antes de mapear el input (Editor2DAlimentarOverride).
-        void ActualizarOverrideLienzo();
+        // sigue los resize) y SimJuego antes de mapear el input (Editor2DFeedOverride).
+        void UpdateOverrideCanvas();
     private:
-        void PivoteEnPantalla(float* px, float* py);   // el pivote actual, en px de pantalla
-        void AplicarDrag(int mx, int my);              // mueve/redimensiona segun el drag activo
+        void PivotInScreen(float* px, float* py);   // el pivote actual, en px de pantalla
+        void ApplyDrag(int mx, int my);             // mueve/redimensiona segun el drag activo
 };
 
-// (el viejo Editor2DXformActivo se reemplazo por el hook COMPARTIDO ViewportBase::XformEnCurso:
-//  controles.cpp envuelve el cursor con el mismo chequeo para el Editor 2D y el UV editor)
+// (el viejo Editor2DXformActivo se reemplazo por el hook COMPARTIDO ViewportBase::XformInProgress:
+//  controls.cpp envuelve el cursor con el mismo chequeo para el Editor 2D y el UV editor)
 // acciones compartidas con los menus de la barra (LayoutInput) y los atajos
-void Editor2DDuplicarSeleccion(Editor2D* ed);   // duplica la seleccion 2D (copias +20,+20)
-void Editor2DSeleccionar(int modo);             // 0 = todo, 1 = nada, 2 = invertir (solo 2D)
+void Editor2DDuplicateSelection(Editor2D* ed);  // duplica la seleccion 2D (copias +20,+20)
+void Editor2DSelect(int mode);                  // 0 = todo, 1 = nada, 2 = invertir (solo 2D)
 void Editor2DZoom1a1(Editor2D* ed);             // zoom 1:1 (pixel-perfect) + vista centrada
-void Editor2DZoomExacto(Editor2D* ed, int n);   // zoom exacto xN, centrado
-void Editor2DEncuadrarSeleccion(Editor2D* ed);  // encuadrar lo seleccionado (numpad .)
+void Editor2DZoomExact(Editor2D* ed, int n);    // zoom exacto xN, centrado
+void Editor2DFrameSelection(Editor2D* ed);      // encuadrar lo seleccionado (numpad .)
 // VISTA DE JUEGO (numpad 0 / menu View): prende o apaga el modo en ESE viewport 2D
-void Editor2DVistaJuego(Editor2D* ed, bool on);
+void Editor2DGameView(Editor2D* ed, bool on);
 // SimJuego (input del Play): si 'vp' es un Editor2D, re-fija su override de lienzo ANTES de
-// mapear pantalla->lienzo, asi el input usa el MISMO lienzo que el ultimo dibujo aunque haya
+// mapear screen->canvas, asi el input usa el MISMO lienzo que el ultimo dibujo aunque haya
 // varios viewports 2D (el que alimenta gana). No hace nada si vp no es un viewport 2D.
-void Editor2DAlimentarOverride(ViewportBase* vp);
-void Editor2DBorrarSeleccion();                 // borra la seleccion (popup de confirmacion)
+void Editor2DFeedOverride(ViewportBase* vp);
+void Editor2DDeleteSelection();                 // borra la seleccion (popup de confirmacion)
 
 #endif // EDITOR2D_H

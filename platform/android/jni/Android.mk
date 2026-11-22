@@ -38,19 +38,19 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dZip.cpp
 # mano igual que en el CMakeLists: W3dTexto = round-trip exacto de floats, W3dMalla = el .w3dm,
 # W3dAlmacen = el montaje del zip. Sin ellos el LINK falla con "undefined symbol: AlmacenCarpeta::Leer"
 # y "W3dEscribirFloat". Al agregar un .cpp al Core hay que compararlo contra el CMakeLists del editor.
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dTexto.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMalla.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dText.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMesh.cpp
 # W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMallaBin.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dAlmacen.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dRecursos.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMeshBin.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dStore.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dResources.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/w3dlog.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dInteractionState.cpp
 # config/mute del Core: W3dScript.cpp lo usa (ConfigMudo/ConfigSetMudo/ConfigGetStr...).
 # Faltaba en el build del editor -> undefined symbols al linkear.
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dConfig.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dTactil.cpp      # pantalla tactil sin SDL (el editor engancha su receptor)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dVibrar.cpp      # la vibracion (vibrar() de la actividad, por JNI)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dTouch.cpp      # pantalla tactil sin SDL (el editor engancha su receptor)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dVibrate.cpp      # la vibracion (vibrar() de la actividad, por JNI)
 # SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dGraphics.cpp #1.1
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Vector3.cpp
@@ -59,18 +59,18 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Matrix4.cpp
 # scripts lua: el modulo del Core + el interprete vendorizado (C plano, compila en NDK)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/script/W3dScript.cpp
 # fisica minima del Core (velocidad + rebotes AABB): va SIEMPRE junto a W3dScript.cpp (registra sus binds)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dFisica.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dPhysics.cpp
 # AUDIO (efectos de los juegos: beep()). Mixer del Core + salida SDL2 (el celular tiene sonido)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudio.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudioSDL.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolumen.cpp        # volumen del proyecto (VolumenAplicarProyecto)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolume.cpp        # volumen del proyecto (VolumenAplicarProyecto)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dClipboardSDL.cpp     # portapapeles del IDE (SDL_SetClipboardText)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigido.cpp        # cuerpos rigidos (W3dRigidos*)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMalla.cpp      # colision contra mallas (colSuelo/colPared)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigid.cpp        # cuerpos rigidos (W3dRigidos*)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMesh.cpp      # colision contra mallas (colSuelo/colPared)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dHitbox.cpp        # hitbox + eventos alEntrar/alSalir/alTocar
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRagdoll.cpp       # ragdolls + IK
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dNav.cpp                # navegacion (caminos)
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dRed.cpp                # jugar en red (binds red*)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dNet.cpp                # jugar en red (binds red*)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp   # musica (W3dMusicRefrescarVolumenes)
 SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
 

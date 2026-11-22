@@ -16,7 +16,7 @@
     #include <GLES/gl.h>
 #else
     #include "variables.h"
-    #include "WhiskUI/theme/colores.h"
+    #include "WhiskUI/theme/colors.h"
     #include <GL/gl.h>
 #endif
 
@@ -36,13 +36,13 @@ extern Camera* CameraActive;
 // la ROTACION (grados, la del constructor de Object: Ry * Rx * Rz) para que una camara en 'desde' MIRE a 'hacia' derecho,
 // sin rolido (la vertical, para arriba). La camara mira a su -Z local. (La de la escena de arranque se escribia a mano,
 // (-35, -45, 0), y no apuntaba al cubo)
-Vector3 CamaraRotMirando(const Vector3& desde, const Vector3& hacia);
+Vector3 CameraRotLooking(const Vector3& from, const Vector3& towards);
 
 class Camera : public Object, public Target {
     public:
-        std::string RielName;   // (inicializados en el constructor: C++03)
-        int offsetRiel;
-        Curve* Riel;
+        std::string RailName;   // (inicializados en el constructor: C++03)
+        int offsetRail;
+        Curve* Rail;
 
         // NODO MANUAL del riel: -1 = SEGUIMIENTO (la camara se proyecta sobre el riel en el
         // punto mas cercano al target, que es el modo de toda la vida). >= 0 = la camara se
@@ -51,7 +51,7 @@ class Camera : public Object, public Target {
         // plataforma va con indice = progreso del path (150 nodos 1 a 1, con el ease in/out
         // horneado en el espaciado de los nodos), no con la proyeccion del target. Es estado de
         // JUEGO, no de proyecto: no se guarda en el .w3d y Reload() lo vuelve a -1.
-        float rielNodo;
+        float railNode;
 
         // MODO DE MIRADA. false (default, comportamiento de siempre) = LOOK-AT: la camara
         // apunta al target, frame a frame. true = MIRADA DEL RIEL: la orientacion sale del
@@ -63,11 +63,11 @@ class Camera : public Object, public Target {
         // hace-. Solo tiene efecto si el .cap del riel trae el canal 'r'; sin el, se sigue
         // mirando al target (no hay nada que usar). Se guarda en el .w3d y se prende/apaga
         // desde lua con setMiradaRiel().
-        bool usarRotacionDelRiel;
+        bool useRailRotation;
 
         // ultimo indice del riel donde se paro la camara (lo deja UpdatePosition; lo usa
         // la mirada del riel para muestrear la rotacion EN EL MISMO punto). -1 = ninguno.
-        float rielIndice;
+        float railIndex;
 
         // LENTE de la camara (editable en el panel + animable). Antes vivia solo en el visor
         // (fovDeg global / orthographic del viewport); ahora es PROPIO de la camara para que "mirar
@@ -84,24 +84,24 @@ class Camera : public Object, public Target {
         // pillarbox); el culling y pantallaDe() usan el mismo numero. Se declara con
         // `aspecto:` en el .w3d (texto y v4) o, si esta en 0, se hereda de la cabecera
         // `aspecto` del .cap del riel por el que viaja (ver Curve::aspecto).
-        float aspecto;
+        float aspect;
 
         // el aspecto EFECTIVO declarado por esta camara: el propio, o el del riel
         // si el propio esta en 0. Devuelve 0 si nadie declara nada.
-        float AspectoDeclarado() const;
+        float DeclaredAspect() const;
 
         // PROFUNDIDAD DE CAMPO (el trazado de rayos la hace de verdad, desde la lente; el desenfoque de campo del
         // postprocesado puede usar este mismo foco). Con 'dof' apagado la camara es un agujerito (todo nitido).
         // fStop = la apertura como en una camara de verdad (f/2.8: mas chico = mas desenfoque); el tamanio de la lente
-        // sale de eso y del fov (sensor de 24 mm de alto). focoDist = la distancia enfocada (m, animable: AnimCamFoco).
-        // focoObjeto = el NOMBRE de un objeto: si esta, el foco lo sigue solo (la distancia hasta el, a lo largo de la
-        // mirada) y focoDist no se usa
+        // sale de eso y del fov (sensor de 24 mm de alto). focusDist = la distancia enfocada (m, animable: AnimCamFocus).
+        // focusObject = el NOMBRE de un objeto: si esta, el foco lo sigue solo (la distancia hasta el, a lo largo de la
+        // mirada) y focusDist no se usa
         bool  dof;
         float fStop;
-        float focoDist;
-        std::string focoObjeto;
-        float DistanciaFoco() const;   // la que se usa ahora (el objeto, o focoDist), en m
-        float RadioLente() const;      // el radio de la lente (m): fov + fStop
+        float focusDist;
+        std::string focusObject;
+        float DistanceFocus() const;   // la que se usa ahora (el objeto, o focusDist), en m
+        float LensRadius() const;      // el radio de la lente (m): fov + fStop
 
         // ¡Nuevas variables para guardar los ejes ya calculados!
         Vector3 rightVector;
@@ -115,59 +115,59 @@ class Camera : public Object, public Target {
         
         void UpdateLookAt();
 
-        // orienta la camara hacia 'dir' (no hace falta normalizarla) con 'rollGrados' de
+        // orienta la camara hacia 'dir' (no hace falta normalizarla) con 'rollDegrees' de
         // alabeo alrededor de esa misma direccion. Es el UNICO lugar donde se arma la base
         // de la camara: lo comparten el look-at al target y la mirada del riel, asi los dos
         // modos producen exactamente la misma clase de rotacion.
-        void MirarHacia(const Vector3& dir, float rollGrados = 0.0f);
+        void LookTowards(const Vector3& dir, float rollDegrees = 0.0f);
 
         // true si ESTE frame la orientacion la manda el riel (modo prendido + riel con
         // canal de rotacion). Cuando da true, UpdateLookAt() no toca nada.
-        bool MiradaLaManejaElRiel() const;
+        bool LookHandlesRail() const;
 
-        // orienta la camara con la rotacion del nodo 'rielIndice' (interpolada). La llama
+        // orienta la camara con la rotacion del nodo 'railIndex' (interpolada). La llama
         // UpdatePosition despues de plantar la posicion; no hace nada si el modo esta
         // apagado o si el riel no trae rotacion.
-        void AplicarMiradaDelRiel();
+        void ApplyRailLook();
 
         void RenderObject() W3D_OVERRIDE;
-        bool DibujaAlgo() W3D_OVERRIDE;    // su gizmo, solo con el overlay "Camera"
+        bool DrawsSomething() W3D_OVERRIDE;    // su gizmo, solo con el overlay "Camera"
 
         void UpdatePosition();
 
-        void SetRiel(const std::string& NewValue);
-        void ReloadRiel(Object* me);
+        void SetRail(const std::string& NewValue);
+        void ReloadRail(Object* me);
 
         // CAMBIO DE RIEL EN CALIENTE (bind lua setRiel). Recibe la Curve YA CARGADA -de la
-        // escena- y deja el par (Riel, RielName) coherente para que el .w3d se guarde bien.
+        // escena- y deja el par (Riel, RailName) coherente para que el .w3d se guarde bien.
         // NULL = soltar el riel (la camara deja de viajar y se queda donde este).
-        // Rechaza los mismos dos casos que ReloadRiel (uno mismo / un ancestro) para no armar
+        // Rechaza los mismos dos casos que ReloadRail (uno mismo / un ancestro) para no armar
         // recursion, y REPOSICIONA en el acto: sin eso la camara pasa un frame entero en la
         // posicion del riel VIEJO, que en el caso medido estaba a 400443 unidades crudas.
         // Devuelve false si el riel no se pudo aplicar (y no toca nada).
-        bool SetRielObjeto(Curve* nuevo);
+        bool SetRailObject(Curve* newValue);
 
         // punto del riel en el indice 'indice' (float: interpola entre nodo y nodo), en
         // coordenadas de MUNDO (ya suma la posicion global BASE de la curva). Clampea a
         // [0, vertexSize-1]. Es el trozo comun del seguimiento y del nodo manual.
-        Vector3 PuntoDelRiel(float indice) const;
+        Vector3 RailPoint(float index) const;
 
         // DOS refs por puntero (ver Objects.h): 0 = el target al que mira, 1 = el RIEL
         // (una Curve). El riel se guarda como Curve*, asi que el cast vive aca -donde
         // el tipo se conoce- y no en el que maneja los borrados.
-        int     RefsPropias() const W3D_OVERRIDE { return 2; }
-        Object* RefPropia(int i) const W3D_OVERRIDE {
+        int     OwnRefs() const W3D_OVERRIDE { return 2; }
+        Object* OwnRef(int i) const W3D_OVERRIDE {
             if (i == 0) return target;
-            if (i == 1) return (Object*)Riel;
+            if (i == 1) return (Object*)Rail;
             return NULL;
         }
-        void SetRefPropia(int i, Object* o) W3D_OVERRIDE {
+        void SetOwnRef(int i, Object* o) W3D_OVERRIDE {
             if (i == 0) target = o;
-            else if (i == 1) Riel = (o && o->getType() == ObjectType::curve) ? (Curve*)o : NULL;
+            else if (i == 1) Rail = (o && o->getType() == ObjectType::curve) ? (Curve*)o : NULL;
         }
-        std::string* RefPropiaNombre(int i) W3D_OVERRIDE {
+        std::string* RefOwnName(int i) W3D_OVERRIDE {
             if (i == 0) return &targetName;
-            if (i == 1) return &RielName;
+            if (i == 1) return &RailName;
             return NULL;
         }
 
@@ -179,6 +179,6 @@ class Camera : public Object, public Target {
 // declara, el aspecto del render (g_renderAspect). La leen el frustum del modo juego
 // (Viewport3D con ViewFromCameraActive), el Culling y pantallaDe(), asi los tres
 // recortan/proyectan con LOS MISMOS numeros que se dibuja.
-float W3dAspectoJuego();
+float W3dGameAspect();
 
 #endif

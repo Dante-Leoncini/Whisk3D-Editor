@@ -1,32 +1,32 @@
 # F12 = Render Image y Ctrl+F12 = Render Animation (app/W3dAtajos.cpp: global.render / global.renderAnim), por la
 # entrada de teclado de verdad (teclareal: el evento de SDL). Cada uno guarda sus PNG con el Path + File name de la
 # tarjeta Render, igual que los botones.
-borrararchivo /tmp/w3d_f12_0001.png
-borrararchivo /tmp/w3d_f12_0003.png
-borrararchivo /tmp/w3d_f12_0005.png
-borrararchivo /tmp/w3d_f12_0006.png
-borrararchivo /tmp/w3d_f12_0007.png
+deletefile /tmp/w3d_f12_0001.png
+deletefile /tmp/w3d_f12_0003.png
+deletefile /tmp/w3d_f12_0005.png
+deletefile /tmp/w3d_f12_0006.png
+deletefile /tmp/w3d_f12_0007.png
 # (el primero, con el comando: deja Path y File name en el panel)
 frame 1
 renderimage /tmp w3d_f12.png
-existe /tmp/w3d_f12_0001.png
+exists /tmp/w3d_f12_0001.png
 # F12: el cuadro actual
 frame 3
-teclareal 3d F12
-existe /tmp/w3d_f12_0003.png
-existe /tmp/w3d_f12_0005.png no
+keyreal 3d F12
+exists /tmp/w3d_f12_0003.png
+exists /tmp/w3d_f12_0005.png no
 # Ctrl+F12: la secuencia del rango del render (5..7)
-renderrango 5 7
-teclareal 3d Ctrl+F12
-existe /tmp/w3d_f12_0005.png
-existe /tmp/w3d_f12_0006.png
-existe /tmp/w3d_f12_0007.png
-renderrango 0 0
-atajoscheck
+renderrange 5 7
+keyreal 3d Ctrl+F12
+exists /tmp/w3d_f12_0005.png
+exists /tmp/w3d_f12_0006.png
+exists /tmp/w3d_f12_0007.png
+renderrange 0 0
+shortcutscheck
 # F12 recien abierto el editor (con un .w3d por doble click): todavia ningun panel de Propiedades es el activo (eso pasa
 # al tocarlo). El primer F12 decia "No hay un panel de Propiedades" y el segundo andaba: ahora toma el del layout
-borrararchivo /tmp/w3d_f12_0004.png
-propsolvidar
+deletefile /tmp/w3d_f12_0004.png
+propsforget
 frame 4
-teclareal 3d F12
-existe /tmp/w3d_f12_0004.png
+keyreal 3d F12
+exists /tmp/w3d_f12_0004.png

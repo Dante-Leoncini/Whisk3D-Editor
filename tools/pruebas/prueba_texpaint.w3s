@@ -36,5 +36,5 @@ brushradius 150
 brushcolor 0 0 1 1 1
 mode texture
 texpaint3d 0 0
-texcaras
+texfaces
 mode object

@@ -4,10 +4,10 @@
 # Correr DESDE ESTA CARPETA:
 #   cd <motor>/tools/pruebas
 #   ../../platform/linux/build/whisk3d --script prueba_inspector_en_vivo.w3s
-abrirw3d prueba_inspector_en_vivo.w3d
+openw3d prueba_inspector_en_vivo.w3d
 simplay 30
-scriptinfo compartido giro 90
+scriptinfo shared giro 90
 scriptval "Cubo" 0 velocidad 360
 simplay 30
-scriptinfo compartido giro 450
+scriptinfo shared giro 450
 simstop

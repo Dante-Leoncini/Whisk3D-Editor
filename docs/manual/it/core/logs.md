@@ -1,6 +1,6 @@
 # Log
 
-Tre livelli in stile printf: `w3dLogf` (informazione), `w3dLogfW` (avviso) e `w3dLogfE` (errore). `g_w3dLogNivel` filtra durante l'esecuzione (3 = tutto, 0 = niente) e compilare con `W3D_DEV_LOG=0` elimina le chiamate dall'eseguibile. Le ultime righe restano anche in memoria: è ciò che mostra la [Console](../editor/consola.md) dell'editor.
+Tre livelli in stile printf: `w3dLogf` (informazione), `w3dLogfW` (avviso) e `w3dLogfE` (errore). `g_w3dLogLevel` filtra durante l'esecuzione (3 = tutto, 0 = niente) e compilare con `W3D_DEV_LOG=0` elimina le chiamate dall'eseguibile. Le ultime righe restano anche in memoria: è ciò che mostra la [Console](../editor/consola.md) dell'editor.
 
 | Sistema | Dove va |
 |---|---|

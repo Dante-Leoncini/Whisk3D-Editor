@@ -27,7 +27,7 @@ Le prix à payer : les lettres sont en pixels et grandissent par multiples entie
 | Dossier | Ce qu'il prend en charge |
 |---|---|
 | `core/` | Les mesures de l'interface et leur échelle (`UI.h`) : [Couleurs et échelle](tema.md) |
-| `theme/` | La palette de couleurs (`colores.h`) : [Couleurs et échelle](tema.md) |
+| `theme/` | La palette de couleurs (`colors.h`) : [Couleurs et échelle](tema.md) |
 | `draw/` | Le dessin 2D (`glesdraw`), les rectangles, les icônes et l'empaqueteur d'atlas : [Dessin et atlas](dibujo.md), [Icônes](iconos.md) |
 | `text/` | La police bitmap, l'atlas étendu et le texte avec des polices TTF précalculées : [Texte](texto.md) |
 | `widgets/` | Les cartes avec bordure, les boutons, les onglets, les menus et les champs de texte : [Boutons, onglets et cases à cocher](botones.md), [Menus déroulants](menus.md), [Entrées et champs de texte](entrada.md) |

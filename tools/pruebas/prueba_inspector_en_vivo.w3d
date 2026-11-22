@@ -2,7 +2,7 @@
 // La usa prueba_inspector_en_vivo.w3s
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {

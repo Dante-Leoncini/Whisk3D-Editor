@@ -6,12 +6,12 @@ Whisk3D UI doesn't open windows or listen to the mouse, the keyboard or the touc
 
 | Event | Where it goes |
 |---|---|
-| The mouse or finger moves | `PopupMenu::MouseMove(x, y)`; the `hover` of buttons and tabs; `PropHoverGroup` and `PropHoverFila` on cards |
+| The mouse or finger moves | `PopupMenu::MouseMove(x, y)`; the `hover` of buttons and tabs; `PropHoverGroup` and `PropHoverRow` on cards |
 | Click or tap | `PopupMenu::Click(x, y)`; `Button::Contains` and `Tab::Contains`; on a card, the row the program works out |
 | Wheel | `PopupMenu::Wheel(dir)` |
 | Arrows | `button_up`, `button_down`, `button_left` and `button_right` of menus, cards and rows |
 | OK or Enter | `PopupMenu::Enter()`, `GroupPropertie::EnterPropertieSelect()` |
-| Cancel or Esc | `PopupMenu::Cerrar()`, `GroupPropertie::Cancel()` |
+| Cancel or Esc | `PopupMenu::Close()`, `GroupPropertie::Cancel()` |
 | A letter | The focused text box |
 
 Coordinates are screen pixels, with Y pointing down.
@@ -23,7 +23,7 @@ Everything can be used with four arrows, OK and Cancel: that's how it's used on 
 - Cards are traversed row by row and skip what can't be selected.
 - Menus are traversed with the arrows, and the highlighted option never goes out of view.
 - Numbers are changed with the arrows, without typing.
-- Keyboard focus is visible: `focoMenu` on buttons and `foco` on tabs, in `accent`, and the white border of `g_kfFocoProp` on a diamond.
+- Keyboard focus is visible: `focusMenu` on buttons and `focus` on tabs, in `accent`, and the white border of `g_kfFocusProp` on a diamond.
 
 Which phone key is which, the soft keys or OK, isn't up to the UI: the editor and each system translate them.
 
@@ -31,7 +31,7 @@ Which phone key is which, the soft keys or OK, isn't up to the UI: the editor an
 
 - A tap is a click.
 - The tap that opens a submenu doesn't choose anything inside it ([Drop-down menus](menus.md)).
-- `UITactil` makes buttons and bars bigger for a finger ([Colors and scale](tema.md)). Today nothing turns it on.
+- `UITouch` makes buttons and bars bigger for a finger ([Colors and scale](tema.md)). Today nothing turns it on.
 
 Dragging to scroll, long-pressing or double-tapping are handled by whoever uses the UI.
 
@@ -45,31 +45,31 @@ Dragging to scroll, long-pressing or double-tapping are handled by whoever uses 
 | `SelectAll()` | Selects everything: the first key replaces it |
 | `InsertChar(c)` | Writes one byte at the cursor |
 | `Backspace()`, `DelForward()` | Delete backward or forward |
-| `CaretIzq()`, `CaretDer()` | Move the cursor. With everything selected, they clear the selection |
+| `CaretLeft()`, `CaretRight()` | Move the cursor. With everything selected, they clear the selection |
 
 Deleting and moving the cursor treat a multi-byte letter, like an `ñ` or a Cyrillic one, as a single one. To type one of those, you pass each byte to `InsertChar`.
 
-Only one box is focused at a time: `g_textFieldActivo`, or `NULL` if there's none. Keys go to that one.
+Only one box is focused at a time: `g_activeTextField`, or `NULL` if there's none. Keys go to that one.
 
 ```cpp
-TextField nombre;
-nombre.SetText("Jugador 1");
-nombre.SelectAll();
-g_textFieldActivo = &nombre;
+TextField name;
+name.SetText("Jugador 1");
+name.SelectAll();
+g_activeTextField = &name;
 
 // with each letter
-if (g_textFieldActivo) g_textFieldActivo->InsertChar(c);
+if (g_activeTextField) g_activeTextField->InsertChar(c);
 
 // when drawing, with the text color set
-RenderTextField(nombre, g_textFieldActivo == &nombre, textAlign::left, 200);
+RenderTextField(name, g_activeTextField == &name, textAlign::left, 200);
 ```
 
-`RenderTextField(caja, foco, alineación, ancho)` draws it at the current origin:
+`RenderTextField(box, focus, alineación, width)` draws it at the current origin:
 
 - Without focus, it's the text.
 - With focus and everything selected, the text is white on `accentDark`.
 - With focus and no selection, the cursor appears: a small line that blinks every 530 ms.
 
-`TextFieldParpadeoTick()` returns `true` when the line changes: that's the moment to redraw.
+`TextFieldBlinkTick()` returns `true` when the line changes: that's the moment to redraw.
 
-`TextField.h` also declares `TextFieldEnfocar`, `TextFieldCancelar` (Esc: goes back to the text from before focusing), `TextFieldInputChar` and `TextFieldFinDeCuadro`. Today they're defined in the editor, in `main/ui/ViewPorts/NumInput.cpp`: the UI alone doesn't provide them.
+`TextField.h` also declares `TextFieldFocus`, `TextFieldCancel` (Esc: goes back to the text from before focusing), `TextFieldInputChar` and `TextFieldFrameEnd`. Today they're defined in the editor, in `main/ui/ViewPorts/NumInput.cpp`: the UI alone doesn't provide them.

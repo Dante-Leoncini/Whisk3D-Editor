@@ -19,79 +19,79 @@
 #  llego al juego".
 #  El eje Y de SDL crece HACIA ABAJO: "arriba" es -1.
 # ==========================================================================
-abrirw3d prueba_input.w3d
+openw3d prueba_input.w3d
 
 # --- 0) EN REPOSO ----------------------------------------------------------
-pad soltar
+pad release
 simplay 1
-pad ejes 0 0
-scriptinfo compartido ejeX 0
-scriptinfo compartido ejeY 0
-scriptinfo compartido bDerecha no
+pad axes 0 0
+scriptinfo shared ejeX 0
+scriptinfo shared ejeY 0
+scriptinfo shared bDerecha no
 
 # --- 1) LA CRUCETA SOLA ----------------------------------------------------
-pad dpad derecha on
+pad dpad right on
 simplay 1
-pad ejes 1 0
-scriptinfo compartido ejeX 1
-scriptinfo compartido ejeY 0
-scriptinfo compartido bDerecha si
-scriptinfo compartido bIzquierda no
+pad axes 1 0
+scriptinfo shared ejeX 1
+scriptinfo shared ejeY 0
+scriptinfo shared bDerecha si
+scriptinfo shared bIzquierda no
 
 # diagonal arriba-derecha: (+1, -1), exactamente, sin normalizar
-pad dpad arriba on
+pad dpad up on
 simplay 1
-pad ejes 1 -1
-scriptinfo compartido ejeX 1
-scriptinfo compartido ejeY -1
-scriptinfo compartido bArriba si
+pad axes 1 -1
+scriptinfo shared ejeX 1
+scriptinfo shared ejeY -1
+scriptinfo shared bArriba si
 
-pad soltar
+pad release
 simplay 1
-pad ejes 0 0
-scriptinfo compartido bArriba no
+pad axes 0 0
+scriptinfo shared bArriba no
 
 # --- 2) EL ANALOGICO MANDA -------------------------------------------------
 # con el stick fuera de la deadzone, la cruceta NO pisa el valor continuo
 pad stick -0.5 0.25
-pad dpad derecha on
+pad dpad right on
 simplay 1
-pad ejes -0.5 0.25
-scriptinfo compartido ejeX -0.500
-scriptinfo compartido ejeY 0.250
+pad axes -0.5 0.25
+scriptinfo shared ejeX -0.500
+scriptinfo shared ejeY 0.250
 # ...pero el boton por NOMBRE sigue estando apretado: son dos lecturas distintas
-scriptinfo compartido bDerecha si
-pad soltar
+scriptinfo shared bDerecha si
+pad release
 simplay 1
 
 # --- 3) LAS FLECHAS DEL TECLADO --------------------------------------------
 # entran al EJE por el mismo camino que la cruceta...
-pad flecha izquierda on
+pad arrow left on
 simplay 1
-pad ejes -1 0
-scriptinfo compartido ejeX -1
-pad flecha abajo on
+pad axes -1 0
+scriptinfo shared ejeX -1
+pad arrow down on
 simplay 1
-pad ejes -1 1
-scriptinfo compartido ejeY 1
+pad axes -1 1
+scriptinfo shared ejeY 1
 # ...pero HOY NO entran a los botones por nombre: SimJuego::TickReal alimenta
 # W3dScriptBotonPad("izquierda"/...) SOLO desde buttonState[] del d-pad, aunque
 # el comentario de al lado diga "mismos nombres que las flechas del teclado".
 # Este assert fija la conducta REAL para que se vea si algun dia cambia; si se
 # decide unificarlo (gFlecha[] tambien a los nombres), este renglon pasa a "si"
 # y es un cambio de contrato deliberado, no un accidente.
-scriptinfo compartido bIzquierda no
-scriptinfo compartido bAbajo no
-pad soltar
+scriptinfo shared bIzquierda no
+scriptinfo shared bAbajo no
+pad release
 simplay 1
-pad ejes 0 0
-scriptinfo compartido ejeX 0
+pad axes 0 0
+scriptinfo shared ejeX 0
 
 # --- 4) UN BOTON DE ACCION -------------------------------------------------
-pad boton a on
+pad button a on
 simplay 1
-scriptinfo compartido bA si
-pad soltar
+scriptinfo shared bA si
+pad release
 simplay 1
-scriptinfo compartido bA no
+scriptinfo shared bA no
 simstop

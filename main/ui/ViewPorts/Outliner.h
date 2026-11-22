@@ -18,170 +18,170 @@
 #include "WhiskUI/draw/rectangle.h"
 #include "WhiskUI/text/bitmapText.h"
 #include "WhiskUI/widgets/TextField.h"   // rename EN LINEA de un recurso / una carpeta
-#include "io/RecursosProyecto.h"         // W3D_VISTAS: las vistas por recursos
+#include "io/ProjectResources.h"         // W3D_VIEWS: las vistas por recursos
 
 class Mesh; // fila VIRTUAL "Armature 2D" (los huesos 2D viven dentro del mesh, no son objetos)
 class Button;
 
 // LAS VISTAS del outliner (su selector de la barra, el del OJO): la ESCENA (el arbol de la raiz
 // activa, el de siempre), la BIBLIOTECA (todo el contenido de este .w3d, en un arbol de carpetas) y
-// cada LIBRERIA externa vinculada (otro .w3d, de solo lectura: OUT_VISTA_LIBEXT + su indice). En el
+// cada LIBRERIA externa vinculada (otro .w3d, de solo lectura: OUT_VIEW_LIBEXT + su indice). En el
 // layout va por su CLAVE ("escena", "biblioteca", "lib:<ruta>").
-enum { OUT_VISTA_ESCENA = 0, OUT_VISTA_BIBLIOTECA = 1, OUT_VISTA_LIBEXT = 2 };
+enum { OUT_VIEW_SCENE = 0, OUT_VIEW_LIBRARY = 1, OUT_VIEW_LIBEXT = 2 };
 
 // UNA FILA de la BIBLIOTECA: una carpeta o un recurso. Es el UNICO modelo de filas de la vista:
 // el dibujo (lista o cuadricula), el click, el arrastre, el teclado y el harness lo arman con
-// Outliner::FilasRecursos (no hay recorridos paralelos que mantener alineados).
-struct OutFilaRec {
-    bool carpeta;          // true = fila de carpeta (plegable)
-    std::string clave;     // carpeta: su ruta ("A/B"); recurso: su clave de biblioteca ("mallas:Arbol")
-    int tipo;              // recurso: su tipo (W3dVistaRec); carpeta: 0
-    std::string id;        // recurso: su id en su tipo ("Arbol")
-    std::string nombre;    // lo que se ve (el tramo de la carpeta, el nombre del recurso)
-    std::string carpetaDe; // recurso: su carpeta; carpeta: su carpeta de arriba
-    int  prof;             // sangria
-    int  icono;            // IconType
-    int  usuarios;         // recurso: cuantos lo usan (0 = HUERFANO); carpeta: cuantos recursos cuelgan
-    bool plegada;          // carpeta plegada
-    bool soloLectura;      // recurso de solo lectura (una libreria externa)
-    bool renombrable;
-    bool parte;            // PARTE de otro recurso (un clip de jerarquia debajo de su biblioteca: W3dRecursoItem::padre)
-    bool sucio;            // no esta guardado (se dibuja con un '*': CambiosProyecto)
-    bool atras;            // CUADRICULA: la celda "Ir atras" (la carpeta de arriba; clave = esa carpeta)
-    long bytes;            // recurso: cuanto ocupa (-1 = no se sabe)
-    bool cargado;          // recurso: esta en memoria (false: guardado, sin cargar -> la carpeta azul)
-    int  tilde;            // recurso: su casilla (-1 = no tiene, 0 / 1): las escenas abiertas en el editor
-    bool externo;          // recurso: su archivo vive AFUERA del .w3d (la flecha de acceso directo sobre el icono)
-    OutFilaRec() : carpeta(false), tipo(0), prof(0), icono(-1), usuarios(0), plegada(false), soloLectura(false),
-                   renombrable(true), parte(false), sucio(false), atras(false), bytes(-1), cargado(true), tilde(-1),
-                   externo(false) {}
+// Outliner::RowsResources (no hay recorridos paralelos que mantener alineados).
+struct OutRowRec {
+    bool folder;          // true = fila de carpeta (plegable)
+    std::string key;      // carpeta: su ruta ("A/B"); recurso: su clave de biblioteca ("mallas:Arbol")
+    int type;             // recurso: su tipo (W3dViewRec); carpeta: 0
+    std::string id;       // recurso: su id en su tipo ("Arbol")
+    std::string name;     // lo que se ve (el tramo de la carpeta, el nombre del recurso)
+    std::string folderOf; // recurso: su carpeta; carpeta: su carpeta de arriba
+    int  prof;            // sangria
+    int  icon;            // IconType
+    int  users;           // recurso: cuantos lo usan (0 = HUERFANO); carpeta: cuantos recursos cuelgan
+    bool collapsed;       // carpeta plegada
+    bool readOnly;        // recurso de solo lectura (una libreria externa)
+    bool renamable;
+    bool part;              // PARTE de otro recurso (un clip de jerarquia debajo de su biblioteca: W3dResourceItem::padre)
+    bool dirty;             // no esta guardado (se dibuja con un '*': CambiosProyecto)
+    bool back;              // CUADRICULA: la celda "Ir atras" (la carpeta de arriba; clave = esa carpeta)
+    long bytes;             // recurso: cuanto ocupa (-1 = no se sabe)
+    bool loaded;            // recurso: esta en memoria (false: guardado, sin cargar -> la carpeta azul)
+    int  check;             // recurso: su casilla (-1 = no tiene, 0 / 1): las escenas abiertas en el editor
+    bool external;          // recurso: su archivo vive AFUERA del .w3d (la flecha de acceso directo sobre el icono)
+    OutRowRec() : folder(false), type(0), prof(0), icon(-1), users(0), collapsed(false), readOnly(false),
+                   renamable(true), part(false), dirty(false), back(false), bytes(-1), loaded(true), check(-1),
+                   external(false) {}
 };
 
 // "Select Users" de la biblioteca (el menu del outliner y el boton de la tarjeta del recurso de
 // Properties hacen lo mismo): selecciona en la escena los objetos que usan esos recursos (claves de
 // biblioteca) y los muestra (los outliners que miraban la biblioteca vuelven al arbol, centrados).
-// 0 = ningun objeto los usa: avisa y la seleccion queda como estaba. Def. en OutlinerRecursos.cpp.
-int OutlinerSeleccionarUsuarios(const std::vector<std::string>& claves);
+// 0 = ningun objeto los usa: avisa y la seleccion queda como estaba. Def. en OutlinerResources.cpp.
+int OutlinerSelectUsers(const std::vector<std::string>& keys);
 
 // la MARCA que el arbol de la escena dibuja despues del nombre de 'obj' (un indice de IconType; -1 = ninguna): el
 // CANDADO en lo que genera un proxy de una libreria externa (de solo lectura). Def. en Outliner.cpp.
-int OutlinerMarcaDeObjeto(Object* obj);
+int OutlinerObjectMark(Object* obj);
 
 // EL ARRASTRE DE LA BIBLIOTECA hacia afuera del outliner (al viewport 3D, a un desplegable de
 // Properties): lo que se arrastra y si es valido donde esta el puntero. Lo dibuja LayoutRenderMenu
 // (el icono y el nombre al lado del cursor) y los destinos lo miran para resaltarse. Def. en
-// OutlinerRecursos.cpp.
-struct OutArrastreBib {
-    bool activo;            // hay un recurso de la biblioteca agarrado
-    int tipo;               // su tipo (W3dVistaRec)
-    std::string id, nombre;
-    int icono;
-    bool soloLectura;       // de una libreria externa (se arrastra recien con la fase de proxies)
-    int x, y;               // el puntero
-    int destino;            // lo que pasaria al soltar ahi: 0 nada, 1 valido, -1 invalido
-    std::string destinoTexto;   // que haria (en el idioma de la UI): "Assign to the 3D Mesh selector"
-    bool fantasma;          // ADENTRO del outliner (reordenar / a una carpeta): solo lo que se lleva junto al puntero
-    OutArrastreBib() : activo(false), tipo(0), icono(-1), soloLectura(false), x(0), y(0), destino(0), fantasma(false) {}
+// OutlinerResources.cpp.
+struct OutDragBib {
+    bool active;            // hay un recurso de la biblioteca agarrado
+    int type;               // su tipo (W3dViewRec)
+    std::string id, name;
+    int icon;
+    bool readOnly;         // de una libreria externa (se arrastra recien con la fase de proxies)
+    int x, y;              // el puntero
+    int destination;       // lo que pasaria al soltar ahi: 0 nada, 1 valido, -1 invalido
+    std::string destinationText;   // que haria (en el idioma de la UI): "Assign to the 3D Mesh selector"
+    bool ghost;          // ADENTRO del outliner (reordenar / a una carpeta): solo lo que se lleva junto al puntero
+    OutDragBib() : active(false), type(0), icon(-1), readOnly(false), x(0), y(0), destination(0), ghost(false) {}
 };
-extern OutArrastreBib g_outArrastre;
+extern OutDragBib g_outDrag;
 // dibuja el recurso arrastrado junto al puntero (lo llama LayoutRenderMenu, encima de todo)
-void OutlinerArrastreRender(int pantallaW, int pantallaH);
+void OutlinerDragRender(int screenW, int screenH);
 
 class Outliner : public ViewportBase, public WithBorder, public Scrollable {
-    friend class Biblioteca;   // (la biblioteca es un outliner fijo en los recursos: arma su barra)
+    friend class Library;   // (la biblioteca es un outliner fijo en los recursos: arma su barra)
     public:
-        Scrollable* ComoScrollable() { return this; }
-        size_t CantidadRenglones;
+        Scrollable* AsScrollable() { return this; }
+        size_t RowCount;
         int lastContentRows;   // filas visibles del ultimo render: si cambian (import/add/delete/desplegar) se recalcula
                                // el scrollbar (antes solo se recalculaba al redimensionar -> tras importar no scrolleaba)
-        int lastCortes;        // cuantos CORTES constructor / cada cuadro tenia (cambian el alto del contenido igual)
-        Rec2D* Renglon;
+        int lastCuts;        // cuantos CORTES constructor / cada cuadro tenia (cambian el alto del contenido igual)
+        Rec2D* Row;
 
-        // CULLING vertical: DibujarRenglon/DibujarOjos recorren la jerarquia contando filas (filaDFS = indice de fila en
+        // CULLING vertical: DrawRow/DrawEyes recorren la jerarquia contando filas (rowDFS = indice de fila en
         // orden DFS) y solo DIBUJAN (y ubican: su numero de fila y su profundidad, sin recorrer la matriz) las que caen en
         // el area visible: el costo es el de las filas que se ven, no el del arbol. cullBaseY = Y en pantalla de la fila 0
         int cullBaseY;
-        unsigned filaDFS;
-        bool FilaEnVista(unsigned fila) const;
+        unsigned rowDFS;
+        bool RowInView(unsigned row) const;
 
         Outliner();
         ~Outliner() W3D_OVERRIDE;
 
-        void CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp);
+        void ComputeRow(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp);
         void Resize(int newW, int newH) W3D_OVERRIDE;
         void Render() W3D_OVERRIDE;
-        void DibujarRenglon(Object* obj, bool hidden, int prof);   // prof: la profundidad (las lineas del arbol)
+        void DrawRow(Object* obj, bool hidden, int prof);   // prof: la profundidad (las lineas del arbol)
         // fila VIRTUAL "Armature 2D" de una malla: UNA sola fila informativa, en AZUL y colgando de
         // la malla, que avisa que el rig 2D es PARTE del mesh y no un objeto de escena. Inerte: no
         // se arrastra, no acepta drops, no se desempareja y NO se despliega (los huesos se listan
         // en la pestania "Armature 2D" del panel Properties).
-        void DibujarArm2D(Mesh* m, int idx, bool hidden, int prof);
-        void DibujarOjos(Object* obj, bool hidden, bool noRender);
+        void DrawArm2D(Mesh* m, int idx, bool hidden, int prof);
+        void DrawEyes(Object* obj, bool hidden, bool noRender);
 
         void button_left() W3D_OVERRIDE;
         void FindMouseOver(int mx, int my);
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll v/h
-        void mouse_button_up(int boton) W3D_OVERRIDE;   // (Symbian: solo con el dedo)
+        void mouse_button_up(int button) W3D_OVERRIDE;   // (Symbian: solo con el dedo)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
-        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
-        void event_key_up(int tecla) W3D_OVERRIDE;
+        void event_key_down(int keyCode, bool repeat) W3D_OVERRIDE;
+        void event_key_up(int keyCode) W3D_OVERRIDE;
         // click para seleccionar la fila (compartido; en el N95 lo llama el
         // router del mouse HID, en PC se puede cablear a mouse_button_up)
-        void ClickSeleccionar(int mx, int my);
+        void ClickSelect(int mx, int my);
 
         // numpad "."": scrollea el outliner para CENTRAR
         // la seleccion en la vista (promedio de las filas visibles de lo seleccionado)
-        void CentrarSeleccion();
+        void CenterSelection();
         // scroll MINIMO para que la fila del objeto ACTIVO se vea entera. A diferencia de
-        // CentrarSeleccion (numpad "."), no mueve nada si la fila ya esta a la vista: con
+        // CenterSelection (numpad "."), no mueve nada si la fila ya esta a la vista: con
         // 315 objetos, centrar en cada tecla marea. La llama la navegacion por flechas.
-        void AsegurarVisible();
+        void EnsureVisible();
 
         // fila bajo el mouse (hover) para feedback visual antes del click
-        int hoverFila;
+        int hoverRow;
         // arrastre de filas (reordenar / emparentar soltando encima)
-        Object* dragObjeto;
+        Object* dragObject;
         bool dragging;
         int dragY0;
         // vista previa del drop: -2 nada, -1 al vacio (raiz),
         // 0 antes de la fila, 1 hijo de la fila, 2 despues
-        int dropFila;
-        int dropZona;
+        int dropRow;
+        int dropZone;
         int dropProf; // profundidad (nivel de sangria) del destino: la linea de insercion se indenta a ese nivel
-        void SoltarDrag(int mx, int my);
+        void ReleaseDrag(int mx, int my);
         // AUTO-SCROLL del arrastre: con el mouse en la franja de arriba/abajo de la lista, la lista se mueve sola
         // (mas rapido cuanto mas cerca del borde; afuera de la lista, a la velocidad maxima). Por TIEMPO (W3dNowMs),
         // no por evento: el mouse quieto en el borde sigue scrolleando. Lo corre Render cada cuadro.
-        int dragMx, dragMy;            // el ultimo mouse del arrastre (pantalla)
-        double autoScrollMs;           // el reloj del cuadro anterior con auto-scroll (0 = no venia scrolleando)
-        float autoScrollResto;         // la fraccion de pixel que quedo
-        void ActualizarDrop(int mx, int my);   // la vista previa del drop bajo (mx, my)
-        void AutoScrollArrastre();
+        int dragMx, dragMy;           // el ultimo mouse del arrastre (pantalla)
+        double autoScrollMs;          // el reloj del cuadro anterior con auto-scroll (0 = no venia scrolleando)
+        float autoScrollRest;         // la fraccion de pixel que quedo
+        void UpdateDrop(int mx, int my);   // la vista previa del drop bajo (mx, my)
+        void AutoScrollDrag();
         // arrastrando una fila de la escena, un RECURSO (puede salir hacia otro viewport: el 3D, Properties) o el divisor
         // de una columna, el cursor NO da la vuelta al llegar al borde
-        bool SinEnvolverCursor() const W3D_OVERRIDE { return dragging || recArrastre || colArrastre >= 0; }
+        bool NoWrapCursor() const W3D_OVERRIDE { return dragging || recDrag || colDrag >= 0; }
 
         // MODO MOVER con teclado (sin mouse, clave en N95 para ordenar lamparas antes de los objetos):
         // g (PC) / 1 (Symbian) entra; flechas reordenan (arriba/abajo) o reparentan (izq=sacar / der=meter);
         // OK/Enter confirma; C/backspace cancela (restaura la posicion original en el arbol).
-        bool moviendo;
-        Object* moverObj;          // el objeto que se esta moviendo (= el activo al entrar)
-        Object* moverPadreOrig;    // padre original (NULL = raiz) para cancelar
-        Object* moverAnteriorOrig; // hermano que estaba ANTES de moverObj (NULL = era el primero) para cancelar
-        void MoverIniciar();       // entra en modo mover con el objeto activo
-        void MoverPaso(int dir);   // 0=arriba 1=abajo 2=afuera(unparent) 3=adentro(parent)
-        void MoverConfirmar();     // sale del modo (deja la posicion nueva)
-        void MoverCancelar();      // restaura la posicion original y sale
-        bool ModoMover() const { return moviendo; }
+        bool moving;
+        Object* moveObj;        // el objeto que se esta moviendo (= el activo al entrar)
+        Object* moveParentOrig; // padre original (NULL = raiz) para cancelar
+        Object* movePrevOrig;   // hermano que estaba ANTES de moveObj (NULL = era el primero) para cancelar
+        void MoveStart();       // entra en modo mover con el objeto activo
+        void MoveStep(int dir); // 0=arriba 1=abajo 2=outside(unparent) 3=inside(parent)
+        void MoveConfirm();     // sale del modo (deja la posicion nueva)
+        void MoveCancel();      // restaura la posicion original y sale
+        bool ModeMove() const { return moving; }
         int ViewportKind() const { return 2; } // (menu de tipo)
-        void ClearHover() { hoverFila = -1; hoverMx = hoverMy = -1; colHover = -1; } // el mouse se fue
+        void ClearHover() { hoverRow = -1; hoverMx = hoverMy = -1; colHover = -1; } // el mouse se fue
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE;   // 2 dedos: zoom de la cuadricula
 
         void key_down_return();
 
         // ================================================================================
-        //  LA BIBLIOTECA (OutlinerRecursos.cpp): el boton de VISTA de la barra (el OJO) elige
+        //  LA BIBLIOTECA (OutlinerResources.cpp): el boton de VISTA de la barra (el OJO) elige
         //  que se ve: la ESCENA (el arbol de siempre, todo lo de arriba), la BIBLIOTECA (el
         //  contenido del .w3d: UN arbol de carpetas cosmeticas con todos los tipos mezclados,
         //  un FILTRO por tipo, lista o CUADRICULA con miniaturas) o una LIBRERIA externa (otro
@@ -191,190 +191,190 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         //  (arrastrar = scroll, MANTENER ~0,5 s = agarrar o el menu contextual), teclado (flechas,
         //  F2, G = mover, Supr) y el keypad del N95 (la barra se navega sin mouse).
         // ================================================================================
-        int vista;                 // OUT_VISTA_* (se guarda en el layout como "vista: <clave>")
-        int filtro;                // el filtro de la biblioteca: un tipo (W3dVistaRec) o -1 = todo
-        bool soloSinUso;           // el filtro "Sin uso": solo los recursos que nadie usa (se suma al del tipo)
-        bool cuadricula;           // la biblioteca como CUADRICULA de miniaturas (false = lista)
-        bool verMemoria;           // la biblioteca: la fila de abajo con la memoria (RAM / video) usada y libre
-        bool verTamanos;           // la biblioteca: cuanto ocupa cada recurso (la columna / la etiqueta de la celda)
-        bool verTipo;              // la biblioteca en LISTA: la columna Tipo (apagada por defecto: el icono ya lo dice)
-        bool verUsos;              // la biblioteca: cuantos lo usan + en uso / huerfano (la columna; en la cuadricula, el icono)
+        int view;                  // OUT_VISTA_* (se guarda en el layout como "vista: <clave>")
+        int filter;                // el filtro de la biblioteca: un tipo (W3dViewRec) o -1 = todo
+        bool onlyUnused;           // el filtro "Sin uso": solo los recursos que nadie usa (se suma al del tipo)
+        bool grid;                 // la biblioteca como CUADRICULA de miniaturas (false = lista)
+        bool showMemory;           // la biblioteca: la fila de abajo con la memoria (RAM / video) usada y libre
+        bool showSizes;            // la biblioteca: cuanto ocupa cada recurso (la columna / la etiqueta de la celda)
+        bool showType;             // la biblioteca en LISTA: la columna Tipo (apagada por defecto: el icono ya lo dice)
+        bool showUses;             // la biblioteca: cuantos lo usan + en uso / huerfano (la columna; en la cuadricula, el icono)
         // CUADRICULA: se ve UNA carpeta a la vez (doble click en una carpeta entra; la celda "Ir atras" sube) y el
         // tamanio de las celdas lo elige el usuario (la rueda o dos dedos)
-        std::string carpetaGrid;   // la carpeta que se ve ("" = la raiz)
-        float celdaZoom;           // 1 = el tamanio de siempre
-        unsigned entroMs;          // cuando se entro a una carpeta con UN click (0 = no): el 2do click de un doble click
+        std::string folderGrid;   // la carpeta que se ve ("" = la raiz)
+        float cellZoom;           // 1 = el tamanio de siempre
+        unsigned enteredMs;       // cuando se entro a una carpeta con UN click (0 = no): el 2do click de un doble click
                                    // no cae en lo que aparecio adentro
-        void EntrarCarpetaGrid(const std::string& carpeta);
+        void EnterFolderGrid(const std::string& folder);
         int hoverMx, hoverMy;      // el mouse sobre el panel (la celda / fila bajo el se resalta); -1 = afuera
-        void CambiarVista(int v);
-        void CambiarFiltro(int f);
-        void CambiarCuadricula(bool on);
-        int AltoFilaMemoria() const;   // el alto de la fila de memoria de abajo (0 = no se ve)
-        bool EnBiblioteca() const { return vista != OUT_VISTA_ESCENA; }
-        bool VistaSoloLectura() const { return vista >= OUT_VISTA_LIBEXT; }
+        void ChangeView(int v);
+        void ChangeFilter(int f);
+        void ChangeGrid(bool on);
+        int RowHeightMemory() const;   // el alto de la fila de memoria de abajo (0 = no se ve)
+        bool InLibrary() const { return view != OUT_VIEW_SCENE; }
+        bool ViewReadOnly() const { return view >= OUT_VIEW_LIBEXT; }
         // la clave de la vista para el layout ("escena", "biblioteca", "lib:<ruta>") y al reves
-        std::string VistaClave() const;
-        bool VistaDeClave(const std::string& c);
+        std::string ViewKey() const;
+        bool ViewByKey(const std::string& c);
         // la barra: [0] tipo  [1] VISTA (ojo)  [2] OBJETO  [3] SELECCION  [4] "+"  [5] filtro  [6] lista/cuadricula  [7] raiz
-        Button* btnVista;
-        Button* btnOpciones;       // el OJO: COMO se ve (lista / cuadricula, memoria, tamanos; en la escena, sus columnas)
-        Button* btnObjeto;
-        Button* btnSeleccion;
-        Button* btnNueva;
-        Button* btnFiltro;
-        Button* btnCuadricula;
-        Button* btnRaiz;           // la raiz que se edita (escena / juego / prefab): el mismo menu que el 3D
-        std::set<std::string> plegadas;      // carpetas PLEGADAS de la biblioteca (cosmetico)
-        std::set<std::string> plegadasExt;   // idem de la libreria externa que se mira
+        Button* btnView;
+        Button* btnOptions;       // el OJO: COMO se ve (lista / cuadricula, memoria, tamanos; en la escena, sus columnas)
+        Button* btnObject;
+        Button* btnSelection;
+        Button* newBtn;
+        Button* btnFilter;
+        Button* btnGrid;
+        Button* btnRoot;           // la raiz que se edita (escena / juego / prefab): el mismo menu que el 3D
+        std::set<std::string> collapsed;      // carpetas PLEGADAS de la biblioteca (cosmetico)
+        std::set<std::string> collapsedExt;   // idem de la libreria externa que se mira
         // el CURSOR de la vista (la fila activa, en verde; teclado y acciones): por IDENTIDAD, no por
         // numero de fila (renombrar/mover/plegar corre los numeros)
-        bool cursorEsCarpeta;
-        std::string cursorClave;
+        bool cursorIsFolder;
+        std::string cursorKey;
         // arrastre: un recurso, una CARPETA (con todo lo suyo) o la SELECCION entera, a una carpeta; un
-        // recurso tambien al viewport 3D o a un desplegable de Properties (g_outArrastre)
-        bool recArrastre, recArrastrando;
-        std::string recArrastreId;
-        bool recArrastreCarpeta;   // lo que se apreto es una carpeta (recArrastreId = su ruta)
-        bool recSoloAlSoltar;      // click sin modificadores sobre una fila de una seleccion de VARIAS:
+        // recurso tambien al viewport 3D o a un desplegable de Properties (g_outDrag)
+        bool recDrag, recDragging;
+        std::string recDragId;
+        bool recDragFolder;      // lo que se apreto es una carpeta (recDragId = su ruta)
+        bool recOnlyOnRelease;   // click sin modificadores sobre una fila de una seleccion de VARIAS:
                                    // si no se arrastra, al soltar queda sola (como en un explorador)
-        bool recElegirAlSoltar;    // el click ELIGE la fila (suelta la escena, activa el recurso) al soltar sin
+        bool recPickOnRelease;    // el click ELIGE la fila (suelta la escena, activa el recurso) al soltar sin
                                    // arrastrar: un arrastre a Properties no puede apagar la tarjeta destino
-        int recArrastreY0, recArrastreX0, recDropFila;
+        int recDragY0, recDragX0, recDropRow;
         // REORDENAR: el recurso que se arrastra va ANTES (o despues) de esta fila. -1 = no (a una carpeta, afuera)
-        int recInsFila;
-        bool recInsDespues;
+        int recInsRow;
+        bool recInsAfter;
         // LISTA: las COLUMNAS (Nombre | Tipo | Tamanio | Usos), con la fila de los titulos arriba (siempre a la vista).
         // El ancho de Tipo / Tamanio / Usos se ajusta arrastrando el divisor de su izquierda (blanco con el mouse
         // encima, verde mientras se arrastra); el Nombre se queda con el resto. -1 = el ancho de siempre.
-        int colAncho[3];           // en px a escala 1 (se multiplica por GlobalScale)
-        int colArrastre, colHover; // el divisor que se arrastra / bajo el mouse (0 Tipo, 1 Tamanio, 2 Usos; -1 ninguno)
-        int AltoCabecera() const;  // la fila de los titulos (0 en la escena y en la cuadricula)
-        int TopContenido() const;  // donde empiezan las filas de la biblioteca (la barra + los titulos)
-        // las columnas en coordenadas del panel: el nombre va de 0 a xTipo; xFin = el borde derecho
-        void ColumnasLista(int& xTipo, int& xTam, int& xEst, int& xFin) const;
-        int DivisorEnPunto(int mx, int my) const;   // -1 = ninguno
+        int colWidth[3];          // en px a escala 1 (se multiplica por GlobalScale)
+        int colDrag, colHover;    // el divisor que se arrastra / bajo el mouse (0 Tipo, 1 Tamanio, 2 Usos; -1 ninguno)
+        int HeaderHeight() const; // la fila de los titulos (0 en la escena y en la cuadricula)
+        int TopContent() const;   // donde empiezan las filas de la biblioteca (la barra + los titulos)
+        // las columnas en coordenadas del panel: el nombre va de 0 a xType; xEnd = el borde derecho
+        void ColumnsList(int& xType, int& xSize, int& xEst, int& xEnd) const;
+        int DivisorInPoint(int mx, int my) const;   // -1 = ninguno
         // TACTIL: la fila AGARRADA con una pulsacion larga (arrastrar = mover; soltar sin mover = menu
         // contextual). -1 = nada agarrado.
-        int agarreFila;
-        bool agarreMovido;
-        int agarreX, agarreY;
+        int grabRow;
+        bool grabMoved;
+        int grabX, grabY;
         // SELECCION MULTIPLE: Ctrl+click agrega/saca, Shift+click = rango desde el cursor, Shift+flechas,
         // "Select All" / "Deselect All" / "Invert Selection", Esc la suelta; sin mouse, el 5 del N95
         // marca/desmarca el cursor. Mover, borrar y "Select Users" van sobre TODA la seleccion (un paso de
         // undo); renombrar y Properties, sobre el cursor. Por IDENTIDAD (claves de biblioteca, rutas de
         // carpeta): plegar, renombrar o mover no la corren. Vacia = el cursor.
-        std::set<std::string> selRecursos, selCarpetas;
+        std::set<std::string> selResources, selFolders;
         // la seleccion la ARMO el usuario (5, Ctrl/Shift, A): el cursor del keypad recorre sin tocarla.
         // false = es la de un click comun o una flecha (sigue al cursor)
-        bool selMarcada;
+        bool selMarked;
         // RENOMBRAR EN LINEA (doble click, F2, "Rename"): un objeto de la escena, un recurso o una carpeta.
         // El campo se dibuja en la fila; Enter o un click afuera confirman, Esc cancela.
-        TextField renombre;
-        bool renombrando, renombreCarpeta, renombreObjeto;
-        std::string renombreClave;     // la carpeta / la clave del recurso
-        unsigned int renombreSerial;   // el objeto (por serial: un objeto borrado no se renombra)
-        int renombreVista;
+        TextField rename;
+        bool renaming, renameFolder, renameObject;
+        std::string renameKey;       // la carpeta / la clave del recurso
+        unsigned int renameSerial;   // el objeto (por serial: un objeto borrado no se renombra)
+        int renameView;
         // MODO MOVER de la biblioteca (G / el 1 del N95, como el de la escena): lo elegido viaja por las
         // carpetas con las flechas (arriba/abajo = la carpeta anterior/siguiente, izquierda = la de arriba,
         // derecha = la primera de adentro), OK/Enter confirma (un paso de undo) y Esc/C cancela.
-        bool moviendoRec;
-        std::string moverRecDestino;
-        // W3dSeleccionSerial que vio la biblioteca: si la ESCENA eligio un objeto despues (en el 3D, en otro
+        bool movingRec;
+        std::string moveRecDestination;
+        // W3dSelectionSerial que vio la biblioteca: si la ESCENA eligio un objeto despues (en el 3D, en otro
         // outliner, un script), la seleccion y el cursor de la biblioteca se sueltan (o se eligen objetos o
         // se eligen recursos: la fila no puede seguir en verde ni ser lo que borra el Supr)
-        unsigned int selEscenaSerial;
+        unsigned int selSceneSerial;
 
         // la lista visible de la vista actual (vacia en la vista Escena)
-        void FilasRecursos(std::vector<OutFilaRec>& out);
-        int  FilaDelCursor(const std::vector<OutFilaRec>& filas) const;   // -1 = no esta a la vista
-        int  FilaRecursoY(int fila) const;       // Y absoluta del CENTRO de la fila (click / harness)
+        void RowsResources(std::vector<OutRowRec>& out);
+        int  CursorRow(const std::vector<OutRowRec>& rows) const;   // -1 = no esta a la vista
+        int  RowResourceY(int row) const;       // Y absoluta del CENTRO de la fila (click / harness)
         // LA GEOMETRIA de una fila (lista o cuadricula): su rectangulo en coordenadas del panel (sin
         // PosX/PosY: los suma quien dibuja). La misma cuenta dibuja, clickea y la usa el harness.
-        void RectFila(const std::vector<OutFilaRec>& filas, int i, int& rx, int& ry, int& rw, int& rh) const;
-        int  FilaEnPunto(const std::vector<OutFilaRec>& filas, int mx, int my) const;   // -1 = ninguna
-        int  CeldaTam() const;                   // el lado de una celda de la cuadricula
+        void RectRow(const std::vector<OutRowRec>& rows, int i, int& rx, int& ry, int& rw, int& rh) const;
+        int  RowInPoint(const std::vector<OutRowRec>& rows, int mx, int my) const;   // -1 = ninguna
+        int  CellSize() const;                   // el lado de una celda de la cuadricula
         // la miniatura que dibuja la celda de un recurso (0 = el icono del tipo: una carpeta, un tipo sin
         // miniatura, o el contenido de una libreria externa, que no se monta)
-        unsigned int MiniaturaDeFila(const OutFilaRec& f, int* w, int* h) const;
-        bool AbrirMenuDeBarra(int mx, int my) W3D_OVERRIDE; // los desplegables (tambien el hover)
-        bool AbrirMenuBoton(int idx);            // idem por indice (teclado del N95)
-        int  BotonDelMenuAbierto() const;        // indice del boton cuyo menu esta abierto (-1 = ninguno)
-        bool ClickBarra(int mx, int my);         // lo directo de la barra: el boton lista/cuadricula
-        bool MenuContexto(int mx, int my);       // click derecho / pulsacion larga: elige la fila y abre Objeto ahi
-        bool MenuContextoTeclado();              // el mismo, de la fila del CURSOR (el OK mantenido del N95)
-        bool DobleClick(int mx, int my);         // doble click / doble tap: renombrar el nombre de la fila
-        bool PulsacionLarga(int mx, int my);     // tactil: mantener apretado agarra la fila (o menu al soltar)
-        bool TeclaRecursos(int tecla);           // LayoutKey (flechas/OK/C del keypad del N95)
-        // LayoutKey de un TECLADO DE PC (LayoutTeclaUI: el panel bajo el mouse recibe las flechas y el
+        unsigned int RowThumbnail(const OutRowRec& f, int* w, int* h) const;
+        bool OpenBarMenu(int mx, int my) W3D_OVERRIDE; // los desplegables (tambien el hover)
+        bool OpenMenuButton(int idx);         // idem por indice (teclado del N95)
+        int  OpenMenuButtonIndex() const;     // indice del boton cuyo menu esta abierto (-1 = ninguno)
+        bool ClickBar(int mx, int my);        // lo directo de la barra: el boton lista/cuadricula
+        bool MenuContext(int mx, int my);     // click derecho / pulsacion larga: elige la fila y abre Objeto ahi
+        bool MenuContextKeyboard();           // el mismo, de la fila del CURSOR (el OK mantenido del N95)
+        bool DoubleClick(int mx, int my);     // doble click / doble tap: renombrar el nombre de la fila
+        bool PressLong(int mx, int my);       // tactil: mantener apretado agarra la fila (o menu al soltar)
+        bool KeyResources(int key);           // LayoutKey (flechas/OK/C del keypad del N95)
+        // LayoutKey de un TECLADO DE PC (LayoutKeyUI: el panel bajo el mouse recibe las flechas y el
         // Enter ANTES que event_key_down): Shift+flechas suma filas, sin Shift la fila queda sola (como
-        // en un explorador). En el N95 es TeclaRecursos (el keypad no tiene Shift: las marcas del 5 quedan).
-        bool TeclaRecursosPC(int tecla);
-        void ElegirFila(const OutFilaRec& f, bool abrirProps); // cursor + recurso activo (suelta la escena)
+        // en un explorador). En el N95 es KeyResources (el keypad no tiene Shift: las marcas del 5 quedan).
+        bool KeyResourcesPC(int key);
+        void PickRow(const OutRowRec& f, bool openProps); // cursor + recurso activo (suelta la escena)
         // acciones (menus, teclas y harness): operan sobre el cursor / la seleccion
-        bool AccionNuevaCarpeta();
-        bool AccionNuevaCarpetaEn(const std::string& padre);   // (el click derecho: en la carpeta de lo que estaba abajo)
-        void CambiarSinUso(bool on);
-        bool AccionNuevoMaterial();
-        bool AccionRenombrar();                  // en las dos vistas (en linea)
-        bool AccionBorrar(bool confirmar);
-        int  AccionPurgar(bool confirmar);
-        int  AccionSeleccionarUsuarios();
-        bool AccionDuplicarRecurso();
-        bool AccionMover(const std::string& carpeta);
-        void AbrirMenuMover(int x, int y);       // "Move to Folder" (submenu con las carpetas)
-        void RenombreSincronizar();              // confirma el rename en linea si perdio el foco
-        void RenombreCancelar();                 // el Esc: descarta sin tocar nada
-        bool RenombrarObjetoEnLinea(Object* o);  // la vista Escena: el nombre del objeto en su fila
+        bool ActionNewFolder();
+        bool ActionNewFolderIn(const std::string& parent);   // (el click derecho: en la carpeta de lo que estaba abajo)
+        void ChangeUnused(bool on);
+        bool ActionNewMaterial();
+        bool ActionRename();                  // en las dos vistas (en linea)
+        bool ActionDelete(bool confirm);
+        int  ActionPurge(bool confirm);
+        int  ActionSelectUsers();
+        bool ActionDuplicateResource();
+        bool ActionMove(const std::string& folder);
+        void OpenMenuMove(int x, int y);     // "Move to Folder" (submenu con las carpetas)
+        void RenameSync();                   // confirma el rename en linea si perdio el foco
+        void RenameCancel();                 // el Esc: descarta sin tocar nada
+        bool RenameObjectInLine(Object* o);  // la vista Escena: el nombre del objeto en su fila
         // la seleccion multiple
-        bool FilaEnSeleccion(const OutFilaRec& f) const;
-        int  SeleccionCantidad() const { return (int)(selRecursos.size() + selCarpetas.size()); }
-        void SeleccionSolo(const OutFilaRec& f);         // la fila sola (click, flechas)
-        void SeleccionAlternar(const OutFilaRec& f);     // Ctrl+click / el 5 del N95
-        bool MarcarCursor();                             // el 5 del N95: marca/desmarca la fila del cursor
-        bool SoltarSeleccion();                          // Esc / "Deselect All": queda el cursor solo (false = no habia)
-        void InvertirSeleccionRec();                     // "Invert Selection"
+        bool RowInSelection(const OutRowRec& f) const;
+        int  SelectionCount() const { return (int)(selResources.size() + selFolders.size()); }
+        void SelectionOnly(const OutRowRec& f);       // la fila sola (click, flechas)
+        void SelectionToggle(const OutRowRec& f);     // Ctrl+click / el 5 del N95
+        bool MarkCursor();                            // el 5 del N95: marca/desmarca la fila del cursor
+        bool ReleaseSelection();                      // Esc / "Deselect All": queda el cursor solo (false = no habia)
+        void InvertSelectionRec();                    // "Invert Selection"
         // el TOQUE de C del N95 en la biblioteca: borra la seleccion (con confirmacion) como el Supr de PC,
         // en vez de los objetos de la escena. false = vista Escena (sigue su camino).
-        bool TeclaBorrarRecursos();
-        void SeleccionarTodoRec();                       // A: todas las filas a la vista (o ninguna si ya estaban)
-        // lo que mueve / borra / lista una accion: la seleccion (o el cursor, si no hay). 'paraMover'
+        bool KeyDeleteResources();
+        void SelectAllRec();                       // A: todas las filas a la vista (o ninguna si ya estaban)
+        // lo que mueve / borra / lista una accion: la seleccion (o el cursor, si no hay). 'toMove'
         // saca lo que ya cuelga de una carpeta elegida (la carpeta lo lleva) y lo de solo lectura.
         // 'recursos' son claves de biblioteca.
-        void Objetivo(std::vector<std::string>& recursos, std::vector<std::string>& carpetas, bool paraMover);
-        bool MoverObjetivo(const std::string& destino);  // TODO lo elegido adentro de 'destino' (un paso de undo)
-        // el modo mover de la biblioteca (ver moviendoRec)
-        void MoverRecIniciar();
-        void MoverRecPaso(int dir);              // 0 arriba, 1 abajo, 2 afuera, 3 adentro
-        void MoverRecConfirmar();
-        void MoverRecCancelar();
+        void GetTarget(std::vector<std::string>& resources, std::vector<std::string>& folders, bool toMove);
+        bool MoveTarget(const std::string& destination);  // TODO lo elegido adentro de 'destino' (un paso de undo)
+        // el modo mover de la biblioteca (ver movingRec)
+        void MoveRecStart();
+        void MoveRecStep(int dir);              // 0 arriba, 1 abajo, 2 afuera, 3 adentro
+        void MoveRecConfirm();
+        void MoveRecCancel();
         // la vista Escena desde el outliner: el menu Seleccion y sus atajos (A / Alt+A / Ctrl+I: 0 todo, 1 nada,
         // 2 invertir) y el menu Objeto con los suyos (Shift+D / Alt+D: duplicar, duplicar vinculado)
-        void SeleccionEscena(int accion);
-        void DuplicarEscena(bool vinculado);
+        void SelectionScene(int action);
+        void DuplicateScene(bool linked);
     private:
         // 'filas' = las de este cuadro (Render las arma una vez)
-        void RenderRecursos(int glY, const std::vector<OutFilaRec>& filas);
-        void ResizeRecursos();
-        void ClickRecursos(int mx, int my);
-        void MotionRecursos(int mx, int my);
-        void SoltarRecursos(int mx, int my);
-        bool TeclaPCRecursos(int tecla);
-        // como se mueve la seleccion con el cursor de teclado (ver CursorATecla)
-        enum { SEL_MARCAS = 0, SEL_EXTENDER, SEL_SOLA };
-        bool TeclaRecursosCon(int tecla, int modoSel);
-        void CursorATecla(const std::vector<OutFilaRec>& filas, int n, int modoSel);
-        void AsegurarVisibleFila(int fila);
-        void SincronizarBarraVista();
+        void RenderResources(int glY, const std::vector<OutRowRec>& rows);
+        void ResizeResources();
+        void ClickResources(int mx, int my);
+        void MotionResources(int mx, int my);
+        void ReleaseResources(int mx, int my);
+        bool KeyPCResources(int key);
+        // como se mueve la seleccion con el cursor de teclado (ver CursorToKey)
+        enum { SEL_MARKS = 0, SEL_EXTEND, SEL_ONLY };
+        bool KeyResourcesWith(int key, int selMode);
+        void CursorToKey(const std::vector<OutRowRec>& rows, int n, int selMode);
+        void EnsureVisibleRow(int row);
+        void SyncBarView();
 };
 
 // LA BIBLIOTECA: los recursos del proyecto (mallas, materiales, texturas, prefabs, escenas, sonidos...) y los de las
 // librerias .w3d vinculadas, en su PROPIO viewport (el tipo "Library" del menu de viewports). Es el mismo Outliner, fijo
 // en la vista de recursos y en CUADRICULA por defecto; el outliner de la escena ya no la muestra (su barra queda con el
 // selector de la escena / el juego / el prefab que se edita).
-class Biblioteca : public Outliner {
+class Library : public Outliner {
     public:
-        Biblioteca();
+        Library();
         int ViewportKind() const W3D_OVERRIDE { return 9; }
 };
 

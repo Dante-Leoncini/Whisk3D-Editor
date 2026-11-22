@@ -1,9 +1,9 @@
 // ============================================================================
 //  W3dAac.cpp - el codificador AAC-LC propio (ver el .h). La sintaxis del flujo es la de ISO/IEC 14496-3 (raw_data_block
-//  con SCE / CPE y END); las tablas Huffman, las de la norma (W3dAacTablas.h).
+//  con SCE / CPE y END); las tablas Huffman, las de la norma (W3dAacTables.h).
 // ============================================================================
 #include "W3dAac.h"
-#include "W3dAacTablas.h"
+#include "W3dAacTables.h"
 #include <cmath>
 #include <cstring>
 
@@ -17,22 +17,22 @@ const int kH = 512;          // la FFT compleja de la MDCT
 // ---- escribir de a bits (o solo contarlos: 'out' NULL) ----
 struct Bits {
     std::vector<unsigned char>* out;
-    unsigned int acum; int nAcum; long total;
-    explicit Bits(std::vector<unsigned char>* o) : out(o), acum(0), nAcum(0), total(0) {}
-    void Poner(unsigned int v, int n) {
+    unsigned int accum; int nAccum; long total;
+    explicit Bits(std::vector<unsigned char>* o) : out(o), accum(0), nAccum(0), total(0) {}
+    void Set(unsigned int v, int n) {
         total += n;
         if (!out) return;
         for (int i = n - 1; i >= 0; i--) {
-            acum = (acum << 1) | ((v >> i) & 1u); nAcum++;
-            if (nAcum == 8) { out->push_back((unsigned char)acum); acum = 0; nAcum = 0; }
+            accum = (accum << 1) | ((v >> i) & 1u); nAccum++;
+            if (nAccum == 8) { out->push_back((unsigned char)accum); accum = 0; nAccum = 0; }
         }
     }
-    void Alinear() { const int r = (int)(total & 7); if (r) Poner(0, 8 - r); }
+    void Align() { const int r = (int)(total & 7); if (r) Set(0, 8 - r); }
 };
 
 // los libros: el codigo y el largo de un indice; cuantos valores agrupa; con signo o no; el valor mas grande
-struct Libro { const unsigned short* cod; const unsigned char* bits; int dim; bool conSigno; int lav; };
-const Libro kLibros[12] = {
+struct Book { const unsigned short* cod; const unsigned char* bits; int dim; bool withSign; int lav; };
+const Book kBooks[12] = {
     { 0, 0, 0, false, 0 },
     { kAacCod1, kAacBits1, 4, true, 1 },   { kAacCod2, kAacBits2, 4, true, 1 },
     { kAacCod3, kAacBits3, 4, false, 2 },  { kAacCod4, kAacBits4, 4, false, 2 },
@@ -48,32 +48,32 @@ inline int Abs(int v) { return v < 0 ? -v : v; }
 void Escape(Bits& b, int v) {
     int n = 4;
     while ((1 << (n + 1)) <= v) n++;
-    for (int i = 0; i < n - 4; i++) b.Poner(1, 1);
-    b.Poner(0, 1);
-    b.Poner((unsigned)(v - (1 << n)), n);
+    for (int i = 0; i < n - 4; i++) b.Set(1, 1);
+    b.Set(0, 1);
+    b.Set((unsigned)(v - (1 << n)), n);
 }
 int BitsEscape(int v) { int n = 4; while ((1 << (n + 1)) <= v) n++; return (n - 4) + 1 + n; }
 
 // una banda [ini, fin) con el libro 'l': escribe (o cuenta) sus bits
-long BandaBits(const int* q, int ini, int fin, int l, Bits* b) {
-    const Libro& L = kLibros[l];
+long BandBits(const int* q, int start, int end, int l, Bits* b) {
+    const Book& L = kBooks[l];
     long bits = 0;
-    for (int i = ini; i < fin; i += L.dim) {
-        int idx = 0, signos = 0, nSignos = 0;
+    for (int i = start; i < end; i += L.dim) {
+        int idx = 0, signs = 0, nSigns = 0;
         if (L.dim == 4) {
-            if (L.conSigno) idx = 27 * (q[i] + 1) + 9 * (q[i + 1] + 1) + 3 * (q[i + 2] + 1) + (q[i + 3] + 1);
+            if (L.withSign) idx = 27 * (q[i] + 1) + 9 * (q[i + 1] + 1) + 3 * (q[i + 2] + 1) + (q[i + 3] + 1);
             else idx = 27 * Abs(q[i]) + 9 * Abs(q[i + 1]) + 3 * Abs(q[i + 2]) + Abs(q[i + 3]);
-        } else if (L.conSigno) {
+        } else if (L.withSign) {
             idx = 9 * (q[i] + 4) + (q[i + 1] + 4);
         } else {
             const int a = Abs(q[i]), c = Abs(q[i + 1]);
             if (l == 11) idx = 17 * (a > 16 ? 16 : a) + (c > 16 ? 16 : c);
             else idx = (l <= 8 ? 8 : 13) * a + c;
         }
-        if (!L.conSigno)
-            for (int k = 0; k < L.dim; k++) if (q[i + k]) { signos = (signos << 1) | (q[i + k] < 0 ? 1 : 0); nSignos++; }
-        bits += L.bits[idx] + nSignos;
-        if (b) { b->Poner(L.cod[idx], L.bits[idx]); if (nSignos) b->Poner((unsigned)signos, nSignos); }
+        if (!L.withSign)
+            for (int k = 0; k < L.dim; k++) if (q[i + k]) { signs = (signs << 1) | (q[i + k] < 0 ? 1 : 0); nSigns++; }
+        bits += L.bits[idx] + nSigns;
+        if (b) { b->Set(L.cod[idx], L.bits[idx]); if (nSigns) b->Set((unsigned)signs, nSigns); }
         if (l == 11) for (int k = 0; k < 2; k++) {
             const int a = Abs(q[i + k]);
             if (a >= 16) { bits += BitsEscape(a); if (b) Escape(*b, a); }
@@ -82,7 +82,7 @@ long BandaBits(const int* q, int ini, int fin, int l, Bits* b) {
     return bits;
 }
 
-const int kFrecuencias[12] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000 };
+const int kFrequencies[12] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000 };
 
 // el FFT complejo de kH puntos (in situ, radix 2)
 void Fft(float* re, float* im, const std::vector<float>& c, const std::vector<float>& s) {
@@ -93,11 +93,11 @@ void Fft(float* re, float* im, const std::vector<float>& c, const std::vector<fl
         if (i < j) { float t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
     }
     for (int len = 2; len <= kH; len <<= 1) {
-        const int paso = kH / len, mitad = len >> 1;
+        const int step = kH / len, half = len >> 1;
         for (int i = 0; i < kH; i += len)
-            for (int k = 0; k < mitad; k++) {
-                const float wr = c[k * paso], wi = -s[k * paso];
-                const int a = i + k, b = a + mitad;
+            for (int k = 0; k < half; k++) {
+                const float wr = c[k * step], wi = -s[k * step];
+                const int a = i + k, b = a + half;
                 const float tr = re[b] * wr - im[b] * wi, ti = re[b] * wi + im[b] * wr;
                 re[b] = re[a] - tr; im[b] = im[a] - ti;
                 re[a] += tr; im[a] += ti;
@@ -107,44 +107,44 @@ void Fft(float* re, float* im, const std::vector<float>& c, const std::vector<fl
 
 } // namespace
 
-W3dAacCodificador::W3dAacCodificador()
-    : muestras(0), retardo(kM), frec(0), can(0), kbps(0), idxFrec(-1), nBandas(0), maxSfb(0), swb(0), llenas(0) {}
+W3dAacEncoder::W3dAacEncoder()
+    : samples(0), delay(kM), freq(0), can(0), kbps(0), idxFreq(-1), nBands(0), maxSfb(0), swb(0), full(0) {}
 
-bool W3dAacCodificador::Abrir(int f, int c, int k) {
-    error.clear(); asc.clear(); datos.clear(); tamanios.clear(); muestras = 0; llenas = 0;
-    idxFrec = -1;
-    for (int i = 0; i < 12; i++) if (kFrecuencias[i] == f) idxFrec = i;
-    if (idxFrec < 0) { error = "frecuencia que el AAC no tiene"; return false; }
+bool W3dAacEncoder::Open(int f, int c, int k) {
+    error.clear(); asc.clear(); data.clear(); sizes.clear(); samples = 0; full = 0;
+    idxFreq = -1;
+    for (int i = 0; i < 12; i++) if (kFrequencies[i] == f) idxFreq = i;
+    if (idxFreq < 0) { error = "frecuencia que el AAC no tiene"; return false; }
     if (c < 1 || c > 2) { error = "solo 1 o 2 canales"; return false; }
-    frec = f; can = c; kbps = k < 16 ? 16 : (k > 320 ? 320 : k);
-    switch (idxFrec) {
-        case 0: case 1: swb = kAacSwb96; nBandas = 41; break;
-        case 2:         swb = kAacSwb64; nBandas = 47; break;
-        case 3: case 4: swb = kAacSwb48; nBandas = 49; break;
-        case 5:         swb = kAacSwb32; nBandas = 51; break;
-        case 6: case 7: swb = kAacSwb24; nBandas = 47; break;
-        case 8: case 9: case 10: swb = kAacSwb16; nBandas = 43; break;
-        default:        swb = kAacSwb8; nBandas = 40; break;
+    freq = f; can = c; kbps = k < 16 ? 16 : (k > 320 ? 320 : k);
+    switch (idxFreq) {
+        case 0: case 1: swb = kAacSwb96; nBands = 41; break;
+        case 2:         swb = kAacSwb64; nBands = 47; break;
+        case 3: case 4: swb = kAacSwb48; nBands = 49; break;
+        case 5:         swb = kAacSwb32; nBands = 51; break;
+        case 6: case 7: swb = kAacSwb24; nBands = 47; break;
+        case 8: case 9: case 10: swb = kAacSwb16; nBands = 43; break;
+        default:        swb = kAacSwb8; nBands = 40; break;
     }
     // EL ANCHO DE BANDA: lo que el bitrate por canal alcanza a cubrir (lo de arriba se descarta: mejor sin agudos que
     // con agudos rotos)
     {
-        const int porCanal = kbps / can;
-        float corte = porCanal >= 96 ? 20000.0f : porCanal >= 64 ? 16000.0f : porCanal >= 48 ? 14000.0f :
-                      porCanal >= 32 ? 11000.0f : porCanal >= 24 ? 8000.0f : 6000.0f;
-        if (corte > f * 0.5f) corte = f * 0.5f;
-        const int bin = (int)(corte / (f * 0.5f) * kM);
+        const int byChannel = kbps / can;
+        float cut = byChannel >= 96 ? 20000.0f : byChannel >= 64 ? 16000.0f : byChannel >= 48 ? 14000.0f :
+                      byChannel >= 32 ? 11000.0f : byChannel >= 24 ? 8000.0f : 6000.0f;
+        if (cut > f * 0.5f) cut = f * 0.5f;
+        const int bin = (int)(cut / (f * 0.5f) * kM);
         maxSfb = 0;
-        while (maxSfb < nBandas && swb[maxSfb] < bin) maxSfb++;
+        while (maxSfb < nBands && swb[maxSfb] < bin) maxSfb++;
     }
     // AudioSpecificConfig: AAC LC (2), la frecuencia, los canales; 1024 por cuadro
-    asc.push_back((unsigned char)((2 << 3) | (idxFrec >> 1)));
-    asc.push_back((unsigned char)(((idxFrec & 1) << 7) | (can << 3)));
-    for (int ch = 0; ch < 2; ch++) { previo[ch].assign(kM, 0.0f); actual[ch].assign(kM, 0.0f); }
+    asc.push_back((unsigned char)((2 << 3) | (idxFreq >> 1)));
+    asc.push_back((unsigned char)(((idxFreq & 1) << 7) | (can << 3)));
+    for (int ch = 0; ch < 2; ch++) { previous[ch].assign(kM, 0.0f); current[ch].assign(kM, 0.0f); }
     tz.resize(kN); tX.resize(kM); txp.resize(kM); tu.resize(kM); tre.resize(kH); tim.resize(kH);
     tq[0].assign(kM, 0); tq[1].assign(kM, 0); tqs.assign(kM, 0);
-    ventana.resize(kN);
-    for (int i = 0; i < kN; i++) ventana[i] = (float)sin(kPi / kN * (i + 0.5f));
+    window.resize(kN);
+    for (int i = 0; i < kN; i++) window[i] = (float)sin(kPi / kN * (i + 0.5f));
     cosR.resize(kH); sinR.resize(kH); cosT.resize(kH); sinT.resize(kH); cosF.resize(kH); sinF.resize(kH);
     for (int m = 0; m < kH; m++) {
         cosR[m] = (float)cos(kPi * (m + 0.25f) / kM); sinR[m] = (float)sin(kPi * (m + 0.25f) / kM);
@@ -156,7 +156,7 @@ bool W3dAacCodificador::Abrir(int f, int c, int k) {
 
 // LA MDCT de 2048 (ya con la ventana) por un FFT de 512: la rotacion a una DCT-IV de 1024 y esa por el FFT. Con el
 // factor 2 de la norma (la IMDCT del decodificador divide por N/2)
-void W3dAacCodificador::Mdct(const float* x, float* X) {
+void W3dAacEncoder::Mdct(const float* x, float* X) {
     float* u = &tu[0]; float* re = &tre[0]; float* im = &tim[0];
     for (int i = 0; i < kM; i++) {
         if (i < kM / 2) u[i] = -x[3 * kN / 4 + i] - x[3 * kN / 4 - 1 - i];
@@ -176,44 +176,44 @@ void W3dAacCodificador::Mdct(const float* x, float* X) {
     }
 }
 
-void W3dAacCodificador::Muestras(const short* pcm, int n) {
-    if (idxFrec < 0 || !pcm) return;
-    muestras += n;
+void W3dAacEncoder::Samples(const short* pcm, int n) {
+    if (idxFreq < 0 || !pcm) return;
+    samples += n;
     for (int i = 0; i < n; i++) {
-        for (int ch = 0; ch < can; ch++) actual[ch][llenas] = (float)pcm[i * can + ch];
-        if (++llenas == kM) Cuadro();
+        for (int ch = 0; ch < can; ch++) current[ch][full] = (float)pcm[i * can + ch];
+        if (++full == kM) Frame();
     }
 }
 
-void W3dAacCodificador::Terminar() {
-    if (idxFrec < 0) return;
-    if (llenas > 0) { for (int ch = 0; ch < can; ch++) for (int i = llenas; i < kM; i++) actual[ch][i] = 0.0f; llenas = kM; Cuadro(); }
+void W3dAacEncoder::Finish() {
+    if (idxFreq < 0) return;
+    if (full > 0) { for (int ch = 0; ch < can; ch++) for (int i = full; i < kM; i++) current[ch][i] = 0.0f; full = kM; Frame(); }
     // el ultimo solapamiento: un cuadro de silencio
-    for (int ch = 0; ch < can; ch++) actual[ch].assign(kM, 0.0f);
-    llenas = kM; Cuadro();
+    for (int ch = 0; ch < can; ch++) current[ch].assign(kM, 0.0f);
+    full = kM; Frame();
 }
 
 // UN CUADRO: la MDCT de cada canal, el scalefactor que entra en el presupuesto, y el raw_data_block
-void W3dAacCodificador::Cuadro() {
-    llenas = 0;
+void W3dAacEncoder::Frame() {
+    full = 0;
     int* q[2] = { &tq[0][0], &tq[1][0] };
     int global[2] = { 100, 100 };
-    int libro[2][64];
-    int maxUsado[2] = { 0, 0 };
+    int book[2][64];
+    int usedMax[2] = { 0, 0 };
     // el presupuesto por canal (bits del cuadro / canales), con lugar para la cabecera de cada canal
-    long presupuesto = (long)((double)kbps * 1000.0 * kM / frec / can) - 40;
-    if (presupuesto > 6000) presupuesto = 6000;   // (la norma: hasta 6144 bits por canal y cuadro)
-    if (presupuesto < 200) presupuesto = 200;
+    long budget = (long)((double)kbps * 1000.0 * kM / freq / can) - 40;
+    if (budget > 6000) budget = 6000;   // (la norma: hasta 6144 bits por canal y cuadro)
+    if (budget < 200) budget = 200;
     for (int ch = 0; ch < can; ch++) {
         float* z = &tz[0]; float* X = &tX[0]; float* xp = &txp[0];
-        for (int i = 0; i < kM; i++) { z[i] = previo[ch][i] * ventana[i]; z[kM + i] = actual[ch][i] * ventana[kM + i]; }
+        for (int i = 0; i < kM; i++) { z[i] = previous[ch][i] * window[i]; z[kM + i] = current[ch][i] * window[kM + i]; }
         Mdct(z, X);
         float maxX = 0.0f;
-        const int fin = swb[maxSfb];
+        const int end = swb[maxSfb];
         for (int i = 0; i < kM; i++) {
             const float a = (float)fabs(X[i]);
-            xp[i] = (i < fin) ? (float)pow(a, 0.75f) : 0.0f;
-            if (i < fin && a > maxX) maxX = a;
+            xp[i] = (i < end) ? (float)pow(a, 0.75f) : 0.0f;
+            if (i < end && a > maxX) maxX = a;
         }
         // el scalefactor mas fino que entra en el presupuesto (biseccion: mas grande = mas grueso = menos bits). El
         // minimo: que ningun valor pase de 8191
@@ -222,107 +222,107 @@ void W3dAacCodificador::Cuadro() {
             const float lim = (float)pow(maxX, 0.75f) / 8191.0f;
             while (lo < 255 && (float)pow(2.0, -0.1875 * (lo - 100)) * 1.0f > 1.0f / lim) lo++;
         }
-        int elegido = 255;
+        int picked = 255;
         int* qs = &tqs[0];
         for (int it = 0; it < 9 && lo <= hi; it++) {
             const int g = (lo + hi) / 2;
             const float esc = (float)pow(2.0, -0.1875 * (g - 100));
             long bits = 0;
-            for (int i = 0; i < fin; i++) { int v = (int)(xp[i] * esc + 0.4054f); qs[i] = X[i] < 0 ? -v : v; }
+            for (int i = 0; i < end; i++) { int v = (int)(xp[i] * esc + 0.4054f); qs[i] = X[i] < 0 ? -v : v; }
             for (int b = 0; b < maxSfb; b++) {
                 int m = 0;
                 for (int i = swb[b]; i < swb[b + 1]; i++) { const int a = Abs(qs[i]); if (a > m) m = a; }
                 if (m == 0) continue;
-                long mejor = 0x7fffffff;
-                for (int l = 1; l <= 11; l++) if (m <= kLibros[l].lav || l == 11) {
-                    const long c = BandaBits(qs, swb[b], swb[b + 1], l, 0);
-                    if (c < mejor) mejor = c;
+                long best = 0x7fffffff;
+                for (int l = 1; l <= 11; l++) if (m <= kBooks[l].lav || l == 11) {
+                    const long c = BandBits(qs, swb[b], swb[b + 1], l, 0);
+                    if (c < best) best = c;
                 }
-                bits += mejor + 1 + 9;   // (+ el scalefactor y, a lo sumo, una seccion)
+                bits += best + 1 + 9;   // (+ el scalefactor y, a lo sumo, una seccion)
             }
-            if (bits <= presupuesto) { elegido = g; hi = g - 1; } else lo = g + 1;
+            if (bits <= budget) { picked = g; hi = g - 1; } else lo = g + 1;
         }
-        if (elegido == 255 && lo <= 255) elegido = lo > 255 ? 255 : lo;
-        global[ch] = elegido;
-        const float esc = (float)pow(2.0, -0.1875 * (elegido - 100));
-        for (int i = 0; i < kM; i++) { int v = (i < fin) ? (int)(xp[i] * esc + 0.4054f) : 0; if (v > 8191) v = 8191; q[ch][i] = X[i] < 0 ? -v : v; }
+        if (picked == 255 && lo <= 255) picked = lo > 255 ? 255 : lo;
+        global[ch] = picked;
+        const float esc = (float)pow(2.0, -0.1875 * (picked - 100));
+        for (int i = 0; i < kM; i++) { int v = (i < end) ? (int)(xp[i] * esc + 0.4054f) : 0; if (v > 8191) v = 8191; q[ch][i] = X[i] < 0 ? -v : v; }
         for (int b = 0; b < maxSfb; b++) {
             int m = 0;
             for (int i = swb[b]; i < swb[b + 1]; i++) { const int a = Abs(q[ch][i]); if (a > m) m = a; }
-            if (m == 0) { libro[ch][b] = 0; continue; }
-            long mejor = 0x7fffffff; int ml = 11;
-            for (int l = 1; l <= 11; l++) if (m <= kLibros[l].lav || l == 11) {
-                const long c = BandaBits(q[ch], swb[b], swb[b + 1], l, 0);
-                if (c < mejor) { mejor = c; ml = l; }
+            if (m == 0) { book[ch][b] = 0; continue; }
+            long best = 0x7fffffff; int ml = 11;
+            for (int l = 1; l <= 11; l++) if (m <= kBooks[l].lav || l == 11) {
+                const long c = BandBits(q[ch], swb[b], swb[b + 1], l, 0);
+                if (c < best) { best = c; ml = l; }
             }
-            libro[ch][b] = ml;
-            maxUsado[ch] = b + 1;
+            book[ch][b] = ml;
+            usedMax[ch] = b + 1;
         }
-        previo[ch] = actual[ch];
+        previous[ch] = current[ch];
     }
     // ---- el raw_data_block ----
-    const size_t antes = datos.size();
-    Bits bw(&datos);
-    if (can == 1) { bw.Poner(0, 3); bw.Poner(0, 4); }            // SCE, etiqueta 0
-    else { bw.Poner(1, 3); bw.Poner(0, 4); bw.Poner(0, 1); }     // CPE, etiqueta 0, sin ventana comun
+    const size_t prev = data.size();
+    Bits bw(&data);
+    if (can == 1) { bw.Set(0, 3); bw.Set(0, 4); }          // SCE, etiqueta 0
+    else { bw.Set(1, 3); bw.Set(0, 4); bw.Set(0, 1); }     // CPE, etiqueta 0, sin ventana comun
     for (int ch = 0; ch < can; ch++) {
-        const int ms = maxUsado[ch];
-        bw.Poner((unsigned)global[ch], 8);
+        const int ms = usedMax[ch];
+        bw.Set((unsigned)global[ch], 8);
         // ics_info: reservado, ONLY_LONG_SEQUENCE, ventana seno, max_sfb, sin prediccion
-        bw.Poner(0, 1); bw.Poner(0, 2); bw.Poner(0, 1); bw.Poner((unsigned)ms, 6); bw.Poner(0, 1);
+        bw.Set(0, 1); bw.Set(0, 2); bw.Set(0, 1); bw.Set((unsigned)ms, 6); bw.Set(0, 1);
         // section_data: las bandas seguidas con el mismo libro, juntas (largo de 5 bits, 31 = sigue)
         for (int b = 0; b < ms; ) {
             int e = b;
-            while (e < ms && libro[ch][e] == libro[ch][b]) e++;
-            bw.Poner((unsigned)libro[ch][b], 4);
+            while (e < ms && book[ch][e] == book[ch][b]) e++;
+            bw.Set((unsigned)book[ch][b], 4);
             int len = e - b;
-            while (len >= 31) { bw.Poner(31, 5); len -= 31; }
-            bw.Poner((unsigned)len, 5);
+            while (len >= 31) { bw.Set(31, 5); len -= 31; }
+            bw.Set((unsigned)len, 5);
             b = e;
         }
         // scale_factor_data: todas las bandas con datos usan el global (diferencia 0 = el indice 60)
-        for (int b = 0; b < ms; b++) if (libro[ch][b]) bw.Poner(kAacSfCod[60], kAacSfBits[60]);
-        bw.Poner(0, 1); bw.Poner(0, 1); bw.Poner(0, 1);         // sin pulse, sin TNS, sin gain control
-        for (int b = 0; b < ms; b++) if (libro[ch][b]) BandaBits(q[ch], swb[b], swb[b + 1], libro[ch][b], &bw);
+        for (int b = 0; b < ms; b++) if (book[ch][b]) bw.Set(kAacSfCod[60], kAacSfBits[60]);
+        bw.Set(0, 1); bw.Set(0, 1); bw.Set(0, 1);         // sin pulse, sin TNS, sin gain control
+        for (int b = 0; b < ms; b++) if (book[ch][b]) BandBits(q[ch], swb[b], swb[b + 1], book[ch][b], &bw);
     }
-    bw.Poner(7, 3);   // END
-    bw.Alinear();
-    tamanios.push_back((unsigned int)(datos.size() - antes));
+    bw.Set(7, 3);   // END
+    bw.Align();
+    sizes.push_back((unsigned int)(data.size() - prev));
 }
 
 // ---- un WAV entero ----
 static unsigned Le32(const unsigned char* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((unsigned)p[3] << 24); }
 static unsigned Le16(const unsigned char* p) { return p[0] | (p[1] << 8); }
 
-bool W3dAacDesdeWav(const std::vector<unsigned char>& w, int kbps, W3dAacCodificador& cod, int& frecuencia, int& canales) {
-    frecuencia = canales = 0;
+bool W3dAacFromWav(const std::vector<unsigned char>& w, int kbps, W3dAacEncoder& cod, int& frequency, int& channels) {
+    frequency = channels = 0;
     if (w.size() < 44 || memcmp(&w[0], "RIFF", 4) != 0 || memcmp(&w[8], "WAVE", 4) != 0) { cod.error = "no es un WAV"; return false; }
-    size_t p = 12, datos = 0, nDatos = 0;
-    int bitsMuestra = 0, formato = 0;
+    size_t p = 12, data = 0, nData = 0;
+    int bitsSample = 0, format = 0;
     while (p + 8 <= w.size()) {
-        const unsigned largo = Le32(&w[p + 4]);
+        const unsigned length = Le32(&w[p + 4]);
         if (memcmp(&w[p], "fmt ", 4) == 0 && p + 8 + 16 <= w.size()) {
-            formato = (int)Le16(&w[p + 8]); canales = (int)Le16(&w[p + 10]);
-            frecuencia = (int)Le32(&w[p + 12]); bitsMuestra = (int)Le16(&w[p + 22]);
+            format = (int)Le16(&w[p + 8]); channels = (int)Le16(&w[p + 10]);
+            frequency = (int)Le32(&w[p + 12]); bitsSample = (int)Le16(&w[p + 22]);
         } else if (memcmp(&w[p], "data", 4) == 0) {
-            datos = p + 8; nDatos = largo;
-            if (datos + nDatos > w.size()) nDatos = w.size() - datos;
+            data = p + 8; nData = length;
+            if (data + nData > w.size()) nData = w.size() - data;
             break;
         }
-        p += 8 + largo + (largo & 1);
+        p += 8 + length + (length & 1);
     }
-    if (formato != 1 || bitsMuestra != 16 || !datos) { cod.error = "el WAV no es PCM de 16 bits"; return false; }
-    if (!cod.Abrir(frecuencia, canales, kbps)) return false;
-    const int porCuadro = canales;
-    const size_t total = nDatos / (2 * porCuadro);
-    std::vector<short> buf(4096 * porCuadro);
-    for (size_t hecho = 0; hecho < total; ) {
-        const size_t n = (total - hecho) > 4096 ? 4096 : (total - hecho);
-        const unsigned char* s = &w[datos + hecho * 2 * porCuadro];
-        for (size_t i = 0; i < n * porCuadro; i++) buf[i] = (short)Le16(s + i * 2);
-        cod.Muestras(&buf[0], (int)n);
-        hecho += n;
+    if (format != 1 || bitsSample != 16 || !data) { cod.error = "el WAV no es PCM de 16 bits"; return false; }
+    if (!cod.Open(frequency, channels, kbps)) return false;
+    const int perFrame = channels;
+    const size_t total = nData / (2 * perFrame);
+    std::vector<short> buf(4096 * perFrame);
+    for (size_t done = 0; done < total; ) {
+        const size_t n = (total - done) > 4096 ? 4096 : (total - done);
+        const unsigned char* s = &w[data + done * 2 * perFrame];
+        for (size_t i = 0; i < n * perFrame; i++) buf[i] = (short)Le16(s + i * 2);
+        cod.Samples(&buf[0], (int)n);
+        done += n;
     }
-    cod.Terminar();
+    cod.Finish();
     return true;
 }

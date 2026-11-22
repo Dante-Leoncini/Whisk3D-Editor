@@ -30,24 +30,24 @@ Core — это библиотека на C++ со своим репозитор
 namespace gfx = w3dEngine;
 
 // файл: может лежать на диске, внутри .w3d, внутри APK или быть упакован в игру
-std::vector<unsigned char> nivel;
-if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", nivel))
+std::vector<unsigned char> level;
+if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", level))
     w3dLogfE("no encontre %s", "niveles/uno.txt");
 
 // текстура: её декодирует stb (или ICL в Symbian), а загружает бэкенд
 unsigned int pasto = 0;
-gfx::LoadTexture("texturas/pasto.png", pasto);
+gfx::LoadTexture("textures/pasto.png", pasto);
 
 // звук: его микширует Core; вывод у каждой системы свой
-w3dEngine::W3dSound* salto = w3dEngine::W3dSoundLoad("sonidos/salto.wav");
-w3dEngine::W3dSoundPlay(salto, 1.0f, false);
+w3dEngine::W3dSound* jump = w3dEngine::W3dSoundLoad("sounds/salto.wav");
+w3dEngine::W3dSoundPlay(jump, 1.0f, false);
 
 // рисование: ни одного вызова OpenGL, sceGu или citro3d
 gfx::Enable(gfx::Texture2D);
 gfx::BindTexture(pasto);
-gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, posiciones);
+gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, positions);
 gfx::EnableArray(gfx::TexCoordArray); gfx::TexCoordPointer2f(0, uvs);
-gfx::DrawTriangles(cantidadDeIndices, indices);
+gfx::DrawTriangles(indexCount, indices);
 ```
 
 ## Что внутри

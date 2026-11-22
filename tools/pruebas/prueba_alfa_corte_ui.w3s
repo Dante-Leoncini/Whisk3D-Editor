@@ -20,58 +20,58 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_alfa_corte_ui.w3s
 # ===========================================================================
-ventana 1280 720
+window 1280 720
 selobj Cubo
 delete
 importgltf prueba_alfa_corte.glb
 loadtex
 selobj prueba_alfa_corte
-matalfa alfa_reja es 0.3
+matalphacut alfa_reja es 0.3
 
 # --- 1) la fila muestra el valor del material
-propsalfa fila 0.3
+propsalpha row 0.3
 
 # --- 2) ARRASTRE: sube (0.005 por px, menos la zona muerta del click) y Ctrl+Z vuelve en un paso
-propsalfa arrastrar 40 0.31 0.5
+propsalpha drag 40 0.31 0.5
 undo
-matalfa alfa_reja es 0.3
-propsalfa fila 0.3
+matalphacut alfa_reja es 0.3
+propsalpha row 0.3
 redo
-propsalfa fila arrastre
+propsalpha row drag
 undo
-matalfa alfa_reja es 0.3
+matalphacut alfa_reja es 0.3
 # el rango: lejos a la derecha queda en 1, lejos a la izquierda en 0 (= apagado)
-propsalfa arrastrar 2000
-matalfa alfa_reja es 1
+propsalpha drag 2000
+matalphacut alfa_reja es 1
 undo
-propsalfa arrastrar -2000
-matalfa alfa_reja es 0
+propsalpha drag -2000
+matalphacut alfa_reja es 0
 undo
-matalfa alfa_reja es 0.3
+matalphacut alfa_reja es 0.3
 
 # --- 3) TEXTO: click sin arrastrar + tipear + Enter, con Ctrl+Z
-propsalfa texto 0.75
-matalfa alfa_reja es 0.75
-propsalfa texto 0
-matalfa alfa_reja es 0
+propsalpha text 0.75
+matalphacut alfa_reja es 0.75
+propsalpha text 0
+matalphacut alfa_reja es 0
 undo
-matalfa alfa_reja es 0.75
+matalphacut alfa_reja es 0.75
 undo
-matalfa alfa_reja es 0.3
+matalphacut alfa_reja es 0.3
 redo
-matalfa alfa_reja es 0.75
+matalphacut alfa_reja es 0.75
 # fuera de rango: la fila lo clampea
-propsalfa texto 7
-matalfa alfa_reja es 1
+propsalpha text 7
+matalphacut alfa_reja es 1
 undo
-matalfa alfa_reja es 0.75
-propsalfa fila 0.75
+matalphacut alfa_reja es 0.75
+propsalpha row 0.75
 
 # --- 4) se guarda como "alfaCorte" y vuelve a la fila al reabrir
-guardarw3d /tmp/w3d_prueba_alfa_corte_ui.w3d
-jsontiene /tmp/w3d_prueba_alfa_corte_ui.w3d alfaCorte 1
-abrirw3d /tmp/w3d_prueba_alfa_corte_ui.w3d
+savew3d /tmp/w3d_prueba_alfa_corte_ui.w3d
+jsonhas /tmp/w3d_prueba_alfa_corte_ui.w3d alphaCut 1
+openw3d /tmp/w3d_prueba_alfa_corte_ui.w3d
 loadtex
 selobj prueba_alfa_corte
-matalfa alfa_reja es 0.75
-propsalfa fila 0.75
+matalphacut alfa_reja es 0.75
+propsalpha row 0.75

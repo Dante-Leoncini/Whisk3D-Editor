@@ -4,7 +4,7 @@ For people who program in C or C++ and want the interface without the editor. Yo
 
 - **The Core, with its scene model.** The UI draws with `w3dEngine` and some rows read objects from the scene (`objects/`, `animation/`, `script/`). See [Using the Core directly](../core/empezar.md).
 - **The UI sources.** All the `.cpp` files in `libs/WhiskUI/`. The include directories are `libs/`, for `"WhiskUI/draw/icons.h"`, and the subfolders `widgets/`, `text/`, `draw/`, `theme/` and `core/`, because inside they include each other without the folder (`"icons.h"`, `"card.h"`).
-- **The skin files.** `font.png` (the letters and the card borders), `font-ext.png` (the extended atlas), `skin.ini` (the colors) and, for the new icons, the `atlas/iconos/` folder. They don't come with the library: they're in the editor's repository, in `res/Skins/Whisk3D/`.
+- **The skin files.** `font.png` (the letters and the card borders), `font-ext.png` (the extended atlas), `skin.ini` (the colors) and, for the new icons, the `atlas/icons/` folder. They don't come with the library: they're in the editor's repository, in `res/Skins/Whisk3D/`.
 
 ## Starting up
 
@@ -13,7 +13,7 @@ The same thing the editor does at startup, minus what belongs to it:
 ```cpp
 #include "w3dTexture.h"
 #include "WhiskUI/core/UI.h"
-#include "WhiskUI/theme/colores.h"
+#include "WhiskUI/theme/colors.h"
 #include "WhiskUI/draw/icons.h"
 #include "WhiskUI/widgets/card.h"
 #include "WhiskUI/text/font.h"
@@ -25,23 +25,23 @@ unsigned int atlas = 0; int w = 0, h = 0;
 w3dEngine::LoadTexture("Skins/Whisk3D/font.png", atlas, &w, &h);
 
 CalcCardUV(w, h);          // the rounded edges
-CrearIconos(w, h);         // the icons that are inside font.png
+CreateIcons(w, h);         // the icons that are inside font.png
 W3dFontSetTexSize(w, h);
 SetIconScale(GlobalScale);
 
 WhiskFont = new Font(w, h, atlas);
 WhiskFont->SetScale(GlobalScale);
-WhiskFont->SetAtlasExtendido("Skins/Whisk3D/font-ext.png");   // it's only loaded when needed
+WhiskFont->SetAtlasExtended("Skins/Whisk3D/font-ext.png");   // it's only loaded when needed
 ```
 
-`GlobalScale` starts at 1. For another scale, see [Colors and scale](tema.md). For the separate icons in `atlas/iconos/`, see [Drawing and atlas](dibujo.md).
+`GlobalScale` starts at 1. For another scale, see [Colors and scale](tema.md). For the separate icons in `atlas/icons/`, see [Drawing and atlas](dibujo.md).
 
 Every time the window size changes:
 
 ```cpp
-W3dPantallaAlto = alto;    // to convert the interface's Y to Scissor's and Viewport's
-MenuPantallaW = ancho;     // so the menus don't go off the screen
-MenuPantallaH = alto;
+W3dScreenHeight = height;    // to convert the interface's Y to Scissor's and Viewport's
+MenuScreenW = width;     // so the menus don't go off the screen
+MenuScreenH = height;
 ```
 
 ## The 2D state
@@ -51,9 +51,9 @@ The UI draws in pixels, with Y pointing down and the origin at the top left. Eac
 ```cpp
 namespace gfx = w3dEngine;
 
-gfx::Viewport(0, 0, ancho, alto);
+gfx::Viewport(0, 0, width, height);
 gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
-gfx::Ortho(0, ancho, alto, 0, -1, 1);       // Y pointing down
+gfx::Ortho(0, width, height, 0, -1, 1);       // Y pointing down
 gfx::MatrixMode(gfx::ModelView);  gfx::LoadIdentity();
 gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::CullFace);
 gfx::Disable(gfx::Lighting);  gfx::Disable(gfx::Fog);
@@ -74,31 +74,31 @@ A card with a number, a checkbox and a button. Each row points to a variable of 
 #include "WhiskUI/Propieties/PropFloat.h"
 #include "WhiskUI/Propieties/PropButton.h"
 
-static float volumen = 0.8f;
-static bool  pantallaCompleta = false;
-static void Salir() { /* ... */ }
+static float volume = 0.8f;
+static bool  fullscreen = false;
+static void Exit() { /* ... */ }
 
-GroupPropertie* opciones = new GroupPropertie("Opciones");
+GroupPropertie* options = new GroupPropertie("Opciones");
 
 PropFloat* vol = new PropFloat("Volumen");
-vol->value = &volumen;
-vol->SetRango(0.0f, 1.0f);
-opciones->properties.push_back(vol);
+vol->value = &volume;
+vol->SetRange(0.0f, 1.0f);
+options->properties.push_back(vol);
 
 PropBool* pc = new PropBool("Pantalla completa");
-pc->value = &pantallaCompleta;
-opciones->properties.push_back(pc);
+pc->value = &fullscreen;
+options->properties.push_back(pc);
 
-PropButton* salir = new PropButton("Salir", IconType::borrar);
-salir->action = Salir;
-opciones->properties.push_back(salir);
+PropButton* exit = new PropButton("Salir", IconType::deleteValue);
+exit->action = Exit;
+options->properties.push_back(exit);
 
-opciones->Resize(200 * GlobalScale, 0);    // the card works out the height
+options->Resize(200 * GlobalScale, 0);    // the card works out the height
 
 // every frame, with the 2D state set
 gfx::PushMatrix();
 gfx::Translatef(10, 10, 0);
-opciones->Render();
+options->Render();
 gfx::PopMatrix();
 ```
 
@@ -106,12 +106,12 @@ The UI doesn't read the keyboard or the mouse: you pass them in. With the keyboa
 
 ```cpp
 // down arrow
-if (opciones->editando) opciones->button_down();   // changes the value
-else opciones->NextSelect();                        // the row below
+if (options->editing) options->button_down();   // changes the value
+else options->NextSelect();                        // the row below
 // OK or Enter: on the title it folds the card; on a row, it edits or presses it
-opciones->EnterPropertieSelect();
+options->EnterPropertieSelect();
 // Cancel: leaves the row as it was
-opciones->Cancel();
+options->Cancel();
 ```
 
 With the mouse, you work out the row under the pointer yourself: see [Cards and properties](propiedades.md). Menus do take coordinates: see [Drop-down menus](menus.md).
@@ -120,10 +120,10 @@ With the mouse, you work out the row under the pointer yourself: see [Cards and 
 
 - **It isn't production-ready.** The repository's `README.md` says so, and it's true: it has editor code inside, which is being separated.
 - **There's no example that uses it on its own.** The `ui/` examples in [Whisk3D-Examples](https://github.com/Dante-Leoncini/Whisk3D-Examples) are `.w3dui` interfaces with Lua run by the game runtime: that belongs to the editor. The code on this page is put together with the same calls the editor uses; it doesn't come from a tested example.
-- **Today it doesn't link on its own.** `PropList.cpp` calls `RebindMaterialMeshPart()`, which is in the editor's properties panel. The focus functions in `TextField.h` (`TextFieldEnfocar`, `TextFieldCancelar`, `TextFieldInputChar`, `TextFieldFinDeCuadro`) are defined in the editor, in `main/ui/ViewPorts/NumInput.cpp`.
+- **Today it doesn't link on its own.** `PropList.cpp` calls `RebindMaterialMeshPart()`, which is in the editor's properties panel. The focus functions in `TextField.h` (`TextFieldFocus`, `TextFieldCancel`, `TextFieldInputChar`, `TextFieldFrameEnd`) are defined in the editor, in `main/ui/ViewPorts/NumInput.cpp`.
 - **It depends on the Core's scene model.** `PropertieBase.h` includes `objects/Objects.h`, and the property list reads meshes, armatures, animations and scripts.
 - **The editor recalculates the scale.** `SetGlobalScale` is in `main/ui/ViewPorts/ViewPorts.cpp`. On its own, you have to recalculate the measurements by hand ([Colors and scale](tema.md)).
-- **Everything is global.** There's one font (`WhiskFont`), one icon table (`IconsUV`), one open menu (`MenuAbierto`) and one focused text box (`g_textFieldActivo`) per program.
+- **Everything is global.** There's one font (`WhiskFont`), one icon table (`IconsUV`), one open menu (`OpenMenu`) and one focused text box (`g_activeTextField`) per program.
 - **The headers expose OpenGL types** (`GLfloat`, `GLshort`, `GLuint`), even though they no longer call OpenGL.
 - **What's coming,** according to the `README.md`: cleaning out the code that belongs to the editor and making usage examples.
 

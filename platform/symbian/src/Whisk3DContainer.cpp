@@ -7,7 +7,7 @@
 
 // INCLUDE FILES
 #include <eiklabel.h>
-#include "ViewPorts/Timeline.h"  // DopeNavTecla: el lapiz sobre el timeline navega keyframes
+#include "ViewPorts/Timeline.h"  // DopeNavKey: el lapiz sobre el timeline navega keyframes
 #include <e32math.h>
 
 #include "Whisk3DContainer.h"
@@ -18,28 +18,28 @@
 #include "w3dt9.h"     // entrada de texto multi-tap (T9) del keypad
 #include "w3dnewscene.h"
 #include <GLES/gl.h> // modelo compartido de PC (Fase 3c): init+render
-#include "render/OpcionesRender.h"     // g_redraw (render event-driven)
-#include "objects/Materials.h"         // HayAnimacionActiva / UpdateAnimatedMaterials
-#include "animation/Animation.h"       // PlayAnimation / AnimFPS / AnimTick (avance del play)
-#include "w3dpantallas.h"              // pantallas externas (TV-out / HDMI): deteccion + superficie propia
-#include "ViewPorts/PantallasExternas.h" // ...y su dibujo (el popup y los viewports son del editor)
-#include "w3dGraphics.h"               // g_statCuadro: las llamadas GL del ultimo cuadro en el [PERF]
+#include "render/RenderOptions.h"     // g_redraw (render event-driven)
+#include "objects/Materials.h"        // HasAnimationActive / UpdateAnimatedMaterials
+#include "animation/Animation.h"      // PlayAnimation / AnimFPS / AnimTick (avance del play)
+#include "w3dpantallas.h"             // pantallas externas (TV-out / HDMI): deteccion + superficie propia
+#include "ViewPorts/ExternalScreens.h" // ...y su dibujo (el popup y los viewports son del editor)
+#include "w3dGraphics.h"               // g_statFrame: las llamadas GL del ultimo cuadro en el [PERF]
 #include <string.h>                    // strlen/memcpy: el volcado de capacidades GL
 #include <hal.h>                       // HAL EPen: el telefono es tactil
 #include <math.h>                      // atan2 / asin: el giro del telefono (inclinar)
 #include <stdio.h>                     // sprintf (la captura de diagnostico)
 #include "w3dTexture.h"                // SavePNG (idem)
-#include "input/W3dTactil.h"            // la pantalla tactil (Core): los mismos eventos que SDL en Android
+#include "input/W3dTouch.h"            // la pantalla tactil (Core): los mismos eventos que SDL en Android
 #include "app/variables.h"             // cfg (la barra de herramientas en los tactiles)
-#include "objects/Gamepad.h"           // MandosSymbianTick: los joysticks Bluetooth
-#include "app/W3dRatonEditor.h"        // W3dRatonTick: el mouse Bluetooth (boton del medio emulado)
-#include "input/W3dMandos.h"            // MandosCerrar
-void ControlesTick();                  // (controles.cpp) la pulsacion larga tactil, por reloj
+#include "objects/Gamepad.h"           // GamepadsSymbianTick: los joysticks Bluetooth
+#include "app/W3dMouseEditor.h"        // W3dMouseTick: el mouse Bluetooth (boton del medio emulado)
+#include "input/W3dGamepads.h"            // GamepadsClose
+void ControlsTick();                  // (controls.cpp) la pulsacion larga tactil, por reloj
 bool LayoutToggleEditMode();            // (LayoutInput.cpp) Tab: entrar/salir del modo edicion
-void LayoutCiclarViewportActivo(int dir);
+void LayoutCycleActiveViewport(int dir);
 
-// BARRA DE PROGRESO (export/import OBJ): el hook de swap que faltaba en Symbian. ProgresoIniciar/Actualizar lo
-// llaman para mostrar la barra DURANTE la operacion bloqueante (sin esto, ProgresoIniciar hacia return y la
+// BARRA DE PROGRESO (export/import OBJ): el hook de swap que faltaba en Symbian. ProgressStart/Actualizar lo
+// llaman para mostrar la barra DURANTE la operacion bloqueante (sin esto, ProgressStart hacia return y la
 // barra/notificacion no aparecian en el N95). Guarda los handles EGL del surface activo (seteados en ConstructL).
 extern void (*LayoutSwapBuffers)();
 static EGLDisplay gSwapDisplay = NULL;
@@ -48,81 +48,81 @@ static EGLSurface gSwapSurface = NULL;
 // MIENTRAS UN RENDER LARGO BLOQUEA (la barra de progreso): una espera anidada CORTA deja llegar las teclas pendientes a
 // OfferKeyEventL (la derecha, la C o Escape cancelan; el resto se descarta) y vuelve sola con un CIdle (prioridad
 // minima: corre despues de todo lo pendiente). El DrawCallBack no dibuja mientras haya barra
-static TInt ProgresoParar(TAny* p) { CActiveSchedulerWait* w = (CActiveSchedulerWait*)p; if (w->IsStarted()) w->AsyncStop(); return 0; }
-static void ProgresoSondearSymbian() {
-    static TBool dentro = EFalse;
-    if (dentro) return;
-    dentro = ETrue;
+static TInt ProgressStop(TAny* p) { CActiveSchedulerWait* w = (CActiveSchedulerWait*)p; if (w->IsStarted()) w->AsyncStop(); return 0; }
+static void ProgressPollSymbian() {
+    static TBool inside = EFalse;
+    if (inside) return;
+    inside = ETrue;
     CActiveSchedulerWait* w = new CActiveSchedulerWait;
     CIdle* idle = w ? CIdle::New(CActive::EPriorityIdle) : NULL;
-    if (w && idle) { idle->Start(TCallBack(ProgresoParar, w)); w->Start(); }
+    if (w && idle) { idle->Start(TCallBack(ProgressStop, w)); w->Start(); }
     delete idle; delete w;
-    dentro = EFalse;
+    inside = EFalse;
 }
-static void W3dProgresoSwap() { w3dEngine::DibujarPendiente(); if (gSwapDisplay) eglSwapBuffers(gSwapDisplay, gSwapSurface); }
+static void W3dProgressSwap() { w3dEngine::DrawPending(); if (gSwapDisplay) eglSwapBuffers(gSwapDisplay, gSwapSurface); }
 
-// ---- DIBUJAR FUERA DE LA PANTALLA (render/OpcionesRender.h): un PBUFFER del tamanio mas grande que se haya pedido. En el
+// ---- DIBUJAR FUERA DE LA PANTALLA (render/RenderOptions.h): un PBUFFER del tamanio mas grande que se haya pedido. En el
 //      N95 lo dibujado en la ventana se veia antes del swap: los colores planos del pase de las sombras y las franjas del
 //      render a archivo parpadeaban en pantalla. Anidable: solo el primero cambia de superficie y vuelve a la que habia ----
-static EGLConfig  gFueraCfg = 0;
-static EGLContext gFueraCtx = EGL_NO_CONTEXT;
-static EGLSurface gFueraPb = EGL_NO_SURFACE, gFueraVolver = EGL_NO_SURFACE;
-static TInt gFueraW = 0, gFueraH = 0, gFueraNivel = 0;
-static TBool gFueraSirve = EFalse;
-static bool FueraEmpezar(int w, int h) {
-    if (gFueraNivel > 0) { gFueraNivel++; return true; }
-    if (!gFueraSirve || !gSwapDisplay || w <= 0 || h <= 0) return false;
-    if (gFueraPb == EGL_NO_SURFACE || w > gFueraW || h > gFueraH) {
-        if (gFueraPb != EGL_NO_SURFACE) { eglDestroySurface(gSwapDisplay, gFueraPb); gFueraPb = EGL_NO_SURFACE; }
-        const TInt nw = w > gFueraW ? w : gFueraW, nh = h > gFueraH ? h : gFueraH;
+static EGLConfig  gOutsideCfg = 0;
+static EGLContext gOutsideCtx = EGL_NO_CONTEXT;
+static EGLSurface gOutsidePb = EGL_NO_SURFACE, gOutsideReturn = EGL_NO_SURFACE;
+static TInt gOutsideW = 0, gOutsideH = 0, gOutsideLevel = 0;
+static TBool gOutsideServes = EFalse;
+static bool OutsideBegin(int w, int h) {
+    if (gOutsideLevel > 0) { gOutsideLevel++; return true; }
+    if (!gOutsideServes || !gSwapDisplay || w <= 0 || h <= 0) return false;
+    if (gOutsidePb == EGL_NO_SURFACE || w > gOutsideW || h > gOutsideH) {
+        if (gOutsidePb != EGL_NO_SURFACE) { eglDestroySurface(gSwapDisplay, gOutsidePb); gOutsidePb = EGL_NO_SURFACE; }
+        const TInt nw = w > gOutsideW ? w : gOutsideW, nh = h > gOutsideH ? h : gOutsideH;
         const EGLint at[] = { EGL_WIDTH, nw, EGL_HEIGHT, nh, EGL_NONE };
-        gFueraPb = eglCreatePbufferSurface(gSwapDisplay, gFueraCfg, at);
-        if (gFueraPb == EGL_NO_SURFACE) {
+        gOutsidePb = eglCreatePbufferSurface(gSwapDisplay, gOutsideCfg, at);
+        if (gOutsidePb == EGL_NO_SURFACE) {
             w3dLogf("[fuera] no se pudo crear el pbuffer de %dx%d (0x%x): se dibuja en la ventana", nw, nh, (TInt)eglGetError());
-            gFueraSirve = EFalse; return false;
+            gOutsideServes = EFalse; return false;
         }
-        gFueraW = nw; gFueraH = nh;
+        gOutsideW = nw; gOutsideH = nh;
         w3dLogf("[fuera] pbuffer de %dx%d", nw, nh);
     }
-    w3dEngine::DibujarPendiente();
-    gFueraVolver = eglGetCurrentSurface(EGL_DRAW);
-    if (eglMakeCurrent(gSwapDisplay, gFueraPb, gFueraPb, gFueraCtx) != EGL_TRUE) {
+    w3dEngine::DrawPending();
+    gOutsideReturn = eglGetCurrentSurface(EGL_DRAW);
+    if (eglMakeCurrent(gSwapDisplay, gOutsidePb, gOutsidePb, gOutsideCtx) != EGL_TRUE) {
         w3dLogf("[fuera] eglMakeCurrent al pbuffer fallo (0x%x): se dibuja en la ventana", (TInt)eglGetError());
-        gFueraSirve = EFalse; return false;
+        gOutsideServes = EFalse; return false;
     }
-    gFueraNivel = 1;
+    gOutsideLevel = 1;
     return true;
 }
-static void FueraTerminar() {
-    if (gFueraNivel <= 0) return;
-    if (--gFueraNivel > 0) return;
-    w3dEngine::DibujarPendiente();
-    eglMakeCurrent(gSwapDisplay, gFueraVolver, gFueraVolver, gFueraCtx);
+static void OutsideFinish() {
+    if (gOutsideLevel <= 0) return;
+    if (--gOutsideLevel > 0) return;
+    w3dEngine::DrawPending();
+    eglMakeCurrent(gSwapDisplay, gOutsideReturn, gOutsideReturn, gOutsideCtx);
 }
 
 // ---- LAS TECLAS DE VOLUMEN (w3dvolumen.dll, RemCon): un paso de 10% por toque, con el aviso del porcentaje ----------
-namespace w3dEngine { void VolumenSet(float v); float VolumenGet(); }
-extern void Notificar(const std::string& msg, bool error);
-static void VolumenPaso(int dir) {
-    float v = w3dEngine::VolumenGet() + (dir > 0 ? 0.1f : -0.1f);
+namespace w3dEngine { void VolumeSet(float v); float VolumeGet(); }
+extern void Notify(const std::string& msg, bool error);
+static void VolumeStep(int dir) {
+    float v = w3dEngine::VolumeGet() + (dir > 0 ? 0.1f : -0.1f);
     if (v < 0.0f) v = 0.0f; if (v > 1.0f) v = 1.0f;
-    w3dEngine::VolumenSet(v);
+    w3dEngine::VolumeSet(v);
     char b[48]; sprintf(b, "Volume %d%%", (int)(v * 100.0f + 0.5f));
-    Notificar(b, false);
+    Notify(b, false);
     g_redraw = true;
 }
-static void W3dVolumenTeclasAbrir() {
-    static RLibrary lib; static TBool hecho = EFalse;
-    if (hecho) return;
-    hecho = ETrue;
+static void W3dVolumeKeysOpen() {
+    static RLibrary lib; static TBool done = EFalse;
+    if (done) return;
+    done = ETrue;
     const TInt r = lib.Load(_L("w3dvolumen.dll"));
     if (r != KErrNone) { w3dLogf("[volumen] w3dvolumen.dll no cargo (err %d): sin las teclas de volumen", r); return; }
-    struct Tabla { int version; void* (*Abrir)(void (*)(int)); void (*Cerrar)(void*); };
-    typedef void (*Fn)(Tabla*);
+    struct Table { int version; void* (*Open)(void (*)(int)); void (*Close)(void*); };
+    typedef void (*Fn)(Table*);
     Fn f = (Fn)lib.Lookup(1);
-    Tabla t; Mem::FillZ(&t, sizeof(t));
+    Table t; Mem::FillZ(&t, sizeof(t));
     if (f) f(&t);
-    if (t.version != 1 || !t.Abrir || !t.Abrir(VolumenPaso)) { w3dLog("[volumen] no se pudo escuchar las teclas de volumen"); return; }
+    if (t.version != 1 || !t.Open || !t.Open(VolumeStep)) { w3dLog("[volumen] no se pudo escuchar las teclas de volumen"); return; }
     w3dLog("[volumen] las teclas de volumen del costado manejan el volumen de Whisk3D");
 }
 
@@ -130,10 +130,10 @@ static void W3dVolumenTeclasAbrir() {
 // Para decidir que caminos de render sirven en cada equipo: las extensiones (programas de vertices, paleta de
 // matrices, multi-draw...), los limites, y si eglGetProcAddress encuentra funciones que el driver no anuncia.
 // El log corta cada linea a ~200 caracteres: los textos largos van en tramos.
-static void LogGlLargo(const char* titulo, const char* txt){
-    if (!txt) { w3dLogf("[gl] %s: (nada)", titulo); return; }
+static void LogGlLength(const char* title, const char* txt){
+    if (!txt) { w3dLogf("[gl] %s: (nada)", title); return; }
     const int n = (int)strlen(txt);
-    int i = 0, parte = 1;
+    int i = 0, part = 1;
     while (i < n) {
         int j = i + 150;
         if (j >= n) j = n;
@@ -141,19 +141,19 @@ static void LogGlLargo(const char* titulo, const char* txt){
         char buf[192];
         int len = j - i; if (len > 190) len = 190;
         memcpy(buf, txt + i, len); buf[len] = 0;
-        w3dLogf("[gl] %s %d: %s", titulo, parte++, buf);
+        w3dLogf("[gl] %s %d: %s", title, part++, buf);
         i = j;
         while (i < n && txt[i] == ' ') i++;
     }
 }
-static void VolcarCapacidadesGL(EGLDisplay d){
-    LogGlLargo("GL_VENDOR", (const char*)glGetString(GL_VENDOR));
-    LogGlLargo("GL_RENDERER", (const char*)glGetString(GL_RENDERER));
-    LogGlLargo("GL_VERSION", (const char*)glGetString(GL_VERSION));
-    LogGlLargo("GL_EXTENSIONS", (const char*)glGetString(GL_EXTENSIONS));
-    LogGlLargo("EGL_VENDOR", eglQueryString(d, EGL_VENDOR));
-    LogGlLargo("EGL_VERSION", eglQueryString(d, EGL_VERSION));
-    LogGlLargo("EGL_EXTENSIONS", eglQueryString(d, EGL_EXTENSIONS));
+static void DumpCapacitiesGL(EGLDisplay d){
+    LogGlLength("GL_VENDOR", (const char*)glGetString(GL_VENDOR));
+    LogGlLength("GL_RENDERER", (const char*)glGetString(GL_RENDERER));
+    LogGlLength("GL_VERSION", (const char*)glGetString(GL_VERSION));
+    LogGlLength("GL_EXTENSIONS", (const char*)glGetString(GL_EXTENSIONS));
+    LogGlLength("EGL_VENDOR", eglQueryString(d, EGL_VENDOR));
+    LogGlLength("EGL_VERSION", eglQueryString(d, EGL_VERSION));
+    LogGlLength("EGL_EXTENSIONS", eglQueryString(d, EGL_EXTENSIONS));
     // limites (los de las extensiones por su valor: el SDK puede no traer glext.h)
     struct Lim { GLenum e; const char* n; };
     const Lim lim[] = {
@@ -199,7 +199,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // dibujar. En blanco eran los parpadeos de la barra de progreso (que limpia en negro)
     Window().SetBackgroundColor(KRgbBlack);
     iOpenGlInitialized = EFalse;
-    iSoltarDedos = EFalse;
+    iReleaseFingers = EFalse;
     // Create the input handler
     iInputHandler = CWhisk3DInput::NewL();
 
@@ -310,7 +310,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 #ifdef W3D_GLES2
     // primero una config cuyo swap pueda CONSERVAR el cuadro (EGL_SWAP_BEHAVIOR_PRESERVED_BIT): la pantalla externa en
     // "solo la externa" mueve el cursor sin redibujar 1280x720 de editor. Si el driver no tiene, la de siempre
-    const EGLint attrib_list_conserva[] = {
+    const EGLint attrib_list_keeps[] = {
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT | 0x0400 /*EGL_SWAP_BEHAVIOR_PRESERVED_BIT*/,
         EGL_BUFFER_SIZE,  BufferSize,
         EGL_DEPTH_SIZE,   16,
@@ -336,22 +336,22 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 #ifdef W3D_GLES2
     // (solo para la superficie de la TV: el telefono y el contexto van con la de siempre. Con esta config TODAS las
     // superficies pedian mas memoria grafica y la de 1280x720 de la TV ya no entraba: quedaba a 960x540 con bordes)
-    if ( eglChooseConfig( iEglDisplay, attrib_list_conserva, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
+    if ( eglChooseConfig( iEglDisplay, attrib_list_keeps, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
         numOfConfigs = 0;
     }
     w3dLogf( "EGL: config que conserva el cuadro en el swap: %s", numOfConfigs > 0 ? "SI" : "no" );
-    if ( numOfConfigs > 0 ) W3dPantallasConfigConserva( configList[0] );
+    if ( numOfConfigs > 0 ) W3dScreensConfigKeeps( configList[0] );
     numOfConfigs = 0;
 #endif
     // primero una que sirva para la ventana Y para un PBUFFER (lo que se dibuja para leerlo y no se muestra: ver
-    // FueraEmpezar); si el driver no tiene, la de siempre
+    // OutsideBegin); si el driver no tiene, la de siempre
     {
-        EGLint conPb[sizeof(attrib_list) / sizeof(attrib_list[0])];
-        for (TUint k = 0; k < sizeof(attrib_list) / sizeof(attrib_list[0]); k++) conPb[k] = attrib_list[k];
-        conPb[1] = EGL_WINDOW_BIT | EGL_PBUFFER_BIT;
-        if ( eglChooseConfig( iEglDisplay, conPb, configList, configSize, &numOfConfigs ) == EGL_FALSE ) numOfConfigs = 0;
-        gFueraSirve = (numOfConfigs > 0) ? ETrue : EFalse;
-        w3dLogf( "EGL: config para ventana y pbuffer: %s", gFueraSirve ? "SI" : "no (lo de las sombras se dibuja en la ventana)" );
+        EGLint withPb[sizeof(attrib_list) / sizeof(attrib_list[0])];
+        for (TUint k = 0; k < sizeof(attrib_list) / sizeof(attrib_list[0]); k++) withPb[k] = attrib_list[k];
+        withPb[1] = EGL_WINDOW_BIT | EGL_PBUFFER_BIT;
+        if ( eglChooseConfig( iEglDisplay, withPb, configList, configSize, &numOfConfigs ) == EGL_FALSE ) numOfConfigs = 0;
+        gOutsideServes = (numOfConfigs > 0) ? ETrue : EFalse;
+        w3dLogf( "EGL: config para ventana y pbuffer: %s", gOutsideServes ? "SI" : "no (lo de las sombras se dibuja en la ventana)" );
     }
     if ( numOfConfigs == 0 && eglChooseConfig( iEglDisplay, attrib_list, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
         _LIT( KChooseConfigFailed, "eglChooseConfig failed" );
@@ -384,11 +384,11 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // SIN MEMORIA GRAFICA (EGL_BAD_ALLOC): en Symbian^3 la comparten todas las apps y una que quedo abierta en segundo
     // plano (un juego) puede tenerla tomada; el sistema la libera cerrando apps de fondo. Se reintenta unos segundos
     // antes de rendirse, y queda en el log el porque
-    for ( TInt intento = 0; iEglSurface == NULL && intento < 10; intento++ )
+    for ( TInt attempt = 0; iEglSurface == NULL && attempt < 10; attempt++ )
         {
         const EGLint err = eglGetError();
         w3dLogf( "EGL: eglCreateWindowSurface fallo (0x%x%s), reintento %d", (TInt)err,
-                 err == EGL_BAD_ALLOC ? ": sin memoria grafica, hay otra app abierta?" : "", (TInt)( intento + 1 ) );
+                 err == EGL_BAD_ALLOC ? ": sin memoria grafica, hay otra app abierta?" : "", (TInt)( attempt + 1 ) );
         User::After( 500000 );
         iEglSurface = eglCreateWindowSurface( iEglDisplay, Config, &Window(), NULL );
         }
@@ -400,8 +400,8 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 
     // Create a rendering context
 #ifdef W3D_GLES2
-    const EGLint atributosContexto[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-    iEglContext = eglCreateContext( iEglDisplay, Config, EGL_NO_CONTEXT, atributosContexto );
+    const EGLint attributesContext[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    iEglContext = eglCreateContext( iEglDisplay, Config, EGL_NO_CONTEXT, attributesContext );
 #else
     iEglContext = eglCreateContext( iEglDisplay, Config, EGL_NO_CONTEXT, NULL );
 #endif
@@ -432,10 +432,10 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     gSwapDisplay = iEglDisplay;
     gSwapSurface = iEglSurface;
     // lo que se dibuja para leerlo (las sombras, las franjas del render): en un pbuffer, si la config sirve para eso
-    gFueraCfg = Config; gFueraCtx = iEglContext;
-    if (gFueraSirve) { W3dFueraDePantallaEmpezar = FueraEmpezar; W3dFueraDePantallaTerminar = FueraTerminar; }
-    LayoutSwapBuffers = W3dProgresoSwap;
-    { extern void (*W3dProgresoSondear)(); W3dProgresoSondear = ProgresoSondearSymbian; }   // (Cancelar en la barra)
+    gOutsideCfg = Config; gOutsideCtx = iEglContext;
+    if (gOutsideServes) { W3dOutsideScreenBegin = OutsideBegin; W3dOutsideScreenFinish = OutsideFinish; }
+    LayoutSwapBuffers = W3dProgressSwap;
+    { extern void (*W3dProgressPoll)(); W3dProgressPoll = ProgressPollSymbian; }   // (Cancelar en la barra)
 
 #ifdef W3D_GLES2
     // backend de shaders: compila el uber-shader y arma los VBOs. TIENE que ir antes de AppInit (que ya dibuja
@@ -452,16 +452,16 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // telefono TACTIL (5800, N97, N8...): la barra de herramientas del 3D, como en Android. Con el dedo es la unica
     // forma de aceptar/cancelar un transform (tocar la pantalla lo MUEVE, no lo confirma). El N95 sigue sin ella.
     {
-        TInt lapiz = 0;
-        if (HAL::Get(HALData::EPen, lapiz) == KErrNone && lapiz) {
-            cfg.nuevoUsuario = true;
+        TInt pencil = 0;
+        if (HAL::Get(HALData::EPen, pencil) == KErrNone && pencil) {
+            cfg.newUser = true;
             extern bool g_gizmoOn; g_gizmoOn = true;   // (y el gizmo, como Android: con el dedo se agarra)
         }
     }
 
     iWhisk3D = CWhisk3D::NewL( size.iWidth, size.iHeight, iInputHandler ); // Create an instance of Whisk3D
     iWhisk3D->AppInit();                                       // Initialize OpenGL ES
-    VolcarCapacidadesGL( iEglDisplay );   // (despues de AppInit: ahi arranca el log) que expone este driver
+    DumpCapacitiesGL( iEglDisplay );   // (despues de AppInit: ahi arranca el log) que expone este driver
 
     // Fase 1 unificacion: arbol de viewports compartido (core/ui). Es el
     // equivalente al rootViewport->Resize(winW, winH) del main.cpp de PC:
@@ -471,13 +471,13 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // Fase 3c: raiz del modelo compartido de PC + cubo default (como
     // ConstructUniversal). Su render sale en cada frame del viewport 3D.
     W3dNewSceneInit();
-    { extern void W3dVideoEncSondear(); W3dVideoEncSondear(); }   // (al log: los codificadores de video del telefono)
+    { extern void W3dVideoEncPoll(); W3dVideoEncPoll(); }   // (al log: los codificadores de video del telefono)
     // LAS TECLAS DE VOLUMEN del costado: el volumen de Whisk3D (llegan por RemCon, desde w3dvolumen.dll)
-    W3dVolumenTeclasAbrir();
+    W3dVolumeKeysOpen();
 
     // PANTALLAS EXTERNAS (TV-out RCA, HDMI): al conectarse una, el popup "clonar / nuevo viewport / propiedades".
     // Despues del layout: el popup se centra con el tamano de pantalla que arma W3dLayoutBuild.
-    W3dPantallasInit( iEglDisplay, iEglConfig, iEglContext, iEglSurface );
+    W3dScreensInit( iEglDisplay, iEglConfig, iEglContext, iEglSurface );
 
     // Mouse/teclado bluetooth (HID). hidsrv.dll se carga en runtime: si el
     // telefono no tiene el driver, NewL deja y seguimos sin mouse (por eso
@@ -515,192 +515,201 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 // repeat del telefono es lentisimo (se sentia a 1fps), por eso no se usa.
 static TBool gHeldUp = EFalse, gHeldDown = EFalse, gHeldLeft = EFalse, gHeldRight = EFalse;
 // tecla VERDE mantenida: + flechas = agrandar/achicar el viewport activo.
-// gGreenUsado = se uso como modificador (entonces al soltar NO cicla viewport).
-static TBool gGreenHeld = EFalse, gGreenUsado = EFalse;
+// gUsedGreen = se uso como modificador (entonces al soltar NO cicla viewport).
+static TBool gGreenHeld = EFalse, gUsedGreen = EFalse;
 // EL OK MANTENIDO = el menu CONTEXTUAL (como mantener el dedo en un tactil, o el click derecho de la PC). Sobre algo que
 // tiene menu -una fila de Propiedades, del Outliner o de la Biblioteca, los keyframes del Timeline, el objeto activo en
 // la Vista 3D- el OK no hace nada al bajar: soltarlo enseguida es el OK de siempre (al soltar); mantenerlo, el telefono
 // VIBRA y cuando termina de vibrar sale el menu del elemento con foco. Con el MOUSE VIRTUAL el OK hace su click al bajar
 // (como siempre) y, si se mantiene sin mover el cursor, sale el menu ahi (el click derecho).
-static TBool gOkEsperando = EFalse;   // el OK esta apretado y todavia no se decidio (corto o largo)
-static TBool gOkConMouse = EFalse;    // ...con el mouse virtual (el click ya se hizo)
-static TBool gOkVibrando = EFalse;
-static TBool gOkLargoHecho = EFalse;  // ya salio el menu: soltar el OK no hace nada mas
+static TBool gOkWaiting = EFalse;     // el OK esta apretado y todavia no se decidio (corto o largo)
+static TBool gOkWithMouse = EFalse;   // ...con el mouse virtual (el click ya se hizo)
+static TBool gOkVibrating = EFalse;
+static TBool gOkLongDone = EFalse;  // ya salio el menu: soltar el OK no hace nada mas
 static TUint gOkTick = 0;
 static TInt  gOkMx = 0, gOkMy = 0;    // (con el mouse virtual: donde estaba el cursor)
-static const TUint kOkVibrarMs = 150, kOkLargoMs = 500;   // (los de la pulsacion larga del tactil)
-static TUint OkTicksAMs(TUint t) {
+static const TUint kOkVibrateMs = 150, kOkLongMs = 500;   // (los de la pulsacion larga del tactil)
+static TUint OkTicksToMs(TUint t) {
 #ifdef __WINS__
     return t * 5;   // (el emulador cuenta a 200 Hz)
 #else
     return t;       // (el N95 a 1000 Hz: ms)
 #endif
 }
-extern bool LayoutMenuContextoTecladoPosible();
-extern bool LayoutMenuContextoTeclado();
-extern bool LayoutMenuContextoEn(int mx, int my);
-namespace w3dEngine { void VibrarMs(int ms, float fuerza); }
+extern bool LayoutMenuContextKeyboardPossible();
+extern bool LayoutMenuContextKeyboard();
+extern bool LayoutMenuContextIn(int mx, int my);
+namespace w3dEngine { void VibrateMs(int ms, float force); }
 // (cada cuadro, DrawCallBack): vibra mientras espera y, al cumplirse el tiempo, abre el menu
-static void OkLargoTick() {
-    if (!gOkEsperando) return;
+static void OkLongTick() {
+    if (!gOkWaiting) return;
     extern bool mouseVisible;
     extern GLshort mouseX, mouseY;
     // con el mouse virtual, mover el cursor (un arrastre) lo cancela: queda el click que ya se hizo
-    if (gOkConMouse && (!mouseVisible || mouseX != gOkMx || mouseY != gOkMy)) { gOkEsperando = EFalse; return; }
-    const TUint ms = OkTicksAMs(User::NTickCount() - gOkTick);
-    if (!gOkVibrando && ms >= kOkVibrarMs) {
-        gOkVibrando = ETrue;
-        w3dEngine::VibrarMs((int)(kOkLargoMs - kOkVibrarMs), 0.6f);
+    if (gOkWithMouse && (!mouseVisible || mouseX != gOkMx || mouseY != gOkMy)) { gOkWaiting = EFalse; return; }
+    const TUint ms = OkTicksToMs(User::NTickCount() - gOkTick);
+    if (!gOkVibrating && ms >= kOkVibrateMs) {
+        gOkVibrating = ETrue;
+        w3dEngine::VibrateMs((int)(kOkLongMs - kOkVibrateMs), 0.6f);
     }
-    if (ms < kOkLargoMs) { g_redraw = true; return; }
-    gOkEsperando = EFalse;
-    gOkLargoHecho = ETrue;
-    if (gOkConMouse) {
-        W3dLayoutSoltarViewport(gOkMx, gOkMy);   // (suelta el click del OK antes de abrir el menu)
-        LayoutMenuContextoEn(gOkMx, gOkMy);
+    if (ms < kOkLongMs) { g_redraw = true; return; }
+    gOkWaiting = EFalse;
+    gOkLongDone = ETrue;
+    if (gOkWithMouse) {
+        W3dLayoutReleaseViewport(gOkMx, gOkMy);   // (suelta el click del OK antes de abrir el menu)
+        LayoutMenuContextIn(gOkMx, gOkMy);
     } else {
-        LayoutMenuContextoTeclado();
+        LayoutMenuContextKeyboard();
     }
     g_redraw = true;
 }
 // mouse virtual (w3dmouse.cpp): si esta visible, las flechas/OK del telefono lo manejan
 extern bool mouseVisible;
 extern GLshort mouseX, mouseY; // pos del cursor virtual a nivel de archivo (el OK del loop cut la usa)
-void W3dMouseMoverFlechas(int aDx, int aDy);
+void W3dMouseMoveArrows(int aDx, int aDy);
+// el IMAN con las flechas (main/ui/ViewPorts/LayoutInput.cpp): moviendo con el iman prendido, cada flecha salta al
+// siguiente nivel de la geometria (en vez de deslizar)
+bool SnapByArrows();
+bool SnapStepArrow(int fx, int fy);
 // loop cut modal (LayoutInput.cpp, compartido): el teclado del telefono lo maneja
-bool LoopCutActivo(); void LoopCutTecla(int aDir); void LoopCutClickIzq(int, int); void LoopCutClickDer(); bool LoopCutOrientando(); void LoopCutOrientAplicarElegida();
-// loop select: modal de direccion (desde una cara, via menu Select); arrancado por LayoutLoopSelectActivo
-bool LoopSelOrientando(); void LoopSelTecla(int aDir); void LoopSelConfirm();
+bool LoopCutActive(); void LoopCutKey(int aDir); void LoopCutClickLeft(int, int); void LoopCutClickRight(); bool LoopCutOrienting(); void LoopCutOrientApplyPicked();
+// loop select: modal de direccion (desde una cara, via menu Select); arrancado por LayoutLoopSelectActive
+bool LoopSelOrienting(); void LoopSelKey(int aDir); void LoopSelConfirm();
+// insertar caras / bevel (Pick3D.cpp, compartido): las flechas agrandan / achican, el lapiz escribe el valor exacto,
+// OK confirma y C cancela
+bool InsetActive(); bool InsetKey(int key); void InsetConfirm(); void InsetCancel();
+bool BevelActive(); bool BevelKey(int key); void BevelConfirm(); void BevelCancel();
+static TBool MeshModalActive() { return (InsetActive() || BevelActive()) ? ETrue : EFalse; }
 // pick shortest path guiado (menu Select): el click lo maneja el pick; C cancela el modo
-bool PickPathGuiado(); void LayoutPickPathCancelar();
+bool PickPathGuided(); void LayoutPickPathCancel();
 // Select Linked / Loop Select guiados de 1 click (menu Select): el click lo maneja el pick; C cancela
-bool GuiadoUnClickActivo(); void LayoutGuiadoCancelar();
+bool GuidedUnClickActive(); void LayoutGuidedCancel();
 // navegacion de seleccion en Edit Mode (LayoutInput.cpp): lapiz + flechas del telefono.
 // Devuelven false si no estamos en Edit Mode (-> el caller hace el ciclado de OBJETOS).
-bool EditSelAvanzar(int, bool); bool EditSelTodoToggle(); bool EditSelToggleActual();
+bool EditSelAdvance(int, bool); bool EditSelAllToggle(); bool EditSelToggleCurrent();
 // LAPIZ del N95 (= "shift" del usuario): pulsacion CORTA sin flecha = ciclar al soltar;
 // pulsacion larga = nada; mantener + flecha = navegar la seleccion.
-static TBool gLapizHeld = EFalse, gLapizArrowUsed = EFalse;
+static TBool gPencilHeld = EFalse, gPencilArrowUsed = EFalse;
 // accesor del lapiz (shift) para el codigo compartido: la barra del viewport muestra "copiar"/"pegar" al mantenerlo.
-bool W3dLapizHeld(){ return gLapizHeld ? true : false; }
-static TUint gLapizDownTick = 0;
+bool W3dPencilHeld(){ return gPencilHeld ? true : false; }
+static TUint gPencilDownTick = 0;
 // el lapiz como INTERRUPTOR durante un transform: prendido, los numeros del keypad escriben el valor exacto
-static TBool gNumTeclado = EFalse;
+static TBool gNumKeyboard = EFalse;
 // MANTENER el lapiz durante un transform (sin tipear): INCLINAR EL TELEFONO. Rotando, el angulo girado (como un volante)
-// es el del objeto y la vista lo acompania; moviendo o escalando, cuanto mas inclinado mas rapido. Ver InclinarTick
-static TBool gIncl = EFalse;            // inclinando ahora (el lapiz sigue apretado)
-static TBool gInclBase = EFalse;        // ya llego la primera muestra: el "cero"
-static TBool gInclRollVista = EFalse;   // la vista esta girada (vuelve al terminar el transform)
-static TBool gInclPrendiElSensor = EFalse;
-static float gInclAntRoll = 0.0f;       // el giro de la muestra anterior (para sumar de a pasos, sin el salto de +-180)
-static float gInclAngulo = 0.0f;        // los grados girados desde que se apreto el lapiz
-static float gInclAcum = 0.0f;          // lo girado en las veces anteriores (soltar y volver a mantener sigue de ahi)
-static float gInclPitch0 = 0.0f, gInclRoll0 = 0.0f;
-static float gInclRestoX = 0.0f, gInclRestoY = 0.0f;   // fracciones de pixel (mover/escalar)
-static const TUint kInclMs = 350;       // mantener el lapiz esto sin tipear = inclinar
+// es el del objeto y la vista lo acompania; moviendo o escalando, cuanto mas inclinado mas rapido. Ver TiltTick
+static TBool gTilt = EFalse;           // inclinando ahora (el lapiz sigue apretado)
+static TBool gTiltBase = EFalse;       // ya llego la primera muestra: el "cero"
+static TBool gTiltRollView = EFalse;   // la vista esta girada (vuelve al terminar el transform)
+static TBool gTiltSensorTurnedOn = EFalse;
+static float gTiltAntRoll = 0.0f;       // el giro de la muestra anterior (para sumar de a pasos, sin el salto de +-180)
+static float gTiltAngle = 0.0f;         // los grados girados desde que se apreto el lapiz
+static float gTiltAccum = 0.0f;         // lo girado en las veces anteriores (soltar y volver a mantener sigue de ahi)
+static float gTiltPitch0 = 0.0f, gTiltRoll0 = 0.0f;
+static float gTiltRestX  = 0.0f, gTiltRestY = 0.0f;   // fracciones de pixel (mover/escalar)
+static const TUint kTiltMs = 350;       // mantener el lapiz esto sin tipear = inclinar
 // ---- INCLINAR EL TELEFONO durante un transform (el lapiz mantenido sin tipear) ----
-namespace w3dEngine { void InclinacionPrender(bool); bool InclinacionPrendida(); bool InclinacionLeerTelefono(float&, float&, float&); }
-extern void NumInputFijar(float v);
-extern void W3dVistaRollFijar(float aGrados);
-extern void W3dVistaRollRestaurar();
-extern TBool W3dXformRotaEnVista();
-static float InclGrados(float r) { return r * 57.29578f; }
-static void InclinarTerminar() {   // se solto el lapiz: queda lo hecho (OK confirma, como siempre)
-	if (!gIncl) return;
-	gIncl = EFalse;
-	gInclAcum = gInclAngulo;
-	if (gInclPrendiElSensor) { w3dEngine::InclinacionPrender(EFalse); gInclPrendiElSensor = EFalse; }
+namespace w3dEngine { void TiltTurnOn(bool); bool OnTilt(); bool TiltReadPhone(float&, float&, float&); }
+extern void NumInputSet(float v);
+extern void W3dViewRollSet(float aDegrees);
+extern void W3dViewRollRestore();
+extern TBool W3dXformRotatesInView();
+static float TiltDegrees(float r) { return r * 57.29578f; }
+static void TiltFinish() {   // se solto el lapiz: queda lo hecho (OK confirma, como siempre)
+	if (!gTilt) return;
+	gTilt = EFalse;
+	gTiltAccum = gTiltAngle;
+	if (gTiltSensorTurnedOn) { w3dEngine::TiltTurnOn(EFalse); gTiltSensorTurnedOn = EFalse; }
 }
-static void InclinarTick() {
-	extern bool NumInputActivo();
+static void TiltTick() {
+	extern bool NumInputActive();
 	// termino el transform (OK / cancelar): la vista vuelve a donde estaba y lo girado se olvida
 	if (!W3dNewTransformActive()) {
-		InclinarTerminar();
-		gInclAcum = 0.0f; gInclAngulo = 0.0f;
-		if (gInclRollVista) { W3dVistaRollRestaurar(); gInclRollVista = EFalse; }
+		TiltFinish();
+		gTiltAccum = 0.0f; gTiltAngle = 0.0f;
+		if (gTiltRollView) { W3dViewRollRestore(); gTiltRollView = EFalse; }
 		return;
 	}
 	// arranca: el lapiz mantenido un rato SIN tipear numeros
-	if (!gIncl) {
-		if (!gLapizHeld || gLapizArrowUsed || gNumTeclado) return;
-		if (OkTicksAMs(User::NTickCount() - gLapizDownTick) < kInclMs) return;
-		if (!w3dEngine::InclinacionPrendida()) {
-			w3dEngine::InclinacionPrender(ETrue);
-			if (!w3dEngine::InclinacionPrendida()) { gLapizArrowUsed = ETrue; w3dLog("[inclinar] sin acelerometro"); return; }
-			gInclPrendiElSensor = ETrue;
+	if (!gTilt) {
+		if (!gPencilHeld || gPencilArrowUsed || gNumKeyboard) return;
+		if (OkTicksToMs(User::NTickCount() - gPencilDownTick) < kTiltMs) return;
+		if (!w3dEngine::OnTilt()) {
+			w3dEngine::TiltTurnOn(ETrue);
+			if (!w3dEngine::OnTilt()) { gPencilArrowUsed = ETrue; w3dLog("[inclinar] sin acelerometro"); return; }
+			gTiltSensorTurnedOn = ETrue;
 		}
-		gIncl = ETrue; gInclBase = EFalse; gInclRestoX = gInclRestoY = 0.0f;
-		gLapizArrowUsed = ETrue;   // (soltar el lapiz NO prende el modo de tipear)
+		gTilt = ETrue; gTiltBase = EFalse; gTiltRestX = gTiltRestY = 0.0f;
+		gPencilArrowUsed = ETrue;   // (soltar el lapiz NO prende el modo de tipear)
 		w3dLog("[inclinar] empieza");
 	}
 	g_redraw = ETrue;
 	float x, y, z;
-	if (!w3dEngine::InclinacionLeerTelefono(x, y, z)) return;   // (el sensor tarda un poco en dar la primera)
+	if (!w3dEngine::TiltReadPhone(x, y, z)) return;   // (el sensor tarda un poco en dar la primera)
 	// el giro como un VOLANTE: el angulo de la gravedad en el plano de la pantalla (acostado no se puede medir)
-	const TBool hayGiro = (x * x + y * y) > 0.12f;
-	const float roll = InclGrados((float)atan2(-x, y));
-	const float pitch = InclGrados((float)asin(z < -1.0f ? -1.0f : (z > 1.0f ? 1.0f : z)));
-	if (!gInclBase) {   // el CERO: como estaba el telefono al empezar
-		gInclBase = ETrue; gInclAntRoll = roll; gInclRoll0 = roll; gInclPitch0 = pitch;
-		gInclAngulo = gInclAcum;
+	const TBool hasTurn = (x * x + y * y) > 0.12f;
+	const float roll = TiltDegrees((float)atan2(-x, y));
+	const float pitch = TiltDegrees((float)asin(z < -1.0f ? -1.0f : (z > 1.0f ? 1.0f : z)));
+	if (!gTiltBase) {   // el CERO: como estaba el telefono al empezar
+		gTiltBase = ETrue; gTiltAntRoll = roll; gTiltRoll0 = roll; gTiltPitch0 = pitch;
+		gTiltAngle = gTiltAccum;
 		return;
 	}
-	extern int DopeXformModo(); extern void DopeXformFijarGrados(float); extern void DopeXformTecla(float, float);
-	const int modoDope = DopeXformModo();
-	if (modoDope == 2 || (modoDope == 0 && W3dNewTransformModo() == 2)) {
+	extern int DopeXformMode(); extern void DopeXformSetDegrees(float); extern void DopeXformKey(float, float);
+	const int modeDope = DopeXformMode();
+	if (modeDope == 2 || (modeDope == 0 && W3dNewTransformMode() == 2)) {
 		// ROTAR: el angulo girado ES el del objeto (inclinar 83 grados = rotar 83), sobre el eje de la vista
-		if (hayGiro) {
-			float d = roll - gInclAntRoll;
+		if (hasTurn) {
+			float d = roll - gTiltAntRoll;
 			if (d > 180.0f) d -= 360.0f; else if (d < -180.0f) d += 360.0f;
-			gInclAntRoll = roll;
-			gInclAngulo += d;
+			gTiltAntRoll = roll;
+			gTiltAngle += d;
 		}
-		if (modoDope == 2) { DopeXformFijarGrados(gInclAngulo); return; }   // (keyframes: sin girar la vista)
-		NumInputFijar(gInclAngulo);
+		if (modeDope == 2) { DopeXformSetDegrees(gTiltAngle); return; }   // (keyframes: sin girar la vista)
+		NumInputSet(gTiltAngle);
 		// la VISTA acompania (el telefono girado + la vista girada al reves: la escena se ve derecha)
-		if (W3dXformRotaEnVista()) { W3dVistaRollFijar(gInclAngulo); gInclRollVista = ETrue; }
+		if (W3dXformRotatesInView()) { W3dViewRollSet(gTiltAngle); gTiltRollView = ETrue; }
 		return;
 	}
 	// MOVER / ESCALAR: la inclinacion es la VELOCIDAD (como un joystick): de costado = izq/der, hacia adelante o atras
 	// = arriba/abajo. Una zona muerta de 3 grados; a 30 grados, unos 7 pixeles por cuadro
-	float dr = roll - gInclRoll0, dp = pitch - gInclPitch0;
+	float dr = roll - gTiltRoll0, dp = pitch - gTiltPitch0;
 	if (dr > 180.0f) dr -= 360.0f; else if (dr < -180.0f) dr += 360.0f;
-	if (!hayGiro) dr = 0.0f;
-	const float zona = 3.0f, k = 0.25f;
-	float vx = (dr > zona) ? dr - zona : (dr < -zona ? dr + zona : 0.0f);
-	float vy = (dp > zona) ? dp - zona : (dp < -zona ? dp + zona : 0.0f);
-	gInclRestoX += vx * k; gInclRestoY -= vy * k;   // (la parte de arriba hacia atras = sube)
-	const TInt px = (TInt)gInclRestoX, py = (TInt)gInclRestoY;
-	gInclRestoX -= (float)px; gInclRestoY -= (float)py;
-	if (px || py) { if (modoDope) DopeXformTecla((float)px, (float)py); else W3dNewTransformMove(px, py); }
+	if (!hasTurn) dr = 0.0f;
+	const float zone = 3.0f, k = 0.25f;
+	float vx = (dr > zone) ? dr - zone : (dr < -zone ? dr + zone : 0.0f);
+	float vy = (dp > zone) ? dp - zone : (dp < -zone ? dp + zone : 0.0f);
+	gTiltRestX += vx * k; gTiltRestY -= vy * k;   // (la parte de arriba hacia atras = sube)
+	const TInt px = (TInt)gTiltRestX, py = (TInt)gTiltRestY;
+	gTiltRestX -= (float)px; gTiltRestY -= (float)py;
+	if (px || py) { if (modeDope) DopeXformKey((float)px, (float)py); else W3dNewTransformMove(px, py); }
 }
 
 
-extern bool NumInputActivo();
+extern bool NumInputActive();
 extern void NumInputBegin();
 extern void NumInputReset();
 // MODIFICADORES de camara del keypad (mismo patron que el lapiz): mantener + flecha = accion de camara.
 // 0 = ZOOM (arriba/abajo); tap 0 (sin flecha) = enfocar (como antes). * = PANEO. # = PRIMERA PERSONA (girar).
 static TBool g0Held = EFalse, g0ArrowUsed = EFalse;
 // el SOFTKEY DERECHO: un toque = la barra de herramientas; mantenido = el mouse virtual
-static TBool gSoftDerHeld = EFalse, gSoftDerLargo = EFalse;
-static TBool gPanelPlegadoLibre = EFalse;   // esta tecla: el panel de la ultima operacion esta plegado (no es suya)
-static TUint gSoftDerTick = 0;
-static const TUint kSoftDerLargoMs = 500;
+static TBool gSoftRightHeld = EFalse, gSoftRightLong = EFalse;
+static TBool gCollapsedFreePanel = EFalse;   // esta tecla: el panel de la ultima operacion esta plegado (no es suya)
+static TUint gSoftRightTick = 0;
+static const TUint kSoftRightLongMs = 500;
 static TBool gStarHeld = EFalse;
 static TBool gHashHeld = EFalse, gHashArrowUsed = EFalse; // # + flecha = vista por cuadrante; tap sin flecha = orto/perspectiva
 // C/backspace como MODIFICADOR (mismo patron que el LAPIZ): tap = popup de confirmar borrado al soltar;
 // mantener + flecha IZQ = undo (Ctrl+Z); mantener + flecha DER = redo (Ctrl+Y).
 static TBool gCHeld = EFalse, gCArrowUsed = EFalse;
 // del editor/undo compartido (extern inline para no arrastrar headers pesados en Symbian)
-extern void UndoDeshacer(); extern void UndoRehacer();
-extern void AbrirConfirmarBorrado(bool incluirCollecciones = false); // firma con bool (sino: undefined symbol en ARM)
+extern void UndoUndo(); extern void UndoRedo();
+extern void OpenConfirmDelete(bool includeCollections = false); // firma con bool (sino: undefined symbol en ARM)
 extern bool LayoutDeleteEdit(int mx, int my);
-extern void LayoutMaximizar(); // verde + OK = maximizar/restaurar el viewport activo
+extern void LayoutMaximize(); // verde + OK = maximizar/restaurar el viewport activo
 extern void LayoutExtrudeFaces();      // 7 = Extrude (se protege sola: no-op fuera de Edit Mode)
-extern void LoopCutIniciar(int aMx, int aMy); // 8 = Loop Cut (idem; arranca el modal en el cursor virtual)
-extern void LayoutLoopCutDesdeActivo();       // 8 = Loop Cut sobre el elemento ACTIVO (mismo path que el menu del viewport3d)
-static void AplicarFlechas3D(){
+extern void LoopCutStart(int aMx, int aMy); // 8 = Loop Cut (idem; arranca el modal en el cursor virtual)
+extern void LayoutLoopCutFromActive();      // 8 = Loop Cut sobre el elemento ACTIVO (mismo path que el menu del viewport3d)
+static void ApplyArrows3D(){
 	static TInt gMouseAccel = 0; // rampa del mouse virtual (arranca lento, acelera al mantener)
 	static TInt gIDEAccel = 0;   // rampa del cursor del IDE (idem: delay inicial + aceleracion)
 	TInt dx = 0, dy = 0;
@@ -711,119 +720,124 @@ static void AplicarFlechas3D(){
 	if (dx == 0 && dy == 0) { gMouseAccel = 0; gIDEAccel = 0; return; } // soltaron: la proxima vez arranca lento de nuevo
 	g_redraw = true; // hay flecha mantenida moviendo camara/transform/valor -> redibujar
 	// POPUP activo (color picker): la flecha MANTENIDA ajusta el valor CADA frame (R/G/B/A o circulo/value).
-	// El auto-repeat del N95 es lentisimo (1fps) -> antes habia que tap-tap-tap ~255 veces. TeclaRepeat NO
+	// El auto-repeat del N95 es lentisimo (1fps) -> antes habia que tap-tap-tap ~255 veces. KeyRepeat NO
 	// navega (eso es 1-por-tap), asi que mantener arr/aba/izq/der solo mueve el valor enfocado.
-	{ extern TBool W3dLayoutPopupPlegado(); if (W3dLayoutPopupActivo() && !W3dLayoutPopupPlegado()){   // (plegado: las flechas no son suyas)
-		if (gHeldLeft)  W3dLayoutTeclaRepeat(EStdKeyLeftArrow);
-		if (gHeldRight) W3dLayoutTeclaRepeat(EStdKeyRightArrow);
-		if (gHeldUp)    W3dLayoutTeclaRepeat(EStdKeyUpArrow);
-		if (gHeldDown)  W3dLayoutTeclaRepeat(EStdKeyDownArrow);
+	{ extern TBool W3dLayoutCollapsedPopup(); if (W3dLayoutActivePopup() && !W3dLayoutCollapsedPopup()){   // (plegado: las flechas no son suyas)
+		if (gHeldLeft)  W3dLayoutKeyRepeat(EStdKeyLeftArrow);
+		if (gHeldRight) W3dLayoutKeyRepeat(EStdKeyRightArrow);
+		if (gHeldUp)    W3dLayoutKeyRepeat(EStdKeyUpArrow);
+		if (gHeldDown)  W3dLayoutKeyRepeat(EStdKeyDownArrow);
 		return;
 	} }
 	// (el foco en la barra de herramientas: las flechas son de ella, una por pulsacion)
-	{ extern bool LayoutToolbarFocoActivo(); if (LayoutToolbarFocoActivo()) return; }
+	{ extern bool LayoutToolbarFocusActive(); if (LayoutToolbarFocusActive()) return; }
 	// MOVIENDO KEYFRAMES con * o 0 mantenidos: la VISTA del timeline (paneo / zoom), para ver donde quedan antes del OK
-	if (DopeXformActivo() && (g0Held || gStarHeld)){
+	if (DopeXformActive() && (g0Held || gStarHeld)){
 		if (W3dLayoutTimelineNav(dx, dy, g0Held, gStarHeld)){ if (g0Held) g0ArrowUsed = ETrue; return; }
 	}
 	// VERDE + flechas: agranda/achica el viewport activo (cualquiera, no solo 3D)
 	// ...con el foco en el PANEL DE CURVAS del timeline: el ANCHO del panel (izq/der), no el del viewport
-	{ extern bool TimelinePanelFocoActivo(); extern void TimelinePanelAncho(int);
-	  if (gGreenHeld && TimelinePanelFocoActivo() && dx != 0){ gGreenUsado = ETrue; TimelinePanelAncho(dx); return; } }
+	{ extern bool TimelinePanelFocusActive(); extern void TimelinePanelWidth(int);
+	  if (gGreenHeld && TimelinePanelFocusActive() && dx != 0){ gUsedGreen = ETrue; TimelinePanelWidth(dx); return; } }
 	if (gGreenHeld){
-		W3dLayoutRedimensionarViewport(dx, dy); // un eje (der/abajo agranda childA)
+		W3dLayoutResizeViewport(dx, dy); // un eje (der/abajo agranda childA)
 		return;
 	}
 	// IDE editando: las flechas MANTENIDAS mueven el cursor con aceleracion (delay inicial, despues rapido).
 	// shift(lapiz)+flecha extiende la seleccion. Sin esto el cursor era 1-por-pulsacion (inusable para el codigo).
-	{ extern void W3dLayoutIDEFlecha(int, bool);
-	  if (W3dLayoutIDEEditando()){
+	{ extern void W3dLayoutIDEArrow(int, bool);
+	  if (W3dLayoutIDEEditing()){
 		gIDEAccel++;
-		bool mover;
-		if      (gIDEAccel == 1)   mover = true;                    // primer paso inmediato
-		else if (gIDEAccel < 10)   mover = false;                   // delay inicial (como un teclado)
-		else if (gIDEAccel < 25)   mover = (gIDEAccel % 3 == 0);    // repeticion lenta
-		else                       mover = true;                    // rapido (cada frame)
-		if (mover){
-			TInt pasos = (gIDEAccel > 45) ? 2 : 1;                 // muy rapido: 2 pasos por frame
-			bool shift = gLapizHeld ? true : false;
-			for (TInt p = 0; p < pasos; p++){
-				if (gHeldLeft)  W3dLayoutIDEFlecha(EStdKeyLeftArrow, shift);
-				if (gHeldRight) W3dLayoutIDEFlecha(EStdKeyRightArrow, shift);
-				if (gHeldUp)    W3dLayoutIDEFlecha(EStdKeyUpArrow, shift);
-				if (gHeldDown)  W3dLayoutIDEFlecha(EStdKeyDownArrow, shift);
+		bool move;
+		if      (gIDEAccel == 1)   move = true;                    // primer paso inmediato
+		else if (gIDEAccel < 10)   move = false;                   // delay inicial (como un teclado)
+		else if (gIDEAccel < 25)   move = (gIDEAccel % 3 == 0);    // repeticion lenta
+		else                       move = true;                    // rapido (cada frame)
+		if (move){
+			TInt steps = (gIDEAccel > 45) ? 2 : 1;                 // muy rapido: 2 pasos por frame
+			bool shift = gPencilHeld ? true : false;
+			for (TInt p = 0; p < steps; p++){
+				if (gHeldLeft)  W3dLayoutIDEArrow(EStdKeyLeftArrow, shift);
+				if (gHeldRight) W3dLayoutIDEArrow(EStdKeyRightArrow, shift);
+				if (gHeldUp)    W3dLayoutIDEArrow(EStdKeyUpArrow, shift);
+				if (gHeldDown)  W3dLayoutIDEArrow(EStdKeyDownArrow, shift);
 			}
 		}
 		return;
 	  }
 	}
 	// CONSOLA: las flechas MANTENIDAS scrollean con aceleracion (comparte la rampa gIDEAccel: solo una activa a la vez)
-	{ extern bool W3dLayoutConsolaActivo(); extern void W3dLayoutConsolaScroll(int, int);
-	  if (W3dLayoutConsolaActivo()){
+	{ extern bool W3dLayoutActiveConsole(); extern void W3dLayoutConsoleScroll(int, int);
+	  if (W3dLayoutActiveConsole()){
 		gIDEAccel++;
-		bool mover;
-		if      (gIDEAccel == 1)   mover = true;
-		else if (gIDEAccel < 10)   mover = false;
-		else if (gIDEAccel < 25)   mover = (gIDEAccel % 3 == 0);
-		else                       mover = true;
-		if (mover){
-			TInt pasos = (gIDEAccel > 45) ? 2 : 1;
-			for (TInt p = 0; p < pasos; p++) W3dLayoutConsolaScroll(dx, dy);
+		bool move;
+		if      (gIDEAccel == 1)   move = true;
+		else if (gIDEAccel < 10)   move = false;
+		else if (gIDEAccel < 25)   move = (gIDEAccel % 3 == 0);
+		else                       move = true;
+		if (move){
+			TInt steps = (gIDEAccel > 45) ? 2 : 1;
+			for (TInt p = 0; p < steps; p++) W3dLayoutConsoleScroll(dx, dy);
 		}
 		return;
 	  }
 	}
 	// MOUSE VIRTUAL visible: las flechas mueven el CURSOR como un mouse (no la camara).
-	// Durante un transform 3D/de malla NO: ahi las flechas mueven la seleccion. El de KEYFRAMES es al reves: lo
-	// maneja el CURSOR (event_mouse_motion -> DopeMoveApply, el mismo camino que arrastrar con el mouse en PC), asi
-	// que ahi las flechas tienen que seguir moviendolo o el transform no se puede manejar con nada.
+	// TAMBIEN durante un transform 3D/de malla (pedido Dante): se mantiene el softkey derecho para que salga el cursor
+	// y las flechas lo llevan hasta que aparece el cuadrado del IMAN debajo (el transform sigue al cursor, como el mouse
+	// en la PC, y el iman busca bajo el); OK confirma. Sin el cursor, las flechas mueven la seleccion (mas abajo). El de
+	// KEYFRAMES lo maneja el CURSOR igual (event_mouse_motion -> DopeMoveApply, el mismo camino que arrastrar con el
+	// mouse en PC), asi que ahi las flechas tienen que seguir moviendolo o el transform no se puede manejar con nada.
 	// UNA TIRA DE SONIDO agarrada (el 1): izq/der la corren o recortan la punta elegida con el lapiz (lento y acelera)
-	{ extern bool TimelineTiraActiva(); extern void TimelineTiraTecla(float);
-	  if (TimelineTiraActiva() && !mouseVisible){
+	{ extern bool TimelineStripActive(); extern void TimelineStripKey(float);
+	  if (TimelineStripActive() && !mouseVisible){
 		float t = (float)gMouseAccel / 45.0f; if (t > 1.0f) t = 1.0f;
 		const float f = 3.0f * (0.25f + 2.25f * t * t);
 		gMouseAccel++;
-		if (dx) TimelineTiraTecla((float)dx * f);
+		if (dx) TimelineStripKey((float)dx * f);
 		return;
 	  } }
 	// KEYFRAMES sin el cursor: las flechas los mueven / escalan / rotan directo (arranca lento y acelera)
-	if (DopeXformActivo() && !mouseVisible){
-		extern void DopeXformTecla(float, float);
+	if (DopeXformActive() && !mouseVisible){
+		extern void DopeXformKey(float, float);
 		float t = (float)gMouseAccel / 45.0f; if (t > 1.0f) t = 1.0f;
 		const float f = 4.0f * (0.25f + 2.25f * t * t);
 		gMouseAccel++;
-		DopeXformTecla((float)dx * f, (float)dy * f);
+		DopeXformKey((float)dx * f, (float)dy * f);
 		return;
 	}
-	if ((mouseVisible && !W3dNewTransformActive()) || DopeXformActivo()){   // (keyframes: aunque el cursor este oculto)
+	if (mouseVisible || DopeXformActive()){   // (keyframes: aunque el cursor este oculto)
 		// arranca LENTO (2px/frame) y acelera al mantener (hasta 9px) -> control fino al inicio, rapido al cruzar
 		int spd = (gMouseAccel < 6) ? 2 : (gMouseAccel < 14) ? 4 : (gMouseAccel < 24) ? 6 : 9;
 		gMouseAccel++;
-		W3dMouseMoverFlechas(dx * spd, dy * spd);
+		W3dMouseMoveArrows(dx * spd, dy * spd);
 		return;
 	}
 	// EDITOR UV activo (sin mouse): flechas MANTENIDAS = paneo CONSTANTE suave; 0 + arriba/abajo = ZOOM.
 	if (W3dLayoutUVNav(dx, dy, g0Held)){ if (g0Held) g0ArrowUsed = ETrue; return; }
 	// TIMELINE activo (sin mouse): izq/der = mover el frame (scrub); 0 + arriba/abajo = zoom; * + flechas = paneo.
 	if (W3dLayoutTimelineNav(dx, dy, g0Held, gStarHeld)){ if (g0Held) g0ArrowUsed = ETrue; return; }
-	if (!W3dLayout3DActivo()) return;
+	if (!W3dLayout3DActive()) return;
 	// MODIFICADORES de camara del keypad (mantener tecla + flechas), prioridad sobre orbit/transform:
 	if (g0Held){ if (dy != 0) W3dNewZoom(-dy); g0ArrowUsed = ETrue; return; }   // 0 + arriba/abajo = ZOOM
 	if (gStarHeld){ W3dNewPan(dx * 8, dy * 8); return; }                        // * + flechas = PANEO
 	// # + flechas = VISTAS POR CUADRANTE: lo aplica el KEY-DOWN (una por pulsacion). Aca no va nada: esto corre
 	// cada frame y te haria girar la vista sin control.
 	if (W3dNewTransformActive()){
+		// con el IMAN prendido, moviendo: las flechas SALTAN de a un nivel, una por pulsacion (en el key-down:
+		// SnapStepArrow). Mantenida no desliza
+		if (SnapByArrows()) return;
 		// mover: paso fino; rotar/escalar: el DOBLE (se sentian lentos). MANTENIDA arranca LENTO (un cuarto: preciso) y
 		// va ACELERANDO hasta 2.5 veces en ~1.5 s (cruzar la pantalla sin esperar). Fracciones de pixel acumuladas
-		static float sRestoX = 0.0f, sRestoY = 0.0f;
-		if (gMouseAccel == 0) { sRestoX = 0.0f; sRestoY = 0.0f; }
-		const float d = (W3dNewTransformModo() == 1) ? 4.0f : 8.0f;
+		static float sRestX = 0.0f, sRestY = 0.0f;
+		if (gMouseAccel == 0) { sRestX = 0.0f; sRestY = 0.0f; }
+		const float d = (W3dNewTransformMode() == 1) ? 4.0f : 8.0f;
 		float t = (float)gMouseAccel / 45.0f; if (t > 1.0f) t = 1.0f;
 		const float f = d * (0.25f + 2.25f * t * t);
 		gMouseAccel++;
-		sRestoX += (float)dx * f; sRestoY += (float)dy * f;
-		const TInt px = (TInt)sRestoX, py = (TInt)sRestoY;
-		sRestoX -= (float)px; sRestoY -= (float)py;
+		sRestX += (float)dx * f; sRestY += (float)dy * f;
+		const TInt px = (TInt)sRestX, py = (TInt)sRestY;
+		sRestX -= (float)px; sRestY -= (float)py;
 		if (px || py) W3dNewTransformMove(px, py);
 	} else {
 		const TInt o = 8;          // orbita suave por frame
@@ -834,17 +848,17 @@ static void AplicarFlechas3D(){
 // MODO JUEGO: mapea el scancode del keypad del N95 al nombre de tecla que leen los scripts lua
 // (tecla/teclaApretada/stick). El D-pad navega el menu y mueve la pala (1 jugador usa arriba/abajo);
 // el centro (select) se trata aparte como enter+espacio. 0 = no es tecla de juego (sigue al editor).
-static const char* W3dJuegoNombreTecla(TInt sc){
+static const char* W3dGameKeyName(TInt sc){
 	switch (sc){
-		case EStdKeyUpArrow:    return "arriba";
-		case EStdKeyDownArrow:  return "abajo";
-		case EStdKeyLeftArrow:  return "izquierda";
-		case EStdKeyRightArrow: return "derecha";
+		case EStdKeyUpArrow:    return "up";
+		case EStdKeyDownArrow:  return "down";
+		case EStdKeyLeftArrow:  return "left";
+		case EStdKeyRightArrow: return "right";
 		case EStdKeyDevice3:    // centro del D-pad (select)
 		case EStdKeyEnter:      return "enter";
 		case 164:               return "softizq"; // softkey IZQUIERDO: reservado para juegos (solo dentro de un viewport de juego)
 		case 165:               return "softder"; // softkey DERECHO: idem (en pausa sigue alternando el cursor virtual)
-		case '1':               return "1";       // digitos del keypad: van al juego durante el play (tecla("1").."tecla("6"))
+		case '1':               return "1";       // digitos del keypad: van al juego durante el play (key("1").."key("6"))
 		case '2':               return "2";
 		case '3':               return "3";
 		case '4':               return "4";       // 4/5/6 tambien son del juego (armas del demo GTA:
@@ -854,21 +868,21 @@ static const char* W3dJuegoNombreTecla(TInt sc){
 	}
 	// las LETRAS de un teclado QWERTY (E71, E72, N97...): el jugador 2 de la pantalla dividida juega con ellas.
 	// (El scancode de una letra es su mayuscula ASCII; el script las lee en minuscula, como en la PC)
-	static const char* const kLetras[26] = { "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q",
+	static const char* const kLetters[26] = { "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q",
 	                                         "r","s","t","u","v","w","x","y","z" };
-	if (sc >= 'A' && sc <= 'Z') return kLetras[sc - 'A'];
+	if (sc >= 'A' && sc <= 'Z') return kLetters[sc - 'A'];
 	return 0;
 }
 
 TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEventCode aType ){
 	// EEventKey (auto-repeat) se ignora: las flechas mantenidas las aplica el
-	// loop de frame (gHeld* + AplicarFlechas3D), no el repeat lento del telefono.
+	// loop de frame (gHeld* + ApplyArrows3D), no el repeat lento del telefono.
 	if (aType == EEventKey) return EKeyWasConsumed;
 	// UN RENDER EN CURSO (la barra de progreso): la tecla derecha, la C o Escape lo cancelan; nada mas se atiende
-	{ extern bool ProgresoActivo(); extern void ProgresoCancelar();
-	  if (ProgresoActivo()) {
+	{ extern bool ProgressActive(); extern void ProgressCancel();
+	  if (ProgressActive()) {
 		const TInt sc0 = aKeyEvent.iScanCode;
-		if (aType == EEventKeyDown && (sc0 == EStdKeyDevice1 || sc0 == EStdKeyBackspace || sc0 == EStdKeyEscape)) ProgresoCancelar();
+		if (aType == EEventKeyDown && (sc0 == EStdKeyDevice1 || sc0 == EStdKeyBackspace || sc0 == EStdKeyEscape)) ProgressCancel();
 		return EKeyWasConsumed;
 	  } }
 	g_redraw = true; // cualquier tecla del telefono (down/up) -> redibujar
@@ -884,29 +898,29 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// TAB (teclado Bluetooth que el sistema entrega como tecla normal): como en la PC, con una malla activa
 			// entra/sale del modo edicion; si no, cicla el viewport activo
 			if (sc == EStdKeyTab){
-				if (!LayoutToggleEditMode()) LayoutCiclarViewportActivo(+1);
+				if (!LayoutToggleEditMode()) LayoutCycleActiveViewport(+1);
 				return EKeyWasConsumed;
 			}
 			// VERDE + '0' = MODO JUEGO PURO (pedido del dueno): el 3D del juego a
 			// pantalla completa y CERO editor (menu/headers/overlays/estadisticas),
-			// para medir el rendimiento REAL. Re-apretar restaura todo. gGreenUsado
+			// para medir el rendimiento REAL. Re-apretar restaura todo. gUsedGreen
 			// evita que al soltar la VERDE se cicle el viewport (mismo patron que
 			// VERDE+OK y VERDE+flecha).
 			if (gGreenHeld && sc == '0'){
-				gGreenUsado = ETrue;
-				extern void LayoutJuegoPuroToggle();
-				LayoutJuegoPuroToggle();
+				gUsedGreen = ETrue;
+				extern void LayoutPureGameToggle();
+				LayoutPureGameToggle();
 				return EKeyWasConsumed;
 			}
 			// MODO JUEGO: el D-pad + select van DIRECTO a los scripts (tecla/teclaApretada), con prioridad
 			// sobre el ruteo del editor (que se come las flechas para orbita/cursor). Sin esto el juego cargaba
 			// pero no respondia a nada en el N95. Cede a popup/menu abiertos (escotilla: softkeys siguen libres).
-			if (AnimEsJuego && PlayAnimation && !gGreenHeld && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
-				const char* jn = W3dJuegoNombreTecla(sc);
+			if (AnimIsGame && PlayAnimation && !gGreenHeld && W3dLayoutGameActiveViewport() && !W3dLayoutActivePopup() && !W3dLayoutOpenMenu()){
+				const char* jn = W3dGameKeyName(sc);
 				if (jn){
-					extern void W3dScriptTecla(const char*, bool);
-					W3dScriptTecla(jn, true);
-					if (sc == EStdKeyDevice3 || sc == EStdKeyEnter) W3dScriptTecla("espacio", true); // select cuenta como enter Y espacio
+					extern void W3dScriptKey(const char*, bool);
+					W3dScriptKey(jn, true);
+					if (sc == EStdKeyDevice3 || sc == EStdKeyEnter) W3dScriptKey("space", true); // select cuenta como enter Y espacio
 					return EKeyWasConsumed;
 				}
 				// 7/8/9/0/*/# SON DEL JUEGO mientras corre (pedido del dueno: el 8
@@ -916,8 +930,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				if (sc == '7' || sc == '8' || sc == '9' || sc == '0' ||
 				    sc == '*' || sc == EStdKeyHash){
 					char jnom[2]; jnom[0] = (char)(sc == EStdKeyHash ? '#' : sc); jnom[1] = 0;
-					extern void W3dScriptTecla(const char*, bool);
-					W3dScriptTecla(jnom, true);
+					extern void W3dScriptKey(const char*, bool);
+					W3dScriptKey(jnom, true);
 					return EKeyWasConsumed;
 				}
 			}
@@ -935,33 +949,33 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// camino de siempre (antes se tragaba todo: apretabas algo y no pasaba nada). El LAPIZ lo despliega para
 			// editarlo (ahi las flechas / OK / C son de el) y otro lapiz lo vuelve a plegar. Con el dedo o el mouse, un toque
 			// en el panel, como siempre
-			{ extern TBool W3dLayoutPopupSemimodal(); extern TBool W3dLayoutPopupPlegado(); extern TBool W3dLayoutPopupPlegarToggle();
-			  if (W3dLayoutPopupSemimodal() && !W3dT9Activo() && !W3dLayoutMenuAbierto()){
-				if ((sc == EStdKeyLeftShift || sc == EStdKeyRightShift) && W3dLayoutPopupPlegarToggle()) return EKeyWasConsumed;
-				if (W3dLayoutPopupPlegado()) gPanelPlegadoLibre = ETrue;   // (la tecla NO va al panel: sigue abajo)
+			{ extern TBool W3dLayoutPopupSemimodal(); extern TBool W3dLayoutCollapsedPopup(); extern TBool W3dLayoutPopupCollapseToggle();
+			  if (W3dLayoutPopupSemimodal() && !W3dT9Active() && !W3dLayoutOpenMenu()){
+				if ((sc == EStdKeyLeftShift || sc == EStdKeyRightShift) && W3dLayoutPopupCollapseToggle()) return EKeyWasConsumed;
+				if (W3dLayoutCollapsedPopup()) gCollapsedFreePanel = ETrue;   // (la tecla NO va al panel: sigue abajo)
 			  }
 			}
-			extern bool SimbolosActivo();
-			const TBool panelLibre = gPanelPlegadoLibre; gPanelPlegadoLibre = EFalse;
-			if ((W3dLayoutPopupActivo() && !panelLibre && (!W3dT9Activo() || SimbolosActivo())) || W3dLayoutMenuAbierto()){
+			extern bool SymbolsActive();
+			const TBool freePanel = gCollapsedFreePanel; gCollapsedFreePanel = EFalse;
+			if ((W3dLayoutActivePopup() && !freePanel && (!W3dT9Active() || SymbolsActive())) || W3dLayoutOpenMenu()){
 				extern GLshort mouseX; extern GLshort mouseY;
 				// soft DER (165) sobre un MENU desplegable (no un popup modal) -> lo CIERRA, igual que el soft
 				// IZQ. (En un popup -ej color picker- 165 sigue siendo Aceptar/OK.) Pedido Dante.
-				if (sc == 165 && W3dLayoutMenuAbierto() && !W3dLayoutPopupActivo()){
-					W3dLayoutTecla(164, mouseX, mouseY); // 164 = Cancel = cierra el menu
+				if (sc == 165 && W3dLayoutOpenMenu() && !W3dLayoutActivePopup()){
+					W3dLayoutKey(164, mouseX, mouseY); // 164 = Cancel = cierra el menu
 					return EKeyWasConsumed;
 				}
-				// POPUP (no menu): marca la flecha MANTENIDA -> AplicarFlechas3D la REPITE cada frame para
+				// POPUP (no menu): marca la flecha MANTENIDA -> ApplyArrows3D la REPITE cada frame para
 				// ajustar el valor (color picker R/G/B/A o circulo/value). El 1er press de abajo navega/ajusta.
-				if (W3dLayoutPopupActivo()){
+				if (W3dLayoutActivePopup()){
 					if (sc == EStdKeyLeftArrow)       gHeldLeft = ETrue;
 					else if (sc == EStdKeyRightArrow) gHeldRight = ETrue;
 					else if (sc == EStdKeyUpArrow)    gHeldUp = ETrue;
 					else if (sc == EStdKeyDownArrow)  gHeldDown = ETrue;
 				}
 				// '*' cierra el selector de simbolos (otra forma de salir sin elegir nada)
-				if (sc == '*'){ extern bool SimbolosActivo(); extern void SimbolosCerrar(); if (SimbolosActivo()){ SimbolosCerrar(); return EKeyWasConsumed; } }
-				W3dLayoutTecla(sc, mouseX, mouseY);
+				if (sc == '*'){ extern bool SymbolsActive(); extern void SymbolsClose(); if (SymbolsActive()){ SymbolsClose(); return EKeyWasConsumed; } }
+				W3dLayoutKey(sc, mouseX, mouseY);
 				return EKeyWasConsumed; // modal: traga el resto tambien
 			}
 			// EDICION NUMERICA por texto en curso (un PropFloat en Propiedades): el keypad ESCRIBE el valor.
@@ -973,15 +987,15 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// '*' = punto decimal en numerico (los simbolos en texto vienen en la etapa 2). izq/der mueven el
 			// caret, C borra, OK confirma y sale, soft-IZQ(164) cancela.
 			// VERDE (resize/ciclar viewport) y LAPIZ (shift para seleccionar/copiar/pegar) NO los toma el T9: se dejan
-			// pasar a sus handlers de abajo (gGreenHeld/gLapizHeld) asi andan mientras se edita texto. El bug era que
-			// el T9 se los comia -> ni resize, ni copiar/pegar, ni seleccion (gLapizHeld nunca se seteaba).
-			if (W3dT9Activo() && sc != EStdKeyYes && sc != EStdKeyLeftShift && sc != EStdKeyRightShift){
+			// pasar a sus handlers de abajo (gGreenHeld/gPencilHeld) asi andan mientras se edita texto. El bug era que
+			// el T9 se los comia -> ni resize, ni copiar/pegar, ni seleccion (gPencilHeld nunca se seteaba).
+			if (W3dT9Active() && sc != EStdKeyYes && sc != EStdKeyLeftShift && sc != EStdKeyRightShift){
 				// IDE editando codigo: el T9 escribe en el editor de scripts (no en un TextField). Flechas = cursor,
 				// OK = nueva linea, C = backspace, soft-izq = salir a la barra (script/save/refresh).
-				if (W3dLayoutIDEEditando()){
-					if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Tecla(sc, ETrue); return EKeyWasConsumed; }
-					if (sc == EStdKeyBackspace){ W3dT9Reset(); W3dLayoutIDEBorrar(); return EKeyWasConsumed; }
-					// las flechas se MANTIENEN (gHeld*) y AplicarFlechas3D mueve el cursor cada frame con aceleracion
+				if (W3dLayoutIDEEditing()){
+					if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Key(sc, ETrue); return EKeyWasConsumed; }
+					if (sc == EStdKeyBackspace){ W3dT9Reset(); W3dLayoutIDEDelete(); return EKeyWasConsumed; }
+					// las flechas se MANTIENEN (gHeld*) y ApplyArrows3D mueve el cursor cada frame con aceleracion
 					// (arranca lento, acelera). shift(lapiz)+flecha selecciona. Single-tap = 1 movimiento.
 					if (sc == EStdKeyLeftArrow){  W3dT9Reset(); gHeldLeft = ETrue;  return EKeyWasConsumed; }
 					if (sc == EStdKeyRightArrow){ W3dT9Reset(); gHeldRight = ETrue; return EKeyWasConsumed; }
@@ -989,52 +1003,52 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					if (sc == EStdKeyDownArrow){  W3dT9Reset(); gHeldDown = ETrue;  return EKeyWasConsumed; }
 					if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dT9Reset(); W3dLayoutIDEEnter(); return EKeyWasConsumed; }
 					// shift(lapiz) + softkey: izquierda = COPIAR la seleccion, derecha = PEGAR (portapapeles del sistema)
-					if (gLapizHeld && sc == 164){ W3dT9Reset(); W3dLayoutIDECopiar(); return EKeyWasConsumed; }
-					if (gLapizHeld && sc == 165){ W3dT9Reset(); W3dLayoutIDEPegar();  return EKeyWasConsumed; }
-					if (sc == 164){ W3dT9Reset(); W3dLayoutIDESalirEdicion(); return EKeyWasConsumed; }
-					if (sc == '*'){ W3dT9Reset(); { extern void SimbolosAbrir(); SimbolosAbrir(); } return EKeyWasConsumed; } // selector de simbolos
+					if (gPencilHeld && sc == 164){ W3dT9Reset(); W3dLayoutIDECopy(); return EKeyWasConsumed; }
+					if (gPencilHeld && sc == 165){ W3dT9Reset(); W3dLayoutIDEPaste();  return EKeyWasConsumed; }
+					if (sc == 164){ W3dT9Reset(); W3dLayoutIDEExitEdit(); return EKeyWasConsumed; }
+					if (sc == '*'){ W3dT9Reset(); { extern void SymbolsOpen(); SymbolsOpen(); } return EKeyWasConsumed; } // selector de simbolos
 					return EKeyWasConsumed; // el resto se consume: no toca la escena
 				}
-				if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Tecla(sc, ETrue); return EKeyWasConsumed; }
+				if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Key(sc, ETrue); return EKeyWasConsumed; }
 				if (sc == EStdKeyBackspace){ W3dT9Reset(); W3dTextFieldChar(8); return EKeyWasConsumed; }
-				if (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){ W3dT9Reset(); W3dLayoutTeclaPanel(sc); return EKeyWasConsumed; }
-				if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dT9Reset(); W3dLayoutTeclaPanel(EStdKeyDevice3); return EKeyWasConsumed; }
-				if (sc == 164){ W3dT9Reset(); W3dLayoutTeclaPanel(EStdKeyEscape); return EKeyWasConsumed; } // soft-IZQ = cancelar
-				if (sc == '*'){ if (W3dNumEditActivo()){ W3dT9Reset(); W3dTextFieldChar('.'); } else { W3dT9Reset(); { extern void SimbolosAbrir(); SimbolosAbrir(); } } return EKeyWasConsumed; } // '.' en numerico; selector de simbolos en texto
+				if (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){ W3dT9Reset(); W3dLayoutKeyPanel(sc); return EKeyWasConsumed; }
+				if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dT9Reset(); W3dLayoutKeyPanel(EStdKeyDevice3); return EKeyWasConsumed; }
+				if (sc == 164){ W3dT9Reset(); W3dLayoutKeyPanel(EStdKeyEscape); return EKeyWasConsumed; } // soft-IZQ = cancelar
+				if (sc == '*'){ if (W3dActiveNumEdit()){ W3dT9Reset(); W3dTextFieldChar('.'); } else { W3dT9Reset(); { extern void SymbolsOpen(); SymbolsOpen(); } } return EKeyWasConsumed; } // '.' en numerico; selector de simbolos en texto
 				return EKeyWasConsumed; // mientras se edita, ninguna otra tecla toca la escena
 			}
-			// FOCO EN EL PANEL DE CURVAS del timeline: flechas y OK lo navegan (W3dLayoutTeclaPanel), el 2 oculta / muestra
+			// FOCO EN EL PANEL DE CURVAS del timeline: flechas y OK lo navegan (W3dLayoutKeyPanel), el 2 oculta / muestra
 			// la curva; la C sigue de largo (borra lo elegido) y el 0 tambien (encuadra)
-			{ extern bool TimelinePanelFocoActivo();
-			  if (TimelinePanelFocoActivo() && !g0Held && !gStarHeld && !gGreenHeld && !gLapizHeld){
+			{ extern bool TimelinePanelFocusActive();
+			  if (TimelinePanelFocusActive() && !g0Held && !gStarHeld && !gGreenHeld && !gPencilHeld){
 				if (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow || sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow ||
 				    sc == EStdKeyDevice3 || sc == EStdKeyEnter){
-					W3dLayoutTeclaPanel(sc); return EKeyWasConsumed;
+					W3dLayoutKeyPanel(sc); return EKeyWasConsumed;
 				}
-				if (sc == '2'){ extern void TimelinePanelOjo(); TimelinePanelOjo(); return EKeyWasConsumed; }
+				if (sc == '2'){ extern void TimelinePanelEye(); TimelinePanelEye(); return EKeyWasConsumed; }
 			  } }
 			// FOCO EN LA BARRA DE HERRAMIENTAS (softkey derecho): flechas / OK / C son de ella
-			{ extern TBool W3dLayoutToolbarTecla(TInt aScan);
-			  if (sc != 164 && sc != 165 && W3dLayoutToolbarTecla(sc)) return EKeyWasConsumed; }
+			{ extern TBool W3dLayoutToolbarKey(TInt aScan);
+			  if (sc != 164 && sc != 165 && W3dLayoutToolbarKey(sc)) return EKeyWasConsumed; }
 			// soft IZQ: VERDE + izquierda = PAUSA el juego (combo DELIBERADO). El softkey SOLO no pausa: seria un
 			// desastre por inercia (salis de un menu en el timeline y pausas sin querer). En un viewport de juego la
-			// izquierda va al juego (W3dJuegoNombreTecla, se captura arriba); en el resto abre/cierra la barra de menu.
+			// izquierda va al juego (W3dGameKeyName, se captura arriba); en el resto abre/cierra la barra de menu.
 			if (sc == 164){
 				if (gGreenHeld){
-					gGreenUsado = ETrue;   // que soltar el verde NO cicle el viewport
+					gUsedGreen = ETrue;   // que soltar el verde NO cicle el viewport
 					// verde + izquierda = PLAY/PAUSA toggle (pausar Y reanudar con el mismo combo). En JUEGO y tambien
 					// en ANIMACION normal (pedido del usuario): togglea PlayAnimation en los dos; solo suelta las
 					// teclas del juego si es juego (en animacion no hay input de juego que soltar).
 					if (PlayAnimation){
-						if (AnimEsJuego){ extern void W3dScriptSoltarTeclas(); W3dScriptSoltarTeclas(); }
+						if (AnimIsGame){ extern void W3dScriptReleaseKeys(); W3dScriptReleaseKeys(); }
 						PlayAnimation = false;
 					} else PlayAnimation = true;   // reanudar
 					return EKeyWasConsumed;
 				}
 				// IDE en modo barra: el soft-izq VUELVE a editar texto (toggle con el soft-izq que en edicion abre la
 				// barra). Sin esto quedabas atascado en la barra (izquierda navegaba/abria el menu de tipo).
-				if (W3dLayoutIDEEnBarra()){ W3dLayoutIDEVolverEdicion(); return EKeyWasConsumed; }
-				W3dLayoutToggleBarra();
+				if (W3dLayoutIDEInBar()){ W3dLayoutIDEReturnEdit(); return EKeyWasConsumed; }
+				W3dLayoutToggleBar();
 				return EKeyWasConsumed;
 			}
 			// soft DER fuera de un popup: alterna el cursor virtual (lo que
@@ -1042,7 +1056,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// soft DER: un TOQUE = el foco en la barra de HERRAMIENTAS de abajo (la Vista 3D, el Timeline...), como el
 			// izquierdo con la barra de arriba; MANTENIDO medio segundo = el mouse virtual (SoftDerTick, al cumplirse)
 			if (sc == 165){
-				gSoftDerHeld = ETrue; gSoftDerLargo = EFalse; gSoftDerTick = User::NTickCount();
+				gSoftRightHeld = ETrue; gSoftRightLong = EFalse; gSoftRightTick = User::NTickCount();
 				return EKeyWasConsumed;
 			}
 			// tecla VERDE de llamada: cicla el viewport activo (borde verde).
@@ -1052,7 +1066,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				// mantener: + flechas agranda/achica el viewport. Tap (sin flechas)
 				// al soltar: cicla el viewport activo (ver EEventKeyUp).
 				gGreenHeld = ETrue;
-				gGreenUsado = EFalse;
+				gUsedGreen = EFalse;
 				return EKeyWasConsumed;
 			}
 			// tecla ROJA "cortar llamada" (end key): la CONSUMIMOS y no hacemos nada -> que NO cierre la app.
@@ -1069,46 +1083,53 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				// MENU/desplegable abierto: las flechas NAVEGAN el menu (no orbitan el 3D ni scrollean). Sin esto, con
 				// el 3D activo las flechas se "mantenian" para la orbita y la seleccion del menu no se movia -> el menu
 				// (ej: el de render) quedaba pegado y no llegabas al item (Stop/Play).
-				if (W3dLayoutMenuAbierto()){
-					if (W3dLayoutTecla(sc, 0, 0)) return EKeyWasConsumed;
+				if (W3dLayoutOpenMenu()){
+					if (W3dLayoutKey(sc, 0, 0)) return EKeyWasConsumed;
 				}
 				// LOOP CUT activo: las flechas eligen orientacion / cortes / slide (single-press)
-				if (LoopCutActivo()){
+				if (LoopCutActive()){
 					int d = (sc == EStdKeyLeftArrow) ? 0 : (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyUpArrow) ? 2 : 3;
-					LoopCutTecla(d);
+					LoopCutKey(d);
+					return EKeyWasConsumed;
+				}
+				// INSERTAR CARAS / BEVEL: las flechas agrandan / achican el valor (en el bevel arriba / abajo = segmentos)
+				if (MeshModalActive()){
+					const int k = (sc == EStdKeyLeftArrow) ? W3dK_LEFT : (sc == EStdKeyRightArrow) ? W3dK_RIGHT :
+					              (sc == EStdKeyUpArrow) ? W3dK_UP : W3dK_DOWN;
+					if (InsetActive()) InsetKey(k); else BevelKey(k);
 					return EKeyWasConsumed;
 				}
 				// LOOP SELECT (modal de direccion desde una cara): las flechas alternan el sentido
-				if (LoopSelOrientando()){
+				if (LoopSelOrienting()){
 					int d = (sc == EStdKeyLeftArrow || sc == EStdKeyUpArrow) ? 0 : 1;
-					LoopSelTecla(d);
+					LoopSelKey(d);
 					return EKeyWasConsumed;
 				}
 				// C mantenido + flecha = UNDO (izq) / REDO (der): el "Ctrl+Z / Ctrl+Y" del telefono
 				if (gCHeld){
 					gCArrowUsed = ETrue; // que soltar la C NO abra el popup de borrar
-					if (sc == EStdKeyLeftArrow)       UndoDeshacer();
-					else if (sc == EStdKeyRightArrow) UndoRehacer();
+					if (sc == EStdKeyLeftArrow)       UndoUndo();
+					else if (sc == EStdKeyRightArrow) UndoRedo();
 					return EKeyWasConsumed;
 				}
 				// LAPIZ mantenido + flecha = navegar la seleccion (sub-elemento de malla; objeto = ciclado). SOLO
 				// sin mouse virtual: con el mouse visible el lapiz es SHIFT (para shift+click = seleccion multiple) y
 				// las flechas deben MOVER EL CURSOR (uno instintivamente manteniene shift y mueve con flechas). Sin
 				// mouse virtual, ahi si las flechas navegan la seleccion (todo/nada/siguiente/anterior).
-				if (gLapizHeld && !mouseVisible){
-					gLapizArrowUsed = ETrue;
+				if (gPencilHeld && !mouseVisible){
+					gPencilArrowUsed = ETrue;
 					// TIMELINE activo: el lapiz navega KEYFRAMES, no la seleccion de objetos (cambiar de objeto
-					// mientras trabajas la animacion es lo ultimo que queres). DopeNavTecla devuelve false si el
+					// mientras trabajas la animacion es lo ultimo que queres). DopeNavKey devuelve false si el
 					// timeline no esta activo -> sigue el camino de siempre.
 					int nav = (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyLeftArrow) ? 2 :
 					          (sc == EStdKeyUpArrow) ? 3 : 4;
-					if (DopeNavTecla(nav)) return EKeyWasConsumed;
-					bool enEdit;
-					if (sc == EStdKeyRightArrow)      enEdit = EditSelAvanzar(1, true);   // mantiene + siguiente
-					else if (sc == EStdKeyLeftArrow)  enEdit = EditSelAvanzar(-1, true);  // mantiene + anterior
-					else if (sc == EStdKeyUpArrow)    enEdit = EditSelTodoToggle();        // todo / nada
-					else                              enEdit = EditSelToggleActual();      // togglea el activo
-					if (!enEdit && (sc == EStdKeyRightArrow || sc == EStdKeyDownArrow) && !W3dNewTransformActive()) W3dNewCycleSelect();
+					if (DopeNavKey(nav)) return EKeyWasConsumed;
+					bool inEdit;
+					if (sc == EStdKeyRightArrow)      inEdit = EditSelAdvance(1, true);   // mantiene + siguiente
+					else if (sc == EStdKeyLeftArrow)  inEdit = EditSelAdvance(-1, true);  // mantiene + anterior
+					else if (sc == EStdKeyUpArrow)    inEdit = EditSelAllToggle();          // todo / nada
+					else                              inEdit = EditSelToggleCurrent();      // togglea el activo
+					if (!inEdit && (sc == EStdKeyRightArrow || sc == EStdKeyDownArrow) && !W3dNewTransformActive()) W3dNewCycleSelect();
 					return EKeyWasConsumed;
 				}
 				// # mantenido + flecha = VISTA POR CUADRANTE (el 1/3/7 del numpad que el telefono no tiene). Va en el
@@ -1117,7 +1138,15 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					gHashArrowUsed = ETrue;   // hubo flecha: soltar el # ya no togglea la perspectiva
 					const TInt vdx = (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyLeftArrow) ? -1 : 0;
 					const TInt vdy = (sc == EStdKeyDownArrow)  ? 1 : (sc == EStdKeyUpArrow)   ? -1 : 0;
-					W3dVistaCuadranteNav(vdx, vdy);
+					W3dQuadrantViewNav(vdx, vdy);
+					return EKeyWasConsumed;
+				}
+				// EL IMAN prendido, moviendo SIN el cursor: cada flecha SALTA al siguiente nivel de la geometria en esa
+				// direccion (uno por pulsacion, en vez de deslizar mientras se mantiene). Igual que las flechas de la PC
+				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dNewTransformActive() && SnapByArrows()){
+					const TInt fx = (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyLeftArrow) ? -1 : 0;
+					const TInt fy = (sc == EStdKeyDownArrow)  ? 1 : (sc == EStdKeyUpArrow)   ? -1 : 0;
+					SnapStepArrow(fx, fy);
 					return EKeyWasConsumed;
 				}
 				// TIMELINE + arriba/abajo (sin modificadores) = saltar al keyframe siguiente/anterior, igual que en
@@ -1126,24 +1155,24 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				// Se pregunta por el TIMELINE y no "no es el 3D": el resto de los viewports (Properties, outliner)
 				// todavia no overridea event_key_down en el telefono, asi que mandarles la tecla la perderia en el
 				// no-op de la base en vez de dejarla seguir a la navegacion del panel.
-				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dLayoutTimelineActivo() && !DopeXformActivo() &&
+				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dLayoutActiveTimeline() && !DopeXformActive() &&
 				    (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow)){
-					if (W3dLayoutTeclaViewport(sc)) return EKeyWasConsumed;
+					if (W3dLayoutKeyViewport(sc)) return EKeyWasConsumed;
 				}
 				// TIMELINE + izquierda/derecha: el TOQUE mueve UN cuadro ya (como en PC); mantenida sigue el scrub,
-				// que arranca despues de un ratito (W3dTimelineFlechaPulsada). Sigue abajo para marcarla mantenida.
-				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dLayoutTimelineActivo() && !DopeXformActivo() &&
+				// que arranca despues de un ratito (W3dTimelinePressedArrow). Sigue abajo para marcarla mantenida.
+				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dLayoutActiveTimeline() && !DopeXformActive() &&
 				    (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow)){
-					extern void W3dTimelineFlechaPulsada();
-					W3dLayoutTeclaViewport(sc);
-					W3dTimelineFlechaPulsada();
+					extern void W3dTimelinePressedArrow();
+					W3dLayoutKeyViewport(sc);
+					W3dTimelinePressedArrow();
 				}
 				// 3D con FOCO DE TRANSPORTE (Stop/Play): la flecha NO orbita, cae al dispatch del panel (linea 618)
-				// para navegar Stop<->Play, igual que el Timeline con foco suelta las flechas. De ahi el && !W3dLayoutFocoTransporte().
-				// UV con foco en "Edit" (W3dLayoutFocoUVEditar): la flecha NO panea, cae al dispatch del panel
+				// para navegar Stop<->Play, igual que el Timeline con foco suelta las flechas. De ahi el && !W3dLayoutFocusTransport().
+				// UV con foco en "Edit" (W3dLayoutFocusUVEdit): la flecha NO panea, cae al dispatch del panel
 				// para seguir navegando la barra (mismo esquema que el foco de transporte del 3D).
-				if (gGreenHeld || (W3dLayout3DActivo() && !W3dLayoutFocoTransporte()) || mouseVisible || (W3dLayoutUVActivo() && !W3dLayoutFocoUVEditar()) || W3dLayoutTimelineActivo() || W3dLayoutConsolaActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor, consola=scroll
-					if (gGreenHeld) gGreenUsado = ETrue; // verde+flecha = resize (no ciclar)
+				if (gGreenHeld || (W3dLayout3DActive() && !W3dLayoutFocusTransport()) || mouseVisible || (W3dLayoutActiveUV() && !W3dLayoutFocusUVEdit()) || W3dLayoutActiveTimeline() || W3dLayoutActiveConsole()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor, consola=scroll
+					if (gGreenHeld) gUsedGreen = ETrue; // verde+flecha = resize (no ciclar)
 					if (sc == EStdKeyLeftArrow)       gHeldLeft = ETrue;
 					else if (sc == EStdKeyRightArrow) gHeldRight = ETrue;
 					else if (sc == EStdKeyUpArrow)    gHeldUp = ETrue;
@@ -1152,7 +1181,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				}
 				// sin verde ni 3D activo: la flecha va al PANEL activo (propiedades/
 				// outliner) por teclado, sin mouse. Single-press (no se mantiene).
-				if (W3dLayoutTeclaPanel(sc)) return EKeyWasConsumed;
+				if (W3dLayoutKeyPanel(sc)) return EKeyWasConsumed;
 			}
 			// LAPIZ + TECLADO durante un transform: el valor EXACTO, como tipear en la PC ("mover 1.5 metros", "rotar 90").
 			// Con el lapiz mantenido los numeros se ESCRIBEN; sin el, el 1/2/3 siguen eligiendo el eje y el 0 lo de siempre.
@@ -1160,9 +1189,10 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// Tambien como INTERRUPTOR: un toque corto del lapiz durante el transform prende el modo "escribir" (sale el
 			// "[|]" en la barra) y los numeros escriben sin mantener nada; otro toque lo apaga y vuelve lo de siempre
 			// (1/2/3 = ejes). Mantener el lapiz y apretar numeros sigue andando igual.
-			const TBool xformDope = DopeXformActivo();
-			if (gNumTeclado && (!W3dNewTransformActive() || (!xformDope && !NumInputActivo()))) gNumTeclado = EFalse;   // (termino)
-			if ((gLapizHeld || gNumTeclado) && W3dNewTransformActive()){
+			const TBool xformDope = DopeXformActive();
+			const TBool xformNum = W3dNewTransformActive() || MeshModalActive();   // (insertar caras / bevel: su valor)
+			if (gNumKeyboard && (!xformNum || (!xformDope && !NumInputActive()))) gNumKeyboard = EFalse;   // (termino)
+			if ((gPencilHeld || gNumKeyboard) && xformNum){
 				TInt c = 0;
 				if (sc >= '0' && sc <= '9') c = sc;
 				else if (sc == '*') c = '.';
@@ -1170,57 +1200,58 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				else if (sc == EStdKeyBackspace) c = 8;
 				if (c){
 					extern bool NumInputChar(int);
-					if (gLapizHeld) gLapizArrowUsed = ETrue;   // (soltar el lapiz despues NO cicla ni cambia el modo)
+					if (gPencilHeld) gPencilArrowUsed = ETrue;   // (soltar el lapiz despues NO cicla ni cambia el modo)
 					// (los KEYFRAMES tienen su propia entrada numerica: la del timeline)
 					if (xformDope){ extern bool DopeNumInputChar(int); DopeNumInputChar((int)c); return EKeyWasConsumed; }
 					NumInputChar((int)c);
 					// en el modo interruptor, borrar todo NO lo apaga (seguiria con "[|]" esperando numeros)
-					if (gNumTeclado && !NumInputActivo()) NumInputBegin();
+					if (gNumKeyboard && !NumInputActive()) NumInputBegin();
 					return EKeyWasConsumed;
 				}
 			}
-			if (sc == '0' && W3dNewTransformActive() && W3dNewTransformModo() == 2){
+			if (sc == '0' && W3dNewTransformActive() && W3dNewTransformMode() == 2){
 				W3dNewToggleOrbital(); // 0 durante rotacion: trackball <-> orbital
 				return EKeyWasConsumed;
 			}
 			// "1" sobre el outliner (sin transform 3D en curso) = entrar/confirmar el modo MOVER:
 			// reordenar/reparentar el objeto activo sin mouse. Clave en el N95 para poner las
 			// lamparas ANTES de los objetos que iluminan. Va antes del 1/2/3 del transform 3D.
-			if (sc == '1' && W3dOutlinerActivo() && !W3dNewTransformActive()){
-				W3dOutlinerMoverToggle();
+			if (sc == '1' && W3dActiveOutliner() && !W3dNewTransformActive()){
+				W3dOutlinerMoveToggle();
 				return EKeyWasConsumed;
 			}
 			// "2"/"3" sobre el outliner (sin transform 3D en curso): 2 = ocultar/mostrar, 3 = visibilidad de
 			// RENDER del objeto activo. Van ANTES del 1/2/3 del transform 3D (que en el outliner no aplica).
-			if (sc == '2' && W3dOutlinerActivo() && !W3dNewTransformActive()){
+			if (sc == '2' && W3dActiveOutliner() && !W3dNewTransformActive()){
 				W3dOutlinerToggleVisible();
 				return EKeyWasConsumed;
 			}
-			if (sc == '3' && W3dOutlinerActivo() && !W3dNewTransformActive()){
+			if (sc == '3' && W3dActiveOutliner() && !W3dNewTransformActive()){
 				W3dOutlinerToggleRender();
 				return EKeyWasConsumed;
 			}
-			if ((sc == '1' || sc == '2' || sc == '3') && DopeXformActivo()){
-				extern void DopeXformEjeTecla(int); DopeXformEjeTecla(sc - '0');   // 1 = X (tiempo), 2 = Y (valor)
+			if ((sc == '1' || sc == '2' || sc == '3') && DopeXformActive()){
+				extern void DopeXformAxisKey(int); DopeXformAxisKey(sc - '0');   // 1 = X (tiempo), 2 = Y (valor)
 				return EKeyWasConsumed;
 			}
+			if ((sc == '1' || sc == '2' || sc == '3') && MeshModalActive()) return EKeyWasConsumed;   // (insertar caras / bevel)
 			if (sc == '1' || sc == '2' || sc == '3'){
 				// El keypad del telefono no tiene letras: el 1/2/3 ES como se tipea g/r/s. Si el viewport activo no
 				// es el 3D, la tecla va a EL, como en PC (el timeline transforma sus keyframes con las MISMAS g/r/s,
 				// no con un camino propio). Solo el 3D sigue con W3dNewTransform*: su event_key_down todavia no
 				// compila en el telefono.
-				if (!W3dLayout3DActivo()){
+				if (!W3dLayout3DActive()){
 					const TInt t = (sc == '1') ? W3dK_G : (sc == '2') ? W3dK_R : W3dK_S;
-					if (W3dLayoutTeclaViewportDirecta(t)) return EKeyWasConsumed;
+					if (W3dLayoutKeyDirectViewport(t)) return EKeyWasConsumed;
 				}
 				// solo con el mouse sobre el 3D (el hover decide, como PC)
-				extern TBool W3dHayMouseBT();
+				extern TBool W3dHasMouseBT();
 				extern GLshort mouseX; extern GLshort mouseY;
-				if (W3dHayMouseBT() && !W3dLayoutMouseSobre3D(mouseX, mouseY)){
+				if (W3dHasMouseBT() && !W3dLayoutMouseOver3D(mouseX, mouseY)){
 					return EKeyWasConsumed;
 				}
 				if (W3dNewTransformActive()){
-					W3dNewTransformEje(sc - '1'); // 1/2/3 = eje X/Y/Z (cicla orient, NO reinicia)
+					W3dNewTransformAxis(sc - '1'); // 1/2/3 = eje X/Y/Z (cicla orient, NO reinicia)
 					return EKeyWasConsumed;
 				}
 				W3dNewTransformStart(sc - '0');
@@ -1242,20 +1273,20 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			if (sc == '7'){ LayoutExtrudeFaces(); return EKeyWasConsumed; }
 			// 8 = Loop Cut SOLO en Edit Mode de malla; FUERA de edicion = entra/sale de la vista desde la CAMARA
 			// ACTIVA (toggle, como el numpad 0 en PC). Antes "8" disparaba Loop Cut siempre -> daba error de loop
-			// cut aun sin estar editando una malla. El gate (Edit Mode vs camara) vive en W3dLayoutTecla8.
-			if (sc == '8'){ W3dLayoutTecla8(); return EKeyWasConsumed; }
-			if (sc == '9'){ if (!W3dOutlinerActivo()) W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear orbital (NO en el outliner)
+			// cut aun sin estar editando una malla. El gate (Edit Mode vs camara) vive en W3dLayoutKey8.
+			if (sc == '8'){ W3dLayoutKey8(); return EKeyWasConsumed; }
+			if (sc == '9'){ if (!W3dActiveOutliner()) W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear orbital (NO en el outliner)
 			if (sc == '4'){ return EKeyWasConsumed; } // 4 = nada
 			// 5 sobre el outliner en una vista de RECURSOS = marcar/desmarcar (seleccion multiple sin mouse)
-			if (sc == '5' && W3dOutlinerActivo() && !W3dNewTransformActive()){ W3dOutlinerMarcarToggle(); return EKeyWasConsumed; }
+			if (sc == '5' && W3dActiveOutliner() && !W3dNewTransformActive()){ W3dOutlinerMarkToggle(); return EKeyWasConsumed; }
 			if (sc == '5'){ return EKeyWasConsumed; } // 5 = nada
 			// con mouse BT activo el teclado navega como en PC: las
 			// flechas/OK van al panel bajo el cursor (no mueven el mouse)
 			{
-				extern TBool W3dHayMouseBT();
+				extern TBool W3dHasMouseBT();
 				extern GLshort mouseX;
 				extern GLshort mouseY;
-				if (W3dHayMouseBT() && W3dLayoutTecla(sc, mouseX, mouseY)){
+				if (W3dHasMouseBT() && W3dLayoutKey(sc, mouseX, mouseY)){
 					return EKeyWasConsumed;
 				}
 			}
@@ -1268,18 +1299,20 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				{ static TInt sLog = 0; if (sLog < 5) { sLog++; w3dLogf("[teclas] shift del sistema (scan %d)", (TInt)sc); } }
 				// LAPIZ: solo REGISTRAR. La accion (ciclar) va al SOLTAR si fue una pulsacion
 				// corta SIN flecha. Larga = nada. Mantener + flecha = navegar (handler de flechas).
-				gLapizHeld = ETrue; gLapizArrowUsed = EFalse; gLapizDownTick = User::NTickCount();
+				gPencilHeld = ETrue; gPencilArrowUsed = EFalse; gPencilDownTick = User::NTickCount();
 				// editando un script: abajo aparece la barra de las softkeys "Copiar | Pegar" mientras se mantiene
-				{ extern void IDELapizSostenido(bool); if (W3dLayoutIDEEditando()) IDELapizSostenido(true); }
+				{ extern void IDEHeldPencil(bool); if (W3dLayoutIDEEditing()) IDEHeldPencil(true); }
 				return EKeyWasConsumed;
 			}
 			// OK del telefono: acepta el transform o la edicion de propiedad
 			if (sc == EStdKeyDevice3){
-				if (gGreenHeld){ gGreenUsado = ETrue; LayoutMaximizar(); return EKeyWasConsumed; } // verde + OK = maximizar/restaurar el viewport
-					if (LoopCutActivo()){ // OK = aceptar/avanzar fase. Eligiendo la direccion SIN mouse: la de las flechas, aplicada + el panel (antes tomaba el punto amarillo mas cercano al cursor escondido)
-					if (LoopCutOrientando() && !mouseVisible) LoopCutOrientAplicarElegida(); else LoopCutClickIzq(mouseX, mouseY);
+				if (gGreenHeld){ gUsedGreen = ETrue; LayoutMaximize(); return EKeyWasConsumed; } // verde + OK = maximizar/restaurar el viewport
+					if (LoopCutActive()){ // OK = aceptar/avanzar fase. Eligiendo la direccion SIN mouse: la de las flechas, aplicada + el panel (antes tomaba el punto amarillo mas cercano al cursor escondido)
+					if (LoopCutOrienting() && !mouseVisible) LoopCutOrientApplyPicked(); else LoopCutClickLeft(mouseX, mouseY);
 					return EKeyWasConsumed; }
-				if (LoopSelOrientando()){ LoopSelConfirm(); return EKeyWasConsumed; } // OK = acepta el loop (modal de direccion)
+				if (LoopSelOrienting()){ LoopSelConfirm(); return EKeyWasConsumed; } // OK = acepta el loop (modal de direccion)
+				if (InsetActive()){ InsetConfirm(); return EKeyWasConsumed; }   // OK = acepta insertar caras / el bevel
+				if (BevelActive()){ BevelConfirm(); return EKeyWasConsumed; }
 				if (W3dNewTransformActive()){
 					W3dNewTransformEnd(EFalse);
 					return EKeyWasConsumed;
@@ -1293,57 +1326,59 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					// BT mouse y PC. Antes el OK virtual hacia SIEMPRE pick 3D -> la cruz de cerrar no respondia (Dante).
 					if (W3dLayoutClickUI(mouseX, mouseY)){ return EKeyWasConsumed; }
 					extern bool LShiftPressed;
-					LShiftPressed = (gLapizHeld || iWhisk3D->iShiftPressed) ? true : false; // lapiz mantenido = shift
-					if (gLapizHeld) gLapizArrowUsed = ETrue; // que soltar el lapiz NO cicle la seleccion
+					LShiftPressed = (gPencilHeld || iWhisk3D->iShiftPressed) ? true : false; // lapiz mantenido = shift
+					if (gPencilHeld) gPencilArrowUsed = ETrue; // que soltar el lapiz NO cicle la seleccion
 					// El OK es un CLICK DE VERDAD al viewport bajo el cursor: el mismo down que manda el mouse en PC.
 					// Asi el timeline se entera (curvas, keyframes, handles) sin que nadie reimplemente el click
 					// afuera, y mantener el OK queda como arrastre solo (el cursor ya emite event_mouse_motion).
 					// El 3D es la excepcion: su button_left() todavia es stub en el telefono -> su pick va aparte.
-					// (mantenerlo quieto despues: el menu contextual ahi, ver OkLargoTick)
-					gOkEsperando = ETrue; gOkConMouse = ETrue; gOkVibrando = EFalse; gOkLargoHecho = EFalse;
+					// (mantenerlo quieto despues: el menu contextual ahi, ver OkLongTick)
+					gOkWaiting = ETrue; gOkWithMouse = ETrue; gOkVibrating = EFalse; gOkLongDone = EFalse;
 					gOkTick = User::NTickCount(); gOkMx = mouseX; gOkMy = mouseY;
-					if (!W3dLayoutMouseSobre3D(mouseX, mouseY) && W3dLayoutClickViewport(mouseX, mouseY)){
+					if (!W3dLayoutMouseOver3D(mouseX, mouseY) && W3dLayoutClickViewport(mouseX, mouseY)){
 						return EKeyWasConsumed;
 					}
 					iWhisk3D->ClickSelect();
 					return EKeyWasConsumed;
 				}
 				// SIN MOUSE: sobre algo con menu contextual el OK ESPERA (corto = el OK de siempre al soltar; mantenido =
-				// vibra y sale el menu: OkLargoTick)
-				if (LayoutMenuContextoTecladoPosible()){
-					gOkEsperando = ETrue; gOkConMouse = EFalse; gOkVibrando = EFalse; gOkLargoHecho = EFalse;
+				// vibra y sale el menu: OkLongTick)
+				if (LayoutMenuContextKeyboardPossible()){
+					gOkWaiting = ETrue; gOkWithMouse = EFalse; gOkVibrating = EFalse; gOkLongDone = EFalse;
 					gOkTick = User::NTickCount();
 					return EKeyWasConsumed;
 				}
 				// OK al panel ACTIVO (propiedades/outliner) por teclado, sin mouse
-				if (W3dLayoutTeclaPanel(EStdKeyDevice3)){
+				if (W3dLayoutKeyPanel(EStdKeyDevice3)){
 					return EKeyWasConsumed;
 				}
-				if (W3dLayoutTecla(EStdKeyDevice3, 0, 0)){
+				if (W3dLayoutKey(EStdKeyDevice3, 0, 0)){
 					return EKeyWasConsumed;
 				}
 			}
 			// tecla C: primero CANCELA (transform activo o edicion de
 			// propiedad); si no hay nada que cancelar, borra el activo
 			if (sc == EStdKeyBackspace){
-				if (LoopCutActivo()){ LoopCutClickDer(); return EKeyWasConsumed; } // C = centra el corte (0.5) + confirma
-				if (PickPathGuiado()){ LayoutPickPathCancelar(); return EKeyWasConsumed; } // C = cancela el modo guiado
-					if (GuiadoUnClickActivo()){ LayoutGuiadoCancelar(); return EKeyWasConsumed; } // C = cancela Select Linked / Loop Select guiados
+				if (LoopCutActive()){ LoopCutClickRight(); return EKeyWasConsumed; } // C = centra el corte (0.5) + confirma
+				if (InsetActive()){ InsetCancel(); return EKeyWasConsumed; }   // C = cancela insertar caras / el bevel
+				if (BevelActive()){ BevelCancel(); return EKeyWasConsumed; }
+				if (PickPathGuided()){ LayoutPickPathCancel(); return EKeyWasConsumed; } // C = cancela el modo guiado
+					if (GuidedUnClickActive()){ LayoutGuidedCancel(); return EKeyWasConsumed; } // C = cancela Select Linked / Loop Select guiados
 				if (W3dNewTransformActive()){
 					W3dNewTransformEnd(ETrue);
 					return EKeyWasConsumed;
 				}
 				// outliner en modo mover: C/backspace CANCELA (restaura la posicion original en el arbol).
-				// Solo consume si realmente estaba moviendo (sino LayoutTeclaPanelActivo devuelve false).
-				if (W3dLayoutTeclaPanel(EStdKeyBackspace)){
+				// Solo consume si realmente estaba moviendo (sino LayoutKeyPanelActive devuelve false).
+				if (W3dLayoutKeyPanel(EStdKeyBackspace)){
 					return EKeyWasConsumed;
 				}
-				if (W3dLayoutTecla(EStdKeyBackspace, 0, 0)){
+				if (W3dLayoutKey(EStdKeyBackspace, 0, 0)){
 					return EKeyWasConsumed;
 				}
 				// el TIMELINE activo con keyframes / curvas elegidos: la C los BORRA (no al objeto activo)
-				{ extern bool TimelineHaySeleccion();
-				  if (W3dLayoutTimelineActivo() && TimelineHaySeleccion() && W3dLayoutTeclaViewport(EStdKeyBackspace)) return EKeyWasConsumed; }
+				{ extern bool TimelineHasSelection();
+				  if (W3dLayoutActiveTimeline() && TimelineHasSelection() && W3dLayoutKeyViewport(EStdKeyBackspace)) return EKeyWasConsumed; }
 				// nada que cancelar: C = MODIFICADOR. Registrar (NO borra en el down). La accion va al
 				// SOLTAR: tap (sin flecha) = popup de confirmar borrado; mantener + flecha = undo/redo.
 				// gCArrowUsed se resetea SOLO en el PRIMER down: los repeats del backspace mantenido NO deben
@@ -1361,31 +1396,31 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// T9: soltar '#' mientras se edita texto resuelve el cambio de modo (tap=Abc/abc/ABC, mantenido=123).
 			// TAMBIEN soltar las teclas NUMERICAS: el T9 usa el key-UP para distinguir MANTENER (auto-repeat, sin
 			// release) de un re-tap deliberado -> sin esto el "mantener->digito" no anda y el multi-tap se rompe.
-			if (W3dT9Activo() && (usc == EStdKeyHash || (usc >= '0' && usc <= '9'))){ W3dT9Tecla(usc, EFalse); return EKeyWasConsumed; }
-			// MODO JUEGO: soltar el D-pad + select -> los scripts (fin del "mantenido" que lee tecla()).
-			if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
-				const char* jn = W3dJuegoNombreTecla(usc);
+			if (W3dT9Active() && (usc == EStdKeyHash || (usc >= '0' && usc <= '9'))){ W3dT9Key(usc, EFalse); return EKeyWasConsumed; }
+			// MODO JUEGO: soltar el D-pad + select -> los scripts (fin del "mantenido" que lee key()).
+			if (AnimIsGame && PlayAnimation && W3dLayoutGameActiveViewport() && !W3dLayoutActivePopup() && !W3dLayoutOpenMenu()){
+				const char* jn = W3dGameKeyName(usc);
 				if (jn){
-					extern void W3dScriptTecla(const char*, bool);
-					W3dScriptTecla(jn, false);
-					if (usc == EStdKeyDevice3 || usc == EStdKeyEnter) W3dScriptTecla("espacio", false);
+					extern void W3dScriptKey(const char*, bool);
+					W3dScriptKey(jn, false);
+					if (usc == EStdKeyDevice3 || usc == EStdKeyEnter) W3dScriptKey("space", false);
 					return EKeyWasConsumed;
 				}
 				// el par del key-down: 7/8/9/0/*/# reservadas al juego mientras corre
 				if (usc == '7' || usc == '8' || usc == '9' || usc == '0' ||
 				    usc == '*' || usc == EStdKeyHash){
 					char jnom[2]; jnom[0] = (char)(usc == EStdKeyHash ? '#' : usc); jnom[1] = 0;
-					extern void W3dScriptTecla(const char*, bool);
-					W3dScriptTecla(jnom, false);
+					extern void W3dScriptKey(const char*, bool);
+					W3dScriptKey(jnom, false);
 					return EKeyWasConsumed;
 				}
 			}
 			if (usc == EStdKeyYes){
-				if (!gGreenUsado){
-					W3dLayoutCiclarViewport(1); // tap = ciclar viewport
+				if (!gUsedGreen){
+					W3dLayoutCycleViewport(1); // tap = ciclar viewport
 					// al cambiar de viewport durante el juego, soltar las teclas del juego: si se ciclo con
 					// una flecha mantenida, que no quede la pala "trabada" moviendose sola.
-					if (AnimEsJuego && PlayAnimation){ extern void W3dScriptSoltarTeclas(); W3dScriptSoltarTeclas(); }
+					if (AnimIsGame && PlayAnimation){ extern void W3dScriptReleaseKeys(); W3dScriptReleaseKeys(); }
 				}
 				gGreenHeld = EFalse;
 				return EKeyWasConsumed;
@@ -1393,54 +1428,54 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			if (usc == EStdKeyNo){ return EKeyWasConsumed; } // tecla ROJA (end): consumida, no cierra la app
 			// soltar el OK = soltar el boton del mouse: cierra el arrastre (y su undo) del viewport que lo recibio
 			if (usc == EStdKeyDevice3 || usc == EStdKeyEnter){
-				if (usc == EStdKeyDevice3 && gOkLargoHecho){ gOkLargoHecho = EFalse; return EKeyWasConsumed; }   // (ya salio el menu)
-				if (usc == EStdKeyDevice3 && gOkEsperando && !gOkConMouse){
+				if (usc == EStdKeyDevice3 && gOkLongDone){ gOkLongDone = EFalse; return EKeyWasConsumed; }   // (ya salio el menu)
+				if (usc == EStdKeyDevice3 && gOkWaiting && !gOkWithMouse){
 					// CORTO, sin mouse: el OK de siempre (el que no se hizo al bajar)
-					gOkEsperando = EFalse;
-					if (!W3dLayoutTeclaPanel(EStdKeyDevice3)) W3dLayoutTecla(EStdKeyDevice3, 0, 0);
+					gOkWaiting = EFalse;
+					if (!W3dLayoutKeyPanel(EStdKeyDevice3)) W3dLayoutKey(EStdKeyDevice3, 0, 0);
 					return EKeyWasConsumed;
 				}
-				gOkEsperando = EFalse;
-				if (mouseVisible) W3dLayoutSoltarViewport(mouseX, mouseY);
+				gOkWaiting = EFalse;
+				if (mouseVisible) W3dLayoutReleaseViewport(mouseX, mouseY);
 				return EKeyWasConsumed;
 			}
 			if (usc == '0'){ // 0 soltada: tap SIN flecha = enfocar (como antes); con flecha ya hizo zoom
-				if (g0Held && !g0ArrowUsed) W3dNewEnfocar();
+				if (g0Held && !g0ArrowUsed) W3dNewFocus();
 				g0Held = EFalse;
 				return EKeyWasConsumed;
 			}
 			if (usc == '*'){ gStarHeld = EFalse; return EKeyWasConsumed; } // * soltada: fin del paneo
 			// soft DER soltado: si fue un TOQUE (no llego al medio segundo del mouse virtual), la barra de herramientas
-			if (usc == 165 && gSoftDerHeld){
-				gSoftDerHeld = EFalse;
-				if (!gSoftDerLargo){ extern TBool W3dLayoutToolbarToggle(); W3dLayoutToolbarToggle(); }
-				gSoftDerLargo = EFalse;
+			if (usc == 165 && gSoftRightHeld){
+				gSoftRightHeld = EFalse;
+				if (!gSoftRightLong){ extern TBool W3dLayoutToolbarToggle(); W3dLayoutToolbarToggle(); }
+				gSoftRightLong = EFalse;
 				return EKeyWasConsumed;
 			}
 			if (usc == EStdKeyHash){ // soltada SIN haber tocado una flecha = TAP -> ortografica <-> perspectiva
-				if (gHashHeld && !gHashArrowUsed) W3dVistaPerspectivaToggle();
+				if (gHashHeld && !gHashArrowUsed) W3dPerspectiveViewToggle();
 				gHashHeld = EFalse;
 				return EKeyWasConsumed;
 			}
 			if (usc == EStdKeyLeftShift || usc == EStdKeyRightShift){ // LAPIZ (solo shift ahora)
 				{ extern bool LShiftPressed; LShiftPressed = false; }
-				TUint dt = User::NTickCount() - gLapizDownTick; // lapiz soltado: corto + sin flecha = ciclar
-				{ extern void IDELapizSostenido(bool); IDELapizSostenido(false); }   // se va la barra Copiar | Pegar
-				InclinarTerminar();   // (si estaba inclinando: queda lo hecho)
+				TUint dt = User::NTickCount() - gPencilDownTick; // lapiz soltado: corto + sin flecha = ciclar
+				{ extern void IDEHeldPencil(bool); IDEHeldPencil(false); }   // se va la barra Copiar | Pegar
+				TiltFinish();   // (si estaba inclinando: queda lo hecho)
 				// (editando un script el lapiz es solo shift: no cicla la seleccion de la escena)
-				if (gLapizHeld && !gLapizArrowUsed && dt < 500 && !W3dNewTransformActive() && !mouseVisible && !W3dLayoutIDEEditando()){
+				if (gPencilHeld && !gPencilArrowUsed && dt < 500 && !W3dNewTransformActive() && !MeshModalActive() && !mouseVisible && !W3dLayoutIDEEditing()){
 					// en el TIMELINE: saca el keyframe actual y pasa al siguiente. En el resto: cicla el activo.
-					if (!DopeNavTecla(0)) W3dNewCycleSelect();
+					if (!DopeNavKey(0)) W3dNewCycleSelect();
 				} // con mouse virtual el lapiz es shift (no cicla)
 				// toque corto DURANTE un transform: prende/apaga el modo de escribir el valor exacto
-				else if (gLapizHeld && !gLapizArrowUsed && dt < 500 && W3dNewTransformActive()){
+				else if (gPencilHeld && !gPencilArrowUsed && dt < 500 && (W3dNewTransformActive() || MeshModalActive())){
 					// (keyframes: su entrada numerica arranca con el primer numero; aca solo el interruptor)
-					if (DopeXformActivo()){ gNumTeclado = !gNumTeclado; }
-					else if (gNumTeclado){ gNumTeclado = EFalse; NumInputReset(); }   // apagado: vuelven los ejes (1/2/3)
-					else            { gNumTeclado = ETrue;  NumInputBegin(); }   // prendido: "[|]" en la barra
+					if (DopeXformActive()){ gNumKeyboard = !gNumKeyboard; }
+					else if (gNumKeyboard){ gNumKeyboard = EFalse; NumInputReset(); }   // apagado: vuelven los ejes (1/2/3)
+					else            { gNumKeyboard = ETrue;  NumInputBegin(); }   // prendido: "[|]" en la barra
 					g_redraw = true;
 				}
-				gLapizHeld = EFalse;
+				gPencilHeld = EFalse;
 				return EKeyWasConsumed;
 			}
 			// C soltada: tap SIN flecha = borrar (edit mode -> menu Delete en el cursor; object mode ->
@@ -1449,7 +1484,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				if (gCHeld && !gCArrowUsed){
 					extern GLshort mouseX; extern GLshort mouseY;
 					// (en una vista de RECURSOS del outliner borra los recursos elegidos, no la escena)
-					if (!LayoutDeleteEdit(mouseX, mouseY) && !W3dOutlinerRecursosBorrar()) AbrirConfirmarBorrado();
+					if (!LayoutDeleteEdit(mouseX, mouseY) && !W3dOutlinerResourcesDelete()) OpenConfirmDelete();
 				}
 				gCHeld = EFalse;
 				return EKeyWasConsumed;
@@ -1469,7 +1504,7 @@ CWhisk3DContainer::~CWhisk3DContainer(){
     // desde aca el editor se esta desarmando: el tactil ya no le manda nada (perder el foco al cerrar levantaba los
     // dedos y mandaba eventos a viewports a medio destruir: KERN-EXEC 3 al salir)
     iOpenGlInitialized = EFalse;
-    w3dEngine::MandosCerrar();   // (apaga la vibracion y suelta el driver de los joysticks)
+    w3dEngine::GamepadsClose();   // (apaga la vibracion y suelta el driver de los joysticks)
     delete iPeriodic;
 
     if ( iWhisk3D ){
@@ -1481,7 +1516,7 @@ CWhisk3DContainer::~CWhisk3DContainer(){
     delete iHidMonitor;
     W3dLayoutDestroy();
 
-    W3dPantallasDestroy();   // (sus superficies comparten el contexto: antes de destruirlo)
+    W3dScreensDestroy();   // (sus superficies comparten el contexto: antes de destruirlo)
     eglMakeCurrent( iEglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
     eglDestroySurface( iEglDisplay, iEglSurface );
     eglDestroyContext( iEglDisplay, iEglContext );
@@ -1558,61 +1593,61 @@ void CWhisk3DContainer::Draw(const TRect& /*aRect*/ ) const
 //
 // PERF del RENDER (lo escribe el [PERF] del modo juego): ms en armar el cuadro (las llamadas al driver: CPU) y en
 // eglSwapBuffers (lo que espera al GPU del tiler), y los cuadros dibujados entre dos lineas del log (los fps reales)
-static TUint gPfRender = 0, gPfSwap = 0, gPfCuadros = 0, gPfDesde = 0;
+static TUint gPfRender = 0, gPfSwap = 0, gPfFrames = 0, gPfFrom = 0;
 
 int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     {
     CWhisk3DContainer* instance = (CWhisk3DContainer*) aInstance;
     // ESPERANDO AL CODIFICADOR DE VIDEO (render a MP4): su espera anidada deja correr este CPeriodic; no se dibuja ni se
     // toca nada hasta que vuelva (w3dvideoenc.cpp)
-    { extern TBool W3dVideoSymbianOcupado(); if (W3dVideoSymbianOcupado()) return 0; }
+    { extern TBool W3dBusyVideoSymbian(); if (W3dBusyVideoSymbian()) return 0; }
     // (un render con su barra de progreso: la espera corta de la barra deja correr este CPeriodic; no se dibuja)
-    { extern bool ProgresoActivo(); if (ProgresoActivo()) return 0; }
+    { extern bool ProgressActive(); if (ProgressActive()) return 0; }
     instance->iFrame++;
-    OkLargoTick();   // el OK mantenido: vibrar y, al terminar, el menu contextual
-    InclinarTick();  // el lapiz mantenido en un transform: inclinar el telefono
+    OkLongTick();  // el OK mantenido: vibrar y, al terminar, el menu contextual
+    TiltTick();    // el lapiz mantenido en un transform: inclinar el telefono
     // LOS SONIDOS DEL EDITOR (el timeline, el audio scrubbing): en la PC los mueve main.cpp en cada cuadro; el telefono
     // no lo llamaba y la escena no sonaba en el editor
-    { extern void W3dSonidosTickEditor(); W3dSonidosTickEditor(); }
+    { extern void W3dSoundsTickEditor(); W3dSoundsTickEditor(); }
     // el softkey derecho MANTENIDO: al cumplirse el medio segundo, el mouse virtual (sin esperar a soltarlo)
-    if (gSoftDerHeld && !gSoftDerLargo) {
-        if (OkTicksAMs(User::NTickCount() - gSoftDerTick) >= kSoftDerLargoMs) {
-            gSoftDerLargo = ETrue;
-            { extern void LayoutToolbarSoltarFoco(); LayoutToolbarSoltarFoco(); }
+    if (gSoftRightHeld && !gSoftRightLong) {
+        if (OkTicksToMs(User::NTickCount() - gSoftRightTick) >= kSoftRightLongMs) {
+            gSoftRightLong = ETrue;
+            { extern void LayoutToolbarReleaseFocus(); LayoutToolbarReleaseFocus(); }
             instance->iWhisk3D->SetMouse();
-            w3dEngine::VibrarMs(60, 0.5f);
+            w3dEngine::VibrateMs(60, 0.5f);
         }
         g_redraw = true;
     }
 
     // APERTURA DE PROYECTO DIFERIDA (tarjeta Archivo / abrir un .w3d en el explorador ->
-    // AbrirProyectoDesde solo encola g_proyAbrirPendiente). Se procesa ACA, con el stack
+    // OpenProjectFrom solo encola g_projOpenPending). Se procesa ACA, con el stack
     // limpio, igual que MainLoopFrame en PC. Sin esto el .w3d elegido quedaba en la cola y
-    // NO se abria en el N95 (el boton que la pidio vive en el layout que AbrirProyectoAhora
+    // NO se abria en el N95 (el boton que la pidio vive en el layout que OpenProjectNow
     // destruye, por eso el open es diferido y no directo).
     {
-        extern std::string g_proyAbrirPendiente;
-        extern void AbrirProyectoAhora(const std::string&);
-        // LA PANTALLA DE INICIO (InicioPopup, como en PC): en el PRIMER cuadro, si la app arranco sin un .w3d (el file
+        extern std::string g_projOpenPending;
+        extern void OpenProjectNow(const std::string&);
+        // LA PANTALLA DE INICIO (HomePopup, como en PC): en el PRIMER cuadro, si la app arranco sin un .w3d (el file
         // manager lo encola en ProcessCommandParametersL, antes de este cuadro) ni en modo juego
-        static TBool sInicioDecidido = EFalse;
-        if (!sInicioDecidido) {
-            sInicioDecidido = ETrue;
-            extern bool g_modoJuego;
-            extern void InicioPopupAbrir();
-            if (g_proyAbrirPendiente.empty() && !g_modoJuego) {
+        static TBool sDecidedStart = EFalse;
+        if (!sDecidedStart) {
+            sDecidedStart = ETrue;
+            extern bool g_gameMode;
+            extern void HomePopupOpen();
+            if (g_projOpenPending.empty() && !g_gameMode) {
                 // la escena de arranque esta "guardada": la foto de lo no guardado, ACA y no al armarla (lo que se inicializa
                 // despues -pantallas, el layout, los recursos- la ensuciaba y abrir un reciente preguntaba si guardar)
-                { extern void W3dCambiosFoto(); W3dCambiosFoto(); }
-                InicioPopupAbrir();   // ("Nuevo archivo" resaltado: OK y arrancas)
-                TInt lapiz = 0;       // con el DEDO, sin resaltar (parecia apretado)
-                if (HAL::Get(HALData::EPen, lapiz) == KErrNone && lapiz) { extern void InicioPopupSinResaltar(); InicioPopupSinResaltar(); }
+                { extern void W3dChangesSnapshot(); W3dChangesSnapshot(); }
+                HomePopupOpen();   // ("Nuevo archivo" resaltado: OK y arrancas)
+                TInt pencil = 0;   // con el DEDO, sin resaltar (parecia apretado)
+                if (HAL::Get(HALData::EPen, pencil) == KErrNone && pencil) { extern void HomePopupNoHighlight(); HomePopupNoHighlight(); }
             }
         }
         // LO PENDIENTE, por la MISMA puerta que la PC (main.cpp): abrir un proyecto, empezar uno NUEVO (Nuevo proyecto,
         // "Nuevo archivo" de la pantalla de inicio) y el LAYOUT elegido en el menu. Antes aca solo se abria: elegir el
         // layout de Animacion o un proyecto nuevo quedaban en espera para siempre
-        { extern void ProcesarProyectoPendiente(); ProcesarProyectoPendiente(); }
+        { extern void ProcessPendingProject(); ProcessPendingProject(); }
     }
 
     // NOTA: aca NO va ningun User::After ni salteo de frames durante la
@@ -1641,7 +1676,7 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     float dtFrame = timeSecs - instance->iLastFrameTimeSecs;
     if (dtFrame > 0.1f)   dtFrame = 0.1f;
     if (dtFrame < 0.001f) dtFrame = 0.001f;
-    { extern void NotificacionesTick(float); NotificacionesTick(timeSecs - instance->iLastFrameTimeSecs); }
+    { extern void NotificationsTick(float); NotificationsTick(timeSecs - instance->iLastFrameTimeSecs); }
 
     // Set the current time to be the last frame time for the upcoming frame
     instance->iLastFrameTimeSecs = timeSecs;
@@ -1653,45 +1688,45 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     }
 
     // pantallas externas: conectar/desconectar (revisa 1 vez por segundo)
-    W3dPantallasTick();
+    W3dScreensTick();
 
     // T9: confirmar el caracter multi-tap a medio elegir cuando vence el timeout (1 seg sin apretar)
     W3dT9Tick();
     // la PULSACION LARGA tactil (agarrar una fila del outliner, la lupa del IDE): se mide con el reloj, como en PC
-    ControlesTick();
+    ControlsTick();
     // los JOYSTICKS Bluetooth (driver bthid-s60): conectar/desconectar + su estado, como los mandos de SDL en PC
-    MandosSymbianTick();
+    GamepadsSymbianTick();
     // el mouse Bluetooth: el apretar que esperaba por si era el boton del medio (izquierdo + derecho juntos), en la
     // pantalla donde esta el cursor (el telefono o la externa)
     extern void W3dMouseTick();
     W3dMouseTick();
     // se perdio el foco con dedos apoyados (FocusChanged): se levantan aca, fuera de cualquier otro evento
-    if (instance->iSoltarDedos) { instance->iSoltarDedos = EFalse; w3dEngine::TactilSoltarTodo(); }
+    if (instance->iReleaseFingers) { instance->iReleaseFingers = EFalse; w3dEngine::TouchReleaseAll(); }
     // flechas MANTENIDAS: aplicar CADA frame (orbitar/mover/rotar/escalar
     // fluido con el teclado, sin depender del auto-repeat lento del telefono)
-    AplicarFlechas3D();
+    ApplyArrows3D();
 
     // CARGA DIFERIDA de texturas del import: 1 por frame (decode+upload). Prende g_redraw al cargar una -> el
     // modelo aparece enseguida y las texturas entran solas. No-op si no hay pendientes. (Va ANTES del check de
     // g_redraw para que corra aunque la escena este quieta.)
-    { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+    { extern void LoadPendingTextures(); LoadPendingTextures(); }
 
     // ANIMACION: materiales/UV animados cada frame + avance del frame en PLAY al ritmo de AnimFPS (independiente de
     // los fps de la UI). En PC vive en MainLoopFrame; en el N95 FALTABA -> el play quedaba "clavado" en el frame 1 y
     // los materiales animados no corrian. (El avance de las VERTEX-anims -VertexAnimation.cpp, SI en el .mmp- se hace
     // abajo, en la rama de juego, con UpdateAnimations(dtSim); el skinning/pose de esqueleto siguen stub.)
     // PAUSA: las FRUTAS y los BANDERINES son billboards de tira UV (AnimacionUV). En PAUSA del juego
-    // (AnimEsJuego && !PlayAnimation) NO se avanzan los materiales animados ni las tiras UV -> quedan quietos,
-    // igual que en PC (main.cpp:609). En PLAY (PlayAnimation) y en el editor normal (AnimEsJuego==false) el
+    // (AnimIsGame && !PlayAnimation) NO se avanzan los materiales animados ni las tiras UV -> quedan quietos,
+    // igual que en PC (main.cpp:609). En PLAY (PlayAnimation) y en el editor normal (AnimIsGame==false) el
     // gate da true y todo anima como antes. ActiveAnimKind!=3 = no pisar la edicion de vertex-anim del timeline.
     // (Las particulas ya estan gateadas por PlayAnimation dentro del bloque 'juego' de abajo: no van aca.)
-    { extern bool TextFieldParpadeoTick(); if (TextFieldParpadeoTick()) g_redraw = true; }   // el cursor que parpadea
+    { extern bool TextFieldBlinkTick(); if (TextFieldBlinkTick()) g_redraw = true; }   // el cursor que parpadea
     { extern int ActiveAnimKind;
-      if (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3) {
+      if (!(AnimIsGame && !PlayAnimation) && ActiveAnimKind != 3) {
           UpdateAnimatedMaterials();
           extern bool UpdateUVAnims(float); if (UpdateUVAnims(dtFrame)) g_redraw = true;
           extern bool UpdateFlipbooks(float); if (UpdateFlipbooks(dtFrame)) g_redraw = true;
-          extern bool W3dOclusionTick(); if (W3dOclusionTick()) g_redraw = true;   // oclusion por nodos (.w3dnodos)
+          extern bool W3dOcclusionTick(); if (W3dOcclusionTick()) g_redraw = true;   // oclusion por nodos (.w3dnodos)
       }
     }
     {
@@ -1706,9 +1741,9 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         // (inicio/actualizar) y dispara sonido/UI, con dt en TIEMPO REAL a 60 nominal. En PC vive en
         // main.cpp; en el N95 FALTABA -> el juego quedaba clavado en el frame 1 (nada de logica ni sonido).
         // Si NO es juego, el play de animacion normal sigue como antes (AnimTick al ritmo de AnimFPS).
-        extern bool SimHayScripts(); extern bool SimActiva(); extern void SimTickPlay(float);
-        bool juego = AnimEsJuego && PlayAnimation && (SimActiva() || SimHayScripts());
-        if (juego) {
+        extern bool SimHasScripts(); extern bool SimActive(); extern void SimTickPlay(float);
+        bool game = AnimIsGame && PlayAnimation && (SimActive() || SimHasScripts());
+        if (game) {
             TUint gameTicks = tickHz / 60;   // objetivo 60 fps nominal
             if (nowA - gLastAnimTick >= gameTicks) {
                 float dtSim = (float)(nowA - gLastAnimTick) / (float)tickHz;  // segundos reales entre ticks
@@ -1721,60 +1756,60 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                 // Loguea el acumulado + promedio cada 30 ticks a e:\whisk3d.log. NTickCount = ms en el N95 (1000 Hz).
                 // reloj de ms para el PERF del SKINNING (lo consumen Mesh::RenderObject +
                 // SkeletalAnimation.cpp): instalado aca, una vez, solo en modo juego.
-                { extern unsigned int (*g_skinRelojMs)();
-                  struct RelojN95 { static unsigned int Ms() { return (unsigned int)User::NTickCount(); } };
-                  if (!g_skinRelojMs) g_skinRelojMs = RelojN95::Ms; }
+                { extern unsigned int (*g_skinClockMs)();
+                  struct ClockN95 { static unsigned int Ms() { return (unsigned int)User::NTickCount(); } };
+                  if (!g_skinClockMs) g_skinClockMs = ClockN95::Ms; }
                 static TUint gPfSim=0, gPfAnim=0, gPfPvs=0, gPfPart=0, gPfN=0; TUint _pf;
                 _pf=User::NTickCount(); SimTickPlay(dtSim);                                              gPfSim  += User::NTickCount()-_pf;
                 // AVANCE de las vertex-anims (Crash y demas mallas animadas): en PC vive en main.cpp; en el N95 FALTABA.
                 _pf=User::NTickCount(); { extern void UpdateAnimations(float); UpdateAnimations(dtSim); }  gPfAnim += User::NTickCount()-_pf;
                 // PVS DEL ESCENARIO (oclusion del MAPA como el Crash original): el stepper que lee el nodo del riel y
                 // APLICA el sector (override del index buffer por triangulo). En PC vive en main.cpp:617; en el N95 FALTABA.
-                _pf=User::NTickCount(); { extern void W3dVisZonasTick(); W3dVisZonasTick(); }              gPfPvs  += User::NTickCount()-_pf;
+                _pf=User::NTickCount(); { extern void W3dVisZonesTick(); W3dVisZonesTick(); }              gPfPvs  += User::NTickCount()-_pf;
                 // PARTICULAS: simula + MATA las vivas (polvo, humo). En PC vive en main.cpp; en el N95 FALTABA.
-                _pf=User::NTickCount(); { extern void W3dParticulasTick(float); W3dParticulasTick(dtSim); } gPfPart += User::NTickCount()-_pf;
+                _pf=User::NTickCount(); { extern void W3dParticlesTick(float); W3dParticlesTick(dtSim); } gPfPart += User::NTickCount()-_pf;
                 if (++gPfN >= 30) {
                     extern void w3dLogf(const char*, ...);
-                    // CULLING: g_cullHijos* se acumulan por Culling::RenderHijos cada frame. El RATIO visibles/total dice
+                    // CULLING: g_cullHijos* se acumulan por Culling::RenderChildren cada frame. El RATIO visibles/total dice
                     // si el frustum descarta mallas en el N95 (visibles<<total = anda; visibles~=total = dibuja TODO ->
                     // el frustum cull no corta y hay que ver por que). El profiler del render mide aparte (overlay stats).
-                    extern int g_cullHijosTotal, g_cullHijosVisibles;
-                    extern int g_luaScriptsActivos, g_luaScriptsTotal, g_renderCaras, g_renderDraws;
+                    extern int g_cullChildrenTotal, g_cullVisibleChildren;
+                    extern int g_luaActiveScripts, g_luaScriptsTotal, g_renderFaces, g_renderDraws;
                     // SKINNING (acumulado por Mesh::RenderObject en los 30 frames): skin= ms promedio
-                    // por frame; recalc= cuantos SkinearMesh recalcularon de verdad y cuantos cayeron
+                    // por frame; recalc= cuantos SkinMesh recalcularon de verdad y cuantos cayeron
                     // al camino COMPLETO (el incremental deberia dejar casi todo en salpicado/nada).
-                    extern int g_skinPerfMs, g_skinPerfSkins, g_skinPerfCompletos;
+                    extern int g_skinPerfMs, g_skinPerfSkins, g_completeSkinPerf;
                     // TOP de scripts por ms (promedio del bloque de 30): dice CUAL lua se come el sim=
                     extern void SimLuaPerfTop(char*, int, int);
                     char topLua[96]; SimLuaPerfTop(topLua, sizeof(topLua), 30);
                     // GL: TODAS las llamadas al driver del ultimo cuadro (escena + HUD del juego + editor + GL crudo)
-                    const w3dEngine::StatsDeCuadro& gc = w3dEngine::g_statCuadro;
+                    const w3dEngine::FrameStats& gc = w3dEngine::g_statFrame;
                     // el render: promedio por cuadro dibujado y los fps de verdad (cuadros / tiempo entre lineas)
-                    const TUint ahoraPf = User::NTickCount();
-                    const TUint cuadrosPf = gPfCuadros ? gPfCuadros : 1;
-                    const TUint fpsPf = (gPfDesde && ahoraPf > gPfDesde) ? (gPfCuadros * 1000u) / (ahoraPf - gPfDesde) : 0;
+                    const TUint nowPf = User::NTickCount();
+                    const TUint framesPf = gPfFrames ? gPfFrames : 1;
+                    const TUint fpsPf = (gPfFrom && nowPf > gPfFrom) ? (gPfFrames * 1000u) / (nowPf - gPfFrom) : 0;
                     // (de ese render: cuanto es la escena armada por RUTINAS y cuanto el HUD; el resto, el editor y el GL suelto)
-                    extern double g_rutinasMs, g_uiMs;
-                    w3dLogf("[PERF] %u fps | render=%u (rutinas=%d hud=%d) swap=%u ms por cuadro", fpsPf, gPfRender / cuadrosPf,
-                            (int)(g_rutinasMs / cuadrosPf + 0.5), (int)(g_uiMs / cuadrosPf + 0.5), gPfSwap / cuadrosPf);
-                    g_rutinasMs = g_uiMs = 0.0;
-                    gPfRender = gPfSwap = gPfCuadros = 0; gPfDesde = ahoraPf;
+                    extern double g_routinesMs, g_uiMs;
+                    w3dLogf("[PERF] %u fps | render=%u (routines=%d hud=%d) swap=%u ms por cuadro", fpsPf, gPfRender / framesPf,
+                            (int)(g_routinesMs / framesPf + 0.5), (int)(g_uiMs / framesPf + 0.5), gPfSwap / framesPf);
+                    g_routinesMs = g_uiMs = 0.0;
+                    gPfRender = gPfSwap = gPfFrames = 0; gPfFrom = nowPf;
                     w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | skin=%d ms (recalc %d, completos %d) | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | GL %d (esc %d ui %d ed %d) | CULLING: %d de %d hijos",
                             gPfSim/30, gPfAnim/30, gPfPvs/30, gPfPart/30,
-                            g_skinPerfMs/30, g_skinPerfSkins/30, g_skinPerfCompletos/30,
-                            g_luaScriptsActivos, g_luaScriptsTotal, topLua, g_renderCaras, g_renderDraws,
-                            gc.total, gc.llamadas[w3dEngine::StatCatEscena] + gc.llamadas[w3dEngine::StatCatParticulas],
-                            gc.llamadas[w3dEngine::StatCatUI], gc.llamadas[w3dEngine::StatCatEditor],
-                            g_cullHijosVisibles/30, g_cullHijosTotal/30);
+                            g_skinPerfMs/30, g_skinPerfSkins/30, g_completeSkinPerf/30,
+                            g_luaActiveScripts, g_luaScriptsTotal, topLua, g_renderFaces, g_renderDraws,
+                            gc.total, gc.calls[w3dEngine::StatCatScene] + gc.calls[w3dEngine::StatCatParticles],
+                            gc.calls[w3dEngine::StatCatUI], gc.calls[w3dEngine::StatCatEditor],
+                            g_cullVisibleChildren/30, g_cullChildrenTotal/30);
                     // el DESGLOSE de sim= por fase (SimJuego): fisica / hitbox / lua / animaciones / streaming
-                    { extern int SimPerfDesglose(double*, bool); double d[5]; const int nt = SimPerfDesglose(d, true);
+                    { extern int SimPerfBreakdown(double*, bool); double d[5]; const int nt = SimPerfBreakdown(d, true);
                       const double k = nt > 0 ? 1.0 / nt : 0.0;
-                      w3dLogf("[PERF] sim por tick: fisica=%d hitbox=%d lua=%d anim=%d streaming=%d ms",
+                      w3dLogf("[PERF] sim por tick: physics=%d hitbox=%d lua=%d anim=%d streaming=%d ms",
                               (int)(d[0] * k + 0.5), (int)(d[1] * k + 0.5), (int)(d[2] * k + 0.5), (int)(d[3] * k + 0.5),
                               (int)(d[4] * k + 0.5)); }
                     gPfSim=gPfAnim=gPfPvs=gPfPart=gPfN=0;
-                    g_cullHijosTotal=0; g_cullHijosVisibles=0;
-                    g_skinPerfMs=0; g_skinPerfSkins=0; g_skinPerfCompletos=0;
+                    g_cullChildrenTotal=0; g_cullVisibleChildren=0;
+                    g_skinPerfMs=0; g_skinPerfSkins=0; g_completeSkinPerf=0;
                 }
                 g_redraw = true;
             }
@@ -1790,73 +1825,73 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // ni el scrub del timeline movian nada (el frame avanzaba y la escena quedaba quieta). Va FUERA del tick de
     // AnimFPS, como en PC: al scrubear con las flechas se tiene que ver YA, no al ritmo del play. Guard interno:
     // solo trabaja al CAMBIAR de frame.
-    { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
+    { extern void ApplyAnimationObjects(); ApplyAnimationObjects(); }
     // VERTEX ANIM ACTIVA EN EL TIMELINE (kind 3): posa la malla al frame del playhead. En PC vive en main.cpp; en
     // el N95 FALTABA -> al seleccionar un clip (ej "correr") y dar Play, la timeline avanzaba pero la vertex-anim
     // NO cambiaba. UpdateAnimations la saltea a proposito (kind 3): manda el playhead, no el auto-avance.
-    { extern void AplicarVertexAnimTimeline(); AplicarVertexAnimTimeline(); }
+    { extern void ApplyVertexAnimTimeline(); ApplyVertexAnimTimeline(); }
 
     // Render EVENT-DRIVEN: solo dibujar+cursor+swap si algo CAMBIO (g_redraw, lo
     // prende cualquier tecla/cursor/flecha) o hay una animacion en play. Si la escena
     // esta quieta, el frame se saltea ENTERO (sin GL ni swap/vsync) -> CPU y bateria
     // casi 0. El timer sigue tickeando, pero sin trabajo de GPU.
     // SOLO LA EXTERNA: el editor entero se dibuja en la pantalla externa; el telefono no gasta GPU (ni swap)
-    extern TBool W3dMouseCuadroCursor();   // (w3dmouse.cpp)
-    if (PantallaExternaSolo() && (g_redraw || HayAnimacionActiva())) {
+    extern TBool W3dMouseFrameCursor();   // (w3dmouse.cpp)
+    if (ExternalScreenOnly() && (g_redraw || HasAnimationActive())) {
         g_redraw = false;
         TUint _pfS = User::NTickCount();
-        PantallasExternasRender();
+        ExternalScreensRender();
         gPfSwap += User::NTickCount() - _pfS;
-        gPfCuadros++;
+        gPfFrames++;
         // (el log paso a paso se apaga tambien aca: el telefono no dibuja, y escribirlo cada cuadro en la tarjeta frenaba)
-        extern int g_pantallasLogCuadros;
-        if (g_pantallasLogCuadros > 0) g_pantallasLogCuadros--;
+        extern int g_screensLogFrames;
+        if (g_screensLogFrames > 0) g_screensLogFrames--;
     }
-    else if (PantallaExternaSolo() && W3dMouseCuadroCursor()) {
+    else if (ExternalScreenOnly() && W3dMouseFrameCursor()) {
         // (solo se movio el cursor: repuesto lo de abajo y dibujado en el lugar nuevo, sin redibujar el editor)
     }
-    else if (g_redraw || HayAnimacionActiva()) {
+    else if (g_redraw || HasAnimationActive()) {
         // CAPTURAR y apagar g_redraw ANTES de dibujar (mismo orden que PC main.cpp): lo que se prenda
         // DURANTE el render vale para el frame SIGUIENTE. Apagarlo despues PISABA esos pedidos: el ray
-        // tracer progresivo (RTViewportPaso prende g_redraw para seguir avanzando) quedaba congelado
+        // tracer progresivo (RTViewportStep prende g_redraw para seguir avanzando) quedaba congelado
         // hasta la proxima tecla -> "solo renderiza cuando aprieto flechas".
         g_redraw = false;
         // los PRIMEROS cuadros dejan cada paso en el log: si el telefono se cuelga dibujando, la ultima linea dice donde
-        static TInt sCuadrosLog = 0;
-        extern int g_pantallasLogCuadros;   // (PantallasExternas.cpp: elegir el modo de una pantalla lo vuelve a prender)
-        const TBool logCuadro = (sCuadrosLog < 3) || g_pantallasLogCuadros > 0;
-        if (logCuadro) w3dLogf("cuadro %d: dibujando el arbol", sCuadrosLog);
+        static TInt sFramesLog = 0;
+        extern int g_screensLogFrames;   // (ExternalScreens.cpp: elegir el modo de una pantalla lo vuelve a prender)
+        const TBool logFrame = (sFramesLog < 3) || g_screensLogFrames > 0;
+        if (logFrame) w3dLogf("cuadro %d: dibujando el arbol", sFramesLog);
         // arbol de viewports (3D confinado a su rectangulo + props) y el cursor encima
         TUint _pfR = User::NTickCount();
         W3dLayoutRender();
-        if (logCuadro) w3dLogf("cuadro %d: arbol listo (glErr=%x), el cursor", sCuadrosLog, (TInt)glGetError());
+        if (logFrame) w3dLogf("cuadro %d: arbol listo (glErr=%x), el cursor", sFramesLog, (TInt)glGetError());
         instance->iWhisk3D->DrawMouseCursor();
         TUint _pfS = User::NTickCount();
         gPfRender += _pfS - _pfR;
 
         // Call eglSwapBuffers, which blit the graphics to the window
-        if (logCuadro) w3dLogf("cuadro %d: swap (glErr=%x)", sCuadrosLog, (TInt)glGetError());
+        if (logFrame) w3dLogf("cuadro %d: swap (glErr=%x)", sFramesLog, (TInt)glGetError());
 #ifdef W3D_GLES2
         // CAPTURA de diagnostico del N8 (E:\whisk3d_cap_N.png, se baja por CODA): lo que se va a presentar, leido con TODO
         // dibujado (despues de mandar lo juntado, antes del swap: no cambia lo que se ve). Una del cuadro 10 (sin menu:
         // los iconos) y la del 2do cuadro de cada menu o popup que se abre, hasta 4 en total
         {
-            static TInt sCapturas = 0, sCuadros = 0, sConMenu = 0;
-            sCuadros++;
-            const TBool hayMenu = W3dLayoutMenuAbierto() || W3dLayoutPopupActivo();
-            sConMenu = hayMenu ? sConMenu + 1 : 0;
-            if (sCapturas < 4 && (sCuadros == 10 || sConMenu == 2)) {
-                w3dEngine::DibujarPendiente();
+            static TInt sCaptures = 0, sFrames = 0, sWithMenu = 0;
+            sFrames++;
+            const TBool hasMenu = W3dLayoutOpenMenu() || W3dLayoutActivePopup();
+            sWithMenu = hasMenu ? sWithMenu + 1 : 0;
+            if (sCaptures < 4 && (sFrames == 10 || sWithMenu == 2)) {
+                w3dEngine::DrawPending();
                 const TSize t = instance->Size();
                 unsigned char* px = (unsigned char*)User::Alloc(t.iWidth * t.iHeight * 4);
                 if (px) {
                     w3dEngine::ReadPixelsRGBA(0, 0, t.iWidth, t.iHeight, px);
-                    char ruta[40];
-                    sprintf(ruta, "E:\\whisk3d_cap_%d.png", (int)sCapturas);
-                    w3dEngine::SavePNG(ruta, px, t.iWidth, t.iHeight, true);
+                    char path[40];
+                    sprintf(path, "E:\\whisk3d_cap_%d.png", (int)sCaptures);
+                    w3dEngine::SavePNG(path, px, t.iWidth, t.iHeight, true);
                     User::Free(px);
-                    w3dLogf("captura %d (%s)", (TInt)sCapturas, hayMenu ? "con un menu abierto" : "sin menu");
-                    sCapturas++;
+                    w3dLogf("captura %d (%s)", (TInt)sCaptures, hasMenu ? "con un menu abierto" : "sin menu");
+                    sCaptures++;
                 }
             }
         }
@@ -1864,14 +1899,14 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         // lo JUNTADO sin dibujar (el lote de la UI 2D del backend ES 2.0: lo ultimo del cuadro, el menu y su texto) va
         // ANTES del swap, que es EGL directo y no lo manda: sin esto quedaba para el cuadro siguiente, dibujado encima
         // de otra cosa (el N8: los popups rompian todo). Como PCSwapBuffers en PC
-        w3dEngine::DibujarPendiente();
+        w3dEngine::DrawPending();
         const EGLBoolean swapOk = eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
-        if (logCuadro) w3dLogf("cuadro %d: swap=%d eglErr=%x, pantallas externas", sCuadrosLog, (TInt)swapOk, (TInt)eglGetError());
+        if (logFrame) w3dLogf("cuadro %d: swap=%d eglErr=%x, pantallas externas", sFramesLog, (TInt)swapOk, (TInt)eglGetError());
         // las pantallas externas con viewport propio (TV/HDMI): su superficie, su arbol, su swap
-        PantallasExternasRender();
-        if (logCuadro) { w3dLogf("cuadro %d: listo", sCuadrosLog); sCuadrosLog++; if (g_pantallasLogCuadros > 0) g_pantallasLogCuadros--; }
+        ExternalScreensRender();
+        if (logFrame) { w3dLogf("cuadro %d: listo", sFramesLog); sFramesLog++; if (g_screensLogFrames > 0) g_screensLogFrames--; }
         gPfSwap += User::NTickCount() - _pfS;
-        gPfCuadros++;
+        gPfFrames++;
     }
 
     // To keep the background light on
@@ -1902,7 +1937,7 @@ void CWhisk3DContainer::HandleControlEventL(
 
 // ---------------------------------------------------------
 // PANTALLA TACTIL: cada dedo -> el Core (input/W3dTactil), que arma los mismos eventos que SDL en Android; el
-// editor los recibe por controles.cpp, el mismo camino que Android y la web
+// editor los recibe por controls.cpp, el mismo camino que Android y la web
 // ---------------------------------------------------------
 //
 void CWhisk3DContainer::HandlePointerEventL( const TPointerEvent& aPointerEvent )
@@ -1911,21 +1946,21 @@ void CWhisk3DContainer::HandlePointerEventL( const TPointerEvent& aPointerEvent 
         {
         return;
         }
-    const TSize tam = Size();
-    w3dEngine::TactilSymbian( aPointerEvent, tam.iWidth, tam.iHeight );
+    const TSize size = Size();
+    w3dEngine::TouchSymbian( aPointerEvent, size.iWidth, size.iHeight );
     }
 
 // SEGUNDO PLANO (minimizar, otra app al frente): el loop de dibujo se detiene. Symbian^3 cierra las apps de fondo que
 // siguen usando la GPU cuando otra necesita memoria grafica (y dibujar en una ventana que no se ve no sirve). Al volver
 // arranca de nuevo y se redibuja todo
-void CWhisk3DContainer::SetPrimerPlano( TBool aPrimerPlano )
+void CWhisk3DContainer::SetFirstPlane( TBool aFirstPlane )
     {
     if ( !iPeriodic )
         {
         return;
         }
-    w3dLogf( "[app] %s", aPrimerPlano ? "vuelve al frente" : "pasa a segundo plano: el dibujo se detiene" );
-    if ( aPrimerPlano )
+    w3dLogf( "[app] %s", aFirstPlane ? "vuelve al frente" : "pasa a segundo plano: el dibujo se detiene" );
+    if ( aFirstPlane )
         {
         if ( !iPeriodic->IsActive() )
             {
@@ -1936,7 +1971,7 @@ void CWhisk3DContainer::SetPrimerPlano( TBool aPrimerPlano )
     else
         {
         iPeriodic->Cancel();
-        if ( iOpenGlInitialized && w3dEngine::TactilDedos() > 0 ) w3dEngine::TactilSoltarTodo();
+        if ( iOpenGlInitialized && w3dEngine::TouchGetFingers() > 0 ) w3dEngine::TouchReleaseAll();
         }
     }
 
@@ -1945,9 +1980,9 @@ void CWhisk3DContainer::FocusChanged( TDrawNow /*aDrawNow*/ )
     // (solo con el editor vivo y algun dedo apoyado: al cerrar la app tambien se pierde el foco)
     // (no aca adentro: este aviso puede llegar en medio de otro evento -crear la ventana de una pantalla externa desde
     // el click de un popup- y levantar los dedos manda eventos al editor; va en el cuadro siguiente)
-    if ( !IsFocused() && iOpenGlInitialized && w3dEngine::TactilDedos() > 0 )
+    if ( !IsFocused() && iOpenGlInitialized && w3dEngine::TouchGetFingers() > 0 )
         {
-        iSoltarDedos = ETrue;
+        iReleaseFingers = ETrue;
         }
     }
 

@@ -16,20 +16,20 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
-juegoprefabsmin /tmp/w3d_f7_juego
-guardarw3d /tmp/w3d_f7_juego/juegoprefabs.w3d
-entradaexiste /tmp/w3d_f7_juego/juegoprefabs.w3d prefabs/enemigo.w3dp 1
-abrirw3d /tmp/w3d_f7_juego/juegoprefabs.w3d
-prefabvivos 3
-prefabinfo Enemigo.001 generados 4 overrides 1
+window 640 480
+gameprefabsmin /tmp/w3d_f7_juego
+savew3d /tmp/w3d_f7_juego/juegoprefabs.w3d
+entryexists /tmp/w3d_f7_juego/juegoprefabs.w3d prefabs/enemigo.w3dp 1
+openw3d /tmp/w3d_f7_juego/juegoprefabs.w3d
+prefablive 3
+prefabinfo Enemigo.001 generated 4 overrides 1
 
 # --- el Play del editor ---
 simplay 130
-scriptinfo compartido juez OK
+scriptinfo shared juez OK
 simstop
-prefabvivos 3
+prefablive 3
 
 # --- el binario (modo debug: deja su whisk3d.log) ---
-compilarjuego 0 0 1
-juegoprefabslog /tmp/w3d_f7_juego juegoprefabs creados=1000 enemigos=1003 scope=1003 latidos=15 muerto=true vida=10045 primer=3 hud=true
+compilegame 0 0 1
+gameprefabslog /tmp/w3d_f7_juego juegoprefabs creados=1000 enemigos=1003 scope=1003 latidos=15 muerto=true vida=10045 primer=3 hud=true

@@ -3,17 +3,17 @@
 ## Привет, мир: двигаем 2D-квадрат стрелками
 
 ```lua
-propiedades = { cuadro = "objeto" }
+properties = { frame = "object" }
 
-function inicio()
+function start()
   beep(440, 120, 0.5)          -- сигнал, чтобы знать, что скрипт запустился
 end
 
-function actualizar(dt)
-  local c = objeto("cuadro")
-  local x, y = posPx(c)
-  if tecla("arriba") then y = y - 200 * dt end
-  if tecla("abajo")  then y = y + 200 * dt end
+function update(dt)
+  local c = object("frame")
+  local x, y = getPosPx(c)
+  if key("up") then y = y - 200 * dt end
+  if key("down")  then y = y + 200 * dt end
   setPosPx(c, x, y)
 end
 ```
@@ -21,27 +21,27 @@ end
 ## 3D-персонаж, который ходит и прыгает
 
 ```lua
-propiedades = { velocidad = 4, salto = 6 }
+properties = { speed = 4, jump = 6 }
 
 local vz = 0                   -- вертикальная скорость (для прыжка)
 
-function actualizar(dt)
-  local yo_ = yo()
-  local v = propiedad("velocidad")
+function update(dt)
+  local yo_ = self()
+  local v = property("speed")
   local dx, dy = 0, 0
-  if tecla("izquierda") then dx = dx - 1 end
-  if tecla("derecha")   then dx = dx + 1 end
-  if tecla("arriba")    then dy = dy - 1 end
-  if tecla("abajo")     then dy = dy + 1 end
-  mover(yo_, dx * v * dt, dy * v * dt, 0)
+  if key("left") then dx = dx - 1 end
+  if key("right")   then dx = dx + 1 end
+  if key("up")    then dy = dy - 1 end
+  if key("down")     then dy = dy + 1 end
+  move(yo_, dx * v * dt, dy * v * dt, 0)
 
   -- простой прыжок: вверх, гравитация тянет вниз, ниже пола (z = 0) не опускается
-  local x, y, z = posicion(yo_)
-  if teclaApretada("espacio") and z <= 0 then vz = propiedad("salto") end
+  local x, y, z = getPosition(yo_)
+  if keyPressed("space") and z <= 0 then vz = property("jump") end
   vz = vz - 9.8 * dt
   z = z + vz * dt
   if z < 0 then z = 0; vz = 0 end
-  setPosicion(yo_, x, y, z)
+  setPosition(yo_, x, y, z)
 end
 ```
 
@@ -51,34 +51,34 @@ end
 -- этот скрипт висит на персонаже, у которого есть дочерний хитбокс
 local monedas = 0
 
-function alEntrar(otro, miHitbox, suHitbox)
-  if string.sub(nombre(otro), 1, 6) == "Moneda" then
-    destruir(otro)
+function onEnter(other, myHitbox, otherHitbox)
+  if string.sub(getName(other), 1, 6) == "Moneda" then
+    destroy(other)
     monedas = monedas + 1
-    setCompartido("monedas", monedas)   -- его читает скрипт счётчика
-    sonido("sonidos/moneda.wav")
+    setShared("monedas", monedas)   -- его читает скрипт счётчика
+    sound("sounds/moneda.wav")
   end
 end
 ```
 
 ```lua
 -- а этот скрипт висит на 2D-тексте счётчика
-function actualizar(dt)
-  setTexto(yo(), "MONEDAS: " .. (compartido("monedas") or 0))
+function update(dt)
+  setText(self(), "MONEDAS: " .. (getShared("monedas") or 0))
 end
 ```
 
 ## Создаём врагов каждые 2 секунды
 
 ```lua
-local tiempo = 0
+local time = 0
 
-function actualizar(dt)
-  tiempo = tiempo + dt
-  if tiempo >= 2 then
-    tiempo = 0
-    local x = azar(-5, 5)
-    instanciar("Enemigo", x, 0, -10, 180)   -- префаб "Enemigo", повёрнутый к нам
+function update(dt)
+  time = time + dt
+  if time >= 2 then
+    time = 0
+    local x = random(-5, 5)
+    instantiate("Enemigo", x, 0, -10, 180)   -- префаб "Enemigo", повёрнутый к нам
   end
 end
 ```
@@ -86,14 +86,14 @@ end
 ## Кнопка, которая меняет сцену
 
 ```lua
-propiedades = { boton = "objeto" }
+properties = { button = "object" }
 
-function actualizar(dt)
-  if apretado(objeto("boton")) or teclaApretada("enter") then
-    cambiarEscena("Nivel1")
+function update(dt)
+  if pressed(object("button")) or keyPressed("enter") then
+    changeScene("Nivel1")
   end
 end
 ```
 
 > [!TIP]
-> В репозитории примеров есть полная игра Pong с комментариями: `Whisk3D-Examples/ui/whiskpaddle/contenido/juego.lua`. В ней используются `velocidad`, `rebotarEn`, `limitar`, `dedo`, `cajaUI` и `azar`.
+> В репозитории примеров есть полная игра Pong с комментариями: `Whisk3D-Examples/ui/whiskpaddle/content/juego.lua`. В ней используются `speed`, `bounceOn`, `limit`, `finger`, `uiBox` и `random`.

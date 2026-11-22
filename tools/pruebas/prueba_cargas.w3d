@@ -6,7 +6,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.05, 1.0"
 
         Camera { name: "Camara" fov: 60.0 y: -8.0 z: 0.0 }
@@ -14,7 +14,7 @@ Whisk3D {
         Curve {
             name: "Riel"
             filePath: cargas-riel.txt
-            ListaCarga { filePath: cargas-riel.cargas.json }
+            LoadList { filePath: cargas-riel.cargas.json }
         }
     }
 }

@@ -21,7 +21,7 @@ Listede iç adıyla, **Oclusion** olarak görünür ve altında parametrelerinin
 Değiştirici neyin göründüğünü hesaplamaz: bunu modelle birlikte gelen bir dosyadan okur. `nivel.obj` dosyasından içe aktarılmış bir örgü için aynı klasörde `nivel.pvs.json` dosyasını arar:
 
 ```json
-{ "sectores": 2, "tris": [[0, 1], [2, 3]] }
+{ "sectors": 2, "tris": [[0, 1], [2, 3]] }
 ```
 
 `sectores` kaç bölge olduğunu belirtir; `tris` ise her bölge için çizilecek üçgenleri içerir; üçgenler `.obj` dosyasındaki yüzlerin sırasına göre 0'dan başlayarak numaralandırılır. Normalde bu dosya orijinal oyundan ya da ayrı bir araçtan gelir. Her bölge bir **düğümdür**: 1 numaralı düğüm ilk listedir, 0 numaralı düğüm ise örgünün tamamını çizer.
@@ -40,7 +40,7 @@ Değiştirici neyin göründüğünü hesaplamaz: bunu modelle birlikte gelen bi
 | Dallar | Yalnızca yolun birden fazla dalı varsa görünür, örneğin ana yol ve bir bonus yolu. En yakın düğüm aranırken hangi dalların hesaba katılacağını seçer; açık olan her dal yeşil görünür. Düğmede örneğin "Dallar: 3 (tümü)" ya da "Dallar: 2/3" yazar. |
 | Geçerli düğüm | O an çizilen bölge; 0 = örgünün tamamı. Her bölgeyi kontrol etmek için elle değiştirilebilir. Düğümü Yol kendisi seçtiğinde motor bu değerin üzerine yazar. |
 
-Bir script'ten `setSector(objeto, n)` etkin düğümü değiştirir (0 = örgünün tamamı). Bkz. [Parçacıklar, sis ve görünürlük](../lua/api-particulas-niebla.md).
+Bir script'ten `setSector(object, n)` etkin düğümü değiştirir (0 = örgünün tamamı). Bkz. [Parçacıklar, sis ve görünürlük](../lua/api-particulas-niebla.md).
 
 ## Bilmekte fayda var
 

@@ -11,7 +11,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -27,7 +27,7 @@ Whisk3D {
             ref_malla: "MallaPVS"
             val_sector: "2"
             CullingTri {
-                metodo: "triangulos"
+                method: "triangles"
                 sector: 1
             }
         }

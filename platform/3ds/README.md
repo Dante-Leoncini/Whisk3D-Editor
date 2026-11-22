@@ -4,7 +4,7 @@ Es el mismo editor de la PC, compilado para el ARM11 de la 3DS con los kits libr
 
 - **devkitARM** es el compilador; **libctru**, el sistema de la consola.
 - **citro3d** maneja la GPU (PICA200). Whisk3D la usa con su propio backend, `libs/Whisk3DCore/graphics/citro3d`, en vez del de OpenGL.
-- **SDL2 de 3DS** (el de `thirdparty/SDL2`, que trae el port oficial) maneja el táctil, los botones y los eventos. Entra por `main.cpp` y `controles.cpp`, igual que en la PC.
+- **SDL2 de 3DS** (el de `thirdparty/SDL2`, que trae el port oficial) maneja el táctil, los botones y los eventos. Entra por `main.cpp` y `controls.cpp`, igual que en la PC.
 
 Lo propio de la consola va con `#ifdef W3D_3DS`, y lo que no tiene lugar en el código compartido, en `w3d_3ds.cpp`.
 

@@ -5,30 +5,30 @@
 #  - las flechas y la rueda NO panean ni hacen zoom (la inspeccion es del modo con la UI);
 #  - con la UI (mirando por la camara, "modo A") el paneo y el zoom siguen andando.
 # Una ventana ANCHA: con la UI el marco del render (16:9) queda con aire a los costados
-ventana 900 300
-vpcamara on
+window 900 300
+vpcamera on
 # --- con la UI: se panea y se hace zoom ---
-vpestado flecha 45 0
-vpestado espera 1 !0 0
-vpestado rueda 10
-vpestado espera !0 !0 0
-vpestado inspeccion 1 0 0
+vpstate arrow 45 0
+vpstate wait 1 !0 0
+vpstate wheel 10
+vpstate wait !0 !0 0
+vpstate inspeccion 1 0 0
 # (el marco con aire: no llena)
-vpestado marco 0.6461 0.92
+vpstate frame 0.6461 0.92
 # --- juego puro (con bandas): el marco es la pantalla, sin inspeccion ---
-juegopuro
-vpestado marco 1 1
-vpestado espera 1 0 0
-vpestado flecha 45 0
-vpestado rueda 10
-vpestado espera 1 0 0
+gamepure
+vpstate frame 1 1
+vpstate wait 1 0 0
+vpstate arrow 45 0
+vpstate wheel 10
+vpstate wait 1 0 0
 # --- cover: igual ---
-juegopuro
-vpestado marco 1 1
-vpestado flecha 45 0
-vpestado espera 1 0 0
+gamepure
+vpstate frame 1 1
+vpstate arrow 45 0
+vpstate wait 1 0 0
 # --- de vuelta con la UI: se panea otra vez ---
-juegopuro
-vpcamara on
-vpestado flecha 45 0
-vpestado espera 1 !0 0
+gamepure
+vpcamera on
+vpstate arrow 45 0
+vpstate wait 1 !0 0

@@ -46,7 +46,7 @@ Bunu nasıl yaptığı, tüm ayrıntılarıyla (grafikler, ses, dosyalar, girdi,
 
 ## Proje
 
-Tüm çalışma bir `.w3d` proje dosyasına kaydedilir. İçinde sahne ve kaynaklar birlikte taşınır: dokular (`texturas/`), script'ler (`scripts/`), sesler, sahneler, prefab'lar. Bir kaynak .w3d'nin **içinde** ya da diskte ayrı bir dosya olarak **dışında** durabilir; ".w3d içine kaydet" ve ".w3d dışına kaydet" menüleri onu bir yerden diğerine taşır. [Proje](proyecto.md) bölümüne bak.
+Tüm çalışma bir `.w3d` proje dosyasına kaydedilir. İçinde sahne ve kaynaklar birlikte taşınır: dokular (`textures/`), script'ler (`scripts/`), sesler, sahneler, prefab'lar. Bir kaynak .w3d'nin **içinde** ya da diskte ayrı bir dosya olarak **dışında** durabilir; ".w3d içine kaydet" ve ".w3d dışına kaydet" menüleri onu bir yerden diğerine taşır. [Proje](proyecto.md) bölümüne bak.
 
 > [!NOTE]
 > Bu kılavuz Whisk3D'nin bugün yapabildiklerini anlatır. İşlev adları, editörde Türkçe olarak gördüğün adlardır. Belirtilen tuşlar varsayılan tuşlardır: [Klavye kısayolları](atajos.md) bölümünden değiştirilebilirler.

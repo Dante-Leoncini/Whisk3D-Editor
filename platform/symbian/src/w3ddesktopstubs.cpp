@@ -3,19 +3,19 @@
 //  de Symbian. Existen para que el editor LINKEE en el telefono; se reemplazan por
 //  la implementacion real al portar cada pieza.
 //
-//   - CompilarJuego: compila el juego a binario (cmake/emcc/ndk via popen/system):
+//   - CompileGame: compila el juego a binario (cmake/emcc/ndk via popen/system):
 //     no aplica en el telefono. Devuelve false (el build no arranco).
 //
-//  (g_w3dUINoCargo y AbrirProyectoDesde ya NO van aca: los define import_w3d.cpp,
+//  (g_w3dUINotLoaded y OpenProjectFrom ya NO van aca: los define import_w3d.cpp,
 //   que ahora SI compila en Symbian.)
 // ============================================================================
 #include <string>
 
 class UI;
 
-bool CompilarJuego(UI*, int, int, int, bool, bool, bool, bool) { return false; }
+bool CompileGame(UI*, int, int, int, bool, bool, bool, bool) { return false; }
 // la tarjeta Juego de Propiedades: sin "Compilar juego" en el telefono el boton queda gris, y el menu "Empieza con"
 // lista las raices 3D (el editor del telefono es 3D)
-bool CompilarJuegoHayJuego() { return false; }
-bool CompilarJuegoEs3D() { return true; }
+bool CompileGameHasGame() { return false; }
+bool CompileGameEs3D() { return true; }
 

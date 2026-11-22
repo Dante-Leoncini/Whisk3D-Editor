@@ -17,7 +17,7 @@
  *  SIN MEMORIA: devolver NULL no avisa a nadie. Casi todo el codigo C++ (un
  *  std::vector que crece, el new de un objeto) sigue de largo y escribe en
  *  NULL: la app se cierra sin dejar rastro. Por eso el pedido que falla queda
- *  en el log, con el estado de la memoria (w3dMemoriaKB no reserva nada).
+ *  en el log, con el estado de la memoria (w3dMemoryKB no reserva nada).
  * ==============================================================================
  */
 
@@ -27,40 +27,40 @@
 #include "w3dlog.h"
 
 // (si el log mismo pidiera memoria y fallara, no se vuelve a entrar)
-static TBool sAvisandoSinMemoria = EFalse;
+static TBool sNotifyingNoMemory = EFalse;
 
-static void AvisarSinMemoria(unsigned int aSize)
+static void NotifyNoMemory(unsigned int aSize)
     {
-    if (sAvisandoSinMemoria)
+    if (sNotifyingNoMemory)
         {
         return;
         }
-    sAvisandoSinMemoria = ETrue;
-    long usado = -1, tomado = -1, libre = -1;
-    w3dMemoriaKB(usado, tomado, libre);
+    sNotifyingNoMemory = ETrue;
+    long used = -1, taken = -1, free = -1;
+    w3dMemoryKB(used, taken, free);
     w3dLogfE("[mem] SIN MEMORIA: fallo un pedido de %u bytes (heap %ld KB en uso, %ld KB tomados; RAM libre %ld KB)",
-             aSize, usado, tomado, libre);
-    sAvisandoSinMemoria = EFalse;
+             aSize, used, taken, free);
+    sNotifyingNoMemory = EFalse;
     }
 
-static void* Pedir(unsigned int aSize)
+static void* Request(unsigned int aSize)
     {
     void* p = User::Alloc(aSize);
     if (!p)
         {
-        AvisarSinMemoria(aSize);
+        NotifyNoMemory(aSize);
         }
     return p;
     }
 
 void* operator new(unsigned int aSize)
     {
-    return Pedir(aSize);
+    return Request(aSize);
     }
 
 void* operator new[](unsigned int aSize)
     {
-    return Pedir(aSize);
+    return Request(aSize);
     }
 
 void operator delete(void* aPtr)

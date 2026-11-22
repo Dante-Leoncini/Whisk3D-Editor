@@ -4,10 +4,10 @@
 # un usuario el 2026-11-11). Correr DESDE ESTA CARPETA:
 #   cd <motor>/tools/pruebas
 #   ../../platform/linux/build/whisk3d --script prueba_opcion_desplegable.w3s
-abrirw3d prueba_opcion_desplegable.w3d
+openw3d prueba_opcion_desplegable.w3d
 scriptinfo
 simplay 3
-scriptinfo compartido dificultad1 dificil
-scriptinfo compartido dificultad2 facil
-scriptinfo compartido sinlista []
+scriptinfo shared dificultad1 dificil
+scriptinfo shared dificultad2 facil
+scriptinfo shared sinlista []
 simstop

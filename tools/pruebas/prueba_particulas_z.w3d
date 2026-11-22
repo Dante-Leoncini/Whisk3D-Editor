@@ -24,7 +24,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.02, 0.02, 0.03, 1.0"
 
         Camera {
@@ -46,22 +46,22 @@ Whisk3D {
         // ---------- B: la chispa es el EMISOR del motor, tambien primero ------
         // vida enorme + cantidad alta: con un solo tick ya hay una particula
         // viva, quieta y grande en el origen del emisor.
-        Particulas {
+        Particles {
             name: "ChispaEmisor"
             x: 3.0
             y: 2.0
             z: 2.0
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 0.6
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 0.6
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
         }
 
         // ---------- C: la chispa esta DETRAS de la mascara ------------------

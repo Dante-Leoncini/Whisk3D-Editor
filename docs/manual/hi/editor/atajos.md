@@ -22,9 +22,9 @@
 
 हर कॉन्टेक्स्ट के शॉर्टकट तब काम करते हैं जब पॉइंटर उस पैनल पर हो; **General** वाले हर जगह काम करते हैं। **During a transform** वाले तब काम करते हैं जब कुछ मूव, रोटेट या स्केल हो रहा हो, और उन्हें प्राथमिकता मिलती है। Script Editor में अक्षर हमेशा टाइप होते हैं: वहाँ सिर्फ़ <kbd>Ctrl</kbd>, <kbd>Alt</kbd> या F कुंजियों वाले कॉम्बिनेशन ही बदले जा सकते हैं।
 
-## atajos.ini फ़ाइल
+## shortcuts.ini फ़ाइल
 
-बदलाव अपने-आप `res/atajos.ini` में सेव होते हैं, `config.ini` के बगल में। इसमें सिर्फ़ बदले गए फ़ंक्शन होते हैं, और इसे हाथ से एडिट किया जा सकता है:
+बदलाव अपने-आप `res/shortcuts.ini` में सेव होते हैं, `config.ini` के बगल में। इसमें सिर्फ़ बदले गए फ़ंक्शन होते हैं, और इसे हाथ से एडिट किया जा सकता है:
 
 ```ini
 # फ़ंक्शन = कॉम्बिनेशन, दूसरा कॉम्बिनेशन   (ख़ाली = कोई शॉर्टकट नहीं)
@@ -44,7 +44,7 @@ xf.cancelar = Esc, Q
 
 ### General (कोई भी पैनल)
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Save project | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ xf.cancelar = Esc, Q
 
 ### 3D Viewport
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ xf.cancelar = Esc, Q
 
 ### During a transform (Move / Rotate / Scale)
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
 | Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ xf.cancelar = Esc, Q
 
 ### UV Editor
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ xf.cancelar = Esc, Q
 
 ### Timeline
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ xf.cancelar = Esc, Q
 
 ### Outliner
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ xf.cancelar = Esc, Q
 
 ### 2D Editor
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ xf.cancelar = Esc, Q
 
 ### Properties (रूटीन के कदम)
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Grab step | <kbd>G</kbd> | — | `props.agarrar` |
 | Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ xf.cancelar = Esc, Q
 
 ### Script Editor
 
-| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | atajos.ini में नाम |
+| फ़ंक्शन | डिफ़ॉल्ट शॉर्टकट | Nokia N95 (फ़ोन का कीपैड) | shortcuts.ini में नाम |
 |---|---|---|---|
 | Save script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Undo | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

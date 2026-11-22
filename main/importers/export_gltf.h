@@ -12,7 +12,7 @@ class Mesh;
 // La usa el propio exportador. La compartia con el bloque "topologia" del .w3d, que ya no se escribe
 // (la geometria va en .w3dm, con los poligonos nativos); el LECTOR de ese bloque la sigue necesitando
 // para MIGRAR los proyectos viejos, asi que el criterio de emision no se puede cambiar solo.
-void OrdenCarasGLB(const Mesh* m, std::vector<int>& orden);
+void OrderFacesGLB(const Mesh* m, std::vector<int>& order);
 
 // Exporta la escena (o solo lo seleccionado) a glTF 2.0. Es el INVERSO del importador (import_gltf.cpp):
 // malla en BIND pose + skin (JOINTS/WEIGHTS + inverseBindMatrices) + huesos (nodos TRS) + animaciones

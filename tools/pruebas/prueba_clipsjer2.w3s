@@ -23,8 +23,8 @@
 #    - el importador glTF anota en cada clip el tamano del esqueleto que lo grabo.
 # ==========================================================================
 
-ventana 1280 720
-escenadefecto
+window 1280 720
+scenedefault
 
 # ---- la jerarquia: Auto > Chasis > Puerta (x=1) ----
 add cube
@@ -39,60 +39,60 @@ selobj Puerta
 objpos 1 0 0
 
 # ---- el desplegable "Clips": una biblioteca NUEVA con su Ctrl+Z / Ctrl+Y ----
-jerlibmenu Auto New Library
-jerinfo Auto lib Auto clips 0 refs 1 refsundo 0
+hierlibmenu Auto New Library
+hierinfo Auto lib Auto clips 0 refs 1 refsundo 0
 undo
-jerinfo Auto lib -
+hierinfo Auto lib -
 redo
-jerinfo Auto lib Auto refs 1 refsundo 0
+hierinfo Auto lib Auto refs 1 refsundo 0
 
 # ---- un clip NUEVO desde el timeline (la biblioteca ya estaba): Ctrl+Z lo saca, Ctrl+Y lo devuelve ENTERO ----
 selobj Auto
 clipmenu Hierarchy Clip
-clipinfo Auto n 1 activo Clip
-animrango 1 11
-animcurva Auto:Clip . y 1 0 11 2
-animcurva Auto:Clip Puerta ry 1 0 11 90
-jerinfo Auto pistas Clip 2
+clipinfo Auto n 1 active Clip
+animrange 1 11
+animcurve Auto:Clip . y 1 0 11 2
+animcurve Auto:Clip Puerta ry 1 0 11 90
+hierinfo Auto tracks Clip 2
 undo
 clipinfo Auto n 0
-animlista activa Scene no Auto:Clip
-jerinfo Auto clips 0 refs 1 refsundo 1
+animlist active Scene no Auto:Clip
+hierinfo Auto clips 0 refs 1 refsundo 1
 redo
 clipinfo Auto n 1
-jerinfo Auto pistas Clip 2 refs 1
+hierinfo Auto tracks Clip 2 refs 1
 # (el Ctrl+Y lo deja ELEGIDO, como quedo al crearlo)
-animlista activa Auto:Clip
+animlist active Auto:Clip
 clipmenu Auto: Clip
-animlista activa Auto:Clip
+animlist active Auto:Clip
 
 # ---- un clip nuevo en un objeto SIN biblioteca: la biblioteca y el clip son UN paso ----
 add cube
 objname Farol
 selobj Farol
 clipmenu Hierarchy Clip
-jerinfo Farol lib Farol clips 1
+hierinfo Farol lib Farol clips 1
 undo
-jerinfo Farol lib -
+hierinfo Farol lib -
 redo
-jerinfo Farol lib Farol clips 1 refs 1
-animlista activa Farol:Clip
+hierinfo Farol lib Farol clips 1 refs 1
+animlist active Farol:Clip
 
 # ---- el "-" de la tarjeta Animation sobre la VISTA de un clip: el clip sale de la biblioteca y vuelve ----
 selobj Auto
 clipmenu Auto: Clip
-animmenos
+animminus
 clipinfo Auto n 0
-jerinfo Auto clips 0
-animlista activa Scene no Auto:Clip
+hierinfo Auto clips 0
+animlist active Scene no Auto:Clip
 undo
-clipinfo Auto n 1 activo Clip
-jerinfo Auto pistas Clip 2
-animlista activa Auto:Clip
+clipinfo Auto n 1 active Clip
+hierinfo Auto tracks Clip 2
+animlist active Auto:Clip
 redo
 clipinfo Auto n 0
 undo
-clipinfo Auto n 1 activo Clip
+clipinfo Auto n 1 active Clip
 frame 6
 objat Auto 0 1 0 0.01
 rotat Puerta 0 45 0 0.1
@@ -100,28 +100,28 @@ frame 1
 
 # ---- animaciones de ESCENA: crear y borrar son deshacibles (vuelven a su lugar con sus curvas) ----
 clipmenu Scene Animation
-animlista tiene Scene.001 activa Scene.001
-animcurva Scene.001 Farol x 1 0 11 5
+animlist has Scene.001 active Scene.001
+animcurve Scene.001 Farol x 1 0 11 5
 undo
-animlista no Scene.001 activa Scene
+animlist no Scene.001 active Scene
 redo
-animlista tiene Scene.001 activa Scene.001
+animlist has Scene.001 active Scene.001
 frame 6
 objat Farol 2.5 0 0 0.01
-animmenos
-animlista no Scene.001 activa Scene
+animminus
+animlist no Scene.001 active Scene
 undo
-animlista tiene Scene.001 activa Scene.001
+animlist has Scene.001 active Scene.001
 frame 6
 objat Farol 2.5 0 0 0.01
 redo
-animlista no Scene.001 activa Scene
+animlist no Scene.001 active Scene
 # ...la UNICA animacion de escena no se saca: se vacia, y el Ctrl+Z le devuelve sus curvas
-animcurva Scene Farol y 1 0 11 4
+animcurve Scene Farol y 1 0 11 4
 frame 6
 objat Farol 2.5 2 0 0.01
-animmenos
-animlista tiene Scene activa Scene
+animminus
+animlist has Scene active Scene
 selobj Farol
 objpos 0 0 0
 frame 6
@@ -129,95 +129,95 @@ objat Farol 0 0 0 0.001
 undo
 frame 6
 objat Farol 0 2 0 0.01
-animmenos
+animminus
 selobj Farol
 objpos 0 0 0
 
 # ---- el "Retarget" POR DEFECTO de un clip (su desplegable en la tarjeta Animation) ----
 clipmenu Auto: Clip
 clipretargetmenu Rotations only
-jerinfo Auto retarget Clip rotaciones
+hierinfo Auto retarget Clip rotations
 undo
-jerinfo Auto retarget Clip completo
+hierinfo Auto retarget Clip complete
 redo
-jerinfo Auto retarget Clip rotaciones
+hierinfo Auto retarget Clip rotations
 undo
-jerinfo Auto retarget Clip completo
+hierinfo Auto retarget Clip complete
 
 # ---- el "Retarget" PROPIO de un objeto y de un armature (tarjeta Animacion del objeto) ----
 objretarget Auto es clip
 objretarget Auto Rotations only
-objretarget Auto es rotaciones
+objretarget Auto es rotations
 undo
 objretarget Auto es clip
 redo
-objretarget Auto es rotaciones
+objretarget Auto es rotations
 rigretarget Rig 2
-objretarget RigB es completo
+objretarget RigB es complete
 objretarget RigB Rotations only
-objretarget RigB es rotaciones
+objretarget RigB es rotations
 undo
-objretarget RigB es completo
+objretarget RigB es complete
 redo
-objretarget RigB es rotaciones
+objretarget RigB es rotations
 
 # ---- la vista ANIMACIONES del outliner: los clips debajo de su biblioteca, renombrar y borrar con undo ----
-raizanim Scene
-recurso animaciones Auto existe 1 usuarios 1
-recurso animaciones Auto/Clip existe 1 nombre Clip usuarios 1
-recurso animaciones Farol/Clip existe 1
-outvista animaciones
-outfila Clip prof 1
+rootanim Scene
+resource animations Auto exists 1 users 1
+resource animations Auto/Clip exists 1 name Clip users 1
+resource animations Farol/Clip exists 1
+outview animations
+outrow Clip prof 1
 clipmenu Auto: Clip
-recrenombrar animaciones Auto/Clip Abrir Auto/Abrir
-recurso animaciones Auto/Clip existe 0
-recurso animaciones Auto/Abrir existe 1 nombre Abrir
-clipinfo Auto tiene Abrir activo Abrir
-animlista activa Auto:Abrir
+recrename animations Auto/Clip Abrir Auto/Abrir
+resource animations Auto/Clip exists 0
+resource animations Auto/Abrir exists 1 name Abrir
+clipinfo Auto has Abrir active Abrir
+animlist active Auto:Abrir
 undo
-recurso animaciones Auto/Clip existe 1
-clipinfo Auto tiene Clip activo Clip
+resource animations Auto/Clip exists 1
+clipinfo Auto has Clip active Clip
 redo
-clipinfo Auto tiene Abrir
-recborrar animaciones Auto/Abrir
+clipinfo Auto has Abrir
+recdelete animations Auto/Abrir
 clipinfo Auto n 0
-animlista activa Scene
+animlist active Scene
 undo
-clipinfo Auto n 1 tiene Abrir
-jerinfo Auto pistas Abrir 2
+clipinfo Auto n 1 has Abrir
+hierinfo Auto tracks Abrir 2
 # (un recurso en uso sigue sin poder borrarse; "Purge orphans" no toca los clips)
-recborrar animaciones Auto falla
-recpurgar animaciones
-recurso animaciones Auto/Abrir existe 1
+recdelete animations Auto fails
+recpurge animations
+resource animations Auto/Abrir exists 1
 # el borrar DEL OUTLINER (la tecla Supr sobre la fila): una parte no pide confirmacion (tiene Ctrl+Z)
 outclick Abrir
-outteclapc supr
+outkeypc supr
 clipinfo Auto n 0
 undo
-clipinfo Auto n 1 tiene Abrir
-recrenombrar animaciones Auto/Abrir Clip Auto/Clip
-outvista escena
+clipinfo Auto n 1 has Abrir
+recrename animations Auto/Abrir Clip Auto/Clip
+outview scene
 
 # ---- guardar / abrir: el retarget propio y el del clip viajan con el proyecto ----
-guardarw3d /tmp/w3d_f6_clipsjer2.w3d
-entradatiene /tmp/w3d_f6_clipsjer2.w3d proyecto.json "rotaciones" 1
-abrirw3d /tmp/w3d_f6_clipsjer2.w3d
-objretarget Auto es rotaciones
-objretarget RigB es rotaciones
-objretarget RigA es completo
+savew3d /tmp/w3d_f6_clipsjer2.w3d
+entryhas /tmp/w3d_f6_clipsjer2.w3d project.json "rotations" 1
+openw3d /tmp/w3d_f6_clipsjer2.w3d
+objretarget Auto es rotations
+objretarget RigB es rotations
+objretarget RigA es complete
 objretarget Farol es clip
-jerinfo Auto lib Auto pistas Clip 2
+hierinfo Auto lib Auto tracks Clip 2
 objretarget Auto Clip default
 
 # ---- CAPAS de clips de jerarquia en el MIX del editor: "Clip" entero + "Giro" sumado a la mitad ----
-clipnuevo Auto Giro 1 11
-animcurva Auto:Giro Chasis rx 1 0 11 30
-raizanim Scene
+clipnew Auto Giro 1 11
+animcurve Auto:Giro Chasis rx 1 0 11 30
+rootanim Scene
 clipmenu Mix
-mixjer Auto Clip
-mixfilas tiene Auto tiene Clip
-jercapa Auto 2 Giro infl 50 modo sumar
-jerinfo Auto capas 2
+mixhier Auto Clip
+mixrows has Auto has Clip
+hierlayer Auto 2 Giro infl 50 mode add
+hierinfo Auto layers 2
 frame 6
 objat Auto 0 1 0 0.01
 rotat Puerta 0 45 0 0.1
@@ -226,43 +226,43 @@ frame 11
 objat Auto 0 2 0 0.01
 rotat Chasis 15 0 0 0.1
 # guardar / abrir: las capas van en el nodo de la raiz
-guardarw3d /tmp/w3d_f6_clipsjer2_capas.w3d
-entradatiene /tmp/w3d_f6_clipsjer2_capas.w3d proyecto.json capasJer 1
-raizanim Scene
+savew3d /tmp/w3d_f6_clipsjer2_capas.w3d
+entryhas /tmp/w3d_f6_clipsjer2_capas.w3d project.json hierLayers 1
+rootanim Scene
 objat Auto 0 0 0 0.001
 rotat Chasis 0 0 0 0.1
-abrirw3d /tmp/w3d_f6_clipsjer2_capas.w3d
-jerinfo Auto capas 2
-jermix frame 11
+openw3d /tmp/w3d_f6_clipsjer2_capas.w3d
+hierinfo Auto layers 2
+hiermix frame 11
 objat Auto 0 2 0 0.01
 rotat Chasis 15 0 0 0.1
-jermix soltar
+hiermix release
 objat Auto 0 0 0 0.001
 
 # ---- JUGANDO: las capas con su cabezal (tick del juego) y el retarget "rotaciones" de una copia al doble ----
-jermix tick 0.1666667 1
+hiermix tick 0.1666667 1
 objat Auto 0 1 0 0.01
 rotat Chasis 7.5 0 0 0.1
-jermix soltar
-jercapa Auto 1 -
-jerinfo Auto capas 0
-dupjerarquia copia Auto +hijos
+hiermix release
+hierlayer Auto 1 -
+hierinfo Auto layers 0
+duphierarchy copy Auto +hijos
 selobj Auto.001
 objpos 10 0 0
 objscale 2 2 2
-jercapa Auto.001 1 Clip
+hierlayer Auto.001 1 Clip
 objretarget Auto.001 Rotations only
-jermix tick 0.1666667 1
+hiermix tick 0.1666667 1
 objat Auto.001 10 2 0 0.01
 objat Puerta.001 1 0 0 0.01
 rotat Puerta.001 0 45 0 0.1
-jermix soltar
+hiermix release
 objretarget Auto.001 Complete
-jercapa Auto.001 1 Clip frame 0
-jermix tick 0.1666667 1
+hierlayer Auto.001 1 Clip frame 0
+hiermix tick 0.1666667 1
 objat Auto.001 10 1 0 0.01
-jermix soltar
-jercapa Auto.001 1 -
+hiermix release
+hierlayer Auto.001 1 -
 
 # ---- lua: objetoCapa / objetoCapaFrame / objetoCapaPeso / objetoCapas (y un clip ajeno calificado) ----
 add cube
@@ -274,16 +274,16 @@ selobj Moto
 objpos -10 0 0
 add cube
 objname Director
-raizscript Director prueba_clipsjer2.lua
+rootscript Director prueba_clipsjer2.lua
 # (6 ticks de 1/30 s: el script lee el frame de la capa ANTES de que el tick la avance -f1 = 5- y despues del
 #  sexto la capa esta en el frame 7 de su clip: la raiz sube 1.2, el chasis gira 18 * 50% = 9, la Moto la mitad)
 simplay 6
-scriptinfo compartido capas 2
-scriptinfo compartido ajeno true
-scriptinfo compartido nada true
-scriptinfo compartido peso2 0.5
-scriptinfo compartido f1 5
-objretarget Farol es rotaciones
+scriptinfo shared capas 2
+scriptinfo shared ajeno true
+scriptinfo shared nada true
+scriptinfo shared peso2 0.5
+scriptinfo shared f1 5
+objretarget Farol es rotations
 objat Moto -10 0.6 0 0.01
 objat Auto 0 1.2 0 0.01
 rotat Chasis 9 0 0 0.1
@@ -292,28 +292,28 @@ objat Moto -10 0 0 0.001
 objat Auto 0 0 0 0.001
 rotat Chasis 0 0 0 0.1
 # (las capas que puso el script son estado de la PARTIDA: el Stop las saca, no llegan al .w3d)
-jerinfo Auto capas 0
-jerinfo Moto capas 0
+hierinfo Auto layers 0
+hierinfo Moto layers 0
 objretarget Farol es clip
 
 # ---- el retarget de un ARMATURE dentro de las CAPAS de su Mix ----
-rigcapa RigB Caminar
-huesopose RigB Cadera 10 2 0 0.01 frame 6
-huesopose RigB Pecho 0 2 0 0.01 frame 6
+riglayer RigB Caminar
+checkbonepose RigB Cadera 10 2 0 0.01 frame 6
+checkbonepose RigB Pecho 0 2 0 0.01 frame 6
 objretarget RigB Complete
-huesopose RigB Cadera 5 1 0 0.01 frame 6
-huesopose RigB Pecho 0 2.5 0 0.01 frame 6
-rigcapa RigB -
+checkbonepose RigB Cadera 5 1 0 0.01 frame 6
+checkbonepose RigB Pecho 0 2.5 0 0.01 frame 6
+riglayer RigB -
 
 # ---- el importador glTF anota el tamano del esqueleto en cada clip ----
 rigskinglb RigA /tmp/w3d_f6_clipsjer2_rig.glb
-importclipsalto /tmp/w3d_f6_clipsjer2_rig.glb n 1
+importclipsheight /tmp/w3d_f6_clipsjer2_rig.glb n 1
 
 # ---- el retarget en el FK RECONSTRUIDO (biped): la raiz avanza su delta escalado, los hijos no se corren ----
 rigbiped RigA RigB
 objretarget RigB Rotations only
-huesopose RigB Cadera 10 2 0 0.01 frame 6 head 10 2 0
-huesopose RigB Pecho 0 2 0 0.01 frame 6 head 10 4 0
+checkbonepose RigB Cadera 10 2 0 0.01 frame 6 head 10 2 0
+checkbonepose RigB Pecho 0 2 0 0.01 frame 6 head 10 4 0
 objretarget RigB Complete
-huesopose RigB Cadera 5 1 0 0.01 frame 6 head 5 1 0
+checkbonepose RigB Cadera 5 1 0 0.01 frame 6 head 5 1 0
 

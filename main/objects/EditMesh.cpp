@@ -3,8 +3,8 @@
 #include "objects/Mesh.h"        // lee la geometria de la malla de render (vertex/edges/faces3d)
 #include "objects/Objects.h"     // EditSelectMode + SelVertex/SelEdge/SelFace
 #include "w3dGraphics.h" // abstraccion de graficos (sin GL directo)
-#include "WhiskUI/theme/colores.h"  // ListaColores(Ubyte) + ColorID
-#include "ui/W3dColors.h"     // W3dColoresUbyte: colores del editor (piso, normales)
+#include "WhiskUI/theme/colors.h"  // ColorList(Ubyte) + ColorID
+#include "ui/W3dColors.h"     // W3dColorsUbyte: colores del editor (piso, normales)
 #include <map>
 #include <set>
 #include <string>
@@ -15,7 +15,7 @@ EditMesh::EditMesh() { src = NULL; activeIdx = -1; syncedGeomVersion = 0; }
 
 // arma la malla de edicion desde la malla de render: vertices unicos, aristas,
 // CARAS (poligono + sus aristas + centro). La seleccion arranca en TODO.
-void EditMesh::Construir(Mesh* m) {
+void EditMesh::Build(Mesh* m) {
     src = m;
     // pos[] nace leyendo el vertex[] de ESTA version -> el cage arranca en sync (el
     // auto-sync de RenderEditOverlay no dispara de mas justo despues de construir)
@@ -24,12 +24,12 @@ void EditMesh::Construir(Mesh* m) {
     vertSel.clear(); edgeSel.clear(); faceSel.clear();
     faces.clear(); faceSrc.clear(); faceEdges.clear(); faceCenter.clear(); faceTriDyn.clear();
     activeIdx = -1;
-    if (!m || !m->vertex || m->vertexSize <= 0) { Recolorear(); return; }
+    if (!m || !m->vertex || m->vertexSize <= 0) { Recolor(); return; }
     const int nV = m->vertexSize;
-    const bool hayRep = ((int)m->posRep.size() == nV);
+    const bool hasRep = ((int)m->posRep.size() == nV);
 
     // 1 vertice por POSICION unica (representante: posRep[i]==i)
-    for (int i = 0; i < nV; i++) if (!hayRep || m->posRep[i] == i) editVerts.push_back(i);
+    for (int i = 0; i < nV; i++) if (!hasRep || m->posRep[i] == i) editVerts.push_back(i);
     pos.reserve(editVerts.size() * 3);
     for (size_t k = 0; k < editVerts.size(); k++) {
         int gi = editVerts[k];
@@ -66,7 +66,7 @@ void EditMesh::Construir(Mesh* m) {
         std::vector<int> poly;
         for (size_t c = 0; c < ring.size(); c++) {
             int gi = ring[c]; if (gi < 0 || gi >= nV) continue;
-            int rep = hayRep ? m->posRep[gi] : gi;
+            int rep = hasRep ? m->posRep[gi] : gi;
             int ei = (rep >= 0 && rep < nV) ? repToEdit[rep] : -1;
             if (ei < 0) continue;
             if (!poly.empty() && poly.back() == ei) continue; // saltar duplicado consecutivo
@@ -99,7 +99,7 @@ void EditMesh::Construir(Mesh* m) {
     vertSel.assign(editVerts.size(), 1);
     edgeSel.assign(lineIdx.size() / 2, 1);
     faceSel.assign(faces.size(), 1);
-    Recolorear();
+    Recolor();
 }
 
 // empuja pos[] (editable, autoritativa al editar) al render IN-PLACE (sin realloc).
@@ -109,17 +109,17 @@ void EditMesh::Construir(Mesh* m) {
 // mover un vertice) y esto era UNA de las puertas por las que se mueven posiciones, no
 // LA puerta: Apply Location/Rotation/Scale, Merge Vertices y Apply Armature escriben
 // vertex[] por su cuenta y tiraban TODAS las marcas en silencio. Ahora el re-anclaje es
-// del guard W3dMoverVerts (libs/Whisk3DCore/objects/Mesh.h), que lo hace solo al cerrar
+// del guard W3dMoveVerts (libs/Whisk3DCore/objects/Mesh.h), que lo hace solo al cerrar
 // el scope, asi no hay nada que recordar en ninguna de las puertas.
-void EditMesh::EmpujarPosiciones(){
+void EditMesh::PushPositions(){
     if (!src || !src->vertex) return;
     Mesh* m = src; const int nV = m->vertexSize;
-    W3dMoverVerts mv(m);                // <- re-ancla sharp/seam al salir de la funcion
-    const bool hayRep = ((int)m->posRep.size() == nV);
+    W3dMoveVerts mv(m);                // <- re-ancla sharp/seam al salir de la funcion
+    const bool hasRep = ((int)m->posRep.size() == nV);
     std::vector<int> repToEdit(nV, -1); // rep GPU -> editVert k
     for (size_t k=0;k<editVerts.size();k++) if (editVerts[k]>=0 && editVerts[k]<nV) repToEdit[editVerts[k]]=(int)k;
     for (int gv=0; gv<nV; gv++){
-        int rep = hayRep ? m->posRep[gv] : gv;
+        int rep = hasRep ? m->posRep[gv] : gv;
         int k = (rep>=0 && rep<nV) ? repToEdit[rep] : -1;
         if (k>=0 && k*3+2 < (int)pos.size()){
             m->vertex[gv*3]=pos[k*3]; m->vertex[gv*3+1]=pos[k*3+1]; m->vertex[gv*3+2]=pos[k*3+2];
@@ -130,7 +130,7 @@ void EditMesh::EmpujarPosiciones(){
 
 // true si la cara f esta "seleccionada" segun el MODO: face=faceSel; vertex=todos
 // sus vertices sel; edge=todas sus aristas sel.
-static bool CaraSel(int mode, size_t f,
+static bool FaceSel(int mode, size_t f,
                     const std::vector<std::vector<int> >& faces,
                     const std::vector<std::vector<int> >& faceEdges,
                     const std::vector<unsigned char>& vertSel,
@@ -150,14 +150,14 @@ static bool CaraSel(int mode, size_t f,
 
 // recolorea puntos, lineas, puntitos-de-cara y arma el fill de caras seleccionadas.
 // La seleccion ACTIVA (activeIdx, ultimo elemento) va de BLANCO.
-void EditMesh::Recolorear() {
+void EditMesh::Recolor() {
     const int mode = EditSelectMode;
-    const GLubyte* csel = ListaColoresUbyte[static_cast<int>(ColorID::accent)];
-    const GLubyte* cuns = W3dColoresUbyte[W3dColor_LineaPiso];
-    const GLubyte* cneg = ListaColoresUbyte[static_cast<int>(ColorID::negro)];
-    const GLubyte* cbla = ListaColoresUbyte[static_cast<int>(ColorID::blanco)];
-    const GLubyte* cmag = W3dColoresUbyte[W3dColor_normalCustom]; // seams (magenta)
-    const bool hayCosturas = (src && !src->seamEdges.empty());
+    const GLubyte* csel = ColorListUbyte[static_cast<int>(ColorID::accent)];
+    const GLubyte* cuns = W3dColorsUbyte[W3dColor_LineFloor];
+    const GLubyte* cneg = ColorListUbyte[static_cast<int>(ColorID::black)];
+    const GLubyte* cbla = ColorListUbyte[static_cast<int>(ColorID::white)];
+    const GLubyte* cmag = W3dColorsUbyte[W3dColor_normalCustom]; // seams (magenta)
+    const bool hasSeams = (src && !src->seamEdges.empty());
     const size_t N = editVerts.size();
     const size_t E = lineIdx.size() / 2;
     const size_t F = faces.size();
@@ -222,13 +222,13 @@ void EditMesh::Recolorear() {
         }
         // SEAM = MAGENTA: si el borde es costura UV y NO esta seleccionado (ca==cuns), lo pinta
         // magenta para que se vea donde se abre el unwrap. La seleccion (verde/blanco) lo pisa.
-        if (hayCosturas && ca == cuns) {
+        if (hasSeams && ca == cuns) {
             int gva = (a >= 0 && a < (int)editVerts.size()) ? editVerts[a] : -1;
             int gvb = (b >= 0 && b < (int)editVerts.size()) ? editVerts[b] : -1;
-            // por PosicionesReposo y no por vertex[]: las claves viven en el espacio de
+            // por RestPositions y no por vertex[]: las claves viven en el espacio de
             // REPOSO, asi que con la malla POSADA por una vertex anim buscar en vertex[]
             // no encuentra NINGUNA y las costuras se apagaban justo mientras se anima.
-            const GLfloat* P = src->PosicionesReposo();
+            const GLfloat* P = src->RestPositions();
             if (P && gva >= 0 && gvb >= 0 && gva < src->vertexSize && gvb < src->vertexSize &&
                 src->seamEdges.count(Mesh::SharpEdgeKey(&P[gva*3], &P[gvb*3]))) {
                 ca = cb = cmag;
@@ -247,7 +247,7 @@ void EditMesh::Recolorear() {
 
     // FILL: triangular (abanico) las caras "seleccionadas" segun el modo
     for (size_t f = 0; f < F; f++) {
-        if (!CaraSel(mode, f, faces, faceEdges, vertSel, edgeSel, faceSel)) continue;
+        if (!FaceSel(mode, f, faces, faceEdges, vertSel, edgeSel, faceSel)) continue;
         const std::vector<int>& p = faces[f];
         for (size_t t = 1; t + 1 < p.size(); t++) {
             faceTriDyn.push_back((MeshIndex)p[0]);
@@ -276,12 +276,12 @@ void EditMesh::Render() {
     // empates pasan (LEqual) y un sesgo chico hacia la camara en la proyeccion (anda en cualquier GPU)
     gfx::Disable(gfx::PolygonOffsetFill);
     gfx::DepthFunc(gfx::DepthLEqual);
-    gfx::SesgoMetros(-0.02f);
+    gfx::BiasMeters(-0.02f);
 #endif
 
     // 1) CARAS seleccionadas: verde 50%, blend, sin escribir z (para no tapar lo de arriba)
     if (!faceTriDyn.empty()) {
-        const float* ac = ListaColores[static_cast<int>(ColorID::accent)];
+        const float* ac = ColorList[static_cast<int>(ColorID::accent)];
         gfx::DisableArray(gfx::ColorArray);
         gfx::Enable(gfx::Blend); gfx::BlendAlpha();
         gfx::DepthMask(false);
@@ -297,10 +297,10 @@ void EditMesh::Render() {
 
     // los arrays que se dibujan: los de siempre, o (telefono, sin X-Ray) solo lo que da a la camara
     const GLfloat* lp = linePos.empty() ? NULL : &linePos[0];   const GLubyte* lc = lineCol.empty() ? NULL : &lineCol[0];
-    int nLineas = (int)(linePos.size() / 3);
+    int nLines = (int)(linePos.size() / 3);
     const GLfloat* vp = &pos[0];   const GLubyte* vc = col.empty() ? NULL : &col[0];   int nVerts = (int)(pos.size() / 3);
     const GLfloat* fp = faceCenter.empty() ? NULL : &faceCenter[0];   const GLubyte* fc = facePtCol.empty() ? NULL : &facePtCol[0];
-    int nCaras = (int)(faceCenter.size() / 3);
+    int nFaces = (int)(faceCenter.size() / 3);
 #if defined(W3D_SYMBIAN)
     // el z de 16 bits del telefono (a 5 metros distingue de a ~4 cm) no tapa la jaula de ATRAS: en un modelo denso se
     // veian los bordes, vertices y puntitos de las caras de atras. Sin X-Ray, una cara que mira para atras (la camara
@@ -308,7 +308,7 @@ void EditMesh::Render() {
     // malla esta tapada por la propia malla: lo que solo toca caras asi no se dibuja. Un pedazo ABIERTO (un plano, una
     // grilla) visto de atras se ve entero. Lo de adelante tapado lo sigue resolviendo el z
     static std::vector<GLfloat> visLP, visVP, visFP; static std::vector<GLubyte> visLC, visVC, visFC;
-    static std::vector<unsigned char> frente, eUso, vUso;   // (uso: bit 1 = tiene cara, bit 2 = tiene cara de frente)
+    static std::vector<unsigned char> front, eUse, vUse;   // (uso: bit 1 = tiene cara, bit 2 = tiene cara de frente)
     if (!g_xray && !faces.empty()) {
         float M[16], P[16];
         gfx::GetMatrix(gfx::ModelView, M); gfx::GetMatrix(gfx::Projection, P);
@@ -317,12 +317,12 @@ void EditMesh::Render() {
         const float A = e*k - f*h, B = f*g - d*k, C = d*h - e*g;
         float det = a*A + b*B + c*C; if (det == 0.0f) det = 1e-12f;
         const float id = 1.0f / det;
-        const float i00 = A*id, i01 = (c*h - b*k)*id, i02 = (b*f - c*e)*id;
-        const float i10 = B*id, i11 = (a*k - c*g)*id, i12 = (c*d - a*f)*id;
-        const float i20 = C*id, i21 = (b*g - a*h)*id, i22 = (a*e - b*d)*id;
-        const bool orto = (P[11] == 0.0f);
+        const float i00  = A*id, i01 = (c*h - b*k)*id, i02 = (b*f - c*e)*id;
+        const float i10  = B*id, i11 = (a*k - c*g)*id, i12 = (c*d - a*f)*id;
+        const float i20  = C*id, i21 = (b*g - a*h)*id, i22 = (a*e - b*d)*id;
+        const bool ortho = (P[11] == 0.0f);
         float cam[3] = { 0, 0, 0 }, dir[3] = { 0, 0, 0 };
-        if (orto) {   // la direccion de la vista (0,0,-1 del ojo) en local
+        if (ortho) {   // la direccion de la vista (0,0,-1 del ojo) en local
             dir[0] = -i02; dir[1] = -i12; dir[2] = -i22;
         } else {      // el ojo (el origen) en local = -A^-1 t
             cam[0] = -(i00*M[12] + i01*M[13] + i02*M[14]);
@@ -330,24 +330,24 @@ void EditMesh::Render() {
             cam[2] = -(i20*M[12] + i21*M[13] + i22*M[14]);
         }
         const size_t F = faces.size();
-        if (caraCerrada.size() != F) {   // pedazos (caras unidas por aristas) sin arista de una sola cara
-            std::vector<int> padre(F); for (size_t f = 0; f < F; f++) padre[f] = (int)f;
+        if (closedFace.size() != F) {   // pedazos (caras unidas por aristas) sin arista de una sola cara
+            std::vector<int> parent(F); for (size_t f = 0; f < F; f++) parent[f] = (int)f;
             const size_t E = lineIdx.size() / 2;
-            std::vector<int> primera(E, -1), cuenta(E, 0);
+            std::vector<int> first(E, -1), count(E, 0);
             for (size_t f = 0; f < F && f < faceEdges.size(); f++)
                 for (size_t q = 0; q < faceEdges[f].size(); q++) { const int eg = faceEdges[f][q]; if (eg < 0 || eg >= (int)E) continue;
-                    cuenta[eg]++;
-                    if (primera[eg] < 0) { primera[eg] = (int)f; continue; }
-                    int a = (int)f, b = primera[eg];
-                    while (padre[a] != a) a = padre[a] = padre[padre[a]];
-                    while (padre[b] != b) b = padre[b] = padre[padre[b]];
-                    if (a != b) padre[a] = b; }
-            std::vector<unsigned char> abierto(F, 0);
-            for (size_t eg = 0; eg < E; eg++) if (cuenta[eg] == 1) { int a = primera[eg]; while (padre[a] != a) a = padre[a]; abierto[a] = 1; }
-            caraCerrada.assign(F, 0);
-            for (size_t f = 0; f < F; f++) { int a = (int)f; while (padre[a] != a) a = padre[a]; caraCerrada[f] = abierto[a] ? 0 : 1; }
+                    count[eg]++;
+                    if (first[eg] < 0) { first[eg] = (int)f; continue; }
+                    int a = (int)f, b = first[eg];
+                    while (parent[a] != a) a = parent[a] = parent[parent[a]];
+                    while (parent[b] != b) b = parent[b] = parent[parent[b]];
+                    if (a != b) parent[a] = b; }
+            std::vector<unsigned char> open(F, 0);
+            for (size_t eg = 0; eg < E; eg++) if (count[eg] == 1) { int a = first[eg]; while (parent[a] != a) a = parent[a]; open[a] = 1; }
+            closedFace.assign(F, 0);
+            for (size_t f = 0; f < F; f++) { int a = (int)f; while (parent[a] != a) a = parent[a]; closedFace[f] = open[a] ? 0 : 1; }
         }
-        frente.assign(F, 0); eUso.assign(lineIdx.size() / 2, 0); vUso.assign(pos.size() / 3, 0);
+        front.assign(F, 0); eUse.assign(lineIdx.size() / 2, 0); vUse.assign(pos.size() / 3, 0);
         for (size_t fi = 0; fi < F && fi*3+2 < faceCenter.size(); fi++) {
             const std::vector<int>& p = faces[fi];
             float nx = 0, ny = 0, nz = 0;   // normal de Newell (sirve para n-gons)
@@ -356,47 +356,47 @@ void EditMesh::Render() {
                 nx += (u[1]-v[1])*(u[2]+v[2]); ny += (u[2]-v[2])*(u[0]+v[0]); nz += (u[0]-v[0])*(u[1]+v[1]);
             }
             const float* cc = &faceCenter[fi*3];
-            const float sg = orto ? (nx*dir[0] + ny*dir[1] + nz*dir[2])
+            const float sg = ortho ? (nx*dir[0] + ny*dir[1] + nz*dir[2])
                                   : (nx*(cc[0]-cam[0]) + ny*(cc[1]-cam[1]) + nz*(cc[2]-cam[2]));
-            const unsigned char u = (unsigned char)((sg <= 0.0f || !caraCerrada[fi]) ? 3 : 1);   // 1 = tapada por la malla
-            frente[fi] = (unsigned char)(u == 3);
-            for (size_t q = 0; q < p.size(); q++) vUso[p[q]] |= u;
+            const unsigned char u = (unsigned char)((sg <= 0.0f || !closedFace[fi]) ? 3 : 1);   // 1 = tapada por la malla
+            front[fi] = (unsigned char)(u == 3);
+            for (size_t q = 0; q < p.size(); q++) vUse[p[q]] |= u;
             if (fi < faceEdges.size())
-                for (size_t q = 0; q < faceEdges[fi].size(); q++) { const int ei = faceEdges[fi][q]; if (ei >= 0 && ei < (int)eUso.size()) eUso[ei] |= u; }
+                for (size_t q = 0; q < faceEdges[fi].size(); q++) { const int ei = faceEdges[fi][q]; if (ei >= 0 && ei < (int)eUse.size()) eUse[ei] |= u; }
         }
         visLP.clear(); visLC.clear();
-        for (size_t ei = 0; ei < eUso.size() && (ei*2+1)*3+2 < linePos.size(); ei++) {
-            if (eUso[ei] == 1) continue;   // solo caras de atras
+        for (size_t ei = 0; ei < eUse.size() && (ei*2+1)*3+2 < linePos.size(); ei++) {
+            if (eUse[ei] == 1) continue;   // solo caras de atras
             visLP.insert(visLP.end(), &linePos[ei*6], &linePos[ei*6] + 6);
             visLC.insert(visLC.end(), &lineCol[ei*8], &lineCol[ei*8] + 8);
         }
-        lp = visLP.empty() ? NULL : &visLP[0]; lc = visLC.empty() ? NULL : &visLC[0]; nLineas = (int)(visLP.size() / 3);
+        lp = visLP.empty() ? NULL : &visLP[0]; lc = visLC.empty() ? NULL : &visLC[0]; nLines = (int)(visLP.size() / 3);
         if (mode == SelVertex) {
             visVP.clear(); visVC.clear();
-            for (size_t vi = 0; vi < vUso.size() && vi*4+3 < col.size(); vi++) {
-                if (vUso[vi] == 1) continue;
+            for (size_t vi = 0; vi < vUse.size() && vi*4+3 < col.size(); vi++) {
+                if (vUse[vi] == 1) continue;
                 visVP.insert(visVP.end(), &pos[vi*3], &pos[vi*3] + 3);
                 visVC.insert(visVC.end(), &col[vi*4], &col[vi*4] + 4);
             }
             vp = visVP.empty() ? NULL : &visVP[0]; vc = visVC.empty() ? NULL : &visVC[0]; nVerts = (int)(visVP.size() / 3);
         } else if (mode == SelFace) {
             visFP.clear(); visFC.clear();
-            for (size_t fi = 0; fi < frente.size() && fi*4+3 < facePtCol.size(); fi++) {
-                if (!frente[fi]) continue;
+            for (size_t fi = 0; fi < front.size() && fi*4+3 < facePtCol.size(); fi++) {
+                if (!front[fi]) continue;
                 visFP.insert(visFP.end(), &faceCenter[fi*3], &faceCenter[fi*3] + 3);
                 visFC.insert(visFC.end(), &facePtCol[fi*4], &facePtCol[fi*4] + 4);
             }
-            fp = visFP.empty() ? NULL : &visFP[0]; fc = visFC.empty() ? NULL : &visFC[0]; nCaras = (int)(visFP.size() / 3);
+            fp = visFP.empty() ? NULL : &visFP[0]; fc = visFC.empty() ? NULL : &visFC[0]; nFaces = (int)(visFP.size() / 3);
         }
     }
 #endif
 
     // 2) LINEAS (glDrawArrays GL_LINES, expandidas, color por vertice)
-    if (nLineas > 0 && lp && lc) {
+    if (nLines > 0 && lp && lc) {
         gfx::VertexPointer3f(0, lp);
         gfx::ColorPointer4ub(lc);
         gfx::LineWidth(1.0f);
-        gfx::DrawLines(nLineas);
+        gfx::DrawLines(nLines);
     }
 
     // 3) PUNTOS: vertices (modo vertex) o puntitos en el centro de cada cara (modo
@@ -407,17 +407,17 @@ void EditMesh::Render() {
         gfx::PointSize(6.0f);
         gfx::DrawPoints(nVerts);
         gfx::PointSize(1.0f);
-    } else if (mode == SelFace && nCaras > 0 && fp && fc) {
+    } else if (mode == SelFace && nFaces > 0 && fp && fc) {
         gfx::VertexPointer3f(0, fp);
         gfx::ColorPointer4ub(fc);
         gfx::PointSize(6.0f);
-        gfx::DrawPoints(nCaras);
+        gfx::DrawPoints(nFaces);
         gfx::PointSize(1.0f);
     }
 
     if (g_xray) gfx::Enable(gfx::DepthTest); // restaurar el z-test tras el overlay X-Ray
 #if defined(W3D_SYMBIAN) && defined(W3D_GLES2)
-    gfx::SesgoMetros(0.0f);
+    gfx::BiasMeters(0.0f);
     gfx::DepthFunc(gfx::DepthLess);
 #endif
     gfx::DisableArray(gfx::ColorArray);
@@ -430,8 +430,8 @@ void EditMesh::Render() {
 // seleccion: el transform de malla en vivo lo llama tras cada apply.
 // rearma los buffers del OVERLAY (lineas + centros de cara) desde pos[] -> el overlay se
 // deriva de las posiciones EDITABLES (autoritativas), sin leer el render. Lo usan las dos
-// puertas (RefrescarRender via EmpujarPosiciones, y SincronizarPos).
-void EditMesh::RefrescarOverlay() {
+// puertas (RefreshRender via PushPositions, y SyncPos).
+void EditMesh::RefreshOverlay() {
     // lineas expandidas (2 vertices por arista, igual que en Construir)
     size_t li = 0;
     for (size_t e = 0; e + 1 < lineIdx.size(); e += 2) {
@@ -452,8 +452,8 @@ void EditMesh::RefrescarOverlay() {
 }
 
 // el RENDER cambio por fuera: re-lee vertex[] -> pos[] y rearma el overlay. (Para cuando
-// algo toco el render directo; la edicion normal va por pos[] -> EmpujarPosiciones.)
-void EditMesh::SincronizarPos() {
+// algo toco el render directo; la edicion normal va por pos[] -> PushPositions.)
+void EditMesh::SyncPos() {
     if (!src || !src->vertex) return;
     const int nV = src->vertexSize;
     for (size_t k = 0; k < editVerts.size(); k++) {
@@ -462,20 +462,20 @@ void EditMesh::SincronizarPos() {
         pos[k*3+1] = src->vertex[gi*3+1];
         pos[k*3+2] = src->vertex[gi*3+2];
     }
-    RefrescarOverlay();
+    RefreshOverlay();
     syncedGeomVersion = src->skinGeomVersion; // ya reflejamos esta version -> no re-sync por frame
 }
 
-void EditMesh::SeleccionarTodo(bool sel) {
+void EditMesh::SelectAll(bool sel) {
     unsigned char v = sel ? 1 : 0;
     if (EditSelectMode == SelFace)      faceSel.assign(faces.size(), v);
     else if (EditSelectMode == SelEdge) edgeSel.assign(lineIdx.size() / 2, v);
     else                                vertSel.assign(editVerts.size(), v);
     activeIdx = -1; // "todo"/"nada" no deja un activo
-    Recolorear();
+    Recolor();
 }
 
-void EditMesh::Invertir() {
+void EditMesh::Invert() {
     if (EditSelectMode == SelFace) {
         for (size_t f = 0; f < faceSel.size(); f++) faceSel[f] = faceSel[f] ? 0 : 1;
     } else if (EditSelectMode == SelEdge) {
@@ -484,84 +484,84 @@ void EditMesh::Invertir() {
         for (size_t k = 0; k < vertSel.size(); k++) vertSel[k] = vertSel[k] ? 0 : 1;
     }
     activeIdx = -1;
-    Recolorear();
+    Recolor();
 }
 
-void EditMesh::TogglearVert(int k, bool soloEste) {
-    if (soloEste) vertSel.assign(editVerts.size(), 0);
-    if (k >= 0 && k < (int)vertSel.size()) vertSel[k] = soloEste ? 1 : (vertSel[k] ? 0 : 1);
+void EditMesh::ToggleVert(int k, bool onlyThis) {
+    if (onlyThis) vertSel.assign(editVerts.size(), 0);
+    if (k >= 0 && k < (int)vertSel.size()) vertSel[k] = onlyThis ? 1 : (vertSel[k] ? 0 : 1);
     activeIdx = (k >= 0 && k < (int)vertSel.size() && vertSel[k]) ? k : -1; // activo = el clickeado si quedo sel
-    Recolorear();
+    Recolor();
 }
 
-void EditMesh::TogglearEdge(int e, bool soloEste) {
-    if (soloEste) edgeSel.assign(lineIdx.size() / 2, 0);
-    if (e >= 0 && e < (int)edgeSel.size()) edgeSel[e] = soloEste ? 1 : (edgeSel[e] ? 0 : 1);
+void EditMesh::ToggleEdge(int e, bool onlyThis) {
+    if (onlyThis) edgeSel.assign(lineIdx.size() / 2, 0);
+    if (e >= 0 && e < (int)edgeSel.size()) edgeSel[e] = onlyThis ? 1 : (edgeSel[e] ? 0 : 1);
     activeIdx = (e >= 0 && e < (int)edgeSel.size() && edgeSel[e]) ? e : -1;
-    Recolorear();
+    Recolor();
 }
 
-void EditMesh::TogglearFace(int f, bool soloEste) {
-    if (soloEste) faceSel.assign(faces.size(), 0);
-    if (f >= 0 && f < (int)faceSel.size()) faceSel[f] = soloEste ? 1 : (faceSel[f] ? 0 : 1);
+void EditMesh::ToggleFace(int f, bool onlyThis) {
+    if (onlyThis) faceSel.assign(faces.size(), 0);
+    if (f >= 0 && f < (int)faceSel.size()) faceSel[f] = onlyThis ? 1 : (faceSel[f] ? 0 : 1);
     activeIdx = (f >= 0 && f < (int)faceSel.size() && faceSel[f]) ? f : -1;
-    Recolorear();
+    Recolor();
 }
 
 // L: Select Linked — selecciona la ISLA (componente conexa por aristas) que contiene
-// al elemento k del 'modo' dado. soloEste reemplaza la seleccion; si no, la agrega.
+// al elemento k del 'modo' dado. onlyThis reemplaza la seleccion; si no, la agrega.
 // Ej: 2 cubos separados -> el mouse sobre uno + L selecciona ese cubo entero.
-void EditMesh::SeleccionarLinked(int k, int modo, bool soloEste) {
+void EditMesh::SelectLinked(int k, int mode, bool onlyThis) {
     const int nV = (int)editVerts.size();
     const int nE = (int)(lineIdx.size() / 2);
     if (nV <= 0) return;
 
     // semilla: los verts del elemento clickeado
-    std::vector<unsigned char> enIsla(nV, 0);
-    std::vector<int> pila;
-    if (modo == SelFace) {
+    std::vector<unsigned char> inIsland(nV, 0);
+    std::vector<int> stack;
+    if (mode == SelFace) {
         if (k < 0 || k >= (int)faces.size()) return;
         const std::vector<int>& p = faces[k];
-        for (size_t c=0;c<p.size();c++) if (p[c]>=0 && p[c]<nV && !enIsla[p[c]]){ enIsla[p[c]]=1; pila.push_back(p[c]); }
-    } else if (modo == SelEdge) {
+        for (size_t c=0;c<p.size();c++) if (p[c]>=0 && p[c]<nV && !inIsland[p[c]]){ inIsland[p[c]]=1; stack.push_back(p[c]); }
+    } else if (mode == SelEdge) {
         if (k < 0 || k >= nE) return;
         int a=lineIdx[k*2], b=lineIdx[k*2+1];
-        if (a>=0&&a<nV){ enIsla[a]=1; pila.push_back(a); }
-        if (b>=0&&b<nV){ enIsla[b]=1; pila.push_back(b); }
+        if (a>=0&&a<nV){ inIsland[a]=1; stack.push_back(a); }
+        if (b>=0&&b<nV){ inIsland[b]=1; stack.push_back(b); }
     } else {
         if (k < 0 || k >= nV) return;
-        enIsla[k]=1; pila.push_back(k);
+        inIsland[k]=1; stack.push_back(k);
     }
-    if (pila.empty()) return;
+    if (stack.empty()) return;
 
     // adyacencia vert<->vert por aristas + flood fill
     std::vector<std::vector<int> > adj(nV);
     for (int eg=0; eg<nE; eg++){ int a=lineIdx[eg*2], b=lineIdx[eg*2+1];
         if (a>=0&&a<nV&&b>=0&&b<nV){ adj[a].push_back(b); adj[b].push_back(a); } }
-    while (!pila.empty()){ int v=pila.back(); pila.pop_back();
-        for (size_t j=0;j<adj[v].size();j++){ int w=adj[v][j]; if (!enIsla[w]){ enIsla[w]=1; pila.push_back(w); } } }
+    while (!stack.empty()){ int v=stack.back(); stack.pop_back();
+        for (size_t j=0;j<adj[v].size();j++){ int w=adj[v][j]; if (!inIsland[w]){ inIsland[w]=1; stack.push_back(w); } } }
 
-    if (soloEste){ vertSel.assign(nV,0); edgeSel.assign(nE,0); faceSel.assign(faces.size(),0); }
+    if (onlyThis){ vertSel.assign(nV,0); edgeSel.assign(nE,0); faceSel.assign(faces.size(),0); }
 
-    if (modo == SelFace){
+    if (mode == SelFace){
         for (size_t f=0;f<faces.size();f++){ const std::vector<int>& p=faces[f]; if (p.empty()) continue;
-            bool all=true; for (size_t c=0;c<p.size();c++) if (p[c]<0||p[c]>=nV||!enIsla[p[c]]){all=false;break;}
+            bool all=true; for (size_t c=0;c<p.size();c++) if (p[c]<0||p[c]>=nV||!inIsland[p[c]]){all=false;break;}
             if (all) faceSel[f]=1; }
-    } else if (modo == SelEdge){
+    } else if (mode == SelEdge){
         for (int eg=0;eg<nE;eg++){ int a=lineIdx[eg*2], b=lineIdx[eg*2+1];
-            if (a>=0&&a<nV&&b>=0&&b<nV && enIsla[a] && enIsla[b]) edgeSel[eg]=1; }
+            if (a>=0&&a<nV&&b>=0&&b<nV && inIsland[a] && inIsland[b]) edgeSel[eg]=1; }
     } else {
-        for (int v=0;v<nV;v++) if (enIsla[v]) vertSel[v]=1;
+        for (int v=0;v<nV;v++) if (inIsland[v]) vertSel[v]=1;
     }
     activeIdx = -1;
-    Recolorear();
+    Recolor();
 }
 
 // Shift+Alt+Click (modo CARA): Loop Select de caras a partir del BORDE clickeado.
 // Camina el loop cruzando, en cada quad, el borde OPUESTO al de entrada -> el loop va
 // PERPENDICULAR al borde clickeado (ej cilindro: click en un borde vertical = el anillo;
 // en uno horizontal = a lo largo). Solo propaga por QUADS (tri/ngones cortan el loop).
-void EditMesh::SeleccionarLoopFace(int edgeK, bool soloEste) {
+void EditMesh::SelectLoopFace(int edgeK, bool onlyThis) {
     const int nE = (int)(lineIdx.size() / 2);
     const int nF = (int)faces.size();
     if (edgeK < 0 || edgeK >= nE || nF == 0) return;
@@ -571,13 +571,13 @@ void EditMesh::SeleccionarLoopFace(int edgeK, bool soloEste) {
     for (int f=0; f<nF; f++){ const std::vector<int>& fe=faceEdges[f];
         for (size_t i=0;i<fe.size();i++){ int eg=fe[i]; if (eg>=0&&eg<nE) edgeFaces[eg].push_back(f); } }
 
-    std::vector<unsigned char> enLoop(nF, 0);
+    std::vector<unsigned char> inLoop(nF, 0);
     // arrancar de cada cara adyacente al borde clickeado (cubre las 2 direcciones)
     for (size_t s=0; s<edgeFaces[edgeK].size(); s++){
         int cur = edgeFaces[edgeK][s];
         int entering = edgeK;
-        while (cur >= 0 && cur < nF && !enLoop[cur]) {
-            enLoop[cur] = 1;                              // selecciono esta cara
+        while (cur >= 0 && cur < nF && !inLoop[cur]) {
+            inLoop[cur] = 1;                              // selecciono esta cara
             const std::vector<int>& fe = faceEdges[cur];
             if ((int)fe.size() != 4) break;              // no-quad: el loop corta aca
             int idx = -1; for (int i=0;i<4;i++) if (fe[i]==entering){ idx=i; break; }
@@ -588,10 +588,10 @@ void EditMesh::SeleccionarLoopFace(int edgeK, bool soloEste) {
             entering = opp; cur = next;
         }
     }
-    if (soloEste) faceSel.assign(nF, 0);
-    for (int f=0; f<nF; f++) if (enLoop[f]) faceSel[f]=1;
+    if (onlyThis) faceSel.assign(nF, 0);
+    for (int f=0; f<nF; f++) if (inLoop[f]) faceSel[f]=1;
     activeIdx = -1;
-    Recolorear();
+    Recolor();
 }
 
 // EDGE LOOP: el anillo que SIGUE la linea del borde (ej. todo el contorno/rim de un cilindro).
@@ -599,7 +599,7 @@ void EditMesh::SeleccionarLoopFace(int edgeK, bool soloEste) {
 // direccion de avance, max alineacion). Asi funciona con cualquier valencia: el grid (cruza al
 // opuesto), el rim del cilindro (sigue la curva tangente, aunque el cap sea un ngon de valencia 3).
 // Corta si el mejor giro es > ~60 grados (polo). Camina en las 2 direcciones desde edgeK.
-void EditMesh::SeleccionarLoopEdge(int edgeK, bool soloEste) {
+void EditMesh::SelectLoopEdge(int edgeK, bool onlyThis) {
     const int nE = (int)(lineIdx.size() / 2);
     if (edgeK < 0 || edgeK >= nE) return;
     const int nV = (int)(pos.size() / 3);
@@ -614,21 +614,21 @@ void EditMesh::SeleccionarLoopEdge(int edgeK, bool soloEste) {
     for (size_t f=0; f<faceEdges.size(); f++)
         for (size_t c=0; c<faceEdges[f].size(); c++){ int e=faceEdges[f][c]; if (e>=0&&e<nE) edgeFaces[e].push_back((int)f); }
 
-    std::vector<unsigned char> enLoop(nE, 0);
-    enLoop[edgeK] = 1;
+    std::vector<unsigned char> inLoop(nE, 0);
+    inLoop[edgeK] = 1;
     for (int dir=0; dir<2; dir++){
         int cur = edgeK;
         int V = (dir==0) ? lineIdx[edgeK*2] : lineIdx[edgeK*2+1];    // avanzamos hacia V
         while (true){
             if (V<0 || V>=nV) break;
             // 1) TOPOLOGICO: el borde en V que NO comparte cara con 'cur'. Si hay EXACTAMENTE 1 -> es el opuesto.
-            int next = -1, nOpuestos = 0;
+            int next = -1, nOpposite = 0;
             for (size_t i=0;i<vertEdges[V].size();i++){
                 int e2=vertEdges[V][i]; if (e2==cur) continue;
-                bool comparte=false;
-                for (size_t a=0; a<edgeFaces[cur].size() && !comparte; a++)
-                    for (size_t b=0; b<edgeFaces[e2].size(); b++) if (edgeFaces[cur][a]==edgeFaces[e2][b]){ comparte=true; break; }
-                if (!comparte){ next=e2; nOpuestos++; }
+                bool shares=false;
+                for (size_t a=0; a<edgeFaces[cur].size() && !shares; a++)
+                    for (size_t b=0; b<edgeFaces[e2].size(); b++) if (edgeFaces[cur][a]==edgeFaces[e2][b]){ shares=true; break; }
+                if (!shares){ next=e2; nOpposite++; }
             }
             // 2) FALLBACK GEOMETRICO (topologico ambiguo: 0 opuestos = rim/borde abierto, o >1 = polo/non-manifold):
             //    seguir el borde mas DERECHO (max alineacion con la entrada). Umbral permisivo (~120 grados) para que
@@ -636,39 +636,39 @@ void EditMesh::SeleccionarLoopEdge(int edgeK, bool soloEste) {
             // en una "T" (valencia 3: no hay arista opuesta) o en un polo (mas de una opuesta) el loop
             // NO sabe si seguir a la izquierda o a la derecha: termina ahi. Antes seguia por la arista mas
             // alineada y se llevaba varios loops por delante.
-            if (nOpuestos != 1) break;
-            if (next<0 || enLoop[next]) break;                       // sin continuacion / cerro el anillo
-            enLoop[next] = 1;
+            if (nOpposite != 1) break;
+            if (next<0 || inLoop[next]) break;                       // sin continuacion / cerro el anillo
+            inLoop[next] = 1;
             int na=lineIdx[next*2], nb=lineIdx[next*2+1];
             V = (na==V) ? nb : na;                                    // el otro vertice de 'next'
             cur = next;
         }
     }
-    if (soloEste) edgeSel.assign(nE, 0);
-    for (int e=0;e<nE;e++) if (enLoop[e]) edgeSel[e]=1;
+    if (onlyThis) edgeSel.assign(nE, 0);
+    for (int e=0;e<nE;e++) if (inLoop[e]) edgeSel[e]=1;
     activeIdx = -1;
-    Recolorear();
+    Recolor();
 }
 
 // MODO VERTICE: selecciona los VERTS del edge loop que pasa por edgeK. Usa edgeSel como intermedio pero lo arma con
 // SOLO este loop (reemplaza) y lo LIMPIA al final. CLAVE: en modo vertice el edgeSel no se muestra ni lo
 // limpia el deseleccionar verts -> si quedaba seteado, los Shift+Alt+Click iban ACUMULANDO loops viejos. Aca cada
-// llamada arranca con el edgeSel limpio. soloEste=true reemplaza la seleccion de verts; false la agrega.
-void EditMesh::SeleccionarLoopEdgeVerts(int edgeK, bool soloEste) {
-    SeleccionarLoopEdge(edgeK, true);                              // edgeSel = SOLO este loop (no acumula)
-    if (soloEste) for (size_t k=0;k<vertSel.size();k++) vertSel[k]=0;
+// llamada arranca con el edgeSel limpio. onlyThis=true reemplaza la seleccion de verts; false la agrega.
+void EditMesh::SelectLoopEdgeVerts(int edgeK, bool onlyThis) {
+    SelectLoopEdge(edgeK, true);                              // edgeSel = SOLO este loop (no acumula)
+    if (onlyThis) for (size_t k=0;k<vertSel.size();k++) vertSel[k]=0;
     for (size_t i=0; i*2+1<lineIdx.size() && i<edgeSel.size(); i++) if (edgeSel[i]) {
         int a=lineIdx[i*2], b=lineIdx[i*2+1];
         if (a>=0&&a<(int)vertSel.size()) vertSel[a]=1;
         if (b>=0&&b<(int)vertSel.size()) vertSel[b]=1; }
     for (size_t i=0;i<edgeSel.size();i++) edgeSel[i]=0;            // limpia el intermedio (no debe persistir en modo vertice)
     activeIdx = -1;
-    Recolorear();
+    Recolor();
 }
 
 // EDGE RING: los travesanos PERPENDICULARES. Camina por quads igual que el loop de CARAS,
 // pero en vez de seleccionar las caras junta los bordes OPUESTOS que va cruzando.
-void EditMesh::SeleccionarRingEdge(int edgeK, bool soloEste) {
+void EditMesh::SelectRingEdge(int edgeK, bool onlyThis) {
     const int nE = (int)(lineIdx.size() / 2);
     const int nF = (int)faces.size();
     if (edgeK < 0 || edgeK >= nE || nF == 0) return;
@@ -676,8 +676,8 @@ void EditMesh::SeleccionarRingEdge(int edgeK, bool soloEste) {
     for (int f=0; f<nF; f++){ const std::vector<int>& fe=faceEdges[f];
         for (size_t i=0;i<fe.size();i++){ int eg=fe[i]; if (eg>=0&&eg<nE) edgeFaces[eg].push_back(f); } }
 
-    std::vector<unsigned char> enRing(nE, 0);
-    enRing[edgeK] = 1;
+    std::vector<unsigned char> inRing(nE, 0);
+    inRing[edgeK] = 1;
     for (size_t s=0; s<edgeFaces[edgeK].size(); s++){               // las 2 direcciones
         int cur = edgeFaces[edgeK][s];
         int entering = edgeK;
@@ -687,17 +687,17 @@ void EditMesh::SeleccionarRingEdge(int edgeK, bool soloEste) {
             int idx=-1; for (int i=0;i<4;i++) if (fe[i]==entering){ idx=i; break; }
             if (idx < 0) break;
             int opp = fe[(idx+2)%4];                                // borde opuesto (el travesano)
-            if (opp<0 || opp>=nE || enRing[opp]) break;
-            enRing[opp] = 1;
+            if (opp<0 || opp>=nE || inRing[opp]) break;
+            inRing[opp] = 1;
             int next = -1;
             for (size_t j=0;j<edgeFaces[opp].size();j++){ int ff=edgeFaces[opp][j]; if (ff!=cur){ next=ff; break; } }
             entering = opp; cur = next;
         }
     }
-    if (soloEste) edgeSel.assign(nE, 0);
-    for (int e=0;e<nE;e++) if (enRing[e]) edgeSel[e]=1;
+    if (onlyThis) edgeSel.assign(nE, 0);
+    for (int e=0;e<nE;e++) if (inRing[e]) edgeSel[e]=1;
     activeIdx = -1;
-    Recolorear();
+    Recolor();
 }
 
 // BFS sin pesos (distancia TOPOLOGICA en saltos) desde src sobre un grafo de adyacencia.
@@ -705,19 +705,19 @@ static void BFSDist(const std::vector<std::vector<int> >& adj, int src, std::vec
     int N = (int)adj.size();
     dist.assign(N, -1);
     if (src < 0 || src >= N) return;
-    std::vector<int> cola; cola.push_back(src); dist[src] = 0;
+    std::vector<int> queue; queue.push_back(src); dist[src] = 0;
     size_t head = 0;
-    while (head < cola.size()){
-        int u = cola[head++];
+    while (head < queue.size()){
+        int u = queue[head++];
         for (size_t i=0;i<adj[u].size();i++){ int v = adj[u][i];
-            if (v>=0 && v<N && dist[v]<0){ dist[v] = dist[u]+1; cola.push_back(v); } }
+            if (v>=0 && v<N && dist[v]<0){ dist[v] = dist[u]+1; queue.push_back(v); } }
     }
 }
 
 // PICK SHORTEST PATH (Ctrl+Click). Arma el grafo de adyacencia del modo activo, hace BFS desde el
 // activo (A) y desde toIdx (B), y selecciona: un solo caminito (backtrack por dist decreciente) o,
 // con fillRegion, TODA la region (todo e con distA[e]+distB[e]==total -> en un grid, el rectangulo).
-void EditMesh::SeleccionarShortestPath(int toIdx, bool fillRegion) {
+void EditMesh::SelectShortestPath(int toIdx, bool fillRegion) {
     const int mode = EditSelectMode;
     const int nV = (int)(pos.size() / 3);
     const int nE = (int)(lineIdx.size() / 2);
@@ -753,11 +753,11 @@ void EditMesh::SeleccionarShortestPath(int toIdx, bool fillRegion) {
     if (!sel || N<=0 || toIdx>=N) return;
 
     int from = activeIdx;
-    if (from<0 || from>=N){ sel[toIdx]=1; activeIdx=toIdx; Recolorear(); return; } // sin activo: solo el clickeado
+    if (from<0 || from>=N){ sel[toIdx]=1; activeIdx=toIdx; Recolor(); return; } // sin activo: solo el clickeado
     std::vector<int> dA, dB;
     BFSDist(adj, from, dA);
     BFSDist(adj, toIdx, dB);
-    if (dA[toIdx] < 0){ sel[toIdx]=1; activeIdx=toIdx; Recolorear(); return; }     // no conexos: solo el clickeado
+    if (dA[toIdx] < 0){ sel[toIdx]=1; activeIdx=toIdx; Recolor(); return; }     // no conexos: solo el clickeado
     const int total = dA[toIdx];
     if (fillRegion){
         for (int e=0;e<N;e++) if (dA[e]>=0 && dB[e]>=0 && dA[e]+dB[e]==total) sel[e]=1;
@@ -769,12 +769,12 @@ void EditMesh::SeleccionarShortestPath(int toIdx, bool fillRegion) {
         sel[from]=1;
     }
     activeIdx = toIdx;
-    Recolorear();
+    Recolor();
 }
 
 // centro LOCAL de los vertices INVOLUCRADOS en la seleccion del modo activo (un
 // vertice compartido cuenta una sola vez). false si no hay nada seleccionado.
-bool EditMesh::CentroSeleccion(float& cx, float& cy, float& cz) const {
+bool EditMesh::SelectionCenter(float& cx, float& cy, float& cz) const {
     const int mode = EditSelectMode;
     const size_t N = editVerts.size();
     if (N == 0) return false;
@@ -799,8 +799,8 @@ bool EditMesh::CentroSeleccion(float& cx, float& cy, float& cz) const {
     return true;
 }
 
-bool EditMesh::CentroRadioSeleccion(float& cx, float& cy, float& cz, float& rLocal) const {
-    if (!CentroSeleccion(cx, cy, cz)) return false; // mismo centro (centroide de lo seleccionado)
+bool EditMesh::SelectionCenterRadius(float& cx, float& cy, float& cz, float& rLocal) const {
+    if (!SelectionCenter(cx, cy, cz)) return false; // mismo centro (centroide de lo seleccionado)
     // 2da pasada: la distancia mas lejana al centro entre los MISMOS vertices seleccionados
     const int mode = EditSelectMode;
     const size_t N = editVerts.size();

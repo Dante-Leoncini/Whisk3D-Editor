@@ -11,8 +11,8 @@ join
 visible 0 Cubo
 mode vertex
 uishot /tmp/w3d_oclusion.png
-wpvisibles 12
+wpvisible 12
 xray 1
 uishot /tmp/w3d_oclusion_xray.png
-wpvisibles 24
+wpvisible 24
 xray 0

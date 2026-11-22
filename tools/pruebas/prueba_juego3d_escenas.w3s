@@ -16,21 +16,21 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
-juegoescenasmin /tmp/w3d_f6_juego
-guardarw3d /tmp/w3d_f6_juego/juegoescenas.w3d
-entradaexiste /tmp/w3d_f6_juego/juegoescenas.w3d escenas/nivel2.w3de 1
-entradaexiste /tmp/w3d_f6_juego/juegoescenas.w3d escenas/intro.w3de 1
-abrirw3d /tmp/w3d_f6_juego/juegoescenas.w3d
-raizinfo n 3 activa Scene tipo juego cargada Intro 0 cargada Nivel2 0 tipode Intro escena tipode Nivel2 juego
+window 640 480
+gamescenesmin /tmp/w3d_f6_juego
+savew3d /tmp/w3d_f6_juego/juegoescenas.w3d
+entryexists /tmp/w3d_f6_juego/juegoescenas.w3d scenes/nivel2.w3de 1
+entryexists /tmp/w3d_f6_juego/juegoescenas.w3d scenes/intro.w3de 1
+openw3d /tmp/w3d_f6_juego/juegoescenas.w3d
+rootinfo n 3 active Scene type game loaded Intro 0 loaded Nivel2 0 tipode Intro scene tipode Nivel2 game
 
 # --- el Play del editor ---
 simplay 30
-raizinfo activa Nivel2
-scriptinfo compartido juez OK
+rootinfo active Nivel2
+scriptinfo shared juez OK
 simstop
-raizinfo activa Scene
+rootinfo active Scene
 
 # --- el binario (modo debug: deja su whisk3d.log) ---
-compilarjuego 0 0 1
-juegoescenaslog /tmp/w3d_f6_juego juegoescenas
+compilegame 0 0 1
+gamesceneslog /tmp/w3d_f6_juego juegoescenas

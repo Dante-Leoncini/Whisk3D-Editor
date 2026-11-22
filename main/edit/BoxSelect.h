@@ -27,35 +27,35 @@
 // ============================================================================
 
 // ---- estado (uno solo: no se pueden arrastrar dos cajas a la vez) ----
-bool BoxSelectArmado();       // paso 1: la cruz sigue al cursor, esperando el arrastre
-bool BoxSelectArrastrando();  // paso 2: hay una caja en curso
-bool BoxSelectActivo();       // armado o arrastrando (para que el viewport no orbite ni pickee)
-void BoxSelectArmar();        // B / menu Select
-void BoxSelectCancelar();     // Esc, click derecho, cambio de modo
+bool BoxSelectBuilt();     // paso 1: la cruz sigue al cursor, esperando el arrastre
+bool BoxSelectDragging();  // paso 2: hay una caja en curso
+bool BoxSelectActive();    // armado o arrastrando (para que el viewport no orbite ni pickee)
+void BoxSelectBuild();     // B / menu Select
+void BoxSelectCancel();    // Esc, click derecho, cambio de modo
 
-void BoxSelectDown(int mx, int my);   // empieza la caja (coords de PANTALLA)
-void BoxSelectMover(int mx, int my);  // la estira (y refresca la cruz mientras esta armado)
+void BoxSelectDown(int mx, int my);  // empieza la caja (coords de PANTALLA)
+void BoxSelectMove(int mx, int my);  // la estira (y refresca la cruz mientras esta armado)
 // termina el arrastre. false si no habia caja o si quedo degenerada (un click suelto).
 // Devuelve el rect NORMALIZADO y la regla: tocar=true (azul) / entero=false (verde).
-bool BoxSelectSoltar(int& x0, int& y0, int& x1, int& y1, bool& tocar);
+bool BoxSelectRelease(int& x0, int& y0, int& x1, int& y1, bool& touch);
 
 void BoxSelectRect(int& x0, int& y0, int& x1, int& y1); // el rect en curso, normalizado
-bool BoxSelectTocar();        // sentido actual: true = azul (rozar), false = verde (entero)
+bool BoxSelectTouch();        // sentido actual: true = azul (rozar), false = verde (entero)
 
 // ---- geometria (la comparten los tres tipos de elemento y los tres editores) ----
-bool BoxPunto(int x0, int y0, int x1, int y1, float px, float py);
+bool BoxPoint(int x0, int y0, int x1, int y1, float px, float py);
 // el segmento a-b toca el rect? (cruza un lado, o esta entero adentro)
-bool BoxSegmento(int x0, int y0, int x1, int y1,
+bool BoxSegment(int x0, int y0, int x1, int y1,
                  float ax, float ay, float bx, float by);
 
 // el punto cae adentro del poligono proyectado? (ray casting). Hace falta para el caso
 // "la caja quedo ENTERA adentro de una cara": ahi no toca ningun vertice ni cruza ninguna
 // arista, pero visualmente esta encima del objeto -- y en azul eso tiene que entrar.
-bool BoxPuntoEnPoligono(const float* px, const float* py, int n, float qx, float qy);
+bool BoxPointInPolygon(const float* px, const float* py, int n, float qx, float qy);
 
 // ---- dibujo: cruz punteada (armado) y caja punteada + relleno (arrastrando) ----
 // En el ortho 2D LOCAL del viewport, como el circulo del pincel: recibe el origen
 // del viewport en pantalla para pasar las coords del cursor a locales.
-void BoxSelectDibujar(int vpX, int vpY, int vpAncho, int vpAlto);
+void BoxSelectDraw(int vpX, int vpY, int vpWidth, int vpHeight);
 
 #endif // BOXSELECT_H

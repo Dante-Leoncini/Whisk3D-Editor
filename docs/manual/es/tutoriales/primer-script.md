@@ -2,7 +2,7 @@
 
 En este tutorial vas a escribir tu primer script de **Lua**: uno que hace girar al cubo.
 
-![Whisk3D con el IDE abajo, donde estaba la Línea de tiempo, con el script girar.lua escrito; a la derecha, Propiedades del cubo con la tarjeta del script: la casilla girar y la velocidad en 90](img/script-ide.webp)
+![Whisk3D con el IDE abajo, donde estaba la Línea de tiempo, con el script rotate.lua escrito; a la derecha, Propiedades del cubo con la tarjeta del script: la casilla rotate y la speed en 90](img/script-ide.webp)
 
 ## 1. El IDE
 
@@ -22,42 +22,42 @@ El script tiene dos partes: arriba, las **propiedades**, y abajo, la **función*
 ### Las propiedades
 
 ```lua
-propiedades = {
-  girar     = true,   -- si el cubo gira o no
-  velocidad = 90,     -- cuantos grados gira por segundo
+properties = {
+  rotate   = true,   -- si el cubo gira o no
+  speed    = 90,     -- cuantos grados gira por segundo
 }
 ```
 
-- **`propiedades`** son los valores del script que se pueden cambiar desde el panel de Propiedades, uno por línea. `girar = true` es un valor **booleano** (verdadero o falso: `true` o `false`), y en el panel se ve como una casilla. `velocidad = 90` es un número, y se ve como un campo numérico. Lo que escribís acá es el valor **de fábrica**: cada objeto que use el script puede tener el suyo.
+- **`properties`** son los valores del script que se pueden cambiar desde el panel de Propiedades, uno por línea. `rotate = true` es un valor **booleano** (verdadero o falso: `true` o `false`), y en el panel se ve como una casilla. `speed = 90` es un número, y se ve como un campo numérico. Lo que escribís acá es el valor **de fábrica**: cada objeto que use el script puede tener el suyo.
 - Lo que va después de `--` es un **comentario**: Lua no lo lee, es para vos.
 
 ### La función
 
 ```lua
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 ```
 
-Una **función** es un bloque de código con un nombre: empieza con `function nombre()` y termina con `end`. Lo que tiene adentro no se hace cuando lo escribís, sino cada vez que alguien **llama** a la función.
+Una **función** es un bloque de código con un nombre: empieza con `function name()` y termina con `end`. Lo que tiene adentro no se hace cuando lo escribís, sino cada vez que alguien **llama** a la función.
 
 Whisk3D tiene **funciones reservadas**: si tu script tiene una función con uno de esos nombres, el motor la llama solo, en el momento justo. Por ejemplo:
 
-- **`inicio()`**: una sola vez, al darle Play. Sirve para preparar las cosas.
-- **`actualizar(dt)`**: en **cada cuadro**, mientras el juego anda.
+- **`start()`**: una sola vez, al darle Play. Sirve para preparar las cosas.
+- **`update(dt)`**: en **cada cuadro**, mientras el juego anda.
 
 Hay más, como las que avisan cuando un objeto choca con otro. Están todas en el manual de Lua: [Cuándo llama el motor a tu script](../lua/ciclo-del-script.md).
 
-`actualizar` es ideal para un videojuego. Un juego dibuja la pantalla muchas veces por segundo, y cada una de esas imágenes es un **cuadro**: todo lo que se mueve, se mueve un poquito en cada cuadro. Acá, en cada cuadro el cubo gira un poco más.
+`update` es ideal para un videojuego. Un juego dibuja la pantalla muchas veces por segundo, y cada una de esas imágenes es un **cuadro**: todo lo que se mueve, se mueve un poquito en cada cuadro. Acá, en cada cuadro el cubo gira un poco más.
 
 - Corre mientras el objeto está **visible**: si lo ocultás, su script deja de correr hasta que vuelva a verse.
 - `dt` son los segundos que pasaron desde el cuadro anterior. Multiplicar la velocidad por `dt` hace que el cubo gire 90 grados **por segundo**, ande el juego a 30 o a 60 cuadros por segundo.
 
 Lo que hace adentro:
 
-**`if propiedad("girar") then` … `end`** es una **condición**. Un `if` («si») hace el código que tiene adentro solo si lo que va entre `if` y `then` es verdadero. Puede tener un `elseif` («si no es cierto, hace esto si…»), que prueba otra condición, y un `else` («si no»), que se hace cuando no se cumplió ninguna; los dos son opcionales. Siempre termina con `end`. Por ejemplo:
+**`if property("rotate") then` … `end`** es una **condición**. Un `if` («si») hace el código que tiene adentro solo si lo que va entre `if` y `then` es verdadero. Puede tener un `elseif` («si no es cierto, hace esto si…»), que prueba otra condición, y un `else` («si no»), que se hace cuando no se cumplió ninguna; los dos son opcionales. Siempre termina con `end`. Por ejemplo:
 
 ```lua
 if puntos >= 100 then
@@ -71,40 +71,40 @@ end
 
 Con 120 puntos el premio es oro; con 70, plata, y con 10, nada. Se hace solo la primera parte que se cumple. (En Lua, `elseif` va todo junto.)
 
-En el script, el `if` no tiene `elseif` ni `else`: si **girar** es verdadero (la casilla está tildada), el cubo gira; si es falso, no pasa nada y la función termina. `propiedad("girar")` lee el valor que tiene ese objeto en el panel. Como se lee en cada cuadro, si lo cambiás con el juego andando, el script se entera en ese momento.
+En el script, el `if` no tiene `elseif` ni `else`: si **rotate** es verdadero (la casilla está tildada), el cubo gira; si es falso, no pasa nada y la función termina. `property("rotate")` lee el valor que tiene ese objeto en el panel. Como se lee en cada cuadro, si lo cambiás con el juego andando, el script se entera en ese momento.
 
-- **`yo()`** es el objeto que tiene el script: el cubo. **`rotacionZ(yo())`** da su rotación en grados sobre la Z (la vertical, la misma Z que ves en el panel de Propiedades), y **`setRotacionZ`** le pone una nueva: la misma, un poco más. Así el cubo gira como un trompo.
+- **`self()`** es el objeto que tiene el script: el cubo. **`getRotationZ(self())`** da su rotación en grados sobre la Z (la vertical, la misma Z que ves en el panel de Propiedades), y **`setRotationZ`** le pone una nueva: la misma, un poco más. Así el cubo gira como un trompo.
 
-`propiedad`, `yo`, `rotacionZ` y `setRotacionZ` también son funciones, pero al revés: las trae Whisk3D y las llamás vos. Están en el [manual de Lua](../lua/README.md).
+`property`, `self`, `getRotationZ` y `setRotationZ` también son funciones, pero al revés: las trae Whisk3D y las llamás vos. Están en el [manual de Lua](../lua/README.md).
 
 ### El script completo
 
 Tocá adentro del IDE y escribí todo junto:
 
 ```lua
-propiedades = {
-  girar     = true,   -- si el cubo gira o no
-  velocidad = 90,     -- cuantos grados gira por segundo
+properties = {
+  rotate   = true,   -- si el cubo gira o no
+  speed    = 90,     -- cuantos grados gira por segundo
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 ```
 
 ## 3. Guardalo
 
-Primero guardá el proyecto, si todavía no lo guardaste: el script se puede guardar adentro del proyecto solo si el proyecto ya está guardado. En Propiedades, en la pestaña del **disquete** (la tarjeta **Archivo**), escribí un **Nombre**, por ejemplo `girar-cubo`, y tocá **Guardar**. Se guarda en la **Carpeta** que muestra la tarjeta.
+Primero guardá el proyecto, si todavía no lo guardaste: el script se puede guardar adentro del proyecto solo si el proyecto ya está guardado. En Propiedades, en la pestaña del **disquete** (la tarjeta **Archivo**), escribí un **Nombre**, por ejemplo `rotate-cubo`, y tocá **Guardar**. Se guarda en la **Carpeta** que muestra la tarjeta.
 
 Después, en la barra de menús del IDE, **Archivo → Guardar como...**:
 
-1. En **Nombre**, poné `girar.lua`.
+1. En **Nombre**, poné `rotate.lua`.
 2. Tildá **Dentro del .w3d**: el script queda guardado adentro del proyecto, en el mismo archivo `.w3d`. La **Carpeta** pasa a ser una de adentro del proyecto: **(raíz)** es la principal.
 3. Tocá **Guardar**.
 
-![El formulario Guardar como... del IDE con el nombre girar.lua y Dentro del .w3d tildado](img/script-guardar.webp)
+![El formulario Guardar como... del IDE con el nombre rotate.lua y Dentro del .w3d tildado](img/script-guardar.webp)
 
 Si no tildás **Dentro del .w3d**, el script se guarda como un archivo suelto, afuera del proyecto, en la **Carpeta** que elijas. Sirve, por ejemplo, para editarlo con otro programa.
 
@@ -124,44 +124,44 @@ Ahora estás en el juego: el botón de la escena muestra un joystick, y en la ba
 
 1. Elegí el **Cubo** del juego (en el Outliner o en la Vista 3D).
 2. En Propiedades, andá a la pestaña del **joystick**.
-3. En la tarjeta **Control**, tocá **Añadir**: se despliega un menú con los scripts del proyecto. Elegí `girar.lua`.
+3. En la tarjeta **Control**, tocá **Añadir**: se despliega un menú con los scripts del proyecto. Elegí `rotate.lua`.
 
-![El menú de Añadir desplegado en la tarjeta Control: girar.lua, el script del proyecto, y Cargar .lua...](img/script-anadir.webp)
+![El menú de Añadir desplegado en la tarjeta Control: rotate.lua, el script del proyecto, y Cargar .lua...](img/script-anadir.webp)
 
-El script aparece en la lista de la tarjeta Control, y abajo se agrega su propia tarjeta, **girar.lua**, con las propiedades que escribiste: la casilla **girar** (tildada) y la **velocidad** (90).
+El script aparece en la lista de la tarjeta Control, y abajo se agrega su propia tarjeta, **rotate.lua**, con las propiedades que escribiste: la casilla **rotate** (tildada) y la **speed** (90).
 
 En la lista, a la derecha del script, hay un **ojo**: tocándolo, el script se apaga (el motor no lo usa) sin quitarlo del objeto ni ocultar el objeto. Otro toque lo prende.
 
-![La tarjeta Control con girar.lua en la lista y los botones Añadir y Quitar; abajo, la tarjeta girar.lua con la casilla girar tildada y la velocidad en 90](img/script-propiedades.webp)
+![La tarjeta Control con rotate.lua en la lista y los botones Añadir y Quitar; abajo, la tarjeta rotate.lua con la casilla rotate tildada y la speed en 90](img/script-propiedades.webp)
 
 ### Un script de afuera
 
 Si escribiste el script con otro editor, o lo guardaste afuera del `.w3d`, tocá **Añadir → Cargar .lua...**. Se abre el explorador, **Cargar script**: elegí el archivo y tocá **Abrir**.
 
-![El explorador Cargar script abierto en la carpeta donde está girar.lua, con girar.lua elegido](img/script-cargar-lua.webp)
+![El explorador Cargar script abierto en la carpeta donde está rotate.lua, con rotate.lua elegido](img/script-cargar-lua.webp)
 
 ## 6. Dale Play
 
 Tocá **Reproducir**: el cubo gira. Mientras el juego anda, la barra de menús de la Vista 3D muestra **Parar** y **Pausa**.
 
-Con el juego andando, probá cambiar las propiedades en la tarjeta **girar.lua**:
+Con el juego andando, probá cambiar las propiedades en la tarjeta **rotate.lua**:
 
-- poné **velocidad** en 360: gira cuatro veces más rápido;
-- destildá **girar**: se queda quieto. Tildala otra vez y sigue.
+- poné **speed** en 360: gira cuatro veces más rápido;
+- destildá **rotate**: se queda quieto. Tildala otra vez y sigue.
 
 Para terminar, tocá **Parar**: el cubo vuelve a como estaba antes de darle Play.
 
-![Reproducir: el cubo gira; la velocidad pasa a 360 y gira más rápido; girar se destilda y se queda quieto; Parar: el cubo vuelve a su lugar, con la velocidad en 90 y girar tildada](img/script-jugar.webp)
+![Reproducir: el cubo gira; la speed pasa a 360 y gira más rápido; rotate se destilda y se queda quieto; Parar: el cubo vuelve a su lugar, con la speed en 90 y rotate tildada](img/script-jugar.webp)
 
 > [!NOTE]
-> Todo lo que pasa con el juego andando se pierde al tocar **Parar**: el cubo vuelve a su lugar, y **girar** y **velocidad** vuelven a los valores que tenían antes de darle Play. Para cambiarlos de verdad, cambialos con el juego parado.
+> Todo lo que pasa con el juego andando se pierde al tocar **Parar**: el cubo vuelve a su lugar, y **rotate** y **speed** vuelven a los valores que tenían antes de darle Play. Para cambiarlos de verdad, cambialos con el juego parado.
 
 ## Para seguir
 
 - [Lua en Whisk3D](../lua/README.md): el manual de Lua, con todas las funciones.
 - [Un script es un componente de un objeto](../lua/scripts-y-objetos.md): las propiedades (también listas, textos y objetos de la escena).
-- [Cuándo llama el motor a tu script](../lua/ciclo-del-script.md): `actualizar`, `inicio` y las demás.
+- [Cuándo llama el motor a tu script](../lua/ciclo-del-script.md): `update`, `start` y las demás.
 
 ## Descargá el ejemplo
 
-Acá está el proyecto terminado, para que lo pruebes o lo compares con el tuyo: **[girar-cubo.w3d](ejemplos/girar-cubo.w3d)**. Abrilo en Whisk3D y dale **Reproducir**. El script está adentro del `.w3d` y se ve en el IDE.
+Acá está el proyecto terminado, para que lo pruebes o lo compares con el tuyo: **[rotate-cube.w3d](ejemplos/rotate-cube.w3d)**. Abrilo en Whisk3D y dale **Reproducir**. El script está adentro del `.w3d` y se ve en el IDE.

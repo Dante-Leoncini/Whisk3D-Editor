@@ -11,21 +11,21 @@
 //  Cambiar un valor DESHACE el paso y lo vuelve a hacer con los valores nuevos (queda UN paso de undo).
 // ============================================================================
 #include "PopUpBase.h"
-#include "PanelDesplazable.h"
+#include "ScrollablePanel.h"
 #include "WhiskUI/Propieties/GroupPropertie.h"
 class Viewport3D; class Card;
 
 // Viewport3D::Aceptar: ANTES de confirmar lee lo que se hizo (hace falta el snapshot); DESPUES abre el panel
-void TransformRedoCapturar(Viewport3D* vp);
-void TransformRedoTrasConfirmar();
-bool TransformRedoAbierto(const Viewport3D* vp);
-bool TransformRedoReaplicando();           // re-haciendo la operacion (Aceptar no vuelve a capturar)
-void TransformRedoCerrar();
+void TransformRedoCapture(Viewport3D* vp);
+void TransformRedoAfterConfirm();
+bool TransformRedoOpen(const Viewport3D* vp);
+bool TransformRedoReapplying();           // re-haciendo la operacion (Aceptar no vuelve a capturar)
+void TransformRedoClose();
 extern bool g_transformRedoAuto;          // false = no se abre solo (el harness: las pruebas viejas no lo esperan)
 // (harness) tocar un valor como si se editara en el panel: campo 0..2 = X/Y/Z (o 0 = angulo), y aceptar/cancelar
-bool TransformRedoFijar(int campo, float valor);
-void TransformRedoBoton(bool aceptar);
-int  TransformRedoTipo();                 // translacion / rotacion / EditScale; -1 = cerrado
+bool TransformRedoSet(int field, float value);
+void TransformRedoButton(bool accept);
+int  TransformRedoType();                 // translacion / rotacion / EditScale; -1 = cerrado
 
 class TransformRedoPanel : public PopUpBase {
     public:
@@ -34,26 +34,26 @@ class TransformRedoPanel : public PopUpBase {
         void Render() W3D_OVERRIDE;
         bool Click(int mx, int my) W3D_OVERRIDE;
         bool Motion(int mx, int my) W3D_OVERRIDE;
-        bool Tecla(int tecla) W3D_OVERRIDE;
-        void Soltar() W3D_OVERRIDE;
-        bool Arrastrando() W3D_OVERRIDE;
-        bool CierraConViewport() W3D_OVERRIDE { return true; } bool Plegable() W3D_OVERRIDE { return grupo != 0; } bool Plegado() W3D_OVERRIDE { return grupo && !grupo->open; } void Desplegar(bool abrir) W3D_OVERRIDE { if (grupo) grupo->open = abrir; }   // click afuera = aceptar (y el click sigue)
+        bool Key(int key) W3D_OVERRIDE;
+        void Release() W3D_OVERRIDE;
+        bool Dragging() W3D_OVERRIDE;
+        bool ClosesWithViewport() W3D_OVERRIDE { return true; } bool Collapsible() W3D_OVERRIDE { return group != 0; } bool Collapsed() W3D_OVERRIDE { return group && !group->open; } void Expand(bool open) W3D_OVERRIDE { if (group) group->open = open; }   // click afuera = aceptar (y el click sigue)
         void Wheel(int delta) W3D_OVERRIDE;
-        void Cerrar() W3D_OVERRIDE;
+        void Close() W3D_OVERRIDE;
 
-        GroupPropertie* grupo;
+        GroupPropertie* group;
         class PropFloat* dragField; bool dragMoved; int lastDragMx;
-        int listaAbierta;   // 0 = ninguna, 1 = orientacion, 2 = curva proporcional
-        int listaSel;
-        Card* lista;
-        Card* marco;                  // el borde verde de lo que se ve (el contenido puede estar desplazado)
-        PanelDesplazable dz;          // mas alto que media pantalla: recortado y con desplazamiento
-        void ClickFila(int mx, int my, bool soloArmar);
-        void Armar();
-        void ResizeGrupo();
-        void Reubicar();
-        int  FilaY(int idx) const;
-        void ListaRect(int& lx, int& ly, int& lw, int& lh) const;
-        int  ListaCantidad() const;
+        int listOpen;   // 0 = ninguna, 1 = orientacion, 2 = curva proporcional
+        int listSel;
+        Card* list;
+        Card* frame;                 // el borde verde de lo que se ve (el contenido puede estar desplazado)
+        ScrollablePanel dz;          // mas alto que media pantalla: recortado y con desplazamiento
+        void ClickRow(int mx, int my, bool onlyBuild);
+        void Build();
+        void ResizeGroup();
+        void Relocate();
+        int  RowY(int idx) const;
+        void ListRect(int& lx, int& ly, int& lw, int& lh) const;
+        int  ListCount() const;
 };
 #endif // TRANSFORMREDOPANEL_H

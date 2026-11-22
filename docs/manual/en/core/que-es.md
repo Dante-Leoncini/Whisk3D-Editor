@@ -30,24 +30,24 @@ A small example of a game written to use Whisk3D Core, which works on every syst
 namespace gfx = w3dEngine;
 
 // a file: it can be on disk, inside the .w3d, inside the APK or packed into the game
-std::vector<unsigned char> nivel;
-if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", nivel))
+std::vector<unsigned char> level;
+if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", level))
     w3dLogfE("no encontre %s", "niveles/uno.txt");
 
 // a texture: stb (or Symbian's ICL) decodes it and the backend uploads it
 unsigned int pasto = 0;
-gfx::LoadTexture("texturas/pasto.png", pasto);
+gfx::LoadTexture("textures/pasto.png", pasto);
 
 // a sound: the Core mixes it; the output belongs to each system
-w3dEngine::W3dSound* salto = w3dEngine::W3dSoundLoad("sonidos/salto.wav");
-w3dEngine::W3dSoundPlay(salto, 1.0f, false);
+w3dEngine::W3dSound* jump = w3dEngine::W3dSoundLoad("sounds/salto.wav");
+w3dEngine::W3dSoundPlay(jump, 1.0f, false);
 
 // drawing: not a single call to OpenGL, sceGu or citro3d
 gfx::Enable(gfx::Texture2D);
 gfx::BindTexture(pasto);
-gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, posiciones);
+gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, positions);
 gfx::EnableArray(gfx::TexCoordArray); gfx::TexCoordPointer2f(0, uvs);
-gfx::DrawTriangles(cantidadDeIndices, indices);
+gfx::DrawTriangles(indexCount, indices);
 ```
 
 ## What's inside

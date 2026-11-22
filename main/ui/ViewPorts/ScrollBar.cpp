@@ -113,18 +113,18 @@ void Scrollable::ScrollByTouch(int dx, int dy){
     PosX += dx; if (PosX > 0) PosX = 0; if (MaxPosX > PosX) PosX = MaxPosX;
 }
 
-void Scrollable::TeletransportarY(int myLocal, int altoVp){
+void Scrollable::TeleportY(int myLocal, int heightVp){
     if (!scrollY || MaxPosY >= 0 || scrollDragFactor <= 0.0f) return;
-    const float alto = (float)(altoVp - scrollTopOffset);
-    const float rango = (float)(-MaxPosY) / scrollDragFactor;   // lo que recorre el agarre
-    const float largo = alto - rango;                            // el largo del agarre
-    const float arriba = (float)(-PosY) * scrollPosFactor;       // donde esta ahora
+    const float height = (float)(heightVp - scrollTopOffset);
+    const float range  = (float)(-MaxPosY) / scrollDragFactor;   // lo que recorre el agarre
+    const float length = height - range;                     // el largo del agarre
+    const float up = (float)(-PosY) * scrollPosFactor;       // donde esta ahora
     const float y = (float)(myLocal - scrollTopOffset);
-    if (y >= arriba && y <= arriba + largo) return;              // (sobre el agarre: se arrastra desde donde esta)
-    float nuevo = y - largo * 0.5f;
-    if (nuevo < 0.0f) nuevo = 0.0f;
-    if (nuevo > rango) nuevo = rango;
-    PosY = -(int)(nuevo * scrollDragFactor);
+    if (y >= up && y <= up + length) return;              // (sobre el agarre: se arrastra desde donde esta)
+    float newValue = y - length * 0.5f;
+    if (newValue < 0.0f) newValue = 0.0f;
+    if (newValue > range) newValue = range;
+    PosY = -(int)(newValue * scrollDragFactor);
     if (PosY > 0) PosY = 0;
     if (MaxPosY > PosY) PosY = MaxPosY;
 }
@@ -155,9 +155,9 @@ void Scrollable::ResizeScrollbar(int width, int height, int MaxX, int MaxY,
     // la barra de botones de arriba achica el area visible y corre el
     // tope superior de la barra de scroll
     scrollTopOffset = topOffset;
-    int alto = height - topOffset;
+    int barHeight = height - topOffset;
     MaxPosX = -MaxX + width - borderGS*2;
-    MaxPosY = MaxY + alto - borderGS*2;
+    MaxPosY = MaxY + barHeight - borderGS*2;
 
     if (MaxPosY > 0) MaxPosY = 0;
     if (MaxPosX > 0) MaxPosX = 0;
@@ -167,28 +167,28 @@ void Scrollable::ResizeScrollbar(int width, int height, int MaxX, int MaxY,
     scrollY = (MaxPosY < 0);
     scrollX = (MaxPosX < 0);
 
-    int limite = borderGS + GlobalScale*5 + borderGS;
+    int limit = borderGS + GlobalScale*5 + borderGS;
 
     // la VERTICAL llega siempre hasta el borde inferior; la HORIZONTAL
     // es la que cede la esquina (no llega al borde derecho si hay
     // barra vertical, para no pisarla)
     int areaScroll = borderGS + GlobalScale * 9;
-    int anchoH = width - (scrollY ? areaScroll : 0); // recorrido horizontal
+    int widthH = width - (scrollY ? areaScroll : 0); // recorrido horizontal
 
     // --- Scroll vertical ---
     float scrollHeight = 0.0f;
     if (scrollY) {
-        float totalHeight = (float)(alto - MaxPosY);
-        scrollHeight = alto * ((float)alto / totalHeight);
-        if (scrollHeight < limite) scrollHeight = limite;
-        if (scrollHeight > alto) scrollHeight = (float)alto;
+        float totalHeight = (float)(barHeight - MaxPosY);
+        scrollHeight = barHeight * ((float)barHeight / totalHeight);
+        if (scrollHeight < limit) scrollHeight = limit;
+        if (scrollHeight > barHeight) scrollHeight = (float)barHeight;
 
-        float rangeContenido = -MaxPosY;
-        float rangeScroll = alto - scrollHeight;
-        scrollPosFactor = rangeScroll / rangeContenido;
-        scrollDragFactor = rangeContenido / rangeScroll;
+        float rangeContent = -MaxPosY;
+        float rangeScroll = barHeight - scrollHeight;
+        scrollPosFactor = rangeScroll / rangeContent;
+        scrollDragFactor = rangeContent / rangeScroll;
     } else {
-        scrollHeight = (float)alto;
+        scrollHeight = (float)barHeight;
         scrollPosFactor = 0;
         scrollDragFactor = 1;
     }
@@ -197,18 +197,18 @@ void Scrollable::ResizeScrollbar(int width, int height, int MaxX, int MaxY,
     float scrollWidthGlobal = 0.0f;
     if (scrollX) {
         float totalWidth = (float)(width - MaxPosX);
-        float scrollWidth = anchoH * ((float)width / totalWidth);
-        if (scrollWidth < limite) scrollWidth = (float)limite;
-        if (scrollWidth > anchoH) scrollWidth = (float)anchoH;
+        float scrollWidth = widthH * ((float)width / totalWidth);
+        if (scrollWidth < limit) scrollWidth = (float)limit;
+        if (scrollWidth > widthH) scrollWidth = (float)widthH;
 
-        float rangeContenidoX = -MaxPosX;
-        float rangeScrollX = anchoH - scrollWidth;
-        scrollPosFactorX = rangeScrollX / rangeContenidoX;
-        scrollDragFactorX = rangeContenidoX / rangeScrollX;
+        float rangeContentX = -MaxPosX;
+        float rangeScrollX = widthH - scrollWidth;
+        scrollPosFactorX = rangeScrollX / rangeContentX;
+        scrollDragFactorX = rangeContentX / rangeScrollX;
 
         scrollWidthGlobal = scrollWidth;
     } else {
-        scrollWidthGlobal = (float)anchoH;
+        scrollWidthGlobal = (float)widthH;
         scrollPosFactorX = 0.0f;
         scrollDragFactorX = 1.0f;
     }
@@ -244,7 +244,7 @@ void Scrollable::ResizeScrollbar(int width, int height, int MaxX, int MaxY,
 }
 
 // ------------------ Dibujar Scrollbar ------------------
-void Scrollable::DibujarScrollbar(ViewportBase* current){
+void Scrollable::DrawScrollbar(ViewportBase* current){
     if (scrollY){
         w3dEngine::PushMatrix();
         w3dEngine::Translatef(0, (int)(-PosY * scrollPosFactor), 0);
@@ -255,16 +255,16 @@ void Scrollable::DibujarScrollbar(ViewportBase* current){
             uvSel = ScrollbarBigUV;
             meshSel = scrollVerticalBigMesh;
             if (ViewPortClickDown && mouseOverScrollYpress){
-                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+                w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
             }
             else {
-                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::blanco)]);
+                w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::white)]);
             }
         }
         else {
             uvSel = ScrollbarUV;
             meshSel = scrollVerticalMesh;
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::grayUI)]);
         }
 
         W3dDrawElemsB(meshSel, uvSel, indicesScrollbar, 18);
@@ -280,16 +280,16 @@ void Scrollable::DibujarScrollbar(ViewportBase* current){
             uvSel = ScrollbarBigUV;
             meshSel = scrollHorizontalBigMesh;
             if (ViewPortClickDown && mouseOverScrollXpress){
-                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+                w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
             }
             else {
-                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::blanco)]);
+                w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::white)]);
             }
         }
         else {
             uvSel = ScrollbarUV;
             meshSel = scrollHorizontalMesh;
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::grayUI)]);
         }
 
         W3dDrawElemsB(meshSel, uvSel, indicesScrollbar, 18);

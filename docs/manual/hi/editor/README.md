@@ -40,4 +40,4 @@
 
 गेम प्रोग्राम करने के लिए [Whisk3D में Lua](../lua/README.md) देखें। C या C++ में प्रोग्राम करने वालों के लिए, अंदर क्या होता है: [Whisk3D Core मैनुअल](../core/README.md)।
 
-Whisk3D · एडिटर मैनुअल (अक्टूबर 2026)। शॉर्टकट की टेबल `main/app/W3dAtajos.cpp` से `tools/genmanual_atajos.py` द्वारा बनाई जाती हैं।
+Whisk3D · एडिटर मैनुअल (अक्टूबर 2026)। शॉर्टकट की टेबल `main/app/W3dShortcuts.cpp` से `tools/genmanual_atajos.py` द्वारा बनाई जाती हैं।

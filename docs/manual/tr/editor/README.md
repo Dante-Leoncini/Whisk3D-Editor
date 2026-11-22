@@ -40,4 +40,4 @@
 
 Oyun programlamak için [Whisk3D'de Lua](../lua/README.md) bölümüne bak. Alttaki katmanda olup bitenler, C ya da C++ ile programlayanlar için: [Whisk3D Core kılavuzu](../core/README.md).
 
-Whisk3D · Editör kılavuzu (Ekim 2026). Kısayol tabloları `tools/genmanual_atajos.py` ile `main/app/W3dAtajos.cpp` dosyasından üretilir.
+Whisk3D · Editör kılavuzu (Ekim 2026). Kısayol tabloları `tools/genmanual_atajos.py` ile `main/app/W3dShortcuts.cpp` dosyasından üretilir.

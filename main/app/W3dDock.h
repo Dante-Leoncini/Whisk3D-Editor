@@ -18,7 +18,7 @@
 //
 //  SIN DEPENDENCIAS DE COMPILACION: GIO/GLib se cargan con dlopen EN EJECUCION.
 //  Si la libreria no esta, o no hay bus de sesion, todo queda en no-op silencioso
-//  (W3dDockDisponible() devuelve false) y el editor anda igual.
+//  (W3dDockAvailable() devuelve false) y el editor anda igual.
 //
 //  EN EL RESTO DE LAS PLATAFORMAS (Windows/Android/Symbian/Web) esto NI EXISTE:
 //  son inline vacias, no hay .cpp que compilar ni simbolo que linkear (importa
@@ -29,26 +29,26 @@
 
 // Prende la barra del icono y le setea el avance (frac 0..1, se clampea).
 // Se llama con el MISMO avance que ya publica la operacion; no lleva cuenta propia.
-void W3dDockProgreso(float frac);
+void W3dDockProgress(float frac);
 
 // Apaga la barra del icono. Tiene que llamarse SI O SI al terminar, al fallar y al
 // cancelar: si no, el icono queda con una barra a medias para siempre. Es no-op si
 // ya estaba apagada, asi que se puede llamar de mas (red de seguridad).
-void W3dDockProgresoFin();
+void W3dDockProgressEnd();
 
 // true si la barra esta LOGICAMENTE prendida (lo pedimos), este o no el D-Bus.
-bool W3dDockProgresoEncendido();
+bool W3dDockProgressOn();
 
 // true si se pudo cargar GIO y conectar al bus de sesion (o sea: se ve de verdad).
 // false = todo lo de arriba es no-op silencioso. Solo para diagnostico/tests.
-bool W3dDockDisponible();
+bool W3dDockAvailable();
 
 #else
 
-inline void W3dDockProgreso(float) {}
-inline void W3dDockProgresoFin() {}
-inline bool W3dDockProgresoEncendido() { return false; }
-inline bool W3dDockDisponible() { return false; }
+inline void W3dDockProgress(float) {}
+inline void W3dDockProgressEnd() {}
+inline bool W3dDockProgressOn() { return false; }
+inline bool W3dDockAvailable() { return false; }
 
 #endif
 

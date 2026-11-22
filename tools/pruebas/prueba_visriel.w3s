@@ -20,9 +20,9 @@
 #  mas claro que el fondo; triangulo recortado = identico al fondo vacio
 #  (-3.5, 0, 3). Las fotos de 3 nodos quedan en /tmp para mirar a ojo.
 # ==========================================================================
-abrirw3d prueba_visriel.w3d
+openw3d prueba_visriel.w3d
 loadtex
-vporbita 0 0 0 12 90 0
+vporbit 0 0 0 12 90 0
 
 # celda declarada en el .w3d: 1 -> dibuja t0 y t1 (el estado de arranque)
 visinfo MallaVis 4 1 2
@@ -33,26 +33,26 @@ activename Jugador
 objpos 0 0 5
 bench 1 noswap
 simplay 6
-scriptinfo compartido vr_indice 0.00
+scriptinfo shared vr_indice 0.00
 visinfo MallaVis 4 1 2
-escenapx foto /tmp/w3d_visriel-nodo0.ppm
-escenapx -3.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx -1.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx  1.5 0 -0.3 comoen -3.5 0 3
-escenapx  3.5 0 -0.3 comoen -3.5 0 3
+scenepx photo /tmp/w3d_visriel-nodo0.ppm
+scenepx -3.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx -1.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx  1.5 0 -0.3 sameas -3.5 0 3
+scenepx  3.5 0 -0.3 sameas -3.5 0 3
 
 # --- NODO 1: camina hasta el segundo nodo -> indice 1.00, celda 2 (APARECE t2,
 #     siguen t0 y t1: el registro DELTA de la playlist, no la malla entera)
 objpos 2 0 5
 bench 1 noswap
 simplay 6
-scriptinfo compartido vr_indice 1.00
+scriptinfo shared vr_indice 1.00
 visinfo MallaVis 4 2 3
-escenapx foto /tmp/w3d_visriel-nodo1.ppm
-escenapx -3.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx -1.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx  3.5 0 -0.3 comoen -3.5 0 3
+scenepx photo /tmp/w3d_visriel-nodo1.ppm
+scenepx -3.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx -1.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx  1.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx  3.5 0 -0.3 sameas -3.5 0 3
 
 # --- ENTRE NODOS: mitad de camino entre el nodo 2 y el 3 -> indice 2.50 (la
 #     prueba de que lo publicado es FRACCIONARIO), celda 3 (DESAPARECEN t0 y
@@ -60,23 +60,23 @@ escenapx  3.5 0 -0.3 comoen -3.5 0 3
 objpos 5 0 5
 bench 1 noswap
 simplay 6
-scriptinfo compartido vr_indice 2.50
+scriptinfo shared vr_indice 2.50
 visinfo MallaVis 4 3 2
-escenapx foto /tmp/w3d_visriel-nodo2.ppm
-escenapx -3.5 0 -0.3 comoen -3.5 0 3
-escenapx -1.5 0 -0.3 comoen -3.5 0 3
-escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx  3.5 0 -0.3 masclaroque -3.5 0 3 40
+scenepx photo /tmp/w3d_visriel-nodo2.ppm
+scenepx -3.5 0 -0.3 sameas -3.5 0 3
+scenepx -1.5 0 -0.3 sameas -3.5 0 3
+scenepx  1.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx  3.5 0 -0.3 lighterthan -3.5 0 3 40
 
 # --- NODO 3 (el ultimo): indice 3.00, celda 4 (mismos triangulos que la 3
 #     pero con OTRO orden: el registro MOVE de la playlist)
 objpos 6 0 5
 bench 1 noswap
 simplay 6
-scriptinfo compartido vr_indice 3.00
+scriptinfo shared vr_indice 3.00
 visinfo MallaVis 4 4 2
-escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx  3.5 0 -0.3 masclaroque -3.5 0 3 40
+scenepx  1.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx  3.5 0 -0.3 lighterthan -3.5 0 3 40
 
 simstop
 # render real con la ultima celda activa (el mismo camino de indices de cliente

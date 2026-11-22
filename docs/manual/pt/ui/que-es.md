@@ -27,7 +27,7 @@ O preço: as letras são de pixels e crescem em múltiplos inteiros ([Cores e es
 | Pasta | O que resolve |
 |---|---|
 | `core/` | As medidas da interface e sua escala (`UI.h`): [Cores e escala](tema.md) |
-| `theme/` | A paleta de cores (`colores.h`): [Cores e escala](tema.md) |
+| `theme/` | A paleta de cores (`colors.h`): [Cores e escala](tema.md) |
 | `draw/` | O desenho 2D (`glesdraw`), os retângulos, os ícones e o empacotador de atlas: [Desenho e atlas](dibujo.md), [Ícones](iconos.md) |
 | `text/` | A fonte bitmap, o atlas estendido e o texto com fontes TTF bakeadas: [Texto](texto.md) |
 | `widgets/` | Os cartões com borda, os botões, as abas, os menus e as caixas de texto: [Botões, abas e caixas de seleção](botones.md), [Menus suspensos](menus.md), [Entrada e caixas de texto](entrada.md) |

@@ -40,4 +40,4 @@ What **Whisk3D Editor** can do, organized by panel and by mode. Draft for review
 
 To program games, see [Lua in Whisk3D](../lua/README.md). What goes on underneath, for people who program in C or C++: [Whisk3D Core manual](../core/README.md).
 
-Whisk3D · Editor manual (October 2026). The shortcut tables are generated from `main/app/W3dAtajos.cpp` with `tools/genmanual_atajos.py`.
+Whisk3D · Editor manual (October 2026). The shortcut tables are generated from `main/app/W3dShortcuts.cpp` with `tools/genmanual_atajos.py`.

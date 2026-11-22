@@ -7,116 +7,116 @@
 selobj Cubo
 delete
 add sphere
-ratonvista3d
-tecla g
-tecla z
-texto 1
-tecla Return
-tecla Tab
-elegirvertice abajo
-tecla Left_Shift down
-tecla s
-tecla Left_Shift up
-menuelegir Cursor to Selected
-tecla Tab
-agregar vacio
+mouseview3d
+key g
+key z
+text 1
+key Return
+key Tab
+pickvertex abajo
+key Left_Shift down
+key s
+key Left_Shift up
+menupick Cursor to Selected
+key Tab
+addui empty
 objat Vacío 0 0 0 0.001
 # la esfera, hija del Vacio (Ctrl+P > Objeto (Mantener Transform.)): la pelota NO se mueve
 selobj EsferaUV
 selname Vacío
-ratonvista3d
-tecla Left_Ctrl down
-tecla p
-tecla Left_Ctrl up
-menuelegir Object (Keep Transform)
-cajamundo EsferaUV -1 0 -1 1 2 1 0.01
+mouseview3d
+key Left_Ctrl down
+key p
+key Left_Ctrl up
+menupick Object (Keep Transform)
+worldbox EsferaUV -1 0 -1 1 2 1 0.01
 selobj Vacío
-ratonvista3d
+mouseview3d
 
 # ---- 2) aplastar: cuadro 1 redonda, flecha a la derecha, S Z 0.75 y S Shift+Z 1.6 ----
 frame 1
-tecla i
-menuelegir Scale Only
-tecla Right
-tecla s
-tecla z
-texto 0.75
-tecla Return
-tecla s
-tecla Left_Shift down
-tecla z
-tecla Left_Shift up
-texto 1.6
-tecla Return
-tecla i
-menuelegir Scale Only
-keyvalor esc z 2 0.75
-keyvalor esc x 2 1.6
-keyvalor esc y 2 1.6
+key i
+menupick Scale Only
+key Right
+key s
+key z
+text 0.75
+key Return
+key s
+key Left_Shift down
+key z
+key Left_Shift up
+text 1.6
+key Return
+key i
+menupick Scale Only
+keyvalue esc z 2 0.75
+keyvalue esc x 2 1.6
+keyvalue esc y 2 1.6
 
 # ---- 3) estirar: el keyframe del 1 duplicado al 4, al 17 y al 29 (Shift+D saca la copia un cuadro a la derecha;
 # el numero tipeado se suma); en el 4, S Z 1.1 y S Shift+Z 0.9 ----
 tl selframe 1
-tl duplicar
-tl valor 2
-tl aceptar
+tl duplicate
+tl value 2
+tl accept
 tl selframe 1
-tl duplicar
-tl valor 15
-tl aceptar
+tl duplicate
+tl value 15
+tl accept
 tl selframe 1
-tl duplicar
-tl valor 27
-tl aceptar
+tl duplicate
+tl value 27
+tl accept
 frame 4
-ratonvista3d
-tecla s
-tecla z
-texto 1.1
-tecla Return
-tecla s
-tecla Left_Shift down
-tecla z
-tecla Left_Shift up
-texto 0.9
-tecla Return
-tecla i
-menuelegir Scale Only
-keyvalor esc z 4 1.1
-keyvalor esc x 4 0.9
-keyvalor esc z 17 1
-keyvalor esc z 29 1
+mouseview3d
+key s
+key z
+text 1.1
+key Return
+key s
+key Left_Shift down
+key z
+key Left_Shift up
+text 0.9
+key Return
+key i
+menupick Scale Only
+keyvalue esc z 4 1.1
+keyvalue esc x 4 0.9
+keyvalue esc z 17 1
+keyvalue esc z 29 1
 # el aplastado del 2 no se toco al duplicar por encima
-keyvalor esc z 2 0.75
+keyvalue esc z 2 0.75
 
 # ---- 4) el salto: cuadro 3 en el piso, 16 arriba (G Z 5), el 3 duplicado al 29 ----
 frame 3
-tecla i
-menuelegir Location Only
+key i
+menupick Location Only
 frame 16
-tecla g
-tecla z
-texto 5
-tecla Return
-tecla i
-menuelegir Location Only
+key g
+key z
+text 5
+key Return
+key i
+menupick Location Only
 tl selframe 3
-tl duplicar
-tl valor 25
-tl aceptar
-keyvalor loc z 3 0
-keyvalor loc z 16 5
-keyvalor loc z 29 0
+tl duplicate
+tl value 25
+tl accept
+keyvalue loc z 3 0
+keyvalue loc z 16 5
+keyvalue loc z 29 0
 
 # ---- 5) el loop: Fin 28 ----
-tl fin 28
+tl end 28
 
 # ---- 6) las curvas: sin X ni Y Posicion; la subida frena al llegar (cubica, Al llegar) y la caida acelera (cubica,
 # Al arrancar) ----
-tl borrarcurva loc x
-tl borrarcurva loc y
+tl deletecurve loc x
+tl deletecurve loc y
 keyinterp out 3 loc
 keyinterp in 16 loc
-keyvalor loc z 3 0 517
-keyvalor loc z 16 5 261
+keyvalue loc z 3 0 517
+keyvalue loc z 16 5 261
 tlframes 1 2 3 4 16 17 29

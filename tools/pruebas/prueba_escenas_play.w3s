@@ -18,64 +18,64 @@
 #    t11..   B de cero (JugB y 1..)
 # ==========================================================================
 
-ventana 1280 720
-escenadefecto
-raizinfo n 1 activa Scene
+window 1280 720
+scenedefault
+rootinfo n 1 active Scene
 add cube
 objname DirA
-raizscript DirA prueba_escenas_a.lua
-raiznueva juego Nivel2
+rootscript DirA prueba_escenas_a.lua
+rootnew game Nivel2
 add cube
 objname JugB
-raizscript JugB prueba_escenas_b.lua
-raizabrir Scene
+rootscript JugB prueba_escenas_b.lua
+rootopen Scene
 
 # ---- el Play: A -> B -> A -> B ----
 simplay 2
-raizinfo activa Scene
-scriptinfo compartido a_n 2
+rootinfo active Scene
+scriptinfo shared a_n 2
 # el cambio pedido en el tick 3 se aplica al final de ESE tick
 simplay 1
-raizinfo activa Nivel2
-scriptinfo compartido a_inicios 1
-scriptinfo compartido b_inicios 1
+rootinfo active Nivel2
+scriptinfo shared a_inicios 1
+scriptinfo shared b_inicios 1
 objat JugB 0 0 0 0.001
 # con la partida andando no se cambia de escena a mano
-raizabrir Scene falla
+rootopen Scene fails
 simplay 1
 objat JugB 0 1 0 0.001
-scriptinfo compartido b_n 1
+scriptinfo shared b_n 1
 # t5..t7: la B vuelve a la A, que arranca de cero (DirA donde lo dejo el usuario)
 simplay 3
-raizinfo activa Scene
-scriptinfo compartido b_n 4
-scriptinfo compartido a_inicios 2
+rootinfo active Scene
+scriptinfo shared b_n 4
+scriptinfo shared a_inicios 2
 objat DirA 0 0 0 0.001
 # t8..t10: la A otra vez a la B, que tambien arranca de cero
 simplay 3
-raizinfo activa Nivel2
-scriptinfo compartido a_n 3
-scriptinfo compartido b_inicios 2
+rootinfo active Nivel2
+scriptinfo shared a_n 3
+scriptinfo shared b_inicios 2
 objat JugB 0 0 0 0.001
 simplay 2
-scriptinfo compartido b_n 2
+scriptinfo shared b_n 2
 objat JugB 0 2 0 0.001
 
 # ---- el Stop: vuelve a la escena del Play y TODAS quedan como las dejo el usuario ----
 simstop
-raizinfo activa Scene
+rootinfo active Scene
 objat DirA 0 0 0 0.001
-raizabrir Nivel2
+rootopen Nivel2
 objat JugB 0 0 0 0.001
-raizabrir Scene
+rootopen Scene
 
 # ---- lo mismo despues de guardar y abrir (Nivel2 se carga de su entrada al pedirla) ----
-guardarw3d /tmp/w3d_f6_escenas_play.w3d
-abrirw3d /tmp/w3d_f6_escenas_play.w3d
-raizinfo n 2 activa Scene cargada Nivel2 0
+savew3d /tmp/w3d_f6_escenas_play.w3d
+openw3d /tmp/w3d_f6_escenas_play.w3d
+rootinfo n 2 active Scene loaded Nivel2 0
 simplay 4
-raizinfo activa Nivel2 cargada Nivel2 1
+rootinfo active Nivel2 loaded Nivel2 1
 objat JugB 0 1 0 0.001
 simstop
-raizinfo activa Scene
+rootinfo active Scene
 objat DirA 0 0 0 0.001

@@ -16,81 +16,81 @@ from recetas_objeto import teclas, recorrido
 PESTANIA_SCRIPTS = 8          # la del joystick en Propiedades
 
 SCRIPT = PorIdioma({
-    "es": """propiedades = {
-  girar     = true,   -- si el cubo gira o no
-  velocidad = 90,     -- cuantos grados gira por segundo
+    "es": """properties = {
+  rotate   = true,   -- si el cubo gira o no
+  speed    = 90,     -- cuantos grados gira por segundo
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
     # (los mismos comentarios que el tutorial en cada idioma; hi, ja y zh usan el ingles: el IDE no muestra esas letras)
-    "en": """propiedades = {
-  girar     = true,   -- whether the cube spins or not
-  velocidad = 90,     -- how many degrees it spins per second
+    "en": """properties = {
+  rotate   = true,   -- whether the cube spins or not
+  speed    = 90,     -- how many degrees it spins per second
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
-    "pt": """propiedades = {
-  girar     = true,   -- se o cubo gira ou não
-  velocidad = 90,     -- quantos graus gira por segundo
+    "pt": """properties = {
+  rotate   = true,   -- se o cubo gira ou não
+  speed    = 90,     -- quantos graus gira por segundo
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
-    "fr": """propiedades = {
-  girar     = true,   -- si le cube tourne ou non
-  velocidad = 90,     -- combien de degrés il tourne par seconde
+    "fr": """properties = {
+  rotate   = true,   -- si le cube tourne ou non
+  speed    = 90,     -- combien de degrés il tourne par seconde
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
-    "it": """propiedades = {
-  girar     = true,   -- se il cubo gira o no
-  velocidad = 90,     -- quanti gradi gira al secondo
+    "it": """properties = {
+  rotate   = true,   -- se il cubo gira o no
+  speed    = 90,     -- quanti gradi gira al secondo
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
-    "tr": """propiedades = {
-  girar     = true,   -- küp dönsün mü
-  velocidad = 90,     -- saniyede kaç derece döner
+    "tr": """properties = {
+  rotate   = true,   -- küp dönsün mü
+  speed    = 90,     -- saniyede kaç derece döner
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
-    "ru": """propiedades = {
-  girar     = true,   -- вращается куб или нет
-  velocidad = 90,     -- на сколько градусов поворачивается в секунду
+    "ru": """properties = {
+  rotate   = true,   -- вращается куб или нет
+  speed    = 90,     -- на сколько градусов поворачивается в секунду
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 """,
@@ -98,7 +98,7 @@ end
 
 ESCENA = """Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         name: "%(escena)s"
         Camera {
             name: "%(camara)s"
@@ -123,32 +123,32 @@ ESCENA = """Whisk3D {
 """
 
 
-def proyecto(idioma, con_script=True, codigo=None, archivo="girar.lua"):
+def proyecto(idioma, con_script=True, codigo=None, archivo="rotate.lua"):
     """La carpeta con el .w3d y el girar.lua (queda en /tmp). con_script=False: el cubo todavia sin el script (antes
     de Aniadir). codigo: otro script en vez del del tutorial (las capturas del manual de Lua)."""
     d = tempfile.mkdtemp(prefix="w3d_script_")
     with open(os.path.join(d, archivo), "w", encoding="utf-8") as f:
         f.write(codigo if codigo is not None else SCRIPT[idioma])
-    with open(os.path.join(d, "girar.w3d"), "w", encoding="utf-8") as f:
+    with open(os.path.join(d, "rotate.w3d"), "w", encoding="utf-8") as f:
         f.write(ESCENA % {"escena": T(idioma, "Scene"), "camara": T(idioma, "Camera"), "luz": T(idioma, "Light"),
                           "cubo": T(idioma, "Cube"),
                           "script": '            script: "%s"\n' % archivo if con_script else ""})
     return d
 
 
-def guion(idioma, raton=False, con_script=True, codigo=None, archivo="girar.lua"):
+def guion(idioma, raton=False, con_script=True, codigo=None, archivo="rotate.lua"):
     """La ventana ancha (la barra de la Vista 3D entra entera, con el boton Reproducir) y la Linea de tiempo grande,
     ya convertida en el Editor de scripts con girar.lua abierto. La escena ya es un juego."""
     d = proyecto(idioma, con_script, codigo, archivo)
     g = Guion(idioma, w=1600, h=900, raton=raton)
-    g.linea("abrirw3d " + os.path.join(d, "girar.w3d"))
+    g.linea("openw3d " + os.path.join(d, "rotate.w3d"))
     g.linea("timeline pause")                      # (un .w3d de texto con scripts se abre ya jugando: como el tutorial no)
-    g.linea("layoutpordefecto")
+    g.linea("layoutdefault")
     g.linea("division 0.69")
-    g.linea("divisionde %d 0.5" % LINEA_DE_TIEMPO)
+    g.linea("divisionof %d 0.5" % LINEA_DE_TIEMPO)
     g.linea("vpkind %d %d" % (LINEA_DE_TIEMPO, MENU_TIPO(IDE)))
-    g.linea("idecargar " + os.path.join(d, archivo))
-    g.linea("raiztipo juego")
+    g.linea("ideload " + os.path.join(d, archivo))
+    g.linea("roottype game")
     g.linea("selobj " + T(idioma, "Cube"))
     g.linea("tick 2")                              # (Propiedades arma las pestanias del cubo en el cuadro siguiente)
     g.clic(*g.info().pestania(PESTANIA_SCRIPTS))   # (propstab no la encuentra: se elige con un click, como a mano)
@@ -195,21 +195,21 @@ def guion_proyecto(idioma, raton=False, script_adentro=True):
     esta en el cubo. El cubo elegido y Propiedades en la pestania del joystick."""
     casa = carpeta_ejemplo(idioma)
     d = proyecto(idioma, con_script=False)
-    w3d = os.path.join(casa, "girar-cubo.w3d")
+    w3d = os.path.join(casa, "rotate-cube.w3d")
     g = Guion(idioma, w=1600, h=900, raton=raton)
     g.entorno = {"HOME": casa}
-    g.linea("abrirw3d " + os.path.join(d, "girar.w3d"))
+    g.linea("openw3d " + os.path.join(d, "rotate.w3d"))
     g.linea("timeline pause")
-    g.linea("guardarw3d " + w3d)
-    g.linea("abrirw3d " + w3d)
+    g.linea("savew3d " + w3d)
+    g.linea("openw3d " + w3d)
     g.linea("timeline pause")
-    g.linea("layoutpordefecto")
+    g.linea("layoutdefault")
     g.linea("division 0.69")
-    g.linea("divisionde %d 0.5" % LINEA_DE_TIEMPO)
+    g.linea("divisionof %d 0.5" % LINEA_DE_TIEMPO)
     g.linea("vpkind %d %d" % (LINEA_DE_TIEMPO, MENU_TIPO(IDE)))
-    g.linea("idecargar " + os.path.join(casa, "girar.lua"))
+    g.linea("ideload " + os.path.join(casa, "rotate.lua"))
     if script_adentro:
-        g.linea("idearchivo 3")                   # Archivo > Guardar en el w3d (el IDE lo pasa adentro del proyecto)
+        g.linea("idefile 3")                   # Archivo > Guardar en el w3d (el IDE lo pasa adentro del proyecto)
     g.linea("selobj " + T(idioma, "Cube"))
     g.linea("tick 2")
     g.clic(*g.info().pestania(PESTANIA_SCRIPTS))
@@ -235,8 +235,8 @@ def guardar(idioma):
     """Paso 3: el "Guardar como..." del IDE, con el nombre girar.lua y "Dentro del .w3d" TILDADO (el proyecto ya esta
     guardado: sin eso no se puede)."""
     g = guion_proyecto(idioma, script_adentro=False)
-    g.linea("idearchivo 2")                       # Archivo > Guardar como...
-    g.linea("guardarcomofijar girar.lua 1")
+    g.linea("idefile 2")                       # Archivo > Guardar como...
+    g.linea("saveasfill rotate.lua 1")
     return foto_formulario(g)
 
 
@@ -244,8 +244,8 @@ def guardar(idioma):
 def guardar_afuera(idioma):
     """Paso 3: el mismo formulario SIN tildar "Dentro del .w3d": aparece la Carpeta (afuera del proyecto)."""
     g = guion_proyecto(idioma, script_adentro=False)
-    g.linea("idearchivo 2")
-    g.linea("guardarcomofijar girar.lua 0")
+    g.linea("idefile 2")
+    g.linea("saveasfill rotate.lua 0")
     return foto_formulario(g)
 
 
@@ -263,10 +263,10 @@ def boton_aniadir(i, idioma):
     boton arranca 2 px arriba de la fila y mide 10 px menos (medido en las capturas, escala 2)."""
     c = i.tarjeta(T(idioma, "Control"))   # (en portugues es "Controle")
     filas = [p for p in i.props if p.get("g") == c["i"]]
-    fila = [p for p in filas if not p.get("nombre")][0]
+    fila = [p for p in filas if not p.get("name")][0]
     arriba = fila["y"] - fila["h"] // 2 - 2
     # sin scripts la tarjeta no tiene la lista ni Quitar: Aniadir va de borde a borde
-    ancho = (c["w"] // 2 + 5) if any(p.get("nombre") for p in filas) else c["w"] - 8
+    ancho = (c["w"] // 2 + 5) if any(p.get("name") for p in filas) else c["w"] - 8
     return c["x"], arriba, ancho, fila["h"] - 10
 
 
@@ -284,7 +284,7 @@ def carpeta_ejemplo(idioma):
                           "tr": ["Belgeler", "İndirilenler", "Resimler", "Müzik"],
                           "ru": ["Документы", "Загрузки", "Изображения", "Музыка"]})[idioma]:
         os.makedirs(os.path.join(d, sub))
-    with open(os.path.join(d, "girar.lua"), "w", encoding="utf-8") as f:
+    with open(os.path.join(d, "rotate.lua"), "w", encoding="utf-8") as f:
         f.write(SCRIPT[idioma])
     return d
 
@@ -300,7 +300,7 @@ def anadir(idioma):
     g.clic(bx + bw // 2, by + bh // 2)
     g.linea("tick 1")
     i2 = g.info()
-    item = [it for it in i2.items if it.get("texto") == "girar.lua"][0]
+    item = [it for it in i2.items if it.get("texto") == "rotate.lua"][0]
     g.raton_mover(item["cx"], item["cy"])
     g.linea("tick 1")
     g.foto()
@@ -320,7 +320,7 @@ def cargar_lua(idioma):
     x, y = g.info().item(100000)                  # Cargar .lua... (kScriptCargarLua en Properties.cpp)
     g.clic(x, y)
     g.linea("tick 2")
-    x, y = g.info().archivo("girar.lua")
+    x, y = g.info().archivo("rotate.lua")
     g.raton_mover(x, y)
     g.clic(x, y)                                  # un click lo elige (dos, lo abren)
     g.linea("tick 1")
@@ -335,7 +335,7 @@ def propiedades(idioma):
     g = guion(idioma)
     i = g.info()
     v = i.vp(PROPIEDADES)
-    ultima = i.prop("velocidad")                    # (la ultima fila de la tarjeta del script)
+    ultima = i.prop("speed")                    # (la ultima fila de la tarjeta del script)
     alto = ultima["y"] + ultima["h"] // 2 + 16 - v["y"]
     g.foto(puntero=False)
     return g.cuadros(recorte=(v["x"], v["y"], v["w"], alto))
@@ -348,9 +348,9 @@ def convertir_juego(idioma):
     d = proyecto(idioma, con_script=False)
     g = Guion(idioma, w=1600, h=900)
     g.linea("division 0.69")
-    g.linea("divisionde %d 0.5" % LINEA_DE_TIEMPO)
+    g.linea("divisionof %d 0.5" % LINEA_DE_TIEMPO)
     g.linea("vpkind %d %d" % (LINEA_DE_TIEMPO, MENU_TIPO(IDE)))
-    g.linea("idecargar " + os.path.join(d, "girar.lua"))
+    g.linea("ideload " + os.path.join(d, "rotate.lua"))
     g.linea("tick 2")
     i = g.info()
     escena = [b for b in i.botones if b["kind"] == VISTA_3D and b.get("rol") == 18][0]   # el boton de la escena
@@ -372,8 +372,8 @@ def jugar(idioma):
     g = guion(idioma, raton=True)
     i = g.info()
     play = i.boton(VISTA_3D, T(idioma, "Play"))
-    vel = i.prop("velocidad")
-    gir = i.prop("girar")
+    vel = i.prop("speed")
+    gir = i.prop("rotate")
     g.fotos = []
     inicio = (play[0] + 60, play[1] + 160)
     g.raton_mover(*inicio)
@@ -407,70 +407,70 @@ def jugar(idioma):
 
 # ---- el manual de Lua: "Un script es un componente de un objeto" (docs/manual/<idioma>/lua/scripts-y-objetos.md) ----
 LUA_PROPIEDADES = PorIdioma({
-    "es": """propiedades = {
-  pelota     = "objeto",                          -- un campo para elegir un objeto de la escena
-  dificultad = { "facil", "normal", "dificil" },  -- una lista desplegable (la primera es la de fabrica)
-  velocidad  = 200,                               -- un numero propio de cada objeto que use el script
-  activo     = true,                              -- un si/no
-  etiqueta   = "caja",                            -- un texto
+    "es": """properties = {
+  ball       = "object",                          -- un campo para elegir un objeto de la escena
+  difficulty = { "facil", "normal", "dificil" },  -- una lista desplegable (la primera es la de fabrica)
+  speed      = 200,                               -- un numero propio de cada objeto que use el script
+  active     = true,                              -- un si/no
+  label      = "caja",                            -- un texto
 }
 
-function inicio()
-  local p   = objeto("pelota")
-  local dif = opcion("dificultad")
-  local v   = propiedad("velocidad")
+function start()
+  local p   = object("ball")
+  local dif = option("difficulty")
+  local v   = property("speed")
 end
 """,
 })
 LUA_PROPIEDADES["en"] = LUA_PROPIEDADES["es"]   # (la captura es la tarjeta, no el codigo: sirve igual en todos)
 LUA_BOTON = PorIdioma({
-    "es": """propiedades = {
-  velocidad = 90,
-  cero = { "Volver a cero", function()
-    setRotacion(yo(), 0, 0, 0)
+    "es": """properties = {
+  speed    = 90,
+  zero = { "Volver a cero", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
     # (lo que dice el boton, como en el manual de cada idioma: lua/scripts-y-objetos.md)
-    "en": """propiedades = {
-  velocidad = 90,
-  cero = { "Back to zero", function()
-    setRotacion(yo(), 0, 0, 0)
+    "en": """properties = {
+  speed    = 90,
+  zero = { "Back to zero", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
-    "pt": """propiedades = {
-  velocidad = 90,
-  cero = { "Voltar a zero", function()
-    setRotacion(yo(), 0, 0, 0)
+    "pt": """properties = {
+  speed    = 90,
+  zero = { "Voltar a zero", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
-    "fr": """propiedades = {
-  velocidad = 90,
-  cero = { "Revenir à zéro", function()
-    setRotacion(yo(), 0, 0, 0)
+    "fr": """properties = {
+  speed    = 90,
+  zero = { "Revenir à zéro", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
-    "it": """propiedades = {
-  velocidad = 90,
-  cero = { "Torna a zero", function()
-    setRotacion(yo(), 0, 0, 0)
+    "it": """properties = {
+  speed    = 90,
+  zero = { "Torna a zero", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
-    "tr": """propiedades = {
-  velocidad = 90,
-  cero = { "Sıfıra dön", function()
-    setRotacion(yo(), 0, 0, 0)
+    "tr": """properties = {
+  speed    = 90,
+  zero = { "Sıfıra dön", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
-    "ru": """propiedades = {
-  velocidad = 90,
-  cero = { "Вернуть в ноль", function()
-    setRotacion(yo(), 0, 0, 0)
+    "ru": """properties = {
+  speed    = 90,
+  zero = { "Вернуть в ноль", function()
+    setRotation(self(), 0, 0, 0)
   end },
 }
 """,
@@ -511,10 +511,10 @@ def proyecto_ejemplo(idioma, salida):
     from capturas import IDIOMAS, BIN, RAIZ
     import subprocess
     d = tempfile.mkdtemp(prefix="w3d_proyecto_")
-    lua = os.path.join(d, "girar.lua")
+    lua = os.path.join(d, "rotate.lua")
     with open(lua, "w", encoding="utf-8") as f:
         f.write(SCRIPT[idioma])
-    w3d = os.path.join(d, "girar-cubo.w3d")
+    w3d = os.path.join(d, "rotate-cube.w3d")
 
     def correr(lineas):
         ruta = os.path.join(d, "guion.w3s")
@@ -528,16 +528,16 @@ def proyecto_ejemplo(idioma, salida):
 
     cubo = T(idioma, "Cube")
     os.makedirs(os.path.dirname(os.path.abspath(salida)), exist_ok=True)
-    correr(["ventana 1600 900", "escala 2", "tick 2",
-            "guardarw3d " + w3d, "abrirw3d " + w3d, "tick 2",                        # el proyecto, guardado
-            "raizmenu 3d Convert to Game", "tick 2",                                  # el juego (una copia)
-            "layoutpordefecto", "divisionde %d 0.5" % LINEA_DE_TIEMPO, "vpkind %d %d" % (LINEA_DE_TIEMPO, MENU_TIPO(IDE)),
-            "idecargar " + lua, "idearchivo 3",                                       # girar.lua, adentro del .w3d
+    correr(["window 1600 900", "scale 2", "tick 2",
+            "savew3d " + w3d, "openw3d " + w3d, "tick 2",                        # el proyecto, guardado
+            "rootmenu 3d Convert to Game", "tick 2",                                  # el juego (una copia)
+            "layoutdefault", "divisionof %d 0.5" % LINEA_DE_TIEMPO, "vpkind %d %d" % (LINEA_DE_TIEMPO, MENU_TIPO(IDE)),
+            "ideload " + lua, "idefile 3",                                       # girar.lua, adentro del .w3d
             "selobj " + cubo, "tick 2",
-            "scriptanadir", "menuelegir girar.lua",                                   # Aniadir > girar.lua
-            "raizmenu 3d Set as Start Scene", "tick 1",                               # el juego, de arranque
-            "guardarw3d " + os.path.abspath(salida)])
+            "scriptadd", "menupick rotate.lua",                                   # Aniadir > girar.lua
+            "rootmenu 3d Set as Start Scene", "tick 1",                               # el juego, de arranque
+            "savew3d " + os.path.abspath(salida)])
     # control: abierto de cero es un juego y el cubo gira 90 grados en 1 segundo (30 cuadros)
-    correr(["abrirw3d " + os.path.abspath(salida), "raizmodo kind 2", "raizmodo juego 1", "selobj " + cubo,
+    correr(["openw3d " + os.path.abspath(salida), "rootmode kind 2", "rootmode game 1", "selobj " + cubo,
             "simplay 30", "objroteuler 0 90 0 0.5", "simstop"])
     return salida

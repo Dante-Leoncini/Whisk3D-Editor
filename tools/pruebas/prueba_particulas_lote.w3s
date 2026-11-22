@@ -9,8 +9,8 @@
 #   - glaudit verifica que NADA del pase de escena toca GL crudo: el cache de
 #     estado (que ahora vive el frame entero, sin Invalidate por malla) tiene
 #     que coincidir con el estado REAL de GL al cerrar cada pase.
-abrirw3d prueba_particulas.w3d
+openw3d prueba_particulas.w3d
 simplay 30
-presupuesto presupuesto-particulas.json lote 3
+budget presupuesto-particulas.json lote 3
 simstop
 glaudit 3

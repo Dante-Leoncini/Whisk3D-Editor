@@ -2,11 +2,11 @@
 #define LAYOUTINPUT_H
 
 #include "ViewPorts/Parent.h"  // emparentar (LayoutMenuParent, LayoutSubmenu*Parent...)
-void LayoutAccionObject(int aId); // dispatcher del menu Object (lo usa Parent.cpp)
+void LayoutActionObject(int aId); // dispatcher del menu Object (lo usa Parent.cpp)
 
 #include "ViewPorts/NumInput.h"  // entrada numerica / formulas (NumInputChar, W3dEvalExpr...)
 
-#include "ViewPorts/Notificaciones.h"  // toasts (Notificar, NotificacionesRender...)
+#include "ViewPorts/Notifications.h"  // toasts (Notificar, NotificationsRender...)
 
 /*
  * Ruteo de entrada COMPARTIDO (4 OS) sobre el arbol de viewports
@@ -40,11 +40,15 @@ struct SnapCfg {
 extern SnapCfg g_snap;
 bool SnapEnabled();  // g_snap.enabled
 void SnapToggle();   // Shift+Tab
+// EL IMAN CON LAS FLECHAS (sin puntero): moviendo con el iman prendido, cada flecha salta al siguiente nivel de la
+// geometria (ver LayoutInput.cpp). fx/fy = la flecha en la pantalla (-1, 0, 1; y para abajo). true = se movio
+bool SnapByArrows();
+bool SnapStepArrow(int fx, int fy);
 // busca el punto de snap bajo el cursor (target actual, entre la geometria candidata). true + outWorld si engancho.
 // outSx/outSy = su posicion en pantalla (para el recuadro verde). vp = el viewport 3D.
 // outEdgeA/outEdgeB (opcionales): si el target es un BORDE, devuelve sus 2 extremos en MUNDO (para que el snap
 // con eje bloqueado lleve el vertice a TOCAR el borde a lo largo del eje, no solo a igualar la coordenada).
-bool SnapBuscarTarget(int mx, int my, class Viewport3D* vp, Vector3& outWorld, float& outSx, float& outSy,
+bool SnapFindTarget(int mx, int my, class Viewport3D* vp, Vector3& outWorld, float& outSx, float& outSy,
                       Vector3* outEdgeA = 0, Vector3* outEdgeB = 0);
 void LayoutMenuSnapTool(int mx, int my); // abre el menu Snap (boton de la barra)
 extern int g_snapCurX, g_snapCurY;       // cursor durante un transform (para el snap)
@@ -61,80 +65,80 @@ struct LayoutKey {
 
 // cambia el modo de interaccion del objeto ACTIVO por el mismo camino que el menu Mode
 // (InteractionMode + las consecuencias: g_editMesh, skin autorado al salir de Edit de huesos).
-void LayoutModoElegir(int modo);
+void LayoutModePick(int mode);
 
 // true = la UI (menu/barra/panel) consumio el click; false = es de la
 // escena 3D (cada plataforma decide: pick, transform, etc.)
 // menu CONTEXTUAL del viewport 3D (click derecho): abre en (mx,my) el menu del modo actual
 // (Object / contexto de malla en Edit / Pose). Es el MISMO menu que el boton de la barra.
-void LayoutMenuContexto3D(int mx, int my);
+void LayoutMenuContext3D(int mx, int my);
 // el menu contextual del elemento con el FOCO DE TECLADO del viewport activo (el OK mantenido del N95). Posible = el OK
 // que se apreto puede terminar en un menu (si no, hace lo suyo en el acto)
-bool LayoutMenuContextoTecladoPosible();
-bool LayoutMenuContextoTeclado();
+bool LayoutMenuContextKeyboardPossible();
+bool LayoutMenuContextKeyboard();
 // el menu contextual del viewport que esta en (mx, my), como el click derecho (el OK mantenido con el mouse virtual)
-bool LayoutMenuContextoEn(int mx, int my);
+bool LayoutMenuContextIn(int mx, int my);
 
 bool LayoutClickUI(int mx, int my);
 // DOBLE CLICK / DOBLE TAP (renombrar en linea en el outliner) y PULSACION LARGA (tactil: agarrar una fila del
 // outliner para arrastrarla, o su menu contextual al soltar sin mover). true = lo uso alguien.
-bool LayoutDobleClickUI(int mx, int my);
-bool LayoutPulsacionLargaUI(int mx, int my);
+bool LayoutDoubleClickUI(int mx, int my);
+bool LayoutLongPressUI(int mx, int my);
 
-// click en la barra del UV editor, por ROL (BarRolUV). Publica para que el comando de test
+// click en la barra del UV editor, por ROL (BarRoleUV). Publica para que el comando de test
 // 'uvbar' (W3dScript) ejercite el MISMO camino que el click real.
 class UVEditor;
-bool LayoutClickBarraUV(UVEditor* uv, int mx, int my);
+bool LayoutClickBarUV(UVEditor* uv, int mx, int my);
 
-// click en la barra del IDE (selector de script / Save / Refresh), por ROL (BarRolIDE).
+// click en la barra del IDE (selector de script / Save / Refresh), por ROL (BarRoleIDE).
 // Publica para que el comando de test 'idetest' ejercite el MISMO camino que el click real.
 class IDE;
-bool LayoutClickBarraIDE(IDE* ide, int mx, int my);
+bool LayoutClickBarIDE(IDE* ide, int mx, int my);
 
 // hover de menus/barras + viewport 3D activo; true = lo consumio un menu
 bool LayoutMotionUI(int mx, int my);
 
 // teclado: menu abierto > edicion de propiedad > panel bajo el mouse
-bool LayoutTeclaUI(int tecla, int mx, int my);
-bool LayoutPopupRepeat(int tecla); // flecha MANTENIDA al popup activo (solo ajusta valores, no navega)
+bool LayoutKeyUI(int key, int mx, int my);
+bool LayoutPopupRepeat(int key); // flecha MANTENIDA al popup activo (solo ajusta valores, no navega)
 
 // rutea una flecha/OK al viewport ACTIVO (sin mouse): propiedades/outliner.
 // El 3D devuelve false (lo maneja orbit/transform). Keyboard-solo (Symbian).
-bool LayoutTeclaPanelActivo(int tecla);
+bool LayoutKeyPanelActive(int key);
 bool LayoutUVNavFrame(int dx, int dy, bool zoomMode); // editor UV: paneo constante (o zoom si 0) por flecha mantenida
-bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode); // Timeline: scrub / zoom(0) / paneo(*) por flecha mantenida
+bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode); // Timeline: scrub / zoom(0) / pan(*) por flecha mantenida
 // ---- click / tecla al viewport que corresponde (el ruteo de PC, ahora tambien para el telefono) ----
-bool LayoutClickViewport(int mx, int my);        // down: el viewport bajo el cursor pasa a activo y recibe el click
-bool LayoutSoltarViewport(int mx, int my);       // up: lo suelta (cierra arrastres/undos)
-bool LayoutTeclaViewport(int tecla, bool repeticion, bool traducir = true); // tecla -> viewport ACTIVO (W3dInput.h)
-bool LayoutTeclaViewportUp(int tecla);
+bool LayoutClickViewport(int mx, int my);         // down: el viewport bajo el cursor pasa a activo y recibe el click
+bool LayoutReleaseViewport(int mx, int my);       // up: lo suelta (cierra arrastres/undos)
+bool LayoutKeyViewport(int key, bool repeat, bool translate = true); // tecla -> viewport ACTIVO (W3dInput.h)
+bool LayoutKeyViewportUp(int key);
 
 // Timeline: navegacion de la barra de transporte por teclado (soft-izq entra/sale; flechas mueven el foco; OK activa)
 void LayoutTimelineBarToggle();
-void LayoutTimelineBarMover(int dir);
-void LayoutTimelineBarActivar();
+void LayoutTimelineBarMove(int dir);
+void LayoutTimelineBarActivate();
 
-bool LayoutMenuAbierto();
+bool LayoutMenuOpen();
 
 // cambia el viewport activo (borde verde) a la siguiente hoja (dir=+1) o la
 // anterior (-1), dando la vuelta. Sin mouse es la unica forma de elegirlo.
-void LayoutCiclarViewportActivo(int dir);
+void LayoutCycleActiveViewport(int dir);
 
 // abre/cierra la barra de menu del viewport activo (soft-izquierda en Symbian)
-void LayoutToggleBarraViewportActivo();
+void LayoutToggleBarActiveViewport();
 
 // redimensiona el viewport activo en un eje (dx izq/der, dy arr/ab) ajustando
 // el divisor del ancestro correcto. verde+flechas en Symbian.
-void LayoutRedimensionarViewportActivo(int dx, int dy, float paso);
+void LayoutResizeActiveViewport(int dx, int dy, float step);
 // arrastre de la ESQUINA (boton de menu) de un viewport: mueve su borde izq (dx) y sup (dy). El
 // superior-izquierdo no se mueve; uno pegado al borde izq solo sube/baja. Ver .cpp.
-void LayoutResizeEsquina(ViewportBase* aVp, int dx, int dy);
+void LayoutResizeCorner(ViewportBase* aVp, int dx, int dy);
 
 // arrastre de la barra de scroll: true si hay una agarrada; Soltar la
 // suelta (PC lo llama al soltar el boton izquierdo)
-bool LayoutEnArrastre();
-bool LayoutPopupArrastrando(); // el picker arrastrando (cursor violeta)
-void LayoutSoltar(int mx, int my);
+bool LayoutInDrag();
+bool LayoutPopupDragging(); // el picker arrastrando (cursor violeta)
+void LayoutRelease(int mx, int my);
 
 // menu de snap: shift+S (mueve seleccion / cursor 3D, )
 void LayoutMenuSnap(int mx, int my);
@@ -147,20 +151,20 @@ void LayoutMenuAdd(int mx, int my);
 bool LayoutDeleteEdit(int mx, int my);
 void LayoutApplyMenu(int mx, int my); // Ctrl+A (Object Mode): abre el menu Apply (Location/Rotation/Scale/All) en el cursor
 // INSERT KEYFRAME (i): dispatch UNICO por contexto (pose 3D / pose 2D / vertices / UV / objeto).
-// 'canales' = mascara KfCanalLoc/Rot/Scl (Animation.h); los contextos de VERTICES y UV la IGNORAN
+// 'canales' = mascara KfChannelLoc/Rot/Scl (Animation.h); los contextos de VERTICES y UV la IGNORAN
 // (una pose de vertices no tiene canales) e insertan directo.
-// 'desdeUV' = lo pide el UV EDITOR (su I / su menu Animation): manda el modo del UV (pose 2D o
+// 'fromUV' = lo pide el UV EDITOR (su I / su menu Animation): manda el modo del UV (pose 2D o
 // capa uv) en vez del InteractionMode del 3D. Sin eso, con el 3D en Edit Mode la I del UV
 // keyframeaba VERTICES en vez del mapeo.
-void InsertarKeyframeContexto(int canales, bool desdeUV = false);
+void InsertKeyframeContext(int channels, bool fromUV = false);
 // abre el desplegable de canales en el cursor. En vertices/UV NO abre nada: inserta de una.
-void LayoutMenuInsertKeyframe(int mx, int my, bool desdeUV = false);
+void LayoutMenuInsertKeyframe(int mx, int my, bool fromUV = false);
 // pone/saca el submenu de canales al item 'idxItem' de un menu segun el contexto (ver arriba)
-class PopupMenu; void LayoutSyncInsertKeySubmenu(PopupMenu* menu, int idxItem, bool desdeUV = false);
-void LayoutMaximizar();      // maximiza/restaura el viewport activo a pantalla completa (toggle, no destructivo)
-bool LayoutEstaMaximizado(); // hay un viewport en fullscreen?
-void LayoutResetMaximizado(); // limpiar el flag de maximizado (al abrir proyecto: el arbol es nuevo)
-void LayoutJuegoPuroToggle(); // MODO JUEGO PURO (N95 VERDE+0): 3D fullscreen con vista de camara y CERO editor
+class PopupMenu; void LayoutSyncInsertKeySubmenu(PopupMenu* menu, int idxItem, bool fromUV = false);
+void LayoutMaximize();    // maximiza/restaura el viewport activo a pantalla completa (toggle, no destructivo)
+bool LayoutIsMaximized(); // hay un viewport en fullscreen?
+void LayoutResetMaximized(); // limpiar el flag de maximizado (al abrir proyecto: el arbol es nuevo)
+void LayoutPureGameToggle(); // MODO JUEGO PURO (N95 VERDE+0): 3D fullscreen con vista de camara y CERO editor
 
 // menu TRANSFORM PIVOT POINT (objeto + edit): sale cerca de (mx,my). Setea el
 // pivote (g_transformPivot) que usan rotar/escalar.
@@ -175,98 +179,98 @@ void LayoutMenuOrientToolbar(int sx, int syTop);
 // Mueve/rota/escala los VERTICES seleccionados de la malla en edicion (no el
 // objeto). Reusa el estado del transform de objetos (estado/axisSelect/orientacion/
 // pivot/cam). El dispatch del viewport ramifica aca cuando InteractionMode==EditMode.
-bool EditXformStart(int est, int eje); // arranca un transform de malla (G/R/S): setea estado/eje + captura undo
-bool EditXformActivo();              // hay un transform de malla en curso
-void EditXformIniciar();            // snapshot de la seleccion (lo llaman los starters G/R/S)
-void ClipMirrorReset();             // (def. en MeshEdit.cpp) olvida los verts "pegados" al plano del mirror clipping
+bool EditXformStart(int est, int axis); // arranca un transform de malla (G/R/S): setea estado/eje + captura undo
+bool EditXformActive();              // hay un transform de malla en curso
+void EditXformSnapshot();            // snapshot de la seleccion (lo llaman los starters G/R/S)
+void ClipMirrorReset();              // (def. en MeshEdit.cpp) olvida los verts "pegados" al plano del mirror clipping
 // (def. en MeshEdit.cpp) MERGE de la seleccion: 0 At Center, 1 At Cursor (cursorLocal), 2 Collapse, 3 By Distance(<dist)
-void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal);
-void EditXformReiniciar();          // restaura al snapshot (cambio de eje X/Y/Z)
-void EditXformConfirmar();          // fija: recalcula bordes + normales (salvo Mesh::bloquearNormales)
-void EditXformCancelar();           // descarta: restaura el snapshot
-void EditXformIniciarExtrude(const Vector3& normalLocal); // move de la tapa del extrude
-void EditXformNumValor(float v); // entrada numerica: aplica el valor exacto (malla)
-void EditXformProporcionalActualizar(); // proportional editing: cambio el radio en medio del transform -> pesos + reescritura
-void LayoutMenuProporcional(int mx, int my); // menu del proportional editing (icono de la curva de la barra)
+void MergeVertsEdit(Mesh* m, int mode, float dist, const Vector3& cursorLocal);
+void EditXformRestart();          // restaura al snapshot (cambio de eje X/Y/Z)
+void EditXformConfirm();          // fija: recalcula bordes + normales (salvo Mesh::lockNormals)
+void EditXformCancel();           // descarta: restaura el snapshot
+void EditXformStartExtrude(const Vector3& normalLocal); // move de la tapa del extrude
+void EditXformNumValue(float v); // entrada numerica: aplica el valor exacto (malla)
+void ProportionalEditXformUpdate(); // proportional editing: cambio el radio en medio del transform -> pesos + reescritura
+void LayoutProportionalMenu(int mx, int my); // menu del proportional editing (icono de la curva de la barra)
 class ViewportBase;
-void LayoutCambiarTipoViewport(ViewportBase* v, int aId); // (harness) cambia el tipo de un viewport: 0=3D 1=outliner 2=props 3=UV 4=timeline...
-void LayoutExtrudeFaces(); // E: extruye la seleccion (vert/arista/cara) + arranca el move
-bool ExtrudeEnCurso();     // el transform en curso es un extrude (para el boton "Repeat" del toolbar)
-void LayoutShrinkFatten(); // Alt+S: mueve cada vertice sel por SU normal (Shrink/Fatten)
-bool EditShrinkActivo();   // el transform en curso es un Shrink/Fatten (reusa EditScale)
-void LayoutDuplicarEdit(); // Shift+D en edit: duplica la seleccion + move libre
-void LayoutRipEdit();      // V en edit: separa la malla a lo largo de la seleccion
-void LayoutConectarVerticesEdit(); // J en edit: Connect Vertex Path (corta las caras entre 2 vertices)
+void LayoutChangeViewportType(ViewportBase* v, int aId); // (harness) cambia el tipo de un viewport: 0=3D 1=outliner 2=props 3=UV 4=timeline...
+void LayoutExtrudeFaces();  // E: extruye la seleccion (vert/arista/cara) + arranca el move
+bool ExtrudeInProgress();   // el transform en curso es un extrude (para el boton "Repeat" del toolbar)
+void LayoutShrinkFatten();  // Alt+S: mueve cada vertice sel por SU normal (Shrink/Fatten)
+bool EditShrinkActive();    // el transform en curso es un Shrink/Fatten (reusa EditScale)
+void LayoutDuplicateEdit(); // Shift+D en edit: duplica la seleccion + move libre
+void LayoutRipEdit();       // V en edit: separa la malla a lo largo de la seleccion
+void LayoutConnectVerticesEdit(); // J en edit: Connect Vertex Path (corta las caras entre 2 vertices)
 // VERTEX SLIDE: desliza cada vertice seleccionado por una de sus aristas, de 0% (donde esta) a 100%
 // (encima del vecino). Shift+V lo arranca; la segunda G lo prende/apaga sobre un move en curso.
 void  LayoutSlideVerticesEdit();
 void  EditSlideToggle();
-void  EditSlideRaton(int dx, int dy);
-bool  EditSlideTecla(int cual);   // 0=izq 1=der (0%..100%), 2=arriba 3=abajo (cambia de direccion)
-bool  EditSlideActivo();
+void  EditSlideMouse(int dx, int dy);
+bool  EditSlideKey(int which);   // 0=izq 1=der (0%..100%), 2=arriba 3=abajo (cambia de direccion)
+bool  EditSlideActive();
 float EditSlideFactor();
-void LayoutSepararEdit();  // P en edit: mueve las caras seleccionadas a un mesh NUEVO (Separate)
-void LayoutNewFaceEdit();  // F: crea arista/cara desde los verts seleccionados
+void LayoutSeparateEdit();  // P en edit: mueve las caras seleccionadas a un mesh NUEVO (Separate)
+void LayoutNewFaceEdit();   // F: crea arista/cara desde los verts seleccionados
 void LayoutShade(bool smooth); // Face > Shade Smooth/Flat (redondea/aplana)
-void LayoutRecalcNormales();   // Recalculate Normals (re-orienta hacia afuera + panel Inside)
-void LayoutFlipNormales();     // Flip: invierte las normales de la seleccion (o todas)
+void LayoutRecalcNormals();    // Recalculate Normals (re-orienta hacia afuera + panel Inside)
+void LayoutFlipNormals();      // Flip: invierte las normales de la seleccion (o todas)
 void LayoutTriangulate();      // Face > Triangulate Faces (Ctrl T): parte las caras sel de >3 lados en tris
 void LayoutMarkSharp(bool sharp);     // Edge > Mark/Clear Sharp (borde afilado en malla smooth)
 void LayoutMenuSharp(int mx, int my); // tecla W: menu Mark/Clear Sharp en el cursor
 void LayoutMenuUV(int mx, int my);    // tecla U: menu UV (Mark Seam + proyecciones) en el cursor
 void LayoutSelectLinked(int mx, int my); // L: selecciona la isla conexa bajo el mouse
 // navegacion de seleccion por teclado en Edit Mode (lapiz + flechas de Symbian)
-bool EditSelAvanzar(int paso, bool extender); // lapiz/flecha: avanza el activo (+1/-1); extender=mantiene
-bool EditSelTodoToggle();                     // lapiz+arriba: todo <-> nada
-bool EditSelToggleActual();                   // lapiz+abajo: togglea el indice activo
+bool EditSelAdvance(int step, bool extend); // lapiz/flecha: avanza el activo (+1/-1); extender=mantiene
+bool EditSelAllToggle();                    // lapiz+arriba: todo <-> nada
+bool EditSelToggleCurrent();                // lapiz+abajo: togglea el indice activo
 
 // ===== LOOP CUT AND SLIDE (Ctrl+R) — modal compartido 4 OS =====
-bool  LoopCutActivo();                   // hay un loop cut en curso (preview o slide)
-void  LoopCutIniciar(int mx, int my);    // Ctrl+R: entra al modal (fase preview)
-void  LoopCutMotion(int mx, int my);     // motion: sigue la arista (preview) / ajusta factor (slide)
-void  LoopCutWheel(int dir);             // rueda: +/- cortes (solo en preview)
-void  LoopCutClickIzq(int mx, int my);   // click izq: aplica+slide / confirma
-void  LoopCutClickDer();                 // click der: factor 0 + confirma
-void  LoopCutCancelar();                 // Esc: descarta
-void  LoopCutRedoAplicar(int cortes, float factor); // panel redo: re-corta desde el snapshot (misma arista y correct UV)
+bool  LoopCutActive();                    // hay un loop cut en curso (preview o slide)
+void  LoopCutStart(int mx, int my);       // Ctrl+R: entra al modal (fase preview)
+void  LoopCutMotion(int mx, int my);      // motion: sigue la arista (preview) / ajusta factor (slide)
+void  LoopCutWheel(int dir);              // rueda: +/- cortes (solo en preview)
+void  LoopCutClickLeft(int mx, int my);   // click izq: aplica+slide / confirma
+void  LoopCutClickRight();                // click der: factor 0 + confirma
+void  LoopCutCancel();                    // Esc: descarta
+void  LoopCutRedoApply(int cuts, float factor); // panel redo: re-corta desde el snapshot (misma arista y correct UV)
 // idem con TODAS las opciones del panel: correctUV (interpolar uv/color en el corte) y edgeSel = cual de las
 // aristas candidatas del primer quad (0..LoopCutGetCandN()-1) es la de entrada del corte (= la direccion)
-void  LoopCutRedoAplicar(int cortes, float factor, bool correctUV, int edgeSel);
-int   LoopCutGetCortes();
+void  LoopCutRedoApply(int cuts, float factor, bool correctUV, int edgeSel);
+int   LoopCutGetCuts();
 float LoopCutGetFactor();
 bool  LoopCutGetCorrectUV();
 int   LoopCutGetCandN();
 int   LoopCutGetCandSel();
 int   LoopCutGetEdge();          // arista (edit mesh) de entrada del corte actual
 int   LoopCutGetCand(int i);     // arista candidata i
-void  LoopCutTecla(int dir);             // flechas en el modal (0=izq 1=der 2=arriba 3=abajo)
-void  LoopCutOrientConfirmarTeclado();   // Enter en orientacion (teclado): confirma la direccion -> preview clasico
-bool  LoopCutOrientando();               // true en la fase de elegir orientacion del quad
-void  LayoutLoopCutDesdeActivo();        // menu Edge/Face: loop cut sobre el borde/quad ACTIVO
-void  LoopCutRenderPreview();            // dibuja el preview (lo llama el viewport 3D)
+void  LoopCutKey(int dir);              // flechas en el modal (0=izq 1=der 2=arriba 3=abajo)
+void  LoopCutOrientConfirmKeyboard();   // Enter en orientacion (teclado): confirma la direccion -> preview clasico
+bool  LoopCutOrienting();               // true en la fase de elegir orientacion del quad
+void  LayoutLoopCutFromActive();        // menu Edge/Face: loop cut sobre el borde/quad ACTIVO
+void  LoopCutRenderPreview();           // dibuja el preview (lo llama el viewport 3D)
 
 // Loop Select (menu Select). tipo: 0=Edge Loop, 1=Edge Ring (modo borde), 2=Face Loop (modo cara).
 // Edge: opera sobre el borde ACTIVO (direccion obvia). Face: arranca un modal de direccion
 // (las flechas eligen 1 de las 2; OK/click acepta) porque una cara tiene 2 sentidos posibles.
-void  LayoutLoopSelectActivo(int tipo);
-bool  LoopSelOrientando();               // true en el modal de elegir direccion (desde una cara)
-void  LoopSelTecla(int dir);             // flechas en el modal (0/2 = sentido A, 1/3 = sentido B)
-void  LoopSelConfirm();                  // OK / click / enter: acepta la seleccion actual
+void  LayoutLoopSelectActive(int type);
+bool  LoopSelOrienting();              // true en el modal de elegir direccion (desde una cara)
+void  LoopSelKey(int dir);             // flechas en el modal (0/2 = sentido A, 1/3 = sentido B)
+void  LoopSelConfirm();                // OK / click / enter: acepta la seleccion actual
 // loop select en una posicion (mouse virtual de Symbian: lapiz+OK). false si no pickeo.
-bool  LayoutLoopSelectEnPos(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
+bool  LayoutLoopSelectInPos(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
 
 // Pick Shortest Path guiado (menu Select): 2 clicks con cartel-tutorial. fill = rellena la region.
 // El click se intercepta en ScenePick3D -> anda igual en PC (mouse) y Symbian (mouse virtual+OK).
-void  LayoutPickPathIniciar(bool fill);
-void  LayoutPickPathCancelar();          // ESC / click der: sale del modo guiado
-bool  PickPathGuiado();                  // true mientras espera los 2 clicks
+void  LayoutPickPathStart(bool fill);
+void  LayoutPickPathCancel();          // ESC / click der: sale del modo guiado
+bool  PickPathGuided();                // true mientras espera los 2 clicks
 // modo guiado de 1 click: Select Linked (desde el menu) y Loop Select sin elemento activo
-void  LayoutSelectLinkedGuiado();        // menu Select > Select Linked: pide click sobre el elemento
-void  LayoutGuiadoCancelar();            // ESC / click der: sale del modo guiado de 1 click
-bool  GuiadoUnClickActivo();             // true mientras espera el click
+void  LayoutSelectLinkedGuided();        // menu Select > Select Linked: pide click sobre el elemento
+void  LayoutGuidedCancel();              // ESC / click der: sale del modo guiado de 1 click
+bool  GuidedUnClickActive();             // true mientras espera el click
 // menu de contexto de Edit Mode (W / boton de barra): abre el menu Vertex/Edge/Face
 // segun el sub-modo, en (mx,my). Los menus son separados (no submenus de "Mesh").
-void LayoutMenuEditContexto(int mx, int my);
+void LayoutMenuEditContext(int mx, int my);
 class PopupMenu;
 PopupMenu* LayoutSubmenuEditVertex();   // los menus Vertex / Edge / Face (W y submenus de "Mesh")
 PopupMenu* LayoutSubmenuEditEdge();
@@ -286,15 +290,15 @@ void LayoutMenuMerge(int mx, int my);  // tecla M en Edit Mode: abre el menu Mer
 // caja de texto editable (reutilizable): el struct + el ruteo viven en libs/WhiskUI/widgets/TextField.h
 #include "WhiskUI/widgets/TextField.h"
 // aplican un paso del transform (dx,dy de pantalla), igual que las de objetos
-void EditXformTraslacion(int dx, int dy, float speed);
-void EditXformTraslacionMundo(const Vector3& T);   // absoluta (mundo): la usa el gizmo
-void EditXformRotEje(int dx, int dy);
+void EditXformTranslation(int dx, int dy, float speed);
+void EditXformTranslationWorld(const Vector3& T);   // absoluta (mundo): la usa el gizmo
+void EditXformRotAxis(int dx, int dy);
 void EditXformRotOrbital(int dx, int dy);
 void EditXformRotAbs(const Quaternion& qAbs); // trackball (delta absoluto desde el inicio)
 void EditXformScale(int dx, int dy, float factor);
 void EditXformScaleSet(float f);   // el factor ABSOLUTO desde el inicio (el mouse: distancia al pivote / la inicial)
-Vector3 EditXformPivotMundo();     // el pivote del transform de malla en curso (mundo)
-// valores acumulados para la barra de estado (Translate/Scale; la rotacion usa gAnguloTransform)
+Vector3 EditXformPivotWorld();     // el pivote del transform de malla en curso (mundo)
+// valores acumulados para la barra de estado (Translate/Scale; la rotacion usa gAngleTransform)
 Vector3 EditXformTransDelta();
 float   EditXformScaleFactor();
 float   EditXformShrinkAmt(); // distancia por la normal (Shrink/Fatten)
@@ -310,21 +314,21 @@ bool LayoutToggleEditMode();
 // La accion del menu Add del viewport3d (los mismos ids que arma ViewPort3D::MenuAdd). Publica: es POR DONDE se
 // crea todo objeto nuevo, asi que el que quiera crear uno (menu, atajo, test) entra por el mismo lado.
 // El menu Add es declarativo (ver la tabla ADD[] en LayoutInput.cpp). Estas son las acciones de sus items, por si
-// hace falta invocarlas directo (atajos, tests). LayoutConstruirMenuAdd arma el menu desde la tabla.
-void LayoutConstruirMenuAdd();
+// hace falta invocarlas directo (atajos, tests). LayoutBuildMenuAdd arma el menu desde la tabla.
+void LayoutBuildMenuAdd();
 // EL layout por defecto del editor (ver el dibujo en LayoutInput.cpp): [3D grande / timeline
 // chico] a la izquierda, [outliner 40 % arriba / propiedades abajo] a la derecha. Lo usan el
 // arranque sin archivo y el fallback de un .w3d sin bloque Layout. 'vp3dOut' (opcional)
 // devuelve el Viewport3D creado, para dejarlo como viewport activo.
 class Viewport3D;
-ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut);
+ViewportBase* LayoutDefault(int w, int h, Viewport3D** vp3dOut);
 void AddCube(); void AddPlane(); void AddVertex(); void AddReference();
 // Lock Orbit: arrastrar PANEA en vez de orbitar. Togglea y avisa con un cartel. false = no hay viewport3d.
 bool LayoutLockOrbitToggle();
 
 // deriva g_editMesh del modo + objeto activo. Llamar al cambiar de modo/objeto.
 // COMPARTIDA PC+Symbian (antes solo la corria el render de PC -> Symbian quedaba sin edicion).
-void ActualizarEditMeshActivo();
+void UpdateActiveEditMesh();
 
 // seleccion 3D por color picking (compartida); (mx,my) en pantalla,
 // (vx,vy,vw,vh) el rect del viewport 3D, arbol arriba-izquierda
@@ -342,6 +346,6 @@ extern void (*LayoutImportGlb)();  // Add > Imports > GLB
 extern void (*LayoutImportStl)();  // Add > Imports > STL
 // el arbol cambio (cambio de tipo / expand / split): la plataforma
 // refresca sus punteros cacheados si los tiene
-extern void (*LayoutArbolCambiado)();
+extern void (*LayoutChangedTree)();
 
 #endif

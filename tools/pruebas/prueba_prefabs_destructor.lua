@@ -2,16 +2,16 @@
 -- devolver la escena como estaba: el destruido vuelve y el creado se va). El puntero que lua se guardo del
 -- destruido ya no es un objeto (tipo() = ""), igual que en el juego compilado
 local n = 0
-local muerto = nil
-function actualizar(dt)
+local dead = nil
+function update(dt)
   n = n + 1
   if n == 3 then
-    muerto = buscar("Enemigo.001")
-    destruir(muerto)
-    local c = instanciar("Enemigo", 0, 10, 0, 45)
-    setCompartido("creado", nombre(c))
+    dead = find("Enemigo.001")
+    destroy(dead)
+    local c = instantiate("Enemigo", 0, 10, 0, 45)
+    setShared("creado", getName(c))
   end
   if n == 5 then
-    setCompartido("destruido", (muerto ~= nil and tipo(muerto) == "") and "si" or "no")
+    setShared("destruido", (dead ~= nil and getType(dead) == "") and "si" or "no")
   end
 end

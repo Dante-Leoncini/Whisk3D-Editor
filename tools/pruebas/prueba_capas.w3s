@@ -9,19 +9,19 @@
 #  (3D); el menu le manda "hola" al Nivel 1, lo pausa y lo reanuda, en su actualizar 15 hace cambiarEscena("Nivel 2"),
 #  en el 20 le manda "hola" al Nivel 2 y en el 25 descarga el Decorado. Cada script anota en compartido().
 # ==========================================================================
-pruebacapas /tmp/w3d_prueba_capas
+testlayers /tmp/w3d_prueba_capas
 simplay 41
 scriptinfo
 # los inicio() de la base y de la capa 2D
-scriptinfo compartido nivel1 inicio
-scriptinfo compartido menu inicio
+scriptinfo shared nivel1 inicio
+scriptinfo shared menu inicio
 # los mensajes: con sus datos (el entero llega entero) y la escena que lo mando
-scriptinfo compartido nivel1_recibio hola:5:Menu
+scriptinfo shared nivel1_recibio hola:5:Menu
 # cambiarEscena reemplazo la base y el menu siguio: su mensaje le llego al Nivel 2
-scriptinfo compartido nivel2 inicio
-scriptinfo compartido nivel2_recibio hola:7:Menu
+scriptinfo shared nivel2 inicio
+scriptinfo shared nivel2_recibio hola:7:Menu
 # el menu corrio todos los cuadros desde que se cargo (no lo corto el cambio de escena)
-scriptinfo compartido menu_ticks 40
+scriptinfo shared menu_ticks 40
 # el Decorado (3D) corrio hasta que el menu lo descargo, tambien despues del cambio de escena
-scriptinfo compartido deco_ticks 24
+scriptinfo shared deco_ticks 24
 simstop

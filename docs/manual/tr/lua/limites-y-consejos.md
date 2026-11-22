@@ -3,8 +3,8 @@
 ## Lua'nın hangi kısımları yok
 
 - `string`, `table` ve `math` ile temel fonksiyonlar (`print`, `pairs`, `ipairs`, `type`, `tostring`, `tonumber`, `pcall`, `assert`…) mevcuttur.
-- `io` ve `os` **yoktur** (bir oyun diskteki dosyalara dokunmaz; bu yüzden `os.time` yoktur); `require`, `coroutine`, `utf8` ve `debug` de yoktur. Veri kaydetmek için `config` / `guardarConfig` kullan.
-- Her script bağımsızdır: başka bir script'in değişkenlerini göremez. İletişim kurmak için `setCompartido` / `compartido` kullanılır.
+- `io` ve `os` **yoktur** (bir oyun diskteki dosyalara dokunmaz; bu yüzden `os.time` yoktur); `require`, `coroutine`, `utf8` ve `debug` de yoktur. Veri kaydetmek için `getConfig` / `saveConfig` kullan.
+- Her script bağımsızdır: başka bir script'in değişkenlerini göremez. İletişim kurmak için `setShared` / `getShared` kullanılır.
 
 ## Hatalar
 
@@ -14,16 +14,16 @@
 
 ## Dikkat edilmesi gerekenler
 
-- `actualizar` yalnızca etkin sahnedeki **görünür** nesnelerde çalışır: bir nesneyi gizlemek onun mantığını kapatır.
-- `destruir`, `cambiarEscena` ve `reproducirEscena` o anda değil, karenin sonunda uygulanır.
+- `update` yalnızca etkin sahnedeki **görünür** nesnelerde çalışır: bir nesneyi gizlemek onun mantığını kapatır.
+- `destroy`, `changeScene` ve `playScene` o anda değil, karenin sonunda uygulanır.
 - Oyun metinlerinin yazı tipi aksanlı harfleri ve ñ'yi çizmez: `"MENÚ"` yerine `"MENU"` yaz.
-- `areaSegura`, `cajaUI` ve `resolucion` ancak ilk kare çizildikten sonra gerçek değerlere sahip olur: onları `inicio` içinde kullanma.
+- `safeArea`, `uiBox` ve `resolution` ancak ilk kare çizildikten sonra gerçek değerlere sahip olur: onları `start` içinde kullanma.
 - Web'de ve Android'de yalnızca **ilk** ışık aydınlatır.
-- Nokia N95'te oyun kumandası ve fare yoktur: telefon tuş takımının adlarıyla `tecla` kullan. Tam sayılar 32 bittir.
+- Nokia N95'te oyun kumandası ve fare yoktur: telefon tuş takımının adlarıyla `key` kullan. Tam sayılar 32 bittir.
 
 ## Hızlı çalışması için (özellikle telefonda)
 
-- Nesneleri yalnızca bir kez, `inicio` içinde ara ve `local` değişkenlerde sakla.
+- Nesneleri yalnızca bir kez, `start` içinde ara ve `local` değişkenlerde sakla.
 - Tekli sürümü bin kez çağırmak yerine "toplu" sürümleri (`setVertices`, `setVerticesColor`) kullan.
-- Hesapları Lua'da yapmak yerine motorun fonksiyonlarını tercih et (`desplazarUV`, `lineaPunto`, dönüş sırası belirtilmiş `setRotacion`).
-- Körü körüne optimize etmeden önce `perfilLua` ve `relojMs` ile ölç.
+- Hesapları Lua'da yapmak yerine motorun fonksiyonlarını tercih et (`scrollUV`, `linePoint`, dönüş sırası belirtilmiş `setRotation`).
+- Körü körüne optimize etmeden önce `luaProfile` ve `clockMs` ile ölç.

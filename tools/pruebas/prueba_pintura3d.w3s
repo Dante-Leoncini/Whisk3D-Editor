@@ -7,12 +7,12 @@ mode texture
 brushradius 150
 brushcolor 0 0 1 1 1
 texpaint3d 0 0
-texpinturainfo
-texcaras 255 255 255
-guardarw3d /tmp/w3d_prueba_pintura3d.w3d
+texpaintinfo
+texfaces 255 255 255
+savew3d /tmp/w3d_prueba_pintura3d.w3d
 w3dpath /tmp/w3d_prueba_pintura3d.w3d
-uvguardar3d 1
+uvsave3d 1
 # --- VELOCIDAD: la textura nueva es de 256x256 y cada toque recorre solo lo que cae bajo el pincel. Un trazo largo
 #     (400 movimientos del dedo) tiene que ir sobrado; con la textura de 1024 y el recorrido viejo tardaba ~20 veces mas ---
-texpaintrazo 400 120 1500
-texpinturainfo
+texpaintstroke 400 120 1500
+texpaintinfo

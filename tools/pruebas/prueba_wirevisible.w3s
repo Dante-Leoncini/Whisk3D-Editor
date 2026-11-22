@@ -18,37 +18,37 @@
 #  La malla se SELECCIONA (grosor 2 px) para que el trazo no dependa del
 #  redondeo de 1 px. Vista desde arriba; (0, 0, 2.5) es fondo vacio.
 # ==========================================================================
-abrirw3d prueba_wirevisible.w3d
+openw3d prueba_wirevisible.w3d
 loadtex
 selname MallaVis
-vpvista wire
-vporbita 0 0 0 12 90 0
+vpview wire
+vporbit 0 0 0 12 90 0
 
 # --- celda 1 = [t0, t1]: SOLO sus aristas (la mitad de la malla) -----------
 visinfo MallaVis 4 1 2
-escenapx -3.5 0 -1 masclaroque 0 0 2.5 20
-escenapx -1.5 0 -1 masclaroque 0 0 2.5 20
-escenapx  1.5 0 -1 comoen 0 0 2.5
-escenapx  3.5 0 -1 comoen 0 0 2.5
+scenepx -3.5 0 -1 lighterthan 0 0 2.5 20
+scenepx -1.5 0 -1 lighterthan 0 0 2.5 20
+scenepx  1.5 0 -1 sameas 0 0 2.5
+scenepx  3.5 0 -1 sameas 0 0 2.5
 # el alambre no rellena: el centroide de t0 sigue siendo fondo
-escenapx -3.5 0 -0.33 comoen 0 0 2.5
+scenepx -3.5 0 -0.33 sameas 0 0 2.5
 
 # --- el toggle "todo": el alambre clasico (todas las aristas) --------------
-vpvista wire todo
-escenapx -3.5 0 -1 masclaroque 0 0 2.5 20
-escenapx  1.5 0 -1 masclaroque 0 0 2.5 20
-escenapx  3.5 0 -1 masclaroque 0 0 2.5 20
+vpview wire all
+scenepx -3.5 0 -1 lighterthan 0 0 2.5 20
+scenepx  1.5 0 -1 lighterthan 0 0 2.5 20
+scenepx  3.5 0 -1 lighterthan 0 0 2.5 20
 
 # --- de vuelta al default y a OTRA celda: el alambre sigue a la lista ------
-vpvista wire visible
+vpview wire visible
 setsector MallaVis 3
 visinfo MallaVis 4 3 2
-escenapx  1.5 0 -1 masclaroque 0 0 2.5 20
-escenapx  3.5 0 -1 masclaroque 0 0 2.5 20
-escenapx -3.5 0 -1 comoen 0 0 2.5
-escenapx -1.5 0 -1 comoen 0 0 2.5
+scenepx  1.5 0 -1 lighterthan 0 0 2.5 20
+scenepx  3.5 0 -1 lighterthan 0 0 2.5 20
+scenepx -3.5 0 -1 sameas 0 0 2.5
+scenepx -1.5 0 -1 sameas 0 0 2.5
 
 # --- celda 0 (malla completa): sin recorte, el alambre entero --------------
 setsector MallaVis 0
-escenapx -3.5 0 -1 masclaroque 0 0 2.5 20
-escenapx  3.5 0 -1 masclaroque 0 0 2.5 20
+scenepx -3.5 0 -1 lighterthan 0 0 2.5 20
+scenepx  3.5 0 -1 lighterthan 0 0 2.5 20

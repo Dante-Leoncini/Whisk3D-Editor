@@ -5,7 +5,7 @@ Tout est fait maison, en C++03, sans moteur externe et sans demander de mémoire
 - **W3dFisica :** vitesse et rebond de boîtes alignées sur les axes. Rien de plus.
 - **W3dRigido :** boîtes orientées avec masse, gravité, impulsions avec frottement et rebond, raycast et événements de contact.
 - **W3dColMalla :** marcher sur les triangles d'un décor (rampes, marches) et être arrêté par les murs, avec une grille pour ne pas parcourir des milliers de triangles.
-- **W3dHitbox :** des boîtes qui ne font que signaler (`alEntrar`, `alQuedarse`, `alSalir`, `alTocar`).
+- **W3dHitbox :** des boîtes qui ne font que signaler (`onEnter`, `onRemain`, `onExit`, `onTouch`).
 - **W3dRagdoll :** des poupées de chiffon, plus la cinématique inverse à deux os et FABRIK.
 - **W3dNav :** le chemin d'un point à un autre sur une grille du sol (A*, puis lissage).
 

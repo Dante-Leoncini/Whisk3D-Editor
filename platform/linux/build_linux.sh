@@ -23,7 +23,7 @@ git submodule update --init --recursive
 # -j ACOTADO, NUNCA "--parallel" pelado: el editor son ~200 unidades de compilacion a
 # -std=c++17 y con paralelismo ilimitado el OOM killer cierra la sesion entera en una
 # maquina de 15 GB (paso tres veces). La mitad de los nucleos, minimo 1, tope 8; se
-# puede pisar con W3D_JOBS=n. Misma regla que W3dCompilarJobs (main/io/CompilarJuego.h).
+# puede pisar con W3D_JOBS=n. Misma regla que W3dCompilarJobs (main/io/CompileGame.h).
 if [ -z "${W3D_JOBS:-}" ]; then
     W3D_NPROC="$(nproc 2>/dev/null || echo 2)"
     W3D_JOBS=$(( W3D_NPROC / 2 ))

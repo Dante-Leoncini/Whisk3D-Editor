@@ -6,6 +6,6 @@
 # (antes desaparecia y no habia boton para recuperarlo).
 add cube
 selobj Cubo.001
-vistatactil 1
-gizmomodos
-vistatactil 0
+viewtouch 1
+gizmomodes
+viewtouch 0

@@ -5,7 +5,7 @@ Her şey ev yapımı; C++03 ile, harici bir motor olmadan ve her karede bellek i
 - **W3dFisica:** eksenlere hizalı kutuların hızı ve sekmesi. O kadar.
 - **W3dRigido:** kütleli yönlendirilmiş kutular, yerçekimi, sürtünmeli ve sekmeli itkiler, raycast ve temas olayları.
 - **W3dColMalla:** bir sahnenin üçgenleri üzerinde yürümek (rampalar, basamaklar) ve duvarların durdurması; binlerce üçgeni kontrol etmemek için bir ızgarayla.
-- **W3dHitbox:** yalnızca haber veren kutular (`alEntrar`, `alQuedarse`, `alSalir`, `alTocar`).
+- **W3dHitbox:** yalnızca haber veren kutular (`onEnter`, `onRemain`, `onExit`, `onTouch`).
 - **W3dRagdoll:** bez bebekler (ragdoll), iki kemikli ters kinematik ve FABRIK.
 - **W3dNav:** zemindeki bir ızgara üzerinde bir noktadan diğerine giden yol (A* ve ardından yolu gerdirme).
 

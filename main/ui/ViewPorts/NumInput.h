@@ -13,17 +13,17 @@
 bool W3dEvalExpr(const std::string& str, float& out);   // evalua "2+3*4" (formulas en el input)
 bool TextFieldInputChar(int c);       // rutea un caracter tipeado al TextField activo
 bool NumInputChar(int c);             // true = lo consumio (hay transform activo)
-bool NumInputActivo();                // hay una expresion tipeada en curso
+bool NumInputActive();                // hay una expresion tipeada en curso
 void NumInputReset();                 // limpia (al terminar/cancelar el transform)
 const std::string& NumInputBuffer();  // la expresion (para la barra de estado)
 int  NumInputCaret();                 // posicion del caret
-bool NumInputNegado();                // el signo '-' esta activo
-bool NumInputValor(float& out);       // valor evaluado (false si la expresion esta incompleta)
+bool NumInputNegated();               // el signo '-' esta activo
+bool NumInputValue(float& out);       // valor evaluado (false si la expresion esta incompleta)
 void NumInputLeft();  void NumInputRight();   // mover el caret (teclado tactil)
-void NumInputBegin();                 // activa la entrada
-void NumInputConfirmar();             // OK del teclado tactil
-void NumInputCancelar();              // X del teclado tactil
-bool NumInputTransformEnCurso();      // hay un transform activo
-void NumInputFijar(float v);          // el valor ENTERO de una (como si se hubiera tipeado): rotar inclinando el telefono
+void NumInputBegin();                    // activa la entrada
+void NumInputConfirm();                  // OK del teclado tactil
+void NumInputCancel();                   // X del teclado tactil
+bool NumInputTransformInProgress();      // hay un transform activo
+void NumInputSet(float v);               // el valor ENTERO de una (como si se hubiera tipeado): rotar inclinando el telefono
 
 #endif

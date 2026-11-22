@@ -40,4 +40,4 @@
 
 Чтобы программировать игры, см. [Lua в Whisk3D](../lua/README.md). То, что происходит под капотом, для тех, кто программирует на C или C++: [Руководство по Whisk3D Core](../core/README.md).
 
-Whisk3D · Руководство по редактору (октябрь 2026). Таблицы горячих клавиш генерируются из `main/app/W3dAtajos.cpp` с помощью `tools/genmanual_atajos.py`.
+Whisk3D · Руководство по редактору (октябрь 2026). Таблицы горячих клавиш генерируются из `main/app/W3dShortcuts.cpp` с помощью `tools/genmanual_atajos.py`.

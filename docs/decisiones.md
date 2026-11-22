@@ -26,7 +26,7 @@ ni aviso: se corrompe en silencio.
 Y si el paso de undo guarda índices de esa lista, tiene que implementar `RemapLista`.
 Al agregar la lista, sumarla también a `W3dNombresJuntarEspacios` (`ObjectMode.cpp`).
 
-Una lista que **se purga sola** (el registro de mallas 3D, `MallaRecurso.h`: los recursos de la
+Una lista que **se purga sola** (el registro de mallas 3D, `MeshResource.h`: los recursos de la
 sesión sin usuarios ni undo se borran en el tick del editor) no puede avisar cada corrimiento:
 sus destinos (`MallaG`, `MallaCarpetaG`) guardan el **serial** del elemento, no su posición, y
 los pasos que guardan un puntero al elemento lo **retienen** (`W3dMallaRecursoUndoRetener`)

@@ -68,7 +68,7 @@ class CWhisk3DAppUi : public CAknAppUi
         virtual TKeyResponse HandleKeyEventL(
             const TKeyEvent& aKeyEvent,TEventCode aType);
 
-        /** Minimizar / volver: detiene o arranca el loop de dibujo (CWhisk3DContainer::SetPrimerPlano). */
+        /** Minimizar / volver: detiene o arranca el loop de dibujo (CWhisk3DContainer::SetFirstPlane). */
         void HandleForegroundEventL( TBool aForeground );
 
         /** La tecla ROJA (cortar llamada): el sistema manda KAknUidValueEndKeyCloseEvent y por defecto cierra la app.
@@ -78,7 +78,7 @@ class CWhisk3DAppUi : public CAknAppUi
 
         /**
          * Recibe el documento cuando la app se lanza desde un file manager ("abrir con", X-plore):
-         * si es un .w3d lo encola en g_proyAbrirPendiente para abrirlo en el primer frame.
+         * si es un .w3d lo encola en g_projOpenPending para abrirlo en el primer frame.
          * @param aCommandLine linea de comando del lanzamiento (incluye el nombre del documento).
          */
         TBool ProcessCommandParametersL(CApaCommandLine& aCommandLine);

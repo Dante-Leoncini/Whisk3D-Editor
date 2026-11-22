@@ -34,25 +34,25 @@
 #include "objects/Textures.h"
 #include "objects/Materials.h"            // Material (cargar textura)
 #include "base/W3dInteractionState.h"     // InteractionMode/EditMode (gate de la tecla "8": loop cut vs camara)
-#include "ViewPorts/PopUp/FileBrowser.h"  // AbrirFileBrowser (explorador compartido)
+#include "ViewPorts/PopUp/FileBrowser.h"  // OpenFileBrowser (explorador compartido)
 #include "w3dnewscene.h"                   // W3dNewImportObj
 #include "WhiskUI/draw/icons.h"
-extern int W3dPantallaAlto;
+extern int W3dScreenHeight;
 extern bool MouseWheel;
 #include "WhiskUI/text/font.h"      // Font/WhiskFont REALES de PC
 #include "WhiskUI/text/bitmapText.h"
-#include "WhiskUI/theme/colores.h"
-#include "objects/Rutina.h"   // W3dHayConstructor: el proyecto limpia la pantalla (modo juego puro)
-#include "w3dGraphics.h"      // W3D_GL_CRUDO: el GL crudo de este archivo entra al contador de llamadas
-#include "W3dEscena.h"        // W3dEscena3DActiva
+#include "WhiskUI/theme/colors.h"
+#include "objects/Routine.h"   // W3dHasConstructor: el proyecto limpia la pantalla (modo juego puro)
+#include "w3dGraphics.h"       // W3D_GL_RAW: el GL crudo de este archivo entra al contador de llamadas
+#include "W3dScene.h"          // W3dScene3DActive
 #include "WhiskUI/text/W3dFont.h"
 #include "w3dlog.h"
 #include "w3dnewscene.h" // mundo nuevo (Fase 3c-2)
 #include "importers/stl.h"  // ImportSTL (Add > Imports > STL)
 #include "ViewPorts/LayoutInput.h" // ruteo COMPARTIDO (menus/barras/paneles)
-#include "ViewPorts/PantallasExternas.h" // el monitor extendido: su menu y su arbol
-#include "ViewPorts/LayoutArbol.h" // LayoutRaizCompleta: el arbol entero aunque haya un viewport maximizado
-#include "render/OpcionesRender.h"      // g_redraw (render event-driven)
+#include "ViewPorts/ExternalScreens.h" // el monitor extendido: su menu y su arbol
+#include "ViewPorts/LayoutTree.h" // LayoutCompleteRoot: el arbol entero aunque haya un viewport maximizado
+#include "render/RenderOptions.h"      // g_redraw (render event-driven)
 #include <GLES/gl.h>
 #include <stdio.h>     // sprintf para formatear los valores
 
@@ -69,9 +69,9 @@ static TBool gHorizontal = ETrue;
 static Viewport3D* gView3D = 0; // el REAL de PC
 static Properties* gProps = 0; // el REAL de PC
 static Outliner* gOutliner = 0; // el REAL de PC
-static ViewportBase* gContRaiz = 0;   // contenedor raiz (Row o Column)
-static ViewportBase* gContHijo = 0;   // contenedor anidado
-static TBool gRaizEsRow = EFalse;     // tipo del raiz (el hijo es lo opuesto)
+static ViewportBase* gContRoot  = 0;   // contenedor raiz (Row o Column)
+static ViewportBase* gContChild = 0;   // contenedor anidado
+static TBool gRootIsRow = EFalse;      // tipo del raiz (el hijo es lo opuesto)
 
 static ViewportBase* gSplitterGrab = 0;
 
@@ -106,9 +106,9 @@ static const TInt KBorderCorner = 6;
 static GLfloat gBorderUVExp[96];
 static TBool gBorderUVInit = EFalse;
 
-// setea ortho de pantalla en pixeles (push); RestaurarOrtho hace el pop. Las matrices van por el motor: lleva su
+// setea ortho de pantalla en pixeles (push); RestoreOrtho hace el pop. Las matrices van por el motor: lleva su
 // sombra en la CPU (GetMatrix sin glGet) y una matriz tocada por GL crudo la dejaria distinta de GL
-static void SetOrthoPantalla() {
+static void SetOrthoScreen() {
 #ifdef W3D_GLES2
     w3dEngine::Viewport(0, 0, gScreenW, gScreenH);   // (ES 2.0: por el motor, que recuerda el viewport puesto)
 #else
@@ -130,7 +130,7 @@ static void SetOrthoPantalla() {
 #endif
 }
 
-static void RestaurarOrtho() {
+static void RestoreOrtho() {
     w3dEngine::PopMatrix();
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::PopMatrix();
@@ -159,11 +159,11 @@ static void ClearRect(TInt aX, TInt aY, TInt aW, TInt aH, const float* aRGBA) {
 // texturas point-sprite de los glifos y las esquinas del borde (las
 // fabrica W3dLayoutBuildGlyphTex cuando el TexMgr sube font.png)
 
-// envuelve el DibujarBordes REAL de PC (WithBorder.cpp) con el ortho y el
+// envuelve el DrawBorders REAL de PC (WithBorder.cpp) con el ortho y el
 // estado que la fase 2D del N95 necesita
-static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
+static void DrawBorderLeaf(ViewportBase* aLeaf, WithBorder* aBorder) {
     if (Textures.empty() || Textures[0]->iID == 0) return;
-    SetOrthoPantalla();
+    SetOrthoScreen();
 #ifdef W3D_GLES2
     // ES 2.0: el mismo estado por el motor (glEnableClientState no existe)
     w3dEngine::Enable(w3dEngine::Texture2D);
@@ -173,7 +173,7 @@ static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
     w3dEngine::Translatef((GLfloat)aLeaf->x, (GLfloat)aLeaf->y, 0.0f);
     w3dEngine::EnableArray(w3dEngine::TexCoordArray);
     w3dEngine::DisableArray(w3dEngine::NormalArray);
-    aBorde->DibujarBordes(aLeaf);
+    aBorder->DrawBorders(aLeaf);
     w3dEngine::EnableArray(w3dEngine::NormalArray);
     w3dEngine::BindTexture((GLuint)W3dNewWhiteTex());
     w3dEngine::Disable(w3dEngine::Blend);
@@ -185,15 +185,15 @@ static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
     w3dEngine::Translatef((GLfloat)aLeaf->x, (GLfloat)aLeaf->y, 0.0f);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY); // el render 3D lo apaga
     glDisableClientState(GL_NORMAL_ARRAY);
-    aBorde->DibujarBordes(aLeaf); // <- el de PC, identico arte y colores
+    aBorder->DrawBorders(aLeaf); // <- el de PC, identico arte y colores
     glEnableClientState(GL_NORMAL_ARRAY);
     glBindTexture(GL_TEXTURE_2D, (GLuint)W3dNewWhiteTex());
     glDisable(GL_BLEND);
 #endif
-    RestaurarOrtho();
+    RestoreOrtho();
 }
 
-// (DrawBorder9 borrado: el borde es WithBorder::DibujarBordes de PC)
+// (DrawBorder9 borrado: el borde es WithBorder::DrawBorders de PC)
 
 
 // arma los 16 vertices del 9-patch para un rect w x h (solo en Resize)
@@ -218,7 +218,7 @@ static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
 // API
 // ----------------------------------------------------------------------------
 
-static void W3dArbolCambiadoHook();
+static void W3dChangedTreeHook();
 
 // ----------------------------------------------------------------------------
 // Import OBJ y Cargar textura via el File browser COMPARTIDO (igual que PC, ver
@@ -226,135 +226,135 @@ static void W3dArbolCambiadoHook();
 // ----------------------------------------------------------------------------
 extern void RebindMaterialMeshPart(); // Properties.cpp
 
-static void W3dImportObjElegido(const std::string& aPath) {
+static void W3dImportPickedObj(const std::string& aPath) {
     W3dNewImportObj(aPath.c_str());
 }
 static void W3dImportObjMenu() {
-    AbrirFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj",
-                     W3dImportObjElegido);
+    OpenFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj",
+                     W3dImportPickedObj);
 }
 
 // Import FBX: mismo explorador compartido, filtrando .fbx (antes "Add > Import FBX" no hacia nada en el N95
 // porque el puntero LayoutImportFbx quedaba sin cablear -> ver el cableado abajo).
-static void W3dImportFbxElegido(const std::string& aPath) {
+static void W3dImportPickedFbx(const std::string& aPath) {
     W3dNewImportFbx(aPath.c_str());
 }
 static void W3dImportFbxMenu() {
-    AbrirFileBrowser("Importar FBX", "Import FBX", ".fbx",
-                     W3dImportFbxElegido);
+    OpenFileBrowser("Importar FBX", "Import FBX", ".fbx",
+                     W3dImportPickedFbx);
 }
 
 // Import glTF / GLB: mismo explorador compartido. ImportGLTF (via W3dNewImportGltf) detecta el GLB por el
 // magic, asi que el mismo callback sirve para ambos; solo cambia el filtro del browser (.gltf vs .glb).
 // Antes "Add > Imports > glTF/GLB" no hacia nada en el N95 porque LayoutImportGltf/Glb quedaban sin cablear.
-static void W3dImportGltfElegido(const std::string& aPath) {
+static void W3dImportPickedGltf(const std::string& aPath) {
     W3dNewImportGltf(aPath.c_str());
 }
 static void W3dImportGltfMenu() {
-    AbrirFileBrowser("Importar glTF", "Import glTF", ".gltf",
-                     W3dImportGltfElegido);
+    OpenFileBrowser("Importar glTF", "Import glTF", ".gltf",
+                     W3dImportPickedGltf);
 }
 static void W3dImportGlbMenu() {
-    AbrirFileBrowser("Importar GLB", "Import GLB", ".glb",
-                     W3dImportGltfElegido);
+    OpenFileBrowser("Importar GLB", "Import GLB", ".glb",
+                     W3dImportPickedGltf);
 }
 
 // Import STL: el importador compartido (main/importers/stl.cpp). En el telefono rechaza lo que no entra en los
 // indices de 16 bits, con aviso, igual que el OBJ.
-static void W3dImportStlElegido(const std::string& aPath) {
+static void W3dImportPickedStl(const std::string& aPath) {
     w3dLogf("W3dImportStl: aPath='%s'", aPath.c_str());
     ImportSTL(aPath);
 }
 static void W3dImportStlMenu() {
-    AbrirFileBrowser("Importar STL", "Import STL", ".stl",
-                     W3dImportStlElegido);
+    OpenFileBrowser("Importar STL", "Import STL", ".stl",
+                     W3dImportPickedStl);
 }
 
-extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
-extern bool gCargarTexturaComoB;      // Properties.cpp: idem el de la TEXTURA B (mezcla de texturas)
+extern bool gLoadTextureAsNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
+extern bool gLoadTextureAsB;      // Properties.cpp: idem el de la TEXTURA B (mezcla de texturas)
 static Material* gSymTexMat = NULL;
-static void W3dTexturaElegida(const std::string& aPath) {
+static void W3dPickedTexture(const std::string& aPath) {
     if (!gSymTexMat) return;
     GLuint id = 0;
     if (LoadTexture(aPath.c_str(), id)) {
         Texture* t = new Texture(aPath);
         t->iID = id;
         Textures.push_back(t);
-        extern int gCargarTexturaMapa;
-        if (gCargarTexturaMapa >= W3D_MAPA_EMISION && gCargarTexturaMapa < W3D_MAPAS) {   // un MAPA del trazado de rayos
-            gSymTexMat->mapaTex[gCargarTexturaMapa] = t; gSymTexMat->mapaConTextura[gCargarTexturaMapa] = true;
+        extern int gLoadTextureMap;
+        if (gLoadTextureMap >= W3D_MAP_EMISSION && gLoadTextureMap < W3D_MAPS) {   // un MAPA del trazado de rayos
+            gSymTexMat->mapTex[gLoadTextureMap] = t; gSymTexMat->mapWithTexture[gLoadTextureMap] = true;
         }
-        else if (gCargarTexturaComoNormal) { gSymTexMat->normalTexture = t; gSymTexMat->normalMap = true; } // MISMO browser, destino segun el flag
-        else if (gCargarTexturaComoB) { gSymTexMat->texturaB = t; }        // (la textura B de la mezcla de texturas)
+        else if (gLoadTextureAsNormal) { gSymTexMat->normalTexture = t; gSymTexMat->normalMap = true; } // MISMO browser, destino segun el flag
+        else if (gLoadTextureAsB) { gSymTexMat->textureB = t; }        // (la textura B de la mezcla de texturas)
         else { gSymTexMat->texture = t; gSymTexMat->textureOn = true; }
         RebindMaterialMeshPart();
     } else {
         // que el fallo se VEA: antes el browser se cerraba y la textura no aparecia, sin ninguna pista
-        extern void Notificar(const std::string&, bool);
-        Notificar("No se pudo cargar la textura", true);
+        extern void Notify(const std::string&, bool);
+        Notify("No se pudo cargar la textura", true);
     }
-    gSymTexMat = NULL; gCargarTexturaComoNormal = false; gCargarTexturaComoB = false;
-    { extern int gCargarTexturaMapa; gCargarTexturaMapa = -1; }
+    gSymTexMat = NULL; gLoadTextureAsNormal = false; gLoadTextureAsB = false;
+    { extern int gLoadTextureMap; gLoadTextureMap = -1; }
 }
 // "Load Texture" (base Y normal map): el MISMO browser en los 4 OS. Quien lo llama ya dejo el flag en el valor
 // correcto (false=textura, true=normal); el callback de arriba decide el destino.
-static void W3dCargarTexturaEn(Material* aMat) {
+static void W3dLoadTextureIn(Material* aMat) {
     gSymTexMat = aMat;
-    AbrirFileBrowser(gCargarTexturaComoNormal ? "Cargar normal map" : "Cargar textura",
-                     gCargarTexturaComoNormal ? "Abrir normal map" : "Abrir textura",
-                     ".png .jpg .jpeg .bmp .tga", W3dTexturaElegida);
+    OpenFileBrowser(gLoadTextureAsNormal ? "Cargar normal map" : "Cargar textura",
+                     gLoadTextureAsNormal ? "Abrir normal map" : "Abrir textura",
+                     ".png .jpg .jpeg .bmp .tga", W3dPickedTexture);
 }
 
 // ============================ IDE (editor de scripts) por keypad en el N95 ============================
 // Dos modos segun barFocusIndex: < 0 = EDITAR TEXTO (el T9 escribe, flechas mueven el cursor, OK = nueva linea,
 // soft-izq = pasar a la barra); >= 0 = BARRA (script/save/refresh, ver LayoutBarraFoco*). Estas funciones son el
 // puente que usa el container (bloque T9 de OfferKeyEventL) y los hooks del T9 (W3dT9IDE*).
-static IDE* IDEActivoPtr() {
+static IDE* IDEActivePtr() {
     if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 8) return (IDE*)viewPortActive;
     return 0;
 }
-bool W3dLayoutIDEEditando() {
-    IDE* i = IDEActivoPtr();
+bool W3dLayoutIDEEditing() {
+    IDE* i = IDEActivePtr();
     return (i && i->barFocusIndex < 0) ? true : false;
 }
-void W3dLayoutIDEInsertar(int c) { IDE* i = IDEActivoPtr(); if (i) { i->InsertarChar((char)c); g_redraw = true; } }
-void W3dLayoutIDEBorrar()        { IDE* i = IDEActivoPtr(); if (i) { i->Backspace(); g_redraw = true; } }
-void W3dLayoutIDEEnter()         { IDE* i = IDEActivoPtr(); if (i) { i->Enter(); g_redraw = true; } }
-void W3dLayoutIDEFlecha(int aScan, bool shift) {
-    IDE* i = IDEActivoPtr(); if (!i) return;
-    if      (aScan == EStdKeyLeftArrow)  i->MoverCursor(0, -1, shift);  // shift extiende la seleccion
-    else if (aScan == EStdKeyRightArrow) i->MoverCursor(0, +1, shift);
-    else if (aScan == EStdKeyUpArrow)    i->MoverCursor(-1, 0, shift);
-    else if (aScan == EStdKeyDownArrow)  i->MoverCursor(+1, 0, shift);
+void W3dLayoutIDEInsert(int c) { IDE* i = IDEActivePtr(); if (i) { i->InsertChar((char)c); g_redraw = true; } }
+void W3dLayoutIDEDelete()        { IDE* i = IDEActivePtr(); if (i) { i->Backspace(); g_redraw = true; } }
+void W3dLayoutIDEEnter()         { IDE* i = IDEActivePtr(); if (i) { i->Enter(); g_redraw = true; } }
+void W3dLayoutIDEArrow(int aScan, bool shift) {
+    IDE* i = IDEActivePtr(); if (!i) return;
+    if      (aScan == EStdKeyLeftArrow)  i->MoveCursor(0, -1, shift);  // shift extiende la seleccion
+    else if (aScan == EStdKeyRightArrow) i->MoveCursor(0, +1, shift);
+    else if (aScan == EStdKeyUpArrow)    i->MoveCursor(-1, 0, shift);
+    else if (aScan == EStdKeyDownArrow)  i->MoveCursor(+1, 0, shift);
     g_redraw = true;
 }
-void W3dLayoutIDESalirEdicion() { IDE* i = IDEActivoPtr(); if (i) i->barFocusIndex = 0; g_redraw = true; } // -> modo barra
-bool W3dLayoutIDEEnBarra()      { IDE* i = IDEActivoPtr(); return (i && i->barFocusIndex >= 0) ? true : false; }
-void W3dLayoutIDEVolverEdicion(){ IDE* i = IDEActivoPtr(); if (i) i->barFocusIndex = -1; g_redraw = true; } // barra -> editar
-bool W3dLayoutIDEInicioPalabra() {
-    IDE* i = IDEActivoPtr(); if (!i) return true;
+void W3dLayoutIDEExitEdit() { IDE* i = IDEActivePtr(); if (i) i->barFocusIndex = 0; g_redraw = true; } // -> modo barra
+bool W3dLayoutIDEInBar()      { IDE* i = IDEActivePtr(); return (i && i->barFocusIndex >= 0) ? true : false; }
+void W3dLayoutIDEReturnEdit(){ IDE* i = IDEActivePtr(); if (i) i->barFocusIndex = -1; g_redraw = true; } // barra -> editar
+bool W3dLayoutIDEStartWord() {
+    IDE* i = IDEActivePtr(); if (!i) return true;
     if (i->curCol <= 0) return true;
-    const std::string& l = i->lineas[i->curLin];
+    const std::string& l = i->lines[i->curLin];
     return (i->curCol - 1 < (int)l.size() && l[i->curCol - 1] == ' ') ? true : false;
 }
-void W3dLayoutIDECopiar() {   // shift + softkey-izq: copiar la seleccion al portapapeles del sistema + toast
-    IDE* i = IDEActivoPtr(); if (!i || !i->haySel) return;
-    i->Copiar();
-    { extern void Notificar(const std::string&, bool); Notificar("texto copiado", false); }
+void W3dLayoutIDECopy() {   // shift + softkey-izq: copiar la seleccion al portapapeles del sistema + toast
+    IDE* i = IDEActivePtr(); if (!i || !i->hasSel) return;
+    i->Copy();
+    { extern void Notify(const std::string&, bool); Notify("texto copiado", false); }
     g_redraw = true;
 }
-void W3dLayoutIDEPegar() { IDE* i = IDEActivoPtr(); if (i) { i->Pegar(); g_redraw = true; } } // shift + softkey-der: pegar
+void W3dLayoutIDEPaste() { IDE* i = IDEActivePtr(); if (i) { i->Paste(); g_redraw = true; } } // shift + softkey-der: pegar
 
-// CONSOLA (kind 7): scroll con flechas MANTENIDAS (el container las setea en gHeld* y AplicarFlechas3D las repite
+// CONSOLA (kind 7): scroll con flechas MANTENIDAS (el container las setea en gHeld* y ApplyArrows3D las repite
 // con aceleracion). ScrollByTouch no depende del mouse (a diferencia de ScrollY/X), asi sirve para el keypad.
-bool W3dLayoutConsolaActivo() {
+bool W3dLayoutActiveConsole() {
     return (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 7) ? true : false;
 }
-void W3dLayoutConsolaScroll(int dx, int dy) {
-    if (!W3dLayoutConsolaActivo()) return;
+void W3dLayoutConsoleScroll(int dx, int dy) {
+    if (!W3dLayoutActiveConsole()) return;
     Console* c = (Console*)viewPortActive;
-    int paso = RenglonHeightGS * 2;
-    c->ScrollByTouch(-dx * paso, -dy * paso);   // Up (dy=-1) -> PosY hacia 0 (muestra arriba); igual que el single-press
+    int step = RowHeightGS * 2;
+    c->ScrollByTouch(-dx * step, -dy * step);   // Up (dy=-1) -> PosY hacia 0 (muestra arriba); igual que el single-press
     g_redraw = true;
 }
 
@@ -364,9 +364,9 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     gScreenH = aHeight;
     g_redraw = true; // cambio de layout/orientacion -> redibujar
     SetGlobalScale(1); // 240p = escala 1 (PC usa 3)
-    W3dPantallaAlto = aHeight;
-    MenuPantallaW = aWidth;  // para que los desplegables clampeen
-    MenuPantallaH = aHeight;
+    W3dScreenHeight = aHeight;
+    MenuScreenW = aWidth;  // para que los desplegables clampeen
+    MenuScreenH = aHeight;
 
 
     // el layout NO se rebuildea al rotar/redimensionar: se resize SIEMPRE el MISMO (asi los viewports no
@@ -374,21 +374,21 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     // Con MAXIMIZAR (o el modo juego, que maximiza el 3D) lo que se DIBUJA es rootViewport (el viewport
     // maximizado), no el arbol completo: hay que redimensionar los dos. Antes solo se hacia gRoot->Resize y al
     // rotar maximizado el viewport visible quedaba con el tamano viejo (franja negra); peor, al des-maximizar
-    // LayoutMaximizar restaura el arbol con el tamano del maximizado -> el tamano viejo quedaba pegado para siempre.
+    // LayoutMaximize restaura el arbol con el tamano del maximizado -> el tamano viejo quedaba pegado para siempre.
     // Primero el arbol completo (reparte el espacio entre sus hojas, incluida la maximizada) y despues el
     // maximizado a pantalla completa, en ese orden. Mismo criterio que PC (main.cpp: rootViewport->Resize).
     // el editor esta entero en la pantalla externa: el arbol tiene SU tamano (al volver al telefono se restaura)
-    if (gRoot && PantallaExternaSolo()) return;
+    if (gRoot && ExternalScreenOnly()) return;
     if (gRoot) {
-        ViewportBase* completa = LayoutRaizCompleta();
-        if (!completa) completa = gRoot;
-        completa->x = 0; completa->y = 0;
-        completa->Resize(aWidth, aHeight);
-        if (rootViewport && rootViewport != completa) {
+        ViewportBase* complete = LayoutCompleteRoot();
+        if (!complete) complete = gRoot;
+        complete->x = 0; complete->y = 0;
+        complete->Resize(aWidth, aHeight);
+        if (rootViewport && rootViewport != complete) {
             rootViewport->x = 0; rootViewport->y = 0;
             rootViewport->Resize(aWidth, aHeight);
         }
-        w3dLogf("layout resize: %dx%d maximizado=%d", aWidth, aHeight, (int)(rootViewport != completa));
+        w3dLogf("layout resize: %dx%d maximized=%d", aWidth, aHeight, (int)(rootViewport != complete));
         return;
     }
 
@@ -397,34 +397,34 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
 
     // hooks COMPARTIDOS del ruteo (LayoutInput opera sobre rootViewport)
     LayoutWarpMouse = W3dMouseWarp;
-    LayoutArbolCambiado = W3dArbolCambiadoHook;
-    LayoutImportObj = W3dImportObjMenu;        // Add > Import OBJ: el browser compartido
-    LayoutImportFbx = W3dImportFbxMenu;        // Add > Import FBX
-    LayoutImportGltf = W3dImportGltfMenu;      // Add > Imports > glTF
-    LayoutImportGlb = W3dImportGlbMenu;        // Add > Imports > GLB
-    LayoutImportStl = W3dImportStlMenu;        // Add > Imports > STL
-    DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura
+    LayoutChangedTree = W3dChangedTreeHook;
+    LayoutImportObj = W3dImportObjMenu;   // Add > Import OBJ: el browser compartido
+    LayoutImportFbx = W3dImportFbxMenu;   // Add > Import FBX
+    LayoutImportGltf = W3dImportGltfMenu; // Add > Imports > glTF
+    LayoutImportGlb = W3dImportGlbMenu;   // Add > Imports > GLB
+    LayoutImportStl = W3dImportStlMenu;   // Add > Imports > STL
+    DialogLoadTexture = W3dLoadTextureIn; // cargar textura
 
     // barra del viewport activo: mostrar el modo de entrada de texto (Abc/abc/ABC/123) del T9 mientras se edita un
     // campo. El render vive en ViewportBase::RenderBar (compartido); aca solo apuntamos el hook a la funcion Symbian.
-    { extern const char* (*g_ViewportBarModoHook)(); extern const char* W3dT9ModoTexto();
-      g_ViewportBarModoHook = W3dT9ModoTexto; }
-    // shift (lapiz): la barra muestra "copiar"/"pegar" mientras se edita texto (W3dLapizHeld vive en el container).
-    { extern bool (*g_ViewportBarShiftHook)(); extern bool W3dLapizHeld();
-      g_ViewportBarShiftHook = W3dLapizHeld; }
+    { extern const char* (*g_ViewportBarModeHook)(); extern const char* W3dT9TextMode();
+      g_ViewportBarModeHook = W3dT9TextMode; }
+    // shift (lapiz): la barra muestra "copiar"/"pegar" mientras se edita texto (W3dPencilHeld vive en el container).
+    { extern bool (*g_ViewportBarShiftHook)(); extern bool W3dPencilHeld();
+      g_ViewportBarShiftHook = W3dPencilHeld; }
 
     // IDE por keypad: enganchar el T9 al editor de scripts (escribir codigo con multi-tap en el N95).
-    W3dT9IDEEditando     = W3dLayoutIDEEditando;
-    W3dT9IDEInsertar     = W3dLayoutIDEInsertar;
-    W3dT9IDEBorrar       = W3dLayoutIDEBorrar;
-    W3dT9IDEInicioPalabra = W3dLayoutIDEInicioPalabra;
+    W3dT9IDEEditing     = W3dLayoutIDEEditing;
+    W3dT9IDEInsert      = W3dLayoutIDEInsert;
+    W3dT9IDEDelete      = W3dLayoutIDEDelete;
+    W3dT9IDEStartWord = W3dLayoutIDEStartWord;
 
-    // EL layout por defecto COMPARTIDO (LayoutPorDefecto, por TAMANO DE PANTALLA): la MISMA logica que PC,
+    // EL layout por defecto COMPARTIDO (LayoutDefault, por TAMANO DE PANTALLA): la MISMA logica que PC,
     // no una propia de Symbian. En el N95 (240x320, lado < 320) da 2 viewports (3D + Propiedades). El
-    // bookkeeping (gRoot/gView3D/gProps/gContRaiz/...) lo arma W3dArbolCambiadoHook recorriendo el arbol.
-    { extern ViewportBase* LayoutPorDefecto(int, int, Viewport3D**);
-      rootViewport = LayoutPorDefecto(aWidth, aHeight, &gView3D); }
-    W3dArbolCambiadoHook();
+    // bookkeeping (gRoot/gView3D/gProps/gContRoot/...) lo arma W3dChangedTreeHook recorriendo el arbol.
+    { extern ViewportBase* LayoutDefault(int, int, Viewport3D**);
+      rootViewport = LayoutDefault(aWidth, aHeight, &gView3D); }
+    W3dChangedTreeHook();
     Viewport3DActive = gView3D;
     // sin mouse SIEMPRE hay un viewport activo (borde verde): el 3D. La tecla verde lo cicla.
     if (!viewPortActive) viewPortActive = gView3D;
@@ -449,7 +449,7 @@ void W3dLayoutRender() {
 #ifdef W3D_GLES2
     // ES 2.0: el GL directo que quede en la capa del telefono (el cursor, las texturas propias) no desincroniza al
     // motor de un cuadro al otro; y el scissor se apaga por el motor
-    w3dEngine::GLES2Resincronizar();
+    w3dEngine::GLES2Resync();
     w3dEngine::Disable(w3dEngine::ScissorTest);
     // ES 2.0: las matrices son del motor (uniforms): la de textura se resetea ahi
     w3dEngine::MatrixMode(w3dEngine::TextureMatrix);
@@ -457,17 +457,17 @@ void W3dLayoutRender() {
     w3dEngine::MatrixMode(w3dEngine::ModelView);
     w3dEngine::Viewport(0, 0, gScreenW, gScreenH);
 #else
-    W3D_GL_CRUDO(glDisable(GL_SCISSOR_TEST));
-    W3D_GL_CRUDO(glMatrixMode(GL_TEXTURE));
-    W3D_GL_CRUDO(glLoadIdentity());
-    W3D_GL_CRUDO(glMatrixMode(GL_MODELVIEW));
-    W3D_GL_CRUDO(glViewport(0, 0, gScreenW, gScreenH));
+    W3D_GL_RAW(glDisable(GL_SCISSOR_TEST));
+    W3D_GL_RAW(glMatrixMode(GL_TEXTURE));
+    W3D_GL_RAW(glLoadIdentity());
+    W3D_GL_RAW(glMatrixMode(GL_MODELVIEW));
+    W3D_GL_RAW(glViewport(0, 0, gScreenW, gScreenH));
 #endif
     // el fondo de TODA la pantalla (los paneles lo pisan). En el MODO JUEGO PURO con un proyecto que limpia el solo
     // (constructor + su "Clear") no: limpiar es cosa del proyecto (sin su "Clear" no se limpia nada) y en el N95 un
     // clear de mas es un cuadro entero de relleno
-    { extern int g_juegoPuro;
-      if (!(g_juegoPuro && W3dHayConstructor() && W3dEscena3DActiva())) {
+    { extern int g_pureGame;
+      if (!(g_pureGame && W3dHasConstructor() && W3dScene3DActive())) {
 #ifdef W3D_GLES2
           // ES 2.0: glClear respeta las mascaras. Si el cuadro anterior termino con la escritura de profundidad
           // apagada (lo ultimo que dibuja un popup o un menu), el clear NO limpiaba la profundidad: todo lo que la usa
@@ -475,19 +475,19 @@ void W3dLayoutRender() {
           // todo"). Las mascaras se prenden por el motor (las recuerda) y el clear tambien va por el
           w3dEngine::DepthMask(true);
           w3dEngine::ColorMask(true, true, true, true);
-          w3dEngine::ClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
-                                ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);
+          w3dEngine::ClearColor(ColorList[static_cast<int>(ColorID::background)][0], ColorList[static_cast<int>(ColorID::background)][1],
+                                ColorList[static_cast<int>(ColorID::background)][2], 1.0f);
           w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
 #else
-          W3D_GL_CRUDO(glClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
-                       ListaColores[static_cast<int>(ColorID::background)][2], 1.0f));
-          W3D_GL_CRUDO(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+          W3D_GL_RAW(glClearColor(ColorList[static_cast<int>(ColorID::background)][0], ColorList[static_cast<int>(ColorID::background)][1],
+                       ColorList[static_cast<int>(ColorID::background)][2], 1.0f));
+          W3D_GL_RAW(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 #endif
       } }
 
     // el resync del estado por malla (Mesh::RenderObject) es por el GL crudo del editor de esta plataforma: en el
     // modo juego puro no hay (y cada malla re-mandaba todo su estado al driver)
-    { extern int g_juegoPuro; w3dEngine::g_invalidarPorMalla = !g_juegoPuro; }
+    { extern int g_pureGame; w3dEngine::g_invalidatePerMesh = !g_pureGame; }
 
     // renderiza el rootViewport COMPARTIDO (no gRoot): "Maximize" reemplaza rootViewport por el viewport
     // activo -> dibuja SOLO ese y los demas NO se renderizan ni recalculan (clave para el rendimiento del N95).
@@ -496,11 +496,11 @@ void W3dLayoutRender() {
     else gRoot->Render();
 
     // MODO JUEGO PURO (VERDE+0): ni menu ni toasts -- SOLO el juego en pantalla
-    { extern int g_juegoPuro;
-      if (!g_juegoPuro) {
+    { extern int g_pureGame;
+      if (!g_pureGame) {
           // desplegable abierto (compartido), salvo que se haya abierto en la pantalla externa (se dibuja alla)
-          if (PantallaExternaDelMenu() == 0) LayoutRenderMenu(gScreenW, gScreenH);
-          extern void NotificacionesRender(int, int); NotificacionesRender(gScreenW, gScreenH); // toasts encima (export/import)
+          if (MenuExternalScreen() == 0) LayoutRenderMenu(gScreenW, gScreenH);
+          extern void NotificationsRender(int, int); NotificationsRender(gScreenW, gScreenH); // toasts encima (export/import)
       } }
     g_prof.render = W3dNowMs() - _profR0; // profiler: TODO el render (viewports 3D + paneles + menus). En Symbian el
     W3dProfEnd();                          // swap/logic van en el event loop (no aca) -> quedan en 0; scene/3d/ui reales.
@@ -512,17 +512,17 @@ void W3dLayoutRender() {
         if ((++diag & 0x7F) == 1) {
 #ifdef W3D_GLES2
             // (ES 2.0: GL_LIGHTING/GL_FOG/... no son estado de GL: el error, el scissor y la geometria)
-            w3dLogf("post-arbol: err=%x sci=%d alto=%d outl=%d,%d %dx%d", W3D_GL_CRUDO(glGetError()),
-                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_SCISSOR_TEST)), W3dPantallaAlto,
+            w3dLogf("post-arbol: err=%x sci=%d height=%d outl=%d,%d %dx%d", W3D_GL_RAW(glGetError()),
+                (TInt)W3D_GL_RAW(glIsEnabled(GL_SCISSOR_TEST)), W3dScreenHeight,
                 gOutliner ? gOutliner->x : -1, gOutliner ? gOutliner->y : -1,
                 gOutliner ? gOutliner->width : -1, gOutliner ? gOutliner->height : -1);
 #else
-            w3dLogf("post-arbol: err=%x luz=%d l0=%d cm=%d tex2d=%d fog=%d sci=%d alto=%d outl=%d,%d %dx%d",
-                W3D_GL_CRUDO(glGetError()),
-                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_LIGHTING)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_LIGHT0)),
-                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_COLOR_MATERIAL)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_TEXTURE_2D)),
-                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_FOG)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_SCISSOR_TEST)),
-                W3dPantallaAlto,
+            w3dLogf("post-arbol: err=%x light=%d l0=%d cm=%d tex2d=%d fog=%d sci=%d height=%d outl=%d,%d %dx%d",
+                W3D_GL_RAW(glGetError()),
+                (TInt)W3D_GL_RAW(glIsEnabled(GL_LIGHTING)), (TInt)W3D_GL_RAW(glIsEnabled(GL_LIGHT0)),
+                (TInt)W3D_GL_RAW(glIsEnabled(GL_COLOR_MATERIAL)), (TInt)W3D_GL_RAW(glIsEnabled(GL_TEXTURE_2D)),
+                (TInt)W3D_GL_RAW(glIsEnabled(GL_FOG)), (TInt)W3D_GL_RAW(glIsEnabled(GL_SCISSOR_TEST)),
+                W3dScreenHeight,
                 gOutliner ? gOutliner->x : -1, gOutliner ? gOutliner->y : -1,
                 gOutliner ? gOutliner->width : -1, gOutliner ? gOutliner->height : -1);
 #endif
@@ -543,13 +543,13 @@ void W3dLayoutMouseMoved(TInt aX, TInt aY) {
 
 // sobre el CONTENIDO de un viewport 3D (no sus barras ni su barra de herramientas): pasar el mouse por ahi sin botones
 // no cambia nada de lo dibujado
-TBool W3dLayoutSobreContenido3D(TInt aX, TInt aY) {
+TBool W3dLayoutOverContent3D(TInt aX, TInt aY) {
     if (!rootViewport) return EFalse;
     ViewportBase* under = FindViewportUnderMouse(rootViewport, aX, aY);
     return under && under->isLeaf() && under->ViewportKind() == 1 && !under->OnBar(aX, aY);
 }
 
-TBool W3dLayoutMouseSobre3D(TInt aX, TInt aY) {
+TBool W3dLayoutMouseOver3D(TInt aX, TInt aY) {
     if (!gRoot) return ETrue;
     // CUALQUIER viewport 3D cuenta (puede haber mas de uno)
     ViewportBase* under = FindViewportUnderMouse(gRoot, aX, aY);
@@ -560,14 +560,14 @@ TBool W3dLayoutMouseSobre3D(TInt aX, TInt aY) {
 // el click solo lo consume para no disparar seleccion 3D detras)
 TBool W3dLayoutClickProps(TInt aX, TInt aY) {
     if (!gProps || !gProps->Contains(aX, aY)) return EFalse;
-    gProps->ClickEn(aX, aY); // plegar/desplegar grupos (compartido con PC)
+    gProps->ClickIn(aX, aY); // plegar/desplegar grupos (compartido con PC)
     return ETrue;
 }
 
 // click izquierdo sobre el outliner (seleccion de objeto del arbol)
 TBool W3dLayoutClickOutliner(TInt aX, TInt aY) {
     if (!gOutliner || !gOutliner->Contains(aX, aY)) return EFalse;
-    gOutliner->ClickSeleccionar(aX, aY); // metodo COMPARTIDO (tambien PC)
+    gOutliner->ClickSelect(aX, aY); // metodo COMPARTIDO (tambien PC)
     return ETrue;
 }
 
@@ -583,7 +583,7 @@ TBool W3dLayoutScrollGrab(TInt aMx, TInt aMy) {
     if (!gRoot) return EFalse;
     ViewportBase* under = FindViewportUnderMouse(gRoot, aMx, aMy);
     if (under && under->isLeaf() &&
-        (VpEsOutliner(under) || under->ViewportKind() == 3)) {
+        (VpIsOutliner(under) || under->ViewportKind() == 3)) {
         gScrollGrab2 = under;
         w3dLog("scroll-arrastre: agarrado (derecho de nuevo para soltar)");
         return ETrue;
@@ -619,35 +619,35 @@ void W3dLayoutMouseMotion(TInt aMx, TInt aMy) {
 // main/ViewPorts/LayoutInput.cpp (COMPARTIDO con PC/Android) ----
 
 // recolecta los punteros que el shell Symbian cachea (gView3D/etc)
-static void W3dRecolectarPaneles(ViewportBase* aNodo) {
-    if (!aNodo) return;
-    if (aNodo->isLeaf()) {
-        switch (aNodo->ViewportKind()) {
-            case 1: if (!gView3D) gView3D = (Viewport3D*)aNodo; break;
-            case 2: if (!gOutliner) gOutliner = (Outliner*)aNodo; break;
-            case 3: if (!gProps) gProps = (Properties*)aNodo; break;
+static void W3dCollectPanels(ViewportBase* aNode) {
+    if (!aNode) return;
+    if (aNode->isLeaf()) {
+        switch (aNode->ViewportKind()) {
+            case 1: if (!gView3D) gView3D = (Viewport3D*)aNode; break;
+            case 2: if (!gOutliner) gOutliner = (Outliner*)aNode; break;
+            case 3: if (!gProps) gProps = (Properties*)aNode; break;
         }
         return;
     }
-    if (aNodo->ContainerKind() == 1) {
-        W3dRecolectarPaneles(((ViewportRow*)aNodo)->childA);
-        W3dRecolectarPaneles(((ViewportRow*)aNodo)->childB);
-    } else if (aNodo->ContainerKind() == 2) {
-        W3dRecolectarPaneles(((ViewportColumn*)aNodo)->childA);
-        W3dRecolectarPaneles(((ViewportColumn*)aNodo)->childB);
+    if (aNode->ContainerKind() == 1) {
+        W3dCollectPanels(((ViewportRow*)aNode)->childA);
+        W3dCollectPanels(((ViewportRow*)aNode)->childB);
+    } else if (aNode->ContainerKind() == 2) {
+        W3dCollectPanels(((ViewportColumn*)aNode)->childA);
+        W3dCollectPanels(((ViewportColumn*)aNode)->childB);
     }
 }
 
-static ViewportBase* W3dPrimerContenedor(ViewportBase* aNodo) {
-    if (!aNodo || aNodo->isLeaf()) return 0;
+static ViewportBase* W3dFirstContainer(ViewportBase* aNode) {
+    if (!aNode || aNode->isLeaf()) return 0;
     ViewportBase* a = 0;
     ViewportBase* b = 0;
-    if (aNodo->ContainerKind() == 1) {
-        a = ((ViewportRow*)aNodo)->childA;
-        b = ((ViewportRow*)aNodo)->childB;
+    if (aNode->ContainerKind() == 1) {
+        a = ((ViewportRow*)aNode)->childA;
+        b = ((ViewportRow*)aNode)->childB;
     } else {
-        a = ((ViewportColumn*)aNodo)->childA;
-        b = ((ViewportColumn*)aNodo)->childB;
+        a = ((ViewportColumn*)aNode)->childA;
+        b = ((ViewportColumn*)aNode)->childB;
     }
     if (a && !a->isLeaf()) return a;
     if (b && !b->isLeaf()) return b;
@@ -655,94 +655,94 @@ static ViewportBase* W3dPrimerContenedor(ViewportBase* aNodo) {
 }
 
 // hook de LayoutInput: el arbol cambio (cambio de tipo / expand / split)
-static void W3dArbolCambiadoHook() {
+static void W3dChangedTreeHook() {
     // cambio el arbol de la PANTALLA EXTERNA (un split en el monitor extendido): no es el del telefono
     // (en el modo "solo la externa" el arbol SI es el del telefono)
-    if (PantallaExternaEnUso() && PantallaExternaEnUso() != PantallaExternaSolo()) return;
+    if (ExternalScreenInUse() && ExternalScreenInUse() != ExternalScreenOnly()) return;
     gRoot = rootViewport; // expand puede cambiar el root
     gScrollGrab2 = 0;
     gSplitterGrab = 0;
     gView3D = 0;
     gOutliner = 0;
     gProps = 0;
-    W3dRecolectarPaneles(gRoot);
+    W3dCollectPanels(gRoot);
     // re-anclar el viewport ACTIVO al arbol NUEVO: al abrir un .w3d el arbol se reconstruye y viewPortActive
     // podia quedar apuntando a un viewport del arbol VIEJO (huerfano/liberado) -> hover/maximize/ruteo de teclas
     // rotos, y con el fix de 1-viewport el 3D es el que hay que enfocar. Preferir el 3D; si no hay, la raiz.
     viewPortActive = gView3D ? (ViewportBase*)gView3D : gRoot;
     if (gView3D) Viewport3DActive = gView3D;
-    gContRaiz = gRoot->isLeaf() ? 0 : gRoot;
-    gContHijo = W3dPrimerContenedor(gRoot);
-    if (gContRaiz) gRaizEsRow = (gRoot->ContainerKind() == 1);
+    gContRoot  = gRoot->isLeaf() ? 0 : gRoot;
+    gContChild = W3dFirstContainer(gRoot);
+    if (gContRoot) gRootIsRow = (gRoot->ContainerKind() == 1);
     w3dLog("layout: arbol de viewports cambiado (LayoutInput)");
 }
 
-TBool W3dLayoutMenuAbierto() {
-    return LayoutMenuAbierto() ? ETrue : EFalse;
+TBool W3dLayoutOpenMenu() {
+    return LayoutMenuOpen() ? ETrue : EFalse;
 }
 
 // hay un popup modal abierto (File browser / color picker)? El container lo
 // usa para mandarle el teclado (flechas/OK/soft) aunque no haya mouse BT.
-TBool W3dLayoutPopupActivo() {
+TBool W3dLayoutActivePopup() {
     return PopUpActive ? ETrue : EFalse;
 }
-// EL PANEL DE LA ULTIMA OPERACION (abajo a la izquierda: mover, extruir, keyframes...): no es modal (CierraConViewport)
-TBool W3dLayoutPopupSemimodal() { return (PopUpActive && PopUpActive->CierraConViewport()) ? ETrue : EFalse; }
+// EL PANEL DE LA ULTIMA OPERACION (abajo a la izquierda: mover, extruir, keyframes...): no es modal (ClosesWithViewport)
+TBool W3dLayoutPopupSemimodal() { return (PopUpActive && PopUpActive->ClosesWithViewport()) ? ETrue : EFalse; }
 TAny* W3dLayoutPopupPtr() { return (TAny*)PopUpActive; }
 // aceptarlo y cerrarlo (lo mismo que tocar afuera): la tecla sigue su camino
-void W3dLayoutPopupSeguir() { if (PopUpActive) PopUpActive->SeguirTrabajando(); g_redraw = true; }
+void W3dLayoutPopupContinue() { if (PopUpActive) PopUpActive->ContinueWorking(); g_redraw = true; }
 // plegado (solo el titulo a la vista): el teclado NO es suyo. El lapiz lo despliega / pliega
-TBool W3dLayoutPopupPlegado() { return (PopUpActive && PopUpActive->Plegable() && PopUpActive->Plegado()) ? ETrue : EFalse; }
-TBool W3dLayoutPopupPlegarToggle() {
-    if (!PopUpActive || !PopUpActive->Plegable()) return EFalse;
-    PopUpActive->Desplegar(PopUpActive->Plegado());
+TBool W3dLayoutCollapsedPopup() { return (PopUpActive && PopUpActive->Collapsible() && PopUpActive->Collapsed()) ? ETrue : EFalse; }
+TBool W3dLayoutPopupCollapseToggle() {
+    if (!PopUpActive || !PopUpActive->Collapsible()) return EFalse;
+    PopUpActive->Expand(PopUpActive->Collapsed());
     g_redraw = true;
     return ETrue;
 }
 
 // tecla verde de llamada: cicla el viewport activo (borde verde) sin mouse.
-void W3dLayoutCiclarViewport(TInt aDir) {
-    LayoutCiclarViewportActivo(aDir);
+void W3dLayoutCycleViewport(TInt aDir) {
+    LayoutCycleActiveViewport(aDir);
 }
 
 // soft-izquierda: abre/cierra la barra de menu del viewport activo.
-void W3dLayoutToggleBarra() {
-    LayoutToggleBarraViewportActivo();
+void W3dLayoutToggleBar() {
+    LayoutToggleBarActiveViewport();
 }
 
 // verde + flechas: redimensiona el viewport activo en un eje (paso chico)
-void W3dLayoutRedimensionarViewport(TInt aDx, TInt aDy) {
-    LayoutRedimensionarViewportActivo(aDx, aDy, 0.01f);
+void W3dLayoutResizeViewport(TInt aDx, TInt aDy) {
+    LayoutResizeActiveViewport(aDx, aDy, 0.01f);
 }
 
 // el viewport ACTIVO (borde verde) es un viewport 3D? (para que las flechas
 // orbiten ahi y no en el outliner/propiedades)
-TBool W3dLayout3DActivo() {
+TBool W3dLayout3DActive() {
     return (viewPortActive && viewPortActive->isLeaf() &&
             viewPortActive->ViewportKind() == 1) ? ETrue : EFalse;
 }
 
 // el 3D activo tiene el FOCO DE BARRA en el transporte Stop/Play? -> ahi las flechas NO orbitan la camara:
-// van al dispatch del panel (LayoutTeclaPanelActivo) para navegar Stop<->Play con el keypad. Espejo de como
-// el Timeline con foco de barra suelta las flechas (W3dLayoutTimelineActivo devuelve false). El container lo
+// van al dispatch del panel (LayoutKeyPanelActive) para navegar Stop<->Play con el keypad. Espejo de como
+// el Timeline con foco de barra suelta las flechas (W3dLayoutActiveTimeline devuelve false). El container lo
 // consulta en el branch de orbita (OfferKeyEventL) para dejar caer la flecha cuando hay foco de transporte.
-TBool W3dLayoutFocoTransporte() {
-    extern bool LayoutFocoEnTransporte(ViewportBase*);
-    return LayoutFocoEnTransporte(viewPortActive) ? ETrue : EFalse;
+TBool W3dLayoutFocusTransport() {
+    extern bool LayoutFocusInTransport(ViewportBase*);
+    return LayoutFocusInTransport(viewPortActive) ? ETrue : EFalse;
 }
 
 // el editor UV activo tiene el foco de barra sobre "Edit" (pintura de textura)? -> las flechas NO panean:
-// van al dispatch del panel para seguir navegando la barra, y OK activa. Espejo de W3dLayoutFocoTransporte.
-TBool W3dLayoutFocoUVEditar() {
-    extern bool LayoutFocoEnUVEditar(ViewportBase*);
-    return LayoutFocoEnUVEditar(viewPortActive) ? ETrue : EFalse;
+// van al dispatch del panel para seguir navegando la barra, y OK activa. Espejo de W3dLayoutFocusTransport.
+TBool W3dLayoutFocusUVEdit() {
+    extern bool LayoutFocusInUVEdit(ViewportBase*);
+    return LayoutFocusInUVEdit(viewPortActive) ? ETrue : EFalse;
 }
 
 // "8" en el N95: EN Edit Mode de malla = Loop Cut (path del menu del viewport3d, como antes); FUERA de edicion
 // = entra/sale de la vista desde la CAMARA ACTIVA (toggle, como el numpad 0 en PC: SetViewFromCameraActive).
 // Antes "8" disparaba Loop Cut SIEMPRE -> daba un error de loop cut aun sin estar editando una malla.
-void W3dLayoutTecla8() {
-    if (InteractionMode == EditMode) { extern void LayoutLoopCutDesdeActivo(); LayoutLoopCutDesdeActivo(); return; }
+void W3dLayoutKey8() {
+    if (InteractionMode == EditMode) { extern void LayoutLoopCutFromActive(); LayoutLoopCutFromActive(); return; }
     if (Viewport3DActive) {
         Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);
         g_redraw = true;
@@ -752,7 +752,7 @@ void W3dLayoutTecla8() {
 // el viewport ACTIVO es donde se JUEGA (3D o 2D/Editor2D)? -> ahi el D-pad va al JUEGO; en
 // cualquier otro (outliner/props/timeline) el D-pad maneja la UI del editor, asi con la tecla
 // verde se cambia de viewport y se puede salir del juego (menu/stop) sin quedar atrapado.
-TBool W3dLayoutJuegoViewportActivo() {
+TBool W3dLayoutGameActiveViewport() {
     if (!viewPortActive || !viewPortActive->isLeaf()) return EFalse;
     const TInt k = viewPortActive->ViewportKind();
     return (k == 1 || k == 6) ? ETrue : EFalse;   // 1 = ViewPort3D, 6 = Editor2D
@@ -769,14 +769,14 @@ void W3dLayoutMenuSnap(TInt aX, TInt aY) {
 }
 
 // boton izquierdo SOLTADO: scroll agarrado + drop del drag del outliner
-void W3dLayoutSoltar(TInt aX, TInt aY) {
-    LayoutSoltar(aX, aY);
+void W3dLayoutRelease(TInt aX, TInt aY) {
+    LayoutRelease(aX, aY);
 }
 
 // estas "en medio de algo" (scroll agarrado / divisor): el cursor del
 // mouse se pinta VERDE para que se note
-TBool W3dLayoutOcupado() {
-    if (LayoutEnArrastre()) return ETrue;
+TBool W3dLayoutBusy() {
+    if (LayoutInDrag()) return ETrue;
     if (gScrollGrab2) return ETrue;
     if (gSplitterGrab) return ETrue;
     return EFalse;
@@ -787,29 +787,29 @@ TBool W3dLayoutOcupado() {
 TBool W3dLayoutWrapMouse(TInt& aX, TInt& aY) {
     ViewportBase* v = viewPortActive;
     if (!v || !v->isLeaf()) return EFalse;
-    if (!VpEsOutliner(v) && v->ViewportKind() != 3) return EFalse;
-    TInt margen = borderGS;
+    if (!VpIsOutliner(v) && v->ViewportKind() != 3) return EFalse;
+    TInt margin = borderGS;
     TBool warped = EFalse;
-    if (aX <= v->x + margen) {
-        aX = v->x + v->width - margen - 1;
+    if (aX <= v->x + margin) {
+        aX = v->x + v->width - margin - 1;
         warped = ETrue;
-    } else if (aX >= v->x + v->width - margen) {
-        aX = v->x + margen + 1;
+    } else if (aX >= v->x + v->width - margin) {
+        aX = v->x + margin + 1;
         warped = ETrue;
     }
-    if (aY <= v->y + margen) {
-        aY = v->y + v->height - margen - 1;
+    if (aY <= v->y + margin) {
+        aY = v->y + v->height - margin - 1;
         warped = ETrue;
-    } else if (aY >= v->y + v->height - margen) {
-        aY = v->y + margen + 1;
+    } else if (aY >= v->y + v->height - margin) {
+        aY = v->y + margin + 1;
         warped = ETrue;
     }
     return warped;
 }
 
 // el popup (color picker) esta arrastrando un valor? (cursor VIOLETA)
-TBool W3dLayoutArrastrePopup() {
-    return LayoutPopupArrastrando() ? ETrue : EFalse;
+TBool W3dLayoutDragPopup() {
+    return LayoutPopupDragging() ? ETrue : EFalse;
 }
 
 // toda la UI compartida (menu abierto > barras > paneles) en un solo punto
@@ -827,7 +827,7 @@ TBool W3dLayoutClickUI(TInt aX, TInt aY) {
 
 // teclado -> el viewport BAJO EL MOUSE (como PC: el hover decide quien
 // recibe el teclado). Todos los paneles, no solo propiedades.
-TBool W3dLayoutTecla(TInt aScan, TInt aMx, TInt aMy) {
+TBool W3dLayoutKey(TInt aScan, TInt aMx, TInt aMy) {
     // traduccion Symbian -> teclas abstractas del ruteo compartido
     int k = -1;
     switch (aScan) {
@@ -845,7 +845,7 @@ TBool W3dLayoutTecla(TInt aScan, TInt aMx, TInt aMy) {
         case 165:               k = LayoutKey::Accept; break; // soft DER = Import/abrir
     }
     if (k < 0) return EFalse;
-    if (LayoutTeclaUI(k, aMx, aMy)) {
+    if (LayoutKeyUI(k, aMx, aMy)) {
         return ETrue;
     }
     // OK/Enter sobre el viewport con una malla seleccionada = TAB de PC: entra o sale de
@@ -858,43 +858,43 @@ TBool W3dLayoutTecla(TInt aScan, TInt aMx, TInt aMy) {
 }
 
 // EDICION NUMERICA por texto (un PropFloat): el contenedor rutea los digitos del keypad al campo enfocado.
-// W3dNumEditActivo dice si hay una edicion numerica en curso; W3dTextFieldChar mete un caracter (0-9, '.', 8=borrar).
-extern bool NumEditActivo();        // WhiskUI/PropFloat.cpp
+// W3dActiveNumEdit dice si hay una edicion numerica en curso; W3dTextFieldChar mete un caracter (0-9, '.', 8=borrar).
+extern bool NumEditActive();        // WhiskUI/PropFloat.cpp
 extern bool TextFieldInputChar(int c); // main/ViewPorts/LayoutInput.cpp (declarada en TextField.h)
 // ROTAR INCLINANDO EL TELEFONO: la vista 3D GIRA sobre su eje igual que el objeto (el telefono inclinado + la vista
 // girada al reves = la escena se ve derecha y el objeto, rotado). Se guarda como estaba y al terminar el transform vuelve.
-static TBool gRollGuardado = EFalse;
+static TBool gSavedRoll = EFalse;
 static Quaternion gRollViewRot;
 static Viewport3D* gRollVp = 0;
-void W3dVistaRollFijar(float aGrados) {
+void W3dViewRollSet(float aDegrees) {
     Viewport3D* vp = Viewport3DActive ? Viewport3DActive : gView3D;
     if (!vp || vp->ViewFromCameraActive) return;   // (mirando por la camara de la escena: esa no se toca)
-    if (!gRollGuardado || gRollVp != vp) { gRollGuardado = ETrue; gRollVp = vp; gRollViewRot = vp->viewRot; }
+    if (!gSavedRoll || gRollVp != vp) { gSavedRoll = ETrue; gRollVp = vp; gRollViewRot = vp->viewRot; }
     vp->viewRot = gRollViewRot;
-    vp->RollOrbit(aGrados);
+    vp->RollOrbit(aDegrees);
     g_redraw = true;
 }
-void W3dVistaRollRestaurar() {
-    if (!gRollGuardado) return;
-    gRollGuardado = EFalse;
+void W3dViewRollRestore() {
+    if (!gSavedRoll) return;
+    gSavedRoll = EFalse;
     if (gRollVp) { gRollVp->viewRot = gRollViewRot; gRollVp->RollOrbit(0.0f); }
     gRollVp = 0;
     g_redraw = true;
 }
 // se esta rotando sobre el eje de la VISTA (sin 1/2/3): el unico en que la vista puede acompaniar al objeto
-TBool W3dXformRotaEnVista() {
+TBool W3dXformRotatesInView() {
     extern int axisSelect;   // (variables.h: X, Y, Z, XYZ = 3, ViewAxis = 4, ..., OrbitalAxis = 8)
     return (axisSelect == 3 || axisSelect == 4 || axisSelect == 8) ? ETrue : EFalse;
 }
 
 // EL SOFTKEY DERECHO: un toque = el foco en la barra de herramientas (abajo) del viewport activo; con el foco puesto,
-// las flechas / OK / C son de la barra (W3dLayoutToolbarTecla)
-extern bool LayoutToolbarFocoToggle();
-extern bool LayoutToolbarFocoActivo();
-extern bool LayoutToolbarTecla(int tecla);
-TBool W3dLayoutToolbarToggle() { return LayoutToolbarFocoToggle() ? ETrue : EFalse; }
-TBool W3dLayoutToolbarTecla(TInt aScan) {
-    if (!LayoutToolbarFocoActivo()) return EFalse;
+// las flechas / OK / C son de la barra (W3dLayoutToolbarKey)
+extern bool LayoutToolbarFocusToggle();
+extern bool LayoutToolbarFocusActive();
+extern bool LayoutToolbarKey(int key);
+TBool W3dLayoutToolbarToggle() { return LayoutToolbarFocusToggle() ? ETrue : EFalse; }
+TBool W3dLayoutToolbarKey(TInt aScan) {
+    if (!LayoutToolbarFocusActive()) return EFalse;
     int k = -1;
     switch (aScan) {
         case EStdKeyUpArrow:    k = LayoutKey::Up; break;
@@ -907,16 +907,16 @@ TBool W3dLayoutToolbarTecla(TInt aScan) {
         case EStdKeyEscape:     k = LayoutKey::Cancel; break;
     }
     if (k < 0) return EFalse;
-    return LayoutToolbarTecla(k) ? ETrue : EFalse;
+    return LayoutToolbarKey(k) ? ETrue : EFalse;
 }
 
-TBool W3dNumEditActivo() { return (NumEditActivo() || (g_textFieldActivo && g_textFieldActivo->numerico)) ? ETrue : EFalse; }
+TBool W3dActiveNumEdit() { return (NumEditActive() || (g_activeTextField && g_activeTextField->numeric)) ? ETrue : EFalse; }
 void  W3dTextFieldChar(TInt c) { TextFieldInputChar((int)c); }
 
 // flecha MANTENIDA (frame-based) al popup activo: SOLO ajusta valores (color picker: R/G/B/A o circulo/
 // value). El container la llama CADA frame segun gHeld* -> subir/bajar un color manteniendo es fluido.
-// NO navega (la navegacion entre elementos sigue 1-por-tap via W3dLayoutTecla en el key-down).
-TBool W3dLayoutTeclaRepeat(TInt aScan) {
+// NO navega (la navegacion entre elementos sigue 1-por-tap via W3dLayoutKey en el key-down).
+TBool W3dLayoutKeyRepeat(TInt aScan) {
     int k = -1;
     switch (aScan) {
         case EStdKeyUpArrow:    k = LayoutKey::Up; break;
@@ -933,7 +933,7 @@ TBool W3dLayoutUVNav(TInt aDx, TInt aDy, TBool aZoom) {
     return LayoutUVNavFrame(aDx, aDy, aZoom ? true : false) ? ETrue : EFalse;
 }
 // query: el viewport activo es el editor UV? (LayoutUVNavFrame con 0,0 no panea, solo devuelve si es UV)
-TBool W3dLayoutUVActivo() { return LayoutUVNavFrame(0, 0, false) ? ETrue : EFalse; }
+TBool W3dLayoutActiveUV() { return LayoutUVNavFrame(0, 0, false) ? ETrue : EFalse; }
 
 // Timeline activo: flecha MANTENIDA = scrub (izq/der); 0-mantenido + arriba/abajo = zoom; * -mantenido + flechas
 // = paneo. ETrue si lo manejo (es el Timeline).
@@ -941,23 +941,23 @@ TBool W3dLayoutTimelineNav(TInt aDx, TInt aDy, TBool aZoom, TBool aPan) {
     return LayoutTimelineNavFrame(aDx, aDy, aZoom ? true : false, aPan ? true : false) ? ETrue : EFalse;
 }
 // query: el viewport activo es el Timeline? (con 0,0 no hace nada, solo devuelve si es Timeline)
-TBool W3dLayoutTimelineActivo() { return LayoutTimelineNavFrame(0, 0, false, false) ? ETrue : EFalse; }
+TBool W3dLayoutActiveTimeline() { return LayoutTimelineNavFrame(0, 0, false, false) ? ETrue : EFalse; }
 
 
 
 // keypad SIN mouse: rutea la flecha/OK al viewport ACTIVO (propiedades/outliner)
-// la lista de pasos de una rutina en el panel de propiedades (main/ui/ViewPorts/PropsRutina.cpp): el "1" agarra el
+// la lista de pasos de una rutina en el panel de propiedades (main/ui/ViewPorts/PropsRoutine.cpp): el "1" agarra el
 // paso elegido (la G de PC) y, agarrado, las flechas lo mueven, el centro lo deja y la C lo devuelve
-bool PropsRutinaTecla(int tecla);
-bool PropsRutinaAgarrando();
-static bool PropiedadesActivas() { return viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 3; }
+bool PropsRoutineKey(int key);
+bool PropsRoutineGrabbing();
+static bool ActiveProperties() { return viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 3; }
 
-TBool W3dLayoutTeclaPanel(TInt aScan) {
-    if (PropiedadesActivas() && PropsRutinaAgarrando()) {
+TBool W3dLayoutKeyPanel(TInt aScan) {
+    if (ActiveProperties() && PropsRoutineGrabbing()) {
         const int t = aScan == EStdKeyUpArrow ? W3dK_UP : aScan == EStdKeyDownArrow ? W3dK_DOWN :
                       (aScan == EStdKeyDevice3 || aScan == EStdKeyEnter) ? W3dK_RETURN :
                       (aScan == EStdKeyBackspace || aScan == EStdKeyEscape) ? W3dK_ESCAPE : -1;
-        if (t >= 0 && PropsRutinaTecla(t)) return ETrue;
+        if (t >= 0 && PropsRoutineKey(t)) return ETrue;
     }
     int k = -1;
     switch (aScan) {
@@ -971,57 +971,57 @@ TBool W3dLayoutTeclaPanel(TInt aScan) {
         case EStdKeyEscape:     k = LayoutKey::Cancel; break; // cancela el modo mover del outliner
     }
     if (k < 0) return EFalse;
-    return LayoutTeclaPanelActivo(k) ? ETrue : EFalse;
+    return LayoutKeyPanelActive(k) ? ETrue : EFalse;
 }
 
 // el viewport ACTIVO es el outliner? (para que "1" entre al modo mover ahi, sin mouse)
-TBool W3dOutlinerActivo() {
+TBool W3dActiveOutliner() {
     return (viewPortActive && viewPortActive->isLeaf() &&
-            VpEsOutliner(viewPortActive)) ? ETrue : EFalse;
+            VpIsOutliner(viewPortActive)) ? ETrue : EFalse;
 }
 
 // "1" sobre el outliner: entra al modo MOVER; si ya esta moviendo, confirma (toggle). En las dos vistas: el de
-// la escena (ModoMover) y el de la biblioteca (moviendoRec, lo elegido viaja por las carpetas)
-void W3dOutlinerMoverToggle() {
-    if (!W3dOutlinerActivo()) return;
+// la escena (ModeMove) y el de la biblioteca (movingRec, lo elegido viaja por las carpetas)
+void W3dOutlinerMoveToggle() {
+    if (!W3dActiveOutliner()) return;
     Outliner* out = (Outliner*)viewPortActive;
-    if (out->ModoMover())       out->MoverConfirmar();
-    else if (out->moviendoRec)  out->MoverRecConfirmar();
-    else                        out->MoverIniciar();
+    if (out->ModeMove())       out->MoveConfirm();
+    else if (out->movingRec)  out->MoveRecConfirm();
+    else                        out->MoveStart();
 }
 
 // "2"/"3" sobre el outliner: 2 = ocultar/mostrar (visible), 3 = visibilidad de RENDER (renderizable) del
-// objeto activo. El estado vive en el Core (ObjActivo); el redibujo ya lo puso el container en cualquier tecla.
+// objeto activo. El estado vive en el Core (ActiveObj); el redibujo ya lo puso el container en cualquier tecla.
 void W3dOutlinerToggleVisible() {
-    if (!W3dOutlinerActivo()) return;
+    if (!W3dActiveOutliner()) return;
     // en una vista de RECURSOS (mallas, materiales...) no hay ojo: el 2 no toca la escena
-    if (((Outliner*)viewPortActive)->vista != W3D_VISTA_ESCENA) return;
+    if (((Outliner*)viewPortActive)->view != W3D_VIEW_SCENE) return;
     extern void ChangeVisibilityObj();
     ChangeVisibilityObj();
 }
 // "5" sobre el outliner en una vista de RECURSOS: marca/desmarca la fila del cursor (la SELECCION
 // MULTIPLE sin mouse: se marcan varias y el 1 / Actions las mueve o borra juntas). C NO suelta las
-// marcas: C + flecha es undo/redo y el toque de C BORRA lo elegido (W3dOutlinerRecursosBorrar, con
+// marcas: C + flecha es undo/redo y el toque de C BORRA lo elegido (W3dOutlinerResourcesDelete, con
 // confirmacion); se sueltan con "Deselect All" del menu de acciones. En la vista Escena no hace nada
 // (EFalse: el 5 sigue su camino).
-TBool W3dOutlinerMarcarToggle() {
-    if (!W3dOutlinerActivo()) return EFalse;
+TBool W3dOutlinerMarkToggle() {
+    if (!W3dActiveOutliner()) return EFalse;
     Outliner* out = (Outliner*)viewPortActive;
-    if (out->vista == W3D_VISTA_ESCENA) return EFalse;
-    return out->MarcarCursor() ? ETrue : EFalse;
+    if (out->view == W3D_VIEW_SCENE) return EFalse;
+    return out->MarkCursor() ? ETrue : EFalse;
 }
 // toque de C (soltada sin flecha) sobre el outliner en una vista de RECURSOS: borra los recursos
 // elegidos (huerfanos, con confirmacion), como el Supr de PC. EFalse = vista Escena: el C borra
 // los objetos seleccionados como siempre.
-TBool W3dOutlinerRecursosBorrar() {
-    if (!W3dOutlinerActivo()) return EFalse;
-    return ((Outliner*)viewPortActive)->TeclaBorrarRecursos() ? ETrue : EFalse;
+TBool W3dOutlinerResourcesDelete() {
+    if (!W3dActiveOutliner()) return EFalse;
+    return ((Outliner*)viewPortActive)->KeyDeleteResources() ? ETrue : EFalse;
 }
 void W3dOutlinerToggleRender() {
-    if (!W3dOutlinerActivo()) return;
-    if (((Outliner*)viewPortActive)->vista != W3D_VISTA_ESCENA) return;   // idem: sin camara en los recursos
-    extern void ChangeRenderizableObj();
-    ChangeRenderizableObj();
+    if (!W3dActiveOutliner()) return;
+    if (((Outliner*)viewPortActive)->view != W3D_VIEW_SCENE) return;   // idem: sin camara en los recursos
+    extern void ChangeRenderableObj();
+    ChangeRenderableObj();
 }
 
 // rueda sobre el outliner: scroll REAL de PC
@@ -1070,8 +1070,8 @@ TBool W3dLayoutDragging() {
 void W3dLayoutDragMove(TInt aDx, TInt aDy) {
     if (!gSplitterGrab) return;
     // el tipo del contenedor se conoce por puntero (sin RTTI en RVCT)
-    TBool esRow = (gSplitterGrab == gContRaiz) ? gRaizEsRow : !gRaizEsRow;
-    if (esRow) {
+    TBool isRow = (gSplitterGrab == gContRoot) ? gRootIsRow : !gRootIsRow;
+    if (isRow) {
         ((ViewportRow*)gSplitterGrab)->SetSizeChildrens(aDx);
     } else {
         // (SetSizeChildrens ahora es arriba-izquierda en los 4 OS)
@@ -1092,31 +1092,31 @@ void W3dLayoutGet3DRect(TInt& aX, TInt& aY, TInt& aW, TInt& aH, TInt& aScreenH) 
 
 // libera el arbol de viewports COMPLETO. OJO: los dtors de ViewportRow/Column borran childB pero NO childA
 // (a proposito, para evitar doble-free) -> un `delete gRoot` a secas FUGA toda la cadena de childA (el 3D, etc.).
-// Bajamos a mano y NULL-eamos los hijos antes del delete (mismo patron que LayoutBorrarSubarbol en LayoutInput.cpp).
-static void W3dBorrarArbol(ViewportBase* aNodo) {
-    if (!aNodo) return;
-    if (!aNodo->isLeaf()) {
-        if (aNodo->ContainerKind() == 1) {
-            ViewportRow* r = (ViewportRow*)aNodo;
-            W3dBorrarArbol(r->childA); W3dBorrarArbol(r->childB);
+// Bajamos a mano y NULL-eamos los hijos antes del delete (mismo patron que LayoutDeleteSubtree en LayoutInput.cpp).
+static void W3dDeleteTree(ViewportBase* aNode) {
+    if (!aNode) return;
+    if (!aNode->isLeaf()) {
+        if (aNode->ContainerKind() == 1) {
+            ViewportRow* r = (ViewportRow*)aNode;
+            W3dDeleteTree(r->childA); W3dDeleteTree(r->childB);
             r->childA = NULL; r->childB = NULL;
         } else {
-            ViewportColumn* c = (ViewportColumn*)aNodo;
-            W3dBorrarArbol(c->childA); W3dBorrarArbol(c->childB);
+            ViewportColumn* c = (ViewportColumn*)aNode;
+            W3dDeleteTree(c->childA); W3dDeleteTree(c->childB);
             c->childA = NULL; c->childB = NULL;
         }
     }
-    delete aNodo;
+    delete aNode;
 }
 
 void W3dLayoutDestroy() {
-    W3dBorrarArbol(gRoot); // libera TODO el arbol (sin fugar el childA chain). gOutliner ya esta dentro si se agrego.
+    W3dDeleteTree(gRoot); // libera TODO el arbol (sin fugar el childA chain). gOutliner ya esta dentro si se agrego.
     gRoot = 0;
     gView3D = 0;
     gProps = 0;
-    gOutliner = 0;
-    gContRaiz = 0;
-    gContHijo = 0;
+    gOutliner  = 0;
+    gContRoot  = 0;
+    gContChild = 0;
     viewPortActive = 0;
     gSplitterGrab = 0;
     gWhisk = 0;
@@ -1127,7 +1127,7 @@ void W3dLayoutDestroy() {
 //  con SDL: de aca para adentro las dos plataformas corren EL MISMO codigo y la tecla va al viewport ACTIVO.
 //  El keypad del N95 ES el teclado: sus numeros entran como '0'..'9' y se mandan como teclas normales.
 // ---------------------------------------------------------------------------------------------------------------
-TInt W3dTeclaDesdeSymbian(TInt aScanCode) {
+TInt W3dKeyFromSymbian(TInt aScanCode) {
     switch (aScanCode) {
         case EStdKeyUpArrow:    return W3dK_UP;
         case EStdKeyDownArrow:  return W3dK_DOWN;
@@ -1142,33 +1142,33 @@ TInt W3dTeclaDesdeSymbian(TInt aScanCode) {
     if (aScanCode >= '0' && aScanCode <= '9') return aScanCode;          // el keypad
     if (aScanCode >= 'A' && aScanCode <= 'Z') return aScanCode - 'A' + 'a'; // el scan llega en MAYUSCULA
     if (aScanCode >= 'a' && aScanCode <= 'z') return aScanCode;
-    return W3dK_NADA;
+    return W3dK_NOTHING;
 }
 
-TBool W3dLayoutTeclaViewport(TInt aScanCode) {
-    return LayoutTeclaViewport(W3dTeclaDesdeSymbian(aScanCode), false) ? ETrue : EFalse;
+TBool W3dLayoutKeyViewport(TInt aScanCode) {
+    return LayoutKeyViewport(W3dKeyFromSymbian(aScanCode), false) ? ETrue : EFalse;
 }
 // ...para las teclas que el telefono TIPEA distinto: su keypad no tiene letras, asi que el 1/2/3 se manda como la
 // g/r/s que serian en PC y del viewport para adentro es exactamente el mismo comando.
-TBool W3dLayoutTeclaViewportDirecta(TInt aTecla) {
-    if (aTecla == W3dK_G && PropiedadesActivas() && PropsRutinaTecla(W3dK_G)) return ETrue;
-    return LayoutTeclaViewport(aTecla, false, false) ? ETrue : EFalse;   // ya es la tecla de la funcion: sin traducir
+TBool W3dLayoutKeyDirectViewport(TInt aKey) {
+    if (aKey == W3dK_G && ActiveProperties() && PropsRoutineKey(W3dK_G)) return ETrue;
+    return LayoutKeyViewport(aKey, false, false) ? ETrue : EFalse;   // ya es la tecla de la funcion: sin traducir
 }
-TBool W3dLayoutTeclaViewportUp(TInt aScanCode) {
-    return LayoutTeclaViewportUp(W3dTeclaDesdeSymbian(aScanCode)) ? ETrue : EFalse;
+TBool W3dLayoutKeyViewportUp(TInt aScanCode) {
+    return LayoutKeyViewportUp(W3dKeyFromSymbian(aScanCode)) ? ETrue : EFalse;
 }
 // El "ok" del cursor virtual: un click de VERDAD (down + up), no un caso especial. Mantenerlo apretado = arrastre.
 TBool W3dLayoutClickViewport(TInt aX, TInt aY) { return LayoutClickViewport(aX, aY) ? ETrue : EFalse; }
-TBool W3dLayoutSoltarViewport(TInt aX, TInt aY) { return LayoutSoltarViewport(aX, aY) ? ETrue : EFalse; }
+TBool W3dLayoutReleaseViewport(TInt aX, TInt aY) { return LayoutReleaseViewport(aX, aY) ? ETrue : EFalse; }
 
 // # + flechas: vistas por cuadrante (el 1/3/7 del numpad, que el telefono no tiene). # solo: orto/perspectiva.
 // La logica vive en el Viewport3D (es matematica de camara, no del telefono); aca solo se elige a QUIEN.
-TBool W3dVistaCuadranteNav(TInt aDx, TInt aDy) {
+TBool W3dQuadrantViewNav(TInt aDx, TInt aDy) {
     if (!Viewport3DActive) return EFalse;
-    ((Viewport3D*)Viewport3DActive)->VistaCuadranteNav(aDx, aDy);
+    ((Viewport3D*)Viewport3DActive)->QuadrantViewNav(aDx, aDy);
     return ETrue;
 }
-TBool W3dVistaPerspectivaToggle() {
+TBool W3dPerspectiveViewToggle() {
     if (!Viewport3DActive) return EFalse;
     ((Viewport3D*)Viewport3DActive)->ChangePerspective();
     return ETrue;

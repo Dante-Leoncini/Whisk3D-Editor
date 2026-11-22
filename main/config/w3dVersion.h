@@ -7,6 +7,6 @@
 const char* W3dVersion();
 // la version + la HORA de compilacion ("26.11.14 21:58"): dos builds del mismo dia se distinguen (Ajustes la muestra;
 // en la web, para saber si el navegador ya tiene la nueva)
-const char* W3dVersionCompilacion();
+const char* W3dVersionBuild();
 
 #endif // W3D_VERSION_H

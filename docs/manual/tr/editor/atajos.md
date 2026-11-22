@@ -22,9 +22,9 @@ Değiştirilmiş kombinasyonlar yeşil görünür. Varsayılan bir kısayol işl
 
 Her bağlamın kısayolları, işaretçi o panelin üzerindeyken geçerlidir; **Genel** kısayolları her yerde geçerlidir. **Dönüşüm sırasında** kısayolları bir şey taşınırken, döndürülürken ya da ölçeklenirken geçerlidir ve önceliklidir. Betik Düzenleyici'de harfler her zaman yazı yazar: orada yalnızca <kbd>Ctrl</kbd>, <kbd>Alt</kbd> ya da F tuşlarıyla yapılan kombinasyonlar yeniden atanabilir.
 
-## atajos.ini dosyası
+## shortcuts.ini dosyası
 
-Değişiklikler kendiliğinden `config.ini`'nin yanındaki `res/atajos.ini` dosyasına kaydedilir. Yalnızca değiştirilmiş işlevler yer alır ve dosya elle düzenlenebilir:
+Değişiklikler kendiliğinden `config.ini`'nin yanındaki `res/shortcuts.ini` dosyasına kaydedilir. Yalnızca değiştirilmiş işlevler yer alır ve dosya elle düzenlenebilir:
 
 ```ini
 # işlev = kombinasyon, başka kombinasyon   (boş = kısayol yok)
@@ -44,7 +44,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### Genel (herhangi bir panel)
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Projeyi kaydet | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Geri Al | <kbd>Ctrl+Z</kbd> | <kbd>C+Sol</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### 3D Görünüm
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Tümünü Seç | <kbd>A</kbd> | <kbd>Kalem+Yukarı</kbd> | `3d.seleccionarTodo` |
 | Tüm seçimi kaldır | <kbd>Alt+A</kbd> | <kbd>Kalem+Yukarı</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### Dönüşüm sırasında (taşıma / döndürme / ölçekleme)
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Onayla | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>Tamam</kbd> | `xf.confirmar` |
 | İptal | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### UV Düzenleyici
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Tümünü Seç | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### Zaman Çizelgesi
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Tümünü Seç | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### Outliner
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Tümünü Seç | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### 2D Düzenleyici
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Tümünü Seç | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### Özellikler (rutin adımları)
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Adımı tut | <kbd>G</kbd> | — | `props.agarrar` |
 | Adımı sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 ### Betik Düzenleyici
 
-| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | atajos.ini içindeki adı |
+| İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
 | Betiği kaydet | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Geri Al | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

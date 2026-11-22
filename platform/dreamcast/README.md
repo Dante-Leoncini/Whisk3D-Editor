@@ -4,7 +4,7 @@ Es el mismo editor de la PC, compilado para el SH-4 de la Dreamcast:
 
 - **KallistiOS** es el sistema.
 - **GLdc** hace de OpenGL 1.x sobre la PVR. Usa el backend fijo `w3dGraphics.cpp`, el mismo de la PC y del N95.
-- **SDL2 de Dreamcast** maneja la ventana GL, el mouse, el teclado y el control. Entra por `main.cpp` y `controles.cpp`, igual que en la PC.
+- **SDL2 de Dreamcast** maneja la ventana GL, el mouse, el teclado y el control. Entra por `main.cpp` y `controls.cpp`, igual que en la PC.
 
 Lo propio de la consola va con `#ifdef W3D_DREAMCAST`.
 

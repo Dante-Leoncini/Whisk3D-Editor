@@ -14,12 +14,12 @@ Koordinatlar ekran pikselleridir; Y aşağı doğrudur ve başlangıç noktası 
 |---|---|
 | `W3dDrawStrip4(verts, uvs)` | Bir kare: bir şeridin sırasıyla 4 `GLshort` köşe ve bunların 8 UV'si. Onu iki üçgene çevirir |
 | `W3dDrawElemsB(verts, uvs, idx, n)` | `GLubyte` indeksli küçük bir mesh, en fazla 64 |
-| `W3dDrawLinesS(ancho, n, verts, idx)` | 3 bileşenli `GLshort` köşelerle en fazla 21 çizgi |
+| `W3dDrawLinesS(width, n, verts, idx)` | 3 bileşenli `GLshort` köşelerle en fazla 21 çizgi |
 | `W3dDrawLinesF(verts, idx, n)` | 3 bileşenli `float` köşelerle çizgiler, çizim başına 40'ar köşe |
 
 `float`'a çevrilen köşeler hiçbir zaman yığına (stack) değil, döngüsel olarak kullanılan 256 yerlik sabit bir depoya gider: N95'in sürücüsü işaretçileri geç okur.
 
-`W3dPantallaAlto` ekranın yüksekliğidir. Onu, boyut değiştiğinde UI'ı kullanan taraf ayarlar; arayüzün Y'sini, aşağıdan sayan `Scissor` ve `Viewport`'un Y'sine çevirmeye yarar.
+`W3dScreenHeight` ekranın yüksekliğidir. Onu, boyut değiştiğinde UI'ı kullanan taraf ayarlar; arayüzün Y'sini, aşağıdan sayan `Scissor` ve `Viewport`'un Y'sine çevirmeye yarar.
 
 ## Düğümler ve dikdörtgenler
 
@@ -28,40 +28,40 @@ Koordinatlar ekran pikselleridir; Y aşağı doğrudur ve başlangıç noktası 
 `Rec2D` (`draw/rectangle.h`) tek renkli bir dikdörtgendir. `SetSize(x, y, w, h)` onu yerleştirir ve `SetColor(r, g, b)` rengini verir. Dokuyu okumaz: `Texture2D` kapalıyken çizilir.
 
 ```cpp
-Rec2D velo;
-velo.SetSize(0, 0, ancho, alto);
+Rec2D veil;
+veil.SetSize(0, 0, width, height);
 gfx::Disable(gfx::Texture2D);
 gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
-velo.RenderObject(false);          // false: kendi rengiyle değil, o anki renkle
+veil.RenderObject(false);          // false: kendi rengiyle değil, o anki renkle
 gfx::Enable(gfx::Texture2D);
 ```
 
 ## Kartlar
 
-`Card` (`widgets/card.h`), düğmelerin, menülerin ve özellik kartlarının yuvarlak köşeli dikdörtgenidir. Bir **9-patch**'tir: ortayı esneten ve köşeleri `2 * GlobalScale` boyutunda bırakan 16 köşe noktası. Köşeler ve orta, `font.png`'nin bir köşesinden gelir. `CalcCardUV(anchoAtlas, altoAtlas)` bu koordinatları hesaplar: dokunun boyutuyla bir kez çağrılır.
+`Card` (`widgets/card.h`), düğmelerin, menülerin ve özellik kartlarının yuvarlak köşeli dikdörtgenidir. Bir **9-patch**'tir: ortayı esneten ve köşeleri `2 * GlobalScale` boyutunda bırakan 16 köşe noktası. Köşeler ve orta, `font.png`'nin bir köşesinden gelir. `CalcCardUV(widthAtlas, heightAtlas)` bu koordinatları hesaplar: dokunun boyutuyla bir kez çağrılır.
 
 | Fonksiyon | Ne yapar |
 |---|---|
 | `Resize(w, h)` | Boyutu değiştirir |
-| `RenderObject(propio)` | Dolguyu çizer |
-| `RenderBorder(propio)` | Yalnızca kenarlığı çizer |
+| `RenderObject(own)` | Dolguyu çizer |
+| `RenderBorder(own)` | Yalnızca kenarlığı çizer |
 | `RenderObjectTab()`, `RenderBorderTab()` | Aynısı, alt kenarı düz: sekmeler için |
 
-`propio` `true` olduğunda kendi rengini (`color` ve `opacity`) kullanır; `false` olduğunda o anki rengi.
+`own` `true` olduğunda kendi rengini (`color` ve `opacity`) kullanır; `false` olduğunda o anki rengi.
 
 ```cpp
-Card fondo(NULL, 120, 40);
-SetColorID(ColorID::gris);
-fondo.RenderObject(false);
+Card background(NULL, 120, 40);
+SetColorID(ColorID::gray);
+background.RenderObject(false);
 SetColorID(ColorID::accent);
-fondo.RenderBorder(false);
+background.RenderBorder(false);
 ```
 
 ## Skin atlası
 
-Tüm arayüz için tek bir doku. 128x128 boyutundaki `font.png`, harfleri, kartların kenarlarını ve eski simgeleri içerir. Yalnızca bununla UI çalışır: `CrearIconos`, simgeleri `font.png`'nin içinden alır.
+Tüm arayüz için tek bir doku. 128x128 boyutundaki `font.png`, harfleri, kartların kenarlarını ve eski simgeleri içerir. Yalnızca bununla UI çalışır: `CreateIcons`, simgeleri `font.png`'nin içinden alır.
 
-Yeni simgeler `atlas/iconos/` içinde ayrı dosyalardır. Editör açılışta daha büyük bir doku kurar (`main/io/SkinAtlas.cpp`): `font.png`'nin tamamını (0,0) noktasına koyar, böylece koordinatları değişmez, ve her simgeyi artan boş yere paketler. Ardından her birinin nereye yerleştiğini UI'a `CrearIconosDesde` ile bildirir. Bu atlası kurmak editöre aittir; paketleyici ve simge tablosu UI'a aittir. Bkz. [Simgeler](iconos.md).
+Yeni simgeler `atlas/icons/` içinde ayrı dosyalardır. Editör açılışta daha büyük bir doku kurar (`main/io/SkinAtlas.cpp`): `font.png`'nin tamamını (0,0) noktasına koyar, böylece koordinatları değişmez, ve her simgeyi artan boş yere paketler. Ardından her birinin nereye yerleştiğini UI'a `CreateIconsFrom` ile bildirir. Bu atlası kurmak editöre aittir; paketleyici ve simge tablosu UI'a aittir. Bkz. [Simgeler](iconos.md).
 
 ## Paketleyici
 
@@ -69,12 +69,12 @@ Yeni simgeler `atlas/iconos/` içinde ayrı dosyalardır. Editör açılışta d
 
 ```cpp
 std::vector<W3dAtlasItem> items(n);       // her görüntüden: rgba, w, h
-items[0].fijo = true;                     // bu, ne olursa olsun istenen yere gider
+items[0].fixed = true;                     // bu, ne olursa olsun istenen yere gider
 items[0].x = 0; items[0].y = 0;
 
-std::vector<unsigned char> lienzo; int W = 0, H = 0;
-if (W3dAtlasPack(&items[0], n, 2, lienzo, &W, &H)) {    // görüntüler arasında 2 piksel boşluk
-    unsigned int tex = w3dEngine::UploadRGBA(&lienzo[0], W, H, true);
+std::vector<unsigned char> canvas; int W = 0, H = 0;
+if (W3dAtlasPack(&items[0], n, 2, canvas, &W, &H)) {    // görüntüler arasında 2 piksel boşluk
+    unsigned int tex = w3dEngine::UploadRGBA(&canvas[0], W, H, true);
     // items[i].x, items[i].y: her birinin nereye yerleştiği
 }
 ```

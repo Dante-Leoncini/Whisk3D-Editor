@@ -16,7 +16,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Curve { name: "RielVis" filePath: visriel.cap }
@@ -33,22 +33,22 @@ Whisk3D {
             name: "Camara"
             fov: 45.0
             target: "Jugador"
-            riel: "RielVis"
-            offsetRiel: 0
+            rail: "RielVis"
+            railOffset: 0
         }
 
-        VisZona {
+        VisZone {
             name: "Zona"
-            modo: "curva"
-            objetivo: "MallaVis"
-            riel: "RielVis"
+            mode: "curve"
+            target: "MallaVis"
+            rail: "RielVis"
             fallback: "completa"
         }
-        VisZona {
+        VisZone {
             name: "ZonaSec"
-            modo: "curva"
-            objetivo: "MallaSec"
-            riel: "RielVis"
+            mode: "curve"
+            target: "MallaSec"
+            rail: "RielVis"
             fallback: 1
         }
 
@@ -60,8 +60,8 @@ Whisk3D {
             ref_zona: "Zona"
             ref_zonaSec: "ZonaSec"
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
             }
         }
         Wavefront {
@@ -69,8 +69,8 @@ Whisk3D {
             filePath: vis-tris.obj
             y: 4.0
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
                 vis: "vis-tris.w3dvis"
             }
         }

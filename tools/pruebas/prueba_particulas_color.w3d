@@ -10,7 +10,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -27,36 +27,36 @@ Whisk3D {
             z: -6.0
         }
 
-        Particulas {
+        Particles {
             name: "EmisorAlpha"
             x: -2.5
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 3.0
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 3.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
         }
 
-        Particulas {
+        Particles {
             name: "EmisorAditivo"
             x: 2.5
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 3.0
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 3.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: true
+            gravity: 0.0
+            additive: true
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
         }
 
         // --- el par para el ORDEN GLOBAL por profundidad (lejos de los otros dos):
@@ -66,38 +66,38 @@ Whisk3D {
         //     rojo opaco de Atras pisa todo (255, 0, 0). Son EMISORES DISTINTOS y
         //     Adelante esta ANTES en el arbol A PROPOSITO: dibujando por lista (sin
         //     el orden global) el rojo pisaria al azul y la prueba fallaria. ---
-        Particulas {
+        Particles {
             name: "EmisorAdelante"
             x: 30.0
             y: 1.5
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 3.0
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 3.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 0.5"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
         }
 
-        Particulas {
+        Particles {
             name: "EmisorAtras"
             x: 30.0
             y: -1.5
-            textura: "texturas/rojo.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 8.0
+            texture: "textures/rojo.png"
+            count: 30.0
+            life: 600.0
+            size: 8.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
         }
     }
 }

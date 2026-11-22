@@ -6,8 +6,8 @@ add cube
 selobj Cubo.001
 uvexportdef 512 512
 # cubo por defecto: las 6 caras ocupan el cuadrado UV entero -> 1-(0.75^6) = 210; el borde del cuadrado es opaco
-uvexportalfa 256 256 128 128 210
-uvexportalfa 256 256 0 0 255
+uvexportalpha 256 256 128 128 210
+uvexportalpha 256 256 0 0 255
 uvexport 256 256 /tmp/w3d_prueba_uv_cubo.png
 # islas separadas: cada cara sola al 25% (64) y el fondo transparente
 mode edit
@@ -15,12 +15,12 @@ selmode face
 select all
 smartuv
 mode object
-uvexportalfa 256 256 40 128 64
-uvexportalfa 256 256 128 20 0 0
+uvexportalpha 256 256 40 128 64
+uvexportalpha 256 256 128 20 0 0
 uvexport 1024 1024 /tmp/w3d_prueba_uv_smart.png
 # con una textura mostrada el popup propone SU tamano (y su nombre)
 newtex grilla 1024 512 uvgrid
 uvexportdef 1024 512
 # el boton de guardar del editor UV abre el menu (con "Export UV Layout...")
 vpkind 5 3
-uvguardarclick
+uvsaveclick

@@ -40,4 +40,4 @@ Ce que **Whisk3D Editor** sait faire, classé par panneau et par mode. Brouillon
 
 Pour programmer des jeux, voir [Lua dans Whisk3D](../lua/README.md). Ce qui se passe en dessous, pour ceux qui programment en C ou en C++ : [Manuel de Whisk3D Core](../core/README.md).
 
-Whisk3D · Manuel de l'éditeur (octobre 2026). Les tableaux de raccourcis sont générés depuis `main/app/W3dAtajos.cpp` avec `tools/genmanual_atajos.py`.
+Whisk3D · Manuel de l'éditeur (octobre 2026). Les tableaux de raccourcis sont générés depuis `main/app/W3dShortcuts.cpp` avec `tools/genmanual_atajos.py`.

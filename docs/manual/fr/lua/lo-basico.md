@@ -13,11 +13,11 @@
 Une variable est créée quand on lui affecte une valeur. Utilisez toujours `local` : la variable n'existe que dans le bloc où elle a été déclarée et n'entre pas en conflit avec les autres.
 
 ```lua
-local vidas = 3           -- nombre (entier)
-local velocidad = 2.5     -- nombre (à virgule)
-local nombre = "Whisky"   -- texte (string)
-local vivo = true         -- booléen : true ou false
-local nada = nil          -- nil = "pas de valeur"
+local lives = 3         -- nombre (entier)
+local speed = 2.5       -- nombre (à virgule)
+local name = "Whisky"   -- texte (string)
+local live = true       -- booléen : true ou false
+local none = nil        -- nil = "pas de valeur"
 ```
 
 Les types de Lua sont : `nil`, `boolean`, `number`, `string`, `table` et `function`. Les objets de la scène que vous fournit Whisk3D sont d'un type spécial qui ne s'utilise qu'en le passant aux fonctions du moteur.
@@ -30,9 +30,9 @@ Les types de Lua sont : `nil`, `boolean`, `number`, `string`, `table` et `funct
 | `//` | Division entière | `7 // 2` → 3 |
 | `%` | Reste | `7 % 2` → 1 |
 | `^` | Puissance | `2 ^ 3` → 8.0 |
-| `== ~= < > <= >=` | Comparaisons (`~=` signifie « différent ») | `vidas ~= 0` |
-| `and or not` | Logiques | `vivo and vidas > 0` |
-| `..` | Concaténer des textes | `"Vidas: " .. vidas` |
+| `== ~= < > <= >=` | Comparaisons (`~=` signifie « différent ») | `lives ~= 0` |
+| `and or not` | Logiques | `live and lives > 0` |
+| `..` | Concaténer des textes | `"Vidas: " .. lives` |
 | `#` | Longueur d'un texte ou d'une liste | `#"hola"` → 4 |
 
 > [!NOTE]
@@ -70,19 +70,19 @@ Lua n'a ni `n++` ni `n += 1` : on écrit `n = n + 1`. Pour interrompre une bouc
 ## Fonctions
 
 ```lua
-local function sumar(a, b)
+local function add(a, b)
   return a + b
 end
-print(sumar(2, 3))        -- 5
+print(add(2, 3))        -- 5
 
 -- une fonction peut renvoyer plusieurs valeurs
 local function minMax(a, b)
   if a < b then return a, b else return b, a end
 end
-local menor, mayor = minMax(8, 3)
+local less, greater = minMax(8, 3)
 ```
 
-Beaucoup de fonctions de Whisk3D renvoient plusieurs valeurs à la fois, par exemple `local x, y, z = posicion(yo())`.
+Beaucoup de fonctions de Whisk3D renvoient plusieurs valeurs à la fois, par exemple `local x, y, z = getPosition(self())`.
 
 ## Tables : listes et dictionnaires
 
@@ -90,23 +90,23 @@ La table est la seule structure de données de Lua, et elle sert à tout.
 
 ```lua
 -- comme liste (les indices commencent à 1, pas à 0)
-local frutas = { "manzana", "pera", "uva" }
-print(frutas[1])          -- manzana
-print(#frutas)            -- 3
-frutas[#frutas + 1] = "kiwi"   -- ajouter à la fin
-table.insert(frutas, "melón")  -- autre façon
+local fruits = { "manzana", "pera", "uva" }
+print(fruits[1])          -- manzana
+print(#fruits)            -- 3
+fruits[#fruits + 1] = "kiwi"   -- ajouter à la fin
+table.insert(fruits, "melón")  -- autre façon
 
-for i, f in ipairs(frutas) do  -- parcourir une liste dans l'ordre
+for i, f in ipairs(fruits) do  -- parcourir une liste dans l'ordre
   print(i, f)
 end
 
 -- comme dictionnaire (clé = valeur)
-local jugador = { nombre = "Ana", puntos = 0 }
-jugador.puntos = jugador.puntos + 10
-print(jugador["nombre"])  -- Ana
+local player = { name = "Ana", puntos = 0 }
+player.puntos = player.puntos + 10
+print(player["nombre"])  -- Ana
 
-for clave, valor in pairs(jugador) do  -- parcourir toutes les clés (sans ordre fixe)
-  print(clave, valor)
+for clave, value in pairs(player) do  -- parcourir toutes les clés (sans ordre fixe)
+  print(clave, value)
 end
 ```
 
@@ -115,7 +115,7 @@ end
 ```lua
 local t = string.format("Puntos: %d  Tiempo: %.1f", 120, 3.456)  -- "Puntos: 120  Tiempo: 3.5"
 local may = string.upper("hola")        -- "HOLA"
-local parte = string.sub("Whisk3D", 1, 5)   -- "Whisk"
+local part = string.sub("Whisk3D", 1, 5)   -- "Whisk"
 local n = tonumber("42")                -- texte vers nombre
 local s = tostring(3.5)                 -- nombre vers texte
 local r = math.floor(2.7)               -- 2
@@ -125,4 +125,4 @@ local m = math.max(4, 9, 2)             -- 9
 local pi = math.pi
 ```
 
-Pour les nombres aléatoires, Whisk3D propose `azar()` (voir la référence). `math.random` fonctionne aussi, et il est déjà initialisé différemment à chaque partie.
+Pour les nombres aléatoires, Whisk3D propose `random()` (voir la référence). `math.random` fonctionne aussi, et il est déjà initialisé différemment à chaque partie.

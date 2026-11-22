@@ -5,7 +5,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         Mesh {
             name: "Caja"
             script: "ojo_a.lua"

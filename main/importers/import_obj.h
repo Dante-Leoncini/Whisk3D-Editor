@@ -58,7 +58,7 @@ public:
     // vertToCP (opcional): por cada vertice de render que se crea, empuja el indice de CONTROL-POINT (fc.vertex) del
     // que salio. Lo usa el importador FBX para mapear los pesos del skin (indexados por control-point) a los vertices
     // de render (weight paint). NULL = no se arma (OBJ normal no lo necesita).
-    void ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs,
+    void ConvertToES1(Mesh* TempMesh, int* accumulatedVertices, int* accumulatedNormals, int* accumulatedUVs,
                       std::vector<int>* vertToCP = NULL);
     void ConvertToES1_NoMerge(Mesh* TempMesh);
 };
@@ -68,36 +68,36 @@ std::string ExtractBaseName(const std::string& filepath);
 
 // Lee UN objeto desde las lineas ya cargadas (idx avanza). Robusto: sin
 // tellg/seekg (que en modo texto fallaba el split multi-objeto).
-bool LeerOBJ(const std::vector<const char*>& lines, // punteros a un buffer del archivo (sin std::string por linea)
+bool ReadOBJ(const std::vector<const char*>& lines, // punteros a un buffer del archivo (sin std::string por linea)
              size_t& idx,
              const std::string& filename,
-             int* acumuladoVertices,
-             int* acumuladoNormales,
-             int* acumuladoUVs,
-             int* acumuladoColores,
+             int* accumulatedVertices,
+             int* accumulatedNormals,
+             int* accumulatedUVs,
+             int* accumulatedColors,
              bool NoMerge);
 
 // Función para leer archivos MTL y cargar materiales
-bool LeerMTL(const std::string& filepath, int objetosCargados);
-void W3dTrimNombre(std::string& s);   // saca \r/\n/espacios del final de un nombre (CRLF de Windows en usemtl/newmtl)
+bool ReadMTL(const std::string& filepath, int loadedObjects);
+void W3dTrimName(std::string& s);   // saca \r/\n/espacios del final de un nombre (CRLF de Windows en usemtl/newmtl)
 
 // Función principal para importar un OBJ
 bool ImportOBJ(const std::string& filepath, bool NoMerge);
 
 // encola una textura (material, ruta) para la carga diferida (1 por frame). Compartida con el importador FBX.
-void EncolarTextura(Material* mat, const std::string& path);
+void EnqueueTexture(Material* mat, const std::string& path);
 // la ruta encolada de 'mat' que todavia no se decodifico ("" si no hay). La usa el importador glTF
 // para saber que textura va a tener un material recien importado (mat->texture todavia es NULL).
-std::string TexturaPendienteDe(const Material* mat);
+std::string PendingTextureOf(const Material* mat);
 // idem pero DEVUELVE LA ENTRADA (NULL si no hay), para el que necesita REESCRIBIRLA.
 // El guardado ingiere la textura al .w3d y deja en la ruta el nombre de entrada; si
 // escribe sobre una copia, la cola se queda con la ruta vieja y al reabrir el material
 // se duplica en ".001". Ver el comentario en import_obj.cpp.
-std::string* TexturaPendienteRefDe(const Material* mat);
+std::string* PendingTextureRefOf(const Material* mat);
 
 // detecta si un mesh IMPORTADO (con normales) es smooth o flat, para setear meshSmooth (sino al editar un vertice
-// se recalcula todo flat). Se llama DESPUES de CalcularBordes (usa posRep). Compartida OBJ + FBX.
-bool MeshShadingImportadoEsSmooth(Mesh* m);
+// se recalcula todo flat). Se llama DESPUES de ComputeBorders (usa posRep). Compartida OBJ + FBX.
+bool MeshShadingImportedIsSmooth(Mesh* m);
 
 // EXPORTAR a OBJ + MTL (geometria, normales, vertex color, UV, texturas y los
 // extras de material de Whisk3D). selectedOnly = solo los objetos seleccionados.
@@ -109,49 +109,49 @@ bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifie
 // CARGA DIFERIDA DE TEXTURAS: el import encola las texturas del MTL (no las decodifica) -> el modelo aparece
 // enseguida. El loop principal (PC main.cpp + Symbian DrawCallBack) llama esto 1 vez por frame: decodifica+sube
 // UNA textura por frame (hilo principal) y la asigna a su material. No-op si la cola esta vacia.
-void CargarTexturasPendientes();
+void LoadPendingTextures();
 // vacia la cola entera de una (para el export: la textura tiene que estar cargada YA)
-void CargarTodasTexturasPendientes();
+void LoadAllPendingTextures();
 // cuantas quedan sin decodificar. El PLAY del juego no arranca con esto > 0
 // (reporte del dueno: "no se puede dar play hasta que carguen todas las texturas").
-int  TexturasPendientes();
+int  PendingTextures();
 // tira la cola SIN cargar (cierre de proyecto: apunta a materiales que se van). Tambien las DORMIDAS.
-void OlvidarTexturasPendientes();
+void ForgetPendingTextures();
 
 // TEXTURAS DORMIDAS: las de un material del proyecto que al abrir NO usa ninguna malla de la escena
 // (un material HUERFANO: el proyecto lo conserva, pero nadie lo dibuja). No se cargan -ni la base,
 // ni el normal map, ni las capas- hasta que una malla lo use: no ocupan GPU ni RAM, el Play del editor
 // no las espera y el juego compilado no las carga nunca. Sus RUTAS siguen siendo del material: el
-// guardado las escribe (TexturaPendienteRefDe + TexturasDormidasDe), el outliner por recursos las
+// guardado las escribe (PendingTextureRefOf + AsleepTexturesOf), el outliner por recursos las
 // cuenta como usuarios y el rename de una textura las sigue.
-struct TexCapaDormida { std::string textura; int mezcla; int uv; bool on; float fuerza; bool horneada; bool mascaraSol;
-                        TexCapaDormida() : mezcla(0), uv(0), on(true), fuerza(1.0f), horneada(false), mascaraSol(false) {} };
-struct TexDormida {
+struct TexAsleepLayer { std::string texture; int mix; int uv; bool on; float force; bool baked; bool maskSun;
+                        TexAsleepLayer() : mix(0), uv(0), on(true), force(1.0f), baked(false), maskSun(false) {} };
+struct AsleepTex {
     Material* mat;
-    std::string base;                    // "" = sin textura base
-    std::string normal;                  // "" = sin normal map
-    std::string texB;                    // "" = sin textura B (la mezcla de texturas, Material::texturaB)
-    std::string mapas[8];                // los MAPAS EMISION..ALFA (W3dMatMapa; "" = sin textura)
-    std::vector<TexCapaDormida> capas;   // las capas extra, en su orden
-    TexDormida() : mat(0) {}
+    std::string base;                     // "" = sin textura base
+    std::string normal;                   // "" = sin normal map
+    std::string texB;                     // "" = sin textura B (la mezcla de texturas, Material::textureB)
+    std::string maps[8];                  // los MAPAS EMISION..ALFA (W3dMatMap; "" = sin textura)
+    std::vector<TexAsleepLayer> layers;   // las capas extra, en su orden
+    AsleepTex() : mat(0) {}
 };
 // deja dormidas las texturas de un material (el lector del proyecto, en vez de cargarlas)
-void TexturasDormir(const TexDormida& d);
+void TexturesSleep(const AsleepTex& d);
 // las dormidas de 'mat' (NULL = no tiene). ESCRIBIBLES: el guardado y el rename reescriben sus rutas.
-TexDormida* TexturasDormidasDe(const Material* mat);
+AsleepTex* AsleepTexturesOf(const Material* mat);
 // despierta las de los materiales que usa alguna malla de la escena: la base va a la cola diferida
 // y el normal map y las capas se cargan ya (como al abrir). Devuelve cuantos materiales desperto.
 // La llaman el lector (al terminar de armar la escena), la cola diferida cada tanto (una malla que
 // pasa a usar un material dormido) y el Play antes de esperar las texturas.
-int  TexturasDespertarUsadas();
+int  TexturesWakeUsed();
 // despierta las de UN material (Properties lo va a mostrar o editar). true = tenia dormidas.
-bool TexturasDespertar(Material* mat);
+bool TexturesWake(Material* mat);
 // DUERME OTRA VEZ las de un material que ya ninguna malla dibuja (el STREAMING, io/Streaming.h, descargo lo ultimo que
 // lo usaba): sus rutas vuelven a quedar dormidas (las guarda el guardado y despiertan como al abrir, cuando una malla
 // lo vuelva a usar) y sus texturas se SUELTAN: la que ningun otro material retiene sale de la GPU en el acto (el
-// refcount de las ranuras, Textures.h: TexturaPonerEn). Una base que esperaba en la cola diferida tambien duerme. Un
+// refcount de las ranuras, Textures.h: TextureSetIn). Una base que esperaba en la cola diferida tambien duerme. Un
 // material ANIMADO no se duerme (sus cuadros pasan por su ranura). false = no tenia nada que dormir.
-bool TexturasAdormecer(Material* mat);
-int  TexturasDormidasCantidad();   // cuantos materiales tienen texturas dormidas (el harness)
+bool TexturesSleepMaterial(Material* mat);
+int  AsleepTexturesCount();   // cuantos materiales tienen texturas dormidas (el harness)
 
 #endif

@@ -10,7 +10,7 @@
 //  Salida:  factor 0..1 (1 = intensidad completa).
 //
 //  Nace para el pincel de pesos (reemplaza el smoothstep que estaba clavado en
-//  PincelAplicar), pero NO sabe nada del pincel a proposito: es una curva y su
+//  BrushApply), pero NO sabe nada del pincel a proposito: es una curva y su
 //  evaluacion. Lo mismo lo va a usar el vertex color, la escultura, el degrade
 //  de una particula o cualquier herramienta con radio -- y el POPUP que lo edita
 //  (FalloffEditor) recibe un W3dFalloff* de quien sea, como el ColorPicker recibe
@@ -22,7 +22,7 @@
 // Los 9 presets analiticos + la curva a mano. El ORDEN es el de la lista del
 // popup (y el de los iconos falloff_*), asi que agregar uno nuevo es agregarlo
 // al final -- no en el medio -- para no correr los valores ya guardados.
-enum W3dFalloffTipo {
+enum W3dFalloffType {
     FoCustom = 0,   // la curva de 'puntos' (editable a mano)
     FoSmooth,       // smoothstep: el clasico, sin escalones
     FoSmoother,     // smootherstep (derivada segunda continua)
@@ -37,21 +37,21 @@ enum W3dFalloffTipo {
 };
 
 // nombre estable del tipo (clave de traduccion: "Smooth", "Sharper", ...)
-const char* W3dFalloffNombre(int tipo);
+const char* W3dFalloffName(int type);
 // nombre del icono del skin para ese tipo ("falloff_smooth"...); "" = todavia no
 // hay arte y el item se dibuja con texto (los iconos van llegando de a uno).
-const char* W3dFalloffIcono(int tipo);
+const char* W3dFalloffIcon(int type);
 
 // un punto de la curva custom, en el cuadrado 0..1 (x = distancia, y = factor)
-struct W3dFalloffPunto {
+struct W3dFalloffPoint {
     float x, y;
-    W3dFalloffPunto() : x(0.0f), y(0.0f) {}
-    W3dFalloffPunto(float X, float Y) : x(X), y(Y) {}
+    W3dFalloffPoint() : x(0.0f), y(0.0f) {}
+    W3dFalloffPoint(float X, float Y) : x(X), y(Y) {}
 };
 
 struct W3dFalloff {
-    int tipo;                              // un W3dFalloffTipo
-    std::vector<W3dFalloffPunto> puntos;   // curva custom, SIEMPRE ordenada por x
+    int type;                              // un W3dFalloffType
+    std::vector<W3dFalloffPoint> points;   // curva custom, SIEMPRE ordenada por x
 
     W3dFalloff();                          // Smooth + la curva custom por defecto
 
@@ -60,11 +60,11 @@ struct W3dFalloff {
     float Eval(float t) const;
 
     // ---- curva custom ----
-    void CurvaDefault();                   // (0,1) -> (1,0): lleno en el centro, cero en el borde
-    int  CurvaAgregar(float x, float y);   // inserta ordenado; devuelve su indice
-    void CurvaBorrar(int i);               // los EXTREMOS no se borran (siempre quedan >= 2 puntos)
-    void CurvaMover(int i, float x, float y); // mueve el punto i (clampea al cuadrado y entre vecinos)
-    int  CurvaCercano(float x, float y, float radio) const; // punto mas cercano (-1 si ninguno cerca)
+    void CurveDefault();               // (0,1) -> (1,0): lleno en el centro, cero en el borde
+    int  CurveAdd(float x, float y);   // inserta ordenado; devuelve su indice
+    void CurveDelete(int i);           // los EXTREMOS no se borran (siempre quedan >= 2 puntos)
+    void CurveMove(int i, float x, float y); // mueve el punto i (clampea al cuadrado y entre vecinos)
+    int  NearCurve(float x, float y, float radius) const; // punto mas cercano (-1 si ninguno cerca)
 };
 
 #endif // W3DFALLOFF_H

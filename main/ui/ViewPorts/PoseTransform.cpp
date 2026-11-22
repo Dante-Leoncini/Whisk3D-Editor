@@ -5,7 +5,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
-#include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
+#include "ViewPorts/PopUp/ConfirmPopup.h" // OpenConfirmDelete (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
@@ -23,49 +23,49 @@
 #include "objects/Camera.h"
 #include "objects/Empty.h"
 #include "objects/Armature.h"
-#include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
-#include "animation/W3dAnimSet.h"         // W3dArmatureAnimsPropias (borrar keyframes de la pose: clip propio)
+#include "animation/SkeletalAnimation.h" // InsertKeyframeSkeleton (Pose Mode: Insert Keyframe)
+#include "animation/W3dAnimSet.h"         // W3dOwnArmatureAnims (borrar keyframes de la pose: clip propio)
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
-#include "objects/Primitivas.h"
+#include "objects/Primitives.h"
 #include "variables.h"
-#include "render/OpcionesRender.h" // g_fpsActual
+#include "render/RenderOptions.h" // g_currentFps
 #include "ViewPorts/PopUp/PopUpBase.h"
 #include "ViewPorts/PopUp/RedoMeshPanel.h"
 #include "WhiskUI/widgets/card.h"        // tarjeta de las notificaciones
 #include "WhiskUI/text/bitmapText.h"  // texto de las notificaciones
 #include "WhiskUI/draw/icons.h"       // iconos notifOk / notifError
-#include "WhiskUI/theme/colores.h"     // ColorID
+#include "WhiskUI/theme/colors.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
 #include "ViewPorts/PoseTransform.h"
 
 // ===== POSE MODE: transform interactivo de huesos (G/R/S) UNIFICADO con el estado de Object Mode =====
 // Los huesos se transforman 1:1 con los objetos: usa el MISMO `estado` (translacion/rotacion/EditScale) +
-// axisSelect/transformOrientation (ejes X/Y/Z global/local/view) + gAnguloTransform + la entrada NUMERICA (NumInput*)
+// axisSelect/transformOrientation (ejes X/Y/Z global/local/view) + gAngleTransform + la entrada NUMERICA (NumInput*)
 // + la barra de estado (header). Cada hueso se edita por su WORLD en espacio NODO: world' = Delta*worldSnap y el local
 // se recalcula contra el padre -> multi-hueso rota/escala alrededor de un PIVOTE COMPARTIDO (por eso tambien se MUEVEN),
 // igual que Object Mode. Confirm = click/Enter/tick; Cancel = Esc/click-der/cruz. La pose se guarda con Insert Keyframe.
-int g_poseModo = 0; // 0=none 1=grab 2=rotate 3=scale (espejo de `estado`)
-static int g_pose2dModo = 0; // POSE 2D del UV editor (comparte g_poseSnap con el 3D; ver al final del archivo)
+int g_poseMode = 0; // 0=none 1=grab 2=rotate 3=scale (espejo de `estado`)
+static int g_pose2dMode = 0; // POSE 2D del UV editor (comparte g_poseSnap con el 3D; ver al final del archivo)
 struct PoseSnap { int b, parent, prof; Vector3 T, R, S; Matrix4 world; }; // world = world NODO al arrancar; prof = profundidad
 static std::vector<PoseSnap> g_poseSnap;
-static Matrix4  g_poseW2N;         // mundo(engine) -> nodo del armature (al arrancar)
+static Matrix4  g_poseW2N;         // world(engine) -> nodo del armature (al arrancar)
 static Vector3  g_posePivotNode;   // pivote en espacio nodo (rotate/scale)
-static int      g_poseActivo = -1; // hueso activo al arrancar (pivote Active / eje Local)
+static int      g_activePose = -1; // hueso activo al arrancar (pivote Active / eje Local)
 static float    g_poseAccX = 0.0f, g_poseAccY = 0.0f; // delta de mouse acumulado desde el inicio
 static int      g_poseLastX = 0, g_poseLastY = 0;
 static bool     g_poseTrackCap = false; static float g_poseTrackAng0 = 0.0f; // trackball: angulo del mouse al arrancar
 static bool     g_poseNum = false; static float g_poseNumV = 0.0f; // valor numerico exacto activo (tipeado)
 extern void NumInputReset();
-extern void UndoPoseIniciar(Armature*); extern void UndoPoseConfirmar();
-static Armature* PoseArmActiva(){
-    return (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+extern void UndoPoseStart(Armature*); extern void UndoPoseConfirm();
+static Armature* ActivePoseArm(){
+    return (InteractionMode == PoseMode && ActiveObj && ActiveObj->getType() == ObjectType::armature) ? (Armature*)ActiveObj : NULL;
 }
 static Matrix4 PMatTrans(const Vector3& t){ Matrix4 m; m.Identity(); m.m[12]=t.x; m.m[13]=t.y; m.m[14]=t.z; return m; }
 static Matrix4 PMatScale(const Vector3& s){ Matrix4 m; m.Identity(); m.m[0]=s.x; m.m[5]=s.y; m.m[10]=s.z; return m; }
-// mundo(engine Y-up, con el transform del objeto armature) -> espacio NODO. glTF: el nodo YA es Y-up (sin NodeToYup);
+// world(engine Y-up, con el transform del objeto armature) -> espacio NODO. glTF: el nodo YA es Y-up (sin NodeToYup);
 // FBX: el nodo es Z-up. (Aplicar NodeToYup a un rig glTF era una de las causas de "rotar desde vista anda mal".)
 // EFECTIVA a proposito (no GetWorldMatrixBase): esta inversa solo baja a espacio NODO
 // DIRECCIONES que vienen de la camara (PoseDirW2N con los ejes de la vista) y sube el pivote
@@ -77,26 +77,26 @@ static Matrix4 PoseW2N(Armature* a){
     // dibujar nada en el medio, asi que con dos viewports abiertos esa puede ser la del OTRO.
     // Se bindea el viewport donde esta el usuario, igual que BoneGrabStartEx. Esto se calcula
     // UNA vez, al arrancar (g_poseW2N), y de ahi sale todo el arrastre.
-    if (Viewport3DActive) Viewport3DActive->BindVista();
+    if (Viewport3DActive) Viewport3DActive->BindView();
     Matrix4 AW; a->GetWorldMatrix(AW); Matrix4 invAW = AW.Inverse();
     return a->skinGltf ? invAW : (SkelNodeToYupMat().Inverse() * invAW);
 }
 static Vector3 PoseDirW2N(const Matrix4& W2N, const Vector3& d){ // direccion world -> nodo (resta el origen)
     Vector3 o = W2N * Vector3(0,0,0); Vector3 r = (W2N * d) - o; float l = r.Length(); return (l>1e-8f)? r*(1.0f/l): r; }
 static Vector3 PoseCam(int which){ // ejes de camara: 0=right 1=up 2=forward
-    Quaternion vr = Viewport3DActive ? Viewport3DActive->RotVista() : Quaternion(1,0,0,0);   // (mirando por la camara: la suya)
+    Quaternion vr = Viewport3DActive ? Viewport3DActive->RotView() : Quaternion(1,0,0,0);   // (mirando por la camara: la suya)
     return vr * ((which==0)?Vector3(1,0,0):(which==1)?Vector3(0,1,0):Vector3(0,0,-1));
 }
-// eje constrenido (X/Y/Z) en espacio NODO segun axisSelect/transformOrientation (misma convencion que EjeMundo: Y=profundidad, Z=arriba)
+// eje constrenido (X/Y/Z) en espacio NODO segun axisSelect/transformOrientation (misma convencion que AxisWorld: Y=profundidad, Z=arriba)
 static Vector3 PoseAxisNode(Armature* a, int ax){
-    if (transformOrientation == LocalOrient && g_poseActivo >= 0){
-        // LOCAL = el eje del HUESO ACTIVO, con la MISMA convencion que EjeOrientado(obj) de Object Mode:
-        // "eje local" = rotacion_del_hueso * EjeMundo(ax). EjeMundo mapea user X->(1,0,0), Y->(0,0,1) (profundidad),
+    if (transformOrientation == LocalOrient && g_activePose >= 0){
+        // LOCAL = el eje del HUESO ACTIVO, con la MISMA convencion que AxisOriented(obj) de Object Mode:
+        // "eje local" = rotacion_del_hueso * AxisWorld(ax). AxisWorld mapea user X->(1,0,0), Y->(0,0,1) (profundidad),
         // Z->(0,1,0) (arriba) -> en el world del hueso EN ESPACIO ENGINE eso es col0 / col2 / col1.
         // (Antes se tomaban las columnas del world en espacio NODO y en el orden 0/1/2: Y y Z quedaban CAMBIADOS
         //  respecto de Global, y en rigs FBX -nodo Z-up- ademas no era el espacio correcto.)
         Matrix4 N2W = g_poseW2N.Inverse();
-        Matrix4 Wb  = N2W * SkelBoneWorldNode(a, g_poseActivo); // world del hueso en espacio ENGINE
+        Matrix4 Wb  = N2W * SkelBoneWorldNode(a, g_activePose); // world del hueso en espacio ENGINE
         int c = (ax==0) ? 0 : (ax==1) ? 2 : 1;
         Vector3 w(Wb.m[c*4], Wb.m[c*4+1], Wb.m[c*4+2]);
         float l = w.Length(); if (l>1e-8f) w = w*(1.0f/l);
@@ -109,7 +109,7 @@ static Vector3 PoseAxisNode(Armature* a, int ax){
 }
 // pivote en espacio NODO segun g_transformPivot (median de las cabezas seleccionadas / hueso activo / individual=median-fallback)
 static Vector3 PosePivotNode(Armature* a, const std::vector<int>& sel){
-    if (g_transformPivot == PivotActive && g_poseActivo >= 0){ Matrix4 W = SkelBoneWorldNode(a, g_poseActivo); return W * Vector3(0,0,0); }
+    if (g_transformPivot == PivotActive && g_activePose >= 0){ Matrix4 W = SkelBoneWorldNode(a, g_activePose); return W * Vector3(0,0,0); }
     Vector3 acc(0,0,0); int n=0;
     for (size_t k=0;k<sel.size();k++){ Matrix4 W = SkelBoneWorldNode(a, sel[k]); acc = acc + (W * Vector3(0,0,0)); n++; }
     return (n>0)? acc*(1.0f/(float)n) : acc;
@@ -125,17 +125,17 @@ static void PoseDecomp(W3dBone& b, const Matrix4& L){
     if(sx>1e-8f){Rm.m[0]=cx.x/sx;Rm.m[1]=cx.y/sx;Rm.m[2]=cx.z/sx;}
     if(sy>1e-8f){Rm.m[4]=cy.x/sy;Rm.m[5]=cy.y/sy;Rm.m[6]=cy.z/sy;}
     if(sz>1e-8f){Rm.m[8]=cz.x/sz;Rm.m[9]=cz.y/sz;Rm.m[10]=cz.z/sz;}
-    b.poseR = SkelMatrizAEulerFBX(Rm, b.rotOrder);
+    b.poseR = SkelMatrixToEulerFBX(Rm, b.rotOrder);
     b.poseS = Vector3(sx, sy, sz);
 }
-static void PoseAplicar(Armature* a); // fwd (definida abajo)
-static void PoseAplicarDeltaNodo(Armature* a, const Matrix4& Delta); // fwd (compartida 3D/2D)
-extern bool NumInputActivo();
-// snapshot de los huesos SELECCIONADOS (g_poseSnap + g_poseActivo + pivote). Compartido entre el
+static void PoseApply(Armature* a); // fwd (definida abajo)
+static void PoseApplyDeltaNode(Armature* a, const Matrix4& Delta); // fwd (compartida 3D/2D)
+extern bool NumInputActive();
+// snapshot de los huesos SELECCIONADOS (g_poseSnap + g_activePose + pivote). Compartido entre el
 // transform 3D (PoseXformStart) y el 2D del UV editor (Pose2DStart). false si no hay seleccion.
-static bool PoseSnapshotSeleccion(Armature* a){
+static bool PoseSnapshotSelection(Armature* a){
     std::vector<int> sel;
-    for (size_t i = 0; i < a->bones.size(); i++){ W3dBone& b = a->bones[i]; if (b.select || (int)i == a->boneActivo) sel.push_back((int)i); }
+    for (size_t i = 0; i < a->bones.size(); i++){ W3dBone& b = a->bones[i]; if (b.select || (int)i == a->activeBone) sel.push_back((int)i); }
     if (sel.empty()) return false;
     std::vector<char> isSel(a->bones.size(), 0); for (size_t k=0;k<sel.size();k++) isSel[sel[k]]=1;
     g_poseSnap.clear();
@@ -144,46 +144,46 @@ static bool PoseSnapshotSeleccion(Armature* a){
         s.world = SkelBoneWorldNode(a, i);
         int d=0, p=b.parent, guard=0; while(p>=0 && p<(int)a->bones.size() && guard++<(int)a->bones.size()){ d++; p=a->bones[p].parent; } s.prof=d; // profundidad (para orden topologico)
         g_poseSnap.push_back(s); }
-    g_poseActivo = (a->boneActivo>=0 && a->boneActivo<(int)a->bones.size() && isSel[a->boneActivo]) ? a->boneActivo : sel[0];
+    g_activePose = (a->activeBone>=0 && a->activeBone<(int)a->bones.size() && isSel[a->activeBone]) ? a->activeBone : sel[0];
     g_posePivotNode = PosePivotNode(a, sel);
     return true;
 }
-void PoseXformStart(int modo){
-    Armature* a = PoseArmActiva(); if (!a) return;
-    if (estado != editNavegacion) return; // ya hay un transform en curso
-    if (g_pose2dModo) return;             // hay un transform de pose 2D (UV editor) en curso
-    if (!PoseSnapshotSeleccion(a)) return;
+void PoseXformStart(int mode){
+    Armature* a = ActivePoseArm(); if (!a) return;
+    if (state != editNavigation) return; // ya hay un transform en curso
+    if (g_pose2dMode) return;            // hay un transform de pose 2D (UV editor) en curso
+    if (!PoseSnapshotSelection(a)) return;
     g_poseW2N = PoseW2N(a);
     // El GIZMO, los EJES X/Y/Z y la LINEA PUNTEADA se dibujan en TransformPivotPoint (via GizmoPivot()).
     // Hay que ponerlo en el pivote de la POSE, en MUNDO: antes quedaba donde lo habia dejado Object Mode
     // (el origen del armature) y los ejes salian en el lugar equivocado.
     { Matrix4 N2W = g_poseW2N.Inverse(); TransformPivotPoint = N2W * g_posePivotNode; }
     g_poseTrackCap = false; // trackball: se recaptura el angulo inicial del mouse
-    UndoPoseIniciar(a); // Ctrl+Z: snapshot de la pose de TODOS los huesos antes del transform
+    UndoPoseStart(a); // Ctrl+Z: snapshot de la pose de TODOS los huesos antes del transform
     // estado COMPARTIDO con Object Mode -> header + numerico + touch keyboard + confirm/cancel se activan solos
-    g_poseModo = modo;
-    estado = (modo==1)?translacion:(modo==2)?rotacion:EditScale;
-    axisSelect = (modo==3)?XYZ:ViewAxis;                     // scale libre = 3 ejes; move/rotate libre = vista
-    transformOrientation = (modo==3)?LocalOrient:GlobalOrient;
-    gAnguloTransform = 0.0f;
+    g_poseMode = mode;
+    state = (mode==1)?translation:(mode==2)?rotation:EditScale;
+    axisSelect = (mode==3)?XYZ:ViewAxis;                     // scale libre = 3 ejes; move/rotate libre = vista
+    transformOrientation = (mode==3)?LocalOrient:GlobalOrient;
+    gAngleTransform = 0.0f;
     g_poseAccX = g_poseAccY = 0.0f; g_poseLastX = lastMouseX; g_poseLastY = lastMouseY;
     g_poseNum = false; g_poseNumV = 0.0f; NumInputReset();
 }
 // llamada desde event_mouse_motion: acumula el delta de mouse y re-aplica desde el snapshot (absoluto -> sin drift)
 void PoseXformMotion(int mx, int my){
-    Armature* a = PoseArmActiva(); if (!a || !g_poseModo) return;
-    if (NumInputActivo()){ g_poseLastX = mx; g_poseLastY = my; return; } // tipeando un valor exacto: el mouse no interfiere
+    Armature* a = ActivePoseArm(); if (!a || !g_poseMode) return;
+    if (NumInputActive()){ g_poseLastX = mx; g_poseLastY = my; return; } // tipeando un valor exacto: el mouse no interfiere
     g_poseNum = false;
     g_poseAccX += (float)(mx - g_poseLastX); g_poseAccY += (float)(my - g_poseLastY);
     g_poseLastX = mx; g_poseLastY = my;
-    // LINEA PUNTEADA pivote->mouse (la dibuja RenderBarraTransform): misma que Object Mode. Necesita
+    // LINEA PUNTEADA pivot->mouse (la dibuja RenderBarTransform): misma que Object Mode. Necesita
     // TransformPivotPoint ya en el pivote de la pose (lo setea PoseXformStart).
-    if (Viewport3DActive) Viewport3DActive->ActualizarLineaTransform(mx, my);
-    PoseAplicar(a);
+    if (Viewport3DActive) Viewport3DActive->UpdateLineTransform(mx, my);
+    PoseApply(a);
 }
-// valor NUMERICO exacto (tipeado): lo llama NumInputAplicar cuando InteractionMode==PoseMode
-void PoseXformNumValor(float v){ Armature* a = PoseArmActiva(); if (!a || !g_poseModo) return; g_poseNum = true; g_poseNumV = v; PoseAplicar(a); }
-static void PoseInvalidar(Armature* a){
+// valor NUMERICO exacto (tipeado): lo llama NumInputApply cuando InteractionMode==PoseMode
+void PoseXformNumValue(float v){ Armature* a = ActivePoseArm(); if (!a || !g_poseMode) return; g_poseNum = true; g_poseNumV = v; PoseApply(a); }
+static void PoseInvalidate(Armature* a){
     if (!a) return; a->poseDirty = true;
     struct L { static void rec(Object* o, Armature* arm){ if (!o) return;
         if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==arm) m->lastSkinFrame=-999999; }
@@ -191,19 +191,19 @@ static void PoseInvalidar(Armature* a){
     L::rec(SceneCollection, a);
     g_redraw = true;
 }
-static void PoseAplicar(Armature* a){
-    if (!a || !g_poseModo || g_poseSnap.empty()) return;
+static void PoseApply(Armature* a){
+    if (!a || !g_poseMode || g_poseSnap.empty()) return;
     bool axFree  = (axisSelect==ViewAxis || axisSelect==XYZ);      // libre (sin eje unico)
-    bool esPlano = (axisSelect==PlaneX || axisSelect==PlaneY || axisSelect==PlaneZ);
+    bool isPlane = (axisSelect==PlaneX || axisSelect==PlaneY || axisSelect==PlaneZ);
     int  ax = (axisSelect==X||axisSelect==PlaneX)?0 : (axisSelect==Y||axisSelect==PlaneY)?1 : (axisSelect==Z||axisSelect==PlaneZ)?2 : 0;
     Matrix4 Delta; Delta.Identity();
-    if (g_poseModo == 1){        // ---- TRANSLATE ----
-        float wpp = Viewport3DActive ? Viewport3DActive->VelocidadArrastreMundo() : 0.01f;
+    if (g_poseMode == 1){        // ---- TRANSLATE ----
+        float wpp = Viewport3DActive ? Viewport3DActive->DragVelocityWorld() : 0.01f;
         Vector3 tNode(0,0,0);
         if (axFree){             // plano de la vista (o valor numerico a lo largo de camRight)
             if (g_poseNum) tNode = PoseDirW2N(g_poseW2N, PoseCam(0)) * g_poseNumV;
             else tNode = PoseDirW2N(g_poseW2N, PoseCam(0)) * (g_poseAccX*wpp) + PoseDirW2N(g_poseW2N, PoseCam(1)) * (-g_poseAccY*wpp);
-        } else if (esPlano){     // los OTROS dos ejes
+        } else if (isPlane){     // los OTROS dos ejes
             int a1=(ax+1)%3, a2=(ax+2)%3;
             float m1 = g_poseNum ? g_poseNumV : (g_poseAccX*wpp);
             float m2 = g_poseNum ? 0.0f       : (-g_poseAccY*wpp);
@@ -213,7 +213,7 @@ static void PoseAplicar(Armature* a){
             tNode = PoseAxisNode(a, ax) * mag;
         }
         Delta = PMatTrans(tNode);
-    } else if (g_poseModo == 2){  // ---- ROTATE alrededor del pivote compartido ----
+    } else if (g_poseMode == 2){  // ---- ROTATE alrededor del pivote compartido ----
         // TRACKBALL (libre / desde la vista): IGUAL que Object Mode -> el angulo lo da la posicion del MOUSE
         // respecto del PIVOTE proyectado a pantalla (360 grados reales), NO el desplazamiento horizontal.
         // Con un eje constrenido (X/Y/Z) se usa el arrastre horizontal, como Object Mode.
@@ -221,7 +221,7 @@ static void PoseAplicar(Armature* a){
         if (g_poseNum) ang = g_poseNumV;
         else if (axFree && Viewport3DActive){
             float px, py;
-            if (Viewport3DActive->ProyectarPunto(TransformPivotPoint, px, py)){
+            if (Viewport3DActive->ProjectPoint(TransformPivotPoint, px, py)){
                 // OJO: se usa g_poseLastX/Y (la pos VIVA del mouse que guarda PoseXformMotion), NO lastMouseX/Y:
                 // esas globales las actualiza CheckWarpMouseInViewport, que en Pose esta DESACTIVADO a proposito
                 // (para que el cursor no se envuelva y pegue un tiron) -> quedaban congeladas y el angulo daba 0.
@@ -235,7 +235,7 @@ static void PoseAplicar(Armature* a){
                 ang = g_poseTrackAng0 - a;
             } else ang = g_poseAccX * 0.5f; // el pivote no se pudo proyectar (detras de camara): fallback
         } else ang = g_poseAccX * 0.5f;
-        gAnguloTransform = ang;
+        gAngleTransform  = ang;
         Vector3 axisNode = axFree ? PoseDirW2N(g_poseW2N, PoseCam(2)) : PoseAxisNode(a, ax); // libre = forward de camara (trackball)
         Matrix4 R = Quaternion::FromAxisAngle(axisNode, ang).ToMatrix();
         Delta = PMatTrans(g_posePivotNode) * R * PMatTrans(g_posePivotNode * -1.0f);
@@ -252,93 +252,93 @@ static void PoseAplicar(Armature* a){
         }
         Delta = PMatTrans(g_posePivotNode) * Sc * PMatTrans(g_posePivotNode * -1.0f);
     }
-    PoseAplicarDeltaNodo(a, Delta);
+    PoseApplyDeltaNode(a, Delta);
 }
 // aplicar un Delta (espacio NODO) sobre el snapshot resolviendo la JERARQUIA: se procesa en ORDEN TOPOLOGICO
 // (padres antes que hijos) y el world del padre se recalcula EN VIVO (ya con los ancestros actualizados). Cada
 // hueso queda en world'=Delta*worldSnap; asi un hijo seleccionado cuyo ANCESTRO (no el padre directo) tambien
-// se selecciono NO se transforma dos veces. COMPARTIDO por el transform 3D (PoseAplicar) y el 2D (Pose2DDelta).
-static void PoseAplicarDeltaNodo(Armature* a, const Matrix4& Delta){
+// se selecciono NO se transforma dos veces. COMPARTIDO por el transform 3D (PoseApply) y el 2D (Pose2DDelta).
+static void PoseApplyDeltaNode(Armature* a, const Matrix4& Delta){
     if (!a || g_poseSnap.empty()) return;
-    static std::vector<int> orden; orden.clear();
-    for (size_t k=0;k<g_poseSnap.size();k++) orden.push_back((int)k);
-    for (size_t i=1;i<orden.size();i++){ int ki=orden[i]; int pk=g_poseSnap[ki].prof; int j=(int)i-1;   // insertion sort por profundidad
-        while(j>=0 && g_poseSnap[orden[j]].prof>pk){ orden[j+1]=orden[j]; j--; } orden[j+1]=ki; }
-    for (size_t oi=0; oi<orden.size(); oi++){
-        PoseSnap& s = g_poseSnap[orden[oi]]; if (s.b < 0 || s.b >= (int)a->bones.size()) continue;
+    static std::vector<int> order; order.clear();
+    for (size_t k=0;k<g_poseSnap.size();k++) order.push_back((int)k);
+    for (size_t i=1;i<order.size();i++){ int ki=order[i]; int pk=g_poseSnap[ki].prof; int j=(int)i-1;   // insertion sort por profundidad
+        while(j>=0 && g_poseSnap[order[j]].prof>pk){ order[j+1]=order[j]; j--; } order[j+1]=ki; }
+    for (size_t oi=0; oi<order.size(); oi++){
+        PoseSnap& s = g_poseSnap[order[oi]]; if (s.b < 0 || s.b >= (int)a->bones.size()) continue;
         Matrix4 targetWorld = Delta * s.world;
         Matrix4 parentWorld = (s.parent>=0 && s.parent<(int)a->bones.size()) ? SkelBoneWorldNode(a, s.parent) : Matrix4(); // EN VIVO
         Matrix4 newLocal = parentWorld.Inverse() * targetWorld;
         PoseDecomp(a->bones[s.b], newLocal);
     }
-    PoseInvalidar(a);
+    PoseInvalidate(a);
 }
 void PoseXformConfirm(){
-    if (!g_poseModo) return;
-    bool akGrupo = false;
+    if (!g_poseMode) return;
+    bool akGroup = false;
     // AUTO KEY: va ANTES de limpiar g_poseSnap, que es contra lo que se mide QUE canal cambio. Solo los huesos
     // que se movieron de verdad dejan keyframe, y solo en sus canales.
     if (AutoKeyOn && ActiveAnimKind != 2){   // ("Juego": sin keyframes; los clips se editan eligiendolos)
-        Armature* a = PoseArmActiva();
-        if (a && AutoKeyEsqueletoPrep(a)){
-            UndoGrupoIniciar(); UndoKeyframesIniciarArm(a);   // (se cierra con el UndoPoseConfirmar: un solo Ctrl+Z)
-            akGrupo = true;
+        Armature* a = ActivePoseArm();
+        if (a && AutoKeySkeletonPrep(a)){
+            UndoGroupStart(); UndoKeyframesStartArm(a);   // (se cierra con el UndoPoseConfirm: un solo Ctrl+Z)
+            akGroup = true;
             int n = 0;
             for (size_t k=0;k<g_poseSnap.size();k++){
                 PoseSnap& sn = g_poseSnap[k];
-                n += AutoKeyHueso(a, sn.b, sn.T, sn.R, sn.S);
+                n += AutoKeyBone(a, sn.b, sn.T, sn.R, sn.S);
             }
-            if (n) AutoKeyEsqueletoFin(a);
+            if (n) AutoKeySkeletonEnd(a);
         }
     }
-    if (akGrupo) UndoKeyframesConfirmar();
-    g_poseModo = 0; g_poseSnap.clear(); estado = editNavegacion; NumInputReset(); UndoPoseConfirmar();
-    if (akGrupo) UndoGrupoFin();
+    if (akGroup) UndoKeyframesConfirm();
+    g_poseMode = 0; g_poseSnap.clear(); state = editNavigation; NumInputReset(); UndoPoseConfirm();
+    if (akGroup) UndoGroupEnd();
 } // deja la pose (Insert Keyframe la guarda a mano; con Auto Key se guarda sola)
 void PoseXformCancel(){
-    Armature* a = PoseArmActiva();
+    Armature* a = ActivePoseArm();
     if (a) for (size_t k=0;k<g_poseSnap.size();k++){ PoseSnap& s=g_poseSnap[k]; if (s.b>=0 && s.b<(int)a->bones.size()){
         a->bones[s.b].poseT=s.T; a->bones[s.b].poseR=s.R; a->bones[s.b].poseS=s.S; } }
-    if (a) PoseInvalidar(a);
-    g_poseModo = 0; g_poseSnap.clear(); estado = editNavegacion; NumInputReset();
+    if (a) PoseInvalidate(a);
+    g_poseMode = 0; g_poseSnap.clear(); state = editNavigation; NumInputReset();
 }
 // X/Y/Z durante un transform de pose: constriñe el eje (1er toque) y cicla Global->Local->View (mismo eje re-apretado),
-// luego RE-APLICA desde el snapshot (absoluto). No usa CiclarEjeTransform de Object Mode (esa llama ReestablecerEstado,
+// luego RE-APLICA desde el snapshot (absoluto). No usa CycleAxisTransform de Object Mode (esa llama RestoreState,
 // que restaura los OBJETOS, no la pose).
-void PoseCiclarEje(int eje){
-    if (!g_poseModo) return;
-    if (g_poseModo == 3){ transformOrientation = LocalOrient; axisSelect = (axisSelect==eje)?XYZ:eje; } // scale: local, eje<->3ejes
-    else if (axisSelect != eje){ axisSelect = eje; }                                                    // 1er toque: eje (orientacion actual)
-    else if (transformOrientation == GlobalOrient){ transformOrientation = LocalOrient; }               // mismo eje: cicla orientacion
+void PoseCycleAxis(int axis){
+    if (!g_poseMode) return;
+    if (g_poseMode == 3){ transformOrientation = LocalOrient; axisSelect = (axisSelect==axis)?XYZ:axis; } // scale: local, eje<->3ejes
+    else if (axisSelect != axis){ axisSelect = axis; }                                                    // 1er toque: eje (orientacion actual)
+    else if (transformOrientation == GlobalOrient){ transformOrientation = LocalOrient; }                 // mismo eje: cicla orientacion
     else if (transformOrientation == LocalOrient){ transformOrientation = ViewOrient; }
     else { axisSelect = ViewAxis; transformOrientation = GlobalOrient; }                                 // vuelve a libre
     g_poseAccX = 0.0f; g_poseAccY = 0.0f; g_poseLastX = lastMouseX; g_poseLastY = lastMouseY; g_poseNum = false; NumInputReset(); g_poseTrackCap = false;
-    Armature* a = PoseArmActiva(); if (a) PoseAplicar(a);
+    Armature* a = ActivePoseArm(); if (a) PoseApply(a);
 }
-void PoseCiclarPlano(int eje){ // Shift+X/Y/Z: constriñe al PLANO (los otros dos ejes). Rotate no tiene plano.
-    if (!g_poseModo || g_poseModo==2) return;
-    int pl = (eje==X)?PlaneX:(eje==Y)?PlaneY:PlaneZ;
+void PoseCyclePlane(int axis){ // Shift+X/Y/Z: constriñe al PLANO (los otros dos ejes). Rotate no tiene plano.
+    if (!g_poseMode || g_poseMode==2) return;
+    int pl = (axis==X)?PlaneX:(axis==Y)?PlaneY:PlaneZ;
     axisSelect = (axisSelect==pl)?ViewAxis:pl; transformOrientation = GlobalOrient;
     g_poseAccX = 0.0f; g_poseAccY = 0.0f; g_poseLastX = lastMouseX; g_poseLastY = lastMouseY; g_poseNum = false; NumInputReset(); g_poseTrackCap = false;
-    Armature* a = PoseArmActiva(); if (a) PoseAplicar(a);
+    Armature* a = ActivePoseArm(); if (a) PoseApply(a);
 }
-void PoseCiclarOrient(){ // "R de nuevo": cicla la orientacion del eje actual (Global->Local->View)
-    if (!g_poseModo) return;
+void PoseCycleOrient(){ // "R de nuevo": cicla la orientacion del eje actual (Global->Local->View)
+    if (!g_poseMode) return;
     transformOrientation = (transformOrientation==GlobalOrient)?LocalOrient:(transformOrientation==LocalOrient)?ViewOrient:GlobalOrient;
     g_poseAccX = 0.0f; g_poseAccY = 0.0f; g_poseLastX = lastMouseX; g_poseLastY = lastMouseY; g_poseTrackCap = false;
-    Armature* a = PoseArmActiva(); if (a) PoseAplicar(a);
+    Armature* a = ActivePoseArm(); if (a) PoseApply(a);
 }
-// EJES de la pose en MUNDO, para que la GUIA (DibujarLineaEjeMundo) dibuje EXACTAMENTE el mismo eje con el que se
-// rota. Sin esto la guia usaba EjeOrientado(*ObjActivo,...) = los ejes del OBJETO ARMATURE, que en "Local" NO son
+// EJES de la pose en MUNDO, para que la GUIA (DrawLineAxisWorld) dibuje EXACTAMENTE el mismo eje con el que se
+// rota. Sin esto la guia usaba AxisOriented(*ActiveObj,...) = los ejes del OBJETO ARMATURE, que en "Local" NO son
 // los del HUESO -> la linea no coincidia con la rotacion real.
 // Devuelve false si no hay transform de pose (el caller usa los ejes del objeto, como siempre).
-bool PoseEjesMundo(Vector3& ex, Vector3& ey, Vector3& ez){
-    Armature* a = PoseArmActiva(); if (!a || !g_poseModo) return false;
+bool PoseAxesWorld(Vector3& ex, Vector3& ey, Vector3& ez){
+    Armature* a = ActivePoseArm(); if (!a || !g_poseMode) return false;
     Matrix4 N2W = g_poseW2N.Inverse();
     Vector3 o = N2W * Vector3(0,0,0);
     Vector3 e[3];
     for (int i=0;i<3;i++){
-        Vector3 n = PoseAxisNode(a, i);                 // el MISMO eje (en nodo) que usa PoseAplicar
+        Vector3 n = PoseAxisNode(a, i);                 // el MISMO eje (en nodo) que usa PoseApply
         Vector3 w = (N2W * n) - o;                      // nodo -> mundo (como DIRECCION)
         float l = w.Length(); e[i] = (l>1e-8f) ? w*(1.0f/l) : w;
     }
@@ -346,82 +346,82 @@ bool PoseEjesMundo(Vector3& ex, Vector3& ey, Vector3& ez){
     return true;
 }
 
-// para el header de Pose (ViewPort3D::W3dTextoTransform): modo activo (1=grab 2=rotate 3=scale) y el valor a mostrar.
-int PoseHeaderModo(){ return g_poseModo; }
-float PoseHeaderValor(){
-    if (g_poseModo==1){ if (g_poseNum) return g_poseNumV; float wpp = Viewport3DActive?Viewport3DActive->VelocidadArrastreMundo():0.01f;
+// para el header de Pose (ViewPort3D::W3dTextTransform): modo activo (1=grab 2=rotate 3=scale) y el valor a mostrar.
+int PoseHeaderMode(){ return g_poseMode; }
+float PoseHeaderValue(){
+    if (g_poseMode==1){ if (g_poseNum) return g_poseNumV; float wpp = Viewport3DActive?Viewport3DActive->DragVelocityWorld():0.01f;
         bool axFree=(axisSelect==ViewAxis||axisSelect==XYZ);
         return axFree ? (Vector3(g_poseAccX, g_poseAccY, 0.0f).Length()*wpp) : ((g_poseAccX-g_poseAccY)*wpp); }
-    if (g_poseModo==3){ return g_poseNum ? g_poseNumV : (1.0f + g_poseAccX*0.01f); }
-    return g_poseNum ? g_poseNumV : (g_poseAccX*0.5f); // rotate: grados (el header lo toma de gAnguloTransform igual)
+    if (g_poseMode==3){ return g_poseNum ? g_poseNumV : (1.0f + g_poseAccX*0.01f); }
+    return g_poseNum ? g_poseNumV : (g_poseAccX*0.5f); // rotate: grados (el header lo toma de gAngleTransform igual)
 }
-// 'canales' = mascara KfCanalLoc/Rot/Scl del menu desplegable de Insert Keyframe (0 = los tres)
-void PoseInsertKeyframe(int canales){ Armature* a = PoseArmActiva(); if (a){ InsertarKeyframeEsqueleto(a, canales); PoseInvalidar(a); } }
+// 'canales' = mascara KfChannelLoc/Rot/Scl del menu desplegable de Insert Keyframe (0 = los tres)
+void PoseInsertKeyframe(int channels){ Armature* a = ActivePoseArm(); if (a){ InsertKeyframeSkeleton(a, channels); PoseInvalidate(a); } }
 // Delete / Clear Keyframe del Modo Pose: los keyframes de los huesos ELEGIDOS y del ACTIVO (los mismos que keyea
-// InsertarKeyframeEsqueleto) en el clip activo. 'soloFrame' = solo los del frame actual; si no, todos.
-static void PoseQuitarKeyframes(bool soloFrame){
-    Armature* a = PoseArmActiva(); if (!a) return;
-    if (a->animActiva < 0 || a->animActiva >= (int)a->animations.size()) return;
-    extern void UndoKeyframesIniciarArm(Armature*); extern void UndoKeyframesConfirmar();
-    UndoKeyframesIniciarArm(a);                  // Ctrl+Z: un paso
-    W3dArmatureAnimsPropias(a);                  // borrar escribe en el clip: nunca en uno compartido
-    SkeletalAnimation* clip = a->animations[a->animActiva];
+// InsertKeyframeSkeleton) en el clip activo. 'onlyFrame' = solo los del frame actual; si no, todos.
+static void PoseRemoveKeyframes(bool onlyFrame){
+    Armature* a = ActivePoseArm(); if (!a) return;
+    if (a->activeAnim < 0 || a->activeAnim >= (int)a->animations.size()) return;
+    extern void UndoKeyframesStartArm(Armature*); extern void UndoKeyframesConfirm();
+    UndoKeyframesStartArm(a);                  // Ctrl+Z: un paso
+    W3dOwnArmatureAnims(a);                    // borrar escribe en el clip: nunca en uno compartido
+    SkeletalAnimation* clip = a->animations[a->activeAnim];
     for (size_t t = 0; t < clip->tracks.size(); t++){
         BoneTrack& tr = clip->tracks[t];
         if (tr.bone < 0 || tr.bone >= (int)a->bones.size()) continue;
-        if (!a->bones[tr.bone].select && tr.bone != a->boneActivo) continue;
-        for (size_t p = 0; p < tr.Propertys.size(); p++){
-            W3dClaves& kf = tr.Propertys[p].keyframes;
-            if (!soloFrame){ kf.clear(); continue; }
+        if (!a->bones[tr.bone].select && tr.bone != a->activeBone) continue;
+        for (size_t p = 0; p < tr.Properties.size(); p++){
+            W3dKeys& kf = tr.Properties[p].keyframes;
+            if (!onlyFrame){ kf.clear(); continue; }
             for (size_t k = 0; k < kf.size(); k++) if (kf.Frame(k) == CurrentFrame){ kf.erase(kf.begin() + k); break; }
         }
     }
-    UndoKeyframesConfirmar();
+    UndoKeyframesConfirm();
     a->lastPoseFrame = -999999; a->lastPoseAnim = -999; a->poseDirty = true;   // la pose se vuelve a leer del clip
-    PoseInvalidar(a);
+    PoseInvalidate(a);
 }
-void PoseBorrarKeyframe(){ PoseQuitarKeyframes(true); }
-void PoseLimpiarKeyframes(){ PoseQuitarKeyframes(false); }
+void PoseDeleteKeyframe(){ PoseRemoveKeyframes(true); }
+void PoseClearKeyframes(){ PoseRemoveKeyframes(false); }
 // Pose Mode > Clear Transform: resetea la pose de los huesos SELECCIONADOS a su rest (si no hay seleccion, TODOS).
 // what: 0=All (T+R+S), 1=Translation (Alt+G), 2=Rotation (Alt+R), 3=Scale (Alt+S). No inserta keyframe.
 void PoseClearTransform(int what){
-    Armature* a = PoseArmActiva(); if (!a) return;
-    if (g_poseModo || g_pose2dModo) return;      // (en medio de un transform de pose: no se pisa su snapshot)
-    UndoPoseIniciar(a);                          // Ctrl+Z: un paso (nada si ya estaban en reposo)
-    bool haySel = false; for (size_t b = 0; b < a->bones.size(); b++) if (a->bones[b].select){ haySel = true; break; }
+    Armature* a = ActivePoseArm(); if (!a) return;
+    if (g_poseMode || g_pose2dMode) return;      // (en medio de un transform de pose: no se pisa su snapshot)
+    UndoPoseStart(a);                            // Ctrl+Z: un paso (nada si ya estaban en reposo)
+    bool hasSel = false; for (size_t b = 0; b < a->bones.size(); b++) if (a->bones[b].select){ hasSel = true; break; }
     for (size_t b = 0; b < a->bones.size(); b++){ W3dBone& bo = a->bones[b];
-        if (haySel && !bo.select) continue; // solo los seleccionados; si no hay ninguno seleccionado -> todos
+        if (hasSel && !bo.select) continue; // solo los seleccionados; si no hay ninguno seleccionado -> todos
         if (what == 0 || what == 1) bo.poseT = bo.restT;
         if (what == 0 || what == 2) bo.poseR = bo.restR;
         if (what == 0 || what == 3) bo.poseS = bo.restS;
     }
-    PoseInvalidar(a);
-    UndoPoseConfirmar();
+    PoseInvalidate(a);
+    UndoPoseConfirm();
 }
 void PoseClearTransformAll(){ PoseClearTransform(0); } // compat
 
 // ===================================================================================================
 //  POSE 2D (armature en el UV EDITOR, Fase 3): mismos snapshots + jerarquia + undo que el 3D, pero el
-//  delta llega EN EL PLANO X-Y del armature (Z fijo). Para rigs AUTORADOS (PrepararSkinAutorado) el
+//  delta llega EN EL PLANO X-Y del armature (Z fijo). Para rigs AUTORADOS (PrepareAuthoredSkin) el
 //  espacio NODO coincide con el espacio LOCAL del armature = el espacio UV donde viven los huesos 2D,
 //  asi que (du,dv) de UV se aplican directo; rotate gira alrededor del eje Z y scale escala X-Y.
 //  El UV editor llama Delta con valores ABSOLUTOS desde el arranque (sin drift acumulado).
 // ===================================================================================================
-bool Pose2DActivo(){ return g_pose2dModo != 0; }
-int  Pose2DModo(){ return g_pose2dModo; }
-void Pose2DStart(int modo){
-    Armature* a = PoseArmActiva(); if (!a) return;
-    if (g_poseModo || g_pose2dModo) return;      // ya hay un transform de pose en curso (3D o 2D)
-    if (!PoseSnapshotSeleccion(a)) return;
-    UndoPoseIniciar(a);                          // Ctrl+Z: un paso por drag (nada si no cambio)
-    g_pose2dModo = modo;
+bool Pose2DActive(){ return g_pose2dMode != 0; }
+int  Pose2DMode(){ return g_pose2dMode; }
+void Pose2DStart(int mode){
+    Armature* a = ActivePoseArm(); if (!a) return;
+    if (g_poseMode || g_pose2dMode) return;      // ya hay un transform de pose en curso (3D o 2D)
+    if (!PoseSnapshotSelection(a)) return;
+    UndoPoseStart(a);                          // Ctrl+Z: un paso por drag (nada si no cambio)
+    g_pose2dMode = mode;
 }
 void Pose2DDelta(float du, float dv, float angDeg, float factor){
-    Armature* a = PoseArmActiva(); if (!a || !g_pose2dModo) return;
+    Armature* a = ActivePoseArm(); if (!a || !g_pose2dMode) return;
     Matrix4 Delta; Delta.Identity();
-    if (g_pose2dModo == 1){                      // GRAB en X-Y (Z fijo)
+    if (g_pose2dMode == 1){                      // GRAB en X-Y (Z fijo)
         Delta = PMatTrans(Vector3(du, dv, 0.0f));
-    } else if (g_pose2dModo == 2){               // ROTATE alrededor de Z, pivote compartido
+    } else if (g_pose2dMode == 2){               // ROTATE alrededor de Z, pivote compartido
         Matrix4 R = Quaternion::FromAxisAngle(Vector3(0, 0, 1), angDeg).ToMatrix();
         Delta = PMatTrans(g_posePivotNode) * R * PMatTrans(g_posePivotNode * -1.0f);
     } else {                                     // SCALE en X-Y (Z queda 1), pivote compartido
@@ -429,38 +429,38 @@ void Pose2DDelta(float du, float dv, float angDeg, float factor){
         Matrix4 Sc = PMatScale(Vector3(f, f, 1.0f));
         Delta = PMatTrans(g_posePivotNode) * Sc * PMatTrans(g_posePivotNode * -1.0f);
     }
-    PoseAplicarDeltaNodo(a, Delta);
+    PoseApplyDeltaNode(a, Delta);
 }
 void Pose2DConfirm(){
-    if (!g_pose2dModo) return;
-    bool akGrupo = false;
+    if (!g_pose2dMode) return;
+    bool akGroup = false;
     // AUTO KEY: igual que el 3D (ANTES de soltar el snapshot; solo los canales que cambiaron)
     if (AutoKeyOn && ActiveAnimKind != 2){   // ("Juego": sin keyframes; los clips se editan eligiendolos)
-        Armature* a = PoseArmActiva();
-        if (a && AutoKeyEsqueletoPrep(a)){
-            UndoGrupoIniciar(); UndoKeyframesIniciarArm(a);   // (se cierra con el UndoPoseConfirmar: un solo Ctrl+Z)
-            akGrupo = true;
+        Armature* a = ActivePoseArm();
+        if (a && AutoKeySkeletonPrep(a)){
+            UndoGroupStart(); UndoKeyframesStartArm(a);   // (se cierra con el UndoPoseConfirm: un solo Ctrl+Z)
+            akGroup = true;
             int n = 0;
             for (size_t k=0;k<g_poseSnap.size();k++){
                 PoseSnap& sn = g_poseSnap[k];
-                n += AutoKeyHueso(a, sn.b, sn.T, sn.R, sn.S);
+                n += AutoKeyBone(a, sn.b, sn.T, sn.R, sn.S);
             }
-            if (n) AutoKeyEsqueletoFin(a);
+            if (n) AutoKeySkeletonEnd(a);
         }
     }
-    if (akGrupo) UndoKeyframesConfirmar();
-    g_pose2dModo = 0; g_poseSnap.clear(); UndoPoseConfirmar();
-    if (akGrupo) UndoGrupoFin();
+    if (akGroup) UndoKeyframesConfirm();
+    g_pose2dMode = 0; g_poseSnap.clear(); UndoPoseConfirm();
+    if (akGroup) UndoGroupEnd();
 }
 void Pose2DCancel(){
-    Armature* a = PoseArmActiva();
+    Armature* a = ActivePoseArm();
     if (a) for (size_t k=0;k<g_poseSnap.size();k++){ PoseSnap& s=g_poseSnap[k]; if (s.b>=0 && s.b<(int)a->bones.size()){
         a->bones[s.b].poseT=s.T; a->bones[s.b].poseR=s.R; a->bones[s.b].poseS=s.S; } }
-    if (a) PoseInvalidar(a);
-    g_pose2dModo = 0; g_poseSnap.clear();
+    if (a) PoseInvalidate(a);
+    g_pose2dMode = 0; g_poseSnap.clear();
 }
 bool Pose2DPivotXY(float& px, float& py){
-    if (!g_pose2dModo) return false;
+    if (!g_pose2dMode) return false;
     px = g_posePivotNode.x; py = g_posePivotNode.y;
     return true;
 }

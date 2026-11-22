@@ -1,7 +1,7 @@
 # REPETIR la curva antes del primer keyframe y despues del ultimo, igual o CORRIDA (cada vuelta arranca donde termino
 # la anterior): es el modificador CICLOS (Propiedades > Modificadores). La matematica, el 3D, y que el Repetir VIEJO
 # de los archivos de antes se abra como un modificador Ciclos.
-ventana 1280 720
+window 1280 720
 add cube
 frame 1
 keychan 0 0
@@ -9,7 +9,7 @@ frame 11
 objmove 10 0 0
 keychan 0 0
 frame 1
-tlciclos armar
-guardarw3d /tmp/w3d_repetir.w3d
-abrirw3d /tmp/w3d_repetir.w3d
-tlciclos leida
+tlcycles armar
+savew3d /tmp/w3d_repetir.w3d
+openw3d /tmp/w3d_repetir.w3d
+tlcycles read

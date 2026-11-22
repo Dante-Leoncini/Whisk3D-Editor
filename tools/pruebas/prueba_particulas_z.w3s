@@ -30,9 +30,9 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_particulas_z.w3s
 # ===========================================================================
-abrirw3d prueba_particulas_z.w3d
+openw3d prueba_particulas_z.w3d
 loadtex
-vpvista material
+vpview material
 simplay 1
 partinfo ChispaEmisor 1 1
 # el contorno del objeto ACTIVO pintaria los pixeles de la ultima mascara
@@ -42,27 +42,27 @@ activename Camara
 # --- 0) lo que el .mtl dejo en el material -----------------------------------
 # el arreglo NO toca los campos del material (el round-trip del .w3d sigue
 # igual): 'escribeZ=si' se mantiene y la regla vive en el render.
-matflags partz-chispa aditivo
+matflags partz-chispa additive
 matflags partz-mascara normal
 matflags partz-fondo normal
 
 # --- A) LA CHISPA ADELANTE: SE VE, Y NO ABRE AGUJERO -------------------------
-vporbita -3 2 0 8 0 0
+vporbit -3 2 0 8 0 0
 # el pixel del reporte: mascara (0,153,0) MAS la chispa aditiva (+26).
-escenapx -3 2 0 es 26 179 26 8
+scenepx -3 2 0 es 26 179 26 8
 # y explicitamente NO es el agujero: fondo (25,25,204) + chispa = 51,51,230.
-escenapx -3 2 0 noes 51 51 230 24
+scenepx -3 2 0 noes 51 51 230 24
 # fuera del quad de la chispa, la mascara esta entera
-escenapx -3 2.6 0 es 0 153 0 8
+scenepx -3 2.6 0 es 0 153 0 8
 
 # --- C) DIFERIR NO ES "DIBUJAR ENCIMA DE TODO" -------------------------------
 # la misma chispa, pero DETRAS de la mascara: el pase diferido conserva el
 # z-test, asi que no aporta ni un pixel (mascara sola).
-vporbita 0 2 0 8 0 0
-escenapx 0 2 0 es 0 153 0 8
+vporbit 0 2 0 8 0 0
+scenepx 0 2 0 es 0 153 0 8
 
 # --- B) EL EMISOR DEL MOTOR: MISMA REGLA -------------------------------------
-vporbita 3 2 0 8 0 0
+vporbit 3 2 0 8 0 0
 # uv v=0 es la PRIMERA fila del PNG (arriba). El cuadrante TRANSPARENTE (0.75,
 # 0.75) tiene que dejar ver la MASCARA que esta detras -- no el fondo por un
 # agujero: esa es la prueba de que la particula no escribio z.
@@ -73,19 +73,19 @@ partpx ChispaEmisor 0.25 0.75 0 0 255 8
 # y la mascara, fuera del quad de la particula, entera. El punto va CORRIDO en X:
 # sobre el eje del emisor pasa su gizmo de overlay (la flechita +Y del editor) y
 # ese pixel mide la flecha, no la escena.
-escenapx 3.5 2.5 0 es 0 153 0 8
+scenepx 3.5 2.5 0 es 0 153 0 8
 
 # --- ROUND-TRIP v4 -----------------------------------------------------------
-guardarw3d prueba_particulas_z_v4.w3d
-abrirw3d prueba_particulas_z_v4.w3d
+savew3d prueba_particulas_z_v4.w3d
+openw3d prueba_particulas_z_v4.w3d
 loadtex
-vpvista material
+vpview material
 simplay 1
 deselectall
 activename Camara
-matflags partz-chispa aditivo
-vporbita -3 2 0 8 0 0
-escenapx -3 2 0 es 26 179 26 8
-escenapx -3 2.6 0 es 0 153 0 8
-vporbita 3 2 0 8 0 0
+matflags partz-chispa additive
+vporbit -3 2 0 8 0 0
+scenepx -3 2 0 es 26 179 26 8
+scenepx -3 2.6 0 es 0 153 0 8
+vporbit 3 2 0 8 0 0
 partpx ChispaEmisor 0.75 0.75 0 153 0 8

@@ -14,12 +14,12 @@
 |---|---|
 | `W3dDrawStrip4(verts, uvs)` | एक वर्ग: स्ट्रिप के क्रम में 4 `GLshort` वर्टेक्स, उनके 8 UV के साथ। यह उसे दो त्रिकोणों में बदल देता है |
 | `W3dDrawElemsB(verts, uvs, idx, n)` | `GLubyte` इंडेक्स वाला एक छोटा मेश, अधिकतम 64 |
-| `W3dDrawLinesS(ancho, n, verts, idx)` | अधिकतम 21 लाइनें, 3 कंपोनेंट वाले `GLshort` वर्टेक्स के साथ |
+| `W3dDrawLinesS(width, n, verts, idx)` | अधिकतम 21 लाइनें, 3 कंपोनेंट वाले `GLshort` वर्टेक्स के साथ |
 | `W3dDrawLinesF(verts, idx, n)` | 3 कंपोनेंट वाले `float` वर्टेक्स के साथ लाइनें, हर ड्रॉइंग में 40-40 वर्टेक्स |
 
 `float` में बदले गए वर्टेक्स 256 जगहों वाले एक तय भंडार में जाते हैं जो चक्र में इस्तेमाल होता है, कभी स्टैक में नहीं: N95 का ड्राइवर पॉइंटर देर से पढ़ता है।
 
-`W3dPantallaAlto` स्क्रीन की ऊँचाई है। UI इस्तेमाल करने वाला इसे आकार बदलते समय सेट करता है, और यह इंटरफ़ेस की Y को `Scissor` और `Viewport` की Y में बदलने के काम आता है, जो नीचे से गिनते हैं।
+`W3dScreenHeight` स्क्रीन की ऊँचाई है। UI इस्तेमाल करने वाला इसे आकार बदलते समय सेट करता है, और यह इंटरफ़ेस की Y को `Scissor` और `Viewport` की Y में बदलने के काम आता है, जो नीचे से गिनते हैं।
 
 ## नोड और आयत
 
@@ -28,40 +28,40 @@
 `Rec2D` (`draw/rectangle.h`) एक रंग का आयत है। `SetSize(x, y, w, h)` उसे जगह पर रखता है और `SetColor(r, g, b)` उसे रंग देता है। यह टेक्सचर नहीं पढ़ता: यह `Texture2D` बंद करके ड्रॉ होता है।
 
 ```cpp
-Rec2D velo;
-velo.SetSize(0, 0, ancho, alto);
+Rec2D veil;
+veil.SetSize(0, 0, width, height);
 gfx::Disable(gfx::Texture2D);
 gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
-velo.RenderObject(false);          // false: मौजूदा रंग से, उसके अपने रंग से नहीं
+veil.RenderObject(false);          // false: मौजूदा रंग से, उसके अपने रंग से नहीं
 gfx::Enable(gfx::Texture2D);
 ```
 
 ## कार्ड
 
-`Card` (`widgets/card.h`) गोल कोनों वाला वह आयत है जो बटन, मेनू और प्रॉपर्टी कार्ड में होता है। यह एक **9-patch** है: 16 वर्टेक्स जो बीच वाले हिस्से को खींचते हैं और कोनों को `2 * GlobalScale` का रखते हैं। कोने और बीच वाला हिस्सा `font.png` के एक कोने से आते हैं। `CalcCardUV(anchoAtlas, altoAtlas)` ये कोऑर्डिनेट गणना करता है: इसे टेक्सचर के आकार के साथ एक बार कॉल किया जाता है।
+`Card` (`widgets/card.h`) गोल कोनों वाला वह आयत है जो बटन, मेनू और प्रॉपर्टी कार्ड में होता है। यह एक **9-patch** है: 16 वर्टेक्स जो बीच वाले हिस्से को खींचते हैं और कोनों को `2 * GlobalScale` का रखते हैं। कोने और बीच वाला हिस्सा `font.png` के एक कोने से आते हैं। `CalcCardUV(widthAtlas, heightAtlas)` ये कोऑर्डिनेट गणना करता है: इसे टेक्सचर के आकार के साथ एक बार कॉल किया जाता है।
 
 | फ़ंक्शन | क्या करता है |
 |---|---|
 | `Resize(w, h)` | आकार बदलता है |
-| `RenderObject(propio)` | भराव ड्रॉ करता है |
-| `RenderBorder(propio)` | सिर्फ़ बॉर्डर ड्रॉ करता है |
+| `RenderObject(own)` | भराव ड्रॉ करता है |
+| `RenderBorder(own)` | सिर्फ़ बॉर्डर ड्रॉ करता है |
 | `RenderObjectTab()`, `RenderBorderTab()` | वही, नीचे वाली सीधी तरफ़ के साथ: टैब के लिए |
 
-`propio` के `true` होने पर यह अपना रंग (`color` और `opacity`) इस्तेमाल करता है; `false` होने पर, मौजूदा रंग।
+`own` के `true` होने पर यह अपना रंग (`color` और `opacity`) इस्तेमाल करता है; `false` होने पर, मौजूदा रंग।
 
 ```cpp
-Card fondo(NULL, 120, 40);
-SetColorID(ColorID::gris);
-fondo.RenderObject(false);
+Card background(NULL, 120, 40);
+SetColorID(ColorID::gray);
+background.RenderObject(false);
 SetColorID(ColorID::accent);
-fondo.RenderBorder(false);
+background.RenderBorder(false);
 ```
 
 ## स्किन का एटलस
 
-पूरे इंटरफ़ेस के लिए एक ही टेक्सचर। 128x128 का `font.png` अक्षर, कार्ड के किनारे और पुराने आइकन लाता है। सिर्फ़ इससे ही UI चल जाती है: `CrearIconos` आइकन `font.png` के अंदर से लेता है।
+पूरे इंटरफ़ेस के लिए एक ही टेक्सचर। 128x128 का `font.png` अक्षर, कार्ड के किनारे और पुराने आइकन लाता है। सिर्फ़ इससे ही UI चल जाती है: `CreateIcons` आइकन `font.png` के अंदर से लेता है।
 
-नए आइकन अलग-अलग फ़ाइलें हैं, `atlas/iconos/` में। एडिटर शुरू होते समय एक बड़ा टेक्सचर बनाता है (`main/io/SkinAtlas.cpp`): वह पूरे `font.png` को (0,0) पर रखता है, ताकि उसके कोऑर्डिनेट न बदलें, और हर आइकन को बची हुई जगह में पैक करता है। फिर वह UI को `CrearIconosDesde` से बताता है कि हर एक कहाँ गया। वह एटलस बनाना एडिटर का काम है; पैकर और आइकन की टेबल UI के हैं। [आइकन](iconos.md) देखें।
+नए आइकन अलग-अलग फ़ाइलें हैं, `atlas/icons/` में। एडिटर शुरू होते समय एक बड़ा टेक्सचर बनाता है (`main/io/SkinAtlas.cpp`): वह पूरे `font.png` को (0,0) पर रखता है, ताकि उसके कोऑर्डिनेट न बदलें, और हर आइकन को बची हुई जगह में पैक करता है। फिर वह UI को `CreateIconsFrom` से बताता है कि हर एक कहाँ गया। वह एटलस बनाना एडिटर का काम है; पैकर और आइकन की टेबल UI के हैं। [आइकन](iconos.md) देखें।
 
 ## पैकर
 
@@ -69,12 +69,12 @@ fondo.RenderBorder(false);
 
 ```cpp
 std::vector<W3dAtlasItem> items(n);       // हर इमेज का: rgba, w, h
-items[0].fijo = true;                     // यह हर हाल में वहीं जाती है जहाँ माँगा गया है
+items[0].fixed = true;                     // यह हर हाल में वहीं जाती है जहाँ माँगा गया है
 items[0].x = 0; items[0].y = 0;
 
-std::vector<unsigned char> lienzo; int W = 0, H = 0;
-if (W3dAtlasPack(&items[0], n, 2, lienzo, &W, &H)) {    // इमेज के बीच 2 पिक्सेल की ख़ाली जगह
-    unsigned int tex = w3dEngine::UploadRGBA(&lienzo[0], W, H, true);
+std::vector<unsigned char> canvas; int W = 0, H = 0;
+if (W3dAtlasPack(&items[0], n, 2, canvas, &W, &H)) {    // इमेज के बीच 2 पिक्सेल की ख़ाली जगह
+    unsigned int tex = w3dEngine::UploadRGBA(&canvas[0], W, H, true);
     // items[i].x, items[i].y: हर एक कहाँ गई
 }
 ```

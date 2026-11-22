@@ -19,92 +19,92 @@
 #  ventana), MENOS llamadas (con los mismos draws) y el cache coherente con GL ('glaudit' compara tambien la
 #  modelview, los binds de buffers y los punteros; 'matrizaudit' cada lectura de la matriz).
 # ==========================================================================
-escenadefecto
-llamadasarmar
+scenedefault
+callsbuild
 selobj LlamGenerada
 modadd array
 deselectall
 # la rutina: dibuja el cubo del proyecto con la matriz de un vacio (multiplicada, y cargada con giro) y rotaciones
-rutina LlamRut
-rutinapaso LlamRut array modo=0 on=1
-rutinapaso LlamRut array modo=1 on=0
-rutinapaso LlamRut array modo=2 on=0
-rutinapaso LlamRut array modo=3 on=0
-rutinapaso LlamRut luz on=0
-rutinapaso LlamRut textura on=0
-rutinapaso LlamRut color n0=1 n1=0.5 n2=0.1 n3=1
-rutinapaso LlamRut punteroVertices ref=Cubo
-rutinapaso LlamRut apilar
-rutinapaso LlamRut matrizObjeto ref=LlamAnclaRut modo=0
-rutinapaso LlamRut rotar n0=30 n1=1 n2=1 n3=0
-rutinapaso LlamRut dibujar ref=Cubo
-rutinapaso LlamRut desapilar
-rutinapaso LlamRut matrizObjeto ref=LlamAnclaRut2 modo=1 n0=45
-rutinapaso LlamRut rotar n0=90 n1=0 n2=0 n3=1
-rutinapaso LlamRut trasladar n0=0.5 n1=0 n2=0
-rutinapaso LlamRut escalar n0=0.8 n1=0.8 n2=0.8
-rutinapaso LlamRut dibujar ref=Cubo
-rutinainfo LlamRut
+routine LlamRut
+routinestep LlamRut array mode=0 on=1
+routinestep LlamRut array mode=1 on=0
+routinestep LlamRut array mode=2 on=0
+routinestep LlamRut array mode=3 on=0
+routinestep LlamRut light on=0
+routinestep LlamRut texture on=0
+routinestep LlamRut color n0=1 n1=0.5 n2=0.1 n3=1
+routinestep LlamRut vertexPointer ref=Cubo
+routinestep LlamRut push
+routinestep LlamRut objectMatrix ref=LlamAnclaRut mode=0
+routinestep LlamRut rotate n0=30 n1=1 n2=1 n3=0
+routinestep LlamRut draw ref=Cubo
+routinestep LlamRut pop
+routinestep LlamRut objectMatrix ref=LlamAnclaRut2 mode=1 n0=45
+routinestep LlamRut rotate n0=90 n1=0 n2=0 n3=1
+routinestep LlamRut translate n0=0.5 n1=0 n2=0
+routinestep LlamRut scale n0=0.8 n1=0.8 n2=0.8
+routinestep LlamRut draw ref=Cubo
+routineinfo LlamRut
 
 # ---- 1) EL EDITOR: viewport con overlays (grilla, gizmos), vista con luces ----
-ventana 640 480
-vpvista rendered
-menosllamadas off
-llamadascuadro calent vp
-llamadascuadro ed_off vp
-menosllamadas on
-llamadascuadro calent vp
-llamadascuadro ed_on vp
-llamadasigual ed_off ed_on
-llamadasbajan ed_off ed_on 40
+window 640 480
+vpview rendered
+fewercalls off
+callsframe calent vp
+callsframe ed_off vp
+fewercalls on
+callsframe calent vp
+callsframe ed_on vp
+callsequal ed_off ed_on
+callsdrop ed_off ed_on 40
 glaudit 3
-matrizaudit on
-llamadascuadro ed_audit vp
-matrizaudit cero
-matrizaudit off
-llamadasigual ed_off ed_audit
+matrixaudit on
+callsframe ed_audit vp
+matrixaudit zero
+matrixaudit off
+callsequal ed_off ed_audit
 
 # ---- 2) EL JUEGO: la camara de la escena, sin editor, como en el telefono (la ventana chica) ----
-juego on
-vpcamara on
-juegopuro
-ventana 320 240
+game on
+vpcamera on
+gamepure
+window 320 240
 simplay 2
 # quieto: dos cuadros iguales seguidos (los esqueletos con la pose ya subida al VBO)
-menosllamadas off
-llamadascuadro calent
-llamadascuadro j_off
-menosllamadas on
-llamadascuadro calent
-llamadascuadro j_on
-llamadasigual j_off j_on
-llamadasbajan j_off j_on 40
+fewercalls off
+callsframe calent
+callsframe j_off
+fewercalls on
+callsframe calent
+callsframe j_on
+callsequal j_off j_on
+callsdrop j_off j_on 40
 # animando: la pose cambia antes de cada cuadro (la malla skinneada va por arrays de RAM)
-menosllamadas off
-llamadaspose LlamRigAnima 20
-llamadascuadro calent
-llamadaspose LlamRigAnima 40
-llamadascuadro a_off
-menosllamadas on
-llamadaspose LlamRigAnima 20
-llamadascuadro calent
-llamadaspose LlamRigAnima 40
-llamadascuadro a_on
-llamadasigual a_off a_on
-llamadasdistinto j_on a_on
-llamadasbajan a_off a_on 30
+fewercalls off
+callspose LlamRigAnima 20
+callsframe calent
+callspose LlamRigAnima 40
+callsframe a_off
+fewercalls on
+callspose LlamRigAnima 20
+callsframe calent
+callspose LlamRigAnima 40
+callsframe a_on
+callsequal a_off a_on
+callsdistinct j_on a_on
+callsdrop a_off a_on 30
 glaudit 3
 # cada opcion sola tambien da la misma imagen (la pose quedo en 40: la de a_off)
-perezosas off
-punteroscache on
-llamadascuadro calent
-llamadascuadro solo_punteros
-llamadasigual a_off solo_punteros
-perezosas on
-punteroscache off
-llamadascuadro calent
-llamadascuadro solo_perezosas
-llamadasigual a_off solo_perezosas
-menosllamadas on
-perezosas es 1
-punteroscache es 1
+lazy off
+pointerscache on
+callsframe calent
+callsframe solo_punteros
+callsequal a_off solo_punteros
+lazy on
+pointerscache off
+callsframe calent
+callsframe solo_perezosas
+callsequal a_off solo_perezosas
+fewercalls on
+lazy es 1
+pointerscache es 1

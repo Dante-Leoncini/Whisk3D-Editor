@@ -14,32 +14,32 @@
 #  t22..t30), salir 2 (t13, t18).
 # ==========================================================================
 
-abrirw3d prueba_hitbox_binds.w3d
-hitboxinfo Zona activo 1 tam 2 2 2 duenio Zona
+openw3d prueba_hitbox_binds.w3d
+hitboxinfo Zona active 1 size 2 2 2 owner Zona
 
 simplay 12
-hitboxinfo Zona tocando 1 activo 0
-scriptinfo compartido dentro12 1
-scriptinfo compartido dentroNombre12 Movil
-scriptinfo compartido tocaMovil12 si
-scriptinfo compartido tocaCaja12 si
-scriptinfo compartido tocaLejos12 no
-scriptinfo compartido movilDentro12 1
-scriptinfo compartido movilActivo12 si
-scriptinfo compartido activo12 no
+hitboxinfo Zona touching 1 active 0
+scriptinfo shared dentro12 1
+scriptinfo shared dentroNombre12 Movil
+scriptinfo shared tocaMovil12 si
+scriptinfo shared tocaCaja12 si
+scriptinfo shared tocaLejos12 no
+scriptinfo shared movilDentro12 1
+scriptinfo shared movilActivo12 si
+scriptinfo shared activo12 no
 
 # t13: apagada -> sale (sin estar ya adentro de nada)
 simplay 1
-hitboxinfo Zona tocando 0 dentro 0 activo 0
-scriptinfo compartido zona_salir 1
-scriptinfo compartido zona_salio Movil
+hitboxinfo Zona touching 0 inside 0 active 0
+scriptinfo shared zona_salir 1
+scriptinfo shared zona_salio Movil
 
 simplay 17
-hitboxinfo Zona activo 1 tam 20 2 2 tocando 1 dentro 1
-scriptinfo compartido zona_entrar 3
-scriptinfo compartido zona_quedarse 13
-scriptinfo compartido zona_salir 2
+hitboxinfo Zona active 1 size 20 2 2 touching 1 inside 1
+scriptinfo shared zona_entrar 3
+scriptinfo shared zona_quedarse 13
+scriptinfo shared zona_salir 2
 
 # Stop devuelve el hitbox como lo dejo el usuario (el script lo agrando)
 simstop
-hitboxinfo Zona activo 1 tam 2 2 2 tocando 0
+hitboxinfo Zona active 1 size 2 2 2 touching 0

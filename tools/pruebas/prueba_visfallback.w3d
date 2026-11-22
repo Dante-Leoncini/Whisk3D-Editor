@@ -15,7 +15,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Wavefront {
@@ -23,8 +23,8 @@ Whisk3D {
             filePath: vis-tris.obj
             y: -3.0
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
                 vis: "vis-hueco.w3dvis"
             }
         }
@@ -33,10 +33,10 @@ Whisk3D {
             filePath: vis-tris.obj
             y: 1.5
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
                 vis: "vis-hueco.w3dvis"
-                sectorFallback: "completa"
+                sectorFallback: "complete"
             }
         }
         Wavefront {
@@ -44,8 +44,8 @@ Whisk3D {
             filePath: vis-tris.obj
             y: 6.0
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
                 vis: "vis-hueco.w3dvis"
                 sectorFallback: 3
             }

@@ -2,4 +2,4 @@
 fsr
 # el viewport en Rendered trazando a la mitad: la imagen agrandada con FSR es del tamano de la vista
 add cube
-fsr vista
+fsr view

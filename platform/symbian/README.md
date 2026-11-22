@@ -32,8 +32,8 @@ Se compila con el SDK de S60 3rd Edition + **Carbide.c++** (o `bldmake` + `abld`
 Los gestos son los mismos de Android y la web, con el mismo código:
 
 - S60 5th (5800, N97): un dedo. Symbian^3 (N8 y los que siguen; la variante ES 2.0): multitáctil.
-- Los dedos los sigue el Core (`libs/Whisk3DCore/input/W3dTactil.cpp`, y `W3dTactilSymbian.cpp` para el `TPointerEvent`). Arma los mismos eventos que SDL en Android: el primer dedo mueve y aprieta el mouse, los demás solo avisan como dedos.
-- El editor los convierte en `SDL_Event` (`main/app/W3dTactilEditor.cpp`) y entran por `controles.cpp`, como en Android. Para eso `controles.cpp` compila en Symbian contra `main/app/W3dSdlMinimo.h`.
+- Los dedos los sigue el Core (`libs/Whisk3DCore/input/W3dTouch.cpp`, y `W3dTouchSymbian.cpp` para el `TPointerEvent`). Arma los mismos eventos que SDL en Android: el primer dedo mueve y aprieta el mouse, los demás solo avisan como dedos.
+- El editor los convierte en `SDL_Event` (`main/app/W3dTouchEditor.cpp`) y entran por `controls.cpp`, como en Android. Para eso `controls.cpp` compila en Symbian contra `main/app/W3dSdlMin.h`.
 - Una mejora de los gestos en Android llega sola al teléfono. En la PC se prueba con `tactiltest` (`tools/pruebas/prueba_tactil.w3s`), que pasa por el mismo camino del Core.
 - En Symbian los handlers de PC del viewport 3D y de los paneles corren solo con el dedo o el mouse Bluetooth (`W3D_SOLO_POR_CONTROLES`): el keypad y el cursor virtual del N95 siguen como antes.
 - En un teléfono táctil la barra de herramientas del 3D sale prendida: con el dedo, el transform se confirma con el tilde.
@@ -49,7 +49,7 @@ Al conectar una pantalla, el editor pregunta qué hacer con ella:
 
 Cómo funciona:
 
-- La lógica es compartida (`main/UI/ViewPorts/PantallasExternas.cpp`). Se prueba en la PC con el comando `pantalla` del harness.
+- La lógica es compartida (`main/UI/ViewPorts/ExternalScreens.cpp`). Se prueba en la PC con el comando `pantalla` del harness.
 - La parte del teléfono es `src/w3dpantallas.cpp`. Revisa una vez por segundo las pantallas que expone wserv (`RWsSession::NumberOfScreens`). En la variante ES 2.0, además, confirma con el AccMonitor que haya un cable de video (HDMI o compuesto).
 - Si se elige un viewport, crea en esa pantalla un window group, una ventana y una superficie EGL que comparte el contexto de la principal.
 - El N8 tiene salida RCA de 480i y HDMI de 720p. La variante ES 1.1 dibuja la pantalla externa a 320x240 como máximo, porque el TV-out del N95 muestra 240p.

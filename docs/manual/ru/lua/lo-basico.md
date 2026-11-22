@@ -13,11 +13,11 @@
 Переменная создаётся, когда ей присваивают значение. Всегда используй `local`: такая переменная существует только внутри блока, где она объявлена, и не конфликтует с другими.
 
 ```lua
-local vidas = 3           -- число (целое)
-local velocidad = 2.5     -- число (дробное)
-local nombre = "Whisky"   -- текст (строка)
-local vivo = true         -- логическое значение: true или false
-local nada = nil          -- nil = "нет значения"
+local lives = 3         -- число (целое)
+local speed = 2.5       -- число (дробное)
+local name = "Whisky"   -- текст (строка)
+local live = true       -- логическое значение: true или false
+local none = nil        -- nil = "нет значения"
 ```
 
 Типы Lua: `nil`, `boolean`, `number`, `string`, `table` и `function`. Объекты сцены, которые выдаёт Whisk3D, — это особый тип, который используется только для передачи в функции движка.
@@ -30,9 +30,9 @@ local nada = nil          -- nil = "нет значения"
 | `//` | Целочисленное деление | `7 // 2` → 3 |
 | `%` | Остаток от деления | `7 % 2` → 1 |
 | `^` | Возведение в степень | `2 ^ 3` → 8.0 |
-| `== ~= < > <= >=` | Сравнения (`~=` означает "не равно") | `vidas ~= 0` |
-| `and or not` | Логические | `vivo and vidas > 0` |
-| `..` | Склеивание строк | `"Vidas: " .. vidas` |
+| `== ~= < > <= >=` | Сравнения (`~=` означает "не равно") | `lives ~= 0` |
+| `and or not` | Логические | `live and lives > 0` |
+| `..` | Склеивание строк | `"Vidas: " .. lives` |
 | `#` | Длина строки или списка | `#"hola"` → 4 |
 
 > [!NOTE]
@@ -70,19 +70,19 @@ end
 ## Функции
 
 ```lua
-local function sumar(a, b)
+local function add(a, b)
   return a + b
 end
-print(sumar(2, 3))        -- 5
+print(add(2, 3))        -- 5
 
 -- функция может возвращать несколько значений
 local function minMax(a, b)
   if a < b then return a, b else return b, a end
 end
-local menor, mayor = minMax(8, 3)
+local less, greater = minMax(8, 3)
 ```
 
-Многие функции Whisk3D возвращают сразу несколько значений, например `local x, y, z = posicion(yo())`.
+Многие функции Whisk3D возвращают сразу несколько значений, например `local x, y, z = getPosition(self())`.
 
 ## Таблицы: списки и словари
 
@@ -90,23 +90,23 @@ local menor, mayor = minMax(8, 3)
 
 ```lua
 -- как список (индексы начинаются с 1, а не с 0)
-local frutas = { "manzana", "pera", "uva" }
-print(frutas[1])          -- manzana
-print(#frutas)            -- 3
-frutas[#frutas + 1] = "kiwi"   -- добавить в конец
-table.insert(frutas, "melón")  -- другой способ
+local fruits = { "manzana", "pera", "uva" }
+print(fruits[1])          -- manzana
+print(#fruits)            -- 3
+fruits[#fruits + 1] = "kiwi"   -- добавить в конец
+table.insert(fruits, "melón")  -- другой способ
 
-for i, f in ipairs(frutas) do  -- обойти список по порядку
+for i, f in ipairs(fruits) do  -- обойти список по порядку
   print(i, f)
 end
 
 -- как словарь (ключ = значение)
-local jugador = { nombre = "Ana", puntos = 0 }
-jugador.puntos = jugador.puntos + 10
-print(jugador["nombre"])  -- Ana
+local player = { name = "Ana", puntos = 0 }
+player.puntos = player.puntos + 10
+print(player["nombre"])  -- Ana
 
-for clave, valor in pairs(jugador) do  -- обойти все ключи (порядок не гарантирован)
-  print(clave, valor)
+for clave, value in pairs(player) do  -- обойти все ключи (порядок не гарантирован)
+  print(clave, value)
 end
 ```
 
@@ -115,7 +115,7 @@ end
 ```lua
 local t = string.format("Puntos: %d  Tiempo: %.1f", 120, 3.456)  -- "Puntos: 120  Tiempo: 3.5"
 local may = string.upper("hola")        -- "HOLA"
-local parte = string.sub("Whisk3D", 1, 5)   -- "Whisk"
+local part = string.sub("Whisk3D", 1, 5)   -- "Whisk"
 local n = tonumber("42")                -- строку в число
 local s = tostring(3.5)                 -- число в строку
 local r = math.floor(2.7)               -- 2
@@ -125,4 +125,4 @@ local m = math.max(4, 9, 2)             -- 9
 local pi = math.pi
 ```
 
-Для случайных чисел в Whisk3D есть `azar()` (см. справочник). Работает и `math.random`: его генератор уже инициализируется по-разному в каждой игре.
+Для случайных чисел в Whisk3D есть `random()` (см. справочник). Работает и `math.random`: его генератор уже инициализируется по-разному в каждой игре.

@@ -4,50 +4,72 @@
 #   - Rotar: la fila pasa a ser columna y al reves
 #   - en el TELEFONO, cada orientacion tiene su layout: al girar vuelve el de la otra
 #   (el harness usa /tmp/w3d_prueba_layouts.txt, que arranca sin existir)
-ventana 960 540
-escala 2
-layout estructura F(C(3D,TL),C(OUT,PROP))
-layout cuantos 1
-layout poner Animación
-layout estructura C(3D,TL)
+window 960 540
+scale 2
+layout structure F(C(3D,TL),C(OUT,PROP))
+layout count 1
+layout set Animación
+layout structure C(3D,TL)
 # rotar: la columna pasa a ser fila, y de vuelta
-layout rotar 1
-layout estructura F(3D,TL)
-layout rotar 5
-layout estructura C(3D,TL)
+layout rotate 1
+layout structure F(3D,TL)
+layout rotate 5
+layout structure C(3D,TL)
 # guardar el actual con un nombre, volver al de fabrica y ponerlo otra vez
-layout rotar 1
-layout guardar Lado a lado
-layout cuantos 2
-layout poner default
-layout estructura F(C(3D,TL),C(OUT,PROP))
-layout poner Lado a lado
-layout estructura F(3D,TL)
+layout rotate 1
+layout save Lado a lado
+layout count 2
+layout set default
+layout structure F(C(3D,TL),C(OUT,PROP))
+layout set Lado a lado
+layout structure F(3D,TL)
 # la ventanita del nombre (Guardar layout...): se escribe y Enter
-layout menu guardar
-texto Personal
-tecla Return
-layout cuantos 3
+layout menu save
+text Personal
+key Return
+layout count 3
 # borrar (tambien el que viene con el programa); sin guardados no hay nada que borrar
-layout borrar Animación
-layout borrar Lado a lado
-layout borrar Personal
-layout cuantos 0
-fail layout borrar Animación
+layout delete Animación
+layout delete Lado a lado
+layout delete Personal
+layout count 0
+fail layout delete Animación
 # el menu de la esquina: Rotar y Layout
-layout poner default
-vpmenutipo 1
+layout set default
+vpmenutype 1
 menuitem Rotate
 menuitem Layout
-tecla Escape
+key Escape
 # TELEFONO: un layout para cada orientacion
-layout telefono 1
-layout pantalla 540 960
-layout estructura C(3D,PROP)
-layout rotar 1
-layout estructura F(3D,PROP)
-layout pantalla 960 540
-layout estructura F(C(3D,TL),C(OUT,PROP))
-layout pantalla 540 960
-layout estructura F(3D,PROP)
-layout telefono 0
+layout phone 1
+layout screen 540 960
+layout structure C(3D,PROP)
+layout rotate 1
+layout structure F(3D,PROP)
+layout screen 960 540
+layout structure F(C(3D,TL),C(OUT,PROP))
+layout screen 540 960
+layout structure F(3D,PROP)
+layout phone 0
+# CERRAR VIEWPORT (la esquina de un viewport): el viewport se va y su hermano toma su lugar. EXPANDIR es al reves:
+# el viewport toma el lugar del hermano
+layout screen 960 540
+layout set default
+layout structure F(C(3D,TL),C(OUT,PROP))
+layout close 5
+layout structure F(3D,C(OUT,PROP))
+layout close 2
+layout structure F(3D,PROP)
+layout set default
+layout expand 5
+layout structure F(TL,C(OUT,PROP))
+# el ultimo viewport no se cierra (el menu ni lo ofrece)
+layout set default
+layout close 5
+layout close 2
+layout close 3
+layout structure 3D
+layout close 1
+layout structure 3D
+layout set default
+layout structure F(C(3D,TL),C(OUT,PROP))

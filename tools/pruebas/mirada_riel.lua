@@ -8,27 +8,27 @@
 --  lo lee, lo APAGA, lo vuelve a leer y deja las dos lecturas en el mapa
 --  compartido para que el .w3s las asserte con `scriptinfo compartido`.
 -- ==========================================================================
-propiedades = {
-    cam = "objeto",     -- ref_cam: "Camara" (la camara del riel)
+properties = {
+    cam = "object",     -- ref_cam: "Camara" (la camara del riel)
 }
 
-function inicio()
-    local cam = objeto and objeto("cam") or nil
-    if not (cam and rielDe and setMiradaRiel) then return end
-    local nombre, off, nodo, mirada = rielDe(cam)
+function start()
+    local cam = object and object("cam") or nil
+    if not (cam and getRail and setRailLook) then return end
+    local name, off, node, look = getRail(cam)
     -- sin espacios: el assert del harness (scriptinfo compartido) lee UN token
-    setCompartido("rielNodos", (nombre ~= "") and "hay" or "ninguno")
-    setCompartido("miradaAntes", mirada and "si" or "no")
+    setShared("rielNodos", (name ~= "") and "hay" or "ninguno")
+    setShared("miradaAntes", look and "si" or "no")
 
-    setMiradaRiel(cam, false)
-    local _, _, _, m2 = rielDe(cam)
-    setCompartido("miradaDespues", m2 and "si" or "no")
+    setRailLook(cam, false)
+    local _, _, _, m2 = getRail(cam)
+    setShared("miradaDespues", m2 and "si" or "no")
 
     -- y de vuelta a prendida, para dejar la escena como estaba
-    setMiradaRiel(cam, true)
-    local _, _, _, m3 = rielDe(cam)
-    setCompartido("miradaFinal", m3 and "si" or "no")
+    setRailLook(cam, true)
+    local _, _, _, m3 = getRail(cam)
+    setShared("miradaFinal", m3 and "si" or "no")
 end
 
-function actualizar(dt)
+function update(dt)
 end

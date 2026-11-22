@@ -16,38 +16,38 @@
 #    ../../platform/linux/build/whisk3d --script prueba_cargas.w3s
 # ===========================================================================
 
-cargastest
+loadstest
 pool 2 1
-abrirw3d prueba_cargas.w3d
+openw3d prueba_cargas.w3d
 
 # --- A) ENTRAR AL RIEL: fila 0 de "adelante" BLOQUEANTE ---------------------
 # poste (297) + puente (564) se empaquetan JUNTOS en una pagina (co-uso)
-cargasentrar Riel adelante
-recinfo otro espejo-poste.obj estado LISTO
-recinfo otro espejo-puente.obj estado LISTO
-recinfo otro espejo-poste.obj trefs 1
-poolinfo vivas 1
+loadsenter Riel forward
+recinfo other espejo-poste.obj state LISTO
+recinfo other espejo-puente.obj state LISTO
+recinfo other espejo-poste.obj trefs 1
+poolinfo live 1
 poolinfo bytes 861
 
 # --- B) CRUZAR EL NODO 1: adquiere ASYNC + suelta la fila 0 de "atras" ------
 # el rojo queda EN VUELO (la bomba no corrio); el poste (fila 0 de atras) se
 # libera YA: refcount 0 = muere al instante, sin LRU
-cargasnodo Riel 1 adelante
-recinfo otro espejo-cubo-rojo.obj estado EN_VUELO
-recinfo otro espejo-poste.obj estado NADA
+loadsnode Riel 1 forward
+recinfo other espejo-cubo-rojo.obj state EN_VUELO
+recinfo other espejo-poste.obj state NADA
 poolinfo bytes 564
 # UNA carga por bombeo: el rojo aterriza (1003 B; no cabe con el puente -> 2da pagina)
 pump
-recinfo otro espejo-cubo-rojo.obj estado LISTO
-poolinfo vivas 2
+recinfo other espejo-cubo-rojo.obj state LISTO
+poolinfo live 2
 poolinfo bytes 1567
 
 # --- C) NODO 2: reuso del id + la pagina del puente se libera al vaciarse ----
-cargasnodo Riel 2 adelante
+loadsnode Riel 2 forward
 pump
-recinfo otro espejo-poste.obj estado LISTO
-recinfo otro espejo-puente.obj estado NADA
-poolinfo vivas 2
+recinfo other espejo-poste.obj state LISTO
+recinfo other espejo-puente.obj state NADA
+poolinfo live 2
 poolinfo bytes 1300
 
 # --- D) EL LIMITE DEL POOL: la orilla (1203 B) necesita 2 paginas CONTIGUAS -
@@ -55,53 +55,53 @@ poolinfo bytes 1300
 # poste): la orilla NO entra y la bomba la deja EN VUELO. El faltante
 # SOSTENIDO (sigue en vuelo tras 3 bombeos) es la senal medible del pool
 # chico; NADA crashea y no hay overflow (solo las bloqueantes lo cuentan).
-cargasnodo Riel 3 adelante
+loadsnode Riel 3 forward
 pump 3
-recinfo otro espejo-orilla.obj estado EN_VUELO
+recinfo other espejo-orilla.obj state EN_VUELO
 poolinfo overflows 0
-poolinfo vivas 1
+poolinfo live 1
 
 # --- E) SE HACE LUGAR Y EL PEDIDO SE RECUPERA -------------------------------
 # OJO: la purga en bloque tambien mata las refs EN VUELO (es el modelo: cambiar
 # de curva cancela lo pendiente de la anterior). Con el pool ya vacio, re-pedir
 # la fila del nodo 3 ahora SI encuentra las 2 paginas contiguas.
-purgar
-poolinfo vivas 0
-recinfo otro espejo-orilla.obj estado NADA
-cargasnodo Riel 3 adelante
+purge
+poolinfo live 0
+recinfo other espejo-orilla.obj state NADA
+loadsnode Riel 3 forward
 pump
-recinfo otro espejo-orilla.obj estado LISTO
-poolinfo vivas 2
+recinfo other espejo-orilla.obj state LISTO
+poolinfo live 2
 poolinfo bytes 1203
 
 # --- F) VOLVER AL MENU: la purga deja el pool EN CERO (prueba de fugas) -----
-purgar
-poolinfo vivas 0
+purge
+poolinfo live 0
 poolinfo bytes 0
 
 # --- G) CAMBIO DE CURVA/DIRECCION: purga en bloque + entrada por la punta ---
 # entrar por ATRAS adquiere la ULTIMA fila de "atras" (el set completo de esa
 # punta: poste + puente + rojo)
-cargasentrar Riel atras
-recinfo otro espejo-poste.obj estado LISTO
-recinfo otro espejo-cubo-rojo.obj estado LISTO
-poolinfo vivas 2
+loadsenter Riel back
+recinfo other espejo-poste.obj state LISTO
+recinfo other espejo-cubo-rojo.obj state LISTO
+poolinfo live 2
 poolinfo bytes 1864
 # re-entrar por ADELANTE purga TODO lo transitorio y carga la fila 0
-cargasentrar Riel adelante
-recinfo otro espejo-cubo-rojo.obj estado NADA
-poolinfo vivas 1
+loadsenter Riel forward
+recinfo other espejo-cubo-rojo.obj state NADA
+poolinfo live 1
 poolinfo bytes 861
 
 # el pico de paginas del recorrido entero: 2 (cabe en el pool de 2)
-poolinfo pico 2
+poolinfo peak 2
 
 # --- H) ROUND-TRIP v4: la declaracion ListaCarga sobrevive al guardado ------
 # (abrir otra escena ademas PURGA las transitorias: el cierre es el "volver
 #  al menu" del modelo, y las paginas quedan en 0 antes de re-entrar)
-guardarw3d prueba_cargas_v4.w3d
-abrirw3d prueba_cargas_v4.w3d
-poolinfo vivas 0
-cargasentrar Riel adelante
-poolinfo vivas 1
+savew3d prueba_cargas_v4.w3d
+openw3d prueba_cargas_v4.w3d
+poolinfo live 0
+loadsenter Riel forward
+poolinfo live 1
 poolinfo bytes 861

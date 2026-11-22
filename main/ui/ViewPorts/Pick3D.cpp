@@ -5,11 +5,11 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
-#include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
+#include "ViewPorts/PopUp/ConfirmPopup.h" // OpenConfirmDelete (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
-#include "edit/MeshEdit.h"   // W3dTriangularCara
+#include "edit/MeshEdit.h"   // W3dTriangulateFace
 #include "ViewPorts/PoseTransform.h" // Pose Mode transform (extraido a su propio archivo)
-#include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
+#include "ViewPorts/Notifications.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
 #include "ViewPorts/Parent.h" // emparentar/desemparentar (extraido a su propio archivo)
 #include "ViewPorts/ViewPort3D.h"
@@ -18,7 +18,7 @@
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
-#include "objects/MallaRecurso.h" // W3dMallaCarasVista: la seleccion por caja de una malla de un recurso
+#include "objects/MeshResource.h" // W3dMeshFacesView: la seleccion por caja de una malla de un recurso
 #include "objects/Materials.h" // Material (mat->texture) para el dropdown "Texture" del UV editor
 #include "objects/Textures.h"  // Texture (path) para las etiquetas del dropdown
 #include "objects/EditMesh.h"
@@ -26,28 +26,28 @@
 #include "objects/Camera.h"
 #include "objects/Empty.h"
 #include "objects/Armature.h"
-#include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
+#include "animation/SkeletalAnimation.h" // InsertKeyframeSkeleton (Pose Mode: Insert Keyframe)
 #include "animation/VertexAnimation.h"   // VtxAnimSnap: los frames de la vertex anim viajan con el snapshot del loop cut
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
 #include "edit/BoneEdit.h" // Edit Mode de ARMATURE: click = seleccionar hueso + drag de head/tail (Fase 3)
-#include "objects/Primitivas.h"
+#include "objects/Primitives.h"
 #include "variables.h"
-#include "render/OpcionesRender.h" // g_fpsActual
+#include "render/RenderOptions.h" // g_currentFps
 #include "ViewPorts/PopUp/PopUpBase.h"
 #include "ViewPorts/PopUp/RedoMeshPanel.h"
 #include "WhiskUI/widgets/card.h"        // tarjeta de las notificaciones
 #include "WhiskUI/text/bitmapText.h"  // texto de las notificaciones
 #include "WhiskUI/draw/icons.h"       // iconos notifOk / notifError
-#include "WhiskUI/theme/colores.h"     // ColorID
+#include "WhiskUI/theme/colors.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
 #include "ViewPorts/Pick3D.h"
 #include "edit/BoxSelect.h"   // la caja compartida + sus predicados
-#include "objects/Hitbox.h"   // el pick de un hitbox es su ALAMBRE (HitboxAristas)
-#include "objects/SondaLuz.h"   // la sonda de luz se elige por su icono (SondaLuzSeDibuja)
-#include "W3dRaices.h"         // las otras escenas abiertas: el click tambien las elige
-#include "io/RaicesEditor.h"   // W3dActivarRaizDe: lo elegido en otra escena abierta la activa
+#include "objects/Hitbox.h"   // el pick de un hitbox es su ALAMBRE (HitboxEdges)
+#include "objects/LightProbe.h"   // la sonda de luz se elige por su icono (LightProbeDraws)
+#include "W3dRoots.h"          // las otras escenas abiertas: el click tambien las elige
+#include "io/EditorRoots.h"    // W3dActivateRootOf: lo elegido en otra escena abierta la activa
 #include "script/W3dScript.h"  // (jugando no: el Play dibuja su base y sus capas)
 
 // ====================================================================
@@ -59,7 +59,7 @@ static Object* pickFound = NULL;
 
 // tipos seleccionables por click: malla (su geometria) o un objeto con icono
 // (camara, luz, empty, instancia) -> un punto del tamaño del icono en su origen
-static bool PickSeleccionable(Object* obj) {
+static bool PickSelectable(Object* obj) {
     if (!obj->visible) return false;
     ObjectType t = obj->getType();
     // si el overlay de ese TIPO esta oculto (submenu "Objects"), tampoco se puede pickear (no se ve -> no se clickea).
@@ -67,18 +67,18 @@ static bool PickSeleccionable(Object* obj) {
     if (t == ObjectType::light  && !g_showLights) return false;
     if (t == ObjectType::camera && !g_showCamera) return false;
     if (t == ObjectType::empty  && !g_showEmpty)  return false;
-    { extern bool g_showSonidos; if (t == ObjectType::sonido && !g_showSonidos) return false; }   // (overlay "Sounds")
-    if (t == ObjectType::hitbox && !HitboxSeDibuja()) return false;   // la MISMA regla que su dibujo
-    if ((t == ObjectType::sondaluz || t == ObjectType::sondareflejo) && !SondaLuzSeDibuja()) return false;
+    { extern bool g_showSounds; if (t == ObjectType::sound && !g_showSounds) return false; }   // (overlay "Sounds")
+    if (t == ObjectType::hitbox && !HitboxDraws()) return false;   // la MISMA regla que su dibujo
+    if ((t == ObjectType::sondaluz || t == ObjectType::sondareflejo) && !LightProbeDraws()) return false;
     return t == ObjectType::mesh || t == ObjectType::camera ||
            t == ObjectType::light || t == ObjectType::empty ||
            t == ObjectType::instance || t == ObjectType::armature ||
-           t == ObjectType::hitbox || t == ObjectType::sonido || t == ObjectType::sondaluz || t == ObjectType::sondareflejo;
+           t == ObjectType::hitbox || t == ObjectType::sound || t == ObjectType::sondaluz || t == ObjectType::sondareflejo;
 }
 // pick en 2 pasadas: primero NO-armatures (con z-buffer), despues armatures (XRAY, sin z, encima de todo)
 // para que el esqueleto se pickee EXACTAMENTE como se ve. 'armaturePass' filtra que se pinta/cuenta en cada pasada.
-static bool PickEnPasada(Object* obj, bool armaturePass) {
-    if (!PickSeleccionable(obj)) return false;
+static bool PickInPass(Object* obj, bool armaturePass) {
+    if (!PickSelectable(obj)) return false;
     return (obj->getType() == ObjectType::armature) == armaturePass;
 }
 
@@ -91,7 +91,7 @@ static void PickPaint(Object* obj, bool armaturePass) {
     Matrix4 M;
     obj->GetMatrix(M);
     w3dEngine::MultMatrix(M.m);
-    if (PickEnPasada(obj, armaturePass)) {
+    if (PickInPass(obj, armaturePass)) {
         pickCounter++;
         int id = pickCounter; // 1..N
         w3dEngine::Color4f(((id & 0x1F)) / 31.0f, ((id >> 5) & 0x3F) / 63.0f, 0.0f, 1.0f);
@@ -101,11 +101,11 @@ static void PickPaint(Object* obj, bool armaturePass) {
             // PRIORIDAD (igual que Render): (1) malla GENERADA por modificador (subdiv/screw) -> es lo que se VE
             // (sin esto un Screw sin caras no se podia clickear); (2) malla DEFORMADA por esqueleto (skinVertex) ->
             // el click sigue la animacion (sino cae en el bind: el drama de LISA); (3) el bind crudo.
-            if (m->genValido && m->genVertex && m->genFaces && m->genFacesSize > 0) {
+            if (m->genValid && m->genVertex && m->genFaces && m->genFacesSize > 0) {
                 w3dEngine::VertexPointer3f(0, m->genVertex);
                 w3dEngine::DrawTriangles(m->genFacesSize, m->genFaces);
             } else if (m->skinArmature && m->faces && m->facesSize > 0) {
-                extern void SkinearMesh(Mesh*); SkinearMesh(m); // asegura skinVertex al frame actual (cacheado)
+                extern void SkinMesh(Mesh*); SkinMesh(m); // asegura skinVertex al frame actual (cacheado)
                 const GLfloat* pb = m->skinVertex ? m->skinVertex : m->vertex; // guard: si no hay skinVertex, bind
                 if (pb) { w3dEngine::VertexPointer3f(0, pb); w3dEngine::DrawTriangles(m->facesSize, m->faces); }
             } else if (m->vertex && m->faces) {
@@ -131,18 +131,18 @@ static void PickPaint(Object* obj, bool armaturePass) {
         } else if (obj->getType() == ObjectType::hitbox) {
             // las ARISTAS de la caja, gruesas: se clickea el alambre que se ve y no el volumen (un
             // hitbox que envuelve una puerta no le tapa el click a la puerta)
-            float lineas[72];
-            HitboxAristas((W3dHitboxBase*)obj, lineas);
+            float lines[72];
+            HitboxEdges((W3dHitboxBase*)obj, lines);
             w3dEngine::LineWidth(5.0f * (float)GlobalScale);
-            w3dEngine::VertexPointer3f(0, lineas);
+            w3dEngine::VertexPointer3f(0, lines);
             w3dEngine::DrawLines(24);
             w3dEngine::LineWidth(1.0f);
         } else {
             // icono (camara/luz/empty/instancia): un punto clickeable en el
             // origen, del MISMO tamaño que el icono 3D (16 * GlobalScale)
-            static const GLfloat origen[3] = { 0.0f, 0.0f, 0.0f };
+            static const GLfloat origin[3] = { 0.0f, 0.0f, 0.0f };
             w3dEngine::PointSize(16.0f * GlobalScale);
-            w3dEngine::VertexPointer3f(0, origen);
+            w3dEngine::VertexPointer3f(0, origin);
             w3dEngine::DrawPoints(1);
         }
     }
@@ -152,23 +152,23 @@ static void PickPaint(Object* obj, bool armaturePass) {
     w3dEngine::PopMatrix();
 }
 
-static void PickResolve(Object* obj, int target, bool armaturePass) {
+static void PickResolves(Object* obj, int target, bool armaturePass) {
     if (!obj || pickFound) return;
-    if (PickEnPasada(obj, armaturePass)) {
+    if (PickInPass(obj, armaturePass)) {
         pickCounter++;
         if (pickCounter == target) { pickFound = obj; return; }
     }
     for (size_t i = 0; i < obj->Childrens.size(); i++) {
-        PickResolve(obj->Childrens[i], target, armaturePass);
+        PickResolves(obj->Childrens[i], target, armaturePass);
     }
 }
 
 // hubo input TACTIL en la sesion? (para agrandar el pick de vertices en pantallas tactiles)
 #ifndef W3D_SYMBIAN
-extern Uint32 g_lastFingerTicks; // controles.cpp
-static bool PickEsTactil(){ return g_lastFingerTicks != 0; }
+extern Uint32 g_lastFingerTicks; // controls.cpp
+static bool PickIsTouch(){ return g_lastFingerTicks != 0; }
 #else
-static bool PickEsTactil(){ return false; }
+static bool PickIsTouch(){ return false; }
 #endif
 
 // EDIT MODE: pick de VERTICE o ARISTA por color-ID (segun EditSelectMode). Dibuja
@@ -185,31 +185,31 @@ static bool PickEsTactil(){ return false; }
 // esta apuntando. Sin X-Ray no cambia nada: ahi el id-buffer es lo correcto (tapa lo de atras).
 static int EditPickFaceXRay(Mesh* m, EditMesh* e, int mx, int my) {
     if (!Viewport3DActive || !e || e->faceCenter.empty()) return -1;
-    Viewport3DActive->BindVista();
+    Viewport3DActive->BindView();
     Matrix4 W; m->GetWorldMatrix(W);
     const int nF = e->NumFaces();
-    const float radio = 40.0f * (float)GlobalScale;   // hasta donde se considera "apuntado"
-    int mejor = -1; float mejorD2 = radio * radio;
+    const float radius = 40.0f * (float)GlobalScale;   // hasta donde se considera "apuntado"
+    int best = -1; float bestD2 = radius * radius;
     for (int f = 0; f < nF && (size_t)(f*3+2) < e->faceCenter.size(); f++) {
         float sx, sy;
         Vector3 w = W * Vector3(e->faceCenter[f*3], e->faceCenter[f*3+1], e->faceCenter[f*3+2]);
-        if (!Viewport3DActive->ProyectarPunto(w, sx, sy)) continue;
+        if (!Viewport3DActive->ProjectPoint(w, sx, sy)) continue;
         const float dx = sx - (float)mx, dy = sy - (float)my;
         const float d2 = dx*dx + dy*dy;
-        if (d2 < mejorD2) { mejorD2 = d2; mejor = f; }
+        if (d2 < bestD2) { bestD2 = d2; best = f; }
     }
-    return mejor;
+    return best;
 }
 
-static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
+static int EditPickIndex(int mode, int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     Mesh* m = (Mesh*)g_editMesh;
     if (!m) return -1;
     m->EnsureEdit();
     EditMesh* e = m->edit;
     if (!e || e->pos.empty()) return -1;
-    if (g_xray && modo == SelFace) return EditPickFaceXRay(m, e, mx, my);
-    const bool edgeMode = (modo == SelEdge);
-    const bool faceMode = (modo == SelFace);
+    if (g_xray && mode == SelFace) return EditPickFaceXRay(m, e, mx, my);
+    const bool edgeMode = (mode == SelEdge);
+    const bool faceMode = (mode == SelFace);
     const int N = faceMode ? e->NumFaces() : edgeMode ? e->NumEdges() : e->NumVerts();
     if (N <= 0) return -1;
 
@@ -221,7 +221,7 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     // LA proyeccion del viewport (la misma funcion que usa su Render): mirando por la camara, la lente de la CAMARA con
     // su marco. Antes se armaba aca con la del visor: desde la camara el click caia en otro lado (una luz no se podia
     // elegir; un cubo grande en el centro, de casualidad si)
-    if (Viewport3DActive) Viewport3DActive->CargarProyeccionVista();
+    if (Viewport3DActive) Viewport3DActive->LoadProjectionView();
     w3dEngine::MatrixMode(w3dEngine::ModelView);
     w3dEngine::LoadIdentity();
     if (Viewport3DActive) Viewport3DActive->UpdateViewOrbit();
@@ -261,7 +261,7 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
 #endif
     // VERTICE + TOUCH: area de lectura GRANDE -> el vertice mas cercano al dedo gana (el voto por
     // pixeles favorece al que tiene el punto mas centrado). Aristas/caras y mouse quedan igual.
-    if (!faceMode && !edgeMode && PickEsTactil()) RAD = 16;
+    if (!faceMode && !edgeMode && PickIsTouch()) RAD = 16;
     const int WD = 2 * RAD + 1;
     int cxw = mx, cyw = screenH - 1 - my; // centro en coords de ventana (GL)
     int x0 = cxw - RAD, y0 = cyw - RAD;
@@ -297,7 +297,7 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     // TAPADO por su propia cara y no se podia clickear. El mismo arreglo que la jaula (EditMesh::Render): los empates
     // pasan y un sesgo chico hacia la camara
     w3dEngine::DepthFunc(w3dEngine::DepthLEqual);
-    w3dEngine::SesgoMetros(-0.02f);
+    w3dEngine::BiasMeters(-0.02f);
 #endif
 
     if (faceMode) {
@@ -350,7 +350,7 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
         // TOUCH: punto de pick un poco mas grande (los vertices son puntitos, dificiles con el dedo), pero
         // SIN exagerar: puntos muy grandes se solapan en mallas densas y sesgan el voto. La tolerancia real
         // la da el area de lectura ampliada (abajo). Con mouse queda igual (22).
-        w3dEngine::PointSize(PickEsTactil() ? 28.0f : 22.0f);
+        w3dEngine::PointSize(PickIsTouch() ? 28.0f : 22.0f);
         w3dEngine::DrawPoints(N);
         w3dEngine::PointSize(1.0f);
     }
@@ -358,7 +358,7 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     GLubyte area[33 * 33 * 4]; // dimensionado para el WD mas grande (vertice+touch: 33); otros modos usan menos
     w3dEngine::ReadPixelsRGBA(x0, y0, WD, WD, area);
 #if defined(W3D_SYMBIAN) && defined(W3D_GLES2)
-    w3dEngine::SesgoMetros(0.0f);
+    w3dEngine::BiasMeters(0.0f);
     w3dEngine::DepthFunc(w3dEngine::DepthLess);
 #endif
     w3dEngine::Enable(w3dEngine::Dither);
@@ -402,18 +402,18 @@ static bool EditPickVert(int mx, int my, int vx, int vy, int vw, int vh, int scr
     if (!e) return true;
     int k = EditPickIndex(EditSelectMode, mx, my, vx, vy, vw, vh, screenH);
     if (k >= 0) {
-        if (EditSelectMode == SelFace)      e->TogglearFace(k, !LShiftPressed);
-        else if (EditSelectMode == SelEdge) e->TogglearEdge(k, !LShiftPressed);
-        else                                e->TogglearVert(k, !LShiftPressed);
+        if (EditSelectMode == SelFace)      e->ToggleFace(k, !LShiftPressed);
+        else if (EditSelectMode == SelEdge) e->ToggleEdge(k, !LShiftPressed);
+        else                                e->ToggleVert(k, !LShiftPressed);
     } else if (!LShiftPressed) {
-        e->SeleccionarTodo(false); // click al vacio sin shift: deseleccionar todo
+        e->SelectAll(false); // click al vacio sin shift: deseleccionar todo
     }
     return true; // el frame siguiente redibuja la escena real
 }
 
 // ===== Navegacion de seleccion por TECLADO en Edit Mode (lapiz + flechas de Symbian) =====
 // Opera sobre vert/edge/face segun EditSelectMode, tocando el array de seleccion + activeIdx;
-// Recolorear() refresca el visual (incluye el relleno de caras). Devuelve false si no aplica.
+// Recolor() refresca el visual (incluye el relleno de caras). Devuelve false si no aplica.
 static unsigned char* EditSelArray(EditMesh* e, int& N){
     if (EditSelectMode == SelFace){ N=(int)e->faceSel.size(); return e->faceSel.empty()?NULL:&e->faceSel[0]; }
     if (EditSelectMode == SelEdge){ N=(int)e->edgeSel.size(); return e->edgeSel.empty()?NULL:&e->edgeSel[0]; }
@@ -426,58 +426,58 @@ static EditMesh* EditSelMesh(){
 
 // ===== Navegacion de seleccion de OBJETOS (Object Mode) =====
 // Espejo EXACTO de la de Edit Mode, pero sobre los objetos de la escena (mismo lapiz +
-// flechas de Symbian). El "activo" es ObjActivo; el "array" es la lista plana de objetos
-// (sin colecciones) en orden de outliner. Seleccionar()/Deseleccionar() mantienen select +
-// ObjSelects + ObjActivo. NO tocar la seleccion durante un transform (estado != editNavegacion,
-// como DeseleccionarTodo: estadoObjetos apunta a los seleccionados y crashea si cambia).
-static void ObjSelRecolectar(Object* nodo, std::vector<Object*>& out){
-    if (!nodo) return;
-    for (size_t i=0;i<nodo->Childrens.size();i++){
-        Object* h = nodo->Childrens[i];
+// flechas de Symbian). El "activo" es ActiveObj; el "array" es la lista plana de objetos
+// (sin colecciones) en orden de outliner. Select()/Deselect() mantienen select +
+// ObjSelects + ActiveObj. NO tocar la seleccion durante un transform (estado != editNavigation,
+// como DeselectAll: objectState apunta a los seleccionados y crashea si cambia).
+static void ObjSelCollect(Object* node, std::vector<Object*>& out){
+    if (!node) return;
+    for (size_t i=0;i<node->Childrens.size();i++){
+        Object* h = node->Childrens[i];
         if (!h) continue;
         if (h->getType() != ObjectType::collection) out.push_back(h); // los objetos, no colecciones
-        ObjSelRecolectar(h, out);                                     // recursivo (sub-colecciones)
+        ObjSelCollect(h, out);                                        // recursivo (sub-colecciones)
     }
 }
-static bool ObjSelLista(std::vector<Object*>& v){
+static bool ObjSelList(std::vector<Object*>& v){
     if (!SceneCollection) return false;
-    ObjSelRecolectar(SceneCollection, v);
+    ObjSelCollect(SceneCollection, v);
     return !v.empty();
 }
-static int ObjSelActivoIdx(const std::vector<Object*>& v){
-    for (size_t i=0;i<v.size();i++) if (v[i]==ObjActivo) return (int)i;
+static int ActiveObjSelIdx(const std::vector<Object*>& v){
+    for (size_t i=0;i<v.size();i++) if (v[i]==ActiveObj) return (int)i;
     return -1;
 }
-static bool ObjSelAvanzar(int paso, bool extender){
-    if (estado != editNavegacion) return true;        // no durante un transform
-    std::vector<Object*> v; if (!ObjSelLista(v)) return true;
+static bool ObjSelAdvance(int step, bool extend){
+    if (state != editNavigation) return true;        // no durante un transform
+    std::vector<Object*> v; if (!ObjSelList(v)) return true;
     int N=(int)v.size();
-    int act = ObjSelActivoIdx(v);
+    int act = ActiveObjSelIdx(v);
     if (act<0){ act=0; for (int i=0;i<N;i++) if (v[i]->select){ act=i; break; } } // sin activo: 1er sel (o 0)
-    if (!extender) v[act]->Deseleccionar();           // deselecciona SOLO el activo (el resto queda)
-    int next = act + paso; if (next<0) next=N-1; if (next>=N) next=0;
-    v[next]->Seleccionar();                            // select=true + ObjActivo=v[next]
+    if (!extend) v[act]->Deselect();           // deselecciona SOLO el activo (el resto queda)
+    int next = act + step; if (next<0) next=N-1; if (next>=N) next=0;
+    v[next]->Select();                            // select=true + ActiveObj=v[next]
     g_redraw = true;
     return true;
 }
-static bool ObjSelTodoToggle(){
-    if (estado != editNavegacion) return true;
-    std::vector<Object*> v; if (!ObjSelLista(v)) return true;
+static bool ObjSelAllToggle(){
+    if (state != editNavigation) return true;
+    std::vector<Object*> v; if (!ObjSelList(v)) return true;
     int N=(int)v.size();
-    bool todo = true; for (int i=0;i<N;i++) if (!v[i]->select){ todo=false; break; }
-    if (todo){ for (int i=0;i<N;i++) v[i]->Deseleccionar(); ObjActivo = NULL; }
-    else     { for (int i=0;i<N;i++) v[i]->Seleccionar(); ObjActivo = v[0]; }
+    bool all = true; for (int i=0;i<N;i++) if (!v[i]->select){ all=false; break; }
+    if (all){ for (int i=0;i<N;i++) v[i]->Deselect(); ActiveObj = NULL; }
+    else     { for (int i=0;i<N;i++) v[i]->Select(); ActiveObj = v[0]; }
     g_redraw = true;
     return true;
 }
-static bool ObjSelToggleActual(){
-    if (estado != editNavegacion) return true;
-    std::vector<Object*> v; if (!ObjSelLista(v)) return true;
+static bool ObjSelToggleCurrent(){
+    if (state != editNavigation) return true;
+    std::vector<Object*> v; if (!ObjSelList(v)) return true;
     int N=(int)v.size();
-    int act = ObjSelActivoIdx(v);
+    int act = ActiveObjSelIdx(v);
     if (act<0){ act=0; for (int i=0;i<N;i++) if (v[i]->select){ act=i; break; } if (!v[act]->select) return true; }
-    if (v[act]->select){ v[act]->Deseleccionar(); ObjActivo = NULL; }
-    else                 v[act]->Seleccionar();        // Seleccionar setea ObjActivo
+    if (v[act]->select){ v[act]->Deselect(); ActiveObj = NULL; }
+    else                 v[act]->Select();        // Seleccionar setea ActiveObj
     g_redraw = true;
     return true;
 }
@@ -489,65 +489,65 @@ static bool ObjSelToggleActual(){
 // ---- POSE MODE: el lapiz/las flechas ciclan HUESOS, no objetos. (Estaba: "si es Edit Mode, sub-elementos; si
 //      no, OBJETOS" -> en Pose caia en objetos y el shift te deseleccionaba el armature y saltaba al siguiente
 //      objeto, que es lo ultimo que queres mientras posas.)
-static Armature* SelArmActiva(){
-    return (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature)
-           ? (Armature*)ObjActivo : NULL;
+static Armature* ActiveSelArm(){
+    return (InteractionMode == PoseMode && ActiveObj && ActiveObj->getType() == ObjectType::armature)
+           ? (Armature*)ActiveObj : NULL;
 }
-static bool PoseSelAvanzar(Armature* a, int paso, bool extender){
+static bool PoseSelAdvance(Armature* a, int step, bool extend){
     int N = (int)a->bones.size(); if (N <= 0) return true;
-    int act = a->boneActivo;
+    int act = a->activeBone;
     if (act < 0 || act >= N){ act = 0; for (int i=0;i<N;i++) if (a->bones[i].select){ act=i; break; } }
-    if (!extender) a->bones[act].select = false;   // deselecciona el activo
-    int next = act + paso;
+    if (!extend) a->bones[act].select = false;   // deselecciona el activo
+    int next = act + step;
     if (next < 0) next = N-1;
     if (next >= N) next = 0;
     a->bones[next].select = true;                  // selecciona el siguiente (si ya estaba, queda)
-    a->boneActivo = next;
+    a->activeBone = next;
     g_redraw = true;
     return true;
 }
-static bool PoseSelTodoToggle(Armature* a){
+static bool PoseSelAllToggle(Armature* a){
     int N = (int)a->bones.size(); if (N <= 0) return true;
-    bool todo = true; for (int i=0;i<N;i++) if (!a->bones[i].select){ todo=false; break; }
-    for (int i=0;i<N;i++) a->bones[i].select = todo ? false : true;
-    a->boneActivo = todo ? -1 : 0;
+    bool all = true; for (int i=0;i<N;i++) if (!a->bones[i].select){ all=false; break; }
+    for (int i=0;i<N;i++) a->bones[i].select = all ? false : true;
+    a->activeBone = all ? -1 : 0;
     g_redraw = true;
     return true;
 }
 
-bool EditSelAvanzar(int paso, bool extender){
-    Armature* pa = SelArmActiva(); if (pa) return PoseSelAvanzar(pa, paso, extender);
-    if (InteractionMode != EditMode) return ObjSelAvanzar(paso, extender);
+bool EditSelAdvance(int step, bool extend){
+    Armature* pa = ActiveSelArm(); if (pa) return PoseSelAdvance(pa, step, extend);
+    if (InteractionMode != EditMode) return ObjSelAdvance(step, extend);
     EditMesh* e = EditSelMesh(); if (!e) return false;
     int N=0; unsigned char* sel = EditSelArray(e, N);
     if (!sel || N<=0) return true;
     int act = e->activeIdx;
     if (act<0 || act>=N){ act=0; for (int i=0;i<N;i++) if (sel[i]){ act=i; break; } } // sin activo: 1er sel (o 0)
-    if (!extender) sel[act] = 0;          // deselecciona el activo
-    int next = act + paso;
+    if (!extend) sel[act] = 0;          // deselecciona el activo
+    int next = act + step;
     if (next < 0) next = N-1;
     if (next >= N) next = 0;
     sel[next] = 1;                        // selecciona el siguiente (si ya estaba, queda)
     e->activeIdx = next;
-    e->Recolorear(); g_redraw = true;
+    e->Recolor(); g_redraw = true;
     return true;
 }
 // lapiz+arriba: si TODO esta seleccionado -> nada; sino -> todo.
-bool EditSelTodoToggle(){
-    Armature* pa = SelArmActiva(); if (pa) return PoseSelTodoToggle(pa);
-    if (InteractionMode != EditMode) return ObjSelTodoToggle();
+bool EditSelAllToggle(){
+    Armature* pa = ActiveSelArm(); if (pa) return PoseSelAllToggle(pa);
+    if (InteractionMode != EditMode) return ObjSelAllToggle();
     EditMesh* e = EditSelMesh(); if (!e) return false;
     int N=0; unsigned char* sel = EditSelArray(e, N);
     if (!sel || N<=0) return true;
-    bool todo = true; for (int i=0;i<N;i++) if (!sel[i]){ todo=false; break; }
-    for (int i=0;i<N;i++) sel[i] = todo ? 0 : 1;
-    e->activeIdx = todo ? -1 : 0;
-    e->Recolorear(); g_redraw = true;
+    bool all = true; for (int i=0;i<N;i++) if (!sel[i]){ all=false; break; }
+    for (int i=0;i<N;i++) sel[i] = all ? 0 : 1;
+    e->activeIdx = all ? -1 : 0;
+    e->Recolor(); g_redraw = true;
     return true;
 }
 // lapiz+abajo: togglea el indice ACTIVO. Si lo deselecciona, pierde el activo.
-bool EditSelToggleActual(){
-    if (InteractionMode != EditMode) return ObjSelToggleActual();
+bool EditSelToggleCurrent(){
+    if (InteractionMode != EditMode) return ObjSelToggleCurrent();
     EditMesh* e = EditSelMesh(); if (!e) return false;
     int N=0; unsigned char* sel = EditSelArray(e, N);
     if (!sel || N<=0) return true;
@@ -555,7 +555,7 @@ bool EditSelToggleActual(){
     if (act<0 || act>=N){ act=0; for (int i=0;i<N;i++) if (sel[i]){ act=i; break; } if (act<0) return true; }
     sel[act] = sel[act] ? 0 : 1;
     e->activeIdx = sel[act] ? act : -1;
-    e->Recolorear(); g_redraw = true;
+    e->Recolor(); g_redraw = true;
     return true;
 }
 
@@ -566,11 +566,11 @@ void LayoutSelectLinked(int mx, int my) {
     Mesh* m = (Mesh*)g_editMesh;
     m->EnsureEdit();
     if (!m->edit) return;
-    UndoCapturarSeleccionEdit(m); // Ctrl+Z: Select Linked va a cambiar la seleccion
+    UndoCaptureSelectionEdit(m); // Ctrl+Z: Select Linked va a cambiar la seleccion
     int vx = Viewport3DActive->x, vy = Viewport3DActive->y;
     int vw = Viewport3DActive->width, vh = Viewport3DActive->height;
-    int k = EditPickIndex(EditSelectMode, mx, my, vx, vy, vw, vh, W3dPantallaAlto);
-    if (k >= 0) { m->edit->SeleccionarLinked(k, EditSelectMode, !LShiftPressed); g_redraw = true; }
+    int k = EditPickIndex(EditSelectMode, mx, my, vx, vy, vw, vh, W3dScreenHeight);
+    if (k >= 0) { m->edit->SelectLinked(k, EditSelectMode, !LShiftPressed); g_redraw = true; }
 }
 
 // ===== LOOP SELECT desde el sub-elemento ACTIVO (menu Select / Symbian lapiz+OK) =====
@@ -580,56 +580,56 @@ void LayoutSelectLinked(int mx, int my) {
 static bool gLoopSelOrient = false;
 static int  gLoopSelFace   = -1;
 static int  gLoopSelDir    = 0;   // 0 / 1 (faceEdges[face][0] o [1])
-bool LoopSelOrientando(){ return gLoopSelOrient; }
+bool LoopSelOrienting(){ return gLoopSelOrient; }
 
-void LayoutLoopSelectGuiado(); // definida mas abajo (modo guiado: pide click cuando no hay elemento activo)
-void LayoutLoopSelectActivo(int tipo){
+void LayoutLoopSelectGuided(); // definida mas abajo (modo guiado: pide click cuando no hay elemento activo)
+void LayoutLoopSelectActive(int type){
     if (InteractionMode != EditMode || !g_editMesh) return;
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return;
     EditMesh* e=m->edit;
-    if (tipo == 2){                                   // FACE LOOP desde la cara activa
+    if (type == 2){                                   // FACE LOOP desde la cara activa
         int act = e->activeIdx;
         if (act<0) for (size_t f=0;f<e->faceSel.size();f++) if (e->faceSel[f]){ act=(int)f; break; }
-        if (act<0){ LayoutLoopSelectGuiado(); return; }  // SIN cara activa -> modo guiado (pedi click o cancela)
+        if (act<0){ LayoutLoopSelectGuided(); return; }  // SIN cara activa -> modo guiado (pedi click o cancela)
         if (act>=(int)e->faceEdges.size() || e->faceEdges[act].size()<2) return;
-        UndoCapturarSeleccionEdit(m); // Ctrl+Z: el loop select (+ refinar direccion con flechas) = 1 sola accion
+        UndoCaptureSelectionEdit(m); // Ctrl+Z: el loop select (+ refinar direccion con flechas) = 1 sola accion
         gLoopSelFace = act; gLoopSelDir = 0; gLoopSelOrient = true;
-        e->SeleccionarLoopFace(e->faceEdges[act][0], true);
-        NotificarHint(T("Loop Select: arrows = direction, Enter to confirm"));
+        e->SelectLoopFace(e->faceEdges[act][0], true);
+        NotifyHint(T("Loop Select: arrows = direction, Enter to confirm"));
     } else {                                          // EDGE LOOP / RING desde el borde activo
         int act = e->activeIdx;
         if (act<0) for (size_t k=0;k<e->edgeSel.size();k++) if (e->edgeSel[k]){ act=(int)k; break; }
-        if (act<0){ LayoutLoopSelectGuiado(); return; }  // SIN borde activo -> modo guiado
-        UndoCapturarSeleccionEdit(m);
-        if (tipo==0) e->SeleccionarLoopEdge(act, true);
-        else         e->SeleccionarRingEdge(act, true);
+        if (act<0){ LayoutLoopSelectGuided(); return; }  // SIN borde activo -> modo guiado
+        UndoCaptureSelectionEdit(m);
+        if (type==0) e->SelectLoopEdge(act, true);
+        else         e->SelectRingEdge(act, true);
     }
     g_redraw = true;
 }
-void LoopSelTecla(int dir){
+void LoopSelKey(int dir){
     if (!gLoopSelOrient || !g_editMesh) return;
     Mesh* m=(Mesh*)g_editMesh; if (!m->edit) return;
     EditMesh* e=m->edit;
     if (gLoopSelFace<0 || gLoopSelFace>=(int)e->faceEdges.size() || e->faceEdges[gLoopSelFace].size()<2) return;
     gLoopSelDir = (dir==1 || dir==3) ? 1 : 0;
-    e->SeleccionarLoopFace(e->faceEdges[gLoopSelFace][gLoopSelDir], true);
+    e->SelectLoopFace(e->faceEdges[gLoopSelFace][gLoopSelDir], true);
     g_redraw = true;
 }
-void LoopSelConfirm(){ gLoopSelOrient = false; NotificarHintClear(); g_redraw = true; }
+void LoopSelConfirm(){ gLoopSelOrient = false; NotifyHintClear(); g_redraw = true; }
 
 // Loop select en una POSICION (cursor): pickea el borde bajo (mx,my) y aplica el loop del modo
 // (cara -> Face Loop ; borde -> Edge Loop). El cursor da la direccion, asi que NO hay modal.
 // Lo usa el mouse virtual de Symbian (lapiz + OK). Devuelve false si no pickeo nada.
-bool LayoutLoopSelectEnPos(int mx, int my, int vx, int vy, int vw, int vh, int screenH){
+bool LayoutLoopSelectInPos(int mx, int my, int vx, int vy, int vw, int vh, int screenH){
     if (InteractionMode != EditMode || !g_editMesh) return false;
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return false;
     int eg = EditPickIndex(SelEdge, mx, my, vx, vy, vw, vh, screenH); // siempre pickea un BORDE de referencia
     if (eg < 0) return false;
-    UndoCapturarSeleccionEdit(m); // Ctrl+Z: loop select por cursor (Symbian) va a cambiar la seleccion
+    UndoCaptureSelectionEdit(m); // Ctrl+Z: loop select por cursor (Symbian) va a cambiar la seleccion
     EditMesh* ed = m->edit;
-    if (EditSelectMode == SelFace)      ed->SeleccionarLoopFace(eg, true);
-    else if (EditSelectMode == SelEdge) ed->SeleccionarLoopEdge(eg, true);
-    else                                ed->SeleccionarLoopEdgeVerts(eg, true); // VERTICE: verts del loop, sin acumular edgeSel
+    if (EditSelectMode == SelFace)      ed->SelectLoopFace(eg, true);
+    else if (EditSelectMode == SelEdge) ed->SelectLoopEdge(eg, true);
+    else                                ed->SelectLoopEdgeVerts(eg, true); // VERTICE: verts del loop, sin acumular edgeSel
     g_redraw = true;
     return true;
 }
@@ -641,41 +641,41 @@ bool LayoutLoopSelectEnPos(int mx, int my, int vx, int vy, int vw, int vh, int s
 static bool gPathGuided = false;
 static bool gPathFill   = false;
 static int  gPathStep   = 0;   // 0 = espera el primero, 1 = espera el segundo
-bool PickPathGuiado(){ return gPathGuided; }
+bool PickPathGuided(){ return gPathGuided; }
 
-static const char* PathElemNombre(){
+static const char* PathElemName(){
     if (EditSelectMode == SelFace) return "face";
     if (EditSelectMode == SelEdge) return "edge";
     return "vertex";
 }
-void LayoutPickPathIniciar(bool fill){
+void LayoutPickPathStart(bool fill){
     if (InteractionMode != EditMode || !g_editMesh) return;
     gPathGuided = true; gPathFill = fill; gPathStep = 0;
-    NotificarHint(std::string(T("Pick Shortest Path: click the first")) + " " + T(PathElemNombre()));
+    NotifyHint(std::string(T("Pick Shortest Path: click the first")) + " " + T(PathElemName()));
     g_redraw = true;
 }
-void LayoutPickPathCancelar(){
+void LayoutPickPathCancel(){
     if (!gPathGuided) return;
-    gPathGuided = false; NotificarHintClear(); g_redraw = true;
+    gPathGuided = false; NotifyHintClear(); g_redraw = true;
 }
 // click durante el modo guiado: true si lo consumio (ScenePick3D NO sigue con el pick normal).
 static bool PickPathClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH){
     if (!gPathGuided || !g_editMesh) return false;
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit();
-    if (!m->edit){ gPathGuided=false; NotificarHintClear(); return true; }
+    if (!m->edit){ gPathGuided=false; NotifyHintClear(); return true; }
     int k = EditPickIndex(EditSelectMode, mx,my,vx,vy,vw,vh,screenH);
     if (k < 0) return true;   // click al vacio: ignora (sigue esperando el mismo paso)
     if (gPathStep == 0){
-        if (EditSelectMode==SelFace)      m->edit->TogglearFace(k, true);  // selecciona el primero (activo)
-        else if (EditSelectMode==SelEdge) m->edit->TogglearEdge(k, true);
-        else                              m->edit->TogglearVert(k, true);
+        if (EditSelectMode==SelFace)      m->edit->ToggleFace(k, true);  // selecciona el primero (activo)
+        else if (EditSelectMode==SelEdge) m->edit->ToggleEdge(k, true);
+        else                              m->edit->ToggleVert(k, true);
         gPathStep = 1;
-        NotificarHint(std::string(T("Now click the second")) + " " + T(PathElemNombre()));
+        NotifyHint(std::string(T("Now click the second")) + " " + T(PathElemName()));
     } else {
-        m->edit->SeleccionarShortestPath(k, gPathFill);
+        m->edit->SelectShortestPath(k, gPathFill);
         gPathGuided = false;
-        NotificarHintClear();
-        Notificar(T(gPathFill ? "Shortest path: region filled" : "Shortest path selected"), false);
+        NotifyHintClear();
+        Notify(T(gPathFill ? "Shortest path: region filled" : "Shortest path selected"), false);
     }
     g_redraw = true;
     return true;
@@ -686,8 +686,8 @@ static bool PickPathClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH)
 //  (edit/BoxSelect.h); aca se decide QUE entra, que es lo unico propio del 3D.
 //
 //  LA REGLA, por tipo de elemento (pedido del dueno):
-//    VERDE (izq->der): entra lo que esta ENTERO adentro. Un pixel afuera y no entra.
-//    AZUL  (der->izq): alcanza con ROZAR.
+//    VERDE (left->right): entra lo que esta ENTERO adentro. Un pixel afuera y no entra.
+//    AZUL  (right->left): alcanza con ROZAR.
 //  Un VERTICE es un punto: esta o no esta, y ahi los dos colores dan lo mismo.
 //  Una ARISTA o una CARA tienen extension: en azul basta que la caja cruce la
 //  arista (aunque las dos puntas queden afuera), en verde tienen que entrar todas
@@ -695,58 +695,58 @@ static bool PickPathClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH)
 //  caen adentro -- y como el rect es convexo, eso es exactamente "ni un pixel
 //  afuera": si las puntas de cada triangulo estan adentro, el triangulo tambien.
 // ============================================================================
-static bool BoxObjetoEntra(Viewport3D* vp, Object* o, int x0, int y0, int x1, int y1, bool tocar) {
+static bool BoxObjectEnters(Viewport3D* vp, Object* o, int x0, int y0, int x1, int y1, bool touch) {
     if (o->getType() != ObjectType::mesh) {
         // sin geometria (camara, luz, empty, hueso): su origen es todo lo que hay
         float sx, sy;
-        if (!vp->ProyectarPunto(o->GetGlobalPosition(), sx, sy)) return false;
-        return BoxPunto(x0, y0, x1, y1, sx - vp->x, sy - vp->y);
+        if (!vp->ProjectPoint(o->GetGlobalPosition(), sx, sy)) return false;
+        return BoxPoint(x0, y0, x1, y1, sx - vp->x, sy - vp->y);
     }
     Mesh* m = (Mesh*)o;
     if (m->vertexSize <= 0 || !m->vertex) {
         float sx, sy;
-        if (!vp->ProyectarPunto(o->GetGlobalPosition(), sx, sy)) return false;
-        return BoxPunto(x0, y0, x1, y1, sx - vp->x, sy - vp->y);
+        if (!vp->ProjectPoint(o->GetGlobalPosition(), sx, sy)) return false;
+        return BoxPoint(x0, y0, x1, y1, sx - vp->x, sy - vp->y);
     }
     Matrix4 W; m->GetWorldMatrix(W);
     const GLfloat* pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex; // la pose visible
     static std::vector<float> px, py; static std::vector<char> vis;
     px.assign((size_t)m->vertexSize, 0.0f); py.assign((size_t)m->vertexSize, 0.0f);
     vis.assign((size_t)m->vertexSize, 0);
-    bool algunoAdentro = false, todosAdentro = true;
+    bool anyInside = false, allInside = true;
     for (int i = 0; i < m->vertexSize; i++) {
         float sx, sy;
         Vector3 w = W * Vector3(pos[i*3], pos[i*3+1], pos[i*3+2]);
-        if (!vp->ProyectarPunto(w, sx, sy)) { todosAdentro = false; continue; } // detras de camara
+        if (!vp->ProjectPoint(w, sx, sy)) { allInside = false; continue; } // detras de camara
         px[(size_t)i] = sx - vp->x; py[(size_t)i] = sy - vp->y; vis[(size_t)i] = 1;
-        if (BoxPunto(x0, y0, x1, y1, px[(size_t)i], py[(size_t)i])) algunoAdentro = true;
-        else todosAdentro = false;
+        if (BoxPoint(x0, y0, x1, y1, px[(size_t)i], py[(size_t)i])) anyInside = true;
+        else allInside = false;
     }
-    if (!tocar) return todosAdentro;      // VERDE: entero adentro
-    if (algunoAdentro) return true;       // AZUL: con una punta adentro ya esta
+    if (!touch) return allInside;      // VERDE: entero adentro
+    if (anyInside) return true;        // AZUL: con una punta adentro ya esta
     // ...o que la caja CRUCE alguna arista, o que haya quedado ENTERA adentro de una cara
     // (ahi no toca ningun vertice ni cruza nada, pero esta encima del objeto igual)
-    const float cxCaja = (float)(x0 + x1) * 0.5f, cyCaja = (float)(y0 + y1) * 0.5f;
+    const float cxBox = (float)(x0 + x1) * 0.5f, cyBox = (float)(y0 + y1) * 0.5f;
     static std::vector<float> polX, polY;
     // las caras de la malla, o las COMPARTIDAS de su recurso si su edicion sigue pendiente
-    // (objects/MallaRecurso.h): la misma prueba que con la malla editada, sin cargar su edicion
-    const std::vector<MeshFace>* pF = W3dMallaCarasVista(m);
+    // (objects/MeshResource.h): la misma prueba que con la malla editada, sin cargar su edicion
+    const std::vector<MeshFace>* pF = W3dMeshFacesView(m);
     // sin caras (escenario cerrado a edicion, o una topologia que no se pudo leer): alcanzan los
     // triangulos del render (mismo resultado: la caja cruza o cae en una cara)
     if (!pF && m->faces && m->facesSize >= 3) {
         for (int t = 0; t + 2 < m->facesSize; t += 3) {
             const int tri[3] = { (int)m->faces[t], (int)m->faces[t + 1], (int)m->faces[t + 2] };
             polX.clear(); polY.clear();
-            bool caraVisible = true;
+            bool faceVisible = true;
             for (int k = 0; k < 3; k++) {
                 const int a = tri[k], b = tri[(k + 1) % 3];
-                if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) { caraVisible = false; continue; }
-                if (!vis[(size_t)a] || !vis[(size_t)b]) { caraVisible = false; continue; }
-                if (BoxSegmento(x0, y0, x1, y1, px[(size_t)a], py[(size_t)a], px[(size_t)b], py[(size_t)b]))
+                if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) { faceVisible = false; continue; }
+                if (!vis[(size_t)a] || !vis[(size_t)b]) { faceVisible = false; continue; }
+                if (BoxSegment(x0, y0, x1, y1, px[(size_t)a], py[(size_t)a], px[(size_t)b], py[(size_t)b]))
                     return true;
                 polX.push_back(px[(size_t)a]); polY.push_back(py[(size_t)a]);
             }
-            if (caraVisible && BoxPuntoEnPoligono(&polX[0], &polY[0], (int)polX.size(), cxCaja, cyCaja))
+            if (faceVisible && BoxPointInPolygon(&polX[0], &polY[0], (int)polX.size(), cxBox, cyBox))
                 return true;
         }
         return false;
@@ -756,36 +756,36 @@ static bool BoxObjetoEntra(Viewport3D* vp, Object* o, int x0, int y0, int x1, in
     for (size_t f = 0; f < F.size(); f++) {
         const std::vector<int>& id = F[f].idx;
         polX.clear(); polY.clear();
-        bool caraVisible = true;
+        bool faceVisible = true;
         for (size_t k = 0; k < id.size(); k++) {
             const int a = id[k], b = id[(k + 1) % id.size()];
-            if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) { caraVisible = false; continue; }
-            if (!vis[(size_t)a] || !vis[(size_t)b]) { caraVisible = false; continue; }
-            if (BoxSegmento(x0, y0, x1, y1, px[(size_t)a], py[(size_t)a], px[(size_t)b], py[(size_t)b]))
+            if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) { faceVisible = false; continue; }
+            if (!vis[(size_t)a] || !vis[(size_t)b]) { faceVisible = false; continue; }
+            if (BoxSegment(x0, y0, x1, y1, px[(size_t)a], py[(size_t)a], px[(size_t)b], py[(size_t)b]))
                 return true;
             polX.push_back(px[(size_t)a]); polY.push_back(py[(size_t)a]);
         }
-        if (caraVisible && BoxPuntoEnPoligono(&polX[0], &polY[0], (int)polX.size(), cxCaja, cyCaja))
+        if (faceVisible && BoxPointInPolygon(&polX[0], &polY[0], (int)polX.size(), cxBox, cyBox))
             return true;
     }
     return false;
 }
 
-static void BoxRecolectar(Object* o, std::vector<Object*>& out) {
+static void BoxCollect(Object* o, std::vector<Object*>& out) {
     if (!o) return;
     for (size_t i = 0; i < o->Childrens.size(); i++) {
         Object* c = o->Childrens[i];
         if (!c) continue;
         if (c->getType() != ObjectType::collection && c->visible) out.push_back(c);
-        BoxRecolectar(c, out);   // las colecciones no se seleccionan, pero sus hijos si
+        BoxCollect(c, out);   // las colecciones no se seleccionan, pero sus hijos si
     }
 }
 
-void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) {
+void BoxSelectApply3D(int x0, int y0, int x1, int y1, bool touch, bool add) {
     Viewport3D* vp = Viewport3DActive;
     if (!vp) return;
-    vp->BindVista();                 // proyectar con ESTA vista (multi-viewport)
-    // el rect llega en pantalla; ProyectarPunto devuelve pantalla tambien, pero los
+    vp->BindView();                 // proyectar con ESTA vista (multi-viewport)
+    // el rect llega en pantalla; ProjectPoint devuelve pantalla tambien, pero los
     // predicados trabajan en LOCALES del viewport (como el resto de los overlays)
     const int lx0 = x0 - vp->x, ly0 = y0 - vp->y, lx1 = x1 - vp->x, ly1 = y1 - vp->y;
 
@@ -794,7 +794,7 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
         m->EnsureEdit();
         EditMesh* e = m->edit;
         if (!e || e->pos.empty()) return;
-        UndoCapturarSeleccionEdit(m);            // Ctrl+Z, igual que All/None/Invert
+        UndoCaptureSelectionEdit(m);            // Ctrl+Z, igual que All/None/Invert
         Matrix4 W; m->GetWorldMatrix(W);
         const int nV = e->NumVerts();
         static std::vector<float> px, py; static std::vector<char> vis;
@@ -802,7 +802,7 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
         for (int k = 0; k < nV; k++) {
             float sx, sy;
             Vector3 w = W * Vector3(e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]);
-            if (!vp->ProyectarPunto(w, sx, sy)) continue;
+            if (!vp->ProjectPoint(w, sx, sy)) continue;
             px[(size_t)k] = sx - vp->x; py[(size_t)k] = sy - vp->y; vis[(size_t)k] = 1;
         }
         // ---- QUE SE VE: sin X-Ray la caja agarra SOLO lo que esta de cara a la camara ----
@@ -810,9 +810,9 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
         // esa cara mira para atras y lo que hay ahi no se ve. De ahi sale la visibilidad de sus
         // aristas y vertices (un vertice se ve si alguna de sus caras se ve). Con X-Ray prendido
         // no se filtra nada: justamente el modo esta para agarrar lo de atras.
-        const bool filtrarOcultos = !g_xray;   // el X-Ray del menu Overlays (global, ya existia)
+        const bool filterHidden = !g_xray;   // el X-Ray del menu Overlays (global, ya existia)
         std::vector<char> vertVis, edgeVis, faceVis;
-        if (filtrarOcultos) {
+        if (filterHidden) {
             vertVis.assign((size_t)nV, 0);
             edgeVis.assign((size_t)e->NumEdges(), 0);
             faceVis.assign((size_t)e->NumFaces(), 0);
@@ -820,13 +820,13 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
                 const std::vector<int>& id = e->faces[(size_t)f];
                 if (id.size() < 3) continue;
                 float area = 0.0f;
-                bool todosVis = true;
+                bool allVis = true;
                 for (size_t k = 0; k < id.size(); k++) {
                     const int a = id[k], b = id[(k + 1) % id.size()];
-                    if (a < 0 || b < 0 || a >= nV || b >= nV || !vis[(size_t)a] || !vis[(size_t)b]) { todosVis = false; break; }
+                    if (a < 0 || b < 0 || a >= nV || b >= nV || !vis[(size_t)a] || !vis[(size_t)b]) { allVis = false; break; }
                     area += px[(size_t)a] * py[(size_t)b] - px[(size_t)b] * py[(size_t)a];
                 }
-                if (!todosVis || area >= 0.0f) continue;   // mira para el otro lado (o no proyecta)
+                if (!allVis || area >= 0.0f) continue;   // mira para el otro lado (o no proyecta)
                 faceVis[(size_t)f] = 1;
                 for (size_t k = 0; k < id.size(); k++)
                     if (id[k] >= 0 && id[k] < nV) vertVis[(size_t)id[k]] = 1;
@@ -837,13 +837,13 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
                     }
             }
         }
-        if (!sumar) e->SeleccionarTodo(false);   // sin Shift la caja REEMPLAZA la seleccion
+        if (!add) e->SelectAll(false);   // sin Shift la caja REEMPLAZA la seleccion
         if (EditSelectMode == SelVertex) {
             // un punto esta o no esta: verde y azul dan lo mismo
             for (int k = 0; k < nV; k++) {
                 if (!vis[(size_t)k]) continue;
-                if (filtrarOcultos && !vertVis[(size_t)k]) continue;   // esta atras: no se ve
-                if (BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)k], py[(size_t)k]))
+                if (filterHidden && !vertVis[(size_t)k]) continue;   // esta atras: no se ve
+                if (BoxPoint(lx0, ly0, lx1, ly1, px[(size_t)k], py[(size_t)k]))
                     e->vertSel[(size_t)k] = 1;
             }
         } else if (EditSelectMode == SelEdge) {
@@ -852,17 +852,17 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
                 const int a = e->lineIdx[(size_t)i*2], b = e->lineIdx[(size_t)i*2+1];
                 if (a < 0 || b < 0 || a >= nV || b >= nV) continue;
                 const bool va = vis[(size_t)a] != 0, vb = vis[(size_t)b] != 0;
-                bool entra;
-                if (!tocar) {   // VERDE: las DOS puntas adentro
-                    entra = va && vb &&
-                            BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a]) &&
-                            BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)b], py[(size_t)b]);
+                bool enters;
+                if (!touch) {   // VERDE: las DOS puntas adentro
+                    enters = va && vb &&
+                            BoxPoint(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a]) &&
+                            BoxPoint(lx0, ly0, lx1, ly1, px[(size_t)b], py[(size_t)b]);
                 } else {        // AZUL: que la caja toque la arista en cualquier punto
-                    entra = va && vb &&
-                            BoxSegmento(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a],
+                    enters = va && vb &&
+                            BoxSegment(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a],
                                         px[(size_t)b], py[(size_t)b]);
                 }
-                if (entra && (!filtrarOcultos || edgeVis[(size_t)i])) e->edgeSel[(size_t)i] = 1;
+                if (enters && (!filterHidden || edgeVis[(size_t)i])) e->edgeSel[(size_t)i] = 1;
             }
         } else { // SelFace
             const int nF = e->NumFaces();
@@ -873,29 +873,29 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
                 for (int f = 0; f < nF && (size_t)(f*3+2) < e->faceCenter.size(); f++) {
                     float sx, sy;
                     Vector3 w = W * Vector3(e->faceCenter[f*3], e->faceCenter[f*3+1], e->faceCenter[f*3+2]);
-                    if (!vp->ProyectarPunto(w, sx, sy)) continue;
-                    if (BoxPunto(lx0, ly0, lx1, ly1, sx - vp->x, sy - vp->y)) e->faceSel[(size_t)f] = 1;
+                    if (!vp->ProjectPoint(w, sx, sy)) continue;
+                    if (BoxPoint(lx0, ly0, lx1, ly1, sx - vp->x, sy - vp->y)) e->faceSel[(size_t)f] = 1;
                 }
-                e->Recolorear();
+                e->Recolor();
                 g_redraw = true;
                 return;
             }
             for (int f = 0; f < nF; f++) {
                 const std::vector<int>& id = e->faces[(size_t)f];
                 if (id.empty()) continue;
-                bool todos = true, alguno = false, cruza = false;
+                bool all = true, any = false, crosses = false;
                 for (size_t k = 0; k < id.size(); k++) {
                     const int a = id[k];
-                    if (a < 0 || a >= nV || !vis[(size_t)a]) { todos = false; continue; }
-                    if (BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a])) alguno = true;
-                    else todos = false;
+                    if (a < 0 || a >= nV || !vis[(size_t)a]) { all = false; continue; }
+                    if (BoxPoint(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a])) any = true;
+                    else all = false;
                     const int b = id[(k + 1) % id.size()];
                     if (b >= 0 && b < nV && vis[(size_t)b] &&
-                        BoxSegmento(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a],
-                                    px[(size_t)b], py[(size_t)b])) cruza = true;
+                        BoxSegment(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a],
+                                    px[(size_t)b], py[(size_t)b])) crosses = true;
                 }
-                bool adentro = false;   // la caja ENTERA adentro de esta cara
-                if (tocar && !alguno && !cruza) {
+                bool inside = false;   // la caja ENTERA adentro de esta cara
+                if (touch && !any && !crosses) {
                     static std::vector<float> polX, polY;
                     polX.clear(); polY.clear();
                     bool okPol = true;
@@ -905,60 +905,60 @@ void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) 
                         polX.push_back(px[(size_t)a]); polY.push_back(py[(size_t)a]);
                     }
                     if (okPol && polX.size() >= 3)
-                        adentro = BoxPuntoEnPoligono(&polX[0], &polY[0], (int)polX.size(),
+                        inside = BoxPointInPolygon(&polX[0], &polY[0], (int)polX.size(),
                                                      (float)(lx0 + lx1) * 0.5f, (float)(ly0 + ly1) * 0.5f);
                 }
-                const bool entra = tocar ? (alguno || cruza || adentro) : todos;
-                if (entra && (!filtrarOcultos || faceVis[(size_t)f])) e->faceSel[(size_t)f] = 1;
+                const bool enters = touch ? (any || crosses || inside) : all;
+                if (enters && (!filterHidden || faceVis[(size_t)f])) e->faceSel[(size_t)f] = 1;
             }
         }
-        e->Recolorear();
+        e->Recolor();
         g_redraw = true;
         return;
     }
 
     // ---- OBJECT MODE ----
     std::vector<Object*> objs;
-    BoxRecolectar(SceneCollection, objs);
-    if (!sumar) DeseleccionarTodo();
+    BoxCollect(SceneCollection, objs);
+    if (!add) DeselectAll();
     for (size_t i = 0; i < objs.size(); i++)
-        if (BoxObjetoEntra(vp, objs[i], lx0, ly0, lx1, ly1, tocar)) objs[i]->Seleccionar();
+        if (BoxObjectEnters(vp, objs[i], lx0, ly0, lx1, ly1, touch)) objs[i]->Select();
     g_redraw = true;
 }
 
 // ===== modo guiado de 1 CLICK (Select Linked desde el menu; Loop Select sin elemento activo) =====
 // Sale un hint pidiendo click; el click hace la operacion y termina (1 solo click, vs los 2 del shortest path).
 // El click se intercepta en ScenePick3D -> anda IGUAL en PC (mouse) y Symbian (mouse virtual + OK).
-static int gGuiadoOp = 0; // 0 = ninguno, 1 = Select Linked, 2 = Loop Select
-bool GuiadoUnClickActivo(){ return gGuiadoOp != 0; }
-void LayoutGuiadoCancelar(){ if (!gGuiadoOp) return; gGuiadoOp = 0; NotificarHintClear(); g_redraw = true; }
-static const char* GuiadoElemNombre(){ return (EditSelectMode==SelFace)?"face":(EditSelectMode==SelEdge)?"edge":"vertex"; }
-void LayoutSelectLinkedGuiado(){
+static int gGuidedOp = 0; // 0 = ninguno, 1 = Select Linked, 2 = Loop Select
+bool GuidedUnClickActive(){ return gGuidedOp != 0; }
+void LayoutGuidedCancel(){ if (!gGuidedOp) return; gGuidedOp = 0; NotifyHintClear(); g_redraw = true; }
+static const char* GuidedElemName(){ return (EditSelectMode==SelFace)?"face":(EditSelectMode==SelEdge)?"edge":"vertex"; }
+void LayoutSelectLinkedGuided(){
     if (InteractionMode != EditMode || !g_editMesh) return;
-    gGuiadoOp = 1;
-    NotificarHint(std::string(T("Select Linked: click the")) + " " + T(GuiadoElemNombre()) + " " + T("you want to select (Esc to cancel)"));
+    gGuidedOp = 1;
+    NotifyHint(std::string(T("Select Linked: click the")) + " " + T(GuidedElemName()) + " " + T("you want to select (Esc to cancel)"));
     g_redraw = true;
 }
-void LayoutLoopSelectGuiado(){ // fallback de Loop Select cuando no hay elemento activo (pide click)
+void LayoutLoopSelectGuided(){ // fallback de Loop Select cuando no hay elemento activo (pide click)
     if (InteractionMode != EditMode || !g_editMesh) return;
-    gGuiadoOp = 2;
-    NotificarHint(std::string(T("Loop Select: click an")) + " " + T((EditSelectMode==SelFace)?"edge of a face":"edge") + " " + T("(Esc to cancel)"));
+    gGuidedOp = 2;
+    NotifyHint(std::string(T("Loop Select: click an")) + " " + T((EditSelectMode==SelFace)?"edge of a face":"edge") + " " + T("(Esc to cancel)"));
     g_redraw = true;
 }
 // click durante el modo guiado: true si lo consumio (ScenePick3D NO sigue con el pick normal).
-static bool GuiadoUnClickClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH){
-    if (!gGuiadoOp || !g_editMesh) return false;
+static bool GuidedUnClickClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH){
+    if (!gGuidedOp || !g_editMesh) return false;
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit();
-    if (!m->edit){ gGuiadoOp=0; NotificarHintClear(); return true; }
-    if (gGuiadoOp == 1){ // Select Linked: la isla conexa que contiene al elemento clickeado
+    if (!m->edit){ gGuidedOp=0; NotifyHintClear(); return true; }
+    if (gGuidedOp == 1){ // Select Linked: la isla conexa que contiene al elemento clickeado
         int k = EditPickIndex(EditSelectMode, mx,my,vx,vy,vw,vh,screenH);
         if (k < 0) return true; // click al vacio: sigue esperando
-        UndoCapturarSeleccionEdit(m);
-        m->edit->SeleccionarLinked(k, EditSelectMode, !LShiftPressed);
-    } else { // Loop Select en la posicion clickeada (cara->Face Loop, borde->Edge Loop; el cursor da la direccion)
-        if (!LayoutLoopSelectEnPos(mx,my,vx,vy,vw,vh,screenH)) return true; // click al vacio: sigue esperando
+        UndoCaptureSelectionEdit(m);
+        m->edit->SelectLinked(k, EditSelectMode, !LShiftPressed);
+    } else { // Loop Select en la posicion clickeada (face->Face Loop, border->Edge Loop; el cursor da la direccion)
+        if (!LayoutLoopSelectInPos(mx,my,vx,vy,vw,vh,screenH)) return true; // click al vacio: sigue esperando
     }
-    gGuiadoOp = 0; NotificarHintClear(); g_redraw = true;
+    gGuidedOp = 0; NotifyHintClear(); g_redraw = true;
     return true;
 }
 
@@ -972,20 +972,20 @@ static bool GuiadoUnClickClick(int mx,int my,int vx,int vy,int vw,int vh,int scr
 //  Esc cancela. Compartido 4 OS (cada plataforma rutea sus eventos).
 static bool gLoopCutOn = false;
 static bool gLoopCutSlide = false;
-static int  gLoopCutCortes = 1;
+static int  gLoopCutCuts = 1;
 static float gLoopCutFactor = 0.0f; // -1..1 (0 = centro)
 static int  gLoopCutEdge = -1;      // arista (edit mesh) bajo el mouse = start del loop
 static int  gLoopCutSlideX0 = 0;    // X del mouse al empezar el slide
 static int  gLoopCutSlideW = 800;   // ancho del viewport (escala del slide)
 static std::vector<float> gLoopCutSegs; // preview (segmentos locales) -> lo dibuja el viewport
-bool gLoopCutEsPunto = false; // true = el corte es de UN borde suelto (perfil): el preview son PUNTOS, no lineas.
+bool gLoopCutIsPoint = false; // true = el corte es de UN borde suelto (perfil): el preview son PUNTOS, no lineas.
                               // Lo setea Mesh::LoopCutPreview (MeshEdit) segun si hay anillo de quads o no.
 // fase ORIENTACION: solo al arrancar el loop cut desde un QUAD activo (menu). Antes de
 // elegir los cortes, las flechas eligen cual de las 2 direcciones del quad cortar.
-static bool gLoopCutOrientando = false;
+static bool gLoopCutOrienting = false;
 static int  gLoopCutOrient = 0;           // 0 / 1
 static int  gLoopCutOrientEdge[2] = {-1,-1}; // los 2 bordes perpendiculares del quad
-bool LoopCutOrientando(){ return gLoopCutOrientando; }
+bool LoopCutOrienting(){ return gLoopCutOrienting; }
 // PICKER de direccion (click/tactil): en la fase de orientacion se dibujan los DOS cortes posibles
 // (amarillo 0.5) + 4 PUNTOS grandes amarillos (centro de cada borde del quad). Tocar/clickear un punto
 // elige la direccion de una. 2 puntos = una direccion, los otros 2 = la otra. gLoopCutSegs2 = el 2do corte.
@@ -993,35 +993,35 @@ static std::vector<float> gLoopCutSegs2;      // preview del corte de la OTRA di
 static float gLoopCutOrientPt[4][3];          // 4 midpoints (LOCAL) de los bordes del quad
 static int   gLoopCutOrientPtDir[4] = {0,0,0,0}; // a que direccion (0/1) pertenece cada punto
 static int   gLoopCutOrientNPts = 0;          // 4 cuando el picker esta activo
-static void LoopCutAplicarYPanel(); // (def mas abajo) aplica el corte + abre el panel de edicion
+static void LoopCutApplyYPanel(); // (def mas abajo) aplica el corte + abre el panel de edicion
 // en tactil no hay rueda ni flechas -> el loop cut se ajusta desde el panel redo (cortes + slide)
 #ifndef W3D_SYMBIAN
-extern Uint32 g_lastFingerTicks; // controles.cpp: hubo input tactil en la sesion
-static bool LoopCutTactil(){ return g_lastFingerTicks != 0; }
+extern Uint32 g_lastFingerTicks; // controls.cpp: hubo input tactil en la sesion
+static bool LoopCutTouch(){ return g_lastFingerTicks != 0; }
 #else
-static bool LoopCutTactil(){ return false; } // Symbian: va a teclado (flechas + Enter)
+static bool LoopCutTouch(){ return false; } // Symbian: va a teclado (flechas + Enter)
 #endif
 
 // snapshot de la geometria PRE-corte (para re-cortar en slide / redo)
-// 'vp' es W3dPosVerts (Mesh.h): las posiciones Y el estado de pose (Mesh::posadaPorAnim) van
+// 'vp' es W3dPosVerts (Mesh.h): las posiciones Y el estado de pose (Mesh::posedByAnim) van
 // juntos. Con un vector pelado, re-cortar (slide/redo) devolvia el vertex[] POSADO con el flag
-// apagado y el CalcularBordes de abajo podaba TODAS las marcas contra la pose.
+// apagado y el ComputeBorders de abajo podaba TODAS las marcas contra la pose.
 struct LCSnap { W3dPosVerts vp; std::vector<GLbyte> vn; std::vector<GLfloat> vu;
                 std::vector<GLubyte> vc; int vsz; std::vector<MeshFace> f3d;
-                std::vector<MaterialGroup> mg; std::vector<int> le, lv; bool tiene; // le/lv = looseEdges/looseVerts
-                VtxAnimSnap vanims; }; // frames de las vertex anims PRE-corte (ver LCRestaurar)
+                std::vector<MaterialGroup> mg; std::vector<int> le, lv; bool has; // le/lv = looseEdges/looseVerts
+                VtxAnimSnap vanims; }; // frames de las vertex anims PRE-corte (ver LCRestore)
 static LCSnap gLCSnap;
 // OPCIONES del panel redo: las 4 aristas del primer quad del loop (candidatas: por cual arista
 // entra el corte -> 2 direcciones), cual esta elegida, y si los uv/color se interpolan
 static int  gLoopCutCand[4] = {-1,-1,-1,-1};
 static int  gLoopCutCandN = 0, gLoopCutCandSel = 0;
 static bool gLoopCutCorrectUV = true;
-// Los indices de arista del edit mesh NO sobreviven a un rebuild (LCRestaurar -> CalcularBordes reagrupa
+// Los indices de arista del edit mesh NO sobreviven a un rebuild (LCRestore -> ComputeBorders reagrupa
 // posRep y el edit se rearma): la arista de entrada y las candidatas se guardan por POSICION de sus dos
-// puntas y se vuelven a resolver contra el edit mesh vivo antes de cada re-corte (LCReanclar).
+// puntas y se vuelven a resolver contra el edit mesh vivo antes de cada re-corte (LCReanchor).
 static Vector3 gLoopCutEdgePos[2];
 static Vector3 gLoopCutCandPos[4][2];
-static int LCBuscarArista(EditMesh* e, const Vector3& a, const Vector3& b){
+static int LCFindEdge(EditMesh* e, const Vector3& a, const Vector3& b){
     if (!e) return -1;
     for (int eg=0; eg<e->NumEdges(); eg++){ const int u=e->lineIdx[(size_t)eg*2], v=e->lineIdx[(size_t)eg*2+1];
         const Vector3 pu(e->pos[(size_t)u*3], e->pos[(size_t)u*3+1], e->pos[(size_t)u*3+2]), pv(e->pos[(size_t)v*3], e->pos[(size_t)v*3+1], e->pos[(size_t)v*3+2]);
@@ -1029,15 +1029,15 @@ static int LCBuscarArista(EditMesh* e, const Vector3& a, const Vector3& b){
     return -1;
 }
 static Vector3 LCPosVert(EditMesh* e, int k){ return Vector3(e->pos[(size_t)k*3], e->pos[(size_t)k*3+1], e->pos[(size_t)k*3+2]); }
-static void LCReanclar(Mesh* m){   // tras LCRestaurar: indices frescos para la arista de entrada y las candidatas
+static void LCReanchor(Mesh* m){   // tras LCRestore: indices frescos para la arista de entrada y las candidatas
     m->EnsureEdit(); EditMesh* e = m->edit; if (!e) return;
-    const int eg = LCBuscarArista(e, gLoopCutEdgePos[0], gLoopCutEdgePos[1]); if (eg >= 0) gLoopCutEdge = eg;
-    for (int i=0;i<gLoopCutCandN;i++){ const int c = LCBuscarArista(e, gLoopCutCandPos[i][0], gLoopCutCandPos[i][1]); if (c >= 0) gLoopCutCand[i] = c; }
+    const int eg = LCFindEdge(e, gLoopCutEdgePos[0], gLoopCutEdgePos[1]); if (eg >= 0) gLoopCutEdge = eg;
+    for (int i=0;i<gLoopCutCandN;i++){ const int c = LCFindEdge(e, gLoopCutCandPos[i][0], gLoopCutCandPos[i][1]); if (c >= 0) gLoopCutCand[i] = c; }
 }
 
-static void LCGuardar(Mesh* m){
+static void LCSave(Mesh* m){
     gLCSnap.vsz = m->vertexSize;
-    gLCSnap.vp.Capturar(m);   // posiciones + estado de pose (la unica puerta; ver Mesh.h)
+    gLCSnap.vp.Capture(m);   // posiciones + estado de pose (la unica puerta; ver Mesh.h)
     if (m->normals)     gLCSnap.vn.assign(m->normals, m->normals + m->vertexSize*3); else gLCSnap.vn.clear();
     if (m->uv)          gLCSnap.vu.assign(m->uv, m->uv + m->vertexSize*2); else gLCSnap.vu.clear();
     if (m->vertexColor) gLCSnap.vc.assign(m->vertexColor, m->vertexColor + m->vertexSize*4); else gLCSnap.vc.clear();
@@ -1048,96 +1048,96 @@ static void LCGuardar(Mesh* m){
     // tambien los frames VIEJOS o el proximo remap los lee desalineados y el cubo animado
     // se rompia por completo (vertex anim + loop cut).
     VertexAnimSnapshot(m, gLCSnap.vanims);
-    gLCSnap.tiene = true;
+    gLCSnap.has = true;
     // candidatas (sobre la malla PRE-corte, que es la que se re-corta): las aristas del primer quad del loop
     gLoopCutCandN = 0; gLoopCutCandSel = 0;
-    { std::vector<int> rEg, rA, rB, lf; bool cerrado = false;   // "cerrado", no "cerr": en Symbian cerr es un macro de STLport
+    { std::vector<int> rEg, rA, rB, lf; bool closed = false;   // "cerrado", no "cerr": en Symbian cerr es un macro de STLport
       m->EnsureEdit(); EditMesh* e = m->edit;
       if (e && gLoopCutEdge >= 0 && gLoopCutEdge < e->NumEdges()) { gLoopCutEdgePos[0] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2]); gLoopCutEdgePos[1] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2+1]); }
-      if (e && gLoopCutEdge >= 0 && m->LoopCutRecorrido(gLoopCutEdge, rEg, rA, rB, lf, cerrado) && !lf.empty() && lf[0] < (int)e->faceEdges.size()) {
+      if (e && gLoopCutEdge >= 0 && m->LoopCutTraversal(gLoopCutEdge, rEg, rA, rB, lf, closed) && !lf.empty() && lf[0] < (int)e->faceEdges.size()) {
           const std::vector<int>& fe = e->faceEdges[lf[0]];
           for (size_t k = 0; k < fe.size() && gLoopCutCandN < 4; k++) { const int c = fe[k]; if (c < 0 || c >= e->NumEdges()) continue;
               gLoopCutCand[gLoopCutCandN] = c; gLoopCutCandPos[gLoopCutCandN][0] = LCPosVert(e, e->lineIdx[(size_t)c*2]); gLoopCutCandPos[gLoopCutCandN][1] = LCPosVert(e, e->lineIdx[(size_t)c*2+1]);
               if (c == gLoopCutEdge) gLoopCutCandSel = gLoopCutCandN; gLoopCutCandN++; } } }
 }
-static void LCRestaurar(Mesh* m){
-    if (!gLCSnap.tiene) return;
-    VertexAnimRestaurarSnap(m, gLCSnap.vanims); // los keyframes vuelven al layout PRE-corte (junto con la geometria)
+static void LCRestore(Mesh* m){
+    if (!gLCSnap.has) return;
+    VertexAnimRestoreSnap(m, gLCSnap.vanims); // los keyframes vuelven al layout PRE-corte (junto con la geometria)
     // si el snapshot tiene la MISMA cantidad de verts (re-cortar sin cambiar la topologia) esto
     // es un MOVE y las claves de sharp/seam hay que re-anclarlas; si cambia, es un REBUILD y el
-    // guard no hace nada (no hay correspondencia por indice). Ver W3dMoverVerts.
-    // OJO CON EL SCOPE: el guard tiene que CERRARSE ANTES del CalcularBordes de abajo
+    // guard no hace nada (no hay correspondencia por indice). Ver W3dMoveVerts.
+    // OJO CON EL SCOPE: el guard tiene que CERRARSE ANTES del ComputeBorders de abajo
     // (que ademas de los bordes PODA las marcas que ya no son arista). Con el guard
     // abierto la poda se saltea, y ese salteo es la red de seguridad, no el plan.
-    { W3dMoverVerts mv(m);
+    { W3dMoveVerts mv(m);
     m->vertexSize = gLCSnap.vsz;
-    gLCSnap.vp.EscribirEn(m);   // vertex[] Y posadaPorAnim, juntos
+    gLCSnap.vp.WriteIn(m);   // vertex[] Y posedByAnim, juntos
     if (!gLCSnap.vn.empty()){ delete[] m->normals; m->normals=new GLbyte[gLCSnap.vsz*3]; for (int i=0;i<gLCSnap.vsz*3;i++) m->normals[i]=gLCSnap.vn[i]; }
     if (!gLCSnap.vu.empty()){ delete[] m->uv; m->uv=new GLfloat[gLCSnap.vsz*2]; for (int i=0;i<gLCSnap.vsz*2;i++) m->uv[i]=gLCSnap.vu[i]; }
     if (!gLCSnap.vc.empty()){ delete[] m->vertexColor; m->vertexColor=new GLubyte[gLCSnap.vsz*4]; for (int i=0;i<gLCSnap.vsz*4;i++) m->vertexColor[i]=gLCSnap.vc[i]; }
     m->faces3d = gLCSnap.f3d; m->materialsGroup = gLCSnap.mg;
     m->looseEdges = gLCSnap.le; m->looseVerts = gLCSnap.lv; // restaurar el perfil suelto (sino desaparece al re-cortar)
     std::vector<MeshIndex> tris;
-    for (size_t f=0;f<m->faces3d.size();f++) W3dTriangularCara(m->vertex, m->faces3d[f].idx, tris);
+    for (size_t f=0;f<m->faces3d.size();f++) W3dTriangulateFace(m->vertex, m->faces3d[f].idx, tris);
     m->facesSize=(int)tris.size(); delete[] m->faces; m->faces=new MeshIndex[m->facesSize>0?m->facesSize:1];
     for (int i=0;i<m->facesSize;i++) m->faces[i]=tris[i];
     } // <- aca se re-ancla sharp/seam (recien despues se puede podar)
-    m->CalcularBordes(); m->RecalcularNormales();
+    m->ComputeBorders(); m->RecalculateNormals();
 }
 
-bool LoopCutActivo(){ return gLoopCutOn; }
+bool LoopCutActive(){ return gLoopCutOn; }
 
-static void LoopCutActualizarPreview(int mx, int my){
+static void LoopCutUpdatePreview(int mx, int my){
     gLoopCutSegs.clear(); gLoopCutEdge = -1;
     if (!Viewport3DActive || !g_editMesh) return;
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return;
     int eg = EditPickIndex(SelEdge, mx, my, Viewport3DActive->x, Viewport3DActive->y,
-                           Viewport3DActive->width, Viewport3DActive->height, W3dPantallaAlto);
+                           Viewport3DActive->width, Viewport3DActive->height, W3dScreenHeight);
     gLoopCutEdge = eg;
-    if (eg>=0) m->LoopCutPreview(eg, gLoopCutCortes, 0.0f, gLoopCutSegs);
+    if (eg>=0) m->LoopCutPreview(eg, gLoopCutCuts, 0.0f, gLoopCutSegs);
 }
 
 // cartel-tutorial del loop cut, segun la fase (orientacion / cortes / slide). Se cierra al confirmar/cancelar.
 static void LoopCutHint(){
-    if (!gLoopCutOn){ NotificarHintClear(); return; }
-    if (gLoopCutOrientando) NotificarHint(T("Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)"));
-    else if (gLoopCutSlide) NotificarHint(T("Loop Cut: move = slide, Enter to confirm, Esc = center"));
-    else                    NotificarHint(T("Loop Cut: scroll = number of cuts, Enter to confirm"));
+    if (!gLoopCutOn){ NotifyHintClear(); return; }
+    if (gLoopCutOrienting) NotifyHint(T("Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)"));
+    else if (gLoopCutSlide) NotifyHint(T("Loop Cut: move = slide, Enter to confirm, Esc = center"));
+    else                    NotifyHint(T("Loop Cut: scroll = number of cuts, Enter to confirm"));
 }
 
-void LoopCutIniciar(int mx, int my){
-    if (InteractionMode!=EditMode || !g_editMesh){ Notificar(T("Loop Cut: enter Edit Mode first"), true); return; }
-    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=false; gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
-    LoopCutActualizarPreview(mx,my);
+void LoopCutStart(int mx, int my){
+    if (InteractionMode!=EditMode || !g_editMesh){ Notify(T("Loop Cut: enter Edit Mode first"), true); return; }
+    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrienting=false; gLoopCutCuts=1; gLoopCutFactor=0.0f; gLCSnap.has=false;
+    LoopCutUpdatePreview(mx,my);
     g_redraw=true;
     LoopCutHint();
 }
 
 // setup del loop cut sobre un BORDE conocido (direccion automatica). En tactil aplica+panel;
 // en PC/Symbian sigue el flujo clasico (rueda = cortes, click aplica + slide).
-static void LoopCutIniciarBorde(Mesh* m, int edgeIdx){
-    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=false;
-    gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
+static void LoopCutStartBorder(Mesh* m, int edgeIdx){
+    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrienting=false;
+    gLoopCutCuts=1; gLoopCutFactor=0.0f; gLCSnap.has=false;
     gLoopCutEdge = edgeIdx;
-    gLoopCutSegs.clear(); m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+    gLoopCutSegs.clear(); m->LoopCutPreview(gLoopCutEdge, gLoopCutCuts, 0.0f, gLoopCutSegs);
     gLoopCutSegs2.clear(); gLoopCutOrientNPts=0;
     g_redraw=true;
-    if (LoopCutTactil()){ LoopCutAplicarYPanel(); return; }
+    if (LoopCutTouch()){ LoopCutApplyYPanel(); return; }
     LoopCutHint();
 }
 
 // setup del loop cut sobre un QUAD conocido: fase ORIENTACION (2 cortes en 0.5 + 4 puntos para
 // elegir direccion con un click/toque; en PC/Symbian tambien flechas + Enter).
-static void LoopCutIniciarQuad(Mesh* m, EditMesh* e, int faceIdx){
-    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=true;
-    gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
+static void LoopCutStartQuad(Mesh* m, EditMesh* e, int faceIdx){
+    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrienting=true;
+    gLoopCutCuts=1; gLoopCutFactor=0.0f; gLCSnap.has=false;
     gLoopCutOrient=0;
     gLoopCutOrientEdge[0] = e->faceEdges[faceIdx][0]; // las 2 direcciones perpendiculares
     gLoopCutOrientEdge[1] = e->faceEdges[faceIdx][1];
     gLoopCutEdge = gLoopCutOrientEdge[0];
     // preview de LAS DOS direcciones (se dibujan ambas en 0.5)
-    gLoopCutSegs.clear();  m->LoopCutPreview(gLoopCutOrientEdge[0], gLoopCutCortes, 0.0f, gLoopCutSegs);
-    gLoopCutSegs2.clear(); m->LoopCutPreview(gLoopCutOrientEdge[1], gLoopCutCortes, 0.0f, gLoopCutSegs2);
+    gLoopCutSegs.clear();  m->LoopCutPreview(gLoopCutOrientEdge[0], gLoopCutCuts, 0.0f, gLoopCutSegs);
+    gLoopCutSegs2.clear(); m->LoopCutPreview(gLoopCutOrientEdge[1], gLoopCutCuts, 0.0f, gLoopCutSegs2);
     // 4 PUNTOS = midpoint de cada borde del quad. Bordes 0,2 -> direccion 0; bordes 1,3 -> direccion 1.
     gLoopCutOrientNPts = 0;
     for (int k=0; k<4 && k<(int)e->faceEdges[faceIdx].size(); k++){
@@ -1160,19 +1160,19 @@ static void LoopCutIniciarQuad(Mesh* m, EditMesh* e, int faceIdx){
 //  - modo CARA:  el quad activo  -> fase ORIENTACION (elegir 1 de las 2 direcciones). SOLO quads.
 //  - modo VERTICE: por la seleccion. 2 verts = un borde (direccion obvia); 4 verts = un quad
 //                  (elegir direccion). Cualquier otra cantidad (3, sueltos, etc.) = invalido.
-void LayoutLoopCutDesdeActivo(){
-    if (InteractionMode!=EditMode || !g_editMesh){ Notificar(T("Loop Cut: enter Edit Mode first"), true); return; }
+void LayoutLoopCutFromActive(){
+    if (InteractionMode!=EditMode || !g_editMesh){ Notify(T("Loop Cut: enter Edit Mode first"), true); return; }
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return;
     EditMesh* e = m->edit;
     int act = e->activeIdx;
     if (EditSelectMode == SelEdge){
-        if (act < 0 || act >= e->NumEdges()){ Notificar(T("Loop Cut: no active edge (click an edge first)"), true); return; }
-        LoopCutIniciarBorde(m, act);
+        if (act < 0 || act >= e->NumEdges()){ Notify(T("Loop Cut: no active edge (click an edge first)"), true); return; }
+        LoopCutStartBorder(m, act);
     } else if (EditSelectMode == SelFace){
-        if (act < 0 || act >= (int)e->faces.size()){ Notificar(T("Loop Cut: no active face (click a face first)"), true); return; }
-        if (e->faces[act].size() != 4){ Notificar(T("Loop Cut: the active face is not a quad"), true); return; } // SOLO quads
-        if (act >= (int)e->faceEdges.size() || e->faceEdges[act].size() < 2){ Notificar(T("Loop Cut: the active face has no edges"), true); return; }
-        LoopCutIniciarQuad(m, e, act);
+        if (act < 0 || act >= (int)e->faces.size()){ Notify(T("Loop Cut: no active face (click a face first)"), true); return; }
+        if (e->faces[act].size() != 4){ Notify(T("Loop Cut: the active face is not a quad"), true); return; } // SOLO quads
+        if (act >= (int)e->faceEdges.size() || e->faceEdges[act].size() < 2){ Notify(T("Loop Cut: the active face has no edges"), true); return; }
+        LoopCutStartQuad(m, e, act);
     } else { // SelVertex: decide por la SELECCION
         std::vector<int> sel;
         for (int k=0; k<(int)e->vertSel.size(); k++) if (e->vertSel[k]) sel.push_back(k);
@@ -1183,84 +1183,84 @@ void LayoutLoopCutDesdeActivo(){
                 int a=e->lineIdx[i*2], b=e->lineIdx[i*2+1];
                 if ((a==sel[0]&&b==sel[1]) || (a==sel[1]&&b==sel[0])){ eg=i; break; }
             }
-            if (eg<0){ Notificar(T("Loop Cut: the 2 selected vertices are not an edge"), true); return; }
-            LoopCutIniciarBorde(m, eg);
+            if (eg<0){ Notify(T("Loop Cut: the 2 selected vertices are not an edge"), true); return; }
+            LoopCutStartBorder(m, eg);
         } else if (sel.size() == 4){
             // 4 verts: la cara (quad) cuyos 4 vertices son EXACTAMENTE los seleccionados -> elegir direccion
             int f = -1;
             for (int i=0; i<(int)e->faces.size(); i++){
                 if (e->faces[i].size()!=4) continue;
-                bool todos=true;
-                for (int j=0;j<4;j++){ if (!e->vertSel[e->faces[i][j]]){ todos=false; break; } }
-                if (todos){ f=i; break; }
+                bool all=true;
+                for (int j=0;j<4;j++){ if (!e->vertSel[e->faces[i][j]]){ all=false; break; } }
+                if (all){ f=i; break; }
             }
-            if (f<0 || f>=(int)e->faceEdges.size() || e->faceEdges[f].size()<2){ Notificar(T("Loop Cut: select the 4 vertices of one quad"), true); return; }
-            LoopCutIniciarQuad(m, e, f);
+            if (f<0 || f>=(int)e->faceEdges.size() || e->faceEdges[f].size()<2){ Notify(T("Loop Cut: select the 4 vertices of one quad"), true); return; }
+            LoopCutStartQuad(m, e, f);
         } else {
-            Notificar(T("Loop Cut: select an edge (2 verts) or a quad (4 verts)"), true); // 3 o algo raro = invalido
+            Notify(T("Loop Cut: select an edge (2 verts) or a quad (4 verts)"), true); // 3 o algo raro = invalido
         }
     }
 }
 
-static void LoopCutConfirmar(){
+static void LoopCutConfirm(){
     gLoopCutOn=false; gLoopCutSlide=false; gLoopCutSegs.clear(); gLoopCutSegs2.clear(); gLoopCutOrientNPts=0;
-    NotificarHintClear();
-    AbrirRedoLoopCutPanel((Mesh*)g_editMesh); // panel redo (cortes + factor); usa el snapshot
+    NotifyHintClear();
+    OpenRedoLoopCutPanel((Mesh*)g_editMesh); // panel redo (cortes + factor); usa el snapshot
     g_redraw=true;
 }
 
 // aplica el corte con los defaults (1 corte, factor 0) y abre el panel redo para editar cortes/slide.
 // Es el camino de UN CLICK/TOUCH: como no hay flechas ni rueda en tactil, se ajusta desde el panel.
-static void LoopCutAplicarYPanel(){
-    if (gLoopCutEdge<0 || !g_editMesh){ LoopCutCancelar(); return; }
+static void LoopCutApplyYPanel(){
+    if (gLoopCutEdge<0 || !g_editMesh){ LoopCutCancel(); return; }
     Mesh* m=(Mesh*)g_editMesh;
-    UndoCapturarMallaGeo(m);           // Ctrl+Z: 1 sola captura, PRE-corte
-    LCGuardar(m);
-    m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, 0.0f);
-    LoopCutConfirmar();                // cierra el modal + abre el panel (cortes + factor)
+    UndoCaptureMeshGeo(m);           // Ctrl+Z: 1 sola captura, PRE-corte
+    LCSave(m);
+    m->LoopCutEdit(gLoopCutEdge, gLoopCutCuts, 0.0f);
+    LoopCutConfirm();                // cierra el modal + abre el panel (cortes + factor)
 }
 
 // ENTER en la fase de orientacion (teclado PC/Symbian): confirma la direccion elegida con las
 // flechas y sigue al flujo clasico (preview con rueda -> click aplica+slide). El PICKER de puntos
 // (click/tactil) NO pasa por aca: ese va directo a aplicar + panel.
-void LoopCutOrientConfirmarTeclado(){
-    if (!gLoopCutOrientando) return;
-    gLoopCutOrientando=false; gLoopCutOrientNPts=0; gLoopCutSegs2.clear();
+void LoopCutOrientConfirmKeyboard(){
+    if (!gLoopCutOrienting) return;
+    gLoopCutOrienting=false; gLoopCutOrientNPts=0; gLoopCutSegs2.clear();
     gLoopCutSegs.clear();
-    if (g_editMesh) ((Mesh*)g_editMesh)->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+    if (g_editMesh) ((Mesh*)g_editMesh)->LoopCutPreview(gLoopCutEdge, gLoopCutCuts, 0.0f, gLoopCutSegs);
     g_redraw=true;
     LoopCutHint(); // ayuda de la fase de cortes
 }
 
 // OK del TELEFONO (sin mouse) en la fase de orientacion: la direccion elegida con las flechas, aplicada de una + el panel
 // (cortes/slide), como el toque de un punto. Antes el OK tomaba el punto mas cercano al cursor ESCONDIDO.
-void LoopCutOrientAplicarElegida(){
-    if (!gLoopCutOrientando) return;
-    gLoopCutOrientando=false; gLoopCutOrientNPts=0; gLoopCutSegs2.clear();
+void LoopCutOrientApplyPicked(){
+    if (!gLoopCutOrienting) return;
+    gLoopCutOrienting=false; gLoopCutOrientNPts=0; gLoopCutSegs2.clear();
     gLoopCutEdge = gLoopCutOrientEdge[gLoopCutOrient];
-    LoopCutAplicarYPanel();
+    LoopCutApplyYPanel();
     g_redraw=true;
 }
 
 void LoopCutMotion(int mx, int my){
     if (!gLoopCutOn) return;
-    if (!g_editMesh){ LoopCutCancelar(); return; } // se salio de Edit Mode con el corte activo
-    if (gLoopCutOrientando) return; // orientacion: los 2 previews son fijos (no re-pickear por hover)
-    if (!gLoopCutSlide){ LoopCutActualizarPreview(mx,my); g_redraw=true; }
+    if (!g_editMesh){ LoopCutCancel(); return; } // se salio de Edit Mode con el corte activo
+    if (gLoopCutOrienting) return; // orientacion: los 2 previews son fijos (no re-pickear por hover)
+    if (!gLoopCutSlide){ LoopCutUpdatePreview(mx,my); g_redraw=true; }
     else {
         float f = (float)(mx - gLoopCutSlideX0) / (float)(gLoopCutSlideW*0.4f);
         if (f>1.0f) f=1.0f; if (f<-1.0f) f=-1.0f;
         gLoopCutFactor=f;
-        Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); LCReanclar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, f, gLoopCutCorrectUV);
+        Mesh* m=(Mesh*)g_editMesh; LCRestore(m); LCReanchor(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCuts, f, gLoopCutCorrectUV);
         g_redraw=true;
     }
 }
 
 void LoopCutWheel(int dir){
-    if (!gLoopCutOn || gLoopCutSlide || gLoopCutOrientando) return; // rueda = cortes (fase preview)
-    gLoopCutCortes += dir; if (gLoopCutCortes<1) gLoopCutCortes=1; if (gLoopCutCortes>32) gLoopCutCortes=32;
+    if (!gLoopCutOn || gLoopCutSlide || gLoopCutOrienting) return; // rueda = cortes (fase preview)
+    gLoopCutCuts += dir; if (gLoopCutCuts<1) gLoopCutCuts=1; if (gLoopCutCuts>32) gLoopCutCuts=32;
     gLoopCutSegs.clear();
-    if (gLoopCutEdge>=0 && g_editMesh) ((Mesh*)g_editMesh)->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+    if (gLoopCutEdge>=0 && g_editMesh) ((Mesh*)g_editMesh)->LoopCutPreview(gLoopCutEdge, gLoopCutCuts, 0.0f, gLoopCutSegs);
     g_redraw=true;
 }
 
@@ -1268,16 +1268,16 @@ void LoopCutWheel(int dir){
 //  orientacion (quad): izq/arriba = direccion 1, der/abajo = direccion 2.
 //  cortes (preview):   arriba/derecha = +1, abajo/izquierda = -1.
 //  slide:              izquierda/derecha mueve el factor.
-void LoopCutTecla(int dir){
+void LoopCutKey(int dir){
     if (!gLoopCutOn || !g_editMesh) return;
     Mesh* m=(Mesh*)g_editMesh;
-    if (gLoopCutOrientando){
+    if (gLoopCutOrienting){
         gLoopCutOrient = (dir==1 || dir==3) ? 1 : 0;
         gLoopCutEdge = gLoopCutOrientEdge[gLoopCutOrient];
         // gLoopCutSegs = la elegida, gLoopCutSegs2 = la OTRA (antes Segs2 quedaba fija en la direccion 1: elegida la 0
         // se veian las dos -una cruz- y elegida la 1, las dos encimadas)
-        gLoopCutSegs.clear();  m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
-        gLoopCutSegs2.clear(); m->LoopCutPreview(gLoopCutOrientEdge[1 - gLoopCutOrient], gLoopCutCortes, 0.0f, gLoopCutSegs2);
+        gLoopCutSegs.clear();  m->LoopCutPreview(gLoopCutEdge, gLoopCutCuts, 0.0f, gLoopCutSegs);
+        gLoopCutSegs2.clear(); m->LoopCutPreview(gLoopCutOrientEdge[1 - gLoopCutOrient], gLoopCutCuts, 0.0f, gLoopCutSegs2);
         g_redraw=true;
         return;
     }
@@ -1285,20 +1285,20 @@ void LoopCutTecla(int dir){
         LoopCutWheel((dir==2 || dir==1) ? +1 : -1); // arriba/derecha +1 corte; abajo/izq -1
         return;
     }
-    float paso = 0.08f; // slide con flechas: izquierda/derecha
-    if (dir==0) gLoopCutFactor -= paso;
-    else if (dir==1) gLoopCutFactor += paso;
+    float step = 0.08f; // slide con flechas: izquierda/derecha
+    if (dir==0) gLoopCutFactor -= step;
+    else if (dir==1) gLoopCutFactor += step;
     else return;
     if (gLoopCutFactor>1.0f) gLoopCutFactor=1.0f;
     if (gLoopCutFactor<-1.0f) gLoopCutFactor=-1.0f;
-    LCRestaurar(m); LCReanclar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, gLoopCutFactor, gLoopCutCorrectUV);
+    LCRestore(m); LCReanchor(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCuts, gLoopCutFactor, gLoopCutCorrectUV);
     g_redraw=true;
 }
 
 // click IZQUIERDO durante el loop cut: en preview aplica+entra al slide; en slide confirma
-void LoopCutClickIzq(int mx, int my){
+void LoopCutClickLeft(int mx, int my){
     if (!gLoopCutOn) return;
-    if (gLoopCutOrientando){
+    if (gLoopCutOrienting){
         // PICKER: elegir la direccion tocando/clickeando el PUNTO mas cercano (uno de los 4
         // midpoints del quad). Con un solo click sacamos la direccion; despues se aplica el
         // corte y se abre el panel (cortes + slide) porque en tactil no hay flechas ni rueda.
@@ -1310,7 +1310,7 @@ void LoopCutClickIzq(int mx, int my){
             for (int i=0;i<gLoopCutOrientNPts;i++){
                 Vector3 wp = W * Vector3(gLoopCutOrientPt[i][0], gLoopCutOrientPt[i][1], gLoopCutOrientPt[i][2]);
                 float sx=0, sy=0;
-                if (!Viewport3DActive->ProyectarPunto(wp, sx, sy)) continue;
+                if (!Viewport3DActive->ProjectPoint(wp, sx, sy)) continue;
                 float dx=sx-lmx, dy=sy-lmy; float d=dx*dx+dy*dy;
                 if (d < bestD){ bestD = d; best = i; }
             }
@@ -1318,61 +1318,61 @@ void LoopCutClickIzq(int mx, int my){
         if (best >= 0){
             gLoopCutOrient = gLoopCutOrientPtDir[best];
             gLoopCutEdge   = gLoopCutOrientEdge[gLoopCutOrient];
-            gLoopCutOrientando=false;
-            LoopCutAplicarYPanel();   // aplica + abre el panel de edicion (cortes/slide)
+            gLoopCutOrienting=false;
+            LoopCutApplyYPanel();   // aplica + abre el panel de edicion (cortes/slide)
         } else {
             // sin puntos proyectables: fallback al confirm clasico (sigue al preview)
-            LoopCutOrientConfirmarTeclado();
+            LoopCutOrientConfirmKeyboard();
         }
         g_redraw=true;
         return;
     }
     if (!gLoopCutSlide){
-        if (gLoopCutEdge<0 || !g_editMesh){ LoopCutCancelar(); return; }
+        if (gLoopCutEdge<0 || !g_editMesh){ LoopCutCancel(); return; }
         Mesh* m=(Mesh*)g_editMesh;
-        UndoCapturarMallaGeo(m); // Ctrl+Z: 1 sola captura, PRE-corte (el slide/redo re-cortan sin recapturar)
-        LCGuardar(m);
-        m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, 0.0f);
+        UndoCaptureMeshGeo(m); // Ctrl+Z: 1 sola captura, PRE-corte (el slide/redo re-cortan sin recapturar)
+        LCSave(m);
+        m->LoopCutEdit(gLoopCutEdge, gLoopCutCuts, 0.0f);
         gLoopCutSlide=true; gLoopCutFactor=0.0f; gLoopCutSlideX0=mx;
         gLoopCutSlideW = Viewport3DActive ? Viewport3DActive->width : 800;
         gLoopCutSegs.clear();
         g_redraw=true;
         LoopCutHint();            // ayuda de la fase de slide
-    } else LoopCutConfirmar();
+    } else LoopCutConfirm();
 }
 
 // click DERECHO: en slide deja el factor en 0 (centro) + confirma; en preview cancela
-void LoopCutClickDer(){
+void LoopCutClickRight(){
     if (!gLoopCutOn) return;
-    if (!gLoopCutSlide || !g_editMesh){ LoopCutCancelar(); return; } // sin Edit Mode no hay malla que cortar
+    if (!gLoopCutSlide || !g_editMesh){ LoopCutCancel(); return; } // sin Edit Mode no hay malla que cortar
     gLoopCutFactor=0.0f;
-    Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); LCReanclar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutCorrectUV);
-    LoopCutConfirmar();
+    Mesh* m=(Mesh*)g_editMesh; LCRestore(m); LCReanchor(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCuts, 0.0f, gLoopCutCorrectUV);
+    LoopCutConfirm();
 }
 
-void LoopCutCancelar(){
+void LoopCutCancel(){
     if (!gLoopCutOn) return;
-    if (gLoopCutSlide && gLCSnap.tiene){ LCRestaurar((Mesh*)g_editMesh); gLCSnap.tiene=false; }
-    // mismo reset COMPLETO que LoopCutConfirmar: sin apagar la fase de orientacion,
+    if (gLoopCutSlide && gLCSnap.has){ LCRestore((Mesh*)g_editMesh); gLCSnap.has=false; }
+    // mismo reset COMPLETO que LoopCutConfirm: sin apagar la fase de orientacion,
     // el toque de 1 dedo y el Enter seguian desviandose a un loop cut ya cancelado
-    gLoopCutOn=false; gLoopCutSlide=false; gLoopCutOrientando=false;
+    gLoopCutOn=false; gLoopCutSlide=false; gLoopCutOrienting=false;
     gLoopCutSegs.clear(); gLoopCutSegs2.clear(); gLoopCutOrientNPts=0;
-    NotificarHintClear();
+    NotifyHintClear();
     g_redraw=true;
 }
 
 // la usa el panel redo: re-corta desde el snapshot con nuevos parametros
-void LoopCutRedoAplicar(int cortes, float factor, bool correctUV, int edgeSel){
-    if (!gLCSnap.tiene || gLoopCutEdge<0 || !g_editMesh) return;
-    if (cortes<1) cortes=1;
-    gLoopCutCortes=cortes; gLoopCutFactor=factor; gLoopCutCorrectUV=correctUV;
-    Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); LCReanclar(m);
+void LoopCutRedoApply(int cuts, float factor, bool correctUV, int edgeSel){
+    if (!gLCSnap.has || gLoopCutEdge<0 || !g_editMesh) return;
+    if (cuts<1) cuts=1;
+    gLoopCutCuts=cuts; gLoopCutFactor=factor; gLoopCutCorrectUV=correctUV;
+    Mesh* m=(Mesh*)g_editMesh; LCRestore(m); LCReanchor(m);
     if (edgeSel >= 0 && edgeSel < gLoopCutCandN) { gLoopCutCandSel = edgeSel; gLoopCutEdge = gLoopCutCand[edgeSel]; gLoopCutEdgePos[0] = gLoopCutCandPos[edgeSel][0]; gLoopCutEdgePos[1] = gLoopCutCandPos[edgeSel][1]; }
-    m->LoopCutEdit(gLoopCutEdge, cortes, factor, correctUV);
+    m->LoopCutEdit(gLoopCutEdge, cuts, factor, correctUV);
     g_redraw=true;
 }
-void LoopCutRedoAplicar(int cortes, float factor){ LoopCutRedoAplicar(cortes, factor, gLoopCutCorrectUV, gLoopCutCandSel); }
-int   LoopCutGetCortes(){ return gLoopCutCortes; }
+void LoopCutRedoApply(int cuts, float factor){ LoopCutRedoApply(cuts, factor, gLoopCutCorrectUV, gLoopCutCandSel); }
+int   LoopCutGetCuts(){ return gLoopCutCuts; }
 float LoopCutGetFactor(){ return gLoopCutFactor; }
 bool  LoopCutGetCorrectUV(){ return gLoopCutCorrectUV; }
 int   LoopCutGetCandN(){ return gLoopCutCandN; }
@@ -1384,7 +1384,7 @@ int   LoopCutGetCand(int i){ return (i >= 0 && i < gLoopCutCandN) ? gLoopCutCand
 // Lo llama el viewport 3D despues de renderizar la escena.
 void LoopCutRenderPreview(){
     if (!gLoopCutOn || !g_editMesh) return;
-    if (gLoopCutSegs.empty() && !gLoopCutOrientando) return;
+    if (gLoopCutSegs.empty() && !gLoopCutOrienting) return;
     Mesh* m=(Mesh*)g_editMesh;
     Matrix4 W; m->GetWorldMatrix(W);
     w3dEngine::PushMatrix(); w3dEngine::MultMatrix(W.m);
@@ -1392,11 +1392,11 @@ void LoopCutRenderPreview(){
     w3dEngine::DisableArray(w3dEngine::NormalArray); w3dEngine::DisableArray(w3dEngine::ColorArray); w3dEngine::DisableArray(w3dEngine::TexCoordArray);
     w3dEngine::EnableArray(w3dEngine::VertexArray);
 
-    if (gLoopCutOrientando){
+    if (gLoopCutOrienting){
         // FASE ORIENTACION (quad): + 4 PUNTOS grandes 100% opacos. Con el DEDO, los DOS cortes posibles en amarillo
         // 0.5 (se toca el punto de la que se quiere). Con TECLADO (flechas + Enter) UNA sola linea: la elegida.
         w3dEngine::LineWidth(3.0f);
-        if (LoopCutTactil()){
+        if (LoopCutTouch()){
             w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 0.5f); // amarillo semitransparente
             if (!gLoopCutSegs2.empty()){ w3dEngine::VertexPointer3f(0, &gLoopCutSegs2[0]); w3dEngine::DrawLines((int)(gLoopCutSegs2.size()/3)); }
         } else {
@@ -1414,7 +1414,7 @@ void LoopCutRenderPreview(){
     } else {
         w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo
         w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);
-        if (gLoopCutEsPunto){ // corte de un BORDE SUELTO: el corte es un PUNTO en la arista, no una linea
+        if (gLoopCutIsPoint){ // corte de un BORDE SUELTO: el corte es un PUNTO en la arista, no una linea
             w3dEngine::PointSize(9.0f);
             w3dEngine::DrawPoints((int)(gLoopCutSegs.size()/3));
             w3dEngine::PointSize(1.0f);
@@ -1436,30 +1436,30 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     if (InteractionMode == WeightPaint) return true;
     // EDIT MODE de ARMATURE (Fase 3): el click selecciona un HUESO (head/tail crudos) y arranca el
     // drag de su extremo (head/tail/cuerpo). Todo vive en BoneEdit.cpp; shift agrega a la seleccion.
-    if (InteractionMode == EditMode && ObjActivo && ObjActivo->getType() == ObjectType::armature && Viewport3DActive)
+    if (InteractionMode == EditMode && ActiveObj && ActiveObj->getType() == ObjectType::armature && Viewport3DActive)
         return BoneEditClick3D(Viewport3DActive, mx, my, vx, vy, LShiftPressed);
     // Ctrl+Z: en Object Mode el click va a cambiar la seleccion -> guardar la previa.
     // (la seleccion de sub-elementos en Edit Mode es 2da tanda)
-    if (InteractionMode != EditMode) UndoCapturarSeleccion();
+    if (InteractionMode != EditMode) UndoCaptureSelection();
     // POSE MODE: el click selecciona un HUESO del armature activo (no un objeto de la escena). Shift = agrega/saca.
-    if (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature && Viewport3DActive) {
-        Armature* arm = (Armature*)ObjActivo;
+    if (InteractionMode == PoseMode && ActiveObj && ActiveObj->getType() == ObjectType::armature && Viewport3DActive) {
+        Armature* arm = (Armature*)ActiveObj;
         int b = Viewport3DActive->PickBone(arm, (float)(mx - vx), (float)(my - vy));
         if (!LShiftPressed) for (size_t i = 0; i < arm->bones.size(); i++) arm->bones[i].select = false;
         if (b >= 0) {
-            bool nuevo = !(LShiftPressed && arm->bones[b].select); // shift sobre uno ya seleccionado -> lo saca
-            arm->bones[b].select = nuevo;
-            arm->boneActivo = nuevo ? b : -1;
-        } else if (!LShiftPressed) arm->boneActivo = -1;
+            bool newValue = !(LShiftPressed && arm->bones[b].select); // shift sobre uno ya seleccionado -> lo saca
+            arm->bones[b].select = newValue;
+            arm->activeBone = newValue ? b : -1;
+        } else if (!LShiftPressed) arm->activeBone = -1;
         g_redraw = true;
         return true;
     }
     // en Edit Mode el click selecciona sub-elementos (no objetos)
     if (InteractionMode == EditMode && g_editMesh) {
-        UndoCapturarSeleccionEdit((Mesh*)g_editMesh); // Ctrl+Z: el click va a cambiar la seleccion de sub-elementos
+        UndoCaptureSelectionEdit((Mesh*)g_editMesh); // Ctrl+Z: el click va a cambiar la seleccion de sub-elementos
         // modo guiado "Pick Shortest Path" (desde el menu): el click elige 1ro/2do elemento
         if (PickPathClick(mx, my, vx, vy, vw, vh, screenH)) return true;
-        if (GuiadoUnClickClick(mx, my, vx, vy, vw, vh, screenH)) return true; // Select Linked / Loop Select guiados (1 click)
+        if (GuidedUnClickClick(mx, my, vx, vy, vw, vh, screenH)) return true; // Select Linked / Loop Select guiados (1 click)
         // Loop Select por Alt+Click (el borde de referencia es el que esta bajo el cursor):
         //   Shift+Alt+Click -> en CUALQUIER modo (CARA=Face Loop, BORDE/VERTICE=Edge Loop). El Shift ademas AGREGA.
         //   Ctrl+Alt+Click (modo BORDE) -> Edge Loop tambien (compat con el atajo viejo; sin shift = reemplaza).
@@ -1469,10 +1469,10 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
             if (m->edit) {
                 int eg = EditPickIndex(SelEdge, mx, my, vx, vy, vw, vh, screenH); // siempre pickea un BORDE de referencia
                 if (eg >= 0) {
-                    bool soloEste = !LShiftPressed; // Shift = agrega a la seleccion; sino reemplaza
-                    if (EditSelectMode == SelFace)      m->edit->SeleccionarLoopFace(eg, soloEste);
-                    else if (EditSelectMode == SelEdge) m->edit->SeleccionarLoopEdge(eg, soloEste);
-                    else                                m->edit->SeleccionarLoopEdgeVerts(eg, true); // VERTICE: REEMPLAZA (Shift es el atajo, no un "add"; ademas no acumula el edgeSel)
+                    bool onlyThis = !LShiftPressed; // Shift = agrega a la seleccion; sino reemplaza
+                    if (EditSelectMode == SelFace)      m->edit->SelectLoopFace(eg, onlyThis);
+                    else if (EditSelectMode == SelEdge) m->edit->SelectLoopEdge(eg, onlyThis);
+                    else                                m->edit->SelectLoopEdgeVerts(eg, true); // VERTICE: REEMPLAZA (Shift es el atajo, no un "add"; ademas no acumula el edgeSel)
                 }
             }
             return true;
@@ -1483,7 +1483,7 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
             Mesh* m = (Mesh*)g_editMesh; m->EnsureEdit();
             if (m->edit) {
                 int k = EditPickIndex(EditSelectMode, mx, my, vx, vy, vw, vh, screenH);
-                if (k >= 0) m->edit->SeleccionarShortestPath(k, LShiftPressed);
+                if (k >= 0) m->edit->SelectShortestPath(k, LShiftPressed);
             }
             return true;
         }
@@ -1498,7 +1498,7 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
         w3dEngine::Scissor(vx, glY, vw, vh);
         w3dEngine::Enable(w3dEngine::ScissorTest);
         // LA proyeccion del viewport (la de su Render: mirando por la camara, la de la CAMARA; ver EditPickIndex)
-        if (Viewport3DActive) Viewport3DActive->CargarProyeccionVista();
+        if (Viewport3DActive) Viewport3DActive->LoadProjectionView();
         w3dEngine::MatrixMode(w3dEngine::ModelView);
         w3dEngine::LoadIdentity();
         if (Viewport3DActive) Viewport3DActive->UpdateViewOrbit();
@@ -1517,16 +1517,16 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
 
     // LAS RAICES que se ven: la activa y las otras escenas abiertas (EscenaRender las dibuja despues de la activa). Una
     // oculta con su ojo no se pinta (sus objetos no se ven)
-    std::vector<Object*> raices;
-    if (SceneCollection->visible) raices.push_back(SceneCollection);
-    if (!W3dScriptHayPartida()) {
-        std::vector<Object*> otras;
-        W3dRaicesOtrasVisibles(otras);
-        raices.insert(raices.end(), otras.begin(), otras.end());
+    std::vector<Object*> roots;
+    if (SceneCollection->visible) roots.push_back(SceneCollection);
+    if (!W3dScriptHasSession()) {
+        std::vector<Object*> other;
+        W3dOtherVisibleRoots(other);
+        roots.insert(roots.end(), other.begin(), other.end());
     }
     pickCounter = 0;
-    for (size_t r = 0; r < raices.size(); r++) PickPaint(raices[r], false); // 1ra pasada: NO-armatures (con z-buffer)
-    for (size_t r = 0; r < raices.size(); r++) PickPaint(raices[r], true);  // 2da: armatures XRAY (sin z, encima)
+    for (size_t r = 0; r < roots.size(); r++) PickPaint(roots[r], false); // 1ra pasada: NO-armatures (con z-buffer)
+    for (size_t r = 0; r < roots.size(); r++) PickPaint(roots[r], true);  // 2da: armatures XRAY (sin z, encima)
     w3dEngine::Enable(w3dEngine::DepthTest); // restaurar (la pasada xray lo dejo off)
 
     GLubyte pix[4] = {0, 0, 0, 0};
@@ -1541,24 +1541,24 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     pickFound = NULL;
     if (id > 0) {
         pickCounter = 0;
-        for (size_t r = 0; r < raices.size() && !pickFound; r++) PickResolve(raices[r], id, false);   // 1ra pasada
-        for (size_t r = 0; r < raices.size() && !pickFound; r++) PickResolve(raices[r], id, true);    // 2da (sigue la cuenta)
+        for (size_t r = 0; r < roots.size() && !pickFound; r++) PickResolves(roots[r], id, false);   // 1ra pasada
+        for (size_t r = 0; r < roots.size() && !pickFound; r++) PickResolves(roots[r], id, true);    // 2da (sigue la cuenta)
     }
     // un objeto de OTRA escena abierta: su escena pasa a ser la activa y el click elige ahi
     if (pickFound) {
-        Object* raiz = pickFound;
-        while (raiz->Parent) raiz = raiz->Parent;
-        if (raiz != SceneCollection && !W3dActivarRaizDe(raiz)) return true;
+        Object* root = pickFound;
+        while (root->Parent) root = root->Parent;
+        if (root != SceneCollection && !W3dActivateRootOf(root)) return true;
     }
     if (!LShiftPressed) {
-        DeseleccionarTodo();
+        DeselectAll();
     }
     {
         if (pickFound) {
             if (LShiftPressed && pickFound->select) {
                 pickFound->select = false; // shift: sacar de la seleccion
             } else {
-                pickFound->Seleccionar();
+                pickFound->Select();
             }
         }
     }
@@ -1576,22 +1576,23 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
 struct InsetSnap { W3dPosVerts vp; std::vector<GLbyte> vn; std::vector<GLfloat> vu; std::vector<GLubyte> vc; int vsz;
                    std::vector<MeshFace> f3d; std::vector<MaterialGroup> mg; std::vector<int> le, lv, rep;
                    std::vector<std::vector<GLfloat> > uvs; std::vector<std::vector<GLubyte> > cols; std::vector<GLbyte> cn;
-                   std::set<std::string> sharp, seam; VtxAnimSnap vanims; bool tiene;
-                   InsetSnap() : vsz(0), tiene(false) {} };
+                   std::set<std::string> sharp, seam; VtxAnimSnap vanims; bool has;
+                   InsetSnap() : vsz(0), has(false) {} };
 static InsetSnap gInSnap;
-static Mesh* gInMalla = NULL;              // la malla del snapshot (si cambia, el snapshot no sirve)
+static Mesh* gInMesh = NULL;              // la malla del snapshot (si cambia, el snapshot no sirve)
 static bool gInsetOn = false;
 static std::vector<char> gInsetSel;        // las faces3d seleccionadas (sobre la malla del snapshot)
-static std::vector<Vector3> gInsetCentros; // los centros de esas caras: la seleccion vuelve al cancelar
-static InsetOpciones gInsetOp;
+static std::vector<Vector3> gInsetCenters; // los centros de esas caras: la seleccion vuelve al cancelar
+static InsetOptions gInsetOp;
 static float gInCx = 0, gInCy = 0;         // el centro de la seleccion en pantalla
-static float gInPxPorU = 100.0f;           // pixeles por unidad (local) alrededor de ese centro
-static float gInDistBase = 0, gInValorBase = 0;
+static float gInPxByU = 100.0f;            // pixeles por unidad (local) alrededor de ese centro
+static float gInDistBase = 0, gInValueBase = 0;
 static bool  gInProf = false;              // el mouse maneja la profundidad (Ctrl)
+static bool  gInDepthDrag = false;         // ...o el boton "Profundidad" de la barra (tactil, sin Ctrl)
 
-static void InsetGuardar(Mesh* m) {
+static void InsetSave(Mesh* m) {
     InsetSnap& s = gInSnap;
-    s.vsz = m->vertexSize; s.vp.Capturar(m);
+    s.vsz = m->vertexSize; s.vp.Capture(m);
     if (m->normals)     s.vn.assign(m->normals, m->normals + m->vertexSize*3); else s.vn.clear();
     if (m->uv)          s.vu.assign(m->uv, m->uv + m->vertexSize*2); else s.vu.clear();
     if (m->vertexColor) s.vc.assign(m->vertexColor, m->vertexColor + m->vertexSize*4); else s.vc.clear();
@@ -1600,15 +1601,15 @@ static void InsetGuardar(Mesh* m) {
     s.cols.clear(); for (size_t k = 0; k < m->colorLayers.size(); k++) s.cols.push_back(m->colorLayers[k]->color);
     s.cn = m->cornerNormal; s.sharp = m->sharpEdges; s.seam = m->seamEdges;
     VertexAnimSnapshot(m, s.vanims);
-    s.tiene = true; gInMalla = m;
+    s.has = true; gInMesh = m;
 }
 // vuelve la malla a como estaba al arrancar. 'regenerar' = dejarla entera (render + edicion); sin eso queda lista
 // solo para que InsetEdit la vuelva a insetar (que regenera al final)
-static void InsetRestaurar(Mesh* m, bool regenerar) {
+static void InsetRestore(Mesh* m, bool regenerate) {
     InsetSnap& s = gInSnap;
-    if (!s.tiene || m != gInMalla) return;
-    VertexAnimRestaurarSnap(m, s.vanims);
-    m->vertexSize = s.vsz; s.vp.EscribirEn(m);
+    if (!s.has || m != gInMesh) return;
+    VertexAnimRestoreSnap(m, s.vanims);
+    m->vertexSize = s.vsz; s.vp.WriteIn(m);
     delete[] m->normals; m->normals = NULL; if (!s.vn.empty()) { m->normals = new GLbyte[s.vsz*3]; for (int i = 0; i < s.vsz*3; i++) m->normals[i] = s.vn[i]; }
     delete[] m->uv; m->uv = NULL; if (!s.vu.empty()) { m->uv = new GLfloat[s.vsz*2]; for (int i = 0; i < s.vsz*2; i++) m->uv[i] = s.vu[i]; }
     delete[] m->vertexColor; m->vertexColor = NULL; if (!s.vc.empty()) { m->vertexColor = new GLubyte[s.vsz*4]; for (int i = 0; i < s.vsz*4; i++) m->vertexColor[i] = s.vc[i]; }
@@ -1616,114 +1617,142 @@ static void InsetRestaurar(Mesh* m, bool regenerar) {
     for (size_t k = 0; k < m->uvMaps.size() && k < s.uvs.size(); k++) m->uvMaps[k]->uv = s.uvs[k];
     for (size_t k = 0; k < m->colorLayers.size() && k < s.cols.size(); k++) m->colorLayers[k]->color = s.cols[k];
     m->cornerNormal = s.cn; m->sharpEdges = s.sharp; m->seamEdges = s.seam;
-    if (regenerar) m->GenerarRender();
+    if (regenerate) m->GenerateRender();
 }
 
-bool InsetActivo() { return gInsetOn; }
-InsetOpciones& InsetOpcionesActuales() { return gInsetOp; }
-void InsetCentroPantalla(float& x, float& y, float& pxPorU) { x = gInCx; y = gInCy; pxPorU = gInPxPorU; }
+bool InsetActive() { return gInsetOn; }
+bool& InsetDepthDrag() { return gInDepthDrag; }
+InsetOptions& InsetCurrentOptions() { return gInsetOp; }
+void InsetScreenCenter(float& x, float& y, float& pxByU) { x = gInCx; y = gInCy; pxByU = gInPxByU; }
 
 static void InsetHint() {
-    if (!gInsetOn) { NotificarHintClear(); return; }
-    NotificarHint(T("Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm"));
+    if (!gInsetOn) { NotifyHintClear(); return; }
+    NotifyHint(T("Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm"));
 }
 
 // re-inseta desde el snapshot con las opciones de ahora (el modal y el panel redo)
-static void InsetAplicar() {
+static void InsetApply() {
     Mesh* m = (Mesh*)g_editMesh;
-    if (!m || m != gInMalla || !gInSnap.tiene) return;
-    InsetRestaurar(m, false);
+    if (!m || m != gInMesh || !gInSnap.has) return;
+    InsetRestore(m, false);
     m->InsetEdit(gInsetOp, gInsetSel);
     g_redraw = true;
 }
-void InsetRedoAplicar() { InsetAplicar(); }
+void InsetRedoApply() { InsetApply(); }
 
-void InsetIniciar(int mx, int my) {
-    if (InteractionMode != EditMode || !g_editMesh) { Notificar(T("Inset: enter Edit Mode first"), true); return; }
-    if (gInsetOn || LoopCutActivo()) return;
+void InsetStart(int mx, int my) {
+    if (InteractionMode != EditMode || !g_editMesh) { Notify(T("Inset: enter Edit Mode first"), true); return; }
+    if (gInsetOn || LoopCutActive()) return;
     Mesh* m = (Mesh*)g_editMesh;
     std::vector<char> sel;
-    if (!m->CarasSeleccionadas3d(sel)) { Notificar(T("Inset: select faces first"), true); g_redraw = true; return; }
-    RedoMeshPanelCerrar();   // (otro panel redo trabaja sobre su propio snapshot)
+    if (!m->SelectedFaces3d(sel)) { Notify(T("Inset: select faces first"), true); g_redraw = true; return; }
+    RedoMeshPanelClose();   // (otro panel redo trabaja sobre su propio snapshot)
     // el centro de la seleccion y la escala de la pantalla alrededor de el
-    Vector3 c(0, 0, 0); int n = 0; gInsetCentros.clear();
+    Vector3 c(0, 0, 0); int n = 0; gInsetCenters.clear();
     for (size_t f = 0; f < sel.size(); f++) { if (!sel[f]) continue;
         const std::vector<int>& idx = m->faces3d[f].idx; Vector3 cf(0, 0, 0);
         for (size_t k = 0; k < idx.size(); k++) cf = cf + Vector3(m->vertex[idx[k]*3], m->vertex[idx[k]*3+1], m->vertex[idx[k]*3+2]);
-        cf = cf * (1.0f / (float)idx.size()); gInsetCentros.push_back(cf); c = c + cf; n++; }
+        cf = cf * (1.0f / (float)idx.size()); gInsetCenters.push_back(cf); c = c + cf; n++; }
     c = c * (1.0f / (float)n);
-    gInCx = (float)mx - 200.0f; gInCy = (float)my; gInPxPorU = 100.0f;   // (sin vista: un centro 200 px a la izquierda)
+    gInCx = (float)mx - 200.0f; gInCy = (float)my; gInPxByU = 100.0f;   // (sin vista: un centro 200 px a la izquierda)
     if (Viewport3DActive) {
-        Viewport3DActive->BindVista();
+        Viewport3DActive->BindView();
         Matrix4 W; m->GetWorldMatrix(W);
         float sx, sy;
-        if (Viewport3DActive->ProyectarPunto(W * c, sx, sy)) {
+        if (Viewport3DActive->ProjectPoint(W * c, sx, sy)) {
             gInCx = sx; gInCy = sy;
-            const Vector3 ejes[3] = { Vector3(1,0,0), Vector3(0,1,0), Vector3(0,0,1) };
-            float mejor = 0.0f;
+            const Vector3 axes[3] = { Vector3(1,0,0), Vector3(0,1,0), Vector3(0,0,1) };
+            float best = 0.0f;
             for (int k = 0; k < 3; k++) { float ax, ay;
-                if (!Viewport3DActive->ProyectarPunto(W * (c + ejes[k]), ax, ay)) continue;
-                const float d = sqrtf((ax-sx)*(ax-sx) + (ay-sy)*(ay-sy)); if (d > mejor) mejor = d; }
-            if (mejor > 1.0f) gInPxPorU = mejor;
+                if (!Viewport3DActive->ProjectPoint(W * (c + axes[k]), ax, ay)) continue;
+                const float d = sqrtf((ax-sx)*(ax-sx) + (ay-sy)*(ay-sy)); if (d > best) best = d; }
+            if (best > 1.0f) gInPxByU = best;
         }
     }
-    InsetGuardar(m);
+    InsetSave(m);
     gInsetSel = sel;
-    gInsetOp.grosor = 0.0f; gInsetOp.profundidad = 0.0f;   // (las tildes quedan como se usaron la ultima vez)
-    gInProf = false;
+    gInsetOp.thickness = 0.0f; gInsetOp.depth = 0.0f;   // (las tildes quedan como se usaron la ultima vez)
+    gInProf = false; gInDepthDrag = false;
+    NumInputReset();
     float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
-    gInDistBase = d < 10.0f ? 10.0f : d; gInValorBase = 0.0f;
+    gInDistBase = d < 10.0f ? 10.0f : d; gInValueBase = 0.0f;
     gInsetOn = true;
     InsetHint();
     g_redraw = true;
 }
 
-void InsetMotion(int mx, int my) {
+// el mouse (o el dedo) arranca desde (mx, my) con el valor que ya tenia: al cambiar lo que maneja (Ctrl) o al apoyar
+// el dedo (sin esto el valor saltaba a la distancia del dedo al centro)
+void InsetGrab(int mx, int my) {
     if (!gInsetOn) return;
-    const float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
-    const bool prof = LCtrlPressed;
-    if (prof != gInProf) {   // cambia lo que maneja el mouse: arranca desde el valor que ya tenia
-        gInProf = prof; gInDistBase = d; gInValorBase = prof ? gInsetOp.profundidad : gInsetOp.grosor;
-    }
-    const float v = gInValorBase + (gInDistBase - d) / gInPxPorU;   // acercarse al centro = mas
-    if (gInProf) gInsetOp.profundidad = v;
-    else         gInsetOp.grosor = v > 0.0f ? v : 0.0f;
-    InsetAplicar();
+    gInProf = LCtrlPressed || gInDepthDrag;
+    gInDistBase = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
+    gInValueBase = gInProf ? gInsetOp.depth : gInsetOp.thickness;
 }
 
-void InsetCancelar() {
+void InsetMotion(int mx, int my) {
+    if (!gInsetOn || NumInputActive()) return;   // (con un valor tipeado manda el numero)
+    const float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
+    if ((LCtrlPressed || gInDepthDrag) != gInProf) InsetGrab(mx, my);   // cambia lo que maneja el mouse
+    const float v = gInValueBase + (gInDistBase - d) / gInPxByU;   // acercarse al centro = mas
+    if (gInProf) gInsetOp.depth = v;
+    else         gInsetOp.thickness = v > 0.0f ? v : 0.0f;
+    InsetApply();
+}
+
+// el valor TIPEADO (la barra de estado, el teclado numerico, el lapiz de Symbian): el grosor, o la profundidad
+// si es lo que maneja el mouse
+void InsetNumber() {
+    float v = 0.0f;
+    if (!gInsetOn || !NumInputValue(v)) return;
+    if (gInProf) gInsetOp.depth = v;
+    else         gInsetOp.thickness = v > 0.0f ? v : 0.0f;
+    InsetApply();
+}
+
+void InsetCancel() {
     if (!gInsetOn) return;
     gInsetOn = false;
+    NumInputReset();
     Mesh* m = (Mesh*)g_editMesh;
-    if (m && m == gInMalla) { InsetRestaurar(m, true); m->SeleccionarCarasPorCentro(gInsetCentros); }
-    gInSnap.tiene = false;
+    if (m && m == gInMesh) { InsetRestore(m, true); m->SelectFacesByCenter(gInsetCenters); }
+    gInSnap.has = false;
     InsetHint();
     g_redraw = true;
 }
 
-void InsetConfirmar() {
+void InsetConfirm() {
     if (!gInsetOn) return;
     gInsetOn = false;
+    NumInputReset();
     InsetHint();
     Mesh* m = (Mesh*)g_editMesh;
-    if (!m || m != gInMalla) { gInSnap.tiene = false; return; }
+    if (!m || m != gInMesh) { gInSnap.has = false; return; }
     // el undo guarda la malla de ANTES: se vuelve a ella, se captura y se re-inseta (el snapshot queda para el panel)
-    InsetRestaurar(m, true); m->SeleccionarCarasPorCentro(gInsetCentros);
-    UndoCapturarMallaGeo(m);
+    InsetRestore(m, true); m->SelectFacesByCenter(gInsetCenters);
+    UndoCaptureMeshGeo(m);
     m->InsetEdit(gInsetOp, gInsetSel);
-    AbrirRedoInsetPanel(m);
+    OpenRedoInsetPanel(m);
     g_redraw = true;
 }
 
 // teclas del modal: true = la uso
-bool InsetTecla(int tecla) {
+bool InsetKey(int key) {
     if (!gInsetOn) return false;
-    switch (tecla) {
-        case W3dK_RETURN: case W3dK_KP_ENTER: InsetConfirmar(); return true;
-        case W3dK_ESCAPE: case W3dK_BACKSPACE: InsetCancelar(); return true;
-        case W3dK_I: gInsetOp.individual = !gInsetOp.individual; InsetAplicar(); return true;
-        case W3dK_B: gInsetOp.borde = !gInsetOp.borde; InsetAplicar(); return true;
-        case W3dK_O: gInsetOp.afuera = !gInsetOp.afuera; InsetAplicar(); return true;
+    switch (key) {
+        case W3dK_RETURN: case W3dK_KP_ENTER: InsetConfirm(); return true;
+        case W3dK_ESCAPE: case W3dK_BACKSPACE: InsetCancel(); return true;
+        case W3dK_I: gInsetOp.individual = !gInsetOp.individual; InsetApply(); return true;
+        case W3dK_B: gInsetOp.border = !gInsetOp.border; InsetApply(); return true;
+        case W3dK_O: gInsetOp.outside = !gInsetOp.outside; InsetApply(); return true;
+        // las FLECHAS agrandan / achican lo que maneja el mouse (el teclado del telefono, sin mouse): de a 10 px
+        case W3dK_UP: case W3dK_RIGHT: case W3dK_DOWN: case W3dK_LEFT: {
+            const float step = ((key == W3dK_UP || key == W3dK_RIGHT) ? 10.0f : -10.0f) / gInPxByU;
+            NumInputReset();
+            if (gInProf) gInsetOp.depth += step;
+            else { gInsetOp.thickness += step; if (gInsetOp.thickness < 0.0f) gInsetOp.thickness = 0.0f; }
+            InsetApply(); return true;
+        }
     }
     return true;   // (el resto no hace nada mientras dura: que no se escape a los atajos del viewport)
 }
@@ -1738,120 +1767,145 @@ bool InsetTecla(int tecla) {
 // ============================================================================
 static bool gBevelOn = false;
 static std::vector<char> gBvSelRep;                       // la seleccion de ANTES (sobre la malla del snapshot)
-static std::vector<std::pair<int,int> > gBvAristas;
-static std::vector<Vector3> gBvCentros;                   // los centros de las caras elegidas: vuelven al cancelar
-static BevelOpciones gBevelOp;
-static float gBvCx = 0, gBvCy = 0, gBvPxPorU = 100.0f, gBvDistBase = 0;
-static bool gBvTieneSnap = false;
+static std::vector<std::pair<int,int> > gBvEdges;
+static std::vector<Vector3> gBvCenters;                   // los centros de las caras elegidas: vuelven al cancelar
+static BevelOptions gBevelOp;
+static float gBvCx = 0, gBvCy = 0, gBvPxByU = 100.0f, gBvDistBase = 0, gBvValueBase = 0;
+static bool gBvHasSnap = false;
 
-bool BevelActivo() { return gBevelOn; }
-BevelOpciones& BevelOpcionesActuales() { return gBevelOp; }
-void BevelCentroPantalla(float& x, float& y, float& pxPorU) { x = gBvCx; y = gBvCy; pxPorU = gBvPxPorU; }
+bool BevelActive() { return gBevelOn; }
+BevelOptions& BevelCurrentOptions() { return gBevelOp; }
+void BevelScreenCenter(float& x, float& y, float& pxByU) { x = gBvCx; y = gBvCy; pxByU = gBvPxByU; }
 
 static void BevelHint() {
-    if (!gBevelOn) { NotificarHintClear(); return; }
-    NotificarHint(T("Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm"));
+    if (!gBevelOn) { NotifyHintClear(); return; }
+    NotifyHint(T("Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm"));
 }
-static void BevelAplicar() {
+static void BevelApply() {
     Mesh* m = (Mesh*)g_editMesh;
-    if (!m || m != gInMalla || !gInSnap.tiene || !gBvTieneSnap) return;
-    InsetRestaurar(m, false);
-    if (!m->BevelEdit(gBevelOp, gBvSelRep, gBvAristas)) m->GenerarRender();   // (ancho 0: la malla de antes, entera)
+    if (!m || m != gInMesh || !gInSnap.has || !gBvHasSnap) return;
+    InsetRestore(m, false);
+    if (!m->BevelEdit(gBevelOp, gBvSelRep, gBvEdges)) m->GenerateRender();   // (ancho 0: la malla de antes, entera)
     g_redraw = true;
 }
-void BevelRedoAplicar() { BevelAplicar(); }
+void BevelRedoApply() { BevelApply(); }
 
-void BevelIniciar(int mx, int my, int afecta) {
-    if (InteractionMode != EditMode || !g_editMesh) { Notificar(T("Bevel: enter Edit Mode first"), true); return; }
-    if (gBevelOn || gInsetOn || LoopCutActivo()) return;
+void BevelStart(int mx, int my, int affects) {
+    if (InteractionMode != EditMode || !g_editMesh) { Notify(T("Bevel: enter Edit Mode first"), true); return; }
+    if (gBevelOn || gInsetOn || LoopCutActive()) return;
     Mesh* m = (Mesh*)g_editMesh;
-    std::vector<char> selRep; std::vector<std::pair<int,int> > aristas;
-    if (!m->BevelSeleccion(selRep, aristas) || (afecta == 1 && aristas.empty())) {
-        Notificar(T(afecta == 1 ? "Bevel: select edges first" : "Bevel: select vertices first"), true); g_redraw = true; return; }
-    RedoMeshPanelCerrar();
+    std::vector<char> selRep; std::vector<std::pair<int,int> > edges;
+    if (!m->BevelSelection(selRep, edges) || (affects == 1 && edges.empty())) {
+        Notify(T(affects == 1 ? "Bevel: select edges first" : "Bevel: select vertices first"), true); g_redraw = true; return; }
+    RedoMeshPanelClose();
     // el centro de lo elegido y la escala de la pantalla alrededor de el
     Vector3 c(0, 0, 0); int n = 0;
     for (int i = 0; i < m->vertexSize && i < (int)selRep.size(); i++) if (selRep[i]) {
         c = c + Vector3(m->vertex[i*3], m->vertex[i*3+1], m->vertex[i*3+2]); n++; }
     if (n > 0) c = c * (1.0f / (float)n);
-    gBvCentros.clear();
-    { std::vector<char> sf; if (m->CarasSeleccionadas3d(sf)) for (size_t f = 0; f < sf.size(); f++) { if (!sf[f]) continue;
+    gBvCenters.clear();
+    { std::vector<char> sf; if (m->SelectedFaces3d(sf)) for (size_t f = 0; f < sf.size(); f++) { if (!sf[f]) continue;
         const std::vector<int>& idx = m->faces3d[f].idx; Vector3 cf(0, 0, 0);
         for (size_t k = 0; k < idx.size(); k++) cf = cf + Vector3(m->vertex[idx[k]*3], m->vertex[idx[k]*3+1], m->vertex[idx[k]*3+2]);
-        gBvCentros.push_back(cf * (1.0f / (float)idx.size())); } }
-    gBvCx = (float)mx - 100.0f; gBvCy = (float)my; gBvPxPorU = 100.0f;
+        gBvCenters.push_back(cf * (1.0f / (float)idx.size())); } }
+    gBvCx = (float)mx - 100.0f; gBvCy = (float)my; gBvPxByU = 100.0f;
     if (Viewport3DActive) {
-        Viewport3DActive->BindVista();
+        Viewport3DActive->BindView();
         Matrix4 W; m->GetWorldMatrix(W);
         float sx, sy;
-        if (Viewport3DActive->ProyectarPunto(W * c, sx, sy)) {
+        if (Viewport3DActive->ProjectPoint(W * c, sx, sy)) {
             gBvCx = sx; gBvCy = sy;
-            const Vector3 ejes[3] = { Vector3(1,0,0), Vector3(0,1,0), Vector3(0,0,1) };
-            float mejor = 0.0f;
+            const Vector3 axes[3] = { Vector3(1,0,0), Vector3(0,1,0), Vector3(0,0,1) };
+            float best = 0.0f;
             for (int k = 0; k < 3; k++) { float ax, ay;
-                if (!Viewport3DActive->ProyectarPunto(W * (c + ejes[k]), ax, ay)) continue;
-                const float d = sqrtf((ax-sx)*(ax-sx) + (ay-sy)*(ay-sy)); if (d > mejor) mejor = d; }
-            if (mejor > 1.0f) gBvPxPorU = mejor;
+                if (!Viewport3DActive->ProjectPoint(W * (c + axes[k]), ax, ay)) continue;
+                const float d = sqrtf((ax-sx)*(ax-sx) + (ay-sy)*(ay-sy)); if (d > best) best = d; }
+            if (best > 1.0f) gBvPxByU = best;
         }
     }
-    InsetGuardar(m);   // (el mismo snapshot que el inset: geometria + capas + marcas)
-    gBvTieneSnap = true;
-    gBvSelRep = selRep; gBvAristas = aristas;
-    gBevelOp.afecta = afecta; gBevelOp.ancho = 0.0f;   // (el resto queda como se uso la ultima vez)
+    InsetSave(m);   // (el mismo snapshot que el inset: geometria + capas + marcas)
+    gBvHasSnap = true;
+    gBvSelRep = selRep; gBvEdges = edges;
+    gBevelOp.affects = affects; gBevelOp.width = 0.0f;   // (el resto queda como se uso la ultima vez)
     const float d = sqrtf(((float)mx-gBvCx)*((float)mx-gBvCx) + ((float)my-gBvCy)*((float)my-gBvCy));
-    gBvDistBase = d;
+    gBvDistBase = d; gBvValueBase = 0.0f;
+    NumInputReset();
     gBevelOn = true;
     BevelHint();
     g_redraw = true;
 }
 
+// el mouse (o el dedo) arranca desde (mx, my) con el ancho que ya tenia (al apoyar el dedo: sin esto saltaba)
+void BevelGrab(int mx, int my) {
+    if (!gBevelOn) return;
+    gBvDistBase = sqrtf(((float)mx-gBvCx)*((float)mx-gBvCx) + ((float)my-gBvCy)*((float)my-gBvCy));
+    gBvValueBase = gBevelOp.width;
+}
 void BevelMotion(int mx, int my) {
-    if (!gBevelOn) return;
+    if (!gBevelOn || NumInputActive()) return;   // (con un valor tipeado manda el numero)
     const float d = sqrtf(((float)mx-gBvCx)*((float)mx-gBvCx) + ((float)my-gBvCy)*((float)my-gBvCy));
-    float v = (d - gBvDistBase) / gBvPxPorU;   // alejarse del centro = mas ancho
-    if (gBevelOp.tipoAncho == 3) v *= 100.0f;   // (Percent: en por ciento)
-    gBevelOp.ancho = v > 0.0f ? v : 0.0f;
-    BevelAplicar();
+    float v = (d - gBvDistBase) / gBvPxByU;   // alejarse del centro = mas ancho
+    if (gBevelOp.widthType == 3) v *= 100.0f;   // (Percent: en por ciento)
+    v += gBvValueBase;
+    gBevelOp.width = v > 0.0f ? v : 0.0f;
+    BevelApply();
 }
-void BevelRueda(int dir) {
+// el valor TIPEADO (la barra de estado, el teclado numerico, el lapiz de Symbian): el ancho
+void BevelNumber() {
+    float v = 0.0f;
+    if (!gBevelOn || !NumInputValue(v)) return;
+    gBevelOp.width = v > 0.0f ? v : 0.0f;
+    BevelApply();
+}
+void BevelWheel(int dir) {
     if (!gBevelOn) return;
-    gBevelOp.segmentos += dir > 0 ? 1 : -1;
-    if (gBevelOp.segmentos < 1) gBevelOp.segmentos = 1; if (gBevelOp.segmentos > 100) gBevelOp.segmentos = 100;
-    BevelAplicar();
+    gBevelOp.segments += dir > 0 ? 1 : -1;
+    if (gBevelOp.segments < 1) gBevelOp.segments = 1; if (gBevelOp.segments > 100) gBevelOp.segments = 100;
+    BevelApply();
 }
 
-void BevelCancelar() {
+void BevelCancel() {
     if (!gBevelOn) return;
     gBevelOn = false;
+    NumInputReset();
     Mesh* m = (Mesh*)g_editMesh;
-    if (m && m == gInMalla) { InsetRestaurar(m, true); if (!gBvCentros.empty()) m->SeleccionarCarasPorCentro(gBvCentros); }
-    gInSnap.tiene = false; gBvTieneSnap = false;
+    if (m && m == gInMesh) { InsetRestore(m, true); if (!gBvCenters.empty()) m->SelectFacesByCenter(gBvCenters); }
+    gInSnap.has = false; gBvHasSnap = false;
     BevelHint();
     g_redraw = true;
 }
 
-void BevelConfirmar() {
+void BevelConfirm() {
     if (!gBevelOn) return;
     gBevelOn = false;
+    NumInputReset();
     BevelHint();
     Mesh* m = (Mesh*)g_editMesh;
-    if (!m || m != gInMalla) { gInSnap.tiene = false; gBvTieneSnap = false; return; }
+    if (!m || m != gInMesh) { gInSnap.has = false; gBvHasSnap = false; return; }
     // el undo guarda la malla de ANTES: se vuelve a ella, se captura y se re-bisela (el snapshot queda para el panel)
-    InsetRestaurar(m, true);
-    UndoCapturarMallaGeo(m);
-    if (!m->BevelEdit(gBevelOp, gBvSelRep, gBvAristas)) m->GenerarRender();
-    AbrirRedoBevelPanel(m);
+    InsetRestore(m, true);
+    UndoCaptureMeshGeo(m);
+    if (!m->BevelEdit(gBevelOp, gBvSelRep, gBvEdges)) m->GenerateRender();
+    OpenRedoBevelPanel(m);
     g_redraw = true;
 }
 
-bool BevelTecla(int tecla) {
+bool BevelKey(int key) {
     if (!gBevelOn) return false;
-    switch (tecla) {
-        case W3dK_RETURN: case W3dK_KP_ENTER: BevelConfirmar(); return true;
-        case W3dK_ESCAPE: case W3dK_BACKSPACE: BevelCancelar(); return true;
-        case W3dK_UP: case W3dK_PGUP:   BevelRueda(+1); return true;
-        case W3dK_DOWN: case W3dK_PGDN: BevelRueda(-1); return true;
-        case W3dK_V: gBevelOp.afecta = gBevelOp.afecta ? 0 : 1; BevelAplicar(); return true;
+    switch (key) {
+        case W3dK_RETURN: case W3dK_KP_ENTER: BevelConfirm(); return true;
+        case W3dK_ESCAPE: case W3dK_BACKSPACE: BevelCancel(); return true;
+        case W3dK_UP: case W3dK_PGUP:   BevelWheel(+1); return true;
+        case W3dK_DOWN: case W3dK_PGDN: BevelWheel(-1); return true;
+        // izquierda / derecha achican / agrandan el ANCHO (el teclado del telefono, sin mouse): de a 10 px
+        case W3dK_RIGHT: case W3dK_LEFT: {
+            float step = (key == W3dK_RIGHT ? 10.0f : -10.0f) / gBvPxByU;
+            if (gBevelOp.widthType == 3) step *= 100.0f;
+            NumInputReset();
+            gBevelOp.width += step; if (gBevelOp.width < 0.0f) gBevelOp.width = 0.0f;
+            BevelApply(); return true;
+        }
+        case W3dK_V: gBevelOp.affects = gBevelOp.affects ? 0 : 1; BevelApply(); return true;
     }
     return true;   // (el resto no hace nada mientras dura)
 }

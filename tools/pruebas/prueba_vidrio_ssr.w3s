@@ -10,17 +10,17 @@
 #  - una esfera de VIDRIO (transmision) muestra lo de atras refractado y, rugosa, esmerilado
 # ==========================================================================
 
-ventana 640 480
-sombreadopixel
-escenadefecto
-fondo textura fondo360_prueba.png
+window 640 480
+pixelshading
+scenedefault
+background texture fondo360_prueba.png
 add cube
 objpos 0 0 -1.05
 objscale 8 8 0.05
 matnew
 matrt 0.05 1
-vista3d sombreado 2
-vista3d gizmo 0
+view3d shading 2
+view3d gizmo 0
 tick 5
 uishot /tmp/w3d_piso.png
 pngpx /tmp/w3d_piso.png 150 330 55 105 235 - 20

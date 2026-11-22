@@ -18,11 +18,11 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.05, 1.0"
         // PIXELADO GLOBAL declarado en el .w3d de TEXTO: NEAREST en todo el 3D y
         // sin mipmaps.
-        pixelado: true
+        pixelated: true
 
         Camera {
             name: "Camara"

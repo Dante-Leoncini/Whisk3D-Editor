@@ -1,6 +1,6 @@
 # 日志
 
-三个级别，printf 风格：`w3dLogf`（信息）、`w3dLogfW`（警告）和 `w3dLogfE`（错误）。`g_w3dLogNivel` 在运行时过滤（3 = 全部，0 = 不输出），用 `W3D_DEV_LOG=0` 编译则会把这些调用从可执行文件中去掉。最近的若干行还会保存在内存中：编辑器的 [Console](../editor/consola.md) 显示的就是这些内容。
+三个级别，printf 风格：`w3dLogf`（信息）、`w3dLogfW`（警告）和 `w3dLogfE`（错误）。`g_w3dLogLevel` 在运行时过滤（3 = 全部，0 = 不输出），用 `W3D_DEV_LOG=0` 编译则会把这些调用从可执行文件中去掉。最近的若干行还会保存在内存中：编辑器的 [Console](../editor/consola.md) 显示的就是这些内容。
 
 | 系统 | 输出到哪里 |
 |---|---|

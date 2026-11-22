@@ -12,10 +12,10 @@
 #include <string>
 
 // el archivo recien escrito se descarga a la PC (no-op fuera del navegador)
-void W3dDescargarSiWeb(const std::string& rutaVFS);
+void W3dDownloadIfWeb(const std::string& vfsPath);
 // abre el selector de archivos del navegador; lo elegido llega a 'cb' con su ruta en /uploads. false = no es el
-// navegador (el que llama sigue con su explorador de siempre). filtro = ".obj .fbx .gltf" (como AbrirFileBrowser)
-bool W3dWebAbrirArchivo(const std::string& titulo, const std::string& filtro, void (*cb)(const std::string&));
+// navegador (el que llama sigue con su explorador de siempre). filtro = ".obj .fbx .gltf" (como OpenFileBrowser)
+bool W3dWebOpenFile(const std::string& title, const std::string& filter, void (*cb)(const std::string&));
 // la carpeta donde se escribe lo que despues se descarga ("" fuera del navegador)
-std::string W3dWebCarpetaDescargas();
+std::string W3dWebFolderDownloads();
 #endif // W3DWEB_H

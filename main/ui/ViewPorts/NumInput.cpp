@@ -5,10 +5,11 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
-#include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
+#include "ViewPorts/PopUp/ConfirmPopup.h" // OpenConfirmDelete (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
+#include "ViewPorts/Pick3D.h"   // InsetActive / BevelActive: tambien escriben su valor exacto
 #include "ViewPorts/PoseTransform.h" // Pose Mode transform (extraido a su propio archivo)
-#include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
+#include "ViewPorts/Notifications.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
 #include "ViewPorts/Properties.h"
@@ -25,23 +26,23 @@
 #include "objects/Camera.h"
 #include "objects/Empty.h"
 #include "objects/Armature.h"
-#include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
+#include "animation/SkeletalAnimation.h" // InsertKeyframeSkeleton (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
-#include "objects/Primitivas.h"
+#include "objects/Primitives.h"
 #include "variables.h"
-#include "render/OpcionesRender.h" // g_fpsActual
+#include "render/RenderOptions.h" // g_currentFps
 #include "ViewPorts/PopUp/PopUpBase.h"
 #include "ViewPorts/PopUp/RedoMeshPanel.h"
 #include "WhiskUI/widgets/card.h"        // tarjeta de las notificaciones
 #include "WhiskUI/text/bitmapText.h"  // texto de las notificaciones
 #include "WhiskUI/draw/icons.h"       // iconos notifOk / notifError
-#include "WhiskUI/theme/colores.h"     // ColorID
+#include "WhiskUI/theme/colors.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
 #include "ViewPorts/NumInput.h"
-#include <cstdio>          // sprintf (NumInputFijar)
+#include <cstdio>          // sprintf (NumInputSet)
 
 // ====================================================================
 //  ENTRADA NUMERICA / FORMULAS durante un transform (COMPARTIDA 4 OS)
@@ -52,9 +53,9 @@
 // nucleo (buffer + evaluador + apply) vive aca; cada SO alimenta los caracteres por
 // NumInputChar (PC desde SDL_TEXTINPUT; Symbian desde su teclado/keypad).
 static std::string gNumBuf;       // la expresion tipeada (sin el signo)
-static bool        gNumActivo = false;
-static bool        gNumNegar = false; // el toggle del '-'
-static int         gNumCaret = 0;     // posicion del caret en gNumBuf (para editar en el medio; teclado tactil ← →)
+static bool        gNumActive = false;
+static bool        gNumNegate = false; // el toggle del '-'
+static int         gNumCaret  = 0;     // posicion del caret en gNumBuf (para editar en el medio; teclado tactil ← →)
 
 // --- evaluador de expresiones (+ * / parentesis, numeros con punto). Parse de
 //     numero MANUAL (sin strtod) para no depender del locale (',' vs '.'). ---
@@ -99,119 +100,122 @@ static bool EvalExpr(const std::string& str, float& out){
 bool W3dEvalExpr(const std::string& str, float& out){ return EvalExpr(str, out); }
 // el Enter de un PropFloat evalua la cuenta con este mismo parser (WhiskUI no conoce al editor: va por puntero)
 extern bool (*g_propFloatEval)(const std::string&, float&);
-static struct EnganchePropFloatEval { EnganchePropFloatEval() { g_propFloatEval = W3dEvalExpr; } } sEnganchePropFloatEval;
+static struct HookPropFloatEval { HookPropFloatEval() { g_propFloatEval = W3dEvalExpr; } } sHookPropFloatEval;
 
 // CAJA DE TEXTO EDITABLE: el campo enfocado + el ruteo de caracteres (compartido).
-// (g_textFieldActivo vive en WhiskUI: text/bitmapText.cpp)
+// (g_activeTextField vive en WhiskUI: text/bitmapText.cpp)
 // edicion numerica por texto de un PropFloat (WhiskUI/PropFloat): Enter aplica, Cancel descarta.
-extern bool NumEditActivo();
+extern bool NumEditActive();
 extern void NumEditCommit();
 extern void NumEditCancel();
 // CANCELAR con Esc/C (ver TextField.h): el texto que tenia el campo enfocado ANTES de tocarlo.
-// gFocoDe = de que campo es (si el foco cambia, se vuelve a anotar).
-static TextField*  gFocoDe = NULL;
-static std::string gFocoTexto;
-TextField* g_textFieldRestaurado = NULL;   // el que un Esc descarto en ESTE cuadro (ver TextField.h)
-void TextFieldEnfocar(TextField* f){
-    g_textFieldActivo = f;
-    g_textFieldRestaurado = NULL;
-    gFocoDe = f;
-    gFocoTexto = f ? f->text : std::string();
+// gFocusOf = de que campo es (si el foco cambia, se vuelve a anotar).
+static TextField*  gFocusOf = NULL;
+static std::string gFocusText;
+TextField* g_restoredTextField = NULL;   // el que un Esc descarto en ESTE cuadro (ver TextField.h)
+void TextFieldFocus(TextField* f){
+    g_activeTextField = f;
+    g_restoredTextField = NULL;
+    gFocusOf = f;
+    gFocusText = f ? f->text : std::string();
 }
-void TextFieldFinDeCuadro(){
-    TextFieldSeguirFoco();
-    g_textFieldRestaurado = NULL;          // los duenos en vivo ya escribieron el texto restaurado
+void TextFieldFrameEnd(){
+    TextFieldContinueFocus();
+    g_restoredTextField = NULL;          // los duenos en vivo ya escribieron el texto restaurado
 }
-void TextFieldSeguirFoco(){
-    if (g_textFieldActivo == gFocoDe) return;
-    gFocoDe = g_textFieldActivo;
-    gFocoTexto = gFocoDe ? gFocoDe->text : std::string();
+void TextFieldContinueFocus(){
+    if (g_activeTextField == gFocusOf) return;
+    gFocusOf = g_activeTextField;
+    gFocusText = gFocusOf ? gFocusOf->text : std::string();
 }
-bool TextFieldCancelar(){
-    if (!g_textFieldActivo) return false;
-    TextFieldSeguirFoco();                 // (enfocado a mano y sin teclas todavia: no cambio nada)
-    g_textFieldActivo->SetText(gFocoTexto);
-    g_textFieldRestaurado = g_textFieldActivo;   // los duenos EN VIVO lo re-escriben este cuadro
-    g_textFieldActivo = NULL;
-    gFocoDe = NULL;
+bool TextFieldCancel(){
+    if (!g_activeTextField) return false;
+    TextFieldContinueFocus();                 // (enfocado a mano y sin teclas todavia: no cambio nada)
+    g_activeTextField->SetText(gFocusText);
+    g_restoredTextField = g_activeTextField;   // los duenos EN VIVO lo re-escriben este cuadro
+    g_activeTextField = NULL;
+    gFocusOf = NULL;
     g_redraw = true;
     return true;
 }
 // EL PORTAPAPELES del campo enfocado (el del sistema: se comparte con el navegador, las notas, el IDE)
-bool TextFieldCopiar(){
-    if (!g_textFieldActivo) return false;
-    if (g_textFieldActivo->HaySeleccion()) w3dEngine::W3dClipboardSet(g_textFieldActivo->Seleccionado());
+bool TextFieldCopy(){
+    if (!g_activeTextField) return false;
+    if (g_activeTextField->HasSelection()) w3dEngine::W3dClipboardSet(g_activeTextField->Selected());
     return true;
 }
-bool TextFieldCortar(){
-    if (!g_textFieldActivo) return false;
-    TextFieldSeguirFoco();
-    if (g_textFieldActivo->HaySeleccion()) { w3dEngine::W3dClipboardSet(g_textFieldActivo->Seleccionado()); g_textFieldActivo->BorrarSeleccion(); }
+bool TextFieldCut(){
+    if (!g_activeTextField) return false;
+    TextFieldContinueFocus();
+    if (g_activeTextField->HasSelection()) { w3dEngine::W3dClipboardSet(g_activeTextField->Selected()); g_activeTextField->DeleteSelection(); }
     g_redraw = true;
     return true;
 }
-bool TextFieldPegar(){
-    if (!g_textFieldActivo) return false;
-    TextFieldSeguirFoco();
+bool TextFieldPaste(){
+    if (!g_activeTextField) return false;
+    TextFieldContinueFocus();
     const std::string t = w3dEngine::W3dClipboardGet();
-    if (!t.empty()) g_textFieldActivo->InsertarTexto(t);
+    if (!t.empty()) g_activeTextField->InsertText(t);
     g_redraw = true;
     return true;
 }
-bool TextFieldSeleccionarTodo(){
-    if (!g_textFieldActivo) return false;
-    g_textFieldActivo->SelectAll();
+bool TextFieldSelectAll(){
+    if (!g_activeTextField) return false;
+    g_activeTextField->SelectAll();
     g_redraw = true;
     return true;
 }
 bool TextFieldInputChar(int c){
-    if (!g_textFieldActivo) return false;
-    TextFieldSeguirFoco();                 // antes de la PRIMERA tecla: el texto de antes
-    if (c == 8)       g_textFieldActivo->Backspace();
-    else if (c == 127)g_textFieldActivo->DelForward();
+    if (!g_activeTextField) return false;
+    TextFieldContinueFocus();                 // antes de la PRIMERA tecla: el texto de antes
+    if (c == 8)       g_activeTextField->Backspace();
+    else if (c == 127)g_activeTextField->DelForward();
     else if (c >= 32 && c < 127) {   // ASCII imprimible
-        if (g_textFieldActivo->numerico && !TextField::CharNumerico(c)) return true;   // un numero: sin letras (se traga)
-        g_textFieldActivo->InsertChar(c);
+        if (g_activeTextField->numeric && !TextField::CharNumeric(c)) return true;   // un numero: sin letras (se traga)
+        g_activeTextField->InsertChar(c);
     }
     else return false;
     g_redraw = true;
     return true;
 }
 
-bool NumInputActivo(){ return gNumActivo; }
-void NumInputReset(){ gNumBuf.clear(); gNumActivo=false; gNumNegar=false; gNumCaret=0; }
+bool NumInputActive(){ return gNumActive; }
+void NumInputReset(){ gNumBuf.clear(); gNumActive=false; gNumNegate=false; gNumCaret=0; }
 const std::string& NumInputBuffer(){ return gNumBuf; }
 int  NumInputCaret(){ return gNumCaret; }                 // posicion del caret (para dibujarlo en la barra)
 void NumInputLeft(){  if (gNumCaret>0) { gNumCaret--; g_redraw=true; } }
 void NumInputRight(){ if (gNumCaret<(int)gNumBuf.size()) { gNumCaret++; g_redraw=true; } }
-bool NumInputNegado(){ return gNumNegar; }
+bool NumInputNegated(){ return gNumNegate; }
 // valor actual (false si la expresion esta incompleta -> no aplicar todavia)
-bool NumInputValor(float& out){
+bool NumInputValue(float& out){
     float v; if (!EvalExpr(gNumBuf, v)) return false;
-    out = gNumNegar ? -v : v; return true;
+    out = gNumNegate ? -v : v; return true;
 }
 
 // el viewport ACTIVO con un G/R/S MODAL propio (UV editor / Editor 2D), o NULL. Es el
 // dispatch GENERICO del TransformUI compartido: si un editor 2D esta transformando, la
-// entrada numerica va a SUS hooks (XformNumValor/Confirmar/Cancelar); si no, a los caminos
+// entrada numerica va a SUS hooks (XformNumValue/Confirmar/Cancelar); si no, a los caminos
 // del 3D de siempre (que no cambian: el 3D es la referencia).
 static ViewportBase* NumInputVpXform(){
-    return (viewPortActive && viewPortActive->XformEnCurso()) ? viewPortActive : NULL;
+    return (viewPortActive && viewPortActive->XformInProgress()) ? viewPortActive : NULL;
 }
 
 // aplica el valor exacto al transform en curso (malla, objeto, o el editor 2D activo)
-static void NumInputAplicar(){
-    if (!gNumActivo) return;
-    float v; if (!NumInputValor(v)) return; // incompleta: espero mas caracteres
+static void NumInputApply(){
+    if (!gNumActive) return;
+    // INSERTAR CARAS / BEVEL: el valor es el grosor / el ancho (lo leen de NumInputValue)
+    if (InsetActive()) { InsetNumber(); return; }
+    if (BevelActive()) { BevelNumber(); return; }
+    float v; if (!NumInputValue(v)) return; // incompleta: espero mas caracteres
     { ViewportBase* vpx = NumInputVpXform();
-      if (vpx){ vpx->XformNumValor(v); return; } } // UV editor / Editor 2D
-    if (InteractionMode == EditMode && EditXformActivo()) EditXformNumValor(v);
+      if (vpx){ vpx->XformNumValue(v); return; } } // UV editor / Editor 2D
+    if (InteractionMode == EditMode && EditXformActive()) EditXformNumValue(v);
     else if (InteractionMode == EditMode){ // Edit de ARMATURE: el valor exacto va al transform de huesos
-        extern int BoneXformModo(); extern void BoneXformNumValor(float);
-        if (BoneXformModo()) BoneXformNumValor(v);
+        extern int BoneXformMode(); extern void BoneXformNumValue(float);
+        if (BoneXformMode()) BoneXformNumValue(v);
     }
-    else if (InteractionMode == PoseMode){ extern void PoseXformNumValor(float); PoseXformNumValor(v); }
-    else                                                  SetTransformNumerico(v);
+    else if (InteractionMode == PoseMode){ extern void PoseXformNumValue(float); PoseXformNumValue(v); }
+    else                                                  SetNumericTransform(v);
 }
 
 // COMPARTIDA: cada plataforma alimenta los caracteres tipeados aca. Devuelve true si
@@ -219,20 +223,20 @@ static void NumInputAplicar(){
 bool NumInputChar(int c){
     // solo durante un transform: el del 3D (estado global) o el MODAL propio del
     // viewport activo (UV editor / Editor 2D, hooks del TransformUI compartido)
-    if (estado == editNavegacion && !NumInputVpXform()) return false;
+    if (state == editNavigation && !NumInputVpXform() && !InsetActive() && !BevelActive()) return false;
     if (c == 8){ // backspace: borra el char ANTES del caret (o el signo si esta vacio)
         if (gNumCaret > 0 && !gNumBuf.empty()) { gNumBuf.erase(gNumCaret-1, 1); gNumCaret--; }
-        else if (gNumBuf.empty()) gNumNegar = false;
+        else if (gNumBuf.empty()) gNumNegate = false;
     } else if (c == '-'){
-        gNumNegar = !gNumNegar; gNumActivo = true;
+        gNumNegate = !gNumNegate; gNumActive = true;
     } else if ((c>='0'&&c<='9') || c=='.' || c=='(' || c==')' || c=='*' || c=='/' || c=='+'){
         if (gNumCaret < 0) gNumCaret = 0; if (gNumCaret > (int)gNumBuf.size()) gNumCaret = (int)gNumBuf.size();
-        gNumBuf.insert(gNumBuf.begin()+gNumCaret, (char)c); gNumCaret++; gNumActivo = true; // inserta EN el caret
+        gNumBuf.insert(gNumBuf.begin()+gNumCaret, (char)c); gNumCaret++; gNumActive = true; // inserta EN el caret
     } else {
         return false; // no es un caracter numerico
     }
-    if (gNumBuf.empty() && !gNumNegar) gNumActivo = false; // se vacio: vuelve el mouse
-    NumInputAplicar();
+    if (gNumBuf.empty() && !gNumNegate) gNumActive = false; // se vacio: vuelve el mouse
+    NumInputApply();
     g_redraw = true;
     return true;
 }
@@ -241,7 +245,7 @@ bool NumInputChar(int c){
 // que se muestra ARRIBA (sin popup/textinput propio), igual que un teclado fisico en PC.
 // el valor de una, como si se hubiera tipeado (con un decimal: es lo que se ve en la barra). Lo usa el telefono al
 // ROTAR INCLINANDOLO: el angulo girado desde que se apreto el lapiz es el angulo del objeto
-void NumInputFijar(float v){
+void NumInputSet(float v){
     char buf[32];
     const bool neg = v < 0.0f;
     float a = neg ? -v : v;
@@ -249,39 +253,44 @@ void NumInputFijar(float v){
     if (dec >= 10) sprintf(buf, "%d", ent + 1);
     else if (dec > 0) sprintf(buf, "%d.%d", ent, dec);
     else sprintf(buf, "%d", ent);
-    gNumBuf = buf; gNumCaret = (int)gNumBuf.size(); gNumNegar = neg; gNumActivo = true;
-    NumInputAplicar();
+    gNumBuf = buf; gNumCaret = (int)gNumBuf.size(); gNumNegate = neg; gNumActive = true;
+    NumInputApply();
     g_redraw = true;
 }
 
 void NumInputBegin(){ // marca la entrada activa asi la barra muestra "[|]" apenas se abre el teclado
-    if (!gNumActivo){ gNumBuf.clear(); gNumCaret=0; gNumNegar=false; gNumActivo=true; }
+    if (!gNumActive){ gNumBuf.clear(); gNumCaret=0; gNumNegate=false; gNumActive=true; }
     g_redraw = true;
 }
-void NumInputConfirmar(){ // Enter del teclado: confirma el transform (Aceptar ya hace NumInputReset)
+void NumInputConfirm(){ // Enter del teclado: confirma el transform (Aceptar ya hace NumInputReset)
+    if (InsetActive()) { InsetConfirm(); g_redraw = true; return; }
+    if (BevelActive()) { BevelConfirm(); g_redraw = true; return; }
     { ViewportBase* vpx = NumInputVpXform();
-      if (vpx){ vpx->XformConfirmar(); g_redraw = true; return; } } // UV / 2D (su confirmar resetea)
-    if (Viewport3DActive) Viewport3DActive->Aceptar();
+      if (vpx){ vpx->XformConfirm(); g_redraw = true; return; } } // UV / 2D (su confirmar resetea)
+    if (Viewport3DActive) Viewport3DActive->Accept();
     g_redraw = true;
 }
-void NumInputCancelar(){ // X del teclado: descarta el transform (mismo camino que la cruz de la barra)
+void NumInputCancel(){ // X del teclado: descarta el transform (mismo camino que la cruz de la barra)
+    if (InsetActive()) { InsetCancel(); g_redraw = true; return; }
+    if (BevelActive()) { BevelCancel(); g_redraw = true; return; }
     { ViewportBase* vpx = NumInputVpXform();
-      if (vpx){ vpx->XformCancelar(); NumInputReset(); g_redraw = true; return; } } // UV / 2D
-    if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
-    else Cancelar(); // objeto: descarta el transform (free function de ObjectMode)
+      if (vpx){ vpx->XformCancel(); NumInputReset(); g_redraw = true; return; } } // UV / 2D
+    if (InteractionMode == EditMode && EditXformActive()) EditXformCancel();
+    else Cancel(); // objeto: descarta el transform (free function de ObjectMode)
     NumInputReset();
     g_redraw = true;
 }
 // hay un transform en curso? (mismo criterio que la barra de estado que lo muestra). El teclado
 // tactil en modo transform se cierra solo si esto deja de ser cierto (se confirmo/cancelo).
-bool NumInputTransformEnCurso(){
+bool NumInputTransformInProgress(){
     if (NumInputVpXform()) return true; // G/R/S modal del UV editor / Editor 2D
+    if (InsetActive() || BevelActive()) return true;   // insertar caras / bevel: su grosor / ancho
     if (!Viewport3DActive) return false;
-    if (!(estado == translacion || estado == rotacion || estado == EditScale)) return false;
+    if (!(state == translation || state == rotation || state == EditScale)) return false;
     if (InteractionMode == ObjectMode) return true;
-    if (InteractionMode == EditMode && EditXformActivo()) return true;
-    { extern int BoneXformModo();
-      if (InteractionMode == EditMode && BoneXformModo()) return true; } // G/R/S de huesos
-    if (InteractionMode == PoseMode && PoseHeaderModo()) return true;
+    if (InteractionMode == EditMode && EditXformActive()) return true;
+    { extern int BoneXformMode();
+      if (InteractionMode == EditMode && BoneXformMode()) return true; } // G/R/S de huesos
+    if (InteractionMode == PoseMode && PoseHeaderMode()) return true;
     return false;
 }

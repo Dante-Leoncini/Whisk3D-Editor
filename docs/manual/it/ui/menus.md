@@ -7,70 +7,70 @@
 - una **casella di controllo**, che mostra e cambia un `bool`,
 - uno **slider**, che modifica un `float` tra due valori,
 - una **scorciatoia**, a destra e in grigio tenue ("Shift D"),
-- `verde`: è l'opzione attiva, con l'icona e il testo in `accent`,
-- `gris`: punta a un `bool`; finché vale `false`, l'opzione appare a metà opacità e non risponde,
-- `lineaArriba`: una linea che la separa dal gruppo di sopra.
+- `green`: è l'opzione attiva, con l'icona e il testo in `accent`,
+- `gray`: punta a un `bool`; finché vale `false`, l'opzione appare a metà opacità e non risponde,
+- `lineUp`: una linea che la separa dal gruppo di sopra.
 
-Il menu può avere un **titolo** (`titulo`): è in bianco, con una linea sotto.
+Il menu può avere un **titolo** (`title`): è in bianco, con una linea sotto.
 
 ## Costruirlo con una tabella
 
 Il modo consigliato è una tabella di `MenuDef`: il testo e ciò che fa ogni opzione stanno nella stessa riga. Non c'è un numero da collegare a uno `switch` da un'altra parte.
 
 ```cpp
-static bool grilla = true;
-static PopupMenu* recientes = NULL;
-static void Nuevo() { /* ... */ }
-static void Abrir() { /* ... */ }
+static bool grid = true;
+static PopupMenu* recent = NULL;
+static void New() { /* ... */ }
+static void Open() { /* ... */ }
 
 static const MenuDef ARCHIVO[] = {
     // texto     acción  atajo     ícono                    submenú     casilla
-    { "Nuevo",   Nuevo,  "Ctrl N", ICONO(IconType::mas) },
-    { "Abrir",   Abrir,  "Ctrl O", ICONO(IconType::carpeta) },
-    { "Recientes", NULL, NULL,     ICONO(IconType::lista),  &recientes },
-    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grilla },
+    { "Nuevo",   New,  "Ctrl N", ICON(IconType::more) },
+    { "Abrir",   Open,  "Ctrl O", ICON(IconType::folder) },
+    { "Recientes", NULL, NULL,     ICON(IconType::list),  &recent },
+    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grid },
 };
 
-recientes = new PopupMenu();          // el submenú tiene que existir antes de construir
+recent = new PopupMenu();          // el submenú tiene que existir antes de construir
 PopupMenu* archivo = new PopupMenu();
-archivo->titulo = "Archivo";
-archivo->Construir(ARCHIVO, 4);
+archivo->title = "Archivo";
+archivo->Build(ARCHIVO, 4);
 ```
 
-`ICONO(x)` aggiunge 1 all'icona: in una tabella, lo 0 significa "senza icona". L'id di ogni opzione è la sua riga.
+`ICON(x)` aggiunge 1 all'icona: in una tabella, lo 0 significa "senza icona". L'id di ogni opzione è la sua riga.
 
 Due hook opzionali, che installa il programma:
 
 ```cpp
-W3dMenuTraducir = MiTraduccion;   // const char* MiTraduccion(const char* texto)
-W3dMenuAtajoTexto = MiAtajo;      // std::string MiAtajo(const std::string& atajo)
+W3dMenuTranslate = MiTraduccion;   // const char* MiTraduccion(const char* texto)
+W3dMenuShortcutText = MiShortcut;      // std::string MiAtajo(const std::string& atajo)
 ```
 
-Con `W3dMenuTraducir`, i testi della tabella escono tradotti quando si costruisce il menu. Con `W3dMenuAtajoTexto`, una scorciatoia può essere un nome che inizia con `@` e l'hook restituisce il tasto corrispondente. Senza quell'hook, una scorciatoia con `@` non viene mostrata.
+Con `W3dMenuTranslate`, i testi della tabella escono tradotti quando si costruisce il menu. Con `W3dMenuShortcutText`, una scorciatoia può essere un nome che inizia con `@` e l'hook restituisce il tasto corrispondente. Senza quell'hook, una scorciatoia con `@` non viene mostrata.
 
 ## Costruirlo a mano
 
 ```cpp
-PopupMenu* vista = new PopupMenu();
-vista->Agregar("Frente", 0, IconType::camera);
-vista->AgregarCheck("Mostrar piso", 1, &verPiso);
-vista->AgregarFloat("Tamaño", 2, &tamanio, 0.0f, 4.0f);
-MenuItem* it = vista->Agregar("Alambre", 3);
-it->verde = esAlambre;
-it->lineaArriba = true;
-vista->action = AlElegir;              // void AlElegir(int id)
+PopupMenu* view = new PopupMenu();
+view->Add("Frente", 0, IconType::camera);
+view->AddCheck("Mostrar piso", 1, &showFloor);
+view->AddFloat("Tamaño", 2, &size, 0.0f, 4.0f);
+MenuItem* it = view->Add("Alambre", 3);
+it->green = isWire;
+it->lineUp = true;
+view->action = OnPick;              // void AlElegir(int id)
 ```
 
-`Agregar` restituisce il `MenuItem*`, per cambiarne il resto. Quando si sceglie un'opzione, `Ejecutar(id)` chiama la sua `accion` se ne ha una e, altrimenti, l'`action(id)` del menu. `Limpiar()` elimina tutte le opzioni, per i menu che cambiano.
+`Add` restituisce il `MenuItem*`, per cambiarne il resto. Quando si sceglie un'opzione, `Run(id)` chiama la sua `action` se ne ha una e, altrimenti, l'`action(id)` del menu. `Clear()` elimina tutte le opzioni, per i menu che cambiano.
 
 ## Aprirlo
 
 ```cpp
-archivo->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-MenuAbierto = archivo;
+archivo->Open(mx, my, MenuScreenW, MenuScreenH);
+OpenMenu = archivo;
 ```
 
-Si apre nel punto che gli passi: il cursore, o il bordo di un pulsante. Se non ci sta, si sposta verso l'interno dello schermo. `Abrir` non tocca `MenuAbierto`: lo imposta chi lo apre. `Cerrar()` lo rimette a `NULL`.
+Si apre nel punto che gli passi: il cursore, o il bordo di un pulsante. Se non ci sta, si sposta verso l'interno dello schermo. `Open` non tocca `OpenMenu`: lo imposta chi lo apre. `Close()` lo rimette a `NULL`.
 
 Quando si apre, prende le misure:
 
@@ -84,26 +84,26 @@ Un sottomenu si apre accanto alla sua riga: a destra se ci sta, altrimenti a sin
 
 ```cpp
 // al mover
-if (MenuAbierto) MenuAbierto->MouseMove(mx, my);
+if (OpenMenu) OpenMenu->MouseMove(mx, my);
 
 // al hacer click o tocar
-if (MenuAbierto) {
-    PopupMenu* m = MenuAbierto;
+if (OpenMenu) {
+    PopupMenu* m = OpenMenu;
     int id = m->Click(mx, my);
-    if (id >= 0) m->Ejecutar(id);
+    if (id >= 0) m->Run(id);
 }
 
 // al dibujar, con una proyección de pantalla completa
-if (MenuAbierto) MenuAbierto->Render();
+if (OpenMenu) OpenMenu->Render();
 ```
 
 `Click` restituisce l'id scelto, `-1` se non ha scelto niente o `-2` se ha aperto un sottomenu.
 
 - Passare con il mouse evidenzia la riga e apre il suo sottomenu, senza clic.
-- Se il mouse si allontana più di `60 * GlobalScale` pixel, il menu si chiude da solo. Con `cerrarLejos = false`, no: per un menu che non si è aperto sul mouse.
+- Se il mouse si allontana più di `60 * GlobalScale` pixel, il menu si chiude da solo. Con `closeFar = false`, no: per un menu che non si è aperto sul mouse.
 - Un clic fuori lo chiude.
 - Un'opzione normale chiude il menu. Una casella cambia e lo lascia aperto, per poterne attivare diverse. Un clic su uno slider imposta il valore in base a dove è caduto.
-- Tenere premuto su uno slider e trascinare cambia il valore in tempo reale. Chi gestisce il mouse passa ogni movimento a `MenuSliderDragMover(mx)`, finché `MenuSliderDragActivo()` è `true`, e al rilascio chiama `MenuSliderDragSoltar()`.
+- Tenere premuto su uno slider e trascinare cambia il valore in tempo reale. Chi gestisce il mouse passa ogni movimento a `MenuSliderDragMove(mx)`, finché `MenuSliderDragActive()` è `true`, e al rilascio chiama `MenuSliderDragRelease()`.
 - Su uno schermo touch, il tocco che apre un sottomenu non sceglie niente al suo interno, anche se il sottomenu è finito sotto il dito. Serve un secondo tocco.
 - Ciò che si sceglie in un sottomenu si esegue in quel sottomenu: ogni menu ha i propri id.
 
@@ -112,19 +112,19 @@ if (MenuAbierto) MenuAbierto->Render();
 Il focus ce l'ha il sottomenu aperto più interno:
 
 ```cpp
-PopupMenu* m = MenuAbierto;
-while (m->submenuAbierto && m->submenuAbierto->abierto) m = m->submenuAbierto;
-MenuItem* it = m->ItemActual();      // la opción resaltada, o NULL
+PopupMenu* m = OpenMenu;
+while (m->openSubmenu && m->openSubmenu->open) m = m->openSubmenu;
+MenuItem* it = m->CurrentItem();      // la opción resaltada, o NULL
 ```
 
 | Funzione | Cosa fa |
 |---|---|
 | `button_up()`, `button_down()` | Spostano l'evidenziazione, ricominciando dall'altro capo. Non aprono sottomenu |
-| `AbrirSubmenuActual()` | Apre il sottomenu dell'opzione evidenziata ed evidenzia la sua prima opzione |
-| `AjustarSlider(+1)`, `AjustarSlider(-1)` | Spostano lo slider di un ventesimo del suo intervallo |
-| `Enter()` | Come un clic sull'opzione evidenziata, e restituisce lo stesso valore. Chiamato su `MenuAbierto`, arriva da solo al sottomenu più interno |
-| `Cerrar()` | Chiude il menu e i suoi sottomenu |
+| `OpenSubmenuCurrent()` | Apre il sottomenu dell'opzione evidenziata ed evidenzia la sua prima opzione |
+| `FitSlider(+1)`, `FitSlider(-1)` | Spostano lo slider di un ventesimo del suo intervallo |
+| `Enter()` | Come un clic sull'opzione evidenziata, e restituisce lo stesso valore. Chiamato su `OpenMenu`, arriva da solo al sottomenu più interno |
+| `Close()` | Chiude il menu e i suoi sottomenu |
 
 Con la tastiera, l'opzione evidenziata resta sempre visibile. Quale tasto chiama cosa lo decide chi usa il menu.
 
-`MenuPantallaW` e `MenuPantallaH` devono contenere la dimensione dello schermo: servono a sistemare il menu.
+`MenuScreenW` e `MenuScreenH` devono contenere la dimensione dello schermo: servono a sistemare il menu.

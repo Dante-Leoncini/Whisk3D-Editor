@@ -11,7 +11,7 @@
     #define W3D_DENOISER_PC 1
 #endif
 
-const char* W3dDenoiserNombre(int d) {
+const char* W3dDenoiserName(int d) {
     switch (d) {
         case W3D_DENOISER_OIDN:  return "Open Image Denoise";
         case W3D_DENOISER_OPTIX: return "OptiX (NVIDIA)";
@@ -23,8 +23,8 @@ const char* W3dDenoiserNombre(int d) {
 
 #ifndef W3D_DENOISER_PC
 // (el N95, Android, la web, las consolas: sin denoisers)
-bool W3dDenoiserDisponible(int d) { return d == W3D_DENOISER_NINGUNO; }
-bool W3dDenoiserAplicar(int, const float*, const float*, const float*, int, int, float*, std::string* err) {
+bool W3dDenoiserAvailable(int d) { return d == W3D_DENOISER_NONE; }
+bool W3dDenoiserApply(int, const float*, const float*, const float*, int, int, float*, std::string* err) {
     if (err) *err = "No denoiser on this platform";
     return false;
 }
@@ -33,13 +33,13 @@ bool W3dDenoiserAplicar(int, const float*, const float*, const float*, int, int,
 #ifdef _WIN32
     #include <windows.h>
     typedef HMODULE W3dLib;
-    static W3dLib AbrirLib(const char* n) { return LoadLibraryA(n); }
-    static void* Simbolo(W3dLib l, const char* s) { return (void*)GetProcAddress(l, s); }
+    static W3dLib OpenLib(const char* n) { return LoadLibraryA(n); }
+    static void* Symbol(W3dLib l, const char* s) { return (void*)GetProcAddress(l, s); }
 #else
     #include <dlfcn.h>
     typedef void* W3dLib;
-    static W3dLib AbrirLib(const char* n) { return dlopen(n, RTLD_NOW | RTLD_LOCAL); }
-    static void* Simbolo(W3dLib l, const char* s) { return dlsym(l, s); }
+    static W3dLib OpenLib(const char* n) { return dlopen(n, RTLD_NOW | RTLD_LOCAL); }
+    static void* Symbol(W3dLib l, const char* s) { return dlsym(l, s); }
 #endif
 
 // ============================================================================
@@ -49,7 +49,7 @@ namespace {
 typedef void* OIDNDevice; typedef void* OIDNFilter; typedef void* OIDNBuffer;
 enum { kOIDN_FORMAT_FLOAT3 = 3 };
 struct OIDN {
-    bool probado, ok;
+    bool tested, ok;
     OIDNDevice (*NewDevice)(int);
     void (*CommitDevice)(OIDNDevice);
     int (*GetDeviceError)(OIDNDevice, const char**);
@@ -68,35 +68,35 @@ struct OIDN {
     void (*ReleaseBuffer)(OIDNBuffer);
     void (*SetFilterImage)(OIDNFilter, const char*, OIDNBuffer, int, size_t, size_t, size_t, size_t, size_t);
     OIDNDevice dev;
-    OIDN() : probado(false), ok(false), dev(0) {}
+    OIDN() : tested(false), ok(false), dev(0) {}
 };
 OIDN gOidn;
 }
-static bool OidnCargar() {
-    if (gOidn.probado) return gOidn.ok;
-    gOidn.probado = true;
+static bool OidnLoad() {
+    if (gOidn.tested) return gOidn.ok;
+    gOidn.tested = true;
 #ifdef _WIN32
-    W3dLib l = AbrirLib("OpenImageDenoise.dll");
+    W3dLib l = OpenLib("OpenImageDenoise.dll");
 #else
-    W3dLib l = AbrirLib("libOpenImageDenoise.so.2");
-    if (!l) l = AbrirLib("libOpenImageDenoise.so");
+    W3dLib l = OpenLib("libOpenImageDenoise.so.2");
+    if (!l) l = OpenLib("libOpenImageDenoise.so");
 #endif
     if (!l) { w3dLogf("[denoiser] Open Image Denoise no esta (OpenImageDenoise.dll): no se ofrece"); return false; }
-    gOidn.NewDevice = (OIDNDevice (*)(int))Simbolo(l, "oidnNewDevice");
-    gOidn.CommitDevice = (void (*)(OIDNDevice))Simbolo(l, "oidnCommitDevice");
-    gOidn.GetDeviceError = (int (*)(OIDNDevice, const char**))Simbolo(l, "oidnGetDeviceError");
-    gOidn.NewFilter = (OIDNFilter (*)(OIDNDevice, const char*))Simbolo(l, "oidnNewFilter");
-    gOidn.SetSharedFilterImage = (void (*)(OIDNFilter, const char*, void*, int, size_t, size_t, size_t, size_t, size_t))Simbolo(l, "oidnSetSharedFilterImage");
-    gOidn.SetFilterBool = (void (*)(OIDNFilter, const char*, bool))Simbolo(l, "oidnSetFilterBool");
-    gOidn.CommitFilter = (void (*)(OIDNFilter))Simbolo(l, "oidnCommitFilter");
-    gOidn.ExecuteFilter = (void (*)(OIDNFilter))Simbolo(l, "oidnExecuteFilter");
-    gOidn.ReleaseFilter = (void (*)(OIDNFilter))Simbolo(l, "oidnReleaseFilter");
-    gOidn.ReleaseDevice = (void (*)(OIDNDevice))Simbolo(l, "oidnReleaseDevice");
-    gOidn.NewBuffer = (OIDNBuffer (*)(OIDNDevice, size_t))Simbolo(l, "oidnNewBuffer");
-    gOidn.WriteBuffer = (void (*)(OIDNBuffer, size_t, size_t, const void*))Simbolo(l, "oidnWriteBuffer");
-    gOidn.ReadBuffer = (void (*)(OIDNBuffer, size_t, size_t, void*))Simbolo(l, "oidnReadBuffer");
-    gOidn.ReleaseBuffer = (void (*)(OIDNBuffer))Simbolo(l, "oidnReleaseBuffer");
-    gOidn.SetFilterImage = (void (*)(OIDNFilter, const char*, OIDNBuffer, int, size_t, size_t, size_t, size_t, size_t))Simbolo(l, "oidnSetFilterImage");
+    gOidn.NewDevice = (OIDNDevice (*)(int))Symbol(l, "oidnNewDevice");
+    gOidn.CommitDevice = (void (*)(OIDNDevice))Symbol(l, "oidnCommitDevice");
+    gOidn.GetDeviceError = (int (*)(OIDNDevice, const char**))Symbol(l, "oidnGetDeviceError");
+    gOidn.NewFilter = (OIDNFilter (*)(OIDNDevice, const char*))Symbol(l, "oidnNewFilter");
+    gOidn.SetSharedFilterImage = (void (*)(OIDNFilter, const char*, void*, int, size_t, size_t, size_t, size_t, size_t))Symbol(l, "oidnSetSharedFilterImage");
+    gOidn.SetFilterBool = (void (*)(OIDNFilter, const char*, bool))Symbol(l, "oidnSetFilterBool");
+    gOidn.CommitFilter = (void (*)(OIDNFilter))Symbol(l, "oidnCommitFilter");
+    gOidn.ExecuteFilter = (void (*)(OIDNFilter))Symbol(l, "oidnExecuteFilter");
+    gOidn.ReleaseFilter = (void (*)(OIDNFilter))Symbol(l, "oidnReleaseFilter");
+    gOidn.ReleaseDevice = (void (*)(OIDNDevice))Symbol(l, "oidnReleaseDevice");
+    gOidn.NewBuffer = (OIDNBuffer (*)(OIDNDevice, size_t))Symbol(l, "oidnNewBuffer");
+    gOidn.WriteBuffer = (void (*)(OIDNBuffer, size_t, size_t, const void*))Symbol(l, "oidnWriteBuffer");
+    gOidn.ReadBuffer = (void (*)(OIDNBuffer, size_t, size_t, void*))Symbol(l, "oidnReadBuffer");
+    gOidn.ReleaseBuffer = (void (*)(OIDNBuffer))Symbol(l, "oidnReleaseBuffer");
+    gOidn.SetFilterImage = (void (*)(OIDNFilter, const char*, OIDNBuffer, int, size_t, size_t, size_t, size_t, size_t))Symbol(l, "oidnSetFilterImage");
     if (!gOidn.NewDevice || !gOidn.CommitDevice || !gOidn.GetDeviceError || !gOidn.NewFilter || !gOidn.SetSharedFilterImage ||
         !gOidn.SetFilterBool || !gOidn.CommitFilter || !gOidn.ExecuteFilter || !gOidn.ReleaseFilter) {
         w3dLogfW("[denoiser] OpenImageDenoise sin las funciones de la API 2: no se usa"); return false;
@@ -110,22 +110,22 @@ static bool OidnCargar() {
     w3dLogf("[denoiser] Open Image Denoise listo");
     return true;
 }
-static bool OidnAplicar(const float* color, const float* albedo, const float* normal, int w, int h, float* out, std::string* err) {
-    if (!OidnCargar()) { if (err) *err = "Open Image Denoise is not installed"; return false; }
+static bool OidnApply(const float* color, const float* albedo, const float* normal, int w, int h, float* out, std::string* err) {
+    if (!OidnLoad()) { if (err) *err = "Open Image Denoise is not installed"; return false; }
     OIDNFilter f = gOidn.NewFilter(gOidn.dev, "RT");
     if (!f) { if (err) *err = "OIDN: no filter"; return false; }
     const size_t bytes = (size_t)w * h * 3 * sizeof(float);
-    const bool conBuffers = gOidn.NewBuffer && gOidn.WriteBuffer && gOidn.ReadBuffer && gOidn.ReleaseBuffer && gOidn.SetFilterImage;
+    const bool withBuffers = gOidn.NewBuffer && gOidn.WriteBuffer && gOidn.ReadBuffer && gOidn.ReleaseBuffer && gOidn.SetFilterImage;
     OIDNBuffer b[4] = { 0, 0, 0, 0 };   // color albedo normal salida
-    if (conBuffers) {
+    if (withBuffers) {
         const float* src[3] = { color, albedo, (albedo && normal) ? normal : 0 };
-        static const char* const nom[4] = { "color", "albedo", "normal", "output" };
+        static const char* const name[4] = { "color", "albedo", "normal", "output" };
         for (int k = 0; k < 4; k++) {
             if (k < 3 && !src[k]) continue;
             b[k] = gOidn.NewBuffer(gOidn.dev, bytes);
             if (!b[k]) continue;
             if (k < 3) gOidn.WriteBuffer(b[k], 0, bytes, src[k]);
-            gOidn.SetFilterImage(f, nom[k], b[k], kOIDN_FORMAT_FLOAT3, (size_t)w, (size_t)h, 0, 0, 0);
+            gOidn.SetFilterImage(f, name[k], b[k], kOIDN_FORMAT_FLOAT3, (size_t)w, (size_t)h, 0, 0, 0);
         }
     } else {
         gOidn.SetSharedFilterImage(f, "color", (void*)color, kOIDN_FORMAT_FLOAT3, (size_t)w, (size_t)h, 0, 0, 0);
@@ -138,7 +138,7 @@ static bool OidnAplicar(const float* color, const float* albedo, const float* no
     gOidn.ExecuteFilter(f);
     const char* m = 0;
     int e = gOidn.GetDeviceError(gOidn.dev, &m);
-    if (conBuffers) {
+    if (withBuffers) {
         if (e == 0 && b[3]) gOidn.ReadBuffer(b[3], 0, bytes, out);
         for (int k = 0; k < 4; k++) if (b[k]) gOidn.ReleaseBuffer(b[k]);
         if (e == 0) e = gOidn.GetDeviceError(gOidn.dev, &m);
@@ -159,7 +159,7 @@ static bool OidnAplicar(const float* color, const float* albedo, const float* no
 namespace {
 typedef int CUres;
 struct CUDA {
-    bool probado, ok;
+    bool tested, ok;
     CUres (*Init)(unsigned int);
     CUres (*DeviceGet)(int*, int);
     CUres (*CtxCreate)(CUcontext*, unsigned int, int);
@@ -170,27 +170,27 @@ struct CUDA {
     CUres (*CtxSynchronize)();
     CUcontext ctx;
     OptixDeviceContext optix;
-    CUDA() : probado(false), ok(false), ctx(0), optix(0) {}
+    CUDA() : tested(false), ok(false), ctx(0), optix(0) {}
 };
 CUDA gCu;
 }
-static bool OptixCargar() {
-    if (gCu.probado) return gCu.ok;
-    gCu.probado = true;
+static bool OptixLoad() {
+    if (gCu.tested) return gCu.ok;
+    gCu.tested = true;
 #ifdef _WIN32
-    W3dLib l = AbrirLib("nvcuda.dll");
+    W3dLib l = OpenLib("nvcuda.dll");
 #else
-    W3dLib l = AbrirLib("libcuda.so.1");
+    W3dLib l = OpenLib("libcuda.so.1");
 #endif
     if (!l) { w3dLogf("[denoiser] sin driver de NVIDIA (nvcuda): OptiX no se ofrece"); return false; }
-    gCu.Init = (CUres (*)(unsigned int))Simbolo(l, "cuInit");
-    gCu.DeviceGet = (CUres (*)(int*, int))Simbolo(l, "cuDeviceGet");
-    gCu.CtxCreate = (CUres (*)(CUcontext*, unsigned int, int))Simbolo(l, "cuCtxCreate_v2");
-    gCu.MemAlloc = (CUres (*)(CUdeviceptr*, size_t))Simbolo(l, "cuMemAlloc_v2");
-    gCu.MemFree = (CUres (*)(CUdeviceptr))Simbolo(l, "cuMemFree_v2");
-    gCu.MemcpyHtoD = (CUres (*)(CUdeviceptr, const void*, size_t))Simbolo(l, "cuMemcpyHtoD_v2");
-    gCu.MemcpyDtoH = (CUres (*)(void*, CUdeviceptr, size_t))Simbolo(l, "cuMemcpyDtoH_v2");
-    gCu.CtxSynchronize = (CUres (*)())Simbolo(l, "cuCtxSynchronize");
+    gCu.Init = (CUres (*)(unsigned int))Symbol(l, "cuInit");
+    gCu.DeviceGet = (CUres (*)(int*, int))Symbol(l, "cuDeviceGet");
+    gCu.CtxCreate = (CUres (*)(CUcontext*, unsigned int, int))Symbol(l, "cuCtxCreate_v2");
+    gCu.MemAlloc = (CUres (*)(CUdeviceptr*, size_t))Symbol(l, "cuMemAlloc_v2");
+    gCu.MemFree = (CUres (*)(CUdeviceptr))Symbol(l, "cuMemFree_v2");
+    gCu.MemcpyHtoD = (CUres (*)(CUdeviceptr, const void*, size_t))Symbol(l, "cuMemcpyHtoD_v2");
+    gCu.MemcpyDtoH = (CUres (*)(void*, CUdeviceptr, size_t))Symbol(l, "cuMemcpyDtoH_v2");
+    gCu.CtxSynchronize = (CUres (*)())Symbol(l, "cuCtxSynchronize");
     if (!gCu.Init || !gCu.DeviceGet || !gCu.CtxCreate || !gCu.MemAlloc || !gCu.MemFree || !gCu.MemcpyHtoD || !gCu.MemcpyDtoH || !gCu.CtxSynchronize) return false;
     int dev = 0;
     if (gCu.Init(0) != 0 || gCu.DeviceGet(&dev, 0) != 0 || gCu.CtxCreate(&gCu.ctx, 0, dev) != 0) { w3dLogfW("[denoiser] CUDA no arranco"); return false; }
@@ -201,64 +201,64 @@ static bool OptixCargar() {
     w3dLogf("[denoiser] OptiX listo");
     return true;
 }
-static bool OptixAplicar(const float* color, const float* albedo, const float* normal, int w, int h, float* out, std::string* err) {
-    if (!OptixCargar()) { if (err) *err = "OptiX needs an NVIDIA card"; return false; }
+static bool OptixApply(const float* color, const float* albedo, const float* normal, int w, int h, float* out, std::string* err) {
+    if (!OptixLoad()) { if (err) *err = "OptiX needs an NVIDIA card"; return false; }
     OptixDenoiserOptions o; memset(&o, 0, sizeof o);
     o.inputKind = albedo ? (normal ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL : OPTIX_DENOISER_INPUT_RGB_ALBEDO) : OPTIX_DENOISER_INPUT_RGB;
     OptixDenoiser den = 0;
     if (optixDenoiserCreate(gCu.optix, &o, &den) != OPTIX_SUCCESS) { if (err) *err = "OptiX: no denoiser"; return false; }
     bool ok = optixDenoiserSetModel(den, OPTIX_DENOISER_MODEL_KIND_LDR, 0, 0) == OPTIX_SUCCESS;
-    OptixDenoiserSizes tam; memset(&tam, 0, sizeof tam);
-    ok = ok && optixDenoiserComputeMemoryResources(den, (unsigned)w, (unsigned)h, &tam) == OPTIX_SUCCESS;
+    OptixDenoiserSizes size; memset(&size, 0, sizeof size);
+    ok = ok && optixDenoiserComputeMemoryResources(den, (unsigned)w, (unsigned)h, &size) == OPTIX_SUCCESS;
     const size_t bytes = (size_t)w * h * 3 * sizeof(float);
-    CUdeviceptr dEstado = 0, dScratch = 0, dCol = 0, dAlb = 0, dNrm = 0, dOut = 0;
-    ok = ok && gCu.MemAlloc(&dEstado, tam.stateSizeInBytes) == 0 && gCu.MemAlloc(&dScratch, tam.withoutOverlapScratchSizeInBytes) == 0 &&
+    CUdeviceptr dState = 0, dScratch = 0, dCol = 0, dAlb = 0, dNrm = 0, dOut = 0;
+    ok = ok && gCu.MemAlloc(&dState, size.stateSizeInBytes) == 0 && gCu.MemAlloc(&dScratch, size.withoutOverlapScratchSizeInBytes) == 0 &&
          gCu.MemAlloc(&dCol, bytes) == 0 && gCu.MemAlloc(&dOut, bytes) == 0;
     if (ok && albedo) ok = gCu.MemAlloc(&dAlb, bytes) == 0;
     if (ok && albedo && normal) ok = gCu.MemAlloc(&dNrm, bytes) == 0;
-    ok = ok && optixDenoiserSetup(den, 0, (unsigned)w, (unsigned)h, dEstado, tam.stateSizeInBytes, dScratch, tam.withoutOverlapScratchSizeInBytes) == OPTIX_SUCCESS;
+    ok = ok && optixDenoiserSetup(den, 0, (unsigned)w, (unsigned)h, dState, size.stateSizeInBytes, dScratch, size.withoutOverlapScratchSizeInBytes) == OPTIX_SUCCESS;
     if (ok) {
         gCu.MemcpyHtoD(dCol, color, bytes);
         if (dAlb) gCu.MemcpyHtoD(dAlb, albedo, bytes);
         if (dNrm) gCu.MemcpyHtoD(dNrm, normal, bytes);
-        OptixImage2D capas[3]; memset(capas, 0, sizeof capas);
+        OptixImage2D layers[3]; memset(layers, 0, sizeof layers);
         const CUdeviceptr ptrs[3] = { dCol, dAlb, dNrm };
         unsigned n = 1 + (dAlb ? 1u : 0u) + (dNrm ? 1u : 0u);
         for (unsigned i = 0; i < n; i++) {
-            capas[i].data = ptrs[i]; capas[i].width = (unsigned)w; capas[i].height = (unsigned)h;
-            capas[i].rowStrideInBytes = (unsigned)(w * 3 * sizeof(float)); capas[i].pixelStrideInBytes = 3 * sizeof(float);
-            capas[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
+            layers[i].data = ptrs[i]; layers[i].width = (unsigned)w; layers[i].height = (unsigned)h;
+            layers[i].rowStrideInBytes = (unsigned)(w * 3 * sizeof(float)); layers[i].pixelStrideInBytes = 3 * sizeof(float);
+            layers[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
         }
-        OptixImage2D salida = capas[0]; salida.data = dOut;
-        OptixDenoiserParams par; memset(&par, 0, sizeof par);
-        ok = optixDenoiserInvoke(den, 0, &par, dEstado, tam.stateSizeInBytes, capas, n, 0, 0, &salida, dScratch, tam.withoutOverlapScratchSizeInBytes) == OPTIX_SUCCESS;
+        OptixImage2D output = layers[0]; output.data = dOut;
+        OptixDenoiserParams pair; memset(&pair, 0, sizeof pair);
+        ok = optixDenoiserInvoke(den, 0, &pair, dState, size.stateSizeInBytes, layers, n, 0, 0, &output, dScratch, size.withoutOverlapScratchSizeInBytes) == OPTIX_SUCCESS;
         ok = ok && gCu.CtxSynchronize() == 0 && gCu.MemcpyDtoH(out, dOut, bytes) == 0;
     }
-    const CUdeviceptr todos[6] = { dEstado, dScratch, dCol, dAlb, dNrm, dOut };
-    for (int i = 0; i < 6; i++) if (todos[i]) gCu.MemFree(todos[i]);
+    const CUdeviceptr all[6] = { dState, dScratch, dCol, dAlb, dNrm, dOut };
+    for (int i = 0; i < 6; i++) if (all[i]) gCu.MemFree(all[i]);
     optixDenoiserDestroy(den);
     if (!ok && err) *err = "OptiX: the denoiser failed";
     return ok;
 }
 #endif   // W3D_OPTIX
 
-bool W3dDenoiserDisponible(int d) {
+bool W3dDenoiserAvailable(int d) {
     switch (d) {
-        case W3D_DENOISER_NINGUNO: return true;
-        case W3D_DENOISER_OIDN:    return OidnCargar();
+        case W3D_DENOISER_NONE: return true;
+        case W3D_DENOISER_OIDN:    return OidnLoad();
 #ifdef W3D_OPTIX
-        case W3D_DENOISER_OPTIX:   return OptixCargar();
+        case W3D_DENOISER_OPTIX:   return OptixLoad();
 #endif
-        case W3D_DENOISER_GPU:     return RTGpuDisponible();
+        case W3D_DENOISER_GPU:     return RTGpuAvailable();
         default: return false;   // (NRD: del backend Vulkan)
     }
 }
-bool W3dDenoiserAplicar(int d, const float* color, const float* albedo, const float* normal, int w, int h, float* salida, std::string* err) {
-    if (!color || !salida || w <= 0 || h <= 0) return false;
-    if (d == W3D_DENOISER_OIDN) return OidnAplicar(color, albedo, normal, w, h, salida, err);
-    if (d == W3D_DENOISER_GPU) return RTGpuDenoisear(color, albedo, normal, w, h, salida, err);
+bool W3dDenoiserApply(int d, const float* color, const float* albedo, const float* normal, int w, int h, float* output, std::string* err) {
+    if (!color || !output || w <= 0 || h <= 0) return false;
+    if (d == W3D_DENOISER_OIDN) return OidnApply(color, albedo, normal, w, h, output, err);
+    if (d == W3D_DENOISER_GPU) return RTGpuDenoise(color, albedo, normal, w, h, output, err);
 #ifdef W3D_OPTIX
-    if (d == W3D_DENOISER_OPTIX) return OptixAplicar(color, albedo, normal, w, h, salida, err);
+    if (d == W3D_DENOISER_OPTIX) return OptixApply(color, albedo, normal, w, h, output, err);
 #endif
     if (err) *err = "This denoiser is not available";
     return false;

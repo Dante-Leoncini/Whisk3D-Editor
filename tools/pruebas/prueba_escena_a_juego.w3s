@@ -15,71 +15,71 @@
 #   de serlo y sus keyframes quedaban colgados del juego. Esta prueba falla con eso en el primer raizinfo.)
 # ==========================================================================
 
-ventana 1280 720
-escala 1
-escenadefecto
-raizinfo n 1 activa Scene tipo escena
+window 1280 720
+scale 1
+scenedefault
+rootinfo n 1 active Scene type scene
 
 # ---- la ESCENA: el Cubo animado (X = 0 en el cuadro 1, X = 10 en el 21) con un script, fisica y un hitbox ----
 selobj Cubo
-keyponer 1 loc 0 0 0
-keyponer 21 loc 10 0 0
+keyset 1 loc 0 0 0
+keyset 21 loc 10 0 0
 objkeys Cubo 6
-raizscript Cubo prueba_escenas_juego.lua velocidad 3
-objfisica Cubo poner dinamico 2.5
-hitboxnuevo Golpe padre Cubo tam 1 2 3 etiqueta enemigo
+rootscript Cubo prueba_escenas_juego.lua velocidad 3
+objphysics Cubo set dynamic 2.5
+hitboxnew Golpe parent Cubo size 1 2 3 label enemigo
 # (con un script, una escena sin tipo explicito se deduciria juego: se la declara escena)
-raiztipo escena
-raizinfo tipo escena
+roottype scene
+rootinfo type scene
 # el OJO del script, apagado con un click de verdad (tarjeta Control de Propiedades)
 selobj Cubo
 tick 2
 propstab 8
 tick 1
-ojoscript 0
-objscript Cubo 0 apagado 1 ref velocidad 3
+eyescript 0
+objscript Cubo 0 off 1 ref velocidad 3
 # un esqueleto que una TIRA de la escena hace caminar desde el cuadro 5 (y otro con el mismo clip, sin tira)
 rigretarget Rig 2
-tiraesqueleto RigA Caminar 5
+armaturestrip RigA Caminar 5
 
 # ---- el cabezal en el cuadro del MEDIO ----
 frame 11
 objat Cubo 5 0 0 0.01
 
 # ---- "Convert to Game" por el selector de la barra del 3D ----
-raizmenu 3d Convert to Game
-raizinfo n 2 escenas 1 juegos 1 activa Scene.001 tipo juego tipode Scene escena
-raizmodo kind 2 juego 1
-escenasabiertas Scene.001
+rootmenu 3d Convert to Game
+rootinfo n 2 scenes 1 games 1 active Scene.001 type game tipode Scene scene
+rootmode kind 2 game 1
+scenesopen Scene.001
 # el Cubo arranca donde estaba en ESE cuadro, y sin keyframes (el juego no tiene animaciones de escena)
 objat Cubo 5 0 0 0.01
 objkeys Cubo 0
-raizcontexto anims 1 camara Cámara luces 1 coleccion Colección
+rootcontext anims 1 camera Cámara lights 1 collection Colección
 # lo que es del objeto y el juego usa, igual que en cualquier duplicado
-objscript Cubo 0 ruta prueba_escenas_juego.lua apagado 1 ref velocidad 3
-objfisica Cubo dinamico masa 2.5
-mallainfo Cubo recurso Cubo
-hitboxinfo Golpe tam 1 2 3 etiqueta enemigo padre Cubo
+objscript Cubo 0 path prueba_escenas_juego.lua off 1 ref velocidad 3
+objphysics Cubo dynamic mass 2.5
+meshcheck Cubo resource Cubo
+hitboxinfo Golpe size 1 2 3 label enemigo parent Cubo
 # el esqueleto de la tira queda con el clip y el cuadro que mostraba (11 - 5 = 6 frames desde el inicio del clip)
-esqueletoclip RigA Caminar cabezal 6
-esqueletoclip RigB Caminar cabezal 0
+armatureclip RigA Caminar playhead 6
+armatureclip RigB Caminar playhead 0
 # la escena ORIGINAL sigue en memoria, con el Cubo en ese cuadro
-raizobjat Scene Cubo 5 0 0 0.01
+rootobjat Scene Cubo 5 0 0 0.01
 
 # ---- Ctrl+Z: de vuelta en la escena y sin el juego; Ctrl+Y: el juego vuelve y se abre ----
 undo
-raizinfo n 1 activa Scene tipo escena
-escenasabiertas Scene
+rootinfo n 1 active Scene type scene
+scenesopen Scene
 objkeys Cubo 6
 redo
-raizinfo n 2 activa Scene.001 tipo juego
-escenasabiertas Scene.001
+rootinfo n 2 active Scene.001 type game
+scenesopen Scene.001
 objat Cubo 5 0 0 0.01
 objkeys Cubo 0
 
 # ---- la escena ORIGINAL quedo intacta: sus keyframes y su animacion ----
-raizabrir Scene
-raizinfo tipo escena
+rootopen Scene
+rootinfo type scene
 objkeys Cubo 6
 frame 1
 objat Cubo 0 0 0 0.01
@@ -87,15 +87,15 @@ frame 21
 objat Cubo 10 0 0 0.01
 
 # ---- guardado y vuelto a abrir: el juego arranca en ese cuadro, sin keyframes; la escena con los suyos ----
-guardarw3d /tmp/w3d_escena_a_juego.w3d
-abrirw3d /tmp/w3d_escena_a_juego.w3d
-raizinfo n 2 tipode Scene escena tipode Scene.001 juego
-raizabrir Scene.001
-raizinfo tipo juego
+savew3d /tmp/w3d_escena_a_juego.w3d
+openw3d /tmp/w3d_escena_a_juego.w3d
+rootinfo n 2 tipode Scene scene tipode Scene.001 game
+rootopen Scene.001
+rootinfo type game
 objat Cubo 5 0 0 0.01
 objkeys Cubo 0
-objscript Cubo 0 apagado 1 ref velocidad 3
-objfisica Cubo dinamico masa 2.5
-raizabrir Scene
-raizinfo tipo escena
+objscript Cubo 0 off 1 ref velocidad 3
+objphysics Cubo dynamic mass 2.5
+rootopen Scene
+rootinfo type scene
 objkeys Cubo 6

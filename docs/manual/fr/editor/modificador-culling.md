@@ -21,7 +21,7 @@ Ne le confondez pas avec l'objet **Culling** du menu Ajouter de la Vue 3D, qui t
 Le modificateur ne calcule pas ce qui est visible : il le lit dans un fichier qui accompagne le modèle. Pour un maillage importé depuis `nivel.obj`, il cherche `nivel.pvs.json` dans le même dossier :
 
 ```json
-{ "sectores": 2, "tris": [[0, 1], [2, 3]] }
+{ "sectors": 2, "tris": [[0, 1], [2, 3]] }
 ```
 
 `sectores` est le nombre de zones, et `tris` contient, pour chaque zone, les triangles à dessiner, numérotés à partir de 0 dans l'ordre des faces du `.obj`. En général, il provient du jeu d'origine ou d'un outil à part. Chaque zone est un **nœud** : le nœud 1 est la première liste, et le nœud 0 dessine le maillage complet.
@@ -40,7 +40,7 @@ Le modificateur ne calcule pas ce qui est visible : il le lit dans un fichier qu
 | Branches | N'apparaît que si le chemin a plus d'une branche, par exemple le parcours principal et un parcours bonus. Choisit les branches prises en compte pour chercher le nœud le plus proche ; chaque branche activée apparaît en vert. Le bouton indique, par exemple, "Branches : 3 (toutes)" ou "Branches : 2/3". |
 | Nœud actuel | La zone en cours de dessin ; 0 = le maillage complet. Vous pouvez le changer à la main pour vérifier chaque zone. Quand le Chemin choisit le nœud tout seul, le moteur l'écrase. |
 
-Depuis un script, `setSector(objeto, n)` change le nœud actif (0 = le maillage complet). Voir [Particules, brouillard et visibilité](../lua/api-particulas-niebla.md).
+Depuis un script, `setSector(object, n)` change le nœud actif (0 = le maillage complet). Voir [Particules, brouillard et visibilité](../lua/api-particulas-niebla.md).
 
 ## Bon à savoir
 

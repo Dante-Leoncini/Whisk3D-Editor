@@ -66,17 +66,17 @@ list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/script/W3dScript.cpp
     # fisica minima del Core (velocidad + rebotes AABB) que usan los scripts lua. Va SIEMPRE
     # junto a W3dScript.cpp: es el que registra sus binds (sin este .cpp el link falla).
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dFisica.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dPhysics.cpp
     # cuerpos rigidos del Core (cajas + impulsos + raycast + eventos a lua)
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRigido.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dColMalla.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRigid.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dColMesh.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dHitbox.cpp
     # ragdolls caseros (particulas + articulaciones con limites) e IK de dos huesos / FABRIK
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRagdoll.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dNav.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/animation/W3dLocomocion.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/animation/W3dLocomotion.cpp
     # jugar en red (LAN, wifi, internet: UDP). Va junto a W3dScript.cpp: registra los binds red*
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/net/W3dRed.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/net/W3dNet.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/w3dTexture.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dCompress.cpp
@@ -85,27 +85,27 @@ list(APPEND SRC_FILES
     # .w3dm: el formato de GEOMETRIA propio (texto por lineas). W3dTexto es su
     # escaner/escritor de numeros (round-trip exacto de float32, cero allocs).
     # OJO: los .cpp del Core de io/ NO entran por GLOB, se listan a mano aca.
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dTexto.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dMalla.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dText.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dMesh.cpp
     # .w3db: la MISMA geometria en binario lista para memoria (el formato por defecto al
-    # guardar). W3dMalla.cpp lo llama (el freno REQ), asi que van SIEMPRE juntos.
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dMallaBin.cpp
+    # guardar). W3dMesh.cpp lo llama (el freno REQ), asi que van SIEMPRE juntos.
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dMeshBin.cpp
     # almacen del proyecto (contenedor .w3d montado / carpeta): los backends del
     # formato v4. El REGISTRO del montaje vive en w3dFilesystem.cpp, asi que los
     # runtimes que no lo usan no necesitan este .cpp.
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dAlmacen.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dStore.cpp
     # almacen de RECURSOS (refcount + streaming): la contabilidad generica que
     # comparten texturas (TexturaCache es su fachada), mallas y animaciones.
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dRecursos.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dResources.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/w3dlog.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dInteractionState.cpp
     # configuracion persistente del Core (clave=valor): W3dScript.cpp la usa para
     # los bindings de config/mute de lua. Sin este .cpp el link falla (w3dEngine::Config*).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dConfig.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dVibrar.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dVibrate.cpp
     # la pantalla tactil de las plataformas sin SDL (Symbian); el editor le engancha su receptor en todas
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dTactil.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dTouch.cpp
     # matematica del engine (antes en core/math): Vector3/Quaternion/Matrix4.
     # Se incluyen como "math/X.h" (engine es include dir). No los globea core/.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/math/Vector3.cpp
@@ -117,7 +117,7 @@ list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dAudioSDL.cpp
     # VOLUMEN maestro + volumen inicial por-proyecto (VolumenAplicarProyecto, lo llama import_w3d.cpp) y el
     # dispatcher de musica (W3dMusicRefrescarVolumenes, que W3dVolumen usa). Sin W3D_ENABLE_MUSIC = stubs no-op.
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dVolumen.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dVolume.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dMusic.cpp
     # PORTAPAPELES del sistema (Core): backend SDL (en Symbian se usa W3dClipboardSymbian.cpp via .mmp)
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/input/W3dClipboardSDL.cpp
@@ -135,7 +135,7 @@ endif()
 
 # VARIOS BACKENDS EN UN EJECUTABLE (libs/Whisk3DCore/graphics/w3dBackend.h): en la PC el editor trae OpenGL fijo Y OpenGL ES 2.0
 # (y despues Vulkan); el que se usa se elige AL ARRANCAR (Ajustes > Graphics). Cada backend se compila en su namespace
-# (w3dEngine::gl / ::es2) y graphics/w3dGraphicsDespacho.cpp reparte las llamadas al activo. (Con W3D_PC_GLES2 queda uno solo.)
+# (w3dEngine::gl / ::es2) y graphics/w3dGraphicsDispatch.cpp reparte las llamadas al activo. (Con W3D_PC_GLES2 queda uno solo.)
 if(NOT W3D_PC_GLES2 AND (WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID)) AND NOT EMSCRIPTEN)
     option(W3D_MULTIBACKEND "Varios backends graficos en el ejecutable, elegidos al arrancar" ON)
 else()
@@ -144,7 +144,7 @@ endif()
 if(W3D_MULTIBACKEND)
     list(APPEND SRC_FILES
         ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/gles2/w3dGraphicsGLES2.cpp
-        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/w3dGraphicsDespacho.cpp)
+        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/w3dGraphicsDispatch.cpp)
     set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=gl")
     set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/gles2/w3dGraphicsGLES2.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=es2")
     add_compile_definitions(W3D_MULTIBACKEND)
@@ -339,7 +339,7 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
         RUNTIME DESTINATION bin
     )
 
-    # (las TRADUCCIONES, res/idiomas/*.txt, y la fuente .w3dfnt tambien: sin ellas el editor instalado salia en ingles)
+    # (las TRADUCCIONES, res/languages/*.txt, y la fuente .w3dfnt tambien: sin ellas el editor instalado salia en ingles)
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/res/
         DESTINATION share/Whisk3d/res
         FILES_MATCHING
@@ -376,18 +376,18 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     # icono del TIPO DE ARCHIVO (Nautilus/hicolor): el mismo logo, instalado en el
     # contexto mimetypes/ con el nombre por defecto de cada tipo, que es el tipo con
     # '/' cambiado por '-'. Tienen que coincidir con el <icon name="..."/> del XML:
-    #   application/vnd.whisk3d.proyecto+zip -> application-vnd.whisk3d.proyecto+zip
+    #   application/vnd.whisk3d.project+zip -> application-vnd.whisk3d.project+zip
     #   application/x-whisk3d-ui             -> application-x-whisk3d-ui
     # (el nombre viejo application-x-whisk3d ya no se instala: ese tipo quedo como
     #  ALIAS y la base de MIME lo resuelve al tipo nuevo antes de pedir el icono)
     install(FILES ${CMAKE_SOURCE_DIR}/res/Whisk3D.svg
         DESTINATION share/icons/hicolor/scalable/mimetypes
-        RENAME application-vnd.whisk3d.proyecto+zip.svg
+        RENAME application-vnd.whisk3d.project+zip.svg
     )
 
     install(FILES ${CMAKE_SOURCE_DIR}/res/Whisk3D.png
         DESTINATION share/icons/hicolor/256x256/mimetypes
-        RENAME application-vnd.whisk3d.proyecto+zip.png
+        RENAME application-vnd.whisk3d.project+zip.png
     )
 
     install(FILES ${CMAKE_SOURCE_DIR}/res/Whisk3D.svg

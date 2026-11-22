@@ -4,7 +4,7 @@ Neredeyse tüm sistemlerde klavyeyi, fareyi, parmakları ve oyun kumandalarını
 
 | Ne | Nasıl gelir |
 |---|---|
-| Dokunmatik ekran | Android'de, tarayıcıda, Vita'da ve 3DS'te SDL. Symbian'da `W3dTactil`, SDL ile aynı dönüşümü yapar (ilk parmak bir fareyi hareket ettirir, diğerleri parmak olarak bildirilir): S60 5th'te tek parmak, N8'de çoklu dokunma |
+| Dokunmatik ekran | Android'de, tarayıcıda, Vita'da ve 3DS'te SDL. Symbian'da `W3dTouch`, SDL ile aynı dönüşümü yapar (ilk parmak bir fareyi hareket ettirir, diğerleri parmak olarak bildirilir): S60 5th'te tek parmak, N8'de çoklu dokunma |
 | Eğim | N95'te, açılışta yüklenen Nokia Sensor API (o olmadan da oyun aynı şekilde çalışır). Android'de ve PC'de SDL ile gelir |
 | Oyun kumandaları | Diğerlerinde SDL. Symbian'da Bluetooth ile bağlanan PS3 ve PS4 kumandaları (bthid-s60 sürücüsü), SDL ile aynı düğme sırasıyla. En fazla 4 |
 | Titreşim | Android'de telefonun titreşim motoru. Tarayıcıda `navigator.vibrate` (iOS'ta, bir hileyle sistemin "tık" sesi). Masaüstünde: hiçbir şey. API az şey vaat eder: "mümkünse kısa bir dokunuş" |

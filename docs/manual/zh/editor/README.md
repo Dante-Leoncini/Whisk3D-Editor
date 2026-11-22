@@ -40,4 +40,4 @@
 
 要编写游戏，请参阅 [Whisk3D 中的 Lua](../lua/README.md)。底层的运行机制，面向使用 C 或 C++ 编程的人：[Whisk3D Core 手册](../core/README.md)。
 
-Whisk3D · 编辑器手册（2026 年 10 月）。快捷键表格由 `tools/genmanual_atajos.py` 从 `main/app/W3dAtajos.cpp` 生成。
+Whisk3D · 编辑器手册（2026 年 10 月）。快捷键表格由 `tools/genmanual_atajos.py` 从 `main/app/W3dShortcuts.cpp` 生成。

@@ -1,15 +1,15 @@
 {
   "version": 1,
-  "adelante": [
-    { "nodo": 0, "ids": ["otro:espejo-poste.obj", "otro:espejo-puente.obj"] },
-    { "nodo": 1, "ids": ["otro:espejo-cubo-rojo.obj"] },
-    { "nodo": 2, "ids": ["otro:espejo-poste.obj"] },
-    { "nodo": 3, "ids": ["otro:espejo-orilla.obj"] }
+  "forward": [
+    { "node": 0, "ids": ["other:espejo-poste.obj", "other:espejo-puente.obj"] },
+    { "node": 1, "ids": ["other:espejo-cubo-rojo.obj"] },
+    { "node": 2, "ids": ["other:espejo-poste.obj"] },
+    { "node": 3, "ids": ["other:espejo-orilla.obj"] }
   ],
-  "atras": [
-    { "nodo": 0, "ids": ["otro:espejo-poste.obj"] },
-    { "nodo": 1, "ids": ["otro:espejo-puente.obj"] },
-    { "nodo": 2, "ids": ["otro:espejo-cubo-rojo.obj"] },
-    { "nodo": 3, "ids": ["otro:espejo-poste.obj", "otro:espejo-puente.obj", "otro:espejo-cubo-rojo.obj"] }
+  "back": [
+    { "node": 0, "ids": ["other:espejo-poste.obj"] },
+    { "node": 1, "ids": ["other:espejo-puente.obj"] },
+    { "node": 2, "ids": ["other:espejo-cubo-rojo.obj"] },
+    { "node": 3, "ids": ["other:espejo-poste.obj", "other:espejo-puente.obj", "other:espejo-cubo-rojo.obj"] }
   ]
 }

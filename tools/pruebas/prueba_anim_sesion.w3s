@@ -12,31 +12,31 @@
 #  en VERDE (abre scrolleado a el).
 # ==========================================================================
 
-ventana 900 700
-personajesmin /tmp/w3d_animsesion 1
+window 900 700
+charactersmin /tmp/w3d_animsesion 1
 clipmenu Quieto
-animactiva armature Personaje Quieto
+animactive armature Personaje Quieto
 frame 3
-guardarw3d /tmp/w3d_animsesion/sesion.w3d
-jsontiene /tmp/w3d_animsesion/sesion.w3d "animTipo": "armature"
-abrirw3d /tmp/w3d_animsesion/sesion.w3d
-animactiva armature Personaje Quieto frame 3
+savew3d /tmp/w3d_animsesion/sesion.w3d
+jsonhas /tmp/w3d_animsesion/sesion.w3d "animType": "armature"
+openw3d /tmp/w3d_animsesion/sesion.w3d
+animactive armature Personaje Quieto frame 3
 # el otro clip, por las dudas (no es "el primero")
 clipmenu Saludo
-animactiva armature Personaje Saludo
-guardarw3d /tmp/w3d_animsesion/sesion.w3d
-abrirw3d /tmp/w3d_animsesion/sesion.w3d
-animactiva armature Personaje Saludo
+animactive armature Personaje Saludo
+savew3d /tmp/w3d_animsesion/sesion.w3d
+openw3d /tmp/w3d_animsesion/sesion.w3d
+animactive armature Personaje Saludo
 # de vuelta a una animacion de escena: en un JUEGO (abre en "Juego") tambien se nombra
 clipmenu Scene
-animactiva escena
-guardarw3d /tmp/w3d_animsesion/sesion.w3d
-jsontiene /tmp/w3d_animsesion/sesion.w3d "animTipo": "escena"
-abrirw3d /tmp/w3d_animsesion/sesion.w3d
-animactiva escena
+animactive scene
+savew3d /tmp/w3d_animsesion/sesion.w3d
+jsonhas /tmp/w3d_animsesion/sesion.w3d "animType": "escena"
+openw3d /tmp/w3d_animsesion/sesion.w3d
+animactive scene
 # en una ESCENA comun la animacion de escena es lo de siempre: no se escribe nada (un .w3d de antes abre igual)
-escenadefecto
-guardarw3d /tmp/w3d_animsesion/comun.w3d
-jsontiene /tmp/w3d_animsesion/comun.w3d "animTipo" 0
-abrirw3d /tmp/w3d_animsesion/comun.w3d
-animactiva escena
+scenedefault
+savew3d /tmp/w3d_animsesion/comun.w3d
+jsonhas /tmp/w3d_animsesion/comun.w3d "animType" 0
+openw3d /tmp/w3d_animsesion/comun.w3d
+animactive scene

@@ -8,5 +8,5 @@
 # para probar el camino de FALLA a mano:
 #   ../../platform/linux/build/whisk3d --script <(echo "abrirw3d prueba_pvs.w3d"; echo "presupuesto presupuesto-prueba.json imposible 2")
 # (debe salir con error "presupuesto EXCEDIDO").
-abrirw3d prueba_pvs.w3d
-presupuesto presupuesto-prueba.json pc 5
+openw3d prueba_pvs.w3d
+budget presupuesto-prueba.json pc 5

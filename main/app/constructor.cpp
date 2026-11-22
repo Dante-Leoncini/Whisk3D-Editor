@@ -1,9 +1,9 @@
 #include "constructor.h"
 #include "ViewPorts/Timeline.h" // el layout PC parte el 3D en columna [3D / Timeline]
-#include "ViewPorts/LayoutInput.h" // LayoutPorDefecto: EL layout por defecto, en un solo lugar
-#include "objects/Primitivas.h"   // W3dMallaNacioHook: el cubo por defecto nace con su recurso
-#include "objects/Rutina.h"       // el CONSTRUCTOR y el "Limpiar pantalla" que trae todo proyecto
-#include "WhiskUI/theme/colores.h" // el fondo del tema: el "Clear color" de un proyecto nuevo
+#include "ViewPorts/LayoutInput.h" // LayoutDefault: EL layout por defecto, en un solo lugar
+#include "objects/Primitives.h"   // W3dMeshSpawnedHook: el cubo por defecto nace con su recurso
+#include "objects/Routine.h"      // el CONSTRUCTOR y el "Limpiar pantalla" que trae todo proyecto
+#include "WhiskUI/theme/colors.h" // el fondo del tema: el "Clear color" de un proyecto nuevo
 #include "W3dLang.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -18,27 +18,27 @@ bool running = false;
 // usuario: CollectionActive != SceneCollection), camara, luz blanca y un cubo. UNA sola
 // definicion: la usa el arranque y el comando `escenadefecto` del harness (los tests que
 // trabajan "sobre la escena del usuario" la necesitan en un proceso que ya corrio otros).
-void W3dCrearEscenaPorDefecto() {
+void W3dCreateDefaultScene() {
     // arriba de todo: el CONSTRUCTOR (corre una vez al empezar el juego: fija el "Clear color", el fondo del tema) y,
     // afuera de el y antes de la coleccion, la rutina que LIMPIA la pantalla en cada cuadro (apagarla o quitarla = no
     // limpiar, tambien en el editor)
-    W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
-                         ListaColores[static_cast<int>(ColorID::background)]);
+    W3dDefaultRoutines(SceneCollection, T("Constructor"), T("Clear screen"),
+                         ColorList[static_cast<int>(ColorID::background)]);
     CollectionActive = new Collection(SceneCollection);
 
     // la CAMARA mira al cubo (el origen) desde arriba y al costado, a 5,5 unidades: con sus 45 grados el cubo entra entero
     // en el render (antes, a 4,3, se cortaban las puntas) y la camara se ve en la vista 3D. La rotacion se CALCULA: era
     // (-35, -45, 0) escrita a mano y no apuntaba al cubo
     { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
-      new Camera(CollectionActive, posCam, CamaraRotMirando(posCam, Vector3(0, 0, 0))); }
+      new Camera(CollectionActive, posCam, CameraRotLooking(posCam, Vector3(0, 0, 0))); }
     Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
     L->SetNameObj(T("Light"));   // el Core la llama "Light"; el nombre lo pone el editor en su idioma (como Agregar > Luz)
     L->SetDiffuse(1, 1, 1); // luz BLANCA por defecto (antes era roja)
 
     NewMesh(MeshType::cube, CollectionActive);
-    if (W3dMallaNacioHook) W3dMallaNacioHook();   // el cubo ya es el recurso "Cubo" de la biblioteca
-    // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (ver W3dRaicesFijarTiposDeducidos)
-    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
+    if (W3dMeshSpawnedHook) W3dMeshSpawnedHook();   // el cubo ya es el recurso "Cubo" de la biblioteca
+    // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (ver W3dRootsSetTypesDeduced)
+    { extern void W3dRootsSetTypesDeduced(); W3dRootsSetTypesDeduced(); }
 }
 
 void ConstructUniversal(int argc, char* argv[]) {
@@ -46,7 +46,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     W3dInitGraphics();
 
     // Siempre un material por defecto
-    MaterialDefecto = MaterialDeFabrica(new Material("Default", true));   // (con shaders: por pixel)
+    MaterialDefault = FactoryMaterial(new Material("Default", true));   // (con shaders: por pixel)
 
 
     // Tamaño de las texturas
@@ -56,7 +56,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     // UI compartida (texturas + fuente + iconos): mismo init que Symbian
     std::string skinDir = w3dFileSystem::GetResDir() + "/Skins/" + cfg.SkinName + "/";
     W3dInitUI(skinDir);
-    SetGlobalScale(cfg.scale > 0 ? cfg.scale : 3); // configurable (config.ini "scale"); 1 = estilo N95
+    SetGlobalScale(cfg.scale > 0 ? cfg.scale : 3); // configurable (config.start "scale"); 1 = estilo N95
 
     // RE-ENTRADA (Android): si la Activity fue destruida y main() se relanza con los globals C++ estaticos VIVOS, ya
     // existe el layout (rootViewport). NO recrear la escena default (sino DUPLICA: otro cubo + camara + luz sobre lo
@@ -121,17 +121,17 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     // Si se abre sin archivo -> escena default
     // ======================================================
-    W3dCrearEscenaPorDefecto();
+    W3dCreateDefaultScene();
 
-    // EL layout por defecto, UNA sola logica por TAMANO DE PANTALLA (LayoutPorDefecto, LayoutInput.cpp):
+    // EL layout por defecto, UNA sola logica por TAMANO DE PANTALLA (LayoutDefault, LayoutInput.cpp):
     // un lado < 320px -> 2 viewports (3D + Propiedades, segun orientacion); mas grande -> 4 viewports
     // (3D + Timeline + Outliner + Props). La MISMA en todos los sistemas (antes habia una rama aca y otra
     // distinta en Symbian). El arranque sin archivo y el fallback de un .w3d sin bloque Layout arman lo mismo.
-    Viewport3D* vp3dInicial = NULL;
-    rootViewport = LayoutPorDefecto(winW, winH, &vp3dInicial);
+    Viewport3D* vp3dInitial = NULL;
+    rootViewport = LayoutDefault(winW, winH, &vp3dInitial);
     // siempre hay un viewport activo (borde verde) por defecto: sin mouse
     // (Symbian) es la unica referencia; con mouse el hover lo pisa enseguida.
-    viewPortActive = vp3dInicial;
+    viewPortActive = vp3dInitial;
 
     /*rootViewport = new ViewportColumn(
         new Outliner(),

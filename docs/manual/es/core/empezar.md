@@ -16,7 +16,7 @@ gfx::MatrixMode(gfx::Projection);  gfx::LoadIdentity();
 gfx::Perspective(45.0f, (float)w / (float)h, 0.1f, 100.0f);
 gfx::MatrixMode(gfx::ModelView);   gfx::LoadIdentity();
 gfx::Translatef(0.0f, 0.0f, -5.0f);
-gfx::Rotatef(angulo, 0.0f, 1.0f, 0.0f);
+gfx::Rotatef(angle, 0.0f, 1.0f, 0.0f);
 gfx::EnableArray(gfx::VertexArray); gfx::VertexPointer3f(0, cubeVerts);
 gfx::EnableArray(gfx::NormalArray); gfx::NormalPointer3b(cubeNormals);
 gfx::DrawTriangles(36, cubeIdx);

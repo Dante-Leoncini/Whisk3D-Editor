@@ -17,42 +17,42 @@
 #  plano lejano segun el tick: largo -> corto -> los tres a la vez.
 #  Se verifica por PIXELES, que es lo unico que prueba que el recorte ocurrio.
 # ==========================================================================
-abrirw3d prueba_lente.w3d
+openw3d prueba_lente.w3d
 loadtex
 # el viewport dibuja POR la camara de la escena: si no, el recorte que se mide
 # seria el de la orbita del editor y el assert no probaria nada
-vpcamara on
+vpcamera on
 
 # --- 1) ALCANCE LARGO: se ve hasta el fondo --------------------------------
 # el script NO toca nada en inicio(): estos tres son los que declaro el .w3d de
 # TEXTO, o sea que de paso prueban que near/far se leen del formato (antes solo
 # se leia el fov y los planos quedaban en los defaults 0.01 / 1000)
 simplay 1
-scriptinfo compartido fov 60.0
-scriptinfo compartido cerca 0.10
-scriptinfo compartido lejos 1000.0
-escenapx 60 0 -300 es 134 142 6 10
-escenapx -2 0 -10  es 134 27 6 10
+scriptinfo shared fov 60.0
+scriptinfo shared cerca 0.10
+scriptinfo shared lejos 1000.0
+scenepx 60 0 -300 es 134 142 6 10
+scenepx -2 0 -10  es 134 27 6 10
 
 # --- 2) ALCANCE CORTO: el fondo deja de dibujarse ---------------------------
 # al tick 3 el script hace setLente(cam, nil, nil, 60): el cartel de atras cae
 # fuera del plano lejano. ESTE es el assert de la feature: sin poder mover el
 # `far` desde el script, el pixel seguiria siendo el cartel.
 simplay 3
-scriptinfo compartido lejos 60.0
-escenapx 60 0 -300 noes 134 142 6 10
+scriptinfo shared lejos 60.0
+scenepx 60 0 -300 noes 134 142 6 10
 # y lo que esta adentro del alcance sigue igual: el recorte no se comio la escena
-escenapx -2 0 -10 es 134 27 6 10
+scenepx -2 0 -10 es 134 27 6 10
 # los otros dos no se tocaron (nil = no tocar ese)
-scriptinfo compartido fov 60.0
-scriptinfo compartido cerca 0.10
+scriptinfo shared fov 60.0
+scriptinfo shared cerca 0.10
 
 # --- 3) LOS TRES A LA VEZ ---------------------------------------------------
 # al tick 6: setLente(cam, 30, 0.5, 1000)
 simplay 3
-scriptinfo compartido fov 30.0
-scriptinfo compartido cerca 0.50
-scriptinfo compartido lejos 1000.0
+scriptinfo shared fov 30.0
+scriptinfo shared cerca 0.50
+scriptinfo shared lejos 1000.0
 simstop
 
 # --- 4) EL LENTE VIAJA EN EL .w3d ------------------------------------------
@@ -61,15 +61,15 @@ simstop
 # de texto. Los tres sobreviven el round-trip a v4.
 # (el lente NO es estado de partida: es una propiedad de la camara que se
 #  guarda, asi que despues del bloque 3 la escena queda con fov 30 / cerca 0.5)
-guardarw3d prueba_lente_v4.w3d
-abrirw3d prueba_lente_v4.w3d
+savew3d prueba_lente_v4.w3d
+openw3d prueba_lente_v4.w3d
 loadtex
 # el fov guardado, leido por el harness antes de correr ningun script
-camriel fov 30.0
-vpcamara on
+camrail fov 30.0
+vpcamera on
 simplay 1
 # y el plano cercano, que es un valor NO default (el default es 0.01): si el
 # round-trip lo perdiera, aca saldria 0.01
-scriptinfo compartido cerca 0.50
-scriptinfo compartido fov 30.0
+scriptinfo shared cerca 0.50
+scriptinfo shared fov 30.0
 simstop

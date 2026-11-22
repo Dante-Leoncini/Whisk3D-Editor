@@ -1,6 +1,6 @@
 # Logs
 
-Trois niveaux de style printf : `w3dLogf` (information), `w3dLogfW` (avertissement) et `w3dLogfE` (erreur). `g_w3dLogNivel` filtre à l'exécution (3 = tout, 0 = rien) et compiler avec `W3D_DEV_LOG=0` retire les appels de l'exécutable. Les dernières lignes restent aussi en mémoire : c'est ce qu'affiche la [Console](../editor/consola.md) de l'éditeur.
+Trois niveaux de style printf : `w3dLogf` (information), `w3dLogfW` (avertissement) et `w3dLogfE` (erreur). `g_w3dLogLevel` filtre à l'exécution (3 = tout, 0 = rien) et compiler avec `W3D_DEV_LOG=0` retire les appels de l'exécutable. Les dernières lignes restent aussi en mémoire : c'est ce qu'affiche la [Console](../editor/consola.md) de l'éditeur.
 
 | Système | Où ça va |
 |---|---|

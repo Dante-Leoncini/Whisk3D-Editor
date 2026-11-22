@@ -8,26 +8,26 @@ keychan 0 0
 frame 2
 objmove 1 0 0
 keychan 0 0
-vpvista solid
-vporbita 0 0 0 12 0 0
-vectores quieto 160 120
-vectores 160 120 objeto 1.5 /tmp/w3d_vectores.png
+vpview solid
+vporbit 0 0 0 12 0 0
+vectors still 160 120
+vectors 160 120 object 1.5 /tmp/w3d_vectores.png
 # del 2 al 3 no hay clave nueva: queda quieto (dx = dy = 0)
 frame 3
-vectores 160 120 0 0 0.5
+vectors 160 120 0 0 0.5
 # EL RENDER A PNG con los tildes: el pase _vectores y el beauty desenfocado
-renderopc 1 1 0.5
+renderopt 1 1 0.5
 frame 2
 renderimage /tmp w3d_vec.png
-existe /tmp/w3d_vec_vectores_0002.png
-existe /tmp/w3d_vec_0002.png
-renderopc 0 0 0.5
+exists /tmp/w3d_vec_vectores_0002.png
+exists /tmp/w3d_vec_0002.png
+renderopt 0 0 0.5
 # LA VISTA "Motion vectors" del viewport: en el cuadro 2 el cubo se movio a la derecha (rojo > 128, verde ~128); en el 3
 # esta quieto (128,128) y el fondo es (128,128,0)
-vpvista vectores
+vpview vectors
 frame 2
-escenapx 1.5 0.5 1
-escenapx 1.5 0.5 1 noes 128 128 255 8
+scenepx 1.5 0.5 1
+scenepx 1.5 0.5 1 noes 128 128 255 8
 frame 3
-escenapx 1.5 0.5 1 es 128 128 255 3
-vpvista solid
+scenepx 1.5 0.5 1 es 128 128 255 3
+vpview solid

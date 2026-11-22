@@ -4,10 +4,10 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
-#include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
+#include "ViewPorts/PopUp/ConfirmPopup.h" // OpenConfirmDelete (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
 #include "ViewPorts/PoseTransform.h" // Pose Mode transform (extraido a su propio archivo)
-#include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
+#include "ViewPorts/Notifications.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
@@ -25,22 +25,22 @@
 #include "objects/Camera.h"
 #include "objects/Empty.h"
 #include "objects/Armature.h"
-#include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
+#include "animation/SkeletalAnimation.h" // InsertKeyframeSkeleton (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
-#include "objects/Primitivas.h"
+#include "objects/Primitives.h"
 #include "variables.h"
-#include "render/OpcionesRender.h" // g_fpsActual
+#include "render/RenderOptions.h" // g_currentFps
 #include "ViewPorts/PopUp/PopUpBase.h"
 #include "ViewPorts/PopUp/RedoMeshPanel.h"
 #include "WhiskUI/widgets/card.h"        // tarjeta de las notificaciones
 #include "WhiskUI/text/bitmapText.h"  // texto de las notificaciones
 #include "WhiskUI/draw/icons.h"       // iconos notifOk / notifError
-#include "WhiskUI/theme/colores.h"     // ColorID
+#include "WhiskUI/theme/colors.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
-#include "edit/BoneEdit.h"  // Ctrl+P / Alt+P en EDICION de huesos 3D (BoneEditActivo + ops)
+#include "edit/BoneEdit.h"  // Ctrl+P / Alt+P en EDICION de huesos 3D (BoneEditActive + ops)
 #include "ViewPorts/Parent.h"
 
 // ====================================================================
@@ -51,68 +51,68 @@ static PopupMenu* gMenuSetParent = NULL;
 static PopupMenu* gMenuClearParent = NULL;
 
 // los seleccionados (sin contar al activo / a los ya-raiz)
-static void RecolectarSeleccionados(Object* aNodo, std::vector<Object*>& aSel,
-                                    Object* aExcluir) {
-    if (!aNodo) return;
-    for (size_t i = 0; i < aNodo->Childrens.size(); i++) {
-        Object* o = aNodo->Childrens[i];
-        if (o->select && o != aExcluir) aSel.push_back(o);
-        RecolectarSeleccionados(o, aSel, aExcluir);
+static void CollectSelected(Object* aNode, std::vector<Object*>& aSel,
+                                    Object* aExclude) {
+    if (!aNode) return;
+    for (size_t i = 0; i < aNode->Childrens.size(); i++) {
+        Object* o = aNode->Childrens[i];
+        if (o->select && o != aExclude) aSel.push_back(o);
+        CollectSelected(o, aSel, aExclude);
     }
 }
 
 // 0 Object, 1 Keep Transform, 2 Without Inverse, 3 Keep T. Without Inv.
 // (sin matrices de inversa propias: 0==2 y 1==3 en nuestro modelo)
-void AccionSetParent(int aId) {
-    if (!ObjActivo || !SceneCollection) return;
+void ActionSetParent(int aId) {
+    if (!ActiveObj || !SceneCollection) return;
     std::vector<Object*> sel;
-    RecolectarSeleccionados(SceneCollection, sel, ObjActivo);
+    CollectSelected(SceneCollection, sel, ActiveObj);
     // emparentar N objetos es UNA accion: los N pasos de undo se funden en uno (ObjectMode.h)
-    ReparentGrupoIniciar();
+    ReparentGroupStart();
     for (size_t i = 0; i < sel.size(); i++) {
-        if (aId == 1 || aId == 3) ReparentKeepTransform(sel[i], ObjActivo);
-        else ReparentSimple(sel[i], ObjActivo);
+        if (aId == 1 || aId == 3) ReparentKeepTransform(sel[i], ActiveObj);
+        else ReparentSimple(sel[i], ActiveObj);
     }
-    ReparentGrupoFin();
+    ReparentGroupEnd();
 }
 
 // 0 Clear Parent, 1 Clear and Keep Transformation, 2 Clear Parent Inverse
-void AccionClearParent(int aId) {
+void ActionClearParent(int aId) {
     if (!SceneCollection) return;
     std::vector<Object*> sel;
-    RecolectarSeleccionados(SceneCollection, sel, NULL);
-    ReparentGrupoIniciar();   // idem: N desemparentados = UN Ctrl+Z
+    CollectSelected(SceneCollection, sel, NULL);
+    ReparentGroupStart();   // idem: N desemparentados = UN Ctrl+Z
     for (size_t i = 0; i < sel.size(); i++) {
         if (!sel[i]->Parent || sel[i]->Parent == SceneCollection) continue;
         if (aId == 1) ReparentKeepTransform(sel[i], SceneCollection);
         else ReparentSimple(sel[i], SceneCollection);
     }
-    ReparentGrupoFin();
+    ReparentGroupEnd();
 }
 
 // Los menus Set/Clear Parent se usan de DOS formas: standalone (Ctrl+P / Ctrl+Alt+P) y como SUBMENUS del menu
 // "Object" de la barra. Para que anden igual en ambos casos usan ids UNICOS (230-233 / 240-242) + la accion
-// LayoutAccionObject (que rutea esos ids a AccionSetParent/AccionClearParent), como el submenu Apply/Delete.
+// LayoutActionObject (que rutea esos ids a ActionSetParent/ActionClearParent), como el submenu Apply/Delete.
 PopupMenu* LayoutSubmenuSetParent() {
     if (!gMenuSetParent) {
         gMenuSetParent = new PopupMenu();
-        gMenuSetParent->titulo = T("Set Parent To");
-        gMenuSetParent->action = LayoutAccionObject;
-        gMenuSetParent->Agregar(T("Object"), 230);
-        gMenuSetParent->Agregar(T("Object (Keep Transform)"), 231);
-        gMenuSetParent->Agregar(T("Object (Without Inverse)"), 232);
-        gMenuSetParent->Agregar(T("Object (Keep Transform Without Inverse)"), 233);
+        gMenuSetParent->title  = T("Set Parent To");
+        gMenuSetParent->action = LayoutActionObject;
+        gMenuSetParent->Add(T("Object"), 230);
+        gMenuSetParent->Add(T("Object (Keep Transform)"), 231);
+        gMenuSetParent->Add(T("Object (Without Inverse)"), 232);
+        gMenuSetParent->Add(T("Object (Keep Transform Without Inverse)"), 233);
     }
     return gMenuSetParent;
 }
 PopupMenu* LayoutSubmenuClearParent() {
     if (!gMenuClearParent) {
         gMenuClearParent = new PopupMenu();
-        gMenuClearParent->titulo = T("Clear Parent");
-        gMenuClearParent->action = LayoutAccionObject;
-        gMenuClearParent->Agregar(T("Clear Parent"), 240);
-        gMenuClearParent->Agregar(T("Clear and Keep Transformation"), 241);
-        gMenuClearParent->Agregar(T("Clear Parent Inverse"), 242);
+        gMenuClearParent->title  = T("Clear Parent");
+        gMenuClearParent->action = LayoutActionObject;
+        gMenuClearParent->Add(T("Clear Parent"), 240);
+        gMenuClearParent->Add(T("Clear and Keep Transformation"), 241);
+        gMenuClearParent->Add(T("Clear Parent Inverse"), 242);
     }
     return gMenuClearParent;
 }
@@ -120,13 +120,13 @@ PopupMenu* LayoutSubmenuClearParent() {
 void LayoutMenuParent(bool aClear, int mx, int my) {
     if (aClear) {
         PopupMenu* m = LayoutSubmenuClearParent();
-        m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-        MenuAbierto = m;
+        m->Open(mx, my, MenuScreenW, MenuScreenH);
+        OpenMenu = m;
     } else {
-        if (!ObjActivo) return; // no hay a quien emparentar
+        if (!ActiveObj) return; // no hay a quien emparentar
         PopupMenu* m = LayoutSubmenuSetParent();
-        m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-        MenuAbierto = m;
+        m->Open(mx, my, MenuScreenW, MenuScreenH);
+        OpenMenu = m;
     }
 }
 
@@ -147,27 +147,27 @@ static PopupMenu* gMenuBoneCtrlP = NULL;
 static int   g_boneAltPCtx  = 0;    // 1 = huesos 3D (Edit de armature); 2 = huesos 2D (UV editor)
 static Mesh* g_boneAltPMesh = NULL; // el mesh del contexto 2D
 
-static void AccionBoneAltP(int aId) { // 0 = Disconnect Bone; 1 = Clear Parent
+static void ActionBoneAltP(int aId) { // 0 = Disconnect Bone; 1 = Clear Parent
     if (g_boneAltPCtx == 1) {
         Armature* a = BoneEditArm();
         if (!a) return;
-        if (aId == 0) BoneEditDesconectarConectados(a);
-        else          BoneEditDesconectar(a);
+        if (aId == 0) BoneEditDisconnectConnected(a);
+        else          BoneEditDisconnect(a);
     } else if (g_boneAltPCtx == 2 && g_boneAltPMesh) {
-        if (aId == 0) Bone2DDesconectarSel(g_boneAltPMesh);
+        if (aId == 0) Bone2DDisconnectSel(g_boneAltPMesh);
         else          Bone2DClearParentSel(g_boneAltPMesh);
     }
     g_redraw = true;
 }
 
 // Ctrl+P: 0 = Keep Offset (lo de siempre), 1 = Connected (soldado al tail del padre)
-static void AccionBoneCtrlP(int aId) {
-    const bool conectar = (aId == 1);
+static void ActionBoneCtrlP(int aId) {
+    const bool connect = (aId == 1);
     if (g_boneAltPCtx == 1) {
         Armature* a = BoneEditArm();
-        if (a) BoneParentarSeleccionAlActivo(a, conectar);
+        if (a) BoneParentSelectionToActive(a, connect);
     } else if (g_boneAltPCtx == 2 && g_boneAltPMesh) {
-        Bone2DParentarSeleccionAlActivo(g_boneAltPMesh, conectar);
+        Bone2DParentSelectionToActive(g_boneAltPMesh, connect);
     }
     g_redraw = true;
 }
@@ -175,10 +175,10 @@ static void AccionBoneCtrlP(int aId) {
 PopupMenu* LayoutSubmenuBoneCtrlP() {
     if (!gMenuBoneCtrlP) {
         gMenuBoneCtrlP = new PopupMenu();
-        gMenuBoneCtrlP->titulo = T("Set Parent To"); // el titulo del Ctrl+P
-        gMenuBoneCtrlP->action = AccionBoneCtrlP;
-        gMenuBoneCtrlP->Agregar(T("Keep Offset"), 0);
-        gMenuBoneCtrlP->Agregar(T("Connected"), 1);
+        gMenuBoneCtrlP->title  = T("Set Parent To"); // el titulo del Ctrl+P
+        gMenuBoneCtrlP->action = ActionBoneCtrlP;
+        gMenuBoneCtrlP->Add(T("Keep Offset"), 0);
+        gMenuBoneCtrlP->Add(T("Connected"), 1);
     }
     return gMenuBoneCtrlP;
 }
@@ -187,62 +187,62 @@ PopupMenu* LayoutSubmenuBoneCtrlP() {
 // barra del UV editor). Calca LayoutMenuBoneAltP2D.
 void LayoutMenuBoneCtrlP2D(Mesh* m, int mx, int my) {
     if (!m) return;
-    BoneAltPContexto2D(m);
+    BoneAltPContext2D(m);
     PopupMenu* mn = LayoutSubmenuBoneCtrlP();
-    if (MenuAbierto && MenuAbierto != mn) MenuAbierto->Cerrar();
-    mn->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-    MenuAbierto = mn;
+    if (OpenMenu && OpenMenu != mn) OpenMenu->Close();
+    mn->Open(mx, my, MenuScreenW, MenuScreenH);
+    OpenMenu = mn;
 }
 
 PopupMenu* LayoutSubmenuBoneAltP() {
     if (!gMenuBoneAltP) {
         gMenuBoneAltP = new PopupMenu();
-        gMenuBoneAltP->titulo = T("Clear Parent"); // el titulo del Alt+P
-        gMenuBoneAltP->action = AccionBoneAltP;    // action PROPIA: funciona standalone Y como submenu
-        gMenuBoneAltP->Agregar(T("Disconnect Bone"), 0);
-        gMenuBoneAltP->Agregar(T("Clear Parent"), 1);
+        gMenuBoneAltP->title  = T("Clear Parent"); // el titulo del Alt+P
+        gMenuBoneAltP->action = ActionBoneAltP;    // action PROPIA: funciona standalone Y como submenu
+        gMenuBoneAltP->Add(T("Disconnect Bone"), 0);
+        gMenuBoneAltP->Add(T("Clear Parent"), 1);
     }
     return gMenuBoneAltP;
 }
-void BoneAltPContexto3D()        { g_boneAltPCtx = 1; g_boneAltPMesh = NULL; }
-void BoneAltPContexto2D(Mesh* m) { g_boneAltPCtx = 2; g_boneAltPMesh = m; }
+void BoneAltPContext3D()        { g_boneAltPCtx = 1; g_boneAltPMesh = NULL; }
+void BoneAltPContext2D(Mesh* m) { g_boneAltPCtx = 2; g_boneAltPMesh = m; }
 
 // abre el popup Alt+P sobre los huesos 2D de ESTE mesh (tambien lo usa el boton Disconnect
 // de la toolbar del UV editor). Calca el patron de los otros menus contextuales.
 void LayoutMenuBoneAltP2D(Mesh* m, int mx, int my) {
     if (!m) return;
-    BoneAltPContexto2D(m);
+    BoneAltPContext2D(m);
     PopupMenu* mn = LayoutSubmenuBoneAltP();
-    if (MenuAbierto && MenuAbierto != mn) MenuAbierto->Cerrar();
-    mn->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-    MenuAbierto = mn;
+    if (OpenMenu && OpenMenu != mn) OpenMenu->Close();
+    mn->Open(mx, my, MenuScreenW, MenuScreenH);
+    OpenMenu = mn;
 }
 
 // contexto de HUESOS 2D activo: el viewport con foco es un editor UV en Edit Bones, sobre la
 // malla activa en Edit Mode (la misma condicion de visibilidad del menu Armature de su barra).
-static Mesh* MeshHuesos2DActivo() {
+static Mesh* MeshBones2DActive() {
     if (!viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 4) return NULL;
     UVEditor* uv = (UVEditor*)viewPortActive;
-    if (uv->uvModo != UVModoHuesos) return NULL;
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (uv->uvMode != UVModeBones) return NULL;
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
     return (m && (Object*)m == g_editMesh) ? m : NULL;
 }
 
 // Ctrl+P / Alt+P con huesos en edicion: opera sobre HUESOS (nunca el popup de emparentar
 // OBJETOS, que es de Object Mode -- era el bug reportado). false = no hay contexto de huesos.
-bool LayoutParentHuesos(bool aAlt, int mx, int my) {
-    if (BoneEditActivo()) {              // EDIT de armature en el 3D
-        BoneAltPContexto3D();
-        if (aAlt || !BoneGrabActivo()) {
+bool LayoutParentBones(bool aAlt, int mx, int my) {
+    if (BoneEditActive()) {              // EDIT de armature en el 3D
+        BoneAltPContext3D();
+        if (aAlt || !BoneGrabActive()) {
             PopupMenu* mn = aAlt ? LayoutSubmenuBoneAltP() : LayoutSubmenuBoneCtrlP();
-            if (MenuAbierto && MenuAbierto != mn) MenuAbierto->Cerrar();
-            mn->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-            MenuAbierto = mn;
+            if (OpenMenu && OpenMenu != mn) OpenMenu->Close();
+            mn->Open(mx, my, MenuScreenW, MenuScreenH);
+            OpenMenu = mn;
         }
         g_redraw = true;
         return true;
     }
-    Mesh* m2 = MeshHuesos2DActivo();     // EDIT de huesos 2D en el UV editor
+    Mesh* m2 = MeshBones2DActive();     // EDIT de huesos 2D en el UV editor
     if (m2) {
         if (aAlt) LayoutMenuBoneAltP2D(m2, mx, my);
         else      LayoutMenuBoneCtrlP2D(m2, mx, my);

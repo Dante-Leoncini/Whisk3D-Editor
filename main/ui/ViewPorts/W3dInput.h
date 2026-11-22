@@ -11,14 +11,14 @@
 // SOLO, el mismo que ya andaba en PC.
 //
 // Cada plataforma traduce lo suyo a esto:
-//   PC       -> main/controles.cpp                     (desde SDL_Event)
+//   PC       -> main/controls.cpp                     (desde SDL_Event)
 //   Symbian  -> platform/symbian/src/Whisk3DContainer.cpp (desde TKeyEvent)
 //
 // Los imprimibles VALEN SU ASCII (W3dK_G == 'g'): se leen igual que se tipean, y en PC la traduccion es directa
 // porque SDLK_g ya es 'g'. Los que no tienen ASCII arrancan en 0x101.
 
-enum W3dTecla {
-    W3dK_NADA = 0,
+enum W3dKey {
+    W3dK_NOTHING = 0,
 
     // --- imprimibles: su propio ASCII ---
     W3dK_SPACE = ' ',
@@ -44,12 +44,12 @@ enum W3dTecla {
     W3dK_KP_5, W3dK_KP_6, W3dK_KP_7, W3dK_KP_8, W3dK_KP_9,
     W3dK_KP_ENTER, W3dK_KP_PERIOD,
 
-    // --- teclas de funcion (F2 ya tenia su lugar arriba). Las usan los atajos reasignables (app/W3dAtajos.h) ---
+    // --- teclas de funcion (F2 ya tenia su lugar arriba). Las usan los atajos reasignables (app/W3dShortcuts.h) ---
     W3dK_F1 = 0x130, W3dK_F3 = 0x132, W3dK_F4, W3dK_F5, W3dK_F6, W3dK_F7, W3dK_F8, W3dK_F9, W3dK_F10, W3dK_F11, W3dK_F12
 };
 
 // Botones del mouse. En el telefono no hay mouse fisico: el cursor virtual manda estos mismos, asi que el "ok" es un
 // click de verdad (down + up) y mantenerlo apretado es un arrastre, sin nada especial del otro lado.
-enum W3dBotonMouse { W3dMB_NINGUNO = 0, W3dMB_IZQ = 1, W3dMB_MEDIO = 2, W3dMB_DER = 3 };
+enum W3dButtonMouse { W3dMB_NONE = 0, W3dMB_IZQ = 1, W3dMB_MIDDLE = 2, W3dMB_DER = 3 };
 
 #endif

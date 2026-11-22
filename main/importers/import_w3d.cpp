@@ -1,19 +1,19 @@
 #include "importers/import_w3d.h"
-#include "io/TexturaEditada.h"   // TexEditLimpiarTodo al reiniciar la escena
-#include "objects/ObjectMode.h"   // W3dNombresRepararEscena (duplicados de archivos ya guardados)
+#include "io/EditedTexture.h"   // TexEditClearAll al reiniciar la escena
+#include "objects/ObjectMode.h"   // W3dNamesRepairScene (duplicados de archivos ya guardados)
 #include <math.h>                    // sqrtf: normal de la clave geometrica de los UV groups
-#include "render/OpcionesRender.h"
-#include "render/SombrasTiempoReal.h"   // g_sombras: la tarjeta "Sombras en tiempo real"
-#include "render/Postproceso.h"   // los efectos del postprocesado
-#include "objects/PostprocesoObj.h"
+#include "render/RenderOptions.h"
+#include "render/RealTimeShadows.h"   // g_shadows: la tarjeta "Sombras en tiempo real"
+#include "render/PostProcess.h"   // los efectos del postprocesado
+#include "objects/PostProcessObj.h"
 #include "render/RayTracer.h"   // g_rt: el trazado de rayos del proyecto   // RenderType / g_redraw: son del editor
 #include "stb/stb_image.h" // stb ahora vive en libs/Whisk3DCore/thirdparty
-#include "script/W3dScript.h"   // colgar el <proyecto>.lua al objeto Script/gamepad
-#include "physics/W3dRigido.h"  // W3dRigidoDef (bloque "fisica") + W3dRigidosAsegurar (anexo en runtime)
-#include "io/W3dRecursos.h"   // listas de carga (cierre de proyecto) — Core
+#include "script/W3dScript.h"  // colgar el <proyecto>.lua al objeto Script/gamepad
+#include "physics/W3dRigid.h"  // W3dRigidDef (bloque "fisica") + W3dRigidEnsure (anexo en runtime)
+#include "io/W3dResources.h"   // listas de carga (cierre de proyecto) — Core
 #include "animation/Animation.h" // auto modo-juego al abrir un proyecto con scripts
 // ============================================================================
-//  W3D_SIN_EDITOR — ESTE MISMO LECTOR, ADENTRO DE UN JUEGO COMPILADO.
+//  W3D_NO_EDITOR — ESTE MISMO LECTOR, ADENTRO DE UN JUEGO COMPILADO.
 //
 //  Un juego 3D exportado tiene que cargar SU escena con el MISMO codigo que la
 //  carga en el editor: si el runtime tuviera su propio lector, el juego se veria
@@ -24,91 +24,91 @@
 //     - el icono de la VENTANA (SDL_SetWindowIcon) y el `cfg` del editor,
 //     - la config de la tarjeta "Juego" (que en el juego ya esta resuelta),
 //     - la SESION guardada (frame + seleccion del usuario),
-//     - y la apertura de un proyecto EN CALIENTE (ReiniciarEscena / AbrirW3D).
+//     - y la apertura de un proyecto EN CALIENTE (RestartScene / OpenW3D).
 //  Todo el resto -- objetos, mallas, materiales, animaciones, constraints,
 //  curvas, camaras, particulas, culling y visibilidad -- es EL MISMO codigo.
-//  La puerta de entrada del juego es W3dProyectoCargarEscena3D (mas abajo).
+//  La puerta de entrada del juego es W3dProjectLoadScene3D (mas abajo).
 // ============================================================================
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
 #include "ViewPorts/Editor2D.h"  // layouts con Editor2D/Timeline (proyectos de juego)
-#include "ViewPorts/LayoutInput.h" // LayoutPorDefecto: el fallback de un .w3d sin bloque Layout
+#include "ViewPorts/LayoutInput.h" // LayoutDefault: el fallback de un .w3d sin bloque Layout
 #include "ViewPorts/Timeline.h"
 #include "ViewPorts/UVEditor.h"  // BuildLayout: faltaban en el mapeo de lectura y un
 #include "ViewPorts/Console.h"   // layout guardado con UV/Console caia al default
 #include "ViewPorts/IDE.h"       // layouts con el editor de texto de scripts (IDE)
-#include "ViewPorts/LayoutArbol.h" // abrir un proyecto LIBERA el layout anterior (ViewportBorrarArbol)
+#include "ViewPorts/LayoutTree.h" // abrir un proyecto LIBERA el layout anterior (ViewportDeleteTree)
 #include "ViewPorts/Outliner.h"   // BuildLayout: la VISTA del outliner (escena / recursos) viaja con la hoja
-#include "io/RecursosProyecto.h"  // las carpetas del outliner por recursos (se leen del proyecto)
+#include "io/ProjectResources.h"  // las carpetas del outliner por recursos (se leen del proyecto)
 #endif
-#include "w3dlog.h"              // avisos de layout tambien al log (los ve la Console)
-#include "W3dLang.h"             // T(): el texto de la barra de progreso en el idioma del editor
-#include "objects/UI.h"          // la UI del proyecto (rama UI { archivo: ... })
-#include "objects/Empty.h"       // el nodo generico ("tipo": "objeto") vuelve como Empty
-#include "objects/Instance.h"    // Instance ("tipo": "Instance"): usado antes del include de mas abajo
-#include "objects/LOD.h"         // objeto LOD (un hijo por distancia a la camara)
-#include "objects/Culling.h"     // objeto Culling (frustum culling de sus hijos)
-#include "objects/Rutina.h"      // objeto Rutina (lista de pasos del render)
-#include "objects/Niebla.h"      // objeto Niebla (glFog en el arbol)
-#include "objects/Sonido.h"      // objeto Sonido (audio puesto en la escena)
-#include "objects/Recorte.h"     // LimpiarZ / Recorte (composicion de la pantalla en el arbol)
-#include "objects/Hitbox.h"      // HITBOX: caja de deteccion con eventos lua
-#include "objects/SondaLuz.h"   // la sonda de luz
-#include "objects/SondaReflejo.h"   // la sonda de reflejo
-#include "objects/InstanciaPrefab.h" // INSTANCIA DE PREFAB ("tipo":"prefab"): sus hijos se generan (io/Prefabs.h)
-#include "io/Prefabs.h"          // la definicion de cada prefab y la generacion de sus instancias
-#include "objects/ProxyW3d.h"    // PROXY W3D ("tipo":"proxy"): un prefab o una escena de una LIBRERIA externa
-#include "io/Librerias.h"        // las LIBRERIAS externas: su contexto de carga (rutas "lib:" y nombres con prefijo)
-#include "objects/Particulas.h"  // objeto Particulas (emisor de billboards del Core)
-#include "objects/VisZona.h"     // objeto VisZona (celda de visibilidad: grilla/volumenes/curva)
-#include "io/UI2DFormato.h"
-#include "W3dEscena.h"           // escenaInicial / modoEscenas (multi-escena)
-#include "W3dRaices.h"           // las ESCENAS 3D y los PREFABS del proyecto (registro + carga perezosa)
-#include "audio/W3dVolumen.h"    // VolumenAplicarProyecto (volumen inicial por-proyecto del .w3d)
-#include "W3dPaletas.h"          // paletas del PROYECTO (raiz "paletas" del .w3d v3)
-#include "io/GuardarW3D.h"       // g_proyIcono: el icono del juego (ruta externa)
-#include "io/W3dContenedor.h"    // FORMATO v4: el .w3d es un zip que se MONTA (no se extrae)
-#include "io/W3dZip.h"           // W3dZipEs: detectar el zip sin levantar el archivo entero
-#include "io/W3dMalla.h"         // .w3dm: la geometria propia (reemplaza al GLB como formato de guardado)
-#include "io/W3dMallaBin.h"      // .w3db: la misma geometria en BINARIO, lista para memoria (sin derivar al abrir)
-#include "objects/MallaRecurso.h" // las mallas 3D como RECURSO: registro "mallas" + "malla": <nombre> del objeto
+#include "w3dlog.h"                // avisos de layout tambien al log (los ve la Console)
+#include "W3dLang.h"               // T(): el texto de la barra de progreso en el idioma del editor
+#include "objects/UI.h"            // la UI del proyecto (rama UI { archivo: ... })
+#include "objects/Empty.h"         // el nodo generico ("tipo": "objeto") vuelve como Empty
+#include "objects/Instance.h"      // Instance ("tipo": "Instance"): usado antes del include de mas abajo
+#include "objects/LOD.h"           // objeto LOD (un hijo por distancia a la camara)
+#include "objects/Culling.h"       // objeto Culling (frustum culling de sus hijos)
+#include "objects/Routine.h"       // objeto Rutina (lista de pasos del render)
+#include "objects/Fog.h"           // objeto Niebla (glFog en el arbol)
+#include "objects/Sound.h"         // objeto Sonido (audio puesto en la escena)
+#include "objects/ClipRegion.h"    // ClearZ / Recorte (composicion de la pantalla en el arbol)
+#include "objects/Hitbox.h"        // HITBOX: caja de deteccion con eventos lua
+#include "objects/LightProbe.h"   // la sonda de luz
+#include "objects/ReflectionProbe.h"   // la sonda de reflejo
+#include "objects/InstancePrefab.h" // INSTANCIA DE PREFAB ("tipo":"prefab"): sus hijos se generan (io/Prefabs.h)
+#include "io/Prefabs.h"         // la definicion de cada prefab y la generacion de sus instancias
+#include "objects/ProxyW3d.h"   // PROXY W3D ("tipo":"proxy"): un prefab o una escena de una LIBRERIA externa
+#include "io/Libraries.h"       // las LIBRERIAS externas: su contexto de carga (rutas "lib:" y nombres con prefijo)
+#include "objects/Particles.h"  // objeto Particulas (emisor de billboards del Core)
+#include "objects/VisZone.h"    // objeto VisZone (celda de visibilidad: grilla/volumenes/curva)
+#include "io/UI2DFormat.h"
+#include "W3dScene.h"           // escenaInicial / modoEscenas (multi-escena)
+#include "W3dRoots.h"           // las ESCENAS 3D y los PREFABS del proyecto (registro + carga perezosa)
+#include "audio/W3dVolume.h"    // VolumeApplyProject (volumen inicial por-proyecto del .w3d)
+#include "W3dPalettes.h"        // paletas del PROYECTO (raiz "paletas" del .w3d v3)
+#include "io/SaveW3D.h"         // g_projIcon: el icono del juego (ruta externa)
+#include "io/W3dContainer.h"    // FORMATO v4: el .w3d es un zip que se MONTA (no se extrae)
+#include "io/W3dZip.h"          // W3dZipIs: detectar el zip sin levantar el archivo entero
+#include "io/W3dMesh.h"         // .w3dm: la geometria propia (reemplaza al GLB como formato de guardado)
+#include "io/W3dMeshBin.h"      // .w3db: la misma geometria en BINARIO, lista para memoria (sin derivar al abrir)
+#include "objects/MeshResource.h" // las mallas 3D como RECURSO: registro "mallas" + "malla": <nombre> del objeto
 #include "io/Streaming.h"            // las instancias DIFERIDAS ("carga": "distancia") no se generan al abrir el juego
-#include "io/W3dNodos.h"         // .w3dnodos: oclusion por nodos de riel (estilo SLST de PS1)
+#include "io/W3dNodes.h"         // .w3dnodos: oclusion por nodos de riel (estilo SLST de PS1)
 #include "objects/Materials.h"   // bloque raiz "materiales" (antes viajaban dentro del GLB)
 #include "graphics/w3dGraphics.h"     // gfx::Mezcla: acotar el modo de mezcla que venga del archivo
-#include "graphics/w3dTexture.h"      // Texturas16Siempre: el formato de las texturas del proyecto
+#include "graphics/w3dTexture.h"      // Textures16Always: el formato de las texturas del proyecto
 #include "objects/Textures.h"
-#include "importers/import_obj.h" // EncolarTextura: la carga de texturas es DIFERIDA (1 por frame)
+#include "importers/import_obj.h" // EnqueueTexture: la carga de texturas es DIFERIDA (1 por frame)
 #include "w3dFilesystem.h"
-#include "W3dAviso.h"            // W3dAvisof: los problemas de carga TIENEN que verse en PANTALLA
-#include "W3dNombres.h"          // W3dNombreUnico: el nombre del constraint migrado, en el espacio del objeto
+#include "W3dNotice.h"          // W3dAvisof: los problemas de carga TIENEN que verse en PANTALLA
+#include "W3dNames.h"           // W3dUniqueName: el nombre del constraint migrado, en el espacio del objeto
 
 // MEDICION de la apertura por fase (ver import_w3d.h). Sin reloj (lo normal) no se mide.
-W3dCargaFases g_w3dCargaFases;
-double (*g_w3dCargaReloj)() = NULL;
+W3dLoadPhases g_w3dLoadPhases;
+double (*g_w3dLoadClock)() = NULL;
 // formato de las mallas al guardar (ver import_w3d.h): el del proyecto + el forzado del harness
-int g_w3dFormatoMallasProyecto = W3D_MALLAS_BINARIO;
-int g_w3dFormatoMallasForzado  = -1;
+int g_w3dFormatMeshesProject = W3D_MESHES_BINARY;
+int g_w3dFormatForcedMeshes  = -1;
 // las mallas .w3db se leen COMO EL JUEGO (solo render; ver import_w3d.h). El juego, siempre.
-#ifndef W3D_SIN_EDITOR
-bool g_w3dMallasComoJuego = false;
+#ifndef W3D_NO_EDITOR
+bool g_w3dMeshesAsGame = false;
 #endif
 // LA PILA DE EFECTOS de un postprocesado (el objeto, o el bloque viejo de los proyectos de antes)
 struct JVal;
-static void W3dPostLeer(JVal* j, W3dPostOpciones& o);
+static void W3dPostRead(JVal* j, W3dPostOptions& o);
 
-static bool MallasComoJuego() {
-#ifdef W3D_SIN_EDITOR
+static bool MeshesAsGame() {
+#ifdef W3D_NO_EDITOR
     return true;
 #else
-    return g_w3dMallasComoJuego;
+    return g_w3dMeshesAsGame;
 #endif
 }
 // ms del reloj de medicion, o 0 si nadie esta midiendo
-static double CargaAhora() { return g_w3dCargaReloj ? g_w3dCargaReloj() : 0.0; }
-// DE DONDE SALIO CADA MALLA en la ULTIMA apertura: AbrirW3D los pone en 0 y los escribe en la
+static double LoadNow() { return g_w3dLoadClock ? g_w3dLoadClock() : 0.0; }
+// DE DONDE SALIO CADA MALLA en la ULTIMA apertura: OpenW3D los pone en 0 y los escribe en la
 // linea "[CARGA]" del log. Se cuentan SIEMPRE, con o sin reloj de medicion: en el telefono no hay
 // harness y el log (e:\whisk3d.log) es la forma de ver que las .w3db abrieron LISTAS, sin derivar.
-static int s_mallasBinarias = 0, s_mallasDerivadas = 0, s_mallasBinRechazadas = 0;
+static int s_binaryMeshes = 0, s_derivedMeshes = 0, s_meshesRejectedBin = 0;
 
 //ESTO DESPUES TIENE QUE IR A UN ARCHIVO SEPARADOOOOO
 #ifndef W3D_SYMBIAN  // icono de la ventana via SDL: solo desktop (en Symbian no hay ventana SDL)
@@ -117,12 +117,12 @@ SDL_Surface* LoadSurfaceSTB(const std::string& path) {
     int width, height, channels;
 
     // por ReadFileBytes y NO por stbi_load(path): asi el icono del proyecto sale
-    // igual de ADENTRO del contenedor .w3d ("proyecto/icono.png") que de un
+    // igual de ADENTRO del contenedor .w3d ("project/icono.png") que de un
     // archivo suelto. stbi_load abre con fopen y no ve el montaje.
-    std::vector<unsigned char> datos;
-    if (!w3dFileSystem::ReadFileBytes(path, datos) || datos.empty())
+    std::vector<unsigned char> data;
+    if (!w3dFileSystem::ReadFileBytes(path, data) || data.empty())
         return NULL;
-    stbi_uc* pixels = stbi_load_from_memory(&datos[0], (int)datos.size(),
+    stbi_uc* pixels = stbi_load_from_memory(&data[0], (int)data.size(),
                                             &width, &height, &channels, 4);
 
     if (!pixels)
@@ -285,7 +285,7 @@ Node* ParseNode(std::vector<std::string>& tk, size_t& i){
 // EL LAYOUT DE VIEWPORTS es del EDITOR: un juego compilado no tiene outliner,
 // timeline ni editor de UVs. Con -DW3D_SIN_EDITOR ni se compila (asi el juego no
 // arrastra la mitad del editor por el link).
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
 void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>& p){
     if(!v) return;
 
@@ -307,7 +307,7 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("ViewFromCameraActive"))   v->ViewFromCameraActive = B("ViewFromCameraActive");
     if(p.count("showOverlays"))           v->showOverlays = B("showOverlays");
     // overlay de STATS (fps/gl/faces/...) PER-VIEWPORT: se leen para que un .w3d pueda abrir con el overlay YA
-    // prendido (ej un juego que quiere ver los fps). Independientes de showOverlays (RenderEstadisticas no gatea).
+    // prendido (ej un juego que quiere ver los fps). Independientes de showOverlays (RenderStats no gatea).
     if(p.count("OverlayFps"))             v->OverlayFps = B("OverlayFps");
     if(p.count("OverlayStatVertices"))    v->OverlayStatVertices = B("OverlayStatVertices");
     if(p.count("OverlayStatFaces"))       v->OverlayStatFaces = B("OverlayStatFaces");
@@ -320,10 +320,10 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("showLights"))             v->showLights = B("showLights");
     if(p.count("showCamera"))             v->showCamera = B("showCamera");
     if(p.count("showEmpty"))              v->showEmpty = B("showEmpty");
-    if(p.count("showParticulas"))         v->showParticulas = B("showParticulas");
-    if(p.count("showCurvas"))             v->showCurvas = B("showCurvas");
+    if(p.count("showParticles"))         v->showParticles = B("showParticles");
+    if(p.count("showCurves"))             v->showCurves = B("showCurves");
     if(p.count("showHitbox"))             v->showHitbox = B("showHitbox");
-    if(p.count("showSonidos"))            v->showSonidos = B("showSonidos");
+    if(p.count("showSounds"))            v->showSounds = B("showSounds");
     // ("ShowUi" se dio de baja: los .w3d viejos que la traigan caen aca como cualquier
     //  clave desconocida -se ignora- y el chrome del viewport se dibuja SIEMPRE)
     if(p.count("showFloor"))              v->showFloor = B("showFloor");
@@ -332,8 +332,8 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("CameraToView"))           v->CameraToView = B("CameraToView");
     if(p.count("showOrigins"))            v->showOrigins = B("showOrigins");
     if(p.count("show3DCursor"))           v->show3DCursor = B("show3DCursor");
-    if(p.count("ShowRelantionshipsLines"))v->ShowRelantionshipsLines = B("ShowRelantionshipsLines");
-    if(p.count("limpiarPantalla"))        v->limpiarPantalla = B("limpiarPantalla");
+    if(p.count("ShowRelationshipsLines"))v->ShowRelationshipsLines = B("ShowRelationshipsLines");
+    if(p.count("clearScreen"))        v->clearScreen = B("clearScreen");
 
     /// --- floats/doubles ---
     if(p.count("nearClip"))       v->nearClip       = F("nearClip", 0.01f);
@@ -374,22 +374,22 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
 }
 
 // MODO + VISTA del timeline guardados en su hoja del layout (ver el comentario grande de
-// LayoutEscribirNodo en GuardarW3D.cpp: por que van con la hoja y no en "sesion" ni en el config).
+// LayoutWriteNode en SaveW3D.cpp: por que van con la hoja y no en "sesion" ni en el config).
 // Sin las props (layout viejo, o escrito a mano) queda el default del constructor: dope sheet con
 // el encuadre de siempre -- por eso el default de cada GetFloatOrDefault es el valor VIVO del
 // timeline recien construido y no una constante repetida aca.
 // Cualquier palabra que no sea "curvas" cae a dope: un layout raro no puede dejar el timeline en
-// un modo invalido. Y los cuatro numeros de la vista pasan SIEMPRE por Timeline::VistaAplicar, que
+// un modo invalido. Y los cuatro numeros de la vista pasan SIEMPRE por Timeline::ViewApply, que
 // es la que valida (nan/inf/zoom<=0/desplazamientos absurdos) y acota con los topes de la rueda:
 // un .w3d es editable a mano y no puede colgar el editor ni dejar el timeline invisible.
 void ApplyTimelineProps(Timeline* t, const std::map<std::string,std::string>& p){
     if(!t) return;
-    if(p.count("modo"))
-        t->modo = (w3dMapAt(p, "modo") == "curvas") ? Timeline::TL_MODO_CURVAS : Timeline::TL_MODO_DOPE;
-    t->VistaAplicar(GetFloatOrDefault(p, "zoomFrame",   t->pxPerFrame),
-                    GetFloatOrDefault(p, "frameIzq",    t->viewStartF),
-                    GetFloatOrDefault(p, "zoomValor",   t->pxPerUnit),
-                    GetFloatOrDefault(p, "centroValor", t->viewCenterV));
+    if(p.count("mode"))
+        t->mode = (w3dMapAt(p, "mode") == "curves") ? Timeline::TL_MODE_CURVES : Timeline::TL_MODE_DOPE;
+    t->ViewApply(GetFloatOrDefault(p, "zoomFrame",   t->pxPerFrame),
+                    GetFloatOrDefault(p, "frameLeft",    t->viewStartF),
+                    GetFloatOrDefault(p, "zoomValue",   t->pxPerUnit),
+                    GetFloatOrDefault(p, "centerValue", t->viewCenterV));
 }
 
 // ----------------------------- Builders -----------------------------
@@ -408,25 +408,25 @@ ViewportBase* BuildLayout(Node* n){
         // (un .w3d de una version mas nueva, o una libreria que ya no esta vinculada) cae a la escena.
         // (un outliner que se guardo mirando los recursos -la fase anterior, con el selector Escena / Biblioteca- abre
         // como el viewport BIBLIOTECA: el outliner ya no la muestra)
-        const bool aRecursos = n->props.count("vista") && w3dMapAt(n->props, "vista") != "escena";
-        Outliner* o = aRecursos ? (Outliner*)new Biblioteca() : new Outliner();
-        if (aRecursos) o->CambiarCuadricula(false);   // (lo que tenia: la lista, salvo "cuadricula: 1")
-        if (n->props.count("vista")) o->VistaDeClave(w3dMapAt(n->props, "vista"));
-        if (n->props.count("filtro")) {
-            const int f = W3dVistaDeClave(w3dMapAt(n->props, "filtro"));
-            if (f > W3D_VISTA_ESCENA) o->CambiarFiltro(f);
+        const bool aResources = n->props.count("view") && w3dMapAt(n->props, "view") != "scene";
+        Outliner* o = aResources ? (Outliner*)new Library() : new Outliner();
+        if (aResources) o->ChangeGrid(false);   // (lo que tenia: la lista, salvo "cuadricula: 1")
+        if (n->props.count("view")) o->ViewByKey(w3dMapAt(n->props, "view"));
+        if (n->props.count("filter")) {
+            const int f = W3dViewByKey(w3dMapAt(n->props, "filter"));
+            if (f > W3D_VIEW_SCENE) o->ChangeFilter(f);
         }
-        if (n->props.count("cuadricula")) o->CambiarCuadricula(w3dMapAt(n->props, "cuadricula") == "1");
+        if (n->props.count("grid")) o->ChangeGrid(w3dMapAt(n->props, "grid") == "1");
         return o;
     }
     if(n->type == "Library"){
-        Biblioteca* b = new Biblioteca();
-        if (n->props.count("vista")) b->VistaDeClave(w3dMapAt(n->props, "vista"));
-        if (n->props.count("filtro")) {
-            const int f = W3dVistaDeClave(w3dMapAt(n->props, "filtro"));
-            if (f > W3D_VISTA_ESCENA) b->CambiarFiltro(f);
+        Library* b = new Library();
+        if (n->props.count("view")) b->ViewByKey(w3dMapAt(n->props, "view"));
+        if (n->props.count("filter")) {
+            const int f = W3dViewByKey(w3dMapAt(n->props, "filter"));
+            if (f > W3D_VIEW_SCENE) b->ChangeFilter(f);
         }
-        if (n->props.count("cuadricula")) b->CambiarCuadricula(w3dMapAt(n->props, "cuadricula") == "1");
+        if (n->props.count("grid")) b->ChangeGrid(w3dMapAt(n->props, "grid") == "1");
         return b;
     }
     if(n->type == "Properties")  return new Properties();
@@ -511,7 +511,7 @@ ViewportBase* BuildLayout(Node* n){
     w3dLogfW("[W3D] layout: viewport desconocido '%s', va un Viewport3D en su lugar", n->type.c_str());
     return new Viewport3D();
 }
-#endif // W3D_SIN_EDITOR (layout de viewports)
+#endif // W3D_NO_EDITOR (layout de viewports)
 
 // liberar un arbol de nodos parseados (el texto viejo y los snippets de layout)
 static void FreeNode(Node* n) {
@@ -527,14 +527,14 @@ static void FreeNode(Node* n) {
 // ===========================================================================
 
 // carpeta del .w3d abierto (rutas relativas del proyecto)
-static std::string DirDelProyecto() {
+static std::string DirOfProject() {
     size_t s = w3dPath.find_last_of("/\\");
     return (s == std::string::npos) ? std::string(".") : w3dPath.substr(0, s);
 }
 
 // el FPS del proyecto (timeline/animaciones). f < 1 = campo ausente o roto:
 // queda el default del editor (no se rompe nada por un numero invalido).
-static void AplicarFps(int f) {
+static void ApplyFps(int f) {
     if (f < 1) return;
     if (f > 120) f = 120;
     AnimFPS = f;
@@ -544,7 +544,7 @@ static void AplicarFps(int f) {
 // animacion): cuantos frames/seg dibuja el motor. Lo lee el loop de escritorio (main.cpp) para pacear;
 // en Symbian el vblank ya topa a <=60 y nadie lo lee (solo se clampea). Default 60.
 int g_fpsCap = 60;
-static void AplicarFpsCap(int f) {
+static void ApplyFpsCap(int f) {
     if (f < 1) return;   // ausente/roto: queda el default (reseteado a 60 al cargar cada proyecto)
 #if defined(W3D_SYMBIAN)
     if (f > 60) f = 60;  // Symbian: nunca supera 60 (el N95 no llega igual)
@@ -557,52 +557,52 @@ static void AplicarFpsCap(int f) {
 
 // el "fullscreen" del archivo NO cambia la ventana al abrir (
 // un proyecto no tiene que arrancar a pantalla completa). Solo actualiza cfg
-// para que GuardarW3D lo re-escriba con el proyecto (y lo lea el juego final).
-#ifndef W3D_SIN_EDITOR
-static void AplicarFullscreen(bool v) { cfg.fullscreen = v; }
+// para que SaveW3D lo re-escriba con el proyecto (y lo lea el juego final).
+#ifndef W3D_NO_EDITOR
+static void ApplyFullscreen(bool v) { cfg.fullscreen = v; }
 #else
 // en el juego compilado el modo de ventana ya lo decidio "Compilar juego" (lo
 // hornea el main.cpp generado): el campo del archivo no lo puede cambiar.
-static void AplicarFullscreen(bool) {}
+static void ApplyFullscreen(bool) {}
 #endif
 
 // estado de REPRODUCCION guardado en el .w3d v3 (campo raiz "reproduciendo"):
 // -1 = ausente (archivos viejos) -> auto-play de siempre si hay scripts;
 //  0 = guardado en PAUSA -> abre en pausa; 1 = guardado en PLAY -> abre en play.
-// Lo consume el pie comun de AbrirW3D; se resetea a -1 en cada apertura.
-static int g_proyReproduciendo = -1;
+// Lo consume el pie comun de OpenW3D; se resetea a -1 en cada apertura.
+static int g_projPlaying = -1;
 
 // ---------------------------------------------------------------------------
 //  BLOQUE "sesion" (v3, opcional): donde estaba trabajando el usuario en ESTE
 //  proyecto -- el frame actual y la seleccion. Ver el comentario grande de
-//  EscribirSesion (GuardarW3D.cpp) para el reparto .w3d / config.ini.
+//  WriteSession (SaveW3D.cpp) para el reparto .w3d / config.start.
 //
 //  Se GUARDA en estos globales durante el parseo y se APLICA en el pie de
-//  AbrirW3D, no aca: la seleccion es por NOMBRE y los nombres recien quedan
-//  definitivos despues de W3dNombresRepararEscena (un .w3d puede traer
+//  OpenW3D, no aca: la seleccion es por NOMBRE y los nombres recien quedan
+//  definitivos despues de W3dNamesRepairScene (un .w3d puede traer
 //  duplicados y el reparador renombra). Un .w3d viejo no trae el bloque:
-//  g_sesFrame queda en -1 y no se toca nada (retrocompat).
+//  g_sessionFrame queda en -1 y no se toca nada (retrocompat).
 // ---------------------------------------------------------------------------
-static int g_sesFrame = -1;                     // -1 = el archivo no trae "sesion"
-static std::string g_sesActivo;                 // nombre del objeto ACTIVO ("" = ninguno)
-static std::vector<std::string> g_sesSeleccion; // nombres de los objetos seleccionados
+static int g_sessionFrame = -1;                     // -1 = el archivo no trae "sesion"
+static std::string g_activeSession;                 // nombre del objeto ACTIVO ("" = ninguno)
+static std::vector<std::string> g_sessionSelection; // nombres de los objetos seleccionados
 // la RAIZ que se estaba editando (una escena 3D que no es la del bloque, o un prefab: ver
-// W3dRaices.h). "" = la del bloque. La seleccion de arriba es de ESA raiz.
-static std::string g_sesRaiz;
-static int g_sesRaizTipo = W3D_RAIZ_ESCENA;
+// W3dRoots.h). "" = la del bloque. La seleccion de arriba es de ESA raiz.
+static std::string g_sessionRoot;
+static int g_sessionRootType = W3D_ROOT_SCENE;
 // QUE MIRABA LA LINEA DE TIEMPO si no era una animacion de escena ("animTipo": armature / objeto / armature2d /
 // flipbook; 0 = la de escena, que ya repone "animaciones"."activa"), de QUIEN (por nombre) y, en una malla, que clip
-static int g_sesAnimTipo = 0;
-static std::string g_sesAnimObjeto;
-static int g_sesAnimClip = -1;
+static int g_sessionAnimType = 0;
+static std::string g_sessionAnimObject;
+static int g_sessionAnimClip = -1;
 
-static void SesionReset() {
-    g_sesFrame = -1; g_sesActivo.clear(); g_sesSeleccion.clear();
-    g_sesRaiz.clear(); g_sesRaizTipo = W3D_RAIZ_ESCENA;
-    g_sesAnimTipo = 0; g_sesAnimObjeto.clear(); g_sesAnimClip = -1;
+static void SessionReset() {
+    g_sessionFrame = -1; g_activeSession.clear(); g_sessionSelection.clear();
+    g_sessionRoot.clear(); g_sessionRootType = W3D_ROOT_SCENE;
+    g_sessionAnimType = 0; g_sessionAnimObject.clear(); g_sessionAnimClip = -1;
 }
 
-// APLICA lo leido. Se llama en el pie de AbrirW3D, con los nombres ya definitivos.
+// APLICA lo leido. Se llama en el pie de OpenW3D, con los nombres ya definitivos.
 //  - frame: se ACOTA (viene de un archivo editable a mano; un frame negativo o
 //    absurdo dejaria el playhead fuera de la regla y toda evaluacion de curvas
 //    trabajando con un numero que no existe).
@@ -611,76 +611,76 @@ static void SesionReset() {
 //    para no abrir el proyecto. Se resuelve con FindObjectByName, que es el mismo
 //    lookup que usan los targets y los scripts -> con homonimos entre escenas cae
 //    en el PRIMERO, exactamente igual que ellos.
-//  - activo: si el nombre no resuelve, ObjActivo queda como lo dejo la seleccion
+//  - activo: si el nombre no resuelve, ActiveObj queda como lo dejo la seleccion
 //    (Object::Seleccionar ya lo va poniendo) y si no habia nada, en NULL.
-static void SesionAplicar() {
-    if (g_sesFrame < 0) return;                      // el archivo no traia el bloque
-    const int kFrameMax = 1000000;                   // la misma cota que el resto de los frames del lector
-    int f = g_sesFrame;
+static void SessionApply() {
+    if (g_sessionFrame < 0) return;                   // el archivo no traia el bloque
+    const int kFrameMax = 1000000;                    // la misma cota que el resto de los frames del lector
+    int f = g_sessionFrame;
     if (f > kFrameMax) {
         w3dLogfW("[W3D] sesion: 'frame' vale %d, fuera de [0..%d] -> se acota", f, kFrameMax);
         f = kFrameMax;
     }
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
     // la ANIMACION de la linea de tiempo va ANTES del frame: elegirla carga SU rango y acota el frame a el
     extern bool g_animMix;
-    if (g_sesAnimTipo != 0 && !g_animMix) {
-        extern bool AnimSelRestaurar(int tipo, Object* o, const std::string& nombre, int clip);
-        Object* o = (!g_sesAnimObjeto.empty() && SceneCollection) ? FindObjectByName(SceneCollection, g_sesAnimObjeto) : NULL;
-        if (!AnimSelRestaurar(g_sesAnimTipo, o, g_sesAnimObjeto, g_sesAnimClip))
-            w3dLogfW("[W3D] sesion: la animacion de '%s' ya no esta -> queda la de escena", g_sesAnimObjeto.c_str());
+    if (g_sessionAnimType != 0 && !g_animMix) {
+        extern bool AnimSelRestore(int type, Object* o, const std::string& name, int clip);
+        Object* o = (!g_sessionAnimObject.empty() && SceneCollection) ? FindObjectByName(SceneCollection, g_sessionAnimObject) : NULL;
+        if (!AnimSelRestore(g_sessionAnimType, o, g_sessionAnimObject, g_sessionAnimClip))
+            w3dLogfW("[W3D] sesion: la animacion de '%s' ya no esta -> queda la de escena", g_sessionAnimObject.c_str());
     }
 #endif
     CurrentFrame = f;
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
     // la pose de ESE cuadro ya (como al arrastrar el cabezal): un clip de un juego deja a sus objetos en el estado base
-    if (g_sesAnimTipo != 0) { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
+    if (g_sessionAnimType != 0) { extern void ApplyAnimationObjects(); ApplyAnimationObjects(); }
 #endif
-    DeseleccionarTodo();
-    ObjActivo = NULL;
-    int perdidos = 0;
-    for (size_t i = 0; i < g_sesSeleccion.size(); i++) {
-        Object* o = SceneCollection ? FindObjectByName(SceneCollection, g_sesSeleccion[i]) : NULL;
-        if (o) o->Seleccionar();
-        else   perdidos++;
+    DeselectAll();
+    ActiveObj = NULL;
+    int lost = 0;
+    for (size_t i = 0; i < g_sessionSelection.size(); i++) {
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, g_sessionSelection[i]) : NULL;
+        if (o) o->Select();
+        else   lost++;
     }
-    ObjActivo = (!g_sesActivo.empty() && SceneCollection) ? FindObjectByName(SceneCollection, g_sesActivo) : NULL;
-    if (perdidos)
-        w3dLogfW("[W3D] sesion: %d objeto(s) de la seleccion guardada ya no existen -> se ignoran", perdidos);
+    ActiveObj = (!g_activeSession.empty() && SceneCollection) ? FindObjectByName(SceneCollection, g_activeSession) : NULL;
+    if (lost)
+        w3dLogfW("[W3D] sesion: %d objeto(s) de la seleccion guardada ya no existen -> se ignoran", lost);
     w3dLogf("[W3D] sesion: frame %d, %d objeto(s) seleccionados, activo '%s'",
-            CurrentFrame, (int)ObjSelects.size(), ObjActivo ? ObjActivo->name.c_str() : "");
+            CurrentFrame, (int)ObjSelects.size(), ActiveObj ? ActiveObj->name.c_str() : "");
     g_redraw = true;
 }
 
 // MULTI-ESCENA: la escena que ARRANCA + el modo. Sin esto, con varias UI el
 // motor no sabia cual es la inicial (arrancaba la primera por orden).
-static void AplicarEscenaInicial(const std::string& n) { W3dEscenaSetInicial(n); }
-static void AplicarModoEscenas(bool v) { W3dEscenaSetModo(v); }
+static void ApplyInitialScene(const std::string& n) { W3dSceneSetInitial(n); }
+static void ApplySceneMode(bool v) { W3dSceneSetMode(v); }
 
 // ICONO del juego: ruta relativa a la carpeta del .w3d (externa SIEMPRE).
-// Queda como icono del PROYECTO (g_proyIcono: tarjeta Juego / Compilar juego)
+// Queda como icono del PROYECTO (g_projIcon: tarjeta Juego / Compilar juego)
 // y como icono de la VENTANA. Vacio o ilegible -> el icono default de Whisk3D.
-// 'resuelta' ya paso por RutaJson: en v4 es la ENTRADA del contenedor
-// ("proyecto/icono.png"), en v3 la ruta de disco. g_proyIcono guarda ESO, que es
+// 'resuelta' ya paso por JsonPath: en v4 es la ENTRADA del contenedor
+// ("project/icono.png"), en v3 la ruta de disco. g_projIcon guarda ESO, que es
 // lo que sabe leer ReadFileBytes y lo que el guardado vuelve a meter adentro.
-static void AplicarIcono(const std::string& resuelta) {
-#if defined(W3D_SIN_EDITOR) || defined(W3D_SYMBIAN)
+static void ApplyIcon(const std::string& resolved) {
+#if defined(W3D_NO_EDITOR) || defined(W3D_SYMBIAN)
     // el juego compilado ya lleva SU icono (lo genera "Compilar juego" y lo pone
     // el main.cpp generado con SDL_SetWindowIcon): el del proyecto no aplica.
-    (void)resuelta;
+    (void)resolved;
 #else
-    const std::string& rel = resuelta;
-    g_proyIcono = rel;
-    std::string ruta;
+    const std::string& rel = resolved;
+    g_projIcon = rel;
+    std::string path;
     if (!rel.empty()) {
-        ruta = rel;
-        if (!w3dFileSystem::FileExists(ruta)) {
-            w3dLogfW("[W3D] icono no encontrado: %s (queda el default)", ruta.c_str());
-            ruta.clear();
+        path = rel;
+        if (!w3dFileSystem::FileExists(path)) {
+            w3dLogfW("[W3D] icono no encontrado: %s (queda el default)", path.c_str());
+            path.clear();
         }
     }
-    if (ruta.empty()) ruta = w3dFileSystem::GetResDir() + "/Whisk3D.png";
-    SDL_Surface* icon = LoadSurfaceSTB(ruta);
+    if (path.empty()) path = w3dFileSystem::GetResDir() + "/Whisk3D.png";
+    SDL_Surface* icon = LoadSurfaceSTB(path);
     if (icon) {
         SDL_SetWindowIcon(window, icon);
         SDL_FreeSurface(icon);
@@ -692,53 +692,53 @@ static void AplicarIcono(const std::string& resuelta) {
 // escena. Si el archivo falta o no parsea, la escena se OMITE con aviso y el
 // RESTO del proyecto abre igual (nunca se aborta todo por una UI rota).
 // 'refRel' es la ruta tal cual la referencia el .w3d: si es relativa se guarda
-// como UI::archivoW3dui CON su subcarpeta ("contenido/menu.w3dui") para que el
-// re-guardado escriba la escena EN EL MISMO lugar (UI2DCargar solo recuerda el
-// nombre pelado y una escena bajo contenido/ se re-guardaba en la raiz).
+// como UI::fileW3dui CON su subcarpeta ("content/menu.w3dui") para que el
+// re-guardado escriba la escena EN EL MISMO lugar (UI2DLoad solo recuerda el
+// nombre pelado y una escena bajo content/ se re-guardaba en la raiz).
 // ESCENAS UI QUE NO SE PUDIERON CARGAR EN ESTA APERTURA (vacio = ninguna). Tercer miembro de
-// la misma familia que W3dAjenos::noCargo (malla) y VertexAnimation::noCargo (vertex anim):
-// el nodo NO se crea, asi que el proximo guardado escribe un proyecto.json SIN esa escena y
+// la misma familia que W3dForeign::notLoaded (malla) y VertexAnimation::notLoaded (vertex anim):
+// el nodo NO se crea, asi que el proximo guardado escribe un project.json SIN esa escena y
 // el usuario la pierde de vista sin enterarse (los bytes del .w3dui sobreviven por
-// PreservarPasajeras, pero ya no los referencia nadie: son un huerfano invisible). Con esto
-// prendido el guardado se FRENA y el .w3d de origen no se toca. Lo limpia ReiniciarEscena.
-std::string g_w3dUINoCargo;
+// PreserveTransient, pero ya no los referencia nadie: son un huerfano invisible). Con esto
+// prendido el guardado se FRENA y el .w3d de origen no se toca. Lo limpia RestartScene.
+std::string g_w3dUINotLoaded;
 
-static UI* CargarUIProyecto(const std::string& ruta, const std::string& refRel = std::string()) {
-    if (ruta.empty()) {
+static UI* LoadUIProject(const std::string& path, const std::string& refRel = std::string()) {
+    if (path.empty()) {
         w3dLogfW("[W3D] nodo UI sin 'archivo': escena omitida");
         return NULL;
     }
-    if (!w3dFileSystem::FileExists(ruta)) {
-        w3dLogfE("[W3D] falta la escena UI %s: se omite (el resto del proyecto abre)", ruta.c_str());
-        if (g_w3dUINoCargo.empty()) g_w3dUINoCargo = ruta;
+    if (!w3dFileSystem::FileExists(path)) {
+        w3dLogfE("[W3D] falta la escena UI %s: se omite (el resto del proyecto abre)", path.c_str());
+        if (g_w3dUINotLoaded.empty()) g_w3dUINotLoaded = path;
         W3dAvisof(true, T("The UI scene '%s' is missing: the project opens without it and I will NOT save over it (see whisk3d.log)"),
-                  W3dNombreCorto(ruta).c_str());
+                  W3dShortName(path).c_str());
         return NULL;
     }
-    UI* u = UI2DCargar(ruta);
+    UI* u = UI2DLoad(path);
     if (!u) {
-        w3dLogfE("[W3D] la escena UI %s no parsea: se omite", ruta.c_str());
-        if (g_w3dUINoCargo.empty()) g_w3dUINoCargo = ruta;
+        w3dLogfE("[W3D] la escena UI %s no parsea: se omite", path.c_str());
+        if (g_w3dUINotLoaded.empty()) g_w3dUINotLoaded = path;
         W3dAvisof(true, T("The UI scene '%s' could not be read: the project opens without it and I will NOT save over it (see whisk3d.log)"),
-                  W3dNombreCorto(ruta).c_str());
+                  W3dShortName(path).c_str());
         return NULL;
     }
     if (!refRel.empty() && refRel[0] != '/' && !(refRel.size() > 1 && refRel[1] == ':'))
-        u->archivoW3dui = refRel;
+        u->fileW3dui = refRel;
     return u;
 }
 
 // el LAYOUT desde su forma de TEXTO "Layout { ... }" (el arbol VIVO serializado
-// por el guardado, ver LayoutSerializarVivo en GuardarW3D.cpp): se reconstruye
+// por el guardado, ver LayoutSerializeLive en SaveW3D.cpp): se reconstruye
 // con el pipeline probado del formato viejo (Tokenize + ParseNode + BuildLayout).
 // Un nombre corto ("2d", archivos guardados antes de que el layout vivo se
 // persistiera) o vacio cae al template estandar de siempre.
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
 // un arbol NUEVO de viewports desde el texto "Layout { ... }" (los layouts guardados del programa, el de cada orientacion
 // del telefono). No toca rootViewport: lo instala quien lo pide. NULL = el texto no arma nada
-ViewportBase* W3dLayoutDesdeTexto(const std::string& texto) {
-    if (texto.compare(0, 6, "Layout") != 0) return NULL;
-    std::vector<std::string> tokens = Tokenize(texto.c_str());
+ViewportBase* W3dLayoutFromText(const std::string& text) {
+    if (text.compare(0, 6, "Layout") != 0) return NULL;
+    std::vector<std::string> tokens = Tokenize(text.c_str());
     size_t i = 0;
     Node* layout = ParseNode(tokens, i);
     ViewportBase* r = (layout && !layout->children.empty()) ? BuildLayout(layout->children[0]) : NULL;
@@ -746,11 +746,11 @@ ViewportBase* W3dLayoutDesdeTexto(const std::string& texto) {
     return r;
 }
 #endif
-static void AplicarLayoutTexto(const std::string& cual) {
-#ifdef W3D_SIN_EDITOR
-    (void)cual;   // el juego compilado no tiene layout de viewports (ver W3D_SIN_EDITOR arriba)
+static void ApplyLayoutText(const std::string& which) {
+#ifdef W3D_NO_EDITOR
+    (void)which;   // el juego compilado no tiene layout de viewports (ver W3D_NO_EDITOR arriba)
 #else
-    const char* texto =
+    const char* text =
         "Layout {\n"
         "    ViewportRow {\n"
         "        ViewportColumn {\n"
@@ -766,9 +766,9 @@ static void AplicarLayoutTexto(const std::string& cual) {
         "        Split: 0.72\n"
         "    }\n"
         "}\n";
-    if (cual.compare(0, 6, "Layout") == 0)
-        texto = cual.c_str();   // layout VIVO guardado en el archivo
-    std::vector<std::string> tokens = Tokenize(texto);
+    if (which.compare(0, 6, "Layout") == 0)
+        text = which.c_str();   // layout VIVO guardado en el archivo
+    std::vector<std::string> tokens = Tokenize(text);
     size_t i = 0;
     Node* layout = ParseNode(tokens, i);
     if (layout && !layout->children.empty())
@@ -789,9 +789,9 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     // Nombre
     if(p.count("name")){
 		// CARGA: el nombre entra CRUDO (el archivo puede traer duplicados de versiones
-		// viejas). Los duplicados los repara de una sola vez W3dNombresRepararEscena al
-		// final de AbrirW3D, que ademas arrastra las refs de scripts y los targets.
-		obj->SetNameCrudo(w3dMapAt(p, "name"));
+		// viejas). Los duplicados los repara de una sola vez W3dNamesRepairScene al
+		// final de OpenW3D, que ademas arrastra las refs de scripts y los targets.
+		obj->SetRawName(w3dMapAt(p, "name"));
 	}
 
     // Posición
@@ -809,12 +809,12 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     }
 
     
-    if(p.count("desplegado")) obj->desplegado = B("desplegado");
+    if(p.count("expanded")) obj->expanded = B("expanded");
     // el "ojito" del outliner: el formato de texto no lo escribia nunca, pero un .w3d
     // a mano tiene que poder ocultar un objeto (mismo idioma que el JSON v4)
     if(p.count("visible")) obj->visible = B("visible");
-    if(p.count("estatico")) obj->estatico = B("estatico"); // GridCull: false = dinamico (se re-evalua su celda por frame)
-    if(p.count("showRelantionshipsLines")) obj->showRelantionshipsLines = B("showRelantionshipsLines");
+    if(p.count("static")) obj->isStatic = B("static"); // GridCull: false = dinamico (se re-evalua su celda por frame)
+    if(p.count("showRelationshipsLines")) obj->showRelationshipsLines = B("showRelationshipsLines");
 
     // Escala
     if(p.count("scale")){
@@ -853,7 +853,7 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
 //      lector devuelve NULL, BuildObjectRecursive hace 'return' temprano y se
 //      lleva puesto EL SUBARBOL ENTERO, en silencio (test 'consmigrasubarbol').
 //  Por eso el nodo viejo entra como Empty con su nombre y su transform, y recien
-//  al final MigrarConstraintsViejos reparte las propiedades y lo saca de la escena
+//  al final MigrateOldConstraints reparte las propiedades y lo saca de la escena
 //  si no tiene hijos.
 //
 //  LOS DEFAULTS DE CADA FORMATO NO SE UNIFICAN: el texto trae 'usePitch' con
@@ -861,27 +861,27 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
 //  formato historico de cada uno; unificarlo cambiaria como abren archivos que hoy
 //  se ven bien.
 // ===========================================================================
-struct PendConsViejo {
-    Object*     nodo;        // el Empty que ocupa el lugar del nodo viejo
+struct OldPendCons {
+    Object*     node;        // el Empty que ocupa el lugar del nodo viejo
     std::string target;      // a QUIEN modificaba: ahi es donde va a vivir el constraint
     bool        horizontal;  // useHorizontal / "horizontal"  -> Billboard bbYaw
     bool        pitch;       // usePitch      / "pitch"       -> Billboard bbPitch
     bool        copyX, copyY, copyZ;   // copyPos* -> Copy Location con fuente = la vista
 };
-static std::vector<PendConsViejo> gPendConsViejo;
+static std::vector<OldPendCons> gOldPendCons;
 
 // LA MISMA mecanica para los dos lectores, para que no diverjan: el Empty + la
 // entrada pendiente. El que llama le aplica despues el nombre y la transform por
-// el camino comun de su formato (ApplyCommonProps / JsonComunes).
-static Object* NodoConstraintViejo(Object* parent, const std::string& target,
+// el camino comun de su formato (ApplyCommonProps / CommonJson).
+static Object* NodeOldConstraint(Object* parent, const std::string& target,
                                    bool horizontal, bool pitch,
                                    bool copyX, bool copyY, bool copyZ) {
     Empty* e = new Empty(parent);
-    PendConsViejo p;
-    p.nodo = e;              p.target = target;
+    OldPendCons p;
+    p.node = e;              p.target = target;
     p.horizontal = horizontal; p.pitch = pitch;
     p.copyX = copyX; p.copyY = copyY; p.copyZ = copyZ;
-    gPendConsViejo.push_back(p);
+    gOldPendCons.push_back(p);
     return e;
 }
 
@@ -898,7 +898,7 @@ static Object* NodoConstraintViejo(Object* parent, const std::string& target,
 //  script, ref_/opt_/val_) pisa la homonima de la raiz del prefab, y los
 //  hijos propios del Clon se AGREGAN a los del prefab. Un Clon de caja pesa
 //  ~2 lineas contra el subarbol completo re-declarado. La geometria/anims ya
-//  se comparten por ruta (MallaDatos/AnimDatos), asi que N clones = N nodos
+//  se comparten por ruta (MeshData/AnimData), asi que N clones = N nodos
 //  livianos + 1 juego de datos.
 //
 //  La Biblioteca tiene que aparecer ANTES que sus Clones (el archivo se
@@ -906,72 +906,72 @@ static Object* NodoConstraintViejo(Object* parent, const std::string& target,
 //  nombre unico automatico (N clones homonimos romperian las refs).
 //
 //  El bind lua `instanciar("caja", x, y, z)` (Core) entra por el hook
-//  W3dInstanciarPrefabHook, que se instala al cargar una Biblioteca; los
+//  W3dInstantiatePrefabHook, que se instala al cargar una Biblioteca; los
 //  clones runtime cuelgan de la raiz de la escena. Coordenadas del MOTOR.
 //
 //  V4: el guardado materializa los clones como objetos completos (la fuente
 //  de verdad del dedup declarativo es el .w3d de texto que emite la build del
-//  proyecto). Los prefabs viven mientras vive el proyecto: ReiniciarEscena
+//  proyecto). Los prefabs viven mientras vive el proyecto: RestartScene
 //  los limpia.
 // ===========================================================================
-static void LeerScriptsDeProps(Object* obj, const std::map<std::string,std::string>& p); // definida abajo
+static void ReadPropScripts(Object* obj, const std::map<std::string,std::string>& p); // definida abajo
 
 static std::map<std::string, Node*> gPrefabs;   // nombre -> COPIA propia del nodo Prefab
 
-static Node* PrefabCopiarNodo(const Node* n) {
+static Node* PrefabCopyNode(const Node* n) {
     Node* c = new Node();
     c->type = n->type;
     c->props = n->props;
     for (size_t i = 0; i < n->children.size(); i++)
-        if (n->children[i]) c->children.push_back(PrefabCopiarNodo(n->children[i]));
+        if (n->children[i]) c->children.push_back(PrefabCopyNode(n->children[i]));
     return c;
 }
-static void PrefabBorrarNodo(Node* n) {
+static void PrefabDeleteNode(Node* n) {
     if (!n) return;
-    for (size_t i = 0; i < n->children.size(); i++) PrefabBorrarNodo(n->children[i]);
+    for (size_t i = 0; i < n->children.size(); i++) PrefabDeleteNode(n->children[i]);
     delete n;
 }
-void W3dPrefabsLimpiar() {
+void W3dPrefabsClear() {
     for (std::map<std::string, Node*>::iterator it = gPrefabs.begin(); it != gPrefabs.end(); ++it)
-        PrefabBorrarNodo(it->second);
+        PrefabDeleteNode(it->second);
     gPrefabs.clear();
 }
-int W3dPrefabsRegistrados() { return (int)gPrefabs.size(); }
+int W3dPrefabsRegistered() { return (int)gPrefabs.size(); }
 
 // instancia el prefab bajo 'parent': overrides = props del Clon (pisan la raiz),
-// hijosExtra = hijos propios del Clon (se agregan). NULL si no hay tal prefab.
-static Object* InstanciarPrefabNodo(const std::string& nombre,
+// childrenExtra = hijos propios del Clon (se agregan). NULL si no hay tal prefab.
+static Object* InstantiatePrefabNode(const std::string& name,
                                     const std::map<std::string,std::string>& overrides,
-                                    const std::vector<Node*>* hijosExtra,
+                                    const std::vector<Node*>* childrenExtra,
                                     Object* parent) {
-    std::map<std::string, Node*>::iterator it = gPrefabs.find(nombre);
+    std::map<std::string, Node*>::iterator it = gPrefabs.find(name);
     if (it == gPrefabs.end() || !it->second) {
-        std::cerr << "[Clon] no hay un Prefab '" << nombre << "' en la Biblioteca\n";
+        std::cerr << "[Clon] no hay un Prefab '" << name << "' en la Biblioteca\n";
         return NULL;
     }
-    Node* raiz = NULL;
-    for (size_t i = 0; i < it->second->children.size() && !raiz; i++)
-        raiz = it->second->children[i];
-    if (!raiz) {
-        std::cerr << "[Clon] el Prefab '" << nombre << "' esta vacio\n";
+    Node* root = NULL;
+    for (size_t i = 0; i < it->second->children.size() && !root; i++)
+        root = it->second->children[i];
+    if (!root) {
+        std::cerr << "[Clon] el Prefab '" << name << "' esta vacio\n";
         return NULL;
     }
     Node tmp;
-    tmp.type  = raiz->type;
-    tmp.props = raiz->props;
+    tmp.type  = root->type;
+    tmp.props = root->props;
     tmp.props.erase("name");   // sin override, nombre unico automatico
     for (std::map<std::string,std::string>::const_iterator kv = overrides.begin();
          kv != overrides.end(); ++kv)
         if (kv->first != "prefab") tmp.props[kv->first] = kv->second;
-    tmp.children = raiz->children;
-    if (hijosExtra)
-        for (size_t i = 0; i < hijosExtra->size(); i++)
-            if ((*hijosExtra)[i]) tmp.children.push_back((*hijosExtra)[i]);
+    tmp.children = root->children;
+    if (childrenExtra)
+        for (size_t i = 0; i < childrenExtra->size(); i++)
+            if ((*childrenExtra)[i]) tmp.children.push_back((*childrenExtra)[i]);
     // el MISMO camino que BuildObjectRecursive, pero devolviendo la raiz creada
     Object* obj = CreateObjectFromNode(&tmp, parent);
     if (!obj) return NULL;
     ApplyCommonProps(obj, tmp.props);
-    LeerScriptsDeProps(obj, tmp.props);
+    ReadPropScripts(obj, tmp.props);
     for (size_t i = 0; i < tmp.children.size(); i++)
         if (tmp.children[i]) BuildObjectRecursive(tmp.children[i], obj);
     return obj;
@@ -979,8 +979,8 @@ static Object* InstanciarPrefabNodo(const std::string& nombre,
 
 // el hook del bind lua instanciar() (Core). Coordenadas del MOTOR -> props del
 // formato de texto (la vertical del texto es z y la profundidad y).
-static Object* HookInstanciarPrefab(const char* nombre, const float* posMotor) {
-    if (!nombre || !*nombre) return NULL;
+static Object* HookInstantiatePrefab(const char* name, const float* posMotor) {
+    if (!name || !*name) return NULL;
     std::map<std::string,std::string> ov;
     if (posMotor) {
         char b[48];
@@ -988,7 +988,7 @@ static Object* HookInstanciarPrefab(const char* nombre, const float* posMotor) {
         snprintf(b, sizeof(b), "%g", posMotor[2]); ov["y"] = b;   // profundidad
         snprintf(b, sizeof(b), "%g", posMotor[1]); ov["z"] = b;   // vertical
     }
-    return InstanciarPrefabNodo(nombre, ov, NULL, SceneCollection);
+    return InstantiatePrefabNode(name, ov, NULL, SceneCollection);
 }
 
 Object* CreateObjectFromNode(Node* n, Object* parent){
@@ -997,23 +997,23 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     const std::map<std::string,std::string>& p = n->props;
 
     // --- Biblioteca de PREFABS: declara subarboles SIN instanciarlos ---
-    if (n->type == "Biblioteca") {
+    if (n->type == "Library") {
         for (size_t i = 0; i < n->children.size(); i++) {
             Node* c = n->children[i];
             if (!c || c->type != "Prefab") continue;
-            std::string nombre = c->props.count("name") ? Unquote(w3dMapAt(c->props, "name")) : std::string();
-            if (nombre.empty()) { std::cerr << "[Biblioteca] Prefab sin name (ignorado)\n"; continue; }
-            std::map<std::string, Node*>::iterator viejo = gPrefabs.find(nombre);
-            if (viejo != gPrefabs.end()) { PrefabBorrarNodo(viejo->second); gPrefabs.erase(viejo); }
-            gPrefabs[nombre] = PrefabCopiarNodo(c);
+            std::string name = c->props.count("name") ? Unquote(w3dMapAt(c->props, "name")) : std::string();
+            if (name.empty()) { std::cerr << "[Biblioteca] Prefab sin name (ignorado)\n"; continue; }
+            std::map<std::string, Node*>::iterator old = gPrefabs.find(name);
+            if (old != gPrefabs.end()) { PrefabDeleteNode(old->second); gPrefabs.erase(old); }
+            gPrefabs[name] = PrefabCopyNode(c);
         }
-        W3dInstanciarPrefabHook = HookInstanciarPrefab;   // habilita instanciar() en lua
+        W3dInstantiatePrefabHook = HookInstantiatePrefab;   // habilita instanciar() en lua
         return NULL;   // la Biblioteca no agrega objetos a la escena
     }
     // --- Clon: instancia un Prefab de la Biblioteca con overrides ---
-    if (n->type == "Clon") {
+    if (n->type == "Clone") {
         if (!n->props.count("prefab")) { std::cerr << "[Clon] falta prefab:\n"; return NULL; }
-        InstanciarPrefabNodo(Unquote(w3dMapAt(n->props, "prefab")), n->props, &n->children, parent);
+        InstantiatePrefabNode(Unquote(w3dMapAt(n->props, "prefab")), n->props, &n->children, parent);
         return NULL;   // todo construido adentro (props + scripts + hijos)
     }
 
@@ -1044,8 +1044,8 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             std::cerr << "[Wobj] Se importo mal el wobj!\n";
             return NULL;
         }
-        mesh->soloRutina = GetBoolOrDefault(n->props, "soloRutina", false);   // la dibuja una rutina (Mesh.h)
-        mesh->bloquearNormales = GetBoolOrDefault(n->props, "bloquearNormales", false);
+        mesh->onlyRoutine = GetBoolOrDefault(n->props, "routineOnly", false);   // la dibuja una rutina (Mesh.h)
+        mesh->lockNormals = GetBoolOrDefault(n->props, "lockNormals", false);
 
 
         for (size_t _ci=0; _ci<n->children.size(); _ci++) {
@@ -1059,13 +1059,13 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
                 int speed = GetIntOrDefault(ap, "speed", 1);
 
-                int proximaAnimacion = GetIntOrDefault(ap, "proximaAnimacion", -1);
+                int nextAnimation = GetIntOrDefault(ap, "nextAnimation", -1);
 
                 // tolerante como el resto del lector: un archivo viejo sin estos
                 // campos NO tira excepcion (at()/stoi lanzan y mataban el editor)
                 VertexAnimation* anim =
                     new VertexAnimation(NULL, ap.count("name") ? w3dMapAt(ap, "name") : std::string("anim"),
-                                        UseNormals, (float)speed, repeat, proximaAnimacion);
+                                        UseNormals, (float)speed, repeat, nextAnimation);
 
                 anim->basePath   = ap.count("basePath") ? GetFilePath(w3dMapAt(ap, "basePath")) : std::string();
                 anim->frameCount = GetIntOrDefault(ap, "frames", 0);
@@ -1078,15 +1078,15 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             // La textura es una TIRA de 'frames' celdas sobre 'eje'; el motor la recorre solo.
             // `ancho`/`alto` (default 1): fraccion de la textura que ocupa la tira -- con la
             // tira metida en el ATLAS UNICO el paso por celda es ancho/frames, no 1/frames.
-            if (child->type == "AnimacionUV") {
+            if (child->type == "AnimationUV") {
                 std::map<std::string,std::string>& up = child->props;
-                std::string eje = up.count("eje") ? Unquote(w3dMapAt(up, "eje")) : std::string("u");
-                mesh->SetUVAnimTira(GetIntOrDefault(up, "frames", 1),
+                std::string axis = up.count("axis") ? Unquote(w3dMapAt(up, "axis")) : std::string("u");
+                mesh->SetUVAnimStrip(GetIntOrDefault(up, "frames", 1),
                                     GetFloatOrDefault(up, "fps", 30.0f),
-                                    (eje == "v") ? 1 : 0,
-                                    GetIntOrDefault(up, "desfase", 0),
-                                    GetFloatOrDefault(up, "ancho", 1.0f),
-                                    GetFloatOrDefault(up, "alto", 1.0f));
+                                    (axis == "v") ? 1 : 0,
+                                    GetIntOrDefault(up, "offset", 0),
+                                    GetFloatOrDefault(up, "width", 1.0f),
+                                    GetFloatOrDefault(up, "height", 1.0f));
             }
             // MODIFICADOR "Culling" POR TRIANGULO (ver edit/Modifier.h). Dos metodos:
             //   CullingTri { metodo: "triangulos"  sector: 0  pvs: "extra/x.pvs.json" }
@@ -1100,33 +1100,33 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             // `sectorFallback:` (opcional) = que dibujar cuando la celda ACTIVA quedo
             // SIN triangulos: "completa" = la malla entera, N = la lista de la celda N;
             // ausente = nada (el comportamiento de siempre). Ver Modifier.h.
-            if (child->type == "CullingTri" || child->type == "Oclusion") {   // "Oclusion" = el buen nombre; CullingTri sigue por retrocompat
+            if (child->type == "CullingTri" || child->type == "Occlusion") {   // "Oclusion" = el buen nombre; CullingTri sigue por retrocompat
                 std::map<std::string,std::string>& cp = child->props;
-                extern void W3dModPVSAgregar(Mesh*, const std::string&, int, const std::string&, int,
+                extern void W3dModPVSAdd(Mesh*, const std::string&, int, const std::string&, int,
                                              const std::string&, bool); // edit/MeshEdit.cpp
-                std::string metodo = cp.count("metodo") ? Unquote(w3dMapAt(cp, "metodo")) : std::string("triangulos");
-                int sector = GetIntOrDefault(cp, "sector", GetIntOrDefault(cp, "celda", 0));
-                std::string archivo = cp.count("vis") ? Unquote(w3dMapAt(cp, "vis"))
+                std::string method = cp.count("method") ? Unquote(w3dMapAt(cp, "method")) : std::string("triangles");
+                int sector = GetIntOrDefault(cp, "sector", GetIntOrDefault(cp, "cell", 0));
+                std::string file = cp.count("vis") ? Unquote(w3dMapAt(cp, "vis"))
                                     : (cp.count("pvs") ? Unquote(w3dMapAt(cp, "pvs")) : std::string());
                 int fallback = 0;
                 if (cp.count("sectorFallback")) {
                     std::string fs = Unquote(w3dMapAt(cp, "sectorFallback"));
-                    fallback = (fs == "completa") ? -1 : GetIntOrDefault(cp, "sectorFallback", 0);
+                    fallback = (fs == "complete") ? -1 : GetIntOrDefault(cp, "sectorFallback", 0);
                 }
                 // path: objeto del recorrido (Curve o malla de aristas) -> el motor elige la celda solo
                 std::string path = cp.count("path") ? Unquote(w3dMapAt(cp, "path")) : std::string();
-                bool soloCam = GetBoolOrDefault(cp, "soloCamaraActiva", true);
-                W3dModPVSAgregar(mesh, metodo, sector, archivo, fallback, path, soloCam);
-                if (cp.count("ramas")) {   // "1101" = rama 2 apagada (filtro del nodo-mas-cercano)
-                    extern void W3dModPVSRamas(Mesh*, const std::string&);
-                    W3dModPVSRamas(mesh, Unquote(w3dMapAt(cp, "ramas")));
+                bool onlyCam = GetBoolOrDefault(cp, "activeCameraOnly", true);
+                W3dModPVSAdd(mesh, method, sector, file, fallback, path, onlyCam);
+                if (cp.count("branches")) {   // "1101" = rama 2 apagada (filtro del nodo-mas-cercano)
+                    extern void W3dModPVSBranches(Mesh*, const std::string&);
+                    W3dModPVSBranches(mesh, Unquote(w3dMapAt(cp, "branches")));
                 }
             }
         }
 
         LoadVertexFrames(mesh);
-        { extern void W3dPVSSincronizar(Mesh*);   // PVS: carga el sidecar + arma el sector declarado
-          W3dPVSSincronizar(mesh); }
+        { extern void W3dPVSSync(Mesh*);   // PVS: carga el sidecar + arma el sector declarado
+          W3dPVSSync(mesh); }
 
         return mesh;
     }
@@ -1134,12 +1134,12 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     if (n->type=="UI"){
         // la INTERFAZ del proyecto: el .w3d referencia un .w3dui EXTERNO (el
         // arbol 2D completo, con sus scripts). Mismo camino que el JSON nuevo.
-        if (!n->props.count("archivo")) {
+        if (!n->props.count("file")) {
             w3dLogfW("[W3D] nodo UI sin 'archivo': escena omitida");
             return NULL;
         }
-        return (Object*)CargarUIProyecto(GetFilePath(w3dMapAt(n->props, "archivo")),
-                                         Unquote(w3dMapAt(n->props, "archivo")));
+        return (Object*)LoadUIProject(GetFilePath(w3dMapAt(n->props, "file")),
+                                         Unquote(w3dMapAt(n->props, "file")));
         // (si cargo, ya quedo colgado de la escena)
     }
 
@@ -1154,44 +1154,44 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // ocupa el slot historico, o sea que 'target' y 'targets' conviven y un
         // archivo viejo abre igual. Va DESPUES de 'target' a proposito: si estan
         // los dos, manda la lista.
-        if(p.count("targets")) mirror->SetTargetsTexto(Unquote(w3dMapAt(p, "targets")));
+        if(p.count("targets")) mirror->SetTargetsText(Unquote(w3dMapAt(p, "targets")));
         mirror->mirrorX = GetBoolOrDefault(p, "mirrorX", mirror->mirrorX);
         mirror->mirrorY = GetBoolOrDefault(p, "mirrorY", mirror->mirrorY);
         mirror->mirrorZ = GetBoolOrDefault(p, "mirrorZ", mirror->mirrorZ);
         // RECORTE DEL REFLEJO (ver Mirror.h): el rectangulo se mide en el PLANO
-        // del espejo, sobre EjeU()/EjeV(). Claves nuevas limiteU0/U1/V0/V1.
+        // del espejo, sobre AxisU()/AxisV(). Claves nuevas limiteU0/U1/V0/V1.
         // Las cuatro viejas (limiteIzquierdo/Derecho/Fondo/Frente, que estaban
         // tomadas prestadas del vocabulario de un objeto de fisica y hablaban de
         // X/Z de mundo) se siguen leyendo como ALIAS: para el espejo horizontal
         // sin rotar, U = X y V = Z, asi que significan exactamente lo mismo.
-        mirror->sinProfundidad = GetBoolOrDefault(p, "sinProfundidad", false);
-        // hundimientoMaximo: DEPRECADO (ver Mirror.h). Se acepta para que el
+        mirror->noDepth = GetBoolOrDefault(p, "noDepth", false);
+        // sinkMax: DEPRECADO (ver Mirror.h). Se acepta para que el
         // archivo abra, se avisa por log, y NO tiene ningun efecto: la
         // reflexion es geometrica pura y el recorte es la silueta del agua.
-        mirror->hundimientoMaximo = GetFloatOrDefault(p, "hundimientoMaximo", 0.0f);
-        if (mirror->hundimientoMaximo > 0.0f)
+        mirror->sinkMax = GetFloatOrDefault(p, "maxSink", 0.0f);
+        if (mirror->sinkMax > 0.0f)
             w3dLogfW("[W3D] Mirror '%s': hundimientoMaximo esta DEPRECADO y no tiene "
                      "efecto (la reflexion es geometrica pura; el recorte del reflejo "
                      "es la silueta del agua en pantalla)", mirror->name.c_str());
-        if (p.count("limiteU0") && p.count("limiteU1") &&
-            p.count("limiteV0") && p.count("limiteV1")) {
-            mirror->usaLimites = true;
-            mirror->limU0 = GetFloatOrDefault(p, "limiteU0", 0);
-            mirror->limU1 = GetFloatOrDefault(p, "limiteU1", 0);
-            mirror->limV0 = GetFloatOrDefault(p, "limiteV0", 0);
-            mirror->limV1 = GetFloatOrDefault(p, "limiteV1", 0);
-        } else if (p.count("limiteIzquierdo") && p.count("limiteDerecho") &&
-                   p.count("limiteFondo") && p.count("limiteFrente")) {
-            mirror->usaLimites = true;
-            mirror->limU0 = GetFloatOrDefault(p, "limiteIzquierdo", 0);
-            mirror->limU1 = GetFloatOrDefault(p, "limiteDerecho", 0);
-            mirror->limV0 = GetFloatOrDefault(p, "limiteFondo", 0);
-            mirror->limV1 = GetFloatOrDefault(p, "limiteFrente", 0);
+        if (p.count("limitU0") && p.count("limitU1") &&
+            p.count("limitV0") && p.count("limitV1")) {
+            mirror->usesLimits = true;
+            mirror->limU0 = GetFloatOrDefault(p, "limitU0", 0);
+            mirror->limU1 = GetFloatOrDefault(p, "limitU1", 0);
+            mirror->limV0 = GetFloatOrDefault(p, "limitV0", 0);
+            mirror->limV1 = GetFloatOrDefault(p, "limitV1", 0);
+        } else if (p.count("leftLimit") && p.count("rightLimit") &&
+                   p.count("backLimit") && p.count("frontLimit")) {
+            mirror->usesLimits = true;
+            mirror->limU0 = GetFloatOrDefault(p, "leftLimit", 0);
+            mirror->limU1 = GetFloatOrDefault(p, "rightLimit", 0);
+            mirror->limV0 = GetFloatOrDefault(p, "backLimit", 0);
+            mirror->limV1 = GetFloatOrDefault(p, "frontLimit", 0);
         }
         // recorte del reflejo (default = hay limites). Solo se lee si viene.
-        if (p.count("recorte")) {
-            mirror->recorteDeclarado = true;
-            mirror->recorte = GetBoolOrDefault(p, "recorte", true);
+        if (p.count("clip")) {
+            mirror->clipDeclared = true;
+            mirror->clip = GetBoolOrDefault(p, "clip", true);
         }
         return mirror;
     }
@@ -1200,73 +1200,73 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // LOD { distancias: "20, 45, 90" <hijos en orden de detalle> }
         // umbral i = hasta donde llega el hijo i; mas alla del ultimo, el ultimo hijo.
         LOD* lod = new LOD(parent);
-        if (p.count("distancias")) lod->SetDistanciasTexto(Unquote(w3dMapAt(p, "distancias")));
-        lod->soloCamaraActiva = GetBoolOrDefault(p, "soloCamaraActiva", false);
+        if (p.count("distances")) lod->SetDistancesText(Unquote(w3dMapAt(p, "distances")));
+        lod->onlyCameraActive = GetBoolOrDefault(p, "activeCameraOnly", false);
         return lod; // los hijos los cuelga BuildObjectRecursive
     }
 
     if (n->type=="Culling"){
-        // Culling { activo: true|false soloCamaraActiva: true|false distanciaMax: 0 <hijos> }
+        // Culling { activo: true|false onlyCameraActive: true|false distanceMax: 0 <hijos> }
         // (frustum culling por AABB + culling por distancia opcional; ver Culling.h)
         Culling* cu = new Culling(parent);
         // metodo de culling (frustum/grid/triangulo/bsp): ausente = frustum (retrocompat .w3d viejos)
-        cu->metodo           = p.count("metodo") ? CullingMetodoDesde(w3dMapAt(p, "metodo")) : (int)Culling::Frustum;
-        cu->activo           = GetBoolOrDefault(p, "activo", true);   // ausente = prendido
-        cu->soloCamaraActiva = GetBoolOrDefault(p, "soloCamaraActiva", false);
-        cu->distanciaMax     = GetFloatOrDefault(p, "distanciaMax", 0.0f);
-        cu->ordenAlpha       = GetBoolOrDefault(p, "ordenAlpha", false); // translucido: cullea + ordena atras->adelante
+        cu->method           = p.count("method") ? CullingMethodFrom(w3dMapAt(p, "method")) : (int)Culling::Frustum;
+        cu->active           = GetBoolOrDefault(p, "active", true);   // ausente = prendido
+        cu->onlyCameraActive = GetBoolOrDefault(p, "activeCameraOnly", false);
+        cu->distanceMax      = GetFloatOrDefault(p, "maxDistance", 0.0f);
+        cu->orderAlpha       = GetBoolOrDefault(p, "alphaOrder", false); // translucido: cullea + ordena back->forward
         cu->cellSize         = GetFloatOrDefault(p, "cellSize", 16.0f);  // metodo grid: lado de celda
-        cu->modo3D           = GetBoolOrDefault(p, "modo3D", false);     // metodo grid: 2D XZ vs 3D
+        cu->mode3D           = GetBoolOrDefault(p, "mode3D", false);     // metodo grid: 2D XZ vs 3D
         // metodo riel: la Curve del recorrido + el .w3dvis de HIJOS visibles por nodo
-        if (p.count("riel"))     cu->rielNombre      = Unquote(w3dMapAt(p, "riel"));
-        if (p.count("visHijos")) cu->visHijosArchivo = Unquote(w3dMapAt(p, "visHijos"));
+        if (p.count("rail"))     cu->railName      = Unquote(w3dMapAt(p, "rail"));
+        if (p.count("visChildren")) cu->visChildrenFile = Unquote(w3dMapAt(p, "visChildren"));
         return cu;
     }
 
     if (n->type=="GridCull"){
         // COMPAT: el nodo GridCull viejo ahora es un Culling con metodo=Grid (el objeto se unifico).
         Culling* g = new Culling(parent);
-        g->metodo           = Culling::Grid;
-        g->activo           = GetBoolOrDefault(p, "activo", true);
+        g->method           = Culling::Grid;
+        g->active           = GetBoolOrDefault(p, "active", true);
         g->cellSize         = GetFloatOrDefault(p, "cellSize", 16.0f);
-        g->modo3D           = GetBoolOrDefault(p, "modo3D", false);
-        g->distanciaMax     = GetFloatOrDefault(p, "distanciaMax", 0.0f);
-        g->soloCamaraActiva = GetBoolOrDefault(p, "soloCamaraActiva", false);
-        g->ordenAlpha       = GetBoolOrDefault(p, "ordenAlpha", false); // celdas de lejos a cerca (transparencias)
+        g->mode3D           = GetBoolOrDefault(p, "mode3D", false);
+        g->distanceMax      = GetFloatOrDefault(p, "maxDistance", 0.0f);
+        g->onlyCameraActive = GetBoolOrDefault(p, "activeCameraOnly", false);
+        g->orderAlpha       = GetBoolOrDefault(p, "alphaOrder", false); // celdas de lejos a cerca (transparencias)
         return g;
     }
 
-    if (n->type=="Particulas"){
+    if (n->type=="Particles"){
         // Particulas { textura: "polvo.png" cantidad: 20 vida: 1.2 tam: 0.4 vel: 2
         //              dispersion: 30 gravedad: 4 aditivo: false color: "1, 1, 1, 1"
-        //              desvanecer: true activo: true }   (ver Particulas.h)
-        Particulas* pt = new Particulas(parent);
+        //              desvanecer: true activo: true }   (ver Particles.h)
+        Particles* pt = new Particles(parent);
         // la textura se resuelve contra la carpeta del .w3d (como filePath del Wavefront)
-        if (p.count("textura")) pt->textura = GetFilePath(w3dMapAt(p, "textura"));
-        pt->cantidad   = GetFloatOrDefault(p, "cantidad",   pt->cantidad);
-        pt->vida       = GetFloatOrDefault(p, "vida",       pt->vida);
-        pt->tam        = GetFloatOrDefault(p, "tam",        pt->tam);
+        if (p.count("texture")) pt->texture = GetFilePath(w3dMapAt(p, "texture"));
+        pt->count      = GetFloatOrDefault(p, "count",   pt->count);
+        pt->life       = GetFloatOrDefault(p, "life",       pt->life);
+        pt->size       = GetFloatOrDefault(p, "size",        pt->size);
         pt->vel        = GetFloatOrDefault(p, "vel",        pt->vel);
         pt->dispersion = GetFloatOrDefault(p, "dispersion", pt->dispersion);
-        pt->gravedad   = GetFloatOrDefault(p, "gravedad",   pt->gravedad);
+        pt->gravity    = GetFloatOrDefault(p, "gravity",   pt->gravity);
         // MEZCLA: el .w3d nuevo trae "mezcla" (int, w3dEngine::Mezcla); los viejos, aditivo/sustractivo (bool)
-        if (p.count("mezcla"))                              pt->mezcla = GetIntOrDefault(p, "mezcla", pt->mezcla);
-        else if (GetBoolOrDefault(p, "sustractivo", false)) pt->mezcla = w3dEngine::MezclaSubtract;
-        else if (GetBoolOrDefault(p, "aditivo", false))     pt->mezcla = w3dEngine::MezclaAdd;
-        if (p.count("color")) pt->SetColorTexto(Unquote(w3dMapAt(p, "color")));
-        pt->desvanecer = GetBoolOrDefault(p, "desvanecer",  pt->desvanecer);
-        pt->activo     = GetBoolOrDefault(p, "activo",      pt->activo);
-        pt->filtrado   = GetBoolOrDefault(p, "filtrado",    pt->filtrado);   // ausente -> true (suave)
+        if (p.count("mix"))                              pt->mix = GetIntOrDefault(p, "mix", pt->mix);
+        else if (GetBoolOrDefault(p, "sustractivo", false)) pt->mix = w3dEngine::MixSubtract;
+        else if (GetBoolOrDefault(p, "additive", false))     pt->mix = w3dEngine::MixAdd;
+        if (p.count("color")) pt->SetTextColor(Unquote(w3dMapAt(p, "color")));
+        pt->fade     = GetBoolOrDefault(p, "fade",  pt->fade);
+        pt->active   = GetBoolOrDefault(p, "active",      pt->active);
+        pt->filtered = GetBoolOrDefault(p, "filtered",    pt->filtered);   // ausente -> true (suave)
         // azar (defaults 0 = sin jitter ni deriva: los archivos viejos no cambian)
-        pt->variacion   = GetFloatOrDefault(p, "variacion",   pt->variacion);
-        pt->turbulencia = GetFloatOrDefault(p, "turbulencia", pt->turbulencia);
-        pt->radioEmision = GetFloatOrDefault(p, "radioEmision", pt->radioEmision);
+        pt->variation  = GetFloatOrDefault(p, "variation",   pt->variation);
+        pt->turbulence = GetFloatOrDefault(p, "turbulence", pt->turbulence);
+        pt->emissionRadius = GetFloatOrDefault(p, "emissionRadius", pt->emissionRadius);
         // rotacion del billboard (defaults false/0 = derecho y quieto, como antes)
-        pt->rotacion    = GetBoolOrDefault (p, "rotacion",    pt->rotacion);
-        pt->velRotacion = GetFloatOrDefault(p, "velRotacion", pt->velRotacion);
-        pt->flipCuadros = GetIntOrDefault(p, "flipCuadros", pt->flipCuadros);   // flipbook por edad
+        pt->rotation    = GetBoolOrDefault (p, "rotation",    pt->rotation);
+        pt->velRotation = GetFloatOrDefault(p, "rotationSpeed", pt->velRotation);
+        pt->flipFrames  = GetIntOrDefault(p, "flipFrames", pt->flipFrames);   // flipbook por edad
         pt->flipCols    = GetIntOrDefault(p, "flipCols",    pt->flipCols);
-        pt->flipFilas   = GetIntOrDefault(p, "flipFilas",   pt->flipFilas);
+        pt->flipRows    = GetIntOrDefault(p, "flipRows",   pt->flipRows);
         // SUB-RECT del atlas unico: "u0, v0, u1, v1" (ausente = textura entera)
         if (p.count("uvRect")) {
             std::string s = Unquote(w3dMapAt(p, "uvRect"));
@@ -1277,32 +1277,32 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         return pt;
     }
 
-    if (n->type=="VisZona"){
-        // VisZona { modo: manual|grilla|volumenes|curva  objetivo: "Escenario"
-        //           ancla: "Jugador"  nx: 8 ny: 1 nz: 8  tamCelda: 4.0  pasoMax: 32
+    if (n->type=="VisZone"){
+        // VisZone { modo: manual|grilla|volumenes|curva  objetivo: "Escenario"
+        //           ancla: "Jugador"  nx: 8 ny: 1 nz: 8  cellSize: 4.0  stepMax: 32
         //           riel: "RielPueblo"  fallback: "completa" }
-        // decide la CELDA de visibilidad del objetivo (ver VisZona.h); en modo
+        // decide la CELDA de visibilidad del objetivo (ver VisZone.h); en modo
         // volumenes sus HIJOS son los volumenes (los cuelga BuildObjectRecursive).
         // `riel:` (alias `curva:`, modo curva) = la Curve cuyos nodos indexan las
         // celdas: con la camara en OTRO riel la zona cae a `fallback:` ("completa"
         // = malla entera, N = celda N). Sin `riel:` nada cambia (legacy).
-        VisZona* vz = new VisZona(parent);
-        std::string modo = p.count("modo") ? Unquote(w3dMapAt(p, "modo")) : std::string("manual");
-        vz->modo = (modo == "grilla") ? VisZona::ModoGrilla
-                 : (modo == "volumenes") ? VisZona::ModoVolumenes
-                 : (modo == "curva") ? VisZona::ModoCurva : VisZona::ModoManual;
-        if (p.count("objetivo")) vz->objetivoNombre = Unquote(w3dMapAt(p, "objetivo"));
-        if (p.count("ancla"))    vz->anclaNombre    = Unquote(w3dMapAt(p, "ancla"));
+        VisZone* vz = new VisZone(parent);
+        std::string mode = p.count("mode") ? Unquote(w3dMapAt(p, "mode")) : std::string("manual");
+        vz->mode = (mode == "grid") ? VisZone::ModeGrid
+                 : (mode == "volumes") ? VisZone::ModeVolumes
+                 : (mode == "curve") ? VisZone::ModeCurve : VisZone::ModeManual;
+        if (p.count("target")) vz->targetName = Unquote(w3dMapAt(p, "target"));
+        if (p.count("anchor"))    vz->anchorName    = Unquote(w3dMapAt(p, "anchor"));
         vz->nx       = GetIntOrDefault(p, "nx", 1);
         vz->ny       = GetIntOrDefault(p, "ny", 1);
         vz->nz       = GetIntOrDefault(p, "nz", 1);
-        vz->tamCelda = GetFloatOrDefault(p, "tamCelda", 1.0f);
-        vz->pasoMax  = GetIntOrDefault(p, "pasoMax", 32);
-        if (p.count("riel"))       vz->rielNombre = Unquote(w3dMapAt(p, "riel"));
-        else if (p.count("curva")) vz->rielNombre = Unquote(w3dMapAt(p, "curva"));
+        vz->cellSize = GetFloatOrDefault(p, "cellSize", 1.0f);
+        vz->stepMax  = GetIntOrDefault(p, "maxStep", 32);
+        if (p.count("rail"))       vz->railName = Unquote(w3dMapAt(p, "rail"));
+        else if (p.count("curve")) vz->railName = Unquote(w3dMapAt(p, "curve"));
         if (p.count("fallback")) {
             std::string fb = Unquote(w3dMapAt(p, "fallback"));
-            vz->celdaFallback = (fb == "completa") ? 0 : GetIntOrDefault(p, "fallback", 0);
+            vz->cellFallback = (fb == "complete") ? 0 : GetIntOrDefault(p, "fallback", 0);
         }
         return vz;
     }
@@ -1332,7 +1332,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
                            "scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated."),
                   p.count("name") ? Unquote(w3dMapAt(p, "name")).c_str() : T("(unnamed)"));
 
-        // el SCRIPT declarado con `script:` lo levanta LeerScriptsDeProps (en
+        // el SCRIPT declarado con `script:` lo levanta ReadPropScripts (en
         // BuildObjectRecursive, para CUALQUIER objeto). Aca queda solo la
         // convencion <proyecto>.lua, que es EXCLUSIVA del Gamepad.
         // convencion ALTERNATIVA: si no declara script pero junto al .w3d hay un
@@ -1348,9 +1348,9 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             if (pt != std::string::npos) base = base.substr(0, pt);
             std::string lua = dir + "/" + base + ".lua";
             if (w3dFileSystem::FileExists(lua)) {
-                if (!gamepad->scriptDatos) gamepad->scriptDatos = new W3dScriptDatos();
-                W3dScriptEntrada e; e.ruta = lua;
-                gamepad->scriptDatos->scripts.push_back(e);
+                if (!gamepad->scriptData) gamepad->scriptData = new W3dScriptData();
+                W3dScriptEntry e; e.path = lua;
+                gamepad->scriptData->scripts.push_back(e);
             }
         }   // (fin de la convencion sin "script:")
 
@@ -1370,14 +1370,14 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
         Curve* curve = new Curve(parent);
         if (curve->LoadFromFile(path)){
-            curve->RecalcularRamas();   // ramas (componentes) para el filtro del modificador Oclusion
+            curve->RecalculateBranches();   // ramas (componentes) para el filtro del modificador Oclusion
             // LISTA DE CARGA (streaming por riel): sidecar declarado como hijo
             //     Curve { filePath: "riel.cap"  ListaCarga { filePath: "riel.cargas.json" } }
             for (size_t _i=0; _i<n->children.size(); _i++) {
                 Node* c = n->children[_i];
-                if (!c || c->type != "ListaCarga") continue;
+                if (!c || c->type != "LoadList") continue;
                 if (!c->props.count("filePath")) { std::cerr << "[ListaCarga] falta filePath\n"; continue; }
-                curve->CargarListaCarga(GetFilePath(w3dMapAt(c->props, "filePath")));
+                curve->LoadLoadList(GetFilePath(w3dMapAt(c->props, "filePath")));
             }
             return curve;
         }
@@ -1396,9 +1396,9 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
     if (n->type=="Constraint"){
         // el objeto Constraint se dio de baja: entra como Empty y sus propiedades pasan
-        // al objeto APUNTADO al final de la carga (ver PendConsViejo, arriba).
+        // al objeto APUNTADO al final de la carga (ver OldPendCons, arriba).
         // OJO: en el formato de TEXTO 'usePitch' tiene default TRUE (en el JSON es false).
-        return NodoConstraintViejo(parent,
+        return NodeOldConstraint(parent,
                                    p.count("target") ? w3dMapAt(p, "target") : std::string(),
                                    GetBoolOrDefault(p, "useHorizontal", true),
                                    GetBoolOrDefault(p, "usePitch", true),
@@ -1410,12 +1410,12 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     if(n->type=="Camera"){
         Camera* camera = new Camera(parent, Vector3(0,0,0), Vector3(0, 0, 0));
         if(p.count("target")) camera->SetTarget(w3dMapAt(p, "target"));
-        if(p.count("riel")) camera->SetRiel(w3dMapAt(p, "riel"));
-        if(p.count("offsetRiel")) camera->offsetRiel = GetIntOrDefault(p, "offsetRiel", 0);
+        if(p.count("rail")) camera->SetRail(w3dMapAt(p, "rail"));
+        if(p.count("railOffset")) camera->offsetRail = GetIntOrDefault(p, "railOffset", 0);
         // MIRADA DEL RIEL: la orientacion sale del yaw/pitch AUTORAL del nodo en vez del
         // look-at al target (ver Camera.h). Ausente = false = comportamiento de siempre.
-        if(p.count("miradaRiel")) camera->usarRotacionDelRiel = GetBoolOrDefault(p, "miradaRiel", false);
-        // LENTE: la rama JSON ya leia los tres ("fov"/"near"/"far", JsonObjetoCrear) pero
+        if(p.count("railLook")) camera->useRailRotation = GetBoolOrDefault(p, "railLook", false);
+        // LENTE: la rama JSON ya leia los tres ("fov"/"near"/"far", JsonObjectCreate) pero
         // el formato texto solo el fov, y una camara con planos de recorte propios quedaba
         // clavada en los defaults (0.01 / 1000). Los tres se pueden ademas leer y escribir
         // desde lua con lenteDe() / setLente().
@@ -1425,7 +1425,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // ENCUADRE DECLARADO (aspecto de imagen, ej 1.481481 = 40:27): el modo juego
         // dibuja ESE frustum y letterboxea el resto (ver Camera::aspecto). Ausente =
         // 0 = como siempre (o heredado de la cabecera `aspecto` del .cap del riel).
-        if(p.count("aspecto")) camera->aspecto = GetFloatOrDefault(p, "aspecto", 0.0f);
+        if(p.count("aspect")) camera->aspect = GetFloatOrDefault(p, "aspect", 0.0f);
         return camera;
     }
 
@@ -1442,14 +1442,14 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     }
 
     if(n->type=="Collection"){
-        // Collection { ordenarPorCamara: true|false ordenarUnaVez: true|false
+        // Collection { sortByCamera: true|false sortOnce: true|false
         //              lote: "estatico" <hijos> }
-        // (orden lejos->cerca para transparentes + lote estatico; ver Collection.h)
+        // (orden far->near para transparentes + lote estatico; ver Collection.h)
         Collection* C = new Collection(parent);
         if(!CollectionActive) CollectionActive = C;
-        C->ordenarPorCamara = GetBoolOrDefault(p, "ordenarPorCamara", false);
-        C->ordenarUnaVez    = GetBoolOrDefault(p, "ordenarUnaVez", false);
-        C->lote = (p.count("lote") && Unquote(w3dMapAt(p, "lote")) == "estatico") ? 1 : 0;
+        C->sortByCamera = GetBoolOrDefault(p, "sortByCamera", false);
+        C->sortOnce     = GetBoolOrDefault(p, "sortOnce", false);
+        C->batch = (p.count("batch") && Unquote(w3dMapAt(p, "batch")) == "static") ? 1 : 0;
         return C;
     }
 
@@ -1462,91 +1462,91 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 //      ref_pelota: "Pelota"     referencia a un objeto (propiedades tipo 0)
 //      opt_modo: "facil"        opcion de un desplegable (tipo 1)
 //      val_id: "3"              valor por instancia (tipo 2: numero/bool/texto)
-//  Los tres prefijos viajan por el MISMO canal (W3dScriptEntrada.refs, par
+//  Los tres prefijos viajan por el MISMO canal (W3dScriptEntry.refs, par
 //  nombre -> texto): quien decide que es cada par es el .lua al leerlo con
-//  objeto()/opcion()/propiedad(). Antes esto vivia solo en la rama Gamepad; la
+//  object()/option()/property(). Antes esto vivia solo en la rama Gamepad; la
 //  convencion <proyecto>.lua (sin `script:`) SI sigue siendo solo del Gamepad.
 // ===========================================================================
-static void LeerScriptsDeProps(Object* obj, const std::map<std::string,std::string>& p){
+static void ReadPropScripts(Object* obj, const std::map<std::string,std::string>& p){
     if (!obj || !p.count("script")) return;
-    if (!obj->scriptDatos) obj->scriptDatos = new W3dScriptDatos();
-    W3dScriptEntrada e;
-    e.ruta = GetFilePath(w3dMapAt(p, "script"));
+    if (!obj->scriptData) obj->scriptData = new W3dScriptData();
+    W3dScriptEntry e;
+    e.path = GetFilePath(w3dMapAt(p, "script"));
     for (std::map<std::string,std::string>::const_iterator it = p.begin(); it != p.end(); ++it)
         if (it->first.compare(0, 4, "ref_") == 0 ||
             it->first.compare(0, 4, "opt_") == 0 ||
             it->first.compare(0, 4, "val_") == 0)
             e.refs.push_back(std::make_pair(it->first.substr(4), Unquote(it->second)));
-    obj->scriptDatos->scripts.push_back(e);
+    obj->scriptData->scripts.push_back(e);
 }
 
 // PROGRESO de la carga de TEXTO (Crash): el camino de texto NO bombeaba la barra -> saltaba 0->100 y en
 // el N95 (carga de minutos) parecia colgada. Se cuenta el total de nodos y cada BuildObjectRecursive avanza
-// su fraccion; ademas exporta [g_progObjIni,g_progObjFin] para que LeerWOBJ bombee DENTRO de una malla
+// su fraccion; ademas exporta [g_progObjStart,g_progObjEnd] para que ReadWOBJ bombee DENTRO de una malla
 // grande. El throttle del popup (ProgressPopup ~1.5%) acota los clear+swap por mas llamadas que se hagan.
-size_t g_bsTotal = 0, g_bsHecho = 0;
-float  g_progObjIni = 0.30f, g_progObjFin = 0.95f;
-static size_t ContarNodos(Node* n){
+size_t g_bsTotal = 0, g_bsDone = 0;
+float  g_progObjStart = 0.30f, g_progObjEnd = 0.95f;
+static size_t CountNodes(Node* n){
     size_t c = 0;
-    for(size_t i=0;i<n->children.size();i++) c += 1 + ContarNodos(n->children[i]);
+    for(size_t i=0;i<n->children.size();i++) c += 1 + CountNodes(n->children[i]);
     return c;
 }
 
 void BuildObjectRecursive(Node* n, Object* parent){
-    extern void ProgresoActualizar(float);
-    float t0 = g_bsTotal ? (float)g_bsHecho / (float)g_bsTotal : 0.0f;
-    g_bsHecho++;
-    float t1 = g_bsTotal ? (float)g_bsHecho / (float)g_bsTotal : 1.0f;
-    g_progObjIni = 0.30f + 0.65f * t0;
-    g_progObjFin = 0.30f + 0.65f * t1;
-    ProgresoActualizar(g_progObjIni);
+    extern void ProgressUpdate(float);
+    float t0 = g_bsTotal ? (float)g_bsDone / (float)g_bsTotal : 0.0f;
+    g_bsDone++;
+    float t1 = g_bsTotal ? (float)g_bsDone / (float)g_bsTotal : 1.0f;
+    g_progObjStart = 0.30f + 0.65f * t0;
+    g_progObjEnd   = 0.30f + 0.65f * t1;
+    ProgressUpdate(g_progObjStart);
 
-    const double tMed = CargaAhora();   // medicion por fase (0 = nadie mide)
+    const double tMed = LoadNow();   // medicion por fase (0 = nadie mide)
     Object* obj = CreateObjectFromNode(n, parent);
     if(!obj) return;
-    // el nodo SOLO (los hijos se miden en su propia vuelta), igual que JsonObjeto del JSON.
+    // el nodo SOLO (los hijos se miden en su propia vuelta), igual que JsonObject del JSON.
     // El texto viejo no tiene armatures: solo se reparten las mallas.
-    if (g_w3dCargaReloj && obj->getType() == ObjectType::mesh) {
-        g_w3dCargaFases.mallasMs += CargaAhora() - tMed;
-        g_w3dCargaFases.mallas++;
-        g_w3dCargaFases.mallasDerivadas++;   // el texto viejo deriva todo al abrir (ImportWOBJ)
+    if (g_w3dLoadClock && obj->getType() == ObjectType::mesh) {
+        g_w3dLoadPhases.meshesMs += LoadNow() - tMed;
+        g_w3dLoadPhases.meshes++;
+        g_w3dLoadPhases.derivedMeshes++;   // el texto viejo deriva todo al abrir (ImportWOBJ)
     }
 
     ApplyCommonProps(obj, n->props);
-    LeerScriptsDeProps(obj, n->props);   // `script:` + ref_/opt_/val_ (cualquier objeto)
+    ReadPropScripts(obj, n->props);   // `script:` + ref_/opt_/val_ (cualquier objeto)
 
     for(size_t _i=0;_i<n->children.size();_i++)
         BuildObjectRecursive(n->children[_i], obj);
 }
 
 void BuildScene(Node* root){
-    if(!root || root->type!="Escena") return;
+    if(!root || root->type!="Scene") return;
 
     // TODOS los campos del proyecto van por los MISMOS aplicadores que el JSON
     // (una sola fuente de verdad por campo). "iconApp" es el alias del formato
     // de texto viejo para "icono" (solo existe en este lector).
-    AplicarIcono(root->props.count("iconApp") ? Unquote(w3dMapAt(root->props, "iconApp"))
+    ApplyIcon(root->props.count("iconApp") ? Unquote(w3dMapAt(root->props, "iconApp"))
                                               : std::string());
 
     if(root->props.count("fullscreen")){
         std::string v = w3dMapAt(root->props, "fullscreen");
-        AplicarFullscreen(v == "true" || v == "1");
+        ApplyFullscreen(v == "true" || v == "1");
     }
 
     // el FPS del proyecto (timeline/animaciones): "fps: 60" en la Escena
-    AplicarFps(GetIntOrDefault(root->props, "fps", 0));
+    ApplyFps(GetIntOrDefault(root->props, "fps", 0));
     // TOPE DE RENDER del proyecto: "fpsCap: 120" en la Escena (distinto de fps=AnimFPS). Symbian lo clampea a 60.
-    AplicarFpsCap(GetIntOrDefault(root->props, "fpsCap", 0));
+    ApplyFpsCap(GetIntOrDefault(root->props, "fpsCap", 0));
 
     // MULTI-ESCENA: la escena que ARRANCA + el modo (lo lee Compilar juego)
-    if(root->props.count("escenaInicial"))
-        AplicarEscenaInicial(Unquote(w3dMapAt(root->props, "escenaInicial")));
-    if(root->props.count("modoEscenas")){
-        std::string v = w3dMapAt(root->props, "modoEscenas");
-        AplicarModoEscenas(v == "true" || v == "1");
+    if(root->props.count("initialScene"))
+        ApplyInitialScene(Unquote(w3dMapAt(root->props, "initialScene")));
+    if(root->props.count("sceneMode")){
+        std::string v = w3dMapAt(root->props, "sceneMode");
+        ApplySceneMode(v == "true" || v == "1");
     }
 
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
     if(root->props.count("Antialiasing")){
         std::string v = w3dMapAt(root->props, "Antialiasing");
         cfg.enableAntialiasing = (v == "true" || v == "1");   // opcion del EDITOR (cfg)
@@ -1559,9 +1559,9 @@ void BuildScene(Node* root){
     //     pixelado: true
     // y a partir de ahi todo el 3D va NEAREST y sin mipmaps. Default false: los
     // ejemplos que ya andan no cambian de aspecto.
-    if(root->props.count("pixelado")){
-        std::string v = w3dMapAt(root->props, "pixelado");
-        w3dEngine::SetPixeladoGlobal(v == "true" || v == "1");
+    if(root->props.count("pixelated")){
+        std::string v = w3dMapAt(root->props, "pixelated");
+        w3dEngine::SetPixelatedGlobal(v == "true" || v == "1");
     }
 
     // MIPMAPPING del proyecto: sin la prop manda el default del EDITOR (cfg.mipmaps,
@@ -1573,21 +1573,21 @@ void BuildScene(Node* root){
         std::string v = w3dMapAt(root->props, "mipmaps");
         w3dEngine::SetMipmapsGlobal(v == "true" || v == "1");
     }
-    w3dEngine::SetTexturas16Siempre(root->props.count("texturas16") &&
-                                    (w3dMapAt(root->props, "texturas16") == "true" || w3dMapAt(root->props, "texturas16") == "1"));
-    w3dEngine::SetTexturas16Movil(root->props.count("texturas16Movil") &&
-                                  (w3dMapAt(root->props, "texturas16Movil") == "true" || w3dMapAt(root->props, "texturas16Movil") == "1"));
-    w3dEngine::SetTexturasMitadDesde(GetIntOrDefault(root->props, "texturasMitadDesde", 0));   // (en el N95)
-    // MALLAS SOLO EN GPU (ausente = false): las que solo dibujan rutinas sueltan su RAM al quedar en VBO (MallaRecurso.h)
-    W3dMallasSoloGPUActivar(root->props.count("mallasSoloGPU") &&
-                            (w3dMapAt(root->props, "mallasSoloGPU") == "true" || w3dMapAt(root->props, "mallasSoloGPU") == "1"));
+    w3dEngine::SetTextures16Always(root->props.count("textures16") &&
+                                    (w3dMapAt(root->props, "textures16") == "true" || w3dMapAt(root->props, "textures16") == "1"));
+    w3dEngine::SetTextures16Mobile(root->props.count("textures16Mobile") &&
+                                  (w3dMapAt(root->props, "textures16Mobile") == "true" || w3dMapAt(root->props, "textures16Mobile") == "1"));
+    w3dEngine::SetTexturesHalfFrom(GetIntOrDefault(root->props, "halfTexturesFrom", 0));   // (en el N95)
+    // MALLAS SOLO EN GPU (ausente = false): las que solo dibujan rutinas sueltan su RAM al quedar en VBO (MeshResource.h)
+    W3dMeshesOnlyGPUActivate(root->props.count("gpuOnlyMeshes") &&
+                            (w3dMapAt(root->props, "gpuOnlyMeshes") == "true" || w3dMapAt(root->props, "gpuOnlyMeshes") == "1"));
 
     // VOLUMEN INICIAL del proyecto (0..1). Vive en el .w3d ("volumen: 0.5") y se aplica SOLO a esta
     // sesion: no pisa el volumen global del usuario ni vale para otros proyectos. Ausente = no se toca.
-    if(root->props.count("volumen")){
-        std::stringstream ss(w3dMapAt(root->props, "volumen"));
+    if(root->props.count("volume")){
+        std::stringstream ss(w3dMapAt(root->props, "volume"));
         float vv = 0.5f; ss >> vv;
-        w3dEngine::VolumenAplicarProyecto(vv);
+        w3dEngine::VolumeApplyProject(vv);
     }
 
     if(root->props.count("background")){
@@ -1596,7 +1596,7 @@ void BuildScene(Node* root){
         std::stringstream ss(bg);
         float r,g,b,a;
         if(ss >> r >> g >> b >> a){
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
             scene->SetBackground(r,g,b,a);   // el objeto Scene vive en el editor
 #endif
         } else {
@@ -1604,8 +1604,8 @@ void BuildScene(Node* root){
         }
     }
 
-    g_bsTotal = ContarNodos(root);
-    g_bsHecho = 0;
+    g_bsTotal = CountNodes(root);
+    g_bsDone  = 0;
     for(size_t _i=0;_i<root->children.size();_i++)
         BuildObjectRecursive(root->children[_i], SceneCollection);  // el parent puede ser la escena global
 
@@ -1615,7 +1615,7 @@ void BuildScene(Node* root){
 
 // ===========================================================================
 //  LECTURA JSON — compartida por el .w3d JSON PLANO nuevo (v3: el .w3d ES el
-//  json) y el zip v2 viejo (escena.json adentro). Construye la escena llamando
+//  json) y el zip v2 viejo (scene.json adentro). Construye la escena llamando
 //  a los MISMOS aplicadores de campos que el formato de texto (ver arriba).
 // ===========================================================================
 #include "io/JsonW3d.h"
@@ -1624,11 +1624,11 @@ void BuildScene(Node* root){
 #include "objects/Instance.h"            // AUDIT versiones: espejo/instancia/curva en el JSON
 #include "objects/Armature.h"            // ARMATURES en el .w3d (Fase 3)
 #include "animation/Armature2DAnimation.h" // clips del armature 2D ("anims2d")
-#include "animation/SkeletalAnimation.h" // clips del esqueleto + PrepararSkin/PrepararSkinAutorado
+#include "animation/SkeletalAnimation.h" // clips del esqueleto + PrepareSkin/PrepareAuthoredSkin
 #include "animation/W3dAnimSet.h"        // ANIMSETS: los clips en binario (.w3da), compartidos entre armatures
 #include "edit/Modifier.h"               // modificador Armature de la malla (referencia por nombre)
-#include "edit/MeshEdit.h"               // W3dStackGeneraMalla: el juego materializa la edicion si el stack genera
-#include "edit/WeightPaint.h"            // WeightPaintAsegurarMapa (reconstruir vertex groups por posicion)
+#include "edit/MeshEdit.h"               // W3dStackGeneratesMesh: el juego materializa la edicion si el stack genera
+#include "edit/WeightPaint.h"            // WeightPaintEnsureMap (reconstruir vertex groups por posicion)
 #include "animation/VertexAnimation.h"   // cargar frames de vertices (blob binario) + curvas
 #include "script/W3dScript.h"
 #include "w3dFilesystem.h"
@@ -1636,18 +1636,18 @@ void BuildScene(Node* root){
 // carpeta del .w3d ABIERTO. En el JSON plano las rutas relativas cuelgan de aca
 // directo; en un zip v2 primero se busca en la carpeta EXTRAIDA y despues aca
 // (los assets EXTERNOS del v2 eran relativos al .w3d, no al zip).
-static std::string gDirProyecto;
+static std::string gDirProject;
 
 // v4: el proyecto abierto es un CONTENEDOR y las rutas del JSON son NOMBRES DE
-// ENTRADA. Lo prende AbrirW3D en el brazo del contenedor y lo apaga al terminar.
-static bool gProyectoV4 = false;
-// true mientras el JUEGO COMPILADO carga su proyecto (W3dProyectoCargarEscena3D): si la escena
+// ENTRADA. Lo prende OpenW3D en el brazo del contenedor y lo apaga al terminar.
+static bool gProjectV4 = false;
+// true mientras el JUEGO COMPILADO carga su proyecto (W3dProjectLoadScene3D): si la escena
 // que arranca no es la del bloque "escena", los objetos del bloque ni se arman (se carga la
-// inicial desde su entrada, ver W3dRaices.h)
-static bool gCargaJuego = false;
-// la BASE de las rutas relativas con la que se abrio el proyecto (AbrirEscenaJson): las escenas y
+// inicial desde su entrada, ver W3dRoots.h)
+static bool gLoadGame = false;
+// la BASE de las rutas relativas con la que se abrio el proyecto (OpenSceneJson): las escenas y
 // prefabs que se cargan despues desde su entrada resuelven sus rutas ("ext:" incluidas) igual
-static std::string gBaseProyecto;
+static std::string gBaseProject;
 
 // una ruta del json -> ruta real (LA unica resolucion de referencias del .w3d).
 //   "ext:..."   -> EXTERNA deliberada: se saca el prefijo y se resuelve contra la
@@ -1657,30 +1657,30 @@ static std::string gBaseProyecto;
 //                  ReadFileBytes la resuelve por el montaje.
 //   v3 y viejos -> la regla de siempre: absoluta tal cual; relativa contra 'base'
 //                  y, si ahi no existe pero al lado del .w3d si, contra el proyecto.
-static std::string RutaJson(const std::string& r, const std::string& base) {
+static std::string JsonPath(const std::string& r, const std::string& base) {
     if (r.empty()) return r;
     // UNA ENTRADA DE UNA LIBRERIA ya nombrada como tal (el proyecto usa una textura o un script de una libreria
-    // vinculada): tal cual, la resuelve el almacen de esa libreria (io/W3dAlmacen.h). Adentro del contenido de
+    // vinculada): tal cual, la resuelve el almacen de esa libreria (io/W3dStore.h). Adentro del contenido de
     // una libreria, "lib:<otra>/..." nombra una de SU registro (una libreria de adentro): la que le toca
     if (r.compare(0, 4, "lib:") == 0) {
-        if (!W3dLibContexto().empty()) {
-            const std::string an = W3dLibsNombreAnidado(W3dLibContexto(), r.substr(4));
+        if (!W3dLibContext().empty()) {
+            const std::string an = W3dLibsNameNested(W3dLibContext(), r.substr(4));
             if (!an.empty()) return "lib:" + an;
         }
         return r;
     }
-    // CONTENIDO DE UNA LIBRERIA (lo que genera un proxy, io/Librerias.h): sus rutas son entradas de ELLA
-    // ("lib:<libreria>/texturas/x.png"), y un "ext:" suyo es relativo a SU .w3d (no se anota como externa
+    // CONTENIDO DE UNA LIBRERIA (lo que genera un proxy, io/Libraries.h): sus rutas son entradas de ELLA
+    // ("lib:<libreria>/textures/x.png"), y un "ext:" suyo es relativo a SU .w3d (no se anota como externa
     // del proyecto: el proyecto no la guarda). En el JUEGO COMPILADO ese archivo viaja empaquetado con la libreria
-    // ("lib:<libreria>/_ext/<rel>", W3dLibsEntradaExterna: lo copia Compilar juego)
+    // ("lib:<libreria>/_ext/<rel>", W3dLibsExternalEntry: lo copia Compilar juego)
     {
-        const std::string& lib = W3dLibContexto();
+        const std::string& lib = W3dLibContext();
         if (!lib.empty()) {
             if (r.size() > 4 && r.compare(0, 4, "ext:") == 0) {
                 std::string x = r.substr(4);
                 if (x.empty() || x[0] == '/' || (x.size() > 2 && x[1] == ':')) return x;
-                if (!W3dLibsDesdeDisco()) return "lib:" + lib + "/" + W3dLibsEntradaExterna(x);
-                std::string dir = W3dLibsRutaDiscoDe(lib);
+                if (!W3dLibsFromDisk()) return "lib:" + lib + "/" + W3dLibsExternalEntry(x);
+                std::string dir = W3dLibsDiskPathOf(lib);
                 const size_t b = dir.find_last_of("/\\");
                 dir = (b == std::string::npos) ? std::string(".") : dir.substr(0, b);
                 return w3dFileSystem::JoinPath(dir, x);
@@ -1693,60 +1693,60 @@ static std::string RutaJson(const std::string& r, const std::string& base) {
         std::string x = r.substr(4);
         std::string res = x;
         if (!(x[0] == '/' || (x.size() > 2 && x[1] == ':')))
-            res = (gDirProyecto.empty() ? base : gDirProyecto) + "/" + x;
-        W3dRefExternaMarcar(res);
+            res = (gDirProject.empty() ? base : gDirProject) + "/" + x;
+        W3dExternalRefMark(res);
         return res;
     }
     if (r[0] == '/' || (r.size() > 2 && r[1] == ':')) return r;   // absoluta
-    if (gProyectoV4 && W3dEsNombreDeEntrada(r)) return r;         // entrada del contenedor
-    std::string enBase = base + "/" + r;
-    if (!w3dFileSystem::FileExists(enBase) &&
-        !gDirProyecto.empty() && gDirProyecto != base) {
-        std::string enProy = gDirProyecto + "/" + r;
-        if (w3dFileSystem::FileExists(enProy)) return enProy;
+    if (gProjectV4 && W3dIsEntryName(r)) return r;                // entrada del contenedor
+    std::string inBase = base + "/" + r;
+    if (!w3dFileSystem::FileExists(inBase) &&
+        !gDirProject.empty() && gDirProject != base) {
+        std::string inProj = gDirProject + "/" + r;
+        if (w3dFileSystem::FileExists(inProj)) return inProj;
     }
-    return enBase;
+    return inBase;
 }
 
 // la textura de un paso "Bind texture" de una Rutina: la misma regla que la de un material (ctx = la base)
-static std::string RutinaRefTextura(const std::string& guardada, void* base) {
-    return RutaJson(guardada, *(const std::string*)base);
+static std::string RoutineRefTexture(const std::string& saved, void* base) {
+    return JsonPath(saved, *(const std::string*)base);
 }
 
 // los campos de RUTA que el lector guarda CRUDOS (se resuelven mas tarde, al dibujar o al usarlos: la textura de
 // las particulas, los hijos visibles por nodo y el .w3dbsp de un Culling, los sidecars pvs/vis del culling por
 // triangulo, el atlas de un flipbook). En el proyecto siguen crudos (como siempre: su guardado los escribe tal
-// cual); en el contenido de una LIBRERIA pasan por RutaJson (son entradas de ella: "lib:<libreria>/...")
-static std::string RutaJsonCampo(const std::string& r, const std::string& base) {
-    return W3dLibContexto().empty() ? r : RutaJson(r, base);
+// cual); en el contenido de una LIBRERIA pasan por JsonPath (son entradas de ella: "lib:<libreria>/...")
+static std::string JsonPathField(const std::string& r, const std::string& base) {
+    return W3dLibContext().empty() ? r : JsonPath(r, base);
 }
-// las rutas de una ESCENA UI que es contenido de una libreria (su .w3dui): las resuelve RutaJson en el contexto de
-// la libreria (UI2DFormato.h: g_w3dRutaLibHook). La guarda lo pone mientras se carga y lo saca despues
-static std::string RutaUIDeLibreria(const std::string& g) { return RutaJson(g, gBaseProyecto); }
-struct GuardaRutaUILib {
-    W3dRutaCargaFn antes;
-    bool activa;
-    explicit GuardaRutaUILib(bool on) : antes(g_w3dRutaLibHook), activa(on) { if (activa) g_w3dRutaLibHook = RutaUIDeLibreria; }
-    ~GuardaRutaUILib() { if (activa) g_w3dRutaLibHook = antes; }
+// las rutas de una ESCENA UI que es contenido de una libreria (su .w3dui): las resuelve JsonPath en el contexto de
+// la libreria (UI2DFormat.h: g_w3dPathLibHook). La guarda lo pone mientras se carga y lo saca despues
+static std::string PathUIOfLib(const std::string& g) { return JsonPath(g, gBaseProject); }
+struct GuardPathUILib {
+    W3dLoadPathFn prev;
+    bool active;
+    explicit GuardPathUILib(bool on) : prev(g_w3dPathLibHook), active(on) { if (active) g_w3dPathLibHook = PathUIOfLib; }
+    ~GuardPathUILib() { if (active) g_w3dPathLibHook = prev; }
 private:
-    GuardaRutaUILib(const GuardaRutaUILib&);
-    GuardaRutaUILib& operator=(const GuardaRutaUILib&);
+    GuardPathUILib(const GuardPathUILib&);
+    GuardPathUILib& operator=(const GuardPathUILib&);
 };
 // un NOMBRE de recurso del JSON (una malla, un animset, un flipbook) -> el nombre con el que vive en memoria.
 // Adentro de una LIBRERIA lleva su prefijo ("Personajes/Cuerpo": su espacio de nombres); desde el proyecto, uno
 // con el prefijo de una libreria vinculada la deja lista (sus recursos se registran recien al usarla)
 // (adentro de una libreria, uno con el prefijo de una libreria de SU registro -una de adentro- es de esa)
-static std::string NombreRecursoJson(const std::string& n) {
+static std::string ResourceNameJson(const std::string& n) {
     if (n.empty()) return n;
-    const std::string& lib = W3dLibContexto();
+    const std::string& lib = W3dLibContext();
     if (!lib.empty()) {
         if (n.find('/') != std::string::npos) {
-            const std::string an = W3dLibsNombreAnidado(lib, n);
+            const std::string an = W3dLibsNameNested(lib, n);
             if (!an.empty()) return an;
         }
         return lib + "/" + n;
     }
-    if (n.find('/') != std::string::npos) W3dLibsDeNombre(n);
+    if (n.find('/') != std::string::npos) W3dLibsByName(n);
     return n;
 }
 
@@ -1761,10 +1761,10 @@ static std::string NombreRecursoJson(const std::string& n) {
 
 // entero del archivo ACOTADO a [lo, hi]. Fuera de rango: se acota y se avisa
 // (el valor sigue siendo utilizable, el editor no se cae).
-static int JIRango(JVal* o, const char* k, int def, int lo, int hi, const char* quien) {
+static int JIRange(JVal* o, const char* k, int def, int lo, int hi, const char* who) {
     int v = JI(o, k, def);
     if (v < lo || v > hi) {
-        w3dLogfW("[W3D] %s: '%s' vale %d, fuera de [%d..%d] -> se acota", quien, k, v, lo, hi);
+        w3dLogfW("[W3D] %s: '%s' vale %d, fuera de [%d..%d] -> se acota", who, k, v, lo, hi);
         v = (v < lo) ? lo : hi;
     }
     return v;
@@ -1774,131 +1774,131 @@ static int JIRango(JVal* o, const char* k, int def, int lo, int hi, const char* 
 // rango, auto-padres y CICLOS quedan como raiz (-1). Sin esto un .w3d a mano
 // con "padre" cruzado (0->1, 1->0) cuelga cualquier recorrido que suba por la
 // cadena (ej: UVEditor.cpp, borrar huesos). Devuelve cuantos arreglo.
-static int SanearPadres(std::vector<int>& padre, const char* quien) {
-    const int n = (int)padre.size();
-    int arreglados = 0;
+static int SanitizeParents(std::vector<int>& parent, const char* who) {
+    const int n = (int)parent.size();
+    int fixed = 0;
     for (int i = 0; i < n; i++) {
-        if (padre[i] < -1 || padre[i] >= n || padre[i] == i) {
-            if (padre[i] != -1) { padre[i] = -1; arreglados++; }
+        if (parent[i] < -1 || parent[i] >= n || parent[i] == i) {
+            if (parent[i] != -1) { parent[i] = -1; fixed++; }
             continue;
         }
-        int p = padre[i], guard = 0;               // subir: si no llega a una raiz en n pasos, hay ciclo
-        while (p >= 0 && guard++ <= n) p = padre[p];
-        if (p >= 0) { padre[i] = -1; arreglados++; }
+        int p = parent[i], guard = 0;               // subir: si no llega a una raiz en n pasos, hay ciclo
+        while (p >= 0 && guard++ <= n) p = parent[p];
+        if (p >= 0) { parent[i] = -1; fixed++; }
     }
-    if (arreglados)
-        w3dLogfW("[W3D] %s: %d hueso(s) con 'padre' invalido o en ciclo -> quedan como raiz", quien, arreglados);
-    return arreglados;
+    if (fixed)
+        w3dLogfW("[W3D] %s: %d hueso(s) con 'padre' invalido o en ciclo -> quedan como raiz", who, fixed);
+    return fixed;
 }
 
-static void JsonComunes(JVal* j, Object* o) {
-    o->name = JS(j, "nombre", o->name);
+static void CommonJson(JVal* j, Object* o) {
+    o->name = JS(j, "name", o->name);
     o->visible = JB(j, "visible", true);
-    o->estatico = JB(j, "estatico", true); // GridCull: false = dinamico (se re-evalua su celda por frame)
-    o->proyectaSombra = JB(j, "proyectaSombra", true);   // (las sombras en tiempo real)
-    o->recibeSombra = JB(j, "recibeSombra", true);
-    o->rebotaLuz = JB(j, "rebotaLuz", true);         // (la luz precalculada: la indirecta)
-    o->captaSombras = JB(j, "captaSombras", false);  // (captador de sombras)
-    o->enSondas = JB(j, "enSondas", true);           // (lo ven las sondas de reflejo y de luz)
-    o->showRelantionshipsLines = JB(j, "lineasParentales", true); // ausente = true (archivos viejos)
-    o->paleta = JS(j, "paleta", "");   // seleccion de paleta ("" = hereda del padre)
+    o->isStatic = JB(j, "static", true); // GridCull: false = dinamico (se re-evalua su celda por frame)
+    o->projectsShadow = JB(j, "castsShadow", true);   // (las sombras en tiempo real)
+    o->receivesShadow = JB(j, "receivesShadow", true);
+    o->bouncesLight = JB(j, "bouncesLight", true);        // (la luz precalculada: la indirecta)
+    o->catchesShadows = JB(j, "catchesShadows", false);  // (captador de sombras)
+    o->inProbes = JB(j, "inProbes", true);             // (lo ven las sondas de reflejo y de luz)
+    o->showRelationshipsLines = JB(j, "parentLines", true); // ausente = true (archivos viejos)
+    o->palette = JS(j, "palette", "");   // seleccion de paleta ("" = hereda del padre)
     JVal* v;
-    if ((v = JHijo(j, "pos", 5)) && v->lista.size() >= 3) {
-        o->pos.x = (float)v->lista[0]->num; o->pos.y = (float)v->lista[1]->num; o->pos.z = (float)v->lista[2]->num;
+    if ((v = JChild(j, "pos", 5)) && v->list.size() >= 3) {
+        o->pos.x = (float)v->list[0]->num; o->pos.y = (float)v->list[1]->num; o->pos.z = (float)v->list[2]->num;
     }
     // ROTACION: el euler del archivo ES el dato (trae sus vueltas) y de el se deriva el quaternion, que es
     // lo que se RENDERIZA. Antes esto escribia los tres floats de rotEuler a mano y no tocaba el quaternion:
     // la escena abria SIN ROTAR ("la camara esta todo en 0 grados"). Va por la puerta (ver Objects.h).
-    if ((v = JHijo(j, "rot", 5)) && v->lista.size() >= 3) {
-        o->SetRotEuler(Vector3((float)v->lista[0]->num, (float)v->lista[1]->num, (float)v->lista[2]->num));
+    if ((v = JChild(j, "rot", 5)) && v->list.size() >= 3) {
+        o->SetRotEuler(Vector3((float)v->list[0]->num, (float)v->list[1]->num, (float)v->list[2]->num));
     }
-    if ((v = JHijo(j, "escala", 5)) && v->lista.size() >= 3) {
-        o->scale.x = (float)v->lista[0]->num; o->scale.y = (float)v->lista[1]->num; o->scale.z = (float)v->lista[2]->num;
+    if ((v = JChild(j, "scale", 5)) && v->list.size() >= 3) {
+        o->scale.x = (float)v->list[0]->num; o->scale.y = (float)v->list[1]->num; o->scale.z = (float)v->list[2]->num;
     }
     // FISICA de cuerpo rigido (opcional; espejo exacto de EscribirFisica del
-    // guardado). Ver physics/W3dRigido.h.
-    JVal* jf = JHijo(j, "fisica", 4);
+    // guardado). Ver physics/W3dRigid.h.
+    JVal* jf = JChild(j, "physics", 4);
     if (jf) {
-        W3dRigidoDef* d = o->fisica ? o->fisica : new W3dRigidoDef();
-        const std::string t = JS(jf, "tipo", "dinamico");
-        d->tipo = (t == "estatico") ? 0 : (t == "personaje") ? 2 : (t == "malla") ? 3 : 1;
-        d->masa     = JF(jf, "masa", d->masa);
-        d->friccion = JF(jf, "friccion", d->friccion);
-        d->rebote   = JF(jf, "rebote", d->rebote);
-        if ((v = JHijo(jf, "caja", 5)) && v->lista.size() >= 3)
-            for (int k = 0; k < 3; k++) d->caja[k] = (float)v->lista[k]->num;
-        if ((v = JHijo(jf, "centro", 5)) && v->lista.size() >= 3)
-            for (int k = 0; k < 3; k++) d->centro[k] = (float)v->lista[k]->num;
-        o->fisica = d;
+        W3dRigidDef* d = o->physics ? o->physics : new W3dRigidDef();
+        const std::string t = JS(jf, "type", "dynamic");
+        d->type = (t == "static") ? 0 : (t == "character") ? 2 : (t == "mesh") ? 3 : 1;
+        d->mass     = JF(jf, "mass", d->mass);
+        d->friction = JF(jf, "friction", d->friction);
+        d->bounce   = JF(jf, "bounce", d->bounce);
+        if ((v = JChild(jf, "box", 5)) && v->list.size() >= 3)
+            for (int k = 0; k < 3; k++) d->box[k] = (float)v->list[k]->num;
+        if ((v = JChild(jf, "center", 5)) && v->list.size() >= 3)
+            for (int k = 0; k < 3; k++) d->center[k] = (float)v->list[k]->num;
+        o->physics = d;
     }
 }
 
 // los scripts lua del objeto: [{archivo, refs{}}]
 static void JsonScripts(JVal* j, Object* o, const std::string& base) {
-    JVal* js = JHijo(j, "scripts", 5);
+    JVal* js = JChild(j, "scripts", 5);
     if (!js) return;
-    for (size_t i = 0; i < js->lista.size(); i++) {
-        JVal* e = js->lista[i];
-        if (e->tipo != 4) continue;
-        if (!o->scriptDatos) o->scriptDatos = new W3dScriptDatos();
-        W3dScriptEntrada ent;
-        ent.ruta = RutaJson(JS(e, "archivo", ""), base);
-        ent.apagado = JB(e, "apagado", false);   // el ojo de la lista de scripts (ausente = prendido)
+    for (size_t i = 0; i < js->list.size(); i++) {
+        JVal* e = js->list[i];
+        if (e->type != 4) continue;
+        if (!o->scriptData) o->scriptData = new W3dScriptData();
+        W3dScriptEntry ent;
+        ent.path = JsonPath(JS(e, "file", ""), base);
+        ent.off = JB(e, "off", false);   // el ojo de la lista de scripts (ausente = prendido)
         // una UI trae sus scripts en su .w3dui Y el guardado los repite en el nodo del proyecto: sin esto el mismo
         // script quedaba cargado DOS veces (dos instancias corriendo a la par)
-        bool repetido = false;
-        for (size_t k = 0; k < o->scriptDatos->scripts.size(); k++)
-            if (o->scriptDatos->scripts[k].ruta == ent.ruta) repetido = true;
-        if (repetido) continue;
-        JVal* refs = JHijo(e, "refs", 4);
+        bool repeated = false;
+        for (size_t k = 0; k < o->scriptData->scripts.size(); k++)
+            if (o->scriptData->scripts[k].path == ent.path) repeated = true;
+        if (repeated) continue;
+        JVal* refs = JChild(e, "refs", 4);
         if (refs)
             for (std::map<std::string, JVal*>::iterator r = refs->obj.begin(); r != refs->obj.end(); ++r)
-                if (r->second->tipo == 2)
+                if (r->second->type == 2)
                     ent.refs.push_back(std::make_pair(r->first, r->second->str));
-        o->scriptDatos->scripts.push_back(ent);
+        o->scriptData->scripts.push_back(ent);
     }
 }
 
 // UNA curva {p, c, k:[[frame,value,interp,htype,inDF,inDV,outDF,outDV],...]} -> AnimProperty.
 // Compartida por las curvas de las vertex anims y por los tracks de los clips de esqueleto (Fase 3).
-static bool CargarCurvaJson(JVal* cj, AnimProperty& ap) {
-    if (!cj || cj->tipo != 4) return false;
+static bool LoadCurveJson(JVal* cj, AnimProperty& ap) {
+    if (!cj || cj->type != 4) return false;
     ap.Property = JI(cj, "p", 0); ap.component = JI(cj, "c", 0);
     { const int ca = JI(cj, "ca", 0), cd = JI(cj, "cd", 0);   // el modificador Repetir (ausente = no)
-      ap.cicloAntes   = (ca >= KfCicloNo && ca <= KfCicloOffset) ? ca : KfCicloNo;
-      ap.cicloDespues = (cd >= KfCicloNo && cd <= KfCicloOffset) ? cd : KfCicloNo; }
-    // la pila de MODIFICADORES (ver EscribirCurva): una fila de numeros por modificador; cota de 64
+      ap.cyclePrev  = (ca >= KfCycleNo && ca <= KfCycleOffset) ? ca : KfCycleNo;
+      ap.cycleAfter = (cd >= KfCycleNo && cd <= KfCycleOffset) ? cd : KfCycleNo; }
+    // la pila de MODIFICADORES (ver WriteCurve): una fila de numeros por modificador; cota de 64
     ap.mods.clear();
-    if (JVal* jm = JHijo(cj, "m", 5)) {
-        for (size_t i = 0; i < jm->lista.size() && i < 64; i++) {
-            JVal* row = jm->lista[i]; if (!row || row->tipo != 5) continue;
-            const int n = JFilaLen(row);
-            float f[KfModificador::NFloats];
-            for (int q = 0; q < KfModificador::NFloats; q++) f[q] = (q < n) ? JFilaNum(row, q, 0) : 0.0f;
-            KfModificador m; m.DeFloats(f, n < KfModificador::NFloats ? n : (int)KfModificador::NFloats);
+    if (JVal* jm = JChild(cj, "m", 5)) {
+        for (size_t i = 0; i < jm->list.size() && i < 64; i++) {
+            JVal* row = jm->list[i]; if (!row || row->type != 5) continue;
+            const int n = JRowLen(row);
+            float f[KfModifier::NFloats];
+            for (int q = 0; q < KfModifier::NFloats; q++) f[q] = (q < n) ? JRowNum(row, q, 0) : 0.0f;
+            KfModifier m; m.FromFloats(f, n < KfModifier::NFloats ? n : (int)KfModifier::NFloats);
             ap.mods.push_back(m);
         }
     }
-    ap.RepetirAModificador();   // (el Repetir de los archivos de antes: queda como modificador Ciclos)
-    JVal* ks = JHijo(cj, "k", 5);
+    ap.RepeatToModifier();   // (el Repetir de los archivos de antes: queda como modificador Ciclos)
+    JVal* ks = JChild(cj, "k", 5);
     // COTA: ninguna cantidad del archivo se usa sin acotar. Un millon de keyframes en
     // UNA curva no es un proyecto, es un archivo roto (o hecho a mano): se cargan los
     // primeros y se dice cuantos quedaron afuera, en vez de comerse la RAM en silencio.
-    size_t nKeys = ks ? ks->lista.size() : 0;
+    size_t nKeys = ks ? ks->list.size() : 0;
     if (nKeys > 1000000) {
         w3dLogfW("[W3D] una curva declara %d keyframes: se cargan los primeros 1000000", (int)nKeys);
         nKeys = 1000000;
     }
     // las filas [frame,value,...] vienen COMPACTAS del parser (JVal::nums): se leen con JFila*
     if (ks) for (size_t i = 0; i < nKeys; i++) {
-        JVal* row = ks->lista[i]; if (!row || row->tipo != 5 || JFilaLen(row) < 3) continue;
+        JVal* row = ks->list[i]; if (!row || row->type != 5 || JRowLen(row) < 3) continue;
         keyFrame kf;
-        kf.frame = (int)JFilaNum(row, 0, 0); kf.value = JFilaNum(row, 1, 0);
-        kf.Interpolation = (int)JFilaNum(row, 2, 0);
-        if (JFilaLen(row) >= 8) {
-            kf.handleType = (int)JFilaNum(row, 3, 0);
-            kf.inDF = JFilaNum(row, 4, 0); kf.inDV = JFilaNum(row, 5, 0);
-            kf.outDF = JFilaNum(row, 6, 0); kf.outDV = JFilaNum(row, 7, 0);
+        kf.frame = (int)JRowNum(row, 0, 0); kf.value = JRowNum(row, 1, 0);
+        kf.Interpolation = (int)JRowNum(row, 2, 0);
+        if (JRowLen(row) >= 8) {
+            kf.handleType = (int)JRowNum(row, 3, 0);
+            kf.inDF = JRowNum(row, 4, 0); kf.inDV = JRowNum(row, 5, 0);
+            kf.outDF = JRowNum(row, 6, 0); kf.outDV = JRowNum(row, 7, 0);
         }
         ap.keyframes.push_back(kf);
     }
@@ -1906,11 +1906,11 @@ static bool CargarCurvaJson(JVal* cj, AnimProperty& ap) {
 }
 
 // curvas de transform de una anim de objeto: [{p, c, k:[[frame,value,interp,htype,inDF,inDV,outDF,outDV],...]}]
-static void CargarCurvasAnim(JVal* aj, VertexAnimation* anim) {
-    JVal* cur = JHijo(aj, "curvas", 5); if (!cur) return;
-    for (size_t c = 0; c < cur->lista.size(); c++) {
+static void LoadCurvesAnim(JVal* settings, VertexAnimation* anim) {
+    JVal* cur = JChild(settings, "curves", 5); if (!cur) return;
+    for (size_t c = 0; c < cur->list.size(); c++) {
         AnimProperty ap;
-        if (CargarCurvaJson(cur->lista[c], ap)) anim->curvas.push_back(ap);
+        if (LoadCurveJson(cur->list[c], ap)) anim->curves.push_back(ap);
     }
 }
 
@@ -1919,81 +1919,81 @@ static void CargarCurvasAnim(JVal* aj, VertexAnimation* anim) {
 // las ramas "modelo" y "glb". 'base' es la carpeta donde se extrajo el zip.
 // CUANTAS vertex anims necesitaron el remapeo por cercania de posicion en la ultima apertura.
 // Lo mira el harness ('quadsave'): con la geometria en .w3dm tiene que quedar en CERO.
-int g_w3dVaRemapeos = 0;
+int g_w3dVaRemaps = 0;
 
 // ANIMACION UV "tira de atlas" del JSON v4: { "frames": N, "fps": F, "eje": "u"|"v",
 // "desfase": D, "ancho": A, "alto": A } bajo la clave "animUV" del objeto malla (la
-// escribe GuardarW3D; ancho/alto default 1 = tira sobre la textura entera).
-static void CargarAnimUV(JVal* j, Mesh* mesh) {
-    JVal* a = JHijo(j, "animUV", 4);
+// escribe SaveW3D; ancho/alto default 1 = tira sobre la textura entera).
+static void LoadAnimUV(JVal* j, Mesh* mesh) {
+    JVal* a = JChild(j, "animUV", 4);
     if (!a || !mesh) return;
-    mesh->SetUVAnimTira(JI(a, "frames", 1), JF(a, "fps", 30.0f),
-                        JS(a, "eje", "u") == "v" ? 1 : 0, JI(a, "desfase", 0),
-                        JF(a, "ancho", 1.0f), JF(a, "alto", 1.0f));
+    mesh->SetUVAnimStrip(JI(a, "frames", 1), JF(a, "fps", 30.0f),
+                        JS(a, "axis", "u") == "v" ? 1 : 0, JI(a, "offset", 0),
+                        JF(a, "width", 1.0f), JF(a, "height", 1.0f));
 }
 
-// true mientras se GENERAN los hijos de una instancia de prefab (W3dPrefabConstruirHijos, mas abajo): sus
-// vertex anims COMPARTEN los frames entre instancias (ver ClaveBlobAnim)
-static bool gGenerandoPrefab = false;
-// la CLAVE de un blob de frames para compartirlo (VertexAnimAdoptarClave): su ruta + su medida + su CRC. El
+// true mientras se GENERAN los hijos de una instancia de prefab (W3dPrefabBuildChildren, mas abajo): sus
+// vertex anims COMPARTEN los frames entre instancias (ver KeyBlobAnim)
+static bool gGeneratingPrefab = false;
+// la CLAVE de un blob de frames para compartirlo (VertexAnimAdoptKey): su ruta + su medida + su CRC. El
 // contenido entra en la clave a proposito: re-guardar reescribe la entrada con otros frames bajo el MISMO
 // nombre, y las instancias generadas antes siguen con los viejos hasta regenerarse
-static std::string ClaveBlobAnim(const std::string& ruta, const std::vector<unsigned char>& datos) {
+static std::string KeyBlobAnim(const std::string& path, const std::vector<unsigned char>& data) {
     char b[48];
-    snprintf(b, sizeof(b), "|%lu|%08x", (unsigned long)datos.size(), W3dZipCrc32(&datos[0], datos.size()));
-    return "blob:" + ruta + b;
+    snprintf(b, sizeof(b), "|%lu|%08x", (unsigned long)data.size(), W3dZipCrc32(&data[0], data.size()));
+    return "blob:" + path + b;
 }
 
-static void CargarAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
-    JVal* anims = JHijo(j, "anims", 5); if (!anims || !mesh) return;
-    for (size_t i = 0; i < anims->lista.size(); i++) {
-        JVal* a = anims->lista[i]; if (a->tipo != 4) continue;
+static void LoadAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
+    JVal* anims = JChild(j, "anims", 5); if (!anims || !mesh) return;
+    for (size_t i = 0; i < anims->list.size(); i++) {
+        JVal* a = anims->list[i]; if (a->type != 4) continue;
         VertexAnimation* anim = new VertexAnimation(
-            NULL, JS(a, "nombre", "anim"), JB(a, "normales", false),
-            JF(a, "velocidad", 1.0f), JB(a, "repetir", true), JI(a, "proxima", -1));
-        anim->basePath  = RutaJson(JS(a, "base", ""), base);
+            NULL, JS(a, "name", "anim"), JB(a, "normals", false),
+            JF(a, "speed", 1.0f), JB(a, "repeat", true), JI(a, "next", -1));
+        anim->basePath  = JsonPath(JS(a, "base", ""), base);
         // padding = ancho del numero de frame en el nombre de archivo ("0001.obj"). Va DIRECTO
         // a un std::setw: un valor absurdo del archivo hacia que LoadFrames armara una cadena de
         // ese tamano (padding: 2000000000 = 2 GB por nombre de archivo).
-        anim->padding   = JIRango(a, "padding", 0, 0, 16, "vertex anim");
-        anim->startFrame= JI(a, "inicio", 1);
-        anim->endFrame  = JI(a, "fin", 250);
+        anim->padding   = JIRange(a, "padding", 0, 0, 16, "vertex anim");
+        anim->startFrame= JI(a, "start", 1);
+        anim->endFrame  = JI(a, "end", 250);
         anim->fps       = JI(a, "fps", 30);
         anim->target    = mesh;
         // FRAMES: preferir el blob binario (self-contained). Legacy: frameCount + .obj.
         std::string buffers = JS(a, "buffers", "");
-        bool cargado = false;
+        bool loaded = false;
         if (!buffers.empty()) {
-            std::vector<unsigned char> datos;
-            // por RutaJson como TODAS las demas referencias: en v4 el blob es la
-            // entrada "animaciones/<slug>.bin" y sale del contenedor montado; en v3
+            std::vector<unsigned char> data;
+            // por JsonPath como TODAS las demas referencias: en v4 el blob es la
+            // entrada "animations/<slug>.bin" y sale del contenedor montado; en v3
             // era un archivo suelto relativo a la carpeta del proyecto/zip
-            if (w3dFileSystem::ReadFileBytes(RutaJson(buffers, base), datos) && !datos.empty()) {
+            if (w3dFileSystem::ReadFileBytes(JsonPath(buffers, base), data) && !data.empty()) {
                 // (una INSTANCIA DE PREFAB: las N mallas generadas de la misma definicion leen el MISMO blob ->
                 //  la primera registra sus frames y las demas los adoptan: UN juego de frames, como la geometria)
-                const std::string clave = gGenerandoPrefab ? ClaveBlobAnim(RutaJson(buffers, base), datos) : std::string();
-                if (!clave.empty() && VertexAnimAdoptarClave(*anim, clave, mesh->vertexSize)) cargado = true;
+                const std::string key = gGeneratingPrefab ? KeyBlobAnim(JsonPath(buffers, base), data) : std::string();
+                if (!key.empty() && VertexAnimAdoptKey(*anim, key, mesh->vertexSize)) loaded = true;
                 else {
-                    cargado = VertexAnimDeserializar(*anim, &datos[0], datos.size());
-                    if (cargado && !clave.empty() && anim->vcount == mesh->vertexSize) VertexAnimRegistrarClave(*anim, clave);
+                    loaded = VertexAnimDeserialize(*anim, &data[0], data.size());
+                    if (loaded && !key.empty() && anim->vcount == mesh->vertexSize) VertexAnimRegisterKey(*anim, key);
                 }
             }
             // ---- EL BLOB ESTABA Y NO SE PUDO LEER: NI SILENCIO NI BORRARLO -------------
-            //  Hermano exacto de W3dAjenos::noCargo de la malla, y quedaba abierto: aca no
+            //  Hermano exacto de W3dForeign::notLoaded de la malla, y quedaba abierto: aca no
             //  salia NI UNA LINEA de log. La anim quedaba con 0 frames y el proximo guardado
-            //  la borraba PARA SIEMPRE (EscribirAnimsVertex no emite "buffers" sin frames y
-            //  PreservarPasajeras descarta a proposito todo lo huerfano bajo "animaciones/",
+            //  la borraba PARA SIEMPRE (WriteAnimsVertex no emite "buffers" sin frames y
+            //  PreserveTransient descarta a proposito todo lo huerfano bajo "animations/",
             //  o sea que el blob viejo desaparece del zip y la anim queda como cascara vacia).
-            //  Se marca y se avisa EN PANTALLA; el guardado se frena en EscribirAnimsVertex.
-            if (!cargado) {
-                anim->noCargo = true;
+            //  Se marca y se avisa EN PANTALLA; el guardado se frena en WriteAnimsVertex.
+            if (!loaded) {
+                anim->notLoaded = true;
                 w3dLogfE("[W3D] '%s': no pude leer los frames de la vertex anim '%s' (%s): queda VACIA y no la voy a guardar encima",
                          mesh->name.c_str(), anim->name.c_str(), buffers.c_str());
                 W3dAvisof(true, T("Could not read the frames of the animation '%s' of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)"),
-                          W3dNombreCorto(anim->name).c_str(), W3dNombreCorto(mesh->name).c_str());
+                          W3dShortName(anim->name).c_str(), W3dShortName(mesh->name).c_str());
             }
         }
-        if (cargado && mesh->vertexSize > 0 && anim->vcount != mesh->vertexSize) {
+        if (loaded && mesh->vertexSize > 0 && anim->vcount != mesh->vertexSize) {
             // ULTIMO RECURSO, y desde la etapa 3 casi nunca se usa: los keyframes son paralelos a
             // vertex[] (POR RENDER-VERT) y el GLB re-splitteaba los verts (24 -> 36), asi que
             // habia que ADIVINAR el vertice por CERCANIA DE POSICION contra la pose base. Con la
@@ -2001,14 +2001,14 @@ static void CargarAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
             // esto queda solo para los .w3d viejos (y para una malla editada por fuera).
             w3dLogfW("[W3D] '%s': la vertex anim '%s' trae %d vertices y la malla tiene %d -> remapeo por POSICION (aproximado)",
                      mesh->name.c_str(), anim->name.c_str(), anim->vcount, mesh->vertexSize);
-            g_w3dVaRemapeos++;
+            g_w3dVaRemaps++;
             anim->target = mesh;
-            VertexAnimRemapPorPosicion(*anim, mesh);
+            VertexAnimRemapByPosition(*anim, mesh);
         }
         // legacy .obj (LoadVertexFrames los lee): es el tope del bucle que abre un .obj por frame.
         // Acotado para que un numero disparatado no se traduzca en millones de aperturas de archivo.
-        if (!cargado) anim->frameCount = JIRango(a, "frames", 0, 0, 100000, "vertex anim");
-        CargarCurvasAnim(a, anim);
+        if (!loaded) anim->frameCount = JIRange(a, "frames", 0, 0, 100000, "vertex anim");
+        LoadCurvesAnim(a, anim);
         NewActiveVertexAnimation(mesh, anim);
     }
     LoadVertexFrames(mesh);   // solo carga de .obj los que NO trajeron blob (frames vacios)
@@ -2020,26 +2020,26 @@ static void CargarAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
 //  cuando ya existen todos los objetos) + los "vgroups" por POSICION.
 // ===========================================================================
 static void JVec3(JVal* j, const char* k, Vector3& v) {
-    JVal* x = JHijo(j, k, 5);
-    if (x && x->lista.size() >= 3) { v.x = (float)x->lista[0]->num; v.y = (float)x->lista[1]->num; v.z = (float)x->lista[2]->num; }
+    JVal* x = JChild(j, k, 5);
+    if (x && x->list.size() >= 3) { v.x = (float)x->list[0]->num; v.y = (float)x->list[1]->num; v.z = (float)x->list[2]->num; }
 }
-static void LeerCapas(JVal* jc, std::vector<W3dCapaAnim>& out); // capas del MIX (definida mas abajo)
+static void ReadLayers(JVal* jc, std::vector<W3dLayerAnim>& out); // capas del MIX (definida mas abajo)
 static void JMat16(JVal* j, const char* k, Matrix4& m) {
-    JVal* x = JHijo(j, k, 5);
-    if (x && x->lista.size() >= 16) for (int i = 0; i < 16; i++) m.m[i] = (float)x->lista[i]->num;
+    JVal* x = JChild(j, k, 5);
+    if (x && x->list.size() >= 16) for (int i = 0; i < 16; i++) m.m[i] = (float)x->list[i]->num;
 }
-struct PendModArm { Mesh* m; std::string nombre; };
+struct PendModArm { Mesh* m; std::string name; };
 static std::vector<PendModArm> gPendModArm; // referencias modArmature a resolver al final de la carga
 
 // AUDIT versiones: el STACK de modificadores (Mirror/Screw/SubSurf/Array/Boolean)
 // ahora viaja en el .w3d ("modificadores"). El target del Mirror va POR NOMBRE y se
 // resuelve al final de la carga (como modArmature); las mallas con stack se anotan
 // para regenerar su malla de render cuando ya esta todo resuelto.
-struct PendModTgt { Modifier* md; std::string nombre; Mesh* m; };   // m = la malla del modificador (el scope)
+struct PendModTgt { Modifier* md; std::string name; Mesh* m; };   // m = la malla del modificador (el scope)
 static std::vector<PendModTgt> gPendModTgt;
 static std::vector<Mesh*> gPendModGen;
 
-static int TipoModInt(const std::string& t) {
+static int ModTypeInt(const std::string& t) {
     if (t == "screw")   return ModifierType::Screw;
     if (t == "mirror")  return ModifierType::Mirror;
     if (t == "array")   return ModifierType::Array;
@@ -2051,150 +2051,150 @@ static int TipoModInt(const std::string& t) {
 
 // lee una lista JSON de 3 bools ("ejes"/"copyPos") con defaults
 static void JBools3(JVal* j, const char* k, bool* a, bool* b, bool* c) {
-    JVal* v = JHijo(j, k, 5);
+    JVal* v = JChild(j, k, 5);
     if (!v) return;
-    if (v->lista.size() > 0 && v->lista[0]->tipo == 3) *a = v->lista[0]->b;
-    if (v->lista.size() > 1 && v->lista[1]->tipo == 3) *b = v->lista[1]->b;
-    if (v->lista.size() > 2 && v->lista[2]->tipo == 3) *c = v->lista[2]->b;
+    if (v->list.size() > 0 && v->list[0]->type == 3) *a = v->list[0]->b;
+    if (v->list.size() > 1 && v->list[1]->type == 3) *b = v->list[1]->b;
+    if (v->list.size() > 2 && v->list[2]->type == 3) *c = v->list[2]->b;
 }
 
-static void CargarModificadores(JVal* j, Mesh* mesh) {
-    JVal* jm = JHijo(j, "modificadores", 5);
+static void LoadModifiers(JVal* j, Mesh* mesh) {
+    JVal* jm = JChild(j, "modifiers", 5);
     if (!jm || !mesh) return;
-    for (size_t i = 0; i < jm->lista.size(); i++) {
-        JVal* e = jm->lista[i]; if (!e || e->tipo != 4) continue;
-        int tipo = TipoModInt(JS(e, "tipo", ""));
-        if (tipo < 0) { w3dLogfW("[W3D] modificador de tipo desconocido '%s': se ignora", JS(e, "tipo", "").c_str()); continue; }
-        Modifier* md = new Modifier(tipo, JS(e, "nombre", NombreTipoModificador(tipo)));
-        md->mostrarViewport = JB(e, "viewport", true);
-        md->mostrarEdit     = JB(e, "edit", true);
-        if (tipo == ModifierType::Mirror) {
-            JBools3(e, "ejes", &md->ejeX, &md->ejeY, &md->ejeZ);
+    for (size_t i = 0; i < jm->list.size(); i++) {
+        JVal* e = jm->list[i]; if (!e || e->type != 4) continue;
+        int type = ModTypeInt(JS(e, "type", ""));
+        if (type < 0) { w3dLogfW("[W3D] modificador de tipo desconocido '%s': se ignora", JS(e, "type", "").c_str()); continue; }
+        Modifier* md = new Modifier(type, JS(e, "name", ModifierTypeName(type)));
+        md->showViewport = JB(e, "viewport", true);
+        md->showEdit     = JB(e, "edit", true);
+        if (type == ModifierType::Mirror) {
+            JBools3(e, "axes", &md->axisX, &md->axisY, &md->axisZ);
             md->merge     = JB(e, "merge", md->merge);
             md->mergeDist = JF(e, "mergeDist", md->mergeDist);
             md->clipping  = JB(e, "clipping", md->clipping);
             std::string tg = JS(e, "target", "");
-            if (!tg.empty()) { PendModTgt p; p.md = md; p.nombre = tg; p.m = mesh; gPendModTgt.push_back(p); }
-        } else if (tipo == ModifierType::Boolean) {
+            if (!tg.empty()) { PendModTgt p; p.md = md; p.name = tg; p.m = mesh; gPendModTgt.push_back(p); }
+        } else if (type == ModifierType::Boolean) {
             const std::string op = JS(e, "op", "difference");
             md->boolOp = (op == "intersect") ? 0 : (op == "union") ? 1 : 2;
             std::string tg = JS(e, "target", "");
-            if (!tg.empty()) { PendModTgt p; p.md = md; p.nombre = tg; p.m = mesh; gPendModTgt.push_back(p); }
-        } else if (tipo == ModifierType::Array) {
-            md->arrCount   = JF(e, "copias", md->arrCount);
-            md->arrRelOn   = JB(e, "relativo", md->arrRelOn);
-            md->arrConstOn = JB(e, "constante", md->arrConstOn);
-            JVal* r = JHijo(e, "rel", 5);     // (5 = lista; puede venir compactada: JFila*)
-            if (r && JFilaLen(r) >= 3) { md->arrRelX = JFilaNum(r, 0, md->arrRelX); md->arrRelY = JFilaNum(r, 1, md->arrRelY); md->arrRelZ = JFilaNum(r, 2, md->arrRelZ); }
-            JVal* c = JHijo(e, "const", 5);
-            if (c && JFilaLen(c) >= 3) { md->arrConstX = JFilaNum(c, 0, md->arrConstX); md->arrConstY = JFilaNum(c, 1, md->arrConstY); md->arrConstZ = JFilaNum(c, 2, md->arrConstZ); }
+            if (!tg.empty()) { PendModTgt p; p.md = md; p.name = tg; p.m = mesh; gPendModTgt.push_back(p); }
+        } else if (type == ModifierType::Array) {
+            md->arrCount   = JF(e, "copies", md->arrCount);
+            md->arrRelOn   = JB(e, "relative", md->arrRelOn);
+            md->arrConstOn = JB(e, "constant", md->arrConstOn);
+            JVal* r = JChild(e, "rel", 5);     // (5 = lista; puede venir compactada: JFila*)
+            if (r && JRowLen(r) >= 3) { md->arrRelX = JRowNum(r, 0, md->arrRelX); md->arrRelY = JRowNum(r, 1, md->arrRelY); md->arrRelZ = JRowNum(r, 2, md->arrRelZ); }
+            JVal* c = JChild(e, "const", 5);
+            if (c && JRowLen(c) >= 3) { md->arrConstX = JRowNum(c, 0, md->arrConstX); md->arrConstY = JRowNum(c, 1, md->arrConstY); md->arrConstZ = JRowNum(c, 2, md->arrConstZ); }
             md->arrMerge     = JB(e, "merge", md->arrMerge);
             md->arrMergeDist = JF(e, "mergeDist", md->arrMergeDist);
             std::string tg = JS(e, "target", "");
-            if (!tg.empty()) { PendModTgt p; p.md = md; p.nombre = tg; p.m = mesh; gPendModTgt.push_back(p); }
-        } else if (tipo == ModifierType::SubdivisionSurface) {
-            md->subLevel       = JF(e, "nivel", md->subLevel);
-            md->subRenderLevel = JF(e, "nivelRender", md->subRenderLevel);
+            if (!tg.empty()) { PendModTgt p; p.md = md; p.name = tg; p.m = mesh; gPendModTgt.push_back(p); }
+        } else if (type == ModifierType::SubdivisionSurface) {
+            md->subLevel       = JF(e, "level", md->subLevel);
+            md->subRenderLevel = JF(e, "renderLevel", md->subRenderLevel);
             md->subSimple      = JB(e, "simple", md->subSimple);
-        } else if (tipo == ModifierType::Screw) {
-            md->screwAngle       = JF(e, "angulo", md->screwAngle);
-            md->screwHeight      = JF(e, "altura", md->screwHeight);
-            md->screwSteps       = JF(e, "pasos", md->screwSteps);
-            md->screwRenderSteps = JF(e, "pasosRender", md->screwRenderSteps);
-            md->screwAxis        = JI(e, "eje", md->screwAxis);
+        } else if (type == ModifierType::Screw) {
+            md->screwAngle       = JF(e, "angle", md->screwAngle);
+            md->screwHeight      = JF(e, "height", md->screwHeight);
+            md->screwSteps       = JF(e, "steps", md->screwSteps);
+            md->screwRenderSteps = JF(e, "renderSteps", md->screwRenderSteps);
+            md->screwAxis        = JI(e, "axis", md->screwAxis);
             md->screwStretchU    = JB(e, "stretchU", md->screwStretchU);
             md->screwStretchV    = JB(e, "stretchV", md->screwStretchV);
-            md->screwSmooth      = JB(e, "suave", md->screwSmooth);
-            md->screwMerge       = JB(e, "soldar", md->screwMerge);
+            md->screwSmooth      = JB(e, "smooth", md->screwSmooth);
+            md->screwMerge       = JB(e, "weld", md->screwMerge);
             md->screwFlip        = JB(e, "flip", md->screwFlip);
-        } else if (tipo == ModifierType::CullingTri) {
+        } else if (type == ModifierType::CullingTri) {
             // Culling por triangulo: metodo + sector/celda activo + NOMBRE del sidecar.
             // Los DATOS no viajan en el .w3d (son megabytes de indices): el sidecar se
             // ingiere al contenedor como cualquier asset y se relee de ahi. Sin "pvs"/
             // "vis" (archivos guardados antes de esto) se derivan del origen, como
             // siempre. "bsp" (el metodo viejo que nunca corto nada) cae a "celdas".
-            std::string metodo = JS(e, "metodo", "triangulos");
-            md->metodoPVS  = (metodo == "celdas" || metodo == "bsp") ? 1 : 0;
+            std::string method = JS(e, "method", "triangles");
+            md->methodPVS  = (method == "cells" || method == "bsp") ? 1 : 0;
             md->sectorPVS  = JI(e, "sector", 0);
             // fallback de celda vacia (-1 = completa, N = celda N, 0/ausente = nada)
             md->sectorFallback = JI(e, "sectorFallback", 0);
-            md->pvsArchivo = RutaJsonCampo(JS(e, "pvs", ""), gBaseProyecto);   // (entradas de la libreria si es de una)
-            md->visArchivo = RutaJsonCampo(JS(e, "vis", ""), gBaseProyecto);
-            md->pathNombre = JS(e, "path", "");                       // recorrido: el motor elige la celda solo
-            md->soloCamaraActiva = JB(e, "soloCamaraActiva", true);
-            { std::string mask = JS(e, "ramas", "");                  // "1101" = rama 2 apagada
-              for (size_t r = 0; r < mask.size(); r++) md->ramasOn.push_back(mask[r] != '0'); }
+            md->pvsFile  = JsonPathField(JS(e, "pvs", ""), gBaseProject);   // (entradas de la libreria si es de una)
+            md->visFile  = JsonPathField(JS(e, "vis", ""), gBaseProject);
+            md->pathName = JS(e, "path", "");                       // recorrido: el motor elige la celda solo
+            md->onlyCameraActive = JB(e, "activeCameraOnly", true);
+            { std::string mask = JS(e, "branches", "");                  // "1101" = rama 2 apagada
+              for (size_t r = 0; r < mask.size(); r++) md->branchesOn.push_back(mask[r] != '0'); }
         }
-        mesh->modificadores.push_back(md);
+        mesh->modifiers.push_back(md);
     }
-    if (!mesh->modificadores.empty()) {
-        mesh->modificadorActivo = (int)mesh->modificadores.size() - 1;
+    if (!mesh->modifiers.empty()) {
+        mesh->activeModifier = (int)mesh->modifiers.size() - 1;
         gPendModGen.push_back(mesh);   // regenerar cuando los targets esten resueltos
     }
 }
 
-static Armature* BuscarArmaturePorNombre(Object* nodo, const std::string& n) {
-    if (!nodo) return NULL;
-    if (nodo->getType() == ObjectType::armature && nodo->name == n) return (Armature*)nodo;
-    for (size_t i = 0; i < nodo->Childrens.size(); i++) {
-        Armature* r = BuscarArmaturePorNombre(nodo->Childrens[i], n);
+static Armature* FindArmatureByName(Object* node, const std::string& n) {
+    if (!node) return NULL;
+    if (node->getType() == ObjectType::armature && node->name == n) return (Armature*)node;
+    for (size_t i = 0; i < node->Childrens.size(); i++) {
+        Armature* r = FindArmatureByName(node->Childrens[i], n);
         if (r) return r;
     }
     return NULL;
 }
 // el scope de una INSTANCIA DE PREFAB (sus hijos generados, sin entrar a las anidadas): el armature del
-// enemigo 7 es el SUYO, no el del primero (ver W3dEsFronteraScope en Objects.h)
-static Armature* BuscarArmatureEnScope(Object* nodo, const std::string& n) {
-    for (size_t i = 0; i < nodo->Childrens.size(); i++) {
-        Object* h = nodo->Childrens[i];
+// enemigo 7 es el SUYO, no el del primero (ver W3dIsBoundaryScope en Objects.h)
+static Armature* FindArmatureInScope(Object* node, const std::string& n) {
+    for (size_t i = 0; i < node->Childrens.size(); i++) {
+        Object* h = node->Childrens[i];
         if (!h) continue;
         if (h->getType() == ObjectType::armature && h->name == n) return (Armature*)h;
-        if (W3dEsFronteraScope(h)) continue;
-        Armature* r = BuscarArmatureEnScope(h, n);
+        if (W3dIsBoundaryScope(h)) continue;
+        Armature* r = FindArmatureInScope(h, n);
         if (r) return r;
     }
     return NULL;
 }
 // el armature 'n' COMO LO VE la malla 'm': primero adentro de su instancia de prefab (y las de afuera),
 // despues en todo el arbol del que cuelga (la regla de siempre: el primero en preorden)
-static Armature* BuscarArmatureDesde(Object* m, const std::string& n) {
-    for (Object* inst = W3dInstanciaDe(m); inst; inst = W3dInstanciaDe(inst)) {
-        Armature* a = BuscarArmatureEnScope(inst, n);
+static Armature* FindArmatureFrom(Object* m, const std::string& n) {
+    for (Object* inst = W3dInstanceOf(m); inst; inst = W3dInstanceOf(inst)) {
+        Armature* a = FindArmatureInScope(inst, n);
         if (a) return a;
     }
-    Object* raiz = W3dRaizDe(m);
-    return BuscarArmaturePorNombre(raiz ? raiz : SceneCollection, n);
+    Object* root = W3dRootOf(m);
+    return FindArmatureByName(root ? root : SceneCollection, n);
 }
 // al FINAL de la carga (ya existen todos los objetos): cada malla con "modArmature" recupera su
 // modificador Armature + skinArmature, y el rig autorado queda preparado para deformar.
-static void ResolverModArmaturePendientes() {
+static void ResolvePendingModArmature() {
     for (size_t i = 0; i < gPendModArm.size(); i++) {
         PendModArm& p = gPendModArm[i];
-        Armature* a = BuscarArmatureDesde(p.m, p.nombre);
-        if (!a) { w3dLogfW("[W3D] modArmature '%s': no hay un armature con ese nombre (la malla queda sin rig)", p.nombre.c_str()); continue; }
-        Modifier* md = new Modifier(ModifierType::Armature, NombreTipoModificador(ModifierType::Armature));
+        Armature* a = FindArmatureFrom(p.m, p.name);
+        if (!a) { w3dLogfW("[W3D] modArmature '%s': no hay un armature con ese nombre (la malla queda sin rig)", p.name.c_str()); continue; }
+        Modifier* md = new Modifier(ModifierType::Armature, ModifierTypeName(ModifierType::Armature));
         md->target = (Object*)a;
-        p.m->modificadores.push_back(md);
+        p.m->modifiers.push_back(md);
         p.m->skinArmature = a;
         p.m->lastSkinFrame = -999999;
-        PrepararSkinAutorado(a); // no-op en rigs importados
+        PrepareAuthoredSkin(a); // no-op en rigs importados
     }
     gPendModArm.clear();
     // targets del stack de modificadores (el plano del Mirror puede ser CUALQUIER
     // objeto de la escena): recien ahora existen todos -> resolver por nombre
     for (size_t i = 0; i < gPendModTgt.size(); i++) {
-        Object* t = W3dBuscarNombreDesde(gPendModTgt[i].m, gPendModTgt[i].nombre);
+        Object* t = W3dFindNameFrom(gPendModTgt[i].m, gPendModTgt[i].name);
         if (t) gPendModTgt[i].md->target = t;
-        else w3dLogfW("[W3D] modificador con target '%s': no hay un objeto con ese nombre", gPendModTgt[i].nombre.c_str());
+        else w3dLogfW("[W3D] modificador con target '%s': no hay un objeto con ese nombre", gPendModTgt[i].name.c_str());
     }
     gPendModTgt.clear();
     // con los targets resueltos, regenerar la malla de render de cada stack cargado
     for (size_t i = 0; i < gPendModGen.size(); i++)
-        gPendModGen[i]->GenerarMallaModificada();
+        gPendModGen[i]->GenerateMeshModified();
     gPendModGen.clear();
 }
 // lee un bloque "corners" ([[x,y,z,u,v,nx,ny,nz,w], ...]) y lo carga en 'ug' (UV GROUP: pesos por
-// RENDER-VERT). Clave GEOMETRICA (ver el comentario largo en GuardarW3D.cpp):
+// RENDER-VERT). Clave GEOMETRICA (ver el comentario largo en SaveW3D.cpp):
 //     v2: [x,y,z, u,v, nx,ny,nz, w]   (9 numeros)
 //     v1: [x,y,z, u,v, w]             (6 numeros, sin normal: AMBIGUA en el cubo por defecto,
 //                                      donde las 6 caras comparten el uv)
@@ -2208,52 +2208,52 @@ static void ResolverModArmaturePendientes() {
 // pesos vuelve en 0. La clave UV se compara contra el REST del skinning 2D si es valido (mesh->uv
 // puede venir ya deformado por la pose). Fila sin match: se AVISA por el log (antes se descartaba
 // en silencio y la perdida era invisible).
-static void CargarCornersEnUVGroup(JVal* cor, Mesh* mesh, UVGroup* ug) {
+static void LoadCornersInUVGroup(JVal* cor, Mesh* mesh, UVGroup* ug) {
     if (!cor || !mesh || !ug || !mesh->uv) return;
     const bool rest = ((int)mesh->uv2dRest.size() == mesh->vertexSize * 2);
     const GLfloat* uvSrc = rest ? &mesh->uv2dRest[0] : mesh->uv;
-    std::vector<char> yaPuesto((size_t)mesh->vertexSize, 0); // sin entradas duplicadas al mismo render-vert
-    int sinMatch = 0, filasV1 = 0, repetidas = 0;
-    for (size_t k = 0; k < cor->lista.size(); k++) {
-        JVal* row = cor->lista[k]; if (!row || row->tipo != 5 || JFilaLen(row) < 6) continue;   // filas compactas (JVal::nums)
-        const bool conNormal = (JFilaLen(row) >= 9);
-        if (!conNormal) filasV1++;
-        float x = JFilaNum(row, 0, 0), y = JFilaNum(row, 1, 0), z = JFilaNum(row, 2, 0);
-        float u = JFilaNum(row, 3, 0), v = JFilaNum(row, 4, 0);
+    std::vector<char> alreadyPlaced((size_t)mesh->vertexSize, 0); // sin entradas duplicadas al mismo render-vert
+    int noMatch = 0, rowsV1 = 0, repeated = 0;
+    for (size_t k = 0; k < cor->list.size(); k++) {
+        JVal* row = cor->list[k]; if (!row || row->type != 5 || JRowLen(row) < 6) continue;   // filas compactas (JVal::nums)
+        const bool withNormal = (JRowLen(row) >= 9);
+        if (!withNormal) rowsV1++;
+        float x = JRowNum(row, 0, 0), y = JRowNum(row, 1, 0), z = JRowNum(row, 2, 0);
+        float u = JRowNum(row, 3, 0), v = JRowNum(row, 4, 0);
         float nx = 0.0f, ny = 0.0f, nz = 0.0f;
-        if (conNormal) { nx = JFilaNum(row, 5, 0); ny = JFilaNum(row, 6, 0); nz = JFilaNum(row, 7, 0); }
-        float w = JFilaNum(row, conNormal ? 8 : 5, 0);
+        if (withNormal) { nx = JRowNum(row, 5, 0); ny = JRowNum(row, 6, 0); nz = JRowNum(row, 7, 0); }
+        float w = JRowNum(row, withNormal ? 8 : 5, 0);
         // pasada 1: la mejor distancia. pasada 2: todos los que empatan con ella.
-        float mejorD = 1e-4f; bool hay = false;
-        for (int pasada = 0; pasada < 2; pasada++) {
+        float bestD = 1e-4f; bool has = false;
+        for (int pass = 0; pass < 2; pass++) {
             for (int i = 0; i < mesh->vertexSize; i++) {
                 float dx = mesh->vertex[i*3]-x, dy = mesh->vertex[i*3+1]-y, dz = mesh->vertex[i*3+2]-z;
                 float du = uvSrc[i*2]-u, dv = uvSrc[i*2+1]-v;
                 float d = dx*dx + dy*dy + dz*dz + du*du + dv*dv;
-                if (conNormal && mesh->normals) {
+                if (withNormal && mesh->normals) {
                     float mx = mesh->normals[i*3]/127.0f, my = mesh->normals[i*3+1]/127.0f, mz = mesh->normals[i*3+2]/127.0f;
                     float L = sqrtf(mx*mx + my*my + mz*mz);
                     if (L > 1e-6f) { mx /= L; my /= L; mz /= L; }
                     float dnx = mx-nx, dny = my-ny, dnz = mz-nz;
                     d += dnx*dnx + dny*dny + dnz*dnz;
                 }
-                if (pasada == 0) { if (d < mejorD) { mejorD = d; hay = true; } }
-                else if (d <= mejorD + 1e-8f) {
-                    if (yaPuesto[(size_t)i]) { repetidas++; continue; }
-                    yaPuesto[(size_t)i] = 1;
-                    ug->verts.push_back(i); ug->pesos.push_back(w);
+                if (pass == 0) { if (d < bestD) { bestD = d; has = true; } }
+                else if (d <= bestD + 1e-8f) {
+                    if (alreadyPlaced[(size_t)i]) { repeated++; continue; }
+                    alreadyPlaced[(size_t)i] = 1;
+                    ug->verts.push_back(i); ug->weights.push_back(w);
                 }
             }
-            if (!hay) break;
+            if (!has) break;
         }
-        if (!hay) sinMatch++;
+        if (!has) noMatch++;
     }
-    if (sinMatch)  w3dLogfW("[W3D] UV group '%s': %d de %d filas sin match en la malla '%s' (esos corners quedan en peso 0)",
-                            ug->nombre.c_str(), sinMatch, (int)cor->lista.size(), mesh->name.c_str());
-    if (repetidas) w3dLogfW("[W3D] UV group '%s': %d filas cayeron en un render-vert ya asignado (clave ambigua); gana la primera",
-                            ug->nombre.c_str(), repetidas);
-    if (filasV1)   w3dLogfW("[W3D] UV group '%s': %d filas en formato viejo (sin normal); la clave puede ser ambigua entre caras que se pisan en UV. Volve a guardar el proyecto para migrarlas",
-                            ug->nombre.c_str(), filasV1);
+    if (noMatch)  w3dLogfW("[W3D] UV group '%s': %d de %d filas sin match en la malla '%s' (esos corners quedan en peso 0)",
+                            ug->name.c_str(), noMatch, (int)cor->list.size(), mesh->name.c_str());
+    if (repeated) w3dLogfW("[W3D] UV group '%s': %d filas cayeron en un render-vert ya asignado (clave ambigua); gana la primera",
+                            ug->name.c_str(), repeated);
+    if (rowsV1)   w3dLogfW("[W3D] UV group '%s': %d filas en formato viejo (sin normal); la clave puede ser ambigua entre caras que se pisan en UV. Volve a guardar el proyecto para migrarlas",
+                            ug->name.c_str(), rowsV1);
 }
 
 // "vgroups" / "uvgroups" de una malla. Los DOS grupos son entidades distintas (ver el bloque
@@ -2267,69 +2267,69 @@ static void CargarCornersEnUVGroup(JVal* cor, Mesh* mesh, UVGroup* ug) {
 // funcionando y al re-guardar el proyecto ya sale en "uvgroups". Un .w3d mas viejo (sin corners de
 // ningun tipo) abre sin UV groups: sus vertex groups quedan intactos y el skinning 2D no deforma
 // hasta que se pinten UV groups (avisado por log si la malla tiene armature 2D).
-static void JsonArm2DCargar(JVal* j, Mesh* mesh); // armatures 2D (formato nuevo + migracion del viejo), mas abajo
+static void JsonArm2DLoad(JVal* j, Mesh* mesh); // armatures 2D (formato nuevo + migracion del viejo), mas abajo
 class Material;
-static Material* MaterialPorNombre(const std::string& nom); // bloque raiz "materiales", mas abajo
+static Material* MaterialByName(const std::string& name); // bloque raiz "materiales", mas abajo
 
-static void CargarRigMesh(JVal* j, Mesh* mesh) {
+static void LoadRigMesh(JVal* j, Mesh* mesh) {
     if (!j || !mesh) return;
     // QUIEN MANDA CUANDO ESTAN LOS DOS: si la malla ya trajo sus grupos del .w3dm (bloques VG y
     // UVG, por INDICE), el bloque viejo del JSON -que los guardaba por CLAVE GEOMETRICA porque el
     // GLB re-splitteaba los vertices- es una version ANTERIOR de lo mismo y se ignora con aviso.
     // Sin esta regla, un archivo con los dos abriria con los grupos DUPLICADOS.
-    const bool vgDelW3dm = !mesh->vertexGroups.empty();
-    const bool ugDelW3dm = !mesh->uvGroups.empty();
-    JVal* jg = JHijo(j, "vgroups", 5);
-    if (jg && vgDelW3dm) {
+    const bool vgOfW3dm = !mesh->vertexGroups.empty();
+    const bool ugOfW3dm = !mesh->uvGroups.empty();
+    JVal* jg = JChild(j, "vgroups", 5);
+    if (jg && vgOfW3dm) {
         w3dLogf("[W3D] '%s': la geometria ya trajo sus vertex groups (.w3dm) -> ignoro el bloque 'vgroups' del JSON (formato viejo)",
                 mesh->name.c_str());
         jg = NULL;
     }
     if (jg && mesh->vertex && mesh->vertexSize > 0) {
-        WeightPaintAsegurarMapa(mesh); // garantiza el mapa render-vert -> control-point
+        WeightPaintEnsureMap(mesh); // garantiza el mapa render-vert -> control-point
         // posicion representativa de cada control-point (primer render-vert que lo usa)
         int nCP = 0;
         for (int i = 0; i < mesh->vertexSize && i < (int)mesh->vertCtrlPoint.size(); i++)
             if (mesh->vertCtrlPoint[i] + 1 > nCP) nCP = mesh->vertCtrlPoint[i] + 1;
         std::vector<float> px(nCP, 0.0f), py(nCP, 0.0f), pz(nCP, 0.0f);
-        std::vector<char> tiene(nCP, 0);
+        std::vector<char> has(nCP, 0);
         for (int i = 0; i < mesh->vertexSize && i < (int)mesh->vertCtrlPoint.size(); i++) {
             int cp = mesh->vertCtrlPoint[i];
-            if (cp < 0 || cp >= nCP || tiene[cp]) continue;
+            if (cp < 0 || cp >= nCP || has[cp]) continue;
             px[cp] = mesh->vertex[i*3]; py[cp] = mesh->vertex[i*3+1]; pz[cp] = mesh->vertex[i*3+2];
-            tiene[cp] = 1;
+            has[cp] = 1;
         }
-        for (size_t g = 0; g < jg->lista.size(); g++) {
-            JVal* e = jg->lista[g]; if (!e || e->tipo != 4) continue;
-            VertexGroup* vg = new VertexGroup(JS(e, "nombre", "Group"));
-            JVal* pts = JHijo(e, "puntos", 5);
-            if (pts) for (size_t k = 0; k < pts->lista.size(); k++) {
-                JVal* row = pts->lista[k]; if (!row || row->tipo != 5 || JFilaLen(row) < 4) continue;   // filas compactas
-                float x = JFilaNum(row, 0, 0), y = JFilaNum(row, 1, 0), z = JFilaNum(row, 2, 0);
-                float w = JFilaNum(row, 3, 0);
-                int mejor = -1; float mejorD = 1e-4f; // tolerancia (los GLB guardan float32 exacto)
+        for (size_t g = 0; g < jg->list.size(); g++) {
+            JVal* e = jg->list[g]; if (!e || e->type != 4) continue;
+            VertexGroup* vg = new VertexGroup(JS(e, "name", "Group"));
+            JVal* pts = JChild(e, "points", 5);
+            if (pts) for (size_t k = 0; k < pts->list.size(); k++) {
+                JVal* row = pts->list[k]; if (!row || row->type != 5 || JRowLen(row) < 4) continue;   // filas compactas
+                float x = JRowNum(row, 0, 0), y = JRowNum(row, 1, 0), z = JRowNum(row, 2, 0);
+                float w = JRowNum(row, 3, 0);
+                int best = -1; float bestD = 1e-4f; // tolerancia (los GLB guardan float32 exacto)
                 for (int cp = 0; cp < nCP; cp++) {
-                    if (!tiene[cp]) continue;
+                    if (!has[cp]) continue;
                     float dx = px[cp]-x, dy = py[cp]-y, dz = pz[cp]-z;
                     float d = dx*dx + dy*dy + dz*dz;
-                    if (d < mejorD) { mejorD = d; mejor = cp; }
+                    if (d < bestD) { bestD = d; best = cp; }
                 }
-                if (mejor >= 0) { vg->verts.push_back(mejor); vg->pesos.push_back(w); }
+                if (best >= 0) { vg->verts.push_back(best); vg->weights.push_back(w); }
             }
             // MIGRACION del formato de un dia: los corners venian DENTRO del vertex group. Se
             // convierten en un UV GROUP del mismo nombre (entidad nueva) y el vertex group queda
             // puro por control-point. Al re-guardar el proyecto ya salen en "uvgroups".
-            JVal* corViejo = JHijo(e, "corners", 5);
-            if (corViejo && !corViejo->lista.empty() && mesh->uv) {
-                UVGroup* ug = new UVGroup(vg->nombre);
-                CargarCornersEnUVGroup(corViejo, mesh, ug);
+            JVal* oldCor = JChild(e, "corners", 5);
+            if (oldCor && !oldCor->list.empty() && mesh->uv) {
+                UVGroup* ug = new UVGroup(vg->name);
+                LoadCornersInUVGroup(oldCor, mesh, ug);
                 mesh->uvGroups.push_back(ug);
                 w3dLogf("[W3D] '%s': el vertex group '%s' traia pesos por corner del formato viejo -> migrados a un UV group homonimo",
-                        mesh->name.c_str(), ug->nombre.c_str());
+                        mesh->name.c_str(), ug->name.c_str());
             }
             mesh->vertexGroups.push_back(vg);
         }
-        if (!mesh->vertexGroups.empty()) mesh->grupoActivo = 0;
+        if (!mesh->vertexGroups.empty()) mesh->activeGroup = 0;
         mesh->lastSkinFrame = -999999;
     }
     // UV GROUPS (bloque propio). Se leen DESPUES de los vgroups para que la migracion de arriba
@@ -2338,8 +2338,8 @@ static void CargarRigMesh(JVal* j, Mesh* mesh) {
     // *** UN GRUPO DEL ARCHIVO = UN GRUPO EN MEMORIA ***  (perdida de datos F5)
     // Antes se buscaba un uvGroup HOMONIMO en la malla y, si aparecia, se le cargaban los
     // corners ENCIMA. Con eso un .w3d con dos "Mano" abria con UNO SOLO: los pesos del segundo
-    // se mezclaban con los del primero (y encima duplicados, porque CargarCornersEnUVGroup
-    // lleva su propio 'yaPuesto' por llamada) y el segundo grupo desaparecia sin un aviso.
+    // se mezclaban con los del primero (y encima duplicados, porque LoadCornersInUVGroup
+    // lleva su propio 'alreadyPlaced' por llamada) y el segundo grupo desaparecia sin un aviso.
     // Ademas ese espacio nunca llegaba a la reparacion de nombres, que es la que renumera los
     // repetidos con el criterio de siempre (primero-gana).
     // El UNICO merge que ERA intencional es el de la MIGRACION de arriba: los corners que
@@ -2349,103 +2349,103 @@ static void CargarRigMesh(JVal* j, Mesh* mesh) {
     // caso se distingue EXPLICITAMENTE: solo se completan los grupos que creo la migracion, UNO
     // POR NOMBRE (marcados como consumidos), y se les LIMPIAN los corners migrados antes de
     // cargar los del bloque nuevo (mezclar las dos versiones daba pesos duplicados).
-    // Cualquier otro homonimo entra como GRUPO SEPARADO y lo renumera W3dNombresRepararEscena.
-    JVal* jug = JHijo(j, "uvgroups", 5);
-    if (jug && ugDelW3dm) {
+    // Cualquier otro homonimo entra como GRUPO SEPARADO y lo renumera W3dNamesRepairScene.
+    JVal* jug = JChild(j, "uvgroups", 5);
+    if (jug && ugOfW3dm) {
         w3dLogf("[W3D] '%s': la geometria ya trajo sus UV groups (.w3dm) -> ignoro el bloque 'uvgroups' del JSON (formato viejo)",
                 mesh->name.c_str());
         jug = NULL;
     }
     if (jug && mesh->vertex && mesh->vertexSize > 0 && mesh->uv) {
-        const size_t nMigrados = mesh->uvGroups.size();   // los que dejo la migracion de "vgroups"
-        std::vector<char> migradoUsado(nMigrados, 0);
-        for (size_t g = 0; g < jug->lista.size(); g++) {
-            JVal* e = jug->lista[g]; if (!e || e->tipo != 4) continue;
-            std::string nom = JS(e, "nombre", "UV Group");
+        const size_t nMigrated = mesh->uvGroups.size();   // los que dejo la migracion de "vgroups"
+        std::vector<char> migratedUsed(nMigrated, 0);
+        for (size_t g = 0; g < jug->list.size(); g++) {
+            JVal* e = jug->list[g]; if (!e || e->type != 4) continue;
+            std::string name = JS(e, "name", "UV Group");
             UVGroup* ug = NULL;
-            for (size_t k = 0; k < nMigrados; k++)       // SOLO contra los migrados, y una sola vez
-                if (!migradoUsado[k] && mesh->uvGroups[k]->nombre == nom) {
-                    migradoUsado[k] = 1;
+            for (size_t k = 0; k < nMigrated; k++)       // SOLO contra los migrados, y una sola vez
+                if (!migratedUsed[k] && mesh->uvGroups[k]->name == name) {
+                    migratedUsed[k] = 1;
                     ug = mesh->uvGroups[k];
-                    ug->verts.clear(); ug->pesos.clear();  // el bloque nuevo MANDA sobre el migrado
+                    ug->verts.clear(); ug->weights.clear();  // el bloque nuevo MANDA sobre el migrado
                     w3dLogf("[W3D] '%s': el UV group '%s' venia migrado de 'vgroups' y el archivo trae "
-                            "tambien su bloque 'uvgroups' -> gana el bloque nuevo", mesh->name.c_str(), nom.c_str());
+                            "tambien su bloque 'uvgroups' -> gana el bloque nuevo", mesh->name.c_str(), name.c_str());
                     break;
                 }
-            if (!ug) { ug = new UVGroup(nom); mesh->uvGroups.push_back(ug); }
-            CargarCornersEnUVGroup(JHijo(e, "corners", 5), mesh, ug);
+            if (!ug) { ug = new UVGroup(name); mesh->uvGroups.push_back(ug); }
+            LoadCornersInUVGroup(JChild(e, "corners", 5), mesh, ug);
         }
         // el activo del formato viejo: el JSON no lo guardaba, asi que queda el 0. VA ADENTRO del
         // if a proposito: cuando los grupos vienen del .w3dm el activo lo dice el archivo
         // (directiva uvgactiva) y pisarlo aca rompia el round-trip byte a byte.
-        if (!mesh->uvGroups.empty()) mesh->uvGrupoActivo = 0;
+        if (!mesh->uvGroups.empty()) mesh->uvActiveGroup = 0;
     }
     std::string ma = JS(j, "modArmature", "");
     if (!ma.empty()) {
-        PendModArm p; p.m = mesh; p.nombre = ma;
+        PendModArm p; p.m = mesh; p.name = ma;
         gPendModArm.push_back(p);
     }
     // ARMATURES 2D DEL MESH: huesos en espacio UV (campo del objeto malla, junto a vgroups).
-    // La POSE del archivo se RE-APLICA aca mismo (Armature2DAplicar): el editor y el juego
+    // La POSE del archivo se RE-APLICA aca mismo (Armature2DApply): el editor y el juego
     // compilado ven las UV posadas al abrir.
     //
     // DOS FORMATOS:
-    //   NUEVO  "armatures2d": [ { nombre, huesos:[...], anims:[...], animActiva } ] + "armature2dActivo"
+    //   NUEVO  "armatures2d": [ { nombre, huesos:[...], anims:[...], activeAnim } ] + "armature2dActive"
     //   VIEJO  "armature2d": [huesos] + "anims2d": [clips] + "anim2dActiva"   (UN solo rig)
     // El viejo se MIGRA en silencio al armature 0 (se llama "Armature 2D") y al guardar sale ya en
     // el formato nuevo. Ausencia de los dos = malla sin rig 2D -> RETROCOMPAT total (la capa uv
     // horneada de la vertex anim sigue reproduciendose como siempre).
-    // Reusa CargarCurvaJson (generico, no sabe de huesos).
-    JsonArm2DCargar(j, mesh);
+    // Reusa LoadCurveJson (generico, no sabe de huesos).
+    JsonArm2DLoad(j, mesh);
 }
 
 // lee los huesos de un bloque JSON (lista de objetos) dentro de 'arm'
-static void JsonArm2DHuesos(JVal* jl, Armature2D* arm) {
+static void JsonArm2DBones(JVal* jl, Armature2D* arm) {
     if (!jl || !arm) return;
-    for (size_t b = 0; b < jl->lista.size(); b++) {
-        JVal* e = jl->lista[b]; if (!e || e->tipo != 4) continue;
+    for (size_t b = 0; b < jl->list.size(); b++) {
+        JVal* e = jl->list[b]; if (!e || e->type != 4) continue;
         W3dBone2D hb;
-        hb.nombre = JS(e, "nombre", "Bone");
-        hb.padre  = JI(e, "padre", -1);
-        hb.conectado = !JB(e, "suelto", false); // "Disconnect Bone": emparentado sin soldar
-        JVal* h = JHijo(e, "head", 5);
-        if (h && h->lista.size() >= 2) { hb.headU = (float)h->lista[0]->num; hb.headV = (float)h->lista[1]->num; }
-        JVal* t = JHijo(e, "tail", 5);
-        if (t && t->lista.size() >= 2) { hb.tailU = (float)t->lista[0]->num; hb.tailV = (float)t->lista[1]->num; }
-        JVal* p = JHijo(e, "pose", 5);
-        if (p && p->lista.size() >= 5) {
-            hb.poseTU  = (float)p->lista[0]->num; hb.poseTV = (float)p->lista[1]->num;
-            hb.poseRot = (float)p->lista[2]->num;
-            hb.poseSX  = (float)p->lista[3]->num; hb.poseSY = (float)p->lista[4]->num;
+        hb.name   = JS(e, "name", "Bone");
+        hb.parent = JI(e, "parent", -1);
+        hb.connected = !JB(e, "loose", false); // "Disconnect Bone": emparentado sin soldar
+        JVal* h = JChild(e, "head", 5);
+        if (h && h->list.size() >= 2) { hb.headU = (float)h->list[0]->num; hb.headV = (float)h->list[1]->num; }
+        JVal* t = JChild(e, "tail", 5);
+        if (t && t->list.size() >= 2) { hb.tailU = (float)t->list[0]->num; hb.tailV = (float)t->list[1]->num; }
+        JVal* p = JChild(e, "pose", 5);
+        if (p && p->list.size() >= 5) {
+            hb.poseTU  = (float)p->list[0]->num; hb.poseTV = (float)p->list[1]->num;
+            hb.poseRot = (float)p->list[2]->num;
+            hb.poseSX  = (float)p->list[3]->num; hb.poseSY = (float)p->list[4]->num;
         }
-        arm->huesos.push_back(hb);
+        arm->bones.push_back(hb);
     }
     // misma cota que el armature 3D: 'padre' fuera de rango o en ciclo -> raiz. Aca ademas
     // evita colgar los recorridos que suben por la cadena sin contador (UVEditor: borrar huesos).
-    { std::vector<int> pad(arm->huesos.size());
-      for (size_t i = 0; i < arm->huesos.size(); i++) pad[i] = arm->huesos[i].padre;
-      if (SanearPadres(pad, arm->nombre.c_str()))
-          for (size_t i = 0; i < arm->huesos.size(); i++) arm->huesos[i].padre = pad[i]; }
+    { std::vector<int> pad(arm->bones.size());
+      for (size_t i = 0; i < arm->bones.size(); i++) pad[i] = arm->bones[i].parent;
+      if (SanitizeParents(pad, arm->name.c_str()))
+          for (size_t i = 0; i < arm->bones.size(); i++) arm->bones[i].parent = pad[i]; }
 }
 
 // lee los clips de un bloque JSON (lista de objetos) dentro de 'arm'
 static void JsonArm2DClips(JVal* jl, Armature2D* arm) {
     if (!jl || !arm) return;
-    for (size_t i = 0; i < jl->lista.size(); i++) {
-        JVal* e = jl->lista[i]; if (!e || e->tipo != 4) continue;
-        Armature2DAnimation* an = new Armature2DAnimation(JS(e, "nombre", "Anim2D"));
+    for (size_t i = 0; i < jl->list.size(); i++) {
+        JVal* e = jl->list[i]; if (!e || e->type != 4) continue;
+        Armature2DAnimation* an = new Armature2DAnimation(JS(e, "name", "Anim2D"));
         an->fps        = JI(e, "fps", 30);
-        an->startFrame = JI(e, "inicio", 1);
-        an->endFrame   = JI(e, "fin", 0);
-        JVal* jt = JHijo(e, "tracks", 5);
-        if (jt) for (size_t t = 0; t < jt->lista.size(); t++) {
-            JVal* tj = jt->lista[t]; if (!tj || tj->tipo != 4) continue;
+        an->startFrame = JI(e, "start", 1);
+        an->endFrame   = JI(e, "end", 0);
+        JVal* jt = JChild(e, "tracks", 5);
+        if (jt) for (size_t t = 0; t < jt->list.size(); t++) {
+            JVal* tj = jt->list[t]; if (!tj || tj->type != 4) continue;
             Bone2DTrack tr;
-            tr.bone = JI(tj, "hueso", -1);
-            JVal* jc = JHijo(tj, "curvas", 5);
-            if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
+            tr.bone = JI(tj, "bone", -1);
+            JVal* jc = JChild(tj, "curves", 5);
+            if (jc) for (size_t c = 0; c < jc->list.size(); c++) {
                 AnimProperty ap;
-                if (CargarCurvaJson(jc->lista[c], ap)) tr.Propertys.push_back(ap);
+                if (LoadCurveJson(jc->list[c], ap)) tr.Properties.push_back(ap);
             }
             an->tracks.push_back(tr);
         }
@@ -2453,47 +2453,47 @@ static void JsonArm2DClips(JVal* jl, Armature2D* arm) {
     }
 }
 
-static void JsonArm2DCargar(JVal* j, Mesh* mesh) {
-    JVal* jarms = JHijo(j, "armatures2d", 5);
+static void JsonArm2DLoad(JVal* j, Mesh* mesh) {
+    JVal* jarms = JChild(j, "armatures2d", 5);
     if (jarms) {                                   // ---- FORMATO NUEVO (varios armatures) ----
-        for (size_t a = 0; a < jarms->lista.size(); a++) {
-            JVal* e = jarms->lista[a]; if (!e || e->tipo != 4) continue;
-            int idx = mesh->Arm2DAgregar(JS(e, "nombre", "Armature 2D"));
+        for (size_t a = 0; a < jarms->list.size(); a++) {
+            JVal* e = jarms->list[a]; if (!e || e->type != 4) continue;
+            int idx = mesh->Arm2DAdd(JS(e, "name", "Armature 2D"));
             Armature2D* arm = mesh->armatures2d[idx];
-            JsonArm2DHuesos(JHijo(e, "huesos", 5), arm);
-            JsonArm2DClips(JHijo(e, "anims", 5), arm);
+            JsonArm2DBones(JChild(e, "bones", 5), arm);
+            JsonArm2DClips(JChild(e, "anims", 5), arm);
             if (!arm->anims.empty()) {
-                arm->animActiva = JI(e, "animActiva", 0);
+                arm->activeAnim = JI(e, "activeAnim", 0);
                 // indice de lista: fuera de rango (por arriba O por abajo) -> el primero
-                if (arm->animActiva < 0 || arm->animActiva >= (int)arm->anims.size()) arm->animActiva = 0;
+                if (arm->activeAnim < 0 || arm->activeAnim >= (int)arm->anims.size()) arm->activeAnim = 0;
             }
         }
-        mesh->armature2dActivo = JI(j, "armature2dActivo", 0);
-        if (mesh->armature2dActivo < 0 || mesh->armature2dActivo >= (int)mesh->armatures2d.size())
-            mesh->armature2dActivo = mesh->armatures2d.empty() ? -1 : 0;
+        mesh->armature2dActive = JI(j, "activeArmature2d", 0);
+        if (mesh->armature2dActive < 0 || mesh->armature2dActive >= (int)mesh->armatures2d.size())
+            mesh->armature2dActive = mesh->armatures2d.empty() ? -1 : 0;
     } else {                                       // ---- FORMATO VIEJO (un solo rig): MIGRAR ----
-        JVal* jh = JHijo(j, "armature2d", 5);
-        JVal* jc = JHijo(j, "anims2d", 5);
+        JVal* jh = JChild(j, "armature2d", 5);
+        JVal* jc = JChild(j, "anims2d", 5);
         if (!jh && !jc) return;                    // malla sin rig 2D: nada que hacer
-        Armature2D* arm = mesh->armatures2d[mesh->Arm2DAgregar("Armature 2D")];
-        JsonArm2DHuesos(jh, arm);
+        Armature2D* arm = mesh->armatures2d[mesh->Arm2DAdd("Armature 2D")];
+        JsonArm2DBones(jh, arm);
         JsonArm2DClips(jc, arm);
         if (!arm->anims.empty()) {
-            arm->animActiva = JI(j, "anim2dActiva", 0);
-            if (arm->animActiva < 0 || arm->animActiva >= (int)arm->anims.size()) arm->animActiva = 0;
+            arm->activeAnim = JI(j, "activeAnim2d", 0);
+            if (arm->activeAnim < 0 || arm->activeAnim >= (int)arm->anims.size()) arm->activeAnim = 0;
         }
     }
-    if (!mesh->TieneArm2D()) return;
-    mesh->Armature2DRestCapturar(); // el UV del GLB ES el rest (se exporta sin la pose)
-    mesh->Armature2DAplicar();      // la pose guardada se ve al abrir (editor y runtime)
+    if (!mesh->HasArm2D()) return;
+    mesh->Armature2DRestCapture(); // el UV del GLB ES el rest (se exporta sin la pose)
+    mesh->Armature2DApply();       // la pose guardada se ve al abrir (editor y runtime)
     // .w3d ANTERIOR a los pesos por corner: el rig 2D existe pero no hay UV groups (los
     // pesos viejos eran vertex groups por control-point, que el hueso 2D ya no mira). No se
     // hornea nada en silencio (eso es justo el bake que el dueno rechazo): se avisa y el
     // usuario re-pinta los UV groups en el editor UV.
-    bool hayHuesos = false;
-    for (size_t a = 0; a < mesh->armatures2d.size() && !hayHuesos; a++)
-        if (mesh->armatures2d[a] && !mesh->armatures2d[a]->huesos.empty()) hayHuesos = true;
-    if (hayHuesos && mesh->uvGroups.empty())
+    bool hasBones = false;
+    for (size_t a = 0; a < mesh->armatures2d.size() && !hasBones; a++)
+        if (mesh->armatures2d[a] && !mesh->armatures2d[a]->bones.empty()) hasBones = true;
+    if (hasBones && mesh->uvGroups.empty())
         w3dLogfW("[W3D] '%s' tiene armature 2D pero ningun UV group: el skinning 2D no deforma nada hasta que pintes pesos en el editor UV (los .w3d viejos pesaban con vertex groups, que ahora son SOLO del armature 3D)",
                  mesh->name.c_str());
 }
@@ -2507,10 +2507,10 @@ static void JsonArm2DCargar(JVal* j, Mesh* mesh) {
 //
 //  El GLB solo lleva TRIANGULOS: el importador arma un MeshFace por triangulo y, como cada corner
 //  empuja su propia normal/uv, tampoco mergea los render-verts (un cubo entra 24 verts/6 quads y
-//  vuelve 36 verts/12 tris). El .w3d guarda aparte el bloque "topologia" (ver GuardarW3D.cpp), que
+//  vuelve 36 verts/12 tris). El .w3d guarda aparte el bloque "topologia" (ver SaveW3D.cpp), que
 //  es lo unico que falta: que corners forman cada poligono, con los indices DEL VERTEX ARRAY DEL GLB.
 //
-//  Como el orden de emision de triangulos del exportador es deterministico (OrdenCarasGLB) y el
+//  Como el orden de emision de triangulos del exportador es deterministico (OrderFacesGLB) y el
 //  importador lo conserva en faces3d, se camina en LOCKSTEP: la cara i de "caras" consume sus n-2
 //  triangulos y de ahi salen los render-verts de cada corner (abanico 0-1-2, 0-2-3, ...). Con eso se
 //  arma la tabla indiceGLB -> render-vert y se REHACEN los arrays EN EL ORDEN DEL GLB, que es el
@@ -2524,7 +2524,7 @@ static void JsonArm2DCargar(JVal* j, Mesh* mesh) {
 
 // mismos atributos (pos + normal + uv + color)? Los corners que vienen del MISMO vertice del GLB
 // son copias exactas (el importador los copia del mismo accessor), asi que la comparacion es EXACTA.
-static bool MismoRenderVert(Mesh* m, int a, int b) {
+static bool SameRenderVert(Mesh* m, int a, int b) {
     if (a == b) return true;
     if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) return false;
     for (int q = 0; q < 3; q++) if (m->vertex[a*3+q] != m->vertex[b*3+q]) return false;
@@ -2536,45 +2536,45 @@ static bool MismoRenderVert(Mesh* m, int a, int b) {
 // ============================================================================
 //  BORRAR 'origen' EN TODO EL SUBARBOL IMPORTADO (rama legacy "glb")
 //
-//  ImportModeloPorExtension marca Mesh::origen con el archivo importado, pero en
+//  ImportModelByExtension marca Mesh::origen con el archivo importado, pero en
 //  la rama legacy ese "archivo" es una ENTRADA DEL PROPIO .w3d, no un archivo del
-//  usuario: dejarlo puesto llena EXTERNOS.txt de rutas internas que no existen.
+//  usuario: dejarlo puesto llena EXTERNALS.txt de rutas internas que no existen.
 //  Antes se limpiaba SOLO el nodo de arriba: un .glb con un ARMATURE que trae la
 //  malla COMO HIJA dejaba a la hija con origen = ruta interna del contenedor y al
-//  guardar aparecia en EXTERNOS.txt como archivo que falta.
+//  guardar aparecia en EXTERNALS.txt como archivo que falta.
 // ============================================================================
-static void LimpiarOrigenRec(Object* o) {
+static void ClearOriginRec(Object* o) {
     if (!o) return;
-    if (o->getType() == ObjectType::mesh) ((Mesh*)o)->origen.clear();
-    for (size_t i = 0; i < o->Childrens.size(); i++) LimpiarOrigenRec(o->Childrens[i]);
+    if (o->getType() == ObjectType::mesh) ((Mesh*)o)->origin.clear();
+    for (size_t i = 0; i < o->Childrens.size(); i++) ClearOriginRec(o->Childrens[i]);
 }
 
-static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
+static bool RetopologizeFromTopology(JVal* j, Mesh* m) {
     if (!j || !m) return false;
-    JVal* topo = JHijo(j, "topologia", 4);
+    JVal* topo = JChild(j, "topology", 4);
     if (!topo) return false;                                  // .w3d viejo: camino de siempre (triangulado)
-    JVal* caras = JHijo(topo, "caras", 5);
-    if (!caras || caras->lista.empty()) return false;
-    const char* nom = m->name.c_str();
+    JVal* faces = JChild(topo, "faces", 5);
+    if (!faces || faces->list.empty()) return false;
+    const char* name = m->name.c_str();
     if (!m->vertex || m->vertexSize <= 0 || m->faces3d.empty()) {
-        w3dLogfW("[W3D] '%s': hay bloque 'topologia' pero la malla del GLB vino vacia -> se ignora", nom);
+        w3dLogfW("[W3D] '%s': hay bloque 'topologia' pero la malla del GLB vino vacia -> se ignora", name);
         return false;
     }
 
     // ---- pasada 0: validar las filas + contar triangulos + mayor indice ----
     // (las caras vienen COMPACTAS del parser -- JVal::nums -- y se leen con JFila*)
     int maxIdx = -1; size_t totTri = 0;
-    for (size_t i = 0; i < caras->lista.size(); i++) {
-        JVal* c = caras->lista[i];
-        if (!c || c->tipo != 5 || JFilaLen(c) < 3) {
-            w3dLogfW("[W3D] '%s': 'topologia' con una cara de menos de 3 corners -> se ignora el bloque (la malla queda triangulada)", nom);
+    for (size_t i = 0; i < faces->list.size(); i++) {
+        JVal* c = faces->list[i];
+        if (!c || c->type != 5 || JRowLen(c) < 3) {
+            w3dLogfW("[W3D] '%s': 'topologia' con una cara de menos de 3 corners -> se ignora el bloque (la malla queda triangulada)", name);
             return false;
         }
-        totTri += JFilaLen(c) - 2;
-        for (size_t k = 0; k < JFilaLen(c); k++) {
-            if (!JFilaEsNum(c, k)) { w3dLogfW("[W3D] '%s': 'topologia' con un indice no numerico -> se ignora el bloque", nom); return false; }
-            int v = (int)JFilaNum(c, k, -1);
-            if (v < 0) { w3dLogfW("[W3D] '%s': 'topologia' con un indice negativo -> se ignora el bloque", nom); return false; }
+        totTri += JRowLen(c) - 2;
+        for (size_t k = 0; k < JRowLen(c); k++) {
+            if (!JRowIsNum(c, k)) { w3dLogfW("[W3D] '%s': 'topologia' con un indice no numerico -> se ignora el bloque", name); return false; }
+            int v = (int)JRowNum(c, k, -1);
+            if (v < 0) { w3dLogfW("[W3D] '%s': 'topologia' con un indice negativo -> se ignora el bloque", name); return false; }
             if (v > maxIdx) maxIdx = v;
         }
     }
@@ -2587,28 +2587,28 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
     // rango se cae al fallback triangulado, igual que cualquier otra topologia inconsistente.
     if (nGlb > m->vertexSize) {
         w3dLogfW("[W3D] '%s': 'topologia' declara %d vertices y el GLB solo trae %d render-verts -> se ignora el bloque (la malla queda triangulada)",
-                 nom, nGlb, m->vertexSize);
+                 name, nGlb, m->vertexSize);
         return false;
     }
     if (maxIdx >= nGlb) {
-        w3dLogfW("[W3D] '%s': 'topologia' referencia el vertice %d pero declara %d -> se ignora el bloque", nom, maxIdx, nGlb);
+        w3dLogfW("[W3D] '%s': 'topologia' referencia el vertice %d pero declara %d -> se ignora el bloque", name, maxIdx, nGlb);
         return false;
     }
     if (totTri != m->faces3d.size()) {
         w3dLogfW("[W3D] '%s': 'topologia' pide %d triangulos y el GLB trae %d (el .glb no es pareja del .w3d) -> la malla queda triangulada",
-                 nom, (int)totTri, (int)m->faces3d.size());
+                 name, (int)totTri, (int)m->faces3d.size());
         return false;
     }
 
     // ---- pasada 1: lockstep triangulo a triangulo -> tabla indiceGLB -> render-vert ----
     std::vector<int> glbARender((size_t)nGlb, -1);
-    std::vector<MeshFace> nuevas; nuevas.reserve(caras->lista.size());
+    std::vector<MeshFace> newValue; newValue.reserve(faces->list.size());
     size_t t = 0;
-    for (size_t i = 0; i < caras->lista.size(); i++) {
-        JVal* c = caras->lista[i];
-        const int n = (int)JFilaLen(c), nTri = n - 2;
+    for (size_t i = 0; i < faces->list.size(); i++) {
+        JVal* c = faces->list[i];
+        const int n = (int)JRowLen(c), nTri = n - 2;
         const MeshFace& T0 = m->faces3d[t];
-        if (T0.idx.size() != 3) { w3dLogfW("[W3D] '%s': el GLB no vino triangulado -> se ignora 'topologia'", nom); return false; }
+        if (T0.idx.size() != 3) { w3dLogfW("[W3D] '%s': el GLB no vino triangulado -> se ignora 'topologia'", name); return false; }
         std::vector<int> rv((size_t)n, -1);
         rv[0] = T0.idx[0]; rv[1] = T0.idx[1]; rv[2] = T0.idx[2];
         for (int k = 1; k < nTri; k++) {
@@ -2616,8 +2616,8 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
             // el abanico tiene que cerrar: corner 0 comun y corner 1 = el ultimo corner del triangulo previo.
             // (se compara por ATRIBUTOS, no por indice: el importador del GLB no mergea, cada corner es un
             //  render-vert distinto aunque venga del mismo vertice del GLB)
-            if (Tk.idx.size() != 3 || !MismoRenderVert(m, Tk.idx[0], rv[0]) || !MismoRenderVert(m, Tk.idx[1], rv[k+1])) {
-                w3dLogfW("[W3D] '%s': el abanico de la cara %d de 'topologia' no cierra contra el GLB -> la malla queda triangulada", nom, (int)i);
+            if (Tk.idx.size() != 3 || !SameRenderVert(m, Tk.idx[0], rv[0]) || !SameRenderVert(m, Tk.idx[1], rv[k+1])) {
+                w3dLogfW("[W3D] '%s': el abanico de la cara %d de 'topologia' no cierra contra el GLB -> la malla queda triangulada", name, (int)i);
                 return false;
             }
             rv[k+2] = Tk.idx[2];
@@ -2625,44 +2625,44 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
         MeshFace mf; mf.mat = T0.mat; mf.smooth = -1;
         mf.idx.resize((size_t)n);
         for (int q = 0; q < n; q++) {
-            int g = (int)JFilaNum(c, (size_t)q, 0);
+            int g = (int)JRowNum(c, (size_t)q, 0);
             if (glbARender[(size_t)g] < 0) glbARender[(size_t)g] = rv[(size_t)q];
-            else if (!MismoRenderVert(m, glbARender[(size_t)g], rv[(size_t)q])) {
-                w3dLogfW("[W3D] '%s': el vertice %d de 'topologia' cae en dos render-verts distintos -> la malla queda triangulada", nom, g);
+            else if (!SameRenderVert(m, glbARender[(size_t)g], rv[(size_t)q])) {
+                w3dLogfW("[W3D] '%s': el vertice %d de 'topologia' cae en dos render-verts distintos -> la malla queda triangulada", name, g);
                 return false;
             }
             mf.idx[(size_t)q] = g;   // por ahora en espacio GLB; se reindexa abajo
         }
-        nuevas.push_back(mf);
+        newValue.push_back(mf);
         t += (size_t)nTri;
     }
     if (t != m->faces3d.size()) return false;   // (no deberia pasar: totTri ya lo garantiza)
 
     // shading POR CARA (sparse): [indiceDeCara, 0=flat|1=smooth]
-    JVal* shade = JHijo(topo, "shade", 5);
-    if (shade) for (size_t k = 0; k < shade->lista.size(); k++) {
-        JVal* p = shade->lista[k]; if (!p || p->tipo != 5 || JFilaLen(p) < 2) continue;   // pares compactos
-        int fi = (int)JFilaNum(p, 0, -1);
-        if (fi >= 0 && fi < (int)nuevas.size()) nuevas[(size_t)fi].smooth = ((int)JFilaNum(p, 1, 0)) ? 1 : 0;
+    JVal* shade = JChild(topo, "shade", 5);
+    if (shade) for (size_t k = 0; k < shade->list.size(); k++) {
+        JVal* p = shade->list[k]; if (!p || p->type != 5 || JRowLen(p) < 2) continue;   // pares compactos
+        int fi = (int)JRowNum(p, 0, -1);
+        if (fi >= 0 && fi < (int)newValue.size()) newValue[(size_t)fi].smooth = ((int)JRowNum(p, 1, 0)) ? 1 : 0;
     }
 
     // ---- pasada 2: rehacer los arrays EN EL ORDEN DEL GLB (= el orden que tenian al guardar) ----
-    std::vector<int> nuevoDe((size_t)nGlb, -1);
-    int nuevoN = 0;
-    for (int g = 0; g < nGlb; g++) if (glbARender[(size_t)g] >= 0) nuevoDe[(size_t)g] = nuevoN++;
-    if (nuevoN <= 0) return false;
-    if (nuevoN != nGlb)
+    std::vector<int> newOf((size_t)nGlb, -1);
+    int newN = 0;
+    for (int g = 0; g < nGlb; g++) if (glbARender[(size_t)g] >= 0) newOf[(size_t)g] = newN++;
+    if (newN <= 0) return false;
+    if (newN != nGlb)
         w3dLogfW("[W3D] '%s': %d vertices del GLB no los usa ninguna cara -> los indices se compactan (%d de %d). La numeracion sigue siendo deterministica, pero la vertex anim se remapea por posicion",
-                 nom, nGlb - nuevoN, nuevoN, nGlb);
+                 name, nGlb - newN, newN, nGlb);
 
-    GLfloat* nvx = new GLfloat[(size_t)nuevoN * 3];
-    GLbyte*  nnr = m->normals     ? new GLbyte[(size_t)nuevoN * 3]  : NULL;
-    GLfloat* nuv = m->uv          ? new GLfloat[(size_t)nuevoN * 2] : NULL;
-    GLubyte* ncl = m->vertexColor ? new GLubyte[(size_t)nuevoN * 4] : NULL;
-    std::vector<int> nCP; if (!m->vertCtrlPoint.empty()) nCP.assign((size_t)nuevoN, -1);
+    GLfloat* nvx = new GLfloat[(size_t)newN * 3];
+    GLbyte*  nnr = m->normals     ? new GLbyte[(size_t)newN * 3]  : NULL;
+    GLfloat* nuv = m->uv          ? new GLfloat[(size_t)newN * 2] : NULL;
+    GLubyte* ncl = m->vertexColor ? new GLubyte[(size_t)newN * 4] : NULL;
+    std::vector<int> nCP; if (!m->vertCtrlPoint.empty()) nCP.assign((size_t)newN, -1);
     std::vector<int> oldToNew((size_t)m->vertexSize, -1);   // para remapear la geometria suelta
     for (int g = 0; g < nGlb; g++) {
-        int d = nuevoDe[(size_t)g]; if (d < 0) continue;
+        int d = newOf[(size_t)g]; if (d < 0) continue;
         int src = glbARender[(size_t)g];
         oldToNew[(size_t)src] = d;
         for (int q = 0; q < 3; q++) nvx[d*3+q] = m->vertex[src*3+q];
@@ -2671,8 +2671,8 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
         if (ncl) for (int q = 0; q < 4; q++) ncl[d*4+q] = m->vertexColor[src*4+q];
         if (!nCP.empty() && src < (int)m->vertCtrlPoint.size()) nCP[(size_t)d] = m->vertCtrlPoint[(size_t)src];
     }
-    for (size_t i = 0; i < nuevas.size(); i++)
-        for (size_t k = 0; k < nuevas[i].idx.size(); k++) nuevas[i].idx[k] = nuevoDe[(size_t)nuevas[i].idx[k]];
+    for (size_t i = 0; i < newValue.size(); i++)
+        for (size_t k = 0; k < newValue[i].idx.size(); k++) newValue[i].idx[k] = newOf[(size_t)newValue[i].idx[k]];
 
     // geometria SUELTA: el GLB no la trae (se pierde igual que antes), pero si algo quedo, se remapea
     { std::vector<int> le; le.reserve(m->looseEdges.size());
@@ -2692,203 +2692,203 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
     if (m->normals)     { delete[] m->normals;     m->normals = nnr; }
     if (m->uv)          { delete[] m->uv;          m->uv = nuv; }
     if (m->vertexColor) { delete[] m->vertexColor; m->vertexColor = ncl; }
-    m->vertexSize = nuevoN;
+    m->vertexSize = newN;
     if (!nCP.empty()) m->vertCtrlPoint.swap(nCP);
-    m->faces3d.swap(nuevas);
-    m->uvSelVert.clear();          // seleccion del editor UV: era del render triangulado
-    m->LiberarCapas(false);        // capas por corner (nC cambio); NO tocar vertex/UV groups
-    // meshSmooth EXPLICITO: antes se adivinaba con MeshShadingImportadoEsSmooth sobre la malla triangulada
-    m->meshSmooth = JB(topo, "suave", m->meshSmooth);
-    m->ReagruparMeshParts();       // faces[] + rangos por mesh part desde faces3d.mat (+ VBO)
-    m->CalcularBordes();           // edges/posRep/centroGeom: las diagonales dejan de ser aristas
-    m->SincronizarCornerNormal();  // cornerNormal desde normals[]: el 1er GenerarRender no reinventa el shading
+    m->faces3d.swap(newValue);
+    m->uvSelVert.clear();        // seleccion del editor UV: era del render triangulado
+    m->FreeLayers(false);        // capas por corner (nC cambio); NO tocar vertex/UV groups
+    // meshSmooth EXPLICITO: antes se adivinaba con MeshShadingImportedIsSmooth sobre la malla triangulada
+    m->meshSmooth = JB(topo, "smooth", m->meshSmooth);
+    m->RegroupMeshParts();  // faces[] + rangos por mesh part desde faces3d.mat (+ VBO)
+    m->ComputeBorders();    // edges/posRep/centerGeom: las diagonales dejan de ser aristas
+    m->SyncCornerNormal();  // cornerNormal desde normals[]: el 1er GenerateRender no reinventa el shading
     return true;
 }
 
-static void JsonObjeto(JVal* j, Object* parent, const std::string& base);
+static void JsonObject(JVal* j, Object* parent, const std::string& base);
 
 // ---------------------------------------------------------------------------
 //  CREA el objeto de UN nodo del .w3d y lo devuelve; los HIJOS NO se leen aca
-//  (los lee JsonObjeto, en UN solo lugar, ver abajo). Es el ESPEJO exacto de
-//  EscribirObjeto/EscribirHijos (GuardarW3D.cpp): antes cada rama leia -o se
+//  (los lee JsonObject, en UN solo lugar, ver abajo). Es el ESPEJO exacto de
+//  WriteObject/WriteChildren (SaveW3D.cpp): antes cada rama leia -o se
 //  OLVIDABA de leer- "hijos", y camara/luz/script/ui/modelo/glb no lo leian, o
 //  sea que ni siquiera un .w3d editado a mano podia colgarles nada.
 //  NULL = el nodo no creo ningun objeto (tipo desconocido, o la carga fallo):
 //  sus hijos cuelgan del padre, que es lo que ya hacia el fallback generico.
 // ---------------------------------------------------------------------------
-static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base) {
-    std::string tipo = JS(j, "tipo", "");
+static Object* JsonObjectCreate(JVal* j, Object* parent, const std::string& base) {
+    std::string type = JS(j, "type", "");
 
-    if (tipo == "coleccion") {
+    if (type == "collection") {
         Collection* c = new Collection(parent);
-        // JsonComunes y no solo el nombre: el guardado nuevo escribe visible/pos/rot/
+        // CommonJson y no solo el nombre: el guardado nuevo escribe visible/pos/rot/
         // escala (una Collection oculta volvia VISIBLE al reabrir). Tolerante: los
         // archivos viejos sin esos campos quedan con los defaults de siempre.
-        JsonComunes(j, c);
+        CommonJson(j, c);
         // orden de dibujo para transparentes (ausente = false: archivos viejos igual)
-        c->ordenarPorCamara = JB(j, "ordenarPorCamara", false);
-        c->ordenarUnaVez    = JB(j, "ordenarUnaVez", false);
+        c->sortByCamera = JB(j, "sortByCamera", false);
+        c->sortOnce     = JB(j, "sortOnce", false);
         // lote estatico (P4): ausente = off (archivos viejos, cero cambio)
-        c->lote = (JS(j, "lote", "") == "estatico") ? 1 : 0;
+        c->batch = (JS(j, "batch", "") == "static") ? 1 : 0;
         return c;
     }
-    if (tipo == "camara") {
+    if (type == "camera") {
         Camera* c = new Camera(parent);
-        JsonComunes(j, c);
+        CommonJson(j, c);
         c->fov = JF(j, "fov", c->fov);           // lente (default 45 si el .w3d es viejo)
-        c->orthographic = JB(j, "orto", c->orthographic);
+        c->orthographic = JB(j, "ortho", c->orthographic);
         c->nearClip = JF(j, "near", c->nearClip);
         c->farClip  = JF(j, "far",  c->farClip);
         // ENCUADRE DECLARADO (ver Camera::aspecto). Ausente = 0 = como siempre.
-        c->aspecto  = JF(j, "aspecto", c->aspecto);
+        c->aspect  = JF(j, "aspect", c->aspect);
         // PROFUNDIDAD DE CAMPO (ausente = apagada, f/2.8, a 5 m)
-        c->dof = JB(j, "dof", c->dof); c->fStop = JF(j, "fStop", c->fStop); c->focoDist = JF(j, "foco", c->focoDist);
-        c->focoObjeto = JS(j, "focoObjeto", "");
-        if (c->fStop < 0.1f) c->fStop = 0.1f; if (c->focoDist < 0.01f) c->focoDist = 0.01f;
+        c->dof = JB(j, "dof", c->dof); c->fStop = JF(j, "fStop", c->fStop); c->focusDist = JF(j, "focus", c->focusDist);
+        c->focusObject = JS(j, "focusObject", "");
+        if (c->fStop < 0.1f) c->fStop = 0.1f; if (c->focusDist < 0.01f) c->focusDist = 0.01f;
         std::string t = JS(j, "target", "");
         if (!t.empty()) c->SetTarget(t);   // se resuelve en ReloadAll al final
         // RIEL (AUDIT versiones): la Curve por la que viaja la camara + su offset
-        std::string riel = JS(j, "riel", "");
-        if (!riel.empty()) c->SetRiel(riel);   // idem: ReloadRiel al final
-        c->offsetRiel = JI(j, "offsetRiel", c->offsetRiel);
+        std::string rail = JS(j, "rail", "");
+        if (!rail.empty()) c->SetRail(rail);   // idem: ReloadRail al final
+        c->offsetRail = JI(j, "railOffset", c->offsetRail);
         // MIRADA DEL RIEL (ver Camera.h). Ausente = false = look-at de siempre.
-        c->usarRotacionDelRiel = JB(j, "miradaRiel", c->usarRotacionDelRiel);
+        c->useRailRotation = JB(j, "railLook", c->useRailRotation);
         return c;
     }
-    if (tipo == "espejo") {   // objeto Espejo (AUDIT versiones: antes se perdia al guardar)
+    if (type == "mirror") {   // objeto Espejo (AUDIT versiones: antes se perdia al guardar)
         Mirror* mi = new Mirror(parent);
-        JsonComunes(j, mi);
-        JBools3(j, "ejes", &mi->mirrorX, &mi->mirrorY, &mi->mirrorZ);
+        CommonJson(j, mi);
+        JBools3(j, "axes", &mi->mirrorX, &mi->mirrorY, &mi->mirrorZ);
         std::string t = JS(j, "target", "");
         if (!t.empty()) mi->SetTarget(t);
         // MULTI-TARGET: "targets" es UNA cadena "A, B, C" (mismo idioma que
         // "distancias" del LOD). Opcional: sin ella manda "target" y un archivo
         // viejo abre exactamente igual.
         std::string ts = JS(j, "targets", "");
-        if (!ts.empty()) mi->SetTargetsTexto(ts);
+        if (!ts.empty()) mi->SetTargetsText(ts);
         // reflejo en agua (ver Mirror.h): sin z + acotado al estanque.
         // "limites" = [u0, u1, v0, v1] en el PLANO del espejo (mismo idioma que "distancias").
-        mi->sinProfundidad = JB(j, "sinProfundidad", false);
-        // hundimientoMaximo: DEPRECADO (ver Mirror.h). Se acepta, se avisa, sin efecto.
-        mi->hundimientoMaximo = JF(j, "hundimientoMaximo", 0.0f);
-        if (mi->hundimientoMaximo > 0.0f)
+        mi->noDepth = JB(j, "noDepth", false);
+        // sinkMax: DEPRECADO (ver Mirror.h). Se acepta, se avisa, sin efecto.
+        mi->sinkMax = JF(j, "maxSink", 0.0f);
+        if (mi->sinkMax > 0.0f)
             w3dLogfW("[W3D] Mirror '%s': hundimientoMaximo esta DEPRECADO y no tiene "
                      "efecto (la reflexion es geometrica pura; el recorte del reflejo "
                      "es la silueta del agua en pantalla)", mi->name.c_str());
-        if (JHijo(j, "recorte", 3)) { mi->recorteDeclarado = true; mi->recorte = JB(j, "recorte", true); }   // 3 = bool
-        JVal* lim = JHijo(j, "limites", 5);
-        if (lim && lim->lista.size() == 4 && lim->lista[0] && lim->lista[1]
-            && lim->lista[2] && lim->lista[3]) {
-            mi->usaLimites = true;
-            mi->limU0 = (float)lim->lista[0]->num;
-            mi->limU1 = (float)lim->lista[1]->num;
-            mi->limV0 = (float)lim->lista[2]->num;
-            mi->limV1 = (float)lim->lista[3]->num;
+        if (JChild(j, "clip", 3)) { mi->clipDeclared = true; mi->clip = JB(j, "clip", true); }   // 3 = bool
+        JVal* lim = JChild(j, "limits", 5);
+        if (lim && lim->list.size() == 4 && lim->list[0] && lim->list[1]
+            && lim->list[2] && lim->list[3]) {
+            mi->usesLimits = true;
+            mi->limU0 = (float)lim->list[0]->num;
+            mi->limU1 = (float)lim->list[1]->num;
+            mi->limV0 = (float)lim->list[2]->num;
+            mi->limV1 = (float)lim->list[3]->num;
         }
         return mi;
     }
-    if (tipo == "instancia") {   // Instance: copias enlazadas del target
+    if (type == "instance") {   // Instance: copias enlazadas del target
         Instance* in = new Instance(parent);
-        JsonComunes(j, in);
+        CommonJson(j, in);
         std::string t = JS(j, "target", "");
         if (!t.empty()) in->SetTarget(t);
         // 'count' es un size_t que manda un for del RENDER: un valor negativo del archivo se
         // convertia en ~1.8e19 vueltas (el editor no volvia del primer frame) y uno gigante
         // tambien. Se acota a algo que se pueda dibujar.
-        in->count     = (size_t)JIRango(j, "count", (int)in->count, 0, 4096, "instancia");
-        in->mirror    = JB(j, "espejado", false);
-        in->mirrorEje = JIRango(j, "espejoEje", 0, 0, 2, "instancia");
+        in->count      = (size_t)JIRange(j, "count", (int)in->count, 0, 4096, "instance");
+        in->mirror     = JB(j, "mirrored", false);
+        in->mirrorAxis = JIRange(j, "mirrorAxis", 0, 0, 2, "instance");
         return in;
     }
-    if (tipo == "constraint") {   // el objeto Constraint VIEJO (dado de baja): se MIGRA
-        // misma mecanica que la rama de texto (ver PendConsViejo): Empty + entrada
+    if (type == "constraint") {   // el objeto Constraint VIEJO (dado de baja): se MIGRA
+        // misma mecanica que la rama de texto (ver OldPendCons): Empty + entrada
         // pendiente, y las props van al objeto APUNTADO al final de la carga. Aca el
         // default de "pitch" es FALSE, que es el del formato JSON y NO el del texto.
         bool cx = false, cy = false, cz = false;
         JBools3(j, "copyPos", &cx, &cy, &cz);
-        Object* e = NodoConstraintViejo(parent, JS(j, "target", ""),
+        Object* e = NodeOldConstraint(parent, JS(j, "target", ""),
                                         JB(j, "horizontal", true), JB(j, "pitch", false),
                                         cx, cy, cz);
-        JsonComunes(j, e);
+        CommonJson(j, e);
         return e;
     }
-    if (tipo == "curva") {   // Curve cargada de archivo (riel de camara)
-        std::string rel = JS(j, "archivo", "");
+    if (type == "curve") {   // Curve cargada de archivo (riel de camara)
+        std::string rel = JS(j, "file", "");
         Curve* cv = new Curve(parent);
-        JsonComunes(j, cv);
+        CommonJson(j, cv);
         // curva AUTORADA (Add > Path / riel editado): los nodos vienen INLINE en "puntos"
-        JVal* pts = JHijo(j, "puntos", 5);
-        if (pts && pts->lista.size() >= 3) {
-            int n = (int)pts->lista.size() / 3;
+        JVal* pts = JChild(j, "points", 5);
+        if (pts && pts->list.size() >= 3) {
+            int n = (int)pts->list.size() / 3;
             cv->vertexSize = n;
             cv->vertex = new GLfloat[n * 3];
             for (int i = 0; i < n * 3; i++)
-                cv->vertex[i] = pts->lista[i] ? (GLfloat)pts->lista[i]->num : 0.0f;
+                cv->vertex[i] = pts->list[i] ? (GLfloat)pts->list[i]->num : 0.0f;
             cv->indices = new GLushort[n];
             for (int i = 0; i < n; i++) cv->indices[i] = (GLushort)i;
-            cv->signoZ = 1.0f;   // autorada en el espacio del motor (sin espejo de .cap)
-            JVal* ar = JHijo(j, "aristas", 5);   // GRAFO con ramas (pares); ausente = polilinea
-            if (ar) for (size_t i = 0; i + 1 < ar->lista.size(); i += 2) {
-                cv->aristas.push_back((GLushort)(ar->lista[i]   ? (int)ar->lista[i]->num   : 0));
-                cv->aristas.push_back((GLushort)(ar->lista[i+1] ? (int)ar->lista[i+1]->num : 0));
+            cv->signZ = 1.0f;   // autorada en el espacio del motor (sin espejo de .cap)
+            JVal* ar = JChild(j, "edges", 5);   // GRAFO con ramas (pares); ausente = polilinea
+            if (ar) for (size_t i = 0; i + 1 < ar->list.size(); i += 2) {
+                cv->edges.push_back((GLushort)(ar->list[i]   ? (int)ar->list[i]->num   : 0));
+                cv->edges.push_back((GLushort)(ar->list[i+1] ? (int)ar->list[i+1]->num : 0));
             }
             cv->BuildKDTree();
         }
         // "archivo" vacio y sin puntos = curva sin origen (queda vacia, el nodo vuelve)
         else if (rel.empty())
             w3dLogfW("[W3D] la curva '%s' no tiene archivo de origen (queda vacia)", cv->name.c_str());
-        else if (!cv->LoadFromFile(RutaJson(rel, base)))
+        else if (!cv->LoadFromFile(JsonPath(rel, base)))
             w3dLogfW("[W3D] no pude cargar la curva %s (queda vacia)", rel.c_str());
-        cv->RecalcularRamas();   // ramas (componentes) para el filtro del modificador Oclusion
+        cv->RecalculateBranches();   // ramas (componentes) para el filtro del modificador Oclusion
         // LISTA DE CARGA (streaming): el sidecar .cargas.json (opcional)
-        { std::string cg = JS(j, "cargas", "");
-          if (!cg.empty()) cv->CargarListaCarga(RutaJson(cg, base)); }
+        { std::string cg = JS(j, "loads", "");
+          if (!cg.empty()) cv->LoadLoadList(JsonPath(cg, base)); }
         return cv;
     }
-    if (tipo == "luz") {
+    if (type == "light") {
         Light* l = Light::Create(parent);
-        if (!l) {   // tope de GL (MAX_LIGHTS): se saltea la luz (antes: crash con NULL en JsonComunes)
+        if (!l) {   // tope de GL (MAX_LIGHTS): se saltea la luz (antes: crash con NULL en CommonJson)
             W3dAvisof(false, T("The light '%s' was not loaded: the scene already has the maximum number of lights (%d)."),
-                      JS(j, "nombre", "").c_str(), (int)MAX_LUCES_ESCENA);
+                      JS(j, "name", "").c_str(), (int)MAX_LIGHTS_SCENE);
             return NULL;
         }
-        JsonComunes(j, l);
-        JVal* col = JHijo(j, "color", 5);
-        if (col && col->lista.size() >= 3)
-            for (int i = 0; i < 3; i++) l->diffuse[i] = (float)col->lista[i]->num;
-        l->direccional = JB(j, "direccional", l->direccional);
-        l->ignorarOrden = JB(j, "ignorarOrden", true);   // ausente = alumbra toda la escena (el pre-pase)
-        JVal* at = JHijo(j, "atenuacion", 5);   // (5 = lista)
-        if (at && JFilaLen(at) >= 3) { l->attConstant = JFilaNum(at, 0, l->attConstant); l->attLinear = JFilaNum(at, 1, l->attLinear); l->attQuadratic = JFilaNum(at, 2, l->attQuadratic); }
-        l->rtRadio = JF(j, "rtRadio", 0.0f);   // trazado de rayos: tamano de la lampara (sin la clave: un proyecto de antes, cuando la lampara nueva era puntual)
-        l->rtRayos = JF(j, "rtRayos", l->rtRayos);   // rayos de sombra (0 = global)
+        CommonJson(j, l);
+        JVal* col = JChild(j, "color", 5);
+        if (col && col->list.size() >= 3)
+            for (int i = 0; i < 3; i++) l->diffuse[i] = (float)col->list[i]->num;
+        l->directional = JB(j, "directional", l->directional);
+        l->ignoreOrder = JB(j, "ignoreOrder", true);   // ausente = alumbra toda la escena (el pre-pase)
+        JVal* at = JChild(j, "atenuacion", 5);   // (5 = lista)
+        if (at && JRowLen(at) >= 3) { l->attConstant = JRowNum(at, 0, l->attConstant); l->attLinear = JRowNum(at, 1, l->attLinear); l->attQuadratic = JRowNum(at, 2, l->attQuadratic); }
+        l->rtRadius = JF(j, "rtRadius", 0.0f);   // trazado de rayos: tamano de la lampara (sin la clave: un proyecto de antes, cuando la lampara nueva era puntual)
+        l->rtRays   = JF(j, "rtRays", l->rtRays);   // rayos de sombra (0 = global)
         // FOCO (cono en grados + concentracion) y el AMBIENTE de la luz (ausentes = los de fabrica)
-        JVal* sp = JHijo(j, "spot", 5);
-        if (sp && JFilaLen(sp) >= 2) { l->spotCutoff = JFilaNum(sp, 0, l->spotCutoff); l->spotExponent = JFilaNum(sp, 1, l->spotExponent); }
-        l->intensidad = JF(j, "intensidad", 1.0f);
-        l->distancia = JF(j, "distancia", 0.0f);
-        JVal* am = JHijo(j, "ambiente", 5);
-        if (am && am->lista.size() >= 3) for (int i = 0; i < 3; i++) l->ambient[i] = (float)am->lista[i]->num;
+        JVal* sp = JChild(j, "spot", 5);
+        if (sp && JRowLen(sp) >= 2) { l->spotCutoff = JRowNum(sp, 0, l->spotCutoff); l->spotExponent = JRowNum(sp, 1, l->spotExponent); }
+        l->intensity = JF(j, "intensity", 1.0f);
+        l->distance = JF(j, "distance", 0.0f);
+        JVal* am = JChild(j, "ambient", 5);
+        if (am && am->list.size() >= 3) for (int i = 0; i < 3; i++) l->ambient[i] = (float)am->list[i]->num;
         return l;
     }
-    if (tipo == "script") {
+    if (type == "script") {
         // MIGRACION del objeto Script/Control (ver el comentario largo de la rama "Gamepad"
         // del .w3d de texto): vuelve como Empty con nombre, transformacion, hijos y scripts.
         // La fisica hardcodeada ("fisica") y el "target" se descartan a proposito.
         Empty* g = new Empty(parent);
-        JsonComunes(j, g);
+        CommonJson(j, g);
         W3dAvisof(false, T("The Script object '%s' no longer exists: it was migrated to an empty object with its "
                            "scripts. Its hardcoded physics (speed/gravity/limits) is NOT migrated."),
                   g->name.c_str());
-        // (los scripts los lee el call site COMUN de JsonObjeto, como los constraints)
+        // (los scripts los lee el call site COMUN de JsonObject, como los constraints)
         return g;
     }
-    if (tipo == "ui") {
-        std::string archivo = JS(j, "archivo", "");
+    if (type == "ui") {
+        std::string file = JS(j, "file", "");
         // una escena UI que es CONTENIDO DE UNA LIBRERIA: sus rutas (texturas, fuentes, scripts) son de ELLA
-        // (UI2DFormato: g_w3dRutaLibHook), no del proyecto
-        GuardaRutaUILib guardaUI(!W3dLibContexto().empty());
-        UI* u = CargarUIProyecto(archivo.empty() ? archivo : RutaJson(archivo, base), archivo);
+        // (UI2DFormato: g_w3dPathLibHook), no del proyecto
+        GuardPathUILib guardUI(!W3dLibContext().empty());
+        UI* u = LoadUIProject(file.empty() ? file : JsonPath(file, base), file);
         // (si no cargo, ya se aviso y el resto del proyecto sigue abriendo)
         // la escena UI se crea SIEMPRE colgada de la raiz: si en el .w3d venia como
         // HIJO de otro objeto, re-colgarla de su padre real (igual que la rama glb)
@@ -2901,7 +2901,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         }
         return (Object*)u;
     }
-    if (tipo == "malla") {
+    if (type == "mesh") {
         // ==================================================================
         //  LA RAMA DE HOY: la geometria es una entrada .w3dm del contenedor.
         //  Es interna SIEMPRE (el proyecto es autocontenido por construccion),
@@ -2909,85 +2909,85 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         //  "origen" es solo INFORMATIVO ("de donde salio" / "reimportar"): si
         //  falta, se avisa y NO pasa nada, la malla ya esta adentro.
         // ==================================================================
-        std::string geo = JS(j, "geometria", "");
-        // LA MALLA COMO RECURSO (objects/MallaRecurso.h): el objeto nombra una malla del
+        std::string geo = JS(j, "geometry", "");
+        // LA MALLA COMO RECURSO (objects/MeshResource.h): el objeto nombra una malla del
         // registro del proyecto ("mallas") y la COMPARTE con los demas que la usan: se lee una
         // sola vez para todos, sin derivar nada, y la edicion queda pendiente hasta que alguien
         // la pida. "geometria" (una entrada propia del objeto) es el formato anterior.
-        const std::string nomMalla = NombreRecursoJson(JS(j, "malla", ""));   // (con el prefijo de su libreria)
+        const std::string nameMesh = ResourceNameJson(JS(j, "mesh", ""));   // (con el prefijo de su libreria)
         Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
-        mesh->soloRutina = JB(j, "soloRutina", false);   // la dibuja una rutina (Mesh.h)
-        mesh->bloquearNormales = JB(j, "bloquearNormales", false);   // Bloquear normales (Mesh.h)
-        { JVal* ju = JHijo(j, "uvMateriales", 5);   // el UV PERSONALIZADO de los mapas de sus materiales
-          if (ju) for (size_t c = 0; c < ju->lista.size(); c++) {
-              JVal* ue = ju->lista[c]; if (!ue || ue->tipo != 4) continue;
-              const std::string mn = JS(ue, "material", ""), mp = JS(ue, "mapa", ""), un = JS(ue, "uv", "");
-              const int ix = JI(ue, "indice", -1);
-              if (mn.empty() || W3dMatMapaDeClave(mp) < 0) continue;
+        mesh->onlyRoutine = JB(j, "routineOnly", false);   // la dibuja una rutina (Mesh.h)
+        mesh->lockNormals = JB(j, "lockNormals", false);   // Bloquear normales (Mesh.h)
+        { JVal* ju = JChild(j, "uvMaterials", 5);   // el UV PERSONALIZADO de los mapas de sus materiales
+          if (ju) for (size_t c = 0; c < ju->list.size(); c++) {
+              JVal* ue = ju->list[c]; if (!ue || ue->type != 4) continue;
+              const std::string mn = JS(ue, "material", ""), mp = JS(ue, "map", ""), un = JS(ue, "uv", "");
+              const int ix = JI(ue, "index", -1);
+              if (mn.empty() || W3dMatMapByKey(mp) < 0) continue;
               if (!un.empty()) mesh->uvPersonal[mn + "\x1f" + mp] = un;
               else if (ix >= 0) mesh->uvPersonalIdx[mn + "\x1f" + mp] = ix;
           } }
-        std::vector<unsigned char> datos;
-        W3dMallaInfo info;
-        bool cargo = false;
+        std::vector<unsigned char> data;
+        W3dMeshInfo info;
+        bool loaded = false;
         // medicion por sub-fase (0 = nadie mide): leer la entrada / parsear el .w3dm / derivados
-        double tMalla = CargaAhora();
-        bool leida = false;
-        MallaRecurso* recMalla = NULL;
-        if (!nomMalla.empty()) {
+        double tMesh = LoadNow();
+        bool read = false;
+        MeshResource* recMesh = NULL;
+        if (!nameMesh.empty()) {
             mesh->noEditable = JB(j, "noEditable", false);   // el AABB del recurso depende del modo
-            recMalla = W3dMallaRecursoPorNombre(nomMalla);
+            recMesh = W3dMeshResourceByName(nameMesh);
             // UNA MALLA DE UNA LIBRERIA QUE NO ESTA (desvinculada, o su .w3d falta): el objeto queda vacio pero la
-            // REFERENCIA se conserva (io/Librerias.h: W3dLibRefAnotar). El guardado la escribe tal cual -sin frenar:
+            // REFERENCIA se conserva (io/Libraries.h: W3dLibRefAnnotate). El guardado la escribe tal cual -sin frenar:
             // no hay geometria del proyecto que perder- y vincular la libreria la resuelve. Solo del PROYECTO: lo que
             // genera un proxy no se guarda
             bool refLib = false;
-            if (!recMalla && W3dLibContexto().empty() && !W3dLibPrefijoDe(nomMalla).empty()) {
-                W3dLibRef ref; ref.nombre = nomMalla;
-                W3dLibRefAnotar(mesh, W3D_LIBREF_MALLA, ref);
+            if (!recMesh && W3dLibContext().empty() && !W3dLibPrefixOf(nameMesh).empty()) {
+                W3dLibRef ref; ref.name = nameMesh;
+                W3dLibRefAnnotate(mesh, W3D_LIBREF_MESH, ref);
                 refLib = true;
                 w3dLogfW("[W3D] la malla '%s' es de la libreria '%s', que no esta: el objeto queda vacio hasta vincularla "
-                         "(la referencia se conserva)", nomMalla.c_str(), W3dLibPrefijoDe(nomMalla).c_str());
+                         "(la referencia se conserva)", nameMesh.c_str(), W3dLibPrefixOf(nameMesh).c_str());
                 W3dAvisof(false, T("'%s' uses the mesh '%s' from a missing library: it stays empty until you link it"),
-                          W3dNombreCorto(JS(j, "nombre", "")).c_str(), W3dNombreCorto(nomMalla).c_str());
-            } else if (!recMalla)
-                w3dLogfE("[W3D] la malla '%s' no esta en el registro del proyecto (el objeto queda vacio)", nomMalla.c_str());
-            else if (!(cargo = W3dMallaVincular(mesh, recMalla))) {
+                          W3dShortName(JS(j, "name", "")).c_str(), W3dShortName(nameMesh).c_str());
+            } else if (!recMesh)
+                w3dLogfE("[W3D] la malla '%s' no esta en el registro del proyecto (el objeto queda vacio)", nameMesh.c_str());
+            else if (!(loaded = W3dMeshLink(mesh, recMesh))) {
                 w3dLogfE("[W3D] no pude cargar la malla '%s' (%s): el objeto queda vacio",
-                         nomMalla.c_str(), recMalla->entrada.c_str());
-                s_mallasBinRechazadas++;
+                         nameMesh.c_str(), recMesh->entry.c_str());
+                s_meshesRejectedBin++;
             }
-            if (!cargo && !refLib) geo = recMalla ? recMalla->entrada : nomMalla;   // para el aviso y el freno de abajo
-            if (g_w3dCargaReloj) { const double t = CargaAhora(); g_w3dCargaFases.mallaParseMs += t - tMalla; tMalla = t; }
+            if (!loaded && !refLib) geo = recMesh ? recMesh->entry : nameMesh;   // para el aviso y el freno de abajo
+            if (g_w3dLoadClock) { const double t = LoadNow(); g_w3dLoadPhases.meshParseMs += t - tMesh; tMesh = t; }
         } else if (geo.empty())
             w3dLogfE("[W3D] una malla del proyecto no dice de que archivo sale (queda vacia)");
-        else if (!(leida = w3dFileSystem::ReadFileBytes(RutaJson(geo, base), datos) && !datos.empty()))
+        else if (!(read = w3dFileSystem::ReadFileBytes(JsonPath(geo, base), data) && !data.empty()))
             w3dLogfE("[W3D] no pude leer la geometria %s (la malla queda vacia)", geo.c_str());
-        if (g_w3dCargaReloj) { const double t = CargaAhora(); g_w3dCargaFases.mallaLeerMs += t - tMalla; tMalla = t; }
+        if (g_w3dLoadClock) { const double t = LoadNow(); g_w3dLoadPhases.meshReadMs += t - tMesh; tMesh = t; }
         // ESCENARIO CERRADO A EDICION: lo dice el proyecto (el .w3db hornea su AABB para el
         // modo con el que se guardo; si el proyecto pide el otro, el lector lo recalcula)
         const bool noEditable = JB(j, "noEditable", false);
-        // EL .w3db (binario, io/W3dMallaBin.h): la malla sale LISTA de la entrada. Se reconoce
+        // EL .w3db (binario, io/W3dMeshBin.h): la malla sale LISTA de la entrada. Se reconoce
         // por su firma, no por la extension (un .w3d escrito a mano puede llamarla como quiera).
         // (La de un RECURSO ya salio lista del vinculo, arriba: cuenta como binaria.)
-        const bool esBin = recMalla ? true : (leida && W3dMallaBinEs(&datos[0], datos.size()));
-        if (recMalla) {
+        const bool isBin = recMesh ? true : (read && W3dMeshBinIs(&data[0], data.size()));
+        if (recMesh) {
             // (nada: el vinculo dejo la malla lista y la edicion pendiente del recurso)
-        } else if (esBin) {
-            W3dMallaBinOpciones op;
+        } else if (isBin) {
+            W3dMeshBinOptions op;
             op.noEditable = noEditable;
             // el JUEGO no edita: solo los bloques de render. Los de edicion quedan PENDIENTES y se
             // leen recien si alguien pide los poligonos de la malla: su propio stack si GENERA
-            // malla (se resuelve abajo, tras CargarModificadores) o un Boolean que la usa de
-            // target (ConstruirPolyMesh). El PVS/Oclusion o un modificador apagado no los piden.
-            if (MallasComoJuego()) op.edicion = false;
-            if (!(cargo = W3dMallaBinLeer(&datos[0], datos.size(), mesh, &info, op))) {
+            // malla (se resuelve abajo, tras LoadModifiers) o un Boolean que la usa de
+            // target (BuildPolyMesh). El PVS/Oclusion o un modificador apagado no los piden.
+            if (MeshesAsGame()) op.edit = false;
+            if (!(loaded = W3dMeshBinRead(&data[0], data.size(), mesh, &info, op))) {
                 w3dLogfE("[W3D] %s no es un .w3db que este Whisk3D pueda leer (la malla queda vacia)", geo.c_str());
-                s_mallasBinRechazadas++;
-            } else if (!op.edicion) mesh->edicionPendiente = RutaJson(geo, base);
-        } else if (leida && !(cargo = W3dMallaLeer((const char*)&datos[0], datos.size(), mesh, &info)))
+                s_meshesRejectedBin++;
+            } else if (!op.edit) mesh->pendingEdit = JsonPath(geo, base);
+        } else if (read && !(loaded = W3dMeshRead((const char*)&data[0], data.size(), mesh, &info)))
             w3dLogfE("[W3D] %s no es un .w3dm que este Whisk3D pueda leer (la malla queda vacia)", geo.c_str());
-        if (g_w3dCargaReloj) { const double t = CargaAhora(); g_w3dCargaFases.mallaParseMs += t - tMalla; tMalla = t; }
+        if (g_w3dLoadClock) { const double t = LoadNow(); g_w3dLoadPhases.meshParseMs += t - tMesh; tMesh = t; }
         // ---- EL .w3dm ESTABA Y NO SE PUDO LEER: NI SILENCIO NI HORNEAR ----------
         //  El lector se NIEGA (no es W3DMESH / lexico de una version mas nueva / falta V o F)
         //  y aca ya hay un Mesh NUEVO y VACIO en la escena, con el nombre y el transform del
@@ -2995,166 +2995,166 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         //  objeto vacio, guardaba, y el primer guardado HORNEABA la nada (el .w3dm quedaba con
         //  0 puntos / 0 caras). Exactamente el degradado silencioso que el formato existe para
         //  impedir, y en el caso estrella: un .w3d escrito por un Whisk3D MAS NUEVO.
-        //  Se marca la malla como "no cargo" (EscribirMallaW3dm se niega a guardarla encima,
+        //  Se marca la malla como "no cargo" (WriteMeshW3dm se niega a guardarla encima,
         //  igual que con el freno "requiere") y se avisa EN PANTALLA. El usuario puede seguir
         //  trabajando; lo que no puede es destruir el archivo sin enterarse.
-        if (!cargo && !geo.empty()) {
-            mesh->w3dmAjenos.noCargo = true;
+        if (!loaded && !geo.empty()) {
+            mesh->w3dmForeign.notLoaded = true;
             W3dAvisof(true, T("Could not read the geometry of '%s': it stays EMPTY and I will not save over it (see whisk3d.log)"),
-                      W3dNombreCorto(geo).c_str());
+                      W3dShortName(geo).c_str());
         }
         // SILENCIOSO JAMAS: cada problema del archivo sale por el log con su numero de
         // linea. FUERA del 'if (cargo)' a proposito: cuando la lectura FRACASA es cuando
         // mas falta hace el motivo (ej: "el archivo no trae el bloque F"), y adentro del
         // if se perdia justo en ese caso.
-        for (size_t k = 0; k < info.avisos.size(); k++)
-            w3dLogfW("[W3D] %s: %s", geo.c_str(), info.avisos[k].c_str());
-        if (cargo) {
-            if (info.soloLectura)
+        for (size_t k = 0; k < info.notices.size(); k++)
+            w3dLogfW("[W3D] %s: %s", geo.c_str(), info.notices[k].c_str());
+        if (loaded) {
+            if (info.readOnly)
                 w3dLogfW("[W3D] %s pide un bloque que este Whisk3D no entiende: la malla abre pero guardar encima la degradaria", geo.c_str());
             // el material vive en la ESCENA y el .w3dm lo referencia POR NOMBRE (bloque PARTMAT):
             // el Core no puede resolver el puntero, lo hace el editor con el bloque "materiales".
-            // (El de un RECURSO lo resolvio su primera carga: W3dMallaMaterialPorNombreHook.)
-            if (!recMalla)
-                for (size_t k = 0; k < mesh->materialsGroup.size() && k < info.materiales.size(); k++)
-                    mesh->materialsGroup[k].material = MaterialPorNombre(info.materiales[k]);
+            // (El de un RECURSO lo resolvio su primera carga: W3dMeshMaterialByNameHook.)
+            if (!recMesh)
+                for (size_t k = 0; k < mesh->materialsGroup.size() && k < info.materials.size(); k++)
+                    mesh->materialsGroup[k].material = MaterialByName(info.materials[k]);
             mesh->noEditable = noEditable;
-            if (esBin && recMalla && recMalla->bytesDeTexto) {
+            if (isBin && recMesh && recMesh->textBytes) {
                 // UNA MALLA DEL REGISTRO EN TEXTO (.w3dm): nada que derivar para ESTE objeto (el
                 // vinculo la dejo lista), pero la malla se derivo al abrir (la conversion del texto,
                 // una vez por malla): cuenta como .w3dm, igual que la "geometria" de texto de antes
-                if (g_w3dCargaReloj) g_w3dCargaFases.mallasDerivadas++;
-                s_mallasDerivadas++;
-            } else if (esBin) {
+                if (g_w3dLoadClock) g_w3dLoadPhases.derivedMeshes++;
+                s_derivedMeshes++;
+            } else if (isBin) {
                 // NADA QUE DERIVAR: el index buffer (agrupado + Forsyth), las aristas, el AABB,
                 // las capas activas en el render y el mapa de puntos vinieron hechos del guardado.
-                if (g_w3dCargaReloj) g_w3dCargaFases.mallasBin++;
-                s_mallasBinarias++;
+                if (g_w3dLoadClock) g_w3dLoadPhases.meshesBin++;
+                s_binaryMeshes++;
             } else {
                 // el cierre que el lector de TEXTO no hace (es del Core y no puede llamar al editor):
                 // index buffer + rangos por mesh part, bordes/posRep, y las capas activas al render.
-                mesh->ReagruparMeshParts();
+                mesh->RegroupMeshParts();
                 // ESCENARIO CERRADO A EDICION: mismo trato que ImportWOBJ con noEditable
                 // (solo el AABB; sin posRep/edges la malla queda identica a la guardada)
-                if (mesh->noEditable) mesh->CalcularAABBSolo();
-                else mesh->CalcularBordes(true, false);   // CONSERVA los puntos del archivo (no re-suelda por posicion)
-                mesh->AplicarCapasAlRender();
+                if (mesh->noEditable) mesh->ComputeAABBOnly();
+                else mesh->ComputeBorders(true, false);   // CONSERVA los puntos del archivo (no re-suelda por posicion)
+                mesh->ApplyLayersToRender();
                 // el mapeo render-vert -> control-point (vertCtrlPoint = posRep). SIN ESTO el skinning
-                // 3D se corta en seco (SkinearMesh sale si el mapa no cubre los verts) y la malla
+                // 3D se corta en seco (SkinMesh sale si el mapa no cubre los verts) y la malla
                 // rigueada abria SIN DEFORMAR, en silencio.
-                WeightPaintAsegurarMapa(mesh);
-                if (g_w3dCargaReloj) g_w3dCargaFases.mallasDerivadas++;
-                s_mallasDerivadas++;
+                WeightPaintEnsureMap(mesh);
+                if (g_w3dLoadClock) g_w3dLoadPhases.derivedMeshes++;
+                s_derivedMeshes++;
             }
             mesh->lastSkinFrame = -999999;   // los vertex groups del archivo reestrenan el skinning
             // lo que la fase de mallas gasta en DERIVAR (index buffer, bordes, capas, mapa de puntos)
-            if (g_w3dCargaReloj) g_w3dCargaFases.mallaDerivadosMs += CargaAhora() - tMalla;
+            if (g_w3dLoadClock) g_w3dLoadPhases.derivedMeshMs += LoadNow() - tMesh;
         }
-        JsonComunes(j, mesh);   // nombre/transform del PROYECTO (manda sobre el "nombre" del .w3dm)
-        // LAS CAPAS DE MATERIAL de encima de cada parte (MaterialGroup::capasMat), por nombre (los materiales ya cargaron)
-        { JVal* jc = JHijo(j, "capasMaterial", 5);
-          if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
-              JVal* e = jc->lista[c]; if (!e || e->tipo != 4) continue;
-              const int parte = JI(e, "parte", -1);
-              JVal* lm = JHijo(e, "materiales", 5);
-              if (!lm || parte < 0 || parte >= (int)mesh->materialsGroup.size()) continue;
-              std::vector<Material*>& cm = mesh->materialsGroup[(size_t)parte].capasMat;
+        CommonJson(j, mesh);   // nombre/transform del PROYECTO (manda sobre el "nombre" del .w3dm)
+        // LAS CAPAS DE MATERIAL de encima de cada parte (MaterialGroup::layersMat), por nombre (los materiales ya cargaron)
+        { JVal* jc = JChild(j, "materialLayers", 5);
+          if (jc) for (size_t c = 0; c < jc->list.size(); c++) {
+              JVal* e = jc->list[c]; if (!e || e->type != 4) continue;
+              const int part = JI(e, "part", -1);
+              JVal* lm = JChild(e, "materials", 5);
+              if (!lm || part < 0 || part >= (int)mesh->materialsGroup.size()) continue;
+              std::vector<Material*>& cm = mesh->materialsGroup[(size_t)part].layersMat;
               cm.clear();
-              for (size_t k = 0; k < lm->lista.size(); k++) {
-                  if (!lm->lista[k] || lm->lista[k]->tipo != 2) continue;
-                  Material* mt = MaterialPorNombre(lm->lista[k]->str);
+              for (size_t k = 0; k < lm->list.size(); k++) {
+                  if (!lm->list[k] || lm->list[k]->type != 2) continue;
+                  Material* mt = MaterialByName(lm->list[k]->str);
                   if (mt) cm.push_back(mt);
               }
           } }
         // ORIGEN: el .obj/.fbx que trajo el usuario. Externo a proposito (lo edita otro programa).
-        std::string org = JS(j, "origen", "");
+        std::string org = JS(j, "origin", "");
         if (!org.empty()) {
-            mesh->origen = RutaJson(org, base);
-            if (!w3dFileSystem::FileExists(mesh->origen))
+            mesh->origin = JsonPath(org, base);
+            if (!w3dFileSystem::FileExists(mesh->origin))
                 w3dLogfW("[W3D] '%s': el archivo de origen '%s' no esta. La malla carga igual (viaja adentro del .w3d); solo no vas a poder reimportarla del original",
-                         mesh->name.c_str(), mesh->origen.c_str());
+                         mesh->name.c_str(), mesh->origin.c_str());
         }
-        CargarAnimsVertex(j, mesh, base);   // vertex anims (blob binario + curvas + rango)
-        CargarRigMesh(j, mesh);             // modArmature + armatures 2D (los grupos vienen del .w3dm)
-        CargarModificadores(j, mesh);       // el resto del stack (Mirror/Screw/SubSurf/...)
+        LoadAnimsVertex(j, mesh, base);   // vertex anims (blob binario + curvas + rango)
+        LoadRigMesh(j, mesh);             // modArmature + armatures 2D (los grupos vienen del .w3dm)
+        LoadModifiers(j, mesh);           // el resto del stack (Mirror/Screw/SubSurf/...)
         // EL JUEGO: una malla cuyo stack GENERA malla (Mirror, SubSurf, Screw, Boolean... encendido)
         // arma sus poligonos apenas se resuelvan los modificadores (gPendModGen): su edicion se
         // materializa YA, de los bytes que estan en memoria (sin releer la entrada). Un stack que
         // no genera nada (solo el PVS/Oclusion, o todo apagado) la deja pendiente: la malla mas
         // grande de un nivel con PVS no carga caras, capas ni aristas que nadie va a usar.
-        if (!mesh->edicionPendiente.empty() && W3dStackGeneraMalla(mesh)) {
-            if (recMalla) W3dMallaBinMaterializarEdicion(mesh);   // de los bytes del RECURSO
-            else W3dMallaBinMaterializarEdicion(mesh, &datos[0], datos.size());
+        if (!mesh->pendingEdit.empty() && W3dStackGeneratesMesh(mesh)) {
+            if (recMesh) W3dMeshBinMaterializeEdit(mesh);   // de los bytes del RECURSO
+            else W3dMeshBinMaterializeEdit(mesh, &data[0], data.size());
         }
-        CargarAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay, propia de la malla)
-        { std::string fbn = NombreRecursoJson(JS(j, "flipbook", ""));   // o un flipbook CON NOMBRE compartido (SceneFlipbooks)
-          if (!fbn.empty()) { Flipbook* fb = FlipbookPorNombre(fbn);
-              if (fb) mesh->UsarFlipbook(fb, JI(j, "flipDesfase", 0)); } }
+        LoadAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay, propia de la malla)
+        { std::string fbn = ResourceNameJson(JS(j, "flipbook", ""));   // o un flipbook CON NOMBRE compartido (SceneFlipbooks)
+          if (!fbn.empty()) { Flipbook* fb = FlipbookByName(fbn);
+              if (fb) mesh->UseFlipbook(fb, JI(j, "flipOffset", 0)); } }
         return mesh;
     }
-    if (tipo == "modelo") {   // wavefront referenciado + sus vertex anims
-        std::string archivo = RutaJson(JS(j, "archivo", ""), base);
-        Mesh* mesh = ImportWOBJ(archivo, parent, false);
-        if (!mesh) { w3dLogfE("[W3D] no pude importar el modelo %s (objeto omitido)", archivo.c_str()); return NULL; }
-        if (g_w3dCargaReloj) g_w3dCargaFases.mallasDerivadas++;   // ImportWOBJ deriva todo al abrir
-        JsonComunes(j, mesh);
-        CargarAnimsVertex(j, mesh, base);   // vertex anims (blob binario + curvas + rango)
-        CargarRigMesh(j, mesh);             // vgroups por posicion + referencia modArmature (Fase 3)
-        CargarModificadores(j, mesh);       // el resto del stack (Mirror/Screw/SubSurf/...)
-        CargarAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay, propia de la malla)
-        { std::string fbn = NombreRecursoJson(JS(j, "flipbook", ""));   // o un flipbook CON NOMBRE compartido (SceneFlipbooks)
-          if (!fbn.empty()) { Flipbook* fb = FlipbookPorNombre(fbn);
-              if (fb) mesh->UsarFlipbook(fb, JI(j, "flipDesfase", 0)); } }
+    if (type == "model") {   // wavefront referenciado + sus vertex anims
+        std::string file = JsonPath(JS(j, "file", ""), base);
+        Mesh* mesh = ImportWOBJ(file, parent, false);
+        if (!mesh) { w3dLogfE("[W3D] no pude importar el modelo %s (objeto omitido)", file.c_str()); return NULL; }
+        if (g_w3dLoadClock) g_w3dLoadPhases.derivedMeshes++;   // ImportWOBJ deriva todo al abrir
+        CommonJson(j, mesh);
+        LoadAnimsVertex(j, mesh, base);   // vertex anims (blob binario + curvas + rango)
+        LoadRigMesh(j, mesh);             // vgroups por posicion + referencia modArmature (Fase 3)
+        LoadModifiers(j, mesh);           // el resto del stack (Mirror/Screw/SubSurf/...)
+        LoadAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay, propia de la malla)
+        { std::string fbn = ResourceNameJson(JS(j, "flipbook", ""));   // o un flipbook CON NOMBRE compartido (SceneFlipbooks)
+          if (!fbn.empty()) { Flipbook* fb = FlipbookByName(fbn);
+              if (fb) mesh->UseFlipbook(fb, JI(j, "flipOffset", 0)); } }
         return mesh;
     }
-    if (tipo == "glb") {      // malla modelada, exportada a GLB dentro del zip
-        std::string archivo = RutaJson(JS(j, "archivo", ""), base);
-        size_t antes = SceneCollection ? SceneCollection->Childrens.size() : 0;
-        extern bool ImportModeloPorExtension(const std::string& path);
-        ImportModeloPorExtension(archivo);
-        Object* creado = NULL;
+    if (type == "glb") {      // malla modelada, exportada a GLB dentro del zip
+        std::string file = JsonPath(JS(j, "file", ""), base);
+        size_t prev = SceneCollection ? SceneCollection->Childrens.size() : 0;
+        extern bool ImportModelByExtension(const std::string& path);
+        ImportModelByExtension(file);
+        Object* created = NULL;
         // lo importado quedo al FINAL de la escena: aplicarle nombre/transform
-        if (SceneCollection && SceneCollection->Childrens.size() > antes) {
-            Object* nuevo = SceneCollection->Childrens.back();
+        if (SceneCollection && SceneCollection->Childrens.size() > prev) {
+            Object* newValue = SceneCollection->Childrens.back();
             // EL GLB DE ADENTRO DEL .w3d NO ES UN "ORIGEN": es una entrada del propio
             // contenedor. Se limpia el SUBARBOL ENTERO (no solo el nodo de arriba: un
             // armature con la malla como hija dejaba a la hija con una ruta INTERNA y
-            // esa ruta terminaba en EXTERNOS.txt como archivo que falta). Va ANTES del
+            // esa ruta terminaba en EXTERNALS.txt como archivo que falta). Va ANTES del
             // reparent para que no dependa de donde quede colgado.
-            LimpiarOrigenRec(nuevo);
+            ClearOriginRec(newValue);
             // el import cuelga SIEMPRE de la raiz; si este nodo venia como HIJO (ej: malla bajo su
             // armature), re-colgarlo del padre real (preserva la jerarquia del rig al reabrir).
             if (parent && parent != SceneCollection) {
                 SceneCollection->Childrens.pop_back();
-                nuevo->Parent = parent;
-                parent->Childrens.push_back(nuevo);
+                newValue->Parent = parent;
+                parent->Childrens.push_back(newValue);
             }
-            JsonComunes(j, nuevo);
-            if (nuevo->getType() == ObjectType::mesh) {
+            CommonJson(j, newValue);
+            if (newValue->getType() == ObjectType::mesh) {
                 // QUADS/NGONS: el GLB solo trae triangulos -> reconstruir los poligonos (y el orden de
                 // los render-verts) desde el bloque "topologia". VA PRIMERO: los uvgroups se matchean
                 // contra los render-verts y la vertex anim compara su vcount contra vertexSize.
-                RetopologizarDesdeTopologia(j, (Mesh*)nuevo);
-                CargarAnimsVertex(j, (Mesh*)nuevo, base);   // vertex anims de la malla modelada
-                CargarRigMesh(j, (Mesh*)nuevo);             // vgroups por posicion + modArmature (Fase 3)
-                CargarModificadores(j, (Mesh*)nuevo);       // el resto del stack (Mirror/Screw/SubSurf/...)
+                RetopologizeFromTopology(j, (Mesh*)newValue);
+                LoadAnimsVertex(j, (Mesh*)newValue, base);   // vertex anims de la malla modelada
+                LoadRigMesh(j, (Mesh*)newValue);             // vgroups por posicion + modArmature (Fase 3)
+                LoadModifiers(j, (Mesh*)newValue);           // el resto del stack (Mirror/Screw/SubSurf/...)
             }
-            creado = nuevo;
+            created = newValue;
         }
-        return creado;
+        return created;
     }
-    if (tipo == "armature") { // ARMATURE (Fase 3): huesos + clips + hijos
+    if (type == "armature") { // ARMATURE (Fase 3): huesos + clips + hijos
         Armature* a = new Armature(parent);
-        JsonComunes(j, a);
-        bool autorado = JB(j, "autorado", false);
-        a->skinGltf = !autorado && JB(j, "gltf", false); // rig glTF: FK Y-up + skin = world * invBind
-        JVal* jb = JHijo(j, "bones", 5);
-        if (jb) for (size_t i = 0; i < jb->lista.size(); i++) {
-            JVal* e = jb->lista[i]; if (!e || e->tipo != 4) continue;
+        CommonJson(j, a);
+        bool authored = JB(j, "authored", false);
+        a->skinGltf = !authored && JB(j, "gltf", false); // rig glTF: FK Y-up + skin = world * invBind
+        JVal* jb = JChild(j, "bones", 5);
+        if (jb) for (size_t i = 0; i < jb->list.size(); i++) {
+            JVal* e = jb->list[i]; if (!e || e->type != 4) continue;
             W3dBone b;
-            b.name = JS(e, "nombre", "Bone");
-            b.parent = JI(e, "padre", -1);
-            b.conectado = !JB(e, "suelto", false); // "Disconnect Bone": emparentado sin soldar
+            b.name = JS(e, "name", "Bone");
+            b.parent = JI(e, "parent", -1);
+            b.connected = !JB(e, "loose", false); // "Disconnect Bone": emparentado sin soldar
             JVec3(e, "head", b.head); JVec3(e, "tail", b.tail);
             if (JB(e, "rest", false)) { // rig importado guardado con fidelidad de FK/skinning
                 b.hasRest = true;
@@ -3171,331 +3171,331 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
             a->bones.push_back(b);
         }
         // jerarquia SANEADA (indices fuera de rango / ciclos -> raiz): los recorridos que suben
-        // por 'parent' asumen que la cadena termina (ver SanearPadres)
+        // por 'parent' asumen que la cadena termina (ver SanitizeParents)
         { std::vector<int> pad(a->bones.size());
           for (size_t i = 0; i < a->bones.size(); i++) pad[i] = a->bones[i].parent;
-          if (SanearPadres(pad, a->name.c_str()))
+          if (SanitizeParents(pad, a->name.c_str()))
               for (size_t i = 0; i < a->bones.size(); i++) a->bones[i].parent = pad[i]; }
         // CLIPS: "anims" es el NOMBRE de un animset del registro (+ "clips": que indices usa, en
         // su orden) o, en los .w3d de antes, la LISTA de clips inline (se sigue leyendo; el
         // proximo guardado la migra a un animset). Ver animation/W3dAnimSet.h.
-        std::string animSet = NombreRecursoJson(JS(j, "anims", ""));   // (con el prefijo de su libreria)
+        std::string animSet = ResourceNameJson(JS(j, "anims", ""));   // (con el prefijo de su libreria)
         if (!animSet.empty()) {
-            std::vector<int> idx; bool conIdx = false;
-            JVal* jcl = JHijo(j, "clips", 5);
-            if (jcl) { conIdx = true;
-                       for (size_t i = 0; i < JFilaLen(jcl); i++) idx.push_back((int)JFilaNum(jcl, i, -1.0f)); }
-            std::string motivo;
-            if (!W3dArmatureAsignarAnimSet(a, animSet, conIdx ? &idx : NULL, &motivo)) {
-                if (W3dLibContexto().empty() && !W3dLibPrefijoDe(animSet).empty() && W3dAnimSetsEntradaDe(animSet).empty()) {
+            std::vector<int> idx; bool withIdx = false;
+            JVal* jcl = JChild(j, "clips", 5);
+            if (jcl) { withIdx = true;
+                       for (size_t i = 0; i < JRowLen(jcl); i++) idx.push_back((int)JRowNum(jcl, i, -1.0f)); }
+            std::string reason;
+            if (!W3dArmatureAssignAnimSet(a, animSet, withIdx ? &idx : NULL, &reason)) {
+                if (W3dLibContext().empty() && !W3dLibPrefixOf(animSet).empty() && W3dAnimSetsEntryOf(animSet).empty()) {
                     // EL ANIMSET DE UNA LIBRERIA QUE NO ESTA (desvinculada, o su .w3d falta): el esqueleto queda sin
-                    // clips pero la REFERENCIA se conserva (io/Librerias.h): se guarda tal cual -sin frenar: no hay
+                    // clips pero la REFERENCIA se conserva (io/Libraries.h): se guarda tal cual -sin frenar: no hay
                     // clips del proyecto que perder- y vincular la libreria la resuelve
-                    W3dLibRef ref; ref.nombre = animSet; ref.clips = idx; ref.conClips = conIdx;
-                    W3dLibRefAnotar(a, W3D_LIBREF_ANIMSET, ref);
+                    W3dLibRef ref; ref.name = animSet; ref.clips = idx; ref.withClips = withIdx;
+                    W3dLibRefAnnotate(a, W3D_LIBREF_ANIMSET, ref);
                     w3dLogfW("[W3D] '%s': su animset '%s' es de una libreria que no esta: sin clips hasta vincularla "
                              "(la referencia se conserva)", a->name.c_str(), animSet.c_str());
                     W3dAvisof(false, T("'%s' uses the animations '%s' from a missing library: no clips until you link it"),
-                              W3dNombreCorto(a->name).c_str(), W3dNombreCorto(animSet).c_str());
+                              W3dShortName(a->name).c_str(), W3dShortName(animSet).c_str());
                 } else {
                 // NI SILENCIO NI BORRARLO: el armature queda sin clips, se avisa en pantalla y el
                 // guardado se FRENA (guardar encima lo dejaria sin animaciones para siempre)
-                a->animSetNoCargo = animSet;
+                a->animSetNotLoaded = animSet;
                 w3dLogfE("[W3D] '%s': no pude cargar sus clips (animset '%s'): %s",
-                         a->name.c_str(), animSet.c_str(), motivo.c_str());
+                         a->name.c_str(), animSet.c_str(), reason.c_str());
                 W3dAvisof(true, T("Could not read the animations of '%s' (%s): they stay EMPTY and I will not save over it (see whisk3d.log)"),
-                          W3dNombreCorto(a->name).c_str(), W3dNombreCorto(animSet).c_str());
+                          W3dShortName(a->name).c_str(), W3dShortName(animSet).c_str());
                 }
             }
         }
-        JVal* ja = JHijo(j, "anims", 5);
-        if (ja) for (size_t i = 0; i < ja->lista.size(); i++) {
-            JVal* e = ja->lista[i]; if (!e || e->tipo != 4) continue;
-            SkeletalAnimation* an = new SkeletalAnimation(JS(e, "nombre", "Animation"));
+        JVal* ja = JChild(j, "anims", 5);
+        if (ja) for (size_t i = 0; i < ja->list.size(); i++) {
+            JVal* e = ja->list[i]; if (!e || e->type != 4) continue;
+            SkeletalAnimation* an = new SkeletalAnimation(JS(e, "name", "Animation"));
             an->FrameRate  = JI(e, "fps", 24);
-            an->startFrame = JI(e, "inicio", 1);
-            an->endFrame   = JI(e, "fin", 0);
-            JVal* jt = JHijo(e, "tracks", 5);
-            if (jt) for (size_t t = 0; t < jt->lista.size(); t++) {
-                JVal* tj = jt->lista[t]; if (!tj || tj->tipo != 4) continue;
+            an->startFrame = JI(e, "start", 1);
+            an->endFrame   = JI(e, "end", 0);
+            JVal* jt = JChild(e, "tracks", 5);
+            if (jt) for (size_t t = 0; t < jt->list.size(); t++) {
+                JVal* tj = jt->list[t]; if (!tj || tj->type != 4) continue;
                 BoneTrack tr;
-                tr.bone = JI(tj, "hueso", -1);
-                JVal* jc = JHijo(tj, "curvas", 5);
-                if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
+                tr.bone = JI(tj, "bone", -1);
+                JVal* jc = JChild(tj, "curves", 5);
+                if (jc) for (size_t c = 0; c < jc->list.size(); c++) {
                     AnimProperty ap;
-                    if (CargarCurvaJson(jc->lista[c], ap)) tr.Propertys.push_back(ap);
+                    if (LoadCurveJson(jc->list[c], ap)) tr.Properties.push_back(ap);
                 }
                 an->tracks.push_back(tr);
             }
             a->animations.push_back(an);
         }
-        a->animActiva = JI(j, "animActiva", a->animations.empty() ? -1 : 0);
-        LeerCapas(JHijo(j, "capas", 5), a->capas);
-        a->capaActiva = a->capas.empty() ? -1 : 0;
-        if (a->animActiva < -1 || a->animActiva >= (int)a->animations.size())
-            a->animActiva = a->animations.empty() ? -1 : 0;
-        if (autorado) PrepararSkinAutorado(a);          // rig del editor: rest/skin desde head/tail
-        else { bool hayRest = false;
-               for (size_t i = 0; i < a->bones.size(); i++) if (a->bones[i].hasRest) { hayRest = true; break; }
-               if (hayRest) PrepararSkin(a); }          // rig importado: recomputar matrices de skinning
+        a->activeAnim = JI(j, "activeAnim", a->animations.empty() ? -1 : 0);
+        ReadLayers(JChild(j, "layers", 5), a->layers);
+        a->activeLayer = a->layers.empty() ? -1 : 0;
+        if (a->activeAnim < -1 || a->activeAnim >= (int)a->animations.size())
+            a->activeAnim = a->animations.empty() ? -1 : 0;
+        if (authored) PrepareAuthoredSkin(a);          // rig del editor: rest/skin desde head/tail
+        else { bool hasRest = false;
+               for (size_t i = 0; i < a->bones.size(); i++) if (a->bones[i].hasRest) { hasRest = true; break; }
+               if (hasRest) PrepareSkin(a); }          // rig importado: recomputar matrices de skinning
         return a;
     }
-    if (tipo == "lod") {   // LOD: un hijo por distancia a la camara (los hijos los lee JsonObjeto)
+    if (type == "lod") {   // LOD: un hijo por distancia a la camara (los hijos los lee JsonObject)
         LOD* l = new LOD(parent);
-        JsonComunes(j, l);
-        JVal* dl = JHijo(j, "distancias", 5);   // lista de numeros (mismo idioma que "color")
-        if (dl) for (size_t i = 0; i < dl->lista.size(); i++)
-            if (dl->lista[i]) l->distancias.push_back((float)dl->lista[i]->num);
-        l->soloCamaraActiva = JB(j, "soloCamaraActiva", false); // ausente en los .w3d viejos
+        CommonJson(j, l);
+        JVal* dl = JChild(j, "distances", 5);   // lista de numeros (mismo idioma que "color")
+        if (dl) for (size_t i = 0; i < dl->list.size(); i++)
+            if (dl->list[i]) l->distances.push_back((float)dl->list[i]->num);
+        l->onlyCameraActive = JB(j, "activeCameraOnly", false); // ausente en los .w3d viejos
         return l;
     }
-    if (tipo == "sonido") {    // SONIDO: audio puesto en la escena (los tiempos en segundos)
-        Sonido* so = new Sonido(parent);
-        JsonComunes(j, so);
-        so->archivo    = JS(j, "archivo", "");
-        so->activo     = JB(j, "activo", true);
-        so->volumen    = JF(j, "volumen", 1.0f);
-        so->tono       = JF(j, "tono", 1.0f);
+    if (type == "sound") {    // SONIDO: audio puesto en la escena (los tiempos en segundos)
+        Sound* so = new Sound(parent);
+        CommonJson(j, so);
+        so->file       = JS(j, "file", "");
+        so->active     = JB(j, "active", true);
+        so->volume     = JF(j, "volume", 1.0f);
+        so->tone       = JF(j, "pitch", 1.0f);
         so->reverb     = JF(j, "reverb", 0.0f);
-        so->paneo      = JF(j, "paneo", 0.0f);
-        so->inicio     = JF(j, "inicio", 0.0f);
-        so->recorteIni = JF(j, "recorteIni", 0.0f);
-        so->recorteFin = JF(j, "recorteFin", 0.0f);
-        so->bucle      = JB(j, "bucle", false);
-        so->posicional = JB(j, "posicional", false);
-        so->radio      = JF(j, "radio", so->radio);
-        so->alcance    = JF(j, "alcance", so->alcance);
+        so->pan        = JF(j, "pan", 0.0f);
+        so->start      = JF(j, "start", 0.0f);
+        so->clipStart  = JF(j, "clipStart", 0.0f);
+        so->clipEnd    = JF(j, "clipEnd", 0.0f);
+        so->loop       = JB(j, "loop", false);
+        so->positional = JB(j, "positional", false);
+        so->radius     = JF(j, "radius", so->radius);
+        so->range      = JF(j, "range", so->range);
         return so;
     }
-    if (tipo == "niebla") {    // NIEBLA: glFog puesta en el arbol (solo en Render)
-        Niebla* ni = new Niebla(parent);
-        JsonComunes(j, ni);
-        ni->activa   = JB(j, "activa", true);
-        std::string m = JS(j, "modo", "lineal");
-        ni->modo     = (m == "exp2") ? 2 : (m == "exp" ? 1 : 0);
-        ni->inicio   = JF(j, "inicio", ni->inicio);
-        ni->fin      = JF(j, "fin", ni->fin);
-        ni->densidad = JF(j, "densidad", ni->densidad);
-        JVal* col = JHijo(j, "color", 5);
-        if (col && col->lista.size() >= 3)
-            for (int i = 0; i < 3; i++) ni->color[i] = (float)col->lista[i]->num;
-        ni->fondo    = JB(j, "fondo", false);
+    if (type == "fog") {    // NIEBLA: glFog puesta en el arbol (solo en Render)
+        Fog* ni = new Fog(parent);
+        CommonJson(j, ni);
+        ni->active   = JB(j, "active", true);
+        std::string m = JS(j, "mode", "linear");
+        ni->mode    = (m == "exp2") ? 2 : (m == "exp" ? 1 : 0);
+        ni->start   = JF(j, "start", ni->start);
+        ni->end     = JF(j, "end", ni->end);
+        ni->density = JF(j, "density", ni->density);
+        JVal* col = JChild(j, "color", 5);
+        if (col && col->list.size() >= 3)
+            for (int i = 0; i < 3; i++) ni->color[i] = (float)col->list[i]->num;
+        ni->background    = JB(j, "background", false);
         return ni;
     }
-    if (tipo == "postproceso") {   // POSTPROCESADO: sus efectos sobre lo ya dibujado en ese punto del arbol
-        Postproceso* pp = new Postproceso(parent);
-        JsonComunes(j, pp);
-        W3dPostLeer(j, pp->opc);
+    if (type == "postProcess") {   // POSTPROCESADO: sus efectos sobre lo ya dibujado en ese punto del arbol
+        PostProcess* pp = new PostProcess(parent);
+        CommonJson(j, pp);
+        W3dPostRead(j, pp->opt);
         return pp;
     }
-    if (tipo == "limpiarz") {  // LIMPIAR Z: borra la profundidad en ese punto del arbol
-        LimpiarZ* lz = new LimpiarZ(parent);
-        JsonComunes(j, lz);
-        lz->activo = JB(j, "activo", true);
+    if (type == "clearz") {  // LIMPIAR Z: borra la profundidad en ese punto del arbol
+        ClearZ* lz = new ClearZ(parent);
+        CommonJson(j, lz);
+        lz->active = JB(j, "active", true);
         return lz;
     }
-    if (tipo == "recorte") {   // RECORTE: los hijos se dibujan en un rectangulo (fracciones, origen en el centro)
-        Recorte* rc = new Recorte(parent);
-        JsonComunes(j, rc);
-        rc->activo   = JB(j, "activo", true);
-        rc->x        = JF(j, "x", 0.0f);
-        rc->y        = JF(j, "y", 0.0f);
-        rc->ancho    = JF(j, "ancho", 1.0f);
-        rc->alto     = JF(j, "alto", 1.0f);
-        rc->camara   = JS(j, "camara", "");
-        rc->limpiarZ = JB(j, "limpiarZ", false);
-        rc->fondo    = JB(j, "fondo", false);
-        JVal* col = JHijo(j, "color", 5);
-        if (col) for (size_t i = 0; i < col->lista.size() && i < 4; i++) rc->color[i] = (float)col->lista[i]->num;
+    if (type == "clip") {   // RECORTE: los hijos se dibujan en un rectangulo (fracciones, origen en el centro)
+        ClipRegion* rc = new ClipRegion(parent);
+        CommonJson(j, rc);
+        rc->active     = JB(j, "active", true);
+        rc->x          = JF(j, "x", 0.0f);
+        rc->y          = JF(j, "y", 0.0f);
+        rc->width      = JF(j, "width", 1.0f);
+        rc->height     = JF(j, "height", 1.0f);
+        rc->camera     = JS(j, "camera", "");
+        rc->clearZ     = JB(j, "clearZ", false);
+        rc->background = JB(j, "background", false);
+        JVal* col = JChild(j, "color", 5);
+        if (col) for (size_t i = 0; i < col->list.size() && i < 4; i++) rc->color[i] = (float)col->list[i]->num;
         return rc;
     }
-    if (tipo == "sondareflejo") {   // SONDA DE REFLEJO: su imagen 360 (objects/SondaReflejo.cpp)
-        SondaReflejo* sr = new SondaReflejo(parent);
-        JsonComunes(j, sr);
-        SondaReflejoLeerCampos(j, sr);
+    if (type == "reflectionprobe") {   // SONDA DE REFLEJO: su imagen 360 (objects/ReflectionProbe.cpp)
+        ReflectionProbe* sr = new ReflectionProbe(parent);
+        CommonJson(j, sr);
+        ReflectionProbeReadFields(j, sr);
         return sr;
     }
-    if (tipo == "sondaluz") {  // SONDA DE LUZ: la grilla con la luz indirecta horneada (objects/SondaLuz.cpp)
-        SondaLuz* sl = new SondaLuz(parent);
-        JsonComunes(j, sl);
-        SondaLuzLeerCampos(j, sl);
+    if (type == "sondaluz") {  // SONDA DE LUZ: la grilla con la luz indirecta horneada (objects/LightProbe.cpp)
+        LightProbe* sl = new LightProbe(parent);
+        CommonJson(j, sl);
+        LightProbeReadFields(j, sl);
         return sl;
     }
-    if (tipo == "hitbox") {    // HITBOX: caja de deteccion con eventos lua (los campos: objects/Hitbox.cpp)
+    if (type == "hitbox") {    // HITBOX: caja de deteccion con eventos lua (los campos: objects/Hitbox.cpp)
         Hitbox* hb = new Hitbox(parent);
-        JsonComunes(j, hb);
-        HitboxLeerCampos(j, hb);
+        CommonJson(j, hb);
+        HitboxReadFields(j, hb);
         return hb;
     }
-    if (tipo == "rutina") {    // Rutina: lista de pasos del render (sin transformacion propia)
-        Rutina* ru = new Rutina(parent);
-        JsonComunes(j, ru);
-        RutinaLeerCampos(j, ru, RutinaRefTextura, (void*)&base);   // ("Bind texture": como la de un material)
+    if (type == "routine") {    // Rutina: lista de pasos del render (sin transformacion propia)
+        Routine* ru = new Routine(parent);
+        CommonJson(j, ru);
+        RoutineReadFields(j, ru, RoutineRefTexture, (void*)&base);   // ("Bind texture": como la de un material)
         return ru;
     }
-    if (tipo == "culling") {   // Culling: contenedor de culling (frustum/grid/triangulo/bsp)
+    if (type == "culling") {   // Culling: contenedor de culling (frustum/grid/triangulo/bsp)
         Culling* cu = new Culling(parent);
-        JsonComunes(j, cu);
-        cu->metodo           = CullingMetodoDesde(JS(j, "metodo", "frustum")); // ausente = frustum (retrocompat)
-        cu->activo           = JB(j, "activo", true);         // ausente = prendido
-        cu->soloCamaraActiva = JB(j, "soloCamaraActiva", false);
-        cu->distanciaMax     = JF(j, "distanciaMax", 0.0f);   // 0 = sin limite (archivos viejos)
-        cu->ordenAlpha       = JB(j, "ordenAlpha", false);    // translucido: cullea + ordena atras->adelante
-        cu->ordenCercania    = JB(j, "ordenCercania", false); // opaco: adelante->atras puro (sin agrupar por material)
+        CommonJson(j, cu);
+        cu->method           = CullingMethodFrom(JS(j, "method", "frustum")); // ausente = frustum (retrocompat)
+        cu->active           = JB(j, "active", true);         // ausente = prendido
+        cu->onlyCameraActive = JB(j, "activeCameraOnly", false);
+        cu->distanceMax      = JF(j, "maxDistance", 0.0f);   // 0 = sin limite (archivos viejos)
+        cu->orderAlpha       = JB(j, "alphaOrder", false);    // translucido: cullea + ordena back->forward
+        cu->orderProximity   = JB(j, "distanceOrder", false); // opaco: forward->back puro (sin agrupar por material)
         cu->cellSize         = JF(j, "cellSize", 16.0f);      // metodo grid
-        cu->modo3D           = JB(j, "modo3D", false);        // metodo grid
-        cu->rielNombre       = JS(j, "riel", "");             // metodo riel: la Curve del recorrido
-        cu->visHijosArchivo  = RutaJsonCampo(JS(j, "visHijos", ""), base);   // metodo riel: hijos visibles por nodo
-        cu->bspArchivo       = RutaJsonCampo(JS(j, "bsp", ""), base);        // metodo bsp: arbol + PVS + clusters por hijo (.w3dbsp)
-        cu->memoriaVisibles  = JS(j, "memoriaVisibles", "");                 // metodo bsp: el PVS por hijo a una memoria (rutinas)
+        cu->mode3D           = JB(j, "mode3D", false);        // metodo grid
+        cu->railName         = JS(j, "rail", "");             // metodo riel: la Curve del recorrido
+        cu->visChildrenFile  = JsonPathField(JS(j, "visChildren", ""), base);   // metodo riel: hijos visibles por nodo
+        cu->bspFile          = JsonPathField(JS(j, "bsp", ""), base);        // metodo bsp: arbol + PVS + clusters por hijo (.w3dbsp)
+        cu->visibleMemory    = JS(j, "visibleMemory", "");                 // metodo bsp: el PVS por hijo a una memoria (rutinas)
         return cu;
     }
-    if (tipo == "gridcull") {   // COMPAT: gridcull viejo -> Culling con metodo=Grid (objeto unificado)
+    if (type == "gridcull") {   // COMPAT: gridcull viejo -> Culling con metodo=Grid (objeto unificado)
         Culling* g = new Culling(parent);
-        g->metodo           = Culling::Grid;
-        JsonComunes(j, g);
-        g->activo           = JB(j, "activo", true);          // ausente = prendido
+        g->method           = Culling::Grid;
+        CommonJson(j, g);
+        g->active           = JB(j, "active", true);          // ausente = prendido
         g->cellSize         = JF(j, "cellSize", 16.0f);
-        g->modo3D           = JB(j, "modo3D", false);
-        g->distanciaMax     = JF(j, "distanciaMax", 0.0f);    // 0 = sin limite
-        g->soloCamaraActiva = JB(j, "soloCamaraActiva", false);
-        g->ordenAlpha       = JB(j, "ordenAlpha", false);     // celdas de lejos a cerca (transparencias)
+        g->mode3D           = JB(j, "mode3D", false);
+        g->distanceMax      = JF(j, "maxDistance", 0.0f);    // 0 = sin limite
+        g->onlyCameraActive = JB(j, "activeCameraOnly", false);
+        g->orderAlpha       = JB(j, "alphaOrder", false);     // celdas de lejos a cerca (transparencias)
         return g;
     }
-    if (tipo == "viszona") {   // VisZona: celda de visibilidad (ver VisZona.h)
-        VisZona* vz = new VisZona(parent);
-        JsonComunes(j, vz);
-        std::string modo = JS(j, "modo", "manual");
-        vz->modo = (modo == "grilla") ? VisZona::ModoGrilla
-                 : (modo == "volumenes") ? VisZona::ModoVolumenes
-                 : (modo == "curva") ? VisZona::ModoCurva : VisZona::ModoManual;
-        vz->objetivoNombre = JS(j, "objetivo", "");
-        vz->anclaNombre    = JS(j, "ancla", "");
+    if (type == "viszona") {   // VisZone: celda de visibilidad (ver VisZone.h)
+        VisZone* vz = new VisZone(parent);
+        CommonJson(j, vz);
+        std::string mode = JS(j, "mode", "manual");
+        vz->mode = (mode == "grid") ? VisZone::ModeGrid
+                 : (mode == "volumes") ? VisZone::ModeVolumes
+                 : (mode == "curve") ? VisZone::ModeCurve : VisZone::ModeManual;
+        vz->targetName = JS(j, "target", "");
+        vz->anchorName = JS(j, "anchor", "");
         vz->nx       = JI(j, "nx", 1);
         vz->ny       = JI(j, "ny", 1);
         vz->nz       = JI(j, "nz", 1);
-        vz->tamCelda = JF(j, "tamCelda", 1.0f);
-        vz->pasoMax  = JI(j, "pasoMax", 32);
-        // multi-riel (ver VisZona.h): riel que indexa las celdas + celda fallback
-        vz->rielNombre    = JS(j, "riel", "");
-        vz->celdaFallback = JI(j, "fallback", 0);
+        vz->cellSize = JF(j, "cellSize", 1.0f);
+        vz->stepMax  = JI(j, "maxStep", 32);
+        // multi-riel (ver VisZone.h): riel que indexa las celdas + celda fallback
+        vz->railName     = JS(j, "rail", "");
+        vz->cellFallback = JI(j, "fallback", 0);
         return vz;
     }
-    if (tipo == "particulas") {   // Particulas: emisor de billboards (ver Particulas.h)
-        Particulas* pt = new Particulas(parent);
-        JsonComunes(j, pt);
-        pt->textura    = RutaJsonCampo(JS(j, "textura", ""), base);   // entrada del contenedor v4 (o ruta externa)
-        pt->cantidad   = JF(j, "cantidad",   pt->cantidad);
-        pt->vida       = JF(j, "vida",       pt->vida);
-        pt->tam        = JF(j, "tam",        pt->tam);
+    if (type == "particles") {   // Particulas: emisor de billboards (ver Particles.h)
+        Particles* pt = new Particles(parent);
+        CommonJson(j, pt);
+        pt->texture    = JsonPathField(JS(j, "texture", ""), base);   // entrada del contenedor v4 (o ruta externa)
+        pt->count      = JF(j, "count",   pt->count);
+        pt->life       = JF(j, "life",       pt->life);
+        pt->size       = JF(j, "size",        pt->size);
         pt->vel        = JF(j, "vel",        pt->vel);
         pt->dispersion = JF(j, "dispersion", pt->dispersion);
-        pt->gravedad   = JF(j, "gravedad",   pt->gravedad);
+        pt->gravity    = JF(j, "gravity",   pt->gravity);
         // MEZCLA: v4 nuevo trae "mezcla" (int); archivos viejos, aditivo/sustractivo (bool)
-        int mz = JI(j, "mezcla", -1);
-        if (mz >= 0)                          pt->mezcla = mz;
-        else if (JB(j, "sustractivo", false)) pt->mezcla = w3dEngine::MezclaSubtract;
-        else if (JB(j, "aditivo",     false)) pt->mezcla = w3dEngine::MezclaAdd;
-        JVal* c = JHijo(j, "color", 5);   // [r, g, b, a] (mismo idioma que "ejes")
-        if (c) for (size_t i = 0; i < c->lista.size() && i < 4; i++)
-            if (c->lista[i]) pt->color[i] = (float)c->lista[i]->num;
-        pt->desvanecer = JB(j, "desvanecer", pt->desvanecer);
-        pt->activo     = JB(j, "activo",     pt->activo);
-        pt->filtrado   = JB(j, "filtrado",   pt->filtrado);   // ausente -> true (suave)
+        int mz = JI(j, "mix", -1);
+        if (mz >= 0)                          pt->mix = mz;
+        else if (JB(j, "sustractivo", false)) pt->mix = w3dEngine::MixSubtract;
+        else if (JB(j, "additive",     false)) pt->mix = w3dEngine::MixAdd;
+        JVal* c = JChild(j, "color", 5);   // [r, g, b, a] (mismo idioma que "ejes")
+        if (c) for (size_t i = 0; i < c->list.size() && i < 4; i++)
+            if (c->list[i]) pt->color[i] = (float)c->list[i]->num;
+        pt->fade     = JB(j, "fade", pt->fade);
+        pt->active   = JB(j, "active",     pt->active);
+        pt->filtered = JB(j, "filtered",   pt->filtered);   // ausente -> true (suave)
         // azar (ausente en archivos v4 viejos -> 0: mismo comportamiento de antes)
-        pt->variacion   = JF(j, "variacion",   pt->variacion);
-        pt->turbulencia = JF(j, "turbulencia", pt->turbulencia);
-        pt->radioEmision = JF(j, "radioEmision", pt->radioEmision);
+        pt->variation  = JF(j, "variation",   pt->variation);
+        pt->turbulence = JF(j, "turbulence", pt->turbulence);
+        pt->emissionRadius = JF(j, "emissionRadius", pt->emissionRadius);
         // rotacion del billboard (ausente -> false/0: derecho y quieto, como antes)
-        pt->rotacion    = JB(j, "rotacion",    pt->rotacion);
-        pt->velRotacion = JF(j, "velRotacion", pt->velRotacion);
-        pt->flipCuadros = JI(j, "flipCuadros", pt->flipCuadros);   // flipbook por edad
+        pt->rotation    = JB(j, "rotation",    pt->rotation);
+        pt->velRotation = JF(j, "rotationSpeed", pt->velRotation);
+        pt->flipFrames  = JI(j, "flipFrames", pt->flipFrames);   // flipbook por edad
         pt->flipCols    = JI(j, "flipCols",    pt->flipCols);
-        pt->flipFilas   = JI(j, "flipFilas",   pt->flipFilas);
+        pt->flipRows    = JI(j, "flipRows",   pt->flipRows);
         // SUB-RECT del atlas unico: [u0, v0, u1, v1] (ausente = textura entera)
         {
-            JVal* r = JHijo(j, "uvRect", 5);
-            if (r && r->lista.size() >= 4)
+            JVal* r = JChild(j, "uvRect", 5);
+            if (r && r->list.size() >= 4)
                 for (int k = 0; k < 4; k++)
-                    if (r->lista[k]->tipo == 1) pt->uvRect[k] = (float)r->lista[k]->num;
+                    if (r->list[k]->type == 1) pt->uvRect[k] = (float)r->list[k]->num;
         }
         // LO AVANZADO (ausente = el default del ctor = el emisor de siempre)
         {
-            const char* v3[4] = { "velAzar", "posAzar", "aceleracion", "velLocal" };
-            float* d3[4] = { pt->velAzar, pt->posAzar, pt->aceleracion, pt->velLocal };
+            const char* v3[4] = { "randomVel", "randomPos", "acceleration", "velLocal" };
+            float* d3[4] = { pt->velRandom, pt->posRandom, pt->acceleration, pt->velLocal };
             for (int q = 0; q < 4; q++) {
-                JVal* r = JHijo(j, v3[q], 5);
-                if (r) for (size_t k = 0; k < r->lista.size() && k < 3; k++)
-                    if (r->lista[k] && r->lista[k]->tipo == 1) d3[q][k] = (float)r->lista[k]->num;
+                JVal* r = JChild(j, v3[q], 5);
+                if (r) for (size_t k = 0; k < r->list.size() && k < 3; k++)
+                    if (r->list[k] && r->list[k]->type == 1) d3[q][k] = (float)r->list[k]->num;
             }
-            JVal* cf = JHijo(j, "colorFinal", 5);
+            JVal* cf = JChild(j, "colorFinal", 5);
             if (cf) {
-                pt->usarColorFinal = true;
-                for (size_t k = 0; k < cf->lista.size() && k < 4; k++)
-                    if (cf->lista[k] && cf->lista[k]->tipo == 1) pt->colorFinal[k] = (float)cf->lista[k]->num;
+                pt->useColorFinal = true;
+                for (size_t k = 0; k < cf->list.size() && k < 4; k++)
+                    if (cf->list[k] && cf->list[k]->type == 1) pt->colorFinal[k] = (float)cf->list[k]->num;
             }
         }
-        pt->arrastre         = JF(j, "arrastre",         pt->arrastre);
-        pt->crecimiento      = JF(j, "crecimiento",      pt->crecimiento);
-        pt->frenoCrecimiento = JF(j, "frenoCrecimiento", pt->frenoCrecimiento);
-        pt->alphaDecae       = JF(j, "alphaDecae",       pt->alphaDecae);
-        pt->alphaMuerte      = JF(j, "alphaMuerte",      pt->alphaMuerte);
-        pt->rotInicial       = JF(j, "rotInicial",       pt->rotInicial);
-        pt->rotAzar          = JF(j, "rotAzar",          pt->rotAzar);
-        pt->velRotAzar       = JF(j, "velRotAzar",       pt->velRotAzar);
-        pt->giroSignoAzar    = JB(j, "giroSignoAzar",    pt->giroSignoAzar);
-        pt->aparecer         = JF(j, "aparecer",         pt->aparecer);
+        pt->drag           = JF(j, "drag",         pt->drag);
+        pt->growth         = JF(j, "growth",      pt->growth);
+        pt->brakeGrowth    = JF(j, "growthBrake", pt->brakeGrowth);
+        pt->alphaDecays    = JF(j, "alphaDecay",       pt->alphaDecays);
+        pt->alphaDeath     = JF(j, "alphaDeath",      pt->alphaDeath);
+        pt->initialRot     = JF(j, "initialRot",       pt->initialRot);
+        pt->rotRandom      = JF(j, "randomRot",          pt->rotRandom);
+        pt->velRotRandom   = JF(j, "randomRotVel",       pt->velRotRandom);
+        pt->turnSignRandom = JB(j, "randomSpinSign",    pt->turnSignRandom);
+        pt->appear         = JF(j, "appear",         pt->appear);
         {   // fundidos por distancia a la camara: [desde, hasta] (m)
-            JVal* fc = JHijo(j, "fundeCerca", 5);
-            if (fc && fc->lista.size() >= 2) { pt->fundeCerca[0] = (float)fc->lista[0]->num; pt->fundeCerca[1] = (float)fc->lista[1]->num; }
-            JVal* fl = JHijo(j, "fundeLejos", 5);
-            if (fl && fl->lista.size() >= 2) { pt->fundeLejos[0] = (float)fl->lista[0]->num; pt->fundeLejos[1] = (float)fl->lista[1]->num; }
+            JVal* fc = JChild(j, "fadeNear", 5);
+            if (fc && fc->list.size() >= 2) { pt->fadeNear[0] = (float)fc->list[0]->num; pt->fadeNear[1] = (float)fc->list[1]->num; }
+            JVal* fl = JChild(j, "fadeFar", 5);
+            if (fl && fl->list.size() >= 2) { pt->fadeFar[0] = (float)fl->list[0]->num; pt->fadeFar[1] = (float)fl->list[1]->num; }
         }
-        pt->flipFps          = JF(j, "flipFps",          pt->flipFps);
-        pt->flipUnaVez       = JB(j, "flipUnaVez",       pt->flipUnaVez);
+        pt->flipFps        = JF(j, "flipFps",          pt->flipFps);
+        pt->flipOnce       = JB(j, "flipOnce",       pt->flipOnce);
         {   // forma: "billboard" | "estirada" | "linea" (string: el enum no viaja como numero)
-            std::string f = JS(j, "forma", "billboard");
-            pt->forma = (f == "estirada") ? w3dEngine::FormaEstirada : (f == "linea") ? w3dEngine::FormaLinea : w3dEngine::FormaBillboard;
+            std::string f = JS(j, "shape", "billboard");
+            pt->shape = (f == "stretched") ? w3dEngine::ShapeStretched : (f == "line") ? w3dEngine::ShapeLine : w3dEngine::ShapeBillboard;
         }
-        pt->estiramiento     = JF(j, "estiramiento",     pt->estiramiento);
-        pt->estelaPuntos     = JI(j, "estelaPuntos",     pt->estelaPuntos);
-        pt->estelaPaso       = JF(j, "estelaPaso",       pt->estelaPaso);
-        pt->grosorLinea      = JF(j, "grosorLinea",      pt->grosorLinea);
+        pt->stretch           = JF(j, "stretch",     pt->stretch);
+        pt->trailPoints       = JI(j, "trailPoints",     pt->trailPoints);
+        pt->trailStep         = JF(j, "trailStep",       pt->trailStep);
+        pt->thicknessLine     = JF(j, "lineThickness",      pt->thicknessLine);
         return pt;
     }
-    if (tipo == "prefab") {    // INSTANCIA DE PREFAB: el nodo + su prefab + sus overrides; los hijos se GENERAN
-        InstanciaPrefab* ip = new InstanciaPrefab(parent);
-        JsonComunes(j, ip);
-        InstanciaPrefabLeerCampos(j, ip);
+    if (type == "prefab") {    // INSTANCIA DE PREFAB: el nodo + su prefab + sus overrides; los hijos se GENERAN
+        InstancePrefab* ip = new InstancePrefab(parent);
+        CommonJson(j, ip);
+        InstancePrefabReadFields(j, ip);
         // adentro de una LIBRERIA, un prefab anidado es un prefab de ESA libreria (su clave en la cache)
-        if (!W3dLibContexto().empty() && !ip->prefab.empty())
-            ip->prefab = W3dLibsClave(W3dLibContexto(), W3D_LIB_PREFAB, ip->prefab);
+        if (!W3dLibContext().empty() && !ip->prefab.empty())
+            ip->prefab = W3dLibsKey(W3dLibContext(), W3D_LIB_PREFAB, ip->prefab);
         // (el guardado no escribe "hijos" de una instancia: lo que tiene sale de la definicion del prefab)
         // una DIFERIDA (io/Streaming.h) en el juego compilado -o en el editor con la vista previa del streaming- no
         // genera nada al abrir: lo genera el streaming cuando su objetivo se acerque
-        if (!W3dStreamingDiferirAlCargar(ip)) W3dPrefabGenerar(ip);
+        if (!W3dStreamingDeferOnLoad(ip)) W3dPrefabGenerate(ip);
         return ip;
     }
-    if (tipo == "proxy") {     // PROXY W3D: un prefab o una escena de una LIBRERIA; los hijos se GENERAN (solo lectura)
+    if (type == "proxy") {     // PROXY W3D: un prefab o una escena de una LIBRERIA; los hijos se GENERAN (solo lectura)
         ProxyW3d* px = new ProxyW3d(parent);
-        JsonComunes(j, px);
-        ProxyW3dLeerCampos(j, px);
-        if (!W3dStreamingDiferirAlCargar(px)) W3dPrefabGenerar(px);   // (una diferida: como la instancia)
+        CommonJson(j, px);
+        ProxyW3dReadFields(j, px);
+        if (!W3dStreamingDeferOnLoad(px)) W3dPrefabGenerate(px);   // (una diferida: como la instancia)
         return px;
     }
-    if (tipo == "objeto") {
-        // el nodo GENERICO que escribe el 'else' de EscribirObjeto (Empty y cualquier tipo
+    if (type == "object") {
+        // el nodo GENERICO que escribe el 'else' de WriteObject (Empty y cualquier tipo
         // sin rama propia): antes NO tenia rama de lectura, asi que el objeto se perdia y
         // sus hijos se re-colgaban del abuelo. Vuelve como Empty (el objeto vacio del editor,
         // que es lo que el usuario puede crear) con su nombre y su transform.
         Empty* o = new Empty(parent);
-        JsonComunes(j, o);
+        CommonJson(j, o);
         // como se dibuja (solo la vista): sin estos campos (archivos de antes) queda el circulo en el piso
-        const int fo = (int)JF(j, "forma", (float)o->forma);
-        if (fo >= 0 && fo < VacioFormas) o->forma = fo;
-        o->tamDibujo = JF(j, "tamDibujo", o->tamDibujo);
-        JVal* rd = JHijo(j, "rotDibujo", 5);   // (5 = lista)
-        if (rd && rd->lista.size() >= 3) o->rotDibujo = Vector3((float)rd->lista[0]->num, (float)rd->lista[1]->num, (float)rd->lista[2]->num);
+        const int fo = (int)JF(j, "shape", (float)o->shape);
+        if (fo >= 0 && fo < EmptyShapes) o->shape = fo;
+        o->drawingSize = JF(j, "drawSize", o->drawingSize);
+        JVal* rd = JChild(j, "drawRot", 5);   // (5 = lista)
+        if (rd && rd->list.size() >= 3) o->rotDrawing = Vector3((float)rd->list[0]->num, (float)rd->list[1]->num, (float)rd->list[2]->num);
         return o;
     }
     return NULL;   // tipo desconocido: sus hijos cuelgan del padre (nunca se pierde el arbol)
@@ -3506,41 +3506,41 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
 //
 //  El .w3d escribe estos objetos como hijos del nodo UI porque el .w3dui no los sabe
 //  llevar (solo escribe tipos 2D) y el .w3d no recorre el subarbol 2D; ver el bloque de
-//  JuntarHuespedesUI en GuardarW3D.cpp. Al llegar aca el .w3dui ya se cargo, o sea que el
+//  CollectGuestsUI en SaveW3D.cpp. Al llegar aca el .w3dui ya se cargo, o sea que el
 //  elemento existe y se lo busca POR NOMBRE dentro de la escena (el espacio de nombres es
 //  por escena: no hay dos elementos homonimos adentro de una UI).
 //  Si el elemento no aparece -un .w3dui editado a mano, o una escena que no cargo- el
 //  objeto se QUEDA colgado del UI: pierde su lugar exacto, pero NO se pierde (que es lo
 //  que pasaba antes) y queda avisado en el log.
 // ---------------------------------------------------------------------------
-static Object* BuscarElemento2D(Object* raiz, const std::string& nombre) {
-    if (!raiz) return NULL;
-    for (size_t i = 0; i < raiz->Childrens.size(); i++) {
-        Object* h = raiz->Childrens[i];
-        if (h->name == nombre) return h;
-        Object* r = BuscarElemento2D(h, nombre);
+static Object* FindElement2D(Object* root, const std::string& name) {
+    if (!root) return NULL;
+    for (size_t i = 0; i < root->Childrens.size(); i++) {
+        Object* h = root->Childrens[i];
+        if (h->name == name) return h;
+        Object* r = FindElement2D(h, name);
         if (r) return r;
     }
     return NULL;
 }
-static void ReColgarDePadre2D(Object* o, Object* ui, const std::string& nombre) {
-    if (!o || !ui || nombre.empty()) return;
-    Object* dest = BuscarElemento2D(ui, nombre);
+static void ReHangFromParent2D(Object* o, Object* ui, const std::string& name) {
+    if (!o || !ui || name.empty()) return;
+    Object* dest = FindElement2D(ui, name);
     if (!dest || dest == o) {
         w3dLogfW("[W3D] '%s' referencia el elemento 2D '%s', que no esta en la escena: queda colgado del UI",
-                 o->name.c_str(), nombre.c_str());
+                 o->name.c_str(), name.c_str());
         return;
     }
     for (Object* q = dest; q; q = q->Parent) if (q == o) return;   // ciclo: no tocar
-    Object* viejo = o->Parent ? o->Parent : SceneCollection;
-    if (viejo) for (size_t k = 0; k < viejo->Childrens.size(); k++)
-        if (viejo->Childrens[k] == o) { viejo->Childrens.erase(viejo->Childrens.begin() + k); break; }
+    Object* old = o->Parent ? o->Parent : SceneCollection;
+    if (old) for (size_t k = 0; k < old->Childrens.size(); k++)
+        if (old->Childrens[k] == o) { old->Childrens.erase(old->Childrens.begin() + k); break; }
     o->Parent = dest;
     dest->Childrens.push_back(o);
 }
 
 // ---------------------------------------------------------------------------
-//  EL STACK DE CONSTRAINTS (simetrico con EscribirConstraints del guardado).
+//  EL STACK DE CONSTRAINTS (simetrico con WriteConstraints del guardado).
 //
 //  Un solo call site, para CUALQUIER tipo de objeto: los constraints son una
 //  propiedad de Object y no de una rama (una Coleccion tambien puede tener).
@@ -3550,179 +3550,179 @@ static void ReColgarDePadre2D(Object* o, Object* ui, const std::string& nombre) 
 //  seria perder el objeto y su subarbol, que es incomparablemente peor.
 //
 //  La FUENTE queda por NOMBRE nomas: el puntero lo resuelve
-//  W3dConstraintsResolverNombres al final de la carga, cuando ya existen todos los
+//  W3dConstraintsResolveNames al final de la carga, cuando ya existen todos los
 //  objetos (aca todavia no existe el que viene despues en el archivo).
 // ---------------------------------------------------------------------------
-static int TipoConsInt(const std::string& t) {
-    if (t == "copyLocation") return W3dConstraintTipo::CopyLocation;
-    if (t == "copyRotation") return W3dConstraintTipo::CopyRotation;
-    if (t == "billboard")    return W3dConstraintTipo::Billboard;
-    if (t == "childOf")      return W3dConstraintTipo::ChildOf;
+static int ConsTypeInt(const std::string& t) {
+    if (t == "copyLocation") return W3dConstraintType::CopyLocation;
+    if (t == "copyRotation") return W3dConstraintType::CopyRotation;
+    if (t == "billboard")    return W3dConstraintType::Billboard;
+    if (t == "childOf")      return W3dConstraintType::ChildOf;
     return -1;   // desconocido (un .w3d de una version mas nueva)
 }
 
-// capas del MIX (ver EscribirCapas en GuardarW3D.cpp): la misma forma para armatures y escenas
-static void LeerCapas(JVal* jc, std::vector<W3dCapaAnim>& out) {
+// capas del MIX (ver WriteLayers en SaveW3D.cpp): la misma forma para armatures y escenas
+static void ReadLayers(JVal* jc, std::vector<W3dLayerAnim>& out) {
     out.clear();
     if (!jc) return;
-    for (size_t i = 0; i < jc->lista.size(); i++) {
-        JVal* e = jc->lista[i]; if (!e || e->tipo != 4) continue;
-        W3dCapaAnim c;
+    for (size_t i = 0; i < jc->list.size(); i++) {
+        JVal* e = jc->list[i]; if (!e || e->type != 4) continue;
+        W3dLayerAnim c;
         c.anim = JS(e, "anim", "");
-        c.influencia = JF(e, "influencia", c.influencia);
-        { std::string m = JS(e, "modo", "mezclar"); c.modo = (m == "sumar") ? 1 : (m == "restar") ? 2 : 0; }
+        c.influence = JF(e, "influence", c.influence);
+        { std::string m = JS(e, "mode", "mix"); c.mode = (m == "add") ? 1 : (m == "subtract") ? 2 : 0; }
         c.visible = JB(e, "visible", true);
-        c.hueso = JS(e, "hueso", "");
-        c.desde = JF(e, "desde", 0.0f);
+        c.bone = JS(e, "bone", "");
+        c.from = JF(e, "from", 0.0f);
         c.vel = JF(e, "vel", 1.0f);
         c.loop = JB(e, "loop", true);
         out.push_back(c);
     }
 }
 
-static void LeerConstraints(JVal* j, Object* o) {
-    JVal* jc = JHijo(j, "constraints", 5);
+static void ReadConstraints(JVal* j, Object* o) {
+    JVal* jc = JChild(j, "constraints", 5);
     if (!jc || !o) return;
-    for (size_t i = 0; i < jc->lista.size(); i++) {
-        JVal* e = jc->lista[i]; if (!e || e->tipo != 4) continue;
-        const std::string ts = JS(e, "tipo", "");
-        const int tipo = TipoConsInt(ts);
-        if (tipo < 0) {
+    for (size_t i = 0; i < jc->list.size(); i++) {
+        JVal* e = jc->list[i]; if (!e || e->type != 4) continue;
+        const std::string ts = JS(e, "type", "");
+        const int type = ConsTypeInt(ts);
+        if (type < 0) {
             w3dLogfW("[W3D] '%s': constraint de tipo desconocido '%s': se ignora (el objeto abre igual)",
                      o->name.c_str(), ts.c_str());
             continue;
         }
-        W3dConstraint* c = new W3dConstraint(tipo);
-        c->nombre     = JS(e, "nombre", W3dNombreTipoConstraint(tipo));
-        c->activo     = JB(e, "activo", true);
-        c->mostrarEdit = JB(e, "vered", false);   // ausente = OFF (el default; ver W3dConstraint.h)
-        c->influencia = JF(e, "influencia", c->influencia);
-        if (tipo == W3dConstraintTipo::Billboard) {
+        W3dConstraint* c = new W3dConstraint(type);
+        c->name       = JS(e, "name", W3dConstraintTypeName(type));
+        c->active     = JB(e, "active", true);
+        c->showEdit = JB(e, "vered", false);   // ausente = OFF (el default; ver W3dConstraint.h)
+        c->influence = JF(e, "influence", c->influence);
+        if (type == W3dConstraintType::Billboard) {
             c->bbYaw   = JB(e, "yaw",   c->bbYaw);
             c->bbPitch = JB(e, "pitch", c->bbPitch);
         } else {
             // "fuente" es el TIPO de fuente y es explicito: cualquier cosa que no sea
             // "vista" es un objeto (que es el default y el caso del 99%).
-            c->fuenteTipo = (JS(e, "fuente", "objeto") == "vista")
-                                ? W3dConstraintFuente::Vista : W3dConstraintFuente::Objeto;
-            if (c->fuenteTipo == W3dConstraintFuente::Objeto)
-                c->fuenteNombre = JS(e, "objeto", "");
-            JBools3(e, "ejes", &c->ejeX, &c->ejeY, &c->ejeZ);
+            c->sourceType = (JS(e, "font", "object") == "view")
+                                ? W3dConstraintSource::View : W3dConstraintSource::Object;
+            if (c->sourceType == W3dConstraintSource::Object)
+                c->sourceName = JS(e, "object", "");
+            JBools3(e, "axes", &c->axisX, &c->axisY, &c->axisZ);
         }
-        if (tipo == W3dConstraintTipo::ChildOf) {
-            c->hueso = JS(e, "hueso", "");
-            JBools3(e, "hereda", &c->coLoc, &c->coRot, &c->coEsc);
-            JMat16(e, "inversa", c->inversa);   // ausente = identidad (el default del ctor)
+        if (type == W3dConstraintType::ChildOf) {
+            c->bone = JS(e, "bone", "");
+            JBools3(e, "inherits", &c->coLoc, &c->coRot, &c->coEsc);
+            JMat16(e, "inverse", c->inverse);   // ausente = identidad (el default del ctor)
         }
         // el archivo lo pudo editar cualquiera: clampea la influencia a [0,100] y arregla
         // el billboard que no gira en ningun eje (ver W3dConstraint::Normalizar)
-        c->Normalizar();
+        c->Normalize();
         o->constraints.push_back(c);
     }
-    if (!o->constraints.empty()) o->constraintActivo = (int)o->constraints.size() - 1;
+    if (!o->constraints.empty()) o->activeConstraint = (int)o->constraints.size() - 1;
 }
 
-static void LeerClipsObjeto(JVal* j, Object* o);   // los "clips" del nodo (definida con las animaciones de escena)
+static void ReadClipsObject(JVal* j, Object* o);   // los "clips" del nodo (definida con las animaciones de escena)
 
 // UN nodo del .w3d: el objeto + SUS HIJOS. La lectura de "hijos" esta ACA y en
-// ningun otro lado (simetrico con EscribirHijos del guardado).
+// ningun otro lado (simetrico con WriteChildren del guardado).
 // (la generacion de una instancia de prefab desde una definicion de MEMORIA pide, por cada objeto creado, el
 //  "_origen" de su nodo: el serial del objeto de la plantilla del que salio. NULL = nadie lo pide)
-static std::vector<std::pair<Object*, unsigned> >* gOrigenes = NULL;
-static void JsonObjeto(JVal* j, Object* parent, const std::string& base) {
-    if (!j || j->tipo != 4) return;
-    const double tMed = CargaAhora();   // medicion por fase (0 = nadie mide)
-    std::vector<std::pair<Object*, unsigned> >* origenes = gOrigenes;
-    gOrigenes = NULL;   // (una instancia anidada genera con su propia definicion: no es de esta plantilla)
-    Object* creado = JsonObjetoCrear(j, parent, base);
-    gOrigenes = origenes;
-    if (gOrigenes && creado) gOrigenes->push_back(std::make_pair(creado, JU(j, "_origen", 0u)));
+static std::vector<std::pair<Object*, unsigned> >* gOrigins = NULL;
+static void JsonObject(JVal* j, Object* parent, const std::string& base) {
+    if (!j || j->type != 4) return;
+    const double tMed = LoadNow();   // medicion por fase (0 = nadie mide)
+    std::vector<std::pair<Object*, unsigned> >* origins = gOrigins;
+    gOrigins = NULL;   // (una instancia anidada genera con su propia definicion: no es de esta plantilla)
+    Object* created = JsonObjectCreate(j, parent, base);
+    gOrigins = origins;
+    if (gOrigins && created) gOrigins->push_back(std::make_pair(created, JU(j, "_origin", 0u)));
     // el nodo SOLO (los hijos se miden en su propia vuelta): mallas y armatures por separado
-    if (g_w3dCargaReloj && creado) {
-        const double dt = CargaAhora() - tMed;
-        if (creado->getType() == ObjectType::mesh) {
-            g_w3dCargaFases.mallasMs += dt; g_w3dCargaFases.mallas++;
-        } else if (creado->getType() == ObjectType::armature) {
-            g_w3dCargaFases.clipsMs += dt; g_w3dCargaFases.armatures++;
-            g_w3dCargaFases.clips += (int)((Armature*)creado)->animations.size();
+    if (g_w3dLoadClock && created) {
+        const double dt = LoadNow() - tMed;
+        if (created->getType() == ObjectType::mesh) {
+            g_w3dLoadPhases.meshesMs += dt; g_w3dLoadPhases.meshes++;
+        } else if (created->getType() == ObjectType::armature) {
+            g_w3dLoadPhases.clipsMs += dt; g_w3dLoadPhases.armatures++;
+            g_w3dLoadPhases.clips += (int)((Armature*)created)->animations.size();
         }
     }
     // el stack de constraints del nodo: DESPUES de crearlo (es donde viven) y ANTES de
     // bajar a los hijos, para que el orden del archivo sea el orden de la lista.
-    if (creado) LeerConstraints(j, creado);
+    if (created) ReadConstraints(j, created);
     // los SCRIPTS lua, de TODOS los tipos, en UN solo call site (espejo del
-    // EscribirScripts comun de GuardarW3D). Antes solo gamepad/malla/modelo/glb
+    // WriteScripts comun de SaveW3D). Antes solo gamepad/malla/modelo/glb
     // los leian: un script en una luz o un vacio se perdia al abrir.
-    if (creado) JsonScripts(j, creado, base);
+    if (created) JsonScripts(j, created, base);
     // su BIBLIOTECA DE CLIPS DE JERARQUIA (animation/W3dAnimSet.h): un animset del registro "animsets".
-    // Si no se puede leer queda anotada (noCargo): el guardado se frena en vez de perderla.
-    if (creado) {
-        const std::string lib = NombreRecursoJson(JS(j, "clipsJerarquia", ""));
+    // Si no se puede leer queda anotada (notLoaded): el guardado se frena en vez de perderla.
+    if (created) {
+        const std::string lib = ResourceNameJson(JS(j, "hierarchyClips", ""));
         if (!lib.empty()) {
-            std::string motivo;
-            if (!W3dJerAsignar(creado, lib, &motivo))
-                W3dAvisof(true, T("'%s': could not load its clips (%s)"), W3dNombreCorto(creado->name).c_str(), motivo.c_str());
+            std::string reason;
+            if (!W3dHierAssign(created, lib, &reason))
+                W3dAvisof(true, T("'%s': could not load its clips (%s)"), W3dShortName(created->name).c_str(), reason.c_str());
         }
         // su RETARGET PROPIO (un armature: el de sus clips de esqueleto; si no, el de sus clips de jerarquia) y
-        // las CAPAS de clips de jerarquia de su Mix (ver EscribirClipsJerarquia en GuardarW3D.cpp)
+        // las CAPAS de clips de jerarquia de su Mix (ver WriteClipsHierarchy en SaveW3D.cpp)
         const std::string ret = JS(j, "retarget", "");
         if (!ret.empty()) {
-            const int m = (ret == "rotaciones") ? W3D_RETARGET_ROTACIONES : W3D_RETARGET_COMPLETO;
-            if (creado->getType() == ObjectType::armature) W3dArmatureRetarget((Armature*)creado, m);
-            else W3dAnimObjetoRetarget(creado, m);
+            const int m = (ret == "rotations") ? W3D_RETARGET_ROTATIONS : W3D_RETARGET_COMPLETE;
+            if (created->getType() == ObjectType::armature) W3dArmatureRetarget((Armature*)created, m);
+            else W3dAnimObjectRetarget(created, m);
         }
-        JVal* capasJer = JHijo(j, "capasJer", 5);
-        if (capasJer) {
-            if (!creado->clipsJer) creado->clipsJer = new W3dJerRaiz();
-            LeerCapas(capasJer, creado->clipsJer->capas);
-            creado->clipsJer->capaActiva = creado->clipsJer->capas.empty() ? -1 : 0;
-            W3dJerCapasCambiaron(creado);
+        JVal* layersHier = JChild(j, "hierLayers", 5);
+        if (layersHier) {
+            if (!created->clipsHier) created->clipsHier = new W3dHierRoot();
+            ReadLayers(layersHier, created->clipsHier->layers);
+            created->clipsHier->activeLayer = created->clipsHier->layers.empty() ? -1 : 0;
+            W3dHierLayersChanged(created);
         }
     }
     // los CLIPS DE OBJETO del formato de la primera version de esta fase ("clips" inline en el nodo): se
-    // pasan a clips de jerarquia cuando ya estan todos sus objetos (AdjuntarClipsPendientes)
-    if (creado) LeerClipsObjeto(j, creado);
-    const std::string padre2d = JS(j, "padre2d", "");
-    if (creado && !padre2d.empty() && parent && parent->getType() == ObjectType::ui)
-        ReColgarDePadre2D(creado, parent, padre2d);
+    // pasan a clips de jerarquia cuando ya estan todos sus objetos (AttachPendingClips)
+    if (created) ReadClipsObject(j, created);
+    const std::string parent2d = JS(j, "parent2d", "");
+    if (created && !parent2d.empty() && parent && parent->getType() == ObjectType::ui)
+        ReHangFromParent2D(created, parent, parent2d);
     // una INSTANCIA DE PREFAB no tiene hijos propios en el archivo: los genera su prefab. Unos "hijos"
     // escritos a mano se ignoran (si no, quedarian mezclados con lo generado y se borrarian al regenerar)
-    if (creado && W3dEsTipoInstancia(creado->getType())) return;   // (un proxy tampoco: los genera su libreria)
-    JVal* h = JHijo(j, "hijos", 5);
+    if (created && W3dIsInstanceType(created->getType())) return;   // (un proxy tampoco: los genera su libreria)
+    JVal* h = JChild(j, "children", 5);
     if (!h) return;
-    Object* p = creado ? creado : parent;
-    for (size_t i = 0; i < h->lista.size(); i++) JsonObjeto(h->lista[i], p, base);
+    Object* p = created ? created : parent;
+    for (size_t i = 0; i < h->list.size(); i++) JsonObject(h->list[i], p, base);
     // un proyecto de antes: la limpieza de la pantalla venia ADENTRO del constructor (corre una vez); va afuera
-    if (creado && creado->getType() == ObjectType::rutina) W3dConstructorSacarLimpiar(creado);
+    if (created && created->getType() == ObjectType::routine) W3dConstructorRemoveClear(created);
 }
 
 // CONFIG de la tarjeta Juego (bloque raiz "compilar", opcional): pisa los
-// defaults ya reseteados en AbrirW3D. Strings legibles ("ventana",
+// defaults ya reseteados en OpenW3D. Strings legibles ("ventana",
 // "pantallaCompleta", ...); un valor desconocido o ausente deja el default del
 // campo (W3dCompilar*Int). Solo existe en el camino JSON: los formatos viejos
 // (zip v2 sin el campo, texto Whisk3D{}) quedan con los defaults.
-namespace w3dEngine { void W3dAudioJuegoVolume(float v); }  // aplicar el volumen del juego (0..1) al mixer del Core
+namespace w3dEngine { void W3dAudioGameVolume(float v); }  // aplicar el volumen del juego (0..1) al mixer del Core
 
-static void AplicarCompilar(JVal* jc) {
+static void ApplyCompile(JVal* jc) {
     if (!jc) return;
-#ifdef W3D_SIN_EDITOR
+#ifdef W3D_NO_EDITOR
     // la tarjeta "Juego" es del editor: en el juego COMPILADO estas opciones ya
     // estan horneadas en el binario (las aplico "Compilar juego" al generarlo).
     (void)jc;
 #else
-    g_proyCompilar.modoVentana = W3dCompilarModoVentanaInt(JS(jc, "modoVentana", ""));
-    g_proyCompilar.orientacion = W3dCompilarOrientacionInt(JS(jc, "orientacion", ""));
-    g_proyCompilar.usarFisica  = JB(jc, "fisica", true);
-    g_proyCompilar.usarSonido  = JB(jc, "sonido", true);
-    g_proyCompilar.modoDebug   = JB(jc, "debug", false);
-    g_proyCompilar.assetsModo  = W3dCompilarAssetsInt(JS(jc, "assets", ""));
-    g_proyCompilar.plataforma  = W3dCompilarPlataformaInt(JS(jc, "plataforma", ""));
-    g_proyCompilar.backend     = W3dCompilarBackendInt(JS(jc, "backend", ""));      // auto|fijo|shaders|vulkan
-    g_proyCompilar.uid         = (unsigned)strtoul(JS(jc, "uid", "0").c_str(), 0, 16);  // UID3 Symbian (hex string)
-    g_proyCompilar.volumen     = JIRango(jc, "volumen", 100, 0, 100, "compilar");        // 0..100 volumen del gameplay
-    g_proyCompilar.resolucion  = JIRango(jc, "resolucion", 100, 25, 100, "compilar");    // % de la pantalla (Android 2.3)
-    w3dEngine::W3dAudioJuegoVolume(g_proyCompilar.volumen / 100.0f);                      // aplicar YA la ganancia al mixer
-    { extern void W3dJuegoVolRefUI(); W3dJuegoVolRefUI(); }                               // refrescar el numero de la tarjeta Juego
+    g_projCompile.windowMode  = W3dCompileWindowModeInt(JS(jc, "windowMode", ""));
+    g_projCompile.orientation = W3dCompileOrientationInt(JS(jc, "orientation", ""));
+    g_projCompile.usePhysics  = JB(jc, "physics", true);
+    g_projCompile.useSound    = JB(jc, "sound", true);
+    g_projCompile.debugMode   = JB(jc, "debug", false);
+    g_projCompile.assetsMode  = W3dCompileAssetsInt(JS(jc, "assets", ""));
+    g_projCompile.platform    = W3dCompilePlatformInt(JS(jc, "platform", ""));
+    g_projCompile.backend     = W3dCompileBackendInt(JS(jc, "backend", ""));      // auto|fijo|shaders|vulkan
+    g_projCompile.uid         = (unsigned)strtoul(JS(jc, "uid", "0").c_str(), 0, 16);  // UID3 Symbian (hex string)
+    g_projCompile.volume      = JIRange(jc, "volume", 100, 0, 100, "compile");        // 0..100 volumen del gameplay
+    g_projCompile.resolution  = JIRange(jc, "resolution", 100, 25, 100, "compile");    // % de la pantalla (Android 2.3)
+    w3dEngine::W3dAudioGameVolume(g_projCompile.volume / 100.0f);                      // aplicar YA la ganancia al mixer
+    { extern void W3dGameVolRefUI(); W3dGameVolRefUI(); }                              // refrescar el numero de la tarjeta Juego
 #endif
 }
 
@@ -3730,327 +3730,327 @@ static void AplicarCompilar(JVal* jc) {
 //  MATERIALES (bloque raiz "materiales")
 //
 //  Antes viajaban ADENTRO del GLB de cada malla y volvian por ImportGLTF. Desde que la geometria
-//  es .w3dm, el material vive en el proyecto.json y cada .w3dm lo referencia POR NOMBRE (bloque
+//  es .w3dm, el material vive en el project.json y cada .w3dm lo referencia POR NOMBRE (bloque
 //  PARTMAT). Se cargan ANTES que los objetos para que la malla ya los encuentre.
 //
-//  REUSO POR NOMBRE, pero SOLO si es REALMENTE el mismo material: ReiniciarEscena borra la escena
+//  REUSO POR NOMBRE, pero SOLO si es REALMENTE el mismo material: RestartScene borra la escena
 //  pero NO el registro global de materiales, asi que sin esto reabrir el proyecto multiplicaria
 //  los materiales (Material.001, .002, ...). Si el homonimo tiene OTRO contenido, el constructor
 //  uniquifica y se avisa (mismo criterio que ImportGLTF).
 // ===========================================================================
-static std::map<std::string, Material*> gMatDeNombre;   // nombre EN EL ARCHIVO -> material vivo
+static std::map<std::string, Material*> gMatByName;   // nombre EN EL ARCHIVO -> material vivo
 
-static bool W3dMatCasi(float a, float b) { float d = a - b; if (d < 0) d = -d; return d <= 1e-4f; }
+static bool W3dMatAlmost(float a, float b) { float d = a - b; if (d < 0) d = -d; return d <= 1e-4f; }
 static void JColor4(JVal* j, const char* k, float* out) {
-    JVal* v = JHijo(j, k, 5);
-    if (v && v->lista.size() >= 4) for (int i = 0; i < 4; i++) out[i] = (float)v->lista[i]->num;
+    JVal* v = JChild(j, k, 5);
+    if (v && v->list.size() >= 4) for (int i = 0; i < 4; i++) out[i] = (float)v->list[i]->num;
 }
 // la ruta de la textura de un material YA existente: la cargada, o la que tiene ENCOLADA (la
 // carga es diferida: recien cargado, mat->texture sigue NULL).
-static std::string W3dMatRutaTex(const Material* m) {
+static std::string W3dMatTexPath(const Material* m) {
     if (m->texture && !m->texture->path.empty()) return m->texture->path;
-    return TexturaPendienteDe(m);
+    return PendingTextureOf(m);
 }
-static bool W3dMismoMaterial(const Material* v, const Material& n, const std::string& texPath) {
+static bool W3dSameMaterial(const Material* v, const Material& n, const std::string& texPath) {
     for (int k = 0; k < 4; k++) {
-        if (!W3dMatCasi(v->diffuse[k],  n.diffuse[k]))  return false;
-        if (!W3dMatCasi(v->specular[k], n.specular[k])) return false;
-        if (!W3dMatCasi(v->emission[k], n.emission[k])) return false;
-        if (!W3dMatCasi(v->ambient[k],  n.ambient[k]))  return false;
+        if (!W3dMatAlmost(v->diffuse[k],  n.diffuse[k]))  return false;
+        if (!W3dMatAlmost(v->specular[k], n.specular[k])) return false;
+        if (!W3dMatAlmost(v->emission[k], n.emission[k])) return false;
+        if (!W3dMatAlmost(v->ambient[k],  n.ambient[k]))  return false;
     }
-    if (!W3dMatCasi(v->shininess, n.shininess)) return false;
-    if (v->interpolacion != n.interpolacion) return false;
+    if (!W3dMatAlmost(v->shininess, n.shininess)) return false;
+    if (v->interpolation != n.interpolation) return false;
     if (v->reflectMode   != n.reflectMode)   return false;
-    if (v->reflejoSonda  != n.reflejoSonda)  return false;
-    if (!W3dMatCasi(v->rtRugosidad, n.rtRugosidad) || !W3dMatCasi(v->rtMetalico, n.rtMetalico)) return false;
-    if (v->textureOn != n.textureOn || v->filtrado != n.filtrado || v->repeat != n.repeat ||
+    if (v->reflectionProbe  != n.reflectionProbe)  return false;
+    if (!W3dMatAlmost(v->rtRoughness, n.rtRoughness) || !W3dMatAlmost(v->rtMetallic, n.rtMetallic)) return false;
+    if (v->textureOn != n.textureOn || v->filtered != n.filtered || v->repeat != n.repeat ||
         v->transparent != n.transparent || v->lighting != n.lighting || v->vertexColor != n.vertexColor ||
         v->culling != n.culling || v->depth_test != n.depth_test || v->chrome != n.chrome ||
         v->normalMap != n.normalMap || v->uv8bit != n.uv8bit) return false;
-    if (v->depth_write != n.depth_write || v->orden_pasada != n.orden_pasada ||
-        v->mezcla != n.mezcla || !W3dMatCasi(v->depth_bias, n.depth_bias) || !W3dMatCasi(v->sesgo_metros, n.sesgo_metros) || !W3dMatCasi(v->alphaTest, n.alphaTest)) return false;
-    if (!W3dMatCasi(v->mezclaB, n.mezclaB) || v->toon != n.toon || !W3dMatCasi(v->contorno, n.contorno)) return false;
-    if (v->lineas != n.lineas || !W3dMatCasi(v->grosorLinea, n.grosorLinea)) return false;
-    if (v->porPixel != n.porPixel) return false;
-    if (v->luzIndirecta != n.luzIndirecta) return false;
-    if (!W3dMatCasi(v->ior, n.ior) || !W3dMatCasi(v->transmision, n.transmision)) return false;
+    if (v->depth_write != n.depth_write || v->order_pass != n.order_pass ||
+        v->mix != n.mix || !W3dMatAlmost(v->depth_bias, n.depth_bias) || !W3dMatAlmost(v->bias_meters, n.bias_meters) || !W3dMatAlmost(v->alphaTest, n.alphaTest)) return false;
+    if (!W3dMatAlmost(v->mixB, n.mixB) || v->toon != n.toon || !W3dMatAlmost(v->outline, n.outline)) return false;
+    if (v->lines != n.lines || !W3dMatAlmost(v->thicknessLine, n.thicknessLine)) return false;
+    if (v->perPixel != n.perPixel) return false;
+    if (v->lightIndirect != n.lightIndirect) return false;
+    if (!W3dMatAlmost(v->ior, n.ior) || !W3dMatAlmost(v->transmission, n.transmission)) return false;
     if (v->ssr != n.ssr) return false;
-    if (v->shaderOn != n.shaderOn || v->shaderArchivo != n.shaderArchivo) return false;
-    for (int k = 0; k < W3D_MAPAS; k++) if (v->uvMapa[k] != n.uvMapa[k] || v->mapaConTextura[k] != n.mapaConTextura[k]) return false;
-    if (W3dMatRutaTex(v) != texPath) return false;
+    if (v->shaderOn != n.shaderOn || v->shaderFile != n.shaderFile) return false;
+    for (int k = 0; k < W3D_MAPS; k++) if (v->uvMap[k] != n.uvMap[k] || v->mapWithTexture[k] != n.mapWithTexture[k]) return false;
+    if (W3dMatTexPath(v) != texPath) return false;
     return true;
 }
-static void W3dCopiarMaterial(const Material& src, Material* dst) {
+static void W3dCopyMaterial(const Material& src, Material* dst) {
     for (int k = 0; k < 4; k++) {
         dst->diffuse[k]  = src.diffuse[k];  dst->specular[k] = src.specular[k];
         dst->emission[k] = src.emission[k]; dst->ambient[k]  = src.ambient[k];
     }
-    dst->shininess = src.shininess; dst->interpolacion = src.interpolacion;
+    dst->shininess = src.shininess; dst->interpolation = src.interpolation;
     dst->reflectMode = src.reflectMode;
-    dst->reflejoSonda = src.reflejoSonda;
-    dst->rtRugosidad = src.rtRugosidad; dst->rtMetalico = src.rtMetalico;
-    dst->textureOn = src.textureOn; dst->filtrado = src.filtrado; dst->repeat = src.repeat;
+    dst->reflectionProbe = src.reflectionProbe;
+    dst->rtRoughness = src.rtRoughness; dst->rtMetallic = src.rtMetallic;
+    dst->textureOn = src.textureOn; dst->filtered = src.filtered; dst->repeat = src.repeat;
     dst->transparent = src.transparent; dst->lighting = src.lighting; dst->vertexColor = src.vertexColor;
     dst->culling = src.culling; dst->depth_test = src.depth_test; dst->chrome = src.chrome;
     dst->normalMap = src.normalMap; dst->uv8bit = src.uv8bit;
-    dst->depth_write = src.depth_write; dst->depth_bias = src.depth_bias; dst->sesgo_metros = src.sesgo_metros; dst->alphaTest = src.alphaTest;
-    dst->orden_pasada = src.orden_pasada; dst->mezcla = src.mezcla; dst->mezclaB = src.mezclaB; dst->toon = src.toon; dst->contorno = src.contorno;
-    dst->lineas = src.lineas; dst->grosorLinea = src.grosorLinea;
-    dst->porPixel = src.porPixel;
-    dst->luzIndirecta = src.luzIndirecta;
-    dst->ior = src.ior; dst->transmision = src.transmision; dst->ssr = src.ssr;
-    if (dst->shaderArchivo != src.shaderArchivo) { dst->shaderId = 0; dst->shaderEstado = 0; }   // (se compila al dibujar)
-    dst->shaderOn = src.shaderOn; dst->shaderArchivo = src.shaderArchivo;
-    for (int k = 0; k < W3D_MAPAS; k++) { dst->uvMapa[k] = src.uvMapa[k]; dst->mapaConTextura[k] = src.mapaConTextura[k]; }
+    dst->depth_write = src.depth_write; dst->depth_bias = src.depth_bias; dst->bias_meters = src.bias_meters; dst->alphaTest = src.alphaTest;
+    dst->order_pass = src.order_pass; dst->mix = src.mix; dst->mixB = src.mixB; dst->toon = src.toon; dst->outline = src.outline;
+    dst->lines = src.lines; dst->thicknessLine = src.thicknessLine;
+    dst->perPixel = src.perPixel;
+    dst->lightIndirect = src.lightIndirect;
+    dst->ior = src.ior; dst->transmission = src.transmission; dst->ssr = src.ssr;
+    if (dst->shaderFile != src.shaderFile) { dst->shaderId = 0; dst->shaderState = 0; }   // (se compila al dibujar)
+    dst->shaderOn = src.shaderOn; dst->shaderFile = src.shaderFile;
+    for (int k = 0; k < W3D_MAPS; k++) { dst->uvMap[k] = src.uvMap[k]; dst->mapWithTexture[k] = src.mapWithTexture[k]; }
 }
 // (el normal map y las capas extra de un material se cargan al DESPERTAR sus texturas, sincronicas
-// y por el mismo cache por ruta con refcount que usa la cola diferida: ver DespertarUna en import_obj)
-// 'lib' = los materiales de una LIBRERIA externa (io/Librerias.h): van a SU espacio de nombres ("Personajes/Piel",
-// Material::libreria), de solo lectura, sin tocar gMatDeNombre ni reusar/renumerar los del proyecto. El que llama
+// y por el mismo cache por ruta con refcount que usa la cola diferida: ver WakeOne en import_obj)
+// 'lib' = los materiales de una LIBRERIA externa (io/Libraries.h): van a SU espacio de nombres ("Personajes/Piel",
+// Material::libreria), de solo lectura, sin tocar gMatByName ni reusar/renumerar los del proyecto. El que llama
 // deja puesto el contexto de la libreria (sus texturas son entradas de ella)
-static void CargarMateriales(JVal* raiz, const std::string& base, const std::string& lib = std::string()) {
-    if (lib.empty()) gMatDeNombre.clear();
-    JVal* jm = JHijo(raiz, "materiales", 5);
+static void LoadMaterials(JVal* root, const std::string& base, const std::string& lib = std::string()) {
+    if (lib.empty()) gMatByName.clear();
+    JVal* jm = JChild(root, "materials", 5);
     if (!jm) return;
-    for (size_t i = 0; i < jm->lista.size(); i++) {
-        JVal* e = jm->lista[i]; if (!e || e->tipo != 4) continue;
-        const std::string nom = W3dLibsPrefijar(lib, JS(e, "nombre", "Material"));
+    for (size_t i = 0; i < jm->list.size(); i++) {
+        JVal* e = jm->list[i]; if (!e || e->type != 4) continue;
+        const std::string name = W3dLibsPrefix(lib, JS(e, "name", "Material"));
         // temporal SIN registrar (el flag "material por defecto" saltea el alta global y el
         // uniquificado del constructor): asi se puede DECIDIR si crear uno o reusar el homonimo.
-        Material tmp(nom, true);
-        JColor4(e, "difuso",    tmp.diffuse);
-        JColor4(e, "especular", tmp.specular);
-        JColor4(e, "emision",   tmp.emission);
-        JColor4(e, "ambiente",  tmp.ambient);
-        tmp.shininess     = JF(e, "brillo", tmp.shininess);
-        tmp.interpolacion = JI(e, "interpolacion", tmp.interpolacion);
-        tmp.reflectMode   = JI(e, "reflejoModo", tmp.reflectMode);
-        tmp.reflejoSonda  = JB(e, "reflejoSonda", false);   // (el reflejo de la sonda de reflejo mas cercana)
-        tmp.rtRugosidad   = JF(e, "rugosidad", tmp.rtRugosidad);   // trazado de rayos (ausentes = default)
-        tmp.rtMetalico    = JF(e, "metalico",  tmp.rtMetalico);
+        Material tmp(name, true);
+        JColor4(e, "diffuse",    tmp.diffuse);
+        JColor4(e, "specular", tmp.specular);
+        JColor4(e, "emission",   tmp.emission);
+        JColor4(e, "ambient",  tmp.ambient);
+        tmp.shininess       = JF(e, "brightness", tmp.shininess);
+        tmp.interpolation   = JI(e, "interpolation", tmp.interpolation);
+        tmp.reflectMode     = JI(e, "reflectionMode", tmp.reflectMode);
+        tmp.reflectionProbe = JB(e, "reflectionProbe", false);   // (el reflejo de la sonda de reflejo mas cercana)
+        tmp.rtRoughness     = JF(e, "roughness", tmp.rtRoughness);   // trazado de rayos (ausentes = default)
+        tmp.rtMetallic      = JF(e, "metallic",  tmp.rtMetallic);
         // DECAL / mezcla. Ausentes en TODO lo guardado hasta hoy -> el default deja el material igual.
-        tmp.depth_bias    = JF(e, "sesgoProfundidad", tmp.depth_bias);
-        tmp.sesgo_metros  = JF(e, "sesgoMetros",      tmp.sesgo_metros);   // sesgo de profundidad en metros (ausente = 0)
-        tmp.alphaTest     = JF(e, "alfaCorte",        tmp.alphaTest);   // recorte por alfa (rejas); ausente = 0
-        tmp.mezclaB       = JF(e, "mezclaB",          tmp.mezclaB);     // mezcla de texturas (texturaB); ausente = 0
-        tmp.ior           = JF(e, "ior",              tmp.ior);         // indice de refraccion; ausente = 1 (sin refraccion)
-        tmp.transmision   = JF(e, "transmision",      tmp.transmision); // lo que es vidrio (trazado); ausente = 0
-        tmp.shaderArchivo = JS(e, "shader", "");                        // el shader escrito (objects/ShaderEscrito.h)
-        tmp.shaderOn      = JB(e, "shaderOn", false);
+        tmp.depth_bias   = JF(e, "depthBias", tmp.depth_bias);
+        tmp.bias_meters  = JF(e, "biasMeters",      tmp.bias_meters);   // sesgo de profundidad en metros (ausente = 0)
+        tmp.alphaTest    = JF(e, "alphaCut",        tmp.alphaTest);    // recorte por alfa (rejas); ausente = 0
+        tmp.mixB         = JF(e, "mixB",          tmp.mixB);         // mezcla de texturas (textureB); ausente = 0
+        tmp.ior          = JF(e, "ior",              tmp.ior);          // indice de refraccion; ausente = 1 (sin refraccion)
+        tmp.transmission = JF(e, "transmission",      tmp.transmission); // lo que es vidrio (trazado); ausente = 0
+        tmp.shaderFile   = JS(e, "shader", "");                         // el shader escrito (objects/WrittenShader.h)
+        tmp.shaderOn     = JB(e, "shaderOn", false);
         // LOS MAPAS: la capa UV y numero / textura de cada uno (las texturas van dormidas, abajo)
-        std::string mapaTexs[W3D_MAPAS];
-        { JVal* jm = JHijo(e, "mapas", 5);
-          if (jm) for (size_t c = 0; c < jm->lista.size(); c++) {
-              JVal* me = jm->lista[c]; if (!me || me->tipo != 4) continue;
-              const int k = W3dMatMapaDeClave(JS(me, "mapa", ""));
+        std::string mapTexs[W3D_MAPS];
+        { JVal* jm = JChild(e, "maps", 5);
+          if (jm) for (size_t c = 0; c < jm->list.size(); c++) {
+              JVal* me = jm->list[c]; if (!me || me->type != 4) continue;
+              const int k = W3dMatMapByKey(JS(me, "map", ""));
               if (k < 0) continue;
-              tmp.uvMapa[k] = JI(me, "uv", 0);
-              tmp.mapaConTextura[k] = JB(me, "conTextura", false);
-              const std::string mt = JS(me, "textura", "");
-              if (!mt.empty() && k >= W3D_MAPA_EMISION) mapaTexs[k] = RutaJson(mt, base);
+              tmp.uvMap[k] = JI(me, "uv", 0);
+              tmp.mapWithTexture[k] = JB(me, "withTexture", false);
+              const std::string mt = JS(me, "texture", "");
+              if (!mt.empty() && k >= W3D_MAP_EMISSION) mapTexs[k] = JsonPath(mt, base);
           } }
-        tmp.toon          = JI(e, "toon",             tmp.toon);        // sombreado toon (texturaB = la rampa); ausente = 0
+        tmp.toon          = JI(e, "toon",             tmp.toon);        // sombreado toon (textureB = la rampa); ausente = 0
         if (tmp.toon < 0 || tmp.toon > 2) tmp.toon = 0;
-        tmp.contorno      = JF(e, "contorno",         tmp.contorno);    // borde del dibujo animado; ausente = 0
-        if (tmp.contorno < 0.0f) tmp.contorno = 0.0f;
-        tmp.orden_pasada  = JI(e, "ordenPasada",      tmp.orden_pasada);
-        tmp.mezcla        = JI(e, "mezcla",           tmp.mezcla);
+        tmp.outline      = JF(e, "outline",         tmp.outline);    // borde del dibujo animado; ausente = 0
+        if (tmp.outline < 0.0f) tmp.outline = 0.0f;
+        tmp.order_pass  = JI(e, "passOrder",      tmp.order_pass);
+        tmp.mix         = JI(e, "mix",           tmp.mix);
         // LINEAS (aristas por material). Ausentes en lo guardado hasta hoy -> default apagado.
-        tmp.lineas        = JB(e, "lineas",           tmp.lineas);
-        tmp.porPixel      = JB(e, "luzPorPixel",      tmp.porPixel);   // (ausente = por vertice)
-        tmp.luzIndirecta  = JB(e, "luzIndirecta",     tmp.luzIndirecta);   // (la sonda de luz por vertice; ausente = no)
-        tmp.ssr           = JB(e, "reflejosPantalla", tmp.ssr);        // (ausente = sin reflejos en pantalla)
-        tmp.grosorLinea   = JF(e, "grosorLinea",      tmp.grosorLinea);
-        if (tmp.grosorLinea < 1.0f) tmp.grosorLinea = 1.0f;
-        if (tmp.orden_pasada < 0) tmp.orden_pasada = 0;
-        if (tmp.orden_pasada > 2) tmp.orden_pasada = 2;
-        if (tmp.mezcla < 0 || tmp.mezcla >= (int)w3dEngine::MezclaCount_) tmp.mezcla = 0;
-        JVal* fl = JHijo(e, "flags", 4);
+        tmp.lines          = JB(e, "lines",           tmp.lines);
+        tmp.perPixel       = JB(e, "perPixelLight",      tmp.perPixel);   // (ausente = por vertice)
+        tmp.lightIndirect  = JB(e, "indirectLight",     tmp.lightIndirect);   // (la sonda de luz por vertice; ausente = no)
+        tmp.ssr            = JB(e, "screenReflections", tmp.ssr);        // (ausente = sin reflejos en pantalla)
+        tmp.thicknessLine  = JF(e, "lineThickness",      tmp.thicknessLine);
+        if (tmp.thicknessLine < 1.0f) tmp.thicknessLine = 1.0f;
+        if (tmp.order_pass < 0) tmp.order_pass = 0;
+        if (tmp.order_pass > 2) tmp.order_pass = 2;
+        if (tmp.mix < 0 || tmp.mix >= (int)w3dEngine::MixCount_) tmp.mix = 0;
+        JVal* fl = JChild(e, "flags", 4);
         if (fl) {
-            tmp.depth_write = JB(fl, "escribeProfundidad", tmp.depth_write);
-            tmp.textureOn   = JB(fl, "textura",      tmp.textureOn);
-            tmp.filtrado    = JB(fl, "filtrado",     tmp.filtrado);
-            tmp.repeat      = JB(fl, "repetir",      tmp.repeat);
-            tmp.transparent = JB(fl, "transparente", tmp.transparent);
-            tmp.lighting    = JB(fl, "luz",          tmp.lighting);
-            tmp.vertexColor = JB(fl, "colorVertice", tmp.vertexColor);
+            tmp.depth_write = JB(fl, "depthWrite", tmp.depth_write);
+            tmp.textureOn   = JB(fl, "texture",      tmp.textureOn);
+            tmp.filtered    = JB(fl, "filtered",     tmp.filtered);
+            tmp.repeat      = JB(fl, "repeat",      tmp.repeat);
+            tmp.transparent = JB(fl, "transparent", tmp.transparent);
+            tmp.lighting    = JB(fl, "light",          tmp.lighting);
+            tmp.vertexColor = JB(fl, "vertexColor", tmp.vertexColor);
             tmp.culling     = JB(fl, "culling",      tmp.culling);
-            tmp.depth_test  = JB(fl, "profundidad",  tmp.depth_test);
-            tmp.chrome      = JB(fl, "reflejo",      tmp.chrome);
+            tmp.depth_test  = JB(fl, "depth",  tmp.depth_test);
+            tmp.chrome      = JB(fl, "reflection",      tmp.chrome);
             tmp.normalMap   = JB(fl, "normalMap",    tmp.normalMap);
             tmp.uv8bit      = JB(fl, "uv8bit",       tmp.uv8bit);
         }
-        std::string texPath = JS(e, "textura", "");
-        if (!texPath.empty()) texPath = RutaJson(texPath, base);
-        // LA TEXTURA B de antes (la mezcla de texturas, "texturaB" + "mezclaB") ahora es una CAPA DE TEXTURA Mix con su
+        std::string texPath = JS(e, "texture", "");
+        if (!texPath.empty()) texPath = JsonPath(texPath, base);
+        // LA TEXTURA B de antes (la mezcla de texturas, "textureB" + "mixB") ahora es una CAPA DE TEXTURA Mix con su
         // factor: entra ADELANTE de las capas (se ve igual: la unidad 1 tambien la mezclaba con la base ya iluminada).
         // Con toon no: ahi la textura B es la rampa
-        std::string texBMigrada; float factorBMigrado = 0.0f;
+        std::string texBMigrated; float factorBMigrated = 0.0f;
         if (tmp.toon == 0) {
-            const std::string tbm = JS(e, "texturaB", "");
-            if (!tbm.empty()) { texBMigrada = RutaJson(tbm, base); factorBMigrado = tmp.mezclaB; }
-            tmp.mezclaB = 0.0f;
+            const std::string tbm = JS(e, "textureB", "");
+            if (!tbm.empty()) { texBMigrated = JsonPath(tbm, base); factorBMigrated = tmp.mixB; }
+            tmp.mixB = 0.0f;
         }
         // CARPETA cosmetica (outliner por recursos): ausente = la raiz
-        const std::string carpeta = W3dMallaCarpetaNormalizar(JS(e, "carpeta", ""));
+        const std::string folder = W3dMeshFolderNormalize(JS(e, "folder", ""));
         // UN MATERIAL DE LIBRERIA: uno por nombre con prefijo en toda la sesion (si la libreria se vuelve a
         // registrar -otra vez vinculada- se reusa el que ya estaba: sus usuarios lo siguen nombrando)
         if (!lib.empty()) {
-            if (W3dLibMaterial(nom)) continue;
-            Material* mat = new Material(nom);   // (el prefijo lo aparta de los del proyecto)
-            W3dCopiarMaterial(tmp, mat);
-            mat->carpeta = carpeta;
-            mat->libreria = lib;
-            W3dLibMaterialRegistrar(nom, mat);
-            TexDormida dz;
+            if (W3dLibMaterial(name)) continue;
+            Material* mat = new Material(name);   // (el prefijo lo aparta de los del proyecto)
+            W3dCopyMaterial(tmp, mat);
+            mat->folder = folder;
+            mat->lib = lib;
+            W3dLibMaterialRegister(name, mat);
+            AsleepTex dz;
             dz.mat = mat;
             dz.base = texPath;
-            std::string nrm = JS(e, "normalTextura", "");
-            if (!nrm.empty()) dz.normal = RutaJson(nrm, base);
-            std::string tb = JS(e, "texturaB", "");
-            if (!tb.empty() && texBMigrada.empty() && tmp.toon != 0) dz.texB = RutaJson(tb, base);
-            for (int k = 0; k < W3D_MAPAS; k++) dz.mapas[k] = mapaTexs[k];
-            JVal* jc = JHijo(e, "capas", 5);
-            if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
-                JVal* ce = jc->lista[c]; if (!ce || ce->tipo != 4) continue;
-                const std::string ct = JS(ce, "textura", "");
+            std::string nrm = JS(e, "normalTexture", "");
+            if (!nrm.empty()) dz.normal = JsonPath(nrm, base);
+            std::string tb = JS(e, "textureB", "");
+            if (!tb.empty() && texBMigrated.empty() && tmp.toon != 0) dz.texB = JsonPath(tb, base);
+            for (int k = 0; k < W3D_MAPS; k++) dz.maps[k] = mapTexs[k];
+            JVal* jc = JChild(e, "layers", 5);
+            if (jc) for (size_t c = 0; c < jc->list.size(); c++) {
+                JVal* ce = jc->list[c]; if (!ce || ce->type != 4) continue;
+                const std::string ct = JS(ce, "texture", "");
                 if (ct.empty()) continue;
-                TexCapaDormida cd; cd.textura = RutaJson(ct, base); cd.mezcla = JI(ce, "mezcla", 0); cd.on = JB(ce, "on", true);
+                TexAsleepLayer cd; cd.texture = JsonPath(ct, base); cd.mix = JI(ce, "mix", 0); cd.on = JB(ce, "on", true);
                 cd.uv = JI(ce, "uv", 0);
-                cd.fuerza = JF(ce, "fuerza", 1.0f); cd.horneada = JB(ce, "horneada", false);
-                cd.mascaraSol = JB(ce, "mascaraSol", false);
-                dz.capas.push_back(cd);
+                cd.force = JF(ce, "force", 1.0f); cd.baked = JB(ce, "baked", false);
+                cd.maskSun = JB(ce, "sunMask", false);
+                dz.layers.push_back(cd);
             }
-            if (!texBMigrada.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
-                TexCapaDormida cd; cd.textura = texBMigrada; cd.mezcla = W3D_CAPA_MIX; cd.fuerza = factorBMigrado;
-                dz.capas.insert(dz.capas.begin(), cd);
+            if (!texBMigrated.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
+                TexAsleepLayer cd; cd.texture = texBMigrated; cd.mix = W3D_LAYER_MIX; cd.force = factorBMigrated;
+                dz.layers.insert(dz.layers.begin(), cd);
             }
-            TexturasDormir(dz);   // (despiertan cuando una malla generada por un proxy los usa)
+            TexturesSleep(dz);   // (despiertan cuando una malla generada por un proxy los usa)
             continue;
         }
-        Material* viejo = BuscarMaterialPorNombre(nom);
-        if (viejo && W3dMismoMaterial(viejo, tmp, texPath)) {
-            if (!carpeta.empty()) viejo->carpeta = carpeta;
-            gMatDeNombre[nom] = viejo; continue;
+        Material* old = FindMaterialByName(name);
+        if (old && W3dSameMaterial(old, tmp, texPath)) {
+            if (!folder.empty()) old->folder = folder;
+            gMatByName[name] = old; continue;
         }
-        Material* mat = new Material(nom);   // el ctor uniquifica: homonimo DISTINTO -> "X.001"
-        W3dCopiarMaterial(tmp, mat);
-        mat->carpeta = carpeta;
+        Material* mat = new Material(name);   // el ctor uniquifica: homonimo DISTINTO -> "X.001"
+        W3dCopyMaterial(tmp, mat);
+        mat->folder = folder;
         // SUS TEXTURAS QUEDAN DORMIDAS (import_obj.h) hasta saber si alguna malla lo usa: el proyecto
         // guarda tambien los materiales HUERFANOS y no tienen por que ocupar la GPU (ni en el editor ni
-        // en el juego compilado). Al terminar de armar la escena, TexturasDespertarUsadas manda las de
+        // en el juego compilado). Al terminar de armar la escena, TexturesWakeUsed manda las de
         // los materiales usados a la cola diferida (la base) y carga el normal map y las capas.
-        TexDormida dz;
+        AsleepTex dz;
         dz.mat = mat;
         dz.base = texPath;
-        std::string nrm = JS(e, "normalTextura", "");
-        if (!nrm.empty()) dz.normal = RutaJson(nrm, base);
-        std::string tb = JS(e, "texturaB", "");
-        if (!tb.empty() && texBMigrada.empty() && tmp.toon != 0) dz.texB = RutaJson(tb, base);
-        for (int k = 0; k < W3D_MAPAS; k++) dz.mapas[k] = mapaTexs[k];
-        JVal* jc = JHijo(e, "capas", 5);
-        if (jc) for (size_t c = 0; c < jc->lista.size(); c++) {
-            JVal* ce = jc->lista[c]; if (!ce || ce->tipo != 4) continue;
-            const std::string ct = JS(ce, "textura", "");
+        std::string nrm = JS(e, "normalTexture", "");
+        if (!nrm.empty()) dz.normal = JsonPath(nrm, base);
+        std::string tb = JS(e, "textureB", "");
+        if (!tb.empty() && texBMigrated.empty() && tmp.toon != 0) dz.texB = JsonPath(tb, base);
+        for (int k = 0; k < W3D_MAPS; k++) dz.maps[k] = mapTexs[k];
+        JVal* jc = JChild(e, "layers", 5);
+        if (jc) for (size_t c = 0; c < jc->list.size(); c++) {
+            JVal* ce = jc->list[c]; if (!ce || ce->type != 4) continue;
+            const std::string ct = JS(ce, "texture", "");
             if (ct.empty()) continue;
-            TexCapaDormida cd; cd.textura = RutaJson(ct, base); cd.mezcla = JI(ce, "mezcla", 0); cd.on = JB(ce, "on", true);
+            TexAsleepLayer cd; cd.texture = JsonPath(ct, base); cd.mix = JI(ce, "mix", 0); cd.on = JB(ce, "on", true);
             cd.uv = JI(ce, "uv", 0);   // capa UV de la malla con la que se dibuja (ausente = 0, la base)
-            cd.fuerza = JF(ce, "fuerza", 1.0f); cd.horneada = JB(ce, "horneada", false);   // el factor de la mezcla (ausente = 1)
-            cd.mascaraSol = JB(ce, "mascaraSol", false);   // (el alfa de la luz horneada: cuanto es del sol)
-            dz.capas.push_back(cd);
+            cd.force = JF(ce, "force", 1.0f); cd.baked = JB(ce, "baked", false);   // el factor de la mezcla (ausente = 1)
+            cd.maskSun = JB(ce, "sunMask", false);   // (el alfa de la luz horneada: cuanto es del sol)
+            dz.layers.push_back(cd);
         }
-        if (!texBMigrada.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
-            TexCapaDormida cd; cd.textura = texBMigrada; cd.mezcla = W3D_CAPA_MIX; cd.fuerza = factorBMigrado;
-            dz.capas.insert(dz.capas.begin(), cd);
+        if (!texBMigrated.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
+            TexAsleepLayer cd; cd.texture = texBMigrated; cd.mix = W3D_LAYER_MIX; cd.force = factorBMigrated;
+            dz.layers.insert(dz.layers.begin(), cd);
         }
-        TexturasDormir(dz);
-        if (viejo) w3dLogfW("[W3D] ya habia un material '%s' con OTRO contenido -> se creo '%s'",
-                            nom.c_str(), mat->name.c_str());
-        gMatDeNombre[nom] = mat;
+        TexturesSleep(dz);
+        if (old) w3dLogfW("[W3D] ya habia un material '%s' con OTRO contenido -> se creo '%s'",
+                            name.c_str(), mat->name.c_str());
+        gMatByName[name] = mat;
     }
 }
 
 // el material que le toca a un mesh part por el NOMBRE que trae el .w3dm ("" = ninguno).
-// Cae a BuscarMaterialPorNombre para los .w3d escritos a mano y para los nombres que ya
+// Cae a FindMaterialByName para los .w3d escritos a mano y para los nombres que ya
 // existian en la sesion.
-// Adentro de una LIBRERIA (su contexto, io/Librerias.h) los nombres son los de SU archivo: su material vive con su
+// Adentro de una LIBRERIA (su contexto, io/Libraries.h) los nombres son los de SU archivo: su material vive con su
 // prefijo. Desde el proyecto, un nombre con el prefijo de una libreria vinculada es un material de ella (la parte
 // de una malla del proyecto a la que se le solto un material de una libreria).
-static Material* MaterialPorNombre(const std::string& nom) {
-    if (nom.empty()) return NULL;
-    const std::string& lib = W3dLibContexto();
+static Material* MaterialByName(const std::string& name) {
+    if (name.empty()) return NULL;
+    const std::string& lib = W3dLibContext();
     if (!lib.empty()) {
-        Material* m = W3dLibMaterial(lib + "/" + nom);
+        Material* m = W3dLibMaterial(lib + "/" + name);
         if (m) return m;
         // (uno de una libreria de SU registro -una de adentro-, soltado en su malla)
-        if (nom.find('/') != std::string::npos) {
-            const std::string an = W3dLibsNombreAnidado(lib, nom);
+        if (name.find('/') != std::string::npos) {
+            const std::string an = W3dLibsNameNested(lib, name);
             if (!an.empty() && (m = W3dLibMaterial(an)) != NULL) return m;
         }
     }
-    std::map<std::string, Material*>::iterator it = gMatDeNombre.find(nom);
-    if (it != gMatDeNombre.end()) return it->second;
-    Material* ml = W3dLibMaterial(nom);
-    if (!ml && nom.find('/') != std::string::npos && !W3dLibsDeNombre(nom).empty()) ml = W3dLibMaterial(nom);
+    std::map<std::string, Material*>::iterator it = gMatByName.find(name);
+    if (it != gMatByName.end()) return it->second;
+    Material* ml = W3dLibMaterial(name);
+    if (!ml && name.find('/') != std::string::npos && !W3dLibsByName(name).empty()) ml = W3dLibMaterial(name);
     if (ml) return ml;
-    return BuscarMaterialPorNombre(nom);
+    return FindMaterialByName(name);
 }
 
 // ===========================================================================
-//  LOS RECURSOS DE UNA LIBRERIA EXTERNA (io/Librerias.h: W3dLibsAsegurar lo llama al montarla): sus materiales,
+//  LOS RECURSOS DE UNA LIBRERIA EXTERNA (io/Libraries.h: W3dLibsEnsure lo llama al montarla): sus materiales,
 //  sus mallas y sus animsets, cada uno con el prefijo de la libreria. Nada se carga: se REGISTRAN (las mallas y
 //  los animsets se leen recien cuando un objeto los usa; las texturas quedan dormidas hasta que una malla usa su
 //  material), y nada de esto es del proyecto (no se lista en su biblioteca ni se guarda).
 // ===========================================================================
-static bool MallaTextoABin(const unsigned char* d, size_t n, const std::string& nombre, std::string& out);   // (mas abajo)
-bool W3dLibRegistrarRecursos(const std::string& lib, JVal* raiz) {
-    if (lib.empty() || !raiz) return false;
-    W3dLibContextoGuarda ctx(lib);
-    W3dMallaMaterialPorNombreHook = MaterialPorNombre;
-    W3dMallaTextoABinHook = MallaTextoABin;
-    CargarMateriales(raiz, gBaseProyecto, lib);
+static bool MeshTextToBin(const unsigned char* d, size_t n, const std::string& name, std::string& out);   // (mas abajo)
+bool W3dLibRegisterResources(const std::string& lib, JVal* root) {
+    if (lib.empty() || !root) return false;
+    W3dLibContextGuard ctx(lib);
+    W3dMeshMaterialByNameHook = MaterialByName;
+    W3dMeshTextToBinHook = MeshTextToBin;
+    LoadMaterials(root, gBaseProject, lib);
     int nm = 0, na = 0;
-    JVal* lm = JHijo(raiz, "mallas", 5);
+    JVal* lm = JChild(root, "meshes", 5);
     if (lm)
-        for (size_t i = 0; i < lm->lista.size(); i++) {
-            JVal* e = lm->lista[i];
-            if (!e || e->tipo != 4) continue;
-            const std::string nom = JS(e, "nombre", ""), ent = JS(e, "entrada", "");
-            if (nom.empty() || ent.empty()) continue;
-            W3dMallaRecursoNuevoLib(lib + "/" + nom, RutaJson(ent, gBaseProyecto), lib);
+        for (size_t i = 0; i < lm->list.size(); i++) {
+            JVal* e = lm->list[i];
+            if (!e || e->type != 4) continue;
+            const std::string name = JS(e, "name", ""), ent = JS(e, "entry", "");
+            if (name.empty() || ent.empty()) continue;
+            W3dMeshResourceNewLib(lib + "/" + name, JsonPath(ent, gBaseProject), lib);
             nm++;
         }
-    W3dAnimSetsAsegurarOps();
-    JVal* la = JHijo(raiz, "animsets", 5);
+    W3dAnimSetsEnsureOps();
+    JVal* la = JChild(root, "animsets", 5);
     if (la)
-        for (size_t i = 0; i < la->lista.size(); i++) {
-            JVal* e = la->lista[i];
-            if (!e || e->tipo != 4) continue;
-            const std::string nom = JS(e, "nombre", ""), ent = JS(e, "entrada", "");
-            if (nom.empty() || ent.empty()) continue;
-            W3dAnimSetsLibAgregar(lib + "/" + nom, RutaJson(ent, gBaseProyecto));
+        for (size_t i = 0; i < la->list.size(); i++) {
+            JVal* e = la->list[i];
+            if (!e || e->type != 4) continue;
+            const std::string name = JS(e, "name", ""), ent = JS(e, "entry", "");
+            if (name.empty() || ent.empty()) continue;
+            W3dAnimSetsLibAdd(lib + "/" + name, JsonPath(ent, gBaseProject));
             na++;
         }
     // sus FLIPBOOKS con nombre (el mismo prefijo). Van a la lista de la escena MARCADOS como de la libreria
     // (Flipbook::libreria): el guardado del proyecto nunca los escribe, sea cual sea su atlas
-    JVal* jf = JHijo(raiz, "flipbooks", 5);
+    JVal* jf = JChild(root, "flipbooks", 5);
     if (jf)
-        for (size_t i = 0; i < jf->lista.size(); i++) {
-            JVal* je = jf->lista[i];
-            if (!je || je->tipo != 4) continue;
-            const std::string n = lib + "/" + JS(je, "nombre", "Flipbook");
-            Flipbook* f = FlipbookPorNombre(n);
-            if (f && !f->libreria.empty()) continue;   // (ya registrado)
+        for (size_t i = 0; i < jf->list.size(); i++) {
+            JVal* je = jf->list[i];
+            if (!je || je->type != 4) continue;
+            const std::string n = lib + "/" + JS(je, "name", "Flipbook");
+            Flipbook* f = FlipbookByName(n);
+            if (f && !f->lib.empty()) continue;   // (ya registrado)
             // uno del PROYECTO con ese nombre es una copia CONGELADA que un guardado viejo filtro al nivel: pasa a
             // ser el de la libreria (con lo que la libreria dice HOY), en vez de taparlo
             if (!f) {
                 f = new Flipbook();
-                f->nombre = n;
+                f->name = n;
                 SceneFlipbooks.push_back(f);
             }
-            f->libreria = lib;
-            f->ConfigurarTira(RutaJson(JS(je, "atlas", ""), gBaseProyecto), JI(je, "cols", 1), JI(je, "filas", 1),
-                              JI(je, "cuadros", 1), JF(je, "fps", 30.0f));
+            f->lib = lib;
+            f->ConfigureStrip(JsonPath(JS(je, "atlas", ""), gBaseProject), JI(je, "cols", 1), JI(je, "rows", 1),
+                              JI(je, "frames", 1), JF(je, "fps", 30.0f));
             f->crossfade = JB(je, "crossfade", false);
         }
     w3dLogf("[librerias] '%s': %d malla(s) y %d animset(s) registrados", lib.c_str(), nm, na);
@@ -4060,8 +4060,8 @@ bool W3dLibRegistrarRecursos(const std::string& lib, JVal* raiz) {
 // ===========================================================================
 //  ANIMACIONES DE ESCENA (bloque raiz "animaciones") -> SceneAnimations
 //
-//  La contraparte de EscribirAnimacionesEscena (io/GuardarW3D.cpp), donde esta
-//  el comentario largo de por que existe y por que vive en el proyecto.json.
+//  La contraparte de WriteAnimationsScene (io/SaveW3D.cpp), donde esta
+//  el comentario largo de por que existe y por que vive en el project.json.
 //  RETROCOMPAT: un .w3d SIN el bloque (o sea todos los guardados hasta hoy, que
 //  es el bug que reporto el dueno) abre igual, con la escena "Scene" default.
 //
@@ -4072,34 +4072,34 @@ bool W3dLibRegistrarRecursos(const std::string& lib, JVal* raiz) {
 // ===========================================================================
 // (las ESCENAS de animacion: 1024 era poco -- un proyecto con mas perdia las que sobraban al abrir y el guardado
 //  siguiente ya no las escribia. 65536 sigue debajo de los ids especiales del selector (Properties.cpp, ANIM_ID_*))
-enum { kAnimMaxEscenas = 65536, kAnimMaxObjetos = 100000, kAnimMaxCurvas = 4096 };
+enum { kAnimMaxScenes = 65536, kAnimMaxObjects = 100000, kAnimMaxCurves = 4096 };
 
 // BUSQUEDA POR NOMBRE RESPETANDO EL SCOPE. Los nombres son unicos POR ESCENA
-// (W3dNombreScopeDe), asi que buscar en todo el arbol podria devolver el widget
+// (W3dScopeNameOf), asi que buscar en todo el arbol podria devolver el widget
 // homonimo de una UI en vez del objeto de la escena. La particion es LA MISMA
-// que la de IndexarScopeGlobal/IndexarScopeUI (Objects.cpp): en el scope global
+// que la de IndexScopeGlobal/IndexScopeUI (Objects.cpp): en el scope global
 // cuenta todo lo que no esta dentro de ninguna UI, mas las RAICES UI.
 // (las INSTANCIAS DE PREFAB tambien son frontera: lo que generan no es del scope de afuera, y el guardado
 //  no escribe curvas de objetos generados)
-static Object* AnimBuscarScopeGlobal(Object* nodo, const std::string& n, bool dentroDeUI) {
-    if (!nodo) return NULL;
-    for (size_t i = 0; i < nodo->Childrens.size(); i++) {
-        Object* h = nodo->Childrens[i];
-        const bool esUI = (h->getType() == ObjectType::ui);
-        if ((esUI || !dentroDeUI) && h->name == n) return h;
-        Object* r = AnimBuscarScopeGlobal(h, n, dentroDeUI || W3dEsFronteraScope(h));
+static Object* AnimFindScopeGlobal(Object* node, const std::string& n, bool insideUI) {
+    if (!node) return NULL;
+    for (size_t i = 0; i < node->Childrens.size(); i++) {
+        Object* h = node->Childrens[i];
+        const bool isUI = (h->getType() == ObjectType::ui);
+        if ((isUI || !insideUI) && h->name == n) return h;
+        Object* r = AnimFindScopeGlobal(h, n, insideUI || W3dIsBoundaryScope(h));
         if (r) return r;
     }
     return NULL;
 }
-static Object* AnimBuscarScopeUI(Object* nodo, const std::string& n) {
-    if (!nodo) return NULL;
-    for (size_t i = 0; i < nodo->Childrens.size(); i++) {
-        Object* h = nodo->Childrens[i];
+static Object* AnimFindScopeUI(Object* node, const std::string& n) {
+    if (!node) return NULL;
+    for (size_t i = 0; i < node->Childrens.size(); i++) {
+        Object* h = node->Childrens[i];
         if (h->getType() == ObjectType::ui) continue;   // otro scope (el suyo)
         if (h->name == n) return h;
-        if (W3dEsFronteraScope(h)) continue;             // una instancia de prefab: lo suyo es de ella
-        Object* r = AnimBuscarScopeUI(h, n);
+        if (W3dIsBoundaryScope(h)) continue;             // una instancia de prefab: lo suyo es de ella
+        Object* r = AnimFindScopeUI(h, n);
         if (r) return r;
     }
     return NULL;
@@ -4115,60 +4115,60 @@ static Object* AnimBuscarScopeUI(Object* nodo, const std::string& n) {
 //  despues), asi que se anotan y se convierten al final, con el arbol completo.
 // ===========================================================================
 namespace {
-struct ClipPendiente {
-    Object* duenio;
-    SceneAnimation* clip;                 // sus curvas con obj = NULL hasta resolverlas
-    std::vector<std::string> nombres;     // paralelo a clip->objetos: "" = el dueno
-    std::vector<std::string> escenas;     // la escena UI del nombre ("" = el scope global)
+struct PendingClip {
+    Object* owner;
+    SceneAnimation* clip;                // sus curvas con obj = NULL hasta resolverlas
+    std::vector<std::string> names;      // paralelo a clip->objects: "" = el dueno
+    std::vector<std::string> scenes;     // la escena UI del nombre ("" = el scope global)
 };
 }
-static std::vector<ClipPendiente> gClipsPend;
+static std::vector<PendingClip> gClipsPend;
 
-static void ClipsPendientesOlvidar() {
+static void PendingClipsForget() {
     for (size_t i = 0; i < gClipsPend.size(); i++) delete gClipsPend[i].clip;
     gClipsPend.clear();
 }
-static void LeerClipsObjeto(JVal* j, Object* o) {
-    JVal* jc = JHijo(j, "clips", 5);
+static void ReadClipsObject(JVal* j, Object* o) {
+    JVal* jc = JChild(j, "clips", 5);
     if (!jc || !o) return;
-    size_t n = jc->lista.size();
-    if (n > (size_t)kAnimMaxEscenas) n = (size_t)kAnimMaxEscenas;
+    size_t n = jc->list.size();
+    if (n > (size_t)kAnimMaxScenes) n = (size_t)kAnimMaxScenes;
     for (size_t i = 0; i < n; i++) {
-        JVal* je = jc->lista[i];
-        if (!je || je->tipo != 4) continue;
-        ClipPendiente p;
-        p.duenio = o;
-        p.clip = new SceneAnimation(JS(je, "nombre", "Clip"));
-        p.clip->startFrame = JI(je, "inicio", 1);
-        p.clip->endFrame   = JI(je, "fin", 250);
+        JVal* je = jc->list[i];
+        if (!je || je->type != 4) continue;
+        PendingClip p;
+        p.owner = o;
+        p.clip = new SceneAnimation(JS(je, "name", "Clip"));
+        p.clip->startFrame = JI(je, "start", 1);
+        p.clip->endFrame   = JI(je, "end", 250);
         p.clip->fps        = JI(je, "fps", 30);
         // (rango/fps SANEADOS, como los de una animacion de escena)
         if (p.clip->startFrame < 0) p.clip->startFrame = 0;
         if (p.clip->endFrame < p.clip->startFrame) p.clip->endFrame = p.clip->startFrame;
         if (p.clip->fps < 1) p.clip->fps = 1;
         if (p.clip->fps > 120) p.clip->fps = 120;
-        JVal* jobjs = JHijo(je, "objetos", 5);
-        size_t nObj = jobjs ? jobjs->lista.size() : 0;
-        if (nObj > (size_t)kAnimMaxObjetos) nObj = (size_t)kAnimMaxObjetos;
+        JVal* jobjs = JChild(je, "objects", 5);
+        size_t nObj = jobjs ? jobjs->list.size() : 0;
+        if (nObj > (size_t)kAnimMaxObjects) nObj = (size_t)kAnimMaxObjects;
         for (size_t k = 0; k < nObj; k++) {
-            JVal* jo = jobjs->lista[k];
-            if (!jo || jo->tipo != 4) continue;
+            JVal* jo = jobjs->list[k];
+            if (!jo || jo->type != 4) continue;
             AnimationObject ao;
             ao.obj = NULL; ao.FirstKeyFrame = 0; ao.LastKeyFrame = 0;
-            JVal* jcur = JHijo(jo, "curvas", 5);
-            size_t nCur = jcur ? jcur->lista.size() : 0;
-            if (nCur > (size_t)kAnimMaxCurvas) nCur = (size_t)kAnimMaxCurvas;
+            JVal* jcur = JChild(jo, "curves", 5);
+            size_t nCur = jcur ? jcur->list.size() : 0;
+            if (nCur > (size_t)kAnimMaxCurves) nCur = (size_t)kAnimMaxCurves;
             for (size_t c = 0; c < nCur; c++) {
                 AnimProperty ap;
-                if (!CargarCurvaJson(jcur->lista[c], ap) || ap.keyframes.empty()) continue;
+                if (!LoadCurveJson(jcur->list[c], ap) || ap.keyframes.empty()) continue;
                 ap.SortKeyFrames();
-                ao.Propertys.push_back(ap);
+                ao.Properties.push_back(ap);
             }
-            if (ao.Propertys.empty()) continue;
+            if (ao.Properties.empty()) continue;
             ao.UpdateFirstLastFrame();
-            p.clip->objetos.push_back(ao);
-            p.nombres.push_back(JS(jo, "objeto", ""));
-            p.escenas.push_back(JS(jo, "escena", ""));
+            p.clip->objects.push_back(ao);
+            p.names.push_back(JS(jo, "object", ""));
+            p.scenes.push_back(JS(jo, "scene", ""));
         }
         gClipsPend.push_back(p);
     }
@@ -4178,99 +4178,99 @@ static void LeerClipsObjeto(JVal* j, Object* o) {
 // de escena), y queda en la pista de su RUTA relativa al dueno (lo que no cuelga del dueno se descarta: un clip
 // de jerarquia solo nombra su jerarquia). Despues elige el clip que se estaba editando al guardar
 // ("animaciones"."activaClip" de 'raiz': una vista de ese clip sobre su raiz).
-static void AdjuntarClipsPendientes(JVal* raiz) {
+static void AttachPendingClips(JVal* root) {
     for (size_t i = 0; i < gClipsPend.size(); i++) {
-        ClipPendiente& p = gClipsPend[i];
+        PendingClip& p = gClipsPend[i];
         SceneAnimation* c = p.clip;
-        W3dClipJer* cj = W3dJerClipNuevo(p.duenio, c->name);
+        W3dClipHier* cj = W3dHierNewClip(p.owner, c->name);
         if (cj) {
-            cj->inicio = c->startFrame; cj->fin = c->endFrame; cj->fps = c->fps;
-            for (size_t k = 0; k < c->objetos.size(); k++) {
+            cj->start = c->startFrame; cj->end = c->endFrame; cj->fps = c->fps;
+            for (size_t k = 0; k < c->objects.size(); k++) {
                 Object* obj = NULL;
-                const std::string& n = p.nombres[k];
-                if (n.empty()) obj = p.duenio;
+                const std::string& n = p.names[k];
+                if (n.empty()) obj = p.owner;
                 else {
-                    obj = FindObjectByName(p.duenio, n);   // su subarbol primero (la hoja de SU puerta)
+                    obj = FindObjectByName(p.owner, n);   // su subarbol primero (la hoja de SU puerta)
                     if (!obj) {
-                        if (p.escenas[k].empty()) obj = AnimBuscarScopeGlobal(SceneCollection, n, false);
+                        if (p.scenes[k].empty()) obj = AnimFindScopeGlobal(SceneCollection, n, false);
                         else {
-                            Object* ui = AnimBuscarScopeGlobal(SceneCollection, p.escenas[k], false);
-                            if (ui && ui->getType() == ObjectType::ui) obj = AnimBuscarScopeUI(ui, n);
+                            Object* ui = AnimFindScopeGlobal(SceneCollection, p.scenes[k], false);
+                            if (ui && ui->getType() == ObjectType::ui) obj = AnimFindScopeUI(ui, n);
                         }
                     }
                 }
-                const std::string ruta = obj ? W3dJerRuta(p.duenio, obj) : std::string();
-                if (ruta.empty()) {
+                const std::string path = obj ? W3dHierPath(p.owner, obj) : std::string();
+                if (path.empty()) {
                     w3dLogfW("[W3D] el clip '%s' de '%s' anima a '%s', que no es de su jerarquia: sus curvas se descartan",
-                             c->name.c_str(), p.duenio->name.c_str(), n.c_str());
+                             c->name.c_str(), p.owner->name.c_str(), n.c_str());
                     continue;
                 }
-                W3dPistaJer pj;
-                pj.ruta = ruta;
-                pj.props = c->objetos[k].Propertys;
-                cj->pistas.push_back(pj);
+                W3dHierTrack pj;
+                pj.path = path;
+                pj.props = c->objects[k].Properties;
+                cj->tracks.push_back(pj);
             }
             w3dLogf("[W3D] '%s': el clip de objeto '%s' pasa a ser un clip de jerarquia de su biblioteca '%s'",
-                    p.duenio->name.c_str(), cj->nombre.c_str(), p.duenio->clipsJer ? p.duenio->clipsJer->animset.c_str() : "?");
+                    p.owner->name.c_str(), cj->name.c_str(), p.owner->clipsHier ? p.owner->clipsHier->animset.c_str() : "?");
         }
         delete c;
         p.clip = NULL;
     }
     gClipsPend.clear();
     // el clip que se estaba editando al guardar
-    JVal* ja = raiz ? JHijo(raiz, "animaciones", 4) : NULL;
-    JVal* jac = ja ? JHijo(ja, "activaClip", 4) : NULL;
+    JVal* ja = root ? JChild(root, "animations", 4) : NULL;
+    JVal* jac = ja ? JChild(ja, "activeClip", 4) : NULL;
     if (jac) {
-        Object* d = FindObjectByName(SceneCollection, JS(jac, "objeto", ""));
-        W3dClipJer* c = d ? W3dJerClip(d, JS(jac, "clip", "")) : NULL;
-        const int idx = c ? W3dClipVista(d, c) : -1;
-        if (idx >= 0) { SetEscenaActiva(idx); AnimCargarRangoActivo(); }
+        Object* d = FindObjectByName(SceneCollection, JS(jac, "object", ""));
+        W3dClipHier* c = d ? W3dHierClip(d, JS(jac, "clip", "")) : NULL;
+        const int idx  = c ? W3dClipView(d, c) : -1;
+        if (idx >= 0) { SetActiveScene(idx); AnimLoadActiveRange(); }
     }
 }
 
-// FLIPBOOKS CON NOMBRE de la escena (contraparte de EscribirFlipbooks). Solo la config;
-// las 8 curvas de UV se regeneran con ConfigurarTira->GenerarCeldas.
-static void CargarFlipbooksEscena(JVal* raiz) {
-    SceneFlipbooksLimpiar();                        // reemplaza la lista entera (escena nueva)
-    JVal* jf = JHijo(raiz, "flipbooks", 5);         // array (.w3d viejo: sin bloque, no pasa nada)
+// FLIPBOOKS CON NOMBRE de la escena (contraparte de WriteFlipbooks). Solo la config;
+// las 8 curvas de UV se regeneran con ConfigureStrip->GenerateCells.
+static void LoadFlipbooksScene(JVal* root) {
+    SceneFlipbooksClear();                           // reemplaza la lista entera (escena nueva)
+    JVal* jf = JChild(root, "flipbooks", 5);         // array (.w3d viejo: sin bloque, no pasa nada)
     if (!jf) return;
-    for (size_t i = 0; i < jf->lista.size(); i++) {
-        JVal* je = jf->lista[i];
-        if (!je || je->tipo != 4) continue;
+    for (size_t i = 0; i < jf->list.size(); i++) {
+        JVal* je = jf->list[i];
+        if (!je || je->type != 4) continue;
         Flipbook* f = new Flipbook();
-        f->nombre = JS(je, "nombre", "Flipbook");
-        f->ConfigurarTira(RutaJsonCampo(JS(je, "atlas", ""), gBaseProyecto), JI(je, "cols", 1), JI(je, "filas", 1),
-                          JI(je, "cuadros", 1), JF(je, "fps", 30.0f));   // grilla + regenera curvas
+        f->name = JS(je, "name", "Flipbook");
+        f->ConfigureStrip(JsonPathField(JS(je, "atlas", ""), gBaseProject), JI(je, "cols", 1), JI(je, "rows", 1),
+                          JI(je, "frames", 1), JF(je, "fps", 30.0f));   // grilla + regenera curvas
         f->crossfade = JB(je, "crossfade", false);
         SceneFlipbooks.push_back(f);
     }
 }
 
-static void CargarAnimacionesEscena(JVal* raiz) {
-    JVal* ja = JHijo(raiz, "animaciones", 4);
+static void LoadAnimationsScene(JVal* root) {
+    JVal* ja = JChild(root, "animations", 4);
     if (!ja) { InitSceneAnimations(); return; }   // .w3d viejo: sin bloque, abre igual
-    JVal* jes = JHijo(ja, "escenas", 5);
-    if (!jes || jes->lista.empty()) { InitSceneAnimations(); return; }
-    // se reemplaza la lista entera (ReiniciarEscena dejo la "Scene" vacia de arranque)
+    JVal* jes = JChild(ja, "scenes", 5);
+    if (!jes || jes->list.empty()) { InitSceneAnimations(); return; }
+    // se reemplaza la lista entera (RestartScene dejo la "Scene" vacia de arranque)
     for (size_t i = 0; i < SceneAnimations.size(); i++) delete SceneAnimations[i];
     SceneAnimations.clear();
     AnimationObjects.clear();
-    SceneAnimActiva = 0;
+    ActiveSceneAnim = 0;
 
-    size_t nEsc = jes->lista.size();
-    if (nEsc > (size_t)kAnimMaxEscenas) {
+    size_t nEsc = jes->list.size();
+    if (nEsc > (size_t)kAnimMaxScenes) {
         w3dLogfW("[W3D] el proyecto declara %d animaciones de escena: se cargan las primeras %d",
-                 (int)nEsc, (int)kAnimMaxEscenas);
-        nEsc = (size_t)kAnimMaxEscenas;
+                 (int)nEsc, (int)kAnimMaxScenes);
+        nEsc = (size_t)kAnimMaxScenes;
     }
-    int perdidos = 0;             // curvas cuyo objeto no aparecio
-    std::string primerPerdido;
+    int lost = 0;             // curvas cuyo objeto no aparecio
+    std::string firstLost;
     for (size_t i = 0; i < nEsc; i++) {
-        JVal* je = jes->lista[i];
-        if (!je || je->tipo != 4) continue;
-        SceneAnimation* esc = new SceneAnimation(JS(je, "nombre", "Scene"));
-        esc->startFrame = JI(je, "inicio", 1);
-        esc->endFrame   = JI(je, "fin", 250);
+        JVal* je = jes->list[i];
+        if (!je || je->type != 4) continue;
+        SceneAnimation* esc = new SceneAnimation(JS(je, "name", "Scene"));
+        esc->startFrame = JI(je, "start", 1);
+        esc->endFrame   = JI(je, "end", 250);
         esc->fps        = JI(je, "fps", 30);
         // rango/fps SANEADOS: un archivo a mano puede traer fin < inicio o fps 0 y eso
         // deja el timeline inutilizable (y AnimTick en un loop de un solo frame)
@@ -4280,119 +4280,119 @@ static void CargarAnimacionesEscena(JVal* raiz) {
         if (esc->fps > 120) esc->fps = 120;
         SceneAnimations.push_back(esc);
         // pista "CAMARA ACTIVA": [{frame, camara}] -> los cortes de la cinematica
-        JVal* jcam = JHijo(je, "camaraActiva", 5);
+        JVal* jcam = JChild(je, "activeCamera", 5);
         if (jcam)
-            for (size_t q = 0; q < jcam->lista.size(); q++) {
-                JVal* jk = jcam->lista[q];
-                if (!jk || jk->tipo != 4) continue;
-                const std::string cam = JS(jk, "camara", "");
+            for (size_t q = 0; q < jcam->list.size(); q++) {
+                JVal* jk = jcam->list[q];
+                if (!jk || jk->type != 4) continue;
+                const std::string cam = JS(jk, "camera", "");
                 if (!cam.empty()) W3dCamKey((int)SceneAnimations.size() - 1, JI(jk, "frame", 0), cam);
             }
 
         // las TIRAS de esqueleto (un "audio" de antes no se lee: el audio de una escena es un objeto Sonido)
-        { JVal* jq = JHijo(je, "esqueletos", 5);
-          if (jq) for (size_t q = 0; q < jq->lista.size(); q++) {
-              JVal* jk = jq->lista[q]; if (!jk || jk->tipo != 4) continue;
-              SceneAnimation::PistaEsqueleto p; p.armature = JS(jk, "armature", ""); p.clip = JS(jk, "clip", ""); p.frame = JI(jk, "frame", 1);
-              if (!p.armature.empty() && !p.clip.empty()) esc->esqueletos.push_back(p);
+        { JVal* jq = JChild(je, "armatures", 5);
+          if (jq) for (size_t q = 0; q < jq->list.size(); q++) {
+              JVal* jk = jq->list[q]; if (!jk || jk->type != 4) continue;
+              SceneAnimation::SkeletonTrack p; p.armature = JS(jk, "armature", ""); p.clip = JS(jk, "clip", ""); p.frame = JI(jk, "frame", 1);
+              if (!p.armature.empty() && !p.clip.empty()) esc->skeletons.push_back(p);
           } }
-        JVal* jobjs = JHijo(je, "objetos", 5);
+        JVal* jobjs = JChild(je, "objects", 5);
         if (!jobjs) continue;
-        size_t nObj = jobjs->lista.size();
-        if (nObj > (size_t)kAnimMaxObjetos) {
+        size_t nObj = jobjs->list.size();
+        if (nObj > (size_t)kAnimMaxObjects) {
             w3dLogfW("[W3D] la animacion '%s' declara %d objetos: se cargan los primeros %d",
-                     esc->name.c_str(), (int)nObj, (int)kAnimMaxObjetos);
-            nObj = (size_t)kAnimMaxObjetos;
+                     esc->name.c_str(), (int)nObj, (int)kAnimMaxObjects);
+            nObj = (size_t)kAnimMaxObjects;
         }
         for (size_t o = 0; o < nObj; o++) {
-            JVal* jo = jobjs->lista[o];
-            if (!jo || jo->tipo != 4) continue;
-            const std::string nombre = JS(jo, "objeto", "");
-            if (nombre.empty()) continue;
+            JVal* jo = jobjs->list[o];
+            if (!jo || jo->type != 4) continue;
+            const std::string name = JS(jo, "object", "");
+            if (name.empty()) continue;
             // SCOPE: "escena" = la UI adentro de la cual vive el objeto (ausente = global)
-            const std::string scope = JS(jo, "escena", "");
+            const std::string scope = JS(jo, "scene", "");
             Object* obj = NULL;
             if (scope.empty()) {
-                obj = AnimBuscarScopeGlobal(SceneCollection, nombre, false);
+                obj = AnimFindScopeGlobal(SceneCollection, name, false);
             } else {
-                Object* ui = AnimBuscarScopeGlobal(SceneCollection, scope, false);
-                if (ui && ui->getType() == ObjectType::ui) obj = AnimBuscarScopeUI(ui, nombre);
+                Object* ui = AnimFindScopeGlobal(SceneCollection, scope, false);
+                if (ui && ui->getType() == ObjectType::ui) obj = AnimFindScopeUI(ui, name);
             }
             if (!obj) {
                 // EL OBJETO NO ESTA (lo borraron o lo renombraron despues de guardar). La curva
                 // NO se cuelga de cualquier lado: se descarta y se AVISA. Colgarla del primer
                 // homonimo que apareciera seria animar un objeto que el usuario no eligio.
-                if (perdidos == 0) primerPerdido = scope.empty() ? nombre : (scope + "/" + nombre);
-                perdidos++;
+                if (lost == 0) firstLost = scope.empty() ? name : (scope + "/" + name);
+                lost++;
                 w3dLogfW("[W3D] la animacion '%s' referencia al objeto '%s'%s%s, que ya no esta: sus curvas se descartan",
-                         esc->name.c_str(), nombre.c_str(),
+                         esc->name.c_str(), name.c_str(),
                          scope.empty() ? "" : " de la escena ", scope.c_str());
                 continue;
             }
             AnimationObject ao;
             ao.obj = obj; ao.FirstKeyFrame = 0; ao.LastKeyFrame = 0;
-            JVal* jcur = JHijo(jo, "curvas", 5);
+            JVal* jcur = JChild(jo, "curves", 5);
             if (jcur) {
-                size_t nCur = jcur->lista.size();
-                if (nCur > (size_t)kAnimMaxCurvas) {
+                size_t nCur = jcur->list.size();
+                if (nCur > (size_t)kAnimMaxCurves) {
                     w3dLogfW("[W3D] '%s' declara %d curvas: se cargan las primeras %d",
-                             nombre.c_str(), (int)nCur, (int)kAnimMaxCurvas);
-                    nCur = (size_t)kAnimMaxCurvas;
+                             name.c_str(), (int)nCur, (int)kAnimMaxCurves);
+                    nCur = (size_t)kAnimMaxCurves;
                 }
                 for (size_t c = 0; c < nCur; c++) {
                     AnimProperty ap;
-                    if (!CargarCurvaJson(jcur->lista[c], ap)) continue;
+                    if (!LoadCurveJson(jcur->list[c], ap)) continue;
                     if (ap.keyframes.empty()) continue;   // curva sin keys: no es dato
                     ap.SortKeyFrames();                    // el archivo puede venir desordenado
-                    ao.Propertys.push_back(ap);
+                    ao.Properties.push_back(ap);
                 }
             }
-            if (ao.Propertys.empty()) continue;
+            if (ao.Properties.empty()) continue;
             ao.UpdateFirstLastFrame();
-            SceneAnimations.back()->objetos.push_back(ao);
+            SceneAnimations.back()->objects.push_back(ao);
         }
     }
     if (SceneAnimations.empty()) { InitSceneAnimations(); return; }
     // LA ACTIVA: sus curvas NO viven en su SceneAnimation sino en el global
     // AnimationObjects (ver el invariante del swap en Animation.h). Se hace el
-    // mismo swap que SetEscenaActiva, o el proyecto abriria con la escena que el
+    // mismo swap que SetActiveScene, o el proyecto abriria con la escena que el
     // usuario estaba viendo aparentemente vacia.
-    int activa = JI(ja, "activa", 0);
-    if (activa < 0 || activa >= (int)SceneAnimations.size()) activa = 0;
-    SceneAnimActiva = activa;
-    AnimationObjects.swap(SceneAnimations[activa]->objetos);
+    int active = JI(ja, "active", 0);
+    if (active < 0 || active >= (int)SceneAnimations.size()) active = 0;
+    ActiveSceneAnim = active;
+    AnimationObjects.swap(SceneAnimations[active]->objects);
     // rango + fps PROPIOS de la animacion activa -> StartFrame/EndFrame/AnimFPS
-    AnimCargarRangoActivo();
-    if (perdidos > 0)
+    AnimLoadActiveRange();
+    if (lost > 0)
         W3dAvisof(true, T("%d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log"),
-                  perdidos, W3dNombreCorto(primerPerdido).c_str());
+                  lost, W3dShortName(firstLost).c_str());
 }
 
 // REGISTRO DE ANIMSETS: "animsets": [{ "nombre", "entrada", "carpeta" }] (ver animation/W3dAnimSet.h).
-// Reemplaza el del proyecto anterior. La entrada va por RutaJson como toda referencia del .w3d.
-static void CargarRegistroAnimSets(JVal* raiz, const std::string& base) {
-    W3dAnimSetsAsegurarOps();   // una lista de carga ("animset:") puede pedir uno antes que los armatures
-    W3dAnimSetsRegistroLimpiar();
-    JVal* ja = raiz ? JHijo(raiz, "animsets", 5) : NULL;
+// Reemplaza el del proyecto anterior. La entrada va por JsonPath como toda referencia del .w3d.
+static void LoadRegistryAnimSets(JVal* root, const std::string& base) {
+    W3dAnimSetsEnsureOps();   // una lista de carga ("animset:") puede pedir uno antes que los armatures
+    W3dAnimSetsRegistryClear();
+    JVal* ja = root ? JChild(root, "animsets", 5) : NULL;
     if (!ja) return;
-    for (size_t i = 0; i < ja->lista.size(); i++) {
-        JVal* e = ja->lista[i]; if (!e || e->tipo != 4) continue;
-        const std::string nom = JS(e, "nombre", ""), ent = JS(e, "entrada", "");
-        if (nom.empty() || ent.empty()) continue;
-        W3dAnimSetsRegistroAgregar(nom, RutaJson(ent, base), W3dMallaCarpetaNormalizar(JS(e, "carpeta", "")));
+    for (size_t i = 0; i < ja->list.size(); i++) {
+        JVal* e = ja->list[i]; if (!e || e->type != 4) continue;
+        const std::string name = JS(e, "name", ""), ent = JS(e, "entry", "");
+        if (name.empty() || ent.empty()) continue;
+        W3dAnimSetsRegistryAdd(name, JsonPath(ent, base), W3dMeshFolderNormalize(JS(e, "folder", "")));
     }
 }
 
 // abre el proyecto desde el TEXTO json 'datos' (el .w3d plano entero, o el
-// escena.json de un zip v2 viejo), con las rutas relativas resueltas contra
+// scene.json de un zip v2 viejo), con las rutas relativas resueltas contra
 // 'base'. false + aviso si el json no parsea (el editor sigue vivo igual).
 // ===========================================================================
-//  EL REGISTRO DE MALLAS DEL PROYECTO (bloque raiz "mallas", objects/MallaRecurso.h):
-//      "mallas": [{"nombre": "Arbol", "entrada": "mallas/arbol.w3db", "carpeta": "Vegetacion"}]
+//  EL REGISTRO DE MALLAS DEL PROYECTO (bloque raiz "mallas", objects/MeshResource.h):
+//      "mallas": [{"nombre": "Arbol", "entrada": "meshes/arbol.w3db", "carpeta": "Vegetacion"}]
 //  Solo se anotan: los arrays se leen recien cuando el primer objeto las usa (una sola vez
 //  para todos). Una entrada sin usuarios (HUERFANA) queda en el registro y se conserva al
 //  guardar. Va DESPUES de los materiales: la primera carga de un recurso resuelve el material
-//  de cada parte por el nombre del archivo (MaterialPorNombre).
+//  de cada parte por el nombre del archivo (MaterialByName).
 // ===========================================================================
 // ===========================================================================
 //  UNA MALLA DE TRABAJO FUERA DE LA ESCENA (ver import_w3d.h): convertir una malla del registro
@@ -4401,327 +4401,327 @@ static void CargarRegistroAnimSets(JVal* raiz, const std::string& base) {
 //  malla en edicion): nada de eso puede pasar en medio de una carga o de un guardado. Se crea
 //  con la seleccion congelada y sin buscar nombre, y se descuelga en el acto.
 // ===========================================================================
-Mesh* W3dMallaTemporalNueva() {
+Mesh* W3dTempNewMesh() {
     const std::vector<Object*> sel = ObjSelects;
-    Object* act = ObjActivo;
-    const unsigned int selSerial = W3dSeleccionSerial;   // (nadie eligio nada: el recurso activo sigue)
-    const int est = estado;
-    const bool nc = W3dNombresCargando;
-    estado = translacion;          // DeseleccionarTodo sale sin tocar nada fuera de la navegacion
-    W3dNombresCargando = true;     // sin recorrer la escena buscando un nombre libre
+    Object* act = ActiveObj;
+    const unsigned int selSerial = W3dSelectionSerial;   // (nadie eligio nada: el recurso activo sigue)
+    const int est = state;
+    const bool nc = W3dNamesLoading;
+    state = translation;        // DeselectAll sale sin tocar nada fuera de la navegacion
+    W3dNamesLoading = true;     // sin recorrer la escena buscando un nombre libre
     Mesh* t = new Mesh(NULL, Vector3(0, 0, 0));
-    W3dNombresCargando = nc;
-    estado = est;
+    W3dNamesLoading = nc;
+    state = est;
     // sin padre, el ctor la cuelga de SceneCollection SIN anotarlo en Parent: se busca ahi
-    Object* colgada = t->Parent ? t->Parent : SceneCollection;
-    if (colgada) {
-        std::vector<Object*>& ch = colgada->Childrens;
+    Object* attached = t->Parent ? t->Parent : SceneCollection;
+    if (attached) {
+        std::vector<Object*>& ch = attached->Childrens;
         for (size_t i = 0; i < ch.size(); i++) if (ch[i] == t) { ch.erase(ch.begin() + (long)i); break; }
     }
     t->Parent = NULL;
     t->select = false;
-    ObjSelects = sel;              // Seleccionar() la habia sumado y hecho activa
-    ObjActivo = act;
-    W3dSeleccionSerial = selSerial;
+    ObjSelects = sel;              // Select() la habia sumado y hecho activa
+    ActiveObj = act;
+    W3dSelectionSerial = selSerial;
     return t;
 }
-void W3dMallaTemporalBorrar(Mesh* t) { delete t; }
+void W3dTempMeshDelete(Mesh* t) { delete t; }
 
 // LA ENTRADA DE TEXTO (.w3dm) DE UNA MALLA DEL REGISTRO -> .w3db en memoria (el gancho
-// W3dMallaTextoABinHook de MallaRecurso.h: el recurso vive en binario). El MISMO camino que la
+// W3dMeshTextToBinHook de MeshResource.h: el recurso vive en binario). El MISMO camino que la
 // rama "malla" con un .w3dm suelto: el lector de texto y la derivacion (index buffer por parte,
 // bordes conservando los puntos del archivo, capas al render, mapa de puntos); despues el
 // escritor binario con el index buffer canonico. Los nombres de material de las partes viajan
 // TAL CUAL venian en el texto (aunque el material no exista en esta escena).
-static bool MallaTextoABin(const unsigned char* d, size_t n, const std::string& nombre, std::string& out) {
+static bool MeshTextToBin(const unsigned char* d, size_t n, const std::string& name, std::string& out) {
     out.clear();
     if (!d || !n) return false;
-    Mesh* t = W3dMallaTemporalNueva();
-    W3dMallaInfo info;
-    bool ok = W3dMallaLeer((const char*)d, n, t, &info);
-    for (size_t k = 0; k < info.avisos.size(); k++)
-        w3dLogfW("[W3D] malla '%s' (texto): %s", nombre.c_str(), info.avisos[k].c_str());
+    Mesh* t = W3dTempNewMesh();
+    W3dMeshInfo info;
+    bool ok = W3dMeshRead((const char*)d, n, t, &info);
+    for (size_t k = 0; k < info.notices.size(); k++)
+        w3dLogfW("[W3D] malla '%s' (texto): %s", name.c_str(), info.notices[k].c_str());
     if (ok) {
-        for (size_t k = 0; k < t->materialsGroup.size() && k < info.materiales.size(); k++)
-            t->materialsGroup[k].material = MaterialPorNombre(info.materiales[k]);
-        t->ReagruparMeshParts();
-        t->CalcularBordes(true, false);   // CONSERVA los puntos del archivo (no re-suelda por posicion)
-        t->AplicarCapasAlRender();
-        WeightPaintAsegurarMapa(t);
-        // el index buffer que ReagruparMeshParts acaba de armar YA es el canonico (los dos salen
-        // de ArmarIndicesPorParte sobre las mismas caras): se escribe tal cual, sin volver a
+        for (size_t k = 0; k < t->materialsGroup.size() && k < info.materials.size(); k++)
+            t->materialsGroup[k].material = MaterialByName(info.materials[k]);
+        t->RegroupMeshParts();
+        t->ComputeBorders(true, false);   // CONSERVA los puntos del archivo (no re-suelda por posicion)
+        t->ApplyLayersToRender();
+        WeightPaintEnsureMap(t);
+        // el index buffer que RegroupMeshParts acaba de armar YA es el canonico (los dos salen
+        // de BuildIndicesByPart sobre las mismas caras): se escribe tal cual, sin volver a
         // triangular ni a pasar Forsyth
-        std::vector<std::string> avisos;
-        ok = W3dMallaBinEscribir(t, NULL, out, &avisos);
-        for (size_t k = 0; k < avisos.size(); k++)
-            w3dLogfW("[W3D] malla '%s' (texto -> binario): %s", nombre.c_str(), avisos[k].c_str());
+        std::vector<std::string> notices;
+        ok = W3dMeshBinWrite(t, NULL, out, &notices);
+        for (size_t k = 0; k < notices.size(); k++)
+            w3dLogfW("[W3D] malla '%s' (texto -> binario): %s", name.c_str(), notices[k].c_str());
         std::string b2;
-        if (ok && W3dMallaBinRenombrar(out, nombre, b2)) out.swap(b2);
-        if (ok && info.materiales.size() == t->materialsGroup.size() &&
-            W3dMallaBinCambiarMateriales(out, info.materiales, b2)) out.swap(b2);
+        if (ok && W3dMeshBinRename(out, name, b2)) out.swap(b2);
+        if (ok && info.materials.size() == t->materialsGroup.size() &&
+            W3dMeshBinChangeMaterials(out, info.materials, b2)) out.swap(b2);
     }
-    W3dMallaTemporalBorrar(t);
+    W3dTempMeshDelete(t);
     if (!ok) out.clear();
     return ok && !out.empty();
 }
 
-static void CargarRegistroMallas(JVal* raiz) {
-    W3dMallaMaterialPorNombreHook = MaterialPorNombre;
-    W3dMallaTextoABinHook = MallaTextoABin;   // entradas del registro en texto ("formatoMallas": "texto")
-    JVal* lista = JHijo(raiz, "mallas", 5);
-    if (!lista) return;
-    for (size_t i = 0; i < lista->lista.size(); i++) {
-        JVal* e = lista->lista[i];
-        if (!e || e->tipo != 4) continue;
-        const std::string nom = JS(e, "nombre", "");
-        const std::string ent = JS(e, "entrada", "");
-        if (nom.empty() || ent.empty()) {
+static void LoadRegistryMeshes(JVal* root) {
+    W3dMeshMaterialByNameHook = MaterialByName;
+    W3dMeshTextToBinHook = MeshTextToBin;   // entradas del registro en texto ("formatoMallas": "texto")
+    JVal* list = JChild(root, "meshes", 5);
+    if (!list) return;
+    for (size_t i = 0; i < list->list.size(); i++) {
+        JVal* e = list->list[i];
+        if (!e || e->type != 4) continue;
+        const std::string name = JS(e, "name", "");
+        const std::string ent  = JS(e, "entry", "");
+        if (name.empty() || ent.empty()) {
             w3dLogfW("[W3D] registro de mallas: una entrada sin nombre o sin archivo (se ignora)");
             continue;
         }
-        if (W3dMallaRecursoPorNombre(nom)) {
-            w3dLogfW("[W3D] registro de mallas: '%s' esta repetida (queda la primera)", nom.c_str());
+        if (W3dMeshResourceByName(name)) {
+            w3dLogfW("[W3D] registro de mallas: '%s' esta repetida (queda la primera)", name.c_str());
             continue;
         }
-        MallaRecurso* r = W3dMallaRecursoNuevo(nom, ent, W3dMallaCarpetaNormalizar(JS(e, "carpeta", "")));
+        MeshResource* r = W3dMeshNewResource(name, ent, W3dMeshFolderNormalize(JS(e, "folder", "")));
         (void)r;
     }
 }
 
-static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base) {
-    double tMed = CargaAhora();   // medicion por fase (0 = nadie mide)
-    gBaseProyecto = base;
-    ClipsPendientesOlvidar();     // (una carga anterior que no llego a engancharlos)
-    JParser parser(datos, n);
-    JVal* raiz = parser.Valor();
-    if (g_w3dCargaReloj) g_w3dCargaFases.jsonMs += CargaAhora() - tMed;
-    w3dLogMemoria("JSON del proyecto leido");
-    if (parser.error || raiz->tipo != 4) {
+static bool OpenSceneJson(const char* data, size_t n, const std::string& base) {
+    double tMed = LoadNow();   // medicion por fase (0 = nadie mide)
+    gBaseProject = base;
+    PendingClipsForget();     // (una carga anterior que no llego a engancharlos)
+    JParser parser(data, n);
+    JVal* root = parser.Value();
+    if (g_w3dLoadClock) g_w3dLoadPhases.jsonMs += LoadNow() - tMed;
+    w3dLogMemory("JSON del proyecto leido");
+    if (parser.error || root->type != 4) {
         w3dLogfE("[W3D] el JSON del proyecto no parsea: %s (se abre vacio)", w3dPath.c_str());
-        delete raiz;
+        delete root;
         return false;
     }
     // fps: canonico en la raiz (v3); el zip v2 lo traia dentro de "escena"
-    AplicarFps(JI(raiz, "fps", 0));
-    AplicarFpsCap(JI(raiz, "fpsCap", 0));
+    ApplyFps(JI(root, "fps", 0));
+    ApplyFpsCap(JI(root, "fpsCap", 0));
     // PALETAS del proyecto (v3), ANTES de los objetos: asi las paletas del
     // .w3d ganan el merge contra las bakeadas en los .w3dui (primera gana).
     // Un .w3d viejo sin el campo: se adoptan las de las UIs al cargarlas.
     {
-        JVal* jps = JHijo(raiz, "paletas", 5);
-        if (jps && !jps->lista.empty()) {
-            std::vector<Paleta> ps;
-            for (size_t i = 0; i < jps->lista.size() && i < 8; i++) {
-                JVal* jp = jps->lista[i];
-                if (!jp || jp->tipo != 4) continue;
-                Paleta pa;
-                pa.nombre = JS(jp, "nombre", "Paleta");
-                JVal* jc = JHijo(jp, "colores", 5);
+        JVal* jps = JChild(root, "palettes", 5);
+        if (jps && !jps->list.empty()) {
+            std::vector<Palette> ps;
+            for (size_t i = 0; i < jps->list.size() && i < 8; i++) {
+                JVal* jp = jps->list[i];
+                if (!jp || jp->type != 4) continue;
+                Palette pa;
+                pa.name = JS(jp, "name", "Palette");
+                JVal* jc = JChild(jp, "colors", 5);
                 if (jc)
-                    for (size_t c = 0; c < jc->lista.size() && c < 32; c++) {
-                        JVal* e = jc->lista[c];
-                        if (!e || e->tipo != 4) continue;
-                        PaletaColor pc;
-                        pc.nombre = JS(e, "nombre", "Color");
+                    for (size_t c = 0; c < jc->list.size() && c < 32; c++) {
+                        JVal* e = jc->list[c];
+                        if (!e || e->type != 4) continue;
+                        PaletteColor pc;
+                        pc.name = JS(e, "name", "Color");
                         pc.rgba[0] = pc.rgba[1] = pc.rgba[2] = pc.rgba[3] = 1.0f;
                         JColor(e, "color", pc.rgba);
-                        pa.colores.push_back(pc);
+                        pa.colors.push_back(pc);
                     }
                 ps.push_back(pa);
             }
-            W3dPaletasAdoptar(ps);
+            W3dPalettesAdopt(ps);
         }
     }
     // MATERIALES del proyecto, ANTES de los objetos: cada .w3dm los referencia por nombre.
     // Un .w3d viejo (mallas en GLB) no trae el bloque y sus materiales siguen viniendo de
     // adentro del .glb, como siempre.
-    CargarMateriales(raiz, base);
-    CargarRegistroMallas(raiz);    // las mallas con nombre (despues de los materiales: sus partes los nombran)
-    CargarFlipbooksEscena(raiz);   // ANTES de los objetos: un objeto puede referenciar un flipbook por nombre
-    CargarRegistroAnimSets(raiz, base);  // ANTES de los objetos: cada armature nombra su animset
-#ifndef W3D_SIN_EDITOR
-    W3dRecursosVistaLeerJson(raiz);      // las carpetas de la biblioteca (cosmeticas; solo el editor)
+    LoadMaterials(root, base);
+    LoadRegistryMeshes(root);   // las mallas con nombre (despues de los materiales: sus partes los nombran)
+    LoadFlipbooksScene(root);   // ANTES de los objetos: un objeto puede referenciar un flipbook por nombre
+    LoadRegistryAnimSets(root, base);  // ANTES de los objetos: cada armature nombra su animset
+#ifndef W3D_NO_EDITOR
+    W3dResourcesViewReadJson(root);      // las carpetas de la biblioteca (cosmeticas; solo el editor)
 #endif
-    // las LIBRERIAS externas vinculadas (io/Librerias.h): solo su registro, ANTES de los objetos (un proxy o un
+    // las LIBRERIAS externas vinculadas (io/Libraries.h): solo su registro, ANTES de los objetos (un proxy o un
     // recurso con prefijo las nombran). Cada una se monta y registra sus recursos recien cuando algo la usa; el
     // juego compilado las trae empaquetadas (no abre ningun .w3d)
-    W3dLibsLeerJson(raiz, !gCargaJuego);
-#ifndef W3D_SIN_EDITOR
-    { extern void W3dLibreriasInvalidar(); W3dLibreriasInvalidar(); }   // (lo que el outliner leyo de las anteriores)
+    W3dLibsReadJson(root, !gLoadGame);
+#ifndef W3D_NO_EDITOR
+    { extern void W3dExtLibsInvalidate(); W3dExtLibsInvalidate(); }   // (lo que el outliner leyo de las anteriores)
 #endif
     // la VISTA PREVIA DEL STREAMING (opcion del proyecto, io/Streaming.h): ANTES de los objetos, porque decide si las
     // instancias diferidas se generan al abrir (sin ella el editor las genera todas). Solo el editor la usa
-    if (!gCargaJuego) g_w3dStreamingVistaPrevia = JB(raiz, "streamingVistaPrevia", false);
-    // las ESCENAS 3D y los PREFABS del proyecto (W3dRaices.h): la raiz actual pasa a ser la de la
+    if (!gLoadGame) g_w3dStreamingPreviewView = JB(root, "streamingPreview", false);
+    // las ESCENAS 3D y los PREFABS del proyecto (W3dRoots.h): la raiz actual pasa a ser la de la
     // escena del bloque "escena"; el resto se carga desde su entrada cuando se la pida
-    W3dRaicesLeerJson(raiz);
+    W3dRootsReadJson(root);
     // el JUEGO arranca en su escena INICIAL: si no es la del bloque, el bloque ni se arma
-    const bool omitirBloque = gCargaJuego && W3dRaizInicialIdx() != W3dRaizBloque();
-    JVal* esc = omitirBloque ? NULL : JHijo(raiz, "escena", 4);
-    if (omitirBloque) {
+    const bool skipBlock = gLoadGame && W3dInitialRootIdx() != W3dRootBlock();
+    JVal* esc = skipBlock ? NULL : JChild(root, "scene", 4);
+    if (skipBlock) {
         w3dLogf("[W3D] el juego arranca en la escena '%s': el bloque \"escena\" no se arma",
-                W3dRaizInicial().c_str());
+                W3dInitialRoot().c_str());
     } else if (esc) {
-        AplicarFps(JI(esc, "fps", 0));
-        AplicarFpsCap(JI(esc, "fpsCap", 0));
-        JVal* objs = JHijo(esc, "objetos", 5);
+        ApplyFps(JI(esc, "fps", 0));
+        ApplyFpsCap(JI(esc, "fpsCap", 0));
+        JVal* objs = JChild(esc, "objects", 5);
         if (objs) {
-            extern void ProgresoActualizar(float);
-            tMed = CargaAhora();
-            for (size_t i = 0; i < objs->lista.size(); i++) {
+            extern void ProgressUpdate(float);
+            tMed = LoadNow();
+            for (size_t i = 0; i < objs->list.size(); i++) {
                 // construir los objetos = 30%->95% de la barra (los imports de modelo de
                 // adentro muestran ademas su propia barra). Throttle interno a ~1.5%.
-                ProgresoActualizar(0.30f + 0.65f * (float)i / (float)objs->lista.size());
-                JsonObjeto(objs->lista[i], SceneCollection, base);
+                ProgressUpdate(0.30f + 0.65f * (float)i / (float)objs->list.size());
+                JsonObject(objs->list[i], SceneCollection, base);
             }
-            if (g_w3dCargaReloj) g_w3dCargaFases.objetosMs += CargaAhora() - tMed;
+            if (g_w3dLoadClock) g_w3dLoadPhases.objectsMs += LoadNow() - tMed;
         }
     } else {
-        w3dLogfW("[W3D] el proyecto no trae \"escena\": abre sin objetos");
+        w3dLogfW("[W3D] el proyecto no trae \"scene\": abre sin objetos");
     }
     // ya existen TODOS los objetos: resolver las referencias modArmature (malla -> armature por nombre)
-    ResolverModArmaturePendientes();
+    ResolvePendingModArmature();
     // las texturas de los materiales que USA alguna malla despiertan (la base a la cola diferida);
     // las de un material HUERFANO quedan dormidas hasta que una malla lo use
-    TexturasDespertarUsadas();
+    TexturesWakeUsed();
     // ...y las CURVAS DE ANIMACION de los objetos, que tambien los referencian por nombre
-    tMed = CargaAhora();
-    if (!omitirBloque) CargarAnimacionesEscena(raiz);   // (las de la inicial vienen con ella)
-    if (!omitirBloque) AdjuntarClipsPendientes(raiz);   // los clips de objeto, despues de las animaciones de escena
-    else ClipsPendientesOlvidar();
-    if (g_w3dCargaReloj) g_w3dCargaFases.animEscenaMs += CargaAhora() - tMed;
+    tMed = LoadNow();
+    if (!skipBlock) LoadAnimationsScene(root);   // (las de la inicial vienen con ella)
+    if (!skipBlock) AttachPendingClips(root);    // los clips de objeto, despues de las animaciones de escena
+    else PendingClipsForget();
+    if (g_w3dLoadClock) g_w3dLoadPhases.animSceneMs += LoadNow() - tMed;
     // "fullscreen" solo si esta presente (no pisar la config del editor con un default)
-    if (JHijo(raiz, "fullscreen", 3)) AplicarFullscreen(JB(raiz, "fullscreen", false));
+    if (JChild(root, "fullscreen", 3)) ApplyFullscreen(JB(root, "fullscreen", false));
     // estado de reproduccion al GUARDAR (v3, opcional): guardado en pausa -> abre en
-    // pausa. Ausente queda -1 y el pie de AbrirW3D hace el auto-play de siempre.
-    if (JHijo(raiz, "reproduciendo", 3))
-        g_proyReproduciendo = JB(raiz, "reproduciendo", true) ? 1 : 0;
+    // pausa. Ausente queda -1 y el pie de OpenW3D hace el auto-play de siempre.
+    if (JChild(root, "playing", 3))
+        g_projPlaying = JB(root, "playing", true) ? 1 : 0;
     // MULTI-ESCENA: escena inicial + modo (opcionales). Si el .w3d trae varios nodos "ui",
     // esta es la que arranca; el resto quedan cargadas y se activan con cambiarEscena().
     // Ausentes: escenaInicial "" (arranca la primera) y modo apagado (retrocompat 1 escena).
-    AplicarEscenaInicial(JS(raiz, "escenaInicial", ""));
-    AplicarModoEscenas(JB(raiz, "modoEscenas", false));
+    ApplyInitialScene(JS(root, "initialScene", ""));
+    ApplySceneMode(JB(root, "sceneMode", false));
     // FORMATO DE LAS MALLAS al guardar (opcion del proyecto, ver import_w3d.h). Ausente =
     // binario (.w3db); "texto" = .w3dm para quien quiere diffs legibles.
-    g_w3dFormatoMallasProyecto = (JS(raiz, "formatoMallas", "binario") == "texto") ? W3D_MALLAS_TEXTO
-                                                                                   : W3D_MALLAS_BINARIO;
-    // EL ORIGEN de los assets importados (ver W3dContenedor.h): de que archivo de disco salio cada entrada
-    W3dAssetOrigenesLimpiar();
-    if (JVal* jo = JHijo(raiz, "origenes", 4))
+    g_w3dFormatMeshesProject = (JS(root, "meshFormat", "binary") == "text") ? W3D_MESHES_TEXT
+                                                                                   : W3D_MESHES_BINARY;
+    // EL ORIGEN de los assets importados (ver W3dContainer.h): de que archivo de disco salio cada entrada
+    W3dAssetOriginsClear();
+    if (JVal* jo = JChild(root, "origins", 4))
         for (std::map<std::string, JVal*>::const_iterator it = jo->obj.begin(); it != jo->obj.end(); ++it)
-            if (it->second && it->second->tipo == 2) W3dAssetOrigenAnotar(it->first, it->second->str);
+            if (it->second && it->second->type == 2) W3dAssetOriginAnnotate(it->first, it->second->str);
     // PIXELADO GLOBAL (ver la rama de texto arriba y w3dGraphics.h). Ausente =
     // false: nada de lo que ya andaba cambia de aspecto.
-    w3dEngine::SetPixeladoGlobal(JB(raiz, "pixelado", false));
+    w3dEngine::SetPixelatedGlobal(JB(root, "pixelated", false));
     // MIPMAPPING (ver la rama de texto): ausente = default del EDITOR (cfg.mipmaps),
     // presente = manda el proyecto. Antes de la cola diferida, asi gobierna la subida.
     w3dEngine::SetMipmapsGlobal(cfg.mipmaps);
-    { JVal* jm = JHijo(raiz, "mipmaps", 3); if (jm) w3dEngine::SetMipmapsGlobal(jm->b); }
+    { JVal* jm = JChild(root, "mipmaps", 3); if (jm) w3dEngine::SetMipmapsGlobal(jm->b); }
     // TEXTURAS DE 16 BITS (ausente = solo las exactas). Antes de la cola diferida: gobierna esta carga
-    { JVal* j16 = JHijo(raiz, "texturas16", 3); w3dEngine::SetTexturas16Siempre(j16 && j16->b); }
+    { JVal* j16 = JChild(root, "textures16", 3); w3dEngine::SetTextures16Always(j16 && j16->b); }
     // EL TRAZADO DE RAYOS del proyecto (ausente = el de fabrica). Es del editor (el render final): el juego no lo trae
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
     {
-        g_rt = W3dRTOpciones();
-        JVal* t = JHijo(raiz, "trazado", 4);
+        g_rt = W3dRTOptions();
+        JVal* t = JChild(root, "raytraced", 4);
         if (t) {
-            g_rt.on = JB(t, "on", g_rt.on); g_rt.rayos = JI(t, "rayos", g_rt.rayos); g_rt.samples = JI(t, "samples", g_rt.samples);
-            g_rt.pases = JI(t, "pases", g_rt.pases); g_rt.denoiser = JI(t, "denoiser", g_rt.denoiser);
-            g_rt.gpu = JB(t, "gpu", g_rt.gpu); g_rt.soloFinal = JB(t, "soloFinal", g_rt.soloFinal); g_rt.escala = JI(t, "escala", g_rt.escala);
-            g_rt.capas = JI(t, "capas", g_rt.capas); g_rt.reescalador = JI(t, "reescalador", g_rt.reescalador);
-            g_rt.semillaVariable = JB(t, "semillaVariable", g_rt.semillaVariable); if (g_rt.capas < 1) g_rt.capas = 1; if (g_rt.capas > 64) g_rt.capas = 64;
-            g_rt.desenfoque = JB(t, "desenfoque", g_rt.desenfoque); g_rt.obturador = JF(t, "obturador", g_rt.obturador);
-            g_rt.obturadorPos = JI(t, "obturadorPos", g_rt.obturadorPos);
-            if (g_rt.obturador < 0.01f) g_rt.obturador = 0.01f; if (g_rt.obturador > 1.0f) g_rt.obturador = 1.0f;
-            if (g_rt.obturadorPos < 0 || g_rt.obturadorPos > 2) g_rt.obturadorPos = 0;
-            g_rt.rebotes = JI(t, "rebotes", g_rt.rebotes); if (g_rt.rebotes < 0) g_rt.rebotes = 0; if (g_rt.rebotes > 8) g_rt.rebotes = 8;
+            g_rt.on = JB(t, "on", g_rt.on); g_rt.rays = JI(t, "rays", g_rt.rays); g_rt.samples = JI(t, "samples", g_rt.samples);
+            g_rt.passes = JI(t, "passes", g_rt.passes); g_rt.denoiser = JI(t, "denoiser", g_rt.denoiser);
+            g_rt.gpu = JB(t, "gpu", g_rt.gpu); g_rt.onlyFinal = JB(t, "finalOnly", g_rt.onlyFinal); g_rt.scale = JI(t, "scale", g_rt.scale);
+            g_rt.layers = JI(t, "layers", g_rt.layers); g_rt.upscaler = JI(t, "upscaler", g_rt.upscaler);
+            g_rt.seedVariable = JB(t, "variableSeed", g_rt.seedVariable); if (g_rt.layers < 1) g_rt.layers = 1; if (g_rt.layers > 64) g_rt.layers = 64;
+            g_rt.blur = JB(t, "blur", g_rt.blur); g_rt.shutter = JF(t, "shutter", g_rt.shutter);
+            g_rt.shutterPos = JI(t, "shutterPos", g_rt.shutterPos);
+            if (g_rt.shutter < 0.01f) g_rt.shutter = 0.01f; if (g_rt.shutter > 1.0f) g_rt.shutter = 1.0f;
+            if (g_rt.shutterPos < 0 || g_rt.shutterPos > 2) g_rt.shutterPos = 0;
+            g_rt.bounces = JI(t, "bounces", g_rt.bounces); if (g_rt.bounces < 0) g_rt.bounces = 0; if (g_rt.bounces > 8) g_rt.bounces = 8;
         }
-        RTInvalidar();
+        RTInvalidate();
     }
 #endif
-    // EL POSTPROCESADO (render/Postproceso.h): sin el bloque, apagado y sin efectos
+    // EL POSTPROCESADO (render/PostProcess.h): sin el bloque, apagado y sin efectos
     {
         // (los proyectos de ANTES tenian UN postprocesado global, el bloque "postproceso": pasa a ser un objeto
         //  Postproceso al FINAL de la escena, que es donde se aplicaba)
-        JVal* t = JHijo(raiz, "postproceso", 4);
+        JVal* t = JChild(root, "postProcess", 4);
         if (t && SceneCollection) {
-            W3dPostOpciones viejo;
-            W3dPostLeer(t, viejo);
-            viejo.on = JB(t, "on", false);
-            viejo.activo = JI(t, "activo", viejo.activo);
-            if (viejo.activo >= (int)viejo.efectos.size()) viejo.activo = (int)viejo.efectos.size() - 1;
-            if (viejo.on || !viejo.efectos.empty()) {
-                Postproceso* pp = new Postproceso(SceneCollection);
-                pp->opc = viejo;
+            W3dPostOptions old;
+            W3dPostRead(t, old);
+            old.on = JB(t, "on", false);
+            old.active = JI(t, "active", old.active);
+            if (old.active >= (int)old.effects.size()) old.active = (int)old.effects.size() - 1;
+            if (old.on || !old.effects.empty()) {
+                PostProcess* pp = new PostProcess(SceneCollection);
+                pp->opt = old;
             }
         }
     }
-    { JVal* j16 = JHijo(raiz, "texturas16Movil", 3); w3dEngine::SetTexturas16Movil(j16 && j16->b); }
+    { JVal* j16 = JChild(root, "textures16Mobile", 3); w3dEngine::SetTextures16Mobile(j16 && j16->b); }
     // TEXTURAS A LA MITAD EN EL N95 (ausente = 0, ninguna): un lado mayor a este se sube a la mitad. Idem: antes de la cola
-    w3dEngine::SetTexturasMitadDesde(JI(raiz, "texturasMitadDesde", 0));
-    // MALLAS SOLO EN GPU (ausente = false): las que solo dibujan rutinas sueltan su RAM al quedar en VBO (MallaRecurso.h)
-    W3dMallasSoloGPUActivar(JB(raiz, "mallasSoloGPU", false));
+    w3dEngine::SetTexturesHalfFrom(JI(root, "halfTexturesFrom", 0));
+    // MALLAS SOLO EN GPU (ausente = false): las que solo dibujan rutinas sueltan su RAM al quedar en VBO (MeshResource.h)
+    W3dMeshesOnlyGPUActivate(JB(root, "gpuOnlyMeshes", false));
     // icono del juego (opcional): ruta EXTERNA relativa al .w3d. La usa la tarjeta
     // Juego y Compilar juego (genera los tamanos chicos al compilar).
-    AplicarIcono(RutaJson(JS(raiz, "icono", ""), base));
+    ApplyIcon(JsonPath(JS(root, "icon", ""), base));
     // config de la tarjeta Juego (opcional): modo ventana, orientacion, flags,
     // assets y plataforma del juego COMPILADO. Ausente = defaults del editor.
-    AplicarCompilar(JHijo(raiz, "compilar", 4));
+    ApplyCompile(JChild(root, "compile", 4));
     // RENDER (opcional): la tarjeta Render. (Su "inicio"/"fin"/"fps" de los .w3d viejos -un rango propio de la secuencia-
     // se ignoran: el render usa el rango y los fps de la escena / animacion activa)
     {
-        JVal* rn = JHijo(raiz, "render", 4);
-        g_sombras = W3dSombrasOpc();   // (sin la tarjeta en el archivo: las de fabrica)
+        JVal* rn = JChild(root, "render", 4);
+        g_shadows = W3dShadowsOpt();   // (sin la tarjeta en el archivo: las de fabrica)
         // el resto de la tarjeta Render (g_render): lo que no esta, el valor de fabrica. La carpeta, si existe aca
-        const W3dRenderOpc d;
-        W3dRenderOpc r;
+        const W3dRenderOpt d;
+        W3dRenderOpt r;
         if (rn) {
-            const std::string carpeta = JS(rn, "carpeta", "");
-            if (!carpeta.empty() && w3dFileSystem::IsDir(carpeta)) r.carpeta = carpeta;
-            r.nombre = JS(rn, "nombre", d.nombre.c_str());
-            r.w = JF(rn, "ancho", d.w); r.h = JF(rn, "alto", d.h);
-            r.formato = JI(rn, "formato", d.formato); r.calidad = JF(rn, "calidad", d.calidad);
-            r.zbuffer = JB(rn, "zbuffer", d.zbuffer); r.normal = JB(rn, "normal", d.normal); r.alfa = JB(rn, "alfa", d.alfa);
-            r.vectores = JB(rn, "vectores", d.vectores); r.desenfoque = JB(rn, "desenfoque", d.desenfoque);
-            r.obturador = JF(rn, "obturador", d.obturador);
-            r.final = JB(rn, "final", d.final); r.finalAlfa = JB(rn, "finalAlfa", d.finalAlfa); r.post = JB(rn, "post", d.post);
-            r.sonido = JB(rn, "sonido", d.sonido); r.audioFormato = JI(rn, "audio", d.audioFormato);
+            const std::string folder = JS(rn, "folder", "");
+            if (!folder.empty() && w3dFileSystem::IsDir(folder)) r.folder = folder;
+            r.name = JS(rn, "name", d.name.c_str());
+            r.w = JF(rn, "width", d.w); r.h = JF(rn, "height", d.h);
+            r.format  = JI(rn, "format", d.format); r.quality = JF(rn, "quality", d.quality);
+            r.zbuffer = JB(rn, "zbuffer", d.zbuffer); r.normal = JB(rn, "normal", d.normal); r.alpha = JB(rn, "alpha", d.alpha);
+            r.vectors = JB(rn, "vectors", d.vectors); r.blur = JB(rn, "blur", d.blur);
+            r.shutter = JF(rn, "shutter", d.shutter);
+            r.final = JB(rn, "final", d.final); r.finalAlpha = JB(rn, "finalAlpha", d.finalAlpha); r.post = JB(rn, "post", d.post);
+            r.sound = JB(rn, "sound", d.sound); r.audioFormat = JI(rn, "audio", d.audioFormat);
             r.audioKbps = JF(rn, "audioKbps", d.audioKbps);
             r.videoCodec = JI(rn, "videoCodec", d.videoCodec); r.videoKbps = JF(rn, "videoKbps", d.videoKbps);
             r.antialias = JI(rn, "antialias", d.antialias);
             // EL FONDO: color, color o textura 360, rotacion y las texturas de fondo (en orden: la pista animable las
             // nombra por su lugar; una que no carga deja su lugar vacio)
-            { Vector3 f(0, 0, 0); JVec3(rn, "fondo", f); g_renderBg[0] = f.x; g_renderBg[1] = f.y; g_renderBg[2] = f.z; g_renderBg[3] = 1.0f; }
-            { Vector3 f(0, 0, 0); JVec3(rn, "fondoRot", f); g_renderBgRot[0] = f.x; g_renderBgRot[1] = f.y; g_renderBgRot[2] = f.z; }
-            g_renderBgModo = JI(rn, "fondoModo", 0) == 1 ? 1 : 0;
-            g_renderLuzFondo = JF(rn, "fondoLuz", 1.0f);   // (la luz del fondo: 1 = 100%)
-            if (g_renderLuzFondo < 0.0f) g_renderLuzFondo = 0.0f;
+            { Vector3 f(0, 0, 0); JVec3(rn, "background", f); g_renderBg[0] = f.x; g_renderBg[1] = f.y; g_renderBg[2] = f.z; g_renderBg[3] = 1.0f; }
+            { Vector3 f(0, 0, 0); JVec3(rn, "backgroundRot", f); g_renderBgRot[0] = f.x; g_renderBgRot[1] = f.y; g_renderBgRot[2] = f.z; }
+            g_renderBgMode = JI(rn, "backgroundMode", 0) == 1 ? 1 : 0;
+            g_renderLightBackground = JF(rn, "backgroundLight", 1.0f);   // (la luz del fondo: 1 = 100%)
+            if (g_renderLightBackground < 0.0f) g_renderLightBackground = 0.0f;
             // LAS SOMBRAS EN TIEMPO REAL (lo que no esta: de fabrica)
-            { const W3dSombrasOpc sd; W3dSombrasOpc so;
-              so.on = JB(rn, "sombras", sd.on);
-              so.distancia = JF(rn, "sombraDistancia", sd.distancia);
-              so.cascadas = JI(rn, "sombraCascadas", sd.cascadas);
-              { Vector3 ct(sd.cortes[0], sd.cortes[1], sd.cortes[2]); JVec3(rn, "sombraCortes", ct);
-                so.cortes[0] = ct.x; so.cortes[1] = ct.y; so.cortes[2] = ct.z; }
-              so.borde = JF(rn, "sombraBorde", sd.borde);
-              so.desenfoque = JF(rn, "sombraDesenfoque", sd.desenfoque);
-              so.resolucion = JI(rn, "sombraResolucion", sd.resolucion);
-              so.suaves = JB(rn, "sombraSuaves", sd.suaves);
-              so.intensidad = JF(rn, "sombraIntensidad", sd.intensidad);
-              so.sesgo = JF(rn, "sombraSesgo", sd.sesgo);
-              { Vector3 cc(sd.color[0], sd.color[1], sd.color[2]); JVec3(rn, "sombraColor", cc);
+            { const W3dShadowsOpt sd; W3dShadowsOpt so;
+              so.on = JB(rn, "shadows", sd.on);
+              so.distance = JF(rn, "shadowDistance", sd.distance);
+              so.cascades = JI(rn, "shadowCascades", sd.cascades);
+              { Vector3 ct(sd.cuts[0], sd.cuts[1], sd.cuts[2]); JVec3(rn, "shadowSplits", ct);
+                so.cuts[0] = ct.x; so.cuts[1] = ct.y; so.cuts[2] = ct.z; }
+              so.border = JF(rn, "shadowBorder", sd.border);
+              so.blur       = JF(rn, "shadowBlur", sd.blur);
+              so.resolution = JI(rn, "shadowResolution", sd.resolution);
+              so.smooth = JB(rn, "softShadows", sd.smooth);
+              so.intensity = JF(rn, "shadowIntensity", sd.intensity);
+              so.bias = JF(rn, "shadowBias", sd.bias);
+              { Vector3 cc(sd.color[0], sd.color[1], sd.color[2]); JVec3(rn, "shadowColor", cc);
                 so.color[0] = cc.x; so.color[1] = cc.y; so.color[2] = cc.z; so.color[3] = 1.0f; }
-              if (so.cascadas < 1) so.cascadas = 1; if (so.cascadas > 4) so.cascadas = 4;
-              g_sombras = so; }
-            JVal* ft = JHijo(rn, "fondoTexturas", 5);
+              if (so.cascades < 1) so.cascades = 1; if (so.cascades > 4) so.cascades = 4;
+              g_shadows = so; }
+            JVal* ft = JChild(rn, "backgroundTextures", 5);
             if (ft) {
-                for (size_t i = 0; i < ft->lista.size(); i++) {
+                for (size_t i = 0; i < ft->list.size(); i++) {
                     Texture* t = NULL;
-                    if (ft->lista[i] && ft->lista[i]->tipo == 2 && !ft->lista[i]->str.empty())
-                        t = TexturaTomar(RutaJson(ft->lista[i]->str, base));
-                    g_renderBgTexs.push_back(t);   // (con la referencia de TexturaTomar: la suelta W3dFondoLimpiar)
+                    if (ft->list[i] && ft->list[i]->type == 2 && !ft->list[i]->str.empty())
+                        t = TextureTake(JsonPath(ft->list[i]->str, base));
+                    g_renderBgTexs.push_back(t);   // (con la referencia de TextureTake: la suelta W3dBackgroundClear)
                 }
-                const int sel = JI(rn, "fondoTextura", 0);
+                const int sel = JI(rn, "backgroundTexture", 0);
                 g_renderBgTex = (sel >= 1 && sel <= (int)g_renderBgTexs.size()) ? g_renderBgTexs[(size_t)(sel - 1)] : NULL;
             }
         }
@@ -4730,45 +4730,45 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     }
     // MIX (opcional): el modo Mix del timeline + su rango + las capas de escena
     {
-        JVal* mx = JHijo(raiz, "mix", 4);
-        g_animMix = mx ? JB(mx, "activo", false) : false;
-        g_mixInicio = mx ? JF(mx, "inicio", 1.0f) : 1.0f;
-        g_mixFin    = mx ? JF(mx, "fin", 250.0f) : 250.0f;
-        LeerCapas(mx ? JHijo(mx, "escenas", 5) : NULL, g_mixEscenas);
-        g_mixEscenaActiva = -1;
+        JVal* mx = JChild(root, "mix", 4);
+        g_animMix = mx ? JB(mx, "active", false) : false;
+        g_mixStart = mx ? JF(mx, "start", 1.0f) : 1.0f;
+        g_mixEnd   = mx ? JF(mx, "end", 250.0f) : 250.0f;
+        ReadLayers(mx ? JChild(mx, "scenes", 5) : NULL, g_mixScenes);
+        g_mixActiveScene = -1;
     }
     // SESION (opcional): frame actual + seleccion. Solo se LEE aca; se aplica en el
-    // pie de AbrirW3D, con los nombres ya definitivos (ver g_sesFrame arriba).
+    // pie de OpenW3D, con los nombres ya definitivos (ver g_sessionFrame arriba).
     {
-        JVal* ses = JHijo(raiz, "sesion", 4);
-        if (ses) {
+        JVal* session = JChild(root, "session", 4);
+        if (session) {
             // el -1 significa "no habia bloque": un frame negativo del archivo se acota a 0 aca
-            // y no se disfraza de ausente (la cota de arriba la pone SesionAplicar)
-            g_sesFrame = JI(ses, "frame", 0);
-            if (g_sesFrame < 0) {
-                w3dLogfW("[W3D] sesion: 'frame' vale %d (negativo) -> se acota a 0", g_sesFrame);
-                g_sesFrame = 0;
+            // y no se disfraza de ausente (la cota de arriba la pone SessionApply)
+            g_sessionFrame = JI(session, "frame", 0);
+            if (g_sessionFrame < 0) {
+                w3dLogfW("[W3D] sesion: 'frame' vale %d (negativo) -> se acota a 0", g_sessionFrame);
+                g_sessionFrame = 0;
             }
-            g_sesActivo = JS(ses, "activo", "");
+            g_activeSession = JS(session, "active", "");
             {   // la animacion de la linea de tiempo (ausente = la de escena)
-                const std::string t = JS(ses, "animTipo", "");
-                g_sesAnimTipo = t == "armature" ? 1 : t == "objeto" ? 3 : t == "armature2d" ? 4 : t == "flipbook" ? 5 :
-                                t == "escena" ? 10 : 0;   // (10: una animacion de escena de un JUEGO, que abre en "Juego")
-                g_sesAnimObjeto = JS(ses, "animObjeto", "");
-                g_sesAnimClip = JI(ses, "animClip", -1);
+                const std::string t = JS(session, "animType", "");
+                g_sessionAnimType = t == "armature" ? 1 : t == "object" ? 3 : t == "armature2d" ? 4 : t == "flipbook" ? 5 :
+                                t == "scene" ? 10 : 0;   // (10: una animacion de escena de un JUEGO, que abre en "Juego")
+                g_sessionAnimObject = JS(session, "animObject", "");
+                g_sessionAnimClip = JI(session, "animClip", -1);
             }
             // la raiz que se estaba editando (ausente = la escena del bloque)
-            g_sesRaiz = JS(ses, "raiz", "");
-            g_sesRaizTipo = W3dRaizTipoDeClave(JS(ses, "raizTipo", "escena"), W3D_RAIZ_ESCENA);
-            JVal* sel = JHijo(ses, "seleccion", 5);
+            g_sessionRoot = JS(session, "root", "");
+            g_sessionRootType = W3dRootTypeByKey(JS(session, "rootType", "scene"), W3D_ROOT_SCENE);
+            JVal* sel = JChild(session, "selection", 5);
             if (sel)
-                for (size_t i = 0; i < sel->lista.size(); i++)
-                    if (sel->lista[i] && sel->lista[i]->tipo == 2)   // 2 = string
-                        g_sesSeleccion.push_back(sel->lista[i]->str);
+                for (size_t i = 0; i < sel->list.size(); i++)
+                    if (sel->list[i] && sel->list[i]->type == 2)   // 2 = string
+                        g_sessionSelection.push_back(sel->list[i]->str);
         }
     }
-    AplicarLayoutTexto(JS(raiz, "layout", "2d"));
-    delete raiz;
+    ApplyLayoutText(JS(root, "layout", "2d"));
+    delete root;
     return true;
 }
 
@@ -4778,216 +4778,216 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
 //  Pedido del demo GTA: importarW3D("assets/claude/claude.w3d") desde Lua trae
 //  un personaje/vehiculo ADENTRO de la escena que ya esta corriendo: objetos
 //  (con jerarquia), materiales y SUS animaciones de escena. A diferencia de
-//  AbrirEscenaJson NO limpia nada ni toca el estado del proyecto (fps, layout,
+//  OpenSceneJson NO limpia nada ni toca el estado del proyecto (fps, layout,
 //  sesion, escena inicial, animacion activa): solo AGREGA.
 //
 //  Limites, a proposito y documentados:
 //   - SOLO acepta JSON v3 plano (el contenedor v4/zip habria que montarlo
 //     ademas del proyecto ya montado: pendiente).
-//   - los nombres del archivo se conservan TAL CUAL (W3dNombresCargando):
-//     importar dos veces el mismo archivo duplica nombres y `buscar()` de lua
+//   - los nombres del archivo se conservan TAL CUAL (W3dNamesLoading):
+//     importar dos veces el mismo archivo duplica nombres y `find()` de lua
 //     devuelve el primero. Evitarlo es responsabilidad del que importa.
 //   - no corre los post-pasos de targets/constraints del abrir completo (los
 //     assets de juego tipo personaje/vehiculo no los usan).
 // ============================================================================
 
 // las animaciones de escena del archivo anexado: mismo parseo que
-// CargarAnimacionesEscena pero SIN limpiar las existentes y SIN tocar la
+// LoadAnimationsScene pero SIN limpiar las existentes y SIN tocar la
 // activa (en el juego se reproducen por nombre con animEscena() de lua).
-static void AnexarAnimacionesEscena(JVal* raiz) {
-    JVal* ja = JHijo(raiz, "animaciones", 4);
+static void AppendAnimationsScene(JVal* root) {
+    JVal* ja = JChild(root, "animations", 4);
     if (!ja) return;
-    JVal* jes = JHijo(ja, "escenas", 5);
-    if (!jes || jes->lista.empty()) return;
+    JVal* jes = JChild(ja, "scenes", 5);
+    if (!jes || jes->list.empty()) return;
     InitSceneAnimations();
-    size_t nEsc = jes->lista.size();
-    if (nEsc > (size_t)kAnimMaxEscenas) nEsc = (size_t)kAnimMaxEscenas;
+    size_t nEsc = jes->list.size();
+    if (nEsc > (size_t)kAnimMaxScenes) nEsc = (size_t)kAnimMaxScenes;
     for (size_t i = 0; i < nEsc; i++) {
-        JVal* je = jes->lista[i];
-        if (!je || je->tipo != 4) continue;
-        SceneAnimation* esc = new SceneAnimation(JS(je, "nombre", "Scene"));
-        esc->startFrame = JI(je, "inicio", 1);
-        esc->endFrame   = JI(je, "fin", 250);
+        JVal* je = jes->list[i];
+        if (!je || je->type != 4) continue;
+        SceneAnimation* esc = new SceneAnimation(JS(je, "name", "Scene"));
+        esc->startFrame = JI(je, "start", 1);
+        esc->endFrame   = JI(je, "end", 250);
         esc->fps        = JI(je, "fps", 30);
         if (esc->startFrame < 0) esc->startFrame = 0;
         if (esc->endFrame < esc->startFrame) esc->endFrame = esc->startFrame;
         if (esc->fps < 1) esc->fps = 1;
         if (esc->fps > 120) esc->fps = 120;
         SceneAnimations.push_back(esc);
-        JVal* jobjs = JHijo(je, "objetos", 5);
+        JVal* jobjs = JChild(je, "objects", 5);
         if (!jobjs) continue;
-        size_t nObj = jobjs->lista.size();
-        if (nObj > (size_t)kAnimMaxObjetos) nObj = (size_t)kAnimMaxObjetos;
+        size_t nObj = jobjs->list.size();
+        if (nObj > (size_t)kAnimMaxObjects) nObj = (size_t)kAnimMaxObjects;
         for (size_t o = 0; o < nObj; o++) {
-            JVal* jo = jobjs->lista[o];
-            if (!jo || jo->tipo != 4) continue;
-            const std::string nombre = JS(jo, "objeto", "");
-            if (nombre.empty()) continue;
+            JVal* jo = jobjs->list[o];
+            if (!jo || jo->type != 4) continue;
+            const std::string name = JS(jo, "object", "");
+            if (name.empty()) continue;
             // los objetos recien anexados ya cuelgan del arbol: scope global
-            Object* obj = AnimBuscarScopeGlobal(SceneCollection, nombre, false);
+            Object* obj = AnimFindScopeGlobal(SceneCollection, name, false);
             if (!obj) {
                 w3dLogfW("[W3D] anexo: la animacion '%s' referencia a '%s', que no aparecio: se descarta",
-                         esc->name.c_str(), nombre.c_str());
+                         esc->name.c_str(), name.c_str());
                 continue;
             }
             AnimationObject ao;
             ao.obj = obj; ao.FirstKeyFrame = 0; ao.LastKeyFrame = 0;
-            JVal* jcur = JHijo(jo, "curvas", 5);
+            JVal* jcur = JChild(jo, "curves", 5);
             if (jcur) {
-                size_t nCur = jcur->lista.size();
-                if (nCur > (size_t)kAnimMaxCurvas) nCur = (size_t)kAnimMaxCurvas;
+                size_t nCur = jcur->list.size();
+                if (nCur > (size_t)kAnimMaxCurves) nCur = (size_t)kAnimMaxCurves;
                 for (size_t c = 0; c < nCur; c++) {
                     AnimProperty ap;
-                    if (!CargarCurvaJson(jcur->lista[c], ap)) continue;
+                    if (!LoadCurveJson(jcur->list[c], ap)) continue;
                     if (ap.keyframes.empty()) continue;
                     ap.SortKeyFrames();
-                    ao.Propertys.push_back(ap);
+                    ao.Properties.push_back(ap);
                 }
             }
-            if (ao.Propertys.empty()) continue;
+            if (ao.Properties.empty()) continue;
             ao.UpdateFirstLastFrame();
-            SceneAnimations.back()->objetos.push_back(ao);
+            SceneAnimations.back()->objects.push_back(ao);
         }
     }
 }
 
 // Los ctores de Object/Mesh dejan seleccionado lo que crean (comportamiento de
-// editor). AbrirW3D lo limpia con DeseleccionarTodo(); el anexo NO puede hacer
+// editor). OpenW3D lo limpia con DeselectAll(); el anexo NO puede hacer
 // eso (pisaria la seleccion del usuario en plena sesion), asi que deselecciona
 // SOLO el subarbol recien importado.
-static void DeseleccionarSubarbol(Object* o) {
+static void DeselectSubtree(Object* o) {
     if (!o) return;
-    if (o->select) o->Deseleccionar();
-    if (ObjActivo == o) ObjActivo = NULL;
+    if (o->select) o->Deselect();
+    if (ActiveObj == o) ActiveObj = NULL;
     for (size_t i = 0; i < o->Childrens.size(); i++)
-        DeseleccionarSubarbol(o->Childrens[i]);
+        DeselectSubtree(o->Childrens[i]);
 }
 
-Object* W3dImportarW3DAnexo(const std::string& ruta) {
-    std::vector<unsigned char> datos;
-    if (!w3dFileSystem::ReadFileBytes(ruta, datos) || datos.empty()) {
-        w3dLogfE("[W3D] importarW3D: no pude leer %s", ruta.c_str());
+Object* W3dImportW3DAppendix(const std::string& path) {
+    std::vector<unsigned char> data;
+    if (!w3dFileSystem::ReadFileBytes(path, data) || data.empty()) {
+        w3dLogfE("[W3D] importarW3D: no pude leer %s", path.c_str());
         return NULL;
     }
     size_t i = 0;
-    while (i < datos.size() && (datos[i] == ' ' || datos[i] == '\t' ||
-                                datos[i] == '\r' || datos[i] == '\n')) i++;
-    if (i >= datos.size() || datos[i] != '{') {
+    while (i < data.size() && (data[i] == ' ' || data[i] == '\t' ||
+                                data[i] == '\r' || data[i] == '\n')) i++;
+    if (i >= data.size() || data[i] != '{') {
         w3dLogfE("[W3D] importarW3D: %s no es un .w3d JSON v3 plano (unico formato anexable por ahora)",
-                 ruta.c_str());
+                 path.c_str());
         return NULL;
     }
-    JParser parser((const char*)&datos[0] + i, datos.size() - i);
-    JVal* raiz = parser.Valor();
-    if (parser.error || raiz->tipo != 4) {
-        w3dLogfE("[W3D] importarW3D: el JSON de %s no parsea", ruta.c_str());
-        delete raiz;
+    JParser parser((const char*)&data[0] + i, data.size() - i);
+    JVal* root = parser.Value();
+    if (parser.error || root->type != 4) {
+        w3dLogfE("[W3D] importarW3D: el JSON de %s no parsea", path.c_str());
+        delete root;
         return NULL;
     }
-    // las rutas internas (mallas/, texturas/) cuelgan de la carpeta DEL ARCHIVO
-    size_t barra = ruta.find_last_of("/\\");
-    const std::string base = (barra == std::string::npos) ? std::string(".") : ruta.substr(0, barra);
-    CargarMateriales(raiz, base);
-    Object* primero = NULL;
-    JVal* esc = JHijo(raiz, "escena", 4);
-    JVal* objs = esc ? JHijo(esc, "objetos", 5) : NULL;
+    // las rutas internas (meshes/, textures/) cuelgan de la carpeta DEL ARCHIVO
+    size_t bar = path.find_last_of("/\\");
+    const std::string base = (bar == std::string::npos) ? std::string(".") : path.substr(0, bar);
+    LoadMaterials(root, base);
+    Object* first = NULL;
+    JVal* esc = JChild(root, "scene", 4);
+    JVal* objs = esc ? JChild(esc, "objects", 5) : NULL;
     if (objs && SceneCollection) {
-        const bool antes = W3dNombresCargando;
-        W3dNombresCargando = true;    // conservar los nombres tal como vienen
-        const size_t nAntes = SceneCollection->Childrens.size();
-        for (size_t k = 0; k < objs->lista.size(); k++)
-            JsonObjeto(objs->lista[k], SceneCollection, base);
-        W3dNombresCargando = antes;
-        if (SceneCollection->Childrens.size() > nAntes)
-            primero = SceneCollection->Childrens[nAntes];
-        for (size_t k = nAntes; k < SceneCollection->Childrens.size(); k++)
-            DeseleccionarSubarbol(SceneCollection->Childrens[k]);
+        const bool prev = W3dNamesLoading;
+        W3dNamesLoading = true;    // conservar los nombres tal como vienen
+        const size_t nPrev = SceneCollection->Childrens.size();
+        for (size_t k = 0; k < objs->list.size(); k++)
+            JsonObject(objs->list[k], SceneCollection, base);
+        W3dNamesLoading = prev;
+        if (SceneCollection->Childrens.size() > nPrev)
+            first = SceneCollection->Childrens[nPrev];
+        for (size_t k = nPrev; k < SceneCollection->Childrens.size(); k++)
+            DeselectSubtree(SceneCollection->Childrens[k]);
         // si la partida esta andando (importarW3D lo llamo un script), dar de
         // alta los cuerpos rigidos de lo que acaba de entrar
-        { extern bool SimActiva();
-          if (SimActiva())
-              for (size_t k = nAntes; k < SceneCollection->Childrens.size(); k++)
-                  W3dRigidosAsegurar(SceneCollection->Childrens[k]); }
+        { extern bool SimActive();
+          if (SimActive())
+              for (size_t k = nPrev; k < SceneCollection->Childrens.size(); k++)
+                  W3dRigidEnsure(SceneCollection->Childrens[k]); }
     }
-    ResolverModArmaturePendientes();
-    TexturasDespertarUsadas();   // las de los materiales que usa lo que acaba de entrar
-    AnexarAnimacionesEscena(raiz);
-    AdjuntarClipsPendientes(NULL);   // los clips de los objetos anexados (sin tocar cual esta elegida)
-    delete raiz;
+    ResolvePendingModArmature();
+    TexturesWakeUsed();   // las de los materiales que usa lo que acaba de entrar
+    AppendAnimationsScene(root);
+    AttachPendingClips(NULL);   // los clips de los objetos anexados (sin tocar cual esta elegida)
+    delete root;
     w3dLogf("[W3D] importarW3D: %s anexado (raiz '%s', %d animaciones de escena en total)",
-            ruta.c_str(), primero ? primero->name.c_str() : "sin objetos",
+            path.c_str(), first ? first->name.c_str() : "sin objetos",
             (int)SceneAnimations.size());
-    return primero;
+    return first;
 }
 
 
 // ---------------------------------------------------------------------------
-//  PEGAR desde el PORTAPAPELES DE OBJETOS (io/GuardarW3D.cpp: W3dPortapapelesCopiar escribio la carpeta, quizas otro
+//  PEGAR desde el PORTAPAPELES DE OBJETOS (io/SaveW3D.cpp: W3dClipboardCopy escribio la carpeta, quizas otro
 //  Whisk3D): las mallas entran al registro con un nombre LIBRE (las del objeto se re-apuntan a ese nombre), los
 //  materiales por la puerta de siempre (el homonimo identico se reusa) y los objetos con el lector de siempre, con
 //  nombres libres (pegar dos veces da "Cubo.001", "Cubo.002"). 'nuevos' = los objetos de arriba que entraron
 // ---------------------------------------------------------------------------
-#ifndef W3D_SIN_EDITOR   // (pegar es del editor: el juego no tiene portapapeles de objetos)
-static void RenombrarMallasJson(JVal* j, const std::map<std::string, std::string>& ren) {
+#ifndef W3D_NO_EDITOR   // (pegar es del editor: el juego no tiene portapapeles de objetos)
+static void RenameMeshesJson(JVal* j, const std::map<std::string, std::string>& row) {
     if (!j) return;
-    if (j->tipo == 4) {
-        std::map<std::string, JVal*>::iterator m = j->obj.find("malla");
-        if (m != j->obj.end() && m->second && m->second->tipo == 2) {
-            std::map<std::string, std::string>::const_iterator r = ren.find(m->second->str);
-            if (r != ren.end()) m->second->str = r->second;
+    if (j->type == 4) {
+        std::map<std::string, JVal*>::iterator m = j->obj.find("mesh");
+        if (m != j->obj.end() && m->second && m->second->type == 2) {
+            std::map<std::string, std::string>::const_iterator r = row.find(m->second->str);
+            if (r != row.end()) m->second->str = r->second;
         }
-        for (std::map<std::string, JVal*>::iterator it = j->obj.begin(); it != j->obj.end(); ++it) RenombrarMallasJson(it->second, ren);
-    } else if (j->tipo == 5) {
-        for (size_t i = 0; i < j->lista.size(); i++) RenombrarMallasJson(j->lista[i], ren);
+        for (std::map<std::string, JVal*>::iterator it = j->obj.begin(); it != j->obj.end(); ++it) RenameMeshesJson(it->second, row);
+    } else if (j->type == 5) {
+        for (size_t i = 0; i < j->list.size(); i++) RenameMeshesJson(j->list[i], row);
     }
 }
-bool W3dPortapapelesPegar(const std::string& carpeta, std::vector<Object*>& nuevos) {
-    nuevos.clear();
+bool W3dClipboardPaste(const std::string& folder, std::vector<Object*>& newValue) {
+    newValue.clear();
     if (!SceneCollection) return false;
-    std::vector<unsigned char> datos;
-    if (!w3dFileSystem::ReadFileBytes(carpeta + "/portapapeles.json", datos) || datos.empty()) return false;
-    JParser parser((const char*)&datos[0], datos.size());
-    JVal* raiz = parser.Valor();
-    if (parser.error || !raiz || raiz->tipo != 4) { delete raiz; return false; }
+    std::vector<unsigned char> data;
+    if (!w3dFileSystem::ReadFileBytes(folder + "/clipboard.json", data) || data.empty()) return false;
+    JParser parser((const char*)&data[0], data.size());
+    JVal* root = parser.Value();
+    if (parser.error || !root || root->type != 4) { delete root; return false; }
     // las MALLAS: un recurso nuevo por cada una, con nombre libre
-    std::map<std::string, std::string> ren;
-    JVal* jm = JHijo(raiz, "mallas", 5);
-    if (jm) for (size_t i = 0; i < jm->lista.size(); i++) {
-        JVal* e = jm->lista[i]; if (!e || e->tipo != 4) continue;
-        const std::string nom = JS(e, "nombre", "Malla"), arch = JS(e, "archivo", "");
+    std::map<std::string, std::string> row;
+    JVal* jm = JChild(root, "meshes", 5);
+    if (jm) for (size_t i = 0; i < jm->list.size(); i++) {
+        JVal* e = jm->list[i]; if (!e || e->type != 4) continue;
+        const std::string name = JS(e, "name", "Mesh"), arch = JS(e, "file", "");
         std::vector<unsigned char> b;
-        if (arch.empty() || !w3dFileSystem::ReadFileBytes(carpeta + "/" + arch, b) || b.empty()) continue;
-        MallaRecurso* r = W3dMallaRecursoNuevo(nom, std::string(), std::string());
+        if (arch.empty() || !w3dFileSystem::ReadFileBytes(folder + "/" + arch, b) || b.empty()) continue;
+        MeshResource* r = W3dMeshNewResource(name, std::string(), std::string());
         if (!r) continue;
-        W3dMallaRecursoPonerBytes(r, std::string((const char*)&b[0], b.size()));
-        ren[nom] = r->nombre;
+        W3dMeshResourceSetBytes(r, std::string((const char*)&b[0], b.size()));
+        row[name] = r->name;
     }
-    RenombrarMallasJson(JHijo(raiz, "objetos", 5), ren);
-    CargarMateriales(raiz, carpeta);
-    JVal* objs = JHijo(raiz, "objetos", 5);
+    RenameMeshesJson(JChild(root, "objects", 5), row);
+    LoadMaterials(root, folder);
+    JVal* objs = JChild(root, "objects", 5);
     if (objs) {
-        const size_t nAntes = SceneCollection->Childrens.size();
-        for (size_t k = 0; k < objs->lista.size(); k++) JsonObjeto(objs->lista[k], SceneCollection, carpeta);
-        for (size_t k = nAntes; k < SceneCollection->Childrens.size(); k++) nuevos.push_back(SceneCollection->Childrens[k]);
+        const size_t nPrev = SceneCollection->Childrens.size();
+        for (size_t k = 0; k < objs->list.size(); k++) JsonObject(objs->list[k], SceneCollection, folder);
+        for (size_t k = nPrev; k < SceneCollection->Childrens.size(); k++) newValue.push_back(SceneCollection->Childrens[k]);
         // NOMBRES LIBRES: lo pegado no le pisa el nombre a nadie ("Cubo" -> "Cubo.001"), con sus hijos
-        struct Libres { static void En(Object* o) { if (!o) return; o->name = W3dNombreLibrePara(&o->name, o->name);
-            for (size_t i = 0; i < o->Childrens.size(); i++) En(o->Childrens[i]); } };
-        for (size_t k = 0; k < nuevos.size(); k++) Libres::En(nuevos[k]);
+        struct Free { static void In(Object* o) { if (!o) return; o->name = W3dFreeNameFor(&o->name, o->name);
+            for (size_t i = 0; i < o->Childrens.size(); i++) In(o->Childrens[i]); } };
+        for (size_t k = 0; k < newValue.size(); k++) Free::In(newValue[k]);
     }
-    ResolverModArmaturePendientes();
-    TexturasDespertarUsadas();
-    AdjuntarClipsPendientes(NULL);
-    delete raiz;
-    return !nuevos.empty();
+    ResolvePendingModArmature();
+    TexturesWakeUsed();
+    AttachPendingClips(NULL);
+    delete root;
+    return !newValue.empty();
 }
-#endif // W3D_SIN_EDITOR (pegar)
+#endif // W3D_NO_EDITOR (pegar)
 
 // ---------------------------------------------------------------------------
-//  MigrarConstraintsViejos: el segundo tiempo de la migracion (ver PendConsViejo).
+//  MigrateOldConstraints: el segundo tiempo de la migracion (ver OldPendCons).
 //
-//  Corre al final de AbrirW3D, con el arbol COMPLETO (por eso es un segundo tiempo:
+//  Corre al final de OpenW3D, con el arbol COMPLETO (por eso es un segundo tiempo:
 //  el objeto apuntado puede venir despues en el archivo) y JUSTO ANTES de
-//  W3dNombresRepararEscena.
+//  W3dNamesRepairScene.
 //
 //  *** POR QUE ANTES DE LA REPARACION DE NOMBRES (y no despues, como estaba) ***
 //  Un nodo constraint viejo puede llamarse IGUAL que un objeto real, y en el formato
@@ -4997,7 +4997,7 @@ bool W3dPortapapelesPegar(const std::string& carpeta, std::vector<Object*>& nuev
 //  gana el preorden (viene antes en el archivo), la que se lleva el ".001" es LA MALLA
 //  DEL USUARIO -- y el nodo se borra unas lineas mas abajo, asi que ese ".001" queda
 //  para siempre en la escena y en el archivo guardado, sin ningun "X" al lado
-//  que lo explique, y los objeto("X") de lua dejan de encontrarla. Corriendo esta
+//  que lo explique, y los object("X") de lua dejan de encontrarla. Corriendo esta
 //  pasada primero, los nodos que desaparecen ya no estan cuando se cuentan los
 //  duplicados y no hay nada que renumerar (lo fija el test 'consmigrachoque').
 //
@@ -5016,15 +5016,15 @@ bool W3dPortapapelesPegar(const std::string& carpeta, std::vector<Object*>& nuev
 //  paso de historial. Un boton de "convertir" en caliente pediria un paso atomico
 //  aparte (queda fuera de alcance a proposito).
 // ---------------------------------------------------------------------------
-static bool MigConNombreExiste(const std::string& n, void* ctx) {
+static bool MigConstraintNameExists(const std::string& n, void* ctx) {
     Object* ob = (Object*)ctx;
     for (size_t i = 0; i < ob->constraints.size(); i++)
-        if (ob->constraints[i] && ob->constraints[i]->nombre == n) return true;
+        if (ob->constraints[i] && ob->constraints[i]->name == n) return true;
     return false;
 }
 // el nodo viejo sale de la escena (solo se llama cuando NO tiene hijos, asi que la
 // promocion de hijos de ~Object no tiene nada que mover y no se corre geometria)
-static void SoltarNodoViejo(Object* o) {
+static void ReleaseOldNode(Object* o) {
     if (!o) return;
     Object* pa = o->Parent;
     if (pa)
@@ -5038,94 +5038,94 @@ static void SoltarNodoViejo(Object* o) {
 // como el orden del vector es el del archivo, que se pierda o no dependeria de cual de
 // los dos nodos viene primero. Los nodos viejos CON hijos NO entran aca: sobreviven como
 // Empty, o sea que a partir de esta migracion son objetos comunes y destinos validos.
-static bool MigNodoSeVa(const Object* o) {
-    for (size_t i = 0; i < gPendConsViejo.size(); i++)
-        if (gPendConsViejo[i].nodo == o && o->Childrens.empty()) return true;
+static bool MigNodeSeVa(const Object* o) {
+    for (size_t i = 0; i < gOldPendCons.size(); i++)
+        if (gOldPendCons[i].node == o && o->Childrens.empty()) return true;
     return false;
 }
 // la MISMA busqueda por nombre que FindObjectByName (preorden, la raiz incluida) pero
 // salteando los nodos que se van. Saltea SOLO al nodo, no a su subarbol: un hijo suyo es
 // geometria del usuario y puede ser un destino perfectamente valido.
-static Object* MigBuscarDestino(Object* nodo, const std::string& nombre) {
-    if (!nodo) return NULL;
-    if (nodo->name == nombre && !MigNodoSeVa(nodo)) return nodo;
-    for (size_t i = 0; i < nodo->Childrens.size(); i++) {
-        Object* r = MigBuscarDestino(nodo->Childrens[i], nombre);
+static Object* MigFindDestination(Object* node, const std::string& name) {
+    if (!node) return NULL;
+    if (node->name == name && !MigNodeSeVa(node)) return node;
+    for (size_t i = 0; i < node->Childrens.size(); i++) {
+        Object* r = MigFindDestination(node->Childrens[i], name);
         if (r) return r;
     }
     return NULL;
 }
-static void MigrarConstraintsViejos() {
-    if (gPendConsViejo.empty()) return;
-    int puestos = 0, sinTarget = 0, conHijos = 0, aOtroNodo = 0;
+static void MigrateOldConstraints() {
+    if (gOldPendCons.empty()) return;
+    int placed = 0, noTarget = 0, withChildren = 0, aOtherNode = 0;
     // los NOMBRES de los nodos que se van, juntados ANTES de tocar nada. Van por nombre y no
     // por puntero porque se consultan cuando el nodo apuntado ya puede estar borrado: asi el
     // aviso de "apuntaba a otro constraint viejo" sale igual venga el target antes o despues
     // en el archivo (con el puntero, el que venia antes ya no estaba y el aviso mentia).
     std::vector<std::string> seVan;
-    for (size_t i = 0; i < gPendConsViejo.size(); i++)
-        if (gPendConsViejo[i].nodo && gPendConsViejo[i].nodo->Childrens.empty())
-            seVan.push_back(gPendConsViejo[i].nodo->name);
-    for (size_t i = 0; i < gPendConsViejo.size(); i++) {
-        PendConsViejo& p = gPendConsViejo[i];
-        if (!p.nodo) continue;
-        const std::string nombreNodo = p.nodo->name;
+    for (size_t i = 0; i < gOldPendCons.size(); i++)
+        if (gOldPendCons[i].node && gOldPendCons[i].node->Childrens.empty())
+            seVan.push_back(gOldPendCons[i].node->name);
+    for (size_t i = 0; i < gOldPendCons.size(); i++) {
+        OldPendCons& p = gOldPendCons[i];
+        if (!p.node) continue;
+        const std::string nodeName = p.node->name;
 
         Object* dest = (p.target.empty() || !SceneCollection)
-                           ? NULL : MigBuscarDestino(SceneCollection, p.target);
-        // el nodo NO puede ser su propio destino. Con MigBuscarDestino esto ya no puede pasar
+                           ? NULL : MigFindDestination(SceneCollection, p.target);
+        // el nodo NO puede ser su propio destino. Con MigFindDestination esto ya no puede pasar
         // por el preorden (un nodo que se va no se devuelve nunca), pero se deja: si el nodo
         // TIENE hijos sobrevive, es un destino valido para los demas... y para si mismo seria
         // un constraint que se escribe encima, o sea lo que el objeto viejo hacia = nada.
-        if (dest == p.nodo) dest = NULL;
+        if (dest == p.node) dest = NULL;
         if (!dest) {
             // POR QUE no hay destino: si el nombre lo tiene OTRO nodo constraint viejo (de los
             // que se van), el aviso generico -"no esta en la escena"- seria falso: el objeto
             // esta, es que no puede recibir nada. Imposible en un archivo real (el objeto viejo
             // apuntaba a geometria), pero si no se dijera el constraint se perderia MUDO.
-            bool otroNodo = false;
-            if (!p.target.empty() && p.target != nombreNodo)   // apuntarse a si mismo no es "otro"
+            bool otherNode = false;
+            if (!p.target.empty() && p.target != nodeName)   // apuntarse a si mismo no es "otro"
                 for (size_t k = 0; k < seVan.size(); k++)
-                    if (seVan[k] == p.target) { otroNodo = true; break; }
-            if (otroNodo) {
-                aOtroNodo++;
+                    if (seVan[k] == p.target) { otherNode = true; break; }
+            if (otherNode) {
+                aOtherNode++;
                 w3dLogfW("[W3D] '%s' era un constraint viejo y su target '%s' es OTRO constraint viejo "
                          "que sale de la escena: no hay a quien migrarlo, no se migra nada",
-                         nombreNodo.c_str(), p.target.c_str());
+                         nodeName.c_str(), p.target.c_str());
                 W3dAvisof(true, T("'%s' pointed to another constraint ('%s'): it could not be migrated"),
-                          W3dNombreCorto(nombreNodo).c_str(), W3dNombreCorto(p.target).c_str());
+                          W3dShortName(nodeName).c_str(), W3dShortName(p.target).c_str());
             } else {
                 // el constraint viejo arrancaba con "if (!target) return": SIN target no hacia
                 // absolutamente nada. No se inventa un constraint apuntando a la nada; se avisa
                 // y listo (el nodo corre la misma suerte que los demas, mas abajo).
-                sinTarget++;
+                noTarget++;
                 w3dLogfW("[W3D] '%s' era un constraint viejo y su target '%s' no esta en la escena: "
                          "no hacia nada, no se migra nada",
-                         nombreNodo.c_str(), p.target.c_str());
+                         nodeName.c_str(), p.target.c_str());
             }
         } else {
             // *** LA INVERSION: las props del nodo van SOBRE EL OBJETO APUNTADO ***
             // POSICION PRIMERO y rotacion despues, que es el orden en el que las aplicaba
             // el RenderObject viejo (y el stack se evalua en orden).
             if (p.copyX || p.copyY || p.copyZ) {
-                W3dConstraint* c = new W3dConstraint(W3dConstraintTipo::CopyLocation);
+                W3dConstraint* c = new W3dConstraint(W3dConstraintType::CopyLocation);
                 // la fuente vieja era la camara del viewport (viewPosGlobal), no un objeto
-                c->fuenteTipo = W3dConstraintFuente::Vista;
-                c->ejeX = p.copyX; c->ejeY = p.copyY; c->ejeZ = p.copyZ;
-                c->nombre = W3dNombreUnico(c->nombre, "Constraint", MigConNombreExiste, dest);
+                c->sourceType = W3dConstraintSource::View;
+                c->axisX = p.copyX; c->axisY = p.copyY; c->axisZ = p.copyZ;
+                c->name = W3dUniqueName(c->name, "Constraint", MigConstraintNameExists, dest);
                 dest->constraints.push_back(c);
-                puestos++;
+                placed++;
             }
             if (p.horizontal || p.pitch) {
-                W3dConstraint* c = new W3dConstraint(W3dConstraintTipo::Billboard);
+                W3dConstraint* c = new W3dConstraint(W3dConstraintType::Billboard);
                 c->bbYaw = p.horizontal; c->bbPitch = p.pitch;   // las 4 combinaciones migran exacto
-                c->Normalizar();
-                c->nombre = W3dNombreUnico(c->nombre, "Constraint", MigConNombreExiste, dest);
+                c->Normalize();
+                c->name = W3dUniqueName(c->name, "Constraint", MigConstraintNameExists, dest);
                 dest->constraints.push_back(c);
-                puestos++;
+                placed++;
             }
             if (!dest->constraints.empty())
-                dest->constraintActivo = (int)dest->constraints.size() - 1;
+                dest->activeConstraint = (int)dest->constraints.size() - 1;
         }
 
         // ---- que pasa con el NODO viejo ----
@@ -5136,165 +5136,165 @@ static void MigrarConstraintsViejos() {
         //    Es la opcion de CERO MATEMATICA. Borrarlo los haria subir por ~Object con
         //    "pos += pos del nodo", que solo conserva la posicion de mundo si el nodo tenia
         //    rotacion identidad y escala 1: si no, mueve geometria del usuario EN SILENCIO.
-        if (p.nodo->Childrens.empty()) {
-            SoltarNodoViejo(p.nodo);
+        if (p.node->Childrens.empty()) {
+            ReleaseOldNode(p.node);
         } else {
-            conHijos++;
+            withChildren++;
             w3dLogfW("[W3D] '%s' era un constraint viejo y tiene %d hijo(s): queda como Empty "
                      "en la misma posicion (sus propiedades ya pasaron al objeto apuntado)",
-                     nombreNodo.c_str(), (int)p.nodo->Childrens.size());
+                     nodeName.c_str(), (int)p.node->Childrens.size());
             W3dAvisof(false, T("'%s' was a constraint: it is now an Empty, its %d child(ren) stayed where they were"),
-                      W3dNombreCorto(nombreNodo).c_str(), (int)p.nodo->Childrens.size());
+                      W3dShortName(nodeName).c_str(), (int)p.node->Childrens.size());
         }
-        p.nodo = NULL;
+        p.node = NULL;
     }
     w3dLogf("[W3D] constraints viejos migrados: %d nodo(s) -> %d constraint(s) sobre el objeto "
             "apuntado (%d sin target, %d apuntando a otro constraint viejo, %d quedaron como "
             "Empty por tener hijos)",
-            (int)gPendConsViejo.size(), puestos, sinTarget, aOtroNodo, conHijos);
-    if (sinTarget > 0)
-        W3dAvisof(true, T("%d old constraint(s) without a target: they did nothing, nothing was migrated"), sinTarget);
-    gPendConsViejo.clear();
+            (int)gOldPendCons.size(), placed, noTarget, aOtherNode, withChildren);
+    if (noTarget > 0)
+        W3dAvisof(true, T("%d old constraint(s) without a target: they did nothing, nothing was migrated"), noTarget);
+    gOldPendCons.clear();
 }
 
 // ============================================================================
-//  EL CONTENIDO DE UNA RAIZ (escena 3D o prefab, ver W3dRaices.h) desde su entrada:
+//  EL CONTENIDO DE UNA RAIZ (escena 3D o prefab, ver W3dRoots.h) desde su entrada:
 //  la carga PEREZOSA del editor y el cambiarEscena() del juego. SceneCollection ES en
 //  este momento esa raiz (vacia), con su propio contexto: lo que se arma aca es suyo.
 //  Mismo lector y mismos post-pasos que abrir el proyecto (sin tocar lo que es del
 //  proyecto: materiales, mallas, animsets, flipbooks y paletas ya estan cargados).
-//    escena del bloque  -> proyecto.json: "escena".objetos + "animaciones" + "mix"
+//    escena del bloque  -> project.json: "escena".objetos + "animaciones" + "mix"
 //    escena (.w3de)     -> "objetos" + "animaciones" + "mix"
 //    prefab (.w3dp)     -> "raiz" (+ "sueltos") + "animaciones" + "mix"
 // ============================================================================
-bool W3dRaizLeerContenido(const W3dRaizFila& fila) {
+bool W3dRootReadContent(const W3dRootRow& row) {
     if (!SceneCollection) return false;
-    const std::string ruta = fila.bloque ? std::string("proyecto.json") : fila.entrada;
-    JVal* raiz = NULL;
-    std::vector<unsigned char> datos;
-    if (!ruta.empty()) {
-        if (!w3dFileSystem::ReadFileBytes(ruta, datos) || datos.empty()) {
-            w3dLogfE("[W3D] no pude leer '%s' (%s '%s'): queda vacia", ruta.c_str(),
-                     W3dRaizTipoClave(fila.tipo), fila.nombre.c_str());
+    const std::string path = row.block ? std::string("project.json") : row.entry;
+    JVal* root = NULL;
+    std::vector<unsigned char> data;
+    if (!path.empty()) {
+        if (!w3dFileSystem::ReadFileBytes(path, data) || data.empty()) {
+            w3dLogfE("[W3D] no pude leer '%s' (%s '%s'): queda vacia", path.c_str(),
+                     W3dRootTypeKey(row.type), row.name.c_str());
             return false;
         }
-        JParser parser((const char*)&datos[0], datos.size());
-        raiz = parser.Valor();
-        if (parser.error || !raiz || raiz->tipo != 4) {
-            w3dLogfE("[W3D] '%s' no parsea (%s '%s'): queda vacia", ruta.c_str(),
-                     W3dRaizTipoClave(fila.tipo), fila.nombre.c_str());
-            delete raiz;
+        JParser parser((const char*)&data[0], data.size());
+        root = parser.Value();
+        if (parser.error || !root || root->type != 4) {
+            w3dLogfE("[W3D] '%s' no parsea (%s '%s'): queda vacia", path.c_str(),
+                     W3dRootTypeKey(row.type), row.name.c_str());
+            delete root;
             return false;
         }
     }
     // las rutas de adentro son NOMBRES DE ENTRADA (igual que al abrir el contenedor)
-    const bool nc = W3dNombresCargando, v4 = gProyectoV4, refs = g_w3dRefsEntradas;
-    W3dNombresCargando = true;
-    gProyectoV4 = true;
-    g_w3dRefsEntradas = true;
+    const bool nc = W3dNamesLoading, v4 = gProjectV4, refs = g_w3dRefsEntries;
+    W3dNamesLoading = true;
+    gProjectV4 = true;
+    g_w3dRefsEntries = true;
     gPendModArm.clear(); gPendModTgt.clear(); gPendModGen.clear();
-    gPendConsViejo.clear();
-    ClipsPendientesOlvidar();
-    const std::string base = gBaseProyecto;   // (la misma del proyecto: las "ext:" relativas resuelven igual)
-    if (raiz) {
+    gOldPendCons.clear();
+    PendingClipsForget();
+    const std::string base = gBaseProject;   // (la misma del proyecto: las "ext:" relativas resuelven igual)
+    if (root) {
         JVal* objs = NULL;
-        if (fila.bloque) {
-            JVal* esc = JHijo(raiz, "escena", 4);
-            objs = esc ? JHijo(esc, "objetos", 5) : NULL;
-        } else if (fila.tipo == W3D_RAIZ_PREFAB) {
-            JVal* jr = JHijo(raiz, "raiz", 4);
+        if (row.block) {
+            JVal* esc = JChild(root, "scene", 4);
+            objs = esc ? JChild(esc, "objects", 5) : NULL;
+        } else if (row.type == W3D_ROOT_PREFAB) {
+            JVal* jr = JChild(root, "root", 4);
             // (una instancia de ESTE prefab adentro de si mismo no se genera: seria infinito)
-            W3dPrefabPilaEntrar(fila.nombre);
-            if (jr) JsonObjeto(jr, SceneCollection, base);
-            W3dPrefabPilaSalir();
-            objs = JHijo(raiz, "sueltos", 5);   // lo que el editor dejo suelto al primer nivel
+            W3dPrefabStackEnter(row.name);
+            if (jr) JsonObject(jr, SceneCollection, base);
+            W3dPrefabStackExit();
+            objs = JChild(root, "loose", 5);   // lo que el editor dejo suelto al primer nivel
         } else {
-            objs = JHijo(raiz, "objetos", 5);
+            objs = JChild(root, "objects", 5);
         }
         if (objs)
-            for (size_t i = 0; i < objs->lista.size(); i++) JsonObjeto(objs->lista[i], SceneCollection, base);
+            for (size_t i = 0; i < objs->list.size(); i++) JsonObject(objs->list[i], SceneCollection, base);
     }
     // un prefab tiene SIEMPRE su objeto raiz (uno recien creado todavia no se guardo)
-    if (fila.tipo == W3D_RAIZ_PREFAB && SceneCollection->Childrens.empty()) {
+    if (row.type == W3D_ROOT_PREFAB && SceneCollection->Childrens.empty()) {
         Empty* e = new Empty(NULL, Vector3(0, 0, 0));
-        e->name = fila.nombre;
+        e->name = row.name;
     }
-    ResolverModArmaturePendientes();
-    TexturasDespertarUsadas();
-    if (raiz) {
-        CargarAnimacionesEscena(raiz);   // las animaciones de escena de ESTA raiz
-        AdjuntarClipsPendientes(raiz);   // ...y los clips de sus objetos
-        JVal* mx = JHijo(raiz, "mix", 4); // ...y sus capas del Mix de escenas (el modo y el rango son del proyecto)
-        LeerCapas(mx ? JHijo(mx, "escenas", 5) : NULL, g_mixEscenas);
-        g_mixEscenaActiva = -1;
+    ResolvePendingModArmature();
+    TexturesWakeUsed();
+    if (root) {
+        LoadAnimationsScene(root);   // las animaciones de escena de ESTA raiz
+        AttachPendingClips(root);    // ...y los clips de sus objetos
+        JVal* mx = JChild(root, "mix", 4); // ...y sus capas del Mix de escenas (el modo y el rango son del proyecto)
+        ReadLayers(mx ? JChild(mx, "scenes", 5) : NULL, g_mixScenes);
+        g_mixActiveScene = -1;
     } else InitSceneAnimations();
-    delete raiz;
-    W3dNombresCargando = nc;
-    gProyectoV4 = v4;
-    g_w3dRefsEntradas = refs;
+    delete root;
+    W3dNamesLoading = nc;
+    gProjectV4 = v4;
+    g_w3dRefsEntries = refs;
     // los post-pasos del abrir, sobre ESTA raiz
-    MigrarConstraintsViejos();
-#ifndef W3D_SIN_EDITOR
-    W3dNombresRepararEscena(true);
-    W3dRecursosVistaInvalidar();         // el outliner por recursos: hay usuarios nuevos
+    MigrateOldConstraints();
+#ifndef W3D_NO_EDITOR
+    W3dNamesRepairScene(true);
+    W3dResourcesViewInvalidate();         // el outliner por recursos: hay usuarios nuevos
 #endif
     SearchLoop();
     SceneCollection->ReloadAll();
-    W3dConstraintsResolverNombres(SceneCollection);
-#ifdef W3D_SIN_EDITOR
-    CargarTodasTexturasPendientes();     // el juego no arranca un nivel con texturas grises
+    W3dConstraintsResolveNames(SceneCollection);
+#ifdef W3D_NO_EDITOR
+    LoadAllPendingTextures();     // el juego no arranca un nivel con texturas grises
 #endif
     return true;
 }
 
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
 // ============================================================================
-//  LA COPIA DE UNA RAIZ ("Convert to Game", io/RaicesEditor.h): arma en SceneCollection (la raiz NUEVA, que en este
-//  momento es la activa y esta vacia) los objetos que escribio W3dRaizSerializarSeco (io/GuardarW3D.cpp), con el
-//  MISMO lector y los MISMOS post-pasos que la carga de una raiz (W3dRaizLeerContenido): nombres crudos (el espacio de
+//  LA COPIA DE UNA RAIZ ("Convert to Game", io/EditorRoots.h): arma en SceneCollection (la raiz NUEVA, que en este
+//  momento es la activa y esta vacia) los objetos que escribio W3dRootSerializeDry (io/SaveW3D.cpp), con el
+//  MISMO lector y los MISMOS post-pasos que la carga de una raiz (W3dRootReadContent): nombres crudos (el espacio de
 //  nombres de los objetos es por raiz: la copia se llama igual), rutas como estan en memoria, las mallas y los
 //  materiales por el nombre de su recurso (compartidos). SIN animaciones de escena: queda la "Scene" vacia de
 //  siempre. 'origenes' recibe cada objeto creado con su "_origen" (el serial del original), para lo que el JSON en
-//  seco no lleva (W3dPrefabArreglarHook y lo demas, en RaicesEditor). false = no parsea.
+//  seco no lleva (W3dPrefabFixHook y lo demas, en RaicesEditor). false = no parsea.
 // ============================================================================
-bool W3dRaizLeerCopiaSeca(const std::string& json, std::vector<std::pair<Object*, unsigned> >* origenes) {
+bool W3dRootReadCopyDry(const std::string& json, std::vector<std::pair<Object*, unsigned> >* origins) {
     if (!SceneCollection || json.empty()) return false;
     JParser parser(json.data(), json.size());
-    JVal* raiz = parser.Valor();
-    if (parser.error || !raiz || raiz->tipo != 4) {
+    JVal* root = parser.Value();
+    if (parser.error || !root || root->type != 4) {
         w3dLogfE("[W3D] la copia de la raiz no parsea: queda vacia");
-        delete raiz;
+        delete root;
         return false;
     }
-    const bool nc = W3dNombresCargando, v4 = gProyectoV4, refs = g_w3dRefsEntradas;
-    W3dNombresCargando = true;
-    gProyectoV4 = true;
-    g_w3dRefsEntradas = true;
+    const bool nc = W3dNamesLoading, v4 = gProjectV4, refs = g_w3dRefsEntries;
+    W3dNamesLoading = true;
+    gProjectV4 = true;
+    g_w3dRefsEntries = true;
     gPendModArm.clear(); gPendModTgt.clear(); gPendModGen.clear();
-    gPendConsViejo.clear();
-    ClipsPendientesOlvidar();
-    std::vector<std::pair<Object*, unsigned> >* orig = gOrigenes;
-    gOrigenes = origenes;
-    JVal* objs = JHijo(raiz, "objetos", 5);
+    gOldPendCons.clear();
+    PendingClipsForget();
+    std::vector<std::pair<Object*, unsigned> >* orig = gOrigins;
+    gOrigins = origins;
+    JVal* objs = JChild(root, "objects", 5);
     if (objs)
-        for (size_t i = 0; i < objs->lista.size(); i++) JsonObjeto(objs->lista[i], SceneCollection, gBaseProyecto);
-    gOrigenes = orig;
-    ResolverModArmaturePendientes();
-    TexturasDespertarUsadas();
+        for (size_t i = 0; i < objs->list.size(); i++) JsonObject(objs->list[i], SceneCollection, gBaseProject);
+    gOrigins = orig;
+    ResolvePendingModArmature();
+    TexturesWakeUsed();
     // (los clips INLINE de un nodo son de las animaciones de escena del formato viejo: la copia no las lleva)
-    ClipsPendientesOlvidar();
+    PendingClipsForget();
     InitSceneAnimations();
-    delete raiz;
-    W3dNombresCargando = nc;
-    gProyectoV4 = v4;
-    g_w3dRefsEntradas = refs;
+    delete root;
+    W3dNamesLoading = nc;
+    gProjectV4 = v4;
+    g_w3dRefsEntries = refs;
     // los post-pasos de la carga de una raiz, sobre ESTA
-    MigrarConstraintsViejos();
-    W3dNombresRepararEscena(true);
-    W3dRecursosVistaInvalidar();
+    MigrateOldConstraints();
+    W3dNamesRepairScene(true);
+    W3dResourcesViewInvalidate();
     SearchLoop();
     SceneCollection->ReloadAll();
-    W3dConstraintsResolverNombres(SceneCollection);
+    W3dConstraintsResolveNames(SceneCollection);
     return true;
 }
 #endif
@@ -5307,179 +5307,179 @@ bool W3dRaizLeerCopiaSeca(const std::string& json, std::vector<std::pair<Object*
 //  generacion ocurre en medio de una carga (una escena con instancias), lo pendiente de la carga
 //  de afuera se aparta y vuelve intacto.
 // ============================================================================
-Object* W3dPrefabConstruirHijos(Object* padre, JVal* j, std::vector<std::pair<Object*, unsigned> >* origenes) {
-    if (!padre || !j || j->tipo != 4) return NULL;
+Object* W3dPrefabBuildChildren(Object* parent, JVal* j, std::vector<std::pair<Object*, unsigned> >* origins) {
+    if (!parent || !j || j->type != 4) return NULL;
     std::vector<PendModArm> arm; arm.swap(gPendModArm);
     std::vector<PendModTgt> tgt; tgt.swap(gPendModTgt);
     std::vector<Mesh*> gen; gen.swap(gPendModGen);
-    std::vector<ClipPendiente> clips; clips.swap(gClipsPend);
-    const bool nc = W3dNombresCargando, v4 = gProyectoV4, refs = g_w3dRefsEntradas, genPrefab = gGenerandoPrefab;
-    W3dNombresCargando = true;
-    gProyectoV4 = true;
-    g_w3dRefsEntradas = true;
-    gGenerandoPrefab = true;   // (las vertex anims de lo generado comparten sus frames entre instancias)
-    std::vector<std::pair<Object*, unsigned> >* orig = gOrigenes;
-    gOrigenes = origenes;
-    const size_t antes = padre->Childrens.size();
-    JsonObjeto(j, padre, gBaseProyecto);
-    gOrigenes = orig;
-    gGenerandoPrefab = genPrefab;
-    ResolverModArmaturePendientes();
+    std::vector<PendingClip> clips; clips.swap(gClipsPend);
+    const bool nc = W3dNamesLoading, v4 = gProjectV4, refs = g_w3dRefsEntries, genPrefab = gGeneratingPrefab;
+    W3dNamesLoading = true;
+    gProjectV4 = true;
+    g_w3dRefsEntries = true;
+    gGeneratingPrefab = true;   // (las vertex anims de lo generado comparten sus frames entre instancias)
+    std::vector<std::pair<Object*, unsigned> >* orig = gOrigins;
+    gOrigins = origins;
+    const size_t prev = parent->Childrens.size();
+    JsonObject(j, parent, gBaseProject);
+    gOrigins = orig;
+    gGeneratingPrefab = genPrefab;
+    ResolvePendingModArmature();
     // (los clips de objeto INLINE son del formato de la primera version de las escenas: una definicion de
     //  prefab no los trae; si un archivo escrito a mano los tuviera, no hay a que raiz adjuntarlos)
-    ClipsPendientesOlvidar();
-    W3dNombresCargando = nc;
-    gProyectoV4 = v4;
-    g_w3dRefsEntradas = refs;
+    PendingClipsForget();
+    W3dNamesLoading = nc;
+    gProjectV4 = v4;
+    g_w3dRefsEntries = refs;
     gPendModArm.swap(arm); gPendModTgt.swap(tgt); gPendModGen.swap(gen); gClipsPend.swap(clips);
-    TexturasDespertarUsadas();   // las de los materiales que usa lo que acaba de entrar
-    return padre->Childrens.size() > antes ? padre->Childrens.back() : NULL;
+    TexturesWakeUsed();   // las de los materiales que usa lo que acaba de entrar
+    return parent->Childrens.size() > prev ? parent->Childrens.back() : NULL;
 }
 
 // ============================================================================
-//  LOS RECURSOS DE UN SUBARBOL (io/Prefabs.h: W3dPrefabRecursosJson): lo que el STREAMING (io/Streaming.h) pide
+//  LOS RECURSOS DE UN SUBARBOL (io/Prefabs.h: W3dPrefabResourcesJson): lo que el STREAMING (io/Streaming.h) pide
 //  ASYNC antes de generar una instancia -las mallas, los animsets (los clips de un esqueleto y la biblioteca de
-//  clips de jerarquia) y las fuentes de los scripts-, resuelto con las MISMAS reglas que JsonObjeto (el prefijo de
+//  clips de jerarquia) y las fuentes de los scripts-, resuelto con las MISMAS reglas que JsonObject (el prefijo de
 //  la libreria del contexto, las rutas "lib:", las entradas del contenedor). No crea ni carga nada.
 // ============================================================================
-static void RecursoAgregar(std::vector<W3dCargasItem>& out, int tipo, const std::string& id) {
+static void ResourceAdd(std::vector<W3dLoadsItem>& out, int type, const std::string& id) {
     if (id.empty()) return;
-    for (size_t i = 0; i < out.size(); i++) if (out[i].tipo == tipo && out[i].id == id) return;
-    W3dCargasItem it; it.tipo = tipo; it.id = id;
+    for (size_t i = 0; i < out.size(); i++) if (out[i].type == type && out[i].id == id) return;
+    W3dLoadsItem it; it.type = type; it.id = id;
     out.push_back(it);
 }
-static void RecursosJsonRec(JVal* j, std::vector<W3dCargasItem>& out, std::vector<MallaRecurso*>* mallas,
-                            std::vector<std::string>& anidados) {
-    if (!j || j->tipo != 4) return;
-    const std::string tipo = JS(j, "tipo", "");
+static void ResourcesJsonRec(JVal* j, std::vector<W3dLoadsItem>& out, std::vector<MeshResource*>* meshes,
+                            std::vector<std::string>& nested) {
+    if (!j || j->type != 4) return;
+    const std::string type = JS(j, "type", "");
     // una INSTANCIA o un PROXY anidado: se genera con la de afuera (sus recursos tambien, por su CLAVE), salvo que
     // sea DIFERIDO: a ese lo pide su propio streaming. El guardado no escribe hijos de una instancia
-    if (tipo == "prefab" || tipo == "proxy") {
-        if (JS(j, "carga", "siempre") == "distancia") return;
-        std::string clave;
-        if (tipo == "prefab") {   // (la misma clave que InstanciaPrefabLeerCampos + la rama "prefab" de JsonObjeto)
-            clave = JS(j, "prefab", "");
-            if (!W3dLibContexto().empty() && !clave.empty()) clave = W3dLibsClave(W3dLibContexto(), W3D_LIB_PREFAB, clave);
-        } else {                  // (la de ProxyW3dLeerCampos)
-            std::string lib = JS(j, "libreria", "");
-            if (!W3dLibContexto().empty()) lib = W3dLibsAnidada(W3dLibContexto(), lib);
-            clave = W3dLibsClave(lib, JS(j, "elementoTipo", "prefab") == "escena" ? W3D_LIB_ESCENA : W3D_LIB_PREFAB,
-                                 JS(j, "elemento", ""));
+    if (type == "prefab" || type == "proxy") {
+        if (JS(j, "load", "always") == "distance") return;
+        std::string key;
+        if (type == "prefab") {   // (la misma clave que InstancePrefabReadFields + la rama "prefab" de JsonObject)
+            key = JS(j, "prefab", "");
+            if (!W3dLibContext().empty() && !key.empty()) key = W3dLibsKey(W3dLibContext(), W3D_LIB_PREFAB, key);
+        } else {                  // (la de ProxyW3dReadFields)
+            std::string lib = JS(j, "lib", "");
+            if (!W3dLibContext().empty()) lib = W3dLibsNested(W3dLibContext(), lib);
+            key = W3dLibsKey(lib, JS(j, "elementType", "prefab") == "scene" ? W3D_LIB_SCENE : W3D_LIB_PREFAB,
+                                 JS(j, "element", ""));
         }
-        if (!clave.empty()) anidados.push_back(clave);
+        if (!key.empty()) nested.push_back(key);
         return;
     }
     // la MALLA del objeto (un recurso del registro del proyecto o de una libreria)
-    const std::string nm = NombreRecursoJson(JS(j, "malla", ""));
+    const std::string nm = ResourceNameJson(JS(j, "mesh", ""));
     if (!nm.empty()) {
-        MallaRecurso* r = W3dMallaRecursoPorNombre(nm);
+        MeshResource* r = W3dMeshResourceByName(nm);
         if (r) {
-            const size_t antes = out.size();
-            RecursoAgregar(out, W3DREC_MALLA, r->IdAlmacen());
-            if (mallas && out.size() > antes) mallas->push_back(r);
+            const size_t prev = out.size();
+            ResourceAdd(out, W3DREC_MESH, r->IdStore());
+            if (meshes && out.size() > prev) meshes->push_back(r);
         }
     }
     // los CLIPS de un esqueleto ("anims": el nombre de su animset; la lista inline de los .w3d viejos no es un recurso)
     // y su BIBLIOTECA de clips de jerarquia: los dos son animsets del registro, por su entrada
-    const std::string an = NombreRecursoJson(JS(j, "anims", ""));
-    if (!an.empty()) RecursoAgregar(out, W3DREC_ANIMSET, W3dAnimSetsEntradaDe(an));
-    const std::string cj = NombreRecursoJson(JS(j, "clipsJerarquia", ""));
-    if (!cj.empty()) RecursoAgregar(out, W3DREC_ANIMSET, W3dAnimSetsEntradaDe(cj));
-    // las FUENTES de sus scripts (la misma ruta que JsonScripts: es la clave con la que CorrerArchivo las busca)
-    JVal* js = JHijo(j, "scripts", 5);
+    const std::string an = ResourceNameJson(JS(j, "anims", ""));
+    if (!an.empty()) ResourceAdd(out, W3DREC_ANIMSET, W3dAnimSetsEntryOf(an));
+    const std::string cj = ResourceNameJson(JS(j, "hierarchyClips", ""));
+    if (!cj.empty()) ResourceAdd(out, W3DREC_ANIMSET, W3dAnimSetsEntryOf(cj));
+    // las FUENTES de sus scripts (la misma ruta que JsonScripts: es la clave con la que RunFile las busca)
+    JVal* js = JChild(j, "scripts", 5);
     if (js)
-        for (size_t i = 0; i < js->lista.size(); i++)
-            if (js->lista[i] && js->lista[i]->tipo == 4) {
-                const std::string a = JS(js->lista[i], "archivo", "");
-                if (!a.empty()) RecursoAgregar(out, W3DREC_SCRIPT, RutaJson(a, gBaseProyecto));
+        for (size_t i = 0; i < js->list.size(); i++)
+            if (js->list[i] && js->list[i]->type == 4) {
+                const std::string a = JS(js->list[i], "file", "");
+                if (!a.empty()) ResourceAdd(out, W3DREC_SCRIPT, JsonPath(a, gBaseProject));
             }
-    JVal* h = JHijo(j, "hijos", 5);
-    if (h) for (size_t i = 0; i < h->lista.size(); i++) RecursosJsonRec(h->lista[i], out, mallas, anidados);
+    JVal* h = JChild(j, "children", 5);
+    if (h) for (size_t i = 0; i < h->list.size(); i++) ResourcesJsonRec(h->list[i], out, meshes, nested);
 }
-void W3dPrefabRecursosJson(JVal* j, std::vector<W3dCargasItem>& out, std::vector<MallaRecurso*>* mallas,
-                           std::vector<std::string>& anidados) {
-    // (las rutas se resuelven como al GENERAR: W3dPrefabConstruirHijos lee con el formato v4)
-    const bool v4 = gProyectoV4, refs = g_w3dRefsEntradas;
-    gProyectoV4 = true;
-    g_w3dRefsEntradas = true;
-    RecursosJsonRec(j, out, mallas, anidados);
-    gProyectoV4 = v4;
-    g_w3dRefsEntradas = refs;
+void W3dPrefabResourcesJson(JVal* j, std::vector<W3dLoadsItem>& out, std::vector<MeshResource*>* meshes,
+                           std::vector<std::string>& nested) {
+    // (las rutas se resuelven como al GENERAR: W3dPrefabBuildChildren lee con el formato v4)
+    const bool v4 = gProjectV4, refs = g_w3dRefsEntries;
+    gProjectV4 = true;
+    g_w3dRefsEntries = true;
+    ResourcesJsonRec(j, out, meshes, nested);
+    gProjectV4 = v4;
+    g_w3dRefsEntries = refs;
 }
 
 // ============================================================================
-//  W3dProyectoCargarEscena3D — LA ESCENA 3D DEL JUEGO COMPILADO.
+//  W3dProjectLoadScene3D — LA ESCENA 3D DEL JUEGO COMPILADO.
 //
 //  Es la puerta de entrada que usa el runtime (w3drun) y el UNICO codigo propio
-//  del juego en todo este archivo: por dentro llama al MISMO AbrirEscenaJson que
+//  del juego en todo este archivo: por dentro llama al MISMO OpenSceneJson que
 //  usa el editor, asi que el .deb/APK arma exactamente el mismo arbol de escena
 //  que el Play — mallas, materiales, animaciones, camaras, curvas/rieles,
 //  culling, LOD, visibilidad por celdas, particulas y constraints.
 //
-//  'datos' son los bytes del proyecto.json que "Compilar juego" dejo al lado del
+//  'datos' son los bytes del project.json que "Compilar juego" dejo al lado del
 //  binario. Las rutas de adentro se tratan como NOMBRES DE ENTRADA (el staging
 //  del compilador es un espejo exacto del contenedor .w3d), asi que
-//  "mallas/pueblo.w3dm" resuelve contra la carpeta del juego sin traducir nada.
+//  "meshes/pueblo.w3dm" resuelve contra la carpeta del juego sin traducir nada.
 //
 //  NO hace el pie del editor (layout, sesion, seleccion, auto-play): hace el que
 //  necesita un juego — resolver targets, recargar el arbol, ligar los constraints
 //  por nombre y dejar las texturas YA cargadas (el juego no puede arrancar con la
 //  cola diferida a medias, se veria gris el primer segundo).
 // ============================================================================
-bool W3dProyectoCargarEscena3D(const void* datos, size_t n) {
-    if (!datos || n == 0) return false;
+bool W3dProjectLoadScene3D(const void* data, size_t n) {
+    if (!data || n == 0) return false;
     if (!SceneCollection) SceneCollection = new Object(NULL, "Scene");
     // los nombres entran CRUDOS (igual que en el editor): el archivo ya viene con
     // los nombres definitivos del proyecto guardado y las refs de los scripts
     // resuelven contra ESOS.
-    W3dNombresCargando = true;
+    W3dNamesLoading = true;
     gPendModArm.clear(); gPendModTgt.clear(); gPendModGen.clear();
-    gPendConsViejo.clear();
-    gDirProyecto.clear();
-    gProyectoV4 = true;              // las rutas del json son nombres de entrada
-    g_w3dRefsEntradas = true;        // ...y las de los .w3dui tambien
-    gCargaJuego = true;              // arranca en su escena INICIAL (ver W3dRaices.h)
+    gOldPendCons.clear();
+    gDirProject.clear();
+    gProjectV4 = true;              // las rutas del json son nombres de entrada
+    g_w3dRefsEntries = true;        // ...y las de los .w3dui tambien
+    gLoadGame = true;               // arranca en su escena INICIAL (ver W3dRoots.h)
     // ---- DETECCION DE FORMATO, LA MISMA QUE HACE EL EDITOR AL ABRIR ----------
-    // El proyecto.json que deja "Compilar juego" es UNA COPIA del .w3d, y un .w3d
+    // El project.json que deja "Compilar juego" es UNA COPIA del .w3d, y un .w3d
     // NO es siempre JSON: el formato TEXTO viejo (`Whisk3D { Escena {...} }`, con
     // comentarios // al principio) sigue abriendo en el editor y sigue siendo el
     // formato de proyectos reales. Aca se parseaba SIEMPRE como JSON, asi que un
     // proyecto de texto compilaba bien, instalaba bien... y el juego abria con la
     // escena 3D VACIA: pantalla NEGRA con el HUD encima. Ahora se mira el primer
-    // byte util, igual que AbrirW3D (json = '{', texto = 'W'/comentario).
-    const char* txt = (const char*)datos;
-    size_t ini = 0;
-    while (ini < n && (txt[ini] == ' ' || txt[ini] == '\t' ||
-                       txt[ini] == '\r' || txt[ini] == '\n')) ini++;
-    bool esJson = (ini < n && txt[ini] == '{');
+    // byte util, igual que OpenW3D (json = '{', texto = 'W'/comentario).
+    const char* txt = (const char*)data;
+    size_t start = 0;
+    while (start < n && (txt[start] == ' ' || txt[start] == '\t' ||
+                       txt[start] == '\r' || txt[start] == '\n')) start++;
+    bool isJson = (start < n && txt[start] == '{');
     bool ok;
-    if (esJson) {
-        ok = AbrirEscenaJson(txt + ini, n - ini, std::string("."));
-        gCargaJuego = false;
+    if (isJson) {
+        ok = OpenSceneJson(txt + start, n - start, std::string("."));
+        gLoadGame = false;
         // la escena INICIAL no es la del bloque: se arma desde su entrada (el bloque no se armo)
-        const int inicial = W3dRaizInicialIdx();
-        if (ok && inicial >= 0 && inicial != W3dRaizActiva()) W3dRaizCargarEnActiva(inicial);
+        const int initial = W3dInitialRootIdx();
+        if (ok && initial >= 0 && initial != W3dActiveRoot()) W3dRootLoadInActive(initial);
     } else {
         // TEXTO viejo: el MISMO pipeline del editor (Tokenize + ParseNode +
         // BuildScene), sin el Layout -- un juego no tiene viewports.
         std::vector<std::string> tokens = Tokenize(std::string(txt, n));
         size_t it = 0;
-        Node* proyecto = ParseNode(tokens, it);
-        ok = (proyecto && proyecto->type == "Whisk3D");
+        Node* project = ParseNode(tokens, it);
+        ok = (project && project->type == "Whisk3D");
         if (!ok) {
             w3dLogfE("[juego] la escena 3D no es JSON ni texto Whisk3D{} (vino '%s')",
-                     proyecto ? proyecto->type.c_str() : "(nada)");
+                     project ? project->type.c_str() : "(nada)");
         } else {
-            Node* escena = Find(proyecto, "Escena");
-            if (escena) BuildScene(escena);
+            Node* scene = Find(project, "Scene");
+            if (scene) BuildScene(scene);
             else        w3dLogfW("[juego] el proyecto de texto no trae 'Escena': sin objetos");
         }
-        FreeNode(proyecto);
+        FreeNode(project);
     }
-    g_w3dRefsEntradas = false;
-    gProyectoV4 = false;
-    gCargaJuego = false;
-    W3dNombresCargando = false;
+    g_w3dRefsEntries = false;
+    gProjectV4 = false;
+    gLoadGame  = false;
+    W3dNamesLoading = false;
     // MIGRACION del objeto Constraint VIEJO (el nodo suelto que apunta a su
     // objetivo): sus propiedades pasan al objeto apuntado. El editor la corre
     // siempre al abrir; el juego NO la corria, asi que un proyecto con nodos
@@ -5487,102 +5487,102 @@ bool W3dProyectoCargarEscena3D(const void* datos, size_t n) {
     // el binario. En el demo eso se ve clarito: el domo del CIELO se engancha a
     // la vista con uno de estos, y sin migrar se quedaba plantado en el origen
     // (arrancabas viendo cielo y a los pocos metros el fondo quedaba NEGRO).
-    MigrarConstraintsViejos();
+    MigrateOldConstraints();
     // targets de los modificadores/objetos, y el arbol recargado
     SearchLoop();
     if (SceneCollection) SceneCollection->ReloadAll();
     // la FUENTE de cada constraint viaja por NOMBRE: se liga con el arbol completo
     // (la pasada vive en el Core justamente porque el juego necesita esto).
-    if (SceneCollection) W3dConstraintsResolverNombres(SceneCollection);
+    if (SceneCollection) W3dConstraintsResolveNames(SceneCollection);
     // las texturas se encolan DIFERIDAS al importar: el juego las quiere todas
     // decodificadas antes del primer frame.
-    CargarTodasTexturasPendientes();
+    LoadAllPendingTextures();
     w3dLogf("[W3D] escena 3D del juego cargada: %d objeto(s) raiz",
             SceneCollection ? (int)SceneCollection->Childrens.size() : 0);
     return ok;
 }
 
-#ifndef W3D_SIN_EDITOR
+#ifndef W3D_NO_EDITOR
 // ---------------------------------------------------------------------------
 //  REINICIAR la escena (cerrar el proyecto actual) para abrir otro EN CALIENTE
 // ---------------------------------------------------------------------------
-void ReiniciarEscena() {
+void RestartScene() {
     // parar el juego/simulacion y soltar los scripts
-    extern bool SimActiva(); extern void SimStop();
-    if (SimActiva()) SimStop();
+    extern bool SimActive(); extern void SimStop();
+    if (SimActive()) SimStop();
     // la TARJETA RENDER es del proyecto: el que viene trae la suya (o los valores de fabrica)
-    { g_render = W3dRenderOpc(); g_renderGen++; }
-    g_w3dExternosFaltan.clear();   // (lo que faltaba es del proyecto de antes)
+    { g_render = W3dRenderOpt(); g_renderGen++; }
+    g_w3dExternalMissing.clear();   // (lo que faltaba es del proyecto de antes)
     // el STREAMING suelta lo que sus instancias retienen del almacen (antes de que el cierre olvide los recursos) y la
     // vista previa vuelve al default del proyecto nuevo
-    W3dStreamingCerrarProyecto();
+    W3dStreamingCloseProject();
     PlayAnimation = false;
-    AnimEsJuego = false;
+    AnimIsGame = false;
     // la ANIMACION ACTIVA (escena/armature/vertex) apunta a objetos que estamos por
     // BORRAR: soltarla ANTES o queda colgando (ActiveAnimMesh/ActiveAnimArm dangling ->
-    // Properties::ActualizarPestanias crasheaba al abrir un proyecto con una vertex anim
+    // Properties::UpdateTabs crasheaba al abrir un proyecto con una vertex anim
     // activa). Volver a modo ESCENA sin objetivo.
     { extern int ActiveAnimKind; extern Mesh* ActiveAnimMesh; extern Armature* ActiveAnimArm;
       ActiveAnimKind = 0; ActiveAnimMesh = NULL; ActiveAnimArm = NULL;
-#ifndef W3D_SIN_EDITOR
-      { extern bool g_animEscenaElegidaEnJuego; g_animEscenaElegidaEnJuego = false; }
+#ifndef W3D_NO_EDITOR
+      { extern bool g_animPickedSceneInGame; g_animPickedSceneInGame = false; }
 #endif
     }
     // salir de Edit Mode: abrir un proyecto en Edit Mode dejaba g_editMesh COLGANDO al
     // borrar la escena (mismo crash que ActiveAnimMesh). Volver a Modo Objeto sin malla.
     { extern int InteractionMode; extern Object* g_editMesh;
       InteractionMode = ObjectMode; g_editMesh = NULL; }
-    // idem el tick de las mallas como recurso (io/MallasProyecto.h): su malla en edicion y la
+    // idem el tick de las mallas como recurso (io/ProjectMeshes.h): su malla en edicion y la
     // activa que se miraba son del arbol que se va a borrar (sin esto el proximo guardado
     // desreferenciaba la malla liberada si ningun viewport 3D corria el tick antes)
-    { extern void W3dMallasEditorOlvidar(); W3dMallasEditorOlvidar(); }
+    { extern void W3dMeshesEditorForget(); W3dMeshesEditorForget(); }
     // el OUTLINER POR RECURSOS: el recurso activo (y la textura que tomo para su vista previa,
     // ANTES de que se liberen las texturas), las carpetas y lo purgado son del proyecto
-    W3dRecursosVistaCerrarProyecto();
-    { extern void W3dLibreriasCerrarProyecto(); W3dLibreriasCerrarProyecto(); }
+    W3dResourcesViewCloseProject();
+    { extern void W3dExtLibsCloseProject(); W3dExtLibsCloseProject(); }
     // los paneles de propiedades sueltan el objeto activo (y la malla de su lista de partes): se van
-    { extern void PropsOlvidarEscena(); PropsOlvidarEscena(); }
-    W3dScriptDescargarTodo();
+    { extern void PropsForgetScene(); PropsForgetScene(); }
+    W3dScriptUnloadAll();
     // el CONTENEDOR del proyecto que se cierra: se suelta su FILE* y su indice
     // (las rutas en memoria que apuntaban a sus entradas mueren con la escena)
-    W3dContenedorDesmontar();
-    W3dRefExternasLimpiar();
-    g_w3dUINoCargo.clear();   // idem el freno de las escenas UI que no cargaron
+    W3dContainerUnmount();
+    W3dExternalRefClear();
+    g_w3dUINotLoaded.clear();   // idem el freno de las escenas UI que no cargaron
     // el formato de las mallas es DEL PROYECTO: el nuevo arranca en el default (binario);
     // el que abre lo fija con su "formatoMallas". (El forzado del harness no se toca.)
-    g_w3dFormatoMallasProyecto = W3D_MALLAS_BINARIO;
+    g_w3dFormatMeshesProject = W3D_MESHES_BINARY;
     // el icono del juego es DEL PROYECTO: al cerrar uno no debe heredarse al
     // siguiente (el que abre lo vuelve a setear si su .w3d lo trae)
-    g_proyIcono.clear();
+    g_projIcon.clear();
     // idem las PALETAS del proyecto: el que abre trae las suyas (del .w3d o
     // adoptadas de sus .w3dui)
-    W3dPaletasLimpiar();
+    W3dPalettesClear();
     // nada seleccionado ni activo
-    DeseleccionarTodo();
-    ObjActivo = NULL;
+    DeselectAll();
+    ActiveObj = NULL;
     // el undo guarda punteros a objetos que van a morir
-    extern void UndoLimpiar();
-    UndoLimpiar();
+    extern void UndoClear();
+    UndoClear();
     // Y LAS CURVAS DE OBJETO TAMBIEN (fallo [E] de la ronda 7): una AnimationObject referencia a su objeto POR
     // PUNTERO, y aca se borra la escena entera. Esto limpiaba... nada: ni AnimationObjects ni las listas de las
     // OTRAS animaciones de escena. Al abrir otro proyecto quedaban curvas apuntando a objetos LIBERADOS y el
-    // primer cambio de frame las desreferenciaba en AplicarAnimacionObjetos (ObjectMode.cpp) -> use-after-free;
+    // primer cambio de frame las desreferenciaba en ApplyAnimationObjects (ObjectMode.cpp) -> use-after-free;
     // ademas el primer objeto nuevo que cayera en una direccion reciclada nacia ya animado.
     // Se limpian TODAS las escenas, no solo la activa: sus curvas son la misma lista swapeada (Animation.cpp).
     InitSceneAnimations();
     AnimationObjects.clear();
     for (size_t i = 0; i < SceneAnimations.size(); i++)
-        if (SceneAnimations[i]) SceneAnimations[i]->objetos.clear();
+        if (SceneAnimations[i]) SceneAnimations[i]->objects.clear();
     // idem las BASES del MIX DE ESCENAS (Animation.cpp): la transform de cada objeto que el mix toco,
-    // guardada POR PUNTERO. Quedaban apuntando a los objetos borrados y salir del Mix (W3dMixEscenasSoltar)
+    // guardada POR PUNTERO. Quedaban apuntando a los objetos borrados y salir del Mix (W3dMixScenesRelease)
     // les escribia encima. Se olvidan sin mover nada: esos objetos se van a borrar.
-    W3dMixEscenasOlvidar();
+    W3dMixScenesForget();
     // ningun clip de jerarquia sonando (cada uno retiene su biblioteca: se sueltan antes de borrar los arboles)
-    W3dAnimObjetosReset();
+    W3dAnimObjectsReset();
     // las OTRAS escenas 3D y los prefabs del proyecto (las raices que no son la activa) se liberan
     // enteras y el registro se vacia: la activa sigue siendo SceneCollection y se vacia abajo
-    W3dRaicesCerrarProyecto();
-    // borrar TODO el arbol, cada hijo del tope CON SU SUBARBOL (W3dLiberarSubarbol).
+    W3dRootsCloseProject();
+    // borrar TODO el arbol, cada hijo del tope CON SU SUBARBOL (W3dFreeSubtree).
     // Antes era un 'delete o' pelado, confiando en que ~Object PROMUEVE los nietos a
     // SceneCollection y la vuelta siguiente los agarraba. Eso solo pasa cuando el borrado
     // tiene Parent: los objetos de PRIMER NIVEL nacen con Parent NULL (solo se meten en
@@ -5595,18 +5595,18 @@ void ReiniciarEscena() {
         while (!SceneCollection->Childrens.empty()) {
             Object* o = SceneCollection->Childrens.back();
             SceneCollection->Childrens.pop_back();
-            W3dLiberarSubarbol(o);
+            W3dFreeSubtree(o);
         }
     CollectionActive = SceneCollection;
     // los FLIPBOOKS CON NOMBRE son del proyecto (y los de sus librerias): el arbol que los usaba ya no existe.
-    // Sin esto un proyecto NUEVO (que no pasa por CargarFlipbooksEscena) heredaba los del anterior y los guardaba
-    SceneFlipbooksLimpiar();
+    // Sin esto un proyecto NUEVO (que no pasa por LoadFlipbooksScene) heredaba los del anterior y los guardaba
+    SceneFlipbooksClear();
 
     // el FONDO del render (color, textura 360, rotacion): es del proyecto. Suelta sus texturas ANTES de liberar las de
     // la escena (sus referencias las retenian)
-    W3dFondoLimpiar();
+    W3dBackgroundClear();
     // ---- TEXTURAS: liberar de verdad (reporte del dueno) ----------------------
-    // Hasta hoy ReiniciarEscena() no tocaba `Textures` ni una vez: abrir un
+    // Hasta hoy RestartScene() no tocaba `Textures` ni una vez: abrir un
     // proyecto tras otro dejaba TODAS las texturas del anterior en la GPU y en
     // el heap para el resto de la vida del proceso. Va DESPUES de destruir el
     // arbol (ninguna malla puede seguir bindeando lo que se libera) y en este
@@ -5616,40 +5616,40 @@ void ReiniciarEscena() {
     //      "material vivo" decia que si SIEMPRE y terminaba cargando texturas
     //      de un proyecto muerto encima del nuevo);
     //   2. liberar las texturas no fijadas, dejando en NULL los Texture* de
-    //      todos los materiales (TexturasLiberarEscena lo hace adentro).
+    //      todos los materiales (TexturesFreeScene lo hace adentro).
     // el PIXELADO es DEL PROYECTO: el que abre trae el suyo (o ninguno)
-    w3dEngine::SetPixeladoGlobal(false);
+    w3dEngine::SetPixelatedGlobal(false);
     // PREFABS: la Biblioteca es DEL PROYECTO (y el hook de instanciar con ella)
-    W3dPrefabsLimpiar();
-    W3dInstanciarPrefabHook = 0;
+    W3dPrefabsClear();
+    W3dInstantiatePrefabHook = 0;
     // ...y las DEFINICIONES cacheadas de los prefabs del proyecto (io/Prefabs.h)
-    W3dPrefabsOlvidarTodo();
-    // LISTAS DE CARGA: son del proyecto (las registro Curve::CargarListaCarga).
+    W3dPrefabsForgetAll();
+    // LISTAS DE CARGA: son del proyecto (las registro Curve::LoadLoadList).
     // Y sus referencias TRANSITORIAS mueren en bloque: cerrar la escena es el
     // "volver al menu" del modelo de streaming (deja las paginas en 0).
-    W3dRecursosPurgarTransitorias();
-    W3dCargasOlvidarTodas();
+    W3dResourcesPurgeTransient();
+    W3dLoadsForgetAll();
     // LAS MALLAS CON NOMBRE son del proyecto: el arbol ya no existe (nadie las usa) y las
     // referencias transitorias se acaban de purgar -> se borra el registro entero
-    W3dMallasRegistroLimpiar();
-    // "mallasSoloGPU" es DEL PROYECTO: el que abre la fija con su proyecto.json (despues de borrar el registro: apagarla
+    W3dMeshesRegistryClear();
+    // "mallasSoloGPU" es DEL PROYECTO: el que abre la fija con su project.json (despues de borrar el registro: apagarla
     // antes releeria cada malla suelta de un contenedor que ya se desmonto)
-    W3dMallasSoloGPUActivar(false);
+    W3dMeshesOnlyGPUActivate(false);
     // ANIMSETS: el registro es del proyecto; los recursos ya se soltaron con los armatures
-    W3dAnimSetsCerrarProyecto();
-    { extern void OlvidarTexturasPendientes(); OlvidarTexturasPendientes(); }
-    TexEditLimpiarTodo();   // las texturas en edicion (pixeles en memoria) se van con la escena
+    W3dAnimSetsCloseProject();
+    { extern void ForgetPendingTextures(); ForgetPendingTextures(); }
+    TexEditClearAll();   // las texturas en edicion (pixeles en memoria) se van con la escena
     // ---- LOS CACHES DEL PROYECTO del lado del juego: sonidos, imagenes 2D y fuentes ----
-    // Se llenan en la PRECARGA de AbrirW3D (y en el primer uso) con clave = la ruta tal
-    // como la escribe el proyecto ("sonidos/x.wav", "texturas/hud.png" en un contenedor).
+    // Se llenan en la PRECARGA de OpenW3D (y en el primer uso) con clave = la ruta tal
+    // como la escribe el proyecto ("sounds/x.wav", "textures/hud.png" en un contenedor).
     // No se vaciaban nunca: el audio decodificado del proyecto cerrado quedaba en el heap
     // (en un proyecto grande, ~67 MB vivos despues de cerrarlo) y abrir OTRO proyecto con
     // entradas del mismo nombre sonaba/mostraba lo del anterior. El arbol ya no existe:
-    // nadie los usa. Van ANTES de TexturasLiberarEscena (las prestadas son de ese cache).
-    { extern void W3dSonidosLiberar(); W3dSonidosLiberar(); }
-    { extern void Fuente2DLiberarTodas(); Fuente2DLiberarTodas(); }
-    { extern void Textura2DLiberarTodas(); Textura2DLiberarTodas(); }
-    { const int n = TexturasLiberarEscena();
+    // nadie los usa. Van ANTES de TexturesFreeScene (las prestadas son de ese cache).
+    { extern void W3dSoundsFree(); W3dSoundsFree(); }
+    { extern void Font2DFreeAll(); Font2DFreeAll(); }
+    { extern void Texture2DFreeAll(); Texture2DFreeAll(); }
+    { const int n = TexturesFreeScene();
       if (n > 0) w3dLogf("[W3D] cierre de proyecto: %d textura(s) liberada(s)", n); }
 
     // ---- MATERIALES: podarlos de verdad (bug anotado y sin arreglar hasta hoy) --
@@ -5657,9 +5657,9 @@ void ReiniciarEscena() {
     // proyecto tras otro dejaba vivos TODOS los materiales del anterior, el ctor
     // de Material los veia como homonimos y uniquificaba, asi que el proyecto
     // reabierto volvia entero con sufijo ".001" (y guardar dejaba el sufijo en el
-    // disco). Va DESPUES de destruir el arbol Y DESPUES de TexturasLiberarEscena,
+    // disco). Va DESPUES de destruir el arbol Y DESPUES de TexturesFreeScene,
     // que recorre `Materials` para soltar sus Texture*.
-    { const int n = MaterialesLiberarEscena();
+    { const int n = MaterialsFreeScene();
       if (n > 0) w3dLogf("[W3D] cierre de proyecto: %d material(es) liberado(s)", n); }
 
     // los punteros de viewport activo apuntan al layout VIEJO: soltarlos (el
@@ -5670,147 +5670,147 @@ void ReiniciarEscena() {
 
 // la apertura REAL (destruye la escena y arma el layout nuevo). Solo debe correr
 // con el stack limpio: desde el inicio del frame (main) o desde el modo --script.
-void AbrirProyectoAhora(const std::string& ruta) {
+void OpenProjectNow(const std::string& path) {
     // BARRA DE PROGRESO: abrir un .w3d bloquea el frame (montar el contenedor, descomprimir,
     // parsear el JSON y construir los objetos). En el N95 eso tarda MUCHO y la pantalla queda
     // congelada -> parece trabado. La barra bombea el render (swap) desde adentro, como el
     // import de modelos: el usuario ve que avanza (y si se traba, en que % quedo).
-    extern void ProgresoIniciar(const std::string&); extern void ProgresoFin();
-    ProgresoIniciar(T("Opening project..."));
-    { extern void InicioPopupCerrar(); InicioPopupCerrar(); }   // (la pantalla de inicio, si seguia abierta)
-    ReiniciarEscena();
+    extern void ProgressStart(const std::string&); extern void ProgressEnd();
+    ProgressStart(T("Opening project..."));
+    { extern void HomePopupClose(); HomePopupClose(); }   // (la pantalla de inicio, si seguia abierta)
+    RestartScene();
     // EL LAYOUT ANTERIOR SE LIBERA. Antes quedaba huerfano ("el viejo queda"): ~0,2 MB de heap
     // por apertura, fijos (las tarjetas del panel de propiedades, las barras...). El proyecto trae
     // su layout (o va el default): ninguno de sus viewports se reusa. Se toma la raiz COMPLETA
     // (con un viewport maximizado, rootViewport es solo esa hoja) y se libera recien con el layout
-    // NUEVO armado: mientras AbrirW3D corre, los punteros globales siguen apuntando a viewports
+    // NUEVO armado: mientras OpenW3D corre, los punteros globales siguen apuntando a viewports
     // vivos, como siempre. Los que apuntan al viejo los sueltan los ganchos de ~ViewportBase
-    // (LayoutArbol.h); los de "activo" se re-anclan al nuevo.
-    ViewportBase* layoutViejo = LayoutRaizCompleta();
+    // (LayoutTree.h); los de "activo" se re-anclan al nuevo.
+    ViewportBase* layoutOld = LayoutCompleteRoot();
     rootViewport = NULL;
-    AbrirW3D(ruta);
+    OpenW3D(path);
     // el layout nuevo nunca paso por Resize: darle el tamano ACTUAL de la ventana
     // (sin esto los viewports quedan en 0x0 y el editor parece TRABADO)
-    extern int MenuPantallaW, MenuPantallaH;
-    if (rootViewport && MenuPantallaW > 0 && MenuPantallaH > 0)
-        rootViewport->Resize(MenuPantallaW, MenuPantallaH);
-    // el arbol es NUEVO: (1) limpiar el estado "maximizado" (el g_rootGuardado viejo es parte del arbol
+    extern int MenuScreenW, MenuScreenH;
+    if (rootViewport && MenuScreenW > 0 && MenuScreenH > 0)
+        rootViewport->Resize(MenuScreenW, MenuScreenH);
+    // el arbol es NUEVO: (1) limpiar el estado "maximizado" (el g_savedRoot viejo es parte del arbol
     // que se libera; sino el menu pide Minimizar y minimizar instala el arbol muerto), (2) liberar el
     // viejo y re-anclar los activos al nuevo (el teclado va a viewPortActive: NULL = crash en la primera
     // tecla), y (3) reenganchar gRoot/paneles del layout (sino en Symbian la rotacion redimensiona el
     // arbol viejo y no re-acomoda nada).
-    { extern void LayoutResetMaximizado(); LayoutResetMaximizado();
-      if (layoutViejo != rootViewport) ViewportBorrarArbol(layoutViejo);
-      LayoutAnclarActivos();
-      extern void (*LayoutArbolCambiado)(); if (LayoutArbolCambiado) LayoutArbolCambiado(); }
-    extern void ProyectoSincronizarCampos();
-    ProyectoSincronizarCampos();
+    { extern void LayoutResetMaximized(); LayoutResetMaximized();
+      if (layoutOld != rootViewport) ViewportDeleteTree(layoutOld);
+      LayoutAnchorActive();
+      extern void (*LayoutChangedTree)(); if (LayoutChangedTree) LayoutChangedTree(); }
+    extern void ProjectSyncFields();
+    ProjectSyncFields();
     // el tipo de las escenas sin tipo guardado se deduce AHORA y queda fijo (antes de la foto: no es un cambio)
-    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
+    { extern void W3dRootsSetTypesDeduced(); W3dRootsSetTypesDeduced(); }
     // lo que se abrio esta GUARDADO: la foto de lo no guardado (los '*', el cartel al cerrar)
-    { extern void W3dCambiosFoto(); W3dCambiosFoto(); }
+    { extern void W3dChangesSnapshot(); W3dChangesSnapshot(); }
     // MODO JUEGO (.sisx bundleado): full-screen del 3D -> el juego se ve solo, sin el chrome
-    // del editor. El auto-play (game mode + Play) ya lo hizo AbrirW3D si el proyecto tiene scripts.
-    { extern bool g_modoJuego;   // definido mas abajo en este archivo
-      if (g_modoJuego) { extern void LayoutMaximizar3DParaJuego(); LayoutMaximizar3DParaJuego(); } }
-    ProgresoFin();
+    // del editor. El auto-play (game mode + Play) ya lo hizo OpenW3D si el proyecto tiene scripts.
+    { extern bool g_gameMode;   // definido mas abajo en este archivo
+      if (g_gameMode) { extern void LayoutMaximize3DForGame(); LayoutMaximize3DForGame(); } }
+    ProgressEnd();
     g_redraw = true;
 }
 
 // abrir un proyecto DESDE LA TARJETA Archivo: NO se abre aca mismo (el boton que
 // disparo esto vive en el layout que vamos a destruir; destruirlo con su stack
 // activo TRABABA el editor). Se anota y el main lo abre al inicio del proximo frame.
-std::string g_proyAbrirPendiente;
+std::string g_projOpenPending;
 // MODO JUEGO: lo prende el arranque (Whisk3D.cpp) cuando el .sisx trae un proyecto bundleado.
 // Hace que al abrir el proyecto se full-screene el viewport 3D (el juego se ve solo).
-bool g_modoJuego = false;
-void AbrirProyectoDesde(const std::string& ruta) {
+bool g_gameMode = false;
+void OpenProjectFrom(const std::string& path) {
     // con algo SIN GUARDAR se pregunta primero ("Se perderan los cambios en:"); el cartel abre el proyecto si el usuario sigue
-    { extern bool W3dCambiosPreguntar(int, const std::string&); if (W3dCambiosPreguntar(1 /*W3D_CAMBIOS_ABRIR*/, ruta)) return; }
-    g_proyAbrirPendiente = ruta;
+    { extern bool W3dChangesAsk(int, const std::string&); if (W3dChangesAsk(1 /*W3D_CHANGES_OPEN*/, path)) return; }
+    g_projOpenPending = path;
     g_redraw = true;
 }
 
 // ===========================================================================
 //  NUEVO PROYECTO (tarjeta Archivo y la pantalla de inicio): la misma escena y el mismo layout con los que arranca el
-//  editor sin archivo (W3dCrearEscenaPorDefecto + LayoutPorDefecto), sin ruta. Como abrir, va DIFERIDO al inicio del
+//  editor sin archivo (W3dCreateDefaultScene + LayoutDefault), sin ruta. Como abrir, va DIFERIDO al inicio del
 //  proximo frame: el boton que lo pide vive en el layout que se reemplaza. Con algo SIN GUARDAR pregunta primero (el
 //  cartel "Se perderan los cambios en:", como abrir otro proyecto): guardar y seguir, seguir sin guardar o cancelar.
 // ===========================================================================
-bool g_proyNuevoPendiente = false;
-// el LAYOUT con el que arranca el proyecto nuevo: "" = el de fabrica (LayoutPorDefecto); si no, uno guardado
+bool g_newPendingProj = false;
+// el LAYOUT con el que arranca el proyecto nuevo: "" = el de fabrica (LayoutDefault); si no, uno guardado
 // (config/W3dLayouts.h). Lo elige la lista de "Nuevo proyecto" (tarjeta Archivo) y la de "Nuevo archivo" (inicio)
-static std::string g_proyNuevoLayout;
-void NuevoProyectoAhora();
+static std::string g_newProjLayout;
+void NewProjectNow();
 // lo pedido por un boton (abrir / nuevo), con el stack limpio: el main al inicio de cada frame (y el harness)
-void ProcesarProyectoPendiente() {
-    if (!g_proyAbrirPendiente.empty()) {
-        const std::string r = g_proyAbrirPendiente;
-        g_proyAbrirPendiente.clear();
-        AbrirProyectoAhora(r);
+void ProcessPendingProject() {
+    if (!g_projOpenPending.empty()) {
+        const std::string r = g_projOpenPending;
+        g_projOpenPending.clear();
+        OpenProjectNow(r);
     }
-    if (g_proyNuevoPendiente) { g_proyNuevoPendiente = false; NuevoProyectoAhora(); }
-#ifndef W3D_SIN_EDITOR
-    { extern void LayoutProcesarPendiente(); LayoutProcesarPendiente(); }   // un layout elegido en el menu (LayoutInput.cpp)
+    if (g_newPendingProj) { g_newPendingProj = false; NewProjectNow(); }
+#ifndef W3D_NO_EDITOR
+    { extern void LayoutProcessPending(); LayoutProcessPending(); }   // un layout elegido en el menu (LayoutInput.cpp)
 #endif
 }
-static void NuevoProyectoPendiente() {
-    g_proyNuevoPendiente = true;
+static void NewPendingProject() {
+    g_newPendingProj = true;
     g_redraw = true;
 }
-void NuevoProyectoConLayout(const std::string& layout) {
-    extern void (*W3dCambiosNuevoHook)();
-    extern bool W3dCambiosPreguntar(int, const std::string&);
-    g_proyNuevoLayout = layout;
-    W3dCambiosNuevoHook = NuevoProyectoPendiente;   // (lo que hace el cartel si el usuario sigue)
-    if (W3dCambiosPreguntar(2 /*W3D_CAMBIOS_NUEVO*/, std::string())) return;
-    NuevoProyectoPendiente();
+void NewProjectWithLayout(const std::string& layout) {
+    extern void (*W3dChangesNewHook)();
+    extern bool W3dChangesAsk(int, const std::string&);
+    g_newProjLayout = layout;
+    W3dChangesNewHook = NewPendingProject;   // (lo que hace el cartel si el usuario sigue)
+    if (W3dChangesAsk(2 /*W3D_CHANGES_NEW*/, std::string())) return;
+    NewPendingProject();
 }
-void NuevoProyectoDesde() { NuevoProyectoConLayout(std::string()); }
-void NuevoProyectoAhora() {
-    { extern void InicioPopupCerrar(); InicioPopupCerrar(); }   // (la pantalla de inicio, si seguia abierta)
-    ReiniciarEscena();
-    ViewportBase* layoutViejo = LayoutRaizCompleta();
+void NewProjectFrom() { NewProjectWithLayout(std::string()); }
+void NewProjectNow() {
+    { extern void HomePopupClose(); HomePopupClose(); }   // (la pantalla de inicio, si seguia abierta)
+    RestartScene();
+    ViewportBase* layoutOld = LayoutCompleteRoot();
     rootViewport = NULL;
     w3dPath.clear();
-    W3dCompilarReset();   // la tarjeta Juego vuelve a los valores de fabrica (abrir los toma del archivo)
-    W3dAssetOrigenesLimpiar();   // (los origenes de los assets eran del proyecto de antes)
-    { extern void W3dCrearEscenaPorDefecto(); W3dCrearEscenaPorDefecto(); }
-    extern int MenuPantallaW, MenuPantallaH;
+    W3dCompileReset();   // la tarjeta Juego vuelve a los valores de fabrica (abrir los toma del archivo)
+    W3dAssetOriginsClear();   // (los origenes de los assets eran del proyecto de antes)
+    { extern void W3dCreateDefaultScene(); W3dCreateDefaultScene(); }
+    extern int MenuScreenW, MenuScreenH;
     Viewport3D* vp3d = NULL;
     rootViewport = NULL;
-#ifndef W3D_SIN_EDITOR
-    if (!g_proyNuevoLayout.empty()) {   // uno guardado: como elegirlo en el menu Layout (LayoutInput.cpp, LayoutInstalar)
-        extern std::string W3dLayoutTexto(const std::string&);
-        rootViewport = W3dLayoutDesdeTexto(W3dLayoutTexto(g_proyNuevoLayout));
-        if (!rootViewport) { extern void Notificar(const std::string&, bool);
-                             Notificar(std::string(T("Could not load the layout")) + ": " + g_proyNuevoLayout, true); }
-        else { extern Viewport3D* LayoutPrimer3DDe(ViewportBase*); vp3d = LayoutPrimer3DDe(rootViewport); }
+#ifndef W3D_NO_EDITOR
+    if (!g_newProjLayout.empty()) {   // uno guardado: como elegirlo en el menu Layout (LayoutInput.cpp, LayoutInstall)
+        extern std::string W3dLayoutText(const std::string&);
+        rootViewport = W3dLayoutFromText(W3dLayoutText(g_newProjLayout));
+        if (!rootViewport) { extern void Notify(const std::string&, bool);
+                             Notify(std::string(T("Could not load the layout")) + ": " + g_newProjLayout, true); }
+        else { extern Viewport3D* LayoutFirst3DOf(ViewportBase*); vp3d = LayoutFirst3DOf(rootViewport); }
     }
 #endif
-    g_proyNuevoLayout.clear();
-    if (!rootViewport) rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, &vp3d);
+    g_newProjLayout.clear();
+    if (!rootViewport) rootViewport = LayoutDefault(MenuScreenW, MenuScreenH, &vp3d);
     if (rootViewport) { rootViewport->x = 0; rootViewport->y = 0; }
-    if (rootViewport && MenuPantallaW > 0 && MenuPantallaH > 0) rootViewport->Resize(MenuPantallaW, MenuPantallaH);
-    // (lo mismo que AbrirProyectoAhora con el arbol nuevo: soltar el viejo y re-anclar los activos)
-    { extern void LayoutResetMaximizado(); LayoutResetMaximizado();
-      if (layoutViejo != rootViewport) ViewportBorrarArbol(layoutViejo);
-      LayoutAnclarActivos();
+    if (rootViewport && MenuScreenW > 0 && MenuScreenH > 0) rootViewport->Resize(MenuScreenW, MenuScreenH);
+    // (lo mismo que OpenProjectNow con el arbol nuevo: soltar el viejo y re-anclar los activos)
+    { extern void LayoutResetMaximized(); LayoutResetMaximized();
+      if (layoutOld != rootViewport) ViewportDeleteTree(layoutOld);
+      LayoutAnchorActive();
       viewPortActive = vp3d ? (ViewportBase*)vp3d : rootViewport;   // (un layout sin Vista 3D: el arbol entero)
-      extern void (*LayoutArbolCambiado)(); if (LayoutArbolCambiado) LayoutArbolCambiado(); }
-    extern void ProyectoSincronizarCampos();
-    ProyectoSincronizarCampos();
-    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
-    { extern void W3dCambiosFoto(); W3dCambiosFoto(); }   // recien hecho: nada sin guardar
+      extern void (*LayoutChangedTree)(); if (LayoutChangedTree) LayoutChangedTree(); }
+    extern void ProjectSyncFields();
+    ProjectSyncFields();
+    { extern void W3dRootsSetTypesDeduced(); W3dRootsSetTypesDeduced(); }
+    { extern void W3dChangesSnapshot(); W3dChangesSnapshot(); }   // recien hecho: nada sin guardar
     g_redraw = true;
 }
 
 // ===========================================================================
-//  ENTRADA UNICA de lectura: AbrirW3D(ruta) detecta el formato POR CONTENIDO
+//  ENTRADA UNICA de lectura: OpenW3D(ruta) detecta el formato POR CONTENIDO
 //  y rutea. Los tres formatos convergen en las mismas estructuras y en los
 //  mismos aplicadores de campos (una sola fuente de verdad por campo):
 //    '{'        -> JSON PLANO nuevo (v3: el .w3d ES el json)
-//    'PK'       -> zip v2 viejo (escena.json adentro; se extrae como antes)
+//    'PK'       -> zip v2 viejo (scene.json adentro; se extrae como antes)
 //    'Whisk3D'  -> texto viejo (Whisk3D { Escena { ... } Layout { ... } })
 //  Cualquier problema (archivo inexistente, json roto, formato desconocido,
 //  .w3dui faltante) deja el editor VIVO: aviso claro en el log (visible en el
@@ -5818,7 +5818,7 @@ void NuevoProyectoAhora() {
 // ===========================================================================
 
 // nombre de archivo pelado sin extension ("a/b/consola.w3d" -> "consola")
-static std::string NombreSinExt(const std::string& r) {
+static std::string NameNoExt(const std::string& r) {
     size_t s = r.find_last_of("/\\");
     std::string b = (s == std::string::npos) ? r : r.substr(s + 1);
     size_t p = b.find_last_of('.');
@@ -5826,75 +5826,75 @@ static std::string NombreSinExt(const std::string& r) {
 }
 
 // ---------------------------------------------------------------------------
-//  camino CONTENEDOR v4: el .w3d es un ZIP con proyecto.json adentro.
+//  camino CONTENEDOR v4: el .w3d es un ZIP con project.json adentro.
 //  NO SE EXTRAE NADA: se indexa, se MONTA como origen virtual de
 //  w3dFileSystem::ReadFileBytes y las rutas del JSON son nombres de entrada.
 //  Por eso texturas, fuentes, lua, .w3dui y GLB cargan de adentro sin tocar sus
 //  call sites, y el editor nunca trabaja sobre una copia extraida.
 //
-//  "mimetype" y "LEEME.txt" (las entradas de servicio del estilo OpenDocument)
+//  "mimetype" y "README.txt" (las entradas de servicio del estilo OpenDocument)
 //  NO se leen NUNCA: son para el que abre el zip con un descompresor. El que
-//  manda para decidir si esto es un proyecto es proyecto.json, asi que un .w3d
+//  manda para decidir si esto es un proyecto es project.json, asi que un .w3d
 //  guardado ANTES del mimetype abre igual y se migra en el primer guardado.
 // ---------------------------------------------------------------------------
-static bool AbrirW3DContenedor(const std::string& ruta) {
-    extern void ProgresoActualizar(float);
-    const double tMed = CargaAhora();   // medicion: montaje + lectura de proyecto.json
-    if (!W3dContenedorMontar(ruta)) {
-        w3dLogfE("[W3D] no pude montar el contenedor %s (se abre vacio)", ruta.c_str());
+static bool OpenW3DContainer(const std::string& path) {
+    extern void ProgressUpdate(float);
+    const double tMed = LoadNow();   // medicion: montaje + lectura de project.json
+    if (!W3dContainerMount(path)) {
+        w3dLogfE("[W3D] no pude montar el contenedor %s (se abre vacio)", path.c_str());
         return false;
     }
-    ProgresoActualizar(0.12f);   // contenedor montado (indice del zip descomprimido)
-    std::vector<unsigned char> datos;
-    if (!w3dFileSystem::ReadFileBytes("proyecto.json", datos) || datos.empty()) {
-        w3dLogfE("[W3D] el contenedor %s no trae proyecto.json legible (se abre vacio)", ruta.c_str());
+    ProgressUpdate(0.12f);   // contenedor montado (indice del zip descomprimido)
+    std::vector<unsigned char> data;
+    if (!w3dFileSystem::ReadFileBytes("project.json", data) || data.empty()) {
+        w3dLogfE("[W3D] el contenedor %s no trae project.json legible (se abre vacio)", path.c_str());
         return false;
     }
-    ProgresoActualizar(0.22f);   // proyecto.json leido y descomprimido
-    if (g_w3dCargaReloj) g_w3dCargaFases.montajeMs += CargaAhora() - tMed;
-    gProyectoV4 = true;
-    g_w3dRefsEntradas = true;          // los .w3dui tambien traen nombres de entrada
-    g_w3dRefExtMarcar = W3dRefExternaMarcar;
-    bool ok = AbrirEscenaJson((const char*)&datos[0], datos.size(), std::string());
-    g_w3dRefsEntradas = false;
-    g_w3dRefExtMarcar = NULL;
+    ProgressUpdate(0.22f);   // project.json leido y descomprimido
+    if (g_w3dLoadClock) g_w3dLoadPhases.mountMs += LoadNow() - tMed;
+    gProjectV4 = true;
+    g_w3dRefsEntries = true;          // los .w3dui tambien traen nombres de entrada
+    g_w3dRefExtMark  = W3dExternalRefMark;
+    bool ok = OpenSceneJson((const char*)&data[0], data.size(), std::string());
+    g_w3dRefsEntries = false;
+    g_w3dRefExtMark  = NULL;
     return ok;
 }
 
 // camino ZIP v2 viejo: extraer a userdata (los .glb/.bin referenciados
-// necesitan vivir en disco) y abrir el escena.json de adentro.
-static bool AbrirW3DZip(const std::string& ruta) {
-    std::string base = w3dFileSystem::GetUserDataDir() + "/w3d_abierto/" + NombreSinExt(ruta);
-    if (!W3dZipExtraer(ruta, base)) {
-        w3dLogfE("[W3D] no pude extraer el zip: %s (se abre vacio)", ruta.c_str());
+// necesitan vivir en disco) y abrir el scene.json de adentro.
+static bool OpenW3DZip(const std::string& path) {
+    std::string base = w3dFileSystem::GetUserDataDir() + "/w3d_abierto/" + NameNoExt(path);
+    if (!W3dZipExtract(path, base)) {
+        w3dLogfE("[W3D] no pude extraer el zip: %s (se abre vacio)", path.c_str());
         return false;
     }
-    std::vector<unsigned char> datos;
-    if (!w3dFileSystem::ReadFileBytes(base + "/escena.json", datos) || datos.empty()) {
-        w3dLogfE("[W3D] el zip no trae escena.json: %s (se abre vacio)", ruta.c_str());
+    std::vector<unsigned char> data;
+    if (!w3dFileSystem::ReadFileBytes(base + "/scene.json", data) || data.empty()) {
+        w3dLogfE("[W3D] el zip no trae escena.json: %s (se abre vacio)", path.c_str());
         return false;
     }
-    return AbrirEscenaJson((const char*)&datos[0], datos.size(), base);
+    return OpenSceneJson((const char*)&data[0], data.size(), base);
 }
 
 // camino TEXTO viejo: Whisk3D { Escena {...} Layout {...} }
-static bool AbrirW3DTexto(const std::string& src) {
-    double tMed = CargaAhora();   // medicion por fase (0 = nadie mide): el parse del texto = "json"
+static bool OpenW3DText(const std::string& src) {
+    double tMed = LoadNow();   // medicion por fase (0 = nadie mide): el parse del texto = "json"
     std::vector<std::string> tokens = Tokenize(src);
     size_t i = 0;
     Node* project = ParseNode(tokens, i);
-    if (g_w3dCargaReloj) g_w3dCargaFases.jsonMs += CargaAhora() - tMed;
+    if (g_w3dLoadClock) g_w3dLoadPhases.jsonMs += LoadNow() - tMed;
     bool ok = project && project->type == "Whisk3D";
     if (!ok) {
         w3dLogfE("[W3D] se esperaba un root Whisk3D{}, vino '%s' (se abre vacio)",
                  project ? project->type.c_str() : "(nada)");
     } else {
-        Node* escena = Find(project, "Escena");
+        Node* scene  = Find(project, "Scene");
         Node* layout = Find(project, "Layout");
-        if (!escena) w3dLogfW("[W3D] el archivo no trae 'Escena': abre sin objetos");
-        tMed = CargaAhora();
-        if (escena) BuildScene(escena);
-        if (g_w3dCargaReloj) g_w3dCargaFases.objetosMs += CargaAhora() - tMed;
+        if (!scene) w3dLogfW("[W3D] el archivo no trae 'Escena': abre sin objetos");
+        tMed = LoadNow();
+        if (scene) BuildScene(scene);
+        if (g_w3dLoadClock) g_w3dLoadPhases.objectsMs += LoadNow() - tMed;
         if (layout && !layout->children.empty())
             rootViewport = BuildLayout(layout->children[0]);
         else
@@ -5905,189 +5905,189 @@ static bool AbrirW3DTexto(const std::string& src) {
 }
 
 
-void AbrirW3D(const std::string& ruta) {
+void OpenW3D(const std::string& path) {
     // los nombres entran CRUDOS mientras dura la carga (los .w3d ya guardados TIENEN
     // duplicados) y se reparan todos juntos al final, con el arbol completo y los
     // vinculos por nombre a la vista. Ademas evita el O(n^2) de uniquificar uno a uno.
-    W3dNombresCargando = true;
-    w3dPath = ruta;
-    gDirProyecto = DirDelProyecto();
-    g_w3dDirProyecto = gDirProyecto;   // base de las rutas "ext:" relativas (UI2DFormato)
+    W3dNamesLoading = true;
+    w3dPath = path;
+    gDirProject = DirOfProject();
+    g_w3dDirProject = gDirProject;   // base de las rutas "ext:" relativas (UI2DFormato)
 
     // REDIRECCION de cout/cerr AL LOG, tambien aca (no solo en el ConstructL de Symbian): si Carbide no
     // recompilo Whisk3DAppUi.cpp, el redirect del arranque no quedo instalado y los cout de la carga caian
     // a la TERMINAL blanca del N95. Abrir un proyecto SIEMPRE pasa por este archivo -> el redirect queda
     // puesto ANTES de leer nada, y persiste toda la sesion (juego incluido). Idempotente (solo el rdbuf).
-    w3dRedirigirCoutAlLog();
+    w3dRedirectCoutToLog();
 
     // INSTRUMENTACION de carga: resetear los acumuladores por fase y dejar un MARCADOR de build.
     // Si en el log NO aparece esta linea ni el resumen "[CARGA]" del pie, la build que corre es VIEJA
     // (Carbide no recompilo import_wobj.cpp/import_w3d.cpp) -> hay que forzar el recompilado.
-    { extern unsigned long g_wobjParseMs, g_wobjBordesMs, g_wobjCount;
-      g_wobjParseMs = g_wobjBordesMs = g_wobjCount = 0; }
-    s_mallasBinarias = s_mallasDerivadas = s_mallasBinRechazadas = 0;
+    { extern unsigned long g_wobjParseMs, g_wobjBordersMs, g_wobjCount;
+      g_wobjParseMs = g_wobjBordersMs = g_wobjCount = 0; }
+    s_binaryMeshes = s_derivedMeshes = s_meshesRejectedBin = 0;
     w3dLogf("[BUILD] parser .obj = strtod (rapido), carga instrumentada");
     // el cache 2D pudo PRESTAR ids del cache 3D del proyecto anterior (atlas
     // unico): al abrir otro proyecto esos ids pueden liberarse -> purgarlas
     // ANTES de cargar (se re-prestan solas al primer uso).
-    { extern void Textura2DPurgarPrestadas(); Textura2DPurgarPrestadas(); }
+    { extern void Texture2DPurgeBorrowed(); Texture2DPurgeBorrowed(); }
     gPendModArm.clear(); // referencias modArmature de una carga anterior (por si quedo algo)
     gPendModTgt.clear(); // idem targets de modificadores y mallas a regenerar
     gPendModGen.clear();
-    gPendConsViejo.clear(); // idem los nodos del objeto Constraint VIEJO (se migran al final)
+    gOldPendCons.clear(); // idem los nodos del objeto Constraint VIEJO (se migran al final)
 
     // campos DEL PROYECTO: arrancan limpios (el archivo los setea si los trae;
     // sin esto un proyecto sin escenaInicial heredaba la del proyecto anterior)
-    AplicarEscenaInicial(std::string());
-    AplicarModoEscenas(false);
+    ApplyInitialScene(std::string());
+    ApplySceneMode(false);
     // idem la config de la tarjeta Juego: un .w3d sin el bloque "compilar" abre
     // con los defaults (no hereda el modo ventana del proyecto anterior)
-    W3dCompilarReset();
+    W3dCompileReset();
     // idem el estado de reproduccion guardado: ausente = -1 (auto-play de siempre)
-    g_proyReproduciendo = -1;
+    g_projPlaying = -1;
     // idem la SESION (frame + seleccion). El frame vuelve al 1: un .w3d sin el bloque
     // (los viejos) abre en el default del editor y NO se queda con el playhead donde lo
-    // habia dejado el proyecto anterior. Si el archivo trae "sesion", SesionAplicar lo
-    // pisa en el pie. La seleccion ya la limpia el DeseleccionarTodo del pie.
-    SesionReset();
+    // habia dejado el proyecto anterior. Si el archivo trae "sesion", SessionApply lo
+    // pisa en el pie. La seleccion ya la limpia el DeselectAll del pie.
+    SessionReset();
     CurrentFrame = 1;
-    // idem el FPS: AplicarFps ignora un "fps" ausente/0, asi que sin este reset
+    // idem el FPS: ApplyFps ignora un "fps" ausente/0, asi que sin este reset
     // un proyecto sin el campo HEREDABA el fps del proyecto anterior
     AnimFPS = 30;
     g_fpsCap = 60;   // idem el tope de render: sin el campo fpsCap se vuelve al default de plataforma
 
     // el proyecto ANTERIOR deja de estar montado (su FILE* se suelta) y sus refs
     // externas dejan de valer: las del que abre las trae SU archivo
-    W3dContenedorDesmontar();
-    W3dRefExternasLimpiar();
-    g_w3dUINoCargo.clear();   // el freno de las escenas UI es DEL proyecto que se abre, no del anterior
-    gProyectoV4 = false;
+    W3dContainerUnmount();
+    W3dExternalRefClear();
+    g_w3dUINotLoaded.clear();   // el freno de las escenas UI es DEL proyecto que se abre, no del anterior
+    gProjectV4 = false;
 
-    std::vector<unsigned char> datos;
-    // un ZIP no se levanta entero solo para detectarlo: W3dZipEs mira 4 bytes y
+    std::vector<unsigned char> data;
+    // un ZIP no se levanta entero solo para detectarlo: W3dZipIs mira 4 bytes y
     // el contenedor despues se indexa por el directorio central (nunca completo)
-    const double tMed = CargaAhora();   // medicion: detectar + leer el archivo (el zip se mide al montar)
-    bool esZip = W3dZipEs(ruta);
-    bool leido = esZip || (w3dFileSystem::ReadFileBytes(ruta, datos) && !datos.empty());
-    if (g_w3dCargaReloj) g_w3dCargaFases.montajeMs += CargaAhora() - tMed;
-    const char* formato = "desconocido";
+    const double tMed = LoadNow();   // medicion: detectar + leer el archivo (el zip se mide al montar)
+    bool isZip = W3dZipIs(path);
+    bool read  = isZip || (w3dFileSystem::ReadFileBytes(path, data) && !data.empty());
+    if (g_w3dLoadClock) g_w3dLoadPhases.mountMs += LoadNow() - tMed;
+    const char* format = "unknown";
     bool ok = false;
 
-    if (esZip) {
-        if (W3dContenedorEs(ruta)) {
-            formato = "contenedor v4";
-            ok = AbrirW3DContenedor(ruta);
+    if (isZip) {
+        if (W3dContainerIs(path)) {
+            format = "contenedor v4";
+            ok = OpenW3DContainer(path);
         } else {
-            formato = "zip v2";
-            ok = AbrirW3DZip(ruta);
+            format = "zip v2";
+            ok = OpenW3DZip(path);
         }
-    } else if (!leido) {
-        w3dLogfE("[W3D] no pude leer %s (no existe o esta vacio): se abre vacio", ruta.c_str());
+    } else if (!read) {
+        w3dLogfE("[W3D] no pude leer %s (no existe o esta vacio): se abre vacio", path.c_str());
     } else {
         // deteccion POR CONTENIDO (no por extension): primer byte util
         size_t i = 0;
-        while (i < datos.size() && (datos[i] == ' ' || datos[i] == '\t' ||
-                                    datos[i] == '\r' || datos[i] == '\n')) i++;
-        bool esTexto = (datos.size() - i >= 7 && memcmp(&datos[i], "Whisk3D", 7) == 0) ||
-                       (i < datos.size() && (datos[i] == '/' || datos[i] == '#'));   // comentario inicial
-        if (i < datos.size() && datos[i] == '{') {
-            formato = "json";
-            ok = AbrirEscenaJson((const char*)&datos[0] + i, datos.size() - i, gDirProyecto);
-        } else if (esTexto) {
-            formato = "texto viejo";
-            ok = AbrirW3DTexto(std::string((const char*)&datos[0], datos.size()));
+        while (i < data.size() && (data[i] == ' ' || data[i] == '\t' ||
+                                    data[i] == '\r' || data[i] == '\n')) i++;
+        bool isText = (data.size() - i >= 7 && memcmp(&data[i], "Whisk3D", 7) == 0) ||
+                       (i < data.size() && (data[i] == '/' || data[i] == '#'));   // comentario inicial
+        if (i < data.size() && data[i] == '{') {
+            format = "json";
+            ok = OpenSceneJson((const char*)&data[0] + i, data.size() - i, gDirProject);
+        } else if (isText) {
+            format = "texto viejo";
+            ok = OpenW3DText(std::string((const char*)&data[0], data.size()));
         } else {
             w3dLogfE("[W3D] %s no parece un .w3d (ni JSON, ni zip, ni texto Whisk3D): se abre vacio",
-                     ruta.c_str());
+                     path.c_str());
         }
     }
 
     // ---- pie COMUN a los tres formatos (tambien si algo fallo: el editor sigue) ----
     if (!CollectionActive) CollectionActive = SceneCollection;
-    bool layoutDelProyecto = (rootViewport != NULL);
+    bool layoutOfProject = (rootViewport != NULL);
     if (!rootViewport) {
         // fallback: el .w3d no trae bloque Layout -> EL layout por defecto (por tamano de pantalla,
-        // el MISMO que el arranque sin archivo). MenuPantallaW/H estan seteados en PC y en Symbian.
-        extern int MenuPantallaW, MenuPantallaH;
-        rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, NULL);
+        // el MISMO que el arranque sin archivo). MenuScreenW/H estan seteados en PC y en Symbian.
+        extern int MenuScreenW, MenuScreenH;
+        rootViewport = LayoutDefault(MenuScreenW, MenuScreenH, NULL);
     }
 
     // nada seleccionado al abrir (los constructores van seleccionando lo
     // ultimo creado; un proyecto recien abierto arranca LIMPIO)
-    DeseleccionarTodo();
-    ObjActivo = NULL;
+    DeselectAll();
+    ActiveObj = NULL;
 
     // una raiz de tipo JUEGO (la del bloque: el registro lo dice, o en un proyecto viejo sale de su
-    // contenido -tiene scripts-, ver W3dRaices.h) arranca con el selector del timeline en "Juego" y
+    // contenido -tiene scripts-, ver W3dRoots.h) arranca con el selector del timeline en "Juego" y
     // en PLAY (asi el doble click abre jugando y las vertex animations corren de una). PERO si el
     // .w3d v3 trae "reproduciendo": false (se GUARDO en pausa), se respeta y abre en pausa.
     // Ausente (-1, archivos viejos) = auto-play de siempre. Una ESCENA abre en su animacion.
-    if (W3dRaizTipoActiva() == W3D_RAIZ_JUEGO) {
-        W3dRaizModoPorTipo(true);
-        PlayAnimation = (g_proyReproduciendo != 0);
+    if (W3dRootActiveType() == W3D_ROOT_GAME) {
+        W3dRootModeByType(true);
+        PlayAnimation = (g_projPlaying != 0);
         g_redraw = true;
     }
-    // LA RED (config/W3dRedPermisos.h): si sus scripts juegan en red, lo decidido para este archivo o la pregunta
+    // LA RED (config/W3dNetPermissions.h): si sus scripts juegan en red, lo decidido para este archivo o la pregunta
     // (una sola vez; si abria jugando, arranca al responder)
-    { extern void RedAlAbrirProyecto(const std::string&); RedAlAbrirProyecto(ruta); }
+    { extern void NetOnOpenProject(const std::string&); NetOnOpenProject(path); }
 
-    W3dNombresCargando = false;
+    W3dNamesLoading = false;
 
     // LAS MALLAS QUE ABRIERON SUELTAS (sin recurso del registro: una "geometria" por objeto, un
     // archivo viejo) se juntan por contenido al guardar; las nuevas de la sesion no
-    // (Mesh::dedupPorContenido, io/MallasProyecto.h)
-    { extern void W3dMallasMarcarSueltasDelArchivo(); W3dMallasMarcarSueltasDelArchivo(); }
+    // (Mesh::dedupByContent, io/ProjectMeshes.h)
+    { extern void W3dMeshesMarkFileLoose(); W3dMeshesMarkFileLoose(); }
     // TODA MALLA ES UN RECURSO: las que abrieron sueltas (un archivo viejo) tienen el suyo YA, no recien al
     // guardar (las iguales comparten uno: mil arboles -> una malla)
-    { extern int W3dMallasAsegurarRecursos(); W3dMallasAsegurarRecursos(); }
+    { extern int W3dMeshesEnsureResources(); W3dMeshesEnsureResources(); }
 
     // MIGRACION del objeto Constraint viejo: sus propiedades pasan al objeto que APUNTABA (la
     // inversion de semantica) y el nodo desaparece si no tiene hijos. Va PRIMERA, antes de la
     // reparacion de nombres, porque los nodos que se van no tienen que contar como duplicados
     // de un objeto real: si contaran, la que se lleva el ".001" (para siempre) puede ser la
-    // malla del usuario. El motivo completo esta arriba, en el bloque de MigrarConstraintsViejos.
-    MigrarConstraintsViejos();
+    // malla del usuario. El motivo completo esta arriba, en el bloque de MigrateOldConstraints.
+    MigrateOldConstraints();
 
     // NOMBRES UNICOS: reparar los duplicados que venian en el archivo. Va ANTES del
-    // ReloadAll (que resuelve targetName/RielName por nombre) para que los punteros se
+    // ReloadAll (que resuelve targetName/RailName por nombre) para que los punteros se
     // resuelvan contra los nombres YA definitivos. Avisa de forma visible: renombrar
     // puede romper scripts lua que buscan por nombre.
-    W3dNombresRepararEscena(true);
+    W3dNamesRepairScene(true);
 
     // recargar los targets de todos los objetos modificadores
     SearchLoop();
     if (SceneCollection) SceneCollection->ReloadAll();
 
     // ...y la FUENTE de cada constraint, que tambien viaja por nombre. Va DESPUES de
-    // W3dNombresRepararEscena (los nombres recien ahi son los definitivos: resolver antes
+    // W3dNamesRepairScene (los nombres recien ahi son los definitivos: resolver antes
     // ligaria contra un nombre que la reparacion todavia va a mover) y despues del
-    // ReloadAll, o sea en el mismo lugar y por el mismo motivo que targetName / RielName.
+    // ReloadAll, o sea en el mismo lugar y por el mismo motivo que targetName / RailName.
     // La pasada vive en el CORE (Objects.cpp) porque el runtime de un juego carga el mismo
     // archivo y necesita exactamente esto.
     // (los constraints que acaba de crear la migracion NO dependen de esta pasada: su fuente
     // es la VISTA, sin nombre que resolver. Por eso puede ir antes y esta no la alcanza.)
-    if (SceneCollection) W3dConstraintsResolverNombres(SceneCollection);
+    if (SceneCollection) W3dConstraintsResolveNames(SceneCollection);
 
     // la RAIZ que el usuario estaba editando (otra escena 3D o un prefab): se abre (carga
     // perezosa) ANTES de la seleccion, que es de esa raiz
-    if (!g_sesRaiz.empty()) {
-        const int r = W3dRaizBuscar(g_sesRaizTipo, g_sesRaiz);
-        std::string motivo;
-        extern bool W3dActivarRaiz(int idx, std::string* motivo);
-        if (r < 0) w3dLogfW("[W3D] sesion: la raiz '%s' ya no esta en el proyecto", g_sesRaiz.c_str());
-        else if (!W3dActivarRaiz(r, &motivo))
-            w3dLogfW("[W3D] sesion: no pude abrir '%s' (%s)", g_sesRaiz.c_str(), motivo.c_str());
+    if (!g_sessionRoot.empty()) {
+        const int r = W3dRootFind(g_sessionRootType, g_sessionRoot);
+        std::string reason;
+        extern bool W3dActivateRoot(int idx, std::string* reason);
+        if (r < 0) w3dLogfW("[W3D] sesion: la raiz '%s' ya no esta en el proyecto", g_sessionRoot.c_str());
+        else if (!W3dActivateRoot(r, &reason))
+            w3dLogfW("[W3D] sesion: no pude abrir '%s' (%s)", g_sessionRoot.c_str(), reason.c_str());
         // (el cambio de raiz para la reproduccion: un JUEGO reabierto arranca como el del bloque)
-        else if (W3dRaizTipoActiva() == W3D_RAIZ_JUEGO) PlayAnimation = (g_proyReproduciendo != 0);
+        else if (W3dRootActiveType() == W3D_ROOT_GAME) PlayAnimation = (g_projPlaying != 0);
     }
 
     // LAS ESCENAS QUE QUEDARON ABIERTAS (varias a la vez en el editor): se cargan ahora, con la activa ya puesta
-    W3dRaicesAbiertasCargar();
+    W3dOpenRootsLoad();
 
     // SESION: el frame y la seleccion que el usuario tenia en ESTE proyecto. Va DESPUES
-    // de W3dNombresRepararEscena (los nombres recien ahi son los definitivos) y despues
-    // del DeseleccionarTodo de arriba, que es el que deja limpio al que no trae bloque.
-    SesionAplicar();
+    // de W3dNamesRepairScene (los nombres recien ahi son los definitivos) y despues
+    // del DeselectAll de arriba, que es el que deja limpio al que no trae bloque.
+    SessionApply();
 
     // RESUMEN corto de la apertura (queda en el log; se ve en el viewport Console)
     if (ok) {
@@ -6098,20 +6098,20 @@ void AbrirW3D(const std::string& ruta) {
                 if (SceneCollection->Childrens[i]->getType() == ObjectType::ui) uis++;
         w3dLogf("[W3D] abierto %s (%s): %d objeto(s), %d escena(s) UI, escenaInicial '%s', "
                 "layout %s, icono '%s'",
-                ruta.c_str(), formato, objs, uis, W3dEscenaInicial().c_str(),
-                layoutDelProyecto ? "del proyecto" : "default", g_proyIcono.c_str());
-        w3dLogMemoria("proyecto abierto");
+                path.c_str(), format, objs, uis, W3dInitialScene().c_str(),
+                layoutOfProject ? "del proyecto" : "default", g_projIcon.c_str());
+        w3dLogMemory("proyecto abierto");
     }
 
     // REPARTO del tiempo de carga por fase (para saber que optimizar en el N95): parse+build de mallas
-    // vs CalcularBordes (estructura de EDICION). La PRESENCIA de esta linea prueba que corre la build nueva.
-    { extern unsigned long g_wobjParseMs, g_wobjBordesMs, g_wobjCount;
+    // vs ComputeBorders (estructura de EDICION). La PRESENCIA de esta linea prueba que corre la build nueva.
+    { extern unsigned long g_wobjParseMs, g_wobjBordersMs, g_wobjCount;
       w3dLogf("[CARGA] mallas .obj=%lu  parse+build=%lu ms  bordes(edicion)=%lu ms",
-              g_wobjCount, g_wobjParseMs, g_wobjBordesMs); }
+              g_wobjCount, g_wobjParseMs, g_wobjBordersMs); }
     // idem las mallas del contenedor: .w3db (listas para memoria, sin derivar) contra .w3dm de texto
     // (derivadas al abrir), y los .w3db que este build no puede usar (en el N95: mas de 65535 vertices)
-    w3dLogf("[CARGA] mallas .w3db=%d (listas, sin derivar)  .w3dm=%d (derivadas al abrir)  .w3db rechazadas=%d",
-            s_mallasBinarias, s_mallasDerivadas, s_mallasBinRechazadas);
+    w3dLogf("[CARGA] mallas .w3db=%d (listas, sin derivar)  .w3dm=%d (derivadas al abrir)  .w3db rejected=%d",
+            s_binaryMeshes, s_derivedMeshes, s_meshesRejectedBin);
 
     // PRECARGA de texturas 2D (emisores de particulas + imagenes del HUD): sin
     // esto cada PNG se decodificaba en su PRIMER uso, EN PLENO GAMEPLAY (la
@@ -6119,47 +6119,47 @@ void AbrirW3D(const std::string& ruta) {
     // carga del proyecto (queja del dueno: "horrible que se ponga a decodificar
     // imagenes durante el gameplay").
     if (SceneCollection) {
-        extern void W3dParticulasPrecargarTexturas(Object*);
-        extern void UI2D_PrecargarTexturas(Object*);
-        extern void W3dSonidosPrecargar();
-        extern void CargarTexturasPendientes();
+        extern void W3dParticlesPreloadTextures(Object*);
+        extern void UI2D_PreloadTextures(Object*);
+        extern void W3dSoundsPreload();
+        extern void LoadPendingTextures();
         extern double W3dNowMs();
         double _pre0 = W3dNowMs();
-        const double tMedPre = CargaAhora();   // medicion por fase (0 = nadie mide)
+        const double tMedPre = LoadNow();   // medicion por fase (0 = nadie mide)
         // PRIMERO el 3D (la cola diferida sube el atlas unico): asi el puente
-        // 2D->3D de Textura2DObtener encuentra el id y el HUD/particulas/fuente
+        // 2D->3D de Texture2DGet encuentra el id y el HUD/particulas/fuente
         // COMPARTEN esa textura en vez de decodificar una copia propia.
-        CargarTexturasPendientes();
-        W3dParticulasPrecargarTexturas(SceneCollection);
-        UI2D_PrecargarTexturas(SceneCollection);
-        W3dSonidosPrecargar();
+        LoadPendingTextures();
+        W3dParticlesPreloadTextures(SceneCollection);
+        UI2D_PreloadTextures(SceneCollection);
+        W3dSoundsPreload();
         w3dLogf("[CARGA] precarga de texturas (3D + 2D) + WAVs: %d ms",
                 (int)(W3dNowMs() - _pre0));
-        if (g_w3dCargaReloj) g_w3dCargaFases.precargaMs += CargaAhora() - tMedPre;
+        if (g_w3dLoadClock) g_w3dLoadPhases.preloadMs += LoadNow() - tMedPre;
     }
 }
 
 // compat: los llamadores viejos (constructor con w3dPath ya seteado) siguen andando
-void OpenW3D() { AbrirW3D(w3dPath); }
-#endif // W3D_SIN_EDITOR (abrir un proyecto EN CALIENTE: es cosa del editor)
-static void W3dPostLeer(JVal* j, W3dPostOpciones& o) {
-    o = W3dPostOpciones();
+void OpenW3D() { OpenW3D(w3dPath); }
+#endif // W3D_NO_EDITOR (abrir un proyecto EN CALIENTE: es cosa del editor)
+static void W3dPostRead(JVal* j, W3dPostOptions& o) {
+    o = W3dPostOptions();
     o.on = JB(j, "on", true);
-    o.activo = JI(j, "elegido", -1);
-    JVal* l = JHijo(j, "efectos", 5);
-    if (l) for (size_t i = 0; i < l->lista.size(); i++) {
-        JVal* je = l->lista[i];
-        if (!je || je->tipo != 4) continue;
-        const int tipo = JI(je, "tipo", -1);
-        if (tipo < 0 || tipo >= W3dPostTipos) continue;   // (un efecto de una version mas nueva: se saltea)
-        W3dPostEfecto e; W3dPostDefectos(e, tipo);
-        e.activo = JB(je, "activo", true); e.opc = JB(je, "opc", e.opc);
-        JVal* v = JHijo(je, "v", 5);
-        if (v) for (size_t k = 0; k < 8 && k < JFilaLen(v); k++) e.v[k] = JFilaNum(v, k, e.v[k]);
-        JVal* col = JHijo(je, "col", 5);
-        if (col) for (size_t k = 0; k < 3 && k < JFilaLen(col); k++) e.col[k] = JFilaNum(col, k, e.col[k]);
-        o.efectos.push_back(e);
+    o.active = JI(j, "selected", -1);
+    JVal* l = JChild(j, "effects", 5);
+    if (l) for (size_t i = 0; i < l->list.size(); i++) {
+        JVal* je = l->list[i];
+        if (!je || je->type != 4) continue;
+        const int type = JI(je, "type", -1);
+        if (type < 0 || type >= W3dPostTypes) continue;   // (un efecto de una version mas nueva: se saltea)
+        W3dPostEffect e; W3dPostDefaults(e, type);
+        e.active = JB(je, "active", true); e.opt = JB(je, "opt", e.opt);
+        JVal* v = JChild(je, "v", 5);
+        if (v) for (size_t k = 0; k < 8 && k < JRowLen(v); k++) e.v[k] = JRowNum(v, k, e.v[k]);
+        JVal* col = JChild(je, "col", 5);
+        if (col) for (size_t k = 0; k < 3 && k < JRowLen(col); k++) e.col[k] = JRowNum(col, k, e.col[k]);
+        o.effects.push_back(e);
     }
-    if (o.activo >= (int)o.efectos.size()) o.activo = (int)o.efectos.size() - 1;
-    if (o.activo < 0 && !o.efectos.empty()) o.activo = 0;
+    if (o.active >= (int)o.effects.size()) o.active = (int)o.effects.size() - 1;
+    if (o.active < 0 && !o.effects.empty()) o.active = 0;
 }

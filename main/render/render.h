@@ -8,17 +8,17 @@
 #ifndef W3D_SYMBIAN
 #include "variables.h"
 #endif
-#include "GeometriaUI/GeometriaUI.h"
-#include "WhiskUI/theme/colores.h"
-#include "GeometriaUI/Floor.h"
+#include "GeometryUI/GeometryUI.h"
+#include "WhiskUI/theme/colors.h"
+#include "GeometryUI/Floor.h"
 #include "objects/Objects.h"
 #include "objects/Textures.h"
 
 // Funciones de render
 void RenderLinkLines(Object* obj);
-void DibujarOrigen(Object* obj);
+void DrawOrigin(Object* obj);
 void RenderOrigins();
-void DibujarIcono3D(Object* obj);
+void DrawIcon3D(Object* obj);
 void RenderIcons3D();
 // linea vertical de cada luz al piso, en ESPACIO MUNDO via
 // GetGlobalPosition(): inmune a escala/rotacion/jerarquia (el viejo

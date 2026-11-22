@@ -12,222 +12,222 @@
 #     "texturas" para las texturas) y vuelven igual al abrir; re-guardar sin cambios = los mismos bytes;
 #   - la carpeta de una textura que se cargo de DISCO sigue a su entrada cuando el guardado la mete
 #     adentro del contenedor.
-ventana 1280 720
+window 1280 720
 
 # ---- 0) un proyecto con recursos de los cuatro tipos ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-mallasrecurso
+meshesresource
 add cube
-mallasrecurso
-matsuelto Piel
-matsuelto Metal
-texasignar Cubo dosmats.png
-animsetsintetica 1 agregar
+meshesresource
+matloose Piel
+matloose Metal
+objtexture Cubo dosmats.png
+animsetsynthetic 1 add
 # una textura de DISCO con carpeta: al guardar entra al contenedor y la carpeta la sigue
-recmover texturas dosmats.png UI
-guardarw3d prueba_outliner_carpetas_v4.w3d
-abrirw3d prueba_outliner_carpetas_v4.w3d
-recurso texturas texturas/dosmats.png carpeta UI
-texentrada dosmats-b.png
+recmove textures dosmats.png UI
+savew3d prueba_outliner_carpetas_v4.w3d
+openw3d prueba_outliner_carpetas_v4.w3d
+resource textures textures/dosmats.png folder UI
+texentry dosmats-b.png
 
 # ---- A) carpeta NUEVA por el "+" de la barra: nace con el nombre en edicion ----
-outvista materiales
+outview materials
 # (el arbol es UNO: la carpeta UI de la textura tambien se ve con el filtro Materiales)
-outfila UI prof 0
+outrow UI prof 0
 outclick Piel
 outmenu New Folder
-outescribir Pieles
-carpetas n 2 tiene Pieles tiene UI
-outfila Pieles cursor 1 prof 0
+outwrite Pieles
+folders n 2 has Pieles has UI
+outrow Pieles cursor 1 prof 0
 
 # ---- B) mover: arrastrar y soltar sobre la carpeta, y el menu "Move to Folder" ----
 outdrag Piel Pieles
-outfila Piel carpeta Pieles prof 1
+outrow Piel folder Pieles prof 1
 outclick Metal
-outmenu mover Pieles
-outfila Metal carpeta Pieles prof 1
+outmenu move Pieles
+outrow Metal folder Pieles prof 1
 # con el cursor en una carpeta, la nueva va ADENTRO
 outclick Pieles
 outmenu New Folder
-outescribir Oscuras
-carpetas n 3 tiene Pieles/Oscuras
+outwrite Oscuras
+folders n 3 has Pieles/Oscuras
 outdrag Metal Oscuras
-outfila Metal carpeta Pieles/Oscuras prof 2
+outrow Metal folder Pieles/Oscuras prof 2
 outpx Metal huerfano
 
 # ---- C) plegar / desplegar: la flechita y el teclado (N95) ----
-outclick Pieles flecha
-outfila Pieles plegada 1
-outnofila Metal
-outtecla right
-outfila Pieles plegada 0
-outfila Metal
-outtecla left
-outfila Pieles plegada 1
-outtecla right
-outtecla right
-outfila Oscuras cursor 1
+outclick Pieles arrow
+outrow Pieles collapsed 1
+outnorow Metal
+outkey right
+outrow Pieles collapsed 0
+outrow Metal
+outkey left
+outrow Pieles collapsed 1
+outkey right
+outkey right
+outrow Oscuras cursor 1
 # izquierda en una carpeta ABIERTA la pliega; en una plegada sube a la de arriba
-outtecla left
-outfila Oscuras plegada 1
-outtecla left
-outfila Pieles cursor 1 plegada 0
-outclick Oscuras flecha
-outfila Oscuras plegada 0
+outkey left
+outrow Oscuras collapsed 1
+outkey left
+outrow Pieles cursor 1 collapsed 0
+outclick Oscuras arrow
+outrow Oscuras collapsed 0
 
 # ---- D) renombrar la carpeta (F2 en linea): arrastra sus subcarpetas y sus recursos; undo ----
 outclick Pieles
-outteclapc f2
-outescribir Organicos
-carpetas materiales tiene Organicos tiene Organicos/Oscuras notiene Pieles
-outfila Metal carpeta Organicos/Oscuras
-recurso materiales Piel carpeta Organicos
+outkeypc f2
+outwrite Organicos
+folders materials has Organicos has Organicos/Oscuras hasnot Pieles
+outrow Metal folder Organicos/Oscuras
+resource materials Piel folder Organicos
 undo
-recurso materiales Piel carpeta Pieles
-carpetas materiales tiene Pieles/Oscuras notiene Organicos
+resource materials Piel folder Pieles
+folders materials has Pieles/Oscuras hasnot Organicos
 redo
-recurso materiales Piel carpeta Organicos
-recurso materiales Metal carpeta Organicos/Oscuras
+resource materials Piel folder Organicos
+resource materials Metal folder Organicos/Oscuras
 
 # ---- E) borrar una carpeta: solo VACIA; el vacio de la lista es la raiz ----
-carpetaborrar materiales Organicos falla
+folderdelete materials Organicos fails
 outdrag Metal -
-outfila Metal carpeta - prof 0
+outrow Metal folder - prof 0
 outclick Oscuras
 outmenu Delete
-carpetas materiales notiene Organicos/Oscuras tiene Organicos
+folders materials hasnot Organicos/Oscuras has Organicos
 undo
-carpetas materiales tiene Organicos/Oscuras
+folders materials has Organicos/Oscuras
 redo
-carpetas n 2 tiene Organicos tiene UI
+folders n 2 has Organicos has UI
 
 # ---- F) Name / Folder del recurso en Properties (con undo) ----
 outclick Metal
-receditar carpeta Metales/Brillantes
-recurso materiales Metal carpeta Metales/Brillantes
-carpetas materiales tiene Metales tiene Metales/Brillantes
-receditar nombre Acero
-recurso materiales Acero carpeta Metales/Brillantes
-recprops nombre Acero carpeta Metales/Brillantes
-recactivo materiales Acero
+recedit folder Metales/Brillantes
+resource materials Metal folder Metales/Brillantes
+folders materials has Metales has Metales/Brillantes
+recedit name Acero
+resource materials Acero folder Metales/Brillantes
+recprops name Acero folder Metales/Brillantes
+recactive materials Acero
 undo
-recurso materiales Metal existe 1
+resource materials Metal exists 1
 redo
-recurso materiales Acero existe 1
+resource materials Acero exists 1
 # renombrar en linea (F2) desde la lista; un nombre tomado queda .001
 outclick Piel
-outteclapc f2
-outescribir Acero
-recurso materiales Acero.001 carpeta Organicos
+outkeypc f2
+outwrite Acero
+resource materials Acero.001 folder Organicos
 undo
-recurso materiales Piel existe 1
+resource materials Piel exists 1
 
 # ---- F2) lo mismo SIN MOUSE (N95): la barra abre el menu Objeto, OK elige, el T9 escribe ----
 outclick Piel
-outbarra soft menu vista
-outbarra der menu opciones
-outbarra der menu objeto
-outbarra abajo
-outbarra abajo
-outbarra ok menu ninguno
-outescribir Cuero
-recurso materiales Cuero carpeta Organicos
+outbar soft menu view
+outbar right menu options
+outbar right menu object
+outbar down
+outbar down
+outbar ok menu none
+outwrite Cuero
+resource materials Cuero folder Organicos
 undo
-recurso materiales Piel existe 1
+resource materials Piel exists 1
 # "mover" (la G de PC / el 1 del N95): el MODO MOVER, lo elegido viaja por las carpetas en vivo
 # (izquierda = la carpeta de arriba, arriba/abajo = el orden del arbol); Enter confirma = UN undo
 outclick Piel
-outteclapc g
-outmover si destino Organicos
-outteclapc left
-outmover si destino -
-recurso materiales Piel carpeta -
-outteclapc down
-outmover si destino Metales
-outteclapc up
-outteclapc enter
-outmover no
-recurso materiales Piel carpeta -
+outkeypc g
+outmove si destination Organicos
+outkeypc left
+outmove si destination -
+resource materials Piel folder -
+outkeypc down
+outmove si destination Metales
+outkeypc up
+outkeypc enter
+outmove no
+resource materials Piel folder -
 undo
-recurso materiales Piel carpeta Organicos
+resource materials Piel folder Organicos
 # Esc cancela: vuelve a donde estaba y no deja paso de undo
 outclick Piel
-outteclapc g
-outteclapc down
-outteclapc down
-recurso materiales Piel carpeta UI
-outteclapc esc
-outmover no
-recurso materiales Piel existe 1 carpeta Organicos
+outkeypc g
+outkeypc down
+outkeypc down
+resource materials Piel folder UI
+outkeypc esc
+outmove no
+resource materials Piel exists 1 folder Organicos
 
 # ---- G) las otras vistas: mallas (tambien desde su tarjeta "3D Mesh"), texturas, animaciones ----
-outvista mallas
-mallacarpeta Cubo Vegetacion/Arboles
-carpetas mallas tiene Vegetacion tiene Vegetacion/Arboles
-outfila Cubo carpeta Vegetacion/Arboles prof 2
-outfila Cubo.001 carpeta - prof 0
+outview meshes
+meshfolder Cubo Vegetacion/Arboles
+folders meshes has Vegetacion has Vegetacion/Arboles
+outrow Cubo folder Vegetacion/Arboles prof 2
+outrow Cubo.001 folder - prof 0
 # renombrar una MALLA desde la lista (F2): el mismo paso de undo que su tarjeta "3D Mesh"
 outclick Cubo.001
-outteclapc f2
-outescribir Roca
-mallainfo Cubo.001 recurso Roca
+outkeypc f2
+outwrite Roca
+meshcheck Cubo.001 resource Roca
 undo
-mallainfo Cubo.001 recurso Cubo.001
+meshcheck Cubo.001 resource Cubo.001
 redo
-recurso mallas Roca usuarios 1
-outvista texturas
+resource meshes Roca users 1
+outview textures
 outclick dosmats-b.png
 outmenu New Folder
-outescribir Fondos
+outwrite Fondos
 outdrag dosmats-b.png Fondos
-recurso texturas texturas/dosmats-b.png carpeta Fondos
-outvista animaciones
-recmover animaciones Personaje Personajes
-outfila Personaje carpeta Personajes prof 1
+resource textures textures/dosmats-b.png folder Fondos
+outview animations
+recmove animations Personaje Personajes
+outrow Personaje folder Personajes prof 1
 # renombrar un ANIMSET (arrastra a sus armatures) con undo
-recrenombrar animaciones Personaje Heroe Heroe
-animsetarm Personaje nombreset Heroe
+recrename animations Personaje Heroe Heroe
+animsetarm Personaje setname Heroe
 undo
-recurso animaciones Personaje carpeta Personajes usuarios 1
-animsetarm Personaje nombreset Personaje
+resource animations Personaje folder Personajes users 1
+animsetarm Personaje setname Personaje
 # una carpeta creada y VACIA tambien se guarda
-carpetanueva animaciones - Vacia
-carpetas animaciones tiene Vacia tiene Personajes
+foldernew animations - Vacia
+folders animations has Vacia has Personajes
 # una carpeta que PARECE una entrada del contenedor ("texturas/...", "mallas/..."): es cosmetica,
 # el guardado no puede tomarla por una referencia a una entrada que falta (y abortar)
-recmover texturas texturas/dosmats.png texturas/Fondos
-recmover mallas Roca mallas/Rocas
-recmover materiales Piel extra/Varios
+recmove textures textures/dosmats.png textures/Fondos
+recmove meshes Roca meshes/Rocas
+recmove materials Piel extra/Varios
 outrender
 
 # ---- H) guardar y reabrir: todo vuelve igual; re-guardar = los mismos bytes ----
-guardarw3d prueba_outliner_carpetas_rt1.w3d
-jsontiene prueba_outliner_carpetas_rt1.w3d "carpetas"
-jsontiene prueba_outliner_carpetas_rt1.w3d "Metales/Brillantes"
-jsontiene prueba_outliner_carpetas_rt1.w3d "Vegetacion/Arboles"
-abrirw3d prueba_outliner_carpetas_rt1.w3d
-carpetas materiales tiene Organicos tiene Metales tiene Metales/Brillantes tiene extra/Varios
-recurso materiales Acero carpeta Metales/Brillantes
-recurso mallas Cubo carpeta Vegetacion/Arboles
-recurso texturas texturas/dosmats.png carpeta texturas/Fondos
-recurso texturas texturas/dosmats-b.png carpeta Fondos
-recurso mallas Roca carpeta mallas/Rocas
-recurso materiales Piel carpeta extra/Varios
-recurso animaciones Personaje carpeta Personajes
-recurso mallas Roca usuarios 1
-carpetas animaciones tiene Vacia
-guardarw3d prueba_outliner_carpetas_rt2.w3d
-w3diguales prueba_outliner_carpetas_rt1.w3d prueba_outliner_carpetas_rt2.w3d
+savew3d prueba_outliner_carpetas_rt1.w3d
+jsonhas prueba_outliner_carpetas_rt1.w3d "folders"
+jsonhas prueba_outliner_carpetas_rt1.w3d "Metales/Brillantes"
+jsonhas prueba_outliner_carpetas_rt1.w3d "Vegetacion/Arboles"
+openw3d prueba_outliner_carpetas_rt1.w3d
+folders materials has Organicos has Metales has Metales/Brillantes has extra/Varios
+resource materials Acero folder Metales/Brillantes
+resource meshes Cubo folder Vegetacion/Arboles
+resource textures textures/dosmats.png folder textures/Fondos
+resource textures textures/dosmats-b.png folder Fondos
+resource meshes Roca folder meshes/Rocas
+resource materials Piel folder extra/Varios
+resource animations Personaje folder Personajes
+resource meshes Roca users 1
+folders animations has Vacia
+savew3d prueba_outliner_carpetas_rt2.w3d
+w3dequal prueba_outliner_carpetas_rt1.w3d prueba_outliner_carpetas_rt2.w3d
 
 # ---- I) purgar el huerfano de una carpeta no borra la carpeta ----
-outvista materiales
-recpurgar materiales n 2
-carpetas materiales tiene Organicos tiene Metales/Brillantes
+outview materials
+recpurge materials n 2
+folders materials has Organicos has Metales/Brillantes
 
 # ---- lo que no tiene que pasar ----
 # (la carpeta ya no tiene tipo: el arbol es uno solo)
 fail carpetaborrar NoExiste
-fail recmover materiales NoExiste Organicos
-fail carpetarenombrar materiales NoExiste Y
+fail recmover materials NoExiste Organicos
+fail carpetarenombrar materials NoExiste Y

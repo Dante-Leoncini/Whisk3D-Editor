@@ -27,7 +27,7 @@ Il prezzo: le lettere sono fatte di pixel e crescono per multipli interi ([Color
 | Cartella | Cosa risolve |
 |---|---|
 | `core/` | Le misure dell'interfaccia e la loro scala (`UI.h`): [Colori e scala](tema.md) |
-| `theme/` | La tavolozza dei colori (`colores.h`): [Colori e scala](tema.md) |
+| `theme/` | La tavolozza dei colori (`colors.h`): [Colori e scala](tema.md) |
 | `draw/` | Il disegno 2D (`glesdraw`), i rettangoli, le icone e il packer di atlas: [Disegno e atlas](dibujo.md), [Icone](iconos.md) |
 | `text/` | Il font bitmap, l'atlas esteso e il testo con font TTF prerenderizzati: [Testo](texto.md) |
 | `widgets/` | I riquadri con bordo, i pulsanti, le schede, i menu e i campi di testo: [Pulsanti, schede e caselle di controllo](botones.md), [Menu a tendina](menus.md), [Input e campi di testo](entrada.md) |

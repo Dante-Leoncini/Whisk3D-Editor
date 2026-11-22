@@ -40,4 +40,4 @@ Cosa può fare **Whisk3D Editor**, organizzato per pannello e per modalità. Boz
 
 Per programmare giochi, vedi [Lua in Whisk3D](../lua/README.md). Ciò che succede sotto, per chi programma in C o C++: [Manuale di Whisk3D Core](../core/README.md).
 
-Whisk3D · Manuale dell'editor (ottobre 2026). Le tabelle delle scorciatoie vengono generate da `main/app/W3dAtajos.cpp` con `tools/genmanual_atajos.py`.
+Whisk3D · Manuale dell'editor (ottobre 2026). Le tabelle delle scorciatoie vengono generate da `main/app/W3dShortcuts.cpp` con `tools/genmanual_atajos.py`.

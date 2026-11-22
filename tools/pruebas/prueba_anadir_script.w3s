@@ -5,25 +5,25 @@
 # ESTA CARPETA:
 #   cd <motor>/tools/pruebas
 #   ../../platform/linux/build/whisk3d --script prueba_anadir_script.w3s
-ventana 1280 720
-escala 1
-abrirw3d prueba_ojo_script.w3d
+window 1280 720
+scale 1
+openw3d prueba_ojo_script.w3d
 timeline pause
-guardarw3d /tmp/w3d_prueba_anadir_script.w3d
-abrirw3d /tmp/w3d_prueba_anadir_script.w3d
+savew3d /tmp/w3d_prueba_anadir_script.w3d
+openw3d /tmp/w3d_prueba_anadir_script.w3d
 timeline pause
 selobj Testigo
 tick 2
 propstab 8
 tick 1
-scriptapagado 0 0
-scriptanadir
-menuabierto si
-menuelegir ojo_a.lua
-menuabierto no
+scriptoff 0 0
+scriptadd
+menuopen si
+menupick ojo_a.lua
+menuopen no
 # ahora el Testigo tiene dos scripts: el suyo (0) y ojo_a (1), prendido
-scriptapagado 1 0
+scriptoff 1 0
 # y "Cargar .lua..." sigue: abre el explorador (el menu se cierra)
-scriptanadir
-menuelegir Load .lua...
-menuabierto no
+scriptadd
+menupick Load .lua...
+menuopen no

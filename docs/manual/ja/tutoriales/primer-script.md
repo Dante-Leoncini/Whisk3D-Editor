@@ -2,7 +2,7 @@
 
 このチュートリアルでは、はじめての**Lua**スクリプトを書きます。立方体を回転させるスクリプトです。
 
-![Timelineがあった下の場所にIDEがあり、girar.luaスクリプトが書かれたWhisk3D。右には立方体のPropertiesがあり、スクリプトのカードにgirarのチェックボックスと、90になったvelocidadがあります](img/script-ide.webp)
+![Timelineがあった下の場所にIDEがあり、rotate.luaスクリプトが書かれたWhisk3D。右には立方体のPropertiesがあり、スクリプトのカードにrotateのチェックボックスと、90になったspeedがあります](img/script-ide.webp)
 
 ## 1. IDE
 
@@ -22,42 +22,42 @@ IDEは空の状態で始まります。書きやすくするために、大き�
 ### プロパティ
 
 ```lua
-propiedades = {
-  girar     = true,   -- whether the cube spins or not
-  velocidad = 90,     -- how many degrees it spins per second
+properties = {
+  rotate   = true,   -- whether the cube spins or not
+  speed    = 90,     -- how many degrees it spins per second
 }
 ```
 
-- **`propiedades`**は、Propertiesパネルから変更できるスクリプトの値で、1行に1つずつ書きます。`girar = true`は**真偽値**（真か偽か：`true`または`false`）で、パネルではチェックボックスとして表示されます。`velocidad = 90`は数値で、数値フィールドとして表示されます。ここに書く値は**初期値**です。このスクリプトを使うオブジェクトは、それぞれ自分の値を持てます。
+- **`properties`**は、Propertiesパネルから変更できるスクリプトの値で、1行に1つずつ書きます。`rotate = true`は**真偽値**（真か偽か：`true`または`false`）で、パネルではチェックボックスとして表示されます。`speed = 90`は数値で、数値フィールドとして表示されます。ここに書く値は**初期値**です。このスクリプトを使うオブジェクトは、それぞれ自分の値を持てます。
 - `--`のあとに書いたものは**コメント**です。Luaはこれを読みません。あなたのためのメモです。このコードのコメントが英語なのは、エディターのIDEがラテン文字とキリル文字しか表示できないためです。
 
 ### 関数
 
 ```lua
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 ```
 
-**関数**は、名前の付いたコードのまとまりです。`function nombre()`で始まり、`end`で終わります。中に書いたことは、書いた時点では実行されません。誰かがその関数を**呼び出す**たびに実行されます。
+**関数**は、名前の付いたコードのまとまりです。`function name()`で始まり、`end`で終わります。中に書いたことは、書いた時点では実行されません。誰かがその関数を**呼び出す**たびに実行されます。
 
 Whisk3Dには**予約された関数**があります。スクリプトにそのどれかと同じ名前の関数があると、エンジンがちょうどよいタイミングで自動的に呼び出します。たとえば：
 
-- **`inicio()`**：Playしたときに1回だけ。準備をするのに使います。
-- **`actualizar(dt)`**：ゲームが動いている間、**毎フレーム**。
+- **`start()`**：Playしたときに1回だけ。準備をするのに使います。
+- **`update(dt)`**：ゲームが動いている間、**毎フレーム**。
 
 ほかにも、オブジェクトが別のオブジェクトにぶつかったことを知らせる関数などがあります。すべてLuaのマニュアルの[エンジンがスクリプトを呼び出すタイミング](../lua/ciclo-del-script.md)に載っています。
 
-`actualizar`はビデオゲームにぴったりです。ゲームは1秒間に何回も画面を描き、その1枚1枚の画像が**フレーム**です。動くものはすべて、フレームごとに少しずつ動きます。ここでは、フレームごとに立方体が少しずつ回転します。
+`update`はビデオゲームにぴったりです。ゲームは1秒間に何回も画面を描き、その1枚1枚の画像が**フレーム**です。動くものはすべて、フレームごとに少しずつ動きます。ここでは、フレームごとに立方体が少しずつ回転します。
 
 - オブジェクトが**表示されている**間、実行されます。オブジェクトを非表示にすると、また表示されるまで、そのスクリプトは止まります。
 - `dt`は、前のフレームから経過した秒数です。速度に`dt`を掛けると、ゲームが毎秒30フレームでも60フレームでも、立方体は**1秒あたり**90度回転します。
 
 中でしていること：
 
-**`if propiedad("girar") then` … `end`**は**条件**です。`if`（「もし」）は、`if`と`then`の間に書いたことが真のときだけ、中のコードを実行します。`elseif`（「そうでなければ、もし…ならこれをする」）を付けて別の条件を調べたり、`else`（「そうでなければ」）を付けて、どの条件も満たされなかったときに実行するコードを書いたりできます。どちらも省略できます。最後は必ず`end`で終わります。たとえば：
+**`if property("rotate") then` … `end`**は**条件**です。`if`（「もし」）は、`if`と`then`の間に書いたことが真のときだけ、中のコードを実行します。`elseif`（「そうでなければ、もし…ならこれをする」）を付けて別の条件を調べたり、`else`（「そうでなければ」）を付けて、どの条件も満たされなかったときに実行するコードを書いたりできます。どちらも省略できます。最後は必ず`end`で終わります。たとえば：
 
 ```lua
 if puntos >= 100 then
@@ -71,40 +71,40 @@ end
 
 120点なら賞は金（gold）、70点なら銀（silver）、10点ならなし（none）です。実行されるのは、条件を満たした最初の部分だけです。（Luaでは、`elseif`は続けて書きます。）
 
-このスクリプトの`if`には、`elseif`も`else`もありません。**girar**が真なら（チェックボックスにチェックが入っていれば）立方体が回転し、偽なら何も起きずに関数が終わります。`propiedad("girar")`は、そのオブジェクトのパネルの値を読み取ります。毎フレーム読み取るので、ゲームの実行中に値を変えると、スクリプトはその瞬間に気づきます。
+このスクリプトの`if`には、`elseif`も`else`もありません。**rotate**が真なら（チェックボックスにチェックが入っていれば）立方体が回転し、偽なら何も起きずに関数が終わります。`property("rotate")`は、そのオブジェクトのパネルの値を読み取ります。毎フレーム読み取るので、ゲームの実行中に値を変えると、スクリプトはその瞬間に気づきます。
 
-- **`yo()`**は、スクリプトを持っているオブジェクト、つまり立方体です。**`rotacionZ(yo())`**は、Z軸（垂直の軸で、Propertiesパネルに表示されるのと同じZ）まわりの回転を度で返します。**`setRotacionZ`**は新しい回転を設定します。今の回転に少し足した値です。こうして、立方体はコマのように回ります。
+- **`self()`**は、スクリプトを持っているオブジェクト、つまり立方体です。**`getRotationZ(self())`**は、Z軸（垂直の軸で、Propertiesパネルに表示されるのと同じZ）まわりの回転を度で返します。**`setRotationZ`**は新しい回転を設定します。今の回転に少し足した値です。こうして、立方体はコマのように回ります。
 
-`propiedad`、`yo`、`rotacionZ`、`setRotacionZ`も関数ですが、向きが逆です。Whisk3Dに用意されていて、あなたが呼び出します。[Luaのマニュアル](../lua/README.md)に載っています。
+`property`、`self`、`getRotationZ`、`setRotationZ`も関数ですが、向きが逆です。Whisk3Dに用意されていて、あなたが呼び出します。[Luaのマニュアル](../lua/README.md)に載っています。
 
 ### スクリプト全体
 
 IDEの中をクリックして、全体を続けて入力します：
 
 ```lua
-propiedades = {
-  girar     = true,   -- whether the cube spins or not
-  velocidad = 90,     -- how many degrees it spins per second
+properties = {
+  rotate   = true,   -- whether the cube spins or not
+  speed    = 90,     -- how many degrees it spins per second
 }
 
-function actualizar(dt)
-  if propiedad("girar") then
-    setRotacionZ(yo(), rotacionZ(yo()) + propiedad("velocidad") * dt)
+function update(dt)
+  if property("rotate") then
+    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
   end
 end
 ```
 
 ## 3. 保存する
 
-まだ保存していなければ、まずプロジェクトを保存します。スクリプトをプロジェクトの中に保存できるのは、プロジェクトが保存済みのときだけです。Propertiesの**フロッピーディスク**のタブ（**File**カード）で、**Name**に名前（たとえば`girar-cubo`）を入力して、**Save**を押します。カードに表示されている**Folder**に保存されます。
+まだ保存していなければ、まずプロジェクトを保存します。スクリプトをプロジェクトの中に保存できるのは、プロジェクトが保存済みのときだけです。Propertiesの**フロッピーディスク**のタブ（**File**カード）で、**Name**に名前（たとえば`rotate-cubo`）を入力して、**Save**を押します。カードに表示されている**Folder**に保存されます。
 
 次に、IDEのメニューバーで**File → Save As...**を選びます：
 
-1. **Name**に`girar.lua`と入力します。
+1. **Name**に`rotate.lua`と入力します。
 2. **Inside the .w3d**にチェックを入れます。スクリプトはプロジェクトの中、同じ`.w3d`ファイルの中に保存されます。**Folder**はプロジェクトの中のフォルダーになります。**(root)**がいちばん上のフォルダーです。
 3. **Save**を押します。
 
-![IDEのSave As...フォーム。名前はgirar.luaで、Inside the .w3dにチェックが入っています](img/script-guardar.webp)
+![IDEのSave As...フォーム。名前はrotate.luaで、Inside the .w3dにチェックが入っています](img/script-guardar.webp)
 
 **Inside the .w3d**にチェックを入れないと、スクリプトはプロジェクトの外に、選んだ**Folder**の中の単独のファイルとして保存されます。たとえば、別のプログラムで編集したいときに便利です。
 
@@ -124,44 +124,44 @@ end
 
 1. ゲームの**Cube**を選択します（Outlinerまたは3D Viewportで）。
 2. Propertiesで、**ジョイスティック**のタブに移ります。
-3. **Control**カードで**Add**を押すと、プロジェクトのスクリプトのメニューが開きます。`girar.lua`を選びます。
+3. **Control**カードで**Add**を押すと、プロジェクトのスクリプトのメニューが開きます。`rotate.lua`を選びます。
 
-![ControlカードでAddのメニューが開いたところ：プロジェクトのスクリプトであるgirar.luaと、Load .lua...](img/script-anadir.webp)
+![ControlカードでAddのメニューが開いたところ：プロジェクトのスクリプトであるrotate.luaと、Load .lua...](img/script-anadir.webp)
 
-スクリプトがControlカードのリストに表示され、その下に、スクリプト自身のカード**girar.lua**が追加されます。書いたプロパティがあり、**girar**のチェックボックス（チェックあり）と**velocidad**（90）が表示されます。
+スクリプトがControlカードのリストに表示され、その下に、スクリプト自身のカード**rotate.lua**が追加されます。書いたプロパティがあり、**rotate**のチェックボックス（チェックあり）と**speed**（90）が表示されます。
 
 リストのスクリプトの右には**目**のアイコンがあります。押すと、スクリプトがオフになります（エンジンが使わなくなります）。オブジェクトからスクリプトを外すことも、オブジェクトを非表示にすることもありません。もう一度押すとオンになります。
 
-![リストにgirar.luaがあり、AddとRemoveのボタンがあるControlカード。その下には、girarにチェックが入り、velocidadが90のgirar.luaカードがあります](img/script-propiedades.webp)
+![リストにrotate.luaがあり、AddとRemoveのボタンがあるControlカード。その下には、rotateにチェックが入り、speedが90のrotate.luaカードがあります](img/script-propiedades.webp)
 
 ### 外部のスクリプト
 
 別のエディターでスクリプトを書いた場合や、`.w3d`の外に保存した場合は、**Add → Load .lua...**を押します。ファイルブラウザー**Load script**が開くので、ファイルを選んで**Open**を押します。
 
-![girar.luaがあるフォルダーで開いたファイルブラウザーLoad script。girar.luaが選択されています](img/script-cargar-lua.webp)
+![rotate.luaがあるフォルダーで開いたファイルブラウザーLoad script。rotate.luaが選択されています](img/script-cargar-lua.webp)
 
 ## 6. Playする
 
 **Play**を押します。立方体が回ります。ゲームの実行中は、3D Viewportのメニューバーに**Stop**と**Pause**が表示されます。
 
-ゲームを動かしたまま、**girar.lua**カードのプロパティを変えてみましょう：
+ゲームを動かしたまま、**rotate.lua**カードのプロパティを変えてみましょう：
 
-- **velocidad**を360にする：4倍の速さで回ります。
-- **girar**のチェックを外す：止まります。もう一度チェックを入れると、また回り出します。
+- **speed**を360にする：4倍の速さで回ります。
+- **rotate**のチェックを外す：止まります。もう一度チェックを入れると、また回り出します。
 
 終わるときは**Stop**を押します。立方体はPlayする前の状態に戻ります。
 
-![Play：立方体が回ります。velocidadが360になり、速く回ります。girarのチェックが外れて止まります。Stop：立方体は元の位置に戻り、velocidadは90、girarにはチェックが入っています](img/script-jugar.webp)
+![Play：立方体が回ります。speedが360になり、速く回ります。rotateのチェックが外れて止まります。Stop：立方体は元の位置に戻り、speedは90、rotateにはチェックが入っています](img/script-jugar.webp)
 
 > [!NOTE]
-> ゲームの実行中に起きたことは、**Stop**を押すとすべて失われます。立方体は元の位置に戻り、**girar**と**velocidad**はPlayする前の値に戻ります。本当に値を変えたいときは、ゲームを止めた状態で変えてください。
+> ゲームの実行中に起きたことは、**Stop**を押すとすべて失われます。立方体は元の位置に戻り、**rotate**と**speed**はPlayする前の値に戻ります。本当に値を変えたいときは、ゲームを止めた状態で変えてください。
 
 ## さらに学ぶ
 
 - [Whisk3DのLua](../lua/README.md)：すべての関数が載っているLuaのマニュアルです。
 - [スクリプトはオブジェクトのコンポーネント](../lua/scripts-y-objetos.md)：プロパティについて（リスト、テキスト、シーンのオブジェクトも）。
-- [エンジンがスクリプトを呼び出すタイミング](../lua/ciclo-del-script.md)：`actualizar`、`inicio`、そのほかの関数。
+- [エンジンがスクリプトを呼び出すタイミング](../lua/ciclo-del-script.md)：`update`、`start`、そのほかの関数。
 
 ## サンプルをダウンロード
 
-完成したプロジェクトです。試してみたり、自分のものと比べたりしてください：**[girar-cubo.w3d](ejemplos/girar-cubo.w3d)**。Whisk3Dで開いて、**Play**を押します。スクリプトは`.w3d`の中にあり、IDEで見られます。
+完成したプロジェクトです。試してみたり、自分のものと比べたりしてください：**[rotate-cube.w3d](ejemplos/rotate-cube.w3d)**。Whisk3Dで開いて、**Play**を押します。スクリプトは`.w3d`の中にあり、IDEで見られます。

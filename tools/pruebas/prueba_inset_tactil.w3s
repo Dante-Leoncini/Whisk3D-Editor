@@ -1,0 +1,66 @@
+# ==========================================================================
+#  INSERTAR CARAS Y BEVEL CON EL DEDO (Android, iPhone, web en el telefono)
+#  Tocar NO confirma: el dedo agarra desde donde toca y arrastrarlo ajusta el tamano desde el valor que ya tenia.
+#  El tilde y la cruz de la barra de abajo confirman / cancelan; sus opciones (Individual, segmentos...) estan al lado.
+#  Tipear un numero (o tocar la barra de estado: el teclado numerico) escribe el valor exacto.
+#  Correr DESDE ESTA CARPETA:  ../../platform/linux/build/whisk3d --script prueba_inset_tactil.w3s
+# ==========================================================================
+
+window 1280 720
+add cube
+mode edit
+selmode face
+select face 0
+# (el mouse sobre la Vista 3D y un cuadro dibujado: la seleccion tiene su lugar en pantalla)
+mouse move 400 250
+tick
+
+# INSET: el dedo apoyado y arrastrado hacia el centro de la seleccion da grosor, y el modal sigue abierto
+inset begin
+finger down 100 80
+inset state 1 0 0
+finger move 200 140
+finger move 300 200
+finger move 350 220
+finger up
+inset state 1 0.001
+# una opcion de la barra (Individual) y el tilde confirma
+tbtap individual
+inset state 1 0.001
+tbtap accept
+inset state 0
+undo
+
+# el valor EXACTO tipeado
+select face 0
+inset begin
+text 0.25
+inset state 1 0.2499 0.2501
+key Return
+inset state 0
+undo
+
+# la cruz cancela
+select face 0
+inset begin
+finger down 100 80
+finger move 300 200
+finger up
+tbtap cancel
+inset state 0
+
+# BEVEL: alejar el dedo del centro da ancho; + suma un segmento; el tilde confirma
+selmode edge
+select all
+bevel begin
+finger down 420 250
+bevel state 1 0 0
+finger move 300 180
+finger move 150 100
+finger up
+bevel state 1 0.001
+tbtap segmore
+bevel state 1 0.001
+tbtap accept
+bevel state 0
+undo

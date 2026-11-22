@@ -9,13 +9,13 @@
  * ==============================================================================
  */
 
-#include "objects/Rutina.h"   // el CONSTRUCTOR y el "Limpiar pantalla" de todo proyecto
-#include "WhiskUI/theme/colores.h"   // el fondo del tema: el "Clear color" de un proyecto nuevo
+#include "objects/Routine.h"   // el CONSTRUCTOR y el "Limpiar pantalla" de todo proyecto
+#include "WhiskUI/theme/colors.h"   // el fondo del tema: el "Clear color" de un proyecto nuevo
 #include "W3dLang.h"
 #include "w3dnewscene.h"
-#include "ViewPorts/Timeline.h"  // DopeXformActivo/Aceptar/Cancelar (transform de keyframes)
+#include "ViewPorts/Timeline.h"  // DopeXformActive/Aceptar/Cancelar (transform de keyframes)
 #include "w3dlayout.h"
-#include "w3dGraphics.h"   // w3dEngine::GLES2Resincronizar (la textura blanca se crea con GL directo)
+#include "w3dGraphics.h"   // w3dEngine::GLES2Resync (la textura blanca se crea con GL directo)
 
 #ifndef GL_POINT_SPRITE_OES
 #define GL_POINT_SPRITE_OES 0x8861
@@ -40,7 +40,7 @@
 #include "w3dlog.h"
 #include "ViewPorts/LayoutInput.h" // ScenePick3D compartido
 #include "objects/Collection.h"
-#include "io/CambiosProyecto.h"   // W3dCambiosFoto: la escena de arranque es lo "guardado" (el '*' y el cartel)
+#include "io/ProjectChanges.h"   // W3dChangesSnapshot: la escena de arranque es lo "guardado" (el '*' y el cartel)
 #include <GLES/gl.h>
 #include <math.h>
 
@@ -62,7 +62,7 @@ static int nViewMode = 1;
 static GLuint gWhiteTex = 0;
 
 // reconstruye el quaternion desde los euler (mismo orden YXZ que Object)
-static void RotDesdeEuler(Object* aObj) {
+static void RotFromEuler(Object* aObj) {
     Quaternion qX = Quaternion::FromAxisAngle(Vector3(1,0,0), aObj->rotEuler.x);
     Quaternion qY = Quaternion::FromAxisAngle(Vector3(0,1,0), aObj->rotEuler.y);
     Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0,0,1), aObj->rotEuler.z);
@@ -81,7 +81,7 @@ unsigned int W3dNewWhiteTex() {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0,
                      GL_RGBA, GL_UNSIGNED_BYTE, px);
 #ifdef W3D_GLES2
-        w3dEngine::GLES2Resincronizar();   // (el glBindTexture de arriba no paso por el motor)
+        w3dEngine::GLES2Resync();   // (el glBindTexture de arriba no paso por el motor)
 #endif
     }
     return gWhiteTex;
@@ -90,11 +90,11 @@ unsigned int W3dNewWhiteTex() {
 // (gizmos/grilla/billboards del puente: borrados, los dibuja render.cpp real)
 
 // LA ESCENA POR DEFECTO del telefono (la version Symbian de la de main/app/constructor.cpp, que no entra en este
-// build): la usan el arranque (abajo) y Nuevo proyecto (import_w3d.cpp NuevoProyectoAhora)
-void W3dCrearEscenaPorDefecto() {
+// build): la usan el arranque (abajo) y Nuevo proyecto (import_w3d.cpp NewProjectNow)
+void W3dCreateDefaultScene() {
     // arriba de todo el CONSTRUCTOR y, afuera de el, el "Limpiar pantalla" de cada cuadro (igual que el de PC)
-    W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
-                         ListaColores[static_cast<int>(ColorID::background)]);
+    W3dDefaultRoutines(SceneCollection, T("Constructor"), T("Clear screen"),
+                         ColorList[static_cast<int>(ColorID::background)]);
     // todo cuelga de una "Collection" (igual que el constructor de PC)
     CollectionActive = new Collection(SceneCollection);
     // luz de escena default: arriba-derecha-atras
@@ -103,31 +103,31 @@ void W3dCrearEscenaPorDefecto() {
     // camara default, misma pose que el constructor de PC
     // (la misma camara que el editor de la PC: main/app/constructor.cpp, mirando al cubo)
     { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
-      new Camera(CollectionActive, posCam, CamaraRotMirando(posCam, Vector3(0.0f, 0.0f, 0.0f))); }
+      new Camera(CollectionActive, posCam, CameraRotLooking(posCam, Vector3(0.0f, 0.0f, 0.0f))); }
     // el cubo se crea ULTIMO y arranca seleccionado
-    Object* cubo = NewMesh(MeshType::cube, CollectionActive, false);
-    if (cubo) {
-        DeseleccionarTodo();
-        cubo->Seleccionar();
+    Object* cube = NewMesh(MeshType::cube, CollectionActive, false);
+    if (cube) {
+        DeselectAll();
+        cube->Select();
     }
     // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (igual que la de PC)
-    { extern void W3dRaicesFijarTiposDeducidos(); W3dRaicesFijarTiposDeducidos(); }
+    { extern void W3dRootsSetTypesDeduced(); W3dRootsSetTypesDeduced(); }
 }
 
 // raiz (SceneCollection) + escena default, como ConstructUniversal de PC
 void W3dNewSceneInit() {
     W3dModelInit();
 
-    if (SceneCollection && SceneCollection->Childrens.empty()) W3dCrearEscenaPorDefecto();
+    if (SceneCollection && SceneCollection->Childrens.empty()) W3dCreateDefaultScene();
     // (los grupos de propiedades los construye cada panel en su ctor)
     // el importador de PC cuelga lo que importa de CollectionActive
     if (!CollectionActive) {
         CollectionActive = SceneCollection;
     }
-    // LO NO GUARDADO (io/CambiosProyecto.h): la escena de arranque esta "guardada" (no hay nada que perder
+    // LO NO GUARDADO (io/ProjectChanges.h): la escena de arranque esta "guardada" (no hay nada que perder
     // todavia), como en PC (main.cpp). Sin esta foto, hasta el primer guardar o abrir nada tenia '*' y
     // Opciones > Salir cerraba sin el cartel. (Si despues se abre un .w3d, la apertura toma la suya.)
-    W3dCambiosFoto();
+    W3dChangesSnapshot();
     w3dLogf("nuevoModelo: escena default (hijos: %d)",
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
 }
@@ -142,62 +142,62 @@ TBool W3dNewTransformStart(TInt aMode) {
     // que en PC (usa el EditXform COMPARTIDO de LayoutInput). Antes Symbian solo hacia
     // Object Mode -> en edicion no se podian mover los verts ("no podia hacer nada").
     if (InteractionMode == EditMode && g_editMesh) {
-        // el transform de EDICION se rastrea por el estado COMPARTIDO (EditXformActivo()
+        // el transform de EDICION se rastrea por el estado COMPARTIDO (EditXformActive()
         // + estado), NO por gTMode (que es de Object Mode). Asi extrude/duplicar -que
         // arrancan el move sin pasar por aca- tambien quedan "activos" para Symbian.
-        if (aMode == 1)      { estado = translacion; axisSelect = ViewAxis; }
-        else if (aMode == 2) { estado = rotacion;    axisSelect = ViewAxis; }
-        else                 { estado = EditScale;   axisSelect = XYZ; }
-        EditXformIniciar(); // snapshot de la seleccion de malla
-        if (!EditXformActivo()) { estado = editNavegacion; return EFalse; }
+        if (aMode == 1)      { state = translation; axisSelect = ViewAxis; }
+        else if (aMode == 2) { state = rotation;    axisSelect = ViewAxis; }
+        else                 { state = EditScale;   axisSelect = XYZ; }
+        EditXformSnapshot(); // snapshot de la seleccion de malla
+        if (!EditXformActive()) { state = editNavigation; return EFalse; }
         w3dLogf("transform EDIT: inicio modo %d", aMode);
         return ETrue;
     }
     // OBJECT MODE: el transform del objeto entero
-    if (!ObjActivo || !ObjActivo->select) return EFalse;
+    if (!ActiveObj || !ActiveObj->select) return EFalse;
     gTMode = aMode;
     if (aMode == 1) {
-        SetPosicion(); // estado = translacion + guardarEstado + ViewAxis
+        BeginTranslate(); // estado = translacion + saveState + ViewAxis
     } else {
-        if (!guardarEstado()) { gTMode = 0; return EFalse; }
-        estado = (aMode == 2) ? rotacion : EditScale;
+        if (!saveState()) { gTMode = 0; return EFalse; }
+        state = (aMode == 2) ? rotation : EditScale;
         axisSelect = ViewAxis;
     }
-    w3dLogf("transform: inicio modo %d (estado=%d)", aMode, estado);
+    w3dLogf("transform: inicio modo %d (state=%d)", aMode, state);
     return ETrue;
 }
 
 // un mover/rotar/escalar de OBJETOS que arranco OTRO (duplicar -Shift+D o el menu-, la barra de herramientas, un menu):
 // el codigo compartido pone 'estado' sin pasar por W3dNewTransformStart. gTMode sigue a 'estado': sin esto, despues de
 // duplicar las flechas orbitaban la vista en vez de mover la copia
-static void SeguirEstadoObjetos() {
+static void ContinueObjectState() {
     if (InteractionMode != ObjectMode) return;
-    if (estado == translacion)    gTMode = 1;
-    else if (estado == rotacion)  gTMode = 2;
-    else if (estado == EditScale) gTMode = 3;
+    if (state == translation)    gTMode = 1;
+    else if (state == rotation)  gTMode = 2;
+    else if (state == EditScale) gTMode = 3;
     else                          gTMode = 0;
 }
 
 TBool W3dNewTransformActive() {
-    SeguirEstadoObjetos();
+    ContinueObjectState();
     // un transform de EDICION de malla (lo arranca G/R/S del keypad, extrude o duplicar)
     // tambien cuenta como activo -> la maquinaria de Symbian (flechas/BT move, accept/
     // cancel, todo gateado por esta funcion) lo maneja igual que el de objetos.
-    if (InteractionMode == EditMode && EditXformActivo()) return ETrue;
+    if (InteractionMode == EditMode && EditXformActive()) return ETrue;
     // idem el transform de KEYFRAMES del timeline (g/s/r del dope sheet / editor de curvas): asi el backspace
     // lo CANCELA y el OK lo ACEPTA por el mismo camino, sin duplicar el ruteo de teclas.
-    if (DopeXformActivo()) return ETrue;
+    if (DopeXformActive()) return ETrue;
     // idem una TIRA DE SONIDO agarrada con el 1 (la 'g' del timeline): OK acepta, C cancela, las flechas la corren
-    { extern bool TimelineTiraActiva(); if (TimelineTiraActiva()) return ETrue; }
+    { extern bool TimelineStripActive(); if (TimelineStripActive()) return ETrue; }
     return gTMode != 0;
 }
 
 // 0 nada, 1 mover, 2 rotar, 3 escalar (para el paso de las flechas)
-TInt W3dNewTransformModo() {
-    SeguirEstadoObjetos();
-    if (InteractionMode == EditMode && EditXformActivo()) {
-        if (estado == rotacion)  return 2;
-        if (estado == EditScale) return 3;
+TInt W3dNewTransformMode() {
+    ContinueObjectState();
+    if (InteractionMode == EditMode && EditXformActive()) {
+        if (state == rotation)  return 2;
+        if (state == EditScale) return 3;
         return 1; // translacion (move / extrude / duplicar)
     }
     return gTMode;
@@ -207,88 +207,88 @@ void W3dNewTransformMove(TInt aDx, TInt aDy) {
     // velocidad de arrastre = mundo-por-pixel a la PROFUNDIDAD del pivot de transform (igual que el
     // mouse/flechas de PC). Asi el paso de las flechas del N95 se siente CONSTANTE en pantalla a
     // cualquier zoom (antes era 0.01 fijo: de cerca iba rapido, de lejos lento).
-    float velMov = Viewport3DActive ? Viewport3DActive->VelocidadArrastreMundo() : 0.01f;
+    float velMov = Viewport3DActive ? Viewport3DActive->DragVelocityWorld() : 0.01f;
     // EDIT MODE: aplica el delta a la seleccion de MALLA segun el estado COMPARTIDO
     // (vale para cualquier starter: keypad G/R/S, extrude, duplicar). VA ANTES del
     // gate de gTMode porque extrude/duplicar no setean gTMode.
-    if (InteractionMode == EditMode && EditXformActivo()) {
-        if (estado == rotacion)       EditXformRotEje(aDx, aDy);
-        else if (estado == EditScale) EditXformScale(aDx, aDy, 0.001f);
-        else                          EditXformTraslacion(aDx, aDy, velMov);
+    if (InteractionMode == EditMode && EditXformActive()) {
+        if (state == rotation)       EditXformRotAxis(aDx, aDy);
+        else if (state == EditScale) EditXformScale(aDx, aDy, 0.001f);
+        else                          EditXformTranslation(aDx, aDy, velMov);
         return;
     }
-    SeguirEstadoObjetos();
+    ContinueObjectState();
     if (!gTMode) return;
     // OBJECT MODE: transform COMPARTIDO con PC (respeta axisSelect/orientacion: 1/2/3=X/Y/Z,
     // direccion relativa a la vista, etc.). Lo usan el mouse BT y las flechas.
-    if (gTMode == 1)      SetTranslacionObjetos(aDx, aDy, velMov);
+    if (gTMode == 1)      SetTranslationObjects(aDx, aDy, velMov);
     else if (gTMode == 2) {
-        if (axisSelect == OrbitalAxis) RotarOrbital(aDx, aDy); // orbital: camUp/camRight
-        else                           SetRotacion(aDx, aDy);
+        if (axisSelect == OrbitalAxis) RotateOrbital(aDx, aDy); // orbital: camUp/camRight
+        else                           BeginRotate(aDx, aDy);
     }
     else if (gTMode == 3) SetScale(aDx, aDy, 0.001f);
 }
 
 // 1/2/3 durante un transform = X/Y/Z (como apretar X/Y/Z en PC): constriñe al
-// eje y re-apretar cicla global->local->view->libre.
-void W3dNewTransformEje(TInt aEje) {
-    CiclarEjeTransform(aEje);
+// eje y re-apretar cicla global->local->view->free.
+void W3dNewTransformAxis(TInt aAxis) {
+    CycleAxisTransform(aAxis);
 }
 
 // 0 durante una rotacion: alterna trackball (desde la vista) <-> orbital/gimbal
 void W3dNewToggleOrbital() {
-    ToggleRotacionOrbital();
+    ToggleRotationOrbital();
 }
 
 // actualiza la linea punteada pivot->mouse (verde) durante rotar/escalar
-void W3dNewTransformLinea(TInt aMx, TInt aMy) {
-    if (Viewport3DActive) Viewport3DActive->ActualizarLineaTransform(aMx, aMy);
+void W3dNewTransformLine(TInt aMx, TInt aMy) {
+    if (Viewport3DActive) Viewport3DActive->UpdateLineTransform(aMx, aMy);
 }
 
 // estamos rotando LIBRE (desde la vista)? -> el mouse usa el trackball
-TBool W3dNewEsRotarDesdeVista() {
-    return (estado == rotacion && axisSelect == ViewAxis) ? ETrue : EFalse;
+TBool W3dNewIsRotateFromView() {
+    return (state == rotation && axisSelect == ViewAxis) ? ETrue : EFalse;
 }
-void W3dNewRotarDesdeVista(TInt aMx, TInt aMy) {
-    if (Viewport3DActive) Viewport3DActive->RotarDesdeVista(aMx, aMy);
+void W3dNewRotateFromView(TInt aMx, TInt aMy) {
+    if (Viewport3DActive) Viewport3DActive->RotateFromView(aMx, aMy);
 }
 
 void W3dNewOrbit(TInt aDx, TInt aDy) {
-    if (Viewport3DActive) Viewport3DActive->OrbitarFlecha(aDx, aDy);
+    if (Viewport3DActive) Viewport3DActive->OrbitArrow(aDx, aDy);
 }
 // modificadores del keypad (N95): 0+flechas=zoom, *+flechas=paneo, #+flechas=primera persona.
 void W3dNewZoom(TInt aDelta) { if (Viewport3DActive) Viewport3DActive->Zoom((float)aDelta); }
-void W3dNewPan(TInt aDx, TInt aDy)  { if (Viewport3DActive) Viewport3DActive->PanFlecha(-aDx, -aDy); } // invertido (Dante: las flechas iban al reves)
+void W3dNewPan(TInt aDx, TInt aDy)  { if (Viewport3DActive) Viewport3DActive->PanArrow(-aDx, -aDy); } // invertido (Dante: las flechas iban al reves)
 
 void W3dNewTransformEnd(TBool aCancel) {
     // TIMELINE: el transform de keyframes (o de una tira de sonido) se acepta/cancela solo (no toca gTMode ni estado)
-    extern bool TimelineTiraActiva();
-    if (DopeXformActivo() || TimelineTiraActiva()) {
-        if (aCancel) DopeXformCancelar(); else DopeXformAceptar();
+    extern bool TimelineStripActive();
+    if (DopeXformActive() || TimelineStripActive()) {
+        if (aCancel) DopeXformCancel(); else DopeXformAccept();
         w3dLogf("transform KEYFRAMES: fin (cancel=%d)", (TInt)aCancel);
         return;
     }
     // EDIT MODE: confirmar (fija + recalcula bordes/normales) o cancelar (restaura snapshot)
     // el transform de MALLA (compartido con PC).
-    if (InteractionMode == EditMode && EditXformActivo()) {
-        if (aCancel) EditXformCancelar(); else EditXformConfirmar();
-        estado = editNavegacion;
+    if (InteractionMode == EditMode && EditXformActive()) {
+        if (aCancel) EditXformCancel(); else EditXformConfirm();
+        state  = editNavigation;
         gTMode = 0;
         w3dLogf("transform EDIT: fin (cancel=%d)", (TInt)aCancel);
         return;
     }
     // OBJECT MODE
     if (aCancel) {
-        Cancelar(); // el REAL de PC: restaura desde estadoObjetos
+        Cancel(); // el REAL de PC: restaura desde objectState
     } else {
         // AUTO KEY: va ANTES del clear, que es lo que borra el snapshot contra el que se mide QUE canal cambio.
-        // En PC esto lo hace Viewport3D::Aceptar(), pero ESA funcion arranca con "#ifdef W3D_SYMBIAN return;" ->
+        // En PC esto lo hace Viewport3D::Accept(), pero ESA funcion arranca con "#ifdef W3D_SYMBIAN return;" ->
         // en el N95 nunca corria y el auto key no guardaba nada, en silencio.
-        AutoKeyObjetos();
-        // ACEPTAR: limpiar lo guardado SIN restaurar (ReestablecerEstado
+        AutoKeyObjects();
+        // ACEPTAR: limpiar lo guardado SIN restaurar (RestoreState
         // restaura posiciones: es el mecanismo interno del cancel)
-        estadoObjetos.clear();
-        estado = editNavegacion;
+        objectState.clear();
+        state = editNavigation;
     }
     w3dLogf("transform: fin (cancel=%d)", (TInt)aCancel);
     gTMode = 0;
@@ -296,50 +296,50 @@ void W3dNewTransformEnd(TBool aCancel) {
 
 // agregar objetos al modelo NUEVO (menu de Symbian). Tipos:
 // 0=cubo 1=plano 2=circulo 3=vertice 4=luz 5=camara 6=empty
-void W3dNewAdd(TInt aTipo) {
-    Object* nuevo = NULL;
-    switch (aTipo) {
-        case 0: nuevo = NewMesh(MeshType::cube, NULL, false); break;
-        case 1: nuevo = NewMesh(MeshType::plane, NULL, false); break;
-        case 2: nuevo = NewMesh(MeshType::circle, NULL, false); break;
-        case 3: nuevo = NewMesh(MeshType::vertice, NULL, false); break;
+void W3dNewAdd(TInt aType) {
+    Object* newValue = NULL;
+    switch (aType) {
+        case 0: newValue = NewMesh(MeshType::cube, NULL, false); break;
+        case 1: newValue = NewMesh(MeshType::plane, NULL, false); break;
+        case 2: newValue = NewMesh(MeshType::circle, NULL, false); break;
+        case 3: newValue = NewMesh(MeshType::vertex, NULL, false); break;
         case 4: {
             Light* l = Light::Create(NULL, 0, 0, 0);
             if (l) { l->pos = cursor3D.pos; }
-            nuevo = l;
+            newValue = l;
             break;
         }
-        case 5: nuevo = new Camera(NULL, cursor3D.pos, Vector3(-35.0f, -45.0f, 0.0f)); break;
-        case 6: nuevo = new Empty(NULL, cursor3D.pos); break;
+        case 5: newValue = new Camera(NULL, cursor3D.pos, Vector3(-35.0f, -45.0f, 0.0f)); break;
+        case 6: newValue = new Empty(NULL, cursor3D.pos); break;
     }
-    if (nuevo) {
-        DeseleccionarTodo();
-        nuevo->Seleccionar();
-        w3dLogf("add: tipo %d agregado", aTipo);
+    if (newValue) {
+        DeselectAll();
+        newValue->Select();
+        w3dLogf("add: tipo %d agregado", aType);
     }
 }
 
 // ctrl+p / alt+p: emparentar / desemparentar (compartido)
-void W3dNewSetParent() { SetParentSeleccion(); }
-void W3dNewClearParent() { ClearParentSeleccion(); }
+void W3dNewSetParent() { SetParentSelection(); }
+void W3dNewClearParent() { ClearParentSelection(); }
 
 // 'a': seleccionar/deseleccionar todo (el compartido de Objects.cpp)
-void W3dNewSeleccionarTodo() {
-    SeleccionarTodo(true);
+void W3dNewSelectAll() {
+    SelectAll(true);
 }
 
 // alt+d: duplicado LINKEADO (instancias de PC)
-void W3dNewInstancia() {
+void W3dNewInstance() {
     NewInstance();
 }
 
 // puente para los TUs viejos (no ven Objects.h por el clash de Object)
-void W3dNewDeseleccionarTodo() {
-    DeseleccionarTodo();
+void W3dNewDeselectAll() {
+    DeselectAll();
 }
 
 // enfocar el objeto activo (el del Viewport3D REAL de PC)
-void W3dNewEnfocar() {
+void W3dNewFocus() {
     // "0" enfoca lo del viewport ACTIVO, no siempre el 3D. En el timeline enfocar el modelo no tiene ningun
     // sentido: ahi el equivalente es encuadrar los keyframes elegidos (el numpad '.' de PC).
     if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 5) {
@@ -347,7 +347,7 @@ void W3dNewEnfocar() {
         return;
     }
     if (Viewport3DActive) {
-        Viewport3DActive->EnfocarObject();
+        Viewport3DActive->FocusObject();
     }
 }
 
@@ -391,31 +391,31 @@ TBool W3dNewScenePick(TInt aX, TInt aY, TInt aVx, TInt aVy, TInt aVw, TInt aVh, 
 
 TBool W3dNewSelInfo(char* aName, TInt aNameMax,
                     float aPos[3], float aRot[3], float aScale[3]) {
-    if (!ObjActivo || !ObjActivo->select) return EFalse;
-    strncpy(aName, ObjActivo->name.c_str(), aNameMax - 1);
+    if (!ActiveObj || !ActiveObj->select) return EFalse;
+    strncpy(aName, ActiveObj->name.c_str(), aNameMax - 1);
     aName[aNameMax - 1] = 0;
-    aPos[0] = ObjActivo->pos.x;   aPos[1] = ObjActivo->pos.y;   aPos[2] = ObjActivo->pos.z;
-    aRot[0] = ObjActivo->rotEuler.x; aRot[1] = ObjActivo->rotEuler.y; aRot[2] = ObjActivo->rotEuler.z;
-    aScale[0] = ObjActivo->scale.x; aScale[1] = ObjActivo->scale.y; aScale[2] = ObjActivo->scale.z;
+    aPos[0] = ActiveObj->pos.x;   aPos[1] = ActiveObj->pos.y;   aPos[2] = ActiveObj->pos.z;
+    aRot[0] = ActiveObj->rotEuler.x; aRot[1] = ActiveObj->rotEuler.y; aRot[2] = ActiveObj->rotEuler.z;
+    aScale[0] = ActiveObj->scale.x; aScale[1] = ActiveObj->scale.y; aScale[2] = ActiveObj->scale.z;
     return ETrue;
 }
 
 void W3dNewAdjust(TInt aRow, TInt aDelta) {
-    if (!ObjActivo) return;
+    if (!ActiveObj) return;
     float d = (float)aDelta;
     switch (aRow) {
-        case 0: ObjActivo->pos.x += d * 0.1f; break;
-        case 1: ObjActivo->pos.y += d * 0.1f; break;
-        case 2: ObjActivo->pos.z += d * 0.1f; break;
-        case 3: ObjActivo->rotEuler.x += d; break;
-        case 4: ObjActivo->rotEuler.y += d; break;
-        case 5: ObjActivo->rotEuler.z += d; break;
-        case 6: ObjActivo->scale.x += d * 0.1f; break;
-        case 7: ObjActivo->scale.y += d * 0.1f; break;
-        case 8: ObjActivo->scale.z += d * 0.1f; break;
+        case 0: ActiveObj->pos.x += d * 0.1f; break;
+        case 1: ActiveObj->pos.y += d * 0.1f; break;
+        case 2: ActiveObj->pos.z += d * 0.1f; break;
+        case 3: ActiveObj->rotEuler.x += d; break;
+        case 4: ActiveObj->rotEuler.y += d; break;
+        case 5: ActiveObj->rotEuler.z += d; break;
+        case 6: ActiveObj->scale.x += d * 0.1f; break;
+        case 7: ActiveObj->scale.y += d * 0.1f; break;
+        case 8: ActiveObj->scale.z += d * 0.1f; break;
     }
     if (aRow >= 3 && aRow <= 5) {
-        RotDesdeEuler(ObjActivo);
+        RotFromEuler(ActiveObj);
     }
 }
 
@@ -448,7 +448,7 @@ TInt W3dNewTreeCount() {
 }
 
 TBool W3dNewTreeItem(TInt aIdx, char* aName, TInt aNameMax,
-                     TInt& aDepth, TBool& aSel, TInt& aTipo) {
+                     TInt& aDepth, TBool& aSel, TInt& aType) {
     if (!SceneCollection || !aName || aNameMax < 2) return EFalse;
     TInt counter = 0;
     TInt depth = 0;
@@ -458,11 +458,11 @@ TBool W3dNewTreeItem(TInt aIdx, char* aName, TInt aNameMax,
     aName[aNameMax - 1] = 0;
     aDepth = depth;
     aSel = o->select ? (TBool)ETrue : (TBool)EFalse;
-    if (o == SceneCollection) aTipo = 0;
-    else if (o->getType() == ObjectType::mesh) aTipo = 1;
-    else if (o->getType() == ObjectType::light) aTipo = 2;
-    else if (o->getType() == ObjectType::camera) aTipo = 4;
-    else aTipo = 3;
+    if (o == SceneCollection) aType = 0;
+    else if (o->getType() == ObjectType::mesh) aType = 1;
+    else if (o->getType() == ObjectType::light) aType = 2;
+    else if (o->getType() == ObjectType::camera) aType = 4;
+    else aType = 3;
     return ETrue;
 }
 
@@ -471,7 +471,7 @@ TBool W3dNewImportObj(const char* aPath) {
     if (!aPath || !aPath[0]) return EFalse;
     w3dLogf("W3dNewImportObj: aPath='%s'", aPath); // diagnostico: confirma que se dispara el import + el path crudo
     bool ok = ImportOBJ(std::string(aPath), false);
-    w3dLogf("importObj: ok=%d hijos=%d", (TInt)ok,
+    w3dLogf("importObj: ok=%d children=%d", (TInt)ok,
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
     return ok ? ETrue : EFalse;
 }
@@ -482,7 +482,7 @@ TBool W3dNewImportFbx(const char* aPath) {
     if (!aPath || !aPath[0]) return EFalse;
     w3dLogf("W3dNewImportFbx: aPath='%s'", aPath);
     bool ok = ImportFBX(std::string(aPath));
-    w3dLogf("importFbx: ok=%d hijos=%d", (TInt)ok,
+    w3dLogf("importFbx: ok=%d children=%d", (TInt)ok,
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
     return ok ? ETrue : EFalse;
 }
@@ -493,7 +493,7 @@ TBool W3dNewImportGltf(const char* aPath) {
     if (!aPath || !aPath[0]) return EFalse;
     w3dLogf("W3dNewImportGltf: aPath='%s'", aPath);
     bool ok = ImportGLTF(std::string(aPath));
-    w3dLogf("importGltf: ok=%d hijos=%d", (TInt)ok,
+    w3dLogf("importGltf: ok=%d children=%d", (TInt)ok,
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
     return ok ? ETrue : EFalse;
 }
@@ -505,14 +505,14 @@ void W3dNewToggleEdit() { LayoutToggleEditMode(); }
 void W3dNewCycleSelect() {
     // El lapiz (tap) cicla el activo: deselec el activo + selec el siguiente, el RESTO queda.
     // Mode-aware (LayoutInput.cpp): en Edit Mode sobre el sub-elemento; en Object Mode sobre el
-    // objeto, con el MISMO comportamiento exacto (ya no reemplaza todo con DeseleccionarTodo).
-    EditSelAvanzar(1, false);
+    // objeto, con el MISMO comportamiento exacto (ya no reemplaza todo con DeselectAll).
+    EditSelAdvance(1, false);
 }
 
 // tecla borrar del telefono: borra el objeto ACTIVO del modelo nuevo
-static void BorrarRec(Object* aObj) {
+static void DeleteRec(Object* aObj) {
     for (size_t c = 0; c < aObj->Childrens.size(); c++) {
-        BorrarRec(aObj->Childrens[c]);
+        DeleteRec(aObj->Childrens[c]);
     }
     aObj->Childrens.clear();
     for (size_t i = 0; i < Lights.size(); i++) {
@@ -527,7 +527,7 @@ static void BorrarRec(Object* aObj) {
 TBool W3dNewDeleteActive() {
     // borra TODOS los seleccionados con el Eliminar compartido de PC
     if (!SceneCollection) return EFalse;
-    if (!HayObjetosSeleccionados(false)) return EFalse;
+    if (!HasObjectsSelected(false)) return EFalse;
     // OJO con las luces: Light::~Light no se saca de Lights -> limpiar
     // las seleccionadas del vector ANTES de que Eliminar las destruya
     for (TInt i = (TInt)Lights.size() - 1; i >= 0; i--) {
@@ -536,8 +536,8 @@ TBool W3dNewDeleteActive() {
             Lights.erase(Lights.begin() + i);
         }
     }
-    Eliminar(true);
-    ObjActivo = NULL;
+    Remove(true);
+    ActiveObj = NULL;
     return ETrue;
 }
 
@@ -546,7 +546,7 @@ void W3dNewTreeSelect(TInt aIdx) {
     TInt counter = 0;
     Object* o = TreeNth(SceneCollection, counter, aIdx, 0, NULL);
     if (!o || o == SceneCollection) return;
-    DeseleccionarTodo();
-    o->Seleccionar();
+    DeselectAll();
+    o->Select();
     w3dLogf("outliner: seleccionado idx=%d", aIdx);
 }

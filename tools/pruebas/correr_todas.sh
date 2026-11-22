@@ -24,9 +24,9 @@ cd "$(dirname "$0")" || exit 1
 
 W3D_BIN="${W3D_BIN:-../../platform/linux/build/whisk3d}"
 # SIN VENTANAS: por defecto las pruebas dibujan en el driver 'offscreen' de SDL (GL por EGL, sin
-# abrir ninguna ventana en el escritorio). Para verlas: W3D_VER_VENTANA=1 ./correr_todas.sh
+# abrir ninguna ventana en el escritorio). Para verlas: W3D_SHOW_WINDOW=1 ./correr_todas.sh
 # (en Windows no hay EGL para el 'offscreen': el exe con --script ya crea la ventana OCULTA solo, ver main.cpp)
-if [ -z "${W3D_VER_VENTANA:-}" ]; then
+if [ -z "${W3D_SHOW_WINDOW:-}" ]; then
     case "$(uname -s)" in
         MINGW*|MSYS*|CYGWIN*) export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}" ;;
         *) export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-offscreen}" SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}" ;;

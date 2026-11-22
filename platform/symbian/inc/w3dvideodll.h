@@ -13,29 +13,29 @@
 // ============================================================================
 
 struct W3dVideoHost {
-    void (*log)(const char* texto);                                   // al log de Whisk3D
-    void (*salida)(void* ctx, const unsigned char* datos, int largo);  // un pedazo codificado (un cuadro)
+    void (*log)(const char* text);                                   // al log de Whisk3D
+    void (*output)(void* ctx, const unsigned char* data, int length);  // un pedazo codificado (un cuadro)
     void* ctx;
 };
 
 enum { W3D_VIDEO_DLL_VERSION = 1 };
 
-struct W3dVideoTabla {
+struct W3dVideoTable {
     int version;                                                       // W3D_VIDEO_DLL_VERSION
     // los codificadores del telefono, al log (lo que saben hacer)
-    void (*Sondear)(const W3dVideoHost* host);
+    void (*Poll)(const W3dVideoHost* host);
     // los que hay: 1 = H.264, 2 = MPEG-4 (0 = ninguno)
-    int (*Hay)();
+    int (*Has)();
     // abre el codificador (preferido: 0 = H.264, 1 = MPEG-4; si no esta, el otro). Devuelve el codificador (NULL = no)
     // y deja el que se uso, el tamano real (multiplos de 16) y el error
-    void* (*Abrir)(const W3dVideoHost* host, int w, int h, int fps, int kbps, int preferido,
+    void* (*Open)(const W3dVideoHost* host, int w, int h, int fps, int kbps, int preferred,
                    int* codec, int* wReal, int* hReal, int* error);
     // un cuadro RGBA (de arriba hacia abajo); 1 = bien
-    int (*Cuadro)(void* cod, const unsigned char* rgba, int w, int h);
+    int (*Frame)(void* cod, const unsigned char* rgba, int w, int h);
     // termina (lo que queda sale por 'salida') y lo libera; 1 = bien
-    int (*Cerrar)(void* cod);
+    int (*Close)(void* cod);
 };
 
-typedef void (*W3dVideoDllTablaFn)(W3dVideoTabla* t);
+typedef void (*W3dVideoDllTableFn)(W3dVideoTable* t);
 
 #endif

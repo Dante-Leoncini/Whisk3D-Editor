@@ -1,5 +1,5 @@
 # una textura que se queda sin usuarios (se la saca del material) sigue en la biblioteca; Purge Orphans la libera
-ventana 1280 720
+window 1280 720
 add cube
 matnew
-texhuerfana bsp_azul.png
+texorphan bsp_azul.png

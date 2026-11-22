@@ -4,7 +4,7 @@
 #ifdef W3D_SYMBIAN
     #include "ui/W3dColors.h"
 // UVs expandidos por indice para drawArrays (se llenan en CalcBorderUV)
-GLfloat bourderUVExp[96];
+GLfloat borderUVExp[96];
 #endif
 
 // UVs e indices
@@ -14,7 +14,7 @@ GLubyte indicesBorder[] = {
     8,9,12,12,9,13,   9,10,13,13,10,14,  10,11,14,14,11,15
 };
 
-GLfloat bourderUV[32] = {
+GLfloat borderUV[32] = {
     0.0f,      0.0f,
     0.0f,      0.0f,
     0.0f,      0.0f,
@@ -34,7 +34,7 @@ GLfloat bourderUV[32] = {
 };
 
 void CalcBorderUV(int texW, int texH) {
-    GLfloat* uv = bourderUV;
+    GLfloat* uv = borderUV;
 
     // Coordenadas UV en píxeles (borde de 13px, esquinas de 6px, centro de 1px)
     float U[4] = { 115.0f / texW, 121.0f / texW, 122.0f / texW, 128.0f / texW };
@@ -50,8 +50,8 @@ void CalcBorderUV(int texW, int texH) {
     }
 #ifdef W3D_SYMBIAN
     for (int i = 0; i < 48; i++) {
-        bourderUVExp[i*2 + 0] = bourderUV[indicesBorder[i]*2 + 0];
-        bourderUVExp[i*2 + 1] = bourderUV[indicesBorder[i]*2 + 1];
+        borderUVExp[i*2 + 0] = borderUV[indicesBorder[i]*2 + 0];
+        borderUVExp[i*2 + 1] = borderUV[indicesBorder[i]*2 + 1];
     }
 #endif
 }
@@ -74,14 +74,14 @@ WithBorder::WithBorder() {
 }
 
 // ------------------ Dibujar ------------------
-void WithBorder::DibujarBordes(ViewportBase* current) {
+void WithBorder::DrawBorders(ViewportBase* current) {
 #ifdef W3D_SYMBIAN
     // misma geometria y arte que PC, pero con drawArrays + vertices FLOAT
     // expandidos (glDrawElements/SHORT no dibujan en la fase 2D del N95)
     const float* c = (current == viewPortActive)
-        ? ListaColores[static_cast<int>(ColorID::accent)] : ListaColores[static_cast<int>(ColorID::negro)];
+        ? ColorList[static_cast<int>(ColorID::accent)] : ColorList[static_cast<int>(ColorID::black)];
     w3dEngine::Color4f(c[0], c[1], c[2], 1.0f);
-    w3dEngine::TexCoordPointer2f(0, bourderUVExp);
+    w3dEngine::TexCoordPointer2f(0, borderUVExp);
     w3dEngine::VertexPointer2f(0, borderMeshExp);
     w3dEngine::DrawTrianglesArray(48);
 #else
@@ -101,11 +101,11 @@ void WithBorder::DibujarBordes(ViewportBase* current) {
     if (!Textures.empty() && Textures[0]) w3dEngine::BindTexture(Textures[0]->iID);
 
     if (current == viewPortActive)
-        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+        w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
     else
-        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::negro)]);
+        w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::black)]);
 
-    w3dEngine::TexCoordPointer2f(0, bourderUV);
+    w3dEngine::TexCoordPointer2f(0, borderUV);
     w3dEngine::VertexPointer2s(0, borderMesh);
     w3dEngine::DrawTrianglesByte(48, indicesBorder);
 #endif
@@ -113,8 +113,11 @@ void WithBorder::DibujarBordes(ViewportBase* current) {
 
 // ------------------ Resize ------------------
 void WithBorder::ResizeBorder(int width, int height) {
-    GLshort U[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(width - 6*GlobalScale), (GLshort)(width) };
-    GLshort V[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(height - 6*GlobalScale), (GLshort)(height) };
+    // (las esquinas del arte miden 6 y su linea 1: la linea sale de GlobalScale pixeles, y del doble en las pantallas x4
+    // -LineScaleUI-: sigue adentro de la banda del borde, borderGS, que el contenido ya deja libre)
+    const int e = 6 * GlobalScale * LineScaleUI();
+    GLshort U[4] = { 0, (GLshort)e, (GLshort)(width - e), (GLshort)(width) };
+    GLshort V[4] = { 0, (GLshort)e, (GLshort)(height - e), (GLshort)(height) };
 
     int k = 0;
     for (int y = 0; y < 4; y++) {

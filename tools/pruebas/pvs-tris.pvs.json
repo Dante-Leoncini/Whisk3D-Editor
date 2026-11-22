@@ -1,5 +1,5 @@
 {
-  "sectores": 2,
+  "sectors": 2,
   "tris": [
     [0, 1],
     [2, 3]

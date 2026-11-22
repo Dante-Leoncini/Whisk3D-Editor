@@ -4,17 +4,17 @@
 #  (el .obj/.stl del que salio) que ya no esta en la maquina se lista en "Archivos que faltan" como HUERFANO. Es solo
 #  procedencia (la geometria viaja adentro del .w3d): "Purgar huerfanos" lo olvida y el guardado deja de avisar.
 # ==========================================================================
-escenadefecto
-borrararchivo /tmp/w3d_faltan_cubo.stl
-stl exportar /tmp/w3d_faltan_cubo.stl sel
+scenedefault
+deletefile /tmp/w3d_faltan_cubo.stl
+stl export /tmp/w3d_faltan_cubo.stl sel
 import /tmp/w3d_faltan_cubo.stl
-recursos faltan n 0
+resources missing n 0
 # (el archivo de origen desaparece: un pendrive que se saco, un proyecto que vino de otra maquina)
-borrararchivo /tmp/w3d_faltan_cubo.stl
-guardarw3d /tmp/w3d_faltan.w3d
-entradaexiste /tmp/w3d_faltan.w3d EXTERNOS.txt 1
-recursos faltan n 1
-recpurgar faltan n 1
-recursos faltan n 0
-guardarw3d /tmp/w3d_faltan.w3d
-entradaexiste /tmp/w3d_faltan.w3d EXTERNOS.txt 0
+deletefile /tmp/w3d_faltan_cubo.stl
+savew3d /tmp/w3d_faltan.w3d
+entryexists /tmp/w3d_faltan.w3d EXTERNALS.txt 1
+resources missing n 1
+recpurge missing n 1
+resources missing n 0
+savew3d /tmp/w3d_faltan.w3d
+entryexists /tmp/w3d_faltan.w3d EXTERNALS.txt 0

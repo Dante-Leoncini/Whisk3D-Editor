@@ -6,12 +6,12 @@ Whisk3D UI non apre finestre né ascolta il mouse, la tastiera o lo schermo touc
 
 | Evento | A chi va |
 |---|---|
-| Si muove il mouse o il dito | `PopupMenu::MouseMove(x, y)`; l'`hover` di pulsanti e schede; `PropHoverGroup` e `PropHoverFila` nei riquadri |
+| Si muove il mouse o il dito | `PopupMenu::MouseMove(x, y)`; l'`hover` di pulsanti e schede; `PropHoverGroup` e `PropHoverRow` nei riquadri |
 | Clic o tocco | `PopupMenu::Click(x, y)`; `Button::Contains` e `Tab::Contains`; in un riquadro, la riga calcolata dal programma |
 | Rotella | `PopupMenu::Wheel(dir)` |
 | Frecce | `button_up`, `button_down`, `button_left` e `button_right` di menu, riquadri e righe |
 | OK o Enter | `PopupMenu::Enter()`, `GroupPropertie::EnterPropertieSelect()` |
-| Annulla o Esc | `PopupMenu::Cerrar()`, `GroupPropertie::Cancel()` |
+| Annulla o Esc | `PopupMenu::Close()`, `GroupPropertie::Cancel()` |
 | Una lettera | Il campo di testo che ha il focus |
 
 Le coordinate sono pixel dello schermo, con la Y verso il basso.
@@ -23,7 +23,7 @@ Tutto si può usare con quattro frecce, OK e Annulla: è così che si usa sull'N
 - I riquadri si percorrono riga per riga e saltano ciò che non si può scegliere.
 - I menu si percorrono con le frecce, e l'opzione evidenziata non esce mai dalla vista.
 - I numeri si cambiano con le frecce, senza digitarli.
-- Il focus della tastiera si vede: `focoMenu` nei pulsanti e `foco` nelle schede, in `accent`, e il bordo bianco di `g_kfFocoProp` su un rombo.
+- Il focus della tastiera si vede: `focusMenu` nei pulsanti e `focus` nelle schede, in `accent`, e il bordo bianco di `g_kfFocusProp` su un rombo.
 
 Quale tasto del telefono corrisponda a ciascuno, i soft key o l'OK, non riguarda la UI: lo traducono l'editor e ogni sistema.
 
@@ -31,7 +31,7 @@ Quale tasto del telefono corrisponda a ciascuno, i soft key o l'OK, non riguarda
 
 - Un tocco è un clic.
 - Il tocco che apre un sottomenu non sceglie niente al suo interno ([Menu a tendina](menus.md)).
-- `UITactil` ingrandisce i pulsanti e le barre per il dito ([Colori e scala](tema.md)). Oggi niente la attiva.
+- `UITouch` ingrandisce i pulsanti e le barre per il dito ([Colori e scala](tema.md)). Oggi niente la attiva.
 
 Trascinare per scorrere, tenere premuto o toccare due volte lo gestisce chi usa la UI.
 
@@ -45,31 +45,31 @@ Trascinare per scorrere, tenere premuto o toccare due volte lo gestisce chi usa 
 | `SelectAll()` | Seleziona tutto: il primo tasto lo sostituisce |
 | `InsertChar(c)` | Scrive un byte dove si trova il cursore |
 | `Backspace()`, `DelForward()` | Cancellano all'indietro o in avanti |
-| `CaretIzq()`, `CaretDer()` | Spostano il cursore. Con tutto selezionato, tolgono la selezione |
+| `CaretLeft()`, `CaretRight()` | Spostano il cursore. Con tutto selezionato, tolgono la selezione |
 
 Cancellare e spostare il cursore trattano come una sola una lettera di più byte, come una `ñ` o una lettera cirillica. Per scriverne una, si passa ogni byte a `InsertChar`.
 
-C'è un solo campo con il focus alla volta: `g_textFieldActivo`, o `NULL` se non ce n'è nessuno. I tasti vanno a quello.
+C'è un solo campo con il focus alla volta: `g_activeTextField`, o `NULL` se non ce n'è nessuno. I tasti vanno a quello.
 
 ```cpp
-TextField nombre;
-nombre.SetText("Jugador 1");
-nombre.SelectAll();
-g_textFieldActivo = &nombre;
+TextField name;
+name.SetText("Jugador 1");
+name.SelectAll();
+g_activeTextField = &name;
 
 // con cada letra
-if (g_textFieldActivo) g_textFieldActivo->InsertChar(c);
+if (g_activeTextField) g_activeTextField->InsertChar(c);
 
 // al dibujar, con el color del texto puesto
-RenderTextField(nombre, g_textFieldActivo == &nombre, textAlign::left, 200);
+RenderTextField(name, g_activeTextField == &name, textAlign::left, 200);
 ```
 
-`RenderTextField(caja, foco, alineación, ancho)` lo disegna nell'origine attuale:
+`RenderTextField(box, focus, alineación, width)` lo disegna nell'origine attuale:
 
 - Senza focus, è solo il testo.
 - Con il focus e tutto selezionato, il testo è bianco su `accentDark`.
 - Con il focus e senza selezione, appare il cursore: una lineetta che lampeggia ogni 530 ms.
 
-`TextFieldParpadeoTick()` restituisce `true` quando la lineetta cambia: è il momento di ridisegnare.
+`TextFieldBlinkTick()` restituisce `true` quando la lineetta cambia: è il momento di ridisegnare.
 
-`TextField.h` dichiara anche `TextFieldEnfocar`, `TextFieldCancelar` (Esc: torna al testo che c'era prima di dare il focus), `TextFieldInputChar` e `TextFieldFinDeCuadro`. Oggi sono definite nell'editor, in `main/ui/ViewPorts/NumInput.cpp`: la UI da sola non le include.
+`TextField.h` dichiara anche `TextFieldFocus`, `TextFieldCancel` (Esc: torna al testo che c'era prima di dare il focus), `TextFieldInputChar` e `TextFieldFrameEnd`. Oggi sono definite nell'editor, in `main/ui/ViewPorts/NumInput.cpp`: la UI da sola non le include.

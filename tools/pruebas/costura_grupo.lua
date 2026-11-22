@@ -7,24 +7,24 @@
 --  grupo llega incompleto desde el archivo, la mitad de la costura se queda
 --  quieta y la malla se abre en dos justo por ahi.
 -- ==========================================================================
-propiedades = {
-    malla = "objeto",   -- ref_malla
+properties = {
+    malla = "object",   -- ref_malla
 }
 
-function inicio()
-    local m = objeto("malla")
-    local idx = grupoVertices(m, "costura")
-    setCompartido("nverts", #idx)
+function start()
+    local m = object("malla")
+    local idx = vertexGroup(m, "costura")
+    setShared("nverts", #idx)
     -- y que TODOS esten en una de las dos posiciones del grupo (x = -1 o x = 1,
     -- con y = -1 e y = 1 respectivamente; la y de lua es la profundidad, Z arriba):
     -- si entrara alguno de mas, se veria aca
-    local fuera = 0
+    local outside = 0
     for k = 1, #idx do
-        local x, y, z = verticePos(m, idx[k])
-        if not ((x < -0.9 and y < -0.9) or (x > 0.9 and y > 0.9)) then fuera = fuera + 1 end
+        local x, y, z = vertexPos(m, idx[k])
+        if not ((x < -0.9 and y < -0.9) or (x > 0.9 and y > 0.9)) then outside = outside + 1 end
     end
-    setCompartido("fuera", fuera)
+    setShared("fuera", outside)
 end
 
-function actualizar(dt)
+function update(dt)
 end

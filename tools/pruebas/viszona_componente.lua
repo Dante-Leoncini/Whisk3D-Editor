@@ -8,26 +8,26 @@
 --  El orden dentro del tick es: scripts -> W3dVisZonasTick, asi que lo que
 --  este script LEE en el tick N es lo aplicado al final del tick N-1.
 -- ==========================================================================
-propiedades = {
-    malla = "objeto",   -- la malla con CullingTri metodo celdas (ref_malla)
-    zona  = "objeto",   -- la VisZona modo curva (ref_zona)
+properties = {
+    malla = "object",   -- la malla con CullingTri metodo celdas (ref_malla)
+    zona  = "object",   -- la VisZona modo curva (ref_zona)
 }
 
 local tick = 0
 
-function inicio()
-    setCompartido("vz_celda", -1)
-    setCompartido("vz_zona", -1)
+function start()
+    setShared("vz_celda", -1)
+    setShared("vz_zona", -1)
 end
 
-function actualizar(dt)
+function update(dt)
     tick = tick + 1
-    local z = objeto("zona")
-    local m = objeto("malla")
+    local z = object("zona")
+    local m = object("malla")
     if not z or not m then return end
-    if tick == 1 then setVisCurvaT(z, 0.0) end   -- nodo 0 -> celda 1
-    if tick == 3 then setVisCurvaT(z, 2.9) end   -- nodo 2.9 -> celda 3 (de a 1 por tick)
-    setCompartido("vz_celda", visCelda(m) or -1)
-    setCompartido("vz_zona",  visCelda(z) or -1)
-    setCompartido("vz_tick", tick)
+    if tick == 1 then setVisCurveT(z, 0.0) end   -- nodo 0 -> celda 1
+    if tick == 3 then setVisCurveT(z, 2.9) end   -- nodo 2.9 -> celda 3 (de a 1 por tick)
+    setShared("vz_celda", visCell(m) or -1)
+    setShared("vz_zona",  visCell(z) or -1)
+    setShared("vz_tick", tick)
 end

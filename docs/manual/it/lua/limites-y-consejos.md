@@ -3,8 +3,8 @@
 ## Quali parti di Lua mancano
 
 - Ci sono `string`, `table` e `math`, più le funzioni di base (`print`, `pairs`, `ipairs`, `type`, `tostring`, `tonumber`, `pcall`, `assert`…).
-- **Non** ci sono `io` né `os` (un gioco non tocca i file del disco; per questo non c'è `os.time`), né `require`, `coroutine`, `utf8` o `debug`. Per salvare dati usa `config` / `guardarConfig`.
-- Ogni script è indipendente: non può vedere le variabili di un altro. Per comunicare, `setCompartido` / `compartido`.
+- **Non** ci sono `io` né `os` (un gioco non tocca i file del disco; per questo non c'è `os.time`), né `require`, `coroutine`, `utf8` o `debug`. Per salvare dati usa `getConfig` / `saveConfig`.
+- Ogni script è indipendente: non può vedere le variabili di un altro. Per comunicare, `setShared` / `getShared`.
 
 ## Errori
 
@@ -14,16 +14,16 @@
 
 ## Cose da tenere a mente
 
-- `actualizar` viene eseguita solo negli oggetti **visibili** della scena attiva: nascondere un oggetto spegne la sua logica.
-- `destruir`, `cambiarEscena` e `reproducirEscena` si applicano alla fine del fotogramma, non nel momento in cui le chiami.
+- `update` viene eseguita solo negli oggetti **visibili** della scena attiva: nascondere un oggetto spegne la sua logica.
+- `destroy`, `changeScene` e `playScene` si applicano alla fine del fotogramma, non nel momento in cui le chiami.
 - Il font dei testi del gioco non disegna accenti né la ñ: scrivi `"MENU"` invece di `"MENÚ"`.
-- `areaSegura`, `cajaUI` e `resolucion` hanno valori reali solo dopo il primo fotogramma disegnato: non usarle in `inicio`.
+- `safeArea`, `uiBox` e `resolution` hanno valori reali solo dopo il primo fotogramma disegnato: non usarle in `start`.
 - Su Web e Android solo la **prima** luce illumina.
-- Sul Nokia N95 non ci sono controller né mouse: usa `tecla` con i nomi della tastiera del telefono. I numeri interi sono a 32 bit.
+- Sul Nokia N95 non ci sono controller né mouse: usa `key` con i nomi della tastiera del telefono. I numeri interi sono a 32 bit.
 
 ## Perché vada veloce (soprattutto sul telefono)
 
-- Cerca gli oggetti una sola volta, in `inicio`, e salvali in variabili `local`.
+- Cerca gli oggetti una sola volta, in `start`, e salvali in variabili `local`.
 - Usa le versioni "per tanti elementi" (`setVertices`, `setVerticesColor`) invece di chiamare mille volte quella per un solo elemento.
-- Preferisci le funzioni del motore (`desplazarUV`, `lineaPunto`, `setRotacion` con ordine) piuttosto che fare i calcoli in Lua.
-- Misura con `perfilLua` e `relojMs` prima di ottimizzare alla cieca.
+- Preferisci le funzioni del motore (`scrollUV`, `linePoint`, `setRotation` con ordine) piuttosto che fare i calcoli in Lua.
+- Misura con `luaProfile` e `clockMs` prima di ottimizzare alla cieca.

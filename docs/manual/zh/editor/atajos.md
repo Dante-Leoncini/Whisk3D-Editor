@@ -22,9 +22,9 @@
 
 每个上下文的快捷键在指针位于对应面板上时生效；**General** 的快捷键在所有面板中都生效。**During a transform** 的快捷键在移动、旋转或缩放某个元素时生效，并且优先。在 Script Editor 中，字母键总是用来输入：那里只能重新分配带 <kbd>Ctrl</kbd>、<kbd>Alt</kbd> 或 F 键的组合。
 
-## atajos.ini 文件
+## shortcuts.ini 文件
 
-修改会自动保存到 `res/atajos.ini` 中，它和 `config.ini` 放在一起。文件中只列出修改过的功能，你也可以手动编辑它：
+修改会自动保存到 `res/shortcuts.ini` 中，它和 `config.ini` 放在一起。文件中只列出修改过的功能，你也可以手动编辑它：
 
 ```ini
 # 功能 = 组合键, 另一个组合键   (留空 = 没有快捷键)
@@ -44,7 +44,7 @@ xf.cancelar = Esc, Q
 
 ### General（任意面板）
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Save project | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ xf.cancelar = Esc, Q
 
 ### 3D Viewport
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ xf.cancelar = Esc, Q
 
 ### During a transform（移动 / 旋转 / 缩放）
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
 | Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ xf.cancelar = Esc, Q
 
 ### UV Editor
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ xf.cancelar = Esc, Q
 
 ### Timeline
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ xf.cancelar = Esc, Q
 
 ### Outliner
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ xf.cancelar = Esc, Q
 
 ### 2D Editor
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ xf.cancelar = Esc, Q
 
 ### Properties（例程的步骤）
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Grab step | <kbd>G</kbd> | — | `props.agarrar` |
 | Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ xf.cancelar = Esc, Q
 
 ### Script Editor
 
-| 功能 | 默认快捷键 | Nokia N95（手机键盘） | atajos.ini 中的名称 |
+| 功能 | 默认快捷键 | Nokia N95（手机键盘） | shortcuts.ini 中的名称 |
 |---|---|---|---|
 | Save script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Undo | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

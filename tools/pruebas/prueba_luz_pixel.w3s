@@ -5,19 +5,19 @@
 #  - POR PIXEL se calcula en cada pixel: cerca del centro sale mucho mas claro que cerca de una esquina.
 # Solo con shaders (la PC con -DW3D_PC_GLES2=ON, la web, Android, el N8): sin ellos la prueba termina en el paso 1.
 # (vista "rendered": las luces de la escena; el centro exacto no se mira, ahi se dibuja el origen)
-sombreadopixel
-ventana 1280 720
+pixelshading
+window 1280 720
 add plane
 objscale 6 1 6
 matnew
 addlight
 objpos 0 1 0
-vpvista rendered
-vporbita 0 0 0 20 -90 0
+vpview rendered
+vporbit 0 0 0 20 -90 0
 deselectall
 # por vertice: cerca del centro NO es mucho mas claro que cerca de una esquina
-matflags Material set vertice
-fail escenapx 1.5 0 1.5 masclaroque 4.5 0 4.5 120
+matflags Material set vertex
+fail escenapx 1.5 0 1.5 lighterthan 4.5 0 4.5 120
 # por pixel: si
 matflags Material set pixel
-escenapx 1.5 0 1.5 masclaroque 4.5 0 4.5 120
+scenepx 1.5 0 1.5 lighterthan 4.5 0 4.5 120

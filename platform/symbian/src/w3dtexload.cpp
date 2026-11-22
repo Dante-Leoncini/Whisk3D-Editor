@@ -24,31 +24,31 @@
 #include "w3dlog.h"
 #include "objects/Textures.h"
 #include "w3dTexture.h" // engine: UploadRGBA (subida comun a los 4 OS)
-#include "w3dGraphics.h" // VBOMemoria (lo que hay en GL, en el log de cada subida)
+#include "w3dGraphics.h" // VBOMemory (lo que hay en GL, en el log de cada subida)
 #include "io/w3dFilesystem.h" // ReadFileBytes: resuelve el contenedor v4 (VFS) y disco
 
 // globales compartidos del modelo de PC (Textures.cpp es PC-only, no se compila en Symbian).
-// g_w3dTexturasGen = contador de generacion del cache de texturas (lo incrementa TexturaCache al
-// borrar una textura); las RUTINAS (RutinaEditor.cpp) lo consultan para invalidar su cache. Sin
-// esta definicion el link del N95 falla con L6218E: Undefined symbol g_w3dTexturasGen.
+// g_w3dTexturesGen = contador de generacion del cache de texturas (lo incrementa TexturaCache al
+// borrar una textura); las RUTINAS (RoutineEditor.cpp) lo consultan para invalidar su cache. Sin
+// esta definicion el link del N95 falla con L6218E: Undefined symbol g_w3dTexturesGen.
 std::vector<Texture*> Textures;
-unsigned g_w3dTexturasGen = 1;
+unsigned g_w3dTexturesGen = 1;
 
 namespace {
 
 // espera sincronica de un Convert del decoder (el import corre en el hilo
 // de UI con el scheduler activo: el wait anidado bombea los AOs del ICL)
-class CEsperaDecode : public CActive {
+class CWaitDecode : public CActive {
     public:
         CActiveSchedulerWait iWait;
 
-        CEsperaDecode() : CActive(EPriorityStandard) {
+        CWaitDecode() : CActive(EPriorityStandard) {
             CActiveScheduler::Add(this);
         }
-        ~CEsperaDecode() {
+        ~CWaitDecode() {
             Cancel();
         }
-        void Esperar() {
+        void Wait() {
             SetActive();
             iWait.Start();
         }
@@ -70,11 +70,11 @@ static void DecodeImageSymbianL(const char* aFilename,
                                 unsigned char** aRgba, TInt& aW, TInt& aH) {
     *aRgba = NULL; aW = 0; aH = 0;
 
-    TFileName nombre;
-    for (const char* p = aFilename; *p && nombre.Length() < 255; p++) {
+    TFileName name;
+    for (const char* p = aFilename; *p && name.Length() < 255; p++) {
         TChar c = (TUint8)*p;
         if (c == '/') { c = '\\'; } // el MTL puede traer slashes de unix
-        nombre.Append(c);
+        name.Append(c);
     }
 
     RFs fs;
@@ -87,16 +87,16 @@ static void DecodeImageSymbianL(const char* aFilename,
     // por la abstraccion del Core (resuelve el montaje del contenedor Y los
     // archivos comunes) y se decodifica DE MEMORIA con DataNewL; si la ruta
     // no aparece por ahi, el camino viejo por archivo queda de fallback.
-    HBufC8* datos = NULL;
+    HBufC8* data = NULL;
     {
         std::vector<unsigned char> bytes;
         if (w3dFileSystem::ReadFileBytes(aFilename ? aFilename : "", bytes) && !bytes.empty()) {
-            datos = HBufC8::NewLC((TInt)bytes.size());
-            datos->Des().Copy(&bytes[0], (TInt)bytes.size());
+            data = HBufC8::NewLC((TInt)bytes.size());
+            data->Des().Copy(&bytes[0], (TInt)bytes.size());
         }
     }
-    CImageDecoder* dec = datos ? CImageDecoder::DataNewL(fs, *datos)
-                               : CImageDecoder::FileNewL(fs, nombre);
+    CImageDecoder* dec = data ? CImageDecoder::DataNewL(fs, *data)
+                               : CImageDecoder::FileNewL(fs, name);
     CleanupStack::PushL(dec);
 
     const TFrameInfo& info = dec->FrameInfo();
@@ -109,35 +109,35 @@ static void DecodeImageSymbianL(const char* aFilename,
     // quedaban pixeles si y pixeles no ("iconos rotos"; las letras, de pixel duro, se veian bien). El N95 (9.2) sigue
     // con la mascara: su decodificador no da alfa en EColor16MA
 #ifdef W3D_GLES2
-    const TBool alfaEnColor = alpha;
+    const TBool alphaInColor = alpha;
 #else
-    const TBool alfaEnColor = EFalse;
+    const TBool alphaInColor = EFalse;
 #endif
     CFbsBitmap* bmp = new (ELeave) CFbsBitmap();
     CleanupStack::PushL(bmp);
-    User::LeaveIfError(bmp->Create(TSize(w, h), alfaEnColor ? EColor16MA : EColor16MU));
+    User::LeaveIfError(bmp->Create(TSize(w, h), alphaInColor ? EColor16MA : EColor16MU));
 
     CFbsBitmap* mask = NULL;
-    if (alpha && !alfaEnColor) {
+    if (alpha && !alphaInColor) {
         mask = new (ELeave) CFbsBitmap();
         CleanupStack::PushL(mask);
         User::LeaveIfError(mask->Create(TSize(w, h), EGray256));
     }
 
-    CEsperaDecode* espera = new (ELeave) CEsperaDecode();
-    CleanupStack::PushL(espera);
+    CWaitDecode* wait = new (ELeave) CWaitDecode();
+    CleanupStack::PushL(wait);
     if (mask) {
-        dec->Convert(&espera->iStatus, *bmp, *mask, 0);
+        dec->Convert(&wait->iStatus, *bmp, *mask, 0);
     } else {
-        dec->Convert(&espera->iStatus, *bmp, 0);
+        dec->Convert(&wait->iStatus, *bmp, 0);
     }
-    espera->Esperar();
-    TInt st = espera->iStatus.Int();
-    char nom8[256];
-    TInt nlen = nombre.Length() > 255 ? 255 : nombre.Length();
-    for (TInt i = 0; i < nlen; i++) { nom8[i] = (char)nombre[i]; }
-    nom8[nlen] = 0;
-    w3dLogf("DecodeImage: '%s' %dx%d alpha=%d status=%d", nom8, w, h, (int)alpha, st);
+    wait->Wait();
+    TInt st = wait->iStatus.Int();
+    char name8[256];
+    TInt nlen = name.Length() > 255 ? 255 : name.Length();
+    for (TInt i = 0; i < nlen; i++) { name8[i] = (char)name[i]; }
+    name8[nlen] = 0;
+    w3dLogf("DecodeImage: '%s' %dx%d alpha=%d status=%d", name8, w, h, (int)alpha, st);
 
     if (st == KErrNone && w > 0 && h > 0) {
         unsigned char* rgba = new (ELeave) unsigned char[w * h * 4];
@@ -169,7 +169,7 @@ static void DecodeImageSymbianL(const char* aFilename,
                 d[0] = (TUint8)((px >> 16) & 0xFF);
                 d[1] = (TUint8)((px >> 8) & 0xFF);
                 d[2] = (TUint8)(px & 0xFF);
-                if (alfaEnColor) d[3] = (TUint8)(px >> 24);
+                if (alphaInColor) d[3] = (TUint8)(px >> 24);
             }
         }
         bmp->UnlockHeap();
@@ -177,13 +177,13 @@ static void DecodeImageSymbianL(const char* aFilename,
         *aRgba = rgba; aW = w; aH = h;
     }
 
-    CleanupStack::PopAndDestroy(espera);
+    CleanupStack::PopAndDestroy(wait);
     if (mask) {
         CleanupStack::PopAndDestroy(mask);
     }
     CleanupStack::PopAndDestroy(bmp);
     CleanupStack::PopAndDestroy(dec);
-    if (datos) CleanupStack::PopAndDestroy(datos);
+    if (data) CleanupStack::PopAndDestroy(data);
     CleanupStack::PopAndDestroy(); // fs
 }
 
@@ -193,7 +193,7 @@ namespace w3dEngine {
 bool DecodeImage(const char* path, unsigned char** outRGBA, int* outW, int* outH) {
     if (!outRGBA) { return false; }
     *outRGBA = NULL;
-    if (EsW3dt(path)) return DecodeW3dt(path, 0, outRGBA, outW, outH);
+    if (IsW3dt(path)) return DecodeW3dt(path, 0, outRGBA, outW, outH);
     TInt w = 0, h = 0;
     unsigned char* rgba = NULL;
     TRAPD(err, DecodeImageSymbianL(path, &rgba, w, h));
@@ -212,17 +212,17 @@ bool DecodeImage(const char* path, unsigned char** outRGBA, int* outW, int* outH
 // mips, o rechazarla con INVALID_VALUE). Las texturas de MATERIAL necesitan REPEAT (tiling),
 // asi que lo que no es potencia de dos se REMUESTREA (vecino mas cercano) al POT siguiente,
 // tope 1024 (una foto de 5MP del N95 baja a 1024x1024): los UV 0..1 no cambian.
-static unsigned char* ReescalarPOT(const unsigned char* rgba, int w, int h, int& outW, int& outH) {
+static unsigned char* RescalePOT(const unsigned char* rgba, int w, int h, int& outW, int& outH) {
     int pw = 1; while (pw < w && pw < 1024) { pw <<= 1; }
     int ph = 1; while (ph < h && ph < 1024) { ph <<= 1; }
     outW = pw; outH = ph;
     unsigned char* dst = new unsigned char[(TInt)pw * ph * 4];
     if (!dst) { return NULL; }
     for (int y = 0; y < ph; y++) {
-        const unsigned char* fila = rgba + (TInt)(y * h / ph) * w * 4;
+        const unsigned char* row = rgba + (TInt)(y * h / ph) * w * 4;
         unsigned char* out = dst + (TInt)y * pw * 4;
         for (int x = 0; x < pw; x++) {
-            const unsigned char* p = fila + (x * w / pw) * 4;
+            const unsigned char* p = row + (x * w / pw) * 4;
             out[x*4] = p[0]; out[x*4+1] = p[1]; out[x*4+2] = p[2]; out[x*4+3] = p[3];
         }
     }
@@ -231,7 +231,7 @@ static unsigned char* ReescalarPOT(const unsigned char* rgba, int w, int h, int&
 
 // LOAD (firma del motor): decode + POT + upload comun + free.
 bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
-    if (EsW3dt(path)) return LoadTextureW3dt(path, outId, outW, outH);   // (sin ICL: lista para la GPU)
+    if (IsW3dt(path)) return LoadTextureW3dt(path, outId, outW, outH);   // (sin ICL: lista para la GPU)
     unsigned char* rgba = NULL;
     int w = 0, h = 0;
     if (!DecodeImage(path, &rgba, &w, &h)) { return false; }
@@ -241,7 +241,7 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     const bool pot = ((w & (w - 1)) == 0) && ((h & (h - 1)) == 0) && w <= 1024 && h <= 1024;
     if (!pot) {
         int pw = 0, ph = 0;
-        unsigned char* esc = ReescalarPOT(rgba, w, h, pw, ph);
+        unsigned char* esc = RescalePOT(rgba, w, h, pw, ph);
         FreeImage(rgba);
         if (!esc) { return false; }
         rgba = esc; w = pw; h = ph;
@@ -249,12 +249,12 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     // limpiar errores GL VIEJOS encolados (p.ej. la miniatura NPOT del file browser): sin esto,
     // el glGetError() de abajo los atribuia a ESTA subida y "Cargar textura" fallaba en SILENCIO
     // (el browser se cerraba y la textura nunca aparecia) aunque el upload hubiera salido bien.
-    // el PROYECTO pidio sus texturas a la MITAD en el telefono (TexturasMitadDesde: un proyecto pensado para PC no
+    // el PROYECTO pidio sus texturas a la MITAD en el telefono (TexturesHalfFrom: un proyecto pensado para PC no
     // entra en la memoria). Se informa el tamano de antes (las UV van de 0 a 1: el dibujo no cambia)
-    const int mitad = TexturasMitadDesde();
-    if (mitad > 0 && (w > mitad || h > mitad)) {
+    const int half = TexturesHalfFrom();
+    if (half > 0 && (w > half || h > half)) {
         int mw = 0, mh = 0;
-        unsigned char* m = ReducirMitadRGBA(rgba, w, h, mw, mh);
+        unsigned char* m = ReduceHalfRGBA(rgba, w, h, mw, mh);
         if (m) { FreeImage(rgba); rgba = m; w = mw; h = mh; }
     }
     while (glGetError() != GL_NO_ERROR) {}
@@ -262,7 +262,7 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     GLenum e = glGetError();
     // (con lo que ya hay en GL: texturas y VBO comparten la memoria del MBX)
     w3dLogf("LoadTexture: subida %dx%d glErr=%x id=%d (en GL: texturas %d KB, VBO %d KB)", w, h, e, (TInt)outId,
-            (TInt)(TexturasMemoria().bytes / 1024), (TInt)(VBOMemoria() / 1024));
+            (TInt)(TexturesMemory().bytes / 1024), (TInt)(VBOMemory() / 1024));
     FreeImage(rgba);
     if (outW) { *outW = origW; }
     if (outH) { *outH = origH; }
@@ -271,49 +271,49 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
 
 // SAVE (firma del motor): EncodePNG (portable, w3dTexture.cpp) + escritura con RFile. En PC/Web
 // SavePNG usa stdio (w3dTexture.cpp); aca es el sink de N95. Sin leaves: usa codigos de retorno.
-static TInt EscribirArchivo(const char* path, const unsigned char* datos, int len);
+static TInt WriteFile(const char* path, const unsigned char* data, int len);
 bool SavePNG(const char* path, const unsigned char* rgba, int w, int h, bool flipY) {
     if (!path) { return false; }
     int len = 0;
     unsigned char* png = EncodePNG(rgba, w, h, flipY, &len); // buffer PNG en el heap
     if (!png) { return false; }
-    const TInt err = EscribirArchivo(path, png, len);
+    const TInt err = WriteFile(path, png, len);
     w3dLogf("SavePNG: '%s' %dx%d %d bytes err=%d", path, w, h, len, (TInt)err);
     delete[] png;
     return (err == KErrNone);
 }
 // el JPG del render (la tarjeta Render: Formato JPG): stb_image_write a memoria + la misma escritura con RFile
-bool SaveJPG(const char* path, const unsigned char* rgba, int w, int h, int calidad, bool flipY) {
+bool SaveJPG(const char* path, const unsigned char* rgba, int w, int h, int quality, bool flipY) {
     if (!path) { return false; }
     std::vector<unsigned char> jpg;
-    if (!EncodeJPG(rgba, w, h, calidad, flipY, jpg)) { return false; }
-    const TInt err = EscribirArchivo(path, &jpg[0], (int)jpg.size());
-    w3dLogf("SaveJPG: '%s' %dx%d calidad %d, %d bytes err=%d", path, w, h, calidad, (TInt)jpg.size(), (TInt)err);
+    if (!EncodeJPG(rgba, w, h, quality, flipY, jpg)) { return false; }
+    const TInt err = WriteFile(path, &jpg[0], (int)jpg.size());
+    w3dLogf("SaveJPG: '%s' %dx%d calidad %d, %d bytes err=%d", path, w, h, quality, (TInt)jpg.size(), (TInt)err);
     return (err == KErrNone);
 }
-static TInt EscribirArchivo(const char* path, const unsigned char* datos, int len);
+static TInt WriteFile(const char* path, const unsigned char* data, int len);
 } // namespace w3dEngine
 // (el MP4 del render a video: w3dvideoenc.cpp)
-TInt W3dEscribirArchivo(const char* path, const unsigned char* datos, int len) { return w3dEngine::EscribirArchivo(path, datos, len); }
+TInt W3dWriteFile(const char* path, const unsigned char* data, int len) { return w3dEngine::WriteFile(path, data, len); }
 namespace w3dEngine {
-static TInt EscribirArchivo(const char* path, const unsigned char* datos, int len) {
+static TInt WriteFile(const char* path, const unsigned char* data, int len) {
 
     // char* -> TFileName (los slashes de unix -> backslash de Symbian)
-    TFileName nombre;
-    for (const char* p = path; *p && nombre.Length() < 255; p++) {
+    TFileName name;
+    for (const char* p = path; *p && name.Length() < 255; p++) {
         TChar c = (TUint8)*p;
         if (c == '/') { c = '\\'; }
-        nombre.Append(c);
+        name.Append(c);
     }
 
     RFs fs;
     TInt err = fs.Connect();
     if (err == KErrNone) {
-        fs.MkDirAll(nombre); // crea la carpeta (E:\whisk3d\render\) si no existe; ignora KErrAlreadyExists
+        fs.MkDirAll(name); // crea la carpeta (E:\whisk3d\render\) si no existe; ignora KErrAlreadyExists
         RFile file;
-        err = file.Replace(fs, nombre, EFileWrite); // crea/sobrescribe
+        err = file.Replace(fs, name, EFileWrite); // crea/sobrescribe
         if (err == KErrNone) {
-            TPtrC8 ptr((const TUint8*)datos, len);
+            TPtrC8 ptr((const TUint8*)data, len);
             err = file.Write(ptr);
             file.Close();
         }

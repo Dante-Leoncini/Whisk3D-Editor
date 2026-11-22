@@ -1,6 +1,6 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "Instance.h"
-#include "objects/Mesh.h"   // w3dDecalesInline: la copia se dibuja con matriz PRESTADA
+#include "objects/Mesh.h"   // w3dDecalsInline: la copia se dibuja con matriz PRESTADA
 
 // Constructor
 Instance::Instance(Object* parent, Object* instance)
@@ -9,7 +9,7 @@ Instance::Instance(Object* parent, Object* instance)
     RenderChildrens = true; // (eran inicializadores de clase: C++03)
     count = 1;
     mirror = false;
-    mirrorEje = 0;
+    mirrorAxis = 0;
 
     if (!instance) return;
 
@@ -38,10 +38,10 @@ void Instance::RenderObject() {
     // matriz de mundo; aca la matriz es PRESTADA (la del target, repetida count
     // veces con un delta). Si la copia se difiriera, se dibujaria UNA sola vez y
     // en el lugar del original. Mismo motivo por el que lo prende el espejo.
-    const bool difInline = w3dDecalesInline;
-    w3dDecalesInline = true;
-    struct Restaurar {   // C++03: sin lambdas. Devuelve el flag salga por donde salga.
-        bool v; ~Restaurar() { w3dDecalesInline = v; }
+    const bool difInline = w3dDecalsInline;
+    w3dDecalsInline = true;
+    struct Restore {   // C++03: sin lambdas. Devuelve el flag salga por donde salga.
+        bool v; ~Restore() { w3dDecalsInline = v; }
     } _rest = { difInline };
     (void)_rest;
 
@@ -53,9 +53,9 @@ void Instance::RenderObject() {
         target->GetMatrix(m);
         w3dEngine::PushMatrix();
         w3dEngine::MultMatrix(m.m);
-        w3dEngine::Scalef(mirrorEje == 0 ? -1.0f : 1.0f,
-                 mirrorEje == 1 ? -1.0f : 1.0f,
-                 mirrorEje == 2 ? -1.0f : 1.0f);
+        w3dEngine::Scalef(mirrorAxis == 0 ? -1.0f : 1.0f,
+                 mirrorAxis == 1 ? -1.0f : 1.0f,
+                 mirrorAxis == 2 ? -1.0f : 1.0f);
         w3dEngine::FrontFace(false);
         target->RenderObject();
         w3dEngine::FrontFace(true);
@@ -87,13 +87,13 @@ void Instance::RenderObject() {
 
         Vector3 rotatedDeltaPos = targetRot * basePosDelta;
 
-        Matrix4 T_rotada; T_rotada.Identity();
-        T_rotada.m[12] = rotatedDeltaPos.x;
-        T_rotada.m[13] = rotatedDeltaPos.y;
-        T_rotada.m[14] = rotatedDeltaPos.z;
+        Matrix4 T_rotated; T_rotated.Identity();
+        T_rotated.m[12] = rotatedDeltaPos.x;
+        T_rotated.m[13] = rotatedDeltaPos.y;
+        T_rotated.m[14] = rotatedDeltaPos.z;
 
         Matrix4 R_delta = baseRot.ToMatrix();
-        w3dEngine::MultMatrix(T_rotada.m);
+        w3dEngine::MultMatrix(T_rotated.m);
         w3dEngine::MultMatrix(R_delta.m);
 
     }

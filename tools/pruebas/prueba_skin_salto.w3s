@@ -13,6 +13,6 @@
 #  reproduciendo, un salto de mas de 2 cuadros tambien (la vuelta del loop).
 # ==========================================================================
 
-ventana 640 480
-personajesmin /tmp/w3d_skinsalto 1
+window 640 480
+charactersmin /tmp/w3d_skinsalto 1
 skincull

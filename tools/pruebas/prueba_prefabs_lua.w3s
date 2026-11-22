@@ -17,76 +17,76 @@
 #  poses y scripts propios, sobreviven a guardar/abrir y el Play arranca las 50 (cada una ve SU cuerpo).
 # ==========================================================================
 
-ventana 640 480
-juegoprefabsmin /tmp/w3d_f7_pl
+window 640 480
+gameprefabsmin /tmp/w3d_f7_pl
 prefabinfo Enemigo.001 overrides 1
-guardarw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
-abrirw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
-prefabvivos 3
-meminfo recursosmalla 3
+savew3d /tmp/w3d_f7_pl/juegoprefabs.w3d
+openw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
+prefablive 3
+meminfo meshresources 3
 simplay 30
-prefabvivos 13
-heapuso
+prefablive 13
+heapusage
 simplay 60
-prefabvivos 13
-heapuso max 256
+prefablive 13
+heapusage max 256
 simplay 30
-prefabvivos 3
-scriptinfo compartido juez OK
-scriptinfo compartido enemigos 1003
-scriptinfo compartido scope_ok 1003
-scriptinfo compartido vida_total 10045
+prefablive 3
+scriptinfo shared juez OK
+scriptinfo shared enemigos 1003
+scriptinfo shared scope_ok 1003
+scriptinfo shared vida_total 10045
 simstop
-prefabvivos 3
-prefabinfo Enemigo.001 generados 4 overrides 1
-prefabcompartido Enemigo instancias 3 mallas 1 animsets 1
-meminfo recursosmalla 3
+prefablive 3
+prefabinfo Enemigo.001 generated 4 overrides 1
+prefabshared Enemigo instances 3 meshes 1 animsets 1
+meminfo meshresources 3
 
 # --- seguir jugando y Stop: lo destruido no queda en las fotos de la partida ---
 simplay 30
 simstop
-prefabvivos 3
-prefabinfo Enemigo.001 generados 4 overrides 1
+prefablive 3
+prefabinfo Enemigo.001 generated 4 overrides 1
 
 # --- destruir() de lo PUESTO en la escena + instanciar() jugando: el Stop lo arregla ---
-prefabenemigo /tmp/w3d_f7_pl2
-prefabinstanciar Enemigo -4 0 -6 nombre Enemigo
-prefabinstanciar Enemigo 0 0 -6 nombre Enemigo.001
-raizscript Cubo prueba_prefabs_destructor.lua
+prefabenemy /tmp/w3d_f7_pl2
+prefabinstantiate Enemigo -4 0 -6 name Enemigo
+prefabinstantiate Enemigo 0 0 -6 name Enemigo.001
+rootscript Cubo prueba_prefabs_destructor.lua
 simplay 6
-scriptinfo compartido creado Enemigo.002
-scriptinfo compartido destruido si
-prefabvivos 2
-prefabinfo Enemigo.002 generados 4
+scriptinfo shared creado Enemigo.002
+scriptinfo shared destruido si
+prefablive 2
+prefabinfo Enemigo.002 generated 4
 fail prefabinfo Enemigo.001
 simstop
-prefabvivos 2
-prefabinfo Enemigo.001 generados 4
+prefablive 2
+prefabinfo Enemigo.001 generated 4
 prefabskin Enemigo.001
 fail prefabinfo Enemigo.002
 
 # --- ACEPTACION del diseno: 50 instancias = 1 recurso de malla y 1 animset; poses y scripts
 #     independientes (yo(), buscar() por scope); guardar/abrir; el Play arranca las 50 ---
-prefabenemigo /tmp/w3d_f7_pl3
-prefabinstanciar Enemigo -50 0 -12 veces 50 nombre Enemigo.049
-prefabvivos 50
-prefabcompartido Enemigo instancias 50 mallas 1 animsets 1
+prefabenemy /tmp/w3d_f7_pl3
+prefabinstantiate Enemigo -50 0 -12 times 50 name Enemigo.049
+prefablive 50
+prefabshared Enemigo instances 50 meshes 1 animsets 1
 prefabskin Enemigo.049
 prefabscope Enemigo.037 Esqueleto Cuerpo Enemigo.037
-guardarw3d /tmp/w3d_f7_pl3/cincuenta.w3d
-abrirw3d /tmp/w3d_f7_pl3/cincuenta.w3d
-prefabvivos 50
-prefabcompartido Enemigo instancias 50 mallas 1 animsets 1
+savew3d /tmp/w3d_f7_pl3/cincuenta.w3d
+openw3d /tmp/w3d_f7_pl3/cincuenta.w3d
+prefablive 50
+prefabshared Enemigo instances 50 meshes 1 animsets 1
 prefabskin Enemigo.025
 prefabclip Enemigo.010 Esqueleto Quieto
 prefabclip Enemigo.011 Esqueleto Saludo
 prefabclip Enemigo.012 Esqueleto Saludo
-prefabpose Enemigo.010 Enemigo.011 10 distinta
-prefabpose Enemigo.011 Enemigo.012 10 igual
+prefabpose Enemigo.010 Enemigo.011 10 distinct
+prefabpose Enemigo.011 Enemigo.012 10 equal
 simplay 3
-scriptinfo compartido enemigos 50
-scriptinfo compartido scope_ok 50
-scriptinfo compartido vida_total 500
+scriptinfo shared enemigos 50
+scriptinfo shared scope_ok 50
+scriptinfo shared vida_total 500
 simstop
-prefabvivos 50
-prefabcompartido Enemigo instancias 50 mallas 1 animsets 1
+prefablive 50
+prefabshared Enemigo instances 50 meshes 1 animsets 1

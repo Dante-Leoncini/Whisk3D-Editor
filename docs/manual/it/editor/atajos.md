@@ -22,9 +22,9 @@ Le combinazioni modificate appaiono in verde. Quando a una funzione si toglie un
 
 Le scorciatoie di ogni contesto valgono quando il puntatore si trova su quel pannello; quelle di **Generale** valgono ovunque. Quelle di **Durante una trasformazione** valgono mentre si sposta, ruota o scala qualcosa, e hanno la precedenza. Nell'editor di script le lettere scrivono sempre: lì si possono riassegnare solo combinazioni con <kbd>Ctrl</kbd>, <kbd>Alt</kbd> o i tasti F.
 
-## Il file atajos.ini
+## Il file shortcuts.ini
 
-Le modifiche si salvano da sole in `res/atajos.ini`, accanto a `config.ini`. Compaiono solo le funzioni modificate, e si può modificare a mano:
+Le modifiche si salvano da sole in `res/shortcuts.ini`, accanto a `config.ini`. Compaiono solo le funzioni modificate, e si può modificare a mano:
 
 ```ini
 # funzione = combinazione, altra combinazione   (vuoto = nessuna scorciatoia)
@@ -44,7 +44,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Generale (qualsiasi pannello)
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Salva progetto | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Annulla | <kbd>Ctrl+Z</kbd> | <kbd>C+Sx</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Vista 3D
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Seleziona tutto | <kbd>A</kbd> | <kbd>Matita+Su</kbd> | `3d.seleccionarTodo` |
 | Deseleziona tutto | <kbd>Alt+A</kbd> | <kbd>Matita+Su</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Durante una trasformazione (spostare / ruotare / scalare)
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Conferma | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
 | Annulla | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Editor UV
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Seleziona tutto | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Deseleziona tutto | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Timeline
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Seleziona tutto | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Deseleziona tutto | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Outliner
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Seleziona tutto | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Deseleziona tutto | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Editor 2D
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Seleziona tutto | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Deseleziona tutto | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Proprietà (passi di una routine)
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Afferra passo | <kbd>G</kbd> | — | `props.agarrar` |
 | Elimina passo | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ Nomi dei tasti: lettere e numeri così come sono, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Editor di script
 
-| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in atajos.ini |
+| Funzione | Scorciatoia predefinita | Nokia N95 (tastiera del telefono) | Nome in shortcuts.ini |
 |---|---|---|---|
 | Salva script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Annulla | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

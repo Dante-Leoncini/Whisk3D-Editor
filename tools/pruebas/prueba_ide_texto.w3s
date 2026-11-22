@@ -7,25 +7,25 @@ ideutf8
 iderefresh
 idetab
 vpkind 1 7
-idecargar ide_guias.lua
+ideload ide_guias.lua
 idecursor 7 14
 # --- menu Editar (deshacer/rehacer/...) y Buscar / Reemplazar (mayusculas, palabra completa, reemplazar todo = un deshacer)
-idebuscartest
+idesearchtest
 # --- un renglon ENORME (las tablas que inyecta un conversor, ~800000 letras): el IDE dibuja solo lo que se ve,
 #     en alto y en ancho; antes colgaba la PC ---
-idegrande
+idebig
 # --- el panel Buscar NO es modal: Ctrl+F lo abre con el foco en "Buscar"; despues de Enter lo tipeado va al script y el
 #     panel sigue abierto; Esc lo cierra ---
-idecargar ide_guias.lua
-teclareal ide Ctrl+F
-idever 1
-textoreal ide local
-idever 1
-teclareal ide Enter
-textoreal ide ZZ
-idever 1 ZZ
-teclareal ide Esc
-idever 0 ZZ
+ideload ide_guias.lua
+keyreal ide Ctrl+F
+idefindcheck 1
+textreal ide local
+idefindcheck 1
+keyreal ide Enter
+textreal ide ZZ
+idefindcheck 1 ZZ
+keyreal ide Esc
+idefindcheck 0 ZZ
 # --- TACTIL: doble toque = palabra, triple = renglon, pulsacion larga = lupa que mueve el cursor, agarraderas que
 #     estiran la seleccion (todo por la misma puerta que la pantalla tactil) ---
-idetactil
+idetouch

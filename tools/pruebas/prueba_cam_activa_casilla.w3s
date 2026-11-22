@@ -4,45 +4,45 @@
 #     - tildar la casilla de otra camara la hace la activa (y destilda la de antes)
 #     - su rombo pone el corte con ESA camara en el frame: verde ahi (2) y verde oscuro en otros frames (1)
 #   (la casilla se sincroniza en cada cuadro: 'tick' despues de elegir otra camara)
-ventana 960 540
-escala 2
-rombo camactiva 0
+window 960 540
+scale 2
+diamond camactiva 0
 selobj Cámara
 tick
 propstab 2
-propvalor 1 Active camera
-rombo camchk 0
+propvalue 1 Active camera
+diamond camchk 0
 # otra camara: no es la activa hasta tildarla
 add camera
 selobj Cámara.001
 tick
 propstab 2
-propvalor 0 Active camera
-propclic Active camera
-propvalor 1 Active camera
+propvalue 0 Active camera
+propclick Active camera
+propvalue 1 Active camera
 selobj Cámara
 tick
-propvalor 0 Active camera
+propvalue 0 Active camera
 # el corte: la camara 1 desde el frame 1
 frame 1
-rombo camchk toggle 2
-rombo camactiva 2
+diamond camchk toggle 2
+diamond camactiva 2
 selobj Cámara.001
 tick
-rombo camchk 0
+diamond camchk 0
 # en el frame 10 la pista sigue mandando la Camara: su rombo, verde oscuro
 frame 10
 selobj Cámara
 tick
-rombo camchk 1
-rombo camactiva 1
+diamond camchk 1
+diamond camactiva 1
 # tildar la otra en el 10 es un cambio sin guardar; su rombo lo keya
 selobj Cámara.001
 tick
-propclic Active camera
-rombo camchk 3
-rombo camchk toggle 2
+propclick Active camera
+diamond camchk 3
+diamond camchk toggle 2
 frame 1
 selobj Cámara
 tick
-rombo camchk 2
+diamond camchk 2

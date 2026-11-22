@@ -21,314 +21,314 @@
 #     el del outliner (vuelve a la escena);
 #   - un script cuenta como usuario de una textura solo si nombra su archivo ENTERO;
 #   - los datos del recurso (tarjeta Recurso) salen en el idioma de la UI, con singular y plural.
-ventana 1280 720
+window 1280 720
 
 # ---- A) Esc / sin cambios: NO renombra un nombre que no esta en la forma de entrada ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-mallasrecurso
-texasignar Cubo dosmats.png
-guardarw3d prueba_outliner_bordes_v4.w3d
-abrirw3d prueba_outliner_bordes_v4.w3d
-entradacruda texturas/Piso_A.png dosmats-b.png
-outvista texturas
-outfila Piso_A.png usuarios 0 estado huerfano
+meshesresource
+objtexture Cubo dosmats.png
+savew3d prueba_outliner_bordes_v4.w3d
+openw3d prueba_outliner_bordes_v4.w3d
+entryraw textures/Piso_A.png dosmats-b.png
+outview textures
+outrow Piso_A.png users 0 state huerfano
 # el rename en linea: F2 + Esc
 outclick Piso_A.png
-outteclapc f2
+outkeypc f2
 outesc
-recurso texturas texturas/Piso_A.png existe 1
-recurso texturas texturas/piso_a.png existe 0
+resource textures textures/Piso_A.png exists 1
+resource textures textures/piso_a.png exists 0
 # el Name de Properties: enfocar + Esc
 outclick Piso_A.png
-campoenfocar recnombre
+fieldfocus recname
 outesc
-recurso texturas texturas/Piso_A.png existe 1
-recurso texturas texturas/piso_a.png existe 0
+resource textures textures/Piso_A.png exists 1
+resource textures textures/piso_a.png exists 0
 # confirmar el MISMO texto tampoco toca nada
-outteclapc f2
-outescribir Piso_A.png
-recurso texturas texturas/Piso_A.png existe 1
+outkeypc f2
+outwrite Piso_A.png
+resource textures textures/Piso_A.png exists 1
 # un nombre escrito de verdad SI renombra (a la forma de entrada), con undo
 outclick Piso_A.png
-outteclapc f2
-outescribir Piso B
-recurso texturas texturas/piso_b.png existe 1
-recurso texturas texturas/Piso_A.png existe 0
+outkeypc f2
+outwrite Piso B
+resource textures textures/piso_b.png exists 1
+resource textures textures/Piso_A.png exists 0
 undo
-recurso texturas texturas/Piso_A.png existe 1
-recurso texturas texturas/piso_b.png existe 0
+resource textures textures/Piso_A.png exists 1
+resource textures textures/piso_b.png exists 0
 
 # ---- B) la carpeta de una textura de DISCO que solo usa una particula, en el PRIMER guardado ----
-escenadefecto
-partex Humo dosmats.png
-outvista texturas
-recmover texturas dosmats.png UI
-recurso texturas dosmats.png carpeta UI
-guardarw3d prueba_outliner_bordes_rt1.w3d
-texrefde particula Humo texturas/dosmats.png
-recurso texturas texturas/dosmats.png carpeta UI
-abrirw3d prueba_outliner_bordes_rt1.w3d
-recurso texturas texturas/dosmats.png carpeta UI usuarios 1
+scenedefault
+pairtex Humo dosmats.png
+outview textures
+recmove textures dosmats.png UI
+resource textures dosmats.png folder UI
+savew3d prueba_outliner_bordes_rt1.w3d
+texrefof particle Humo textures/dosmats.png
+resource textures textures/dosmats.png folder UI
+openw3d prueba_outliner_bordes_rt1.w3d
+resource textures textures/dosmats.png folder UI users 1
 
 # ---- C) una textura SOLO EN MEMORIA que nadie usa: se conserva (con su carpeta) ----
 newtex Lienzo 64 64 uvgrid
-outvista texturas
-outfila lienzo.png usuarios 0 estado huerfano
-recmover texturas texturas/lienzo.png Pintura
-guardarw3d prueba_outliner_bordes_rt2.w3d
-zipentrada prueba_outliner_bordes_rt2.w3d texturas/lienzo.png
-abrirw3d prueba_outliner_bordes_rt2.w3d
-recurso texturas texturas/lienzo.png existe 1 usuarios 0 carpeta Pintura
+outview textures
+outrow lienzo.png users 0 state huerfano
+recmove textures textures/lienzo.png Pintura
+savew3d prueba_outliner_bordes_rt2.w3d
+zipentry prueba_outliner_bordes_rt2.w3d textures/lienzo.png
+openw3d prueba_outliner_bordes_rt2.w3d
+resource textures textures/lienzo.png exists 1 users 0 folder Pintura
 # (purgarla SI la saca del archivo)
-recborrar texturas texturas/lienzo.png
-guardarw3d prueba_outliner_bordes_rt3.w3d
-zipentrada prueba_outliner_bordes_rt3.w3d texturas/lienzo.png no
+recdelete textures textures/lienzo.png
+savew3d prueba_outliner_bordes_rt3.w3d
+zipentry prueba_outliner_bordes_rt3.w3d textures/lienzo.png no
 
 # ---- D) la FUENTE BITMAP de un Texto2D: un usuario del png; renombrarlo lleva al texto y al json ----
-abrirw3d prueba_fuente.w3d
-guardarw3d prueba_outliner_bordes_fuente_v4.w3d
-abrirw3d prueba_outliner_bordes_fuente_v4.w3d
-outvista texturas
-outfila fuente-bitmap-npot.png estado uso usuarios 1
-outfila fuente-bitmap-minima.png estado uso usuarios 1
-recborrar texturas texturas/fuente-bitmap-npot.png falla
-recrenombrar texturas texturas/fuente-bitmap-npot.png glifos texturas/glifos.png
-uifuente
-uiglifo TxtBitmap A 10 14 0 0 12
-outfila glifos.png estado uso usuarios 1
+openw3d prueba_fuente.w3d
+savew3d prueba_outliner_bordes_fuente_v4.w3d
+openw3d prueba_outliner_bordes_fuente_v4.w3d
+outview textures
+outrow fuente-bitmap-npot.png state use users 1
+outrow fuente-bitmap-minima.png state use users 1
+recdelete textures textures/fuente-bitmap-npot.png fails
+recrename textures textures/fuente-bitmap-npot.png glifos textures/glifos.png
+uifont
+uiglyph TxtBitmap A 10 14 0 0 12
+outrow glifos.png state use users 1
 undo
-recurso texturas texturas/fuente-bitmap-npot.png existe 1 usuarios 1
-uiglifo TxtBitmap A 10 14 0 0 12
+resource textures textures/fuente-bitmap-npot.png exists 1 users 1
+uiglyph TxtBitmap A 10 14 0 0 12
 redo
-recurso texturas texturas/glifos.png existe 1 usuarios 1
-guardarw3d prueba_outliner_bordes_fuente_rt.w3d
-zipentrada prueba_outliner_bordes_fuente_rt.w3d texturas/glifos.png
-zipentrada prueba_outliner_bordes_fuente_rt.w3d texturas/fuente-bitmap-npot.png no
-zipentrada prueba_outliner_bordes_fuente_rt.w3d extra/glifos.json
-zipentrada prueba_outliner_bordes_fuente_rt.w3d extra/fuente-bitmap-npot.json no
-abrirw3d prueba_outliner_bordes_fuente_rt.w3d
-uiglifo TxtBitmap A 10 14 0 0 12
-outvista texturas
-outfila glifos.png estado uso usuarios 1
+resource textures textures/glifos.png exists 1 users 1
+savew3d prueba_outliner_bordes_fuente_rt.w3d
+zipentry prueba_outliner_bordes_fuente_rt.w3d textures/glifos.png
+zipentry prueba_outliner_bordes_fuente_rt.w3d textures/fuente-bitmap-npot.png no
+zipentry prueba_outliner_bordes_fuente_rt.w3d extra/glifos.json
+zipentry prueba_outliner_bordes_fuente_rt.w3d extra/fuente-bitmap-npot.json no
+openw3d prueba_outliner_bordes_fuente_rt.w3d
+uiglyph TxtBitmap A 10 14 0 0 12
+outview textures
+outrow glifos.png state use users 1
 # el par de la fuente con el .json AL LADO del png en texturas/ (como lo arman las herramientas de
 # afuera): el json es del texto aunque el texto nombre el png; "Purge Orphans" no se lo lleva
-entradacruda texturas/glifos.json texturas/ui/fuente-bitmap-npot.json
-outfila glifos.json estado uso usuarios 1
-outpx glifos.json uso
-recpurgar texturas n 0
-outfila glifos.json estado uso
-uiglifo TxtBitmap A 10 14 0 0 12
+entryraw textures/glifos.json textures/ui/fuente-bitmap-npot.json
+outrow glifos.json state use users 1
+outpx glifos.json use
+recpurge textures n 0
+outrow glifos.json state use
+uiglyph TxtBitmap A 10 14 0 0 12
 
 # ---- E) un animset que retiene un armature BORRADO (el undo): no se purga a medias ----
-escenadefecto
-animsetsintetica 1 agregar
-guardarw3d prueba_outliner_bordes_anim_v4.w3d
-abrirw3d prueba_outliner_bordes_anim_v4.w3d
+scenedefault
+animsetsynthetic 1 add
+savew3d prueba_outliner_bordes_anim_v4.w3d
+openw3d prueba_outliner_bordes_anim_v4.w3d
 selobj Personaje
 delete
-outvista animaciones
-outfila Personaje estado huerfano
-recpurgar animaciones n 0
-recborrar animaciones Personaje falla
-recurso animaciones Personaje existe 1
+outview animations
+outrow Personaje state huerfano
+recpurge animations n 0
+recdelete animations Personaje fails
+resource animations Personaje exists 1
 undo
-outfila Personaje estado uso usuarios 1
+outrow Personaje state use users 1
 
 # ---- F) las texturas de un material HUERFANO quedan DORMIDAS ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-texasignar Cubo dosmats.png
+objtexture Cubo dosmats.png
 add cube
 selobj Cubo.001
 matnew
-texasignar Cubo.001 dosmats-b.png
+objtexture Cubo.001 dosmats-b.png
 selobj Cubo.001
 delete
-matsuelto Suelto
-mallamaterial Cubo 0 Suelto
-guardarw3d prueba_outliner_bordes_mat_v4.w3d
-abrirw3d prueba_outliner_bordes_mat_v4.w3d
+matloose Suelto
+meshmaterial Cubo 0 Suelto
+savew3d prueba_outliner_bordes_mat_v4.w3d
+openw3d prueba_outliner_bordes_mat_v4.w3d
 # "Material" y "Material.001" no los usa nadie: no se dibujan, sus texturas no se cargan
-outvista materiales
-outfila Material estado huerfano
-outfila Material.001 estado huerfano
-texdormidas n 2
-texcargada texturas/dosmats.png 0
-texcargada texturas/dosmats-b.png 0
+outview materials
+outrow Material state huerfano
+outrow Material.001 state huerfano
+texasleep n 2
+texloaded textures/dosmats.png 0
+texloaded textures/dosmats-b.png 0
 # (siguen siendo usuarios de sus texturas: no se purgan de abajo)
-outvista texturas
-outfila dosmats.png estado uso usuarios 1
-outfila dosmats-b.png estado uso usuarios 1
+outview textures
+outrow dosmats.png state use users 1
+outrow dosmats-b.png state use users 1
 # guardar con las dormidas: las entradas siguen y re-guardar da los mismos bytes
-guardarw3d prueba_outliner_bordes_mat_rt1.w3d
-zipentrada prueba_outliner_bordes_mat_rt1.w3d texturas/dosmats.png
-zipentrada prueba_outliner_bordes_mat_rt1.w3d texturas/dosmats-b.png
-abrirw3d prueba_outliner_bordes_mat_rt1.w3d
-texdormidas n 2
-guardarw3d prueba_outliner_bordes_mat_rt2.w3d
-w3diguales prueba_outliner_bordes_mat_rt1.w3d prueba_outliner_bordes_mat_rt2.w3d
+savew3d prueba_outliner_bordes_mat_rt1.w3d
+zipentry prueba_outliner_bordes_mat_rt1.w3d textures/dosmats.png
+zipentry prueba_outliner_bordes_mat_rt1.w3d textures/dosmats-b.png
+openw3d prueba_outliner_bordes_mat_rt1.w3d
+texasleep n 2
+savew3d prueba_outliner_bordes_mat_rt2.w3d
+w3dequal prueba_outliner_bordes_mat_rt1.w3d prueba_outliner_bordes_mat_rt2.w3d
 # una malla que PASA a usar el material sin pasar por Properties (un undo, un script): la cola
 # diferida del loop principal lo despierta sola
-texdormidas asignar Cubo 0 Material cuadros 20 n 1
-texcargada texturas/dosmats.png 1
-texcargada texturas/dosmats-b.png 0
+texasleep assign Cubo 0 Material frames 20 n 1
+texloaded textures/dosmats.png 1
+texloaded textures/dosmats-b.png 0
 # Properties va a mostrar el otro huerfano: despierta
-outvista materiales
+outview materials
 outclick Material.001
 recprops material Material.001
-texdormidas cuadros 2 n 0
-texcargada texturas/dosmats-b.png 1
+texasleep frames 2 n 0
+texloaded textures/dosmats-b.png 1
 
 # ---- G) el teclado de PC por la puerta real: flechas = la fila sola, Shift+flechas suma ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-matsuelto Piel
-matsuelto Metal
-matsuelto Cuero
-matsuelto Hueso
-outvista materiales
+matloose Piel
+matloose Metal
+matloose Cuero
+matloose Hueso
+outview materials
 outclick Cuero
 outclick Metal ctrl
 outsel n 2
-outteclapc down
-outsel n 1 tiene Piel
-outteclapc shiftup
-outsel n 2 tiene Piel tiene Metal
-outteclapc shiftup
-outsel n 3 tiene Piel tiene Metal tiene Material
+outkeypc down
+outsel n 1 has Piel
+outkeypc shiftup
+outsel n 2 has Piel has Metal
+outkeypc shiftup
+outsel n 3 has Piel has Metal has Material
 
 # ---- H) la lista SCROLLEADA: la seleccion multiple y el destino de un arrastre se ven ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-matsuelto M01
-matsuelto M02
-matsuelto M03
-matsuelto M04
-matsuelto M05
-matsuelto M06
-matsuelto M07
-matsuelto M08
-matsuelto M09
-matsuelto M10
-matsuelto M11
-matsuelto M12
-matsuelto M13
-matsuelto M14
-matsuelto M15
-matsuelto M16
-matsuelto M17
-matsuelto M18
-matsuelto M19
-matsuelto M20
-matsuelto M21
-matsuelto M22
-matsuelto M23
-matsuelto M24
-matsuelto M25
-matsuelto M26
-matsuelto M27
-matsuelto M28
-matsuelto M29
-matsuelto M30
-matsuelto M31
-matsuelto M32
-matsuelto M33
-matsuelto M34
-matsuelto M35
-matsuelto M36
-matsuelto M37
-matsuelto M38
-matsuelto M39
-matsuelto M40
-outvista materiales
-outfilas n 41
+matloose M01
+matloose M02
+matloose M03
+matloose M04
+matloose M05
+matloose M06
+matloose M07
+matloose M08
+matloose M09
+matloose M10
+matloose M11
+matloose M12
+matloose M13
+matloose M14
+matloose M15
+matloose M16
+matloose M17
+matloose M18
+matloose M19
+matloose M20
+matloose M21
+matloose M22
+matloose M23
+matloose M24
+matloose M25
+matloose M26
+matloose M27
+matloose M28
+matloose M29
+matloose M30
+matloose M31
+matloose M32
+matloose M33
+matloose M34
+matloose M35
+matloose M36
+matloose M37
+matloose M38
+matloose M39
+matloose M40
+outview materials
+outrows n 41
 outclick M01
 outclick M03 ctrl
-outfondo M01 sel
-outfondo M02 nosel
-outfondo M03 sel
+outbackground M01 sel
+outbackground M02 nosel
+outbackground M03 sel
 # abajo de todo (la lista scrolleada)
 outclick M38
 outclick M40 ctrl
 outclick M39 ctrl
 outsel n 3
-outfondo M38 sel
-outfondo M39 sel
-outfondo M40 sel
-outfondo M37 nosel
+outbackground M38 sel
+outbackground M39 sel
+outbackground M40 sel
+outbackground M37 nosel
 # el DESTINO de un arrastre: la carpeta del recurso apuntado (bien abajo, tambien scrolleado)
-carpetanueva materiales - A
-carpetanueva materiales - B
+foldernew materials - A
+foldernew materials - B
 outclick M01
 outclick M25 shift
-outmenu mover A
-recmover materiales M26 B
-recmover materiales M27 B
-outdragsobre M40 M27 B
-outdragsobre M40 B B
-outdragsobre M40 M30 -
-recurso materiales M40 carpeta -
+outmenu move A
+recmove materials M26 B
+recmove materials M27 B
+outdragover M40 M27 B
+outdragover M40 B B
+outdragover M40 M30 -
+resource materials M40 folder -
 
 # ---- I) "Select Users" solo con usuarios OBJETO; el de Properties vuelve a la escena ----
-escenadefecto
+scenedefault
 add cube
 selobj Cubo.001
 matnew
-mallasrecurso
+meshesresource
 selobj Cubo.001
 delete
 selobj Cubo
-seleccion n 1 tiene Cubo
+selection n 1 has Cubo
 # (su unico usuario es la malla huerfana del registro: no hay nada que seleccionar)
-outvista materiales
-outfila Material estado uso usuarios 1
+outview materials
+outrow Material state use users 1
 outclick Material
 fail outmenu Select Users
-outcontexto Material
-outbarra c menu ninguno
-recboton usuarios oculto
+outcontext Material
+outbar c menu none
+recbutton users hidden
 # elegir un recurso de la biblioteca DESELECCIONA la escena (fase 4b: o se eligen objetos o recursos)
-seleccion n 0
+selection n 0
 # el boton de Properties: selecciona, como el menu (la biblioteca SIGUE en la biblioteca: no vuelve a la escena)
 selobj Cubo
 matnew
-mallasrecurso
-outvista mallas
+meshesresource
+outview meshes
 outclick Cubo
-recboton usuarios
-outvista es mallas
-seleccion n 1 tiene Cubo
+recbutton users
+outview es meshes
+selection n 1 has Cubo
 
 # ---- J) un script nombra una textura solo si nombra su archivo ENTERO ----
-abrirw3d prueba_outliner_bordes_v4.w3d
-texentrada dosmats-b.png
-outvista texturas
-outfila dosmats-b.png usuarios 0 estado huerfano
-entradatexto scripts/nota.lua -- no la usa: "otrodosmats-b.png" ni "dosmats-b.png.bak"
-outfila dosmats-b.png usuarios 0 estado huerfano
-entradatexto scripts/hud.lua setTextura(obj, "texturas/dosmats-b.png")
-outfila dosmats-b.png usuarios 1 estado uso
-recpurgar texturas n 0
-outfila dosmats-b.png estado uso
+openw3d prueba_outliner_bordes_v4.w3d
+texentry dosmats-b.png
+outview textures
+outrow dosmats-b.png users 0 state huerfano
+entrytext scripts/nota.lua -- no la usa: "otrodosmats-b.png" ni "dosmats-b.png.bak"
+outrow dosmats-b.png users 0 state huerfano
+entrytext scripts/hud.lua setTexture(obj, "textures/dosmats-b.png")
+outrow dosmats-b.png users 1 state use
+recpurge textures n 0
+outrow dosmats-b.png state use
 
 # ---- K) los datos del recurso en el idioma de la UI (singular y plural) ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-mallasrecurso
-animsetsintetica 1 agregar
-guardarw3d prueba_outliner_bordes_info_v4.w3d
-abrirw3d prueba_outliner_bordes_info_v4.w3d
-recdatos mallas Cubo en 24 vertices, 12 triangles, 1 part
-recdatos mallas Cubo es 24 vértices, 12 triángulos, 1 parte
-recdatos animaciones Personaje es 4 clips, 5 huesos
-recdatos animaciones Personaje en 4 clips, 5 bones
+meshesresource
+animsetsynthetic 1 add
+savew3d prueba_outliner_bordes_info_v4.w3d
+openw3d prueba_outliner_bordes_info_v4.w3d
+recdata meshes Cubo at 24 vertices, 12 triangles, 1 part
+recdata meshes Cubo es 24 vértices, 12 triángulos, 1 parte
+recdata animations Personaje es 4 clips, 5 huesos
+recdata animations Personaje at 4 clips, 5 bones
 
 # ---- lo que no tiene que pasar ----
-fail recboton nada
+fail recboton none
 fail outfondo NoExiste sel

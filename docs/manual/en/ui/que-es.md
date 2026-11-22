@@ -27,7 +27,7 @@ The price: the letters are pixel art and grow in integer multiples ([Colors and 
 | Folder | What it handles |
 |---|---|
 | `core/` | The interface measurements and their scale (`UI.h`): [Colors and scale](tema.md) |
-| `theme/` | The color palette (`colores.h`): [Colors and scale](tema.md) |
+| `theme/` | The color palette (`colors.h`): [Colors and scale](tema.md) |
 | `draw/` | 2D drawing (`glesdraw`), rectangles, icons and the atlas packer: [Drawing and atlas](dibujo.md), [Icons](iconos.md) |
 | `text/` | The bitmap font, the extended atlas and text with baked TTF fonts: [Text](texto.md) |
 | `widgets/` | Bordered cards, buttons, tabs, menus and text boxes: [Buttons, tabs and checkboxes](botones.md), [Drop-down menus](menus.md), [Input and text boxes](entrada.md) |

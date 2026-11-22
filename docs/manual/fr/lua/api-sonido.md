@@ -3,12 +3,12 @@
 | Fonction | Ce qu'elle fait |
 |---|---|
 | `beep(freq [, ms, vol])` | Un bip (sans fichier). |
-| `sonido("sonidos/x.wav" [, vol, tono, loop, pan]) → h` | Joue un son ; renvoie un identifiant. |
-| `sonido("sonidos/x.wav", {vol, tono, loop, pan, ataque, decaimiento, sostenido, caida, liberacion, duracion, reverb}) → h` | La même chose avec des noms, plus l'enveloppe (attaque, déclin, maintien de 0 à 1, `caida` : le maintien baisse de 60 dB en autant de secondes, relâchement, et `duracion` : la note se relâche seule après autant de secondes) et la part du son envoyée à la réverbération (0 à 1). |
-| `pararSonido(h [, fundido])`, `pararSonidos()`, `ajustarSonido(h, vol [, tono])` | Arrêter ou ajuster des sons. |
-| `soltarSonido(h)` | Relâche la note : l'enveloppe passe à son relâchement. |
-| `reverb(sala, amortiguacion, nivel)` | La réverbération générale : taille de la salle, amortissement et niveau (de 0 à 1 ; niveau 0 l'éteint). |
-| `silenciar(bool)`, `estaMudo()` | Silence général. |
-| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Relance un **objet Son** (à partir de `seg` secondes de son passage) ou le fait taire. |
-| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Lire / changer un objet Son : `archivo` (la source), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (et en lecture `duracion`, `sonando`). |
-| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Un nouvel objet Son (`destruir(obj)` le retire). Dans un prefab, il s'instancie comme n'importe quel objet. |
+| `sound("sounds/x.wav" [, vol, pitch, loop, pan]) → h` | Joue un son ; renvoie un identifiant. |
+| `sound("sounds/x.wav", {vol, pitch, loop, pan, attack, decay, sustain, fall, release, duration, reverb}) → h` | La même chose avec des noms, plus l'enveloppe (attaque, déclin, maintien de 0 à 1, `fall` : le maintien baisse de 60 dB en autant de secondes, relâchement, et `duration` : la note se relâche seule après autant de secondes) et la part du son envoyée à la réverbération (0 à 1). |
+| `stopSound(h [, fundido])`, `stopSounds()`, `adjustSound(h, vol [, pitch])` | Arrêter ou ajuster des sons. |
+| `releaseSound(h)` | Relâche la note : l'enveloppe passe à son relâchement. |
+| `reverb(room, damping, level)` | La réverbération générale : taille de la salle, amortissement et niveau (de 0 à 1 ; niveau 0 l'éteint). |
+| `mute(bool)`, `isMuted()` | Silence général. |
+| `playSound(obj [, seg])`, `muteSound(obj)` | Relance un **objet Son** (à partir de `seg` secondes de son passage) ou le fait taire. |
+| `soundObject(obj) → t`, `setSoundObject(obj, t)` | Lire / changer un objet Son : `file` (la source), `active`, `volume`, `pitch`, `reverb`, `pan`, `start`, `clipStart`, `clipEnd`, `loop`, `positional`, `radius`, `range` (et en lecture `duration`, `playing`). |
+| `createSound("sounds/x.wav" [, parent]) → obj` | Un nouvel objet Son (`destroy(obj)` le retire). Dans un prefab, il s'instancie comme n'importe quel objet. |

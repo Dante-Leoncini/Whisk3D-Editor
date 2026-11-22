@@ -27,7 +27,7 @@ Bedeli: harfler piksellidir ve tam sayı katlarıyla büyür ([Renkler ve ölçe
 | Klasör | Neyi çözer |
 |---|---|
 | `core/` | Arayüzün ölçüleri ve ölçeği (`UI.h`): [Renkler ve ölçek](tema.md) |
-| `theme/` | Renk paleti (`colores.h`): [Renkler ve ölçek](tema.md) |
+| `theme/` | Renk paleti (`colors.h`): [Renkler ve ölçek](tema.md) |
 | `draw/` | 2D çizim (`glesdraw`), dikdörtgenler, simgeler ve atlas paketleyici: [Çizim ve atlas](dibujo.md), [Simgeler](iconos.md) |
 | `text/` | Bitmap yazı tipi, genişletilmiş atlas ve önceden pişirilmiş TTF yazı tipleriyle metin: [Metin](texto.md) |
 | `widgets/` | Kenarlıklı kartlar, düğmeler, sekmeler, menüler ve metin kutuları: [Düğmeler, sekmeler ve onay kutuları](botones.md), [Açılır menüler](menus.md), [Girdi ve metin kutuları](entrada.md) |

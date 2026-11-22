@@ -23,22 +23,22 @@
 
 # --- 1) EL BUG: sin cache, la misma imagen se sube una vez por material -----
 texcache off
-abrirw3d prueba_texcache.w3d
+openw3d prueba_texcache.w3d
 loadtex
 texinfo
 # 7 pedidos = 7 cargas de disco (cero reusos). Es lo que hacia el motor antes.
-texinfo cargas 7
-texinfo reusos 0
-texinfo subidos 131411
+texinfo loads 7
+texinfo reuses 0
+texinfo uploaded 131411
 
 # --- 2) EL ARREGLO: con cache, 7 pedidos = 2 cargas -------------------------
 texcache on
-abrirw3d prueba_texcache.w3d
+openw3d prueba_texcache.w3d
 loadtex
 texinfo
-texinfo cargas 2
-texinfo reusos 5
-texinfo subidos 22186
+texinfo loads 2
+texinfo reuses 5
+texinfo uploaded 22186
 # y el ASSERT duro: la escena entera no puede pasar de 22 186 B de texturas.
 # Si alguien vuelve a subir la misma imagen N veces, este numero explota.
 texinfo max 22186
@@ -47,9 +47,9 @@ texinfo max 22186
 # (abrirw3d hace ReiniciarEscena, que ahora libera las texturas del proyecto
 #  anterior: si no liberara, el contador de vivas iria creciendo corrida a
 #  corrida en vez de quedarse en 2 de contenido)
-abrirw3d prueba_texcache.w3d
+openw3d prueba_texcache.w3d
 loadtex
-texinfo contenido 2
+texinfo content 2
 
 # --- 3bis) NO SE DA PLAY CON TEXTURAS A MEDIO CARGAR ------------------------
 # ("no se puede dar play hasta que carguen todas las texturas"). Recien abierto,
@@ -57,10 +57,10 @@ texinfo contenido 2
 # PRECARGA del final de AbrirW3D ya consumio uno). `juegotex` corre LA MISMA
 # funcion que el boton Play del editor: si queda algo, lo carga entero antes
 # de arrancar.
-abrirw3d prueba_texcache.w3d
-texpend 6
-juegotex
-texpend 0
+openw3d prueba_texcache.w3d
+texpending 6
+gametex
+texpending 0
 
 # --- 4) PIXELADO GLOBAL: sin mipmaps -> ~1/4 menos de GPU -------------------
 # ("pixela todas las texturas y no uses filtros de textura"). Se declara en la
@@ -70,27 +70,27 @@ texpend 0
 # prenderlo a mano despues solo afecta a lo que se sube despues (rojo, sin
 # mipmaps): 21 845 + 256 = 22 101 (con mipmaps serian 22 186). El 16 640 exacto
 # (todo sin mipmaps) lo mide 4ter, donde el .w3d lo declara ANTES de la precarga.
-abrirw3d prueba_texcache.w3d
-pixelado on
+openw3d prueba_texcache.w3d
+pixelated on
 loadtex
 texinfo
-pixelado es true
-texinfo subidos 22101
+pixelated es true
+texinfo uploaded 22101
 texinfo max 22101
 
 # --- 4ter) el .w3d de TEXTO tambien lo declara ------------------------------
 # Es la linea que hay que agregarle al .w3d de texto, adentro
 # de `Escena { }` y al lado de `background`:   pixelado: true
-abrirw3d prueba_texcache_pix.w3d
-pixelado es true
+openw3d prueba_texcache_pix.w3d
+pixelated es true
 loadtex
-texinfo subidos 16640
+texinfo uploaded 16640
 
 # --- 5) ROUND-TRIP v4: `pixelado` tiene que sobrevivir al guardado ----------
-guardarw3d prueba_texcache_v4.w3d
-abrirw3d prueba_texcache_v4.w3d
+savew3d prueba_texcache_v4.w3d
+openw3d prueba_texcache_v4.w3d
 loadtex
-pixelado es true
+pixelated es true
 # y un .w3d que NO lo declara vuelve a false (no se hereda entre proyectos)
-abrirw3d prueba_texcache.w3d
-pixelado es false
+openw3d prueba_texcache.w3d
+pixelated es false

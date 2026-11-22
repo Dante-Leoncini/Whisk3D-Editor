@@ -12,11 +12,11 @@
 #  WebGL / Vulkan) no reponia el modo de textura; el del pipeline fijo si.
 # ==========================================================================
 
-ventana 1280 720
-sombreadopixel
-escenadefecto
-rutina Modo Constructor
-rutinapaso Modo texturaModo modo=1
+window 1280 720
+pixelshading
+scenedefault
+routine Modo Constructor
+routinestep Modo textureMode mode=1
 tick
 tick
 uishot /tmp/w3d_constructor_ui.png

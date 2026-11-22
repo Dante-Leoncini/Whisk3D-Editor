@@ -4,32 +4,32 @@ Script'in özel adlara sahip fonksiyonlar tanımlar ve motor bunları tam zaman�
 
 | Fonksiyon | Ne zaman çağrılır |
 |---|---|
-| `inicio()` | Bir kez, Oynat'a basıldığında (ya da nesne `instanciar` ile oluşturulur oluşturulmaz). Nesneleri bulmak ve değişkenleri hazırlamak için kullanılır. |
-| `actualizar(dt)` | Her karede, nesne **görünür** olduğu ve etkin sahnede bulunduğu sürece. `dt`, önceki kareden bu yana geçen saniyedir (0.001 ile 0.1 arasında). |
-| `alEntrar(otro, miHitbox, suHitbox)` | Bir hitbox başka birine dokunmaya başladığında. |
-| `alQuedarse(otro, miHitbox, suHitbox)` | Birbirlerine dokunmaya devam ettikleri sürece her karede. |
-| `alSalir(otro, miHitbox, suHitbox)` | Birbirlerine dokunmayı bıraktıklarında (biri gizlenirse ya da devre dışı bırakılırsa da). |
-| `alTocar(otro, impulso, x, y, z, nx, ny, nz)` | İki **katı cisim** çarpıştığında. `x, y, z` temas noktası, `nx, ny, nz` ise diğerine doğru olan yöndür. |
+| `start()` | Bir kez, Oynat'a basıldığında (ya da nesne `instantiate` ile oluşturulur oluşturulmaz). Nesneleri bulmak ve değişkenleri hazırlamak için kullanılır. |
+| `update(dt)` | Her karede, nesne **görünür** olduğu ve etkin sahnede bulunduğu sürece. `dt`, önceki kareden bu yana geçen saniyedir (0.001 ile 0.1 arasında). |
+| `onEnter(other, myHitbox, otherHitbox)` | Bir hitbox başka birine dokunmaya başladığında. |
+| `onStay(other, myHitbox, otherHitbox)` | Birbirlerine dokunmaya devam ettikleri sürece her karede. |
+| `onExit(other, myHitbox, otherHitbox)` | Birbirlerine dokunmayı bıraktıklarında (biri gizlenirse ya da devre dışı bırakılırsa da). |
+| `onTouch(other, impulse, x, y, z, nx, ny, nz)` | İki **katı cisim** çarpıştığında. `x, y, z` temas noktası, `nx, ny, nz` ise diğerine doğru olan yöndür. |
 
-Hitbox olaylarını hitbox'ın script'leri ve onun ebeveyn nesnesinin script'leri alır. Diğeri bir katı cisimse, `suHitbox` `nil` olarak gelir.
+Hitbox olaylarını hitbox'ın script'leri ve onun ebeveyn nesnesinin script'leri alır. Diğeri bir katı cisimse, `otherHitbox` `nil` olarak gelir.
 
 ## dt ile bir şeyleri hareket ettirmek
 
 Hızları her zaman `dt` ile çarp. Böylece oyun güçlü bir PC'de de yavaş bir telefonda da aynı hızda ilerler:
 
 ```lua
-function actualizar(dt)
-  mover(yo(), 3 * dt, 0, 0)   -- +X yönünde saniyede 3 birim
+function update(dt)
+  move(self(), 3 * dt, 0, 0)   -- +X yönünde saniyede 3 birim
 end
 ```
 
 ## Bir kare içindeki sıra
 
-1. Fizik (hızlar, katı cisimler) ve çarpışma olayları: `alTocar`, `alSalir`, `alEntrar`, `alQuedarse`.
-2. Tüm script'lerin `actualizar(dt)` fonksiyonu, Outliner'daki sırayla.
+1. Fizik (hızlar, katı cisimler) ve çarpışma olayları: `onTouch`, `onExit`, `onEnter`, `onStay`.
+2. Tüm script'lerin `update(dt)` fonksiyonu, Outliner'daki sırayla.
 3. Animasyonlar (sahne, klipler, iskeletler).
-4. Karenin sonu: bekleyen `destruir()` çağrıları uygulanır, örneklenen nesneler sahneye girer ve istenen `cambiarEscena()` yapılır.
+4. Karenin sonu: bekleyen `destroy()` çağrıları uygulanır, örneklenen nesneler sahneye girer ve istenen `changeScene()` yapılır.
 
 ## Oyunu durdurunca
 
-Durdur'a basınca tüm script'ler kapatılır, ortak alan silinir ve sahne Oynat'tan önceki hâline döner. Oyun çalışırken bir script'i düzenlersen, o nesne script'i yeniden yükler: değişkenleri sıfırlanır ve `inicio()` yeniden çağrılır.
+Durdur'a basınca tüm script'ler kapatılır, ortak alan silinir ve sahne Oynat'tan önceki hâline döner. Oyun çalışırken bir script'i düzenlersen, o nesne script'i yeniden yükler: değişkenleri sıfırlanır ve `start()` yeniden çağrılır.

@@ -11,7 +11,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -20,54 +20,54 @@ Whisk3D {
             z: 2.0
         }
 
-        Particulas {
+        Particles {
             name: "EmisorDerecho"
             x: -6.0
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 2.0
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 2.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
         }
 
-        Particulas {
+        Particles {
             name: "EmisorRotado"
             x: 0.0
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 2.0
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 2.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
-            rotacion: true
+            fade: false
+            active: true
+            rotation: true
         }
 
-        Particulas {
+        Particles {
             name: "EmisorGiro"
             x: 6.0
-            textura: "texturas/cuadrantes.png"
-            cantidad: 30.0
-            vida: 600.0
-            tam: 2.0
+            texture: "textures/cuadrantes.png"
+            count: 30.0
+            life: 600.0
+            size: 2.0
             vel: 0.0
             dispersion: 0.0
-            gravedad: 0.0
-            aditivo: false
+            gravity: 0.0
+            additive: false
             color: "1, 1, 1, 1"
-            desvanecer: false
-            activo: true
-            velRotacion: 360.0
+            fade: false
+            active: true
+            rotationSpeed: 360.0
         }
     }
 }

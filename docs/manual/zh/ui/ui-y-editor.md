@@ -19,22 +19,22 @@
 | 视口：分割屏幕、视口的边框、菜单栏和工具栏 | `main/ui/ViewPorts/`（`ViewPorts.cpp`、`WithBorder.cpp`、`ToolbarBase.cpp`） |
 | 属性面板：有哪些卡片、它们的选项卡、在行上的单击和拖动 | `main/ui/ViewPorts/Properties.cpp` |
 | 模态窗口：颜色选择器、文件浏览器、确认框、进度条、屏幕键盘 | `main/ui/ViewPorts/PopUp/` |
-| 通知 | `main/ui/ViewPorts/Notificaciones.cpp` |
+| 通知 | `main/ui/ViewPorts/Notifications.cpp` |
 | 面板的滚动条 | `main/ui/ViewPorts/ScrollBar.cpp` |
-| 帮助提示框。文本由 `Button::ayuda` 保存 | `W3dAyudaRender`，位于 `main/ui/ViewPorts/LayoutInput.cpp` |
-| 哪个按键、单击或触摸发给哪个控件，以及 N95 的按键 | `main/ui/ViewPorts/LayoutInput.cpp`、`main/app/controles.cpp`、`platform/symbian/src/` |
+| 帮助提示框。文本由 `Button::help` 保存 | `W3dHelpRender`，位于 `main/ui/ViewPorts/LayoutInput.cpp` |
+| 哪个按键、单击或触摸发给哪个控件，以及 N95 的按键 | `main/ui/ViewPorts/LayoutInput.cpp`、`main/app/controls.cpp`、`platform/symbian/src/` |
 | 文本框的焦点函数 | `main/ui/ViewPorts/NumInput.cpp` |
-| 翻译 `T()`。UI 只有 `W3dMenuTraducir` 这个钩子 | `main/config/W3dLang.cpp` |
+| 翻译 `T()`。UI 只有 `W3dMenuTranslate` 这个钩子 | `main/config/W3dLang.cpp` |
 | UI 的启动 | `main/app/W3dInitUI.cpp` |
 | 用单独的图标拼出皮肤图集 | `main/io/SkinAtlas.cpp` |
 | 重新计算缩放 | `SetGlobalScale`，位于 `main/ui/ViewPorts/ViewPorts.cpp` |
 | 在 PC 和 Android 上读取 `skin.ini` | `loadColors`，位于 `main/app/main.cpp` |
 | 编辑器自己的颜色：地面、坐标轴、法线 | `main/ui/W3dColors.cpp` |
-| 皮肤文件：`font.png`、`font-ext.png`、`atlas/iconos/`、`skin.ini` | `res/Skins/Whisk3D/` |
+| 皮肤文件：`font.png`、`font-ext.png`、`atlas/icons/`、`skin.ini` | `res/Skins/Whisk3D/` |
 | 扩展图集的生成器 | `tools/fuente_ext.py` |
-| [2D Editor](../editor/editor-2d.md) 以及游戏的 `.w3dui` 界面：文本、图片、矩形、容器、九宫格（slice 9）、按钮和视频 | `main/objects/`（`UI.h`、`Texto2D.h`、`Boton2D.h`……）、`main/render/UIOverlay.cpp`、`main/io/UI2DFormato.cpp`、`main/io/Fuente2D.cpp`、`main/ui/ViewPorts/Editor2D.cpp` |
+| [2D Editor](../editor/editor-2d.md) 以及游戏的 `.w3dui` 界面：文本、图片、矩形、容器、九宫格（slice 9）、按钮和视频 | `main/objects/`（`UI.h`、`Text2D.h`、`Button2D.h`……）、`main/render/UIOverlay.cpp`、`main/io/UI2DFormat.cpp`、`main/io/Font2D.cpp`、`main/ui/ViewPorts/Editor2D.cpp` |
 
-2D Editor 用 `W3dTextAtlas` 绘制文本，它属于 UI。在运行时用 stb_truetype 烘焙 TTF 则属于编辑器（`main/io/Fuente2D.cpp`）。
+2D Editor 用 `W3dTextAtlas` 绘制文本，它属于 UI。在运行时用 stb_truetype 烘焙 TTF 则属于编辑器（`main/io/Font2D.cpp`）。
 
 ## 在 UI 中，但属于编辑器
 

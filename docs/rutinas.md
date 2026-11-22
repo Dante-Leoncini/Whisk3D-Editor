@@ -59,7 +59,7 @@ Los dos arrancan en **Auto**, que sigue al **fondo del render** (la tarjeta Rend
 - El "Clear" de profundidad limpia aunque la escritura de z esté apagada (glClear la respetaría): la deja prendida.
 - El juego compilado y el modo juego puro (también en el N95) no limpian por su cuenta: un clear de más es un
   cuadro entero de relleno. Un proyecto viejo (sin constructor) lo sigue limpiando el viewport, y si lua apaga el
-  pase 3D (`dibujar3D(false)`) también.
+  pase 3D (`draw3D(false)`) también.
 
 ## La lista
 
@@ -133,7 +133,7 @@ los arrays de una **malla 3D de la biblioteca** (el recurso, no un objeto) y **D
   **tira de triángulos** (las tiras de la parte cosidas con degenerados en una sola llamada: 2 triángulos = 4 índices),
   abanico. Quads, tira de quads y polígono **no existen en GL ES 1.1**: se simulan convirtiéndolos a triángulos (el
   panel lo avisa: más índices, más lento). Los flujos derivados se arman una vez y quedan en un IBO
-  (`libs/Whisk3DCore/objects/MallaFlujos.cpp`).
+  (`libs/Whisk3DCore/objects/MeshFlows.cpp`).
 - La tira solo conviene si la malla **comparte vértices**: un quad suelto cuesta 4 + 2 degenerados = 6 índices, lo
   mismo que la lista. En Daytona (casi todo quads sueltos, cada uno con su UV y su color) la tira gana en 5 de 1965
   partes: el conversor elige la tira solo donde manda menos índices.
@@ -166,34 +166,34 @@ corta para la decoración, manda menos de la mitad de triángulos que probar cel
 **Cambiar los pasos** desde el juego (el índice: 1 = el primero de la lista que usa la rutina):
 
 ```lua
-setPaso(rutina, 4, "on", false)            -- prende / apaga
-setPaso(rutina, 4, "n", 1, 0, 0, 1)        -- sus números ("color" es lo mismo; nil = ese queda)
-setPaso(rutina, 4, "ref", "Cubo2")         -- otra malla / textura / objeto / rutina (error si no existe)
-setPaso(rutina, 4, "modo", 2)              -- la opción ("entero": la parte, la luz...)
-local r, g, b, a = leerPaso(rutina, 4, "n")
+setStep(rutina, 4, "on", false)            -- prende / apaga
+setStep(rutina, 4, "n", 1, 0, 0, 1)        -- sus números ("color" es lo mismo; nil = ese queda)
+setStep(rutina, 4, "ref", "Cubo2")         -- otra malla / textura / objeto / rutina (error si no existe)
+setStep(rutina, 4, "modo", 2)              -- la opción ("entero": la parte, la luz...)
+local r, g, b, a = getStep(rutina, 4, "n")
 ```
 
 El paso **Call Lua** llama, mientras se dibuja, a una función del script de la rutina o de **otro objeto** (el que se
-elige en el paso, "Script de"). Ahí adentro `paso(nombre, ...)` ejecuta cualquier paso. Los argumentos se reparten
+elige en el paso, "Script de"). Ahí adentro `step(getName, ...)` ejecuta cualquier paso. Los argumentos se reparten
 por tipo:
 
 ```lua
-function dibujar()
-  paso("array", "normales", false)          -- (o "Normals"; vértices, uv, colores)
-  paso("colorLimpieza", 0, 0, 0, 1)         -- (con números: ese color; sin números, Auto)
-  paso("limpiar", "color", "profundidad")   -- (o la máscara: 1 color, 2 profundidad, 4 estencil)
+function draw()
+  step("array", "normals", false)   -- (o "Normals"; vértices, uv, colores)
+  step("clearColor", 0, 0, 0, 1)    -- (con números: ese color; sin números, Auto)
+  step("clear", "color", "depth")   -- (o la máscara: 1 color, 2 profundidad, 4 estencil)
   -- paso("limpiar", "color", "profundidad", "cielo.png", 0, 0, 90)   -- un fondo 360 propio, girado 90° en Z
-  paso("punteroVertices", "Cubo")
-  paso("color", 0.2, 0.6, 1, 1)
-  paso("apilar")
-  paso("trasladar", 0, 2.2, 0)
-  paso("dibujar", "Cubo", -1, "tira")       -- malla, parte, primitiva
-  paso("desapilar")
+  step("vertexPointer", "Cubo")
+  step("color", 0.2, 0.6, 1, 1)
+  step("apilar")
+  step("trasladar", 0, 2.2, 0)
+  step("draw", "Cubo", -1, "tira")       -- malla, parte, primitiva
+  step("desapilar")
 end
 ```
 
 Texto = la referencia y después la opción (`"tira"`, `"Diffuse"`...); `"@nombre[i]"` = una memoria; número = la parte
-/ luz / cuántos saltear y después los valores; booleano = on/off. Fuera del dibujo `paso()` da error.
+/ luz / cuántos saltear y después los valores; booleano = on/off. Fuera del dibujo `step()` da error.
 
 ## Una lista por modo de render
 
@@ -202,7 +202,7 @@ panel: **Modo de render** elige cuál se edita; **Usa** dice qué usa ese modo.
 
 ## Validación (solo el editor)
 
-El núcleo no chequea nada. El **editor** revisa antes de dibujar (`main/edit/RutinaEditor.cpp`), también las
+El núcleo no chequea nada. El **editor** revisa antes de dibujar (`main/edit/RoutineEditor.cpp`), también las
 subrutinas: referencias vivas, partes y rangos, el array de la memoria, luces, opciones, memorias, Push/Pop
 equilibrados y sin ciclos. Si falla, no se ejecuta y el outliner la pinta en rojo con el motivo.
 
@@ -238,7 +238,7 @@ se quedan. Sin la RAM:
 - los punteros bindean el VBO (el recurso recuerda qué arrays tenía) y "Dibujar elementos" con triángulos manda el
   rango del IBO, también por array de rangos y banderas; "Test de visibilidad" usa la caja cacheada;
 - un flujo **derivado** (tira, aristas, puntos, simuladas) sale si ya estaba armado. Uno nuevo lo arma la precarga
-  de la rutina (un paso que se agrega o cambia) o el panel, releyendo la malla; desde Lua (`paso()`) no se puede: no
+  de la rutina (un paso que se agrega o cambia) o el panel, releyendo la malla; desde Lua (`step()`) no se puede: no
   se dibuja y queda un aviso en el log (una vez);
 - el paso **Matcap** lee las normales de RAM en cada cuadro: esa malla se relee y ya no se suelta.
 
@@ -253,13 +253,13 @@ están solo en GPU, la RAM que soltaron y cuántas veces se releyó una. Prueba:
 
 `rutinaperfil on` / `ver` (harness): por tipo de paso, cuántas veces corrió y cuántas llamadas GL hizo.
 
-`perfilLua(cuadros [, etiqueta [, instrucciones [, lineas]]])` (lua, también en el N95): llamada al empezar cada
+`luaProfile(cuadros [, etiqueta [, instrucciones [, lineas]]])` (lua, también en el N95): llamada al empezar cada
 `actualizar()`, muestrea el script cada `instrucciones` instrucciones de la VM (1000 por defecto) y cada `cuadros`
 cuadros vuelca al log, en ms por cuadro, las líneas más caras, el tiempo propio y el inclusivo de cada función (por
 la línea donde se define). Prende además el perfil de las rutinas y lo vuelca en los mismos cuadros: por tipo de paso
 veces y llamadas GL por cuadro, ms solo de los Dibujar (leer el reloj en los ~2000 pasos chicos de un cuadro costaba
 más que ellos), y por rutina ms y triángulos por cuadro (inclusivo). Si cambia la etiqueta (la fase del juego) arranca
-de cero sin volcar la mezcla; `perfilLua(0)` lo apaga. En el N95 el reloj es de 1 ms: cada muestra sale gruesa pero el
+de cero sin volcar la mezcla; `luaProfile(0)` lo apaga. En el N95 el reloj es de 1 ms: cada muestra sale gruesa pero el
 promedio de muchos cuadros es bueno; conviene muestrear cada ~5000 instrucciones (el hook cuesta).
 
 ## Medido: Daytona USA en modo avanzado
@@ -292,8 +292,8 @@ outliner, la barra del viewport y la interfaz de la cámara.
 **Copy screen** copia lo que se dibujó hasta ese paso (el cuadro de la imagen: el encuadre de la cámara, sin las
 bandas) a la textura `pantalla:<nombre>` (el nombre va en la referencia del paso; la textura se crea sola). Con eso una
 rutina puede dibujar algo, copiarlo, limpiar y dibujar el resto usándolo con **Bind texture** (`pantalla:<nombre>`):
-un espejo, una pantalla dentro del juego, una imagen congelada detrás de un menú. Desde lua, `capturarPantalla(nombre)`
-pide la copia de la imagen entera de ese cuadro (al terminar la escena, o con el HUD) y `capturaUV(nombre)` da la parte
+un espejo, una pantalla dentro del juego, una imagen congelada detrás de un menú. Desde lua, `captureScreen(getName)`
+pide la copia de la imagen entera de ese cuadro (al terminar la escena, o con el HUD) y `captureUV(getName)` da la parte
 de la textura que la muestra derecha.
 
 - Es `glCopyTexSubImage2D`: está en GL 1.1, GLES 1.1 (el N95) y GLES2/WebGL sin extensiones. La textura es la potencia
@@ -303,14 +303,14 @@ de la textura que la muestra derecha.
   malla, la UV va de 1 a 0).
 - En el PowerVR del N95 copiar en medio del cuadro obliga a dibujar todo lo mandado hasta ahí: sirve para un cuadro de
   vez en cuando (un corte, un fundido), no para cada cuadro.
-- Las capturas son del proyecto: se liberan con sus texturas al cerrarlo (`main/render/EscenaRender.h/.cpp`).
+- Las capturas son del proyecto: se liberan con sus texturas al cerrarlo (`main/render/SceneRender.h/.cpp`).
 
 ## Archivos
 
-- `main/objects/Rutina.h/.cpp`: el objeto, los pasos, las memorias, el ejecutor (cache de punteros y de IBO), el
-  constructor, `paso()` de lua y su .w3d.
-- `libs/Whisk3DCore/objects/MallaFlujos.h/.cpp`: los flujos por parte (tiras, aristas, vértices, simuladas) y la caja.
-- `main/edit/RutinaEditor.cpp`: la validación, los íconos y el menú agrupado (solo el editor).
-- `main/ui/ViewPorts/PropsRutina.cpp`: la tarjeta del panel.
+- `main/objects/Routine.h/.cpp`: el objeto, los pasos, las memorias, el ejecutor (cache de punteros y de IBO), el
+  constructor, `step()` de lua y su .w3d.
+- `libs/Whisk3DCore/objects/MeshFlows.h/.cpp`: los flujos por parte (tiras, aristas, vértices, simuladas) y la caja.
+- `main/edit/RoutineEditor.cpp`: la validación, los íconos y el menú agrupado (solo el editor).
+- `main/ui/ViewPorts/PropsRoutine.cpp`: la tarjeta del panel.
 - `libs/Whisk3DCore/graphics/w3dGraphics.h`: `DrawElements` (primitivas), `LightN` / `LightNfv` / `LightModelAmbient`,
   `EstadoFotoTomar` / `EstadoFotoReponer`.

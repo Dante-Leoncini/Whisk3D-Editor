@@ -30,8 +30,8 @@ struct PolyMesh {
 
 // arma la PolyMesh desde faces3d de la malla (dedupe de verts de render por posicion).
 // Def en MeshEdit.cpp.
-void ConstruirPolyMesh(Mesh* m, PolyMesh& W);
+void BuildPolyMesh(Mesh* m, PolyMesh& W);
 // shading de la cara f (tolera un PolyMesh sin Fsmooth: -1 = hereda)
-inline int PolySmoothDe(const PolyMesh& W, size_t f) { return (f < W.Fsmooth.size()) ? W.Fsmooth[f] : -1; }
+inline int PolySmoothOf(const PolyMesh& W, size_t f) { return (f < W.Fsmooth.size()) ? W.Fsmooth[f] : -1; }
 
 #endif // POLYMESH_H

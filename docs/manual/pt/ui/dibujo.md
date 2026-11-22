@@ -14,12 +14,12 @@ As coordenadas são pixels de tela, com o Y para baixo e a origem no canto super
 |---|---|
 | `W3dDrawStrip4(verts, uvs)` | Um quadrado: 4 vértices `GLshort` na ordem de uma tira, com seus 8 UV. Converte para dois triângulos |
 | `W3dDrawElemsB(verts, uvs, idx, n)` | Uma malha pequena com índices `GLubyte`, até 64 |
-| `W3dDrawLinesS(ancho, n, verts, idx)` | Até 21 linhas, com vértices `GLshort` de 3 componentes |
+| `W3dDrawLinesS(width, n, verts, idx)` | Até 21 linhas, com vértices `GLshort` de 3 componentes |
 | `W3dDrawLinesF(verts, idx, n)` | Linhas com vértices `float` de 3 componentes, de 40 em 40 vértices por desenho |
 
 Os vértices convertidos para `float` vão para um depósito fixo de 256 posições usado de forma circular, nunca para a pilha: o driver do N95 lê os ponteiros tarde.
 
-`W3dPantallaAlto` é a altura da tela. Quem usa a UI a define ao mudar o tamanho, e ela serve para converter o Y da interface para o de `Scissor` e `Viewport`, que contam de baixo para cima.
+`W3dScreenHeight` é a altura da tela. Quem usa a UI a define ao mudar o tamanho, e ela serve para converter o Y da interface para o de `Scissor` e `Viewport`, que contam de baixo para cima.
 
 ## Nós e retângulos
 
@@ -28,40 +28,40 @@ Os vértices convertidos para `float` vão para um depósito fixo de 256 posiç�
 `Rec2D` (`draw/rectangle.h`) é um retângulo de uma cor. `SetSize(x, y, w, h)` o posiciona e `SetColor(r, g, b)` define sua cor. Ele não lê a textura: é desenhado com `Texture2D` desligado.
 
 ```cpp
-Rec2D velo;
-velo.SetSize(0, 0, ancho, alto);
+Rec2D veil;
+veil.SetSize(0, 0, width, height);
 gfx::Disable(gfx::Texture2D);
 gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
-velo.RenderObject(false);          // false: com a cor atual, não com a dele
+veil.RenderObject(false);          // false: com a cor atual, não com a dele
 gfx::Enable(gfx::Texture2D);
 ```
 
 ## Cartões
 
-`Card` (`widgets/card.h`) é o retângulo com cantos arredondados dos botões, dos menus e dos cartões de propriedades. É um **9-patch**: 16 vértices que esticam o centro e mantêm os cantos de `2 * GlobalScale`. Os cantos e o centro vêm de um cantinho de `font.png`. `CalcCardUV(anchoAtlas, altoAtlas)` calcula essas coordenadas: é chamada uma vez, com o tamanho da textura.
+`Card` (`widgets/card.h`) é o retângulo com cantos arredondados dos botões, dos menus e dos cartões de propriedades. É um **9-patch**: 16 vértices que esticam o centro e mantêm os cantos de `2 * GlobalScale`. Os cantos e o centro vêm de um cantinho de `font.png`. `CalcCardUV(widthAtlas, heightAtlas)` calcula essas coordenadas: é chamada uma vez, com o tamanho da textura.
 
 | Função | O que faz |
 |---|---|
 | `Resize(w, h)` | Muda o tamanho |
-| `RenderObject(propio)` | Desenha o preenchimento |
-| `RenderBorder(propio)` | Desenha só a borda |
+| `RenderObject(own)` | Desenha o preenchimento |
+| `RenderBorder(own)` | Desenha só a borda |
 | `RenderObjectTab()`, `RenderBorderTab()` | O mesmo, com o lado de baixo reto: para as abas |
 
-Com `propio` em `true`, usa a sua própria cor (`color` e `opacity`); com `false`, a cor atual.
+Com `own` em `true`, usa a sua própria cor (`color` e `opacity`); com `false`, a cor atual.
 
 ```cpp
-Card fondo(NULL, 120, 40);
-SetColorID(ColorID::gris);
-fondo.RenderObject(false);
+Card background(NULL, 120, 40);
+SetColorID(ColorID::gray);
+background.RenderObject(false);
 SetColorID(ColorID::accent);
-fondo.RenderBorder(false);
+background.RenderBorder(false);
 ```
 
 ## O atlas do skin
 
-Uma única textura para toda a interface. `font.png`, de 128x128, traz as letras, as bordas dos cartões e os ícones antigos. Só com isso a UI já funciona: `CrearIconos` pega os ícones de dentro de `font.png`.
+Uma única textura para toda a interface. `font.png`, de 128x128, traz as letras, as bordas dos cartões e os ícones antigos. Só com isso a UI já funciona: `CreateIcons` pega os ícones de dentro de `font.png`.
 
-Os ícones novos são arquivos avulsos, em `atlas/iconos/`. Ao iniciar, o editor monta uma textura maior (`main/io/SkinAtlas.cpp`): coloca `font.png` inteiro em (0,0), assim suas coordenadas não mudam, e empacota cada ícone no espaço que sobra. Depois informa à UI onde ficou cada um, com `CrearIconosDesde`. Montar esse atlas é do editor; o empacotador e a tabela de ícones são da UI. Veja [Ícones](iconos.md).
+Os ícones novos são arquivos avulsos, em `atlas/icons/`. Ao iniciar, o editor monta uma textura maior (`main/io/SkinAtlas.cpp`): coloca `font.png` inteiro em (0,0), assim suas coordenadas não mudam, e empacota cada ícone no espaço que sobra. Depois informa à UI onde ficou cada um, com `CreateIconsFrom`. Montar esse atlas é do editor; o empacotador e a tabela de ícones são da UI. Veja [Ícones](iconos.md).
 
 ## O empacotador
 
@@ -69,12 +69,12 @@ Os ícones novos são arquivos avulsos, em `atlas/iconos/`. Ao iniciar, o editor
 
 ```cpp
 std::vector<W3dAtlasItem> items(n);       // de cada imagem: rgba, w, h
-items[0].fijo = true;                     // esta vai obrigatoriamente onde for pedido
+items[0].fixed = true;                     // esta vai obrigatoriamente onde for pedido
 items[0].x = 0; items[0].y = 0;
 
-std::vector<unsigned char> lienzo; int W = 0, H = 0;
-if (W3dAtlasPack(&items[0], n, 2, lienzo, &W, &H)) {    // 2 pixels de folga entre imagens
-    unsigned int tex = w3dEngine::UploadRGBA(&lienzo[0], W, H, true);
+std::vector<unsigned char> canvas; int W = 0, H = 0;
+if (W3dAtlasPack(&items[0], n, 2, canvas, &W, &H)) {    // 2 pixels de folga entre imagens
+    unsigned int tex = w3dEngine::UploadRGBA(&canvas[0], W, H, true);
     // items[i].x, items[i].y: onde ficou cada uma
 }
 ```

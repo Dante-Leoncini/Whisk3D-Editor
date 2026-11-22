@@ -21,19 +21,19 @@ selobj Cubo
 delete
 importgltf prueba_alfa_corte.glb
 loadtex
-matalfa alfa_reja es 0.3
+matalphacut alfa_reja es 0.3
 
 # round-trip
-guardarw3d /tmp/w3d_prueba_alfa_corte.w3d
-abrirw3d /tmp/w3d_prueba_alfa_corte.w3d
+savew3d /tmp/w3d_prueba_alfa_corte.w3d
+openw3d /tmp/w3d_prueba_alfa_corte.w3d
 loadtex
-matalfa alfa_reja es 0.3
+matalphacut alfa_reja es 0.3
 
 # editar
-matalfa alfa_reja 0
-matalfa alfa_reja es 0
-matalfa alfa_reja 0.5
-matalfa alfa_reja es 0.5
-guardarw3d /tmp/w3d_prueba_alfa_corte.w3d
-abrirw3d /tmp/w3d_prueba_alfa_corte.w3d
-matalfa alfa_reja es 0.5
+matalphacut alfa_reja 0
+matalphacut alfa_reja es 0
+matalphacut alfa_reja 0.5
+matalphacut alfa_reja es 0.5
+savew3d /tmp/w3d_prueba_alfa_corte.w3d
+openw3d /tmp/w3d_prueba_alfa_corte.w3d
+matalphacut alfa_reja es 0.5

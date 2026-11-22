@@ -6,65 +6,65 @@
 #   - con algo SIN GUARDAR, "Nuevo proyecto" pregunta primero (el cartel): cancelar deja todo como estaba
 #     (en el harness el cartel no aparece solo: 'cartelprender si' lo pone como en el producto)
 #   (el harness empieza con la lista de recientes vacia: /tmp/w3d_prueba_recientes.txt)
-ventana 960 540
-escala 2
-inicio abrir
-inicio textura si
-inicio recientes 0
-inicio cerrar
+window 960 540
+scale 2
+start open
+start texture si
+start recent 0
+start close
 # abrir y guardar anotan los recientes
-guardarw3d ../debug/inicio_a.w3d
-guardarw3d ../debug/inicio_b.w3d
-abrirw3d ../debug/inicio_a.w3d
-abrirw3d ../debug/inicio_b.w3d
-inicio abrir
-inicio recientes 2
-inicio fila 1 inicio_b.w3d
-inicio fila 2 inicio_a.w3d
+savew3d ../debug/inicio_a.w3d
+savew3d ../debug/inicio_b.w3d
+openw3d ../debug/inicio_a.w3d
+openw3d ../debug/inicio_b.w3d
+start open
+start recent 2
+start row 1 inicio_b.w3d
+start row 2 inicio_a.w3d
 # tocar el segundo lo abre y la pantalla se cierra (liberando el logo)
-inicio tocar 2
-inicio cerrar
-proyectopendiente inicio_a.w3d
-inicio abrir
-inicio fila 1 inicio_a.w3d
+start touch 2
+start close
+projectpending inicio_a.w3d
+start open
+start row 1 inicio_a.w3d
 # Nuevo archivo: la escena de arranque, sin archivo (con el cartel apagado, como en el harness, lo agregado se va)
 add cube
 selobj Cubo.001
-inicio tocar 0
-proyectopendiente sinarchivo
+start touch 0
+projectpending nofile
 fail selobj Cubo.001
 selobj Cubo
-inicio cerrar
+start close
 # el boton "Nuevo proyecto" de la tarjeta Archivo hace lo mismo
-abrirw3d ../debug/inicio_b.w3d
+openw3d ../debug/inicio_b.w3d
 add cube
 propstab 0
-propclic New project
-proyectopendiente sinarchivo
+propclick New project
+projectpending nofile
 fail selobj Cubo.001
 selobj Cubo
 # "Extraer" ahora es de cada recurso (tarjeta Recurso): una COPIA de su archivo de adentro del .w3d a una carpeta
-abrirw3d ../debug/inicio_b.w3d
-recextraer mallas Cubo ../debug/inicio_extraer
+openw3d ../debug/inicio_b.w3d
+recextract meshes Cubo ../debug/inicio_extraer
 # "Nuevo proyecto" con el cubo agregado SIN GUARDAR: aparece el cartel y no se borra nada hasta elegir
-abrirw3d ../debug/inicio_b.w3d
+openw3d ../debug/inicio_b.w3d
 add cube
-cartelprender si
+dialogshow si
 propstab 0
-propclic New project
-proyectopendiente inicio_b.w3d
+propclick New project
+projectpending inicio_b.w3d
 selobj Cubo.001
-cartelresponder cancelar
-proyectopendiente inicio_b.w3d
+dialogrespond cancel
+projectpending inicio_b.w3d
 selobj Cubo.001
 # otra vez, ahora "seguir sin guardar": la escena de arranque
-propclic New project
-cartelresponder seguir
-proyectopendiente sinarchivo
+propclick New project
+dialogrespond continue
+projectpending nofile
 fail selobj Cubo.001
 selobj Cubo
 # recien creado no hay nada sin guardar: no pregunta
 propstab 0
-propclic New project
-proyectopendiente sinarchivo
-cartelprender no
+propclick New project
+projectpending nofile
+dialogshow no

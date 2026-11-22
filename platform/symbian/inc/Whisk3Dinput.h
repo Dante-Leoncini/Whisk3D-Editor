@@ -28,8 +28,8 @@ enum {
     EJoystickLeft,
     EJoystickRight,
     EEscape,
-    EVolumenUp,
-    EVolumenDown,
+    EVolumeUp,
+    EVolumeDown,
     //EJoystickFire,
     //EDelete,
     //EShift,
@@ -51,8 +51,8 @@ static const TUint KKeyCodeMap[] = {
     //EKeyDelete,        EDelete,
     //EKeyRightShift,     EShift,
     //EKeyLeftShift,     EShift,
-    EKeyIncVolume,     EVolumenUp,                
-    EKeyDecVolume,     EVolumenDown,
+    EKeyIncVolume,     EVolumeUp,                
+    EKeyDecVolume,     EVolumeDown,
     EStdKeyEscape,     EEscape
     //EKeyMenu,          EMenu
 };

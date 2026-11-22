@@ -46,7 +46,7 @@ Come lo fa, in tutti i dettagli (la grafica, il suono, i file, l'input, la rete,
 
 ## Il progetto
 
-Tutto il lavoro viene salvato in un file di progetto `.w3d`. Al suo interno viaggiano la scena e anche le risorse: texture (`texturas/`), script (`scripts/`), suoni, scene, prefab. Una risorsa può stare **dentro** il .w3d o **fuori**, come file separato sul disco; i menu "Salva nel .w3d" e "Salva fuori dal .w3d" la spostano da una parte all'altra. Vedi [Il progetto](proyecto.md).
+Tutto il lavoro viene salvato in un file di progetto `.w3d`. Al suo interno viaggiano la scena e anche le risorse: texture (`textures/`), script (`scripts/`), suoni, scene, prefab. Una risorsa può stare **dentro** il .w3d o **fuori**, come file separato sul disco; i menu "Salva nel .w3d" e "Salva fuori dal .w3d" la spostano da una parte all'altra. Vedi [Il progetto](proyecto.md).
 
 > [!NOTE]
 > Questo manuale descrive ciò che Whisk3D sa fare oggi. I nomi delle funzioni sono quelli che vedi nell'editor in italiano. I tasti indicati sono quelli predefiniti: puoi cambiarli in [Scorciatoie da tastiera](atajos.md).

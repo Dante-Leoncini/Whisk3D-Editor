@@ -21,7 +21,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.0, 0.0, 0.0, 1.0"
 
         Wavefront {
@@ -48,11 +48,11 @@ Whisk3D {
             mirrorX: false
             mirrorY: true
             mirrorZ: false
-            sinProfundidad: true
-            limiteIzquierdo: -6.0
-            limiteDerecho: 6.0
-            limiteFondo: -6.0
-            limiteFrente: 6.0
+            noDepth: true
+            leftLimit: -6.0
+            rightLimit: 6.0
+            backLimit: -6.0
+            frontLimit: 6.0
             z: 20.0
         }
 

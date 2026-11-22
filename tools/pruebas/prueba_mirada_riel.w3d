@@ -8,7 +8,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.02, 0.02, 0.03, 1.0"
 
         Curve {
@@ -33,9 +33,9 @@ Whisk3D {
             name: "Camara"
             fov: 45.0
             target: "Mira"
-            riel: "Riel de Mirada"
-            offsetRiel: 0
-            miradaRiel: true
+            rail: "Riel de Mirada"
+            railOffset: 0
+            railLook: true
         }
     }
 }

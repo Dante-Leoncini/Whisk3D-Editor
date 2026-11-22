@@ -47,15 +47,15 @@ struct W3dModSerial {
 class Modifier {
     public:
         W3dModSerial serial; // identidad estable (ver arriba). 'serial.v' nunca es 0.
-        int tipo;            // ModifierType::Enum
-        std::string nombre;  // nombre visible (editable a futuro; arranca con el nombre del tipo)
+        int type;            // ModifierType::Enum
+        std::string name;    // nombre visible (editable a futuro; arranca con el nombre del tipo)
 
         // --- VISIBILIDAD (todos los modificadores) ---
-        bool mostrarViewport; // OFF = NUNCA se calcula (se saltea en el pipeline; el siguiente opera sobre el estado previo)
-        bool mostrarEdit;     // OFF = no se calcula EN Edit Mode (edicion rapida N95; al salir de Edit se recalcula)
+        bool showViewport; // OFF = NUNCA se calcula (se saltea en el pipeline; el siguiente opera sobre el estado previo)
+        bool showEdit;     // OFF = no se calcula EN Edit Mode (edicion rapida N95; al salir de Edit se recalcula)
 
         // --- MIRROR (por ahora solo este modificador tiene params; cuando haya mas -> subclases) ---
-        bool  ejeX, ejeY, ejeZ; // ejes a espejar (default X). El espejo es secuencial: X, luego Y sobre el
+        bool  axisX, axisY, axisZ; // ejes a espejar (default X). El espejo es secuencial: X, luego Y sobre el
                                 // resultado, luego Z (como Blender).
         Object* target;         // NULL = espejo desde el ORIGEN del objeto; si no, desde el origen del TARGET
                                 // (su posicion + ROTACION en el mundo definen el plano; la escala no importa).
@@ -112,13 +112,13 @@ class Modifier {
         // .obj de origen de la malla:
         //     <modelo>.pvs.json = { "sectores": M, "tris": [[t0, t1, ...], ...] }
         // con cada t = indice de TRIANGULO 0-based en el ORDEN DE CARAS del OBJ. El
-        // modificador precalcula UN index buffer por sector (W3dPVSAplicarSector) y en
+        // modificador precalcula UN index buffer por sector (W3dPVSApplySector) y en
         // runtime se dibuja SOLO el del sector activo: cambiar de sector = swap del index
         // buffer (re-subida del IBO), NUNCA trabajo por frame. La malla original queda
         // INTACTA y editable (el modificador no toca vertex/faces; solo elige indices).
         // El lua del juego cambia el sector con setSector(obj, s) al pasar de nodo/camara.
-        // metodoPVS 0 = "Triangulos (PVS)": sectores del sidecar `.pvs.json` (arriba).
-        // metodoPVS 1 = "Celdas (VisSet)": el dato es un `.w3dvis` binario (formato/
+        // methodPVS 0 = "Triangulos (PVS)": sectores del sidecar `.pvs.json` (arriba).
+        // methodPVS 1 = "Celdas (VisSet)": el dato es un `.w3dvis` binario (formato/
         //   w3dvis.md, cargado en visSet): celdas de a miles, listas CON ORDEN y deltas
         //   entre celdas vecinas. Reemplaza al viejo "BSP" (que nunca corto nada); un
         //   .w3d viejo que declare "bsp" cae aca y, sin `.w3dvis` que cargar, sigue
@@ -126,7 +126,7 @@ class Modifier {
         // En los DOS metodos sectorPVS es la celda/sector ACTIVO (1-based; 0 = completa)
         // y el resultado es el override Mesh::pvsFaces/pvsGroups/pvsVersion: ese es el
         // contrato con el render (el core dibuja, esto decide).
-        int  metodoPVS;
+        int  methodPVS;
         int  sectorPVS;    // sector/celda ACTIVO, 1-based. 0 o fuera de rango = malla completa (fallback).
         // FALLBACK DE CELDA VACIA (declarado en el archivo, "sectorFallback:"):
         // que se dibuja cuando la celda/sector ACTIVO existe pero su lista quedo
@@ -144,42 +144,42 @@ class Modifier {
         // NOMBRE REAL del sidecar, tal como quedo en el contenedor (o en disco). Se
         // guarda en el .w3d y se INGIERE al empaquetar: derivarlo de <origen>.pvs.json
         // funcionaba solo con el pipeline del proyecto desplegado en disco. Al mandar
-        // un .w3d v4 a otra maquina el .obj entra como "modelos/x.obj" y el sidecar no
+        // un .w3d v4 a otra maquina el .obj entra como "models/x.obj" y el sidecar no
         // entraba a ningun lado -> el PVS desaparecia SIN AVISO. Vacio = derivar del
         // origen, como antes (compatibilidad con los .w3d ya guardados).
-        std::string pvsArchivo;
-        // NOMBRE REAL del `.w3dvis` (metodo "celdas"), mismo contrato que pvsArchivo:
+        std::string pvsFile;
+        // NOMBRE REAL del `.w3dvis` (metodo "celdas"), mismo contrato que pvsFile:
         // vacio = derivar de <origen sin extension>.w3dvis / extra/<base>.w3dvis.
-        std::string visArchivo;
+        std::string visFile;
         // PATH del recorrido (idea del dueno: "el modificador apunta a un path"): nombre de un
         // objeto de la escena -una Curve (el riel de la camara) o una malla de aristas creada
         // con Add > Path- cuyos NODOS son las celdas. Con path, el motor elige la celda SOLO:
-        // el nodo mas cercano al ojo (W3dOclusionTick, main/io/W3dNodos.cpp). Vacio = la celda
-        // la maneja lua/VisZona/el panel, como siempre. Se resuelve POR NOMBRE en cada tick
+        // el nodo mas cercano al ojo (W3dOcclusionTick, main/io/W3dNodes.cpp). Vacio = la celda
+        // la maneja lua/VisZone/el panel, como siempre. Se resuelve POR NOMBRE en cada tick
         // (sin puntero guardado: borrar/rehacer el path nunca deja nada colgando).
-        std::string pathNombre;
+        std::string pathName;
         // "solo camara activa" (default ON): el nodo se elige desde la CAMARA ACTIVA (jugando
         // sigue el riel solo). OFF = desde la vista del viewport activo: volas libre por el
         // escenario y ves aparecer/desaparecer lo que el dato dice (demo A/B en vivo).
-        bool soloCamaraActiva;
+        bool onlyCameraActive;
         // RAMAS del path habilitadas para el nodo-mas-cercano (pedido del dueno: un path puede
         // tener ramificaciones -nivel principal, bonus- y "la rama principal no sirve con el
         // objeto de bonus"). Indice = rama (componente conexa del path); VACIO = todas.
-        std::vector<char> ramasOn;
+        std::vector<char> branchesOn;
         // -- runtime (NO se serializa) --
-        std::vector< std::vector<int> > pvsSectores; // tris por sector, del sidecar
+        std::vector< std::vector<int> > pvsSectors; // tris por sector, del sidecar
         VisSet visSet;     // metodo "celdas": el `.w3dvis` cargado (por VALOR: copiar el
                            // modificador copia el dato y no hay doble-free con el copy-ctor
                            // implicito que usa la duplicacion de objetos)
-        std::vector<unsigned> visLista; // la lista de la celda APLICADA, en el orden del archivo
-        bool pvsCargado;   // ya se intento leer el sidecar (evita re-lecturas por frame)
-        int  pvsAplicado;  // sector cuyo index buffer esta armado en la malla (-1 = ninguno)
+        std::vector<unsigned> visList; // la lista de la celda APLICADA, en el orden del archivo
+        bool pvsLoaded;    // ya se intento leer el sidecar (evita re-lecturas por frame)
+        int  appliedPvs;   // sector cuyo index buffer esta armado en la malla (-1 = ninguno)
         int  pvsFacesBase; // facesSize con el que se armo (si la malla cambio, se rearma y revalida)
 
         Modifier(int t, const std::string& n)
-            : tipo(t), nombre(n),
-              mostrarViewport(true), mostrarEdit(true),
-              ejeX(true), ejeY(false), ejeZ(false), target(NULL),
+            : type(t), name(n),
+              showViewport(true), showEdit(true),
+              axisX(true), axisY(false), axisZ(false), target(NULL),
               merge(true), mergeDist(0.001f), clipping(true),
               subLevel(1.0f), subRenderLevel(2.0f), subSimple(false),
               screwAngle(360.0f), screwHeight(0.0f), screwSteps(16.0f), screwRenderSteps(32.0f),
@@ -188,13 +188,13 @@ class Modifier {
               boolOp(2), boolTargetGeoVer(0),
               arrCount(2.0f), arrRelOn(true), arrRelX(1.0f), arrRelY(0.0f), arrRelZ(0.0f),
               arrConstOn(false), arrConstX(0.0f), arrConstY(0.0f), arrConstZ(0.0f), arrMerge(false), arrMergeDist(0.001f),
-              metodoPVS(0), sectorPVS(0), sectorFallback(0), soloCamaraActiva(true),
-              pvsCargado(false), pvsAplicado(-1), pvsFacesBase(0) {}
+              methodPVS(0), sectorPVS(0), sectorFallback(0), onlyCameraActive(true),
+              pvsLoaded(false), appliedPvs(-1), pvsFacesBase(0) {}
         virtual ~Modifier() {}
 };
 
 // nombre por defecto de cada tipo (para la lista + el menu "Add")
-inline const char* NombreTipoModificador(int t) {
+inline const char* ModifierTypeName(int t) {
     switch (t) {
         case ModifierType::Screw:              return "Screw";
         case ModifierType::Mirror:             return "Mirror";
@@ -202,7 +202,7 @@ inline const char* NombreTipoModificador(int t) {
         case ModifierType::SubdivisionSurface: return "Subdivision Surface";
         case ModifierType::Boolean:            return "Boolean";
         case ModifierType::Armature:           return "Armature";
-        case ModifierType::CullingTri:         return "Oclusion";   // culling POR TRIANGULO con dato precalculado (el buen nombre, pedido del dueno)
+        case ModifierType::CullingTri:         return "Occlusion";   // culling POR TRIANGULO con dato precalculado (el buen nombre, pedido del dueno)
     }
     return "Modifier";
 }

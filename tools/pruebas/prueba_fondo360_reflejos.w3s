@@ -9,16 +9,16 @@
 #  fondo 360 un metal sin entorno queda oscuro). La imagen tambien alumbra lo difuso (la copia borrosa).
 # ==========================================================================
 
-ventana 640 480
-sombreadopixel
-escenadefecto
+window 640 480
+pixelshading
+scenedefault
 selobj Cubo
 objpos 0 0 -40
 add uvsphere
 matnew
 matrt 0.05 1
-vista3d sombreado 2
-vista3d gizmo 0
-fondo textura fondo360_prueba.png
+view3d shading 2
+view3d gizmo 0
+background texture fondo360_prueba.png
 tick 5
 uishot /tmp/w3d_reflejos.png

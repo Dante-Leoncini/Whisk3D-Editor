@@ -7,70 +7,70 @@
 - una **casilla**, que muestra y cambia un `bool`,
 - un **deslizador**, que edita un `float` entre dos valores,
 - un **atajo**, a la derecha y en gris tenue ("Shift D"),
-- `verde`: es la opción activa, con el ícono y el texto en `accent`,
-- `gris`: apunta a un `bool`; mientras valga `false`, la opción se ve a media opacidad y no responde,
-- `lineaArriba`: una línea que la separa del grupo de arriba.
+- `green`: es la opción activa, con el ícono y el texto en `accent`,
+- `gray`: apunta a un `bool`; mientras valga `false`, la opción se ve a media opacidad y no responde,
+- `lineUp`: una línea que la separa del grupo de arriba.
 
-El menú puede tener un **título** (`titulo`): va en blanco, con una línea abajo.
+El menú puede tener un **título** (`title`): va en blanco, con una línea abajo.
 
 ## Armarlo con una tabla
 
 La forma recomendada es una tabla de `MenuDef`: el texto y lo que hace cada opción van en la misma fila. No hay un número que conectar con un `switch` en otro lado.
 
 ```cpp
-static bool grilla = true;
-static PopupMenu* recientes = NULL;
-static void Nuevo() { /* ... */ }
-static void Abrir() { /* ... */ }
+static bool grid = true;
+static PopupMenu* recent = NULL;
+static void New() { /* ... */ }
+static void Open() { /* ... */ }
 
 static const MenuDef ARCHIVO[] = {
     // texto     acción  atajo     ícono                    submenú     casilla
-    { "Nuevo",   Nuevo,  "Ctrl N", ICONO(IconType::mas) },
-    { "Abrir",   Abrir,  "Ctrl O", ICONO(IconType::carpeta) },
-    { "Recientes", NULL, NULL,     ICONO(IconType::lista),  &recientes },
-    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grilla },
+    { "Nuevo",   New,  "Ctrl N", ICON(IconType::more) },
+    { "Abrir",   Open,  "Ctrl O", ICON(IconType::folder) },
+    { "Recientes", NULL, NULL,     ICON(IconType::list),  &recent },
+    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grid },
 };
 
-recientes = new PopupMenu();          // el submenú tiene que existir antes de construir
+recent = new PopupMenu();          // el submenú tiene que existir antes de construir
 PopupMenu* archivo = new PopupMenu();
-archivo->titulo = "Archivo";
-archivo->Construir(ARCHIVO, 4);
+archivo->title = "Archivo";
+archivo->Build(ARCHIVO, 4);
 ```
 
-`ICONO(x)` le suma 1 al ícono: en una tabla, el 0 quiere decir "sin ícono". El id de cada opción es su fila.
+`ICON(x)` le suma 1 al ícono: en una tabla, el 0 quiere decir "sin ícono". El id de cada opción es su fila.
 
 Dos ganchos opcionales, que instala el programa:
 
 ```cpp
-W3dMenuTraducir = MiTraduccion;   // const char* MiTraduccion(const char* texto)
-W3dMenuAtajoTexto = MiAtajo;      // std::string MiAtajo(const std::string& atajo)
+W3dMenuTranslate = MiTraduccion;   // const char* MiTraduccion(const char* texto)
+W3dMenuShortcutText = MiShortcut;      // std::string MiAtajo(const std::string& atajo)
 ```
 
-Con `W3dMenuTraducir`, los textos de la tabla salen traducidos al construir el menú. Con `W3dMenuAtajoTexto`, un atajo puede ser un nombre que empieza con `@` y el gancho devuelve la tecla que corresponde. Sin ese gancho, un atajo con `@` no se muestra.
+Con `W3dMenuTranslate`, los textos de la tabla salen traducidos al construir el menú. Con `W3dMenuShortcutText`, un atajo puede ser un nombre que empieza con `@` y el gancho devuelve la tecla que corresponde. Sin ese gancho, un atajo con `@` no se muestra.
 
 ## Armarlo a mano
 
 ```cpp
-PopupMenu* vista = new PopupMenu();
-vista->Agregar("Frente", 0, IconType::camera);
-vista->AgregarCheck("Mostrar piso", 1, &verPiso);
-vista->AgregarFloat("Tamaño", 2, &tamanio, 0.0f, 4.0f);
-MenuItem* it = vista->Agregar("Alambre", 3);
-it->verde = esAlambre;
-it->lineaArriba = true;
-vista->action = AlElegir;              // void AlElegir(int id)
+PopupMenu* view = new PopupMenu();
+view->Add("Frente", 0, IconType::camera);
+view->AddCheck("Mostrar piso", 1, &showFloor);
+view->AddFloat("Tamaño", 2, &size, 0.0f, 4.0f);
+MenuItem* it = view->Add("Alambre", 3);
+it->green = isWire;
+it->lineUp = true;
+view->action = OnPick;              // void AlElegir(int id)
 ```
 
-`Agregar` devuelve el `MenuItem*`, para cambiarle lo demás. Al elegir una opción, `Ejecutar(id)` llama a su `accion` si tiene una y, si no, al `action(id)` del menú. `Limpiar()` borra todas las opciones, para los menús que cambian.
+`Add` devuelve el `MenuItem*`, para cambiarle lo demás. Al elegir una opción, `Run(id)` llama a su `action` si tiene una y, si no, al `action(id)` del menú. `Clear()` borra todas las opciones, para los menús que cambian.
 
 ## Abrirlo
 
 ```cpp
-archivo->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-MenuAbierto = archivo;
+archivo->Open(mx, my, MenuScreenW, MenuScreenH);
+OpenMenu = archivo;
 ```
 
-Se abre en el punto que le pasás: el cursor, o el borde de un botón. Si no entra, se corre para adentro de la pantalla. `Abrir` no toca `MenuAbierto`: lo pone quien lo abre. `Cerrar()` lo vuelve a `NULL`.
+Se abre en el punto que le pasás: el cursor, o el borde de un botón. Si no entra, se corre para adentro de la pantalla. `Open` no toca `OpenMenu`: lo pone quien lo abre. `Close()` lo vuelve a `NULL`.
 
 Al abrirse se mide:
 
@@ -84,26 +84,26 @@ Un submenú se abre al lado de su fila: a la derecha si entra, si no a la izquie
 
 ```cpp
 // al mover
-if (MenuAbierto) MenuAbierto->MouseMove(mx, my);
+if (OpenMenu) OpenMenu->MouseMove(mx, my);
 
 // al hacer click o tocar
-if (MenuAbierto) {
-    PopupMenu* m = MenuAbierto;
+if (OpenMenu) {
+    PopupMenu* m = OpenMenu;
     int id = m->Click(mx, my);
-    if (id >= 0) m->Ejecutar(id);
+    if (id >= 0) m->Run(id);
 }
 
 // al dibujar, con una proyección de pantalla completa
-if (MenuAbierto) MenuAbierto->Render();
+if (OpenMenu) OpenMenu->Render();
 ```
 
 `Click` devuelve el id elegido, `-1` si no eligió nada o `-2` si abrió un submenú.
 
 - Pasar el mouse resalta la fila y abre su submenú, sin click.
-- Si el mouse se aleja más de `60 * GlobalScale` píxeles, el menú se cierra solo. Con `cerrarLejos = false`, no: para un menú que no se abrió en el mouse.
+- Si el mouse se aleja más de `60 * GlobalScale` píxeles, el menú se cierra solo. Con `closeFar = false`, no: para un menú que no se abrió en el mouse.
 - Un click afuera lo cierra.
 - Una opción común cierra el menú. Una casilla cambia y lo deja abierto, para prender varias. Un click en un deslizador pone el valor según dónde cayó.
-- Mantener apretado sobre un deslizador y arrastrar cambia el valor en vivo. Quien maneja el mouse le pasa cada movimiento a `MenuSliderDragMover(mx)`, mientras `MenuSliderDragActivo()` sea `true`, y al soltar llama a `MenuSliderDragSoltar()`.
+- Mantener apretado sobre un deslizador y arrastrar cambia el valor en vivo. Quien maneja el mouse le pasa cada movimiento a `MenuSliderDragMove(mx)`, mientras `MenuSliderDragActive()` sea `true`, y al soltar llama a `MenuSliderDragRelease()`.
 - En una pantalla táctil, el toque que abre un submenú no elige nada adentro de él, aunque el submenú haya quedado bajo el dedo. Hace falta un segundo toque.
 - Lo que se elige en un submenú se ejecuta en ese submenú: cada menú tiene sus propios ids.
 
@@ -112,19 +112,19 @@ if (MenuAbierto) MenuAbierto->Render();
 El foco lo tiene el submenú abierto más adentro:
 
 ```cpp
-PopupMenu* m = MenuAbierto;
-while (m->submenuAbierto && m->submenuAbierto->abierto) m = m->submenuAbierto;
-MenuItem* it = m->ItemActual();      // la opción resaltada, o NULL
+PopupMenu* m = OpenMenu;
+while (m->openSubmenu && m->openSubmenu->open) m = m->openSubmenu;
+MenuItem* it = m->CurrentItem();      // la opción resaltada, o NULL
 ```
 
 | Función | Qué hace |
 |---|---|
 | `button_up()`, `button_down()` | Mueven el resaltado, dando la vuelta. No abren submenús |
-| `AbrirSubmenuActual()` | Abre el submenú de la opción resaltada y resalta su primera opción |
-| `AjustarSlider(+1)`, `AjustarSlider(-1)` | Mueven el deslizador un veinteavo de su rango |
-| `Enter()` | Como un click en la opción resaltada, y devuelve lo mismo. Llamado en `MenuAbierto`, llega solo al submenú de más adentro |
-| `Cerrar()` | Cierra el menú y sus submenús |
+| `OpenSubmenuCurrent()` | Abre el submenú de la opción resaltada y resalta su primera opción |
+| `FitSlider(+1)`, `FitSlider(-1)` | Mueven el deslizador un veinteavo de su rango |
+| `Enter()` | Como un click en la opción resaltada, y devuelve lo mismo. Llamado en `OpenMenu`, llega solo al submenú de más adentro |
+| `Close()` | Cierra el menú y sus submenús |
 
 Con el teclado, la opción resaltada siempre queda a la vista. Qué tecla llama a qué lo decide quien usa el menú.
 
-`MenuPantallaW` y `MenuPantallaH` tienen que tener el tamaño de la pantalla: con ellos se acomoda el menú.
+`MenuScreenW` y `MenuScreenH` tienen que tener el tamaño de la pantalla: con ellos se acomoda el menú.

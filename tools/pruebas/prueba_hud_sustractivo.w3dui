@@ -1,28 +1,28 @@
 {
   "version": 1,
-  "nombre": "PruebaHudSustractivo",
-  "ventana": {
-    "igualQueRender": true,
-    "ancho": 640,
-    "alto": 480,
-    "escalaGlobal": 1,
+  "name": "PruebaHudSustractivo",
+  "window": {
+    "sameAsRender": true,
+    "width": 640,
+    "height": 480,
+    "globalScale": 1,
     "color": [0, 0, 0, 0]
   },
-  "paleta": "",
-  "paletas": [],
-  "hijos": [
+  "palette": "",
+  "palettes": [],
+  "children": [
     {
-      "tipo": "imagen",
-      "nombre": "IconoAnim",
+      "type": "image",
+      "name": "IconoAnim",
       "pos": [0.15, 0.15, 0],
-      "ancla": 5,
-      "textura": "texturas/rojo.png",
-      "modo": 0,
-      "usarAlpha": true,
-      "ancho": 48,
-      "alto": 48,
-      "tamModo": 1,
-      "hijos": []
+      "anchor": 5,
+      "texture": "textures/rojo.png",
+      "mode": 0,
+      "useAlpha": true,
+      "width": 48,
+      "height": 48,
+      "sizeMode": 1,
+      "children": []
     }
   ]
 }

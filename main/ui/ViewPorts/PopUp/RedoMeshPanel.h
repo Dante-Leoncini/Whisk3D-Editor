@@ -15,44 +15,44 @@ class Viewport3D;
 // cosa (click afuera).
 class RedoMeshPanel : public PopUpBase {
     public:
-        RedoMeshPanel(Mesh* m, int modo = 0); // 0 = primitiva (Add); 1 = Recalculate Normals
+        RedoMeshPanel(Mesh* m, int mode = 0); // 0 = primitiva (Add); 1 = Recalculate Normals
         ~RedoMeshPanel();
 
         void Render() W3D_OVERRIDE;
         bool Click(int mx, int my) W3D_OVERRIDE;
         bool Motion(int mx, int my) W3D_OVERRIDE;
-        bool Tecla(int tecla) W3D_OVERRIDE;
-        void Soltar() W3D_OVERRIDE;
-        bool CierraConViewport() W3D_OVERRIDE { return true; } bool Plegable() W3D_OVERRIDE { return grupo != 0; } bool Plegado() W3D_OVERRIDE { return grupo && !grupo->open; } void Desplegar(bool abrir) W3D_OVERRIDE { if (grupo) grupo->open = abrir; } // se cierra al tocar el viewport
-        void Plegar();   // nace PLEGADO: solo la flecha y el titulo (ver RedoMeshPanel.cpp)
+        bool Key(int key) W3D_OVERRIDE;
+        void Release() W3D_OVERRIDE;
+        bool ClosesWithViewport() W3D_OVERRIDE { return true; } bool Collapsible() W3D_OVERRIDE { return group != 0; } bool Collapsed() W3D_OVERRIDE { return group && !group->open; } void Expand(bool open) W3D_OVERRIDE { if (group) group->open = open; } // se cierra al tocar el viewport
+        void Collapse();   // nace PLEGADO: solo la flecha y el titulo (ver RedoMeshPanel.cpp)
 
     private:
-        GroupPropertie* grupo;
+        GroupPropertie* group;
         PropFloat* dragField; // campo bajo el toque: si se ARRASTRA cambia el valor; si es un TAP abre el teclado
         bool dragMoved;       // el dedo/mouse se movio (arrastre) -> no abrir el teclado al soltar
         int lastDragMx;       // X del ultimo evento (el popup no warpea el mouse)
-        Viewport3D* vpCreador;  // el viewport3D que creo la forma (se lee su rect ACTUAL)
-        void ResizeGrupo();
-        void Reubicar(); // x/y en la esquina inf-izq del viewport
+        Viewport3D* vpCreator;  // el viewport3D que creo la forma (se lee su rect ACTUAL)
+        void ResizeGroup();
+        void Relocate(); // x/y en la esquina inf-izq del viewport
 };
 
 // abre/reemplaza el panel para la primitiva recien creada
-void AbrirRedoMeshPanel(Mesh* m);
+void OpenRedoMeshPanel(Mesh* m);
 
 // abre/reemplaza el panel "Recalculate Normals" (tilde Inside) sobre la malla en edicion
-void AbrirRedoNormalesPanel(Mesh* m);
+void OpenRedoNormalsPanel(Mesh* m);
 
 // abre/reemplaza el panel "Loop Cut and Slide" (Number of Cuts + Factor)
-void AbrirRedoLoopCutPanel(Mesh* m);
+void OpenRedoLoopCutPanel(Mesh* m);
 
 // abre/reemplaza el panel "Inset Faces" (Thickness, Depth y las tildes de Blender)
-void AbrirRedoInsetPanel(Mesh* m);
+void OpenRedoInsetPanel(Mesh* m);
 // abre/reemplaza el panel "Bevel" (Affect, Width Type, Width, Segments, Profile... como el de Blender)
-void AbrirRedoBevelPanel(Mesh* m);
+void OpenRedoBevelPanel(Mesh* m);
 
 // el panel (o su malla) sigue vivo? Lo usa el test 'uipunteros': si borran la malla que edita,
 // el panel tiene que cerrarse, porque sus campos apuntan a MIEMBROS de ella y los ESCRIBEN.
-bool RedoMeshPanelActivo();
-void RedoMeshPanelCerrar();   // undo/redo lo cierran (su snapshot quedo viejo)
+bool RedoMeshPanelActive();
+void RedoMeshPanelClose();   // undo/redo lo cierran (su snapshot quedo viejo)
 
 #endif

@@ -32,195 +32,195 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_mallas_solo_gpu.w3s
 # ===========================================================================
-ventana 800 600
+window 800 600
 selobj Cubo
 delete
 import prueba_mallas_solo_gpu.obj
-mallasregistro tiene Piezas
-guardarw3d /tmp/w3d_prueba_sologpu_a.w3d
-abrirw3d /tmp/w3d_prueba_sologpu_a.w3d
+meshesregistry has Piezas
+savew3d /tmp/w3d_prueba_sologpu_a.w3d
+openw3d /tmp/w3d_prueba_sologpu_a.w3d
 # sin su objeto: la malla queda huerfana en el registro (con su entrada) y solo la va a dibujar la rutina
 selobj Piezas
 delete
-guardarw3d /tmp/w3d_prueba_sologpu_b.w3d
-abrirw3d /tmp/w3d_prueba_sologpu_b.w3d
-mallasregistro tiene Piezas
-sologpu es 0
+savew3d /tmp/w3d_prueba_sologpu_b.w3d
+openw3d /tmp/w3d_prueba_sologpu_b.w3d
+meshesregistry has Piezas
+onlygpu es 0
 
 # la rutina: rangos [cantidad, (primero, ultimo, bandera) x 2] y las banderas del test de visibilidad
-memoria rg 0 2
-memoria rg 1 0
-memoria rg 2 3
-memoria rg 3 0
-memoria rg 4 4
-memoria rg 5 7
-memoria rg 6 1
-rutina SoloRut
-rutinapaso SoloRut array modo=0 on=1
-rutinapaso SoloRut array modo=3 on=1
-rutinapaso SoloRut array modo=1 on=0
-rutinapaso SoloRut array modo=2 on=0
-rutinapaso SoloRut luz on=0
-rutinapaso SoloRut textura on=0
-rutinapaso SoloRut punteroVertices ref=Piezas
-rutinapaso SoloRut punteroColores ref=Piezas
-rutinapaso SoloRut visible ref=Piezas entero=0 n0=@vis[0]
-rutinapaso SoloRut visible ref=Piezas entero=1 n0=@vis[1] n2=0.5
-rutinapaso SoloRut dibujar ref=Piezas entero=-1 sub=2 n2=@rg[0] n3=@vis[0]
-rutinapaso SoloRut dibujar ref=Piezas entero=1 modo=1
-rutinainfo SoloRut
+memory rg 0 2
+memory rg 1 0
+memory rg 2 3
+memory rg 3 0
+memory rg 4 4
+memory rg 5 7
+memory rg 6 1
+routine SoloRut
+routinestep SoloRut array mode=0 on=1
+routinestep SoloRut array mode=3 on=1
+routinestep SoloRut array mode=1 on=0
+routinestep SoloRut array mode=2 on=0
+routinestep SoloRut light on=0
+routinestep SoloRut texture on=0
+routinestep SoloRut vertexPointer ref=Piezas
+routinestep SoloRut colorPointer ref=Piezas
+routinestep SoloRut visible ref=Piezas integer=0 n0=@vis[0]
+routinestep SoloRut visible ref=Piezas integer=1 n0=@vis[1] n2=0.5
+routinestep SoloRut draw ref=Piezas integer=-1 sub=2 n2=@rg[0] n3=@vis[0]
+routinestep SoloRut draw ref=Piezas integer=1 mode=1
+routineinfo SoloRut
 deselectall
-vpvista material
-vporbita 0 0 0 5
+vpview material
+vporbit 0 0 0 5
 
 # 1) APAGADA: el primer cuadro sube los VBO; la malla sigue en RAM
-sologpucuadro off1
-sologpucuadro off2
-rutinainfo SoloRut
+onlygpuframe off1
+onlygpuframe off2
+routineinfo SoloRut
 # (la rutina dibuja: el centro del primer quad de la parte A, en la diagonal entre el rojo y el amarillo)
-escenapx -1.1 -0.5 0 es 255 128 0 16
-sologpuinfo Piezas sologpu 0 ram 1
-memoriaes vis 0 1
-memoriaes vis 1 0
-meminfo sologpu 0
-sologpumini Piezas guardar ram
+scenepx -1.1 -0.5 0 es 255 128 0 16
+onlygpuinfo Piezas gpuonly 0 ram 1
+memories vis 0 1
+memories vis 1 0
+meminfo gpuonly 0
+onlygpumini Piezas save ram
 
 # 2) PRENDIDA: el cuadro siguiente la suelta (al cerrar la corrida de rutinas) y dibuja sin RAM
-sologpu on
-sologpucuadro on1
-sologpuinfo Piezas sologpu 1 ram 0 rambytes 0 recargas 0
-meminfo sologpu 1
-memoriaes vis 0 1
-memoriaes vis 1 0
-sologpuigual off2 on1
-sologpucuadro on2
-sologpuigual off2 on2
-rutinainfo SoloRut
+onlygpu on
+onlygpuframe on1
+onlygpuinfo Piezas gpuonly 1 ram 0 rambytes 0 reloads 0
+meminfo gpuonly 1
+memories vis 0 1
+memories vis 1 0
+onlygpuequal off2 on1
+onlygpuframe on2
+onlygpuequal off2 on2
+routineinfo SoloRut
 # sin la RAM: los triangulos salen del IBO (24 indices, 12 de la parte B) y las lineas de la parte B del flujo
 # que se armo antes de soltarla (2 quads = 10 aristas); los puntos nunca se armaron: no se pueden (0, un aviso)
-sologpuinfo Piezas sologpu 1 flujo -1 4 24 flujo 1 4 12 flujo 1 1 20 flujo 0 0 0
+onlygpuinfo Piezas gpuonly 1 flow -1 4 24 flow 1 4 12 flow 1 1 20 flow 0 0 0
 
 # 3) CONTEXTO GL PERDIDO: se relee de sus bytes, sube de nuevo, vuelve a soltar y dibuja igual
-sologpuperder
-sologpucuadro perdido
-sologpuinfo Piezas sologpu 1 ram 0 recargas 1
-sologpuigual off2 perdido
+onlygpulose
+onlygpuframe perdido
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 1
+onlygpuequal off2 perdido
 
 # 4) el EDITOR pide la RAM (la miniatura de la biblioteca): se relee, la miniatura es la misma, y el
 #    proximo cuadro la vuelve a soltar
-sologpumini Piezas igual ram
-sologpuinfo Piezas sologpu 0 ram 1 recargas 2
-sologpucuadro mini
-sologpuinfo Piezas sologpu 1 ram 0
-sologpuigual off2 mini
+onlygpumini Piezas equal ram
+onlygpuinfo Piezas gpuonly 0 ram 1 reloads 2
+onlygpuframe mini
+onlygpuinfo Piezas gpuonly 1 ram 0
+onlygpuequal off2 mini
 
 # 5) un OBJETO pasa a usarla: se relee y no se suelta mientras la use; Ctrl+Z la deja sin usuarios
 add cube
-mallaasignar Cubo Piezas
-sologpuinfo Piezas sologpu 0 ram 1 usuarios 1 recargas 3
-sologpucuadro conobjeto
-sologpuinfo Piezas sologpu 0 ram 1 usuarios 1
+meshassign Cubo Piezas
+onlygpuinfo Piezas gpuonly 0 ram 1 users 1 reloads 3
+onlygpuframe conobjeto
+onlygpuinfo Piezas gpuonly 0 ram 1 users 1
 undo
-sologpuinfo Piezas usuarios 0
+onlygpuinfo Piezas users 0
 selobj Cubo
 delete
 deselectall
-sologpucuadro sinobjeto
-sologpuinfo Piezas sologpu 1 ram 0 usuarios 0
+onlygpuframe sinobjeto
+onlygpuinfo Piezas gpuonly 1 ram 0 users 0
 # (la escena cambio -un objeto agregado y borrado: los numeros de la interfaz son otros-: se compara con el
 # mismo cuadro con la opcion apagada, que devuelve la malla a RAM)
-sologpu off
-sologpuinfo Piezas sologpu 0 ram 1
-sologpucuadro sinobjetooff
-sologpuinfo Piezas sologpu 0 ram 1
-sologpuigual sinobjeto sinobjetooff
-sologpu on
-sologpucuadro sinobjeto2
-sologpuinfo Piezas sologpu 1 ram 0
-sologpuigual sinobjeto sinobjeto2
+onlygpu off
+onlygpuinfo Piezas gpuonly 0 ram 1
+onlygpuframe sinobjetooff
+onlygpuinfo Piezas gpuonly 0 ram 1
+onlygpuequal sinobjeto sinobjetooff
+onlygpu on
+onlygpuframe sinobjeto2
+onlygpuinfo Piezas gpuonly 1 ram 0
+onlygpuequal sinobjeto sinobjeto2
 
 # 6) un paso NUEVO con un flujo DERIVADO que no estaba (tira de triangulos de la parte A, corrida a la derecha):
 #    la precarga de la rutina relee la malla para armarlo y la RAM se vuelve a soltar al cerrar la corrida
-sologpuinfo Piezas recargas 4
-rutinapaso SoloRut trasladar n0=0 n1=-1.2 n2=0
-rutinapaso SoloRut dibujar ref=Piezas entero=0 modo=5
-sologpucuadro tira
-rutinainfo SoloRut
-sologpuinfo Piezas sologpu 1 ram 0 recargas 5
-escenapx -1.1 -1.7 0 es 255 128 0 16
-sologpucuadro tira2
-sologpuinfo Piezas sologpu 1 ram 0 recargas 5
-sologpuigual tira tira2
-sologpu off
-sologpuinfo Piezas sologpu 0 ram 1 recargas 6
-sologpucuadro tiraoff
-sologpuigual tira tiraoff
-sologpu on
-sologpucuadro tira3
-sologpuinfo Piezas sologpu 1 ram 0
+onlygpuinfo Piezas reloads 4
+routinestep SoloRut translate n0=0 n1=-1.2 n2=0
+routinestep SoloRut draw ref=Piezas integer=0 mode=5
+onlygpuframe strip
+routineinfo SoloRut
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 5
+scenepx -1.1 -1.7 0 es 255 128 0 16
+onlygpuframe tira2
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 5
+onlygpuequal strip tira2
+onlygpu off
+onlygpuinfo Piezas gpuonly 0 ram 1 reloads 6
+onlygpuframe tiraoff
+onlygpuequal strip tiraoff
+onlygpu on
+onlygpuframe tira3
+onlygpuinfo Piezas gpuonly 1 ram 0
 # una SUBRUTINA (oculta: solo la llama la rutina) con otro flujo derivado (los puntos de la parte B), salteada
 # mientras @sub[0] es 0: la precarga de la rutina tambien arma los flujos de sus subrutinas (una vez), asi que
 # cuando la llama mas tarde -la malla ya sin RAM- la dibuja sin releerla
-memoria sub 0 0
-rutina SubRut
+memory sub 0 0
+routine SubRut
 visible 0 SubRut
-rutinapaso SubRut tamPunto n0=6
-rutinapaso SubRut dibujar ref=Piezas entero=1 modo=0
-rutinapaso SoloRut saltarSi n0=@sub[0] entero=1
-rutinapaso SoloRut rutina ref=SubRut
-sologpucuadro subsalteada
-sologpuinfo Piezas sologpu 1 ram 0 recargas 7 flujo 1 0 8
-memoria sub 0 1
-sologpucuadro subdibujada
-sologpuinfo Piezas sologpu 1 ram 0 recargas 7
-sologpu off
-sologpucuadro subdibujadaoff
-sologpuigual subdibujada subdibujadaoff
-sologpu on
-sologpucuadro sub3
-sologpuinfo Piezas sologpu 1 ram 0 recargas 8
+routinestep SubRut pointSize n0=6
+routinestep SubRut draw ref=Piezas integer=1 mode=0
+routinestep SoloRut skipIf n0=@sub[0] integer=1
+routinestep SoloRut routine ref=SubRut
+onlygpuframe subsalteada
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 7 flow 1 0 8
+memory sub 0 1
+onlygpuframe subdibujada
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 7
+onlygpu off
+onlygpuframe subdibujadaoff
+onlygpuequal subdibujada subdibujadaoff
+onlygpu on
+onlygpuframe sub3
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 8
 
 # 7) GUARDAR con la malla suelta: su entrada se copia TAL CUAL y la clave va al proyecto.json. Al reabrir la
 #    opcion vuelve prendida y despues del primer cuadro la malla queda soloGPU, con el mismo cuadro
-guardarw3d /tmp/w3d_prueba_sologpu_c.w3d
-sologpubytes /tmp/w3d_prueba_sologpu_b.w3d /tmp/w3d_prueba_sologpu_c.w3d mallas/piezas.w3db
-abrirw3d /tmp/w3d_prueba_sologpu_c.w3d
-sologpu es 1
+savew3d /tmp/w3d_prueba_sologpu_c.w3d
+onlygpubytes /tmp/w3d_prueba_sologpu_b.w3d /tmp/w3d_prueba_sologpu_c.w3d meshes/piezas.w3db
+openw3d /tmp/w3d_prueba_sologpu_c.w3d
+onlygpu es 1
 deselectall
-vpvista material
-vporbita 0 0 0 5
-sologpucuadro reabierto
-sologpuinfo Piezas sologpu 1 ram 0 recargas 8
-meminfo sologpu 1
+vpview material
+vporbit 0 0 0 5
+onlygpuframe reabierto
+onlygpuinfo Piezas gpuonly 1 ram 0 reloads 8
+meminfo gpuonly 1
 # (sin la clave, la misma malla abre en RAM: guardar con la opcion apagada no escribe la clave)
-sologpu off
-guardarw3d /tmp/w3d_prueba_sologpu_d.w3d
-abrirw3d /tmp/w3d_prueba_sologpu_d.w3d
-sologpu es 0
+onlygpu off
+savew3d /tmp/w3d_prueba_sologpu_d.w3d
+openw3d /tmp/w3d_prueba_sologpu_d.w3d
+onlygpu es 0
 deselectall
-vpvista material
-vporbita 0 0 0 5
-sologpucuadro reabiertooff
-sologpuinfo Piezas sologpu 0 ram 1
-sologpuigual reabierto reabiertooff
-sologpubytes /tmp/w3d_prueba_sologpu_b.w3d /tmp/w3d_prueba_sologpu_d.w3d mallas/piezas.w3db
-meminfo sologpu 0
+vpview material
+vporbit 0 0 0 5
+onlygpuframe reabiertooff
+onlygpuinfo Piezas gpuonly 0 ram 1
+onlygpuequal reabierto reabiertooff
+onlygpubytes /tmp/w3d_prueba_sologpu_b.w3d /tmp/w3d_prueba_sologpu_d.w3d meshes/piezas.w3db
+meminfo gpuonly 0
 
 # 8) apagar la opcion devuelve la malla a RAM
-sologpu on
-sologpucuadro fin
-sologpuinfo Piezas sologpu 1 ram 0
-sologpu off
-sologpuinfo Piezas sologpu 0 ram 1
-meminfo sologpu 0
+onlygpu on
+onlygpuframe fin
+onlygpuinfo Piezas gpuonly 1 ram 0
+onlygpu off
+onlygpuinfo Piezas gpuonly 0 ram 1
+meminfo gpuonly 0
 
 # 9) el paso MATCAP lee las normales de RAM en cada cuadro: con el la malla no se suelta (y una suelta se recupera)
-sologpu on
-sologpucuadro antesmatcap
-sologpuinfo Piezas sologpu 1 ram 0
-rutinapaso SoloRut matcap ref=Piezas on=1
-sologpucuadro matcap
-sologpuinfo Piezas sologpu 0 ram 1
-sologpucuadro matcap2
-sologpuinfo Piezas sologpu 0 ram 1
-meminfo sologpu 0
+onlygpu on
+onlygpuframe antesmatcap
+onlygpuinfo Piezas gpuonly 1 ram 0
+routinestep SoloRut matcap ref=Piezas on=1
+onlygpuframe matcap
+onlygpuinfo Piezas gpuonly 0 ram 1
+onlygpuframe matcap2
+onlygpuinfo Piezas gpuonly 0 ram 1
+meminfo gpuonly 0

@@ -5,6 +5,6 @@
 # ==========================================================================
 add cube
 selobj Cubo.001
-vistatactil 1
-gizmocentro
-vistatactil 0
+viewtouch 1
+gizmocenter
+viewtouch 0

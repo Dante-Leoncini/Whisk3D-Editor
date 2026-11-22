@@ -21,25 +21,25 @@ delete
 importgltf prueba_capas_uv.glb
 loadtex
 meshinfo
-matcapa capas_piso capas 1
-matcapa capas_piso 0 es uv 1 mezcla 3 on 1
+matlayer capas_piso layers 1
+matlayer capas_piso 0 es uv 1 mix 3 on 1
 
 # --- round-trip v4 ---
-guardarw3d /tmp/w3d_prueba_capas_uv.w3d
-abrirw3d /tmp/w3d_prueba_capas_uv.w3d
+savew3d /tmp/w3d_prueba_capas_uv.w3d
+openw3d /tmp/w3d_prueba_capas_uv.w3d
 loadtex
 meshinfo
-matcapa capas_piso capas 1
-matcapa capas_piso 0 es uv 1 mezcla 3 on 1
+matlayer capas_piso layers 1
+matlayer capas_piso 0 es uv 1 mix 3 on 1
 
 # --- editar la capa como el panel: otra mezcla, la UV base, apagar, borrar ---
-matcapa capas_piso 0 mezcla 1
-matcapa capas_piso 0 es mezcla 1
-matcapa capas_piso 0 uv 0
-matcapa capas_piso 0 es uv 0
-matcapa capas_piso 0 off
-matcapa capas_piso 0 es on 0
-matcapa capas_piso 0 del
-matcapa capas_piso capas 0
-matcapa capas_piso add capas_lightmap.png
-matcapa capas_piso capas 1
+matlayer capas_piso 0 mix 1
+matlayer capas_piso 0 es mix 1
+matlayer capas_piso 0 uv 0
+matlayer capas_piso 0 es uv 0
+matlayer capas_piso 0 off
+matlayer capas_piso 0 es on 0
+matlayer capas_piso 0 of
+matlayer capas_piso layers 0
+matlayer capas_piso add capas_lightmap.png
+matlayer capas_piso layers 1

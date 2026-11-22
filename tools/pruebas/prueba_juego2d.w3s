@@ -20,15 +20,15 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
+window 640 480
 
 # --- 1) el juego 2D minimo, guardado y abierto como proyecto ----------------
-juego2dmin /tmp/w3d_juego2d
-guardarw3d /tmp/w3d_juego2d/juego2dmin.w3d
-abrirw3d /tmp/w3d_juego2d/juego2dmin.w3d
+game2dmin /tmp/w3d_juego2d
+savew3d /tmp/w3d_juego2d/juego2dmin.w3d
+openw3d /tmp/w3d_juego2d/juego2dmin.w3d
 
 # --- 2) compilarlo para Linux (sin 3D: solo kFuentesBase) --------------------
-compilarjuego 0 0
+compilegame 0 0
 
 # --- 3) correr el BINARIO y mirarle los pixeles ------------------------------
-juego2dpx /tmp/w3d_juego2d juego2dmin
+game2dpx /tmp/w3d_juego2d juego2dmin

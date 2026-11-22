@@ -1,0 +1,39 @@
+# ==========================================================================
+#  LA SONDA DE REFLEJO Y EL GUARDADO
+#  (1) La imagen 360 horneada de una sonda es una textura del proyecto que la sonda nombra en el .w3d: la biblioteca
+#      la cuenta como EN USO. "Purgar huerfanas" se la llevaba y despues el guardado se cancelaba ("falta adentro del
+#      proyecto: texturas/reflejo_sondareflejo.png"), sin forma de arreglarlo desde la biblioteca. Tambien la de una
+#      sonda que se paso a tiempo real (el .w3d la sigue nombrando para volver a horneada).
+#      Tampoco se puede "borrar igual" desde la biblioteca: el aviso dice que sonda la usa. Y si la imagen ya no esta
+#      en ningun lado, la sonda se guarda sin imagen (es un dato que se vuelve a hornear): nunca traba el guardado.
+#  (2) Una sonda BORRADA (el Ctrl+Z la guarda fuera del arbol, todavia colgando del padre) no refleja ni captura: antes
+#      seguia reflejando desde adentro del objeto del que colgaba.
+# ==========================================================================
+scenedefault
+addui reflectionprobe
+srbake
+srcount 1
+# ---- (1) horneada: purgar huerfanas no se lleva su imagen y el proyecto se guarda ----
+recpurge textures n 0
+deletefile /tmp/w3d_prueba_sr_guardar.w3d
+savew3d /tmp/w3d_prueba_sr_guardar.w3d
+openw3d /tmp/w3d_prueba_sr_guardar.w3d
+selobj ReflectionProbe
+recpurge textures n 0
+savew3d /tmp/w3d_prueba_sr_guardar.w3d
+# ---- ni "borrar igual" desde la biblioteca: la usa la sonda (el aviso dice cual) ----
+recdeleteforced textures textures/reflejo_sondareflejo.png fails
+recdelete textures textures/reflejo_sondareflejo.png fails
+savew3d /tmp/w3d_prueba_sr_guardar.w3d
+# ---- la de tiempo real sigue nombrando la imagen de antes: tampoco se purga ----
+srtype realTime
+recpurge textures n 0
+savew3d /tmp/w3d_prueba_sr_guardar.w3d
+# ---- (2) borrada: ya no esta en la escena, no refleja, y el proyecto se guarda sin ella ----
+delete
+srcount 0
+savew3d /tmp/w3d_prueba_sr_guardar.w3d
+# ---- Ctrl+Z la devuelve: vuelve a contar ----
+undo
+srcount 1
+deletefile /tmp/w3d_prueba_sr_guardar.w3d

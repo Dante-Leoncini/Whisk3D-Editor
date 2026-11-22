@@ -6,19 +6,19 @@
 #include "WhiskUI/draw/glesdraw.h"
 #include "WhiskUI/core/UI.h" // GlobalScale (point sprites relativos)
 #include "WhiskUI/draw/icons.h" // IconSizeGS: el parlante del 3D, del tamano del icono del panel
-#include "ui/W3dColors.h" // W3dColores: colores del editor (ejes de transformacion)
-#include "objects/Mesh.h"          // Mesh + g_meshOverlayHook (hook de overlays)
-#include "objects/RenderColors.h"  // gRenderColors / RC_selActive (color del contorno)
-#include "render/OpcionesRender.h" // g_mostrarOverlays (master de overlays)
+#include "ui/W3dColors.h" // W3dColors: colores del editor (ejes de transformacion)
+#include "objects/Mesh.h"         // Mesh + g_meshOverlayHook (hook de overlays)
+#include "objects/RenderColors.h" // gRenderColors / RC_selActive (color del contorno)
+#include "render/RenderOptions.h" // g_showOverlays (master de overlays)
 #ifndef W3D_SYMBIAN
-#include "GeometriaUI/GeometriaUI.h" // LineaLightVertex/LineaEdge (gizmo de la luz; PC)
-#include "variables.h"               // showOverlayGlobal
+#include "GeometryUI/GeometryUI.h" // LineLightVertex/LineEdge (gizmo de la luz; PC)
+#include "variables.h"             // showOverlayGlobal
 #endif
-#include "W3dRaices.h"               // las otras escenas abiertas: sus iconos tambien
+#include "W3dRoots.h"                // las otras escenas abiertas: sus iconos tambien
 #include "script/W3dScript.h"        // (jugando no: el Play dibuja su base y sus capas)
 
 // angulo (rad) en el vertice p del triangulo p-q-r (pondera la normal de cara en el vertex-normal)
-static float AnguloEnVertice(const float* p, const float* q, const float* r) {
+static float AngleInVertex(const float* p, const float* q, const float* r) {
     float e1x=q[0]-p[0], e1y=q[1]-p[1], e1z=q[2]-p[2];
     float e2x=r[0]-p[0], e2y=r[1]-p[1], e2z=r[2]-p[2];
     float l1=sqrtf(e1x*e1x+e1y*e1y+e1z*e1z), l2=sqrtf(e2x*e2x+e2y*e2y+e2z*e2z);
@@ -29,7 +29,7 @@ static float AnguloEnVertice(const float* p, const float* q, const float* r) {
 }
 
 // dibuja los pares de puntos de 'buf' como GL_LINES con el color de la paleta
-static void DibujarLineasNormales(std::vector<GLfloat>& buf, int colorId) {
+static void DrawLinesNormals(std::vector<GLfloat>& buf, int colorId) {
     if (buf.empty()) return;
     namespace gfx = w3dEngine;
     const float* c = gRenderColors[colorId];
@@ -39,8 +39,8 @@ static void DibujarLineasNormales(std::vector<GLfloat>& buf, int colorId) {
 }
 
 // PRECALCULA las lineas de los 3 overlays de normales en sus buffers (cacheado; se rehace solo
-// si cambia la geometria o el largo L del slider). Antes era Mesh::CalcularOverlayNormales (core).
-static void CalcularOverlayNormales(Mesh* m) {
+// si cambia la geometria o el largo L del slider). Antes era Mesh::ComputeOverlayNormals (core).
+static void ComputeOverlayNormals(Mesh* m) {
     m->overlayLcache = OverlayNormalSize;
     const float L = OverlayNormalSize;
     const int nTri = m->facesSize / 3;
@@ -99,19 +99,19 @@ static void CalcularOverlayNormales(Mesh* m) {
             float bx=p2[0]-p0[0], by=p2[1]-p0[1], bz=p2[2]-p0[2];
             float nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx;
             float ln=sqrtf(nx*nx+ny*ny+nz*nz); if (ln<1e-6f) continue; nx/=ln; ny/=ln; nz/=ln;
-            float w0=AnguloEnVertice(p0,p1,p2), w1=AnguloEnVertice(p1,p0,p2), w2=AnguloEnVertice(p2,p0,p1);
+            float w0=AngleInVertex(p0,p1,p2), w1=AngleInVertex(p1,p0,p2), w2=AngleInVertex(p2,p0,p1);
             acc[i0*3]+=nx*w0; acc[i0*3+1]+=ny*w0; acc[i0*3+2]+=nz*w0;
             acc[i1*3]+=nx*w1; acc[i1*3+1]+=ny*w1; acc[i1*3+2]+=nz*w1;
             acc[i2*3]+=nx*w2; acc[i2*3+1]+=ny*w2; acc[i2*3+2]+=nz*w2;
         }
-        const bool usarRep = ((int)m->posRep.size() == nV);
+        const bool useRep = ((int)m->posRep.size() == nV);
         std::vector<float> sum(nV*3, 0.0f);
         for (int i = 0; i < nV; i++) {
-            int r = usarRep ? m->posRep[i] : i;
+            int r = useRep ? m->posRep[i] : i;
             sum[r*3]+=acc[i*3]; sum[r*3+1]+=acc[i*3+1]; sum[r*3+2]+=acc[i*3+2];
         }
         for (int i = 0; i < nV; i++) {
-            int r = usarRep ? m->posRep[i] : i;
+            int r = useRep ? m->posRep[i] : i;
             if (r != i) continue; // una sola linea por representante de posicion
             float sx=sum[i*3], sy=sum[i*3+1], sz=sum[i*3+2];
             float ln=sqrtf(sx*sx+sy*sy+sz*sz); if (ln<1e-6f) continue; sx/=ln; sy/=ln; sz/=ln;
@@ -122,20 +122,20 @@ static void CalcularOverlayNormales(Mesh* m) {
     }
 }
 
-// overlay de normales (vertex=amarillo / custom=magenta / face=cian). Antes era Mesh::RenderNormales (core).
-static void RenderNormales(Mesh* m) {
+// overlay de normales (vertex=amarillo / custom=magenta / face=cian). Antes era Mesh::RenderNormals (core).
+static void RenderNormals(Mesh* m) {
     if (!OverlayVertexNormal && !OverlayCustomNormal && !OverlayFaceNormal) return;
     if (!m->vertex || !m->faces) return;
     namespace gfx = w3dEngine;
-    if (m->overlayLcache != OverlayNormalSize) CalcularOverlayNormales(m);
+    if (m->overlayLcache != OverlayNormalSize) ComputeOverlayNormals(m);
     gfx::Disable(gfx::Lighting);
     gfx::Disable(gfx::Texture2D);
     gfx::DisableArray(gfx::NormalArray);
     gfx::DisableArray(gfx::ColorArray);
     gfx::DisableArray(gfx::TexCoordArray);
-    if (OverlayFaceNormal)   DibujarLineasNormales(m->normFaceBuf,   RC_normalFace);
-    if (OverlayCustomNormal) DibujarLineasNormales(m->normCustomBuf, RC_normalCustom);
-    if (OverlayVertexNormal) DibujarLineasNormales(m->normVertBuf,   RC_normalVert);
+    if (OverlayFaceNormal)   DrawLinesNormals(m->normFaceBuf,   RC_normalFace);
+    if (OverlayCustomNormal) DrawLinesNormals(m->normCustomBuf, RC_normalCustom);
+    if (OverlayVertexNormal) DrawLinesNormals(m->normVertBuf,   RC_normalVert);
     gfx::VertexPointer3f(0, m->vertex); // no dejar el puntero en un buffer temporal
     gfx::Invalidate();
 }
@@ -144,27 +144,27 @@ static void RenderNormales(Mesh* m) {
 // y dibuja el contorno de seleccion / normales / overlay de edit. Se registra solo al arrancar
 // (struct de abajo); en una app/juego sin editor el hook queda NULL y no se dibuja nada.
 static void MeshOverlayHook(Mesh* m) {
-    if (!g_mostrarOverlays) return;
+    if (!g_showOverlays) return;
     if ((Object*)m == g_editMesh) {
         m->RenderEditOverlay();   // (el X-Ray de la jaula ya lo maneja EditMesh::Render)
-    } else if (m->select && w3dVerSeleccion) {   // "Ver seleccion" OFF (menu Select): sin contorno
-        int cid = ((Object*)m == ObjActivo) ? RC_selActive : RC_selInactive;
+    } else if (m->select && w3dShowSelection) {   // "Ver seleccion" OFF (menu Select): sin contorno
+        int cid = ((Object*)m == ActiveObj) ? RC_selActive : RC_selInactive;
         const float* col = gRenderColors[cid];
-        m->RenderBordes(col, 3.0f, true); // pushBack=true: el contorno se empuja ATRAS (DepthRange), sin adelantar las caras
-        RenderNormales(m);
-    } else if (m->facesSize == 0 && !(m->genValido && m->genVertex && m->genFaces)) {
+        m->RenderBorders(col, 3.0f, true); // pushBack=true: el contorno se empuja ATRAS (DepthRange), sin adelantar las caras
+        RenderNormals(m);
+    } else if (m->facesSize == 0 && !(m->genValid && m->genVertex && m->genFaces)) {
         // malla SIN caras propias NI malla generada (un wireframe suelto, no un perfil de modificador): dibuja sus
         // bordes como OVERLAY del editor asi no queda invisible en modo objeto (sino no hay forma de saber que hay
         // algo). Es overlay -> NO sale en el render final. Los verts sueltos no se dibujan (ok, alcanza con lineas).
         // Con malla generada (ej. Screw) NO se dibuja el perfil: en modo objeto solo se ve el resultado (como Blender).
-        m->RenderBordes(gRenderColors[RC_wireframe], 1.5f, false);
+        m->RenderBorders(gRenderColors[RC_wireframe], 1.5f, false);
     }
 }
 struct MeshOverlayHookReg { MeshOverlayHookReg() { g_meshOverlayHook = MeshOverlayHook; } };
 static MeshOverlayHookReg g_meshOverlayHookReg;
 
 #ifndef W3D_SYMBIAN
-// NOTA: la luz se representa con (a) su ICONO (RenderIcons3D/DibujarIcono3D) y (b) la LINEA al piso
+// NOTA: la luz se representa con (a) su ICONO (RenderIcons3D/DrawIcon3D) y (b) la LINEA al piso
 // (RenderLightLines), ambos con color de seleccion y gateados por el toggle "Lights". El viejo hook dibujaba
 // ADEMAS una linea local (0,0,0 -> 0,-3,0) que quedaba mal/redundante -> se quito. Sin registrar
 // el hook, Light::RenderObject no dibuja ninguna linea extra (g_lightOverlayHook queda NULL).
@@ -179,14 +179,14 @@ void RenderLinkLines(Object* obj){
     static int slot = 0;
     for (size_t c = 0; c < obj->Childrens.size(); c++) {
         Object* objChild = obj->Childrens[c];
-        if (!objChild->visible || !objChild->showRelantionshipsLines ) continue;
-        if (objChild->getType() == ObjectType::ui || objChild->getType() == ObjectType::texto2d ||
-            objChild->getType() == ObjectType::imagen2d ||
+        if (!objChild->visible || !objChild->showRelationshipsLines ) continue;
+        if (objChild->getType() == ObjectType::ui || objChild->getType() == ObjectType::text2d ||
+            objChild->getType() == ObjectType::image2d ||
             objChild->getType() == ObjectType::rect2d ||
             objChild->getType() == ObjectType::cont2d ||
             objChild->getType() == ObjectType::slice9 ||
-            objChild->getType() == ObjectType::boton2d ||
-            objChild->getType() == ObjectType::expandir2d ||
+            objChild->getType() == ObjectType::button2d ||
+            objChild->getType() == ObjectType::expand2d ||
             objChild->getType() == ObjectType::video2d) continue; // sin linea de parent para la UI 2D
         // Culling se comporta como Collection: es un contenedor ESTRUCTURAL (agrupa 100s de props para
         // cullear), no una relacion padre-hijo real -> no dibuja lineas a sus hijos (sino satura el editor).
@@ -200,16 +200,16 @@ void RenderLinkLines(Object* obj){
             v[3] = b.x; v[4] = b.y; v[5] = b.z;
 
             Vector3 diff = b - a;
-            GLfloat distancia = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+            GLfloat distance = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
 
-            lineUV[3] = distancia*8;
-            W3dDrawLinesF(v, LineaEdge, LineaEdgeSize);
+            lineUV[3] = distance*8;
+            W3dDrawLinesF(v, LineEdge, LineEdgeSize);
         }
         RenderLinkLines(objChild);
     }
 }
 
-void DibujarOrigen(Object* obj){
+void DrawOrigin(Object* obj){
     if (!obj->visible) return;
     if (obj->getType() == ObjectType::ui) return;   // la UI no vive en el 3D: ni ella ni sus hijos 2D
 
@@ -219,12 +219,12 @@ void DibujarOrigen(Object* obj){
     obj->GetMatrix(local);
     w3dEngine::MultMatrix(local.m);
 
-    if (obj->select || obj == ObjActivo){
-        if (obj == ObjActivo){
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+    if (obj->select || obj == ActiveObj){
+        if (obj == ActiveObj){
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
         }
         else {
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
         }
         w3dEngine::DrawPoints(1);
     }
@@ -234,7 +234,7 @@ void DibujarOrigen(Object* obj){
         w3dEngine::Rotatef(obj->rotZ, 0, 1, 0);
         w3dEngine::Rotatef(obj->rotY, 0, 0, 1);*/
         for (size_t c = 0; c < obj->Childrens.size(); c++) {
-            DibujarOrigen(obj->Childrens[c]);
+            DrawOrigin(obj->Childrens[c]);
         }
     }
     w3dEngine::PopMatrix();
@@ -254,7 +254,7 @@ void RenderOrigins(){
     w3dEngine::Enable(w3dEngine::PointSprite);
     w3dEngine::PointSize(8 * GlobalScale); // origen: 8 relativo a la UI
     for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-        DibujarOrigen(SceneCollection->Childrens[c]);
+        DrawOrigin(SceneCollection->Childrens[c]);
     }
     w3dEngine::PointSpriteCoordReplace(false);
     w3dEngine::Disable(w3dEngine::PointSprite);
@@ -263,12 +263,12 @@ void RenderOrigins(){
 // visible considerando TODOS los ancestros (ocultar la coleccion
 // VISTA LOCAL ("/"): lo que no esta aislado tampoco muestra su icono ni sus lineas (Objects.cpp: g_localView*)
 #include <set>
-extern bool g_localViewActivo;
-extern const std::set<Object*>* g_localViewVisibles;
-static bool FueraDeVistaLocal(Object* o) { return g_localViewActivo && g_localViewVisibles && !g_localViewVisibles->count(o); }   // (los padres de paso tampoco)
+extern bool g_localViewActive;
+extern const std::set<Object*>* g_visibleLocalView;
+static bool OutsideViewLocal(Object* o) { return g_localViewActive && g_visibleLocalView && !g_visibleLocalView->count(o); }   // (los padres de paso tampoco)
 
 // tambien oculta la linea de la lampara al piso)
-static bool VisibleEnArbol(Object* o) {
+static bool VisibleInTree(Object* o) {
     while (o) {
         if (!o->visible) return false;
         o = o->Parent;
@@ -281,11 +281,11 @@ static bool VisibleEnArbol(Object* o) {
 //        piso, 10 m. FOCO: su cono (8 aristas y el circulo del borde) del largo de su distancia. PUNTUAL: la esfera
 //        de su distancia (tres circulos). El cono y la esfera, solo con la luz seleccionada ('sel').
 // Pool propio rotativo (como el de las lineas: el driver puede leer tarde)
-static void DibujarGuiaLuz(Light* L, bool sel) {
-    const bool foco = !L->direccional && L->spotCutoff < 179.5f;
-    const bool punto = !L->direccional && !foco;
-    if (!L->direccional && !sel) return;
-    if (punto && L->distancia <= 0.0f) return;   // (sin limite: no hay esfera que mostrar)
+static void DrawGuideLight(Light* L, bool sel) {
+    const bool focus = !L->directional && L->spotCutoff < 179.5f;
+    const bool point = !L->directional && !focus;
+    if (!L->directional && !sel) return;
+    if (point && L->distance <= 0.0f) return;   // (sin limite: no hay esfera que mostrar)
     static GLfloat pool[8][192 * 3];
     static int slot = 0;
     GLfloat* v = pool[slot]; slot = (slot + 1) % 8;
@@ -294,14 +294,14 @@ static void DibujarGuiaLuz(Light* L, bool sel) {
     Vector3 ex(W.m[0], W.m[1], W.m[2]), ey(W.m[4], W.m[5], W.m[6]), ez(W.m[8], W.m[9], W.m[10]);
     ex = ex.Normalized(); ey = ey.Normalized(); ez = ez.Normalized();
     int n = 0;
-    if (L->direccional) {   // SOL: alumbra hacia su -Y local, hasta cortar el piso
-        float largo = 10.0f;
-        if (ey.y > 0.02f && p.y > 0.0f) { largo = p.y / ey.y; if (largo > 1000.0f) largo = 1000.0f; }
+    if (L->directional) {   // SOL: alumbra hacia su -Y local, hasta cortar el piso
+        float length = 10.0f;
+        if (ey.y > 0.02f && p.y > 0.0f) { length = p.y / ey.y; if (length > 1000.0f) length = 1000.0f; }
         v[0] = p.x; v[1] = p.y; v[2] = p.z;
-        v[3] = p.x - ey.x * largo; v[4] = p.y - ey.y * largo; v[5] = p.z - ey.z * largo;
+        v[3] = p.x - ey.x * length; v[4] = p.y - ey.y * length; v[5] = p.z - ey.z * length;
         n = 2;
-    } else if (punto) {     // PUNTUAL: la esfera de su distancia (en el mundo: no la deforma la escala del objeto)
-        const float r = L->distancia;
+    } else if (point) {     // PUNTUAL: la esfera de su distancia (en el mundo: no la deforma la escala del objeto)
+        const float r = L->distance;
         const int N = 32;
         for (int pl = 0; pl < 3; pl++)
             for (int i = 0; i < N; i++) {
@@ -315,10 +315,10 @@ static void DibujarGuiaLuz(Light* L, bool sel) {
             }
     } else {       // FOCO: hacia su -Z local, el cono de 'spotCutoff' grados
         // el largo del cono: su DISTANCIA en metros (hasta donde alumbra); sin limite (0), un cono corto de 2 m
-        float largo = L->distancia > 0.0f ? L->distancia : 2.0f; if (largo < 0.05f) largo = 0.05f; if (largo > 1000.0f) largo = 1000.0f;
+        float length = L->distance > 0.0f ? L->distance : 2.0f; if (length < 0.05f) length = 0.05f; if (length > 1000.0f) length = 1000.0f;
         float ang = L->spotCutoff; if (ang > 85.0f) ang = 85.0f;
-        const float r = largo * tanf(ang * 3.14159265f / 180.0f);
-        const Vector3 c(p.x - ez.x * largo, p.y - ez.y * largo, p.z - ez.z * largo);
+        const float r = length * tanf(ang * 3.14159265f / 180.0f);
+        const Vector3 c(p.x - ez.x * length, p.y - ez.y * length, p.z - ez.z * length);
         for (int i = 0; i < 24; i++) {
             const float a0 = i * (6.2831853f / 24.0f), a1 = (i + 1) * (6.2831853f / 24.0f);
             const float c0 = cosf(a0) * r, s0 = sinf(a0) * r, c1 = cosf(a1) * r, s1 = sinf(a1) * r;
@@ -346,14 +346,14 @@ void RenderLightLines(){
     w3dEngine::DisableArray(w3dEngine::TexCoordArray);
     w3dEngine::LineWidth(1);
     for (size_t l = 0; l < Lights.size(); l++) {
-        if (!VisibleEnArbol(Lights[l]) || FueraDeVistaLocal(Lights[l])) continue;
+        if (!VisibleInTree(Lights[l]) || OutsideViewLocal(Lights[l])) continue;
         // mismo esquema de color que el icono de la luz
-        if (Lights[l] == (Light*)ObjActivo && Lights[l]->select)
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+        if (Lights[l] == (Light*)ActiveObj && Lights[l]->select)
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
         else if (Lights[l]->select)
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
         else
-            SetColorID(ColorID::grisUI, 0.7f);
+            SetColorID(ColorID::grayUI, 0.7f);
         Vector3 p = Lights[l]->GetGlobalPosition();
         GLfloat* v = pool[slot];
         slot = (slot + 1) % 16;
@@ -361,13 +361,13 @@ void RenderLightLines(){
         v[3] = p.x; v[4] = 0.0f; v[5] = p.z;
         w3dEngine::VertexPointer3f(0, v);
         w3dEngine::DrawLines(2);
-        DibujarGuiaLuz(Lights[l], Lights[l]->select);   // (el cono y la esfera, solo de la SELECCIONADA; la linea del sol, siempre)
+        DrawGuideLight(Lights[l], Lights[l]->select);   // (el cono y la esfera, solo de la SELECCIONADA; la linea del sol, siempre)
     }
     w3dEngine::EnableArray(w3dEngine::TexCoordArray);
 }
 
-void DibujarIcono3D(Object* obj){
-    if (!obj->visible || FueraDeVistaLocal(obj)) return;
+void DrawIcon3D(Object* obj){
+    if (!obj->visible || OutsideViewLocal(obj)) return;
 
     w3dEngine::PushMatrix();
     Matrix4 local;                 // LOCAL, no obj->M: ver el comentario de 'M' en Objects.h
@@ -376,12 +376,12 @@ void DibujarIcono3D(Object* obj){
 
     extern bool g_showLights; // toggle "Lights" del submenu "Objects": oculta tambien el icono de la luz
     if (obj->getType() == ObjectType::light && g_showLights){
-        if (ObjActivo == obj && obj->select)
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+        if (ActiveObj == obj && obj->select)
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
         else if (obj->select)
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
         else
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+            w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::grayUI)]);
         w3dEngine::DrawPoints(1);
     }
 
@@ -390,58 +390,58 @@ void DibujarIcono3D(Object* obj){
         w3dEngine::Rotatef(obj->rotZ, 0, 1, 0);
         w3dEngine::Rotatef(obj->rotY, 0, 0, 1);*/
         for (size_t c = 0; c < obj->Childrens.size(); c++) {
-            DibujarIcono3D(obj->Childrens[c]);
+            DrawIcon3D(obj->Childrens[c]);
         }
     }
     w3dEngine::PopMatrix();
 }
 
-// el PARLANTE de los objetos Sonido: el mismo punto con icono que la lampara de las luces (parlante.png del skin)
-static void DibujarIconoSonido3D(Object* obj){
-    if (!obj->visible || FueraDeVistaLocal(obj)) return;
+// el PARLANTE de los objetos Sonido: el mismo punto con icono que la lampara de las luces (speaker.png del skin)
+static void DrawIconSound3D(Object* obj){
+    if (!obj->visible || OutsideViewLocal(obj)) return;
     w3dEngine::PushMatrix();
     Matrix4 local; obj->GetMatrix(local);
     w3dEngine::MultMatrix(local.m);
-    if (obj->getType() == ObjectType::sonido){
-        if (ObjActivo == obj && obj->select)  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
-        else if (obj->select)                 w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
-        else                                  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+    if (obj->getType() == ObjectType::sound){
+        if (ActiveObj == obj && obj->select)  w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
+        else if (obj->select)                 w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
+        else                                  w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::grayUI)]);
         w3dEngine::DrawPoints(1);
     }
-    for (size_t c = 0; c < obj->Childrens.size(); c++) DibujarIconoSonido3D(obj->Childrens[c]);
+    for (size_t c = 0; c < obj->Childrens.size(); c++) DrawIconSound3D(obj->Childrens[c]);
     w3dEngine::PopMatrix();
 }
-// la SONDA DE LUZ: su icono (sonda.png del skin, una esfera con su brillo). Seleccionada dibuja ademas su caja y sus
-// esferas (objects/SondaLuz.cpp)
-static void DibujarIconoSonda3D(Object* obj){
-    if (!obj->visible || FueraDeVistaLocal(obj)) return;
+// la SONDA DE LUZ: su icono (probe.png del skin, una esfera con su brillo). Seleccionada dibuja ademas su caja y sus
+// esferas (objects/LightProbe.cpp)
+static void DrawIconProbe3D(Object* obj){
+    if (!obj->visible || OutsideViewLocal(obj)) return;
     w3dEngine::PushMatrix();
     Matrix4 local; obj->GetMatrix(local);
     w3dEngine::MultMatrix(local.m);
     if (obj->getType() == ObjectType::sondaluz || obj->getType() == ObjectType::sondareflejo){
-        if (ObjActivo == obj && obj->select)  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
-        else if (obj->select)                 w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
-        else                                  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+        if (ActiveObj == obj && obj->select)  w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
+        else if (obj->select)                 w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
+        else                                  w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::grayUI)]);
         w3dEngine::DrawPoints(1);
     }
-    for (size_t c = 0; c < obj->Childrens.size(); c++) DibujarIconoSonda3D(obj->Childrens[c]);
+    for (size_t c = 0; c < obj->Childrens.size(); c++) DrawIconProbe3D(obj->Childrens[c]);
     w3dEngine::PopMatrix();
 }
-static unsigned int TexSonda(){
-    static bool probado = false; static unsigned int id = 0;
-    if (!probado){
-        probado = true;
+static unsigned int TexProbe(){
+    static bool tested = false; static unsigned int id = 0;
+    if (!tested){
+        tested = true;
         extern std::string g_skinDir;
-        if (!w3dEngine::LoadTexture((g_skinDir + "sonda.png").c_str(), id)) id = 0;
+        if (!w3dEngine::LoadTexture((g_skinDir + "probe.png").c_str(), id)) id = 0;
     }
     return id;
 }
-static unsigned int TexParlante(){
-    static bool probado = false; static unsigned int id = 0;
-    if (!probado){
-        probado = true;
+static unsigned int TexSpeaker(){
+    static bool tested = false; static unsigned int id = 0;
+    if (!tested){
+        tested = true;
         extern std::string g_skinDir;
-        if (!w3dEngine::LoadTexture((g_skinDir + "parlante.png").c_str(), id)) id = 0;
+        if (!w3dEngine::LoadTexture((g_skinDir + "speaker.png").c_str(), id)) id = 0;
     }
     return id;
 }
@@ -461,16 +461,16 @@ void RenderIcons3D(){
     w3dEngine::PointSize(16 * GlobalScale); // iconos de 16 relativos a la UI
 
     // (las OTRAS escenas abiertas en el editor tambien: se ven y se eligen junto a la activa)
-    std::vector<Object*> raices(1, (Object*)SceneCollection);
-    if (!W3dScriptHayPartida()) {
-        std::vector<Object*> otras;
-        W3dRaicesOtrasVisibles(otras);
-        raices.insert(raices.end(), otras.begin(), otras.end());
+    std::vector<Object*> roots(1, (Object*)SceneCollection);
+    if (!W3dScriptHasSession()) {
+        std::vector<Object*> other;
+        W3dOtherVisibleRoots(other);
+        roots.insert(roots.end(), other.begin(), other.end());
     }
-    for (size_t r = 0; r < raices.size(); r++) DibujarIcono3D(raices[r]);
+    for (size_t r = 0; r < roots.size(); r++) DrawIcon3D(roots[r]);
     // los SONIDOS (overlay "Sounds"): su parlante
-    { extern bool g_showSonidos;
-      const unsigned int tp = g_showSonidos ? TexParlante() : 0;
+    { extern bool g_showSounds;
+      const unsigned int tp = g_showSounds ? TexSpeaker() : 0;
       if (tp){
           // el MISMO tamano y la misma nitidez que el icono del panel: el icono (10 de los 16 del png) a IconSizeGS
           w3dEngine::BindTexture(tp);
@@ -478,17 +478,17 @@ void RenderIcons3D(){
           w3dEngine::TexFilter(false);
 #endif
           w3dEngine::PointSize((float)IconSizeGS * 16.0f / 10.0f);
-          for (size_t r = 0; r < raices.size(); r++) DibujarIconoSonido3D(raices[r]);
+          for (size_t r = 0; r < roots.size(); r++) DrawIconSound3D(roots[r]);
       } }
-    // las SONDAS DE LUZ: su icono (la caja y las esferas, solo seleccionada: SondaLuz::RenderObject)
-    { const unsigned int ts = TexSonda();
+    // las SONDAS DE LUZ: su icono (la caja y las esferas, solo seleccionada: LightProbe::RenderObject)
+    { const unsigned int ts = TexProbe();
       if (ts){
           w3dEngine::BindTexture(ts);
 #ifndef W3D_SYMBIAN
           w3dEngine::TexFilter(false);
 #endif
           w3dEngine::PointSize((float)IconSizeGS * 16.0f / 10.0f);
-          for (size_t r = 0; r < raices.size(); r++) DibujarIconoSonda3D(raices[r]);
+          for (size_t r = 0; r < roots.size(); r++) DrawIconProbe3D(roots[r]);
       } }
 
     w3dEngine::PointSpriteCoordReplace(false);

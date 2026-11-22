@@ -40,7 +40,7 @@ struct Config {
     // false = usuario EXPERIMENTADO (atajos de teclado, menos cosas en pantalla): oculta la barra de
     // HERRAMIENTAS de abajo del viewport 3D. Default: visible en PC/Android/Web; oculta en Symbian
     // (el N95 va a teclas; un N8 tactil puede prenderla por config).
-    bool nuevoUsuario;
+    bool newUser;
     // AUTO KEY (el boton rojo del timeline): es un MODO DE TRABAJO del editor, no dato del
     // proyecto. Grabar o no grabar mientras transformas es como estar en modo insercion: el
     // que lo usa lo quiere prendido SIEMPRE, en cualquier proyecto que abra, y el que no, nunca.
@@ -59,17 +59,17 @@ struct Config {
     // EL TECLADO EN PANTALLA (Ajustes > "Use system keyboard"). false (default) = los de Whisk3D en TODOS lados: el
     // QWERTY para texto y el numerico para numeros. true = el del sistema (Android) en todos lados. Antes cada campo
     // elegia por su cuenta (el nombre de un layout salia con el del sistema y el resto con el de Whisk3D)
-    bool tecladoSistema;
+    bool keyboardSystem;
     Config()
         : fullscreen(false), enableAntialiasing(false), mipmaps(true),
           width(800), height(600), displayIndex(0),
 #ifdef W3D_SYMBIAN
-          scale(1), nuevoUsuario(false),   // N95: UI a escala 1 (240x320) + usuario experimentado (va a teclas)
+          scale(1), newUser(false),   // N95: UI a escala 1 (240x320) + usuario experimentado (va a teclas)
 #else
-          scale(3), nuevoUsuario(true),
+          scale(3), newUser(true),
 #endif
           autoKey(false),
-          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath(""), logs(3), tecladoSistema(false) {}
+          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath(""), logs(3), keyboardSystem(false) {}
 };
 extern Config cfg;
 
@@ -89,10 +89,10 @@ struct Viewpoint {
 };
 
 enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
-// InteractionMode (ObjectMode/EditMode/PoseMode...) y estado (editNavegacion/rotacion...) se
+// InteractionMode (ObjectMode/EditMode/PoseMode...) y estado (editNavigation/rotacion...) se
 // declaran en el MOTOR: base/W3dInteractionState.h (incluido arriba).
 enum { pointLight, sunLight };
-enum { Orbit, Fly, Apuntar };
+enum { Orbit, Fly, Point };
 enum { vertexSelect, edgeSelect, faceSelect };
 // X/Y/Z = constreñido a un eje; XYZ/ViewAxis = libre (3 ejes); PlaneX/Y/Z =
 // constreñido a un PLANO (Shift+eje: mueve en los OTROS dos, excluye ese eje).
@@ -105,9 +105,9 @@ typedef enum { X, Y, Z, XYZ, ViewAxis, PlaneX, PlaneY, PlaneZ, OrbitalAxis } Axi
 typedef enum { GlobalOrient, LocalOrient, ViewOrient, NormalOrient } TransformOrient;
 
 // barra de HERRAMIENTAS (abajo del viewport 3D): ids del historial de acciones (MRU, max 8,
-// separado por modo objeto/edicion). ToolbarRegistrarAccion la llaman los starters (G/R/S/E...).
+// separado por modo objeto/edicion). ToolbarRegisterAction la llaman los starters (G/R/S/E...).
 enum { TBMove, TBRotate, TBScale, TBExtrude, TBLoopCut, TBDelete };
-void ToolbarRegistrarAccion(int id); // def en ViewPort3D.cpp
+void ToolbarRegisterAction(int id); // def en ViewPort3D.cpp
 
 // Declaraciones de variables (extern)
 extern int axisSelect;
@@ -123,8 +123,8 @@ extern int nextLightId;
 extern float angle;
 // true = recien arranco un transform (G/R/S/extrude): el primer motion debe IGNORAR el
 // delta dx/dy (que todavia es del frame anterior) para que el transform arranque en CERO
-extern bool g_xformPrimerMov;
-extern int navegacionMode;
+extern bool g_xformFirstMov;
+extern int navigationMode;
 extern std::string w3dPath;
 extern std::string exeDir;
 
@@ -145,8 +145,8 @@ extern bool showOverlayGlobal;
 extern bool g_showLights;
 extern bool g_showCamera;
 extern bool g_showEmpty;
-extern bool g_showParticulas; // gizmo (flecha) de los emisores de particulas (overlay "Objects")
-extern bool g_showCurvas;     // linea de las curvas/rieles (overlay "Objects")
+extern bool g_showParticles; // gizmo (flecha) de los emisores de particulas (overlay "Objects")
+extern bool g_showCurves;    // linea de las curvas/rieles (overlay "Objects")
 extern bool ViewFromCameraActiveGlobal;
 extern Vector3 camRight;
 extern Vector3 camUp;
@@ -157,9 +157,9 @@ extern GLshort mouseX;
 extern GLshort mouseY;
 extern bool mouseVisible;
 extern int ShiftCount;
-extern int valorRotacion;
-extern float gAnguloTransform; // angulo acumulado durante una rotacion (display)
-extern int NumTexturasWhisk3D;
+extern int valueRotation;
+extern float gAngleTransform; // angulo acumulado durante una rotacion (display)
+extern int NumTexturesWhisk3D;
 
 #ifndef W3D_SYMBIAN
 // Cursores SDL

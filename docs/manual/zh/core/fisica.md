@@ -5,7 +5,7 @@
 - **W3dFisica：** 轴对齐盒子的速度和反弹。仅此而已。
 - **W3dRigido：** 带质量的有向盒子、重力、带摩擦和反弹的冲量、射线检测和接触事件。
 - **W3dColMalla：** 在场景的三角形上行走（斜坡、台阶），并让墙壁挡住去路；使用一个栅格，避免逐一检查成千上万个三角形。
-- **W3dHitbox：** 只发出通知的盒子（`alEntrar`、`alQuedarse`、`alSalir`、`alTocar`）。
+- **W3dHitbox：** 只发出通知的盒子（`onEnter`、`onRemain`、`onExit`、`onTouch`）。
 - **W3dRagdoll：** 布娃娃，以及双骨骼反向动力学和 FABRIK。
 - **W3dNav：** 在地面栅格上从一点到另一点的路径（先用 A*，再做路径拉直）。
 

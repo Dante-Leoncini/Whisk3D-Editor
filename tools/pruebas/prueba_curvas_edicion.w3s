@@ -2,7 +2,7 @@
 # rango de frames; Ctrl+Z; sobreviven a guardar y reabrir), los HANDLES (Vista > Mostrar handles, le ganan al gizmo,
 # el dedo los edita, escalar en Y los aplasta), la tarjeta de AJUSTAR la ultima operacion del timeline y la SELECCION
 # MULTIPLE de las tarjetas Curva y Keyframes.
-ventana 1280 720
+window 1280 720
 add cube
 frame 1
 keychan 0 0
@@ -13,7 +13,7 @@ frame 20
 objmove -10 0 0
 keychan 0 0
 frame 1
-curvasedicion armar
-guardarw3d /tmp/w3d_curvas_edicion.w3d
-abrirw3d /tmp/w3d_curvas_edicion.w3d
-curvasedicion leida
+curvesedit armar
+savew3d /tmp/w3d_curvas_edicion.w3d
+openw3d /tmp/w3d_curvas_edicion.w3d
+curvesedit read

@@ -19,7 +19,7 @@
     #ifndef _WIN32
     #include <GL/glext.h>
     #endif
-    #include "WhiskUI/theme/colores.h"
+    #include "WhiskUI/theme/colors.h"
     //para leer el archivo de texto
     #include <fstream>
     #include <sstream>
@@ -43,7 +43,7 @@ class Curve : public Object {
         int vertexSize;   // (inicializados en el constructor: C++03)
         GLfloat* vertex;
         GLushort* indices;
-        std::string origen; // archivo del que se cargo (LoadFromFile lo setea; lo
+        std::string origin; // archivo del que se cargo (LoadFromFile lo setea; lo
                             // guarda el .w3d para poder recargar la curva al abrir)
 
         // ---- CANALES OPCIONALES POR NODO (riel de camara) --------------------
@@ -54,14 +54,14 @@ class Curve : public Object {
         // 6). Un .cap sin ellas deja los dos punteros en NULL y todo se comporta como
         // siempre; un motor viejo las ignora (ya se saltea toda linea que no sea 'p').
         // Los consume Camera cuando esta en modo "mirada del riel".
-        GLfloat* rotNodo;   // 3 por nodo (pitch, yaw, roll) o NULL
-        GLfloat* fovNodo;   // 1 por nodo o NULL
+        GLfloat* rotNode;   // 3 por nodo (pitch, yaw, roll) o NULL
+        GLfloat* fovNode;   // 1 por nodo o NULL
 
         // ---- CONVENCION DE EJES DEL ARCHIVO ----------------------------------
         // Un .cap puede declarar en que mano viene autoreado, con una linea
         // OPCIONAL despues del `count`:
-        //     ejes x y z      -> ya viene en el espacio del motor (signoZ = +1)
-        //     ejes x y -z     -> viene con la Z al reves (signoZ = -1)
+        //     ejes x y z      -> ya viene en el espacio del motor (signZ = +1)
+        //     ejes x y -z     -> viene con la Z al reves (signZ = -1)
         // Sin esa linea el default es -1 POR COMPATIBILIDAD: el cargador negaba la
         // Z de todo nodo incondicionalmente, sin forma de apagarlo, porque el unico
         // productor historico de .cap autoreaba en un espacio de mano contraria.
@@ -74,11 +74,11 @@ class Curve : public Object {
         // archivo y las dos formulas lo leen de aca, en vez de ser un acuerdo tacito
         // entre dos cuentas escritas en dos archivos distintos.
         //
-        // CONVENCION DEL CANAL 'r' (en el espacio del motor, o sea con signoZ = +1):
+        // CONVENCION DEL CANAL 'r' (en el espacio del motor, o sea con signZ = +1):
         //     forward = ( -sin(yaw)*cos(pitch),  sin(pitch),  -cos(yaw)*cos(pitch) )
         //     roll    = giro sobre ese eje
         // es decir: yaw 0 mira hacia -Z, yaw +90 hacia -X, y pitch positivo levanta.
-        float signoZ;       // +1 = espacio del motor; -1 = Z espejada
+        float signZ;       // +1 = espacio del motor; -1 = Z espejada
 
         // ---- ENCUADRE AUTORAL DEL RIEL ---------------------------------------
         // Cabecera OPCIONAL (va suelta, como `ejes`):
@@ -88,7 +88,7 @@ class Curve : public Object {
         // camara que viaja por este riel no declara un `aspecto:` propio, el modo
         // juego encuadra el render a ESTE aspecto (letterbox/pillarbox) en vez de
         // usar el del render/ventana. 0 = el .cap no lo declara (todo como antes).
-        float aspecto;
+        float aspect;
 
         Curve(Object* parent = NULL, Vector3 pos = Vector3(0,0,0));
 
@@ -101,8 +101,8 @@ class Curve : public Object {
         // FOCO/ENCUADRE ('.' / Frame Selected): centro y radio del bounding de los NODOS.
         // Sin esto el encuadre usaba el origen del objeto (radio 0) y un riel de 1000
         // unidades "se encuadraba" a la nada (queja del dueno: "funciona muy mal").
-        Vector3 PuntoFoco() const W3D_OVERRIDE;
-        float   RadioFoco() const W3D_OVERRIDE;
+        Vector3 PointFocus() const W3D_OVERRIDE;
+        float   FocusRadius() const W3D_OVERRIDE;
 
         // ---- GRAFO DE RAMAS (pedido del dueno: "el riel puede tener ramificaciones... todos
         // los path de crash en un solo objeto") -------------------------------------------
@@ -111,18 +111,18 @@ class Curve : public Object {
         // crea ramas, borrar un nodo separa sub-paths. Una RAMA = componente conexa; el
         // modificador Oclusion puede filtrar que ramas participan del nodo-mas-cercano (la
         // rama del bonus no sirve al nivel principal y viceversa).
-        std::vector<GLushort> aristas;
-        std::vector<int> ramaDeNodo;   // (derivado, no se serializa) componente conexa de cada nodo
-        int nRamas;                    // cantidad de ramas (componentes)
+        std::vector<GLushort> edges;
+        std::vector<int> nodeBranch;   // (derivado, no se serializa) componente conexa de cada nodo
+        int nBranches;                 // cantidad de ramas (componentes)
         // MALLA DE EDICION INTERNA (parte de la curva, NO un objeto de escena: no se puede
         // seleccionar, ni borrar, ni aparece en el outliner -- muere con la curva). Al entrar
         // a Edit Mode sobre la curva, g_editMesh apunta ACA y toda la maquinaria de edicion
         // de mallas (G/E, vertices/aristas) opera sobre ella; al salir, los nodos vuelven.
-        Mesh* edicion;                 // NULL hasta la primera edicion; delete en ~Curve
-        void RecalcularRamas();        // rehace ramaDeNodo/nRamas (llamar tras cargar/editar)
-        // nodo mas cercano CONSIDERANDO solo las ramas habilitadas (ramasOn[rama] != 0);
+        Mesh* edit;                        // NULL hasta la primera edicion; delete en ~Curve
+        void RecalculateBranches();        // rehace nodeBranch/nBranches (llamar tras cargar/editar)
+        // nodo mas cercano CONSIDERANDO solo las ramas habilitadas (branchesOn[rama] != 0);
         // NULL o vacio = todas. Lineal (~1000 nodos = trivial, tambien en el N95).
-        int FindNearestFiltrado(const Vector3& target, const std::vector<char>* ramasOn) const;
+        int FindNearestFiltered(const Vector3& target, const std::vector<char>* branchesOn) const;
 
         bool LoadFromFile(const std::string& filepath);
 
@@ -134,24 +134,24 @@ class Curve : public Object {
         KDNode* BuildKDTreeRecursive(std::vector<int>& indices, int depth);
         int FindNearest(const Vector3& target) const;
 
-        // ---- LISTA DE CARGA (streaming por riel, io/W3dRecursos.h) ----------
+        // ---- LISTA DE CARGA (streaming por riel, io/W3dResources.h) ----------
         // El sidecar `<riel>.cargas.json` (formato/cargas-json.md) trae, por
         // DIRECCION, que recursos adquiere cada nodo al cruzarse. Se declara:
         //     Curve { filePath: "riel.cap"  ListaCarga { filePath: "riel.cargas.json" } }
-        // CargarListaCarga parsea el JSON y registra las filas en el almacen;
-        // el juego avisa los cruces con W3dCargasCruzarNodo(cargasHandle, ...).
-        int         cargasHandle;   // -1 = sin lista de carga
-        std::string cargasArchivo;  // el sidecar declarado (para el guardado)
-        bool CargarListaCarga(const std::string& ruta);
+        // LoadLoadList parsea el JSON y registra las filas en el almacen;
+        // el juego avisa los cruces con W3dLoadsCrossNode(loadsHandle, ...).
+        int         loadsHandle;  // -1 = sin lista de carga
+        std::string loadsFile;    // el sidecar declarado (para el guardado)
+        bool LoadLoadList(const std::string& path);
 
         // true si el .cap traia el canal de rotacion por nodo
-        bool TieneRotacion() const { return rotNodo != NULL && vertexSize > 0; }
+        bool HasRotation() const { return rotNode != NULL && vertexSize > 0; }
 
         // Rotacion (y fov) del riel en el indice fraccionario 'indice', interpolando
         // entre nodo y nodo POR ARCO CORTO (los 0/360 del yaw cruzan seguido: un lerp
         // crudo hace girar la camara entera en un frame). 'fovOut' puede ser NULL.
         // Devuelve false si la curva no trae rotacion (y no toca las salidas).
-        bool RotacionEnNodo(float indice, Vector3* pitchYawRoll, float* fovOut) const;
+        bool RotationInNode(float index, Vector3* pitchYawRoll, float* fovOut) const;
 };
 
 #endif

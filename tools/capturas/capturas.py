@@ -4,7 +4,7 @@ Capturas de los tutoriales y del manual de Whisk3D.
 
 Cada RECETA (recetas.py) maneja el editor como una persona: toca, arrastra, gira la
 rueda y aprieta teclas con eventos reales (los comandos raton/dedo/rueda/tecla del
-harness, main/test/W3dCapturas.cpp) y saca fotos con 'uishot'. Todo corre con
+harness, main/test/W3dCaptures.cpp) y saca fotos con 'uishot'. Todo corre con
 'whisk3d --script', sin abrir ninguna ventana. Despues se le dibuja encima el dedo,
 el puntero o la tecla apretada, y se arma la imagen final: un .webp quieto o animado
 en bucle.
@@ -35,7 +35,7 @@ BIN = os.environ.get("W3D_BIN", os.path.join(RAIZ, "platform", "linux", "build",
 SALIDA = os.path.join(RAIZ, "docs", "manual", "{idioma}", "tutoriales", "img")
 
 # el idioma de la interfaz sale del sistema (W3dIdiomaDetectar): se le pasa por LANG. Son los 9 del editor
-# (res/idiomas/); las paginas en otros idiomas (hindi, japones, chino) muestran las capturas en ingles.
+# (res/languages/); las paginas en otros idiomas (hindi, japones, chino) muestran las capturas en ingles.
 IDIOMAS = {"es": "es_AR.UTF-8", "en": "en_US.UTF-8", "pt": "pt_BR.UTF-8", "fr": "fr_FR.UTF-8", "it": "it_IT.UTF-8",
            "tr": "tr_TR.UTF-8", "de": "de_DE.UTF-8", "pl": "pl_PL.UTF-8", "ru": "ru_RU.UTF-8"}
 
@@ -50,13 +50,13 @@ _TRADUCCIONES = {}
 
 
 def T(idioma, en):
-    """Lo que muestra el editor en ese idioma para el texto en ingles 'en' (res/idiomas/<idioma>.txt, la misma tabla
+    """Lo que muestra el editor en ese idioma para el texto en ingles 'en' (res/languages/<idioma>.txt, la misma tabla
     que usa T() en el editor). Sirve para los nombres que pone el editor, como la "Luz" o la "Camara" de la escena."""
     if idioma == "en":
         return en
     if idioma not in _TRADUCCIONES:
         tabla = {}
-        ruta = os.path.join(RAIZ, "res", "idiomas", idioma + ".txt")
+        ruta = os.path.join(RAIZ, "res", "languages", idioma + ".txt")
         if os.path.isfile(ruta):
             for linea in open(ruta, encoding="utf-8").read().split("\n"):
                 if linea.count("\t") == 1:
@@ -121,7 +121,7 @@ class Info:
             tipo, resto = partes[0], partes[1] if len(partes) > 1 else ""
             d = {}
             # texto=... / titulo=... / nombre=... van siempre ultimos y pueden tener espacios
-            for campo in ("texto", "titulo", "nombre"):
+            for campo in ("texto", "titulo", "name"):
                 if (" %s=" % campo) in " " + resto:
                     resto, valor = (" " + resto).split(" %s=" % campo, 1)
                     d[campo] = valor
@@ -158,7 +158,7 @@ class Info:
             elif tipo == "prop":
                 self.props.append(d)
             elif tipo == "objeto":
-                self.objetos[d.get("nombre")] = d
+                self.objetos[d.get("name")] = d
             elif tipo == "cursor3d":
                 self.cursor3d = (d["x"], d["y"])
             elif tipo == "numpad":
@@ -199,7 +199,7 @@ class Info:
             if d["prop"] == prop and d["comp"] == comp:
                 return d
         raise SystemExit("capturas: la Linea de tiempo no tiene la fila %d/%d (tiene: %s)"
-                         % (prop, comp, [(d["prop"], d["comp"], d.get("nombre")) for d in self.tlfilas]))
+                         % (prop, comp, [(d["prop"], d["comp"], d.get("name")) for d in self.tlfilas]))
 
     def tl_fila(self, prop, comp):
         """Donde hacer click para elegir la fila de un canal (prop: 0 Localizacion, 1 Rotacion, 2 Escala; comp interno)."""
@@ -286,9 +286,9 @@ class Info:
     def archivo(self, nombre):
         """Centro de un archivo o carpeta del explorador abierto, por su nombre."""
         for a in self.archivos:
-            if a.get("nombre") == nombre:
+            if a.get("name") == nombre:
                 return a["x"] + a["w"] // 2, a["y"] + a["h"] // 2
-        raise SystemExit("capturas: el explorador no muestra '%s' (muestra: %s)" % (nombre, [a.get("nombre") for a in self.archivos]))
+        raise SystemExit("capturas: el explorador no muestra '%s' (muestra: %s)" % (nombre, [a.get("name") for a in self.archivos]))
 
     def pestania(self, n):
         """Centro de la pestania n de Propiedades (el numero fijo: 1 Objeto, 2 la del tipo...)."""
@@ -306,24 +306,24 @@ class Info:
 
     def prop(self, nombre, n=0):
         """Una fila de Propiedades por su nombre (el n-esimo, si se repite): su dict (y, valor, rombo...)."""
-        hay = [p for p in self.props if p.get("nombre") == nombre]
+        hay = [p for p in self.props if p.get("name") == nombre]
         if len(hay) <= n:
-            raise SystemExit("capturas: no hay una fila '%s' (hay: %s)" % (nombre, [p.get("nombre") for p in self.props]))
+            raise SystemExit("capturas: no hay una fila '%s' (hay: %s)" % (nombre, [p.get("name") for p in self.props]))
         return hay[n]
 
     def fila_info(self, nombre):
         """La fila de un objeto en el Outliner: {'x', 'y' (el nombre), 'ojo', 'camara', 'flecha' (sus X), 'elegido'}."""
         for f in self.filas:
-            if f.get("nombre") == nombre:
+            if f.get("name") == nombre:
                 return f
-        raise SystemExit("capturas: el Outliner no muestra '%s' (muestra: %s)" % (nombre, [f.get("nombre") for f in self.filas]))
+        raise SystemExit("capturas: el Outliner no muestra '%s' (muestra: %s)" % (nombre, [f.get("name") for f in self.filas]))
 
     def fila(self, nombre):
         """Centro del nombre de un objeto en el Outliner."""
         for f in self.filas:
-            if f.get("nombre") == nombre:
+            if f.get("name") == nombre:
                 return f["x"], f["y"]
-        raise SystemExit("capturas: el Outliner no muestra '%s' (muestra: %s)" % (nombre, [f.get("nombre") for f in self.filas]))
+        raise SystemExit("capturas: el Outliner no muestra '%s' (muestra: %s)" % (nombre, [f.get("name") for f in self.filas]))
 
     def centro_candado(self):
         if not self.candado:
@@ -361,9 +361,9 @@ class Guion:
         if self.telefono:   # la pantalla del telefono, en escala 1, adentro de su foto (n95.py)
             w, h, escala, ampliar = self.telefono.ancho, self.telefono.alto, 1, 1
         self.idioma, self.w, self.h, self.ampliar, self.n95 = idioma, w, h, ampliar, bool(self.telefono)
-        self.lineas = ["ventana %d %d" % (w, h), "escala %d" % escala]
+        self.lineas = ["window %d %d" % (w, h), "scale %d" % escala]
         if self.telefono:
-            self.lineas += ["layoutpordefecto"]
+            self.lineas += ["layoutdefault"]
             if self.telefono is n95_mod.HORIZONTAL:
                 self.lineas += ["division 0.55"]
         self.fotos = []
@@ -405,16 +405,16 @@ class Guion:
 
     # ---- entrada ---------------------------------------------------------------
     def dedo_abajo(self, x, y, id=1):
-        self.lineas.append("dedo down %d %d %d" % (x, y, id))
+        self.lineas.append("finger down %d %d %d" % (x, y, id))
         self.punteros[id] = {"tipo": "dedo", "x": x, "y": y, "abajo": True}
 
     def dedo_mover(self, x, y, id=1):
-        self.lineas.append("dedo move %d %d %d" % (x, y, id))
+        self.lineas.append("finger move %d %d %d" % (x, y, id))
         self.punteros[id] = dict(self.punteros.get(id) or {"tipo": "dedo", "abajo": True}, x=x, y=y)
 
     def dedo_arriba(self, id=1):
         p = self.punteros[id]
-        self.lineas.append("dedo up %d %d %d" % (p["x"], p["y"], id))
+        self.lineas.append("finger up %d %d %d" % (p["x"], p["y"], id))
         self.punteros[id] = dict(p, abajo=False)
 
     def dedos_quitar(self):
@@ -463,17 +463,17 @@ class Guion:
 
     def raton_mover(self, x, y):
         """Mueve el mouse (si hay botones apretados, es un arrastre)."""
-        self.lineas.append("raton move %d %d" % (x, y))
+        self.lineas.append("mouse move %d %d" % (x, y))
         self.puntero = {"tipo": "raton", "x": x, "y": y, "abajo": bool(self.botones)}
 
-    def raton_abajo(self, x, y, boton="izq"):
-        self.lineas.append("raton down %d %d %s" % (x, y, boton))
+    def raton_abajo(self, x, y, boton="left"):
+        self.lineas.append("mouse down %d %d %s" % (x, y, boton))
         self.botones.add(boton)
         self.puntero = {"tipo": "raton", "x": x, "y": y, "abajo": True}
 
-    def raton_arriba(self, boton="izq"):
+    def raton_arriba(self, boton="left"):
         p = self.puntero
-        self.lineas.append("raton up %d %d %s" % (p["x"], p["y"], boton))
+        self.lineas.append("mouse up %d %d %s" % (p["x"], p["y"], boton))
         self.botones.discard(boton)
         self.puntero = dict(p, abajo=bool(self.botones))
 
@@ -482,19 +482,19 @@ class Guion:
         self.lineas.append(("mod " + " ".join(t.lower() for t in teclas)).strip())
         self.mods = list(teclas)
 
-    def clic(self, x, y, boton="izq"):
-        self.lineas += ["raton down %d %d %s" % (x, y, boton), "raton up %d %d %s" % (x, y, boton)]
+    def clic(self, x, y, boton="left"):
+        self.lineas += ["mouse down %d %d %s" % (x, y, boton), "mouse up %d %d %s" % (x, y, boton)]
         self.puntero = {"tipo": "raton", "x": x, "y": y, "abajo": False}
 
     def rueda(self, pasos, x, y):
-        self.lineas.append("rueda %d %d %d" % (pasos, x, y))
+        self.lineas.append("wheel %d %d %d" % (pasos, x, y))
         self.giro = 1 if pasos > 0 else -1          # (se dibuja en la proxima foto)
 
     def tecla(self, nombre):
-        self.lineas.append("tecla %s" % nombre)
+        self.lineas.append("key %s" % nombre)
 
     def esperar(self, ms):
-        self.lineas.append("esperar %d" % ms)
+        self.lineas.append("wait %d" % ms)
 
     def sin_puntero(self):
         self.punteros = {}
@@ -507,14 +507,14 @@ class Guion:
     # ---- fotos ----------------------------------------------------------------
     def verde(self):
         """N95: un toque de la tecla verde de llamada (pasa al viewport siguiente)."""
-        self.lineas.append("verde")
+        self.lineas.append("green")
 
     def verde_flecha(self, dx, dy, cuadros=1):
         """N95: la tecla verde mantenida + una flecha durante esos cuadros (cambia el tamanio del viewport activo)."""
-        self.lineas.append("verde %d %d %d" % (dx, dy, cuadros))
+        self.lineas.append("green %d %d %d" % (dx, dy, cuadros))
 
     def keypad(self, accion, *args):
-        """N95: el keypad sobre la Vista 3D (ver el comando 'n95' de W3dCapturas.cpp): orbitar dx dy cuadros,
+        """N95: el keypad sobre la Vista 3D (ver el comando 'n95' de W3dCaptures.cpp): orbitar dx dy cuadros,
         zoom dy cuadros, panear dx dy cuadros, vista dx dy, perspectiva, encuadrar, camara."""
         self.lineas.append(" ".join(["n95", accion] + [str(a) for a in args]))
 
@@ -661,7 +661,7 @@ def dibujar_raton(capa, r, x1, y1, ancho=58, alto=90):
     ImageDraw.Draw(cuerpo).rounded_rectangle([0, 0, W - 1, H - 1], radius=int(W * 0.48), fill=255)
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     im.paste((246, 246, 246, 255), (0, 0), cuerpo)
-    for boton, caja in (("izq", (0, 0, W // 2, corte)), ("der", (W // 2, 0, W, corte))):
+    for boton, caja in (("left", (0, 0, W // 2, corte)), ("right", (W // 2, 0, W, corte))):
         if boton in r["botones"]:
             m = Image.new("L", (W, H), 0)
             ImageDraw.Draw(m).rectangle(caja, fill=255)
@@ -672,7 +672,7 @@ def dibujar_raton(capa, r, x1, y1, ancho=58, alto=90):
     d.line([(0, corte), (W, corte)], fill=oscuro, width=2 * s)
     rw, rh = int(W * 0.2), int(corte * 0.55)
     rueda = [W // 2 - rw // 2, int(corte * 0.2), W // 2 + rw // 2, int(corte * 0.2) + rh]
-    activa = "medio" in r["botones"] or r["giro"]
+    activa = "middle" in r["botones"] or r["giro"]
     d.rounded_rectangle(rueda, radius=rw // 2, fill=VERDE + (255,) if activa else (120, 120, 120, 255), outline=oscuro, width=2 * s)
     borde = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(borde).rounded_rectangle([0, 0, W - 1, H - 1], radius=int(W * 0.48), outline=oscuro, width=3 * s)

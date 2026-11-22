@@ -10,7 +10,7 @@
 #   celda 2 = [3,2]     -> solo transparentes: 1 run [3,2] (orden invertido)
 #   celda 3 = [0,1]     -> solo opacos: 0 runs
 # visinfo asserts: celdas, celdaActiva, trisDibujando, runsTransparentes.
-abrirw3d prueba_visorden.w3d
+openw3d prueba_visorden.w3d
 visinfo MallaOrden 3 1 4 1
 setsector MallaOrden 2
 visinfo MallaOrden 3 2 2 1
@@ -22,9 +22,9 @@ visinfo MallaOrden 3 9 4 0
 setsector MallaOrden 1
 visinfo MallaOrden 3 1 4 1
 # round-trip v4: el `.w3dvis` viaja y el orden sobrevive la recarga
-guardarw3d prueba_visorden_v4.w3d
-zipentrada prueba_visorden_v4.w3d extra/vis-dos.w3dvis
-abrirw3d prueba_visorden_v4.w3d
+savew3d prueba_visorden_v4.w3d
+zipentry prueba_visorden_v4.w3d extra/vis-dos.w3dvis
+openw3d prueba_visorden_v4.w3d
 visinfo MallaOrden 3 1 4 1
 # render real: los runs salen por el camino de indices client sobre el VBO
 bench 2 noswap

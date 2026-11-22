@@ -23,7 +23,7 @@ APLICAR_ESCALA = 222                               # Objeto > Aplicar > Escalar 
 # las manijas del gizmo (Gizmo.h, GizmoManija)
 EJE_X, EJE_Y, EJE_Z, CENTRO, LIBRE = 0, 1, 2, 6, 8   # (en modo rotar no hay CENTRO: el interior es LIBRE)
 
-VISTA_LEON = "vporbita 0 0.85 0 3.2 -12 28"         # Leon entero, un poco de costado
+VISTA_LEON = "vporbit 0 0.85 0 3.2 -12 28"         # Leon entero, un poco de costado
 
 
 def hay_leon():
@@ -46,8 +46,8 @@ def escena_leon(g, vista=VISTA_LEON, caja=False):
     g.linea("selobj " + T(g.idioma, "Light"))
     g.linea("objpos 3 4 -3")
     g.linea("import " + LEON)
-    g.linea("texturas")
-    g.linea("vista3d huesos 0")
+    g.linea("textures")
+    g.linea("view3d bones 0")
     g.linea("deselectall")
     g.linea("selobj " + RIG)
     g.linea(vista)
@@ -266,7 +266,7 @@ def mover_raton(g, puntos, cartel, dur=60):
 def teclas_raton(idioma):
     """G (Leon sigue al mouse), X (solo en X), click; R, click; S, click."""
     g = Guion(idioma, raton=True)
-    escena_leon(g, vista="vporbita 0 0.9 0 4.6 -12 28")
+    escena_leon(g, vista="vporbit 0 0.9 0 4.6 -12 28")
     rec, (cx, cy) = vista_pc(g)
     p = (cx + 40, cy + 70)
     g.raton_mover(*p)
@@ -314,9 +314,9 @@ def teclas_nokia(idioma):
     """N95 (sin gizmo, como viene): 1 + flechas + OK (mover); 2, 3 (el eje Z) + flechas + OK (rotar sobre su eje
     vertical); 3 + flechas + OK (escalar)."""
     g = Guion(idioma, n95="vertical")
-    escena_leon(g, vista="vporbita 0.4 0.9 0 3.6 -12 28")
-    g.linea("vista3d gizmo 0")                     # (el N95 viene sin gizmo y sin la barra de abajo)
-    g.linea("vista3d barra 0")
+    escena_leon(g, vista="vporbit 0.4 0.9 0 3.6 -12 28")
+    g.linea("view3d gizmo 0")                     # (el N95 viene sin gizmo y sin la barra de abajo)
+    g.linea("view3d bar 0")
     g.foto(dur=900)
     pasos = (("1", "num1", 1, None, (("derecha", 3), ("arriba", 2))),
              ("2", "num2", 2, ("3", "num3", 2), (("derecha", 16),)),
@@ -346,7 +346,7 @@ def teclas_nokia(idioma):
 def comandos_dedo(idioma):
     """Tactil: Mover en la barra de abajo, el dedo arrastra en la vista, la tilde verde confirma."""
     g = Guion(idioma)
-    escena_leon(g, vista="vporbita 0 0.9 0 4.6 -12 28")
+    escena_leon(g, vista="vporbit 0 0.9 0 4.6 -12 28")
     tactil(g)
     rec, (cx, cy) = vista_pc(g)
     i = g.info()
@@ -387,7 +387,7 @@ def numero_dedo(idioma):
     """Tactil, con precision: Rotar en la barra de herramientas y Z; un toque en la barra de arriba (la que muestra
     el valor) abre el teclado numerico: 90 y OK. Leon queda girado exactamente 90 grados."""
     g = Guion(idioma)
-    escena_leon(g, vista="vporbita 0 0.9 0 4.6 -12 28")
+    escena_leon(g, vista="vporbit 0 0.9 0 4.6 -12 28")
     tactil(g)
     rec, _ = vista_pc(g)
     g.foto(dur=900)
@@ -405,8 +405,8 @@ def numero_dedo(idioma):
 def origen_solo(idioma):
     """El origen de un objeto, de cerca (el cubo elegido, con el gizmo apagado para que se vea)."""
     g = Guion(idioma, ampliar=3)
-    g.linea("vista3d gizmo 0")
-    g.linea("vporbita 0 0 0 5 -30 25")
+    g.linea("view3d gizmo 0")
+    g.linea("vporbit 0 0 0 5 -30 25")
     o = g.info().objetos[T(idioma, "Cube")]
     g.foto()
     return g.cuadros(recorte=(o["x"] - 80, o["y"] - 55, 160, 110))
@@ -418,7 +418,7 @@ def cursor3d_solo(idioma):
     g = Guion(idioma, ampliar=3)
     g.linea("deselectall")
     g.linea("cursor3d 2.2 0 0.8")
-    g.linea("vporbita 2.2 0 0.8 4 -30 25")         # (el cursor en el medio de la vista)
+    g.linea("vporbit 2.2 0 0.8 4 -30 25")         # (el cursor en el medio de la vista)
     x, y = g.info().cursor3d
     g.foto()
     return g.cuadros(recorte=(x - 80, y - 55, 160, 110))
@@ -475,7 +475,7 @@ def escala_raton(idioma):
     g.linea("division 0.62")                      # (Propiedades mas ancho y alto: que se vea la escala)
     g.linea("objname " + CAJA[idioma])
     g.linea("objscale 2 0.5 1")
-    g.linea("vporbita 0 0 0 9 -20 30")
+    g.linea("vporbit 0 0 0 9 -20 30")
     rec, (cx, cy) = vista_pc(g)
     p = (cx + 150, cy + 40)
     g.raton_mover(*p)
@@ -515,7 +515,7 @@ def outliner(idioma):
 def emparentar_raton(idioma):
     """La caja se arrastra en el Outliner hasta leon_rig (queda adentro); con G se mueve a Leon y la caja va con el."""
     g = Guion(idioma, w=960, h=920, raton=True)
-    escena_leon(g, caja=True, vista="vporbita 0.2 0.85 0 4.4 -12 28")
+    escena_leon(g, caja=True, vista="vporbit 0.2 0.85 0 4.4 -12 28")
     g.linea("division 0.6")                       # (el Outliner mas ancho: que se lean los nombres)
     i = g.info()
     a, b = i.fila(CAJA[idioma]), i.fila(RIG)
@@ -573,7 +573,7 @@ def importar(idioma):
     hay_leon()
     g = Guion(idioma, w=960, h=720, raton=True)
     g.linea("delete")
-    g.linea("vporbita 0 0.9 0 3.8 -12 28")
+    g.linea("vporbit 0 0.9 0 3.8 -12 28")
     g.foto(dur=900)
     x, y = g.info().boton_rol(VISTA_3D, BR_ADD)
     g.raton_mover(x + 60, y + 120)
@@ -603,8 +603,8 @@ def importar(idioma):
     g.tecla("Escape")
     g.tecla("Escape")
     g.linea("import " + LEON)
-    g.linea("texturas")
-    g.linea("vista3d huesos 0")
+    g.linea("textures")
+    g.linea("view3d bones 0")
     g.sin_puntero()
     g.foto(dur=2400)
     return g.cuadros(calidad=72)
@@ -708,7 +708,7 @@ def elegir(nombre_en):
 
 
 def sonido(g):
-    g.linea("agregar sonido")
+    g.linea("addui sound")
 
 
 def leon_malla(g):
@@ -720,7 +720,7 @@ def leon_malla(g):
 def con(que, tipo):
     """El cubo de la escena nueva con un modificador o una restriccion de ese tipo."""
     def prep(g):
-        g.linea("agregar %s %d" % (que, tipo))
+        g.linea("addui %s %d" % (que, tipo))
     return prep
 
 
@@ -783,7 +783,7 @@ def teclas(g, lista, cartel, dur=1600):
     g.foto(dur=500, tecla=cartel)
     for t in lista:
         if t.startswith("="):
-            g.linea("texto " + t[1:])
+            g.linea("text " + t[1:])
         else:
             g.tecla(t)
     g.foto(dur=dur, tecla=cartel)
@@ -804,7 +804,7 @@ GIRAR_90 = (["r", "z", "=90", "Return"], "R  Z  90  Enter")
 def cursor(idioma):
     """Iman: Leon elegido -> Cursor a lo seleccionado (el cursor 3D va a sus pies); la caja -> Seleccion a Cursor."""
     g = Guion(idioma, w=1200, h=720, raton=True)     # (ancha: que la barra de la Vista 3D muestre el menu Objeto)
-    escena_leon(g, caja=True, vista="vporbita 0 0.6 0 5 -25 28")
+    escena_leon(g, caja=True, vista="vporbit 0 0.6 0 5 -25 28")
     g.linea("division 0.66")
     g.linea("deselectall")
     g.linea("selobj " + CAJA[idioma])
@@ -845,7 +845,7 @@ def pivote(idioma):
     g.linea("selobj " + nombres[0])
     for n in nombres[1:]:
         g.linea("selname " + n)
-    g.linea("vporbita 1.6 0 0 9 -60 0")
+    g.linea("vporbit 1.6 0 0 9 -60 0")
     rec, (cx, cy) = vista_pc(g)
     g.foto(dur=1000)
     for p in (PIVOTE_MEDIO, PIVOTE_INDIVIDUAL, PIVOTE_CURSOR):
@@ -864,7 +864,7 @@ def pivote(idioma):
 def local_global(idioma):
     """Leon girado 40: en Global la flecha verde lo mueve en la Y del mundo; en Local, derecho hacia donde mira."""
     g = Guion(idioma, raton=True)
-    escena_leon(g, vista="vporbita 0 0.6 0 4.6 -35 28")
+    escena_leon(g, vista="vporbit 0 0.6 0 4.6 -35 28")
     g.linea("objrot 40")
     rec, _ = vista_pc(g)
     g.foto(dur=1000)
@@ -891,7 +891,7 @@ def modelar_guion(idioma, raton=True):
     """La Vista 3D con Propiedades al lado (que se vea la Escala del objeto) y el cubo de siempre, de 2 x 2 x 2 m."""
     g = Guion(idioma, w=1200, h=760, raton=raton)
     g.linea("division 0.66")
-    g.linea("vporbita 0 0.8 0 9 -32 18")
+    g.linea("vporbit 0 0.8 0 9 -32 18")
     return g
 
 
@@ -909,7 +909,7 @@ def comando(g, pasos, mover=()):
         cartel = ",  ".join(hechas)
         g.foto(dur=450, tecla=cartel)
         if t.startswith("="):
-            g.linea("texto " + t[1:])
+            g.linea("text " + t[1:])
         else:
             g.tecla(t)
         g.foto(dur=900, tecla=cartel)
@@ -989,7 +989,7 @@ def modelar_exacto(idioma):
     G, X, -1.1, Enter: el cubo de 2 m queda de 0,9 m de ancho."""
     g = modelar_guion(idioma)
     modelar_subido(g)
-    g.linea("modo edicion")
+    g.linea("modemenu edit")
     rec, (cx, cy) = vista_pc(g)
     g.linea("cursor3d 1 0.4 0")                   # (el costado +X, abajo: lejos de la flecha roja del gizmo)
     fx, fy = g.info().cursor3d
@@ -1029,7 +1029,7 @@ def modelar_gizmo(idioma):
     """En el Modo Edicion, con todo elegido: el gizmo pasa a escalar y se achica en X y en Y arrastrando, a ojo."""
     g = modelar_guion(idioma)
     modelar_subido(g)
-    g.linea("modo edicion")
+    g.linea("modemenu edit")
     rec, (cx, cy) = vista_pc(g)
     g.raton_mover(cx + 200, cy + 140)
     g.foto(dur=1000)
@@ -1044,7 +1044,7 @@ def modelar_gizmo_dedo(idioma):
     """Tactil: lo mismo con el dedo, sobre el gizmo (mas grande en una pantalla tactil)."""
     g = modelar_tactil(idioma)
     modelar_subido(g)
-    g.linea("modo edicion")
+    g.linea("modemenu edit")
     rec, _ = vista_pc(g)
     g.foto(dur=1000)
     gizmo_escalar(g, dedo=True)
@@ -1062,7 +1062,7 @@ def modelar_ficha(idioma):
     g.raton_mover(cx + 200, cy + 140)
     for t in ("g", "z"):
         g.tecla(t)
-    g.linea("texto 1")
+    g.linea("text 1")
     g.tecla("Return")
     v = g.info().vp(VISTA_3D)
     g.clic(v["x"] + 100, v["y"] + v["h"] - 40)    # la ficha plegada ("> Mover"): un click la despliega
@@ -1099,7 +1099,7 @@ def ficha_tactil(g, mirar=900):
     v = g.info().vp(VISTA_3D)
     tocar_en(g, v["x"] + 100, v["y"] + v["h"] - 40, antes=700, despues=mirar)
     tocar_en(g, v["x"] + 347, v["y"] + v["h"] - 50, antes=500, despues=700)
-    g.linea("trboton 1")                          # (por si el toque no la cerro)
+    g.linea("trbutton 1")                          # (por si el toque no la cerro)
 
 
 def numero_tactil(g, comando_txt, eje, valor, ficha=True):
@@ -1166,7 +1166,7 @@ def modelar_exacto_dedo(idioma):
     g = modelar_tactil(idioma)
     g.linea("trpanel on")
     modelar_subido(g)
-    g.linea("modo edicion")
+    g.linea("modemenu edit")
     g.linea("cursor3d 1 0.4 0")
     fx, fy = g.info().cursor3d
     g.linea("cursor3d 0 0 0")
@@ -1201,16 +1201,16 @@ def n95_comando(g, modo, tecla_modo, eje, tecla_eje, valor):
     for k, c in enumerate(valor):
         escrito += c
         tid = TECLA_N95.get(c, "num" + c)
-        paso("lápiz + " + escrito, ("lapiz", tid), lambda c=c: g.linea("texto " + c), junto=(k > 0))
+        paso("lápiz + " + escrito, ("lapiz", tid), lambda c=c: g.linea("text " + c), junto=(k > 0))
     paso("OK", ("ok",), lambda: g.keypad("aceptar"))
     g.foto(dur=1200)
 
 
 def modelar_n95(idioma):
     g = Guion(idioma, n95="vertical")
-    g.linea("vista3d gizmo 0")                     # (el N95 viene sin gizmo y sin la barra de abajo)
-    g.linea("vista3d barra 0")
-    g.linea("vporbita 0 0.8 0 9 -32 18")
+    g.linea("view3d gizmo 0")                     # (el N95 viene sin gizmo y sin la barra de abajo)
+    g.linea("view3d bar 0")
+    g.linea("vporbit 0 0.8 0 9 -32 18")
     return g
 
 
@@ -1230,7 +1230,7 @@ def modelar_edicion_nokia(idioma):
     modelar_subido(g)
     g.foto(dur=900)
     g.foto(dur=450, tecla="OK", teclas=("ok",))
-    g.linea("modo edicion")
+    g.linea("modemenu edit")
     g.foto(dur=900, tecla="OK")
     n95_comando(g, 3, "3", 0, "1", "0.45")
     n95_comando(g, 3, "3", 1, "2", "0.05")
@@ -1241,7 +1241,7 @@ def modelar_edicion_nokia(idioma):
 BR_MODO, BR_SELMODO = 1, 2
 BISAGRA = "0.5 1 0"           # el centro de la cara angosta de la +X (la derecha, la que se ve): donde va la bisagra
 BISAGRA_CLICK = "0.5 0.45 0"   # donde se hace click para elegirla: mas abajo, lejos de la flecha roja del gizmo
-PUERTA_GIRO = float(os.environ.get("W3D_PUERTA_GIRO", "-25"))              # el angulo de la camara alrededor de la puerta
+PUERTA_GIRO = float(os.environ.get("W3D_DOOR_TURN", "-25"))              # el angulo de la camara alrededor de la puerta
 PUERTA_VENTANA = dict(w=1800, h=640)
 
 
@@ -1262,7 +1262,7 @@ def puerta_escena(g):
     g.linea("objscale 0.5 1 0.05")
     g.linea("objpos 0 1 0")
     g.linea("apply scale")
-    g.linea("vporbita 0 1 0 5.5 %g 26" % PUERTA_GIRO)   # (de frente y un poco a la derecha: se ve el costado de la bisagra)
+    g.linea("vporbit 0 1 0 5.5 %g 26" % PUERTA_GIRO)   # (de frente y un poco a la derecha: se ve el costado de la bisagra)
 
 
 def abrir_menu(g, rol, ids, kind=VISTA_3D):
@@ -1309,12 +1309,12 @@ def puerta_paso_1(idioma):
 @receta("puerta-paso-2")
 def puerta_paso_2(idioma):
     """Paso 2: en el Modo Edicion, el boton Vertice / Arista / Cara, abierto, con Cara marcado."""
-    return puerta_paso_menu(idioma, ["modo edicion"], BR_SELMODO, ("Face",))
+    return puerta_paso_menu(idioma, ["modemenu edit"], BR_SELMODO, ("Face",))
 
 
 def elegir_bisagra(g):
     """En el Modo Edicion: modo Cara y un click en el costado de la bisagra. Devuelve donde fue el click."""
-    g.linea("caras 3")                            # (pasa a modo Cara; el click de abajo elige la de la bisagra)
+    g.linea("faces 3")                            # (pasa a modo Cara; el click de abajo elige la de la bisagra)
     g.linea("cursor3d " + BISAGRA_CLICK)          # (donde queda ese costado en la pantalla)
     x, y = g.info().cursor3d
     g.linea("cursor3d 0 0 0")
@@ -1327,7 +1327,7 @@ def puerta_paso_3(idioma):
     """Paso 3: la cara angosta del lado de la bisagra, elegida (en verde) y marcada, con el puntero encima."""
     g = Guion(idioma, **PUERTA_VENTANA)
     puerta_escena(g)
-    g.linea("modo edicion")
+    g.linea("modemenu edit")
     x, y = elegir_bisagra(g)
     rec = recorte_pasos(g)
     g.raton_mover(x, y)
@@ -1338,13 +1338,13 @@ def puerta_paso_3(idioma):
 @receta("puerta-paso-4")
 def puerta_paso_4(idioma):
     """Paso 4: menu Malla > Iman, abierto, con Cursor a lo seleccionado marcado."""
-    return puerta_paso_menu(idioma, ["modo edicion", "bisagra"], BR_MALLA, ("Snap", IMAN_CURSOR_A_SELECCION))
+    return puerta_paso_menu(idioma, ["modemenu edit", "bisagra"], BR_MALLA, ("Snap", IMAN_CURSOR_A_SELECCION))
 
 
 @receta("puerta-paso-5")
 def puerta_paso_5(idioma):
     """Paso 5: con el cursor 3D en la bisagra, el boton del modo abierto, con Modo Objeto marcado."""
-    return puerta_paso_menu(idioma, ["modo edicion", "bisagra", "cursor3d " + BISAGRA], BR_MODO, ("Object Mode",))
+    return puerta_paso_menu(idioma, ["modemenu edit", "bisagra", "cursor3d " + BISAGRA], BR_MODO, ("Object Mode",))
 
 
 @receta("puerta-paso-6")
@@ -1446,7 +1446,7 @@ def puerta_gira_bien_dedo(idioma):
     """Tactil: con el origen en la bisagra, la puerta se abre y se cierra desde ahi."""
     g = puerta_tactil(idioma)
     g.linea("cursor3d " + BISAGRA)
-    g.linea("origen cursor")
+    g.linea("origin cursor")
     rec = puerta_girar_dedo(g)
     return g.cuadros(recorte=rec, ancho=960, calidad=90)
 
@@ -1458,9 +1458,9 @@ def puerta_n95(idioma):
     g.linea("objscale 0.5 1 0.05")
     g.linea("objpos 0 1 0")
     g.linea("apply scale")
-    g.linea("vista3d gizmo 0")
-    g.linea("vista3d barra 0")
-    g.linea("vporbita 0 1 0 6 -25 26")
+    g.linea("view3d gizmo 0")
+    g.linea("view3d bar 0")
+    g.linea("vporbit 0 1 0 6 -25 26")
     return g
 
 
@@ -1499,7 +1499,7 @@ def puerta_gira_bien_nokia(idioma):
     """N95: con el origen en la bisagra, 2, 3 y las flechas la abren y la cierran desde ahi."""
     g = puerta_n95(idioma)
     g.linea("cursor3d " + BISAGRA)
-    g.linea("origen cursor")
+    g.linea("origin cursor")
     puerta_girar_n95(g)
     return g.cuadros(calidad=88)
 
@@ -1523,7 +1523,7 @@ def caja_raton(idioma):
     g.linea("selobj " + T(idioma, "Light"))       # (la luz, al fondo: caia en la fila)
     g.linea("objpos 3 4 -6")
     g.linea("deselectall")
-    g.linea("vporbita 0 0.4 0 7.5 -35 0")
+    g.linea("vporbit 0 0.4 0 7.5 -35 0")
     rec, (cx, cy) = vista_pc(g)
     obj = g.info().objetos
     p = [(obj[n]["x"], obj[n]["y"]) for n in nombres]
@@ -1600,13 +1600,13 @@ def vacio_formas(idioma):
     g.linea("division 0.95")
     for i, (_, forma, rot) in enumerate(VACIO_FORMAS):
         g.linea("cursor3d %g 0 0" % (-6.5 + i * 2.6))
-        g.linea("agregar vacio")
-        g.linea("vacioponer %d 1.6 %g %g %g" % (forma, rot[0], rot[1], rot[2]))
+        g.linea("addui empty")
+        g.linea("emptyset %d 1.6 %g %g %g" % (forma, rot[0], rot[1], rot[2]))
     g.linea("cursor3d 0 -30 0")                  # (el cursor 3D, fuera de cuadro)
     g.linea("deselectall")
-    g.linea("vista3d gizmo 0")
-    g.linea("vporbita 0 0.3 0 10 -30 0")          # (inclinacion, giro: desde arriba, de frente)
-    g.linea("n95 perspectiva")                    # ORTOGRAFICA: sin la deformacion de la lente a los costados
+    g.linea("view3d gizmo 0")
+    g.linea("vporbit 0 0.3 0 10 -30 0")          # (inclinacion, giro: desde arriba, de frente)
+    g.linea("n95 perspective")                    # ORTOGRAFICA: sin la deformacion de la lente a los costados
     i = g.info()
     v = i.vp(VISTA_3D)
     marcas = []

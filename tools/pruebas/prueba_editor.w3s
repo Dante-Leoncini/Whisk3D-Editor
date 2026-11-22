@@ -24,8 +24,8 @@ uxeditor
 # de rename de las refs de lua van por (objeto, indice de script, indice de ref): sin el
 # aviso al undo, un Ctrl+Z de un rename escribe el nombre viejo encima de la ref de OTRO
 # script (corrupcion silenciosa).
-luaquitar
-luamover
+luaremove
+luamove
 
 # layoutdump : el layout por defecto (outliner ARRIBA al 40 % / propiedades debajo, y el
 # timeline bien chico bajo el viewport 3D) respeta los minimos de viewport.

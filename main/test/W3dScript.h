@@ -19,6 +19,6 @@ bool W3dRunScript(const std::string& path);
 
 // Ejecuta UN comando (una linea). err = motivo si falla. Reusable por el runner,
 // y a futuro por el historial / la consola.
-bool W3dRunCommand(const std::string& linea, std::string& err);
+bool W3dRunCommand(const std::string& line, std::string& err);
 
 #endif

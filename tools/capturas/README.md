@@ -20,7 +20,7 @@ No abre ninguna ventana: usa `whisk3d --script` con el driver `offscreen` de SDL
 ## Cómo funciona
 
 1. Una **receta** (`recetas.py`) arma un guion del harness: `ventana`, `escala` y la entrada de una persona
-   con los comandos de `main/test/W3dCapturas.cpp`:
+   con los comandos de `main/test/W3dCaptures.cpp`:
    - `raton down|move|up x y [izq|medio|der]`, `dedo down|move|up x y [id]` (id 2: un segundo dedo),
      `rueda pasos x y`, `mod shift|alt|ctrl` (teclas mantenidas con el mouse; `mod` solo las suelta) y
      `tecla nombre` (nombre de SDL: `m`, `Right`, `Return`, `Escape`...; `_` = espacio: `Keypad_7`, `Left_Ctrl`).
@@ -67,7 +67,7 @@ Y en el `.md`: `![Texto que la describe](img/viewports-menu.webp)`.
 
 ### El mouse dibujado
 
-`Guion(idioma, raton=True)` dibuja un mouse abajo a la derecha con lo que se aprieta: el botón (en verde),
+`Guion(idioma, mouse=True)` dibuja un mouse abajo a la derecha con lo que se aprieta: el botón (en verde),
 la rueda (verde si se aprieta o gira, con una flecha) y las teclas mantenidas (`g.mod("Shift")`):
 
 ```python
@@ -77,7 +77,7 @@ g.raton_mover(x + 40, y)        # arrastre
 g.raton_arriba("medio")
 g.rueda(1, x, y)                # la rueda para adelante
 ```
-- Las que necesitan un comando nuevo del harness: agregarlo en `main/test/W3dCapturas.cpp`, no en
+- Las que necesitan un comando nuevo del harness: agregarlo en `main/test/W3dCaptures.cpp`, no en
   `W3dScript.cpp`, que tarda minutos en compilar.
 
 ## Demos del Nokia N95

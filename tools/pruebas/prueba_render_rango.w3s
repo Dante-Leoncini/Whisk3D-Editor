@@ -1,18 +1,18 @@
 # prueba_render_rango.w3s — la tarjeta RENDER muestra y cambia EL MISMO rango y fps de la escena / animacion activa
 #   (StartFrame, EndFrame, AnimFPS: los del timeline y la tarjeta Animacion). Antes el render tenia un rango propio
 #   (0 = el del timeline) y sus campos se veian en cero.
-ventana 960 540
+window 960 540
 # la escena de arranque: los campos muestran su rango (no ceros)
-rendercampos ver 1 250 30
+renderfields show 1 250 30
 # cambiar el rango de la animacion (como el timeline) se ve en la tarjeta Render
-renderrango 5 70
-rendercampos ver 5 70 30
+renderrange 5 70
+renderfields show 5 70 30
 # y escribir en la tarjeta Render cambia la animacion
-rendercampos fijar ini 10
-rendercampos fijar fin 120
-rendercampos fijar fps 25
-rendercampos ver 10 120 25
+renderfields set start 10
+renderfields set end 120
+renderfields set fps 25
+renderfields show 10 120 25
 # se guarda con la escena: al reabrir sigue igual
-guardarw3d ../debug/render_rango.w3d
-abrirw3d ../debug/render_rango.w3d
-rendercampos ver 10 120 25
+savew3d ../debug/render_rango.w3d
+openw3d ../debug/render_rango.w3d
+renderfields show 10 120 25

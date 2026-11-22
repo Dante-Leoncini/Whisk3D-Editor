@@ -13,11 +13,11 @@
      con la misma prioridad (70), que es MAYOR que la del zip generico (60).
 
      NOMBRES: el tipo del contenedor es el que el ARCHIVO declara adentro
-     (application/vnd.whisk3d.proyecto+zip). El viejo application/x-whisk3d queda
+     (application/vnd.whisk3d.project+zip). El viejo application/x-whisk3d queda
      como <alias> para no romper las asociaciones ya hechas (mimeapps.list de los
      usuarios que ya tenian el .deb instalado). -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-  <mime-type type="application/vnd.whisk3d.proyecto+zip">
+  <mime-type type="application/vnd.whisk3d.project+zip">
     <comment>Whisk3D project</comment>
     <comment xml:lang="es">Proyecto Whisk3D</comment>
     <!-- nombre anterior del tipo: sigue resolviendo al mismo -->
@@ -28,7 +28,7 @@
     <magic priority="70">
       <match type="string" value="PK\003\004" offset="0">
         <match type="string" value="mimetype" offset="30">
-          <match type="string" value="application/vnd.whisk3d.proyecto+zip" offset="38"/>
+          <match type="string" value="application/vnd.whisk3d.project+zip" offset="38"/>
         </match>
       </match>
     </magic>
@@ -36,7 +36,7 @@
     <glob pattern="*.w3d"/>
     <!-- icono del tipo: se instala en hicolor/.../mimetypes/ con el nombre del
          tipo con '/' cambiado por '-' (ver INSTALACION LINUX en el CMakeLists) -->
-    <icon name="application-vnd.whisk3d.proyecto+zip"/>
+    <icon name="application-vnd.whisk3d.project+zip"/>
     <generic-icon name="package-x-generic"/>
   </mime-type>
   <!-- la interfaz 2D (.w3dui) es JSON SUELTO, no un zip: su firma es la de un

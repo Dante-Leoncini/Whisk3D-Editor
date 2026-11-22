@@ -20,111 +20,111 @@
 #    - los clips de JERARQUIA (bloques JCLP) tambien: compactos al abrir, reproducirlos no expande.
 # ==========================================================================
 
-ventana 1280 720
+window 1280 720
 
 # ---- A) los clips horneados, creados en memoria (curvas COMUNES) y guardados en un .w3da. Tres armatures
 #         con los mismos clips; "Invertido" tiene los huesos en otro orden (el guardado le da su animset:
 #         se lo apunta al de los otros, asi al abrir usa sus clips por una VARIANTE) ----
-clavessintetica /tmp/w3d_claves_v.w3d invertido
-clavesinfo compactas 0
-posefoto claves_comunes.pose juego 1
+keyssynthetic /tmp/w3d_claves_v.w3d inverted
+keysinfo compact 0
+posesnapshot claves_comunes.pose game 1
 animsetsw3d /tmp/w3d_claves_v.w3d animsets 2 clips 4 armatures 3
-animsetapuntar /tmp/w3d_claves_v.w3d /tmp/w3d_claves_a.w3d Invertido Horneado
+animsetpoint /tmp/w3d_claves_v.w3d /tmp/w3d_claves_a.w3d Invertido Horneado
 
 # ---- B) al abrir quedan COMPACTAS: 39 curvas (23 de "Largo" -22 regulares y la irregular- + 16 de "Corto"), UNA
 #         copia para los dos "Horneado", y otras 39 en la VARIANTE de "Invertido" (la copia reindexada se copia
 #         compacta), a menos de 5 B por clave. Ninguna se expande. ----
-abrirw3d /tmp/w3d_claves_a.w3d
-clavesinfo marca compactas 78 maxbpc 5
-animsetinfo vivos 1 refs 3 clips 2 variantes 1 clipsvariante 2
+openw3d /tmp/w3d_claves_a.w3d
+keysinfo mark compact 78 maxbpc 5
+animsetinfo live 1 refs 3 clips 2 variants 1 clipsvariant 2
 meminfo
 # la MISMA pose, bit a bit, en el editor y con el cabezal continuo del juego
-posefoto claves_compactas.pose juego 1
-posefotoigual claves_comunes.pose claves_compactas.pose
+posesnapshot claves_compactas.pose game 1
+posesnapshotequal claves_comunes.pose claves_compactas.pose
 # cada curva contra la evaluacion de antes (y contra una copia comun con las mismas claves): mirar no expande
-clavescomparar Horneado compactas 39
-clavescomparar Horneado.001 compactas 39 paso 0.0625
-clavescomparar Invertido compactas 39
-clavesinfo nuevas 0 compactas 78
-animsetsellos clips 4
+keyscompare Horneado compact 39
+keyscompare Horneado.001 compact 39 step 0.0625
+keyscompare Invertido compact 39
+keysinfo new 0 compact 78
+animsetstamps clips 4
 
 # ---- C) JUGAR: modo juego, unos cuadros simulados y dibujados, la pose de todos los clips en el cabezal del
 #         juego: no se expande NINGUNA curva ----
-juego on
+game on
 simplay 20
 glaudit 3
 simplay 7
 glaudit 2
-posefoto claves_juego.pose juego 1
-juego off
-clavesinfo nuevas 0 compactas 78
-posefoto claves_despues.pose juego 1
-posefotoigual claves_comunes.pose claves_despues.pose
+posesnapshot claves_juego.pose game 1
+game off
+keysinfo new 0 compact 78
+posesnapshot claves_despues.pose game 1
+posesnapshotequal claves_comunes.pose claves_despues.pose
 
 # ---- D) guardar SIN editar: los mismos bytes del .w3da (escrito desde las compactas, sin expandirlas) ----
-guardarw3d /tmp/w3d_claves_b.w3d
-w3diguales /tmp/w3d_claves_a.w3d /tmp/w3d_claves_b.w3d animaciones/
-clavesinfo nuevas 0 compactas 78
-abrirw3d /tmp/w3d_claves_b.w3d
-clavesinfo marca compactas 78
-guardarw3d /tmp/w3d_claves_c.w3d
-w3diguales /tmp/w3d_claves_b.w3d /tmp/w3d_claves_c.w3d
-clavesinfo nuevas 0
+savew3d /tmp/w3d_claves_b.w3d
+w3dequal /tmp/w3d_claves_a.w3d /tmp/w3d_claves_b.w3d animations/
+keysinfo new 0 compact 78
+openw3d /tmp/w3d_claves_b.w3d
+keysinfo mark compact 78
+savew3d /tmp/w3d_claves_c.w3d
+w3dequal /tmp/w3d_claves_b.w3d /tmp/w3d_claves_c.w3d
+keysinfo new 0
 
 # ---- E) EDITAR: copy-on-write del armature y UNA curva editada -> se expande SOLO esa; Ctrl+Z la devuelve
 #         (compacta otra vez), Ctrl+Y la rehace ----
-claveseditar Horneado 0 mover
-claveseditar Horneado 0 insertar
-claveseditar Horneado 0 borrar
-animsetarm Horneado compartido 0
-animsetarm Horneado.001 compartido 1
+keysedit Horneado 0 move
+keysedit Horneado 0 insert
+keysedit Horneado 0 delete
+animsetarm Horneado shared 0
+animsetarm Horneado.001 shared 1
 # los clips de los otros armatures siguen compactos y sellados
-animsetsellos clips 4
-clavescomparar Horneado.001 compactas 39
-clavescomparar Invertido compactas 39
+animsetstamps clips 4
+keyscompare Horneado.001 compact 39
+keyscompare Invertido compact 39
 # el dope sheet de verdad (mover / borrar / Ctrl+Z) sobre una curva compacta: anda como siempre
-animsetdope Horneado.001 1 mover compartido 0 copias 1
-animsetdope Horneado.001 1 undo compartido 0
-animsetdope Horneado.001 0 borrar compartido 0
-clavescomparar Horneado
-clavescomparar Horneado.001
+animsetdope Horneado.001 1 move shared 0 copies 1
+animsetdope Horneado.001 1 undo shared 0
+animsetdope Horneado.001 0 delete shared 0
+keyscompare Horneado
+keyscompare Horneado.001
 
 # ---- F) guardar lo EDITADO y reabrir: la misma pose; lo que no se edito vuelve compacto ----
-posefoto claves_editado.pose juego 1
-guardarw3d /tmp/w3d_claves_d.w3d
-abrirw3d /tmp/w3d_claves_d.w3d
-posefoto claves_editado2.pose juego 1
-posefotoigual claves_editado.pose claves_editado2.pose
-clavescomparar Horneado
-clavescomparar Horneado.001
-clavesinfo marca
-guardarw3d /tmp/w3d_claves_e.w3d
-w3diguales /tmp/w3d_claves_d.w3d /tmp/w3d_claves_e.w3d animaciones/
-clavesinfo nuevas 0
+posesnapshot claves_editado.pose game 1
+savew3d /tmp/w3d_claves_d.w3d
+openw3d /tmp/w3d_claves_d.w3d
+posesnapshot claves_editado2.pose game 1
+posesnapshotequal claves_editado.pose claves_editado2.pose
+keyscompare Horneado
+keyscompare Horneado.001
+keysinfo mark
+savew3d /tmp/w3d_claves_e.w3d
+w3dequal /tmp/w3d_claves_d.w3d /tmp/w3d_claves_e.w3d animations/
+keysinfo new 0
 
 # ---- G) CLIPS DE JERARQUIA (bloques JCLP): las mismas curvas compactas ----
-escenadefecto
+scenedefault
 add cube
 objname Grua
 add cube
 objname Brazo
 parent Brazo Grua
-clipnuevo Grua girar 1 13
+clipnew Grua girar 1 13
 # (5 claves cada 3 frames: bezier con handles automaticos, como inserta el editor)
-animcurva Grua:girar Brazo ry 1 0 4 30 7 60 10 90 13 120
-animcurva Grua:girar . y 1 0 4 0.5 7 1.5 10 1.5 13 3
-raizanim Scene
-jerplay Grua girar loop 0
-jertick 0.1 1
+animcurve Grua:girar Brazo ry 1 0 4 30 7 60 10 90 13 120
+animcurve Grua:girar . y 1 0 4 0.5 7 1.5 10 1.5 13 3
+rootanim Scene
+hierplay Grua girar loop 0
+hiertick 0.1 1
 rotat Brazo 0 30 0 0.001
-jerreset
-guardarw3d /tmp/w3d_claves_jer.w3d
-abrirw3d /tmp/w3d_claves_jer.w3d
-clavesinfo marca compactas 2
-clavescomparar Grua compactas 2
-jerplay Grua girar loop 0
-jertick 0.1 1
+hierreset
+savew3d /tmp/w3d_claves_jer.w3d
+openw3d /tmp/w3d_claves_jer.w3d
+keysinfo mark compact 2
+keyscompare Grua compact 2
+hierplay Grua girar loop 0
+hiertick 0.1 1
 rotat Brazo 0 30 0 0.001
-jertick 0.05 3
-jerreset
-clavesinfo nuevas 0 compactas 2
+hiertick 0.05 3
+hierreset
+keysinfo new 0 compact 2

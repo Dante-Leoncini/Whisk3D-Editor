@@ -8,7 +8,7 @@
 # prueba de que el spec alcanza para un conversor externo.
 # Celdas (1-based): 1=[0,1] 2=[2,0,1] 3=[2,3] 4=[3,2]. K=2 -> 1 y 3 son CLAVE,
 # 2 y 4 son DELTA (ADD con payload / MOVE, reversibles).
-abrirw3d prueba_viszona.w3d
+openw3d prueba_viszona.w3d
 # celda declarada en el .w3d: 1 -> dibuja 2 tris; el archivo trae 4 celdas
 visinfo MallaVis 4 1 2
 # setSector es el override manual de siempre y en metodo celdas TAMBIEN manda:
@@ -24,9 +24,9 @@ visinfo MallaVis 4 9 4
 setsector MallaVis 1
 visinfo MallaVis 4 1 2
 # round-trip v4: el modificador (metodo celdas + celda) y el `.w3dvis` viajan
-guardarw3d prueba_viszona_v4.w3d
-zipentrada prueba_viszona_v4.w3d extra/vis-tris.w3dvis
-abrirw3d prueba_viszona_v4.w3d
+savew3d prueba_viszona_v4.w3d
+zipentry prueba_viszona_v4.w3d extra/vis-tris.w3dvis
+openw3d prueba_viszona_v4.w3d
 visinfo MallaVis 4 1 2
 # --- VisZona modo curva + binds (setVisCurvaT / visCelda) ---
 # timeline del componente (scripts -> W3dVisZonasTick, lee con 1 tick de retardo):
@@ -35,8 +35,8 @@ visinfo MallaVis 4 1 2
 #  (8 ticks: los de mas no cambian el estado final; no se asume si el primer
 #   simplay corre o no actualizar() ademas de inicio())
 simplay 8
-scriptinfo compartido vz_celda 3
-scriptinfo compartido vz_zona 3
+scriptinfo shared vz_celda 3
+scriptinfo shared vz_zona 3
 visinfo MallaVis 4 3 2
 simstop
 # render real con la celda activa (ejercita el mismo camino que el PVS clasico)

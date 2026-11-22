@@ -46,7 +46,7 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver {
 
     public: // New functions
         /** Segundo plano (minimizar, otra app): detiene el loop de dibujo; al volver lo arranca de nuevo. */
-        void SetPrimerPlano( TBool aPrimerPlano );
+        void SetFirstPlane( TBool aFirstPlane );
 
         /**
          * Callback function for the CPeriodic. Calculates the current frame, keeps the background
@@ -143,7 +143,7 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver {
          * Used to check if SizeChanged() can react to incoming notifications.
          */
         TBool iOpenGlInitialized;
-        TBool iSoltarDedos;   // perdio el foco con dedos apoyados: se levantan en el proximo cuadro
+        TBool iReleaseFingers;   // perdio el foco con dedos apoyados: se levantan en el proximo cuadro
 
         /** Time (int ticks) when the example started running (rendering frames). */
         TUint iStartTimeTicks;

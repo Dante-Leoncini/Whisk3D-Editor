@@ -7,35 +7,35 @@
 --  La pose "mov" sube los vertices: se mira la ALTURA, que en lua es la z
 --  (Z arriba; el tercer valor de verticePos).
 -- ==========================================================================
-propiedades = {
-    a = "objeto",   -- la instancia que se posa (ref_a)
-    b = "objeto",   -- la instancia testigo (ref_b)
+properties = {
+    a = "object",   -- la instancia que se posa (ref_a)
+    b = "object",   -- la instancia testigo (ref_b)
 }
 
 local tick = 0
 local z0 = nil
 
-function inicio()
-    setCompartido("ac_iguales", -1)
-    setCompartido("ac_movida", -1)
-    setCompartido("ac_intacta", -1)
+function start()
+    setShared("ac_iguales", -1)
+    setShared("ac_movida", -1)
+    setShared("ac_intacta", -1)
 end
 
-function actualizar(dt)
+function update(dt)
     tick = tick + 1
-    local A = objeto("a")
-    local B = objeto("b")
+    local A = object("a")
+    local B = object("b")
     if not A or not B then return end
     if tick == 1 then
-        local _, _, za = verticePos(A, 1)
-        local _, _, zb = verticePos(B, 1)
+        local _, _, za = vertexPos(A, 1)
+        local _, _, zb = vertexPos(B, 1)
         z0 = zb
-        setCompartido("ac_iguales", (za == zb) and 1 or 0)
-        animar(A, 1, 1)   -- posa SOLO AniA en el clip "mov" (la pose +2)
+        setShared("ac_iguales", (za == zb) and 1 or 0)
+        animate(A, 1, 1)   -- posa SOLO AniA en el clip "mov" (la pose +2)
     elseif tick == 2 then
-        local _, _, za = verticePos(A, 1)
-        local _, _, zb = verticePos(B, 1)
-        setCompartido("ac_movida", (za ~= z0) and 1 or 0)
-        setCompartido("ac_intacta", (zb == z0) and 1 or 0)
+        local _, _, za = vertexPos(A, 1)
+        local _, _, zb = vertexPos(B, 1)
+        setShared("ac_movida", (za ~= z0) and 1 or 0)
+        setShared("ac_intacta", (zb == z0) and 1 or 0)
     end
 end

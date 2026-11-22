@@ -14,25 +14,25 @@
 --  motor decide si aplica la playlist o el fallback declarado.
 --  Deja nombre e indice leidos en el mapa compartido para los asserts.
 -- ==========================================================================
-propiedades = {
-    cam     = "objeto",   -- la camara (viaja por RielVis o RielOtro)
-    zona    = "objeto",   -- VisZona con riel declarado (recibe identificador)
-    zonaSec = "objeto",   -- VisZona con riel declarado (SIN identificador)
+properties  = {
+    cam     = "object",   -- la camara (viaja por RielVis o RielOtro)
+    zona    = "object",   -- VisZona con riel declarado (recibe identificador)
+    zonaSec = "object",   -- VisZona con riel declarado (SIN identificador)
 }
 
-function inicio()
-    setCompartido("vrm_indice", "-1")
-    setCompartido("vrm_riel", "")
+function start()
+    setShared("vrm_indice", "-1")
+    setShared("vrm_riel", "")
 end
 
-function actualizar(dt)
-    local cam, zona, zonaSec = objeto("cam"), objeto("zona"), objeto("zonaSec")
-    if not (cam and zona and rielDe and setVisCurvaT) then return end
-    local nombre, _, _, _, indice = rielDe(cam)
-    if indice and indice >= 0 then
-        setVisCurvaT(zona, indice, nombre)          -- con identificador
-        if zonaSec then setVisCurvaT(zonaSec, indice) end -- sin: decide la camara
+function update(dt)
+    local cam, zone, zoneSec = object("cam"), object("zona"), object("zonaSec")
+    if not (cam and zone and getRail and setVisCurveT) then return end
+    local name, _, _, _, index = getRail(cam)
+    if index and index >= 0 then
+        setVisCurveT(zone, index, name)          -- con identificador
+        if zoneSec then setVisCurveT(zoneSec, index) end -- sin: decide la camara
     end
-    setCompartido("vrm_indice", string.format("%.2f", indice or -1))
-    setCompartido("vrm_riel", nombre or "")
+    setShared("vrm_indice", string.format("%.2f", index or -1))
+    setShared("vrm_riel", name or "")
 end

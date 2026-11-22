@@ -22,9 +22,9 @@ Les combinaisons modifiées s'affichent en vert. Quand on retire à une fonction
 
 Les raccourcis de chaque contexte s'appliquent quand le pointeur se trouve sur ce panneau ; ceux de **Général** s'appliquent partout. Ceux de **Pendant une transformation** s'appliquent pendant que l'on déplace, fait pivoter ou met à l'échelle quelque chose, et ils sont prioritaires. Dans l'éditeur de scripts, les lettres écrivent toujours : on ne peut y réassigner que des combinaisons avec <kbd>Ctrl</kbd>, <kbd>Alt</kbd> ou les touches F.
 
-## Le fichier atajos.ini
+## Le fichier shortcuts.ini
 
-Les modifications sont enregistrées automatiquement dans `res/atajos.ini`, à côté de `config.ini`. Seules les fonctions modifiées y figurent, et le fichier peut être modifié à la main :
+Les modifications sont enregistrées automatiquement dans `res/shortcuts.ini`, à côté de `config.ini`. Seules les fonctions modifiées y figurent, et le fichier peut être modifié à la main :
 
 ```ini
 # fonction = combinaison, autre combinaison   (vide = aucun raccourci)
@@ -44,7 +44,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Général (n'importe quel panneau)
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Enregistrer projet | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Annuler | <kbd>Ctrl+Z</kbd> | <kbd>C+Gauche</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Vue 3D
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Tout sélectionner | <kbd>A</kbd> | <kbd>Crayon+Haut</kbd> | `3d.seleccionarTodo` |
 | Tout désélectionner | <kbd>Alt+A</kbd> | <kbd>Crayon+Haut</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Pendant une transformation (déplacer / faire pivoter / mettre à l'échelle)
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Confirmer | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
 | Annuler | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Éditeur UV
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Tout sélectionner | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Tout désélectionner | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Timeline
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Tout sélectionner | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Tout désélectionner | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Outliner
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Tout sélectionner | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Tout désélectionner | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Éditeur 2D
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Tout sélectionner | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Tout désélectionner | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Propriétés (étapes d'une routine)
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Saisir étape | <kbd>G</kbd> | — | `props.agarrar` |
 | Supprimer étape | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ Noms des touches : lettres et chiffres tels quels, `Enter`, `Esc`, `Tab`, `Spac
 
 ### Éditeur de scripts
 
-| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans atajos.ini |
+| Fonction | Raccourci par défaut | Nokia N95 (clavier du téléphone) | Nom dans shortcuts.ini |
 |---|---|---|---|
 | Enregistrer script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Annuler | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

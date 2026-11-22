@@ -1,10 +1,10 @@
 {
   "editor": {
-    "mallasMin": 4,
-    "trisOpacosMin": 48
+    "meshesMin": 4,
+    "opaqueTrisMin": 48
   },
   "lote": {
-    "mallas": 1,
-    "trisOpacosMin": 48
+    "meshes": 1,
+    "opaqueTrisMin": 48
   }
 }

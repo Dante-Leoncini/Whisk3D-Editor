@@ -12,7 +12,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.05, 1.0"
 
         Curve {
@@ -34,8 +34,8 @@ Whisk3D {
             near: 0.10
             far: 1000.0
             target: "Mira"
-            riel: "RielIndice"
-            offsetRiel: 4
+            rail: "RielIndice"
+            railOffset: 4
         }
     }
 }

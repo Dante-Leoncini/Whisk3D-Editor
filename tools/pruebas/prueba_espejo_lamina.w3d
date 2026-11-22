@@ -30,7 +30,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.08, 1.0"
 
         Camera {
@@ -50,11 +50,11 @@ Whisk3D {
             mirrorX: false
             mirrorY: true
             mirrorZ: false
-            limiteIzquierdo: 118.5
-            limiteDerecho: 121.5
-            limiteFondo: 998.5
-            limiteFrente: 1001.5
-            hundimientoMaximo: 0.6
+            leftLimit: 118.5
+            rightLimit: 121.5
+            backLimit: 998.5
+            frontLimit: 1001.5
+            maxSink: 0.6
             // el Mirror va en el ORIGEN salvo por la vertical: su matriz de
             // mundo se aplica a puntos de MUNDO, asi que cualquier X/Z distinta
             // de 0 duplicaria esas coordenadas del reflejo. Los limites, en

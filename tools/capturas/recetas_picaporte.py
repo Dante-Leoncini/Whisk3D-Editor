@@ -17,47 +17,47 @@ def W(ux, uy, uz):
 
 def k(*teclas):
     """Teclas y numeros como lineas del harness ('=0.15' se tipea)."""
-    return [("texto " + t[1:]) if t.startswith("=") else ("tecla " + t) for t in teclas]
+    return [("text " + t[1:]) if t.startswith("=") else ("key " + t) for t in teclas]
 
 
-SHIFT_D = ["tecla Left_Shift down", "tecla d", "tecla Left_Shift up", "tecla Escape"]
-CTRL = lambda t: ["tecla Left_Ctrl down", "tecla " + t, "tecla Left_Ctrl up"]
+SHIFT_D = ["key Left_Shift down", "key d", "key Left_Shift up", "key Escape"]
+CTRL = lambda t: ["key Left_Ctrl down", "key " + t, "key Left_Ctrl up"]
 
 # LAS ETAPAS, en orden: cada una deja la escena como queda despues de esa parte del tutorial ({P} = la puerta)
 ETAPAS = [
     ("puerta", ["objname {P}", "objscale 0.45 1 0.05", "objpos 0 1 0", "apply scale", "cursor3d 0.45 1 0",
-                "origen cursor", "cursor3d 0 -30 0", "selobj {P}"]),
-    ("edicion", ["ratonvista3d", "tecla Tab", "selmode face", "select none"]),
-    ("cara", ["elegircerca -0.45 0.05 0"]),
+                "origin cursor", "cursor3d 0 -30 0", "selobj {P}"]),
+    ("edicion", ["mouseview3d", "key Tab", "selmode face", "select none"]),
+    ("cara", ["picknear -0.45 0.05 0"]),
     ("placa", SHIFT_D + k("s", "=0.15", "Return", "s", "z", "=0.45", "Return", "g", "x", "=-0.31", "Return",
                           "e", "=0.03", "Return")),
-    ("separada", ["vinculado", "ratonvista3d", "tecla p", "tecla Tab"]),
-    ("materiales", ["selobj {P}", "matnombre Madera", "matcolor 0.55 0.33 0.17", "selobj {P}.001", "matnew",
-                    "matnombre Metal", "matcolor 0.75 0.75 0.78"]),
-    ("espejo", ["selobj {P}.001", "agregar modificador 1", "propstab 4", "cuadro", "propclic Mirror X",
-                "propclic Mirror Y"]),
-    ("manija_edicion", ["selobj {P}.001", "ratonvista3d", "tecla Keypad_/", "tecla Tab", "selmode face",
-                        "elegircerca -0.76 0.08 0"]),
+    ("separada", ["linked", "mouseview3d", "key p", "key Tab"]),
+    ("materiales", ["selobj {P}", "matname Madera", "matcolor 0.55 0.33 0.17", "selobj {P}.001", "matnew",
+                    "matname Metal", "matcolor 0.75 0.75 0.78"]),
+    ("espejo", ["selobj {P}.001", "addui modifier 1", "propstab 4", "drawframe", "propclick Mirror X",
+                "propclick Mirror Y"]),
+    ("manija_edicion", ["selobj {P}.001", "mouseview3d", "key Keypad_/", "key Tab", "selmode face",
+                        "picknear -0.76 0.08 0"]),
     ("manija_eje", SHIFT_D + k("s", "=0.6", "Return", "e", "=0.08", "Return")),
-    ("manija_brazo", ["selmode edge", "elegircerca -0.8005 0.16 0"] + k("g", "y", "=0.05", "Return") +
-                     ["selmode face", "elegircerca -0.76 0.185 0"] + k("e", "x", "=0.34", "Return", "s", "x", "=0", "Return")),
-    ("manija", ["vinculado", "tecla p", "tecla Tab", "tecla Keypad_/", "renombrarfila {P}.002 Manija"]),
-    ("unida", ["selobj {P}.001", "propstab 4", "cuadro", "propclic Apply Modifier", "selobj {P}.001", "selname {P}",
-               "ratonvista3d"] + CTRL("j")),
-    ("sincaras", ["selobj {P}", "ratonvista3d", "tecla Tab", "selmode face", "elegircerca -0.76 0.05 0",
-                  "elegircerca -0.76 -0.05 0 +", "tecla x", "menuelegir Faces", "tecla Tab"]),
-    ("origen", ["selobj Manija", "propstab 4", "cuadro", "propclic Apply Modifier", "ratonvista3d", "tecla Tab",
-                "selmode face", "elegircerca -0.76 0.08 0", "elegircerca -0.76 -0.08 0 +", "tecla Left_Shift down",
-                "tecla s", "tecla Left_Shift up", "menuelegir Cursor to Selected", "tecla x", "menuelegir Faces",
-                "tecla Tab", "origen cursor"]),
-    ("emparentada", ["selobj Manija", "selname {P}", "ratonvista3d"] + CTRL("p") + ["menuelegir Object (Keep Transform)"]),
+    ("manija_brazo", ["selmode edge", "picknear -0.8005 0.16 0"] + k("g", "y", "=0.05", "Return") +
+                     ["selmode face", "picknear -0.76 0.185 0"] + k("e", "x", "=0.34", "Return", "s", "x", "=0", "Return")),
+    ("manija", ["linked", "key p", "key Tab", "key Keypad_/", "renamerow {P}.002 Manija"]),
+    ("unida", ["selobj {P}.001", "propstab 4", "drawframe", "propclick Apply Modifier", "selobj {P}.001", "selname {P}",
+               "mouseview3d"] + CTRL("j")),
+    ("sincaras", ["selobj {P}", "mouseview3d", "key Tab", "selmode face", "picknear -0.76 0.05 0",
+                  "picknear -0.76 -0.05 0 +", "key x", "menupick Faces", "key Tab"]),
+    ("origen", ["selobj Manija", "propstab 4", "drawframe", "propclick Apply Modifier", "mouseview3d", "key Tab",
+                "selmode face", "picknear -0.76 0.08 0", "picknear -0.76 -0.08 0 +", "key Left_Shift down",
+                "key s", "key Left_Shift up", "menupick Cursor to Selected", "key x", "menupick Faces",
+                "key Tab", "origin cursor"]),
+    ("emparentada", ["selobj Manija", "selname {P}", "mouseview3d"] + CTRL("p") + ["menupick Object (Keep Transform)"]),
 ]
 
 # la camara: de frente y un poco de costado, a la altura del picaporte
-VISTA_PLACA = "vporbita -0.31 1.0 0.05 1.5 -12 -22"
-VISTA_LADO = "vporbita -0.31 1.0 0.0 1.3 -12 -90"      # de canto, desde el borde: una placa de cada lado
-VISTA_PUERTA = "vporbita 0 1.0 0 5.2 -20 -25"          # la puerta entera
-VISTA_45 = "vporbita -0.31 1.0 0.0 1.4 -20 -45"       # a 45 grados: las caras de atras se ven como CARAS (de canto eran lineas)
+VISTA_PLACA = "vporbit -0.31 1.0 0.05 1.5 -12 -22"
+VISTA_LADO = "vporbit -0.31 1.0 0.0 1.3 -12 -90"      # de canto, desde el borde: una placa de cada lado
+VISTA_PUERTA = "vporbit 0 1.0 0 5.2 -20 -25"          # la puerta entera
+VISTA_45 = "vporbit -0.31 1.0 0.0 1.4 -20 -45"       # a 45 grados: las caras de atras se ven como CARAS (de canto eran lineas)
 
 
 def guion(idioma, hasta, vista=VISTA_PLACA):
@@ -99,9 +99,9 @@ def pasos(g, lista, fin=1400):
 
 def teclas_numero(teclas_, numero):
     """[('S', ...), ('0.15', ...), ('Enter', ...)] a partir de 'S' 'Z' y el numero."""
-    out = [(t.upper(), ["tecla " + t]) for t in teclas_]
-    out.append((numero, ["texto " + numero]))
-    out.append(("Enter", ["tecla Return"]))
+    out = [(t.upper(), ["key " + t]) for t in teclas_]
+    out.append((numero, ["text " + numero]))
+    out.append(("Enter", ["key Return"]))
     return out
 
 
@@ -178,7 +178,7 @@ def placa(idioma):
     g = guion(idioma, "edicion")
     g.foto(dur=700)
     clic3d(g, W(-0.45, 0.05, 0))
-    pasos(g, [("Shift + D", ["tecla Left_Shift down", "tecla d", "tecla Left_Shift up"]), ("Esc", ["tecla Escape"])], fin=700)
+    pasos(g, [("Shift + D", ["key Left_Shift down", "key d", "key Left_Shift up"]), ("Esc", ["key Escape"])], fin=700)
     pasos(g, teclas_numero(["s"], "0.15"), fin=600)
     pasos(g, teclas_numero(["s", "z"], "0.45"), fin=600)
     g.linea(VISTA_PLACA.replace("-0.31", "-0.15").replace("1.5", "2.0"))
@@ -197,8 +197,8 @@ def separar(idioma):
     x, y = pantalla(g, W(-0.76, 0.08, 0))
     g.raton_mover(x, y)
     g.foto(dur=800)
-    pasos(g, [("L", ["tecla l"]), ("P", ["tecla p"])], fin=900)
-    pasos(g, [("Tab", ["tecla Tab"])], fin=1800)
+    pasos(g, [("L", ["key l"]), ("P", ["key p"])], fin=900)
+    pasos(g, [("Tab", ["key Tab"])], fin=1800)
     return g.cuadros(calidad=90)
 
 
@@ -209,7 +209,7 @@ def materiales(idioma):
     g = guion(idioma, "materiales")
     g.linea("selobj " + PUERTA[idioma] + ".001")
     g.linea("propstab 2")
-    g.linea("vista3d sombreado 1")
+    g.linea("view3d shading 1")
     g.linea("propscroll 4")                       # (que se vea la tarjeta Material entera)
     g.foto(dur=100, puntero=False)
     return g.cuadros(calidad=92)
@@ -239,11 +239,11 @@ def manija(idioma):
     x, y = pantalla(g, W(-0.76, 0.08, 0))
     g.raton_mover(x, y)
     g.foto(dur=600)
-    pasos(g, [("/", ["tecla Keypad_/"]), ("Tab", ["tecla Tab"])], fin=500)
+    pasos(g, [("/", ["key Keypad_/"]), ("Tab", ["key Tab"])], fin=500)
     g.linea("selmode face")
     g.linea("select none")
     clic3d(g, W(-0.76, 0.08, 0))
-    pasos(g, [("Shift + D", ["tecla Left_Shift down", "tecla d", "tecla Left_Shift up"]), ("Esc", ["tecla Escape"])], fin=600)
+    pasos(g, [("Shift + D", ["key Left_Shift down", "key d", "key Left_Shift up"]), ("Esc", ["key Escape"])], fin=600)
     pasos(g, teclas_numero(["s"], "0.6"), fin=600)
     pasos(g, teclas_numero(["e"], "0.08"))
     return g.cuadros(calidad=90)
@@ -253,13 +253,13 @@ def manija(idioma):
 def brazo(idioma):
     """Arista: la de afuera del lado del borde, G Y 0.05 (la cara de adelante queda inclinada). Cara: esa cara, E X 0.34
     (el brazo, en X y no en la normal) y S X 0 (la punta queda derecha)."""
-    g = guion(idioma, "manija_eje", vista="vporbita -0.16 1.0 0.1 1.2 -25 -20")
+    g = guion(idioma, "manija_eje", vista="vporbit -0.16 1.0 0.1 1.2 -25 -20")
     g.foto(dur=600)
     menu(g, BR_SELMODO, ["Edge"])
     clic3d(g, W(-0.8005, 0.16, 0))
     pasos(g, teclas_numero(["g", "y"], "0.05"), fin=600)
     menu(g, BR_SELMODO, ["Face"])
-    senalar3d(g, W(-0.76, 0.185, 0), "elegircerca -0.76 0.185 0")
+    senalar3d(g, W(-0.76, 0.185, 0), "picknear -0.76 0.185 0")
     pasos(g, teclas_numero(["e", "x"], "0.34"), fin=600)
     pasos(g, teclas_numero(["s", "x"], "0"))
     return g.cuadros(calidad=90)
@@ -268,15 +268,15 @@ def brazo(idioma):
 @receta("picaporte-manija-separar-raton")
 def manija_separar(idioma):
     """L y P separan la manija (Puerta.002); doble click en el Outliner y se llama Manija."""
-    g = guion(idioma, "manija_brazo", vista="vporbita -0.16 1.0 0.1 1.2 -25 -20")
+    g = guion(idioma, "manija_brazo", vista="vporbit -0.16 1.0 0.1 1.2 -25 -20")
     x, y = pantalla(g, W(-0.55, 0.19, 0))
     g.raton_mover(x, y)
     g.foto(dur=600)
-    pasos(g, [("L", ["tecla l"]), ("P", ["tecla p"]), ("Tab", ["tecla Tab"]), ("/", ["tecla Keypad_/"])], fin=900)
+    pasos(g, [("L", ["key l"]), ("P", ["key p"]), ("Tab", ["key Tab"]), ("/", ["key Keypad_/"])], fin=900)
     f = g.info().fila_info(PUERTA[idioma] + ".002")
     g.raton_mover(f["x"], f["y"])
     g.foto(dur=600)
-    g.linea("renombrarfila %s.002 Manija" % PUERTA[idioma])
+    g.linea("renamerow %s.002 Manija" % PUERTA[idioma])
     g.foto(dur=1800)
     return g.cuadros(calidad=90)
 
@@ -298,7 +298,7 @@ def unir(idioma):
     g.clic(x, y)
     g.linea("mod")
     g.foto(dur=800, tecla="Shift + click")
-    pasos(g, [("Ctrl + J", ["tecla Left_Ctrl down", "tecla j", "tecla Left_Ctrl up"])], fin=2000)
+    pasos(g, [("Ctrl + J", ["key Left_Ctrl down", "key j", "key Left_Ctrl up"])], fin=2000)
     return g.cuadros(calidad=90)
 
 
@@ -309,15 +309,15 @@ def rayosx(idioma):
     g = guion(idioma, "unida", vista=VISTA_45)
     g.linea("selobj " + PUERTA[idioma])
     g.foto(dur=600)
-    pasos(g, [("Tab", ["tecla Tab"])], fin=400)
+    pasos(g, [("Tab", ["key Tab"])], fin=400)
     g.linea("selmode face")
     g.linea("select none")
     menu(g, BR_SUPERPOS, ["X-Ray"])
     g.tecla("Escape")
     g.foto(dur=900)
-    senalar3d(g, W(-0.76, 0.05, 0), "elegircerca -0.76 0.05 0")
-    senalar3d(g, W(-0.76, -0.05, 0), "elegircerca -0.76 -0.05 0 +", despues=1000)
-    pasos(g, [("X", ["tecla x"])], fin=500)
+    senalar3d(g, W(-0.76, 0.05, 0), "picknear -0.76 0.05 0")
+    senalar3d(g, W(-0.76, -0.05, 0), "picknear -0.76 -0.05 0 +", despues=1000)
+    pasos(g, [("X", ["key x"])], fin=500)
     menu_abierto(g, "Faces", despues=1800)
     return g.cuadros(calidad=90)
 
@@ -332,18 +332,18 @@ def origen(idioma):
     g.linea("propstab 4")
     g.foto(dur=600)
     clic_prop(g, "Apply Modifier", despues=900)
-    pasos(g, [("Tab", ["ratonvista3d", "tecla Tab"])], fin=400)
+    pasos(g, [("Tab", ["mouseview3d", "key Tab"])], fin=400)
     g.linea("selmode face")
     g.linea("select none")
-    senalar3d(g, W(-0.76, 0.08, 0), "elegircerca -0.76 0.08 0")
-    senalar3d(g, W(-0.76, -0.08, 0), "elegircerca -0.76 -0.08 0 +")
-    pasos(g, [("Shift + S", ["tecla Left_Shift down", "tecla s", "tecla Left_Shift up"])], fin=400)
+    senalar3d(g, W(-0.76, 0.08, 0), "picknear -0.76 0.08 0")
+    senalar3d(g, W(-0.76, -0.08, 0), "picknear -0.76 -0.08 0 +")
+    pasos(g, [("Shift + S", ["key Left_Shift down", "key s", "key Left_Shift up"])], fin=400)
     menu_abierto(g, "Cursor to Selected", despues=1200)
-    pasos(g, [("X", ["tecla x"])], fin=400)
+    pasos(g, [("X", ["key x"])], fin=400)
     menu_abierto(g, "Faces", despues=900)
     x, y = pantalla(g, W(-0.6, 0.19, 0.12))
     g.raton_mover(x, y)
-    pasos(g, [("Tab", ["tecla Tab"]), ("W", ["tecla w"])], fin=400)
+    pasos(g, [("Tab", ["key Tab"]), ("W", ["key w"])], fin=400)
     menu_ruta(g, ["Set Origin", "Origin to 3D Cursor"], despues=2000)
     return g.cuadros(calidad=90)
 
@@ -356,7 +356,7 @@ def flota(idioma):
     g.linea("selobj " + PUERTA[idioma])
     g.foto(dur=900)
     pasos(g, teclas_numero(["r", "z"], "-70"), fin=1800)
-    pasos(g, [("Ctrl + Z", ["tecla Left_Ctrl down", "tecla z", "tecla Left_Ctrl up"])], fin=1200)
+    pasos(g, [("Ctrl + Z", ["key Left_Ctrl down", "key z", "key Left_Ctrl up"])], fin=1200)
     return g.cuadros(calidad=90)
 
 
@@ -375,7 +375,7 @@ def emparentar(idioma):
     g.clic(x, y)
     g.linea("mod")
     g.foto(dur=800, tecla="Shift + click")
-    pasos(g, [("Ctrl + P", ["tecla Left_Ctrl down", "tecla p", "tecla Left_Ctrl up"])], fin=400)
+    pasos(g, [("Ctrl + P", ["key Left_Ctrl down", "key p", "key Left_Ctrl up"])], fin=400)
     menu_abierto(g, "Object (Keep Transform)", despues=1200)
     clic3d(g, W(-0.75, 0.05, 0.85))               # solo la PUERTA: la manija la acompania por ser su hija
     pasos(g, teclas_numero(["r", "z"], "-70"), fin=2200)
@@ -466,7 +466,7 @@ def placa_dedo(idioma):
 def manija_dedo(idioma):
     """Tactil, en la vista local de la placa: la cara de adelante, Duplicar, Escalar 0.6, Extruir 0.08; Arista, la de
     afuera, Mover Y 0.05; Cara, la inclinada, Extruir X 0.34 y Escalar X 0."""
-    g = guion_tactil(idioma, "manija_edicion", vista="vporbita -0.16 1.0 0.1 1.2 -25 -20")
+    g = guion_tactil(idioma, "manija_edicion", vista="vporbit -0.16 1.0 0.1 1.2 -25 -20")
     g.linea("select none")
     g.foto(dur=600)
     toque3d(g, W(-0.76, 0.08, 0))
@@ -479,7 +479,7 @@ def manija_dedo(idioma):
     tocar_menu(g, BR_SELMODO, ["Face"])
     x, y = pantalla(g, W(-0.76, 0.185, 0))
     tocar_en(g, x, y)
-    g.linea("elegircerca -0.76 0.185 0")          # (la inclinada, sin confundirla con la de al lado)
+    g.linea("picknear -0.76 0.185 0")          # (la inclinada, sin confundirla con la de al lado)
     numero_dedo(g, "Extrude", "X", "0.34")
     numero_dedo(g, "Scale", "X", "0")
     g.foto(dur=1500)
@@ -504,7 +504,7 @@ def unir_dedo(idioma):
     g = guion_tactil(idioma, "manija", vista=VISTA_LADO)
     g.linea("selobj " + PUERTA[idioma] + ".001")
     g.linea("propstab 4")
-    g.linea("propclic Apply Modifier")
+    g.linea("propclick Apply Modifier")
     g.linea("selname " + PUERTA[idioma])
     g.foto(dur=900)
     tocar_menu(g, BR_OBJETO, ["Join"])
@@ -526,10 +526,10 @@ def emparentar_dedo(idioma):
 
 
 # ---- Nokia N95 ------------------------------------------------------------------------------------------------------
-def guion_n95(idioma, hasta, vista="vporbita -0.31 1.0 0.05 1.8 -12 -22"):
+def guion_n95(idioma, hasta, vista="vporbit -0.31 1.0 0.05 1.8 -12 -22"):
     g = Guion(idioma, n95="vertical")
-    g.linea("vista3d gizmo 0")
-    g.linea("vista3d barra 0")
+    g.linea("view3d gizmo 0")
+    g.linea("view3d bar 0")
     p = PUERTA[idioma]
     for nombre, lineas in ETAPAS:
         for l in lineas:
@@ -560,7 +560,7 @@ def n95_sin_eje(g, modo, tecla_modo, valor, extruir=False):
     escrito = ""
     for k, c in enumerate(valor):
         escrito += c
-        paso("lápiz + " + escrito, ("lapiz", TECLA_N95.get(c, "num" + c)), lambda c=c: g.linea("texto " + c), junto=(k > 0))
+        paso("lápiz + " + escrito, ("lapiz", TECLA_N95.get(c, "num" + c)), lambda c=c: g.linea("text " + c), junto=(k > 0))
     paso("OK", ("ok",), lambda: g.keypad("aceptar"))
     g.foto(dur=1100)
 
@@ -583,17 +583,17 @@ def placa_nokia(idioma):
 def manija_nokia(idioma):
     """N95 (la cara de la placa ya duplicada): 3, 0.6; 7, 0.08; la arista: 1, 2 (Y), 0.05; la cara inclinada: 7, 1
     (X), 0.34; 3, 1 (X), 0."""
-    g = guion_n95(idioma, "manija_edicion", vista="vporbita -0.16 1.0 0.1 1.3 -25 -20")
+    g = guion_n95(idioma, "manija_edicion", vista="vporbit -0.16 1.0 0.1 1.3 -25 -20")
     g.linea("duplicate")
     g.foto(dur=900)
     n95_sin_eje(g, 3, "3", "0.6")
     n95_sin_eje(g, 1, "7", "0.08", extruir=True)
     g.linea("selmode edge")
-    g.linea("elegircerca -0.8005 0.16 0")
+    g.linea("picknear -0.8005 0.16 0")
     g.foto(dur=700)
     n95_comando(g, 1, "1", 1, "2", "0.05")
     g.linea("selmode face")
-    g.linea("elegircerca -0.76 0.185 0")
+    g.linea("picknear -0.76 0.185 0")
     g.foto(dur=700)
     hechas_extruir_x(g)
     n95_comando(g, 3, "3", 0, "1", "0")
@@ -606,7 +606,7 @@ def hechas_extruir_x(g):
     for rotulo, ids, accion in [("7", ("num7",), lambda: g.keypad("extruir")),
                                 ("1", ("num1",), lambda: g.keypad("eje", 0))] + \
                                [("lápiz + " + "0.34"[:k + 1], ("lapiz", TECLA_N95.get(c, "num" + c)),
-                                 (lambda c=c: g.linea("texto " + c))) for k, c in enumerate("0.34")] + \
+                                 (lambda c=c: g.linea("text " + c))) for k, c in enumerate("0.34")] + \
                                [("OK", ("ok",), lambda: g.keypad("aceptar"))]:
         if rotulo.startswith("lápiz") and hechas and hechas[-1].startswith("lápiz"):
             hechas[-1] = rotulo

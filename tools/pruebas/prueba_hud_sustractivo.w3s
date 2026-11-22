@@ -17,9 +17,9 @@
 #  y lee el pixel del CENTRO del icono en CADA uno: si un solo frame da negro
 #  (r,g,b <= 20), FALLA. 84 ticks = 28 ciclos completos de los 3 frames.
 # ==========================================================================
-abrirw3d prueba_hud_sustractivo.w3d
+openw3d prueba_hud_sustractivo.w3d
 loadtex
-juego on
+game on
 simplay 2
 hudanimpx IconoAnim 84
-juego off
+game off

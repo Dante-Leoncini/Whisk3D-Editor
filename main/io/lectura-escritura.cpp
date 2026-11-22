@@ -14,7 +14,7 @@
 //  TRES importadores que usa el menu -OBJ, glTF/GLB y FBX- no lo tocaban nunca,
 //  asi que para el usuario real 'origen' no existia: no habia "reimportar desde
 //  el original", el archivo del usuario no se marcaba como referencia externa (no
-//  salia el renglon en EXTERNOS.txt) y el aviso de "el archivo de origen no esta"
+//  salia el renglon en EXTERNALS.txt) y el aviso de "el archivo de origen no esta"
 //  al reabrir no podia dispararse jamas. Lo que se habia probado como OK era el
 //  camino legacy, no el que usa el dueno.
 //
@@ -44,13 +44,13 @@ static unsigned int SerialMaxRec(Object* o) {
 }
 
 // marca 'origen' en toda malla NACIDA en este import (serial > la marca de agua)
-static void MarcarOrigenRec(Object* o, const std::string& path, unsigned int desdeSerial) {
+static void MarkOriginRec(Object* o, const std::string& path, unsigned int fromSerial) {
     if (!o) return;
     if (o->getType() == ObjectType::mesh) {
         Mesh* m = (Mesh*)o;
-        if (o->serial > desdeSerial && m->origen.empty()) m->origen = path;
+        if (o->serial > fromSerial && m->origin.empty()) m->origin = path;
     }
-    for (size_t i = 0; i < o->Childrens.size(); i++) MarcarOrigenRec(o->Childrens[i], path, desdeSerial);
+    for (size_t i = 0; i < o->Childrens.size(); i++) MarkOriginRec(o->Childrens[i], path, fromSerial);
 }
 
 // dispatch por EXTENSION: .fbx -> ImportFBX; .gltf/.glb -> ImportGLTF; .stl -> ImportSTL; el resto (.obj) -> ImportOBJ.
@@ -58,40 +58,40 @@ static void MarcarOrigenRec(Object* o, const std::string& path, unsigned int des
 // llama para "--open <archivo>". Lo que es solo de PC es el explorador de archivos, no esto.
 // ES LA PUERTA UNICA: cualquier camino que importe un modelo (file browser, menu Add > Import,
 // --open, el picker de la web, el comando 'import' del harness) tiene que entrar por aca, o la
-// malla queda sin origen y el .w3d guardado sale sin EXTERNOS.txt.
-bool ImportModeloPorExtension(const std::string& path) {
+// malla queda sin origen y el .w3d guardado sale sin EXTERNALS.txt.
+bool ImportModelByExtension(const std::string& path) {
     size_t d = path.find_last_of('.');
     std::string ext = (d == std::string::npos) ? std::string() : path.substr(d);
     for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
-    const unsigned int antes = SerialMaxRec(SceneCollection);
+    const unsigned int prev = SerialMaxRec(SceneCollection);
     bool ok;
     if (ext == ".fbx") ok = ImportFBX(path);
     else if (ext == ".gltf" || ext == ".glb") ok = ImportGLTF(path);
     else if (ext == ".stl") ok = ImportSTL(path);
     else               ok = ImportOBJ(path, false);
-    MarcarOrigenRec(SceneCollection, path, antes);
+    MarkOriginRec(SceneCollection, path, prev);
     return ok;
 }
 
-void ImportModeloCallback(const std::string& path) { ImportModeloPorExtension(path); }
+void ImportModelCallback(const std::string& path) { ImportModelByExtension(path); }
 
 #if defined(ANDROID) || defined(W3D_SYMBIAN)
 
-int abrir() { return 0; }              // TODO: picker propio
-int BuscarVertexAnimation() { return 0; }
+int open() { return 0; }              // TODO: picker propio
+int FindVertexAnimation() { return 0; }
 
 #else
 
 #include "ViewPorts/PopUp/FileBrowser.h" // el explorador COMPARTIDO (reemplaza tinyfd)
 #include "W3dLang.h"                       // T(): el titulo del explorador en el idioma del editor
 
-int abrir() {
+int open() {
     // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX + glTF/GLB + STL)
-    AbrirFileBrowser(T("Import 3D model"), T("Import 3D model"), ".obj .fbx .gltf .glb .stl", ImportModeloCallback);
+    OpenFileBrowser(T("Import 3D model"), T("Import 3D model"), ".obj .fbx .gltf .glb .stl", ImportModelCallback);
     return 0;
 }
 
-int BuscarVertexAnimation() {
+int FindVertexAnimation() {
     // (la animacion por vertices todavia no esta implementada; cuando lo este
     //  se abre el browser con filtro .txt y se carga. Sin dialogo nativo.)
     return 0;

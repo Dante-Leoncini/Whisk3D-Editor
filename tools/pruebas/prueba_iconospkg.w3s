@@ -8,4 +8,4 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_iconospkg.w3s
 # ==========================================================================
-iconospkg
+iconspkg

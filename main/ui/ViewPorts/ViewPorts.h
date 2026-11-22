@@ -11,7 +11,7 @@
 
 #include "objects/Objects.h"
 #include "WhiskUI/core/UI.h" // globals de escala/layout (compartidos)
-#include "WhiskUI/theme/colores.h" // paleta compartida (ListaColores/ColorID)
+#include "WhiskUI/theme/colors.h" // paleta compartida (ColorList/ColorID)
 #include "WhiskUI/draw/icons.h"   // iconos compartidos (mismo atlas font.png)
 #include "WhiskUI/widgets/Button.h"  // boton compartido (barra de viewports)
 #include "WhiskUI/draw/rectangle.h" // linea separadora de la barra
@@ -22,7 +22,7 @@ class Scrollable; // ScrollBar.h (que incluye a este: por eso va declarada, no i
 
 // El icono de un objeto se DERIVA de su tipo (el core ya no guarda iconos de UI).
 // Compartido por Outliner + Properties; definido en Outliner.cpp.
-size_t IconoDeObjeto(Object* o);
+size_t ObjectIcon(Object* o);
 
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
@@ -67,34 +67,34 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp);
 
 // Botones de barra por ROL (no por indice): reordenar una barra no rompe el dispatch.
 // Sirven para la barra superior (BarButtons) Y la toolbar (ToolButtons). Def en ViewPort3D.cpp.
-Button* BarRolBtn(std::vector<Button*>& B, int rol); // el boton con ese rol (NULL si no esta)
-int     BarRolIdx(std::vector<Button*>& B, int rol); // su INDICE (para la nav izq/der), -1 si no esta
+Button* BarRoleBtn(std::vector<Button*>& B, int role); // el boton con ese rol (NULL si no esta)
+int     BarRoleIdx(std::vector<Button*>& B, int role); // su INDICE (para la nav izq/der), -1 si no esta
 
 // MRU de acciones de una toolbar (compartido; def en ToolbarBase.cpp): 'id' pasa al frente,
 // sin repetidos, hasta 8. Cada editor tiene SU historial (el 3D dos: objeto/edicion).
 void ToolbarMRU(std::vector<int>& hist, int id);
 // texto de una accion TB* del historial (TBMove/TBRotate/... de variables.h), ya traducido.
-const char* ToolbarAccionLabel(int id);
+const char* ToolbarActionLabel(int id);
 
 // ---- FILA DE BARRAS DEL PINCEL: estado GLOBAL del gesto y del foco (def en ToolbarBase.cpp).
 // Global y no por viewport a proposito: el pincel es UNO solo (BrushGet) y solo se puede
 // arrastrar una barra a la vez, igual que el drag del item-slider de los menus (MenuSliderDrag*).
-bool BrushBarDragActivo();          // hay un arrastre de barra armado (el down cayo en una)
-void BrushBarDragMover(int mx, int my); // el mouse se movio con el boton apretado -> valor en vivo
-void BrushBarDragSoltar();          // se solto: si NO hubo arrastre fue un TAP -> edicion numerica
+bool BrushBarDragActive();          // hay un arrastre de barra armado (el down cayo en una)
+void BrushBarDragMove(int mx, int my); // el mouse se movio con el boton apretado -> valor en vivo
+void BrushBarDragRelease();          // se solto: si NO hubo arrastre fue un TAP -> edicion numerica
 // TECLADO (Symbian/keypad): arriba/abajo turnan entre las dos barras, OK entra a editarlas
 // (y ahi izquierda/derecha mueven el valor), C/Cancel suelta el foco. true = la tecla se consumio.
-bool BrushBarTecla(ViewportBase* vp, int tecla);
-int  BrushBarFoco();                // barra enfocada por teclado: -1 ninguna, 0 radio, 1 valor
-bool BrushBarEditando();            // el foco esta en modo ajuste (OK apretado): izq/der mueven
-void BrushBarSoltarFoco();          // saca el foco (al salir del modo pintura)
+bool BrushBarKey(ViewportBase* vp, int key);
+int  BrushBarFocus();                 // barra enfocada por teclado: -1 ninguna, 0 radio, 1 valor
+bool BrushBarEditing();               // el foco esta en modo ajuste (OK apretado): izq/der mueven
+void BrushBarReleaseFocus();          // saca el foco (al salir del modo pintura)
 class ViewportBase;
-void BrushBarOlvidarViewport(ViewportBase* vp); // el viewport murio en medio del gesto: olvidarlo
-bool BrushBarArrastrandoRadio();       // la barra del RADIO del pincel se esta arrastrando (vista previa en el 3D)
+void BrushBarForgetViewport(ViewportBase* vp); // el viewport murio en medio del gesto: olvidarlo
+bool BrushBarDraggingRadius();       // la barra del RADIO del pincel se esta arrastrando (vista previa en el 3D)
 
 // Variables UV/indices
 extern GLubyte indicesBorder[];
-extern GLfloat bourderUV[32];
+extern GLfloat borderUV[32];
 
 /**
  * @brief Clase base de todo panel de la UI del editor.
@@ -133,7 +133,7 @@ class ViewportBase {
         // Antes esto era una tabla de downcasts a mano indexada por ViewportKind(), en LayoutInput: para que un
         // viewport nuevo tuviera scroll habia que acordarse de agregarlo ALLA. Si te olvidabas, la barra se
         // dibujaba y no respondia a nada. Asi el enganche vive en el propio viewport y es una linea.
-        virtual Scrollable* ComoScrollable() { return NULL; }
+        virtual Scrollable* AsScrollable() { return NULL; }
 
         virtual void event_mouse_motion(int mx, int my);
         virtual void button_left();
@@ -142,19 +142,19 @@ class ViewportBase {
         // El viewport abre el menu de barra que este bajo (mx,my), si hay alguno. Lo llama el ruteo compartido al
         // pasar el mouse SIN click, para deslizarse de un menu a otro. Solo menus: deslizarse por encima de un
         // boton de accion no puede dispararla. false = ahi no hay ningun menu.
-        virtual bool AbrirMenuDeBarra(int mx, int my) { (void)mx; (void)my; return false; }
+        virtual bool OpenBarMenu(int mx, int my) { (void)mx; (void)my; return false; }
         virtual void button_down();
         // Input: teclas/rueda/soltar. Ya no dependen de SDL (ver W3dInput.h), asi que existen en TODAS las
         // plataformas: es lo que permite que el ruteo por viewport activo sea UNO SOLO. Mientras pedian un
         // SDL_Event, en el telefono se compilaban afuera y cada tecla habia que reinventarla desde el otro lado.
-        virtual void event_key_down(int tecla, bool repeticion);
-        virtual void event_key_up(int tecla);
+        virtual void event_key_down(int keyCode, bool repeat);
+        virtual void event_key_up(int key);
         // La rueda ocurre EN una posicion, y esa posicion VIENE CON EL EVENTO. No se lee de lastMouseX/Y: esos
         // son el ULTIMO CLICK, no donde esta el cursor -- solo los refrescan el click y el warp. Con el global, la
         // rueda sobre Properties no scrolleaba hasta que clickeabas algo (la barra se la comia por una posicion
         // vieja).
         virtual void event_mouse_wheel(float dy, int mx, int my);
-        virtual void mouse_button_up(int boton);
+        virtual void mouse_button_up(int button);
         // gesto de 2 dedos (web/movil): zoomDelta = pinch (abrir dedos = acercar); panDx/panDy = arrastre
         // del punto medio en pixeles. Default vacio; lo implementa el Viewport3D (zoom + paneo).
         virtual void event_finger_gesture(float zoomDelta, float panDx, float panDy);
@@ -162,7 +162,7 @@ class ViewportBase {
         // dedos; panDx/panDy = cuanto se corrio desde el evento anterior; (sepX0, sepY0) -> (sepX1, sepY1) = la separacion
         // entre los dedos (dedo 2 - dedo 1) antes y ahora. Los editores 2D hacen con esto el zoom ANCLADO a los dedos y
         // proporcional (lo que estaba debajo de los dedos se queda debajo), y por eje en las curvas. false = no lo usa:
-        // controles.cpp manda el event_finger_gesture de siempre.
+        // controls.cpp manda el event_finger_gesture de siempre.
         virtual bool event_finger_pinch(float cx, float cy, float panDx, float panDy,
                                         float sepX0, float sepY0, float sepX1, float sepY1) {
             (void)cx; (void)cy; (void)panDx; (void)panDy; (void)sepX0; (void)sepY0; (void)sepX1; (void)sepY1;
@@ -176,24 +176,24 @@ class ViewportBase {
         // en la barra (ahi consume el evento). La usan los event_mouse_wheel / event_finger_scroll.
         bool BarScrollHorizontal(int px, int py, int delta);
         // virtuales: la barra superior O la de HERRAMIENTAS (abajo) entran al hit-test/scroll.
-        // OnBar setea toolGesto para que BarScrollBy scrollee la barra donde ARRANCO el gesto.
+        // OnBar setea toolGesture para que BarScrollBy scrollee la barra donde ARRANCO el gesto.
         virtual bool OnBar(int px, int py);  // (px,py) cae en una barra? (hit-test, sin scrollear)
         virtual void BarScrollBy(int delta); // scroll horizontal de la barra SIN hit-test (gesto ya lockeado)
         // touch: (mx,my) cae sobre un campo NUMERICO editable (value box)? Default false; lo redefine
         // Properties. Si true, el arrastre horizontal edita (slider) en vez de scrollear.
-        virtual bool PuntoEnCampoNumerico(int mx, int my) { return false; }
+        virtual bool PointInFieldNumeric(int mx, int my) { return false; }
         // SLIDER TACTIL: arrastre horizontal dentro de un campo numerico edita su valor (independiente del
         // gFloatDrag de mouse). Armar guarda el campo bajo (mx,my); Mover suma dx*dragStep; Soltar limpia.
-        virtual bool TouchSliderArmar(int mx, int my) { return false; }
-        virtual void TouchSliderMover(int dx) {}
-        virtual void TouchSliderSoltar() {}
+        virtual bool TouchSliderBuild(int mx, int my) { return false; }
+        virtual void TouchSliderMove(int dx) {}
+        virtual void TouchSliderRelease() {}
 
         virtual void Render() = 0;
         virtual void Resize(int newW, int newH);
 
         // barra de botones del viewport, siempre visible (arriba o,
         // a eleccion del usuario, abajo)
-        bool barAbajo;
+        bool barDown;
         GLfloat barAlpha; // 1 = opaca; el 3D usa 0.5 (se ve la escena)
         std::vector<Button*> BarButtons; // [0] = boton de icono (derecha)
         std::vector<Tab*> BarTabs; // pestanias (por ahora sin accion)
@@ -204,9 +204,9 @@ class ViewportBase {
         int barScrollManual; // scroll por rueda del mouse (PC); se usa cuando NO
                              // hay foco de teclado (sino el foco centra el boton)
         Card* barCard;
-        Rec2D* barLinea; // separador oscuro bajo la barra (no en el 3D)
+        Rec2D* barLine; // separador oscuro bajo la barra (no en el 3D)
 
-        void BarCrear();   // crea la barra con el boton de icono comun
+        void BarCreate();   // crea la barra con el boton de icono comun
         int BarHeight() const;
         int BarTopOffset() const; // alto que la barra le come al contenido
         void RenderBar();  // dibujar al final del Render (en ortho 2D)
@@ -214,7 +214,7 @@ class ViewportBase {
         // menu enfocado, y los sx/sy absolutos de botones/pestañas). La llama
         // RenderBar antes de dibujar y el ruteo de teclado antes de abrir un
         // menu (asi el hit-test usa la posicion YA scrolleada).
-        void ActualizarBarra();
+        void UpdateBar();
         void BarHover(int mx, int my);
         bool BarClick(int mx, int my); // true: el click es de la barra
 
@@ -222,24 +222,24 @@ class ViewportBase {
         // botones persistentes por ROL, scroll horizontal, hit tolerante (tap desviado agarra el
         // boton mas cercano en X), render y MRU (ToolbarMRU). Cada editor pone SUS botones en el
         // ctor y define la parte CONTEXTUAL en dos virtuales chicos:
-        //   ToolbarSincronizar() = visibilidad/colores/texto segun el estado (puro, sin GL -> testeable)
-        //   ToolbarAccionRol(r)  = que hace el boton con rol r al clickearlo
+        //   ToolbarSync() = visibilidad/colores/texto segun el estado (puro, sin GL -> testeable)
+        //   ToolbarActionRole(r)  = que hace el boton con rol r al clickearlo
         // La usan el 3D (historial+transform), el UV editor y el Editor 2D (G/R/S). Un viewport sin
         // ToolButtons no tiene toolbar (OnToolbar/Render devuelven que no hay). ----
-        std::vector<Button*> ToolButtons; // botones persistentes (con ->rol)
+        std::vector<Button*> ToolButtons; // botones persistentes (con ->role)
         int  toolScroll;                  // scroll horizontal manual de la toolbar
-        int  toolFoco;                    // TECLADO (el softkey derecho del N95): el boton enfocado (-1 = ninguno)
-        bool ToolbarFocoMover(int dir);   // al visible anterior / siguiente (false = no hay barra o botones)
-        bool ToolbarFocoActivar();        // OK: la accion del enfocado (el mismo camino que el click)
-        bool toolGesto;                   // el gesto de arrastre arranco sobre la toolbar (no la barra de arriba)
+        int  toolFocus;                   // TECLADO (el softkey derecho del N95): el boton enfocado (-1 = ninguno)
+        bool ToolbarFocusMove(int dir);   // al visible anterior / siguiente (false = no hay barra o botones)
+        bool ToolbarFocusActivate();      // OK: la accion del enfocado (el mismo camino que el click)
+        bool toolGesture;                 // el gesto de arrastre arranco sobre la toolbar (no la barra de arriba)
         virtual bool ToolbarVisible() const;   // default: hay botones. Cada editor lo restringe (contexto)
         int  ToolbarHeight() const;            // = BarHeight()
         bool OnToolbar(int px, int py) const;  // (px,py) cae en la toolbar?
         void ToolbarScrollBy(int delta);
-        virtual void ToolbarSincronizar() {}   // visibilidad CONTEXTUAL (estado puro; cada editor la define)
-        void ToolbarActualizar();              // Sincronizar + layout (anchos, clamp del scroll, sx/sy absolutos)
-        bool ToolbarClick(int mx, int my);     // hit tolerante + despacho por rol (true = consumido)
-        virtual void ToolbarAccionRol(int rol) { (void)rol; } // accion del boton con ese rol
+        virtual void ToolbarSync() {}        // visibilidad CONTEXTUAL (estado puro; cada editor la define)
+        void ToolbarUpdate();                // Sincronizar + layout (anchos, clamp del scroll, sx/sy absolutos)
+        bool ToolbarClick(int mx, int my);   // hit tolerante + despacho por rol (true = consumido)
+        virtual void ToolbarActionRole(int role) { (void)role; } // accion del boton con ese rol
         virtual void RenderToolbar();          // fondo + botones (al final del Render, en ortho 2D)
 
         // ---- FILA DE BARRAS DEL PINCEL (arriba de la toolbar), COMPARTIDA (ToolbarBase.cpp).
@@ -264,18 +264,18 @@ class ViewportBase {
         // (UV editor / Editor 2D) implementa estos hooks chicos y lo comun corre por la base,
         // sin duplicar. El 3D NO los implementa: su transform va por el estado global (es la
         // referencia de la que se extrajo esta mecanica) y NumInput cae a sus caminos de siempre. ----
-        virtual bool XformEnCurso() const { return false; }   // hay un G/R/S propio en curso
+        virtual bool XformInProgress() const { return false; }   // hay un G/R/S propio en curso
         // un ARRASTRE propio que tiene que poder salir del viewport (las filas del outliner: llegar al borde hace
-        // auto-scroll): el cursor NO se envuelve al borde opuesto mientras dura (controles.cpp)
-        virtual bool SinEnvolverCursor() const { return false; }
-        virtual void XformNumValor(float v) { (void)v; }      // aplicar el valor exacto tipeado (NumInput)
-        virtual void XformConfirmar() {}                      // tilde / Enter / click
-        virtual void XformCancelar() {}                       // cruz / Esc / click derecho
-        virtual void XformToggleEje(int eje) { (void)eje; }   // 1=X 2=Y (teclas y toolbar, MISMO camino)
-        virtual std::string XformTextoBarra() { return std::string(); } // texto de la barra de info
+        // auto-scroll): el cursor NO se envuelve al borde opuesto mientras dura (controls.cpp)
+        virtual bool NoWrapCursor() const { return false; }
+        virtual void XformNumValue(float v) { (void)v; }         // aplicar el valor exacto tipeado (NumInput)
+        virtual void XformConfirm() {}                           // tilde / Enter / click
+        virtual void XformCancel() {}                            // cruz / Esc / click derecho
+        virtual void XformToggleAxis(int axis) { (void)axis; }   // 1=X 2=Y (teclas y toolbar, MISMO camino)
+        virtual std::string XformTextBar() { return std::string(); } // texto de la barra de info
         // durante el transform la barra de menu se vuelve barra de INFO (fondo + texto accent);
-        // extraida del RenderBarraTransform del 3D. Def. en TransformUI.cpp.
-        void RenderBarraInfo(const std::string& texto);
+        // extraida del RenderBarTransform del 3D. Def. en TransformUI.cpp.
+        void RenderBarInfo(const std::string& text);
 
         // el mouse se fue a OTRO viewport: apagar el hover propio
         virtual void ClearHover() {}
@@ -301,7 +301,7 @@ class ViewportRow : public ViewportBase {
         void Resize(int newW, int newH) W3D_OVERRIDE;
         void Render() W3D_OVERRIDE;
         void button_left() W3D_OVERRIDE;
-        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void mouse_button_up(int button) W3D_OVERRIDE;
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
 
         // ------------------ Funciones propias ------------------
@@ -328,12 +328,12 @@ class ViewportColumn : public ViewportBase {
         void Render() W3D_OVERRIDE;
 
         void button_left() W3D_OVERRIDE;
-        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void mouse_button_up(int button) W3D_OVERRIDE;
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
 };
 
 // el OUTLINER de la escena (2) y la BIBLIOTECA (9) son la misma clase (Outliner): el input, el arrastre y los atajos
 // los tratan igual
-inline bool VpEsOutliner(const ViewportBase* v) { if (!v) return false; const int k = v->ViewportKind(); return k == 2 || k == 9; }
+inline bool VpIsOutliner(const ViewportBase* v) { if (!v) return false; const int k = v->ViewportKind(); return k == 2 || k == 9; }
 
 #endif

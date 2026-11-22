@@ -10,83 +10,83 @@
 #     cuando la escena se edita (cada paso de undo) y cuando cambia su camara activa (que no apila undo);
 #   - una raiz sin cargar (perezosa) no se carga por su miniatura;
 #   - no van al .w3d.
-ventana 1280 720
+window 1280 720
 
 # ---- 0) la escena por defecto: su camara mira al cubo (el medio de la miniatura esta pintado) ----
-escenadefecto
-outvista biblioteca
-outcuadricula 1
-outmini Scene si centro colorvivo
-outmini Scene si celda centro colorvivo
+scenedefault
+outview library
+outgrid 1
+outmini Scene si center vividcolor
+outmini Scene si cell center vividcolor
 
 # ---- A) una escena que mira por su camara ACTIVA: "Frente" ve el cubo, "Atras" le da la espalda ----
-raiznueva escena Otra
-raizcamara Frente 0 0 8
+rootnew scene Otra
+rootcamera Frente 0 0 8
 add cube
-raizcamara Atras 0 0 -8
-camactiva set Atras
-raizcontexto camara Atras
-raizabrir Scene
-outvista biblioteca
-outcuadricula 1
+rootcamera Atras 0 0 -8
+camactive set Atras
+rootcontext camera Atras
+rootopen Scene
+outview library
+outgrid 1
 # (la activa de Otra es Atras, que no ve nada; la primera de su arbol, Frente, si veria el cubo)
-outmini Otra si vacia
-outmini Otra si celda vacia
+outmini Otra si empty
+outmini Otra si cell empty
 # elegir otra camara activa no apila un paso de undo: la miniatura se rehace igual
-raizabrir Otra
-camactiva set Frente
-raizabrir Scene
-outvista biblioteca
-outmini Otra si centro colorvivo
-outmini Otra si celda centro colorvivo
+rootopen Otra
+camactive set Frente
+rootopen Scene
+outview library
+outmini Otra si center vividcolor
+outmini Otra si cell center vividcolor
 
 # ---- B) la del CACHE se rehace con cada EDICION: esconder el cubo de la escena la vacia; Ctrl+Z la vuelve ----
-outvista escena
+outview scene
 outclick Cubo
 outmenu Hide/Show
 objvis Cubo 0
-outvista biblioteca
-outcuadricula 1
-outmini Scene si celda vacia
+outview library
+outgrid 1
+outmini Scene si cell empty
 undo
 objvis Cubo 1
-outmini Scene si celda centro colorvivo
+outmini Scene si cell center vividcolor
 
 # ---- C) un PREFAB: encuadrado de frente (su camara no cuenta); uno vacio no tiene ----
-raiznueva prefab Caja
+rootnew prefab Caja
 add cube
-raizcamara Mirilla 0 0 -8
-raiznueva prefab Vacio
-raizabrir Scene
-outvista biblioteca
-outmini Caja si centro colorvivo
-outmini Caja si celda centro colorvivo
+rootcamera Mirilla 0 0 -8
+rootnew prefab Vacio
+rootopen Scene
+outview library
+outmini Caja si center vividcolor
+outmini Caja si cell center vividcolor
 outmini Vacio no
 
 # ---- D) no van al .w3d (con 1 miniatura en el cache y con 3, los mismos bytes); al abrir, las raices
 #      perezosas no se cargan por su miniatura ----
-guardarw3d prueba_biblioteca_miniaturas_v4.w3d
-abrirw3d prueba_biblioteca_miniaturas_v4.w3d
-outvista biblioteca
-outcuadricula 1
-outmini Scene si celda centro colorvivo
+savew3d prueba_biblioteca_miniaturas_v4.w3d
+openw3d prueba_biblioteca_miniaturas_v4.w3d
+outview library
+outgrid 1
+outmini Scene si cell center vividcolor
 outmini Otra no
 outmini Caja no
 # (guardar carga las perezosas solo para escribirlas y las vuelve a soltar: siguen sin miniatura)
-guardarw3d prueba_biblioteca_miniaturas_rt1.w3d
+savew3d prueba_biblioteca_miniaturas_rt1.w3d
 outmini Otra no
 # abrirla la carga: desde ahi tiene la suya (desde su camara)
-raizabrir Otra
-raizabrir Caja prefab
-raizabrir Scene
-outvista biblioteca
-outmini Otra si celda centro colorvivo
-outmini Caja si celda centro colorvivo
-guardarw3d prueba_biblioteca_miniaturas_rt2.w3d
-w3diguales prueba_biblioteca_miniaturas_v4.w3d prueba_biblioteca_miniaturas_rt1.w3d
-w3diguales prueba_biblioteca_miniaturas_rt1.w3d prueba_biblioteca_miniaturas_rt2.w3d
+rootopen Otra
+rootopen Caja prefab
+rootopen Scene
+outview library
+outmini Otra si cell center vividcolor
+outmini Caja si cell center vividcolor
+savew3d prueba_biblioteca_miniaturas_rt2.w3d
+w3dequal prueba_biblioteca_miniaturas_v4.w3d prueba_biblioteca_miniaturas_rt1.w3d
+w3dequal prueba_biblioteca_miniaturas_rt1.w3d prueba_biblioteca_miniaturas_rt2.w3d
 
 # ---- lo que no tiene que pasar ----
 fail outmini Scene si celda vacia
 fail outmini Vacio si
-fail outmini Otra si nada
+fail outmini Otra si none

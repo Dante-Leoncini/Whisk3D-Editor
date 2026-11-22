@@ -22,9 +22,9 @@ Changed combinations are shown in green. When a default shortcut is taken away f
 
 The shortcuts of each context apply when the pointer is over that panel; the **General** ones apply everywhere. The **During a transform** ones apply while something is being moved, rotated or scaled, and they take priority. In the script editor, letters always type: there you can only reassign combinations with <kbd>Ctrl</kbd>, <kbd>Alt</kbd> or F keys.
 
-## The atajos.ini file
+## The shortcuts.ini file
 
-Changes are saved automatically in `res/atajos.ini`, next to `config.ini`. Only the changed functions are listed, and the file can be edited by hand:
+Changes are saved automatically in `res/shortcuts.ini`, next to `config.ini`. Only the changed functions are listed, and the file can be edited by hand:
 
 ```ini
 # function = combination, another combination   (empty = no shortcut)
@@ -44,7 +44,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### General (any panel)
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Save project | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### 3D Viewport
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### During a transform (move / rotate / scale)
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
 | Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### UV Editor
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### Timeline
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### Outliner
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### 2D Editor
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Select All | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Deselect All | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### Properties (routine steps)
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Grab step | <kbd>G</kbd> | — | `props.agarrar` |
 | Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 ### Script Editor
 
-| Function | Default shortcut | Nokia N95 (phone keypad) | Name in atajos.ini |
+| Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
 | Save script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Undo | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

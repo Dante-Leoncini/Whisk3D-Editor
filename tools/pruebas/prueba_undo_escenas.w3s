@@ -16,6 +16,6 @@
 #  (escenaborra va PRIMERO: la lista de escenas es del proceso y arranca con una sola)
 # ==========================================================================
 
-ventana 640 480
-escenaborra
-delescena
+window 640 480
+scenedelete
+delscene

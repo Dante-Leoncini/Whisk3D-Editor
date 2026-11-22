@@ -18,19 +18,19 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
-juegohitboxmin /tmp/w3d_f5_hitbox
-guardarw3d /tmp/w3d_f5_hitbox/juegohitbox.w3d
-abrirw3d /tmp/w3d_f5_hitbox/juegohitbox.w3d
+window 640 480
+gamehitboxmin /tmp/w3d_f5_hitbox
+savew3d /tmp/w3d_f5_hitbox/juegohitbox.w3d
+openw3d /tmp/w3d_f5_hitbox/juegohitbox.w3d
 
 # --- el Play del editor (el juez exige UN alTocar por lado y sigue mirando 1 s mas) ---
 simplay 120
-scriptinfo compartido juez OK
-scriptinfo compartido puerta_quedarse 7
-compartidonum piso_tocar 1
-compartidonum caja_tocar 1
+scriptinfo shared juez OK
+scriptinfo shared puerta_quedarse 7
+sharednum piso_tocar 1
+sharednum caja_tocar 1
 simstop
 
 # --- el binario (modo debug: deja su whisk3d.log) ---
-compilarjuego 0 0 1
-juegohitboxlog /tmp/w3d_f5_hitbox juegohitbox
+compilegame 0 0 1
+gamehitboxlog /tmp/w3d_f5_hitbox juegohitbox

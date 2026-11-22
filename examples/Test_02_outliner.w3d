@@ -1,5 +1,5 @@
 Whisk3D {
-    Escena {
+    Scene {
         Mesh {
             name: "Cube01"
             x: 0.0

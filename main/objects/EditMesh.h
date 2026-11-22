@@ -48,64 +48,64 @@ class EditMesh {
         std::vector<std::vector<int> > faceEdges; // faceEdges[f] = indices de arista del poligono
         std::vector<GLfloat> faceCenter;          // centro xyz de cada cara (los puntitos)
         std::vector<GLubyte> facePtCol;           // color del puntito por cara (negro/verde/blanco)
-        std::vector<unsigned char> caraCerrada;   // (telefono) la cara es de un pedazo CERRADO de la malla: si mira para
+        std::vector<unsigned char> closedFace;    // (telefono) la cara es de un pedazo CERRADO de la malla: si mira para
                                                   // atras, la tapa la propia malla (se calcula al dibujar, una vez)
         std::vector<MeshIndex> faceTriDyn;         // triangulos de las caras SELECCIONADAS (fill)
         int activeIdx;                            // ultimo sub-elemento seleccionado (activo) o -1
         // skinGeomVersion de src con el que se lleno pos[]. Si src->skinGeomVersion difiere,
         // algo movio vertex[] POR FUERA de la edicion (tipico: una vertex anim parada en un
         // frame del timeline -> EvalVertexAnim deforma vertex[] y bumpea la version). Entonces
-        // el cage quedo en la pose vieja y hay que re-derivarlo con SincronizarPos. Editar
-        // verts (EmpujarPosiciones) NO bumpea la version -> la edicion en curso no se re-pisa.
+        // el cage quedo en la pose vieja y hay que re-derivarlo con SyncPos. Editar
+        // verts (PushPositions) NO bumpea la version -> la edicion en curso no se re-pisa.
         unsigned syncedGeomVersion;
         // (las capas de datos -UV maps / vertex colors / vertex groups- viven PERSISTENTES
-        //  en el Mesh, no aca: ver Mesh::uvMaps/colorLayers/vertexGroups + Mesh::GenerarRender)
+        //  en el Mesh, no aca: ver Mesh::uvMaps/colorLayers/vertexGroups + Mesh::GenerateRender)
 
         EditMesh();
 
-        void Construir(Mesh* m);  // arma todo desde la malla de render (1 vez)
+        void Build(Mesh* m);  // arma todo desde la malla de render (1 vez)
         // empuja las posiciones EDITABLES (pos[], autoritativas durante la edicion) al
         // render IN-PLACE: cada vert GPU toma la pos del editVert de su grupo (posRep).
-        // Sin realloc ni cambio de topologia. Lo usa Mesh::RefrescarRender (mover verts).
-        void EmpujarPosiciones();
-        void RefrescarOverlay();  // rearma lineas + centros de cara desde pos[] (sin leer render)
-        void Recolorear();        // recolorea todo segun EditSelectMode + seleccion + activo
+        // Sin realloc ni cambio de topologia. Lo usa Mesh::RefreshRender (mover verts).
+        void PushPositions();
+        void RefreshOverlay();  // rearma lineas + centros de cara desde pos[] (sin leer render)
+        void Recolor();         // recolorea todo segun EditSelectMode + seleccion + activo
         // re-lee las posiciones desde src->vertex y rearma linePos + faceCenter (sin
         // tocar la topologia ni la seleccion). Lo usa el transform de malla en vivo.
-        void SincronizarPos();
+        void SyncPos();
         void Render();            // dibuja caras (semitransp) + lineas + vertices/puntos-cara
 
         // seleccion del sub-elemento ACTIVO (EditSelectMode: vertex/edge/face)
-        void SeleccionarTodo(bool sel);
-        void Invertir();
-        void TogglearVert(int k, bool soloEste); // pick de vertice (soloEste=sin shift)
-        void TogglearEdge(int e, bool soloEste); // pick de arista
-        void TogglearFace(int f, bool soloEste); // pick de cara
+        void SelectAll(bool sel);
+        void Invert();
+        void ToggleVert(int k, bool onlyThis); // pick de vertice (onlyThis=sin shift)
+        void ToggleEdge(int e, bool onlyThis); // pick de arista
+        void ToggleFace(int f, bool onlyThis); // pick de cara
         // L: Select Linked — selecciona la isla conexa que contiene al elemento k (en
-        // 'modo' SelVertex/Edge/Face). soloEste reemplaza; si no, agrega.
-        void SeleccionarLinked(int k, int modo, bool soloEste);
+        // 'modo' SelVertex/Edge/Face). onlyThis reemplaza; si no, agrega.
+        void SelectLinked(int k, int mode, bool onlyThis);
         // Shift+Alt+Click (modo cara): Loop Select de caras desde el borde edgeK
-        // (propaga por quads, perpendicular al borde). soloEste reemplaza; si no, agrega.
-        void SeleccionarLoopFace(int edgeK, bool soloEste);
+        // (propaga por quads, perpendicular al borde). onlyThis reemplaza; si no, agrega.
+        void SelectLoopFace(int edgeK, bool onlyThis);
         // Modo BORDE — dos tipos de loop (como Blender):
         //  EDGE LOOP: el anillo que SIGUE la linea del borde (el circulo de un cilindro);
         //    cruza cada vertice regular (4 bordes) al borde que NO comparte cara.
         //  EDGE RING: los travesanos PERPENDICULARES (camina por quads como el loop de caras,
-        //    pero junta los bordes opuestos). soloEste reemplaza; si no, agrega.
-        void SeleccionarLoopEdge(int edgeK, bool soloEste);
-        void SeleccionarLoopEdgeVerts(int edgeK, bool soloEste); // modo VERTICE: verts del edge loop (sin acumular edgeSel)
-        void SeleccionarRingEdge(int edgeK, bool soloEste);
+        //    pero junta los bordes opuestos). onlyThis reemplaza; si no, agrega.
+        void SelectLoopEdge(int edgeK, bool onlyThis);
+        void SelectLoopEdgeVerts(int edgeK, bool onlyThis); // modo VERTICE: verts del edge loop (sin acumular edgeSel)
+        void SelectRingEdge(int edgeK, bool onlyThis);
         // Pick Shortest Path (Ctrl+Click): camino mas corto desde el ACTIVO hasta toIdx, en el
         // modo activo (vert/edge/face). fillRegion=false -> un solo caminito; true -> rellena TODA
         // la region (todos los elementos en ALGUN camino minimo: distA+distB==total; en un grid =
         // el rectangulo). AGREGA a la seleccion (no reemplaza); toIdx queda activo.
-        void SeleccionarShortestPath(int toIdx, bool fillRegion);
+        void SelectShortestPath(int toIdx, bool fillRegion);
         // centro LOCAL de la seleccion del sub-elemento activo (para enfocar con ".").
         // false si no hay nada seleccionado.
-        bool CentroSeleccion(float& cx, float& cy, float& cz) const;
+        bool SelectionCenter(float& cx, float& cy, float& cz) const;
         // ademas del centro LOCAL, el radio LOCAL (distancia mas lejana al centro) de la seleccion,
         // para que el foco '.' ajuste el zoom a lo seleccionado. false si no hay nada seleccionado.
-        bool CentroRadioSeleccion(float& cx, float& cy, float& cz, float& rLocal) const;
+        bool SelectionCenterRadius(float& cx, float& cy, float& cz, float& rLocal) const;
 
         int NumVerts() const { return (int)editVerts.size(); }
         int NumEdges() const { return (int)(lineIdx.size() / 2); }

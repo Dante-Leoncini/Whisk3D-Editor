@@ -1,92 +1,92 @@
 # ATAJOS REASIGNABLES: la combinacion apretada se traduce a la de fabrica de su funcion antes de repartirla.
 # Todo entra por la misma puerta que el teclado de verdad (teclareal -> InputUsuarioSDL3).
-atajoscheck
+shortcutscheck
 selobj Cubo
 # --- de fabrica: H oculta / muestra ---
 objvisible 1
-teclareal 3d H
+keyreal 3d H
 objvisible 0
-teclareal 3d H
+keyreal 3d H
 objvisible 1
 # --- Ocultar pasa a Ctrl+Q: la H queda libre (no hace nada) ---
-atajo 3d.ocultar Ctrl+Q
-teclareal 3d H
+shortcut 3d.hide Ctrl+Q
+keyreal 3d H
 objvisible 1
-teclareal 3d Ctrl+Q
+keyreal 3d Ctrl+Q
 objvisible 0
-teclareal 3d Ctrl+Q
+keyreal 3d Ctrl+Q
 objvisible 1
 # --- una segunda combinacion para la misma funcion ---
-atajoagregar 3d.ocultar Shift+J
-teclareal 3d Shift+J
+shortcutadd 3d.hide Shift+J
+keyreal 3d Shift+J
 objvisible 0
-teclareal 3d Ctrl+Q
+keyreal 3d Ctrl+Q
 objvisible 1
 # --- una combinacion que ya era de otra funcion del contexto: se la saca ---
-atajoagregar 3d.ocultar K
-atajover 3d.overlays ""
-atajover 3d.ocultar Ctrl+Q, Shift+J, K
-teclareal 3d K
+shortcutadd 3d.hide K
+shortcutshow 3d.overlays ""
+shortcutshow 3d.hide Ctrl+Q, Shift+J, K
+keyreal 3d K
 objvisible 0
-teclareal 3d K
+keyreal 3d K
 objvisible 1
 # --- Mover pasa a Ctrl+M; durante el transform, Cancelar pasa a Q (Esc queda libre) ---
-atajo 3d.mover Ctrl+M
-teclareal 3d G
-xformactivo 0
-teclareal 3d Ctrl+M
-xformactivo 1
-teclareal 3d Esc
-xformactivo 0
-atajo xf.cancelar Q
-teclareal 3d Ctrl+M
-xformactivo 1
-teclareal 3d Esc
-xformactivo 1
-teclareal 3d Q
-xformactivo 0
+shortcut 3d.move Ctrl+M
+keyreal 3d G
+xformactive 0
+keyreal 3d Ctrl+M
+xformactive 1
+keyreal 3d Esc
+xformactive 0
+shortcut xf.cancel Q
+keyreal 3d Ctrl+M
+xformactive 1
+keyreal 3d Esc
+xformactive 1
+keyreal 3d Q
+xformactive 0
 # --- la ventana esperando tecla: Esc cancela la espera, cualquier otra queda asignada ---
-atajocapturar 3d.overlays Esc
-atajover 3d.overlays ""
-atajocapturar 3d.overlays Alt+F5
-atajover 3d.overlays Alt+F5
+shortcutcapture 3d.overlays Esc
+shortcutshow 3d.overlays ""
+shortcutcapture 3d.overlays Alt+F5
+shortcutshow 3d.overlays Alt+F5
 # --- el archivo: solo lo cambiado, y vuelve igual ---
-atajosguardar
-atajo 3d.mover G
-atajo 3d.ocultar H
-atajoscargar
-atajover 3d.mover Ctrl+M
-atajover xf.cancelar Q
-atajover 3d.ocultar Ctrl+Q, Shift+J, K
-atajover 3d.overlays Alt+F5
+shortcutssave
+shortcut 3d.move G
+shortcut 3d.hide H
+shortcutsload
+shortcutshow 3d.move Ctrl+M
+shortcutshow xf.cancel Q
+shortcutshow 3d.hide Ctrl+Q, Shift+J, K
+shortcutshow 3d.overlays Alt+F5
 # --- restablecer una funcion le devuelve su tecla aunque otra la hubiera tomado ---
-atajoreset 3d.overlays
-atajover 3d.overlays K
-atajover 3d.ocultar Ctrl+Q, Shift+J
-atajoreset
-atajover 3d.ocultar H
+shortcutreset 3d.overlays
+shortcutshow 3d.overlays K
+shortcutshow 3d.hide Ctrl+Q, Shift+J
+shortcutreset
+shortcutshow 3d.hide H
 # --- un atajo GLOBAL (los que se resuelven antes de llegar al viewport): Deshacer pasa a F5 ---
-atajo global.deshacer F5
-teclareal 3d H
+shortcut global.undo F5
+keyreal 3d H
 objvisible 0
-teclareal 3d Ctrl+Z
+keyreal 3d Ctrl+Z
 objvisible 0
-teclareal 3d F5
+keyreal 3d F5
 objvisible 1
-atajoreset
+shortcutreset
 # --- la ventana (Properties > Settings > Keyboard Shortcuts...) abre en cada contexto ---
-atajosventana 3 0
-atajosventana 8 2
+shortcutswindow 3 0
+shortcutswindow 8 2
 # --- los menus muestran lo CONFIGURADO (los items guardan "@funcion", no la tecla) ---
-menuatajo @3d.mover G
-menuatajo @3d.vistaCamara Num 0
-menuatajo @3d.encuadrar Num .
-menuatajo @global.emparentar Ctrl P
-atajo 3d.mover Ctrl+M, G
-menuatajo @3d.mover Ctrl M
-atajo 3d.mover
-menuatajo @3d.mover -
-menuatajo Ctrl+Click Ctrl+Click
-menuatajo @tel:9 -
-atajoreset
-menuatajo @3d.mover G
+menushortcut @3d.move G
+menushortcut @3d.viewCamera Num 0
+menushortcut @3d.focus Num .
+menushortcut @global.emparentar Ctrl P
+shortcut 3d.move Ctrl+M, G
+menushortcut @3d.move Ctrl M
+shortcut 3d.move
+menushortcut @3d.move -
+menushortcut Ctrl+Click Ctrl+Click
+menushortcut @tel:9 -
+shortcutreset
+menushortcut @3d.move G

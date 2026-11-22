@@ -24,50 +24,50 @@
 #       objetos que se borran: con ASan, escribirles encima es un error).
 # ==========================================================================
 
-ventana 640 480
-personajesmin /tmp/w3d_playesq 2
-personajesdirector /tmp/w3d_playesq
-guardarw3d /tmp/w3d_playesq/esq.w3d
-abrirw3d /tmp/w3d_playesq/esq.w3d
+window 640 480
+charactersmin /tmp/w3d_playesq 2
+charactersdirector /tmp/w3d_playesq
+savew3d /tmp/w3d_playesq/esq.w3d
+openw3d /tmp/w3d_playesq/esq.w3d
 
 # --- 1) lo que dejo el usuario ------------------------------------------------
-esqjuego Personaje clip Saludo frame 0 vel 1 loop 1 termino 0 capas 0 trans 0
-esqjuego Personaje.001 clip Quieto frame 0 vel 1 loop 1 capas 0 trans 0
-esqjuego escenas capas 0
+armaturegame Personaje clip Saludo frame 0 vel 1 loop 1 ended 0 layers 0 trans 0
+armaturegame Personaje.001 clip Quieto frame 0 vel 1 loop 1 layers 0 trans 0
+armaturegame escenas layers 0
 
 # --- 2) el Play: el Director cambio todo en inicio() ---------------------------
 simplay 5
-esqjuego Personaje clip Quieto frame 8 vel 2 loop 0 termino 0
-esqjuego Personaje.001 clip Quieto frame 4 capas 1 trans 1
-esqjuego escenas capas 1
+armaturegame Personaje clip Quieto frame 8 vel 2 loop 0 ended 0
+armaturegame Personaje.001 clip Quieto frame 4 layers 1 trans 1
+armaturegame escenas layers 1
 simplay 15
-esqjuego Personaje clip Quieto frame 29 termino 1
-esqjuego Personaje.001 frame 16 trans 0
+armaturegame Personaje clip Quieto frame 29 ended 1
+armaturegame Personaje.001 frame 16 trans 0
 
 # --- 3) Stop: como lo dejo el usuario ------------------------------------------
 simstop
-esqjuego Personaje clip Saludo frame 0 vel 1 loop 1 termino 0 capas 0 trans 0
-esqjuego Personaje.001 clip Quieto frame 0 vel 1 loop 1 capas 0 trans 0
-esqjuego escenas capas 0
-mixescena mezclar Paseo 15 Paseante
-mixescena soltar Paseante -20 0 -8
+armaturegame Personaje clip Saludo frame 0 vel 1 loop 1 ended 0 layers 0 trans 0
+armaturegame Personaje.001 clip Quieto frame 0 vel 1 loop 1 layers 0 trans 0
+armaturegame escenas layers 0
+mixscene mix Paseo 15 Paseante
+mixscene release Paseante -20 0 -8
 # el archivo guardado DESPUES del Stop tiene el clip y las capas del usuario
-guardarw3d /tmp/w3d_playesq/esq_stop.w3d
-abrirw3d /tmp/w3d_playesq/esq_stop.w3d
-esqjuego Personaje clip Saludo capas 0
-esqjuego Personaje.001 clip Quieto capas 0
-esqjuego escenas capas 0
+savew3d /tmp/w3d_playesq/esq_stop.w3d
+openw3d /tmp/w3d_playesq/esq_stop.w3d
+armaturegame Personaje clip Saludo layers 0
+armaturegame Personaje.001 clip Quieto layers 0
+armaturegame escenas layers 0
 # un segundo Play arranca igual que el primero (nada quedo pegado de la partida anterior)
 simplay 5
-esqjuego Personaje clip Quieto frame 8 vel 2 loop 0 termino 0
-esqjuego Personaje.001 frame 4 capas 1 trans 1
+armaturegame Personaje clip Quieto frame 8 vel 2 loop 0 ended 0
+armaturegame Personaje.001 frame 4 layers 1 trans 1
 simstop
-esqjuego Personaje clip Saludo frame 0 vel 1 loop 1 termino 0 capas 0 trans 0
-esqjuego escenas capas 0
+armaturegame Personaje clip Saludo frame 0 vel 1 loop 1 ended 0 layers 0 trans 0
+armaturegame escenas layers 0
 
 # --- 4) el Mix de escenas del editor despues del Stop, y abrir otro proyecto -----
-mixescena mezclar Paseo 15 Paseante
-mixescena soltar Paseante -20 0 -8
-mixescena mezclar Paseo 15 Paseante
-abrirw3d /tmp/w3d_playesq/esq_stop.w3d
-mixescena soltar Paseante -20 0 -8
+mixscene mix Paseo 15 Paseante
+mixscene release Paseante -20 0 -8
+mixscene mix Paseo 15 Paseante
+openw3d /tmp/w3d_playesq/esq_stop.w3d
+mixscene release Paseante -20 0 -8

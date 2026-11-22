@@ -25,22 +25,22 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
+window 640 480
 
 # --- 1) el juego 3D minimo con el Boolean, guardado en binario -----------------
-formatomallas binario
-juego3dbool /tmp/w3d_juego3dbool
-guardarw3d /tmp/w3d_juego3dbool/juego3dbool.w3d
+formatmeshes binary
+game3dbool /tmp/w3d_juego3dbool
+savew3d /tmp/w3d_juego3dbool/juego3dbool.w3d
 # las tres mallas (el cubo, el testigo de afuera y el target) son la MISMA malla del proyecto
 # (juego3dbool las vincula como duplicados vinculados: un .w3db, "mallas" en proyecto.json, que
 # usan los tres objetos). El target NO tiene modificadores, asi que en el juego queda con la
 # edicion PENDIENTE (la materializa ConstruirPolyMesh desde los bytes del recurso compartido)
-w3dbinfo /tmp/w3d_juego3dbool/juego3dbool.w3d w3db 1 w3dm 0 tiene FACE
-abrirw3d /tmp/w3d_juego3dbool/juego3dbool.w3d
+w3dbinfo /tmp/w3d_juego3dbool/juego3dbool.w3d w3db 1 w3dm 0 has FACE
+openw3d /tmp/w3d_juego3dbool/juego3dbool.w3d
 
 # --- 2) compilarlo para Linux, con los assets sueltos -------------------------
-compilarjuego 0 0
+compilegame 0 0
 
 # --- 3) correr el BINARIO y mirar por el agujero ------------------------------
-juego3dboolpx /tmp/w3d_juego3dbool juego3dbool
-formatomallas proyecto
+game3dboolpx /tmp/w3d_juego3dbool juego3dbool
+formatmeshes project

@@ -15,7 +15,7 @@
 //      el punto donde toca el borde queda como vertice de la cara vecina tambien
 //      (esa cara recibe el mismo segmento) -> sin T-junctions;
 //    - una cadena CERRADA (un agujero adentro de la cara) se resuelve con DOS
-//      cortes a esquinas vecinas: un "cuadrado" y una "U" (ver CortarCerrada),
+//      cortes a esquinas vecinas: un "cuadrado" y una "U" (ver CutClosed),
 //      mas la "tapa" del agujero como poligono aparte para que la clasificacion
 //      decida su suerte.
 //  El BSP queda SOLO para clasificar un punto adentro/afuera de la otra malla.
@@ -63,7 +63,7 @@ struct Poly {
         v.swap(r);
         pl.n = -pl.n; pl.w = -pl.w;
     }
-    Vector3 Centroide() const {
+    Vector3 Centroid() const {
         Vector3 c(0, 0, 0);
         for (size_t i = 0; i < v.size(); i++) c += v[i].p;
         return v.empty() ? c : c * (1.0f / (float)v.size());
@@ -71,7 +71,7 @@ struct Poly {
 };
 
 // plano por NEWELL: robusto con ngons y con tres primeros vertices casi colineales
-static Plane PlanoDe(const std::vector<CV>& v) {
+static Plane PlaneOf(const std::vector<CV>& v) {
     Plane pl;
     const int n = (int)v.size();
     if (n < 3) return pl;
@@ -101,30 +101,30 @@ struct Node {
     Node* back;
     Node() : front(NULL), back(NULL) {}
     ~Node() { delete front; delete back; }
-    void Build(const std::vector<Poly>& lista, int prof = 0) {
-        if (lista.empty() || prof > 4000) return;
-        if (!pl.ok) pl = lista[0].pl;
+    void Build(const std::vector<Poly>& list, int prof = 0) {
+        if (list.empty() || prof > 4000) return;
+        if (!pl.ok) pl = list[0].pl;
         std::vector<Poly> f, b;
-        for (size_t i = 0; i < lista.size(); i++) {
-            const Poly& p = lista[i];
-            int tipo = 0;
-            std::vector<int> tipos(p.v.size(), 0);
+        for (size_t i = 0; i < list.size(); i++) {
+            const Poly& p = list[i];
+            int type = 0;
+            std::vector<int> types(p.v.size(), 0);
             for (size_t k = 0; k < p.v.size(); k++) {
                 const float t = pl.n.Dot(p.v[k].p) - pl.w;
-                tipos[k] = (t < -EPS) ? 2 : (t > EPS) ? 1 : 0;
-                tipo |= tipos[k];
+                types[k] = (t < -EPS) ? 2 : (t > EPS) ? 1 : 0;
+                type |= types[k];
             }
-            if (tipo == 0) continue;               // coplanar: el nodo ya lo representa
-            if (tipo == 1) { f.push_back(p); continue; }
-            if (tipo == 2) { b.push_back(p); continue; }
+            if (type == 0) continue;               // coplanar: el nodo ya lo representa
+            if (type == 1) { f.push_back(p); continue; }
+            if (type == 2) { b.push_back(p); continue; }
             Poly pf, pb; pf.mat = pb.mat = p.mat; pf.smooth = pb.smooth = p.smooth; pf.pl = pb.pl = p.pl;   // cruza: se parte
             const int n = (int)p.v.size();
             for (int i2 = 0; i2 < n; i2++) {
                 const int j = (i2 + 1) % n;
                 const CV& vi = p.v[(size_t)i2]; const CV& vj = p.v[(size_t)j];
-                if (tipos[(size_t)i2] != 2) pf.v.push_back(vi);
-                if (tipos[(size_t)i2] != 1) pb.v.push_back(vi);
-                if ((tipos[(size_t)i2] | tipos[(size_t)j]) == 3) {
+                if (types[(size_t)i2] != 2) pf.v.push_back(vi);
+                if (types[(size_t)i2] != 1) pb.v.push_back(vi);
+                if ((types[(size_t)i2] | types[(size_t)j]) == 3) {
                     const float den = pl.n.Dot(vj.p - vi.p);
                     const float t = (fabsf(den) < 1e-12f) ? 0.5f : (pl.w - pl.n.Dot(vi.p)) / den;
                     const CV nv = Lerp(vi, vj, t);
@@ -139,22 +139,22 @@ struct Node {
     }
     // true = adentro del solido. Un punto justo sobre un plano se empuja al frente (afuera);
     // los llamadores clasifican centroides CORRIDOS 1 mm, asi que casi nunca pasa.
-    bool Adentro(const Vector3& p) const {
+    bool Inside(const Vector3& p) const {
         if (!pl.ok) return false;
         const float t = pl.n.Dot(p) - pl.w;
-        if (t >= -EPS) return front ? front->Adentro(p) : false;
-        return back ? back->Adentro(p) : true;
+        if (t >= -EPS) return front ? front->Inside(p) : false;
+        return back ? back->Inside(p) : true;
     }
 };
 
 // ---------------------------------------------------------------------------
 //  Carga / descarga
 // ---------------------------------------------------------------------------
-static void Cargar(const PolyMesh& M, int matForzado, std::vector<Poly>& out) {
+static void Load(const PolyMesh& M, int forcedMat, std::vector<Poly>& out) {
     for (size_t f = 0; f < M.F.size(); f++) {
         const std::vector<int>& id = M.F[f];
         if (id.size() < 3) continue;
-        Poly p; p.mat = (matForzado >= 0) ? matForzado : M.Fmat[f]; p.smooth = PolySmoothDe(M, f);
+        Poly p; p.mat = (forcedMat >= 0) ? forcedMat : M.Fmat[f]; p.smooth = PolySmoothOf(M, f);
         for (size_t k = 0; k < id.size(); k++) {
             const int i = id[k];
             if (i < 0 || i >= (int)M.P.size()) { p.v.clear(); break; }
@@ -166,28 +166,28 @@ static void Cargar(const PolyMesh& M, int matForzado, std::vector<Poly>& out) {
             p.v.push_back(cv);
         }
         if (p.v.size() < 3) continue;
-        p.pl = PlanoDe(p.v);
+        p.pl = PlaneOf(p.v);
         if (!p.pl.ok) continue;
         // un poligono que NO es plano (un quad torcido) no se puede cortar por su plano: se
         // abre en abanico ANTES de entrar. Solo esos; los planos (la regla) siguen enteros.
-        float desvio = 0.0f;
+        float deviation = 0.0f;
         for (size_t k = 0; k < p.v.size(); k++) {
             const float d = fabsf(p.pl.n.Dot(p.v[k].p) - p.pl.w);
-            if (d > desvio) desvio = d;
+            if (d > deviation) deviation = d;
         }
-        if (desvio <= EPS * 0.5f || p.v.size() == 3) { out.push_back(p); continue; }
+        if (deviation <= EPS * 0.5f || p.v.size() == 3) { out.push_back(p); continue; }
         for (size_t k = 1; k + 1 < p.v.size(); k++) {
             Poly t; t.mat = p.mat; t.smooth = p.smooth;
             t.v.push_back(p.v[0]); t.v.push_back(p.v[k]); t.v.push_back(p.v[k+1]);
-            t.pl = PlanoDe(t.v);
+            t.pl = PlaneOf(t.v);
             if (t.pl.ok) out.push_back(t);
         }
     }
 }
 
 // lista de poligonos -> PolyMesh. Posiciones deduplicadas (cuantizadas a 1e-4, como
-// SoldarPolyPorPos). Dos corners seguidos en el mismo lugar se funden en uno.
-static void Descargar(const std::vector<Poly>& polys, PolyMesh& out) {
+// WeldPolyByPos). Dos corners seguidos en el mismo lugar se funden en uno.
+static void Unload(const std::vector<Poly>& polys, PolyMesh& out) {
     out.P.clear(); out.F.clear(); out.Fmat.clear(); out.Fsmooth.clear(); out.Fuv.clear(); out.Fcol.clear(); out.E.clear();
     std::map<std::string, int> pool;
     for (size_t i = 0; i < polys.size(); i++) {
@@ -235,7 +235,7 @@ static void BboxPoly(const Poly& p, Vector3& lo, Vector3& hi) {
         if (q.x > hi.x) hi.x = q.x; if (q.y > hi.y) hi.y = q.y; if (q.z > hi.z) hi.z = q.z;
     }
 }
-static bool CajasSeTocan(const Vector3& lo1, const Vector3& hi1, const Vector3& lo2, const Vector3& hi2) {
+static bool BoxesTouch(const Vector3& lo1, const Vector3& hi1, const Vector3& lo2, const Vector3& hi2) {
     const float m = TOL;
     return !(hi1.x < lo2.x - m || lo1.x > hi2.x + m || hi1.y < lo2.y - m || lo1.y > hi2.y + m || hi1.z < lo2.z - m || lo1.z > hi2.z + m);
 }
@@ -243,24 +243,24 @@ static bool CajasSeTocan(const Vector3& lo1, const Vector3& hi1, const Vector3& 
 // ---------------------------------------------------------------------------
 //  Geometria plana (dentro del plano de una cara)
 // ---------------------------------------------------------------------------
-static void Ejes2D(const Vector3& n, Vector3& ex, Vector3& ey) {
+static void Axes2D(const Vector3& n, Vector3& ex, Vector3& ey) {
     Vector3 a = (fabsf(n.x) < 0.9f) ? Vector3(1, 0, 0) : Vector3(0, 1, 0);
     ex = Vector3::Cross(n, a).Normalized();
     ey = Vector3::Cross(n, ex);
 }
-static bool DentroDe(const Poly& P, const Vector3& q) {
-    Vector3 ex, ey; Ejes2D(P.pl.n, ex, ey);
+static bool Inside(const Poly& P, const Vector3& q) {
+    Vector3 ex, ey; Axes2D(P.pl.n, ex, ey);
     const float qx = q.Dot(ex), qy = q.Dot(ey);
-    bool dentro = false;
+    bool inside = false;
     const int n = (int)P.v.size();
     for (int i = 0, j = n - 1; i < n; j = i++) {
         const float xi = P.v[(size_t)i].p.Dot(ex), yi = P.v[(size_t)i].p.Dot(ey);
         const float xj = P.v[(size_t)j].p.Dot(ex), yj = P.v[(size_t)j].p.Dot(ey);
-        if (((yi > qy) != (yj > qy)) && (qx < (xj - xi) * (qy - yi) / (yj - yi + 1e-12f) + xi)) dentro = !dentro;
+        if (((yi > qy) != (yj > qy)) && (qx < (xj - xi) * (qy - yi) / (yj - yi + 1e-12f) + xi)) inside = !inside;
     }
-    return dentro;
+    return inside;
 }
-static bool Cruzan2D(float ax, float ay, float bx, float by, float cx, float cy, float dx, float dy) {
+static bool Cross2D(float ax, float ay, float bx, float by, float cx, float cy, float dx, float dy) {
     const float d1 = (bx-ax)*(cy-ay) - (by-ay)*(cx-ax);
     const float d2 = (bx-ax)*(dy-ay) - (by-ay)*(dx-ax);
     const float d3 = (dx-cx)*(ay-cy) - (dy-cy)*(ax-cx);
@@ -287,15 +287,15 @@ static CV Interior(const Poly& P, const Vector3& q) {
 //  Interseccion cara contra cara: los tramos de la recta comun de los dos planos que caen
 //  ADENTRO de las dos caras.
 // ---------------------------------------------------------------------------
-static int SobreBorde(const Poly& P, const Vector3& q, float& s);
-static bool DentroOBorde(const Poly& P, const Vector3& q) {
-    float s; return SobreBorde(P, q, s) >= 0 || DentroDe(P, q);
+static int OverBorder(const Poly& P, const Vector3& q, float& s);
+static bool InsideOrBorder(const Poly& P, const Vector3& q) {
+    float s; return OverBorder(P, q, s) >= 0 || Inside(P, q);
 }
 // tramos [t0,t1] de la recta o + d*t que caen adentro de la cara (o sobre su borde). Se juntan
 // TODOS los t candidatos (cruces de arista + vertices apoyados en la recta) y se decide tramo
 // por tramo con el punto medio: asi una recta que corre POR una arista (la de la cara vecina,
 // caso comun entre cajas) cuenta igual, y sirve para ngons concavos. Devuelve pares.
-static void CrucesEnRecta(const Poly& P, const Vector3& o, const Vector3& d, std::vector<float>& ts) {
+static void CrossesInLine(const Poly& P, const Vector3& o, const Vector3& d, std::vector<float>& ts) {
     const Vector3 m = Vector3::Cross(P.pl.n, d);      // perpendicular a la recta, dentro del plano
     const int n = (int)P.v.size();
     std::vector<float> cand;
@@ -316,12 +316,12 @@ static void CrucesEnRecta(const Poly& P, const Vector3& o, const Vector3& d, std
     for (size_t i = 0; i < cand.size(); i++) if (u.empty() || cand[i] - u.back() > TOL) u.push_back(cand[i]);
     ts.clear();
     for (size_t i = 0; i + 1 < u.size(); i++) {
-        if (!DentroOBorde(P, o + d * (0.5f * (u[i] + u[i+1])))) continue;
+        if (!InsideOrBorder(P, o + d * (0.5f * (u[i] + u[i+1])))) continue;
         if (!ts.empty() && fabsf(ts.back() - u[i]) <= TOL) ts.back() = u[i+1];   // pegado al anterior: se alarga
         else { ts.push_back(u[i]); ts.push_back(u[i+1]); }
     }
 }
-static void SegmentosInterseccion(const Poly& F, const Poly& G, std::vector<std::pair<Vector3,Vector3> >& out) {
+static void SegmentsIntersection(const Poly& F, const Poly& G, std::vector<std::pair<Vector3,Vector3> >& out) {
     const Vector3 dn = Vector3::Cross(F.pl.n, G.pl.n);
     const float l2 = dn.LengthSq();
     if (l2 < 1e-10f) return;                            // coplanares o paralelas: no hay recta
@@ -329,8 +329,8 @@ static void SegmentosInterseccion(const Poly& F, const Poly& G, std::vector<std:
     const Vector3 o = (Vector3::Cross(G.pl.n, dn) * F.pl.w + Vector3::Cross(dn, F.pl.n) * G.pl.w) * (1.0f / l2);
     const Vector3 d = dn * (1.0f / sqrtf(l2));
     std::vector<float> tf, tg;
-    CrucesEnRecta(F, o, d, tf);
-    CrucesEnRecta(G, o, d, tg);
+    CrossesInLine(F, o, d, tf);
+    CrossesInLine(G, o, d, tg);
     for (size_t i = 0; i + 1 < tf.size(); i += 2)
         for (size_t j = 0; j + 1 < tg.size(); j += 2) {
             const float a = (tf[i] > tg[j]) ? tf[i] : tg[j];
@@ -342,25 +342,25 @@ static void SegmentosInterseccion(const Poly& F, const Poly& G, std::vector<std:
 // ---------------------------------------------------------------------------
 //  Cadenas: los segmentos sueltos de una cara se unen por sus puntas
 // ---------------------------------------------------------------------------
-struct Cadena { std::vector<Vector3> pts; bool cerrada; Cadena() : cerrada(false) {} };
-static bool Mismo(const Vector3& a, const Vector3& b) { return (a - b).LengthSq() < TOL * TOL; }
-static void Encadenar(std::vector<std::pair<Vector3,Vector3> > segs, std::vector<Cadena>& out) {
+struct Chain { std::vector<Vector3> pts; bool closed; Chain() : closed(false) {} };
+static bool Same(const Vector3& a, const Vector3& b) { return (a - b).LengthSq() < TOL * TOL; }
+static void ChainSegments(std::vector<std::pair<Vector3,Vector3> > segs, std::vector<Chain>& out) {
     while (!segs.empty()) {
-        Cadena c; c.pts.push_back(segs.back().first); c.pts.push_back(segs.back().second); segs.pop_back();
-        bool crecio = true;
-        while (crecio) {
-            crecio = false;
+        Chain c; c.pts.push_back(segs.back().first); c.pts.push_back(segs.back().second); segs.pop_back();
+        bool grew = true;
+        while (grew) {
+            grew = false;
             for (size_t i = 0; i < segs.size(); i++) {
                 const Vector3& a = segs[i].first; const Vector3& b = segs[i].second;
-                if      (Mismo(c.pts.back(), a))  { c.pts.push_back(b); }
-                else if (Mismo(c.pts.back(), b))  { c.pts.push_back(a); }
-                else if (Mismo(c.pts.front(), a)) { c.pts.insert(c.pts.begin(), b); }
-                else if (Mismo(c.pts.front(), b)) { c.pts.insert(c.pts.begin(), a); }
+                if      (Same(c.pts.back(), a))  { c.pts.push_back(b); }
+                else if (Same(c.pts.back(), b))  { c.pts.push_back(a); }
+                else if (Same(c.pts.front(), a)) { c.pts.insert(c.pts.begin(), b); }
+                else if (Same(c.pts.front(), b)) { c.pts.insert(c.pts.begin(), a); }
                 else continue;
-                segs.erase(segs.begin() + i); crecio = true; break;
+                segs.erase(segs.begin() + i); grew = true; break;
             }
         }
-        if (c.pts.size() >= 4 && Mismo(c.pts.front(), c.pts.back())) { c.pts.pop_back(); c.cerrada = true; }
+        if (c.pts.size() >= 4 && Same(c.pts.front(), c.pts.back())) { c.pts.pop_back(); c.closed = true; }
         if (c.pts.size() >= 2) out.push_back(c);
     }
 }
@@ -368,7 +368,7 @@ static void Encadenar(std::vector<std::pair<Vector3,Vector3> > segs, std::vector
 // ---------------------------------------------------------------------------
 //  Cortar una cara por sus cadenas
 // ---------------------------------------------------------------------------
-static int SobreBorde(const Poly& P, const Vector3& q, float& s) {
+static int OverBorder(const Poly& P, const Vector3& q, float& s) {
     const int n = (int)P.v.size();
     for (int i = 0; i < n; i++) {
         const Vector3& a = P.v[(size_t)i].p; const Vector3& b = P.v[(size_t)(i + 1) % n].p;
@@ -379,19 +379,19 @@ static int SobreBorde(const Poly& P, const Vector3& q, float& s) {
     }
     return -1;
 }
-static int Insertar(Poly& P, int e, float s, const Vector3& q, bool& inserto) {
+static int Insert(Poly& P, int e, float s, const Vector3& q, bool& inserted) {
     const int n = (int)P.v.size();
-    inserto = false;
+    inserted = false;
     if (s < 1e-4f) return e;                       // ya es un vertice de la cara
     if (s > 1.0f - 1e-4f) return (e + 1) % n;
     CV nv = Lerp(P.v[(size_t)e], P.v[(size_t)(e + 1) % n], s); nv.p = q;
     P.v.insert(P.v.begin() + e + 1, nv);
-    inserto = true;
+    inserted = true;
     return e + 1;
 }
 // el segmento a-b esta apoyado sobre una arista de P? Un tramo de la curva de interseccion
 // que corre por el borde de la cara no la corta (es el borde de la cara vecina): se ignora.
-static bool SobreArista(const Poly& P, const Vector3& a, const Vector3& b) {
+static bool OverEdge(const Poly& P, const Vector3& a, const Vector3& b) {
     const int n = (int)P.v.size();
     for (int i = 0; i < n; i++) {
         const Vector3& p = P.v[(size_t)i].p; const Vector3& q = P.v[(size_t)(i + 1) % n].p;
@@ -407,46 +407,46 @@ static bool SobreArista(const Poly& P, const Vector3& a, const Vector3& b) {
 // un punto SEGURO adentro del poligono (no el centroide: en un ojo de cerradura el centroide
 // cae en el agujero). Es el centro de la "oreja" mas grande: un vertice convexo cuyo
 // triangulo con sus vecinos no contiene otro vertice.
-static Vector3 PuntoInterior(const Poly& P) {
+static Vector3 PointInterior(const Poly& P) {
     const int n = (int)P.v.size();
-    if (n <= 3) return P.Centroide();
-    Vector3 ex, ey; Ejes2D(P.pl.n, ex, ey);
+    if (n <= 3) return P.Centroid();
+    Vector3 ex, ey; Axes2D(P.pl.n, ex, ey);
     std::vector<float> x((size_t)n), y((size_t)n);
     float area = 0.0f;
     for (int i = 0; i < n; i++) { x[(size_t)i] = P.v[(size_t)i].p.Dot(ex); y[(size_t)i] = P.v[(size_t)i].p.Dot(ey); }
     for (int i = 0; i < n; i++) { const int j = (i + 1) % n; area += x[(size_t)i] * y[(size_t)j] - x[(size_t)j] * y[(size_t)i]; }
-    const float signo = (area < 0.0f) ? -1.0f : 1.0f;
-    int mejor = -1; float mejorArea = 0.0f;
+    const float sign = (area < 0.0f) ? -1.0f : 1.0f;
+    int best = -1; float bestArea = 0.0f;
     for (int i = 0; i < n; i++) {
         const int a = (i + n - 1) % n, c = (i + 1) % n;
         const float ax = x[(size_t)a], ay = y[(size_t)a], bx = x[(size_t)i], by = y[(size_t)i], cx = x[(size_t)c], cy = y[(size_t)c];
-        const float cr = ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) * signo;
-        if (cr <= 1e-10f || cr <= mejorArea) continue;    // concavo, degenerado, o mas chico que el mejor
-        bool libre = true;
-        for (int k = 0; k < n && libre; k++) {
+        const float cr = ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) * sign;
+        if (cr <= 1e-10f || cr <= bestArea) continue;    // concavo, degenerado, o mas chico que el mejor
+        bool free = true;
+        for (int k = 0; k < n && free; k++) {
             if (k == a || k == i || k == c) continue;
             const float px = x[(size_t)k], py = y[(size_t)k];
             if ((fabsf(px - ax) < TOL && fabsf(py - ay) < TOL) || (fabsf(px - bx) < TOL && fabsf(py - by) < TOL) ||
                 (fabsf(px - cx) < TOL && fabsf(py - cy) < TOL)) continue;   // el mismo lugar que una esquina
-            const float d1 = ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) * signo;
-            const float d2 = ((cx - bx) * (py - by) - (cy - by) * (px - bx)) * signo;
-            const float d3 = ((ax - cx) * (py - cy) - (ay - cy) * (px - cx)) * signo;
-            if (d1 > 0.0f && d2 > 0.0f && d3 > 0.0f) libre = false;
+            const float d1 = ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) * sign;
+            const float d2 = ((cx - bx) * (py - by) - (cy - by) * (px - bx)) * sign;
+            const float d3 = ((ax - cx) * (py - cy) - (ay - cy) * (px - cx)) * sign;
+            if (d1 > 0.0f && d2 > 0.0f && d3 > 0.0f) free = false;
         }
-        if (libre) { mejor = i; mejorArea = cr; }
+        if (free) { best = i; bestArea = cr; }
     }
-    if (mejor < 0) return P.Centroide();
-    const int a = (mejor + n - 1) % n, c = (mejor + 1) % n;
-    return (P.v[(size_t)a].p + P.v[(size_t)mejor].p + P.v[(size_t)c].p) * (1.0f / 3.0f);
+    if (best < 0) return P.Centroid();
+    const int a = (best + n - 1) % n, c = (best + 1) % n;
+    return (P.v[(size_t)a].p + P.v[(size_t)best].p + P.v[(size_t)c].p) * (1.0f / 3.0f);
 }
-static bool CortarAbierta(const Poly& P, const Cadena& c, Poly& p1, Poly& p2) {
+static bool CutOpen(const Poly& P, const Chain& c, Poly& p1, Poly& p2) {
     Poly W = P;
     float s0, s1;
-    int e0 = SobreBorde(W, c.pts.front(), s0); if (e0 < 0) return false;
+    int e0 = OverBorder(W, c.pts.front(), s0); if (e0 < 0) return false;
     bool ins0, ins1;
-    int i0 = Insertar(W, e0, s0, c.pts.front(), ins0);
-    int e1 = SobreBorde(W, c.pts.back(), s1);  if (e1 < 0) return false;
-    int i1 = Insertar(W, e1, s1, c.pts.back(), ins1);
+    int i0 = Insert(W, e0, s0, c.pts.front(), ins0);
+    int e1 = OverBorder(W, c.pts.back(), s1);  if (e1 < 0) return false;
+    int i1 = Insert(W, e1, s1, c.pts.back(), ins1);
     if (ins1 && i1 <= i0) i0++;                   // insertar ANTES de i0 lo corrio un lugar
     const int n = (int)W.v.size();
     std::vector<CV> in;
@@ -469,17 +469,17 @@ static bool CortarAbierta(const Poly& P, const Cadena& c, Poly& p1, Poly& p2) {
     return p1.v.size() >= 3 && p2.v.size() >= 3;
 }
 // un puente p->q (en 2D) que no cruce ninguna arista de las listas (salvo las que tocan sus puntas)
-static bool PuenteLibre(float px, float py, float qx, float qy,
+static bool BridgeFree(float px, float py, float qx, float qy,
                         const std::vector<float>& ox, const std::vector<float>& oy, int i,
                         const std::vector<float>& hx, const std::vector<float>& hy, int j) {
     const int n = (int)ox.size(), m = (int)hx.size();
     for (int k = 0; k < n; k++) {
         if (k == i || (k + 1) % n == i) continue;
-        if (Cruzan2D(px, py, qx, qy, ox[(size_t)k], oy[(size_t)k], ox[(size_t)((k + 1) % n)], oy[(size_t)((k + 1) % n)])) return false;
+        if (Cross2D(px, py, qx, qy, ox[(size_t)k], oy[(size_t)k], ox[(size_t)((k + 1) % n)], oy[(size_t)((k + 1) % n)])) return false;
     }
     for (int k = 0; k < m; k++) {
         if (k == j || (k + 1) % m == j) continue;
-        if (Cruzan2D(px, py, qx, qy, hx[(size_t)k], hy[(size_t)k], hx[(size_t)((k + 1) % m)], hy[(size_t)((k + 1) % m)])) return false;
+        if (Cross2D(px, py, qx, qy, hx[(size_t)k], hy[(size_t)k], hx[(size_t)((k + 1) % m)], hy[(size_t)((k + 1) % m)])) return false;
     }
     return true;
 }
@@ -490,9 +490,9 @@ static bool PuenteLibre(float px, float py, float qx, float qy,
 // aparte, para que la clasificacion decida si se queda. Lo propuso el dueno en vez del ojo de
 // cerradura (una "O" con una linea): un vertice repetido en la misma cara rompia la
 // triangulacion y las aristas al editar.
-static bool CortarCerrada(const Poly& P, const Cadena& c, Poly& U, Poly& quad, Poly& tapa) {
+static bool CutClosed(const Poly& P, const Chain& c, Poly& U, Poly& quad, Poly& cap) {
     if (c.pts.size() < 3) return false;
-    Vector3 ex, ey; Ejes2D(P.pl.n, ex, ey);
+    Vector3 ex, ey; Axes2D(P.pl.n, ex, ey);
     float area = 0.0f;
     for (size_t k = 0; k < c.pts.size(); k++) {
         const Vector3& a = c.pts[k]; const Vector3& b = c.pts[(k + 1) % c.pts.size()];
@@ -512,83 +512,83 @@ static bool CortarCerrada(const Poly& P, const Cadena& c, Poly& U, Poly& quad, P
         const float d1 = (P.v[(size_t)i].p - ccw[(size_t)j]).LengthSq();
         const float d2 = (P.v[(size_t)i2].p - ccw[(size_t)j2]).LengthSq();
         if (d1 + d2 >= md) continue;
-        if (!PuenteLibre(ox[(size_t)i], oy[(size_t)i], hx[(size_t)j], hy[(size_t)j], ox, oy, i, hx, hy, j)) continue;
-        if (!PuenteLibre(ox[(size_t)i2], oy[(size_t)i2], hx[(size_t)j2], hy[(size_t)j2], ox, oy, i2, hx, hy, j2)) continue;
-        if (Cruzan2D(ox[(size_t)i], oy[(size_t)i], hx[(size_t)j], hy[(size_t)j], ox[(size_t)i2], oy[(size_t)i2], hx[(size_t)j2], hy[(size_t)j2])) continue;
+        if (!BridgeFree(ox[(size_t)i], oy[(size_t)i], hx[(size_t)j], hy[(size_t)j], ox, oy, i, hx, hy, j)) continue;
+        if (!BridgeFree(ox[(size_t)i2], oy[(size_t)i2], hx[(size_t)j2], hy[(size_t)j2], ox, oy, i2, hx, hy, j2)) continue;
+        if (Cross2D(ox[(size_t)i], oy[(size_t)i], hx[(size_t)j], hy[(size_t)j], ox[(size_t)i2], oy[(size_t)i2], hx[(size_t)j2], hy[(size_t)j2])) continue;
         md = d1 + d2; mi = i; mj = j;
     }
     if (mi < 0) return false;
     const int mi2 = (mi + 1) % n, mj2 = (mj + 1) % m;
-    quad.mat = U.mat = tapa.mat = P.mat; quad.smooth = U.smooth = tapa.smooth = P.smooth; quad.pl = U.pl = tapa.pl = P.pl;
-    quad.v.clear(); U.v.clear(); tapa.v.clear();
+    quad.mat = U.mat = cap.mat = P.mat; quad.smooth = U.smooth = cap.smooth = P.smooth; quad.pl = U.pl = cap.pl = P.pl;
+    quad.v.clear(); U.v.clear(); cap.v.clear();
     quad.v.push_back(P.v[(size_t)mi]); quad.v.push_back(P.v[(size_t)mi2]);
     quad.v.push_back(Interior(P, ccw[(size_t)mj2])); quad.v.push_back(Interior(P, ccw[(size_t)mj]));
     for (int k = 0; k < n; k++) U.v.push_back(P.v[(size_t)((mi2 + k) % n)]);              // borde: de mi2 hasta mi
     for (int k = 0; k < m; k++) U.v.push_back(Interior(P, ccw[(size_t)(((mj - k) % m + m) % m)]));   // agujero al reves: de mj hasta mj2
-    for (int k = 0; k < m; k++) tapa.v.push_back(Interior(P, ccw[(size_t)k]));
+    for (int k = 0; k < m; k++) cap.v.push_back(Interior(P, ccw[(size_t)k]));
     return true;
 }
-static void Cortar(const Poly& P, const std::vector<std::pair<Vector3,Vector3> >& segsTodos, std::vector<Poly>& out) {
+static void Cut(const Poly& P, const std::vector<std::pair<Vector3,Vector3> >& segsAll, std::vector<Poly>& out) {
     std::vector<std::pair<Vector3,Vector3> > segs;
-    for (size_t k = 0; k < segsTodos.size(); k++)
-        if (!SobreArista(P, segsTodos[k].first, segsTodos[k].second)) segs.push_back(segsTodos[k]);
+    for (size_t k = 0; k < segsAll.size(); k++)
+        if (!OverEdge(P, segsAll[k].first, segsAll[k].second)) segs.push_back(segsAll[k]);
     if (segs.empty()) { out.push_back(P); return; }
-    std::vector<Cadena> cadenas; Encadenar(segs, cadenas);
+    std::vector<Chain> chains; ChainSegments(segs, chains);
     // un lazo cerrado que TOCA el borde no es un agujero: se abre en ese punto y se corta
     // como cadena abierta (que entra y sale por el mismo lugar)
-    for (size_t c = 0; c < cadenas.size(); c++) {
-        if (!cadenas[c].cerrada) continue;
-        int toca = -1; float st;
-        for (size_t k = 0; k < cadenas[c].pts.size() && toca < 0; k++)
-            if (SobreBorde(P, cadenas[c].pts[k], st) >= 0) toca = (int)k;
-        if (toca < 0) continue;
+    for (size_t c = 0; c < chains.size(); c++) {
+        if (!chains[c].closed) continue;
+        int touches = -1; float st;
+        for (size_t k = 0; k < chains[c].pts.size() && touches < 0; k++)
+            if (OverBorder(P, chains[c].pts[k], st) >= 0) touches = (int)k;
+        if (touches < 0) continue;
         std::vector<Vector3> ab;
-        const size_t m = cadenas[c].pts.size();
-        for (size_t k = 0; k <= m; k++) ab.push_back(cadenas[c].pts[((size_t)toca + k) % m]);
-        cadenas[c].pts.swap(ab); cadenas[c].cerrada = false;
+        const size_t m = chains[c].pts.size();
+        for (size_t k = 0; k <= m; k++) ab.push_back(chains[c].pts[((size_t)touches + k) % m]);
+        chains[c].pts.swap(ab); chains[c].closed = false;
     }
-    std::vector<Poly> piezas(1, P);
-    for (size_t c = 0; c < cadenas.size(); c++) {
-        if (cadenas[c].cerrada) continue;
-        for (size_t i = 0; i < piezas.size(); i++) {
+    std::vector<Poly> pieces(1, P);
+    for (size_t c = 0; c < chains.size(); c++) {
+        if (chains[c].closed) continue;
+        for (size_t i = 0; i < pieces.size(); i++) {
             Poly p1, p2;
-            if (CortarAbierta(piezas[i], cadenas[c], p1, p2)) { piezas[i] = p1; piezas.push_back(p2); break; }
+            if (CutOpen(pieces[i], chains[c], p1, p2)) { pieces[i] = p1; pieces.push_back(p2); break; }
         }
     }
-    for (size_t c = 0; c < cadenas.size(); c++) {
-        if (!cadenas[c].cerrada) continue;
-        int mejor = -1, mejorVotos = 0;                  // la pieza que contiene MAS puntos del lazo
-        for (size_t i = 0; i < piezas.size(); i++) {
-            int votos = 0;
-            for (size_t k = 0; k < cadenas[c].pts.size(); k++) if (DentroDe(piezas[i], cadenas[c].pts[k])) votos++;
-            if (votos > mejorVotos) { mejorVotos = votos; mejor = (int)i; }
+    for (size_t c = 0; c < chains.size(); c++) {
+        if (!chains[c].closed) continue;
+        int best = -1, bestVotes = 0;                  // la pieza que contiene MAS puntos del lazo
+        for (size_t i = 0; i < pieces.size(); i++) {
+            int votes = 0;
+            for (size_t k = 0; k < chains[c].pts.size(); k++) if (Inside(pieces[i], chains[c].pts[k])) votes++;
+            if (votes > bestVotes) { bestVotes = votes; best = (int)i; }
         }
-        if (mejor < 0) continue;
-        Poly U, quad, tapa;
-        if (CortarCerrada(piezas[(size_t)mejor], cadenas[c], U, quad, tapa)) { piezas[(size_t)mejor] = U; piezas.push_back(quad); piezas.push_back(tapa); }
+        if (best < 0) continue;
+        Poly U, quad, cap;
+        if (CutClosed(pieces[(size_t)best], chains[c], U, quad, cap)) { pieces[(size_t)best] = U; pieces.push_back(quad); pieces.push_back(cap); }
     }
-    out.insert(out.end(), piezas.begin(), piezas.end());
+    out.insert(out.end(), pieces.begin(), pieces.end());
 }
 
 // ---------------------------------------------------------------------------
 //  Clasificacion de un pedazo contra la OTRA malla
 // ---------------------------------------------------------------------------
-enum { AFUERA = 0, ADENTRO = 1, COPL_MISMO = 2, COPL_OPUESTO = 3 };
-static int Lado(const Poly& p, const Node& otro) {
-    const Vector3 c = PuntoInterior(p);
-    const bool masAdentro = otro.Adentro(c - p.pl.n * SEP);
-    const bool masAfuera  = otro.Adentro(c + p.pl.n * SEP);
-    if (masAdentro && masAfuera)   return ADENTRO;
-    if (!masAdentro && !masAfuera) return AFUERA;
-    return masAdentro ? COPL_MISMO : COPL_OPUESTO;
+enum { OUTSIDE = 0, INSIDE = 1, COPL_SAME = 2, COPL_OPPOSITE = 3 };
+static int Side(const Poly& p, const Node& other) {
+    const Vector3 c = PointInterior(p);
+    const bool moreInside  = other.Inside(c - p.pl.n * SEP);
+    const bool moreOutside = other.Inside(c + p.pl.n * SEP);
+    if (moreInside && moreOutside)   return INSIDE;
+    if (!moreInside && !moreOutside) return OUTSIDE;
+    return moreInside ? COPL_SAME : COPL_OPPOSITE;
 }
 
 } // namespace
 
 void BooleanPoly(PolyMesh& A, const PolyMesh& B, int op, int matB) {
     std::vector<Poly> pa, pb;
-    Cargar(A, -1, pa);
-    Cargar(B, matB, pb);
+    Load(A, -1, pa);
+    Load(B, matB, pb);
     if (pa.empty() || pb.empty()) return;
 
     Node ta, tb;
@@ -601,36 +601,36 @@ void BooleanPoly(PolyMesh& A, const PolyMesh& B, int op, int matB) {
     for (size_t j = 0; j < pb.size(); j++) BboxPoly(pb[j], loB[j], hiB[j]);
     for (size_t i = 0; i < pa.size(); i++)
         for (size_t j = 0; j < pb.size(); j++) {
-            if (!CajasSeTocan(loA[i], hiA[i], loB[j], hiB[j])) continue;
+            if (!BoxesTouch(loA[i], hiA[i], loB[j], hiB[j])) continue;
             std::vector<std::pair<Vector3,Vector3> > s;
-            SegmentosInterseccion(pa[i], pb[j], s);
+            SegmentsIntersection(pa[i], pb[j], s);
             for (size_t k = 0; k < s.size(); k++) { segA[i].push_back(s[k]); segB[j].push_back(s[k]); }
         }
 
-    std::vector<Poly> piezasA, piezasB;
-    for (size_t i = 0; i < pa.size(); i++) Cortar(pa[i], segA[i], piezasA);
-    for (size_t j = 0; j < pb.size(); j++) Cortar(pb[j], segB[j], piezasB);
+    std::vector<Poly> piecesA, piecesB;
+    for (size_t i = 0; i < pa.size(); i++) Cut(pa[i], segA[i], piecesA);
+    for (size_t j = 0; j < pb.size(); j++) Cut(pb[j], segB[j], piecesB);
 
     // que pedazo sobrevive, segun la operacion (la misma tabla que da csg.js con sus invert):
     //   union:      A afuera de B + B afuera de A;   coplanar mismo sentido -> queda el de A
     //   difference: A afuera de B + B ADENTRO de A dado vuelta;   A coplanar opuesto queda
     //   intersect:  A adentro de B + B adentro de A;  coplanar mismo sentido -> queda el de A
-    std::vector<Poly> salida;
-    for (size_t i = 0; i < piezasA.size(); i++) {
-        const int l = Lado(piezasA[i], tb);
-        bool queda;
-        if (op == BoolOp::Union)           queda = (l == AFUERA  || l == COPL_MISMO);
-        else if (op == BoolOp::Difference) queda = (l == AFUERA  || l == COPL_OPUESTO);
-        else                               queda = (l == ADENTRO || l == COPL_MISMO);
-        if (queda) salida.push_back(piezasA[i]);
+    std::vector<Poly> output;
+    for (size_t i = 0; i < piecesA.size(); i++) {
+        const int l = Side(piecesA[i], tb);
+        bool remains;
+        if (op == BoolOp::Union)           remains = (l == OUTSIDE  || l == COPL_SAME);
+        else if (op == BoolOp::Difference) remains = (l == OUTSIDE  || l == COPL_OPPOSITE);
+        else                               remains = (l == INSIDE || l == COPL_SAME);
+        if (remains) output.push_back(piecesA[i]);
     }
-    for (size_t j = 0; j < piezasB.size(); j++) {
-        const int l = Lado(piezasB[j], ta);
-        const bool queda = (op == BoolOp::Union) ? (l == AFUERA) : (l == ADENTRO);
-        if (!queda) continue;
-        Poly p = piezasB[j];
+    for (size_t j = 0; j < piecesB.size(); j++) {
+        const int l = Side(piecesB[j], ta);
+        const bool remains = (op == BoolOp::Union) ? (l == OUTSIDE) : (l == INSIDE);
+        if (!remains) continue;
+        Poly p = piecesB[j];
         if (op == BoolOp::Difference) p.Flip();   // las caras de B miran hacia el hueco
-        salida.push_back(p);
+        output.push_back(p);
     }
-    Descargar(salida, A);
+    Unload(output, A);
 }

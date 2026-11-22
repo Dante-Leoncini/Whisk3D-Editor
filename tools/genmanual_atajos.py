@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ---------------------------------------------------------------------------------------------------------------
 #  genmanual_atajos.py -- regenera las tablas de "Atajos de fabrica" del manual (docs/manual/es/editor/atajos.md)
-#  desde la tabla del codigo (main/app/W3dAtajos.cpp) y las traducciones (res/idiomas/es.txt).
+#  desde la tabla del codigo (main/app/W3dShortcuts.cpp) y las traducciones (res/languages/es.txt).
 #
 #  La pagina tiene dos marcas, <!--ATAJOS-INICIO--> y <!--ATAJOS-FIN-->: lo de adentro se reemplaza entero.
 #  Asi el manual dice siempre lo mismo que el editor: si cambia un atajo de fabrica, se corre esto y listo.
@@ -15,8 +15,8 @@ import re
 import sys
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ATAJOS = os.path.join(RAIZ, "main", "app", "W3dAtajos.cpp")
-TABLA = os.path.join(RAIZ, "res", "idiomas", "es.txt")   # <ingles> TAB <castellano> (ver tools/genlang.py)
+ATAJOS = os.path.join(RAIZ, "main", "app", "W3dShortcuts.cpp")
+TABLA = os.path.join(RAIZ, "res", "languages", "es.txt")   # <ingles> TAB <castellano> (ver tools/genlang.py)
 MANUAL = os.path.join(RAIZ, "docs", "manual", "es", "editor", "atajos.md")
 INI, FIN = "<!--ATAJOS-INICIO-->", "<!--ATAJOS-FIN-->"
 

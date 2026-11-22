@@ -27,7 +27,7 @@ UI 没有针对各系统的专属代码。它不调用 OpenGL：一切都用 `w3
 | 文件夹 | 解决什么问题 |
 |---|---|
 | `core/` | 界面的尺寸及其缩放（`UI.h`）：[颜色和缩放](tema.md) |
-| `theme/` | 调色板（`colores.h`）：[颜色和缩放](tema.md) |
+| `theme/` | 调色板（`colors.h`）：[颜色和缩放](tema.md) |
 | `draw/` | 2D 绘制（`glesdraw`）、矩形、图标和图集打包器：[绘制和图集](dibujo.md)、[图标](iconos.md) |
 | `text/` | 位图字体、扩展图集，以及使用烘焙好的 TTF 字体的文本：[文本](texto.md) |
 | `widgets/` | 带边框的卡片、按钮、选项卡、菜单和文本框：[按钮、选项卡和复选框](botones.md)、[下拉菜单](menus.md)、[输入和文本框](entrada.md) |

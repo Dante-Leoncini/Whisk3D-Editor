@@ -2,9 +2,9 @@
 
 | Funzione | Cosa fa |
 |---|---|
-| `numVertices(m)`, `verticePos(m, i)`, `setVerticePos(m, i, x, y, z)` | Leggere e spostare i vertici uno per uno. |
+| `vertexCount(m)`, `vertexPos(m, i)`, `setVertexPos(m, i, x, y, z)` | Leggere e spostare i vertici uno per uno. |
 | `setVertices(m, {i, x, y, z, ...})` | Spostare molti vertici in una volta (molto più veloce). |
-| `grupoVertices(m, "grupo") → {índices}` | I vertici di un gruppo (chiamala una sola volta, in `inicio`). |
-| `setVerticeColor`, `setVerticesColor` | Colorare i vertici da codice. |
-| `setVerticeUV`, `desplazarUV(m, du, dv)`, `copiarUV` | Spostare le UV (acqua, nastri trasportatori…). |
-| `setTexturaB`, `setMezclaTextura`, `mezclaTextura` | Mescolare due texture in un materiale. |
+| `vertexGroup(m, "grupo") → {índices}` | I vertici di un gruppo (chiamala una sola volta, in `start`). |
+| `setVertexColor`, `setVerticesColor` | Colorare i vertici da codice. |
+| `setVertexUV`, `scrollUV(m, du, dv)`, `copyUV` | Spostare le UV (acqua, nastri trasportatori…). |
+| `setTextureB`, `setTextureMix`, `getTextureMix` | Mescolare due texture in un materiale. |

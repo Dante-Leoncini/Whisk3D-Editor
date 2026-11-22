@@ -13,11 +13,11 @@
 给变量赋值就会创建它。请始终使用 `local`：这样变量只存在于声明它的代码块中，不会和其他变量冲突。
 
 ```lua
-local vidas = 3           -- 数字（整数）
-local velocidad = 2.5     -- 数字（带小数）
-local nombre = "Whisky"   -- 文本（string）
-local vivo = true         -- 布尔值：true 或 false
-local nada = nil          -- nil = “没有值”
+local lives = 3         -- 数字（整数）
+local speed = 2.5       -- 数字（带小数）
+local name = "Whisky"   -- 文本（string）
+local live = true       -- 布尔值：true 或 false
+local none = nil        -- nil = “没有值”
 ```
 
 Lua 的类型有：`nil`、`boolean`、`number`、`string`、`table` 和 `function`。Whisk3D 提供给你的场景对象是一种特殊类型，只能把它传给引擎的函数来使用。
@@ -30,9 +30,9 @@ Lua 的类型有：`nil`、`boolean`、`number`、`string`、`table` 和 `functi
 | `//` | 整除 | `7 // 2` → 3 |
 | `%` | 取余 | `7 % 2` → 1 |
 | `^` | 乘方 | `2 ^ 3` → 8.0 |
-| `== ~= < > <= >=` | 比较（`~=` 表示“不等于”） | `vidas ~= 0` |
-| `and or not` | 逻辑运算 | `vivo and vidas > 0` |
-| `..` | 连接文本 | `"Vidas: " .. vidas` |
+| `== ~= < > <= >=` | 比较（`~=` 表示“不等于”） | `lives ~= 0` |
+| `and or not` | 逻辑运算 | `live and lives > 0` |
+| `..` | 连接文本 | `"Vidas: " .. lives` |
 | `#` | 文本或列表的长度 | `#"hola"` → 4 |
 
 > [!NOTE]
@@ -70,19 +70,19 @@ Lua 没有 `n++`，也没有 `n += 1`：要写成 `n = n + 1`。要跳出循环�
 ## 函数
 
 ```lua
-local function sumar(a, b)
+local function add(a, b)
   return a + b
 end
-print(sumar(2, 3))        -- 5
+print(add(2, 3))        -- 5
 
 -- 一个函数可以返回多个值
 local function minMax(a, b)
   if a < b then return a, b else return b, a end
 end
-local menor, mayor = minMax(8, 3)
+local less, greater = minMax(8, 3)
 ```
 
-Whisk3D 的许多函数会同时返回多个值，例如 `local x, y, z = posicion(yo())`。
+Whisk3D 的许多函数会同时返回多个值，例如 `local x, y, z = getPosition(self())`。
 
 ## 表：列表和字典
 
@@ -90,23 +90,23 @@ Whisk3D 的许多函数会同时返回多个值，例如 `local x, y, z = posici
 
 ```lua
 -- 作为列表（索引从 1 开始，而不是 0）
-local frutas = { "manzana", "pera", "uva" }
-print(frutas[1])          -- manzana
-print(#frutas)            -- 3
-frutas[#frutas + 1] = "kiwi"   -- 添加到末尾
-table.insert(frutas, "melón")  -- 另一种写法
+local fruits = { "manzana", "pera", "uva" }
+print(fruits[1])          -- manzana
+print(#fruits)            -- 3
+fruits[#fruits + 1] = "kiwi"   -- 添加到末尾
+table.insert(fruits, "melón")  -- 另一种写法
 
-for i, f in ipairs(frutas) do  -- 按顺序遍历列表
+for i, f in ipairs(fruits) do  -- 按顺序遍历列表
   print(i, f)
 end
 
 -- 作为字典（键 = 值）
-local jugador = { nombre = "Ana", puntos = 0 }
-jugador.puntos = jugador.puntos + 10
-print(jugador["nombre"])  -- Ana
+local player = { name = "Ana", puntos = 0 }
+player.puntos = player.puntos + 10
+print(player["nombre"])  -- Ana
 
-for clave, valor in pairs(jugador) do  -- 遍历所有键（顺序不固定）
-  print(clave, valor)
+for clave, value in pairs(player) do  -- 遍历所有键（顺序不固定）
+  print(clave, value)
 end
 ```
 
@@ -115,7 +115,7 @@ end
 ```lua
 local t = string.format("Puntos: %d  Tiempo: %.1f", 120, 3.456)  -- "Puntos: 120  Tiempo: 3.5"
 local may = string.upper("hola")        -- "HOLA"
-local parte = string.sub("Whisk3D", 1, 5)   -- "Whisk"
+local part = string.sub("Whisk3D", 1, 5)   -- "Whisk"
 local n = tonumber("42")                -- 文本转数字
 local s = tostring(3.5)                 -- 数字转文本
 local r = math.floor(2.7)               -- 2
@@ -125,4 +125,4 @@ local m = math.max(4, 9, 2)             -- 9
 local pi = math.pi
 ```
 
-要生成随机数，Whisk3D 提供了 `azar()`（参见参考部分）。`math.random` 也能用，它在每局游戏中都已经用不同的种子初始化好了。
+要生成随机数，Whisk3D 提供了 `random()`（参见参考部分）。`math.random` 也能用，它在每局游戏中都已经用不同的种子初始化好了。

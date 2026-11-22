@@ -16,4 +16,4 @@
 #  El comando trae su escena adentro a proposito: no hay fixture que se pueda
 #  desincronizar de lo que mide. Hasta hoy ningun .w3s lo corria.
 # ==========================================================================
-chocantest
+collidetest

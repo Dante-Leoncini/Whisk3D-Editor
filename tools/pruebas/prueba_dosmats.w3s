@@ -26,10 +26,10 @@
 # ===========================================================================
 
 # --- 1) EN EL ORIGEN: los 3 primeros cargan, el cuarto no nombra ninguna ----
-abrirw3d prueba_dosmats.w3d
-loadtex contex 3
-loadtex sintex 1
-loadtex rotas 0
+openw3d prueba_dosmats.w3d
+loadtex withtex 3
+loadtex notex 1
+loadtex broken 0
 mattex dosmats        dosmats.png
 mattex dosmats-sombra dosmats.png
 mattex dosmats-otra   dosmats-b.png
@@ -40,10 +40,10 @@ mattex dosmats-sintex NADA
 # NOMBRE DE ENTRADA. Los dos materiales que comparten imagen tienen que quedar
 # los dos apuntando a la MISMA entrada (dedup por contenido), no uno adentro y
 # el otro colgado afuera.
-guardarw3d prueba_dosmats_v4.w3d
-mattex dosmats        texturas/dosmats.png
-mattex dosmats-sombra texturas/dosmats.png
-mattex dosmats-otra   texturas/dosmats-b.png
+savew3d prueba_dosmats_v4.w3d
+mattex dosmats        textures/dosmats.png
+mattex dosmats-sombra textures/dosmats.png
+mattex dosmats-otra   textures/dosmats-b.png
 mattex dosmats-sintex NADA
 
 # --- 3) REABRIR EL v4: NINGUNA textura se perdio ----------------------------
@@ -52,8 +52,8 @@ mattex dosmats-sintex NADA
 # PIDIENDO una imagen que no carga -> `rotas` > 0. Ese es el assert clave.
 # (los materiales del proyecto anterior siguen vivos en la lista global -- por
 #  eso aca se cuenta 'rotas', que no depende de cuantos haya, y no 'contex')
-abrirw3d prueba_dosmats_v4.w3d
-loadtex rotas 0
+openw3d prueba_dosmats_v4.w3d
+loadtex broken 0
 # el decal sin map_Kd sigue siendo un decal de verdad (no se lo comio nada)
 matflags dosmats-sombra decal
 matflags dosmats-sintex decal
@@ -68,17 +68,17 @@ matflags dosmats-sintex decal
 # materiales a ".001" y el proyecto.json cambia por eso, no por el contenedor.
 # El round-trip byte a byte del proyecto ENTERO lo cubre tools/empaquetar_w3d.py,
 # que reabre en un proceso FRESCO.
-guardarw3d prueba_dosmats_rt.w3d
-w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt.w3d texturas/
-w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt.w3d EXTERNOS.txt
+savew3d prueba_dosmats_rt.w3d
+w3dequal prueba_dosmats_v4.w3d prueba_dosmats_rt.w3d textures/
+w3dequal prueba_dosmats_v4.w3d prueba_dosmats_rt.w3d EXTERNALS.txt
 
 # --- 5) y una vuelta mas: el resultado se estabiliza ------------------------
-abrirw3d prueba_dosmats_rt.w3d
-loadtex rotas 0
-guardarw3d prueba_dosmats_rt2.w3d
-w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt2.w3d texturas/
-w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt2.w3d EXTERNOS.txt
+openw3d prueba_dosmats_rt.w3d
+loadtex broken 0
+savew3d prueba_dosmats_rt2.w3d
+w3dequal prueba_dosmats_v4.w3d prueba_dosmats_rt2.w3d textures/
+w3dequal prueba_dosmats_v4.w3d prueba_dosmats_rt2.w3d EXTERNALS.txt
 # y dos guardados seguidos del MISMO estado son identicos ENTEROS (el escritor
 # es deterministico: es lo que hace posible el round-trip)
-guardarw3d prueba_dosmats_rt3.w3d
-w3diguales prueba_dosmats_rt2.w3d prueba_dosmats_rt3.w3d
+savew3d prueba_dosmats_rt3.w3d
+w3dequal prueba_dosmats_rt2.w3d prueba_dosmats_rt3.w3d

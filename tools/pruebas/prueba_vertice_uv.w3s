@@ -20,14 +20,14 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_vertice_uv.w3s
 # ===========================================================================
-abrirw3d prueba_vertice_uv.w3d
+openw3d prueba_vertice_uv.w3d
 loadtex
-juego on
+game on
 simplay 1
 uvat Cubo 1 0 0.25 0.75 0.0001
 uvat Cubo 1 1 0.1 0.9 0.0001
 objat Cubo 0 0 1 0.001
 simplay 2
 objat Cubo 0 0 3 0.001
-juego off
+game off
 uvat Cubo 1 0

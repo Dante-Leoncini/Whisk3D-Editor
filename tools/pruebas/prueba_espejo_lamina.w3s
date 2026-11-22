@@ -34,53 +34,53 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_espejo_lamina.w3s
 # ===========================================================================
-abrirw3d prueba_espejo_lamina.w3d
+openw3d prueba_espejo_lamina.w3d
 loadtex
 # vista REPRODUCIBLE: el estanque no esta en el origen, asi que la orbita
 # guardada del usuario no sirve.
-vporbita 120 0.5 1000 12 -20 0
-espejopx ReflejoLamina info
+vporbit 120 0.5 1000 12 -20 0
+mirrorpx ReflejoLamina info
 
 # --- (1) EL AGUA NO SE ROMPE -----------------------------------------------
 # cinco puntos repartidos por la lamina, incluidos los que quedan sobre la
 # silueta que el espejo marca en el estencil. Con el bug los cinco daban
 # 13,13,13 (el color de borrado, porque no hay fondo de estanque).
-escenapx 118.80 0.5 1001.20 es 6 127 127 10
-escenapx 121.20 0.5  998.80 es 6 127 127 10
-escenapx 120.90 0.5 1000.90 es 6 127 127 10
-escenapx 118.80 0.5  998.80 es 6 127 127 10
-escenapx 119.00 0.5  999.50 es 6 127 127 10
+scenepx 118.80 0.5 1001.20 es 6 127 127 10
+scenepx 121.20 0.5  998.80 es 6 127 127 10
+scenepx 120.90 0.5 1000.90 es 6 127 127 10
+scenepx 118.80 0.5  998.80 es 6 127 127 10
+scenepx 119.00 0.5  999.50 es 6 127 127 10
 
 # --- (2) ESPEJO DE VERDAD, SIN PARCHES --------------------------------------
 # PARADO sobre el agua (el poste bajado a 0.2 de la superficie): su imagen
 # queda pegada del otro lado del plano y se ve ROJO BAJO EL AGUA.
 activename PosteAlto
 objpos 120 0.7 1000
-espejopx ReflejoLamina reflejo 120 0.7 1000 es 115 121 121 12
+mirrorpx ReflejoLamina reflection 120 0.7 1000 es 115 121 121 12
 # SALTANDO (la altura original, 2.5 sobre la lamina): la imagen baja 2.5 por
 # debajo -- reflexion geometrica pura, el reflejo se mueve OPUESTO al objeto --
 # y en ESTA escena chica eso proyecta FUERA de la silueta del agua: no queda ni
 # un pixel. En un cuerpo de agua grande sigue visible (prueba_espejo_z, "el
 # target SUBE y su reflejo BAJA").
 objpos 120 3.0 1000
-espejopx ReflejoLamina reflejo 120 3.0 1000 es 13 13 13 8
+mirrorpx ReflejoLamina reflection 120 3.0 1000 es 13 13 13 8
 # hundimientoMaximo esta DEPRECADO: el .w3d de esta escena lo declara (0.6) y
 # forzarlo tampoco cambia NADA. Antes clavaba el reflejo a la superficie ("se
 # queda enganchado en la base del agua"); hoy se acepta, avisa y no hace nada.
-espejopx ReflejoLamina hundimiento 0.6
-espejopx ReflejoLamina reflejo 120 3.0 1000 es 13 13 13 8
+mirrorpx ReflejoLamina sink 0.6
+mirrorpx ReflejoLamina reflection 120 3.0 1000 es 13 13 13 8
 
 # --- el poste REAL sigue con su color crudo (el pase restaura el estado) ----
 # (soltar la seleccion primero: el contorno verde del activo pintaria el pixel)
 deselectall
 activename Camara
-espejopx ReflejoLamina mundo 120 3.0 1000 es 255 0 0 8
+mirrorpx ReflejoLamina world 120 3.0 1000 es 255 0 0 8
 
 # --- ROUND-TRIP v4: el campo deprecado viaja (sin efecto) y nada se rompe ---
-guardarw3d prueba_espejo_lamina_v4.w3d
-abrirw3d prueba_espejo_lamina_v4.w3d
+savew3d prueba_espejo_lamina_v4.w3d
+openw3d prueba_espejo_lamina_v4.w3d
 loadtex
-vporbita 120 0.5 1000 12 -20 0
-espejopx ReflejoLamina info
-escenapx 120.90 0.5 1000.90 es 6 127 127 10
-espejopx ReflejoLamina reflejo 120 3.0 1000 es 13 13 13 8
+vporbit 120 0.5 1000 12 -20 0
+mirrorpx ReflejoLamina info
+scenepx 120.90 0.5 1000.90 es 6 127 127 10
+mirrorpx ReflejoLamina reflection 120 3.0 1000 es 13 13 13 8

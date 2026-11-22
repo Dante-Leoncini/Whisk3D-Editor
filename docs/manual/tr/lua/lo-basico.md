@@ -13,11 +13,11 @@
 Bir değişken, ona bir değer atandığında oluşturulur. Her zaman `local` kullan: değişken yalnızca tanımlandığı blok içinde var olur ve diğerleriyle çakışmaz.
 
 ```lua
-local vidas = 3           -- sayı (tam sayı)
-local velocidad = 2.5     -- sayı (ondalıklı)
-local nombre = "Whisky"   -- metin (string)
-local vivo = true         -- boolean: true ya da false
-local nada = nil          -- nil = "değer yok"
+local lives = 3         -- sayı (tam sayı)
+local speed = 2.5       -- sayı (ondalıklı)
+local name = "Whisky"   -- metin (string)
+local live = true       -- boolean: true ya da false
+local none = nil        -- nil = "değer yok"
 ```
 
 Lua'nın türleri şunlardır: `nil`, `boolean`, `number`, `string`, `table` ve `function`. Whisk3D'nin sana verdiği sahne nesneleri, yalnızca motorun fonksiyonlarına aktarılarak kullanılan özel bir türdür.
@@ -30,9 +30,9 @@ Lua'nın türleri şunlardır: `nil`, `boolean`, `number`, `string`, `table` ve 
 | `//` | Tam sayı bölmesi | `7 // 2` → 3 |
 | `%` | Kalan | `7 % 2` → 1 |
 | `^` | Üs alma | `2 ^ 3` → 8.0 |
-| `== ~= < > <= >=` | Karşılaştırmalar (`~=` "eşit değil" demektir) | `vidas ~= 0` |
-| `and or not` | Mantıksal | `vivo and vidas > 0` |
-| `..` | Metinleri birleştirme | `"Vidas: " .. vidas` |
+| `== ~= < > <= >=` | Karşılaştırmalar (`~=` "eşit değil" demektir) | `lives ~= 0` |
+| `and or not` | Mantıksal | `live and lives > 0` |
+| `..` | Metinleri birleştirme | `"Vidas: " .. lives` |
 | `#` | Bir metnin ya da listenin uzunluğu | `#"hola"` → 4 |
 
 > [!NOTE]
@@ -70,19 +70,19 @@ Lua'da `n++` ya da `n += 1` yoktur: `n = n + 1` yazılır. Bir döngüyü kesmek
 ## Fonksiyonlar
 
 ```lua
-local function sumar(a, b)
+local function add(a, b)
   return a + b
 end
-print(sumar(2, 3))        -- 5
+print(add(2, 3))        -- 5
 
 -- bir fonksiyon birden fazla değer döndürebilir
 local function minMax(a, b)
   if a < b then return a, b else return b, a end
 end
-local menor, mayor = minMax(8, 3)
+local less, greater = minMax(8, 3)
 ```
 
-Whisk3D'nin birçok fonksiyonu aynı anda birden fazla değer döndürür, örneğin `local x, y, z = posicion(yo())`.
+Whisk3D'nin birçok fonksiyonu aynı anda birden fazla değer döndürür, örneğin `local x, y, z = getPosition(self())`.
 
 ## Tablolar: listeler ve sözlükler
 
@@ -90,23 +90,23 @@ Tablo, Lua'nın tek veri yapısıdır ve her işe yarar.
 
 ```lua
 -- liste olarak (dizinler 0'dan değil, 1'den başlar)
-local frutas = { "manzana", "pera", "uva" }
-print(frutas[1])          -- manzana
-print(#frutas)            -- 3
-frutas[#frutas + 1] = "kiwi"   -- sona ekleme
-table.insert(frutas, "melón")  -- başka bir yol
+local fruits = { "manzana", "pera", "uva" }
+print(fruits[1])          -- manzana
+print(#fruits)            -- 3
+fruits[#fruits + 1] = "kiwi"   -- sona ekleme
+table.insert(fruits, "melón")  -- başka bir yol
 
-for i, f in ipairs(frutas) do  -- bir listeyi sırayla dolaşma
+for i, f in ipairs(fruits) do  -- bir listeyi sırayla dolaşma
   print(i, f)
 end
 
 -- sözlük olarak (anahtar = değer)
-local jugador = { nombre = "Ana", puntos = 0 }
-jugador.puntos = jugador.puntos + 10
-print(jugador["nombre"])  -- Ana
+local player = { name = "Ana", puntos = 0 }
+player.puntos = player.puntos + 10
+print(player["nombre"])  -- Ana
 
-for clave, valor in pairs(jugador) do  -- tüm anahtarları dolaşma (sabit bir sıra olmadan)
-  print(clave, valor)
+for clave, value in pairs(player) do  -- tüm anahtarları dolaşma (sabit bir sıra olmadan)
+  print(clave, value)
 end
 ```
 
@@ -115,7 +115,7 @@ end
 ```lua
 local t = string.format("Puntos: %d  Tiempo: %.1f", 120, 3.456)  -- "Puntos: 120  Tiempo: 3.5"
 local may = string.upper("hola")        -- "HOLA"
-local parte = string.sub("Whisk3D", 1, 5)   -- "Whisk"
+local part = string.sub("Whisk3D", 1, 5)   -- "Whisk"
 local n = tonumber("42")                -- metinden sayıya
 local s = tostring(3.5)                 -- sayıdan metne
 local r = math.floor(2.7)               -- 2
@@ -125,4 +125,4 @@ local m = math.max(4, 9, 2)             -- 9
 local pi = math.pi
 ```
 
-Rastgele sayılar için Whisk3D'de `azar()` vardır (başvuruya bak). `math.random` da çalışır; her oyunda farklı bir tohumla başlatılmış olarak gelir.
+Rastgele sayılar için Whisk3D'de `random()` vardır (başvuruya bak). `math.random` da çalışır; her oyunda farklı bir tohumla başlatılmış olarak gelir.

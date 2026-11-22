@@ -46,7 +46,7 @@ Comment il s'y prend, en détail (les graphismes, le son, les fichiers, les entr
 
 ## Le projet
 
-Tout le travail est enregistré dans un fichier de projet `.w3d`. Il contient la scène, mais aussi les ressources : textures (`texturas/`), scripts (`scripts/`), sons, scènes, prefabs. Une ressource peut se trouver **dans** le .w3d ou **en dehors**, comme fichier séparé sur le disque ; les menus « Enregistrer dans le .w3d » et « Enregistrer hors du .w3d » la font passer de l'un à l'autre. Voir [Le projet](proyecto.md).
+Tout le travail est enregistré dans un fichier de projet `.w3d`. Il contient la scène, mais aussi les ressources : textures (`textures/`), scripts (`scripts/`), sons, scènes, prefabs. Une ressource peut se trouver **dans** le .w3d ou **en dehors**, comme fichier séparé sur le disque ; les menus « Enregistrer dans le .w3d » et « Enregistrer hors du .w3d » la font passer de l'un à l'autre. Voir [Le projet](proyecto.md).
 
 > [!NOTE]
 > Ce manuel décrit ce que Whisk3D sait faire aujourd'hui. Les noms des fonctions sont ceux affichés dans l'éditeur en français. Les touches indiquées sont celles par défaut : vous pouvez les modifier dans [Raccourcis clavier](atajos.md).

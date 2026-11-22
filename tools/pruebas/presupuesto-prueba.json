@@ -1,10 +1,10 @@
 {
   "pc": {
     "dc": 500,
-    "trisOpacos": 200000,
+    "opaqueTris": 200000,
     "trisBlend": 50000,
     "texbinds": 200,
-    "bytesSubidos": 4194304,
+    "uploadedBytes": 4194304,
     "stateChanges": 20000,
     "cpuRenderMs": 50
   },

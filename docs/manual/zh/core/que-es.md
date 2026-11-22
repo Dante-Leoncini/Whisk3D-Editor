@@ -30,24 +30,24 @@ Core 是一个 C++ 库，有自己的仓库 [Whisk3D-Core](https://github.com/Da
 namespace gfx = w3dEngine;
 
 // 一个文件：它可以在磁盘上、在 .w3d 里、在 APK 里，或者打包在游戏中
-std::vector<unsigned char> nivel;
-if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", nivel))
+std::vector<unsigned char> level;
+if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", level))
     w3dLogfE("no encontre %s", "niveles/uno.txt");
 
 // 一张纹理：由 stb（或 Symbian 的 ICL）解码，由后端上传
 unsigned int pasto = 0;
-gfx::LoadTexture("texturas/pasto.png", pasto);
+gfx::LoadTexture("textures/pasto.png", pasto);
 
 // 一个声音：由 Core 混音；输出由各个系统负责
-w3dEngine::W3dSound* salto = w3dEngine::W3dSoundLoad("sonidos/salto.wav");
-w3dEngine::W3dSoundPlay(salto, 1.0f, false);
+w3dEngine::W3dSound* jump = w3dEngine::W3dSoundLoad("sounds/salto.wav");
+w3dEngine::W3dSoundPlay(jump, 1.0f, false);
 
 // 绘制：一次也不调用 OpenGL、sceGu 或 citro3d
 gfx::Enable(gfx::Texture2D);
 gfx::BindTexture(pasto);
-gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, posiciones);
+gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, positions);
 gfx::EnableArray(gfx::TexCoordArray); gfx::TexCoordPointer2f(0, uvs);
-gfx::DrawTriangles(cantidadDeIndices, indices);
+gfx::DrawTriangles(indexCount, indices);
 ```
 
 ## 里面有什么

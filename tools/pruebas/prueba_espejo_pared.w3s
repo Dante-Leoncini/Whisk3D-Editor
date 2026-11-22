@@ -22,56 +22,56 @@
 #     255,  0,  0   el poste ROJO          255,230,0   el poste AMARILLO
 #      13, 13, 13   el fondo de la escena = ahi NO se dibujo reflejo
 # ===========================================================================
-abrirw3d prueba_espejo_pared.w3d
+openw3d prueba_espejo_pared.w3d
 loadtex
-espejopx EspejoPared info
+mirrorpx EspejoPared info
 
 # --- EL REFLEJO SE VE, y en el plano correcto -------------------------------
 # PosteCentro cae entero adentro del rectangulo
-espejopx EspejoPared reflejo 0 1.5 1.0 es 255 0 0 8
+mirrorpx EspejoPared reflection 0 1.5 1.0 es 255 0 0 8
 # y el objeto REAL sigue con su color crudo (el pase del espejo restaura estado)
-espejopx EspejoPared mundo 0 1.5 1.0 es 255 0 0 8
+mirrorpx EspejoPared world 0 1.5 1.0 es 255 0 0 8
 
 # --- BORDE U (el eje horizontal del plano) ----------------------------------
 # PosteBorde ocupa x 1.7..2.7 contra un borde en x = 2.0: el ORIGEN (2.2) esta
 # AFUERA. Se ve la parte de adentro...
-espejopx EspejoPared reflejo 1.9 1.5 1.0 es 255 230 0 8
+mirrorpx EspejoPared reflection 1.9 1.5 1.0 es 255 230 0 8
 # ...y TAMBIEN la parte del cuerpo mas alla del borde: un espejo refleja lo que
 # esta al lado de su marco cuando el rayo del ojo cruza la silueta (los planos
 # de mundo que cortaban aca eran el bug del reflejo que desaparecia).
-espejopx EspejoPared reflejo 2.6 1.5 1.0 es 255 230 0 8
+mirrorpx EspejoPared reflection 2.6 1.5 1.0 es 255 230 0 8
 # El RECORTE es la SILUETA en pantalla: en un punto DEL PLANO del espejo apenas
 # afuera del rectangulo no se pinto nada (fondo de la escena).
-espejopx EspejoPared mundo 2.3 1.5 -2.0 es 13 13 13 8
+mirrorpx EspejoPared world 2.3 1.5 -2.0 es 13 13 13 8
 
 # --- BORDE V (la ALTURA): el eje que antes NO EXISTIA -----------------------
 # PosteBajo ocupa altura 0.1..1.1 contra un borde V que empieza en 0.5.
 # Por encima del borde se ve...
-espejopx EspejoPared reflejo -1 0.9 1.0 es 255 230 0 8
+mirrorpx EspejoPared reflection -1 0.9 1.0 es 255 230 0 8
 # ...y la parte de abajo TAMBIEN (la imagen virtual se ve a traves de la
 # silueta del espejo, aunque el cuerpo quede bajo el marco).
-espejopx EspejoPared reflejo -1 0.25 1.0 es 255 230 0 8
+mirrorpx EspejoPared reflection -1 0.25 1.0 es 255 230 0 8
 # El recorte en V es la SILUETA: en un punto DEL PLANO apenas por debajo del
 # borde v=0.5 no se pinto nada. Con los limites viejos (X/Z de mundo) este eje
 # ni siquiera existia: este es EL assert de la generalizacion.
-espejopx EspejoPared mundo -1 0.3 -2.0 es 13 13 13 8
+mirrorpx EspejoPared world -1 0.3 -2.0 es 13 13 13 8
 # el objeto REAL a esa misma altura sigue estando: lo que se recorta es la imagen
-espejopx EspejoPared mundo -1 0.25 1.0 es 255 230 0 8
+mirrorpx EspejoPared world -1 0.25 1.0 es 255 230 0 8
 
 # --- YA AFUERA: el gate lo descarta entero ----------------------------------
 # PosteLejos (x = 7) no proyecta nada adentro del rectangulo. El gate proyecta el
 # AABB sobre EjeU()/EjeV(), no mira .x/.z de mundo.
-espejopx EspejoPared reflejo 7 1.5 1.0 es 13 13 13 8
+mirrorpx EspejoPared reflection 7 1.5 1.0 es 13 13 13 8
 
 # --- ROUND-TRIP v4: "limites" viaja igual que siempre -----------------------
 # El array del JSON no cambio un byte -- [u0, u1, v0, v1] --; lo que cambio es
 # contra que ejes se interpreta cuando el espejo no es horizontal.
-guardarw3d prueba_espejo_pared_v4.w3d
-abrirw3d prueba_espejo_pared_v4.w3d
+savew3d prueba_espejo_pared_v4.w3d
+openw3d prueba_espejo_pared_v4.w3d
 loadtex
-espejopx EspejoPared info
-espejopx EspejoPared reflejo 0 1.5 1.0 es 255 0 0 8
-espejopx EspejoPared reflejo 2.6 1.5 1.0 es 255 230 0 8
-espejopx EspejoPared mundo 2.3 1.5 -2.0 es 13 13 13 8
-espejopx EspejoPared reflejo -1 0.9 1.0 es 255 230 0 8
-espejopx EspejoPared mundo -1 0.3 -2.0 es 13 13 13 8
+mirrorpx EspejoPared info
+mirrorpx EspejoPared reflection 0 1.5 1.0 es 255 0 0 8
+mirrorpx EspejoPared reflection 2.6 1.5 1.0 es 255 230 0 8
+mirrorpx EspejoPared world 2.3 1.5 -2.0 es 13 13 13 8
+mirrorpx EspejoPared reflection -1 0.9 1.0 es 255 230 0 8
+mirrorpx EspejoPared world -1 0.3 -2.0 es 13 13 13 8

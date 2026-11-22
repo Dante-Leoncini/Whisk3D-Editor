@@ -31,12 +31,12 @@ Core 说的是固定管线的语言。着色器后端用一个“uber-shader”�
 
 几乎总是在**编译时**选择：每个系统只编译一个后端，调用直接进行，没有任何额外开销。
 
-例外是 PC（Windows 和 Linux）。在 PC 上，可执行文件同时带有 OpenGL、OpenGL ES 2.0 和 Vulkan，在**启动时**选择，位置是 **Properties → Settings → Graphics**（重启后生效；参见[其他功能](../editor/otras-funciones.md)）。每个后端都在自己的命名空间中编译（`w3dEngine::gl`、`w3dEngine::es2`、`w3dEngine::vk`），并把自己的函数填入一张**分派表**（`w3dBackendTabla.h`）。`w3dEngine` 的每个函数都会调用当前后端的对应函数：
+例外是 PC（Windows 和 Linux）。在 PC 上，可执行文件同时带有 OpenGL、OpenGL ES 2.0 和 Vulkan，在**启动时**选择，位置是 **Properties → Settings → Graphics**（重启后生效；参见[其他功能](../editor/otras-funciones.md)）。每个后端都在自己的命名空间中编译（`w3dEngine::gl`、`w3dEngine::es2`、`w3dEngine::vk`），并把自己的函数填入一张**分派表**（`w3dBackendTable.h`）。`w3dEngine` 的每个函数都会调用当前后端的对应函数：
 
 ```cpp
-// graphics/w3dDespacho.inc，由 tools/generar_despacho.py 生成
-void Enable(Cap c) { W3D_TABLA()->Enable(c); }
-void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTriangles(count, indices); }
+// graphics/w3dDispatch.inc，由 tools/generar_despacho.py 生成
+void Enable(Cap c) { W3D_TABLE()->Enable(c); }
+void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLE()->DrawTriangles(count, indices); }
 ```
 
 如果选中的后端在那台机器上无法运行，就继续使用 OpenGL。Vulkan 需要驱动、GPU 以及放在可执行文件旁边的着色器编译器 `shaderc_shared`，在 32 位版本中默认关闭。在 macOS 上，可执行文件只带有 OpenGL。
@@ -60,13 +60,13 @@ void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTrian
 
 | 询问 | 回答“否”时会怎样 |
 |---|---|
-| `VBOSoportado()` | 网格以内存中的数组形式提交（Dreamcast、Vita） |
-| `EstencilBits()` | 水面反射退回到用平面裁剪 |
-| `PlanosRecorteMax()` | 反射改为不用裁剪平面来处理（PVR 没有裁剪平面） |
-| `MezclaTexturasSoportada()` | 材质的各层分多遍绘制 |
-| `TieneTexGen()` | 球面反射由软件计算，或用纹理矩阵计算（`TexMatrixMatcap`，在 N95 上可用） |
-| `SombreadoPorPixelSoportado()` | 光照保持逐顶点，编辑器也不提供该选项 |
-| `ShadersEscritos()` | 带自定义着色器的材质按常规方式绘制（参见[手写着色器](../editor/shaders.md)） |
+| `VBOSupported()` | 网格以内存中的数组形式提交（Dreamcast、Vita） |
+| `StencilBits()` | 水面反射退回到用平面裁剪 |
+| `PlanesClipMax()` | 反射改为不用裁剪平面来处理（PVR 没有裁剪平面） |
+| `MixTexturesSupported()` | 材质的各层分多遍绘制 |
+| `HasTexGen()` | 球面反射由软件计算，或用纹理矩阵计算（`TexMatrixMatcap`，在 N95 上可用） |
+| `ShadingPerPixelSupported()` | 光照保持逐顶点，编辑器也不提供该选项 |
+| `ShadersWritten()` | 带自定义着色器的材质按常规方式绘制（参见[手写着色器](../editor/shaders.md)） |
 
 ## 状态缓存
 
@@ -81,13 +81,13 @@ void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTrian
 - **Dreamcast：** 2 的幂，8 到 1024，16 位（565 或 4444），没有 mipmap。
 - **N95：** 只支持 2 的幂；其他尺寸在上传前会重新采样。
 
-项目可以要求使用 **16 位**纹理（内存减半），并且只在 N95 上，从某个尺寸起以**一半尺寸**上传（`texturasMitadDesde`）。`.w3dt` 格式保存的是已经可以直接交给 GPU 的纹理，连同 mipmap：加载它就是读取再上传。
+项目可以要求使用 **16 位**纹理（内存减半），并且只在 N95 上，从某个尺寸起以**一半尺寸**上传（`texturesHalfFrom`）。`.w3dt` 格式保存的是已经可以直接交给 GPU 的纹理，连同 mipmap：加载它就是读取再上传。
 
 坦白说一个细节：纹理上传和灯光仍然会直接调用两三个 OpenGL 函数。在没有 OpenGL 的主机上，后端带有一个小层来实现它们（`gu/w3dGLgu.cpp`、`citro3d/w3dGLc3d.cpp`）。
 
 ## 屏幕和安全区域
 
-`PantallaSetTam` 和 `PantallaEsVertical` 只保存一次屏幕是竖着还是横着（横向 = 宽大于高），这样引擎的任何部分都可以查询。**安全区域**（`SafeAreaGet`）表示每条边有多少像素不能用于界面：刘海、手势条、手机浏览器的地址栏和工具栏。背景绘制在整个窗口中，界面绘制在安全区域内。在 PC、Symbian 和主机上，边距都是 0；在浏览器中会实际测量。
+`ScreenSetSize` 和 `ScreenIsVertical` 只保存一次屏幕是竖着还是横着（横向 = 宽大于高），这样引擎的任何部分都可以查询。**安全区域**（`SafeAreaGet`）表示每条边有多少像素不能用于界面：刘海、手势条、手机浏览器的地址栏和工具栏。背景绘制在整个窗口中，界面绘制在安全区域内。在 PC、Symbian 和主机上，边距都是 0；在浏览器中会实际测量。
 
 ## 最小机器的限制
 
@@ -96,7 +96,7 @@ void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTrian
 | 限制 | 在哪里 | Core 如何处理 |
 |---|---|---|
 | 16 位索引（每个网格最多 65,535 个顶点） | Symbian | `MeshIndex` 在那里是 16 位，在其他系统上是 32 位；导入器会拒绝放不下的内容 |
-| 同时最多 8 盏灯 | 所有系统（`LucesMax`） | 着色器后端用相同的计算来模拟；PSP 用硬件处理 4 盏，Android 2.3 最多使用 4 盏 |
+| 同时最多 8 盏灯 | 所有系统（`LightsMax`） | 着色器后端用相同的计算来模拟；PSP 用硬件处理 4 盏，Android 2.3 最多使用 4 盏 |
 | 没有着色器 | 固定管线后端 | 着色器相关的函数回答“否”，材质按常规方式绘制 |
 | 16 位 Z | PSP | 近裁剪面根据环绕距离调整，与 N95 上一样 |
 | 一共 16 MB | Dreamcast | 用 `-Os` 编译，链接器会丢弃没用到的部分；纹理使用 16 位 |

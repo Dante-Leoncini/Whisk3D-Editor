@@ -57,11 +57,11 @@ class Scrollable {
         void ScrollByTouch(int dx, int dy); // touch: arrastrar el CONTENIDO 1:1 (sin tocar la barra)
         // un click en el RIEL (fuera del agarre): el agarre salta ahi (su centro bajo el puntero). myLocal: la y del
         // click adentro del viewport; alto: el alto del viewport. Despues se sigue arrastrando como siempre
-        void TeletransportarY(int myLocal, int alto);
+        void TeleportY(int myLocal, int height);
         void ScrollMouseOver(ViewportBase* current, int mx, int my);
         void ResizeScrollbar(int width, int height, int MaxX, int MaxY,
                              int topOffset = 0);
-        void DibujarScrollbar(ViewportBase* current);
+        void DrawScrollbar(ViewportBase* current);
 };
 
 #endif

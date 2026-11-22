@@ -29,8 +29,8 @@ add cube
 add cube
 add cube
 add cube
-outscrollfin
+outscrollend
 # con las rutinas y el constructor ocultos (menu del ojo) tambien llega al final
-outver 0 0
-outscrollfin
-outver 1 1
+outshow 0 0
+outscrollend
+outshow 1 1

@@ -4,7 +4,7 @@ Es el mismo editor de la PC, compilado para el MIPS Allegrex de la PSP con el ki
 
 - **pspdev** es el compilador (`psp-gcc`) con el PSPSDK (sceGu, sceCtrl, el cargador) y las herramientas que arman el `EBOOT.PBP`.
 - **El dibujo es propio**: la PSP no tiene OpenGL. El Core tiene un backend para su GPU (el GE), en `libs/Whisk3DCore/graphics/gu/`, con la misma API que el de OpenGL (`graphics/w3dGraphics.h`), como el de citro3d para la 3DS.
-- **SDL2 de la PSP** maneja los eventos, el control y el sonido. Entra por `main.cpp` y `controles.cpp`, igual que en la PC.
+- **SDL2 de la PSP** maneja los eventos, el control y el sonido. Entra por `main.cpp` y `controls.cpp`, igual que en la PC.
 
 Lo propio de la consola va con `#ifdef W3D_PSP`, y lo que no tiene lugar en el código compartido, en `w3d_psp.cpp`. El `GL/gl.h` de `include/` trae los tipos de GL (el PSPGL de pspdev no se usa).
 

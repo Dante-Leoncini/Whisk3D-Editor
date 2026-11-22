@@ -187,13 +187,13 @@ def casilla(idioma):
 def lista(idioma):
     """Una lista con sus botones: el cubo con dos modificadores; el de abajo sube con Subir."""
     g = guion_props(idioma)
-    g.linea("agregar modificador 1")              # Espejo
-    g.linea("agregar modificador 3")              # Superficie de subdivision (queda elegido)
+    g.linea("addui modifier 1")              # Espejo
+    g.linea("addui modifier 3")              # Superficie de subdivision (queda elegido)
     g.linea("propstab 4")
     rec = recorte_props(g)
     i = g.info()
     t = i.tarjeta(T(idioma, "Modifiers"))
-    filas = [p for p in i.props if p["g"] == t["i"] and not p.get("nombre")]   # [Anadir | Quitar], [Subir | Bajar]
+    filas = [p for p in i.props if p["g"] == t["i"] and not p.get("name")]   # [Anadir | Quitar], [Subir | Bajar]
     sub = filas[1]
     x = t["x"] + t["w"] // 4                      # (la mitad izquierda de la fila: Subir)
     g.raton_mover(x, sub["y"] + 120)
@@ -276,8 +276,8 @@ def nokia(idioma):
     """N95: la tecla verde pasa a Propiedades; abajo hasta la Posicion X; OK; 2; OK."""
     from recetas import TECLA_VERDE
     g = Guion(idioma, n95="vertical")
-    g.linea("vista3d gizmo 0")                     # (el N95 viene sin gizmo y sin la barra de abajo)
-    g.linea("vista3d barra 0")
+    g.linea("view3d gizmo 0")                     # (el N95 viene sin gizmo y sin la barra de abajo)
+    g.linea("view3d bar 0")
     g.foto(dur=900)
     g.foto(dur=350, teclas=("verde",), tecla=TECLA_VERDE[idioma])
     g.verde()
@@ -289,7 +289,7 @@ def nokia(idioma):
     g.tecla("Return")
     g.foto(dur=600)
     g.foto(dur=300, teclas=("num2",), tecla="2")
-    g.linea("texto 2")
+    g.linea("text 2")
     g.foto(dur=600)
     g.foto(dur=300, teclas=("ok",), tecla="OK")
     g.tecla("Return")
@@ -394,7 +394,7 @@ def out_renombrar(idioma):
     g.foto(dur=700)
     g.raton_mover(x, y)
     g.foto(dur=400)
-    g.lineas.append("raton doble %d %d izq" % (x, y))
+    g.lineas.append("mouse double %d %d left" % (x, y))
     g.foto(dur=700, tecla="2 clicks")
     g.mod("Ctrl"); g.tecla("a"); g.mod()
     teclas(g, ["=" + CAJA[idioma]], CAJA[idioma], dur=500)
@@ -423,7 +423,7 @@ def out_activo(idioma):
         g.linea("objpos %g 0.3 %g" % ((k % 6) * 1.2 - 3, (k // 6) * 1.2 - 3))
         nombres.append(n)
     g.linea("deselectall")
-    g.linea("vporbita 0 0 0 11 -50 20")
+    g.linea("vporbit 0 0 0 11 -50 20")
     i = g.info()
     obj = i.objetos[nombres[-1]]
     v = i.vp(OUTLINER)
@@ -446,8 +446,8 @@ def out_nokia(idioma):
     from recetas import TECLA_VERDE
     from capturas import MENU_TIPO
     g = Guion(idioma, n95="vertical")
-    g.linea("vista3d gizmo 0")
-    g.linea("vista3d barra 0")
+    g.linea("view3d gizmo 0")
+    g.linea("view3d bar 0")
     i = g.info()
     x, y = i.esquina(PROPIEDADES)                  # (el viewport de abajo pasa a ser un Outliner, como en el tutorial 1)
     g.clic(x, y)
@@ -462,12 +462,12 @@ def out_nokia(idioma):
     tecla(TECLA_VERDE[idioma], "verde", ["verde"])
     # hasta la Luz: la 1ra flecha entra en Constructor; despues Limpiar pantalla, Coleccion, Camara, Luz
     for _ in range(5):
-        tecla("↓", "abajo", ["outliner tecla Down"], dur=350)
-    tecla("1", "num1", ["outliner n95 mover"], dur=800)
-    tecla("↑", "arriba", ["outliner tecla Up"], dur=800)
-    tecla("1", "num1", ["outliner n95 mover"], dur=900)
+        tecla("↓", "abajo", ["outliner key Down"], dur=350)
+    tecla("1", "num1", ["outliner n95 move"], dur=800)
+    tecla("↑", "arriba", ["outliner key Up"], dur=800)
+    tecla("1", "num1", ["outliner n95 move"], dur=900)
     for _ in range(2):
-        tecla("↓", "abajo", ["outliner tecla Down"], dur=350)
+        tecla("↓", "abajo", ["outliner key Down"], dur=350)
     tecla("2", "num2", ["outliner n95 visible"], dur=1100)
     tecla("2", "num2", ["outliner n95 visible"], dur=900)
     tecla("3", "num3", ["outliner n95 render"], dur=1600)
@@ -528,7 +528,7 @@ def v3d_gizmo_cursor(idioma):
     g = Guion(idioma, w=1200, h=680)
     g.linea("division 0.8")
     g.linea("cursor3d -2.4 0 1.4")
-    g.linea("vporbita -1.0 0.3 0.6 6 -25 24")          # cerca: el cubo y el cursor llenan la vista
+    g.linea("vporbit -1.0 0.3 0.6 6 -25 24")          # cerca: el cubo y el cursor llenan la vista
     rec, _ = vista_pc(g)
     i = g.info()
     cx, cy = i.manijas[6]                               # el centro del gizmo
@@ -591,8 +591,8 @@ def foto_vista(g):
 def v3d_modo_edicion(idioma):
     """El cubo en el Modo Edicion, con una cara elegida."""
     g = Guion(idioma)
-    g.linea("modo edicion")
-    g.linea("caras 0")
+    g.linea("modemenu edit")
+    g.linea("faces 0")
     return foto_vista(g)
 
 
@@ -601,9 +601,9 @@ def v3d_modo_edicion_esqueleto(idioma):
     """El esqueleto de Leon en el Modo Edicion: los huesos en su posicion de reposo."""
     from recetas_objeto import escena_leon
     g = Guion(idioma)
-    escena_leon(g, vista="vporbita 0 0.9 0 3 -10 28")
-    g.linea("vista3d huesos 1")
-    g.linea("modo edicion")
+    escena_leon(g, vista="vporbit 0 0.9 0 3 -10 28")
+    g.linea("view3d bones 1")
+    g.linea("modemenu edit")
     return foto_vista(g)
 
 
@@ -612,11 +612,11 @@ def v3d_modo_pose(idioma):
     """El esqueleto de Leon en el Modo Pose, a mitad de su animacion de caminar."""
     from recetas_objeto import escena_leon
     g = Guion(idioma)
-    escena_leon(g, vista="vporbita 0 0.9 0 3 -10 28")
-    g.linea("vista3d huesos 1")
+    escena_leon(g, vista="vporbit 0 0.9 0 3 -10 28")
+    g.linea("view3d bones 1")
     g.linea("animlistsel 1")                      # (el clip 'caminar')
     g.linea("frame 12")
-    g.linea("modo pose")
+    g.linea("modemenu pose")
     return foto_vista(g)
 
 
@@ -625,10 +625,10 @@ def v3d_modo_pesos(idioma):
     """Una malla de Leon en la Pintura de Pesos: en rojo lo que mueve mucho el hueso elegido, en azul lo que no."""
     from recetas_objeto import escena_leon
     g = Guion(idioma)
-    escena_leon(g, vista="vporbita 0 0.9 0 3 -10 28")
+    escena_leon(g, vista="vporbit 0 0.9 0 3 -10 28")
     g.linea("deselectall")
     g.linea("selobj leon")
-    g.linea("modo pesos")
+    g.linea("modemenu weights")
     return foto_vista(g)
 
 
@@ -638,7 +638,7 @@ def trazo(g, modo, color=None):
     from recetas import vista_pc
     if color:
         g.linea("brushcolor %s" % color)
-    g.linea("modo " + modo)
+    g.linea("modemenu " + modo)
     rec, (cx, cy) = vista_pc(g)
     a, b = (cx - 90, cy - 10), (cx + 90, cy + 25)
     g.raton_mover(*a)
@@ -664,7 +664,7 @@ def v3d_modo_textura(idioma):
     """Leon en la Pintura de Textura: un trazo rojo sobre su campera (se pinta la textura)."""
     from recetas_objeto import escena_leon
     g = Guion(idioma, raton=True)
-    escena_leon(g, vista="vporbita 0 1.2 0 1.8 -5 15")
+    escena_leon(g, vista="vporbit 0 1.2 0 1.8 -5 15")
     g.linea("deselectall")
     g.linea("selobj leon")
     return trazo(g, "textura", "1 0.1 0.1 1 1")
@@ -714,7 +714,7 @@ def v3d_menu_animacion_pose(idioma):
     g = Guion(idioma, w=1600, h=760)
     g.linea("division 0.78")
     escena_leon(g)
-    g.linea("modo pose")
+    g.linea("modemenu pose")
     g.clic(*g.info().boton_rol(VISTA_3D, 16))
     g.sin_puntero()
     rec = recorte_menu(g)
@@ -730,7 +730,7 @@ def receta_pivote(n, nombre):
     def icono(idioma):
         g = Guion(idioma, w=1600, h=600)
         g.linea("division 0.78")
-        g.linea("pivote %d" % n)
+        g.linea("pivot %d" % n)
         b = [x for x in g.info().botones if x["kind"] == VISTA_3D and x.get("rol") == 3][0]
         g.sin_puntero()
         g.foto()

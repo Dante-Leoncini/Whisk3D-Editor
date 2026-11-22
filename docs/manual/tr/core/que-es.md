@@ -30,24 +30,24 @@ Whisk3D Core'u kullanmak için yazılmış ve tüm sistemlerde çalışan bir oy
 namespace gfx = w3dEngine;
 
 // bir dosya: diskte, .w3d'nin içinde, APK'nın içinde ya da oyuna paketlenmiş olabilir
-std::vector<unsigned char> nivel;
-if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", nivel))
+std::vector<unsigned char> level;
+if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", level))
     w3dLogfE("no encontre %s", "niveles/uno.txt");
 
 // bir doku: onu stb (ya da Symbian'ın ICL'i) çözer ve arka uç yükler
 unsigned int pasto = 0;
-gfx::LoadTexture("texturas/pasto.png", pasto);
+gfx::LoadTexture("textures/pasto.png", pasto);
 
 // bir ses: onu Core karıştırır; çıkış her sistemin kendisinindir
-w3dEngine::W3dSound* salto = w3dEngine::W3dSoundLoad("sonidos/salto.wav");
-w3dEngine::W3dSoundPlay(salto, 1.0f, false);
+w3dEngine::W3dSound* jump = w3dEngine::W3dSoundLoad("sounds/salto.wav");
+w3dEngine::W3dSoundPlay(jump, 1.0f, false);
 
 // çizim: OpenGL'e, sceGu'ya ya da citro3d'ye tek bir çağrı bile yok
 gfx::Enable(gfx::Texture2D);
 gfx::BindTexture(pasto);
-gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, posiciones);
+gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, positions);
 gfx::EnableArray(gfx::TexCoordArray); gfx::TexCoordPointer2f(0, uvs);
-gfx::DrawTriangles(cantidadDeIndices, indices);
+gfx::DrawTriangles(indexCount, indices);
 ```
 
 ## İçinde neler var

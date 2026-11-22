@@ -2,6 +2,6 @@
 
 | Fonksiyon | Ne yapar |
 |---|---|
-| `emitir(obj [, n])`, `setEmitiendo(obj, bool)` | Bir parçacık patlaması ya da bir yayıcıyı açma/kapama. |
-| `niebla(obj)`, `setNiebla(obj, densidad [, r, g, b, inicio, fin])` | Sisi okuma ve değiştirme. |
-| `setSector`, `visCelda`, `setVisAncla`, `setVisCurvaT`, `setLote` | Seviyenin hangi kısımlarının çizileceğinin gelişmiş kontrolü. |
+| `emit(obj [, n])`, `setEmitting(obj, bool)` | Bir parçacık patlaması ya da bir yayıcıyı açma/kapama. |
+| `getFog(obj)`, `setFog(obj, density [, r, g, b, inicio, fin])` | Sisi okuma ve değiştirme. |
+| `setSector`, `visCell`, `setVisAnchor`, `setVisCurveT`, `setBatch` | Seviyenin hangi kısımlarının çizileceğinin gelişmiş kontrolü. |

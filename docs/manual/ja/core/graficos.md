@@ -31,12 +31,12 @@ Coreは固定パイプラインの言葉で話します。シェーダーのバ�
 
 ほとんどの場合、**コンパイル時**に決まります。各システムはバックエンドを1つだけコンパイルし、呼び出しは直接そこへ行くので、余分なコストは一切かかりません。
 
-例外はPC（WindowsとLinux）です。PCの実行ファイルにはOpenGL、OpenGL ES 2.0、Vulkanが入っていて、**起動時**に選びます。選ぶ場所は**Properties → Settings → Graphics**です（再起動後に有効になります。[3D Viewportのその他の機能](../editor/otras-funciones.md)を参照）。各バックエンドはそれぞれの名前空間（`w3dEngine::gl`、`w3dEngine::es2`、`w3dEngine::vk`）でコンパイルされ、自分の関数で**ディスパッチテーブル**（`w3dBackendTabla.h`）を埋めます。`w3dEngine`の各関数は、アクティブなバックエンドの関数を呼び出します：
+例外はPC（WindowsとLinux）です。PCの実行ファイルにはOpenGL、OpenGL ES 2.0、Vulkanが入っていて、**起動時**に選びます。選ぶ場所は**Properties → Settings → Graphics**です（再起動後に有効になります。[3D Viewportのその他の機能](../editor/otras-funciones.md)を参照）。各バックエンドはそれぞれの名前空間（`w3dEngine::gl`、`w3dEngine::es2`、`w3dEngine::vk`）でコンパイルされ、自分の関数で**ディスパッチテーブル**（`w3dBackendTable.h`）を埋めます。`w3dEngine`の各関数は、アクティブなバックエンドの関数を呼び出します：
 
 ```cpp
-// graphics/w3dDespacho.inc、tools/generar_despacho.pyが生成
-void Enable(Cap c) { W3D_TABLA()->Enable(c); }
-void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTriangles(count, indices); }
+// graphics/w3dDispatch.inc、tools/generar_despacho.pyが生成
+void Enable(Cap c) { W3D_TABLE()->Enable(c); }
+void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLE()->DrawTriangles(count, indices); }
 ```
 
 選んだものがそのマシンで動かなければ、OpenGLのままになります。Vulkanには、ドライバー、GPU、そして実行ファイルの隣にシェーダーコンパイラー`shaderc_shared`が必要で、32ビットのビルドでは無効になっています。macOSの実行ファイルにはOpenGLしか入っていません。
@@ -60,13 +60,13 @@ void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTrian
 
 | 問い合わせ | 「いいえ」のときどうなるか |
 |---|---|
-| `VBOSoportado()` | メッシュはRAM上の配列として送られます（Dreamcast、Vita） |
-| `EstencilBits()` | 水の反射は、クリッピング平面による方法に切り替わります |
-| `PlanosRecorteMax()` | 反射はクリッピング平面なしで処理します（PVRにはクリッピング平面がありません） |
-| `MezclaTexturasSoportada()` | マテリアルのレイヤーは、複数のパスで描画します |
-| `TieneTexGen()` | 球面反射は、ソフトウェアで計算するか、テクスチャ行列で計算します（`TexMatrixMatcap`。こちらはN95でも動きます） |
-| `SombreadoPorPixelSoportado()` | ライティングは頂点ごとのままで、エディターはそのオプションを表示すらしません |
-| `ShadersEscritos()` | 自作シェーダーを使うマテリアルは、いつもどおりに描画されます（[自作シェーダー](../editor/shaders.md)を参照） |
+| `VBOSupported()` | メッシュはRAM上の配列として送られます（Dreamcast、Vita） |
+| `StencilBits()` | 水の反射は、クリッピング平面による方法に切り替わります |
+| `PlanesClipMax()` | 反射はクリッピング平面なしで処理します（PVRにはクリッピング平面がありません） |
+| `MixTexturesSupported()` | マテリアルのレイヤーは、複数のパスで描画します |
+| `HasTexGen()` | 球面反射は、ソフトウェアで計算するか、テクスチャ行列で計算します（`TexMatrixMatcap`。こちらはN95でも動きます） |
+| `ShadingPerPixelSupported()` | ライティングは頂点ごとのままで、エディターはそのオプションを表示すらしません |
+| `ShadersWritten()` | 自作シェーダーを使うマテリアルは、いつもどおりに描画されます（[自作シェーダー](../editor/shaders.md)を参照） |
 
 ## 状態のキャッシュ
 
@@ -81,13 +81,13 @@ void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTrian
 - **Dreamcast：** 8〜1024の2のべき乗、16ビット（565または4444）、ミップマップなし。
 - **N95：** 2のべき乗のみ。それ以外はアップロード前にリサンプリングします。
 
-プロジェクトでは、**16ビット**のテクスチャ（メモリは半分）を指定できます。さらにN95でだけ、一定のサイズ以上のテクスチャを**半分のサイズ**でアップロードできます（`texturasMitadDesde`）。`.w3dt`フォーマットは、ミップマップ付きでGPUにそのまま渡せる状態のテクスチャを保存します：読み込みは、読んでアップロードするだけです。
+プロジェクトでは、**16ビット**のテクスチャ（メモリは半分）を指定できます。さらにN95でだけ、一定のサイズ以上のテクスチャを**半分のサイズ**でアップロードできます（`texturesHalfFrom`）。`.w3dt`フォーマットは、ミップマップ付きでGPUにそのまま渡せる状態のテクスチャを保存します：読み込みは、読んでアップロードするだけです。
 
 正直に言うと、テクスチャのアップロードとライトは、まだOpenGLの関数を2つか3つ直接呼んでいます。OpenGLのないコンソールでは、それを実装する小さなレイヤーがバックエンドに入っています（`gu/w3dGLgu.cpp`、`citro3d/w3dGLc3d.cpp`）。
 
 ## 画面とセーフエリア
 
-`PantallaSetTam`と`PantallaEsVertical`は、画面が縦向きか横向きか（横向き＝高さより幅が大きい）を一度だけ保存し、エンジンのどこからでも問い合わせられるようにします。**セーフエリア**（`SafeAreaGet`）は、各辺の何ピクセルがインターフェースに使えないかを示します：ノッチ、ジェスチャーバー、スマートフォンのブラウザーのバーなどです。背景はウィンドウ全体に描画し、インターフェースはセーフエリアの内側に描画します。PC、Symbian、コンソールでは各辺の値は0で、ブラウザーでは実際に測ります。
+`ScreenSetSize`と`ScreenIsVertical`は、画面が縦向きか横向きか（横向き＝高さより幅が大きい）を一度だけ保存し、エンジンのどこからでも問い合わせられるようにします。**セーフエリア**（`SafeAreaGet`）は、各辺の何ピクセルがインターフェースに使えないかを示します：ノッチ、ジェスチャーバー、スマートフォンのブラウザーのバーなどです。背景はウィンドウ全体に描画し、インターフェースはセーフエリアの内側に描画します。PC、Symbian、コンソールでは各辺の値は0で、ブラウザーでは実際に測ります。
 
 ## いちばん小さなマシンの制限
 
@@ -96,7 +96,7 @@ Core向けに書くものは、いちばん制約の多いマシンに収まら�
 | 制限 | 場所 | Coreでの対処 |
 |---|---|---|
 | 16ビットのインデックス（メッシュ1つあたり最大65,535頂点） | Symbian | `MeshIndex`はそこでは16ビット、それ以外では32ビット。インポーターは収まらないものを受け付けません |
-| 同時に8個までのライト | すべて（`LucesMax`） | シェーダーのバックエンドは同じ計算でエミュレートします。PSPはハードウェアで4個、Android 2.3は最大4個を使います |
+| 同時に8個までのライト | すべて（`LightsMax`） | シェーダーのバックエンドは同じ計算でエミュレートします。PSPはハードウェアで4個、Android 2.3は最大4個を使います |
 | シェーダーなし | 固定機能のバックエンド | シェーダー関連の関数は「いいえ」を返し、マテリアルはいつもどおりに描画されます |
 | 16ビットのZ | PSP | N95と同様に、ニアクリップ面をオービットの距離に合わせて調整します |
 | 全部で16 MB | Dreamcast | `-Os`でコンパイルし、リンカーが使わないものを捨てます。テクスチャは16ビットです |

@@ -17,53 +17,53 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
+window 640 480
 streamlua /tmp/w3d_f9_lua dosmats.png
-abrirw3d /tmp/w3d_f9_lua/streamlua.w3d
-streamestado Fija cargada
-streamestado Cerca cargada
-streamestado Lejos cargada
-streamtexrefs exacto
+openw3d /tmp/w3d_f9_lua/streamlua.w3d
+streamstate Fija loaded
+streamstate Cerca loaded
+streamstate Lejos loaded
+streamtexrefs exact
 
 # --- el Play ---
 simplay 1
 # (el primer actualizar ya pidio: descargar Fija y Cerca, cargar Lejos -su malla y su textura ya estaban: se genera
 #  en el mismo frame-)
-streamestado Fija descargada
-streamestado Cerca descargada
-streamestado Lejos cargada
-streaminfo instancias 3 cargadas 1
+streamstate Fija unloaded
+streamstate Cerca unloaded
+streamstate Lejos loaded
+streaminfo instances 3 loaded 1
 simplay 30
-streamestado Fija cargada
-streamestado Cerca cargada
-streamestado Lejos descargada
-scriptinfo compartido juez OK
-scriptinfo compartido veredicto F1C1L0,fijadas,auto
-streamtexrefs exacto
-streamveredicto
+streamstate Fija loaded
+streamstate Cerca loaded
+streamstate Lejos unloaded
+scriptinfo shared juez OK
+scriptinfo shared veredicto F1C1L0,fijadas,auto
+streamtexrefs exact
+streamverdict
 # (descargar las tres desde afuera del script: la Madera sale de la GPU; cargar una la trae de vuelta. La Fija la
 #  fijo cargar() del script: vuelve a decidir su carga, ahora por distancia)
-streamobjetivo 1000 0 1000
-streamfijar Fija auto
-streamcarga Fija distancia 8
+streamtarget 1000 0 1000
+streamset Fija auto
+streamload Fija distance 8
 simplay 5
-streaminfo cargadas 0 pidiendo 0 pedidos 0
-streammem mallas 2 texturas 0 scripts 0
-streamobjetivo 3 0 3
+streaminfo loaded 0 requesting 0 requests 0
+streammem meshes 2 textures 0 scripts 0
+streamtarget 3 0 3
 simplay 5
-streaminfo cargadas 2
-streammem mallas 3 texturas 1
-streamtexrefs exacto
-streamobjetivo off
+streaminfo loaded 2
+streammem meshes 3 textures 1
+streamtexrefs exact
+streamtarget off
 simstop
 # (el Stop: las tres como estaban antes del Play, y la Fija vuelve a ser de siempre -su paso de undo-)
-streamestado Fija cargada
-streamestado Cerca cargada
-streamestado Lejos cargada
+streamstate Fija loaded
+streamstate Cerca loaded
+streamstate Lejos loaded
 undo
-streamestado Fija cargada
-streamcarga Fija siempre
+streamstate Fija loaded
+streamload Fija always
 
 # --- el juego compilado: el mismo veredicto ---
-compilarjuego 0 0 1
-streamjuegolog /tmp/w3d_f9_lua streamlua igual
+compilegame 0 0 1
+streamgamelog /tmp/w3d_f9_lua streamlua equal

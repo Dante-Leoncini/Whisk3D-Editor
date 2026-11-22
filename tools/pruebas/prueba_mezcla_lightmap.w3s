@@ -22,48 +22,48 @@ delete
 importgltf prueba_mezcla_lightmap.glb
 loadtex
 deselectall
-matcapa mezcla_lm capas 1
-vpvista material
-vporbita 0 0 0 4
-escenapx -0.5 0.5 0 es 64 0 0 16
-escenapx 0.5 0.5 0 es 190 0 0 16
+matlayer mezcla_lm layers 1
+vpview material
+vporbit 0 0 0 4
+scenepx -0.5 0.5 0 es 64 0 0 16
+scenepx 0.5 0.5 0 es 190 0 0 16
 
 # la misma superficie por una rutina (la malla clasica oculta): punteros, textura base en la unidad 0 y el lightmap en la 1
 visible 0 prueba_mezcla_lightmap
-rutina LmRut
-rutinapaso LmRut array modo=0 on=1
-rutinapaso LmRut array modo=2 on=1
-rutinapaso LmRut array modo=1 on=0
-rutinapaso LmRut array modo=3 on=0
-rutinapaso LmRut luz on=0
-rutinapaso LmRut color n0=1 n1=1 n2=1 n3=1
-rutinapaso LmRut punteroVertices ref=prueba_mezcla_lightmap
-rutinapaso LmRut punteroUV ref=prueba_mezcla_lightmap
-rutinapaso LmRut textura on=1
-rutinapaso LmRut fijarTextura ref=mezcla_a.png
-rutinapaso LmRut texturaModo modo=0
-rutinapaso LmRut mezclaTexturas ref=capas_lightmap.png modo=2 entero=1 n0=1 on=1
-rutinapaso LmRut dibujar ref=prueba_mezcla_lightmap
-rutinainfo LmRut
-escenapx -0.5 0.5 0 es 64 0 0 16
-escenapx 0.5 0.5 0 es 190 0 0 16
+routine LmRut
+routinestep LmRut array mode=0 on=1
+routinestep LmRut array mode=2 on=1
+routinestep LmRut array mode=1 on=0
+routinestep LmRut array mode=3 on=0
+routinestep LmRut light on=0
+routinestep LmRut color n0=1 n1=1 n2=1 n3=1
+routinestep LmRut vertexPointer ref=prueba_mezcla_lightmap
+routinestep LmRut uvPointer ref=prueba_mezcla_lightmap
+routinestep LmRut texture on=1
+routinestep LmRut bindTexture ref=mezcla_a.png
+routinestep LmRut textureMode mode=0
+routinestep LmRut textureMix ref=capas_lightmap.png mode=2 integer=1 n0=1 on=1
+routinestep LmRut draw ref=prueba_mezcla_lightmap
+routineinfo LmRut
+scenepx -0.5 0.5 0 es 64 0 0 16
+scenepx 0.5 0.5 0 es 190 0 0 16
 
 # "Skip if no flag" (saltarSiNinguna): un array de rangos en @rg (cantidad, primero, ultimo, bandera...) y las banderas
 # en @fl. Con la bandera en 0 saltea los 3 pasos que siguen (test de profundidad afuera -el segundo dibujo va a la
 # misma profundidad-, la textura azul y otro dibujo): queda lo rojo. Con la bandera en 1 los corre y el plano sale
 # azul (mezcla_b.png, con el mismo lightmap)
-memoria rg 0 1
-memoria rg 1 0
-memoria rg 2 0
-memoria rg 3 0
-memoria fl 0 0
-rutinapaso LmRut saltarSiNinguna entero=3 n0=@rg[0] n1=@fl[0]
-rutinapaso LmRut testZ on=0
-rutinapaso LmRut fijarTextura ref=mezcla_b.png
-rutinapaso LmRut dibujar ref=prueba_mezcla_lightmap
-rutinainfo LmRut
-escenapx -0.5 0.5 0 es 64 0 0 16
-escenapx 0.5 0.5 0 es 190 0 0 16
-memoria fl 0 1
-escenapx -0.5 0.5 0 es 0 0 64 16
-escenapx 0.5 0.5 0 es 0 0 190 16
+memory rg 0 1
+memory rg 1 0
+memory rg 2 0
+memory rg 3 0
+memory fl 0 0
+routinestep LmRut skipIfNone integer=3 n0=@rg[0] n1=@fl[0]
+routinestep LmRut testZ on=0
+routinestep LmRut bindTexture ref=mezcla_b.png
+routinestep LmRut draw ref=prueba_mezcla_lightmap
+routineinfo LmRut
+scenepx -0.5 0.5 0 es 64 0 0 16
+scenepx 0.5 0.5 0 es 190 0 0 16
+memory fl 0 1
+scenepx -0.5 0.5 0 es 0 0 64 16
+scenepx 0.5 0.5 0 es 0 0 190 16

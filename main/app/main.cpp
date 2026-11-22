@@ -1,21 +1,21 @@
 #ifndef _WIN32
 #include <sys/stat.h>   // mkdir (la carpeta temporal del usuario en --script)
 #endif
-#include "app/W3dTeclado.h"   // teclado en pantalla de Android + pantalla completa automatica
-#include "audio/W3dAudio.h"   // pausa del mixer con el juego en pausa
+#include "app/W3dKeyboard.h"   // teclado en pantalla de Android + pantalla completa automatica
+#include "audio/W3dAudio.h"    // pausa del mixer con el juego en pausa
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
-#include "render/OpcionesRender.h"
+#include "render/RenderOptions.h"
 #ifdef W3D_MULTIBACKEND
 #include "w3dBackend.h"   // el backend grafico se elige al arrancar
 #endif
-#include "WhiskUI/widgets/TextField.h"   // TextFieldParpadeoTick (el cursor que parpadea)   // RenderType / g_redraw: son del editor
-#include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
+#include "WhiskUI/widgets/TextField.h"   // TextFieldBlinkTick (el cursor que parpadea)   // RenderType / g_redraw: son del editor
+#include "W3dLang.h"   // config.start: "idioma = es" fuerza el idioma por encima del SO
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
 #include "test/W3dMcp.h"
 #ifdef W3D_MCP
-#include "test/W3dHistorial.h"   // la grabadora de pasos (W3D_HISTORIAL=<ruta>)
+#include "test/W3dHistory.h"   // la grabadora de pasos (W3D_HISTORY=<ruta>)
 #endif    // whisk3d --mcp: el editor atiende a una IA (Model Context Protocol, solo en la PC)
-#include "io/CambiosProyecto.h" // lo no guardado: el cartel al cerrar y el '*' del titulo
+#include "io/ProjectChanges.h" // lo no guardado: el cartel al cerrar y el '*' del titulo
 
 #ifdef __EMSCRIPTEN__       // WebGL: el browser es 1 hilo -> el loop es emscripten_set_main_loop
 #include <emscripten.h>
@@ -33,13 +33,13 @@ static double W3dWebDpr() {
 // la escala de la UI de fabrica en la web (ver la carga del config): con el dedo, la de Android; con mouse, la del config
 // por el devicePixelRatio
 // la pantalla se usa con el DEDO (telefono, tablet): el puntero principal es "grueso"
-static bool W3dWebDedo() {
+static bool W3dWebFinger() {
     return EM_ASM_INT({ return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0; }) != 0;
 }
-static int W3dWebEscalaUI(int escalaConfig) {
-    const int dedo = W3dWebDedo() ? 1 : 0;
-    if (dedo) return 4;   // (en un iPhone 13, con 3 se ve bien pero las opciones quedan chicas para el dedo)
-    const int base = escalaConfig > 0 ? escalaConfig : 2;
+static int W3dWebScaleUI(int scaleConfig) {
+    const int finger = W3dWebFinger() ? 1 : 0;
+    if (finger) return 4;   // (en un iPhone 13, con 3 se ve bien pero las opciones quedan chicas para el dedo)
+    const int base = scaleConfig > 0 ? scaleConfig : 2;
     int e = (int)floor((double)base * W3dWebDpr() + 0.5);
     if (e < 1) e = 1;
     if (e > 8) e = 8;
@@ -51,29 +51,29 @@ static int W3dWebEscalaUI(int escalaConfig) {
                         // carga por w3dEngine (import/export, browser, texturas, warp, swap). Symbian tiene lo suyo.
     #define NOMINMAX
 
-#include "lectura-escritura.h"      // abrir(): dialogo + ImportOBJ
+#include "lectura-escritura.h"      // open(): dialogo + ImportOBJ
 #include "ViewPorts/PopUp/FileBrowser.h" // explorador de archivos COMPARTIDO
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
-#include "ViewPorts/PopUp/ConfirmarPopup.h" // Android: "Atras" pregunta si cerrar Whisk3D
+#include "ViewPorts/PopUp/ConfirmPopup.h" // Android: "Atras" pregunta si cerrar Whisk3D
 #include "W3dDock.h"                       // barra de progreso en el icono del dock (Linux; no-op en el resto)
-#include "io/CompilarJuego.h"            // build de juegos en 2do plano (Tick + barra overlay)
-#include "io/W3dContenedor.h"            // W3dImportarAsset: importar = copiar adentro del .w3d
+#include "io/CompileGame.h"              // build de juegos en 2do plano (Tick + barra overlay)
+#include "io/W3dContainer.h"             // W3dImportAsset: importar = copiar adentro del .w3d
 #include "importers/import_obj.h"        // ImportOBJ (el importador real)
 #include "importers/import_fbx.h"        // ImportFBX
 #include "importers/import_gltf.h"       // ImportGLTF (.gltf/.glb)
-#include "ViewPorts/ViewPort3D.h"        // Viewport3DActive->EnfocarObject() para --framesel
+#include "ViewPorts/ViewPort3D.h"        // Viewport3DActive->FocusObject() para --framesel
 #include "W3dProfile.h"                  // profiler del frame (ms por categoria)
 #include "w3dVersion.h"                   // W3dVersion() para el titulo de ventana
 
 // el callback del menu "Add > Import OBJ": abre el explorador filtrado a .obj
 static void PCImportObj() {
-    AbrirFileBrowser(T("Import OBJ"), T("Import OBJ"), ".obj", ImportModeloCallback);
+    OpenFileBrowser(T("Import OBJ"), T("Import OBJ"), ".obj", ImportModelCallback);
 }
-// "Add > Imports > FBX/glTF/GLB": mismo explorador; ImportModeloPorExtension rutea por extension al importador correcto.
-static void PCImportFbx()  { AbrirFileBrowser(T("Import FBX"),  T("Import FBX"),  ".fbx",  ImportModeloCallback); }
-static void PCImportGltf() { AbrirFileBrowser(T("Import glTF"), T("Import glTF"), ".gltf", ImportModeloCallback); }
-static void PCImportGlb()  { AbrirFileBrowser(T("Import GLB"),  T("Import GLB"),  ".glb",  ImportModeloCallback); }
-static void PCImportStl()  { AbrirFileBrowser(T("Import STL"),  T("Import STL"),  ".stl",  ImportModeloCallback); }
+// "Add > Imports > FBX/glTF/GLB": mismo explorador; ImportModelByExtension rutea por extension al importador correcto.
+static void PCImportFbx()  { OpenFileBrowser(T("Import FBX"),  T("Import FBX"),  ".fbx",  ImportModelCallback); }
+static void PCImportGltf() { OpenFileBrowser(T("Import glTF"), T("Import glTF"), ".gltf", ImportModelCallback); }
+static void PCImportGlb()  { OpenFileBrowser(T("Import GLB"),  T("Import GLB"),  ".glb",  ImportModelCallback); }
+static void PCImportStl()  { OpenFileBrowser(T("Import STL"),  T("Import STL"),  ".stl",  ImportModelCallback); }
 
 // EL CUADRO A LA VENTANA y el vsync: con el backend Vulkan no hay contexto de GL, los hace el (graphics/vulkan/w3dVk.h)
 #ifdef W3D_VULKAN
@@ -82,45 +82,45 @@ static void PCImportStl()  { AbrirFileBrowser(T("Import STL"),  T("Import STL"),
 #ifdef W3D_PSP
 #include "graphics/gu/w3dGu.h"   // la PSP: dibuja el GE con sceGu (sin OpenGL)
 #endif
-static void W3dPresentar(SDL_Window* w) {
+static void W3dPresent(SDL_Window* w) {
 #ifdef W3D_PSP
     (void)w;
-    w3dEngine::GuCuadroTerminar();   // (la PSP: espera al GE, el vsync y da vuelta los buffers)
+    w3dEngine::GuFrameFinish();   // (la PSP: espera al GE, el vsync y da vuelta los buffers)
     return;
 #endif
 #ifdef W3D_VULKAN
-    if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) { VkGLPresentar(); return; }
+    if (w3dEngine::ActiveBackend() == w3dEngine::BackendVulkan) { VkGLPresent(); return; }
 #endif
     SDL_GL_SwapWindow(w);
 }
-static void W3dVsync(int intervalo) {
+static void W3dVsync(int interval) {
 #ifdef W3D_VULKAN
-    if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) { VkGLVsync(intervalo); return; }
+    if (w3dEngine::ActiveBackend() == w3dEngine::BackendVulkan) { VkGLVsync(interval); return; }
 #endif
-    SDL_GL_SetSwapInterval(intervalo);
+    SDL_GL_SetSwapInterval(interval);
 }
 // hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
 static SDL_Window* g_swapWindow = NULL;
-static void PCSwapBuffers() { w3dEngine::DibujarPendiente(); if (g_swapWindow) W3dPresentar(g_swapWindow); }
+static void PCSwapBuffers() { w3dEngine::DrawPending(); if (g_swapWindow) W3dPresent(g_swapWindow); }
 // mientras un render largo bloquea (la barra de progreso): Escape o el boton "Cancelar" lo cortan; cerrar la ventana
 // tambien (y el cierre vuelve a la cola, para que el editor pregunte al terminar). El resto de la entrada se descarta
-static void PCProgresoSondear() {
-    extern void ProgresoCancelar(); extern bool ProgresoBotonCancelarEn(int, int);
+static void PCProgressPoll() {
+    extern void ProgressCancel(); extern bool ProgressButtonCancelIn(int, int);
     SDL_Event e;
-    bool salir = false;
+    bool exit = false;
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) { salir = true; ProgresoCancelar(); }
-        else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) ProgresoCancelar();
-        else if (e.type == SDL_MOUSEBUTTONDOWN && ProgresoBotonCancelarEn(e.button.x, e.button.y)) ProgresoCancelar();
+        if (e.type == SDL_QUIT) { exit = true; ProgressCancel(); }
+        else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) ProgressCancel();
+        else if (e.type == SDL_MOUSEBUTTONDOWN && ProgressButtonCancelIn(e.button.x, e.button.y)) ProgressCancel();
         else if (e.type == SDL_FINGERDOWN && g_swapWindow) {
             int ww = 0, hh = 0; SDL_GetWindowSize(g_swapWindow, &ww, &hh);
-            if (ProgresoBotonCancelarEn((int)(e.tfinger.x * ww), (int)(e.tfinger.y * hh))) ProgresoCancelar();
+            if (ProgressButtonCancelIn((int)(e.tfinger.x * ww), (int)(e.tfinger.y * hh))) ProgressCancel();
         }
     }
-    if (salir) { SDL_Event q; memset(&q, 0, sizeof(q)); q.type = SDL_QUIT; SDL_PushEvent(&q); }
+    if (exit) { SDL_Event q; memset(&q, 0, sizeof(q)); q.type = SDL_QUIT; SDL_PushEvent(&q); }
 }
 
-#include "ViewPorts/Properties.h" // DialogoCargarTextura
+#include "ViewPorts/Properties.h" // DialogLoadTexture
 #include "objects/Textures.h"
 #include "objects/Materials.h"    // Material (asignar la textura cargada)
 
@@ -134,12 +134,12 @@ static void PCWarpMouse(int x, int y) {
 #ifdef __EMSCRIPTEN__
 // MOUSE CAPTURADO EN EL NAVEGADOR (juego estilo FPS): la pagina no puede mover el cursor, asi que el truco de PC
 // (teletransportarlo al centro cada cuadro) no existe. Se usa el POINTER LOCK del navegador (SDL_SetRelativeMouseMode):
-// el cursor desaparece y el movimiento llega como relativo. Lo maneja la captura de MainLoopFrame; ProcesarEvento junta
+// el cursor desaparece y el movimiento llega como relativo. Lo maneja la captura de MainLoopFrame; ProcessEvent junta
 // el movimiento y clava la posicion del cursor al centro del juego (como en PC: un click no cae en otro panel).
-static bool  g_webPunteroPedido = false;          // SDL_SetRelativeMouseMode(SDL_TRUE) pedido para el juego
-static float g_webRatonDX = 0, g_webRatonDY = 0;  // movimiento con el puntero bloqueado desde el ultimo cuadro
-static int   g_webCentroX = 0, g_webCentroY = 0;  // el centro del viewport del juego
-static bool WebPunteroBloqueado() {
+static bool  g_webPointerRequest = false;         // SDL_SetRelativeMouseMode(SDL_TRUE) pedido para el juego
+static float g_webMouseDX = 0, g_webMouseDY = 0;  // movimiento con el puntero bloqueado desde el ultimo cuadro
+static int   g_webCenterX = 0, g_webCenterY = 0;  // el centro del viewport del juego
+static bool WebLockedPointer() {
     EmscriptenPointerlockChangeEvent pl;
     return emscripten_get_pointerlock_status(&pl) == EMSCRIPTEN_RESULT_SUCCESS && pl.isActive;
 }
@@ -149,54 +149,54 @@ static bool WebPunteroBloqueado() {
 // carga al material que la pidio (async: el browser es modal)
 extern void RebindMaterialMeshPart(); // Properties.cpp
 static Material* gTexMat = NULL;
-extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
-extern bool gCargarTexturaComoB;      // Properties.cpp: idem el de la TEXTURA B (mezcla de texturas)
-extern int  gCargarTexturaCapa;       // Properties.cpp: >= 0 = el "Load Texture" de ESA capa de textura del material
-extern int  gCargarTexturaMapa;       // Properties.cpp: >= 0 = el "Load Texture" de ESE mapa del material (W3dMatMapa)
-static void TexturaElegida(const std::string& pathElegido) {
+extern bool gLoadTextureAsNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
+extern bool gLoadTextureAsB;      // Properties.cpp: idem el de la TEXTURA B (mezcla de texturas)
+extern int  gLoadTextureLayer;    // Properties.cpp: >= 0 = el "Load Texture" de ESA capa de textura del material
+extern int  gLoadTextureMap;      // Properties.cpp: >= 0 = el "Load Texture" de ESE mapa del material (W3dMatMap)
+static void PickedTexture(const std::string& pickedPath) {
     if (!gTexMat) return;
-    // CARGAR = QUEDA AFUERA: la textura elegida del disco se referencia como EXTERNA (W3dCargarExterno, ver
-    // io/W3dContenedor.h); a meterla adentro del .w3d se la pasa desde la Biblioteca
-    const std::string path = W3dCargarExterno(pathElegido);
+    // CARGAR = QUEDA AFUERA: la textura elegida del disco se referencia como EXTERNA (W3dLoadExternal, ver
+    // io/W3dContainer.h); a meterla adentro del .w3d se la pasa desde la Biblioteca
+    const std::string path = W3dLoadExternal(pickedPath);
     // por el CACHE por ruta: elegir dos veces la misma imagen (para dos
     // materiales) NO la sube dos veces a la GPU. Y la anterior se suelta, asi
     // el refcount baja y esa textura se puede liberar de verdad.
-    Texture* t = TexturaTomar(path);
+    Texture* t = TextureTake(path);
     if (t) {
-        if (gCargarTexturaMapa >= W3D_MAPA_EMISION && gCargarTexturaMapa < W3D_MAPAS) {   // a un MAPA (emision, rugosidad...)
-            extern void W3dMaterialPonerMapa(Material* mat, Texture* tex, int mapa);   // (con undo; la ranura toma la suya)
-            W3dMaterialPonerMapa(gTexMat, t, gCargarTexturaMapa);
-            TexturaSoltar(t);   // (la del cache: la ranura ya retuvo la suya)
-        } else if (gCargarTexturaCapa >= 0) {   // a una CAPA de textura (se crea si es la fila "Add Layer")
-            extern void UndoMaterialModIniciar(Material*); extern void UndoMaterialModCommit();
-            UndoMaterialModIniciar(gTexMat);   // (Ctrl+Z la saca: el paso guarda la lista de capas)
-            const size_t n = (size_t)gCargarTexturaCapa;
-            if (n >= gTexMat->capas.size()) gTexMat->capas.resize(n + 1);
-            Texture* anterior = gTexMat->capas[n].tex;
-            gTexMat->capas[n].tex = t;
-            if (anterior && anterior != t) TexturaSoltar(anterior);
+        if (gLoadTextureMap >= W3D_MAP_EMISSION && gLoadTextureMap < W3D_MAPS) {   // a un MAPA (emision, rugosidad...)
+            extern void W3dMaterialSetMap(Material* mat, Texture* tex, int map);   // (con undo; la ranura toma la suya)
+            W3dMaterialSetMap(gTexMat, t, gLoadTextureMap);
+            TextureRelease(t);   // (la del cache: la ranura ya retuvo la suya)
+        } else if (gLoadTextureLayer >= 0) {   // a una CAPA de textura (se crea si es la fila "Add Layer")
+            extern void UndoMaterialModStart(Material*); extern void UndoMaterialModCommit();
+            UndoMaterialModStart(gTexMat);   // (Ctrl+Z la saca: el paso guarda la lista de capas)
+            const size_t n = (size_t)gLoadTextureLayer;
+            if (n >= gTexMat->layers.size()) gTexMat->layers.resize(n + 1);
+            Texture* prev = gTexMat->layers[n].tex;
+            gTexMat->layers[n].tex = t;
+            if (prev && prev != t) TextureRelease(prev);
             UndoMaterialModCommit();
-        } else if (gCargarTexturaComoB) {   // a la TEXTURA B (mezcla de texturas en una pasada)
-            Texture* anterior = gTexMat->texturaB;
-            gTexMat->texturaB = t;
-            if (anterior && anterior != t) TexturaSoltar(anterior);
+        } else if (gLoadTextureAsB) {   // a la TEXTURA B (mezcla de texturas en una pasada)
+            Texture* prev     = gTexMat->textureB;
+            gTexMat->textureB = t;
+            if (prev && prev != t) TextureRelease(prev);
         } else {
-            Texture* anterior = gCargarTexturaComoNormal ? gTexMat->normalTexture : gTexMat->texture;
-            if (gCargarTexturaComoNormal) { gTexMat->normalTexture = t; gTexMat->normalMap = true; }
+            Texture* prev = gLoadTextureAsNormal ? gTexMat->normalTexture : gTexMat->texture;
+            if (gLoadTextureAsNormal) { gTexMat->normalTexture = t; gTexMat->normalMap = true; }
             else { gTexMat->texture = t; gTexMat->textureOn = true; }
-            if (anterior && anterior != t) TexturaSoltar(anterior);
+            if (prev && prev != t) TextureRelease(prev);
         }
         RebindMaterialMeshPart();
     }
-    gTexMat = NULL; gCargarTexturaComoNormal = false; gCargarTexturaComoB = false; gCargarTexturaCapa = -1; gCargarTexturaMapa = -1;
+    gTexMat = NULL; gLoadTextureAsNormal = false; gLoadTextureAsB = false; gLoadTextureLayer = -1; gLoadTextureMap = -1;
 }
-// "Load Texture" (base Y normal map): el MISMO browser. Quien lo llama ya dejo gCargarTexturaComoNormal en el
+// "Load Texture" (base Y normal map): el MISMO browser. Quien lo llama ya dejo gLoadTextureAsNormal en el
 // valor correcto (false=textura, true=normal); el callback de arriba decide el destino.
-static void PCCargarTexturaEn(Material* mat) {
+static void PCLoadTextureIn(Material* mat) {
     gTexMat = mat;
-    AbrirFileBrowser(gCargarTexturaComoNormal ? T("Load normal map") : T("Load Texture"),
-                    gCargarTexturaComoNormal ? T("Open normal map") : T("Open"),
-                    ".png .jpg .jpeg .bmp .tga", TexturaElegida);
+    OpenFileBrowser(gLoadTextureAsNormal ? T("Load normal map") : T("Load Texture"),
+                    gLoadTextureAsNormal ? T("Open normal map") : T("Open"),
+                    ".png .jpg .jpeg .bmp .tga", PickedTexture);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -206,24 +206,24 @@ static void PCCargarTexturaEn(Material* mat) {
 //  El file browser interno navega el FS virtual de emscripten (no ve los archivos
 //  reales del usuario). En web abrimos un <input type=file> nativo: el navegador
 //  deja elegir del disco, leemos el archivo, lo escribimos en /uploads del FS de
-//  emscripten y llamamos a la MISMA logica de carga (TexturaElegida / ImportOBJ).
+//  emscripten y llamamos a la MISMA logica de carga (PickedTexture / ImportOBJ).
 //  Para el OBJ el <input multiple> deja elegir el .obj + su .mtl + las texturas
 //  juntos: quedan en la misma carpeta (/uploads) y el importador los resuelve.
 // ============================================================================
 extern "C" {
 // las llama el JS del picker cuando el archivo ya esta escrito en el FS de emscripten
-EMSCRIPTEN_KEEPALIVE void WebTexturaCargada(const char* path) { TexturaElegida(std::string(path)); }
-// POR LA PUERTA UNICA (ImportModeloPorExtension), no por el importador directo: sino la malla
-// importada en la web quedaba SIN Mesh::origen (ni "reimportar del original" ni EXTERNOS.txt).
-EMSCRIPTEN_KEEPALIVE void WebObjCargado(const char* path)     { ImportModeloPorExtension(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE void WebFbxCargado(const char* path)     { ImportModeloPorExtension(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE void WebLoadedTexture(const char* path) { PickedTexture(std::string(path)); }
+// POR LA PUERTA UNICA (ImportModelByExtension), no por el importador directo: sino la malla
+// importada en la web quedaba SIN Mesh::origen (ni "reimportar del original" ni EXTERNALS.txt).
+EMSCRIPTEN_KEEPALIVE void LoadedWebObj(const char* path)     { ImportModelByExtension(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE void LoadedWebFbx(const char* path)     { ImportModelByExtension(std::string(path)); }
 }
 
 // overlay con un BOTON real: el <input type=file>.click() se dispara DENTRO del tap del boton (gesto DOM
 // genuino). Necesario para iOS Safari: ahi input.click() llamado desde el RAF (fuera de un gesto de usuario)
 // NO abre el selector -> "al hacerle click no ocurre nada". El input va en el DOM (otro requisito de iOS).
 // tipo: 0 = textura (1 imagen), 1 = OBJ (multi: obj+mtl+texturas).
-EM_JS(void, WebAbrirPicker, (int tipo), {
+EM_JS(void, WebOpenPicker, (int type), {
     var prev = document.getElementById('w3d-pick'); if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
     var ov = document.createElement('div');
     ov.id = 'w3d-pick';
@@ -233,34 +233,34 @@ EM_JS(void, WebAbrirPicker, (int tipo), {
     card.style.cssText = 'margin-top:8vh;width:92%;max-width:440px;background:#2b2b2b;border:1px solid #555;'
         + 'border-radius:10px;padding:16px;box-shadow:0 6px 30px rgba(0,0,0,0.6);font-family:sans-serif;color:#ddd;';
     var lab = document.createElement('div');
-    lab.textContent = (tipo == 2) ? 'Importar FBX (.fbx)' : tipo ? 'Importar OBJ (.obj + .mtl + texturas)' : 'Cargar textura (imagen)';
+    lab.textContent = (type == 2) ? 'Importar FBX (.fbx)' : type ? 'Importar OBJ (.obj + .mtl + texturas)' : 'Cargar textura (imagen)';
     lab.style.cssText = 'font-size:15px;margin-bottom:12px;color:#9ac9ff;';
     var input = document.createElement('input');
     input.type = 'file';
-    if (tipo == 2)   { input.accept = '.fbx'; }                                                  // FBX: un solo archivo binario
-    else if (tipo)   { input.multiple = true; input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga'; }
+    if (type == 2)   { input.accept = '.fbx'; }                                                  // FBX: un solo archivo binario
+    else if (type)   { input.multiple = true; input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga'; }
     else             { input.accept = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp,.tga'; }
     input.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;'; // en el DOM pero oculto
     input.onchange = function(e) {
         var files = Array.prototype.slice.call(e.target.files);
-        if (!files.length) { cerrar(); return; }
+        if (!files.length) { close(); return; }
         try { FS.mkdir('/uploads'); } catch (_e) {}
-        if (tipo == 2) {                       // FBX: un solo archivo binario -> WebFbxCargado
+        if (type == 2) {                       // FBX: un solo archivo binario -> LoadedWebFbx
             var f = files[0], r = new FileReader();
             r.onload = function() {
                 var p = '/uploads/' + f.name;
                 FS.writeFile(p, new Uint8Array(r.result));
-                ccall('WebFbxCargado', null, ['string'], [p]);
+                ccall('LoadedWebFbx', null, ['string'], [p]);
             };
-            r.readAsArrayBuffer(f); cerrar();
-        } else if (!tipo) {
+            r.readAsArrayBuffer(f); close();
+        } else if (!type) {
             var f = files[0], r = new FileReader();
             r.onload = function() {
                 var p = '/uploads/' + f.name;
                 FS.writeFile(p, new Uint8Array(r.result));
-                ccall('WebTexturaCargada', null, ['string'], [p]);
+                ccall('WebLoadedTexture', null, ['string'], [p]);
             };
-            r.readAsArrayBuffer(f); cerrar();
+            r.readAsArrayBuffer(f); close();
         } else {
             var objPath = null, pending = files.length;
             files.forEach(function(f) {
@@ -269,11 +269,11 @@ EM_JS(void, WebAbrirPicker, (int tipo), {
                     var p = '/uploads/' + f.name;
                     FS.writeFile(p, new Uint8Array(r.result));
                     if (f.name.toLowerCase().endsWith('.obj')) objPath = p;
-                    if (--pending === 0 && objPath) ccall('WebObjCargado', null, ['string'], [objPath]);
+                    if (--pending === 0 && objPath) ccall('LoadedWebObj', null, ['string'], [objPath]);
                 };
                 r.readAsArrayBuffer(f);
             });
-            cerrar();
+            close();
         }
     };
     var btnPick = document.createElement('button');
@@ -281,31 +281,31 @@ EM_JS(void, WebAbrirPicker, (int tipo), {
     btnPick.style.cssText = 'width:100%;font-size:17px;padding:14px;border:none;border-radius:6px;'
         + 'background:#3a8f68;color:#fff;font-weight:bold;';
     var btnC = document.createElement('button');
-    btnC.textContent = 'Cancelar';
+    btnC.textContent = 'Cancel';
     btnC.style.cssText = 'width:100%;margin-top:10px;font-size:15px;padding:11px;border:none;border-radius:6px;background:#444;color:#ddd;';
-    function cerrar(){ if (ov.parentNode) ov.parentNode.removeChild(ov); }
+    function close(){ if (ov.parentNode) ov.parentNode.removeChild(ov); }
     // el click del boton ES el gesto de usuario -> input.click() adentro SI abre el selector en iOS
     btnPick.addEventListener('click', function(){ input.click(); });
-    btnC.addEventListener('click', function(){ cerrar(); });
-    ov.addEventListener('mousedown', function(e){ if (e.target === ov) cerrar(); });
-    ov.addEventListener('touchend', function(e){ if (e.target === ov) cerrar(); });
+    btnC.addEventListener('click', function(){ close(); });
+    ov.addEventListener('mousedown', function(e){ if (e.target === ov) close(); });
+    ov.addEventListener('touchend', function(e){ if (e.target === ov) close(); });
     ['mousedown','mouseup','touchstart','touchmove','touchend','pointerdown','pointerup'].forEach(function(ev){
         card.addEventListener(ev, function(e){ e.stopPropagation(); });
     });
     card.appendChild(lab); card.appendChild(input); card.appendChild(btnPick); card.appendChild(btnC);
     ov.appendChild(card); document.body.appendChild(ov);
 });
-static void WebAbrirPickerTextura(){ WebAbrirPicker(0); }
-static void WebAbrirPickerObj(){ WebAbrirPicker(1); }
-static void WebAbrirPickerFbx(){ WebAbrirPicker(2); }
+static void WebOpenPickerTexture(){ WebOpenPicker(0); }
+static void WebOpenPickerObj(){ WebOpenPicker(1); }
+static void WebOpenPickerFbx(){ WebOpenPicker(2); }
 
-static void WebCargarTexturaEn(Material* mat) { gTexMat = mat; WebAbrirPickerTextura(); }
-static void WebImportObj() { WebAbrirPickerObj(); }
-static void WebImportFbx() { WebAbrirPickerFbx(); } // web: FBX por el selector NATIVO del navegador (como OBJ/texturas)
+static void WebLoadTextureIn(Material* mat) { gTexMat = mat; WebOpenPickerTexture(); }
+static void WebImportObj() { WebOpenPickerObj(); }
+static void WebImportFbx() { WebOpenPickerFbx(); } // web: FBX por el selector NATIVO del navegador (como OBJ/texturas)
 
 // descarga un archivo del FS de emscripten al DISCO del usuario (export OBJ/mtl y renders PNG).
 // La llaman Properties.cpp (export OBJ) y ViewPort3D.cpp (render) via forward-declaration.
-EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
+EM_JS(void, WebUnloadFile, (const char* pathPtr, const char* namePtr), {
     var path = UTF8ToString(pathPtr), name = UTF8ToString(namePtr);
     // COLA espaciada: Safari (sobre todo iOS) ignora descargas programaticas disparadas juntas -> de un
     // export OBJ+MTL o de varios renders solo bajaba UNO. Las encolamos y disparamos de a una con un gap.
@@ -331,8 +331,8 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 });
 
 #endif // __EMSCRIPTEN__
-#include "WhiskUI/widgets/PopupMenu.h" // MenuPantallaW/H (desplegables)
-#include "WhiskUI/draw/glesdraw.h"  // W3dPantallaAlto (flip de Y)
+#include "WhiskUI/widgets/PopupMenu.h" // MenuScreenW/H (desplegables)
+#include "WhiskUI/draw/glesdraw.h"  // W3dScreenHeight (flip de Y)
 #ifdef _WIN32
     #include <windows.h> // SOLO Windows (el resto del bloque es escritorio compartido Win+Linux)
 #endif
@@ -400,8 +400,8 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 
 //Whisk3D imports
 #include "variables.h"
-#include "WhiskUI/theme/colores.h"
-#include "ui/W3dColors.h" // W3dColores(Ubyte) + carga de colores del editor + Sincronizar
+#include "WhiskUI/theme/colors.h"
+#include "ui/W3dColors.h" // W3dColors(Ubyte) + carga de colores del editor + Sincronizar
 #include "objects/RenderColors.h" // paleta de render del core (Fase D: el sync de loadColors la llena)
 #include "objects/Textures.h"
 #include "objects/Materials.h"
@@ -411,12 +411,12 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/PopUp/PopUpBase.h"
 #include "ViewPorts/PopUp/ColorPicker.h"
-#include "controles.h"
+#include "controls.h"
 #include "constructor.h"
 
 // Reloj de ms: el Core ya trae uno portable; aca le damos el de SDL, que mide tiempo de PARED
-// (el respaldo del Core usa clock(), que mide CPU). Se registra en el arranque, ver W3dSetReloj.
-static unsigned int RelojSDL() { return SDL_GetTicks(); }
+// (el respaldo del Core usa clock(), que mide CPU). Se registra en el arranque, ver W3dSetClock.
+static unsigned int ClockSDL() { return SDL_GetTicks(); }
 
 // ---------------------------------------------------------------------------------------------------------------
 //  VENTANA + CONTEXTO GL, CON INTENTOS DE RESPALDO.
@@ -424,21 +424,21 @@ static unsigned int RelojSDL() { return SDL_GetTicks(); }
 //  algunos XWayland, Mesa por software... Pedir una sola combinacion fija y salir si no estaba dejaba al editor sin
 //  abrir ("Error SDL_CreateWindow: Couldn't find matching GLX visual", reporte de un usuario del AppImage). Ahora se
 //  prueba de lo mas lindo a lo mas basico y se queda con lo primero que abra; lo que se resigna va al log.
-//  W3D_GL_PRUEBA_RESPALDO=1 hace fallar el primer intento a proposito (para probar el respaldo sin ese driver).
+//  W3D_GL_TEST_FALLBACK=1 hace fallar el primer intento a proposito (para probar el respaldo sin ese driver).
 // ---------------------------------------------------------------------------------------------------------------
 #ifdef W3D_3DS
 #include "graphics/citro3d/w3dC3D.h"   // la 3DS: dibuja citro3d (sin OpenGL)
 #endif
-struct W3dIntentoGL { int msaa, estencil, z; const char* que; };
-static bool g_glSinMsaa = false;   // se pidio antialiasing y el driver no lo dio (se avisa al abrir)
-static bool g_ventanaOculta = false;   // --script en Windows: la ventana se crea oculta (ver el arranque de main)
-static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags, bool antialias, SDL_GLContext* ctxOut) {
+struct W3dAttemptGL { int msaa, stencil, z; const char* that; };
+static bool g_glNoMsaa = false;   // se pidio antialiasing y el driver no lo dio (se avisa al abrir)
+static bool g_windowHidden = false;   // --script en Windows: la ventana se crea oculta (ver el arranque de main)
+static SDL_Window* CreateWindowGL(const char* title, int w, int h, Uint32 flags, bool antialias, SDL_GLContext* ctxOut) {
 #ifdef W3D_3DS
     // la 3DS no tiene OpenGL: la ventana es la pantalla de abajo (la tactil, donde SDL entrega los toques) y dibuja
     // citro3d (graphics/citro3d/w3dGraphicsC3D.cpp), que se inicia aca: SDL ya inicio las pantallas (gfxInit)
     (void)antialias;
     *ctxOut = NULL;
-    SDL_Window* win3ds = SDL_CreateWindow(titulo, SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), w, h, flags);
+    SDL_Window* win3ds = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), w, h, flags);
     if (win3ds && !w3dEngine::C3DInit()) { w3dLogfE("citro3d no inicio"); SDL_DestroyWindow(win3ds); return NULL; }
     return win3ds;
 #endif
@@ -447,32 +447,32 @@ static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags
     // (graphics/gu/w3dGraphicsGu.cpp), que se inicia aca
     (void)antialias;
     *ctxOut = NULL;
-    SDL_Window* winPsp = SDL_CreateWindow(titulo, 0, 0, w, h, flags);
-    if (winPsp && !w3dEngine::GuIniciar()) { w3dLogfE("el GE no inicio"); SDL_DestroyWindow(winPsp); return NULL; }
+    SDL_Window* winPsp = SDL_CreateWindow(title, 0, 0, w, h, flags);
+    if (winPsp && !w3dEngine::GuStart()) { w3dLogfE("el GE no inicio"); SDL_DestroyWindow(winPsp); return NULL; }
     return winPsp;
 #endif
-    static const W3dIntentoGL kIntentos[] = {
+    static const W3dAttemptGL kAttempts[] = {
         { 4, 8, 24, "antialiasing 4x, estencil 8, profundidad 24" },
         { 2, 8, 24, "antialiasing 2x, estencil 8, profundidad 24" },
         { 0, 8, 24, "sin antialiasing, estencil 8, profundidad 24" },
         { 0, 0, 24, "sin antialiasing ni estencil, profundidad 24" },
         { 0, 0, 16, "sin antialiasing ni estencil, profundidad 16" },
     };
-    const int n = (int)(sizeof(kIntentos) / sizeof(kIntentos[0]));
-    const bool forzarFallo = std::getenv("W3D_GL_PRUEBA_RESPALDO") != NULL;
+    const int n = (int)(sizeof(kAttempts) / sizeof(kAttempts[0]));
+    const bool forceFailed = std::getenv("W3D_GL_TEST_FALLBACK") != NULL;
     for (int i = antialias ? 0 : 2; i < n; i++) {
-        const W3dIntentoGL& t = kIntentos[i];
+        const W3dAttemptGL& t = kAttempts[i];
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, t.msaa ? 1 : 0);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, t.msaa);
-        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, t.estencil);
+        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, t.stencil);
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, t.z);
-        if (forzarFallo && i == (antialias ? 0 : 2)) { w3dLogfW("Ventana GL (%s): fallo forzado por W3D_GL_PRUEBA_RESPALDO", t.que); continue; }
-        SDL_Window* win = SDL_CreateWindow(titulo, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
-        if (!win) { w3dLogfW("Ventana GL (%s): %s", t.que, SDL_GetError()); continue; }
+        if (forceFailed && i == (antialias ? 0 : 2)) { w3dLogfW("Ventana GL (%s): fallo forzado por W3D_GL_TEST_FALLBACK", t.that); continue; }
+        SDL_Window* win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+        if (!win) { w3dLogfW("Ventana GL (%s): %s", t.that, SDL_GetError()); continue; }
         SDL_GLContext ctx = SDL_GL_CreateContext(win);
-        if (!ctx) { w3dLogfW("Contexto GL (%s): %s", t.que, SDL_GetError()); SDL_DestroyWindow(win); continue; }
-        if (antialias && t.msaa == 0) g_glSinMsaa = true;
-        if (i > (antialias ? 0 : 2)) w3dLogf("Ventana GL abierta con respaldo: %s", t.que);
+        if (!ctx) { w3dLogfW("Contexto GL (%s): %s", t.that, SDL_GetError()); SDL_DestroyWindow(win); continue; }
+        if (antialias && t.msaa == 0) g_glNoMsaa = true;
+        if (i > (antialias ? 0 : 2)) w3dLogf("Ventana GL abierta con respaldo: %s", t.that);
         *ctxOut = ctx;
         return win;
     }
@@ -483,25 +483,25 @@ static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags
 // LA VENTANA DE VULKAN: la abre SDL con el cargador del sistema (vulkan-1.dll / libvulkan.so.1) y el backend arranca
 // sobre ella (graphics/vulkan/w3dVk.h). NULL = no anduvo (ya quedo en el log por que)
 #include <SDL2/SDL_vulkan.h>
-static bool VkSuperficieSDL(void* user, void* instancia, void* out) {
-    return SDL_Vulkan_CreateSurface((SDL_Window*)user, (VkInstance)instancia, (VkSurfaceKHR*)out) == SDL_TRUE;
+static bool VkSurfaceSDL(void* user, void* instance, void* out) {
+    return SDL_Vulkan_CreateSurface((SDL_Window*)user, (VkInstance)instance, (VkSurfaceKHR*)out) == SDL_TRUE;
 }
-static void VkTamanioSDL(void* user, int* w, int* h) { SDL_Vulkan_GetDrawableSize((SDL_Window*)user, w, h); }
-static SDL_Window* CrearVentanaVulkan(const char* titulo, int w, int h, Uint32 flags) {
+static void VkSizeSDL(void* user, int* w, int* h) { SDL_Vulkan_GetDrawableSize((SDL_Window*)user, w, h); }
+static SDL_Window* CreateWindowVulkan(const char* title, int w, int h, Uint32 flags) {
     if (SDL_Vulkan_LoadLibrary(NULL) != 0) { w3dLogfW("[vk] sin el cargador de Vulkan: %s", SDL_GetError()); return NULL; }
     flags = (flags & ~SDL_WINDOW_OPENGL) | SDL_WINDOW_VULKAN;
-    SDL_Window* win = SDL_CreateWindow(titulo, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+    SDL_Window* win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
     if (!win) { w3dLogfW("[vk] ventana: %s", SDL_GetError()); SDL_Vulkan_UnloadLibrary(); return NULL; }
     unsigned n = 0;
     SDL_Vulkan_GetInstanceExtensions(win, &n, NULL);
     std::vector<const char*> ext(n);
     if (n) SDL_Vulkan_GetInstanceExtensions(win, &n, &ext[0]);
-    W3dVkVentana v;
+    W3dVkWindow v;
     v.getInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
-    v.extensiones = n ? &ext[0] : NULL; v.nExtensiones = n;
-    v.crearSuperficie = VkSuperficieSDL; v.tamanio = VkTamanioSDL; v.user = win;
+    v.extensions = n ? &ext[0] : NULL; v.nExtensions = n;
+    v.createSurface = VkSurfaceSDL; v.size = VkSizeSDL; v.user = win;
     std::string err;
-    if (!VkGLIniciar(v, &err)) {
+    if (!VkGLStart(v, &err)) {
         w3dLogfW("[vk] no arranco: %s", err.c_str());
         SDL_DestroyWindow(win);
         SDL_Vulkan_UnloadLibrary();
@@ -514,13 +514,13 @@ static SDL_Window* CrearVentanaVulkan(const char* titulo, int w, int h, Uint32 f
 // Función simple para leer el ini
 #ifdef __ANDROID__
 // el archivo ENTERO de un SDL_RWops, terminado en 0 (y lo cierra). Sin SDL_RWsize: en el SDL 2.0.7 del APK de Android 2.3
-// da -1 con un archivo comun (el config.ini del usuario, no los del APK): el buffer quedaba vacio, SDL_RWread copiaba el
+// da -1 con un archivo comun (el config.start del usuario, no los del APK): el buffer quedaba vacio, SDL_RWread copiaba el
 // archivo a un puntero nulo y el editor se cerraba al arrancar (el Galaxy Ace, apenas se guardaba algo en Ajustes)
-static std::vector<char> W3dLeerRW(SDL_RWops* rw) {
+static std::vector<char> W3dReadRW(SDL_RWops* rw) {
     std::vector<char> b;
-    char trozo[4096];
+    char chunk[4096];
     size_t n;
-    while ((n = SDL_RWread(rw, trozo, 1, sizeof(trozo))) > 0) b.insert(b.end(), trozo, trozo + n);
+    while ((n = SDL_RWread(rw, chunk, 1, sizeof(chunk))) > 0) b.insert(b.end(), chunk, chunk + n);
     SDL_RWclose(rw);
     b.push_back(0);
     return b;
@@ -552,7 +552,7 @@ Config loadConfig(const std::string& filename) {
             return cfg;
         }
 
-        std::vector<char> buffer = W3dLeerRW(rw);
+        std::vector<char> buffer = W3dReadRW(rw);
 
         std::istringstream iss(buffer.data());
     #else
@@ -564,9 +564,9 @@ Config loadConfig(const std::string& filename) {
 
         // (por el operator<< del stream y no con istreambuf_iterator: si el read falla, el iterador tira una excepcion
         // que nadie atrapa y la app se cae; asi solo queda el texto que se pudo leer)
-        std::ostringstream leido;
-        leido << file.rdbuf();
-        std::istringstream iss(leido.str());
+        std::ostringstream read;
+        read << file.rdbuf();
+        std::istringstream iss(read.str());
     #endif
 
     std::string line;
@@ -582,16 +582,16 @@ Config loadConfig(const std::string& filename) {
             else if (key == "height") cfg.height = std::stoi(value);
             else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
             else if (key == "scale") cfg.scale = std::stoi(value);
-            else if (key == "nuevoUsuario") cfg.nuevoUsuario = (value == "true" || value == "1"); // barra de herramientas
-            else if (key == "autoKey") cfg.autoKey = (value == "true" || value == "1");           // boton AUTO KEY del timeline
+            else if (key == "newUser") cfg.newUser = (value == "true" || value == "1"); // barra de herramientas
+            else if (key == "autoKey") cfg.autoKey = (value == "true" || value == "1");      // boton AUTO KEY del timeline
             else if (key == "SkinName") cfg.SkinName = value;
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
             else if (key == "repoPath") cfg.repoPath = value;   // raiz del repo para Compilar (editor instalado)
             else if (key == "logs") cfg.logs = std::stoi(value);   // nivel de los logs del editor (Ajustes > Logs)
-            else if (key == "tecladoSistema") cfg.tecladoSistema = (value == "true" || value == "1");   // Ajustes > teclado
-            else if (key == "idioma") {
+            else if (key == "systemKeyboard") cfg.keyboardSystem = (value == "true" || value == "1");   // Ajustes > teclado
+            else if (key == "language") {
                 // "auto" (o ausente) = seguir al sistema. Cualquier otra cosa FUERZA ese idioma.
-                if (value != "auto" && !value.empty()) { g_idioma = W3dIdiomaDe(value.c_str()); g_idiomaForzado = true; }
+                if (value != "auto" && !value.empty()) { g_language = W3dLanguageOf(value.c_str()); g_languageForced = true; }
             }
         }
     }
@@ -602,15 +602,15 @@ Config loadConfig(const std::string& filename) {
 bool loadColors(const std::string& filename) {
     static std::unordered_map<std::string, ColorID> colorMap = {
         {"background", ColorID::background},
-        {"blanco", ColorID::blanco},
+        {"white", ColorID::white},
         {"accent", ColorID::accent},
         {"accentDark", ColorID::accentDark},
-        {"negro", ColorID::negro},
-        {"gris", ColorID::gris},
+        {"black", ColorID::black},
+        {"gray", ColorID::gray},
         {"headerColor", ColorID::headerColor},
-        {"negroTransparente", ColorID::negroTransparente},
-        {"grisUI", ColorID::grisUI},
-        {"grisLinea", ColorID::grisLinea}
+        {"blackTransparent", ColorID::blackTransparent},
+        {"grayUI", ColorID::grayUI},
+        {"grayLine", ColorID::grayLine}
     };
 
     std::string skinPath = filename;
@@ -644,7 +644,7 @@ bool loadColors(const std::string& filename) {
             return false;
         }
 
-        std::vector<char> buffer = W3dLeerRW(rw);
+        std::vector<char> buffer = W3dReadRW(rw);
 
         fileStream.str(buffer.data());
     #else
@@ -654,9 +654,9 @@ bool loadColors(const std::string& filename) {
             return false;
         }
 
-        std::ostringstream leido;   // (no istreambuf_iterator: ver loadConfig)
-        leido << file.rdbuf();
-        fileStream.str(leido.str());
+        std::ostringstream read;   // (no istreambuf_iterator: ver loadConfig)
+        read << file.rdbuf();
+        fileStream.str(read.str());
     #endif
 
     std::string line;
@@ -672,15 +672,15 @@ bool loadColors(const std::string& filename) {
         auto it = colorMap.find(name);
         if (it != colorMap.end()) {
             int idx = static_cast<int>(it->second);
-            ListaColores[idx][0] = r;
-            ListaColores[idx][1] = g;
-            ListaColores[idx][2] = b;
-            ListaColores[idx][3] = a;
+            ColorList[idx][0] = r;
+            ColorList[idx][1] = g;
+            ColorList[idx][2] = b;
+            ColorList[idx][3] = a;
 
-            ListaColoresUbyte[idx][0] = (GLubyte)(r*255);
-            ListaColoresUbyte[idx][1] = (GLubyte)(g*255);
-            ListaColoresUbyte[idx][2] = (GLubyte)(b*255);
-            ListaColoresUbyte[idx][3] = (GLubyte)(a*255);
+            ColorListUbyte[idx][0] = (GLubyte)(r*255);
+            ColorListUbyte[idx][1] = (GLubyte)(g*255);
+            ColorListUbyte[idx][2] = (GLubyte)(b*255);
+            ColorListUbyte[idx][3] = (GLubyte)(a*255);
 
             #ifdef __ANDROID__
                 __android_log_print(ANDROID_LOG_VERBOSE, "SDL_MAIN",
@@ -690,16 +690,16 @@ bool loadColors(const std::string& filename) {
                 //std::cout << "Color " << name << " cargado: R=" << r << " G=" << g << " B=" << b << " A=" << a << "\n";
             #endif
         } else {
-            int eidx = editorColorIdPorNombre(name.c_str());
+            int eidx = editorColorIdByName(name.c_str());
             if (eidx >= 0) {
-                W3dColores[eidx][0] = r;
-                W3dColores[eidx][1] = g;
-                W3dColores[eidx][2] = b;
-                W3dColores[eidx][3] = a;
-                W3dColoresUbyte[eidx][0] = (GLubyte)(r*255);
-                W3dColoresUbyte[eidx][1] = (GLubyte)(g*255);
-                W3dColoresUbyte[eidx][2] = (GLubyte)(b*255);
-                W3dColoresUbyte[eidx][3] = (GLubyte)(a*255);
+                W3dColors[eidx][0] = r;
+                W3dColors[eidx][1] = g;
+                W3dColors[eidx][2] = b;
+                W3dColors[eidx][3] = a;
+                W3dColorsUbyte[eidx][0] = (GLubyte)(r*255);
+                W3dColorsUbyte[eidx][1] = (GLubyte)(g*255);
+                W3dColorsUbyte[eidx][2] = (GLubyte)(b*255);
+                W3dColorsUbyte[eidx][3] = (GLubyte)(a*255);
             } else {
                 std::cerr << "Color desconocido en colors.skin: " << name << "\n";
             }
@@ -707,8 +707,8 @@ bool loadColors(const std::string& filename) {
     }
 
     // Fase D: copiar la paleta de la UI a la de RENDER del core. Ahora COMPARTIDO
-    // (colores.cpp), asi Symbian -que carga por loadColorsW3d- tambien lo hace.
-    SincronizarRenderColores();
+    // (colors.cpp), asi Symbian -que carga por loadColorsW3d- tambien lo hace.
+    SyncRenderColors();
 
     return true;
 }
@@ -753,26 +753,26 @@ bool g_didRender = false; // el ultimo MainLoopFrame DIBUJO? -> el loop de escri
 
 // procesa UN evento SDL. COMPARTIDO: lo llaman el poll del frame Y la espera de reposo del loop (asi el manejo de
 // input no esta duplicado). Cualquier evento marca g_redraw (hay que redibujar).
-// LO NO GUARDADO (io/CambiosProyecto.h): cerrar la ventana con algo sin guardar abre el cartel "Se perderan
+// LO NO GUARDADO (io/ProjectChanges.h): cerrar la ventana con algo sin guardar abre el cartel "Se perderan
 // los cambios en:" en vez de salir; el cartel sale (o guarda y sale) con estos ganchos
-static void CambiosSalir() { running = false; }
-static void CambiosAbrir(const std::string& ruta) { extern std::string g_proyAbrirPendiente; g_proyAbrirPendiente = ruta; g_redraw = true; }
+static void ChangesExit() { running = false; }
+static void ChangesOpen(const std::string& path) { extern std::string g_projOpenPending; g_projOpenPending = path; g_redraw = true; }
 #ifdef __ANDROID__
 // "Cerrar" en la pregunta de ATRAS (sin nada sin guardar): se cierra
-static void AtrasCerrarConfirmado() { running = false; }
+static void BackCloseConfirmed() { running = false; }
 #endif
-static bool CambiosGuardar() {
+static bool ChangesSave() {
     extern std::string w3dPath;
-    extern bool GuardarW3D(const std::string&);
-    extern void GuardarProyectoComo();
-    if (w3dPath.empty()) { GuardarProyectoComo(); return false; }   // (sin archivo: primero "Guardar como")
-    return GuardarW3D(w3dPath);
+    extern bool SaveW3D(const std::string&);
+    extern void SaveProjectAs();
+    if (w3dPath.empty()) { SaveProjectAs(); return false; }   // (sin archivo: primero "Guardar como")
+    return SaveW3D(w3dPath);
 }
 // MIENTRAS SE COMPILA UN JUEGO ("Compilar juego") el editor queda bloqueado: no se usa ni se guarda el proyecto hasta que
-// termina; se ve la barra de progreso sobre el editor oscurecido (ProgresoOverlayRender). Lo que hace el usuario se
+// termina; se ve la barra de progreso sobre el editor oscurecido (ProgressOverlayRender). Lo que hace el usuario se
 // descarta, salvo SOLTAR (el mouse, un dedo, una tecla): terminan lo que se apreto antes (el click que lanzo la
 // compilacion) y no dejan nada trabado. Los eventos de la ventana (el tamanio) y de los mandos que se conectan siguen
-static bool EventoBloqueadoAlCompilar(const SDL_Event& e) {
+static bool LockedEventOnCompile(const SDL_Event& e) {
     switch (e.type) {
         case SDL_QUIT: case SDL_KEYDOWN: case SDL_TEXTEDITING: case SDL_TEXTINPUT:
         case SDL_MOUSEMOTION: case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEWHEEL:
@@ -786,48 +786,57 @@ static bool EventoBloqueadoAlCompilar(const SDL_Event& e) {
 }
 // LA VENTANA REPARTIDA: el layout y el area de los popups (MenuPantalla*) van en lo que NO tapa un teclado. El del
 // sistema achica la ventana (Android con adjustResize) o la tapa sin achicarla (en pantalla completa: lo avisa Java,
-// W3dTecladoTapado); el de Whisk3D abierto para el IDE se queda abajo y el IDE maximizado arriba. W3dPantallaAlto
+// W3dKeyboardCovered); el de Whisk3D abierto para el IDE se queda abajo y el IDE maximizado arriba. W3dScreenHeight
 // sigue siendo el alto de la ventana (las cuentas de GL)
-static void VentanaReacomodar() {
-    const int tapado = W3dTecladoTapado();
-    const int hUtil = winH - tapado;
-    W3dTecladoRedimension(winW, winH, tapado);   // un teclado del sistema abierto -> maximizar el viewport que lo pidio
-    W3dPantallaAlto = winH;
-    MenuPantallaW = winW;
-    MenuPantallaH = hUtil;
-    if (rootViewport) rootViewport->Resize(winW, hUtil - W3dTecladoIDEAltoActual());
+static void WindowRearrange() {
+    const int covered = W3dKeyboardCovered();
+    const int hUseful = winH - covered;
+    W3dKeyboardResize(winW, winH, covered);   // un teclado del sistema abierto -> maximizar el viewport que lo pidio
+    W3dScreenHeight = winH;
+    MenuScreenW = winW;
+    MenuScreenH = hUseful;
+    if (rootViewport) rootViewport->Resize(winW, hUseful - W3dKeyboardIDECurrentHeight());
     // el TELEFONO girado: el layout de la otra orientacion (cada una tiene el suyo: LayoutInput.cpp). Con un teclado
     // abierto no: la parte de arriba de un telefono parado puede ser mas ancha que alta y no se giro nada
-    if (!W3dTecladoVisible() && !W3dTecladoIDEAltoActual()) { extern void LayoutTamanoPantalla(int, int); LayoutTamanoPantalla(winW, winH); }
+    if (!W3dKeyboardVisible() && !W3dKeyboardIDECurrentHeight()) { extern void LayoutScreenSize(int, int); LayoutScreenSize(winW, winH); }
 }
 
-static void ProcesarEvento(SDL_Event& e) {
-    // lo que tapa el teclado del sistema cambio (Android en pantalla completa: ver W3dTecladoTapado)
-    if (W3dTecladoEsEvento(e)) { VentanaReacomodar(); g_redraw = true; return; }
-    {   extern bool CompilarJuegoEnCurso();
-        if (CompilarJuegoEnCurso() && EventoBloqueadoAlCompilar(e)) {
-            if (e.type == SDL_QUIT) { extern void Notificar(const std::string&, bool); Notificar(T("Wait for the build to finish"), false); }
+// LA WEB RENDERIZANDO UN VIDEO (Render Animation a MP4, Properties.cpp): va de a unos cuadros por vuelta del bucle del
+// navegador y el editor queda bloqueado como al compilar un juego
+#ifdef __EMSCRIPTEN__
+extern bool W3dWebRenderInProgress();
+extern bool W3dWebRenderTick();
+#else
+static bool W3dWebRenderInProgress() { return false; }
+#endif
+static void ProcessEvent(SDL_Event& e) {
+    // lo que tapa el teclado del sistema cambio (Android en pantalla completa: ver W3dKeyboardCovered)
+    if (W3dKeyboardIsEvent(e)) { WindowRearrange(); g_redraw = true; return; }
+    {   extern bool CompileGameInProgress();
+        const bool compiling = CompileGameInProgress();
+        if ((compiling || W3dWebRenderInProgress()) && LockedEventOnCompile(e)) {
+            if (e.type == SDL_QUIT && compiling) { extern void Notify(const std::string&, bool); Notify(T("Wait for the build to finish"), false); }
             if (e.type == SDL_DROPFILE && e.drop.file) SDL_free(e.drop.file);
             if (e.type == SDL_DROPTEXT && e.drop.file) SDL_free(e.drop.file);
             return;
         }
     }
 #ifdef W3D_VITA
-    { extern bool W3dVitaEventoValido(const SDL_Event&); if (!W3dVitaEventoValido(e)) return; }   // (el panel de atras)
+    { extern bool W3dVitaValidEvent(const SDL_Event&); if (!W3dVitaValidEvent(e)) return; }   // (el panel de atras)
 #endif
     g_redraw = true;
 #ifdef W3D_DREAMCAST
-    if (e.type == SDL_MOUSEMOTION && e.motion.which != SDL_TOUCH_MOUSEID) { extern void W3dDcMouseMovido(); W3dDcMouseMovido(); }
+    if (e.type == SDL_MOUSEMOTION && e.motion.which != SDL_TOUCH_MOUSEID) { extern void W3dMovedDcMouse(); W3dMovedDcMouse(); }
 #endif
 #ifdef __EMSCRIPTEN__
     // puntero bloqueado para el juego: el movimiento va a ratonRel() y, para el resto del editor, el cursor queda en el
     // centro del juego (el movimiento relativo ya no lo mueve)
-    if (g_webPunteroPedido && (e.type == SDL_MOUSEMOTION || e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) &&
-        WebPunteroBloqueado()) {
+    if (g_webPointerRequest && (e.type == SDL_MOUSEMOTION || e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) &&
+        WebLockedPointer()) {
         if (e.type == SDL_MOUSEMOTION) {
-            g_webRatonDX += (float)e.motion.xrel; g_webRatonDY += (float)e.motion.yrel;
-            e.motion.x = g_webCentroX; e.motion.y = g_webCentroY; e.motion.xrel = 0; e.motion.yrel = 0;
-        } else { e.button.x = g_webCentroX; e.button.y = g_webCentroY; }
+            g_webMouseDX += (float)e.motion.xrel; g_webMouseDY += (float)e.motion.yrel;
+            e.motion.x = g_webCenterX; e.motion.y = g_webCenterY; e.motion.xrel = 0; e.motion.yrel = 0;
+        } else { e.button.x = g_webCenterX; e.button.y = g_webCenterY; }
     }
 #endif
     // el SISTEMA cierra la app (Android: SDLActivity.onDestroy inyecta SDL_QUIT + SDL_APP_TERMINATING y bloquea su
@@ -840,7 +849,7 @@ static void ProcesarEvento(SDL_Event& e) {
         // colgada hasta el ANR (y lo no guardado se perdia igual)
         running = false;
 #else
-        if (!W3dCambiosPreguntar(W3D_CAMBIOS_SALIR, std::string())) running = false;
+        if (!W3dChangesAsk(W3D_CHANGES_EXIT, std::string())) running = false;
 #endif
         return;
     }
@@ -852,10 +861,10 @@ static void ProcesarEvento(SDL_Event& e) {
     // el SDL_QUIT de arriba). (Antes Android mandaba la app al fondo y no se cerraba nunca)
     if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && e.key.keysym.sym == SDLK_AC_BACK) {
         if (e.type == SDL_KEYUP || e.key.repeat) return;
-        if (PopUpActive) PopUpActive->Tecla(LayoutKey::Cancel);
-        else if (!W3dCambiosPreguntar(W3D_CAMBIOS_SALIR, std::string())) {
-            if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-            confirmarPopup->Preguntar(T("Close Whisk3D?"), T("Close"), T("Cancel"), AtrasCerrarConfirmado, NULL);
+        if (PopUpActive) PopUpActive->Key(LayoutKey::Cancel);
+        else if (!W3dChangesAsk(W3D_CHANGES_EXIT, std::string())) {
+            if (!confirmPopup) confirmPopup = new ConfirmPopup();
+            confirmPopup->Ask(T("Close Whisk3D?"), T("Close"), T("Cancel"), BackCloseConfirmed, NULL);
         }
         g_redraw = true;
         return;
@@ -864,18 +873,18 @@ static void ProcesarEvento(SDL_Event& e) {
 #if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
     // un ARCHIVO soltado desde el explorador del sistema (Windows / Linux / Mac): al viewport que queda bajo el puntero
     // (el 3D importa el modelo o le pone la imagen a la malla; la biblioteca lo guarda en el proyecto: ver
-    // UI/ViewPorts/SoltarRecurso.cpp). Durante el arrastre del sistema la ventana no recibe el movimiento: la posicion
+    // UI/ViewPorts/DropResource.cpp). Durante el arrastre del sistema la ventana no recibe el movimiento: la posicion
     // sale del mouse global menos la ventana
     if (e.type == SDL_DROPFILE) {
         if (e.drop.file) {
             int gx = 0, gy = 0, wx = 0, wy = 0;
             SDL_GetGlobalMouseState(&gx, &gy);
             SDL_GetWindowPosition(window, &wx, &wy);
-            extern bool W3dSoltarArchivo(const std::string& ruta, int mx, int my, std::string* que);
-            extern void Notificar(const std::string& msg, bool error);
-            std::string que;
-            const bool ok = W3dSoltarArchivo(e.drop.file, gx - wx, gy - wy, &que);
-            if (!que.empty()) Notificar(que, !ok);
+            extern bool W3dReleaseFile(const std::string& path, int mx, int my, std::string* that);
+            extern void Notify(const std::string& msg, bool error);
+            std::string that;
+            const bool ok = W3dReleaseFile(e.drop.file, gx - wx, gy - wy, &that);
+            if (!that.empty()) Notify(that, !ok);
             SDL_free(e.drop.file);
         }
         return;
@@ -889,46 +898,56 @@ static void ProcesarEvento(SDL_Event& e) {
 #endif
         winW = e.window.data1;
         winH = e.window.data2;
-        VentanaReacomodar();
+        WindowRearrange();
     } else {
-        InputUsuarioSDL3(e);
+        InputUserSDL3(e);
     }
 }
 
 static void MainLoopFrame() {
 #ifdef W3D_MCP
-    W3dHistorialCuadro();   // la grabadora de pasos: lo que cambio (sin W3D_HISTORIAL no hace nada)
+    W3dHistoryFrame();   // la grabadora de pasos: lo que cambio (sin W3D_HISTORY no hace nada)
     // el MCP (--mcp): los pedidos de la IA se atienden aca, entre cuadros. Si el cliente se va, el editor se cierra
     // por la misma puerta que la cruz de la ventana (con el cartel si hay cambios sin guardar)
-    if (W3dMcpActivo()) {
-        static bool clienteIdo = false;
-        if (!W3dMcpAtender() && !clienteIdo) {
-            clienteIdo = true;
+    if (W3dMcpActive()) {
+        static bool clientGone = false;
+        if (!W3dMcpHandle() && !clientGone) {
+            clientGone = true;
             SDL_Event q; SDL_zero(q); q.type = SDL_QUIT; SDL_PushEvent(&q);
         }
+    }
+#endif
+#ifdef __EMSCRIPTEN__
+    // EL VIDEO DE LA WEB en curso: esta vuelta es suya (renderiza unos cuadros, el navegador los codifica y se ve la
+    // barra de progreso). El editor no se dibuja; la entrada la atiende la barra como en el render de la PC
+    // (PCProgressPoll: Escape o su boton Cancelar lo cortan, el resto se descarta)
+    if (W3dWebRenderInProgress()) {
+        PCProgressPoll();
+        W3dWebRenderTick();
+        return;
     }
 #endif
     // apertura de proyecto DIFERIDA (tarjeta Archivo): se procesa aca, con el
     // stack limpio, porque el boton que la pidio vive en el layout a destruir
     // (y el NUEVO PROYECTO de la tarjeta Archivo / la pantalla de inicio, igual: import_w3d.cpp)
-    { extern void ProcesarProyectoPendiente(); ProcesarProyectoPendiente(); }
-    Contadores();
+    { extern void ProcessPendingProject(); ProcessPendingProject(); }
+    Counters();
     // EL TITULO de la ventana dice el proyecto y un '*' si hay algo sin guardar (cada medio segundo: listar lo
     // sucio recorre la biblioteca)
     {
-        static Uint32 ultimoTitulo = 0;
-        const Uint32 ahora = SDL_GetTicks();
-        if (window && (ultimoTitulo == 0 || ahora - ultimoTitulo > 500)) {
-            ultimoTitulo = ahora;
+        static Uint32 lastTitle = 0;
+        const Uint32 nowMs = SDL_GetTicks();
+        if (window && (lastTitle == 0 || nowMs - lastTitle > 500)) {
+            lastTitle = nowMs;
             extern std::string w3dPath;
-            std::string nom = w3dPath;
-            const size_t b = nom.find_last_of("/\\");
-            if (b != std::string::npos) nom = nom.substr(b + 1);
-            char titulo[512];
-            snprintf(titulo, sizeof(titulo), "Whisk3D Pre-Alpha %s%s%s%s", W3dVersion(), nom.empty() ? "" : " - ", nom.c_str(),
-                     W3dCambiosHayCache() ? " *" : "");
-            static std::string ultimo;
-            if (ultimo != titulo) { ultimo = titulo; SDL_SetWindowTitle(window, titulo); }
+            std::string name = w3dPath;
+            const size_t b = name.find_last_of("/\\");
+            if (b != std::string::npos) name = name.substr(b + 1);
+            char title[512];
+            snprintf(title, sizeof(title), "Whisk3D Pre-Alpha %s%s%s%s", W3dVersion(), name.empty() ? "" : " - ", name.c_str(),
+                     W3dChangesHasCache() ? " *" : "");
+            static std::string last;
+            if (last != title) { last = title; SDL_SetWindowTitle(window, title); }
         }
     }
     W3dProfBegin(); // profiler: reset del frame
@@ -942,9 +961,9 @@ static void MainLoopFrame() {
     // dt REAL del frame (el gameplay y las animaciones son proporcionales al
     // tiempo, NO a los fps: a 10 fps en el Nokia se recorre lo mismo por segundo)
     static double g_dtPrevMs = W3dNowMs();
-    double g_dtAhoraMs = W3dNowMs();
-    float dtFrame = (float)((g_dtAhoraMs - g_dtPrevMs) / 1000.0);
-    g_dtPrevMs = g_dtAhoraMs;
+    double g_dtNowMs = W3dNowMs();
+    float dtFrame = (float)((g_dtNowMs - g_dtPrevMs) / 1000.0);
+    g_dtPrevMs = g_dtNowMs;
     if (dtFrame < 0.0f) dtFrame = 0.0f;
     if (dtFrame > 0.1f) dtFrame = 0.1f;   // pico (debugger/carga): no dar saltos gigantes
 
@@ -962,8 +981,8 @@ static void MainLoopFrame() {
             // "no cambio nada" para una malla DISTINTA -> su vertex anim no se evaluaba (la malla
             // nueva se quedaba en la pose del bind hasta mover el playhead).
             static unsigned int lastSerial = 0, lastGen = 0; static int lastAnim = -1, lastFrame = -999999;
-            if (ActiveAnimMesh->serial != lastSerial || ai != lastAnim || CurrentFrame != lastFrame || lastGen != g_animCurvasGen) {
-                lastSerial = ActiveAnimMesh->serial; lastAnim = ai; lastFrame = CurrentFrame; lastGen = g_animCurvasGen;   // (o editaron la curva)
+            if (ActiveAnimMesh->serial != lastSerial || ai != lastAnim || CurrentFrame != lastFrame || lastGen != g_animCurvesGen) {
+                lastSerial = ActiveAnimMesh->serial; lastAnim = ai; lastFrame = CurrentFrame; lastGen = g_animCurvesGen;   // (o editaron la curva)
                 VertexAnimation* an = ActiveAnimMesh->animations[ai];
                 an->target = ActiveAnimMesh;
                 // los frames son KEYFRAMES en cuadros arbitrarios: se evalua por
@@ -980,26 +999,26 @@ static void MainLoopFrame() {
     // ... y con una VERTEX ANIM en el timeline (kind 3) el RESTO del mundo queda
     // QUIETO: solo se ve la animacion del objeto que estas editando (las demas
     // vertex anims y las texturas animadas no corren).
-    if (TextFieldParpadeoTick()) g_redraw = true;   // el cursor de la caja de texto enfocada parpadea
-    if (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3) {
+    if (TextFieldBlinkTick()) g_redraw = true;   // el cursor de la caja de texto enfocada parpadea
+    if (!(AnimIsGame && !PlayAnimation) && ActiveAnimKind != 3) {
         UpdateAnimations(dtFrame);
         UpdateAnimatedMaterials(dtFrame);
         // ANIMACIONES UV "tira de atlas" (Core, autoplay): mismas reglas de pausa
         // que las texturas animadas. true = alguna malla cambio su uv -> redibujar.
         if (UpdateUVAnims(dtFrame)) g_redraw = true;
-        // FLIPBOOKS (Imagen2D/particulas, registro unificado del Core): el motor avanza la UV.
+        // FLIPBOOKS (Image2D/particulas, registro unificado del Core): el motor avanza la UV.
         { extern bool UpdateFlipbooks(float); if (UpdateFlipbooks(dtFrame)) g_redraw = true; }
-        // VISIBILIDAD POR CELDA (VisZona): evalua el modo (grilla/volumenes/curva)
+        // VISIBILIDAD POR CELDA (VisZone): evalua el modo (grilla/volumenes/curva)
         // y aplica la celda a su malla objetivo. Un paso por frame, como las particulas.
-        { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+        { extern void W3dVisZonesTick(); W3dVisZonesTick(); }
         // OCLUSION POR NODOS DE RIEL (.w3dnodos): en PLAY el nodo sigue a la camara activa.
-        { extern bool W3dOclusionTick(); if (W3dOclusionTick()) g_redraw = true; }
+        { extern bool W3dOcclusionTick(); if (W3dOcclusionTick()) g_redraw = true; }
     }
     // PARTICULAS: la SIMULACION de lo vivo (avanzar + MATAR por vida) corre SIEMPRE que el mundo respira, TAMBIEN
     // con una vertex anim activa en el timeline (kind 3) -> sino, seleccionar/editar una vertex-anim CONGELABA las
-    // particulas ya emitidas y no morian. La EMISION la controla el flag 'visible' por objeto (W3dParticulasTick).
-    if (!(AnimEsJuego && !PlayAnimation)) {
-        extern void W3dParticulasTick(float); W3dParticulasTick(dtFrame);
+    // particulas ya emitidas y no morian. La EMISION la controla el flag 'visible' por objeto (W3dParticlesTick).
+    if (!(AnimIsGame && !PlayAnimation)) {
+        extern void W3dParticlesTick(float); W3dParticlesTick(dtFrame);
     }
 
     // CLIP DEL ARMATURE 2D en el timeline (kind 4): el rig 2D de la malla sigue al PLAYHEAD. Se evalua
@@ -1012,9 +1031,9 @@ static void MainLoopFrame() {
     // los clips 2D no se reproducian con el Play ni en el juego compilado (el camino viejo, con la
     // pose horneada en la capa uv de la vertex anim, SI corria: sin esto era una regresion).
     if (ActiveAnimKind == 4 && ActiveAnimMesh && !ActiveAnimMesh->Arm2DAnims().empty())
-        Armature2DEvaluar(ActiveAnimMesh, CurrentFrame);
-    else if (ActiveAnimKind == 2 && !(AnimEsJuego && !PlayAnimation))
-        Armature2DEvaluarEscena(CurrentFrame);
+        Armature2DEvaluate(ActiveAnimMesh, CurrentFrame);
+    else if (ActiveAnimKind == 2 && !(AnimIsGame && !PlayAnimation))
+        Armature2DEvaluateScene(CurrentFrame);
 
 #ifdef __EMSCRIPTEN__
     // el canvas puede cambiar de tamano (ventana del browser). SDL2/Emscripten no siempre emite el
@@ -1035,7 +1054,7 @@ static void MainLoopFrame() {
             emscripten_set_canvas_element_size("#canvas", nw, nh); // resolucion = display (nitido)
             SDL_SetWindowSize(window, nw, nh);
             winW = nw; winH = nh;
-            W3dPantallaAlto = winH; MenuPantallaW = winW; MenuPantallaH = winH;
+            W3dScreenHeight = winH; MenuScreenW = winW; MenuScreenH = winH;
             rootViewport->Resize(winW, winH);
             g_redraw = true;
         }
@@ -1047,43 +1066,46 @@ static void MainLoopFrame() {
     // REPOSO: si no hay animacion NI nada pendiente para redibujar, BLOQUEAR esperando el 1er evento
     // Esto reemplaza el busy-spin (que corria todo esto en loop cerrado). En emscripten NO se bloquea (el
     // requestAnimationFrame del browser no se puede frenar). El paceo cuando SI animamos lo hace el while de abajo.
-    { extern bool W3dParticulasAnimando();
+    { extern bool W3dParticlesAnimating();
       // las particulas solo mantienen vivo el loop si su tick CORRE (mismas reglas de
       // pausa que el bloque de UpdateAnimatedMaterials: congeladas no redibujan nada)
-      bool _partAnim = !(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3 &&
-                       W3dParticulasAnimando();
-      extern bool W3dInerciaActiva();   // un panel que sigue deslizando solo despues de soltarlo (controles.cpp)
-      bool _animPre = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation || W3dInerciaActiva() ||
+      bool _partAnim = !(AnimIsGame && !PlayAnimation) && ActiveAnimKind != 3 &&
+                       W3dParticlesAnimating();
+      extern bool W3dInertiaActive();   // un panel que sigue deslizando solo despues de soltarlo (controls.cpp)
+      bool _animPre = HasAnimationActive() || !VertexAnimationActives.empty() || PlayAnimation || W3dInertiaActive() ||
                       _partAnim;
-      if (!_animPre && !_needRender && !g_redraw && SDL_WaitEventTimeout(&e, 200)) ProcesarEvento(e); }
+      if (!_animPre && !_needRender && !g_redraw && SDL_WaitEventTimeout(&e, 200)) ProcessEvent(e); }
 #endif
 #ifdef W3D_DREAMCAST
     {   // el control de la consola como mouse (fuera del modo juego; con el juego corriendo el control es del juego)
-        extern bool SimActiva(); extern void W3dDcControlComoMouse(bool);
-        W3dDcControlComoMouse(AnimEsJuego && PlayAnimation && SimActiva());
+        extern bool SimActive(); extern void W3dDcControlAsMouse(bool);
+        W3dDcControlAsMouse(AnimIsGame && PlayAnimation && SimActive());
     }
 #endif
 #ifdef W3D_3DS
     {   // los botones y los sticks de la consola en el editor (fuera del modo juego, como en la Dreamcast)
-        extern bool SimActiva(); extern void W3d3dsControles(bool);
-        W3d3dsControles(AnimEsJuego && PlayAnimation && SimActiva());
+        extern bool SimActive(); extern void W3d3dsControls(bool);
+        W3d3dsControls(AnimIsGame && PlayAnimation && SimActive());
     }
 #endif
 #ifdef W3D_VITA
     {   // los botones y los sticks de la consola en el editor (fuera del modo juego, como en la 3DS)
-        extern bool SimActiva(); extern void W3dVitaControles(bool);
-        W3dVitaControles(AnimEsJuego && PlayAnimation && SimActiva());
+        extern bool SimActive(); extern void W3dVitaControls(bool);
+        W3dVitaControls(AnimIsGame && PlayAnimation && SimActive());
     }
 #endif
 #ifdef W3D_PSP
     {   // el control como mouse (sin pantalla tactil; fuera del modo juego, como en la Dreamcast)
-        extern bool SimActiva(); extern void W3dPspControles(bool);
-        W3dPspControles(AnimEsJuego && PlayAnimation && SimActiva());
+        extern bool SimActive(); extern void W3dPspControls(bool);
+        W3dPspControls(AnimIsGame && PlayAnimation && SimActive());
     }
 #endif
-    while (SDL_PollEvent(&e)) ProcesarEvento(e); // manejo compartido (mismo que la espera de reposo)
+    while (SDL_PollEvent(&e)) ProcessEvent(e); // manejo compartido (mismo que la espera de reposo)
     // la PULSACION LARGA tactil (agarrar una fila del outliner): se mide con el reloj, no con eventos
-    { extern void ControlesTick(); ControlesTick(); }
+    { extern void ControlsTick(); ControlsTick(); }
+#ifdef __EMSCRIPTEN__
+    if (W3dWebRenderInProgress()) return;   // (una tecla o un boton recien empezo el video de la web: la barra ya esta dibujada)
+#endif
 
 #ifdef __EMSCRIPTEN__
     if (!running) { emscripten_cancel_main_loop(); return; } // SDL_QUIT -> salir del loop del browser
@@ -1097,60 +1119,60 @@ static void MainLoopFrame() {
     // capturarRaton(true), el cursor se esconde y cada frame se lee cuanto se movio desde el CENTRO del viewport del
     // juego y se lo TELETRANSPORTA de vuelta al centro (SDL_WarpMouseInWindow). Asi nunca se sale del viewport ni de
     // la ventana (con el modo relativo de SDL el cursor se escapaba y dejaba de girar la vista). El delta llega a
-    // ratonRel() de lua. ESC pausa el juego (PlayAnimation = false, controles.cpp) -> se suelta el mouse; Play /
+    // ratonRel() de lua. ESC pausa el juego (PlayAnimation = false, controls.cpp) -> se suelta el mouse; Play /
     // espacio lo vuelve a capturar. Sin foco (alt-tab) no se toca el mouse del usuario.
     {
-        extern bool SimActiva(); extern bool W3dScriptRatonCapturar(); extern void W3dScriptRatonRel(float, float);
-        extern void W3dScriptRatonCapturadoSet(bool); extern bool JuegoViewportRect(int*, int*, int*, int*);
-        static bool ratonCapturado = false;
+        extern bool SimActive(); extern bool W3dScriptMouseCapture(); extern void W3dScriptMouseRel(float, float);
+        extern void W3dScriptCapturedMouseSet(bool); extern bool GameViewportRect(int*, int*, int*, int*);
+        static bool mouseCaptured = false;
         int vx = 0, vy = 0, vw = 0, vh = 0;
-        const Uint32 wf = window ? SDL_GetWindowFlags(window) : 0;
-        const bool foco = (wf & SDL_WINDOW_INPUT_FOCUS) != 0 && (wf & SDL_WINDOW_MINIMIZED) == 0;
-        const bool quiere = AnimEsJuego && PlayAnimation && SimActiva() && W3dScriptRatonCapturar() && foco &&
-                            JuegoViewportRect(&vx, &vy, &vw, &vh);
+        const Uint32 wf  = window ? SDL_GetWindowFlags(window) : 0;
+        const bool focus = (wf & SDL_WINDOW_INPUT_FOCUS) != 0 && (wf & SDL_WINDOW_MINIMIZED) == 0;
+        const bool wants = AnimIsGame && PlayAnimation && SimActive() && W3dScriptMouseCapture() && focus &&
+                            GameViewportRect(&vx, &vy, &vw, &vh);
 #ifdef __EMSCRIPTEN__
         // NAVEGADOR: POINTER LOCK. El navegador lo concede recien con un click o una tecla (el pedido queda armado
         // hasta entonces: el aviso lo dice). Si lo suelta por su cuenta (Esc, otra pestania) es el Esc de PC: pausa.
-        static bool bloqueadoAntes = false;
-        const bool bloqueado = g_webPunteroPedido && WebPunteroBloqueado();
-        if (quiere) {
-            g_webCentroX = vx + vw / 2; g_webCentroY = vy + vh / 2;
+        static bool lockedPrev = false;
+        const bool locked = g_webPointerRequest && WebLockedPointer();
+        if (wants) {
+            g_webCenterX = vx + vw / 2; g_webCenterY = vy + vh / 2;
             // (SDL lo arma solo con el puntero sobre el canvas: si no, se reintenta el cuadro siguiente)
-            if (!g_webPunteroPedido && SDL_SetRelativeMouseMode(SDL_TRUE) == 0) {
-                g_webPunteroPedido = true;
-                if (!WebPunteroBloqueado()) Notificar(T("Click the game to capture the mouse (Esc releases it)"), false);
+            if (!g_webPointerRequest && SDL_SetRelativeMouseMode(SDL_TRUE) == 0) {
+                g_webPointerRequest = true;
+                if (!WebLockedPointer()) Notify(T("Click the game to capture the mouse (Esc releases it)"), false);
             }
-            if (bloqueado) {
-                if (g_webRatonDX != 0.0f || g_webRatonDY != 0.0f) { W3dScriptRatonRel(g_webRatonDX, g_webRatonDY); g_redraw = true; }
-            } else if (bloqueadoAntes) {
+            if (locked) {
+                if (g_webMouseDX != 0.0f || g_webMouseDY != 0.0f) { W3dScriptMouseRel(g_webMouseDX, g_webMouseDY); g_redraw = true; }
+            } else if (lockedPrev) {
                 PlayAnimation = false;   // el navegador solto el mouse (Esc): pausa, como el Esc de PC
                 g_redraw = true;
             }
-        } else if (g_webPunteroPedido) {
+        } else if (g_webPointerRequest) {
             SDL_SetRelativeMouseMode(SDL_FALSE);
-            g_webPunteroPedido = false;
+            g_webPointerRequest = false;
         }
-        g_webRatonDX = 0.0f; g_webRatonDY = 0.0f;
-        bloqueadoAntes = quiere && bloqueado;
-        ratonCapturado = quiere && bloqueado;
+        g_webMouseDX = 0.0f; g_webMouseDY = 0.0f;
+        lockedPrev    = wants && locked;
+        mouseCaptured = wants && locked;
 #else
-        if (quiere) {
+        if (wants) {
             const int cx = vx + vw / 2, cy = vy + vh / 2;
             int mx = cx, my = cy; SDL_GetMouseState(&mx, &my);
-            if (!ratonCapturado) {
+            if (!mouseCaptured) {
                 SDL_ShowCursor(SDL_DISABLE);
                 PCWarpMouse(cx, cy);   // el primer salto al centro no cuenta como movimiento
-                ratonCapturado = true;
+                mouseCaptured = true;
             } else {
                 const int dx = mx - cx, dy = my - cy;
-                if (dx || dy) { W3dScriptRatonRel((float)dx, (float)dy); PCWarpMouse(cx, cy); g_redraw = true; }
+                if (dx || dy) { W3dScriptMouseRel((float)dx, (float)dy); PCWarpMouse(cx, cy); g_redraw = true; }
             }
-        } else if (ratonCapturado) {
+        } else if (mouseCaptured) {
             SDL_ShowCursor(SDL_ENABLE);
-            ratonCapturado = false;
+            mouseCaptured = false;
         }
 #endif
-        W3dScriptRatonCapturadoSet(ratonCapturado);
+        W3dScriptCapturedMouseSet(mouseCaptured);
     }
     // Animación
     Uint32 now = SDL_GetTicks();
@@ -1159,21 +1181,21 @@ static void MainLoopFrame() {
     unsigned int animMs = (AnimFPS > 0) ? (unsigned int)(1000 / AnimFPS) : 33;
     // el MODO JUEGO va a 60 fps fijo (la fisica de los scripts se siente fluida);
     // el timeline de animacion normal conserva su AnimFPS
-    if (AnimEsJuego && PlayAnimation) animMs = 1000 / 60;
+    if (AnimIsGame && PlayAnimation) animMs = 1000 / 60;
     if (now - lastAnimTime >= animMs) {
         lastAnimTime = now;
         // juego en PAUSA (partida cargada sin Play): el mixer se congela (la musica no sigue sonando de fondo);
         // SimTickPlay lo despausa al reanudar y SimStop corta todo
-        { extern bool SimActiva(); if (AnimEsJuego && !PlayAnimation && SimActiva() && !w3dEngine::W3dAudioPaused()) w3dEngine::W3dAudioPause(true); }
+        { extern bool SimActive(); if (AnimIsGame && !PlayAnimation && SimActive() && !w3dEngine::W3dAudioPaused()) w3dEngine::W3dAudioPause(true); }
         // Timeline: si esta en PLAY, avanzar CurrentFrame (loop Start..End) y forzar redibujo
         if (PlayAnimation) {
-            extern void SimTickPlay(float); extern bool SimHayScripts(); extern bool SimActiva();
-            bool juego = AnimEsJuego && (SimActiva() || SimHayScripts());
+            extern void SimTickPlay(float); extern bool SimHasScripts(); extern bool SimActive();
+            bool game = AnimIsGame && (SimActive() || SimHasScripts());
             // el dt de la SIMULACION tambien es TIEMPO REAL entre ticks (el fisico
             // del juego rinde lo mismo a 30, 60 o 10 fps)
             static Uint32 lastSimMs = 0;
             float dtSim;
-            if (lastSimMs == 0 || now < lastSimMs) dtSim = juego ? (1.0f / 60.0f)
+            if (lastSimMs == 0 || now < lastSimMs) dtSim = game ? (1.0f / 60.0f)
                                 : 1.0f / (AnimFPS > 0 ? (float)AnimFPS : 30.0f);
             else {
                 dtSim = (float)(now - lastSimMs) / 1000.0f;
@@ -1181,10 +1203,10 @@ static void MainLoopFrame() {
                 if (dtSim < 0.001f) dtSim = 0.001f;
             }
             lastSimMs = now;
-            if (juego && AnimPlayDir < 0) {
+            if (game && AnimPlayDir < 0) {
                 // PLAY EN REVERSA en modo juego: el juego no graba su pasado, no hay nada que rebobinar -> pausa
                 PlayAnimation = false;
-            } else if (juego) {
+            } else if (game) {
                 // MODO JUEGO hacia adelante: el playhead lo lleva la simulacion
                 // (sin AnimTick: no hay Fin ni loop)
                 SimTickPlay(dtSim);
@@ -1196,34 +1218,34 @@ static void MainLoopFrame() {
         }
         // Actualizar frame
     }
-    // LOS SONIDOS de la escena (objetos Sonido): suenan con el Play del timeline, en segundos (main/objects/Sonido.cpp)
-    { extern void W3dSonidosTickEditor(); W3dSonidosTickEditor(); }
+    // LOS SONIDOS de la escena (objetos Sonido): suenan con el Play del timeline, en segundos (main/objects/Sound.cpp)
+    { extern void W3dSoundsTickEditor(); W3dSoundsTickEditor(); }
     // ANIMACION DE OBJETOS (transform pos/rot/escala): aplica los keyframes al frame actual (play o scrub del timeline).
     // Guard interno: solo trabaja al CAMBIAR de frame -> editar/keyframear un objeto en un frame fijo no lo resnapea.
-    { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
+    { extern void ApplyAnimationObjects(); ApplyAnimationObjects(); }
 
     // notificaciones (toasts): corre el timer (las de exito se cierran solas) y
     // mantiene vivo el render mientras haya alguna de exito activa
     static Uint32 lastNotif = now;
-    NotificacionesTick((float)(now - lastNotif) / 1000.0f);
+    NotificationsTick((float)(now - lastNotif) / 1000.0f);
     lastNotif = now;
 
     // build del juego en 2do plano ("Compilar juego"): mientras corre mantiene vivo el
     // render (la barra avanza) y al terminar el worker hace join + Notificar exito/error.
-    CompilarJuegoTick();
+    CompileGameTick();
 
     // RED DE SEGURIDAD de la barra del dock: si no hay NINGUNA operacion con progreso
     // (ni build, ni import/export/render con la barra modal) el icono no puede quedar
     // con una barra a medias. Cubre cualquier camino de error que se haya olvidado de
-    // llamar a ProgresoFin(). Es no-op si ya estaba apagada.
-    if (!CompilarJuegoEnCurso() && !ProgresoActivo()) W3dDockProgresoFin();
+    // llamar a ProgressEnd(). Es no-op si ya estaba apagada.
+    if (!CompileGameInProgress() && !ProgressActive()) W3dDockProgressEnd();
 
     // CARGA DIFERIDA de texturas del import: 1 por frame (decode+upload). Prende g_redraw al cargar una -> el
     // modelo aparece enseguida y las texturas entran solas. No-op si no hay pendientes.
-    { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+    { extern void LoadPendingTextures(); LoadPendingTextures(); }
     // la BOMBA del almacen de recursos: UNA carga async por frame (streaming).
     // Cola vacia = no-op: en el editor no cuesta nada.
-    { extern void W3dRecursosPump(); W3dRecursosPump(); }
+    { extern void W3dResourcesPump(); W3dResourcesPump(); }
     // la VISTA PREVIA del STREAMING (io/Streaming.h): sin jugar y con la opcion del proyecto prendida, las instancias
     // diferidas cargan y descargan segun la vista del viewport (jugando lo hace el tick de la partida)
     { extern void W3dStreamingTickEditor(); W3dStreamingTickEditor(); }
@@ -1231,10 +1253,10 @@ static void MainLoopFrame() {
     // Render EVENT-DRIVEN: solo si algo cambio (g_redraw) o hay una animacion EN
     // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
     // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
-    extern bool W3dParticulasAnimando();
+    extern bool W3dParticlesAnimating();
     // un emisor vivo mantiene el redibujado, pero SOLO si su tick corre (ver _partAnim arriba)
-    bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation ||
-                    (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3 && W3dParticulasAnimando());
+    bool animating = HasAnimationActive() || !VertexAnimationActives.empty() || PlayAnimation ||
+                    (!(AnimIsGame && !PlayAnimation) && ActiveAnimKind != 3 && W3dParticlesAnimating());
     double _renderNowMs = W3dNowMs(); // reloj de alta resolucion (para el profiler)
 #ifdef __EMSCRIPTEN__
     // WebGL: renderizar SIEMPRE (no event-driven). Motivos: 1) el canvas WebGL usa
@@ -1242,9 +1264,9 @@ static void MainLoopFrame() {
     // (parpadeos/negro al quedar quieto); 2) el color-ID pick (hover/loop cut) limpia el framebuffer
     // visible y hay que taparlo cada frame. El RAF ya limita a la tasa del monitor y se PAUSA en
     // tabs ocultas, asi que no quema GPU de fondo. (En escritorio se mantiene el event-driven.)
-    bool doRender = true; (void)animando; (void)_renderNowMs;
+    bool doRender = true; (void)animating; (void)_renderNowMs;
 #else
-    bool doRender = (_needRender || g_redraw || animando); // _needRender = del frame previo; g_redraw = eventos/subsistemas de este.
+    bool doRender = (_needRender || g_redraw || animating); // _needRender = del frame previo; g_redraw = eventos/subsistemas de este.
     // El CAP a 60fps lo hace el LOOP (paceo por sleep), no aca -> sin busy-spin.
 #endif
     g_didRender = doRender; // el loop de escritorio lo lee: si dibujo -> pacea 60fps; si no -> bloquea en eventos (0% CPU)
@@ -1253,54 +1275,54 @@ static void MainLoopFrame() {
         lastRenderTime = now;
         double _profRender0 = W3dNowMs();
 #ifdef W3D_3DS
-        w3dEngine::C3DCuadroEmpezar();                     // (la 3DS: el cuadro de citro3d, el editor en la de abajo)
-        { extern void W3d3dsPantallaArriba(); W3d3dsPantallaArriba(); }   // (la vista grande; deja elegida la de abajo)
+        w3dEngine::C3DFrameBegin();                     // (la 3DS: el cuadro de citro3d, el editor en la de abajo)
+        { extern void W3d3dsScreenUp(); W3d3dsScreenUp(); }   // (la vista grande; deja elegida la de abajo)
 #endif
 #ifdef W3D_PSP
-        w3dEngine::GuCuadroEmpezar();                      // (la PSP: la lista del GE de este cuadro)
+        w3dEngine::GuFrameBegin();                      // (la PSP: la lista del GE de este cuadro)
 #endif
-        { extern void TecladosVigilar(); TecladosVigilar(); }   // (el teclado de Whisk3D del IDE se fue: el IDE vuelve)
+        { extern void KeyboardsWatch(); KeyboardsWatch(); }   // (el teclado de Whisk3D del IDE se fue: el IDE vuelve)
         if (rootViewport){
             rootViewport->Render();
         }
         // popups y desplegables (los dibuja el modulo compartido)
         LayoutRenderMenu(winW, winH);
-        { extern void TecladoSistemaCampoRender(); TecladoSistemaCampoRender(); }   // el campo, arriba del teclado del sistema
-        { extern void CargaDedoRender(int, int); CargaDedoRender(winW, winH); }   // el circulo de carga de la pulsacion larga
-        NotificacionesRender(winW, winH); // toasts ENCIMA de todo
+        { extern void KeyboardSystemFieldRender(); KeyboardSystemFieldRender(); }   // el campo, arriba del teclado del sistema
+        { extern void LoadFingerRender(int, int); LoadFingerRender(winW, winH); }   // el circulo de carga de la pulsacion larga
+        NotificationsRender(winW, winH); // toasts ENCIMA de todo
         // barra del build de "Compilar juego": overlay NO modal (el MISMO widget que la
         // barra del export de modelos) anclado abajo; muestra la etapa + el porcentaje
         // que publica el worker. El editor sigue usable: la barra solo se dibuja, no
         // captura input ni bloquea el loop.
-        if (CompilarJuegoEnCurso()) {
-            std::string etapaBld;
-            int pctBld = CompilarJuegoProgreso(&etapaBld);
-            ProgresoOverlayRender(etapaBld, (float)pctBld / 100.0f);
+        if (CompileGameInProgress()) {
+            std::string stageBld;
+            int pctBld = CompileGameProgress(&stageBld);
+            ProgressOverlayRender(stageBld, (float)pctBld / 100.0f);
         }
         LayoutTickFPS(now); // overlay de fps (reloj de PC: SDL_GetTicks)
         g_prof.render = W3dNowMs() - _profRender0; // profiler: TODO el render (viewports 3D + paneles UI + menus)
         double _profSwap0 = W3dNowMs();
 #ifdef W3D_DREAMCAST
-        { extern void W3dDcDibujarCursor(int, int); W3dDcDibujarCursor(winW, winH); }   // (la consola no tiene cursor propio)
+        { extern void W3dDcDrawCursor(int, int); W3dDcDrawCursor(winW, winH); }   // (la consola no tiene cursor propio)
 #endif
 #ifdef W3D_PSP
-        { extern void W3dPspDibujarCursor(int, int); W3dPspDibujarCursor(winW, winH); }   // (el cursor que mueve el control)
+        { extern void W3dPspDrawCursor(int, int); W3dPspDrawCursor(winW, winH); }   // (el cursor que mueve el control)
 #endif
 #ifdef W3D_3DS
-        w3dEngine::C3DCuadroTerminar();
-        { extern void W3d3dsCuadroDibujado(); W3d3dsCuadroDibujado(); }   // (la captura de prueba en la SD)
+        w3dEngine::C3DFrameFinish();
+        { extern void W3d3dsDrawnFrame(); W3d3dsDrawnFrame(); }   // (la captura de prueba en la SD)
 #else
-        w3dEngine::DibujarPendiente();
+        w3dEngine::DrawPending();
 #ifdef W3D_VITA
-        { extern void W3dVitaCuadroDibujado(); W3dVitaCuadroDibujado(); }   // (la captura de prueba, antes de mostrarlo)
+        { extern void W3dVitaDrawnFrame(); W3dVitaDrawnFrame(); }   // (la captura de prueba, antes de mostrarlo)
 #endif
-        W3dPresentar(window);
+        W3dPresent(window);
 #endif
 #ifdef W3D_DREAMCAST
-        { extern void W3dDcCuadroDibujado(); W3dDcCuadroDibujado(); }   // (la captura de prueba por la consola serie)
+        { extern void W3dDcDrawnFrame(); W3dDcDrawnFrame(); }   // (la captura de prueba por la consola serie)
 #endif
 #ifdef W3D_PSP
-        { extern void W3dPspCuadroDibujado(); W3dPspCuadroDibujado(); }   // (la captura de prueba en el Memory Stick)
+        { extern void W3dPspDrawnFrame(); W3dPspDrawnFrame(); }   // (la captura de prueba en el Memory Stick)
 #endif
         g_prof.swap = W3dNowMs() - _profSwap0; // profiler: swap (con vsync ON = espera al vblank)
         W3dProfEnd(); // profiler: suaviza g_profShow hacia g_prof (numeros estables). NO se resetea g_redraw aca: se
@@ -1310,9 +1332,9 @@ static void MainLoopFrame() {
         // apenas dibujamos el PRIMER frame, ocultamos la pantalla de carga del shell. Es lo mas
         // robusto: no depende de setStatus('')/onRuntimeInitialized (que con emscripten_set_main_loop
         // pueden no dispararse porque main() no retorna). Se hace una sola vez.
-        static bool loaderOculto = false;
-        if (!loaderOculto) {
-            loaderOculto = true;
+        static bool hiddenLoader = false;
+        if (!hiddenLoader) {
+            hiddenLoader = true;
             EM_ASM({ var l = document.getElementById('loader'); if (l) l.classList.add('hidden'); });
         }
 #endif
@@ -1329,18 +1351,18 @@ int main(int argc, char* argv[]) {
 #ifdef W3D_MCP
     // --mcp: antes que nada imprima, stdin y stdout pasan a ser del protocolo (ver test/W3dMcp.cpp)
     for (int ai = 1; ai < argc; ai++)
-        if (std::string(argv[ai]) == "--mcp" && !W3dMcpIniciar()) { fprintf(stderr, "whisk3d --mcp: no se pudo iniciar\n"); return 1; }
+        if (std::string(argv[ai]) == "--mcp" && !W3dMcpStart()) { fprintf(stderr, "whisk3d --mcp: no se pudo iniciar\n"); return 1; }
 #endif
 #ifndef __EMSCRIPTEN__
-    w3dRedirigirCoutAlLog();   // cout/cerr -> whisk3d.log (no la consola blanca de Windows). Impl comun en w3dlog.cpp.
+    w3dRedirectCoutToLog();   // cout/cerr -> whisk3d.log (no la consola blanca de Windows). Impl comun en w3dlog.cpp.
 #endif
 #ifdef W3D_MCP
-    W3dHistorialIniciar();     // W3D_HISTORIAL=<ruta.txt>: anota los pasos de la persona (para armar tutoriales)
+    W3dHistoryStart();     // W3D_HISTORY=<ruta.txt>: anota los pasos de la persona (para armar tutoriales)
 #endif
 #ifdef __EMSCRIPTEN__
     SDL_SetMainReady(); // web: no arrancamos por el main de SDL
     // touch -> mouse SIEMPRE sintetizado por SDL (which = SDL_TOUCH_MOUSEID): el ruteo tactil de
-    // controles.cpp distingue por ese which los eventos del dedo de los mouse FANTASMA del browser.
+    // controls.cpp distingue por ese which los eventos del dedo de los mouse FANTASMA del browser.
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
     // en web solo VIDEO: el subsistema de gamepad puede no estar y haria fallar todo el SDL_Init
     Uint32 initFlags = SDL_INIT_VIDEO;
@@ -1352,7 +1374,7 @@ int main(int argc, char* argv[]) {
     // a abrir se relanzaba main() con los globals C++ estaticos vivos -> ConstructUniversal duplicaba la escena (otro
     // cubo/camara/luz) y las texturas quedaban negras (contexto GL nuevo). Junto con launchMode=singleTask del manifest.
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
-    // ATRAS llega como tecla (SDLK_AC_BACK): la maneja ProcesarEvento (pregunta si cerrar). Sin esto Android la usaba
+    // ATRAS llega como tecla (SDLK_AC_BACK): la maneja ProcessEvent (pregunta si cerrar). Sin esto Android la usaba
     // para mandar la app al fondo
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
@@ -1368,9 +1390,9 @@ int main(int argc, char* argv[]) {
     SDL_setenv("SDL_VIDEO_X11_WMCLASS", "whisk3d", 1);
     // MODO TEST SIN VENTANAS NI SONIDO: "whisk3d --script" dibuja en el driver 'offscreen' de SDL (GL por EGL, sin
     // abrir nada en el escritorio: las suites no llenan la pantalla de ventanas). Para ver la ventana:
-    // W3D_VER_VENTANA=1. Un SDL_VIDEODRIVER explicito siempre manda.
+    // W3D_SHOW_WINDOW=1. Un SDL_VIDEODRIVER explicito siempre manda.
     for (int ai = 1; ai < argc; ai++)
-        if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_VER_VENTANA") && !SDL_getenv("SDL_VIDEODRIVER")) {
+        if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_SHOW_WINDOW") && !SDL_getenv("SDL_VIDEODRIVER")) {
             SDL_setenv("SDL_VIDEODRIVER", "offscreen", 1);
             if (!SDL_getenv("SDL_AUDIODRIVER")) SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);   // y sin sonido
             break;
@@ -1378,16 +1400,16 @@ int main(int argc, char* argv[]) {
 #endif
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
     // VULKAN SIN VENTANA en Linux: el driver 'offscreen' de SDL no da superficie de Vulkan, asi que una prueba con Vulkan
-    // va por X11 (SDL_VIDEODRIVER=x11). Con W3D_VENTANA_OCULTA=1 esa ventana se crea OCULTA: no aparece en el escritorio
-    if (SDL_getenv("W3D_VENTANA_OCULTA")) g_ventanaOculta = true;
+    // va por X11 (SDL_VIDEODRIVER=x11). Con W3D_WINDOW_HIDDEN=1 esa ventana se crea OCULTA: no aparece en el escritorio
+    if (SDL_getenv("W3D_WINDOW_HIDDEN")) g_windowHidden = true;
 #endif
 #ifdef _WIN32
     // lo mismo en Windows: el driver 'offscreen' de SDL necesita EGL (no hay), asi que la ventana se crea OCULTA
-    // (SDL_WINDOW_HIDDEN: contexto WGL real, no aparece en el escritorio ni en la barra de tareas). W3D_VER_VENTANA=1
+    // (SDL_WINDOW_HIDDEN: contexto WGL real, no aparece en el escritorio ni en la barra de tareas). W3D_SHOW_WINDOW=1
     // la muestra.
     for (int ai = 1; ai < argc; ai++)
-        if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_VER_VENTANA")) {
-            g_ventanaOculta = true;
+        if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_SHOW_WINDOW")) {
+            g_windowHidden = true;
             if (!SDL_getenv("SDL_AUDIODRIVER")) SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);   // y sin sonido
             break;
         }
@@ -1408,10 +1430,10 @@ int main(int argc, char* argv[]) {
     }
 #ifdef W3D_VITA
     // la Vita: sin el compilador de shaders del sistema vitaGL no puede dibujar (se avisa y se sale, ver w3d_vita.cpp)
-    { extern bool W3dVitaPuedeDibujar(); if (!W3dVitaPuedeDibujar()) { SDL_Quit(); return 1; } }
+    { extern bool W3dVitaCanDraw(); if (!W3dVitaCanDraw()) { SDL_Quit(); return 1; } }
 #endif
 
-    W3dSetReloj(RelojSDL);   // el motor usa el reloj de PARED de SDL en vez de su respaldo
+    W3dSetClock(ClockSDL);   // el motor usa el reloj de PARED de SDL en vez de su respaldo
     w3dFileSystem::Init();
     #if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
     // SIN res/ el editor abre igual pero sin texturas ni iconos (cuadrados blancos) y sin decir por que. Se avisa
@@ -1422,9 +1444,9 @@ int main(int argc, char* argv[]) {
                                 "Instala el paquete (.deb) o deja la carpeta res/ al lado del ejecutable.";
         w3dLogfE("%s", msg.c_str());
         std::cerr << msg << std::endl;
-        bool enScript = false;
-        for (int ai = 1; ai < argc; ai++) if (std::string(argv[ai]) == "--script") enScript = true;
-        if (!enScript) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Whisk3D", msg.c_str(), NULL);
+        bool inScript = false;
+        for (int ai = 1; ai < argc; ai++) if (std::string(argv[ai]) == "--script") inScript = true;
+        if (!inScript) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Whisk3D", msg.c_str(), NULL);
     }
     #endif
     // AUDIO: arranca el mixer (efectos de los juegos: beep() de los scripts lua). Si el device no
@@ -1500,7 +1522,7 @@ int main(int argc, char* argv[]) {
     // ESTENCIL: lo pide el recorte por FORMA del reflejo del espejo (la lamina de
     // agua marcada con z-test, para que lo que pase por delante del estanque no
     // reciba reflejo). 8 bits es lo que da cualquier driver junto al z de 24
-    // (D24S8); si el driver lo niega, w3dEngine::EstencilBits() devuelve 0 y el
+    // (D24S8); si el driver lo niega, w3dEngine::StencilBits() devuelve 0 y el
     // espejo se recorta igual por planos (solo pierde la oclusion).
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
@@ -1509,30 +1531,30 @@ int main(int argc, char* argv[]) {
     // El config del USUARIO vive en la carpeta escribible (SDL_GetPrefPath): res/ puede ser de solo lectura (el
     // AppImage, el .deb instalado en /usr/share, el APK). Si todavia no guardo nada, vale el de fabrica de res/.
     {
-        const std::string cfgUsuario = w3dFileSystem::GetUserDataDir() + "/config.ini";
-        FILE* fu = fopen(cfgUsuario.c_str(), "rb");
-        const bool hayUsuario = (fu != NULL);
+        const std::string cfgUser = w3dFileSystem::GetUserDataDir() + "/config.ini";
+        FILE* fu = fopen(cfgUser.c_str(), "rb");
+        const bool hasUser = (fu != NULL);
         if (fu) fclose(fu);
     #ifdef __ANDROID__
-        cfg = loadConfig(hayUsuario ? cfgUsuario : std::string("res/config.ini"));
+        cfg = loadConfig(hasUser ? cfgUser : std::string("res/config.ini"));
         // Android es de alta densidad y se usa con el dedo -> escala 3 de fabrica (el config compartido viene en 2
         // para PC). Si el usuario ya eligio una escala en Ajustes, se respeta la suya.
-    #ifdef W3D_ANDROID_VIEJO
+    #ifdef W3D_ANDROID_OLD
         // (los de Android 2.3 tienen pantallas de 320x480 o menos, con la densidad del N95: escala 1)
-        if (!hayUsuario) cfg.scale = 1;
+        if (!hasUser) cfg.scale = 1;
     #else
-        if (!hayUsuario) cfg.scale = 3;
+        if (!hasUser) cfg.scale = 3;
     #endif
     #else
-        cfg = loadConfig(hayUsuario ? cfgUsuario : w3dFileSystem::GetResDir() + "/config.ini");
+        cfg = loadConfig(hasUser ? cfgUser : w3dFileSystem::GetResDir() + "/config.ini");
     #endif
     #ifdef __EMSCRIPTEN__
         // WEB: el canvas va a la resolucion REAL de la pantalla (CSS x devicePixelRatio, ver MainLoopFrame), asi que
         // la escala de la UI se cuenta en pixeles del DISPOSITIVO. Con el dedo (iPhone, Android, iPad) 4; con mouse,
         // la del config multiplicada por el devicePixelRatio (una Mac retina: 2 x 2 = 4), asi la interfaz mide lo
         // mismo que antes pero nitida. Si el usuario eligio una escala en Ajustes, manda la suya.
-        if (!hayUsuario) cfg.scale = W3dWebEscalaUI(cfg.scale);
-        { extern bool g_w3dTelefono; g_w3dTelefono = W3dWebDedo(); }   // el layout de fabrica del telefono (LayoutPorDefecto)
+        if (!hasUser) cfg.scale = W3dWebScaleUI(cfg.scale);
+        { extern bool g_w3dPhone; g_w3dPhone = W3dWebFinger(); }   // el layout de fabrica del telefono (LayoutDefault)
     #endif
     }
     winW = cfg.width;  winH = cfg.height;  // aplicar el tamano del config a la ventana
@@ -1554,61 +1576,61 @@ int main(int argc, char* argv[]) {
     // del config, o la que eligio el usuario) y sin antialiasing
     winW = 960; winH = 544; cfg.fullscreen = true; cfg.enableAntialiasing = false;
 #endif
-#ifdef W3D_ANDROID_VIEJO
+#ifdef W3D_ANDROID_OLD
     // Android 2.3: sin antialiasing. La VideoCore IV lo da (4x), pero con tiles cuatro veces mas chicos el cuadro tardaba
     // ~300 ms en la GPU
     cfg.enableAntialiasing = false;
 #endif
-    // AUTO KEY: arranca SIEMPRE apagado (pedido del dueno); el autoKey del config.ini ya no se aplica.
+    // AUTO KEY: arranca SIEMPRE apagado (pedido del dueno); el autoKey del config.start ya no se aplica.
     // LOGS: el nivel del config (Ajustes > Logs)
-    g_w3dLogNivel = cfg.logs;
+    g_w3dLogLevel = cfg.logs;
 
 #ifdef W3D_MULTIBACKEND
     // EL BACKEND GRAFICO se elige ACA, antes de crear la ventana (graphics/w3dBackend.h): Ajustes > Graphics
     // (cfg.graphicsAPI), o "--backend <OpenGL|es2>" en la linea de comandos (el harness corre las pruebas con cada uno)
     {
-        std::string pedido = cfg.graphicsAPI;
-        for (int k = 1; k + 1 < argc; k++) if (std::string(argv[k]) == "--backend") pedido = argv[k + 1];
-        if (pedido == "es2" || pedido == "gles2") pedido = "OpenGL ES 2.0";
-        const int b = w3dEngine::BackendDeNombre(pedido.c_str());
-        if (b >= 0 && !w3dEngine::BackendUsar(b))
-            w3dLogfW("[graficos] '%s' no esta en este ejecutable: se usa OpenGL", pedido.c_str());
-        w3dLogf("[graficos] backend: %s", w3dEngine::BackendNombre(w3dEngine::BackendActivo()));
+        std::string request = cfg.graphicsAPI;
+        for (int k = 1; k + 1 < argc; k++) if (std::string(argv[k]) == "--backend") request = argv[k + 1];
+        if (request == "es2" || request == "gles2") request = "OpenGL ES 2.0";
+        const int b = w3dEngine::BackendFromName(request.c_str());
+        if (b >= 0 && !w3dEngine::BackendUse(b))
+            w3dLogfW("[graficos] '%s' no esta en este ejecutable: se usa OpenGL", request.c_str());
+        w3dLogf("[graficos] backend: %s", w3dEngine::BackendName(w3dEngine::ActiveBackend()));
     }
 #endif
     //TODO: Esto muy probablemente de problemas en gama baja? no se si deba configurable
-    // (multisample / estencil / profundidad: los prueba CrearVentanaGL, de lo mas completo a lo mas basico)
+    // (multisample / estencil / profundidad: los prueba CreateWindowGL, de lo mas completo a lo mas basico)
     #ifdef __ANDROID__
-        window = CrearVentanaGL("Whisk3D Pre-Alpha", winW, winH,
+        window = CreateWindowGL("Whisk3D Pre-Alpha", winW, winH,
                                 SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE,
                                 cfg.enableAntialiasing, &glContext);
-        if (window) W3dPantallaCompletaAuto(window);   // sin notch: pantalla completa (la barra de arriba ocupa espacio valioso)
+        if (window) W3dFullscreenAuto(window);   // sin notch: pantalla completa (la barra de arriba ocupa espacio valioso)
     #else
         // fullscreen -> maximizada; sino respeta width/height del config (util para
         // probar tamanos chicos, ej. 240x320 estilo N95 con scale=1)
     #ifdef W3D_DREAMCAST
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;   // (la consola es una sola pantalla)
     #elif defined(W3D_3DS)
-        Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CrearVentanaGL)
+        Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CreateWindowGL)
     #elif defined(W3D_VITA)
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;   // (la consola es una sola pantalla)
     #elif defined(W3D_PSP)
-        Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CrearVentanaGL)
+        Uint32 windowFlags = SDL_WINDOW_FULLSCREEN;   // (sin OpenGL: ver CreateWindowGL)
     #else
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
         if (cfg.fullscreen) windowFlags |= SDL_WINDOW_MAXIMIZED;
-        if (g_ventanaOculta) windowFlags = (windowFlags & ~SDL_WINDOW_MAXIMIZED) | SDL_WINDOW_HIDDEN;   // --script en Windows
+        if (g_windowHidden) windowFlags = (windowFlags & ~SDL_WINDOW_MAXIMIZED) | SDL_WINDOW_HIDDEN;   // --script en Windows
     #endif
 #ifdef W3D_VULKAN
         // VULKAN: su ventana (sin contexto de GL). Si no arranca en esta maquina (sin driver, sin GPU, sin shaderc) se sigue
         // con OpenGL, como si se hubiera elegido ese
-        if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) {
-            window = CrearVentanaVulkan("Whisk3D Pre-Alpha", winW, winH, windowFlags);
-            if (!window) { w3dLogfW("[graficos] Vulkan no arranco en esta maquina: se usa OpenGL"); w3dEngine::BackendUsar(w3dEngine::BackendOpenGL); }
+        if (w3dEngine::ActiveBackend() == w3dEngine::BackendVulkan) {
+            window = CreateWindowVulkan("Whisk3D Pre-Alpha", winW, winH, windowFlags);
+            if (!window) { w3dLogfW("[graficos] Vulkan no arranco en esta maquina: se usa OpenGL"); w3dEngine::BackendUse(w3dEngine::BackendOpenGL); }
         }
         if (!window)
 #endif
-        window = CrearVentanaGL("Whisk3D Pre-Alpha", winW, winH, windowFlags, cfg.enableAntialiasing, &glContext);
+        window = CreateWindowGL("Whisk3D Pre-Alpha", winW, winH, windowFlags, cfg.enableAntialiasing, &glContext);
         #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
         // ULTIMO RESPALDO: en una sesion Wayland, SDL abre por X11 (XWayland) y ahi puede no haber GLX usable.
         // Si nada abrio, se reintenta con el driver Wayland, que crea el contexto por EGL y no necesita GLX.
@@ -1619,7 +1641,7 @@ int main(int argc, char* argv[]) {
                 SDL_QuitSubSystem(SDL_INIT_VIDEO);
                 SDL_setenv("SDL_VIDEODRIVER", "wayland", 1);
                 if (SDL_InitSubSystem(SDL_INIT_VIDEO) == 0)
-                    window = CrearVentanaGL("Whisk3D Pre-Alpha", winW, winH, windowFlags, cfg.enableAntialiasing, &glContext);
+                    window = CreateWindowGL("Whisk3D Pre-Alpha", winW, winH, windowFlags, cfg.enableAntialiasing, &glContext);
                 else
                     w3dLogfW("Wayland no inicio: %s", SDL_GetError());
             }
@@ -1628,9 +1650,9 @@ int main(int argc, char* argv[]) {
     #endif
 
     if (window) { // titulo con la VERSION (fecha de build): asi una captura de pantalla dice de que version es
-        char titulo[64];
-        snprintf(titulo, sizeof(titulo), "Whisk3D Pre-Alpha %s", W3dVersion());
-        SDL_SetWindowTitle(window, titulo);
+        char title[64];
+        snprintf(title, sizeof(title), "Whisk3D Pre-Alpha %s", W3dVersion());
+        SDL_SetWindowTitle(window, title);
 #ifdef W3D_DREAMCAST
         SDL_StartTextInput();   // (el SDL de la PC arranca con la entrada de texto activa; el de la Dreamcast, apagada)
 #endif
@@ -1642,7 +1664,7 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return -1;
     }
-    if (g_glSinMsaa) w3dLogfW("Antialiasing pedido pero el driver no lo ofrece: se abre sin multisampling");
+    if (g_glNoMsaa) w3dLogfW("Antialiasing pedido pero el driver no lo ofrece: se abre sin multisampling");
 
     SDL_GetWindowSize(window, &winW, &winH);
 
@@ -1679,10 +1701,10 @@ int main(int argc, char* argv[]) {
     LayoutImportGltf = PCImportGltf;
     LayoutImportGlb = PCImportGlb;
     LayoutImportStl = PCImportStl;
-    DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
+    DialogLoadTexture = PCLoadTextureIn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
-    { extern void (*W3dProgresoSondear)(); W3dProgresoSondear = PCProgresoSondear; }   // (Cancelar en la barra)
+    { extern void (*W3dProgressPoll)(); W3dProgressPoll = PCProgressPoll; }   // (Cancelar en la barra)
 #endif
 #ifdef __ANDROID__
     // Android: import OBJ + "Load Texture" usan el MISMO file browser interno que PC
@@ -1693,55 +1715,55 @@ int main(int argc, char* argv[]) {
     LayoutImportGltf = PCImportGltf;
     LayoutImportGlb = PCImportGlb;
     LayoutImportStl = PCImportStl;
-    DialogoCargarTextura = PCCargarTexturaEn;
+    DialogLoadTexture = PCLoadTextureIn;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers;
-    { extern void (*W3dProgresoSondear)(); W3dProgresoSondear = PCProgresoSondear; }   // (Cancelar en la barra)
+    { extern void (*W3dProgressPoll)(); W3dProgressPoll = PCProgressPoll; }   // (Cancelar en la barra)
 #endif
 #ifdef __EMSCRIPTEN__
     // en web pisamos import/textura con el SELECTOR DEL NAVEGADOR (el browser interno solo ve el FS
     // virtual de emscripten, no los archivos del usuario). El resto de hooks (warp/swap) sirven igual.
     LayoutImportObj = WebImportObj;
     LayoutImportFbx = WebImportFbx; // web: FBX tambien por el selector nativo (antes caia al explorador interno)
-    DialogoCargarTextura = WebCargarTexturaEn;
+    DialogLoadTexture = WebLoadTextureIn;
 #endif
 
     // LOS MANDOS QUE YA ESTAN ENCHUFADOS. Los que se enchufen DESPUES entran
     // solos por los eventos SDL_CONTROLLERDEVICEADDED/REMOVED (hotplug), que
-    // atiende InputUsuarioSDL3 (main/app/controles.cpp): ya no hay que cerrar el
+    // atiende InputUserSDL3 (main/app/controls.cpp): ya no hay que cerrar el
     // editor, enchufar el control y volver a abrir.
-    { extern void W3dControlesAbrirLosQueHay(); W3dControlesAbrirLosQueHay(); }
+    { extern void W3dControlsOpenThatHas(); W3dControlsOpenThatHas(); }
 
     running = true;
     // arbol en coordenadas ARRIBA-izquierda (unificado con Symbian);
     // el flip a GL pasa solo en glViewport/glScissor con este alto
-    W3dPantallaAlto = winH;
-    MenuPantallaW = winW;
-    MenuPantallaH = winH;
+    W3dScreenHeight = winH;
+    MenuScreenW = winW;
+    MenuScreenH = winH;
     rootViewport->Resize(winW, winH);
-    { extern void LayoutTamanoPantalla(int, int); LayoutTamanoPantalla(winW, winH); }   // (la orientacion con la que arranca)
+    { extern void LayoutScreenSize(int, int); LayoutScreenSize(winW, winH); }   // (la orientacion con la que arranca)
 
     // los ganchos del cartel de lo no guardado (salir, abrir otro proyecto, guardar)
-    W3dCambiosSalirHook = CambiosSalir;
-    g_ventanaReacomodarHook = VentanaReacomodar;   // (los teclados de Whisk3D: el del IDE, ver NumPad.cpp)
-    W3dCambiosAbrirHook = CambiosAbrir;
-    W3dCambiosGuardarHook = CambiosGuardar;
-    W3dCambiosFoto();   // el proyecto de arranque esta "guardado" (no hay nada que perder todavia)
+    W3dChangesExitHook = ChangesExit;
+    g_windowRearrangeHook = WindowRearrange;   // (los teclados de Whisk3D: el del IDE, ver NumPad.cpp)
+    W3dChangesOpenHook = ChangesOpen;
+    W3dChangesSaveHook = ChangesSave;
+    W3dChangesSnapshot();   // el proyecto de arranque esta "guardado" (no hay nada que perder todavia)
 
     // MODO TEST: "whisk3d --script <ruta>" corre un script de comandos (sin GUI) y
     // sale (0 = todo OK, 1 = fallo). Ver main/test/W3dScript.cpp.
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--script" && ai + 1 < argc) {
-            g_w3dCambiosSinCartel = true;   // (el harness no muestra el cartel: el comando 'cambios' lo consulta)
+            g_w3dChangesNoDialog = true;   // (el harness no muestra el cartel: el comando 'cambios' lo consulta)
             { extern bool g_transformRedoAuto; g_transformRedoAuto = false; }   // (el panel de la ultima operacion: solo si la prueba lo pide)
             #ifndef _WIN32
-            { const char* tmp = "/tmp/w3d_prueba_usuario"; mkdir(tmp, 0755); w3dFileSystem::SetUserDataDir(tmp); }   // (config.ini y demas del usuario: no se tocan)
+            { const char* tmp = "/tmp/w3d_prueba_usuario"; mkdir(tmp, 0755); w3dFileSystem::SetUserDataDir(tmp); }   // (config.start y demas del usuario: no se tocan)
             #endif
-            { extern void W3dAtajosRutaFijar(const std::string&); W3dAtajosRutaFijar("/tmp/w3d_prueba_atajos.ini"); }   // (los atajos de fabrica; el atajos.ini del usuario no se toca)
-            { extern void W3dLayoutsRutaFijar(const std::string&); remove("/tmp/w3d_prueba_layouts.txt");   // (los layouts guardados
-              W3dLayoutsRutaFijar("/tmp/w3d_prueba_layouts.txt"); }                                        //  del usuario no se tocan)
-            { extern void W3dRecientesRutaFijar(const std::string&); remove("/tmp/w3d_prueba_recientes.txt");   // (los archivos recientes
-              W3dRecientesRutaFijar("/tmp/w3d_prueba_recientes.txt"); }                                         //  del usuario no se tocan; arranca vacia)
-            { extern void W3dScriptSemillaFija(bool); W3dScriptSemillaFija(true); }   // (el mismo script juega siempre igual: las capturas se comparan)
+            { extern void W3dShortcutsPathSet(const std::string&); W3dShortcutsPathSet("/tmp/w3d_prueba_atajos.ini"); }   // (los atajos de fabrica; el shortcuts.start del usuario no se toca)
+            { extern void W3dLayoutsPathSet(const std::string&); remove("/tmp/w3d_prueba_layouts.txt");   // (los layouts guardados
+              W3dLayoutsPathSet("/tmp/w3d_prueba_layouts.txt"); }                                        //  del usuario no se tocan)
+            { extern void W3dRecentPathSet(const std::string&); remove("/tmp/w3d_prueba_recientes.txt");   // (los archivos recientes
+              W3dRecentPathSet("/tmp/w3d_prueba_recientes.txt"); }                                         //  del usuario no se tocan; arranca vacia)
+            { extern void W3dScriptFixedSeed(bool); W3dScriptFixedSeed(true); }   // (el mismo script juega siempre igual: las capturas se comparan)
             bool ok = W3dRunScript(argv[ai + 1]);
             SDL_Quit();
             return ok ? 0 : 1;
@@ -1752,18 +1774,18 @@ int main(int argc, char* argv[]) {
     // file browser). Rutea por extension: .fbx -> ImportFBX; el resto -> ImportOBJ.
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--open" && ai + 1 < argc) {
-            std::string ruta = argv[ai + 1];
+            std::string path = argv[ai + 1];
             // .w3d = proyecto entero (zip+json): va por el abridor de proyectos, no por el
             // importador de modelos (que solo entiende .obj/.fbx). Asi se puede arrancar el
             // editor con una escena guardada (util para depurar animaciones desde consola).
-            size_t punto = ruta.find_last_of('.');
-            std::string ext = (punto != std::string::npos) ? ruta.substr(punto) : "";
+            size_t point = path.find_last_of('.');
+            std::string ext = (point != std::string::npos) ? path.substr(point) : "";
             for (size_t k = 0; k < ext.size(); k++) ext[k] = (char)tolower(ext[k]);
             if (ext == ".w3d") {
-                extern void AbrirProyectoAhora(const std::string&);
-                AbrirProyectoAhora(ruta);
+                extern void OpenProjectNow(const std::string&);
+                OpenProjectNow(path);
             } else {
-                ImportModeloPorExtension(ruta);
+                ImportModelByExtension(path);
             }
             g_redraw = true;
         }
@@ -1778,7 +1800,7 @@ int main(int argc, char* argv[]) {
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--framesel") {
             extern Viewport3D* Viewport3DActive;
-            if (Viewport3DActive) Viewport3DActive->EnfocarObject();
+            if (Viewport3DActive) Viewport3DActive->FocusObject();
             g_redraw = true;
         }
     }
@@ -1798,33 +1820,34 @@ int main(int argc, char* argv[]) {
         // "whisk3d proyecto.w3d --juego": abre DIRECTO jugando (el selector del
         // timeline en "Juego" + play): para probar un juego sin tocar nada
         if (std::string(argv[ai]) == "--juego") {
-            extern int ActiveAnimKind; extern bool AnimEsJuego; extern bool PlayAnimation;
+            extern int ActiveAnimKind; extern bool AnimIsGame; extern bool PlayAnimation;
             // misma puerta que el boton Play: nada de arrancar con la cola de
             // texturas a medias (el primer segundo de juego salia gris)
-            extern bool JuegoEsperarTexturas(); JuegoEsperarTexturas();
-            ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1;
+            extern bool GameWaitTextures(); GameWaitTextures();
+            ActiveAnimKind = 2; AnimIsGame = true; StartFrame = 1;
             PlayAnimation = true; g_redraw = true;
         }
     }
 
-    // LA PANTALLA DE INICIO (ui/ViewPorts/PopUp/InicioPopup.h): arriba, con el engranaje girando, Nuevo archivo, los
+    // LA PANTALLA DE INICIO (ui/ViewPorts/PopUp/HomePopup.h): arriba, con el engranaje girando, Nuevo archivo, los
     // archivos recientes y Abrir... Solo si el editor arranco SIN un archivo (ni un .w3d por doble click o --open, ni
     // un modelo, ni el modo juego): el que abrio algo ya sabe que quiere hacer
     {
-        bool conArchivo = (argc > 1 && argv[1][0] != '-');
+        bool withFile = (argc > 1 && argv[1][0] != '-');
         for (int ai = 1; ai < argc; ai++) {
             const std::string a = argv[ai];
-            if (a == "--open" || a == "--juego") conArchivo = true;
+            if (a == "--open" || a == "--juego") withFile = true;
         }
         extern std::string w3dPath;
-        extern bool g_modoJuego;
-        if (!conArchivo && w3dPath.empty() && !g_modoJuego) { extern void InicioPopupAbrir(); InicioPopupAbrir(); }
+        extern bool g_gameMode;
+        if (!withFile && w3dPath.empty() && !g_gameMode) { extern void HomePopupOpen(); HomePopupOpen(); }
     }
 
 #ifdef __EMSCRIPTEN__
     // WebGL: el browser es de 1 solo hilo, no podemos bloquear con un while(). Le pasamos el
     // frame y el browser lo llama (~60 veces/seg via requestAnimationFrame). El 3er arg = 1
     // "simula" un loop infinito (no se ejecuta lo de abajo). El cleanup queda solo para escritorio.
+    { extern void W3dWebVideoTest(); W3dWebVideoTest(); }   // (el navegador codifica H.264? Render a MP4: io/W3dWebVideo.h)
     emscripten_set_main_loop(MainLoopFrame, 0, 1);
 #else
     // Loop de escritorio PACEADO (reemplaza el busy-spin viejo): MainLoopFrame ya bloquea en REPOSO (0% CPU). Cuando
@@ -1839,30 +1862,30 @@ int main(int argc, char* argv[]) {
     while (running) {
         int cap = (g_fpsCap > 0) ? g_fpsCap : 60;
         const double frameMs = 1000.0 / (double)cap;
-        int quiereVsync = (cap > 60) ? 0 : 1;
-        if (quiereVsync != capVsync) { W3dVsync(quiereVsync); capVsync = quiereVsync; }
+        int wantsVsync = (cap > 60) ? 0 : 1;
+        if (wantsVsync != capVsync) { W3dVsync(wantsVsync); capVsync = wantsVsync; }
         MainLoopFrame();
         if (g_didRender) {
             nextFrame += frameMs;
-            double ahora = W3dNowMs();
-            if (nextFrame < ahora - frameMs) nextFrame = ahora; // atraso grande (frame lento): resincronizar
-            double espera = nextFrame - ahora;
-            if (espera > 1.0) SDL_Delay((Uint32)espera); // duerme el resto del frame (yield de CPU)
+            double now = W3dNowMs();
+            if (nextFrame < now - frameMs) nextFrame = now; // atraso grande (frame lento): resincronizar
+            double wait = nextFrame - now;
+            if (wait > 1.0) SDL_Delay((Uint32)wait); // duerme el resto del frame (yield de CPU)
         } else {
             nextFrame = W3dNowMs(); // estuvimos en reposo (MainLoopFrame bloqueo) -> resincronizar al reanudar
         }
     }
 #endif
 
-    W3dDockProgresoFin(); // ultimo seguro: cerrar el editor no puede dejar la barra prendida en el dock
+    W3dDockProgressEnd(); // ultimo seguro: cerrar el editor no puede dejar la barra prendida en el dock
     if (controller) SDL_GameControllerClose(controller);
 #ifdef W3D_3DS
     // citro3d se cierra ANTES que la ventana: SDL_Quit apaga las pantallas (gfxExit) y citro3d tiene enganchados al
     // sistema su hook de APT y su interrupcion del vblank. Cerrar la app con eso puesto trababa la consola
-    w3dEngine::C3DFin();
+    w3dEngine::C3DEnd();
 #endif
 #ifdef W3D_VULKAN
-    VkGLTerminar();
+    VkGLFinish();
 #endif
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);

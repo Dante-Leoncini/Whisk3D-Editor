@@ -1,42 +1,42 @@
 {
   "version": 3,
-  "escena": {
-    "objetos": [
+  "scene": {
+    "objects": [
       {
-        "tipo": "objeto", "nombre": "Puerta", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "puerta" } } ],
-        "hijos": [
+        "type": "object", "name": "Puerta", "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": [1, 1, 1],
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "puerta" } } ],
+        "children": [
           {
-            "tipo": "hitbox", "nombre": "ZonaPuerta", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
-            "activo": true, "tam": [2, 2, 2], "centro": [0, 0, 0], "etiqueta": "", "filtro": "jugador",
-            "detectarCuerpos": false,
-            "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "zona" } } ]
+            "type": "hitbox", "name": "ZonaPuerta", "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": [1, 1, 1],
+            "active": true, "size": [2, 2, 2], "center": [0, 0, 0], "label": "", "filter": "jugador",
+            "detectBodies": false,
+            "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "zona" } } ]
           }
         ]
       },
       {
-        "tipo": "objeto", "nombre": "Trampa", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "trampa" } } ],
-        "hijos": [
-          { "tipo": "hitbox", "nombre": "SoloEnemigos", "pos": [0, 0, 0], "tam": [2, 2, 2], "filtro": "enemigo" }
+        "type": "object", "name": "Trampa", "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": [1, 1, 1],
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "trampa" } } ],
+        "children": [
+          { "type": "hitbox", "name": "SoloEnemigos", "pos": [0, 0, 0], "size": [2, 2, 2], "filter": "enemigo" }
         ]
       },
       {
-        "tipo": "hitbox", "nombre": "Apagada", "pos": [0, 0, 0], "activo": false, "tam": [2, 2, 2],
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "apagada" } } ]
+        "type": "hitbox", "name": "Apagada", "pos": [0, 0, 0], "active": false, "size": [2, 2, 2],
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "apagada" } } ]
       },
       {
-        "tipo": "hitbox", "nombre": "Oculta", "pos": [0, 0, 0], "visible": false, "tam": [2, 2, 2],
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "oculta" } } ]
+        "type": "hitbox", "name": "Oculta", "pos": [0, 0, 0], "visible": false, "size": [2, 2, 2],
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "oculta" } } ]
       },
       {
-        "tipo": "objeto", "nombre": "Movil", "pos": [-5.05, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
+        "type": "object", "name": "Movil", "pos": [-5.05, 0, 0], "rot": [0, 0, 0], "scale": [1, 1, 1],
         "scripts": [
-          { "archivo": "hitbox_mover.lua", "refs": { "x0": "-5.05" } },
-          { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "movil" } }
+          { "file": "hitbox_mover.lua", "refs": { "x0": "-5.05" } },
+          { "file": "hitbox_contador.lua", "refs": { "prefijo": "movil" } }
         ],
-        "hijos": [
-          { "tipo": "hitbox", "nombre": "CajaMovil", "pos": [0, 0, 0], "tam": [1, 1, 1], "etiqueta": "jugador" }
+        "children": [
+          { "type": "hitbox", "name": "CajaMovil", "pos": [0, 0, 0], "size": [1, 1, 1], "label": "jugador" }
         ]
       }
     ]

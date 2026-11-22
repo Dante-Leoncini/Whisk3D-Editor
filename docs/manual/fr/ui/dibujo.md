@@ -14,12 +14,12 @@ Les coordonnées sont des pixels d'écran, avec le Y vers le bas et l'origine en
 |---|---|
 | `W3dDrawStrip4(verts, uvs)` | Un carré : 4 sommets `GLshort` dans l'ordre d'une bande, avec leurs 8 UV. Elle le convertit en deux triangles |
 | `W3dDrawElemsB(verts, uvs, idx, n)` | Un petit maillage avec des indices `GLubyte`, jusqu'à 64 |
-| `W3dDrawLinesS(ancho, n, verts, idx)` | Jusqu'à 21 lignes, avec des sommets `GLshort` à 3 composantes |
+| `W3dDrawLinesS(width, n, verts, idx)` | Jusqu'à 21 lignes, avec des sommets `GLshort` à 3 composantes |
 | `W3dDrawLinesF(verts, idx, n)` | Des lignes avec des sommets `float` à 3 composantes, par paquets de 40 sommets par dessin |
 
 Les sommets convertis en `float` vont dans un réservoir fixe de 256 places utilisé de façon circulaire, jamais sur la pile : le pilote du N95 lit les pointeurs tardivement.
 
-`W3dPantallaAlto` est la hauteur de l'écran. C'est celui qui utilise l'UI qui la définit quand la taille change, et elle sert à convertir le Y de l'interface en celui de `Scissor` et `Viewport`, qui comptent depuis le bas.
+`W3dScreenHeight` est la hauteur de l'écran. C'est celui qui utilise l'UI qui la définit quand la taille change, et elle sert à convertir le Y de l'interface en celui de `Scissor` et `Viewport`, qui comptent depuis le bas.
 
 ## Nœuds et rectangles
 
@@ -28,40 +28,40 @@ Les sommets convertis en `float` vont dans un réservoir fixe de 256 places util
 `Rec2D` (`draw/rectangle.h`) est un rectangle d'une seule couleur. `SetSize(x, y, w, h)` le place et `SetColor(r, g, b)` lui donne sa couleur. Il ne lit pas la texture : il se dessine avec `Texture2D` désactivé.
 
 ```cpp
-Rec2D velo;
-velo.SetSize(0, 0, ancho, alto);
+Rec2D veil;
+veil.SetSize(0, 0, width, height);
 gfx::Disable(gfx::Texture2D);
 gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
-velo.RenderObject(false);          // false : avec la couleur courante, pas avec la sienne
+veil.RenderObject(false);          // false : avec la couleur courante, pas avec la sienne
 gfx::Enable(gfx::Texture2D);
 ```
 
 ## Cartes
 
-`Card` (`widgets/card.h`) est le rectangle à coins arrondis des boutons, des menus et des cartes de propriétés. C'est un **9-patch** : 16 sommets qui étirent le centre et laissent les coins à `2 * GlobalScale`. Les coins et le centre proviennent d'un recoin de `font.png`. `CalcCardUV(anchoAtlas, altoAtlas)` calcule ces coordonnées : on l'appelle une fois, avec la taille de la texture.
+`Card` (`widgets/card.h`) est le rectangle à coins arrondis des boutons, des menus et des cartes de propriétés. C'est un **9-patch** : 16 sommets qui étirent le centre et laissent les coins à `2 * GlobalScale`. Les coins et le centre proviennent d'un recoin de `font.png`. `CalcCardUV(widthAtlas, heightAtlas)` calcule ces coordonnées : on l'appelle une fois, avec la taille de la texture.
 
 | Fonction | Ce qu'elle fait |
 |---|---|
 | `Resize(w, h)` | Change la taille |
-| `RenderObject(propio)` | Dessine le remplissage |
-| `RenderBorder(propio)` | Dessine seulement la bordure |
+| `RenderObject(own)` | Dessine le remplissage |
+| `RenderBorder(own)` | Dessine seulement la bordure |
 | `RenderObjectTab()`, `RenderBorderTab()` | La même chose, avec le côté du bas droit : pour les onglets |
 
-Avec `propio` à `true`, elle utilise sa propre couleur (`color` et `opacity`) ; avec `false`, la couleur courante.
+Avec `own` à `true`, elle utilise sa propre couleur (`color` et `opacity`) ; avec `false`, la couleur courante.
 
 ```cpp
-Card fondo(NULL, 120, 40);
-SetColorID(ColorID::gris);
-fondo.RenderObject(false);
+Card background(NULL, 120, 40);
+SetColorID(ColorID::gray);
+background.RenderObject(false);
 SetColorID(ColorID::accent);
-fondo.RenderBorder(false);
+background.RenderBorder(false);
 ```
 
 ## L'atlas du skin
 
-Une seule texture pour toute l'interface. `font.png`, en 128x128, contient les lettres, les bords des cartes et les anciennes icônes. Avec cela seulement, l'UI fonctionne : `CrearIconos` prend les icônes à l'intérieur de `font.png`.
+Une seule texture pour toute l'interface. `font.png`, en 128x128, contient les lettres, les bords des cartes et les anciennes icônes. Avec cela seulement, l'UI fonctionne : `CreateIcons` prend les icônes à l'intérieur de `font.png`.
 
-Les nouvelles icônes sont des fichiers séparés, dans `atlas/iconos/`. Au démarrage, l'éditeur construit une texture plus grande (`main/io/SkinAtlas.cpp`) : il place `font.png` entier en (0,0), ce qui évite de changer ses coordonnées, et empaquette chaque icône dans la place qui reste. Ensuite, il indique à l'UI où chacune a fini, avec `CrearIconosDesde`. Construire cet atlas relève de l'éditeur ; l'empaqueteur et la table d'icônes relèvent de l'UI. Voir [Icônes](iconos.md).
+Les nouvelles icônes sont des fichiers séparés, dans `atlas/icons/`. Au démarrage, l'éditeur construit une texture plus grande (`main/io/SkinAtlas.cpp`) : il place `font.png` entier en (0,0), ce qui évite de changer ses coordonnées, et empaquette chaque icône dans la place qui reste. Ensuite, il indique à l'UI où chacune a fini, avec `CreateIconsFrom`. Construire cet atlas relève de l'éditeur ; l'empaqueteur et la table d'icônes relèvent de l'UI. Voir [Icônes](iconos.md).
 
 ## L'empaqueteur
 
@@ -69,12 +69,12 @@ Les nouvelles icônes sont des fichiers séparés, dans `atlas/iconos/`. Au dém
 
 ```cpp
 std::vector<W3dAtlasItem> items(n);       // pour chaque image : rgba, w, h
-items[0].fijo = true;                     // celle-ci va obligatoirement là où on le demande
+items[0].fixed = true;                     // celle-ci va obligatoirement là où on le demande
 items[0].x = 0; items[0].y = 0;
 
-std::vector<unsigned char> lienzo; int W = 0, H = 0;
-if (W3dAtlasPack(&items[0], n, 2, lienzo, &W, &H)) {    // 2 pixels d'espace entre les images
-    unsigned int tex = w3dEngine::UploadRGBA(&lienzo[0], W, H, true);
+std::vector<unsigned char> canvas; int W = 0, H = 0;
+if (W3dAtlasPack(&items[0], n, 2, canvas, &W, &H)) {    // 2 pixels d'espace entre les images
+    unsigned int tex = w3dEngine::UploadRGBA(&canvas[0], W, H, true);
     // items[i].x, items[i].y : où chacune a fini
 }
 ```

@@ -6,7 +6,7 @@
  * (el reloj cambia segun el OS). Lo consume el overlay "Statistics" del Viewport3D.
  */
 #include "W3dProfile.h"
-#include "w3dGraphics.h"   // StatsCuadro: el contador de llamadas GL cierra el cuadro aca
+#include "w3dGraphics.h"   // StatsFrame: el contador de llamadas GL cierra el cuadro aca
 
 #ifdef W3D_SYMBIAN
 #include <e32std.h> // User::NTickCount
@@ -27,13 +27,13 @@ double W3dNowMs() {
 #endif
 }
 
-// el reloj de relojMs() en lua (script/BindsJuego.cpp: sin el perfilador, como en un juego compilado, usa clock())
-extern double (*g_w3dRelojMsHook)();
-namespace { struct RegistrarRelojMs { RegistrarRelojMs() { g_w3dRelojMsHook = W3dNowMs; } } gRegistrarRelojMs; }
+// el reloj de relojMs() en lua (script/BindsGame.cpp: sin el perfilador, como en un juego compilado, usa clock())
+extern double (*g_w3dClockMsHook)();
+namespace { struct RegisterClockMs { RegisterClockMs() { g_w3dClockMsHook = W3dNowMs; } } gRegisterClockMs; }
 
 void W3dProfBegin() {
     g_prof.logic = g_prof.scene = g_prof.viewport3d = g_prof.render = g_prof.swap = 0.0;
-    w3dEngine::StatsCuadro();   // (las llamadas GL del cuadro anterior, completo: escena + HUD + editor)
+    w3dEngine::StatsFrame();   // (las llamadas GL del cuadro anterior, completo: escena + HUD + editor)
 }
 
 void W3dProfEnd() {

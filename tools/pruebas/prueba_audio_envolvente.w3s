@@ -8,46 +8,46 @@
 # `audiograbar <seg> <wav|-> <lua>` pone el mixer en pausa, corre el lua y MEZCLA sin dispositivo; `audionivel
 # <desde_ms> <hasta_ms> <min> <max>` mide el RMS de esa ventana de lo grabado. sonidos/tono.wav: un seno de 440 Hz a
 # media escala (RMS 0.354), 1 s, 22050 Hz. Sin dispositivo de audio los dos comandos lo dicen y no fallan.
-abrirw3d prueba_sonido.w3d
+openw3d prueba_sonido.w3d
 
 # sin envolvente: el sonido entero a su volumen (la forma con posiciones sigue igual)
-audiograbar 1.0 - sonido("sonidos/tono.wav")
-audionivel 0 100 0.34 0.37
-audionivel 800 900 0.34 0.37
-audiograbar 1.0 - sonido("sonidos/tono.wav", 0.5)
-audionivel 200 800 0.17 0.185
+audiorecord 1.0 - sound("sounds/tono.wav")
+audiolevel 0 100 0.34 0.37
+audiolevel 800 900 0.34 0.37
+audiorecord 1.0 - sound("sounds/tono.wav", 0.5)
+audiolevel 200 800 0.17 0.185
 
 # ataque: de 0 al maximo en 0.5 s (lineal)
-audiograbar 1.0 - sonido("sonidos/tono.wav", {ataque = 0.5})
-audionivel 0 50 0 0.06
-audionivel 600 700 0.34 0.37
+audiorecord 1.0 - sound("sounds/tono.wav", {attack = 0.5})
+audiolevel 0 50 0 0.06
+audiolevel 600 700 0.34 0.37
 
 # decaimiento al sostenido: 0.25 del maximo despues de 0.2 s
-audiograbar 1.0 - sonido("sonidos/tono.wav", {decaimiento = 0.2, sostenido = 0.25})
-audionivel 0 30 0.25 0.37
-audionivel 500 600 0.08 0.095
+audiorecord 1.0 - sound("sounds/tono.wav", {decay = 0.2, sustain = 0.25})
+audiolevel 0 30 0.25 0.37
+audiolevel 500 600 0.08 0.095
 
 # la nota se suelta sola a los 0.3 s y baja 60 dB en 0.1 s
-audiograbar 1.0 - sonido("sonidos/tono.wav", {duracion = 0.3, liberacion = 0.1})
-audionivel 100 250 0.34 0.37
-audionivel 500 1000 0 0.002
+audiorecord 1.0 - sound("sounds/tono.wav", {duration = 0.3, release = 0.1})
+audiolevel 100 250 0.34 0.37
+audiolevel 500 1000 0 0.002
 
 # caida: el sostenido baja 60 dB en 0.3 s aunque la nota siga
-audiograbar 1.0 - sonido("sonidos/tono.wav", {caida = 0.3})
-audionivel 0 50 0.2 0.37
-audionivel 400 500 0 0.005
+audiorecord 1.0 - sound("sounds/tono.wav", {fall = 0.3})
+audiolevel 0 50 0.2 0.37
+audiolevel 400 500 0 0.005
 
 # soltarSonido: una nota en loop con liberacion de 0.2 s
-audiograbar 1.0 - h = sonido("sonidos/tono.wav", {loop = true, liberacion = 0.2}) soltarSonido(h)
-audionivel 0 50 0.05 0.37
-audionivel 300 1000 0 0.002
+audiorecord 1.0 - h = sound("sounds/tono.wav", {loop = true, release = 0.2}) releaseSound(h)
+audiolevel 0 50 0.05 0.37
+audiolevel 300 1000 0 0.002
 
 # la reverb: sin envio la cola es silencio; con envio, la sala sigue sonando despues de la nota
-audiograbar 1.2 - reverb(0.8, 0.3, 0.5) sonido("sonidos/tono.wav", {duracion = 0.2})
-audionivel 400 1000 0 0.001
-audiograbar 1.2 - reverb(0.8, 0.3, 0.5) sonido("sonidos/tono.wav", {duracion = 0.2, reverb = 1})
-audionivel 400 1000 0.01 0.2
+audiorecord 1.2 - reverb(0.8, 0.3, 0.5) sound("sounds/tono.wav", {duration = 0.2})
+audiolevel 400 1000 0 0.001
+audiorecord 1.2 - reverb(0.8, 0.3, 0.5) sound("sounds/tono.wav", {duration = 0.2, reverb = 1})
+audiolevel 400 1000 0.01 0.2
 # y no deja una continua pegada (el redondeo de los enteros de los peines la juntaba: quedaba en 0.0036 para siempre):
 # a los 6 s la cola ya se apago
-audiograbar 6.0 - reverb(0.8, 0.3, 0.5) sonido("sonidos/tono.wav", {duracion = 0.2, reverb = 1})
-audionivel 5500 6000 0 0.0012
+audiorecord 6.0 - reverb(0.8, 0.3, 0.5) sound("sounds/tono.wav", {duration = 0.2, reverb = 1})
+audiolevel 5500 6000 0 0.0012

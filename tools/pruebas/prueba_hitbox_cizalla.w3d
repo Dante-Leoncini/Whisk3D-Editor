@@ -1,21 +1,21 @@
 {
   "version": 3,
-  "escena": {
-    "objetos": [
+  "scene": {
+    "objects": [
       {
-        "tipo": "objeto", "nombre": "Padre", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [4, 1, 1],
-        "hijos": [
-          { "tipo": "hitbox", "nombre": "Rombo", "pos": [0, 0, 0], "rot": [0, 0, 45], "escala": [1, 1, 1], "tam": [1, 1, 1] }
+        "type": "object", "name": "Padre", "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": [4, 1, 1],
+        "children": [
+          { "type": "hitbox", "name": "Rombo", "pos": [0, 0, 0], "rot": [0, 0, 45], "scale": [1, 1, 1], "size": [1, 1, 1] }
         ]
       },
-      { "tipo": "hitbox", "nombre": "Adentro1", "pos": [2.5, 0.05, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Adentro2", "pos": [2.0, 0.1, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Adentro3", "pos": [1.5, 0.25, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Adentro4", "pos": [0, 0.3, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Afuera1", "pos": [1.487, 0.645, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Afuera2", "pos": [3.0, 0, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Afuera3", "pos": [0, 0.85, 0], "tam": [0.1, 0.1, 0.1] },
-      { "tipo": "hitbox", "nombre": "Afuera4", "pos": [-2.2, -0.35, 0], "tam": [0.1, 0.1, 0.1] }
+      { "type": "hitbox", "name": "Adentro1", "pos": [2.5, 0.05, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Adentro2", "pos": [2.0, 0.1, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Adentro3", "pos": [1.5, 0.25, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Adentro4", "pos": [0, 0.3, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Afuera1", "pos": [1.487, 0.645, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Afuera2", "pos": [3.0, 0, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Afuera3", "pos": [0, 0.85, 0], "size": [0.1, 0.1, 0.1] },
+      { "type": "hitbox", "name": "Afuera4", "pos": [-2.2, -0.35, 0], "size": [0.1, 0.1, 0.1] }
     ]
   }
 }

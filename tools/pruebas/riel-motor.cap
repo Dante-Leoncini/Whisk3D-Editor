@@ -6,7 +6,7 @@ count 3
 # Los tres nodos son los del riel-a en x = 0, 2, 4, con la MISMA z = 3: aca se
 # leen en z = +3 y en riel-a.cap (sin cabecera) en z = -3. El canal 'r' de
 # mirada sufre el mismo espejo, asi que un yaw 0 mira a -Z en los dos casos.
-ejes x y z
+axes x y z
 p 0.0 5.0 3.0
 r 0.0 0.0 0.0
 p 2.0 5.0 3.0

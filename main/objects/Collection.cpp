@@ -1,6 +1,6 @@
 #include "Collection.h"
 #include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
-#include "Camera.h"              // CameraActive: la lente de "ordenarUnaVez"
+#include "Camera.h"              // CameraActive: la lente de "sortOnce"
 #include "objects/CameraBase.h"  // g_renderCamPos/Rot: la vista que esta dibujando
 #include "objects/Mesh.h"        // lote estatico: hornea mallas (P4)
 #include "objects/Materials.h"   // materiales simples (elegibilidad del lote)
@@ -11,13 +11,13 @@
 // Constructor
 Collection::Collection(Object* parent, Vector3 pos)
     : Object(parent, T("Collection"), pos){
-    ordenarPorCamara = false;
-    ordenarUnaVez    = false;
-    ordenValido      = false;
-    ultimoPorCamara  = false;
-    ultimoUnaVez     = false;
-    lote             = 0;      // off: comportamiento de siempre
-    loteData         = NULL;
+    sortByCamera = false;
+    sortOnce     = false;
+    orderValid   = false;
+    lastByCamera = false;
+    lastOnce     = false;
+    batch        = 0;      // off: comportamiento de siempre
+    batchData    = NULL;
 }
 
 // Método getType
@@ -29,130 +29,130 @@ ObjectType Collection::getType() {
 // unico valido para transparentes (el blend compone de atras hacia adelante).
 // La distancia sale del ORIGEN del hijo en mundo (GetGlobalPosition): barato y
 // suficiente para objetos chicos tipo fruta (no se mide el AABB como en Culling).
-struct HijoLejano {
+struct FarChild {
     Object* o;
     float   dist2;
-    bool operator<(const HijoLejano& b) const { return dist2 > b.dist2; }
+    bool operator<(const FarChild& b) const { return dist2 > b.dist2; }
 };
 
-static void OrdenarLejosCerca(const std::vector<Object*>& hijos, const Vector3& cam,
-                              std::vector<HijoLejano>& orden) {
-    orden.clear();
-    orden.reserve(hijos.size());
-    for (size_t c = 0; c < hijos.size(); c++) {
-        HijoLejano h;
-        h.o = hijos[c];
-        Vector3 d = hijos[c]->GetGlobalPosition() - cam;
+static void SortFarNear(const std::vector<Object*>& children, const Vector3& cam,
+                              std::vector<FarChild>& order) {
+    order.clear();
+    order.reserve(children.size());
+    for (size_t c = 0; c < children.size(); c++) {
+        FarChild h;
+        h.o = children[c];
+        Vector3 d = children[c]->GetGlobalPosition() - cam;
         h.dist2 = d.x*d.x + d.y*d.y + d.z*d.z;
-        orden.push_back(h);
+        order.push_back(h);
     }
-    std::sort(orden.begin(), orden.end());
+    std::sort(order.begin(), order.end());
 }
 
 // ===========================================================================
 //  LOTE ESTATICO (P4) — ver Collection.h. El armado y el dibujo viven aca.
 // ===========================================================================
-struct W3dLoteRango {
+struct W3dBatchRange {
     Material* mat;      // el material del rango (bucket por puntero: materiales
                         // COMPARTIDOS entre trozos se fusionan en un solo draw)
-    Mesh*     host;     // una malla que usa ese material (presta AplicarMaterial)
+    Mesh*     host;     // una malla que usa ese material (presta ApplyMaterial)
     int       start;    // primer indice en idx[]
     int       count;    // cantidad de indices
 };
-struct W3dLoteEstatico {
+struct W3dStaticBatch {
     std::vector<GLfloat>  pos;    // world ya aplicado
     std::vector<GLbyte>   nor;    // rotadas a world (normalizadas por columna)
     std::vector<GLubyte>  col;    // 255 donde la malla no traia color
     std::vector<GLfloat>  uvs;    // 0 donde no traia uv
     std::vector<MeshIndex> idx;   // rangos por material, contiguos
-    std::vector<W3dLoteRango> rangos;
-    std::vector<unsigned> miembros;  // seriales de TODO el scan elegible (revalida membresia)
-    std::vector<char>     incluida;  // paralela a miembros: 1 = horneada en el lote
+    std::vector<W3dBatchRange> ranges;
+    std::vector<unsigned> members;   // seriales de TODO el scan elegible (revalida membresia)
+    std::vector<char>     included;  // paralela a miembros: 1 = horneada en el lote
                                      // (0 = no entro por el tope de vertices: se dibuja normal)
     unsigned vboPos, vboNor, vboCol, vboUV, vboIdx;
-    bool subido;
-    W3dLoteEstatico() : vboPos(0), vboNor(0), vboCol(0), vboUV(0), vboIdx(0), subido(false) {}
+    bool uploaded;
+    W3dStaticBatch() : vboPos(0), vboNor(0), vboCol(0), vboUV(0), vboIdx(0), uploaded(false) {}
 };
 
 // tope PORTABLE de vertices por lote: MeshIndex es de 16 bits en el hardware
 // chico (crossplatform.h). Lo que no entra queda AFUERA del lote (se dibuja
 // normal): nunca indices invalidos.
-static const size_t kLoteMaxVerts = 65500;
+static const size_t kBatchMaxVerts = 65500;
 
 // una malla es HORNEABLE si es estatica y todos sus materiales son simples
 // (ver Collection.h). Conservador a proposito: ante la duda, se dibuja normal.
-static bool LoteElegible(Mesh* m) {
-    if (!m || !m->visible || !m->renderizable) return false;
-    if (m->skinArmature || !m->modificadores.empty() || m->genValido) return false;
+static bool BatchEligible(Mesh* m) {
+    if (!m || !m->visible || !m->renderable) return false;
+    if (m->skinArmature || !m->modifiers.empty() || m->genValid) return false;
     if (m->flipbook || m->pvsFaces) return false;
     if (!m->vertex || m->vertexSize <= 0 || !m->faces || m->facesSize < 3) return false;
     for (size_t g = 0; g < m->materialsGroup.size(); g++) {
         Material* mt = m->materialsGroup[g].material;
         if (!mt) continue;   // material default: simple
-        if (mt->transparent || mt->chrome || mt->normalMap || !mt->capas.empty()) return false;
-        if (mt->orden_pasada != 0 || mt->depth_bias != 0.0f || mt->sesgo_metros != 0.0f) return false;
+        if (mt->transparent || mt->chrome || mt->normalMap || !mt->layers.empty()) return false;
+        if (mt->order_pass != 0 || mt->depth_bias != 0.0f || mt->bias_meters != 0.0f) return false;
         if (!mt->depth_test || !mt->depth_write) return false;
     }
     return true;
 }
 
 // junta las mallas horneables del subarbol (respetando visible de la cadena)
-static void LoteJuntar(Object* raiz, std::vector<Mesh*>& out) {
-    std::vector<Object*> st; st.push_back(raiz);
+static void BatchCollect(Object* root, std::vector<Mesh*>& out) {
+    std::vector<Object*> st; st.push_back(root);
     while (!st.empty()) {
         Object* o = st.back(); st.pop_back();
         if (!o->visible) continue;
-        if (o->getType() == ObjectType::mesh && LoteElegible((Mesh*)o)) out.push_back((Mesh*)o);
+        if (o->getType() == ObjectType::mesh && BatchEligible((Mesh*)o)) out.push_back((Mesh*)o);
         for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
     }
 }
 
-void Collection::LoteLiberar() {
-    if (!loteData) return;
+void Collection::BatchFree() {
+    if (!batchData) return;
     namespace gfx = w3dEngine;
-    // las mallas no se "destapan": el sello (enLoteEstatico == w3dLoteStamp) solo
+    // las mallas no se "destapan": el sello (inStaticBatch == w3dBatchStamp) solo
     // vale el frame en que el lote las marco; sin lote nadie las marca y vuelven
     // a dibujarse solas. Cero bookkeeping, cero punteros viejos.
-    gfx::DeleteBuffer(loteData->vboPos); gfx::DeleteBuffer(loteData->vboNor);
-    gfx::DeleteBuffer(loteData->vboCol); gfx::DeleteBuffer(loteData->vboUV);
-    gfx::DeleteBuffer(loteData->vboIdx);
-    delete loteData; loteData = NULL;
+    gfx::DeleteBuffer(batchData->vboPos); gfx::DeleteBuffer(batchData->vboNor);
+    gfx::DeleteBuffer(batchData->vboCol); gfx::DeleteBuffer(batchData->vboUV);
+    gfx::DeleteBuffer(batchData->vboIdx);
+    delete batchData; batchData = NULL;
 }
 
 // arma/valida el lote y lo dibuja. false = no aplica (dibujar todo normal).
-bool Collection::LoteRender() {
+bool Collection::BatchRender() {
     namespace gfx = w3dEngine;
-    extern bool AnimEsJuego; extern bool PlayAnimation;
-    const bool jugando = AnimEsJuego && PlayAnimation;
-    if (lote != 1 || !jugando) { LoteLiberar(); return false; }
+    extern bool AnimIsGame; extern bool PlayAnimation;
+    const bool playing = AnimIsGame && PlayAnimation;
+    if (batch != 1 || !playing) { BatchFree(); return false; }
 
     // ---- membresia ACTUAL (barata: traversal sin trabajo de geometria) ----
-    std::vector<Mesh*> mallas;
-    LoteJuntar(this, mallas);
-    if (mallas.empty()) { LoteLiberar(); return false; }
+    std::vector<Mesh*> meshes;
+    BatchCollect(this, meshes);
+    if (meshes.empty()) { BatchFree(); return false; }
 
     // el lote vigente sigue valiendo? (misma membresia, por SERIAL: no se
     // deref-erencia ningun puntero viejo). Cambio visibilidad/alta/baja -> rearmar.
-    if (loteData) {
-        bool igual = (loteData->miembros.size() == mallas.size());
-        for (size_t i = 0; igual && i < mallas.size(); i++)
-            igual = (loteData->miembros[i] == mallas[i]->serial);
-        if (!igual) LoteLiberar();
+    if (batchData) {
+        bool equal = (batchData->members.size() == meshes.size());
+        for (size_t i = 0; equal && i < meshes.size(); i++)
+            equal = (batchData->members[i] == meshes[i]->serial);
+        if (!equal) BatchFree();
     }
 
     // ---- ARMADO (una vez; ~decenas de ms como mucho, jamas por frame) ----
-    if (!loteData) {
-        loteData = new W3dLoteEstatico();
+    if (!batchData) {
+        batchData = new W3dStaticBatch();
         size_t nVerts = 0;
         // buckets por MATERIAL: indices acumulados por material, en orden de aparicion
-        std::vector<Material*> orden;                    // materiales en orden
+        std::vector<Material*> order;                    // materiales en orden
         std::vector< std::vector<MeshIndex> > buckets;   // indices de cada uno
         std::vector<Mesh*> hosts;
-        for (size_t mi = 0; mi < mallas.size(); mi++) {
-            Mesh* m = mallas[mi];
-            loteData->miembros.push_back(m->serial);
-            if (nVerts + (size_t)m->vertexSize > kLoteMaxVerts) { loteData->incluida.push_back(0); continue; } // no entra: se dibuja normal
-            loteData->incluida.push_back(1);
+        for (size_t mi = 0; mi < meshes.size(); mi++) {
+            Mesh* m = meshes[mi];
+            batchData->members.push_back(m->serial);
+            if (nVerts + (size_t)m->vertexSize > kBatchMaxVerts) { batchData->included.push_back(0); continue; } // no entra: se dibuja normal
+            batchData->included.push_back(1);
             // bake de vertices a WORLD (posicion) + normales rotadas (columnas de W
             // normalizadas: con escala uniforme es exacto; el contrato del lote)
             Matrix4 W; m->GetWorldMatrix(W);
@@ -164,64 +164,64 @@ bool Collection::LoteRender() {
             for (int v = 0; v < m->vertexSize; v++) {
                 Vector3 p(m->vertex[v*3], m->vertex[v*3+1], m->vertex[v*3+2]);
                 Vector3 w = W * p;
-                loteData->pos.push_back(w.x); loteData->pos.push_back(w.y); loteData->pos.push_back(w.z);
+                batchData->pos.push_back(w.x); batchData->pos.push_back(w.y); batchData->pos.push_back(w.z);
                 if (m->normals) {
                     float nx = m->normals[v*3]/127.0f, ny = m->normals[v*3+1]/127.0f, nz = m->normals[v*3+2]/127.0f;
                     float wx = (c0[0]*nx + c1[0]*ny + c2[0]*nz);
                     float wy = (c0[1]*nx + c1[1]*ny + c2[1]*nz);
                     float wz = (c0[2]*nx + c1[2]*ny + c2[2]*nz);
                     float wl = sqrtf(wx*wx + wy*wy + wz*wz); if (wl < 1e-9f) wl = 1.0f;
-                    loteData->nor.push_back((GLbyte)(wx/wl*127.0f));
-                    loteData->nor.push_back((GLbyte)(wy/wl*127.0f));
-                    loteData->nor.push_back((GLbyte)(wz/wl*127.0f));
-                } else { loteData->nor.push_back(0); loteData->nor.push_back(0); loteData->nor.push_back(127); }
+                    batchData->nor.push_back((GLbyte)(wx/wl*127.0f));
+                    batchData->nor.push_back((GLbyte)(wy/wl*127.0f));
+                    batchData->nor.push_back((GLbyte)(wz/wl*127.0f));
+                } else { batchData->nor.push_back(0); batchData->nor.push_back(0); batchData->nor.push_back(127); }
                 if (m->vertexColor) {
-                    loteData->col.push_back(m->vertexColor[v*4]);   loteData->col.push_back(m->vertexColor[v*4+1]);
-                    loteData->col.push_back(m->vertexColor[v*4+2]); loteData->col.push_back(m->vertexColor[v*4+3]);
-                } else { loteData->col.push_back(255); loteData->col.push_back(255); loteData->col.push_back(255); loteData->col.push_back(255); }
-                if (m->uv) { loteData->uvs.push_back(m->uv[v*2]); loteData->uvs.push_back(m->uv[v*2+1]); }
-                else       { loteData->uvs.push_back(0.0f); loteData->uvs.push_back(0.0f); }
+                    batchData->col.push_back(m->vertexColor[v*4]);   batchData->col.push_back(m->vertexColor[v*4+1]);
+                    batchData->col.push_back(m->vertexColor[v*4+2]); batchData->col.push_back(m->vertexColor[v*4+3]);
+                } else { batchData->col.push_back(255); batchData->col.push_back(255); batchData->col.push_back(255); batchData->col.push_back(255); }
+                if (m->uv) { batchData->uvs.push_back(m->uv[v*2]); batchData->uvs.push_back(m->uv[v*2+1]); }
+                else       { batchData->uvs.push_back(0.0f); batchData->uvs.push_back(0.0f); }
             }
             nVerts += (size_t)m->vertexSize;
             for (size_t g = 0; g < m->materialsGroup.size(); g++) {
                 const MaterialGroup& grp = m->materialsGroup[g];
                 if (grp.indicesDrawnCount <= 0) continue;
-                Material* mat = grp.material ? grp.material : MaterialDefecto;
+                Material* mat = grp.material ? grp.material : MaterialDefault;
                 size_t b = 0;
-                for (; b < orden.size(); b++) if (orden[b] == mat) break;
-                if (b == orden.size()) { orden.push_back(mat); buckets.push_back(std::vector<MeshIndex>()); hosts.push_back(m); }
+                for (; b < order.size(); b++) if (order[b] == mat) break;
+                if (b == order.size()) { order.push_back(mat); buckets.push_back(std::vector<MeshIndex>()); hosts.push_back(m); }
                 std::vector<MeshIndex>& bk = buckets[b];
                 for (int i = 0; i < grp.indicesDrawnCount; i++)
                     bk.push_back((MeshIndex)(base + m->faces[grp.startDrawn + i]));
             }
         }
         // buckets -> IBO contiguo con un rango por material
-        for (size_t b = 0; b < orden.size(); b++) {
-            W3dLoteRango r;
-            r.mat = orden[b]; r.host = hosts[b];
-            r.start = (int)loteData->idx.size();
+        for (size_t b = 0; b < order.size(); b++) {
+            W3dBatchRange r;
+            r.mat = order[b]; r.host = hosts[b];
+            r.start = (int)batchData->idx.size();
             r.count = (int)buckets[b].size();
-            loteData->idx.insert(loteData->idx.end(), buckets[b].begin(), buckets[b].end());
-            loteData->rangos.push_back(r);
+            batchData->idx.insert(batchData->idx.end(), buckets[b].begin(), buckets[b].end());
+            batchData->ranges.push_back(r);
         }
         // a GPU (una vez). Sin VBOs: quedan los arrays de cliente (fallback).
-        if (gfx::VBOSoportado() && !loteData->pos.empty() && !loteData->idx.empty()) {
-            loteData->vboPos = gfx::GenBuffer(); gfx::ArrayBufferData(loteData->vboPos, &loteData->pos[0], (int)(loteData->pos.size()*sizeof(GLfloat)));
-            loteData->vboNor = gfx::GenBuffer(); gfx::ArrayBufferData(loteData->vboNor, &loteData->nor[0], (int)loteData->nor.size());
-            loteData->vboCol = gfx::GenBuffer(); gfx::ArrayBufferData(loteData->vboCol, &loteData->col[0], (int)loteData->col.size());
-            loteData->vboUV  = gfx::GenBuffer(); gfx::ArrayBufferData(loteData->vboUV,  &loteData->uvs[0], (int)(loteData->uvs.size()*sizeof(GLfloat)));
-            loteData->vboIdx = gfx::GenBuffer(); gfx::IndexBufferData(loteData->vboIdx, &loteData->idx[0], (int)(loteData->idx.size()*sizeof(MeshIndex)));
-            loteData->subido = loteData->vboPos && loteData->vboIdx;
+        if (gfx::VBOSupported() && !batchData->pos.empty() && !batchData->idx.empty()) {
+            batchData->vboPos   = gfx::GenBuffer(); gfx::ArrayBufferData(batchData->vboPos, &batchData->pos[0], (int)(batchData->pos.size()*sizeof(GLfloat)));
+            batchData->vboNor   = gfx::GenBuffer(); gfx::ArrayBufferData(batchData->vboNor, &batchData->nor[0], (int)batchData->nor.size());
+            batchData->vboCol   = gfx::GenBuffer(); gfx::ArrayBufferData(batchData->vboCol, &batchData->col[0], (int)batchData->col.size());
+            batchData->vboUV    = gfx::GenBuffer(); gfx::ArrayBufferData(batchData->vboUV,  &batchData->uvs[0], (int)(batchData->uvs.size()*sizeof(GLfloat)));
+            batchData->vboIdx   = gfx::GenBuffer(); gfx::IndexBufferData(batchData->vboIdx, &batchData->idx[0], (int)(batchData->idx.size()*sizeof(MeshIndex)));
+            batchData->uploaded = batchData->vboPos && batchData->vboIdx;
         }
     }
     // marcar las mallas HORNEADAS con el SELLO del pase: Mesh::RenderObject las
-    // saltea SOLO este frame (ver w3dLoteStamp en Mesh.h). El pase del espejo
+    // saltea SOLO este frame (ver w3dBatchStamp en Mesh.h). El pase del espejo
     // corre dentro del mismo pase -> mismo sello -> ahi tampoco se duplican (el
     // lote se re-dibuja mirrado cuando el espejo re-recorre esta Collection).
-    for (size_t i = 0; i < mallas.size() && i < loteData->incluida.size(); i++)
-        if (loteData->incluida[i]) mallas[i]->enLoteEstatico = w3dLoteStamp;
+    for (size_t i = 0; i < meshes.size() && i < batchData->included.size(); i++)
+        if (batchData->included[i]) meshes[i]->inStaticBatch = w3dBatchStamp;
 
-    if (loteData->idx.empty()) return true;   // lote vacio: los hijos igual se dibujan (abajo)
+    if (batchData->idx.empty()) return true;   // lote vacio: los hijos igual se dibujan (abajo)
 
     // ---- DIBUJO: las posiciones ya estan horneadas en MUNDO y la pila de
     // modelview ya trae vista (+ espejo, si es el pase del reflejo) + los
@@ -231,118 +231,118 @@ bool Collection::LoteRender() {
     // con transform propio, el lote sale igual que las mallas sueltas. ----
     Matrix4 W; GetWorldMatrix(W);
     Matrix4 invW;
-    if (!Matrix4::InvertirAfin(W, invW)) invW = W.Inverse();
+    if (!Matrix4::InvertAffine(W, invW)) invW = W.Inverse();
     gfx::MatrixMode(gfx::ModelView);
     gfx::PushMatrix();
     gfx::MultMatrix(invW.m);
-    const bool solido = w3dRenderSolido;
-    const bool conLuz = !w3dRenderSinLuz;
-    for (size_t r = 0; r < loteData->rangos.size(); r++) {
-        const W3dLoteRango& rg = loteData->rangos[r];
-        Material* mat = (solido || !rg.mat) ? MaterialDefecto : rg.mat;
-        rg.host->AplicarMaterial(mat, conLuz, solido, false);
-        // AplicarMaterial dejo los PUNTEROS de la malla host: pisarlos con los del lote
-        if (loteData->subido) {
-            gfx::VertexVBO(loteData->vboPos);
-            gfx::NormalVBO(loteData->vboNor);
-            gfx::ColorVBO(loteData->vboCol);
-            gfx::TexCoordVBO(loteData->vboUV);
-            gfx::BindIndexVBO(loteData->vboIdx);
+    const bool solid     = w3dRenderSolid;
+    const bool withLight = !w3dRenderNoLight;
+    for (size_t r = 0; r < batchData->ranges.size(); r++) {
+        const W3dBatchRange& rg = batchData->ranges[r];
+        Material* mat = (solid || !rg.mat) ? MaterialDefault : rg.mat;
+        rg.host->ApplyMaterial(mat, withLight, solid, false);
+        // ApplyMaterial dejo los PUNTEROS de la malla host: pisarlos con los del lote
+        if (batchData->uploaded) {
+            gfx::VertexVBO(batchData->vboPos);
+            gfx::NormalVBO(batchData->vboNor);
+            gfx::ColorVBO(batchData->vboCol);
+            gfx::TexCoordVBO(batchData->vboUV);
+            gfx::BindIndexVBO(batchData->vboIdx);
             gfx::DrawTrianglesVBO(rg.count, rg.start);
         } else {
-            gfx::VertexPointer3f(0, &loteData->pos[0]);
-            gfx::NormalPointer3b(&loteData->nor[0]);
-            gfx::ColorPointer4ub(&loteData->col[0]);
-            gfx::TexCoordPointer2f(0, &loteData->uvs[0]);
-            gfx::DrawTriangles(rg.count, &loteData->idx[rg.start]);
+            gfx::VertexPointer3f(0, &batchData->pos[0]);
+            gfx::NormalPointer3b(&batchData->nor[0]);
+            gfx::ColorPointer4ub(&batchData->col[0]);
+            gfx::TexCoordPointer2f(0, &batchData->uvs[0]);
+            gfx::DrawTriangles(rg.count, &batchData->idx[rg.start]);
         }
     }
-    if (loteData->subido) gfx::UnbindVBOs();
+    if (batchData->uploaded) gfx::UnbindVBOs();
     gfx::PopMatrix();
     return true;
 }
 
-void Collection::RenderHijos() {
+void Collection::RenderChildren() {
     // ---- LOTE ESTATICO (P4): jugando, dibuja el escenario horneado en pocos
     // draws y deja que el resto del subarbol se dibuje normal (las mallas
-    // horneadas se saltean solas via enLoteEstatico). ----
-    if (lote == 1) {
-        LoteRender();               // arma/valida/dibuja (o libera si no aplica)
-        Object::RenderHijos();      // el resto (y todo, si el lote no aplico)
+    // horneadas se saltean solas via inStaticBatch). ----
+    if (batch == 1) {
+        BatchRender();                 // arma/valida/dibuja (o libera si no aplica)
+        Object::RenderChildren();      // el resto (y todo, si el lote no aplico)
         return;
-    } else if (loteData) {
-        LoteLiberar();              // el flag se apago: volver al camino normal
+    } else if (batchData) {
+        BatchFree();              // el flag se apago: volver al camino normal
     }
     // "recalcula al TOCAR cualquiera de los dos checkboxes": se detecta aca (y no
     // en el panel) para que valga igual desde lua, la carga del .w3d o el undo.
-    if (ordenarPorCamara != ultimoPorCamara || ordenarUnaVez != ultimoUnaVez) {
-        ultimoPorCamara = ordenarPorCamara;
-        ultimoUnaVez    = ordenarUnaVez;
-        ordenValido     = false;
-        ordenCongelado.clear();
+    if (sortByCamera != lastByCamera || sortOnce != lastOnce) {
+        lastByCamera = sortByCamera;
+        lastOnce     = sortOnce;
+        orderValid   = false;
+        frozenOrder.clear();
     }
-    if (!ordenarPorCamara || Childrens.empty()) {
-        Object::RenderHijos();   // orden del arbol, como siempre
+    if (!sortByCamera || Childrens.empty()) {
+        Object::RenderChildren();   // orden del arbol, como siempre
         return;
     }
 
-    if (ordenarUnaVez) {
+    if (sortOnce) {
         // ---- orden CONGELADO con la camara ACTIVA del juego: se calcula una vez
         // y despues se dibuja SIEMPRE igual (orbitar el viewport lo deja ver).
         // Revalidacion por MEMBRESIA: si un hijo entro/salio del arbol se
         // recalcula (nunca queda un puntero viejo). O(n^2) sobre los hijos
         // directos nomas: para el caso de uso (decenas de frutas) no pesa. ----
-        bool valido = ordenValido && ordenCongelado.size() == Childrens.size();
-        for (size_t i = 0; valido && i < ordenCongelado.size(); i++) {
-            bool esta = false;
-            for (size_t c = 0; c < Childrens.size() && !esta; c++)
-                esta = (Childrens[c] == ordenCongelado[i]);
-            if (!esta) valido = false;
+        bool valid = orderValid && frozenOrder.size() == Childrens.size();
+        for (size_t i = 0; valid && i < frozenOrder.size(); i++) {
+            bool is = false;
+            for (size_t c = 0; c < Childrens.size() && !is; c++)
+                is = (Childrens[c] == frozenOrder[i]);
+            if (!is) valid = false;
         }
-        if (!valido) {
+        if (!valid) {
             // sin Camera activa cae a la vista que dibuja (mejor eso que no ordenar)
             Vector3 cam = CameraActive ? CameraActive->GetGlobalPosition() : g_renderCamPos;
-            std::vector<HijoLejano> orden;
-            OrdenarLejosCerca(Childrens, cam, orden);
-            ordenCongelado.clear();
-            ordenCongelado.reserve(orden.size());
-            for (size_t i = 0; i < orden.size(); i++) ordenCongelado.push_back(orden[i].o);
-            ordenValido = true;
+            std::vector<FarChild> order;
+            SortFarNear(Childrens, cam, order);
+            frozenOrder.clear();
+            frozenOrder.reserve(order.size());
+            for (size_t i = 0; i < order.size(); i++) frozenOrder.push_back(order[i].o);
+            orderValid = true;
         }
-        for (size_t i = 0; i < ordenCongelado.size(); i++) ordenCongelado[i]->Render();
+        for (size_t i = 0; i < frozenOrder.size(); i++) frozenOrder[i]->Render();
         return;
     }
 
     // ---- orden POR FRAME: lejos -> cerca respecto de la vista QUE DIBUJA
     // (g_renderCamPos: el viewport en el editor, la camara activa en el juego).
     // Orden LOCAL del render de este frame: Childrens no se toca (mismo criterio
-    // que Culling::RenderHijos). ----
-    std::vector<HijoLejano> orden;
-    OrdenarLejosCerca(Childrens, g_renderCamPos, orden);
-    for (size_t i = 0; i < orden.size(); i++) orden[i].o->Render();
+    // que Culling::RenderChildren). ----
+    std::vector<FarChild> order;
+    SortFarNear(Childrens, g_renderCamPos, order);
+    for (size_t i = 0; i < order.size(); i++) order[i].o->Render();
 }
 
 // ---------------------------------------------------------------------------
 //  setLote(coleccion, "estatico"|"off") de lua: hook instalado aca (el bind
-//  vive en BindsJuego.cpp, que no conoce esta clase; sin instalar = no-op).
+//  vive en BindsGame.cpp, que no conoce esta clase; sin instalar = no-op).
 // ---------------------------------------------------------------------------
-extern bool (*W3dSetLoteHook)(Object*, const char*);
-static bool SetLoteDeObj(Object* o, const char* modo) {
+extern bool (*W3dSetBatchHook)(Object*, const char*);
+static bool SetObjBatch(Object* o, const char* mode) {
     if (!o || o->getType() != ObjectType::collection) return false;
-    ((Collection*)o)->lote = (modo && std::string(modo) == "estatico") ? 1 : 0;
+    ((Collection*)o)->batch = (mode && std::string(mode) == "static") ? 1 : 0;
     return true;
 }
-namespace { struct LoteHookReg { LoteHookReg() { W3dSetLoteHook = SetLoteDeObj; } } gLoteHookReg; }
+namespace { struct BatchHookReg { BatchHookReg() { W3dSetBatchHook = SetObjBatch; } } gBatchHookReg; }
 
 // Destructor
 Collection::~Collection() {
     // liberar los buffers del lote SIN tocar mallas (el arbol puede estar
-    // destruyendose: LoteLiberar recorre hijos y aca ya no es seguro)
-    if (loteData) {
+    // destruyendose: BatchFree recorre hijos y aca ya no es seguro)
+    if (batchData) {
         namespace gfx = w3dEngine;
-        gfx::DeleteBuffer(loteData->vboPos); gfx::DeleteBuffer(loteData->vboNor);
-        gfx::DeleteBuffer(loteData->vboCol); gfx::DeleteBuffer(loteData->vboUV);
-        gfx::DeleteBuffer(loteData->vboIdx);
-        delete loteData; loteData = NULL;
+        gfx::DeleteBuffer(batchData->vboPos); gfx::DeleteBuffer(batchData->vboNor);
+        gfx::DeleteBuffer(batchData->vboCol); gfx::DeleteBuffer(batchData->vboUV);
+        gfx::DeleteBuffer(batchData->vboIdx);
+        delete batchData; batchData = NULL;
     }
 }

@@ -12,7 +12,7 @@
 #      el editor usa la latina de font.png.
 #  Las letras acentuadas NO estan dibujadas: se arman con la letra base y la marca encima (o abajo).
 #
-#  Este archivo es la UNICA fuente: genera el png y libs/WhiskUI/text/FuenteExt.h (las tablas que lee font.cpp:
+#  Este archivo es la UNICA fuente: genera el png y libs/WhiskUI/text/FontExt.h (las tablas que lee font.cpp:
 #  que celda tiene cada caracter y como se arma cada letra compuesta). tools/genlang.py lo importa para saber que
 #  caracteres se pueden mostrar.
 #
@@ -28,7 +28,7 @@ import sys
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PNG = os.path.join(RAIZ, "res", "Skins", "Whisk3D", "font-ext.png")
-CABECERA = os.path.join(RAIZ, "libs", "WhiskUI", "text", "FuenteExt.h")
+CABECERA = os.path.join(RAIZ, "libs", "WhiskUI", "text", "FontExt.h")
 FONT_CPP = os.path.join(RAIZ, "libs", "WhiskUI", "text", "font.cpp")
 
 ANCHO, ALTO = 128, 64          # potencia de 2 (el N95 no acepta otra cosa)
@@ -45,18 +45,18 @@ def g(*filas):
 V = "....."
 # ---- las marcas (celdas fijas: font.cpp las pide por numero) ----------------------------------------------------
 MARCAS = [  # (nombre, glifo)
-    ("GraveMin",       g(V, ".#...", "..#..")),
-    ("GraveMay",       g(".#...", "..#..")),
-    ("CircunflejoMin", g(V, "..#..", ".#.#.")),
-    ("CircunflejoMay", g("..#..", ".#.#.")),
-    ("DieresisMin",    g(V, V, ".#.#.")),
-    ("DieresisMay",    g(".#.#.")),
-    ("PuntoMin",       g(V, V, "..#..")),
-    ("PuntoMay",       g("..#..")),
-    ("BreveMin",       g(V, "#...#", ".###.")),
-    ("BreveMay",       g("#...#", ".###.")),
-    ("Cedilla",        g(V, V, V, V, V, V, V, V, V, "..#..", ".##..")),
-    ("Ogonek",         g(V, V, V, V, V, V, V, V, V, "...#.", "....#")),
+    ("GraveLower",       g(V, ".#...", "..#..")),
+    ("GraveUpper",       g(".#...", "..#..")),
+    ("CircumflexLower",  g(V, "..#..", ".#.#.")),
+    ("CircumflexUpper",  g("..#..", ".#.#.")),
+    ("DiaeresisLower",   g(V, V, ".#.#.")),
+    ("DiaeresisUpper",   g(".#.#.")),
+    ("DotLower",         g(V, V, "..#..")),
+    ("DotUpper",         g("..#..")),
+    ("BreveLower",       g(V, "#...#", ".###.")),
+    ("BreveUpper",       g("#...#", ".###.")),
+    ("Cedilla",          g(V, V, V, V, V, V, V, V, V, "..#..", ".##..")),
+    ("Ogonek",           g(V, V, V, V, V, V, V, V, V, "...#.", "....#")),
 ]
 
 # ---- letras y signos propios ------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ COMO_LATINA = {"А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H",
                "Х": "X", "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x"}
 
 # ---- letras compuestas: letra base + marca ----------------------------------------------------------------------
-# La marca: Agudo y Tilde salen de font.png (font.cpp); el resto, de este atlas. 'May' = la version para mayuscula.
+# La marca: Acute y Tilde salen de font.png (font.cpp); el resto, de este atlas. 'Upper' = la version para mayuscula.
 # Las i con grave, circunflejo o dieresis van sobre la i SIN punto (si no, el punto y la marca se pisan). La i con
 # agudo sigue con la i de font.png: es la del castellano y del portugues, y asi esos idiomas no cargan el extendido.
 def _compuestas():
@@ -142,18 +142,18 @@ def _compuestas():
     def put(letras, bases, marca):
         for l, b in zip(letras, bases):
             c[l] = (b, marca)
-    put("áéíóúćńśźý", "aeioucnszy", "Agudo")     # (la i de font.png, como siempre: asi el castellano no carga el extendido)
-    put("ÁÉÍÓÚĆŃŚŹÝ", "AEIOUCNSZY", "Agudo")
+    put("áéíóúćńśźý", "aeioucnszy", "Acute")     # (la i de font.png, como siempre: asi el castellano no carga el extendido)
+    put("ÁÉÍÓÚĆŃŚŹÝ", "AEIOUCNSZY", "Acute")
     put("ãõñ", "aon", "Tilde")
     put("ÃÕ", "AO", "Tilde")
     put("àèìòù", "aeıou", "Grave")
     put("ÀÈÌÒÙ", "AEIOU", "Grave")
-    put("âêîôû", "aeıou", "Circunflejo")
-    put("ÂÊÎÔÛ", "AEIOU", "Circunflejo")
-    put("äëïöüÿё", "aeıouye", "Dieresis")
-    put("ÄËÏÖÜŸЁ", "AEIOUYЕ", "Dieresis")
-    put("żİ", "zI", "Punto")
-    put("Ż", "Z", "Punto")
+    put("âêîôû", "aeıou", "Circumflex")
+    put("ÂÊÎÔÛ", "AEIOU", "Circumflex")
+    put("äëïöüÿё", "aeıouye", "Diaeresis")
+    put("ÄËÏÖÜŸЁ", "AEIOUYЕ", "Diaeresis")
+    put("żİ", "zI", "Dot")
+    put("Ż", "Z", "Dot")
     put("ğй", "gи", "Breve")
     put("ĞЙ", "GИ", "Breve")
     put("çşÇŞ", "csCS", "Cedilla")
@@ -163,8 +163,8 @@ def _compuestas():
 
 COMPUESTAS = _compuestas()
 COMPUESTAS.pop("ñ", None)      # la n~ esta dibujada en font.png (con su tilde propia)
-COMPUESTAS["Ё"] = ("E", "Dieresis")   # (la Е cirilica es la E latina)
-COMPUESTAS["ё"] = ("e", "Dieresis")
+COMPUESTAS["Ё"] = ("E", "Diaeresis")   # (la Е cirilica es la E latina)
+COMPUESTAS["ё"] = ("e", "Diaeresis")
 
 
 def glifos_de_font_png():
@@ -214,50 +214,50 @@ def generar(muestra=None):
 
     marcas = [n for n, _ in MARCAS]
     lineas = [
-        "#ifndef W3D_FUENTE_EXT_H",
-        "#define W3D_FUENTE_EXT_H",
+        "#ifndef W3D_FONT_EXT_H",
+        "#define W3D_FONT_EXT_H",
         "// GENERADO por tools/fuente_ext.py -- no editar a mano: se cambia el script y se lo vuelve a correr.",
         "// El atlas EXTENDIDO de la fuente (res/Skins/<skin>/font-ext.png): marcas de acentos, letras y signos que no",
         "// entran en font.png y el cirilico. Ver font.cpp: se carga recien cuando un texto lo necesita.",
         "",
-        "#define W3D_FUENTE_EXT_ANCHO %d" % ANCHO,
-        "#define W3D_FUENTE_EXT_ALTO %d" % ALTO,
-        "#define W3D_FUENTE_EXT_COLUMNAS %d   // celda i: x = 1 + (i %% columnas) * 6, y = (i / columnas) * 12" % COLUMNAS,
+        "#define W3D_FONT_EXT_WIDTH %d" % ANCHO,
+        "#define W3D_FONT_EXT_HEIGHT %d" % ALTO,
+        "#define W3D_FONT_EXT_COLUMNS %d   // celda i: x = 1 + (i %% columnas) * 6, y = (i / columnas) * 12" % COLUMNAS,
         "",
         "// las marcas de los acentos: su celda (el glifo entero de 5x11, con la marca en su fila)",
-        "enum W3dFuenteExtMarca {",
+        "enum W3dFontExtMark {",
     ]
     for i, n in enumerate(marcas):
-        lineas.append("    W3dMarca%s = %d," % (n, i))
-    lineas += ["    W3dMarcaCantidad = %d" % len(marcas), "};", ""]
+        lineas.append("    W3dMark%s = %d," % (n, i))
+    lineas += ["    W3dMarkCount = %d" % len(marcas), "};", ""]
     lineas.append("// los caracteres dibujados en este atlas (ordenados por codepoint): su celda")
-    lineas.append("struct W3dFuenteExtGlifo { unsigned short cp; unsigned char celda; };")
-    lineas.append("static const W3dFuenteExtGlifo W3dFuenteExtGlifos[] = {")
+    lineas.append("struct W3dFontExtGlyph { unsigned short cp; unsigned char cell; };")
+    lineas.append("static const W3dFontExtGlyph W3dFontExtGlyphs[] = {")
     filas = sorted((ord(ch), i) for i, (ch, _) in enumerate(cs) if i >= len(marcas))
     for cp, i in filas:
         lineas.append("    { 0x%04X, %d },   // %s" % (cp, i, chr(cp)))
-    lineas += ["};", "static const unsigned W3dFuenteExtGlifosN = %d;" % len(filas), ""]
+    lineas += ["};", "static const unsigned W3dFontExtGlyphsN = %d;" % len(filas), ""]
     lineas.append("// cirilicas que son IGUALES a una latina: se dibujan con la de font.png")
-    lineas.append("struct W3dFuenteExtIgual { unsigned short cp; unsigned short latina; };")
-    lineas.append("static const W3dFuenteExtIgual W3dFuenteExtIguales[] = {")
+    lineas.append("struct W3dFontExtEqual { unsigned short cp; unsigned short latina; };")
+    lineas.append("static const W3dFontExtEqual W3dFontExtEquals[] = {")
     for ch, lat in sorted(COMO_LATINA.items(), key=lambda p: ord(p[0])):
         lineas.append("    { 0x%04X, '%s' },   // %s" % (ord(ch), lat, ch))
-    lineas += ["};", "static const unsigned W3dFuenteExtIgualesN = %d;" % len(COMO_LATINA), ""]
+    lineas += ["};", "static const unsigned W3dFontExtEqualsN = %d;" % len(COMO_LATINA), ""]
     lineas.append("// letras COMPUESTAS: la letra base + una marca. marca: 0 = agudo y 1 = tilde (de font.png, ver font.cpp);")
     lineas.append("// 2 + n = la celda n de este atlas (ya elegida: la version de la marca para mayuscula o minuscula)")
-    lineas.append("struct W3dFuenteExtCompuesta { unsigned short cp; unsigned short base; unsigned char marca; };")
-    lineas.append("static const W3dFuenteExtCompuesta W3dFuenteExtCompuestas[] = {")
+    lineas.append("struct W3dFontExtComposite { unsigned short cp; unsigned short base; unsigned char mark; };")
+    lineas.append("static const W3dFontExtComposite W3dFontExtComposites[] = {")
     def codigo(m, base):
-        if m == "Agudo":
+        if m == "Acute":
             return 0
         if m == "Tilde":
             return 1
         if m in marcas:                              # una sola version (cedilla, ogonek: van abajo)
             return 2 + marcas.index(m)
-        return 2 + marcas.index(m + ("May" if base.isupper() else "Min"))
+        return 2 + marcas.index(m + ("Upper" if base.isupper() else "Lower"))
     for ch, (b, m) in sorted(COMPUESTAS.items(), key=lambda p: ord(p[0])):
         lineas.append("    { 0x%04X, 0x%04X, %d },   // %s = %s + %s" % (ord(ch), ord(b), codigo(m, b), ch, b, m))
-    lineas += ["};", "static const unsigned W3dFuenteExtCompuestasN = %d;" % len(COMPUESTAS), "", "#endif", ""]
+    lineas += ["};", "static const unsigned W3dFontExtCompositesN = %d;" % len(COMPUESTAS), "", "#endif", ""]
     open(CABECERA, "w", encoding="utf-8").write("\n".join(lineas))
 
     if muestra:

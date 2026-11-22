@@ -1,8 +1,8 @@
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         iconApp: Whisk3D_experiment.png
-        limpiarPantalla: true
+        clearScreen: true
         background: "0.0, 0.0, 0.0, 1.0"
 
         Wavefront {
@@ -47,7 +47,7 @@ Whisk3D {
                 CameraToView: false
                 showOrigins: true
                 show3DCursor: false
-                ShowRelantionshipsLines: true
+                ShowRelationshipsLines: true
                 view: MaterialPreview
                 rotX: 35.0
                 rotY: -35.0

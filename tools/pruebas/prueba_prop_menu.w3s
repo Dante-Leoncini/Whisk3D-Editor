@@ -2,16 +2,16 @@
 #   medio segundo (con el circulo de carga arriba del dedo). Sobre una fila de valor:
 #     Restablecer (el valor de fabrica, si se sabe) / Copiar / Pegar
 #     ---- (si es animable) Insertar keyframe / Borrar todos los keyframes / Copiar keyframe / Pegar keyframe
-ventana 960 540
-escala 2
+window 960 540
+scale 2
 selobj Cubo
 propstab 1
 objpos 2 0 0
 tick
-propvalor 2 Location X
+propvalue 2 Location X
 # click derecho en la X de la posicion (la fila "Location X"): el menu, con la parte de animacion
-propclicder Location X
-menuabierto si
+proprightclick Location X
+menuopen si
 menuitem Reset
 menuitem Copy
 menuitem Paste
@@ -20,60 +20,60 @@ menuitem Delete All Keyframes
 menuitem Copy Keyframe
 menuitem Paste Keyframe
 # copiar el 2, cambiarlo y pegarlo
-menuelegir Copy
+menupick Copy
 objpos 5 0 0
 tick
-propclicder Location X
-menuelegir Paste
-propvalor 2 Location X
+proprightclick Location X
+menupick Paste
+propvalue 2 Location X
 # restablecer: el de fabrica (0), y Ctrl+Z lo devuelve
-propclicder Location X
-menuelegir Reset
-propvalor 0 Location X
+proprightclick Location X
+menupick Reset
+propvalue 0 Location X
 undo
 tick
-propvalor 2 Location X
+propvalue 2 Location X
 # KEYFRAMES: insertar en el 1, copiarlo, pegarlo en el 10 y borrarlos todos
 frame 1
-propclicder Location X
-menuelegir Insert Keyframe
-canalestado 0 0 2
-propclicder Location X
-menuelegir Copy Keyframe
+proprightclick Location X
+menupick Insert Keyframe
+channelstate 0 0 2
+proprightclick Location X
+menupick Copy Keyframe
 frame 10
-canalestado 0 0 1
+channelstate 0 0 1
 objpos 7 0 0
-propclicder Location X
-menuelegir Paste Keyframe
-canalestado 0 0 2
-propvalor 2 Location X
-propclicder Location X
-menuelegir Delete All Keyframes
-canalestado 0 0 0
+proprightclick Location X
+menupick Paste Keyframe
+channelstate 0 0 2
+propvalue 2 Location X
+proprightclick Location X
+menupick Delete All Keyframes
+channelstate 0 0 0
 # EL DEDO: quieto medio segundo sobre la fila abre el mismo menu (y vibra). (Con el panel quieto: un dedo sobre un
 # panel que sigue deslizando solo lo FRENA, no es un toque)
-propdedo Location X
-esperar 200
+propfinger Location X
+wait 200
 tick
-menuabierto no
-esperar 450
+menuopen no
+wait 450
 tick
-menuabierto si
+menuopen si
 menuitem Copy Keyframe
 # soltar el dedo deja el menu abierto (para tocar una opcion); Esc lo cierra
-dedo up
-menuabierto si
-tecla Escape
-menuabierto no
+finger up
+menuopen si
+key Escape
+menuopen no
 # (despues de un dedo, el mouse de verdad se ignora medio segundo: los clicks FANTASMA que sintetizan los navegadores)
-esperar 600
+wait 600
 # una CASILLA: Visible. Restablecer la vuelve a tildar
-propclicder Visible
-menuabierto si
+proprightclick Visible
+menuopen si
 menuitem Insert Keyframe
-menuelegir Copy
-propclic Visible
-propvalor 0 Visible
-propclicder Visible
-menuelegir Reset
-propvalor 1 Visible
+menupick Copy
+propclick Visible
+propvalue 0 Visible
+proprightclick Visible
+menupick Reset
+propvalue 1 Visible

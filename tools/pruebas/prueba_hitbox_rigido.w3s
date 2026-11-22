@@ -19,48 +19,48 @@
 #  ni entra a la Zona ni dispara alTocar (ni en el piso ni en ella).
 # ==========================================================================
 
-abrirw3d prueba_hitbox_rigido.w3d
-hitboxinfo Zona cuerpos 1
-hitboxinfo Ciega cuerpos 0
+openw3d prueba_hitbox_rigido.w3d
+hitboxinfo Zona bodies 1
+hitboxinfo Ciega bodies 0
 
 simplay 60
-scriptinfo compartido zona_entrar 1
-scriptinfo compartido zona_salir 1
-scriptinfo compartido zona_otro Caja
-scriptinfo compartido zona_suyo nil
-scriptinfo compartido caja_entrar 1
-scriptinfo compartido caja_salir 1
-scriptinfo compartido caja_otro Zona
-scriptinfo compartido caja_mio nil
-scriptinfo compartido caja_suyo Zona
-scriptinfo compartido ciega_entrar 0
-scriptinfo compartido confiltro_entrar 0
-scriptinfo compartido piso_tocado Caja
-scriptinfo compartido caja_tocado Piso
-compartidonum piso_tocar 1
-compartidonum caja_tocar 1
-compartidonum piso_nz 0.99 1.01
-compartidonum caja_nz -1.01 -0.99
-posobjeto Caja 0 0.5 0 0.05
-hitboxstats cuerpos 2 contactos 1
+scriptinfo shared zona_entrar 1
+scriptinfo shared zona_salir 1
+scriptinfo shared zona_otro Caja
+scriptinfo shared zona_suyo nil
+scriptinfo shared caja_entrar 1
+scriptinfo shared caja_salir 1
+scriptinfo shared caja_otro Zona
+scriptinfo shared caja_mio nil
+scriptinfo shared caja_suyo Zona
+scriptinfo shared ciega_entrar 0
+scriptinfo shared confiltro_entrar 0
+scriptinfo shared piso_tocado Caja
+scriptinfo shared caja_tocado Piso
+sharednum piso_tocar 1
+sharednum caja_tocar 1
+sharednum piso_nz 0.99 1.01
+sharednum caja_nz -1.01 -0.99
+posobject Caja 0 0.5 0 0.05
+hitboxstats bodies 2 contacts 1
 
 # 100 ticks mas: la caja se duerme apoyada y NO vuelve a "tocar"
 simplay 100
-compartidonum piso_tocar 1
-compartidonum caja_tocar 1
-hitboxstats contactos 1
+sharednum piso_tocar 1
+sharednum caja_tocar 1
+hitboxstats contacts 1
 
 simstop
-posobjeto Caja 0 4 0
-hitboxstats contactos 0
+posobject Caja 0 4 0
+hitboxstats contacts 0
 
 # --- la misma caja OCULTA: se simula, pero no participa (ni hitbox ni alTocar) ---
-abrirw3d prueba_hitbox_rigido_oculta.w3d
+openw3d prueba_hitbox_rigido_oculta.w3d
 simplay 60
-posobjeto Caja 0 0.5 0 0.05
-scriptinfo compartido zona_entrar 0
-scriptinfo compartido caja_entrar 0
-compartidonum piso_tocar 0
-compartidonum caja_tocar 0
-hitboxstats cuerpos 1 contactos 0
+posobject Caja 0 0.5 0 0.05
+scriptinfo shared zona_entrar 0
+scriptinfo shared caja_entrar 0
+sharednum piso_tocar 0
+sharednum caja_tocar 0
+hitboxstats bodies 1 contacts 0
 simstop

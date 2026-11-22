@@ -11,7 +11,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -23,7 +23,7 @@ Whisk3D {
 
         LOD {
             name: "LodPrueba"
-            distancias: "10, 25"
+            distances: "10, 25"
             Mesh {
                 name: "LodCerca"
             }
@@ -34,7 +34,7 @@ Whisk3D {
 
         Culling {
             name: "CullPrueba"
-            soloCamaraActiva: true
+            activeCameraOnly: true
             Mesh {
                 name: "CajaAdentro"
             }
@@ -46,8 +46,8 @@ Whisk3D {
 
         Collection {
             name: "FrutasTransparentes"
-            ordenarPorCamara: true
-            ordenarUnaVez: true
+            sortByCamera: true
+            sortOnce: true
             Mesh {
                 name: "FrutaCerca"
                 y: 2.0

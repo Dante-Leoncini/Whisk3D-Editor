@@ -5,7 +5,7 @@ Tutto fatto in casa, in C++03, senza motore esterno e senza chiedere memoria a o
 - **W3dFisica:** velocità e rimbalzo di box allineati agli assi. Nient'altro.
 - **W3dRigido:** box orientati con massa, gravità, impulsi con attrito e rimbalzo, raycast ed eventi di contatto.
 - **W3dColMalla:** camminare sui triangoli di uno scenario (rampe, gradini) e farsi fermare dai muri, con una griglia per non dover controllare migliaia di triangoli.
-- **W3dHitbox:** box che si limitano ad avvisare (`alEntrar`, `alQuedarse`, `alSalir`, `alTocar`).
+- **W3dHitbox:** box che si limitano ad avvisare (`onEnter`, `onRemain`, `onExit`, `onTouch`).
 - **W3dRagdoll:** ragdoll, e cinematica inversa a due ossa e FABRIK.
 - **W3dNav:** il percorso da un punto a un altro su una griglia del pavimento (A* e poi tensionamento).
 

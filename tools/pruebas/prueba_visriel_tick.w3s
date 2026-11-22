@@ -22,7 +22,7 @@
 #  Celdas de vis-tris.w3dvis (1-based): 1=[t0,t1] 2=[t2,t0,t1] 3=[t2,t3]
 #  4=[t3,t2]. celda = 1 + floor(indice).
 # ==========================================================================
-abrirw3d prueba_visriel.w3d
+openw3d prueba_visriel.w3d
 loadtex
 
 # celda declarada en el .w3d: 1 -> dibuja t0 y t1 (el estado de arranque)
@@ -33,26 +33,26 @@ activename Jugador
 # --- NODO 0: el jugador arranca al pie del primer nodo -> indice 0.00, celda 1
 objpos 0 0 5
 simplay 6
-scriptinfo compartido vr_indice 0.00
+scriptinfo shared vr_indice 0.00
 visinfo MallaVis 4 1 2
 
 # --- NODO 1: sin frames en el medio, el indice tiene que avanzar igual ->
 #     indice 1.00, celda 2 (el registro DELTA de la playlist)
 objpos 2 0 5
 simplay 6
-scriptinfo compartido vr_indice 1.00
+scriptinfo shared vr_indice 1.00
 visinfo MallaVis 4 2 3
 
 # --- ENTRE NODOS: indice 2.50 (fraccionario, horneado por el TICK), celda 3
 objpos 5 0 5
 simplay 6
-scriptinfo compartido vr_indice 2.50
+scriptinfo shared vr_indice 2.50
 visinfo MallaVis 4 3 2
 
 # --- NODO 3 (el ultimo): indice 3.00, celda 4
 objpos 6 0 5
 simplay 6
-scriptinfo compartido vr_indice 3.00
+scriptinfo shared vr_indice 3.00
 visinfo MallaVis 4 4 2
 
 simstop
@@ -60,8 +60,8 @@ simstop
 # el PRIMER render de toda la prueba, con la ultima celda ya activa: los
 # pixeles tienen que salir recortados como manda la celda 4 (t2 y t3
 # dibujados, t0 y t1 fuera), mirando desde arriba como en prueba_visriel
-vporbita 0 0 0 12 90 0
-escenapx -3.5 0 -0.3 comoen -3.5 0 3
-escenapx -1.5 0 -0.3 comoen -3.5 0 3
-escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
-escenapx  3.5 0 -0.3 masclaroque -3.5 0 3 40
+vporbit 0 0 0 12 90 0
+scenepx -3.5 0 -0.3 sameas -3.5 0 3
+scenepx -1.5 0 -0.3 sameas -3.5 0 3
+scenepx  1.5 0 -0.3 lighterthan -3.5 0 3 40
+scenepx  3.5 0 -0.3 lighterthan -3.5 0 3 40

@@ -1,7 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "Mirror.h"
-#include "objects/Mesh.h"   // w3dDecalesInline: la sombra del target se dibuja en el pase del espejo
-#include "Culling.h"    // W3dBoundsSubarbol: el AABB en MUNDO del subarbol del target
+#include "objects/Mesh.h"   // w3dDecalsInline: la sombra del target se dibuja en el pase del espejo
+#include "Culling.h"    // W3dBoundsSubtree: el AABB en MUNDO del subarbol del target
 #include <sstream>
 
 // Constructor
@@ -13,12 +13,12 @@ Mirror::Mirror(Object* parent, Vector3 pos, bool x, bool y, bool z)
     mirrorZ = z;
     // defaults que antes eran inicializadores in-class (C++11): en C++03/RVCT van aca.
     RenderChildrens = true;
-    sinProfundidad = false;
-    usaLimites = false;
+    noDepth = false;
+    usesLimits = false;
     limU0 = limU1 = limV0 = limV1 = 0.0f;
-    recorte = false;
-    recorteDeclarado = false;
-    hundimientoMaximo = 0.0f;
+    clip = false;
+    clipDeclared = false;
+    sinkMax = 0.0f;
 }
 
 // Devuelve el tipo de objeto
@@ -26,9 +26,9 @@ ObjectType Mirror::getType() {
     return ObjectType::mirror;
 }
 
-// UNA sola fuente de verdad de la reflexion: mundo(espejo) * Scale(-ejes). Render
+// UNA sola fuente de verdad de la reflexion: world(espejo) * Scale(-ejes). Render
 // y medicion tienen que salir de aca (si divergen, el test mide otra cosa).
-void Mirror::MatrizEspejo(Matrix4& out) const {
+void Mirror::MatrixMirror(Matrix4& out) const {
     Matrix4 W; GetWorldMatrix(W);
     Matrix4 S; S.Identity();
     S.m[0]  = mirrorX ? -1.0f : 1.0f;
@@ -39,8 +39,8 @@ void Mirror::MatrizEspejo(Matrix4& out) const {
 
 // punto fijo del eje Y: y = m13 + m5*y  ->  y = m13 / (1 - m5). Con mirrorY (m5=-1)
 // da m13/2, que es el "z: 2*h" que declaran los .w3d de una lamina de agua.
-float Mirror::PlanoY() const {
-    Matrix4 R; MatrizEspejo(R);
+float Mirror::PlaneY() const {
+    Matrix4 R; MatrixMirror(R);
     float d = 1.0f - R.m[5];
     return (d > 1e-6f || d < -1e-6f) ? (R.m[13] / d) : R.m[13];
 }
@@ -48,13 +48,13 @@ float Mirror::PlanoY() const {
 // ---------------------------------------------------------------------------
 //  EL PLANO DEL ESPEJO, EN MUNDO (ver Mirror.h)
 //
-//  MatrizEspejo es W * S, con S negando uno de los ejes LOCALES. O sea: el plano
+//  MatrixMirror es W * S, con S negando uno de los ejes LOCALES. O sea: el plano
 //  de reflexion es el plano local perpendicular a ese eje que pasa por el origen
 //  local, llevado a mundo por W.
 //   * la NORMAL es la columna de W del eje negado, normalizada;
 //   * un PUNTO del plano es el medio entre el origen y su reflejo -- y el reflejo
 //     del origen es, justamente, la traslacion de R;
-//   * EjeU/EjeV son las otras dos columnas, en el orden X, Y, Z sin la normal.
+//   * AxisU/AxisV son las otras dos columnas, en el orden X, Y, Z sin la normal.
 //     Para el espejo horizontal (mirrorY) eso da U = X y V = Z, que es exactamente
 //     lo que se medía antes a mano.
 //
@@ -62,10 +62,10 @@ float Mirror::PlanoY() const {
 //  (es una rotacion); se toma el primero para que el recorte siga siendo algo
 //  razonable en vez de romperse.
 // ---------------------------------------------------------------------------
-static Vector3 ColumnaW(const Matrix4& W, int c) {
+static Vector3 ColumnW(const Matrix4& W, int c) {
     return Vector3(W.m[c*4+0], W.m[c*4+1], W.m[c*4+2]);
 }
-int Mirror::EjeEspejado() const {
+int Mirror::MirroredAxis() const {
     if (mirrorX) return 0;
     if (mirrorY) return 1;
     if (mirrorZ) return 2;
@@ -73,45 +73,45 @@ int Mirror::EjeEspejado() const {
 }
 Vector3 Mirror::Normal() const {
     Matrix4 W; GetWorldMatrix(W);
-    Vector3 n = ColumnaW(W, EjeEspejado());
+    Vector3 n = ColumnW(W, MirroredAxis());
     return n.Normalized();
 }
-Vector3 Mirror::PuntoDelPlano() const {
-    Matrix4 R; MatrizEspejo(R);
+Vector3 Mirror::PlanePoint() const {
+    Matrix4 R; MatrixMirror(R);
     // R * (0,0,0) = la traslacion de R; el punto medio con el origen cae en el plano
     return Vector3(R.m[12] * 0.5f, R.m[13] * 0.5f, R.m[14] * 0.5f);
 }
-Vector3 Mirror::EjeU() const {
+Vector3 Mirror::AxisU() const {
     Matrix4 W; GetWorldMatrix(W);
-    const int e = EjeEspejado();
-    return ColumnaW(W, (e == 0) ? 1 : 0).Normalized();   // X negado -> U = Y; si no, U = X
+    const int e = MirroredAxis();
+    return ColumnW(W, (e == 0) ? 1 : 0).Normalized();   // X negado -> U = Y; si no, U = X
 }
-Vector3 Mirror::EjeV() const {
+Vector3 Mirror::AxisV() const {
     Matrix4 W; GetWorldMatrix(W);
-    const int e = EjeEspejado();
-    return ColumnaW(W, (e == 2) ? 1 : 2).Normalized();   // Z negado -> V = Y; si no, V = Z
+    const int e = MirroredAxis();
+    return ColumnW(W, (e == 2) ? 1 : 2).Normalized();   // Z negado -> V = Y; si no, V = Z
 }
 
 // ---------------------------------------------------------------------------
-//  hundimientoMaximo: DEPRECADO (ver Mirror.h). La reflexion es GEOMETRICA
+//  sinkMax: DEPRECADO (ver Mirror.h). La reflexion es GEOMETRICA
 //  PURA: el objeto sube y el reflejo baja la distancia exacta, siempre. La
-//  matriz por target queda como alias de MatrizEspejo para que el harness siga
+//  matriz por target queda como alias de MatrixMirror para que el harness siga
 //  midiendo por la misma puerta que el render.
 // ---------------------------------------------------------------------------
-void Mirror::MatrizEspejoTarget(Object* tg, Matrix4& out) const {
+void Mirror::MatrixMirrorTarget(Object* tg, Matrix4& out) const {
     (void)tg;
-    MatrizEspejo(out);
+    MatrixMirror(out);
 }
 
 
 // ---- targets ----
-int Mirror::TargetsVivos() const {
+int Mirror::LiveTargets() const {
     int n = target ? 1 : 0;
     for (size_t i = 0; i < targetsExtra.size(); i++) if (targetsExtra[i]) n++;
     return n;
 }
 
-Object* Mirror::TargetVivo(int i) const {
+Object* Mirror::LiveTarget(int i) const {
     if (target) { if (i == 0) return target; i--; }
     for (size_t k = 0; k < targetsExtra.size(); k++) {
         if (!targetsExtra[k]) continue;
@@ -121,31 +121,31 @@ Object* Mirror::TargetVivo(int i) const {
     return NULL;
 }
 
-void Mirror::SetTargetsTexto(const std::string& lista) {
-    std::vector<std::string> nombres;
-    std::stringstream ss(lista);
+void Mirror::SetTargetsText(const std::string& list) {
+    std::vector<std::string> names;
+    std::stringstream ss(list);
     std::string tok;
     while (std::getline(ss, tok, ',')) {
         size_t a = tok.find_first_not_of(" \t\r\n\"");
         size_t b = tok.find_last_not_of(" \t\r\n\"");
         if (a == std::string::npos) continue;
-        nombres.push_back(tok.substr(a, b - a + 1));
+        names.push_back(tok.substr(a, b - a + 1));
     }
-    if (nombres.empty()) return;
-    SetTarget(nombres[0]);                 // el primero ocupa el slot historico
-    targetsExtraNombre.clear();
+    if (names.empty()) return;
+    SetTarget(names[0]);                 // el primero ocupa el slot historico
+    targetsExtraName.clear();
     targetsExtra.clear();
-    for (size_t i = 1; i < nombres.size(); i++) {
-        targetsExtraNombre.push_back(nombres[i]);
+    for (size_t i = 1; i < names.size(); i++) {
+        targetsExtraName.push_back(names[i]);
         targetsExtra.push_back(NULL);
     }
 }
 
-std::string Mirror::TargetsTexto() const {
+std::string Mirror::TargetsText() const {
     std::string s = target ? target->name : targetName;
-    for (size_t i = 0; i < targetsExtraNombre.size(); i++) {
+    for (size_t i = 0; i < targetsExtraName.size(); i++) {
         const std::string n = (i < targetsExtra.size() && targetsExtra[i])
-                            ? targetsExtra[i]->name : targetsExtraNombre[i];
+                            ? targetsExtra[i]->name : targetsExtraName[i];
         if (n.empty()) continue;
         if (!s.empty()) s += ", ";
         s += n;
@@ -157,9 +157,9 @@ std::string Mirror::TargetsTexto() const {
 // con los mismos dos chequeos: ni yo mismo ni un ancestro -> recursion infinita)
 void Mirror::Reload() {
     ReloadTarget(this);
-    for (size_t i = 0; i < targetsExtra.size() && i < targetsExtraNombre.size(); i++) {
+    for (size_t i = 0; i < targetsExtra.size() && i < targetsExtraName.size(); i++) {
         targetsExtra[i] = NULL;
-        Object* o = W3dBuscarNombreDesde(this, targetsExtraNombre[i]);   // (por scope, como el target)
+        Object* o = W3dFindNameFrom(this, targetsExtraName[i]);   // (por scope, como el target)
         if (!o || o == this || IsMyAncestor(this, o)) continue;
         targetsExtra[i] = o;
     }
@@ -179,17 +179,17 @@ void Mirror::Reload() {
 //  Los PLANOS DE MUNDO (el semiespacio bajo la superficie + las 4 paredes del
 //  rectangulo) quedan SOLO como fallback para un contexto sin estencil: cortan
 //  el reflejo por su posicion en el mundo, que para el salto y la orilla es la
-//  respuesta equivocada (era el bug que tapaba el parche `hundimientoMaximo`,
+//  respuesta equivocada (era el bug que tapaba el parche `sinkMax`,
 //  hoy deprecado), pero sin estencil no hay nada mejor.
 //
 //  El plano de recorte va en el espacio de la MATRIZ ACTUAL, que en RenderObject
 //  es la de MUNDO del espejo: un plano de mundo P se pasa como W^T * P.
 // ---------------------------------------------------------------------------
-static void PlanoAEspacioLocal(const Matrix4& W, const float* mundo, float* out) {
+static void PlaneToSpaceLocal(const Matrix4& W, const float* world, float* out) {
     // (W^T * P): si p_mundo = W * p_local, entonces P.p_mundo = (W^T P).p_local
     for (int i = 0; i < 4; i++)
-        out[i] = W.m[i*4+0]*mundo[0] + W.m[i*4+1]*mundo[1]
-               + W.m[i*4+2]*mundo[2] + W.m[i*4+3]*mundo[3];
+        out[i] = W.m[i*4+0]*world[0] + W.m[i*4+1]*world[1]
+               + W.m[i*4+2]*world[2] + W.m[i*4+3]*world[3];
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ static void PlanoAEspacioLocal(const Matrix4& W, const float* mundo, float* out)
 //  no solo al tocar el agua. si salta tambien y si esta al borde del agua
 //  tambien. solo cuando ya no se llega a reflejar deja de verse realmente".
 //
-//  El gate viejo preguntaba por PuntoFoco()/RadioFoco(), que para todo lo que no
+//  El gate viejo preguntaba por PointFocus()/FocusRadius(), que para todo lo que no
 //  es una Mesh (un Empty que agrupa al personaje, por ejemplo) valen "el origen" y
 //  "cero": o sea que en la practica era "el ORIGEN del objeto esta adentro del
 //  rectangulo". Con el personaje parado en la orilla el origen caia afuera y el reflejo
@@ -216,13 +216,13 @@ static void PlanoAEspacioLocal(const Matrix4& W, const float* mundo, float* out)
 //
 //  Devuelve false = no hay nada que dibujar de ese target.
 // ---------------------------------------------------------------------------
-bool Mirror::TargetSeRefleja(Object* tg) const {
+bool Mirror::TargetReflects(Object* tg) const {
     if (!tg || !tg->visible) return false;
     // una malla que dibuja una RUTINA: se refleja solo si la rutina la dibujo en este cuadro o en el anterior (paso su
     // prueba de visibilidad). Lo que esta lejos no se refleja (ni se marca el estencil por el)
-    if (tg->getType() == ObjectType::mesh && ((Mesh*)tg)->soloRutina && g_w3dPase - ((Mesh*)tg)->paseDibujado > 1)
+    if (tg->getType() == ObjectType::mesh && ((Mesh*)tg)->onlyRoutine && g_w3dPass - ((Mesh*)tg)->drawnPass > 1)
         return false;
-    if (!Recorta()) return true;    // espejo sin recorte: todo target visible se refleja
+    if (!Crops()) return true;    // espejo sin recorte: todo target visible se refleja
 
     // NADA de descartar por el rectangulo: un espejo refleja tambien lo que
     // esta AL LADO suyo (el que camina por la orilla se ve en el agua aunque su
@@ -230,15 +230,15 @@ bool Mirror::TargetSeRefleja(Object* tg) const {
     // ENTERO quedo del otro lado del plano" (hundido): su imagen caeria ARRIBA
     // del agua, y un agua no refleja lo que tiene abajo.
     Vector3 mn, mx;
-    if (!W3dBoundsSubarbol(tg, mn, mx)) {
+    if (!W3dBoundsSubtree(tg, mn, mx)) {
         // sin geometria medible (un Empty pelado): se cae al criterio del
         // origen, que para un punto es exactamente lo correcto.
-        Vector3 c = tg->PuntoFoco();
-        const float r = tg->RadioFoco();
+        Vector3 c = tg->PointFocus();
+        const float r = tg->FocusRadius();
         mn = Vector3(c.x - r, c.y - r, c.z - r);
         mx = Vector3(c.x + r, c.y + r, c.z + r);
     }
-    const Vector3 N = Normal(), P0 = PuntoDelPlano();
+    const Vector3 N = Normal(), P0 = PlanePoint();
     float n1 = 0;
     for (int i = 0; i < 8; i++) {
         Vector3 c((i & 1) ? mx.x : mn.x, (i & 2) ? mx.y : mn.y, (i & 4) ? mx.z : mn.z);
@@ -252,7 +252,7 @@ bool Mirror::TargetSeRefleja(Object* tg) const {
 //  ORDEN DE PASADAS DEL ESPEJO (reporte del dueno: "algo me dice que estas
 //  ignorando el test de profundidad [...] el zbuffer lo tenes que hacer si o si")
 //
-//  Antes el reflejo se dibujaba con `sinProfundidad`, que es LITERALMENTE apagar
+//  Antes el reflejo se dibujaba con `noDepth`, que es LITERALMENTE apagar
 //  el z-test: por eso se veia mal (el reflejo no se auto-ocultaba, y cualquier
 //  cosa dibujada antes quedaba tapada por el). El z-test estaba apagado porque el
 //  fondo OPACO del estanque esta apenas debajo de la superficie y el reflejo cae
@@ -265,7 +265,7 @@ bool Mirror::TargetSeRefleja(Object* tg) const {
 //       ni profundidad. Lo que este DELANTE del agua (el puente que cruza el
 //       estanque) no la marca -> ahi no va a haber reflejo. [prueba (b)]
 //    B) BORRAR  la profundidad SOLO adentro de la marca. Aca muere el motivo por
-//       el que existia `sinProfundidad`: el fondo opaco del estanque deja de
+//       el que existia `noDepth`: el fondo opaco del estanque deja de
 //       ganarle al reflejo, sin tener que apagar el z-test. [prueba (c)]
 //    C) REFLEJO dibujado adentro de la marca, CON z-test Y escritura de z (asi el
 //       reflejo se auto-ocluye: el brazo de atras del personaje no se dibuja sobre el
@@ -286,31 +286,31 @@ bool Mirror::TargetSeRefleja(Object* tg) const {
 //       cielo -> escenario SOLIDO -> ESPEJOS (A,B,C,D) -> agua/alpha -> personaje,
 //       enemigos y demas entidades -> particulas -> HUD.
 //
-//  Sin buffer de estencil en el contexto (EstencilBits() == 0) se cae al camino
-//  viejo: recorte por planos + `sinProfundidad`. Peor, pero nunca peor que antes.
+//  Sin buffer de estencil en el contexto (StencilBits() == 0) se cae al camino
+//  viejo: recorte por planos + `noDepth`. Peor, pero nunca peor que antes.
 // ---------------------------------------------------------------------------
 
 // Renderizado del mirror
 void Mirror::RenderObject() {
     namespace gfx = w3dEngine;
-    if (TargetsVivos() == 0 || (!mirrorX && !mirrorY && !mirrorZ)) return;
+    if (LiveTargets() == 0 || (!mirrorX && !mirrorY && !mirrorZ)) return;
     // ningun objetivo para reflejar (todos lejos u ocultos): ni el estencil
-    { bool alguno = false; for (int t = 0; t < TargetsVivos() && !alguno; t++) alguno = TargetSeRefleja(TargetVivo(t)); if (!alguno) return; }
+    { bool any = false; for (int t = 0; t < LiveTargets() && !any; t++) any = TargetReflects(LiveTarget(t)); if (!any) return; }
 
     Matrix4 W; GetWorldMatrix(W);
-    Matrix4 Winv; bool hayInv = Matrix4::InvertirAfin(W, Winv);
-    const bool recorta  = Recorta();
-    const float planoY  = PlanoY();
+    Matrix4 Winv; bool hasInv = Matrix4::InvertAffine(W, Winv);
+    const bool crops    = Crops();
+    const float planeY  = PlaneY();
     // el plano del espejo en MUNDO: normal, punto y los dos ejes en los que se
     // mide el rectangulo de recorte (ver Mirror.h)
-    const Vector3 N = Normal(), U = EjeU(), V = EjeV(), P0 = PuntoDelPlano();
+    const Vector3 N = Normal(), U = AxisU(), V = AxisV(), P0 = PlanePoint();
 
     // AUTOCULL por el RECTANGULO del espejo (feedback del dueno: "los reflejos
     // consumen llamadas innecesarias"): el reflejo solo se VE a traves del rect
     // del agua; si ese rect esta fuera del frustum, re-dibujar el target es caras
     // y draws tirados (el grueso del sobre-dibujo medido en el N95). Espejos sin
     // limites no se cortan (no hay rect que medir).
-    if (usaLimites) {
+    if (usesLimits) {
         const Vector3 esq[4] = { P0 + U*limU0 + V*limV0, P0 + U*limU1 + V*limV0,
                                  P0 + U*limU0 + V*limV1, P0 + U*limU1 + V*limV1 };
         Vector3 mn = esq[0], mx = esq[0];
@@ -333,7 +333,7 @@ void Mirror::RenderObject() {
     //     por la orilla aparezca cortado por el borde -- como en un espejo de
     //     verdad. Los CUATRO PLANOS del rectangulo NO sirven para eso: cortan
     //     por DONDE ESTA la geometria reflejada y no por donde SE VE (ese era el
-    //     bug que tapaba el parche `hundimientoMaximo`), asi que quedan SOLO
+    //     bug que tapaba el parche `sinkMax`), asi que quedan SOLO
     //     como fallback para un contexto sin estencil.
     //
     //   * EN EL MUNDO lo recorta UN PLANO DE USUARIO sobre la superficie: el
@@ -345,38 +345,38 @@ void Mirror::RenderObject() {
     //     que esta BAJO el plano se refleja HACIA ARRIBA: sale al aire, por
     //     encima del cuerpo real. El estencil no puede verlo (esa imagen cae
     //     justo adentro de la silueta del agua en pantalla) y el gate
-    //     TargetSeRefleja tampoco (solo apaga el cuerpo ENTERO hundido).
+    //     TargetReflects tampoco (solo apaga el cuerpo ENTERO hundido).
     //     El arreglo barato y de GL 1.1 / GL ES 1.1 puro es el plano de recorte
     //     de usuario (glClipPlane / GL_CLIP_PLANE0): UN plano, prendido SOLO
     //     durante el pase del reflejo, que descarta todo lo que quede del lado
-    //     de arriba. Sin planos disponibles (PlanosRecorteMax() == 0, el minimo
-    //     que el estandar permite en GLES 1.1) PlanosRecorte es un no-op y el
+    //     de arriba. Sin planos disponibles (PlanesClipMax() == 0, el minimo
+    //     que el estandar permite en GLES 1.1) PlanesClip es un no-op y el
     //     espejo sigue funcionando con el estencil solo, como antes.
-    const bool conMascara = recorta && usaLimites && hayInv && gfx::EstencilBits() > 0;
-    float planos[5 * 4];
-    int nPlanos = 0;
-    if (recorta) {
+    const bool withMask = crops && usesLimits && hasInv && gfx::StencilBits() > 0;
+    float planes[5 * 4];
+    int nPlanes = 0;
+    if (crops) {
         // a) DETRAS DEL ESPEJO: -n.p + n.p0 >= 0. Es el semiespacio de ESTE lado
         //    del plano (bajo el agua, detras del vidrio). Sin esto, la parte del
         //    target que esta del otro lado del plano se refleja de este lado y
         //    se ve flotando fuera del recorte. Para el espejo horizontal
-        //    (n = +Y, n.p0 = planoY) esto es exactamente el viejo
-        //    { 0, -1, 0, planoY }. Va SIEMPRE: con mascara y sin ella.
+        //    (n = +Y, n.p0 = planeY) esto es exactamente el viejo
+        //    { 0, -1, 0, planeY }. Va SIEMPRE: con mascara y sin ella.
         {
             const float p[4] = { -N.x, -N.y, -N.z, N.Dot(P0) };
-            PlanoAEspacioLocal(W, p, &planos[nPlanos*4]); nPlanos++;
+            PlaneToSpaceLocal(W, p, &planes[nPlanes*4]); nPlanes++;
         }
         // b) las 4 paredes del rectangulo, EN EL PLANO DEL ESPEJO. SOLO en el
         //    fallback sin estencil (ver arriba: en pantalla recorta la mascara).
-        if (usaLimites && !conMascara) {
-            const float paredes[4][4] = {
+        if (usesLimits && !withMask) {
+            const float walls[4][4] = {
                 {  U.x,  U.y,  U.z, -limU0 },   // u >= limU0
                 { -U.x, -U.y, -U.z,  limU1 },   // u <= limU1
                 {  V.x,  V.y,  V.z, -limV0 },   // v >= limV0
                 { -V.x, -V.y, -V.z,  limV1 },   // v <= limV1
             };
-            for (int i = 0; i < 4 && nPlanos < 5; i++) {
-                PlanoAEspacioLocal(W, paredes[i], &planos[nPlanos*4]); nPlanos++;
+            for (int i = 0; i < 4 && nPlanes < 5; i++) {
+                PlaneToSpaceLocal(W, walls[i], &planes[nPlanes*4]); nPlanes++;
             }
         }
     }
@@ -385,11 +385,11 @@ void Mirror::RenderObject() {
     // El VALOR 1 se usa y se devuelve a 0 dentro de esta misma funcion, asi que
     // varios espejos en la misma escena no se pisan.
     float quad[12];
-    if (conMascara) {
+    if (withMask) {
         // el rectangulo del agua, en el plano del espejo, pasado a LOCAL (la
         // matriz activa es la de mundo del espejo)
         // P(u,v) = N*(N.P0) + U*u + V*v, con {U, V, N} ortonormal. Para el espejo
-        // horizontal da { limU0, planoY, limV1 }, que es el quad de siempre.
+        // horizontal da { limU0, planeY, limV1 }, que es el quad de siempre.
         const float dn = N.Dot(P0);
         const float uv[4][2] = {
             { limU0, limV1 }, { limU1, limV1 }, { limU1, limV0 }, { limU0, limV0 },
@@ -403,8 +403,8 @@ void Mirror::RenderObject() {
         }
         // ---- PASE A: marcar SIN color y CON z-test: donde el agua no se ve
         // (tapada por el puente) no queda marca -> ahi no hay reflejo.
-        gfx::EstencilLimpiar(0);
-        gfx::EstencilMarcar(1);
+        gfx::StencilClear(0);
+        gfx::StencilMark(1);
         gfx::ColorMask(false, false, false, false);
         gfx::DepthMask(false);
         gfx::Enable(gfx::DepthTest);
@@ -444,10 +444,10 @@ void Mirror::RenderObject() {
         gfx::Disable(gfx::PolygonOffsetFill);
         gfx::ColorMask(true, true, true, true);
         gfx::DepthFunc(gfx::DepthLess);    // como estaba
-        gfx::EstencilDentro(1);            // de aca en mas se dibuja SOLO adentro
+        gfx::StencilInside(1);             // de aca en mas se dibuja SOLO adentro
 
         // ---- PASE B: mandar la PROFUNDIDAD al FONDO adentro de la marca --------
-        // Aca desaparece el motivo por el que existia `sinProfundidad`. El fondo
+        // Aca desaparece el motivo por el que existia `noDepth`. El fondo
         // OPACO del estanque escribio z apenas debajo de la superficie y el
         // reflejo cae mas hondo todavia: con el z-test normal no pasaba UN SOLO
         // PIXEL, y por eso el motor terminaba apagando el z-test entero (que es
@@ -474,46 +474,46 @@ void Mirror::RenderObject() {
 
     // paridad IMPAR de ejes espejados = invertir el winding (con 2 ejes es una
     // rotacion y el frente queda como estaba)
-    int nEjes = (mirrorX ? 1 : 0) + (mirrorY ? 1 : 0) + (mirrorZ ? 1 : 0);
-    if (nEjes & 1) gfx::FrontFace(false);
+    int nAxes = (mirrorX ? 1 : 0) + (mirrorY ? 1 : 0) + (mirrorZ ? 1 : 0);
+    if (nAxes & 1) gfx::FrontFace(false);
 
     // ---- PASE C: el reflejo ------------------------------------------------
     // CON mascara: z-buffer NORMAL (test + escritura). La profundidad de la
     // region quedo limpia en el pase B, asi que el reflejo se dibuja entero y
     // ademas se AUTO-OCLUYE (el brazo de atras del personaje no se pinta sobre el de
     // adelante, que es lo que pasaba sin z).
-    // SIN mascara (contexto sin estencil): camino viejo. `sinProfundidad` apaga
-    // el z-test y w3dPaseEspejoSinZ evita que AplicarMaterial lo vuelva a
+    // SIN mascara (contexto sin estencil): camino viejo. `noDepth` apaga
+    // el z-test y w3dPassMirrorNoZ evita que ApplyMaterial lo vuelva a
     // prender desde mat->depth_test.
-    const bool zNormal = conMascara;
-    bool zEstaba = false;
+    const bool zNormal = withMask;
+    bool zWas = false;
     if (zNormal) {
-        zEstaba = true;
+        zWas = true;
         gfx::Enable(gfx::DepthTest);
         gfx::DepthMask(true);
         gfx::DepthFunc(gfx::DepthLEqual);
-    } else if (sinProfundidad) {
-        zEstaba = gfx::IsEnabled(gfx::DepthTest);
+    } else if (noDepth) {
+        zWas = gfx::IsEnabled(gfx::DepthTest);
         gfx::Disable(gfx::DepthTest);
         gfx::DepthMask(false);
-        gfx::w3dPaseEspejoSinZ = true;
+        gfx::w3dPassMirrorNoZ = true;
     }
-    if (nPlanos > 0) gfx::PlanosRecorte(nPlanos, planos);
+    if (nPlanes > 0) gfx::PlanesClip(nPlanes, planes);
 
     // las CALCOMANIAS del target (la sombra del personaje) se dibujan ACA MISMO y no
     // en el pase diferido del final: aca esta puesta la matriz espejada y el
     // recorte por estencil/planos. Diferidas se dibujarian despues, sin espejar
     // y fuera de la mascara.
-    const bool decalInlineAntes = w3dDecalesInline;
-    w3dDecalesInline = true;
-    w3dReflejando = true;   // (un objetivo soloRutina: Mesh::RenderSoloRutinaReflejo)
+    const bool decalInlinePrev = w3dDecalsInline;
+    w3dDecalsInline = true;
+    w3dReflecting = true;   // (un objetivo onlyRoutine: Mesh::RenderOnlyRoutineReflection)
 
-    const int nT = TargetsVivos();
+    const int nT = LiveTargets();
     for (int t = 0; t < nT; t++) {
-        Object* tg = TargetVivo(t);
-        // EL GATE (ver TargetSeRefleja): "la proyeccion del objeto sobre el agua
+        Object* tg = LiveTarget(t);
+        // EL GATE (ver TargetReflects): "la proyeccion del objeto sobre el agua
         // intersecta el rectangulo", no "el origen esta adentro".
-        if (!TargetSeRefleja(tg)) continue;
+        if (!TargetReflects(tg)) continue;
 
         gfx::PushMatrix();
         // La matriz del target tiene que ser la de MUNDO: con la LOCAL, un target
@@ -521,8 +521,8 @@ void Mirror::RenderObject() {
         // rectangulo, que se compara contra coordenadas de mundo, no cerraba).
         Matrix4 Mt; tg->GetWorldMatrix(Mt);
         // REFLEXION GEOMETRICA PURA: W * S * Mt, la misma matriz que devuelve
-        // MatrizEspejoTarget (lo que mide el harness). El parche del
-        // hundimientoMaximo que metia una T aca esta deprecado.
+        // MatrixMirrorTarget (lo que mide el harness). El parche del
+        // sinkMax que metia una T aca esta deprecado.
         // espejar CADA eje tildado (mismo idioma que Instance).
         gfx::Scalef(mirrorX ? -1.0f : 1.0f,
                     mirrorY ? -1.0f : 1.0f,
@@ -530,24 +530,24 @@ void Mirror::RenderObject() {
         gfx::MultMatrix(Mt.m);
         tg->RenderObject();
 
-        // los hijos POR LA PUERTA VIRTUAL (RenderHijos), no recorriendo Childrens
+        // los hijos POR LA PUERTA VIRTUAL (RenderChildren), no recorriendo Childrens
         // a mano: asi el reflejo de un target que sea (o contenga) un LOD dibuja
         // EL NIVEL ELEGIDO y no los dos superpuestos, y una Collection ordenada
         // por camara se refleja en su orden.
-        if (RenderChildrens) tg->RenderHijos();
+        if (RenderChildrens) tg->RenderChildren();
         gfx::PopMatrix();
     }
 
-    w3dDecalesInline = decalInlineAntes;
-    w3dReflejando = false;
-    if (nPlanos > 0) gfx::PlanosRecorte(0, NULL);
-    if (!zNormal && sinProfundidad) {
-        gfx::w3dPaseEspejoSinZ = false;
+    w3dDecalsInline = decalInlinePrev;
+    w3dReflecting = false;
+    if (nPlanes > 0) gfx::PlanesClip(0, NULL);
+    if (!zNormal && noDepth) {
+        gfx::w3dPassMirrorNoZ = false;
         gfx::DepthMask(true);
-        if (zEstaba) gfx::Enable(gfx::DepthTest);
+        if (zWas) gfx::Enable(gfx::DepthTest);
     }
-    if (nEjes & 1) gfx::FrontFace(true); // restaurar
-    if (conMascara) {
+    if (nAxes & 1) gfx::FrontFace(true); // restaurar
+    if (withMask) {
         // ---- PASE D: devolver la profundidad de la region al plano del agua ----
         // El pase B dejo un agujero en el z-buffer con la forma del agua. Si se
         // deja asi, cualquier cosa dibujada DESPUES que este detras del estanque
@@ -598,8 +598,8 @@ void Mirror::RenderObject() {
         gfx::ColorMask(true, true, true, true);
         gfx::DepthFunc(gfx::DepthLess);
 
-        gfx::EstencilApagar();
-        gfx::EstencilLimpiar(0);   // dejar el buffer como estaba para el proximo espejo
+        gfx::StencilTurnOff();
+        gfx::StencilClear(0);   // dejar el buffer como estaba para el proximo espejo
     }
 }
 

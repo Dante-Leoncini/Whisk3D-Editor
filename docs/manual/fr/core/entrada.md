@@ -4,7 +4,7 @@ Sur presque tous les systèmes, **SDL2** fournit le clavier, la souris, les doig
 
 | Quoi | Comment ça arrive |
 |---|---|
-| Tactile | SDL sur Android, dans le navigateur, sur la Vita et la 3DS. Sous Symbian, `W3dTactil` fait la même conversion que SDL (le premier doigt déplace une souris, les autres sont signalés comme des doigts) : un doigt sur S60 5th, multitouch sur le N8 |
+| Tactile | SDL sur Android, dans le navigateur, sur la Vita et la 3DS. Sous Symbian, `W3dTouch` fait la même conversion que SDL (le premier doigt déplace une souris, les autres sont signalés comme des doigts) : un doigt sur S60 5th, multitouch sur le N8 |
 | Inclinaison | Sur le N95, la Sensor API de Nokia, chargée au démarrage (sans elle, le jeu fonctionne quand même). Sur Android et sur PC, elle arrive par SDL |
 | Manettes | SDL ailleurs. Sous Symbian, les manettes PS3 et PS4 en Bluetooth (le pilote bthid-s60), dans le même ordre de boutons que SDL. Jusqu'à 4 |
 | Vibration | Android, avec le vibreur du téléphone. Navigateur, `navigator.vibrate` (sur iOS, le « tic » du système grâce à une astuce). Bureau : rien. L'API promet peu : « une petite vibration, si possible » |

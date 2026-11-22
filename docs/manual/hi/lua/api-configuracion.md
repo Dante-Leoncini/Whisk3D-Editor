@@ -2,5 +2,5 @@
 
 | फ़ंक्शन | क्या करता है |
 |---|---|
-| `config(clave [, def]) → texto`, `setConfig(clave, valor)` | गेम के विकल्प (रिकॉर्ड, वॉल्यूम…) पढ़ना और लिखना। |
-| `guardarConfig()`, `cargarConfig()` | उन्हें डिस्क पर (या ब्राउज़र में) सेव करना और फिर से पढ़ना। |
+| `getConfig(clave [, def]) → text`, `setConfig(clave, value)` | गेम के विकल्प (रिकॉर्ड, वॉल्यूम…) पढ़ना और लिखना। |
+| `saveConfig()`, `loadConfig()` | उन्हें डिस्क पर (या ब्राउज़र में) सेव करना और फिर से पढ़ना। |

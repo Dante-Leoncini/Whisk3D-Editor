@@ -15,10 +15,10 @@ public class Whisk3DActivity extends SDLActivity {
     // EL VIDEO DEL RENDER (W3dVideo: el codificador del telefono). Lo llama el codigo nativo por JNI (Properties.cpp,
     // W3D_VIDEO_ANDROID): por la actividad, para que las clases se busquen con el class loader de la app
     private final W3dVideo video = new W3dVideo();
-    public boolean videoAbrir(String ruta, int w, int h, int fps, int kbps) { return video.abrir(ruta, w, h, fps, kbps); }
-    public boolean videoCuadro(byte[] rgba, int w, int h) { return video.cuadro(rgba, w, h); }
-    public boolean videoCerrar(String wav, int kbpsAudio) { return video.cerrar(wav, kbpsAudio); }
-    public boolean audioAac(String wav, String salida, int kbps) { return W3dVideo.aacDeWav(wav, salida, kbps); }
+    public boolean videoOpen(String path, int w, int h, int fps, int kbps) { return video.open(path, w, h, fps, kbps); }
+    public boolean videoFrame(byte[] rgba, int w, int h) { return video.frame(rgba, w, h); }
+    public boolean videoClose(String wav, int kbpsAudio) { return video.close(wav, kbpsAudio); }
+    public boolean audioAac(String wav, String output, int kbps) { return W3dVideo.aacOfWav(wav, output, kbps); }
 
     @Override
     protected String[] getLibraries() {
@@ -52,23 +52,23 @@ public class Whisk3DActivity extends SDLActivity {
                     // 1) DocumentsUI: document/primary:Download/x.w3d
                     String p = d.getLastPathSegment(); // ya viene decodificado
                     if (p != null && p.startsWith("primary:")) {
-                        String ruta = Environment.getExternalStorageDirectory()
+                        String path = Environment.getExternalStorageDirectory()
                                       + "/" + p.substring("primary:".length());
-                        if (new java.io.File(ruta).canRead()) return new String[]{ ruta };
+                        if (new java.io.File(path).canRead()) return new String[]{ path };
                     }
                     // 2) MediaStore y varios gestores: la columna _data ES la ruta
                     try {
                         android.database.Cursor c = getContentResolver().query(
                                 d, new String[]{ "_data" }, null, null, null);
                         if (c != null) {
-                            String ruta = null;
+                            String path = null;
                             if (c.moveToFirst()) {
                                 int col = c.getColumnIndex("_data");
-                                if (col >= 0) ruta = c.getString(col);
+                                if (col >= 0) path = c.getString(col);
                             }
                             c.close();
-                            if (ruta != null && new java.io.File(ruta).canRead())
-                                return new String[]{ ruta };
+                            if (path != null && new java.io.File(path).canRead())
+                                return new String[]{ path };
                         }
                     } catch (Exception e) { /* el proveedor no expone _data */ }
                     // 3) proveedores que EMBEBEN la ruta en la URI (Files de Google:
@@ -78,8 +78,8 @@ public class Whisk3DActivity extends SDLActivity {
                         int i2 = up.indexOf("/storage/");
                         if (i2 < 0) { i2 = up.indexOf("/sdcard/"); }
                         if (i2 >= 0) {
-                            String ruta = up.substring(i2);
-                            if (new java.io.File(ruta).canRead()) return new String[]{ ruta };
+                            String path = up.substring(i2);
+                            if (new java.io.File(path).canRead()) return new String[]{ path };
                         }
                     }
                     // 4) ultimo recurso: COPIAR el contenido a la cache. Solo viaja
@@ -108,10 +108,10 @@ public class Whisk3DActivity extends SDLActivity {
     // que el file browser interno (opendir/fopen) NO podia leer los modelos .obj/.w3d ni sus texturas. "All files
     // access" (MANAGE_EXTERNAL_STORAGE) habilita leer/escribir CUALQUIER archivo, como en Android <=10, sin tener
     // que reescribir el browser con SAF. Se pide una sola vez: si no esta otorgado, se abre la pantalla de Settings.
-    // la PANTALLA tiene recorte (notch / camara)? Lo pregunta el codigo nativo (W3dTeclado.cpp) al arrancar: sin notch
+    // la PANTALLA tiene recorte (notch / camara)? Lo pregunta el codigo nativo (W3dKeyboard.cpp) al arrancar: sin notch
     // la app va en pantalla completa (la barra de arriba ocupa espacio valioso); con notch se deja la barra, que es
     // donde esta la camara. Antes de Android 9 no hay API de recortes -> pantalla completa.
-    public boolean tieneNotch() {
+    public boolean hasNotch() {
         try {
             if (Build.VERSION.SDK_INT >= 29) {
                 android.view.DisplayCutout c = getWindowManager().getDefaultDisplay().getCutout();
@@ -144,12 +144,12 @@ public class Whisk3DActivity extends SDLActivity {
         }
     }
 
-    // EL TECLADO DEL SISTEMA: cuanto de la superficie de SDL tapa, en pixeles (W3dTeclado.cpp). En pantalla completa
+    // EL TECLADO DEL SISTEMA: cuanto de la superficie de SDL tapa, en pixeles (W3dKeyboard.cpp). En pantalla completa
     // Android no achica la ventana con el teclado: sin esto el editor no se enteraba y el campo quedaba debajo. Con la
     // ventana achicada da 0 (ya no tapa nada). Se avisa solo cuando cambia
-    private static native void nativeTecladoTapado(int px);
-    private int tapadoAvisado = -1;
-    private void vigilarTeclado() {
+    private static native void nativeKeyboardCovered(int px);
+    private int coveredNotified = -1;
+    private void watchKeyboard() {
         final android.view.View decor = getWindow().getDecorView();
         decor.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
@@ -160,10 +160,10 @@ public class Whisk3DActivity extends SDLActivity {
                 int[] p = new int[2];
                 mSurface.getLocationOnScreen(p);
                 int h = mSurface.getHeight();
-                int tapado = p[1] + h - r.bottom;
-                if (tapado < h * 15 / 100) tapado = 0;   // (la barra de navegacion no es el teclado)
-                if (tapado == tapadoAvisado) return;
-                try { nativeTecladoTapado(tapado); tapadoAvisado = tapado; } catch (Throwable t) { /* (sin libmain todavia) */ }
+                int covered = p[1] + h - r.bottom;
+                if (covered < h * 15 / 100) covered = 0;   // (la barra de navegacion no es el teclado)
+                if (covered == coveredNotified) return;
+                try { nativeKeyboardCovered(covered); coveredNotified = covered; } catch (Throwable t) { /* (sin libmain todavia) */ }
             }
         });
     }
@@ -171,7 +171,7 @@ public class Whisk3DActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        vigilarTeclado();
+        watchKeyboard();
         // Android 10+: sin la capa semitransparente de "contraste" que el sistema pone sobre la barra de navegacion
         // (con el tema claro salia blanquecina). El fondo de las barras es el negro de la ventana (styles.xml). La de
         // estado no lleva esa capa por defecto (y su setStatusBarContrastEnforced quedo obsoleto en Android 15).
@@ -180,13 +180,13 @@ public class Whisk3DActivity extends SDLActivity {
         }
         // ANDROID 15+ con targetSdk 35/36: la ventana va SIEMPRE de borde a borde. Sin esto, con la barra de estado a
         // la vista (pantalla con notch) el editor se dibujaba DEBAJO de la barra y de la camara, y el teclado ya no
-        // achicaba la ventana (adjustResize ahora solo avisa): W3dTeclado.cpp lo detecta porque la ventana se achica.
+        // achicaba la ventana (adjustResize ahora solo avisa): W3dKeyboard.cpp lo detecta porque la ventana se achica.
         // Se le da al contenido el margen de las barras del sistema, del recorte y del teclado. En pantalla completa
         // las barras estan ocultas y su margen es 0.
         if (Build.VERSION.SDK_INT >= 35) {
-            android.view.View contenido = getWindow().getDecorView().findViewById(android.R.id.content);
-            if (contenido != null) {
-                contenido.setOnApplyWindowInsetsListener(new android.view.View.OnApplyWindowInsetsListener() {
+            android.view.View content = getWindow().getDecorView().findViewById(android.R.id.content);
+            if (content != null) {
+                content.setOnApplyWindowInsetsListener(new android.view.View.OnApplyWindowInsetsListener() {
                     @Override
                     public android.view.WindowInsets onApplyWindowInsets(android.view.View v, android.view.WindowInsets wi) {
                         android.graphics.Insets m = wi.getInsets(android.view.WindowInsets.Type.systemBars()
@@ -212,9 +212,9 @@ public class Whisk3DActivity extends SDLActivity {
         }
     }
 
-    // la VIBRACION (input/W3dVibrar.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
+    // la VIBRACION (input/W3dVibrate.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
     // que ya se puede arrastrar
-    public void vibrar(int ms) {
+    public void vibrate(int ms) {
         try {
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
             if (v != null) v.vibrate(ms);

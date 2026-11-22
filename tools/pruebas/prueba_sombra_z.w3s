@@ -32,7 +32,7 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_sombra_z.w3s
 # ===========================================================================
-abrirw3d prueba_sombra_z.w3d
+openw3d prueba_sombra_z.w3d
 loadtex
 
 # los flags del material: transparente + NO escribe z + sesgo negativo + orden 1
@@ -40,44 +40,44 @@ matflags sombra-blob decal
 matflags sombra-piso normal
 
 # vista FIJA (el assert de pixel tiene que ser reproducible)
-vporbita 0 0 0 16 -30 0
+vporbit 0 0 0 16 -30 0
 
 # --- A) rampa 30 grados, blob coplanar --------------------------------------
-escenapx -6 0 0    es 26 26 26 6
-escenapx -6 0 0.4  es 26 26 26 6
-escenapx -6 0 0    masoscuroque -6 0 1.2 60
+scenepx -6 0 0    es 26 26 26 6
+scenepx -6 0 0.4  es 26 26 26 6
+scenepx -6 0 0    darkerthan -6 0 1.2 60
 
 # --- B) rampa 55 grados (el peor caso de pendiente) -------------------------
-escenapx -2 0 0    es 26 26 26 6
-escenapx -2 0 0.4  es 26 26 26 6
+scenepx -2 0 0    es 26 26 26 6
+scenepx -2 0 0.4  es 26 26 26 6
 
 # --- C) EL ORDEN: el blob declarado ANTES de la superficie que lo recibe -----
 # (el caso de la sombra de Crash sobre los troncos). Sin el pase diferido este
 # es el assert que fallaba: la superficie, dibujada despues, borraba la sombra.
-escenapx 2 0 0     es 26 26 26 6
-escenapx 2 0 0.4   es 26 26 26 6
+scenepx 2 0 0     es 26 26 26 6
+scenepx 2 0 0.4   es 26 26 26 6
 
 # --- D) piso llano (control) ------------------------------------------------
-escenapx 6 0 0     es 26 26 26 6
-escenapx 6 0 0.4   es 26 26 26 6
+scenepx 6 0 0     es 26 26 26 6
+scenepx 6 0 0.4   es 26 26 26 6
 
 # --- la superficie SIGUE ahi (la sombra no la borro) ------------------------
-escenapx -6 0 1.2  masclaroque -6 0 0 60
+scenepx -6 0 1.2  lighterthan -6 0 0 60
 
 # --- E) LA CALCOMANIA NO TAPA LO QUE ESTA DELANTE ---------------------------
 # El cuerpo que proyecta la sombra es opaco y esta MAS CERCA de la camara. Una
 # calcomania no escribe z, pero SI hace z-test: el cuerpo tiene que ganar. Si
 # el pase diferido dibujara las calcomanias sin z-test, este pixel daria 26.
-escenapx 6 1.6 -1.2  es 204 204 204 6
-escenapx 6 1.6 -1.2  masclaroque 6 0 0 60
+scenepx 6 1.6 -1.2  es 204 204 204 6
+scenepx 6 1.6 -1.2  lighterthan 6 0 0 60
 
 # --- ROUND-TRIP v4 ----------------------------------------------------------
-guardarw3d prueba_sombra_z_v4.w3d
-abrirw3d prueba_sombra_z_v4.w3d
+savew3d prueba_sombra_z_v4.w3d
+openw3d prueba_sombra_z_v4.w3d
 loadtex
 matflags sombra-blob decal
-vporbita 0 0 0 16 -30 0
-escenapx -6 0 0    es 26 26 26 6
-escenapx -2 0 0    es 26 26 26 6
-escenapx 2 0 0     es 26 26 26 6
-escenapx 6 0 0     es 26 26 26 6
+vporbit 0 0 0 16 -30 0
+scenepx -6 0 0    es 26 26 26 6
+scenepx -2 0 0    es 26 26 26 6
+scenepx 2 0 0     es 26 26 26 6
+scenepx 6 0 0     es 26 26 26 6

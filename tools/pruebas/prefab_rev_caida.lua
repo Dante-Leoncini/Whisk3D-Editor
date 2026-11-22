@@ -3,13 +3,13 @@
 -- dormida, quedaba quieta)
 local n = 0
 local c = nil
-function actualizar(dt)
+function update(dt)
   n = n + 1
-  if n == 1 then c = instanciar("Caja", 10, 0, 5) end   -- a 5 de altura (Z arriba)
+  if n == 1 then c = instantiate("Caja", 10, 0, 5) end   -- a 5 de altura (Z arriba)
   if n == 3 then
-    local cubo = c and buscar("Caja", c) or nil
+    local cube = c and find("Caja", c) or nil
     local vx, vy, vz = nil, nil, nil
-    if cubo then vx, vy, vz = fisicaVel(cubo) end
-    setCompartido("caida", (vz ~= nil and vz < -3) and "cae" or "quieta")   -- vz: la vertical
+    if cube then vx, vy, vz = physicsVel(cube) end
+    setShared("caida", (vz ~= nil and vz < -3) and "cae" or "quieta")   -- vz: la vertical
   end
 end

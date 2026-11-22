@@ -5,18 +5,18 @@
 -- ==========================================================================
 local tick = 0
 
-function inicio()
-    setCompartido("pf_spawn", -1)
-    setCompartido("pf_spawn_nil", -1)
+function start()
+    setShared("pf_spawn", -1)
+    setShared("pf_spawn_nil", -1)
 end
 
-function actualizar(dt)
+function update(dt)
     tick = tick + 1
     if tick == 1 then
-        local o = instanciar("caja", 0.0, 0.0, 4.0)   -- a 4 de altura
-        setCompartido("pf_spawn", (o ~= nil) and 1 or 0)
+        local o = instantiate("caja", 0.0, 0.0, 4.0)   -- a 4 de altura
+        setShared("pf_spawn", (o ~= nil) and 1 or 0)
         -- un prefab que NO existe tiene que dar nil (no crashear)
-        local malo = instanciar("no-existe")
-        setCompartido("pf_spawn_nil", (malo == nil) and 1 or 0)
+        local bad = instantiate("no-existe")
+        setShared("pf_spawn_nil", (bad == nil) and 1 or 0)
     end
 end

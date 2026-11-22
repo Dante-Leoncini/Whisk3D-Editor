@@ -6,13 +6,13 @@
 --  elegido, y si no se eligio nada, la DE FABRICA (la primera de la lista),
 --  la misma que muestra el panel de Propiedades. Antes devolvia "".
 -- ==========================================================================
-propiedades = {
+properties = {
     id = 0,                                         -- cual de los dos objetos (val_id)
     dificultad = { "facil", "normal", "dificil" },  -- una lista desplegable (la primera es la de fabrica)
 }
 
-function inicio()
-    setCompartido("dificultad" .. propiedad("id"), opcion("dificultad"))
+function start()
+    setShared("dificultad" .. property("id"), option("dificultad"))
     -- una opcion que no esta declarada como lista: "" (como siempre)
-    setCompartido("sinlista", "[" .. opcion("noexiste") .. "]")
+    setShared("sinlista", "[" .. option("noexiste") .. "]")
 end

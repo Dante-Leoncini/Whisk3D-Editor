@@ -21,7 +21,7 @@ Não o confunda com o objeto **Culling** do menu Adicionar da Viewport 3D, que t
 O modificador não calcula o que é visto: ele lê isso de um arquivo que acompanha o modelo. Para uma malha importada de `nivel.obj`, ele procura `nivel.pvs.json` na mesma pasta:
 
 ```json
-{ "sectores": 2, "tris": [[0, 1], [2, 3]] }
+{ "sectors": 2, "tris": [[0, 1], [2, 3]] }
 ```
 
 `sectores` é quantas zonas há, e `tris` tem, para cada zona, os triângulos que são desenhados, numerados a partir de 0 na ordem das faces do `.obj`. O normal é que ele venha do jogo original ou de uma ferramenta à parte. Cada zona é um **nó**: o nó 1 é a primeira lista, e o nó 0 desenha a malha completa.
@@ -40,7 +40,7 @@ O modificador não calcula o que é visto: ele lê isso de um arquivo que acompa
 | Ramos | Só aparece se o caminho tiver mais de um ramo, por exemplo o caminho principal e um de bônus. Escolhe quais ramos contam na busca do nó mais próximo; cada ramo ligado aparece em verde. O botão diz, por exemplo, "Ramos: 3 (todos)" ou "Ramos: 2/3". |
 | Nó atual | A zona que está sendo desenhada; 0 = a malha completa. Dá para mudá-lo à mão para revisar cada zona. Quando o Caminho escolhe o nó sozinho, o motor o sobrescreve. |
 
-Por um script, `setSector(objeto, n)` muda o nó ativo (0 = a malha completa). Veja [Partículas, névoa e visibilidade](../lua/api-particulas-niebla.md).
+Por um script, `setSector(object, n)` muda o nó ativo (0 = a malha completa). Veja [Partículas, névoa e visibilidade](../lua/api-particulas-niebla.md).
 
 ## O que é bom saber
 

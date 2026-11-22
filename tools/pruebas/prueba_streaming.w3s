@@ -21,80 +21,80 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
-streamcrear /tmp/w3d_f9_stream dosmats.png lado 16 paso 10 distancia 25 vueltas 2
-entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json "carga": 1
-entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json "distancia": 1
-entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json streamingVistaPrevia 0
+window 640 480
+streamcreate /tmp/w3d_f9_stream dosmats.png side 16 step 10 distance 25 turns 2
+entryhas /tmp/w3d_f9_stream/juego/streaming.w3d project.json "load": 1
+entryhas /tmp/w3d_f9_stream/juego/streaming.w3d project.json "distance": 1
+entryhas /tmp/w3d_f9_stream/juego/streaming.w3d project.json streamingPreview 0
 
 # --- A) el editor genera todo; el Play arranca sin nada de lo diferido ---
-abrirw3d /tmp/w3d_f9_stream/juego/streaming.w3d
-streaminfo instancias 256 cargadas 256 pedidos 0
+openw3d /tmp/w3d_f9_stream/juego/streaming.w3d
+streaminfo instances 256 loaded 256 requests 0
 streamtexrefs
 simplay 1
-streaminfo cargadas 0 pidiendo 0 descargadas 256 pedidos 0
+streaminfo loaded 0 requesting 0 unloaded 256 requests 0
 # (la base: lo del nivel sin nada del streaming -los dos cubos del juego minimo-)
-streammem mallas 2 animsets 0 texturas 0 scripts 0 base
+streammem meshes 2 animsets 0 textures 0 scripts 0 base
 
 # --- B) el recorrido, dos vueltas: acotado y estable ---
-streambench 579 etiqueta vuelta1 peor 250
-streaminfo cargadas 0 pidiendo 0 pedidos 0
-streammem igual
-streambench 540 etiqueta vuelta2 peor 250 heapcrece 512 rssmaxcomo vuelta1 2048
-streaminfo cargadas 0 pidiendo 0 pedidos 0
-streammem igual
+streambench 579 label vuelta1 worst 250
+streaminfo loaded 0 requesting 0 requests 0
+streammem equal
+streambench 540 label vuelta2 worst 250 heapgrows 512 rssmaxas vuelta1 2048
+streaminfo loaded 0 requesting 0 requests 0
+streammem equal
 # (el meminfo de siempre dice lo mismo: dos mallas vivas, las de la escena)
-meminfo mallas 2
+meminfo meshes 2
 streamtexrefs
-scriptinfo compartido juez OK
-scriptinfo compartido veredicto 0,8,20,8,8,20,0,8,20,8,8,20,0
-streamveredicto
+scriptinfo shared juez OK
+scriptinfo shared veredicto 0,8,20,8,8,20,0,8,20,8,8,20,0
+streamverdict
 simstop
-streaminfo cargadas 256 pidiendo 0 pedidos 0
+streaminfo loaded 256 requesting 0 requests 0
 
 # --- C) el juego compilado: el mismo veredicto ---
-compilarjuego 0 0 1
-streamjuegolog /tmp/w3d_f9_stream/juego streaming igual
+compilegame 0 0 1
+streamgamelog /tmp/w3d_f9_stream/juego streaming equal
 
 # --- D) la VISTA PREVIA del editor ---
-abrirw3d /tmp/w3d_f9_stream/juego/streaming.w3d
-streaminfo cargadas 256
-streamvista 1
-streamobjetivo 75 6 75
+openw3d /tmp/w3d_f9_stream/juego/streaming.w3d
+streaminfo loaded 256
+streamview 1
+streamtarget 75 6 75
 # (lo generado al abrir se descarga de a 4 por frame, 60 frames; quedan las 20 de adentro de 25 m y las 4 que estan
 #  en la franja de la histeresis -entre 25 y 27,5 m-: ya estaban cargadas)
 streamtick 80
-streaminfo cargadas 24 pidiendo 0
-streamestado S119 cargada
-streamestado S000 descargada
-streamobjetivo -80 6 -80
+streaminfo loaded 24 requesting 0
+streamstate S119 loaded
+streamstate S000 unloaded
+streamtarget -80 6 -80
 streamtick 40
-streaminfo cargadas 0 pidiendo 0 pedidos 0
-streammem mallas 2 animsets 0 texturas 0 scripts 0
-guardarw3d /tmp/w3d_f9_stream/juego/vista.w3d
-entradatiene /tmp/w3d_f9_stream/juego/vista.w3d proyecto.json streamingVistaPrevia 1
-abrirw3d /tmp/w3d_f9_stream/juego/vista.w3d
+streaminfo loaded 0 requesting 0 requests 0
+streammem meshes 2 animsets 0 textures 0 scripts 0
+savew3d /tmp/w3d_f9_stream/juego/vista.w3d
+entryhas /tmp/w3d_f9_stream/juego/vista.w3d project.json streamingPreview 1
+openw3d /tmp/w3d_f9_stream/juego/vista.w3d
 # (con la vista previa prendida, las diferidas NO se generan al abrir)
-streaminfo instancias 256 cargadas 0
-streammem mallas 2 animsets 0 texturas 0
-streamobjetivo 0 6 0
+streaminfo instances 256 loaded 0
+streammem meshes 2 animsets 0 textures 0
+streamtarget 0 6 0
 streamtick 40
-streaminfo cargadas 8
-streamestado S000 cargada
+streaminfo loaded 8
+streamstate S000 loaded
 # (apagarla: el editor vuelve a ver el nivel entero)
-streamvista 0
-streaminfo cargadas 256
-streamobjetivo off
+streamview 0
+streaminfo loaded 256
+streamtarget off
 
 # --- E) la tarjeta de Properties (con Ctrl+Z) ---
 selobj S017
-streamtarjeta visible 1 modo distancia distancia 25 objetivo 1 vista 1
-streamtarjeta editardistancia 40 distancia 40
+streamcard visible 1 mode distance distance 25 target 1 view 1
+streamcard editdistance 40 distance 40
 undo
-streamtarjeta distancia 25
-streamcarga S017 siempre
-streamtarjeta modo siempre objetivo 0
+streamcard distance 25
+streamload S017 always
+streamcard mode siempre target 0
 undo
-streamtarjeta modo distancia distancia 25
+streamcard mode distance distance 25
 selobj Director
-streamtarjeta visible 0
+streamcard visible 0

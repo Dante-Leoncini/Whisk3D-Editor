@@ -10,5 +10,5 @@ Icon=whisk3d
 Terminal=false
 StartupNotify=true
 Categories=3DGraphics;Graphics;
-MimeType=application/vnd.whisk3d.proyecto+zip;application/x-whisk3d;
+MimeType=application/vnd.whisk3d.project+zip;application/x-whisk3d;
 Keywords=3d;modeling;animation;painting;sculpting;texturing;rendering;render engine;cycles;game engine;

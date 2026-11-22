@@ -1,32 +1,32 @@
 {
   "version": 3,
-  "escena": {
-    "objetos": [
+  "scene": {
+    "objects": [
       {
-        "tipo": "objeto", "nombre": "Piso", "pos": [0, -0.5, 0],
-        "fisica": { "tipo": "estatico", "masa": 1, "caja": [10, 1, 10], "centro": [0, 0, 0], "friccion": 0.5, "rebote": 0 },
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "piso" } } ]
+        "type": "object", "name": "Piso", "pos": [0, -0.5, 0],
+        "physics": { "type": "static", "mass": 1, "box": [10, 1, 10], "center": [0, 0, 0], "friction": 0.5, "bounce": 0 },
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "piso" } } ]
       },
       {
-        "tipo": "objeto", "nombre": "Caja", "pos": [0, 4, 0],
-        "fisica": { "tipo": "dinamico", "masa": 1, "caja": [1, 1, 1], "centro": [0, 0, 0], "friccion": 0.5, "rebote": 0 },
+        "type": "object", "name": "Caja", "pos": [0, 4, 0],
+        "physics": { "type": "dynamic", "mass": 1, "box": [1, 1, 1], "center": [0, 0, 0], "friction": 0.5, "bounce": 0 },
         "scripts": [
-          { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "caja" } },
-          { "archivo": "hitbox_despertar.lua" }
+          { "file": "hitbox_contador.lua", "refs": { "prefijo": "caja" } },
+          { "file": "hitbox_despertar.lua" }
         ]
       },
       {
-        "tipo": "hitbox", "nombre": "Zona", "pos": [0, 2.5, 0], "tam": [3, 1, 3], "detectarCuerpos": true,
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "zona" } } ]
+        "type": "hitbox", "name": "Zona", "pos": [0, 2.5, 0], "size": [3, 1, 3], "detectBodies": true,
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "zona" } } ]
       },
       {
-        "tipo": "hitbox", "nombre": "Ciega", "pos": [0, 1.5, 0], "tam": [3, 0.5, 3], "detectarCuerpos": false,
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "ciega" } } ]
+        "type": "hitbox", "name": "Ciega", "pos": [0, 1.5, 0], "size": [3, 0.5, 3], "detectBodies": false,
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "ciega" } } ]
       },
       {
-        "tipo": "hitbox", "nombre": "ConFiltro", "pos": [0, 3.5, 0], "tam": [3, 0.4, 3], "detectarCuerpos": true,
-        "filtro": "algo",
-        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "confiltro" } } ]
+        "type": "hitbox", "name": "ConFiltro", "pos": [0, 3.5, 0], "size": [3, 0.4, 3], "detectBodies": true,
+        "filter": "algo",
+        "scripts": [ { "file": "hitbox_contador.lua", "refs": { "prefijo": "confiltro" } } ]
       }
     ]
   }

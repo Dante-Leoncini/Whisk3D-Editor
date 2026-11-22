@@ -7,70 +7,70 @@
 - एक **चेकबॉक्स**, जो एक `bool` दिखाता है और बदलता है,
 - एक **स्लाइडर**, जो दो मानों के बीच एक `float` एडिट करता है,
 - एक **शॉर्टकट**, दाईं ओर और हल्के ग्रे में ("Shift D"),
-- `verde`: यह सक्रिय विकल्प है, आइकन और टेक्स्ट `accent` में,
-- `gris`: एक `bool` की ओर इशारा करता है; जब तक वह `false` है, विकल्प आधी अपारदर्शिता में दिखता है और जवाब नहीं देता,
-- `lineaArriba`: एक लाइन जो इसे ऊपर वाले समूह से अलग करती है।
+- `green`: यह सक्रिय विकल्प है, आइकन और टेक्स्ट `accent` में,
+- `gray`: एक `bool` की ओर इशारा करता है; जब तक वह `false` है, विकल्प आधी अपारदर्शिता में दिखता है और जवाब नहीं देता,
+- `lineUp`: एक लाइन जो इसे ऊपर वाले समूह से अलग करती है।
 
-मेनू का एक **शीर्षक** (`titulo`) हो सकता है: यह सफ़ेद में होता है, नीचे एक लाइन के साथ।
+मेनू का एक **शीर्षक** (`title`) हो सकता है: यह सफ़ेद में होता है, नीचे एक लाइन के साथ।
 
 ## टेबल से बनाना
 
 सुझाया गया तरीका `MenuDef` की एक टेबल है: हर विकल्प का टेक्स्ट और उसका काम एक ही पंक्ति में होते हैं। कोई नंबर नहीं है जिसे कहीं और किसी `switch` से जोड़ना पड़े।
 
 ```cpp
-static bool grilla = true;
-static PopupMenu* recientes = NULL;
-static void Nuevo() { /* ... */ }
-static void Abrir() { /* ... */ }
+static bool grid = true;
+static PopupMenu* recent = NULL;
+static void New() { /* ... */ }
+static void Open() { /* ... */ }
 
 static const MenuDef ARCHIVO[] = {
     // टेक्स्ट    ऐक्शन   शॉर्टकट   आइकन                     सबमेनू      चेकबॉक्स
-    { "Nuevo",   Nuevo,  "Ctrl N", ICONO(IconType::mas) },
-    { "Abrir",   Abrir,  "Ctrl O", ICONO(IconType::carpeta) },
-    { "Recientes", NULL, NULL,     ICONO(IconType::lista),  &recientes },
-    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grilla },
+    { "Nuevo",   New,  "Ctrl N", ICON(IconType::more) },
+    { "Abrir",   Open,  "Ctrl O", ICON(IconType::folder) },
+    { "Recientes", NULL, NULL,     ICON(IconType::list),  &recent },
+    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grid },
 };
 
-recientes = new PopupMenu();          // सबमेनू को बनाने से पहले मौजूद होना चाहिए
+recent = new PopupMenu();          // सबमेनू को बनाने से पहले मौजूद होना चाहिए
 PopupMenu* archivo = new PopupMenu();
-archivo->titulo = "Archivo";
-archivo->Construir(ARCHIVO, 4);
+archivo->title = "Archivo";
+archivo->Build(ARCHIVO, 4);
 ```
 
-`ICONO(x)` आइकन में 1 जोड़ता है: टेबल में 0 का मतलब है "बिना आइकन"। हर विकल्प का id उसकी पंक्ति है।
+`ICON(x)` आइकन में 1 जोड़ता है: टेबल में 0 का मतलब है "बिना आइकन"। हर विकल्प का id उसकी पंक्ति है।
 
 दो वैकल्पिक हुक, जिन्हें प्रोग्राम इंस्टॉल करता है:
 
 ```cpp
-W3dMenuTraducir = MiTraduccion;   // const char* MiTraduccion(const char* texto)
-W3dMenuAtajoTexto = MiAtajo;      // std::string MiAtajo(const std::string& atajo)
+W3dMenuTranslate = MiTraduccion;   // const char* MiTraduccion(const char* texto)
+W3dMenuShortcutText = MiShortcut;      // std::string MiAtajo(const std::string& atajo)
 ```
 
-`W3dMenuTraducir` के साथ, मेनू बनाते समय टेबल के टेक्स्ट अनुवादित होकर आते हैं। `W3dMenuAtajoTexto` के साथ, शॉर्टकट `@` से शुरू होने वाला एक नाम हो सकता है और हुक उससे जुड़ी कुंजी लौटाता है। उस हुक के बिना, `@` वाला शॉर्टकट नहीं दिखता।
+`W3dMenuTranslate` के साथ, मेनू बनाते समय टेबल के टेक्स्ट अनुवादित होकर आते हैं। `W3dMenuShortcutText` के साथ, शॉर्टकट `@` से शुरू होने वाला एक नाम हो सकता है और हुक उससे जुड़ी कुंजी लौटाता है। उस हुक के बिना, `@` वाला शॉर्टकट नहीं दिखता।
 
 ## हाथ से बनाना
 
 ```cpp
-PopupMenu* vista = new PopupMenu();
-vista->Agregar("Frente", 0, IconType::camera);
-vista->AgregarCheck("Mostrar piso", 1, &verPiso);
-vista->AgregarFloat("Tamaño", 2, &tamanio, 0.0f, 4.0f);
-MenuItem* it = vista->Agregar("Alambre", 3);
-it->verde = esAlambre;
-it->lineaArriba = true;
-vista->action = AlElegir;              // void AlElegir(int id)
+PopupMenu* view = new PopupMenu();
+view->Add("Frente", 0, IconType::camera);
+view->AddCheck("Mostrar piso", 1, &showFloor);
+view->AddFloat("Tamaño", 2, &size, 0.0f, 4.0f);
+MenuItem* it = view->Add("Alambre", 3);
+it->green = isWire;
+it->lineUp = true;
+view->action = OnPick;              // void AlElegir(int id)
 ```
 
-`Agregar` `MenuItem*` लौटाता है, ताकि उसकी बाकी चीज़ें बदली जा सकें। किसी विकल्प को चुनने पर, `Ejecutar(id)` उसका `accion` कॉल करता है अगर उसमें है, और नहीं तो मेनू का `action(id)`। `Limpiar()` सारे विकल्प मिटा देता है, बदलने वाले मेनू के लिए।
+`Add` `MenuItem*` लौटाता है, ताकि उसकी बाकी चीज़ें बदली जा सकें। किसी विकल्प को चुनने पर, `Run(id)` उसका `action` कॉल करता है अगर उसमें है, और नहीं तो मेनू का `action(id)`। `Clear()` सारे विकल्प मिटा देता है, बदलने वाले मेनू के लिए।
 
 ## खोलना
 
 ```cpp
-archivo->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-MenuAbierto = archivo;
+archivo->Open(mx, my, MenuScreenW, MenuScreenH);
+OpenMenu = archivo;
 ```
 
-यह उस बिंदु पर खुलता है जो आप देते हैं: कर्सर, या किसी बटन का किनारा। अगर यह नहीं समाता, तो स्क्रीन के अंदर की ओर खिसक जाता है। `Abrir`, `MenuAbierto` को नहीं छूता: उसे वह सेट करता है जो मेनू खोलता है। `Cerrar()` उसे फिर से `NULL` कर देता है।
+यह उस बिंदु पर खुलता है जो आप देते हैं: कर्सर, या किसी बटन का किनारा। अगर यह नहीं समाता, तो स्क्रीन के अंदर की ओर खिसक जाता है। `Open`, `OpenMenu` को नहीं छूता: उसे वह सेट करता है जो मेनू खोलता है। `Close()` उसे फिर से `NULL` कर देता है।
 
 खुलते समय यह ख़ुद को मापता है:
 
@@ -84,26 +84,26 @@ MenuAbierto = archivo;
 
 ```cpp
 // हिलाते समय
-if (MenuAbierto) MenuAbierto->MouseMove(mx, my);
+if (OpenMenu) OpenMenu->MouseMove(mx, my);
 
 // क्लिक या टैप करते समय
-if (MenuAbierto) {
-    PopupMenu* m = MenuAbierto;
+if (OpenMenu) {
+    PopupMenu* m = OpenMenu;
     int id = m->Click(mx, my);
-    if (id >= 0) m->Ejecutar(id);
+    if (id >= 0) m->Run(id);
 }
 
 // ड्रॉ करते समय, पूरी स्क्रीन वाले प्रोजेक्शन के साथ
-if (MenuAbierto) MenuAbierto->Render();
+if (OpenMenu) OpenMenu->Render();
 ```
 
 `Click` चुना गया id लौटाता है, `-1` अगर कुछ नहीं चुना गया या `-2` अगर कोई सबमेनू खुला।
 
 - माउस ऊपर से ले जाने पर पंक्ति हाइलाइट होती है और उसका सबमेनू खुलता है, बिना क्लिक के।
-- अगर माउस `60 * GlobalScale` पिक्सेल से ज़्यादा दूर चला जाए, तो मेनू अपने आप बंद हो जाता है। `cerrarLejos = false` के साथ नहीं: उस मेनू के लिए जो माउस पर नहीं खुला था।
+- अगर माउस `60 * GlobalScale` पिक्सेल से ज़्यादा दूर चला जाए, तो मेनू अपने आप बंद हो जाता है। `closeFar = false` के साथ नहीं: उस मेनू के लिए जो माउस पर नहीं खुला था।
 - बाहर क्लिक करने पर यह बंद हो जाता है।
 - एक सामान्य विकल्प मेनू बंद कर देता है। एक चेकबॉक्स बदलता है और मेनू खुला छोड़ देता है, ताकि कई चालू किए जा सकें। स्लाइडर पर क्लिक करने से मान वहाँ के हिसाब से सेट होता है जहाँ क्लिक पड़ा।
-- स्लाइडर पर दबाए रखकर ड्रैग करने से मान लाइव बदलता है। माउस संभालने वाला हर हलचल `MenuSliderDragMover(mx)` को देता है, जब तक `MenuSliderDragActivo()` `true` है, और छोड़ते समय `MenuSliderDragSoltar()` कॉल करता है।
+- स्लाइडर पर दबाए रखकर ड्रैग करने से मान लाइव बदलता है। माउस संभालने वाला हर हलचल `MenuSliderDragMove(mx)` को देता है, जब तक `MenuSliderDragActive()` `true` है, और छोड़ते समय `MenuSliderDragRelease()` कॉल करता है।
 - टचस्क्रीन पर, जो टैप कोई सबमेनू खोलता है वह उसके अंदर कुछ नहीं चुनता, भले ही सबमेनू उंगली के नीचे आ गया हो। दूसरा टैप चाहिए।
 - सबमेनू में जो चुना जाता है वह उसी सबमेनू में चलता है: हर मेनू के अपने id होते हैं।
 
@@ -112,19 +112,19 @@ if (MenuAbierto) MenuAbierto->Render();
 फ़ोकस सबसे अंदर खुले सबमेनू के पास होता है:
 
 ```cpp
-PopupMenu* m = MenuAbierto;
-while (m->submenuAbierto && m->submenuAbierto->abierto) m = m->submenuAbierto;
-MenuItem* it = m->ItemActual();      // हाइलाइट किया गया विकल्प, या NULL
+PopupMenu* m = OpenMenu;
+while (m->openSubmenu && m->openSubmenu->open) m = m->openSubmenu;
+MenuItem* it = m->CurrentItem();      // हाइलाइट किया गया विकल्प, या NULL
 ```
 
 | फ़ंक्शन | क्या करता है |
 |---|---|
 | `button_up()`, `button_down()` | हाइलाइट को हिलाते हैं, घूमकर वापस आते हुए। सबमेनू नहीं खोलते |
-| `AbrirSubmenuActual()` | हाइलाइट किए गए विकल्प का सबमेनू खोलता है और उसका पहला विकल्प हाइलाइट करता है |
-| `AjustarSlider(+1)`, `AjustarSlider(-1)` | स्लाइडर को उसकी रेंज का बीसवाँ हिस्सा खिसकाते हैं |
-| `Enter()` | हाइलाइट किए गए विकल्प पर क्लिक जैसा, और वही लौटाता है। `MenuAbierto` पर कॉल करने पर, यह अपने आप सबसे अंदर वाले सबमेनू तक पहुँचता है |
-| `Cerrar()` | मेनू और उसके सबमेनू बंद करता है |
+| `OpenSubmenuCurrent()` | हाइलाइट किए गए विकल्प का सबमेनू खोलता है और उसका पहला विकल्प हाइलाइट करता है |
+| `FitSlider(+1)`, `FitSlider(-1)` | स्लाइडर को उसकी रेंज का बीसवाँ हिस्सा खिसकाते हैं |
+| `Enter()` | हाइलाइट किए गए विकल्प पर क्लिक जैसा, और वही लौटाता है। `OpenMenu` पर कॉल करने पर, यह अपने आप सबसे अंदर वाले सबमेनू तक पहुँचता है |
+| `Close()` | मेनू और उसके सबमेनू बंद करता है |
 
 कीबोर्ड से, हाइलाइट किया गया विकल्प हमेशा दिखता रहता है। कौन-सी कुंजी किसे कॉल करती है, यह मेनू इस्तेमाल करने वाला तय करता है।
 
-`MenuPantallaW` और `MenuPantallaH` में स्क्रीन का आकार होना चाहिए: इन्हीं से मेनू अपनी जगह ठीक करता है।
+`MenuScreenW` और `MenuScreenH` में स्क्रीन का आकार होना चाहिए: इन्हीं से मेनू अपनी जगह ठीक करता है।

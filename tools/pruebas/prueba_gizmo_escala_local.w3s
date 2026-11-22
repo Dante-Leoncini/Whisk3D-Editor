@@ -2,4 +2,4 @@
 # ejes del objeto (la flecha roja apunta a su X y arrastrarla estira solo su X). El de MOVER sigue el menu.
 add cube
 selobj Cubo.001
-gizmoescalalocal
+gizmoscalelocal

@@ -1,6 +1,6 @@
 # Logs
 
-Three printf-style levels: `w3dLogf` (information), `w3dLogfW` (warning) and `w3dLogfE` (error). `g_w3dLogNivel` filters at runtime (3 = everything, 0 = nothing), and compiling with `W3D_DEV_LOG=0` removes the calls from the executable. The last lines are also kept in memory: that's what the editor's [Console](../editor/consola.md) shows.
+Three printf-style levels: `w3dLogf` (information), `w3dLogfW` (warning) and `w3dLogfE` (error). `g_w3dLogLevel` filters at runtime (3 = everything, 0 = nothing), and compiling with `W3D_DEV_LOG=0` removes the calls from the executable. The last lines are also kept in memory: that's what the editor's [Console](../editor/consola.md) shows.
 
 | System | Where it goes |
 |---|---|

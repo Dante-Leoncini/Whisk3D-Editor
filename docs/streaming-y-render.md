@@ -8,7 +8,7 @@ juego.
 
 ## 1. Una textura por RUTA, no por material
 
-`Whisk3DCore/objects/TexturaCache.cpp` es la única puerta de creación y destrucción de una `Texture`
+`Whisk3DCore/objects/TextureCache.cpp` es la única puerta de creación y destrucción de una `Texture`
 de contenido. Indexa por la ruta con la que se pidió y lleva **refcount**.
 
 Sin ese caché, cada camino que ve un `map_Kd` hace `new Texture()` + `LoadTexture`: el importador

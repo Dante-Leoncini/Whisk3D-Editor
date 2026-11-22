@@ -5,11 +5,11 @@
 # uifuente imprime fuenteBitmap='texturas/ui/fuente-bitmap-npot.png' para
 # TxtBitmap y vacia para TxtNormal; tras el v4 el campo tiene que sobrevivir
 # (como entrada del contenedor, junto con su .json de glifos).
-abrirw3d prueba_fuente.w3d
-uifuente
-guardarw3d prueba_fuente_v4.w3d
-abrirw3d prueba_fuente_v4.w3d
-uifuente
+openw3d prueba_fuente.w3d
+uifont
+savew3d prueba_fuente_v4.w3d
+openw3d prueba_fuente_v4.w3d
+uifont
 
 # --- LAS METRICAS POR GLIFO (xoff / yoff / avance del .json) ----------------
 # La fuente de esta prueba es un atlas NPOT (136x99) generado con
@@ -17,23 +17,23 @@ uifuente
 # contra el tamano acolchado (arriba `uifuente` asierta justamente eso).
 #
 # 'A' es un glifo comun: 10x14 = exactamente el alto del renglon.
-uiglifo TxtBitmap A 10 14 0 0 12
+uiglyph TxtBitmap A 10 14 0 0 12
 # 'g' tiene DESCENDENTE: 18 px de alto contra 14 de renglon, y declara yoff 0
 # para colgar por debajo de la base. Con el default viejo (yoff = alto_linea -
 # h) daria -4 y el glifo saldria LEVANTADO por encima del renglon: ese es el
 # caso que una fuente solo-mayusculas nunca ejercitaba.
-uiglifo TxtBitmap g 10 18 0 0 12
-uiglifo TxtBitmap p 10 18 0 0 12
-uiglifo TxtBitmap , 10 18 0 0 12
+uiglyph TxtBitmap g 10 18 0 0 12
+uiglyph TxtBitmap p 10 18 0 0 12
+uiglyph TxtBitmap , 10 18 0 0 12
 
 # --- LOS DEFAULTS DEL FORMATO Y EL OPT-IN DE MAYUSCULAS ---------------------
 # fuente-bitmap-minima.json declara SOLO x/y/w/h y solo mayusculas. Sirve para
 # dos cosas:
 #  a) los defaults: xoff = 0, avance = w + 1 = 11, yoff = alto_linea - h.
 #     Para 'A' (h = 14 = alto_linea) eso da yoff 0, igual que declararlo.
-uiglifo TxtMinima A 10 14 0 0 11
+uiglyph TxtMinima A 10 14 0 0 11
 #  b) "mayusculas_si_falta": true -> la minuscula ausente cae en su mayuscula y
 #     sale con las MISMAS metricas. Sin esa clave el motor avisa por log y el
 #     codepoint cae en el glifo de reemplazo (que es el default para cualquier
 #     proyecto que no lo pida).
-uiglifo TxtMinima a 10 14 0 0 11
+uiglyph TxtMinima a 10 14 0 0 11

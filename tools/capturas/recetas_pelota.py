@@ -15,38 +15,38 @@ BR_SUPERPOS = 7
 
 
 def SHIFT(t):
-    return ["tecla Left_Shift down", "tecla " + t, "tecla Left_Shift up"]
+    return ["key Left_Shift down", "key " + t, "key Left_Shift up"]
 
 
 def N(t, numero):
     """Una tecla + un numero + Enter (S 0.75, G 5)."""
-    return ["tecla " + c for c in t] + ["texto " + numero, "tecla Return"]
+    return ["key " + c for c in t] + ["text " + numero, "key Return"]
 
 
 # las ETAPAS, en orden: cada una deja la escena como queda despues de esa parte del tutorial
 ETAPAS = [
     ("esfera", ["selobj {Cube}", "delete", "cursor3d 0 1 0", "add sphere", "cursor3d 0 0 0"]),
-    ("cursor", ["ratonvista3d", "tecla Tab", "elegirvertice abajo"] + SHIFT("s") +
-               ["menuelegir Cursor to Selected", "tecla Tab"]),
-    ("vacio", ["agregar vacio"]),
+    ("cursor", ["mouseview3d", "key Tab", "pickvertex abajo"] + SHIFT("s") +
+               ["menupick Cursor to Selected", "key Tab"]),
+    ("vacio", ["addui empty"]),
     ("emparentada", ["parent {Esfera} {Vacio}", "parent {Vacio} {Coleccion}", "selobj {Vacio}"]),
-    ("aplastada", ["ratonvista3d", "frame 1", "tecla i", "menuelegir Scale Only", "frame 2"] + N("sz", "0.75") +
-                  ["tecla s"] + SHIFT("z") + ["texto 1.6", "tecla Return", "tecla i", "menuelegir Scale Only"]),
+    ("aplastada", ["mouseview3d", "frame 1", "key i", "menupick Scale Only", "frame 2"] + N("sz", "0.75") +
+                  ["key s"] + SHIFT("z") + ["text 1.6", "key Return", "key i", "menupick Scale Only"]),
     # (Shift+D saca la copia UN cuadro a la derecha; el numero tipeado se suma: 1 -> 1 + 1 + 2 = 4)
-    ("redonda", ["tl selframe 1", "tl duplicar", "tl valor 2", "tl aceptar",
-                 "tl selframe 1", "tl duplicar", "tl valor 15", "tl aceptar",
-                 "tl selframe 1", "tl duplicar", "tl valor 27", "tl aceptar"]),
-    ("estirada", ["frame 4", "ratonvista3d"] + N("sz", "1.1") + ["tecla s"] + SHIFT("z") +
-                 ["texto 0.9", "tecla Return", "tecla i", "menuelegir Scale Only"]),
-    ("salto", ["frame 3", "tecla i", "menuelegir Location Only", "frame 16"] + N("gz", "5") +
-              ["tecla i", "menuelegir Location Only", "tl selframe 3", "tl duplicar", "tl valor 25", "tl aceptar"]),
-    ("fin", ["tl fin 28"]),
-    ("limpia", ["tl borrarcurva loc x", "tl borrarcurva loc y"]),
+    ("redonda", ["tl selframe 1", "tl duplicate", "tl value 2", "tl accept",
+                 "tl selframe 1", "tl duplicate", "tl value 15", "tl accept",
+                 "tl selframe 1", "tl duplicate", "tl value 27", "tl accept"]),
+    ("estirada", ["frame 4", "mouseview3d"] + N("sz", "1.1") + ["key s"] + SHIFT("z") +
+                 ["text 0.9", "key Return", "key i", "menupick Scale Only"]),
+    ("salto", ["frame 3", "key i", "menupick Location Only", "frame 16"] + N("gz", "5") +
+              ["key i", "menupick Location Only", "tl selframe 3", "tl duplicate", "tl value 25", "tl accept"]),
+    ("fin", ["tl end 28"]),
+    ("limpia", ["tl deletecurve loc x", "tl deletecurve loc y"]),
     ("curvas", ["keyinterp out 3 loc", "keyinterp in 16 loc"]),
 ]
 
-VISTA_CERCA = "vporbita 0 1.0 0 6.5 -14 -30"      # la pelota de cerca
-VISTA_SALTO = "vporbita 0 3.0 0 15 -8 -30"        # el salto entero (hasta Z 5 y un poco mas)
+VISTA_CERCA = "vporbit 0 1.0 0 6.5 -14 -30"      # la pelota de cerca
+VISTA_SALTO = "vporbit 0 3.0 0 15 -8 -30"        # el salto entero (hasta Z 5 y un poco mas)
 
 
 def nombres(idioma):
@@ -68,11 +68,11 @@ def guion(idioma, hasta, vista=VISTA_CERCA, raton=True, tl=(-1, 31)):
     costado el Outliner y Propiedades; la escena armada HASTA esa etapa (incluida)."""
     g = Guion(idioma, w=1440, h=840, raton=raton)
     g.linea("division 0.7")
-    g.linea("divisionde 5 0.58")
+    g.linea("divisionof 5 0.58")
     armar(g, hasta)
     g.linea(vista)
     g.linea("cursor3d 0 -30 0")
-    g.linea("tl vista %g %g" % tl)
+    g.linea("tl view %g %g" % tl)
     return g
 
 
@@ -96,7 +96,7 @@ def tl_duplicar(g, desde, hasta, fila=0):
     g.foto(dur=400)
     g.clic(x, y)
     g.foto(dur=500)
-    g.linea("tecla Left_Shift down"); g.linea("tecla d"); g.linea("tecla Left_Shift up")
+    g.linea("key Left_Shift down"); g.linea("key d"); g.linea("key Left_Shift up")
     g.foto(dur=500, tecla="Shift + D")
     x2 = i.tl_x(hasta - 1)
     g.raton_mover(x + 1, y)                       # (el editor descarta el primer movimiento despues de Shift+D: se
@@ -123,7 +123,7 @@ def en_vista3d(g, fx=0.72, fy=0.62):
 
 def insertar(g, opcion_en):
     """I y la opcion del menu Insertar Keyframe (Solo Escala / Solo Localizacion)."""
-    rp.pasos(g, [("I", ["tecla i"])], fin=300)
+    rp.pasos(g, [("I", ["key i"])], fin=300)
     rp.menu_abierto(g, opcion_en, despues=900)
 
 
@@ -147,15 +147,15 @@ def vacio(idioma):
     g.linea("selmode vertex")
     g.foto(dur=700)
     en_vista3d(g)
-    rp.pasos(g, [("Tab", ["tecla Tab"])], fin=400)
+    rp.pasos(g, [("Tab", ["key Tab"])], fin=400)
     g.linea("select none")
     menu(g, BR_SUPERPOS, ["X-Ray"])
     g.tecla("Escape")
     g.foto(dur=700)
-    rp.senalar3d(g, (0, 0, 0), "elegirvertice abajo", despues=900)
+    rp.senalar3d(g, (0, 0, 0), "pickvertex abajo", despues=900)
     rp.pasos(g, [("Shift + S", SHIFT("s"))], fin=300)
     rp.menu_abierto(g, "Cursor to Selected", despues=900)
-    rp.pasos(g, [("Tab", ["tecla Tab"])], fin=400)
+    rp.pasos(g, [("Tab", ["key Tab"])], fin=400)
     menu(g, BR_SUPERPOS, ["X-Ray"])
     g.tecla("Escape")
     en_vista3d(g)
@@ -175,7 +175,7 @@ def vacio(idioma):
     g.mod()
     g.foto(dur=900, tecla="Ctrl + click")
     en_vista3d(g)
-    rp.pasos(g, [("Ctrl + P", ["tecla Left_Ctrl down", "tecla p", "tecla Left_Ctrl up"])], fin=300)
+    rp.pasos(g, [("Ctrl + P", ["key Left_Ctrl down", "key p", "key Left_Ctrl up"])], fin=300)
     rp.menu_abierto(g, "Object (Keep Transform)", despues=1800)
     return g.cuadros(calidad=90)
 
@@ -199,7 +199,7 @@ def por_que(idioma):
         en_vista3d(g)
         marca = [("etiqueta", v["x"] + v["w"] // 2, arriba, cartel[idioma])]
         hechas = []
-        for rot, lin in [("S", ["tecla s"]), ("Z", ["tecla z"]), ("0.5", ["texto 0.5"])]:
+        for rot, lin in [("S", ["key s"]), ("Z", ["key z"]), ("0.5", ["text 0.5"])]:
             hechas.append(rot)
             g.foto(dur=350, tecla=",  ".join(hechas))
             for l in lin:
@@ -220,9 +220,9 @@ def aplastar(idioma):
     en_vista3d(g)
     g.foto(dur=700, tecla=PorIdioma({"es": "cuadro 1", "en": "frame 1"})[idioma])
     insertar(g, "Scale Only")
-    rp.pasos(g, [("→", ["tecla Right"])], fin=500)
+    rp.pasos(g, [("→", ["key Right"])], fin=500)
     rp.pasos(g, rp.teclas_numero(["s", "z"], "0.75"), fin=500)
-    rp.pasos(g, [("S", ["tecla s"]), SHIFT_Z, ("1.6", ["texto 1.6"]), ("Enter", ["tecla Return"])], fin=500)
+    rp.pasos(g, [("S", ["key s"]), SHIFT_Z, ("1.6", ["text 1.6"]), ("Enter", ["key Return"])], fin=500)
     insertar(g, "Scale Only")
     g.foto(dur=1200)
     return g.cuadros(calidad=90)
@@ -240,7 +240,7 @@ def estirar(idioma):
     tl_cuadro(g, 4)
     en_vista3d(g)
     rp.pasos(g, rp.teclas_numero(["s", "z"], "1.1"), fin=500)
-    rp.pasos(g, [("S", ["tecla s"]), SHIFT_Z, ("0.9", ["texto 0.9"]), ("Enter", ["tecla Return"])], fin=500)
+    rp.pasos(g, [("S", ["key s"]), SHIFT_Z, ("0.9", ["text 0.9"]), ("Enter", ["key Return"])], fin=500)
     insertar(g, "Scale Only")
     g.foto(dur=1200)
     return g.cuadros(calidad=90)
@@ -261,7 +261,7 @@ def saltar(idioma):
     rp.pasos(g, rp.teclas_numero(["g", "z"], "5"), fin=500)
     insertar(g, "Location Only")
     tl_duplicar(g, 3, 29)
-    g.linea("tl fin 28")                          # (el Fin, en el video que sigue: aca, que el Play de la vuelta)
+    g.linea("tl end 28")                          # (el Fin, en el video que sigue: aca, que el Play de la vuelta)
     reproducir(g, vueltas=2, cartel=PorIdioma({"es": "Espacio (Play)", "en": "Space (Play)"})[idioma])
     return g.cuadros(calidad=88)
 
@@ -282,8 +282,8 @@ def fin(idioma):
     g.foto(dur=500)
     g.clic(x, y)
     g.foto(dur=500)
-    g.linea("tecla Left_Ctrl down"); g.linea("tecla a"); g.linea("tecla Left_Ctrl up")
-    rp.pasos(g, [("28", ["texto 28"]), ("Enter", ["tecla Return"])], fin=900)
+    g.linea("key Left_Ctrl down"); g.linea("key a"); g.linea("key Left_Ctrl up")
+    rp.pasos(g, [("28", ["text 28"]), ("Enter", ["key Return"])], fin=900)
     g.tecla("Escape")
     g.foto(dur=1500)
     return g.cuadros(calidad=90)
@@ -305,14 +305,14 @@ def curvas(idioma):
         g.foto(dur=450)
         g.clic(x, y)
         g.foto(dur=600)
-        rp.pasos(g, [("X", ["tecla x"])], fin=600)
+        rp.pasos(g, [("X", ["key x"])], fin=600)
     x, y = g.info().boton_rol(TIMELINE, TL_VISTA)
     g.raton_mover(x, y)
     g.foto(dur=400)
     g.clic(x, y)
     g.foto(dur=600)
     rp.menu_abierto(g, "Curves", despues=900)
-    g.linea("tl vista -1 31 -0.6 5.6")
+    g.linea("tl view -1 31 -0.6 5.6")
     g.foto(dur=1200)
     for f, ease in ((3, TL_AL_LLEGAR), (16, TL_AL_ARRANCAR)):
         x, y = g.info().tl_key_curva(0, 1, f)
@@ -347,7 +347,7 @@ def final(idioma):
     g = guion(idioma, "curvas", vista=VISTA_SALTO)
     piso(g, 5, 5)
     g.linea("deselectall")
-    g.linea("vista3d overlays 0")
+    g.linea("view3d overlays 0")
     v = g.info().vp(VISTA_3D)
     reproducir(g, vueltas=3)
     return g.cuadros(calidad=88, recorte=(v["x"], v["y"] + v["barra"], v["w"], v["h"] - v["barra"]))
@@ -377,25 +377,25 @@ def comparar(idioma):
         g.linea("add sphere")
         g.linea("objname " + nombre)
         g.linea("cursor3d %g 0 0" % x)
-        g.linea("origen cursor")
+        g.linea("origin cursor")
         g.linea("selobj " + nombre)
         for f, z in ((3, 0), (16, 5), (29, 0)):
-            g.linea("keyponer %d loc %g 0 %g" % (f, x, z))
+            g.linea("keyset %d loc %g 0 %g" % (f, x, z))
         if curva == "lineal":
-            g.linea("keyinterp lineal 3 loc")
-            g.linea("keyinterp lineal 16 loc")
+            g.linea("keyinterp linear 3 loc")
+            g.linea("keyinterp linear 16 loc")
         else:
             g.linea("keyinterp out 3 loc")
             g.linea("keyinterp in 16 loc")
         if estirar:
             for f, (sx, sz) in ((1, (1, 1)), (2, (1.6, 0.75)), (4, (0.9, 1.1)), (17, (1, 1)), (29, (1, 1))):
-                g.linea("keyponer %d esc %g %g %g" % (f, sx, sx, sz))
-    g.linea("tl fin 28")
+                g.linea("keyset %d esc %g %g %g" % (f, sx, sx, sz))
+    g.linea("tl end 28")
     piso(g, 9, 2)
     g.linea("deselectall")
-    g.linea("vista3d overlays 0")
-    g.linea("vporbita 0 3.7 0 12 0 0")
-    g.linea("n95 perspectiva")                    # (ortografica: las tres a la misma escala)
+    g.linea("view3d overlays 0")
+    g.linea("vporbit 0 3.7 0 12 0 0")
+    g.linea("n95 perspective")                    # (ortografica: las tres a la misma escala)
     g.linea("frame 1")
     i = g.info()
     v = i.vp(VISTA_3D)
@@ -467,10 +467,10 @@ def saltar_dedo(idioma):
     return g.cuadros(calidad=90)
 
 
-def guion_n95(idioma, hasta, vista="vporbita 0 1.0 0 7.5 -14 -30"):
+def guion_n95(idioma, hasta, vista="vporbit 0 1.0 0 7.5 -14 -30"):
     g = Guion(idioma, n95="vertical")
-    g.linea("vista3d gizmo 0")
-    g.linea("vista3d barra 0")
+    g.linea("view3d gizmo 0")
+    g.linea("view3d bar 0")
     armar(g, hasta)
     g.linea(vista)
     g.linea("cursor3d 0 -30 0")
@@ -483,9 +483,9 @@ def aplastar_nokia(idioma):
     1.6."""
     g = guion_n95(idioma, "emparentada")
     g.linea("frame 1")
-    g.linea("ratonvista3d")
-    g.linea("tecla i")
-    g.linea("menuelegir Scale Only")
+    g.linea("mouseview3d")
+    g.linea("key i")
+    g.linea("menupick Scale Only")
     g.linea("frame 2")
     g.foto(dur=900)
     n95_comando(g, 3, "3", 2, "3", "0.75")
@@ -497,11 +497,11 @@ def aplastar_nokia(idioma):
 @receta("pelota-saltar-nokia")
 def saltar_nokia(idioma):
     """N95 (en el cuadro 16): 1, 3 (Z), lapiz + 5, OK."""
-    g = guion_n95(idioma, "emparentada", vista="vporbita 0 2.6 0 13 -10 -30")   # (el N95 no tiene Linea de tiempo)
+    g = guion_n95(idioma, "emparentada", vista="vporbit 0 2.6 0 13 -10 -30")   # (el N95 no tiene Linea de tiempo)
     g.linea("frame 3")
-    g.linea("ratonvista3d")
-    g.linea("tecla i")
-    g.linea("menuelegir Location Only")
+    g.linea("mouseview3d")
+    g.linea("key i")
+    g.linea("menupick Location Only")
     g.linea("frame 16")
     g.foto(dur=900)
     n95_comando(g, 1, "1", 2, "3", "5")

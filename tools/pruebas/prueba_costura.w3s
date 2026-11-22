@@ -25,14 +25,14 @@
 #  con color por vertice distinto a cada lado, o sea DOS control-points en
 #  (-1,0,-1) y DOS en (1,0,1). El sidecar mete en el grupo los del lado rojo.
 # ==========================================================================
-abrirw3d prueba_costura.w3d
+openw3d prueba_costura.w3d
 
 # --- RECIEN IMPORTADO: el grupo es el que declara el sidecar ---------------
 # 2 control-points (los rojos), 2 render-verts.
 vertinfo QuadCostura costura 2 2
 simplay 1
-scriptinfo compartido nverts 2
-scriptinfo compartido fuera 0
+scriptinfo shared nverts 2
+scriptinfo shared fuera 0
 simstop
 
 # --- TRAS EL ROUND-TRIP: el grupo vuelve IGUAL ------------------------------
@@ -41,12 +41,12 @@ simstop
 # que el archivo los guarda como puntos distintos y el grupo vuelve con sus 2,
 # ni uno menos (el bug viejo: volvia incompleto) ni uno mas (el bug siguiente:
 # soldarlos por posicion le regalaba el peso a los del otro lado).
-guardarw3d prueba_costura_v4.w3d
-abrirw3d prueba_costura_v4.w3d
+savew3d prueba_costura_v4.w3d
+openw3d prueba_costura_v4.w3d
 vertinfo QuadCostura costura 2 2
 # y lo que ve LUA por grupoVertices() (la via por la que un juego mueve o tine
 # un subconjunto de la malla) son los mismos 2, en las dos posiciones del grupo
 simplay 1
-scriptinfo compartido nverts 2
-scriptinfo compartido fuera 0
+scriptinfo shared nverts 2
+scriptinfo shared fuera 0
 simstop

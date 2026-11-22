@@ -5,7 +5,7 @@ trpanel on
 add cube
 selobj Cubo.001
 objmove 1 0 0
-trinfo mover
-trfoco
-trinfo cerrado
+trinfo move
+trfocus
+trinfo closed
 objat Cubo.001 1 0 0 0.001

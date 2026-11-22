@@ -20,124 +20,124 @@
 #       recupera su nombre.
 # ==========================================================================
 
-ventana 1280 720
-libcrear /tmp/w3d_f8x/lib personajes.w3d dosmats.png
-libcrearextras /tmp/w3d_f8x/extras extras.w3d dosmats.png /tmp/w3d_f8x/lib/personajes.w3d
+window 1280 720
+libcreate /tmp/w3d_f8x/lib personajes.w3d dosmats.png
+libcreateextras /tmp/w3d_f8x/extras extras.w3d dosmats.png /tmp/w3d_f8x/lib/personajes.w3d
 # (la libreria: su textura y su script de afuera quedan "ext:"; lo suelto no entra; lo importado si)
-entradatiene /tmp/w3d_f8x/extras/extras.w3d proyecto.json ext:fuera/cartel.png 1
-entradatiene /tmp/w3d_f8x/extras/extras.w3d prefabs/cartel.w3dp ext:fuera/externo.lua 1
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d texturas/cartel.png 0
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d scripts/externo.lua 0
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d sonidos/entrada.wav 1
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d extra/roca.w3d 1
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d texturas/logo.png 1
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d sonidos/bip.wav 0
-entradaexiste /tmp/w3d_f8x/extras/extras.w3d anexos/piedra.w3d 0
-entradatiene /tmp/w3d_f8x/extras/extras.w3d proyecto.json "librerias": 1
-entradatiene /tmp/w3d_f8x/extras/extras.w3d prefabs/escuadra.w3dp "proxy", 1
-entradatiene /tmp/w3d_f8x/extras/extras.w3d prefabs/escuadra.w3dp personajes/Tronco 1
+entryhas /tmp/w3d_f8x/extras/extras.w3d project.json ext:fuera/cartel.png 1
+entryhas /tmp/w3d_f8x/extras/extras.w3d prefabs/cartel.w3dp ext:fuera/externo.lua 1
+entryexists /tmp/w3d_f8x/extras/extras.w3d textures/cartel.png 0
+entryexists /tmp/w3d_f8x/extras/extras.w3d scripts/externo.lua 0
+entryexists /tmp/w3d_f8x/extras/extras.w3d sounds/entrada.wav 1
+entryexists /tmp/w3d_f8x/extras/extras.w3d extra/roca.w3d 1
+entryexists /tmp/w3d_f8x/extras/extras.w3d textures/logo.png 1
+entryexists /tmp/w3d_f8x/extras/extras.w3d sounds/bip.wav 0
+entryexists /tmp/w3d_f8x/extras/extras.w3d anexos/piedra.w3d 0
+entryhas /tmp/w3d_f8x/extras/extras.w3d project.json "libs": 1
+entryhas /tmp/w3d_f8x/extras/extras.w3d prefabs/escuadra.w3dp "proxy", 1
+entryhas /tmp/w3d_f8x/extras/extras.w3d prefabs/escuadra.w3dp personajes/Tronco 1
 
 # --- A) LIBRERIA ADENTRO DE LIBRERIA ---
-escenadefecto
-libvincular /tmp/w3d_f8x/extras/extras.w3d
-libinfo extras vinculada 1 prefabs 4 escenas 2 cantidad 1
-libinfo personajes vinculada 0
+scenedefault
+liblink /tmp/w3d_f8x/extras/extras.w3d
+libinfo extras linked 1 prefabs 4 scenes 2 count 1
+libinfo personajes linked 0
 libproxy extras prefab Escuadra 0 0 0
-libanidada extras personajes como extras~personajes
-libinfo personajes vinculada 0 cantidad 1
-prefabnodo Escuadra Enemigo tipo proxy generado 1
-prefabnodo Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo tipo mesh generado 1
-prefabnodo Escuadra Viga tipo mesh generado 1
-mallainfo Viga recurso extras~personajes/Tronco
-libcompartido extras~personajes prefab Enemigo proxies 1 mallas 1 animsets 1 materiales 1 texturas 1
-librecurso malla extras~personajes/Cuerpo existe 1 libreria extras~personajes biblioteca 0
-libmarca Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo candado
-libmarca Escuadra Viga candado
-libmarca Escuadra proxy -
+libnested extras personajes as extras~personajes
+libinfo personajes linked 0 count 1
+prefabnode Escuadra Enemigo type proxy generated 1
+prefabnode Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo type mesh generated 1
+prefabnode Escuadra Viga type mesh generated 1
+meshcheck Viga resource extras~personajes/Tronco
+libshared extras~personajes prefab Enemigo proxies 1 meshes 1 animsets 1 materials 1 textures 1
+libresource mesh extras~personajes/Cuerpo exists 1 lib extras~personajes library 0
+libmark Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo lock
+libmark Escuadra Viga lock
+libmark Escuadra proxy -
 # (el proxy de adentro no se toca: ni Edit Mode, ni las filas de Properties)
-libeditar Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo
+libedit Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo
 prefabsel Escuadra Enemigo/Enemigo/Esqueleto/Cuerpo
-libpropsmalla 3 lectura 1 intentar
+libpropsmesh 3 lectura 1 try
 # (el nivel vincula el MISMO archivo: la de adentro pasa a ser esa y comparten memoria)
-libvincular /tmp/w3d_f8x/lib/personajes.w3d
-libanidada extras personajes como personajes
+liblink /tmp/w3d_f8x/lib/personajes.w3d
+libnested extras personajes as personajes
 libproxy personajes prefab Enemigo 4 0 0
 libproxy extras prefab Escuadra 8 0 0
-libcompartido personajes prefab Enemigo proxies 2 mallas 1 animsets 1 materiales 1 texturas 1
+libshared personajes prefab Enemigo proxies 2 meshes 1 animsets 1 materials 1 textures 1
 # (guardar: nada de la de adentro entra al nivel; reabrir la vuelve a resolver igual)
-guardarw3d /tmp/w3d_f8x/nivel/nivel.w3d
-entradatiene /tmp/w3d_f8x/nivel/nivel.w3d proyecto.json extras~ 0
-entradatiene /tmp/w3d_f8x/nivel/nivel.w3d proyecto.json Tronco 0
-entradaexiste /tmp/w3d_f8x/nivel/nivel.w3d mallas/tronco.w3db 0
-abrirw3d /tmp/w3d_f8x/nivel/nivel.w3d
-libanidada extras personajes como personajes
-libcompartido personajes prefab Enemigo proxies 3 mallas 1 animsets 1 materiales 1 texturas 1
-guardarw3d /tmp/w3d_f8x/nivel/nivel2.w3d
-abrirw3d /tmp/w3d_f8x/nivel/nivel2.w3d
-guardarw3d /tmp/w3d_f8x/nivel/nivel3.w3d
-w3diguales /tmp/w3d_f8x/nivel/nivel2.w3d /tmp/w3d_f8x/nivel/nivel3.w3d
+savew3d /tmp/w3d_f8x/nivel/nivel.w3d
+entryhas /tmp/w3d_f8x/nivel/nivel.w3d project.json extras~ 0
+entryhas /tmp/w3d_f8x/nivel/nivel.w3d project.json Tronco 0
+entryexists /tmp/w3d_f8x/nivel/nivel.w3d meshes/tronco.w3db 0
+openw3d /tmp/w3d_f8x/nivel/nivel.w3d
+libnested extras personajes as personajes
+libshared personajes prefab Enemigo proxies 3 meshes 1 animsets 1 materials 1 textures 1
+savew3d /tmp/w3d_f8x/nivel/nivel2.w3d
+openw3d /tmp/w3d_f8x/nivel/nivel2.w3d
+savew3d /tmp/w3d_f8x/nivel/nivel3.w3d
+w3dequal /tmp/w3d_f8x/nivel/nivel2.w3d /tmp/w3d_f8x/nivel/nivel3.w3d
 
 # --- B) AFUERA de su .w3d ("ext:"), SUELTOS y ENTRADAS que nombra su script ---
-escenadefecto
-libvincular /tmp/w3d_f8x/extras/extras.w3d
+scenedefault
+liblink /tmp/w3d_f8x/extras/extras.w3d
 libproxy extras prefab Cartel 0 0 0
-libtexcargar
-texrefde material extras/Pintura /tmp/w3d_f8x/extras/fuera/cartel.png
-prefabnodo Cartel . tipo vacio generado 1
+libtexload
+texrefof material extras/Pintura /tmp/w3d_f8x/extras/fuera/cartel.png
+prefabnode Cartel . type empty generated 1
 simplay 3
-scriptinfo compartido externo OK
-scriptinfo compartido anexos Piedra+Roca
+scriptinfo shared externo OK
+scriptinfo shared anexos Piedra+Roca
 simstop
 
 # --- C) sonido() de un script de la libreria: lo suelto y la entrada son de SU libreria ---
 libproxy extras prefab Sonoro 4 0 0
 simplay 3
-scriptinfo compartido sonoro listo
-libsonido /tmp/w3d_f8x/extras/sonidos/bip.wav cacheado 1
-libsonido lib:extras/sonidos/entrada.wav cacheado 1
+scriptinfo shared sonoro listo
+libsound /tmp/w3d_f8x/extras/sounds/bip.wav cached 1
+libsound lib:extras/sounds/entrada.wav cached 1
 simstop
 
 # --- D) una escena UI de la libreria: sus rutas son de ELLA (y las de su setTextura) ---
-libproxy extras escena Panel 0 0 4
-libimagen Fondo textura lib:extras/texturas/logo.png
-libimagen Icono textura - script lib:extras/scripts/panel.lua
+libproxy extras scene Panel 0 0 4
+libimage Fondo texture lib:extras/textures/logo.png
+libimage Icono texture - script lib:extras/scripts/panel.lua
 simplay 3
-libimagen Icono textura lib:extras/texturas/logo.png
+libimage Icono texture lib:extras/textures/logo.png
 simstop
 
 # --- E) un script de la libreria instancia un prefab de la de ADENTRO (el nombre de SU registro) ---
-escenadefecto
-libvincular /tmp/w3d_f8x/extras/extras.w3d
+scenedefault
+liblink /tmp/w3d_f8x/extras/extras.w3d
 libproxy extras prefab Llamador 0 0 0
 simplay 3
-scriptinfo compartido llamado proxy
-scriptinfo compartido tronco si
-prefabvivos 2
+scriptinfo shared llamado proxy
+scriptinfo shared tronco si
+prefablive 2
 simstop
-prefabvivos 1
+prefablive 1
 
 # --- F) desvincular: sus proxies se regeneran VACIOS; Ctrl+Z / Ctrl+Y ---
-escenadefecto
-libvincular /tmp/w3d_f8x/lib/personajes.w3d
-libproxy personajes prefab Enemigo 0 0 0 veces 3
-libdesvincular personajes
-libinfo personajes vinculada 0 cantidad 0
-libproxyinfo Enemigo libreria personajes generados 0 vacio 1
-libproxyinfo Enemigo.002 generados 0 vacio 1
+scenedefault
+liblink /tmp/w3d_f8x/lib/personajes.w3d
+libproxy personajes prefab Enemigo 0 0 0 times 3
+libunlink personajes
+libinfo personajes linked 0 count 0
+libproxyinfo Enemigo lib personajes generated 0 empty 1
+libproxyinfo Enemigo.002 generated 0 empty 1
 undo
-libinfo personajes vinculada 1 cantidad 1
-libproxyinfo Enemigo generados 4 vacio 0
-libproxyinfo Enemigo.002 generados 4 vacio 0
+libinfo personajes linked 1 count 1
+libproxyinfo Enemigo generated 4 empty 0
+libproxyinfo Enemigo.002 generated 4 empty 0
 redo
-libproxyinfo Enemigo.001 generados 0 vacio 1
+libproxyinfo Enemigo.001 generated 0 empty 1
 undo
-libproxyinfo Enemigo.001 generados 4 vacio 0
+libproxyinfo Enemigo.001 generated 4 empty 0
 # (volver a vincular el MISMO archivo, sin Ctrl+Z: recupera su nombre y sus proxies vuelven)
-libdesvincular personajes
-libproxyinfo Enemigo vacio 1
-libvincular /tmp/w3d_f8x/lib/personajes.w3d
-libinfo personajes vinculada 1
-libproxyinfo Enemigo generados 4 vacio 0
+libunlink personajes
+libproxyinfo Enemigo empty 1
+liblink /tmp/w3d_f8x/lib/personajes.w3d
+libinfo personajes linked 1
+libproxyinfo Enemigo generated 4 empty 0
 undo
-libproxyinfo Enemigo vacio 1
-libinfo personajes vinculada 0
+libproxyinfo Enemigo empty 1
+libinfo personajes linked 0

@@ -13,11 +13,11 @@
 A variable is created when you assign it a value. Always use `local`: the variable exists only inside the block where it was declared and doesn't clash with others.
 
 ```lua
-local vidas = 3           -- number (integer)
-local velocidad = 2.5     -- number (with decimals)
-local nombre = "Whisky"   -- text (string)
-local vivo = true         -- boolean: true or false
-local nada = nil          -- nil = "no value"
+local lives = 3         -- number (integer)
+local speed = 2.5       -- number (with decimals)
+local name = "Whisky"   -- text (string)
+local live = true       -- boolean: true or false
+local none = nil        -- nil = "no value"
 ```
 
 Lua's types are: `nil`, `boolean`, `number`, `string`, `table` and `function`. The scene objects Whisk3D gives you are a special type that you only use by passing it to the engine's functions.
@@ -30,9 +30,9 @@ Lua's types are: `nil`, `boolean`, `number`, `string`, `table` and `function`. T
 | `//` | Integer division | `7 // 2` → 3 |
 | `%` | Remainder | `7 % 2` → 1 |
 | `^` | Power | `2 ^ 3` → 8.0 |
-| `== ~= < > <= >=` | Comparisons (`~=` means "not equal") | `vidas ~= 0` |
-| `and or not` | Logical | `vivo and vidas > 0` |
-| `..` | Join strings | `"Vidas: " .. vidas` |
+| `== ~= < > <= >=` | Comparisons (`~=` means "not equal") | `lives ~= 0` |
+| `and or not` | Logical | `live and lives > 0` |
+| `..` | Join strings | `"Vidas: " .. lives` |
 | `#` | Length of a string or a list | `#"hola"` → 4 |
 
 > [!NOTE]
@@ -70,19 +70,19 @@ Lua has no `n++` or `n += 1`: you write `n = n + 1`. To break out of a loop, use
 ## Functions
 
 ```lua
-local function sumar(a, b)
+local function add(a, b)
   return a + b
 end
-print(sumar(2, 3))        -- 5
+print(add(2, 3))        -- 5
 
 -- a function can return several values
 local function minMax(a, b)
   if a < b then return a, b else return b, a end
 end
-local menor, mayor = minMax(8, 3)
+local less, greater = minMax(8, 3)
 ```
 
-Many Whisk3D functions return several values at once, for example `local x, y, z = posicion(yo())`.
+Many Whisk3D functions return several values at once, for example `local x, y, z = getPosition(self())`.
 
 ## Tables: lists and dictionaries
 
@@ -90,23 +90,23 @@ The table is Lua's only data structure, and it's used for everything.
 
 ```lua
 -- as a list (indices start at 1, not 0)
-local frutas = { "manzana", "pera", "uva" }
-print(frutas[1])          -- manzana
-print(#frutas)            -- 3
-frutas[#frutas + 1] = "kiwi"   -- add at the end
-table.insert(frutas, "melón")  -- another way
+local fruits = { "manzana", "pera", "uva" }
+print(fruits[1])          -- manzana
+print(#fruits)            -- 3
+fruits[#fruits + 1] = "kiwi"   -- add at the end
+table.insert(fruits, "melón")  -- another way
 
-for i, f in ipairs(frutas) do  -- go through a list in order
+for i, f in ipairs(fruits) do  -- go through a list in order
   print(i, f)
 end
 
 -- as a dictionary (key = value)
-local jugador = { nombre = "Ana", puntos = 0 }
-jugador.puntos = jugador.puntos + 10
-print(jugador["nombre"])  -- Ana
+local player = { name = "Ana", puntos = 0 }
+player.puntos = player.puntos + 10
+print(player["nombre"])  -- Ana
 
-for clave, valor in pairs(jugador) do  -- go through all the keys (in no fixed order)
-  print(clave, valor)
+for clave, value in pairs(player) do  -- go through all the keys (in no fixed order)
+  print(clave, value)
 end
 ```
 
@@ -115,7 +115,7 @@ end
 ```lua
 local t = string.format("Puntos: %d  Tiempo: %.1f", 120, 3.456)  -- "Puntos: 120  Tiempo: 3.5"
 local may = string.upper("hola")        -- "HOLA"
-local parte = string.sub("Whisk3D", 1, 5)   -- "Whisk"
+local part = string.sub("Whisk3D", 1, 5)   -- "Whisk"
 local n = tonumber("42")                -- string to number
 local s = tostring(3.5)                 -- number to string
 local r = math.floor(2.7)               -- 2
@@ -125,4 +125,4 @@ local m = math.max(4, 9, 2)             -- 9
 local pi = math.pi
 ```
 
-For random numbers, Whisk3D has `azar()` (see the reference). `math.random` also works, and it already comes seeded differently in each game session.
+For random numbers, Whisk3D has `random()` (see the reference). `math.random` also works, and it already comes seeded differently in each game session.

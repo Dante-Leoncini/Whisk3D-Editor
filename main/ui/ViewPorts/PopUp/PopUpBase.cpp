@@ -28,7 +28,7 @@ void PopUpBase::initView() {
     w3dEngine::LoadIdentity();
 
     // arbol arriba-izquierda -> GL abajo-izquierda (4 OS)
-    const int glY = W3dPantallaAlto - y - popUpWindow->height;
+    const int glY = W3dScreenHeight - y - popUpWindow->height;
     w3dEngine::Enable(w3dEngine::ScissorTest);
     w3dEngine::Scissor(x, glY, popUpWindow->width, popUpWindow->height);
     w3dEngine::Viewport(x, glY, popUpWindow->width, popUpWindow->height);
@@ -65,16 +65,16 @@ bool PopUpBase::Motion(int mx, int my) {
     return true;
 }
 
-bool PopUpBase::Tecla(int tecla) {
+bool PopUpBase::Key(int key) {
     return true;
 }
 
-void PopUpBase::Soltar() {}
+void PopUpBase::Release() {}
 
-bool PopUpBase::Arrastrando() {
+bool PopUpBase::Dragging() {
     return false;
 }
 
-void PopUpBase::Cerrar() {
+void PopUpBase::Close() {
     if (PopUpActive == this) PopUpActive = NULL;
 }

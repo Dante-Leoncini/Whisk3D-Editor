@@ -2,7 +2,7 @@
 
 ## A fonte bitmap
 
-A letra da interface é desenhada à mão em `font.png`. Cada caractere é uma célula de **5x11** pixels e avança **6** (`CharacterWidth`). Uma linha de texto mede **12** (`RenglonHeight`). É monoespaçada: todos os caracteres ocupam o mesmo espaço. Com a escala, tudo é multiplicado por `GlobalScale`.
+A letra da interface é desenhada à mão em `font.png`. Cada caractere é uma célula de **5x11** pixels e avança **6** (`CharacterWidth`). Uma linha de texto mede **12** (`RowHeight`). É monoespaçada: todos os caracteres ocupam o mesmo espaço. Com a escala, tudo é multiplicado por `GlobalScale`.
 
 `Font` (`text/font.h`) guarda as coordenadas de cada caractere. Há uma só, global: `WhiskFont`. Ela é criada com o tamanho do atlas e a sua textura ([Usar a UI diretamente](empezar.md)).
 
@@ -24,18 +24,18 @@ As letras com acento não estão desenhadas: elas são montadas com a letra base
 - `;`, `^`, `~`, `` ` ``, `±`, `«`, `»`, `–`, `—` e `…`,
 - o **cirílico**. As letras iguais a uma latina (`А В Е К М Н О Р С Т Х` e `а е о р с у х`) usam a de `font.png`.
 
-Ele só é carregado na primeira vez que um texto precisa dele: `SetAtlasExtendido` só guarda o caminho. Em inglês ou em espanhol, ele pode nunca ser carregado, e no N95 a memória conta. Se o arquivo faltar, uma letra composta sai sem o sinal e um caractere do estendido sai como `?`.
+Ele só é carregado na primeira vez que um texto precisa dele: `SetAtlasExtended` só guarda o caminho. Em inglês ou em espanhol, ele pode nunca ser carregado, e no N95 a memória conta. Se o arquivo faltar, uma letra composta sai sem o sinal e um caractere do estendido sai como `?`.
 
-As tabelas, com a célula de cada caractere e o modo de montar cada letra, estão em `text/FuenteExt.h`. Elas não são editadas à mão: são geradas por `tools/fuente_ext.py`, que também desenha o PNG e está no repositório do editor.
+As tabelas, com a célula de cada caractere e o modo de montar cada letra, estão em `text/FontExt.h`. Elas não são editadas à mão: são geradas por `tools/fuente_ext.py`, que também desenha o PNG e está no repositório do editor.
 
-Com as duas texturas, cabem o espanhol, o português, o francês, o alemão, o italiano, o polonês, o turco e o russo. Não cabem o japonês, o chinês nem o hindi: o que não está em nenhum atlas sai como `?`. `WhiskFont->Soporta(cp)` diz se um caractere pode ser desenhado.
+Com as duas texturas, cabem o espanhol, o português, o francês, o alemão, o italiano, o polonês, o turco e o russo. Não cabem o japonês, o chinês nem o hindi: o que não está em nenhum atlas sai como `?`. `WhiskFont->Supports(cp)` diz se um caractere pode ser desenhado.
 
 O texto vai em UTF-8. `UTF8_Char` lê sequências de 1 a 3 bytes. Uma de 4 bytes, como um emoji, não é lida: sai como pontos de interrogação.
 
 ## Desenhar um texto
 
 ```cpp
-SetColorID(ColorID::blanco);
+SetColorID(ColorID::white);
 RenderBitmapText("Hola", textAlign::left, 200);   // 200: a largura máxima, em pixels
 ```
 
@@ -43,7 +43,7 @@ Ele é desenhado na origem da matriz atual, com a cor atual. Cada texto é uma c
 
 ## Medir e cortar
 
-A largura de um texto é a quantidade de letras vezes `CharacterWidthGS`. `UTF8_Largo(texto)` conta letras, não bytes: um `ñ` ocupa dois bytes e conta como uma letra.
+A largura de um texto é a quantidade de letras vezes `CharacterWidthGS`. `UTF8_Length(text)` conta letras, não bytes: um `ñ` ocupa dois bytes e conta como uma letra.
 
 Se não couber na largura máxima, `RenderBitmapText` o corta:
 
@@ -53,33 +53,33 @@ Se não couber na largura máxima, `RenderBitmapText` o corta:
 | `textAlign::right` | Termina na origem | O começo: num campo, vê-se o que foi escrito por último |
 | `textAlign::center` | Centralizado na largura máxima | O final |
 
-`RenderBitmapEtiqueta(texto, ancho)` é para o rótulo de uma linha: fica alinhado à direita, mas, se não couber, corta o final e acrescenta `..` ("Vetores de movimen..").
+`RenderBitmapLabel(text, width)` é para o rótulo de uma linha: fica alinhado à direita, mas, se não couber, corta o final e acrescenta `..` ("Vetores de movimen..").
 
-`RenderBitmapFloat(valor, alineación, ancho, unidad)` desenha um número com quatro casas decimais e a unidade colada: `90.0000°`. Não usa `%f`, porque o `printf` do Symbian não formata `float`.
+`RenderBitmapFloat(value, alineación, width, unit)` desenha um número com quatro casas decimais e a unidade colada: `90.0000°`. Não usa `%f`, porque o `printf` do Symbian não formata `float`.
 
 ## Texto com fontes TTF
 
 Para letras de tamanho livre existe o `w3dui::W3dTextAtlas` (`text/W3dTextAtlas.h`). É só um header. Ele desenha uma fonte TTF já bakeada num atlas, e cada letra é escalada e posicionada individualmente: serve para títulos, pontuações e letras animadas. Ele não rasteriza a TTF em tempo de execução.
 
-O atlas é bakeado no PC com `text/bake_atlas.py`, que precisa do Pillow: `bake_atlas.py <fuente.ttf> <lado del atlas> <alto de letra> <salida>`. O lado do atlas é 128, 256, 512 ou 1024. Ele bakeia o ASCII e `áéíóúÁÉÍÓÚñÑüÜ¿¡`. Saem `<salida>.png`, com a cobertura em cinza e sem alfa, e `<salida>.w3dfnt`, com as medidas de cada letra.
+O atlas é bakeado no PC com `text/bake_atlas.py`, que precisa do Pillow: `bake_atlas.py <source.ttf> <side of atlas> <height of letter> <output>`. O lado do atlas é 128, 256, 512 ou 1024. Ele bakeia o ASCII e `áéíóúÁÉÍÓÚñÑüÜ¿¡`. Saem `<output>.png`, com a cobertura em cinza e sem alfa, e `<output>.w3dfnt`, com as medidas de cada letra.
 
 ```cpp
 #include "WhiskUI/text/W3dTextAtlas.h"
 #include "io/w3dFilesystem.h"
 
 std::vector<unsigned char> fnt, png;
-w3dFileSystem::ReadFileBytes("fuentes/titulo.w3dfnt", fnt);
-w3dFileSystem::ReadFileBytes("fuentes/titulo.png", png);
+w3dFileSystem::ReadFileBytes("fonts/titulo.w3dfnt", fnt);
+w3dFileSystem::ReadFileBytes("fonts/titulo.png", png);
 
-w3dui::W3dTextAtlas titulo;
-titulo.Load(&fnt[0], fnt.size(), &png[0], png.size());
+w3dui::W3dTextAtlas title;
+title.Load(&fnt[0], fnt.size(), &png[0], png.size());
 
-titulo.Begin();                                                // atlas, mesclagem e estado
-titulo.DrawText("Puntaje: 120", 10, 10, 24, 1, 1, 1, 1);      // x, y, altura, r, g, b, a
-float ancho = titulo.TextWidth("Puntaje: 120", 24);
+title.Begin();                                                // atlas, mesclagem e estado
+title.DrawText("Puntaje: 120", 10, 10, 24, 1, 1, 1, 1);      // x, y, altura, r, g, b, a
+float width = title.TextWidth("Puntaje: 120", 24);
 ```
 
-`(x, y)` é a parte de cima da linha, com o Y para baixo. `DrawText` junta todas as letras num único desenho. `DrawGlyph` desenha uma só, para letras de tamanho ou cor diferentes. `LineHeight(alto)` dá a altura de uma linha. Por padrão, mescla com alfa pré-multiplicado (`MezclaPremult`): o texto pode ser de qualquer cor.
+`(x, y)` é a parte de cima da linha, com o Y para baixo. `DrawText` junta todas as letras num único desenho. `DrawGlyph` desenha uma só, para letras de tamanho ou cor diferentes. `LineHeight(height)` dá a altura de uma linha. Por padrão, mescla com alfa pré-multiplicado (`MixPremult`): o texto pode ser de qualquer cor.
 
 ## A tabela sem GPU
 

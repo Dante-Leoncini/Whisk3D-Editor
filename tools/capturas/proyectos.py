@@ -19,6 +19,6 @@ idiomas = ["es"]
 if "--idiomas" in sys.argv:
     idiomas = sys.argv[sys.argv.index("--idiomas") + 1].split(",")
 for idi in idiomas:
-    destino = os.path.join(capturas.RAIZ, "docs", "manual", idi, "tutoriales", "ejemplos", "girar-cubo.w3d")
+    destino = os.path.join(capturas.RAIZ, "docs", "manual", idi, "tutoriales", "ejemplos", "rotate-cube.w3d")
     recetas_script.proyecto_ejemplo(idi, destino)
     print("%s  %.1f KB" % (os.path.relpath(destino, capturas.RAIZ), os.path.getsize(destino) / 1024.0))

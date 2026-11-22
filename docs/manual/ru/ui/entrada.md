@@ -6,12 +6,12 @@ Whisk3D UI не открывает окна и не слушает мышь, к�
 
 | Событие | Куда идёт |
 |---|---|
-| Движение мыши или пальца | `PopupMenu::MouseMove(x, y)`; `hover` кнопок и вкладок; `PropHoverGroup` и `PropHoverFila` в карточках |
+| Движение мыши или пальца | `PopupMenu::MouseMove(x, y)`; `hover` кнопок и вкладок; `PropHoverGroup` и `PropHoverRow` в карточках |
 | Клик или касание | `PopupMenu::Click(x, y)`; `Button::Contains` и `Tab::Contains`; в карточке — строка, которую вычислит программа |
 | Колесо | `PopupMenu::Wheel(dir)` |
 | Стрелки | `button_up`, `button_down`, `button_left` и `button_right` меню, карточек и строк |
 | OK или Enter | `PopupMenu::Enter()`, `GroupPropertie::EnterPropertieSelect()` |
-| Отмена или Esc | `PopupMenu::Cerrar()`, `GroupPropertie::Cancel()` |
+| Отмена или Esc | `PopupMenu::Close()`, `GroupPropertie::Cancel()` |
 | Буква | Текстовое поле в фокусе |
 
 Координаты — это пиксели экрана, с осью Y вниз.
@@ -23,7 +23,7 @@ Whisk3D UI не открывает окна и не слушает мышь, к�
 - Карточки проходятся строка за строкой, пропуская то, что нельзя выбрать.
 - Меню проходятся стрелками, и подсвеченный пункт никогда не уходит из виду.
 - Числа меняются стрелками, без ввода с клавиатуры.
-- Фокус клавиатуры виден: `focoMenu` у кнопок и `foco` у вкладок, в `accent`, и белая рамка `g_kfFocoProp` вокруг ромба.
+- Фокус клавиатуры виден: `focusMenu` у кнопок и `focus` у вкладок, в `accent`, и белая рамка `g_kfFocusProp` вокруг ромба.
 
 Какая клавиша телефона чему соответствует, софт-клавиши или OK, к UI не относится: это переводят редактор и каждая система.
 
@@ -31,7 +31,7 @@ Whisk3D UI не открывает окна и не слушает мышь, к�
 
 - Касание — это клик.
 - Касание, которое открывает подменю, ничего в нём не выбирает ([Выпадающие меню](menus.md)).
-- `UITactil` увеличивает кнопки и панели под палец ([Цвета и масштаб](tema.md)). Сейчас её ничто не включает.
+- `UITouch` увеличивает кнопки и панели под палец ([Цвета и масштаб](tema.md)). Сейчас её ничто не включает.
 
 Перетаскивание для прокрутки, долгое нажатие и двойное касание обрабатывает тот, кто использует UI.
 
@@ -45,31 +45,31 @@ Whisk3D UI не открывает окна и не слушает мышь, к�
 | `SelectAll()` | Выделяет всё: первая клавиша заменяет текст |
 | `InsertChar(c)` | Записывает байт в позицию курсора |
 | `Backspace()`, `DelForward()` | Удаляют назад или вперёд |
-| `CaretIzq()`, `CaretDer()` | Двигают курсор. Если всё выделено, снимают выделение |
+| `CaretLeft()`, `CaretRight()` | Двигают курсор. Если всё выделено, снимают выделение |
 
 Удаление и перемещение курсора обрабатывают букву из нескольких байт, например `ñ` или кириллическую, как одну. Чтобы ввести такую букву, каждый её байт передаётся в `InsertChar`.
 
-В фокусе одновременно может быть только одно поле: `g_textFieldActivo`, или `NULL`, если такого нет. Клавиши идут в него.
+В фокусе одновременно может быть только одно поле: `g_activeTextField`, или `NULL`, если такого нет. Клавиши идут в него.
 
 ```cpp
-TextField nombre;
-nombre.SetText("Jugador 1");
-nombre.SelectAll();
-g_textFieldActivo = &nombre;
+TextField name;
+name.SetText("Jugador 1");
+name.SelectAll();
+g_activeTextField = &name;
 
 // с каждой буквой
-if (g_textFieldActivo) g_textFieldActivo->InsertChar(c);
+if (g_activeTextField) g_activeTextField->InsertChar(c);
 
 // при рисовании, с установленным цветом текста
-RenderTextField(nombre, g_textFieldActivo == &nombre, textAlign::left, 200);
+RenderTextField(name, g_activeTextField == &name, textAlign::left, 200);
 ```
 
-`RenderTextField(caja, foco, alineación, ancho)` рисует поле в текущем начале координат:
+`RenderTextField(box, focus, alineación, width)` рисует поле в текущем начале координат:
 
 - Без фокуса — это просто текст.
 - С фокусом и всем выделенным текст рисуется белым на `accentDark`.
 - С фокусом и без выделения появляется курсор: чёрточка, которая мигает каждые 530 мс.
 
-`TextFieldParpadeoTick()` возвращает `true`, когда чёрточка меняется: это момент перерисовать.
+`TextFieldBlinkTick()` возвращает `true`, когда чёрточка меняется: это момент перерисовать.
 
-`TextField.h` также объявляет `TextFieldEnfocar`, `TextFieldCancelar` (Esc: возвращает текст, который был до получения фокуса), `TextFieldInputChar` и `TextFieldFinDeCuadro`. Сейчас они определены в редакторе, в `main/ui/ViewPorts/NumInput.cpp`: сама UI их не содержит.
+`TextField.h` также объявляет `TextFieldFocus`, `TextFieldCancel` (Esc: возвращает текст, который был до получения фокуса), `TextFieldInputChar` и `TextFieldFrameEnd`. Сейчас они определены в редакторе, в `main/ui/ViewPorts/NumInput.cpp`: сама UI их не содержит.

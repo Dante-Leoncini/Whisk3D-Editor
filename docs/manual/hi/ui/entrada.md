@@ -6,12 +6,12 @@ Whisk3D UI न विंडो खोलती है, न माउस, की�
 
 | इवेंट | किसके पास जाता है |
 |---|---|
-| माउस या उंगली हिलती है | `PopupMenu::MouseMove(x, y)`; बटनों और टैब का `hover`; कार्ड में `PropHoverGroup` और `PropHoverFila` |
+| माउस या उंगली हिलती है | `PopupMenu::MouseMove(x, y)`; बटनों और टैब का `hover`; कार्ड में `PropHoverGroup` और `PropHoverRow` |
 | क्लिक या टैप | `PopupMenu::Click(x, y)`; `Button::Contains` और `Tab::Contains`; किसी कार्ड में, वह पंक्ति जो प्रोग्राम गणना करे |
 | व्हील | `PopupMenu::Wheel(dir)` |
 | ऐरो | मेनू, कार्ड और पंक्तियों के `button_up`, `button_down`, `button_left` और `button_right` |
 | OK या Enter | `PopupMenu::Enter()`, `GroupPropertie::EnterPropertieSelect()` |
-| Cancel या Esc | `PopupMenu::Cerrar()`, `GroupPropertie::Cancel()` |
+| Cancel या Esc | `PopupMenu::Close()`, `GroupPropertie::Cancel()` |
 | कोई अक्षर | फ़ोकस वाला टेक्स्ट बॉक्स |
 
 कोऑर्डिनेट स्क्रीन के पिक्सेल हैं, Y नीचे की ओर।
@@ -23,7 +23,7 @@ Whisk3D UI न विंडो खोलती है, न माउस, की�
 - कार्ड में पंक्ति-दर-पंक्ति चला जाता है और जो चुना नहीं जा सकता उसे छोड़ दिया जाता है।
 - मेनू में ऐरो से चला जाता है, और हाइलाइट किया गया विकल्प कभी दृश्य से बाहर नहीं जाता।
 - नंबर ऐरो से बदले जाते हैं, टाइप किए बिना।
-- कीबोर्ड का फ़ोकस दिखता है: बटनों में `focoMenu` और टैब में `foco`, `accent` में, और किसी डायमंड पर `g_kfFocoProp` की सफ़ेद बॉर्डर।
+- कीबोर्ड का फ़ोकस दिखता है: बटनों में `focusMenu` और टैब में `focus`, `accent` में, और किसी डायमंड पर `g_kfFocusProp` की सफ़ेद बॉर्डर।
 
 फ़ोन की कौन-सी कुंजी कौन-सा काम करती है, सॉफ़्ट की या OK, यह UI का नहीं है: इसका अनुवाद एडिटर और हर सिस्टम करता है।
 
@@ -31,7 +31,7 @@ Whisk3D UI न विंडो खोलती है, न माउस, की�
 
 - एक टैप एक क्लिक है।
 - जो टैप कोई सबमेनू खोलता है, वह उसके अंदर कुछ नहीं चुनता ([ड्रॉपडाउन मेनू](menus.md))।
-- `UITactil` बटनों और बार को उंगली के लिए बड़ा करता है ([रंग और स्केल](tema.md))। आज इसे कुछ भी चालू नहीं करता।
+- `UITouch` बटनों और बार को उंगली के लिए बड़ा करता है ([रंग और स्केल](tema.md))। आज इसे कुछ भी चालू नहीं करता।
 
 स्क्रॉल करने के लिए ड्रैग करना, दबाए रखना या दो बार टैप करना UI इस्तेमाल करने वाला संभालता है।
 
@@ -45,31 +45,31 @@ Whisk3D UI न विंडो खोलती है, न माउस, की�
 | `SelectAll()` | सब कुछ चुनता है: पहली कुंजी उसकी जगह ले लेती है |
 | `InsertChar(c)` | कर्सर की जगह पर एक बाइट लिखता है |
 | `Backspace()`, `DelForward()` | पीछे की ओर या आगे की ओर मिटाते हैं |
-| `CaretIzq()`, `CaretDer()` | कर्सर हिलाते हैं। सब कुछ चुना होने पर, चुनाव हटा देते हैं |
+| `CaretLeft()`, `CaretRight()` | कर्सर हिलाते हैं। सब कुछ चुना होने पर, चुनाव हटा देते हैं |
 
 मिटाना और कर्सर हिलाना कई बाइट वाले अक्षर को, जैसे `ñ` या कोई सिरिलिक अक्षर, एक ही मानते हैं। ऐसा अक्षर लिखने के लिए, हर बाइट `InsertChar` को दिया जाता है।
 
-एक समय में सिर्फ़ एक बॉक्स पर फ़ोकस होता है: `g_textFieldActivo`, या `NULL` अगर कोई नहीं। कुंजियाँ उसी के पास जाती हैं।
+एक समय में सिर्फ़ एक बॉक्स पर फ़ोकस होता है: `g_activeTextField`, या `NULL` अगर कोई नहीं। कुंजियाँ उसी के पास जाती हैं।
 
 ```cpp
-TextField nombre;
-nombre.SetText("Jugador 1");
-nombre.SelectAll();
-g_textFieldActivo = &nombre;
+TextField name;
+name.SetText("Jugador 1");
+name.SelectAll();
+g_activeTextField = &name;
 
 // हर अक्षर के साथ
-if (g_textFieldActivo) g_textFieldActivo->InsertChar(c);
+if (g_activeTextField) g_activeTextField->InsertChar(c);
 
 // ड्रॉ करते समय, टेक्स्ट का रंग सेट करके
-RenderTextField(nombre, g_textFieldActivo == &nombre, textAlign::left, 200);
+RenderTextField(name, g_activeTextField == &name, textAlign::left, 200);
 ```
 
-`RenderTextField(caja, foco, alineación, ancho)` इसे मौजूदा ओरिजिन पर ड्रॉ करता है:
+`RenderTextField(box, focus, alineación, width)` इसे मौजूदा ओरिजिन पर ड्रॉ करता है:
 
 - बिना फ़ोकस के, यह बस टेक्स्ट है।
 - फ़ोकस के साथ और सब कुछ चुना होने पर, टेक्स्ट `accentDark` पर सफ़ेद में होता है।
 - फ़ोकस के साथ और बिना चुनाव के, कर्सर दिखता है: एक छोटी लकीर जो हर 530 ms पर टिमटिमाती है।
 
-`TextFieldParpadeoTick()` तब `true` लौटाता है जब लकीर बदलती है: यही दोबारा ड्रॉ करने का समय है।
+`TextFieldBlinkTick()` तब `true` लौटाता है जब लकीर बदलती है: यही दोबारा ड्रॉ करने का समय है।
 
-`TextField.h`, `TextFieldEnfocar`, `TextFieldCancelar` (Esc: फ़ोकस करने से पहले वाले टेक्स्ट पर लौटता है), `TextFieldInputChar` और `TextFieldFinDeCuadro` भी डिक्लेयर करता है। आज ये एडिटर में, `main/ui/ViewPorts/NumInput.cpp` में परिभाषित हैं: अकेली UI इन्हें साथ नहीं लाती।
+`TextField.h`, `TextFieldFocus`, `TextFieldCancel` (Esc: फ़ोकस करने से पहले वाले टेक्स्ट पर लौटता है), `TextFieldInputChar` और `TextFieldFrameEnd` भी डिक्लेयर करता है। आज ये एडिटर में, `main/ui/ViewPorts/NumInput.cpp` में परिभाषित हैं: अकेली UI इन्हें साथ नहीं लाती।

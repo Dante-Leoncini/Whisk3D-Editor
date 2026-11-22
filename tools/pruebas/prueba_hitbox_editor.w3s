@@ -6,31 +6,31 @@
 #    ../../platform/linux/build/whisk3d --script prueba_hitbox_editor.w3s
 # ==========================================================================
 
-ventana 1280 720
-escenadefecto
+window 1280 720
+scenedefault
 
 # un cubo escalado: el hitbox HIJO toma el tamano de la malla en el espacio LOCAL
 # del cubo (la escala del padre la aplica el motor, no se hornea en 'tam')
 add cube
-nombreactivo Caja
+nameactive Caja
 objscale 3 3 3
 hitboxadd Caja
-hitboxinfo Hitbox padre Caja duenio Caja tam 2 2 2 centro 0 0 0 activo 1 cuerpos 0
+hitboxinfo Hitbox parent Caja owner Caja size 2 2 2 center 0 0 0 active 1 bodies 0
 # sin activo: suelto, con el cubo unitario (y es su propio dueno)
 hitboxadd -
-hitboxinfo Hitbox.001 padre - duenio Hitbox.001 tam 1 1 1
+hitboxinfo Hitbox.001 parent - owner Hitbox.001 size 1 1 1
 
 # un hitbox con TODOS los campos distintos del default
-hitboxnuevo Sensor etiqueta jugador filtro enemigo cuerpos 1 activo 0 tam 1 2 3 centro 0.5 0 -0.5 pos 4 0 0
+hitboxnew Sensor label jugador filter enemigo bodies 1 active 0 size 1 2 3 center 0.5 0 -0.5 pos 4 0 0
 hitboxdup Sensor
-hitboxinfo Sensor.001 etiqueta jugador filtro enemigo cuerpos 1 activo 0 tam 1 2 3 centro 0.5 0 -0.5
+hitboxinfo Sensor.001 label jugador filter enemigo bodies 1 active 0 size 1 2 3 center 0.5 0 -0.5
 hitboxprops Sensor
 
 # guardar + abrir: los campos viajan todos
-guardarw3d prueba_hitbox_editor_v4.w3d
-abrirw3d prueba_hitbox_editor_v4.w3d
-hitboxinfo Sensor etiqueta jugador filtro enemigo cuerpos 1 activo 0 tam 1 2 3 centro 0.5 0 -0.5
-hitboxinfo Sensor.001 etiqueta jugador filtro enemigo cuerpos 1 activo 0
-hitboxinfo Hitbox padre Caja duenio Caja tam 2 2 2
-hitboxinfo Hitbox.001 padre - tam 1 1 1
+savew3d prueba_hitbox_editor_v4.w3d
+openw3d prueba_hitbox_editor_v4.w3d
+hitboxinfo Sensor label jugador filter enemigo bodies 1 active 0 size 1 2 3 center 0.5 0 -0.5
+hitboxinfo Sensor.001 label jugador filter enemigo bodies 1 active 0
+hitboxinfo Hitbox parent Caja owner Caja size 2 2 2
+hitboxinfo Hitbox.001 parent - size 1 1 1
 hitboxprops Hitbox

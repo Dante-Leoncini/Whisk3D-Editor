@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ---------------------------------------------------------------------------------------------------------------
-#  genlang.py -- las TRADUCCIONES de la interfaz del editor: res/idiomas/<codigo>.txt (es, pt, fr, it, tr, de, pl, ru).
+#  genlang.py -- las TRADUCCIONES de la interfaz del editor: res/languages/<codigo>.txt (es, pt, fr, it, tr, de, pl, ru).
 #
 #  Estan en disco y no compiladas: el editor carga al arrancar SOLO el archivo del idioma elegido (en el N95 la RAM
 #  vale; antes las 1700 frases en tres idiomas vivian siempre en memoria, dentro del ejecutable). El ingles no
@@ -33,7 +33,7 @@ import re
 import sys
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CARPETA = os.path.join(RAIZ, "res", "idiomas")
+CARPETA = os.path.join(RAIZ, "res", "languages")
 TABLA_VIEJA = os.path.join(RAIZ, "main", "config", "W3dLangTabla.h")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

@@ -31,12 +31,12 @@ Il Core parla la lingua della pipeline fissa. Il backend a shader la **emula** c
 
 Quasi sempre, **in compilazione**: ogni sistema compila un solo backend e le chiamate vanno dirette, senza alcun costo extra.
 
-L'eccezione è il PC (Windows e Linux). Lì l'eseguibile include OpenGL, OpenGL ES 2.0 e Vulkan, e si sceglie **all'avvio**, in **Proprietà → Impostazioni → Grafica** (vale dopo il riavvio; vedi [Altre funzioni](../editor/otras-funciones.md)). Ogni backend si compila nel proprio namespace (`w3dEngine::gl`, `w3dEngine::es2`, `w3dEngine::vk`) e riempie una **tabella di dispatch** (`w3dBackendTabla.h`) con le sue funzioni. Ogni funzione di `w3dEngine` chiama quella del backend attivo:
+L'eccezione è il PC (Windows e Linux). Lì l'eseguibile include OpenGL, OpenGL ES 2.0 e Vulkan, e si sceglie **all'avvio**, in **Proprietà → Impostazioni → Grafica** (vale dopo il riavvio; vedi [Altre funzioni](../editor/otras-funciones.md)). Ogni backend si compila nel proprio namespace (`w3dEngine::gl`, `w3dEngine::es2`, `w3dEngine::vk`) e riempie una **tabella di dispatch** (`w3dBackendTable.h`) con le sue funzioni. Ogni funzione di `w3dEngine` chiama quella del backend attivo:
 
 ```cpp
-// graphics/w3dDespacho.inc, generado por tools/generar_despacho.py
-void Enable(Cap c) { W3D_TABLA()->Enable(c); }
-void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLA()->DrawTriangles(count, indices); }
+// graphics/w3dDispatch.inc, generado por tools/generar_despacho.py
+void Enable(Cap c) { W3D_TABLE()->Enable(c); }
+void DrawTriangles(int count, const MeshIndex* indices) { W3D_TABLE()->DrawTriangles(count, indices); }
 ```
 
 Se quello scelto non funziona su quella macchina, resta OpenGL. Vulkan ha bisogno del driver, della GPU e del compilatore di shader `shaderc_shared` accanto all'eseguibile, ed è disattivato nelle build a 32 bit. Su macOS l'eseguibile include solo OpenGL.
@@ -60,13 +60,13 @@ Non tutte le GPU sanno fare le stesse cose, e il Core non lo nasconde: ogni back
 
 | Domanda | Cosa succede se risponde di no |
 |---|---|
-| `VBOSoportado()` | Le mesh vanno come array nella RAM (Dreamcast, Vita) |
-| `EstencilBits()` | Il riflesso dell'acqua ripiega sul ritaglio con i piani |
-| `PlanosRecorteMax()` | Il riflesso si arrangia senza piani (la PVR non li ha) |
-| `MezclaTexturasSoportada()` | I livelli di un materiale vanno in più passate |
-| `TieneTexGen()` | Il riflesso sferico si calcola via software o con la matrice di texture (`TexMatrixMatcap`, che invece funziona sull'N95) |
-| `SombreadoPorPixelSoportado()` | La luce resta per vertice e l'editor non offre nemmeno l'opzione |
-| `ShadersEscritos()` | Il materiale con uno shader proprio si disegna come sempre (vedi [Shader scritti](../editor/shaders.md)) |
+| `VBOSupported()` | Le mesh vanno come array nella RAM (Dreamcast, Vita) |
+| `StencilBits()` | Il riflesso dell'acqua ripiega sul ritaglio con i piani |
+| `PlanesClipMax()` | Il riflesso si arrangia senza piani (la PVR non li ha) |
+| `MixTexturesSupported()` | I livelli di un materiale vanno in più passate |
+| `HasTexGen()` | Il riflesso sferico si calcola via software o con la matrice di texture (`TexMatrixMatcap`, che invece funziona sull'N95) |
+| `ShadingPerPixelSupported()` | La luce resta per vertice e l'editor non offre nemmeno l'opzione |
+| `ShadersWritten()` | Il materiale con uno shader proprio si disegna come sempre (vedi [Shader scritti](../editor/shaders.md)) |
 
 ## La cache di stato
 
@@ -81,13 +81,13 @@ Ogni cambio di stato costa qualcosa al driver. Il Core ricorda cosa è impostato
 - **Dreamcast:** potenza di due da 8 a 1024, a 16 bit (565 o 4444), senza mipmap.
 - **N95:** solo potenze di due; le altre vengono ricampionate prima dell'upload.
 
-Un progetto può chiedere texture a **16 bit** (metà della memoria) e, solo sull'N95, caricarle **a metà dimensione** oltre una certa grandezza (`texturasMitadDesde`). Il formato `.w3dt` salva una texture già pronta per la GPU, con le sue mipmap: caricarla significa leggerla e inviarla.
+Un progetto può chiedere texture a **16 bit** (metà della memoria) e, solo sull'N95, caricarle **a metà dimensione** oltre una certa grandezza (`texturesHalfFrom`). Il formato `.w3dt` salva una texture già pronta per la GPU, con le sue mipmap: caricarla significa leggerla e inviarla.
 
 Un dettaglio onesto: l'upload delle texture e le luci chiamano ancora direttamente due o tre funzioni di OpenGL. Sulle console senza OpenGL, il backend include un piccolo strato che le implementa (`gu/w3dGLgu.cpp`, `citro3d/w3dGLc3d.cpp`).
 
 ## Lo schermo e l'area sicura
 
-`PantallaSetTam` e `PantallaEsVertical` salvano una sola volta se lo schermo è in verticale o in orizzontale (orizzontale = più largo che alto), così qualsiasi parte del motore può chiederlo. L'**area sicura** (`SafeAreaGet`) dice quanti pixel di ogni bordo non vanno usati per l'interfaccia: il notch, la barra dei gesti, le barre del browser del cellulare. Lo sfondo si disegna su tutta la finestra e l'interfaccia dentro l'area sicura. Sul PC, su Symbian e sulle console i bordi valgono 0; nel browser vengono misurati.
+`ScreenSetSize` e `ScreenIsVertical` salvano una sola volta se lo schermo è in verticale o in orizzontale (orizzontale = più largo che alto), così qualsiasi parte del motore può chiederlo. L'**area sicura** (`SafeAreaGet`) dice quanti pixel di ogni bordo non vanno usati per l'interfaccia: il notch, la barra dei gesti, le barre del browser del cellulare. Lo sfondo si disegna su tutta la finestra e l'interfaccia dentro l'area sicura. Sul PC, su Symbian e sulle console i bordi valgono 0; nel browser vengono misurati.
 
 ## I limiti del più piccolo
 
@@ -96,7 +96,7 @@ Ciò che si scrive per il Core deve entrare nella macchina più limitata. Questi
 | Limite | Dove | Come lo gestisce il Core |
 |---|---|---|
 | Indici a 16 bit (fino a 65.535 vertici per mesh) | Symbian | `MeshIndex` lì è a 16 bit e altrove a 32; l'importatore rifiuta ciò che non ci sta |
-| 8 luci alla volta | Tutti (`LucesMax`) | Il backend a shader le emula con lo stesso calcolo; la PSP ne fa 4 in hardware e Android 2.3 ne usa fino a 4 |
+| 8 luci alla volta | Tutti (`LightsMax`) | Il backend a shader le emula con lo stesso calcolo; la PSP ne fa 4 in hardware e Android 2.3 ne usa fino a 4 |
 | Niente shader | I backend fissi | Le funzioni degli shader rispondono di no e il materiale si disegna come sempre |
 | Z a 16 bit | PSP | Il piano vicino si adatta alla distanza di orbita, come sull'N95 |
 | 16 MB per tutto | Dreamcast | Si compila con `-Os` e il linker scarta ciò che non si usa; le texture vanno a 16 bit |

@@ -82,9 +82,9 @@ SOURCE          w3dvideoenc.cpp // los codificadores de video del telefono (DevV
 SOURCE          w3dmouse.cpp // cursor virtual de Symbian
 SOURCE          w3dinput.cpp // input propio del telefono (teclado/keypad)
 SOURCE          w3dpantallas.cpp // pantallas externas (TV-out RCA / HDMI): deteccion + superficie EGL propia
-SOURCE          w3dsdlminimo.cpp // lo poco de SDL que lee controles.cpp (reloj, mouse, pantalla)
+SOURCE          w3dsdlminimo.cpp // lo poco de SDL que lee controls.cpp (reloj, mouse, pantalla)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts
-SOURCE          PantallasExternas.cpp // el popup clonar/viewport y el dibujo de cada pantalla externa (compartido)
+SOURCE          ExternalScreens.cpp // el popup clonar/viewport y el dibujo de cada pantalla externa (compartido)
 
 // motor compartido (Whisk3DCore / libs\Whisk3DCore): texturas + estado de graficos + log
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\graphics
@@ -118,7 +118,7 @@ SOURCE          Matrix4.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Objects.cpp
 SOURCE          Materials.cpp
-SOURCE          ShaderEscrito.cpp
+SOURCE          WrittenShader.cpp
 SOURCE          ShaderCPU.cpp
 SOURCE          Mesh.cpp
 SOURCE          CameraBase.cpp // camara BASE del core (la vista que usa el render)
@@ -130,7 +130,7 @@ SOURCEPATH      ..\..\..\main\objects
 SOURCE          Scene.cpp
 SOURCE          Collection.cpp
 SOURCE          EditMesh.cpp
-SOURCE          Primitivas.cpp
+SOURCE          Primitives.cpp
 SOURCE          Empty.cpp
 SOURCE          Camera.cpp Target.cpp Curve.cpp ObjectMode.cpp Instance.cpp
 
@@ -142,7 +142,7 @@ SOURCE          import_obj.cpp
 SOURCEPATH      ..\..\..\main\ui\ViewPorts
 SOURCE          ViewPorts.cpp WithBorder.cpp ScrollBar.cpp Outliner.cpp Properties.cpp ViewPort3D.cpp UVEditor.cpp LayoutInput.cpp
 SOURCE          PoseTransform.cpp // Pose Mode: transform de huesos (extraido de LayoutInput, Fase 2)
-SOURCE          Notificaciones.cpp // toasts (extraido de LayoutInput, Fase 2)
+SOURCE          Notifications.cpp // toasts (extraido de LayoutInput, Fase 2)
 SOURCE          NumInput.cpp // entrada numerica/formulas (extraido de LayoutInput, Fase 2)
 SOURCE          Parent.cpp // emparentar/desemparentar (extraido de LayoutInput, Fase 2)
 SOURCE          Pick3D.cpp // pick/seleccion 3D + loop cut (extraido de LayoutInput, Fase 2)
@@ -162,37 +162,37 @@ SOURCE          MeshEdit.cpp
 SOURCE          WeightPaint.cpp // Fase 2 weight paint: pincel + escritura de pesos (undo por trazo)
 SOURCE          BoneEdit.cpp // Fase 3: Edit Mode de huesos (extrude/duplicar/borrar/grab + rename con vgroup)
 SOURCE          UVUnwrap.cpp // menu U: unwrap (conforme + relajacion), smart project, lightmap, follow quads, reset
-SOURCE          Proporcional.cpp // proportional editing (tecla O): pesos por distancia + circulo de influencia
+SOURCE          Proportional.cpp // proportional editing (tecla O): pesos por distancia + circulo de influencia
 SOURCE          BoxSelect.cpp // B: caja de seleccion (compartida por 3D/UV/2D)
 SOURCE          W3dFalloff.cpp // curvas de falloff del pincel (pesos + vertex color)
 SOURCE          BooleanMod.cpp // modificador booleano (C++03, compila en Symbian)
-SOURCE          RutinaEditor.cpp // validacion de las rutinas antes de dibujarlas (solo el editor)
+SOURCE          RoutineEditor.cpp // validacion de las rutinas antes de dibujarlas (solo el editor)
 
 SOURCEPATH      ..\..\..\main\render
-SOURCE          render.cpp OpcionesRender.cpp
-SOURCE          EscenaRender.cpp // el pase 3D compartido con el runtime de los juegos
-SOURCE          SombrasTiempoReal.cpp // las sombras en tiempo real (en el N95: la sombra proyectada por la CPU)
+SOURCE          render.cpp RenderOptions.cpp
+SOURCE          SceneRender.cpp // el pase 3D compartido con el runtime de los juegos
+SOURCE          RealTimeShadows.cpp // las sombras en tiempo real (en el N95: la sombra proyectada por la CPU)
 
 SOURCEPATH      ..\..\..\main\app
 SOURCE          variables.cpp
 SOURCE          W3dInitUI.cpp // init de UI compartido
-SOURCE          W3dAtajos.cpp // atajos de teclado reasignables (la tabla + el traductor + atajos.ini)
-SOURCE          W3dTeclado.cpp // teclado en pantalla (Android); en Symbian son stubs vacios
-SOURCE          controles.cpp // el input de PC/Android: los gestos tactiles (Symbian les manda los mismos eventos)
-SOURCE          W3dTactilEditor.cpp // los dedos del Core (input/W3dTactil) -> SDL_Event -> controles.cpp
-SOURCE          W3dRatonEditor.cpp // el mouse Bluetooth -> SDL_Event -> controles.cpp (como el mouse de la PC)
+SOURCE          W3dShortcuts.cpp // atajos de teclado reasignables (la tabla + el traductor + atajos.ini)
+SOURCE          W3dKeyboard.cpp // teclado en pantalla (Android); en Symbian son stubs vacios
+SOURCE          controls.cpp // el input de PC/Android: los gestos tactiles (Symbian les manda los mismos eventos)
+SOURCE          W3dTouchEditor.cpp // los dedos del Core (input/W3dTactil) -> SDL_Event -> controls.cpp
+SOURCE          W3dMouseEditor.cpp // el mouse Bluetooth -> SDL_Event -> controls.cpp (como el mouse de la PC)
 SOURCEPATH      ..\..\..\main\config
 SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
-SOURCE          W3dConfigGuardar.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
-SOURCE          W3dRecientes.cpp     // los ultimos proyectos abiertos/guardados (recientes.txt)
+SOURCE          W3dConfigSave.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
+SOURCE          W3dRecent.cpp     // los ultimos proyectos abiertos/guardados (recientes.txt)
 SOURCE          W3dLayouts.cpp       // los layouts guardados de los viewports (layouts.txt)
-SOURCE          W3dRedPermisos.cpp   // el permiso de la red de cada proyecto y el nombre del dispositivo
+SOURCE          W3dNetPermissions.cpp   // el permiso de la red de cada proyecto y el nombre del dispositivo
 SOURCE          W3dProfile.cpp // reloj de pared + tiempos por categoria del frame (overlay Statistics)
 SOURCEPATH      ..\..\..\main\undo
 SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
 
 SOURCEPATH      ..\..\..\main\ui\GeometriaUI
-SOURCE          GeometriaUI.cpp Floor.cpp
+SOURCE          GeometryUI.cpp Floor.cpp
 
 SOURCEPATH      ..\..\..\libs\WhiskUI\Propieties
 SOURCE          PropertieBase.cpp GroupPropertie.cpp PropFloat.cpp
@@ -201,15 +201,15 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 
 // pila de UI de PC (fase outliner real)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
-SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp TimelineRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp UVMapaPopup.cpp TiempoPopup.cpp InicioPopup.cpp NombrePopup.cpp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmPopup.cpp ProgressPopup.cpp SaveAsPopup.cpp TransformRedoPanel.cpp TimelineRedoPanel.cpp ShortcutsPopup.cpp FindPopup.cpp ExportUVPopup.cpp NewTexturePopup.cpp UVMapPopup.cpp TimePopup.cpp HomePopup.cpp NamePopup.cpp
 SOURCE          FalloffEditor.cpp // popup del editor de curva de falloff del pincel
-SOURCE          CambiosPopup.cpp // el cartel "Se perderan los cambios en:" (al salir / abrir otro proyecto)
+SOURCE          ChangesPopup.cpp // el cartel "Se perderan los cambios en:" (al salir / abrir otro proyecto)
 
 // La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
 SOURCEPATH      ..\..\..\libs\WhiskUI\core
 SOURCE          UI.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\theme
-SOURCE          colores.cpp
+SOURCE          colors.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
 SOURCE          object2D.cpp rectangle.cpp icons.cpp glesdraw.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\text
@@ -222,57 +222,57 @@ SOURCE          card.cpp Button.cpp PopupMenu.cpp Tab.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\animation
 SOURCE          VertexAnimation.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
-SOURCE          TexturaCache.cpp
+SOURCE          TextureCache.cpp
 SOURCEPATH      ..\..\..\main
-SOURCE          W3dEscena.cpp
-SOURCE          W3dRaices.cpp   // las ESCENAS 3D y los PREFABS del proyecto (raices, carga perezosa, cambiarEscena)
+SOURCE          W3dScene.cpp
+SOURCE          W3dRoots.cpp   // las ESCENAS 3D y los PREFABS del proyecto (raices, carga perezosa, cambiarEscena)
 SOURCEPATH      ..\..\..\main\io
-SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp UVExportar.cpp TexturaEditada.cpp W3dWeb.cpp W3dMp4.cpp W3dAac.cpp W3dH264.cpp
-SOURCE          MallasProyecto.cpp // editor: publicar/hacer unica/duplicar y el guardado de las mallas como recurso
-SOURCE          W3dNodos.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
-SOURCE          GuardarAnimSets.cpp   // el guardado de los ANIMSETS (.w3da): plan + dedup por clip (lo llama GuardarW3D)
-SOURCE          RecursosProyecto.cpp  // el OUTLINER POR RECURSOS: proveedores, carpetas cosmeticas, recurso activo
-SOURCE          RaicesEditor.cpp      // escenas/prefabs en el editor: cambiar de raiz, el selector, sus vistas
-SOURCE          RecursosDatos.cpp     // la biblioteca: datos de cada archivo (resolucion/alfa de una imagen, formato/duracion de un sonido)
-SOURCE          BibliotecaExterna.cpp // la biblioteca: los .w3d VINCULADOS (explorar sin montar, solo lectura)
-SOURCE          CambiosProyecto.cpp   // lo SIN GUARDAR ('*' por recurso y por raiz) y el cartel al salir / abrir
-SOURCE          Miniaturas.cpp        // las miniaturas de la cuadricula de la biblioteca (perezosas, en memoria)
+SOURCE          SaveW3D.cpp W3dContainer.cpp UI2DFormat.cpp Texture2D.cpp Font2D.cpp SkinAtlas.cpp Video2DCache.cpp GeneratedTexture.cpp UVExport.cpp EditedTexture.cpp W3dWeb.cpp W3dMp4.cpp W3dAac.cpp W3dH264.cpp
+SOURCE          ProjectMeshes.cpp // editor: publicar/hacer unica/duplicar y el guardado de las mallas como recurso
+SOURCE          W3dNodes.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
+SOURCE          SaveAnimSets.cpp   // el guardado de los ANIMSETS (.w3da): plan + dedup por clip (lo llama GuardarW3D)
+SOURCE          ProjectResources.cpp  // el OUTLINER POR RECURSOS: proveedores, carpetas cosmeticas, recurso activo
+SOURCE          EditorRoots.cpp      // escenas/prefabs en el editor: cambiar de raiz, el selector, sus vistas
+SOURCE          ResourceData.cpp     // la biblioteca: datos de cada archivo (resolucion/alfa de una imagen, formato/duracion de un sonido)
+SOURCE          ExternalLibrary.cpp // la biblioteca: los .w3d VINCULADOS (explorar sin montar, solo lectura)
+SOURCE          ProjectChanges.cpp   // lo SIN GUARDAR ('*' por recurso y por raiz) y el cartel al salir / abrir
+SOURCE          Thumbnails.cpp        // las miniaturas de la cuadricula de la biblioteca (perezosas, en memoria)
 SOURCEPATH      ..\..\..\main\objects
-SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp Niebla.cpp Recorte.cpp Sonido.cpp PostprocesoObj.cpp
-SOURCE          Rutina.cpp // objeto Rutina: lista de pasos del render (C++03)
+SOURCE          Culling.cpp Particles.cpp VisZone.cpp Gamepad.cpp Fog.cpp ClipRegion.cpp Sound.cpp PostProcessObj.cpp
+SOURCE          Routine.cpp // objeto Rutina: lista de pasos del render (C++03)
 SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
-SOURCE          SondaLuz.cpp   // objeto Sonda de luz (la luz indirecta horneada)
-SOURCE          SondaReflejo.cpp   // objeto Sonda de reflejo (una imagen 360 horneada para los reflejos)
+SOURCE          LightProbe.cpp   // objeto Sonda de luz (la luz indirecta horneada)
+SOURCE          ReflectionProbe.cpp   // objeto Sonda de reflejo (una imagen 360 horneada para los reflejos)
 SOURCEPATH      ..\..\..\main\render
-SOURCE          UIOverlay.cpp RayTracer.cpp Denoiser.cpp RTGpu.cpp VectoresMovimiento.cpp ReescaladoFSR.cpp Postproceso.cpp   // Postproceso: la pila de efectos (por CPU en el N95); VectoresMovimiento: el pase de vectores (GL 1.1) y el desenfoque por CPU; RayTracer: trazado de rayos por CPU (un hilo en el N95); Denoiser y RTGpu: vacios en Symbian
+SOURCE          UIOverlay.cpp RayTracer.cpp Denoiser.cpp RTGpu.cpp MotionVectors.cpp UpscalingFSR.cpp PostProcess.cpp   // Postproceso: la pila de efectos (por CPU en el N95); VectoresMovimiento: el pase de vectores (GL 1.1) y el desenfoque por CPU; RayTracer: trazado de rayos por CPU (un hilo en el N95); Denoiser y RTGpu: vacios en Symbian
 // audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
 // (CMdaAudioOutputStream en su propio hilo, doble-buffer). Con W3D_ENABLE_AUDIO arriba
 // compilan el camino REAL; sin el, W3dAudio.cpp cae a stubs no-op.
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\audio
-// W3dVolumen.cpp = volumen maestro + el volumen inicial por-proyecto del .w3d (VolumenAplicarProyecto,
+// W3dVolume.cpp = volumen maestro + el volumen inicial por-proyecto del .w3d (VolumenAplicarProyecto,
 // lo llama import_w3d.cpp). W3dMusic.cpp entra por el dispatcher (W3dMusicRefrescarVolumenes SIEMPRE
 // compila, fuera de W3D_ENABLE_MUSIC): sin el flag son stubs no-op, no arrastra backend de musica.
-SOURCE          W3dAudio.cpp W3dAudioSymbian.cpp W3dVolumen.cpp W3dMusic.cpp
+SOURCE          W3dAudio.cpp W3dAudioSymbian.cpp W3dVolume.cpp W3dMusic.cpp
 // subsistemas del Core que el link pedia (todos C++03, portables): sistema de
 // recursos, zip (.w3d/.w3dpack), almacen, config, visibilidad/PVS, atlas de skin.
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
-SOURCE          W3dRecursos.cpp W3dZip.cpp W3dAlmacen.cpp
+SOURCE          W3dResources.cpp W3dZip.cpp W3dStore.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
-SOURCE          VisSet.cpp MallaDatos.cpp
-SOURCE          MallaRecurso.cpp // las mallas 3D como RECURSO compartido (registro "mallas", vinculo, VBO compartidos)
-SOURCE          MallaFlujos.cpp // los flujos de indices por parte para las rutinas (tiras, aristas, vertices, quads simulados)
+SOURCE          VisSet.cpp MeshData.cpp
+SOURCE          MeshResource.cpp // las mallas 3D como RECURSO compartido (registro "mallas", vinculo, VBO compartidos)
+SOURCE          MeshFlows.cpp // los flujos de indices por parte para las rutinas (tiras, aristas, vertices, quads simulados)
 SOURCE          VisBsp.cpp       // metodo Bsp del Culling: arbol BSP + PVS por cluster (.w3dbsp)
-SOURCE          MundoBsp.cpp     // el MUNDO del .w3dbsp v2: geometria por hoja y material, un draw por material (C++03)
+SOURCE          WorldBsp.cpp     // el MUNDO del .w3dbsp v2: geometria por hoja y material, un draw por material (C++03)
 SOURCE          W3dCables.cpp    // cables finos: lineas de 1 pixel con el grosor en la opacidad por la distancia
 SOURCE          W3dVideoTex.cpp  // un video como textura: cuadros RGB565 comprimidos leidos de a uno, dos texturas alternadas
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\input
 SOURCE          W3dClipboardSymbian.cpp
-SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: CHWRMVibra)
-SOURCE          W3dInclinacion.cpp W3dInclinacionSymbian.cpp // el acelerometro (RRSensorApi.dll, en runtime): rotar inclinando
-SOURCE          W3dTactil.cpp W3dTactilSymbian.cpp // la pantalla tactil (S60 5th: 1 dedo; Symbian^3: multitactil)
-SOURCE          W3dMandosSymbian.cpp // los joysticks Bluetooth (DualShock 3/4) del driver bthid-s60, cargado en runtime
+SOURCE          W3dVibrate.cpp // la vibracion (en el telefono: CHWRMVibra)
+SOURCE          W3dTilt.cpp W3dTiltSymbian.cpp // el acelerometro (RRSensorApi.dll, en runtime): rotar inclinando
+SOURCE          W3dTouch.cpp W3dTouchSymbian.cpp // la pantalla tactil (S60 5th: 1 dedo; Symbian^3: multitactil)
+SOURCE          W3dGamepadsSymbian.cpp // los joysticks Bluetooth (DualShock 3/4) del driver bthid-s60, cargado en runtime
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
 SOURCE          W3dAtlasPacker.cpp
 // objetos del editor que faltaban: LOD (niveles de detalle) y el espejo/agua
@@ -297,10 +297,10 @@ SOURCE          lvm.c lzio.c
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\script
 SOURCE          W3dScript.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
-SOURCE          W3dFisica.cpp
+SOURCE          W3dPhysics.cpp
 // cuerpos rigidos del Core (cajas + impulsos + raycast + contactos para lua)
-SOURCE          W3dRigido.cpp
-SOURCE          W3dColMalla.cpp
+SOURCE          W3dRigid.cpp
+SOURCE          W3dColMesh.cpp
 // hitbox del Core (cajas de deteccion + eventos alEntrar/alSalir/alTocar para lua)
 SOURCE          W3dHitbox.cpp
 // ragdolls caseros e IK (dos huesos con polo, FABRIK)
@@ -309,15 +309,15 @@ SOURCE          W3dRagdoll.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 SOURCE          W3dNav.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\animation
-SOURCE          W3dLocomocion.cpp
+SOURCE          W3dLocomotion.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 // jugar en red (LAN, wifi, internet: UDP por los sockets de Open C; pide NetworkServices)
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\net
-SOURCE          W3dRed.cpp
+SOURCE          W3dNet.cpp
 SOURCEPATH      ..\..\..\main\script
 // ScriptUI.cpp: engancha gBindExtra (constructor estatico) -> registra los binds de JUEGO
 // (sonido/setTexto/posPx/pantalla/...). Sin esto, un .lua que llama sonido() da "nil value".
-SOURCE          BindsJuego.cpp SimJuego.cpp ScriptUI.cpp
+SOURCE          BindsGame.cpp SimGame.cpp ScriptUI.cpp
 
 // OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
 // resuelven contra el ultimo SOURCEPATH)
@@ -388,7 +388,7 @@ LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
 LIBRARY         eikcoctl.lib estlib.lib fbscli.lib
 LIBRARY         efsrv.lib
 LIBRARY         hal.lib // HAL::Get(EMemoryRAMFree): la RAM libre en el log ([mem], w3dlog.cpp)
-LIBRARY         hwrmvibraclient.lib // CHWRMVibra: el vibrador del telefono (W3dVibrar.cpp: el OK mantenido, vibrar() de lua)
+LIBRARY         hwrmvibraclient.lib // CHWRMVibra: el vibrador del telefono (W3dVibrate.cpp: el OK mantenido, vibrar() de lua)
 LIBRARY         ImageConversion.lib
 LIBRARY         mediaclientaudiostream.lib // CMdaAudioOutputStream: salida de audio del Core
 #ifdef W3D_MMP_GLES2
@@ -425,7 +425,7 @@ END
 // N95: con cualquiera de las dos el telefono rechaza el binario self-signed
 // ("funcion no admitida"). La app no las usaba (el acelerometro esta
 // comentado); si algun dia hacen falta, hay que firmarse con Open Signed.
-// NetworkServices (auto-firmable): los juegos en red (net/W3dRed.cpp); el telefono pregunta por el punto de acceso
+// NetworkServices (auto-firmable): los juegos en red (net/W3dNet.cpp); el telefono pregunta por el punto de acceso
 CAPABILITY ReadUserData WriteUserData NetworkServices
 
 SOURCEPATH ..\..\..\main\ui\ViewPorts\PopUp
@@ -449,14 +449,14 @@ SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderOb
 SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
 SOURCE PropsHitbox.cpp           // tarjeta "Hitbox" del panel de propiedades
-SOURCE PropsSondaLuz.cpp         // tarjeta "Light Probe" (la sonda de luz) del panel de propiedades
-SOURCE PropsSondaReflejo.cpp     // tarjeta "Reflection Probe" (la sonda de reflejo) del panel de propiedades
-SOURCE PropsHorneado.cpp         // tarjeta "Bake Lighting" (precalcular la iluminacion) del panel de propiedades
-SOURCE PropsSombras.cpp          // tarjeta "Real-time shadows" de la pestania Render
-SOURCE MenuTexto.cpp            // el menu del texto (Cortar / Copiar / Pegar / Seleccionar todo)
-SOURCE PropsRutina.cpp           // tarjeta "Routine" del panel de propiedades (los pasos de una rutina)
-SOURCE OutlinerRecursos.cpp      // las vistas de recursos del outliner (selector de vista, carpetas, en uso/huerfano)
-SOURCE SoltarRecurso.cpp         // soltar un recurso de la biblioteca en el 3D (malla/material/textura/animset)
+SOURCE PropsLightProbe.cpp         // tarjeta "Light Probe" (la sonda de luz) del panel de propiedades
+SOURCE PropsReflectionProbe.cpp     // tarjeta "Reflection Probe" (la sonda de reflejo) del panel de propiedades
+SOURCE PropsBake.cpp         // tarjeta "Bake Lighting" (precalcular la iluminacion) del panel de propiedades
+SOURCE PropsShadows.cpp          // tarjeta "Real-time shadows" de la pestania Render
+SOURCE MenuText.cpp            // el menu del texto (Cortar / Copiar / Pegar / Seleccionar todo)
+SOURCE PropsRoutine.cpp           // tarjeta "Routine" del panel de propiedades (los pasos de una rutina)
+SOURCE OutlinerResources.cpp      // las vistas de recursos del outliner (selector de vista, carpetas, en uso/huerfano)
+SOURCE DropResource.cpp         // soltar un recurso de la biblioteca en el 3D (malla/material/textura/animset)
 
 SOURCEPATH ..\src
 SOURCE w3dskelstubs.cpp          // solo w3dGetTicks (reloj de ms del core); los stubs del esqueleto ya no van (SkeletalAnimation.cpp compila)
@@ -468,9 +468,9 @@ SOURCE w3ddesktopstubs.cpp
 //     externas; sera tambien la base del formato propio .w3d (archivo comprimido). ---
 SOURCEPATH ..\..\..\libs\Whisk3DCore\io
 SOURCE w3dCompress.cpp           // inflate DEFLATE/zlib self-contained (arrays comprimidos del FBX + futuro .w3d)
-SOURCE W3dTexto.cpp              // escaner de texto del .w3dm (numeros exactos, cero allocs por token)
-SOURCE W3dMalla.cpp              // lector/escritor del .w3dm (la geometria propia, en texto por lineas)
-SOURCE W3dMallaBin.cpp           // lector/escritor del .w3db (la misma geometria en binario, lista para memoria)
+SOURCE W3dText.cpp              // escaner de texto del .w3dm (numeros exactos, cero allocs por token)
+SOURCE W3dMesh.cpp              // lector/escritor del .w3dm (la geometria propia, en texto por lineas)
+SOURCE W3dMeshBin.cpp           // lector/escritor del .w3db (la misma geometria en binario, lista para memoria)
 
 SOURCEPATH ..\..\..\main\importers
 SOURCE import_fbx.cpp            // importador FBX binario (parseo + descompresion + malla/esqueleto/materiales)
@@ -482,13 +482,13 @@ SOURCE stl.cpp                   // importador STL (binario y ASCII) y exportado
 //     (GuardarW3D/W3dZip no estan en este build; el #ifdef W3D_SYMBIAN del .cpp
 //     compila solo los stubs). Regla del repo: todo .cpp nuevo de main\ entra aca. ---
 SOURCEPATH ..\..\..\main\io
-SOURCE GuardarVersion.cpp
-SOURCE LuaCompilar.cpp           // compilar .lua a bytecode (Compilar juego): stub no-op en Symbian (sin lua en este build)
+SOURCE SaveVersion.cpp
+SOURCE LuaCompile.cpp           // compilar .lua a bytecode (Compilar juego): stub no-op en Symbian (sin lua en este build)
 
 // --- PREFABS: la INSTANCIA (sus hijos se generan del prefab), la generacion + instanciar()/destruir() de lua,
 //     el editor (lo generado no se toca, Add > Prefab, Create Prefab, Unpack) y su tarjeta de Properties ---
 SOURCEPATH ..\..\..\main\objects
-SOURCE InstanciaPrefab.cpp       // INSTANCIA DE PREFAB (ObjectType::prefab)
+SOURCE InstancePrefab.cpp       // INSTANCIA DE PREFAB (ObjectType::prefab)
 SOURCEPATH ..\..\..\main\io
 SOURCE Prefabs.cpp               // la definicion de cada prefab y la generacion de sus instancias
 SOURCE PrefabsEditor.cpp         // el editor sobre las instancias de prefab
@@ -500,7 +500,7 @@ SOURCE PropsPrefab.cpp           // tarjeta "Prefab Instance" del panel de propi
 SOURCEPATH ..\..\..\main\objects
 SOURCE ProxyW3d.cpp              // PROXY W3D (ObjectType::proxy): genera sus hijos como una instancia de prefab
 SOURCEPATH ..\..\..\main\io
-SOURCE Librerias.cpp             // el registro de las librerias, su montaje y sus prefabs/escenas
+SOURCE Libraries.cpp             // el registro de las librerias, su montaje y sus prefabs/escenas
 
 // --- STREAMING: las instancias de prefab y los proxies DIFERIDOS ("carga": "distancia") cargan y descargan en
 //     tiempo real segun la distancia a su objetivo (pedidos async al almacen + refcount) ---

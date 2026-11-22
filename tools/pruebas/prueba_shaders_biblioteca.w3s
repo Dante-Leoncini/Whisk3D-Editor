@@ -4,19 +4,19 @@
 #    volver a la biblioteca vuelve a su material, y soltado ahi no cambia nada
 #  - soltado sobre la malla, el material de esa parte pasa a usar el shader (y compila); tambien un .glsl soltado desde
 #    el explorador del sistema
-ventana 1280 720
-abrirw3d ../../examples/shaders/Ejemplos_Shaders.w3d
-outvista biblioteca
-vporbita 4.4 -0.3 0 5 -10 0
-vpvista material
-outprevia dibujo_animado.glsl Cubo_Latido
-outsoltar dibujo_animado.glsl 3d
+window 1280 720
+openw3d ../../examples/shaders/Ejemplos_Shaders.w3d
+outview library
+vporbit 4.4 -0.3 0 5 -10 0
+vpview material
+outpreview dibujo_animado.glsl Cubo_Latido
+outrelease dibujo_animado.glsl 3d
 selobj Cubo_Latido
 # un .glsl soltado DESDE EL EXPLORADOR del sistema sobre una malla (escena nueva, sin guardar): la parte lo usa
-escenadefecto
-vporbita 0 0 0 6 -20 0
-soltararchivo ../../examples/shaders/latido.glsl 1
+scenedefault
+vporbit 0 0 0 6 -20 0
+releasefile ../../examples/shaders/latido.glsl 1
 selobj Cubo
-matshader soporte hay
-matshader compila si
+matshader support has
+matshader compiles si
 

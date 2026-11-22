@@ -14,12 +14,12 @@
 |---|---|
 | `W3dDrawStrip4(verts, uvs)` | Квадрат: 4 вершины `GLshort` в порядке полосы, с их 8 UV. Переводит его в два треугольника |
 | `W3dDrawElemsB(verts, uvs, idx, n)` | Маленький меш с индексами `GLubyte`, до 64 |
-| `W3dDrawLinesS(ancho, n, verts, idx)` | До 21 линии, с вершинами `GLshort` из 3 компонентов |
+| `W3dDrawLinesS(width, n, verts, idx)` | До 21 линии, с вершинами `GLshort` из 3 компонентов |
 | `W3dDrawLinesF(verts, idx, n)` | Линии с вершинами `float` из 3 компонентов, по 40 вершин за вызов рисования |
 
 Вершины, переведённые во `float`, идут в фиксированное хранилище на 256 мест, которое используется по кругу, и никогда не в стек: драйвер N95 читает указатели с опозданием.
 
-`W3dPantallaAlto` — это высота экрана. Её задаёт тот, кто использует UI, при изменении размера, и она нужна, чтобы переводить Y интерфейса в Y для `Scissor` и `Viewport`, которые отсчитывают снизу.
+`W3dScreenHeight` — это высота экрана. Её задаёт тот, кто использует UI, при изменении размера, и она нужна, чтобы переводить Y интерфейса в Y для `Scissor` и `Viewport`, которые отсчитывают снизу.
 
 ## Узлы и прямоугольники
 
@@ -28,40 +28,40 @@
 `Rec2D` (`draw/rectangle.h`) — это прямоугольник одного цвета. `SetSize(x, y, w, h)` размещает его, а `SetColor(r, g, b)` задаёт ему цвет. Он не читает текстуру: рисуется с выключенным `Texture2D`.
 
 ```cpp
-Rec2D velo;
-velo.SetSize(0, 0, ancho, alto);
+Rec2D veil;
+veil.SetSize(0, 0, width, height);
 gfx::Disable(gfx::Texture2D);
 gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
-velo.RenderObject(false);          // false: текущим цветом, а не своим
+veil.RenderObject(false);          // false: текущим цветом, а не своим
 gfx::Enable(gfx::Texture2D);
 ```
 
 ## Карточки
 
-`Card` (`widgets/card.h`) — это прямоугольник со скруглёнными углами у кнопок, меню и карточек свойств. Это **9-patch**: 16 вершин, которые растягивают середину и оставляют углы размером `2 * GlobalScale`. Углы и середина берутся из уголка `font.png`. `CalcCardUV(anchoAtlas, altoAtlas)` вычисляет эти координаты: её вызывают один раз, с размером текстуры.
+`Card` (`widgets/card.h`) — это прямоугольник со скруглёнными углами у кнопок, меню и карточек свойств. Это **9-patch**: 16 вершин, которые растягивают середину и оставляют углы размером `2 * GlobalScale`. Углы и середина берутся из уголка `font.png`. `CalcCardUV(widthAtlas, heightAtlas)` вычисляет эти координаты: её вызывают один раз, с размером текстуры.
 
 | Функция | Что делает |
 |---|---|
 | `Resize(w, h)` | Меняет размер |
-| `RenderObject(propio)` | Рисует заливку |
-| `RenderBorder(propio)` | Рисует только рамку |
+| `RenderObject(own)` | Рисует заливку |
+| `RenderBorder(own)` | Рисует только рамку |
 | `RenderObjectTab()`, `RenderBorderTab()` | То же самое, но с прямой нижней стороной: для вкладок |
 
-Если `propio` равно `true`, используется свой цвет (`color` и `opacity`); если `false` — текущий цвет.
+Если `own` равно `true`, используется свой цвет (`color` и `opacity`); если `false` — текущий цвет.
 
 ```cpp
-Card fondo(NULL, 120, 40);
-SetColorID(ColorID::gris);
-fondo.RenderObject(false);
+Card background(NULL, 120, 40);
+SetColorID(ColorID::gray);
+background.RenderObject(false);
 SetColorID(ColorID::accent);
-fondo.RenderBorder(false);
+background.RenderBorder(false);
 ```
 
 ## Атлас скина
 
-Одна текстура на весь интерфейс. `font.png` размером 128x128 содержит буквы, края карточек и старые иконки. Одного его хватает, чтобы UI работала: `CrearIconos` берёт иконки из `font.png`.
+Одна текстура на весь интерфейс. `font.png` размером 128x128 содержит буквы, края карточек и старые иконки. Одного его хватает, чтобы UI работала: `CreateIcons` берёт иконки из `font.png`.
 
-Новые иконки — это отдельные файлы в `atlas/iconos/`. При запуске редактор собирает текстуру побольше (`main/io/SkinAtlas.cpp`): кладёт весь `font.png` в точку (0,0), чтобы его координаты не менялись, и упаковывает каждую иконку в оставшееся место. Затем он сообщает UI, где оказалась каждая из них, через `CrearIconosDesde`. Сборка этого атласа относится к редактору; упаковщик и таблица иконок — к UI. См. [Иконки](iconos.md).
+Новые иконки — это отдельные файлы в `atlas/icons/`. При запуске редактор собирает текстуру побольше (`main/io/SkinAtlas.cpp`): кладёт весь `font.png` в точку (0,0), чтобы его координаты не менялись, и упаковывает каждую иконку в оставшееся место. Затем он сообщает UI, где оказалась каждая из них, через `CreateIconsFrom`. Сборка этого атласа относится к редактору; упаковщик и таблица иконок — к UI. См. [Иконки](iconos.md).
 
 ## Упаковщик
 
@@ -69,12 +69,12 @@ fondo.RenderBorder(false);
 
 ```cpp
 std::vector<W3dAtlasItem> items(n);       // для каждого изображения: rgba, w, h
-items[0].fijo = true;                     // это изображение обязательно встаёт туда, куда сказано
+items[0].fixed = true;                     // это изображение обязательно встаёт туда, куда сказано
 items[0].x = 0; items[0].y = 0;
 
-std::vector<unsigned char> lienzo; int W = 0, H = 0;
-if (W3dAtlasPack(&items[0], n, 2, lienzo, &W, &H)) {    // 2 пикселя зазора между изображениями
-    unsigned int tex = w3dEngine::UploadRGBA(&lienzo[0], W, H, true);
+std::vector<unsigned char> canvas; int W = 0, H = 0;
+if (W3dAtlasPack(&items[0], n, 2, canvas, &W, &H)) {    // 2 пикселя зазора между изображениями
+    unsigned int tex = w3dEngine::UploadRGBA(&canvas[0], W, H, true);
     // items[i].x, items[i].y: где оказалось каждое
 }
 ```

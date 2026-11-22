@@ -1,10 +1,10 @@
 // ============================================================================
 //  W3dH264.cpp - el codificador H.264 propio (ver el .h). La sintaxis, la transformada entera, la cuantizacion y la
 //  reconstruccion son las de ISO/IEC 14496-10 (perfil Baseline, CAVLC); las tablas de CAVLC, las de la norma
-//  (W3dH264Tablas.h).
+//  (W3dH264Tables.h).
 // ============================================================================
 #include "W3dH264.h"
-#include "W3dH264Tablas.h"
+#include "W3dH264Tables.h"
 #include <cstring>
 #include <cstdlib>
 #include <cmath>
@@ -14,33 +14,33 @@ namespace {
 // ---- los bits de un RBSP ----
 struct Bits {
     std::vector<unsigned char>& v;
-    unsigned int acum; int n;
-    explicit Bits(std::vector<unsigned char>& o) : v(o), acum(0), n(0) {}
-    void Poner(unsigned int x, int k) {
+    unsigned int accum; int n;
+    explicit Bits(std::vector<unsigned char>& o) : v(o), accum(0), n(0) {}
+    void Set(unsigned int x, int k) {
         for (int i = k - 1; i >= 0; i--) {
-            acum = (acum << 1) | ((x >> i) & 1u);
-            if (++n == 8) { v.push_back((unsigned char)acum); acum = 0; n = 0; }
+            accum = (accum << 1) | ((x >> i) & 1u);
+            if (++n == 8) { v.push_back((unsigned char)accum); accum = 0; n = 0; }
         }
     }
     void Ue(unsigned int x) {
         const unsigned int y = x + 1;
         int len = 0; while ((y >> len) > 1) len++;
-        Poner(0, len); Poner(y, len + 1);
+        Set(0, len); Set(y, len + 1);
     }
     void Se(int x) { Ue(x > 0 ? (unsigned)(2 * x - 1) : (unsigned)(-2 * x)); }
-    void Cierre() { Poner(1, 1); while (n) Poner(0, 1); }   // rbsp_trailing_bits
+    void Close() { Set(1, 1); while (n) Set(0, 1); }   // rbsp_trailing_bits
 };
 
 // el NAL: codigo de inicio, la cabecera y el RBSP con los bytes de prevencion (00 00 0x -> 00 00 03 0x)
-void Nal(std::vector<unsigned char>& out, int refIdc, int tipo, const std::vector<unsigned char>& rbsp) {
+void Nal(std::vector<unsigned char>& out, int refIdc, int type, const std::vector<unsigned char>& rbsp) {
     out.push_back(0); out.push_back(0); out.push_back(0); out.push_back(1);
-    out.push_back((unsigned char)((refIdc << 5) | tipo));
-    int ceros = 0;
+    out.push_back((unsigned char)((refIdc << 5) | type));
+    int zeros = 0;
     for (size_t i = 0; i < rbsp.size(); i++) {
         const unsigned char b = rbsp[i];
-        if (ceros >= 2 && b <= 3) { out.push_back(3); ceros = 0; }
+        if (zeros >= 2 && b <= 3) { out.push_back(3); zeros = 0; }
         out.push_back(b);
-        ceros = (b == 0) ? ceros + 1 : 0;
+        zeros = (b == 0) ? zeros + 1 : 0;
     }
 }
 
@@ -48,7 +48,7 @@ const int kMF[6][3] = { {13107, 5243, 8066}, {11916, 4660, 7490}, {10082, 4194, 
                         {9362, 3647, 5825}, {8192, 3355, 5243}, {7282, 2893, 4559} };
 const int kV[6][3] = { {10, 16, 13}, {11, 18, 14}, {13, 20, 16}, {14, 23, 18}, {16, 25, 20}, {18, 29, 23} };
 const int kZig[16] = { 0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15 };   // (raster y*4+x)
-inline int Clase(int pos) { const int x = pos & 3, y = pos >> 2; return ((x & 1) == 0 && (y & 1) == 0) ? 0 : ((x & 1) && (y & 1)) ? 1 : 2; }
+inline int Class(int pos) { const int x = pos & 3, y = pos >> 2; return ((x & 1) == 0 && (y & 1) == 0) ? 0 : ((x & 1) && (y & 1)) ? 1 : 2; }
 inline int QpCroma(int q) {
     static const int t[22] = { 29, 30, 31, 32, 32, 33, 34, 34, 35, 35, 36, 36, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39 };
     return q < 30 ? q : t[q - 30];
@@ -57,7 +57,7 @@ inline int Clip255(int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
 inline int Med(int a, int b, int c) { return a > b ? (b > c ? b : (a > c ? c : a)) : (a > c ? a : (b > c ? c : b)); }
 
 // la transformada directa 4x4 (la de la norma: W = Cf X CfT). in/out raster y*4+x
-void Directa(const int* in, int* out) {
+void Direct(const int* in, int* out) {
     int t[16];
     for (int y = 0; y < 4; y++) {
         const int* r = in + y * 4;
@@ -71,7 +71,7 @@ void Directa(const int* in, int* out) {
     }
 }
 // la inversa EXACTA del decodificador (8.5.12.2: primero las filas, despues las columnas, y (x + 32) >> 6)
-void Inversa(const int* d, int* r) {
+void Inverse(const int* d, int* r) {
     int f[16];
     for (int i = 0; i < 4; i++) {
         const int* p = d + i * 4;
@@ -84,7 +84,7 @@ void Inversa(const int* d, int* r) {
         r[j] = (g0 + g3 + 32) >> 6; r[4 + j] = (g1 + g2 + 32) >> 6; r[8 + j] = (g1 - g2 + 32) >> 6; r[12 + j] = (g0 - g3 + 32) >> 6;
     }
 }
-inline int Cuant(int w, int mf, int f, int qbits) {
+inline int Quant(int w, int mf, int f, int qbits) {
     const int a = w < 0 ? -w : w;
     int l = (int)(((long long)a * mf + f) >> qbits);
     if (l > 2000) l = 2000;   // (Baseline: level_prefix hasta 15)
@@ -93,30 +93,30 @@ inline int Cuant(int w, int mf, int f, int qbits) {
 
 // ---- CAVLC: un bloque (los niveles en orden de barrido, 'n' = maxNumCoeff; nC = -1: el DC del croma). Devuelve
 //      cuantos no nulos tiene ----
-int Bloque(Bits& b, const int* c, int n, int nC) {
+int Block(Bits& b, const int* c, int n, int nC) {
     int pos[16], lv[16], total = 0;
     for (int i = n - 1; i >= 0; i--) if (c[i]) { pos[total] = i; lv[total] = c[i]; total++; }   // (de la frecuencia mas alta)
     int t1 = 0;
     for (int k = 0; k < total && t1 < 3; k++) { if (lv[k] == 1 || lv[k] == -1) t1++; else break; }
-    if (nC < 0) b.Poner(kH264CdcTokBits[total * 4 + t1], kH264CdcTokLen[total * 4 + t1]);
+    if (nC < 0) b.Set(kH264CdcTokBits[total * 4 + t1], kH264CdcTokLen[total * 4 + t1]);
     else {
         const int t = nC < 2 ? 0 : nC < 4 ? 1 : nC < 8 ? 2 : 3;
-        b.Poner(kH264TokBits[t * 68 + total * 4 + t1], kH264TokLen[t * 68 + total * 4 + t1]);
+        b.Set(kH264TokBits[t * 68 + total * 4 + t1], kH264TokLen[t * 68 + total * 4 + t1]);
     }
     if (!total) return 0;
-    for (int k = 0; k < t1; k++) b.Poner(lv[k] < 0 ? 1 : 0, 1);
+    for (int k = 0; k < t1; k++) b.Set(lv[k] < 0 ? 1 : 0, 1);
     int sl = (total > 10 && t1 < 3) ? 1 : 0;
     for (int k = t1; k < total; k++) {
         const int L = lv[k];
         int code = L > 0 ? 2 * L - 2 : -2 * L - 1;
         if (k == t1 && t1 < 3) code -= 2;
         if (sl == 0) {
-            if (code < 14) { b.Poner(0, code); b.Poner(1, 1); }
-            else if (code < 30) { b.Poner(0, 14); b.Poner(1, 1); b.Poner((unsigned)(code - 14), 4); }
-            else { b.Poner(0, 15); b.Poner(1, 1); b.Poner((unsigned)(code - 30), 12); }
+            if (code < 14) { b.Set(0, code); b.Set(1, 1); }
+            else if (code < 30) { b.Set(0, 14); b.Set(1, 1); b.Set((unsigned)(code - 14), 4); }
+            else { b.Set(0, 15); b.Set(1, 1); b.Set((unsigned)(code - 30), 12); }
         } else {
-            if (code < (15 << sl)) { b.Poner(0, code >> sl); b.Poner(1, 1); b.Poner((unsigned)(code & ((1 << sl) - 1)), sl); }
-            else { b.Poner(0, 15); b.Poner(1, 1); b.Poner((unsigned)(code - (15 << sl)), 12); }
+            if (code < (15 << sl)) { b.Set(0, code >> sl); b.Set(1, 1); b.Set((unsigned)(code & ((1 << sl) - 1)), sl); }
+            else { b.Set(0, 15); b.Set(1, 1); b.Set((unsigned)(code - (15 << sl)), 12); }
         }
         if (sl == 0) sl = 1;
         const int a = L < 0 ? -L : L;
@@ -125,15 +125,15 @@ int Bloque(Bits& b, const int* c, int n, int nC) {
     int tz = 0;
     if (total < n) {
         tz = pos[0] + 1 - total;
-        if (nC < 0) b.Poner(kH264CdcTzBits[(total - 1) * 4 + tz], kH264CdcTzLen[(total - 1) * 4 + tz]);
-        else b.Poner(kH264TzBits[(total - 1) * 16 + tz], kH264TzLen[(total - 1) * 16 + tz]);
+        if (nC < 0) b.Set(kH264CdcTzBits[(total - 1) * 4 + tz], kH264CdcTzLen[(total - 1) * 4 + tz]);
+        else b.Set(kH264TzBits[(total - 1) * 16 + tz], kH264TzLen[(total - 1) * 16 + tz]);
     }
-    int quedan = tz;
-    for (int k = 0; k < total - 1 && quedan > 0; k++) {
+    int remain = tz;
+    for (int k = 0; k < total - 1 && remain > 0; k++) {
         const int run = pos[k] - pos[k + 1] - 1;
-        const int fila = (quedan > 7 ? 7 : quedan) - 1;
-        b.Poner(kH264RunBits[fila * 16 + run], kH264RunLen[fila * 16 + run]);
-        quedan -= run;
+        const int row = (remain > 7 ? 7 : remain) - 1;
+        b.Set(kH264RunBits[row * 16 + run], kH264RunLen[row * 16 + run]);
+        remain -= run;
     }
     return total;
 }
@@ -143,19 +143,19 @@ inline void PosBlk(int blk, int& bx, int& by) { bx = ((blk >> 2) & 1) * 2 + (blk
 
 } // namespace
 
-W3dH264Codificador::W3dH264Codificador()
-    : w(0), h(0), wSrc(0), fps(30), kbps(1000), gop(30), mbW(0), mbH(0), qp(28), nCuadro(0), idrId(0), bytesMeta(0), bytesHechos(0) {}
+W3dH264Encoder::W3dH264Encoder()
+    : w(0), h(0), wSrc(0), fps(30), kbps(1000), gop(30), mbW(0), mbH(0), qp(28), nFrame(0), idrId(0), bytesMeta(0), doneBytes(0) {}
 
-bool W3dH264Codificador::Abrir(int ww, int hh, int f, int k, int g) {
+bool W3dH264Encoder::Open(int ww, int hh, int f, int k, int g) {
     w = ww & ~1; h = hh & ~1; wSrc = ww;
     if (w < 16 || h < 16) return false;
     fps = f > 0 ? f : 30; kbps = k > 16 ? k : 16; gop = g > 0 ? g : fps;
     mbW = (w + 15) / 16; mbH = (h + 15) / 16;
-    const size_t PW = (size_t)mbW * 16, PH = (size_t)mbH * 16, tam = PW * PH * 3 / 2;
-    cur.assign(tam, 0); rec.assign(tam, 0); ref.assign(tam, 0);
+    const size_t PW = (size_t)mbW * 16, PH = (size_t)mbH * 16, size = PW * PH * 3 / 2;
+    cur.assign(size, 0); rec.assign(size, 0); ref.assign(size, 0);
     nzL.assign((size_t)mbW * 4 * mbH * 4, 0); nzU.assign((size_t)mbW * 2 * mbH * 2, 0); nzV = nzU;
-    mvx.assign((size_t)mbW * mbH, 0); mvy = mvx; esSalto.assign((size_t)mbW * mbH, 0);
-    nCuadro = 0; idrId = 0; bytesHechos = 0;
+    mvx.assign((size_t)mbW * mbH, 0); mvy = mvx; isJump.assign((size_t)mbW * mbH, 0);
+    nFrame = 0; idrId = 0; doneBytes = 0;
     // el QP de arranque segun los bits por pixel que da el bitrate
     const double bpp = (double)kbps * 1000.0 / ((double)fps * w * h);
     int q = (int)(26.0 - 6.0 * log(bpp / 0.1) / log(2.0) + 0.5);
@@ -163,7 +163,7 @@ bool W3dH264Codificador::Abrir(int ww, int hh, int f, int k, int g) {
     return true;
 }
 
-void W3dH264Codificador::ConvertirRgba(const unsigned char* rgba) {
+void W3dH264Encoder::ConvertRgba(const unsigned char* rgba) {
     const int PW = mbW * 16, PH = mbH * 16;
     unsigned char* Y = &cur[0];
     unsigned char* U = Y + (size_t)PW * PH;
@@ -171,9 +171,9 @@ void W3dH264Codificador::ConvertirRgba(const unsigned char* rgba) {
     const int stride = wSrc;   // (el RGBA viene del ancho pedido)
     for (int y = 0; y < PH; y++) {
         const int sy = y < h ? y : h - 1;
-        const unsigned char* fila = rgba + (size_t)sy * stride * 4;
+        const unsigned char* row = rgba + (size_t)sy * stride * 4;
         for (int x = 0; x < PW; x++) {
-            const unsigned char* p = fila + (size_t)(x < w ? x : w - 1) * 4;
+            const unsigned char* p = row + (size_t)(x < w ? x : w - 1) * 4;
             Y[(size_t)y * PW + x] = (unsigned char)(((66 * p[0] + 129 * p[1] + 25 * p[2] + 128) >> 8) + 16);
         }
     }
@@ -193,50 +193,50 @@ void W3dH264Codificador::ConvertirRgba(const unsigned char* rgba) {
         }
 }
 
-bool W3dH264Codificador::Cuadro(const unsigned char* rgba, std::vector<unsigned char>& salida) {
-    salida.clear();
+bool W3dH264Encoder::Frame(const unsigned char* rgba, std::vector<unsigned char>& output) {
+    output.clear();
     if (!mbW || !rgba) return false;
-    ConvertirRgba(rgba);
-    const bool idr = (nCuadro % gop) == 0;
+    ConvertRgba(rgba);
+    const bool idr = (nFrame % gop) == 0;
     if (idr) {
         // ---- SPS ----
         std::vector<unsigned char> r; Bits b(r);
         const long fs = (long)mbW * mbH, mbps = fs * fps;
-        static const int kNiv[][3] = { {21, 792, 19800}, {22, 1620, 20250}, {30, 1620, 40500}, {31, 3600, 108000},
+        static const int kLevel[][3] = { {21, 792, 19800}, {22, 1620, 20250}, {30, 1620, 40500}, {31, 3600, 108000},
                                        {32, 5120, 216000}, {40, 8192, 245760}, {42, 8704, 522240}, {50, 22080, 589824},
                                        {51, 36864, 983040}, {52, 36864, 2073600} };
-        int nivel = 52;
-        for (int i = 0; i < 10; i++) if (fs <= kNiv[i][1] && mbps <= kNiv[i][2]) { nivel = kNiv[i][0]; break; }
-        b.Poner(66, 8); b.Poner(0xC0, 8); b.Poner((unsigned)nivel, 8);
-        b.Ue(0);            // seq_parameter_set_id
-        b.Ue(12);           // log2_max_frame_num_minus4 (16 bits)
-        b.Ue(2);            // pic_order_cnt_type 2 (el orden es el de decodificar)
-        b.Ue(1);            // max_num_ref_frames
-        b.Poner(0, 1);      // gaps_in_frame_num_value_allowed_flag
+        int level = 52;
+        for (int i = 0; i < 10; i++) if (fs <= kLevel[i][1] && mbps <= kLevel[i][2]) { level = kLevel[i][0]; break; }
+        b.Set(66, 8); b.Set(0xC0, 8); b.Set((unsigned)level, 8);
+        b.Ue(0);          // seq_parameter_set_id
+        b.Ue(12);         // log2_max_frame_num_minus4 (16 bits)
+        b.Ue(2);          // pic_order_cnt_type 2 (el orden es el de decodificar)
+        b.Ue(1);          // max_num_ref_frames
+        b.Set(0, 1);      // gaps_in_frame_num_value_allowed_flag
         b.Ue((unsigned)(mbW - 1)); b.Ue((unsigned)(mbH - 1));
-        b.Poner(1, 1);      // frame_mbs_only_flag
-        b.Poner(1, 1);      // direct_8x8_inference_flag
+        b.Set(1, 1);      // frame_mbs_only_flag
+        b.Set(1, 1);      // direct_8x8_inference_flag
         const int cr = (mbW * 16 - w) / 2, cb = (mbH * 16 - h) / 2;
-        if (cr || cb) { b.Poner(1, 1); b.Ue(0); b.Ue((unsigned)cr); b.Ue(0); b.Ue((unsigned)cb); } else b.Poner(0, 1);
-        b.Poner(0, 1);      // vui_parameters_present_flag
-        b.Cierre();
-        Nal(salida, 3, 7, r);
+        if (cr || cb) { b.Set(1, 1); b.Ue(0); b.Ue((unsigned)cr); b.Ue(0); b.Ue((unsigned)cb); } else b.Set(0, 1);
+        b.Set(0, 1);      // vui_parameters_present_flag
+        b.Close();
+        Nal(output, 3, 7, r);
         // ---- PPS ----
         std::vector<unsigned char> p; Bits c(p);
-        c.Ue(0); c.Ue(0); c.Poner(0, 1); c.Poner(0, 1); c.Ue(0); c.Ue(0); c.Ue(0);
-        c.Poner(0, 1); c.Poner(0, 2); c.Se(0); c.Se(0); c.Se(0);
-        c.Poner(1, 1);      // deblocking_filter_control_present_flag (para apagarlo en el slice)
-        c.Poner(0, 1); c.Poner(0, 1);
-        c.Cierre();
-        Nal(salida, 3, 8, p);
+        c.Ue(0); c.Ue(0); c.Set(0, 1); c.Set(0, 1); c.Ue(0); c.Ue(0); c.Ue(0);
+        c.Set(0, 1); c.Set(0, 2); c.Se(0); c.Se(0); c.Se(0);
+        c.Set(1, 1);      // deblocking_filter_control_present_flag (para apagarlo en el slice)
+        c.Set(0, 1); c.Set(0, 1);
+        c.Close();
+        Nal(output, 3, 8, p);
     }
     std::vector<unsigned char> nal;
-    CodificarCuadro(idr, nal);
-    salida.insert(salida.end(), nal.begin(), nal.end());
+    EncodeFrame(idr, nal);
+    output.insert(output.end(), nal.begin(), nal.end());
     // EL BITRATE: el QP del proximo cuadro segun lo que midio este (un cuadro clave puede medir varias veces mas)
     {
-        const double objetivo = (double)kbps * 1000.0 / 8.0 / fps * (idr ? 4.0 : 1.0);
-        const double r = salida.size() / (objetivo > 1.0 ? objetivo : 1.0);
+        const double target = (double)kbps * 1000.0 / 8.0 / fps * (idr ? 4.0 : 1.0);
+        const double r = output.size() / (target > 1.0 ? target : 1.0);
         int d = (int)floor(6.0 * log(r > 0.01 ? r : 0.01) / log(2.0) + 0.5);
         if (d > 4) d = 4;
         if (d < -2) d = -2;
@@ -244,16 +244,16 @@ bool W3dH264Codificador::Cuadro(const unsigned char* rgba, std::vector<unsigned 
         if (qp < 12) qp = 12;
         if (qp > 50) qp = 50;
     }
-    bytesHechos += (long)salida.size();
+    doneBytes += (long)output.size();
     ref.swap(rec);   // (la reconstruccion pasa a ser la referencia; 'rec' se pisa entera en el proximo)
-    nCuadro++;
+    nFrame++;
     return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 //  EL CUADRO: un slice con todos los macrobloques
 // ---------------------------------------------------------------------------------------------------------------------
-void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& out) {
+void W3dH264Encoder::EncodeFrame(bool idr, std::vector<unsigned char>& out) {
     const int PW = mbW * 16, PH = mbH * 16, CW = PW / 2, CH = PH / 2;
     const unsigned char* cY = &cur[0];
     const unsigned char* cU = cY + (size_t)PW * PH;
@@ -275,16 +275,16 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
     b.Ue(0);                          // first_mb_in_slice
     b.Ue(idr ? 7u : 5u);              // slice_type (I / P, todos iguales)
     b.Ue(0);                          // pic_parameter_set_id
-    const int frameNum = idr ? 0 : (nCuadro % gop);
-    b.Poner((unsigned)(frameNum & 0xFFFF), 16);
+    const int frameNum = idr ? 0 : (nFrame % gop);
+    b.Set((unsigned)(frameNum & 0xFFFF), 16);
     if (idr) { b.Ue((unsigned)(idrId & 1)); idrId++; }
-    if (!idr) { b.Poner(0, 1); b.Poner(0, 1); }      // num_ref_idx_active_override_flag, ref_pic_list_modification_flag_l0
-    if (idr) { b.Poner(0, 1); b.Poner(0, 1); }       // no_output_of_prior_pics_flag, long_term_reference_flag
-    else b.Poner(0, 1);                              // adaptive_ref_pic_marking_mode_flag
-    b.Se(qp - 26);                                   // slice_qp_delta
-    b.Ue(1);                                         // disable_deblocking_filter_idc: sin filtro
+    if (!idr) { b.Set(0, 1); b.Set(0, 1); }      // num_ref_idx_active_override_flag, ref_pic_list_modification_flag_l0
+    if (idr) { b.Set(0, 1); b.Set(0, 1); }       // no_output_of_prior_pics_flag, long_term_reference_flag
+    else b.Set(0, 1);                            // adaptive_ref_pic_marking_mode_flag
+    b.Se(qp - 26);                               // slice_qp_delta
+    b.Ue(1);                                     // disable_deblocking_filter_idc: sin filtro
 
-    int saltos = 0;
+    int jumps = 0;
     for (int my = 0; my < mbH; my++)
         for (int mx = 0; mx < mbW; mx++) {
             const int mb = my * mbW + mx;
@@ -294,33 +294,33 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
             int levDC[16];            // I16: el DC en barrido
             int levCdc[2][4], levCac[2][4][16];
             int tcL[16], tcC[2][4];
-            int cbpL = 0, cbpC = 0, modoI = 2;
+            int cbpL = 0, cbpC = 0, modeI = 2;
             int mvX = 0, mvY = 0, mvpX = 0, mvpY = 0;
-            bool salto = false;
+            bool jump = false;
 
             // ===== LA PREDICCION =====
             if (idr) {
-                const bool hayA = mx > 0, hayB = my > 0;
+                const bool hasA = mx > 0, hasB = my > 0;
                 int top[16], left[16];
                 for (int i = 0; i < 16; i++) {
-                    top[i] = hayB ? rY[(size_t)(py - 1) * PW + px + i] : 0;
-                    left[i] = hayA ? rY[(size_t)(py + i) * PW + px - 1] : 0;
+                    top[i] = hasB ? rY[(size_t)(py - 1) * PW + px + i] : 0;
+                    left[i] = hasA ? rY[(size_t)(py + i) * PW + px - 1] : 0;
                 }
                 int sT = 0, sL = 0; for (int i = 0; i < 16; i++) { sT += top[i]; sL += left[i]; }
-                const int dc = (hayA && hayB) ? (sT + sL + 16) >> 5 : hayB ? (sT + 8) >> 4 : hayA ? (sL + 8) >> 4 : 128;
-                long mejor = -1;
+                const int dc = (hasA && hasB) ? (sT + sL + 16) >> 5 : hasB ? (sT + 8) >> 4 : hasA ? (sL + 8) >> 4 : 128;
+                long bestCost = -1;
                 for (int m = 0; m < 3; m++) {
-                    if (m == 0 && !hayB) continue;
-                    if (m == 1 && !hayA) continue;
+                    if (m == 0 && !hasB) continue;
+                    if (m == 1 && !hasA) continue;
                     long sad = 0;
                     for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) {
                         const int p = m == 0 ? top[x] : m == 1 ? left[y] : dc;
                         sad += abs((int)cY[(size_t)(py + y) * PW + px + x] - p);
                     }
-                    if (mejor < 0 || sad < mejor) { mejor = sad; modoI = m; }
+                    if (bestCost < 0 || sad < bestCost) { bestCost = sad; modeI = m; }
                 }
                 for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++)
-                    predY[y * 16 + x] = modoI == 0 ? top[x] : modoI == 1 ? left[y] : dc;
+                    predY[y * 16 + x] = modeI == 0 ? top[x] : modeI == 1 ? left[y] : dc;
                 // croma: DC por bloque de 4x4 (8.3.4)
                 for (int c = 0; c < 2; c++) {
                     const unsigned char* R = c == 0 ? rU : rV;
@@ -330,42 +330,42 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                         const int xo = (blk & 1) * 4, yo = (blk >> 1) * 4;
                         int sT2 = 0, sL2 = 0;
                         for (int i = 0; i < 4; i++) {
-                            if (hayB) sT2 += R[(size_t)(cy - 1) * CW + cx + xo + i];
-                            if (hayA) sL2 += R[(size_t)(cy + yo + i) * CW + cx - 1];
+                            if (hasB) sT2 += R[(size_t)(cy - 1) * CW + cx + xo + i];
+                            if (hasA) sL2 += R[(size_t)(cy + yo + i) * CW + cx - 1];
                         }
                         int v;
                         if ((xo == 0 && yo == 0) || (xo > 0 && yo > 0)) {
-                            v = (hayA && hayB) ? (sT2 + sL2 + 4) >> 3 : hayA ? (sL2 + 2) >> 2 : hayB ? (sT2 + 2) >> 2 : 128;
+                            v = (hasA && hasB) ? (sT2 + sL2 + 4) >> 3 : hasA ? (sL2 + 2) >> 2 : hasB ? (sT2 + 2) >> 2 : 128;
                         } else if (xo > 0 && yo == 0) {
-                            v = hayB ? (sT2 + 2) >> 2 : hayA ? (sL2 + 2) >> 2 : 128;
+                            v = hasB ? (sT2 + 2) >> 2 : hasA ? (sL2 + 2) >> 2 : 128;
                         } else {
-                            v = hayA ? (sL2 + 2) >> 2 : hayB ? (sT2 + 2) >> 2 : 128;
+                            v = hasA ? (sL2 + 2) >> 2 : hasB ? (sT2 + 2) >> 2 : 128;
                         }
                         for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) pr[(yo + y) * 8 + xo + x] = v;
                     }
                 }
             } else {
                 // el movimiento PREDICHO (8.4.1.3) y el del P_Skip (8.4.1.1)
-                const bool hayA = mx > 0, hayB = my > 0;
-                bool hayC = my > 0 && mx + 1 < mbW;
-                int cIdx = hayC ? mb - mbW + 1 : -1;
-                if (!hayC && my > 0 && mx > 0) { hayC = true; cIdx = mb - mbW - 1; }
+                const bool hasA = mx > 0, hasB = my > 0;
+                bool hasC = my > 0 && mx + 1 < mbW;
+                int cIdx = hasC ? mb - mbW + 1 : -1;
+                if (!hasC && my > 0 && mx > 0) { hasC = true; cIdx = mb - mbW - 1; }
                 int ax = 0, ay = 0, bxv = 0, byv = 0, cxv = 0, cyv = 0;
-                if (hayA) { ax = mvx[mb - 1]; ay = mvy[mb - 1]; }
-                if (hayB) { bxv = mvx[mb - mbW]; byv = mvy[mb - mbW]; }
-                if (hayC) { cxv = mvx[cIdx]; cyv = mvy[cIdx]; }
-                if (!hayB && !hayC && hayA) { mvpX = ax; mvpY = ay; }
+                if (hasA) { ax = mvx[mb - 1]; ay = mvy[mb - 1]; }
+                if (hasB) { bxv = mvx[mb - mbW]; byv = mvy[mb - mbW]; }
+                if (hasC) { cxv = mvx[cIdx]; cyv = mvy[cIdx]; }
+                if (!hasB && !hasC && hasA) { mvpX = ax; mvpY = ay; }
                 else {
-                    const int nRef = (hayA ? 1 : 0) + (hayB ? 1 : 0) + (hayC ? 1 : 0);
-                    if (nRef == 1) { mvpX = hayA ? ax : hayB ? bxv : cxv; mvpY = hayA ? ay : hayB ? byv : cyv; }
+                    const int nRef = (hasA ? 1 : 0) + (hasB ? 1 : 0) + (hasC ? 1 : 0);
+                    if (nRef == 1) { mvpX = hasA ? ax : hasB ? bxv : cxv; mvpY = hasA ? ay : hasB ? byv : cyv; }
                     else { mvpX = Med(ax, bxv, cxv); mvpY = Med(ay, byv, cyv); }
                 }
                 int skX = mvpX, skY = mvpY;
-                if (!hayA || !hayB || (ax == 0 && ay == 0) || (bxv == 0 && byv == 0)) { skX = 0; skY = 0; }
+                if (!hasA || !hasB || (ax == 0 && ay == 0) || (bxv == 0 && byv == 0)) { skX = 0; skY = 0; }
                 // LA BUSQUEDA (pixel entero): el SAD con un costo por el movimiento; candidatos 0, el predicho y el del
                 // salto, despues un diamante cada vez mas fino
                 const int lam = 1 + qp / 6;
-                struct Costo { static long Sad(const unsigned char* C, const unsigned char* F, int PW_, int PH_, int px_, int py_, int dx, int dy) {
+                struct Cost { static long Sad(const unsigned char* C, const unsigned char* F, int PW_, int PH_, int px_, int py_, int dx, int dy) {
                     const int x0 = px_ + dx, y0 = py_ + dy;
                     long s = 0;
                     if (x0 >= 0 && y0 >= 0 && x0 + 16 <= PW_ && y0 + 16 <= PH_) {
@@ -390,20 +390,20 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                 for (int k = 0; k < 3; k++) {
                     const int dx = cand[k][0], dy = cand[k][1];
                     if (dx < -R || dx > R || dy < -R || dy > R) continue;
-                    const long s = Costo::Sad(cY, fY, PW, PH, px, py, dx, dy) + lam * (abs(dx * 4 - mvpX) + abs(dy * 4 - mvpY));
+                    const long s = Cost::Sad(cY, fY, PW, PH, px, py, dx, dy) + lam * (abs(dx * 4 - mvpX) + abs(dy * 4 - mvpY));
                     if (best < 0 || s < best) { best = s; bx = dx; by = dy; }
                 }
-                for (int paso = 8; paso >= 1; paso >>= 1) {
-                    bool mejoro = true;
-                    for (int it = 0; it < 8 && mejoro; it++) {
-                        mejoro = false;
+                for (int step = 8; step >= 1; step >>= 1) {
+                    bool improved = true;
+                    for (int it = 0; it < 8 && improved; it++) {
+                        improved = false;
                         static const int dd[4][2] = { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
                         const int ox = bx, oy = by;
                         for (int k = 0; k < 4; k++) {
-                            const int dx = ox + dd[k][0] * paso, dy = oy + dd[k][1] * paso;
+                            const int dx = ox + dd[k][0] * step, dy = oy + dd[k][1] * step;
                             if (dx < -R || dx > R || dy < -R || dy > R) continue;
-                            const long s = Costo::Sad(cY, fY, PW, PH, px, py, dx, dy) + lam * (abs(dx * 4 - mvpX) + abs(dy * 4 - mvpY));
-                            if (s < best) { best = s; bx = dx; by = dy; mejoro = true; }
+                            const long s = Cost::Sad(cY, fY, PW, PH, px, py, dx, dy) + lam * (abs(dx * 4 - mvpX) + abs(dy * 4 - mvpY));
+                            if (s < best) { best = s; bx = dx; by = dy; improved = true; }
                         }
                     }
                 }
@@ -427,7 +427,7 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                     }
                 }
                 (void)skX; (void)skY;
-                salto = (mvX == skX && mvY == skY);   // (si ademas no queda residuo: P_Skip)
+                jump = (mvX == skX && mvY == skY);   // (si ademas no queda residuo: P_Skip)
             }
 
             // ===== EL RESIDUO: transformada y cuantizacion; y la reconstruccion (como el decodificador) =====
@@ -440,19 +440,19 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                     const int yy = by4 * 4 + y, xx = bx4 * 4 + x;
                     res[y * 4 + x] = (int)cY[(size_t)(py + yy) * PW + px + xx] - predY[yy * 16 + xx];
                 }
-                Directa(res, W);
+                Direct(res, W);
                 const int m = qp % 6;
                 int tc = 0;
                 for (int k = 0; k < 16; k++) {
                     const int p = kZig[k];
                     if (idr && k == 0) { levAC[blk][0] = 0; continue; }
-                    const int l = Cuant(W[p], kMF[m][Clase(p)], idr ? fIntra : fInter, qbits);
+                    const int l = Quant(W[p], kMF[m][Class(p)], idr ? fIntra : fInter, qbits);
                     levAC[blk][k] = l;
                     if (l) tc++;
                 }
                 if (idr) wDC[by4 * 4 + bx4] = W[0];   // (el DC, a la transformada de Hadamard; raster de bloques)
                 tcL[blk] = tc;
-                for (int k = 0; k < 16; k++) { const int p = kZig[k]; deq[blk][p] = (levAC[blk][k] * kV[m][Clase(p)]) << (qp / 6); }
+                for (int k = 0; k < 16; k++) { const int p = kZig[k]; deq[blk][p] = (levAC[blk][k] * kV[m][Class(p)]) << (qp / 6); }
             }
             // I16: el DC de los 16 bloques (Hadamard 4x4)
             int dcRec[16];
@@ -469,7 +469,7 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                 }
                 const int m = qp % 6;
                 int c[16];
-                for (int k = 0; k < 16; k++) { levDC[k] = Cuant(Y[kZig[k]], kMF[m][0], 2 * fIntra, qbits + 1); c[kZig[k]] = levDC[k]; }
+                for (int k = 0; k < 16; k++) { levDC[k] = Quant(Y[kZig[k]], kMF[m][0], 2 * fIntra, qbits + 1); c[kZig[k]] = levDC[k]; }
                 // la reconstruccion del DC (8.5.10): f = H c H y la escala
                 int f2[16];
                 for (int i = 0; i < 4; i++) {
@@ -486,18 +486,18 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                     if (qp >= 36) dcRec[k] = (f2[k] * LS) << (qp / 6 - 6);
                     else dcRec[k] = (f2[k] * LS + (1 << (5 - qp / 6))) >> (6 - qp / 6);
                 }
-                bool hayAC = false;
-                for (int blk = 0; blk < 16; blk++) if (tcL[blk]) hayAC = true;
-                cbpL = hayAC ? 15 : 0;
+                bool hasAC = false;
+                for (int blk = 0; blk < 16; blk++) if (tcL[blk]) hasAC = true;
+                cbpL = hasAC ? 15 : 0;
                 for (int blk = 0; blk < 16; blk++) {
                     int bx4, by4; PosBlk(blk, bx4, by4);
                     deq[blk][0] = dcRec[by4 * 4 + bx4];
                 }
             } else {
                 for (int i8 = 0; i8 < 4; i8++) {
-                    bool hay = false;
-                    for (int k = 0; k < 4; k++) if (tcL[i8 * 4 + k]) hay = true;
-                    if (hay) cbpL |= 1 << i8;
+                    bool has = false;
+                    for (int k = 0; k < 4; k++) if (tcL[i8 * 4 + k]) has = true;
+                    if (has) cbpL |= 1 << i8;
                     else for (int k = 0; k < 4; k++) { for (int q = 0; q < 16; q++) { levAC[i8 * 4 + k][q] = 0; deq[i8 * 4 + k][q] = 0; } }
                 }
             }
@@ -505,14 +505,14 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
             for (int blk = 0; blk < 16; blk++) {
                 int bx4, by4; PosBlk(blk, bx4, by4);
                 int rr[16];
-                Inversa(deq[blk], rr);
+                Inverse(deq[blk], rr);
                 for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) {
                     const int yy = by4 * 4 + y, xx = bx4 * 4 + x;
                     rY[(size_t)(py + yy) * PW + px + xx] = (unsigned char)Clip255(predY[yy * 16 + xx] + rr[y * 4 + x]);
                 }
             }
             // ---- el croma ----
-            bool hayCdc = false, hayCac = false;
+            bool hasCdc = false, hasCac = false;
             int deqC[2][4][16];
             for (int c = 0; c < 2; c++) {
                 const unsigned char* C = c == 0 ? cU : cV;
@@ -524,25 +524,25 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                     int res[16], W[16];
                     for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++)
                         res[y * 4 + x] = (int)C[(size_t)(my * 8 + yo + y) * CW + mx * 8 + xo + x] - pr[(yo + y) * 8 + xo + x];
-                    Directa(res, W);
+                    Direct(res, W);
                     wdc[blk] = W[0];
                     int tc = 0;
                     levCac[c][blk][0] = 0;
                     for (int k = 1; k < 16; k++) {
                         const int p = kZig[k];
-                        const int l = Cuant(W[p], kMF[m][Clase(p)], idr ? fIntraC : fInterC, qbitsC);
+                        const int l = Quant(W[p], kMF[m][Class(p)], idr ? fIntraC : fInterC, qbitsC);
                         levCac[c][blk][k] = l; if (l) tc++;
                     }
                     tcC[c][blk] = tc;
-                    if (tc) hayCac = true;
+                    if (tc) hasCac = true;
                 }
                 // el DC 2x2
                 const int f0 = wdc[0] + wdc[1] + wdc[2] + wdc[3], f1 = wdc[0] - wdc[1] + wdc[2] - wdc[3];
                 const int f2 = wdc[0] + wdc[1] - wdc[2] - wdc[3], f3 = wdc[0] - wdc[1] - wdc[2] + wdc[3];
                 const int Ys[4] = { f0, f1, f2, f3 };
-                for (int k = 0; k < 4; k++) { levCdc[c][k] = Cuant(Ys[k], kMF[m][0], 2 * (idr ? fIntraC : fInterC), qbitsC + 1); if (levCdc[c][k]) hayCdc = true; }
+                for (int k = 0; k < 4; k++) { levCdc[c][k] = Quant(Ys[k], kMF[m][0], 2 * (idr ? fIntraC : fInterC), qbitsC + 1); if (levCdc[c][k]) hasCdc = true; }
             }
-            cbpC = hayCac ? 2 : (hayCdc ? 1 : 0);
+            cbpC = hasCac ? 2 : (hasCdc ? 1 : 0);
             for (int c = 0; c < 2; c++) {
                 const int m = qpc % 6;
                 if (cbpC < 2) for (int blk = 0; blk < 4; blk++) { tcC[c][blk] = 0; for (int k = 0; k < 16; k++) levCac[c][blk][k] = 0; }
@@ -552,7 +552,7 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                 const int g[4] = { l[0] + l[1] + l[2] + l[3], l[0] - l[1] + l[2] - l[3], l[0] + l[1] - l[2] - l[3], l[0] - l[1] - l[2] + l[3] };
                 const int LS = 16 * kV[m][0];
                 for (int blk = 0; blk < 4; blk++) {
-                    for (int k = 0; k < 16; k++) { const int p = kZig[k]; deqC[c][blk][p] = (levCac[c][blk][k] * kV[m][Clase(p)]) << (qpc / 6); }
+                    for (int k = 0; k < 16; k++) { const int p = kZig[k]; deqC[c][blk][p] = (levCac[c][blk][k] * kV[m][Class(p)]) << (qpc / 6); }
                     deqC[c][blk][0] = ((g[blk] * LS) << (qpc / 6)) >> 5;
                 }
                 unsigned char* RR = c == 0 ? rU : rV;
@@ -560,7 +560,7 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                 for (int blk = 0; blk < 4; blk++) {
                     const int xo = (blk & 1) * 4, yo = (blk >> 1) * 4;
                     int rr[16];
-                    Inversa(deqC[c][blk], rr);
+                    Inverse(deqC[c][blk], rr);
                     for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++)
                         RR[(size_t)(my * 8 + yo + y) * CW + mx * 8 + xo + x] = (unsigned char)Clip255(pr[(yo + y) * 8 + xo + x] + rr[y * 4 + x]);
                 }
@@ -579,12 +579,12 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
             }
 
             // ===== P_Skip: mismo movimiento que el predicho para el salto y nada de residuo =====
-            if (!idr && salto && cbpL == 0 && cbpC == 0) {
-                mvx[mb] = (short)mvX; mvy[mb] = (short)mvY; esSalto[mb] = 1;
-                saltos++;
+            if (!idr && jump && cbpL == 0 && cbpC == 0) {
+                mvx[mb] = (short)mvX; mvy[mb] = (short)mvY; isJump[mb] = 1;
+                jumps++;
                 continue;
             }
-            esSalto[mb] = 0;
+            isJump[mb] = 0;
             mvx[mb] = (short)(idr ? 0 : mvX); mvy[mb] = (short)(idr ? 0 : mvY);
 
             // ===== LOS BITS DEL MACROBLOQUE =====
@@ -594,16 +594,16 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                 return (a && bb) ? (nA + nB + 1) >> 1 : a ? nA : bb ? nB : 0;
             } };
             if (idr) {
-                b.Ue((unsigned)(1 + modoI + 4 * cbpC + (cbpL ? 12 : 0)));   // mb_type I_16x16_<modo>_<cbpC>_<AC>
-                b.Ue(0);                                                     // intra_chroma_pred_mode: DC
-                b.Se(0);                                                     // mb_qp_delta
-                Bloque(b, levDC, 16, NC::Luma(nzL, nzLW, mx * 4, my * 4));   // el DC (el nC del bloque 0)
+                b.Ue((unsigned)(1 + modeI + 4 * cbpC + (cbpL ? 12 : 0)));   // mb_type I_16x16_<modo>_<cbpC>_<AC>
+                b.Ue(0);                                                    // intra_chroma_pred_mode: DC
+                b.Se(0);                                                    // mb_qp_delta
+                Block(b, levDC, 16, NC::Luma(nzL, nzLW, mx * 4, my * 4));   // el DC (el nC del bloque 0)
                 if (cbpL) for (int blk = 0; blk < 16; blk++) {
                     int bx4, by4; PosBlk(blk, bx4, by4);
-                    Bloque(b, levAC[blk] + 1, 15, NC::Luma(nzL, nzLW, mx * 4 + bx4, my * 4 + by4));
+                    Block(b, levAC[blk] + 1, 15, NC::Luma(nzL, nzLW, mx * 4 + bx4, my * 4 + by4));
                 }
             } else {
-                b.Ue((unsigned)saltos); saltos = 0;              // mb_skip_run
+                b.Ue((unsigned)jumps); jumps = 0;                // mb_skip_run
                 b.Ue(0);                                         // mb_type P_L0_16x16
                 b.Se(mvX - mvpX); b.Se(mvY - mvpY);              // mvd_l0
                 const int cbp = cbpL | (cbpC << 4);
@@ -614,21 +614,21 @@ void W3dH264Codificador::CodificarCuadro(bool idr, std::vector<unsigned char>& o
                     for (int blk = 0; blk < 16; blk++) {
                         if (!(cbpL & (1 << (blk >> 2)))) continue;
                         int bx4, by4; PosBlk(blk, bx4, by4);
-                        Bloque(b, levAC[blk], 16, NC::Luma(nzL, nzLW, mx * 4 + bx4, my * 4 + by4));
+                        Block(b, levAC[blk], 16, NC::Luma(nzL, nzLW, mx * 4 + bx4, my * 4 + by4));
                     }
                 }
             }
             if (cbpC) {
-                Bloque(b, levCdc[0], 4, -1);
-                Bloque(b, levCdc[1], 4, -1);
+                Block(b, levCdc[0], 4, -1);
+                Block(b, levCdc[1], 4, -1);
                 if (cbpC == 2) for (int c = 0; c < 2; c++) {
                     const std::vector<signed char>& nz = c == 0 ? nzU : nzV;
                     for (int blk = 0; blk < 4; blk++)
-                        Bloque(b, levCac[c][blk] + 1, 15, NC::Luma(nz, nzCW, mx * 2 + (blk & 1), my * 2 + (blk >> 1)));
+                        Block(b, levCac[c][blk] + 1, 15, NC::Luma(nz, nzCW, mx * 2 + (blk & 1), my * 2 + (blk >> 1)));
                 }
             }
         }
-    if (!idr && saltos) b.Ue((unsigned)saltos);   // (los ultimos saltados)
-    b.Cierre();
+    if (!idr && jumps) b.Ue((unsigned)jumps);   // (los ultimos saltados)
+    b.Close();
     Nal(out, idr ? 3 : 2, idr ? 5 : 1, r);
 }

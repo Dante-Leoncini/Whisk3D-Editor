@@ -32,13 +32,13 @@ Scene::~Scene() {
 }
 
 // una raiz nueva, AFUERA del arbol activo (ver Scene.h): el ctor de Object la deja suelta con
-// W3dRaizCreando, y el de Scene no puede pisar el 'scene' de la raiz que se esta mirando
-Scene* W3dSceneNuevaRaiz() {
-    Scene* antes = scene;
-    W3dRaizCreando = true;
+// W3dRootCreating, y el de Scene no puede pisar el 'scene' de la raiz que se esta mirando
+Scene* W3dSceneNewRoot() {
+    Scene* prev = scene;
+    W3dRootCreating = true;
     Scene* r = new Scene();
-    W3dRaizCreando = false;
-    scene = antes;
+    W3dRootCreating = false;
+    scene = prev;
     return r;
 }
 
@@ -53,5 +53,5 @@ void W3dModelInit() {
 
 #ifndef W3D_SYMBIAN
 // en PC se arma sola en el arranque estatico, como antes (el editor no llama a W3dModelInit)
-namespace { struct CrearRaiz { CrearRaiz() { W3dModelInit(); } } g_crearRaiz; }
+namespace { struct CreateRoot { CreateRoot() { W3dModelInit(); } } g_createRoot; }
 #endif

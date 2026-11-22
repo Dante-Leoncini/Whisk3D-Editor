@@ -5,13 +5,13 @@
 --  su presencia: setCompartido("pf_<etiqueta>", 1) -> el .w3s verifica que el
 --  default y el override conviven en clones distintos del MISMO prefab.
 -- ==========================================================================
-propiedades = {
+properties = {
     etiqueta = "sin",
 }
 
-function inicio()
-    setCompartido("pf_" .. propiedad("etiqueta"), 1)
+function start()
+    setShared("pf_" .. property("etiqueta"), 1)
 end
 
-function actualizar(dt)
+function update(dt)
 end

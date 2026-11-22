@@ -26,25 +26,25 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
+window 640 480
 
 # --- 1) el juego 3D minimo con personajes animados, guardado y abierto ---------
-juego3dmin /tmp/w3d_juego3danims
-animsetsintetica 3 agregar
-animsetluajuego /tmp/w3d_juego3danims
-guardarw3d /tmp/w3d_juego3danims/juego3dmin.w3d
+game3dmin /tmp/w3d_juego3danims
+animsetsynthetic 3 add
+animsetluagame /tmp/w3d_juego3danims
+savew3d /tmp/w3d_juego3danims/juego3dmin.w3d
 animsetsw3d /tmp/w3d_juego3danims/juego3dmin.w3d animsets 1 clips 5 armatures 3 inline 0
-abrirw3d /tmp/w3d_juego3danims/juego3dmin.w3d
-animsetinfo vivos 1 registro 1
+openw3d /tmp/w3d_juego3danims/juego3dmin.w3d
+animsetinfo live 1 registry 1
 
 # --- 2) compilarlo para Linux, con los assets sueltos ---------------------------
-compilarjuego 0 0
+compilegame 0 0
 
 # --- 3) correr el BINARIO: la franja se prende solo si los clips cargaron -------
-juego3dpx /tmp/w3d_juego3danims juego3dmin
+game3dpx /tmp/w3d_juego3danims juego3dmin
 
 # --- 4) sin los .w3da en los assets, el mismo binario NO la prende -------------
-animsetjuegoquitar /tmp/w3d_juego3danims quitar
+animsetgameremove /tmp/w3d_juego3danims remove
 fail juego3dpx /tmp/w3d_juego3danims juego3dmin
-animsetjuegoquitar /tmp/w3d_juego3danims volver
-juego3dpx /tmp/w3d_juego3danims juego3dmin
+animsetgameremove /tmp/w3d_juego3danims return
+game3dpx /tmp/w3d_juego3danims juego3dmin

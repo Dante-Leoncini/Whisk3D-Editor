@@ -21,25 +21,25 @@ import java.nio.ByteBuffer;
 // ================================================================================================================
 public class W3dVideo {
     private static final String TAG = "W3dVideo";
-    private static final long ESPERA_US = 10000;   // (10 ms por vuelta al pedir buffers al codificador)
+    private static final long WAIT_US = 10000;   // (10 ms por vuelta al pedir buffers al codificador)
 
     private MediaCodec enc;
     private MediaMuxer mux;
-    private int pista = -1;
+    private int track = -1;
     private boolean muxOn, ok;
-    private long cuadros;
+    private long frames;
     private int w, h, fps;
-    private String ruta, rutaVideo;
+    private String path, videoPath;
     private final MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
     // el video de w x h (se redondea a par: H.264 en 4:2:0) a 'fps', con 'kbps' de bitrate. false si el telefono no
     // tiene codificador para ese tamano
-    public boolean abrir(String ruta, int w, int h, int fps, int kbps) {
-        liberar();
+    public boolean open(String path, int w, int h, int fps, int kbps) {
+        free();
         try {
-            this.ruta = ruta;
+            this.path = path;
             this.w = (w + 1) & ~1; this.h = (h + 1) & ~1; this.fps = fps > 0 ? fps : 24;
-            rutaVideo = ruta + ".video.tmp.mp4";
+            videoPath = path + ".video.tmp.mp4";
             MediaFormat f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, this.w, this.h);
             f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             f.setInteger(MediaFormat.KEY_BIT_RATE, kbps * 1000);
@@ -48,29 +48,29 @@ public class W3dVideo {
             enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
             enc.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
             enc.start();
-            mux = new MediaMuxer(rutaVideo, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            cuadros = 0; pista = -1; muxOn = false; ok = true;
+            mux = new MediaMuxer(videoPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            frames = 0; track = -1; muxOn = false; ok = true;
             return true;
         } catch (Exception e) {
             Log.e(TAG, "abrir: " + e);
-            liberar();
+            free();
             return false;
         }
     }
 
     // un cuadro: sw x sh pixeles RGBA de arriba hacia abajo
-    public boolean cuadro(byte[] rgba, int sw, int sh) {
+    public boolean frame(byte[] rgba, int sw, int sh) {
         if (!ok || enc == null) return false;
         try {
-            int i = enc.dequeueInputBuffer(ESPERA_US);
-            for (int vueltas = 0; i < 0 && vueltas < 1000; vueltas++) { drenar(false); i = enc.dequeueInputBuffer(ESPERA_US); }
+            int i = enc.dequeueInputBuffer(WAIT_US);
+            for (int turns = 0; i < 0 && turns < 1000; turns++) { drain(false); i = enc.dequeueInputBuffer(WAIT_US); }
             if (i < 0) { ok = false; return false; }
             Image img = enc.getInputImage(i);
             if (img == null) { ok = false; return false; }
-            llenar(img, rgba, sw, sh);
-            enc.queueInputBuffer(i, 0, w * h * 3 / 2, cuadros * 1000000L / fps, 0);
-            cuadros++;
-            drenar(false);
+            fill(img, rgba, sw, sh);
+            enc.queueInputBuffer(i, 0, w * h * 3 / 2, frames * 1000000L / fps, 0);
+            frames++;
+            drain(false);
             return true;
         } catch (Exception e) {
             Log.e(TAG, "cuadro: " + e);
@@ -81,40 +81,40 @@ public class W3dVideo {
 
     // termina el video; con 'wav' (el audio de la escena ya renderizado) le agrega el sonido en AAC de 'kbpsAudio'. El
     // MP4 queda en 'ruta'
-    public boolean cerrar(String wav, int kbpsAudio) {
-        boolean bien = ok && enc != null;
+    public boolean close(String wav, int kbpsAudio) {
+        boolean good = ok && enc != null;
         try {
-            if (bien) {
-                int i = enc.dequeueInputBuffer(ESPERA_US);
-                for (int vueltas = 0; i < 0 && vueltas < 1000; vueltas++) { drenar(false); i = enc.dequeueInputBuffer(ESPERA_US); }
-                if (i >= 0) enc.queueInputBuffer(i, 0, 0, cuadros * 1000000L / fps, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                drenar(true);
+            if (good) {
+                int i = enc.dequeueInputBuffer(WAIT_US);
+                for (int turns = 0; i < 0 && turns < 1000; turns++) { drain(false); i = enc.dequeueInputBuffer(WAIT_US); }
+                if (i >= 0) enc.queueInputBuffer(i, 0, 0, frames * 1000000L / fps, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                drain(true);
             }
         } catch (Exception e) {
             Log.e(TAG, "cerrar: " + e);
-            bien = false;
+            good = false;
         }
-        liberar();
-        bien = bien && muxOn;
-        File tmpVideo = new File(rutaVideo);
-        if (bien) {
+        free();
+        good = good && muxOn;
+        File tmpVideo = new File(videoPath);
+        if (good) {
             if (wav != null && wav.length() > 0) {
-                String tmpAudio = ruta + ".audio.tmp.m4a";
-                bien = aacDeWav(wav, tmpAudio, kbpsAudio) && juntar(rutaVideo, tmpAudio, ruta);
+                String tmpAudio = path + ".audio.tmp.m4a";
+                good = aacOfWav(wav, tmpAudio, kbpsAudio) && collect(videoPath, tmpAudio, path);
                 new File(tmpAudio).delete();
             } else {
-                File fin = new File(ruta);
-                fin.delete();
-                bien = tmpVideo.renameTo(fin);
+                File end = new File(path);
+                end.delete();
+                good = tmpVideo.renameTo(end);
             }
         }
         tmpVideo.delete();
-        return bien;
+        return good;
     }
 
     // RGBA -> YUV 4:2:0 (BT.601, rango limitado) en los planos que pide el codificador (cualquier distribucion: la del
     // Image, con sus pasos de fila y de pixel). Lo que sobra al redondear a par repite el borde
-    private void llenar(Image img, byte[] rgba, int sw, int sh) {
+    private void fill(Image img, byte[] rgba, int sw, int sh) {
         Image.Plane[] p = img.getPlanes();
         ByteBuffer yb = p[0].getBuffer(), ub = p[1].getBuffer(), vb = p[2].getBuffer();
         int yRow = p[0].getRowStride(), yPix = p[0].getPixelStride();
@@ -138,12 +138,12 @@ public class W3dVideo {
     }
 
     // lo que el codificador ya codifico, al MP4. 'fin' = hasta el final del stream
-    private void drenar(boolean fin) {
-        for (int vueltas = 0; vueltas < 100000; vueltas++) {
-            int o = enc.dequeueOutputBuffer(info, fin ? ESPERA_US : 0);
-            if (o == MediaCodec.INFO_TRY_AGAIN_LATER) { if (!fin) return; continue; }
+    private void drain(boolean end) {
+        for (int turns = 0; turns < 100000; turns++) {
+            int o = enc.dequeueOutputBuffer(info, end ? WAIT_US : 0);
+            if (o == MediaCodec.INFO_TRY_AGAIN_LATER) { if (!end) return; continue; }
             if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                pista = mux.addTrack(enc.getOutputFormat());
+                track = mux.addTrack(enc.getOutputFormat());
                 mux.start(); muxOn = true;
                 continue;
             }
@@ -152,14 +152,14 @@ public class W3dVideo {
             if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) info.size = 0;
             if (info.size > 0 && muxOn && b != null) {
                 b.position(info.offset); b.limit(info.offset + info.size);
-                mux.writeSampleData(pista, b, info);
+                mux.writeSampleData(track, b, info);
             }
             enc.releaseOutputBuffer(o, false);
             if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) return;
         }
     }
 
-    private void liberar() {
+    private void free() {
         try { if (enc != null) { enc.stop(); } } catch (Exception e) { }
         try { if (enc != null) { enc.release(); } } catch (Exception e) { }
         enc = null;
@@ -171,58 +171,58 @@ public class W3dVideo {
 
     // ---- EL AUDIO: un WAV (PCM de 16 bits) a AAC en un .m4a, con el codificador del telefono. Tambien es el
     //      "Renderizar audio" en AAC de Android ----
-    public static boolean aacDeWav(String wav, String salida, int kbps) {
+    public static boolean aacOfWav(String wav, String output, int kbps) {
         MediaCodec ac = null; MediaMuxer am = null; boolean muxOk = false;
         FileInputStream in = null;
         try {
             in = new FileInputStream(wav);
             byte[] cab = new byte[44];
             if (in.read(cab) != 44) return false;
-            int canales = (cab[22] & 255) | ((cab[23] & 255) << 8);
+            int channels = (cab[22] & 255) | ((cab[23] & 255) << 8);
             int rate = (cab[24] & 255) | ((cab[25] & 255) << 8) | ((cab[26] & 255) << 16) | ((cab[27] & 255) << 24);
-            if (canales < 1 || rate <= 0) return false;
-            MediaFormat f = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, rate, canales);
+            if (channels < 1 || rate <= 0) return false;
+            MediaFormat f = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, rate, channels);
             f.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
             f.setInteger(MediaFormat.KEY_BIT_RATE, kbps * 1000);
             f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384);
             ac = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
             ac.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
             ac.start();
-            am = new MediaMuxer(salida, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            am = new MediaMuxer(output, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             MediaCodec.BufferInfo bi = new MediaCodec.BufferInfo();
-            int pistaA = -1;
-            long muestras = 0;
-            final int bytesPorMuestra = 2 * canales;
-            byte[] tramo = new byte[8192];
-            boolean entradaFin = false, salidaFin = false;
-            while (!salidaFin) {
-                if (!entradaFin) {
-                    int i = ac.dequeueInputBuffer(ESPERA_US);
+            int trackA = -1;
+            long samples = 0;
+            final int bytesBySample = 2 * channels;
+            byte[] segment = new byte[8192];
+            boolean entryEnd = false, outputEnd = false;
+            while (!outputEnd) {
+                if (!entryEnd) {
+                    int i = ac.dequeueInputBuffer(WAIT_US);
                     if (i >= 0) {
                         ByteBuffer b = ac.getInputBuffer(i);
                         b.clear();
-                        int quiero = Math.min(tramo.length, b.capacity());
-                        quiero -= quiero % bytesPorMuestra;
-                        int n = in.read(tramo, 0, quiero);
-                        long pts = muestras * 1000000L / rate;
+                        int want = Math.min(segment.length, b.capacity());
+                        want -= want % bytesBySample;
+                        int n = in.read(segment, 0, want);
+                        long pts = samples * 1000000L / rate;
                         if (n <= 0) {
                             ac.queueInputBuffer(i, 0, 0, pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                            entradaFin = true;
+                            entryEnd = true;
                         } else {
-                            b.put(tramo, 0, n);
+                            b.put(segment, 0, n);
                             ac.queueInputBuffer(i, 0, n, pts, 0);
-                            muestras += n / bytesPorMuestra;
+                            samples += n / bytesBySample;
                         }
                     }
                 }
-                int o = ac.dequeueOutputBuffer(bi, ESPERA_US);
-                if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) { pistaA = am.addTrack(ac.getOutputFormat()); am.start(); muxOk = true; }
+                int o = ac.dequeueOutputBuffer(bi, WAIT_US);
+                if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) { trackA = am.addTrack(ac.getOutputFormat()); am.start(); muxOk = true; }
                 else if (o >= 0) {
                     ByteBuffer b = ac.getOutputBuffer(o);
                     if ((bi.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) bi.size = 0;
-                    if (bi.size > 0 && muxOk && b != null) { b.position(bi.offset); b.limit(bi.offset + bi.size); am.writeSampleData(pistaA, b, bi); }
+                    if (bi.size > 0 && muxOk && b != null) { b.position(bi.offset); b.limit(bi.offset + bi.size); am.writeSampleData(trackA, b, bi); }
                     ac.releaseOutputBuffer(o, false);
-                    if ((bi.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) salidaFin = true;
+                    if ((bi.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputEnd = true;
                 }
             }
             return muxOk;
@@ -237,11 +237,11 @@ public class W3dVideo {
     }
 
     // junta el video y el audio (cada uno con una pista) en un MP4
-    private static boolean juntar(String video, String audio, String salida) {
+    private static boolean collect(String video, String audio, String output) {
         MediaMuxer m = null; MediaExtractor ev = null, ea = null; boolean on = false;
         try {
-            new File(salida).delete();
-            m = new MediaMuxer(salida, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            new File(output).delete();
+            m = new MediaMuxer(output, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             ev = new MediaExtractor(); ev.setDataSource(video); ev.selectTrack(0);
             ea = new MediaExtractor(); ea.setDataSource(audio); ea.selectTrack(0);
             int tv = m.addTrack(ev.getTrackFormat(0)), ta = m.addTrack(ea.getTrackFormat(0));
@@ -249,19 +249,19 @@ public class W3dVideo {
             // INTERCALADAS por tiempo (el MP4 las quiere asi): siempre la muestra mas temprana de las dos pistas
             ByteBuffer b = ByteBuffer.allocate(4 * 1024 * 1024);
             MediaCodec.BufferInfo bi = new MediaCodec.BufferInfo();
-            boolean hayV = true, hayA = true;
-            while (hayV || hayA) {
-                long t_v = hayV ? ev.getSampleTime() : Long.MAX_VALUE, t_a = hayA ? ea.getSampleTime() : Long.MAX_VALUE;
-                if (t_v < 0) { hayV = false; continue; }
-                if (t_a < 0) { hayA = false; continue; }
-                boolean deVideo = t_v <= t_a;
-                MediaExtractor ex = deVideo ? ev : ea;
+            boolean hasV = true, hasA = true;
+            while (hasV || hasA) {
+                long t_v = hasV ? ev.getSampleTime() : Long.MAX_VALUE, t_a = hasA ? ea.getSampleTime() : Long.MAX_VALUE;
+                if (t_v < 0) { hasV = false; continue; }
+                if (t_a < 0) { hasA = false; continue; }
+                boolean fromVideo = t_v <= t_a;
+                MediaExtractor ex = fromVideo ? ev : ea;
                 int n = ex.readSampleData(b, 0);
-                if (n < 0) { if (deVideo) hayV = false; else hayA = false; continue; }
+                if (n < 0) { if (fromVideo) hasV = false; else hasA = false; continue; }
                 bi.offset = 0; bi.size = n; bi.presentationTimeUs = ex.getSampleTime();
                 bi.flags = (ex.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0 ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
-                m.writeSampleData(deVideo ? tv : ta, b, bi);
-                if (!ex.advance()) { if (deVideo) hayV = false; else hayA = false; }
+                m.writeSampleData(fromVideo ? tv : ta, b, bi);
+                if (!ex.advance()) { if (fromVideo) hasV = false; else hasA = false; }
             }
             return true;
         } catch (Exception e) {

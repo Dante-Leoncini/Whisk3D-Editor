@@ -37,7 +37,7 @@ for W3D in "${PROYECTOS[@]}"; do
     N="$(basename "$W3D" .w3d)"
     NOMBRES+=("$N")
     for B in fijo es2; do
-        printf 'abrirw3d %s\nloadtex\nuishot %s/%s_%s_a.png\nsimplay 45\nloadtex\nuishot %s/%s_%s_b.png\n' \
+        printf 'openw3d %s\nloadtex\nuishot %s/%s_%s_a.png\nsimplay 45\nloadtex\nuishot %s/%s_%s_b.png\n' \
             "$W3D" "$OUT" "$B" "$N" "$OUT" "$B" "$N" > "$OUT/${B}_$N.w3s"
     done
     SDL_VIDEODRIVER=offscreen "$RAIZ/platform/linux/build/whisk3d" --script "$OUT/fijo_$N.w3s" > "$OUT/fijo_$N.log" 2>&1 &

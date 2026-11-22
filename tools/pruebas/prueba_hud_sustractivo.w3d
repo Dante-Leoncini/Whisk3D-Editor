@@ -11,7 +11,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -28,24 +28,24 @@ Whisk3D {
 
         // el humo SUSTRACTIVO delante de la camara: su lote se dibuja TODOS
         // los frames y deja la blend equation en dst - src si nadie la repone
-        Particulas {
+        Particles {
             name: "HumoResta"
             y: -4.0
             z: 2.0
-            textura: "texturas/particula.png"
-            cantidad: 20
-            vida: 2.0
-            tam: 1.0
+            texture: "textures/particula.png"
+            count: 20
+            life: 2.0
+            size: 1.0
             vel: 0.3
             dispersion: 20
-            gravedad: 0
+            gravity: 0
             sustractivo: true
             color: "0.3, 0.3, 0.3, 1.0"
-            activo: true
+            active: true
         }
 
         UI {
-            archivo: "prueba_hud_sustractivo.w3dui"
+            file: "prueba_hud_sustractivo.w3dui"
         }
 
         Collection {

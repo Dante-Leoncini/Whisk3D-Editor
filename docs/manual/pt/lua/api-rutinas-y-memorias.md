@@ -4,8 +4,8 @@ As rotinas (listas de passos de desenho montadas no painel de Propriedades) pode
 
 | Função | O que faz |
 |---|---|
-| `setMemoria(nombre, i, v)`, `memoria(nombre, i)`, `setMemorias(nombre, i, v1, v2, ...)` | Escrever e ler memórias (o índice vai de **0** a 255). |
-| `setPaso(rutina, i, campo, ...)`, `leerPaso(rutina, i, campo)` | Mudar ou ler um passo de uma rotina (campos: `"on"`, `"n"`, `"color"`, `"ref"`, `"modo"`, `"entero"`). |
-| `paso(nombre, ...)` | Executa um passo de desenho; só vale dentro de uma função chamada pelo passo "Chamar Lua" de uma rotina. |
+| `setMemory(name, i, v)`, `getMemory(name, i)`, `setMemories(name, i, v1, v2, ...)` | Escrever e ler memórias (o índice vai de **0** a 255). |
+| `setStep(routine, i, field, ...)`, `getStep(routine, i, field)` | Mudar ou ler um passo de uma rotina (campos: `"on"`, `"n"`, `"color"`, `"ref"`, `"modo"`, `"entero"`). |
+| `step(name, ...)` | Executa um passo de desenho; só vale dentro de uma função chamada pelo passo "Chamar Lua" de uma rotina. |
 
-Em uma rotina com **Repetir** maior que 1, a memória `bucle` diz em qual volta ela está: `@bucle[0]` é a volta atual (a partir de 0) e `@bucle[1]` o total.
+Em uma rotina com **Repetir** maior que 1, a memória `loop` diz em qual volta ela está: `@loop[0]` é a volta atual (a partir de 0) e `@loop[1]` o total.

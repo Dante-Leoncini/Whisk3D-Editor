@@ -4,7 +4,7 @@
 
 - **Core с его моделью сцены.** UI рисует через `w3dEngine`, а некоторые строки читают объекты сцены (`objects/`, `animation/`, `script/`). См. [Использовать Core напрямую](../core/empezar.md).
 - **Исходники UI.** Все `.cpp` из `libs/WhiskUI/`. Каталоги заголовков — `libs/`, для `"WhiskUI/draw/icons.h"`, и подпапки `widgets/`, `text/`, `draw/`, `theme/` и `core/`, потому что внутри файлы подключают друг друга без папки (`"icons.h"`, `"card.h"`).
-- **Файлы скина.** `font.png` (буквы и края карточек), `font-ext.png` (расширенный атлас), `skin.ini` (цвета) и, для новых иконок, папка `atlas/iconos/`. С библиотекой они не поставляются: они лежат в репозитории редактора, в `res/Skins/Whisk3D/`.
+- **Файлы скина.** `font.png` (буквы и края карточек), `font-ext.png` (расширенный атлас), `skin.ini` (цвета) и, для новых иконок, папка `atlas/icons/`. С библиотекой они не поставляются: они лежат в репозитории редактора, в `res/Skins/Whisk3D/`.
 
 ## Запуск
 
@@ -13,7 +13,7 @@
 ```cpp
 #include "w3dTexture.h"
 #include "WhiskUI/core/UI.h"
-#include "WhiskUI/theme/colores.h"
+#include "WhiskUI/theme/colors.h"
 #include "WhiskUI/draw/icons.h"
 #include "WhiskUI/widgets/card.h"
 #include "WhiskUI/text/font.h"
@@ -25,23 +25,23 @@ unsigned int atlas = 0; int w = 0, h = 0;
 w3dEngine::LoadTexture("Skins/Whisk3D/font.png", atlas, &w, &h);
 
 CalcCardUV(w, h);          // скруглённые края
-CrearIconos(w, h);         // иконки, которые лежат внутри font.png
+CreateIcons(w, h);         // иконки, которые лежат внутри font.png
 W3dFontSetTexSize(w, h);
 SetIconScale(GlobalScale);
 
 WhiskFont = new Font(w, h, atlas);
 WhiskFont->SetScale(GlobalScale);
-WhiskFont->SetAtlasExtendido("Skins/Whisk3D/font-ext.png");   // загружается только когда понадобится
+WhiskFont->SetAtlasExtended("Skins/Whisk3D/font-ext.png");   // загружается только когда понадобится
 ```
 
-`GlobalScale` начинается с 1. Для другого масштаба см. [Цвета и масштаб](tema.md). Для отдельных иконок из `atlas/iconos/` см. [Рисование и атлас](dibujo.md).
+`GlobalScale` начинается с 1. Для другого масштаба см. [Цвета и масштаб](tema.md). Для отдельных иконок из `atlas/icons/` см. [Рисование и атлас](dibujo.md).
 
 Каждый раз, когда меняется размер окна:
 
 ```cpp
-W3dPantallaAlto = alto;    // чтобы переводить Y интерфейса в Y для Scissor и Viewport
-MenuPantallaW = ancho;     // чтобы меню не выходили за пределы экрана
-MenuPantallaH = alto;
+W3dScreenHeight = height;    // чтобы переводить Y интерфейса в Y для Scissor и Viewport
+MenuScreenW = width;     // чтобы меню не выходили за пределы экрана
+MenuScreenH = height;
 ```
 
 ## 2D-состояние
@@ -51,9 +51,9 @@ UI рисует в пикселях, с осью Y вниз и началом к
 ```cpp
 namespace gfx = w3dEngine;
 
-gfx::Viewport(0, 0, ancho, alto);
+gfx::Viewport(0, 0, width, height);
 gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
-gfx::Ortho(0, ancho, alto, 0, -1, 1);       // Y вниз
+gfx::Ortho(0, width, height, 0, -1, 1);       // Y вниз
 gfx::MatrixMode(gfx::ModelView);  gfx::LoadIdentity();
 gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::CullFace);
 gfx::Disable(gfx::Lighting);  gfx::Disable(gfx::Fog);
@@ -74,31 +74,31 @@ gfx::Enable(gfx::Blend); gfx::BlendAlpha();
 #include "WhiskUI/Propieties/PropFloat.h"
 #include "WhiskUI/Propieties/PropButton.h"
 
-static float volumen = 0.8f;
-static bool  pantallaCompleta = false;
-static void Salir() { /* ... */ }
+static float volume = 0.8f;
+static bool  fullscreen = false;
+static void Exit() { /* ... */ }
 
-GroupPropertie* opciones = new GroupPropertie("Opciones");
+GroupPropertie* options = new GroupPropertie("Opciones");
 
 PropFloat* vol = new PropFloat("Volumen");
-vol->value = &volumen;
-vol->SetRango(0.0f, 1.0f);
-opciones->properties.push_back(vol);
+vol->value = &volume;
+vol->SetRange(0.0f, 1.0f);
+options->properties.push_back(vol);
 
 PropBool* pc = new PropBool("Pantalla completa");
-pc->value = &pantallaCompleta;
-opciones->properties.push_back(pc);
+pc->value = &fullscreen;
+options->properties.push_back(pc);
 
-PropButton* salir = new PropButton("Salir", IconType::borrar);
-salir->action = Salir;
-opciones->properties.push_back(salir);
+PropButton* exit = new PropButton("Salir", IconType::deleteValue);
+exit->action = Exit;
+options->properties.push_back(exit);
 
-opciones->Resize(200 * GlobalScale, 0);    // высоту рассчитывает карточка
+options->Resize(200 * GlobalScale, 0);    // высоту рассчитывает карточка
 
 // в каждом кадре, с установленным 2D-состоянием
 gfx::PushMatrix();
 gfx::Translatef(10, 10, 0);
-opciones->Render();
+options->Render();
 gfx::PopMatrix();
 ```
 
@@ -106,12 +106,12 @@ UI не читает клавиатуру и мышь: их передаёшь �
 
 ```cpp
 // стрелка вниз
-if (opciones->editando) opciones->button_down();   // меняет значение
-else opciones->NextSelect();                        // строка ниже
+if (options->editing) options->button_down();   // меняет значение
+else options->NextSelect();                        // строка ниже
 // OK или Enter: на заголовке сворачивает карточку; на строке — редактирует или нажимает её
-opciones->EnterPropertieSelect();
+options->EnterPropertieSelect();
 // Отмена: оставляет строку как была
-opciones->Cancel();
+options->Cancel();
 ```
 
 С мышью строку под указателем вычисляешь ты: см. [Карточки и свойства](propiedades.md). А вот меню принимают координаты: см. [Выпадающие меню](menus.md).
@@ -120,10 +120,10 @@ opciones->Cancel();
 
 - **Она не готова для продакшена.** Так сказано в `README.md` репозитория, и это правда: внутри есть код редактора, который сейчас отделяется.
 - **Нет примера, который использовал бы её отдельно.** Примеры из `ui/` в [Whisk3D-Examples](https://github.com/Dante-Leoncini/Whisk3D-Examples) — это интерфейсы `.w3dui` с Lua, которые запускает среда выполнения игры: это относится к редактору. Код на этой странице составлен из тех же вызовов, что использует редактор, а не взят из проверенного примера.
-- **Сейчас она не линкуется отдельно.** `PropList.cpp` вызывает `RebindMaterialMeshPart()`, которая находится в панели свойств редактора. Функции фокуса из `TextField.h` (`TextFieldEnfocar`, `TextFieldCancelar`, `TextFieldInputChar`, `TextFieldFinDeCuadro`) определены в редакторе, в `main/ui/ViewPorts/NumInput.cpp`.
+- **Сейчас она не линкуется отдельно.** `PropList.cpp` вызывает `RebindMaterialMeshPart()`, которая находится в панели свойств редактора. Функции фокуса из `TextField.h` (`TextFieldFocus`, `TextFieldCancel`, `TextFieldInputChar`, `TextFieldFrameEnd`) определены в редакторе, в `main/ui/ViewPorts/NumInput.cpp`.
 - **Она зависит от модели сцены Core.** `PropertieBase.h` подключает `objects/Objects.h`, а список свойств читает меши, скелеты, анимации и скрипты.
 - **Масштаб пересчитывает редактор.** `SetGlobalScale` находится в `main/ui/ViewPorts/ViewPorts.cpp`. Без редактора размеры нужно пересчитывать вручную ([Цвета и масштаб](tema.md)).
-- **Всё глобальное.** На программу приходится один шрифт (`WhiskFont`), одна таблица иконок (`IconsUV`), одно открытое меню (`MenuAbierto`) и одно текстовое поле в фокусе (`g_textFieldActivo`).
+- **Всё глобальное.** На программу приходится один шрифт (`WhiskFont`), одна таблица иконок (`IconsUV`), одно открытое меню (`OpenMenu`) и одно текстовое поле в фокусе (`g_activeTextField`).
 - **Заголовки показывают типы OpenGL** (`GLfloat`, `GLshort`, `GLuint`), хотя к OpenGL они уже не обращаются.
 - **Что дальше**, согласно `README.md`: вычистить код, который относится к редактору, и сделать примеры использования.
 

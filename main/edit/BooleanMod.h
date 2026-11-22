@@ -24,7 +24,7 @@
 //  adentro/afuera. Una cara que la otra malla no toca sale INTACTA (un quad
 //  sigue quad, un ngon sigue ngon); nada se triangula. Es lo que pidio el dueno
 //  y lo que deja una malla editable al hacer Apply. Los ngons concavos que salen
-//  los triangula W3dTriangularCara (ear clipping) al armar el index buffer.
+//  los triangula W3dTriangulateFace (ear clipping) al armar el index buffer.
 //  LIMITE conocido: pedazos coplanares vecinos no se fusionan (la union de dos
 //  cajas deja la tapa en 3 quads); es un pase aparte (pendiente).
 //

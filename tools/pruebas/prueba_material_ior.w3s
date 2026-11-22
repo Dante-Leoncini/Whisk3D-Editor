@@ -9,28 +9,28 @@
 #  aparece con la transmision (o con lo transparente por alfa) y se va sin ella.
 # ==========================================================================
 
-ventana 1200 1800
-escala 2
+window 1200 1800
+scale 2
 selobj Cubo
 propstab 2
 tick
-propclic New Material
+propclick New Material
 tick
-menuelegir New Material
+menupick New Material
 tick
 rtopt 1 1 4 1
 tick
 fail propvalor 1 IOR
 mattrans 1
 tick
-propvalor 1 IOR
+propvalue 1 IOR
 mattrans 0
 tick
 fail propvalor 1 IOR
 # desde la tarjeta (tipeando la Transmision): el IOR de fabrica (1, sin refraccion) pasa a 1.5, el vidrio
-propclic Transmission
-texto 1
-tecla Return
+propclick Transmission
+text 1
+key Return
 tick
-propvalor 1 Transmission
-propvalor 1.5 IOR
+propvalue 1 Transmission
+propvalue 1.5 IOR

@@ -22,4 +22,4 @@ void W3dMouseWarp(int aX, int aY);
 
 // mover el cursor con las FLECHAS del telefono (cuando el mouse virtual esta visible):
 // clamp a la pantalla + el viewport bajo el cursor pasa a activo (como mover el mouse BT)
-void W3dMouseMoverFlechas(int aDx, int aDy);
+void W3dMouseMoveArrows(int aDx, int aDy);

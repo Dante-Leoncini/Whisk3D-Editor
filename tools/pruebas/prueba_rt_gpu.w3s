@@ -9,11 +9,11 @@ addlight
 objmove 2 4 -2
 rtopt 1 1 16
 rtlight 0 0 0
-vpvista rendered
-vporbita 0 0.5 0 12 -35 -23
-rtgpu 1 saltar
+vpview rendered
+vporbit 0 0.5 0 12 -35 -23
+rtgpu 1 skip
 rtrender 96 72 2
-rtengpu si
+rtongpu si
 rttris 14
 rtpixel 4 4 0 0 0 0
 rtpixel 80 56 255 255 255 40
@@ -21,7 +21,7 @@ rtpixel 36 40 0 0 0 8
 # la DISTANCIA de la luz tambien en el shader: a 1 m no llega al piso (queda la luz de la escena inicial, gris)
 rtlight 0 0 0 1
 rtrender 96 72 2
-rtengpu si
+rtongpu si
 rtpixel 80 56 184 184 184 16
 rtlight 0 0 0
 # penumbra con pocos pases: ruido; con el denoiser de la GPU, liso
@@ -29,15 +29,15 @@ rtlight 1.5 1 0
 rtopt 1 1 2
 rtdenoiser 0
 rtrender 160 120 2
-rtruido 20 70 70 100 mayorque 10.0
+rtnoise 20 70 70 100 greaterthan 10.0
 rtdenoiser 4
 rtrender 160 120 2
-rtengpu si
-rtruido 20 70 70 100 menorque 4.0
+rtongpu si
+rtnoise 20 70 70 100 lessthan 4.0
 rtdenoiser 0
 # y en la CPU sigue andando
 rtgpu 0
 rtrender 96 72 2
-rtengpu no
+rtongpu no
 # la GPU compartida entre el viewport (a la mitad) y el render a archivo (a tamano completo): no se cuelga
-rtgpucompartida
+rtgpushared

@@ -10,7 +10,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -26,7 +26,7 @@ Whisk3D {
         }
 
         UI {
-            archivo: "prueba_ui_estado.w3dui"
+            file: "prueba_ui_estado.w3dui"
         }
     }
 }

@@ -21,11 +21,11 @@ public class Whisk3DActivity extends SDLActivity {
         return new String[0];
     }
 
-    // EL TECLADO DEL SISTEMA: cuanto de la superficie de SDL tapa, en pixeles (W3dTeclado.cpp). La app va en pantalla
+    // EL TECLADO DEL SISTEMA: cuanto de la superficie de SDL tapa, en pixeles (W3dKeyboard.cpp). La app va en pantalla
     // completa y ahi Android no achica la ventana con el teclado (ni SDL 2.0.7 sabe salir de pantalla completa): sin
     // esto el editor no se enteraba y el campo quedaba debajo del teclado. Se avisa solo cuando cambia
-    private static native void nativeTecladoTapado(int px);
-    private int tapadoAvisado = -1;
+    private static native void nativeKeyboardCovered(int px);
+    private int coveredNotified = -1;
 
     @Override
     protected void onCreate(android.os.Bundle b) {
@@ -42,10 +42,10 @@ public class Whisk3DActivity extends SDLActivity {
                 int[] p = new int[2];
                 sup.getLocationOnScreen(p);
                 int h = sup.getHeight();
-                int tapado = p[1] + h - r.bottom;
-                if (tapado < h * 15 / 100) tapado = 0;   // (una barra del sistema no es el teclado)
-                if (tapado == tapadoAvisado) return;
-                try { nativeTecladoTapado(tapado); tapadoAvisado = tapado; } catch (Throwable t) { /* (sin libmain todavia) */ }
+                int covered = p[1] + h - r.bottom;
+                if (covered < h * 15 / 100) covered = 0;   // (una barra del sistema no es el teclado)
+                if (covered == coveredNotified) return;
+                try { nativeKeyboardCovered(covered); coveredNotified = covered; } catch (Throwable t) { /* (sin libmain todavia) */ }
             }
         });
     }
@@ -65,15 +65,15 @@ public class Whisk3DActivity extends SDLActivity {
         }
     }
 
-    // la pantalla tiene recorte (notch)? Lo pregunta el editor para ir a pantalla completa (W3dTeclado.cpp). En la
+    // la pantalla tiene recorte (notch)? Lo pregunta el editor para ir a pantalla completa (W3dKeyboard.cpp). En la
     // epoca de Android 2.3 ninguna lo tenia
-    public boolean tieneNotch() {
+    public boolean hasNotch() {
         return false;
     }
 
-    // la VIBRACION (input/W3dVibrar.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
+    // la VIBRACION (input/W3dVibrate.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
     // que ya se puede arrastrar
-    public void vibrar(int ms) {
+    public void vibrate(int ms) {
         try {
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
             if (v != null) v.vibrate(ms);

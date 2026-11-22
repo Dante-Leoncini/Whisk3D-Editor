@@ -8,24 +8,24 @@
 local t = 0
 local function b(v) if v then return "si" end return "no" end
 
-function actualizar(dt)
+function update(dt)
   t = t + 1
-  local mio = yo()
+  local mine = self()
   if t == 12 then
-    local d = hitboxDentro(mio)
-    setCompartido("dentro12", #d)
-    if d[1] then setCompartido("dentroNombre12", nombre(d[1])) else setCompartido("dentroNombre12", "nil") end
-    setCompartido("tocaMovil12", b(hitboxTocando(mio, buscar("Movil"))))
-    setCompartido("tocaCaja12", b(hitboxTocando(mio, buscar("CajaMovil"))))
-    setCompartido("tocaLejos12", b(hitboxTocando(mio, buscar("Lejos"))))
-    local dm = hitboxDentro(buscar("Movil"))
-    setCompartido("movilDentro12", #dm)
-    setCompartido("movilActivo12", b(hitboxActivo(buscar("Movil"))))
-    setHitboxActivo(mio, false)
-    setCompartido("activo12", b(hitboxActivo(mio)))
+    local d = hitboxInside(mine)
+    setShared("dentro12", #d)
+    if d[1] then setShared("dentroNombre12", getName(d[1])) else setShared("dentroNombre12", "nil") end
+    setShared("tocaMovil12", b(hitboxTouching(mine, find("Movil"))))
+    setShared("tocaCaja12", b(hitboxTouching(mine, find("CajaMovil"))))
+    setShared("tocaLejos12", b(hitboxTouching(mine, find("Lejos"))))
+    local dm = hitboxInside(find("Movil"))
+    setShared("movilDentro12", #dm)
+    setShared("movilActivo12", b(hitboxActive(find("Movil"))))
+    setHitboxActive(mine, false)
+    setShared("activo12", b(hitboxActive(mine)))
   elseif t == 14 then
-    setHitboxActivo(mio, true)
+    setHitboxActive(mine, true)
   elseif t == 20 then
-    setHitboxTam(mio, 20, 2, 2)
+    setHitboxSize(mine, 20, 2, 2)
   end
 end

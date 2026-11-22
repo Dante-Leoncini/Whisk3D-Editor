@@ -14,7 +14,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         Camera { name: "Camara" y: -8.0 z: 2.0 }
         Wavefront {
             name: "QuadCostura"

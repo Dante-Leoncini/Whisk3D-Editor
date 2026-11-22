@@ -4,39 +4,39 @@ trpanel on
 add cube
 selobj Cubo.001
 objmove 1 0 0
-trinfo mover
+trinfo move
 objat Cubo.001 1 0 0 0.001
 # X = 3 en el panel: el cubo queda en 3 (no en 1 + 3)
-trfijar 0 3
+trset 0 3
 objat Cubo.001 3 0 0 0.001
 # Y de la UI = z interno
-trfijar 1 2
+trset 1 2
 objat Cubo.001 3 0 2 0.001
 # un solo paso de undo: vuelve al origen
 undo
 objat Cubo.001 0 0 0 0.001
-trinfo cerrado
+trinfo closed
 # Cancelar deshace el cambio
 objmove 0 0 5
-trinfo mover
-trboton 0
+trinfo move
+trbutton 0
 objat Cubo.001 0 0 0 0.001
-trinfo cerrado
+trinfo closed
 # escalar: factor de X desde el panel
 objxf scale x 2
-trinfo escalar
-trfijar 0 4
+trinfo scale
+trset 0 4
 objscaleat 4 1 1
-trboton 1
-trinfo cerrado
+trbutton 1
+trinfo closed
 # rotar: angulo desde el panel
 objxf rotate z 30
-trinfo rotar
-trfijar 0 90
+trinfo rotate
+trset 0 90
 objroteuler 0 90 0
-trboton 1
+trbutton 1
 # --- pantalla BAJA: el panel se ve a la mitad del alto y se desplaza arrastrando (sin tocar las opciones); las flechas
 #     llevan la fila elegida a la vista; Esc / Supr cierran aceptando ---
 objmove 1 0 0
-trinfo mover
+trinfo move
 trpanelscroll

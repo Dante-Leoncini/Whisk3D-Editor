@@ -8,7 +8,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -21,8 +21,8 @@ Whisk3D {
             name: "MallaOrden"
             filePath: vis-dos.obj
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
             }
         }
     }

@@ -18,17 +18,17 @@
 #include <string>
 
 enum W3dDenoiser {
-    W3D_DENOISER_NINGUNO = 0,
+    W3D_DENOISER_NONE = 0,
     W3D_DENOISER_OIDN,
     W3D_DENOISER_OPTIX,
     W3D_DENOISER_NRD,
     W3D_DENOISER_GPU,      // el propio (A-Trous en la GPU, render/RTGpu.h): cualquier GPU con Vulkan
     W3D_DENOISERS
 };
-const char* W3dDenoiserNombre(int d);        // en INGLES (la UI lo pasa por T())
-bool W3dDenoiserDisponible(int d);           // la libreria esta en ESTA maquina (se prueba una vez)
+const char* W3dDenoiserName(int d);        // en INGLES (la UI lo pasa por T())
+bool W3dDenoiserAvailable(int d);          // la libreria esta en ESTA maquina (se prueba una vez)
 // limpia 'color' (w*h*3 floats) en 'salida' (w*h*3). 'albedo' / 'normal' pueden ser NULL. false = no se pudo
 // (la razon en 'err'): quien llama se queda con el color sin limpiar
-bool W3dDenoiserAplicar(int d, const float* color, const float* albedo, const float* normal, int w, int h,
-                        float* salida, std::string* err);
+bool W3dDenoiserApply(int d, const float* color, const float* albedo, const float* normal, int w, int h,
+                        float* output, std::string* err);
 #endif // W3D_DENOISER_H

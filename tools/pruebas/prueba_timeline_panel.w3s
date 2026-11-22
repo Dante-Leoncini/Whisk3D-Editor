@@ -4,7 +4,7 @@
 #  - el borde se pinta blanco con el mouse encima, verde arrastrando, y arrastrarlo cambia el ancho
 #  - Backspace (la C del N95) / Supr / X borran la CURVA elegida (fila) o los keyframes elegidos
 #  - un keyframe se agarra con un click cerca, no hace falta caer justo en el rombo
-ventana 1280 720
+window 1280 720
 add cube
 frame 1
 keychan 0 0

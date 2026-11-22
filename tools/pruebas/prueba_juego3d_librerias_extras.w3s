@@ -16,38 +16,38 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
-libcrear /tmp/w3d_f8y/lib personajes.w3d dosmats.png
-libcrearextras /tmp/w3d_f8y/extras extras.w3d dosmats.png /tmp/w3d_f8y/lib/personajes.w3d
-libjuegoextras /tmp/w3d_f8y/juego /tmp/w3d_f8y/extras/extras.w3d
-guardarw3d /tmp/w3d_f8y/juego/libjuego2.w3d
-entradatiene /tmp/w3d_f8y/juego/libjuego2.w3d proyecto.json ext:../extras/extras.w3d 1
-entradatiene /tmp/w3d_f8y/juego/libjuego2.w3d proyecto.json personajes 0
-abrirw3d /tmp/w3d_f8y/juego/libjuego2.w3d
-libinfo personajes vinculada 0
-prefabvivos 4
-libanidada extras personajes como extras~personajes
+window 640 480
+libcreate /tmp/w3d_f8y/lib personajes.w3d dosmats.png
+libcreateextras /tmp/w3d_f8y/extras extras.w3d dosmats.png /tmp/w3d_f8y/lib/personajes.w3d
+libgameextras /tmp/w3d_f8y/juego /tmp/w3d_f8y/extras/extras.w3d
+savew3d /tmp/w3d_f8y/juego/libjuego2.w3d
+entryhas /tmp/w3d_f8y/juego/libjuego2.w3d project.json ext:../extras/extras.w3d 1
+entryhas /tmp/w3d_f8y/juego/libjuego2.w3d project.json personajes 0
+openw3d /tmp/w3d_f8y/juego/libjuego2.w3d
+libinfo personajes linked 0
+prefablive 4
+libnested extras personajes as extras~personajes
 
 # --- el Play del editor ---
 simplay 30
-scriptinfo compartido juez OK
-scriptinfo compartido enemigos 1
+scriptinfo shared juez OK
+scriptinfo shared enemigos 1
 simstop
 
 # --- el binario (modo debug: deja su whisk3d.log) con los assets sueltos ---
-compilarjuego 0 0 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/proyecto.json lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/_ext/fuera/cartel.png lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/_ext/fuera/externo.lua lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/anexos/piedra.w3d lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/sonidos/bip.wav lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/extra/roca.w3d lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras~personajes/proyecto.json lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras~personajes/scripts/enemigo.lua lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/_anidadas.json lee 1
-libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/personajes/proyecto.json lee 0
-libjuegolog /tmp/w3d_f8y/juego libjuego2 externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo
+compilegame 0 0 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras/project.json lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras/_ext/fuera/cartel.png lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras/_ext/fuera/externo.lua lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras/anexos/piedra.w3d lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras/sounds/bip.wav lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras/extra/roca.w3d lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras~personajes/project.json lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/extras~personajes/scripts/enemigo.lua lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/_nested.json lee 1
+libpath /tmp/w3d_f8y/juego/platform-build/linux/libs/personajes/project.json lee 0
+libgamelog /tmp/w3d_f8y/juego libjuego2 externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo
 
 # --- lo mismo con los assets EMPAQUETADOS (el pak) ---
-compilarjuego 0 1 1
-libjuegolog /tmp/w3d_f8y/juego libjuego2 externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo
+compilegame 0 1 1
+libgamelog /tmp/w3d_f8y/juego libjuego2 externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo

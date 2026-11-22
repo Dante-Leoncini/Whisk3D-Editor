@@ -17,7 +17,7 @@ struct JVal;   // io/JsonW3d.h
 //    centro[3]       centro de la caja respecto del origen del objeto
 //    etiqueta        lo que ven los filtros de los otros hitbox ("jugador")
 //    filtro          solo reacciona a otros con esa etiqueta ("" = todos)
-//    detectarCuerpos tambien contra los cuerpos rigidos (Add > Physics)
+//    detectBodies tambien contra los cuerpos rigidos (Add > Physics)
 //
 //  Se dibuja como caja de ALAMBRE: verde activo, gris inactivo, AMARILLA si en
 //  el Play esta tocando algo que le importa. En el juego compilado no se ve
@@ -31,31 +31,31 @@ class Hitbox : public W3dHitboxBase {
 public:
     Hitbox(Object* parent = NULL, Vector3 pos = Vector3(0, 0, 0));
     void RenderObject() W3D_OVERRIDE;
-    bool DibujaAlgo() W3D_OVERRIDE;    // solo con su overlay (el juego no la dibuja)
+    bool DrawsSomething() W3D_OVERRIDE;    // solo con su overlay (el juego no la dibuja)
 };
 
 // las 12 aristas de la caja (24 vertices, 72 floats) en el espacio LOCAL del hitbox:
 // la comparten el dibujo y el pick del editor
-void HitboxAristas(const W3dHitboxBase* h, float out[72]);
+void HitboxEdges(const W3dHitboxBase* h, float out[72]);
 
 // overlay por TIPO del editor (Overlays > Objects > Hitbox): el viewport 3D lo publica por frame
 // (= su showHitbox con los overlays prendidos), como g_showEmpty. Default true.
 extern bool g_showHitbox;
 // la caja se DIBUJA en este pase? Overlays del editor con el tipo prendido, o el overlay de debug
 // de lua (verHitboxes). Una sola regla para el dibujo y el pick: lo que no se ve no se clickea.
-bool HitboxSeDibuja(void);
+bool HitboxDraws(void);
 
 // ---- lo que usan el editor y el lector/escritor (una sola fuente de los campos) ----
-// copia de los campos propios (W3dDuplicarUno pone despues pos/rot/escala/nombre/scripts)
-Hitbox* HitboxDuplicar(Hitbox* src);
+// copia de los campos propios (W3dDuplicateOne pone despues pos/rot/escala/nombre/scripts)
+Hitbox* HitboxDuplicate(Hitbox* src);
 // hijo NUEVO de 'padre' con la caja que ENVUELVE sus mallas (todo el subarbol, en el espacio
 // local del padre). Sin mallas queda el cubo unitario. Lo usa Add > Hitbox.
-Hitbox* HitboxCrearAjustado(Object* padre);
+Hitbox* HitboxCreateFitted(Object* parent);
 // true si 'o' puede ser padre de un hitbox creado desde Add (un objeto 3D de la escena)
-bool HitboxPadreValido(Object* o);
+bool HitboxParentValid(Object* o);
 // los campos propios en el .w3d ("tipo":"hitbox"): el escritor agrega ESTO despues de los
 // comunes (cada linea empieza con ",\n" + sangria 'ind'), y el lector los lee de 'j'
-void HitboxEscribirCampos(std::string& s, int ind, const W3dHitboxBase* h);
-void HitboxLeerCampos(JVal* j, W3dHitboxBase* h);
+void HitboxWriteFields(std::string& s, int ind, const W3dHitboxBase* h);
+void HitboxReadFields(JVal* j, W3dHitboxBase* h);
 
 #endif

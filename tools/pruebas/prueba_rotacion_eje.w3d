@@ -3,7 +3,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         Mesh {
             name: "Caja"
             script: "rotacion_eje.lua"

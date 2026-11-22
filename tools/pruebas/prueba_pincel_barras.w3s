@@ -34,7 +34,7 @@ brushbar
 falloff
 # wptest busca el bloque UVG adentro del .w3dm de TEXTO que guarda: se fija texto
 # (el formato por defecto es el binario, .w3db) y despues se vuelve al del proyecto
-formatomallas texto
+formatmeshes text
 wptest
-formatomallas proyecto
+formatmeshes project
 vcolor

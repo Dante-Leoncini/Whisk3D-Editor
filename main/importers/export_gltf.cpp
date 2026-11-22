@@ -1,24 +1,24 @@
 #include "W3dLang.h"   // T(): los avisos salen en el idioma del editor
-#include "io/W3dMallaBin.h"   // la edicion pendiente de una malla de un recurso (se materializa al exportar)
-#include "objects/MallaRecurso.h" // W3dMallaSoltarEdicion: vuelve a quedar pendiente al terminar
+#include "io/W3dMeshBin.h"   // la edicion pendiente de una malla de un recurso (se materializa al exportar)
+#include "objects/MeshResource.h" // W3dMeshReleaseEdit: vuelve a quedar pendiente al terminar
 #include "export_gltf.h"
-#include "edit/MeshEdit.h"   // W3dTriangularCara
+#include "edit/MeshEdit.h"   // W3dTriangulateFace
 #include "import_obj.h"                  // ExtractBaseName
 #include "objects/Mesh.h"
 #include "objects/Armature.h"
 #include "objects/Materials.h"
 #include "objects/Textures.h"
 #include "objects/Objects.h"             // SceneCollection / ObjectType
-#include "objects/ObjectMode.h"          // RotGlobalDe (normales a mundo en mallas estaticas)
+#include "objects/ObjectMode.h"          // RotGlobalOf (normales a mundo en mallas estaticas)
 #include "animation/SkeletalAnimation.h" // SkelMatRotEuler + BoneTrack/SkeletalAnimation
 #include "animation/Animation.h"         // AnimProperty / keyFrame + AnimPosition/Rotation/Scale
-#include "ViewPorts/PopUp/ProgressPopup.h" // ProgresoIniciar/Actualizar
+#include "ViewPorts/PopUp/ProgressPopup.h" // ProgressStart/Actualizar
 #include "ViewPorts/LayoutInput.h"       // Notificar
 #include "math/Quaternion.h"
 #include "math/Matrix4.h"
 #include "math/Vector3.h"
 #include "w3dFilesystem.h"
-#include "io/W3dWeb.h"   // W3dDescargarSiWeb: en el navegador el export (y sus texturas) bajan a la PC
+#include "io/W3dWeb.h"   // W3dDownloadIfWeb: en el navegador el export (y sus texturas) bajan a la PC
 #include "w3dlog.h"
 #include <vector>
 #include <string>
@@ -73,11 +73,11 @@ std::string PathUri(const std::string& p) { std::string o; for (size_t i = 0; i 
 std::string DirOf(const std::string& p) { size_t s = p.find_last_of("/\\"); return (s == std::string::npos) ? std::string() : p.substr(0, s + 1); }
 std::string BaseName(const std::string& p) { size_t s = p.find_last_of("/\\"); return (s == std::string::npos) ? p : p.substr(s + 1); }
 
-void RecolectarMeshes(Object* o, bool selectedOnly, std::vector<Mesh*>& out) {
+void CollectMeshes(Object* o, bool selectedOnly, std::vector<Mesh*>& out) {
     if (o) for (size_t i = 0; i < o->Childrens.size(); i++) {
         Object* c = o->Childrens[i];
         if (c->getType() == ObjectType::mesh && (!selectedOnly || c->select)) out.push_back((Mesh*)c);
-        RecolectarMeshes(c, selectedOnly, out);
+        CollectMeshes(c, selectedOnly, out);
     }
 }
 
@@ -91,7 +91,7 @@ void EulerAQuat(const Vector3& e, int order, float& x, float& y, float& z, float
 // descompone una matriz LOCAL (column-major) en T / quat(x,y,z,w) / S, SIN pasar por euler (evita gimbal). Es
 // la conversion que necesita glTF (node.translation/rotation/scale). La usamos con el LOCAL derivado del bind y
 // de la skinMatrix animada -> el FK estandar de glTF reproduce el bind/animacion de CUALQUIER rig (incluido biped).
-void DescomponerTRSQuat(const Matrix4& M, Vector3& T, float& qx, float& qy, float& qz, float& qw, Vector3& S) {
+void DecomposeTRSQuat(const Matrix4& M, Vector3& T, float& qx, float& qy, float& qz, float& qw, Vector3& S) {
     T = Vector3(M.m[12], M.m[13], M.m[14]);
     float sx = sqrtf(M.m[0]*M.m[0] + M.m[1]*M.m[1] + M.m[2]*M.m[2]);
     float sy = sqrtf(M.m[4]*M.m[4] + M.m[5]*M.m[5] + M.m[6]*M.m[6]);
@@ -106,7 +106,7 @@ void DescomponerTRSQuat(const Matrix4& M, Vector3& T, float& qx, float& qy, floa
 }
 
 // LOCAL de un hueso (relativo al padre) desde matrices de MUNDO por hueso (bind o animado). root: mundo tal cual.
-Matrix4 LocalDeMundo(const std::vector<Matrix4>& world, const std::vector<int>& parent, int b) {
+Matrix4 WorldLocal(const std::vector<Matrix4>& world, const std::vector<int>& parent, int b) {
     return (parent[b] >= 0) ? (world[parent[b]].Inverse() * world[b]) : world[b];
 }
 
@@ -159,12 +159,12 @@ std::string JoinArr(const std::vector<std::string>& v) {
 } // namespace
 
 // ============================================================================
-//  OrdenCarasGLB (ver export_gltf.h): el orden EXACTO de emision de triangulos.
+//  OrderFacesGLB (ver export_gltf.h): el orden EXACTO de emision de triangulos.
 //  Fuente UNICA de verdad; el lector del bloque "topologia" de los .w3d VIEJOS
 //  camina en lockstep con esto para migrarlos (ver import_w3d.cpp).
 // ============================================================================
-void OrdenCarasGLB(const Mesh* m, std::vector<int>& orden) {
-    orden.clear();
+void OrderFacesGLB(const Mesh* m, std::vector<int>& order) {
+    order.clear();
     if (!m) return;
     int nGroups = (int)m->materialsGroup.size(); if (nGroups == 0) nGroups = 1;
     for (int g = 0; g < nGroups; g++) {
@@ -173,7 +173,7 @@ void OrdenCarasGLB(const Mesh* m, std::vector<int>& orden) {
             int fm = (F.mat < 0 || F.mat >= (int)m->materialsGroup.size()) ? 0 : F.mat;
             if (fm != g) continue;
             if (F.idx.size() < 3) continue;   // cara degenerada: no emite ningun triangulo
-            orden.push_back((int)f);
+            order.push_back((int)f);
         }
     }
 }
@@ -182,32 +182,32 @@ void OrdenCarasGLB(const Mesh* m, std::vector<int>& orden) {
 //  ExportGLTF
 // ============================================================================
 bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
-    std::vector<Mesh*> meshes; RecolectarMeshes(SceneCollection, selectedOnly, meshes);
-    if (meshes.empty()) { w3dLogfE("ExportGLTF: no hay meshes"); Notificar(T("glTF: nothing to export"), true); return false; }
+    std::vector<Mesh*> meshes; CollectMeshes(SceneCollection, selectedOnly, meshes);
+    if (meshes.empty()) { w3dLogfE("ExportGLTF: no hay meshes"); Notify(T("glTF: nothing to export"), true); return false; }
     // las mallas de un RECURSO compartido tienen la edicion (las caras) PENDIENTE: el export
-    // emite por caras, asi que se leen antes (objects/MallaRecurso.h) y, al terminar, las que se
+    // emite por caras, asi que se leen antes (objects/MeshResource.h) y, al terminar, las que se
     // leyeron solo para esto vuelven a quedar pendientes (no queda la memoria de todas cargada)
-    struct Prestadas {
+    struct Borrowed {
         std::vector<Mesh*> v;
-        ~Prestadas() { for (size_t i = 0; i < v.size(); i++) W3dMallaSoltarEdicion(v[i]); }
-    } prestadas;
+        ~Borrowed() { for (size_t i = 0; i < v.size(); i++) W3dMeshReleaseEdit(v[i]); }
+    } borrowed;
     for (size_t i = 0; i < meshes.size(); i++) {
-        if (meshes[i]->edicionPendiente.empty()) continue;
-        const bool delRecurso = meshes[i]->malla != NULL;
-        if (W3dMallaBinMaterializarEdicion(meshes[i]) && delRecurso) prestadas.v.push_back(meshes[i]);
+        if (meshes[i]->pendingEdit.empty()) continue;
+        const bool ofResource = meshes[i]->mesh != NULL;
+        if (W3dMeshBinMaterializeEdit(meshes[i]) && ofResource) borrowed.v.push_back(meshes[i]);
     }
 
-    // FORZAR la carga de las texturas pendientes: el import las encola (EncolarTextura) y se cargan diferidas 1/frame.
+    // FORZAR la carga de las texturas pendientes: el import las encola (EnqueueTexture) y se cargan diferidas 1/frame.
     // Si exportas apenas importaste (antes de que corran esos frames) mat->texture sigue NULL -> se exportaba sin
     // textura. Aca se vacia la cola de una para que el material tenga su textura al momento de exportar.
-    { extern void CargarTodasTexturasPendientes(); CargarTodasTexturasPendientes(); }
+    { extern void LoadAllPendingTextures(); LoadAllPendingTextures(); }
 
     // ARMATURE: el rig de la primera malla skinneada (todas las skinneadas comparten esqueleto en nuestros imports)
     Armature* arm = NULL;
     for (size_t i = 0; i < meshes.size() && !arm; i++) if (meshes[i]->skinArmature) arm = meshes[i]->skinArmature;
     int nBones = arm ? (int)arm->bones.size() : 0;
 
-    ProgresoIniciar(T("Exporting glTF..."));
+    ProgressStart(T("Exporting glTF..."));
 
     Bufb buf;
     std::vector<std::string> nodesJson, meshesJson, animsJson, matsJson, texsJson, imgsJson;
@@ -222,11 +222,11 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             Material* mat = m->materialsGroup[g].material; if (!mat || matIdx.count(mat)) continue;
             matIdx[mat] = (int)mats.size(); mats.push_back(mat);
             if (mat->textureOn && mat->texture && !texIdx.count(mat->texture)) { texIdx[mat->texture] = (int)texs.size(); texs.push_back(mat->texture); }
-            for (size_t c = 0; c < mat->capas.size(); c++) {   // las texturas de las capas extra tambien salen
-                Texture* t = mat->capas[c].tex;
+            for (size_t c = 0; c < mat->layers.size(); c++) {   // las texturas de las capas extra tambien salen
+                Texture* t = mat->layers[c].tex;
                 if (t && !texIdx.count(t)) { texIdx[t] = (int)texs.size(); texs.push_back(t); }
             }
-            if (mat->texturaB && !texIdx.count(mat->texturaB)) { texIdx[mat->texturaB] = (int)texs.size(); texs.push_back(mat->texturaB); }   // (la textura B)
+            if (mat->textureB && !texIdx.count(mat->textureB)) { texIdx[mat->textureB] = (int)texs.size(); texs.push_back(mat->textureB); }   // (la textura B)
         }
     }
     // texturas: se COPIAN al lado del archivo exportado y se referencian por BASENAME. Asi el reimport (y Blender)
@@ -245,7 +245,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                     else w3dLogfW("ExportGLTF: no pude copiar la textura a %s", dest.c_str());
                 }
             }
-            W3dDescargarSiWeb(dest);   // navegador: la textura baja AL LADO del .gltf/.glb (el export la nombra por basename)
+            W3dDownloadIfWeb(dest);   // navegador: la textura baja AL LADO del .gltf/.glb (el export la nombra por basename)
         }
         imgUri.push_back(base.empty() ? PathUri(texs[i]->path) : base);   // (la uri de cada imagen: la usan las capas)
         imgsJson.push_back("{\"uri\":\"" + Jesc(imgUri.back()) + "\"}");
@@ -267,30 +267,30 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         j += std::string(",\"extras\":{\"w3d_lighting\":") + (mat->lighting?"true":"false")
            + ",\"w3d_culling\":"     + (mat->culling?"true":"false")
            + ",\"w3d_textureOn\":"   + (mat->textureOn?"true":"false")
-           + ",\"w3d_filtrado\":"    + (mat->filtrado?"true":"false")
+           + ",\"w3d_filtered\":"    + (mat->filtered?"true":"false")
            + ",\"w3d_repeat\":"      + (mat->repeat?"true":"false")
            + ",\"w3d_transparent\":" + (mat->transparent?"true":"false")
-           + ",\"w3d_alfaCorte\":"   + Ftos(mat->alphaTest)
+           + ",\"w3d_alphaCut\":"   + Ftos(mat->alphaTest)
            + ",\"w3d_depthTest\":"   + (mat->depth_test?"true":"false")
            + ",\"w3d_vertexColor\":" + (mat->vertexColor?"true":"false")
            + ",\"w3d_chrome\":"      + (mat->chrome?"true":"false")
            + ",\"w3d_normalMap\":"   + (mat->normalMap?"true":"false")
            + ",\"w3d_reflectMode\":" + Itos((long)mat->reflectMode)
            + ",\"w3d_shininess\":"   + Ftos(mat->shininess);
-        if (mat->texturaB && texIdx.count(mat->texturaB))   // mezcla de texturas: la textura B (uri) y cuanto de ella
-            j += ",\"w3d_texturaB\":\"" + Jesc(imgUri[(size_t)texIdx[mat->texturaB]]) + "\",\"w3d_mezclaB\":" + Ftos(mat->mezclaB);
-        if (mat->toon && mat->texturaB && texIdx.count(mat->texturaB))   // sombreado toon: la rampa y como se aplica
-            j += ",\"w3d_toon\":\"" + Jesc(imgUri[(size_t)texIdx[mat->texturaB]]) + "\",\"w3d_toonMezcla\":\""
-               + (mat->toon == 2 ? "multiplicar" : "restar") + "\"";
-        if (mat->contorno > 0.0f) j += ",\"w3d_contorno\":" + Ftos(mat->contorno);
-        if (!mat->capas.empty()) {   // capas de textura extra: [{textura (uri), mezcla, uv, on}]
+        if (mat->textureB && texIdx.count(mat->textureB))   // mezcla de texturas: la textura B (uri) y cuanto de ella
+            j += ",\"w3d_textureB\":\"" + Jesc(imgUri[(size_t)texIdx[mat->textureB]]) + "\",\"w3d_mixB\":" + Ftos(mat->mixB);
+        if (mat->toon && mat->textureB && texIdx.count(mat->textureB))   // sombreado toon: la rampa y como se aplica
+            j += ",\"w3d_toon\":\"" + Jesc(imgUri[(size_t)texIdx[mat->textureB]]) + "\",\"w3d_toonMix\":\""
+               + (mat->toon == 2 ? "multiply" : "subtract") + "\"";
+        if (mat->outline > 0.0f) j += ",\"w3d_outline\":" + Ftos(mat->outline);
+        if (!mat->layers.empty()) {   // capas de textura extra: [{textura (uri), mezcla, uv, on}]
             std::vector<std::string> cj;
-            for (size_t c = 0; c < mat->capas.size(); c++) {
-                Texture* t = mat->capas[c].tex; if (!t || !texIdx.count(t)) continue;
-                cj.push_back("{\"textura\":\"" + Jesc(imgUri[(size_t)texIdx[t]]) + "\",\"mezcla\":" + Itos((long)mat->capas[c].blend)
-                             + ",\"uv\":" + Itos((long)mat->capas[c].uvMapa) + ",\"on\":" + (mat->capas[c].on ? "true" : "false") + "}");
+            for (size_t c = 0; c < mat->layers.size(); c++) {
+                Texture* t = mat->layers[c].tex; if (!t || !texIdx.count(t)) continue;
+                cj.push_back("{\"texture\":\"" + Jesc(imgUri[(size_t)texIdx[t]]) + "\",\"mix\":" + Itos((long)mat->layers[c].blend)
+                             + ",\"uv\":" + Itos((long)mat->layers[c].uvMap) + ",\"on\":" + (mat->layers[c].on ? "true" : "false") + "}");
             }
-            j += ",\"w3d_capas\":[" + JoinArr(cj) + "]";
+            j += ",\"w3d_layers\":[" + JoinArr(cj) + "]";
         }
         j += "}";
         j += "}";
@@ -298,10 +298,10 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
     }
 
     // ---- huesos -> nodos (node i = bone i) + inverseBindMatrices ----
-    std::map<std::string, int> jointDeNombre;
+    std::map<std::string, int> jointByName;
     int ibmAcc = -1, skinRootNode = -1;
     if (arm && nBones > 0) {
-        for (int j = 0; j < nBones; j++) jointDeNombre[arm->bones[j].name] = j;
+        for (int j = 0; j < nBones; j++) jointByName[arm->bones[j].name] = j;
         // inverseBindMatrix = la MISMA matriz que el motor multiplica en skinMatrix = world * X. Con g_skinFormula==1
         // (default) X = skinA (para el biped incluye clusterTransform + la correccion D; en rig limpio skinA==skinInvBind).
         // Exportar skinInvBind cuando el motor usa skinA desalineaba el bind del biped (rest ~0.967). Con skinA: exacto.
@@ -322,7 +322,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         for (int j = 0; j < nBones; j++) {
             const W3dBone& b = arm->bones[j];
             Vector3 T, S; float qx, qy, qz, qw;
-            if (!arm->skinGltf && b.hasSkin) { Matrix4 local = LocalDeMundo(bindW, parent, j); DescomponerTRSQuat(local, T, qx, qy, qz, qw, S); } // FBX biped
+            if (!arm->skinGltf && b.hasSkin) { Matrix4 local = WorldLocal(bindW, parent, j); DecomposeTRSQuat(local, T, qx, qy, qz, qw, S); } // FBX biped
             else { T = b.restT; S = b.restS; EulerAQuat(b.restR, b.rotOrder, qx, qy, qz, qw); } // glTF (o manual): Lcl-rest directo
             std::string n = "{\"name\":\"" + Jesc(b.name) + "\",\"translation\":[" + Ftos(T.x) + "," + Ftos(T.y) + "," + Ftos(T.z)
                 + "],\"rotation\":[" + Ftos(qx) + "," + Ftos(qy) + "," + Ftos(qz) + "," + Ftos(qw)
@@ -338,7 +338,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
     std::vector<int> sceneMeshNodes;
     std::map<Object*, int> objNode; // Object* de cada malla exportada -> su indice de nodo (para animaciones de objeto)
     for (size_t mi = 0; mi < meshes.size(); mi++) {
-        ProgresoActualizar((float)mi / (float)meshes.size());
+        ProgressUpdate((float)mi / (float)meshes.size());
         Mesh* m = meshes[mi];
         if (!m->vertex || m->vertexSize <= 0) continue;
         int nV = m->vertexSize;
@@ -376,21 +376,21 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         // JOINTS_0 / WEIGHTS_0 desde los vertex groups (por control-point): top-4 pesos por vertice, normalizados.
         int jntAcc = -1, wgtAcc = -1;
         if (skinned && !m->vertexGroups.empty() && !m->vertCtrlPoint.empty()) {
-            std::map<int, std::vector<std::pair<int, float> > > wDe; // control-point -> [(joint, peso)]
+            std::map<int, std::vector<std::pair<int, float> > > wOf; // control-point -> [(joint, peso)]
             for (size_t g = 0; g < m->vertexGroups.size(); g++) {
                 VertexGroup* vg = m->vertexGroups[g]; if (!vg) continue;
-                std::map<std::string, int>::iterator it = jointDeNombre.find(vg->nombre); if (it == jointDeNombre.end()) continue;
+                std::map<std::string, int>::iterator it = jointByName.find(vg->name); if (it == jointByName.end()) continue;
                 int j = it->second;
-                for (size_t v = 0; v < vg->verts.size() && v < vg->pesos.size(); v++) wDe[vg->verts[v]].push_back(std::make_pair(j, vg->pesos[v]));
+                for (size_t v = 0; v < vg->verts.size() && v < vg->weights.size(); v++) wOf[vg->verts[v]].push_back(std::make_pair(j, vg->weights[v]));
             }
-            { size_t maxInf = 0, over4 = 0; for (std::map<int, std::vector<std::pair<int, float> > >::iterator it = wDe.begin(); it != wDe.end(); ++it) { if (it->second.size() > maxInf) maxInf = it->second.size(); if (it->second.size() > 4) over4++; }
+            { size_t maxInf = 0, over4 = 0; for (std::map<int, std::vector<std::pair<int, float> > >::iterator it = wOf.begin(); it != wOf.end(); ++it) { if (it->second.size() > maxInf) maxInf = it->second.size(); if (it->second.size() > 4) over4++; }
               if (over4) w3dLogfW("ExportGLTF: '%s' %d control-points con >4 influencias (max %d) -> glTF JOINTS_0 topea en 4, deform aproximada", m->name.c_str(), (int)over4, (int)maxInf); }
             std::vector<uint16_t> JNT((size_t)nV * 4, 0);
             std::vector<float> WGT((size_t)nV * 4, 0.0f);
             for (int i = 0; i < nV; i++) {
                 int cp = (i < (int)m->vertCtrlPoint.size()) ? m->vertCtrlPoint[i] : -1;
-                std::map<int, std::vector<std::pair<int, float> > >::iterator it = wDe.find(cp);
-                if (it == wDe.end()) { WGT[(size_t)i*4] = 1.0f; continue; } // sin peso: 100% al hueso 0 (evita vertices sueltos)
+                std::map<int, std::vector<std::pair<int, float> > >::iterator it = wOf.find(cp);
+                if (it == wOf.end()) { WGT[(size_t)i*4] = 1.0f; continue; } // sin peso: 100% al hueso 0 (evita vertices sueltos)
                 std::vector<std::pair<int, float> >& lst = it->second;
                 int best[4] = {0,0,0,0}; float bw[4] = {0,0,0,0};
                 for (size_t e = 0; e < lst.size(); e++) { float w = lst[e].second;
@@ -411,16 +411,16 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
 
         std::vector<std::string> prims;
         int nGroups = (int)m->materialsGroup.size(); if (nGroups == 0) nGroups = 1;
-        // el ORDEN de emision sale de OrdenCarasGLB (ya agrupado por mesh part): el .w3d guarda sus
+        // el ORDEN de emision sale de OrderFacesGLB (ya agrupado por mesh part): el .w3d guarda sus
         // poligonos con esa misma lista, asi que al reabrir se camina en lockstep triangulo a triangulo.
-        std::vector<int> ordenF; OrdenCarasGLB(m, ordenF);
+        std::vector<int> orderF; OrderFacesGLB(m, orderF);
         size_t oi = 0;
         for (int g = 0; g < nGroups; g++) {
             std::vector<uint32_t> idx;
-            while (oi < ordenF.size()) { const MeshFace& F = m->faces3d[ordenF[oi]];
+            while (oi < orderF.size()) { const MeshFace& F = m->faces3d[orderF[oi]];
                 int fm = (F.mat < 0 || F.mat >= (int)m->materialsGroup.size()) ? 0 : F.mat;
-                if (fm != g) break;   // ordenF esta agrupado: en cuanto cambia el grupo, se corta
-                std::vector<MeshIndex> tri; W3dTriangularCara(m->vertex, F.idx, tri);   // misma triangulacion que el render
+                if (fm != g) break;   // orderF esta agrupado: en cuanto cambia el grupo, se corta
+                std::vector<MeshIndex> tri; W3dTriangulateFace(m->vertex, F.idx, tri);   // misma triangulacion que el render
                 for (size_t t = 0; t < tri.size(); t++) idx.push_back((uint32_t)tri[t]);
                 oi++;
             }
@@ -451,7 +451,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             // de la ultima vista que se dibujo. Con la efectiva, un billboard exportaba la
             // orientacion de la CAMARA horneada en el nodo del .gltf (ver Objects.h).
             Matrix4 W; m->GetWorldMatrixBase(W);
-            Vector3 T, S; float qx, qy, qz, qw; DescomponerTRSQuat(W, T, qx, qy, qz, qw, S);
+            Vector3 T, S; float qx, qy, qz, qw; DecomposeTRSQuat(W, T, qx, qy, qz, qw, S);
             node += ",\"translation\":[" + Ftos(T.x) + "," + Ftos(T.y) + "," + Ftos(T.z) + "]";
             node += ",\"rotation\":["    + Ftos(qx)  + "," + Ftos(qy)  + "," + Ftos(qz) + "," + Ftos(qw) + "]";
             node += ",\"scale\":["       + Ftos(S.x) + "," + Ftos(S.y) + "," + Ftos(S.z) + "]";
@@ -483,9 +483,9 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                     int prop = propsExp[pe];
                     const char* path = (prop == AnimPosition) ? "translation" : (prop == AnimRotation) ? "rotation" : "scale";
                     std::vector<int> frames; // union de los frames de las curvas X/Y/Z de esta propiedad
-                    for (size_t pi = 0; pi < tr.Propertys.size(); pi++){
-                        if (tr.Propertys[pi].Property != prop) continue;
-                        for (size_t k = 0; k < tr.Propertys[pi].keyframes.size(); k++) frames.push_back(tr.Propertys[pi].keyframes[k].frame);
+                    for (size_t pi = 0; pi < tr.Properties.size(); pi++){
+                        if (tr.Properties[pi].Property != prop) continue;
+                        for (size_t k = 0; k < tr.Properties[pi].keyframes.size(); k++) frames.push_back(tr.Properties[pi].keyframes[k].frame);
                     }
                     if (frames.empty()) continue;
                     std::sort(frames.begin(), frames.end());
@@ -495,7 +495,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                     std::vector<float> times(frames.size()), vals;
                     for (size_t k = 0; k < frames.size(); k++) {
                         times[k] = (float)(frames[k] - 1) / fps;
-                        Vector3 v = EvalPropVec(tr.Propertys, prop, frames[k], def);
+                        Vector3 v = EvalPropVec(tr.Properties, prop, frames[k], def);
                         if (prop == AnimRotation) { float qx, qy, qz, qw; EulerAQuat(v, rotOrder, qx, qy, qz, qw); vals.push_back(qx); vals.push_back(qy); vals.push_back(qz); vals.push_back(qw); }
                         else { vals.push_back(v.x); vals.push_back(v.y); vals.push_back(v.z); }
                     }
@@ -524,27 +524,27 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         std::vector<Matrix4> bindW(nBones); for (int j = 0; j < nBones; j++) bindW[j] = ((g_skinFormula == 1) ? arm->bones[j].skinA : arm->bones[j].skinInvBind).Inverse();
         // rest local por hueso (bind-derivado) -> para saltear huesos estaticos (que quedan == rest en todo el clip)
         std::vector<float> rT(nBones*3), rR(nBones*4), rS(nBones*3);
-        for (int j = 0; j < nBones; j++) { Vector3 T,S; float qx,qy,qz,qw; DescomponerTRSQuat(LocalDeMundo(bindW,parent,j), T,qx,qy,qz,qw,S);
+        for (int j = 0; j < nBones; j++) { Vector3 T,S; float qx,qy,qz,qw; DecomposeTRSQuat(WorldLocal(bindW,parent,j), T,qx,qy,qz,qw,S);
             rT[j*3]=T.x;rT[j*3+1]=T.y;rT[j*3+2]=T.z; rR[j*4]=qx;rR[j*4+1]=qy;rR[j*4+2]=qz;rR[j*4+3]=qw; rS[j*3]=S.x;rS[j*3+1]=S.y;rS[j*3+2]=S.z; }
         // guardar el estado de animacion del editor (lo tocamos para forzar la evaluacion del clip) y restaurarlo al final
-        int savActiva = arm->animActiva, savKind = ActiveAnimKind, savFrame = CurrentFrame; Armature* savArm = ActiveAnimArm; bool savPrev = g_skelAnimPreview;
-        ActiveAnimKind = 1; ActiveAnimArm = arm; g_skelAnimPreview = true; // EvaluarPoseEsqueleto solo anima el clip ACTIVO
+        int activeSav = arm->activeAnim, savKind = ActiveAnimKind, savFrame = CurrentFrame; Armature* savArm = ActiveAnimArm; bool savPrev = g_skelAnimPreview;
+        ActiveAnimKind = 1; ActiveAnimArm = arm; g_skelAnimPreview = true; // EvaluatePoseSkeleton solo anima el clip ACTIVO
         for (size_t ci = 0; ci < arm->animations.size(); ci++) {
             SkeletalAnimation* clip = arm->animations[ci]; if (!clip) continue;
             float fps = (float)(clip->FrameRate > 0 ? clip->FrameRate : 24);
             int f0 = clip->startFrame, f1 = clip->endFrame; if (f1 < f0) f1 = f0;
             int nF = f1 - f0 + 1; if (nF < 1) nF = 1; if (nF > 4096) nF = 4096; // tope de seguridad
-            arm->animActiva = (int)ci;
+            arm->activeAnim = (int)ci;
             std::vector<float> times(nF);
             std::vector<std::vector<float> > Tv(nBones), Rv(nBones), Sv(nBones);
             for (int fi = 0; fi < nF; fi++) {
                 int f = f0 + fi; times[fi] = (float)fi / fps;
                 arm->poseDirty = false; arm->lastPoseFrame = -999999; // forzar re-FK de ESTE frame (evita el cache)
-                EvaluarPoseEsqueleto(arm, f);
+                EvaluatePoseSkeleton(arm, f);
                 std::vector<Matrix4> world(nBones);
                 for (int j = 0; j < nBones; j++) world[j] = arm->bones[j].skinMatrix * bindW[j]; // node_world: world*skinInvBind=skinMatrix
                 for (int j = 0; j < nBones; j++) {
-                    Vector3 T, S; float qx, qy, qz, qw; DescomponerTRSQuat(LocalDeMundo(world, parent, j), T, qx, qy, qz, qw, S);
+                    Vector3 T, S; float qx, qy, qz, qw; DecomposeTRSQuat(WorldLocal(world, parent, j), T, qx, qy, qz, qw, S);
                     Tv[j].push_back(T.x); Tv[j].push_back(T.y); Tv[j].push_back(T.z);
                     Rv[j].push_back(qx); Rv[j].push_back(qy); Rv[j].push_back(qz); Rv[j].push_back(qw);
                     Sv[j].push_back(S.x); Sv[j].push_back(S.y); Sv[j].push_back(S.z);
@@ -558,12 +558,12 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             int inAcc = buf.addFloats(times, 1, "SCALAR", 0, true); // input (tiempos) compartido por todos los samplers del clip
             std::vector<std::string> channels, samplers;
             for (int j = 0; j < nBones; j++) {
-                bool mueve = false; // hueso que queda en rest TODO el clip -> el node rest ya lo cubre (se saltea)
-                for (int fi = 0; fi < nF && !mueve; fi++) {
-                    for (int c = 0; c < 3; c++) if (fabsf(Tv[j][(size_t)fi*3+c]-rT[j*3+c]) > 1e-5f || fabsf(Sv[j][(size_t)fi*3+c]-rS[j*3+c]) > 1e-5f) mueve = true;
-                    for (int c = 0; c < 4; c++) if (fabsf(Rv[j][(size_t)fi*4+c]-rR[j*4+c]) > 1e-5f) mueve = true;
+                bool moves = false; // hueso que queda en rest TODO el clip -> el node rest ya lo cubre (se saltea)
+                for (int fi = 0; fi < nF && !moves; fi++) {
+                    for (int c = 0; c < 3; c++) if (fabsf(Tv[j][(size_t)fi*3+c]-rT[j*3+c]) > 1e-5f || fabsf(Sv[j][(size_t)fi*3+c]-rS[j*3+c]) > 1e-5f) moves = true;
+                    for (int c = 0; c < 4; c++) if (fabsf(Rv[j][(size_t)fi*4+c]-rR[j*4+c]) > 1e-5f) moves = true;
                 }
-                if (!mueve) continue;
+                if (!moves) continue;
                 int tAcc = buf.addFloats(Tv[j], 3, "VEC3", 0, false);
                 int rAcc = buf.addFloats(Rv[j], 4, "VEC4", 0, false);
                 int sAcc = buf.addFloats(Sv[j], 3, "VEC3", 0, false);
@@ -580,8 +580,8 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             animsJson.push_back("{\"name\":\""+Jesc(clip->name)+"\",\"extras\":{\"frameRate\":"+Itos((long)fps)+"},\"channels\":["+JoinArr(channels)+"],\"samplers\":["+JoinArr(samplers)+"]}");
         }
         // restaurar el estado de animacion del editor
-        arm->animActiva = savActiva; ActiveAnimKind = savKind; ActiveAnimArm = savArm; g_skelAnimPreview = savPrev;
-        arm->poseDirty = false; arm->lastPoseFrame = -999999; EvaluarPoseEsqueleto(arm, savFrame);
+        arm->activeAnim = activeSav; ActiveAnimKind = savKind; ActiveAnimArm = savArm; g_skelAnimPreview = savPrev;
+        arm->poseDirty = false; arm->lastPoseFrame = -999999; EvaluatePoseSkeleton(arm, savFrame);
     }
 
     // ---- animaciones de OBJETO (transform pos/rot/escala de mallas): cada SceneAnimation = una animacion glTF.
@@ -589,10 +589,10 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
     //      componente (rot euler->quat via FromEulerXYZ, IGUAL que SetRotEuler -> round-trip exacto) y se escribe
     //      sampler+channel apuntando al NODO de la malla. El fps de la escena va en extras (glTF estandar).
     InitSceneAnimations(); // garantiza que exista la escena "Scene" (idempotente) -> sus curvas viven en AnimationObjects
-    for (size_t si = 0; si < SceneAnimations.size(); si++) {
-        SceneAnimation* esc = SceneAnimations[si]; if (!esc) continue;
-        // las curvas de la escena ACTIVA viven en el global AnimationObjects; las de las demas en esc->objetos
-        std::vector<AnimationObject>& objs = ((int)si == SceneAnimActiva) ? AnimationObjects : esc->objetos;
+    for (size_t yes = 0; yes < SceneAnimations.size(); yes++) {
+        SceneAnimation* esc = SceneAnimations[yes]; if (!esc) continue;
+        // las curvas de la escena ACTIVA viven en el global AnimationObjects; las de las demas en esc->objects
+        std::vector<AnimationObject>& objs = ((int)yes == ActiveSceneAnim) ? AnimationObjects : esc->objects;
         float fps = (float)(esc->fps > 0 ? esc->fps : 30);
         std::vector<std::string> channels, samplers;
         for (size_t oi = 0; oi < objs.size(); oi++) {
@@ -605,9 +605,9 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                 int prop = propsExp[pe];
                 const char* path = (prop==AnimPosition)?"translation":(prop==AnimRotation)?"rotation":"scale";
                 std::vector<int> frames;
-                for (size_t pi = 0; pi < ao.Propertys.size(); pi++){
-                    if (ao.Propertys[pi].Property != prop) continue;
-                    for (size_t k = 0; k < ao.Propertys[pi].keyframes.size(); k++) frames.push_back(ao.Propertys[pi].keyframes[k].frame);
+                for (size_t pi = 0; pi < ao.Properties.size(); pi++){
+                    if (ao.Properties[pi].Property != prop) continue;
+                    for (size_t k = 0; k < ao.Properties[pi].keyframes.size(); k++) frames.push_back(ao.Properties[pi].keyframes[k].frame);
                 }
                 if (frames.empty()) continue;
                 std::sort(frames.begin(), frames.end());
@@ -616,7 +616,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                 std::vector<float> times(frames.size()), vals;
                 for (size_t k = 0; k < frames.size(); k++) {
                     times[k] = (float)(frames[k]-1)/fps;
-                    Vector3 v = EvalPropVec(ao.Propertys, prop, frames[k], def);
+                    Vector3 v = EvalPropVec(ao.Properties, prop, frames[k], def);
                     if (prop==AnimRotation){ Quaternion q = Quaternion::FromEulerXYZ(v.x, v.y, v.z);
                         vals.push_back(q.x); vals.push_back(q.y); vals.push_back(q.z); vals.push_back(q.w); }
                     else { vals.push_back(v.x); vals.push_back(v.y); vals.push_back(v.z); }
@@ -683,10 +683,10 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
 
     // cerrar la barra de progreso EN LOS DOS caminos (faltaba: quedaba "activa" para siempre,
     // y con eso la barra del icono del dock se quedaba prendida a medias)
-    if (!ok) { ProgresoFin(); w3dLogfE("ExportGLTF: no pude escribir %s", filepath.c_str()); Notificar(T("glTF: could not write the file"), true); return false; }
-    ProgresoFin();
+    if (!ok) { ProgressEnd(); w3dLogfE("ExportGLTF: no pude escribir %s", filepath.c_str()); Notify(T("glTF: could not write the file"), true); return false; }
+    ProgressEnd();
     w3dLogf("ExportGLTF: %s (%d malla(s), %d hueso(s), %d clip(s), buffer=%d bytes)", filepath.c_str(), (int)meshesJson.size(), nBones, (int)animsJson.size(), (int)buf.bin.size());
-    W3dDescargarSiWeb(filepath);   // navegador: bajar el archivo a la PC (el disco de emscripten es virtual)
-    Notificar(T(binary ? "GLB saved successfully!" : "glTF saved successfully!"), false);
+    W3dDownloadIfWeb(filepath);   // navegador: bajar el archivo a la PC (el disco de emscripten es virtual)
+    Notify(T(binary ? "GLB saved successfully!" : "glTF saved successfully!"), false);
     return true;
 }

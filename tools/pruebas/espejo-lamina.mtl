@@ -1,6 +1,6 @@
 newmtl espejo-lamina
 Kd 1.000000 1.000000 1.000000
-map_Kd texturas/agua.png
+map_Kd textures/agua.png
 NoLight
 PIXELATED
 BackfaceCullingOff

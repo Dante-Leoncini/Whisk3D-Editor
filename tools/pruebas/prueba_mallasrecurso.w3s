@@ -37,264 +37,264 @@
 # que materializar sus arrays/VBO para que los contadores cierren); el autocull por frustum no
 # dibuja (ni materializa) lo que la camara no ve, y eso es correcto pero no es lo que se mide aca.
 autocull 0
-ventana 1280 720
-formatomallas binario
+window 1280 720
+formatmeshes binary
 
 # --- A) mil arboles iguales -> una malla ------------------------------------------
-escenasintetica 1000 ../debug/mr_mil.w3d
+scenesynthetic 1000 ../debug/mr_mil.w3d
 w3dbinfo ../debug/mr_mil.w3d w3db 1 w3dm 0
-cargabench ../debug/mr_mil.w3d 3 mallas 1000 mallasbin 1000 derivadas 0 objetos 1003 fugakb 64
-abrirw3d ../debug/mr_mil.w3d
-mallasregistro n 1 cargados 1
-mallarender
-meminfo mallas 1
-meminfo mallasrefs 1000
-meminfo recursosmalla 1
-meminfo vbocompartidos 1
+loadbench ../debug/mr_mil.w3d 3 meshes 1000 meshesbin 1000 derived 0 objects 1003 leakkb 64
+openw3d ../debug/mr_mil.w3d
+meshesregistry n 1 loaded 1
+meshrender
+meminfo meshes 1
+meminfo meshesrefs 1000
+meminfo meshresources 1
+meminfo sharedvbo 1
 # ...y NINGUN objeto sube VBO propios: los mil se dibujaron con TODAS sus capas desde los VBO
 # del recurso (un juego de VBO para los mil, no uno por objeto ademas del compartido)
-mallasvbo propios 0 delrecurso 1000 dibujadas 1000
-mallainfo Arbol recurso Arbol usuarios 1000 vbo compartido edicion pendiente comparte Arbol.500
+meshesvbo own 0 delresource 1000 drawn 1000
+meshcheck Arbol resource Arbol users 1000 vbo shared edit pending shares Arbol.500
 # sin grupos ni formas: el recurso no guarda extras (y ningun arbol paga la identidad de sus puntos)
-mallasregistro extras 0
-guardarw3d ../debug/mr_mil2.w3d
-w3diguales ../debug/mr_mil.w3d ../debug/mr_mil2.w3d
+meshesregistry extras 0
+savew3d ../debug/mr_mil2.w3d
+w3dequal ../debug/mr_mil.w3d ../debug/mr_mil2.w3d
 
 # --- B) editar un usuario modifica a todos ---------------------------------------
-escenasintetica 20 ../debug/mr_sint.w3d
-abrirw3d ../debug/mr_sint.w3d
+scenesynthetic 20 ../debug/mr_sint.w3d
+openw3d ../debug/mr_sint.w3d
 # --- I) mirar sin materializar (alambre / snap / caja con la topologia del recurso) ------
-mallamirar Arbol.009
-mallainfo Arbol.009 edicion pendiente
-mallavert Arbol 0 guardar a0
-mallavert Arbol.009 0 guardar b0
+meshlook Arbol.009
+meshcheck Arbol.009 edit pending
+meshvert Arbol 0 save a0
+meshvert Arbol.009 0 save b0
 selobj Arbol.005
 mode edit
 select all
 move 0.5
 mode object
-mallainfo Arbol.005 recurso Arbol usuarios 20
-mallavert Arbol 0 delta a0 0.5 0 0
-mallavert Arbol.009 0 delta b0 0.5 0 0
-mallainfo Arbol comparte Arbol.005
+meshcheck Arbol.005 resource Arbol users 20
+meshvert Arbol 0 delta a0 0.5 0 0
+meshvert Arbol.009 0 delta b0 0.5 0 0
+meshcheck Arbol shares Arbol.005
 # el Ctrl+Z del move (el primero deshace el cambio de modo): vuelve en TODOS al salir
 undo
 undo
 mode object
-mallavert Arbol 0 delta a0 0 0 0
-mallavert Arbol.005 0 delta a0 0 0 0
+meshvert Arbol 0 delta a0 0 0 0
+meshvert Arbol.005 0 delta a0 0 0 0
 selobj Arbol.005
 mode edit
 select all
 move 0.5
 mode object
-mallavert Arbol.012 0 delta a0 0.5 0 0
+meshvert Arbol.012 0 delta a0 0.5 0 0
 
 # --- C) hacer unica / nueva copia (con undo) ---------------------------------------
-mallaunica Arbol.007
-mallainfo Arbol.007 recurso Arbol.001 usuarios 1 nocomparte Arbol
-mallainfo Arbol recurso Arbol usuarios 19
+meshunique Arbol.007
+meshcheck Arbol.007 resource Arbol.001 users 1 noshare Arbol
+meshcheck Arbol resource Arbol users 19
 undo
-mallainfo Arbol.007 recurso Arbol usuarios 20 comparte Arbol
+meshcheck Arbol.007 resource Arbol users 20 shares Arbol
 # Arbol.001 se quedo sin usuarios, pero el redo lo nombra: no se purga
-mallaspurgar n 0
-mallasregistro tiene Arbol.001
+meshespurge n 0
+meshesregistry has Arbol.001
 redo
-mallainfo Arbol.007 recurso Arbol.001 usuarios 1
+meshcheck Arbol.007 resource Arbol.001 users 1
 # editar la unica NO mueve a las demas
-mallavert Arbol.007 0 guardar u0
+meshvert Arbol.007 0 save u0
 selobj Arbol.007
 mode edit
 select all
 move 0.25
 mode object
-mallavert Arbol.007 0 delta u0 0.25 0 0
-mallavert Arbol 0 delta a0 0.5 0 0
-mallanueva Arbol.011
-mallainfo Arbol.011 recurso Arbol.002 usuarios 1
+meshvert Arbol.007 0 delta u0 0.25 0 0
+meshvert Arbol 0 delta a0 0.5 0 0
+meshnew Arbol.011
+meshcheck Arbol.011 resource Arbol.002 users 1
 undo
-mallainfo Arbol.011 recurso Arbol usuarios 19
+meshcheck Arbol.011 resource Arbol users 19
 
 # --- D) Alt+D vinculado / Shift+D copia (con undo de la creacion) -------------------
-malladup Arbol.003 vinculado
-mallainfo @ultimo recurso Arbol usuarios 20 comparte Arbol.003
+meshdup Arbol.003 linked
+meshcheck @ultimo resource Arbol users 20 shares Arbol.003
 undo
-mallainfo Arbol recurso Arbol usuarios 19
+meshcheck Arbol resource Arbol users 19
 redo
-mallainfo @ultimo recurso Arbol usuarios 20
+meshcheck @ultimo resource Arbol users 20
 # --- J) el Alt+D descarto el redo del "New Copy": Arbol.002 (de la sesion, sin usuarios y sin
 #     paso de undo que lo nombre) se PURGA y su nombre queda libre
-mallaspurgar n 1
-mallasregistro notiene Arbol.002
-malladup Arbol.003 copia
-mallainfo @ultimo recurso Arbol.002 usuarios 1 nocomparte Arbol.003
+meshespurge n 1
+meshesregistry hasnot Arbol.002
+meshdup Arbol.003 copy
+meshcheck @ultimo resource Arbol.002 users 1 noshare Arbol.003
 undo
-mallainfo Arbol.003 recurso Arbol usuarios 20
+meshcheck Arbol.003 resource Arbol users 20
 redo
-mallainfo @ultimo recurso Arbol.002 usuarios 1
+meshcheck @ultimo resource Arbol.002 users 1
 
 # --- E) el material es de la malla; renombrar el recurso ----------------------------
-mallamaterial Arbol.004 0 MatCorteza
-mallainfo Arbol.010 material 0 MatCorteza
-mallainfo Arbol.007 material 0 Default
+meshmaterial Arbol.004 0 MatCorteza
+meshcheck Arbol.010 material 0 MatCorteza
+meshcheck Arbol.007 material 0 Default
 undo
-mallainfo Arbol.010 material 0 Default
+meshcheck Arbol.010 material 0 Default
 redo
-mallainfo Arbol.010 material 0 MatCorteza
-mallarenombrar Arbol.004 Pino
-mallainfo Arbol.010 recurso Pino usuarios 20
+meshcheck Arbol.010 material 0 MatCorteza
+meshrename Arbol.004 Pino
+meshcheck Arbol.010 resource Pino users 20
 undo
-mallainfo Arbol.010 recurso Arbol
+meshcheck Arbol.010 resource Arbol
 redo
-mallainfo Arbol.010 recurso Pino
+meshcheck Arbol.010 resource Pino
 # la CARPETA (cosmetica): normalizada, con undo, la ven todos los objetos de la malla
-mallacarpeta Arbol.010 Vegetacion//Arboles/
-mallainfo Arbol.004 carpeta Vegetacion/Arboles
+meshfolder Arbol.010 Vegetacion//Arboles/
+meshcheck Arbol.004 folder Vegetacion/Arboles
 undo
-mallainfo Arbol.004 carpeta -
+meshcheck Arbol.004 folder -
 redo
-mallainfo Arbol.004 carpeta Vegetacion/Arboles
-guardarw3d ../debug/mr_sint2.w3d
-abrirw3d ../debug/mr_sint2.w3d
-mallasregistro n 3 tiene Pino tiene Arbol.001 tiene Arbol.002 notiene Arbol notiene Arbol.003 carpeta Pino Vegetacion/Arboles carpeta Arbol.001 -
-mallainfo Arbol.010 recurso Pino usuarios 20 comparte Arbol.004 material 0 MatCorteza
-mallainfo Arbol.007 recurso Arbol.001 usuarios 1
-mallavert Arbol 0 delta a0 0.5 0 0
-mallavert Arbol.007 0 delta u0 0.25 0 0
+meshcheck Arbol.004 folder Vegetacion/Arboles
+savew3d ../debug/mr_sint2.w3d
+openw3d ../debug/mr_sint2.w3d
+meshesregistry n 3 has Pino has Arbol.001 has Arbol.002 hasnot Arbol hasnot Arbol.003 folder Pino Vegetacion/Arboles folder Arbol.001 -
+meshcheck Arbol.010 resource Pino users 20 shares Arbol.004 material 0 MatCorteza
+meshcheck Arbol.007 resource Arbol.001 users 1
+meshvert Arbol 0 delta a0 0.5 0 0
+meshvert Arbol.007 0 delta u0 0.25 0 0
 # guardar sin tocar nada: los mismos bytes
-guardarw3d ../debug/mr_sint3.w3d
-w3diguales ../debug/mr_sint2.w3d ../debug/mr_sint3.w3d
+savew3d ../debug/mr_sint3.w3d
+w3dequal ../debug/mr_sint2.w3d ../debug/mr_sint3.w3d
 
 # --- F) una HUERFANA (sin objetos) sobrevive a guardar y abrir ----------------------
-mallaasignar Arbol.007 Pino
-mallainfo Arbol.007 recurso Pino usuarios 21
-mallasregistro tiene Arbol.001
-guardarw3d ../debug/mr_huerf.w3d
-abrirw3d ../debug/mr_huerf.w3d
-mallasregistro n 3 tiene Arbol.001 cargados 2
-guardarw3d ../debug/mr_huerf2.w3d
-w3diguales ../debug/mr_huerf.w3d ../debug/mr_huerf2.w3d
+meshassign Arbol.007 Pino
+meshcheck Arbol.007 resource Pino users 21
+meshesregistry has Arbol.001
+savew3d ../debug/mr_huerf.w3d
+openw3d ../debug/mr_huerf.w3d
+meshesregistry n 3 has Arbol.001 loaded 2
+savew3d ../debug/mr_huerf2.w3d
+w3dequal ../debug/mr_huerf.w3d ../debug/mr_huerf2.w3d
 # la huerfana se puede pedir por el almacen como la pide una ListaCarga "malla:" (async: la
 # carga la bomba) y se suelta con las transitorias
-mallaadquirir mallas/arbol.001.w3db async
-recinfo malla mallas/arbol.001.w3db estado EN_VUELO
+meshacquire meshes/arbol.001.w3db async
+recinfo mesh meshes/arbol.001.w3db state EN_VUELO
 pump 1
-recinfo malla mallas/arbol.001.w3db estado LISTO
-mallasregistro cargados 3
-purgar
-recinfo malla mallas/arbol.001.w3db estado NADA
-mallasregistro cargados 2
+recinfo mesh meshes/arbol.001.w3db state LISTO
+meshesregistry loaded 3
+purge
+recinfo mesh meshes/arbol.001.w3db state NADA
+meshesregistry loaded 2
 
 # --- G) un proyecto VIEJO (.w3dm de texto, "geometria" por objeto) migra al registro --
-formatomallas texto
-mallaslegado on
-escenasintetica 6 ../debug/mr_viejo.w3d
-mallaslegado off
+formatmeshes text
+mesheslegacy on
+scenesynthetic 6 ../debug/mr_viejo.w3d
+mesheslegacy off
 w3dbinfo ../debug/mr_viejo.w3d w3db 0 w3dm 6
-abrirw3d ../debug/mr_viejo.w3d
+openw3d ../debug/mr_viejo.w3d
 # TODA malla es un recurso (la biblioteca): las mallas de un archivo viejo lo tienen YA al abrir, no recien
 # al guardar, y las iguales comparten UNO (6 arboles -> una malla 3D)
-mallasregistro n 1
-mallainfo Arbol recurso Arbol usuarios 6
-formatomallas binario
-guardarw3d ../debug/mr_migrado.w3d
+meshesregistry n 1
+meshcheck Arbol resource Arbol users 6
+formatmeshes binary
+savew3d ../debug/mr_migrado.w3d
 w3dbinfo ../debug/mr_migrado.w3d w3db 1 w3dm 0
-mallainfo Arbol.003 recurso Arbol usuarios 6
-abrirw3d ../debug/mr_migrado.w3d
-mallasregistro n 1
-mallainfo Arbol.005 recurso Arbol usuarios 6 comparte Arbol
-cargabench ../debug/mr_migrado.w3d 1 mallas 6 mallasbin 6 derivadas 0
+meshcheck Arbol.003 resource Arbol users 6
+openw3d ../debug/mr_migrado.w3d
+meshesregistry n 1
+meshcheck Arbol.005 resource Arbol users 6 shares Arbol
+loadbench ../debug/mr_migrado.w3d 1 meshes 6 meshesbin 6 derived 0
 
 # --- H) skinning por instancia con la malla compartida ------------------------------
-mallaskindos armar
-mallainfo PersonajeB recurso Personaje usuarios 2 comparte PersonajeA
-mallaskindos verificar
-mallarender
-mallainfo PersonajeA vbo pose
-guardarw3d ../debug/mr_skin.w3d
-abrirw3d ../debug/mr_skin.w3d
+meshskintwo build
+meshcheck PersonajeB resource Personaje users 2 shares PersonajeA
+meshskintwo verify
+meshrender
+meshcheck PersonajeA vbo pose
+savew3d ../debug/mr_skin.w3d
+openw3d ../debug/mr_skin.w3d
 # cada personaje tiene SUS grupos (el skinning los lee de la malla) y el recurso ya no guarda
 # otra copia: los solt?? cuando el primer usuario limpio los tuvo
-mallasregistro n 1 extras 0
-mallainfo PersonajeA recurso Personaje usuarios 2 comparte PersonajeB grupos 2
-mallainfo PersonajeB grupos 2
-mallaskindos verificar
+meshesregistry n 1 extras 0
+meshcheck PersonajeA resource Personaje users 2 shares PersonajeB groups 2
+meshcheck PersonajeB groups 2
+meshskintwo verify
 # un tercero vinculado copia los grupos de un usuario limpio (sin releer la entrada)
-malladup PersonajeA vinculado
-mallainfo @ultimo recurso Personaje usuarios 3 grupos 2 comparte PersonajeA
-mallasregistro extras 0
+meshdup PersonajeA linked
+meshcheck @ultimo resource Personaje users 3 groups 2 shares PersonajeA
+meshesregistry extras 0
 
 # --- K) la POSE de la sesion sobrevive a que OTRO usuario publique ----------------------
-escenasintetica 6 ../debug/mr_pose.w3d
-abrirw3d ../debug/mr_pose.w3d
+scenesynthetic 6 ../debug/mr_pose.w3d
+openw3d ../debug/mr_pose.w3d
 # Arbol.004 anima sus UV (flipbook propio, parado en el cuadro 1 de 4: u + 0.25) y Arbol.005
 # esta POSADO por su vertex anim (cuadro 10 = el doble de su reposo)
-mallauv Arbol.004 0 guardar base
-mallaflip Arbol.004 4 1
-mallauv Arbol.004 0 delta base 0.25 0
-mallavert Arbol.004 0 guardar p0
-mallava Arbol.005 10
-mallavert Arbol.005 0 guardar va10
+meshuv Arbol.004 0 save base
+meshflip Arbol.004 4 1
+meshuv Arbol.004 0 delta base 0.25 0
+meshvert Arbol.004 0 save p0
+meshva Arbol.005 10
+meshvert Arbol.005 0 save va10
 selobj Arbol.002
 mode edit
 select all
 move 0.5
 mode object
 # la geometria nueva le llego a Arbol.004... y sigue en su cuadro (antes quedaba en reposo)
-mallavert Arbol.004 0 delta p0 0.5 0 0
-mallauv Arbol.004 0 delta base 0.25 0
-mallainfo Arbol.004 flipbook si recurso Arbol usuarios 6
+meshvert Arbol.004 0 delta p0 0.5 0 0
+meshuv Arbol.004 0 delta base 0.25 0
+meshcheck Arbol.004 flipbook si resource Arbol users 6
 # Arbol.005 sigue en la pose de su anim (antes volvia al reposo nuevo hasta el proximo cuadro)
-mallavert Arbol.005 0 delta va10 0 0 0
-mallainfo Arbol.005 recurso Arbol usuarios 6
+meshvert Arbol.005 0 delta va10 0 0 0
+meshcheck Arbol.005 resource Arbol users 6
 # el duplicado (vinculado o copia) se lleva el flipbook, en el mismo cuadro
-malladup Arbol.004 vinculado
-mallainfo @ultimo flipbook si recurso Arbol
-mallauv @ultimo 0 delta base 0.25 0
-malladup Arbol.004 copia
-mallainfo @ultimo flipbook si
-mallauv @ultimo 0 delta base 0.25 0
+meshdup Arbol.004 linked
+meshcheck @ultimo flipbook si resource Arbol
+meshuv @ultimo 0 delta base 0.25 0
+meshdup Arbol.004 copy
+meshcheck @ultimo flipbook si
+meshuv @ultimo 0 delta base 0.25 0
 
 # --- T) el FORMATO DE TEXTO: el mismo registro, una .w3dm por malla ----------------------
-formatomallas texto
-escenasintetica 20 ../debug/mr_texto.w3d
+formatmeshes text
+scenesynthetic 20 ../debug/mr_texto.w3d
 w3dbinfo ../debug/mr_texto.w3d w3db 0 w3dm 1
-abrirw3d ../debug/mr_texto.w3d
-mallasregistro n 1 tiene Arbol
-mallainfo Arbol.013 recurso Arbol usuarios 20 comparte Arbol edicion pendiente
-mallamirar Arbol.013
-mallavert Arbol 0 guardar t0
+openw3d ../debug/mr_texto.w3d
+meshesregistry n 1 has Arbol
+meshcheck Arbol.013 resource Arbol users 20 shares Arbol edit pending
+meshlook Arbol.013
+meshvert Arbol 0 save t0
 selobj Arbol.006
 mode edit
 select all
 move 0.5
 mode object
-mallavert Arbol.019 0 delta t0 0.5 0 0
-guardarw3d ../debug/mr_texto2.w3d
+meshvert Arbol.019 0 delta t0 0.5 0 0
+savew3d ../debug/mr_texto2.w3d
 w3dbinfo ../debug/mr_texto2.w3d w3db 0 w3dm 1
-abrirw3d ../debug/mr_texto2.w3d
-mallavert Arbol.019 0 delta t0 0.5 0 0
-mallainfo Arbol.019 usuarios 20 comparte Arbol.006
+openw3d ../debug/mr_texto2.w3d
+meshvert Arbol.019 0 delta t0 0.5 0 0
+meshcheck Arbol.019 users 20 shares Arbol.006
 # guardar sin tocar nada: la .w3dm se copia tal cual
-guardarw3d ../debug/mr_texto3.w3d
-w3diguales ../debug/mr_texto2.w3d ../debug/mr_texto3.w3d
+savew3d ../debug/mr_texto3.w3d
+w3dequal ../debug/mr_texto2.w3d ../debug/mr_texto3.w3d
 # de texto a binario: la malla pasa a .w3db
-formatomallas binario
-guardarw3d ../debug/mr_texto_bin.w3d
+formatmeshes binary
+savew3d ../debug/mr_texto_bin.w3d
 w3dbinfo ../debug/mr_texto_bin.w3d w3db 1 w3dm 0
-abrirw3d ../debug/mr_texto_bin.w3d
-mallasregistro n 1
-mallavert Arbol.019 0 delta t0 0.5 0 0
+openw3d ../debug/mr_texto_bin.w3d
+meshesregistry n 1
+meshvert Arbol.019 0 delta t0 0.5 0 0
 # de binario a texto con una HUERFANA (sin objetos: sale de sus bytes)
-abrirw3d ../debug/mr_huerf.w3d
-formatomallas texto
-guardarw3d ../debug/mr_huerf_t.w3d
+openw3d ../debug/mr_huerf.w3d
+formatmeshes text
+savew3d ../debug/mr_huerf_t.w3d
 w3dbinfo ../debug/mr_huerf_t.w3d w3db 0 w3dm 3
-abrirw3d ../debug/mr_huerf_t.w3d
-mallasregistro n 3 tiene Arbol.001
-mallaadquirir mallas/arbol.001.w3dm bloqueante
-recinfo malla mallas/arbol.001.w3dm estado LISTO
-purgar
-guardarw3d ../debug/mr_huerf_t2.w3d
-w3diguales ../debug/mr_huerf_t.w3d ../debug/mr_huerf_t2.w3d
-formatomallas proyecto
+openw3d ../debug/mr_huerf_t.w3d
+meshesregistry n 3 has Arbol.001
+meshacquire meshes/arbol.001.w3dm bloqueante
+recinfo mesh meshes/arbol.001.w3dm state LISTO
+purge
+savew3d ../debug/mr_huerf_t2.w3d
+w3dequal ../debug/mr_huerf_t.w3d ../debug/mr_huerf_t2.w3d
+formatmeshes project

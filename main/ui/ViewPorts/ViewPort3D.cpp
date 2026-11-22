@@ -1,21 +1,21 @@
-#include "objects/SondaLuz.h"            // SondaLuzNuevoPase: las sondas de luz tambien en el render a archivo
-#include "render/SombrasTiempoReal.h"    // W3dSombrasPase / Fin: las sombras en tiempo real en el render a archivo
-#include "objects/Rutina.h"   // g_w3dSoloJuego / W3dHayConstructor: quien limpia la pantalla
-#include "W3dEscena.h"        // W3dEscena3DActiva (lua dibujar3D(false): el "Clear" del proyecto no corre)
-#include "io/RaicesEditor.h"   // el selector de escena/prefab de la barra (BR_Raiz)
-#include "objects/Light.h" // W3dLucesPrepase
+#include "objects/LightProbe.h"        // LightProbeNewPass: las sondas de luz tambien en el render a archivo
+#include "render/RealTimeShadows.h"    // W3dShadowsPass / Fin: las sombras en tiempo real en el render a archivo
+#include "objects/Routine.h"   // g_w3dOnlyGame / W3dHasConstructor: quien limpia la pantalla
+#include "W3dScene.h"          // W3dScene3DActive (lua dibujar3D(false): el "Clear" del proyecto no corre)
+#include "io/EditorRoots.h"   // el selector de escena/prefab de la barra (BR_Root)
+#include "objects/Light.h" // W3dLightsPrePass
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"
-#include "edit/MeshEdit.h"   // W3dRenderCornersSeparados
+#include "edit/MeshEdit.h"   // W3dRenderCornersSeparated
 #include "ui/ViewPorts/Gizmo.h"   // gizmo de mover
-#include "edit/Proporcional.h"   // proportional editing: tecla O, rueda = radio, circulo de influencia
-#include "io/TexturaEditada.h"
-#include "io/UVExportar.h"        // pintura de textura: si las UV se pisan, se despliegan antes de pintar
-#include "edit/UVUnwrap.h"         // W3dSmartUVProjectTodas
-#include "io/TexturaGenerada.h"   // la textura para pintar (del color del material)
-#include "objects/Materials.h"     // MaterialDefecto    // TEXTURE PAINT: los pixeles de la textura de la parte activa
-#include "ui/ViewPorts/UVEditor.h"  // UVParteMostrada: que parte (material) se pinta
-#include "W3dAviso.h"
+#include "edit/Proportional.h"   // proportional editing: tecla O, rueda = radio, circulo de influencia
+#include "io/EditedTexture.h"
+#include "io/UVExport.h"        // pintura de textura: si las UV se pisan, se despliegan antes de pintar
+#include "edit/UVUnwrap.h"         // W3dSmartUVProjectAll
+#include "io/GeneratedTexture.h"   // la textura para pintar (del color del material)
+#include "objects/Materials.h"     // MaterialDefault    // TEXTURE PAINT: los pixeles de la textura de la parte activa
+#include "ui/ViewPorts/UVEditor.h"  // UVShownPart: que parte (material) se pinta
+#include "W3dNotice.h"
 #include <stdlib.h>   // getenv (debug de oclusion)
 #include "render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
@@ -28,57 +28,57 @@
 #ifdef W3D_SYMBIAN
 #include <e32std.h> // User::NTickCount() (reloj del profiler en el N95; ~ms, el mismo que usa LayoutTickFPS)
 #endif
-#include "ViewPorts/Pick3D.h"   // InsetIniciar (I en Edit Mode)
-#include "app/W3dTactilEditor.h"   // W3dEventoTactil: en Symbian el camino de PC del 3D corre solo con el dedo
+#include "ViewPorts/Pick3D.h"   // InsetStart (I en Edit Mode)
+#include "app/W3dTouchEditor.h"   // W3dEventTouch: en Symbian el camino de PC del 3D corre solo con el dedo
 #include <string>
 #include "WhiskUI/draw/glesdraw.h"
-#include "ui/W3dColors.h" // W3dColores: colores del editor (piso, ejes de transformacion)
-#include "render/OpcionesRender.h" // flags del overlay de normales
+#include "ui/W3dColors.h" // W3dColors: colores del editor (piso, ejes de transformacion)
+#include "render/RenderOptions.h" // flags del overlay de normales
 #include "render/RayTracer.h"
 #include "ViewPorts/PopUp/TransformRedoPanel.h"   // ajustar la ultima operacion (mover/rotar/escalar)      // vista Rendered + "Ray Tracing": la imagen trazada por CPU encima de la escena GL
-#include "render/EscenaRender.h"   // EL pase 3D COMPARTIDO con el runtime del juego compilado
-#include "objects/Mesh.h"          // overlay de estadisticas (vertsAgrupados, faces3d)
-#include "objects/EditMesh.h"      // foco al centro de la seleccion en edit mode
-#include "objects/Armature.h"      // dibujar huesos del esqueleto encima de todo
-#include "objects/Particulas.h"    // pase de particulas: se dibujan DESPUES de los opacos
-#include "objects/UI.h"            // igualQueRender: el HUD del juego elige lienzo/letterbox
-#include "animation/SkeletalAnimation.h" // EvaluarPoseEsqueleto (pose al reproducir)
+#include "render/SceneRender.h"   // EL pase 3D COMPARTIDO con el runtime del juego compilado
+#include "objects/Mesh.h"         // overlay de estadisticas (groupedVerts, faces3d)
+#include "objects/EditMesh.h"     // foco al centro de la seleccion en edit mode
+#include "objects/Armature.h"     // dibujar huesos del esqueleto encima de todo
+#include "objects/Particles.h"    // pase de particulas: se dibujan DESPUES de los opacos
+#include "objects/UI.h"           // sameAsRender: el HUD del juego elige lienzo/letterbox
+#include "animation/SkeletalAnimation.h" // EvaluatePoseSkeleton (pose al reproducir)
 #include "animation/Animation.h"          // CurrentFrame
-#include "w3dlog.h"                      // w3dLogMemoria: la memoria antes / despues de las texturas del Play
+#include "w3dlog.h"                      // w3dLogMemory: la memoria antes / despues de las texturas del Play
 // la sim del juego (scripts lua) esta cargada? (play O pausa; false tras Stop)
-static bool JuegoSimActiva() { extern bool SimActiva(); return SimActiva(); }
-// dibujando una MITAD de la pantalla dividida (RenderDividido): la mitad es la imagen entera (sin encuadre ni bandas)
+static bool GameSimActive() { extern bool SimActive(); return SimActive(); }
+// dibujando una MITAD de la pantalla dividida (RenderSplit): la mitad es la imagen entera (sin encuadre ni bandas)
 // y el Render no vuelve a partir
-static bool gVistaPartida = false;
-extern int g_juegoPuro;
+static bool gSessionView = false;
+extern int g_pureGame;
 // el aspecto del MARCO de la camara en un viewport de aspecto 'va'. En el MODO JUEGO PURO (VERDE+0, sin la UI) el marco
 // es la pantalla: en COVER (2) siempre; con BANDAS (1) solo si la camara declara un aspecto (ese es el del juego: lo de
 // afuera, negro). Sin declarar, el aspecto del render no importa ahi: el juego llena la pantalla
-static float AspectoMarco(float va) {
-    if (g_juegoPuro == 2 || gVistaPartida) return va;
-    if (g_juegoPuro && !(CameraActive && CameraActive->AspectoDeclarado() > 0.01f)) return va;
-    const float ra = W3dAspectoJuego();
+static float FrameAspect(float va) {
+    if (g_pureGame == 2 || gSessionView) return va;
+    if (g_pureGame && !(CameraActive && CameraActive->DeclaredAspect() > 0.01f)) return va;
+    const float ra = W3dGameAspect();
     return (ra < 1e-4f) ? va : ra;
 }
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
-#include "ViewPorts/UVEditor.h"    // roles TBR_Pincel*/TBR_Grupo (toolbar del modo Weight Paint, compartidos con el UV)
+#include "ViewPorts/UVEditor.h"    // roles TBR_Pincel*/TBR_Group (toolbar del modo Weight Paint, compartidos con el UV)
 #include "edit/WeightPaint.h"      // pincel + escritura de pesos (modo Weight Paint)
 #include "edit/BoxSelect.h"        // B: caja de seleccion (compartida con los otros editores)
 #include "edit/BoneEdit.h"         // Edit Mode de ARMATURE: ops de huesos + grab de head/tail (Fase 3)
-#include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
+#include "ViewPorts/PopUp/NumPad.h" // NumPadOpenTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/TransformUI.h"  // UI compartida del transform (W3dFmtFloat / TextoNum / barra de info)
-#include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
-#include "ViewPorts/PopUp/ProgressPopup.h"  // barra "Rendering..." durante el render por tiles (clave en N95)
-#include "ViewPorts/Notificaciones.h"       // aviso "Loading textures..." al dar Play
-#include "importers/import_obj.h"           // TexturasPendientes / CargarTodasTexturasPendientes
+#include "ViewPorts/PopUp/ConfirmPopup.h"  // OpenConfirmDelete (popup al borrar con la tecla)
+#include "ViewPorts/PopUp/ProgressPopup.h" // barra "Rendering..." durante el render por tiles (clave en N95)
+#include "ViewPorts/Notifications.h"       // aviso "Loading textures..." al dar Play
+#include "importers/import_obj.h"          // PendingTextures / LoadAllPendingTextures
 void RebindMaterialMeshPart(); // (def en Properties.cpp) refresca el panel de material tras undo/redo
 #include "W3dProfile.h" // g_profShow (ms por categoria) para el overlay Statistics; se define en config/W3dProfile.cpp
-#include "render/VectoresMovimiento.h" // el pase de vectores de movimiento del render a PNG
-#include "render/Postproceso.h"        // el postprocesado de la vista Rendered
-#include "objects/PostprocesoObj.h"    // ...puesto en el arbol (el objeto Postproceso)
+#include "render/MotionVectors.h"   // el pase de vectores de movimiento del render a PNG
+#include "render/PostProcess.h"     // el postprocesado de la vista Rendered
+#include "objects/PostProcessObj.h" // ...puesto en el arbol (el objeto Postproceso)
 #include "script/W3dScript.h"   // la pantalla dividida (W3dVistas*: setVistas / setVistaCamara de lua)
 #ifdef W3D_SYMBIAN
-extern int W3dPantallaAlto; // los headers GLES + tipos GL los da GeometriaUI.h (via ViewPort3D.h)
+extern int W3dScreenHeight; // los headers GLES + tipos GL los da GeometryUI.h (via ViewPort3D.h)
 #ifndef GL_POINT_SPRITE
 #define GL_POINT_SPRITE 0x8861
 #endif
@@ -88,45 +88,45 @@ extern int W3dPantallaAlto; // los headers GLES + tipos GL los da GeometriaUI.h 
 #endif
 
 // HARNESS (hudanimpx): si esta puesto, el proximo RenderUI junta aca las posiciones
-// RESUELTAS de los elementos del HUD (el MISMO vector de UI2D_DibujarOverlay). Asi la
+// RESUELTAS de los elementos del HUD (el MISMO vector de UI2D_DrawOverlay). Asi la
 // prueba lee el pixel del elemento EN EL FRAME REAL (3D + HUD), no en una pantalla
 // sintetica. NULL (siempre, salvo mientras el harness mide) = cero costo.
-std::vector<UI2DPos>* g_hudCapturaPos = NULL;
+std::vector<UI2DPos>* g_hudCapturePos = NULL;
 
 PopupMenu* MenuAdd = NULL;
 PopupMenu* MenuImports = NULL; // submenu "Add > Imports": OBJ / FBX / glTF / GLB
-PopupMenu* MenuMallas  = NULL; // submenu "Add > Mesh": las primitivas (8 de las 19 filas del menu)
+PopupMenu* MenuMeshes  = NULL; // submenu "Add > Mesh": las primitivas (8 de las 19 filas del menu)
 PopupMenu* MenuPrefabsAdd = NULL; // submenu "Add > Prefab": los prefabs del proyecto (io/PrefabsEditor.h)
-PopupMenu* MenuEscenasAdd = NULL; // submenu "Add > Scene": las otras escenas instanciadas (io/PrefabsEditor.h)
+PopupMenu* MenuScenesAdd  = NULL; // submenu "Add > Scene": las otras escenas instanciadas (io/PrefabsEditor.h)
 PopupMenu* MenuCore = NULL;      // submenu "Add > Core": las RUTINAS (objetos avanzados: pasos del render)
-PopupMenu* MenuModificadores = NULL;   // submenu "Add > Modifier Objects": espejo, array, instancia
-PopupMenu* MenuLucesAdd = NULL;        // submenu "Add > Lights": luz, sol, foco y la sonda de luz
+PopupMenu* MenuModifiers = NULL;   // submenu "Add > Modifier Objects": espejo, array, instancia
+PopupMenu* MenuLightsAdd = NULL;   // submenu "Add > Lights": luz, sol, foco y la sonda de luz
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuAnimation = NULL; // "Animation": keyframes del objeto + Motion Trail (solo con seleccion)
 // los submenus de las capas de la animacion de una malla (vertices, normales, UV): insertar un keyframe y borrar la capa
-static PopupMenu* MenuKeyMalla = NULL;
-static PopupMenu* MenuBorrarCapaMalla = NULL;
+static PopupMenu* MenuKeyMesh = NULL;
+static PopupMenu* MenuDeleteLayerMesh = NULL;
 // El menu "Animation" se ARMA AL ABRIRLO (LayoutInput.cpp), segun el contexto: lo de las mallas (sus keyframes de
 // vertices, normales y UV, y borrar una de esas capas) solo con una MALLA activa; en el Modo Pose, los keyframes de
 // los huesos y Reset Pose (los huesos elegidos vuelven a como estan en el Modo Edicion). El item 0 es SIEMPRE Insert
 // Keyframe (LayoutSyncInsertKeySubmenu le pone o le saca el submenu de canales).
-void MenuAnimationArmar(){
+void MenuAnimationBuild(){
     if (!MenuAnimation) return;
     extern PopupMenu* MenuInsertKey;
-    MenuAnimation->Limpiar();
-    MenuAnimation->Agregar(T("Insert Keyframe"), 510, IconType::keyframe, MenuInsertKey)->atajo = "@3d.keyframe";
+    MenuAnimation->Clear();
+    MenuAnimation->Add(T("Insert Keyframe"), 510, IconType::keyframe, MenuInsertKey)->shortcut = "@3d.keyframe";
     const bool pose = (InteractionMode == PoseMode);
-    const bool malla = !pose && ObjActivo && ObjActivo->getType() == ObjectType::mesh;
-    if (malla) MenuAnimation->Agregar(T("Insert Mesh Keyframe"), 0, IconType::mesh, MenuKeyMalla);
+    const bool mesh = !pose && ActiveObj && ActiveObj->getType() == ObjectType::mesh;
+    if (mesh) MenuAnimation->Add(T("Insert Mesh Keyframe"), 0, IconType::mesh, MenuKeyMesh);
     // (en el Modo Pose, Delete/Clear Keyframe son los de los HUESOS: el dispatch de 511/512 lo ve)
-    MenuAnimation->Agregar(T("Delete Keyframe"), 511, IconType::borrar);
-    MenuAnimation->Agregar(T("Clear Keyframe"),  512);
-    if (pose) MenuAnimation->Agregar(T("Reset Pose"), 520, IconType::armature);   // PoseClearTransform(0)
+    MenuAnimation->Add(T("Delete Keyframe"), 511, IconType::trash);
+    MenuAnimation->Add(T("Clear Keyframe"),  512);
+    if (pose) MenuAnimation->Add(T("Reset Pose"), 520, IconType::armature);   // PoseClearTransform(0)
     // una CAPA entera de la animacion de la malla (p. ej. las normales de un modelo sin iluminacion). No es un
     // keyframe: es una capa de la animacion, por eso va en su propio submenu.
-    if (malla) MenuAnimation->Agregar(T("Delete Mesh Layer"), 0, IconType::borrar, MenuBorrarCapaMalla);
-    MenuAnimation->AgregarCheck(T("Motion Trail"), 513, &MotionTrailOn);
+    if (mesh) MenuAnimation->Add(T("Delete Mesh Layer"), 0, IconType::trash, MenuDeleteLayerMesh);
+    MenuAnimation->AddCheck(T("Motion Trail"), 513, &MotionTrailOn);
 }
 PopupMenu* MenuMesh = NULL;      // edit mode: operaciones de malla (Transform + Extrude)
 PopupMenu* MenuTransform = NULL; // submenu de Object: Move / Rotate / Scale
@@ -135,7 +135,7 @@ PopupMenu* MenuSetOrigin = NULL; // submenu de Object: Geometry/Origin/Cursor
 PopupMenu* MenuApply = NULL;     // submenu de Object: Apply Location/Rotation/Scale/All (Ctrl A)
 PopupMenu* MenuView = NULL;      // boton "View" (antes de Select): submenus Cameras + Viewpoint
 MenuItem* MenuItemLockOrbit = NULL; // el item "Lock Orbit" del menu View (para refrescar su tilde al abrir)
-MenuItem* MenuItemCamaraBloqueada = NULL; // "Mover la camara con la vista" (el candado de la vista de camara) en el menu View
+MenuItem* MenuItemLockedCamera = NULL; // "Mover la camara con la vista" (el candado de la vista de camara) en el menu View
 MenuItem* MenuItemLocalView = NULL; // el item "Local View" del menu View (tilde = local view activo en el viewport)
 PopupMenu* MenuViewpoint = NULL; // submenu de View: Camera/Top/Bottom/Front/Back/Right/Left (numpad)
 PopupMenu* MenuCameras = NULL;   // submenu de View: Set Active Object as Camera / Active Camera
@@ -146,12 +146,12 @@ PopupMenu* MenuMode = NULL;      // modo del objeto activo: Object/Edit/Vertex/W
 PopupMenu* MenuSelMode = NULL;   // edit mode: sub-elemento Vertex/Edge/Face
 
 // busca un boton de la barra por su ROL (no por indice) -> reordenar la barra no rompe nada.
-Button* BarRolBtn(std::vector<Button*>& B, int rol){
-    for (size_t i = 0; i < B.size(); i++) if (B[i] && B[i]->rol == rol) return B[i];
+Button* BarRoleBtn(std::vector<Button*>& B, int role){
+    for (size_t i = 0; i < B.size(); i++) if (B[i] && B[i]->role == role) return B[i];
     return NULL;
 }
-int BarRolIdx(std::vector<Button*>& B, int rol){
-    for (size_t i = 0; i < B.size(); i++) if (B[i] && B[i]->rol == rol) return (int)i;
+int BarRoleIdx(std::vector<Button*>& B, int role){
+    for (size_t i = 0; i < B.size(); i++) if (B[i] && B[i]->role == role) return (int)i;
     return -1;
 }
 
@@ -159,353 +159,362 @@ int BarRolIdx(std::vector<Button*>& B, int rol){
 // alrededor del pivot EN pantalla. gTrackballCap = ya capturamos el angulo
 // inicial; los Track* son endpoints (coords de pantalla del viewport) de la
 // linea punteada pivot->mouse.
-// gTrackballCap es GLOBAL (variables.h): SetRotacion() lo resetea al arrancar
+// gTrackballCap es GLOBAL (variables.h): BeginRotate() lo resetea al arrancar
 static float gTrackballAng0 = 0.0f;
 static float gTrackPivX = 0, gTrackPivY = 0, gTrackMouseX = 0, gTrackMouseY = 0;
-static bool  gLineaValida = false; // hay endpoints validos para la linea punteada
+static bool  gLineValid = false; // hay endpoints validos para la linea punteada
 
 Viewport3D::Viewport3D(Vector3 pos){
-    // barra: [0] tipo de viewport (BarCrear), [1] Select, [2] Add,
+    // barra: [0] tipo de viewport (BarCreate), [1] Select, [2] Add,
     //        [3] Object (solo con algo seleccionado), [4] Overlays
     // barra: [0] tipo de viewport, [1] Mode (selector de modo, con icono),
     // [2] SelMode (Vertex/Edge/Face, SOLO en edit mode, al lado de Mode),
     // [3] Select, [4] Add, [5] Object, [6] Overlays, [7] Render, [8] Orient.
-    BarCrear(); // [0] = icono de tipo/split
-    // Cada boton lleva su ROL estable; el dispatch los busca por rol (BarRolBtn) -> el ORDEN
+    BarCreate(); // [0] = icono de tipo/split
+    // Cada boton lleva su ROL estable; el dispatch los busca por rol (BarRoleBtn) -> el ORDEN
     // VISUAL de aca se puede cambiar libremente sin tocar el dispatch. Orient va ANTES de Select.
     Button* b;
-    b = new Button(T("Object Mode"), (int)IconType::object); b->rol = BR_Mode;
-        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo si el activo es malla
-    b = new Button("", (int)IconType::selVertex); b->rol = BR_SelMode;     // SOLO icono (Vertex/Edge/Face)
-        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo en edit mode
-    b = new Button("", (int)IconType::pivotMedian); b->rol = BR_Pivot;     // Transform Pivot (solo icono)
-        b->desplegable = true; BarButtons.push_back(b);
-    b = new Button(T("Orient")); b->rol = BR_Orient;                          // orientacion del transform
-        b->desplegable = true; BarButtons.push_back(b);                    // (movido ANTES de Select)
-    b = new Button("", IconType::snap); b->rol = BR_Snap;                  // SNAP (imanta al mover): verde si esta ON
-        b->ayuda = "Snap";
-        b->desplegable = true; BarButtons.push_back(b);
-    b = new Button("", (int)IconType::curve); b->rol = BR_Proporcional;    // PROPORTIONAL EDITING (O): la curva, verde si ON
-        b->ayuda = "Proportional Editing";
-        b->desplegable = true; BarButtons.push_back(b);
+    b = new Button(T("Object Mode"), (int)IconType::object); b->role = BR_Mode;
+        b->dropdown = true; b->visible = false; BarButtons.push_back(b); // solo si el activo es malla
+    b = new Button("", (int)IconType::selVertex); b->role = BR_SelMode;     // SOLO icono (Vertex/Edge/Face)
+        b->dropdown = true; b->visible = false; BarButtons.push_back(b); // solo en edit mode
+    b = new Button("", (int)IconType::pivotMedian); b->role = BR_Pivot;     // Transform Pivot (solo icono)
+        b->dropdown = true; BarButtons.push_back(b);
+    b = new Button(T("Orient")); b->role = BR_Orient;                          // orientacion del transform
+        b->dropdown = true; BarButtons.push_back(b);                        // (movido ANTES de Select)
+    b = new Button("", IconType::snap); b->role = BR_Snap;                  // SNAP (imanta al mover): verde si esta ON
+        b->help = "Snap";
+        b->dropdown = true; BarButtons.push_back(b);
+    b = new Button("", (int)IconType::curve); b->role = BR_Proportional;    // PROPORTIONAL EDITING (O): la curva, verde si ON
+        b->help = "Proportional Editing";
+        b->dropdown = true; BarButtons.push_back(b);
     // "View" es un ICONO (monitor): el texto ocupaba ancho de barra, que es lo que escasea (sobre todo en el N95).
-    b = new Button("", IconType::monitor); b->rol = BR_View; b->desplegable = true; b->ayuda = "View"; BarButtons.push_back(b);
+    b = new Button("", IconType::monitor); b->role = BR_View; b->dropdown = true; b->help = "View"; BarButtons.push_back(b);
     // "Select" y "Add" son ICONOS sin texto (el titulo va en el menu desplegable): el texto
     // "Seleccionar"/"Anadir" comia ancho de barra (escaso, sobre todo en el N95).
-    b = new Button("", IconType::seleccion); b->rol = BR_Select; b->desplegable = true; b->ayuda = "Select"; BarButtons.push_back(b);
-    b = new Button("", IconType::mas); b->rol = BR_Add; b->desplegable = true; b->ayuda = "Add"; BarButtons.push_back(b);
-    b = new Button(T("Mesh")); b->rol = BR_Mesh;                               // Transform/Snap/Delete comun
-        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit mode
-    b = new Button("", (int)IconType::guardar); b->rol = BR_TexGuardar;   // pintura de textura: guardar lo pintado
-        b->ayuda = "Save Texture";
-        b->desplegable = true; b->visible = false; BarButtons.push_back(b);
-    b = new Button("", IconType::keyframe); b->rol = BR_Animation;   // icono rombo (keyframe)
-        b->ayuda = "Animation";
-    b->desplegable = true;
+    b = new Button("", IconType::selection); b->role = BR_Select; b->dropdown = true; b->help = "Select"; BarButtons.push_back(b);
+    b = new Button("", IconType::plus); b->role = BR_Add; b->dropdown = true; b->help = "Add"; BarButtons.push_back(b);
+    b = new Button(T("Mesh")); b->role = BR_Mesh;                               // Transform/Snap/Delete comun
+        b->dropdown = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit mode
+    b = new Button("", (int)IconType::save); b->role = BR_TexSave;   // pintura de textura: guardar lo pintado
+        b->help = "Save Texture";
+        b->dropdown = true; b->visible = false; BarButtons.push_back(b);
+    b = new Button("", IconType::keyframe); b->role = BR_Animation;   // icono rombo (keyframe)
+        b->help = "Animation";
+    b->dropdown = true;
     BarButtons.push_back(b);
-    b = new Button("", IconType::object); b->rol = BR_Object;              // cubo
-        b->ayuda = "Object";
-        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo con seleccion (no edit)
+    b = new Button("", IconType::object); b->role = BR_Object;              // cubo
+        b->help = "Object";
+        b->dropdown = true; b->visible = false; BarButtons.push_back(b); // solo con seleccion (no edit)
     // Overlays y Render son ICONOS: el texto comia ancho de barra. El OJO del overlay ademas dice el estado
     // (abierto = se ven; cerrado = apagados), asi que se elige por frame mas abajo, no aca.
-    b = new Button("", IconType::visible); b->rol = BR_Overlays; b->desplegable = true; b->ayuda = "Overlays"; BarButtons.push_back(b);
-    b = new Button("", IconType::camera);  b->rol = BR_Render;   b->desplegable = true; b->ayuda = "Render"; BarButtons.push_back(b);
+    b = new Button("", IconType::visible); b->role = BR_Overlays; b->dropdown = true; b->help = "Overlays"; BarButtons.push_back(b);
+    b = new Button("", IconType::camera);  b->role = BR_Render;   b->dropdown = true; b->help = "Render"; BarButtons.push_back(b);
     // la ESCENA / el JUEGO / el PREFAB que se edita: icono + nombre, desplegable (escenas, juegos, prefabs,
-    // Nueva escena, Nuevo juego, Nuevo prefab). El icono lo pone W3dRaicesBotonSincronizar segun el tipo
-    b = new Button("", (int)IconType::camera); b->rol = BR_Raiz; b->desplegable = true; b->caretMenu = true;
+    // Nueva escena, Nuevo juego, Nuevo prefab). El icono lo pone W3dRootsButtonSync segun el tipo
+    b = new Button("", (int)IconType::camera); b->role = BR_Root; b->dropdown = true; b->caretMenu = true;
         BarButtons.push_back(b);
     // MODO JUEGO: transporte minimo (visible SOLO con la animacion "Juego" activa).
     // Sin ellos, un layout con solo el viewport 3D no tenia forma de pausar/parar.
-    b = new Button(T("Stop")); b->rol = BR_JuegoStop; b->visible = false; BarButtons.push_back(b);
-    b = new Button(T("Play")); b->rol = BR_JuegoPlay;  b->visible = false; BarButtons.push_back(b);
-    b = new Button(T("UV")); b->rol = BR_UV;                                  // Mark Seam + proyecciones
-        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit
+    b = new Button(T("Stop")); b->role = BR_GameStop; b->visible = false; BarButtons.push_back(b);
+    b = new Button(T("Play")); b->role = BR_GamePlay;  b->visible = false; BarButtons.push_back(b);
+    b = new Button(T("UV")); b->role = BR_UV;                                  // Mark Seam + proyecciones
+        b->dropdown = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit
     barAlpha = 0.5f; // en el 3D la barra deja ver la escena detras
     // barra de HERRAMIENTAS (abajo): MISMOS Button que la barra de arriba. El mecanismo (layout/
     // scroll/hit/render) es el COMPARTIDO de ViewportBase (ToolbarBase.cpp); la visibilidad/colores
-    // se setean por frame en ToolbarSincronizar (contextual: historial vs controles del transform).
+    // se setean por frame en ToolbarSync (contextual: historial vs controles del transform).
     // Undo / Redo: SIEMPRE presentes (PC y tactil), primeros (izquierda) para que no se pierdan.
     // Flecha izquierda = deshacer (como el "atras" del navegador); derecha = rehacer.
     // (cuadrado = solo icono, ancho = alto: antes lo forzaba el layout de la toolbar a mano)
-    b = new Button("", (int)IconType::deshacer); b->rol = TBR_Undo; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
-    b = new Button("", (int)IconType::rehacer); b->rol = TBR_Redo; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
-    b = new Button("", (int)IconType::notifOk);    b->rol = TBR_Aceptar;  b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::undo); b->role = TBR_Undo; b->centered = true; b->square = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::redo); b->role = TBR_Redo; b->centered = true; b->square = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::notifOk);    b->role = TBR_Accept;  b->centered = true; ToolButtons.push_back(b);
     // "Repeat" (solo en extrude): acepta el extrude y vuelve a extruir la seleccion, sin buscar el boton Extrude.
-    b = new Button(T("Repeat")); b->rol = TBR_Repeat; b->centrado = true; ToolButtons.push_back(b);
-    b = new Button("", (int)IconType::notifError); b->rol = TBR_Cancelar; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button(T("Repeat")); b->role = TBR_Repeat; b->centered = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::notifError); b->role = TBR_Cancel; b->centered = true; ToolButtons.push_back(b);
     // modificadores TACTILES (Android/WebGL sin teclado): Shift y Ctrl. Toggle -> quedan encendidos (verde) y
     // togglean LShiftPressed/LCtrlPressed (multi-seleccion, shortest path). Solo visibles con pantalla tactil.
     // Van ANTES de orientacion/ejes: sino durante un transform quedaban al final y se salian de la pantalla.
-    b = new Button("Shift"); b->rol = TBR_Shift; b->centrado = true; ToolButtons.push_back(b);
-    b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("Shift"); b->role = TBR_Shift; b->centered = true; ToolButtons.push_back(b);
+    b = new Button("Ctrl");  b->role = TBR_Ctrl;  b->centered = true; ToolButtons.push_back(b);
     // "View" (toggle): en Edit Mode, con 1 dedo orbitar/panear/zoom aunque haya una operacion en curso.
-    b = new Button("", (int)IconType::monitor); b->rol = TBR_View; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b); // "vista": el mismo monitor del menu View de arriba
-    b = new Button("", (int)IconType::curve); b->rol = TBR_Proporcional; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b); // proportional editing: toggle de un click
-    b = new Button(T("Global")); b->rol = TBR_Orient; b->desplegable = true; ToolButtons.push_back(b);
-    b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
-    b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
-    b = new Button("Z"); b->rol = TBR_EjeZ; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::monitor); b->role = TBR_View; b->centered = true; b->square = true; ToolButtons.push_back(b); // "vista": el mismo monitor del menu View de arriba
+    b = new Button("", (int)IconType::curve); b->role = TBR_Proportional; b->centered = true; b->square = true; ToolButtons.push_back(b); // proportional editing: toggle de un click
+    b = new Button("", (int)IconType::snap); b->role = TBR_Snap; b->centered = true; b->square = true; b->help = "Snap"; ToolButtons.push_back(b); // el iman: toggle de un click
+    b = new Button(T("Global")); b->role = TBR_Orient; b->dropdown = true; ToolButtons.push_back(b);
+    // las opciones de INSERTAR CARAS y del BEVEL (solo mientras dura cada uno; prendidas = en verde)
+    b = new Button(T("Individual"));   b->role = TBR_InsetIndividual; b->centered = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(T("Boundary"));     b->role = TBR_InsetBoundary;   b->centered = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(T("Outset"));       b->role = TBR_InsetOutset;     b->centered = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(T("Depth"));        b->role = TBR_InsetDepth;      b->centered = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("-");               b->role = TBR_BevelSegLess;    b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("+");               b->role = TBR_BevelSegMore;    b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(T("Vertices"));     b->role = TBR_BevelVertices;   b->centered = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("X"); b->role = TBR_AxisX; b->centered = true; b->square = true; ToolButtons.push_back(b);
+    b = new Button("Y"); b->role = TBR_AxisY; b->centered = true; b->square = true; ToolButtons.push_back(b);
+    b = new Button("Z"); b->role = TBR_AxisZ; b->centered = true; b->square = true; ToolButtons.push_back(b);
     // PINCEL (modo Weight Paint): modo (+/-/=) y grupo activo. Los ROLES son los reservados en
-    // UVEditor.h (TBR_Pincel*/TBR_Grupo): la MISMA toolbar contextual que el UV en modo pintura.
-    // Textos por frame en ToolbarSincronizar (labels de WeightPaintLabels).
+    // UVEditor.h (TBR_Pincel*/TBR_Group): la MISMA toolbar contextual que el UV en modo pintura.
+    // Textos por frame en ToolbarSync (labels de WeightPaintLabels).
     // El RADIO y el VALOR no tienen boton: son la fila de barras deslizables de arriba de la
     // toolbar (ViewportBase::RenderBrushBar), que se arrastran sin abrir ningun desplegable.
-    b = new Button("+");     b->rol = TBR_PincelModo;   b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
-    b = new Button(T("Group")); b->rol = TBR_Grupo;        b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("+");     b->role = TBR_BrushMode;   b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(T("Group")); b->role = TBR_Group;        b->dropdown = true; b->visible = false; ToolButtons.push_back(b);
     // MARCAS: icono de malla. Prendido = se ven los cuadraditos pintables y el pincel trabaja
     // sobre ELLOS (al valor de la barra, sin falloff), no sobre la superficie.
-    b = new Button("", (int)IconType::mesh); b->rol = TBR_Marcas; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
-    b = new Button("", (int)IconType::selVertex); b->rol = TBR_PorVertice; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b); // vertex color: por vertice / por corner
+    b = new Button("", (int)IconType::mesh); b->role = TBR_Marks; b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::selVertex); b->role = TBR_PerVertex; b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b); // vertex color: por vertice / por corner
     // FALLOFF: abre el editor (lista de presets + curva custom). El texto/icono del boton
     // muestran el falloff ACTIVO, asi se ve cual esta puesto sin abrir nada.
-    b = new Button(T("Smooth")); b->rol = TBR_Falloff; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(T("Smooth")); b->role = TBR_Falloff; b->dropdown = true; b->visible = false; ToolButtons.push_back(b);
     // VERTEX PAINT: el color del pincel, como cuadradito relleno (el boton se tinta con el color
     // vivo). Lo abre el ColorPicker de siempre -> color libre o color de PALETA por indice.
-    b = new Button(""); b->rol = TBR_ColorPincel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(""); b->role = TBR_ColorBrush; b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b);
     // "editar solo lo seleccionado" (mascara de pintura): toggle GLOBAL compartido con la
-    // toolbar del UV editor (WeightPaintSoloSel); icono de seleccion, tinte accent = ON
-    b = new Button("", (int)IconType::seleccion); b->rol = TBR_SoloSel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    // toolbar del UV editor (WeightPaintOnlySel); icono de seleccion, tinte accent = ON
+    b = new Button("", (int)IconType::selection); b->role = TBR_OnlySel; b->centered = true; b->square = true; b->visible = false; ToolButtons.push_back(b);
     for (int i = 0; i < 8; i++){ // historial de acciones (MRU, hasta 8)
-        b = new Button(""); b->rol = TBR_Hist + i; b->visible = false; ToolButtons.push_back(b);
+        b = new Button(""); b->role = TBR_Hist + i; b->visible = false; ToolButtons.push_back(b);
     }
     if (!MenuAdd){
         // el menu Add es DECLARATIVO: la lista de items (texto/icono/accion) vive en una tabla en LayoutInput
-        // (LayoutConstruirMenuAdd). Aca solo se crean los objetos-menu; el contenido lo pone el builder.
+        // (LayoutBuildMenuAdd). Aca solo se crean los objetos-menu; el contenido lo pone el builder.
         MenuAdd = new PopupMenu();
         MenuImports = new PopupMenu();
-        MenuMallas = new PopupMenu();
+        MenuMeshes = new PopupMenu();
         MenuPrefabsAdd = new PopupMenu();
-        MenuEscenasAdd = new PopupMenu();
+        MenuScenesAdd  = new PopupMenu();
         MenuCore = new PopupMenu();
-        MenuModificadores = new PopupMenu();
-        MenuLucesAdd = new PopupMenu();
-        extern void LayoutConstruirMenuAdd();
-        LayoutConstruirMenuAdd();
-        MenuAdd->titulo = T("Add");   // el boton es un icono sin texto -> el menu lleva titulo
+        MenuModifiers = new PopupMenu();
+        MenuLightsAdd = new PopupMenu();
+        extern void LayoutBuildMenuAdd();
+        LayoutBuildMenuAdd();
+        MenuAdd->title = T("Add");   // el boton es un icono sin texto -> el menu lleva titulo
     }
     if (!MenuSelect){
         MenuSelect = new PopupMenu();
-        MenuSelect->titulo = T("Select");   // el boton es un icono sin texto -> el menu lleva titulo
-        MenuSelect->Agregar(T("All"), 0)->atajo = "@3d.seleccionarTodo";
-        MenuSelect->Agregar(T("None"), 1)->atajo = "@3d.deseleccionar";
-        MenuSelect->Agregar(T("Invert"), 2)->atajo = "@3d.invertir";
+        MenuSelect->title = T("Select");   // el boton es un icono sin texto -> el menu lleva titulo
+        MenuSelect->Add(T("All"), 0)->shortcut = "@3d.seleccionarTodo";
+        MenuSelect->Add(T("None"), 1)->shortcut = "@3d.deseleccionar";
+        MenuSelect->Add(T("Invert"), 2)->shortcut = "@3d.invertir";
     }
     if (!MenuObject){
         // submenu Transform (Move/Rotate/Scale = G/R/S)
         MenuTransform = new PopupMenu();
-        MenuTransform->Agregar(T("Move"), 100)->atajo = "@3d.mover";
-        MenuTransform->Agregar(T("Rotate"), 101)->atajo = "@3d.rotar";
-        MenuTransform->Agregar(T("Scale"), 102)->atajo = "@3d.escalar";
+        MenuTransform->Add(T("Move"), 100)->shortcut = "@3d.mover";
+        MenuTransform->Add(T("Rotate"), 101)->shortcut = "@3d.rotar";
+        MenuTransform->Add(T("Scale"), 102)->shortcut = "@3d.escalar";
         // submenu Set Origin (mueve el origen y/o la geometria)
         MenuSetOrigin = new PopupMenu();
-        MenuSetOrigin->Agregar(T("Geometry to Origin"), 200);
-        MenuSetOrigin->Agregar(T("Origin to Geometry"), 201);
-        MenuSetOrigin->Agregar(T("Origin to 3D Cursor"), 202);
+        MenuSetOrigin->Add(T("Geometry to Origin"), 200);
+        MenuSetOrigin->Add(T("Origin to Geometry"), 201);
+        MenuSetOrigin->Add(T("Origin to 3D Cursor"), 202);
         // "Clear Original File": borra Mesh::origen (el .obj/.fbx del que se importo). Es lo
-        // UNICO que apaga el aviso "N archivo(s) externo(s) NO estan" cuando el usuario movio
+        // UNICO que apaga el aviso "N file(s) external(s) NO estan" cuando el usuario movio
         // o borro ese archivo; la geometria no se toca (viaja horneada en el .w3dm). Va aca,
-        // en el submenu que ya habla del origen del objeto. Ver OlvidarOrigenSeleccionadas.
-        MenuSetOrigin->Agregar(T("Clear Original File"), 203);
-        // submenu Apply (Ctrl A): hornea el transform en la malla (ids 220-223 -> LayoutAccionObject -> AplicarTransform)
+        // en el submenu que ya habla del origen del objeto. Ver ForgetOriginSelected.
+        MenuSetOrigin->Add(T("Clear Original File"), 203);
+        // submenu Apply (Ctrl A): hornea el transform en la malla (ids 220-223 -> LayoutActionObject -> ApplyTransform)
         MenuApply = new PopupMenu();
-        MenuApply->titulo = T("Apply"); // titulo visible tambien cuando se abre standalone con Ctrl+A
-        MenuApply->Agregar(T("Location"), 220);
-        MenuApply->Agregar(T("Rotation"), 221);
-        MenuApply->Agregar(T("Scale"), 222);
-        MenuApply->Agregar(T("All Transforms"), 223);
+        MenuApply->title = T("Apply"); // titulo visible tambien cuando se abre standalone con Ctrl+A
+        MenuApply->Add(T("Location"), 220);
+        MenuApply->Add(T("Rotation"), 221);
+        MenuApply->Add(T("Scale"), 222);
+        MenuApply->Add(T("All Transforms"), 223);
         // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
         // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
         // decia el texto, NO lleva: repetirlo es ruido.
-        MenuObject = new PopupMenu(); MenuObject->titulo = T("Object");
-        MenuObject->Agregar(T("Transform"), 0, -1, MenuTransform);    // abre submenu
-        MenuObject->Agregar(T("Set Origin"), 4, -1, MenuSetOrigin);  // abre submenu
-        MenuObject->Agregar(T("Apply"), 6, -1, MenuApply)->atajo = "@3d.aplicar"; // submenu Location/Rotation/Scale/All
+        MenuObject = new PopupMenu(); MenuObject->title = T("Object");
+        MenuObject->Add(T("Transform"), 0, -1, MenuTransform);    // abre submenu
+        MenuObject->Add(T("Set Origin"), 4, -1, MenuSetOrigin);  // abre submenu
+        MenuObject->Add(T("Apply"), 6, -1, MenuApply)->shortcut = "@3d.aplicar"; // submenu Location/Rotation/Scale/All
         // IMAN (Shift+S): el cursor 3D a lo seleccionado / al origen, lo seleccionado al cursor... En Modo Objeto solo
         // se abria con el atajo: en pantallas tactiles y en el N95 no habia forma de mover el cursor 3D. Sus opciones
-        // se ejecutan en el propio submenu (AccionSnap): los ids 0-7 no chocan con los de este menu.
-        { extern PopupMenu* LayoutSubmenuSnap(); MenuObject->Agregar(T("Snap"), 8, -1, LayoutSubmenuSnap())->atajo = "@global.menuSnap"; }
-        // CORTAR / COPIAR / PEGAR (tambien entre ventanas de Whisk3D: LayoutObjetosCopiar), separados con una linea
-        MenuObject->Agregar(T("Cut"), 720, IconType::tijera)->atajo = "Ctrl+X";
-        MenuObject->Agregar(T("Copy"), 721, IconType::copiar)->atajo = "Ctrl+C";
-        MenuObject->Agregar(T("Paste"), 722, IconType::pegar)->atajo = "Ctrl+V";
-        MenuObject->Agregar(T("Duplicate Objects"), 1)->atajo = "@3d.duplicar";
-        MenuObject->items[MenuObject->items.size() - 1]->lineaArriba = true;
-        MenuObject->Agregar(T("Duplicate Linked"), 2)->atajo = "@3d.instancia";
-        MenuObject->Agregar(T("Join"), 5)->atajo = "@3d.unir"; // une las mallas seleccionadas en el objeto activo
+        // se ejecutan en el propio submenu (ActionSnap): los ids 0-7 no chocan con los de este menu.
+        { extern PopupMenu* LayoutSubmenuSnap(); MenuObject->Add(T("Snap"), 8, -1, LayoutSubmenuSnap())->shortcut = "@global.menuSnap"; }
+        // CORTAR / COPIAR / PEGAR (tambien entre ventanas de Whisk3D: LayoutObjectsCopy), separados con una linea
+        MenuObject->Add(T("Cut"), 720, IconType::scissors)->shortcut = "Ctrl+X";
+        MenuObject->Add(T("Copy"), 721, IconType::copy)->shortcut = "Ctrl+C";
+        MenuObject->Add(T("Paste"), 722, IconType::paste)->shortcut = "Ctrl+V";
+        MenuObject->Add(T("Duplicate Objects"), 1)->shortcut = "@3d.duplicar";
+        MenuObject->items[MenuObject->items.size() - 1]->lineUp = true;
+        MenuObject->Add(T("Duplicate Linked"), 2)->shortcut = "@3d.instancia";
+        MenuObject->Add(T("Join"), 5)->shortcut = "@3d.unir"; // une las mallas seleccionadas en el objeto activo
         // Set/Clear Parent (Ctrl P / Alt P): submenus construidos en LayoutInput.cpp (reusan los mismos que
         // los atajos). Solo aparecen aca -> solo en Object Mode (MenuObject no se muestra en Edit).
-        MenuObject->Agregar(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->atajo = "@global.emparentar";
-        MenuObject->Agregar(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->atajo = "@global.desemparentar";
-        MenuObject->Agregar(T("Delete"), 3, IconType::borrar)->atajo = "@3d.borrar";
+        MenuObject->Add(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->shortcut = "@global.emparentar";
+        MenuObject->Add(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->shortcut = "@global.desemparentar";
+        MenuObject->Add(T("Delete"), 3, IconType::trash)->shortcut = "@3d.borrar";
         // PREFABS (io/PrefabsEditor.h): lo elegido pasa a un prefab nuevo (queda una instancia) / la instancia
         // activa se desempaqueta en objetos comunes
-        MenuObject->Agregar(T("Create Prefab"), 700, IconType::prefab);
-        MenuObject->Agregar(T("Unpack Prefab"), 701, IconType::prefab);
+        MenuObject->Add(T("Create Prefab"), 700, IconType::prefab);
+        MenuObject->Add(T("Unpack Prefab"), 701, IconType::prefab);
         // menu "Animation" (barra, Object Mode): keyframes del TRANSFORM del objeto + Motion Trail. Antes era un
         // SUBMENU de "Object"; es su propio menu de la barra (queda a un click, no a dos).
         // SUBMENU de canales de Insert Keyframe (compartido por el menu Animation, el menu Pose, el
         // menu Animation del UV y la tecla I). Los ids 530-533 burbujean hasta la action del menu
-        // TOP (PopupMenu::Click) -> los despacha el mismo LayoutAccionObject, sin plomeria nueva.
+        // TOP (PopupMenu::Click) -> los despacha el mismo LayoutActionObject, sin plomeria nueva.
         // Se aplica a OBJETOS y a POSES de huesos (3D y 2D); en vertices/UV ni se abre.
         extern PopupMenu* MenuInsertKey;
-        MenuInsertKey = new PopupMenu(); MenuInsertKey->titulo = T("Insert Keyframe");
+        MenuInsertKey = new PopupMenu(); MenuInsertKey->title = T("Insert Keyframe");
         // su accion DESDE YA: un submenu ejecuta con la suya (PopupMenu::Enter / Click). Antes se ponia recien al
         // abrirlo con la tecla I -> entrando por el menu Animation (el N95, sin la I) elegir "All" no hacia nada
-        { extern void LayoutAccionObject(int); MenuInsertKey->action = LayoutAccionObject; }
-        MenuInsertKey->Agregar(T("All"), 530, IconType::keyframe);  // localizacion + rotacion + escala
-        MenuInsertKey->Agregar(T("Location Only"), 531);
-        MenuInsertKey->Agregar(T("Rotation Only"), 532);
-        MenuInsertKey->Agregar(T("Scale Only"), 533);
+        { extern void LayoutActionObject(int); MenuInsertKey->action = LayoutActionObject; }
+        MenuInsertKey->Add(T("All"), 530, IconType::keyframe);  // localizacion + rotacion + escala
+        MenuInsertKey->Add(T("Location Only"), 531);
+        MenuInsertKey->Add(T("Rotation Only"), 532);
+        MenuInsertKey->Add(T("Scale Only"), 533);
         MenuAnimation = new PopupMenu();
-        MenuAnimation->titulo = T("Animation");   // el boton es un icono sin texto -> el menu lleva titulo
+        MenuAnimation->title = T("Animation");   // el boton es un icono sin texto -> el menu lleva titulo
         // KEYFRAMES DE LA MALLA: "vertex animation", "normal animation" y "animar los UV" son la MISMA
         // animacion con capas distintas. Este submenu deja elegir cual capturar en vez de dejar que la
         // decida el editor desde el que insertaste (que es el default y sigue estando).
-        MenuKeyMalla = new PopupMenu();
-        { extern void LayoutAccionObject(int); MenuKeyMalla->action = LayoutAccionObject; }   // (ids 540-542: ver MenuInsertKey)
-        MenuKeyMalla->Agregar(T("Vertices"), 540, IconType::mesh);
-        MenuKeyMalla->Agregar(T("Normals"),  541, IconType::normalVertex);
-        MenuKeyMalla->Agregar(T("UV"),       542, IconType::textura);
-        MenuBorrarCapaMalla = new PopupMenu();
-        { extern void LayoutAccionObject(int); MenuBorrarCapaMalla->action = LayoutAccionObject; }   // (ids 550-552)
-        MenuBorrarCapaMalla->Agregar(T("Vertices"), 550, IconType::mesh);
-        MenuBorrarCapaMalla->Agregar(T("Normals"),  551, IconType::normalVertex);
-        MenuBorrarCapaMalla->Agregar(T("UV"),       552, IconType::textura);
-        MenuAnimationArmar();   // (se vuelve a armar cada vez que se abre: depende del modo y del objeto activo)
+        MenuKeyMesh = new PopupMenu();
+        { extern void LayoutActionObject(int); MenuKeyMesh->action = LayoutActionObject; }   // (ids 540-542: ver MenuInsertKey)
+        MenuKeyMesh->Add(T("Vertices"), 540, IconType::mesh);
+        MenuKeyMesh->Add(T("Normals"),  541, IconType::normalVertex);
+        MenuKeyMesh->Add(T("UV"),       542, IconType::texture);
+        MenuDeleteLayerMesh = new PopupMenu();
+        { extern void LayoutActionObject(int); MenuDeleteLayerMesh->action = LayoutActionObject; }   // (ids 550-552)
+        MenuDeleteLayerMesh->Add(T("Vertices"), 550, IconType::mesh);
+        MenuDeleteLayerMesh->Add(T("Normals"),  551, IconType::normalVertex);
+        MenuDeleteLayerMesh->Add(T("UV"),       552, IconType::texture);
+        MenuAnimationBuild();   // (se vuelve a armar cada vez que se abre: depende del modo y del objeto activo)
         // menu "Pose" (Pose Mode): Insert Keyframe + submenu Transform (Move/Rotate/Scale). Reusa MenuTransform.
         extern PopupMenu* MenuPose;
         // (regla de los titulos: el boton de contexto es un icono sin texto -> su menu lleva titulo)
-        MenuPose = new PopupMenu(); MenuPose->titulo = T("Pose");
-        MenuPose->Agregar(T("Insert Keyframe"), 500, IconType::armature, MenuInsertKey)->atajo = "@3d.keyframe"; // submenu de canales
-        MenuPose->Agregar(T("Transform"), 0, -1, MenuTransform); // Move(G)/Rotate(R)/Scale(S) -> ids 100/101/102
+        MenuPose = new PopupMenu(); MenuPose->title = T("Pose");
+        MenuPose->Add(T("Insert Keyframe"), 500, IconType::armature, MenuInsertKey)->shortcut = "@3d.keyframe"; // submenu de canales
+        MenuPose->Add(T("Transform"), 0, -1, MenuTransform); // Move(G)/Rotate(R)/Scale(S) -> ids 100/101/102
         // Clear Transform: resetea la pose de los huesos SELECCIONADOS a rest. All (T+R+S) / Translation / Rotation / Scale.
         static PopupMenu* MenuClearPose = NULL;
         MenuClearPose = new PopupMenu();
-        { extern void LayoutAccionObject(int); MenuClearPose->action = LayoutAccionObject; }   // (ids 520-523: ver MenuInsertKey)
-        MenuClearPose->Agregar(T("All"), 520, IconType::armature);          // T+R+S -> PoseClearTransform(0)
-        MenuClearPose->Agregar(T("Translation"), 521)->atajo = "@3d.limpiarPos";     // PoseClearTransform(1)
-        MenuClearPose->Agregar(T("Rotation"), 522)->atajo = "@3d.limpiarRot";        // PoseClearTransform(2)
-        MenuClearPose->Agregar(T("Scale"), 523)->atajo = "@3d.limpiarEsc";           // PoseClearTransform(3)
-        MenuPose->Agregar(T("Clear Transform"), 0, -1, MenuClearPose);
+        { extern void LayoutActionObject(int); MenuClearPose->action = LayoutActionObject; }   // (ids 520-523: ver MenuInsertKey)
+        MenuClearPose->Add(T("All"), 520, IconType::armature);          // T+R+S -> PoseClearTransform(0)
+        MenuClearPose->Add(T("Translation"), 521)->shortcut = "@3d.limpiarPos";     // PoseClearTransform(1)
+        MenuClearPose->Add(T("Rotation"), 522)->shortcut = "@3d.limpiarRot";        // PoseClearTransform(2)
+        MenuClearPose->Add(T("Scale"), 523)->shortcut = "@3d.limpiarEsc";           // PoseClearTransform(3)
+        MenuPose->Add(T("Clear Transform"), 0, -1, MenuClearPose);
         // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
-        // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutAccionMesh) se asigna al abrirlo.
+        // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutActionMesh) se asigna al abrirlo.
         // submenu Transform de EDIT (como el de objeto pero + Shrink/Fatten, que solo tiene sentido en malla)
         static PopupMenu* MenuTransformEdit = NULL;
         MenuTransformEdit = new PopupMenu();
-        MenuTransformEdit->Agregar(T("Move"), 100)->atajo = "@3d.mover";
-        MenuTransformEdit->Agregar(T("Rotate"), 101)->atajo = "@3d.rotar";
-        MenuTransformEdit->Agregar(T("Scale"), 102)->atajo = "@3d.escalar";
-        MenuTransformEdit->Agregar(T("Shrink/Fatten"), 103)->atajo = "@3d.limpiarEsc"; // cada vert por su normal
+        MenuTransformEdit->Add(T("Move"), 100)->shortcut = "@3d.mover";
+        MenuTransformEdit->Add(T("Rotate"), 101)->shortcut = "@3d.rotar";
+        MenuTransformEdit->Add(T("Scale"), 102)->shortcut = "@3d.escalar";
+        MenuTransformEdit->Add(T("Shrink/Fatten"), 103)->shortcut = "@3d.limpiarEsc"; // cada vert por su normal
         MenuMesh = new PopupMenu();
-        MenuMesh->titulo = T("Mesh");
-        MenuMesh->Agregar(T("Transform"), 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
-        MenuMesh->Agregar(T("Vertex"), 0, -1, LayoutSubmenuEditVertex());   // los de W, los tres (como las barras de Blender)
-        MenuMesh->Agregar(T("Edge"), 0, -1, LayoutSubmenuEditEdge());
-        MenuMesh->Agregar(T("Face"), 0, -1, LayoutSubmenuEditFace());
-        MenuMesh->Agregar(T("Duplicate"), 314)->atajo = "@3d.duplicar";          // comun a vertice/borde/cara
-        MenuMesh->Agregar(T("Separate"), 316)->atajo = "@3d.separar";                 // caras selec -> mesh NUEVO
-        MenuMesh->Agregar(T("Merge"), 0, -1, LayoutSubmenuMerge())->atajo = "@3d.merge"; // suelda verts (limpia duplicados)
+        MenuMesh->title = T("Mesh");
+        MenuMesh->Add(T("Transform"), 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
+        MenuMesh->Add(T("Vertex"), 0, -1, LayoutSubmenuEditVertex());   // los de W, los tres (como las barras de Blender)
+        MenuMesh->Add(T("Edge"), 0, -1, LayoutSubmenuEditEdge());
+        MenuMesh->Add(T("Face"), 0, -1, LayoutSubmenuEditFace());
+        MenuMesh->Add(T("Duplicate"), 314)->shortcut = "@3d.duplicar";          // comun a vertice/borde/cara
+        MenuMesh->Add(T("Separate"), 316)->shortcut = "@3d.separar";                 // caras selec -> mesh NUEVO
+        MenuMesh->Add(T("Merge"), 0, -1, LayoutSubmenuMerge())->shortcut = "@3d.merge"; // suelda verts (limpia duplicados)
         // Auto Merge (opt-in, OFF por defecto): al confirmar un move suelda los verts movidos con los que queden
-        // a <= Threshold. Con el auto merge apagado, "Threshold" se ve en gris (->gris = &g_autoMerge).
-        // ids 390/391: fuera del rango 0-7 (que LayoutAccionMesh rutea a Snap) y sin caso en LayoutAccionObject
+        // a <= Threshold. Con el auto merge apagado, "Threshold" se ve en gris (->gray = &g_autoMerge).
+        // ids 390/391: fuera del rango 0-7 (que LayoutActionMesh rutea a Snap) y sin caso en LayoutActionObject
         // (no-op). El toggle del check y el set del slider los hace el propio item; la accion no tiene que hacer nada.
-        MenuMesh->AgregarCheck(T("Auto Merge"), 390, &g_autoMerge);
-        MenuMesh->AgregarFloat(T("Threshold"), 391, &g_autoMergeThreshold, 0.0f, 0.1f)->gris = &g_autoMerge;
-        MenuMesh->Agregar(T("Normals"), 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
-        MenuMesh->Agregar(T("Snap"), 0, -1, LayoutSubmenuSnap())->atajo = "@global.menuSnap";
-        MenuMesh->Agregar(T("Delete"), 360, -1, LayoutSubmenuDelete())->atajo = "@3d.borrar"; // abajo de todo
+        MenuMesh->AddCheck(T("Auto Merge"), 390, &g_autoMerge);
+        MenuMesh->AddFloat(T("Threshold"), 391, &g_autoMergeThreshold, 0.0f, 0.1f)->gray = &g_autoMerge;
+        MenuMesh->Add(T("Normals"), 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
+        MenuMesh->Add(T("Snap"), 0, -1, LayoutSubmenuSnap())->shortcut = "@global.menuSnap";
+        MenuMesh->Add(T("Delete"), 360, -1, LayoutSubmenuDelete())->shortcut = "@3d.borrar"; // abajo de todo
     }
     if (!MenuView){
         // boton "View" (antes de Select): submenu Viewpoint con los 7 puntos de vista (mismos atajos del numpad).
-        // ids 400-406 -> LayoutAccionView -> Viewport3DActive->SetViewpoint(...). Antes eran atajos "ocultos".
+        // ids 400-406 -> LayoutActionView -> Viewport3DActive->SetViewpoint(...). Antes eran atajos "ocultos".
         MenuViewpoint = new PopupMenu();
-        MenuViewpoint->Agregar(T("Camera"), 400)->atajo = "@3d.vistaCamara";
-        MenuViewpoint->Agregar(T("Top"),    401)->atajo = "@3d.vistaArriba";
-        MenuViewpoint->Agregar(T("Bottom"), 402)->atajo = "@3d.vistaAbajo";
-        MenuViewpoint->Agregar(T("Front"),  403)->atajo = "@3d.vistaFrente";
-        MenuViewpoint->Agregar(T("Back"),   404)->atajo = "@3d.vistaAtras";
-        MenuViewpoint->Agregar(T("Right"),  405)->atajo = "@3d.vistaDerecha";
-        MenuViewpoint->Agregar(T("Left"),   406)->atajo = "@3d.vistaIzquierda";
+        MenuViewpoint->Add(T("Camera"), 400)->shortcut = "@3d.vistaCamara";
+        MenuViewpoint->Add(T("Top"),    401)->shortcut = "@3d.vistaArriba";
+        MenuViewpoint->Add(T("Bottom"), 402)->shortcut = "@3d.vistaAbajo";
+        MenuViewpoint->Add(T("Front"),  403)->shortcut = "@3d.vistaFrente";
+        MenuViewpoint->Add(T("Back"),   404)->shortcut = "@3d.vistaAtras";
+        MenuViewpoint->Add(T("Right"),  405)->shortcut = "@3d.vistaDerecha";
+        MenuViewpoint->Add(T("Left"),   406)->shortcut = "@3d.vistaIzquierda";
         // submenu Cameras: setear el objeto activo como camara / ver desde la camara activa
         MenuCameras = new PopupMenu();
-        MenuCameras->Agregar(T("Set Active Object as Camera"), 410)->atajo = "@3d.camaraActiva";
-        MenuCameras->Agregar(T("Active Camera"),               411)->atajo = "@3d.vistaCamara";
+        MenuCameras->Add(T("Set Active Object as Camera"), 410)->shortcut = "@3d.camaraActiva";
+        MenuCameras->Add(T("Active Camera"),               411)->shortcut = "@3d.vistaCamara";
         // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
         // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
         // decia el texto, NO lleva: repetirlo es ruido. El boton View ahora es un icono -> titulo.
-        MenuView = new PopupMenu(); MenuView->titulo = T("View");
-        MenuView->Agregar(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint)
-        MenuView->Agregar(T("Viewpoint"), 0, -1, MenuViewpoint); // abre submenu
-        MenuView->Agregar(T("Frame Selected"), 420)->atajo = "@3d.encuadrar"; // enfocar la seleccion (EnfocarObject)
-        MenuItemLocalView = MenuView->Agregar(T("Local View"), 422); // aisla la seleccion en ESTE viewport (tilde = activo)
-        MenuItemLocalView->atajo = "@3d.vistaLocal";
-        MenuView->Agregar(T("Perspective/Ortho"), 407)->atajo = "@3d.perspectiva"; // alterna perspectiva/ortografica
+        MenuView = new PopupMenu(); MenuView->title = T("View");
+        MenuView->Add(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint)
+        MenuView->Add(T("Viewpoint"), 0, -1, MenuViewpoint); // abre submenu
+        MenuView->Add(T("Frame Selected"), 420)->shortcut = "@3d.encuadrar"; // enfocar la seleccion (FocusObject)
+        MenuItemLocalView = MenuView->Add(T("Local View"), 422); // aisla la seleccion en ESTE viewport (tilde = activo)
+        MenuItemLocalView->shortcut = "@3d.vistaLocal";
+        MenuView->Add(T("Perspective/Ortho"), 407)->shortcut = "@3d.perspectiva"; // alterna perspectiva/ortografica
         // Lock Orbit: item REGULAR (no checkbox) -> al tocarlo togglea Y CIERRA el menu. El
         // tilde (verde) se refresca al abrir el menu, con el estado del viewport activo (LayoutInput).
-        MenuItemLockOrbit = MenuView->Agregar(T("Lock Orbit"), 421);
-        MenuItemLockOrbit->atajo = "@tel:9";   // solo el keypad del N95 tiene tecla para esto
+        MenuItemLockOrbit = MenuView->Add(T("Lock Orbit"), 421);
+        MenuItemLockOrbit->shortcut = "@tel:9";   // solo el keypad del N95 tiene tecla para esto
         // el CANDADO de la vista de camara tambien desde el menu: en el N95 sin mouse no hay como tocarlo
-        MenuItemCamaraBloqueada = MenuView->Agregar(T("Lock the camera to the view"), 423);
+        MenuItemLockedCamera = MenuView->Add(T("Lock the camera to the view"), 423);
     }
     if (!MenuRender){
         // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
         // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
         // decia el texto, NO lleva: repetirlo es ruido.
-        MenuRender = new PopupMenu(); MenuRender->titulo = T("Render");
-        MenuRender->Agregar(T("Render Preview"), 0);
-        MenuRender->Agregar(T("Material Preview"), 1);
-        MenuRender->Agregar(T("Solid Preview"), 2);
-        MenuRender->Agregar(T("Wireframe Preview"), 3);
-        MenuRender->Agregar(T("ZBuffer Preview"), 4);
-        MenuRender->Agregar(T("Normal View"), 5); // simula normal map con 3 luces R/G/B
-        MenuRender->Agregar(T("Alpha Preview"), 6); // matte blanco/negro por alpha (debug del pase alpha)
-        MenuRender->Agregar(T("Motion vectors"), 8); // lo que se mueve cada pixel desde el cuadro anterior
+        MenuRender = new PopupMenu(); MenuRender->title = T("Render");
+        MenuRender->Add(T("Render Preview"), 0);
+        MenuRender->Add(T("Material Preview"), 1);
+        MenuRender->Add(T("Solid Preview"), 2);
+        MenuRender->Add(T("Wireframe Preview"), 3);
+        MenuRender->Add(T("ZBuffer Preview"), 4);
+        MenuRender->Add(T("Normal View"), 5); // simula normal map con 3 luces R/G/B
+        MenuRender->Add(T("Alpha Preview"), 6); // matte blanco/negro por alpha (debug del pase alpha)
+        MenuRender->Add(T("Motion vectors"), 8); // lo que se mueve cada pixel desde el cuadro anterior
         // wireframe SOLO de lo que se dibuja (default ON): con visibilidad por
         // triangulo activa (modificador Culling) el alambre muestra la lista
         // ACTIVA de la celda, no todas las aristas. El flag es global del Core
         // (w3dGraphics.h): el checkbox lo togglea directo.
-        MenuRender->AgregarCheck(T("Wireframe: Only Visible"), 7, &w3dRenderWireframeSoloVisible);
+        MenuRender->AddCheck(T("Wireframe: Only Visible"), 7, &w3dRenderWireframeOnlyVisible);
     }
     if (!MenuOrient){
         // orientacion usada al constrenir a un eje (X/Y/Z) y por el extrude. Default Global.
         MenuOrient = new PopupMenu();
-        MenuOrient->titulo = T("Transform Orientations");
-        MenuOrient->Agregar(T("Global"), 0);
-        MenuOrient->Agregar(T("Local"), 1);
-        MenuOrient->Agregar(T("Normal"), 3); // = la direccion de la normal (lo que hace el extrude)
-        MenuOrient->Agregar(T("View"), 2);
+        MenuOrient->title = T("Transform Orientations");
+        MenuOrient->Add(T("Global"), 0);
+        MenuOrient->Add(T("Local"), 1);
+        MenuOrient->Add(T("Normal"), 3); // = la direccion de la normal (lo que hace el extrude)
+        MenuOrient->Add(T("View"), 2);
     }
     if (!MenuMode){
         // modo del objeto activo (solo malla). Edit y los Paint todavia no
         // hacen nada: dejamos la opcion para mas adelante.
         MenuMode = new PopupMenu();
-        MenuMode->Agregar(T("Object Mode"), 0, IconType::object); // icono de objeto
-        MenuMode->Agregar(T("Edit Mode"), 1, IconType::mesh);     // icono de malla 3d
-        MenuMode->Agregar(T("Vertex Paint"), 2, IconType::mesh);
-        MenuMode->Agregar(T("Weight Paint"), 3, IconType::mesh);
-        MenuMode->Agregar(T("Texture Paint"), 4, IconType::mesh);
+        MenuMode->Add(T("Object Mode"), 0, IconType::object); // icono de objeto
+        MenuMode->Add(T("Edit Mode"), 1, IconType::mesh);     // icono de malla 3d
+        MenuMode->Add(T("Vertex Paint"), 2, IconType::mesh);
+        MenuMode->Add(T("Weight Paint"), 3, IconType::mesh);
+        MenuMode->Add(T("Texture Paint"), 4, IconType::mesh);
     }
     if (!MenuSelMode){
         // sub-elemento de Edit Mode (la seleccion -todo/nada/invertir- y el render
         // se refieren a esto). Vertex es el default.
         MenuSelMode = new PopupMenu();
-        MenuSelMode->Agregar(T("Vertex"), SelVertex, IconType::selVertex);
-        MenuSelMode->Agregar(T("Edge"),   SelEdge,   IconType::selEdge);
+        MenuSelMode->Add(T("Vertex"), SelVertex, IconType::selVertex);
+        MenuSelMode->Add(T("Edge"),   SelEdge,   IconType::selEdge);
         // Face se DESHABILITA (gris) editando una malla sin caras (un path/riel)
-        { extern bool g_selFaceDisponible;
-          MenuSelMode->Agregar(T("Face"), SelFace, IconType::selFace)->gris = &g_selFaceDisponible; }
+        { extern bool g_selFaceAvailable;
+          MenuSelMode->Add(T("Face"), SelFace, IconType::selFace)->gray = &g_selFaceAvailable; }
     }
     // (eran inicializadores de clase: C++03)
     orthographic = false;
     ViewFromCameraActive = false;
     camFrameOn = false; camFrameNX = 1.0f; camFrameNY = 1.0f; camFrameLetterbox = false;
-    letterboxNegro = false;   // editor: bandas ATENUADAS por default (auditar el culling)
-    statTrisFrame = 0; statDrawsFrame = 0; statBindsFrame = 0; statEstadosFrame = 0; statOtrasFrame = 0;
+    letterboxBlack = false;   // editor: bandas ATENUADAS por default (auditar el culling)
+    statTrisFrame = 0; statDrawsFrame = 0; statBindsFrame = 0; statStatesFrame = 0; statOtherFrame = 0;
     camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f;
     hudX0 = 0.0f; hudY0 = 0.0f; hudW = 0.0f; hudH = 0.0f; hudEsc = 1.0f; // aun sin HUD dibujado
     hudOverride = false;
     showOverlays = true;
-    soloEscena = false;
+    onlyScene = false;
     // stats por-viewport apagados por defecto (igual que los globales viejos; --stats o el menu los prende)
     OverlayFps = false; OverlayStatVertices = false; OverlayStatFaces = false;
     OverlayStatGL = false; OverlayStatModgen = false; OverlayStatTimes = false;
@@ -518,21 +527,21 @@ Viewport3D::Viewport3D(Vector3 pos){
     showLights = true;
     showCamera = true;
     showEmpty = true;
-    showSonidos = true;
-    showParticulas = true;   // los emisores de particulas SE VEN (al dar Play, JuegoPrepararViewports apaga los overlays)
-    showCurvas = true;       // las curvas/rieles se ven por defecto; el checkbox permite ocultarlas
-    showHitbox = true;       // el alambre de los hitbox (sin apagar los demas overlays ni el hitbox)
+    showSounds = true;
+    showParticles = true;   // los emisores de particulas SE VEN (al dar Play, GamePrepareViewports apaga los overlays)
+    showCurves = true;      // las curvas/rieles se ven por defecto; el checkbox permite ocultarlas
+    showHitbox = true;      // el alambre de los hitbox (sin apagar los demas overlays ni el hitbox)
     show3DCursor = true;
-    ShowRelantionshipsLines = true;
-    limpiarPantalla = true;
+    ShowRelationshipsLines = true;
+    clearScreen = true;
     lockOrbit = false; // por defecto se orbita normal; el usuario lo activa para modo tablero 2D
-    localViewActivo = false;   // local view ("/") apagado
-    lvNacidos = 0;
+    localViewActive = false;   // local view ("/") apagado
+    lvSpawned = 0;
     view = RenderType::MaterialPreview;
     nearClip = 0.01f;
     farClip = 1000.0f;
     aspect = 1.0f;
-    bgSolido[0] = bgSolido[1] = bgSolido[2] = bgSolido[3] = -1.0f; // sentinel: usar el color del tema
+    bgSolid[0] = bgSolid[1] = bgSolid[2] = bgSolid[3] = -1.0f; // sentinel: usar el color del tema
     viewRot = Quaternion::FromEulerYXZ(-30.0f, -23.0f, 0.0f);
     orbitDistance = 10.0f;
 
@@ -542,80 +551,80 @@ Viewport3D::Viewport3D(Vector3 pos){
 Viewport3D::~Viewport3D() {
     // si este viewport era el dueno del lienzo del juego (modo juego con UI
     // dinamica), soltarlo: un override colgado apuntaria a un viewport muerto
-    UI2D_OverrideVentanaQuitar(this);
+    UI2D_OverrideWindowRemove(this);
     // idem el 3D ACTIVO: abrir un proyecto libera el layout anterior y cambiar el tipo de
     // un viewport lo borra. El primer render de un 3D vivo lo re-engancha (Render).
     if (Viewport3DActive == this) Viewport3DActive = NULL;
 };
 
-void Viewport3D::AbrirMenuOverlays(int x, int y){
+void Viewport3D::OpenMenuOverlays(int x, int y){
     if (!MenuOverlays){
         // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
         // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
         // decia el texto, NO lleva: repetirlo es ruido.
-        MenuOverlays = new PopupMenu(); MenuOverlays->titulo = T("Overlays");
+        MenuOverlays = new PopupMenu(); MenuOverlays->title = T("Overlays");
     }
     // se reconstruye en cada apertura apuntando a los flags de ESTE viewport
     // (cada instancia 3D tiene los suyos: split view = overlays independientes).
     // Sin titulo: el primer item ES el master "Show Overlays". Si esta off el
-    // resto se ve en gris (->gris = &showOverlays) porque sin overlay no se ven.
-    MenuOverlays->Limpiar();
-    MenuOverlays->AgregarCheck(T("Show Overlays"), 0, &showOverlays);
-    MenuOverlays->AgregarCheck(T("Floor"), 1, &showFloor)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck(T("X Axis"), 2, &showXaxis)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck(T("Y Axis"), 3, &showYaxis)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck(T("Origins"), 4, &showOrigins)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck(T("Gizmo"), 45, &g_gizmoOn)->gris = &showOverlays;   // el gizmo de mover (Symbian: OFF por defecto)
+    // resto se ve en gris (->gray = &showOverlays) porque sin overlay no se ven.
+    MenuOverlays->Clear();
+    MenuOverlays->AddCheck(T("Show Overlays"), 0, &showOverlays);
+    MenuOverlays->AddCheck(T("Floor"), 1, &showFloor)->gray = &showOverlays;
+    MenuOverlays->AddCheck(T("X Axis"), 2, &showXaxis)->gray = &showOverlays;
+    MenuOverlays->AddCheck(T("Y Axis"), 3, &showYaxis)->gray = &showOverlays;
+    MenuOverlays->AddCheck(T("Origins"), 4, &showOrigins)->gray = &showOverlays;
+    MenuOverlays->AddCheck(T("Gizmo"), 45, &g_gizmoOn)->gray = &showOverlays;   // el gizmo de mover (Symbian: OFF por defecto)
     // submenu "Objects": mostrar/ocultar el overlay de cada tipo de objeto (esqueleto / luces / camaras / empties)
     static PopupMenu* MenuOverlayObjects = NULL;
     if (!MenuOverlayObjects) MenuOverlayObjects = new PopupMenu(); // sin titulo (ya sabes que es al abrirlo)
-    MenuOverlayObjects->Limpiar();
-    MenuOverlayObjects->AgregarCheck(T("Armature"), 13, &showArmature, IconType::armature);
-    MenuOverlayObjects->AgregarCheck(T("Lights"),   14, &showLights,   IconType::light);
-    MenuOverlayObjects->AgregarCheck(T("Camera"),   15, &showCamera,   IconType::camera);
-    MenuOverlayObjects->AgregarCheck(T("Empty"),    16, &showEmpty,    IconType::empty);
-    MenuOverlayObjects->AgregarCheck(T("Particles"),17, &showParticulas, IconType::arrow);
-    MenuOverlayObjects->AgregarCheck(T("Curves"),   18, &showCurvas,   IconType::curve);
-    MenuOverlayObjects->AgregarCheck(T("Hitbox"),   19, &showHitbox,   IconType::hitbox);
-    MenuOverlayObjects->AgregarCheck(T("Sounds"),   20, &showSonidos,  IconType::sonido);
-    MenuOverlays->Agregar(T("Objects"), 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck(T("3D Cursor"), 5, &show3DCursor)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck(T("Relationship Lines"), 6, &ShowRelantionshipsLines)->gris = &showOverlays;
+    MenuOverlayObjects->Clear();
+    MenuOverlayObjects->AddCheck(T("Armature"), 13, &showArmature, IconType::armature);
+    MenuOverlayObjects->AddCheck(T("Lights"),   14, &showLights,   IconType::light);
+    MenuOverlayObjects->AddCheck(T("Camera"),   15, &showCamera,   IconType::camera);
+    MenuOverlayObjects->AddCheck(T("Empty"),    16, &showEmpty,    IconType::empty);
+    MenuOverlayObjects->AddCheck(T("Particles"),17, &showParticles, IconType::arrow);
+    MenuOverlayObjects->AddCheck(T("Curves"),   18, &showCurves,   IconType::curve);
+    MenuOverlayObjects->AddCheck(T("Hitbox"),   19, &showHitbox,   IconType::hitbox);
+    MenuOverlayObjects->AddCheck(T("Sounds"),   20, &showSounds,  IconType::sound);
+    MenuOverlays->Add(T("Objects"), 13, IconType::object, MenuOverlayObjects)->gray = &showOverlays;
+    MenuOverlays->AddCheck(T("3D Cursor"), 5, &show3DCursor)->gray = &showOverlays;
+    MenuOverlays->AddCheck(T("Relationship Lines"), 6, &ShowRelationshipsLines)->gray = &showOverlays;
     // submenu "Normals" (solo en meshes seleccionadas): 3 toggles + slider de tamano. Sin titulo (ya sabes que es al abrirlo).
     static PopupMenu* MenuOverlayNormals = NULL;
     if (!MenuOverlayNormals) MenuOverlayNormals = new PopupMenu();
-    MenuOverlayNormals->Limpiar();
-    MenuOverlayNormals->AgregarCheck(T("Vertex Normal"), 7, &OverlayVertexNormal, IconType::normalVertex);
-    MenuOverlayNormals->AgregarCheck(T("Custom Normal"), 8, &OverlayCustomNormal, IconType::normalCustom);
-    MenuOverlayNormals->AgregarCheck(T("Face Normal"),   9, &OverlayFaceNormal,   IconType::normalFace);
-    MenuOverlayNormals->AgregarFloat(T("Normal Size"),  10, &OverlayNormalSize, 0.0f, 1.0f);
-    MenuOverlays->Agregar(T("Normals"), 7, IconType::normalVertex, MenuOverlayNormals)->gris = &showOverlays;
+    MenuOverlayNormals->Clear();
+    MenuOverlayNormals->AddCheck(T("Vertex Normal"), 7, &OverlayVertexNormal, IconType::normalVertex);
+    MenuOverlayNormals->AddCheck(T("Custom Normal"), 8, &OverlayCustomNormal, IconType::normalCustom);
+    MenuOverlayNormals->AddCheck(T("Face Normal"),   9, &OverlayFaceNormal,   IconType::normalFace);
+    MenuOverlayNormals->AddFloat(T("Normal Size"),  10, &OverlayNormalSize, 0.0f, 1.0f);
+    MenuOverlays->Add(T("Normals"), 7, IconType::normalVertex, MenuOverlayNormals)->gray = &showOverlays;
     // submenu "Statistics": texto blanco arriba a la derecha del viewport. Cada linea es un toggle independiente. Sin titulo.
     static PopupMenu* MenuOverlayStats = NULL;
     if (!MenuOverlayStats) MenuOverlayStats = new PopupMenu();
-    MenuOverlayStats->Limpiar();
-    MenuOverlayStats->AgregarCheck(T("FPS"),      12, &OverlayFps);
-    MenuOverlayStats->AgregarCheck(T("Vertices"), 17, &OverlayStatVertices);
-    MenuOverlayStats->AgregarCheck(T("Faces"),    18, &OverlayStatFaces);
-    MenuOverlayStats->AgregarCheck(T("GL Calls"), 21, &OverlayStatGL); // llamadas GL por frame (draw/bind/estado)
-    MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
-    MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
-    MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
+    MenuOverlayStats->Clear();
+    MenuOverlayStats->AddCheck(T("FPS"),      12, &OverlayFps);
+    MenuOverlayStats->AddCheck(T("Vertices"), 17, &OverlayStatVertices);
+    MenuOverlayStats->AddCheck(T("Faces"),    18, &OverlayStatFaces);
+    MenuOverlayStats->AddCheck(T("GL Calls"), 21, &OverlayStatGL); // llamadas GL por frame (draw/bind/estado)
+    MenuOverlayStats->AddCheck("Modgen",   19, &OverlayStatModgen);
+    MenuOverlayStats->AddCheck(T("Times"),    20, &OverlayStatTimes);
+    MenuOverlays->Add(T("Statistics"), 11, -1, MenuOverlayStats)->gray = &showOverlays;
     // (aca estaba "Clear Screen": limpiar la pantalla ahora es PROGRAMABLE. Todo proyecto trae arriba de todo el
-    // "Clear color" en el constructor y, despues de el, la rutina "Limpiar pantalla" (Rutina.h, W3dRutinasPorDefecto): quitarla o
+    // "Clear color" en el constructor y, despues de el, la rutina "Limpiar pantalla" (Routine.h, W3dDefaultRoutines): quitarla o
     // apagarla = no limpiar, tambien en el editor (ver "QUIEN LIMPIA" en Render).)
     // X-Ray (retopologia): la malla EN EDICION se dibuja semitransparente (30%) sin z-test y sus bordes/vertices
     // siempre encima -> se ven y se pueden SELECCIONAR los verts/aristas de atras (los tapados por las caras).
     // Modo propio, NO se grisa con Show Overlays. Global (una sola malla en edicion a la vez).
-    MenuOverlays->AgregarCheck(T("X-Ray"), 14, &g_xray);
+    MenuOverlays->AddCheck(T("X-Ray"), 14, &g_xray);
     // Letterbox negro: con encuadre declarado + juego corriendo, las bandas de afuera
     // del marco se pintan OPACAS como en el dispositivo. OFF (default) = atenuadas,
     // para ver que hay afuera y auditar el culling. NO se grisa con Show Overlays
     // (es parte de la vista de juego, no un overlay de edicion).
-    MenuOverlays->AgregarCheck(T("Black Letterbox"), 15, &letterboxNegro);
+    MenuOverlays->AddCheck(T("Black Letterbox"), 15, &letterboxBlack);
     MenuOverlays->action = NULL; // el toggle lo hace el propio item (checkbox)
-    MenuOverlays->Abrir(x, y, MenuPantallaW, MenuPantallaH);
-    MenuAbierto = MenuOverlays;
+    MenuOverlays->Open(x, y, MenuScreenW, MenuScreenH);
+    OpenMenu = MenuOverlays;
 }
 
 void Viewport3D::event_mouse_wheel(float dy, int mx, int my) {
@@ -624,8 +633,8 @@ void Viewport3D::event_mouse_wheel(float dy, int mx, int my) {
     if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return;
     if (OnToolbar(mx, my)) { ToolbarScrollBy((int)(dy * 40)); return; } // barra de HERRAMIENTAS (abajo)
     // PROPORTIONAL EDITING: con un transform en curso la rueda cambia el RADIO de influencia, no el zoom
-    if (ProporcionalAplicable() && estado != editNavegacion) {
-        ProporcionalRadioEscalar(dy > 0 ? 1.1f : 1.0f / 1.1f); ProporcionalReaplicar(); g_redraw = true; return;
+    if (ProportionalApplicable() && state != editNavigation) {
+        ProportionalRadiusScale(dy > 0 ? 1.1f : 1.0f / 1.1f); ProportionalReapply(); g_redraw = true; return;
     }
     Zoom(dy * 2.0f); // Zoom() ya distingue: viewport normal = distancia; vista de camara = inspeccion
 }
@@ -635,7 +644,7 @@ void Viewport3D::event_mouse_wheel(float dy, int mx, int my) {
 // vista alejada, la grilla del piso se veia a traves del cubo. En la orbita se usa un near proporcional a la distancia al
 // pivot (2%: a 5 m, 10 cm -> ~4 mm de precision): lo que quede a menos de eso de la camara se recorta, como en cualquier
 // visor. La PC (z de 24) queda con el de siempre. Lo usa tambien el pick
-float Viewport3D::NearVista() const {
+float Viewport3D::NearView() const {
 #if defined(W3D_SYMBIAN) || defined(W3D_PSP)
     const float n = orbitDistance * 0.02f;
     return (!orthographic && n > nearClip) ? n : nearClip;
@@ -645,109 +654,109 @@ float Viewport3D::NearVista() const {
 }
 
 // suma al radio del foco el bounding de cada objeto seleccionado (esfera centrada en 'c' que
-// envuelve la seleccion entera): max(|c - PuntoFoco| + RadioFoco) sobre los seleccionados.
-static void CalcRadioFocoRec(Object* obj, const Vector3& c, float& r){
+// envuelve la seleccion entera): max(|c - PointFocus| + FocusRadius) sobre los seleccionados.
+static void CalcFocusRadiusRec(Object* obj, const Vector3& c, float& r){
     if (obj->select){
-        float d = (obj->PuntoFoco() - c).Length() + obj->RadioFoco();
+        float d = (obj->PointFocus() - c).Length() + obj->FocusRadius();
         if (d > r) r = d;
     }
-    for (size_t i = 0; i < obj->Childrens.size(); i++) CalcRadioFocoRec(obj->Childrens[i], c, r);
+    for (size_t i = 0; i < obj->Childrens.size(); i++) CalcFocusRadiusRec(obj->Childrens[i], c, r);
 }
 
-void Viewport3D::EnfocarObject() {
-    // el foco PREGUNTA donde esta lo seleccionado (PuntoFoco/RadioFoco -> matrices de mundo) y esa
+void Viewport3D::FocusObject() {
+    // el foco PREGUNTA donde esta lo seleccionado (PointFocus/FocusRadius -> matrices de mundo) y esa
     // respuesta depende de cual es la vista bindeada. Enfocar puede dispararse desde el menu o el
     // atajo sin haber dibujado ESTE viewport ultimo, asi que primero se bindea el suyo.
-    BindVista();
+    BindView();
     // Edit Mode: enfocar la SELECCION de sub-elementos (vertices/aristas/caras): centro + radio
     // -> centra Y ajusta el zoom. Si no hay nada seleccionado, cae al foco del objeto.
     if (InteractionMode == EditMode && g_editMesh) {
         Mesh* m = (Mesh*)g_editMesh;
         m->EnsureEdit();
         float cx, cy, cz, rL;
-        if (m->edit && m->edit->CentroRadioSeleccion(cx, cy, cz, rL)) {
-            Vector3 c = m->LocalAMundo(Vector3(cx, cy, cz));
-            EncuadrarRadio(c, m->EscalarRadioLocal(Vector3(cx, cy, cz), rL)); // radio local -> mundo
+        if (m->edit && m->edit->SelectionCenterRadius(cx, cy, cz, rL)) {
+            Vector3 c = m->LocalToWorld(Vector3(cx, cy, cz));
+            FrameRadius(c, m->ScaleRadiusLocal(Vector3(cx, cy, cz), rL)); // radio local -> mundo
             return;
         }
     }
     if (!ObjSelects.empty()) {
         // el FOCO mira el CENTRO GEOMETRICO de la seleccion (las mallas aportan su centro de
         // vertices), NO el pivote de transform. El radio envuelve toda la seleccion (con su tamaño).
-        Vector3 c = CentroFocoSeleccion();
+        Vector3 c = FocusCenterSelection();
         float r = 0.0f;
         if (SceneCollection)
             for (size_t i = 0; i < SceneCollection->Childrens.size(); i++)
-                CalcRadioFocoRec(SceneCollection->Childrens[i], c, r);
-        EncuadrarRadio(c, r);
+                CalcFocusRadiusRec(SceneCollection->Childrens[i], c, r);
+        FrameRadius(c, r);
     }
 }
 
-void Viewport3D::EncuadrarRadio(const Vector3& centro, float radio){
+void Viewport3D::FrameRadius(const Vector3& center, float radius){
     // MIRANDO POR LA CAMARA ACTIVA: con el CANDADO cerrado se encuadra moviendo la CAMARA (sin girarla: se acerca o se
     // aleja a lo largo de su mirada hasta que lo elegido entra en SU encuadre); abierto, como orbitar: se sale de la
     // vista de camara (desde donde estaba la camara) y se encuadra con la orbita. Sin la UI (juego puro), nada
-    const bool porCamara = ViewFromCameraActive && CameraActive;
-    if (porCamara && g_juegoPuro) return;
-    const bool moverCamara = porCamara && CameraToView;
-    if (porCamara) { OrbitaDesdeCamara(); if (!moverCamara) SetViewFromCameraActive(false); }
-    pivot = centro;
-    if (radio < 0.05f) radio = 0.05f; // un vertice/punto: radio minimo (zoom cercano pero no degenerado)
+    const bool byCamera = ViewFromCameraActive && CameraActive;
+    if (byCamera && g_pureGame) return;
+    const bool moveCamera = byCamera && CameraToView;
+    if (byCamera) { OrbitFromCamera(); if (!moveCamera) SetViewFromCameraActive(false); }
+    pivot = center;
+    if (radius < 0.05f) radius = 0.05f; // un vertice/punto: radio minimo (zoom cercano pero no degenerado)
     // distancia para que una esfera de 'radio' entre en el FOV. Se usa el menor half-FOV (vertical vs
     // horizontal, segun el aspect) para que entre en las DOS direcciones. *1.25 = padding pedido.
     // (moviendo la camara: SU lente y el aspecto de SU marco)
     float aspect = (height > 0) ? (float)width / (float)height : 1.0f;
-    if (moverCamara) aspect = AspectoMarco(aspect);
-    float halfV = (moverCamara ? CameraActive->fov : fovDeg) * 0.5f * 3.14159265f / 180.0f;
+    if (moveCamera) aspect = FrameAspect(aspect);
+    float halfV = (moveCamera ? CameraActive->fov : fovDeg) * 0.5f * 3.14159265f / 180.0f;
     float halfH = atanf(tanf(halfV) * aspect);
     float ang = halfV < halfH ? halfV : halfH;
     float s = sinf(ang); if (s < 0.01f) s = 0.01f;
-    orbitDistance = radio / s * 1.25f;
+    orbitDistance = radius / s * 1.25f;
     if (orbitDistance < 0.02f)     orbitDistance = 0.02f;
     if (orbitDistance > farClip)   orbitDistance = farClip;
     RecalcOrbitPosition();
-    if (moverCamara) CamaraDesdeOrbita();
+    if (moveCamera) CameraFromOrbit();
 }
 
 // ---- LOCAL VIEW ("/"): aisla la seleccion en este viewport (solo dibuja los seleccionados + sus hijos),
 // encuadra, y al re-tocar restaura vista + visibilidad. ----
-static void LV_AgregarSubarbol(Object* o, std::set<Object*>& s){
+static void LV_AddSubtree(Object* o, std::set<Object*>& s){
     if (!o) return;
     s.insert(o);
-    for (size_t i = 0; i < o->Childrens.size(); i++) LV_AgregarSubarbol(o->Childrens[i], s);
+    for (size_t i = 0; i < o->Childrens.size(); i++) LV_AddSubtree(o->Childrens[i], s);
 }
-static void LV_AgregarAncestros(Object* o, std::set<Object*>& s){
+static void LV_AddAncestors(Object* o, std::set<Object*>& s){
     for (Object* p = o->Parent; p; p = p->Parent) s.insert(p);   // padres: para que la recursion ALCANCE al hijo
 }
 // los objetos que NACIERON con serial >= desde (Separar, Shift+D, Aniadir, Pegar, importar...): entran a la vista local
-static void LV_AgregarNacidos(Object* raiz, unsigned int desde, std::set<Object*>& vis, std::set<Object*>& paso){
-    if (!raiz) return;
-    for (size_t i = 0; i < raiz->Childrens.size(); i++){
-        Object* o = raiz->Childrens[i];
-        if (o->serial >= desde) { LV_AgregarSubarbol(o, vis); LV_AgregarAncestros(o, paso); }
-        else LV_AgregarNacidos(o, desde, vis, paso);
+static void LV_AddSpawned(Object* root, unsigned int from, std::set<Object*>& vis, std::set<Object*>& step){
+    if (!root) return;
+    for (size_t i = 0; i < root->Childrens.size(); i++){
+        Object* o = root->Childrens[i];
+        if (o->serial >= from) { LV_AddSubtree(o, vis); LV_AddAncestors(o, step); }
+        else LV_AddSpawned(o, from, vis, step);
     }
 }
-void Viewport3D::LocalViewEntrar(){
-    localViewSet.clear(); localViewPaso.clear();
+void Viewport3D::LocalViewEnter(){
+    localViewSet.clear(); localViewStep.clear();
     for (size_t i = 0; i < ObjSelects.size(); i++){
-        LV_AgregarSubarbol(ObjSelects[i], localViewSet);   // el seleccionado + su descendencia
-        LV_AgregarAncestros(ObjSelects[i], localViewPaso); // + su cadena de padres: solo de paso (no se dibujan)
+        LV_AddSubtree(ObjSelects[i], localViewSet);    // el seleccionado + su descendencia
+        LV_AddAncestors(ObjSelects[i], localViewStep); // + su cadena de padres: solo de paso (no se dibujan)
     }
     if (SceneCollection) localViewSet.insert(SceneCollection); // la raiz siempre traversable
-    lvNacidos = W3dObjetosNacidos();   // desde aca, lo que nazca en esta vista entra a la vista local
+    lvSpawned = W3dObjectsSpawned();   // desde aca, lo que nazca en esta vista entra a la vista local
     // snapshot de la camara para restaurarla al salir
     lvViewRot = viewRot; lvPivot = pivot; lvOrbitDistance = orbitDistance;
     lvOrtho = orthographic; lvFromCam = ViewFromCameraActive;
     lvZoom = camViewZoom; lvPanX = camViewPanX; lvPanY = camViewPanY;
-    localViewActivo = true;
+    localViewActive = true;
     if (ViewFromCameraActive) SetViewFromCameraActive(false);   // (por la camara no se encuadra: se vuelve al salir)
-    EnfocarObject();   // Frame Selected: encuadra la seleccion aislada
+    FocusObject();   // Frame Selected: encuadra la seleccion aislada
     g_redraw = true;
 }
-void Viewport3D::LocalViewSalir(){
-    localViewActivo = false;
-    localViewSet.clear(); localViewPaso.clear();
+void Viewport3D::LocalViewExit(){
+    localViewActive = false;
+    localViewSet.clear(); localViewStep.clear();
     viewRot = lvViewRot; pivot = lvPivot; orbitDistance = lvOrbitDistance;
     orthographic = lvOrtho; ViewFromCameraActive = lvFromCam;
     camViewZoom = lvZoom; camViewPanX = lvPanX; camViewPanY = lvPanY;
@@ -755,20 +764,20 @@ void Viewport3D::LocalViewSalir(){
     g_redraw = true;
 }
 void Viewport3D::LocalViewToggle(){
-    if (localViewActivo) LocalViewSalir();
-    else if (!ObjSelects.empty()) LocalViewEntrar();   // sin seleccion no hace nada
+    if (localViewActive) LocalViewExit();
+    else if (!ObjSelects.empty()) LocalViewEnter();   // sin seleccion no hace nada
 }
 
 void Viewport3D::Zoom(float delta){
     // vista de camara: el zoom es de INSPECCION (escala la vista + el marco), NO mueve la camara.
     if (ViewFromCameraActive){
-        if (g_juegoPuro) return;   // (sin la UI se ve el juego tal cual: nada de inspeccion)
+        if (g_pureGame) return;   // (sin la UI se ve el juego tal cual: nada de inspeccion)
         if (CameraToView && CameraActive) {   // candado cerrado: la CAMARA avanza / retrocede hacia su punto
-            OrbitaDesdeCamara();
+            OrbitFromCamera();
             const bool vc = ViewFromCameraActive; ViewFromCameraActive = false;
             Zoom(delta);
             ViewFromCameraActive = vc;
-            CamaraDesdeOrbita();
+            CameraFromOrbit();
             return;
         }
         camViewZoom *= expf(delta * 0.03f);
@@ -787,7 +796,7 @@ void Viewport3D::Zoom(float delta){
 // LA VISTA DE ESTE VIEWPORT como camara BASE del core (CameraBase): la camara activa de la
 // escena si se esta mirando "por" ella, o la orbita propia del viewport. UNA sola fuente: la
 // usan el bind al core y la matriz de vista de GL, que no pueden salirse una de la otra.
-CameraBase Viewport3D::VistaCam() const {
+CameraBase Viewport3D::ViewCam() const {
     CameraBase cam;
     if (ViewFromCameraActive && CameraActive) {
         cam.pos = CameraActive->pos;
@@ -802,8 +811,8 @@ CameraBase Viewport3D::VistaCam() const {
 // publica ESTA vista al core y NADA MAS (ver ViewPort3D.h). Contraste con UpdateViewOrbit, que
 // ademas ESCRIBE la camara de escena (UpdatePosition/UpdateLookAt le pisan pos/rot al objeto
 // Camera), recalcula las luces y carga la matriz de GL: eso es cosa del que va a DIBUJAR.
-void Viewport3D::BindVista() {
-    W3dVistaBind(VistaCam());
+void Viewport3D::BindView() {
+    W3dViewBind(ViewCam());
 }
 
 void Viewport3D::UpdateViewOrbit() {
@@ -812,24 +821,24 @@ void Viewport3D::UpdateViewOrbit() {
         CameraActive->UpdateLookAt();
     }
 
-    W3dVista3D v; v.cam = VistaCam();
+    W3dView3D v; v.cam = ViewCam();
     // los ejes con los que se mueve / rota / escala son los de lo que se VE en el viewport activo: mirando por la camara
     // activa, los de la camara (antes quedaban los de la orbita y el objeto se iba para cualquier lado)
-    if (Viewport3DActive == this) PublicarEjesVista();
+    if (Viewport3DActive == this) PublishAxesView();
 
     // luz del NORMAL MAPPING: en RENDER preview usa la luz de ESCENA (Lights[0]) -> el relieve responde a la
     // lampara y su color. En material/solid preview usa la CAMARA (headlight) en blanco -> el material preview NO
     // depende de las luces de escena (no se tienen que ver las luces de escena en material preview).
-    Vector3 luzPos = v.cam.pos, luzCol(1, 1, 1);   // headlight neutro
+    Vector3 lightPos = v.cam.pos, lightCol(1, 1, 1);   // headlight neutro
     if (view == RenderType::Rendered && !Lights.empty() && Lights[0]) {
         Matrix4 LW; Lights[0]->GetWorldMatrix(LW);
-        luzPos = Vector3(LW.m[12], LW.m[13], LW.m[14]);
-        luzCol = Vector3(Lights[0]->diffuse[0], Lights[0]->diffuse[1], Lights[0]->diffuse[2]);
+        lightPos = Vector3(LW.m[12], LW.m[13], LW.m[14]);
+        lightCol = Vector3(Lights[0]->diffuse[0], Lights[0]->diffuse[1], Lights[0]->diffuse[2]);
     }
     // publicar la vista al core + cargar la matriz de vista: el MISMO camino que el
     // runtime del juego (EscenaRender). De aca salen el chrome equirect (reflejo
     // respecto de esta camara) y la base right/up/forward del MATCAP por software.
-    W3dEscena3DCamara(v, luzPos, luzCol);
+    W3dScene3DCamera(v, lightPos, lightCol);
 }
 
 void Viewport3D::RotateOrbit() {
@@ -837,21 +846,21 @@ void Viewport3D::RotateOrbit() {
     // te SACA de la vista de camara y sigue como la orbita de siempre desde donde estaba la camara. Sin la UI (juego
     // puro) nada; con "Lock Orbit" el arrastre panea la inspeccion, como antes
     if (ViewFromCameraActive && CameraActive) {
-        if (g_juegoPuro) return;
+        if (g_pureGame) return;
         if (CameraToView) {
-            OrbitaDesdeCamara();
+            OrbitFromCamera();
             const bool vc = ViewFromCameraActive; ViewFromCameraActive = false;
             RotateOrbit();
             ViewFromCameraActive = vc;
-            CamaraDesdeOrbita();
+            CameraFromOrbit();
             return;
         }
         if (lockOrbit) { Pan(); return; }
-        OrbitaDesdeCamara();
+        OrbitFromCamera();
         SetViewFromCameraActive(false);
     }
     // "Lock Orbit" ON: NUNCA gira el orbital. Todo lo que orbitaria (arrastre de mouse, 1 dedo tactil,
-    // flechas via OrbitarFlecha) PANEA en su lugar. Usa el mismo dx/dy que ya seteo el que llama. El zoom
+    // flechas via OrbitArrow) PANEA en su lugar. Usa el mismo dx/dy que ya seteo el que llama. El zoom
     // (rueda / pinch) no pasa por aca, asi que sigue igual. Ideal para usar el viewport como tablero 2D.
     if (lockOrbit) { Pan(); return; }
 
@@ -879,7 +888,7 @@ void Viewport3D::RotateOrbit() {
     RecalcOrbitPosition();
 }
 
-void Viewport3D::OrbitarFlecha(int ndx, int ndy){
+void Viewport3D::OrbitArrow(int ndx, int ndy){
     float odx = dx, ody = dy;        // preservar el delta del mouse
     // Lock Orbit ON: las flechas PANEAN (RotateOrbit deriva a Pan). El pan por flechas de '*' (W3dNewPan) NIEGA el
     // delta ("las flechas iban al reves"); aca hay que negar igual, sino el mismo Pan() quedaba INVERTIDO con lock
@@ -893,13 +902,13 @@ void Viewport3D::OrbitarFlecha(int ndx, int ndy){
 void Viewport3D::Pan(){
     // vista de camara: el paneo es de INSPECCION (mueve la VISTA + el marco), NO mueve la camara.
     if (ViewFromCameraActive){
-        if (g_juegoPuro) return;   // (sin la UI se ve el juego tal cual: nada de inspeccion)
+        if (g_pureGame) return;   // (sin la UI se ve el juego tal cual: nada de inspeccion)
         if (CameraToView && CameraActive) {   // candado cerrado: se mueve la CAMARA
-            OrbitaDesdeCamara();
+            OrbitFromCamera();
             const bool vc = ViewFromCameraActive; ViewFromCameraActive = false;
             Pan();
             ViewFromCameraActive = vc;
-            CamaraDesdeOrbita();
+            CameraFromOrbit();
             return;
         }
         camViewPanX += 2.0f * dx / (float)(width  > 0 ? width  : 1);
@@ -919,8 +928,8 @@ void Viewport3D::Pan(){
     RecalcOrbitPosition();
 }
 
-// paneo por TECLADO (mismo patron que OrbitarFlecha): setea dx/dy, panea, restaura. Lo usa el keypad del N95.
-void Viewport3D::PanFlecha(int ndx, int ndy){
+// paneo por TECLADO (mismo patron que OrbitArrow): setea dx/dy, panea, restaura. Lo usa el keypad del N95.
+void Viewport3D::PanArrow(int ndx, int ndy){
     float odx = dx, ody = dy;
     dx = (float)ndx; dy = (float)ndy;
     Pan();
@@ -932,7 +941,7 @@ void Viewport3D::PanFlecha(int ndx, int ndy){
 void Viewport3D::event_finger_gesture(float zoomDelta, float panDx, float panDy){
     if (zoomDelta != 0.0f) Zoom(zoomDelta);
     if (panDx != 0.0f || panDy != 0.0f){
-        float odx = dx, ody = dy;       // Pan() usa dx/dy; los guardamos y restauramos (como PanFlecha)
+        float odx = dx, ody = dy;       // Pan() usa dx/dy; los guardamos y restauramos (como PanArrow)
         dx = panDx; dy = panDy;
         Pan();
         dx = odx; dy = ody;
@@ -940,7 +949,7 @@ void Viewport3D::event_finger_gesture(float zoomDelta, float panDx, float panDy)
 }
 
 // El viewport 3D no scrollea CONTENIDO: el gesto de 1 dedo fuera de la barra orbita (lo maneja
-// controles.cpp). La barra superior la agarra el gesto lockeado por OnBar/BarScrollBy.
+// controls.cpp). La barra superior la agarra el gesto lockeado por OnBar/BarScrollBy.
 bool Viewport3D::event_finger_scroll(int px, int py, int dx, int dy){
     return false;
 }
@@ -957,14 +966,14 @@ void Viewport3D::RollOrbit(float angleDeg) {
     RecalcOrbitPosition();
 }
 
-Quaternion Viewport3D::RotVista() const { return VistaCam().rot; }
-void Viewport3D::PublicarEjesVista(){
-    const Quaternion r = RotVista();
+Quaternion Viewport3D::RotView() const { return ViewCam().rot; }
+void Viewport3D::PublishAxesView(){
+    const Quaternion r = RotView();
     camRight   = r * Vector3(1, 0, 0);
     camUp      = r * Vector3(0, 1, 0);
     camForward = r * Vector3(0, 0, -1);
 }
-void Viewport3D::OrbitaDesdeCamara(){
+void Viewport3D::OrbitFromCamera(){
     if (!CameraActive) return;
     viewRot = CameraActive->Rot();
     viewRot.normalize();
@@ -972,63 +981,63 @@ void Viewport3D::OrbitaDesdeCamara(){
     pivot = CameraActive->pos + (viewRot * Vector3(0, 0, -1)) * orbitDistance;
     RecalcOrbitPosition();
 }
-void Viewport3D::CamaraDesdeOrbita(){
+void Viewport3D::CameraFromOrbit(){
     if (!CameraActive) return;
     CameraActive->pos = viewPos;
     CameraActive->SetRot(viewRot);
-    extern void W3dCambiosTocado();
-    W3dCambiosTocado();
-    RTInvalidar();
+    extern void W3dTouchedChanges();
+    W3dTouchedChanges();
+    RTInvalidate();
     g_redraw = true;
 }
-bool Viewport3D::CandadoCamaraVisible() const {
-    extern bool AnimEsJuego;
-    return ViewFromCameraActive && CameraActive && camFrameOn && showOverlays && !g_juegoPuro &&
-           !(AnimEsJuego && JuegoSimActiva());
+bool Viewport3D::LockCameraVisible() const {
+    extern bool AnimIsGame;
+    return ViewFromCameraActive && CameraActive && camFrameOn && showOverlays && !g_pureGame &&
+           !(AnimIsGame && GameSimActive());
 }
 // el BOTON del candado: un boton de la UI (fondo + borde), cuadrado, con el icono rojo (abierto) o verde (cerrado)
-static Button* gBotonCandado = NULL;
-static Button* BotonCandado(bool cerrado) {
-    if (!gBotonCandado) {
-        gBotonCandado = new Button("", (int)IconType::candadoAbierto, true);
-        gBotonCandado->cuadrado = true; gBotonCandado->centrado = true;
-        gBotonCandado->ayuda = "Lock the camera to the view";
+static Button* gButtonLock = NULL;
+static Button* ButtonLock(bool closed) {
+    if (!gButtonLock) {
+        gButtonLock = new Button("", (int)IconType::lockOpen, true);
+        gButtonLock->square = true; gButtonLock->centered = true;
+        gButtonLock->help = "Lock the camera to the view";
     }
-    static const float rojo[3] = { 0.90f, 0.25f, 0.22f }, verde[3] = { 0.30f, 0.85f, 0.35f };
-    gBotonCandado->icon = cerrado ? (int)IconType::candado : (int)IconType::candadoAbierto;
-    gBotonCandado->colorTexto = cerrado ? verde : rojo;
-    gBotonCandado->Resize(10000);
-    return gBotonCandado;
+    static const float red[3] = { 0.90f, 0.25f, 0.22f }, green[3] = { 0.30f, 0.85f, 0.35f };
+    gButtonLock->icon = closed ? (int)IconType::lock : (int)IconType::lockOpen;
+    gButtonLock->textColor = closed ? green : red;
+    gButtonLock->Resize(10000);
+    return gButtonLock;
 }
 // DEBAJO del marco de la camara (afuera, centrado con el), sin taparse con la barra de herramientas (ni con la de menu
 // si esta abajo); si abajo del marco no entra, lo mas abajo posible
-void Viewport3D::CandadoCamaraRect(int& rx, int& ry, int& lado) const {
-    Button* b = BotonCandado(CameraToView);
-    lado = b->height > b->width ? b->height : b->width;
+void Viewport3D::LockCameraRect(int& rx, int& ry, int& side) const {
+    Button* b = ButtonLock(CameraToView);
+    side = b->height > b->width ? b->height : b->width;
     const float W = (float)width, H = (float)height;
     const float cx = (camViewPanX * 0.5f + 0.5f) * W, cy = (0.5f - camViewPanY * 0.5f) * H;   // (RenderCamPassepartout)
     const float hh = camFrameNY * camViewZoom * H * 0.5f;
-    int abajo = (barCard && barAbajo) ? BarHeight() : 0;
-    if (ToolbarVisible()) abajo += ToolbarHeight();
-    rx = (int)cx - lado / 2;
+    int down = (barCard && barDown) ? BarHeight() : 0;
+    if (ToolbarVisible()) down += ToolbarHeight();
+    rx = (int)cx - side / 2;
     ry = (int)(cy + hh) + gapGS;
-    const int tope = height - abajo - lado - gapGS;
-    if (ry > tope) ry = tope;
-    if (rx < gapGS) rx = gapGS; if (rx > width - lado - gapGS) rx = width - lado - gapGS;
+    const int limit = height - down - side - gapGS;
+    if (ry > limit) ry = limit;
+    if (rx < gapGS) rx = gapGS; if (rx > width - side - gapGS) rx = width - side - gapGS;
 }
-bool Viewport3D::CandadoCamaraClick(int mx, int my){
-    if (!CandadoCamaraVisible()) return false;
-    int rx, ry, lado; CandadoCamaraRect(rx, ry, lado);
+bool Viewport3D::LockCameraClick(int mx, int my){
+    if (!LockCameraVisible()) return false;
+    int rx, ry, side; LockCameraRect(rx, ry, side);
     const int lx = mx - x, ly = my - y;
-    if (lx < rx || lx >= rx + lado || ly < ry || ly >= ry + lado) return false;
+    if (lx < rx || lx >= rx + side || ly < ry || ly >= ry + side) return false;
     CameraToView = !CameraToView;
     g_redraw = true;
     return true;
 }
-void Viewport3D::RenderCandadoCamara(){
-    if (!CandadoCamaraVisible()) return;
-    int rx, ry, lado; CandadoCamaraRect(rx, ry, lado);
-    Button* b = BotonCandado(CameraToView);
+void Viewport3D::RenderLockCamera(){
+    if (!LockCameraVisible()) return;
+    int rx, ry, side; LockCameraRect(rx, ry, side);
+    Button* b = ButtonLock(CameraToView);
     b->sx = x + rx; b->sy = y + ry;   // (rect absoluto: el hover y el cartel de ayuda)
     w3dEngine::Enable(w3dEngine::Texture2D);
     w3dEngine::PushMatrix();
@@ -1041,24 +1050,24 @@ void Viewport3D::RecalcOrbitPosition(){
     Vector3 forward = viewRot * Vector3(0,0,-1);
     viewPos = pivot - forward * orbitDistance;
 
-    // los ejes de la VISTA (mirando por la camara activa: los de la camara, ver RotVista)
-    PublicarEjesVista();
+    // los ejes de la VISTA (mirando por la camara activa: los de la camara, ver RotView)
+    PublishAxesView();
 }
 
-Viewport3D::Lente Viewport3D::LenteActual() const {
-    Lente L;
-    const CameraBase cam = VistaCam();        // ESTE viewport (no los globals, que pisa el ultimo render en multi-3D)
-    L.pos = cam.pos;
-    L.der = cam.rot * Vector3(1, 0, 0);
-    L.arr = cam.rot * Vector3(0, 1, 0);
-    L.fwd = cam.rot * Vector3(0, 0, -1);      // hacia la escena
+Viewport3D::Lens Viewport3D::CurrentLens() const {
+    Lens L;
+    const CameraBase cam = ViewCam();        // ESTE viewport (no los globals, que pisa el ultimo render en multi-3D)
+    L.pos   = cam.pos;
+    L.right = cam.rot * Vector3(1, 0, 0);
+    L.arr   = cam.rot * Vector3(0, 1, 0);
+    L.fwd   = cam.rot * Vector3(0, 0, -1);      // hacia la escena
     const bool camFrame = (ViewFromCameraActive && CameraActive);
     const float va = (height > 0) ? (float)width / (float)height : 1.0f;
     float fov = fovDeg, ra = va, nx = 1.0f, ny = 1.0f;
-    L.orto = orthographic; L.zoom = 1.0f; L.panX = 0.0f; L.panY = 0.0f;
-    if (camFrame) {                            // la MISMA cuenta que Render() + W3dEscena3DProyeccion
-        fov = CameraActive->fov; L.orto = CameraActive->orthographic;
-        ra = AspectoMarco(va);
+    L.ortho = orthographic; L.zoom = 1.0f; L.panX = 0.0f; L.panY = 0.0f;
+    if (camFrame) {                            // la MISMA cuenta que Render() + W3dScene3DProjection
+        fov = CameraActive->fov; L.ortho = CameraActive->orthographic;
+        ra = FrameAspect(va);
         if (camFrameOn) { nx = camFrameNX; ny = camFrameNY; }
         if (nx < 1e-4f) nx = 1.0f; if (ny < 1e-4f) ny = 1.0f;
         L.zoom = camViewZoom; L.panX = camViewPanX; L.panY = camViewPanY;
@@ -1066,21 +1075,21 @@ Viewport3D::Lente Viewport3D::LenteActual() const {
     // media-extension visible: en orto el volumen (size = orbitDistance*tan(fov/2), sigue el zoom); en
     // perspectiva tan(fov/2) (se divide por la profundidad)
     float h = tanf(fov * 0.5f * 3.14159265f / 180.0f);
-    if (L.orto) { h *= orbitDistance; if (h < 0.001f) h = 0.001f; }
+    if (L.ortho) { h *= orbitDistance; if (h < 0.001f) h = 0.001f; }
     L.sx = h * ra / nx; L.sy = h / ny;
     return L;
 }
 
-bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy, float* outW){
-    const Lente L = LenteActual();
+bool Viewport3D::ProjectPoint(const Vector3& p, float& sx, float& sy, float* outW){
+    const Lens L = CurrentLens();
     Vector3 rel = p - L.pos;
     float ez = rel.Dot(L.fwd);                // distancia hacia adelante
     if (ez < 0.0001f) return false;           // detras de la camara
     // divisor de perspectiva: en perspectiva es la profundidad (para interpolar perspective-correct); en
     // ortografica NO hay division -> 1.0 (la proyeccion es afin, el baricentrico de pantalla ya es el real).
-    if (outW) *outW = L.orto ? 1.0f : ez;
-    const float d = L.orto ? 1.0f : ez;
-    float ndcX = rel.Dot(L.der) / (L.sx * d) * L.zoom + L.panX;
+    if (outW) *outW = L.ortho ? 1.0f : ez;
+    const float d = L.ortho ? 1.0f : ez;
+    float ndcX = rel.Dot(L.right) / (L.sx * d) * L.zoom + L.panX;
     float ndcY = rel.Dot(L.arr) / (L.sy * d) * L.zoom + L.panY;
     sx = (ndcX * 0.5f + 0.5f) * (float)width;
     sy = (1.0f - (ndcY * 0.5f + 0.5f)) * (float)height; // pantalla: Y hacia abajo
@@ -1091,13 +1100,13 @@ bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy, float* o
 // del mas cercano al click (lmx,lmy en coords LOCALES del viewport), o -1 si ninguno esta dentro del umbral (px).
 int Viewport3D::PickBone(Armature* arm, float lmx, float lmy){
     if (!arm || arm->bones.empty()) return -1;
-    EvaluarPoseEsqueleto(arm, CurrentFrame); // asegurar la pose al frame actual (poseHead/poseTail)
+    EvaluatePoseSkeleton(arm, CurrentFrame); // asegurar la pose al frame actual (poseHead/poseTail)
     Matrix4 W; arm->GetWorldMatrix(W);
     int best = -1; float bestD = 14.0f; // umbral de seleccion en pixeles
     for (size_t i = 0; i < arm->bones.size(); i++){
         Vector3 h = W * arm->bones[i].poseHead, t = W * arm->bones[i].poseTail;
         float hx,hy,tx,ty;
-        if (!ProyectarPunto(h,hx,hy) || !ProyectarPunto(t,tx,ty)) continue;
+        if (!ProjectPoint(h,hx,hy) || !ProjectPoint(t,tx,ty)) continue;
         // distancia del click al SEGMENTO 2D (hx,hy)-(tx,ty)
         float dx=tx-hx, dy=ty-hy; float len2=dx*dx+dy*dy;
         float u = (len2>1e-6f) ? ((lmx-hx)*dx+(lmy-hy)*dy)/len2 : 0.0f;
@@ -1120,22 +1129,22 @@ int Viewport3D::PickBone(Armature* arm, float lmx, float lmy){
 // en el ORIGEN REAL del objeto y no donde el constraint lo esta mostrando. Se ve raro y es lo
 // correcto: el gizmo tiene que estar donde de verdad pivota la cuenta que va al .w3d, no donde
 // esta el dibujo. La rama de Individual Origins si usa la efectiva, y no contradice nada: con ese
-// modo AplicarPivotATransform sale antes de tocar a nadie, o sea que ese punto NO escribe.
+// modo ApplyPivotToTransform sale antes de tocar a nadie, o sea que ese punto NO escribe.
 static Vector3 GizmoPivot(){
-    if (g_transformPivot == PivotIndividual && ObjActivo) return ObjActivo->GetGlobalPosition();
+    if (g_transformPivot == PivotIndividual && ActiveObj) return ActiveObj->GetGlobalPosition();
     return TransformPivotPoint;
 }
 
 // VELOCIDAD de arrastre en MUNDO por pixel de pantalla, a la PROFUNDIDAD del pivot de transform.
 // Con esto, al arrastrar N pixeles (mouse o flechas) lo agarrado se mueve N pixeles EN PANTALLA a
 // cualquier zoom -> se siente "pegado" al cursor. Antes era un 0.01 FIJO que ignoraba el zoom (de
-// cerca movia muchisimo, de lejos poquito). Es la inversa exacta de ProyectarPunto (misma base/FOV).
-float Viewport3D::VelocidadArrastreMundo(){
+// cerca movia muchisimo, de lejos poquito). Es la inversa exacta de ProjectPoint (misma base/FOV).
+float Viewport3D::DragVelocityWorld(){
     if (height <= 0) return 0.01f;                // guarda (no deberia pasar)
-    // la MISMA lente que ProyectarPunto (mirando por la camara: la de la camara, con marco y zoom)
-    const Lente L = LenteActual();
+    // la MISMA lente que ProjectPoint (mirando por la camara: la de la camara, con marco y zoom)
+    const Lens L = CurrentLens();
     float ez = 1.0f;                             // ortho: mundo-por-pixel constante (no depende de z)
-    if (!L.orto) {
+    if (!L.ortho) {
         ez = (GizmoPivot() - L.pos).Dot(L.fwd);  // profundidad (eye-space) del pivot de transform
         if (ez < nearClip) ez = nearClip;        // no detras de la camara
     }
@@ -1143,44 +1152,44 @@ float Viewport3D::VelocidadArrastreMundo(){
     return 2.0f * ez * L.sy / (L.zoom > 1e-4f ? L.zoom : 1.0f) / (float)height;
 }
 
-void Viewport3D::ActualizarLineaTransform(int mx, int my){
-    if ((estado == rotacion || estado == EditScale) && ObjActivo){
+void Viewport3D::UpdateLineTransform(int mx, int my){
+    if ((state == rotation || state == EditScale) && ActiveObj){
         float px, py;
-        if (ProyectarPunto(GizmoPivot(), px, py)){
+        if (ProjectPoint(GizmoPivot(), px, py)){
             gTrackPivX = px; gTrackPivY = py;
             gTrackMouseX = (float)mx - (float)x;
             gTrackMouseY = (float)my - (float)y;
-            gLineaValida = true;
+            gLineValid   = true;
         }
     }
 }
 
-void Viewport3D::RotarDesdeVista(int mx, int my){
-    if (!ObjActivo) return;
+void Viewport3D::RotateFromView(int mx, int my){
+    if (!ActiveObj) return;
     float px, py;
-    if (!ProyectarPunto(GizmoPivot(), px, py)) return; // el angulo se mide desde el PIVOTE
+    if (!ProjectPoint(GizmoPivot(), px, py)) return; // el angulo se mide desde el PIVOTE
     float lmx = (float)mx - (float)x, lmy = (float)my - (float)y;
     float ang = 180.0f - atan2f(lmy - py, lmx - px) * 180.0f / 3.14159265f;
     if (!gTrackballCap) { gTrackballCap = true; gTrackballAng0 = ang; }
     float delta = ang - gTrackballAng0;
-    gAnguloTransform = delta; // barra de estado (angulo del mouse)
-    Vector3 cf = RotVista() * Vector3(0, 0, -1);
+    gAngleTransform = delta; // barra de estado (angulo del mouse)
+    Vector3 cf = RotView() * Vector3(0, 0, -1);
     // -delta: el usuario lo quiere al reves (mouse horario -> objeto horario)
     // Edit Mode: el trackball gira los VERTICES seleccionados (rotacion absoluta).
-    if (InteractionMode == EditMode && EditXformActivo()) {
+    if (InteractionMode == EditMode && EditXformActive()) {
         EditXformRotAbs(Quaternion::FromAxisAngle(cf, -delta));
         return;
     }
-    for (size_t o = 0; o < estadoObjetos.size(); o++) {
-        Object& ob = *estadoObjetos[o].obj;
+    for (size_t o = 0; o < objectState.size(); o++) {
+        Object& ob = *objectState[o].obj;
         // por la puerta: antes se derivaba el euler a mano con ToEulerYXZ mientras el resto del editor
         // usa XYZ -> lo que se guardaba NO era lo que se veia. SetRot lo deriva bien y conserva las vueltas.
-        // W3dRotarMundoSobre: el eje de la vista es DE MUNDO y el snapshot es LOCAL -> se conjuga por el
+        // W3dRotateWorldOver: el eje de la vista es DE MUNDO y el snapshot es LOCAL -> se conjuga por el
         // padre (sin eso, rotar desde la vista un objeto emparentado y rotado giraba por cualquier lado).
-        ob.SetRot(W3dRotarMundoSobre(ob, Quaternion::FromAxisAngle(cf, -delta * estadoObjetos[o].peso), estadoObjetos[o].rot)); // peso: proportional
+        ob.SetRot(W3dRotateWorldOver(ob, Quaternion::FromAxisAngle(cf, -delta * objectState[o].weight), objectState[o].rot)); // peso: proportional
     }
-    AplicarPivotATransform(); // gira las posiciones alrededor del pivote
-    { extern void SnapAjustarObjRot(); SnapAjustarObjRot(); } // imanta: el activo apunta al target (si snap ON)
+    ApplyPivotToTransform(); // gira las posiciones alrededor del pivote
+    { extern void SnapFitObjRot(); SnapFitObjRot(); } // imanta: el activo apunta al target (si snap ON)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1191,30 +1200,30 @@ void Viewport3D::RotarDesdeVista(int mx, int my){
 //    - izq/der: giran el yaw 90. Desde el top o el bottom tambien, que es "rotar la vista" desde arriba.
 //    - arriba/abajo: suben/bajan el pitch, con TOPE en top y en bottom (de arriba no se sigue girando).
 // ---------------------------------------------------------------------------------------------------------------
-static Quaternion W3dVistaQuat(int yaw90, int pitch){   // yaw90 en pasos de 90; pitch en {-1,0,1}
+static Quaternion W3dViewQuat(int yaw90, int pitch){   // yaw90 en pasos de 90; pitch en {-1,0,1}
     return Quaternion::FromAxisAngle(Vector3(1,0,0), (float)pitch * -90.0f)
          * Quaternion::FromAxisAngle(Vector3(0,1,0), (float)(yaw90 * 90));
 }
 // El cuadrante mas parecido a la orientacion actual. 'exacta' = ya estabas EN el (no hace falta encuadrar).
-void Viewport3D::VistaCuadranteActual(int& yaw90, int& pitch, bool& exacta) const {
+void Viewport3D::CurrentQuadrantView(int& yaw90, int& pitch, bool& exact) const {
     // las 12 combinaciones (4 yaw x 3 pitch) son 12 orientaciones DISTINTAS: top girado 90 no es lo mismo que right.
     // Se prueban todas y gana la mas parecida.
-    float mejor = -1.0f; yaw90 = 0; pitch = 0;
+    float best = -1.0f; yaw90 = 0; pitch = 0;
     for (int p = -1; p <= 1; p++){
         for (int y = 0; y < 4; y++){
-            Quaternion q = W3dVistaQuat(y, p);
+            Quaternion q = W3dViewQuat(y, p);
             // |dot| entre unitarios: 1 = misma orientacion (q y -q son la misma rotacion, de ahi el abs)
             float d = q.x*viewRot.x + q.y*viewRot.y + q.z*viewRot.z + q.w*viewRot.w;
             if (d < 0.0f) d = -d;
-            if (d > mejor){ mejor = d; yaw90 = y; pitch = p; }
+            if (d > best){ best = d; yaw90 = y; pitch = p; }
         }
     }
-    exacta = (mejor > 0.9999f);   // coseno del medio angulo: pegado al cuadrante
+    exact = (best > 0.9999f);   // coseno del medio angulo: pegado al cuadrante
 }
-void Viewport3D::VistaCuadranteNav(int dx, int dy){
-    int yaw90, pitch; bool exacta;
-    VistaCuadranteActual(yaw90, pitch, exacta);
-    if (exacta){                       // ya encuadrado: la flecha MUEVE
+void Viewport3D::QuadrantViewNav(int dx, int dy){
+    int yaw90, pitch; bool exact;
+    CurrentQuadrantView(yaw90, pitch, exact);
+    if (exact){                       // ya encuadrado: la flecha MUEVE
         if (dx > 0) yaw90 = (yaw90 + 1) & 3;
         else if (dx < 0) yaw90 = (yaw90 + 3) & 3;
         if (dy < 0 && pitch < 1) pitch++;    // arriba: hacia el top, y ahi se planta
@@ -1223,7 +1232,7 @@ void Viewport3D::VistaCuadranteNav(int dx, int dy){
     // si NO estabas encuadrado, la flecha solo te lleva al cuadrante mas cercano
     ViewFromCameraActive = false; camFrameOn = false;
     camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f;
-    viewRot = W3dVistaQuat(yaw90, pitch);
+    viewRot = W3dViewQuat(yaw90, pitch);
     viewRot.normalize();
     RecalcOrbitPosition();
     g_redraw = true;
@@ -1281,11 +1290,11 @@ void Viewport3D::SetViewpoint(Viewpoint value) {
 void Viewport3D::ReloadLights() {
     ::view = view;
     // "Show Overlays" MANDA, tambien con el juego corriendo. Aca habia un gate duro
-    // (`&& !W3dJuegoCorriendo()`) que apagaba los overlays al dar Play pasara lo que
+    // (`&& !W3dGameRunning()`) que apagaba los overlays al dar Play pasara lo que
     // pasara: el checkbox quedaba mentiroso (marcado y sin efecto) y no habia manera
     // de mirar la Curve del riel, los gizmos o los contornos con el juego andando,
     // que es justo cuando se los quiere ver. "El juego se ve limpio" ya lo resuelve
-    // JuegoPrepararViewports(true), que apaga showOverlays AL INICIAR la partida: el
+    // GamePrepareViewports(true), que apaga showOverlays AL INICIAR la partida: el
     // default sigue siendo limpio y ahora el usuario puede volver a prenderlos.
     ::showOverlayGlobal = showOverlays;
     ::ViewFromCameraActiveGlobal = ViewFromCameraActive;
@@ -1303,7 +1312,7 @@ void Viewport3D::ReloadLights() {
 #endif
     // LAS LUCES DEL PASE (apagar las 8 de GL + la luz frontal de los modos de preview)
     // viven en EscenaRender, compartidas con el runtime del juego compilado.
-    W3dEscena3DLuces((int)(RenderType::Enum)view);
+    W3dScene3DLights((int)(RenderType::Enum)view);
 }
 
 // Cicla los modos de vista: MaterialPreview -> Solid -> NormalView -> Wireframe -> ZBuffer -> Alpha -> Rendered -> (vuelve)
@@ -1325,48 +1334,48 @@ void Viewport3D::Resize(int newW, int newH) {
 }
 
 // Mostrar u ocultar overlays
-void Viewport3D::SetShowOverlays(bool valor) {
-    showOverlays = valor;
+void Viewport3D::SetShowOverlays(bool value) {
+    showOverlays = value;
 }
 
 // WEIGHT PAINT: en modo Weight Paint, prende el degradado de peso en el mesh ACTIVO (y lo apaga en el que se dejo de
 // pintar). Recalcula el color cada frame (barato y refleja el cambio de grupo activo al instante). Fuera del modo,
 // apaga el ultimo. Se llama antes de renderizar la escena.
 static Mesh* g_wpMesh = NULL;
-static int WP3DCapaColor(Mesh* m);   // (definida mas abajo, con el pincel de color)
-static void WeightPaintActualizar();
-void WP3DSincronizarModoPintura() { WeightPaintActualizar(); }   // harness: lo que hace el frame al cambiar de modo
-static void WeightPaintActualizar() {
+static int WP3DLayerColor(Mesh* m);   // (definida mas abajo, con el pincel de color)
+static void WeightPaintUpdate();
+void WP3DSyncPaintMode() { WeightPaintUpdate(); }   // harness: lo que hace el frame al cambiar de modo
+static void WeightPaintUpdate() {
     Mesh* target = NULL;
-    const bool esPeso  = (InteractionMode == WeightPaint);
-    const bool esColor = (InteractionMode == VertexPaint);
+    const bool isWeight = (InteractionMode == WeightPaint);
+    const bool isColor  = (InteractionMode == VertexPaint);
     // las MARCAS del pincel se recuerdan POR MODO: pintando pesos arrancan apagadas (pincel
     // clasico); pintando color arrancan con los cuadraditos de face corner prendidos, que es
     // como se pinta un corner exacto. Al cambiar de modo cada uno recupera lo suyo.
     {
-        static int marcasPeso = MarcasOff, marcasColor = MarcasCorner, modoPrev = -1;
-        const int modo = esPeso ? 1 : esColor ? 2 : 0;
-        if (modo != modoPrev) {
-            if (modoPrev == 1) marcasPeso  = BrushGet().marcas;
-            if (modoPrev == 2) marcasColor = BrushGet().marcas;
-            if (modo == 1) BrushGet().marcas = marcasPeso;
-            if (modo == 2) BrushGet().marcas = marcasColor;
-            modoPrev = modo;
+        static int marksWeight = MarksOff, marksColor = MarksCorner, prevMode = -1;
+        const int mode = isWeight ? 1 : isColor ? 2 : 0;
+        if (mode != prevMode) {
+            if (prevMode == 1) marksWeight  = BrushGet().marks;
+            if (prevMode == 2) marksColor = BrushGet().marks;
+            if (mode == 1) BrushGet().marks = marksWeight;
+            if (mode == 2) BrushGet().marks = marksColor;
+            prevMode = mode;
         }
     }
-    if ((esPeso || esColor) && ObjActivo && ObjActivo->getType() == ObjectType::mesh)
-        target = (Mesh*)ObjActivo;
+    if ((isWeight || isColor) && ActiveObj && ActiveObj->getType() == ObjectType::mesh)
+        target = (Mesh*)ActiveObj;
     // VERTEX PAINT: la malla pintada se renderiza con un vert POR CORNER (sino dos corners fusionados
-    // no se pueden pintar por separado, ver W3dRenderCornersSeparados). Al salir, o al cambiar de
+    // no se pueden pintar por separado, ver W3dRenderCornersSeparated). Al salir, o al cambiar de
     // malla, la anterior se vuelve a fusionar.
     {
-        const bool separar = esColor && (target != NULL);
-        const bool cambio = (separar != W3dRenderCornersSeparadosActivo()) || (separar && target != g_wpMesh);
-        if (cambio) {
-            Mesh* anterior = g_wpMesh;
-            W3dRenderCornersSeparados(separar);
-            if (anterior && (anterior != target || !separar)) anterior->GenerarRender();   // vuelve a fusionar
-            if (separar) target->GenerarRender();                                        // separa
+        const bool separate = isColor && (target != NULL);
+        const bool change = (separate != W3dRenderSeparatedCornersActive()) || (separate && target != g_wpMesh);
+        if (change) {
+            Mesh* prev = g_wpMesh;
+            W3dRenderCornersSeparated(separate);
+            if (prev && (prev != target || !separate)) prev->GenerateRender();   // vuelve a fusionar
+            if (separate) target->GenerateRender();                                        // separa
         }
     }
     if (g_wpMesh && g_wpMesh != target) {       // apaga el anterior (los DOS pases)
@@ -1375,16 +1384,16 @@ static void WeightPaintActualizar() {
     }
     g_wpMesh = target;
     if (!target) return;
-    target->weightPaintOn = esPeso;
-    target->vertexPaintOn = esColor;
-    if (esPeso) {
-        WeightPaintAsegurarMapa(target); // malla del editor recien creada: mapa render-vert -> control-point
-        target->ConstruirColorPeso(target->grupoActivo);
-    } else if (esColor) {
+    target->weightPaintOn = isWeight;
+    target->vertexPaintOn = isColor;
+    if (isWeight) {
+        WeightPaintEnsureMap(target); // malla del editor recien creada: mapa render-vert -> control-point
+        target->BuildWeightColor(target->activeGroup);
+    } else if (isColor) {
         // preparar la capa AL ENTRAR al modo, no al primer trazo: es lo que hace que la malla
         // se vea con su vertex color (blanco si nunca tuvo) desde el momento en que entras.
         // Sin esto la malla seguia con su material y luces, y no se entendia que ibas a pintar.
-        if (WP3DCapaColor(target) < 0) target->vertexPaintOn = false;
+        if (WP3DLayerColor(target) < 0) target->vertexPaintOn = false;
     }
 }
 
@@ -1392,9 +1401,9 @@ static void WeightPaintActualizar() {
 //  PINTURA DE PESOS en el viewport 3D (modo Weight Paint): click + drag pinta con
 //  el pincel sobre el grupo ACTIVO del mesh activo. El trabajo real (falloff,
 //  clamp, sparse, undo por trazo) vive en edit/WeightPaint.cpp; aca solo se
-//  proyectan los vertices a pantalla (ProyectarPunto) y se rutean los eventos.
+//  proyectan los vertices a pantalla (ProjectPoint) y se rutean los eventos.
 // ============================================================================
-static bool g_wp3dPintando = false; // hay un trazo en curso en un viewport 3D (mouse apretado)
+static bool g_wp3dPainting = false; // hay un trazo en curso en un viewport 3D (mouse apretado)
 // TRAZO PENDIENTE (pantalla tactil): al apoyar un dedo NO se pinta enseguida; se espera un ratito
 // (o que el dedo se mueva) por si viene un 2do dedo, que es un gesto de camara. Asi no se pintan
 // pesos/colores sin querer al querer orbitar o hacer zoom. Un tap solo (levantar sin mover) pinta
@@ -1402,27 +1411,27 @@ static bool g_wp3dPintando = false; // hay un trazo en curso en un viewport 3D (
 static bool   g_wpPend = false;
 static int    g_wpPendX = 0, g_wpPendY = 0;
 static unsigned int g_wpPendTicks = 0;
-static const unsigned int kWpEsperaMs = 180;   // ventana para que aparezca el 2do dedo
-extern bool g_ultimoDownTactil;          // controles.cpp: el ultimo mouse-down fue un dedo
-extern int  W3dDedosActivos();           // controles.cpp: dedos apoyados
+static const unsigned int kWpWaitMs = 180;   // ventana para que aparezca el 2do dedo
+extern bool g_lastDownTouch;             // controls.cpp: el ultimo mouse-down fue un dedo
+extern int  W3dActiveFingers();          // controls.cpp: dedos apoyados
 #ifndef W3D_SYMBIAN
 static unsigned int WP3DTicksMs() { return SDL_GetTicks(); }
 #else
 static unsigned int WP3DTicksMs() { return (unsigned int)User::NTickCount(); } // ~ms (mismo reloj que LayoutTickFPS)
 #endif
-void WP3DPinturaCancelarPendiente() { g_wpPend = false; }
-int  WP3DEstadoPintura() { return g_wp3dPintando ? 2 : (g_wpPend ? 1 : 0); }   // harness: 0 nada, 1 esperando, 2 pintando
+void WP3DPaintCancelPending() { g_wpPend = false; }
+int  WP3DPaintState() { return g_wp3dPainting ? 2 : (g_wpPend ? 1 : 0); }   // harness: 0 nada, 1 esperando, 2 pintando
 
 // posicion VIVA del cursor en modo pintura (-1 = todavia no se movio). lastMouseX/Y
-// solo se refrescan al CLICKEAR (GuardarMousePos) o durante un drag (CheckWarpMouse):
+// solo se refrescan al CLICKEAR (SaveMousePos) o durante un drag (CheckWarpMouse):
 // hoverando sin boton el circulo del pincel quedaba CONGELADO en el ultimo click.
 // event_mouse_motion los actualiza en cada motion (solo en modo pintura).
 static int g_wpCursorX = -1, g_wpCursorY = -1;
 
 // modos de PINTURA del viewport 3D: el circulo del pincel sigue al cursor -> cada motion
 // guarda la posicion y redibuja. Extensible: sumar aca vertex/texture paint cuando pinten
-// con el mismo pincel. (El UV editor en UVModoPesos lleva su propio cursor lastMx/lastMy.)
-static bool WP3DModoPintura() {
+// con el mismo pincel. (El UV editor en UVModeWeights lleva su propio cursor lastMx/lastMy.)
+static bool WP3DPaintMode() {
     // los DOS pinceles: el de pesos y el de vertex color. Comparten TODO (circulo, radio,
     // valor, falloff, marcas, mascara "solo lo seleccionado") y se diferencian solo en QUE
     // escriben, asi que todo el andamiaje del viewport es el mismo.
@@ -1433,10 +1442,10 @@ struct WP3DCtx { Viewport3D* vp; Mesh* m; Matrix4 W; const GLfloat* pos; };
 
 // proyector del 3D: posicion en pantalla del render-vert i (sobre la POSE visible, skinVertex
 // si hay esqueleto). Solo vertices FRONT-FACING: el test barato normal-en-mundo vs direccion
-// camara->vert (dot > 0 = mira para el otro lado -> no se pinta lo de atras). Con la malla
+// camera->vert (dot > 0 = mira para el otro lado -> no se pinta lo de atras). Con la malla
 // posada la normal usada es la de BIND (no la rotada): aproximacion asumida, alcanza para
 // descartar la cara de atras y evita rotar normales por hueso en cada pasada.
-static bool WP3DProyectar(void* ctx, int i, float& sx, float& sy) {
+static bool WP3DProject(void* ctx, int i, float& sx, float& sy) {
     WP3DCtx* c = (WP3DCtx*)ctx;
     Vector3 local(c->pos[i*3], c->pos[i*3+1], c->pos[i*3+2]);
     Vector3 wpos = c->W * local;
@@ -1449,66 +1458,66 @@ static bool WP3DProyectar(void* ctx, int i, float& sx, float& sy) {
         Vector3 dir = wpos - c->vp->viewPos;              // camara -> vert
         if (wn.Dot(dir) > 0.0f) return false;             // back-facing: no pintable
     }
-    return c->vp->ProyectarPunto(wpos, sx, sy);
+    return c->vp->ProjectPoint(wpos, sx, sy);
 }
 
 // una pasada del pincel en (mx,my) GLOBALES de pantalla (se pasan a locales del viewport)
-static void WP3DPintar(Viewport3D* vp, int mx, int my) {
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+static void WP3DPaint(Viewport3D* vp, int mx, int my) {
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
     if (!m) return;
     WP3DCtx c; c.vp = vp; c.m = m;
     // EFECTIVA a proposito (no GetWorldMatrixBase): el pincel decide que vertice toca
     // PROYECTANDOLO A PANTALLA, asi que la matriz tiene que ser la MISMA con la que se dibujo
     // la malla o el circulo pinta vertices que no estan abajo del cursor. Y como es efectiva
-    // hay que bindear ESTA vista: WP3DProyectar ya usa vp->viewPos y vp->ProyectarPunto, y si
+    // hay que bindear ESTA vista: WP3DProject ya usa vp->viewPos y vp->ProjectPoint, y si
     // la matriz saliera de la vista que dibujo ultimo (el otro viewport) los pesos -- que se
     // serializan en el .w3d -- se escribirian en los vertices equivocados.
-    vp->BindVista();
+    vp->BindView();
     m->GetWorldMatrix(c.W);
     c.pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex; // pintar sobre la pose visible
-    BrushEstado& br = BrushGet();
-    PincelAplicar(m, m->grupoActivo, (float)(mx - vp->x), (float)(my - vp->y),
-                  br.radioPx, br.fuerza, (WPModo)br.modo, WP3DProyectar, &c,
-                  NULL, &BrushFalloffEfectivo());
-    g_redraw = true; // WeightPaintActualizar recalcula el color por frame -> feedback inmediato
+    BrushState& br = BrushGet();
+    BrushApply(m, m->activeGroup, (float)(mx - vp->x), (float)(my - vp->y),
+                  br.radiusPx, br.force, (WPMode)br.mode, WP3DProject, &c,
+                  NULL, &EffectiveBrushFalloff());
+    g_redraw = true; // WeightPaintUpdate recalcula el color por frame -> feedback inmediato
 }
 
 // asegura una capa de color USABLE y devuelve su indice (-1 si la malla no da). Es el
 // equivalente del "grupo automatico al primer trazo" del pincel de pesos: pintar tiene que
 // funcionar sin obligar a preparar nada a mano. Una malla que nunca tuvo vertex color
 // arranca en BLANCO (que es como se ve hoy: sin color = sin tinte).
-static int WP3DCapaColor(Mesh* m) {
+static int WP3DLayerColor(Mesh* m) {
     if (!m || m->vertexSize <= 0) return -1;
-    const int nC = m->ContarCorners();
+    const int nC = m->CountCorners();
     if (nC <= 0) return -1;
     if (!m->vertexColor) {
-        // COW: los buffers de render pueden estar COMPARTIDOS entre instancias (MallaDatos.h).
+        // COW: los buffers de render pueden estar COMPARTIDOS entre instancias (MeshData.h).
         // Escribir sin desinstanciar pintaria tambien a las otras copias.
-        m->DesinstanciarDatos(W3DMD_COL);
+        m->UninstantiateData(W3DMD_COL);
         m->vertexColor = new GLubyte[(size_t)m->vertexSize * 4];
         for (int i = 0; i < m->vertexSize * 4; i++) m->vertexColor[i] = 255;
     }
-    if (m->colorLayers.empty()) m->PoblarCapas();
+    if (m->colorLayers.empty()) m->PopulateLayers();
     if (m->colorLayers.empty()) return -1;
-    if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) m->colorActivo = 0;
-    ColorLayer* cl = m->colorLayers[m->colorActivo];
+    if (m->activeColor < 0 || m->activeColor >= (int)m->colorLayers.size()) m->activeColor = 0;
+    ColorLayer* cl = m->colorLayers[m->activeColor];
     if ((int)cl->color.size() != nC * 4) cl->color.assign((size_t)nC * 4, 255);
-    return m->colorActivo;
+    return m->activeColor;
 }
 
-static bool g_wpColorCambio = false;  // el trazo de color cambio algo (decide si va al undo)
+static bool g_wpChangeColor = false;  // el trazo de color cambio algo (decide si va al undo)
 
-// una pasada del pincel de COLOR (misma cuenta de contexto que WP3DPintar)
-static void WP3DPintarColor(Viewport3D* vp, int mx, int my) {
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+// una pasada del pincel de COLOR (misma cuenta de contexto que WP3DPaint)
+static void WP3DPaintColor(Viewport3D* vp, int mx, int my) {
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
     if (!m) return;
-    const int capa = WP3DCapaColor(m);
-    if (capa < 0) return;
+    const int layer = WP3DLayerColor(m);
+    if (layer < 0) return;
     WP3DCtx c; c.vp = vp; c.m = m;
-    vp->BindVista();                 // idem pesos: la matriz EFECTIVA depende de ESTA vista
+    vp->BindView();                 // idem pesos: la matriz EFECTIVA depende de ESTA vista
     m->GetWorldMatrix(c.W);
     c.pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
-    BrushEstado& br = BrushGet();
+    BrushState& br = BrushGet();
     unsigned char rgba[4];
     for (int q = 0; q < 4; q++) {
         float v = br.color[q];
@@ -1516,10 +1525,10 @@ static void WP3DPintarColor(Viewport3D* vp, int mx, int my) {
         if (v > 1.0f) v = 1.0f;
         rgba[q] = (unsigned char)(v * 255.0f + 0.5f);
     }
-    if (PincelAplicarColor(m, capa, (float)(mx - vp->x), (float)(my - vp->y),
-                           br.radioPx, br.fuerza, rgba, br.palIdx,
-                           WP3DProyectar, &c, NULL, &BrushFalloffEfectivo()))
-        g_wpColorCambio = true;
+    if (BrushApplyColor(m, layer, (float)(mx - vp->x), (float)(my - vp->y),
+                           br.radiusPx, br.force, rgba, br.palIdx,
+                           WP3DProject, &c, NULL, &EffectiveBrushFalloff()))
+        g_wpChangeColor = true;
     g_redraw = true;
 }
 
@@ -1532,84 +1541,84 @@ static void WP3DPintarColor(Viewport3D* vp, int mx, int my) {
 //  se pinta con la caida del pincel segun su distancia en pantalla. Asi el trazo queda donde se ve, por
 //  mas que la cara este en escorzo.
 // ---------------------------------------------------------------------------
-static TexturaEditable* g_wpTexEd = NULL;
-static bool  g_wpTexCambio = false;
+static TextureEditable* g_wpTexEd = NULL;
+static bool  g_wpTexChange = false;
 static float g_wpTexPrevX = -1e9f, g_wpTexPrevY = 0.0f;
-static Texture* WP3DTexturaActiva(Mesh* m, int& parte) {
-    parte = UVParteMostrada(m);
-    if (parte < 0 || parte >= (int)m->materialsGroup.size()) return NULL;
-    Material* mt = m->materialsGroup[(size_t)parte].material;
+static Texture* WP3DActiveTexture(Mesh* m, int& part) {
+    part = UVShownPart(m);
+    if (part < 0 || part >= (int)m->materialsGroup.size()) return NULL;
+    Material* mt = m->materialsGroup[(size_t)part].material;
     return (mt && mt->texture && mt->texture->iID) ? mt->texture : NULL;
 }
 // PINTAR SOBRE EL OBJETO aunque todavia no tenga textura (el cubo por defecto): al primer trazo se arma lo que hace falta
 //  - un material PROPIO para la parte (el por defecto es compartido: pintarlo pintaria todos los objetos)
 //  - UV que no se pisen (sin UV, o todas las caras en el mismo lugar como el cubo por defecto): Smart UV de todas
 //  - una textura EN MEMORIA del color del material (con "*": no se guarda hasta "Guardar" desde la barra o el editor UV)
-static bool WP3DCrearTexturaPintura(Mesh* m) {
+static bool WP3DCreateTexturePaint(Mesh* m) {
     if (!m || m->materialsGroup.empty()) return false;
-    int parte = UVParteMostrada(m);
-    if (parte < 0 || parte >= (int)m->materialsGroup.size()) parte = 0;
-    Material* mt = m->materialsGroup[(size_t)parte].material;
-    if (!mt || mt == MaterialDefecto) { extern Material* NuevoMaterialEnMeshPart(Mesh*, int); mt = NuevoMaterialEnMeshPart(m, parte); }
+    int part = UVShownPart(m);
+    if (part < 0 || part >= (int)m->materialsGroup.size()) part = 0;
+    Material* mt = m->materialsGroup[(size_t)part].material;
+    if (!mt || mt == MaterialDefault) { extern Material* NewMaterialInMeshPart(Mesh*, int); mt = NewMaterialInMeshPart(m, part); }
     if (!mt) return false;
-    if (!m->uv || UVFraccionSolapada(m) > 0.05f) {
+    if (!m->uv || UVOverlappedFraction(m) > 0.05f) {
         std::string msg;
-        if (W3dSmartUVProjectTodas(m, 66.0f, 0.02f, msg)) Notificar(T("Automatic UVs were generated to paint"), false);
+        if (W3dSmartUVProjectAll(m, 66.0f, 0.02f, msg)) Notify(T("Automatic UVs were generated to paint"), false);
     }
     if (!m->uv) return false;
     // 256x256 en todas las plataformas: alcanza para pintar y en el telefono/Android una mas grande era lentisima
     // (pedido del dueno). El que quiera mas definicion crea la textura a mano en el editor UV (Nueva Textura).
-    const int lado = 256;
+    const int side = 256;
     // la textura arranca con el color del material, y el material pasa a blanco: el color queda en la textura (sino
     // se multiplicaria dos veces y lo pintado se veria oscuro)
     const float col[4] = { mt->diffuse[0], mt->diffuse[1], mt->diffuse[2], 1.0f };
-    std::vector<unsigned char> px; W3dGenerarTextura(TexGenBlank, lado, lado, col, false, px);
-    Texture* tex = TexEditCrear(m->name + "_pintura", px, lado, lado, false);
+    std::vector<unsigned char> px; W3dGenerateTexture(TexGenBlank, side, side, col, false, px);
+    Texture* tex = TexEditCreate(m->name + "_paint", px, side, side, false);
     if (!tex) return false;
     mt->texture = tex; mt->textureOn = true;
     mt->diffuse[0] = mt->diffuse[1] = mt->diffuse[2] = 1.0f;
     { extern void RebindMaterialMeshPart(); RebindMaterialMeshPart(); }
-    Notificar(std::string(T("New paint texture")) + ": " + TexEditEtiqueta(tex), false);
+    Notify(std::string(T("New paint texture")) + ": " + TexEditLabel(tex), false);
     return true;
 }
-Texture* WP3DTexturaPintada() {
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    int parte = -1; return m ? WP3DTexturaActiva(m, parte) : NULL;
+Texture* WP3DPaintedTexture() {
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+    int part = -1; return m ? WP3DActiveTexture(m, part) : NULL;
 }
-static bool WP3DTexTrazoIniciar(Mesh* m) {
-    int parte = -1;
-    Texture* t = WP3DTexturaActiva(m, parte);
-    if (!t && WP3DCrearTexturaPintura(m)) t = WP3DTexturaActiva(m, parte);
-    if (!t || !m->uv) { Notificar(T("Texture Paint: the active part has no texture"), true); return false; }
-    g_wpTexEd = TexEditObtener(t);
+static bool WP3DTexStrokeStart(Mesh* m) {
+    int part = -1;
+    Texture* t = WP3DActiveTexture(m, part);
+    if (!t && WP3DCreateTexturePaint(m)) t = WP3DActiveTexture(m, part);
+    if (!t || !m->uv) { Notify(T("Texture Paint: the active part has no texture"), true); return false; }
+    g_wpTexEd = TexEditGet(t);
     if (!g_wpTexEd) return false;
-    UndoTexturaIniciar(g_wpTexEd);
-    g_wpTexCambio = false; g_wpTexPrevX = -1e9f;
+    UndoTextureStart(g_wpTexEd);
+    g_wpTexChange = false; g_wpTexPrevX = -1e9f;
     return true;
 }
-static void WP3DDabTextura(Viewport3D* vp, Mesh* m, const Matrix4& W, const GLfloat* pos, int parte,
-                           float bx, float by, float radioPx, const unsigned char* rgba, float fuerza, const W3dFalloff& fo, int* rect) {
-    TexturaEditable* te = g_wpTexEd;
+static void WP3DDabTexture(Viewport3D* vp, Mesh* m, const Matrix4& W, const GLfloat* pos, int part,
+                           float bx, float by, float radiusPx, const unsigned char* rgba, float force, const W3dFalloff& fo, int* rect) {
+    TextureEditable* te = g_wpTexEd;
     const int tw = te->w, th = te->h;
-    const float r2 = radioPx * radioPx;
-    const bool oclusion = WPOclusionActiva(m);
+    const float r2 = radiusPx * radiusPx;
+    const bool occlusion = WPOcclusionActive(m);
     std::vector<Vector3> wp; std::vector<float> sx, sy, sw;
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         const MeshFace& F = m->faces3d[f];
         const int n = (int)F.idx.size();
-        if (F.mat != parte || n < 3) continue;
+        if (F.mat != part || n < 3) continue;
         wp.resize((size_t)n); sx.resize((size_t)n); sy.resize((size_t)n); sw.resize((size_t)n);
         bool ok = true; float mnx = 1e30f, mny = 1e30f, mxx = -1e30f, mxy = -1e30f;
         for (int c = 0; c < n && ok; c++) {
             const int rv = F.idx[(size_t)c];
             if (rv < 0 || rv >= m->vertexSize) { ok = false; break; }
             wp[(size_t)c] = W * Vector3(pos[rv*3], pos[rv*3+1], pos[rv*3+2]);
-            if (!vp->ProyectarPunto(wp[(size_t)c], sx[(size_t)c], sy[(size_t)c], &sw[(size_t)c])) { ok = false; break; }
+            if (!vp->ProjectPoint(wp[(size_t)c], sx[(size_t)c], sy[(size_t)c], &sw[(size_t)c])) { ok = false; break; }
             if (sx[(size_t)c] < mnx) mnx = sx[(size_t)c]; if (sx[(size_t)c] > mxx) mxx = sx[(size_t)c];
             if (sy[(size_t)c] < mny) mny = sy[(size_t)c]; if (sy[(size_t)c] > mxy) mxy = sy[(size_t)c];
         }
         if (!ok) continue;
-        if (mxx < bx - radioPx || mnx > bx + radioPx || mxy < by - radioPx || mny > by + radioPx) continue;   // lejos del pincel
+        if (mxx < bx - radiusPx || mnx > bx + radiusPx || mxy < by - radiusPx || mny > by + radiusPx) continue;   // lejos del pincel
         Vector3 nrm(0, 0, 0);   // normal de mundo (Newell): las caras de espaldas no se pintan
         for (int c = 0; c < n; c++) { const Vector3& a = wp[(size_t)c]; const Vector3& b = wp[(size_t)((c + 1) % n)];
             nrm.x += (a.y - b.y) * (a.z + b.z); nrm.y += (a.z - b.z) * (a.x + b.x); nrm.z += (a.x - b.x) * (a.y + b.y); }
@@ -1638,22 +1647,22 @@ static void WP3DDabTextura(Viewport3D* vp, Mesh* m, const Matrix4& W, const GLfl
                 if (fabsf(dets) > 1e-6f) {
                     const float invs = 1.0f / dets;
                     float umin = 1e30f, umax = -1e30f, vmin = 1e30f, vmax = -1e30f;
-                    bool caja = true;
-                    for (int k = 0; k <= 16 && caja; k++) {
+                    bool box = true;
+                    for (int k = 0; k <= 16 && box; k++) {
                         const float ang = (float)k * (6.2831853f / 16.0f);
-                        const float px = (k == 16) ? bx : bx + cosf(ang) * radioPx, py = (k == 16) ? by : by + sinf(ang) * radioPx;
+                        const float px = (k == 16) ? bx : bx + cosf(ang) * radiusPx, py = (k == 16) ? by : by + sinf(ang) * radiusPx;
                         const float qx = px - S0x, qy = py - S0y;
                         const float l1 = (qx * cy - cx * qy) * invs, l2 = (ax * qy - qx * ay) * invs, l0 = 1.0f - l1 - l2;
                         const float q0 = l0 / w0, q1 = l1 / w1, q2 = l2 / w2, den = q0 + q1 + q2;
-                        if (den <= 1e-12f) { caja = false; break; }   // detras del horizonte: sin recorte (todo el triangulo)
+                        if (den <= 1e-12f) { box = false; break; }   // detras del horizonte: sin recorte (todo el triangulo)
                         const float g0 = q0 / den, g1 = q1 / den, g2 = q2 / den;
                         const float uu = g0 * u0 + g1 * u1 + g2 * u2, vv = g0 * v0 + g1 * v1 + g2 * v2;
                         if (uu < umin) umin = uu; if (uu > umax) umax = uu;
                         if (vv < vmin) vmin = vv; if (vv > vmax) vmax = vv;
                     }
-                    if (caja) {
-                        const float lado = (umax - umin > vmax - vmin) ? umax - umin : vmax - vmin;
-                        const float mg = 2.0f + 0.05f * lado;   // margen: el circulo se muestreo en 16 puntos
+                    if (box) {
+                        const float side = (umax - umin > vmax - vmin) ? umax - umin : vmax - vmin;
+                        const float mg = 2.0f + 0.05f * side;   // margen: el circulo se muestreo en 16 puntos
                         const int cx0 = (int)floorf(umin - mg), cx1 = (int)ceilf(umax + mg);
                         const int cy0 = (int)floorf(vmin - mg), cy1 = (int)ceilf(vmax + mg);
                         if (cx0 > x0) x0 = cx0; if (cx1 < x1) x1 = cx1;
@@ -1673,116 +1682,116 @@ static void WP3DDabTextura(Viewport3D* vp, Mesh* m, const Matrix4& W, const GLfl
                 const float ssx = (pw0 * S0x + pw1 * S1x + pw2 * S2x) / pw, ssy = (pw0 * S0y + pw1 * S1y + pw2 * S2y) / pw;
                 const float ddx = ssx - bx, ddy = ssy - by, d2 = ddx * ddx + ddy * ddy;
                 if (d2 > r2) continue;
-                if (oclusion) { const int fv = WPOclusionCaraEn(ssx, ssy); if (fv >= 0 && fv != (int)f) continue; }   // tapado
-                const float a = fuerza * fo.Eval(sqrtf(d2) / radioPx);
+                if (occlusion) { const int fv = WPOcclusionFaceIn(ssx, ssy); if (fv >= 0 && fv != (int)f) continue; }   // tapado
+                const float a = force * fo.Eval(sqrtf(d2) / radiusPx);
                 if (a <= 0.0f) continue;
-                TexEditMezclar(te, x, y, rgba, a);
-                TexEditRectUnir(rect, x, y);
+                TexEditMix(te, x, y, rgba, a);
+                TexEditRectJoin(rect, x, y);
             }
         }
     }
 }
-static void WP3DPintarTextura(Viewport3D* vp, int mx, int my) {
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+static void WP3DPaintTexture(Viewport3D* vp, int mx, int my) {
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
     if (!m || !g_wpTexEd || !m->uv) return;
-    int parte = -1; Texture* t = WP3DTexturaActiva(m, parte);
+    int part = -1; Texture* t = WP3DActiveTexture(m, part);
     if (!t || t != g_wpTexEd->tex) return;
-    vp->BindVista();
+    vp->BindView();
     Matrix4 W; m->GetWorldMatrix(W);
     const GLfloat* pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
-    BrushEstado& br = BrushGet();
+    BrushState& br = BrushGet();
     unsigned char rgba[4];
     for (int q = 0; q < 4; q++) { float c = br.color[q]; if (c < 0) c = 0; if (c > 1) c = 1; rgba[q] = (unsigned char)(c * 255.0f + 0.5f); }
-    const W3dFalloff& fo = BrushFalloffEfectivo();
+    const W3dFalloff& fo = EffectiveBrushFalloff();
     const float bx = (float)(mx - vp->x), by = (float)(my - vp->y);
     int rect[4] = { -1, -1, -1, -1 };
     if (g_wpTexPrevX > -1e8f) {   // toques interpolados desde el anterior (sin huecos en un trazo rapido)
         const float dx = bx - g_wpTexPrevX, dy = by - g_wpTexPrevY, dist = sqrtf(dx*dx + dy*dy);
-        float paso = br.radioPx / 3.0f; if (paso < 2.0f) paso = 2.0f;
-        int n = (int)ceilf(dist / paso); if (n < 1) n = 1; if (n > 64) n = 64;
-        for (int i = 1; i <= n; i++) { const float f = (float)i / (float)n; WP3DDabTextura(vp, m, W, pos, parte, g_wpTexPrevX + dx * f, g_wpTexPrevY + dy * f, br.radioPx, rgba, br.fuerza, fo, rect); }
-    } else WP3DDabTextura(vp, m, W, pos, parte, bx, by, br.radioPx, rgba, br.fuerza, fo, rect);
+        float step = br.radiusPx / 3.0f; if (step < 2.0f) step = 2.0f;
+        int n = (int)ceilf(dist / step); if (n < 1) n = 1; if (n > 64) n = 64;
+        for (int i = 1; i <= n; i++) { const float f = (float)i / (float)n; WP3DDabTexture(vp, m, W, pos, part, g_wpTexPrevX + dx * f, g_wpTexPrevY + dy * f, br.radiusPx, rgba, br.force, fo, rect); }
+    } else WP3DDabTexture(vp, m, W, pos, part, bx, by, br.radiusPx, rgba, br.force, fo, rect);
     g_wpTexPrevX = bx; g_wpTexPrevY = by;
-    if (rect[0] >= 0) { TexEditSubir(g_wpTexEd, rect[0], rect[1], rect[2], rect[3], true); g_wpTexCambio = true; }
+    if (rect[0] >= 0) { TexEditUpload(g_wpTexEd, rect[0], rect[1], rect[2], rect[3], true); g_wpTexChange = true; }
     g_redraw = true;
 }
 // (prueba del harness) un toque de pintura de textura en (mx,my) de pantalla, con su trazo completo
 bool W3dTexPaint3DHarness(Viewport3D* vp, int mx, int my) {
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    if (!vp || !m || !WP3DTexTrazoIniciar(m)) return false;
-    WP3DPintarTextura(vp, mx, my);
-    const bool cambio = g_wpTexCambio;
-    TexEditFinTrazo(g_wpTexEd); UndoTexturaConfirmar(g_wpTexCambio); g_wpTexEd = NULL; g_wpTexCambio = false;
-    return cambio;
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+    if (!vp || !m || !WP3DTexStrokeStart(m)) return false;
+    WP3DPaintTexture(vp, mx, my);
+    const bool change = g_wpTexChange;
+    TexEditEndStroke(g_wpTexEd); UndoTextureConfirm(g_wpTexChange); g_wpTexEd = NULL; g_wpTexChange = false;
+    return change;
 }
 // (prueba del harness) un TRAZO de n toques seguidos sin soltar, como el dedo arrastrando en circulo alrededor del
 // centro (radio en px). Devuelve los ms que tardo la pintura (sin el deshacer del final), o -1.
-double W3dTexPaint3DTrazoMs(Viewport3D* vp, int n, float radio) {
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    if (!vp || !m || n < 1 || !WP3DTexTrazoIniciar(m)) return -1.0;
+double W3dTexPaint3DStrokeMs(Viewport3D* vp, int n, float radius) {
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+    if (!vp || !m || n < 1 || !WP3DTexStrokeStart(m)) return -1.0;
     const float cx = (float)(vp->x + vp->width / 2), cy = (float)(vp->y + vp->height / 2);
     const unsigned int t0 = WP3DTicksMs();   // portable: SDL en PC, NTickCount en Symbian
     for (int i = 0; i < n; i++) {
         const float a = (float)i * 0.15f;
-        WP3DPintarTextura(vp, (int)(cx + cosf(a) * radio), (int)(cy + sinf(a) * radio));
+        WP3DPaintTexture(vp, (int)(cx + cosf(a) * radius), (int)(cy + sinf(a) * radius));
     }
     const double ms = (double)(WP3DTicksMs() - t0);
-    TexEditFinTrazo(g_wpTexEd); UndoTexturaConfirmar(g_wpTexCambio); g_wpTexEd = NULL; g_wpTexCambio = false;
+    TexEditEndStroke(g_wpTexEd); UndoTextureConfirm(g_wpTexChange); g_wpTexEd = NULL; g_wpTexChange = false;
     return ms;
 }
-static void WP3DPasada(Viewport3D* vp, int mx, int my) {
-    if (InteractionMode == VertexPaint)       WP3DPintarColor(vp, mx, my);
-    else if (InteractionMode == TexturePaint) WP3DPintarTextura(vp, mx, my);
-    else                                      WP3DPintar(vp, mx, my);
+static void WP3DPass(Viewport3D* vp, int mx, int my) {
+    if (InteractionMode == VertexPaint)       WP3DPaintColor(vp, mx, my);
+    else if (InteractionMode == TexturePaint) WP3DPaintTexture(vp, mx, my);
+    else                                      WP3DPaint(vp, mx, my);
 }
 // arranca el trazo (snapshot de undo). false = no hay nada que pintar en esta malla.
-static bool WP3DTrazoIniciar(Mesh* m) {
-    if (InteractionMode == TexturePaint) return WP3DTexTrazoIniciar(m);
+static bool WP3DStrokeStart(Mesh* m) {
+    if (InteractionMode == TexturePaint) return WP3DTexStrokeStart(m);
     if (InteractionMode == VertexPaint) {
-        const int capa = WP3DCapaColor(m);
-        if (capa < 0) return false;
-        g_wpColorCambio = false;
-        BrushTrazoResetear();          // el tope por trazo arranca limpio (ver WeightPaint.h)
-        UndoColorIniciar(m, capa);
+        const int layer = WP3DLayerColor(m);
+        if (layer < 0) return false;
+        g_wpChangeColor = false;
+        BrushStrokeReset();          // el tope por trazo arranca limpio (ver WeightPaint.h)
+        UndoColorStart(m, layer);
         return true;
     }
-    return WeightPaintTrazoIniciar(m) >= 0;
+    return WeightPaintStrokeStart(m) >= 0;
 }
 // cierra el trazo: un paso de undo por trazo, como en pesos (se descarta si no cambio nada)
-static bool WP3DTrazoIniciar(Mesh* m);
-static void WP3DPasada(Viewport3D* vp, int mx, int my);
+static bool WP3DStrokeStart(Mesh* m);
+static void WP3DPass(Viewport3D* vp, int mx, int my);
 // resuelve el trazo pendiente: 2 dedos -> se descarta; se movio / paso la espera / forzar (soltar) -> arranca
-static void WP3DPendienteResolver(Viewport3D* vp, int mx, int my, bool forzar) {
+static void WP3DPendingResolve(Viewport3D* vp, int mx, int my, bool force) {
     if (!g_wpPend) return;
-    if (W3dDedosActivos() >= 2) { g_wpPend = false; return; }
-    const int umbral = 6 * GlobalScale;
-    const bool movio = (mx - g_wpPendX > umbral) || (g_wpPendX - mx > umbral) || (my - g_wpPendY > umbral) || (g_wpPendY - my > umbral);
-    const bool paso  = (WP3DTicksMs() - g_wpPendTicks) >= kWpEsperaMs;
-    if (!forzar && !movio && !paso) return;
+    if (W3dActiveFingers() >= 2) { g_wpPend = false; return; }
+    const int threshold = 6 * GlobalScale;
+    const bool moved    = (mx - g_wpPendX > threshold) || (g_wpPendX - mx > threshold) || (my - g_wpPendY > threshold) || (g_wpPendY - my > threshold);
+    const bool step     = (WP3DTicksMs() - g_wpPendTicks) >= kWpWaitMs;
+    if (!force && !moved && !step) return;
     g_wpPend = false;
-    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    if (!m || !WP3DTrazoIniciar(m)) return;
-    g_wp3dPintando = true;
-    WP3DPasada(vp, g_wpPendX, g_wpPendY);
-    if (movio) WP3DPasada(vp, mx, my);
+    Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+    if (!m || !WP3DStrokeStart(m)) return;
+    g_wp3dPainting = true;
+    WP3DPass(vp, g_wpPendX, g_wpPendY);
+    if (moved) WP3DPass(vp, mx, my);
 }
-static void WP3DTrazoFin() {
-    if (InteractionMode == TexturePaint) { TexEditFinTrazo(g_wpTexEd); UndoTexturaConfirmar(g_wpTexCambio); g_wpTexEd = NULL; g_wpTexCambio = false; return; }
-    if (InteractionMode == VertexPaint) { UndoColorConfirmar(g_wpColorCambio); g_wpColorCambio = false; }
-    else                                  WeightPaintTrazoFin();
+static void WP3DStrokeEnd() {
+    if (InteractionMode == TexturePaint) { TexEditEndStroke(g_wpTexEd); UndoTextureConfirm(g_wpTexChange); g_wpTexEd = NULL; g_wpTexChange = false; return; }
+    if (InteractionMode == VertexPaint) { UndoColorConfirm(g_wpChangeColor); g_wpChangeColor = false; }
+    else                                  WeightPaintStrokeEnd();
 }
 
 // CRUZ GUIA / CAJA del box select. Mismo ortho 2D local que el circulo del pincel: es un
 // overlay de pantalla, no geometria de la escena.
 static void BoxSelectRender3D(Viewport3D* vp) {
-    if (!BoxSelectActivo()) return;
+    if (!BoxSelectActive()) return;
     if (Viewport3DActive != vp) return;   // la caja es de UN viewport (el activo)
     namespace gfx = w3dEngine;
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, vp->width, vp->height, 0, -1, 1);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
     gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting);
-    BoxSelectDibujar(vp->x, vp->y, vp->width, vp->height);
+    BoxSelectDraw(vp->x, vp->y, vp->width, vp->height);
     gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); // restaurar para la UI
     gfx::Invalidate();
 }
@@ -1792,29 +1801,29 @@ static void BoxSelectRender3D(Viewport3D* vp) {
 // ============================================================================
 //  OCLUSION para pintar: al empezar el frame (modos de pintura, sin X-Ray) se dibuja la malla
 //  pintada con un COLOR POR CARA (ID) en el area del viewport, se lee el resultado y se le deja a
-//  WeightPaint (WPOclusionSet). Las marcas y los pinceles preguntan "que cara hay en este pixel":
+//  WeightPaint (WPOcclusionSet). Las marcas y los pinceles preguntan "que cara hay en este pixel":
 //  un corner de una cara que mira a camara pero esta tapada por otra ya no aparece ni se pinta.
 //  El render normal pisa este dibujo enseguida (viene el Clear de la escena). Costo: un draw de
 //  la malla + un ReadPixels del viewport por frame, solo mientras se pinta.
 // ============================================================================
 static std::vector<unsigned char> g_wpOclBuf;
-static void WP3DOclusionPass(Viewport3D* vp) {
-    Mesh* m = (WP3DModoPintura() && ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    if (!m || g_xray || m->vertexSize <= 0 || vp->width <= 0 || vp->height <= 0) { WPOclusionLimpiar(); return; }
+static void WP3DOcclusionPass(Viewport3D* vp) {
+    Mesh* m = (WP3DPaintMode() && ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+    if (!m || g_xray || m->vertexSize <= 0 || vp->width <= 0 || vp->height <= 0) { WPOcclusionClear(); return; }
 #ifdef W3D_DREAMCAST
     // la PVR arma el cuadro recien al cerrarlo: este dibujo no se puede leer y el Clear no lo borra, asi que quedaba
     // ENCIMA de la escena (el cubo pintado se veia negro, solo las lineas). Sin mapa vale el test de back-facing, como
     // con X-Ray
-    WPOclusionLimpiar();
+    WPOcclusionClear();
     return;
 #endif
     namespace gfx = w3dEngine;
-    const int glY = W3dPantallaAlto - vp->y - vp->height;
-    // la PROYECCION ya la cargo el frame (W3dEscena3DProyeccion); la VISTA la aplica la escena mas
+    const int glY = W3dScreenHeight - vp->y - vp->height;
+    // la PROYECCION ya la cargo el frame (W3dScene3DProjection); la VISTA la aplica la escena mas
     // adelante, asi que aca se carga a mano y al final se deja el modelview en identidad como estaba
-    vp->BindVista();
+    vp->BindView();
     gfx::MatrixMode(gfx::ModelView);
-    gfx::LoadMatrix(vp->VistaCam().ViewMatrix().m);
+    gfx::LoadMatrix(vp->ViewCam().ViewMatrix().m);
     gfx::Viewport(vp->x, glY, vp->width, vp->height);
     gfx::Scissor(vp->x, glY, vp->width, vp->height);
     gfx::Enable(gfx::ScissorTest);
@@ -1832,7 +1841,7 @@ static void WP3DOclusionPass(Viewport3D* vp) {
     static std::vector<GLfloat> tp; static std::vector<GLubyte> tc; static std::vector<MeshIndex> tri;
     tp.clear(); tc.clear();
     for (size_t f = 0; f < m->faces3d.size(); f++) {
-        tri.clear(); W3dTriangularCara(pos, m->faces3d[f].idx, tri);
+        tri.clear(); W3dTriangulateFace(pos, m->faces3d[f].idx, tri);
         const int id = (int)f + 1;
         const GLubyte r = (GLubyte)((id & 0x1F) << 3), g = (GLubyte)(((id >> 5) & 0x3F) << 2), b = (GLubyte)(((id >> 11) & 0x1F) << 3);
         for (size_t t = 0; t < tri.size(); t++) {
@@ -1849,98 +1858,98 @@ static void WP3DOclusionPass(Viewport3D* vp) {
     }
     g_wpOclBuf.resize((size_t)vp->width * (size_t)vp->height * 4);
     gfx::ReadPixelsRGBA(vp->x, glY, vp->width, vp->height, &g_wpOclBuf[0]);
-    WPOclusionSet(&g_wpOclBuf[0], vp->x, glY, vp->width, vp->height, vp->x, vp->y, W3dPantallaAlto, m);
+    WPOcclusionSet(&g_wpOclBuf[0], vp->x, glY, vp->width, vp->height, vp->x, vp->y, W3dScreenHeight, m);
     gfx::Enable(gfx::Dither); gfx::Enable(gfx::Multisample);
-    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();   // como lo dejo W3dEscena3DProyeccion
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();   // como lo dejo W3dScene3DProjection
     gfx::Invalidate();
 }
 
 // harness: cuantos face corners de la malla quedan visibles (marcas/pincel) en el viewport 3D activo
-int WP3DCornersVisibles(Mesh* m) {
+int WP3DVisibleCorners(Mesh* m) {
     if (!m || !viewPortActive || viewPortActive->ViewportKind() != 1) return -1;
     Viewport3D* vp = (Viewport3D*)viewPortActive;
     WP3DCtx c; c.vp = vp; c.m = m;
-    vp->BindVista();
+    vp->BindView();
     m->GetWorldMatrix(c.W);
     c.pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
     std::vector<float> cx, cy; std::vector<char> ok;
-    WPCornersEnPantalla(m, WP3DProyectar, &c, cx, cy, ok);
+    WPCornersInScreen(m, WP3DProject, &c, cx, cy, ok);
     int n = 0; for (size_t i = 0; i < ok.size(); i++) if (ok[i]) n++;
     if (getenv("W3D_OCLDBG")) {
-        size_t noNegro = 0; int idMax = -1;
-        for (size_t i = 0; i + 3 < g_wpOclBuf.size(); i += 4) if (g_wpOclBuf[i] | g_wpOclBuf[i+1] | g_wpOclBuf[i+2]) { noNegro++;
+        size_t notBlack = 0; int idMax = -1;
+        for (size_t i = 0; i + 3 < g_wpOclBuf.size(); i += 4) if (g_wpOclBuf[i] | g_wpOclBuf[i+1] | g_wpOclBuf[i+2]) { notBlack++;
             const int id = (g_wpOclBuf[i] >> 3) | ((g_wpOclBuf[i+1] >> 2) << 5) | ((g_wpOclBuf[i+2] >> 3) << 11); if (id > idMax) idMax = id; }
-        printf("      [ocldbg] vp=(%d,%d %dx%d) pantallaAlto=%d buf=%d px no-negros=%d idMax=%d\n", vp->x, vp->y, vp->width, vp->height, W3dPantallaAlto, (int)(g_wpOclBuf.size()/4), (int)noNegro, idMax);
+        printf("      [ocldbg] vp=(%d,%d %dx%d) screenHeight=%d buf=%d px no-black=%d idMax=%d\n", vp->x, vp->y, vp->width, vp->height, W3dScreenHeight, (int)(g_wpOclBuf.size()/4), (int)notBlack, idMax);
         int L = 0;
         for (size_t f = 0; f < m->faces3d.size() && L < 8; f++) for (size_t k = 0; k < m->faces3d[f].idx.size() && L < 8; k++, L++) {
-            float sx = 0, sy = 0; const bool p = WP3DProyectar(&c, m->faces3d[f].idx[k], sx, sy);
-            printf("      [ocldbg] corner %d cara %d: vert->(%.0f,%.0f) proy=%d cuadradito=(%.0f,%.0f) idEnPixel=%d ok=%d\n", L, (int)f, sx, sy, p ? 1 : 0, cx[(size_t)L], cy[(size_t)L], WPOclusionCaraEn(cx[(size_t)L], cy[(size_t)L]), ok[(size_t)L]);
+            float sx = 0, sy = 0; const bool p = WP3DProject(&c, m->faces3d[f].idx[k], sx, sy);
+            printf("      [ocldbg] corner %d cara %d: vert->(%.0f,%.0f) proj=%d cuadradito=(%.0f,%.0f) idInPixel=%d ok=%d\n", L, (int)f, sx, sy, p ? 1 : 0, cx[(size_t)L], cy[(size_t)L], WPOcclusionFaceIn(cx[(size_t)L], cy[(size_t)L]), ok[(size_t)L]);
         }
     }
     return n;
 }
 
-void WP3DPinturaTick(Viewport3D* vp) {   // por frame (lo llama el render): la espera vence aunque el dedo no se mueva
+void WP3DPaintTick(Viewport3D* vp) {   // por frame (lo llama el render): la espera vence aunque el dedo no se mueva
     if (!g_wpPend) return;
     if (!leftMouseDown) { g_wpPend = false; return; }
-    WP3DPendienteResolver(vp, g_wpCursorX, g_wpCursorY, false);
+    WP3DPendingResolve(vp, g_wpCursorX, g_wpCursorY, false);
     g_redraw = true;   // seguir redibujando hasta resolver
 }
 // VISTA PREVIA DEL RADIO: al cambiar el radio del pincel (arrastrando la barra, con las flechas o tipeando el valor)
 // se ve en el CENTRO del viewport el area que va a tener, en su tamano real; se desvanece un rato despues. Detecta el
 // cambio comparando contra el ultimo radio visto: cualquier camino que lo cambie la dispara.
-static float  g_wpRadioVisto = -1.0f;
-static double g_wpRadioCambioMs = -1.0e9;
-static int    g_wpRadioCuadros = 0;   // sin reloj (N95: W3dNowMs = 0) se cuenta en cuadros
-static float WP3DPreviaRadioAlfa() {
-    const float r = BrushGet().radioPx;
-    const double ahora = W3dNowMs();
-    if (g_wpRadioVisto < 0.0f) g_wpRadioVisto = r;   // la primera vez no es un cambio
-    const bool cambio = (r != g_wpRadioVisto) || BrushBarArrastrandoRadio();
-    if (cambio) { g_wpRadioVisto = r; g_wpRadioCambioMs = ahora; g_wpRadioCuadros = 40; }
-    float alfa = 0.0f;
-    if (ahora > 0.0) {
-        const double t = ahora - g_wpRadioCambioMs;
-        alfa = (t < 900.0) ? 1.0f : (t < 1300.0) ? (float)(1.0 - (t - 900.0) / 400.0) : 0.0f;
-    } else if (g_wpRadioCuadros > 0) {
-        alfa = (g_wpRadioCuadros > 10) ? 1.0f : (float)g_wpRadioCuadros / 10.0f;
-        g_wpRadioCuadros--;
+static float  g_wpSeenRadius = -1.0f;
+static double g_wpChangeRadiusMs = -1.0e9;
+static int    g_wpFrameRadius = 0;   // sin reloj (N95: W3dNowMs = 0) se cuenta en cuadros
+static float WP3DPreviewAlphaRadius() {
+    const float r = BrushGet().radiusPx;
+    const double now = W3dNowMs();
+    if (g_wpSeenRadius < 0.0f) g_wpSeenRadius = r;   // la primera vez no es un cambio
+    const bool change = (r != g_wpSeenRadius) || BrushBarDraggingRadius();
+    if (change) { g_wpSeenRadius = r; g_wpChangeRadiusMs = now; g_wpFrameRadius = 40; }
+    float alpha = 0.0f;
+    if (now > 0.0) {
+        const double t = now - g_wpChangeRadiusMs;
+        alpha = (t < 900.0) ? 1.0f : (t < 1300.0) ? (float)(1.0 - (t - 900.0) / 400.0) : 0.0f;
+    } else if (g_wpFrameRadius > 0) {
+        alpha = (g_wpFrameRadius > 10) ? 1.0f : (float)g_wpFrameRadius / 10.0f;
+        g_wpFrameRadius--;
     }
-    if (alfa > 0.0f) g_redraw = true;   // el desvanecido necesita los cuadros siguientes
-    return alfa;
+    if (alpha > 0.0f) g_redraw = true;   // el desvanecido necesita los cuadros siguientes
+    return alpha;
 }
-static void WP3DDibujarPreviaRadio(Viewport3D* vp, float alfa) {
+static void WP3DDrawPreviewRadius(Viewport3D* vp, float alpha) {
     namespace gfx = w3dEngine;
-    const float r = BrushGet().radioPx;
-    if (r <= 0.0f || alfa <= 0.0f) return;
+    const float r = BrushGet().radiusPx;
+    if (r <= 0.0f || alpha <= 0.0f) return;
     const float cx = vp->width * 0.5f, cy = vp->height * 0.5f;
     const int N = 64;
-    static float tri[N * 6], aro[N * 4];
+    static float tri[N * 6], hoop[N * 4];
     for (int i = 0; i < N; i++) {
         const float a0 = 6.2831853f * (float)i / (float)N, a1 = 6.2831853f * (float)(i + 1) / (float)N;
         const float x0 = cx + cosf(a0) * r, y0 = cy + sinf(a0) * r, x1 = cx + cosf(a1) * r, y1 = cy + sinf(a1) * r;
-        tri[i*6] = cx; tri[i*6+1] = cy; tri[i*6+2] = x0; tri[i*6+3] = y0; tri[i*6+4] = x1; tri[i*6+5] = y1;
-        aro[i*4] = x0; aro[i*4+1] = y0; aro[i*4+2] = x1; aro[i*4+3] = y1;
+        tri[i*6]  = cx; tri[i*6+1] = cy; tri[i*6+2] = x0; tri[i*6+3] = y0; tri[i*6+4] = x1; tri[i*6+5] = y1;
+        hoop[i*4] = x0; hoop[i*4+1] = y0; hoop[i*4+2] = x1; hoop[i*4+3] = y1;
     }
     gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::ColorArray);
     gfx::DisableArray(gfx::NormalArray); gfx::EnableArray(gfx::VertexArray);
     gfx::Enable(gfx::Blend); gfx::BlendAlpha();
     // el AREA (relleno tenue) y su borde: halo oscuro + linea blanca, como el circulo del cursor
-    const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
-    gfx::Color4f(acc[0], acc[1], acc[2], 0.18f * alfa);
+    const float* acc = ColorList[static_cast<int>(ColorID::accent)];
+    gfx::Color4f(acc[0], acc[1], acc[2], 0.18f * alpha);
     gfx::VertexPointer2f(0, tri);
     gfx::DrawTrianglesArray(N * 3);
-    gfx::VertexPointer2f(0, aro);
-    gfx::LineWidth(3.0f * GlobalScale); gfx::Color4f(0.0f, 0.0f, 0.0f, 0.8f * alfa); gfx::DrawLines(N * 2);
-    gfx::LineWidth(1.5f * GlobalScale); gfx::Color4f(1.0f, 1.0f, 1.0f, alfa); gfx::DrawLines(N * 2);
+    gfx::VertexPointer2f(0, hoop);
+    gfx::LineWidth(3.0f * GlobalScale); gfx::Color4f(0.0f, 0.0f, 0.0f, 0.8f * alpha); gfx::DrawLines(N * 2);
+    gfx::LineWidth(1.5f * GlobalScale); gfx::Color4f(1.0f, 1.0f, 1.0f, alpha); gfx::DrawLines(N * 2);
     gfx::LineWidth(1.0f);
     gfx::Disable(gfx::Blend);
 }
 
-static void WP3DRenderPincel(Viewport3D* vp) {
-    WP3DPinturaTick(vp);
-    if (!WP3DModoPintura()) return;
-    const float alfaPrevia = WP3DPreviaRadioAlfa();
+static void WP3DRenderBrush(Viewport3D* vp) {
+    WP3DPaintTick(vp);
+    if (!WP3DPaintMode()) return;
+    const float alphaPreview = WP3DPreviewAlphaRadius();
     namespace gfx = w3dEngine;
     // DOS COSAS DISTINTAS, con reglas distintas:
     //  - el CIRCULO es el cursor del pincel: sigue al mouse y solo se ve con el mouse sobre el
@@ -1950,23 +1959,23 @@ static void WP3DRenderPincel(Viewport3D* vp) {
     //    se las quiere ver) ni de que haya un popup abierto (el de falloff, sin ir mas lejos).
     int mx = (g_wpCursorX >= 0) ? g_wpCursorX : (int)lastMouseX;   // cursor VIVO (o el ultimo click)
     int my = (g_wpCursorY >= 0) ? g_wpCursorY : (int)lastMouseY;
-    const bool cursorAdentro =
-        !PopUpActive && !LayoutMenuAbierto() &&
+    const bool cursorInside =
+        !PopUpActive && !LayoutMenuOpen() &&
         mx >= vp->x && mx < vp->x + vp->width && my >= vp->y && my < vp->y + vp->height &&
         !vp->OnBar(mx, my) && !vp->OnToolbar(mx, my) && !vp->OnBrushBar(mx, my);
-    if (!cursorAdentro && BrushGet().marcas == MarcasOff && !WeightPaintSoloSel() && alfaPrevia <= 0.0f) return; // nada que dibujar
+    if (!cursorInside && BrushGet().marks == MarksOff && !WeightPaintOnlySel() && alphaPreview <= 0.0f) return; // nada que dibujar
     // el contexto del proyector se arma ANTES del ortho 2D: GetWorldMatrix es la matriz
     // EFECTIVA (billboards/constraints miran a la camara), asi que necesita ESTA vista
     // bindeada -- y bindearla despues pisaria el ortho con el que se dibuja.
-    Mesh* mm = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    WP3DCtx c; bool hayCtx = false;
-    const bool hayMarcas = (mm && BrushGet().marcas != MarcasOff && mm->vertexSize > 0);
-    if (mm && mm->vertexSize > 0 && (hayMarcas || WeightPaintSoloSel())) {
+    Mesh* mm = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+    WP3DCtx c; bool hasCtx = false;
+    const bool hasMarks = (mm && BrushGet().marks != MarksOff && mm->vertexSize > 0);
+    if (mm && mm->vertexSize > 0 && (hasMarks || WeightPaintOnlySel())) {
         c.vp = vp; c.m = mm;
-        vp->BindVista();
+        vp->BindView();
         mm->GetWorldMatrix(c.W);
         c.pos = (mm->skinArmature && mm->skinVertex) ? mm->skinVertex : mm->vertex; // la pose visible
-        hayCtx = true;
+        hasCtx = true;
     }
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, vp->width, vp->height, 0, -1, 1);
@@ -1974,9 +1983,9 @@ static void WP3DRenderPincel(Viewport3D* vp) {
     gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Blend);
     // VELO sobre lo no pintable (mascara "solo lo seleccionado"): antes de las marcas, para que
     // los cuadraditos queden ARRIBA del velo y se sigan viendo.
-    if (hayCtx && WeightPaintSoloSel())
-        BrushDibujarCarasBloqueadas(mm, WP3DProyectar, &c);
-    if (hayCtx && hayMarcas) {
+    if (hasCtx && WeightPaintOnlySel())
+        BrushDrawFacesLocked(mm, WP3DProject, &c);
+    if (hasCtx && hasMarks) {
         // relleno = el color del PESO que ya tiene el punto (la misma rampa que tinta la malla):
         // el cuadradito muestra lo que vale, no solo donde esta. Si el color todavia no se armo
         // para esta malla, van en gris (NULL) y no se dibuja nada de mas.
@@ -1984,42 +1993,42 @@ static void WP3DRenderPincel(Viewport3D* vp) {
             (InteractionMode == VertexPaint)
                 ? mm->vertexColor                                   // vertex color: el color real del punto
                 : (((int)mm->weightPaintColor.size() >= mm->vertexSize * 4)
-                       ? &mm->weightPaintColor[0] : NULL);          // pesos: la rampa azul->rojo
+                       ? &mm->weightPaintColor[0] : NULL);          // pesos: la rampa blue->red
         // el MODO sale del pincel, pero en VERTEX COLOR manda la capa: una capa por corner
         // muestra un cuadrado por corner (corridos hacia el centro de su cara) y una capa
         // Per-Vertex los muestra sobre el vertice. Son ubicaciones distintas a proposito:
         // es lo unico que distingue a simple vista en que unidad estas pintando.
-        int modoMarcas = BrushGet().marcas;
-        if (InteractionMode == VertexPaint && modoMarcas != MarcasOff) {
-            const ColorLayer* cl = (mm->colorActivo >= 0 && mm->colorActivo < (int)mm->colorLayers.size())
-                                 ? mm->colorLayers[mm->colorActivo] : NULL;
-            modoMarcas = ((cl && cl->porVertice) || BrushGet().porVertice) ? MarcasVertice : MarcasCorner;
+        int markMode = BrushGet().marks;
+        if (InteractionMode == VertexPaint && markMode != MarksOff) {
+            const ColorLayer* cl = (mm->activeColor >= 0 && mm->activeColor < (int)mm->colorLayers.size())
+                                 ? mm->colorLayers[mm->activeColor] : NULL;
+            markMode = ((cl && cl->perVertex) || BrushGet().perVertex) ? MarksVertex : MarksCorner;
         }
-        BrushDibujarMarcas(mm, modoMarcas, 7.0f * (float)GlobalScale, colorRV, WP3DProyectar, &c);
+        BrushDrawMarks(mm, markMode, 7.0f * (float)GlobalScale, colorRV, WP3DProject, &c);
     }
-    if (cursorAdentro) BrushDibujarCirculo((float)(mx - vp->x), (float)(my - vp->y), BrushGet().radioPx);
-    if (alfaPrevia > 0.0f) WP3DDibujarPreviaRadio(vp, alfaPrevia);   // el radio que se esta ajustando, en el centro
+    if (cursorInside) BrushDrawCircle((float)(mx - vp->x), (float)(my - vp->y), BrushGet().radiusPx);
+    if (alphaPreview > 0.0f) WP3DDrawPreviewRadius(vp, alphaPreview);   // el radio que se esta ajustando, en el centro
     gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); // restaurar para la UI que sigue
     gfx::Invalidate();
 }
 
 // EL POSTPROCESADO EN EL ARBOL: cuando el pase de escena de un viewport llega a un objeto Postproceso, sus efectos se
-// aplican a lo dibujado HASTA AHI (PostProcesar: mirando por la camara, adentro de su marco) y lo que sigue se dibuja
+// aplican a lo dibujado HASTA AHI (RunPostProcess: mirando por la camara, adentro de su marco) y lo que sigue se dibuja
 // limpio y adelante (la profundidad se borra, como el Limpiar Z). Con el trazado de rayos la imagen trazada se pega
 // DESPUES de la escena: ahi se aplican al final, en el mismo orden
 static Viewport3D* gVpPost = NULL;   // el viewport que esta dibujando su escena (NULL: nadie, ej. el pick)
 static int gVpPostGlY = 0;
-static bool gEnPost = false;         // (los pases de datos del postprocesado vuelven a dibujar la escena: no re-entrar)
-static std::vector<Postproceso*> gPostDiferidos;
-static bool gCpuProfListo = false, gCpuVecListo = false;   // (los datos de antemano por CPU: PostDatosPrevios)
-// LA UI EN SU LUGAR DEL ARBOL (UI::enArbol): cuando el recorrido llega a la UI que se muestra, se dibuja AHI como el overlay
-// de siempre (DibujarHUDJuego); lo que sigue en el outliner se dibuja encima (un Limpiar Z y un cubo: adelante de la UI)
+static bool gInPost = false;         // (los pases de datos del postprocesado vuelven a dibujar la escena: no re-entrar)
+static std::vector<PostProcess*> gDeferedPost;
+static bool gCpuProfReady = false, gCpuVecReady = false;   // (los datos de antemano por CPU: PostPreviousData)
+// LA UI EN SU LUGAR DEL ARBOL (UI::inTree): cuando el recorrido llega a la UI que se muestra, se dibuja AHI como el overlay
+// de siempre (DrawHUDGame); lo que sigue en el outliner se dibuja encima (un Limpiar Z y un cubo: adelante de la UI)
 static Viewport3D* gVpUI = NULL;
 static int gVpUIglY = 0;
-static bool gHudEnArbol = false;   // (este cuadro ya se dibujo en el arbol: RenderUI no lo repite)
-static void UIEnArbol(UI* u) {
+static bool gHudInTree = false;   // (este cuadro ya se dibujo en el arbol: RenderUI no lo repite)
+static void UIInTree(UI* u) {
     Viewport3D* vp = gVpUI;
-    if (!vp || gEnPost || u != UI2D_UIDelEditor()) return;
+    if (!vp || gInPost || u != UI2D_EditorUI()) return;
     namespace gfx = w3dEngine;
     float P[16], MV[16];
     gfx::GetMatrix(gfx::Projection, P);
@@ -2029,42 +2038,42 @@ static void UIEnArbol(UI* u) {
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, (float)vp->width, (float)vp->height, 0, -1, 1);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
-    vp->Estado2D();
-    vp->DibujarHUDJuego();
-    gHudEnArbol = true;
+    vp->State2D();
+    vp->DrawHUDGame();
+    gHudInTree = true;
     // la escena sigue como estaba
     gfx::Viewport(vp->x, gVpUIglY, vp->width, vp->height);
     gfx::Enable(gfx::ScissorTest); gfx::Scissor(vp->x, gVpUIglY, vp->width, vp->height);
     gfx::MatrixMode(gfx::Projection); gfx::LoadMatrix(P);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadMatrix(MV);
-    W3dEscena3DModo((int)(RenderType::Enum)vp->view);
+    W3dScene3DMode((int)(RenderType::Enum)vp->view);
     gfx::Enable(gfx::DepthTest); gfx::DepthMask(true); gfx::DepthFunc(gfx::DepthLess);
     gfx::Invalidate();
 }
-static void PostEnArbol(Postproceso* p) {
+static void PostInTree(PostProcess* p) {
     Viewport3D* vp = gVpPost;
-    if (!vp || gEnPost || !p->opc.on) return;
-    W3dPostUsar(&p->opc);
-    const bool hace = W3dPostHay();
-    W3dPostUsar(NULL);
-    if (!hace) return;   // (prendido sin efectos que hagan algo: ni lo toca)
-    if (g_rt.on) { gPostDiferidos.push_back(p); return; }
+    if (!vp || gInPost || !p->opt.on) return;
+    W3dPostUse(&p->opt);
+    const bool does = W3dPostHas();
+    W3dPostUse(NULL);
+    if (!does) return;   // (prendido sin efectos que hagan algo: ni lo toca)
+    if (g_rt.on) { gDeferedPost.push_back(p); return; }
     namespace gfx = w3dEngine;
     float P[16], MV[16];
     gfx::GetMatrix(gfx::Projection, P);
     gfx::GetMatrix(gfx::ModelView, MV);
-    gEnPost = true;
-    W3dPostUsar(&p->opc);
-    vp->PostProcesar(gVpPostGlY);
-    W3dPostUsar(NULL);
-    gEnPost = false;
+    gInPost = true;
+    W3dPostUse(&p->opt);
+    vp->RunPostProcess(gVpPostGlY);
+    W3dPostUse(NULL);
+    gInPost = false;
     // la escena sigue como estaba: la lente, la matriz donde iba el recorrido, el modo y las luces de la vista
     gfx::Viewport(vp->x, gVpPostGlY, vp->width, vp->height);
     gfx::MatrixMode(gfx::Projection); gfx::LoadMatrix(P);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadMatrix(MV);
-    W3dEscena3DModo((int)(RenderType::Enum)vp->view);
+    W3dScene3DMode((int)(RenderType::Enum)vp->view);
     gfx::Enable(gfx::DepthTest); gfx::DepthMask(true);
-    // (la profundidad y el movimiento ya estan de antemano -PostDatosPrevios-: la escena no se redibujo y la
+    // (la profundidad y el movimiento ya estan de antemano -PostPreviousData-: la escena no se redibujo y la
     //  profundidad sigue siendo la de lo dibujado. Lo que sigue en el arbol se dibuja contra ella, normal)
     gfx::Invalidate();
 }
@@ -2072,7 +2081,7 @@ static void PostEnArbol(Postproceso* p) {
 // LA PROYECCION de este viewport (la que usa Render y la que tienen que usar los PICKS para ver exactamente lo mismo):
 // mirando por la camara, SU lente con su marco y la inspeccion; en la orbita, la del visor. Usa el marco que calculo el
 // ultimo Render (camFrameOn / camFrameNX / camFrameNY). Deja el MatrixMode en ModelView con identidad
-void Viewport3D::CargarProyeccionVista() {
+void Viewport3D::LoadProjectionView() {
     const bool camFrame = (ViewFromCameraActive && CameraActive);
     const float camNX = camFrameOn ? camFrameNX : 1.0f, camNY = camFrameOn ? camFrameNY : 1.0f;
     // al MIRAR POR LA CAMARA se usa SU lente (fov + ortografica PROPIOS de la camara, editables/animables);
@@ -2080,10 +2089,10 @@ void Viewport3D::CargarProyeccionVista() {
     float projFov = camFrame ? CameraActive->fov : fovDeg;
     bool  projOrtho = camFrame ? CameraActive->orthographic : orthographic;
     // distancia MINIMA/MAXIMA de dibujado: la de la camara al mirar por ella (animables), la del visor en la orbita
-    float projNear = camFrame ? CameraActive->nearClip : NearVista();
+    float projNear = camFrame ? CameraActive->nearClip : NearView();
     float projFar  = camFrame ? CameraActive->farClip  : farClip;
 
-    // publicar la LENTE de esta vista al core (acompania al W3dVistaBind de UpdateViewOrbit):
+    // publicar la LENTE de esta vista al core (acompania al W3dViewBind de UpdateViewOrbit):
     // el objeto Culling arma su frustum en CPU con estos numeros. Mirando por la camara se
     // publica el frustum del RENDER (fov de la camara + aspecto del render): es el del juego;
     // el aire del passepartout queda afuera a proposito (se cull-ea lo que el juego cull-earia).
@@ -2091,31 +2100,31 @@ void Viewport3D::CargarProyeccionVista() {
     // encuadre, el frustum y la lente publicada al Core son bit a bit los mismos en el
     // Play del editor y en el .deb/APK compilado. Lo unico propio del editor que entra
     // aca es la INSPECCION (zoom/pan de la vista de camara), que en el juego vale 1/0/0.
-    // En ORTOGRAFICA la distancia camara->objeto NO cambia el tamaño aparente: el "zoom" es la escala del
+    // En ORTOGRAFICA la distancia camera->object NO cambia el tamaño aparente: el "zoom" es la escala del
     // volumen visible (glOrtho), no la distancia. Atamos el half-height a orbitDistance*tan(fov/2) para que
     // zoomear agrande/achique igual que en perspectiva (y al alternar perspectiva/orto el objeto quede del
     // mismo tamaño). El far se corre con la distancia asi el objeto no se corta por el far al alejarse.
-    W3dVista3D vst;
-    vst.cam           = VistaCam();
-    vst.fov           = projFov;
-    vst.nearC         = projNear;
-    vst.farC          = projOrtho ? (orbitDistance + projFar) : projFar;
-    vst.orto          = projOrtho;
-    vst.ortoSize      = orbitDistance * tanf(projFov * 0.5f * 3.14159265f / 180.0f);
-    if (vst.ortoSize < 0.001f) vst.ortoSize = 0.001f;
-    vst.aspectoVista  = (aspect > 1e-4f) ? aspect : 1.0f;
+    W3dView3D vst;
+    vst.cam            = ViewCam();
+    vst.fov            = projFov;
+    vst.nearC          = projNear;
+    vst.farC           = projOrtho ? (orbitDistance + projFar) : projFar;
+    vst.ortho          = projOrtho;
+    vst.orthoSize      = orbitDistance * tanf(projFov * 0.5f * 3.14159265f / 180.0f);
+    if (vst.orthoSize < 0.001f) vst.orthoSize = 0.001f;
+    vst.viewAspect  = (aspect > 1e-4f) ? aspect : 1.0f;
     // en COVER (juego puro 2) la imagen es la del VIEWPORT: sin encuadre declarado
-    vst.aspectoImagen = camFrame ? AspectoMarco(vst.aspectoVista) : vst.aspectoVista;
-    vst.marcoNX       = camNX;
-    vst.marcoNY       = camNY;
-    vst.altoImagenPx  = (float)height * ((camNY > 1e-4f) ? camNY : 1.0f) * ((camFrame && camViewZoom > 0.0f) ? camViewZoom : 1.0f);
+    vst.imageAspect   = camFrame ? FrameAspect(vst.viewAspect) : vst.viewAspect;
+    vst.frameNX       = camNX;
+    vst.frameNY       = camNY;
+    vst.imageHeightPx = (float)height * ((camNY > 1e-4f) ? camNY : 1.0f) * ((camFrame && camViewZoom > 0.0f) ? camViewZoom : 1.0f);
     if (camFrame) { vst.zoom = camViewZoom; vst.panX = camViewPanX; vst.panY = camViewPanY; }
-    W3dEscena3DProyeccion(vst);   // (deja el MatrixMode en ModelView con identidad)
+    W3dScene3DProjection(vst);   // (deja el MatrixMode en ModelView con identidad)
 }
 
 void Viewport3D::Render() {
-    // la PANTALLA DIVIDIDA (setVistas(2) de un juego): las dos mitades y el HUD, ver RenderDividido
-    if (!gVistaPartida && W3dVistasCuantas() > 1 && RenderDividido()) return;
+    // la PANTALLA DIVIDIDA (setVistas(2) de un juego): las dos mitades y el HUD, ver RenderSplit
+    if (!gSessionView && W3dViewsCount() > 1 && RenderSplit()) return;
     double _tVp0 = W3dNowMs(); // profiler: tiempo total de este viewport 3D
     ReloadLights();
 
@@ -2137,39 +2146,39 @@ void Viewport3D::Render() {
     camFrameLetterbox = false;
     if (camFrame) {
         float va = (aspect > 1e-4f) ? aspect : 1.0f; // aspecto del viewport
-        float ra = W3dAspectoJuego(); // declarado por la camara, o el del render (ver Camera.h)
-        extern bool AnimEsJuego; extern bool PlayAnimation;
-        // MODO JUEGO PURO "COVER" (VERDE+0 dos veces, g_juegoPuro == 2): el marco
+        float ra = W3dGameAspect(); // declarado por la camara, o el del render (ver Camera.h)
+        extern bool AnimIsGame; extern bool PlayAnimation;
+        // MODO JUEGO PURO "COVER" (VERDE+0 dos veces, g_pureGame == 2): el marco
         // ES el viewport (ra = va -> NX = NY = 1): sin bandas, el frustum llena la
         // pantalla (vertical u horizontal) y el culling publicado es EXACTAMENTE lo
         // que se ve -- nada se esfuma en los bordes. La UI del juego se encaja al
         // marco, asi que se adapta sola al viewport y los contadores quedan visibles.
-        // (una mitad de la pantalla dividida: igual, la mitad entera). Ver AspectoMarco
-        ra = AspectoMarco(va);
+        // (una mitad de la pantalla dividida: igual, la mitad entera). Ver FrameAspect
+        ra = FrameAspect(va);
         // en el modo juego puro (sin la UI) la inspeccion no va: el juego tal cual, sin zoom ni paneo
-        if (g_juegoPuro) { camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f; }
-        camFrameLetterbox = (CameraActive->AspectoDeclarado() > 0.01f) && g_juegoPuro != 2 && !gVistaPartida &&
-                            (g_juegoPuro || (AnimEsJuego && (PlayAnimation || JuegoSimActiva())));
+        if (g_pureGame) { camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f; }
+        camFrameLetterbox = (CameraActive->DeclaredAspect() > 0.01f) && g_pureGame != 2 && !gSessionView &&
+                            (g_pureGame || (AnimIsGame && (PlayAnimation || GameSimActive())));
         // jugando encuadrado o sin la UI: sin aire (el marco toca los bordes)
-        const float margin = (camFrameLetterbox || g_juegoPuro || gVistaPartida) ? 1.0f : 0.92f;
-        // LA cuenta del encuadre vive en main/render/EscenaRender.cpp: el runtime del
+        const float margin = (camFrameLetterbox || g_pureGame || gSessionView) ? 1.0f : 0.92f;
+        // LA cuenta del encuadre vive en main/render/SceneRender.cpp: el runtime del
         // juego compilado llama a la MISMA, asi el .deb/APK encuadra igual que el Play.
-        W3dEncuadreMarco(va, ra, margin, &camNX, &camNY);
+        W3dFramingFrame(va, ra, margin, &camNX, &camNY);
         camFrameOn = true; camFrameNX = camNX; camFrameNY = camNY;
     }
 
-    CargarProyeccionVista();   // (la lente de la vista: ver abajo; deja el MatrixMode en ModelView con identidad)
+    LoadProjectionView();   // (la lente de la vista: ver abajo; deja el MatrixMode en ModelView con identidad)
     // los DATOS de los Postproceso del arbol (profundidad / movimiento), ANTES de la escena: el Clear de abajo los tapa
-    if (!soloEscena && view == RenderType::Rendered && camFrameOn) PostDatosPrevios(W3dPantallaAlto - y - height);
+    if (!onlyScene && view == RenderType::Rendered && camFrameOn) PostPreviousData(W3dScreenHeight - y - height);
 
     // Limpiar pantalla
-    const int glY = W3dPantallaAlto - y - height; // arbol arriba-izq -> GL
+    const int glY = W3dScreenHeight - y - height; // arbol arriba-izq -> GL
     w3dEngine::Enable(w3dEngine::ScissorTest);
     w3dEngine::Scissor(x, glY, width, height);
-    if (!soloEscena) WP3DOclusionPass(this);   // modos de pintura: mapa "que cara se ve en cada pixel" (lo pisa el Clear de abajo)
+    if (!onlyScene) WP3DOcclusionPass(this);   // modos de pintura: mapa "que cara se ve en cada pixel" (lo pisa el Clear de abajo)
 
     // ZBuffer: fog de profundidad con rango FIJO en unidades de mundo (NO depende de la escena ni del
-    // zoom). Es SOLO la distancia camara->objeto: en la camara = blanco, a fogFar o mas lejos = negro.
+    // zoom). Es SOLO la distancia camera->object: en la camara = blanco, a fogFar o mas lejos = negro.
     // Al mover/zoomear la camara cambian las distancias -> TODO se aclara al acercarse y se oscurece al
     // alejarse por igual (incluido el objeto mas cercano). Para afinar el contraste, cambiar fogFar.
     const float fogNear = nearClip; // ~camara = blanco
@@ -2177,15 +2186,15 @@ void Viewport3D::Render() {
 
     if (view == RenderType::ZBuffer) {
         w3dEngine::Enable(w3dEngine::Fog);
-        w3dEngine::FogMode(true);
+        w3dEngine::FogMode(0);
         w3dEngine::FogStart(fogNear); // rango FIJO: solo la distancia a la camara define el tono
         w3dEngine::FogEnd(fogFar);
         GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
         w3dEngine::FogColor(fogColor);
     } else {
         w3dEngine::Disable(w3dEngine::Fog);
-        w3dEngine::ClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
-                     ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
+        w3dEngine::ClearColor(ColorList[static_cast<int>(ColorID::background)][0], ColorList[static_cast<int>(ColorID::background)][1],
+                     ColorList[static_cast<int>(ColorID::background)][2], ColorList[static_cast<int>(ColorID::background)][3]);
     }
 
     // QUIEN LIMPIA. Un proyecto con CONSTRUCTOR limpia el solo, con sus pasos "Clear color" y "Clear" (sin un "Clear"
@@ -2195,20 +2204,20 @@ void Viewport3D::Render() {
     // color con su fondo fijo y ahi el proyecto solo limpia profundidad y estencil. Un proyecto viejo (sin
     // constructor) lo limpia el viewport, como siempre. En el modo juego puro la escena es la pantalla entera: sin
     // scissor (el "Clear" del proyecto la limpia toda, como en el juego compilado)
-    const bool modoAnalisis = (view == RenderType::ZBuffer || view == RenderType::Alpha || view == RenderType::NormalView ||
-                               view == RenderType::Vectores);
-    const bool proyectoLimpia = W3dHayConstructor() && W3dEscena3DActiva();   // (lua dibujar3D(false): no corre)
-    const bool limpiaElProyecto = proyectoLimpia && !modoAnalisis;
-    g_w3dLimpiarColorFijo = proyectoLimpia && modoAnalisis;
+    const bool analysisMode = (view == RenderType::ZBuffer || view == RenderType::Alpha || view == RenderType::NormalView ||
+                               view == RenderType::Vectors);
+    const bool projectClean = W3dHasConstructor() && W3dScene3DActive();   // (lua dibujar3D(false): no corre)
+    const bool cleanProject = projectClean && !analysisMode;
+    g_w3dClearColorFixed = projectClean && analysisMode;
     // el "Clear color" del proyecto en AUTO: en la vista Render (y jugando) el fondo del render; en las otras, el fondo de
     // este visor (con el que lo limpiaria un proyecto sin constructor). Se suelta despues del pase de la escena
-    if (limpiaElProyecto && view != RenderType::Rendered && !g_juegoPuro)
-        W3dFondoAutoFijar(bgSolido[3] >= 0.0f ? bgSolido : ListaColores[static_cast<int>(ColorID::background)]);
-    else W3dFondoAutoFijar(NULL);
+    if (cleanProject && view != RenderType::Rendered && !g_pureGame)
+        W3dBackgroundAutoSet(bgSolid[3] >= 0.0f ? bgSolid : ColorList[static_cast<int>(ColorID::background)]);
+    else W3dBackgroundAutoSet(NULL);
     // (una mitad de la pantalla dividida recorta siempre: el "Clear" del proyecto no borra la otra)
-    const bool recortarEscena = proyectoLimpia && (!g_juegoPuro || gVistaPartida);
-    const bool pisoDespues = limpiaElProyecto;
-    if (limpiaElProyecto) {
+    const bool cropScene = projectClean && (!g_pureGame || gSessionView);
+    const bool floorAfter = cleanProject;
+    if (cleanProject) {
         // (nada: ni color ni profundidad)
     } else {
         if (view == RenderType::ZBuffer || view == RenderType::Alpha) {
@@ -2218,17 +2227,17 @@ void Viewport3D::Render() {
             // (0,0,1) en view-space, que el Core codifica como (0.5,0.5,1.0). Asi el "vacio" se lee
             // como una superficie de frente, igual que la base de un normal map.
             w3dEngine::ClearColor(0.5f, 0.5f, 1.0f, 1.0f);
-        } else if (view == RenderType::Vectores) {
-            float bg[4]; W3dVecColorFondo(bg); w3dEngine::ClearColor(bg[0], bg[1], bg[2], bg[3]);   // quieto, sin geometria
+        } else if (view == RenderType::Vectors) {
+            float bg[4]; W3dVecBackgroundColor(bg); w3dEngine::ClearColor(bg[0], bg[1], bg[2], bg[3]);   // quieto, sin geometria
         } else if (view == RenderType::Rendered) {
             w3dEngine::ClearColor(g_renderBg[0], g_renderBg[1], g_renderBg[2], g_renderBg[3]); // fondo GLOBAL del render
         } else {
-            // solid / wireframe / material / normal: fondo POR-VIEWPORT (bgSolido). Sentinel alpha<0 = tema.
-            if (bgSolido[3] >= 0.0f)
-                w3dEngine::ClearColor(bgSolido[0], bgSolido[1], bgSolido[2], bgSolido[3]);
+            // solid / wireframe / material / normal: fondo POR-VIEWPORT (bgSolid). Sentinel alpha<0 = tema.
+            if (bgSolid[3] >= 0.0f)
+                w3dEngine::ClearColor(bgSolid[0], bgSolid[1], bgSolid[2], bgSolid[3]);
             else
-                w3dEngine::ClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
-                             ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
+                w3dEngine::ClearColor(ColorList[static_cast<int>(ColorID::background)][0], ColorList[static_cast<int>(ColorID::background)][1],
+                             ColorList[static_cast<int>(ColorID::background)][2], ColorList[static_cast<int>(ColorID::background)][3]);
         }
         // el clear respeta la mascara: si lo ultimo dibujado (un popup, un menu) dejo la escritura de profundidad
         // apagada, la profundidad no se limpiaba y la escena quedaba rechazada entera (el N8)
@@ -2236,7 +2245,7 @@ void Viewport3D::Render() {
         w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
     }
 
-    if (!recortarEscena) w3dEngine::Disable(w3dEngine::ScissorTest);
+    if (!cropScene) w3dEngine::Disable(w3dEngine::ScissorTest);
     w3dEngine::Viewport(x, glY, width, height);
 
     w3dEngine::Disable(w3dEngine::Texture2D);
@@ -2259,17 +2268,17 @@ void Viewport3D::Render() {
     // ponerla despues de cargar la matriz de vista deja la escena oscura.
     // La derivacion vive en EscenaRender, compartida con el runtime del juego: si el
     // juego eligiera otra, el .deb se veria distinto del Play.
-    W3dEscena3DModo((int)(RenderType::Enum)view);
+    W3dScene3DMode((int)(RenderType::Enum)view);
 
     UpdateViewOrbit();
 
     w3dEngine::Enable(w3dEngine::DepthTest);
 
     // Dibujar overlays (en MODO JUEGO PURO ni la grilla/piso: cero editor)
-    if (showOverlays && !g_juegoPuro) {
-            w3dEngine::Material(w3dEngine::MatDiffuse,  ListaColores[static_cast<int>(ColorID::negro)]);
-            w3dEngine::Material(w3dEngine::MatAmbient,  ListaColores[static_cast<int>(ColorID::negro)]);
-            w3dEngine::Material(w3dEngine::MatSpecular, ListaColores[static_cast<int>(ColorID::negro)]);
+    if (showOverlays && !g_pureGame) {
+            w3dEngine::Material(w3dEngine::MatDiffuse,  ColorList[static_cast<int>(ColorID::black)]);
+            w3dEngine::Material(w3dEngine::MatAmbient,  ColorList[static_cast<int>(ColorID::black)]);
+            w3dEngine::Material(w3dEngine::MatSpecular, ColorList[static_cast<int>(ColorID::black)]);
 
         w3dEngine::Disable(w3dEngine::CullFace);
         w3dEngine::Disable(w3dEngine::Lighting);
@@ -2293,62 +2302,62 @@ void Viewport3D::Render() {
         // `if (showOverlays)`). Antes el piso quedaba fuera del corte de modo juego y
         // jugando se veia la grilla pero no los contornos: "Mostrar Superposiciones"
         // significaba dos cosas distintas segun la rama.
-        if (!pisoDespues && (showFloor || showXaxis || showYaxis)) RenderFloor();
+        if (!floorAfter && (showFloor || showXaxis || showYaxis)) RenderFloor();
         w3dEngine::DepthMask(true);
     }
 
     // Edit Mode: marcar la malla ACTIVA para que su render dibuje el overlay de
     // edicion (vertices como puntos + bordes encima) en vez del contorno de objeto.
     // (misma derivacion COMPARTIDA que usa el cambio de modo; PC la refresca por frame
-    //  para seguir a ObjActivo, Symbian la setea al cambiar de modo)
-    ActualizarEditMeshActivo();
+    //  para seguir a ActiveObj, Symbian la setea al cambiar de modo)
+    UpdateActiveEditMesh();
 
-    // master de overlays para el render del CORE (Mesh::Render lee g_mostrarOverlays para no dibujar
+    // master de overlays para el render del CORE (Mesh::Render lee g_showOverlays para no dibujar
     // contornos de seleccion ni el overlay de edit). Se setea por frame = el showOverlays del viewport,
     // SIN cortarlo por el modo juego: "Show Overlays" significa lo mismo jugando que editando (ver el
-    // comentario de ReloadLights). Al dar Play, JuegoPrepararViewports(true) ya lo deja apagado; si el
+    // comentario de ReloadLights). Al dar Play, GamePrepareViewports(true) ya lo deja apagado; si el
     // usuario lo prende, ve las curvas, los empties, los huesos, los gizmos y los contornos.
     // EXCEPCION: el MODO JUEGO PURO (VERDE+0) apaga TODO lo del editor a la fuerza.
-    const bool ovl = showOverlays && !g_juegoPuro;
-    g_mostrarOverlays = ovl;
-    w3dRenderOverlays = ovl; // el Core lo lee (Mesh::RenderObject); g_mostrarOverlays sigue siendo del editor
+    const bool ovl = showOverlays && !g_pureGame;
+    g_showOverlays    = ovl;
+    w3dRenderOverlays = ovl; // el Core lo lee (Mesh::RenderObject); g_showOverlays sigue siendo del editor
     // overlays por tipo (submenu "Objects"): del viewport -> globales que lee el traversal del Core (Empty/Camera/luz)
     g_showLights = showLights && ovl; g_showCamera = showCamera && ovl; g_showEmpty = showEmpty && ovl;
-    g_showParticulas = showParticulas && ovl; g_showCurvas = showCurvas && ovl;
+    g_showParticles = showParticles && ovl; g_showCurves = showCurves && ovl;
     { extern bool g_showHitbox; g_showHitbox = showHitbox && ovl; }
-    { extern bool g_showSonidos; g_showSonidos = showSonidos && ovl; }   // objects/Sonido.cpp (icono, esferas y pick)   // objects/Hitbox.cpp (dibujo y pick)
-    // LOCAL VIEW de ESTE viewport -> globals que lee Object::Render (mismo patron que g_mostrarOverlays). El set
+    { extern bool g_showSounds; g_showSounds = showSounds && ovl; }   // objects/Sound.cpp (icono, esferas y pick)   // objects/Hitbox.cpp (dibujo y pick)
+    // LOCAL VIEW de ESTE viewport -> globals que lee Object::Render (mismo patron que g_showOverlays). El set
     // vive en el viewport; otro viewport sin local view lo deja en false/NULL al publicar SU estado.
     // lo que NACE mientras dura la vista local (Separar con P, Shift+D, Aniadir, Pegar...) entra a la vista local de la
     // Vista 3D donde se esta trabajando, como en Blender. Antes el objeto nuevo desaparecia y parecia un error (duenio,
     // 2026-11-09). Las OTRAS Vistas 3D en vista local solo se ponen al dia (no lo suman)
-    if (localViewActivo) {
-        const unsigned int nacidos = W3dObjetosNacidos();
-        if (nacidos != lvNacidos) {
-            if (Viewport3DActive == this) LV_AgregarNacidos(SceneCollection, lvNacidos, localViewSet, localViewPaso);
-            lvNacidos = nacidos;
+    if (localViewActive) {
+        const unsigned int spawned = W3dObjectsSpawned();
+        if (spawned != lvSpawned) {
+            if (Viewport3DActive == this) LV_AddSpawned(SceneCollection, lvSpawned, localViewSet, localViewStep);
+            lvSpawned = spawned;
         }
     }
-    { g_localViewActivo = localViewActivo; g_localViewVisibles = localViewActivo ? &localViewSet : 0;
-      g_localViewPaso = localViewActivo ? &localViewPaso : 0; }
+    { g_localViewActive = localViewActive; g_visibleLocalView = localViewActive ? &localViewSet : 0;
+      g_localViewStep = localViewActive ? &localViewStep : 0; }
 
-    // (los flags de dibujo del Core los dejo W3dEscena3DModo mas arriba, junto con la
+    // (los flags de dibujo del Core los dejo W3dScene3DMode mas arriba, junto con la
     //  posicion de la luz: tienen que quedar puestos con la modelview en identidad.)
 
     // ZBuffer: RE-seteamos el fog de profundidad JUSTO antes de dibujar las mallas (RenderFloor lo pisa
     // con su propio fog). Asi las mallas se sombrean por profundidad: cerca claro -> lejos oscuro.
     if (view == RenderType::ZBuffer) {
         w3dEngine::Enable(w3dEngine::Fog);
-        w3dEngine::FogMode(true);
+        w3dEngine::FogMode(0);
         w3dEngine::FogStart(fogNear); // mismo rango FIJO que arriba
         w3dEngine::FogEnd(fogFar);
         GLfloat fogZ[] = {0.0f, 0.0f, 0.0f, 1.0f};
         w3dEngine::FogColor(fogZ);
     }
 
-    WeightPaintActualizar(); // prende/apaga el degradado de peso en el mesh activo (modo Weight Paint)
+    WeightPaintUpdate(); // prende/apaga el degradado de peso en el mesh activo (modo Weight Paint)
 
-    const unsigned limpiezas0 = g_w3dLimpiezasColor;   // (si el proyecto limpio el color en este cuadro: las barras)
+    const unsigned clears0 = g_w3dClearsColor;   // (si el proyecto limpio el color en este cuadro: las barras)
     // Renderiza la escena recursivamente
     { double _tScn0 = W3dNowMs();
       // base para las ESTADISTICAS del frame de este viewport (overlay "faces"/"gl"):
@@ -2359,8 +2368,8 @@ void Viewport3D::Render() {
       const int _stDraw0 = w3dEngine::g_statDrawTris;
       const int _stBind0 = w3dEngine::g_statTexBinds;
       const int _stEst0  = w3dEngine::g_statStateChanges;
-      const int _stOtr0  = w3dEngine::g_statOtras;
-      // EL PASE DE ESCENA vive en main/render/EscenaRender.cpp y lo llama TAMBIEN el
+      const int _stOtr0  = w3dEngine::g_otherStat;
+      // EL PASE DE ESCENA vive en main/render/SceneRender.cpp y lo llama TAMBIEN el
       // runtime del juego compilado: recorrido del arbol (que adentro resuelve culling,
       // LOD, visibilidad por celdas, espejos, instancias, luces y lotes) y despues los
       // tres diferidos, en este orden:
@@ -2372,38 +2381,38 @@ void Viewport3D::Render() {
       //     los overlays del editor (huesos, motion trail, passepartout, UI). La modelview
       //     quedo en la matriz de VISTA -> se dibujan en coords de MUNDO.
       // (El resync del cache de estado y el sello de lote tambien pasaron para alla.)
-      if (view == RenderType::Vectores) VistaVectores();   // (en vez de la escena: el color de su movimiento)
+      if (view == RenderType::Vectors) VectorView();   // (en vez de la escena: el color de su movimiento)
       else {
-          // (los objetos Postproceso actuan durante el recorrido: ver PostEnArbol)
-          const bool conPost = (view == RenderType::Rendered) && camFrameOn;
-          if (conPost) { gVpPost = this; gVpPostGlY = glY; g_postEnArbol = PostEnArbol; gPostDiferidos.clear(); }
+          // (los objetos Postproceso actuan durante el recorrido: ver PostInTree)
+          const bool withPost = (view == RenderType::Rendered) && camFrameOn;
+          if (withPost) { gVpPost = this; gVpPostGlY = glY; g_postInTree = PostInTree; gDeferedPost.clear(); }
           // la UI del juego se ve mirando por la camara o jugando (ver RenderUI): ahi puede ir en su lugar del arbol
-          gHudEnArbol = false;
-          const bool conUI = !soloEscena && (camFrameOn || g_juegoPuro || AnimEsJuego);
-          if (conUI) { gVpUI = this; gVpUIglY = glY; g_uiEnArbol = UIEnArbol; }
-          W3dEscena3DPasada();
-          W3dFondoAutoFijar(NULL);   // (el color de Auto de este visor: lo que se dibuje despues usa el del render)
-          if (conPost) { gVpPost = NULL; g_postEnArbol = 0; }
-          if (conUI) { gVpUI = NULL; g_uiEnArbol = 0; }
+          gHudInTree = false;
+          const bool withUI = !onlyScene && (camFrameOn || g_pureGame || AnimIsGame);
+          if (withUI) { gVpUI = this; gVpUIglY = glY; g_uiInTree = UIInTree; }
+          W3dScene3DPass();
+          W3dBackgroundAutoSet(NULL);   // (el color de Auto de este visor: lo que se dibuje despues usa el del render)
+          if (withPost) { gVpPost = NULL; g_postInTree = 0; }
+          if (withUI) { gVpUI = NULL; g_uiInTree = 0; }
       }
       // (P1) auditoria del cache de estado al CERRAR el pase de escena (solo si el
       // harness la prendio con 'glaudit'; en el frame normal cuesta cero): si algo
       // del pase toco GL crudo, aca se detecta y se acumula el desync.
-      if (w3dEngine::g_auditarEscena) w3dEngine::g_auditDesyncs += w3dEngine::AuditarEstado();
+      if (w3dEngine::g_auditScene) w3dEngine::g_auditDesyncs += w3dEngine::AuditState();
       // cierre de las ESTADISTICAS del pase de escena de ESTE viewport (overlay)
-      statTrisFrame    = (w3dEngine::g_statIndices      - _stTris0) / 3;
-      statDrawsFrame   =  w3dEngine::g_statDrawTris     - _stDraw0;
-      statBindsFrame   =  w3dEngine::g_statTexBinds     - _stBind0;
-      statEstadosFrame =  w3dEngine::g_statStateChanges - _stEst0;
-      statOtrasFrame   =  w3dEngine::g_statOtras        - _stOtr0;
+      statTrisFrame   = (w3dEngine::g_statIndices      - _stTris0) / 3;
+      statDrawsFrame  =  w3dEngine::g_statDrawTris     - _stDraw0;
+      statBindsFrame  =  w3dEngine::g_statTexBinds     - _stBind0;
+      statStatesFrame =  w3dEngine::g_statStateChanges - _stEst0;
+      statOtherFrame  =  w3dEngine::g_otherStat        - _stOtr0;
       // exponer caras/draws del viewport ACTIVO como globals planos (para el [PERF] del juego).
-      { extern int g_renderCaras, g_renderDraws;
-        if (Viewport3DActive == this) { g_renderCaras = statTrisFrame; g_renderDraws = statDrawsFrame; } }
+      { extern int g_renderFaces, g_renderDraws;
+        if (Viewport3DActive == this) { g_renderFaces = statTrisFrame; g_renderDraws = statDrawsFrame; } }
       g_prof.scene += W3dNowMs() - _tScn0; } // profiler: escena (skinning + modelos)
 
     // la GRILLA de un proyecto que limpia el solo: despues de la escena (su "Clear" la habria borrado), con el estado
     // que espera (la escena dejo cualquiera) y contra el z de la escena
-    if (pisoDespues && showOverlays && !g_juegoPuro && (showFloor || showXaxis || showYaxis)) {
+    if (floorAfter && showOverlays && !g_pureGame && (showFloor || showXaxis || showYaxis)) {
         w3dEngine::UnbindVBOs();   // (la grilla apunta a RAM)
         w3dEngine::Disable(w3dEngine::Lighting); w3dEngine::Disable(w3dEngine::Texture2D);
         w3dEngine::Disable(w3dEngine::Blend); w3dEngine::Disable(w3dEngine::CullFace);
@@ -2415,30 +2424,30 @@ void Viewport3D::Render() {
         RenderFloor();
         w3dEngine::DepthMask(true);
     }
-    if (recortarEscena) w3dEngine::Disable(w3dEngine::ScissorTest);
+    if (cropScene) w3dEngine::Disable(w3dEngine::ScissorTest);
 
     // TRAZADO DE RAYOS (vista Rendered con "Ray Tracing" tildado): avanza unos tiles y pega la imagen trazada
     // sobre la escena GL (una textura del tamano del viewport). Los overlays del editor siguen encima con GL.
-    if (view == RenderType::Rendered && g_rt.on) RTViewportPaso(this);
+    if (view == RenderType::Rendered && g_rt.on) RTViewportStep(this);
     // EL POSTPROCESADO con el trazado de rayos: los objetos Postproceso que el recorrido encontro, sobre la imagen
     // trazada (ya pegada), en el orden del arbol
-    if (!gPostDiferidos.empty()) {
-        for (size_t i = 0; i < gPostDiferidos.size(); i++) {
-            W3dPostUsar(&gPostDiferidos[i]->opc); gEnPost = true;
-            PostProcesar(glY);
-            gEnPost = false; W3dPostUsar(NULL);
+    if (!gDeferedPost.empty()) {
+        for (size_t i = 0; i < gDeferedPost.size(); i++) {
+            W3dPostUse(&gDeferedPost[i]->opt); gInPost = true;
+            RunPostProcess(glY);
+            gInPost = false; W3dPostUse(NULL);
         }
-        gPostDiferidos.clear();
+        gDeferedPost.clear();
     }
-    W3dPostDatosOlvidar(); gCpuProfListo = gCpuVecListo = false;
+    W3dPostDataForget(); gCpuProfReady = gCpuVecReady = false;
     // la imagen trazada tapa lo que el pase de escena dibujo como overlay (la piramide de las CAMARAS, la linea de las
     // LUCES): se dibujan otra vez encima, contra el z de la escena. (Sin el trazado, el postprocesado los deja como
     // estaban en la imagen: redibujarlos encima duplicaba los semitransparentes)
-    if (view == RenderType::Rendered && g_rt.on && ovl) RTGizmosEncima(SceneCollection);
+    if (view == RenderType::Rendered && g_rt.on && ovl) RTGizmosOnTop(SceneCollection);
 
     // huesos encima de todo (ignoran z-buffer). Es OVERLAY del editor: se apaga con "Show Overlays",
     // con su propio toggle "Armature" del menu de overlays, o jugando (ovl ya corta por modo juego).
-    if (ovl && showArmature) RenderArmaturasEncima(SceneCollection);
+    if (ovl && showArmature) RenderArmaturesOnTop(SceneCollection);
     // Motion Trail: mismo criterio (overlay del editor, en x-ray). Lo prende el menu Animation.
     if (ovl) RenderMotionTrail();
 
@@ -2449,10 +2458,10 @@ void Viewport3D::Render() {
     // un proyecto que NO limpio el color en este cuadro (sin "Clear", o solo profundidad): el 3D deja estela, que es lo
     // pedido, pero las BARRAS del area son translucidas sobre el 3D y se encimaban con las del cuadro anterior (texto
     // fantasma). Sus franjas se limpian con el fondo del tema: la interfaz del editor no se ensucia
-    if (limpiaElProyecto && !g_juegoPuro && g_w3dLimpiezasColor == limpiezas0) {
-        const int arri = barAbajo ? 0 : BarTopOffset();
-        const int abaj = (ToolbarVisible() ? ToolbarHeight() : 0) + (barAbajo ? BarTopOffset() : 0);
-        const float* bg = ListaColores[static_cast<int>(ColorID::background)];
+    if (cleanProject && !g_pureGame && g_w3dClearsColor == clears0) {
+        const int arri = barDown ? 0 : BarTopOffset();
+        const int abaj = (ToolbarVisible() ? ToolbarHeight() : 0) + (barDown ? BarTopOffset() : 0);
+        const float* bg = ColorList[static_cast<int>(ColorID::background)];
         w3dEngine::ClearColor(bg[0], bg[1], bg[2], 1.0f);
         w3dEngine::Enable(w3dEngine::ScissorTest);
         if (arri > 0) { w3dEngine::Scissor(x, glY + height - arri, width, arri); w3dEngine::Clear(w3dEngine::ColorBuffer); }
@@ -2463,22 +2472,22 @@ void Viewport3D::Render() {
     // estado GL 2D tras las mallas. La opcion ShowUi que lo salteaba se dio de baja:
     // sin chrome el viewport quedaba inusable y el estado sucio (CULL_FACE + arrays
     // prendidos) contaminaba el proximo dibujo 2D (los errores graficos reportados).
-    if (soloEscena) { Estado2D(); g_prof.viewport3d += W3dNowMs() - _tVp0; return; }
+    if (onlyScene) { State2D(); g_prof.viewport3d += W3dNowMs() - _tVp0; return; }
     RenderUI();
-    RenderSnapIndicador(); // recuadro verde en el target de snap (encima de todo)
-    WP3DRenderPincel(this); // circulo del pincel (modo Weight Paint), siguiendo al mouse
+    RenderSnapIndicator(); // recuadro verde en el target de snap (encima de todo)
+    WP3DRenderBrush(this); // circulo del pincel (modo Weight Paint), siguiendo al mouse
     BoxSelectRender3D(this); // cruz guia / caja de seleccion (tecla B)
     g_prof.viewport3d += W3dNowMs() - _tVp0; // profiler: cierra el tiempo de este viewport 3D
 }
 
 // los GIZMOS de las camaras y las luces sobre la imagen trazada (ver arriba): cada uno con su matriz de mundo, sobre
 // la modelview de la VISTA que dejo el pase de escena
-void Viewport3D::RTGizmosEncima(Object* o) {
+void Viewport3D::RTGizmosOnTop(Object* o) {
     if (!o) return;
     if (o != (Object*)SceneCollection && !o->visible) return;
-    if (localViewActivo && o != (Object*)SceneCollection && !localViewSet.count(o)) {   // (vista local: solo lo aislado;
-        if (!localViewPaso.count(o)) return;                                         //  por sus padres solo se pasa)
-        for (size_t i = 0; i < o->Childrens.size(); i++) RTGizmosEncima(o->Childrens[i]);
+    if (localViewActive && o != (Object*)SceneCollection && !localViewSet.count(o)) {   // (vista local: solo lo aislado;
+        if (!localViewStep.count(o)) return;                                         //  por sus padres solo se pasa)
+        for (size_t i = 0; i < o->Childrens.size(); i++) RTGizmosOnTop(o->Childrens[i]);
         return;
     }
     const ObjectType t = o->getType();
@@ -2491,14 +2500,14 @@ void Viewport3D::RTGizmosEncima(Object* o) {
         else if (g_lightOverlayHook) g_lightOverlayHook((Light*)o);
         w3dEngine::PopMatrix();
     }
-    if (t == ObjectType::sonido) {   // las ESFERAS del alcance de un sonido 3D (lo dibuja el propio Sonido)
+    if (t == ObjectType::sound) {   // las ESFERAS del alcance de un sonido 3D (lo dibuja el propio Sonido)
         Matrix4 W; o->GetWorldMatrix(W);
         // (en X-RAY: el alcance es una ayuda, se ve aunque este detras de la escena; contra el z no se veia)
         w3dEngine::Disable(w3dEngine::DepthTest);
         w3dEngine::PushMatrix(); w3dEngine::MultMatrix(W.m); o->RenderObject(); w3dEngine::PopMatrix();
         w3dEngine::Enable(w3dEngine::DepthTest);
     }
-    for (size_t i = 0; i < o->Childrens.size(); i++) RTGizmosEncima(o->Childrens[i]);
+    for (size_t i = 0; i < o->Childrens.size(); i++) RTGizmosOnTop(o->Childrens[i]);
 }
 
 // ARMATURE: dibuja los huesos de TODAS las armatures de la escena como lineas AZULES, encima de todo (z-test OFF),
@@ -2517,50 +2526,50 @@ void Viewport3D::RTGizmosEncima(Object* o) {
 void Viewport3D::RenderMotionTrail(){
     namespace gfx = w3dEngine;
     if (!MotionTrailOn || ObjSelects.empty()) return;
-    static std::vector<GLfloat> claro, oscuro, puntos;
-    claro.clear(); oscuro.clear(); puntos.clear();
-    std::vector<Vector3> pts; std::vector<int> keys; int desde, hasta;
+    static std::vector<GLfloat> bright, dark, points;
+    bright.clear(); dark.clear(); points.clear();
+    std::vector<Vector3> pts; std::vector<int> keys; int from, until;
     // ---- POSE MODE: el camino de los HUESOS seleccionados (el trail del objeto armature no dice nada: lo que
     //      se mueve son los huesos). Los puntos vienen en espacio NODO -> se pasan a mundo con el world del
     //      armature, igual que se dibujan los huesos.
-    if (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature){
-        Armature* a = (Armature*)ObjActivo;
+    if (InteractionMode == PoseMode && ActiveObj && ActiveObj->getType() == ObjectType::armature){
+        Armature* a = (Armature*)ActiveObj;
         Matrix4 AW; a->GetWorldMatrix(AW);
         for (size_t b = 0; b < a->bones.size(); b++){
-            if (!(a->bones[b].select || (int)b == a->boneActivo)) continue;
-            if (!MotionTrailHuesoNodo(a, (int)b, pts, keys, desde, hasta)) continue;
+            if (!(a->bones[b].select || (int)b == a->activeBone)) continue;
+            if (!MotionTrailBoneNode(a, (int)b, pts, keys, from, until)) continue;
             for (size_t i = 0; i < pts.size(); i++) pts[i] = AW * pts[i];
             for (size_t i = 1; i < pts.size(); i++){
-                std::vector<GLfloat>& dst = ((i & 1) ? claro : oscuro);
+                std::vector<GLfloat>& dst = ((i & 1) ? bright : dark);
                 dst.push_back(pts[i-1].x); dst.push_back(pts[i-1].y); dst.push_back(pts[i-1].z);
                 dst.push_back(pts[i].x);   dst.push_back(pts[i].y);   dst.push_back(pts[i].z);
             }
             for (size_t k = 0; k < keys.size(); k++){
-                int idx = keys[k] - desde;
+                int idx = keys[k] - from;
                 if (idx < 0 || idx >= (int)pts.size()) continue;
-                puntos.push_back(pts[idx].x); puntos.push_back(pts[idx].y); puntos.push_back(pts[idx].z);
+                points.push_back(pts[idx].x); points.push_back(pts[idx].y); points.push_back(pts[idx].z);
             }
         }
     }
     else
     for (size_t s2 = 0; s2 < ObjSelects.size(); s2++){
-        if (!MotionTrailDe(ObjSelects[s2], pts, keys, desde, hasta)) continue;
+        if (!MotionTrailOf(ObjSelects[s2], pts, keys, from, until)) continue;
         // tramos: uno por FRAME, alternando el buffer -> claro/oscuro/claro...
         for (size_t i = 1; i < pts.size(); i++){
-            std::vector<GLfloat>& dst = ((i & 1) ? claro : oscuro);
+            std::vector<GLfloat>& dst = ((i & 1) ? bright : dark);
             dst.push_back(pts[i-1].x); dst.push_back(pts[i-1].y); dst.push_back(pts[i-1].z);
             dst.push_back(pts[i].x);   dst.push_back(pts[i].y);   dst.push_back(pts[i].z);
         }
         // un punto por KEYFRAME (no por frame)
         for (size_t k = 0; k < keys.size(); k++){
-            int idx = keys[k] - desde;
+            int idx = keys[k] - from;
             if (idx < 0 || idx >= (int)pts.size()) continue;
-            puntos.push_back(pts[idx].x); puntos.push_back(pts[idx].y); puntos.push_back(pts[idx].z);
+            points.push_back(pts[idx].x); points.push_back(pts[idx].y); points.push_back(pts[idx].z);
         }
     }
-    if (claro.empty() && oscuro.empty()) return;
+    if (bright.empty() && dark.empty()) return;
 
-    GLboolean luz = gfx::IsEnabled(gfx::Lighting);
+    GLboolean light = gfx::IsEnabled(gfx::Lighting);
     gfx::Disable(gfx::Lighting);
     gfx::Disable(gfx::Texture2D);
     gfx::Disable(gfx::DepthTest);        // X-RAY: encima de todo, como los huesos
@@ -2568,50 +2577,50 @@ void Viewport3D::RenderMotionTrail(){
     gfx::DisableArray(gfx::ColorArray);
     gfx::DisableArray(gfx::TexCoordArray);
     gfx::LineWidth(2.0f);
-    if (!oscuro.empty()){
+    if (!dark.empty()){
         gfx::Color4f(0.30f, 0.30f, 0.35f, 1.0f);
-        gfx::VertexPointer3f(0, &oscuro[0]);
-        gfx::DrawLines((int)(oscuro.size() / 3));
+        gfx::VertexPointer3f(0, &dark[0]);
+        gfx::DrawLines((int)(dark.size() / 3));
     }
-    if (!claro.empty()){
+    if (!bright.empty()){
         gfx::Color4f(0.95f, 0.95f, 1.00f, 1.0f);
-        gfx::VertexPointer3f(0, &claro[0]);
-        gfx::DrawLines((int)(claro.size() / 3));
+        gfx::VertexPointer3f(0, &bright[0]);
+        gfx::DrawLines((int)(bright.size() / 3));
     }
-    if (!puntos.empty()){                // los KEYFRAMES: mismo tamaño que los vertices del Edit Mode
+    if (!points.empty()){                // los KEYFRAMES: mismo tamaño que los vertices del Edit Mode
         gfx::PointSize(6.0f);   // el MISMO que los vertices del Edit Mode
-        const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
+        const float* acc = ColorList[static_cast<int>(ColorID::accent)];
         gfx::Color4f(acc[0], acc[1], acc[2], 1.0f);
-        gfx::VertexPointer3f(0, &puntos[0]);
-        gfx::DrawPoints((int)(puntos.size() / 3));
+        gfx::VertexPointer3f(0, &points[0]);
+        gfx::DrawPoints((int)(points.size() / 3));
         gfx::PointSize(1.0f);
     }
     gfx::LineWidth(1.0f);
     gfx::Enable(gfx::DepthTest);
     gfx::EnableArray(gfx::NormalArray);
-    if (luz) gfx::Enable(gfx::Lighting);
+    if (light) gfx::Enable(gfx::Lighting);
     gfx::Invalidate();
 }
 
-void Viewport3D::RenderArmaturasEncima(Object* node){
+void Viewport3D::RenderArmaturesOnTop(Object* node){
     if (!node) return;
     // VISTA LOCAL: solo los huesos de lo aislado (antes se veian TODOS los esqueletos, aunque no estuvieran elegidos)
     // (tampoco los del armature PADRE de una malla elegida: por los padres solo se pasa, para llegar a lo aislado)
-    if (localViewActivo && node != (Object*)SceneCollection && !localViewSet.count(node)) {
-        if (!localViewPaso.count(node)) return;
-        for (size_t c = 0; c < node->Childrens.size(); c++) RenderArmaturasEncima(node->Childrens[c]);
+    if (localViewActive && node != (Object*)SceneCollection && !localViewSet.count(node)) {
+        if (!localViewStep.count(node)) return;
+        for (size_t c = 0; c < node->Childrens.size(); c++) RenderArmaturesOnTop(node->Childrens[c]);
         return;
     }
     if (node->visible && node->getType() == ObjectType::armature){
         Armature* arm = static_cast<Armature*>(node);
         if (!arm->bones.empty()){
             namespace gfx = w3dEngine;
-            EvaluarPoseEsqueleto(arm, CurrentFrame); // pose animada (o rest si no hay clip) -> poseHead/poseTail
+            EvaluatePoseSkeleton(arm, CurrentFrame); // pose animada (o rest si no hay clip) -> poseHead/poseTail
             Matrix4 W; arm->GetWorldMatrix(W);
             gfx::MatrixMode(gfx::ModelView);
             gfx::PushMatrix();
             gfx::MultMatrix(W.m);
-            GLboolean luz = gfx::IsEnabled(gfx::Lighting);
+            GLboolean light = gfx::IsEnabled(gfx::Lighting);
             gfx::Disable(gfx::Lighting);
             gfx::Disable(gfx::Texture2D);
             gfx::Disable(gfx::DepthTest);   // encima de todo
@@ -2625,8 +2634,8 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             // (multi-seleccion). En Object Mode todos van a 'buf' con el color del armature (verde/azul de objeto).
             // EDIT MODE de armature (Fase 3): mismos colores por seleccion PERO sobre head/tail CRUDOS (el rest que
             // se edita, no la pose) + PUNTOS en cada extremo (los agarraderos del drag).
-            bool poseMode = (InteractionMode == PoseMode && arm == (Armature*)ObjActivo);
-            bool editArm  = (InteractionMode == EditMode && arm == (Armature*)ObjActivo);
+            bool poseMode = (InteractionMode == PoseMode && arm == (Armature*)ActiveObj);
+            bool editArm  = (InteractionMode == EditMode && arm == (Armature*)ActiveObj);
             std::vector<GLfloat> buf, dash, bufSel, bufAct; buf.reserve(arm->bones.size() * 6);
             std::vector<GLfloat> pts, ptsSel; // extremos (solo editArm): normal / del hueso seleccionado-activo
             for (size_t i = 0; i < arm->bones.size(); i++){
@@ -2635,7 +2644,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
                 Vector3 T = editArm ? b.tail : b.poseTail;
                 std::vector<GLfloat>* dst = &buf;
                 if (poseMode || editArm){
-                    if ((int)i == arm->boneActivo) dst = &bufAct;   // activo = blanco
+                    if ((int)i == arm->activeBone) dst = &bufAct;   // activo = blanco
                     else if (b.select)             dst = &bufSel;   // seleccionado = verde
                     // sino queda en buf (azul, ver mas abajo)
                 }
@@ -2661,12 +2670,12 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             }
             // color de 'buf': en Pose/Edit = AZUL (huesos sin seleccionar); en Object Mode = color del armature
             // (ACTIVO verde / seleccionado verde-secundario / no seleccionado azul, como el resto de objetos).
-            bool activo = (arm == (Armature*)ObjActivo);
+            bool active = (arm == (Armature*)ActiveObj);
             const float* col;
-            if (poseMode || editArm){ static const float azulH[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = azulH; } // sin seleccionar = AZUL (el negro se perdia en el fondo)
-            else if (activo)         col = ListaColores[(int)ColorID::accent];
-            else if (arm->select)    col = ListaColores[(int)ColorID::accentDark];
-            else { static const float azul[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = azul; }
+            if (poseMode || editArm){ static const float blueH[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = blueH; } // sin seleccionar = AZUL (el negro se perdia en el fondo)
+            else if (active)         col = ColorList[(int)ColorID::accent];
+            else if (arm->select)    col = ColorList[(int)ColorID::accentDark];
+            else { static const float blue[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = blue; }
             gfx::LineWidth(2.0f);
             if (!buf.empty()){
                 gfx::Color4f(col[0], col[1], col[2], 1.0f);
@@ -2675,7 +2684,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             }
             // huesos SELECCIONADOS (Pose Mode): VERDE, mas gruesos, encima.
             if (!bufSel.empty()){
-                const float* sc = ListaColores[(int)ColorID::accent];
+                const float* sc = ColorList[(int)ColorID::accent];
                 gfx::Color4f(sc[0], sc[1], sc[2], 1.0f);
                 gfx::LineWidth(3.0f);
                 gfx::VertexPointer3f(0, &bufSel[0]);
@@ -2689,7 +2698,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
                 gfx::DrawLines((int)(bufAct.size() / 3));
             }
             // LINEA DE PARENTESCO (hueso emparentado con gap): PUNTEADA COMO LA DE EMPARENTAR
-            // OBJETOS (RenderRelantionshipsLines): la misma textura de puntos chicos
+            // OBJETOS (RenderRelationshipsLines): la misma textura de puntos chicos
             // (relationshipLine.png repetida a lo largo, ~8 repeticiones por unidad de mundo) y
             // el mismo GRIS UI -- de OTRO color que el hueso, que con el punteado azul a mano se
             // confundia con una linea cortada (reporte del dueno). Un draw por linea (cada una
@@ -2701,7 +2710,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
                 gfx::BindTexture(Textures[3]->iID);
                 gfx::TexFilter(false);
                 gfx::TexWrap(true);
-                SetColorID(ColorID::grisUI);
+                SetColorID(ColorID::grayUI);
                 gfx::LineWidth(1.0f);
                 for (size_t k = 0; k + 5 < dash.size(); k += 6){
                     // largo en MUNDO (el espaciado de los puntos = el de la relationship line,
@@ -2736,20 +2745,20 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             gfx::LineWidth(1.0f);
             gfx::Enable(gfx::DepthTest);
             gfx::EnableArray(gfx::NormalArray);
-            if (luz) gfx::Enable(gfx::Lighting);
+            if (light) gfx::Enable(gfx::Lighting);
             gfx::PopMatrix();
             gfx::Invalidate();
         }
     }
     for (size_t c = 0; c < node->Childrens.size(); c++)
-        RenderArmaturasEncima(node->Childrens[c]);
+        RenderArmaturesOnTop(node->Childrens[c]);
 }
 
 // SNAP: recuadro verde (solo borde) en el target bajo el cursor mientras se mueve con snap ON. Asi sabes
-// que esta enganchando y donde. g_snapSx/Sy son coords del viewport (las setea SnapBuscarTarget/SnapAjustar).
-void Viewport3D::RenderSnapIndicador(){
+// que esta enganchando y donde. g_snapSx/Sy son coords del viewport (las setea SnapFindTarget/SnapAjustar).
+void Viewport3D::RenderSnapIndicator(){
     if (!g_snap.enabled || !g_snapHit) return;
-    if (!(Viewport3DActive == this && (estado==translacion||estado==rotacion||estado==EditScale))) return;
+    if (!(Viewport3DActive == this && (state==translation||state==rotation||state==EditScale))) return;
     namespace gfx = w3dEngine;
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, width, height, 0, -1, 1);
@@ -2759,9 +2768,9 @@ void Viewport3D::RenderSnapIndicador(){
     gfx::EnableArray(gfx::VertexArray);
     // el recuadro crece con la escala de la UI (a escala 2, 16 px) y con el DEDO es mas grande todavia: chico, con la yema
     // encima, ni se veia. El borde, de GlobalScale px (varios recuadros pegados: LineWidth > 1 no anda en todos los GLES)
-    extern bool ToolbarUsaTactil();
+    extern bool ToolbarUsesTouch();
     const int gs = GlobalScale > 0 ? GlobalScale : 1;
-    const float h = (float)((ToolbarUsaTactil() ? 9 : 4) * gs);   // medio lado
+    const float h = (float)((ToolbarUsesTouch() ? 9 : 4) * gs);   // medio lado
     gfx::Color4f(0.15f, 1.0f, 0.2f, 1.0f); // verde
     for (int k = 0; k < gs; k++) {
         const float x0 = g_snapSx - h - k, x1 = g_snapSx + h + k, y0 = g_snapSy - h - k, y1 = g_snapSy + h + k;
@@ -2781,8 +2790,8 @@ void Viewport3D::RenderCamPassepartout(){
     // con el JUEGO corriendo no va el borde blanco: si ademas el marco ocupa todo el viewport (el aspecto del juego
     // es el de la pantalla) no hay nada que dibujar. Ni el 2D ni el Invalidate del final (en el N95 son ~40 llamadas
     // por cuadro: la UI que sigue arma su estado 2D completo)
-    if (AnimEsJuego && JuegoSimActiva() &&
-        W3dEscena3DSinBandas((float)width, (float)height, camFrameNX, camFrameNY, camViewZoom, camViewPanX, camViewPanY))
+    if (AnimIsGame && GameSimActive() &&
+        W3dScene3DNoBands((float)width, (float)height, camFrameNX, camFrameNY, camViewZoom, camViewPanX, camViewPanY))
         return;
     // 2D local del viewport (0..width, 0..height ; y hacia abajo)
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
@@ -2794,14 +2803,14 @@ void Viewport3D::RenderCamPassepartout(){
     gfx::EnableArray(gfx::VertexArray);
     float W = (float)width, H = (float)height;
     // afuera del marco: 4 bandas (arriba/abajo/izq/der), las MISMAS que dibuja el
-    // runtime del juego (main/render/EscenaRender.cpp). EN EL EDITOR van ATENUADAS
+    // runtime del juego (main/render/SceneRender.cpp). EN EL EDITOR van ATENUADAS
     // (negro 0.5: se ve que hay afuera y se puede auditar el culling, reporte del
     // dueno); NEGRO OPACO -lo que ve el jugador en el aparato, y lo que el juego
-    // compilado dibuja siempre- solo con el toggle 'letterboxNegro' prendido
+    // compilado dibuja siempre- solo con el toggle 'letterboxBlack' prendido
     // (preview del dispositivo; lo usan las pruebas encuadrepx).
-    W3dEscena3DBandas(W, H, camFrameNX, camFrameNY, camViewZoom, camViewPanX, camViewPanY,
-                      camFrameLetterbox && (letterboxNegro || g_juegoPuro));
-    if (g_juegoPuro) { gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); gfx::Invalidate(); return; }   // (sin borde)
+    W3dScene3DBands(W, H, camFrameNX, camFrameNY, camViewZoom, camViewPanX, camViewPanY,
+                      camFrameLetterbox && (letterboxBlack || g_pureGame));
+    if (g_pureGame) { gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); gfx::Invalidate(); return; }   // (sin borde)
     // el marco sigue el zoom/pan de INSPECCION (misma transform que la proyeccion). NDC->pixeles (y hacia abajo).
     float cx = (camViewPanX * 0.5f + 0.5f) * W;
     float cy = (0.5f - camViewPanY * 0.5f) * H;
@@ -2810,7 +2819,7 @@ void Viewport3D::RenderCamPassepartout(){
     // BORDE BLANCO del marco = lo que se va a renderizar. Con el JUEGO corriendo
     // no se dibuja (el juego se ve limpio); con Stop vuelve.
     // VERDE con la camara activa SELECCIONADA (se sabe que lo que se edita es esa camara)
-    if (!(AnimEsJuego && JuegoSimActiva())) {
+    if (!(AnimIsGame && GameSimActive())) {
         if (CameraActive->select) gfx::Color4f(0.30f, 0.85f, 0.35f, 1.0f);
         else gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
         gfx::LineWidth(1.0f);
@@ -2834,10 +2843,10 @@ void Viewport3D::RenderCamPassepartout(){
 // cuantos TILES hacen falta para un render de outW x outH (para el total de la barra de progreso).
 // Mismo tope de tile que RenderAPNG (el tamano del viewport).
 // EL ANTIALIASING del render rasterizado (g_render.antialias): cada tile se dibuja 'S' veces mas grande y se promedia
-static int SuperMuestreo() { const int s = g_render.antialias; return s < 1 ? 1 : (s > 4 ? 4 : s); }
-int Viewport3D::TilesNecesarios(int outW, int outH) const {
+static int SuperSampled() { const int s = g_render.antialias; return s < 1 ? 1 : (s > 4 ? 4 : s); }
+int Viewport3D::NeededTiles(int outW, int outH) const {
     if (outW <= 0 || outH <= 0) return 0;
-    const int S = SuperMuestreo();
+    const int S = SuperSampled();
     int capW = (width  > 0) ? width / S : outW;
     int capH = (height > 0) ? height / S : outH;
     if (capW < 1) capW = 1;
@@ -2849,13 +2858,13 @@ int Viewport3D::TilesNecesarios(int outW, int outH) const {
 }
 
 #ifdef __EMSCRIPTEN__
-extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
+extern "C" void WebUnloadFile(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
 #endif
 // la EXTENSION del frustum de la imagen COMPLETA (aspect = outW/outH, NO el del viewport) y su matriz
-static void ExtensionImagen(bool orto, float fov, float orbitDist, float nearC, int outW, int outH,
+static void ExtensionImage(bool ortho, float fov, float orbitDist, float nearC, int outW, int outH,
                             float& left, float& right, float& bottom, float& top) {
     const float aspectR = (float)outW / (float)outH;
-    if (orto){
+    if (ortho){
         // igual que el viewport: el tamano del volumen orto sigue el zoom (orbitDistance), no un valor fijo
         float size = orbitDist * tanf(fov * 0.5f * 3.14159265f / 180.0f);
         if (size < 0.001f) size = 0.001f;
@@ -2871,9 +2880,9 @@ static void MatMul16(const float* a, const float* b, float* o) {   // o = a * b 
         o[c * 4 + r] = s;
     }
 }
-static void MatProyeccion(bool orto, float l, float r, float b, float t, float n, float f, float* m) {
+static void MatProjection(bool ortho, float l, float r, float b, float t, float n, float f, float* m) {
     for (int i = 0; i < 16; i++) m[i] = 0.0f;
-    if (orto) {
+    if (ortho) {
         m[0] = 2.0f / (r - l); m[5] = 2.0f / (t - b); m[10] = -2.0f / (f - n);
         m[12] = -(r + l) / (r - l); m[13] = -(t + b) / (t - b); m[14] = -(f + n) / (f - n); m[15] = 1.0f;
     } else {
@@ -2882,23 +2891,23 @@ static void MatProyeccion(bool orto, float l, float r, float b, float t, float n
     }
 }
 // EL LENTE de la imagen del render: el de la CAMARA activa (su fov, ortografica, distancias minima y maxima: lo mismo
-// que la vista al mirar por ella, CargarProyeccionVista); sin camara, el del visor. Antes el render usaba siempre el
+// que la vista al mirar por ella, LoadProjectionView); sin camara, el del visor. Antes el render usaba siempre el
 // del visor (lejos = 1000): lo que la camara dibujaba mas lejos -el cielo de un escenario- salia negro en el archivo
-void Viewport3D::LenteImagen(bool& orto, float& fov, float& n, float& f) const {
+void Viewport3D::LensImage(bool& ortho, float& fov, float& n, float& f) const {
     if (CameraActive) {
-        orto = CameraActive->orthographic; fov = CameraActive->fov;
+        ortho = CameraActive->orthographic; fov = CameraActive->fov;
         n = CameraActive->nearClip; f = CameraActive->farClip;
-    } else { orto = orthographic; fov = fovDeg; n = nearClip; f = farClip; }
+    } else { ortho = orthographic; fov = fovDeg; n = nearClip; f = farClip; }
     if (n <= 0.0f) n = 0.001f;
     if (f <= n) f = n + 1.0f;
-    if (orto) f += orbitDistance;   // (far corrido: no cortar el objeto al alejar)
+    if (ortho) f += orbitDistance;   // (far corrido: no cortar el objeto al alejar)
 }
-void Viewport3D::MatrizImagen(int outW, int outH, float* VP16){
+void Viewport3D::MatrixImage(int outW, int outH, float* VP16){
     float left, right, bottom, top;
-    bool lOrto; float lFov, lNear, lFar; LenteImagen(lOrto, lFov, lNear, lFar);
-    ExtensionImagen(lOrto, lFov, orbitDistance, lNear, outW > 0 ? outW : 1, outH > 0 ? outH : 1, left, right, bottom, top);
+    bool lOrtho; float lFov, lNear, lFar; LensImage(lOrtho, lFov, lNear, lFar);
+    ExtensionImage(lOrtho, lFov, orbitDistance, lNear, outW > 0 ? outW : 1, outH > 0 ? outH : 1, left, right, bottom, top);
     float P[16], V[16];
-    MatProyeccion(lOrto, left, right, bottom, top, lNear, lFar, P);
+    MatProjection(lOrtho, left, right, bottom, top, lNear, lFar, P);
     const bool camPrev = ViewFromCameraActive;
     if (CameraActive) ViewFromCameraActive = true;   // (como RenderAPNG: desde la camara activa)
     w3dEngine::MatrixMode(w3dEngine::ModelView);
@@ -2911,16 +2920,16 @@ void Viewport3D::MatrizImagen(int outW, int outH, float* VP16){
 // LA VISTA "MOTION VECTORS": en cada dibujo, la escena en el cuadro ANTERIOR (y la camara, si se mira por ella) se
 // recuerda en la ranura del viewport y se vuelve al actual para pintar cada malla con su movimiento en la pantalla
 // (lo mismo que el pase _vectores del render). Llamar con la proyeccion y la VISTA de este viewport cargadas
-void Viewport3D::VistaVectores() { VistaMovimiento(false, 1.0f); }
-void Viewport3D::VistaDatos(bool profundidad, bool propiaZ) {
+void Viewport3D::VectorView() { MotionView(false, 1.0f); }
+void Viewport3D::DatumView(bool depth, bool ownZ) {
     namespace gfx = w3dEngine;
-    float bg[4]; if (profundidad) W3dVecColorFondoDatos(bg); else W3dVecColorFondo(bg);
+    float bg[4]; if (depth) W3dVecBackgroundColorData(bg); else W3dVecBackgroundColor(bg);
     gfx::ClearColor(bg[0], bg[1], bg[2], bg[3]);
-    if (propiaZ) {
+    if (ownZ) {
         // DE ANTEMANO (antes de la escena): con SU profundidad, escrita y probada como cualquier dibujo
         gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer);
         gfx::Enable(gfx::DepthTest); gfx::DepthFunc(gfx::DepthLEqual); gfx::DepthMask(true);
-        VistaMovimiento(profundidad, PostLejos());
+        MotionView(depth, FarPost());
         gfx::DepthFunc(gfx::DepthLess);
         return;
     }
@@ -2931,74 +2940,74 @@ void Viewport3D::VistaDatos(bool profundidad, bool propiaZ) {
     // asomaba a traves de los objetos
     gfx::Enable(gfx::DepthTest); gfx::DepthFunc(gfx::DepthLEqual); gfx::DepthMask(false);
     gfx::Enable(gfx::PolygonOffsetFill); gfx::PolygonOffset(-1.0f, -4.0f);
-    VistaMovimiento(profundidad, PostLejos());
+    MotionView(depth, FarPost());
     gfx::PolygonOffset(0.0f, 0.0f); gfx::Disable(gfx::PolygonOffsetFill);
     gfx::DepthMask(true); gfx::DepthFunc(gfx::DepthLess);
 }
-void Viewport3D::VistaMovimiento(bool datos, float lejos) {
+void Viewport3D::MotionView(bool data, float far) {
     namespace gfx = w3dEngine;
-    extern int CurrentFrame; extern void AplicarAnimacionObjetos();
+    extern int CurrentFrame; extern void ApplyAnimationObjects();
     float P[16], V[16], VP[16], Vant[16], VPant[16];
     gfx::GetMatrix(gfx::Projection, P);
     gfx::GetMatrix(gfx::ModelView, V);
     MatMul16(P, V, VP);
-    const bool porCamara = ViewFromCameraActive && CameraActive;
+    const bool byCamera = ViewFromCameraActive && CameraActive;
     const int f = CurrentFrame;
-    CurrentFrame = f - 1; AplicarAnimacionObjetos();
-    if (porCamara) { gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity(); UpdateViewOrbit(); gfx::GetMatrix(gfx::ModelView, Vant); }
+    CurrentFrame = f - 1; ApplyAnimationObjects();
+    if (byCamera) { gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity(); UpdateViewOrbit(); gfx::GetMatrix(gfx::ModelView, Vant); }
     else memcpy(Vant, V, sizeof(Vant));
     MatMul16(P, Vant, VPant);
-    W3dVecUsarRanura(1);
-    W3dVecRecordar(SceneCollection, VPant);
-    CurrentFrame = f; AplicarAnimacionObjetos();
-    if (porCamara) { gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity(); UpdateViewOrbit(); }
+    W3dVecUseSlot(1);
+    W3dVecRemember(SceneCollection, VPant);
+    CurrentFrame = f; ApplyAnimationObjects();
+    if (byCamera) { gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity(); UpdateViewOrbit(); }
     gfx::Invalidate();
-    if (datos) W3dVecDibujarDatos(SceneCollection, VP, width, height, lejos);
-    else W3dVecDibujar(SceneCollection, VP, width, height);
-    W3dVecUsarRanura(0);
+    if (data) W3dVecDrawData(SceneCollection, VP, width, height, far);
+    else W3dVecDraw(SceneCollection, VP, width, height);
+    W3dVecUseSlot(0);
 }
 
 // ---------------------------------------------------------------------------
-//  EL POSTPROCESADO de la vista Rendered (render/Postproceso.h). Con shaders, en la GPU sobre copias de la pantalla
+//  EL POSTPROCESADO de la vista Rendered (render/PostProcess.h). Con shaders, en la GPU sobre copias de la pantalla
 //  (el pase de datos lo dibuja este viewport); sin shaders (GLES 1.1), la imagen se lee, la CPU le hace los efectos
 //  (con la profundidad de un pase ZBuffer y el movimiento del pase de vectores, si hacen falta) y se pega encima
 // ---------------------------------------------------------------------------
 // (el pase de datos va con la proyeccion del viewport ENTERO; el postprocesado, sobre el rectangulo del marco)
 static int gPostVp[4], gPostRect[4];
-static void PostDatosCB(void* ctx, bool profundidad) {
+static void PostDataCB(void* ctx, bool depth) {
     w3dEngine::Viewport(gPostVp[0], gPostVp[1], gPostVp[2], gPostVp[3]);
-    ((Viewport3D*)ctx)->VistaDatos(profundidad);
+    ((Viewport3D*)ctx)->DatumView(depth);
     w3dEngine::Viewport(gPostRect[0], gPostRect[1], gPostRect[2], gPostRect[3]);
 }
-void Viewport3D::PaseProfundidadCPU() {
+void Viewport3D::PassDepthCPU() {
     namespace gfx = w3dEngine;
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
-    W3dEscena3DLuces((int)RenderType::ZBuffer); W3dEscena3DModo((int)RenderType::ZBuffer);
+    W3dScene3DLights((int)RenderType::ZBuffer); W3dScene3DMode((int)RenderType::ZBuffer);
     UpdateViewOrbit();
-    gfx::Enable(gfx::Fog); gfx::FogMode(true); gfx::FogStart(nearClip); gfx::FogEnd(40.0f);
+    gfx::Enable(gfx::Fog); gfx::FogMode(0); gfx::FogStart(nearClip); gfx::FogEnd(40.0f);
     { GLfloat fz[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; gfx::FogColor(fz); }
     gfx::ClearColor(0.0f, 0.0f, 0.0f, 1.0f); gfx::DepthMask(true);
     gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer);
     gfx::Enable(gfx::DepthTest);
-    W3dEscena3DPasada();
+    W3dScene3DPass();
     gfx::Disable(gfx::Fog);
     // (la vista de nuevo en su modo)
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
-    W3dEscena3DLuces((int)(RenderType::Enum)view); W3dEscena3DModo((int)(RenderType::Enum)view);
+    W3dScene3DLights((int)(RenderType::Enum)view); W3dScene3DMode((int)(RenderType::Enum)view);
     UpdateViewOrbit();
 }
-static void DarVueltaFilas(unsigned char* p, int w, int h) {
-    std::vector<unsigned char> fila((size_t)w * 4);
+static void GiveTurnRows(unsigned char* p, int w, int h) {
+    std::vector<unsigned char> row((size_t)w * 4);
     for (int y = 0; y < h / 2; y++) {
         unsigned char* a = p + (size_t)y * w * 4; unsigned char* b = p + (size_t)(h - 1 - y) * w * 4;
-        memcpy(&fila[0], a, fila.size()); memcpy(a, b, fila.size()); memcpy(b, &fila[0], fila.size());
+        memcpy(&row[0], a, row.size()); memcpy(a, b, row.size()); memcpy(b, &row[0], row.size());
     }
 }
 // el MARCO de la camara en coords de GL: donde va el postprocesado (en el modo juego puro, el viewport entero)
 bool Viewport3D::RectPost(int glY, int& rx, int& ry, int& w, int& h) const {
     if (!camFrameOn || width <= 0 || height <= 0) return false;
     rx = x; ry = glY; w = width; h = height;
-    if (!g_juegoPuro) {
+    if (!g_pureGame) {
         const float W = (float)width, H = (float)height;
         const float cx = (camViewPanX * 0.5f + 0.5f) * W, cy = (0.5f - camViewPanY * 0.5f) * H;   // (RenderCamPassepartout)
         const float hw = camFrameNX * camViewZoom * W * 0.5f, hh = camFrameNY * camViewZoom * H * 0.5f;
@@ -3010,67 +3019,67 @@ bool Viewport3D::RectPost(int glY, int& rx, int& ry, int& w, int& h) const {
     }
     return true;
 }
-// los DATOS de antemano (los objetos Postproceso que los piden): ver W3dPostDatosPrevios. Por CPU se leen a estos
+// los DATOS de antemano (los objetos Postproceso que los piden): ver W3dPostDataPrevious. Por CPU se leen a estos
 static std::vector<float> gCpuProf; static std::vector<unsigned char> gCpuVec;
-static void DarVueltaFilas(unsigned char* p, int w, int h);
-static void PostDatosPrevCB(void* ctx, bool profundidad) { ((Viewport3D*)ctx)->VistaDatos(profundidad, true); }
-void Viewport3D::PostDatosPrevios(int glY) {
+static void GiveTurnRows(unsigned char* p, int w, int h);
+static void PostDataPrevCB(void* ctx, bool depth) { ((Viewport3D*)ctx)->DatumView(depth, true); }
+void Viewport3D::PostPreviousData(int glY) {
     namespace gfx = w3dEngine;
-    gCpuProfListo = gCpuVecListo = false;
-    W3dPostDatosOlvidar();
+    gCpuProfReady = gCpuVecReady = false;
+    W3dPostDataForget();
     bool prof = false, mov = false;
-    { std::vector<Postproceso*> ps; W3dPostprocesosDe(SceneCollection, ps);
+    { std::vector<PostProcess*> ps; W3dPostProcessesOf(SceneCollection, ps);
       for (size_t i = 0; i < ps.size(); i++) {
-          if (!ps[i]->opc.on) continue;
-          W3dPostUsar(&ps[i]->opc);
-          if (W3dPostHay()) { prof = prof || W3dPostNecesitaProfundidad(); mov = mov || W3dPostNecesitaMovimiento(); }
+          if (!ps[i]->opt.on) continue;
+          W3dPostUse(&ps[i]->opt);
+          if (W3dPostHas()) { prof = prof || W3dPostNeedsDepth(); mov = mov || W3dPostNeedsMotion(); }
       }
-      W3dPostUsar(NULL); }
+      W3dPostUse(NULL); }
     if (!prof && !mov) return;
     int rx, ry, w, h;
     if (!RectPost(glY, rx, ry, w, h)) return;
     gfx::Viewport(x, glY, width, height);
     gfx::Enable(gfx::ScissorTest); gfx::Scissor(rx, ry, w, h);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
-    W3dEscena3DLuces((int)(RenderType::Enum)view); W3dEscena3DModo((int)(RenderType::Enum)view);
+    W3dScene3DLights((int)(RenderType::Enum)view); W3dScene3DMode((int)(RenderType::Enum)view);
     UpdateViewOrbit();
-    if (!W3dPostDatosPrevios(rx, ry, w, h, PostDatosPrevCB, this, prof, mov)) {
+    if (!W3dPostDataPrevious(rx, ry, w, h, PostDataPrevCB, this, prof, mov)) {
         // POR CPU: los mismos pases, leidos a memoria
         std::vector<unsigned char> aux((size_t)w * h * 4);
         if (mov) {
-            VistaDatos(false, true);
+            DatumView(false, true);
             gCpuVec.resize((size_t)w * h * 4);
             gfx::ReadPixelsRGBA(rx, ry, w, h, &gCpuVec[0]);
-            DarVueltaFilas(&gCpuVec[0], w, h);
-            gCpuVecListo = true;
+            GiveTurnRows(&gCpuVec[0], w, h);
+            gCpuVecReady = true;
         }
         if (prof) {
-            PaseProfundidadCPU();
+            PassDepthCPU();
             gfx::ReadPixelsRGBA(rx, ry, w, h, &aux[0]);
-            DarVueltaFilas(&aux[0], w, h);
+            GiveTurnRows(&aux[0], w, h);
             gCpuProf.resize((size_t)w * h);
-            const float n0 = nearClip, rango = 40.0f - nearClip;
-            for (size_t i = 0; i < gCpuProf.size(); i++) gCpuProf[i] = n0 + (1.0f - aux[i * 4] / 255.0f) * rango;
-            gCpuProfListo = true;
+            const float n0 = nearClip, range = 40.0f - nearClip;
+            for (size_t i = 0; i < gCpuProf.size(); i++) gCpuProf[i] = n0 + (1.0f - aux[i * 4] / 255.0f) * range;
+            gCpuProfReady = true;
         }
     }
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
     gfx::Invalidate();
 }
-void Viewport3D::PostProcesar(int glY) {
+void Viewport3D::RunPostProcess(int glY) {
     namespace gfx = w3dEngine;
     extern int CurrentFrame;
-    if (!W3dPostHay() || width <= 0 || height <= 0) return;
+    if (!W3dPostHas() || width <= 0 || height <= 0) return;
     // los efectos son los de la CAMARA: solo mirando por la camara activa, y solo adentro de su marco (lo que sale en
     // el render). En el modo juego puro (sin la UI) el marco es la pantalla
     int rx, ry, w, h;
     if (!RectPost(glY, rx, ry, w, h)) return;
-    const unsigned semilla = (unsigned)CurrentFrame * 7919u + 17u;
+    const unsigned seed = (unsigned)CurrentFrame * 7919u + 17u;
     gfx::Enable(gfx::ScissorTest); gfx::Scissor(rx, ry, w, h);
     gPostVp[0] = x; gPostVp[1] = glY; gPostVp[2] = width; gPostVp[3] = height;
     gPostRect[0] = rx; gPostRect[1] = ry; gPostRect[2] = w; gPostRect[3] = h;
     gfx::Viewport(rx, ry, w, h);
-    const bool gpu = W3dPostGPU(rx, ry, w, h, PostDatosCB, this, PostLejos(), semilla);
+    const bool gpu = W3dPostGPU(rx, ry, w, h, PostDataCB, this, FarPost(), seed);
     gfx::Viewport(x, glY, width, height);
     if (gpu) {
         gfx::Disable(gfx::ScissorTest);
@@ -3080,40 +3089,40 @@ void Viewport3D::PostProcesar(int glY) {
     // ---- POR CPU ---- (los pases de datos dibujan el viewport entero; el tijeretazo los deja en el marco)
     static std::vector<unsigned char> img, aux, vec;
     static std::vector<float> prof;
-    const bool prevOk = (gCpuProfListo ? gCpuProf.size() == (size_t)w * h : true) && (gCpuVecListo ? gCpuVec.size() == (size_t)w * h * 4 : true);
+    const bool prevOk = (gCpuProfReady ? gCpuProf.size() == (size_t)w * h : true) && (gCpuVecReady ? gCpuVec.size() == (size_t)w * h * 4 : true);
     img.resize((size_t)w * h * 4);
     gfx::ReadPixelsRGBA(rx, ry, w, h, &img[0]);
-    DarVueltaFilas(&img[0], w, h);   // (GL lee de abajo hacia arriba)
+    GiveTurnRows(&img[0], w, h);   // (GL lee de abajo hacia arriba)
     const float* profP = NULL; const unsigned char* vecP = NULL;
     // (el movimiento PRIMERO: va contra la profundidad de la escena sin tocarla; el de profundidad redibuja la escena
     // entera y deja el z-buffer como estaba)
-    if (W3dPostNecesitaMovimiento() && gCpuVecListo && prevOk) vecP = &gCpuVec[0];   // (de antemano)
-    else if (W3dPostNecesitaMovimiento()) {
-        VistaDatos(false);
+    if (W3dPostNeedsMotion() && gCpuVecReady && prevOk) vecP = &gCpuVec[0];   // (de antemano)
+    else if (W3dPostNeedsMotion()) {
+        DatumView(false);
         vec.resize((size_t)w * h * 4);
         gfx::ReadPixelsRGBA(rx, ry, w, h, &vec[0]);
-        DarVueltaFilas(&vec[0], w, h);
+        GiveTurnRows(&vec[0], w, h);
         vecP = &vec[0];
     }
-    if (W3dPostNecesitaProfundidad() && gCpuProfListo && prevOk) profP = &gCpuProf[0];   // (de antemano)
-    else if (W3dPostNecesitaProfundidad()) {
-        PaseProfundidadCPU();
+    if (W3dPostNeedsDepth() && gCpuProfReady && prevOk) profP = &gCpuProf[0];   // (de antemano)
+    else if (W3dPostNeedsDepth()) {
+        PassDepthCPU();
         aux.resize((size_t)w * h * 4);
         gfx::ReadPixelsRGBA(rx, ry, w, h, &aux[0]);
-        DarVueltaFilas(&aux[0], w, h);
+        GiveTurnRows(&aux[0], w, h);
         prof.resize((size_t)w * h);
-        const float n0 = nearClip, rango = 40.0f - nearClip;
-        for (size_t i = 0; i < prof.size(); i++) prof[i] = n0 + (1.0f - aux[i * 4] / 255.0f) * rango;   // (la niebla: blanco cerca)
+        const float n0 = nearClip, range = 40.0f - nearClip;
+        for (size_t i = 0; i < prof.size(); i++) prof[i] = n0 + (1.0f - aux[i * 4] / 255.0f) * range;   // (la niebla: blanco cerca)
         profP = &prof[0];
     }
-    W3dPostCPU(&img[0], w, h, profP, vecP, semilla);
+    W3dPostCPU(&img[0], w, h, profP, vecP, seed);
     // la imagen de vuelta, en una textura del tamanio de la vista (potencia de 2: el N95)
     static unsigned int tex = 0; static int tw = 0, th = 0;
     int pw = 64, ph = 64; while (pw < w) pw <<= 1; while (ph < h) ph <<= 1;
     if (!tex || pw != tw || ph != th) {
         if (tex) gfx::DeleteTexture(tex);
-        std::vector<unsigned char> vacio((size_t)pw * ph * 4, 255);
-        tex = gfx::UploadRGBA(&vacio[0], pw, ph, false, false);
+        std::vector<unsigned char> empty((size_t)pw * ph * 4, 255);
+        tex = gfx::UploadRGBA(&empty[0], pw, ph, false, false);
         tw = pw; th = ph;
     }
     if (!tex) { gfx::Disable(gfx::ScissorTest); return; }
@@ -3154,37 +3163,37 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
         // web: bajar el PNG al disco del usuario (el FS de emscripten es virtual)
         std::string nm = filename;
         size_t sl = nm.find_last_of("/\\"); if (sl != std::string::npos) nm = nm.substr(sl + 1);
-        WebDescargarArchivo(filename, nm.c_str());
+        WebUnloadFile(filename, nm.c_str());
     }
 #endif
     return ok;
 }
 // la imagen entera en memoria (las franjas, una debajo de la otra): para lo que necesita el cuadro entero (el
 // postprocesado, el desenfoque por vectores, el alfa de la composicion final, el JPG y los videos)
-namespace { struct W3dJuntarFranjas {
+namespace { struct W3dCollectStripes {
     std::vector<unsigned char>* s; int w;
     static bool Fn(void* c, const unsigned char* px, int y0, int n) {
-        W3dJuntarFranjas* j = (W3dJuntarFranjas*)c;
+        W3dCollectStripes* j = (W3dCollectStripes*)c;
         memcpy(&(*j->s)[(size_t)y0 * j->w * 4], px, (size_t)n * j->w * 4);
         return true;
     }
 }; }
-bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::vector<unsigned char>& salida, int progBase, int progTotal){
+bool Viewport3D::RenderABuffer(int outW, int outH, RenderType::Enum pass, std::vector<unsigned char>& output, int progBase, int progTotal){
     if (outW <= 0 || outH <= 0 || !SceneCollection) return false;
-    salida.resize((size_t)outW * outH * 4);
-    W3dJuntarFranjas j; j.s = &salida; j.w = outW;
-    return RenderFranjas(outW, outH, pass, W3dJuntarFranjas::Fn, &j, progBase, progTotal);
+    output.resize((size_t)outW * outH * 4);
+    W3dCollectStripes j; j.s = &output; j.w = outW;
+    return RenderStripes(outW, outH, pass, W3dCollectStripes::Fn, &j, progBase, progTotal);
 }
 // LAS FRANJAS: la imagen de outW x outH se dibuja por TILES (puede ser mas grande que la ventana) y se entrega de a
 // FRANJAS de arriba hacia abajo (una fila de tiles), con sus filas al derecho. Quien la recibe puede escribirla al
 // archivo y soltarla: asi la imagen entera no esta nunca en memoria (el N95 y el N8 renderizan en 4K escribiendo en la
 // tarjeta). false si fn falla (la escritura) o no hay escena
-bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFranjaFn fn, void* ctx, int progBase, int progTotal){
+bool Viewport3D::RenderStripes(int outW, int outH, RenderType::Enum pass, W3dStripeFn fn, void* ctx, int progBase, int progTotal){
     if (outW <= 0 || outH <= 0 || !SceneCollection || !fn) return false;
 
     // tope de tile = lo que entra seguro en el framebuffer (el viewport ya entra en la ventana). Con ANTIALIASING ('S'
     // muestras por lado; no en los vectores, que son datos) cada tile se dibuja S veces mas grande y se promedia
-    const int S = (pass == RenderType::Vectores) ? 1 : SuperMuestreo();
+    const int S = (pass == RenderType::Vectors) ? 1 : SuperSampled();
     int capW = (width  > 0) ? width / S : outW;
     int capH = (height > 0) ? height / S : outH;
     if (capW < 1) capW = 1;
@@ -3193,18 +3202,18 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
     int tileH = (outH < capH) ? outH : capH;
     if (tileW <= 0 || tileH <= 0) return false;
 
-    unsigned char* franja = new unsigned char[(size_t)outW * tileH * 4];   // (una fila de tiles: lo unico entero en memoria)
+    unsigned char* stripe = new unsigned char[(size_t)outW * tileH * 4];   // (una fila de tiles: lo unico entero en memoria)
     unsigned char* tile = new unsigned char[(size_t)tileW * tileH * 4];
-    unsigned char* grande = (S > 1) ? new unsigned char[(size_t)tileW * S * tileH * S * 4] : NULL;   // (el tile sin promediar)
+    unsigned char* big = (S > 1) ? new unsigned char[(size_t)tileW * S * tileH * S * 4] : NULL;   // (el tile sin promediar)
     bool ok = true;
 
     // extension del frustum de la imagen COMPLETA (aspect = outW/outH, NO el del viewport)
     float top, bottom, left, right;
-    bool lOrto; float lFov, lNear, lFar; LenteImagen(lOrto, lFov, lNear, lFar);   // (el de la camara activa)
-    ExtensionImagen(lOrto, lFov, orbitDistance, lNear, outW, outH, left, right, bottom, top);
+    bool lOrtho; float lFov, lNear, lFar; LensImage(lOrtho, lFov, lNear, lFar);   // (el de la camara activa)
+    ExtensionImage(lOrtho, lFov, orbitDistance, lNear, outW, outH, left, right, bottom, top);
     // el pase de VECTORES cuenta en pixeles de la imagen entera: su matriz (desde la misma camara)
-    float VPimagen[16];
-    if (pass == RenderType::Vectores) MatrizImagen(outW, outH, VPimagen);
+    float VPImage[16];
+    if (pass == RenderType::Vectors) MatrixImage(outW, outH, VPImage);
 
     // fijar el PASE (sin overlay): modo + luces + flags del Core, una sola vez
     RenderType viewPrev = view; bool overlaysPrev = showOverlays;
@@ -3215,25 +3224,25 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
     if (CameraActive) ViewFromCameraActive = true;
     view = pass; showOverlays = false;
     ReloadLights();
-    g_mostrarOverlays = false; w3dRenderOverlays = false;
+    g_showOverlays = false; w3dRenderOverlays = false;
     w3dRenderWireframe   = false;
-    w3dRenderSolido      = (pass == RenderType::Solid);
+    w3dRenderSolid       = (pass == RenderType::Solid);
     w3dRenderNormalColor = (pass == RenderType::NormalView);
-    w3dRenderSinLuz      = (pass == RenderType::ZBuffer);
-    w3dRenderLuces       = (pass == RenderType::Rendered);
+    w3dRenderNoLight     = (pass == RenderType::ZBuffer);
+    w3dRenderLights      = (pass == RenderType::Rendered);
     w3dRenderAlpha       = (pass == RenderType::Alpha);
-    const bool paseVec   = (pass == RenderType::Vectores);
+    const bool passVec   = (pass == RenderType::Vectors);
     // los pases de ANALISIS van con SU fondo (el de abajo) aunque el proyecto limpie solo (CONSTRUCTOR + "Limpiar
     // pantalla"): su "Clear" limpia la profundidad pero no el color, como en la vista (QUIEN LIMPIA, en Render). Sin
     // esto el pase de alfa salia con el "Clear color" del proyecto (rosa) en vez de negro
-    const bool limpiarFijoPrev = g_w3dLimpiarColorFijo;
-    g_w3dLimpiarColorFijo = W3dHayConstructor() && (pass == RenderType::ZBuffer || pass == RenderType::Alpha ||
-                                                    pass == RenderType::NormalView || paseVec);
+    const bool clearFixedPrev = g_w3dClearColorFixed;
+    g_w3dClearColorFixed = W3dHasConstructor() && (pass == RenderType::ZBuffer || pass == RenderType::Alpha ||
+                                                    pass == RenderType::NormalView || passVec);
 
     // color de fondo del pase
     float bg[4];
     if (pass == RenderType::ZBuffer || pass == RenderType::Alpha){ bg[0]=bg[1]=bg[2]=0.0f; bg[3]=1.0f; } // NEGRO (matte blanco sobre negro)
-    else if (paseVec) W3dVecColorFondo(bg);                                                                  // quieto: (128,128,0)
+    else if (passVec) W3dVecBackgroundColor(bg);                                                                  // quieto: (128,128,0)
     else if (pass == RenderType::NormalView){ bg[0]=0.5f; bg[1]=0.5f; bg[2]=1.0f; bg[3]=1.0f; } // AZUL normal-map: normal (0,0,1) de frente = (0.5,0.5,1.0)
     else if (pass == RenderType::Rendered){
         bg[0]=g_renderBg[0]; bg[1]=g_renderBg[1]; bg[2]=g_renderBg[2]; bg[3]=g_renderBg[3]; // color de fondo GLOBAL del render
@@ -3242,9 +3251,9 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
     // las filas de tiles de ARRIBA hacia abajo ('arriba' = la primera fila de la franja contando desde arriba); cada
     // tile en coords BOTTOM-LEFT (como GL: ty)
     int tileIdx = 0; // para la barra: frac = (progBase + tiles hechos) / progTotal
-    for (int arriba = 0; arriba < outH && ok && !ProgresoCancelado(); arriba += tileH){
-        const int th = (arriba + tileH <= outH) ? tileH : (outH - arriba);
-        const int ty = outH - arriba - th;
+    for (int up = 0; up < outH && ok && !ProgressCanceled(); up += tileH){
+        const int th = (up + tileH <= outH) ? tileH : (outH - up);
+        const int ty = outH - up - th;
         for (int tx = 0; tx < outW; tx += tileW){
             int tw = (tx + tileW <= outW) ? tileW : (outW - tx);
 
@@ -3254,10 +3263,10 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
             float t = bottom + (top    - bottom) * (float)(ty + th) / (float)outH;
 
             // (en el N95, la franja en una superficie APARTE: dibujada en la ventana se veia entre la barra de progreso)
-            const bool fueraTile = W3dFueraDePantallaEmpezar && W3dFueraDePantallaEmpezar(tileW * S, tileH * S);
+            const bool outsideTile = W3dOutsideScreenBegin && W3dOutsideScreenBegin(tileW * S, tileH * S);
             w3dEngine::MatrixMode(w3dEngine::Projection);
             w3dEngine::LoadIdentity();
-            if (lOrto) w3dEngine::Ortho(l, r, b, t, lNear, lFar);
+            if (lOrtho) w3dEngine::Ortho(l, r, b, t, lNear, lFar);
             else       w3dEngine::Frustum(l, r, b, t, lNear, lFar);
 
             w3dEngine::Viewport(0, 0, tw * S, th * S); // el tile en la esquina del framebuffer (S veces mas grande con antialiasing)
@@ -3275,7 +3284,7 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
             w3dEngine::Enable(w3dEngine::DepthTest);
 
             if (pass == RenderType::ZBuffer){
-                w3dEngine::Enable(w3dEngine::Fog); w3dEngine::FogMode(true);
+                w3dEngine::Enable(w3dEngine::Fog); w3dEngine::FogMode(0);
                 w3dEngine::FogStart(lNear); w3dEngine::FogEnd(40.0f);
                 GLfloat fz[4] = {0.0f, 0.0f, 0.0f, 1.0f}; w3dEngine::FogColor(fz);
             } else {
@@ -3285,76 +3294,76 @@ bool Viewport3D::RenderFranjas(int outW, int outH, RenderType::Enum pass, W3dFra
             w3dEngine::ClearColor(bg[0], bg[1], bg[2], bg[3]);
             w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
 
-            if (paseVec) {   // VECTORES DE MOVIMIENTO: cada malla con el color de su movimiento (render/VectoresMovimiento.h)
+            if (passVec) {   // VECTORES DE MOVIMIENTO: cada malla con el color de su movimiento (render/MotionVectors.h)
                 w3dEngine::Invalidate();
-                W3dVecDibujar(SceneCollection, VPimagen, outW, outH);
+                W3dVecDraw(SceneCollection, VPImage, outW, outH);
             } else {
-            W3dParticulasLimpiarPendientes();
-    W3dDecalesLimpiarPendientes();   // las sombras sueltas van al final del frame
-    W3dLucesLimpiarPendientes();     // idem las chispas/halos aditivos
+            W3dParticlesClearPending();
+    W3dDecalsClearPending();         // las sombras sueltas van al final del frame
+    W3dLightsClearPending();         // idem las chispas/halos aditivos
             w3dEngine::Invalidate(); // (P1) resync una vez por pase, como en el viewport
-            w3dLoteStamp++;          // (P4) sello del pase (lote estatico)
-            // LA IMAGEN FINAL lleva lo mismo que la vista (render/EscenaRender.cpp, W3dEscena3DPasada): las SONDAS DE LUZ
+            w3dBatchStamp++;         // (P4) sello del pase (lote estatico)
+            // LA IMAGEN FINAL lleva lo mismo que la vista (render/SceneRender.cpp, W3dScene3DPass): las SONDAS DE LUZ
             // y las SOMBRAS EN TIEMPO REAL. Sin esto el render a archivo (PNG, JPG, el MP4 del telefono) salia sin ellas.
             // (Los pases de analisis -profundidad, normales, alfa- no: son datos)
-            const bool imagenFinal = (pass == RenderType::Rendered);
-            if (imagenFinal) { SondaLuzNuevoPase(); W3dSombrasPase(); W3dEscena3DFondoArchivo(); }
-            W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
+            const bool imageFinal = (pass == RenderType::Rendered);
+            if (imageFinal) { LightProbeNewPass(); W3dShadowsPass(); W3dScene3DBackgroundFile(); }
+            W3dLightsPrePass(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
             SceneCollection->Render();
-            W3dLucesPrepaseFin();
+            W3dLightsPrePassEnd();
             // PROXY de edicion de Curve (riel/path): vive FUERA del arbol de escena a proposito
             // (no aparece en el outliner, no se guarda, no lo toca nada) y se dibuja explicito
-            // aca, solo mientras se edita. Ver CurveEntrarEdicion (LayoutInput.cpp).
-            { extern Object* W3dCurveProxyActivo();
-              Object* px = W3dCurveProxyActivo(); if (px) px->Render(); }
+            // aca, solo mientras se edita. Ver CurveEnterEdit (LayoutInput.cpp).
+            { extern Object* W3dActiveCurveProxy();
+              Object* px = W3dActiveCurveProxy(); if (px) px->Render(); }
             // CALCOMANIAS SUELTAS (sombras): recien ahora, con toda la escena opaca ya
     // dibujada. Antes se dibujaban en su lugar del arbol y cualquier opaco
     // posterior (troncos, EscenarioAlpha) las borraba: no escriben z a proposito.
-    W3dDecalesDibujarPendientes();
-    W3dLucesDibujarPendientes();        // chispas/halos aditivos (tambien en el render a PNG)
-    W3dParticulasDibujarPendientes();   // translucidas despues de los opacos (tambien en el render a PNG)
-            if (imagenFinal) { W3dSombrasFin(); W3dEscena3DFondoArchivoFin(); }   // (como en la vista: despues de las calcomanias y las particulas)
+    W3dDecalsDrawPending();
+    W3dLightsDrawPending();      // chispas/halos aditivos (tambien en el render a PNG)
+    W3dParticlesDrawPending();   // translucidas despues de los opacos (tambien en el render a PNG)
+            if (imageFinal) { W3dShadowsEnd(); W3dScene3DBackgroundFileEnd(); }   // (como en la vista: despues de las calcomanias y las particulas)
             }
 
             if (S > 1) {
                 // el ANTIALIASING: cada pixel, el promedio de sus S x S muestras
-                w3dEngine::ReadPixelsRGBA(0, 0, tw * S, th * S, grande);
+                w3dEngine::ReadPixelsRGBA(0, 0, tw * S, th * S, big);
                 const int gw = tw * S, n = S * S;
                 for (int y = 0; y < th; y++)
                     for (int x = 0; x < tw; x++) {
                         unsigned int acc[4] = { 0, 0, 0, 0 };
                         for (int sy = 0; sy < S; sy++) {
-                            const unsigned char* q = grande + ((size_t)(y * S + sy) * gw + (size_t)x * S) * 4;
+                            const unsigned char* q = big + ((size_t)(y * S + sy) * gw + (size_t)x * S) * 4;
                             for (int sx = 0; sx < S; sx++, q += 4) { acc[0] += q[0]; acc[1] += q[1]; acc[2] += q[2]; acc[3] += q[3]; }
                         }
                         unsigned char* o = tile + ((size_t)y * tw + x) * 4;
                         for (int k = 0; k < 4; k++) o[k] = (unsigned char)((acc[k] + (unsigned)n / 2) / (unsigned)n);
                     }
             } else w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
-            if (fueraTile) W3dFueraDePantallaTerminar();   // (la barra de progreso, en la ventana)
+            if (outsideTile) W3dOutsideScreenFinish();   // (la barra de progreso, en la ventana)
             for (int row = 0; row < th; row++){   // (GL lee de ABAJO hacia arriba: la franja va al derecho)
-                memcpy(franja + (size_t)((th - 1 - row) * outW + tx) * 4,
+                memcpy(stripe + (size_t)((th - 1 - row) * outW + tx) * 4,
                        tile + (size_t)(row * tw) * 4,
                        (size_t)tw * 4);
             }
             // barra de progreso: redibujo COMPLETO por tile (el render pisa el framebuffer). progTotal
-            // cuenta pases x tiles (lo arma AccionRenderImage); progBase = tiles de los pases anteriores.
+            // cuenta pases x tiles (lo arma ActionRenderImage); progBase = tiles de los pases anteriores.
             ++tileIdx;
-            if (progTotal > 0) ProgresoActualizarFull((float)(progBase + tileIdx) / (float)progTotal);
+            if (progTotal > 0) ProgressUpdateFull((float)(progBase + tileIdx) / (float)progTotal);
         }
-        if (!fn(ctx, franja, arriba, th)) ok = false;
+        if (!fn(ctx, stripe, up, th)) ok = false;
     }
 
     // restaurar el estado del viewport (los flags de pase se re-setean solos en el proximo Render,
     // pero los limpiamos ya por las dudas de que algo dibuje antes)
     view = viewPrev; showOverlays = overlaysPrev; ViewFromCameraActive = camPrev;
-    w3dRenderAlpha = false; w3dRenderSinLuz = false; w3dRenderNormalColor = false;
-    g_w3dLimpiarColorFijo = limpiarFijoPrev;
+    w3dRenderAlpha = false; w3dRenderNoLight = false; w3dRenderNormalColor = false;
+    g_w3dClearColorFixed = clearFixedPrev;
     ReloadLights();
 
-    delete[] franja;
+    delete[] stripe;
     delete[] tile;
-    delete[] grande;
+    delete[] big;
     return ok;
 }
 
@@ -3366,14 +3375,14 @@ void Viewport3D::RenderFloor() {
     //la solucion seria poner un vertice en el medio de la linea. eso arreglaria bastante el problema
     //por ahora el fog se quita... triste
     w3dEngine::Enable(w3dEngine::Fog);
-    w3dEngine::FogMode(true);
+    w3dEngine::FogMode(0);
     w3dEngine::FogStart(nearClip);
     w3dEngine::FogEnd(30.0f);
 
     if (view == RenderType::Rendered) {
         w3dEngine::FogColor(scene->backgroundColor);
     } else {
-        w3dEngine::FogColor(ListaColores[static_cast<int>(ColorID::background)]);
+        w3dEngine::FogColor(ColorList[static_cast<int>(ColorID::background)]);
     }
 
     w3dEngine::LineWidth(1);
@@ -3383,10 +3392,10 @@ void Viewport3D::RenderFloor() {
     // apagar Floor no la ocultaba)
     if (showFloor) {
         w3dEngine::Color4f(
-            W3dColores[W3dColor_LineaPiso][0],
-            W3dColores[W3dColor_LineaPiso][1],
-            W3dColores[W3dColor_LineaPiso][2],
-            W3dColores[W3dColor_LineaPiso][3]
+            W3dColors[W3dColor_LineFloor][0],
+            W3dColors[W3dColor_LineFloor][1],
+            W3dColors[W3dColor_LineFloor][2],
+            W3dColors[W3dColor_LineFloor][3]
         );
         W3dDrawLinesF(objVertexdataFloor, objFacedataFloor, objFacesFloor);
     }
@@ -3395,61 +3404,61 @@ void Viewport3D::RenderFloor() {
     if (showXaxis) {
         w3dEngine::LineWidth(2);
         w3dEngine::Color4f(
-            W3dColores[W3dColor_LineaPisoRoja][0],
-            W3dColores[W3dColor_LineaPisoRoja][1],
-            W3dColores[W3dColor_LineaPisoRoja][2],
-            W3dColores[W3dColor_LineaPisoRoja][3]
+            W3dColors[W3dColor_LineFloorRed][0],
+            W3dColors[W3dColor_LineFloorRed][1],
+            W3dColors[W3dColor_LineFloorRed][2],
+            W3dColors[W3dColor_LineFloorRed][3]
         );
-        W3dDrawLinesF(objVertexdataFloor, EjeRojo, 2);
+        W3dDrawLinesF(objVertexdataFloor, RedAxis, 2);
         w3dEngine::LineWidth(1);
     } else if (showFloor) {
         w3dEngine::Color4f(
-            W3dColores[W3dColor_LineaPiso][0],
-            W3dColores[W3dColor_LineaPiso][1],
-            W3dColores[W3dColor_LineaPiso][2],
-            W3dColores[W3dColor_LineaPiso][3]
+            W3dColors[W3dColor_LineFloor][0],
+            W3dColors[W3dColor_LineFloor][1],
+            W3dColors[W3dColor_LineFloor][2],
+            W3dColors[W3dColor_LineFloor][3]
         );
-        W3dDrawLinesF(objVertexdataFloor, EjeRojo, 2);
+        W3dDrawLinesF(objVertexdataFloor, RedAxis, 2);
     }
 
     // Linea Verde
     if (showYaxis) {
         w3dEngine::LineWidth(2);
         w3dEngine::Color4f(
-            W3dColores[W3dColor_LineaPisoVerde][0],
-            W3dColores[W3dColor_LineaPisoVerde][1],
-            W3dColores[W3dColor_LineaPisoVerde][2],
-            W3dColores[W3dColor_LineaPisoVerde][3]
+            W3dColors[W3dColor_LineFloorGreen][0],
+            W3dColors[W3dColor_LineFloorGreen][1],
+            W3dColors[W3dColor_LineFloorGreen][2],
+            W3dColors[W3dColor_LineFloorGreen][3]
         );
-        W3dDrawLinesF(objVertexdataFloor, EjeVerde, 2);
+        W3dDrawLinesF(objVertexdataFloor, GreenAxis, 2);
         w3dEngine::LineWidth(1);
     } else if (showFloor) {
         w3dEngine::Color4f(
-            W3dColores[W3dColor_LineaPiso][0],
-            W3dColores[W3dColor_LineaPiso][1],
-            W3dColores[W3dColor_LineaPiso][2],
-            W3dColores[W3dColor_LineaPiso][3]
+            W3dColors[W3dColor_LineFloor][0],
+            W3dColors[W3dColor_LineFloor][1],
+            W3dColors[W3dColor_LineFloor][2],
+            W3dColors[W3dColor_LineFloor][3]
         );
-        W3dDrawLinesF(objVertexdataFloor, EjeVerde, 2);
+        W3dDrawLinesF(objVertexdataFloor, GreenAxis, 2);
     }
 
     w3dEngine::Disable(w3dEngine::Fog);
 }
 
 // linea-guia por 'c' a lo largo de 'dir' (world space, larga a ambos lados)
-static void DibujarLineaEjeMundo(const Vector3& c, const Vector3& dir, int colorIdx) {
+static void DrawLineAxisWorld(const Vector3& c, const Vector3& dir, int colorIdx) {
     const float L = 1000.0f;
     GLfloat v[6] = {
         c.x - dir.x * L, c.y - dir.y * L, c.z - dir.z * L,
         c.x + dir.x * L, c.y + dir.y * L, c.z + dir.z * L
     };
-    w3dEngine::Color4fv(W3dColores[colorIdx]);
+    w3dEngine::Color4fv(W3dColors[colorIdx]);
     w3dEngine::VertexPointer3f(0, v);
     w3dEngine::DrawLines(2);
 }
 
 void Viewport3D::RenderAllAxisTransform() {
-    if (!ObjActivo) return;
+    if (!ActiveObj) return;
     w3dEngine::Disable(w3dEngine::DepthTest);
     w3dEngine::Disable(w3dEngine::Blend);
     w3dEngine::Disable(w3dEngine::Texture2D);
@@ -3468,7 +3477,7 @@ void Viewport3D::RenderAllAxisTransform() {
     // transformacion vaya por la normal. UNA linea a lo largo de la normal (color Z: la normal es el "Z" de su orientacion).
     // Al constreñir a un eje real (tecla X/Y/Z) gEVuseCustom se apaga -> vuelve a la linea del eje. Compartido 4 OS.
     if (gEVuseCustom) {
-        DibujarLineaEjeMundo(c, gTransformNormal, W3dColor_ColorTransformZ);
+        DrawLineAxisWorld(c, gTransformNormal, W3dColor_ColorTransformZ);
         return;
     }
     int a = axisSelect;
@@ -3478,31 +3487,31 @@ void Viewport3D::RenderAllAxisTransform() {
     // EDIT de ARMATURE (G/R/S de huesos): los ejes son los del transform de puntas (en "Local", los del
     // hueso ACTIVO con Y a lo largo del hueso). La guia dibuja EXACTAMENTE el eje con el que se mueve.
     { Vector3 bex, bey, bez;
-      if (BoneEjesMundo(bex, bey, bez)){
-        if (drawX) DibujarLineaEjeMundo(c, bex, W3dColor_ColorTransformX);
-        if (drawY) DibujarLineaEjeMundo(c, bey, W3dColor_ColorTransformY);
-        if (drawZ) DibujarLineaEjeMundo(c, bez, W3dColor_ColorTransformZ);
+      if (BoneAxesWorld(bex, bey, bez)){
+        if (drawX) DrawLineAxisWorld(c, bex, W3dColor_ColorTransformX);
+        if (drawY) DrawLineAxisWorld(c, bey, W3dColor_ColorTransformY);
+        if (drawZ) DrawLineAxisWorld(c, bez, W3dColor_ColorTransformZ);
         return;
       } }
     // POSE MODE: los ejes son los del HUESO (en "Local" el eje local es el del hueso, NO el del objeto armature).
     // Se piden los MISMOS que usa el transform de pose -> la guia coincide siempre con la rotacion real.
-    { extern bool PoseEjesMundo(Vector3&, Vector3&, Vector3&);
-      Vector3 pex, pey, pez;
-      if (PoseEjesMundo(pex, pey, pez)){
-        if (drawX) DibujarLineaEjeMundo(c, pex, W3dColor_ColorTransformX);
-        if (drawY) DibujarLineaEjeMundo(c, pey, W3dColor_ColorTransformY);
-        if (drawZ) DibujarLineaEjeMundo(c, pez, W3dColor_ColorTransformZ);
+    { extern bool PoseAxesWorld(Vector3&, Vector3&, Vector3&);
+      Vector3 pex, pey, fish;
+      if (PoseAxesWorld(pex, pey, fish)){
+        if (drawX) DrawLineAxisWorld(c, pex, W3dColor_ColorTransformX);
+        if (drawY) DrawLineAxisWorld(c, pey, W3dColor_ColorTransformY);
+        if (drawZ) DrawLineAxisWorld(c, fish, W3dColor_ColorTransformZ);
         return;
       } }
-    if (drawX) DibujarLineaEjeMundo(c, EjeOrientado(*ObjActivo, X), W3dColor_ColorTransformX);
-    if (drawY) DibujarLineaEjeMundo(c, EjeOrientado(*ObjActivo, Y), W3dColor_ColorTransformY);
-    if (drawZ) DibujarLineaEjeMundo(c, EjeOrientado(*ObjActivo, Z), W3dColor_ColorTransformZ);
+    if (drawX) DrawLineAxisWorld(c, AxisOriented(*ActiveObj, X), W3dColor_ColorTransformX);
+    if (drawY) DrawLineAxisWorld(c, AxisOriented(*ActiveObj, Y), W3dColor_ColorTransformY);
+    if (drawZ) DrawLineAxisWorld(c, AxisOriented(*ActiveObj, Z), W3dColor_ColorTransformZ);
 }
 
 void Viewport3D::RenderOverlay() {
-    w3dEngine::Material(w3dEngine::MatDiffuse,  ListaColores[static_cast<int>(ColorID::negro)]);
-    w3dEngine::Material(w3dEngine::MatAmbient,  ListaColores[static_cast<int>(ColorID::negro)]);
-    w3dEngine::Material(w3dEngine::MatSpecular, ListaColores[static_cast<int>(ColorID::negro)]);
+    w3dEngine::Material(w3dEngine::MatDiffuse,  ColorList[static_cast<int>(ColorID::black)]);
+    w3dEngine::Material(w3dEngine::MatAmbient,  ColorList[static_cast<int>(ColorID::black)]);
+    w3dEngine::Material(w3dEngine::MatSpecular, ColorList[static_cast<int>(ColorID::black)]);
 
     w3dEngine::Disable(w3dEngine::CullFace);
     w3dEngine::Disable(w3dEngine::Lighting);
@@ -3523,11 +3532,11 @@ void Viewport3D::RenderOverlay() {
     if (!SceneCollection->Childrens.empty()) {
         w3dEngine::LineWidth(1);
 
-        if (ShowRelantionshipsLines) RenderRelantionshipsLines();
+        if (ShowRelationshipsLines) RenderRelationshipsLines();
         RenderIcons3D();
         // "Ver en 3D" de la UI: los elementos 2D metidos EN la escena, con su profundidad Z
-        if (UI2D_HayVerEn3D()) {
-            UI2D_DibujarEnMundo();
+        if (UI2D_HasShowIn3D()) {
+            UI2D_DrawInWorld();
             w3dEngine::BlendAlpha();
             w3dEngine::Disable(w3dEngine::Texture2D);
             w3dEngine::EnableArray(w3dEngine::VertexArray);
@@ -3543,15 +3552,15 @@ void Viewport3D::RenderOverlay() {
         w3dEngine::Disable(w3dEngine::Texture2D);
 
         if (!SceneCollection->Childrens.empty() &&
-            (estado == translacion || estado == rotacion || estado == EditScale))
+            (state == translation || state == rotation || state == EditScale))
             RenderAllAxisTransform();
     }
 
     // en los modos de pintura el cursor 3D no sirve para nada (no se agrega ni se transforma): se oculta
-    const bool pinturaCursor = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
-    if (show3DCursor && !pinturaCursor) Render3Dcursor();
-    if (showOverlays && !pinturaCursor) GizmoRender(this);   // gizmo de mover (Overlays > Gizmo)
-    if (showOverlays && !pinturaCursor) ProporcionalRender(this);   // circulo de influencia del proportional editing
+    const bool paintCursor = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+    if (show3DCursor && !paintCursor) Render3Dcursor();
+    if (showOverlays && !paintCursor) GizmoRender(this);   // gizmo de mover (Overlays > Gizmo)
+    if (showOverlays && !paintCursor) ProportionalRender(this);   // circulo de influencia del proportional editing
 
     // (la barra de botones 2D NO se dibuja aca: es chrome del area, no un
     //  overlay. Va en RenderUI() junto con los bordes para que se vea aunque
@@ -3570,13 +3579,13 @@ void Viewport3D::RenderOverlay() {
 #endif
 }
 
-void Viewport3D::RenderRelantionshipsLines() {
+void Viewport3D::RenderRelationshipsLines() {
     w3dEngine::EnableArray(w3dEngine::TexCoordArray);
     w3dEngine::Enable(w3dEngine::Texture2D);
     w3dEngine::Enable(w3dEngine::Blend);
     w3dEngine::DepthMask(false);
     w3dEngine::TexCoordPointer2f(0, lineUV);
-    SetColorID(ColorID::grisUI);
+    SetColorID(ColorID::grayUI);
     w3dEngine::BindTexture(Textures[3]->iID);
     w3dEngine::TexFilter(false);
     w3dEngine::TexFilter(false);
@@ -3618,7 +3627,7 @@ void Viewport3D::Render3Dcursor() {
 
     w3dEngine::VertexPointer3f(0, Cursor3DVertices);
     w3dEngine::LineWidth(2);
-    SetColorID(ColorID::grisUI);
+    SetColorID(ColorID::grayUI);
     W3dDrawLinesF(Cursor3DVertices, Cursor3DEdges, Cursor3DEdgesSize);
 
     w3dEngine::PopMatrix();
@@ -3628,25 +3637,25 @@ void Viewport3D::Render3Dcursor() {
 // ancho de barra): lo dice el ICONO, y el titulo de su menu lo confirma al abrirlo.
 // FUERA del render a proposito: esto es ESTADO, no dibujo. Mientras vivio adentro de RenderUI -que es GL y no corre
 // headless- era intesteable, y de hecho el texto se seguia reescribiendo por frame pisando al que lo sacaba.
-void Viewport3D::SyncBotonContexto(){
-    Button* bObj = BarRolBtn(BarButtons, BR_Object);
+void Viewport3D::SyncButtonContext(){
+    Button* bObj = BarRoleBtn(BarButtons, BR_Object);
     if (!bObj) return;
-    bool esMesh  = (ObjActivo && ObjActivo->getType() == ObjectType::mesh);
-    bool esArm   = (ObjActivo && ObjActivo->getType() == ObjectType::armature);
-    bool enEdit  = (esMesh && InteractionMode == EditMode);
-    bool poseM   = (InteractionMode == PoseMode && esArm);
-    bool editArm = (InteractionMode == EditMode && esArm); // Edit de huesos: el boton abre el menu "Armature"
+    bool isMesh  = (ActiveObj && ActiveObj->getType() == ObjectType::mesh);
+    bool isArm   = (ActiveObj && ActiveObj->getType() == ObjectType::armature);
+    bool inEdit  = (isMesh && InteractionMode == EditMode);
+    bool poseM   = (InteractionMode == PoseMode && isArm);
+    bool editArm = (InteractionMode == EditMode && isArm); // Edit de huesos: el boton abre el menu "Armature"
     // en los modos de PINTURA el menu Object no va (no se puede seleccionar ni transformar): oculto
-    const bool pintura = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
-    bObj->visible = (HayObjetosSeleccionados() || poseM) && !pintura;
+    const bool paint = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+    bObj->visible = (HasObjectsSelected() || poseM) && !paint;
     bObj->text.clear();
     bObj->icon = (poseM || editArm) ? (int)IconType::armature :
-        !enEdit ? (int)IconType::object :
+        !inEdit ? (int)IconType::object :
         (EditSelectMode == SelEdge) ? (int)IconType::selEdge :
         (EditSelectMode == SelFace) ? (int)IconType::selFace : (int)IconType::selVertex;
 }
 
-void Viewport3D::Estado2D() {
+void Viewport3D::State2D() {
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
     w3dEngine::Ortho(0, width, height, 0, -1, 1);
@@ -3677,19 +3686,19 @@ void Viewport3D::Estado2D() {
 // escena una vez en cada mitad con la camara de esa vista (antes, el script reorienta lo suyo: antesDeVista) y el HUD
 // UNA vez encima del cuadro entero (los medidores de los dos jugadores ya van uno a cada lado). Cada mitad es su
 // imagen entera: el aspecto de la mitad, sin bandas. Solo el viewport activo, jugando y mirando por la camara
-bool Viewport3D::RenderDividido() {
-    extern bool AnimEsJuego; extern bool PlayAnimation;
-    if (Viewport3DActive != this || !ViewFromCameraActive || !CameraActive || !AnimEsJuego) return false;
-    if (!(PlayAnimation || JuegoSimActiva()) || width < 8 || height < 8) return false;
+bool Viewport3D::RenderSplit() {
+    extern bool AnimIsGame; extern bool PlayAnimation;
+    if (Viewport3DActive != this || !ViewFromCameraActive || !CameraActive || !AnimIsGame) return false;
+    if (!(PlayAnimation || GameSimActive()) || width < 8 || height < 8) return false;
     // el marco del juego en este viewport (la cuenta de Render: el aspecto declarado, sin aire)
     const float va = (aspect > 1e-4f) ? aspect : 1.0f;
-    const float ra = AspectoMarco(va);
+    const float ra = FrameAspect(va);
     float nx = 1.0f, ny = 1.0f;
-    W3dEncuadreMarco(va, ra, 1.0f, &nx, &ny);
+    W3dFramingFrame(va, ra, 1.0f, &nx, &ny);
     const int fw = (int)((float)width * nx + 0.5f), fh = (int)((float)height * ny + 0.5f);
     const int fx = x + (width - fw) / 2, fy = y + (height - fh) / 2;
     // negro en todo el viewport: las bandas y la raya entre las mitades
-    const int glY = W3dPantallaAlto - y - height;
+    const int glY = W3dScreenHeight - y - height;
     w3dEngine::Enable(w3dEngine::ScissorTest);
     w3dEngine::Scissor(x, glY, width, height);
     w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -3699,27 +3708,27 @@ bool Viewport3D::RenderDividido() {
     const int x0 = x, y0 = y, w0 = width, h0 = height;
     const GLfloat a0 = aspect;
     Camera* cam0 = CameraActive;
-    const bool lado = W3dVistasModo() == 0;
-    const int raya = 1;   // (media raya: 2 px entre las dos)
-    gVistaPartida = true;
+    const bool side = W3dViewsMode() == 0;
+    const int stripe = 1;   // (media raya: 2 px entre las dos)
+    gSessionView = true;
     for (int v = 0; v < 2; v++) {
-        if (lado) { width = fw / 2 - raya; height = fh; x = v ? fx + fw - width : fx; y = fy; }
-        else      { width = fw; height = fh / 2 - raya; x = fx; y = v ? fy + fh - height : fy; }
+        if (side) { width = fw / 2 - stripe; height = fh; x = v ? fx + fw - width : fx; y = fy; }
+        else      { width = fw; height = fh / 2 - stripe; x = fx; y = v ? fy + fh - height : fy; }
         aspect = (GLfloat)width / (GLfloat)(height > 0 ? height : 1);
-        Object* c = W3dVistaCamara(v);
+        Object* c = W3dCameraView(v);
         CameraActive = (c && c->getType() == ObjectType::camera) ? (Camera*)c : cam0;
-        W3dVistaAntes(v);
+        W3dViewBefore(v);
         // (el "Limpiar" del proyecto, solo en esta mitad)
-        g_w3dRecorteVistaOn = true;
-        g_w3dRecorteVista[0] = x; g_w3dRecorteVista[1] = W3dPantallaAlto - y - height;
-        g_w3dRecorteVista[2] = width; g_w3dRecorteVista[3] = height;
-        soloEscena = true;
+        g_w3dClipViewOn = true;
+        g_w3dClipView[0] = x; g_w3dClipView[1] = W3dScreenHeight - y - height;
+        g_w3dClipView[2] = width; g_w3dClipView[3] = height;
+        onlyScene = true;
         Render();
-        soloEscena = false;
+        onlyScene = false;
     }
-    g_w3dRecorteVistaOn = false;
-    gVistaPartida = false;
-    W3dVistaDespues();
+    g_w3dClipViewOn = false;
+    gSessionView = false;
+    W3dViewAfter();
     x = x0; y = y0; width = w0; height = h0; aspect = a0;
     CameraActive = cam0;
     // el HUD sobre el cuadro entero: el marco de este viewport, como lo dejaria Render
@@ -3730,11 +3739,11 @@ bool Viewport3D::RenderDividido() {
 }
 
 // la INTERFAZ 2D del juego sobre la pantalla del juego (el marco de la camara o el viewport): ver RenderUI. Con el
-// estado 2D del viewport ya puesto (Estado2D y la ortho local 0..width, 0..height)
-void Viewport3D::DibujarHUDJuego() {
-        { int arri = barAbajo ? 0 : BarTopOffset();
+// estado 2D del viewport ya puesto (State2D y la ortho local 0..width, 0..height)
+void Viewport3D::DrawHUDGame() {
+        { int arri = barDown ? 0 : BarTopOffset();
           // la toolbar solo resta area si de verdad se dibuja (en modo juego se oculta)
-          int abaj = (ToolbarVisible() ? ToolbarHeight() : 0) + (barAbajo ? BarTopOffset() : 0);
+          int abaj = (ToolbarVisible() ? ToolbarHeight() : 0) + (barDown ? BarTopOffset() : 0);
           // 1) la PANTALLA: mirando por la camara es el MARCO del passepartout (el render
           //    encuadrado, aspecto g_renderAspect: el HUD queda ALINEADO con la imagen del
           //    juego y con pantallaDe()); si no, el area util del viewport.
@@ -3747,38 +3756,38 @@ void Viewport3D::DibujarHUDJuego() {
               float chh = camFrameNY * camViewZoom * (float)height * 0.5f;
               if (chw > 1.0f && chh > 1.0f) { sx0 = cfx - chw; sy0 = cfy - chh; sw = chw * 2.0f; sh = chh * 2.0f; }
           }
-          UI2D_BaseRecorte(x, y, width, height);   // el overflow recorta con scissor absoluto
-          UI* uJuego = UI2D_UIDelEditor();
-          bool dinamica = (!uJuego || uJuego->igualQueRender);
-          if (dinamica && AnimEsJuego) {
+          UI2D_BaseClip(x, y, width, height);   // el overflow recorta con scissor absoluto
+          UI* uGame = UI2D_EditorUI();
+          bool dynamic = (!uGame || uGame->sameAsRender);
+          if (dynamic && AnimIsGame) {
               // 2a) MODO JUEGO con UI "igual que el render": la pantalla ES el lienzo
-              //     (override, exactamente la rama igualQueRender de w3drun donde la
-              //     ventana real es el lienzo) -> mapeo 1:1, tamModo 2 escala con
+              //     (override, exactamente la rama sameAsRender de w3drun donde la
+              //     ventana real es el lienzo) -> mapeo 1:1, sizeMode 2 escala con
               //     min(w,h)/480 de ESTA pantalla (en apaisado: la ALTURA / 480).
               //     (P5) ESTADO POR VIEWPORT: el override PERSISTENTE -- el que leen
-              //     los binds del juego (pantalla()/pantallaDe) entre frames -- lo
+              //     los binds del juego (screen()/pantallaDe) entre frames -- lo
               //     publica SOLO el viewport ACTIVO; el dibujo de ESTE viewport usa
               //     un override CON ALCANCE que al salir repone lo que habia. Antes
               //     cada viewport lo pisaba al dibujar (el ultimo ganaba) y con dos
               //     viewports 3D de tamanos distintos la UI del juego se re-armaba a
               //     cada rato con una pantalla distinta ("se agranda y achica como
               //     loca, independiente por cada viewport3d").
-              if (Viewport3DActive == this) UI2D_OverrideVentana(this, sw, sh);
-              UI2D_OverrideVentanaScope ventana(this, sw, sh);
+              if (Viewport3DActive == this) UI2D_OverrideWindow(this, sw, sh);
+              UI2D_OverrideWindowScope window(this, sw, sh);
               hudX0 = sx0; hudY0 = sy0; hudW = sw; hudH = sh; hudEsc = 1.0f; hudOverride = true;
-              { extern float g_hudMargenX, g_hudMargenY, g_hudMarco[4];
+              { extern float g_hudMarginX, g_hudMarginY, g_hudFrame[4];
                 if (Viewport3DActive == this) {
-                    g_hudMargenX = g_hudMargenY = 0.0f;
-                    g_hudMarco[0] = g_hudMarco[1] = 0.0f; g_hudMarco[2] = sw; g_hudMarco[3] = sh;
+                    g_hudMarginX = g_hudMarginY = 0.0f;
+                    g_hudFrame[0] = g_hudFrame[1] = 0.0f; g_hudFrame[2] = sw; g_hudFrame[3] = sh;
                 } }
-              UI2D_DibujarOverlay(sx0, sy0, sw, sh, 1.0f, g_hudCapturaPos, true);
-              W3dCapturasHacerConHud();   // (capturarPantalla(nombre, true): con el HUD ya dibujado)
+              UI2D_DrawOverlay(sx0, sy0, sw, sh, 1.0f, g_hudCapturePos, true);
+              W3dCapturesDoWithHud();   // (capturarPantalla(nombre, true): con el HUD ya dibujado)
           } else {
               // 2b) lienzo con tamano propio, o EDICION (el lienzo sigue siendo el del
               //     render, asi el Editor 2D no cambia): ENCAJARLO (letterbox) con escala
               //     UNIFORME min(sw/lw, sh/lh), la misma cuenta que w3drun / Editor2D.
-              UI2D_OverrideVentanaQuitar(this);
-              float lw, lh; UI2D_TamanoLienzo(&lw, &lh);
+              UI2D_OverrideWindowRemove(this);
+              float lw, lh; UI2D_CanvasSize(&lw, &lh);
               if (lw < 1.0f) lw = 1.0f; if (lh < 1.0f) lh = 1.0f;
               float esc = sw / lw; if (sh / lh < esc) esc = sh / lh;
               if (esc < 0.0001f) esc = 0.0001f;
@@ -3789,22 +3798,22 @@ void Viewport3D::DibujarHUDJuego() {
               // LIENZO, hasta los bordes del VIEWPORT (no del cuadro de la camara: sus bandas tambien son pantalla): en
               // vertical con el lienzo 4:3, las franjas de arriba y de abajo donde se pega lo que va en los bordes.
               // (marcoPantalla()) el cuadro de la imagen 3D en unidades del lienzo, desde su centro
-              { extern float g_hudMargenX, g_hudMargenY, g_hudMarco[4];
+              { extern float g_hudMarginX, g_hudMarginY, g_hudFrame[4];
                 if (Viewport3DActive == this) {
                     // (en el modo juego puro no hay barras del editor: la pantalla es el viewport entero)
                     const float ux0 = 0.0f, uw = (float)width;
-                    const float uy0 = g_juegoPuro ? 0.0f : (float)arri;
-                    const float uh = g_juegoPuro ? (float)height : (float)(height - arri - abaj);
-                    g_hudMargenX = (dx0 - ux0) / esc; g_hudMargenY = (dy0 - uy0) / esc;
-                    if ((ux0 + uw) - (dx0 + dw) < dx0 - ux0) g_hudMargenX = ((ux0 + uw) - (dx0 + dw)) / esc;
-                    if ((uy0 + uh) - (dy0 + dh) < dy0 - uy0) g_hudMargenY = ((uy0 + uh) - (dy0 + dh)) / esc;
-                    if (g_hudMargenX < 0.0f) g_hudMargenX = 0.0f;
-                    if (g_hudMargenY < 0.0f) g_hudMargenY = 0.0f;
-                    g_hudMarco[0] = (sx0 - (dx0 + dw * 0.5f)) / esc; g_hudMarco[1] = (sy0 - (dy0 + dh * 0.5f)) / esc;
-                    g_hudMarco[2] = sw / esc; g_hudMarco[3] = sh / esc;
+                    const float uy0 = g_pureGame ? 0.0f : (float)arri;
+                    const float uh = g_pureGame ? (float)height : (float)(height - arri - abaj);
+                    g_hudMarginX = (dx0 - ux0) / esc; g_hudMarginY = (dy0 - uy0) / esc;
+                    if ((ux0 + uw) - (dx0 + dw) < dx0 - ux0) g_hudMarginX = ((ux0 + uw) - (dx0 + dw)) / esc;
+                    if ((uy0 + uh) - (dy0 + dh) < dy0 - uy0) g_hudMarginY = ((uy0 + uh) - (dy0 + dh)) / esc;
+                    if (g_hudMarginX < 0.0f) g_hudMarginX = 0.0f;
+                    if (g_hudMarginY < 0.0f) g_hudMarginY = 0.0f;
+                    g_hudFrame[0] = (sx0 - (dx0 + dw * 0.5f)) / esc; g_hudFrame[1] = (sy0 - (dy0 + dh * 0.5f)) / esc;
+                    g_hudFrame[2] = sw / esc; g_hudFrame[3] = sh / esc;
                 } }
-              UI2D_DibujarOverlay(dx0, dy0, dw, dh, esc, g_hudCapturaPos, true);
-              W3dCapturasHacerConHud();   // (capturarPantalla(nombre, true): con el HUD ya dibujado)
+              UI2D_DrawOverlay(dx0, dy0, dw, dh, esc, g_hudCapturePos, true);
+              W3dCapturesDoWithHud();   // (capturarPantalla(nombre, true): con el HUD ya dibujado)
           } }
 }
 
@@ -3814,7 +3823,7 @@ void Viewport3D::RenderUI() {
     // ShowUi que lo salteaba se dio de baja: dejaba el viewport sin chrome y el
     // estado GL 2D sin resetear). (Usa el viewport ya seteado en Render().)
     {
-        Estado2D();
+        State2D();
         // la INTERFAZ 2D del juego/programa, dibujada sobre la PANTALLA DEL JUEGO (no sobre
         // el viewport entero, que era lo que la dejaba "aplastada": estirar el lienzo al
         // rect del viewport escala X e Y con factores distintos y ademas descuadra el HUD
@@ -3824,19 +3833,19 @@ void Viewport3D::RenderUI() {
         // SOLO MIRANDO POR LA CAMARA ACTIVA, o JUGANDO (el Play del juego, el modo juego puro: un juego 2D no tiene
         // camara y su UI es todo lo que hay): EDITANDO en el espacio 3D libre, la vida, el puntaje y los menus del juego
         // flotando sobre la escena no significan nada.
-        const bool verUIJuego = camFrameOn || g_juegoPuro || AnimEsJuego;   // (camFrameOn: hay marco de la camara)
-        if (!verUIJuego) W3dCapturasHacerConHud();   // (las capturas que esperaban el HUD no se quedan colgadas)
-        // (el HUD ya se dibujo EN SU LUGAR DEL ARBOL si la UI lo pide: ver UIEnArbol)
-        if (verUIJuego && !gHudEnArbol) DibujarHUDJuego();
+        const bool showUIGame = camFrameOn || g_pureGame || AnimIsGame;   // (camFrameOn: hay marco de la camara)
+        if (!showUIGame) W3dCapturesDoWithHud();   // (las capturas que esperaban el HUD no se quedan colgadas)
+        // (el HUD ya se dibujo EN SU LUGAR DEL ARBOL si la UI lo pide: ver UIInTree)
+        if (showUIGame && !gHudInTree) DrawHUDGame();
         // MODO JUEGO PURO (VERDE+0): el HUD del juego ya se dibujo; todo lo que
         // sigue es CHROME del editor (barras, botones, toolbar, estadisticas).
         // Un corte temprano = cero draws y cero texto del editor por frame.
-        if (g_juegoPuro) { if (!W3dHayConstructor()) w3dEngine::Invalidate(); return; }
+        if (g_pureGame) { if (!W3dHasConstructor()) w3dEngine::Invalidate(); return; }
         // el OVERLAY DEL JUEGO pudo dejar CUALQUIER estado 2D: una imagen/video
-        // sin canal alpha APAGA Blend (UIOverlay::DibujarImagenRect), el texto
+        // sin canal alpha APAGA Blend (UIOverlay::DrawImageRect), el texto
         // deja mezcla premultiplicada, un elemento con profundidad prende el
         // z-test. La UI del viewport no ASUME nada de eso: AFIRMA su estado
-        // completo (mismo criterio que W3dDecalesDibujarPendientes). Era el bug
+        // completo (mismo criterio que W3dDecalsDrawPending). Era el bug
         // de los botones de pausa con BORDES NEGROS jugando: el HUD del juego
         // terminaba en una imagen opaca, Blend quedaba apagado de verdad (el
         // cache lo sabia, asi que este bloque -- que solo reponia la FUNCION de
@@ -3844,7 +3853,7 @@ void Viewport3D::RenderUI() {
         // esquinas de los botones salian opacas/negras. Con el cache fino,
         // re-afirmar lo que ya estaba puesto cuesta cero llamadas de driver. Tambien el estado de MATERIAL que dejo la
         // escena: un alpha test prendido borraba la barra translucida, la UI de la camara y las filas tenues
-        w3dEngine::EstadoBase();
+        w3dEngine::BaseState();
         w3dEngine::Disable(w3dEngine::DepthTest);
         w3dEngine::Disable(w3dEngine::CullFace);
         w3dEngine::Enable(w3dEngine::Blend);
@@ -3859,147 +3868,148 @@ void Viewport3D::RenderUI() {
         w3dEngine::TexFilter(false);
         // durante un transform (mover/rotar/escalar, o ubicar un duplicado) la
         // barra de botones se reemplaza por una barra de estado con los valores
-        extern int g_poseModo;
-        bool transformando = (Viewport3DActive == this &&
-            (estado == translacion || estado == rotacion || estado == EditScale) &&
-            (InteractionMode == ObjectMode ||
-             (InteractionMode == EditMode && EditXformActivo()) ||
-             (InteractionMode == EditMode && BoneXformModo()) ||   // G/R/S de huesos (Edit de armature)
-             (InteractionMode == PoseMode && g_poseModo)));
-        if (transformando) {
-            RenderBarraTransform();
-        } else if (AnimEsJuego && JuegoSimActiva()) {
+        extern int g_poseMode;
+        bool transforming = (Viewport3DActive == this &&
+            (((state == translation || state == rotation || state == EditScale) &&
+              (InteractionMode == ObjectMode ||
+               (InteractionMode == EditMode && EditXformActive()) ||
+               (InteractionMode == EditMode && BoneXformMode()) ||   // G/R/S de huesos (Edit de armature)
+               (InteractionMode == PoseMode && g_poseMode))) ||
+             InsetActive() || BevelActive()));                     // insertar caras / bevel: su valor
+        if (transforming) {
+            RenderBarTransform();
+        } else if (AnimIsGame && GameSimActive()) {
             // ===== MODO JUEGO (sim corriendo): barra MINIMA. Se puede: parar/
             // pausar/reanudar, y los menus View (cambiar camara) / Overlays /
             // Render. Nada de editar. Con STOP la interfaz vuelve a la normal. =====
-            static const int kOcultar[] = { BR_Mode, BR_SelMode, BR_Pivot, BR_Orient, BR_Snap, BR_Proporcional,
-                                            BR_Select, BR_Add, BR_Mesh, BR_Animation, BR_Object, BR_UV, BR_Raiz };
-            for (size_t i = 0; i < sizeof(kOcultar) / sizeof(kOcultar[0]); i++) {
-                Button* bo = BarRolBtn(BarButtons, kOcultar[i]);
+            static const int kHide[] = { BR_Mode, BR_SelMode, BR_Pivot, BR_Orient, BR_Snap, BR_Proportional,
+                                            BR_Select, BR_Add, BR_Mesh, BR_Animation, BR_Object, BR_UV, BR_Root };
+            for (size_t i = 0; i < sizeof(kHide) / sizeof(kHide[0]); i++) {
+                Button* bo = BarRoleBtn(BarButtons, kHide[i]);
                 if (bo) bo->visible = false;
             }
-            Button* bs = BarRolBtn(BarButtons, BR_JuegoStop);
-            Button* bl = BarRolBtn(BarButtons, BR_JuegoPlay);
+            Button* bs = BarRoleBtn(BarButtons, BR_GameStop);
+            Button* bl = BarRoleBtn(BarButtons, BR_GamePlay);
             if (bs) bs->visible = true;
             if (bl) {
                 bl->visible = true;
                 // UN SOLO boton play/pausa: dice lo que va a HACER el click
                 bl->text = PlayAnimation ? T("Pause") : T("Play");
                 // verde mientras el juego CORRE (mismo estilo que Snap ON)
-                static float playVerde[3]; const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
-                for (int i = 0; i < 3; i++) playVerde[i] = acc[i] * 0.4f;
-                bl->tinte = PlayAnimation ? playVerde : NULL;
-                bl->colorTexto = PlayAnimation ? acc : NULL;
+                static float playGreen[3]; const float* acc = ColorList[static_cast<int>(ColorID::accent)];
+                for (int i = 0; i < 3; i++) playGreen[i] = acc[i] * 0.4f;
+                bl->tint = PlayAnimation ? playGreen : NULL;
+                bl->textColor = PlayAnimation ? acc : NULL;
             }
             for (size_t i = 0; i < BarButtons.size(); i++)
-                if (BarButtons[i]->rol == BR_Overlays)
+                if (BarButtons[i]->role == BR_Overlays)
                     BarButtons[i]->icon = showOverlays ? (int)IconType::visible : (int)IconType::hidden;
             RenderBar();
         } else {
             // el boton [1] (modo) para MALLA (Object/Edit/Paint) o ARMATURE (Object/Edit/Pose);
             // muestra el modo actual con su icono.
             { Button* bt;   // sin sim: barra normal; el Play queda si estamos en "Juego"
-              if ((bt = BarRolBtn(BarButtons, BR_JuegoStop)))  bt->visible = false;
-              if ((bt = BarRolBtn(BarButtons, BR_JuegoPlay))) {
-                  bt->visible = AnimEsJuego;
+              if ((bt = BarRoleBtn(BarButtons, BR_GameStop)))  bt->visible = false;
+              if ((bt = BarRoleBtn(BarButtons, BR_GamePlay))) {
+                  bt->visible = AnimIsGame;
                   bt->text = T("Play");
-                  bt->tinte = NULL; bt->colorTexto = NULL;
+                  bt->tint = NULL; bt->textColor = NULL;
               } }
-            bool esMesh = ObjActivo && ObjActivo->getType() == ObjectType::mesh;
-            bool esArm  = ObjActivo && ObjActivo->getType() == ObjectType::armature;
+            bool isMesh = ActiveObj && ActiveObj->getType() == ObjectType::mesh;
+            bool isArm  = ActiveObj && ActiveObj->getType() == ObjectType::armature;
             // la escena/prefab que se edita (en un juego empaquetado no se cambia de escena a mano)
-            { Button* bR = BarRolBtn(BarButtons, BR_Raiz);
-              if (bR) { extern bool g_modoJuego; bR->visible = !g_modoJuego; W3dRaicesBotonSincronizar(bR); } }
+            { Button* bR = BarRoleBtn(BarButtons, BR_Root);
+              if (bR) { extern bool g_gameMode; bR->visible = !g_gameMode; W3dRootsButtonSync(bR); } }
             // se buscan por ROL (no por indice) -> reordenar la barra no rompe esto.
-            Button* bMode = BarRolBtn(BarButtons, BR_Mode);
+            Button* bMode = BarRoleBtn(BarButtons, BR_Mode);
             if (bMode) {
-                bMode->visible = esMesh || esArm;
-                if (!esMesh && !esArm) InteractionMode = ObjectMode;
+                bMode->visible = isMesh || isArm;
+                if (!isMesh && !isArm) InteractionMode = ObjectMode;
                 // un armature no tiene Paint: si quedo en un modo de malla, volver a Object
-                if (esArm && InteractionMode != EditMode && InteractionMode != PoseMode) InteractionMode = ObjectMode;
+                if (isArm && InteractionMode != EditMode && InteractionMode != PoseMode) InteractionMode = ObjectMode;
                 // una malla no tiene Pose: si venia de un armature en Pose, volver a Object
-                if (esMesh && InteractionMode == PoseMode) InteractionMode = ObjectMode;
+                if (isMesh && InteractionMode == PoseMode) InteractionMode = ObjectMode;
                 bMode->text = (InteractionMode == EditMode)     ? T("Edit Mode") :
                               (InteractionMode == PoseMode)     ? T("Pose Mode") :
                               (InteractionMode == VertexPaint)  ? T("Vertex Paint") :
                               (InteractionMode == WeightPaint)  ? T("Weight Paint") :
                               (InteractionMode == TexturePaint) ? T("Texture Paint") : T("Object Mode");
                 bMode->icon = (InteractionMode == ObjectMode) ? (int)IconType::object :
-                              esArm                            ? (int)IconType::armature : (int)IconType::mesh;
+                              isArm                            ? (int)IconType::armature : (int)IconType::mesh;
             }
-            bool enEdit = (esMesh && InteractionMode == EditMode);
-            Button* bSelM = BarRolBtn(BarButtons, BR_SelMode); // sub-elemento, SOLO en edit (icono)
+            bool inEdit = (isMesh && InteractionMode == EditMode);
+            Button* bSelM = BarRoleBtn(BarButtons, BR_SelMode); // sub-elemento, SOLO en edit (icono)
             if (bSelM) {
-                bSelM->visible = enEdit;
+                bSelM->visible = inEdit;
                 bSelM->icon = (EditSelectMode == SelEdge) ? (int)IconType::selEdge :
                               (EditSelectMode == SelFace) ? (int)IconType::selFace : (int)IconType::selVertex;
             }
-            Button* bUV = BarRolBtn(BarButtons, BR_UV);       // UV: SOLO en edit
-            if (bUV) bUV->visible = enEdit;
-            Button* bMesh = BarRolBtn(BarButtons, BR_Mesh);   // Mesh (Transform/Snap/Delete): SOLO en edit
-            if (bMesh) bMesh->visible = enEdit;
-            Button* bAdd = BarRolBtn(BarButtons, BR_Add);     // Add: SOLO en Object Mode
+            Button* bUV = BarRoleBtn(BarButtons, BR_UV);       // UV: SOLO en edit
+            if (bUV) bUV->visible = inEdit;
+            Button* bMesh = BarRoleBtn(BarButtons, BR_Mesh);   // Mesh (Transform/Snap/Delete): SOLO en edit
+            if (bMesh) bMesh->visible = inEdit;
+            Button* bAdd = BarRoleBtn(BarButtons, BR_Add);     // Add: SOLO en Object Mode
             if (bAdd) bAdd->visible = (InteractionMode == ObjectMode);
             // PINTURA (pesos / color / textura): no se puede cambiar la seleccion ni transformar nada, asi
             // que los menus Select y Object, el snap, la orientacion (Global) y el pivot no tienen sentido
             // en la barra: se ocultan (pedido del dueno).
-            const bool pintura = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+            const bool paint = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
             { Button* b;
-              if ((b = BarRolBtn(BarButtons, BR_Select))) b->visible = !pintura;
-              if ((b = BarRolBtn(BarButtons, BR_Object))) b->visible = !pintura; }
-            Button* bPiv = BarRolBtn(BarButtons, BR_Pivot);   // Pivot: solo icono = el modo actual
-            if (bPiv) bPiv->visible = !pintura;
+              if ((b = BarRoleBtn(BarButtons, BR_Select))) b->visible = !paint;
+              if ((b = BarRoleBtn(BarButtons, BR_Object))) b->visible = !paint; }
+            Button* bPiv = BarRoleBtn(BarButtons, BR_Pivot);   // Pivot: solo icono = el modo actual
+            if (bPiv) bPiv->visible = !paint;
             if (bPiv) bPiv->icon = (g_transformPivot == PivotCursor3D)   ? (int)IconType::pivotCursor :
                                    (g_transformPivot == PivotIndividual) ? (int)IconType::pivotIndividual :
                                    (g_transformPivot == PivotActive)     ? (int)IconType::pivotActive :
                                                                            (int)IconType::pivotMedian;
-            SyncBotonContexto();
+            SyncButtonContext();
             // "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado, en Object Mode y en
             // Pose Mode (ahi: Insert Keyframe y Reset Pose).
-            Button* bAnim = BarRolBtn(BarButtons, BR_Animation);
-            if (bAnim) bAnim->visible = HayObjetosSeleccionados() &&
+            Button* bAnim = BarRoleBtn(BarButtons, BR_Animation);
+            if (bAnim) bAnim->visible = HasObjectsSelected() &&
                 ((InteractionMode == ObjectMode) || (InteractionMode == PoseMode) ||
                  (InteractionMode == EditMode && ActiveAnimKind == 3)); // editando una vertex anim: Insert Keyframe a mano
-            Button* bOri = BarRolBtn(BarButtons, BR_Orient);  // muestra la orientacion actual
-            if (bOri) bOri->visible = !pintura;
+            Button* bOri = BarRoleBtn(BarButtons, BR_Orient);  // muestra la orientacion actual
+            if (bOri) bOri->visible = !paint;
             if (bOri) bOri->text = T((transformOrientation == LocalOrient)  ? "Local" :
                                      (transformOrientation == ViewOrient)   ? "View"  :
                                      (transformOrientation == NormalOrient) ? "Normal" : "Global");
             // SNAP: el boton se ilumina VERDE cuando esta ON (para saber que el imantado esta activo)
-            Button* bSnap = BarRolBtn(BarButtons, BR_Snap);
-            if (bSnap) bSnap->visible = !pintura;
+            Button* bSnap = BarRoleBtn(BarButtons, BR_Snap);
+            if (bSnap) bSnap->visible = !paint;
             if (bSnap){
-                static float snapVerde[3]; const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
-                for (int i=0;i<3;i++) snapVerde[i]=acc[i]*0.4f;
-                bSnap->tinte = g_snap.enabled ? snapVerde : NULL;
-                bSnap->colorTexto = g_snap.enabled ? acc : NULL;
+                static float snapGreen[3]; const float* acc = ColorList[static_cast<int>(ColorID::accent)];
+                for (int i=0;i<3;i++) snapGreen[i]=acc[i]*0.4f;
+                bSnap->tint = g_snap.enabled ? snapGreen : NULL;
+                bSnap->textColor = g_snap.enabled ? acc : NULL;
             }
             // PINTURA DE TEXTURA: el diskette (la textura pintada vive en RAM hasta guardarla); con "*" pendiente, verde
-            { Button* bTG = BarRolBtn(BarButtons, BR_TexGuardar);
+            { Button* bTG = BarRoleBtn(BarButtons, BR_TexSave);
               if (bTG) {
                   bTG->visible = (InteractionMode == TexturePaint);
-                  Mesh* mT = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-                  int pT = -1; Texture* tT = mT ? WP3DTexturaActiva(mT, pT) : NULL;
-                  const bool pend = tT && TexEditSinGuardar(tT);
-                  static float tgVerde[3]; const float* accT = ListaColores[static_cast<int>(ColorID::accent)];
-                  for (int i=0;i<3;i++) tgVerde[i]=accT[i]*0.4f;
-                  bTG->tinte = pend ? tgVerde : NULL;
-                  bTG->colorTexto = pend ? accT : NULL;
+                  Mesh* mT = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+                  int pT = -1; Texture* tT = mT ? WP3DActiveTexture(mT, pT) : NULL;
+                  const bool pend = tT && TexEditUnsaved(tT);
+                  static float tgGreen[3]; const float* accT = ColorList[static_cast<int>(ColorID::accent)];
+                  for (int i=0;i<3;i++) tgGreen[i]=accT[i]*0.4f;
+                  bTG->tint = pend ? tgGreen : NULL;
+                  bTG->textColor = pend ? accT : NULL;
               } }
             // PROPORTIONAL EDITING: el icono de la curva de caida elegida, VERDE cuando esta ON (tecla O)
-            Button* bProp = BarRolBtn(BarButtons, BR_Proporcional);
+            Button* bProp = BarRoleBtn(BarButtons, BR_Proportional);
             if (bProp){
-                bProp->visible = !pintura && (InteractionMode == EditMode || InteractionMode == ObjectMode);
-                bProp->icon = ProporcionalTipoIcono(g_prop.tipo);
-                static float propVerde[3]; const float* accP = ListaColores[static_cast<int>(ColorID::accent)];
-                for (int i=0;i<3;i++) propVerde[i]=accP[i]*0.4f;
-                bProp->tinte = g_prop.on ? propVerde : NULL;
-                bProp->colorTexto = g_prop.on ? accP : NULL;
+                bProp->visible = !paint && (InteractionMode == EditMode || InteractionMode == ObjectMode);
+                bProp->icon = ProportionalIconType(g_prop.type);
+                static float propGreen[3]; const float* accP = ColorList[static_cast<int>(ColorID::accent)];
+                for (int i=0;i<3;i++) propGreen[i]=accP[i]*0.4f;
+                bProp->tint = g_prop.on ? propGreen : NULL;
+                bProp->textColor = g_prop.on ? accP : NULL;
             }
             // el OJO del overlay dice si estan prendidos: abierto = se ven, cerrado = apagados. Va aca (por
             // frame) y no al construirlo, porque el estado cambia.
             for (size_t i = 0; i < BarButtons.size(); i++)
-                if (BarButtons[i]->rol == BR_Overlays)
+                if (BarButtons[i]->role == BR_Overlays)
                     BarButtons[i]->icon = showOverlays ? (int)IconType::visible : (int)IconType::hidden;
             RenderBar();
         }
@@ -4007,12 +4017,12 @@ void Viewport3D::RenderUI() {
         // Se dibuja TAMBIEN durante un transform (ahi viven el tilde/cruz y los ejes X/Y/Z).
         RenderToolbar();
         // estadisticas/fps (texto blanco arriba a la derecha; misma ortho 2D)
-        RenderEstadisticas();
+        RenderStats();
         // el CANDADO de la vista de camara (abajo al centro)
-        RenderCandadoCamara();
+        RenderLockCamera();
         // "Ray Tracing: 3/16" .. "done" (arriba a la izquierda, misma ortho 2D)
         // (en la VISTA LOCAL el cartel lo dice: "Local View", o adelante del del trazado)
-        if (!(view == RenderType::Rendered && RTRenderEstado(this)) && localViewActivo) W3dVistaCartel(this, T("Local View"));
+        if (!(view == RenderType::Rendered && RTRenderState(this)) && localViewActive) W3dDialogView(this, T("Local View"));
     }
 
     w3dEngine::MatrixMode(w3dEngine::Projection);
@@ -4021,7 +4031,7 @@ void Viewport3D::RenderUI() {
     w3dEngine::MatrixMode(w3dEngine::ModelView);
     w3dEngine::LoadIdentity();
 
-    w3dEngine::Viewport(x, W3dPantallaAlto - y - height, width, height);
+    w3dEngine::Viewport(x, W3dScreenHeight - y - height, width, height);
     w3dEngine::Ortho(0, width, height, 0, -1, 1);
 
     w3dEngine::Disable(w3dEngine::CullFace);
@@ -4042,7 +4052,7 @@ void Viewport3D::RenderUI() {
     w3dEngine::EnableArray(w3dEngine::TexCoordArray);
     w3dEngine::DisableArray(w3dEngine::NormalArray);
 
-    DibujarBordes(this);
+    DrawBorders(this);
 }
 
 // float -> texto portable (sin %f, que no anda en Symbian). El formateo vive en el
@@ -4050,15 +4060,15 @@ void Viewport3D::RenderUI() {
 static std::string W3dFmtF(float v, int dec){ return W3dFmtFloat(v, dec); }
 
 // busca el estado guardado (pos/rot/scale al iniciar el transform) del objeto
-static SaveState* W3dEstadoGuardado(Object* o){
-    for (size_t i = 0; i < estadoObjetos.size(); i++)
-        if (estadoObjetos[i].obj == o) return &estadoObjetos[i];
+static SaveState* W3dSavedState(Object* o){
+    for (size_t i = 0; i < objectState.size(); i++)
+        if (objectState[i].obj == o) return &objectState[i];
     return NULL;
 }
 
 // el texto de la barra de estado: operacion + valores en vivo del objeto activo
 // (mismo mapeo de ejes que el panel Properties: Location Y=z, Z=y; Scale x/y/z)
-static const char* W3dOrientPalabra(){
+static const char* W3dOrientWord(){
     if (transformOrientation == LocalOrient) return T("local");
     if (transformOrientation == ViewOrient)  return T("view");
     return T("global");
@@ -4066,30 +4076,30 @@ static const char* W3dOrientPalabra(){
 
 // arma el texto: un solo eje muestra SOLO ese eje ("X: .. along global X"); un
 // plano muestra los dos del plano; libre muestra los tres (sin sufijo).
-static std::string W3dLineaTransform(const char* titulo, float vx, float vy, float vz){
+static std::string W3dLineTransform(const char* title, float vx, float vy, float vz){
     int a = axisSelect;
-    std::string ori = W3dOrientPalabra();
+    std::string ori = W3dOrientWord();
     if (a == X || a == Y || a == Z){
         const char* L = (a == X) ? "X" : (a == Y) ? "Y" : "Z";
         float v = (a == X) ? vx : (a == Y) ? vy : vz;
-        return std::string(titulo) + " " + L + ": " + W3dFmtF(v, 4) + "  " + T("along") + " " + ori + " " + L;
+        return std::string(title) + " " + L + ": " + W3dFmtF(v, 4) + "  " + T("along") + " " + ori + " " + L;
     }
     if (a == PlaneX || a == PlaneY || a == PlaneZ){
-        std::string s = titulo, ejes;
-        if (a != PlaneX){ s += "  X: " + W3dFmtF(vx, 4); ejes += "X"; }
-        if (a != PlaneY){ s += "  Y: " + W3dFmtF(vy, 4); if (!ejes.empty()) ejes += "-"; ejes += "Y"; }
-        if (a != PlaneZ){ s += "  Z: " + W3dFmtF(vz, 4); if (!ejes.empty()) ejes += "-"; ejes += "Z"; }
-        return s + "  " + T("along") + " " + ori + " " + ejes;
+        std::string s = title, axes;
+        if (a != PlaneX){ s += "  X: " + W3dFmtF(vx, 4); axes += "X"; }
+        if (a != PlaneY){ s += "  Y: " + W3dFmtF(vy, 4); if (!axes.empty()) axes += "-"; axes += "Y"; }
+        if (a != PlaneZ){ s += "  Z: " + W3dFmtF(vz, 4); if (!axes.empty()) axes += "-"; axes += "Z"; }
+        return s + "  " + T("along") + " " + ori + " " + axes;
     }
     // libre (3 ejes)
-    return std::string(titulo) + "  X: " + W3dFmtF(vx, 4) +
+    return std::string(title) + "  X: " + W3dFmtF(vx, 4) +
                          "  Y: " + W3dFmtF(vy, 4) + "  Z: " + W3dFmtF(vz, 4);
 }
 
 // sufijo "  along <orient> <ejes>" para un valor numerico, segun axisSelect
-static std::string W3dSufijoEjes(){
+static std::string W3dSuffixAxes(){
     int a = axisSelect;
-    std::string ori = W3dOrientPalabra();
+    std::string ori = W3dOrientWord();
     if (a==X||a==Y||a==Z) return std::string("  ") + T("along") + " " + ori + " " + ((a==X)?"X":(a==Y)?"Y":"Z");
     if (a==PlaneX) return std::string("  ") + T("along") + " " + ori + " Y-Z";
     if (a==PlaneY) return std::string("  ") + T("along") + " " + ori + " X-Z";
@@ -4097,69 +4107,83 @@ static std::string W3dSufijoEjes(){
     return ""; // libre
 }
 
-static std::string W3dTextoTransform(){
+static std::string W3dTextTransform(){
+    // INSERTAR CARAS / BEVEL: su valor (o lo tipeado). Tocar la barra abre el teclado numerico para escribirlo exacto
+    if (InsetActive() || BevelActive()){
+        const char* op = InsetActive() ? T("Inset Faces") : T("Bevel");
+        if (NumInputActive()) return std::string(op) + ": " + TransformUITextNum("");
+        if (BevelActive()){
+            const BevelOptions& b = BevelCurrentOptions();
+            char seg[16]; snprintf(seg, sizeof(seg), "%d", b.segments);
+            return std::string(op) + ": " + T("Width") + " " + W3dFmtF(b.width, 3) + "  " + T("Segments") + " " + seg;
+        }
+        const InsetOptions& o = InsetCurrentOptions();
+        std::string s = std::string(op) + ": " + T("Thickness") + " " + W3dFmtF(o.thickness, 3);
+        if (o.depth != 0.0f || InsetDepthDrag()) s += std::string("  ") + T("Depth") + " " + W3dFmtF(o.depth, 3);
+        return s;
+    }
     // ENTRADA NUMERICA: muestra la EXPRESION tipeada + su resultado (
     // "Move: [(2*3)+3] = 9  along global X"). Vale para objetos y malla. El armado
     // "[expr|] = valor" es el compartido de TransformUI (mismo formato en UV / 2D).
-    if (NumInputActivo()){
-        const char* op = (estado==rotacion) ? T("Rotate") : (estado==EditScale) ? (EditShrinkActivo() ? T("Shrink/Fatten") : T("Scale")) : T("Move");
-        const char* unit = (estado==rotacion) ? "\xC2\xB0" : "";
-        std::string suf = (estado==rotacion && (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis)) ? "" : W3dSufijoEjes();
-        return std::string(op) + ": " + TransformUITextoNum(unit) + suf;
+    if (NumInputActive()){
+        const char* op = (state==rotation) ? T("Rotate") : (state==EditScale) ? (EditShrinkActive() ? T("Shrink/Fatten") : T("Scale")) : T("Move");
+        const char* unit = (state==rotation) ? "\xC2\xB0" : "";
+        std::string suf = (state==rotation && (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis)) ? "" : W3dSuffixAxes();
+        return std::string(op) + ": " + TransformUITextNum(unit) + suf;
     }
     // Edit Mode: los valores son los del TRANSFORM DE MALLA (los vertices), no del
     // objeto (que no se mueve). Mismos labels de eje/orientacion. La rotacion usa
-    // gAnguloTransform igual que objetos, asi que cae al codigo de abajo.
-    const bool edit = (InteractionMode == EditMode && EditXformActivo());
+    // gAngleTransform igual que objetos, asi que cae al codigo de abajo.
+    const bool edit = (InteractionMode == EditMode && EditXformActive());
     if (edit){
-        if (estado == translacion){
+        if (state == translation){
             Vector3 d = EditXformTransDelta(); // mundo (engine xyz) -> user X/Y/Z (swap z/y)
-            return W3dLineaTransform(T("Translate"), d.x, d.z, d.y);
+            return W3dLineTransform(T("Translate"), d.x, d.z, d.y);
         }
-        if (estado == EditScale){
-            if (EditShrinkActivo()) return std::string(T("Shrink/Fatten")) + ": " + W3dFmtF(EditXformShrinkAmt(), 4);
+        if (state == EditScale){
+            if (EditShrinkActive()) return std::string(T("Shrink/Fatten")) + ": " + W3dFmtF(EditXformShrinkAmt(), 4);
             float f = EditXformScaleFactor();
-            return W3dLineaTransform(T("Scale"), f, f, f);
+            return W3dLineTransform(T("Scale"), f, f, f);
         }
-        // rotacion: cae al bloque comun (gAnguloTransform + axisSelect/orientacion)
+        // rotacion: cae al bloque comun (gAngleTransform + axisSelect/orientacion)
     }
     // EDIT de ARMATURE (G/R/S de huesos): translate/scale muestran el valor del transform de puntas.
-    // Rotate cae al bloque comun (usa gAnguloTransform, que BoneXformAplicar setea).
-    if (InteractionMode == EditMode && BoneXformModo()){
-        int bm = BoneXformModo();
-        if (bm == 1) return std::string(T("Translate")) + ": " + W3dFmtF(BoneXformHeaderValor(), 4) + W3dSufijoEjes();
-        if (bm == 3) return std::string(T("Scale")) + ": " + W3dFmtF(BoneXformHeaderValor(), 3);
+    // Rotate cae al bloque comun (usa gAngleTransform, que BoneXformApply setea).
+    if (InteractionMode == EditMode && BoneXformMode()){
+        int bm = BoneXformMode();
+        if (bm == 1) return std::string(T("Translate")) + ": " + W3dFmtF(BoneXformHeaderValue(), 4) + W3dSuffixAxes();
+        if (bm == 3) return std::string(T("Scale")) + ": " + W3dFmtF(BoneXformHeaderValue(), 3);
     }
     // POSE Mode: translate/scale muestran el valor de la POSE (no el del objeto armature). Rotate cae al bloque comun
-    // (usa gAnguloTransform, que el transform de pose setea). El numerico ya lo cubre el bloque de arriba.
-    { extern int PoseHeaderModo(); extern float PoseHeaderValor();
-      if (InteractionMode == PoseMode && PoseHeaderModo()){
-        int pm = PoseHeaderModo();
-        if (pm == 1) return std::string(T("Translate")) + ": " + W3dFmtF(PoseHeaderValor(), 4) + W3dSufijoEjes();
-        if (pm == 3) return std::string(T("Scale")) + ": " + W3dFmtF(PoseHeaderValor(), 3);
+    // (usa gAngleTransform, que el transform de pose setea). El numerico ya lo cubre el bloque de arriba.
+    { extern int PoseHeaderMode(); extern float PoseHeaderValue();
+      if (InteractionMode == PoseMode && PoseHeaderMode()){
+        int pm = PoseHeaderMode();
+        if (pm == 1) return std::string(T("Translate")) + ": " + W3dFmtF(PoseHeaderValue(), 4) + W3dSuffixAxes();
+        if (pm == 3) return std::string(T("Scale")) + ": " + W3dFmtF(PoseHeaderValue(), 3);
       } }
-    if (!ObjActivo) return "";
-    SaveState* st = W3dEstadoGuardado(ObjActivo);
-    if (estado == translacion){
-        Vector3 p = ObjActivo->pos;
+    if (!ActiveObj) return "";
+    SaveState* st = W3dSavedState(ActiveObj);
+    if (state == translation){
+        Vector3 p = ActiveObj->pos;
         Vector3 p0 = st ? st->pos : p;
         // X/Y/Z del usuario = engine x / z / y (swap del modelo)
-        return W3dLineaTransform(T("Translate"), p.x - p0.x, p.z - p0.z, p.y - p0.y);
+        return W3dLineTransform(T("Translate"), p.x - p0.x, p.z - p0.z, p.y - p0.y);
     }
-    if (estado == EditScale){
-        Vector3 s = ObjActivo->scale;
+    if (state == EditScale){
+        Vector3 s = ActiveObj->scale;
         Vector3 s0 = st ? st->scale : Vector3(1,1,1);
         float fx = (s0.x != 0.0f) ? s.x / s0.x : s.x;
         float fy = (s0.y != 0.0f) ? s.y / s0.y : s.y;
         float fz = (s0.z != 0.0f) ? s.z / s0.z : s.z;
-        return W3dLineaTransform(T("Scale"), fx, fz, fy); // Y=scale.z, Z=scale.y
+        return W3dLineTransform(T("Scale"), fx, fz, fy); // Y=scale.z, Z=scale.y
     }
-    if (estado == rotacion){
-        std::string r = std::string(T("Rotate")) + "  " + W3dFmtF(gAnguloTransform, 1) + "\xC2\xB0";
+    if (state == rotation){
+        std::string r = std::string(T("Rotate")) + "  " + W3dFmtF(gAngleTransform, 1) + "\xC2\xB0";
         int a = axisSelect;
         if (a == X || a == Y || a == Z){
             const char* L = (a == X) ? "X" : (a == Y) ? "Y" : "Z";
-            r += std::string("  ") + T("along") + " " + W3dOrientPalabra() + " " + L;
+            r += std::string("  ") + T("along") + " " + W3dOrientWord() + " " + L;
         }
         else if (a == OrbitalAxis) r += std::string("  ") + T("Orbital");
         return r;
@@ -4169,15 +4193,15 @@ static std::string W3dTextoTransform(){
 
 // linea PUNTEADA 2D (coords de pantalla del viewport, Y abajo) entre dos puntos.
 // (la usa tambien el timeline: la misma linea pivote -> mouse al rotar / escalar keyframes)
-void DibujarLineaPunteada2D(float ax, float ay, float bx, float by){
+void DrawDashedLine2D(float ax, float ay, float bx, float by){
     float dx = bx - ax, dy = by - ay;
     float len = sqrtf(dx * dx + dy * dy);
     if (len < 2.0f) return;
     float ux = dx / len, uy = dy / len;
-    const float dash = 6.0f, gap = 5.0f, paso = dash + gap;
+    const float dash = 6.0f, gap = 5.0f, step = dash + gap;
     GLfloat v[4 * 128]; // hasta 128 guiones
     int n = 0;
-    for (float t = 0.0f; t < len && n < 128; t += paso){
+    for (float t = 0.0f; t < len && n < 128; t += step){
         float t2 = t + dash; if (t2 > len) t2 = len;
         v[n*4+0] = ax + ux*t;  v[n*4+1] = ay + uy*t;
         v[n*4+2] = ax + ux*t2; v[n*4+3] = ay + uy*t2;
@@ -4197,49 +4221,50 @@ void DibujarLineaPunteada2D(float ax, float ay, float bx, float by){
     w3dEngine::EnableArray(w3dEngine::TexCoordArray);
 }
 
-void Viewport3D::RenderBarraTransform(){
+void Viewport3D::RenderBarTransform(){
     if (!barCard) return;
 
     // linea punteada VERDE del pivot al mouse: en ROTAR y ESCALAR (no translate). La barra es chrome
     // (se ve aunque Show Overlays este off), pero la linea punteada SI es overlay del transform: con
     // overlays off NO se dibuja (igual que los ejes de constraint, que viven en RenderOverlay).
-    if (showOverlays && (estado == rotacion || estado == EditScale) && gLineaValida){
-        DibujarLineaPunteada2D(gTrackPivX, gTrackPivY, gTrackMouseX, gTrackMouseY);
+    if (showOverlays && (state == rotation || state == EditScale) && gLineValid){
+        DrawDashedLine2D(gTrackPivX, gTrackPivY, gTrackMouseX, gTrackMouseY);
     }
 
     // fondo + texto: el dibujo COMPARTIDO de la barra de info (TransformUI.cpp), el
     // mismo que usan el UV editor y el Editor 2D durante sus transforms.
-    RenderBarraInfo(W3dTextoTransform());
+    RenderBarInfo(W3dTextTransform());
 }
 
 // TACTIL: un tap sobre la barra de estado del transform (la que dice "Move: ... = ...")
 // abre el teclado numerico en modo transform para editar el valor EXACTO como en PC.
 // Solo cuando hay un transform en curso y este es el viewport activo.
-bool Viewport3D::ClickBarraTransform(int mx, int my){
+bool Viewport3D::ClickBarTransform(int mx, int my){
     if (Viewport3DActive != this) return false;
-    if (!(estado == translacion || estado == rotacion || estado == EditScale)) return false;
-    if (!(InteractionMode == ObjectMode ||
-          (InteractionMode == EditMode && EditXformActivo()) ||
-          (InteractionMode == EditMode && BoneXformModo()))) return false; // G/R/S de huesos: valor exacto tactil
+    const bool modalMesh = InsetActive() || BevelActive();   // insertar caras / bevel: el grosor / el ancho exacto
+    if (!modalMesh && !(state == translation || state == rotation || state == EditScale)) return false;
+    if (!modalMesh && !(InteractionMode == ObjectMode ||
+          (InteractionMode == EditMode && EditXformActive()) ||
+          (InteractionMode == EditMode && BoneXformMode()))) return false; // G/R/S de huesos: valor exacto tactil
     int barH = BarHeight();
-    int yBar = barAbajo ? (y + height - barH) : y; // misma franja que RenderBarraTransform
+    int yBar = barDown ? (y + height - barH) : y; // misma franja que RenderBarTransform
     if (mx < x || mx >= x + width || my < yBar || my >= yBar + barH) return false;
-    NumPadAbrirTransform();
+    NumPadOpenTransform();
     return true;
 }
 
 // El overlay de estadisticas (arriba-derecha: vertices/caras/modgen/ms/fps) vive en ViewPort3D_Stats.cpp
-// junto a su helper W3dContarMallas. Solo lee globales ya expuestos (profiler, contadores de OpcionesRender).
+// junto a su helper W3dCountMeshes. Solo lee globales ya expuestos (profiler, contadores de OpcionesRender).
 
 void Viewport3D::ChangePerspective(){
     orthographic = !orthographic;
 }
 
 // SYMBIAN: el camino de PC del viewport 3D (aceptar, click, soltar, arrastre) corre solo con el DEDO
-// (W3D_SOLO_POR_CONTROLES, app/W3dTactilEditor.h). El cursor virtual, el mouse BT y el keypad del N95 siguen por el
+// (W3D_ONLY_BY_CONTROLS, app/W3dTouchEditor.h). El cursor virtual, el mouse BT y el keypad del N95 siguen por el
 // suyo (w3dnewscene / HID), como antes.
-void Viewport3D::Aceptar() {
-    W3D_SOLO_POR_CONTROLES();
+void Viewport3D::Accept() {
+    W3D_ONLY_BY_CONTROLS();
 
     // Mostrar el cursor
     #if !defined(W3D_SYMBIAN) && SDL_MAJOR_VERSION == 2
@@ -4251,114 +4276,114 @@ void Viewport3D::Aceptar() {
     if (SceneCollection->Childrens.empty()){ ViewPortClickDown = false; return; }
 
     // EDIT de ARMATURE: el tilde verde / Enter confirman el transform de huesos en curso
-    if (BoneGrabActivo()){
-        BoneGrabConfirmar();
+    if (BoneGrabActive()){
+        BoneGrabConfirm();
         NumInputReset();
         ViewPortClickDown = false;
         return;
     }
     // AJUSTAR LA ULTIMA OPERACION: lo que se hizo se lee ANTES de confirmar (hace falta el snapshot) y el panel se abre
     // DESPUES (cuando ya esta su paso de undo)
-    TransformRedoCapturar(this);
+    TransformRedoCapture(this);
     if ( InteractionMode == ObjectMode ){
-        if (estado != editNavegacion){
-            // AUTO KEY: va ANTES de UndoTransformConfirmar, que es lo que puede limpiar estadoObjetos (el
+        if (state != editNavigation){
+            // AUTO KEY: va ANTES de UndoTransformConfirm, que es lo que puede limpiar objectState (el
             // snapshot contra el que se mide QUE canal cambio). Y antes tambien para que los keyframes que
             // guarda entren en el MISMO comando de undo que el transform.
-            UndoGrupoIniciar();       // un solo Ctrl+Z: el transform Y los keyframes que dejo el auto key
-            UndoKeyframesIniciar(); AutoKeyObjetos(); UndoKeyframesConfirmar();
-            UndoTransformConfirmar(); // Ctrl+Z: el transform se ACEPTO -> pushea el undo pendiente
-            UndoGrupoFin();
-            estado = editNavegacion;
+            UndoGroupStart();       // un solo Ctrl+Z: el transform Y los keyframes que dejo el auto key
+            UndoKeyframesStart(); AutoKeyObjects(); UndoKeyframesConfirm();
+            UndoTransformConfirm(); // Ctrl+Z: el transform se ACEPTO -> pushea el undo pendiente
+            UndoGroupEnd();
+            state = editNavigation;
         }
-    } else if (InteractionMode == EditMode && EditXformActivo()){
-        EditXformConfirmar(); // fija el transform de malla (recalcula bordes+normales)
+    } else if (InteractionMode == EditMode && EditXformActive()){
+        EditXformConfirm(); // fija el transform de malla (recalcula bordes+normales)
     } else if (InteractionMode == PoseMode){
-        extern int g_poseModo; extern void PoseXformConfirm();
-        if (g_poseModo) PoseXformConfirm(); // fija la pose editada (Enter / tick del toolbar); idempotente con el click
+        extern int g_poseMode; extern void PoseXformConfirm();
+        if (g_poseMode) PoseXformConfirm(); // fija la pose editada (Enter / tick del toolbar); idempotente con el click
     }
     NumInputReset(); // termina el transform -> limpia el valor numerico tipeado
     ViewPortClickDown = false;
-    TransformRedoTrasConfirmar();
+    TransformRedoAfterConfirm();
 }
 
 void Viewport3D::button_left(){
-    W3D_SOLO_POR_CONTROLES();
+    W3D_ONLY_BY_CONTROLS();
 
     // EDIT de ARMATURE: un grab MODAL de huesos en curso (E/G/toolbar) se CONFIRMA con el click,
     // como cualquier transform. Se marca el click como consumido para que el ScenePick3D del mismo
     // evento no re-pickee un hueso.
-    if (BoneGrabActivo() && !BoneGrabPorClick()){
-        BoneGrabConfirmar();
-        BoneGrabMarcarClickConsumido();
+    if (BoneGrabActive() && !BoneGrabByClick()){
+        BoneGrabConfirm();
+        BoneGrabMarkConsumedClick();
         return;
     }
-    if (estado == translacion || estado == EditScale || estado == rotacion){
-        Aceptar();
+    if (state == translation || state == EditScale || state == rotation){
+        Accept();
     }
     // WEIGHT PAINT: el click sobre el contenido PINTA (arranca el TRAZO: snapshot de undo +
     // primera pasada del pincel). El drag sigue en event_mouse_motion; el commit al soltar.
-    else if (WP3DModoPintura() && !PopUpActive){
-        Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-        GuardarMousePos();
-        if (m && g_ultimoDownTactil) {
+    else if (WP3DPaintMode() && !PopUpActive){
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        SaveMousePos();
+        if (m && g_lastDownTouch) {
             // dedo: el trazo queda PENDIENTE hasta que se mueva, pase la espera o se suelte (ver arriba)
             g_wpPend = true; g_wpPendX = lastMouseX; g_wpPendY = lastMouseY; g_wpPendTicks = WP3DTicksMs();
             g_redraw = true;
-        } else if (m && WP3DTrazoIniciar(m)){
-            g_wp3dPintando = true;
-            WP3DPasada(this, lastMouseX, lastMouseY);
+        } else if (m && WP3DStrokeStart(m)){
+            g_wp3dPainting = true;
+            WP3DPass(this, lastMouseX, lastMouseY);
         }
     }
     else {
-        GuardarMousePos();
+        SaveMousePos();
     }
 }
 
-void Viewport3D::mouse_button_up(int boton){
-    W3D_SOLO_POR_CONTROLES();
-    if (GizmoArrastrando()) { GizmoSoltar(this); ViewPortClickDown = false; return; }   // soltar la manija = confirmar
-    if (g_wpPend) WP3DPendienteResolver(this, g_wpPendX, g_wpPendY, true);   // tap sin mover: UNA pasada ahi
-    if (g_wp3dPintando){ g_wp3dPintando = false; WP3DTrazoFin(); } // fin del trazo -> commit del undo
+void Viewport3D::mouse_button_up(int button){
+    W3D_ONLY_BY_CONTROLS();
+    if (GizmoDragging()) { GizmoRelease(this); ViewPortClickDown = false; return; }   // soltar la manija = confirmar
+    if (g_wpPend) WP3DPendingResolve(this, g_wpPendX, g_wpPendY, true);   // tap sin mover: UNA pasada ahi
+    if (g_wp3dPainting){ g_wp3dPainting = false; WP3DStrokeEnd(); } // fin del trazo -> commit del undo
     // EDIT de ARMATURE: el drag de head/tail arrancado por el click termina al SOLTAR (commit del undo)
-    if (BoneGrabActivo() && BoneGrabPorClick()) BoneGrabConfirmar();
+    if (BoneGrabActive() && BoneGrabByClick()) BoneGrabConfirm();
     ViewPortClickDown = false;
 }
 
-extern bool g_altNavActivo;   // controles.cpp: arrastre izquierdo con Alt = navegar (orbitar / con Shift desplazar)
+extern bool g_altNavActive;   // controls.cpp: arrastre izquierdo con Alt = navegar (orbitar / con Shift desplazar)
 void Viewport3D::event_mouse_motion(int mx, int my){
     // el viewport 3D bajo el mouse pasa a ser el ACTIVO (multi-viewport)
     Viewport3DActive = this;
     // POSE MODE: si hay un transform de huesos en curso (G/R/S), el arrastre lo aplica a la pose y NO orbita/transforma
     // objetos. Usa mx/my (delta con signo real), NO las globales dx/dy que no se actualizan durante el transform de hueso.
-    { extern int g_poseModo; if (g_poseModo){ extern void PoseXformMotion(int,int); PoseXformMotion(mx, my); return; } }
+    { extern int g_poseMode; if (g_poseMode){ extern void PoseXformMotion(int,int); PoseXformMotion(mx, my); return; } }
 
-    W3D_SOLO_POR_CONTROLES();
+    W3D_ONLY_BY_CONTROLS();
 
     // MODO PINTURA: el circulo del pincel sigue al mouse -> guardar la posicion VIVA del
     // cursor (lastMouseX/Y solo se refrescan al clickear: el circulo quedaba congelado
     // hoverando) y redibujar en cada motion. Con un trazo en curso (mouse apretado), cada
     // motion PINTA otra pasada y consume el evento (asi el izquierdo no orbita en
     // Android/web mientras se pinta).
-    if (WP3DModoPintura()) { g_wpCursorX = mx; g_wpCursorY = my; g_redraw = true; }
+    if (WP3DPaintMode()) { g_wpCursorX = mx; g_wpCursorY = my; g_redraw = true; }
     if (g_wpPend){
         if (!leftMouseDown) { g_wpPend = false; }                  // up perdido
-        else { WP3DPendienteResolver(this, mx, my, false); if (g_wpPend) return; }   // sigue esperando: ni pinta ni orbita
+        else { WP3DPendingResolve(this, mx, my, false); if (g_wpPend) return; }   // sigue esperando: ni pinta ni orbita
     }
-    if (g_wp3dPintando){
-        if (leftMouseDown){ WP3DPasada(this, mx, my); return; }
-        g_wp3dPintando = false; WP3DTrazoFin(); // up perdido (solto fuera del viewport): commit igual
+    if (g_wp3dPainting){
+        if (leftMouseDown){ WP3DPass(this, mx, my); return; }
+        g_wp3dPainting = false; WP3DStrokeEnd(); // up perdido (solto fuera del viewport): commit igual
     }
     // EDIT de ARMATURE: drag de head/tail (o grab modal de E/G) en curso -> el arrastre mueve los extremos
-    if (BoneGrabActivo()){
-        if (BoneGrabPorClick() && !leftMouseDown){ BoneGrabConfirmar(); } // up perdido: commit igual
+    if (BoneGrabActive()){
+        if (BoneGrabByClick() && !leftMouseDown){ BoneGrabConfirm(); } // up perdido: commit igual
         else { BoneGrabMotion3D(this, mx, my); return; }
     }
 
     // si no estamos rotando, se re-captura el angulo del trackball al volver.
     // la linea punteada solo vale en rotar/escalar (no translate ni navegacion).
-    if (estado != rotacion) gTrackballCap = false;
-    if (estado != rotacion && estado != EditScale) gLineaValida = false;
+    if (state != rotation) gTrackballCap = false;
+    if (state != rotation && state != EditScale) gLineValid = false;
 
     //boton del medio del mouse (en Android/WebGL tambien el IZQUIERDO: el touch sintetiza click izq ->
     // 1 dedo arrastrado tiene que orbitar. El tap-vs-drag distingue seleccionar de orbitar.
@@ -4371,24 +4396,24 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // En las demas (PC, Symbian) decide el DEDO, no la plataforma: una pantalla tactil orbita igual que Android; el
     // mouse (el de la PC, el Bluetooth del telefono) sigue con el boton del medio / Alt y arrastrar es la caja.
     #if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || defined(W3D_3DS) || defined(W3D_VITA) || defined(W3D_PSP)
-        const bool izqOrbita = true;
+        const bool leftOrbit = true;
     #else
-        const bool izqOrbita = g_ultimoDownTactil;
+        const bool leftOrbit = g_lastDownTouch;
     #endif
-        bool viewOrbita = (g_viewEditMode && (InteractionMode == EditMode || WP3DModoPintura()));   // pintura: vista ON = el dedo orbita
-        // Alt + arrastre izquierdo = lo mismo que el boton del medio (controles.cpp decide click / arrastre)
-        if (middleMouseDown || (leftMouseDown && (g_altNavActivo || (izqOrbita && (estado == editNavegacion || viewOrbita))))) {
+        bool viewOrbit = (g_viewEditMode && (InteractionMode == EditMode || WP3DPaintMode()));   // pintura: vista ON = el dedo orbita
+        // Alt + arrastre izquierdo = lo mismo que el boton del medio (controls.cpp decide click / arrastre)
+        if (middleMouseDown || (leftMouseDown && (g_altNavActive || (leftOrbit && (state == editNavigation || viewOrbit))))) {
         ViewPortClickDown = true;
         // Chequear si Shift está presionado
         #if defined(W3D_SYMBIAN)
             bool shiftHeld = LShiftPressed;   // (el lapiz / shift del teclado del telefono)
         #else
         #if SDL_MAJOR_VERSION == 2
-            const Uint8* state = SDL_GetKeyboardState(NULL);
+            const Uint8* mouseState = SDL_GetKeyboardState(NULL);
         #elif SDL_MAJOR_VERSION == 3
             const bool* state = SDL_GetKeyboardState(NULL);
         #endif
-        bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT] || (SDL_GetModState() & KMOD_SHIFT) != 0;
+        bool shiftHeld = mouseState[SDL_SCANCODE_LSHIFT] || mouseState[SDL_SCANCODE_RSHIFT] || (SDL_GetModState() & KMOD_SHIFT) != 0;
         #endif
 
         if (shiftHeld) {
@@ -4415,56 +4440,56 @@ void Viewport3D::event_mouse_motion(int mx, int my){
             RotateOrbit();
         }
     }
-    else if (estado == translacion || estado == rotacion || estado == EditScale){
+    else if (state == translation || state == rotation || state == EditScale){
         // PRIMER motion de un transform nuevo: el delta dx/dy todavia es el del frame
         // anterior (CheckWarpMouseInViewport lo recalcula DESPUES de esto) -> lo ignoro
         // para que el transform arranque en CERO y no pegue un salto.
         // El flag se consume SOLO con un delta REAL (dx/dy != 0). Una motion ESPURIA de delta 0
         // (pasa a veces tras el click del menu de extrude) NO debe limpiarlo, sino el primer move
         // de verdad (que arrastra el delta viejo del menu al viewport) salta. (bug intermitente).
-        const bool escalaNueva = g_xformPrimerMov;   // (la escala toma aca su distancia de referencia al pivote)
-        if (g_xformPrimerMov) {
-            if (dx != 0 || dy != 0) g_xformPrimerMov = false;
+        const bool newScale = g_xformFirstMov;   // (la escala toma aca su distancia de referencia al pivote)
+        if (g_xformFirstMov) {
+            if (dx != 0 || dy != 0) g_xformFirstMov = false;
             dx = 0; dy = 0; // este motion arranca SIEMPRE en cero
         }
         g_snapCurX = mx; g_snapCurY = my; // cursor para el SNAP (busca el target bajo el mouse)
         // si el usuario esta tipeando un valor EXACTO, el mouse NO pisa el transform
-        if (NumInputActivo()) { ActualizarLineaTransform(mx, my); return; }
+        if (NumInputActive()) { UpdateLineTransform(mx, my); return; }
         // Ocultar el cursor
         //SDL_HideCursor();
         // Edit Mode: el transform actua sobre los VERTICES seleccionados (no el
         // objeto). Mismo eje/orientacion/pivot, otro target (modulo en LayoutInput).
-        const bool edit = (InteractionMode == EditMode && EditXformActivo());
-        switch (estado) {
-            case translacion:
+        const bool edit = (InteractionMode == EditMode && EditXformActive());
+        switch (state) {
+            case translation:
                 // GIZMO: el punto agarrado sigue al puntero (absoluto, por rayo), no el arrastre por velocidad
-                if (GizmoArrastrando() && GizmoMotion(this, mx, my)) break;
+                if (GizmoDragging() && GizmoMotion(this, mx, my)) break;
                 // el slide (G-G / Shift+V) reusa el estado del move: mismo modal, otro recorrido
-                if (edit && EditSlideActivo()) EditSlideRaton(dx, dy);
-                else if (edit) EditXformTraslacion(dx, dy, VelocidadArrastreMundo());
-                else      SetTranslacionObjetos(dx, dy, VelocidadArrastreMundo());
+                if (edit && EditSlideActive()) EditSlideMouse(dx, dy);
+                else if (edit) EditXformTranslation(dx, dy, DragVelocityWorld());
+                else      SetTranslationObjects(dx, dy, DragVelocityWorld());
                 break;
-            case rotacion:
+            case rotation:
                 // GIZMO de rotar: el semicirculo de un eje gira por el angulo alrededor del centro (absoluto)
-                if (GizmoArrastrando() && GizmoMotion(this, mx, my)) break;
+                if (GizmoDragging() && GizmoMotion(this, mx, my)) break;
                 if (axisSelect == ViewAxis) {
-                    RotarDesdeVista(mx, my); // trackball (ramifica a edit adentro)
+                    RotateFromView(mx, my); // trackball (ramifica a edit adentro)
                 } else if (axisSelect == OrbitalAxis) {
                     gTrackballCap = false;   // orbital: izq/der=camUp, arr/ab=camRight
                     if (edit) EditXformRotOrbital(dx, dy);
-                    else      RotarOrbital(dx, dy);
+                    else      RotateOrbital(dx, dy);
                 } else {
                     gTrackballCap = false;   // constreñido a un eje: incremental
-                    if (edit) EditXformRotEje(dx, dy);
-                    else      SetRotacion(dx, dy);
+                    if (edit) EditXformRotAxis(dx, dy);
+                    else      SetRotation(dx, dy);
                 }
                 break;
             case EditScale:
                 // GIZMO de escalar: la manija agarrada sigue al puntero (proporcion de distancias desde el centro)
-                if (GizmoArrastrando() && GizmoMotion(this, mx, my)) break;
+                if (GizmoDragging() && GizmoMotion(this, mx, my)) break;
                 // Shrink/Fatten (edit): la distancia por la normal es en MUNDO -> velocidad tipo "mover"
                 // para que se sienta pegado al dedo/mouse. Escala normal: factor chico de siempre.
-                if (edit && EditShrinkActivo()) { EditXformScale(dx, dy, VelocidadArrastreMundo()); break; }
+                if (edit && EditShrinkActive()) { EditXformScale(dx, dy, DragVelocityWorld()); break; }
                 // ESCALA por la DISTANCIA AL PIVOTE EN PANTALLA (como Blender): factor = distancia del puntero al
                 // pivote / la de cuando empezo. Es proporcional a lo que se ve: alejado con el zoom (el objeto chico),
                 // poco movimiento escala mucho; antes era un paso fijo por pixel y de lejos no avanzaba. El puntero
@@ -4472,11 +4497,11 @@ void Viewport3D::event_mouse_motion(int mx, int my){
                 {
                     static float sVx = 0, sVy = 0, sPx = 0, sPy = 0, sD0 = 0;
                     static bool sOk = false;
-                    if (escalaNueva) {
+                    if (newScale) {
                         sOk = false;
-                        const Vector3 piv = edit ? EditXformPivotMundo() : TransformPivotPoint;
+                        const Vector3 piv = edit ? EditXformPivotWorld() : TransformPivotPoint;
                         float px, py;
-                        if (ProyectarPunto(piv, px, py)) {
+                        if (ProjectPoint(piv, px, py)) {
                             sPx = px; sPy = py; sVx = (float)mx; sVy = (float)my;
                             sD0 = sqrtf((sVx - sPx) * (sVx - sPx) + (sVy - sPy) * (sVy - sPy));
                             sOk = sD0 > 8.0f;   // (encima del pivote no hay distancia de referencia: paso fijo)
@@ -4498,24 +4523,45 @@ void Viewport3D::event_mouse_motion(int mx, int my){
                 break;
         }
         // linea punteada VERDE del pivot al mouse (rotar/escalar, no translate)
-        ActualizarLineaTransform(mx, my);
+        UpdateLineTransform(mx, my);
     }
 }
 
-extern void W3dPasoFrame(int d);   // Timeline.cpp
-// IZQUIERDA / DERECHA navegando: el cuadro anterior / siguiente de la animacion (como en el timeline). En TODAS las
-// plataformas: el teclado del TELEFONO (keypad del N95) no pasa por aca (orbita por W3dNewOrbit); un teclado
-// Bluetooth en Symbian si, igual que en la PC
-static bool FlechaCambiaFrame(int estadoVp) { return estadoVp == editNavegacion && !BoneGrabActivo(); }
-void Viewport3D::TeclaDerecha(){
-    if (FlechaCambiaFrame(estado)) { W3dPasoFrame(+1); return; }
+
+// LAS FLECHAS DE LA VISTA 3D, iguales en la PC y en el telefono (el keypad del N95 llega por W3dNewOrbit /
+// W3dNewTransformMove; un teclado -el de la PC, uno Bluetooth en Symbian- llega aca):
+//  - navegando: ORBITAN (el cuadro anterior / siguiente es del Timeline: sus izq/der, y arr/ab saltan de keyframe)
+//  - con un transform y el IMAN prendido, moviendo: SALTAN al siguiente nivel de la geometria (SnapStepArrow); sin nada
+//    mas adelante, se quedan donde estan
+//  - si no: mueven / rotan / escalan de a un paso; la malla en Edit Mode (el objeto sigue en cada flecha)
+// true = la flecha ya se uso
+bool Viewport3D::ArrowCommon(int fx, int fy){
+    if (BoneGrabActive()) return true;   // (transform de huesos: las flechas no tocan los objetos)
+    if (state == editNavigation){ OrbitArrow(fx * 8, fy * 8); g_redraw = true; return true; }
+    if (state != translation && state != rotation && state != EditScale) return false;
+    if (SnapByArrows()){ SnapStepArrow(fx, fy); return true; }
+    if (InteractionMode == EditMode && EditXformActive()){
+        const bool positive = (fx > 0 || fy < 0);   // derecha / arriba
+        if (state == translation) EditXformTranslation(fx * 5, fy * 5, DragVelocityWorld());
+        else if (state == rotation){
+            if (axisSelect == OrbitalAxis) EditXformRotOrbital(fx * 20, fy * 20);
+            else EditXformRotAxis(positive ? -20 : 20, 0);   // (~2 grados por toque, como el objeto)
+        }
+        else EditXformScale(positive ? 2 : -2, 0, 0.001f);
+        g_redraw = true;
+        return true;
+    }
+    return false;
+}
+void Viewport3D::KeyRight(){
+    if (ArrowCommon(1, 0)) return;
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
     return;
 }
 #else
     // transform de HUESOS en curso: las flechas no deben tocar los OBJETOS (comparten `estado`)
-    if (BoneGrabActivo()) return;
+    if (BoneGrabActive()) return;
 
     //mueve el mouse
     /*if (mouseVisible){
@@ -4524,8 +4570,8 @@ void Viewport3D::TeclaDerecha(){
     }*/
 
     //rotX -= fixedMul( 1, aDeltaTimeSecs );
-    if (estado == editNavegacion){
-        if (navegacionMode == Orbit){
+    if (state == editNavigation){
+        if (navigationMode == Orbit){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
@@ -4541,7 +4587,7 @@ void Viewport3D::TeclaDerecha(){
                 //rotX+= 0.5;
             }
         }
-        else if (navegacionMode == Fly){
+        else if (navigationMode == Fly){
             // Convertir el angulo de rotX a radianes
             /*GLfloat radRotX = rotX * M_PI / 180.0;
 
@@ -4554,17 +4600,17 @@ void Viewport3D::TeclaDerecha(){
             //PivotY -= 30 * leftY;
         }
     }
-    else if (estado == translacion){
-        SetTranslacionObjetos(5, 0, VelocidadArrastreMundo());
+    else if (state == translation){
+        SetTranslationObjects(5, 0, DragVelocityWorld());
     }
-    else if (estado == rotacion){
-        if (axisSelect == OrbitalAxis) RotarOrbital(20, 0); // orbital: yaw (camUp)
-        else SetRotacion(-20, 0); // ~2 grados por toque
+    else if (state == rotation){
+        if (axisSelect == OrbitalAxis) RotateOrbital(20, 0); // orbital: yaw (camUp)
+        else SetRotation(-20, 0); // ~2 grados por toque
     }
-    else if (estado == EditScale){
+    else if (state == EditScale){
         SetScale(2,0);
     }
-    else if (estado == timelineMove){
+    else if (state == timelineMove){
         CurrentFrame++;
         if (!PlayAnimation){
         }
@@ -4572,15 +4618,15 @@ void Viewport3D::TeclaDerecha(){
 }
 #endif
 
-void Viewport3D::TeclaIzquierda(){
-    if (FlechaCambiaFrame(estado)) { W3dPasoFrame(-1); return; }
+void Viewport3D::KeyLeft(){
+    if (ArrowCommon(-1, 0)) return;
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
     return;
 }
 #else
     // transform de HUESOS en curso: las flechas no deben tocar los OBJETOS (comparten `estado`)
-    if (BoneGrabActivo()) return;
+    if (BoneGrabActive()) return;
 
     //mueve el mouse
     if (mouseVisible){
@@ -4589,8 +4635,8 @@ void Viewport3D::TeclaIzquierda(){
     }
 
     //rotX += fixedMul( 0.1, aDeltaTimeSecs );
-    if (estado == editNavegacion){
-        if (navegacionMode == Orbit){
+    if (state == editNavigation){
+        if (navigationMode == Orbit){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
@@ -4606,7 +4652,7 @@ void Viewport3D::TeclaIzquierda(){
                 //rotX-= 0.5;
             }
         }
-        else if (navegacionMode == Fly){
+        else if (navigationMode == Fly){
             // Convertir el angulo de rotX a radianes
             /*GLfloat radRotX = rotX * M_PI / 180.0;
 
@@ -4619,17 +4665,17 @@ void Viewport3D::TeclaIzquierda(){
             //PivotY += 30 * leftY;
         }
     }
-    else if (estado == translacion){
-        SetTranslacionObjetos(-5, 0, VelocidadArrastreMundo());
+    else if (state == translation){
+        SetTranslationObjects(-5, 0, DragVelocityWorld());
     }
-    else if (estado == rotacion){
-        if (axisSelect == OrbitalAxis) RotarOrbital(-20, 0); // orbital: yaw (camUp)
-        else SetRotacion(20, 0); // ~2 grados por toque
+    else if (state == rotation){
+        if (axisSelect == OrbitalAxis) RotateOrbital(-20, 0); // orbital: yaw (camUp)
+        else SetRotation(20, 0); // ~2 grados por toque
     }
-    else if (estado == EditScale){
+    else if (state == EditScale){
         SetScale(-2,0);
     }
-    else if (estado == timelineMove){
+    else if (state == timelineMove){
         CurrentFrame--;
         // wrap del scrub: al pasar el inicio, vuelve al final (antes PISABA
         // StartFrame con EndFrame: destruia el rango de la animacion)
@@ -4638,14 +4684,15 @@ void Viewport3D::TeclaIzquierda(){
 }
 #endif
 
-void Viewport3D::TeclaArriba(){
+void Viewport3D::KeyUp(){
+    if (ArrowCommon(0, -1)) return;
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
     return;
 }
 #else
     // transform de HUESOS en curso: las flechas no deben tocar los OBJETOS (comparten `estado`)
-    if (BoneGrabActivo()) return;
+    if (BoneGrabActive()) return;
 
     //mueve el mouse
     if (mouseVisible){
@@ -4653,8 +4700,8 @@ void Viewport3D::TeclaArriba(){
         if (mouseY < 0){mouseY = 0;};
     }
 
-    if (estado == editNavegacion){
-        if (navegacionMode == Orbit){
+    if (state == editNavigation){
+        if (navigationMode == Orbit){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
@@ -4673,7 +4720,7 @@ void Viewport3D::TeclaArriba(){
                 //rotY-= 0.5;
             }
         }
-        else if (navegacionMode == Fly){
+        else if (navigationMode == Fly){
             // Convertir el angulo de rotX a radianes
             /*GLfloat radRotX = rotX * M_PI / 180.0;
 
@@ -4681,26 +4728,27 @@ void Viewport3D::TeclaArriba(){
             PivotX-= 30 * sin(radRotX);*/
         }
     }
-    else if (estado == EditScale){
+    else if (state == EditScale){
         SetScale(2,0);
     }
-    else if (estado == rotacion && axisSelect == OrbitalAxis){
-        RotarOrbital(0, -20); // orbital: pitch (camRight) hacia arriba
+    else if (state == rotation && axisSelect == OrbitalAxis){
+        RotateOrbital(0, -20); // orbital: pitch (camRight) hacia arriba
     }
-    else if (estado == translacion){
-        SetTranslacionObjetos(0, -5, VelocidadArrastreMundo());
+    else if (state == translation){
+        SetTranslationObjects(0, -5, DragVelocityWorld());
     }
 }
 #endif
 
-void Viewport3D::TeclaAbajo(){
+void Viewport3D::KeyDown(){
+    if (ArrowCommon(0, 1)) return;
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
     return;
 }
 #else
     // transform de HUESOS en curso: las flechas no deben tocar los OBJETOS (comparten `estado`)
-    if (BoneGrabActivo()) return;
+    if (BoneGrabActive()) return;
 
     //mueve el mouse
     /*if (mouseVisible){
@@ -4708,8 +4756,8 @@ void Viewport3D::TeclaAbajo(){
         if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
     }*/
 
-    if (estado == editNavegacion){
-        if (navegacionMode == Orbit){
+    if (state == editNavigation){
+        if (navigationMode == Orbit){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
@@ -4728,7 +4776,7 @@ void Viewport3D::TeclaAbajo(){
                 //rotY+= 0.5;
             }
         }
-        else if (navegacionMode == Fly){
+        else if (navigationMode == Fly){
             // Convertir el angulo de rotX a radianes
             /*GLfloat radRotX = rotX * M_PI / 180.0;
 
@@ -4736,30 +4784,30 @@ void Viewport3D::TeclaAbajo(){
             PivotX+= 30 * sin(radRotX);*/
         }
     }
-    else if (estado == EditScale){
+    else if (state == EditScale){
         SetScale(-2,0);
     }
-    else if (estado == rotacion && axisSelect == OrbitalAxis){
-        RotarOrbital(0, 20); // orbital: pitch (camRight) hacia abajo
+    else if (state == rotation && axisSelect == OrbitalAxis){
+        RotateOrbital(0, 20); // orbital: pitch (camRight) hacia abajo
     }
-    else if (estado == translacion){
-        SetTranslacionObjetos(0, 5, VelocidadArrastreMundo());
+    else if (state == translation){
+        SetTranslationObjects(0, 5, DragVelocityWorld());
     }
 }
 #endif
 
 // (OnBar / BarScrollBy: la base ya contempla la toolbar de abajo -- ver ViewPorts.cpp/ToolbarBase.cpp)
 
-void Viewport3D::SetEje(int eje){
+void Viewport3D::SetAxis(int axis){
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
     return;
 }
 #else
 
-    if (estado != editNavegacion){
-        ReestablecerEstado(false);
-        axisSelect = eje;
+    if (state != editNavigation){
+        RestoreState(false);
+        axisSelect = axis;
     }
 }
 #endif
@@ -4783,30 +4831,30 @@ void Viewport3D::SetViewFromCameraActive(bool value){
     ViewFromCameraActive = value;
 }
 
-void Viewport3D::event_key_down(int tecla, bool repeticion){
-    const int key = tecla;
+void Viewport3D::event_key_down(int keyCode, bool repeat){
+    const int key = keyCode;
     // Los menus que abren EN EL CURSOR (Shift+A, U, X, W, Ctrl+R...) usan lastMouseX/Y, que solo se
     // refrescaban en el CLICK -> el menu salia de la ULTIMA posicion clickeada, no del mouse. Aca
     // (con SDL_GetMouseState = posicion ACTUAL) se ponen donde esta el mouse. No durante un transform.
-    if (estado == editNavegacion) GuardarMousePos();
+    if (state == editNavigation) SaveMousePos();
     // las FLECHAS se repiten al mantenerlas (mover/orbitar continuo); el resto
     // de las teclas ignora el auto-repeat.
-    bool esFlecha = (key == W3dK_UP || key == W3dK_DOWN || key == W3dK_LEFT || key == W3dK_RIGHT);
-    if (esFlecha && repeticion != 0) {
-        if (key == W3dK_RIGHT)     TeclaDerecha();
-        else if (key == W3dK_LEFT) TeclaIzquierda();
-        else if (key == W3dK_UP)   TeclaArriba();
-        else                       TeclaAbajo();
+    bool isArrow = (key == W3dK_UP || key == W3dK_DOWN || key == W3dK_LEFT || key == W3dK_RIGHT);
+    if (isArrow && repeat != 0) {
+        if (key == W3dK_RIGHT)     KeyRight();
+        else if (key == W3dK_LEFT) KeyLeft();
+        else if (key == W3dK_UP)   KeyUp();
+        else                       KeyDown();
         return;
     }
     // Ctrl+C / Ctrl+X / Ctrl+V en Object Mode: copiar / cortar / pegar OBJETOS (tambien entre ventanas de Whisk3D)
-    if (repeticion == 0 && LCtrlPressed && !LShiftPressed && InteractionMode == ObjectMode && estado == editNavegacion &&
+    if (repeat == 0 && LCtrlPressed && !LShiftPressed && InteractionMode == ObjectMode && state == editNavigation &&
         (key == W3dK_C || key == W3dK_X || key == W3dK_V)) {
-        extern void LayoutObjetosCopiar(bool cortar); extern void LayoutObjetosPegar();
-        if (key == W3dK_V) LayoutObjetosPegar(); else LayoutObjetosCopiar(key == W3dK_X);
+        extern void LayoutObjectsCopy(bool cut); extern void LayoutObjectsPaste();
+        if (key == W3dK_V) LayoutObjectsPaste(); else LayoutObjectsCopy(key == W3dK_X);
         return;
     }
-    if (repeticion == 0) {
+    if (repeat == 0) {
         switch (key) {
             case W3dK_LSHIFT:
                 ShiftCount = 0;
@@ -4816,20 +4864,20 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 LAltPressed = true;
                 break;
             case W3dK_RETURN:  // Enter
-                if (BoneGrabActivo()){ BoneGrabConfirmar(); break; } // grab de huesos: Enter confirma
+                if (BoneGrabActive()){ BoneGrabConfirm(); break; } // grab de huesos: Enter confirma
                 key_down_return();
                 break;
             case W3dK_RIGHT:   // Flecha derecha
-                TeclaDerecha();
+                KeyRight();
                 break;
             case W3dK_LEFT:    // Flecha izquierda
-                TeclaIzquierda();
+                KeyLeft();
                 break;
             case W3dK_UP:
-                TeclaArriba();
+                KeyUp();
                 break;
             case W3dK_DOWN:
-                TeclaAbajo();
+                KeyDown();
                 break;
             case W3dK_A:
                 // simple: las funciones ya saben si es object o edit mode
@@ -4839,27 +4887,27 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 else if (LShiftPressed) {               // Shift+A: menu Add en el cursor (object)
                     if (InteractionMode == ObjectMode) LayoutMenuAdd(lastMouseX, lastMouseY);
                 }
-                // EDIT MODE de ARMATURE: A / Alt+A operan sobre los HUESOS (SeleccionarTodo*
+                // EDIT MODE de ARMATURE: A / Alt+A operan sobre los HUESOS (SelectAll*
                 // solo sabe de mallas/objetos/pose -> ahi no hacian nada). Con la seleccion
                 // completa, las ops de huesos (G/R/S, E, X, Shift+D, Ctrl+P) toman todo.
-                else if (BoneEditActivo() && !BoneGrabActivo())
-                    BoneEditSeleccionarTodos(BoneEditArm(), !LAltPressed);
-                else if (LAltPressed) DeseleccionarTodo();   // Alt+A: deseleccionar todo
-                else SeleccionarTodoForzado();          // A: seleccionar todo
+                else if (BoneEditActive() && !BoneGrabActive())
+                    BoneEditSelectAll(BoneEditArm(), !LAltPressed);
+                else if (LAltPressed) DeselectAll();   // Alt+A: deseleccionar todo
+                else SelectAllForced();          // A: seleccionar todo
                 break;
             case W3dK_I:
                 // I = Insert Keyframe. Abre el MENU DE CANALES (Todos / Localizacion / Rotacion /
                 // Escala) en Object Mode y en Pose Mode; en Edit Mode (vertices) inserta DIRECTO
                 // sin menu (una pose de vertices no tiene canales). Todo el ruteo esta en
-                // LayoutMenuInsertKeyframe / InsertarKeyframeContexto (LayoutInput.cpp).
+                // LayoutMenuInsertKeyframe / InsertKeyframeContext (LayoutInput.cpp).
                 // Shift+I = insertar TODOS los canales de una, sin abrir el menu (para el que ya
                 // sabe lo que quiere y no quiere el click de mas).
                 // Edit Mode de malla: I = INSET FACES (como Blender); los keyframes de vertices siguen en el menu Animation
-                if (!LCtrlPressed && !LShiftPressed && InteractionMode == EditMode && g_editMesh && estado == editNavegacion) {
-                    InsetIniciar(lastMouseX, lastMouseY); break;
+                if (!LCtrlPressed && !LShiftPressed && InteractionMode == EditMode && g_editMesh && state == editNavigation) {
+                    InsetStart(lastMouseX, lastMouseY); break;
                 }
-                if (LCtrlPressed) InvertirSeleccion();       // Ctrl+I: invertir seleccion
-                else if (LShiftPressed) InsertarKeyframeContexto(KfCanalTodos);
+                if (LCtrlPressed) InvertSelection();       // Ctrl+I: invertir seleccion
+                else if (LShiftPressed) InsertKeyframeContext(KfChannelAll);
                 else LayoutMenuInsertKeyframe(lastMouseX, lastMouseY);
                 break;
             case W3dK_D: {
@@ -4868,40 +4916,40 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 }
                 else if (LShiftPressed){
                     // Edit Mode: duplica la seleccion de malla (o los HUESOS si se edita un armature); si no, los objetos
-                    if (BoneEditActivo() && !BoneGrabActivo()) BoneEditDuplicarInteractivo(BoneEditArm(), true);
-                    else if (InteractionMode == EditMode && g_editMesh) LayoutDuplicarEdit();
+                    if (BoneEditActive() && !BoneGrabActive()) BoneEditDuplicateInteractive(BoneEditArm(), true);
+                    else if (InteractionMode == EditMode && g_editMesh) LayoutDuplicateEdit();
                     else DuplicatedObject();
                 }
                 break;
             }
             case W3dK_F:
                 // F: "New Edge/Face from Vertices" (solo Edit Mode con malla)
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
+                if (state == editNavigation && InteractionMode == EditMode && g_editMesh)
                     LayoutNewFaceEdit();
                 break;
             case W3dK_N:
                 // Shift+N: Recalculate Normals (Edit Mode), igual que el menu Face
-                if (LShiftPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
-                    LayoutRecalcNormales();
+                if (LShiftPressed && state == editNavigation && InteractionMode == EditMode && g_editMesh)
+                    LayoutRecalcNormals();
                 break;
             case W3dK_B:
                 // Ctrl+B (Edit Mode de malla): BEVEL de las aristas; Ctrl+Shift+B: de los vertices (como Blender)
-                if (LCtrlPressed && InteractionMode == EditMode && g_editMesh && estado == editNavegacion) {
-                    BevelIniciar(lastMouseX, lastMouseY, LShiftPressed ? 0 : 1); break;
+                if (LCtrlPressed && InteractionMode == EditMode && g_editMesh && state == editNavigation) {
+                    BevelStart(lastMouseX, lastMouseY, LShiftPressed ? 0 : 1); break;
                 }
                 // B: BOX SELECT. Anda en Object Mode y en Edit Mode. Arma la cruz guia y
                 // espera el arrastre (el paso 2). Ver edit/BoxSelect.h.
-                if (estado == editNavegacion) { BoxSelectArmar(); BoxSelectMover(lastMouseX, lastMouseY); }
+                if (state == editNavigation) { BoxSelectBuild(); BoxSelectMove(lastMouseX, lastMouseY); }
                 break;
             case W3dK_L:
                 // L: Select Linked (la isla conectada bajo el mouse)
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
+                if (state == editNavigation && InteractionMode == EditMode && g_editMesh)
                     LayoutSelectLinked(lastMouseX, lastMouseY);
                 break;
             case W3dK_PGUP: case W3dK_PGDN:
                 // Re Pag / Av Pag: RADIO del proportional editing durante un transform (teclado sin rueda, N95)
-                if (ProporcionalAplicable() && estado != editNavegacion) {
-                    ProporcionalRadioEscalar(key == W3dK_PGUP ? 1.1f : 1.0f / 1.1f); ProporcionalReaplicar(); g_redraw = true;
+                if (ProportionalApplicable() && state != editNavigation) {
+                    ProportionalRadiusScale(key == W3dK_PGUP ? 1.1f : 1.0f / 1.1f); ProportionalReapply(); g_redraw = true;
                 }
                 break;
             case W3dK_O:
@@ -4909,8 +4957,8 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 // vale: los vecinos vuelven a su lugar (off) o se arrastran desde el proximo transform (on).
                 if (InteractionMode == EditMode || InteractionMode == ObjectMode) {
                     g_prop.on = !g_prop.on;
-                    Notificar(T(g_prop.on ? "Proportional Editing: on" : "Proportional Editing: off"), false);
-                    ProporcionalReaplicar();
+                    Notify(T(g_prop.on ? "Proportional Editing: on" : "Proportional Editing: off"), false);
+                    ProportionalReapply();
                     g_redraw = true;
                 }
                 break;
@@ -4918,19 +4966,19 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 // Edit Mode: U abre el menu UV (Mark Seam + proyecciones).
                 // Object Mode: U NO hace nada (la "limpieza de pantalla" / Show Overlays se maneja
                 // SOLO desde el checkbox del menu Overlays, no por tecla).
-                if (InteractionMode == EditMode && g_editMesh && estado == editNavegacion)
+                if (InteractionMode == EditMode && g_editMesh && state == editNavigation)
                     LayoutMenuUV(lastMouseX, lastMouseY);
                 break;
             case W3dK_J:
                 // Ctrl+J: une las mallas seleccionadas en el objeto activo (Join).
                 // J sola en Edit Mode: Connect Vertex Path (corta las caras entre los 2 vertices).
-                if (LCtrlPressed && estado == editNavegacion && InteractionMode == ObjectMode)
-                    JoinObjetos();
-                else if (!LCtrlPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
-                    LayoutConectarVerticesEdit();
+                if (LCtrlPressed && state == editNavigation && InteractionMode == ObjectMode)
+                    JoinObjects();
+                else if (!LCtrlPressed && state == editNavigation && InteractionMode == EditMode && g_editMesh)
+                    LayoutConnectVerticesEdit();
                 break;
             case W3dK_H:
-                UndoCapturarVisibilidad();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
+                UndoCaptureVisibility();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
                 ChangeVisibilityObj();
                 break;
             case W3dK_K:
@@ -4938,53 +4986,53 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 break;
             case W3dK_X:
                 // EDIT de ARMATURE con transform modal (G/R/S): X constrinie al eje (Shift+X = plano);
-                // re-apretar cicla Global->Local->View->libre, como Object/Pose.
-                if (BoneXformModo()){
-                    if (LShiftPressed) BoneCiclarPlano(0); else BoneCiclarEje(0);
+                // re-apretar cicla Global->Local->View->free, como Object/Pose.
+                if (BoneXformMode()){
+                    if (LShiftPressed) BoneCyclePlane(0); else BoneCycleAxis(0);
                     break;
                 }
                 // EDIT de ARMATURE: X = borrar los huesos seleccionados (re-parenta los hijos al abuelo)
-                if (BoneEditActivo() && !BoneGrabActivo() && estado == editNavegacion){
-                    BoneEditBorrar(BoneEditArm());
+                if (BoneEditActive() && !BoneGrabActive() && state == editNavigation){
+                    BoneEditDelete(BoneEditArm());
                     break;
                 }
                 // Pose Mode: X = eje X (Shift+X = plano YZ); cicla Global/Local/View al re-apretar
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(0); else PoseCiclarEje(0); break; } }
+                if (InteractionMode == PoseMode){ extern int g_poseMode; extern void PoseCycleAxis(int); extern void PoseCyclePlane(int); if (g_poseMode){ if (LShiftPressed) PoseCyclePlane(0); else PoseCycleAxis(0); break; } }
                 // durante un transform: X = eje X (re-apretar cicla
-                // Global->Local->View->libre); Shift+X = plano (mueve en Y,Z).
-                if (estado != editNavegacion){
-                    if (LShiftPressed) CiclarPlanoTransform(X);
-                    else CiclarEjeTransform(X);
-                    if (EditXformActivo()) EditXformReiniciar(); // restaura y re-aplica el nuevo eje
+                // Global->Local->View->free); Shift+X = plano (mueve en Y,Z).
+                if (state != editNavigation){
+                    if (LShiftPressed) CyclePlaneTransform(X);
+                    else CycleAxisTransform(X);
+                    if (EditXformActive()) EditXformRestart(); // restaura y re-aplica el nuevo eje
                 }
                 // Edit Mode: menu Delete cerca del cursor; Object Mode: POPUP de confirmar borrado
-                else if (!LayoutDeleteEdit(lastMouseX, lastMouseY)) AbrirConfirmarBorrado();
+                else if (!LayoutDeleteEdit(lastMouseX, lastMouseY)) OpenConfirmDelete();
                 break;
             case W3dK_BACKSPACE:
             case W3dK_DELETE:
-                if (BoneEditActivo() && !BoneGrabActivo() && estado == editNavegacion){ // Supr = borrar huesos
-                    BoneEditBorrar(BoneEditArm());
+                if (BoneEditActive() && !BoneGrabActive() && state == editNavigation){ // Supr = borrar huesos
+                    BoneEditDelete(BoneEditArm());
                     break;
                 }
-                if (estado == editNavegacion && !LayoutDeleteEdit(lastMouseX, lastMouseY))
-                    AbrirConfirmarBorrado();
+                if (state == editNavigation && !LayoutDeleteEdit(lastMouseX, lastMouseY))
+                    OpenConfirmDelete();
                 break;
             case W3dK_Y:
-                if (BoneXformModo()){ if (LShiftPressed) BoneCiclarPlano(1); else BoneCiclarEje(1); break; } // modal de huesos: eje Y
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(1); else PoseCiclarEje(1); break; } }
-                if (estado != editNavegacion){
-                    if (LShiftPressed) CiclarPlanoTransform(Y);
-                    else CiclarEjeTransform(Y);
-                    if (EditXformActivo()) EditXformReiniciar();
+                if (BoneXformMode()){ if (LShiftPressed) BoneCyclePlane(1); else BoneCycleAxis(1); break; } // modal de huesos: eje Y
+                if (InteractionMode == PoseMode){ extern int g_poseMode; extern void PoseCycleAxis(int); extern void PoseCyclePlane(int); if (g_poseMode){ if (LShiftPressed) PoseCyclePlane(1); else PoseCycleAxis(1); break; } }
+                if (state != editNavigation){
+                    if (LShiftPressed) CyclePlaneTransform(Y);
+                    else CycleAxisTransform(Y);
+                    if (EditXformActive()) EditXformRestart();
                 }
                 break;
             case W3dK_Z:
-                if (BoneXformModo()){ if (LShiftPressed) BoneCiclarPlano(2); else BoneCiclarEje(2); break; } // modal de huesos: eje Z
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(2); else PoseCiclarEje(2); break; } }
-                if (estado != editNavegacion){
-                    if (LShiftPressed) CiclarPlanoTransform(Z);
-                    else CiclarEjeTransform(Z);
-                    if (EditXformActivo()) EditXformReiniciar();
+                if (BoneXformMode()){ if (LShiftPressed) BoneCyclePlane(2); else BoneCycleAxis(2); break; } // modal de huesos: eje Z
+                if (InteractionMode == PoseMode){ extern int g_poseMode; extern void PoseCycleAxis(int); extern void PoseCyclePlane(int); if (g_poseMode){ if (LShiftPressed) PoseCyclePlane(2); else PoseCycleAxis(2); break; } }
+                if (state != editNavigation){
+                    if (LShiftPressed) CyclePlaneTransform(Z);
+                    else CycleAxisTransform(Z);
+                    if (EditXformActive()) EditXformRestart();
                 }
                 // sin transform: Z = el siguiente MODO DE VISTA (Material Preview -> Solid -> ... -> Rendered), el
                 // mismo ciclo que el 6 del keypad del telefono (Ctrl+Z es deshacer: lo agarra controles antes)
@@ -4992,93 +5040,93 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 break;
             case W3dK_R:
                 // Ctrl+R: Loop Cut and Slide (Edit Mode con malla)
-                if (LCtrlPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh){
-                    LoopCutIniciar(lastMouseX, lastMouseY);
+                if (LCtrlPressed && state == editNavigation && InteractionMode == EditMode && g_editMesh){
+                    LoopCutStart(lastMouseX, lastMouseY);
                     break;
                 }
                 // EDIT de ARMATURE: R rota la seleccion (puntas/huesos) alrededor del pivote del
                 // viewport; R de nuevo (ya rotando) cicla la orientacion Global->Local->View.
-                if (BoneEditActivo()){
-                    if (BoneXformModo() == 2) BoneCiclarOrient();
-                    else if (!LCtrlPressed && !BoneGrabActivo() && estado == editNavegacion) BoneXformStart(BoneEditArm(), 2);
+                if (BoneEditActive()){
+                    if (BoneXformMode() == 2) BoneCycleOrient();
+                    else if (!LCtrlPressed && !BoneGrabActive() && state == editNavigation) BoneXformStart(BoneEditArm(), 2);
                     break;
                 }
                 // POSE MODE: R rota los huesos seleccionados; R de nuevo (ya rotando) cicla la orientacion View->Global->Local.
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseXformStart(int); extern void PoseCiclarOrient(); extern void PoseClearTransform(int);
+                if (InteractionMode == PoseMode){ extern int g_poseMode; extern void PoseXformStart(int); extern void PoseCycleOrient(); extern void PoseClearTransform(int);
                     if (LAltPressed) PoseClearTransform(2);                       // Alt+R: Clear Rotation
-                    else if (g_poseModo == 2) PoseCiclarOrient(); else PoseXformStart(2); break; }
+                    else if (g_poseMode == 2) PoseCycleOrient(); else PoseXformStart(2); break; }
                 // R arranca la rotacion (trackball); R de nuevo alterna
                 // trackball <-> orbital/gimbal (sin tener que ciclar X/Y/Z).
                 // En Edit Mode el transform actua sobre los vertices seleccionados.
-                if (estado == rotacion) ToggleRotacionOrbital();
-                else { // EditXformStart en Edit Mode CAPTURA el undo (Ctrl+Z); en Object Mode -> SetRotacion
-                    valorRotacion = 0;
-                    if (!EditXformStart(rotacion, ViewAxis)) SetRotacion();
+                if (state == rotation) ToggleRotationOrbital();
+                else { // EditXformStart en Edit Mode CAPTURA el undo (Ctrl+Z); en Object Mode -> BeginRotate
+                    valueRotation = 0;
+                    if (!EditXformStart(rotation, ViewAxis)) BeginRotate();
                 }
                 break;
             case W3dK_G:
                 // EDIT de ARMATURE: G agarra la seleccion (puntas o huesos enteros; la punta compartida
                 // arrastra a su soldada). Modal: click/Enter confirma, Esc cancela, X/Y/Z constrinien.
-                if (BoneEditActivo() && estado == editNavegacion){
-                    if (!BoneGrabActivo()) BoneXformStart(BoneEditArm(), 1);
+                if (BoneEditActive() && state == editNavigation){
+                    if (!BoneGrabActive()) BoneXformStart(BoneEditArm(), 1);
                     break;
                 }
                 if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
                     if (LAltPressed) PoseClearTransform(1); else PoseXformStart(1); break; } // POSE: Alt+G limpia translacion; G mueve
                 // G con un move YA en curso (Edit Mode): la segunda G pasa a SLIDE, la tercera vuelve a
                 // trasladar. No confirma nada: es el mismo modal cambiando de recorrido.
-                if (InteractionMode == EditMode && estado == translacion && EditXformActivo()){
+                if (InteractionMode == EditMode && state == translation && EditXformActive()){
                     EditSlideToggle(); break;
                 }
-                // EditXformStart (no EditXformIniciar directo) -> en Edit Mode CAPTURA el undo del move (Ctrl+Z)
-                if (!EditXformStart(translacion, ViewAxis)) SetPosicion();
+                // EditXformStart (no EditXformSnapshot directo) -> en Edit Mode CAPTURA el undo del move (Ctrl+Z)
+                if (!EditXformStart(translation, ViewAxis)) BeginTranslate();
                 break;
             case W3dK_S:
                 // EDIT de ARMATURE: S escala la seleccion alrededor del pivote (X/Y/Z constrinien)
-                if (BoneEditActivo()){
-                    if (!BoneGrabActivo() && estado == editNavegacion) BoneXformStart(BoneEditArm(), 3);
+                if (BoneEditActive()){
+                    if (!BoneGrabActive() && state == editNavigation) BoneXformStart(BoneEditArm(), 3);
                     break;
                 }
                 if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
                     if (LAltPressed) PoseClearTransform(3); else PoseXformStart(3); break; } // POSE: Alt+S limpia escala; S escala
                 // Alt+S en Edit Mode = Shrink/Fatten (cada vert por su normal). Sin Alt = Scale.
                 if (LAltPressed && InteractionMode == EditMode && g_editMesh) LayoutShrinkFatten();
-                else if (!EditXformStart(EditScale, XYZ)) SetEscala();
+                else if (!EditXformStart(EditScale, XYZ)) BeginScale();
                 break;
             case W3dK_E:
                 // EDIT de ARMATURE: E extruye un hueso desde CADA punta seleccionada (hueso entero =
                 // desde su tail) y deja los tails nuevos agarrados al mouse (click/Enter confirma).
-                if (BoneEditActivo() && !BoneGrabActivo() && estado == editNavegacion){
-                    BoneEditExtruirInteractivo(BoneEditArm(), true);
+                if (BoneEditActive() && !BoneGrabActive() && state == editNavigation){
+                    BoneEditExtrudeInteractive(BoneEditArm(), true);
                     break;
                 }
                 // Edit Mode: extrude de las caras seleccionadas (arranca el move por
                 // la normal). En Object Mode no hace nada.
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
+                if (state == editNavigation && InteractionMode == EditMode && g_editMesh)
                     LayoutExtrudeFaces();
                 break;
             case W3dK_V:
                 // Edit Mode: Shift+V = SLIDE de los vertices seleccionados; V sola = RIP (separa la malla).
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh){
+                if (state == editNavigation && InteractionMode == EditMode && g_editMesh){
                     if (LShiftPressed) LayoutSlideVerticesEdit();
                     else               LayoutRipEdit();
                 }
                 break;
             case W3dK_P:
                 // EDIT de ARMATURE: Alt+P = menu Disconnect Bone / Clear Parent (punto 5). En PC
-                // el atajo global (controles.cpp) lo consume antes; esto es el fallback si el
+                // el atajo global (controls.cpp) lo consume antes; esto es el fallback si el
                 // evento llega directo al viewport.
-                if (LAltPressed && BoneEditActivo() && !BoneGrabActivo() && estado == editNavegacion){
-                    LayoutParentHuesos(true, lastMouseX, lastMouseY);
+                if (LAltPressed && BoneEditActive() && !BoneGrabActive() && state == editNavigation){
+                    LayoutParentBones(true, lastMouseX, lastMouseY);
                     break;
                 }
                 // Edit Mode: SEPARATE -> mueve las caras seleccionadas a un mesh NUEVO (P > Selection)
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
-                    LayoutSepararEdit();
+                if (state == editNavigation && InteractionMode == EditMode && g_editMesh)
+                    LayoutSeparateEdit();
                 break;
             case W3dK_W:
                 // Edit Mode: menu Mark/Clear Sharp en el cursor (bordes filosos)
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
+                if (state == editNavigation && InteractionMode == EditMode && g_editMesh)
                     LayoutMenuSharp(lastMouseX, lastMouseY);
                 break;
             // Numpad (Ctrl = la vista OPUESTA)
@@ -5099,15 +5147,15 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
             }
             case W3dK_KP_7: SetViewpoint(LCtrlPressed ? Viewpoint::bottom : Viewpoint::top); break;
 #ifndef W3D_SYMBIAN   // (herramientas de desarrollo de la PC)
-            case W3dK_KP_8: BuscarVertexAnimation(); break;
-            case W3dK_KP_9: abrir(); break;
+            case W3dK_KP_8: FindVertexAnimation(); break;
+            case W3dK_KP_9: open(); break;
 #endif
             case W3dK_KP_0:
                 if (LCtrlPressed) SetActiveObjectAsCamera();          // Ctrl+Num 0: activo -> camara activa (SIN cambiar la vista)
                 else SetViewFromCameraActive(!ViewFromCameraActive);  // Num 0: ver desde la camara (toggle)
                 break;
             case W3dK_KP_PERIOD: {
-                EnfocarObject();
+                FocusObject();
                 break;
             }
             case W3dK_SLASH:   // Local View: aisla la seleccion (frame + oculta el resto); re-tocar restaura todo
@@ -5116,15 +5164,15 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
             // si querés, agregá más teclas aquí
             case W3dK_ESCAPE:  // Esc
                 // box select armado o en curso: lo cancela sin tocar la seleccion
-                if (BoxSelectActivo()){ BoxSelectCancelar(); break; }
+                if (BoxSelectActive()){ BoxSelectCancel(); break; }
                 // grab de huesos en curso: lo cancela (restaura head/tail del snapshot)
-                if (BoneGrabActivo()){ BoneGrabCancelar(); NumInputReset(); break; }
+                if (BoneGrabActive()){ BoneGrabCancel(); NumInputReset(); break; }
                 // loop cut en curso: lo descarta (restaura la geometria pre-corte)
-                if (LoopCutActivo()) LoopCutCancelar();
+                if (LoopCutActive()) LoopCutCancel();
                 // Edit Mode con transform de malla en curso: descarta (restaura el
                 // snapshot de vertices); si no, cancela el transform de objetos.
-                else if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
-                else Cancelar();
+                else if (InteractionMode == EditMode && EditXformActive()) EditXformCancel();
+                else Cancel();
                 NumInputReset();
                 break;
         }
@@ -5136,22 +5184,22 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 key_down_return();
                 break;
             case W3dK_RIGHT:   // Flecha derecha
-                TeclaDerecha();
+                KeyRight();
                 break;
             case W3dK_LEFT:    // Flecha izquierda
-                TeclaIzquierda();
+                KeyLeft();
                 break;
             case W3dK_UP:
-                TeclaArriba();
+                KeyUp();
                 break;
             case W3dK_DOWN:
-                TeclaAbajo();
+                KeyDown();
                 break;
             case W3dK_A:
-                if (BoneEditActivo() && !BoneGrabActivo())
-                    BoneEditSeleccionarTodos(BoneEditArm(), !LAltPressed); // Edit de armature: huesos
-                else if (LAltPressed) DeseleccionarTodo();
-                else SeleccionarTodoForzado();
+                if (BoneEditActive() && !BoneGrabActive())
+                    BoneEditSelectAll(BoneEditArm(), !LAltPressed); // Edit de armature: huesos
+                else if (LAltPressed) DeselectAll();
+                else SelectAllForced();
                 break;
             // Numpad (Ctrl = la vista OPUESTA)
             case W3dK_KP_1: {
@@ -5168,30 +5216,30 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 break;
             }
 #ifndef W3D_SYMBIAN   // (herramientas de desarrollo de la PC)
-            case W3dK_KP_8: BuscarVertexAnimation(); break;
-            case W3dK_KP_9: abrir(); break;
+            case W3dK_KP_8: FindVertexAnimation(); break;
+            case W3dK_KP_9: open(); break;
 #endif
             //case W3dK_KP_0: numpad('0'); break;
             case W3dK_KP_PERIOD: {
-                EnfocarObject();
+                FocusObject();
                 break;
             }
             // si querés, agregá más teclas aquí
             case W3dK_ESCAPE:  // Esc
                 // grab de huesos en curso: lo cancela (mantener Esc apretado no debe caer al Cancelar de objetos)
-                if (BoneGrabActivo()){ BoneGrabCancelar(); NumInputReset(); break; }
+                if (BoneGrabActive()){ BoneGrabCancel(); NumInputReset(); break; }
                 // Edit Mode con transform de malla en curso: descarta (restaura el
                 // snapshot de vertices); si no, cancela el transform de objetos.
-                if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
-                else Cancelar();
+                if (InteractionMode == EditMode && EditXformActive()) EditXformCancel();
+                else Cancel();
                 NumInputReset();
                 break;
         }
     }
 }
 
-void Viewport3D::event_key_up(int tecla){
-    const int key = tecla;
+void Viewport3D::event_key_up(int keyCode){
+    const int key = keyCode;
     switch (key) {
         case W3dK_LSHIFT:
             // (el TAP de Shift que ciclaba la seleccion era un idioma del TELEFONO -sin mouse,
@@ -5210,13 +5258,13 @@ void Viewport3D::event_key_up(int tecla){
 }
 
 void Viewport3D::key_down_return(){
-    Aceptar();
+    Accept();
 }
 
 Viewport3D* Viewport3DActive = NULL;
 // rect (coords de ventana SDL, origen arriba-izquierda) del viewport 3D que dibuja el juego: lo usa la captura del
 // mouse de main.cpp para teletransportar el cursor al centro cada frame. false si todavia no se dibujo ninguno.
-bool JuegoViewportRect(int* x, int* y, int* w, int* h) {
+bool GameViewportRect(int* x, int* y, int* w, int* h) {
     Viewport3D* v = Viewport3DActive;
     if (!v || v->width < 8 || v->height < 8) return false;
     *x = v->x; *y = v->y; *w = v->width; *h = v->height;
@@ -5224,7 +5272,7 @@ bool JuegoViewportRect(int* x, int* y, int* w, int* h) {
 }
 
 //precalculos
-bool recalcularCamara = true;
+bool recalculateCamera = true;
 GLfloat radY = 0.0f;
 GLfloat radX = 0.0f;
 
@@ -5239,39 +5287,39 @@ GLfloat sinY = 0.0f;
 // ============================================================================
 //  MODO JUEGO: al DAR PLAY los viewports 3D arrancan como un juego de verdad.
 // ============================================================================
-static void JuegoPrepararViewportsRec(ViewportBase* v, bool apagarOverlays) {
+static void GamePrepareViewportsRec(ViewportBase* v, bool turnOffOverlays) {
     if (!v) return;
     if (v->ViewportKind() == 1) {
         Viewport3D* v3 = (Viewport3D*)v;
         // DAR PLAY YA NO APAGA LOS OVERLAYS: reporte del dueno "al darle play me quitas los overlays, eso no va".
         // Se respeta el showOverlays que el usuario tenga (grilla/gizmos + gate del overlay de stats fps/gl/faces).
-        (void)apagarOverlays; // (vestigial: antes forzaba v3->showOverlays=false)
+        (void)turnOffOverlays; // (vestigial: antes forzaba v3->showOverlays=false)
         // DAR PLAY NO TOCA LA VISTA DEL USUARIO. Reporte del dueno, textual:
         // "cuando aprieto play no quiero que me modifiques el paneo/zoom de la
         // camara activa". Aca se reseteaba camViewZoom/camViewPanX/camViewPanY
         // (la INSPECCION de la vista de camara) "para que el render vuelva a su
         // marco completo": el encuadre que el usuario se armo a mano se perdia en
         // cada Play. El LOD y el Culling YA no dependen de esto -- miden desde la
-        // Camera del juego por su cuenta (LOD::OjoDeMedida / Culling::RenderHijos
-        // con W3dJuegoCorriendo) sin escribir una sola variable del viewport.
+        // Camera del juego por su cuenta (LOD::MeasureEye / Culling::RenderChildren
+        // con W3dGameRunning) sin escribir una sola variable del viewport.
         (void)v3;
     }
     // por ContainerKind, NO dynamic_cast: el arbol esta disenado sin RTTI (el
     // compilador del N95 no lo tiene; ver ViewPorts.h) y este .cpp compila alla
     if (v->ContainerKind() == 1) {
         ViewportRow* r = (ViewportRow*)v;
-        JuegoPrepararViewportsRec(r->childA, apagarOverlays);
-        JuegoPrepararViewportsRec(r->childB, apagarOverlays);
+        GamePrepareViewportsRec(r->childA, turnOffOverlays);
+        GamePrepareViewportsRec(r->childB, turnOffOverlays);
     } else if (v->ContainerKind() == 2) {
         ViewportColumn* c = (ViewportColumn*)v;
-        JuegoPrepararViewportsRec(c->childA, apagarOverlays);
-        JuegoPrepararViewportsRec(c->childB, apagarOverlays);
+        GamePrepareViewportsRec(c->childA, turnOffOverlays);
+        GamePrepareViewportsRec(c->childB, turnOffOverlays);
     }
 }
-// apagarOverlays: true SOLO al INICIAR el juego (si el usuario los prende en
+// turnOffOverlays: true SOLO al INICIAR el juego (si el usuario los prende en
 // pausa, reanudar no se los vuelve a apagar)
-void JuegoPrepararViewports(bool apagarOverlays) {
-    JuegoPrepararViewportsRec(rootViewport, apagarOverlays);
+void GamePrepareViewports(bool turnOffOverlays) {
+    GamePrepareViewportsRec(rootViewport, turnOffOverlays);
     g_redraw = true;
 }
 
@@ -5291,28 +5339,28 @@ void JuegoPrepararViewports(bool apagarOverlays) {
 //  ESPERA, no un rechazo -- rechazar obligaria al usuario a apretar Play dos
 //  veces sin saber por que.
 // ---------------------------------------------------------------------------
-bool JuegoEsperarTexturas() {
+bool GameWaitTextures() {
     // un material DORMIDO (huerfano al abrir) que una malla paso a usar hace un momento: se despierta
     // ya, asi el juego tampoco arranca con esa malla en gris (los huerfanos siguen sin cargarse)
-    TexturasDespertarUsadas();
-    const int pend = TexturasPendientes();
+    TexturesWakeUsed();
+    const int pend = PendingTextures();
     if (pend <= 0) return true;
     char msg[192];
     snprintf(msg, sizeof(msg), T("Loading %d texture(s) before Play..."), pend);
-    Notificar(msg, false);
-    w3dLogMemoria("antes de las texturas del Play");
-    CargarTodasTexturasPendientes();
-    w3dLogMemoria("texturas del Play cargadas");
+    Notify(msg, false);
+    w3dLogMemory("antes de las texturas del Play");
+    LoadAllPendingTextures();
+    w3dLogMemory("texturas del Play cargadas");
     g_redraw = true;
-    return TexturasPendientes() == 0;
+    return PendingTextures() == 0;
 }
 
 // ---- QUIEN ESCUCHA los sonidos 3D en el editor: la vista 3D activa (por la camara si se mira por ella) ----
-#include "objects/Sonido.h"
-static bool OyenteVista(Vector3& pos, Vector3& der, Vector3& adel) {
+#include "objects/Sound.h"
+static bool ListenerView(Vector3& pos, Vector3& right, Vector3& forward) {
     if (!Viewport3DActive) return false;
-    const Viewport3D::Lente L = Viewport3DActive->LenteActual();
-    pos = L.pos; der = L.der; adel = L.fwd;
+    const Viewport3D::Lens L = Viewport3DActive->CurrentLens();
+    pos = L.pos; right = L.right; forward = L.fwd;
     return true;
 }
-namespace { struct RegOyente { RegOyente() { W3dSonidoOyenteHook = OyenteVista; } } gRegOyente; }
+namespace { struct RegListener { RegListener() { W3dSoundListenerHook = ListenerView; } } gRegListener; }

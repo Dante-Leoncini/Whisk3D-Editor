@@ -34,7 +34,7 @@ echo "== nativo (ndk-build)"
 W3D_JOBS="${W3D_JOBS:-$(( $(nproc) / 2 ))}"; [ "$W3D_JOBS" -ge 1 ] 2>/dev/null || W3D_JOBS=1
 "$NDK/ndk-build" -j"$W3D_JOBS" NDK_PROJECT_PATH="$AQUI" APP_BUILD_SCRIPT="$AQUI/jni/Android.mk" \
     NDK_APPLICATION_MK="$AQUI/jni/Application.mk" NDK_OUT="$B/obj" NDK_LIBS_OUT="$B/lib" \
-    SDL_DIR="$SDL" W3D_RAIZ="$RAIZ" > "$B.ndk.log" 2>&1 || { grep -m20 -E "error|Error" "$B.ndk.log"; echo "(ver $B.ndk.log)"; exit 1; }
+    SDL_DIR="$SDL" W3D_ROOT="$RAIZ" > "$B.ndk.log" 2>&1 || { grep -m20 -E "error|Error" "$B.ndk.log"; echo "(ver $B.ndk.log)"; exit 1; }
 
 echo "== java"
 rm -rf "$B/clases" "$B/dex" && mkdir -p "$B/clases" "$B/dex"

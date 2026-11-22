@@ -1,3 +1,3 @@
 # el .w3d como PAQUETE listo para cargar: texturas .w3dt (16 bits + mipmaps hechos) y lectura por rango del zip
-ventana 320 240
-paquetetest
+window 320 240
+packagetest

@@ -7,7 +7,7 @@
 #      una franja justo arriba (la captura)
 #  Correr: cd tools/pruebas && ../../platform/linux/build/whisk3d --script prueba_teclado_area.w3s
 # ============================================================================
-ventana 640 480
-escenadefecto
+window 640 480
+scenedefault
 vpkind 1 7
-tecladoarea /tmp/w3d_teclado_campo.png
+keyboardarea /tmp/w3d_teclado_campo.png

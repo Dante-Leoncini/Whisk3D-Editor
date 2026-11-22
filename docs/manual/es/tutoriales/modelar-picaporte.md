@@ -80,7 +80,7 @@ La manija sale de la placa, con el mismo truco:
 6. La punta quedó inclinada. Para dejarla derecha, escalala a cero en X: <kbd>S</kbd> <kbd>X</kbd> `0` <kbd>Enter</kbd>. Todos sus vértices quedan a la misma X: la punta queda plana.
 
 ![En Arista, la arista de afuera sube con G Y 0.05; en Cara, la cara inclinada sale en X con E X 0.34 y S X 0 deja la punta derecha](img/picaporte-brazo-raton.webp)
-7. <kbd>L</kbd> elige toda la manija y <kbd>P</kbd> la separa: queda en **Puerta.002**. Ponele un nombre: doble click en el Outliner y escribí `Manija`.
+7. <kbd>L</kbd> elige toda la manija y <kbd>P</kbd> la separa: queda en **Puerta.002**. Ponele un nombre: doble click en el Outliner y escribí `Handle`.
 
 ![L y P separan la manija; con un doble click en el Outliner pasa a llamarse Manija](img/picaporte-manija-separar-raton.webp)
 

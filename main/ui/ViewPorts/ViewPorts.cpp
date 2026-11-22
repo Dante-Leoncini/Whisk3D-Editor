@@ -1,7 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
-#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
+#include "render/RenderOptions.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/ViewPorts.h"
-#include "ViewPorts/LayoutArbol.h" // aviso de destruccion + borrar un arbol entero
+#include "ViewPorts/LayoutTree.h" // aviso de destruccion + borrar un arbol entero
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include <math.h>
 
@@ -31,69 +31,69 @@ void ViewportBase::Resize(int newW, int newH) {
     height = newH;
 }
 
-// ---- AVISO DE DESTRUCCION (ver LayoutArbol.h) ----
+// ---- AVISO DE DESTRUCCION (ver LayoutTree.h) ----
 // La lista arranca en NULL por inicializacion ESTATICA: los ganchos se registran desde
 // constructores globales de otros .cpp, en cualquier orden, y no dependen de que este
 // archivo haya "arrancado".
-static ViewportOlvidarFn s_olvidarGanchos[ViewportOlvidarMaxGanchos] = {0,0,0,0,0,0,0,0,0,0,0,0};
-bool ViewportOlvidarRegistrar(ViewportOlvidarFn f){
+static ViewportForgetFn s_forgetHooks[ViewportForgetMaxHooks] = {0,0,0,0,0,0,0,0,0,0,0,0};
+bool ViewportForgetRegister(ViewportForgetFn f){
     if (!f) return false;
-    for (int i = 0; i < (int)ViewportOlvidarMaxGanchos; i++){
-        if (s_olvidarGanchos[i] == f) return true;   // ya estaba
-        if (!s_olvidarGanchos[i]) { s_olvidarGanchos[i] = f; return true; }
+    for (int i = 0; i < (int)ViewportForgetMaxHooks; i++){
+        if (s_forgetHooks[i] == f) return true;   // ya estaba
+        if (!s_forgetHooks[i]) { s_forgetHooks[i] = f; return true; }
     }
-    return false;   // sin lugar: agrandar ViewportOlvidarMaxGanchos
+    return false;   // sin lugar: agrandar ViewportForgetMaxHooks
 }
 
 // viewports vivos en el proceso (hojas + contenedores): el harness lo compara con el
 // arbol actual para probar que abrir un proyecto no deja el layout anterior huerfano
-static int s_viewportsVivos = 0;
-int ViewportsVivos(){ return s_viewportsVivos; }
+static int s_liveViewports = 0;
+int LiveViewports(){ return s_liveViewports; }
 
-void ViewportBorrarArbol(ViewportBase* raiz){
-    if (!raiz) return;
-    if (!raiz->isLeaf()){
-        if (raiz->ContainerKind() == 1){
-            ViewportRow* r = (ViewportRow*)raiz;
+void ViewportDeleteTree(ViewportBase* root){
+    if (!root) return;
+    if (!root->isLeaf()){
+        if (root->ContainerKind() == 1){
+            ViewportRow* r = (ViewportRow*)root;
             ViewportBase* a = r->childA; ViewportBase* b = r->childB;
             r->childA = NULL; r->childB = NULL;   // antes del delete: el dtor borra childB
-            ViewportBorrarArbol(a); ViewportBorrarArbol(b);
-        } else if (raiz->ContainerKind() == 2){
-            ViewportColumn* c = (ViewportColumn*)raiz;
+            ViewportDeleteTree(a); ViewportDeleteTree(b);
+        } else if (root->ContainerKind() == 2){
+            ViewportColumn* c = (ViewportColumn*)root;
             ViewportBase* a = c->childA; ViewportBase* b = c->childB;
             c->childA = NULL; c->childB = NULL;
-            ViewportBorrarArbol(a); ViewportBorrarArbol(b);
+            ViewportDeleteTree(a); ViewportDeleteTree(b);
         }
     }
-    delete raiz;
+    delete root;
 }
 
 ViewportBase::ViewportBase()
     : x(0), y(0), width(0), height(0) {
     // barra de botones (C++03: en el ctor)
-    barAbajo = false;
+    barDown  = false;
     barAlpha = 1.0f;
     barFocusIndex = -1;
     barScrollX = 0;
     barScrollManual = 0;
     barCard = NULL;
-    barLinea = NULL;
+    barLine = NULL;
     toolScroll = 0;
-    toolFoco = -1;    // (sin foco de teclado en la barra de abajo)    // toolbar compartida (ToolbarBase.cpp): sin scroll ni gesto al nacer
-    toolGesto = false;
-    s_viewportsVivos++;
+    toolFocus = -1;    // (sin foco de teclado en la barra de abajo)    // toolbar compartida (ToolbarBase.cpp): sin scroll ni gesto al nacer
+    toolGesture = false;
+    s_liveViewports++;
 }
 ViewportBase::~ViewportBase(){
-    s_viewportsVivos--;
-    BrushBarOlvidarViewport(this); // no dejar el gesto de la fila del pincel apuntando a un viewport muerto
+    s_liveViewports--;
+    BrushBarForgetViewport(this); // no dejar el gesto de la fila del pincel apuntando a un viewport muerto
     // los demas modulos que se guardan punteros a viewports (activo, gesto en curso, menu
-    // abierto desde...) sueltan ESTE (LayoutArbol.h)
-    for (int g = 0; g < (int)ViewportOlvidarMaxGanchos; g++)
-        if (s_olvidarGanchos[g]) s_olvidarGanchos[g](this);
+    // abierto desde...) sueltan ESTE (LayoutTree.h)
+    for (int g = 0; g < (int)ViewportForgetMaxHooks; g++)
+        if (s_forgetHooks[g]) s_forgetHooks[g](this);
     if (viewPortActive == this) viewPortActive = NULL;
     if (rootViewport == this) rootViewport = NULL;
     // la BARRA es del viewport: sus botones, pestanias y toolbar se crean en el ctor de cada
-    // tipo (BarCrear + los push_back) y nadie mas los libera. Mientras el layout vivia para
+    // tipo (BarCreate + los push_back) y nadie mas los libera. Mientras el layout vivia para
     // siempre daba igual; ahora un viewport borrado (abrir un proyecto, cambiar de tipo) los
     // fugaba. Cada Button/Tab libera su Card.
     for (size_t i = 0; i < BarButtons.size(); i++) delete BarButtons[i];
@@ -101,7 +101,7 @@ ViewportBase::~ViewportBase(){
     for (size_t i = 0; i < ToolButtons.size(); i++) delete ToolButtons[i];
     BarButtons.clear(); BarTabs.clear(); ToolButtons.clear();
     delete barCard;  barCard = NULL;
-    delete barLinea; barLinea = NULL;
+    delete barLine; barLine = NULL;
 }
 void ViewportBase::event_mouse_motion(int mx, int my) {}
 void ViewportBase::button_left() {}
@@ -110,10 +110,10 @@ void ViewportBase::button_up(){};
 void ViewportBase::button_down(){};
 // base: no-op. El viewport que quiera teclas/rueda las overridea (hoy: Timeline en las dos plataformas; el resto
 // todavia solo en PC). Asi el ruteo puede mandarle a cualquiera sin preguntar quien es.
-void ViewportBase::event_key_down(int tecla, bool repeticion) {}
-void ViewportBase::event_key_up(int tecla) {}
+void ViewportBase::event_key_down(int keyCode, bool repeat) {}
+void ViewportBase::event_key_up(int key) {}
 void ViewportBase::event_mouse_wheel(float dy, int mx, int my) {}
-void ViewportBase::mouse_button_up(int boton) {}
+void ViewportBase::mouse_button_up(int button) {}
 void ViewportBase::event_finger_gesture(float zoomDelta, float panDx, float panDy){} // base: no-op (los paneles no zoomean/panean)
 bool ViewportBase::event_finger_scroll(int px, int py, int dx, int dy){ return false; } // base: no scrollea (el viewport 3D orbita)
 
@@ -122,39 +122,39 @@ extern bool g_redraw;
 bool ViewportBase::BarScrollHorizontal(int px, int py, int delta){
     if (!barCard || (BarButtons.empty() && BarTabs.empty())) return false; // no hay barra
     int barH = BarHeight();
-    int yBar = barAbajo ? (y + height - barH) : y;
+    int yBar = barDown ? (y + height - barH) : y;
     if (px < x || px >= x + width || py < yBar || py >= yBar + barH) return false; // el evento no cae en la barra
     barScrollManual -= delta; // delta>0 (rueda arriba / dedo a la derecha) = mostrar lo de la izquierda
     if (barScrollManual < 0) barScrollManual = 0;
-    ActualizarBarra(); // re-clampea contra el ancho total (deja el maximo si te pasas)
+    UpdateBar(); // re-clampea contra el ancho total (deja el maximo si te pasas)
     g_redraw = true;
     return true;
 }
 
 // (px,py) cae en la barra superior O en la toolbar de abajo? El gesto de arrastre queda lockeado
-// a la barra que se toco (toolGesto) para que BarScrollBy scrollee la correcta. Antes esto era un
+// a la barra que se toco (toolGesture) para que BarScrollBy scrollee la correcta. Antes esto era un
 // override del Viewport3D (el unico con toolbar); ahora la toolbar es de la base -> vale para todos.
 bool ViewportBase::OnBar(int px, int py){
     if (barCard && !(BarButtons.empty() && BarTabs.empty())){
         int barH = BarHeight();
-        int yBar = barAbajo ? (y + height - barH) : y;
+        int yBar = barDown ? (y + height - barH) : y;
         if (px >= x && px < x + width && py >= yBar && py < yBar + barH){
-            toolGesto = false;
+            toolGesture = false;
             return true;
         }
     }
-    if (OnToolbar(px, py)){ toolGesto = true; return true; }
+    if (OnToolbar(px, py)){ toolGesture = true; return true; }
     return false;
 }
 
 // scroll horizontal de la barra SIN hit-test: para cuando el gesto de scroll YA arranco sobre la barra
-// y hay que seguir aunque el dedo se salga de ella (gesto lockeado). toolGesto decide CUAL barra.
+// y hay que seguir aunque el dedo se salga de ella (gesto lockeado). toolGesture decide CUAL barra.
 void ViewportBase::BarScrollBy(int delta){
-    if (toolGesto){ ToolbarScrollBy(delta); return; }
+    if (toolGesture){ ToolbarScrollBy(delta); return; }
     if (!barCard || (BarButtons.empty() && BarTabs.empty())) return;
     barScrollManual -= delta;
     if (barScrollManual < 0) barScrollManual = 0;
-    ActualizarBarra();
+    UpdateBar();
     g_redraw = true;
 }
 
@@ -256,7 +256,7 @@ void ViewportRow::button_left() {
     ViewPortClickDown = true;
 }
 
-void ViewportRow::mouse_button_up(int boton){
+void ViewportRow::mouse_button_up(int button){
     ViewPortClickDown = false;
 }
 
@@ -357,7 +357,7 @@ void ViewportColumn::button_left() {
     ViewPortClickDown = true;
 }
 
-void ViewportColumn::mouse_button_up(int boton){
+void ViewportColumn::mouse_button_up(int button){
     ViewPortClickDown = false;
 }
 
@@ -377,6 +377,21 @@ ViewportColumn::~ViewportColumn() {
 static bool VpIsInside(ViewportBase* v, int mx, int my) {
     return v != NULL && mx >= v->x && mx < v->x + v->width &&
            my >= v->y && my < v->y + v->height;
+}
+
+// EL BORDE ENTRE DOS VIEWPORTS: cuanto se puede errar al agarrarlo, a cada lado de la division. Era el hueco que se ve
+// (3 de la UI): con el mouse habia que pegarle justo al centro y con el dedo casi no se podia. Ahora cubre la banda del
+// borde de los dos viewports (5 de la UI con el mouse, 9 con el dedo -el ultimo toque fue hace menos de 2 segundos-) y
+// en las pantallas x4 el doble, como la linea del borde (LineScaleUI)
+#ifndef W3D_SYMBIAN
+extern Uint32 g_lastFingerTicks;   // controls.cpp: el ultimo evento de dedo
+#endif
+int VpToleranceBorder() {
+    int t = 5;
+#ifndef W3D_SYMBIAN
+    if (g_lastFingerTicks != 0 && SDL_GetTicks() - g_lastFingerTicks < 2000) t = 9;
+#endif
+    return t * GlobalScale * LineScaleUI();
 }
 
 static bool VpIsInPadding(ViewportBase* a, ViewportBase* b, bool isRow,
@@ -413,13 +428,14 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     if (!vp) return NULL;
 
     const int PADDING = paddingViewportGS;
+    const int GRAB = VpToleranceBorder();   // (la division gana antes que el contenido de los dos lados)
 
     // -----------------------------
     // ViewportRow (divide en columnas)
     // -----------------------------
     if (vp->ContainerKind() == 1) {
         ViewportRow* row = (ViewportRow*)vp;
-        if (VpIsInPadding(row->childA, row->childB, true, mx, my, PADDING))
+        if (VpIsInPadding(row->childA, row->childB, true, mx, my, GRAB))
             return vp;
 
         if (VpIsInside(row->childA, mx, my))
@@ -433,7 +449,7 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     // -----------------------------
     else if (vp->ContainerKind() == 2) {
         ViewportColumn* col = (ViewportColumn*)vp;
-        if (VpIsInPadding(col->childA, col->childB, false, mx, my, PADDING))
+        if (VpIsInPadding(col->childA, col->childB, false, mx, my, GRAB))
             return vp;
 
         if (VpIsInside(col->childA, mx, my))
@@ -459,10 +475,10 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
 
 void SetGlobalScale(int scale){
     GlobalScale = scale;
-    marginGS = margin * scale;
+    marginGS = uiMargin * scale;
     paddingGS = padding * scale;
     gapGS = gap * scale;
-    RenglonHeightGS = RenglonHeight * scale;
+    RowHeightGS = RowHeight * scale;
     borderGS = border * scale;
     bordersGS = borderGS * 2;
     LetterWidthGS = LetterWidth * scale;
@@ -472,7 +488,7 @@ void SetGlobalScale(int scale){
     // separador de 1px de las barras que no son del 3D). Asi se puede achicar un viewport hasta que queden SOLO sus
     // controles: p.ej. dejar el timeline como una tira con el transporte y nada mas. Antes MinViewportHeight era un
     // valor fijo mas grande y siempre sobraba un hueco inutil debajo de la barra.
-    MinViewportHeightGS = UIBotonAltura() + UIBarPadding() * 2 + scale * 2;
+    MinViewportHeightGS = UIButtonHeight() + UIBarPadding() * 2 + scale * 2;
     MinViewportWidthGS = MinViewportWidth * scale;
     CharacterWidthGS = CharacterWidth * scale;
 
@@ -490,13 +506,13 @@ void SetGlobalScale(int scale){
 }
 
 #ifndef W3D_SYMBIAN
-// el movimiento que se esta procesando es de un DEDO (controles.cpp lo marca en cada motion): un dedo no se puede
+// el movimiento que se esta procesando es de un DEDO (controls.cpp lo marca en cada motion): un dedo no se puede
 // teletransportar como el cursor del mouse, asi que no se envuelve en el borde. Queda el delta real y el gesto (orbitar,
 // panear, transformar) sigue aunque el dedo salga del viewport
-bool g_cursorEsDedo = false;
+bool g_cursorIsFinger = false;
 void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     if (!vp) return;
-    if (g_cursorEsDedo) {
+    if (g_cursorIsFinger) {
         dx = mx - lastMouseX; dy = my - lastMouseY;
         lastMouseX = mx; lastMouseY = my;
         return;
@@ -550,13 +566,13 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     lastMouseY = my;
 }
 #else
-// Symbian: lo llama controles.cpp con el DEDO o con el MOUSE Bluetooth. El mouse se envuelve como en la PC (el cursor
+// Symbian: lo llama controls.cpp con el DEDO o con el MOUSE Bluetooth. El mouse se envuelve como en la PC (el cursor
 // sale por un borde del viewport y aparece por el otro: se puede seguir moviendo/rotando sin quedarse sin pantalla); el
-// cursor lo mueve la plataforma (W3dRatonTeletransportar). Un dedo no se puede teletransportar: queda solo el delta.
-#include "app/W3dRatonEditor.h"
-bool g_cursorEsDedo = false;   // (lo marca controles.cpp; aca decide W3dEventoRaton: el dedo nunca se envuelve)
+// cursor lo mueve la plataforma (W3dMouseTeleport). Un dedo no se puede teletransportar: queda solo el delta.
+#include "app/W3dMouseEditor.h"
+bool g_cursorIsFinger = false;   // (lo marca controls.cpp; aca decide W3dEventMouse: el dedo nunca se envuelve)
 void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
-    if (vp && W3dEventoRaton() && W3dRatonTeletransportar) {
+    if (vp && W3dEventMouse() && W3dMouseTeleport) {
         const int left = vp->x + borderGS, right = vp->x + vp->width - borderGS;
         const int top = vp->y + borderGS, bottom = vp->y + vp->height - borderGS;
         bool warped = false;
@@ -564,7 +580,7 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
         else if (mx >= right)  { mx = left + 1;  warped = true; }
         if (my <= top)         { my = bottom - 1; warped = true; }
         else if (my >= bottom) { my = top + 1;    warped = true; }
-        if (warped) { W3dRatonTeletransportar(mx, my); dx = 0; dy = 0; }
+        if (warped) { W3dMouseTeleport(mx, my); dx = 0; dy = 0; }
         else        { dx = mx - lastMouseX; dy = my - lastMouseY; }
         lastMouseX = mx; lastMouseY = my;
         return;
@@ -578,16 +594,16 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
 #endif
 // ============== barra de botones de los viewports ==============
 
-void ViewportBase::BarCrear(){
+void ViewportBase::BarCreate(){
     barCard = new Card(NULL, 10, 10);
-    barLinea = new Rec2D();
+    barLine = new Rec2D();
     // todos los viewports llevan SIEMPRE primero el boton de icono:
     // dice que tipo de viewport es (a futuro va a servir para cambiarlo)
     BarButtons.push_back(new Button("", IconType::arrow, true));
 }
 
 int ViewportBase::BarTopOffset() const {
-    if (!barCard || barAbajo) return 0;
+    if (!barCard || barDown) return 0;
     return BarHeight();
 }
 
@@ -595,8 +611,8 @@ int ViewportBase::BarHeight() const {
     // boton + padding abajo + 1px MAS de margen arriba (los botones quedan un
     // toque mas abajo). Las barras que NO son del 3D llevan ademas una linea
     // separadora de 1px en el borde inferior.
-    int h = UIBotonAltura() + UIBarPadding() * 2 + GlobalScale;
-    if (ViewportKind() != 1 && barLinea) h += GlobalScale; // separador (1px)
+    int h = UIButtonHeight() + UIBarPadding() * 2 + GlobalScale;
+    if (ViewportKind() != 1 && barLine) h += GlobalScale; // separador (1px)
     return h;
 }
 
@@ -607,35 +623,35 @@ int ViewportBase::BarHeight() const {
 // EL ICONO DE CADA TIPO de viewport en el MENU de tipo (el boton de la esquina sigue siendo la flecha para abajo): el cubo
 // el 3D, el ojo el outliner, la llave inglesa las propiedades, la malla el editor UV, el reloj la linea de tiempo, la
 // textura el editor 2D, el codigo el IDE, la carpeta la biblioteca. Los que no tienen uno propio, ninguno (la flecha)
-int W3dIconoDeViewport(int kind) {
+int W3dViewportIcon(int kind) {
     switch (kind) {
         case 1: return (int)IconType::object;
         case 2: return (int)IconType::visible;
-        case 3: return (int)IconType::modificador;
+        case 3: return (int)IconType::modifier;
         case 4: return (int)IconType::mesh;
-        case 5: return (int)IconType::reloj;
-        case 6: return (int)IconType::textura;
-        case 7: return (int)IconType::consola;
+        case 5: return (int)IconType::clock;
+        case 6: return (int)IconType::texture;
+        case 7: return (int)IconType::console;
         case 8: return (int)IconType::script;
-        case 9: return (int)IconType::carpeta;
+        case 9: return (int)IconType::folder;
     }
     return (int)IconType::arrow;
 }
-void ViewportBase::ActualizarBarra(){
+void ViewportBase::UpdateBar(){
     if (!barCard || BarButtons.empty()) return;
     int barH = BarHeight();
-    int yBar = barAbajo ? height - barH : 0;
+    int yBar = barDown ? height - barH : 0;
     int btnGap = 2 * GlobalScale; // gap CHICO entre botones (antes gapGS) p/ que entren mas
     // NO se resetea barFocusIndex aca: el ruteo de teclado la llama ANTES de
     // abrir el menu (ahi todavia no hay menu abierto). El reset lo hace RenderBar.
 
     // medir anchos + posicion del enfocado
-    int total = gapGS, focoX = -1, focoW = 0;
+    int total = gapGS, focusX = -1, focusW = 0;
     for (size_t b = 0; b < BarButtons.size(); b++){
         Button* btn = BarButtons[b];
         if (!btn->visible) continue;
         btn->Resize(width - gapGS * 2);
-        if (this == viewPortActive && (int)b == barFocusIndex){ focoX = total; focoW = btn->width; }
+        if (this == viewPortActive && (int)b == barFocusIndex){ focusX = total; focusW = btn->width; }
         total += btn->width + btnGap;
     }
     // las PESTAÑAS tambien cuentan para el ancho total (sino el scroll maximo salia mal: en propiedades hay
@@ -647,8 +663,8 @@ void ViewportBase::ActualizarBarra(){
         total += tab->width + GlobalScale;
     }
     int maxS = total - width; if (maxS < 0) maxS = 0; // sin hueco a la derecha
-    if (focoX >= 0){
-        barScrollX = focoX + focoW / 2 - width / 2; // teclado: centrar el enfocado
+    if (focusX >= 0){
+        barScrollX = focusX + focusW / 2 - width / 2; // teclado: centrar el enfocado
     } else {
         barScrollX = barScrollManual; // PC sin foco: scroll por rueda del mouse
     }
@@ -661,11 +677,11 @@ void ViewportBase::ActualizarBarra(){
     for (size_t b = 0; b < BarButtons.size(); b++){
         Button* btn = BarButtons[b];
         if (!btn->visible){ btn->sx = -10000; btn->sy = -10000; btn->hover = false; continue; } // hover apagado (como la toolbar)
-        int by = barAbajo ? (barH - UIBarPadding() - btn->height)
+        int by = barDown ? (barH - UIBarPadding() - btn->height)
                           : (UIBarPadding() + GlobalScale);
         if (by < 0) by = 0;
         // con un menu abierto, el ENFOCADO se resalta verde y los demas no
-        btn->focoMenu = (this == viewPortActive && barFocusIndex >= 0 && (int)b == barFocusIndex); // solo el viewport ACTIVO resalta su barra
+        btn->focusMenu = (this == viewPortActive && barFocusIndex >= 0 && (int)b == barFocusIndex); // solo el viewport ACTIVO resalta su barra
         btn->sx = x + bx;
         btn->sy = y + yBar + by;
         bx += btn->width + btnGap;
@@ -674,7 +690,7 @@ void ViewportBase::ActualizarBarra(){
         Tab* tab = BarTabs[t];
         if (!tab->visible){ tab->sx = -10000; tab->sy = -10000; continue; }
         tab->Resize(width - gapGS * 2);
-        int ty = barAbajo ? 0 : barH - tab->height;
+        int ty = barDown ? 0 : barH - tab->height;
         tab->sx = x + bx;
         tab->sy = y + yBar + ty;
         bx += tab->width + GlobalScale;
@@ -682,8 +698,8 @@ void ViewportBase::ActualizarBarra(){
 }
 
 // hook opcional (lo setea la plataforma): texto del modo de entrada de texto a mostrar en la barra del viewport
-// ACTIVO mientras se edita un campo (Symbian lo apunta a W3dT9ModoTexto: "Abc"/"abc"/"ABC"/"123"). NULL en PC.
-const char* (*g_ViewportBarModoHook)() = 0;
+// ACTIVO mientras se edita un campo (Symbian lo apunta a W3dT9TextMode: "Abc"/"abc"/"ABC"/"123"). NULL en PC.
+const char* (*g_ViewportBarModeHook)() = 0;
 // shift (lapiz) mantenido durante la edicion de texto: la barra muestra "copiar" (izq) y "pegar" (der). NULL en PC.
 bool (*g_ViewportBarShiftHook)() = 0;
 
@@ -693,40 +709,40 @@ void ViewportBase::RenderBar(){
     // sin ningun menu abierto el foco se apaga (la barra vuelve a la normalidad). EXCEPCION: el Timeline (kind 5)
     // navega sus botones de transporte SIN abrir menu -> su foco lo maneja el ruteo de teclado (LayoutTimelineBar*),
     // no se apaga aca (sino se perderia cada frame).
-    extern bool LayoutMenuAbierto();
-    extern bool LayoutFocoEnTransporte(ViewportBase*);
+    extern bool LayoutMenuOpen();
+    extern bool LayoutFocusInTransport(ViewportBase*);
     // el 3D (kind 1) retiene su foco de barra SOLO si esta en el transporte Stop/Play Y es el viewport ACTIVO
     // (como el Timeline kind 5, que no se apaga cada frame). El 'this==viewPortActive' hace que al ciclar de
     // viewport (verde) el 3D SUELTE el foco -> al volver las flechas orbitan de nuevo (no quedan pegadas en
     // Stop/Play) y un 3D no-activo (multi-vista PC) no retiene un indice stale.
-    bool retieneTransporte = (this == viewPortActive) && LayoutFocoEnTransporte(this);
+    bool retainsTransport = (this == viewPortActive) && LayoutFocusInTransport(this);
     // el UV retiene el foco sobre "Edit" (accion directa sin menu, como el transporte): sin esto el
     // foco se borraba cada frame y el OK no encontraba a quien activar (keypad del N95)
-    extern bool LayoutFocoEnUVEditar(ViewportBase*);
-    bool retieneUVEditar = (this == viewPortActive) && LayoutFocoEnUVEditar(this);
-    if (!LayoutMenuAbierto() && ViewportKind() != 5 && ViewportKind() != 6 && ViewportKind() != 8
-        && !retieneTransporte && !retieneUVEditar) barFocusIndex = -1;
-    ActualizarBarra(); // layout + auto-scroll + sx/sy frescos
+    extern bool LayoutFocusInUVEdit(ViewportBase*);
+    bool retainsUVEdit = (this == viewPortActive) && LayoutFocusInUVEdit(this);
+    if (!LayoutMenuOpen() && ViewportKind() != 5 && ViewportKind() != 6 && ViewportKind() != 8
+        && !retainsTransport && !retainsUVEdit) barFocusIndex = -1;
+    UpdateBar(); // layout + auto-scroll + sx/sy frescos
     int barH = BarHeight();
-    int yBar = barAbajo ? height - barH : 0;
+    int yBar = barDown ? height - barH : 0;
 
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(0, (GLfloat)yBar, 0);
 
     // fondo de la barra: el color de las tarjetas (en el 3D barAlpha
     // es 0.5 y se ve la escena detras)
-    SetColorID(ColorID::gris, barAlpha);
+    SetColorID(ColorID::gray, barAlpha);
     barCard->Resize(width, barH);
     barCard->RenderObject(false);
 
     // linea oscura que separa la barra del resto de la interfaz (en el
     // 3D no hace falta: la barra es translucida)
-    if (ViewportKind() != 1 && barLinea){
+    if (ViewportKind() != 1 && barLine){
         w3dEngine::Disable(w3dEngine::Texture2D);
         SetColorID(ColorID::background);
-        barLinea->SetSize(0, (GLshort)(barAbajo ? 0 : barH - GlobalScale),
+        barLine->SetSize(0, (GLshort)(barDown ? 0 : barH - GlobalScale),
                           (GLshort)width, (GLshort)GlobalScale);
-        barLinea->RenderObject(false);
+        barLine->RenderObject(false);
         w3dEngine::Enable(w3dEngine::Texture2D);
     }
 
@@ -751,27 +767,27 @@ void ViewportBase::RenderBar(){
 
     // indicador del modo de entrada de texto (T9 del keypad Symbian) a la DERECHA de la barra del viewport ACTIVO,
     // mientras se edita un campo: "Abc"/"abc"/"ABC"/"123". En PC el hook es NULL y no dibuja nada.
-    if (this == viewPortActive && g_ViewportBarModoHook){
-        const char* modo = g_ViewportBarModoHook();
-        if (modo && modo[0]){
+    if (this == viewPortActive && g_ViewportBarModeHook){
+        const char* mode = g_ViewportBarModeHook();
+        if (mode && mode[0]){
             int ty = (barH - LetterHeightGS) / 2;
             bool shift = (g_ViewportBarShiftHook && g_ViewportBarShiftHook());
             if (shift){
                 // con SHIFT: "copiar" a la IZQUIERDA + "pegar" a la DERECHA (asi se sabe que shift+softkey copia/pega);
                 // el modo (Abc/abc/ABC/123) queda CENTRADO para no pisar "pegar".
-                SetColorID(ColorID::blanco);
+                SetColorID(ColorID::white);
                 w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)ty, 0);
                 RenderBitmapText(std::string(T("Copy")), textAlign::left, width / 2); w3dEngine::PopMatrix();
                 w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - gapGS), (GLfloat)ty, 0);
                 RenderBitmapText(std::string(T("Paste")), textAlign::right, width / 2); w3dEngine::PopMatrix();
                 SetColorID(ColorID::accent);
                 w3dEngine::PushMatrix(); w3dEngine::Translatef(0, (GLfloat)ty, 0);
-                RenderBitmapText(std::string(modo), textAlign::center, width); w3dEngine::PopMatrix();
+                RenderBitmapText(std::string(mode), textAlign::center, width); w3dEngine::PopMatrix();
             } else {
                 // sin shift: el modo a la DERECHA (borde derecho anclado en width - gapGS; antes quedaba en x=0 = fuera)
                 SetColorID(ColorID::accent);
                 w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - gapGS), (GLfloat)ty, 0);
-                RenderBitmapText(std::string(modo), textAlign::right, width - gapGS * 2); w3dEngine::PopMatrix();
+                RenderBitmapText(std::string(mode), textAlign::right, width - gapGS * 2); w3dEngine::PopMatrix();
             }
         }
     }
@@ -798,7 +814,7 @@ void ViewportBase::BarHover(int mx, int my){
 bool ViewportBase::BarClick(int mx, int my){
     if (!barCard) return false;
     if (!Contains(mx, my)) return false;
-    int yBar = barAbajo ? y + height - BarHeight() : y;
+    int yBar = barDown ? y + height - BarHeight() : y;
     if (my < yBar || my >= yBar + BarHeight()) return false;
     // por ahora los botones no hacen nada: la barra solo consume el click
     return true;

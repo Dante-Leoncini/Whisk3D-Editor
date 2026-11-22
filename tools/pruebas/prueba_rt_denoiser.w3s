@@ -14,18 +14,18 @@ objmove 2 4 -2
 rtopt 1 1 1 1
 # una lampara GRANDE con un solo rayo: la penumbra sale granulada
 rtlight 2 1 0
-vpvista rendered
-vporbita 0 0.5 0 12 -35 -23
+vpview rendered
+vporbit 0 0.5 0 12 -35 -23
 # sin denoiser: ruido
 rtdenoiser 0
 rtrender 96 72 1
-rtruido 10 50 86 70 mayorque 4
+rtnoise 10 50 86 70 greaterthan 4
 # Open Image Denoise (cualquier PC): mucho menos ruido
 rtdenoiser 1 si
 rtdenoiser 1
 rtrender 96 72 1
-rtruido 10 50 86 70 menorque 3
+rtnoise 10 50 86 70 lessthan 3
 # OptiX (solo con una placa NVIDIA: sin ella la prueba termina aca, bien)
-rtdenoiser 2 saltar
+rtdenoiser 2 skip
 rtrender 96 72 1
-rtruido 10 50 86 70 menorque 3
+rtnoise 10 50 86 70 lessthan 3

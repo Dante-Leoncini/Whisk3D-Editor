@@ -2,11 +2,11 @@ LOCAL_PATH := $(call my-dir)
 MY_PATH := $(LOCAL_PATH)
 # ============================================================================
 #  jni/Android.mk -- Whisk3D para Android 2.3 (API 10) en ARMv6, con ndk-build del NDK r15c y SDL 2.0.7.
-#  Lo llama build_android_viejo.sh, que pasa SDL_DIR (las fuentes de SDL 2.0.7, fuera del proyecto) y W3D_RAIZ (la
+#  Lo llama build_android_viejo.sh, que pasa SDL_DIR (las fuentes de SDL 2.0.7, fuera del proyecto) y W3D_ROOT (la
 #  raiz del repo). Las fuentes son las del Android de siempre (platform/android/jni/Android.mk): al agregar un .cpp
 #  al Core, hay que sumarlo en los dos.
 # ============================================================================
-PROJECT_ROOT := $(W3D_RAIZ)
+PROJECT_ROOT := $(W3D_ROOT)
 
 # 1) SDL 2.0.7 (el ultimo que anda en Android 2.3), con su propio Android.mk
 include $(SDL_DIR)/Android.mk
@@ -17,7 +17,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := main
 CORE := Whisk3DCore
 
-# main/ entero menos main/test (el harness de pruebas corre solo en la PC; W3dRunScript va en w3d_android_viejo.cpp)
+# main/ entero menos main/test (el harness de pruebas corre solo en la PC; W3dRunScript va en w3d_android_old.cpp)
 SRC_FILES := $(shell find $(PROJECT_ROOT)/main $(PROJECT_ROOT)/libs/$(CORE)/objects \
 $(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/WhiskUI \
 -name '*.cpp' -not -path '*/main/test/*')
@@ -25,35 +25,35 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dFilesystem.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/w3dTexture.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dCompress.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dZip.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dTexto.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMalla.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMallaBin.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dAlmacen.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dRecursos.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dText.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMesh.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMeshBin.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dStore.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dResources.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/w3dlog.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dInteractionState.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dConfig.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dTactil.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dVibrar.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dTouch.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dVibrate.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Vector3.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Quaternion.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Matrix4.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/script/W3dScript.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dFisica.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dPhysics.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudio.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudioSDL.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolumen.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolume.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/input/W3dClipboardSDL.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigido.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMalla.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigid.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMesh.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dHitbox.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRagdoll.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dNav.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dRed.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dNet.cpp
 SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
-SRC_FILES += $(MY_PATH)/w3d_android_viejo.cpp
+SRC_FILES += $(MY_PATH)/w3d_android_old.cpp
 
 LOCAL_SRC_FILES := $(SRC_FILES)
 

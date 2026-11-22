@@ -21,7 +21,7 @@ Non va confuso con l'oggetto **Culling** del menu Aggiungi della Vista 3D, che l
 Il modificatore non calcola cosa si vede: lo legge da un file che accompagna il modello. Per una mesh importata da `nivel.obj`, cerca `nivel.pvs.json` nella stessa cartella:
 
 ```json
-{ "sectores": 2, "tris": [[0, 1], [2, 3]] }
+{ "sectors": 2, "tris": [[0, 1], [2, 3]] }
 ```
 
 `sectores` è il numero di zone, e `tris` contiene, per ogni zona, i triangoli da disegnare, numerati da 0 nell'ordine delle facce del `.obj`. Di solito proviene dal gioco originale o da uno strumento a parte. Ogni zona è un **nodo**: il nodo 1 è il primo elenco, e il nodo 0 disegna la mesh intera.
@@ -40,7 +40,7 @@ Il modificatore non calcola cosa si vede: lo legge da un file che accompagna il 
 | Rami | Appare solo se il percorso ha più di un ramo, per esempio il percorso principale e uno bonus. Sceglie quali rami contano per cercare il nodo più vicino; ogni ramo attivo appare in verde. Il pulsante dice, per esempio, "Rami: 3 (tutti)" o "Rami: 2/3". |
 | Nodo corrente | La zona che viene disegnata; 0 = la mesh intera. Si può cambiare a mano per controllare ogni zona. Quando è il Percorso a scegliere il nodo, il motore lo sovrascrive. |
 
-Da uno script, `setSector(objeto, n)` cambia il nodo attivo (0 = la mesh intera). Vedi [Particelle, nebbia e visibilità](../lua/api-particulas-niebla.md).
+Da uno script, `setSector(object, n)` cambia il nodo attivo (0 = la mesh intera). Vedi [Particelle, nebbia e visibilità](../lua/api-particulas-niebla.md).
 
 ## Cosa conviene sapere
 

@@ -2,7 +2,7 @@
 
 ## ビットマップフォント
 
-インターフェースの文字は、`font.png`に手で描かれています。各文字は**5x11**ピクセルのセルで、送り幅は**6**（`CharacterWidth`）です。1行の高さは**12**（`RenglonHeight`）です。等幅フォントで、すべての文字が同じ幅を取ります。スケールをかけると、すべてが`GlobalScale`倍になります。
+インターフェースの文字は、`font.png`に手で描かれています。各文字は**5x11**ピクセルのセルで、送り幅は**6**（`CharacterWidth`）です。1行の高さは**12**（`RowHeight`）です。等幅フォントで、すべての文字が同じ幅を取ります。スケールをかけると、すべてが`GlobalScale`倍になります。
 
 `Font`（`text/font.h`）は、各文字の座標を保持します。グローバルに1つだけ、`WhiskFont`があります。アトラスのサイズとそのテクスチャを渡して作成します（[UIを直接使う](empezar.md)）。
 
@@ -24,18 +24,18 @@
 - `;`、`^`、`~`、`` ` ``、`±`、`«`、`»`、`–`、`—`、`…`
 - **キリル文字**。ラテン文字と同じ形の文字（`А В Е К М Н О Р С Т Х`と`а е о р с у х`）は、`font.png`のものを使います。
 
-拡張アトラスは、テキストが初めて必要としたときに読み込まれます：`SetAtlasExtendido`はパスを保存するだけです。英語やスペイン語では一度も読み込まれないこともあり、N95ではそのメモリが貴重です。ファイルがない場合、組み立てる文字は記号なしで表示され、拡張アトラスの文字は`?`になります。
+拡張アトラスは、テキストが初めて必要としたときに読み込まれます：`SetAtlasExtended`はパスを保存するだけです。英語やスペイン語では一度も読み込まれないこともあり、N95ではそのメモリが貴重です。ファイルがない場合、組み立てる文字は記号なしで表示され、拡張アトラスの文字は`?`になります。
 
-各文字がどのセルにあり、各文字をどう組み立てるかのテーブルは、`text/FuenteExt.h`にあります。手では編集しません：エディターのリポジトリにある`tools/fuente_ext.py`が生成し、PNGも描画します。
+各文字がどのセルにあり、各文字をどう組み立てるかのテーブルは、`text/FontExt.h`にあります。手では編集しません：エディターのリポジトリにある`tools/fuente_ext.py`が生成し、PNGも描画します。
 
-2つのテクスチャで、スペイン語、ポルトガル語、フランス語、ドイツ語、イタリア語、ポーランド語、トルコ語、ロシア語に対応できます。日本語、中国語、ヒンディー語は入りません：どのアトラスにもないものは`?`になります。`WhiskFont->Soporta(cp)`は、文字を描画できるかどうかを返します。
+2つのテクスチャで、スペイン語、ポルトガル語、フランス語、ドイツ語、イタリア語、ポーランド語、トルコ語、ロシア語に対応できます。日本語、中国語、ヒンディー語は入りません：どのアトラスにもないものは`?`になります。`WhiskFont->Supports(cp)`は、文字を描画できるかどうかを返します。
 
 テキストはUTF-8です。`UTF8_Char`は1〜3バイトのシーケンスを読みます。絵文字のような4バイトのシーケンスは読めず、疑問符として表示されます。
 
 ## テキストを描画する
 
 ```cpp
-SetColorID(ColorID::blanco);
+SetColorID(ColorID::white);
 RenderBitmapText("Hola", textAlign::left, 200);   // 200：最大の幅（ピクセル）
 ```
 
@@ -43,7 +43,7 @@ RenderBitmapText("Hola", textAlign::left, 200);   // 200：最大の幅（ピク
 
 ## 測る、切る
 
-テキストの幅は、文字数×`CharacterWidthGS`です。`UTF8_Largo(texto)`はバイトではなく文字を数えます：`ñ`は2バイトですが、1文字と数えます。
+テキストの幅は、文字数×`CharacterWidthGS`です。`UTF8_Length(text)`はバイトではなく文字を数えます：`ñ`は2バイトですが、1文字と数えます。
 
 最大の幅に収まらなければ、`RenderBitmapText`がテキストを切ります：
 
@@ -53,33 +53,33 @@ RenderBitmapText("Hola", textAlign::left, 200);   // 200：最大の幅（ピク
 | `textAlign::right` | 原点で終わります | 先頭：入力欄では最後に入力した部分が見えます |
 | `textAlign::center` | 最大の幅の中央 | 末尾 |
 
-`RenderBitmapEtiqueta(texto, ancho)`は行のラベル用です：右揃えですが、収まらなければ末尾を切って`..`を付けます（"Vectores de movimi.."）。
+`RenderBitmapLabel(text, width)`は行のラベル用です：右揃えですが、収まらなければ末尾を切って`..`を付けます（"Vectores de movimi.."）。
 
-`RenderBitmapFloat(valor, alineación, ancho, unidad)`は、小数点以下4桁の数値を単位付きで描画します：`90.0000°`。Symbianの`printf`は`float`を書式化できないので、`%f`は使いません。
+`RenderBitmapFloat(value, alineación, width, unit)`は、小数点以下4桁の数値を単位付きで描画します：`90.0000°`。Symbianの`printf`は`float`を書式化できないので、`%f`は使いません。
 
 ## TTFフォントによるテキスト
 
 サイズを自由に変えられる文字には、`w3dui::W3dTextAtlas`（`text/W3dTextAtlas.h`）があります。ヘッダーだけのものです。アトラスにベイク済みのTTFフォントを描画し、文字ごとに自由に拡大と配置ができます：タイトル、スコア、アニメーションする文字に向いています。実行中にTTFをラスタライズはしません。
 
-アトラスは、Pillowが必要な`text/bake_atlas.py`を使ってPCでベイクします：`bake_atlas.py <fuente.ttf> <lado del atlas> <alto de letra> <salida>`。アトラスの1辺は128、256、512、1024のいずれかです。ASCIIと`áéíóúÁÉÍÓÚñÑüÜ¿¡`をベイクします。出力されるのは、カバレッジをグレーで表したアルファなしの`<salida>.png`と、各文字の寸法を持つ`<salida>.w3dfnt`です。
+アトラスは、Pillowが必要な`text/bake_atlas.py`を使ってPCでベイクします：`bake_atlas.py <source.ttf> <side of atlas> <height of letter> <output>`。アトラスの1辺は128、256、512、1024のいずれかです。ASCIIと`áéíóúÁÉÍÓÚñÑüÜ¿¡`をベイクします。出力されるのは、カバレッジをグレーで表したアルファなしの`<output>.png`と、各文字の寸法を持つ`<output>.w3dfnt`です。
 
 ```cpp
 #include "WhiskUI/text/W3dTextAtlas.h"
 #include "io/w3dFilesystem.h"
 
 std::vector<unsigned char> fnt, png;
-w3dFileSystem::ReadFileBytes("fuentes/titulo.w3dfnt", fnt);
-w3dFileSystem::ReadFileBytes("fuentes/titulo.png", png);
+w3dFileSystem::ReadFileBytes("fonts/titulo.w3dfnt", fnt);
+w3dFileSystem::ReadFileBytes("fonts/titulo.png", png);
 
-w3dui::W3dTextAtlas titulo;
-titulo.Load(&fnt[0], fnt.size(), &png[0], png.size());
+w3dui::W3dTextAtlas title;
+title.Load(&fnt[0], fnt.size(), &png[0], png.size());
 
-titulo.Begin();                                                // アトラス、ブレンド、状態
-titulo.DrawText("Puntaje: 120", 10, 10, 24, 1, 1, 1, 1);      // x、y、高さ、r、g、b、a
-float ancho = titulo.TextWidth("Puntaje: 120", 24);
+title.Begin();                                                // アトラス、ブレンド、状態
+title.DrawText("Puntaje: 120", 10, 10, 24, 1, 1, 1, 1);      // x、y、高さ、r、g、b、a
+float width = title.TextWidth("Puntaje: 120", 24);
 ```
 
-`(x, y)`は行の上端で、Yは下向きです。`DrawText`はすべての文字を1回の描画にまとめます。`DrawGlyph`は1文字だけを描画するもので、サイズや色の違う文字に使います。`LineHeight(alto)`は1行の高さを返します。初期設定では乗算済みアルファ（`MezclaPremult`）でブレンドするので、テキストはどんな色にもできます。
+`(x, y)`は行の上端で、Yは下向きです。`DrawText`はすべての文字を1回の描画にまとめます。`DrawGlyph`は1文字だけを描画するもので、サイズや色の違う文字に使います。`LineHeight(height)`は1行の高さを返します。初期設定では乗算済みアルファ（`MixPremult`）でブレンドするので、テキストはどんな色にもできます。
 
 ## GPUを使わないテーブル
 

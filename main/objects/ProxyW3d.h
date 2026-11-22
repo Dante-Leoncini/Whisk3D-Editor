@@ -2,9 +2,9 @@
 #define W3D_PROXY_W3D_H
 // ============================================================================
 //  ProxyW3d — un PROXY W3D (ObjectType::proxy): el nodo de la escena que usa un PREFAB
-//  o una ESCENA de una LIBRERIA externa (otro .w3d de solo lectura, io/Librerias.h).
+//  o una ESCENA de una LIBRERIA externa (otro .w3d de solo lectura, io/Libraries.h).
 //
-//  Es una instancia de prefab (objects/InstanciaPrefab.h) con otro origen: sus hijos se
+//  Es una instancia de prefab (objects/InstancePrefab.h) con otro origen: sus hijos se
 //  GENERAN con la MISMA maquinaria (io/Prefabs.h: definicion cacheada, nombres crudos,
 //  frontera de scope, overrides de visible y de propiedades de scripts) desde la
 //  definicion del elemento de la libreria, pero son de SOLO LECTURA:
@@ -17,34 +17,34 @@
 //  Cambiar la libreria en disco y reabrir el nivel lo regenera con lo nuevo.
 //
 //  LA CLAVE: 'prefab' (el campo de la instancia) guarda la clave del elemento en la
-//  cache de definiciones: "lib:<libreria>/prefab|escena/<elemento>" (W3dLibsClave). La
+//  cache de definiciones: "lib:<libreria>/prefab|scene/<elemento>" (W3dLibsKey). La
 //  libreria, el elemento y su tipo salen de ahi (asi el undo de "cambiar el elemento"
 //  de una instancia sirve igual para un proxy).
 //
 //  Compartido editor/juego (C++03). Motor generico.
 // ============================================================================
-#include "objects/InstanciaPrefab.h"
+#include "objects/InstancePrefab.h"
 #include <string>
 
-class ProxyW3d : public InstanciaPrefab {
+class ProxyW3d : public InstancePrefab {
 public:
     ProxyW3d(Object* parent = NULL, Vector3 pos = Vector3(0, 0, 0));
     ObjectType getType() W3D_OVERRIDE { return ObjectType::proxy; }
     // lo que genera (salen de la clave 'prefab'; vacios = sin elegir)
-    std::string Libreria() const;
-    std::string Elemento() const;
-    int TipoElemento() const;          // W3D_LIB_PREFAB / W3D_LIB_ESCENA (io/Librerias.h)
+    std::string Lib() const;
+    std::string Element() const;
+    int ElementType() const;          // W3D_LIB_PREFAB / W3D_LIB_SCENE (io/Libraries.h)
     // fija la libreria y el elemento (NO regenera: eso es de quien lo llama)
-    void Fijar(const std::string& libreria, int tipo, const std::string& elemento);
+    void Set(const std::string& lib, int type, const std::string& element);
 };
 
-// la CLAVE de un proxy de 'elemento' de 'libreria' (W3dLibsClave; con libreria y sin elemento, una PARCIAL
+// la CLAVE de un proxy de 'elemento' de 'libreria' (W3dLibsKey; con libreria y sin elemento, una PARCIAL
 // "lib:<libreria>/prefab/" que recuerda la libreria elegida)
-std::string W3dProxyClave(const std::string& libreria, int tipo, const std::string& elemento);
+std::string W3dProxyKey(const std::string& lib, int type, const std::string& element);
 
 // los campos propios en el .w3d ("tipo":"proxy"): el escritor agrega ESTO despues de los comunes (cada linea
 // empieza con ",\n" + sangria 'ind'), y el lector los lee de 'j' (sin generar nada)
-void ProxyW3dEscribirCampos(std::string& s, int ind, const ProxyW3d* px);
-void ProxyW3dLeerCampos(JVal* j, ProxyW3d* px);
+void ProxyW3dWriteFields(std::string& s, int ind, const ProxyW3d* px);
+void ProxyW3dReadFields(JVal* j, ProxyW3d* px);
 
 #endif

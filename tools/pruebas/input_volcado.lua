@@ -17,20 +17,20 @@ local function txt(n)
     return string.format("%.3f", n)
 end
 
-function inicio()
+function start()
     actualizar(0)
 end
 
-function actualizar(dt)
-    local x, y = stick("izq")
-    setCompartido("ejeX", txt(x))
-    setCompartido("ejeY", txt(y))
+function update(dt)
+    local x, y = stick("left")
+    setShared("ejeX", txt(x))
+    setShared("ejeY", txt(y))
     -- las cuatro direcciones POR NOMBRE (la cruceta y las flechas entran por el
     -- mismo camino que los botones con nombre)
-    setCompartido("bArriba",     boton("arriba")     and "si" or "no")
-    setCompartido("bAbajo",      boton("abajo")      and "si" or "no")
-    setCompartido("bIzquierda",  boton("izquierda")  and "si" or "no")
-    setCompartido("bDerecha",    boton("derecha")    and "si" or "no")
+    setShared("bArriba",     button("up")     and "si" or "no")
+    setShared("bAbajo",      button("down")      and "si" or "no")
+    setShared("bIzquierda",  button("left")  and "si" or "no")
+    setShared("bDerecha",    button("right")    and "si" or "no")
     -- y un boton de accion cualquiera, para que se vea que no es un caso aparte
-    setCompartido("bA", boton("a") and "si" or "no")
+    setShared("bA", button("a") and "si" or "no")
 end

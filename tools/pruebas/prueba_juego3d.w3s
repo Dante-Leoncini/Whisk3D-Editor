@@ -38,15 +38,15 @@
 #  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
 # ==========================================================================
 
-ventana 640 480
+window 640 480
 
 # --- 1) el juego 3D minimo, guardado y abierto como proyecto -----------------
-juego3dmin /tmp/w3d_juego3d
-guardarw3d /tmp/w3d_juego3d/juego3dmin.w3d
-abrirw3d /tmp/w3d_juego3d/juego3dmin.w3d
+game3dmin /tmp/w3d_juego3d
+savew3d /tmp/w3d_juego3d/juego3dmin.w3d
+openw3d /tmp/w3d_juego3d/juego3dmin.w3d
 
 # --- 2) compilarlo para Linux, con los assets sueltos ------------------------
-compilarjuego 0 0
+compilegame 0 0
 
 # --- 3) correr el BINARIO y mirarle los pixeles ------------------------------
-juego3dpx /tmp/w3d_juego3d juego3dmin
+game3dpx /tmp/w3d_juego3d juego3dmin

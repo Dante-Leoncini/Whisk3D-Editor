@@ -23,35 +23,35 @@ delete
 importgltf prueba_mezcla_texturas.glb
 loadtex
 deselectall
-matmezcla mezcla_ab es 0.5
-vpvista material
-vporbita 0 0 0 4
-escenapx 0.5 0.5 0 es 128 0 128 14
-matmezcla mezcla_ab 0
-escenapx 0.5 0.5 0 es 255 0 0 14
-matmezcla mezcla_ab 1
-escenapx 0.5 0.5 0 es 0 0 255 14
-matmezcla mezcla_ab 0.25
-escenapx 0.5 0.5 0 es 191 0 64 16
+matmix mezcla_ab es 0.5
+vpview material
+vporbit 0 0 0 4
+scenepx 0.5 0.5 0 es 128 0 128 14
+matmix mezcla_ab 0
+scenepx 0.5 0.5 0 es 255 0 0 14
+matmix mezcla_ab 1
+scenepx 0.5 0.5 0 es 0 0 255 14
+matmix mezcla_ab 0.25
+scenepx 0.5 0.5 0 es 191 0 64 16
 
 # round-trip por el contenedor
-guardarw3d /tmp/w3d_prueba_mezcla_texturas.w3d
-abrirw3d /tmp/w3d_prueba_mezcla_texturas.w3d
+savew3d /tmp/w3d_prueba_mezcla_texturas.w3d
+openw3d /tmp/w3d_prueba_mezcla_texturas.w3d
 loadtex
 deselectall
-matmezcla mezcla_ab es 0.25
-vpvista material
-vporbita 0 0 0 4
-escenapx 0.5 0.5 0 es 191 0 64 16
+matmix mezcla_ab es 0.25
+vpview material
+vporbit 0 0 0 4
+scenepx 0.5 0.5 0 es 191 0 64 16
 
 # sacar y volver a poner la textura B
-matmezcla mezcla_ab sintextura
-escenapx 0.5 0.5 0 es 255 0 0 14
-matmezcla mezcla_ab textura mezcla_b.png
-matmezcla mezcla_ab 1
-escenapx 0.5 0.5 0 es 0 0 255 14
+matmix mezcla_ab notexture
+scenepx 0.5 0.5 0 es 255 0 0 14
+matmix mezcla_ab texture mezcla_b.png
+matmix mezcla_ab 1
+scenepx 0.5 0.5 0 es 0 0 255 14
 
 # el paso de rutina "Texture mix": se crea con su textura y su numero, y la rutina queda valida
-rutina MezclaRut
-rutinapaso MezclaRut mezclaTexturas ref=mezcla_b.png n0=0.75 on=1
-rutinainfo MezclaRut
+routine MezclaRut
+routinestep MezclaRut textureMix ref=mezcla_b.png n0=0.75 on=1
+routineinfo MezclaRut

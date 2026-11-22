@@ -1,13 +1,13 @@
 {
   "version": 3,
-  "escena": {
-    "objetos": [
+  "scene": {
+    "objects": [
       {
-        "tipo": "hitbox", "nombre": "Zona", "pos": [0, 0, 0], "tam": [4, 4, 4],
-        "scripts": [ { "archivo": "hitbox_orden.lua", "refs": { "prefijo": "zona", "apagarEn": "3" } } ]
+        "type": "hitbox", "name": "Zona", "pos": [0, 0, 0], "size": [4, 4, 4],
+        "scripts": [ { "file": "hitbox_orden.lua", "refs": { "prefijo": "zona", "apagarEn": "3" } } ]
       },
-      { "tipo": "objeto", "nombre": "P1", "pos": [0, 0, 0] },
-      { "tipo": "objeto", "nombre": "P2", "pos": [0, 0, 0] }
+      { "type": "object", "name": "P1", "pos": [0, 0, 0] },
+      { "type": "object", "name": "P2", "pos": [0, 0, 0] }
     ]
   }
 }

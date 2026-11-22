@@ -21,7 +21,7 @@ No hay que confundirlo con el objeto **Culling** del menú Añadir de la Vista 3
 El modificador no calcula qué se ve: lo lee de un archivo que acompaña al modelo. Para una malla importada de `nivel.obj`, busca `nivel.pvs.json` en la misma carpeta:
 
 ```json
-{ "sectores": 2, "tris": [[0, 1], [2, 3]] }
+{ "sectors": 2, "tris": [[0, 1], [2, 3]] }
 ```
 
 `sectores` es cuántas zonas hay, y `tris` tiene, para cada zona, los triángulos que se dibujan, numerados desde 0 en el orden de las caras del `.obj`. Lo normal es que venga del juego original o de una herramienta aparte. Cada zona es un **nodo**: el nodo 1 es la primera lista, y el nodo 0 dibuja la malla completa.
@@ -40,7 +40,7 @@ El modificador no calcula qué se ve: lo lee de un archivo que acompaña al mode
 | Ramas | Solo aparece si la ruta tiene más de una rama, por ejemplo el camino principal y uno de bonus. Elige qué ramas cuentan para buscar el nodo más cercano; cada rama prendida se ve en verde. El botón dice, por ejemplo, "Ramas: 3 (todas)" o "Ramas: 2/3". |
 | Nodo actual | La zona que se está dibujando; 0 = la malla completa. Se puede cambiar a mano para revisar cada zona. Cuando la Ruta elige el nodo sola, el motor lo pisa. |
 
-Desde un script, `setSector(objeto, n)` cambia el nodo activo (0 = la malla completa). Ver [Partículas, niebla y visibilidad](../lua/api-particulas-niebla.md).
+Desde un script, `setSector(object, n)` cambia el nodo activo (0 = la malla completa). Ver [Partículas, niebla y visibilidad](../lua/api-particulas-niebla.md).
 
 ## Lo que conviene saber
 

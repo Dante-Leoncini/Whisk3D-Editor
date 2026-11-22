@@ -19,34 +19,34 @@
 #       entrada se olvida en vez de correrse a '#guardado...'.
 # ==========================================================================
 
-ventana 640 480
-personajesmin /tmp/w3d_animolvido 2
-guardarw3d /tmp/w3d_animolvido/sano.w3d
-animsetromper /tmp/w3d_animolvido/sano.w3d /tmp/w3d_animolvido/roto.w3d corte
+window 640 480
+charactersmin /tmp/w3d_animolvido 2
+savew3d /tmp/w3d_animolvido/sano.w3d
+animsetbreak /tmp/w3d_animolvido/sano.w3d /tmp/w3d_animolvido/roto.w3d cut
 
 # --- A) el proyecto roto tres veces: UN solo FALLO a la vez (el del proyecto abierto) ---
-abrirw3d /tmp/w3d_animolvido/roto.w3d
-animsetarm Personaje nocargo 1 clips 0
-animsetinfo vivos 0 descriptores 1
-abrirw3d /tmp/w3d_animolvido/roto.w3d
-animsetinfo vivos 0 descriptores 1
-abrirw3d /tmp/w3d_animolvido/roto.w3d
-animsetinfo vivos 0 descriptores 1
+openw3d /tmp/w3d_animolvido/roto.w3d
+animsetarm Personaje notloaded 1 clips 0
+animsetinfo live 0 descriptores 1
+openw3d /tmp/w3d_animolvido/roto.w3d
+animsetinfo live 0 descriptores 1
+openw3d /tmp/w3d_animolvido/roto.w3d
+animsetinfo live 0 descriptores 1
 # el sano despues: solo SU animset, ningun '#olvidado...' colgando
-abrirw3d /tmp/w3d_animolvido/sano.w3d
-animsetarm Personaje nocargo 0 compartido 1 clips 2
-animsetarm Personaje.001 nocargo 0 compartido 1 clips 2
-animsetinfo vivos 1 refs 2 descriptores 1
-animsetrec animaciones/personaje.w3da refs 2
-animsetrec #olvidado1:animaciones/personaje.w3da nada
+openw3d /tmp/w3d_animolvido/sano.w3d
+animsetarm Personaje notloaded 0 shared 1 clips 2
+animsetarm Personaje.001 notloaded 0 shared 1 clips 2
+animsetinfo live 1 refs 2 descriptores 1
+animsetrec animations/personaje.w3da refs 2
+animsetrec #olvidado1:animaciones/personaje.w3da none
 
 # --- B) el guardado que reescribe la entrada rota (huerfana) olvida su FALLO ---
-abrirw3d /tmp/w3d_animolvido/roto.w3d
-animsetinfo vivos 0 descriptores 1
-animsetborrar Personaje
-animsetborrar Personaje.001
-guardarw3d /tmp/w3d_animolvido/sin.w3d
-animsetinfo vivos 0 descriptores 0 registro 1
+openw3d /tmp/w3d_animolvido/roto.w3d
+animsetinfo live 0 descriptores 1
+animsetdelete Personaje
+animsetdelete Personaje.001
+savew3d /tmp/w3d_animolvido/sin.w3d
+animsetinfo live 0 descriptores 0 registry 1
 # y el sano se sigue abriendo entero despues de todo eso
-abrirw3d /tmp/w3d_animolvido/sano.w3d
-animsetinfo vivos 1 refs 2 descriptores 1
+openw3d /tmp/w3d_animolvido/sano.w3d
+animsetinfo live 1 refs 2 descriptores 1

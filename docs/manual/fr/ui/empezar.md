@@ -4,7 +4,7 @@ Pour ceux qui programment en C ou en C++ et veulent l'interface sans l'éditeur.
 
 - **Le Core, avec son modèle de scène.** L'UI dessine avec `w3dEngine` et certaines lignes lisent des objets de la scène (`objects/`, `animation/`, `script/`). Voir [Utiliser le Core directement](../core/empezar.md).
 - **Les sources de l'UI.** Tous les `.cpp` de `libs/WhiskUI/`. Les répertoires d'includes sont `libs/`, pour `"WhiskUI/draw/icons.h"`, et les sous-dossiers `widgets/`, `text/`, `draw/`, `theme/` et `core/`, car à l'intérieur ils s'incluent entre eux sans le dossier (`"icons.h"`, `"card.h"`).
-- **Les fichiers du skin.** `font.png` (les lettres et les bords des cartes), `font-ext.png` (l'atlas étendu), `skin.ini` (les couleurs) et, pour les nouvelles icônes, le dossier `atlas/iconos/`. Ils ne sont pas fournis avec la bibliothèque : ils se trouvent dans le dépôt de l'éditeur, dans `res/Skins/Whisk3D/`.
+- **Les fichiers du skin.** `font.png` (les lettres et les bords des cartes), `font-ext.png` (l'atlas étendu), `skin.ini` (les couleurs) et, pour les nouvelles icônes, le dossier `atlas/icons/`. Ils ne sont pas fournis avec la bibliothèque : ils se trouvent dans le dépôt de l'éditeur, dans `res/Skins/Whisk3D/`.
 
 ## Démarrer
 
@@ -13,7 +13,7 @@ La même chose que ce que fait l'éditeur au démarrage, sans ce qui lui est pro
 ```cpp
 #include "w3dTexture.h"
 #include "WhiskUI/core/UI.h"
-#include "WhiskUI/theme/colores.h"
+#include "WhiskUI/theme/colors.h"
 #include "WhiskUI/draw/icons.h"
 #include "WhiskUI/widgets/card.h"
 #include "WhiskUI/text/font.h"
@@ -25,23 +25,23 @@ unsigned int atlas = 0; int w = 0, h = 0;
 w3dEngine::LoadTexture("Skins/Whisk3D/font.png", atlas, &w, &h);
 
 CalcCardUV(w, h);          // les bords arrondis
-CrearIconos(w, h);         // les icônes qui se trouvent dans font.png
+CreateIcons(w, h);         // les icônes qui se trouvent dans font.png
 W3dFontSetTexSize(w, h);
 SetIconScale(GlobalScale);
 
 WhiskFont = new Font(w, h, atlas);
 WhiskFont->SetScale(GlobalScale);
-WhiskFont->SetAtlasExtendido("Skins/Whisk3D/font-ext.png");   // il n'est chargé que lorsqu'il le faut
+WhiskFont->SetAtlasExtended("Skins/Whisk3D/font-ext.png");   // il n'est chargé que lorsqu'il le faut
 ```
 
-`GlobalScale` démarre à 1. Pour une autre échelle, voir [Couleurs et échelle](tema.md). Pour les icônes séparées de `atlas/iconos/`, voir [Dessin et atlas](dibujo.md).
+`GlobalScale` démarre à 1. Pour une autre échelle, voir [Couleurs et échelle](tema.md). Pour les icônes séparées de `atlas/icons/`, voir [Dessin et atlas](dibujo.md).
 
 Chaque fois que la taille de la fenêtre change :
 
 ```cpp
-W3dPantallaAlto = alto;    // pour convertir le Y de l'interface en celui de Scissor et Viewport
-MenuPantallaW = ancho;     // pour que les menus ne sortent pas de l'écran
-MenuPantallaH = alto;
+W3dScreenHeight = height;    // pour convertir le Y de l'interface en celui de Scissor et Viewport
+MenuScreenW = width;     // pour que les menus ne sortent pas de l'écran
+MenuScreenH = height;
 ```
 
 ## L'état 2D
@@ -51,9 +51,9 @@ L'UI dessine en pixels, avec le Y vers le bas et l'origine en haut à gauche. Ch
 ```cpp
 namespace gfx = w3dEngine;
 
-gfx::Viewport(0, 0, ancho, alto);
+gfx::Viewport(0, 0, width, height);
 gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
-gfx::Ortho(0, ancho, alto, 0, -1, 1);       // Y vers le bas
+gfx::Ortho(0, width, height, 0, -1, 1);       // Y vers le bas
 gfx::MatrixMode(gfx::ModelView);  gfx::LoadIdentity();
 gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::CullFace);
 gfx::Disable(gfx::Lighting);  gfx::Disable(gfx::Fog);
@@ -74,31 +74,31 @@ Une carte avec un nombre, une case à cocher et un bouton. Chaque ligne pointe v
 #include "WhiskUI/Propieties/PropFloat.h"
 #include "WhiskUI/Propieties/PropButton.h"
 
-static float volumen = 0.8f;
-static bool  pantallaCompleta = false;
-static void Salir() { /* ... */ }
+static float volume = 0.8f;
+static bool  fullscreen = false;
+static void Exit() { /* ... */ }
 
-GroupPropertie* opciones = new GroupPropertie("Opciones");
+GroupPropertie* options = new GroupPropertie("Opciones");
 
 PropFloat* vol = new PropFloat("Volumen");
-vol->value = &volumen;
-vol->SetRango(0.0f, 1.0f);
-opciones->properties.push_back(vol);
+vol->value = &volume;
+vol->SetRange(0.0f, 1.0f);
+options->properties.push_back(vol);
 
 PropBool* pc = new PropBool("Pantalla completa");
-pc->value = &pantallaCompleta;
-opciones->properties.push_back(pc);
+pc->value = &fullscreen;
+options->properties.push_back(pc);
 
-PropButton* salir = new PropButton("Salir", IconType::borrar);
-salir->action = Salir;
-opciones->properties.push_back(salir);
+PropButton* exit = new PropButton("Salir", IconType::deleteValue);
+exit->action = Exit;
+options->properties.push_back(exit);
 
-opciones->Resize(200 * GlobalScale, 0);    // la hauteur est calculée par la carte
+options->Resize(200 * GlobalScale, 0);    // la hauteur est calculée par la carte
 
 // à chaque image, avec l'état 2D en place
 gfx::PushMatrix();
 gfx::Translatef(10, 10, 0);
-opciones->Render();
+options->Render();
 gfx::PopMatrix();
 ```
 
@@ -106,12 +106,12 @@ L'UI ne lit ni le clavier ni la souris : c'est à vous de les lui transmettre. A
 
 ```cpp
 // flèche bas
-if (opciones->editando) opciones->button_down();   // change la valeur
-else opciones->NextSelect();                        // la ligne du dessous
+if (options->editing) options->button_down();   // change la valeur
+else options->NextSelect();                        // la ligne du dessous
 // OK ou Enter : sur le titre, replie la carte ; sur une ligne, la modifie ou l'actionne
-opciones->EnterPropertieSelect();
+options->EnterPropertieSelect();
 // Annuler : remet la ligne comme elle était
-opciones->Cancel();
+options->Cancel();
 ```
 
 Avec la souris, c'est à vous de calculer la ligne sous le pointeur : voir [Cartes et propriétés](propiedades.md). Les menus, eux, reçoivent des coordonnées : voir [Menus déroulants](menus.md).
@@ -120,10 +120,10 @@ Avec la souris, c'est à vous de calculer la ligne sous le pointeur : voir [Cart
 
 - **Elle n'est pas prête pour la production.** Le `README.md` du dépôt le dit, et c'est le cas : elle contient du code de l'éditeur, qui est en cours de séparation.
 - **Il n'y a pas d'exemple qui l'utilise seule.** Les exemples de `ui/` dans [Whisk3D-Examples](https://github.com/Dante-Leoncini/Whisk3D-Examples) sont des interfaces `.w3dui` avec du Lua exécuté par le runtime du jeu : cela relève de l'éditeur. Le code de cette page est construit avec les mêmes appels que ceux de l'éditeur ; il ne vient pas d'un exemple testé.
-- **Aujourd'hui, elle ne se lie pas seule.** `PropList.cpp` appelle `RebindMaterialMeshPart()`, qui se trouve dans le panneau des propriétés de l'éditeur. Les fonctions de focus de `TextField.h` (`TextFieldEnfocar`, `TextFieldCancelar`, `TextFieldInputChar`, `TextFieldFinDeCuadro`) sont définies dans l'éditeur, dans `main/ui/ViewPorts/NumInput.cpp`.
+- **Aujourd'hui, elle ne se lie pas seule.** `PropList.cpp` appelle `RebindMaterialMeshPart()`, qui se trouve dans le panneau des propriétés de l'éditeur. Les fonctions de focus de `TextField.h` (`TextFieldFocus`, `TextFieldCancel`, `TextFieldInputChar`, `TextFieldFrameEnd`) sont définies dans l'éditeur, dans `main/ui/ViewPorts/NumInput.cpp`.
 - **Elle dépend du modèle de scène du Core.** `PropertieBase.h` inclut `objects/Objects.h`, et la liste de propriétés lit des maillages, des squelettes, des animations et des scripts.
 - **C'est l'éditeur qui recalcule l'échelle.** `SetGlobalScale` se trouve dans `main/ui/ViewPorts/ViewPorts.cpp`. Seule, il faut recalculer les mesures à la main ([Couleurs et échelle](tema.md)).
-- **Tout est global.** Il y a une police (`WhiskFont`), une table d'icônes (`IconsUV`), un menu ouvert (`MenuAbierto`) et un champ de texte ayant le focus (`g_textFieldActivo`) par programme.
+- **Tout est global.** Il y a une police (`WhiskFont`), une table d'icônes (`IconsUV`), un menu ouvert (`OpenMenu`) et un champ de texte ayant le focus (`g_activeTextField`) par programme.
 - **Les headers exposent des types OpenGL** (`GLfloat`, `GLshort`, `GLuint`), même s'ils n'appellent plus OpenGL.
 - **À venir,** d'après le `README.md` : nettoyer le code qui relève de l'éditeur et faire des exemples d'utilisation.
 

@@ -14,12 +14,12 @@
 |---|---|
 | `W3dDrawStrip4(verts, uvs)` | 正方形：ストリップの順に並んだ`GLshort`の頂点4つと、そのUV 8つ。2つの三角形に変換します |
 | `W3dDrawElemsB(verts, uvs, idx, n)` | `GLubyte`のインデックスを持つ小さなメッシュ（最大64） |
-| `W3dDrawLinesS(ancho, n, verts, idx)` | 最大21本の線。頂点は3成分の`GLshort` |
+| `W3dDrawLinesS(width, n, verts, idx)` | 最大21本の線。頂点は3成分の`GLshort` |
 | `W3dDrawLinesF(verts, idx, n)` | 3成分の`float`の頂点を持つ線。1回の描画で40頂点ずつ |
 
 `float`に変換した頂点は、スタックではなく、256か所の固定のバッファーに入れて循環して使います：N95のドライバーはポインターを遅れて読むからです。
 
-`W3dPantallaAlto`は画面の高さです。サイズが変わったときにUIを使う側が設定し、インターフェースのYを、下から数える`Scissor`と`Viewport`のYに変換するために使います。
+`W3dScreenHeight`は画面の高さです。サイズが変わったときにUIを使う側が設定し、インターフェースのYを、下から数える`Scissor`と`Viewport`のYに変換するために使います。
 
 ## ノードと矩形
 
@@ -28,40 +28,40 @@
 `Rec2D`（`draw/rectangle.h`）は単色の矩形です。`SetSize(x, y, w, h)`で位置を決め、`SetColor(r, g, b)`で色を設定します。テクスチャは読まないので、`Texture2D`をオフにして描画します。
 
 ```cpp
-Rec2D velo;
-velo.SetSize(0, 0, ancho, alto);
+Rec2D veil;
+veil.SetSize(0, 0, width, height);
 gfx::Disable(gfx::Texture2D);
 gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
-velo.RenderObject(false);          // false：自分の色ではなく、現在の色で描く
+veil.RenderObject(false);          // false：自分の色ではなく、現在の色で描く
 gfx::Enable(gfx::Texture2D);
 ```
 
 ## カード
 
-`Card`（`widgets/card.h`）は、ボタン、メニュー、プロパティのカードに使われる角丸の矩形です。**9パッチ**になっていて、16個の頂点で中央を伸ばし、角は`2 * GlobalScale`のまま残します。角と中央は`font.png`の隅の一部から取ります。`CalcCardUV(anchoAtlas, altoAtlas)`がその座標を計算します：テクスチャのサイズを渡して、1回だけ呼びます。
+`Card`（`widgets/card.h`）は、ボタン、メニュー、プロパティのカードに使われる角丸の矩形です。**9パッチ**になっていて、16個の頂点で中央を伸ばし、角は`2 * GlobalScale`のまま残します。角と中央は`font.png`の隅の一部から取ります。`CalcCardUV(widthAtlas, heightAtlas)`がその座標を計算します：テクスチャのサイズを渡して、1回だけ呼びます。
 
 | 関数 | 働き |
 |---|---|
 | `Resize(w, h)` | サイズを変えます |
-| `RenderObject(propio)` | 塗りを描画します |
-| `RenderBorder(propio)` | 枠だけを描画します |
+| `RenderObject(own)` | 塗りを描画します |
+| `RenderBorder(own)` | 枠だけを描画します |
 | `RenderObjectTab()`、`RenderBorderTab()` | 同じものを、下辺を直線にして描画します：タブ用 |
 
-`propio`が`true`のときは自分の色（`color`と`opacity`）を使い、`false`のときは現在の色を使います。
+`own`が`true`のときは自分の色（`color`と`opacity`）を使い、`false`のときは現在の色を使います。
 
 ```cpp
-Card fondo(NULL, 120, 40);
-SetColorID(ColorID::gris);
-fondo.RenderObject(false);
+Card background(NULL, 120, 40);
+SetColorID(ColorID::gray);
+background.RenderObject(false);
 SetColorID(ColorID::accent);
-fondo.RenderBorder(false);
+background.RenderBorder(false);
 ```
 
 ## スキンのアトラス
 
-インターフェース全体で1枚のテクスチャです。128x128の`font.png`には、文字、カードの縁、古いアイコンが入っています。これだけでもUIは動きます：`CrearIconos`が`font.png`の中のアイコンを使います。
+インターフェース全体で1枚のテクスチャです。128x128の`font.png`には、文字、カードの縁、古いアイコンが入っています。これだけでもUIは動きます：`CreateIcons`が`font.png`の中のアイコンを使います。
 
-新しいアイコンは、`atlas/iconos/`にある個別のファイルです。エディターは起動時に、もっと大きなテクスチャを組み立てます（`main/io/SkinAtlas.cpp`）：`font.png`を丸ごと(0,0)に置くので、その座標は変わりません。そして、残った場所に各アイコンを詰め込みます。そのあと、それぞれがどこに置かれたかを`CrearIconosDesde`でUIに渡します。このアトラスを組み立てるのはエディターの仕事で、パッカーとアイコンのテーブルはUIのものです。[アイコン](iconos.md)を参照してください。
+新しいアイコンは、`atlas/icons/`にある個別のファイルです。エディターは起動時に、もっと大きなテクスチャを組み立てます（`main/io/SkinAtlas.cpp`）：`font.png`を丸ごと(0,0)に置くので、その座標は変わりません。そして、残った場所に各アイコンを詰め込みます。そのあと、それぞれがどこに置かれたかを`CreateIconsFrom`でUIに渡します。このアトラスを組み立てるのはエディターの仕事で、パッカーとアイコンのテーブルはUIのものです。[アイコン](iconos.md)を参照してください。
 
 ## パッカー
 
@@ -69,12 +69,12 @@ fondo.RenderBorder(false);
 
 ```cpp
 std::vector<W3dAtlasItem> items(n);       // 各画像のrgba、w、h
-items[0].fijo = true;                     // これは必ず指定した位置に置く
+items[0].fixed = true;                     // これは必ず指定した位置に置く
 items[0].x = 0; items[0].y = 0;
 
-std::vector<unsigned char> lienzo; int W = 0, H = 0;
-if (W3dAtlasPack(&items[0], n, 2, lienzo, &W, &H)) {    // 画像の間に2ピクセルの余白
-    unsigned int tex = w3dEngine::UploadRGBA(&lienzo[0], W, H, true);
+std::vector<unsigned char> canvas; int W = 0, H = 0;
+if (W3dAtlasPack(&items[0], n, 2, canvas, &W, &H)) {    // 画像の間に2ピクセルの余白
+    unsigned int tex = w3dEngine::UploadRGBA(&canvas[0], W, H, true);
     // items[i].x, items[i].y：それぞれが置かれた位置
 }
 ```

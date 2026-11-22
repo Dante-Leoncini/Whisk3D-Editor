@@ -10,43 +10,43 @@ frame 2
 objmove 1 0 0
 keychan 0 0
 deselectall
-vporbita 0 0 0 12 0 0
+vporbit 0 0 0 12 0 0
 rtgpu 0
 frame 2
-rtdesenfoque 0
+rtblur 0
 rtrender 160 120 16
 rtref
-rtdesenfoque 1 1.0
+rtblur 1 1.0
 rtrender 160 120 16
-rtdif 40 30
-rtdesenfoque 1 1.0 fin
+rtdiff 40 30
+rtblur 1 1.0 end
 rtrender 160 120 16
-rtdif 40 30
-rtdesenfoque 1 1.0 inicio
+rtdiff 40 30
+rtblur 1 1.0 start
 rtrender 160 120 16
-rtdif 40 0 20
+rtdiff 40 0 20
 frame 5
-rtdesenfoque 0
+rtblur 0
 rtrender 160 120 16
 rtref
-rtdesenfoque 1 1.0
+rtblur 1 1.0
 rtrender 160 120 16
-rtdif 40 0 20
+rtdiff 40 0 20
 # lo mismo en la GPU (sin GPU con Vulkan, la prueba termina aca)
-rtgpu 1 saltar
+rtgpu 1 skip
 frame 2
-rtdesenfoque 0
+rtblur 0
 rtrender 160 120 16
 rtref
-rtdesenfoque 1 1.0
+rtblur 1 1.0
 rtrender 160 120 16
-rtengpu si
-rtdif 40 30
+rtongpu si
+rtdiff 40 30
 frame 5
-rtdesenfoque 0
+rtblur 0
 rtrender 160 120 16
 rtref
-rtdesenfoque 1 1.0
+rtblur 1 1.0
 rtrender 160 120 16
-rtdif 40 0 20
-rtdesenfoque 0
+rtdiff 40 0 20
+rtblur 0

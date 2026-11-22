@@ -24,20 +24,20 @@
 #  archivo, FALLA diciendo cual. W3D_CORPUS_OBLIGATORIO=1 hace que su falta
 #  sea una falla. Escriben en tools/debug.
 # ==========================================================================
-ventana 1280 720
+window 1280 720
 
 # --- ESTOS TESTS MIDEN EL .w3dm DE TEXTO: buscan sus bloques adentro de los .w3d
 #     que guardan, fabrican un .w3dm "del futuro", etc. Desde la malla binaria
 #     (.w3db) el formato por defecto del guardado es binario, asi que aca se FIJA
 #     texto para todo el proceso. La malla binaria tiene su propia prueba
 #     (prueba_w3db.w3s), que ademas corre en binario los que no miran el texto. ---
-formatomallas texto
+formatmeshes text
 
 # --- el .w3dm (texto) y sus caminos de perdida --------------------------------
 w3dm
-perdida
+lost
 w3dmf1
-escenadefecto
+scenedefault
 w3dmf2
 w3dmf3
 w3dmf4
@@ -46,47 +46,47 @@ w3dmf6
 w3dmf7
 w3dmf8
 w3dmf9
-escenadefecto
+scenedefault
 w3dmf10
 
 # --- la geometria por el flujo real del editor (guardar / reabrir) -----------
 quadsave
 
 # --- el contenedor (zip) y las cotas del lector --------------------------------
-contenedor
+container
 ziphard
 zipidx
-montaje
-w3dcotas
+mount
+w3dbounds
 
 # --- marcas SHARP/SEAM a traves de las operaciones de edicion ----------------
-escenadefecto
-dupmarcas
-escenadefecto
-sepmarcas
-escenadefecto
-delmarcas
-escenadefecto
-modmarcas
-escenadefecto
-movmarcas
-escenadefecto
-joinmarcas
-escenadefecto
-mirmarcas
-escenadefecto
-extmarcas
-escenadefecto
-vamarcas
+scenedefault
+dupmarks
+scenedefault
+sepmarks
+scenedefault
+delmarks
+scenedefault
+modmarks
+scenedefault
+movmarks
+scenedefault
+joinmarks
+scenedefault
+mirmarks
+scenedefault
+extmarks
+scenedefault
+vamarks
 
 # --- sin el corpus (clon limpio): las partes que lo usan se SALTEAN con aviso
 #     y el resto de cada test corre igual. Simulado, para probar ese camino
 #     tambien en la maquina que tiene el corpus: w3dm (T1.9) + quadsave (4/5, 6
 #     y 8) + w3dcotas (1/2/3) = 5 partes salteadas, ni una mas ni una menos ----
-simularsincorpus 1
+simulatenocorpus 1
 w3dm
 quadsave
-w3dcotas
-simularsincorpus 0 salteadas 5
+w3dbounds
+simulatenocorpus 0 skipped 5
 fail simularsincorpus 2
-fail simularsincorpus 1 salteadas 5
+fail simularsincorpus 1 skipped 5

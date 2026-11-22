@@ -3,12 +3,12 @@
 # motor queda rotEuler (10, 30, 20) (la Z de Lua es la y del motor). Correr DESDE ESTA CARPETA:
 #   cd <motor>/tools/pruebas
 #   ../../platform/linux/build/whisk3d --script prueba_rotacion_eje.w3s
-abrirw3d prueba_rotacion_eje.w3d
+openw3d prueba_rotacion_eje.w3d
 timeline pause
 selobj Caja
 simplay 1
-compartidonum x 9.99 10.01
-compartidonum y 19.99 20.01
-compartidonum z 29.99 30.01
+sharednum x 9.99 10.01
+sharednum y 19.99 20.01
+sharednum z 29.99 30.01
 objroteuler 10 30 20 0.01
 simstop

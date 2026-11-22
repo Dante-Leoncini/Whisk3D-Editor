@@ -21,8 +21,8 @@ class Instance : public Object, public Target {
     public:
         bool RenderChildrens;   // (inicializados en el ctor: C++03)
         size_t count;
-        bool mirror;            // true: renderiza el target ESPEJADO (Mirror)
-        int mirrorEje;          // 0=X, 1=Y, 2=Z (eje del espejo)
+        bool mirror;             // true: renderiza el target ESPEJADO (Mirror)
+        int mirrorAxis;          // 0=X, 1=Y, 2=Z (eje del espejo)
 
         Instance(Object* parent, Object* instance = NULL);
 
@@ -34,10 +34,10 @@ class Instance : public Object, public Target {
 
         // la UNICA ref por puntero de la instancia: su target (ver Objects.h). Con
         // esto el destructor la suelta Y el borrado (DeleteUndo) la limpia/restaura.
-        int     RefsPropias() const W3D_OVERRIDE { return 1; }
-        Object* RefPropia(int i) const W3D_OVERRIDE { return (i == 0) ? target : NULL; }
-        void    SetRefPropia(int i, Object* o) W3D_OVERRIDE { if (i == 0) target = o; }
-        std::string* RefPropiaNombre(int i) W3D_OVERRIDE { return (i == 0) ? &targetName : NULL; }
+        int     OwnRefs() const W3D_OVERRIDE { return 1; }
+        Object* OwnRef(int i) const W3D_OVERRIDE { return (i == 0) ? target : NULL; }
+        void    SetOwnRef(int i, Object* o) W3D_OVERRIDE { if (i == 0) target = o; }
+        std::string* RefOwnName(int i) W3D_OVERRIDE { return (i == 0) ? &targetName : NULL; }
 
         ~Instance();
 };

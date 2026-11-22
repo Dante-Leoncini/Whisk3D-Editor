@@ -14,147 +14,147 @@
 #   - el atlas de un flipbook y el icono de un boton 2D cuentan como usuarios (no se purgan);
 #   - un material / malla / animset / objeto que se LLAMA como una entrada ("texturas/piedra",
 #     "mallas/rocas"...) no frena el guardado; vuelve igual y re-guardar da los mismos bytes.
-ventana 1280 720
+window 1280 720
 
 # ---- 0) una textura con TRES usuarios (material, particulas, flipbook) y una huerfana importada ----
-escenadefecto
+scenedefault
 selobj Cubo
 matnew
-texasignar Cubo dosmats.png
-partex Humo dosmats.png
-guardarw3d prueba_outliner_texturas_v4.w3d
-abrirw3d prueba_outliner_texturas_v4.w3d
-fliptex Llamas texturas/dosmats.png
-texentrada dosmats-b.png
-outvista texturas
-outfila dosmats.png usuarios 3 estado uso
-outfila dosmats-b.png usuarios 0 estado huerfano
-texrefde particula Humo texturas/dosmats.png
+objtexture Cubo dosmats.png
+pairtex Humo dosmats.png
+savew3d prueba_outliner_texturas_v4.w3d
+openw3d prueba_outliner_texturas_v4.w3d
+fliptex Llamas textures/dosmats.png
+texentry dosmats-b.png
+outview textures
+outrow dosmats.png users 3 state use
+outrow dosmats-b.png users 0 state huerfano
+texrefof particle Humo textures/dosmats.png
 
 # ---- A) RENOMBRAR una textura en uso (F2 en linea): la entrada y todos los que la nombran ----
-recmover texturas texturas/dosmats.png UI
+recmove textures textures/dosmats.png UI
 outclick dosmats.png
-recactivo texturas texturas/dosmats.png
-outteclapc f2
-outescribir Madera
-recurso texturas texturas/madera.png existe 1 usuarios 3 carpeta UI
-recurso texturas texturas/dosmats.png existe 0
-texcargada texturas/madera.png 1
-texcargada texturas/dosmats.png 0
-texrefde particula Humo texturas/madera.png
-texrefde flipbook Llamas texturas/madera.png
-recactivo texturas texturas/madera.png
-outfila madera.png cursor 1 carpeta UI
+recactive textures textures/dosmats.png
+outkeypc f2
+outwrite Madera
+resource textures textures/madera.png exists 1 users 3 folder UI
+resource textures textures/dosmats.png exists 0
+texloaded textures/madera.png 1
+texloaded textures/dosmats.png 0
+texrefof particle Humo textures/madera.png
+texrefof flipbook Llamas textures/madera.png
+recactive textures textures/madera.png
+outrow madera.png cursor 1 folder UI
 undo
-recurso texturas texturas/dosmats.png existe 1 usuarios 3 carpeta UI
-recurso texturas texturas/madera.png existe 0
-texrefde particula Humo texturas/dosmats.png
-texcargada texturas/dosmats.png 1
+resource textures textures/dosmats.png exists 1 users 3 folder UI
+resource textures textures/madera.png exists 0
+texrefof particle Humo textures/dosmats.png
+texloaded textures/dosmats.png 1
 redo
-recurso texturas texturas/madera.png usuarios 3
-texrefde flipbook Llamas texturas/madera.png
+resource textures textures/madera.png users 3
+texrefof flipbook Llamas textures/madera.png
 # una HUERFANA importada en la sesion (vive en el overlay): desde el campo Name de Properties
 outclick dosmats-b.png
-recprops tab 1 nombre dosmats-b.png
-receditar nombre Cielo Nublado
-recurso texturas texturas/cielo_nublado.png existe 1 usuarios 0
-recurso texturas texturas/dosmats-b.png existe 0
+recprops tab 1 name dosmats-b.png
+recedit name Cielo Nublado
+resource textures textures/cielo_nublado.png exists 1 users 0
+resource textures textures/dosmats-b.png exists 0
 # a un nombre TOMADO: queda unico ("-2", como las importadas)
-recrenombrar texturas texturas/madera.png cielo_nublado.png texturas/cielo_nublado-2.png
+recrename textures textures/madera.png cielo_nublado.png textures/cielo_nublado-2.png
 undo
-recurso texturas texturas/madera.png existe 1 usuarios 3
+resource textures textures/madera.png exists 1 users 3
 # (Esc descarta tambien aca)
 outclick madera.png
-outteclapc f2
-outtipear Otra
+outkeypc f2
+outtype Otra
 outesc
-recurso texturas texturas/madera.png existe 1
+resource textures textures/madera.png exists 1
 outrender
 
 # ---- B) guardar y reabrir: la entrada NUEVA esta, la vieja no; todos la siguen nombrando ----
-guardarw3d prueba_outliner_texturas_rt1.w3d
-zipentrada prueba_outliner_texturas_rt1.w3d texturas/madera.png
-zipentrada prueba_outliner_texturas_rt1.w3d texturas/dosmats.png no
-zipentrada prueba_outliner_texturas_rt1.w3d texturas/cielo_nublado.png
-zipentrada prueba_outliner_texturas_rt1.w3d texturas/dosmats-b.png no
-abrirw3d prueba_outliner_texturas_rt1.w3d
-recurso texturas texturas/madera.png usuarios 3 carpeta UI
-recurso texturas texturas/cielo_nublado.png usuarios 0
-texrefde particula Humo texturas/madera.png
-texrefde flipbook Llamas texturas/madera.png
-guardarw3d prueba_outliner_texturas_rt2.w3d
-w3diguales prueba_outliner_texturas_rt1.w3d prueba_outliner_texturas_rt2.w3d
+savew3d prueba_outliner_texturas_rt1.w3d
+zipentry prueba_outliner_texturas_rt1.w3d textures/madera.png
+zipentry prueba_outliner_texturas_rt1.w3d textures/dosmats.png no
+zipentry prueba_outliner_texturas_rt1.w3d textures/cielo_nublado.png
+zipentry prueba_outliner_texturas_rt1.w3d textures/dosmats-b.png no
+openw3d prueba_outliner_texturas_rt1.w3d
+resource textures textures/madera.png users 3 folder UI
+resource textures textures/cielo_nublado.png users 0
+texrefof particle Humo textures/madera.png
+texrefof flipbook Llamas textures/madera.png
+savew3d prueba_outliner_texturas_rt2.w3d
+w3dequal prueba_outliner_texturas_rt1.w3d prueba_outliner_texturas_rt2.w3d
 
 # ---- C) PURGAR EN CALIENTE una textura CARGADA que nadie usa ----
 # (queda cargada: el material la usaba y paso a usar otra)
-texasignar Cubo texturas/cielo_nublado.png
-texasignar Cubo texturas/madera.png
-texcargada texturas/cielo_nublado.png 1
-outvista texturas
-outfila cielo_nublado.png usuarios 0 estado huerfano
+objtexture Cubo textures/cielo_nublado.png
+objtexture Cubo textures/madera.png
+texloaded textures/cielo_nublado.png 1
+outview textures
+outrow cielo_nublado.png users 0 state huerfano
 outclick cielo_nublado.png
 recprops tab 1 preview 1
-outteclapc supr
-outconfirmar si
-outnofila cielo_nublado.png
-texcargada texturas/cielo_nublado.png 0
-texpurgadas n 1
-recactivo ninguno
+outkeypc supr
+outconfirm si
+outnorow cielo_nublado.png
+texloaded textures/cielo_nublado.png 0
+texpurged n 1
+recactive none
 # una EN USO no se purga (y el flipbook cuenta: sin el, la textura seguiria en uso por el material)
-recborrar texturas texturas/madera.png falla
+recdelete textures textures/madera.png fails
 outrender
-guardarw3d prueba_outliner_texturas_rt3.w3d
-zipentrada prueba_outliner_texturas_rt3.w3d texturas/cielo_nublado.png no
-zipentrada prueba_outliner_texturas_rt3.w3d texturas/madera.png
-abrirw3d prueba_outliner_texturas_rt3.w3d
-texpurgadas n 0
+savew3d prueba_outliner_texturas_rt3.w3d
+zipentry prueba_outliner_texturas_rt3.w3d textures/cielo_nublado.png no
+zipentry prueba_outliner_texturas_rt3.w3d textures/madera.png
+openw3d prueba_outliner_texturas_rt3.w3d
+texpurged n 0
 
 # ---- D) LO PURGADO QUE VUELVE: un undo re-asigna el material purgado, y con el su textura ----
-texentrada dosmats-b.png
-matsuelto Piedra
-mallamaterial Cubo 0 Piedra
-texasignar Cubo texturas/dosmats-b.png
-mallamaterial Cubo 0 Material
-outvista materiales
-outfila Piedra estado huerfano
-recborrar materiales Piedra
-outvista texturas
-recurso texturas texturas/dosmats-b.png usuarios 0
-recborrar texturas texturas/dosmats-b.png
-texcargada texturas/dosmats-b.png 0
-texpurgadas n 1
-outnofila dosmats-b.png
+texentry dosmats-b.png
+matloose Piedra
+meshmaterial Cubo 0 Piedra
+objtexture Cubo textures/dosmats-b.png
+meshmaterial Cubo 0 Material
+outview materials
+outrow Piedra state huerfano
+recdelete materials Piedra
+outview textures
+resource textures textures/dosmats-b.png users 0
+recdelete textures textures/dosmats-b.png
+texloaded textures/dosmats-b.png 0
+texpurged n 1
+outnorow dosmats-b.png
 # el undo de "mallamaterial Cubo 0 Material": Piedra vuelve a la malla -> vuelve a su lista y su
 # textura se recarga en el MISMO objeto (los punteros viejos siguen valiendo)
 undo
-recurso materiales Piedra existe 1 usuarios 1
-texcargada texturas/dosmats-b.png 1
-texpurgadas n 0
-recurso texturas texturas/dosmats-b.png usuarios 1
-outfila dosmats-b.png estado uso
-guardarw3d prueba_outliner_texturas_rt4.w3d
-zipentrada prueba_outliner_texturas_rt4.w3d texturas/dosmats-b.png
+resource materials Piedra exists 1 users 1
+texloaded textures/dosmats-b.png 1
+texpurged n 0
+resource textures textures/dosmats-b.png users 1
+outrow dosmats-b.png state use
+savew3d prueba_outliner_texturas_rt4.w3d
+zipentry prueba_outliner_texturas_rt4.w3d textures/dosmats-b.png
 
 # ---- E) NOMBRES con forma de ENTRADA: el guardado no los toma por entradas que faltan ----
-animsetsintetica 1 agregar
-guardarw3d prueba_outliner_texturas_rt5.w3d
-abrirw3d prueba_outliner_texturas_rt5.w3d
-recrenombrar materiales Piedra texturas/piedra texturas/piedra
-recrenombrar mallas Cubo mallas/rocas mallas/rocas
-recrenombrar animaciones Personaje animaciones/heroe animaciones/heroe
+animsetsynthetic 1 add
+savew3d prueba_outliner_texturas_rt5.w3d
+openw3d prueba_outliner_texturas_rt5.w3d
+recrename materials Piedra textures/piedra textures/piedra
+recrename meshes Cubo meshes/rocas meshes/rocas
+recrename animations Personaje animations/heroe animations/heroe
 selobj Cubo
 objname scripts/jefe
-guardarw3d prueba_outliner_texturas_rt6.w3d
-jsontiene prueba_outliner_texturas_rt6.w3d "texturas/piedra"
-jsontiene prueba_outliner_texturas_rt6.w3d "mallas/rocas"
-abrirw3d prueba_outliner_texturas_rt6.w3d
-recurso materiales texturas/piedra existe 1 usuarios 1
-recurso mallas mallas/rocas existe 1 usuarios 1
-recurso animaciones animaciones/heroe existe 1 usuarios 1
+savew3d prueba_outliner_texturas_rt6.w3d
+jsonhas prueba_outliner_texturas_rt6.w3d "textures/piedra"
+jsonhas prueba_outliner_texturas_rt6.w3d "meshes/rocas"
+openw3d prueba_outliner_texturas_rt6.w3d
+resource materials textures/piedra exists 1 users 1
+resource meshes meshes/rocas exists 1 users 1
+resource animations animations/heroe exists 1 users 1
 selobj scripts/jefe
-guardarw3d prueba_outliner_texturas_rt7.w3d
-w3diguales prueba_outliner_texturas_rt6.w3d prueba_outliner_texturas_rt7.w3d
+savew3d prueba_outliner_texturas_rt7.w3d
+w3dequal prueba_outliner_texturas_rt6.w3d prueba_outliner_texturas_rt7.w3d
 
 # ---- lo que no tiene que pasar ----
 fail texrefde particula NoExiste
-fail recrenombrar texturas texturas/noexiste.png Algo
+fail recrenombrar textures textures/noexiste.png Algo

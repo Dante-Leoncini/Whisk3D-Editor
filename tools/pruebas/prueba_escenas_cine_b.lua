@@ -1,9 +1,9 @@
 -- JUEGO "Nivel2" de prueba_escenas_cine.w3s (prueba del motor): cuenta sus ticks
 local n = 0
-function inicio()
-  setCompartido("b_inicios", (compartido("b_inicios") or 0) + 1)
+function start()
+  setShared("b_inicios", (getShared("b_inicios") or 0) + 1)
 end
-function actualizar(dt)
+function update(dt)
   n = n + 1
-  setCompartido("b_n", n)
+  setShared("b_n", n)
 end

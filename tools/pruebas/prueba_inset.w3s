@@ -1,5 +1,5 @@
 # Inset Faces: una cara, la region entera, individual, sin borde (plano), profundidad, outset, undo y el modal
-ventana 1280 720
+window 1280 720
 add cube
 mode edit
 selmode face
@@ -9,15 +9,15 @@ undo
 select all
 inset 0.1 individual
 undo
-inset 0.2 esquina ensuperficie
+inset 0.2 corner onsurface
 undo
-inset 0.2 esquina ensuperficie noparejo
-undo
-select face 0
-inset 0.2 0.3 selafuera
+inset 0.2 corner onsurface nouniform
 undo
 select face 0
-inset 0.2 afuera riel relativo nointerp noparejo
+inset 0.2 0.3 seloutside
+undo
+select face 0
+inset 0.2 outside rail relative nointerp nouniform
 undo
 mode object
 add plane

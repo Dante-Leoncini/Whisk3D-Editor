@@ -44,4 +44,4 @@ Qué puede hacer **Whisk3D Editor**, ordenado por panel y por modo. Borrador par
 
 Para programar juegos, ver [Lua en Whisk3D](../lua/README.md). Lo que pasa por debajo, para quien programa en C o C++: [Manual de Whisk3D Core](../core/README.md).
 
-Whisk3D · Manual del editor (octubre 2026). Las tablas de atajos se generan desde `main/app/W3dAtajos.cpp` con `tools/genmanual_atajos.py`.
+Whisk3D · Manual del editor (octubre 2026). Las tablas de atajos se generan desde `main/app/W3dShortcuts.cpp` con `tools/genmanual_atajos.py`.

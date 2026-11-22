@@ -6,7 +6,7 @@
 # MEZCLA ALPHA (aditivo:false): cada cuadrante opaco sale con SU color exacto y el
 # cuadrante transparente deja ver el FONDO. MEZCLA ADITIVA (aditivo:true): el rojo
 # suma sobre el fondo (fondomas) y el transparente no suma nada (fondo).
-abrirw3d prueba_particulas_color.w3d
+openw3d prueba_particulas_color.w3d
 simplay 1
 partinfo EmisorAlpha 1 1
 partinfo EmisorAditivo 1 1
@@ -14,14 +14,14 @@ partinfo EmisorAditivo 1 1
 partpx EmisorAlpha 0.25 0.25 255 0 0
 partpx EmisorAlpha 0.75 0.25 0 255 0
 partpx EmisorAlpha 0.25 0.75 0 0 255
-partpx EmisorAlpha 0.75 0.75 fondo
-partpx EmisorAditivo 0.25 0.25 fondomas 255 0 0
-partpx EmisorAditivo 0.75 0.25 fondomas 0 255 0
-partpx EmisorAditivo 0.75 0.75 fondo
+partpx EmisorAlpha 0.75 0.75 background
+partpx EmisorAditivo 0.25 0.25 backgroundplus 255 0 0
+partpx EmisorAditivo 0.75 0.25 backgroundplus 0 255 0
+partpx EmisorAditivo 0.75 0.75 background
 # ORDEN GLOBAL back-to-front ENTRE emisores: el cuadrante azul del emisor de
 # adelante (alpha 0.5) tiene que MEZCLAR sobre el rojo opaco del de atras
 # (127, 0, 127). Si el orden fuera por emisor (o al reves), el rojo opaco
 # pisaria y daria (255, 0, 0). El transparente de adelante deja ver el rojo.
-vporbita 30 0 0 8
+vporbit 30 0 0 8
 partpx EmisorAdelante 0.25 0.75 127 0 127 16
 partpx EmisorAdelante 0.75 0.75 255 0 0 16

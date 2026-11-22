@@ -10,15 +10,15 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Wavefront {
             name: "MallaVis"
             filePath: vis-tris.obj
             CullingTri {
-                metodo: "celdas"
-                celda: 1
+                method: "cells"
+                cell: 1
             }
         }
     }

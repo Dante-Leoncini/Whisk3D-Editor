@@ -9,27 +9,27 @@
 #include "Whisk3D.h"        // CWhisk3D (estos son metodos suyos)
 #include "w3dnewscene.h"    // W3dNew* (transform/escena) + DuplicatedObject
 #include "variables.h"      // ShiftCount (global compartido) + mouseX/mouseY
-#include "render/OpcionesRender.h" // g_redraw (render event-driven)
+#include "render/RenderOptions.h"  // g_redraw (render event-driven)
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete de edit mode)
 
-void CWhisk3D::SetRotacion(){
+void CWhisk3D::BeginRotate(){
 	// puente: arranca la transformacion REAL (estado de PC / ObjectMode)
 	if (W3dNewTransformActive()){ W3dNewTransformEnd(ETrue); }
 	W3dNewTransformStart(2); // rotar
 };
 
-void CWhisk3D::SetEscala(){
+void CWhisk3D::BeginScale(){
 	// puente: arranca la transformacion REAL (estado de PC / ObjectMode)
 	if (W3dNewTransformActive()){ W3dNewTransformEnd(ETrue); }
 	W3dNewTransformStart(3); // escalar
 };
 
-void CWhisk3D::ChangeEje(){
+void CWhisk3D::ChangeAxis(){
 	// (el bloqueo de eje viejo se retiro: el estado quedaba congelado)
-	SetPosicion(); // puente: arranca el move del modelo nuevo
+	BeginTranslate(); // puente: arranca el move del modelo nuevo
 }
 
-void CWhisk3D::SetPosicion(){
+void CWhisk3D::BeginTranslate(){
 	// puente: arranca la transformacion REAL (estado de PC / ObjectMode)
 	if (W3dNewTransformActive()){ W3dNewTransformEnd(ETrue); }
 	W3dNewTransformStart(1); // mover
@@ -43,7 +43,7 @@ void CWhisk3D::EventKeyDown(TInt scan){
 		case(68): //D
 			if (iShiftPressed){
 				if (InteractionMode == EditMode){
-					LayoutDuplicarEdit(); // Edit: duplica la seleccion de malla + move
+					LayoutDuplicateEdit(); // Edit: duplica la seleccion de malla + move
 				} else {
 					ShiftCount = 40;
 					::DuplicatedObject(); // Object: duplica el objeto (compartido ObjectMode)
@@ -59,7 +59,7 @@ void CWhisk3D::EventKeyDown(TInt scan){
 			if (InteractionMode == EditMode) LayoutExtrudeFaces();
 			break;
 		case(83): //S
-			SetEscala();
+			BeginScale();
 			break;
 		case(88): //X
 			// Edit Mode: menu Delete cerca del cursor; Object Mode: borra objetos
@@ -70,16 +70,16 @@ void CWhisk3D::EventKeyDown(TInt scan){
 	}
 };
 
-void CWhisk3D::TecladoNumerico(TInt numero){
-	switch (numero) {
+void CWhisk3D::NumericKeyboard(TInt number){
+	switch (number) {
 			case 1:
-				SetPosicion();
+				BeginTranslate();
 				break;
 			case 2:
-				SetRotacion();
+				BeginRotate();
 				break;
 			case 3:
-				SetEscala();
+				BeginScale();
 				break;
 			case 4:
 				W3dNewSceneToggleRenderMode(); // modo de vista (viewport real)	
@@ -91,7 +91,7 @@ void CWhisk3D::TecladoNumerico(TInt numero){
 				W3dNewSceneToggleRenderMode(); // modo de vista (viewport real)	
 				break;
 			case 0:
-				W3dNewEnfocar(); // el del Viewport3D real
+				W3dNewFocus(); // el del Viewport3D real
 			default:
 				break;
 		}

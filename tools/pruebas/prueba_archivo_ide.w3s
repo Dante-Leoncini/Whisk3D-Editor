@@ -2,30 +2,30 @@
 # fuera del w3d. Lo que vive ADENTRO se guarda en el .w3d del disco (Guardar guarda tambien el proyecto); "en el w3d"
 # y "fuera del w3d" mudan el archivo (las referencias lo siguen).
 vpkind 5 7
-idecargar componente.lua componente.lua
+ideload componente.lua componente.lua
 # Guardar como... sin proyecto: solo afuera (una copia en /tmp); el IDE pasa a editar la copia
-idearchivo 2
-guardarcomo w3d_prueba_copia.lua 1 /tmp 1
+idefile 2
+saveas w3d_prueba_copia.lua 1 /tmp 1
 ideinfo /tmp/w3d_prueba_copia.lua
 # con un proyecto: Guardar en el w3d -> queda adentro (scripts/) y el proyecto se guarda
-guardarw3d /tmp/w3d_prueba_archivo.w3d
+savew3d /tmp/w3d_prueba_archivo.w3d
 w3dpath /tmp/w3d_prueba_archivo.w3d
-idearchivo 3
+idefile 3
 ideinfo scripts/w3d_prueba_copia.lua
 # Guardar fuera del w3d -> vuelve a un archivo del disco
-idefuera /tmp
+ideoutside /tmp
 ideinfo /tmp/w3d_prueba_copia.lua
 # Guardar como... adentro con otro nombre, y Guardar (escribe el .w3d del disco)
-idearchivo 2
-guardarcomo w3d_prueba_otro.lua 1 - 1
+idefile 2
+saveas w3d_prueba_otro.lua 1 - 1
 ideinfo scripts/w3d_prueba_otro.lua
-idearchivo 1
+idefile 1
 # texturas: Guardar como... afuera, despues en el w3d
 add cube
 selobj Cubo.001
 newtex lienzo 32 32 blank
-uvguardar 5
-guardarcomo w3d_prueba_lienzo.png 0 /tmp 1
+uvsave 5
+saveas w3d_prueba_lienzo.png 0 /tmp 1
 texlabel w3d_prueba_lienzo.png
-uvguardar 3
+uvsave 3
 texlabel w3d_prueba_lienzo.png

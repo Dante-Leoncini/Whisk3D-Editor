@@ -11,7 +11,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.05, 1.0"
 
         Camera {
@@ -22,7 +22,7 @@ Whisk3D {
             script: "prefab_spawner.lua"
         }
 
-        Biblioteca {
+        Library {
             Prefab {
                 name: "caja"
                 Wavefront {
@@ -33,8 +33,8 @@ Whisk3D {
             }
         }
 
-        Clon { prefab: "caja" x: -3.2 y: 0.0 z: 0.0 }
-        Clon { prefab: "caja" x:  0.0 y: 0.0 z: 0.0 }
-        Clon { prefab: "caja" name: "CajaEspecial" x: 3.2 y: 0.0 z: 0.0 val_etiqueta: "especial" }
+        Clone { prefab: "caja" x: -3.2 y: 0.0 z: 0.0 }
+        Clone { prefab: "caja" x:  0.0 y: 0.0 z: 0.0 }
+        Clone { prefab: "caja" name: "CajaEspecial" x: 3.2 y: 0.0 z: 0.0 val_etiqueta: "especial" }
     }
 }

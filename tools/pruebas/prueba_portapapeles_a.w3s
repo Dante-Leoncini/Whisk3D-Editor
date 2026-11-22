@@ -7,6 +7,6 @@ select all
 bevel 0.2 segs 2
 mode object
 selname Cubo
-matnombre Rojo_Portapapeles
+matname Rojo_Portapapeles
 matcolor 1 0 0
-copiar
+copy

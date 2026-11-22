@@ -11,15 +11,15 @@
 #  existian para el trazado de rayos.
 # ==========================================================================
 
-ventana 640 480
-sombreadopixel
-escenadefecto
+window 640 480
+pixelshading
+scenedefault
 selobj Cubo
 objpos 0 0 -40
 add uvsphere
 matnew
-vista3d sombreado 1
-vista3d gizmo 0
+view3d shading 1
+view3d gizmo 0
 tick
 uishot /tmp/w3d_pbr_base.png
 pngpx /tmp/w3d_pbr_base.png 200 230 203 203 203 - 40

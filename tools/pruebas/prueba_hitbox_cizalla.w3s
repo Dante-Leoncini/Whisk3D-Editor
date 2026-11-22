@@ -16,20 +16,20 @@
 #  referencia exacta independiente en miles de pares al azar.
 # ==========================================================================
 
-abrirw3d prueba_hitbox_cizalla.w3d
-hitboxpaso 1
-hitboxinfo Adentro1 tocando 1
-hitboxinfo Adentro2 tocando 1
-hitboxinfo Adentro3 tocando 1
-hitboxinfo Adentro4 tocando 1
-hitboxinfo Afuera1 tocando 0
-hitboxinfo Afuera2 tocando 0
-hitboxinfo Afuera3 tocando 0
-hitboxinfo Afuera4 tocando 0
-hitboxinfo Rombo dentro 4
-hitboxstats hitboxes 9 pares 4
+openw3d prueba_hitbox_cizalla.w3d
+hitboxstep 1
+hitboxinfo Adentro1 touching 1
+hitboxinfo Adentro2 touching 1
+hitboxinfo Adentro3 touching 1
+hitboxinfo Adentro4 touching 1
+hitboxinfo Afuera1 touching 0
+hitboxinfo Afuera2 touching 0
+hitboxinfo Afuera3 touching 0
+hitboxinfo Afuera4 touching 0
+hitboxinfo Rombo inside 4
+hitboxstats hitboxes 9 pairs 4
 
 hitboxsat 20000
-hitboxgrilla 400 cizalla 1
-hitboxgrilla 2000 grande 1 cizalla 1
-escenadefecto
+hitboxgrid 400 shear 1
+hitboxgrid 2000 big 1 shear 1
+scenedefault

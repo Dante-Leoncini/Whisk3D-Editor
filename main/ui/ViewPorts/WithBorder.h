@@ -21,7 +21,7 @@ void CalcBorderUV(int texW, int texH);
 
 // Variables UV/indices
 extern GLubyte indicesBorder[];
-extern GLfloat bourderUV[32];
+extern GLfloat borderUV[32];
 
 // -----------------------------
 // WithBorder
@@ -39,7 +39,7 @@ class WithBorder {
         WithBorder(); // C++03: el mesh default se arma en el constructor
 
         // ------------------ Funciones ------------------
-        void DibujarBordes(ViewportBase* current);
+        void DrawBorders(ViewportBase* current);
         void ResizeBorder(int width, int height);
 };
 

@@ -1,8 +1,8 @@
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         iconApp: Whisk3D_experiment.png
-        limpiarPantalla: true
+        clearScreen: true
         background: "0.1, 0.15, 0.1, 1.0"
 
         Gamepad {
@@ -93,7 +93,7 @@ Whisk3D {
                 CameraToView: false
                 showOrigins: true
                 show3DCursor: true
-                ShowRelantionshipsLines: true
+                ShowRelationshipsLines: true
                 view: Rendered
                 rotX: 120.0
                 posZ: 3.0
@@ -111,7 +111,7 @@ Whisk3D {
                     CameraToView: false
                     showOrigins: true
                     show3DCursor: true
-                    ShowRelantionshipsLines: true
+                    ShowRelationshipsLines: true
                     view: MaterialPreview
                     rotX: 270.0
                 }

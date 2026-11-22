@@ -1,5 +1,5 @@
 count 6
-ejes x y z
+axes x y z
 # Riel de juguete para prueba_riel_indice.w3s: seis nodos espaciados 1.0 sobre
 # X. La camara viaja con offsetRiel 4: con el target proyectado en el nodo 0 el
 # indice crudo daria -4 (el bug del principio del nivel real) y tiene que salir

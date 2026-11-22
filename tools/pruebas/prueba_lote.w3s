@@ -7,10 +7,10 @@
 #     cubo suelto) y los MISMOS 48 triangulos siguen en pantalla
 #     (trisOpacosMin=48: dibujar de menos tambien falla).
 #   - round-trip v4: el flag lote viaja y el comportamiento se repite.
-abrirw3d prueba_lote.w3d
-presupuesto presupuesto-lote.json editor 3
-presupuesto presupuesto-lote.json lote 3 jugando
-guardarw3d prueba_lote_v4.w3d
-abrirw3d prueba_lote_v4.w3d
-presupuesto presupuesto-lote.json editor 3
-presupuesto presupuesto-lote.json lote 3 jugando
+openw3d prueba_lote.w3d
+budget presupuesto-lote.json editor 3
+budget presupuesto-lote.json lote 3 playing
+savew3d prueba_lote_v4.w3d
+openw3d prueba_lote_v4.w3d
+budget presupuesto-lote.json editor 3
+budget presupuesto-lote.json lote 3 playing

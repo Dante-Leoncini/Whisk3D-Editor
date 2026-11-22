@@ -8,26 +8,26 @@ add cube
 objpos 6.9 -3.8 1.1
 objname Lejos
 deselectall
-vpcamara on
+vpcamera on
 rtgpu 0
 camdof 0
 rtrender 200 150 24
 rtref
 camdof 1 0.1 0 Cubo
 rtrender 200 150 24
-rtdif 40 60
+rtdiff 40 60
 camdof 0
 rtrender 200 150 24
-rtdif 40 0 20
+rtdiff 40 0 20
 camdof 1 0.1 0 Lejos
 rtrender 200 150 24
-rtdif 40 60
-rtgpu 1 saltar
+rtdiff 40 60
+rtgpu 1 skip
 camdof 0
 rtrender 200 150 24
 rtref
 camdof 1 0.1 0 Cubo
 rtrender 200 150 24
-rtengpu si
-rtdif 40 60
+rtongpu si
+rtdiff 40 60
 camdof 0

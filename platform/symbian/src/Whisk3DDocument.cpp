@@ -68,21 +68,21 @@ CEikAppUi* CWhisk3DDocument::CreateAppUiL()
 // CWhisk3DDocument::OpenFileL()
 // abrir un .w3d desde un file manager (X-plore "abrir con"): NO abrimos nada aca (corre durante la
 // construccion de la app; montar/parsear/reconstruir el layout ahi puede reventar). Solo encolamos la
-// ruta en g_proyAbrirPendiente -> el drain del DrawCallBack lo abre en el primer frame, con el stack limpio.
+// ruta en g_projOpenPending -> el drain del DrawCallBack lo abre en el primer frame, con el stack limpio.
 // ----------------------------------------------------
 //
 void CWhisk3DDocument::OpenFileL(CFileStore*& aFileStore, RFile& aFile)
     {
     aFileStore = NULL;   // no manejamos un CFileStore: el editor abre el .w3d por su cuenta
-    TFileName nombre;
-    if (aFile.FullName(nombre) == KErrNone && nombre.Length() > 0)
+    TFileName name;
+    if (aFile.FullName(name) == KErrNone && name.Length() > 0)
         {
         char buf[260];
-        TInt n = nombre.Length() > 259 ? 259 : nombre.Length();
-        for (TInt i = 0; i < n; i++) buf[i] = (char)nombre[i];
+        TInt n = name.Length() > 259 ? 259 : name.Length();
+        for (TInt i = 0; i < n; i++) buf[i] = (char)name[i];
         buf[n] = 0;
-        extern std::string g_proyAbrirPendiente;
-        g_proyAbrirPendiente = buf;
+        extern std::string g_projOpenPending;
+        g_projOpenPending = buf;
         }
     // el editor abre el .w3d por su cuenta (fopen): este handle del framework no se usa y, abierto, BLOQUEA el
     // archivo (en Symbian no se puede reemplazar ni borrar un archivo en uso: guardar encima fallaba)

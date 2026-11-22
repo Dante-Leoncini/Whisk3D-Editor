@@ -27,35 +27,35 @@ SRC="$SRC $CORE/io/w3dFilesystem.cpp $CORE/graphics/w3dTexture.cpp $CORE/io/w3dC
 # el montaje del zip. Sin ellos el LINK falla con "undefined symbol: AlmacenCarpeta::Leer" y
 # "W3dEscribirFloat", y como el .wasm viejo queda en su lugar es facil creer que compilo.
 # Si se agrega otro .cpp al Core, comparar contra el CMakeLists antes de dar por bueno el build.
-SRC="$SRC $CORE/io/W3dTexto.cpp $CORE/io/W3dMalla.cpp $CORE/io/W3dAlmacen.cpp"
+SRC="$SRC $CORE/io/W3dText.cpp $CORE/io/W3dMesh.cpp $CORE/io/W3dStore.cpp"
 # W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
-SRC="$SRC $CORE/io/W3dMallaBin.cpp"
-SRC="$SRC $CORE/io/W3dRecursos.cpp"
-SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp $CORE/input/W3dTactil.cpp"
+SRC="$SRC $CORE/io/W3dMeshBin.cpp"
+SRC="$SRC $CORE/io/W3dResources.cpp"
+SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp $CORE/input/W3dTouch.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
 SRC="$SRC $CORE/graphics/gles2/w3dGraphicsGLES2.cpp"
 # scripts lua: el modulo del Core + el interprete vendorizado. Los .c de lua NO
 # aceptan -std=c++17 -> se compilan APARTE a una lib estatica y se linkea al final.
 SRC="$SRC $CORE/script/W3dScript.cpp"
 # fisica minima del Core (velocidad + rebotes AABB): va SIEMPRE junto a W3dScript.cpp (registra sus binds)
-SRC="$SRC $CORE/physics/W3dFisica.cpp"
+SRC="$SRC $CORE/physics/W3dPhysics.cpp"
 # cuerpos rigidos + colision contra mallas: W3dScript.cpp registra SIEMPRE sus binds (fisicaVel,
 # colSuelo...). Faltaban aca (el CMakeLists y el Android.mk ya los tenian).
-SRC="$SRC $CORE/physics/W3dRigido.cpp $CORE/physics/W3dColMalla.cpp"
+SRC="$SRC $CORE/physics/W3dRigid.cpp $CORE/physics/W3dColMesh.cpp"
 SRC="$SRC $CORE/physics/W3dHitbox.cpp"   # hitbox + eventos alEntrar/alSalir/alTocar
 SRC="$SRC $CORE/physics/W3dRagdoll.cpp"  # ragdolls + IK
 SRC="$SRC $CORE/physics/W3dNav.cpp"  # navegacion (caminos)
-SRC="$SRC $CORE/net/W3dRed.cpp"          # binds red* (en el navegador: sin red por ahora)
+SRC="$SRC $CORE/net/W3dNet.cpp"          # binds red* (en el navegador: sin red por ahora)
 # volumen del proyecto (VolumenAplicarProyecto, lo llama el lector) + el dispatcher de musica que
 # W3dVolumen usa (sin W3D_ENABLE_MUSIC son stubs mudos). Mismo par que el CMakeLists.
-SRC="$SRC $CORE/audio/W3dVolumen.cpp $CORE/audio/W3dMusic.cpp"
+SRC="$SRC $CORE/audio/W3dVolume.cpp $CORE/audio/W3dMusic.cpp"
 # audio: el beep() de los juegos (efectos estilo WhiskPaddle). SDL2 audio anda en emscripten (-sUSE_SDL=2).
 # Sin estas fuentes el link falla: W3dScript/main referencian W3dSoundBeep/W3dSoundPlay/W3dAudioInit.
 SRC="$SRC $CORE/audio/W3dAudio.cpp $CORE/audio/W3dAudioSDL.cpp"
 # portapapeles del sistema (Core): backend SDL (mapea al del navegador en emscripten)
 SRC="$SRC $CORE/input/W3dClipboardSDL.cpp"
-# la vibracion (navigator.vibrate o el "tic" de iOS): controles.cpp la llama al agarrar algo en la biblioteca
-SRC="$SRC $CORE/input/W3dVibrar.cpp"
+# la vibracion (navigator.vibrate o el "tic" de iOS): controls.cpp la llama al agarrar algo en la biblioteca
+SRC="$SRC $CORE/input/W3dVibrate.cpp"
 LUA_A="$OUT/libw3dlua.a"
 if [[ ! -f "$LUA_A" || thirdparty/lua/src -nt "$LUA_A" ]]; then
     echo "compilando lua (C) -> libw3dlua.a"

@@ -2,9 +2,9 @@
 
 | Функция | Что делает |
 |---|---|
-| `animEscena(nombre [, loop])`, `pararEscena()`, `animEscenaFrame(f)` | Анимации всей сцены. |
-| `animObjeto(raiz, "clip" [, loop])`, `animObjetoParar`, `animObjetoTermino`, `animObjetoVelocidad` | Клипы анимации объекта и его потомков. |
-| `animClip(esqueleto, clip [, loop])`, `animTermino`, `animVelocidad`, `animTransicion` | Анимации скелета (ходьба, прыжок…) и плавный переход между ними. |
-| `animCapa(esq, n, clip [, peso, modo])` и родственные функции | Смешивание нескольких анимаций одновременно по слоям (от 1 до 16), например бег + стрельба. |
-| `huesoPunto(esq, "hueso" [, x, y, z]) → x, y, z` | Где находится кость (чтобы вложить оружие в руку). |
-| `animar(malla, n [, frame])` | Меняет вершинную анимацию меша. |
+| `animScene(name [, loop])`, `stopScene()`, `animSceneFrame(f)` | Анимации всей сцены. |
+| `animObject(root, "clip" [, loop])`, `animObjectStop`, `animObjectFinished`, `animObjectSpeed` | Клипы анимации объекта и его потомков. |
+| `animClip(armature, clip [, loop])`, `animFinished`, `animSpeed`, `animTransition` | Анимации скелета (ходьба, прыжок…) и плавный переход между ними. |
+| `animLayer(esq, n, clip [, weight, mode])` и родственные функции | Смешивание нескольких анимаций одновременно по слоям (от 1 до 16), например бег + стрельба. |
+| `bonePoint(esq, "hueso" [, x, y, z]) → x, y, z` | Где находится кость (чтобы вложить оружие в руку). |
+| `animate(mesh, n [, frame])` | Меняет вершинную анимацию меша. |

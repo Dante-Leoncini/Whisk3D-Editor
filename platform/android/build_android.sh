@@ -20,7 +20,7 @@ fi
 
 # -j ACOTADO, NUNCA $(nproc) pelado: son ~200 unidades de compilacion POR ABI y con
 # paralelismo ilimitado el OOM killer cierra la sesion entera (mismo criterio que
-# W3dCompilarJobs, main/io/CompilarJuego.h). Se puede pisar con W3D_JOBS=n.
+# W3dCompilarJobs, main/io/CompileGame.h). Se puede pisar con W3D_JOBS=n.
 if [[ -z "${W3D_JOBS:-}" ]]; then
 	W3D_NPROC="$(nproc 2>/dev/null || echo 2)"
 	W3D_JOBS=$(( W3D_NPROC / 2 ))

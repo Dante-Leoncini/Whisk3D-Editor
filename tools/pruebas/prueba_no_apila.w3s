@@ -10,18 +10,18 @@
 #  una pasada aparte). Antes cada uno costaba sus 3 llamadas de matriz por
 #  cuadro (un juego con 50 emisores de efectos esperando: 150 llamadas).
 # ==========================================================================
-escenadefecto
-noapilaarmar
-juego on
-vpcamara on
-juegopuro
-ventana 320 240
+scenedefault
+nostackbuild
+game on
+vpcamera on
+gamepure
+window 320 240
 simplay 2
 # el vacio con los cuatro adentro: 0 llamadas
-noapila NoApila
-noapila NoApila_emisor
-noapila NoApila_hitbox
-noapila NoApila_camara
-noapila NoApila_armature
+nostack NoApila
+nostack NoApila_emisor
+nostack NoApila_hitbox
+nostack NoApila_camara
+nostack NoApila_armature
 # el control: el cubo SI cuesta (la prueba mide algo)
-noapila Cubo cuesta
+nostack Cubo cuesta

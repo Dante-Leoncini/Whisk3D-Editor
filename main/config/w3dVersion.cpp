@@ -9,29 +9,29 @@
 #endif
 
 const char* W3dVersion() {
-    static char ver[16] = {0};
-    if (ver[0]) return ver;
+    static char show[16] = {0};
+    if (show[0]) return show;
 #ifdef W3D_VERSION
     // el build system ya la paso en "YY.MM.DD" (CMake string(TIMESTAMP) / Android.mk `date`)
-    snprintf(ver, sizeof(ver), "%s", W3D_VERSION);
+    snprintf(show, sizeof(show), "%s", W3D_VERSION);
 #else
     // fallback: parsear __DATE__ ("Mmm DD YYYY", ej "Jul 10 2026") -> "YY.MM.DD"
     const char* d = __DATE__;
-    static const char meses[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
-    int mes = 1;
+    static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+    int month = 1;
     for (int i = 0; i < 12; i++)
-        if (d[0]==meses[i*3] && d[1]==meses[i*3+1] && d[2]==meses[i*3+2]) { mes = i+1; break; }
-    int dia  = (d[4]==' ' ? 0 : (d[4]-'0'))*10 + (d[5]-'0');
-    int anio = ((d[9]-'0')*10 + (d[10]-'0')); // ultimos 2 digitos del anio
-    snprintf(ver, sizeof(ver), "%02d.%02d.%02d", anio, mes, dia);
+        if (d[0]==months[i*3] && d[1]==months[i*3+1] && d[2]==months[i*3+2]) { month = i+1; break; }
+    int day  = (d[4]==' ' ? 0 : (d[4]-'0'))*10 + (d[5]-'0');
+    int year = ((d[9]-'0')*10 + (d[10]-'0')); // ultimos 2 digitos del anio
+    snprintf(show, sizeof(show), "%02d.%02d.%02d", year, month, day);
 #endif
-    return ver;
+    return show;
 }
 
-const char* W3dVersionCompilacion() {
-    static char ver[32] = {0};
-    if (ver[0]) return ver;
+const char* W3dVersionBuild() {
+    static char show[32] = {0};
+    if (show[0]) return show;
     const char* t = __TIME__;   // "HH:MM:SS" de cuando se compilo este archivo
-    snprintf(ver, sizeof(ver), "%s %c%c:%c%c", W3dVersion(), t[0], t[1], t[3], t[4]);
-    return ver;
+    snprintf(show, sizeof(show), "%s %c%c:%c%c", W3dVersion(), t[0], t[1], t[3], t[4]);
+    return show;
 }

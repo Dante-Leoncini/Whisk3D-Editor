@@ -16,7 +16,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.05, 1.0"
 
         Camera {
@@ -24,7 +24,7 @@ Whisk3D {
             fov: 60.0
             near: 0.10
             far: 1000.0
-            aspecto: 1.481481
+            aspect: 1.481481
         }
 
         // CENTRO (rojo): bien adentro del encuadre, se tiene que seguir viendo

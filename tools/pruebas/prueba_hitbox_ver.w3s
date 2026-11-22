@@ -16,25 +16,25 @@
 #    - el toggle por tipo se guarda con el layout.
 # ==========================================================================
 
-ventana 1280 720
-abrirw3d prueba_hitbox_ver.w3d
-hitboxvista Zona dibuja 1 pick 1 ver 0
-hitboxvista Zona overlays 0 dibuja 0 pick 0
-hitboxvista Zona tipo 0 dibuja 0 pick 0
-hitboxvista Zona dibuja 1 pick 1
+window 1280 720
+openw3d prueba_hitbox_ver.w3d
+hitboxview Zona draws 1 pick 1 show 0
+hitboxview Zona overlays 0 draws 0 pick 0
+hitboxview Zona type 0 draws 0 pick 0
+hitboxview Zona draws 1 pick 1
 
 # --- Play: verHitboxes(true) -> se ve aun sin overlays (es el overlay de DEBUG) ---
 simplay 2
-hitboxvista Zona overlays 0 dibuja 1 pick 1 ver 1
+hitboxview Zona overlays 0 draws 1 pick 1 show 1
 simstop
 
 # --- Stop: muere con la partida ---
-hitboxvista Zona overlays 0 dibuja 0 pick 0 ver 0
-hitboxvista Zona dibuja 1 pick 1
+hitboxview Zona overlays 0 draws 0 pick 0 show 0
+hitboxview Zona draws 1 pick 1
 
 # --- el toggle Overlays > Objects > Hitbox se guarda con el layout ---
-hitboxvista Zona tipo 0 queda 1 dibuja 0
-guardarw3d prueba_hitbox_ver_v4.w3d
-abrirw3d prueba_hitbox_ver_v4.w3d
-hitboxvista Zona dibuja 0 pick 0
-hitboxvista Zona tipo 1 queda 1 dibuja 1 pick 1
+hitboxview Zona type 0 remains 1 draws 0
+savew3d prueba_hitbox_ver_v4.w3d
+openw3d prueba_hitbox_ver_v4.w3d
+hitboxview Zona draws 0 pick 0
+hitboxview Zona type 1 remains 1 draws 1 pick 1

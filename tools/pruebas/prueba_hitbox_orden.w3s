@@ -19,34 +19,34 @@
 #  recibe alTocar(CajaB) y despues alTocar(CajaA), tambien reabierto.
 # ==========================================================================
 
-abrirw3d prueba_hitbox_orden.w3d
-hitboxnuevo Z2 padre P2 tam 1 1 1
-hitboxnuevo Z1 padre P1 tam 1 1 1
+openw3d prueba_hitbox_orden.w3d
+hitboxnew Z2 parent P2 size 1 1 1
+hitboxnew Z1 parent P1 size 1 1 1
 simplay 4
-scriptinfo compartido zona_entrar P1;P2;
-scriptinfo compartido zona_dentro P1;P2;
-scriptinfo compartido zona_quedarse P1;P2;
-scriptinfo compartido zona_salir P1;P2;
+scriptinfo shared zona_entrar P1;P2;
+scriptinfo shared zona_dentro P1;P2;
+scriptinfo shared zona_quedarse P1;P2;
+scriptinfo shared zona_salir P1;P2;
 simstop
 
 # --- guardada y reabierta (los seriales ahora siguen el orden del archivo): lo mismo ---
-guardarw3d prueba_hitbox_orden_v4.w3d
-abrirw3d prueba_hitbox_orden_v4.w3d
+savew3d prueba_hitbox_orden_v4.w3d
+openw3d prueba_hitbox_orden_v4.w3d
 simplay 4
-scriptinfo compartido zona_entrar P1;P2;
-scriptinfo compartido zona_dentro P1;P2;
-scriptinfo compartido zona_quedarse P1;P2;
-scriptinfo compartido zona_salir P1;P2;
+scriptinfo shared zona_entrar P1;P2;
+scriptinfo shared zona_dentro P1;P2;
+scriptinfo shared zona_quedarse P1;P2;
+scriptinfo shared zona_salir P1;P2;
 simstop
 
 # --- alTocar: el orden del arbol de los cuerpos (el de W3dRigido al dar Play) ---
-abrirw3d prueba_hitbox_orden_rigido.w3d
-ordenhijo CajaB 1
+openw3d prueba_hitbox_orden_rigido.w3d
+childorder CajaB 1
 simplay 60
-scriptinfo compartido piso_tocar CajaB;CajaA;
+scriptinfo shared piso_tocar CajaB;CajaA;
 simstop
-guardarw3d prueba_hitbox_orden_rigido_v4.w3d
-abrirw3d prueba_hitbox_orden_rigido_v4.w3d
+savew3d prueba_hitbox_orden_rigido_v4.w3d
+openw3d prueba_hitbox_orden_rigido_v4.w3d
 simplay 60
-scriptinfo compartido piso_tocar CajaB;CajaA;
+scriptinfo shared piso_tocar CajaB;CajaA;
 simstop

@@ -21,7 +21,7 @@ Don't confuse it with the **Culling** object in the 3D Viewport's Add menu, whic
 The modifier doesn't calculate what can be seen: it reads it from a file that comes with the model. For a mesh imported from `nivel.obj`, it looks for `nivel.pvs.json` in the same folder:
 
 ```json
-{ "sectores": 2, "tris": [[0, 1], [2, 3]] }
+{ "sectors": 2, "tris": [[0, 1], [2, 3]] }
 ```
 
 `sectores` is how many zones there are, and `tris` holds, for each zone, the triangles that get drawn, numbered from 0 in the order of the faces in the `.obj`. Normally it comes from the original game or from a separate tool. Each zone is a **node**: node 1 is the first list, and node 0 draws the whole mesh.
@@ -40,7 +40,7 @@ The modifier doesn't calculate what can be seen: it reads it from a file that co
 | Branches | It only appears if the path has more than one branch, for example the main route and a bonus one. It chooses which branches count when looking for the closest node; each branch that's on is shown in green. The button says, for example, "Branches: 3 (all)" or "Branches: 2/3". |
 | Current node | The zone being drawn; 0 = the whole mesh. You can change it by hand to check each zone. When the Path picks the node by itself, the engine overrides it. |
 
-From a script, `setSector(objeto, n)` changes the active node (0 = the whole mesh). See [Particles, fog and visibility](../lua/api-particulas-niebla.md).
+From a script, `setSector(object, n)` changes the active node (0 = the whole mesh). See [Particles, fog and visibility](../lua/api-particulas-niebla.md).
 
 ## Good to know
 

@@ -4,14 +4,14 @@
 #  hacia activo al viewport que estaba debajo de ella antes de que el menu la ejecutara. Ahora se maximiza el viewport
 #  del menu. Con el mouse, igual.
 # ==========================================================================
-ventana 960 540
-escala 2
-layoutpordefecto
-raiz 0
-dedotoque esquina 1
-dedotoque item Maximize
-raiz 1
+window 960 540
+scale 2
+layoutdefault
+root 0
+fingertouch corner 1
+fingertouch item Maximize
+root 1
 # Minimizar (la misma opcion) vuelve el layout entero
-dedotoque esquina 1
-dedotoque item Minimize
-raiz 0
+fingertouch corner 1
+fingertouch item Minimize
+root 0

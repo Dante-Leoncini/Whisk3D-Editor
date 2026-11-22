@@ -4,17 +4,17 @@ Una sola API para leer y escribir: `w3dFileSystem::ReadFileBytes`, `ReadTextFile
 
 `ReadFileBytes` busca en este orden:
 
-1. **Una librería vinculada** (las rutas `lib:<nombre>/...`).
+1. **Una librería vinculada** (las rutas `lib:<name>/...`).
 2. **El pak embebido:** un juego compilado con "Assets: Empaquetados" lleva todos sus archivos adentro del ejecutable.
 3. **El contenedor montado:** el .w3d abierto. El contenedor **se monta, no se extrae**: texturas, fuentes, scripts e interfaces cargan de adentro del zip sin que nadie cambie su código.
 4. **Los assets del APK** (Android): una ruta relativa se lee del APK con el `AAssetManager` del NDK.
 5. **El disco.**
 
-Las rutas se normalizan antes de buscar (sin `.` ni `..`). Un .mtl que nombra `modelos/crash/../../texturas/sombra_blob.png` no estaba en ningún índice, y adentro del APK la textura salía blanca.
+Las rutas se normalizan antes de buscar (sin `.` ni `..`). Un .mtl que nombra `models/crash/../../textures/sombra_blob.png` no estaba en ningún índice, y adentro del APK la textura salía blanca.
 
 | Sistema | Los recursos (`res/`) | Donde se escribe |
 |---|---|---|
-| Windows, Linux | Al lado del ejecutable (en Linux también `<prefijo>/share/Whisk3d/res`) | La carpeta del usuario; los ajustes, en la de SDL (`SDL_GetPrefPath`) |
+| Windows, Linux | Al lado del ejecutable (en Linux también `<prefix>/share/Whisk3d/res`) | La carpeta del usuario; los ajustes, en la de SDL (`SDL_GetPrefPath`) |
 | Android | Adentro del APK | `/storage/emulated/0`; lo exportado, en Descargas |
 | Navegador | Empaquetados en el `.data`, montados en `/res` | La configuración, en `localStorage`; guardar descarga el archivo ([cómo](../editor/proyecto.md)) |
 | Symbian | Rutas propias del teléfono | `E:/` (la tarjeta de memoria) o `C:/` |
@@ -26,4 +26,4 @@ Las rutas se normalizan antes de buscar (sin `.` ni `..`). Un .mtl que nombra `m
 Dos piezas más del módulo:
 
 - **W3dRecursos** lleva la cuenta de cada dato pesado (texturas, mallas, animaciones): quién lo usa y cuándo liberarlo. Lo que no se necesita enseguida se carga de a tajadas, un poco en cada cuadro.
-- **W3dConfig** guarda ajustes como `clave=valor`. En el navegador van a `localStorage`; en el resto, a un archivo de texto. No pide memoria dinámica, así sirve igual en Symbian. Desde Lua: [Configuración guardada](../lua/api-configuracion.md).
+- **W3dConfig** guarda ajustes como `key=value`. En el navegador van a `localStorage`; en el resto, a un archivo de texto. No pide memoria dinámica, así sirve igual en Symbian. Desde Lua: [Configuración guardada](../lua/api-configuracion.md).

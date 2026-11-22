@@ -21,10 +21,10 @@ int nextLightId = GL_LIGHT1;
 
 float angle = 55.0f;
 // estado + InteractionMode se DEFINEN en el motor: libs/Whisk3DCore/base/W3dInteractionState.cpp
-bool g_xformPrimerMov = false;
+bool g_xformFirstMov = false;
 bool gEVuseCustom = false;             // transform constrenido a la NORMAL (extrude / orientacion Normal)
 Vector3 gTransformNormal(0, 1, 0);     // esa normal, en MUNDO
-int navegacionMode;
+int navigationMode;
 
 
 Config cfg;
@@ -47,9 +47,9 @@ bool showOverlayGlobal = false;
 bool g_showLights = true;   // overlays por tipo (submenu "Objects"); sincronizados por el viewport
 bool g_showCamera = true;
 bool g_showEmpty  = true;
-bool g_showSonidos = true;   // el parlante (y las esferas) de los objetos Sonido
-bool g_showParticulas = true;   // las flechas de los emisores de particulas se ven (el viewport lo pisa por cuadro)
-bool g_showCurvas     = true;   // default ON: las curvas/rieles se ven salvo que se destilde
+bool g_showSounds = true;   // el parlante (y las esferas) de los objetos Sonido
+bool g_showParticles = true;   // las flechas de los emisores de particulas se ven (el viewport lo pisa por cuadro)
+bool g_showCurves    = true;   // default ON: las curvas/rieles se ven salvo que se destilde
 bool ViewFromCameraActiveGlobal = false;
 
 Vector3 camRight;
@@ -69,11 +69,11 @@ bool mouseVisible = false;
 // globales compartidos por los 4 OS (input/transform). Antes el N95 los
 // redefinia en Whisk3D.cpp; ahora viven aca para todos (limpieza final).
 int ShiftCount = 0;
-int valorRotacion = 0;
-float gAnguloTransform = 0.0f;
+int valueRotation = 0;
+float gAngleTransform = 0.0f;
 
 #ifndef W3D_SYMBIAN
-int NumTexturasWhisk3D = 0;
+int NumTexturesWhisk3D = 0;
 #endif
 
 #ifndef W3D_SYMBIAN

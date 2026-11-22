@@ -9,41 +9,41 @@
 #  referencia de mas (la textura no se liberaba nunca: streamtexrefs exacto fallaba).
 # ==========================================================================
 
-ventana 1280 720
-escenadefecto
+window 1280 720
+scenedefault
 selobj Cubo
 matnew
-guardarw3d /tmp/w3d_f9_rev7.w3d
-abrirw3d /tmp/w3d_f9_rev7.w3d
-texentrada dosmats-b.png
-texentrada alfa_reja.png
+savew3d /tmp/w3d_f9_rev7.w3d
+openw3d /tmp/w3d_f9_rev7.w3d
+texentry dosmats-b.png
+texentry alfa_reja.png
 
 # --- A) soltar en la vista 3D, deshacer y editar otra cosa ---
-outvista texturas
-outsoltar dosmats-b.png 3d 0 0
-streamtexrefs exacto
+outview textures
+outrelease dosmats-b.png 3d 0 0
+streamtexrefs exact
 selobj Cubo
 undo
 objmove 1 0 0
-streamtexrefs exacto
+streamtexrefs exact
 # (y otra vez, ahora vaciando el historial con la textura puesta)
-outvista texturas
-outsoltar dosmats-b.png 3d 0 0
-streamundolimpiar
-streamtexrefs exacto
+outview textures
+outrelease dosmats-b.png 3d 0 0
+streamundoclear
+streamtexrefs exact
 
 # --- B) soltar en la tarjeta del material (Properties) ---
 selobj Cubo
 propstab 2
-outsoltar alfa_reja.png props textura
+outrelease alfa_reja.png props texture
 # (la de antes -dosmats-b.png- la tiene el paso de undo: una referencia mas que las ranuras)
 streamtexrefs
 selobj Cubo
 undo
 objmove 1 0 0
-streamtexrefs exacto
+streamtexrefs exact
 propstab 2
-outsoltar alfa_reja.png props textura
-streamundolimpiar
-streamtexrefs exacto
-escenadefecto
+outrelease alfa_reja.png props texture
+streamundoclear
+streamtexrefs exact
+scenedefault

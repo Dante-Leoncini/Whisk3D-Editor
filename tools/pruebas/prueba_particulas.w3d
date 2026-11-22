@@ -10,7 +10,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -19,50 +19,50 @@ Whisk3D {
             z: 2.0
         }
 
-        Particulas {
+        Particles {
             name: "EmisorContinuo"
-            textura: "texturas/particula.png"
-            cantidad: 30.0
-            vida: 2.0
-            tam: 0.4
+            texture: "textures/particula.png"
+            count: 30.0
+            life: 2.0
+            size: 0.4
             vel: 2.0
             dispersion: 45.0
-            gravedad: 4.0
-            aditivo: false
+            gravity: 4.0
+            additive: false
             color: "1, 0.9, 0.8, 1"
-            desvanecer: true
-            activo: true
+            fade: true
+            active: true
         }
 
-        Particulas {
+        Particles {
             name: "EmisorRafaga"
             x: 3.0
-            textura: "texturas/particula.png"
-            cantidad: 0.0
-            vida: 3.0
-            tam: 0.25
+            texture: "textures/particula.png"
+            count: 0.0
+            life: 3.0
+            size: 0.25
             vel: 3.0
             dispersion: 360.0
-            gravedad: -1.0
-            aditivo: true
+            gravity: -1.0
+            additive: true
             color: "0.4, 0.8, 1, 0.9"
-            desvanecer: false
-            activo: true
+            fade: false
+            active: true
             // azar: jitter +-40% (vida minima 1.8 s > el segundo simulado: las 8
             // siguen vivas al assert) + deriva suave. Round-trip por partinfo.
-            variacion: 0.4
-            turbulencia: 1.5
+            variation: 0.4
+            turbulence: 1.5
             script: "particulas_rafaga.lua"
             ref_emisor: "EmisorRafaga"
         }
 
-        Particulas {
+        Particles {
             name: "EmisorApagado"
             x: -3.0
-            textura: "texturas/particula.png"
-            cantidad: 60.0
-            vida: 2.0
-            activo: false
+            texture: "textures/particula.png"
+            count: 60.0
+            life: 2.0
+            active: false
         }
     }
 }

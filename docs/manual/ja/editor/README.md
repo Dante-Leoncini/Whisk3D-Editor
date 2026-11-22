@@ -40,4 +40,4 @@
 
 ゲームのプログラミングについては、[Whisk3DのLua](../lua/README.md)を参照してください。内部で何が起きているかは、CやC++でプログラミングする人向けの[Whisk3D Coreマニュアル](../core/README.md)にあります。
 
-Whisk3D · エディターマニュアル（2026年10月）。ショートカットの表は、`tools/genmanual_atajos.py`によって`main/app/W3dAtajos.cpp`から生成されています。
+Whisk3D · エディターマニュアル（2026年10月）。ショートカットの表は、`tools/genmanual_atajos.py`によって`main/app/W3dShortcuts.cpp`から生成されています。

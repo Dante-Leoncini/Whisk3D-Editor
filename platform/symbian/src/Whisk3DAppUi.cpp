@@ -25,27 +25,27 @@ namespace w3dEngine { bool W3dAudioInit(int); void W3dAudioShutdown(); }
 #include <string>
 #include "w3dlog.h"     // el vigia escribe en el log
 
-// LO SIN GUARDAR (main/io/CambiosProyecto.h, compartido): al salir con cambios pendientes primero va el
+// LO SIN GUARDAR (main/io/ProjectChanges.h, compartido): al salir con cambios pendientes primero va el
 // cartel "Se perderan los cambios en:"; su "Salir sin guardar" / "Guardar y salir" vuelve por el gancho
-bool W3dCambiosPreguntar(int accion, const std::string& ruta);
-extern void (*W3dCambiosSalirHook)();
-static void SalirConfirmado(){
+bool W3dChangesAsk(int action, const std::string& path);
+extern void (*W3dChangesExitHook)();
+static void ExitConfirmed(){
     CWhisk3DAppUi* ui = static_cast<CWhisk3DAppUi*>(CEikonEnv::Static()->EikAppUi());
     if (ui) ui->Exit();
 }
 // LA TECLA ROJA: con algo sin guardar, el cartel de los cambios (Guardar y salir / Salir sin guardar / Cancelar); sin
 // nada, "Salir de Whisk3D?". Minimizar es la tecla del menu
-#include "ViewPorts/PopUp/ConfirmarPopup.h"
+#include "ViewPorts/PopUp/ConfirmPopup.h"
 #include "W3dLang.h"
-bool W3dCambiosCartelAbierto();
-static void PreguntarSalir(){
+bool W3dChangesDialogOpen();
+static void AskExit(){
 
-    if (W3dCambiosCartelAbierto()) return;                                   // (ya esta preguntando)
-    if (confirmarPopup && (PopUpBase*)confirmarPopup == PopUpActive) return;
-    W3dCambiosSalirHook = SalirConfirmado;
-    if (W3dCambiosPreguntar(0 /*W3D_CAMBIOS_SALIR*/, std::string())) return;  // (hay cambios: el cartel)
-    if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-    confirmarPopup->Preguntar(T("Exit Whisk3D?"), T("Exit"), T("Cancel"), SalirConfirmado, NULL);
+    if (W3dChangesDialogOpen()) return;                                   // (ya esta preguntando)
+    if (confirmPopup && (PopUpBase*)confirmPopup == PopUpActive) return;
+    W3dChangesExitHook = ExitConfirmed;
+    if (W3dChangesAsk(0 /*W3D_CHANGES_EXIT*/, std::string())) return;  // (hay cambios: el cartel)
+    if (!confirmPopup) confirmPopup = new ConfirmPopup();
+    confirmPopup->Ask(T("Exit Whisk3D?"), T("Exit"), T("Cancel"), ExitConfirmed, NULL);
     extern bool g_redraw; g_redraw = true;
 }
 
@@ -55,42 +55,42 @@ static void PreguntarSalir(){
 // Sin esto un cierre en el telefono no deja rastro. El principal deja de ser "permanente" del proceso (si lo es, su
 // panic mata el proceso entero antes de que el vigia escriba) y el vigia, despues de escribir, termina el proceso
 // con el mismo motivo. El log no usa el heap (RFile + buffers en la pila): sirve aunque el heap este roto.
-static TThreadId sHiloPrincipal;
+static TThreadId sMainThread;
 
-static TInt VigiaCierre(TAny* /*aNada*/){
-    RThread principal;
-    if (principal.Open(sHiloPrincipal) != KErrNone) return KErrNone;
-    TRequestStatus estado;
-    principal.Logon(estado);
-    User::WaitForRequest(estado);
-    const TExitType tipo = principal.ExitType();
-    const TInt razon = principal.ExitReason();
-    const TExitCategoryName categoria = principal.ExitCategory();
-    principal.Close();
+static TInt WatchdogClose(TAny* /*aNada*/){
+    RThread main;
+    if (main.Open(sMainThread) != KErrNone) return KErrNone;
+    TRequestStatus state;
+    main.Logon(state);
+    User::WaitForRequest(state);
+    const TExitType type = main.ExitType();
+    const TInt reason = main.ExitReason();
+    const TExitCategoryName category = main.ExitCategory();
+    main.Close();
     char cat[KMaxExitCategoryName + 1];
-    TInt n = categoria.Length();
+    TInt n = category.Length();
     if (n > KMaxExitCategoryName) n = KMaxExitCategoryName;
-    for (TInt i = 0; i < n; i++) cat[i] = (char)categoria[i];
+    for (TInt i = 0; i < n; i++) cat[i] = (char)category[i];
     cat[n] = 0;
-    if (tipo == EExitPanic) {
-        w3dLogfE("[cierre] el hilo principal termino con un PANIC: %s %d", cat, (int)razon);
-        w3dLogMemoria("al cerrar");
-        RProcess().Panic(categoria, razon);   // el proceso termina igual que antes (el audio sin el principal no sirve)
+    if (type == EExitPanic) {
+        w3dLogfE("[cierre] el hilo principal termino con un PANIC: %s %d", cat, (int)reason);
+        w3dLogMemory("al cerrar");
+        RProcess().Panic(category, reason);   // el proceso termina igual que antes (el audio sin el principal no sirve)
     } else {
-        w3dLogf("[cierre] el hilo principal termino (tipo %d, %s %d)", (int)tipo, cat, (int)razon);
-        RProcess().Kill(razon);
+        w3dLogf("[cierre] el hilo principal termino (tipo %d, %s %d)", (int)type, cat, (int)reason);
+        RProcess().Kill(reason);
     }
     return KErrNone;
 }
 
-static void IniciarVigiaCierre(){
-    sHiloPrincipal = RThread().Id();
+static void StartWatchdogClose(){
+    sMainThread = RThread().Id();
     User::SetCritical(User::ENotCritical);
-    RThread vigia;
+    RThread watchdog;
     // (pila de 16 KB: el vsnprintf del log; el heap es el del principal: el vigia casi no reserva nada)
-    if (vigia.Create(_L("W3dVigiaCierre"), VigiaCierre, 0x4000, static_cast<RAllocator*>(NULL), NULL) == KErrNone) {
-        vigia.Resume();
-        vigia.Close();
+    if (watchdog.Create(_L("W3dWatchdogClose"), WatchdogClose, 0x4000, static_cast<RAllocator*>(NULL), NULL) == KErrNone) {
+        watchdog.Resume();
+        watchdog.Close();
     }
 }
 
@@ -103,10 +103,10 @@ static void IniciarVigiaCierre(){
 //
 void CWhisk3DAppUi::ConstructL(){
     BaseConstructL();
-    IniciarVigiaCierre();   // el log dice como termino la app (un panic deja su categoria y numero)
+    StartWatchdogClose();   // el log dice como termino la app (un panic deja su categoria y numero)
     // cout/cerr -> el log PROPIO (no la terminal/consola). Va ANTES de cargar el proyecto para atrapar cualquier
     // cout de los importadores. En Symbian el std::cout iba a una terminal en pantalla; ahora cae en whisk3d.log.
-    { extern void w3dRedirigirCoutAlLog(); w3dRedirigirCoutAlLog(); }
+    { extern void w3dRedirectCoutToLog(); w3dRedirectCoutToLog(); }
     iAppContainer = new (ELeave) CWhisk3DContainer;
     iAppContainer->SetMopParent(this);
     iAppContainer->ConstructL( ClientRect() );
@@ -115,13 +115,13 @@ void CWhisk3DAppUi::ConstructL(){
     // el mismo rate que la demo de q3rev). Si el device no abre el stream, W3dAudioInit
     // devuelve false y todo queda mudo (no rompe la app).
     w3dEngine::W3dAudioInit(22050);
-    W3dCambiosSalirHook = SalirConfirmado;
+    W3dChangesExitHook = ExitConfirmed;
 }
 
 // Destructor
 CWhisk3DAppUi::~CWhisk3DAppUi(){
 	w3dEngine::W3dAudioShutdown();   // parar el hilo de audio antes de soltar el resto
-	w3dLogBajar();   // lo que el log tenia juntado, al archivo (ver w3dlog.cpp)
+	w3dLogFlush();   // lo que el log tenia juntado, al archivo (ver w3dlog.cpp)
 	if ( iAppContainer ){
 		RemoveFromStack( iAppContainer );
 		delete iAppContainer;
@@ -149,18 +149,18 @@ void CWhisk3DAppUi::DynInitMenuPaneL(TInt /*aResourceId*/, CEikMenuPane* /*aMenu
 // ----------------------------------------------------
 // CWhisk3DAppUi::ProcessCommandParametersL
 // abrir un .w3d cuando el file manager (X-plore "abrir con") lanza la app: el framework pasa el nombre del
-// documento aca. Lo encolamos en g_proyAbrirPendiente (el drain del DrawCallBack lo abre en el primer frame,
+// documento aca. Lo encolamos en g_projOpenPending (el drain del DrawCallBack lo abre en el primer frame,
 // con el stack limpio). Es la via robusta: no todos los lanzamientos pasan por Document::OpenFileL.
 // ----------------------------------------------------
 //
 TBool CWhisk3DAppUi::ProcessCommandParametersL(CApaCommandLine& aCommandLine)
     {
-    TPtrC nombre = aCommandLine.DocumentName();
-    if (nombre.Length() > 0)
+    TPtrC name = aCommandLine.DocumentName();
+    if (name.Length() > 0)
         {
         char buf[260];
-        TInt n = nombre.Length() > 259 ? 259 : nombre.Length();
-        for (TInt i = 0; i < n; i++) buf[i] = (char)nombre[i];
+        TInt n = name.Length() > 259 ? 259 : name.Length();
+        for (TInt i = 0; i < n; i++) buf[i] = (char)name[i];
         buf[n] = 0;
         std::string s = buf;
         std::string low = s;
@@ -168,8 +168,8 @@ TBool CWhisk3DAppUi::ProcessCommandParametersL(CApaCommandLine& aCommandLine)
             if (low[i] >= 'A' && low[i] <= 'Z') low[i] = (char)(low[i] + 32);
         if (low.size() >= 4 && low.compare(low.size() - 4, 4, ".w3d") == 0)
             {
-            extern std::string g_proyAbrirPendiente;
-            g_proyAbrirPendiente = s;
+            extern std::string g_projOpenPending;
+            g_projOpenPending = s;
             }
         }
     return CAknAppUi::ProcessCommandParametersL(aCommandLine);
@@ -196,26 +196,26 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
         if (aType == EEventKeyDown) {
 			switch(scan){    
                 /*case EKeyIncVolume: // Volumen arriba
-                    iAppContainer->iWhisk3D->SetPosicion();
+                    iAppContainer->iWhisk3D->BeginTranslate();
                     return EKeyWasConsumed;
                 case EKeyDecVolume: // Volumen abajo
-                    iAppContainer->iWhisk3D->SetPosicion();
+                    iAppContainer->iWhisk3D->BeginTranslate();
                     return EKeyWasConsumed;
                 case(162): //volumen arriba
-                    iAppContainer->iWhisk3D->SetPosicion();
+                    iAppContainer->iWhisk3D->BeginTranslate();
                     return EKeyWasNotConsumed;
                 case(163): //volumen abajo
-                    iAppContainer->iWhisk3D->SetPosicion();
+                    iAppContainer->iWhisk3D->BeginTranslate();
                     return EKeyWasNotConsumed;*/
                 case EStdKeyEscape: // Código estándar para la tecla ESC
                     W3dNewTransformEnd(ETrue); // modelo nuevo // Llama a tu función Cancelar
                     return EKeyWasConsumed;                
                 /*case(14): //izquierda
-                    //iAppContainer->iWhisk3D->Rotar(1);
+                    //iAppContainer->iWhisk3D->Rotate(1);
                     iAppContainer->iWhisk3D->Tab();
                     return EKeyWasConsumed;
                 case(15): //derecha
-                    //iAppContainer->iWhisk3D->Rotar(2);
+                    //iAppContainer->iWhisk3D->Rotate(2);
                     iAppContainer->iWhisk3D->Tab();
                     return EKeyWasConsumed;
                 case(16): //arriba
@@ -240,52 +240,52 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
                     W3dNewDeleteActive(); // el del modelo nuevo
                     return EKeyWasConsumed;
                 case(49): //1
-                    iAppContainer->iWhisk3D->TecladoNumerico(1);
+                    iAppContainer->iWhisk3D->NumericKeyboard(1);
                     return EKeyWasConsumed;
                 case(50): //2
-                    iAppContainer->iWhisk3D->TecladoNumerico(2);
+                    iAppContainer->iWhisk3D->NumericKeyboard(2);
                     return EKeyWasConsumed;
                 case(51): //3
-                    iAppContainer->iWhisk3D->TecladoNumerico(3);
+                    iAppContainer->iWhisk3D->NumericKeyboard(3);
                     return EKeyWasConsumed;
                 case(52): //4
-                    iAppContainer->iWhisk3D->TecladoNumerico(4);
+                    iAppContainer->iWhisk3D->NumericKeyboard(4);
                     return EKeyWasConsumed;
                 case(53): //5
-                    iAppContainer->iWhisk3D->TecladoNumerico(5);
+                    iAppContainer->iWhisk3D->NumericKeyboard(5);
                     return EKeyWasConsumed;
                 case(54): //6
-                    iAppContainer->iWhisk3D->TecladoNumerico(6);
+                    iAppContainer->iWhisk3D->NumericKeyboard(6);
                     return EKeyWasConsumed;
                 case(55): //7
-                    iAppContainer->iWhisk3D->TecladoNumerico(7);
+                    iAppContainer->iWhisk3D->NumericKeyboard(7);
                     return EKeyWasConsumed;
                 case(56): //8
-                    iAppContainer->iWhisk3D->TecladoNumerico(8);
+                    iAppContainer->iWhisk3D->NumericKeyboard(8);
                     return EKeyWasConsumed;
                 case(57): //9
-                    iAppContainer->iWhisk3D->TecladoNumerico(9);
+                    iAppContainer->iWhisk3D->NumericKeyboard(9);
                     return EKeyWasConsumed;
                 case(48): //0
-                    iAppContainer->iWhisk3D->TecladoNumerico(0);
+                    iAppContainer->iWhisk3D->NumericKeyboard(0);
                     return EKeyWasConsumed;
                 case(42): //*
-                    iAppContainer->iWhisk3D->TecladoNumerico(10);
+                    iAppContainer->iWhisk3D->NumericKeyboard(10);
                     return EKeyWasConsumed;
                 case(127): //#
-                    iAppContainer->iWhisk3D->TecladoNumerico(11);
+                    iAppContainer->iWhisk3D->NumericKeyboard(11);
                     return EKeyWasConsumed;
                 case(226): //camara
                     //iAppContainer->iWhisk3D->Extrude();
                     return EKeyWasConsumed;
                 case(196): //llamada
-                    iAppContainer->iWhisk3D->ChangeEje();
+                    iAppContainer->iWhisk3D->ChangeAxis();
                     return EKeyWasConsumed;
                 case(71): //G
-                    iAppContainer->iWhisk3D->SetPosicion();
+                    iAppContainer->iWhisk3D->BeginTranslate();
                     return EKeyWasConsumed;
                 case(82): //R
-                    iAppContainer->iWhisk3D->SetRotacion();
+                    iAppContainer->iWhisk3D->BeginRotate();
                     return EKeyWasConsumed;
                 case(81): //Q
                     W3dNewTransformEnd(ETrue); // modelo nuevo
@@ -357,8 +357,8 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
 }
 
 enum{
-	cubo, esfera, cilindro, plane, vacio, camara,
-    cad, luz, vertice, circle
+	cube, sphere, cylinder, plane, empty, camera,
+    cad, light, vertex, circle
 };
 
 enum{
@@ -375,7 +375,7 @@ typedef enum { AnimPosition, AnimRotation, AnimScale };
 void CWhisk3DAppUi::HandleForegroundEventL( TBool aForeground )
     {
     CAknAppUi::HandleForegroundEventL( aForeground );
-    if ( iAppContainer ) iAppContainer->SetPrimerPlano( aForeground );
+    if ( iAppContainer ) iAppContainer->SetFirstPlane( aForeground );
     }
 
 #include <avkon.hrh>   // KAknUidValueEndKeyCloseEvent
@@ -384,7 +384,7 @@ void CWhisk3DAppUi::HandleWsEventL( const TWsEvent& aEvent, CCoeControl* aDestin
     if ( aEvent.Type() == KAknUidValueEndKeyCloseEvent )
         {
         w3dLog("tecla roja: pregunta antes de salir");
-        PreguntarSalir();
+        AskExit();
         return;   // (NO al framework: el cerraria la app)
         }
     CAknAppUi::HandleWsEventL( aEvent, aDestination );
@@ -398,7 +398,7 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break;
         case EEikCmdExit:
             {
-            // en el telefono se cierra y punto: sin el cartel de "cambios sin guardar" (ver CambiosProyecto.cpp)
+            // en el telefono se cierra y punto: sin el cartel de "cambios sin guardar" (ver ProjectChanges.cpp)
             Exit();
             break;
             }

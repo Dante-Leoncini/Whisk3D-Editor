@@ -2,29 +2,29 @@
 
 A **hand-written shader** is a text file (`.glsl`) that decides how a material is drawn, pixel by pixel. It's for effects the regular material doesn't have: frosted glass that shows what's behind it blurred, moving water, heat haze, cartoon shading, a pulsing glow…
 
-You only write your own part: a `Fragmento()` function (the color of each pixel) and, if you want, a `Vertice()` one (to move the vertices). Whisk3D adds everything else.
+You only write your own part: a `Fragment()` function (the color of each pixel) and, if you want, a `Vertex()` one (to move the vertices). Whisk3D adds everything else.
 
 ## Where it works
 
 The same file works the same way on every graphics backend:
 
-| Backend | `@vertice` | `@fragmento` |
+| Backend | `@vertex` | `@fragment` |
 |---|---|---|
 | OpenGL ES 2.0: Android, browser (WebGL), Nokia N8, PC with **Graphics → OpenGL ES 2.0** | On the GPU | On the GPU |
 | Vulkan (PC) | On the GPU | On the GPU |
 | PC OpenGL (the default one), OpenGL ES 1.1 (Nokia N95), Nintendo 3DS, Dreamcast | **On the CPU** | No: the material is drawn as usual |
 
-On a backend without shaders nothing breaks: the **`@vertice` runs on the CPU** (the wavy water moves just the same on the N95) and the color comes from the normal material. The Material card says so: *"This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual"*.
+On a backend without shaders nothing breaks: the **`@vertex` runs on the CPU** (the wavy water moves just the same on the N95) and the color comes from the normal material. The Material card says so: *"This graphics backend has no shaders: the @vertex section runs on the CPU and the rest of the material is drawn as usual"*.
 
-### `@vertice` on the CPU
+### `@vertex` on the CPU
 
-Where there are no shaders, Whisk3D includes an interpreter that reads the **same text** of `@vertice` and runs it vertex by vertex before drawing. You don't have to write anything different. It understands what is used to move vertices:
+Where there are no shaders, Whisk3D includes an interpreter that reads the **same text** of `@vertex` and runs it vertex by vertex before drawing. You don't have to write anything different. It understands what is used to move vertices:
 
 - `float`, `int`, `bool`, `vec2`, `vec3`, `vec4`; constants (`const float VELOCIDAD = 2.0;`) and your own functions (with `in`, `out`, `inout`);
 - `if` / `else`, `for` (with `break` and `continue`), `return`, the ternary `? :`;
 - operators, components (`pos.y`, `n.xz`, also for writing) and constructors (`vec3(...)`);
 - GLSL's number functions: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `pow`, `exp`, `log`, `sqrt`, `abs`, `sign`, `floor`, `ceil`, `fract`, `mod`, `min`, `max`, `clamp`, `mix`, `step`, `smoothstep`, `length`, `distance`, `dot`, `cross`, `normalize`, `reflect`, `refract`;
-- `w3d_tiempo`, `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico`.
+- `w3d_time`, `w3d_ior`, `w3d_transmission`, `w3d_roughness`, `w3d_metallic`.
 
 It doesn't understand matrices, arrays, `while` or `#define`: if you use them, the error says so with its line (and on the GPU it would work). It runs once per frame over all the mesh's vertices: on the N95 it's best used on small meshes (a few hundred vertices, like the example water). It works if **all** parts of the mesh use the same shader; otherwise the mesh is drawn without moving.
 
@@ -60,21 +60,21 @@ The project's shaders appear in the **Library** (the Outliner in Library mode), 
 ```glsl
 // comments go with // or /* */
 
-@vertice
-void Vertice(inout vec3 pos, inout vec3 normal) {
+@vertex
+void Vertex(inout vec3 pos, inout vec3 normal) {
     // optional: move the vertices
 }
 
-@fragmento
-vec4 Fragmento() {
-    vec4 base = w3d_color * w3d_Textura(w3d_uv);
-    return vec4(base.rgb * w3d_Luz(w3d_Normal()), base.a);
+@fragment
+vec4 Fragment() {
+    vec4 base = w3d_color * w3d_Texture(w3d_uv);
+    return vec4(base.rgb * w3d_Light(w3d_Normal()), base.a);
 }
 ```
 
-- **`@fragmento`** marks where the pixel code starts and **`@vertice`** where the vertex code starts. Both are optional: a file without marks is all fragment.
-- **`vec4 Fragmento()`** is required: it returns the pixel color (red, green, blue, alpha; from 0 to 1).
-- **`void Vertice(inout vec3 pos, inout vec3 normal)`** is optional. It receives the vertex position and normal in **object** space (Y up, in meters) and you can change them.
+- **`@fragment`** marks where the pixel code starts and **`@vertex`** where the vertex code starts. Both are optional: a file without marks is all fragment.
+- **`vec4 Fragment()`** is required: it returns the pixel color (red, green, blue, alpha; from 0 to 1).
+- **`void Vertex(inout vec3 pos, inout vec3 normal)`** is optional. It receives the vertex position and normal in **object** space (Y up, in meters) and you can change them.
 - You can write your own functions and constants (`const float VELOCIDAD = 2.0;`), above where you use them.
 - The language is **GLSL ES 1.00**, the one in WebGL 1. You have `float`, `vec2/3/4`, `mat3/4`, `sin`, `cos`, `mix`, `clamp`, `pow`, `dot`, `normalize`, `reflect`, `refract`, `fract`, `smoothstep` and the rest of GLSL.
 - **Don't** write `main`, or declare `uniform`, `attribute`, `varying` or `precision`: Whisk3D adds those.
@@ -82,39 +82,39 @@ vec4 Fragmento() {
 
 ## What you can use
 
-### In `Fragmento()`
+### In `Fragment()`
 
 | Name | Type | What it is |
 |---|---|---|
 | `w3d_uv` | `vec2` | The UV coordinates of the point (from the first UV layer). |
 | `w3d_Normal()` | `vec3` | The point's normal, already normalized, in camera space. If the back face is visible, it points the other way. |
 | `w3d_normal` | `vec3` | The normal, not normalized or flipped. |
-| `w3d_posVista` | `vec3` | The point's position in camera space (the camera is at 0,0,0 looking toward −Z). |
-| `w3d_HaciaCamara()` | `vec3` | The direction from the point toward the camera. |
-| `w3d_HaciaLuz()` | `vec3` | The direction from the point toward the first light. |
-| `w3d_Luz(n)` | `vec3` | The light that reaches it with normal `n`: the ambient plus the first light (diffuse). |
-| `w3d_luzColor` | `vec4` | The color of the first light (with its intensity). |
-| `w3d_luzPos` | `vec4` | The position of the first light in camera space (`w` = 0: it's a direction, the sun). |
-| `w3d_ambiente` | `vec4` | The ambient light. |
+| `w3d_viewPos` | `vec3` | The point's position in camera space (the camera is at 0,0,0 looking toward −Z). |
+| `w3d_ToCamera()` | `vec3` | The direction from the point toward the camera. |
+| `w3d_ToLight()` | `vec3` | The direction from the point toward the first light. |
+| `w3d_Light(n)` | `vec3` | The light that reaches it with normal `n`: the ambient plus the first light (diffuse). |
+| `w3d_lightColor` | `vec4` | The color of the first light (with its intensity). |
+| `w3d_lightPos` | `vec4` | The position of the first light in camera space (`w` = 0: it's a direction, the sun). |
+| `w3d_ambient` | `vec4` | The ambient light. |
 | `w3d_color` | `vec4` | The material's **Color** (with its alpha). |
-| `w3d_emision` | `vec4` | The material's **Emission**. |
-| `w3d_Textura(uv)` | `vec4` | The material's texture at those UVs (white if it has none). `v` starts at the **top** of the image (0 = the top row, 1 = the bottom one). |
+| `w3d_emission` | `vec4` | The material's **Emission**. |
+| `w3d_Texture(uv)` | `vec4` | The material's texture at those UVs (white if it has none). `v` starts at the **top** of the image (0 = the top row, 1 = the bottom one). |
 | `w3d_colorVertice` | `vec4` | The vertex color (if the mesh has one and the material uses **Vertex color**). |
-| `w3d_rugosidad`, `w3d_metalico` | `float` | The material's **Roughness** and **Metallic**. |
-| `w3d_ior`, `w3d_transmision` | `float` | The material's **IOR** and **Transmission** (the ray tracing ones). |
-| `w3d_tiempo` | `float` | Seconds, for animating. In the editor it is the **timeline** time (the current frame ÷ the FPS): paused, it stays still; with **Play** it advances; and by scrubbing the timeline you can see any moment. In the exported game it is the time since it started. |
-| `w3d_PuntoPantalla()` | `vec2` | Where the pixel is in the view: (0,0) bottom left, (1,1) top right. |
+| `w3d_roughness`, `w3d_metallic` | `float` | The material's **Roughness** and **Metallic**. |
+| `w3d_ior`, `w3d_transmission` | `float` | The material's **IOR** and **Transmission** (the ray tracing ones). |
+| `w3d_time` | `float` | Seconds, for animating. In the editor it is the **timeline** time (the current frame ÷ the FPS): paused, it stays still; with **Play** it advances; and by scrubbing the timeline you can see any moment. In the exported game it is the time since it started. |
+| `w3d_ScreenPoint()` | `vec2` | Where the pixel is in the view: (0,0) bottom left, (1,1) top right. |
 | `w3d_Pixel()` | `vec2` | The size of one pixel in those same units. |
-| `w3d_Pantalla(p)` | `vec4` | **What is already drawn** at point `p` of the view. See below. |
-| `w3d_AMundo(v)` | `vec3` | Converts a direction from camera space to **world** space (Y up). Useful for reading an environment map that doesn't turn with the camera (see *Environment reflection*). |
+| `w3d_Screen(p)` | `vec4` | **What is already drawn** at point `p` of the view. See below. |
+| `w3d_ToWorld(v)` | `vec3` | Converts a direction from camera space to **world** space (Y up). Useful for reading an environment map that doesn't turn with the camera (see *Environment reflection*). |
 
-### In `Vertice()`
+### In `Vertex()`
 
-`pos` and `normal` (of the object), and `w3d_tiempo`.
+`pos` and `normal` (of the object), and `w3d_time`.
 
-## Seeing what's behind: `w3d_Pantalla`
+## Seeing what's behind: `w3d_Screen`
 
-A material that reads the screen with `w3d_Pantalla` can show what's behind the object, and shift it, blur it or tint it. That's how you make glass, water, hot air or a force field.
+A material that reads the screen with `w3d_Screen` can show what's behind the object, and shift it, blur it or tint it. That's how you make glass, water, hot air or a force field.
 
 - Meshes with a shader that reads the screen are drawn **last**, after the rest of the scene, so what's behind them is already drawn. It doesn't matter where they are in the Outliner.
 - Before each one, the view is copied to a texture (one copy per mesh and per mesh part). On a PC or a modern phone it's cheap. On an old phone, better keep such objects few.
@@ -123,7 +123,7 @@ A material that reads the screen with `w3d_Pantalla` can show what's behind the 
 
 ## Examples
 
-All of these are files in **`examples/shaders/`** in the repository, with their textures in `examples/shaders/texturas/`, and applied to objects in the project **`examples/shaders/Ejemplos_Shaders.w3d`**: open it and try them out. You can also drag the `.glsl` files into your project.
+All of these are files in **`examples/shaders/`** in the repository, with their textures in `examples/shaders/textures/`, and applied to objects in the project **`examples/shaders/Ejemplos_Shaders.w3d`**: open it and try them out. You can also drag the `.glsl` files into your project.
 
 | File | What it does |
 |---|---|
@@ -131,54 +131,54 @@ All of these are files in **`examples/shaders/`** in the repository, with their 
 | `vidrio_plano.glsl` | Frosted glass for a **plane** (a window, a glass partition); the texture says where it is frosted. |
 | `reflejo_entorno.glsl` | Metal or plastic that reflects a panoramic photo of the surroundings (the texture). |
 | `reflejo_matcap.glsl` | The cheapest reflection: a texture with a painted sphere. |
-| `latido.glsl` | A pulsing glow (`w3d_tiempo`). |
+| `latido.glsl` | A pulsing glow (`w3d_time`). |
 | `dibujo_animado.glsl` | Light in three tones. |
-| `agua.glsl` | Waves with `@vertice` and what's below shifted. |
-| `bandera.glsl` | A flag waving (`@vertice` only: also works on the N95). |
-| `respirar.glsl` | It inflates and deflates along its normals (`@vertice` only). |
-| `torcer.glsl` | It twists around the vertical axis (`@vertice` only). |
-| `saltar.glsl` | It bounces and squashes when it hits the floor (`@vertice` only). |
+| `agua.glsl` | Waves with `@vertex` and what's below shifted. |
+| `bandera.glsl` | A flag waving (`@vertex` only: also works on the N95). |
+| `respirar.glsl` | It inflates and deflates along its normals (`@vertex` only). |
+| `torcer.glsl` | It twists around the vertical axis (`@vertex` only). |
+| `saltar.glsl` | It bounces and squashes when it hits the floor (`@vertex` only). |
 
-The vertex ones are applied to small meshes in **`examples/shaders/Ejemplos_Vertex_N95.w3d`**, made for the N95 (where `@vertice` runs on the CPU). They move with the timeline's **Play**.
+The vertex ones are applied to small meshes in **`examples/shaders/Ejemplos_Vertex_N95.w3d`**, made for the N95 (where `@vertex` runs on the CPU). They move with the timeline's **Play**.
 
 ### A pulsing color
 
 ```glsl
-vec4 Fragmento() {
-    float latido = 0.5 + 0.5 * sin(w3d_tiempo * 4.0);
-    vec3 luz = w3d_Luz(w3d_Normal());
+vec4 Fragment() {
+    float latido = 0.5 + 0.5 * sin(w3d_time * 4.0);
+    vec3 luz = w3d_Light(w3d_Normal());
     return vec4(w3d_color.rgb * luz + vec3(1.0, 0.2, 0.1) * latido * 0.5, 1.0);
 }
 ```
 
-A shader that uses `w3d_tiempo` moves with the timeline's **Play** (like an animation); when paused it stays still and the editor doesn't redraw needlessly. In the exported game it moves on its own.
+A shader that uses `w3d_time` moves with the timeline's **Play** (like an animation); when paused it stays still and the editor doesn't redraw needlessly. In the exported game it moves on its own.
 
 ### Cartoon (three tones)
 
 ```glsl
-vec4 Fragmento() {
-    float l = dot(w3d_Normal(), w3d_HaciaLuz());
+vec4 Fragment() {
+    float l = dot(w3d_Normal(), w3d_ToLight());
     float tono = l > 0.6 ? 1.0 : (l > 0.1 ? 0.65 : 0.35);
-    vec4 base = w3d_color * w3d_Textura(w3d_uv);
+    vec4 base = w3d_color * w3d_Texture(w3d_uv);
     return vec4(base.rgb * tono, base.a);
 }
 ```
 
-### Moving water (`@vertice`)
+### Moving water (`@vertex`)
 
 ```glsl
-@vertice
-void Vertice(inout vec3 pos, inout vec3 normal) {
-    float ola = sin(pos.x * 2.0 + w3d_tiempo * 2.0) * 0.1 + sin(pos.z * 3.0 + w3d_tiempo * 1.5) * 0.05;
+@vertex
+void Vertex(inout vec3 pos, inout vec3 normal) {
+    float ola = sin(pos.x * 2.0 + w3d_time * 2.0) * 0.1 + sin(pos.z * 3.0 + w3d_time * 1.5) * 0.05;
     pos.y += ola;
 }
 
-@fragmento
-vec4 Fragmento() {
+@fragment
+vec4 Fragment() {
     vec3 n = w3d_Normal();
-    vec2 p = w3d_PuntoPantalla() + n.xy * 0.03;          // what's below, slightly shifted
-    vec3 fondo = w3d_Pantalla(p).rgb;
-    float borde = pow(1.0 - max(dot(n, w3d_HaciaCamara()), 0.0), 3.0);
+    vec2 p = w3d_ScreenPoint() + n.xy * 0.03;          // what's below, slightly shifted
+    vec3 fondo = w3d_Screen(p).rgb;
+    float borde = pow(1.0 - max(dot(n, w3d_ToCamera()), 0.0), 3.0);
     return vec4(mix(fondo * w3d_color.rgb, vec3(0.8, 0.9, 1.0), borde * 0.6), 1.0);
 }
 ```
@@ -190,40 +190,40 @@ For the wave to show, the plane needs vertices: subdivide it in Edit Mode.
 This is `examples/shaders/vidrio_esmerilado.glsl` (the glass sphere in the examples project). What's behind looks blurred and slightly bent:
 
 ```glsl
-@fragmento
-vec4 Fragmento() {
+@fragment
+vec4 Fragment() {
     vec3 n = w3d_Normal();
-    vec3 ojo = w3d_HaciaCamara();
+    vec3 ojo = w3d_ToCamera();
 
     // refraction: the screen is read shifted according to the normal
-    vec2 p = w3d_PuntoPantalla() + n.xy * (w3d_ior - 1.0) * 0.15;
+    vec2 p = w3d_ScreenPoint() + n.xy * (w3d_ior - 1.0) * 0.15;
 
     // the blur: the average of 13 reads around it; roughness widens the circle
-    vec2 r = w3d_Pixel() * (1.0 + 18.0 * w3d_rugosidad);
-    vec3 c = w3d_Pantalla(p).rgb;
-    c += w3d_Pantalla(p + r * vec2( 1.0,  0.0)).rgb;
-    c += w3d_Pantalla(p + r * vec2(-1.0,  0.0)).rgb;
-    c += w3d_Pantalla(p + r * vec2( 0.0,  1.0)).rgb;
-    c += w3d_Pantalla(p + r * vec2( 0.0, -1.0)).rgb;
-    c += w3d_Pantalla(p + r * vec2( 1.4,  1.4)).rgb;
-    c += w3d_Pantalla(p + r * vec2(-1.4,  1.4)).rgb;
-    c += w3d_Pantalla(p + r * vec2( 1.4, -1.4)).rgb;
-    c += w3d_Pantalla(p + r * vec2(-1.4, -1.4)).rgb;
-    c += w3d_Pantalla(p + r * vec2( 2.5,  1.0)).rgb;
-    c += w3d_Pantalla(p + r * vec2(-1.0,  2.5)).rgb;
-    c += w3d_Pantalla(p + r * vec2(-2.5, -1.0)).rgb;
-    c += w3d_Pantalla(p + r * vec2( 1.0, -2.5)).rgb;
+    vec2 r = w3d_Pixel() * (1.0 + 18.0 * w3d_roughness);
+    vec3 c = w3d_Screen(p).rgb;
+    c += w3d_Screen(p + r * vec2( 1.0,  0.0)).rgb;
+    c += w3d_Screen(p + r * vec2(-1.0,  0.0)).rgb;
+    c += w3d_Screen(p + r * vec2( 0.0,  1.0)).rgb;
+    c += w3d_Screen(p + r * vec2( 0.0, -1.0)).rgb;
+    c += w3d_Screen(p + r * vec2( 1.4,  1.4)).rgb;
+    c += w3d_Screen(p + r * vec2(-1.4,  1.4)).rgb;
+    c += w3d_Screen(p + r * vec2( 1.4, -1.4)).rgb;
+    c += w3d_Screen(p + r * vec2(-1.4, -1.4)).rgb;
+    c += w3d_Screen(p + r * vec2( 2.5,  1.0)).rgb;
+    c += w3d_Screen(p + r * vec2(-1.0,  2.5)).rgb;
+    c += w3d_Screen(p + r * vec2(-2.5, -1.0)).rgb;
+    c += w3d_Screen(p + r * vec2( 1.0, -2.5)).rgb;
     c /= 13.0;
 
     vec3 atras = c * mix(vec3(1.0), w3d_color.rgb, 0.35);     // tinted by the glass color
-    vec3 superficie = w3d_color.rgb * w3d_Luz(n);
-    vec3 col = mix(superficie, atras, w3d_transmision);
+    vec3 superficie = w3d_color.rgb * w3d_Light(n);
+    vec3 col = mix(superficie, atras, w3d_transmission);
 
     // the light's highlight and the brighter edge
-    vec3 medio = normalize(w3d_HaciaLuz() + ojo);
-    float brillo = pow(max(dot(n, medio), 0.0), 80.0) * (1.0 - w3d_rugosidad);
+    vec3 medio = normalize(w3d_ToLight() + ojo);
+    float brillo = pow(max(dot(n, medio), 0.0), 80.0) * (1.0 - w3d_roughness);
     float borde = pow(1.0 - max(dot(n, ojo), 0.0), 3.0);
-    col += w3d_luzColor.rgb * brillo + vec3(0.2) * borde;
+    col += w3d_lightColor.rgb * brillo + vec3(0.2) * borde;
     return vec4(col, 1.0);
 }
 ```
@@ -232,24 +232,24 @@ It is controlled from the material: **Transmission** (0 = opaque glass in the ma
 
 ### Flat frosted glass
 
-For a **plane**: a window, a glass partition, a glass screen. It's `examples/shaders/vidrio_plano.glsl`. It averages 17 reads of what's behind in two rings; **Roughness** widens the rings. The material's **texture** says *where* it is frosted: white = blurred, black = clear. With `texturas/escarcha.png` you get smudges, a small clean window and drops running down; without a texture, the whole glass is frosted. Better turn off **Culling** on the plane so it can be seen from both sides.
+For a **plane**: a window, a glass partition, a glass screen. It's `examples/shaders/vidrio_plano.glsl`. It averages 17 reads of what's behind in two rings; **Roughness** widens the rings. The material's **texture** says *where* it is frosted: white = blurred, black = clear. With `textures/escarcha.png` you get smudges, a small clean window and drops running down; without a texture, the whole glass is frosted. Better turn off **Culling** on the plane so it can be seen from both sides.
 
 ```glsl
-float esmerilado = w3d_Textura(w3d_uv).r * w3d_rugosidad;   // how much THIS point blurs
+float esmerilado = w3d_Texture(w3d_uv).r * w3d_roughness;   // how much THIS point blurs
 vec2 r = w3d_Pixel() * (1.0 + 26.0 * esmerilado);           // the radius of the reads
 ```
 
 ### Environment reflection (how to use a texture for reflections)
 
-It's `examples/shaders/reflejo_entorno.glsl`. The **material's texture** is a **panoramic** photo of what surrounds the object: an *equirectangular* image, twice as wide as it is tall, covering 360° around and 180° from top to bottom (like `texturas/entorno.png`: sky, sun, buildings and a checkered floor). For each pixel:
+It's `examples/shaders/reflejo_entorno.glsl`. The **material's texture** is a **panoramic** photo of what surrounds the object: an *equirectangular* image, twice as wide as it is tall, covering 360° around and 180° from top to bottom (like `textures/entorno.png`: sky, sun, buildings and a checkered floor). For each pixel:
 
 1. `reflect(-ojo, n)` gives the direction the **view bounces** to, in camera space.
-2. `w3d_AMundo(...)` converts that direction to the **world**, so the reflection stays still even when the camera turns.
+2. `w3d_ToWorld(...)` converts that direction to the **world**, so the reflection stays still even when the camera turns.
 3. `Panorama(...)` turns the direction into a point on the photo: the angle around (`atan`) is `u` and the angle from top to bottom (`acos`) is `v`.
 4. It is blended with the surface according to **Fresnel** (more reflection at grazing angles) and **Metallic** (a metal reflects everything, tinted by its **Color**).
 
 ```glsl
-@fragmento
+@fragment
 const float PI = 3.14159265;
 
 vec2 Panorama(vec3 d) {
@@ -258,15 +258,15 @@ vec2 Panorama(vec3 d) {
     return vec2(u, v);
 }
 
-vec4 Fragmento() {
+vec4 Fragment() {
     vec3 n = w3d_Normal();
-    vec3 ojo = w3d_HaciaCamara();
+    vec3 ojo = w3d_ToCamera();
     vec3 r = reflect(-ojo, n);
-    vec3 entorno = w3d_Textura(Panorama(normalize(w3d_AMundo(r)))).rgb;
+    vec3 entorno = w3d_Texture(Panorama(normalize(w3d_ToWorld(r)))).rgb;
     float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(n, ojo), 0.0), 5.0);
-    float cuanto = mix(fresnel, 1.0, w3d_metalico);
-    vec3 superficie = w3d_color.rgb * w3d_Luz(n);
-    vec3 reflejo = entorno * mix(vec3(1.0), w3d_color.rgb, w3d_metalico);
+    float cuanto = mix(fresnel, 1.0, w3d_metallic);
+    vec3 superficie = w3d_color.rgb * w3d_Light(n);
+    vec3 reflejo = entorno * mix(vec3(1.0), w3d_color.rgb, w3d_metallic);
     return vec4(mix(superficie, reflejo, cuanto), 1.0);
 }
 ```
@@ -275,19 +275,19 @@ Any 2:1 panoramic photo works (360° photos from a phone, or HDRIs converted to 
 
 ### Matcap reflection
 
-It's `examples/shaders/reflejo_matcap.glsl`: a single texture read, so it runs on any GPU. The texture is a **painted sphere** (`texturas/matcap.png`); each pixel takes the color of the point on the sphere that faces the same way as its normal. The reflection follows the camera (not the world).
+It's `examples/shaders/reflejo_matcap.glsl`: a single texture read, so it runs on any GPU. The texture is a **painted sphere** (`textures/matcap.png`); each pixel takes the color of the point on the sphere that faces the same way as its normal. The reflection follows the camera (not the world).
 
 ```glsl
-vec4 Fragmento() {
+vec4 Fragment() {
     vec3 n = w3d_Normal();
     vec2 uv = vec2(n.x, -n.y) * 0.49 + 0.5;   // (the texture's v starts at the top: y flipped)
-    return vec4(w3d_Textura(uv).rgb * w3d_color.rgb, 1.0);
+    return vec4(w3d_Texture(uv).rgb * w3d_color.rgb, 1.0);
 }
 ```
 
 ## In a routine: the **Shader** step
 
-A hand-written shader is like a **GL state**: you set it and whatever is drawn afterwards uses it. In a **routine** (Add → Draw → **Shader**) the step has the `.glsl` **file**, the **On** checkbox and four numbers: **IOR**, **Transmission**, **Roughness** and **Metallic** (they arrive as `w3d_ior`, `w3d_transmision`, `w3d_rugosidad`, `w3d_metalico`; they can be animated or read from a memory).
+A hand-written shader is like a **GL state**: you set it and whatever is drawn afterwards uses it. In a **routine** (Add → Draw → **Shader**) the step has the `.glsl` **file**, the **On** checkbox and four numbers: **IOR**, **Transmission**, **Roughness** and **Metallic** (they arrive as `w3d_ior`, `w3d_transmission`, `w3d_roughness`, `w3d_metallic`; they can be animated or read from a memory).
 
 ```
 Shader          vidrio_plano.glsl  On   (IOR 1.5, Roughness 0.6)
@@ -297,7 +297,7 @@ Shader          Off
 Draw elements   Marco           ← no shader from here on
 ```
 
-With **On**, the "Draw elements" that follow use the shader; with the checkbox off it is removed. When the routine ends it is removed automatically. It works on **OpenGL ES 2.0 and Vulkan**; on OpenGL ES 1.1 and fixed-function GL the step does nothing (a routine's draws point directly at the mesh data: `@vertice` on the CPU is for materials). A shader that reads the screen (`w3d_Pantalla`) sees what the routine and the scene drew **before** that step: you decide the order.
+With **On**, the "Draw elements" that follow use the shader; with the checkbox off it is removed. When the routine ends it is removed automatically. It works on **OpenGL ES 2.0 and Vulkan**; on OpenGL ES 1.1 and fixed-function GL the step does nothing (a routine's draws point directly at the mesh data: `@vertex` on the CPU is for materials). A shader that reads the screen (`w3d_Screen`) sees what the routine and the scene drew **before** that step: you decide the order.
 
 ## With ray tracing
 
@@ -318,6 +318,6 @@ Ray tracing doesn't run your shader. It uses the material values: **Color**, **R
 |---|---|
 | `undefined variable` / `undeclared identifier` | A misspelled name or one that doesn't exist (`w3d_Normal()` with parentheses?). |
 | `cannot convert` / `wrong operand types` | Mixed types: `1` is an `int`, write `1.0`. A `vec3` can't be added to a `vec4`. |
-| `Fragmento: no matching overloaded function` or it doesn't compile without `Fragmento` | The `vec4 Fragmento()` function is missing or returns another type. |
+| `Fragment: no matching overloaded function` or it doesn't compile without `Fragment` | The `vec4 Fragment()` function is missing or returns another type. |
 | `redefinition of main` | Don't write `main`: Whisk3D adds it. |
-| What's behind doesn't show | The shader uses `w3d_Pantalla` but the material is **Transparent** with low alpha, or what's behind is drawn later (particles). |
+| What's behind doesn't show | The shader uses `w3d_Screen` but the material is **Transparent** with low alpha, or what's behind is drawn later (particles). |

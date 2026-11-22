@@ -30,24 +30,24 @@ Whisk3D Core इस्तेमाल करने के लिए लिखे
 namespace gfx = w3dEngine;
 
 // एक फ़ाइल: यह डिस्क पर, .w3d के अंदर, APK के अंदर या गेम में पैक की हुई हो सकती है
-std::vector<unsigned char> nivel;
-if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", nivel))
+std::vector<unsigned char> level;
+if (!w3dFileSystem::ReadFileBytes("niveles/uno.txt", level))
     w3dLogfE("no encontre %s", "niveles/uno.txt");
 
 // एक टेक्सचर: stb (या Symbian का ICL) इसे डिकोड करता है और बैकएंड इसे अपलोड करता है
 unsigned int pasto = 0;
-gfx::LoadTexture("texturas/pasto.png", pasto);
+gfx::LoadTexture("textures/pasto.png", pasto);
 
 // एक साउंड: Core इसे मिक्स करता है; आउटपुट हर सिस्टम का अपना है
-w3dEngine::W3dSound* salto = w3dEngine::W3dSoundLoad("sonidos/salto.wav");
-w3dEngine::W3dSoundPlay(salto, 1.0f, false);
+w3dEngine::W3dSound* jump = w3dEngine::W3dSoundLoad("sounds/salto.wav");
+w3dEngine::W3dSoundPlay(jump, 1.0f, false);
 
 // ड्रॉ करना: OpenGL, sceGu या citro3d को एक भी कॉल नहीं
 gfx::Enable(gfx::Texture2D);
 gfx::BindTexture(pasto);
-gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, posiciones);
+gfx::EnableArray(gfx::VertexArray);   gfx::VertexPointer3f(0, positions);
 gfx::EnableArray(gfx::TexCoordArray); gfx::TexCoordPointer2f(0, uvs);
-gfx::DrawTriangles(cantidadDeIndices, indices);
+gfx::DrawTriangles(indexCount, indices);
 ```
 
 ## अंदर क्या है

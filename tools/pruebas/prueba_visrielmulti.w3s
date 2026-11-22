@@ -18,9 +18,9 @@
 #  identificador por bind); ZonaSec -> MallaSec (fallback celda 1, decide el
 #  riel de la Camera activa).
 # ==========================================================================
-abrirw3d prueba_visrielmulti.w3d
+openw3d prueba_visrielmulti.w3d
 loadtex
-vporbita 0 0 0 12 90 0
+vporbit 0 0 0 12 90 0
 
 # estado de arranque: celda declarada 1 -> [t0, t1]
 visinfo MallaVis 4 1 2
@@ -33,7 +33,7 @@ activename Jugador
 objpos 0 0 5
 bench 1 noswap
 simplay 6
-scriptinfo compartido vrm_riel RielVis
+scriptinfo shared vrm_riel RielVis
 visinfo MallaVis 4 1 2
 visinfo MallaSec 4 1 2
 
@@ -41,42 +41,42 @@ visinfo MallaSec 4 1 2
 objpos 5 0 5
 bench 1 noswap
 simplay 6
-scriptinfo compartido vrm_indice 2.50
+scriptinfo shared vrm_indice 2.50
 visinfo MallaVis 4 3 2
 visinfo MallaSec 4 3 2
 
 # --- LA CAMARA SE VA A OTRO RIEL: el indice de ese riel NO indexa estas ----
 #     celdas. Zona (identificador del bind) cae a "completa"; ZonaSec (riel de
 #     la Camera activa) cae a su celda 1. NUNCA la playlist con indice ajeno.
-camriel set RielOtro
-camriel riel RielOtro
+camrail set RielOtro
+camrail rail RielOtro
 bench 1 noswap
 simplay 4
-scriptinfo compartido vrm_riel RielOtro
+scriptinfo shared vrm_riel RielOtro
 visinfo MallaVis 4 0 4
 visinfo MallaSec 4 1 2
 
 # --- VUELVE AL RIEL PROPIO: salto DIRECTO a la celda del nodo (un solo tick,
 #     sin pasear el stepper por celdas que nunca estuvieron activas) ---------
-camriel set RielVis
-camriel riel RielVis
+camrail set RielVis
+camrail rail RielVis
 bench 1 noswap
 simplay 1
-scriptinfo compartido vrm_riel RielVis
+scriptinfo shared vrm_riel RielVis
 visinfo MallaVis 4 3 2
 visinfo MallaSec 4 3 2
 
 # --- ROUND-TRIP v4: riel y fallback de la VisZona viajan en el proyecto ----
-guardarw3d prueba_visrielmulti_v4.w3d
-abrirw3d prueba_visrielmulti_v4.w3d
+savew3d prueba_visrielmulti_v4.w3d
+openw3d prueba_visrielmulti_v4.w3d
 loadtex
-vporbita 0 0 0 12 90 0
+vporbit 0 0 0 12 90 0
 activename Jugador
 objpos 5 0 5
 bench 1 noswap
 simplay 6
 visinfo MallaVis 4 3 2
-camriel set RielOtro
+camrail set RielOtro
 bench 1 noswap
 simplay 4
 visinfo MallaVis 4 0 4

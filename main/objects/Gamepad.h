@@ -6,9 +6,9 @@
 //
 //   1) LA ENTRADA CRUDA DEL MANDO (axisState / buttonState / deadzone /
 //      RefreshInputControllerSDL). Es input, es generico y se queda: cualquier
-//      juego lo lee, y los scripts lo reciben por stick() / boton().
+//      juego lo lee, y los scripts lo reciben por stick() / button().
 //
-//   2) EL OBJETO DE ESCENA `ObjetoScript` (ObjectType::script): un colgadero de
+//   2) EL OBJETO DE ESCENA `ObjectScript` (ObjectType::script): un colgadero de
 //      scripts con un target opcional. Historicamente se llamaba "Gamepad" y
 //      llevaba adentro un character controller plataformero -- velocidad,
 //      gravedad, potenciaSalto, velocidadMaximaCaida y cuatro limites de mundo.
@@ -16,7 +16,7 @@
 //      formato de guardado: se dio de baja. Los valores de configuracion de un
 //      script son datos del proyecto y viajan por el sistema generico de
 //      propiedades (`val_<nombre>` del .w3d + la tabla `propiedades` del .lua),
-//      que se leen con propiedad() / parametro().
+//      que se leen con property() / parametro().
 //
 //      El objeto tampoco se puede crear desde el menu Add (cualquier objeto
 //      acepta scripts). Sobrevive para que un .w3d viejo siga abriendo: los dos
@@ -46,18 +46,18 @@
 #include "Target.h"
 
 #ifdef W3D_SYMBIAN
-#include "app/W3dSdlMinimo.h"   // los numeros de ejes y botones de SDL: el telefono pone ahi sus joysticks (bthid)
+#include "app/W3dSdlMin.h"   // los numeros de ejes y botones de SDL: el telefono pone ahi sus joysticks (bthid)
 #endif
 // ---- (1) ENTRADA CRUDA DEL MANDO: generica, la lee cualquier juego. PC/Android/web por SDL; Symbian por el driver
-//          Bluetooth bthid-s60 (W3dMandos del Core, ver MandosSymbianTick) en los MISMOS lugares --------
+//          Bluetooth bthid-s60 (W3dMandos del Core, ver GamepadsSymbianTick) en los MISMOS lugares --------
 extern float axisState[SDL_CONTROLLER_AXIS_MAX];
 extern bool buttonState[SDL_CONTROLLER_BUTTON_MAX];
 extern GLfloat deadzone;
 // ...y CADA MANDO por separado (hasta 4, en el orden en que se movieron por primera vez): los dos jugadores de la
 // pantalla dividida. axisState / buttonState siguen siendo la mezcla de todos (lo que lee un juego de uno)
-enum { W3D_MANDOS_SDL = 4 };
-extern float axisStateM[W3D_MANDOS_SDL][SDL_CONTROLLER_AXIS_MAX];
-extern bool buttonStateM[W3D_MANDOS_SDL][SDL_CONTROLLER_BUTTON_MAX];
+enum { W3D_GAMEPADS_SDL = 4 };
+extern float axisStateM[W3D_GAMEPADS_SDL][SDL_CONTROLLER_AXIS_MAX];
+extern bool buttonStateM[W3D_GAMEPADS_SDL][SDL_CONTROLLER_BUTTON_MAX];
 
 #ifndef W3D_SYMBIAN
 // Refresca axisState/buttonState desde un evento SDL
@@ -65,15 +65,15 @@ void RefreshInputControllerSDL(SDL_Event &e);
 #else
 // Symbian: lee los joysticks del driver (una vez por cuadro), avisa los que se conectan o desconectan y deja su
 // estado en axisState / buttonState (por mando y mezclados), como hace SDL en PC
-void MandosSymbianTick();
+void GamepadsSymbianTick();
 #endif
 
 struct VertexAnimationActive;   // solo por puntero (ver targetAnim)
 
 // ---- (2) EL OBJETO DE ESCENA: scripts + un target opcional ------------------
-class ObjetoScript : public Object, public Target {
+class ObjectScript : public Object, public Target {
     public:
-        ObjetoScript(Object* parent);
+        ObjectScript(Object* parent);
 
         // el reproductor de vertex animation del target, si el target es una malla.
         // Muere con ella (~Mesh lo saca de VertexAnimationActives), asi que se
@@ -85,12 +85,12 @@ class ObjetoScript : public Object, public Target {
         void RenderObject() W3D_OVERRIDE;
 
         // su unica ref por puntero: el target (ver Objects.h)
-        int     RefsPropias() const W3D_OVERRIDE { return 1; }
-        Object* RefPropia(int i) const W3D_OVERRIDE { return (i == 0) ? target : NULL; }
-        void    SetRefPropia(int i, Object* o) W3D_OVERRIDE { if (i == 0) { target = o; targetAnim = NULL; } }
-        std::string* RefPropiaNombre(int i) W3D_OVERRIDE { return (i == 0) ? &targetName : NULL; }
+        int     OwnRefs() const W3D_OVERRIDE { return 1; }
+        Object* OwnRef(int i) const W3D_OVERRIDE { return (i == 0) ? target : NULL; }
+        void    SetOwnRef(int i, Object* o) W3D_OVERRIDE { if (i == 0) { target = o; targetAnim = NULL; } }
+        std::string* RefOwnName(int i) W3D_OVERRIDE { return (i == 0) ? &targetName : NULL; }
 
-        ~ObjetoScript();
+        ~ObjectScript();
 };
 
 #endif

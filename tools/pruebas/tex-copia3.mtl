@@ -2,6 +2,6 @@
 # que pasa en el proyecto Crash (28 trozos de escenario con el mismo atlas).
 newmtl tex-copia3
 Kd 1.000000 1.000000 1.000000
-map_Kd texturas/cuadrantes.png
+map_Kd textures/cuadrantes.png
 NoLight
 BackfaceCullingOff

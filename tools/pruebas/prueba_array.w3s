@@ -11,7 +11,7 @@ genbbox -1 -1 -1 7 1 1 0.01
 modarray 4 0 0 0 0 0 2
 genbbox -1 -1 -1 1 7 1 0.01
 # guardar y abrir: los parametros vuelven
-guardarw3d /tmp/w3d_prueba_array.w3d
-abrirw3d /tmp/w3d_prueba_array.w3d
+savew3d /tmp/w3d_prueba_array.w3d
+openw3d /tmp/w3d_prueba_array.w3d
 selobj Cubo.001
 genbbox -1 -1 -1 1 7 1 0.01

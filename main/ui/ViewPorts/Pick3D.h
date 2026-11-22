@@ -9,65 +9,70 @@
  * Select Linked / Loop Select (modos guiados) y Loop Cut. Extraido de LayoutInput (Fase 2).
  */
 
-bool EditSelAvanzar(int paso, bool extender);
-bool EditSelTodoToggle();
-bool EditSelToggleActual();
+bool EditSelAdvance(int step, bool extend);
+bool EditSelAllToggle();
+bool EditSelToggleCurrent();
 void LayoutSelectLinked(int mx, int my);
-bool LoopSelOrientando();
-void LayoutLoopSelectGuiado(); // definida mas abajo (modo guiado: pide click cuando no hay elemento activo);
-void LayoutLoopSelectActivo(int tipo);
-void LoopSelTecla(int dir);
+bool LoopSelOrienting();
+void LayoutLoopSelectGuided(); // definida mas abajo (modo guiado: pide click cuando no hay elemento activo);
+void LayoutLoopSelectActive(int type);
+void LoopSelKey(int dir);
 void LoopSelConfirm();
-bool LayoutLoopSelectEnPos(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
-bool PickPathGuiado();
-void LayoutPickPathIniciar(bool fill);
-void LayoutPickPathCancelar();
-bool GuiadoUnClickActivo();
-void LayoutGuiadoCancelar();
-void LayoutSelectLinkedGuiado();
+bool LayoutLoopSelectInPos(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
+bool PickPathGuided();
+void LayoutPickPathStart(bool fill);
+void LayoutPickPathCancel();
+bool GuidedUnClickActive();
+void LayoutGuidedCancel();
+void LayoutSelectLinkedGuided();
 
 // BOX SELECT del viewport 3D: aplica la caja (en coords de PANTALLA) sobre los objetos
 // (Object Mode) o los sub-elementos (Edit Mode). 'tocar' = regla azul (alcanza con rozar);
 // false = regla verde (tiene que entrar entero). 'sumar' = suma a la seleccion (Shift).
-void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar);
-bool LoopCutOrientando();
-bool LoopCutActivo();
-void LoopCutIniciar(int mx, int my);
-void LayoutLoopCutDesdeActivo();
-void LoopCutOrientConfirmarTeclado();
+void BoxSelectApply3D(int x0, int y0, int x1, int y1, bool touch, bool add);
+bool LoopCutOrienting();
+bool LoopCutActive();
+void LoopCutStart(int mx, int my);
+void LayoutLoopCutFromActive();
+void LoopCutOrientConfirmKeyboard();
 void LoopCutMotion(int mx, int my);
 void LoopCutWheel(int dir);
-void LoopCutTecla(int dir);
-void LoopCutClickIzq(int mx, int my);
-void LoopCutClickDer();
-void LoopCutCancelar();
-void LoopCutRedoAplicar(int cortes, float factor);
+void LoopCutKey(int dir);
+void LoopCutClickLeft(int mx, int my);
+void LoopCutClickRight();
+void LoopCutCancel();
+void LoopCutRedoApply(int cuts, float factor);
 float LoopCutGetFactor();
 void LoopCutRenderPreview();
 bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
 
 // INSET FACES (I en Edit Mode / menu Face): el modal + el panel redo (la op de malla: Mesh::InsetEdit)
-struct InsetOpciones;
-bool InsetActivo();
-void InsetIniciar(int mx, int my);
+struct InsetOptions;
+bool InsetActive();
+void InsetStart(int mx, int my);
 void InsetMotion(int mx, int my);
-void InsetConfirmar();
-void InsetCancelar();
-bool InsetTecla(int tecla);                 // W3dK_*: true = la uso (mientras dura el modal, todas)
-void InsetRedoAplicar();                    // el panel cambio una opcion: re-inseta desde la malla de antes
-InsetOpciones& InsetOpcionesActuales();     // las opciones (las tildes del panel apuntan aca)
-void InsetCentroPantalla(float& x, float& y, float& pxPorU);   // (pruebas) el centro de la seleccion en pantalla
+void InsetConfirm();
+void InsetCancel();
+bool InsetKey(int key);                  // W3dK_*: true = la uso (mientras dura el modal, todas)
+void InsetGrab(int mx, int my);          // TACTIL: el dedo toca ahi y arrastra desde el valor que ya tenia
+void InsetNumber();                      // el valor tipeado (NumInput) pasa a ser el grosor (o la profundidad)
+bool& InsetDepthDrag();                  // el dedo maneja la PROFUNDIDAD (el boton de la barra; en la PC, Ctrl)
+void InsetRedoApply();                   // el panel cambio una opcion: re-inseta desde la malla de antes
+InsetOptions& InsetCurrentOptions();     // las opciones (las tildes del panel apuntan aca)
+void InsetScreenCenter(float& x, float& y, float& pxByU);   // (pruebas) el centro de la seleccion en pantalla
 // BEVEL (Ctrl+B en Edit Mode / menus Edge y Vertex): el modal + el panel redo (la op de malla: Mesh::BevelEdit)
-struct BevelOpciones;
-bool BevelActivo();
-void BevelIniciar(int mx, int my, int afecta = 1);   // afecta: 1 = aristas, 0 = vertices
+struct BevelOptions;
+bool BevelActive();
+void BevelStart(int mx, int my, int affects = 1);   // afecta: 1 = aristas, 0 = vertices
 void BevelMotion(int mx, int my);
-void BevelRueda(int dir);
-void BevelConfirmar();
-void BevelCancelar();
-bool BevelTecla(int tecla);
-void BevelRedoAplicar();
-BevelOpciones& BevelOpcionesActuales();
-void BevelCentroPantalla(float& x, float& y, float& pxPorU);
+void BevelWheel(int dir);
+void BevelConfirm();
+void BevelCancel();
+bool BevelKey(int key);
+void BevelGrab(int mx, int my);          // TACTIL: el dedo toca ahi y arrastra desde el ancho que ya tenia
+void BevelNumber();                      // el valor tipeado (NumInput) pasa a ser el ancho
+void BevelRedoApply();
+BevelOptions& BevelCurrentOptions();
+void BevelScreenCenter(float& x, float& y, float& pxByU);
 
 #endif

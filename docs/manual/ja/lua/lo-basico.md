@@ -13,11 +13,11 @@
 変数は、値を代入したときに作られます。必ず`local`を使ってください。そうすると、変数は宣言したブロックの中だけに存在し、ほかの変数とぶつかりません。
 
 ```lua
-local vidas = 3           -- 数値（整数）
-local velocidad = 2.5     -- 数値（小数）
-local nombre = "Whisky"   -- テキスト（文字列）
-local vivo = true         -- 真偽値：trueまたはfalse
-local nada = nil          -- nil =「値なし」
+local lives = 3         -- 数値（整数）
+local speed = 2.5       -- 数値（小数）
+local name = "Whisky"   -- テキスト（文字列）
+local live = true       -- 真偽値：trueまたはfalse
+local none = nil        -- nil =「値なし」
 ```
 
 Luaの型は、`nil`、`boolean`、`number`、`string`、`table`、`function`です。Whisk3Dが渡すシーンのオブジェクトは特別な型で、エンジンの関数に渡すことでだけ使えます。
@@ -30,9 +30,9 @@ Luaの型は、`nil`、`boolean`、`number`、`string`、`table`、`function`で
 | `//` | 整数の割り算 | `7 // 2` → 3 |
 | `%` | 余り | `7 % 2` → 1 |
 | `^` | べき乗 | `2 ^ 3` → 8.0 |
-| `== ~= < > <= >=` | 比較（`~=`は「等しくない」） | `vidas ~= 0` |
-| `and or not` | 論理演算 | `vivo and vidas > 0` |
-| `..` | テキストの連結 | `"Vidas: " .. vidas` |
+| `== ~= < > <= >=` | 比較（`~=`は「等しくない」） | `lives ~= 0` |
+| `and or not` | 論理演算 | `live and lives > 0` |
+| `..` | テキストの連結 | `"Vidas: " .. lives` |
 | `#` | テキストまたはリストの長さ | `#"hola"` → 4 |
 
 > [!NOTE]
@@ -70,19 +70,19 @@ Luaには`n++`も`n += 1`もありません。`n = n + 1`と書きます。ル�
 ## 関数
 
 ```lua
-local function sumar(a, b)
+local function add(a, b)
   return a + b
 end
-print(sumar(2, 3))        -- 5
+print(add(2, 3))        -- 5
 
 -- 関数は複数の値を返せる
 local function minMax(a, b)
   if a < b then return a, b else return b, a end
 end
-local menor, mayor = minMax(8, 3)
+local less, greater = minMax(8, 3)
 ```
 
-Whisk3Dの多くの関数は、一度に複数の値を返します。たとえば`local x, y, z = posicion(yo())`のように使います。
+Whisk3Dの多くの関数は、一度に複数の値を返します。たとえば`local x, y, z = getPosition(self())`のように使います。
 
 ## テーブル：リストと辞書
 
@@ -90,23 +90,23 @@ Whisk3Dの多くの関数は、一度に複数の値を返します。たとえ�
 
 ```lua
 -- リストとして（インデックスは0ではなく1から始まる）
-local frutas = { "manzana", "pera", "uva" }
-print(frutas[1])          -- manzana
-print(#frutas)            -- 3
-frutas[#frutas + 1] = "kiwi"   -- 末尾に追加
-table.insert(frutas, "melón")  -- 別の方法
+local fruits = { "manzana", "pera", "uva" }
+print(fruits[1])          -- manzana
+print(#fruits)            -- 3
+fruits[#fruits + 1] = "kiwi"   -- 末尾に追加
+table.insert(fruits, "melón")  -- 別の方法
 
-for i, f in ipairs(frutas) do  -- リストを順番にたどる
+for i, f in ipairs(fruits) do  -- リストを順番にたどる
   print(i, f)
 end
 
 -- 辞書として（キー = 値）
-local jugador = { nombre = "Ana", puntos = 0 }
-jugador.puntos = jugador.puntos + 10
-print(jugador["nombre"])  -- Ana
+local player = { name = "Ana", puntos = 0 }
+player.puntos = player.puntos + 10
+print(player["nombre"])  -- Ana
 
-for clave, valor in pairs(jugador) do  -- すべてのキーをたどる（順序は決まっていない）
-  print(clave, valor)
+for clave, value in pairs(player) do  -- すべてのキーをたどる（順序は決まっていない）
+  print(clave, value)
 end
 ```
 
@@ -115,7 +115,7 @@ end
 ```lua
 local t = string.format("Puntos: %d  Tiempo: %.1f", 120, 3.456)  -- "Puntos: 120  Tiempo: 3.5"
 local may = string.upper("hola")        -- "HOLA"
-local parte = string.sub("Whisk3D", 1, 5)   -- "Whisk"
+local part = string.sub("Whisk3D", 1, 5)   -- "Whisk"
 local n = tonumber("42")                -- テキストを数値に
 local s = tostring(3.5)                 -- 数値をテキストに
 local r = math.floor(2.7)               -- 2
@@ -125,4 +125,4 @@ local m = math.max(4, 9, 2)             -- 9
 local pi = math.pi
 ```
 
-乱数には、Whisk3Dの`azar()`を使えます（リファレンスを参照）。`math.random`も使えます。こちらは、プレイごとに異なるシードがあらかじめ設定されています。
+乱数には、Whisk3Dの`random()`を使えます（リファレンスを参照）。`math.random`も使えます。こちらは、プレイごとに異なるシードがあらかじめ設定されています。

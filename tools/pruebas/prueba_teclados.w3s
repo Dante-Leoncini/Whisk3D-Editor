@@ -13,58 +13,58 @@
 #    3. con el del sistema: ningun teclado de Whisk3D
 # ==========================================================================
 
-ventana 1200 1800
-escala 2
+window 1200 1800
+scale 2
 selobj Cubo
 propstab 2
 tick
-propclic New Material
+propclick New Material
 tick
-menuelegir New Material
+menupick New Material
 tick
-matver rugosidad 0.5
-esperar 600
+matshow roughness 0.5
+wait 600
 
 # ---- 1) el numero de un mapa: el NUMERICO ----
-teclado whisk3d
-propdedo Roughness
-dedo up
+keyboard whisk3d
+propfinger Roughness
+finger up
 tick
-tecladoabierto numpad
-tecladotocar DEL 0 . 2 5 OK
+keyboardopen numpad
+keyboardtouch DEL 0 . 2 5 OK
 tick
-tecladoabierto ninguno
-matver rugosidad 0.25
+keyboardopen none
+matshow roughness 0.25
 undo
-matver rugosidad 0.5
+matshow roughness 0.5
 # (X cancela: queda el valor de antes)
-esperar 600
-propdedo Roughness
-dedo up
+wait 600
+propfinger Roughness
+finger up
 tick
-tecladoabierto numpad
-tecladotocar DEL 9 X
+keyboardopen numpad
+keyboardtouch DEL 9 X
 tick
-matver rugosidad 0.5
+matshow roughness 0.5
 
 # ---- 2) el nombre de un layout: el QWERTY ----
-layout cuantos 1
-layout menu guardar
-tecladoabierto qwerty
-tecladotocar OK
+layout count 1
+layout menu save
+keyboardopen qwerty
+keyboardtouch OK
 tick
-tecladoabierto ninguno
-layout cuantos 2
+keyboardopen none
+layout count 2
 
 # ---- 3) con el teclado del sistema: ninguno de Whisk3D ----
-teclado sistema
-esperar 600
-propdedo Roughness
-dedo up
+keyboard system
+wait 600
+propfinger Roughness
+finger up
 tick
-tecladoabierto ninguno
-tecla Escape
-layout menu guardar
-tecladoabierto ninguno
-tecla Escape
-teclado whisk3d
+keyboardopen none
+key Escape
+layout menu save
+keyboardopen none
+key Escape
+keyboard whisk3d

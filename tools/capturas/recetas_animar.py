@@ -15,34 +15,34 @@ TL_CUADRATICA = 404
 
 
 def R(eje, numero):
-    return ["tecla r", "tecla " + eje, "texto " + numero, "tecla Return"]
+    return ["key r", "key " + eje, "text " + numero, "key Return"]
 
 
 # las ETAPAS de la animacion, despues de la puerta con su picaporte (la ultima etapa del tutorial 8)
 ETAPAS = [
-    ("picaporte", ["selobj Manija", "ratonvista3d", "frame 1", "tecla i", "menuelegir Rotation Only", "frame 9"] +
-                  R("y", "-34") + ["tecla i", "menuelegir Rotation Only"]),
+    ("picaporte", ["selobj Manija", "mouseview3d", "frame 1", "key i", "menupick Rotation Only", "frame 9"] +
+                  R("y", "-34") + ["key i", "menupick Rotation Only"]),
     # (Shift+D saca la copia un cuadro a la derecha y el numero tipeado se suma: 9 + 1 + 16 = 26; 1 + 1 + 31 = 33)
-    ("duplicados", ["tl selframe 9", "tl duplicar", "tl valor 16", "tl aceptar",
-                    "tl selframe 1", "tl duplicar", "tl valor 31", "tl aceptar"]),
-    ("puerta", ["selobj {P}", "ratonvista3d", "frame 11", "tecla i", "menuelegir Rotation Only", "frame 26"] +
-               R("z", "-80") + ["tecla i", "menuelegir Rotation Only"]),
-    ("fin", ["tl fin 50"]),
-    ("limpias", ["selobj Manija", "tl borrarcurva rot x", "tl borrarcurva rot z",
-                 "selobj {P}", "tl borrarcurva rot x", "tl borrarcurva rot y"]),
+    ("duplicados", ["tl selframe 9", "tl duplicate", "tl value 16", "tl accept",
+                    "tl selframe 1", "tl duplicate", "tl value 31", "tl accept"]),
+    ("puerta", ["selobj {P}", "mouseview3d", "frame 11", "key i", "menupick Rotation Only", "frame 26"] +
+               R("z", "-80") + ["key i", "menupick Rotation Only"]),
+    ("fin", ["tl end 50"]),
+    ("limpias", ["selobj Manija", "tl deletecurve rot x", "tl deletecurve rot z",
+                 "selobj {P}", "tl deletecurve rot x", "tl deletecurve rot y"]),
     ("curvas", ["selobj Manija", "keyinterp cuadratica 1 rot", "keyinterp cuadratica 9 rot",
                 "keyinterp cuadratica 26 rot", "keyinterp cuadratica 33 rot"]),
 ]
 
-VISTA_PICAPORTE = "vporbita -0.31 1.0 0.05 1.6 -12 -22"   # el picaporte de cerca
-VISTA_PUERTA = "vporbita 0.2 1.0 0.2 3.6 -14 -28"             # la puerta entera
+VISTA_PICAPORTE = "vporbit -0.31 1.0 0.05 1.6 -12 -22"   # el picaporte de cerca
+VISTA_PUERTA = "vporbit 0.2 1.0 0.2 3.6 -14 -28"             # la puerta entera
 
 
 def guion(idioma, hasta=None, vista=VISTA_PUERTA, raton=True):
     """La puerta con su picaporte (tutorial 8) y la animacion HASTA esa etapa; la Linea de tiempo grande."""
     g = Guion(idioma, w=1440, h=840, raton=raton)
     g.linea("division 0.7")
-    g.linea("divisionde 5 0.58")
+    g.linea("divisionof 5 0.58")
     p = rp.PUERTA[idioma]
     for nombre, lineas in rp.ETAPAS:
         for l in lineas:
@@ -57,7 +57,7 @@ def guion(idioma, hasta=None, vista=VISTA_PUERTA, raton=True):
                 break
     g.linea(vista)
     g.linea("cursor3d 0 -30 0")
-    g.linea("tl vista -1 51")
+    g.linea("tl view -1 51")
     return g
 
 
@@ -117,7 +117,7 @@ def puerta(idioma):
     """Click en la puerta; cuadro 11: I > Solo Rotacion (cerrada); cuadro 26: R Z -80 e I > Solo Rotacion. Play: el
     picaporte baja, la puerta se abre y el picaporte vuelve."""
     g = guion(idioma, "duplicados")
-    g.linea("tl fin 50")
+    g.linea("tl end 50")
     elegir(g, PUERTA_P)
     rpel.tl_cuadro(g, 11)
     rpel.en_vista3d(g, 0.85, 0.7)
@@ -170,7 +170,7 @@ def puntos_curva(idioma, tipo, n=48):
     if tipo not in _PUNTOS:
         g = Guion(idioma, w=400, h=300)
         for nombre, _ in CURVAS:
-            g.linea("curvapuntos %s %d" % (nombre, n))
+            g.linea("curvepoints %s %d" % (nombre, n))
         salida = g._correr(g.lineas)
         actual, i = None, 0
         for linea in salida.splitlines():
@@ -206,9 +206,9 @@ def curvas(idioma):
         g.linea("keyinterp " + tipo)
     g.linea("cursor3d 0 -30 0")
     g.linea("deselectall")
-    g.linea("vista3d overlays 0")
-    g.linea("vporbita 3.0 3.5 0 12 0 0")
-    g.linea("n95 perspectiva")                    # (ortografica: las seis pelotas a la misma escala)
+    g.linea("view3d overlays 0")
+    g.linea("vporbit 3.0 3.5 0 12 0 0")
+    g.linea("n95 perspective")                    # (ortografica: las seis pelotas a la misma escala)
     g.linea("frame 1")
     i = g.info()
     v = i.vp(VISTA_3D)
@@ -237,17 +237,17 @@ def barra(idioma):
     g = guion(idioma, "curvas")                    # (la manija ya en Cuadratica: asi sale tambien el Suavizado)
     g.linea("frame 1")
     g.linea("selobj Manija")
-    g.linea("tl curvas")
-    g.linea("tl encuadrar")
+    g.linea("tl curves")
+    g.linea("tl focus")
     g.linea("tl selframe 1")
     i = g.info()
     t = i.vp(TIMELINE)
-    botones = [b for b in i.herramientas if b["kind"] == TIMELINE and b.get("nombre")]
+    botones = [b for b in i.herramientas if b["kind"] == TIMELINE and b.get("name")]
     g.foto(dur=900)
     for b in botones:
         cx, cy = b["x"] + b["w"] // 2, b["y"] + b["h"] // 2
         g.raton_mover(cx, cy)
-        nombre = T(idioma, b["nombre"])
+        nombre = T(idioma, b["name"])
         g.foto(dur=900, marcas=[("rect", b["x"] - 2, b["y"] - 2, b["w"] + 4, b["h"] + 4),
                                 ("etiqueta", min(max(cx, t["x"] + 150), t["x"] + t["w"] - 150), b["y"] - 34, nombre)])
     return g.cuadros(calidad=90, recorte=(t["x"], t["y"], t["w"], t["h"]))
@@ -268,7 +268,7 @@ def picaporte_curva(idioma):
     g.clic(x, y)
     g.foto(dur=600)
     rp.menu_abierto(g, "Curves", despues=800)
-    g.linea("tl encuadrar")
+    g.linea("tl focus")
     g.foto(dur=900)
     for comp in (0, 1):                            # las rotaciones que no cambian: lineas planas
         x, y = g.info().tl_fila(1, comp)
@@ -276,7 +276,7 @@ def picaporte_curva(idioma):
         g.foto(dur=450)
         g.clic(x, y)
         g.foto(dur=500)
-        rp.pasos(g, [("X", ["tecla x"])], fin=600)
+        rp.pasos(g, [("X", ["key x"])], fin=600)
     x, y = g.info().tl_fila(1, 2)                  # la fila que queda: un click y la Linea de tiempo encuadra su curva
     g.raton_mover(x, y)
     g.foto(dur=450)

@@ -1,6 +1,6 @@
 # Log'lar
 
-printf tarzında üç seviye: `w3dLogf` (bilgi), `w3dLogfW` (uyarı) ve `w3dLogfE` (hata). `g_w3dLogNivel` çalışma zamanında filtreler (3 = hepsi, 0 = hiçbiri) ve `W3D_DEV_LOG=0` ile derlemek çağrıları çalıştırılabilir dosyadan siler. Son satırlar ayrıca bellekte kalır: editörün [Konsol](../editor/consola.md) panelinde gösterilen budur.
+printf tarzında üç seviye: `w3dLogf` (bilgi), `w3dLogfW` (uyarı) ve `w3dLogfE` (hata). `g_w3dLogLevel` çalışma zamanında filtreler (3 = hepsi, 0 = hiçbiri) ve `W3D_DEV_LOG=0` ile derlemek çağrıları çalıştırılabilir dosyadan siler. Son satırlar ayrıca bellekte kalır: editörün [Konsol](../editor/consola.md) panelinde gösterilen budur.
 
 | Sistem | Nereye gider |
 |---|---|

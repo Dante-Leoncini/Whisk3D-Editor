@@ -15,7 +15,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.05, 0.05, 0.05, 1.0"
 
         Camera {
@@ -47,11 +47,11 @@ Whisk3D {
             mirrorX: false
             mirrorY: false
             mirrorZ: true
-            recorte: true
-            limiteU0: -2.0
-            limiteU1: 2.0
-            limiteV0: 0.5
-            limiteV1: 3.0
+            clip: true
+            limitU0: -2.0
+            limitU1: 2.0
+            limitV0: 0.5
+            limitV1: 3.0
             y: -4.0
         }
     }

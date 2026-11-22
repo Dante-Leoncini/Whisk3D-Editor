@@ -33,13 +33,13 @@ typedef struct { const char* language; const char* country; } SDL_Locale;
 // terminada en {NULL, NULL} que se libera con SDL_free
 #include <sys/system_properties.h>
 static inline SDL_Locale* SDL_GetPreferredLocales(void) {
-    static char lang[PROP_VALUE_MAX], pais[PROP_VALUE_MAX];
+    static char lang[PROP_VALUE_MAX], country[PROP_VALUE_MAX];
     if (__system_property_get("persist.sys.language", lang) <= 0 &&
         __system_property_get("ro.product.locale.language", lang) <= 0) return NULL;
-    if (__system_property_get("persist.sys.country", pais) <= 0) pais[0] = 0;
+    if (__system_property_get("persist.sys.country", country) <= 0) country[0] = 0;
     SDL_Locale* l = (SDL_Locale*)SDL_malloc(2 * sizeof(SDL_Locale));
     if (!l) return NULL;
-    l[0].language = lang; l[0].country = pais[0] ? pais : NULL;
+    l[0].language = lang; l[0].country = country[0] ? country : NULL;
     l[1].language = NULL; l[1].country = NULL;
     return l;
 }

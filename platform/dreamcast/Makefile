@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------------------------------------------
 #  Whisk3D para Sega Dreamcast: KallistiOS + GLdc (OpenGL 1.x de la PVR) + SDL2 de Dreamcast (mouse, teclado,
-#  control, ventana GL). Es el MISMO editor que la PC (main.cpp + controles.cpp con SDL2, el backend fijo de
+#  control, ventana GL). Es el MISMO editor que la PC (main.cpp + controls.cpp con SDL2, el backend fijo de
 #  graficos w3dGraphics.cpp), compilado para el SH-4. Lo propio de la consola va con #ifdef W3D_DREAMCAST.
 #
 #  No se usa directo: lo llama build_dreamcast.sh (que carga el entorno de KallistiOS). Salida en build/:
@@ -19,34 +19,34 @@ FUENTES_CPP := $(shell cd $(RAIZ) && find main libs/Whisk3DCore/objects libs/Whi
                    -name '*.cpp' -not -path 'main/test/*' | sort)
 FUENTES_CPP += \
     libs/Whisk3DCore/script/W3dScript.cpp \
-    libs/Whisk3DCore/physics/W3dFisica.cpp \
-    libs/Whisk3DCore/physics/W3dRigido.cpp \
-    libs/Whisk3DCore/physics/W3dColMalla.cpp \
+    libs/Whisk3DCore/physics/W3dPhysics.cpp \
+    libs/Whisk3DCore/physics/W3dRigid.cpp \
+    libs/Whisk3DCore/physics/W3dColMesh.cpp \
     libs/Whisk3DCore/physics/W3dHitbox.cpp \
     libs/Whisk3DCore/physics/W3dRagdoll.cpp \
     libs/Whisk3DCore/physics/W3dNav.cpp \
-    libs/Whisk3DCore/net/W3dRed.cpp \
+    libs/Whisk3DCore/net/W3dNet.cpp \
     libs/Whisk3DCore/io/w3dFilesystem.cpp \
     libs/Whisk3DCore/graphics/w3dTexture.cpp \
     libs/Whisk3DCore/io/w3dCompress.cpp \
     libs/Whisk3DCore/io/W3dZip.cpp \
-    libs/Whisk3DCore/io/W3dTexto.cpp \
-    libs/Whisk3DCore/io/W3dMalla.cpp \
-    libs/Whisk3DCore/io/W3dMallaBin.cpp \
-    libs/Whisk3DCore/io/W3dAlmacen.cpp \
-    libs/Whisk3DCore/io/W3dRecursos.cpp \
+    libs/Whisk3DCore/io/W3dText.cpp \
+    libs/Whisk3DCore/io/W3dMesh.cpp \
+    libs/Whisk3DCore/io/W3dMeshBin.cpp \
+    libs/Whisk3DCore/io/W3dStore.cpp \
+    libs/Whisk3DCore/io/W3dResources.cpp \
     libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp \
     libs/Whisk3DCore/base/w3dlog.cpp \
     libs/Whisk3DCore/base/W3dInteractionState.cpp \
     libs/Whisk3DCore/base/W3dConfig.cpp \
-    libs/Whisk3DCore/input/W3dTactil.cpp \
-    libs/Whisk3DCore/input/W3dVibrar.cpp \
+    libs/Whisk3DCore/input/W3dTouch.cpp \
+    libs/Whisk3DCore/input/W3dVibrate.cpp \
     libs/Whisk3DCore/math/Vector3.cpp \
     libs/Whisk3DCore/math/Quaternion.cpp \
     libs/Whisk3DCore/math/Matrix4.cpp \
     libs/Whisk3DCore/audio/W3dAudio.cpp \
     libs/Whisk3DCore/audio/W3dAudioSDL.cpp \
-    libs/Whisk3DCore/audio/W3dVolumen.cpp \
+    libs/Whisk3DCore/audio/W3dVolume.cpp \
     libs/Whisk3DCore/audio/W3dMusic.cpp \
     libs/Whisk3DCore/input/W3dClipboardSDL.cpp \
     platform/dreamcast/w3d_dreamcast.cpp

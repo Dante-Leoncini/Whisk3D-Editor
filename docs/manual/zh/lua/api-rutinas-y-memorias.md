@@ -4,8 +4,8 @@
 
 | 函数 | 作用 |
 |---|---|
-| `setMemoria(nombre, i, v)`, `memoria(nombre, i)`, `setMemorias(nombre, i, v1, v2, ...)` | 写入和读取内存（索引从 **0** 到 255）。 |
-| `setPaso(rutina, i, campo, ...)`, `leerPaso(rutina, i, campo)` | 修改或读取例程中的某个步骤（字段：`"on"`、`"n"`、`"color"`、`"ref"`、`"modo"`、`"entero"`）。 |
-| `paso(nombre, ...)` | 执行一个绘制步骤；只在由例程的“Call Lua”步骤调用的函数中有效。 |
+| `setMemory(name, i, v)`, `getMemory(name, i)`, `setMemories(name, i, v1, v2, ...)` | 写入和读取内存（索引从 **0** 到 255）。 |
+| `setStep(routine, i, field, ...)`, `getStep(routine, i, field)` | 修改或读取例程中的某个步骤（字段：`"on"`、`"n"`、`"color"`、`"ref"`、`"modo"`、`"entero"`）。 |
+| `step(name, ...)` | 执行一个绘制步骤；只在由例程的“Call Lua”步骤调用的函数中有效。 |
 
-在 **Repeat** 大于 1 的例程中，`bucle` 内存会告诉你当前是第几轮：`@bucle[0]` 是当前轮次（从 0 开始），`@bucle[1]` 是总轮数。
+在 **Repeat** 大于 1 的例程中，`loop` 内存会告诉你当前是第几轮：`@loop[0]` 是当前轮次（从 0 开始），`@loop[1]` 是总轮数。

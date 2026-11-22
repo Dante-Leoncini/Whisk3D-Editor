@@ -8,7 +8,7 @@
 # campo apagada no desenfoca, y su apertura (f-stop) manda cuanto
 # (con ES2 sobre el GL de la PC y la ventana con antialiasing, copiar la pantalla toma UNA muestra de los bordes
 # suavizados: el cuadro quieto cambia ~0.7% de los pixeles, solo en esos bordes. Vulkan y la CPU dan exacto)
-ventana 1280 720
+window 1280 720
 add cube
 frame 1
 keychan 0 0
@@ -16,64 +16,64 @@ frame 2
 objmove 1 0 0
 keychan 0 0
 deselectall
-vpvista rendered
+vpview rendered
 post cpu
 frame 3
 # --- en la ORBITA del visor (sin mirar por la camara) el postprocesado no va ---
-vporbita 0 0 0 10 -20 30
+vporbit 0 0 0 10 -20 30
 vpref
 post on
-post agregar grano 0.4 1
-vpdif 12 0 0
+post add grain 0.4 1
+vpdiff 12 0 0
 post off
-post limpiar
+post clear
 # --- mirando por la CAMARA ---
-vpcamara on
+vpcamera on
 vpref
 post on
-post agregar grano 0.4 1
-vpdif 12 20000
+post add grain 0.4 1
+vpdiff 12 20000
 # (afuera del marco, nada)
-vpdif 12 0 0 afuera
-post limpiar
-vpdif 2 0 50
-post agregar foco 2 0.5 2 0
-vpdif 12 300
-vpdif 12 0 0 afuera
+vpdiff 12 0 0 outside
+post clear
+vpdiff 2 0 50
+post add focus 2 0.5 2 0
+vpdiff 12 300
+vpdiff 12 0 0 outside
 post off
-vpdif 2 0 50
+vpdiff 2 0 50
 # --- el desenfoque de campo con el FOCO DE LA CAMARA: su profundidad de campo apagada = nada ---
 post on
-post limpiar
-post agregar foco 2 0.5 2 1
+post clear
+post add focus 2 0.5 2 1
 camdof 0
-vpdif 2 0 50
+vpdiff 2 0 50
 # prendida y bien abierta (f/0.5, enfocada a 2 m): desenfoca
 camdof 1 0.5 2
-vpdif 12 300
+vpdiff 12 300
 # cerrada (f/64): casi nada (la apertura manda; en ES2 sobre el GL de la PC, la copia de los bordes suavizados)
 camdof 1 64 2
-vpdif 12 0 4000
+vpdiff 12 0 4000
 camdof 0
 # --- BLOOM (umbral bajo: lo claro brilla y se desparrama); afuera del marco nada; el modo rapido tambien ---
-post limpiar
-post agregar bloom 1.5 0.2 0.5 1 5 0
-vpdif 6 2000
-vpdif 6 0 0 afuera
-post limpiar
-post agregar bloom 1.5 0.2 0.5 1 5 0.8 1
-vpdif 6 2000
+post clear
+post add bloom 1.5 0.2 0.5 1 5 0
+vpdiff 6 2000
+vpdiff 6 0 0 outside
+post clear
+post add bloom 1.5 0.2 0.5 1 5 0.8 1
+vpdiff 6 2000
 # (umbral 1: nada pasa el filtro)
-post limpiar
-post agregar bloom 1.5 1 0 1 5 0
-vpdif 6 0 4000
-post limpiar
-post agregar mov 1.0
-vpdif 6 0 6000
+post clear
+post add bloom 1.5 1 0 1 5 0
+vpdiff 6 0 4000
+post clear
+post add mov 1.0
+vpdiff 6 0 6000
 frame 2
 post off
 vpref
 post on
-vpdif 12 200
+vpdiff 12 200
 post off
-post limpiar
+post clear

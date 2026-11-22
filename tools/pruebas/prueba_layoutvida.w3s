@@ -13,19 +13,19 @@
 #  Correr DESDE ESTA CARPETA:
 #    ../../platform/linux/build/whisk3d --script prueba_layoutvida.w3s
 # ==========================================================================
-ventana 1280 720
+window 1280 720
 
 # --- 1) el arranque: el layout por defecto (3D, timeline, outliner, propiedades)
-viewports hojas 4
+viewports leaves 4
 
 # --- 2) abrir proyectos seguidos no deja layouts huerfanos -------------------
 # texto viejo sin bloque Layout (va el default) y un contenedor v4 con el suyo
-abrirw3d prueba_texcache.w3d
-viewports hojas 4
-abrirw3d prueba_espejo_v4.w3d
+openw3d prueba_texcache.w3d
+viewports leaves 4
+openw3d prueba_espejo_v4.w3d
 viewports
-abrirw3d prueba_texcache.w3d
-viewports hojas 4
+openw3d prueba_texcache.w3d
+viewports leaves 4
 
 # --- 3) TODOS los tipos de viewport se liberan (cada destructor corre) -------
 # los cuatro por UV / Editor 2D / Consola / IDE (el cambio de tipo ya borraba el
@@ -34,29 +34,29 @@ vpkind 5 3
 vpkind 2 5
 vpkind 3 6
 vpkind 1 7
-viewports hojas 4
-abrirw3d prueba_texcache.w3d
-viewports hojas 4
+viewports leaves 4
+openw3d prueba_texcache.w3d
+viewports leaves 4
 
 # --- 4) con un viewport MAXIMIZADO rootViewport es solo esa hoja: el arbol
 #        guardado tambien se libera (y no queda "maximizado" en el nuevo)
-layoutmaximizar 3
+layoutmaximize 3
 viewports
-abrirw3d prueba_texcache.w3d
-viewports hojas 4
+openw3d prueba_texcache.w3d
+viewports leaves 4
 
 # --- 5) el campo de texto enfocado era del panel liberado: se suelta ----------
-propsfoco
-abrirw3d prueba_texcache.w3d
-propsfoco nulo
+propsfocus
+openw3d prueba_texcache.w3d
+propsfocus null
 viewports
 
 # y un RENAME en curso (el boton "Rename Material" del panel se volvio input): se
 # cancela antes de que el boton muera, no queda escribiendo en un boton liberado
 selobj Copia1
 propsrename
-abrirw3d prueba_texcache.w3d
-propsrename nulo
+openw3d prueba_texcache.w3d
+propsrename null
 viewports
 
 # --- 6) el panel "Add" recuerda el 3D que lo creo: si ese 3D muere (cambiar su
@@ -69,13 +69,13 @@ viewports
 
 # --- 7) memoria: reabrir el mismo proyecto no deja heap vivo ------------------
 # (con el layout huerfano eran ~205 KB por reapertura; ahora un par de KB)
-cargabench prueba_texcache.w3d 4 fugakb 24
-viewports hojas 4
+loadbench prueba_texcache.w3d 4 leakkb 24
+viewports leaves 4
 
 # --- 8) lo que no tiene que pasar ---------------------------------------------
-fail viewports hojas 3
+fail viewports leaves 3
 fail viewports ramas 2
 fail layoutmaximizar 9
-fail propsfoco otro
-fail propsrename otro
+fail propsfoco other
+fail propsrename other
 fail redopanel 1

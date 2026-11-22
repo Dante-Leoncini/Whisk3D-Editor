@@ -7,7 +7,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.2, 0.2, 0.25, 1.0"
 
         Camera {
@@ -19,11 +19,11 @@ Whisk3D {
         Wavefront {
             name: "QuadAnimado"
             filePath: uvanim-quad.obj
-            AnimacionUV {
+            AnimationUV {
                 frames: 4
                 fps: 12
-                eje: u
-                desfase: 1
+                axis: u
+                offset: 1
             }
         }
 

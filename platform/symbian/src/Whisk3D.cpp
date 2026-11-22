@@ -8,7 +8,7 @@
 #include "w3dmouse.h" // cursor virtual de Symbian (el telefono no tiene mouse)
 #include "w3dTexture.h" // motor: cargador de texturas universal
 #include "w3dGraphics.h" // motor: abstraccion del estado de graficos
-#include "WhiskUI/theme/colores.h" // paleta del editor (ListaColores/ColorID) — compartida
+#include "WhiskUI/theme/colors.h" // paleta del editor (ColorList/ColorID) — compartida
 #include "w3dnewscene.h"
 #include "math/w3dmath.h" // w3dClamp compartido (4 OS)
 #include "W3dInitUI.h" // init de UI compartido (texturas+fuente+iconos)
@@ -61,7 +61,7 @@ void CWhisk3D::AppInit( void ){
 	SetScreenSize( winW, winH );
 
     // estado de graficos inicial: el MISMO inicializador universal que usa PC
-    w3dEngine::ClearColor( ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1], ListaColores[static_cast<int>(ColorID::background)][2], 1.f );
+    w3dEngine::ClearColor( ColorList[static_cast<int>(ColorID::background)][0], ColorList[static_cast<int>(ColorID::background)][1], ColorList[static_cast<int>(ColorID::background)][2], 1.f );
     W3dInitGraphics();
 
     RFs fs;
@@ -91,21 +91,21 @@ void CWhisk3D::AppInit( void ){
 	TFileName fullFilePath = RootDirectory;
     fullFilePath.Append(privateDir);
 
-	// skin.ini COMPARTIDO (misma paleta que PC: verde whisk3d). Antes de las
+	// skin.start COMPARTIDO (misma paleta que PC: verde whisk3d). Antes de las
 	// texturas: los colores no dependen de ellas pero conviene tenerlos ya.
 	{
-		char rutaSkin[260];
+		char skinPath[260];
 		TInt len = fullFilePath.Length() > 240 ? 240 : fullFilePath.Length();
-		for (TInt i = 0; i < len; i++) { rutaSkin[i] = (char)fullFilePath[i]; }
-		const char* fin = "skin.ini";
-		for (TInt k = 0; fin[k] && len < 250; k++) { rutaSkin[len++] = fin[k]; }
-		rutaSkin[len] = 0;
+		for (TInt i = 0; i < len; i++) { skinPath[i] = (char)fullFilePath[i]; }
+		const char* end = "skin.ini";
+		for (TInt k = 0; end[k] && len < 250; k++) { skinPath[len++] = end[k]; }
+		skinPath[len] = 0;
 		extern bool loadColorsW3d(const char*);
 		extern bool loadEditorColorsW3d(const char*);
-		extern void SincronizarRenderColores();
-		if (loadColorsW3d(rutaSkin)) {
-			loadEditorColorsW3d(rutaSkin);
-			SincronizarRenderColores();
+		extern void SyncRenderColors();
+		if (loadColorsW3d(skinPath)) {
+			loadEditorColorsW3d(skinPath);
+			SyncRenderColors();
 			w3dLog("skin.ini cargado: paleta de Whisk3D activa");
 		} else {
 			w3dLog("skin.ini NO se pudo abrir (paleta default)");
@@ -113,22 +113,22 @@ void CWhisk3D::AppInit( void ){
 	}
 
 	// ---- MODO JUEGO ----------------------------------------------------------
-	// Si el .sisx trae un proyecto bundleado en <privado>\game\juego.w3d, se AUTO-ABRE
-	// en el arranque (encolando en g_proyAbrirPendiente, que drena el DrawCallBack en el
-	// primer frame -> AbrirProyectoAhora). Un .sisx de EDITOR no trae ese archivo, asi que
+	// Si el .sisx trae un proyecto bundleado en <privado>\game\game.w3d, se AUTO-ABRE
+	// en el arranque (encolando en g_projOpenPending, que drena el DrawCallBack en el
+	// primer frame -> OpenProjectNow). Un .sisx de EDITOR no trae ese archivo, asi que
 	// arranca como editor normal. Mismo binario, dos comportamientos segun el bundle.
 	{
-		char rutaJuego[260];
+		char gamePath[260];
 		TInt lj = fullFilePath.Length() > 230 ? 230 : fullFilePath.Length();
-		for (TInt i = 0; i < lj; i++) { rutaJuego[i] = (char)fullFilePath[i]; }
-		const char* finJ = "game\\juego.w3d";
-		for (TInt k = 0; finJ[k] && lj < 250; k++) { rutaJuego[lj++] = finJ[k]; }
-		rutaJuego[lj] = 0;
-		if (w3dFileSystem::FileExists(rutaJuego)) {
-			extern std::string g_proyAbrirPendiente;
-			extern bool g_modoJuego;
-			g_proyAbrirPendiente = rutaJuego;
-			g_modoJuego = true;   // -> full-screen del 3D al abrir (el juego se ve solo)
+		for (TInt i = 0; i < lj; i++) { gamePath[i] = (char)fullFilePath[i]; }
+		const char* endJ = "game\\game.w3d";
+		for (TInt k = 0; endJ[k] && lj < 250; k++) { gamePath[lj++] = endJ[k]; }
+		gamePath[lj] = 0;
+		if (w3dFileSystem::FileExists(gamePath)) {
+			extern std::string g_projOpenPending;
+			extern bool g_gameMode;
+			g_projOpenPending = gamePath;
+			g_gameMode = true;   // -> full-screen del 3D al abrir (el juego se ve solo)
 			w3dLog("modo juego: proyecto bundleado detectado, auto-abriendo full-screen");
 		}
 	}

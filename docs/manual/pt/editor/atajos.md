@@ -22,9 +22,9 @@ As combinações alteradas aparecem em verde. Quando um atalho padrão é tirado
 
 Os atalhos de cada contexto valem quando o ponteiro está sobre esse painel; os de **Geral** valem em todos. Os de **Durante uma transformação** valem enquanto algo é movido, rotacionado ou escalado, e têm prioridade. No editor de scripts, as letras sempre escrevem: lá só dá para reatribuir combinações com <kbd>Ctrl</kbd>, <kbd>Alt</kbd> ou teclas F.
 
-## O arquivo atajos.ini
+## O arquivo shortcuts.ini
 
-As mudanças são salvas sozinhas em `res/atajos.ini`, ao lado de `config.ini`. Só aparecem as funções alteradas, e dá para editá-lo à mão:
+As mudanças são salvas sozinhas em `res/shortcuts.ini`, ao lado de `config.ini`. Só aparecem as funções alteradas, e dá para editá-lo à mão:
 
 ```ini
 # funcao = combinacao, outra combinacao   (vazio = sem atalho)
@@ -44,7 +44,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Geral (qualquer painel)
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Salvar projeto | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
 | Desfazer | <kbd>Ctrl+Z</kbd> | <kbd>C+Esq</kbd> | `global.deshacer` |
@@ -62,7 +62,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Viewport 3D
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Selecionar tudo | <kbd>A</kbd> | <kbd>Lápis+Cima</kbd> | `3d.seleccionarTodo` |
 | Desselecionar tudo | <kbd>Alt+A</kbd> | <kbd>Lápis+Cima</kbd> | `3d.deseleccionar` |
@@ -114,7 +114,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Durante uma transformação (mover / rotacionar / escalar)
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Confirmar | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
 | Cancelar | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
@@ -129,7 +129,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Editor UV
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Selecionar tudo | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
 | Desselecionar tudo | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
@@ -148,7 +148,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Linha do Tempo
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Selecionar tudo | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
 | Desselecionar tudo | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
@@ -170,7 +170,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Outliner
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Selecionar tudo | <kbd>A</kbd> | — | `out.seleccionarTodo` |
 | Desselecionar tudo | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
@@ -185,7 +185,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Editor 2D
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Selecionar tudo | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
 | Desselecionar tudo | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
@@ -200,7 +200,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Propriedades (passos de uma rotina)
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Pegar passo | <kbd>G</kbd> | — | `props.agarrar` |
 | Apagar passo | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
@@ -208,7 +208,7 @@ Nomes de teclas: letras e números tal como são, `Enter`, `Esc`, `Tab`, `Space`
 
 ### Editor de scripts
 
-| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em atajos.ini |
+| Função | Atalho padrão | Nokia N95 (teclado do celular) | Nome em shortcuts.ini |
 |---|---|---|---|
 | Salvar script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
 | Desfazer | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |

@@ -1,10 +1,10 @@
 // ============================================================================
 //  RTGpuShader.inc - los compute shaders del trazado de rayos por GPU (RTGpu.cpp). GLSL 4.50 de Vulkan; el de trazar
-//  es el MISMO algoritmo que RayTracer.cpp (Trazar, Visibilidad, LuzEn, Radiancia, PrimerImpacto): si se cambia uno,
+//  es el MISMO algoritmo que RayTracer.cpp (Trazar, Visibilidad, LightIn, Radiancia, FirstImpact): si se cambia uno,
 //  cambiar el otro. La recursion de los reflejos va con una pila (GLSL no tiene recursion).
 // ============================================================================
 // (sin #version: RTGpu.cpp pone "#version 450", o "#version 460" + GL_EXT_ray_query + W3D_RTX con los nucleos RTX)
-static const char* kRTGpuComun = R"GLSL(
+static const char* kRTCommonGpu = R"GLSL(
 layout(local_size_x = 8, local_size_y = 8) in;
 struct Vert { vec4 p; vec4 n; vec4 t; };          // p.w = u, n.w = v
 struct Mat { vec4 m0; vec4 m1; vec4 m2; vec4 m3; vec4 m4; };
@@ -310,7 +310,7 @@ vec3 NormalEn(Hit h, vec3 d) {
 }
 )GLSL";
 
-static const char* kRTGpuTrazar = R"GLSL(
+static const char* kRTGpuTrace = R"GLSL(
 // un rayo de camara con sus capas transparentes; los REFLEJOS del metal van a una pila (hasta 4 rebotes)
 int gRebotes = 0;   // los rebotes de la luz (pc.dims.w >> 8)
 int gEnvMat = -1;   // el material extra del FONDO 360 (((pc.info.w >> 1) & 0x7FFF) - 1; -1 = el color de fondo)
@@ -488,7 +488,7 @@ void main() {
 static const char* kRTGpuDemod = R"GLSL(
 #version 450
 layout(local_size_x = 8, local_size_y = 8) in;
-layout(std430, binding = 0) readonly buffer BAcum { vec4 acum[]; };
+layout(std430, binding = 0) readonly buffer BAccum { vec4 accum[]; };
 layout(std430, binding = 1) buffer BSal { vec4 sal[]; };
 layout(std430, binding = 2) readonly buffer BAlb { vec4 alb[]; };
 layout(std430, binding = 3) readonly buffer BNrm { vec4 nrm[]; };

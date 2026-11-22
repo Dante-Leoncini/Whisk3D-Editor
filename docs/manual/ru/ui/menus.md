@@ -7,70 +7,70 @@
 - **флажок**, который показывает и переключает `bool`,
 - **ползунок**, который редактирует `float` между двумя значениями,
 - **сочетание клавиш**, справа и бледно-серым («Shift D»),
-- `verde`: это активный пункт, с иконкой и текстом в `accent`,
-- `gris`: указывает на `bool`; пока он равен `false`, пункт отображается с половинной непрозрачностью и не реагирует,
-- `lineaArriba`: линия, которая отделяет пункт от группы выше.
+- `green`: это активный пункт, с иконкой и текстом в `accent`,
+- `gray`: указывает на `bool`; пока он равен `false`, пункт отображается с половинной непрозрачностью и не реагирует,
+- `lineUp`: линия, которая отделяет пункт от группы выше.
 
-У меню может быть **заголовок** (`titulo`): он рисуется белым, с линией под ним.
+У меню может быть **заголовок** (`title`): он рисуется белым, с линией под ним.
 
 ## Собрать по таблице
 
 Рекомендуемый способ — таблица `MenuDef`: текст и то, что делает каждый пункт, находятся в одной строке. Нет номера, который нужно связывать со `switch` где-то в другом месте.
 
 ```cpp
-static bool grilla = true;
-static PopupMenu* recientes = NULL;
-static void Nuevo() { /* ... */ }
-static void Abrir() { /* ... */ }
+static bool grid = true;
+static PopupMenu* recent = NULL;
+static void New() { /* ... */ }
+static void Open() { /* ... */ }
 
 static const MenuDef ARCHIVO[] = {
     // текст     функция клавиши   иконка                   подменю     флажок
-    { "Nuevo",   Nuevo,  "Ctrl N", ICONO(IconType::mas) },
-    { "Abrir",   Abrir,  "Ctrl O", ICONO(IconType::carpeta) },
-    { "Recientes", NULL, NULL,     ICONO(IconType::lista),  &recientes },
-    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grilla },
+    { "Nuevo",   New,  "Ctrl N", ICON(IconType::more) },
+    { "Abrir",   Open,  "Ctrl O", ICON(IconType::folder) },
+    { "Recientes", NULL, NULL,     ICON(IconType::list),  &recent },
+    { "Grilla",  NULL,   NULL,     0,                       NULL,       &grid },
 };
 
-recientes = new PopupMenu();          // подменю должно существовать до вызова Construir
+recent = new PopupMenu();          // подменю должно существовать до вызова Construir
 PopupMenu* archivo = new PopupMenu();
-archivo->titulo = "Archivo";
-archivo->Construir(ARCHIVO, 4);
+archivo->title = "Archivo";
+archivo->Build(ARCHIVO, 4);
 ```
 
-`ICONO(x)` прибавляет к иконке 1: в таблице 0 означает «без иконки». Id каждого пункта — номер его строки.
+`ICON(x)` прибавляет к иконке 1: в таблице 0 означает «без иконки». Id каждого пункта — номер его строки.
 
 Два необязательных хука, которые устанавливает программа:
 
 ```cpp
-W3dMenuTraducir = MiTraduccion;   // const char* MiTraduccion(const char* texto)
-W3dMenuAtajoTexto = MiAtajo;      // std::string MiAtajo(const std::string& atajo)
+W3dMenuTranslate = MiTraduccion;   // const char* MiTraduccion(const char* texto)
+W3dMenuShortcutText = MiShortcut;      // std::string MiAtajo(const std::string& atajo)
 ```
 
-С `W3dMenuTraducir` тексты таблицы при построении меню выходят переведёнными. С `W3dMenuAtajoTexto` сочетание клавиш может быть именем, которое начинается с `@`, а хук возвращает соответствующую клавишу. Без этого хука сочетание с `@` не отображается.
+С `W3dMenuTranslate` тексты таблицы при построении меню выходят переведёнными. С `W3dMenuShortcutText` сочетание клавиш может быть именем, которое начинается с `@`, а хук возвращает соответствующую клавишу. Без этого хука сочетание с `@` не отображается.
 
 ## Собрать вручную
 
 ```cpp
-PopupMenu* vista = new PopupMenu();
-vista->Agregar("Frente", 0, IconType::camera);
-vista->AgregarCheck("Mostrar piso", 1, &verPiso);
-vista->AgregarFloat("Tamaño", 2, &tamanio, 0.0f, 4.0f);
-MenuItem* it = vista->Agregar("Alambre", 3);
-it->verde = esAlambre;
-it->lineaArriba = true;
-vista->action = AlElegir;              // void AlElegir(int id)
+PopupMenu* view = new PopupMenu();
+view->Add("Frente", 0, IconType::camera);
+view->AddCheck("Mostrar piso", 1, &showFloor);
+view->AddFloat("Tamaño", 2, &size, 0.0f, 4.0f);
+MenuItem* it = view->Add("Alambre", 3);
+it->green = isWire;
+it->lineUp = true;
+view->action = OnPick;              // void AlElegir(int id)
 ```
 
-`Agregar` возвращает `MenuItem*`, чтобы можно было изменить остальное. При выборе пункта `Ejecutar(id)` вызывает его `accion`, если она есть, а если нет — `action(id)` меню. `Limpiar()` удаляет все пункты, для меню, которые меняются.
+`Add` возвращает `MenuItem*`, чтобы можно было изменить остальное. При выборе пункта `Run(id)` вызывает его `action`, если она есть, а если нет — `action(id)` меню. `Clear()` удаляет все пункты, для меню, которые меняются.
 
 ## Открыть
 
 ```cpp
-archivo->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-MenuAbierto = archivo;
+archivo->Open(mx, my, MenuScreenW, MenuScreenH);
+OpenMenu = archivo;
 ```
 
-Меню открывается в переданной точке: у курсора или у края кнопки. Если оно не помещается, то сдвигается внутрь экрана. `Abrir` не трогает `MenuAbierto`: его устанавливает тот, кто открывает меню. `Cerrar()` возвращает его в `NULL`.
+Меню открывается в переданной точке: у курсора или у края кнопки. Если оно не помещается, то сдвигается внутрь экрана. `Open` не трогает `OpenMenu`: его устанавливает тот, кто открывает меню. `Close()` возвращает его в `NULL`.
 
 При открытии меню измеряется:
 
@@ -84,26 +84,26 @@ MenuAbierto = archivo;
 
 ```cpp
 // при движении
-if (MenuAbierto) MenuAbierto->MouseMove(mx, my);
+if (OpenMenu) OpenMenu->MouseMove(mx, my);
 
 // при клике или касании
-if (MenuAbierto) {
-    PopupMenu* m = MenuAbierto;
+if (OpenMenu) {
+    PopupMenu* m = OpenMenu;
     int id = m->Click(mx, my);
-    if (id >= 0) m->Ejecutar(id);
+    if (id >= 0) m->Run(id);
 }
 
 // при рисовании, с проекцией на весь экран
-if (MenuAbierto) MenuAbierto->Render();
+if (OpenMenu) OpenMenu->Render();
 ```
 
 `Click` возвращает id выбранного пункта, `-1`, если ничего не выбрано, или `-2`, если открылось подменю.
 
 - Наведение мыши подсвечивает строку и открывает её подменю, без клика.
-- Если мышь отходит дальше чем на `60 * GlobalScale` пикселей, меню закрывается само. С `cerrarLejos = false` — нет: для меню, которое открылось не у мыши.
+- Если мышь отходит дальше чем на `60 * GlobalScale` пикселей, меню закрывается само. С `closeFar = false` — нет: для меню, которое открылось не у мыши.
 - Клик снаружи закрывает его.
 - Обычный пункт закрывает меню. Флажок переключается и оставляет меню открытым, чтобы можно было включить несколько. Клик по ползунку ставит значение в зависимости от того, куда он пришёлся.
-- Если зажать ползунок и тянуть, значение меняется на лету. Тот, кто обрабатывает мышь, передаёт каждое движение в `MenuSliderDragMover(mx)`, пока `MenuSliderDragActivo()` равно `true`, а при отпускании вызывает `MenuSliderDragSoltar()`.
+- Если зажать ползунок и тянуть, значение меняется на лету. Тот, кто обрабатывает мышь, передаёт каждое движение в `MenuSliderDragMove(mx)`, пока `MenuSliderDragActive()` равно `true`, а при отпускании вызывает `MenuSliderDragRelease()`.
 - На сенсорном экране касание, которое открывает подменю, ничего в нём не выбирает, даже если подменю оказалось под пальцем. Нужно второе касание.
 - То, что выбрано в подменю, выполняется в этом подменю: у каждого меню свои id.
 
@@ -112,19 +112,19 @@ if (MenuAbierto) MenuAbierto->Render();
 Фокус у самого глубокого открытого подменю:
 
 ```cpp
-PopupMenu* m = MenuAbierto;
-while (m->submenuAbierto && m->submenuAbierto->abierto) m = m->submenuAbierto;
-MenuItem* it = m->ItemActual();      // подсвеченный пункт или NULL
+PopupMenu* m = OpenMenu;
+while (m->openSubmenu && m->openSubmenu->open) m = m->openSubmenu;
+MenuItem* it = m->CurrentItem();      // подсвеченный пункт или NULL
 ```
 
 | Функция | Что делает |
 |---|---|
 | `button_up()`, `button_down()` | Двигают подсветку, по кругу. Подменю не открывают |
-| `AbrirSubmenuActual()` | Открывает подменю подсвеченного пункта и подсвечивает его первый пункт |
-| `AjustarSlider(+1)`, `AjustarSlider(-1)` | Двигают ползунок на одну двадцатую его диапазона |
-| `Enter()` | Как клик по подсвеченному пункту, и возвращает то же самое. Вызванная у `MenuAbierto`, сама доходит до самого глубокого подменю |
-| `Cerrar()` | Закрывает меню и его подменю |
+| `OpenSubmenuCurrent()` | Открывает подменю подсвеченного пункта и подсвечивает его первый пункт |
+| `FitSlider(+1)`, `FitSlider(-1)` | Двигают ползунок на одну двадцатую его диапазона |
+| `Enter()` | Как клик по подсвеченному пункту, и возвращает то же самое. Вызванная у `OpenMenu`, сама доходит до самого глубокого подменю |
+| `Close()` | Закрывает меню и его подменю |
 
 С клавиатурой подсвеченный пункт всегда остаётся на виду. Какая клавиша что вызывает, решает тот, кто использует меню.
 
-В `MenuPantallaW` и `MenuPantallaH` должен быть размер экрана: по ним меню и размещается.
+В `MenuScreenW` и `MenuScreenH` должен быть размер экрана: по ним меню и размещается.

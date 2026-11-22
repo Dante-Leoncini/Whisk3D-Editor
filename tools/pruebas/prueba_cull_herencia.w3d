@@ -15,7 +15,7 @@
 // ==========================================================================
 Whisk3D {
     version: 20251127
-    Escena {
+    Scene {
         background: "0.02, 0.02, 0.03, 1.0"
         Camera {
             name: "Camara"
@@ -27,15 +27,15 @@ Whisk3D {
         }
         Culling {
             name: "CullZona"
-            activo: true
-            soloCamaraActiva: true
+            active: true
+            activeCameraOnly: true
             Wavefront { name: "Cull0" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 scale: 0.05 }
             Wavefront { name: "CullLejos" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 300.0 scale: 0.05 }
             // LOD SIN flag propio, ADENTRO del Culling designado: HEREDA la
             // camara de medida en todos los viewports
             LOD {
                 name: "LodAdentro"
-                distancias: "8"
+                distances: "8"
                 Wavefront { name: "AdFina"   filePath: lod-barra-fina.obj }
                 Wavefront { name: "AdGruesa" filePath: lod-barra-gruesa.obj }
             }
@@ -45,7 +45,7 @@ Whisk3D {
         // ultimo en dibujar es la orbita a 250 -> hijo GRUESO).
         LOD {
             name: "LodFuera"
-            distancias: "8"
+            distances: "8"
             Wavefront { name: "FuFina"   filePath: lod-barra-fina.obj   z: 3.0 }
             Wavefront { name: "FuGruesa" filePath: lod-barra-gruesa.obj z: 3.0 }
         }

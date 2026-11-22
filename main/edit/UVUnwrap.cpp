@@ -18,15 +18,15 @@
 //   - Reset: cada cara ocupa toda la textura.
 //
 //  Convencion de V: el engine dibuja V=0 ARRIBA de la imagen (como las proyecciones de
-//  ProyectarUVCaras). Los algoritmos trabajan con V hacia arriba (asi "bien orientado" es
+//  ProjectUVFaces). Los algoritmos trabajan con V hacia arriba (asi "bien orientado" es
 //  determinante positivo) y al escribir se voltea V (v = 1 - v).
 // ============================================================================
 #include "edit/UVUnwrap.h"
-#include "edit/MeshEdit.h"      // W3dTriangularCara (ngons)
+#include "edit/MeshEdit.h"      // W3dTriangulateFace (ngons)
 #include "objects/Mesh.h"
 #include "objects/EditMesh.h"
 #include "objects/Objects.h"    // EditSelectMode / SelFace
-#include "Undo.h"               // UndoCapturarMallaGeo
+#include "Undo.h"               // UndoCaptureMeshGeo
 #include <math.h>
 #include <map>
 #include <vector>
@@ -40,62 +40,62 @@ namespace {
 //  La malla vista por el desplegado: caras de faces3d, vertices UNICOS por posicion (posRep),
 //  corners numerados en el orden de las capas por-corner (ini[f] + c) y la seleccion de caras.
 // ---------------------------------------------------------------------------
-struct UVMalla {
+struct UVMesh {
     Mesh* m;
     const GLfloat* P;                 // posiciones de reposo por render vert
     int nC;                           // corners totales
-    std::vector<int> ini;             // ini[f] = primer corner de faces3d[f]
+    std::vector<int> start;           // ini[f] = primer corner de faces3d[f]
     std::vector<unsigned char> sel;   // faces3d[f] seleccionada
     std::vector<int> rep;             // render vert -> vertice unico
-    int activa;                       // faces3d activa (modo cara) o -1
+    int active;                       // faces3d activa (modo cara) o -1
     int nSel;
 };
 
-// (W3dSmartUVProjectTodas) desplegar TODAS las caras, sin mirar la seleccion de Edit Mode
-static bool gUVTodasLasCaras = false;
-static bool Preparar(Mesh* m, UVMalla& M, std::string& msg, const char* op) {
+// (W3dSmartUVProjectAll) desplegar TODAS las caras, sin mirar la seleccion de Edit Mode
+static bool gUVAllFaces = false;
+static bool Prepare(Mesh* m, UVMesh& M, std::string& msg, const char* op) {
     msg = std::string(op) + ": select faces first";
     if (!m) return false;
     m->EnsureEdit();
     if (!m->edit || !m->vertex || m->vertexSize <= 0) return false;
     M.m = m;
-    M.P = m->PosicionesReposo(); if (!M.P) M.P = m->vertex;
+    M.P = m->RestPositions(); if (!M.P) M.P = m->vertex;
     // vertice unico por POSICION con tolerancia (posRep agrupa por bytes exactos: los polos de la esfera
     // difieren en un redondeo y quedaban como vertices distintos -> la isla se abria en el polo)
     const int nV = m->vertexSize;
-    const bool hayRep = ((int)m->posRep.size() == nV);
+    const bool hasRep = ((int)m->posRep.size() == nV);
     M.rep.resize((size_t)nV);
-    std::map<std::pair<long, std::pair<long,long> >, int> porPos;
+    std::map<std::pair<long, std::pair<long,long> >, int> byPos;
     for (int i = 0; i < nV; i++) {
-        const int r = hayRep ? m->posRep[(size_t)i] : i;
+        const int r = hasRep ? m->posRep[(size_t)i] : i;
         const float* p = &M.P[(size_t)r * 3];
         std::pair<long, std::pair<long,long> > key((long)floor(p[0] * 1e5 + 0.5), std::make_pair((long)floor(p[1] * 1e5 + 0.5), (long)floor(p[2] * 1e5 + 0.5)));
-        std::map<std::pair<long, std::pair<long,long> >, int>::iterator it = porPos.find(key);
-        if (it == porPos.end()) { porPos[key] = r; M.rep[(size_t)i] = r; } else M.rep[(size_t)i] = it->second;
+        std::map<std::pair<long, std::pair<long,long> >, int>::iterator it = byPos.find(key);
+        if (it == byPos.end()) { byPos[key] = r; M.rep[(size_t)i] = r; } else M.rep[(size_t)i] = it->second;
     }
     EditMesh* e = m->edit;
     M.sel.assign(m->faces3d.size(), 0); M.nSel = 0;
-    if (gUVTodasLasCaras) { for (size_t f = 0; f < m->faces3d.size(); f++) M.sel[f] = 1; M.nSel = (int)m->faces3d.size(); }
+    if (gUVAllFaces) { for (size_t f = 0; f < m->faces3d.size(); f++) M.sel[f] = 1; M.nSel = (int)m->faces3d.size(); }
     else
     for (size_t f = 0; f < e->faceSel.size() && f < e->faceSrc.size(); f++) {
         if (!e->faceSel[f]) continue;
         const int f3 = e->faceSrc[f];
         if (f3 >= 0 && f3 < (int)m->faces3d.size() && !M.sel[(size_t)f3]) { M.sel[(size_t)f3] = 1; M.nSel++; }
     }
-    M.activa = -1;
-    if (EditSelectMode == SelFace && e->activeIdx >= 0 && e->activeIdx < (int)e->faceSrc.size()) M.activa = e->faceSrc[(size_t)e->activeIdx];
-    M.ini.resize(m->faces3d.size()); int L = 0;
-    for (size_t f = 0; f < m->faces3d.size(); f++) { M.ini[f] = L; L += (int)m->faces3d[f].idx.size(); }
+    M.active = -1;
+    if (EditSelectMode == SelFace && e->activeIdx >= 0 && e->activeIdx < (int)e->faceSrc.size()) M.active = e->faceSrc[(size_t)e->activeIdx];
+    M.start.resize(m->faces3d.size()); int L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++) { M.start[f] = L; L += (int)m->faces3d[f].idx.size(); }
     M.nC = L;
     if (M.nSel == 0) return false;
     msg.clear();
     return true;
 }
 
-static inline const float* Pos(const UVMalla& M, int rv) { return &M.P[(size_t)rv * 3]; }
-static inline int Rep(const UVMalla& M, int rv) { return M.rep[(size_t)rv]; }
+static inline const float* Pos(const UVMesh& M, int rv) { return &M.P[(size_t)rv * 3]; }
+static inline int Rep(const UVMesh& M, int rv) { return M.rep[(size_t)rv]; }
 static inline double Dist3(const float* a, const float* b) { const double dx = a[0]-b[0], dy = a[1]-b[1], dz = a[2]-b[2]; return sqrt(dx*dx + dy*dy + dz*dz); }
-static bool EsCostura(const UVMalla& M, int rva, int rvb) {
+static bool IsSeam(const UVMesh& M, int rva, int rvb) {
     if (M.m->seamEdges.empty()) return false;
     return M.m->seamEdges.count(Mesh::SharpEdgeKey(Pos(M, rva), Pos(M, rvb))) > 0;
 }
@@ -105,46 +105,46 @@ struct UF {
     std::vector<int> p;
     void Init(int n) { p.resize((size_t)n); for (int i = 0; i < n; i++) p[(size_t)i] = i; }
     int Find(int a) { while (p[(size_t)a] != a) { p[(size_t)a] = p[(size_t)p[(size_t)a]]; a = p[(size_t)a]; } return a; }
-    void Unir(int a, int b) { a = Find(a); b = Find(b); if (a != b) p[(size_t)a] = b; }
+    void Join(int a, int b) { a = Find(a); b = Find(b); if (a != b) p[(size_t)a] = b; }
 };
 
 // lados de las caras seleccionadas, por par de vertices unicos (min,max)
-struct Lado { int f, c; };   // cara y corner de salida (el lado va del corner c al c+1)
-typedef std::map<std::pair<int,int>, std::vector<Lado> > TablaLados;
-static void ArmarLados(const UVMalla& M, TablaLados& T) {
+struct Side { int f, c; };   // cara y corner de salida (el lado va del corner c al c+1)
+typedef std::map<std::pair<int,int>, std::vector<Side> > SideTable;
+static void BuildSides(const UVMesh& M, SideTable& T) {
     for (size_t f = 0; f < M.m->faces3d.size(); f++) {
         if (!M.sel[f]) continue;
         const std::vector<int>& idx = M.m->faces3d[f].idx; const int cnt = (int)idx.size();
         for (int c = 0; c < cnt; c++) {
             const int a = Rep(M, idx[(size_t)c]), b = Rep(M, idx[(size_t)((c + 1) % cnt)]);
             if (a == b) continue;
-            Lado l; l.f = (int)f; l.c = c;
+            Side l; l.f = (int)f; l.c = c;
             T[std::make_pair(a < b ? a : b, a < b ? b : a)].push_back(l);
         }
     }
 }
 // corner (global) de la cara del lado que tiene el vertice unico v
-static int CornerDe(const UVMalla& M, const Lado& l, int v) {
+static int CornerOf(const UVMesh& M, const Side& l, int v) {
     const std::vector<int>& idx = M.m->faces3d[(size_t)l.f].idx; const int cnt = (int)idx.size();
-    return (Rep(M, idx[(size_t)l.c]) == v) ? M.ini[(size_t)l.f] + l.c : M.ini[(size_t)l.f] + (l.c + 1) % cnt;
+    return (Rep(M, idx[(size_t)l.c]) == v) ? M.start[(size_t)l.f] + l.c : M.start[(size_t)l.f] + (l.c + 1) % cnt;
 }
 
-// uvDe[corner] = uv vert (numerado denso) o -1 si la cara no esta seleccionada. Dos corners son el
+// uvOf[corner] = uv vert (numerado denso) o -1 si la cara no esta seleccionada. Dos corners son el
 // MISMO uv vert cuando comparten vertice a traves de un lado compartido que no es costura (y, si
 // hay 'grupo', entre caras del mismo grupo). Una costura que muere en el medio de una isla no
 // parte nada: los corners se juntan dando la vuelta por el otro lado.
-static int AsignarUVVerts(const UVMalla& M, const TablaLados& T, bool costuras, const std::vector<int>* grupo, std::vector<int>& uvDe) {
+static int AssignUVVerts(const UVMesh& M, const SideTable& T, bool seams, const std::vector<int>* group, std::vector<int>& uvOf) {
     UF uf; uf.Init(M.nC);
-    for (TablaLados::const_iterator it = T.begin(); it != T.end(); ++it) {
-        const std::vector<Lado>& ls = it->second;
+    for (SideTable::const_iterator it = T.begin(); it != T.end(); ++it) {
+        const std::vector<Side>& ls = it->second;
         if (ls.size() < 2) continue;
         const int va = it->first.first, vb = it->first.second;
         {   const std::vector<int>& idx = M.m->faces3d[(size_t)ls[0].f].idx; const int cnt = (int)idx.size();
-            if (costuras && EsCostura(M, idx[(size_t)ls[0].c], idx[(size_t)((ls[0].c + 1) % cnt)])) continue; }
+            if (seams && IsSeam(M, idx[(size_t)ls[0].c], idx[(size_t)((ls[0].c + 1) % cnt)])) continue; }
         for (size_t i = 0; i < ls.size(); i++) for (size_t j = i + 1; j < ls.size(); j++) {
-            if (grupo && (*grupo)[(size_t)ls[i].f] != (*grupo)[(size_t)ls[j].f]) continue;
-            uf.Unir(CornerDe(M, ls[i], va), CornerDe(M, ls[j], va));
-            uf.Unir(CornerDe(M, ls[i], vb), CornerDe(M, ls[j], vb));
+            if (group && (*group)[(size_t)ls[i].f] != (*group)[(size_t)ls[j].f]) continue;
+            uf.Join(CornerOf(M, ls[i], va), CornerOf(M, ls[j], va));
+            uf.Join(CornerOf(M, ls[i], vb), CornerOf(M, ls[j], vb));
         }
     }
     // dos corners de la MISMA cara sobre el mismo vertice (el polo de la esfera: un quad con dos esquinas
@@ -153,17 +153,17 @@ static int AsignarUVVerts(const UVMalla& M, const TablaLados& T, bool costuras, 
         if (!M.sel[f]) continue;
         const std::vector<int>& idx = M.m->faces3d[f].idx; const int cnt = (int)idx.size();
         for (int c1 = 0; c1 < cnt; c1++) for (int c2 = c1 + 1; c2 < cnt; c2++)
-            if (Rep(M, idx[(size_t)c1]) == Rep(M, idx[(size_t)c2])) uf.Unir(M.ini[f] + c1, M.ini[f] + c2);
+            if (Rep(M, idx[(size_t)c1]) == Rep(M, idx[(size_t)c2])) uf.Join(M.start[f] + c1, M.start[f] + c2);
     }
-    uvDe.assign((size_t)M.nC, -1);
+    uvOf.assign((size_t)M.nC, -1);
     std::vector<int> id((size_t)M.nC, -1); int n = 0;
     for (size_t f = 0; f < M.m->faces3d.size(); f++) {
         if (!M.sel[f]) continue;
         const int cnt = (int)M.m->faces3d[f].idx.size();
         for (int c = 0; c < cnt; c++) {
-            const int k = M.ini[f] + c, r = uf.Find(k);
+            const int k = M.start[f] + c, r = uf.Find(k);
             if (id[(size_t)r] < 0) id[(size_t)r] = n++;
-            uvDe[(size_t)k] = id[(size_t)r];
+            uvOf[(size_t)k] = id[(size_t)r];
         }
     }
     return n;
@@ -173,61 +173,61 @@ static int AsignarUVVerts(const UVMalla& M, const TablaLados& T, bool costuras, 
 //  Cartas (islas): caras que comparten algun uv vert. Cada carta tiene sus corners, el uv vert
 //  local de cada corner, la posicion 3D de cada uv vert local y sus coordenadas uv.
 // ---------------------------------------------------------------------------
-struct Carta {
-    std::vector<int> caras;       // faces3d
+struct UVChart {
+    std::vector<int> faces;       // faces3d
     std::vector<int> corners;     // corners globales
     std::vector<int> local;       // local[i] = uv vert local del corner corners[i]
     std::vector<double> p3;       // 3 por uv vert local (posicion 3D)
     std::vector<double> uv;       // 2 por uv vert local
     int nLoc;
-    Carta() : nLoc(0) {}
+    UVChart() : nLoc(0) {}
 };
 
-static void ArmarCartas(const UVMalla& M, const std::vector<int>& uvDe, int nUV, std::vector<Carta>& cartas) {
+static void BuildCards(const UVMesh& M, const std::vector<int>& uvOf, int nUV, std::vector<UVChart>& cards) {
     const int nF = (int)M.m->faces3d.size();
     UF uf; uf.Init(nF);
-    std::vector<int> primera((size_t)nUV, -1);
+    std::vector<int> first((size_t)nUV, -1);
     for (int f = 0; f < nF; f++) {
         if (!M.sel[(size_t)f]) continue;
         const int cnt = (int)M.m->faces3d[(size_t)f].idx.size();
         for (int c = 0; c < cnt; c++) {
-            const int u = uvDe[(size_t)(M.ini[(size_t)f] + c)];
-            if (primera[(size_t)u] < 0) primera[(size_t)u] = f; else uf.Unir(f, primera[(size_t)u]);
+            const int u = uvOf[(size_t)(M.start[(size_t)f] + c)];
+            if (first[(size_t)u] < 0) first[(size_t)u] = f; else uf.Join(f, first[(size_t)u]);
         }
     }
-    std::map<int,int> raizACarta;
+    std::map<int,int> rootToCard;
     for (int f = 0; f < nF; f++) {
         if (!M.sel[(size_t)f]) continue;
         const int r = uf.Find(f);
-        std::map<int,int>::iterator it = raizACarta.find(r);
-        if (it == raizACarta.end()) { raizACarta[r] = (int)cartas.size(); cartas.push_back(Carta()); it = raizACarta.find(r); }
-        cartas[(size_t)it->second].caras.push_back(f);
+        std::map<int,int>::iterator it = rootToCard.find(r);
+        if (it == rootToCard.end()) { rootToCard[r] = (int)cards.size(); cards.push_back(UVChart()); it = rootToCard.find(r); }
+        cards[(size_t)it->second].faces.push_back(f);
     }
     std::vector<int> loc((size_t)nUV, -1);
-    for (size_t ci = 0; ci < cartas.size(); ci++) {
-        Carta& C = cartas[ci];
-        std::vector<int> usados;
-        for (size_t i = 0; i < C.caras.size(); i++) {
-            const int f = C.caras[i];
+    for (size_t ci = 0; ci < cards.size(); ci++) {
+        UVChart& C = cards[ci];
+        std::vector<int> used;
+        for (size_t i = 0; i < C.faces.size(); i++) {
+            const int f = C.faces[i];
             const std::vector<int>& idx = M.m->faces3d[(size_t)f].idx; const int cnt = (int)idx.size();
             for (int c = 0; c < cnt; c++) {
-                const int k = M.ini[(size_t)f] + c, u = uvDe[(size_t)k];
+                const int k = M.start[(size_t)f] + c, u = uvOf[(size_t)k];
                 if (loc[(size_t)u] < 0) {
-                    loc[(size_t)u] = C.nLoc++; usados.push_back(u);
+                    loc[(size_t)u] = C.nLoc++; used.push_back(u);
                     const float* p = Pos(M, idx[(size_t)c]);
                     C.p3.push_back(p[0]); C.p3.push_back(p[1]); C.p3.push_back(p[2]);
                 }
                 C.corners.push_back(k); C.local.push_back(loc[(size_t)u]);
             }
         }
-        for (size_t i = 0; i < usados.size(); i++) loc[(size_t)usados[i]] = -1;
+        for (size_t i = 0; i < used.size(); i++) loc[(size_t)used[i]] = -1;
         C.uv.assign((size_t)C.nLoc * 2, 0.0);
     }
 }
 
 // triangulos de la cara f como TERNAS DE CORNERS globales (abanico; ear clipping si es concava)
-static void TriangulosCara(const UVMalla& M, int f, std::vector<int>& out) {
-    const std::vector<int>& idx = M.m->faces3d[(size_t)f].idx; const int cnt = (int)idx.size(); const int L = M.ini[(size_t)f];
+static void TrianglesFace(const UVMesh& M, int f, std::vector<int>& out) {
+    const std::vector<int>& idx = M.m->faces3d[(size_t)f].idx; const int cnt = (int)idx.size(); const int L = M.start[(size_t)f];
     out.clear();
     if (cnt < 3) return;
     if (cnt == 3) { out.push_back(L); out.push_back(L + 1); out.push_back(L + 2); return; }
@@ -237,7 +237,7 @@ static void TriangulosCara(const UVMalla& M, int f, std::vector<int>& out) {
         else            { out.push_back(L); out.push_back(L+1); out.push_back(L+3); out.push_back(L+1); out.push_back(L+2); out.push_back(L+3); }
         return;
     }
-    std::vector<MeshIndex> tris; W3dTriangularCara(M.P, idx, tris);
+    std::vector<MeshIndex> tris; W3dTriangulateFace(M.P, idx, tris);
     for (size_t t = 0; t + 2 < tris.size(); t += 3) {
         int cs[3];
         for (int i = 0; i < 3; i++) {
@@ -254,9 +254,9 @@ static void TriangulosCara(const UVMalla& M, int f, std::vector<int>& out) {
 //  p1 sobre +x, p2 con y > 0: marco derecho respecto de la normal de la cara), area, angulos 3D
 //  y los gradientes de la funcion "sombrero" de cada vertice (para el jacobiano).
 // ---------------------------------------------------------------------------
-struct TriPlano { int v[3]; double x[3], y[3], A, ang[3], gx[3], gy[3]; };
+struct TriPlane { int v[3]; double x[3], y[3], A, ang[3], gx[3], gy[3]; };
 
-static bool ArmarTriPlano(const double* p0, const double* p1, const double* p2, TriPlano& t) {
+static bool BuildTriPlane(const double* p0, const double* p1, const double* p2, TriPlane& t) {
     const double e1[3] = { p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2] }, e2[3] = { p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2] };
     const double l1 = sqrt(e1[0]*e1[0] + e1[1]*e1[1] + e1[2]*e1[2]);
     const double l2 = sqrt(e2[0]*e2[0] + e2[1]*e2[1] + e2[2]*e2[2]);
@@ -282,16 +282,16 @@ static bool ArmarTriPlano(const double* p0, const double* p1, const double* p2, 
 }
 
 // lc[corner] = uv vert local (solo los corners de esta carta estan cargados)
-static void TriangulosCarta(const UVMalla& M, const Carta& C, const std::vector<int>& lc, std::vector<TriPlano>& tris) {
+static void TrianglesCard(const UVMesh& M, const UVChart& C, const std::vector<int>& lc, std::vector<TriPlane>& tris) {
     std::vector<int> tc;
-    for (size_t i = 0; i < C.caras.size(); i++) {
-        TriangulosCara(M, C.caras[i], tc);
+    for (size_t i = 0; i < C.faces.size(); i++) {
+        TrianglesFace(M, C.faces[i], tc);
         for (size_t t = 0; t + 2 < tc.size(); t += 3) {
-            TriPlano tp;
+            TriPlane tp;
             tp.v[0] = lc[(size_t)tc[t]]; tp.v[1] = lc[(size_t)tc[t+1]]; tp.v[2] = lc[(size_t)tc[t+2]];
             if (tp.v[0] < 0 || tp.v[1] < 0 || tp.v[2] < 0) continue;
             if (tp.v[0] == tp.v[1] || tp.v[1] == tp.v[2] || tp.v[0] == tp.v[2]) continue;
-            if (!ArmarTriPlano(&C.p3[(size_t)tp.v[0]*3], &C.p3[(size_t)tp.v[1]*3], &C.p3[(size_t)tp.v[2]*3], tp)) continue;
+            if (!BuildTriPlane(&C.p3[(size_t)tp.v[0]*3], &C.p3[(size_t)tp.v[1]*3], &C.p3[(size_t)tp.v[2]*3], tp)) continue;
             tris.push_back(tp);
         }
     }
@@ -305,18 +305,18 @@ static void TriangulosCarta(const UVMalla& M, const Carta& C, const std::vector<
 //  El sistema rectangular se resuelve por gradientes conjugados sobre las ecuaciones normales
 //  sin armar A^T A (cada iteracion hace un producto por A y otro por A^T).
 // ---------------------------------------------------------------------------
-struct Disperso {
-    std::vector<int> ini;        // ini[fila]..ini[fila+1]
+struct Sparse {
+    std::vector<int> start;        // ini[fila]..ini[fila+1]
     std::vector<int> col;
     std::vector<double> val;
     std::vector<double> rhs;
     int nCol;
-    Disperso() : nCol(0) {}
+    Sparse() : nCol(0) {}
     void MulA(const std::vector<double>& x, std::vector<double>& y) const {
         const size_t nR = rhs.size();
         for (size_t r = 0; r < nR; r++) {
             double s = 0.0;
-            for (int k = ini[r]; k < ini[r+1]; k++) s += val[(size_t)k] * x[(size_t)col[(size_t)k]];
+            for (int k = start[r]; k < start[r+1]; k++) s += val[(size_t)k] * x[(size_t)col[(size_t)k]];
             y[r] = s;
         }
     }
@@ -324,32 +324,32 @@ struct Disperso {
         x.assign((size_t)nCol, 0.0);
         const size_t nR = rhs.size();
         for (size_t r = 0; r < nR; r++)
-            for (int k = ini[r]; k < ini[r+1]; k++) x[(size_t)col[(size_t)k]] += val[(size_t)k] * y[r];
+            for (int k = start[r]; k < start[r+1]; k++) x[(size_t)col[(size_t)k]] += val[(size_t)k] * y[r];
     }
 };
 
-static double Punto(const std::vector<double>& a, const std::vector<double>& b) { double s = 0.0; for (size_t i = 0; i < a.size(); i++) s += a[i] * b[i]; return s; }
+static double Point(const std::vector<double>& a, const std::vector<double>& b) { double s = 0.0; for (size_t i = 0; i < a.size(); i++) s += a[i] * b[i]; return s; }
 
-static void ResolverMinCuad(const Disperso& S, std::vector<double>& x) {
+static void ResolveMinCuad(const Sparse& S, std::vector<double>& x) {
     const size_t nR = S.rhs.size();
     x.assign((size_t)S.nCol, 0.0);
     if (nR == 0 || S.nCol == 0) return;
     std::vector<double> r(S.rhs), s, p, q(nR, 0.0);
     S.MulAT(r, s);
     p = s;
-    double gamma = Punto(s, s);
+    double gamma = Point(s, s);
     const double tol = gamma * 1e-22;
     int maxIt = 4 * S.nCol + 200; if (maxIt > 20000) maxIt = 20000;
     for (int it = 0; it < maxIt; it++) {
         if (gamma <= tol) break;
         S.MulA(p, q);
-        const double qq = Punto(q, q);
+        const double qq = Point(q, q);
         if (qq <= 0.0) break;
-        const double alfa = gamma / qq;
-        for (size_t i = 0; i < x.size(); i++) x[i] += alfa * p[i];
-        for (size_t i = 0; i < nR; i++) r[i] -= alfa * q[i];
+        const double alpha = gamma / qq;
+        for (size_t i = 0; i < x.size(); i++) x[i] += alpha * p[i];
+        for (size_t i = 0; i < nR; i++) r[i] -= alpha * q[i];
         S.MulAT(r, s);
-        const double gn = Punto(s, s);
+        const double gn = Point(s, s);
         if (gn <= tol) break;
         const double beta = gn / gamma;
         for (size_t i = 0; i < p.size(); i++) p[i] = s[i] + beta * p[i];
@@ -357,41 +357,41 @@ static void ResolverMinCuad(const Disperso& S, std::vector<double>& x) {
     }
 }
 
-static void AplanarConforme(const std::vector<TriPlano>& tris, int nLoc, const std::vector<double>& p3, std::vector<double>& uv) {
+static void FlattenConformal(const std::vector<TriPlane>& tris, int nLoc, const std::vector<double>& p3, std::vector<double>& uv) {
     uv.assign((size_t)nLoc * 2, 0.0);
     if (nLoc < 2 || tris.empty()) return;
     // los dos vertices fijos: extremos del eje mas largo de la caja de la isla
     double mn[3] = { 1e300, 1e300, 1e300 }, mx[3] = { -1e300, -1e300, -1e300 };
     for (int k = 0; k < nLoc; k++) for (int a = 0; a < 3; a++) { const double c = p3[(size_t)k*3 + a]; if (c < mn[a]) mn[a] = c; if (c > mx[a]) mx[a] = c; }
-    int eje = 0; for (int a = 1; a < 3; a++) if (mx[a] - mn[a] > mx[eje] - mn[eje]) eje = a;
+    int axis = 0; for (int a = 1; a < 3; a++) if (mx[a] - mn[a] > mx[axis] - mn[axis]) axis = a;
     int pA = 0, pB = 0;
-    for (int k = 1; k < nLoc; k++) { if (p3[(size_t)k*3 + eje] < p3[(size_t)pA*3 + eje]) pA = k; if (p3[(size_t)k*3 + eje] > p3[(size_t)pB*3 + eje]) pB = k; }
+    for (int k = 1; k < nLoc; k++) { if (p3[(size_t)k*3 + axis] < p3[(size_t)pA*3 + axis]) pA = k; if (p3[(size_t)k*3 + axis] > p3[(size_t)pB*3 + axis]) pB = k; }
     if (pA == pB) pB = (pA + 1) % nLoc;
     double d = 0.0; { const double dx = p3[(size_t)pB*3]-p3[(size_t)pA*3], dy = p3[(size_t)pB*3+1]-p3[(size_t)pA*3+1], dz = p3[(size_t)pB*3+2]-p3[(size_t)pA*3+2]; d = sqrt(dx*dx + dy*dy + dz*dz); }
     if (d < 1e-9) d = 1.0;
     uv[(size_t)pA*2] = 0.0; uv[(size_t)pA*2+1] = 0.0; uv[(size_t)pB*2] = d; uv[(size_t)pB*2+1] = 0.0;
-    std::vector<int> colDe((size_t)nLoc, -1); int nCol = 0;
-    for (int k = 0; k < nLoc; k++) if (k != pA && k != pB) { colDe[(size_t)k] = nCol; nCol += 2; }
+    std::vector<int> colOf((size_t)nLoc, -1); int nCol = 0;
+    for (int k = 0; k < nLoc; k++) if (k != pA && k != pB) { colOf[(size_t)k] = nCol; nCol += 2; }
     if (nCol == 0) return;
-    Disperso S; S.nCol = nCol;
+    Sparse S; S.nCol = nCol;
     for (size_t t = 0; t < tris.size(); t++) {
-        const TriPlano& T = tris[t];
+        const TriPlane& T = tris[t];
         const double sA = sqrt(T.A);
-        for (int fila = 0; fila < 2; fila++) {
-            S.ini.push_back((int)S.col.size()); double b = 0.0;
+        for (int row = 0; row < 2; row++) {
+            S.start.push_back((int)S.col.size()); double b = 0.0;
             for (int i = 0; i < 3; i++) {
                 const int k = T.v[i];
-                const double cu = (fila == 0) ? sA * T.gx[i] : sA * T.gy[i];
-                const double cv = (fila == 0) ? -sA * T.gy[i] : sA * T.gx[i];
-                if (colDe[(size_t)k] >= 0) { S.col.push_back(colDe[(size_t)k]); S.val.push_back(cu); S.col.push_back(colDe[(size_t)k] + 1); S.val.push_back(cv); }
+                const double cu = (row == 0) ? sA * T.gx[i] : sA * T.gy[i];
+                const double cv = (row == 0) ? -sA * T.gy[i] : sA * T.gx[i];
+                if (colOf[(size_t)k] >= 0) { S.col.push_back(colOf[(size_t)k]); S.val.push_back(cu); S.col.push_back(colOf[(size_t)k] + 1); S.val.push_back(cv); }
                 else b -= cu * uv[(size_t)k*2] + cv * uv[(size_t)k*2+1];
             }
             S.rhs.push_back(b);
         }
     }
-    S.ini.push_back((int)S.col.size());
-    std::vector<double> x; ResolverMinCuad(S, x);
-    for (int k = 0; k < nLoc; k++) if (colDe[(size_t)k] >= 0) { uv[(size_t)k*2] = x[(size_t)colDe[(size_t)k]]; uv[(size_t)k*2+1] = x[(size_t)colDe[(size_t)k] + 1]; }
+    S.start.push_back((int)S.col.size());
+    std::vector<double> x; ResolveMinCuad(S, x);
+    for (int k = 0; k < nLoc; k++) if (colOf[(size_t)k] >= 0) { uv[(size_t)k*2] = x[(size_t)colOf[(size_t)k]]; uv[(size_t)k*2+1] = x[(size_t)colOf[(size_t)k] + 1]; }
 }
 
 // ---------------------------------------------------------------------------
@@ -404,17 +404,17 @@ static void AplanarConforme(const std::vector<TriPlano>& tris, int nLoc, const s
 //      borde); el minimo (4 por unidad de area) es la isometria.
 //  Un triangulo dado vuelta (det <= 0) vale infinito: la busqueda lineal nunca lo acepta.
 // ---------------------------------------------------------------------------
-static const double kInfinito = 1e30;
+static const double kInfinite = 1e30;
 
-static double EnergiaTri(const TriPlano& t, const std::vector<double>& uv, int metodo) {
+static double EnergyTri(const TriPlane& t, const std::vector<double>& uv, int method) {
     double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
     for (int i = 0; i < 3; i++) {
         const double u = uv[(size_t)t.v[i]*2], v = uv[(size_t)t.v[i]*2+1];
         a += t.gx[i] * u; b += t.gy[i] * u; c += t.gx[i] * v; d += t.gy[i] * v;
     }
     const double det = a*d - b*c;
-    if (det <= 1e-14) return kInfinito;
-    if (metodo == W3dUnwrapEstiramiento) return t.A * (a*a + b*b + c*c + d*d) * (1.0 + 1.0 / (det * det));
+    if (det <= 1e-14) return kInfinite;
+    if (method == W3dUnwrapStretch) return t.A * (a*a + b*b + c*c + d*d) * (1.0 + 1.0 / (det * det));
     double e = 0.0;
     for (int i = 0; i < 3; i++) {
         const int j = (i + 1) % 3, k = (i + 2) % 3;
@@ -426,18 +426,18 @@ static double EnergiaTri(const TriPlano& t, const std::vector<double>& uv, int m
     return e;
 }
 
-static double EnergiaVert(const std::vector<int>& I, const std::vector<TriPlano>& tris, const std::vector<double>& uv, int metodo) {
+static double EnergyVert(const std::vector<int>& I, const std::vector<TriPlane>& tris, const std::vector<double>& uv, int method) {
     double e = 0.0;
-    for (size_t i = 0; i < I.size(); i++) { e += EnergiaTri(tris[(size_t)I[i]], uv, metodo); if (e >= kInfinito) return kInfinito; }
+    for (size_t i = 0; i < I.size(); i++) { e += EnergyTri(tris[(size_t)I[i]], uv, method); if (e >= kInfinite) return kInfinite; }
     return e;
 }
 
-static void Relajar(const std::vector<TriPlano>& tris, int nLoc, std::vector<double>& uv, int metodo) {
+static void Relax(const std::vector<TriPlane>& tris, int nLoc, std::vector<double>& uv, int method) {
     if (tris.empty() || nLoc == 0) return;
     std::vector<std::vector<int> > inc((size_t)nLoc);
     for (size_t t = 0; t < tris.size(); t++) for (int i = 0; i < 3; i++) inc[(size_t)tris[t].v[i]].push_back((int)t);
-    const int pasadas = (tris.size() > 20000) ? 8 : (tris.size() > 5000) ? 15 : 30;
-    for (int pasada = 0; pasada < pasadas; pasada++) {
+    const int passes = (tris.size() > 20000) ? 8 : (tris.size() > 5000) ? 15 : 30;
+    for (int pass = 0; pass < passes; pass++) {
         for (int k = 0; k < nLoc; k++) {
             const std::vector<int>& I = inc[(size_t)k];
             if (I.empty()) continue;
@@ -450,25 +450,25 @@ static void Relajar(const std::vector<TriPlano>& tris, int nLoc, std::vector<dou
             }
             if (ne == 0) continue; esc /= ne;
             if (esc < 1e-12) continue;
-            const double E0 = EnergiaVert(I, tris, uv, metodo);
-            if (E0 >= kInfinito) continue;           // ya dado vuelta: no se toca
+            const double E0 = EnergyVert(I, tris, uv, method);
+            if (E0 >= kInfinite) continue;           // ya dado vuelta: no se toca
             const double u = uv[(size_t)k*2], v = uv[(size_t)k*2+1], h = esc * 1e-3;
-            uv[(size_t)k*2] = u + h; const double Eu1 = EnergiaVert(I, tris, uv, metodo);
-            uv[(size_t)k*2] = u - h; const double Eu0 = EnergiaVert(I, tris, uv, metodo); uv[(size_t)k*2] = u;
-            uv[(size_t)k*2+1] = v + h; const double Ev1 = EnergiaVert(I, tris, uv, metodo);
-            uv[(size_t)k*2+1] = v - h; const double Ev0 = EnergiaVert(I, tris, uv, metodo); uv[(size_t)k*2+1] = v;
-            if (Eu1 >= kInfinito || Eu0 >= kInfinito || Ev1 >= kInfinito || Ev0 >= kInfinito) continue;
+            uv[(size_t)k*2] = u + h; const double Eu1 = EnergyVert(I, tris, uv, method);
+            uv[(size_t)k*2] = u - h; const double Eu0 = EnergyVert(I, tris, uv, method); uv[(size_t)k*2] = u;
+            uv[(size_t)k*2+1] = v + h; const double Ev1 = EnergyVert(I, tris, uv, method);
+            uv[(size_t)k*2+1] = v - h; const double Ev0 = EnergyVert(I, tris, uv, method); uv[(size_t)k*2+1] = v;
+            if (Eu1 >= kInfinite || Eu0 >= kInfinite || Ev1 >= kInfinite || Ev0 >= kInfinite) continue;
             const double gu = (Eu1 - Eu0) / (2.0 * h), gv = (Ev1 - Ev0) / (2.0 * h);
             const double g = sqrt(gu*gu + gv*gv);
             if (!(g > 1e-15)) continue;
             const double du = -gu / g, dv = -gv / g;
-            double paso = esc * 0.2; bool mejoro = false;
+            double step = esc * 0.2; bool improved = false;
             for (int j = 0; j < 8; j++) {
-                uv[(size_t)k*2] = u + du * paso; uv[(size_t)k*2+1] = v + dv * paso;
-                if (EnergiaVert(I, tris, uv, metodo) < E0) { mejoro = true; break; }
-                paso *= 0.5;
+                uv[(size_t)k*2] = u + du * step; uv[(size_t)k*2+1] = v + dv * step;
+                if (EnergyVert(I, tris, uv, method) < E0) { improved = true; break; }
+                step *= 0.5;
             }
-            if (!mejoro) { uv[(size_t)k*2] = u; uv[(size_t)k*2+1] = v; }
+            if (!improved) { uv[(size_t)k*2] = u; uv[(size_t)k*2+1] = v; }
         }
     }
 }
@@ -479,28 +479,28 @@ static void Relajar(const std::vector<TriPlano>& tris, int nLoc, std::vector<dou
 //  biseccion (la mayor con la que todo entra). 'margen' = separacion entre islas (y la mitad
 //  contra el borde), en unidades UV.
 // ---------------------------------------------------------------------------
-struct OrdenAlto { const std::vector<double>* H; bool operator()(int a, int b) const { return (*H)[(size_t)a] > (*H)[(size_t)b]; } };
+struct OrderHeight { const std::vector<double>* H; bool operator()(int a, int b) const { return (*H)[(size_t)a] > (*H)[(size_t)b]; } };
 
-static bool Colocar(const std::vector<double>& W, const std::vector<double>& H, const std::vector<int>& orden, double s, double mg, std::vector<double>& X, std::vector<double>& Y) {
-    const double x0 = mg * 0.5, ancho = 1.0 - mg;
-    double x = 0.0, y = 0.0, filaH = 0.0;
-    for (size_t o = 0; o < orden.size(); o++) {
-        const int i = orden[o];
+static bool Place(const std::vector<double>& W, const std::vector<double>& H, const std::vector<int>& order, double s, double mg, std::vector<double>& X, std::vector<double>& Y) {
+    const double x0 = mg * 0.5, width = 1.0 - mg;
+    double x = 0.0, y = 0.0, rowH = 0.0;
+    for (size_t o = 0; o < order.size(); o++) {
+        const int i = order[o];
         const double bw = W[(size_t)i] * s, bh = H[(size_t)i] * s;
-        if (bw > ancho + 1e-12) return false;
-        if (x > 0.0 && x + bw > ancho + 1e-12) { y += filaH + mg; x = 0.0; filaH = 0.0; }
+        if (bw > width + 1e-12) return false;
+        if (x > 0.0 && x + bw > width + 1e-12) { y += rowH + mg; x = 0.0; rowH = 0.0; }
         X[(size_t)i] = x0 + x; Y[(size_t)i] = x0 + y;
-        x += bw + mg; if (bh > filaH) filaH = bh;
+        x += bw + mg; if (bh > rowH) rowH = bh;
     }
-    return y + filaH <= ancho + 1e-12;
+    return y + rowH <= width + 1e-12;
 }
 
-static void Empaquetar(std::vector<Carta>& cartas, double margen) {
-    const int n = (int)cartas.size(); if (n == 0) return;
+static void Pack(std::vector<UVChart>& cards, double margin) {
+    const int n = (int)cards.size(); if (n == 0) return;
     std::vector<double> W((size_t)n, 0.0), H((size_t)n, 0.0);
     for (int i = 0; i < n; i++) {
-        Carta& C = cartas[(size_t)i]; if (C.nLoc == 0) continue;
-        double mejorArea = 1e300, mejorAng = 0.0;
+        UVChart& C = cards[(size_t)i]; if (C.nLoc == 0) continue;
+        double bestArea = 1e300, bestAng = 0.0;
         for (int a = 0; a < 12; a++) {
             const double ang = a * (3.14159265358979 / 12.0), cs = cos(ang), sn = sin(ang);
             double mnx = 1e300, mny = 1e300, mxx = -1e300, mxy = -1e300;
@@ -510,9 +510,9 @@ static void Empaquetar(std::vector<Carta>& cartas, double margen) {
                 if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y;
             }
             const double area = (mxx - mnx) * (mxy - mny);
-            if (area < mejorArea - 1e-15) { mejorArea = area; mejorAng = ang; }
+            if (area < bestArea - 1e-15) { bestArea = area; bestAng = ang; }
         }
-        const double cs = cos(mejorAng), sn = sin(mejorAng);
+        const double cs = cos(bestAng), sn = sin(bestAng);
         double mnx = 1e300, mny = 1e300, mxx = -1e300, mxy = -1e300;
         for (int k = 0; k < C.nLoc; k++) {
             const double u = C.uv[(size_t)k*2], v = C.uv[(size_t)k*2+1];
@@ -523,48 +523,48 @@ static void Empaquetar(std::vector<Carta>& cartas, double margen) {
         for (int k = 0; k < C.nLoc; k++) { C.uv[(size_t)k*2] -= mnx; C.uv[(size_t)k*2+1] -= mny; }
         W[(size_t)i] = mxx - mnx; H[(size_t)i] = mxy - mny;
     }
-    double mg = margen; if (mg < 0.0) mg = 0.0; if (mg > 0.4) mg = 0.4;
+    double mg = margin; if (mg < 0.0) mg = 0.0; if (mg > 0.4) mg = 0.4;
     double maxW = 0.0, maxH = 0.0;
     for (int i = 0; i < n; i++) { if (W[(size_t)i] > maxW) maxW = W[(size_t)i]; if (H[(size_t)i] > maxH) maxH = H[(size_t)i]; }
-    const double mayor = (maxW > maxH) ? maxW : maxH;
-    std::vector<int> orden((size_t)n); for (int i = 0; i < n; i++) orden[(size_t)i] = i;
-    OrdenAlto cmp; cmp.H = &H; std::sort(orden.begin(), orden.end(), cmp);
+    const double greater = (maxW > maxH) ? maxW : maxH;
+    std::vector<int> order((size_t)n); for (int i = 0; i < n; i++) order[(size_t)i] = i;
+    OrderHeight cmp; cmp.H = &H; std::sort(order.begin(), order.end(), cmp);
     std::vector<double> X((size_t)n, 0.0), Y((size_t)n, 0.0);
     double sOk = 0.0;
-    if (mayor > 1e-12) {
-        double lo = 0.0, hi = (1.0 - mg) / mayor;
-        if (Colocar(W, H, orden, hi, mg, X, Y)) sOk = hi;
-        else for (int it = 0; it < 40; it++) { const double mid = 0.5 * (lo + hi); if (Colocar(W, H, orden, mid, mg, X, Y)) { lo = mid; sOk = mid; } else hi = mid; }
+    if (greater > 1e-12) {
+        double lo = 0.0, hi = (1.0 - mg) / greater;
+        if (Place(W, H, order, hi, mg, X, Y)) sOk = hi;
+        else for (int it = 0; it < 40; it++) { const double mid = 0.5 * (lo + hi); if (Place(W, H, order, mid, mg, X, Y)) { lo = mid; sOk = mid; } else hi = mid; }
     }
-    Colocar(W, H, orden, sOk, mg, X, Y);
+    Place(W, H, order, sOk, mg, X, Y);
     for (int i = 0; i < n; i++) {
-        Carta& C = cartas[(size_t)i];
+        UVChart& C = cards[(size_t)i];
         for (int k = 0; k < C.nLoc; k++) { C.uv[(size_t)k*2] = X[(size_t)i] + C.uv[(size_t)k*2] * sOk; C.uv[(size_t)k*2+1] = Y[(size_t)i] + C.uv[(size_t)k*2+1] * sOk; }
     }
 }
 
 // escribe las cartas en el mapa UV activo (solo los corners de las caras seleccionadas), con Ctrl+Z
-static bool EscribirCartas(const UVMalla& M, const std::vector<Carta>& cartas, bool voltearV) {
+static bool WriteCards(const UVMesh& M, const std::vector<UVChart>& cards, bool flipV) {
     Mesh* m = M.m;
-    if (m->uvMaps.empty()) m->PoblarCapas();
-    UVMap* um = (m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvMapActivo] : NULL;
+    if (m->uvMaps.empty()) m->PopulateLayers();
+    UVMap* um = (m->uvActiveMap >= 0 && m->uvActiveMap < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvActiveMap] : NULL;
     std::vector<float> uvL((size_t)M.nC * 2, 0.0f);
     if (um && (int)um->uv.size() == M.nC * 2) for (size_t i = 0; i < uvL.size(); i++) uvL[i] = um->uv[i];
-    for (size_t ci = 0; ci < cartas.size(); ci++) {
-        const Carta& C = cartas[ci];
+    for (size_t ci = 0; ci < cards.size(); ci++) {
+        const UVChart& C = cards[ci];
         for (size_t i = 0; i < C.corners.size(); i++) {
             const int k = C.corners[i], l = C.local[i];
             const double u = C.uv[(size_t)l*2], v = C.uv[(size_t)l*2+1];
-            uvL[(size_t)k*2] = (float)u; uvL[(size_t)k*2+1] = (float)(voltearV ? 1.0 - v : v);
+            uvL[(size_t)k*2] = (float)u; uvL[(size_t)k*2+1] = (float)(flipV ? 1.0 - v : v);
         }
     }
-    UndoCapturarMallaGeo(m);
-    m->EscribirUVProyeccion(uvL);
+    UndoCaptureMeshGeo(m);
+    m->WriteUVProjection(uvL);
     return true;
 }
 
 // base ortonormal (t, b) del plano de normal n, con t x b = n (proyeccion bien orientada)
-static void BasePlano(const double* n, double* t, double* b) {
+static void BasePlane(const double* n, double* t, double* b) {
     double h[3] = { 0.0, 0.0, 0.0 };
     const double ax = fabs(n[0]), ay = fabs(n[1]), az = fabs(n[2]);
     if (ax <= ay && ax <= az) h[0] = 1.0; else if (ay <= az) h[1] = 1.0; else h[2] = 1.0;
@@ -575,7 +575,7 @@ static void BasePlano(const double* n, double* t, double* b) {
 }
 
 // normal unitaria (Newell) y area de la cara f
-static void NormalCara(const UVMalla& M, int f, double* n, double& area) {
+static void NormalFace(const UVMesh& M, int f, double* n, double& area) {
     const std::vector<int>& idx = M.m->faces3d[(size_t)f].idx; const int cnt = (int)idx.size();
     n[0] = n[1] = n[2] = 0.0;
     for (int c = 0; c < cnt; c++) {
@@ -587,128 +587,128 @@ static void NormalCara(const UVMalla& M, int f, double* n, double& area) {
     if (l > 1e-12) { n[0] /= l; n[1] /= l; n[2] /= l; } else { n[0] = 0.0; n[1] = 0.0; n[2] = 1.0; }
 }
 
-struct OrdenArea { const std::vector<double>* A; bool operator()(int a, int b) const { return (*A)[(size_t)a] > (*A)[(size_t)b]; } };
+struct OrderArea { const std::vector<double>* A; bool operator()(int a, int b) const { return (*A)[(size_t)a] > (*A)[(size_t)b]; } };
 
 } // namespace
 
 // ============================================================================
 //  Unwrap
 // ============================================================================
-bool W3dUnwrap(Mesh* m, int metodo, float margen, std::string& msg, int* islas) {
-    UVMalla M; if (!Preparar(m, M, msg, "Unwrap")) return false;
-    TablaLados T; ArmarLados(M, T);
-    std::vector<int> uvDe; const int nUV = AsignarUVVerts(M, T, true, NULL, uvDe);
-    std::vector<Carta> cartas; ArmarCartas(M, uvDe, nUV, cartas);
+bool W3dUnwrap(Mesh* m, int method, float margin, std::string& msg, int* islands) {
+    UVMesh M; if (!Prepare(m, M, msg, "Unwrap")) return false;
+    SideTable T; BuildSides(M, T);
+    std::vector<int> uvOf; const int nUV = AssignUVVerts(M, T, true, NULL, uvOf);
+    std::vector<UVChart> cards; BuildCards(M, uvOf, nUV, cards);
     // una isla CERRADA (sin borde: ningun lado libre ni costura) no se puede aplanar: colapsa. Si toda la
     // seleccion es asi (un cubo o una esfera sin costuras), se avisa en vez de escribir basura.
-    {   std::vector<unsigned char> abierta(cartas.size(), 0);
-        std::vector<int> cartaDe(m->faces3d.size(), -1);
-        for (size_t ci = 0; ci < cartas.size(); ci++) for (size_t i = 0; i < cartas[ci].caras.size(); i++) cartaDe[(size_t)cartas[ci].caras[i]] = (int)ci;
-        for (TablaLados::const_iterator it = T.begin(); it != T.end(); ++it) {
-            const std::vector<Lado>& ls = it->second;
-            const int ci = cartaDe[(size_t)ls[0].f]; if (ci < 0) continue;
-            bool borde = (ls.size() != 2);
-            if (!borde) { const std::vector<int>& idx = m->faces3d[(size_t)ls[0].f].idx; const int cnt = (int)idx.size();
-                          borde = EsCostura(M, idx[(size_t)ls[0].c], idx[(size_t)((ls[0].c + 1) % cnt)]); }
-            if (borde) abierta[(size_t)ci] = 1;
+    {   std::vector<unsigned char> open(cards.size(), 0);
+        std::vector<int> cardOf(m->faces3d.size(), -1);
+        for (size_t ci = 0; ci < cards.size(); ci++) for (size_t i = 0; i < cards[ci].faces.size(); i++) cardOf[(size_t)cards[ci].faces[i]] = (int)ci;
+        for (SideTable::const_iterator it = T.begin(); it != T.end(); ++it) {
+            const std::vector<Side>& ls = it->second;
+            const int ci = cardOf[(size_t)ls[0].f]; if (ci < 0) continue;
+            bool border = (ls.size() != 2);
+            if (!border) { const std::vector<int>& idx = m->faces3d[(size_t)ls[0].f].idx; const int cnt = (int)idx.size();
+                          border = IsSeam(M, idx[(size_t)ls[0].c], idx[(size_t)((ls[0].c + 1) % cnt)]); }
+            if (border) open[(size_t)ci] = 1;
         }
-        bool alguna = false; for (size_t ci = 0; ci < cartas.size(); ci++) if (abierta[ci]) alguna = true;
-        if (!alguna) { msg = "Unwrap: closed surface, mark seams first"; return false; }
+        bool any = false; for (size_t ci = 0; ci < cards.size(); ci++) if (open[ci]) any = true;
+        if (!any) { msg = "Unwrap: closed surface, mark seams first"; return false; }
     }
     std::vector<int> lc((size_t)M.nC, -1);
-    for (size_t ci = 0; ci < cartas.size(); ci++) {
-        Carta& C = cartas[ci];
+    for (size_t ci = 0; ci < cards.size(); ci++) {
+        UVChart& C = cards[ci];
         for (size_t i = 0; i < C.corners.size(); i++) lc[(size_t)C.corners[i]] = C.local[i];
-        std::vector<TriPlano> tris; TriangulosCarta(M, C, lc, tris);
-        AplanarConforme(tris, C.nLoc, C.p3, C.uv);
-        if (metodo != W3dUnwrapConforme) Relajar(tris, C.nLoc, C.uv, metodo);
+        std::vector<TriPlane> tris; TrianglesCard(M, C, lc, tris);
+        FlattenConformal(tris, C.nLoc, C.p3, C.uv);
+        if (method != W3dUnwrapConformal) Relax(tris, C.nLoc, C.uv, method);
         for (size_t i = 0; i < C.corners.size(); i++) lc[(size_t)C.corners[i]] = -1;
     }
-    Empaquetar(cartas, margen);
-    if (islas) *islas = (int)cartas.size();
-    return EscribirCartas(M, cartas, true);
+    Pack(cards, margin);
+    if (islands) *islands = (int)cards.size();
+    return WriteCards(M, cards, true);
 }
 
 // ============================================================================
 //  Smart UV Project
 // ============================================================================
-bool W3dSmartUVProject(Mesh* m, float anguloLimiteDeg, float margen, std::string& msg, int* islas) {
-    UVMalla M; if (!Preparar(m, M, msg, "Smart UV Project")) return false;
+bool W3dSmartUVProject(Mesh* m, float angleLimitDeg, float margin, std::string& msg, int* islands) {
+    UVMesh M; if (!Prepare(m, M, msg, "Smart UV Project")) return false;
     const int nF = (int)m->faces3d.size();
     std::vector<double> N((size_t)nF * 3, 0.0), Ar((size_t)nF, 0.0);
-    std::vector<int> orden;
-    for (int f = 0; f < nF; f++) if (M.sel[(size_t)f]) { NormalCara(M, f, &N[(size_t)f*3], Ar[(size_t)f]); orden.push_back(f); }
-    OrdenArea cmp; cmp.A = &Ar; std::sort(orden.begin(), orden.end(), cmp);
-    double lim = anguloLimiteDeg; if (lim < 1.0) lim = 1.0; if (lim > 89.0) lim = 89.0;
+    std::vector<int> order;
+    for (int f = 0; f < nF; f++) if (M.sel[(size_t)f]) { NormalFace(M, f, &N[(size_t)f*3], Ar[(size_t)f]); order.push_back(f); }
+    OrderArea cmp; cmp.A = &Ar; std::sort(order.begin(), order.end(), cmp);
+    double lim = angleLimitDeg; if (lim < 1.0) lim = 1.0; if (lim > 89.0) lim = 89.0;
     const double cosLim = cos(lim * 3.14159265358979 / 180.0);
     // grupos de proyeccion: la cara mas grande sin grupo abre uno y se lleva a las que miran parecido
-    std::vector<int> grupo((size_t)nF, -1); std::vector<double> gN; int ng = 0;
-    for (size_t i = 0; i < orden.size(); i++) {
-        const int f = orden[i]; if (grupo[(size_t)f] >= 0) continue;
-        const int g = ng++; grupo[(size_t)f] = g;
+    std::vector<int> group((size_t)nF, -1); std::vector<double> gN; int ng = 0;
+    for (size_t i = 0; i < order.size(); i++) {
+        const int f = order[i]; if (group[(size_t)f] >= 0) continue;
+        const int g = ng++; group[(size_t)f] = g;
         const double* nf = &N[(size_t)f*3]; gN.push_back(nf[0]); gN.push_back(nf[1]); gN.push_back(nf[2]);
-        for (size_t j = i + 1; j < orden.size(); j++) {
-            const int h = orden[j]; if (grupo[(size_t)h] >= 0) continue;
+        for (size_t j = i + 1; j < order.size(); j++) {
+            const int h = order[j]; if (group[(size_t)h] >= 0) continue;
             const double* nh = &N[(size_t)h*3];
-            if (nf[0]*nh[0] + nf[1]*nh[1] + nf[2]*nh[2] >= cosLim) grupo[(size_t)h] = g;
+            if (nf[0]*nh[0] + nf[1]*nh[1] + nf[2]*nh[2] >= cosLim) group[(size_t)h] = g;
         }
     }
-    TablaLados T; ArmarLados(M, T);
-    std::vector<int> uvDe; const int nUV = AsignarUVVerts(M, T, true, &grupo, uvDe);
-    std::vector<Carta> cartas; ArmarCartas(M, uvDe, nUV, cartas);
-    for (size_t ci = 0; ci < cartas.size(); ci++) {
-        Carta& C = cartas[ci]; if (C.caras.empty()) continue;
-        const int g = grupo[(size_t)C.caras[0]];
-        double t[3], b[3]; BasePlano(&gN[(size_t)g*3], t, b);
+    SideTable T; BuildSides(M, T);
+    std::vector<int> uvOf; const int nUV = AssignUVVerts(M, T, true, &group, uvOf);
+    std::vector<UVChart> cards; BuildCards(M, uvOf, nUV, cards);
+    for (size_t ci = 0; ci < cards.size(); ci++) {
+        UVChart& C = cards[ci]; if (C.faces.empty()) continue;
+        const int g = group[(size_t)C.faces[0]];
+        double t[3], b[3]; BasePlane(&gN[(size_t)g*3], t, b);
         for (int k = 0; k < C.nLoc; k++) {
             const double* p = &C.p3[(size_t)k*3];
             C.uv[(size_t)k*2] = p[0]*t[0] + p[1]*t[1] + p[2]*t[2];
             C.uv[(size_t)k*2+1] = p[0]*b[0] + p[1]*b[1] + p[2]*b[2];
         }
     }
-    Empaquetar(cartas, margen);
-    if (islas) *islas = (int)cartas.size();
-    return EscribirCartas(M, cartas, true);
+    Pack(cards, margin);
+    if (islands) *islands = (int)cards.size();
+    return WriteCards(M, cards, true);
 }
 
 // ============================================================================
 //  Lightmap Pack: grilla de celdas iguales, una cara por celda (proyectada sobre su plano)
 // ============================================================================
-bool W3dLightmapPack(Mesh* m, float margen, std::string& msg) {
-    UVMalla M; if (!Preparar(m, M, msg, "Lightmap Pack")) return false;
+bool W3dLightmapPack(Mesh* m, float margin, std::string& msg) {
+    UVMesh M; if (!Prepare(m, M, msg, "Lightmap Pack")) return false;
     const int nF = (int)m->faces3d.size();
-    std::vector<Carta> cartas;
+    std::vector<UVChart> cards;
     for (int f = 0; f < nF; f++) {
         if (!M.sel[(size_t)f]) continue;
         const std::vector<int>& idx = m->faces3d[(size_t)f].idx; const int cnt = (int)idx.size();
-        Carta C; C.caras.push_back(f); C.nLoc = cnt;
-        double n[3], area; NormalCara(M, f, n, area);
-        double t[3], b[3]; BasePlano(n, t, b);
+        UVChart C; C.faces.push_back(f); C.nLoc = cnt;
+        double n[3], area; NormalFace(M, f, n, area);
+        double t[3], b[3]; BasePlane(n, t, b);
         for (int c = 0; c < cnt; c++) {
             const float* p = Pos(M, idx[(size_t)c]);
-            C.corners.push_back(M.ini[(size_t)f] + c); C.local.push_back(c);
+            C.corners.push_back(M.start[(size_t)f] + c); C.local.push_back(c);
             C.p3.push_back(p[0]); C.p3.push_back(p[1]); C.p3.push_back(p[2]);
             C.uv.push_back(p[0]*t[0] + p[1]*t[1] + p[2]*t[2]);
             C.uv.push_back(p[0]*b[0] + p[1]*b[1] + p[2]*b[2]);
         }
-        cartas.push_back(C);
+        cards.push_back(C);
     }
-    const int n = (int)cartas.size();
+    const int n = (int)cards.size();
     int cols = (int)ceil(sqrt((double)n)); if (cols < 1) cols = 1;
-    const double celda = 1.0 / cols;
-    double mg = margen; if (mg < 0.0) mg = 0.0; if (mg > celda * 0.5) mg = celda * 0.5;
-    const double util = celda - mg;
+    const double cell = 1.0 / cols;
+    double mg = margin; if (mg < 0.0) mg = 0.0; if (mg > cell * 0.5) mg = cell * 0.5;
+    const double util = cell - mg;
     for (int i = 0; i < n; i++) {
-        Carta& C = cartas[(size_t)i];
+        UVChart& C = cards[(size_t)i];
         double mnx = 1e300, mny = 1e300, mxx = -1e300, mxy = -1e300;
         for (int k = 0; k < C.nLoc; k++) { const double u = C.uv[(size_t)k*2], v = C.uv[(size_t)k*2+1]; if (u < mnx) mnx = u; if (u > mxx) mxx = u; if (v < mny) mny = v; if (v > mxy) mxy = v; }
-        double mayor = (mxx - mnx > mxy - mny) ? mxx - mnx : mxy - mny; if (mayor < 1e-12) mayor = 1.0;
-        const double s = util / mayor;
-        const double cx = (i % cols) * celda + celda * 0.5, cy = (i / cols) * celda + celda * 0.5;
+        double greater = (mxx - mnx > mxy - mny) ? mxx - mnx : mxy - mny; if (greater < 1e-12) greater = 1.0;
+        const double s = util / greater;
+        const double cx = (i % cols) * cell + cell * 0.5, cy = (i / cols) * cell + cell * 0.5;
         const double bx = 0.5 * (mnx + mxx), by = 0.5 * (mny + mxy);
         for (int k = 0; k < C.nLoc; k++) { C.uv[(size_t)k*2] = cx + (C.uv[(size_t)k*2] - bx) * s; C.uv[(size_t)k*2+1] = cy + (C.uv[(size_t)k*2+1] - by) * s; }
     }
-    return EscribirCartas(M, cartas, true);
+    return WriteCards(M, cards, true);
 }
 
 // ============================================================================
@@ -717,30 +717,30 @@ bool W3dLightmapPack(Mesh* m, float margen, std::string& msg) {
 //  direccion, a la razon de largos 3D (la grilla sigue derecha y a escala).
 // ============================================================================
 bool W3dFollowActiveQuads(Mesh* m, std::string& msg, int* quads) {
-    UVMalla M; if (!Preparar(m, M, msg, "Follow Active Quads")) return false;
-    if (M.activa < 0 || !M.sel[(size_t)M.activa] || m->faces3d[(size_t)M.activa].idx.size() != 4) {
+    UVMesh M; if (!Prepare(m, M, msg, "Follow Active Quads")) return false;
+    if (M.active < 0 || !M.sel[(size_t)M.active] || m->faces3d[(size_t)M.active].idx.size() != 4) {
         msg = "Follow Active Quads: the active face must be a selected quad"; return false;
     }
-    if (m->uvMaps.empty()) m->PoblarCapas();
-    UVMap* um = (m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvMapActivo] : NULL;
+    if (m->uvMaps.empty()) m->PopulateLayers();
+    UVMap* um = (m->uvActiveMap >= 0 && m->uvActiveMap < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvActiveMap] : NULL;
     if (!um || (int)um->uv.size() != M.nC * 2) { msg = "Follow Active Quads: the active face must be a selected quad"; return false; }
     std::vector<float> uvL(um->uv.begin(), um->uv.end());
-    TablaLados T; ArmarLados(M, T);
-    std::vector<unsigned char> visto(m->faces3d.size(), 0);
-    std::vector<int> cola; cola.push_back(M.activa); visto[(size_t)M.activa] = 1;
-    int hechos = 0;
-    for (size_t qi = 0; qi < cola.size(); qi++) {
-        const int f = cola[qi];
-        const std::vector<int>& idx = m->faces3d[(size_t)f].idx; const int L = M.ini[(size_t)f];
+    SideTable T; BuildSides(M, T);
+    std::vector<unsigned char> seen(m->faces3d.size(), 0);
+    std::vector<int> queue; queue.push_back(M.active); seen[(size_t)M.active] = 1;
+    int done = 0;
+    for (size_t qi = 0; qi < queue.size(); qi++) {
+        const int f = queue[qi];
+        const std::vector<int>& idx = m->faces3d[(size_t)f].idx; const int L = M.start[(size_t)f];
         for (int c = 0; c < 4; c++) {
             const int c1 = (c + 1) % 4;
             const int a = Rep(M, idx[(size_t)c]), b = Rep(M, idx[(size_t)c1]);
             if (a == b) continue;
-            TablaLados::const_iterator it = T.find(std::make_pair(a < b ? a : b, a < b ? b : a));
+            SideTable::const_iterator it = T.find(std::make_pair(a < b ? a : b, a < b ? b : a));
             if (it == T.end()) continue;
             for (size_t li = 0; li < it->second.size(); li++) {
                 const int g = it->second[li].f;
-                if (g == f || visto[(size_t)g] || !M.sel[(size_t)g] || m->faces3d[(size_t)g].idx.size() != 4) continue;
+                if (g == f || seen[(size_t)g] || !M.sel[(size_t)g] || m->faces3d[(size_t)g].idx.size() != 4) continue;
                 const std::vector<int>& jg = m->faces3d[(size_t)g].idx;
                 int ia = -1, ib = -1;
                 for (int cc = 0; cc < 4; cc++) { const int r = Rep(M, jg[(size_t)cc]); if (r == a && ia < 0) ia = cc; else if (r == b && ib < 0) ib = cc; }
@@ -758,19 +758,19 @@ bool W3dFollowActiveQuads(Mesh* m, std::string& msg, int* quads) {
                 const float ub0 = uvL[(size_t)(L+c1)*2], ub1 = uvL[(size_t)(L+c1)*2+1];
                 const float ud0 = uvL[(size_t)(L+d)*2],  ud1 = uvL[(size_t)(L+d)*2+1];
                 const float ue0 = uvL[(size_t)(L+e2)*2], ue1 = uvL[(size_t)(L+e2)*2+1];
-                const int Lg = M.ini[(size_t)g];
+                const int Lg = M.start[(size_t)g];
                 uvL[(size_t)(Lg+ia)*2] = ua0; uvL[(size_t)(Lg+ia)*2+1] = ua1;
                 uvL[(size_t)(Lg+ib)*2] = ub0; uvL[(size_t)(Lg+ib)*2+1] = ub1;
                 uvL[(size_t)(Lg+x)*2] = (float)(ua0 + (ua0 - ud0) * r); uvL[(size_t)(Lg+x)*2+1] = (float)(ua1 + (ua1 - ud1) * r);
                 uvL[(size_t)(Lg+y)*2] = (float)(ub0 + (ub0 - ue0) * r); uvL[(size_t)(Lg+y)*2+1] = (float)(ub1 + (ub1 - ue1) * r);
-                visto[(size_t)g] = 1; cola.push_back(g); hechos++;
+                seen[(size_t)g] = 1; queue.push_back(g); done++;
             }
         }
     }
-    if (hechos == 0) { msg = "Follow Active Quads: no neighbouring quads"; return false; }
-    UndoCapturarMallaGeo(m);
-    m->EscribirUVProyeccion(uvL);
-    if (quads) *quads = hechos;
+    if (done == 0) { msg = "Follow Active Quads: no neighbouring quads"; return false; }
+    UndoCaptureMeshGeo(m);
+    m->WriteUVProjection(uvL);
+    if (quads) *quads = done;
     return true;
 }
 
@@ -779,15 +779,15 @@ bool W3dFollowActiveQuads(Mesh* m, std::string& msg, int* quads) {
 //  cuadrado, ngons sobre el circulo inscripto). V=0 arriba, como el resto del engine.
 // ============================================================================
 bool W3dUVReset(Mesh* m, std::string& msg) {
-    UVMalla M; if (!Preparar(m, M, msg, "Reset")) return false;
-    if (m->uvMaps.empty()) m->PoblarCapas();
-    UVMap* um = (m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvMapActivo] : NULL;
+    UVMesh M; if (!Prepare(m, M, msg, "Reset")) return false;
+    if (m->uvMaps.empty()) m->PopulateLayers();
+    UVMap* um = (m->uvActiveMap >= 0 && m->uvActiveMap < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvActiveMap] : NULL;
     std::vector<float> uvL((size_t)M.nC * 2, 0.0f);
     if (um && (int)um->uv.size() == M.nC * 2) for (size_t i = 0; i < uvL.size(); i++) uvL[i] = um->uv[i];
     static const float cuadU[4] = { 0.0f, 1.0f, 1.0f, 0.0f }, cuadV[4] = { 1.0f, 1.0f, 0.0f, 0.0f };
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         if (!M.sel[f]) continue;
-        const int cnt = (int)m->faces3d[f].idx.size(), L = M.ini[f];
+        const int cnt = (int)m->faces3d[f].idx.size(), L = M.start[f];
         for (int c = 0; c < cnt; c++) {
             float u, v;
             if (cnt <= 4) { u = cuadU[c]; v = cuadV[c]; }
@@ -795,18 +795,18 @@ bool W3dUVReset(Mesh* m, std::string& msg) {
             uvL[(size_t)(L + c)*2] = u; uvL[(size_t)(L + c)*2+1] = v;
         }
     }
-    UndoCapturarMallaGeo(m);
-    m->EscribirUVProyeccion(uvL);
+    UndoCaptureMeshGeo(m);
+    m->WriteUVProjection(uvL);
     return true;
 }
 
 // Smart UV Project de TODAS las caras de la malla (sin Edit Mode ni seleccion): lo usa la pintura de textura cuando la
 // malla no tiene UV o las tiene todas pisadas (el cubo por defecto: las 6 caras en el mismo cuadrado)
-bool W3dSmartUVProjectTodas(Mesh* m, float anguloLimiteDeg, float margen, std::string& msg) {
+bool W3dSmartUVProjectAll(Mesh* m, float angleLimitDeg, float margin, std::string& msg) {
     if (!m) return false;
     m->EnsureEdit();
-    gUVTodasLasCaras = true;
-    const bool ok = W3dSmartUVProject(m, anguloLimiteDeg, margen, msg);
-    gUVTodasLasCaras = false;
+    gUVAllFaces = true;
+    const bool ok = W3dSmartUVProject(m, angleLimitDeg, margin, msg);
+    gUVAllFaces = false;
     return ok;
 }

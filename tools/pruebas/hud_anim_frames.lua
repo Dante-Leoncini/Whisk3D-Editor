@@ -4,16 +4,16 @@
 --  planos. Lo usa prueba_hud_sustractivo.w3d; el .w3s muestrea el pixel del
 --  centro del icono en CADA frame real y falla si UNO SOLO sale negro.
 -- ==========================================================================
-propiedades = {
-    icono = "objeto",     -- ref_icono: "IconoAnim"
+properties = {
+    icono = "object",     -- ref_icono: "IconoAnim"
 }
 
 local t = 0
-local texs = { "texturas/rojo.png", "texturas/amarillo.png", "texturas/azul.png" }
+local texs = { "textures/rojo.png", "textures/amarillo.png", "textures/azul.png" }
 
-function actualizar(dt)
-    local o = objeto and objeto("icono") or nil
-    if not (o and setTextura) then return end
+function update(dt)
+    local o = object and object("icono") or nil
+    if not (o and setTexture) then return end
     t = t + 1
-    setTextura(o, texs[(t % 3) + 1])
+    setTexture(o, texs[(t % 3) + 1])
 end

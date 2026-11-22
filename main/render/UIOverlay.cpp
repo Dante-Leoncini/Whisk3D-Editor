@@ -4,31 +4,31 @@
 #include "render/UIOverlay.h"
 #include "objects/Objects.h"
 #include "objects/UI.h"
-#include "objects/Elemento2D.h"
-#include "objects/Texto2D.h"
-#include "objects/Imagen2D.h"
+#include "objects/Element2D.h"
+#include "objects/Text2D.h"
+#include "objects/Image2D.h"
 #include "objects/Rect2D.h"
-#include "objects/Contenedor2D.h"
+#include "objects/Container2D.h"
 #include "objects/Slice9.h"
-#include "objects/Boton2D.h"
-#include "objects/Expandir2D.h"
+#include "objects/Button2D.h"
+#include "objects/Expand2D.h"
 #include "objects/Video2D.h"
-#include "io/Fuente2D.h"
-#include "io/Textura2D.h"
+#include "io/Font2D.h"
+#include "io/Texture2D.h"
 #include "io/Video2DCache.h"
 #include "WhiskUI/text/W3dTextAtlas.h"
-#include "WhiskUI/draw/glesdraw.h"  // W3dPantallaAlto (el scissor de GL mide desde abajo)
-#include "W3dEscena.h"              // W3dEscenaActiva(): el lienzo/UI del juego = la escena activa
-#include "W3dPaletas.h"             // paleta EFECTIVA por objeto (herencia por Parent)
-#include "script/BindsJuego.h"      // BindsJuegoRatonEstado(): mouse-over para el borde de hover
+#include "WhiskUI/draw/glesdraw.h"  // W3dScreenHeight (el scissor de GL mide desde abajo)
+#include "W3dScene.h"               // W3dActiveScene(): el lienzo/UI del juego = la escena activa
+#include "W3dPalettes.h"            // paleta EFECTIVA por objeto (herencia por Parent)
+#include "script/BindsGame.h"       // BindsGameMouseState(): mouse-over para el borde de hover
 #include <math.h>                   // fabsf: el rectangulo de UV dado vuelta
 #include "w3dGraphics.h"
 #include <stdio.h>    // snprintf (formato de los textos number/float)
 #include <stdlib.h>   // atof
-#include "render/OpcionesRender.h"  // g_redraw: el video animandose pide redibujar
+#include "render/RenderOptions.h"  // g_redraw: el video animandose pide redibujar
 #ifndef W3D_GAME_RUNTIME
-#include "ViewPorts/Properties.h"   // PropsActivo->renderW/H: la ventana ES el tamano del render
-#include <map>                         // el armado de los textos por elemento (DibujarTextoBloque)
+#include "ViewPorts/Properties.h"   // PropsActive->renderW/H: la ventana ES el tamano del render
+#include <map>                         // el armado de los textos por elemento (DrawTextBlock)
 #else
 // el RUNTIME del juego (sin editor) provee el tamano de la ventana: no hay panel
 extern float g_gameRenderW, g_gameRenderH;
@@ -39,31 +39,31 @@ namespace gfx = w3dEngine;
 // OVERRIDE de la ventana (ver UIOverlay.h): un viewport 2D en VISTA DE JUEGO con UI dinamica
 // declara que la ventana simulada es SU rect util. Estado global consciente: hay UNA pantalla de
 // juego, y quien la define es el viewport en vista de juego (dibujo, input y binds ven lo mismo).
-static const void* gOvrVentanaDueno = 0;   // 0 = sin override (comportamiento de siempre)
-static float gOvrVentanaW = 0.0f, gOvrVentanaH = 0.0f;
+static const void* gOvrWindowOwner = 0;   // 0 = sin override (comportamiento de siempre)
+static float gOvrWindowW = 0.0f, gOvrWindowH = 0.0f;
 
-void UI2D_OverrideVentana(const void* dueno, float w, float h) {
-    gOvrVentanaDueno = dueno;
-    gOvrVentanaW = (w < 1.0f) ? 1.0f : w;
-    gOvrVentanaH = (h < 1.0f) ? 1.0f : h;
+void UI2D_OverrideWindow(const void* owner, float w, float h) {
+    gOvrWindowOwner = owner;
+    gOvrWindowW = (w < 1.0f) ? 1.0f : w;
+    gOvrWindowH = (h < 1.0f) ? 1.0f : h;
 }
-void UI2D_OverrideVentanaQuitar(const void* dueno) {
-    if (gOvrVentanaDueno == dueno) gOvrVentanaDueno = 0;   // solo el dueno vigente lo limpia
+void UI2D_OverrideWindowRemove(const void* owner) {
+    if (gOvrWindowOwner == owner) gOvrWindowOwner = 0;   // solo el dueno vigente lo limpia
 }
 
-// estado crudo del override, para UI2D_OverrideVentanaScope (guardar/reponer).
+// estado crudo del override, para UI2D_OverrideWindowScope (guardar/reponer).
 // Reponer NO clampea: repone EXACTAMENTE lo leido (incluido "sin override").
-void UI2D_OverrideVentanaLeer(const void** dueno, float* w, float* h) {
-    *dueno = gOvrVentanaDueno; *w = gOvrVentanaW; *h = gOvrVentanaH;
+void UI2D_OverrideWindowRead(const void** owner, float* w, float* h) {
+    *owner = gOvrWindowOwner; *w = gOvrWindowW; *h = gOvrWindowH;
 }
-void UI2D_OverrideVentanaReponer(const void* dueno, float w, float h) {
-    gOvrVentanaDueno = dueno; gOvrVentanaW = w; gOvrVentanaH = h;
+void UI2D_OverrideWindowRestore(const void* owner, float w, float h) {
+    gOvrWindowOwner = owner; gOvrWindowW = w; gOvrWindowH = h;
 }
 
-void UI2D_TamanoVentana(float* w, float* h) {
+void UI2D_WindowSize(float* w, float* h) {
 #ifndef W3D_GAME_RUNTIME
     // VISTA DE JUEGO con UI "igual que el render": la ventana es el rect util del viewport 2D
-    if (gOvrVentanaDueno) { *w = gOvrVentanaW; *h = gOvrVentanaH; return; }
+    if (gOvrWindowOwner) { *w = gOvrWindowW; *h = gOvrWindowH; return; }
     // la fuente de verdad es el tamano del RENDER: editarlo se ve al instante en el Editor 2D
     *w = g_render.w;
     *h = g_render.h;
@@ -72,15 +72,15 @@ void UI2D_TamanoVentana(float* w, float* h) {
 #endif
 }
 
-void (*g_uiEnArbol)(UI* u) = 0;
+void (*g_uiInTree)(UI* u) = 0;
 
-UI* UI2D_UIDelEditor() {
+UI* UI2D_EditorUI() {
     // con un juego CORRIENDO (Play o runtime) manda la escena ACTIVA: su lienzo/tamano es
-    // el que ven el script (pantalla/posPx) y el dibujo. Sin juego, gActiva es NULL.
-    UI* act = W3dEscenaActiva();
+    // el que ven el script (pantalla/posPx) y el dibujo. Sin juego, gActive es NULL.
+    UI* act = W3dActiveScene();
     if (act) return act;
     // el UI de la cadena del activo gana (estas trabajando en el); sino el primero en escena
-    for (Object* o = ObjActivo; o; o = o->Parent)
+    for (Object* o = ActiveObj; o; o = o->Parent)
         if (o->getType() == ObjectType::ui) return (UI*)o;
     if (!SceneCollection) return NULL;
     for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
@@ -90,67 +90,67 @@ UI* UI2D_UIDelEditor() {
     return NULL;
 }
 
-void UI2D_TamanoLienzo(float* w, float* h) {
-    UI* u = UI2D_UIDelEditor();
-    if (u && !u->igualQueRender) { *w = u->ancho; *h = u->alto; return; }
-    UI2D_TamanoVentana(w, h);
+void UI2D_CanvasSize(float* w, float* h) {
+    UI* u = UI2D_EditorUI();
+    if (u && !u->sameAsRender) { *w = u->width; *h = u->height; return; }
+    UI2D_WindowSize(w, h);
 }
 
-bool UI2D_EsElemento2D(Object* o) {
+bool UI2D_IsElement2D(Object* o) {
     if (!o) return false;
     ObjectType t = o->getType();
-    return t == ObjectType::texto2d || t == ObjectType::imagen2d ||
+    return t == ObjectType::text2d || t == ObjectType::image2d ||
            t == ObjectType::rect2d  || t == ObjectType::cont2d ||
-           t == ObjectType::slice9  || t == ObjectType::boton2d ||
-           t == ObjectType::expandir2d || t == ObjectType::video2d;
+           t == ObjectType::slice9  || t == ObjectType::button2d ||
+           t == ObjectType::expand2d || t == ObjectType::video2d;
 }
 
-// cast comodo: valido despues de chequear UI2D_EsElemento2D (comparten la base Elemento2D)
-static Elemento2D* E2(Object* o) { return (Elemento2D*)o; }
+// cast comodo: valido despues de chequear UI2D_IsElement2D (comparten la base Element2D)
+static Element2D* E2(Object* o) { return (Element2D*)o; }
 
 // PRECARGA de las imagenes 2D del juego: la wumpa-tira del contador (y todo
 // icono de HUD que arranca oculto) se decodificaba en el PRIMER pickup, en
 // pleno gameplay -- un tiron visible en el N95. Al abrir el proyecto se tocan
 // todas las rutas: el costo va a la CARGA, no al juego.
-void UI2D_PrecargarTexturas(Object* raiz) {
-    if (!raiz) return;
-    std::vector<Object*> st; st.push_back(raiz);
+void UI2D_PreloadTextures(Object* root) {
+    if (!root) return;
+    std::vector<Object*> st; st.push_back(root);
     while (!st.empty()) {
         Object* o = st.back(); st.pop_back();
         ObjectType t = o->getType();
-        if (t == ObjectType::imagen2d) {
-            Imagen2D* im = (Imagen2D*)o;
-            if (!im->textura.empty()) Textura2DObtener(im->textura);
+        if (t == ObjectType::image2d) {
+            Image2D* im = (Image2D*)o;
+            if (!im->texture.empty()) Texture2DGet(im->texture);
         } else if (t == ObjectType::slice9) {
             Slice9* s9 = (Slice9*)o;
-            if (!s9->textura.empty()) Textura2DObtener(s9->textura);
-        } else if (t == ObjectType::boton2d) {
-            Boton2D* b = (Boton2D*)o;
-            if (!b->icono.empty()) Textura2DObtener(b->icono);
-            if (!b->texturaFondo.empty()) Textura2DObtener(b->texturaFondo);
+            if (!s9->texture.empty()) Texture2DGet(s9->texture);
+        } else if (t == ObjectType::button2d) {
+            Button2D* b = (Button2D*)o;
+            if (!b->icon.empty()) Texture2DGet(b->icon);
+            if (!b->textureBackground.empty()) Texture2DGet(b->textureBackground);
         }
         for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
     }
 }
 
-float* UI2D_Rot2dDe(Object* o) {
-    return UI2D_EsElemento2D(o) ? &E2(o)->rot2d : NULL;
+float* UI2D_Rot2dOf(Object* o) {
+    return UI2D_IsElement2D(o) ? &E2(o)->rot2d : NULL;
 }
 
-bool UI2D_TamanoElem(Object* o, float** w, float** h) {
+bool UI2D_ElemSize(Object* o, float** w, float** h) {
     // texto y boton no tienen rect propio (lo calculan de su contenido); expandir tampoco
-    if (!UI2D_EsElemento2D(o)) return false;
+    if (!UI2D_IsElement2D(o)) return false;
     ObjectType t = o->getType();
-    if (t == ObjectType::texto2d || t == ObjectType::boton2d || t == ObjectType::expandir2d)
+    if (t == ObjectType::text2d || t == ObjectType::button2d || t == ObjectType::expand2d)
         return false;
-    *w = &E2(o)->ancho; *h = &E2(o)->alto;
+    *w = &E2(o)->width; *h = &E2(o)->height;
     return true;
 }
 
-void UI2D_PuntoAncla(int ancla, float x0, float y0, float w, float h, float* ax, float* ay) {
+void UI2D_PointAnchor(int anchor, float x0, float y0, float w, float h, float* ax, float* ay) {
     // fracciones (fx,fy) del rect por ancla: 0=centro 1=izq 2=der 3=arriba 4=abajo 5..8=esquinas
     float fx = 0.5f, fy = 0.5f;
-    switch (ancla) {
+    switch (anchor) {
         case 1: fx = 0.0f; break;               // izquierda (centro vertical)
         case 2: fx = 1.0f; break;               // derecha
         case 3: fy = 0.0f; break;               // arriba (centro horizontal)
@@ -165,72 +165,72 @@ void UI2D_PuntoAncla(int ancla, float x0, float y0, float w, float h, float* ax,
     *ay = y0 + h * fy;
 }
 
-// ---- accesores UI-o-elemento (el UI no deriva de Elemento2D: es la ventana) ----------------
-static float OpacidadDe(Object* o) {
-    return UI2D_EsElemento2D(o) ? E2(o)->opacidad : 1.0f;
+// ---- accesores UI-o-elemento (el UI no deriva de Element2D: es la ventana) ----------------
+static float OpacityOf(Object* o) {
+    return UI2D_IsElement2D(o) ? E2(o)->opacity : 1.0f;
 }
 // el padding POR LADO, ya en px de pantalla (proporcional: fraccion del LADO MENOR)
-static void PaddingLados(Object* o, float escala, float rw, float rh,
-                         float* izq, float* der, float* arr, float* aba) {
+static void PaddingSides(Object* o, float scale, float rw, float rh,
+                         float* left, float* right, float* arr, float* bottom) {
     float i, d, a, b;
     bool px;
     if (o->getType() == ObjectType::ui) {
         UI* u = (UI*)o;
-        i = u->padIzq; d = u->padDer; a = u->padArr; b = u->padAba; px = u->padGapPx;
+        i = u->padLeft; d = u->padRight; a = u->padArr; b = u->padBottom; px = u->padGapPx;
     } else {
-        Elemento2D* e = E2(o);
-        i = e->padIzq; d = e->padDer; a = e->padArr; b = e->padAba; px = e->padGapPx;
+        Element2D* e = E2(o);
+        i = e->padLeft; d = e->padRight; a = e->padArr; b = e->padBottom; px = e->padGapPx;
     }
-    float menor = (rw < rh) ? rw : rh;
-    float f = px ? escala : menor;
-    *izq = i * f; *der = d * f; *arr = a * f; *aba = b * f;
+    float lower = (rw < rh) ? rw : rh;
+    float f = px ? scale : lower;
+    *left = i * f; *right = d * f; *arr = a * f; *bottom = b * f;
 }
-static int     LayoutDe(Object* o)   { return (o->getType() == ObjectType::ui) ? ((UI*)o)->layoutHijos : E2(o)->layoutHijos; }
-static float   GapDe(Object* o)      { return (o->getType() == ObjectType::ui) ? ((UI*)o)->gap         : E2(o)->gap; }
-static bool    PadGapPxDe(Object* o) { return (o->getType() == ObjectType::ui) ? ((UI*)o)->padGapPx    : E2(o)->padGapPx; }
-static bool    RecortaXDe(Object* o) { return (o->getType() == ObjectType::ui) ? ((UI*)o)->recortaX    : E2(o)->recortaX; }
-static bool    RecortaYDe(Object* o) { return (o->getType() == ObjectType::ui) ? ((UI*)o)->recortaY    : E2(o)->recortaY; }
-static bool    ConScrollDe(Object* o){ return (o->getType() == ObjectType::ui) ? ((UI*)o)->conScroll   : E2(o)->conScroll; }
-static float   ScrollXDe(Object* o)  { return (o->getType() == ObjectType::ui) ? ((UI*)o)->scrollX     : E2(o)->scrollX; }
-static float   ScrollYDe(Object* o)  { return (o->getType() == ObjectType::ui) ? ((UI*)o)->scrollY     : E2(o)->scrollY; }
+static int     LayoutOf(Object* o)   { return (o->getType() == ObjectType::ui) ? ((UI*)o)->layoutChildren : E2(o)->layoutChildren; }
+static float   GapOf(Object* o)      { return (o->getType() == ObjectType::ui) ? ((UI*)o)->gap         : E2(o)->gap; }
+static bool    PadGapPxOf(Object* o) { return (o->getType() == ObjectType::ui) ? ((UI*)o)->padGapPx    : E2(o)->padGapPx; }
+static bool    CropsXOf(Object* o) { return (o->getType() == ObjectType::ui) ? ((UI*)o)->cropsX    : E2(o)->cropsX; }
+static bool    CropsAndOf(Object* o) { return (o->getType() == ObjectType::ui) ? ((UI*)o)->cropsY    : E2(o)->cropsY; }
+static bool    WithScrollOf(Object* o){ return (o->getType() == ObjectType::ui) ? ((UI*)o)->withScroll   : E2(o)->withScroll; }
+static float   ScrollXOf(Object* o)  { return (o->getType() == ObjectType::ui) ? ((UI*)o)->scrollX     : E2(o)->scrollX; }
+static float   ScrollYOf(Object* o)  { return (o->getType() == ObjectType::ui) ? ((UI*)o)->scrollY     : E2(o)->scrollY; }
 
-static int LayoutAjusteDe(Object* o) {
-    return (o->getType() == ObjectType::ui) ? ((UI*)o)->layoutAjuste : E2(o)->layoutAjuste;
+static int LayoutFitOf(Object* o) {
+    return (o->getType() == ObjectType::ui) ? ((UI*)o)->layoutFit : E2(o)->layoutFit;
 }
-static int LayoutAlignDe(Object* o) {
+static int LayoutAlignOf(Object* o) {
     return (o->getType() == ObjectType::ui) ? ((UI*)o)->layoutAlign : E2(o)->layoutAlign;
 }
-static int DistribucionDe(Object* o) {
-    return (o->getType() == ObjectType::ui) ? ((UI*)o)->distribucion : E2(o)->distribucion;
+static int DistributionOf(Object* o) {
+    return (o->getType() == ObjectType::ui) ? ((UI*)o)->distribution : E2(o)->distribution;
 }
 
-float UI2D_FactorEscala() {
+float UI2D_FactorScale() {
     float w, h;
-    UI2D_TamanoLienzo(&w, &h);
+    UI2D_CanvasSize(&w, &h);
     float m = (w < h) ? w : h;
     return (m >= 1.0f) ? m / 480.0f : 1.0f;
 }
 
 // ancho o alto DECLARADO del elemento resuelto a px de PANTALLA segun su unidad
-// (tamModo): fraccion del rect de referencia (ref = rw o rh), px del lienzo, o px
+// (sizeMode): fraccion del rect de referencia (ref = rw o rh), px del lienzo, o px
 // ESCALADOS (valor * factor de pantalla: mismo tamano fisico en cualquier
 // orientacion). 'escala' = px de lienzo -> px de pantalla.
-static float TamSegunModo(float valor, int modo, float escala, float ref) {
-    if (modo == TAM2D_PX)       return valor * escala;
-    if (modo == TAM2D_ESCALADO) return valor * UI2D_FactorEscala() * escala;
-    return valor * ref;
+static float SizeByMode(float value, int mode, float scale, float ref) {
+    if (mode == TAM2D_PX)       return value * scale;
+    if (mode == TAM2D_SCALED) return value * UI2D_FactorScale() * scale;
+    return value * ref;
 }
 
-// factor del TEXTO de un texto/boton segun su unidad (tamModo): con ESCALADO el alto de
+// factor del TEXTO de un texto/boton segun su unidad (sizeMode): con ESCALADO el alto de
 // fuente (y el pad del boton) tambien miden en px de REFERENCIA x la escala de pantalla,
 // igual que el ancho/alto: la letra mide LO MISMO fisico en cualquier lienzo. La fuente
 // pixel despues snapea a multiplos enteros del glifo (PxSnap), asi que sigue nitida.
-static float FactorTexto(int modo) {
-    return (modo == TAM2D_ESCALADO) ? UI2D_FactorEscala() : 1.0f;
+static float FactorText(int mode) {
+    return (mode == TAM2D_SCALED) ? UI2D_FactorScale() : 1.0f;
 }
 
 // (los colores de PALETA se resuelven contra la paleta EFECTIVA de cada
-//  elemento: Object::paleta heredada por Parent; ver W3dPaletas.h)
+//  elemento: Object::paleta heredada por Parent; ver W3dPalettes.h)
 
 // snap del tamano del texto pixel: la fuente PIXEL se dibuja SIEMPRE a escala ENTERA del
 // glifo (floor al multiplo de fontPx, minimo x1), en el editor y en el runtime por igual:
@@ -243,20 +243,20 @@ static float PxSnap(const w3dui::W3dTextAtlas* at, float px, bool /*paraAbajo*/)
 }
 // pal >= 0: el color con nombre de la paleta EFECTIVA del elemento (la que
 // eligio el o un padre, heredada); sino el color PROPIO del elemento
-static const float* ColorResuelto(Object* o, int pal, const float* propio) {
+static const float* ResolvedColor(Object* o, int pal, const float* own) {
     if (pal >= 0) {
-        std::vector<PaletaColor>* cs = W3dColoresEfectivos(o);
+        std::vector<PaletteColor>* cs = W3dEffectiveColors(o);
         if (cs && pal < (int)cs->size()) return (*cs)[pal].rgba;
     }
-    return propio;
+    return own;
 }
 
 // el CONTENIDO del texto segun su tipo: string tal cual, number entero,
 // float con N decimales (0 = sin decimales). Para los HUD numericos.
-static std::string TextoSegunTipo(Texto2D* t) {
-    if (t->tipo == 0) return t->texto;
-    double v = atof(t->texto.c_str());
-    int dec = (t->tipo == 1) ? 0 : (int)(t->decimales + 0.5f);
+static std::string TextByType(Text2D* t) {
+    if (t->type == 0) return t->text;
+    double v = atof(t->text.c_str());
+    int dec = (t->type == 1) ? 0 : (int)(t->decimals + 0.5f);
     if (dec < 0) dec = 0; if (dec > 8) dec = 8;
     char buf[64];
     snprintf(buf, sizeof(buf), "%.*f", dec, v);
@@ -266,21 +266,21 @@ static std::string TextoSegunTipo(Texto2D* t) {
 // ---- TEXTO MULTILINEA ----------------------------------------------------------------------
 // parte el texto en lineas al ancho maxW: 0 = una sola linea, 1 = salta por PALABRAS
 // (espacios), 2 = salta desde cualquier parte (por codepoint, sin romper UTF-8)
-static void PartirParrafo(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
-                          float maxW, int modo, std::vector<std::string>& out) {
+static void SplitParagraph(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
+                          float maxW, int mode, std::vector<std::string>& out) {
     out.clear();
-    if (modo == 0 || maxW <= 0.0f) { out.push_back(txt); return; }
-    std::string linea;
-    if (modo == 1) {
+    if (mode == 0 || maxW <= 0.0f) { out.push_back(txt); return; }
+    std::string line;
+    if (mode == 1) {
         size_t i = 0;
         while (i <= txt.size()) {
             size_t sp = txt.find(' ', i);
             std::string pal = (sp == std::string::npos) ? txt.substr(i) : txt.substr(i, sp - i);
-            std::string prueba = linea.empty() ? pal : linea + " " + pal;
-            if (!linea.empty() && at->TextWidth(prueba.c_str(), px) > maxW) {
-                out.push_back(linea);
-                linea = pal;
-            } else linea = prueba;
+            std::string test = line.empty() ? pal : line + " " + pal;
+            if (!line.empty() && at->TextWidth(test.c_str(), px) > maxW) {
+                out.push_back(line);
+                line = pal;
+            } else line = test;
             if (sp == std::string::npos) break;
             i = sp + 1;
         }
@@ -289,30 +289,30 @@ static void PartirParrafo(const w3dui::W3dTextAtlas* at, const std::string& txt,
         while (i < txt.size()) {
             size_t j = i + 1;   // avanzar un CODEPOINT (los bytes de continuacion son 10xxxxxx)
             while (j < txt.size() && ((unsigned char)txt[j] & 0xC0) == 0x80) j++;
-            std::string prueba = linea + txt.substr(i, j - i);
-            if (!linea.empty() && at->TextWidth(prueba.c_str(), px) > maxW) {
-                out.push_back(linea);
-                linea = txt.substr(i, j - i);
-            } else linea = prueba;
+            std::string test = line + txt.substr(i, j - i);
+            if (!line.empty() && at->TextWidth(test.c_str(), px) > maxW) {
+                out.push_back(line);
+                line = txt.substr(i, j - i);
+            } else line = test;
             i = j;
         }
     }
-    if (!linea.empty() || out.empty()) out.push_back(linea);
+    if (!line.empty() || out.empty()) out.push_back(line);
 }
 // ...y los SALTOS DE LINEA duros ('\n') se respetan siempre (en cualquier modo, tambien "una linea"): cada
 // parrafo se parte por su cuenta. Un parrafo vacio es una linea vacia.
-static void PartirLineas(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
-                         float maxW, int modo, std::vector<std::string>& out) {
+static void SplitLines(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
+                         float maxW, int mode, std::vector<std::string>& out) {
     out.clear();
-    if (txt.find('\n') == std::string::npos) { PartirParrafo(at, txt, px, maxW, modo, out); return; }
+    if (txt.find('\n') == std::string::npos) { SplitParagraph(at, txt, px, maxW, mode, out); return; }
     size_t i = 0;
-    std::vector<std::string> parte;
+    std::vector<std::string> part;
     while (true) {
         size_t nl = txt.find('\n', i);
-        std::string par = txt.substr(i, nl == std::string::npos ? std::string::npos : nl - i);
-        if (!par.empty() && par[par.size() - 1] == '\r') par.erase(par.size() - 1);
-        PartirParrafo(at, par, px, maxW, modo, parte);
-        out.insert(out.end(), parte.begin(), parte.end());
+        std::string pair = txt.substr(i, nl == std::string::npos ? std::string::npos : nl - i);
+        if (!pair.empty() && pair[pair.size() - 1] == '\r') pair.erase(pair.size() - 1);
+        SplitParagraph(at, pair, px, maxW, mode, part);
+        out.insert(out.end(), part.begin(), part.end());
         if (nl == std::string::npos) break;
         i = nl + 1;
     }
@@ -320,13 +320,13 @@ static void PartirLineas(const w3dui::W3dTextAtlas* at, const std::string& txt, 
 
 // el tamano de fuente mas grande con el que el texto ENTRA en el area rw x rh
 // (biseccion: 'entra' es monotono con el tamano)
-static float PxQueEntra(const w3dui::W3dTextAtlas* at, const std::string& txt,
-                        int modo, float rw, float rh) {
+static float PxThatEnters(const w3dui::W3dTextAtlas* at, const std::string& txt,
+                        int mode, float rw, float rh) {
     float lo = 2.0f, hi = rh;
     std::vector<std::string> lin;
     for (int it = 0; it < 12; it++) {
         float mid = (lo + hi) * 0.5f;
-        PartirLineas(at, txt, mid, (modo != 0) ? rw : 1e9f, modo, lin);
+        SplitLines(at, txt, mid, (mode != 0) ? rw : 1e9f, mode, lin);
         float maxW = 0.0f;
         for (size_t i = 0; i < lin.size(); i++) {
             float w = at->TextWidth(lin[i].c_str(), mid);
@@ -345,20 +345,20 @@ static int   gBaseX = 0, gBaseY = 0, gBaseW = 0, gBaseH = 0;
 static float gClip[4] = { 0, 0, 0, 0 };   // x0, y0, x1, y1
 
 // HOVER del mouse para los botones: la posicion del mouse (BindsJuego, coords de lienzo)
-// pasada a las coords de DIBUJO del overlay actual. La resuelve UI2D_DibujarOverlay al
-// arrancar (con su propio mapeo x0/y0/escala) y DibujarBoton solo compara contra su rect.
+// pasada a las coords de DIBUJO del overlay actual. La resuelve UI2D_DrawOverlay al
+// arrancar (con su propio mapeo x0/y0/escala) y DrawButton solo compara contra su rect.
 // gHoverOk false = sin mouse presente (tactil) -> ningun boton dibuja el borde de hover.
 static bool  gHoverOk = false;
 static float gHoverX = 0.0f, gHoverY = 0.0f;
 
-static void AplicarScissorLocal(float x0, float y0, float x1, float y1) {
+static void ApplyScissorLocal(float x0, float y0, float x1, float y1) {
     if (x1 < x0) x1 = x0;
     if (y1 < y0) y1 = y0;
     int w = (int)(x1 - x0), h = (int)(y1 - y0);
-    gfx::Scissor(gBaseX + (int)x0, W3dPantallaAlto - (gBaseY + (int)y0) - h, w, h);
+    gfx::Scissor(gBaseX + (int)x0, W3dScreenHeight - (gBaseY + (int)y0) - h, w, h);
 }
 
-void UI2D_BaseRecorte(int vx, int vy, int vw, int vh, const float* clipLocal) {
+void UI2D_BaseClip(int vx, int vy, int vw, int vh, const float* clipLocal) {
     gBaseX = vx; gBaseY = vy; gBaseW = vw; gBaseH = vh;
     if (clipLocal) {   // recorte de arranque propio (ej: la vista de juego, sin la barra)
         gClip[0] = clipLocal[0]; gClip[1] = clipLocal[1];
@@ -370,8 +370,8 @@ void UI2D_BaseRecorte(int vx, int vy, int vw, int vh, const float* clipLocal) {
 
 // ---- dibujo de contenido -------------------------------------------------------------------
 // estado 2D para un quad (el texto arma el suyo en Begin())
-static void EstadoQuad(unsigned tex, bool conDepth) {
-    if (conDepth) gfx::Enable(gfx::DepthTest);   // modo mundo: la profundidad Z importa
+static void QuadState(unsigned tex, bool withDepth) {
+    if (withDepth) gfx::Enable(gfx::DepthTest);   // modo mundo: la profundidad Z importa
     else          gfx::Disable(gfx::DepthTest);
     gfx::Disable(gfx::Lighting); gfx::Disable(gfx::CullFace);
     gfx::Enable(gfx::Blend); gfx::BlendAlpha();
@@ -398,7 +398,7 @@ static void QuadUV(float x0, float y0, float x1, float y1,
 
 // como QuadUV pero remapea los UV 0..1 a un SUB-RECT del atlas (celda de un flipbook):
 // u' = uOff + u*uSc, v' = vOff + v*vSc. Con (0,0,1,1) es identico a QuadUV.
-static void QuadUVCelda(float x0, float y0, float x1, float y1,
+static void QuadUVCell(float x0, float y0, float x1, float y1,
                         float u0, float v0, float u1, float v1,
                         float uOff, float vOff, float uSc, float vSc) {
     QuadUV(x0, y0, x1, y1,
@@ -410,53 +410,53 @@ static void QuadUVCelda(float x0, float y0, float x1, float y1,
 // 0 = estirar, 1 = ajustar (entera, con bandas), 2 = cover (llena recortando).
 // (uOff,vOff,uSc,vSc) selecciona una CELDA del atlas (default = textura entera): el modo
 // se resuelve DENTRO de la celda (iw/ih ya vienen en pixeles de celda para el aspecto).
-static void DibujarTexturaModo(unsigned tex, int iw, int ih, int modo,
+static void DrawTextureMode(unsigned tex, int iw, int ih, int mode,
                                float x0, float y0, float x1, float y1,
                                float uOff = 0.0f, float vOff = 0.0f,
                                float uSc = 1.0f, float vSc = 1.0f) {
     float rw = x1 - x0, rh = y1 - y0;
     if (rw < 1e-6f || rh < 1e-6f) return;
-    if (modo == 1) {
+    if (mode == 1) {
         float e = rw / iw; if (rh / ih < e) e = rh / ih;
         float w = iw * e, h = ih * e;
         float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
-        QuadUVCelda(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f,
+        QuadUVCell(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f,
                     0, 0, 1, 1, uOff, vOff, uSc, vSc);
-    } else if (modo == 2) {
+    } else if (mode == 2) {
         float e = rw / iw; if (rh / ih > e) e = rh / ih;
         float du = (rw / e) / iw * 0.5f;   // mitad del ancho visible, en UV
         float dv = (rh / e) / ih * 0.5f;
-        QuadUVCelda(x0, y0, x1, y1, 0.5f - du, 0.5f - dv, 0.5f + du, 0.5f + dv,
+        QuadUVCell(x0, y0, x1, y1, 0.5f - du, 0.5f - dv, 0.5f + du, 0.5f + dv,
                     uOff, vOff, uSc, vSc);
     } else {
-        QuadUVCelda(x0, y0, x1, y1, 0, 0, 1, 1, uOff, vOff, uSc, vSc);
+        QuadUVCell(x0, y0, x1, y1, 0, 0, 1, 1, uOff, vOff, uSc, vSc);
     }
 }
 
 // (El flipbook 2D ya NO tiene subsistema propio aca: usa el Flipbook UNIFICADO del Core
-//  -- Imagen2D::flipPlay se registra solo en el registro global de Flipbook.cpp y lo tickea
-//  UpdateFlipbooks. El render lee flipPlay.uvActual. Ver Flipbook.h.)
+//  -- Image2D::flipPlay se registra solo en el registro global de Flipbook.cpp y lo tickea
+//  UpdateFlipbooks. El render lee flipPlay.uvCurrent. Ver Flipbook.h.)
 
-// dibuja la textura de una Imagen2D dentro del rect (x0,y0)-(x1,y1) segun su modo.
+// dibuja la textura de una Image2D dentro del rect (x0,y0)-(x1,y1) segun su modo.
 // Sin textura: un gris translucido para que el rect se vea igual.
-static void DibujarImagenRect(Imagen2D* im, float x0, float y0, float x1, float y1,
-                              bool conDepth, float op) {
+static void DrawImageRect(Image2D* im, float x0, float y0, float x1, float y1,
+                              bool withDepth, float op) {
     int iw = 0, ih = 0;
-    unsigned tex = Textura2DObtener(im->textura, &iw, &ih);
-    EstadoQuad(tex, conDepth);
+    unsigned tex = Texture2DGet(im->texture, &iw, &ih);
+    QuadState(tex, withDepth);
     if (!tex || iw < 1 || ih < 1) {
         gfx::Color4f(0.5f, 0.5f, 0.55f, 0.35f * op);   // placeholder: elegi una textura
         QuadUV(x0, y0, x1, y1, 0, 0, 1, 1);
         return;
     }
-    gfx::TexFilter(im->filtrado);                   // sin filtro = NEAREST pixel-perfect
-    if (!im->usarAlpha) gfx::Disable(gfx::Blend);   // sin canal alpha: se dibuja opaca
+    gfx::TexFilter(im->filtered);                  // sin filtro = NEAREST pixel-perfect
+    if (!im->useAlpha) gfx::Disable(gfx::Blend);   // sin canal alpha: se dibuja opaca
     // MEZCLA propia (aditiva: brillos / destellos de un HUD, el "suma" del juego). La normal es la del estado 2D.
-    const bool mezclaPropia = im->usarAlpha && im->mezcla != (int)gfx::MezclaAlpha;
-    if (mezclaPropia) gfx::SetMezcla(im->mezcla);
-    const float* c = ColorResuelto(im, im->palTinte, im->color);   // TINTE (propio o de paleta)
+    const bool mixOwn = im->useAlpha && im->mix != (int)gfx::MixAlpha;
+    if (mixOwn) gfx::SetMix(im->mix);
+    const float* c = ResolvedColor(im, im->palTint, im->color);   // TINTE (propio o de paleta)
     gfx::Color4f(c[0], c[1], c[2], c[3] * op);
-    // FLIPBOOK: si anima, dibujar la VENTANA UV actual (el motor la avanzo en flipPlay.uvActual).
+    // FLIPBOOK: si anima, dibujar la VENTANA UV actual (el motor la avanzo en flipPlay.uvCurrent).
     // Se toma la ventana rectangular de las esquinas 0 (u0,v0) y 2 (u1,v1): cubre el flipbook por
     // celdas y el scroll/zoom eje-alineado; el skew/rotacion (esquinas 1 y 3) es un caso futuro.
     // IMAGEN FIJA: manda su uvRect (default 0,0,1,1 = entera; atlas unico = su recorte).
@@ -467,8 +467,8 @@ static void DibujarImagenRect(Imagen2D* im, float x0, float y0, float x1, float 
     if (vSc == 0.0f) { vOff = 0.0f; vSc = 1.0f; }
     int cw = (int)(iw * fabsf(uSc) + 0.5f); if (cw < 1) cw = 1;   // px del recorte (aspecto de modo 1/2)
     int ch = (int)(ih * fabsf(vSc) + 0.5f); if (ch < 1) ch = 1;
-    if (im->EsFlipbook()) {
-        const float* uvp = im->flipPlay.uvActual;   // (0,0)(1,0)(1,1)(0,1)
+    if (im->IsFlipbook()) {
+        const float* uvp = im->flipPlay.uvCurrent;   // (0,0)(1,0)(1,1)(0,1)
         uOff = uvp[0]; vOff = uvp[1];
         uSc = uvp[4] - uvp[0];   // ancho de la ventana (esq2.u - esq0.u)
         vSc = uvp[5] - uvp[1];   // alto  de la ventana (esq2.v - esq0.v)
@@ -477,58 +477,58 @@ static void DibujarImagenRect(Imagen2D* im, float x0, float y0, float x1, float 
         cw = (int)(iw * uSc + 0.5f); if (cw < 1) cw = 1;   // px de la celda (aspecto de modo 1/2)
         ch = (int)(ih * vSc + 0.5f); if (ch < 1) ch = 1;
     }
-    DibujarTexturaModo(tex, cw, ch, im->modo, x0, y0, x1, y1, uOff, vOff, uSc, vSc);
-    if (mezclaPropia) gfx::BlendAlpha();   // el siguiente elemento vuelve a la mezcla normal
+    DrawTextureMode(tex, cw, ch, im->mode, x0, y0, x1, y1, uOff, vOff, uSc, vSc);
+    if (mixOwn) gfx::BlendAlpha();   // el siguiente elemento vuelve a la mezcla normal
 }
 
 // el FRAME actual del video dentro del rect. Con 'reproducir' avanza solo (y pide
 // redibujar: el editor es por eventos); sin loop queda clavado en el ultimo frame.
-static void DibujarVideoRect(Video2D* vd, float x0, float y0, float x1, float y1,
-                             bool conDepth, float op) {
+static void DrawVideoRect(Video2D* vd, float x0, float y0, float x1, float y1,
+                             bool withDepth, float op) {
     const VideoPreview* v = Video2DPreview(vd->video);
     if (!v || v->numFrames < 1) {
-        EstadoQuad(0, conDepth);
+        QuadState(0, withDepth);
         gfx::Color4f(0.25f, 0.25f, 0.3f, 0.5f * op);   // placeholder: elegi un video
         QuadUV(x0, y0, x1, y1, 0, 0, 1, 1);
         return;
     }
     int f = 0;
-    if (vd->reproducir && v->numFrames > 1) {
-        unsigned ms = W3dMsAhora();
+    if (vd->play && v->numFrames > 1) {
+        unsigned ms = W3dMsNow();
         if (vd->t0ms == 0) vd->t0ms = ms;
         unsigned df = (unsigned)((ms - vd->t0ms) * v->fps / 1000.0f);
         f = vd->loop ? (int)(df % (unsigned)v->numFrames)
                      : ((int)df >= v->numFrames ? v->numFrames - 1 : (int)df);
         g_redraw = true;   // animandose: el proximo frame tambien se dibuja
     } else vd->t0ms = 0;
-    EstadoQuad(v->frames[f], conDepth);
-    gfx::TexFilter(vd->filtrado);
-    if (!vd->usarAlpha) gfx::Disable(gfx::Blend);   // sin transparencia: opaco
+    QuadState(v->frames[f], withDepth);
+    gfx::TexFilter(vd->filtered);
+    if (!vd->useAlpha) gfx::Disable(gfx::Blend);   // sin transparencia: opaco
     gfx::Color4f(1.0f, 1.0f, 1.0f, op);
-    DibujarTexturaModo(v->frames[f], v->w, v->h, vd->modo, x0, y0, x1, y1);
+    DrawTextureMode(v->frames[f], v->w, v->h, vd->mode, x0, y0, x1, y1);
 }
 
 // el borde del slice9 EN LA TEXTURA, clampeado: minimo 1, maximo ceil(N/2)-1 por eje
 // (siempre tiene que quedar al menos 1 px de centro para estirar; en 5x5 el maximo es 2)
-static void BordesTexturaSlice9(Slice9* s9, int iw, int ih, float* bX, float* bY) {
+static void BordersTextureSlice9(Slice9* s9, int iw, int ih, float* bX, float* bY) {
     float maxBX = (float)((iw + 1) / 2 - 1); if (maxBX < 1.0f) maxBX = 1.0f;
     float maxBY = (float)((ih + 1) / 2 - 1); if (maxBY < 1.0f) maxBY = 1.0f;
-    *bX = s9->bordeX; if (*bX < 1.0f) *bX = 1.0f; if (*bX > maxBX) *bX = maxBX;
-    *bY = s9->bordeY; if (*bY < 1.0f) *bY = 1.0f; if (*bY > maxBY) *bY = maxBY;
+    *bX = s9->borderX; if (*bX < 1.0f) *bX = 1.0f; if (*bX > maxBX) *bX = maxBX;
+    *bY = s9->borderY; if (*bY < 1.0f) *bY = 1.0f; if (*bY > maxBY) *bY = maxBY;
 }
 
-void UI2D_CortesSlice9(Slice9* s9, float x0, float y0, float x1, float y1,
-                       float escalaDest, float* dX, float* dY) {
+void UI2D_CutsSlice9(Slice9* s9, float x0, float y0, float x1, float y1,
+                       float scaleDest, float* dX, float* dY) {
     int iw = 0, ih = 0;
-    Textura2DObtener(s9->textura, &iw, &ih);
+    Texture2DGet(s9->texture, &iw, &ih);
     if (iw < 1) iw = 16;
     if (ih < 1) ih = 16;
     float bX, bY;
-    BordesTexturaSlice9(s9, iw, ih, &bX, &bY);
-    // el borde DIBUJADO, por eje (esquinas rectangulares si bordeX != bordeY);
+    BordersTextureSlice9(s9, iw, ih, &bX, &bY);
+    // el borde DIBUJADO, por eje (esquinas rectangulares si borderX != borderY);
     // nunca pasa de la mitad del rect (sino los pedazos se cruzan)
-    *dX = bX * s9->escalaBorde * escalaDest;
-    *dY = bY * s9->escalaBorde * escalaDest;
+    *dX = bX * s9->borderScale * scaleDest;
+    *dY = bY * s9->borderScale * scaleDest;
     float maxDX = (x1 - x0) * 0.5f, maxDY = (y1 - y0) * 0.5f;
     if (*dX > maxDX) *dX = maxDX;
     if (*dY > maxDY) *dY = maxDY;
@@ -537,38 +537,38 @@ void UI2D_CortesSlice9(Slice9* s9, float x0, float y0, float x1, float y1,
 extern int GlobalScale;
 // escala efectiva de un UI raiz: si "igual que el editor" esta tildado, sigue el GlobalScale del editor (por
 // plataforma: x1 N95, x2/x3 PC/Android); sino, el valor manual. Clamp a >= 0.25 para no colapsar a 0.
-static float UI_EscalaEfectiva(const UI* u) {
-    float gs = u->escalaIgualEditor ? (float)GlobalScale : u->escalaGlobal;
+static float UI_EffectiveScale(const UI* u) {
+    float gs = u->equalScaleEditor ? (float)GlobalScale : u->scaleGlobal;
     return gs >= 0.25f ? gs : 1.0f;
 }
 
-float UI2D_EscalaGlobalDe(Object* o) {
+float UI2D_ScaleGlobalOf(Object* o) {
     for (Object* p = o; p; p = p->Parent)
         if (p->getType() == ObjectType::ui)
-            return UI_EscalaEfectiva((UI*)p);
+            return UI_EffectiveScale((UI*)p);
     return 1.0f;
 }
 
 // SLICE 9: la textura partida en 9 (esquinas fijas, lados estirados en un eje, centro
-// estirado). 'escalaDest' = px de pantalla por px de lienzo (el borde dibujado mide
-// borde * escalaBorde * eso).
-static void DibujarSlice9Rect(Slice9* s9, float x0, float y0, float x1, float y1,
-                              bool conDepth, float op, float escalaDest) {
+// estirado). 'scaleDest' = px de pantalla por px de lienzo (el borde dibujado mide
+// borde * borderScale * eso).
+static void DrawSlice9Rect(Slice9* s9, float x0, float y0, float x1, float y1,
+                              bool withDepth, float op, float scaleDest) {
     int iw = 0, ih = 0;
-    unsigned tex = Textura2DObtener(s9->textura, &iw, &ih);
-    EstadoQuad(tex, conDepth);
+    unsigned tex = Texture2DGet(s9->texture, &iw, &ih);
+    QuadState(tex, withDepth);
     if (!tex || iw < 1 || ih < 1) {
         gfx::Color4f(0.5f, 0.5f, 0.55f, 0.35f * op);   // placeholder: elegi una textura
         QuadUV(x0, y0, x1, y1, 0, 0, 1, 1);
         return;
     }
-    gfx::TexFilter(s9->filtrado);                   // sin filtro = NEAREST pixel-perfect
-    const float* c9 = ColorResuelto(s9, s9->palTinte, s9->color);   // TINTE (propio o de paleta)
+    gfx::TexFilter(s9->filtered);                   // sin filtro = NEAREST pixel-perfect
+    const float* c9 = ResolvedColor(s9, s9->palTint, s9->color);   // TINTE (propio o de paleta)
     gfx::Color4f(c9[0], c9[1], c9[2], c9[3] * op);
     float bX, bY;
-    BordesTexturaSlice9(s9, iw, ih, &bX, &bY);
+    BordersTextureSlice9(s9, iw, ih, &bX, &bY);
     float dX, dY;
-    UI2D_CortesSlice9(s9, x0, y0, x1, y1, escalaDest, &dX, &dY);
+    UI2D_CutsSlice9(s9, x0, y0, x1, y1, scaleDest, &dX, &dY);
     float bu = bX / iw, bv = bY / ih;
     float xs[4] = { x0, x0 + dX, x1 - dX, x1 };
     float ys[4] = { y0, y0 + dY, y1 - dY, y1 };
@@ -580,119 +580,119 @@ static void DibujarSlice9Rect(Slice9* s9, float x0, float y0, float x1, float y1
 }
 
 // quad de color solido del RECTANGULO (alpha 0 = invisible)
-static void DibujarRectSolido(Rect2D* r, float x0, float y0, float x1, float y1,
-                              bool conDepth, float op) {
-    const float* c = ColorResuelto(r, r->palColor, r->color);
+static void DrawSolidRect(Rect2D* r, float x0, float y0, float x1, float y1,
+                              bool withDepth, float op) {
+    const float* c = ResolvedColor(r, r->palColor, r->color);
     float a = c[3] * op;
     if (a <= 0.0f) return;
-    EstadoQuad(0, conDepth);   // mismo estado 2D, sin textura
+    QuadState(0, withDepth);   // mismo estado 2D, sin textura
     gfx::Color4f(c[0], c[1], c[2], a);
     QuadUV(x0, y0, x1, y1, 0, 0, 1, 1);
 }
 
-static void DibujarElemRec(Object* o, float rx0, float ry0, float rw, float rh,
-                           float escala, std::vector<UI2DPos>* outPos, float op, int celdaEje);
-static float MedirNatural(Object* o, float escala, float rw, float rh, bool ejeX);
+static void DrawElemRec(Object* o, float rx0, float ry0, float rw, float rh,
+                           float scale, std::vector<UI2DPos>* outPos, float op, int cellAxis);
+static float MeasureNatural(Object* o, float scale, float rw, float rh, bool axisX);
 
 
 // reparte los HIJOS en el rect interior del padre segun su layout: libre (cada uno con su
 // ancla y posicion), o filas/columnas (celdas del 100% del area repartidas por PESO, con gap)
-static void DibujarHijos2D(Object* padre, float rx0, float ry0, float rw, float rh,
-                           float escala, std::vector<UI2DPos>* outPos, float op) {
-    int lay = LayoutDe(padre);
+static void DrawChildren2D(Object* parent, float rx0, float ry0, float rw, float rh,
+                           float scale, std::vector<UI2DPos>* outPos, float op) {
+    int lay = LayoutOf(parent);
     if (lay == 0) {
-        for (size_t i = 0; i < padre->Childrens.size(); i++)
-            DibujarElemRec(padre->Childrens[i], rx0, ry0, rw, rh, escala, outPos, op, 0);
+        for (size_t i = 0; i < parent->Childrens.size(); i++)
+            DrawElemRec(parent->Childrens[i], rx0, ry0, rw, rh, scale, outPos, op, 0);
         return;
     }
     int n = 0;
-    float sumaPeso = 0.0f;
-    for (size_t i = 0; i < padre->Childrens.size(); i++) {
-        Object* h = padre->Childrens[i];
-        if (!UI2D_EsElemento2D(h) || !h->visible) continue;
-        float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-        sumaPeso += pe;
+    float sumWeight = 0.0f;
+    for (size_t i = 0; i < parent->Childrens.size(); i++) {
+        Object* h = parent->Childrens[i];
+        if (!UI2D_IsElement2D(h) || !h->visible) continue;
+        float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+        sumWeight += pe;
         n++;
     }
     if (n < 1) return;
     // gap proporcional: fraccion del LADO MENOR (mide lo mismo en filas que en columnas)
-    float menor = (rw < rh) ? rw : rh;
-    float gap = PadGapPxDe(padre) ? GapDe(padre) * escala : GapDe(padre) * menor;
-    bool ejeX = (lay == 2);
-    float total = (ejeX ? rw : rh) - gap * (n - 1);
+    float lower = (rw < rh) ? rw : rh;
+    float gap  = PadGapPxOf(parent) ? GapOf(parent) * scale : GapOf(parent) * lower;
+    bool axisX = (lay == 2);
+    float total = (axisX ? rw : rh) - gap * (n - 1);
     if (total < 0.0f) total = 0.0f;
 
     // el MARGEN de un hijo, en px de pantalla: aire ALREDEDOR de su celda (como CSS).
     // Proporcional = fraccion del lado menor del area del padre, igual que el gap.
-    float factorMarg = PadGapPxDe(padre) ? escala : menor;
-    #define MARGEN4(h, mi, md, ma, mb) { Elemento2D* _e = E2(h); \
-        mi = _e->margIzq * factorMarg; md = _e->margDer * factorMarg; \
-        ma = _e->margArr * factorMarg; mb = _e->margAba * factorMarg; }
+    float factorMargin = PadGapPxOf(parent) ? scale : lower;
+    #define MARGIN4(h, mi, md, ma, mb) { Element2D* _e = E2(h); \
+        mi = _e->marginLeft * factorMargin; md = _e->marginRight * factorMargin; \
+        ma = _e->marginTop * factorMargin; mb = _e->marginBottom * factorMargin; }
 
-    if (LayoutAjusteDe(padre) == 1) {
+    if (LayoutFitOf(parent) == 1) {
         // ---- ajuste MINIMO: cada hijo su tamano natural (+ su margen); el sobrante lo
         // absorben los EXPANDIR y los elementos con el checkbox "expandir" prendido ----
-        float suma = 0.0f, sumaPesoExp = 0.0f;
+        float sum = 0.0f, sumWeightExp = 0.0f;
         int nExp = 0;
-        for (size_t i = 0; i < padre->Childrens.size(); i++) {
-            Object* h = padre->Childrens[i];
-            if (!UI2D_EsElemento2D(h) || !h->visible) continue;
-            float mi, md, ma, mb; MARGEN4(h, mi, md, ma, mb);
-            suma += ejeX ? (mi + md) : (ma + mb);
-            if (h->getType() == ObjectType::expandir2d) {
-                float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-                sumaPesoExp += pe; nExp++;
+        for (size_t i = 0; i < parent->Childrens.size(); i++) {
+            Object* h = parent->Childrens[i];
+            if (!UI2D_IsElement2D(h) || !h->visible) continue;
+            float mi, md, ma, mb; MARGIN4(h, mi, md, ma, mb);
+            sum += axisX ? (mi + md) : (ma + mb);
+            if (h->getType() == ObjectType::expand2d) {
+                float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+                sumWeightExp += pe; nExp++;
             } else {
-                suma += MedirNatural(h, escala, rw, rh, ejeX);
-                if (E2(h)->expandir) {
-                    float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-                    sumaPesoExp += pe; nExp++;
+                sum += MeasureNatural(h, scale, rw, rh, axisX);
+                if (E2(h)->expand) {
+                    float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+                    sumWeightExp += pe; nExp++;
                 }
             }
         }
-        float libre = total - suma;
-        if (libre < 0.0f) libre = 0.0f;
+        float free = total - sum;
+        if (free < 0.0f) free = 0.0f;
         // DISTRIBUCION estilo css del sobrante del eje principal (solo tiene sentido
         // en este ajuste MINIMO: con ESTIRAR los hijos ocupan el 100% y no sobra nada).
         // between: extremos pegados y el resto en partes iguales ENTRE hijos; around:
         // media unidad en cada extremo; evenly: unidades iguales, extremos incluidos.
         // Con distribucion activa los expandibles no absorben (el sobrante es de las
         // separaciones) y el align tampoco aplica.
-        int dist = DistribucionDe(padre);
-        float sep = 0.0f;   // espacio EXTRA entre hijos (se suma al gap)
-        float ini = 0.0f;
-        if (dist == 1)      { if (n > 1) sep = libre / (float)(n - 1); }
-        else if (dist == 2) { sep = libre / (float)n; ini = sep * 0.5f; }
-        else if (dist == 3) { sep = libre / (float)(n + 1); ini = sep; }
+        int dist = DistributionOf(parent);
+        float sep   = 0.0f;   // espacio EXTRA entre hijos (se suma al gap)
+        float start = 0.0f;
+        if (dist == 1)      { if (n > 1) sep = free / (float)(n - 1); }
+        else if (dist == 2) { sep = free / (float)n; start = sep * 0.5f; }
+        else if (dist == 3) { sep = free / (float)(n + 1); start = sep; }
         else if (nExp == 0) {
             // sin expandibles el bloque entero se ALINEA: 0 = inicio, 1 = centro, 2 = fin
-            int al = LayoutAlignDe(padre);
-            if (al == 1) ini = libre * 0.5f;
-            else if (al == 2) ini = libre;
+            int to = LayoutAlignOf(parent);
+            if (to == 1) start = free * 0.5f;
+            else if (to == 2) start = free;
         }
         if (dist != 0) nExp = 0;   // ver arriba: el sobrante no va a los expandibles
-        float avX = rx0 + (ejeX ? ini : 0.0f);
-        float avY = ry0 + (ejeX ? 0.0f : ini);
-        for (size_t i = 0; i < padre->Childrens.size(); i++) {
-            Object* h = padre->Childrens[i];
-            if (!UI2D_EsElemento2D(h) || !h->visible) continue;
-            float mi, md, ma, mb; MARGEN4(h, mi, md, ma, mb);
-            bool exp2d = (h->getType() == ObjectType::expandir2d);
+        float avX = rx0 + (axisX ? start : 0.0f);
+        float avY = ry0 + (axisX ? 0.0f : start);
+        for (size_t i = 0; i < parent->Childrens.size(); i++) {
+            Object* h = parent->Childrens[i];
+            if (!UI2D_IsElement2D(h) || !h->visible) continue;
+            float mi, md, ma, mb; MARGIN4(h, mi, md, ma, mb);
+            bool exp2d = (h->getType() == ObjectType::expand2d);
             float extra = 0.0f;
-            if ((exp2d || E2(h)->expandir) && nExp > 0) {
-                float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-                extra = libre * pe / sumaPesoExp;
+            if ((exp2d || E2(h)->expand) && nExp > 0) {
+                float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+                extra = free * pe / sumWeightExp;
             }
-            float tam = (exp2d ? 0.0f : MedirNatural(h, escala, rw, rh, ejeX)) + extra;
+            float size = (exp2d ? 0.0f : MeasureNatural(h, scale, rw, rh, axisX)) + extra;
             // la celda va INSETEADA por el margen (en el eje transversal tambien)
-            if (ejeX) {
+            if (axisX) {
                 float ch2 = rh - ma - mb; if (ch2 < 0.0f) ch2 = 0.0f;
-                DibujarElemRec(h, avX + mi, ry0 + ma, tam, ch2, escala, outPos, op, 1);
-                avX += mi + tam + md + gap + sep;
+                DrawElemRec(h, avX + mi, ry0 + ma, size, ch2, scale, outPos, op, 1);
+                avX += mi + size + md + gap + sep;
             } else {
                 float cw2 = rw - mi - md; if (cw2 < 0.0f) cw2 = 0.0f;
-                DibujarElemRec(h, rx0 + mi, avY + ma, cw2, tam, escala, outPos, op, 2);
-                avY += ma + tam + mb + gap + sep;
+                DrawElemRec(h, rx0 + mi, avY + ma, cw2, size, scale, outPos, op, 2);
+                avY += ma + size + mb + gap + sep;
             }
         }
         return;
@@ -700,43 +700,43 @@ static void DibujarHijos2D(Object* padre, float rx0, float ry0, float rw, float 
 
     // ---- ajuste ESTIRAR (default): se reparten el 100% por PESO. La celda del hijo
     // incluye su margen; el elemento se dibuja adentro, inseteado. ----
-    float avance = rx0, avanceY = ry0;
-    for (size_t i = 0; i < padre->Childrens.size(); i++) {
-        Object* h = padre->Childrens[i];
-        if (!UI2D_EsElemento2D(h) || !h->visible) continue;
-        float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-        float tam = total * pe / sumaPeso;   // el PESO reparte el espacio (no partes iguales)
-        float mi, md, ma, mb; MARGEN4(h, mi, md, ma, mb);
+    float advance = rx0, advanceY = ry0;
+    for (size_t i = 0; i < parent->Childrens.size(); i++) {
+        Object* h = parent->Childrens[i];
+        if (!UI2D_IsElement2D(h) || !h->visible) continue;
+        float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+        float size = total * pe / sumWeight;   // el PESO reparte el espacio (no partes iguales)
+        float mi, md, ma, mb; MARGIN4(h, mi, md, ma, mb);
         if (lay == 1) {   // FILAS: se apilan hacia abajo
             float cw2 = rw - mi - md; if (cw2 < 0.0f) cw2 = 0.0f;
-            float th2 = tam - ma - mb; if (th2 < 0.0f) th2 = 0.0f;
-            DibujarElemRec(h, rx0 + mi, avanceY + ma, cw2, th2, escala, outPos, op, 2);
-            avanceY += tam + gap;
+            float th2 = size - ma - mb; if (th2 < 0.0f) th2 = 0.0f;
+            DrawElemRec(h, rx0 + mi, advanceY + ma, cw2, th2, scale, outPos, op, 2);
+            advanceY += size + gap;
         } else {          // COLUMNAS: una al lado de la otra
             float ch2 = rh - ma - mb; if (ch2 < 0.0f) ch2 = 0.0f;
-            float tw2 = tam - mi - md; if (tw2 < 0.0f) tw2 = 0.0f;
-            DibujarElemRec(h, avance + mi, ry0 + ma, tw2, ch2, escala, outPos, op, 1);
-            avance += tam + gap;
+            float tw2 = size - mi - md; if (tw2 < 0.0f) tw2 = 0.0f;
+            DrawElemRec(h, advance + mi, ry0 + ma, tw2, ch2, scale, outPos, op, 1);
+            advance += size + gap;
         }
     }
-    #undef MARGEN4
+    #undef MARGIN4
 }
 
 // los hijos del objeto, con su padding, su RECORTE (overflow por eje) y su scroll aplicados.
 // clip(x0..y1) = el rect del PADRE (donde se recorta); cont* = el area interior (con padding).
-static void DibujarHijosRecortados(Object* padre, float clipX0, float clipY0,
+static void DrawChildrenCropped(Object* parent, float clipX0, float clipY0,
                                    float clipX1, float clipY1,
                                    float contX0, float contY0, float contW, float contH,
-                                   float escala, std::vector<UI2DPos>* outPos, float op) {
-    bool cx = RecortaXDe(padre), cy = RecortaYDe(padre);
+                                   float scale, std::vector<UI2DPos>* outPos, float op) {
+    bool cx = CropsXOf(parent), cy = CropsAndOf(parent);
     float prev[4] = { gClip[0], gClip[1], gClip[2], gClip[3] };
     // el SCISSOR tiene que estar prendido para que el recorte exista: el viewport 3D lo apaga despues de limpiar la
     // escena y su RenderUI no lo vuelve a prender (el overflow de un contenedor no recortaba nada jugando; en el
     // Editor 2D si, porque ahi el area ya lo tenia prendido). Se prende aca y se deja como estaba (consulta al cache)
-    bool scissorAntes = true;
+    bool scissorPrev = true;
     if (cx || cy) {
-        scissorAntes = gfx::IsEnabled(gfx::ScissorTest);
-        if (!scissorAntes) gfx::Enable(gfx::ScissorTest);
+        scissorPrev = gfx::IsEnabled(gfx::ScissorTest);
+        if (!scissorPrev) gfx::Enable(gfx::ScissorTest);
         // interseccion del recorte del padre con el vigente (los recortes se anidan)
         float nx0 = cx ? clipX0 : gClip[0], nx1 = cx ? clipX1 : gClip[2];
         float ny0 = cy ? clipY0 : gClip[1], ny1 = cy ? clipY1 : gClip[3];
@@ -745,32 +745,32 @@ static void DibujarHijosRecortados(Object* padre, float clipX0, float clipY0,
         if (nx1 > gClip[2]) nx1 = gClip[2];
         if (ny1 > gClip[3]) ny1 = gClip[3];
         gClip[0] = nx0; gClip[1] = ny0; gClip[2] = nx1; gClip[3] = ny1;
-        AplicarScissorLocal(nx0, ny0, nx1, ny1);
+        ApplyScissorLocal(nx0, ny0, nx1, ny1);
     }
     // el scroll corre el CONTENIDO (solo tiene sentido con el recorte del eje activo)
-    if (ConScrollDe(padre)) {
-        if (cx) contX0 -= ScrollXDe(padre) * escala;
-        if (cy) contY0 -= ScrollYDe(padre) * escala;
+    if (WithScrollOf(parent)) {
+        if (cx) contX0 -= ScrollXOf(parent) * scale;
+        if (cy) contY0 -= ScrollYOf(parent) * scale;
     }
-    DibujarHijos2D(padre, contX0, contY0, contW, contH, escala, outPos, op);
+    DrawChildren2D(parent, contX0, contY0, contW, contH, scale, outPos, op);
     if (cx || cy) {
         gClip[0] = prev[0]; gClip[1] = prev[1]; gClip[2] = prev[2]; gClip[3] = prev[3];
-        AplicarScissorLocal(prev[0], prev[1], prev[2], prev[3]);
-        if (!scissorAntes) gfx::Disable(gfx::ScissorTest);
+        ApplyScissorLocal(prev[0], prev[1], prev[2], prev[3]);
+        if (!scissorPrev) gfx::Disable(gfx::ScissorTest);
     }
 }
 
-// fuente EFECTIVA de un texto 2D: la BITMAP declarada (fuenteBitmap: png + json de
-// glifos, ver Texto2D.h) si carga; si falta el archivo cae a la fuente comun (ttf o
+// fuente EFECTIVA de un texto 2D: la BITMAP declarada (fontBitmap: png + json de
+// glifos, ver Text2D.h) si carga; si falta el archivo cae a la fuente comun (ttf o
 // la de Whisk3D) para que el texto nunca desaparezca.
 // 'px' = el alto con que se va a dibujar en pixeles de PANTALLA (0 = sin saberlo): una .ttf viene horneada a ese tamano
-// (Fuente2DObtenerPx: nitida en cualquier definicion)
-static w3dui::W3dTextAtlas* FuenteDeTexto2D(Texto2D* t, float px = 0.0f) {
-    if (!t->fuenteBitmap.empty()) {
-        w3dui::W3dTextAtlas* at = Fuente2DObtener(t->fuenteBitmap);
+// (Font2DGetPx: nitida en cualquier definicion)
+static w3dui::W3dTextAtlas* Text2DFont(Text2D* t, float px = 0.0f) {
+    if (!t->fontBitmap.empty()) {
+        w3dui::W3dTextAtlas* at = Font2DGet(t->fontBitmap);
         if (at) return at;
     }
-    return (px > 0.0f) ? Fuente2DObtenerPx(t->fuente, px) : Fuente2DObtener(t->fuente);
+    return (px > 0.0f) ? Font2DGetPx(t->source, px) : Font2DGet(t->source);
 }
 
 // EL ARMADO de un texto (el tamano que entra, las lineas partidas y sus anchos) por elemento: se rehace solo si cambio
@@ -778,51 +778,51 @@ static w3dui::W3dTextAtlas* FuenteDeTexto2D(Texto2D* t, float px = 0.0f) {
 // textos cada cuadro y rearmarlos eran vectores nuevos (memoria del heap: en el N95, lo caro), la busqueda del tamano
 // que entra (12 vueltas) y medir cada linea. La entrada sabe el serial del objeto (una direccion reciclada no la usa)
 namespace {
-struct ArmadoTexto {
+struct BuiltText {
     unsigned serial;
     const void* at;
     std::string txt;
-    float pxPedido, rw, rh;
-    int lineas;
-    bool ajusta;
+    float pxRequest, rw, rh;
+    int lines;
+    bool fits;
     float px, maxW;
     std::vector<std::string> lin;
-    std::vector<float> anchos;
-    ArmadoTexto() : serial(0), at(0), pxPedido(0), rw(0), rh(0), lineas(0), ajusta(false), px(0), maxW(0) {}
+    std::vector<float> widths;
+    BuiltText() : serial(0), at(0), pxRequest(0), rw(0), rh(0), lines(0), fits(false), px(0), maxW(0) {}
 };
-std::map<const Texto2D*, ArmadoTexto> gArmados;
+std::map<const Text2D*, BuiltText> gBuilt;
 }
 
 // dibuja el bloque de TEXTO (con lineas y auto-ajuste) centrado en su ancla; devuelve
 // el rect ocupado en outB[4]. rw/rh = area de referencia (para partir lineas y auto-tam).
-static void DibujarTextoBloque(Texto2D* t, float sx, float sy, float rw, float rh,
-                               float escala, float op, float* outB) {
+static void DrawTextBlock(Text2D* t, float sx, float sy, float rw, float rh,
+                               float scale, float op, float* outB) {
     outB[0] = sx; outB[1] = sy; outB[2] = sx; outB[3] = sy;
-    const float pxPedido = t->tam * escala * FactorTexto(t->tamModo);
-    w3dui::W3dTextAtlas* at = FuenteDeTexto2D(t, pxPedido);
-    std::string txt = TextoSegunTipo(t);
+    const float pxRequest = t->size * scale * FactorText(t->sizeMode);
+    w3dui::W3dTextAtlas* at = Text2DFont(t, pxRequest);
+    std::string txt = TextByType(t);
     if (!at || txt.empty()) return;
-    const bool ajusta = t->autoTam && rw > 4.0f && rh > 4.0f;
-    if (gArmados.size() > 1024) gArmados.clear();   // (los de elementos que ya no existen)
-    ArmadoTexto& A = gArmados[t];
-    if (A.serial != t->serial || A.at != at || A.pxPedido != pxPedido || A.rw != rw || A.rh != rh ||
-        A.lineas != t->lineas || A.ajusta != ajusta || A.txt != txt) {
-        float pxA = ajusta ? PxQueEntra(at, txt, t->lineas, rw, rh) : pxPedido;   // ajustar el tamano al area
+    const bool fits = t->autoSize && rw > 4.0f && rh > 4.0f;
+    if (gBuilt.size() > 1024) gBuilt.clear();   // (los de elementos que ya no existen)
+    BuiltText& A = gBuilt[t];
+    if (A.serial != t->serial || A.at != at || A.pxRequest != pxRequest || A.rw != rw || A.rh != rh ||
+        A.lines != t->lines || A.fits != fits || A.txt != txt) {
+        float pxA = fits ? PxThatEnters(at, txt, t->lines, rw, rh) : pxRequest;   // ajustar el tamano al area
         // fuente PIXEL: snap al multiplo entero LOGICO (la vista escala suave encima)
-        pxA = PxSnap(at, pxA, t->autoTam);
-        PartirLineas(at, txt, pxA, (t->lineas != 0) ? rw : 1e9f, t->lineas, A.lin);
-        A.anchos.resize(A.lin.size());
+        pxA = PxSnap(at, pxA, t->autoSize);
+        SplitLines(at, txt, pxA, (t->lines != 0) ? rw : 1e9f, t->lines, A.lin);
+        A.widths.resize(A.lin.size());
         A.maxW = 0.0f;
         for (size_t i = 0; i < A.lin.size(); i++) {
-            A.anchos[i] = at->TextWidth(A.lin[i].c_str(), pxA);
-            if (A.anchos[i] > A.maxW) A.maxW = A.anchos[i];
+            A.widths[i] = at->TextWidth(A.lin[i].c_str(), pxA);
+            if (A.widths[i] > A.maxW) A.maxW = A.widths[i];
         }
-        A.serial = t->serial; A.at = at; A.txt = txt; A.pxPedido = pxPedido; A.rw = rw; A.rh = rh;
-        A.lineas = t->lineas; A.ajusta = ajusta; A.px = pxA;
+        A.serial = t->serial; A.at = at; A.txt = txt; A.pxRequest = pxRequest; A.rw = rw; A.rh = rh;
+        A.lines  = t->lines; A.fits = fits; A.px = pxA;
     }
     const float px = A.px;
     const std::vector<std::string>& lin = A.lin;
-    const std::vector<float>& anchos = A.anchos;
+    const std::vector<float>& widths = A.widths;
     const float maxW = A.maxW;
     float lh = at->LineHeight(px);
     float bh = lh * lin.size();
@@ -839,11 +839,11 @@ static void DibujarTextoBloque(Texto2D* t, float sx, float sy, float rw, float r
         bx = (float)(int)(bx + (bx >= 0 ? 0.5f : -0.5f));
     }
     outB[0] = bx; outB[1] = ty; outB[2] = bx + maxW; outB[3] = ty + bh;
-    const float* tc = ColorResuelto(t, t->palColor, t->color);
+    const float* tc = ResolvedColor(t, t->palColor, t->color);
     at->Begin();
     for (size_t i = 0; i < lin.size(); i++) {
         float tx = sx;
-        if (t->alignH == 1) tx -= anchos[i] * 0.5f; else if (t->alignH == 2) tx -= anchos[i];
+        if (t->alignH == 1) tx -= widths[i] * 0.5f; else if (t->alignH == 2) tx -= widths[i];
         if (at->pixelPerfect) tx = (float)(int)(tx + (tx >= 0 ? 0.5f : -0.5f));
         at->DrawText(lin[i].c_str(), tx, ty + lh * i, px,
                      tc[0], tc[1], tc[2], tc[3] * op);
@@ -852,49 +852,49 @@ static void DibujarTextoBloque(Texto2D* t, float sx, float sy, float rw, float r
 
 // mide el tamano NATURAL del boton (padding + icono + texto), en px de PANTALLA.
 // rw/rh = rect de referencia (para el boton de solo arte con tamano RELATIVO).
-static void MedirBoton(Boton2D* b, float escala, float rw, float rh, float* w, float* h) {
-    float fT = FactorTexto(b->tamModo);
-    float px = b->tam * escala * fT;
-    w3dui::W3dTextAtlas* at = Fuente2DObtenerPx(b->fuente, px);
+static void MeasureButton(Button2D* b, float scale, float rw, float rh, float* w, float* h) {
+    float fT = FactorText(b->sizeMode);
+    float px = b->size * scale * fT;
+    w3dui::W3dTextAtlas* at = Font2DGetPx(b->source, px);
     if (at) px = PxSnap(at, px, false);
-    float tw = (at && !b->texto.empty()) ? at->TextWidth(b->texto.c_str(), px) : 0.0f;
+    float tw = (at && !b->text.empty()) ? at->TextWidth(b->text.c_str(), px) : 0.0f;
     float icoW = 0.0f, icoH = 0.0f;
-    if (!b->icono.empty()) {
+    if (!b->icon.empty()) {
         int iw = 0, ih = 0;
-        Textura2DObtener(b->icono, &iw, &ih);
-        icoW = iw * escala; icoH = ih * escala;
+        Texture2DGet(b->icon, &iw, &ih);
+        icoW = iw * scale; icoH = ih * scale;
     }
-    float p = b->pad * escala * fT;
+    float p = b->pad * scale * fT;
     float contH = (px > icoH) ? px : icoH;
     *w = p * 2.0f + icoW + ((icoW > 0.0f && tw > 0.0f) ? p : 0.0f) + tw;
     *h = p * 2.0f + contH;
     // boton de SOLO ARTE (textura de fondo, sin texto ni icono): manda su propio
     // ancho/alto (midiendo el contenido quedaria de 8px, el pad solo)
-    if (tw <= 0.0f && icoW <= 0.0f && !b->texturaFondo.empty()) {
-        *w = TamSegunModo(b->ancho, b->tamModo, escala, rw);
-        *h = TamSegunModo(b->alto,  b->tamModo, escala, rh);
+    if (tw <= 0.0f && icoW <= 0.0f && !b->textureBackground.empty()) {
+        *w = SizeByMode(b->width, b->sizeMode, scale, rw);
+        *h = SizeByMode(b->height,  b->sizeMode, scale, rh);
     }
 }
 
 // la card del boton: fondo + borde de 1px (GEOMETRIA, como la barra del editor) + contenido
-static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
-                         float escala, float op) {
-    const float* cFondo = ColorResuelto(b, b->palFondo, b->colorFondo);
-    const float* cTexto = ColorResuelto(b, b->palTexto, b->colorTexto);
-    const float* cBorde = ColorResuelto(b, b->palBorde, b->colorBorde);
+static void DrawButton(Button2D* b, float x0, float y0, float x1, float y1,
+                         float scale, float op) {
+    const float* cBackground = ResolvedColor(b, b->palBackground, b->backgroundColor);
+    const float* cText       = ResolvedColor(b, b->palText, b->textColor);
+    const float* cBorder     = ResolvedColor(b, b->palBorder, b->borderColor);
     int tw9 = 0, th9 = 0;
-    unsigned tex9 = b->texturaFondo.empty() ? 0 : Textura2DObtener(b->texturaFondo, &tw9, &th9);
+    unsigned tex9 = b->textureBackground.empty() ? 0 : Texture2DGet(b->textureBackground, &tw9, &th9);
     if (tex9 && tw9 > 0 && th9 > 0) {
         // FONDO con textura de 9 pedazos (como el slice9), tenida con el color de fondo
-        EstadoQuad(tex9, false);
+        QuadState(tex9, false);
         gfx::TexFilter(false);
-        gfx::Color4f(cFondo[0], cFondo[1], cFondo[2], cFondo[3] * op);
-        float bX = b->bordeTexX, bY = b->bordeTexY;
+        gfx::Color4f(cBackground[0], cBackground[1], cBackground[2], cBackground[3] * op);
+        float bX = b->borderTexX, bY = b->borderTexY;
         float mX = (float)((tw9 + 1) / 2 - 1); if (mX < 1) mX = 1;
         float mY = (float)((th9 + 1) / 2 - 1); if (mY < 1) mY = 1;
         if (bX < 1) bX = 1; if (bX > mX) bX = mX;
         if (bY < 1) bY = 1; if (bY > mY) bY = mY;
-        float dX = bX * b->escalaBordeTex * escala, dY = bY * b->escalaBordeTex * escala;
+        float dX = bX * b->borderScaleTex * scale, dY = bY * b->borderScaleTex * scale;
         if (dX > (x1 - x0) * 0.5f) dX = (x1 - x0) * 0.5f;
         if (dY > (y1 - y0) * 0.5f) dY = (y1 - y0) * 0.5f;
         float bu = bX / tw9, bv = bY / th9;
@@ -907,12 +907,12 @@ static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
                 QuadUV(xs[i], ys[j], xs[i+1], ys[j+1], us[i], vs[j], us[i+1], vs[j+1]);
     } else {
         // fondo plano
-        EstadoQuad(0, false);
-        gfx::Color4f(cFondo[0], cFondo[1], cFondo[2], cFondo[3] * op);
+        QuadState(0, false);
+        gfx::Color4f(cBackground[0], cBackground[1], cBackground[2], cBackground[3] * op);
         QuadUV(x0, y0, x1, y1, 0, 0, 1, 1);
         // borde de 1px de lienzo (escalado): 4 rectangulos finos (GEOMETRIA, como el editor)
-        float g = escala; if (g < 1.0f) g = 1.0f;
-        gfx::Color4f(cBorde[0], cBorde[1], cBorde[2], cBorde[3] * op);
+        float g = scale; if (g < 1.0f) g = 1.0f;
+        gfx::Color4f(cBorder[0], cBorder[1], cBorder[2], cBorder[3] * op);
         QuadUV(x0, y0, x1, y0 + g, 0, 0, 1, 1);
         QuadUV(x0, y1 - g, x1, y1, 0, 0, 1, 1);
         QuadUV(x0, y0, x0 + g, y1, 0, 0, 1, 1);
@@ -921,27 +921,27 @@ static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
     // contenido: icono a la izquierda + texto, CENTRADO en el boton (horizontal y
     // vertical): con el boton mas ancho que su natural (celda estirada) el contenido
     // no queda pegado a la izquierda. Al tamano natural centrar == arrancar en el pad.
-    float fT = FactorTexto(b->tamModo);
-    float p = b->pad * escala * fT;
+    float fT = FactorText(b->sizeMode);
+    float p = b->pad * scale * fT;
     int iw = 0, ih = 0;
-    unsigned texIco = b->icono.empty() ? 0 : Textura2DObtener(b->icono, &iw, &ih);
-    float icoW = texIco ? iw * escala : 0.0f;
-    float icoH = texIco ? ih * escala : 0.0f;
-    w3dui::W3dTextAtlas* at = b->texto.empty() ? NULL : Fuente2DObtenerPx(b->fuente, b->tam * escala * fT);
+    unsigned texIco = b->icon.empty() ? 0 : Texture2DGet(b->icon, &iw, &ih);
+    float icoW = texIco ? iw * scale : 0.0f;
+    float icoH = texIco ? ih * scale : 0.0f;
+    w3dui::W3dTextAtlas* at = b->text.empty() ? NULL : Font2DGetPx(b->source, b->size * scale * fT);
     float px = 0.0f, tw = 0.0f;
     if (at) {
-        px = PxSnap(at, b->tam * escala * fT, false);
-        tw = at->TextWidth(b->texto.c_str(), px);
+        px = PxSnap(at, b->size * scale * fT, false);
+        tw = at->TextWidth(b->text.c_str(), px);
     }
     float contW = icoW + ((icoW > 0.0f && tw > 0.0f) ? p : 0.0f) + tw;
     float cx = (x0 + x1 - contW) * 0.5f;
     if (cx < x0 + p) cx = x0 + p;   // capado: nunca arranca antes del pad
     if (texIco) {
         float cy = (y0 + y1 - icoH) * 0.5f;
-        EstadoQuad(texIco, false);
+        QuadState(texIco, false);
         gfx::TexFilter(false);   // los iconos pixelados, como el editor
-        gfx::Color4f(cTexto[0], cTexto[1], cTexto[2],
-                     cTexto[3] * op);   // el icono se TINE como el texto
+        gfx::Color4f(cText[0], cText[1], cText[2],
+                     cText[3] * op);   // el icono se TINE como el texto
         QuadUV(cx, cy, cx + icoW, cy + icoH, 0, 0, 1, 1);
         cx += icoW + p;
     }
@@ -952,18 +952,18 @@ static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
             ty = (float)(int)(ty + 0.5f);
         }
         at->Begin();
-        at->DrawText(b->texto.c_str(), cx, ty, px,
-                     cTexto[0], cTexto[1], cTexto[2], cTexto[3] * op);
+        at->DrawText(b->text.c_str(), cx, ty, px,
+                     cText[0], cText[1], cText[2], cText[3] * op);
     }
     // BORDE de HOVER: feedback de mouse-over. Se dibuja SOLO con un mouse presente
     // (gHoverOk; en tactil no hay hover) y con el cursor DENTRO del rect resuelto del
     // boton. ~2px por dentro del borde, en colorHover (verde accent por defecto; la
     // calculadora usa blanco). Va ENCIMA de la card/textura, en las dos ramas de fondo.
-    const float* cHover = ColorResuelto(b, b->palHover, b->colorHover);
+    const float* cHover = ResolvedColor(b, b->palHover, b->colorHover);
     if (gHoverOk && gHoverX >= x0 && gHoverX <= x1 && gHoverY >= y0 && gHoverY <= y1 &&
         cHover[3] > 0.001f) {
-        float g2 = 2.0f * escala; if (g2 < 2.0f) g2 = 2.0f;
-        EstadoQuad(0, false);
+        float g2 = 2.0f * scale; if (g2 < 2.0f) g2 = 2.0f;
+        QuadState(0, false);
         gfx::Color4f(cHover[0], cHover[1], cHover[2],
                      cHover[3] * op);
         QuadUV(x0, y0, x1, y0 + g2, 0, 0, 1, 1);
@@ -975,25 +975,25 @@ static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
 
 // el tamano NATURAL de un hijo sobre el eje del layout (px de pantalla). El eje cruzado
 // siempre ocupa el 100%. Expandir devuelve 0 (absorbe el sobrante aparte).
-static float MedirNatural(Object* o, float escala, float rw, float rh, bool ejeX) {
+static float MeasureNatural(Object* o, float scale, float rw, float rh, bool axisX) {
     ObjectType t = o->getType();
-    if (t == ObjectType::expandir2d) return 0.0f;
-    if (t == ObjectType::boton2d) {
+    if (t == ObjectType::expand2d) return 0.0f;
+    if (t == ObjectType::button2d) {
         float w, h;
-        MedirBoton((Boton2D*)o, escala, rw, rh, &w, &h);
-        return ejeX ? w : h;
+        MeasureButton((Button2D*)o, scale, rw, rh, &w, &h);
+        return axisX ? w : h;
     }
-    if (t == ObjectType::texto2d) {
-        Texto2D* tx = (Texto2D*)o;
-        w3dui::W3dTextAtlas* at = FuenteDeTexto2D(tx, tx->tam * escala * FactorTexto(tx->tamModo));
-        std::string txt = TextoSegunTipo(tx);
+    if (t == ObjectType::text2d) {
+        Text2D* tx = (Text2D*)o;
+        w3dui::W3dTextAtlas* at = Text2DFont(tx, tx->size * scale * FactorText(tx->sizeMode));
+        std::string txt = TextByType(tx);
         if (!at || txt.empty()) return 0.0f;
-        float px = PxSnap(at, tx->tam * escala * FactorTexto(tx->tamModo), false);
-        return ejeX ? at->TextWidth(txt.c_str(), px) : px;
+        float px = PxSnap(at, tx->size * scale * FactorText(tx->sizeMode), false);
+        return axisX ? at->TextWidth(txt.c_str(), px) : px;
     }
-    Elemento2D* e = E2(o);
-    if (ejeX) return TamSegunModo(e->ancho, e->tamModo, escala, rw);
-    return TamSegunModo(e->alto, e->tamModo, escala, rh);
+    Element2D* e = E2(o);
+    if (axisX) return SizeByMode(e->width, e->sizeMode, scale, rw);
+    return SizeByMode(e->height, e->sizeMode, scale, rh);
 }
 
 // dibuja un elemento y sus hijos. El rect (rx0,ry0,rw,rh) es el marco de REFERENCIA para el
@@ -1003,20 +1003,20 @@ static float MedirNatural(Object* o, float escala, float rw, float rh, bool ejeX
 // posicion se ignora y las imagenes/rectangulos/contenedores llenan la celda entera.
 // La rotacion se aplica con la matriz: los HIJOS quedan adentro y la heredan; la OPACIDAD
 // tambien (op = la acumulada de los padres).
-// celdaEje: 0 = libre (con ancla+posicion); 1 = celda de un layout en COLUMNAS (el ancho
+// cellAxis: 0 = libre (con ancla+posicion); 1 = celda de un layout en COLUMNAS (el ancho
 // de la celda ya es la medida del hijo); 2 = celda de FILAS (idem con el alto).
-static void DibujarElemRec(Object* o, float rx0, float ry0, float rw, float rh,
-                           float escala, std::vector<UI2DPos>* outPos, float op, int celdaEje) {
-    if (!o || !o->visible || !UI2D_EsElemento2D(o)) return;
-    bool enCelda = (celdaEje != 0);
-    Elemento2D* e = E2(o);
+static void DrawElemRec(Object* o, float rx0, float ry0, float rw, float rh,
+                           float scale, std::vector<UI2DPos>* outPos, float op, int cellAxis) {
+    if (!o || !o->visible || !UI2D_IsElement2D(o)) return;
+    bool inCell = (cellAxis != 0);
+    Element2D* e = E2(o);
     float rot = e->rot2d;
-    op *= e->opacidad;
+    op *= e->opacity;
 
     float ax, ay;
-    UI2D_PuntoAncla(e->ancla, rx0, ry0, rw, rh, &ax, &ay);
-    float sx = enCelda ? ax : ax + o->pos.x * rw;
-    float sy = enCelda ? ay : ay + o->pos.y * rh;
+    UI2D_PointAnchor(e->anchor, rx0, ry0, rw, rh, &ax, &ay);
+    float sx = inCell ? ax : ax + o->pos.x * rw;
+    float sy = inCell ? ay : ay + o->pos.y * rh;
     size_t posIdx = 0;
     if (outPos) {
         UI2DPos p; p.obj = o; p.sx = sx; p.sy = sy;
@@ -1027,8 +1027,8 @@ static void DibujarElemRec(Object* o, float rx0, float ry0, float rw, float rh,
         outPos->push_back(p);
     }
 
-    bool rotado = (rot != 0.0f);
-    if (rotado) {
+    bool rotated = (rot != 0.0f);
+    if (rotated) {
         gfx::MatrixMode(gfx::ModelView);
         gfx::PushMatrix();
         gfx::Translatef(sx, sy, 0.0f);
@@ -1039,64 +1039,64 @@ static void DibujarElemRec(Object* o, float rx0, float ry0, float rw, float rh,
     // el rect que OCUPA el elemento (bounds sin rotar): referencia de ancla para sus hijos
     float bx0 = sx, by0 = sy, bx1 = sx, by1 = sy;
 
-    if (o->getType() == ObjectType::texto2d) {
+    if (o->getType() == ObjectType::text2d) {
         float B[4];
-        DibujarTextoBloque((Texto2D*)o, sx, sy, rw, rh, escala, op, B);
+        DrawTextBlock((Text2D*)o, sx, sy, rw, rh, scale, op, B);
         bx0 = B[0]; by0 = B[1]; bx1 = B[2]; by1 = B[3];
-    } else if (o->getType() == ObjectType::boton2d) {
-        Boton2D* b = (Boton2D*)o;
+    } else if (o->getType() == ObjectType::button2d) {
+        Button2D* b = (Button2D*)o;
         // el boton se agarra por su CENTRO con su tamano NATURAL; en una celda usa su
         // natural CENTRADO y capado a la celda (llenarla deformaba el arte de fondo:
         // los botones redondos del slot salian estirados a lo alto de la barra)
         float w, h;
-        MedirBoton(b, escala, rw, rh, &w, &h);
-        if (enCelda) {
+        MeasureButton(b, scale, rw, rh, &w, &h);
+        if (inCell) {
             // el EJE del layout ya viene medido en la celda (remedirlo contra la celda
             // achicaba los botones relativos a palitos); el transversal usa su natural.
             // Con EXPANDIR prendido llena TAMBIEN el eje cruzado (un teclado: el boton
             // ocupa todo el alto de su fila); el de solo arte no se deforma igual (el
             // encaje por aspecto de abajo lo reencaja)
-            if (celdaEje == 1) w = rw; else h = rh;
-            if (b->expandir) { w = rw; h = rh; }
+            if (cellAxis == 1) w = rw; else h = rh;
+            if (b->expand) { w = rw; h = rh; }
             if (w > rw) w = rw;
             if (h > rh) h = rh;
         }
         // boton de SOLO ARTE: mantiene el ASPECTO del archivo (un boton redondo no se
         // deforma cuando el lienzo cambia de proporcion): se ENCAJA en el rect medido
-        if (b->texto.empty() && b->icono.empty() && !b->texturaFondo.empty()) {
+        if (b->text.empty() && b->icon.empty() && !b->textureBackground.empty()) {
             int aw9 = 0, ah9 = 0;
-            Textura2DObtener(b->texturaFondo, &aw9, &ah9);
+            Texture2DGet(b->textureBackground, &aw9, &ah9);
             if (aw9 > 0 && ah9 > 0 && w > 0.5f && h > 0.5f) {
                 float asp = (float)aw9 / (float)ah9;
                 if (w / h > asp) w = h * asp;
                 else             h = w / asp;
             }
         }
-        float ccx = enCelda ? rx0 + rw * 0.5f : sx;
-        float ccy = enCelda ? ry0 + rh * 0.5f : sy;
+        float ccx = inCell ? rx0 + rw * 0.5f : sx;
+        float ccy = inCell ? ry0 + rh * 0.5f : sy;
         bx0 = ccx - w * 0.5f; by0 = ccy - h * 0.5f;
         bx1 = ccx + w * 0.5f; by1 = ccy + h * 0.5f;
-        DibujarBoton(b, bx0, by0, bx1, by1, escala, op);
-    } else if (o->getType() == ObjectType::expandir2d) {
+        DrawButton(b, bx0, by0, bx1, by1, scale, op);
+    } else if (o->getType() == ObjectType::expand2d) {
         // invisible: solo ocupa su celda (para seleccionarlo en el editor)
-        if (enCelda) { bx0 = rx0; by0 = ry0; bx1 = rx0 + rw; by1 = ry0 + rh; }
+        if (inCell) { bx0 = rx0; by0 = ry0; bx1 = rx0 + rw; by1 = ry0 + rh; }
     } else {
         // imagen / rectangulo / contenedor / slice9: un rect agarrado al ancla por su
         // CENTRO (en una esquina se ve 1/4, en un borde 1/2); en una celda la llena
-        // entera. La unidad del ancho/alto la dice tamModo (fraccion/px/escalado).
-        float aw = TamSegunModo(e->ancho, e->tamModo, escala, rw);
-        float ah = TamSegunModo(e->alto,  e->tamModo, escala, rh);
+        // entera. La unidad del ancho/alto la dice sizeMode (fraccion/px/escalado).
+        float aw = SizeByMode(e->width, e->sizeMode, scale, rw);
+        float ah = SizeByMode(e->height,  e->sizeMode, scale, rh);
         float hw = aw * 0.5f, hh = ah * 0.5f;
-        if (enCelda) { bx0 = rx0; by0 = ry0; bx1 = rx0 + rw; by1 = ry0 + rh; }
+        if (inCell) { bx0 = rx0; by0 = ry0; bx1 = rx0 + rw; by1 = ry0 + rh; }
         else         { bx0 = sx - hw; by0 = sy - hh; bx1 = sx + hw; by1 = sy + hh; }
-        if (o->getType() == ObjectType::imagen2d)
-            DibujarImagenRect((Imagen2D*)o, bx0, by0, bx1, by1, false, op);
+        if (o->getType() == ObjectType::image2d)
+            DrawImageRect((Image2D*)o, bx0, by0, bx1, by1, false, op);
         else if (o->getType() == ObjectType::video2d)
-            DibujarVideoRect((Video2D*)o, bx0, by0, bx1, by1, false, op);
+            DrawVideoRect((Video2D*)o, bx0, by0, bx1, by1, false, op);
         else if (o->getType() == ObjectType::rect2d)
-            DibujarRectSolido((Rect2D*)o, bx0, by0, bx1, by1, false, op);
+            DrawSolidRect((Rect2D*)o, bx0, by0, bx1, by1, false, op);
         else if (o->getType() == ObjectType::slice9)
-            DibujarSlice9Rect((Slice9*)o, bx0, by0, bx1, by1, false, op, escala);
+            DrawSlice9Rect((Slice9*)o, bx0, by0, bx1, by1, false, op, scale);
         // el contenedor no dibuja nada: es invisible, solo ordena a sus hijos
     }
     if (outPos) {
@@ -1107,89 +1107,89 @@ static void DibujarElemRec(Object* o, float rx0, float ry0, float rw, float rh,
     // los hijos se anclan al RECT del padre (encogido por su padding POR LADO) y heredan
     // su rotacion y su opacidad; el layout decide como se reparten y el overflow recorta.
     float pi, pd, pa, pb;
-    PaddingLados(o, escala, bx1 - bx0, by1 - by0, &pi, &pd, &pa, &pb);
-    DibujarHijosRecortados(o, bx0, by0, bx1, by1,
+    PaddingSides(o, scale, bx1 - bx0, by1 - by0, &pi, &pd, &pa, &pb);
+    DrawChildrenCropped(o, bx0, by0, bx1, by1,
                            bx0 + pi, by0 + pa,
                            (bx1 - bx0) - pi - pd, (by1 - by0) - pa - pb,
-                           escala, outPos, op);
+                           scale, outPos, op);
 
-    if (rotado) { gfx::MatrixMode(gfx::ModelView); gfx::PopMatrix(); }
+    if (rotated) { gfx::MatrixMode(gfx::ModelView); gfx::PopMatrix(); }
 }
 
 // el TIEMPO del HUD del juego (ms acumulados: lo leen el [PERF] del N95 y benchjuego)
 double g_uiMs = 0.0;
 double W3dNowMs();
-namespace { struct CronoUI { double t0; CronoUI() { t0 = W3dNowMs(); }
-                             ~CronoUI() { g_uiMs += W3dNowMs() - t0; } }; }
+namespace { struct TimerUI { double t0; TimerUI() { t0 = W3dNowMs(); }
+                             ~TimerUI() { g_uiMs += W3dNowMs() - t0; } }; }
 // UNA ventana UI (una escena 2D) con sus elementos, en el rect del lienzo
-static void DibujarVentanaUI(UI* u, float x0, float y0, float w, float h, float escala, std::vector<UI2DPos>* outPos) {
+static void DrawWindowUI(UI* u, float x0, float y0, float w, float h, float scale, std::vector<UI2DPos>* outPos) {
     Object* o = (Object*)u;
     if (u->color[3] > 0.0f) {   // fondo de la ventana (transparente por defecto)
-        EstadoQuad(0, false);
-        gfx::Color4f(u->color[0], u->color[1], u->color[2], u->color[3] * u->opacidad);
+        QuadState(0, false);
+        gfx::Color4f(u->color[0], u->color[1], u->color[2], u->color[3] * u->opacity);
         QuadUV(x0, y0, x0 + w, y0 + h, 0, 0, 1, 1);
     }
     // la ESCALA GLOBAL del UI multiplica todo lo que este en px (texto, tamanos,
     // padding, gap, bordes): x1 = N95, x3 = como se ve en PC. La ventana no cambia.
-    float esc2 = escala * UI_EscalaEfectiva(u);
+    float esc2 = scale * UI_EffectiveScale(u);
     float pi, pd, pa, pb;
-    PaddingLados(o, esc2, w, h, &pi, &pd, &pa, &pb);
-    DibujarHijosRecortados(o, x0, y0, x0 + w, y0 + h,
+    PaddingSides(o, esc2, w, h, &pi, &pd, &pa, &pb);
+    DrawChildrenCropped(o, x0, y0, x0 + w, y0 + h,
                            x0 + pi, y0 + pa, w - pi - pd, h - pa - pb,
-                           esc2, outPos, u->opacidad);
+                           esc2, outPos, u->opacity);
 }
 
-void UI2D_DibujarOverlay(float x0, float y0, float w, float h, float escala,
-                         std::vector<UI2DPos>* outPos, bool saltarVerEn3D) {
+void UI2D_DrawOverlay(float x0, float y0, float w, float h, float scale,
+                         std::vector<UI2DPos>* outPos, bool skipShowIn3D) {
     if (!SceneCollection) return;
-    CronoUI crono;
+    TimerUI timer;
     gfx::StatScope cat(gfx::StatCatUI);   // (el contador de llamadas: esto es la interfaz del juego)
     // HOVER: pasar el mouse (coords de LIENZO, centro 0,0) a las coords de DIBUJO de ESTE
     // overlay. El mapeo es el mismo del dibujo: el lienzo entero ocupa el rect (x0,y0,w,h).
     // Sin mouse presente (tactil) gHoverOk queda false y ningun boton dibuja el borde.
     {
         float rcx = 0.0f, rcy = 0.0f;
-        gHoverOk = BindsJuegoRatonEstado(&rcx, &rcy);
+        gHoverOk = BindsGameMouseState(&rcx, &rcy);
         if (gHoverOk) {
-            float lw, lh; UI2D_TamanoLienzo(&lw, &lh);
+            float lw, lh; UI2D_CanvasSize(&lw, &lh);
             if (lw < 1.0f) lw = 1.0f; if (lh < 1.0f) lh = 1.0f;
             gHoverX = x0 + (rcx / lw + 0.5f) * w;
             gHoverY = y0 + (rcy / lh + 0.5f) * h;
         }
     }
     // MULTI-ESCENA: el overlay muestra UNA sola escena, la MISMA que eligen el tamano del
-    // lienzo y los scripts (UI2D_UIDelEditor): en Play/runtime es la escena ACTIVA; en
+    // lienzo y los scripts (UI2D_EditorUI): en Play/runtime es la escena ACTIVA; en
     // edicion, la que se esta editando (la cadena del objeto activo, o la primera). Antes se
     // dibujaban TODAS las UI visibles APILADAS: como cada ventana pinta su color de fondo,
     // con varias escenas de fondo OPACO la de arriba tapaba a las de abajo y se perdian las
     // transparencias (el editor se veia todo opaco). Dibujar solo la escena elegida restaura
     // ese comportamiento SIN romper el multi-escena: en Play la elegida ES la activa, la unica
-    // visible igual (el resto las oculta MostrarSolo).
-    UI* soloEsta = UI2D_UIDelEditor();
+    // visible igual (el resto las oculta ShowOnly).
+    UI* onlyIs = UI2D_EditorUI();
     for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
         Object* o = SceneCollection->Childrens[i];
         if (!o || o->getType() != ObjectType::ui || !o->visible) continue;
-        if (soloEsta && (UI*)o != soloEsta) continue;       // solo la escena elegida (multi-escena)
-        if (saltarVerEn3D && ((UI*)o)->verEn3D) continue;   // ese se esta viendo EN el mundo
-        if (W3dEscenaEsCapaRaiz(o)) continue;                // (las capas van despues: arriba de todo)
-        DibujarVentanaUI((UI*)o, x0, y0, w, h, escala, outPos);
+        if (onlyIs && (UI*)o != onlyIs) continue;           // solo la escena elegida (multi-escena)
+        if (skipShowIn3D && ((UI*)o)->showIn3D) continue;   // ese se esta viendo EN el mundo
+        if (W3dSceneIsLayerRoot(o)) continue;                // (las capas van despues: arriba de todo)
+        DrawWindowUI((UI*)o, x0, y0, w, h, scale, outPos);
     }
-    // LAS CAPAS 2D (cargarEscena, W3dEscena.h): arriba de la escena activa, en el orden en que se cargaron. Pueden
+    // LAS CAPAS 2D (cargarEscena, W3dScene.h): arriba de la escena activa, en el orden en que se cargaron. Pueden
     // vivir en otra raiz (el editor, despues de un cambiarEscena 3D): se dibujan de su lista, no del arbol
-    for (int c = 0; c < W3dEscenaCapas(); c++) {
-        Object* o = W3dEscenaCapaRaiz(c);
-        if (!o || W3dEscenaCapaEs3D(c) || !o->visible || o->getType() != ObjectType::ui) continue;
-        if (saltarVerEn3D && ((UI*)o)->verEn3D) continue;
-        DibujarVentanaUI((UI*)o, x0, y0, w, h, escala, outPos);
+    for (int c = 0; c < W3dSceneLayers(); c++) {
+        Object* o = W3dSceneLayerRoot(c);
+        if (!o || W3dSceneLayerEs3D(c) || !o->visible || o->getType() != ObjectType::ui) continue;
+        if (skipShowIn3D && ((UI*)o)->showIn3D) continue;
+        DrawWindowUI((UI*)o, x0, y0, w, h, scale, outPos);
     }    // (el texto ya no apaga lo suyo en cada cadena: una vez, al terminar)
     gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
 }
 
-bool UI2D_HayVerEn3D() {
+bool UI2D_HasShowIn3D() {
     if (!SceneCollection) return false;
     for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
         Object* o = SceneCollection->Childrens[i];
-        if (o && o->getType() == ObjectType::ui && o->visible && ((UI*)o)->verEn3D) return true;
+        if (o && o->getType() == ObjectType::ui && o->visible && ((UI*)o)->showIn3D) return true;
     }
     return false;
 }
@@ -1198,57 +1198,57 @@ bool UI2D_HayVerEn3D() {
 // origen (1 unidad = 100 px), y la profundidad Z del elemento se ve de verdad. Los
 // elementos miran al frente (+Z). Sin recorte (el scissor no aplica en 3D) y el texto
 // va en una sola linea: es un modo de INSPECCION de profundidad, no el render final.
-static void DibujarElemMundoRec(Object* o, float rx0, float ry0, float rw, float rh,
-                                float ventW, float ventH, float op, bool enCelda);
+static void DrawElemWorldRec(Object* o, float rx0, float ry0, float rw, float rh,
+                                float ventW, float ventH, float op, bool inCell);
 
-static void DibujarHijosMundo(Object* padre, float rx0, float ry0, float rw, float rh,
+static void DrawChildrenWorld(Object* parent, float rx0, float ry0, float rw, float rh,
                               float ventW, float ventH, float op) {
-    int lay = LayoutDe(padre);
+    int lay = LayoutOf(parent);
     if (lay == 0) {
-        for (size_t i = 0; i < padre->Childrens.size(); i++)
-            DibujarElemMundoRec(padre->Childrens[i], rx0, ry0, rw, rh, ventW, ventH, op, false);
+        for (size_t i = 0; i < parent->Childrens.size(); i++)
+            DrawElemWorldRec(parent->Childrens[i], rx0, ry0, rw, rh, ventW, ventH, op, false);
         return;
     }
     int n = 0;
-    float sumaPeso = 0.0f;
-    for (size_t i = 0; i < padre->Childrens.size(); i++) {
-        Object* h = padre->Childrens[i];
-        if (!UI2D_EsElemento2D(h) || !h->visible) continue;
-        float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-        sumaPeso += pe;
+    float sumWeight = 0.0f;
+    for (size_t i = 0; i < parent->Childrens.size(); i++) {
+        Object* h = parent->Childrens[i];
+        if (!UI2D_IsElement2D(h) || !h->visible) continue;
+        float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+        sumWeight += pe;
         n++;
     }
     if (n < 1) return;
-    float menor = (rw < rh) ? rw : rh;
-    float gap = PadGapPxDe(padre) ? GapDe(padre) : GapDe(padre) * menor;
-    float libre = ((lay == 1) ? rh : rw) - gap * (n - 1);
-    if (libre < 0.0f) libre = 0.0f;
-    float avance = rx0, avanceY = ry0;
-    for (size_t i = 0; i < padre->Childrens.size(); i++) {
-        Object* h = padre->Childrens[i];
-        if (!UI2D_EsElemento2D(h) || !h->visible) continue;
-        float pe = E2(h)->peso; if (pe < 0.01f) pe = 0.01f;
-        float tam = libre * pe / sumaPeso;
-        if (lay == 1) { DibujarElemMundoRec(h, rx0, avanceY, rw, tam, ventW, ventH, op, true); avanceY += tam + gap; }
-        else          { DibujarElemMundoRec(h, avance, ry0, tam, rh, ventW, ventH, op, true); avance += tam + gap; }
+    float lower = (rw < rh) ? rw : rh;
+    float gap = PadGapPxOf(parent) ? GapOf(parent) : GapOf(parent) * lower;
+    float free = ((lay == 1) ? rh : rw) - gap * (n - 1);
+    if (free < 0.0f) free = 0.0f;
+    float advance = rx0, advanceY = ry0;
+    for (size_t i = 0; i < parent->Childrens.size(); i++) {
+        Object* h = parent->Childrens[i];
+        if (!UI2D_IsElement2D(h) || !h->visible) continue;
+        float pe = E2(h)->weight; if (pe < 0.01f) pe = 0.01f;
+        float size = free * pe / sumWeight;
+        if (lay == 1) { DrawElemWorldRec(h, rx0, advanceY, rw, size, ventW, ventH, op, true); advanceY += size + gap; }
+        else          { DrawElemWorldRec(h, advance, ry0, size, rh, ventW, ventH, op, true); advance += size + gap; }
     }
 }
 
-static void DibujarElemMundoRec(Object* o, float rx0, float ry0, float rw, float rh,
-                                float ventW, float ventH, float op, bool enCelda) {
-    if (!o || !o->visible || !UI2D_EsElemento2D(o)) return;
-    Elemento2D* e = E2(o);
+static void DrawElemWorldRec(Object* o, float rx0, float ry0, float rw, float rh,
+                                float ventW, float ventH, float op, bool inCell) {
+    if (!o || !o->visible || !UI2D_IsElement2D(o)) return;
+    Element2D* e  = E2(o);
     const float K = 1.0f / 100.0f;                 // px de lienzo -> unidades de mundo
     float rot = e->rot2d;
-    op *= e->opacidad;
+    op *= e->opacity;
 
     float ax, ay;
-    UI2D_PuntoAncla(e->ancla, rx0, ry0, rw, rh, &ax, &ay);
+    UI2D_PointAnchor(e->anchor, rx0, ry0, rw, rh, &ax, &ay);
     // la posicion es RELATIVA al rect de referencia (en celda se ignora)
-    float cxp = enCelda ? ax : ax + o->pos.x * rw;
-    float cyp = enCelda ? ay : ay + o->pos.y * rh;   // en px de lienzo
+    float cxp = inCell ? ax : ax + o->pos.x * rw;
+    float cyp = inCell ? ay : ay + o->pos.y * rh;   // en px de lienzo
     // en una celda las imagenes/rectangulos la llenan entera: su centro es el de la celda
-    if (enCelda && o->getType() != ObjectType::texto2d) {
+    if (inCell && o->getType() != ObjectType::text2d) {
         cxp = rx0 + rw * 0.5f;
         cyp = ry0 + rh * 0.5f;
     }
@@ -1267,71 +1267,71 @@ static void DibujarElemMundoRec(Object* o, float rx0, float ry0, float rw, float
     if (rot != 0.0f) gfx::Rotatef(-rot, 0.0f, 0.0f, 1.0f);
     gfx::Scalef(1.0f, -1.0f, 1.0f);             // el contenido es Y-DOWN; el mundo es Y-UP
 
-    if (o->getType() == ObjectType::texto2d) {
-        Texto2D* t = (Texto2D*)o;
-        w3dui::W3dTextAtlas* at = FuenteDeTexto2D(t);
-        std::string txt = TextoSegunTipo(t);
+    if (o->getType() == ObjectType::text2d) {
+        Text2D* t = (Text2D*)o;
+        w3dui::W3dTextAtlas* at = Text2DFont(t);
+        std::string txt = TextByType(t);
         if (at && !txt.empty()) {
-            float pxU = t->tam * K;                 // alto del texto en unidades de mundo
+            float pxU = t->size * K;                 // alto del texto en unidades de mundo
             float wU  = at->TextWidth(txt.c_str(), pxU);
             float wpx = wU / K;
             float ox = 0.0f, oy = 0.0f;             // pen del texto, en unidades (espacio Y-DOWN)
             if (t->alignH == 1) ox -= wU * 0.5f; else if (t->alignH == 2) ox -= wU;
             if (t->alignV == 1) oy -= pxU * 0.5f; else if (t->alignV == 2) oy -= pxU;
             bx0 = cxp + ox / K; bx1 = bx0 + wpx;
-            by0 = cyp + oy / K; by1 = by0 + t->tam;
-            const float* tcM = ColorResuelto(t, t->palColor, t->color);
+            by0 = cyp + oy / K; by1 = by0 + t->size;
+            const float* tcM = ResolvedColor(t, t->palColor, t->color);
             at->Begin();
             gfx::Enable(gfx::DepthTest);           // que la profundidad se note contra la escena
             at->DrawText(txt.c_str(), ox, oy, pxU,
                          tcM[0], tcM[1], tcM[2], tcM[3] * op);
         }
-    } else if (o->getType() == ObjectType::boton2d || o->getType() == ObjectType::expandir2d) {
+    } else if (o->getType() == ObjectType::button2d || o->getType() == ObjectType::expand2d) {
         // en el modo mundo el boton/expandir no se dibujan (es inspeccion de profundidad)
     } else {
         // el modo mundo trabaja en px de lienzo directos (escala 1); el factor
         // escalado sale del lienzo de ESTE UI (ventW/ventH)
         float fesc = ((ventW < ventH) ? ventW : ventH) / 480.0f;
         if (fesc < 1.0f / 480.0f) fesc = 1.0f;
-        float aw = enCelda ? rw : (e->tamModo == TAM2D_FRACCION ? e->ancho * rw
-                                 : e->ancho * (e->tamModo == TAM2D_ESCALADO ? fesc : 1.0f));
-        float ah = enCelda ? rh : (e->tamModo == TAM2D_FRACCION ? e->alto * rh
-                                 : e->alto  * (e->tamModo == TAM2D_ESCALADO ? fesc : 1.0f));
+        float aw = inCell ? rw : (e->sizeMode == TAM2D_FRACTION ? e->width * rw
+                                 : e->width * (e->sizeMode == TAM2D_SCALED ? fesc : 1.0f));
+        float ah = inCell ? rh : (e->sizeMode == TAM2D_FRACTION ? e->height * rh
+                                 : e->height  * (e->sizeMode == TAM2D_SCALED ? fesc : 1.0f));
         float hw = aw * K * 0.5f, hh = ah * K * 0.5f;
         bx0 = cxp - aw * 0.5f; by0 = cyp - ah * 0.5f;
         bx1 = cxp + aw * 0.5f; by1 = cyp + ah * 0.5f;
-        if (o->getType() == ObjectType::imagen2d)
-            DibujarImagenRect((Imagen2D*)o, -hw, -hh, hw, hh, true, op);
+        if (o->getType() == ObjectType::image2d)
+            DrawImageRect((Image2D*)o, -hw, -hh, hw, hh, true, op);
         else if (o->getType() == ObjectType::video2d)
-            DibujarVideoRect((Video2D*)o, -hw, -hh, hw, hh, true, op);
+            DrawVideoRect((Video2D*)o, -hw, -hh, hw, hh, true, op);
         else if (o->getType() == ObjectType::rect2d)
-            DibujarRectSolido((Rect2D*)o, -hw, -hh, hw, hh, true, op);
+            DrawSolidRect((Rect2D*)o, -hw, -hh, hw, hh, true, op);
         else if (o->getType() == ObjectType::slice9)
-            DibujarSlice9Rect((Slice9*)o, -hw, -hh, hw, hh, true, op, K);
+            DrawSlice9Rect((Slice9*)o, -hw, -hh, hw, hh, true, op, K);
         // el contenedor no dibuja nada
     }
     gfx::PopMatrix();
 
     float pi, pd, pa, pb;
-    PaddingLados(o, 1.0f, bx1 - bx0, by1 - by0, &pi, &pd, &pa, &pb);
-    DibujarHijosMundo(o, bx0 + pi, by0 + pa,
+    PaddingSides(o, 1.0f, bx1 - bx0, by1 - by0, &pi, &pd, &pa, &pb);
+    DrawChildrenWorld(o, bx0 + pi, by0 + pa,
                       (bx1 - bx0) - pi - pd, (by1 - by0) - pa - pb,
                       ventW, ventH, op);
 }
 
-void UI2D_DibujarEnMundo() {
+void UI2D_DrawInWorld() {
     if (!SceneCollection) return;
     gfx::StatScope cat(gfx::StatCatUI);
     for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
         Object* o = SceneCollection->Childrens[i];
-        if (!o || o->getType() != ObjectType::ui || !o->visible || !((UI*)o)->verEn3D) continue;
+        if (!o || o->getType() != ObjectType::ui || !o->visible || !((UI*)o)->showIn3D) continue;
         UI* u = (UI*)o;
         float vw, vh;
-        if (!u->igualQueRender) { vw = u->ancho; vh = u->alto; }
-        else UI2D_TamanoVentana(&vw, &vh);
+        if (!u->sameAsRender) { vw = u->width; vh = u->height; }
+        else UI2D_WindowSize(&vw, &vh);
         float pi, pd, pa, pb;
-        PaddingLados(o, 1.0f, vw, vh, &pi, &pd, &pa, &pb);
-        DibujarHijosMundo(o, pi, pa, vw - pi - pd, vh - pa - pb,
-                          vw, vh, u->opacidad);
+        PaddingSides(o, 1.0f, vw, vh, &pi, &pd, &pa, &pb);
+        DrawChildrenWorld(o, pi, pa, vw - pi - pd, vh - pa - pb,
+                          vw, vh, u->opacity);
     }    gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
 }

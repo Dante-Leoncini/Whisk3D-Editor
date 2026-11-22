@@ -10,61 +10,61 @@
 #  instancias: "Purge Orphans" no los toca), los renombra con undo y los borra.
 # ==========================================================================
 
-ventana 1280 720
-escenadefecto
-raiznueva prefab Enemigo
-raizinfo n 2 activa Enemigo tipo prefab prefabs 1 objetos 1
-raizcontexto coleccion Enemigo luces 0 camara -
-raizparent Enemigo
+window 1280 720
+scenedefault
+rootnew prefab Enemigo
+rootinfo n 2 active Enemigo type prefab prefabs 1 objects 1
+rootcontext collection Enemigo lights 0 camera -
+rootparent Enemigo
 add cube
 objname Cuerpo
 parent Cuerpo Enemigo
-objrel Cuerpo padre Enemigo
-raizcamara Suelta
-raizinfo objetos 3
-raizabrir Scene
+objrel Cuerpo parent Enemigo
+rootcamera Suelta
+rootinfo objects 3
+rootopen Scene
 # (los 4 de la escena + las 2 rutinas que trae todo proyecto: Constructor y Limpiar pantalla)
-raizinfo objetos 6
+rootinfo objects 6
 
 # ---- guardar: la entrada del prefab, con su raiz, sus hijos y lo suelto ----
-guardarw3d /tmp/w3d_f6_prefab.w3d
-entradaexiste /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp 1
-entradatiene /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp "raiz" 1
-entradatiene /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp Cuerpo 1
-entradatiene /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp sueltos 1
-entradatiene /tmp/w3d_f6_prefab.w3d proyecto.json Suelta 0
-entradatiene /tmp/w3d_f6_prefab.w3d proyecto.json prefabs/enemigo.w3dp 1
+savew3d /tmp/w3d_f6_prefab.w3d
+entryexists /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp 1
+entryhas /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp "root" 1
+entryhas /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp Cuerpo 1
+entryhas /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp loose 1
+entryhas /tmp/w3d_f6_prefab.w3d project.json Suelta 0
+entryhas /tmp/w3d_f6_prefab.w3d project.json prefabs/enemigo.w3dp 1
 
 # ---- abrir: el prefab no se carga hasta que se lo abre ----
-abrirw3d /tmp/w3d_f6_prefab.w3d
-raizinfo n 2 activa Scene cargada Enemigo 0
-raizabrir Enemigo prefab
-raizinfo tipo prefab objetos 3
-raizparent Enemigo
-raizparent Suelta
-objrel Cuerpo padre Enemigo
-raizabrir Scene
-guardarw3d /tmp/w3d_f6_prefab_2.w3d
-w3diguales /tmp/w3d_f6_prefab.w3d /tmp/w3d_f6_prefab_2.w3d
+openw3d /tmp/w3d_f6_prefab.w3d
+rootinfo n 2 active Scene loaded Enemigo 0
+rootopen Enemigo prefab
+rootinfo type prefab objects 3
+rootparent Enemigo
+rootparent Suelta
+objrel Cuerpo parent Enemigo
+rootopen Scene
+savew3d /tmp/w3d_f6_prefab_2.w3d
+w3dequal /tmp/w3d_f6_prefab.w3d /tmp/w3d_f6_prefab_2.w3d
 
 # ---- su vista del outliner ----
-outvista prefabs
-outfilas n 1
-outfila Enemigo usuarios 0 estado huerfano
-recpurgar prefabs n 0
-outfilas n 1
-recrenombrar prefabs Enemigo Soldado
-outfila Soldado
+outview prefabs
+outrows n 1
+outrow Enemigo users 0 state huerfano
+recpurge prefabs n 0
+outrows n 1
+recrename prefabs Enemigo Soldado
+outrow Soldado
 undo
-outfila Enemigo
+outrow Enemigo
 redo
-guardarw3d /tmp/w3d_f6_prefab_3.w3d
-entradaexiste /tmp/w3d_f6_prefab_3.w3d prefabs/soldado.w3dp 1
-entradaexiste /tmp/w3d_f6_prefab_3.w3d prefabs/enemigo.w3dp 0
-recborrar prefabs Soldado
-outfilas n 0
-raizinfo n 1 prefabs 0
-outvista escena
-guardarw3d /tmp/w3d_f6_prefab_4.w3d
-entradaexiste /tmp/w3d_f6_prefab_4.w3d prefabs/soldado.w3dp 0
-entradatiene /tmp/w3d_f6_prefab_4.w3d proyecto.json prefabs 0
+savew3d /tmp/w3d_f6_prefab_3.w3d
+entryexists /tmp/w3d_f6_prefab_3.w3d prefabs/soldado.w3dp 1
+entryexists /tmp/w3d_f6_prefab_3.w3d prefabs/enemigo.w3dp 0
+recdelete prefabs Soldado
+outrows n 0
+rootinfo n 1 prefabs 0
+outview scene
+savew3d /tmp/w3d_f6_prefab_4.w3d
+entryexists /tmp/w3d_f6_prefab_4.w3d prefabs/soldado.w3dp 0
+entryhas /tmp/w3d_f6_prefab_4.w3d project.json prefabs 0

@@ -21,12 +21,12 @@
 #include "test/W3dMcp.h"
 #include "test/W3dScript.h"
 #include "io/JsonW3d.h"            // JVal (el arbol del JSON)
-#include "io/lectura-escritura.h"  // ImportModeloPorExtension
+#include "io/lectura-escritura.h"  // ImportModelByExtension
 #include "objects/Objects.h"
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/LayoutInput.h"
-#include "WhiskUI/widgets/PopupMenu.h"   // MenuPantallaW
+#include "WhiskUI/widgets/PopupMenu.h"   // MenuScreenW
 #include "undo/Undo.h"
 #include "w3dGraphics.h"
 #include "w3dVersion.h"
@@ -58,55 +58,55 @@
 #endif
 
 extern bool g_redraw;
-extern int W3dPantallaAlto;
+extern int W3dScreenHeight;
 void AddCube(); void AddPlane(); void AddCircle(); void AddUVSphere(); void AddCone(); void AddCylinder();
 void AddVertex(); void AddEmpty(); void AddCamera(); void AddLight();
 
 // ============================================================================
 //  La entrada y la salida
 // ============================================================================
-static bool  gActivo = false;
-static FILE* gProto = NULL;       // el stdout original: por aca sale el protocolo
-static int   gFdCaptura = -1;     // lo que queda de stdout: un archivo temporal con lo que imprimen los comandos
-static SDL_mutex* gCola = NULL;
-static std::deque<std::string> gPedidos;
-static SDL_atomic_t gCerrado;     // stdin se cerro: el cliente se fue
-static SDL_atomic_t gTipoEvento;  // el evento que despierta al loop (que en reposo duerme esperando eventos)
+static bool  gActive = false;
+static FILE* gProto = NULL;        // el stdout original: por aca sale el protocolo
+static int   gFdCapture  = -1;     // lo que queda de stdout: un archivo temporal con lo que imprimen los comandos
+static SDL_mutex* gQueue = NULL;
+static std::deque<std::string> gRequests;
+static SDL_atomic_t gClosed;     // stdin se cerro: el cliente se fue
+static SDL_atomic_t gEventType;  // el evento que despierta al loop (que en reposo duerme esperando eventos)
 
-static void Despertar() {
-    const int t = SDL_AtomicGet(&gTipoEvento);
+static void Wake() {
+    const int t = SDL_AtomicGet(&gEventType);
     if (t <= 0) return;
     SDL_Event e;
     SDL_zero(e);
     e.type = (Uint32)t;
     SDL_PushEvent(&e);
 }
-static void Encolar(std::string& linea) {
-    while (!linea.empty() && (linea[linea.size() - 1] == '\n' || linea[linea.size() - 1] == '\r')) linea.erase(linea.size() - 1);
-    if (linea.empty()) return;
-    SDL_LockMutex(gCola);
-    gPedidos.push_back(linea);
-    SDL_UnlockMutex(gCola);
-    linea.clear();
-    Despertar();
+static void Enqueue(std::string& line) {
+    while (!line.empty() && (line[line.size() - 1] == '\n' || line[line.size() - 1] == '\r')) line.erase(line.size() - 1);
+    if (line.empty()) return;
+    SDL_LockMutex(gQueue);
+    gRequests.push_back(line);
+    SDL_UnlockMutex(gQueue);
+    line.clear();
+    Wake();
 }
 // el hilo lector: una linea por pedido (una linea larga llega en partes)
-static int LeerPedidos(void*) {
-    std::string linea;
+static int ReadRequests(void*) {
+    std::string line;
     char buf[4096];
     while (fgets(buf, sizeof(buf), stdin)) {
-        linea += buf;
-        if (!linea.empty() && linea[linea.size() - 1] == '\n') Encolar(linea);
+        line += buf;
+        if (!line.empty() && line[line.size() - 1] == '\n') Enqueue(line);
     }
-    Encolar(linea);
-    SDL_AtomicSet(&gCerrado, 1);
-    Despertar();
+    Enqueue(line);
+    SDL_AtomicSet(&gClosed, 1);
+    Wake();
     return 0;
 }
 
-bool W3dMcpActivo() { return gActivo; }
+bool W3dMcpActive() { return gActive; }
 
-bool W3dMcpIniciar() {
+bool W3dMcpStart() {
     fflush(stdout);
     const int fdOut = W3D_FILENO(stdout);
     const int fdProto = W3D_DUP(fdOut);
@@ -116,44 +116,44 @@ bool W3dMcpIniciar() {
     _setmode(_fileno(stdin), _O_BINARY);
 #endif
     gProto = W3D_FDOPEN(fdProto, "wb");
-    FILE* captura = tmpfile();
-    if (!gProto || !captura) return false;
-    gFdCaptura = W3D_FILENO(captura);
-    W3D_DUP2(gFdCaptura, fdOut);
-    gCola = SDL_CreateMutex();
-    SDL_Thread* hilo = SDL_CreateThread(LeerPedidos, "w3d_mcp", NULL);
-    if (!gCola || !hilo) return false;
-    SDL_DetachThread(hilo);
-    gActivo = true;
+    FILE* capture = tmpfile();
+    if (!gProto || !capture) return false;
+    gFdCapture = W3D_FILENO(capture);
+    W3D_DUP2(gFdCapture, fdOut);
+    gQueue = SDL_CreateMutex();
+    SDL_Thread* thread = SDL_CreateThread(ReadRequests, "w3d_mcp", NULL);
+    if (!gQueue || !thread) return false;
+    SDL_DetachThread(thread);
+    gActive = true;
     return true;
 }
 
 // lo que imprimieron los comandos desde la ultima vez (y el archivo vuelve a cero)
-static std::string LeerCaptura() {
+static std::string ReadCapture() {
     fflush(stdout);
-    const long fin = (long)W3D_LSEEK(gFdCaptura, 0, SEEK_END);
+    const long end = (long)W3D_LSEEK(gFdCapture, 0, SEEK_END);
     std::string s;
-    if (fin > 0) {
-        s.resize((size_t)fin);
-        W3D_LSEEK(gFdCaptura, 0, SEEK_SET);
-        const long n = (long)W3D_READ(gFdCaptura, &s[0], (unsigned)fin);
+    if (end > 0) {
+        s.resize((size_t)end);
+        W3D_LSEEK(gFdCapture, 0, SEEK_SET);
+        const long n = (long)W3D_READ(gFdCapture, &s[0], (unsigned)end);
         s.resize(n > 0 ? (size_t)n : 0);
     }
-    W3D_TRUNC(gFdCaptura, 0);
-    W3D_LSEEK(gFdCaptura, 0, SEEK_SET);
+    W3D_TRUNC(gFdCapture, 0);
+    W3D_LSEEK(gFdCapture, 0, SEEK_SET);
     return s;
 }
 
 // ============================================================================
 //  JSON: el lector (completo: todos los escapes, \uXXXX a UTF-8) y lo poco que hace falta para escribir
 // ============================================================================
-struct LectorJson {
+struct ReaderJson {
     const char* p;
-    const char* fin;
+    const char* end;
     bool error;
-    LectorJson(const std::string& s) : p(s.data()), fin(s.data() + s.size()), error(false) {}
-    void Blancos() { while (p < fin && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++; }
-    bool Comer(char c) { Blancos(); if (p < fin && *p == c) { p++; return true; } error = true; return false; }
+    ReaderJson(const std::string& s) : p(s.data()), end(s.data() + s.size()), error(false) {}
+    void Whitespace() { while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++; }
+    bool Eat(char c) { Whitespace(); if (p < end && *p == c) { p++; return true; } error = true; return false; }
     static void Utf8(std::string& s, unsigned c) {
         if (c < 0x80) s += (char)c;
         else if (c < 0x800) { s += (char)(0xC0 | (c >> 6)); s += (char)(0x80 | (c & 0x3F)); }
@@ -163,7 +163,7 @@ struct LectorJson {
     unsigned Hex4() {
         unsigned v = 0;
         for (int i = 0; i < 4; i++) {
-            if (p >= fin) { error = true; return 0; }
+            if (p >= end) { error = true; return 0; }
             const char c = *p++;
             v <<= 4;
             if (c >= '0' && c <= '9') v |= (unsigned)(c - '0');
@@ -173,12 +173,12 @@ struct LectorJson {
         }
         return v;
     }
-    std::string Cadena() {
+    std::string ReadString() {
         std::string s;
-        if (!Comer('"')) return s;
-        while (p < fin && *p != '"') {
+        if (!Eat('"')) return s;
+        while (p < end && *p != '"') {
             if (*p != '\\') { s += *p++; continue; }
-            if (++p >= fin) break;
+            if (++p >= end) break;
             const char c = *p++;
             switch (c) {
                 case 'n': s += '\n'; break;
@@ -188,7 +188,7 @@ struct LectorJson {
                 case 'f': s += '\f'; break;
                 case 'u': {
                     unsigned u = Hex4();
-                    if (u >= 0xD800 && u < 0xDC00 && fin - p >= 6 && p[0] == '\\' && p[1] == 'u') {   // (par sustituto)
+                    if (u >= 0xD800 && u < 0xDC00 && end - p >= 6 && p[0] == '\\' && p[1] == 'u') {   // (par sustituto)
                         p += 2;
                         const unsigned lo = Hex4();
                         u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
@@ -199,66 +199,66 @@ struct LectorJson {
                 default: s += c; break;   // \" \\ \/
             }
         }
-        if (p < fin) p++; else error = true;
+        if (p < end) p++; else error = true;
         return s;
     }
-    JVal* Valor() {
-        Blancos();
+    JVal* Value() {
+        Whitespace();
         JVal* v = new JVal();
-        if (p >= fin) { error = true; return v; }
+        if (p >= end) { error = true; return v; }
         if (*p == '{') {
-            v->tipo = 4; p++;
-            Blancos();
-            if (p < fin && *p == '}') { p++; return v; }
+            v->type = 4; p++;
+            Whitespace();
+            if (p < end && *p == '}') { p++; return v; }
             while (!error) {
-                Blancos();
-                const std::string k = Cadena();
-                if (!Comer(':')) break;
+                Whitespace();
+                const std::string k = ReadString();
+                if (!Eat(':')) break;
                 JVal*& slot = v->obj[k];
                 delete slot;
-                slot = Valor();
-                Blancos();
-                if (p < fin && *p == ',') { p++; continue; }
-                Comer('}');
+                slot = Value();
+                Whitespace();
+                if (p < end && *p == ',') { p++; continue; }
+                Eat('}');
                 break;
             }
         } else if (*p == '[') {
-            v->tipo = 5; p++;
-            Blancos();
-            if (p < fin && *p == ']') { p++; return v; }
+            v->type = 5; p++;
+            Whitespace();
+            if (p < end && *p == ']') { p++; return v; }
             while (!error) {
-                v->lista.push_back(Valor());
-                Blancos();
-                if (p < fin && *p == ',') { p++; continue; }
-                Comer(']');
+                v->list.push_back(Value());
+                Whitespace();
+                if (p < end && *p == ',') { p++; continue; }
+                Eat(']');
                 break;
             }
         } else if (*p == '"') {
-            v->tipo = 2; v->str = Cadena();
-        } else if (fin - p >= 4 && !strncmp(p, "true", 4)) { v->tipo = 3; v->b = true; p += 4; }
-        else if (fin - p >= 5 && !strncmp(p, "false", 5)) { v->tipo = 3; v->b = false; p += 5; }
-        else if (fin - p >= 4 && !strncmp(p, "null", 4)) { p += 4; }
+            v->type = 2; v->str = ReadString();
+        } else if (end - p >= 4 && !strncmp(p, "true", 4)) { v->type = 3; v->b = true; p += 4; }
+        else if (end - p >= 5 && !strncmp(p, "false", 5)) { v->type = 3; v->b = false; p += 5; }
+        else if (end - p >= 4 && !strncmp(p, "null", 4)) { p += 4; }
         else {
             char nbuf[64];
-            size_t n = (size_t)(fin - p); if (n > sizeof(nbuf) - 1) n = sizeof(nbuf) - 1;
+            size_t n = (size_t)(end - p); if (n > sizeof(nbuf) - 1) n = sizeof(nbuf) - 1;
             memcpy(nbuf, p, n); nbuf[n] = 0;
-            char* despues = NULL;
-            v->num = strtod(nbuf, &despues);
-            if (despues == nbuf) error = true;
-            else { v->tipo = 1; p += despues - nbuf; }
+            char* after = NULL;
+            v->num = strtod(nbuf, &after);
+            if (after == nbuf) error = true;
+            else { v->type = 1; p += after - nbuf; }
         }
         return v;
     }
 };
-static const JVal* Campo(const JVal* o, const char* k) {
-    if (!o || o->tipo != 4) return NULL;
+static const JVal* Field(const JVal* o, const char* k) {
+    if (!o || o->type != 4) return NULL;
     std::map<std::string, JVal*>::const_iterator it = o->obj.find(k);
     return it == o->obj.end() ? NULL : it->second;
 }
-static std::string Texto(const JVal* v) { return (v && v->tipo == 2) ? v->str : std::string(); }
-static bool Tres(const JVal* v, float out[3]) {
-    if (!v || v->tipo != 5 || v->lista.size() != 3) return false;
-    for (int i = 0; i < 3; i++) { if (v->lista[i]->tipo != 1) return false; out[i] = (float)v->lista[i]->num; }
+static std::string Text(const JVal* v) { return (v && v->type == 2) ? v->str : std::string(); }
+static bool Three(const JVal* v, float out[3]) {
+    if (!v || v->type != 5 || v->list.size() != 3) return false;
+    for (int i = 0; i < 3; i++) { if (v->list[i]->type != 1) return false; out[i] = (float)v->list[i]->num; }
     return true;
 }
 static std::string Esc(const std::string& s) {
@@ -273,10 +273,10 @@ static std::string Esc(const std::string& s) {
     return o + "\"";
 }
 // el id del pedido, tal cual vino (numero o texto), para la respuesta
-static std::string IdTexto(const JVal* id) {
+static std::string IdText(const JVal* id) {
     if (!id) return "null";
-    if (id->tipo == 2) return Esc(id->str);
-    if (id->tipo == 1) {
+    if (id->type == 2) return Esc(id->str);
+    if (id->type == 1) {
         char b[48];
         if (id->num == (double)(long long)id->num) snprintf(b, sizeof(b), "%lld", (long long)id->num);
         else snprintf(b, sizeof(b), "%.17g", id->num);
@@ -307,16 +307,16 @@ struct Bits {
     unsigned acc;
     int n;
     Bits() : acc(0), n(0) {}
-    void Poner(unsigned v, int cant) {   // (el primer bit, el de abajo)
-        acc |= v << n; n += cant;
+    void Set(unsigned v, int count) {   // (el primer bit, el de abajo)
+        acc |= v << n; n += count;
         while (n >= 8) { out += (char)(acc & 0xFF); acc >>= 8; n -= 8; }
     }
-    void Huffman(unsigned codigo, int cant) {   // (los codigos de Huffman van del bit de arriba)
+    void Huffman(unsigned code, int count) {   // (los codigos de Huffman van del bit de arriba)
         unsigned r = 0;
-        for (int i = 0; i < cant; i++) r |= ((codigo >> i) & 1u) << (cant - 1 - i);
-        Poner(r, cant);
+        for (int i = 0; i < count; i++) r |= ((code >> i) & 1u) << (count - 1 - i);
+        Set(r, count);
     }
-    void Cerrar() { if (n > 0) { out += (char)(acc & 0xFF); acc = 0; n = 0; } }
+    void Close() { if (n > 0) { out += (char)(acc & 0xFF); acc = 0; n = 0; } }
 };
 static void Literal(Bits& b, unsigned v) {
     if (v < 144) b.Huffman(0x30 + v, 8);
@@ -324,58 +324,58 @@ static void Literal(Bits& b, unsigned v) {
     else if (v < 280) b.Huffman(v - 256, 7);
     else b.Huffman(0xC0 + (v - 280), 8);
 }
-static void Repeticion(Bits& b, int largo, int dist) {
+static void Repeat(Bits& b, int length, int dist) {
     static const int baseL[29] = { 3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258 };
     static const int extraL[29] = { 0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0 };
     static const int baseD[30] = { 1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577 };
     static const int extraD[30] = { 0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13 };
     int i = 28;
-    while (baseL[i] > largo) i--;
+    while (baseL[i] > length) i--;
     Literal(b, (unsigned)(257 + i));
-    if (extraL[i]) b.Poner((unsigned)(largo - baseL[i]), extraL[i]);
+    if (extraL[i]) b.Set((unsigned)(length - baseL[i]), extraL[i]);
     int j = 29;
     while (baseD[j] > dist) j--;
     b.Huffman((unsigned)j, 5);
-    if (extraD[j]) b.Poner((unsigned)(dist - baseD[j]), extraD[j]);
+    if (extraD[j]) b.Set((unsigned)(dist - baseD[j]), extraD[j]);
 }
 static std::string Deflate(const std::string& d) {
     const int n = (int)d.size();
     const unsigned char* s = (const unsigned char*)d.data();
-    const int kVentana = 32768, kHash = 1 << 15;
-    std::vector<int> cabeza(kHash, -1), previo(kVentana, -1);
+    const int kWindow = 32768, kHash = 1 << 15;
+    std::vector<int> head(kHash, -1), previous(kWindow, -1);
     Bits b;
-    b.Poner(1, 1);   // ultimo bloque
-    b.Poner(1, 2);   // codigos fijos
+    b.Set(1, 1);   // ultimo bloque
+    b.Set(1, 2);   // codigos fijos
     int i = 0;
     while (i < n) {
-        int mejor = 0, mejorD = 0;
+        int best = 0, bestD = 0;
         if (i + 3 <= n) {
             const unsigned h = ((unsigned)s[i] * 2654435761u ^ (unsigned)s[i + 1] * 40503u ^ (unsigned)s[i + 2]) & (kHash - 1);
-            int c = cabeza[h];
-            for (int vueltas = 0; c >= 0 && i - c <= kVentana && vueltas < 32; vueltas++) {
+            int c = head[h];
+            for (int turns = 0; c >= 0 && i - c <= kWindow && turns < 32; turns++) {
                 int l = 0;
-                const int tope = (n - i < 258) ? n - i : 258;
-                while (l < tope && s[c + l] == s[i + l]) l++;
-                if (l > mejor) { mejor = l; mejorD = i - c; if (l == tope) break; }
-                c = previo[c % kVentana];
+                const int limit = (n - i < 258) ? n - i : 258;
+                while (l < limit && s[c + l] == s[i + l]) l++;
+                if (l > best) { best = l; bestD = i - c; if (l == limit) break; }
+                c = previous[c % kWindow];
             }
-            previo[i % kVentana] = cabeza[h];
-            cabeza[h] = i;
+            previous[i % kWindow] = head[h];
+            head[h] = i;
         }
-        if (mejor >= 3) {
-            Repeticion(b, mejor, mejorD);
-            for (int k = 1; k < mejor; k++) {   // (los saltados tambien entran a la busqueda)
+        if (best >= 3) {
+            Repeat(b, best, bestD);
+            for (int k = 1; k < best; k++) {   // (los saltados tambien entran a la busqueda)
                 const int q = i + k;
                 if (q + 3 > n) break;
                 const unsigned h = ((unsigned)s[q] * 2654435761u ^ (unsigned)s[q + 1] * 40503u ^ (unsigned)s[q + 2]) & (kHash - 1);
-                previo[q % kVentana] = cabeza[h];
-                cabeza[h] = q;
+                previous[q % kWindow] = head[h];
+                head[h] = q;
             }
-            i += mejor;
+            i += best;
         } else Literal(b, s[i++]);
     }
     Literal(b, 256);   // fin del bloque
-    b.Cerrar();
+    b.Close();
     return b.out;
 }
 static unsigned Crc32(const std::string& d, unsigned crc = 0xFFFFFFFFu) {
@@ -386,48 +386,48 @@ static unsigned Crc32(const std::string& d, unsigned crc = 0xFFFFFFFFu) {
     return crc;
 }
 static void Be32(std::string& o, unsigned v) { o += (char)(v >> 24); o += (char)(v >> 16); o += (char)(v >> 8); o += (char)v; }
-static void Trozo(std::string& png, const char* tipo, const std::string& datos) {
-    Be32(png, (unsigned)datos.size());
-    const std::string td = std::string(tipo, 4) + datos;
+static void Chunk(std::string& png, const char* type, const std::string& data) {
+    Be32(png, (unsigned)data.size());
+    const std::string td = std::string(type, 4) + data;
     png += td;
     Be32(png, Crc32(td) ^ 0xFFFFFFFFu);
 }
 // RGB (filas de arriba hacia abajo) -> PNG. Cada fila con el filtro que deja menos (Sub o Up: la resta con el vecino
 // convierte las zonas lisas en ceros, que el deflate junta)
-static std::string PngComprimido(const std::vector<unsigned char>& rgb, int w, int h) {
-    std::string crudo;
-    crudo.reserve((size_t)(w * 3 + 1) * h);
-    const int fila = w * 3;
-    std::string sub((size_t)fila, 0), up((size_t)fila, 0);
+static std::string CompressedPng(const std::vector<unsigned char>& rgb, int w, int h) {
+    std::string raw;
+    raw.reserve((size_t)(w * 3 + 1) * h);
+    const int row = w * 3;
+    std::string sub((size_t)row, 0), up((size_t)row, 0);
     for (int y = 0; y < h; y++) {
-        const unsigned char* f = &rgb[(size_t)y * fila];
-        const unsigned char* a = y > 0 ? f - fila : NULL;
-        long costoSub = 0, costoUp = 0;
-        for (int x = 0; x < fila; x++) {
+        const unsigned char* f = &rgb[(size_t)y * row];
+        const unsigned char* a = y > 0 ? f - row : NULL;
+        long costSub = 0, costUp = 0;
+        for (int x = 0; x < row; x++) {
             const unsigned char vs = (unsigned char)(f[x] - (x >= 3 ? f[x - 3] : 0));
             const unsigned char vu = (unsigned char)(f[x] - (a ? a[x] : 0));
             sub[x] = (char)vs; up[x] = (char)vu;
-            costoSub += vs < 128 ? vs : 256 - vs;
-            costoUp += vu < 128 ? vu : 256 - vu;
+            costSub += vs < 128 ? vs : 256 - vs;
+            costUp += vu < 128 ? vu : 256 - vu;
         }
-        if (costoUp < costoSub) { crudo += (char)2; crudo += up; } else { crudo += (char)1; crudo += sub; }
+        if (costUp < costSub) { raw += (char)2; raw += up; } else { raw += (char)1; raw += sub; }
     }
     std::string z;
     z += (char)0x78; z += (char)0x01;   // (zlib: deflate, ventana de 32 KB)
-    z += Deflate(crudo);
+    z += Deflate(raw);
     unsigned a1 = 1, b1 = 0;
-    for (size_t i = 0; i < crudo.size(); i++) { a1 = (a1 + (unsigned char)crudo[i]) % 65521u; b1 = (b1 + a1) % 65521u; }
+    for (size_t i = 0; i < raw.size(); i++) { a1 = (a1 + (unsigned char)raw[i]) % 65521u; b1 = (b1 + a1) % 65521u; }
     Be32(z, (b1 << 16) | a1);
     std::string png("\x89PNG\r\n\x1a\n", 8), ihdr;
     Be32(ihdr, (unsigned)w); Be32(ihdr, (unsigned)h);
     ihdr += (char)8; ihdr += (char)2; ihdr += (char)0; ihdr += (char)0; ihdr += (char)0;   // 8 bits, RGB
-    Trozo(png, "IHDR", ihdr);
-    Trozo(png, "IDAT", z);
-    Trozo(png, "IEND", std::string());
+    Chunk(png, "IHDR", ihdr);
+    Chunk(png, "IDAT", z);
+    Chunk(png, "IEND", std::string());
     return png;
 }
 
-static void Enviar(const std::string& json) {
+static void Send(const std::string& json) {
     fputs(json.c_str(), gProto);
     fputc('\n', gProto);
     fflush(gProto);
@@ -436,171 +436,171 @@ static void Enviar(const std::string& json) {
 // ============================================================================
 //  Las herramientas
 // ============================================================================
-struct Resultado {
-    std::string texto;
-    std::string imagenPng;   // (la captura)
+struct Result {
+    std::string text;
+    std::string imagePng;   // (la captura)
     bool error;
-    Resultado() : error(false) {}
+    Result() : error(false) {}
 };
 
-static Object* Buscar(Object* o, const std::string& nombre) {
+static Object* Find(Object* o, const std::string& name) {
     if (!o) return NULL;
-    if (o != SceneCollection && o->name == nombre) return o;
-    for (size_t i = 0; i < o->Childrens.size(); i++) if (Object* r = Buscar(o->Childrens[i], nombre)) return r;
+    if (o != SceneCollection && o->name == name) return o;
+    for (size_t i = 0; i < o->Childrens.size(); i++) if (Object* r = Find(o->Childrens[i], name)) return r;
     return NULL;
 }
 // LAS COORDENADAS DE LA PERSONA: las del panel Propiedades, con Z para arriba. Adentro el editor tiene Y para arriba:
 // el campo "Y" de la posicion es pos.z y el "Z" es pos.y. La rotacion (euler en grados) y la escala van como el panel
-static void Arbol(Object* o, int prof, std::string& out) {
+static void Tree(Object* o, int prof, std::string& out) {
     char b[512];
     const Vector3& p = o->pos; const Vector3& r = o->rotEuler; const Vector3& e = o->scale;
     snprintf(b, sizeof(b), "%*s- %s (%s) pos %.3g %.3g %.3g | rot %.3g %.3g %.3g | escala %.3g %.3g %.3g%s%s%s\n",
-             prof * 2, "", o->name.c_str(), W3dNombreTipo(o->getType()), p.x, p.z, p.y, r.x, r.y, r.z, e.x, e.y, e.z,
-             o->select ? " [seleccionado]" : "", o == ObjActivo ? " [activo]" : "", o->visible ? "" : " [oculto]");
+             prof * 2, "", o->name.c_str(), W3dTypeName(o->getType()), p.x, p.z, p.y, r.x, r.y, r.z, e.x, e.y, e.z,
+             o->select ? " [seleccionado]" : "", o == ActiveObj ? " [activo]" : "", o->visible ? "" : " [oculto]");
     out += b;
-    for (size_t i = 0; i < o->Childrens.size(); i++) Arbol(o->Childrens[i], prof + 1, out);
+    for (size_t i = 0; i < o->Childrens.size(); i++) Tree(o->Childrens[i], prof + 1, out);
 }
 
-static Resultado HerrEscena() {
-    Resultado r;
-    if (!SceneCollection) { r.error = true; r.texto = "no hay escena"; return r; }
-    r.texto = "Escena (como el panel Propiedades: Z para arriba, rotacion euler en grados):\n";
-    for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) Arbol(SceneCollection->Childrens[i], 0, r.texto);
-    if (SceneCollection->Childrens.empty()) r.texto += "(vacia)\n";
+static Result ToolScene() {
+    Result r;
+    if (!SceneCollection) { r.error = true; r.text = "no hay escena"; return r; }
+    r.text = "Escena (como el panel Propiedades: Z para arriba, rotacion euler en grados):\n";
+    for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) Tree(SceneCollection->Childrens[i], 0, r.text);
+    if (SceneCollection->Childrens.empty()) r.text += "(vacia)\n";
     return r;
 }
 
 // la pantalla tal como se ve (o solo la vista 3D activa) a PNG: el mismo dibujo que la captura del harness (uishot),
-// achicada (de a bloques enteros, hasta 'anchoMax') y comprimida
-static Resultado HerrCaptura(bool soloVista3D, int anchoMax) {
-    Resultado r;
-    if (!rootViewport) { r.error = true; r.texto = "no hay layout de viewports"; return r; }
-    { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
-    const int W = MenuPantallaW, H = W3dPantallaAlto;
-    if (W < 1 || H < 1) { r.error = true; r.texto = "la ventana no tiene tamano"; return r; }
+// achicada (de a bloques enteros, hasta 'widthMax') y comprimida
+static Result ToolCapture(bool onlyView3D, int widthMax) {
+    Result r;
+    if (!rootViewport) { r.error = true; r.text = "no hay layout de viewports"; return r; }
+    { extern void LoadPendingTextures(); LoadPendingTextures(); }
+    const int W = MenuScreenW, H = W3dScreenHeight;
+    if (W < 1 || H < 1) { r.error = true; r.text = "la ventana no tiene tamano"; return r; }
     rootViewport->Render();
     LayoutRenderMenu(W, H);   // (los menus y popups van aparte, encima de todo)
     w3dEngine::Finish();
     int x0 = 0, y0 = 0, w = W, h = H;
     Viewport3D* vp = Viewport3DActive;
-    if (soloVista3D && vp && vp->width > 0 && vp->height > 0) { x0 = vp->x; w = vp->width; h = vp->height; y0 = H - vp->y - vp->height; }
+    if (onlyView3D && vp && vp->width > 0 && vp->height > 0) { x0 = vp->x; w = vp->width; h = vp->height; y0 = H - vp->y - vp->height; }
     std::vector<unsigned char> px((size_t)w * h * 4, 0);
     w3dEngine::ReadPixelsRGBA(x0, y0, w, h, &px[0]);   // (de abajo hacia arriba)
-    if (anchoMax < 64) anchoMax = 64;
-    const int f = (w + anchoMax - 1) / anchoMax;      // de a cuantos pixeles se promedia
+    if (widthMax < 64) widthMax = 64;
+    const int f = (w + widthMax - 1) / widthMax;      // de a cuantos pixeles se promedia
     const int ow = w / f, oh = h / f;
     std::vector<unsigned char> rgb((size_t)ow * oh * 3);
     for (int y = 0; y < oh; y++)
         for (int x = 0; x < ow; x++)
             for (int c = 0; c < 3; c++) {
-                unsigned suma = 0;
+                unsigned sum = 0;
                 for (int j = 0; j < f; j++)
-                    for (int i = 0; i < f; i++) suma += px[((size_t)(h - 1 - (y * f + j)) * w + (x * f + i)) * 4 + c];
-                rgb[((size_t)y * ow + x) * 3 + c] = (unsigned char)(suma / (unsigned)(f * f));
+                    for (int i = 0; i < f; i++) sum += px[((size_t)(h - 1 - (y * f + j)) * w + (x * f + i)) * 4 + c];
+                rgb[((size_t)y * ow + x) * 3 + c] = (unsigned char)(sum / (unsigned)(f * f));
             }
-    r.imagenPng = PngComprimido(rgb, ow, oh);
+    r.imagePng = CompressedPng(rgb, ow, oh);
     char b[128];
-    snprintf(b, sizeof(b), "%s: %dx%d (la ventana mide %dx%d)", soloVista3D ? "vista 3D" : "ventana", ow, oh, W, H);
-    r.texto = b;
+    snprintf(b, sizeof(b), "%s: %dx%d (la ventana mide %dx%d)", onlyView3D ? "vista 3D" : "window", ow, oh, W, H);
+    r.text = b;
     return r;
 }
 
 // comandos del harness, uno por linea: corta en el primero que falla. Devuelve lo que imprimieron
-static Resultado HerrComandos(const std::string& texto) {
-    Resultado r;
-    LeerCaptura();   // (lo que haya quedado de antes no es de estos comandos)
+static Result ToolCommands(const std::string& text) {
+    Result r;
+    ReadCapture();   // (lo que haya quedado de antes no es de estos comandos)
     size_t a = 0;
     int n = 0;
-    while (a <= texto.size()) {
-        size_t b = texto.find('\n', a);
-        if (b == std::string::npos) b = texto.size();
-        std::string linea = texto.substr(a, b - a);
+    while (a <= text.size()) {
+        size_t b = text.find('\n', a);
+        if (b == std::string::npos) b = text.size();
+        std::string line = text.substr(a, b - a);
         a = b + 1;
-        const size_t i0 = linea.find_first_not_of(" \t\r");
+        const size_t i0 = line.find_first_not_of(" \t\r");
         if (i0 == std::string::npos) continue;
-        const size_t i1 = linea.find_last_not_of(" \t\r");
-        linea = linea.substr(i0, i1 - i0 + 1);
-        if (linea[0] == '#') continue;
+        const size_t i1 = line.find_last_not_of(" \t\r");
+        line = line.substr(i0, i1 - i0 + 1);
+        if (line[0] == '#') continue;
         std::string err;
-        const bool ok = W3dRunCommand(linea, err);
-        const std::string impreso = LeerCaptura();
-        r.texto += (ok ? "OK    " : "FALLO ") + linea + "\n" + impreso;
-        if (!ok) { r.texto += "  -> " + err + "\n"; r.error = true; break; }
+        const bool ok = W3dRunCommand(line, err);
+        const std::string printed = ReadCapture();
+        r.text += (ok ? "OK    " : "FALLO ") + line + "\n" + printed;
+        if (!ok) { r.text += "  -> " + err + "\n"; r.error = true; break; }
         n++;
     }
-    if (r.texto.empty()) r.texto = "(sin comandos)";
+    if (r.text.empty()) r.text = "(sin comandos)";
     g_redraw = true;
     return r;
 }
 
-static Resultado HerrAgregar(const std::string& tipo) {
-    Resultado r;
-    struct { const char* nombre; void (*fn)(); } tabla[] = {
+static Result ToolAdd(const std::string& type) {
+    Result r;
+    struct { const char* name; void (*fn)(); } table[] = {
         { "cube", AddCube }, { "plane", AddPlane }, { "circle", AddCircle }, { "uvsphere", AddUVSphere },
         { "cone", AddCone }, { "cylinder", AddCylinder }, { "vertex", AddVertex }, { "empty", AddEmpty },
         { "camera", AddCamera }, { "light", AddLight },
     };
-    for (size_t i = 0; i < sizeof(tabla) / sizeof(tabla[0]); i++) {
-        if (tipo != tabla[i].nombre) continue;
-        LeerCaptura();
-        tabla[i].fn();
-        LeerCaptura();
+    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
+        if (type != table[i].name) continue;
+        ReadCapture();
+        table[i].fn();
+        ReadCapture();
         g_redraw = true;
-        r.texto = std::string("agregado: ") + (ObjActivo ? ObjActivo->name : tipo);
+        r.text = std::string("added: ") + (ActiveObj ? ActiveObj->name : type);
         return r;
     }
     r.error = true;
-    r.texto = "tipo desconocido: '" + tipo + "' (cube, plane, circle, uvsphere, cone, cylinder, vertex, empty, camera, light)";
+    r.text  = "tipo desconocido: '" + type + "' (cube, plane, circle, uvsphere, cone, cylinder, vertex, empty, camera, light)";
     return r;
 }
 
-static Resultado HerrSeleccionar(const std::string& nombre, bool agregar) {
-    Resultado r;
-    Object* o = nombre.empty() ? NULL : Buscar(SceneCollection, nombre);
-    if (!nombre.empty() && !o) { r.error = true; r.texto = "no hay ningun objeto llamado '" + nombre + "'"; return r; }
-    UndoCapturarSeleccion();
-    if (!agregar) DeseleccionarTodo();
-    if (o) o->Seleccionar();
+static Result ToolSelect(const std::string& name, bool add) {
+    Result r;
+    Object* o = name.empty() ? NULL : Find(SceneCollection, name);
+    if (!name.empty() && !o) { r.error = true; r.text = "no hay ningun objeto llamado '" + name + "'"; return r; }
+    UndoCaptureSelection();
+    if (!add) DeselectAll();
+    if (o) o->Select();
     g_redraw = true;
-    r.texto = o ? "seleccionado: " + o->name + " (activo)" : std::string("nada seleccionado");
+    r.text = o ? "selected: " + o->name + " (activo)" : std::string("nada seleccionado");
     return r;
 }
 
-static Resultado HerrTransformar(const JVal* args) {
-    Resultado r;
-    const std::string nombre = Texto(Campo(args, "nombre"));
-    Object* o = nombre.empty() ? ObjActivo : Buscar(SceneCollection, nombre);
-    if (!o) { r.error = true; r.texto = nombre.empty() ? "no hay objeto activo" : "no hay ningun objeto llamado '" + nombre + "'"; return r; }
+static Result ToolTransform(const JVal* args) {
+    Result r;
+    const std::string name = Text(Field(args, "name"));
+    Object* o = name.empty() ? ActiveObj : Find(SceneCollection, name);
+    if (!o) { r.error = true; r.text = name.empty() ? "no hay objeto activo" : "no hay ningun objeto llamado '" + name + "'"; return r; }
     float p[3], rot[3], e[3];
-    const bool hayP = Tres(Campo(args, "posicion"), p), hayR = Tres(Campo(args, "rotacion"), rot), hayE = Tres(Campo(args, "escala"), e);
-    if (!hayP && !hayR && !hayE) { r.error = true; r.texto = "falta posicion, rotacion o escala (cada una, una lista de 3 numeros)"; return r; }
-    UndoTransformIniciarObj(o);   // (queda en el Ctrl+Z como un transform hecho a mano)
-    if (hayP) o->pos = Vector3(p[0], p[2], p[1]);   // (Z para arriba, como el panel: ver Arbol)
-    if (hayR) o->SetRotEuler(Vector3(rot[0], rot[1], rot[2]));
-    if (hayE) o->scale = Vector3(e[0], e[1], e[2]);
-    UndoTransformConfirmar();
-    { extern bool g_objetosMovidos; g_objetosMovidos = true; }
+    const bool hasP = Three(Field(args, "position"), p), hasR = Three(Field(args, "rotation"), rot), hasE = Three(Field(args, "scale"), e);
+    if (!hasP && !hasR && !hasE) { r.error = true; r.text = "falta posicion, rotacion o escala (cada una, una lista de 3 numeros)"; return r; }
+    UndoTransformStartObj(o);   // (queda en el Ctrl+Z como un transform hecho a mano)
+    if (hasP) o->pos = Vector3(p[0], p[2], p[1]);   // (Z para arriba, como el panel: ver Arbol)
+    if (hasR) o->SetRotEuler(Vector3(rot[0], rot[1], rot[2]));
+    if (hasE) o->scale = Vector3(e[0], e[1], e[2]);
+    UndoTransformConfirm();
+    { extern bool g_objectsMoved; g_objectsMoved = true; }
     g_redraw = true;
     std::string t;
-    Arbol(o, 0, t);
-    r.texto = "listo:\n" + t;
+    Tree(o, 0, t);
+    r.text = "ready:\n" + t;
     return r;
 }
 
-static Resultado HerrImportar(const std::string& ruta) {
-    Resultado r;
-    if (ruta.empty()) { r.error = true; r.texto = "falta la ruta"; return r; }
-    LeerCaptura();
-    const bool ok = ImportModeloPorExtension(ruta);
-    r.texto = LeerCaptura();
-    r.texto += ok ? "importado: " + ruta : "no se pudo importar: " + ruta;
+static Result ToolImport(const std::string& path) {
+    Result r;
+    if (path.empty()) { r.error = true; r.text = "falta la ruta"; return r; }
+    ReadCapture();
+    const bool ok = ImportModelByExtension(path);
+    r.text = ReadCapture();
+    r.text += ok ? "imported: " + path : "no se pudo importar: " + path;
     r.error = !ok;
     g_redraw = true;
     return r;
 }
 
 // ---- la lista de herramientas (tools/list) ----
-static const char* kHerramientas = R"JSON([
+static const char* kTools = R"JSON([
 {"name":"escena","description":"El arbol de objetos de la escena de Whisk3D: nombre, tipo, posicion, rotacion (euler en grados), escala, y cual esta seleccionado y cual es el activo. Las coordenadas son las del panel Propiedades: Z para arriba.","inputSchema":{"type":"object","properties":{}}},
 {"name":"captura","description":"Una imagen PNG de lo que muestra el editor, para ver el resultado. Por defecto solo la vista 3D activa; con zona='ventana', el editor entero. Se achica hasta ancho_max pixeles (800 si no se dice).","inputSchema":{"type":"object","properties":{"zona":{"type":"string","enum":["vista3d","ventana"]},"ancho_max":{"type":"integer"}}}},
 {"name":"agregar_objeto","description":"Agrega un objeto en el cursor 3D, como el menu Add. Queda seleccionado y activo.","inputSchema":{"type":"object","properties":{"tipo":{"type":"string","enum":["cube","plane","circle","uvsphere","cone","cylinder","vertex","empty","camera","light"]}},"required":["tipo"]}},
@@ -614,95 +614,95 @@ static const char* kHerramientas = R"JSON([
 {"name":"comando","description":"Para todo lo demas: comandos del editor, uno por linea (los del harness de pruebas de Whisk3D, main/test/W3dScript.cpp; hay mas de 600). Corta en el primero que falla y devuelve lo que imprimieron. Algunos: mode <object|edit> | select <all|none> | selmode <vertex|edge|face> | extrude <dist> | loopcut <arista> <cortes> <factor> | merge <center|bydistance> | triangulate | separate | duplicate | join | shade <smooth|flat> | apply <location|rotation|scale|all> | objname <nombre> | parent <hijo> <padre> | modadd <screw|mirror|array|subsurf|boolean> | modapply | matnew | matcolor <r> <g> <b> (0 a 1) | newtex <nombre> <ancho> <alto> <blank|uvgrid|colorgrid> | unwrap <angle|conformal> | smartuv | addarmature | timeline <play|pause|goto N> | frame N | export <ruta.obj> | exportgltf <ruta> | exportglb <ruta> | rtrender <ancho> <alto> | xray <0|1> | undo | redo.","inputSchema":{"type":"object","properties":{"comandos":{"type":"string"}},"required":["comandos"]}}
 ])JSON";
 
-static Resultado Llamar(const std::string& nombre, const JVal* args) {
-    if (nombre == "escena") return HerrEscena();
-    if (nombre == "captura") {
-        const JVal* am = Campo(args, "ancho_max");
-        return HerrCaptura(Texto(Campo(args, "zona")) != "ventana", (am && am->tipo == 1) ? (int)am->num : 800);
+static Result Call(const std::string& name, const JVal* args) {
+    if (name == "escena") return ToolScene();
+    if (name == "captura") {
+        const JVal* am = Field(args, "width_max");
+        return ToolCapture(Text(Field(args, "zone")) != "window", (am && am->type == 1) ? (int)am->num : 800);
     }
-    if (nombre == "agregar_objeto") return HerrAgregar(Texto(Campo(args, "tipo")));
-    if (nombre == "seleccionar") {
-        const JVal* ag = Campo(args, "agregar");
-        return HerrSeleccionar(Texto(Campo(args, "nombre")), ag && ag->tipo == 3 && ag->b);
+    if (name == "agregar_objeto") return ToolAdd(Text(Field(args, "type")));
+    if (name == "seleccionar") {
+        const JVal* ag = Field(args, "add");
+        return ToolSelect(Text(Field(args, "name")), ag && ag->type == 3 && ag->b);
     }
-    if (nombre == "transformar") return HerrTransformar(args);
-    if (nombre == "borrar_seleccion") return HerrComandos("delete");
-    if (nombre == "deshacer") {
-        const JVal* re = Campo(args, "rehacer");
-        return HerrComandos((re && re->tipo == 3 && re->b) ? "redo" : "undo");
+    if (name == "transformar") return ToolTransform(args);
+    if (name == "borrar_seleccion") return ToolCommands("delete");
+    if (name == "deshacer") {
+        const JVal* re = Field(args, "redo");
+        return ToolCommands((re && re->type == 3 && re->b) ? "redo" : "undo");
     }
-    if (nombre == "abrir_proyecto") return HerrComandos("abrirw3d " + Texto(Campo(args, "ruta")));
-    if (nombre == "guardar_proyecto") return HerrComandos("guardarw3d " + Texto(Campo(args, "ruta")));
-    if (nombre == "importar_modelo") return HerrImportar(Texto(Campo(args, "ruta")));
-    if (nombre == "comando") return HerrComandos(Texto(Campo(args, "comandos")));
-    Resultado r;
+    if (name == "abrir_proyecto") return ToolCommands("openw3d " + Text(Field(args, "path")));
+    if (name == "guardar_proyecto") return ToolCommands("savew3d " + Text(Field(args, "path")));
+    if (name == "importar_modelo") return ToolImport(Text(Field(args, "path")));
+    if (name == "comando") return ToolCommands(Text(Field(args, "commands")));
+    Result r;
     r.error = true;
-    r.texto = "herramienta desconocida: '" + nombre + "'";
+    r.text  = "herramienta desconocida: '" + name + "'";
     return r;
 }
 
 // ============================================================================
 //  El protocolo
 // ============================================================================
-static void Atender(const std::string& linea) {
-    LectorJson lj(linea);
-    JVal* msj = lj.Valor();
-    if (lj.error || msj->tipo != 4) {
-        Enviar("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"JSON invalido\"}}");
+static void Handle(const std::string& line) {
+    ReaderJson lj(line);
+    JVal* msj = lj.Value();
+    if (lj.error || msj->type != 4) {
+        Send("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"JSON invalido\"}}");
         delete msj;
         return;
     }
-    const std::string metodo = Texto(Campo(msj, "method"));
-    const JVal* idv = Campo(msj, "id");
-    const std::string id = IdTexto(idv);
-    const JVal* params = Campo(msj, "params");
+    const std::string method = Text(Field(msj, "method"));
+    const JVal* idv = Field(msj, "id");
+    const std::string id = IdText(idv);
+    const JVal* params = Field(msj, "params");
     if (!idv) { delete msj; return; }   // una notificacion (notifications/initialized, cancelled...): sin respuesta
     std::string res;
-    if (metodo == "initialize") {
+    if (method == "initialize") {
         // la version que pide el cliente, si es una de estas; si no, la ultima
-        std::string ver = Texto(Campo(params, "protocolVersion"));
-        if (ver != "2024-11-05" && ver != "2025-03-26" && ver != "2025-06-18") ver = "2025-06-18";
-        res = "{\"protocolVersion\":" + Esc(ver) + ",\"capabilities\":{\"tools\":{\"listChanged\":false}},"
+        std::string show = Text(Field(params, "protocolVersion"));
+        if (show != "2024-11-05" && show != "2025-03-26" && show != "2025-06-18") show = "2025-06-18";
+        res = "{\"protocolVersion\":" + Esc(show) + ",\"capabilities\":{\"tools\":{\"listChanged\":false}},"
               "\"serverInfo\":{\"name\":\"whisk3d\",\"version\":" + Esc(W3dVersion()) + "},"
               "\"instructions\":" + Esc("Whisk3D es un editor 3D (modelado, materiales, animacion, juegos). Lo que hagas se ve "
                                         "en la ventana del editor y se deshace con Ctrl+Z como si lo hubiera hecho una persona. "
                                         "Usa 'escena' para saber que hay y 'captura' para ver el resultado.") + "}";
-    } else if (metodo == "ping") {
+    } else if (method == "ping") {
         res = "{}";
-    } else if (metodo == "tools/list") {
+    } else if (method == "tools/list") {
         // (la lista esta escrita en varias lineas para leerla aca; el protocolo es un mensaje por linea)
-        std::string lista;
-        for (const char* c = kHerramientas; *c; c++) if (*c != '\n' && *c != '\r') lista += *c;
-        res = "{\"tools\":" + lista + "}";
-    } else if (metodo == "tools/call") {
-        const Resultado r = Llamar(Texto(Campo(params, "name")), Campo(params, "arguments"));
+        std::string list;
+        for (const char* c = kTools; *c; c++) if (*c != '\n' && *c != '\r') list += *c;
+        res = "{\"tools\":" + list + "}";
+    } else if (method == "tools/call") {
+        const Result r = Call(Text(Field(params, "name")), Field(params, "arguments"));
         res = "{\"content\":[";
-        if (!r.imagenPng.empty()) res += "{\"type\":\"image\",\"data\":\"" + Base64(r.imagenPng) + "\",\"mimeType\":\"image/png\"},";
-        res += "{\"type\":\"text\",\"text\":" + Esc(r.texto) + "}],\"isError\":" + (r.error ? "true" : "false") + "}";
+        if (!r.imagePng.empty()) res += "{\"type\":\"image\",\"data\":\"" + Base64(r.imagePng) + "\",\"mimeType\":\"image/png\"},";
+        res += "{\"type\":\"text\",\"text\":" + Esc(r.text) + "}],\"isError\":" + (r.error ? "true" : "false") + "}";
     } else {
-        Enviar("{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"error\":{\"code\":-32601,\"message\":" + Esc("metodo desconocido: " + metodo) + "}}");
+        Send("{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"error\":{\"code\":-32601,\"message\":" + Esc("metodo desconocido: " + method) + "}}");
         delete msj;
         return;
     }
-    Enviar("{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + res + "}");
+    Send("{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + res + "}");
     delete msj;
 }
 
-bool W3dMcpAtender() {
-    if (!gActivo) return true;
-    if (SDL_AtomicGet(&gTipoEvento) == 0) {
+bool W3dMcpHandle() {
+    if (!gActive) return true;
+    if (SDL_AtomicGet(&gEventType) == 0) {
         const Uint32 t = SDL_RegisterEvents(1);
-        SDL_AtomicSet(&gTipoEvento, t == (Uint32)-1 ? -1 : (int)t);
+        SDL_AtomicSet(&gEventType, t == (Uint32)-1 ? -1 : (int)t);
     }
     for (;;) {
         std::string p;
-        SDL_LockMutex(gCola);
-        if (!gPedidos.empty()) { p = gPedidos.front(); gPedidos.pop_front(); }
-        SDL_UnlockMutex(gCola);
+        SDL_LockMutex(gQueue);
+        if (!gRequests.empty()) { p = gRequests.front(); gRequests.pop_front(); }
+        SDL_UnlockMutex(gQueue);
         if (p.empty()) break;
-        Atender(p);
+        Handle(p);
     }
-    return SDL_AtomicGet(&gCerrado) == 0;
+    return SDL_AtomicGet(&gClosed) == 0;
 }
 
 #endif // W3D_MCP

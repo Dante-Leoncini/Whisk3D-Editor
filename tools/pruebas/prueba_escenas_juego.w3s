@@ -19,158 +19,158 @@
 #  scripts = juego) y que los tipos sobreviven a guardar/abrir.
 # ==========================================================================
 
-ventana 1280 720
-escenadefecto
+window 1280 720
+scenedefault
 
 # ---- el proyecto de arranque es una ESCENA (no tiene scripts): su timeline es su animacion ----
-raizinfo n 1 activa Scene tipo escena
-raizmodo kind 0 juego 0 autokey 1 menujuego 0
+rootinfo n 1 active Scene type scene
+rootmode kind 0 game 0 autokey 1 gamemenu 0
 # "Juego" no existe en una escena (el selector no lo ofrece y elegirlo no cambia nada)
-raizanim juego
-raizmodo kind 0 juego 0
+rootanim game
+rootmode kind 0 game 0
 
 # ---- "New Game" por el selector de la barra del 3D ----
-raizmenu 3d New Game
-raizinfo n 2 activa Game tipo juego juegos 1 escenas 1
-raizmodo kind 2 juego 1 autokey 0 menujuego 1
-raizbarra 3d Game icono gamepad
-raizbarra outliner Game icono gamepad
+rootmenu 3d New Game
+rootinfo n 2 active Game type game games 1 scenes 1
+rootmode kind 2 game 1 autokey 0 gamemenu 1
+rootbar 3d Game icon gamepad
+rootbar outliner Game icon gamepad
 add cube
 objname Jugador
 selobj Jugador
 
 # ---- en "Juego" NO hay keyframes: la I no inserta y el dope sheet no arma filas ----
-raizkey n 0
-raizdope 0
+rootkey n 0
+rootdope 0
 
 # ---- un CLIP de escena del juego (lo dispararia Lua con animEscena): se edita eligiendolo ----
-raizclip Salto Jugador 1 0 11 10
-raizanim Salto
-raizmodo kind 0 juego 0 autokey 1 menujuego 1
+rootclip Salto Jugador 1 0 11 10
+rootanim Salto
+rootmode kind 0 game 0 autokey 1 gamemenu 1
 frame 6
 objat Jugador 5 0 0 0.01
-raizdope 4
+rootdope 4
 # en el clip SI se insertan keyframes (son del clip, no del juego)
-raizkey n 9
+rootkey n 9
 # ---- volver a "Juego": el juego vuelve a su frame 1 (el Jugador donde lo dejo el usuario) ----
-raizanim juego
-raizmodo kind 2 juego 1 autokey 0
+rootanim game
+rootmode kind 2 game 1 autokey 0
 objat Jugador 0 0 0 0.001
-raizdope 0
-raizkey n 0
+rootdope 0
+rootkey n 0
 # el clip sigue ahi (con el keyframe nuevo), elegirlo lo vuelve a mostrar
-raizanim Salto
+rootanim Salto
 frame 11
 objat Jugador 10 0 0 0.01
 # guardar editando un clip escribe el ESTADO BASE del juego (se verifica al final) y no toca la pantalla
-guardarw3d /tmp/w3d_f6_juego_clip.w3d
+savew3d /tmp/w3d_f6_juego_clip.w3d
 objat Jugador 10 0 0 0.01
 # dejar la raiz editando un clip: se deja en su estado base (al volver, "Juego" en su frame 1)
-raizabrir Scene
-raizabrir Game
-raizmodo kind 2 juego 1
+rootopen Scene
+rootopen Game
+rootmode kind 2 game 1
 objat Jugador 0 0 0 0.001
 
 # ---- el "+" de la barra del outliner: New Game ----
-raizboton juego
-raizinfo n 3 activa Game.001 tipo juego juegos 2
-raizabrir Game
+rootbutton game
+rootinfo n 3 active Game.001 type game games 2
+rootopen Game
 
 # ---- el TIPO en el lugar (raiztipo): la escena de arranque pasa a ser un juego (y vuelve, con undo) ----
-raizabrir Scene
-raiztipo juego
-raizinfo tipo juego juegos 3 escenas 0
-raizmodo kind 2 juego 1 menujuego 1
+rootopen Scene
+roottype game
+rootinfo type game games 3 scenes 0
+rootmode kind 2 game 1 gamemenu 1
 undo
-raizinfo tipo escena escenas 1
-raizmodo kind 0 juego 0 menujuego 0
+rootinfo type scene scenes 1
+rootmode kind 0 game 0 gamemenu 0
 redo
-raizinfo tipo juego
+rootinfo type game
 undo
-raizinfo tipo escena
+rootinfo type scene
 
 # ---- la vista "Scenes" lista escenas Y juegos (cada uno con su icono) ----
-outvista escenas
-outfilas n 3
-outfila Game usuarios 0 icono gamepad
-outfila Scene usuarios 0 icono camera
-outvista escena
+outview scenes
+outrows n 3
+outrow Game users 0 icon gamepad
+outrow Scene users 0 icon camera
+outview scene
 
 # ---- un JUEGO simula (no graba su pasado): Stop devuelve el frame 1 ----
-raizabrir Game
-raizscript Jugador prueba_escenas_juego.lua
+rootopen Game
+rootscript Jugador prueba_escenas_juego.lua
 simplay 10
 objat Jugador 10 0 0 0.001
 simstop
 objat Jugador 0 0 0 0.001
 # sin partida el cabezal se queda en el estado base (frame 1)
-raizscrub 7 cur 1
+rootscrub 7 cur 1
 # un JUEGO sin scripts igual simula (su fisica, sus particulas, sus hitbox)
-raizabrir Game.001
+rootopen Game.001
 simplay 2
 simstop
 
 # ---- guardar / abrir: el tipo de cada raiz sobrevive ----
-raizabrir Scene
-guardarw3d /tmp/w3d_f6_juego.w3d
-entradaexiste /tmp/w3d_f6_juego.w3d escenas/game.w3de 1
-entradatiene /tmp/w3d_f6_juego.w3d proyecto.json escenas3d 1
-abrirw3d /tmp/w3d_f6_juego.w3d
-raizinfo n 3 activa Scene tipo escena cargada Game 0 tipode Game juego tipode Game.001 juego
-raizmodo kind 0 juego 0
-raizabrir Game
-raizmodo kind 2 juego 1
-raizinfo tipo juego
-raizabrir Scene
-guardarw3d /tmp/w3d_f6_juego_2.w3d
-w3diguales /tmp/w3d_f6_juego.w3d /tmp/w3d_f6_juego_2.w3d
+rootopen Scene
+savew3d /tmp/w3d_f6_juego.w3d
+entryexists /tmp/w3d_f6_juego.w3d scenes/game.w3de 1
+entryhas /tmp/w3d_f6_juego.w3d project.json scenes3d 1
+openw3d /tmp/w3d_f6_juego.w3d
+rootinfo n 3 active Scene type scene loaded Game 0 tipode Game game tipode Game.001 game
+rootmode kind 0 game 0
+rootopen Game
+rootmode kind 2 game 1
+rootinfo type game
+rootopen Scene
+savew3d /tmp/w3d_f6_juego_2.w3d
+w3dequal /tmp/w3d_f6_juego.w3d /tmp/w3d_f6_juego_2.w3d
 
 # ---- un proyecto de UNA raiz: una ESCENA sigue siendo escena aunque le pongas un script (2026-11-11: una escena puede
 #      tener scripts). Un JUEGO con scripts no escribe el registro (es el tipo que se deduce de su contenido): asi son los
 #      proyectos viejos, y al abrirlos su tipo sale de lo que tienen ----
-escenadefecto
-raizinfo n 1 tipo escena
-raizscript Cubo prueba_escenas_juego.lua
-raizinfo tipo escena
-raiztipo juego
-raizinfo tipo juego
-guardarw3d /tmp/w3d_f6_juego_viejo.w3d
-entradatiene /tmp/w3d_f6_juego_viejo.w3d proyecto.json escenas3d 0
-abrirw3d /tmp/w3d_f6_juego_viejo.w3d
-raizinfo n 1 tipo juego
-raizmodo kind 2 juego 1
+scenedefault
+rootinfo n 1 type scene
+rootscript Cubo prueba_escenas_juego.lua
+rootinfo type scene
+roottype game
+rootinfo type game
+savew3d /tmp/w3d_f6_juego_viejo.w3d
+entryhas /tmp/w3d_f6_juego_viejo.w3d project.json scenes3d 0
+openw3d /tmp/w3d_f6_juego_viejo.w3d
+rootinfo n 1 type game
+rootmode kind 2 game 1
 # ...y si se lo declara ESCENA a mano, el registro lo dice (aunque tenga scripts)
-raiztipo escena
-guardarw3d /tmp/w3d_f6_juego_escena.w3d
-entradatiene /tmp/w3d_f6_juego_escena.w3d proyecto.json escenas3d 1
-abrirw3d /tmp/w3d_f6_juego_escena.w3d
-raizinfo n 1 tipo escena
-raizmodo kind 0 juego 0
+roottype scene
+savew3d /tmp/w3d_f6_juego_escena.w3d
+entryhas /tmp/w3d_f6_juego_escena.w3d project.json scenes3d 1
+openw3d /tmp/w3d_f6_juego_escena.w3d
+rootinfo n 1 type scene
+rootmode kind 0 game 0
 
 # ---- el guardado de arriba (hecho editando el clip "Salto") tiene al juego en su frame 1 ----
 # (2026-11-16: abrir VUELVE a lo que se estaba editando -- el clip "Salto" en su frame 11 -- y "Juego" devuelve el
 #  estado base que se guardo)
-abrirw3d /tmp/w3d_f6_juego_clip.w3d
-raizinfo activa Game tipo juego
-raizmodo kind 0 juego 0
+openw3d /tmp/w3d_f6_juego_clip.w3d
+rootinfo active Game type game
+rootmode kind 0 game 0
 objat Jugador 10 0 0 0.01
-raizanim juego
-raizmodo kind 2 juego 1
+rootanim game
+rootmode kind 2 game 1
 objat Jugador 0 0 0 0.001
-raizanim Salto
+rootanim Salto
 frame 11
 objat Jugador 10 0 0 0.01
-raizanim juego
+rootanim game
 objat Jugador 0 0 0 0.001
 
 # ---- el "+" del outliner crea los TRES tipos; cada raiz con su icono (los que ya existian) ----
-raizboton escena
-raizinfo activa Scene.001 tipo escena
-raizbarra 3d Scene.001 icono camera
-raizbarra outliner Scene.001 icono camera
-raizboton prefab
-raizinfo activa Prefab tipo prefab
-raizbarra 3d Prefab icono prefab
-raizboton juego
-raizinfo activa Game.001 tipo juego
-raizbarra outliner Game.001 icono gamepad
+rootbutton escena
+rootinfo active Scene.001 type scene
+rootbar 3d Scene.001 icon camera
+rootbar outliner Scene.001 icon camera
+rootbutton prefab
+rootinfo active Prefab type prefab
+rootbar 3d Prefab icon prefab
+rootbutton game
+rootinfo active Game.001 type game
+rootbar outliner Game.001 icon gamepad
