@@ -63,8 +63,8 @@ size_t ObjectIcon(Object* o) {
         case ObjectType::postProcess: return (size_t)IconType::monitor;
         case ObjectType::clip:    return (size_t)IconType::clip;
         case ObjectType::hitbox:     return (size_t)IconType::hitbox;     // Hitbox: caja de deteccion
-        case ObjectType::sondaluz:   return (size_t)IconType::sphere;     // Sonda de luz: la luz indirecta horneada
-        case ObjectType::sondareflejo: return (size_t)IconType::photo;    // Sonda de reflejo: una foto de 360 grados
+        case ObjectType::lightProbe:   return (size_t)IconType::sphere;     // Sonda de luz: la luz indirecta horneada
+        case ObjectType::reflectionProbe: return (size_t)IconType::photo;    // Sonda de reflejo: una foto de 360 grados
         case ObjectType::prefab:     // instancia de prefab (sus hijos: generados); la de una ESCENA, el icono de escena
             return W3dPrefabIsScene(((InstancePrefab*)o)->prefab) ? (size_t)IconType::camera : (size_t)IconType::prefab;
         case ObjectType::proxy:      return (size_t)IconType::lib;    // proxy W3D: lo que genera es de una libreria

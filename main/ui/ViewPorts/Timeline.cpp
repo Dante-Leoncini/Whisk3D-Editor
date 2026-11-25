@@ -3170,14 +3170,14 @@ bool Timeline::MenuContext(int mx, int my, int menuX, int menuY){
     MenuItem* it;
     static bool sHasUndo, sHasRedo;
     sHasUndo = UndoHasSomething(); sHasRedo = UndoHasRedo();
-    it = g_tlMenuCtx->Add(T("Undo"), TL_KEY_UNDO, (int)IconType::undo); it->shortcut = "@global.deshacer"; it->gray = &sHasUndo;
-    it = g_tlMenuCtx->Add(T("Redo"), TL_KEY_REDO, (int)IconType::redo);  it->shortcut = "@global.rehacer";  it->gray = &sHasRedo;
-    it = g_tlMenuCtx->Add(T("Cut"), TL_KEY_CUT, (int)IconType::scissors);   it->shortcut = "@tl.cortar";   it->gray = &sHasSel;
+    it = g_tlMenuCtx->Add(T("Undo"), TL_KEY_UNDO, (int)IconType::undo); it->shortcut = "@global.undo"; it->gray = &sHasUndo;
+    it = g_tlMenuCtx->Add(T("Redo"), TL_KEY_REDO, (int)IconType::redo);  it->shortcut = "@global.redo";  it->gray = &sHasRedo;
+    it = g_tlMenuCtx->Add(T("Cut"), TL_KEY_CUT, (int)IconType::scissors);   it->shortcut = "@tl.cut";   it->gray = &sHasSel;
     it->lineUp = true;
-    it = g_tlMenuCtx->Add(T("Copy"), TL_KEY_COPY, (int)IconType::copy);  it->shortcut = "@tl.copiar";   it->gray = &sHasSel;
-    it = g_tlMenuCtx->Add(T("Paste"), TL_KEY_PASTE, (int)IconType::paste);   it->shortcut = "@tl.pegar";    it->gray = &sHasClip;
-    it = g_tlMenuCtx->Add(T("Duplicate"), TL_KEY_DUP); it->shortcut = "@tl.duplicar"; it->gray = &sHasSel; it->lineUp = true;
-    it = g_tlMenuCtx->Add(T("Delete"), TL_KEY_OF);   it->shortcut = "@tl.borrar";   it->gray = &sHasSel;
+    it = g_tlMenuCtx->Add(T("Copy"), TL_KEY_COPY, (int)IconType::copy);  it->shortcut = "@tl.copy";   it->gray = &sHasSel;
+    it = g_tlMenuCtx->Add(T("Paste"), TL_KEY_PASTE, (int)IconType::paste);   it->shortcut = "@tl.paste";    it->gray = &sHasClip;
+    it = g_tlMenuCtx->Add(T("Duplicate"), TL_KEY_DUP); it->shortcut = "@tl.duplicate"; it->gray = &sHasSel; it->lineUp = true;
+    it = g_tlMenuCtx->Add(T("Delete"), TL_KEY_OF);   it->shortcut = "@tl.delete";   it->gray = &sHasSel;
     if (OpenMenu && OpenMenu != g_tlMenuCtx) OpenMenu->Close();
     g_tlMenuCtx->Open(menuX >= 0 ? menuX : mx, menuY >= 0 ? menuY : my, MenuScreenW, MenuScreenH);
     OpenMenu = g_tlMenuCtx;
@@ -4459,9 +4459,9 @@ void Timeline::OpenMenuKey(int mx, int my){
     // se rearma en cada apertura: Rotate solo existe en CURVAS (en el dope sheet el unico eje es el tiempo, girar
     // no significa nada)
     g_tlMenuKeyXf->Clear();
-    g_tlMenuKeyXf->Add(T("Move"), TL_KEY_MOVE)->shortcut = "@tl.mover";
-    if (mode == TL_MODE_CURVES) g_tlMenuKeyXf->Add(T("Rotate"), TL_KEY_ROT)->shortcut = "@tl.rotar";
-    g_tlMenuKeyXf->Add(T("Scale"), TL_KEY_SCALE)->shortcut = "@tl.escalar";
+    g_tlMenuKeyXf->Add(T("Move"), TL_KEY_MOVE)->shortcut = "@tl.move";
+    if (mode == TL_MODE_CURVES) g_tlMenuKeyXf->Add(T("Rotate"), TL_KEY_ROT)->shortcut = "@tl.rotate";
+    g_tlMenuKeyXf->Add(T("Scale"), TL_KEY_SCALE)->shortcut = "@tl.scale";
     BuildMenuInterp(g_tlMenuKeyIn);
     BuildMenuHandle(g_tlMenuHandle);
     g_tlMenuKey->Clear();
@@ -4476,12 +4476,12 @@ void Timeline::OpenMenuKey(int mx, int my){
     // los handles solo existen en CURVAS: en el dope sheet no hay nada que ajustar
     if (mode == TL_MODE_CURVES) g_tlMenuKey->Add(T("Handle Type"), -1, -1, g_tlMenuHandle)->shortcut = "@tl.handle";
     g_tlMenuKey->Add(T("Smart Euler"), TL_KEY_SMARTEULER);
-    g_tlMenuKey->Add(T("Cut"), TL_KEY_CUT, (int)IconType::scissors)->shortcut = "@tl.cortar";
+    g_tlMenuKey->Add(T("Cut"), TL_KEY_CUT, (int)IconType::scissors)->shortcut = "@tl.cut";
     g_tlMenuKey->items.back()->lineUp = true;
-    g_tlMenuKey->Add(T("Copy"), TL_KEY_COPY, (int)IconType::copy)->shortcut = "@tl.copiar";
-    g_tlMenuKey->Add(T("Paste"), TL_KEY_PASTE, (int)IconType::paste)->shortcut = "@tl.pegar";
-    g_tlMenuKey->Add(T("Duplicate"), TL_KEY_DUP)->shortcut = "@tl.duplicar";
-    g_tlMenuKey->Add(T("Delete"), TL_KEY_OF)->shortcut = "@tl.borrar";
+    g_tlMenuKey->Add(T("Copy"), TL_KEY_COPY, (int)IconType::copy)->shortcut = "@tl.copy";
+    g_tlMenuKey->Add(T("Paste"), TL_KEY_PASTE, (int)IconType::paste)->shortcut = "@tl.paste";
+    g_tlMenuKey->Add(T("Duplicate"), TL_KEY_DUP)->shortcut = "@tl.duplicate";
+    g_tlMenuKey->Add(T("Delete"), TL_KEY_OF)->shortcut = "@tl.delete";
     if (OpenMenu && OpenMenu != g_tlMenuKey) OpenMenu->Close();
     g_tlMenuKey->Open(mx, my, MenuScreenW, MenuScreenH);
     OpenMenu = g_tlMenuKey;
@@ -4532,9 +4532,9 @@ void Timeline::OpenMenuSelect(int mx, int my){
     if (!g_tlMenuSel){
         // (el boton es un icono: el menu lleva titulo, como el View)
         g_tlMenuSel = new PopupMenu(); g_tlMenuSel->title = T("Select"); g_tlMenuSel->action = TL_menuSelAction;
-        g_tlMenuSel->Add(T("All"), 0)->shortcut = "@tl.seleccionarTodo";
-        g_tlMenuSel->Add(T("None"), 1)->shortcut = "@tl.deseleccionar";
-        g_tlMenuSel->Add(T("Invert"), 2)->shortcut = "@tl.invertir";
+        g_tlMenuSel->Add(T("All"), 0)->shortcut = "@tl.selectAll";
+        g_tlMenuSel->Add(T("None"), 1)->shortcut = "@tl.deselect";
+        g_tlMenuSel->Add(T("Invert"), 2)->shortcut = "@tl.invert";
     }
     if (OpenMenu && OpenMenu != g_tlMenuSel) OpenMenu->Close();
     g_tlMenuSel->Open(mx, my, MenuScreenW, MenuScreenH);
@@ -4577,7 +4577,7 @@ void Timeline::OpenMenuView(int mx, int my){
     // el MODO del editor: Dope Sheet (rombos por fila) o Curves (el grafico tiempo x valor). El activo en verde
     g_tlMenuView->Add(T("Dope Sheet"), TL_VIEW_DOPE, IconType::keyframe)->green = (mode != TL_MODE_CURVES);
     g_tlMenuView->Add(T("Curves"), TL_VIEW_CURVES, IconType::interp_bezier)->green = (mode == TL_MODE_CURVES);
-    { MenuItem* it = g_tlMenuView->Add(T("Frame Selected"), TL_VIEW_FRAMESEL); it->shortcut = "@tl.encuadrar"; it->lineUp = true; }
+    { MenuItem* it = g_tlMenuView->Add(T("Frame Selected"), TL_VIEW_FRAMESEL); it->shortcut = "@tl.focus"; it->lineUp = true; }
     g_tlMenuView->AddCheck(T("Show Panel"), TL_VIEW_PANEL, &g_dopePanelOn);
     if (mode == TL_MODE_CURVES) g_tlMenuView->AddCheck(T("Show Handles"), TL_VIEW_HANDLES, &g_tlShowHandles);
     g_tlMenuView->AddCheck(T("Auto frame"), TL_VIEW_AUTOFRAME, &g_dopeAutoFrame);

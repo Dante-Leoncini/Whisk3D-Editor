@@ -187,7 +187,7 @@ Each option is in [Object Mode](modo-objeto.md). In Edit Mode, this button becom
 | ZBuffer Preview | The depth: light up close, dark far away. |
 | Normal View | The normals, in colors. |
 | Alpha Preview | Transparency, in black and white. |
-| Motion vectors | How far each pixel moved since the previous frame (red = X, green = Y). It's the same image as the `_vectores` pass of the render. |
+| Motion vectors | How far each pixel moved since the previous frame (red = X, green = Y). It's the same image as the `_vectors` pass of the render. |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> switches to the next mode. ![Nokia](../tutoriales/img/icono-nokia.svg) On the N95, <kbd>6</kbd>.
 

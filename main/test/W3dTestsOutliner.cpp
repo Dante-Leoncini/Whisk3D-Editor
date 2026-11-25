@@ -1606,10 +1606,11 @@ static bool CmdOutGrid(std::istringstream& ss, std::string& err) {
     if (o->grid != (v == "1")) { err = "outgrid: no cambio"; return false; }
     return true;
 }
-// outmini <nombre> [si|no] [celda] [colorvivo] [vacia] [centro] [png <ruta>]: la MINIATURA de la celda (se
-// dibuja la cuadricula hasta que este: son perezosas). 'si' = tiene una (la textura GL); 'colorvivo' = sus
-// pixeles no son todos del mismo color; 'vacia' = no se dibujo nada (todo transparente: la camara no ve
-// nada); 'centro' = el pixel del medio esta pintado (lo que la camara mira de frente). Sin 'celda' se miran
+// outmini <nombre> [si|no] [cell] [vividcolor] [empty] [center] [red|green|blue] [png <ruta>]: la MINIATURA de la celda
+// (se dibuja la cuadricula hasta que este: son perezosas). 'si' = tiene una (la textura GL); 'vividcolor' = sus
+// pixeles no son todos del mismo color; 'empty' = no se dibujo nada (todo transparente: la camara no ve
+// nada); 'center' = el pixel del medio esta pintado (lo que la camara mira de frente); red|green|blue = ese canal domina
+// en el medio. Sin 'cell' se miran
 // los pixeles generados en el momento; con 'celda', los DIBUJADOS en la celda (la textura del CACHE, la que
 // ve el usuario: prueba que se rehizo): pintado = distinto del fondo de la celda. 'png' los vuelca
 static bool CmdOutMini(std::istringstream& ss, std::string& err) {
@@ -1620,7 +1621,7 @@ static bool CmdOutMini(std::istringstream& ss, std::string& err) {
     while (ss >> k) {
         if (k == "png") ss >> png;
         else if (k == "cell") inCell = true;
-        else if (k == "vividcolor" || k == "empty" || k == "center") asserts.push_back(k);
+        else if (k == "vividcolor" || k == "empty" || k == "center" || k == "red" || k == "green" || k == "blue") asserts.push_back(k);
         else { err = "outmini: no entiendo '" + k + "'"; return false; }
     }
     std::vector<OutRowRec> rows; o->RowsResources(rows);
@@ -1675,6 +1676,14 @@ static bool CmdOutMini(std::istringstream& ss, std::string& err) {
         if (asserts[a] == "vividcolor" && (opaque == 0 || distinct == 0)) { err = "outmini: la miniatura de '" + n + "' esta vacia o es de un solo color"; return false; }
         if (asserts[a] == "empty" && (!has || opaque > 0)) { err = "outmini: la miniatura de '" + n + "' tiene algo dibujado (o no hay)"; return false; }
         if (asserts[a] == "center" && !center) { err = "outmini: el medio de la miniatura de '" + n + "' esta vacio"; return false; }
+        // red|green|blue: ese canal es el que domina en el medio (de QUE material es la miniatura)
+        if (asserts[a] == "red" || asserts[a] == "green" || asserts[a] == "blue") {
+            const int c = asserts[a] == "red" ? 0 : asserts[a] == "green" ? 1 : 2;
+            const unsigned char* m = center ? &px[middle - 3] : NULL;
+            if (!m || m[c] <= m[(c + 1) % 3] || m[c] <= m[(c + 2) % 3]) {
+                err = "outmini: el medio de la miniatura de '" + n + "' no es " + asserts[a]; return false;
+            }
+        }
     }
     return true;
 }

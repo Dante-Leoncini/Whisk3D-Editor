@@ -2890,6 +2890,9 @@ static bool Mesh_ApplyStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth) 
         if (mod->type == ModifierType::SubdivisionSurface){
             int lvl = (int)((render ? mod->subRenderLevel : mod->subLevel) + 0.5f);
             if (lvl < 0) lvl = 0; if (lvl > 6) lvl = 6; // tope (cada nivel x4 caras)
+            // (en una GPU chica el VISOR subdivide hasta 1: cada nivel son 4 veces los triangulos -una esfera con 3
+            //  eran 25 mil, que en su pantalla ocupan 40 pixeles- y era lo mas lento del cuadro. El render final, entero)
+            if (!render && lvl > 1 && W3dSmallGPU()) lvl = 1;
             for (int L=0; L<lvl; L++) SubdivideLevel(W, mod->subSimple);
             // NO se toca el shading: subdividir no es suavizar. Cada cara hija hereda el flag de su madre
             // (SubdivideLevel), asi que una malla plana sigue facetada y una suave sigue suave.
@@ -3592,6 +3595,7 @@ void Mesh::GenerateMeshModified() {
         }
     }
     genValid=true;
+    if (++genVersion == 0) genVersion = 1;   // (los VBOs de la malla generada se vuelven a subir)
 }
 
 // Aplica UN eje del MIRROR directamente sobre la malla EDITABLE (vertex[]/faces3d + uv/color/normal por VERT):

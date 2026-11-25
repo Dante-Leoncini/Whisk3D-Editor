@@ -1,5 +1,5 @@
-# LOS SHADERS EN LA BIBLIOTECA y ARRASTRARLOS A UNA MALLA (io/RecursosProyecto.cpp: W3D_VISTA_SHADERS,
-# UI/ViewPorts/SoltarRecurso.cpp). Con el proyecto de ejemplos (examples/shaders/Ejemplos_Shaders.w3d):
+# LOS SHADERS EN LA BIBLIOTECA y ARRASTRARLOS A UNA MALLA (io/ProjectResources.cpp: W3D_VIEW_SHADERS,
+# UI/ViewPorts/DropResource.cpp). Con el proyecto de ejemplos (examples/shaders/Ejemplos_Shaders.w3d):
 #  - mientras se arrastra un shader sobre una malla, la parte bajo el puntero se DIBUJA con el (vista previa); al
 #    volver a la biblioteca vuelve a su material, y soltado ahi no cambia nada
 #  - soltado sobre la malla, el material de esa parte pasa a usar el shader (y compila); tambien un .glsl soltado desde

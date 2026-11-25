@@ -1,0 +1,31 @@
+# LOS PANELES GUARDADOS MIENTRAS SE NAVEGA (ui/ViewPorts/ViewPorts.cpp: W3dViewCacheBegin): girar la vista 3D dibuja
+# solo la vista encima de la imagen guardada de los paneles, y la pantalla tiene que quedar IGUAL que dibujando todo
+window 960 540
+tick
+viewcache
+# el primer cuadro de una navegacion se dibuja entero y guarda los paneles
+vpstate orbit 6 2
+tick
+viewcache 0
+# los que siguen salen de la imagen guardada
+vpstate orbit 6 2
+tick
+vpstate orbit -3 4
+tick
+viewcache 2
+buffershot /tmp/w3d_paneles_guardados.png
+# un cuadro sin navegar (algo pudo cambiar en los paneles): todo de nuevo, con la misma vista
+tick
+viewcache 0
+buffershot /tmp/w3d_paneles_enteros.png
+pngdiff /tmp/w3d_paneles_guardados.png /tmp/w3d_paneles_enteros.png 0.2 40
+# mirando por la camara con el candado cerrado, girar mueve el objeto camara (sus valores en Properties): todo de nuevo
+vpcamera on
+vpstate lock si
+tick
+vpstate orbit 6 2
+tick
+vpstate orbit 6 2
+tick
+vpstate camera moved
+viewcache 0

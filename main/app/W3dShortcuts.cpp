@@ -3,6 +3,8 @@
 //  C++03: compila tambien en el telefono.
 // ============================================================================
 #include "W3dShortcuts.h"
+#include "base/w3dlog.h"
+#include <set>
 #include "ViewPorts/W3dInput.h"
 #include "ViewPorts/ViewPorts.h"       // viewPortActive
 #include "ViewPorts/LayoutInput.h"     // EditXformActive
@@ -35,8 +37,8 @@ static const W3dShortcutDef kShortcuts[] = {
     { "global.menuSnap",      W3dATC_GLOBAL,   "Snap menu",                  "Shift+S", NULL, "Shift S" },
     { "global.play",          W3dATC_GLOBAL,   "Play / Pause",               "Space", "Green+Left soft", NULL },
     { "global.menuBar",     W3dATC_GLOBAL,   "Menu bar",                   "M", "Left soft", NULL },
-    { "global.emparentar",    W3dATC_GLOBAL,   "Parent",                     "Ctrl+P", NULL, "Ctrl P" },
-    { "global.desemparentar", W3dATC_GLOBAL,   "Clear Parent",               "Alt+P", NULL, "Alt P" },
+    { "global.parent",    W3dATC_GLOBAL,   "Parent",                     "Ctrl+P", NULL, "Ctrl P" },
+    { "global.clearParent", W3dATC_GLOBAL,   "Clear Parent",               "Alt+P", NULL, "Alt P" },
     { "global.screen",      W3dATC_GLOBAL,   "Fullscreen",                 "F11" },
     { "global.render",        W3dATC_GLOBAL,   "Render Image",               "F12" },
     { "global.renderAnim",    W3dATC_GLOBAL,   "Render Animation",           "Ctrl+F12" },
@@ -92,8 +94,8 @@ static const W3dShortcutDef kShortcuts[] = {
     { "3d.menuUV",            W3dATC_3D_EDIT,  "UV menu",                    "U" },
     // ---- vista 3D: lo que hacia falta y sale del teclado del handler (estaba solo como texto en el menu) ----
     { "3d.inset",             W3dATC_3D_EDIT,  "Inset Faces",                "I" },
-    { "3d.bisel",             W3dATC_3D_EDIT,  "Bevel Edges",                "Ctrl+B" },
-    { "3d.biselVert",         W3dATC_3D_EDIT,  "Bevel Vertices",             "Ctrl+Shift+B" },
+    { "3d.bevel",             W3dATC_3D_EDIT,  "Bevel Edges",                "Ctrl+B" },
+    { "3d.bevelVertices",         W3dATC_3D_EDIT,  "Bevel Vertices",             "Ctrl+Shift+B" },
     { "3d.cut",            W3dATC_3D_OBJ,   "Cut",                        "Ctrl+X" },
     { "3d.copy",            W3dATC_3D_OBJ,   "Copy",                       "Ctrl+C" },
     { "3d.paste",             W3dATC_3D_OBJ,   "Paste",                      "Ctrl+V" },
@@ -110,7 +112,7 @@ static const W3dShortcutDef kShortcuts[] = {
     { "3d.keyRot",            W3dATC_3D_OBJ,   "Insert Rotation Keyframe",   "", NULL, NULL, "obj:532" },
     { "3d.keyEsc",            W3dATC_3D_OBJ,   "Insert Scale Keyframe",      "", NULL, NULL, "obj:533" },
     { "3d.createPrefab",       W3dATC_3D_OBJ,   "Create Prefab",              "", NULL, NULL, "obj:700" },
-    { "3d.desarmarPrefab",    W3dATC_3D_OBJ,   "Unpack Prefab",              "", NULL, NULL, "obj:701" },
+    { "3d.unpackPrefab",    W3dATC_3D_OBJ,   "Unpack Prefab",              "", NULL, NULL, "obj:701" },
     { "3d.smooth",             W3dATC_3D_EDIT,  "Shade Smooth",               "", NULL, NULL, "obj:320" },
     { "3d.plane",             W3dATC_3D_EDIT,  "Shade Flat",                 "", NULL, NULL, "obj:321" },
     { "3d.flipNormals",   W3dATC_3D_EDIT,  "Flip Normals",               "", NULL, NULL, "obj:324" },
@@ -184,9 +186,9 @@ static const W3dShortcutDef kShortcuts[] = {
     { "tl.easing",            W3dATC_TIMELINE, "Easing Type",                "Ctrl+E" },
     { "tl.handle",            W3dATC_TIMELINE, "Handle type",                "V" },
     { "tl.focus",         W3dATC_TIMELINE, "Frame Selected",             "Num.", "0", NULL },
-    { "tl.frameAnt",          W3dATC_TIMELINE, "Previous frame",             "Left" },
+    { "tl.prevFrame",          W3dATC_TIMELINE, "Previous frame",             "Left" },
     { "tl.nextFrame",          W3dATC_TIMELINE, "Next frame",                 "Right" },
-    { "tl.keyAnt",            W3dATC_TIMELINE, "Previous keyframe",          "Down" },
+    { "tl.prevKey",            W3dATC_TIMELINE, "Previous keyframe",          "Down" },
     { "tl.nextKey",            W3dATC_TIMELINE, "Next keyframe",              "Up" },
     { "tl.start",            W3dATC_TIMELINE, "Go to start",                "Home" },
     { "tl.end",               W3dATC_TIMELINE, "Go to end",                  "End" },
@@ -228,8 +230,8 @@ static const W3dShortcutDef kShortcuts[] = {
     { "2d.delete",            W3dATC_2D,       "Delete",                     "X, Delete" },
     { "2d.focus",         W3dATC_2D,       "Frame Selected",             "Num." },
     { "2d.gameView",        W3dATC_2D,       "Game View",                  "Num0" },
-    { "2d.emparentar",        W3dATC_2D,       "Set Parent",                 "", NULL, NULL, "2dobj:40" },
-    { "2d.desemparentar",     W3dATC_2D,       "Clear Parent",               "", NULL, NULL, "2dobj:41" },
+    { "2d.parent",        W3dATC_2D,       "Set Parent",                 "", NULL, NULL, "2dobj:40" },
+    { "2d.clearParent",     W3dATC_2D,       "Clear Parent",               "", NULL, NULL, "2dobj:41" },
     { "2d.zoom1",             W3dATC_2D,       "Zoom 1:1",                   "", NULL, NULL, "2dvista:1" },
     { "2d.zoom2",             W3dATC_2D,       "Zoom 2:1",                   "", NULL, NULL, "2dvista:2" },
 
@@ -375,7 +377,13 @@ std::string W3dShortcutMenuLabel(const std::string& hint) {
 #endif
     }
     const int i = W3dShortcutFind(hint.c_str() + 1);
-    if (i < 0) return std::string();
+    if (i < 0) {
+        // (una clave que no esta en la tabla: el menu queda sin su atajo y nadie se entera. Paso con 83 opciones cuando
+        //  la tabla paso a ingles y los menus seguian pidiendo "@3d.mover": se avisa en el log, una vez por clave)
+        static std::set<std::string> told;
+        if (told.insert(hint).second) w3dLogfW("[atajos] un menu pide '%s', que no esta en la tabla (W3dShortcuts.cpp)", hint.c_str());
+        return std::string();
+    }
 #ifdef W3D_SYMBIAN
     // el teclado BT del N95 tiene su propio mapa fijo (w3dmouse.cpp): lo que se reasigna en PC no lo toca
     if (keyboardBT && kShortcuts[i].bt) return kShortcuts[i].bt;

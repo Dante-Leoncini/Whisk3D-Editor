@@ -62,8 +62,8 @@ static void ProgressPollSymbian() {
 static void W3dProgressSwap() { w3dEngine::DrawPending(); if (gSwapDisplay) eglSwapBuffers(gSwapDisplay, gSwapSurface); }
 
 // ---- DIBUJAR FUERA DE LA PANTALLA (render/RenderOptions.h): un PBUFFER del tamanio mas grande que se haya pedido. En el
-//      N95 lo dibujado en la ventana se veia antes del swap: los colores planos del pase de las sombras y las franjas del
-//      render a archivo parpadeaban en pantalla. Anidable: solo el primero cambia de superficie y vuelve a la que habia ----
+//      N95 lo dibujado en la ventana se veia antes del swap: las franjas del render a archivo parpadeaban en pantalla.
+//      Anidable: solo el primero cambia de superficie y vuelve a la que habia ----
 static EGLConfig  gOutsideCfg = 0;
 static EGLContext gOutsideCtx = EGL_NO_CONTEXT;
 static EGLSurface gOutsidePb = EGL_NO_SURFACE, gOutsideReturn = EGL_NO_SURFACE;
@@ -351,7 +351,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
         withPb[1] = EGL_WINDOW_BIT | EGL_PBUFFER_BIT;
         if ( eglChooseConfig( iEglDisplay, withPb, configList, configSize, &numOfConfigs ) == EGL_FALSE ) numOfConfigs = 0;
         gOutsideServes = (numOfConfigs > 0) ? ETrue : EFalse;
-        w3dLogf( "EGL: config para ventana y pbuffer: %s", gOutsideServes ? "SI" : "no (lo de las sombras se dibuja en la ventana)" );
+        w3dLogf( "EGL: config para ventana y pbuffer: %s", gOutsideServes ? "SI" : "no (las franjas del render se dibujan en la ventana)" );
     }
     if ( numOfConfigs == 0 && eglChooseConfig( iEglDisplay, attrib_list, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
         _LIT( KChooseConfigFailed, "eglChooseConfig failed" );
@@ -431,7 +431,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // BARRA DE PROGRESO: cablear el swap de Symbian (faltaba) -> la barra de export/import ya puede dibujarse.
     gSwapDisplay = iEglDisplay;
     gSwapSurface = iEglSurface;
-    // lo que se dibuja para leerlo (las sombras, las franjas del render): en un pbuffer, si la config sirve para eso
+    // lo que se dibuja para leerlo (las franjas del render): en un pbuffer, si la config sirve para eso
     gOutsideCfg = Config; gOutsideCtx = iEglContext;
     if (gOutsideServes) { W3dOutsideScreenBegin = OutsideBegin; W3dOutsideScreenFinish = OutsideFinish; }
     LayoutSwapBuffers = W3dProgressSwap;
@@ -868,8 +868,8 @@ static const char* W3dGameKeyName(TInt sc){
 		case EStdKeyRightArrow: return "right";
 		case EStdKeyDevice3:    // centro del D-pad (select)
 		case EStdKeyEnter:      return "enter";
-		case 164:               return "softizq"; // softkey IZQUIERDO: reservado para juegos (solo dentro de un viewport de juego)
-		case 165:               return "softder"; // softkey DERECHO: idem (en pausa sigue alternando el cursor virtual)
+		case 164:               return "softleft"; // softkey IZQUIERDO: reservado para juegos (solo dentro de un viewport de juego)
+		case 165:               return "softright"; // softkey DERECHO: idem (en pausa sigue alternando el cursor virtual)
 		case '1':               return "1";       // digitos del keypad: van al juego durante el play (key("1").."key("6"))
 		case '2':               return "2";
 		case '3':               return "3";

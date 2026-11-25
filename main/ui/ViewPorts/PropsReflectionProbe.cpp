@@ -22,7 +22,7 @@ extern void PropsLayoutDirty();
 void PropsOpenMenuUnderButton(PopupMenu* menu, Button* button);   // (Properties.cpp: el estandar de los desplegables)
 
 static ReflectionProbe* SrActive() {
-    return (ActiveObj && ActiveObj->getType() == ObjectType::sondareflejo) ? (ReflectionProbe*)ActiveObj : NULL;
+    return (ActiveObj && ActiveObj->getType() == ObjectType::reflectionProbe) ? (ReflectionProbe*)ActiveObj : NULL;
 }
 // Z-ARRIBA, como la tarjeta Transformar: el campo "Y" es la z interna y el "Z" la y
 static const int kAxis[3] = { 0, 2, 1 };

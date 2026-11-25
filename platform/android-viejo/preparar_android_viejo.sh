@@ -1,7 +1,7 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------------------------------------------
 #  preparar_android_viejo.sh -- lo que hace falta para compilar Whisk3D para Android 2.3, fuera del proyecto: en
-#  ~/android-viejo (o en W3D_ANDROID_VIEJO). Sin root. Si algo ya esta, lo saltea.
+#  ~/android-viejo (o en W3D_ANDROID_OLD). Sin root. Si algo ya esta, lo saltea.
 #
 #  1. el NDK r15c: el ultimo que compila para armeabi (ARMv5/v6) y para android-9
 #  2. las fuentes de SDL 2.0.7: el ultimo SDL que anda en Android 2.3 (desde 2.0.8 piden la API 14)
@@ -11,7 +11,7 @@
 #  ANDROID_HOME, un JDK (javac y keytool) e ImageMagick (convert). Para instalar en el telefono, adb.
 # ---------------------------------------------------------------------------------------------------------------
 set -e
-VIEJO="${W3D_ANDROID_VIEJO:-$HOME/android-viejo}"
+VIEJO="${W3D_ANDROID_OLD:-$HOME/android-viejo}"
 mkdir -p "$VIEJO/fuentes" "$VIEJO/host/lib"
 cd "$VIEJO"
 

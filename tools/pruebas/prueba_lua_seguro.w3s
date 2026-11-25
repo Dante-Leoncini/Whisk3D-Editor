@@ -1,0 +1,11 @@
+# Los scripts de un proyecto no tocan la maquina: sin loadfile/dofile (leian cualquier archivo por su ruta), sin
+# string.dump y sin cargar BYTECODE (load con modo "b", o un .lua precompilado): la maquina virtual de Lua no lo
+# verifica y uno armado a mano ejecuta codigo nativo. El texto sigue cargando. Y leer las propiedades de un script
+# (lo hace la tarjeta del script al elegir el objeto) corta un cuerpo que no termina en vez de colgar el editor.
+luaprops lua_seguro.lua noLoadfile 1
+luaprops lua_seguro.lua noDofile 1
+luaprops lua_seguro.lua noDump 1
+luaprops lua_seguro.lua noBytecode 1
+luaprops lua_seguro.lua textLoads 5
+luaprops lua_seguro.lua noIo 1
+luaprops lua_bucle.lua error

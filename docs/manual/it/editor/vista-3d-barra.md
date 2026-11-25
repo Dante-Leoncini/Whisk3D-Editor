@@ -187,7 +187,7 @@ Ogni opzione si trova in [Modalità Oggetto](modo-objeto.md). In Modalità Modif
 | Anteprima ZBuffer | La profondità: chiaro vicino, scuro lontano. |
 | Vista normale | Le normali, a colori. |
 | Anteprima alfa | La trasparenza, in bianco e nero. |
-| Vettori di movimento | Quanto si è mosso ogni pixel dal fotogramma precedente (rosso = X, verde = Y). È la stessa immagine della passata `_vectores` del render. |
+| Vettori di movimento | Quanto si è mosso ogni pixel dal fotogramma precedente (rosso = X, verde = Y). È la stessa immagine della passata `_vectors` del render. |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> passa alla modalità successiva. ![Nokia](../tutoriales/img/icono-nokia.svg) Sull'N95, il <kbd>6</kbd>.
 

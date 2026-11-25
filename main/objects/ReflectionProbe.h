@@ -65,7 +65,7 @@ public:
 
     ReflectionProbe(Object* parent = NULL, Vector3 pos = Vector3(0, 0, 0));
     ~ReflectionProbe();
-    ObjectType getType() W3D_OVERRIDE { return ObjectType::sondareflejo; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::reflectionProbe; }
     void RenderObject() W3D_OVERRIDE;
     bool DrawsSomething() W3D_OVERRIDE { return true; }
 

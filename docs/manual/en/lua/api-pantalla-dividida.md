@@ -2,7 +2,7 @@
 
 | Function | What it does |
 |---|---|
-| `setViews(n [, "lado" \| "up"])` | `2` splits the screen in two (side by side or one above the other); `1` goes back to the full screen. The 2D interface (the HUD) is drawn once, on top of both. |
+| `setViews(n [, "side" \| "up"])` | `2` splits the screen in two (side by side or one above the other); `1` goes back to the full screen. The 2D interface (the HUD) is drawn once, on top of both. |
 | `setCameraView(i, camera)` | The camera of view `i` (1 or 2). If not set, the active one. |
 | `view() → i, n` | The view being drawn (1 or 2; 0 outside drawing) and how many there are. |
 | `beforeView(i)` | (Your script defines it.) The engine calls it before drawing each view, in the script that called `setViews`. That's where you turn whatever faces the camera (billboards, particles) toward THAT camera, or hide what that view shouldn't see. Don't move anything that advances over time: that goes in `update`. |

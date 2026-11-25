@@ -62,9 +62,11 @@ struct JVal {
     bool   getB(const char* k, bool d) const { const JVal* v = find(k); return (v && v->t == BOOL) ? v->b : d; }
 };
 
+// (depth: no mas de 128 niveles de [ y {: unos pocos KB de "[[[[..." agotaban la pila -antes en la PSP y el N95-.
+//  Cada valor se arma EN SU LUGAR del padre: antes se armaba aparte y se copiaba entero, subarbol por subarbol)
 struct JParser {
-    const char* p; const char* end; bool ok;
-    JParser(const char* s, size_t n) : p(s), end(s + n), ok(true) {}
+    const char* p; const char* end; bool ok; int depth;
+    JParser(const char* s, size_t n) : p(s), end(s + n), ok(true), depth(0) {}
     void skipWs() { while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++; }
     bool parse(JVal& out) { skipWs(); return value(out); }
     bool value(JVal& v) {
@@ -78,30 +80,32 @@ struct JParser {
         return number(v);
     }
     bool object(JVal& v) {
+        if (++depth > 128) { ok = false; return false; }
         v.t = JVal::OBJ; p++; // '{'
-        skipWs(); if (p < end && *p == '}') { p++; return true; }
+        skipWs(); if (p < end && *p == '}') { p++; depth--; return true; }
         while (p < end) {
             skipWs(); if (p >= end || *p != '"') { ok = false; return false; }
             std::string key; if (!string(key)) return false;
             skipWs(); if (p >= end || *p != ':') { ok = false; return false; } p++;
-            JVal val; if (!value(val)) return false;
-            v.members.push_back(std::make_pair(key, val));
+            v.members.push_back(std::make_pair(key, JVal()));
+            if (!value(v.members.back().second)) return false;
             skipWs(); if (p >= end) { ok = false; return false; }
             if (*p == ',') { p++; continue; }
-            if (*p == '}') { p++; return true; }
+            if (*p == '}') { p++; depth--; return true; }
             ok = false; return false;
         }
         ok = false; return false;
     }
     bool array(JVal& v) {
+        if (++depth > 128) { ok = false; return false; }
         v.t = JVal::ARR; p++; // '['
-        skipWs(); if (p < end && *p == ']') { p++; return true; }
+        skipWs(); if (p < end && *p == ']') { p++; depth--; return true; }
         while (p < end) {
-            JVal el; if (!value(el)) return false;
-            v.arr.push_back(el);
+            v.arr.push_back(JVal());
+            if (!value(v.arr.back())) return false;
             skipWs(); if (p >= end) { ok = false; return false; }
             if (*p == ',') { p++; continue; }
-            if (*p == ']') { p++; return true; }
+            if (*p == ']') { p++; depth--; return true; }
             ok = false; return false;
         }
         ok = false; return false;
@@ -245,6 +249,15 @@ struct GltfDoc {
         return &buffers[buf][off];
     }
 
+    // EL ACCESSOR ENTRA EN SU VISTA: 'count' elementos de 'elem' bytes, cada 'stride', desde 'accOff'. Los numeros
+    // vienen del archivo: un byteOffset o byteStride negativo pasado a size_t, o un count grande (en 32 bits), hacia
+    // dar la vuelta a la cuenta "accOff + (count - 1) * stride + elem <= len" y se leia antes o despues del buffer
+    static bool Fits(int accOff, int count, size_t stride, size_t elem, size_t len) {
+        if (accOff < 0 || count < 0 || stride == 0 || stride > 255 || elem > len) return false;
+        if (count == 0) return true;
+        if ((size_t)accOff > len - elem) return false;
+        return (size_t)(count - 1) <= (len - elem - (size_t)accOff) / stride;
+    }
     static size_t compSize(int ct) { switch (ct) { case 5120: case 5121: return 1; case 5122: case 5123: return 2; case 5125: case 5126: return 4; } return 0; }
     static int    numComp(const std::string& t) { if (t == "SCALAR") return 1; if (t == "VEC2") return 2; if (t == "VEC3") return 3; if (t == "VEC4") return 4; if (t == "MAT2") return 4; if (t == "MAT3") return 9; if (t == "MAT4") return 16; return 1; }
 
@@ -258,14 +271,13 @@ struct GltfDoc {
         std::string type = a.getS("type", "SCALAR");
         ncomp = numComp(type);
         bool norm = false; { const JVal* n = a.find("normalized"); if (n && n->t == JVal::BOOL) norm = n->b; }
-        size_t accOff = (size_t)a.getI("byteOffset", 0);
+        const int accOffI = a.getI("byteOffset", 0);
         size_t stride = 0, len = 0; const unsigned char* base = viewPtr(bv, stride, len); if (!base) return false;
         size_t cs = compSize(ct); if (cs == 0) return false;
         if (stride == 0) stride = cs * ncomp;
-        if (count < 0) return false;
-        // el accessor tiene que ENTRAR en su bufferView: sin esta cota, un .bin
-        // truncado (o un count corrupto) se leia fuera del buffer
-        if (count > 0 && accOff + (size_t)(count - 1) * stride + (size_t)ncomp * cs > len) return false;
+        // (el accessor tiene que ENTRAR en su bufferView: un .bin truncado o un count corrupto se leia afuera)
+        if (!Fits(accOffI, count, stride, (size_t)ncomp * cs, len)) return false;
+        const size_t accOff = (size_t)accOffI;
         out.resize((size_t)count * ncomp);
         for (int i = 0; i < count; i++) {
             const unsigned char* e = base + accOff + (size_t)i * stride;
@@ -291,11 +303,11 @@ struct GltfDoc {
         int bv = a.getI("bufferView", -1); if (bv < 0) return false;
         int ct = a.getI("componentType", 5125);
         int count = a.getI("count", 0);
-        size_t accOff = (size_t)a.getI("byteOffset", 0);
+        const int accOffI = a.getI("byteOffset", 0);
         size_t stride = 0, len = 0; const unsigned char* base = viewPtr(bv, stride, len); if (!base) return false;
         size_t cs = compSize(ct); if (cs == 0) return false; if (stride == 0) stride = cs;
-        if (count < 0) return false;
-        if (count > 0 && accOff + (size_t)(count - 1) * stride + cs > len) return false; // (misma cota que readFloats)
+        if (!Fits(accOffI, count, stride, cs, len)) return false;   // (misma cota que readFloats)
+        const size_t accOff = (size_t)accOffI;
         out.resize(count);
         for (int i = 0; i < count; i++) { const unsigned char* pc = base + accOff + (size_t)i * stride; uint32_t v = 0;
             if (ct == 5125) memcpy(&v, pc, 4); else if (ct == 5123) { uint16_t s; memcpy(&s, pc, 2); v = s; } else v = *pc;
@@ -400,7 +412,7 @@ bool ImportGLTF(const std::string& filepath) {
         size_t pos = 12;
         while (pos + 8 <= file.size()) {
             uint32_t clen, ctype; memcpy(&clen, &file[pos], 4); memcpy(&ctype, &file[pos + 4], 4); pos += 8;
-            if (pos + clen > file.size()) break;
+            if (clen > file.size() - pos) break;   // (restando: pos + clen da la vuelta en 32 bits)
             if (ctype == 0x4E4F534A) jsonStr.assign((const char*)&file[pos], clen);           // "JSON"
             else if (ctype == 0x004E4942) glbBin.assign(file.begin() + pos, file.begin() + pos + clen); // "BIN\0"
             pos += clen; if (clen % 4) pos += 4 - (clen % 4);
@@ -449,12 +461,26 @@ bool ImportGLTF(const std::string& filepath) {
         const JVal* kids = n.find("children");
         if (kids && kids->t == JVal::ARR) for (size_t c = 0; c < kids->size(); c++) { int ci = kids->arr[c].intOr(-1); if (ci >= 0 && ci < nNodes) parentNode[ci] = i; }
     }
-    // GLOBAL por FK (los nodos ya vienen en orden util, pero resolvemos por cadena de padres por si acaso)
+    // (un archivo con un CICLO en los children -A hijo de B y B de A- colgaba las vueltas por la cadena de padres: se
+    //  corta el enlace que lo cierra)
+    for (int i = 0; i < nNodes; i++) {
+        int p = parentNode[i], steps = 0;
+        while (p >= 0 && p != i && steps++ < nNodes) p = parentNode[p];
+        if (p == i || steps > nNodes) parentNode[i] = -1;
+    }
+    // GLOBAL por FK, sin recursion (una cadena de miles de nodos agotaba la pila de la PSP): cada nodo junta su cadena de
+    // padres hasta uno ya resuelto y la resuelve de arriba para abajo
     { std::vector<char> done(nNodes, 0);
-      struct L { static Matrix4 rec(int i, std::vector<Matrix4>& g, const std::vector<Matrix4>& l, const std::vector<int>& pair, std::vector<char>& d) {
-          if (d[i]) return g[i]; d[i] = 1;
-          g[i] = (pair[i] >= 0) ? rec(pair[i], g, l, pair, d) * l[i] : l[i]; return g[i]; } };
-      for (int i = 0; i < nNodes; i++) L::rec(i, globalM, localM, parentNode, done);
+      std::vector<int> chain;
+      for (int i = 0; i < nNodes; i++) {
+          chain.clear();
+          for (int k = i; k >= 0 && !done[k]; k = parentNode[k]) chain.push_back(k);
+          for (size_t c = chain.size(); c-- > 0;) {
+              const int k = chain[c], pa = parentNode[k];
+              globalM[k] = (pa >= 0) ? globalM[pa] * localM[k] : localM[k];
+              done[k] = 1;
+          }
+      }
     }
 
     Object* collection = CollectionActive;
@@ -470,7 +496,11 @@ bool ImportGLTF(const std::string& filepath) {
         int nJoints = (joints && joints->t == JVal::ARR) ? (int)joints->size() : 0;
         if (nJoints > 0) {
             std::vector<int> jointNode(nJoints);
-            for (int j = 0; j < nJoints; j++) { jointNode[j] = joints->arr[j].intOr(-1); jointOfNode[jointNode[j]] = j; }
+            for (int j = 0; j < nJoints; j++) {
+                int nd = joints->arr[j].intOr(-1);
+                if (nd >= nNodes) nd = -1;   // (un nodo que no existe: parentNode[nd] / globalM[nd] leian afuera)
+                jointNode[j] = nd; jointOfNode[nd] = j;
+            }
             std::vector<Matrix4> ibm; { int ibmAcc = sk.getI("inverseBindMatrices", -1); if (ibmAcc >= 0) doc.readMats(ibmAcc, ibm); }
 
             // HUESOS QUE NO PESAN: un nodo ANCESTRO de algun joint que tiene canales de animacion tambien es hueso
@@ -804,7 +834,8 @@ bool ImportGLTF(const std::string& filepath) {
 
             // pesos por control-point (skinned): joint LOCAL de la primitiva -> hueso global
             const JVal* jointsArr = (skins && skins->size() > 0) ? skins->arr[0].find("joints") : NULL;
-            if (skinned && jnc >= 4 && wnc >= 4 && jointsArr) {
+            // (jc / wc >= pc: un accessor de pesos o de joints mas corto que las posiciones se leia afuera)
+            if (skinned && jnc >= 4 && wnc >= 4 && jc >= pc && wc >= pc && jointsArr) {
                 for (int i = 0; i < pc; i++) for (int e = 0; e < 4; e++) {
                     float w = WGT[(size_t)i*wnc+e]; if (w <= 0.0001f) continue;
                     int localJ = (int)(JNT[(size_t)i*jnc+e] + 0.5f);

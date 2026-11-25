@@ -21,10 +21,8 @@
 #include "io/Libraries.h"
 #include "script/SimGame.h"   // el CACHE de la simulacion: lo que se renderiza de un juego
 #include "w3dlog.h"
-#ifndef W3D_SYMBIAN
-#include <filesystem>   // listar los skins de res/Skins (la tarjeta Ajustes)
-#endif
 #include "W3dLang.h"
+#include "ui/panels/Panels.h"   // las tarjetas declaradas (la Niebla, ...)
 #include "objects/Text2D.h"   // panel del elemento de texto del Editor 2D
 #include "objects/Image2D.h"  // panel del elemento de imagen
 #include "objects/Rect2D.h"   // panel del elemento rectangulo
@@ -128,7 +126,7 @@ static void ActionLightBackground() {
 #include <cstdio>
 #include <cstdlib> // atof: el valor configurado (string) -> buffer del PropFloat (tarjetas de script)
 #include <ctime>   // time(): semilla del UID random del juego
-#include <string.h> // memcpy (en Linux llegaba por <filesystem>, que el build de Symbian no incluye)
+#include <string.h> // memcpy
 #include <string>
 #include <set> // centro UV de la seleccion (posiciones UV unicas, tarjeta "Transform UV")
 #include <map> // los videos del render (un ffmpeg por pase)
@@ -275,6 +273,8 @@ static Material* ActiveMaterialUI(){
     Material** l = LayerMatPlace(m, idx, LayerPickedMat(m, idx));   // (el de la CAPA elegida)
     return l ? *l : m->materialsGroup[idx].material;
 }
+// (el harness lee y escribe el MISMO material que edita la tarjeta)
+Material* PropsEditedMaterial() { return ActiveMaterialUI(); }
 static void SelInListMeshPart(int idx){
     if (!PropsActive) return;
     PropListMeshParts* list = static_cast<PropListMeshParts*>(PropsActive->propMeshParts->properties[0]);
@@ -1092,6 +1092,9 @@ static void OpenMenuUnderButton(PopupMenu* menu, Button* button){
                 button->sy + button->height - GlobalScale, MenuScreenW, MenuScreenH);
     OpenMenu = menu;
 }
+
+// (el mismo, para las tarjetas declaradas: ui/panels/Panels.cpp)
+void PropsOpenMenuUnder(PopupMenu* menu, Button* button) { OpenMenuUnderButton(menu, button); }
 
 // ============================================================================
 //  TARJETA "3D Mesh": LA MALLA COMO RECURSO (objects/MeshResource.h, io/ProjectMeshes.h).
@@ -2095,13 +2098,9 @@ static void ActionMenuBackend(){
 // queda al menos el que esta puesto: el dropdown nunca sale vacio.
 static void W3dListSkins(std::vector<std::string>& out){
     out.clear();
-#ifndef W3D_SYMBIAN
-    try {
-        const std::string dir = w3dFileSystem::GetResDir() + "/Skins";
-        for (std::filesystem::directory_iterator it(dir), end; it != end; ++it)
-            if (it->is_directory()) out.push_back(it->path().filename().string());
-    } catch (...) { }
-#endif
+    std::vector<w3dFileSystem::DirEntry> dir;
+    if (w3dFileSystem::ListDir(w3dFileSystem::GetResDir() + "/Skins", dir))
+        for (size_t i = 0; i < dir.size(); i++) if (dir[i].isDir) out.push_back(dir[i].name);
     if (out.empty()) out.push_back(cfg.SkinName);
 }
 
@@ -2220,12 +2219,6 @@ static void SyncRepoField(PropText* pt){
 }
 
 static void BuildMenuMaterials();
-static void ActionMenuMaterials(){
-    if (!PropsActive) return;
-    if (!ActiveObj || ActiveObj->getType() != ObjectType::mesh) return;
-    BuildMenuMaterials();
-    OpenMenuUnderButton(MenuMaterials, PropsActive->propBtnNewMaterial->button);
-}
 // la FLECHA de una capa de la lista: el menu de materiales, ahi (lo que se elija va a esa capa)
 static int gMenuMatX = 0, gMenuMatY = 0;
 static void ActionChangeMaterialLayer(){
@@ -8753,41 +8746,6 @@ static void ActionMenuRcCamera(){
     OpenMenuUnderButton(MenuRcCamera, PropsActive->propRcCamera->button);
 }
 
-// LA FORMA del Vacio (como se dibuja): cruz, cuadrado, circulo o esfera. En el orden de EmptyCross.. (Empty.h)
-static PopupMenu* EmptyMenuShape = NULL;
-static const char* kEmptyShapes[EmptyShapes] = { "Cross", "Square", "Circle", "Sphere", "Cube" };
-// el icono de cada forma (el mismo orden): la cruz, el cuadrado (plano), el circulo, la esfera y el cubo
-static int EmptyShapeIcon(int f) {
-    static const int kIc[EmptyShapes] = { (int)IconType::cross, (int)IconType::plane, (int)IconType::circle,
-                                          (int)IconType::sphere, (int)IconType::object };
-    return kIc[(f >= 0 && f < EmptyShapes) ? f : EmptyCircle];
-}
-// en el menu, de la mas simple a la mas completa (los ids son los de Empty.h)
-static const int kEmptyOrderMenu[EmptyShapes] = { EmptyCross, EmptySquare, EmptyCube, EmptyCircle, EmptySphere };
-static const char* EmptyShapeText(int f) { return T(kEmptyShapes[(f >= 0 && f < EmptyShapes) ? f : EmptyCircle]); }
-static void EmptyActionPickedShape(int id){
-    if (id < 0 || id >= EmptyShapes || !ActiveObj || ActiveObj->getType() != ObjectType::empty) return;
-    static_cast<Empty*>(ActiveObj)->shape = id;
-    if (PropsActive && PropsActive->propEmptyShape) {
-        PropsActive->propEmptyShape->button->text = EmptyShapeText(id);
-        PropsActive->propEmptyShape->button->icon = EmptyShapeIcon(id);
-    }
-    extern void W3dTouchedChanges(); W3dTouchedChanges();
-    g_redraw = true;
-}
-static void ActionEmptyMenuShape(){
-    if (!PropsActive || !PropsActive->propEmptyShape) return;
-    if (!ActiveObj || ActiveObj->getType() != ObjectType::empty) return;
-    if (!EmptyMenuShape){ EmptyMenuShape = new PopupMenu(); EmptyMenuShape->action = EmptyActionPickedShape; }
-    EmptyMenuShape->Clear();
-    const int current = static_cast<Empty*>(ActiveObj)->shape;
-    for (int k = 0; k < EmptyShapes; k++) {
-        const int i = kEmptyOrderMenu[k];
-        EmptyMenuShape->Add(T(kEmptyShapes[i]), i, EmptyShapeIcon(i))->green = (i == current);
-    }
-    OpenMenuUnderButton(EmptyMenuShape, PropsActive->propEmptyShape->button);
-}
-
 // EL ARCHIVO del Sonido: los sonidos del proyecto (soltar un .wav en la biblioteca o en la vista 3D los agrega)
 static PopupMenu* MenuSoundFile = NULL;
 static std::vector<std::string> gSoundFiles;
@@ -8846,24 +8804,6 @@ static void ActionPositionalSound(){
     if (PropsActive) { PropsActive->target = NULL; PropsActive->RefreshTargetProperties(); }
     PropertiesLayoutDirty = true;
     g_redraw = true;
-}
-
-// DROPDOWN del MODO de la Niebla (Lineal / Exp / Exp2)
-static PopupMenu* MenuFogMode = NULL;
-static const char* FogModeLabel(int m){ return m == 2 ? "Exp2" : (m == 1 ? "Exp" : T("Linear")); }
-static void ActionFogPickedMode(int id){
-    if (!ActiveObj || ActiveObj->getType() != ObjectType::fog) return;
-    static_cast<Fog*>(ActiveObj)->mode = id;
-    g_redraw = true;
-}
-static void ActionMenuFogMode(){
-    if (!PropsActive || !PropsActive->propFogMode) return;
-    if (!MenuFogMode){ MenuFogMode = new PopupMenu(); MenuFogMode->action = ActionFogPickedMode; }
-    MenuFogMode->Clear();
-    MenuFogMode->Add(T("Linear"), 0, IconType::fog);
-    MenuFogMode->Add("Exp",       1, IconType::fog);
-    MenuFogMode->Add("Exp2",      2, IconType::fog);
-    OpenMenuUnderButton(MenuFogMode, PropsActive->propFogMode->button);
 }
 
 // nombre visible del metodo para el texto del boton
@@ -9733,7 +9673,7 @@ void Properties::BuildGroups(){
 
     // ===== Tarjeta APARTE "Material". Orden: New Material + Rename Material (las opciones
     // del material), LINEA separadora, y abajo la textura + sus opciones. Los props se guardan en arrays
-    // (propMatChk/propMatCol/propMatShin) -> Rebind los setea por nombre, NO por indice (reordenar = libre).
+    // (propMatChk) -> Rebind los setea por nombre, NO por indice (reordenar = libre).
     // ===== Tarjeta "Resource" (pestania "Malla 3D", la 3): el recurso elegido en la BIBLIOTECA del outliner.
     // Va ANTES de la tarjeta Material: con un material elegido, la de abajo es su tarjeta Material.
     propResource = new GroupPropertie(T("Resource"));
@@ -9837,9 +9777,6 @@ void Properties::BuildGroups(){
     propLayerMatChange->button->dropdown = true;
     propLayerMatChange->action = ActionButtonChangeMaterial;
     propMaterial->properties.push_back(propLayerMatChange);
-    propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);   // (el selector viejo: solo en Symbian, sin mouse)
-    propBtnNewMaterial->button->dropdown = true;
-    propBtnNewMaterial->action = ActionMenuMaterials;
     propBtnRenameMat = new PropButton(T("Rename Material"), -1); // ANTES de la textura, SIN icono
     propBtnRenameMat->action = ActionRenameMaterial; // se vuelve input al apretarlo; oculto si es el default
 #ifdef W3D_SYMBIAN
@@ -9916,13 +9853,6 @@ void Properties::BuildGroups(){
     // Se CONSTRUYE todo primero (el bind es por member, no importa el orden de construccion); el PUSH define el
     // orden VISUAL, que se reorganizo: Lighting arriba de todo, Vertex Color sobre Base Color, y los
     // "pro" (Culling / Depth Test) abajo de todo.
-    const char* namesCol[3] = { "Base Color","Specular","Emission" };
-    for (int i = 0; i < 3; i++) propMatCol[i] = new PropColor(T(namesCol[i]));
-    propMatShin = new PropFloat(T("Shininess"));
-    propMatShin->SetRange(0.0f, 255.0f);
-    propMatShin->fineStep = 1.0f; propMatShin->thickStep = 10.0f; propMatShin->dragStep = 1.0f;
-    propMatShin->integer = true;      // es un entero (tiene que ser entero), no float
-    propMatShin->accelerates = true;  // izq/der arranca en 1 y acelera (empieza lento y despues acelera)
     // [8]="Reflection"; [9] SIN uso (lo reemplaza el dropdown de modo -> oculto en Rebind); [10]="Normal Mapping".
     const char* namesChk[11] = { "Filtering","Transparent","Vertex Color","Lighting","Repeat","Culling","Depth Test","Smooth Shading","Reflection","(reflect mode)","Normal Mapping" };
     for (int i = 0; i < 11; i++) {
@@ -10003,14 +9933,6 @@ void Properties::BuildGroups(){
     propBtnShaderComp->action = ActionShaderCompile;
     propMatShaderMsg = new PropLabel("", true /*wrap*/);
     propMaterial->properties.push_back(propMatChk[2]);  // Vertex Color (sobre Base Color)
-    // TRAZADO DE RAYOS: rugosidad (0 = espejo .. 1 = mate) y metalico (0 = difuso .. 1 = metal). Solo se ven con el
-    // tilde "Ray Tracing" de la pestania Render; el render GL no los usa.
-    propMatRough = new PropFloat(T("Roughness")); propMatRough->SetRange(0.0f, 1.0f);
-    propMatRough->fineStep = 0.05f; propMatRough->thickStep = 0.1f; propMatRough->dragStep = 0.01f;
-    propMatRough->onChange = ActionRTValues;   // (ya no va en la lista: es el numero del "Roughness Map")
-    propMatMetal = new PropFloat(T("Metallic")); propMatMetal->SetRange(0.0f, 1.0f);
-    propMatMetal->fineStep = 0.05f; propMatMetal->thickStep = 0.1f; propMatMetal->dragStep = 0.01f;
-    propMatMetal->onChange = ActionRTValues;   // (ya no va en la lista: es el numero del "Metallic Map")
     propMaterial->properties.push_back(propMatChk[0]);  // Filtering
     propMaterial->properties.push_back(propMatChk[4]);  // Repeat
     // (el NORMAL MAP va debajo del color base: ver arriba)
@@ -10026,6 +9948,7 @@ void Properties::BuildGroups(){
     propMaterial->properties.push_back(propMatChk[5]);  // Culling
     propMaterial->properties.push_back(propBtnDepth); // Depth Test/Write (desplegable)
     propMaterial->properties.push_back(propMatBias);  // Depth Bias
+    propMaterial->properties.push_back(propMatBiasM); // Depth Bias (m) (se armaba y se enlazaba, pero nunca entro a la tarjeta)
     // (el sesgo EN METROS ya no esta en la tarjeta: un solo sesgo, el del z-buffer. Un proyecto que lo traia lo sigue
     //  aplicando: Material::bias_meters se lee y se guarda igual)
     propMaterial->properties.push_back(propMatOrder);       // el pase (opacos / calcomanias / transparentes)
@@ -10309,47 +10232,9 @@ void Properties::BuildGroups(){
     GroupProperties.push_back(propSound);
 
     // VACIO: como se dibuja. Es solo la vista: no cambia el objeto, ni su transformacion, ni a sus hijos
-    propEmpty = new GroupPropertie(T("Empty"));
-    propEmptyShape = new PropButton(T("Shape"), IconType::cross);
-    propEmptyShape->withLabel = true;
-    propEmptyShape->button->dropdown = true;
-    propEmptyShape->action = ActionEmptyMenuShape;
-    propEmpty->properties.push_back(propEmptyShape);
-    propEmptySize = new PropFloat(T("Size"), "m"); propEmptySize->SetRange(0.001f, 100000.0f);
-    propEmptySize->fineStep = 0.1f; propEmptySize->thickStep = 1.0f; propEmptySize->dragStep = 0.05f;
-    propEmpty->properties.push_back(propEmptySize);
-    propEmptyRotX = new PropFloat(T("Rotation X"), "\xc2\xb0"); propEmpty->properties.push_back(propEmptyRotX);
-    propEmptyRotY = new PropFloat("Y", "\xc2\xb0");             propEmpty->properties.push_back(propEmptyRotY);
-    propEmptyRotZ = new PropFloat("Z", "\xc2\xb0");             propEmpty->properties.push_back(propEmptyRotZ);
-    GroupProperties.push_back(propEmpty);
 
-    propFog = new GroupPropertie(T("Fog"));
-    propFogActive = new PropBool(T("Active"));
-    propFog->properties.push_back(propFogActive);
-    propFogMode = new PropButton(T("Linear"), IconType::fog);
-    propFogMode->button->dropdown = true;
-    propFogMode->action = ActionMenuFogMode;
-    propFog->properties.push_back(propFogMode);
-    propFogStart = new PropFloat(T("Start"), "m");
-    propFogStart->SetRange(0.0f, 100000.0f);
-    propFog->properties.push_back(propFogStart);
-    propFogEnd = new PropFloat(T("End"), "m");
-    propFogEnd->SetRange(0.0f, 100000.0f);
-    propFog->properties.push_back(propFogEnd);
-    propFogDens = new PropFloat(T("Density"));
-    propFogDens->SetRange(0.0f, 10.0f);
-    propFog->properties.push_back(propFogDens);
-    propFogColor = new PropColor(T("Color"));
-    propFog->properties.push_back(propFogColor);
-    propFogBackground = new PropBool(T("Paint background"));   // el fondo del render toma el color de la niebla
-    propFog->properties.push_back(propFogBackground);
-    GroupProperties.push_back(propFog);
 
     // LIMPIAR Z y RECORTE: composicion de la pantalla puesta en el arbol
-    propClearZ   = new GroupPropertie(T("Clear Depth"));
-    propLzActive = new PropBool(T("Active"));
-    propClearZ->properties.push_back(propLzActive);
-    GroupProperties.push_back(propClearZ);
     propClip = new GroupPropertie(T("Screen Rect"));
     propRcActive = new PropBool(T("Active"));
     propClip->properties.push_back(propRcActive);
@@ -10468,64 +10353,7 @@ void Properties::BuildGroups(){
 
     // ---- MOVIMIENTO: velocidad (cono + azar por eje), fuerzas (gravedad, aceleracion propia, arrastre, turbulencia)
     //      y la caja de nacimiento. Los ejes son los LOCALES del emisor (su +Y es el eje del cono). ----
-    propPartMovCard = new GroupPropertie(T("Particle Motion"));
-    propPartMovCard->valueWidth = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
-    propPartVel = new PropFloat(T("Velocity"), "m/s");
-    propPartVel->SetRange(0.0f, 10000.0f);
-    propPartMovCard->properties.push_back(propPartVel);
-    propPartDispersion = new PropFloat(T("Spread"), "deg"); // apertura TOTAL del cono
-    propPartDispersion->SetRange(0.0f, 360.0f);
-    propPartMovCard->properties.push_back(propPartDispersion);
-    {
-        const char* axes[3] = { "X", "Y", "Z" };
-        for (int k = 0; k < 3; k++) {
-            propPartVelBase[k] = new PropFloat(std::string(T("Base velocity")) + " " + axes[k], "m/s");
-            propPartVelBase[k]->SetRange(-10000.0f, 10000.0f);
-            propPartMovCard->properties.push_back(propPartVelBase[k]);
-        }
-        for (int k = 0; k < 3; k++) {
-            propPartVelRandom[k] = new PropFloat(std::string(T("Random velocity")) + " " + axes[k], "m/s");
-            propPartVelRandom[k]->SetRange(0.0f, 10000.0f);
-            propPartMovCard->properties.push_back(propPartVelRandom[k]);
-        }
-        propPartGravity = new PropFloat(T("Gravity"), "m/s2");  // + cae / - sube
-        propPartGravity->SetRange(-1000.0f, 1000.0f);
-        propPartMovCard->properties.push_back(propPartGravity);
-        for (int k = 0; k < 3; k++) {
-            propPartAcc[k] = new PropFloat(std::string(T("Acceleration")) + " " + axes[k], "m/s2");
-            propPartAcc[k]->SetRange(-10000.0f, 10000.0f);
-            propPartMovCard->properties.push_back(propPartAcc[k]);
-        }
-        propPartDrag = new PropFloat(T("Drag (speed kept per second)"), "");
-        propPartDrag->SetRange(0.0f, 1.0f);
-        propPartMovCard->properties.push_back(propPartDrag);
-        propPartTurbulence = new PropFloat(T("Turbulence"), ""); // deriva suave por particula (unid/s^2)
-        propPartTurbulence->SetRange(0.0f, 1000.0f);
-        propPartMovCard->properties.push_back(propPartTurbulence);
-        for (int k = 0; k < 3; k++) {
-            propPartPosRandom[k] = new PropFloat(std::string(T("Spawn box")) + " " + axes[k], "m");
-            propPartPosRandom[k]->SetRange(0.0f, 10000.0f);
-            propPartMovCard->properties.push_back(propPartPosRandom[k]);
-        }
-    }
-    GroupProperties.push_back(propPartMovCard);
 
-    // ---- TAMANIO: lado + variacion + crecimiento con freno ----
-    propPartCardSize = new GroupPropertie(T("Particle Size"));
-    propPartCardSize->valueWidth = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
-    propPartSize = new PropFloat(T("Size"), "m");            // lado del billboard, en mundo
-    propPartSize->SetRange(0.0f, 1000.0f);
-    propPartCardSize->properties.push_back(propPartSize);
-    propPartVariation = new PropFloat(T("Variation"), "");  // 0..1: jitter por particula (vel/vida/tam)
-    propPartVariation->SetRange(0.0f, 1.0f);
-    propPartCardSize->properties.push_back(propPartVariation);
-    propPartCrec = new PropFloat(T("Growth (size per second)"), "x/s");
-    propPartCrec->SetRange(-100.0f, 1000.0f);
-    propPartCardSize->properties.push_back(propPartCrec);
-    propPartBrake = new PropFloat(T("Growth kept per second"), "");
-    propPartBrake->SetRange(0.0f, 1.0f);
-    propPartCardSize->properties.push_back(propPartBrake);
-    GroupProperties.push_back(propPartCardSize);
 
     // ---- COLOR Y ALFA ----
     propPartColCard = new GroupPropertie(T("Particle Color"));
@@ -10570,25 +10398,6 @@ void Properties::BuildGroups(){
     GroupProperties.push_back(propPartColCard);
 
     // ---- ROTACION ----
-    propPartRotCard = new GroupPropertie(T("Particle Rotation"));
-    propPartRotCard->valueWidth = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
-    propPartRotation = new PropBool(T("Random angle (0-360)"));   // angulo azaroso fijo al nacer
-    propPartRotCard->properties.push_back(propPartRotation);
-    propPartRotStart = new PropFloat(T("Start angle"), "deg");
-    propPartRotStart->SetRange(-360.0f, 360.0f);
-    propPartRotCard->properties.push_back(propPartRotStart);
-    propPartRotRandom = new PropFloat(T("Angle random"), "deg");
-    propPartRotRandom->SetRange(0.0f, 180.0f);
-    propPartRotCard->properties.push_back(propPartRotRandom);
-    propPartVelRot = new PropFloat(T("Spin"), "deg/s");       // giro continuo
-    propPartVelRot->SetRange(-3600.0f, 3600.0f);
-    propPartRotCard->properties.push_back(propPartVelRot);
-    propPartVelRotRandom = new PropFloat(T("Spin random"), "deg/s");
-    propPartVelRotRandom->SetRange(0.0f, 3600.0f);
-    propPartRotCard->properties.push_back(propPartVelRotRandom);
-    propPartTurnSign = new PropBool(T("Random spin direction"));
-    propPartRotCard->properties.push_back(propPartTurnSign);
-    GroupProperties.push_back(propPartRotCard);
 
     // ---- FORMA Y FLIPBOOK ----
     propPartShapeCard = new GroupPropertie(T("Particle Shape"));
@@ -10631,12 +10440,6 @@ void Properties::BuildGroups(){
 
     // pestania de la Collection: orden de dibujo de los hijos para TRANSPARENTES
     // (lejos -> cerca respecto de la camara; ver Collection.h)
-    propCollection = new GroupPropertie(T("Collection"));
-    propCollOrderCam  = new PropBool(T("Sort by camera"));
-    propCollOrderOnce = new PropBool(T("Sort once (active camera)"));
-    propCollection->properties.push_back(propCollOrderCam);
-    propCollection->properties.push_back(propCollOrderOnce);
-    GroupProperties.push_back(propCollection);
 
     // ===== pestania RENDER: tarjeta "Render" (arriba) + tarjeta "Export" (abajo) =====
     // ===== tarjeta ARCHIVO (pestania Render, PRIMERA): el proyecto .w3d =====
@@ -11969,6 +11772,8 @@ void Properties::BuildGroups(){
     propRowConstraintInverse->Add(T("Clear Inverse"), ActionConstraintClearInverse);
     propConstraintProps->properties.push_back(propRowConstraintInverse);
     GroupProperties.push_back(propConstraintProps);
+    // LAS TARJETAS DECLARADAS (ui/panels/PanelsText.cpp): la Niebla, ...
+    panels = W3dPanelsBuild(GroupProperties);
 }
 
 
@@ -12449,7 +12254,6 @@ static void UpdateCardResource(Properties* p, bool inRec, int view, const std::s
         // salio de la tarjeta con la tarjeta Material bindeada a un material SUELTO: vuelve al mesh part
         if (p->recVersionBind != 0) {
             p->recVersionBind = 0;
-            if (p->propBtnNewMaterial) p->propBtnNewMaterial->hidden = false;
             if (ActiveObj && ActiveObj->getType() == ObjectType::mesh) p->Rebind();
         }
         return;
@@ -12544,7 +12348,7 @@ static void UpdateCardResource(Properties* p, bool inRec, int view, const std::s
     const bool isMat = (view == W3D_VIEW_MATERIALS);   // (su visibilidad la decide UpdateTabs)
     const unsigned show = W3dActiveResourceVersion() + 1u;   // +1: 0 queda para "sin bindear"
     if (isMat && p->recVersionBind != show) { p->recVersionBind = show; p->Rebind(); }
-    if (!isMat && p->recVersionBind != 0) { p->recVersionBind = 0; if (p->propBtnNewMaterial) p->propBtnNewMaterial->hidden = false; }
+    if (!isMat && p->recVersionBind != 0) p->recVersionBind = 0;
 }
 
 // LA TARJETA DE UN RECURSO DE UNA LIBRERIA VINCULADA (de solo lectura): lo que es, de que libreria, y lo que ESTE proyecto
@@ -12552,7 +12356,7 @@ static void UpdateCardResource(Properties* p, bool inRec, int view, const std::s
 static void UpdateCardResourceExt(Properties* p, bool show, int lib, const W3dResourceItem& it, const std::string& idGlobal) {
     if (!p || !p->propResource) return;
     if (p->propResource->visible != show) { p->propResource->visible = show; PropertiesLayoutDirty = true; }
-    if (p->recVersionBind != 0) { p->recVersionBind = 0; if (p->propBtnNewMaterial) p->propBtnNewMaterial->hidden = false; }
+    p->recVersionBind = 0;
     if (!show) { if (p->propRecPreview) p->propRecPreview->tex = NULL; return; }
     const int view = it.type;
     p->propResource->icon = it.icon >= 0 ? it.icon : W3dIconView(view);
@@ -12630,8 +12434,9 @@ static PropButton* TypeDestination(Properties* p, int type) {
         case W3D_VIEW_MESHES:
             return (m && p->propMesh3D && p->propMesh3D->visible) ? p->propBtnMeshSel : NULL;
         case W3D_VIEW_MATERIALS:
-            return (m && p->propMaterial && p->propMaterial->visible && p->propBtnNewMaterial && !p->propBtnNewMaterial->hidden)
-                   ? p->propBtnNewMaterial : NULL;
+            // (el desplegable "Cambiar material": el selector viejo que iba aca nunca estuvo en la tarjeta)
+            return (m && p->propMaterial && p->propMaterial->visible && p->propLayerMatChange && !p->propLayerMatChange->hidden)
+                   ? p->propLayerMatChange : NULL;
         case W3D_VIEW_TEXTURES:
             return (p->propMaterial && p->propMaterial->visible && p->propBtnTexture && !p->propBtnTexture->hidden)
                    ? p->propBtnTexture : NULL;
@@ -12956,7 +12761,6 @@ void Properties::Rebind(){
     Material* material = NULL;
     Mesh* mesh = NULL;
     Material* recMat = (activeTab == 3) ? W3dActiveResourceMaterial() : NULL;
-    if (propBtnNewMaterial) propBtnNewMaterial->hidden = (recMat != NULL);
     if (recMat) {
         material = recMat;
     } else {
@@ -12973,7 +12777,7 @@ void Properties::Rebind(){
     if (propLayerMatAdd) propLayerMatAdd->hidden = (recMat != NULL);
     if (propLayerMatChange) propLayerMatChange->hidden = (recMat != NULL);
 
-    // Tarjeta "Material" (propMaterial): el bind es POR MEMBER (propMatChk/propMatCol/...),
+    // Tarjeta "Material" (propMaterial): el bind es POR MEMBER (propMatChk/...),
     // reordenar la tarjeta no rompe nada. El material POR DEFECTO no se edita: se ocultan
     // sus filas (value=NULL) y se muestra el aviso.
     // un material HUERFANO recien abierto tiene sus texturas DORMIDAS (import_obj.h): la tarjeta lo
@@ -12984,7 +12788,6 @@ void Properties::Rebind(){
     bool fromLib = material && !material->lib.empty();
     if (mesh && mesh->mesh && !mesh->mesh->lib.empty()) fromLib = true;
     for (Object* q = mesh ? W3dInstanceOf(mesh) : NULL; q && !fromLib; q = W3dInstanceOf(q)) fromLib = (q->getType() == ObjectType::proxy);
-    if (fromLib && propBtnNewMaterial) propBtnNewMaterial->hidden = true;
     if (fromLib && propLayerMatAdd) propLayerMatAdd->hidden = true;
     if (fromLib && propLayerMatChange) propLayerMatChange->hidden = true;
     bool isDefault = (!material || material == MaterialDefault || fromLib);
@@ -13186,14 +12989,6 @@ void Properties::Rebind(){
             }
         }
     }
-    // Base Color: se OCULTA si Vertex Color esta ON (ahi manda el color del vertice, la base "no se ve" -> al pepe).
-    propMatCol[0]->value = (isDefault || material->vertexColor) ? NULL : material->diffuse;
-    // Specular / Emission / Shininess: solo tienen sentido con LIGHTING ON -> se ocultan si esta OFF.
-    propMatCol[1]->value = (isDefault || !material->lighting) ? NULL : material->specular;
-    propMatCol[2]->value = (isDefault || !material->lighting) ? NULL : material->emission;
-    propMatShin->value   = (isDefault || !material->lighting) ? NULL : &material->shininess;
-    if (propMatRough) propMatRough->value = (isDefault || !g_rt.on) ? NULL : &material->rtRoughness;   // solo trazando
-    if (propMatMetal) propMatMetal->value = (isDefault || !g_rt.on) ? NULL : &material->rtMetallic;
 
     // CON EL SHADER AVANZADO TILDADO el material lo dibuja el shader: las opciones de arriba se van (quedan el selector del
     // material, renombrarlo y las filas del shader). Cada pasada de Rebind las vuelve a poner, asi que al destildarlo vuelven
@@ -13201,7 +12996,7 @@ void Properties::Rebind(){
         std::vector<PropertieBase*>& v = propMaterial->properties;
         for (size_t q = 0; q < v.size(); q++) {
             PropertieBase* p = v[q];
-            if (p == propBtnNewMaterial || p == propBtnRenameMat || p == propMatShaderOn || p == propBtnShader ||
+            if (p == propBtnRenameMat || p == propMatShaderOn || p == propBtnShader ||
                 p == propListLayersMat || p == propLayerMatAdd || p == propLayerMatChange ||
                 p == propBtnShaderComp || p == propMatShaderMsg) continue;
             switch (p->GetType()) {
@@ -13218,12 +13013,6 @@ void Properties::Rebind(){
         }
     }
 
-    // el selector muestra el material actual del mesh part (el por defecto, con su nombre traducido: el
-    // "Default Material" de MaterialDefault->name es un identificador, no se renombra)
-    if (propBtnNewMaterial) {
-        propBtnNewMaterial->button->text =
-            (material && material != MaterialDefault) ? material->name : std::string(T("Default Material"));
-    }
     PropertiesLayoutDirty = true; // el alto de la tarjeta pudo cambiar
 }
 
@@ -14033,15 +13822,6 @@ void Properties::RefreshTargetProperties(){
 
 
     // VACIO: bind directo a su dibujo (NULL = oculto)
-    if (propEmptySize){
-        Empty* va = (ActiveObj && ActiveObj->getType() == ObjectType::empty) ? static_cast<Empty*>(ActiveObj) : NULL;
-        if (propEmptyShape->hidden != !va) { propEmptyShape->hidden = !va; PropertiesLayoutDirty = true; }
-        if (va) { propEmptyShape->button->text = EmptyShapeText(va->shape); propEmptyShape->button->icon = EmptyShapeIcon(va->shape); }
-        propEmptySize->value = va ? &va->drawingSize : NULL;
-        propEmptyRotX->value = va ? &va->rotDrawing.x : NULL;
-        propEmptyRotY->value = va ? &va->rotDrawing.y : NULL;
-        propEmptyRotZ->value = va ? &va->rotDrawing.z : NULL;
-    }
 
     // SONIDO: bind directo; el paneo solo sin 3D, radio / alcance / esferas solo con 3D (NULL = oculto)
     if (propSoundActive){
@@ -14069,26 +13849,12 @@ void Properties::RefreshTargetProperties(){
         if (so && so->positional != posPrev) { posPrev = so->positional; PropertiesLayoutDirty = true; }
     }
 
-    // NIEBLA: bind directo; inicio/fin solo en lineal, densidad solo en exp/exp2 (NULL = oculto)
-    if (propFogActive){
-        Fog* ni = (ActiveObj->getType() == ObjectType::fog) ? static_cast<Fog*>(ActiveObj) : NULL;
-        propFogActive->value     = ni ? &ni->active : NULL;
-        propFogStart->value      = (ni && ni->mode == 0) ? &ni->start : NULL;
-        propFogEnd->value        = (ni && ni->mode == 0) ? &ni->end : NULL;
-        propFogDens->value       = (ni && ni->mode != 0) ? &ni->density : NULL;
-        propFogColor->value      = ni ? ni->color : NULL;
-        propFogBackground->value = ni ? &ni->background : NULL;
-        propFogMode->button->text = ni ? FogModeLabel(ni->mode) : "";
-        propFogMode->hidden       = !ni;
-    }
+    // LAS TARJETAS DECLARADAS (ui/panels/PanelsText.cpp): cada fila a su campo del objeto activo
+    W3dPanelsBind(panels, ActiveObj);
 
     // POSTPROCESO: su tarjeta (la pila del objeto: PostRowsPanel la vuelve a enlazar)
     PostRowsPanel(this);
     // LIMPIAR Z / RECORTE: bind directo
-    if (propLzActive){
-        ClearZ* lz = (ActiveObj->getType() == ObjectType::clearz) ? static_cast<ClearZ*>(ActiveObj) : NULL;
-        propLzActive->value = lz ? &lz->active : NULL;
-    }
     if (propRcActive){
         ClipRegion* rc = (ActiveObj->getType() == ObjectType::clip) ? static_cast<ClipRegion*>(ActiveObj) : NULL;
         propRcActive->value = rc ? &rc->active : NULL;
@@ -14111,30 +13877,12 @@ void Properties::RefreshTargetProperties(){
                                           ? FileName(pt->texture) : std::string(T("No Texture"));
         propPartCount->value      = pt ? &pt->count   : NULL;
         propPartLife->value       = pt ? &pt->life       : NULL;
-        propPartSize->value       = pt ? &pt->size        : NULL;
-        propPartVel->value        = pt ? &pt->vel        : NULL;
-        propPartDispersion->value = pt ? &pt->dispersion : NULL;
-        propPartGravity->value    = pt ? &pt->gravity   : NULL;
-        propPartVariation->value  = pt ? &pt->variation  : NULL;
-        propPartTurbulence->value = pt ? &pt->turbulence : NULL;
-        if (propPartRotation) propPartRotation->value = pt ? &pt->rotation    : NULL;
-        if (propPartVelRot)   propPartVelRot->value   = pt ? &pt->velRotation : NULL;
         if (propPartColor)    propPartColor->value    = pt ? pt->color        : NULL; // float[4] -> ColorPicker
         if (propPartMix)   propPartMix->button->text = pt ? MixName(pt->mix) : std::string(T("Blend"));
         propPartFade->value   = pt ? &pt->fade : NULL;
         propPartActive->value = pt ? &pt->active     : NULL;
         if (propPartFiltering) propPartFiltering->value = pt ? &pt->filtered : NULL;
         // ---- lo avanzado ----
-        for (int k = 0; k < 3; k++) {
-            if (propPartAcc[k])     propPartAcc[k]->value     = pt ? &pt->acceleration[k] : NULL;
-            if (propPartVelRandom[k]) propPartVelRandom[k]->value = pt ? &pt->velRandom[k]     : NULL;
-            if (propPartVelBase[k]) propPartVelBase[k]->value = pt ? &pt->velLocal[k]    : NULL;
-            if (propPartPosRandom[k]) propPartPosRandom[k]->value = pt ? &pt->posRandom[k]     : NULL;
-        }
-        if (propPartDrag)    propPartDrag->value    = pt ? &pt->drag         : NULL;
-        if (propPartCrec)        propPartCrec->value        = pt ? &pt->growth      : NULL;
-        // el freno solo tiene sentido si crece
-        if (propPartBrake)       propPartBrake->value       = (pt && pt->growth != 0.0f) ? &pt->brakeGrowth : NULL;
         if (propPartAlphaDecays)  propPartAlphaDecays->value  = pt ? &pt->alphaDecays       : NULL;
         if (propPartAlphaDeath) propPartAlphaDeath->value = pt ? &pt->alphaDeath      : NULL;
         if (propPartAppear)    propPartAppear->value    = pt ? &pt->appear         : NULL;
@@ -14144,12 +13892,6 @@ void Properties::RefreshTargetProperties(){
         }
         if (propPartUseColEnd)  propPartUseColEnd->value  = pt ? &pt->useColorFinal   : NULL;
         if (propPartEndColor)    propPartEndColor->value    = (pt && pt->useColorFinal) ? pt->colorFinal : NULL;
-        // con "angulo al azar 0-360" prendido, el angulo inicial y su azar no se usan: se esconden
-        const bool rotFixed = pt && !pt->rotation;
-        if (propPartRotStart)      propPartRotStart->value      = rotFixed ? &pt->initialRot : NULL;
-        if (propPartRotRandom)     propPartRotRandom->value     = rotFixed ? &pt->rotRandom    : NULL;
-        if (propPartVelRotRandom)  propPartVelRotRandom->value  = pt ? &pt->velRotRandom      : NULL;
-        if (propPartTurnSign)   propPartTurnSign->value   = pt ? &pt->turnSignRandom   : NULL;
         // FORMA: cada fila solo con la forma que la usa
         const int shape = pt ? pt->shape : 0;
         if (propPartShape) {
@@ -14174,15 +13916,6 @@ void Properties::RefreshTargetProperties(){
         if (propPartFlipOne)   propPartFlipOne->value   = (hasFlip && pt->flipFps > 0.0f) ? &pt->flipOnce : NULL;
     }
 
-    // COLLECTION: idem. OJO: la raiz Scene tambien reporta tipo collection
-    // (Scene.cpp) pero NO es una Collection -> el chequeo de Parent la descarta
-    // (las raices no tienen padre) y el cast nunca la toca.
-    if (propCollOrderCam && propCollOrderOnce){
-        Collection* col = (ActiveObj->getType() == ObjectType::collection && ActiveObj->Parent)
-                        ? static_cast<Collection*>(ActiveObj) : NULL;
-        propCollOrderCam->value  = col ? &col->sortByCamera : NULL;
-        propCollOrderOnce->value = col ? &col->sortOnce    : NULL;
-    }
 
     Resize(width, height);
 }
@@ -14273,7 +14006,7 @@ Properties::Properties() : ViewportBase() {
     propCullOrderNear = NULL;
     propCamActive = NULL; propActiveCamSel = NULL; propActiveCamKey = NULL;
     propCurve = NULL; propCurveMods = NULL; propCurveModProps = NULL; propListCurveMods = NULL; curveRows = NULL;
-    propClearZ = NULL; propLzActive = NULL; propClip = NULL; propRcActive = NULL; propRcX = NULL; propRcY = NULL;
+    propClip = NULL; propRcActive = NULL; propRcX = NULL; propRcY = NULL;
     propMatLightInd = NULL;
     propHitbox = NULL; propHbActive = NULL; propHbLabel = NULL; propHbFilter = NULL; propHbBodies = NULL;
     propProbe = NULL; propSlRays = NULL; propSlBake = NULL; propSlState = NULL; propSlBar = NULL; propSlCancel = NULL;
@@ -14296,32 +14029,25 @@ Properties::Properties() : ViewportBase() {
     propPfLoad = NULL; propPfDistance = NULL; propPfTarget = NULL; propPfView = NULL;   // (el streaming de la tarjeta)
     for (int k = 0; k < 3; k++) { propHbSize[k] = NULL; propHbCenter[k] = NULL; }
     propRcWidth = NULL; propRcHeight = NULL; propRcCamera = NULL; propRcClearZ = NULL; propRcBackground = NULL; propRcColor = NULL;
-    propEmpty = NULL; propEmptyShape = NULL; propEmptySize = NULL; propEmptyRotX = NULL; propEmptyRotY = NULL; propEmptyRotZ = NULL;
     propSound = NULL; propSoundFile = NULL; propSoundActive = NULL; propSoundVol = NULL; propSoundTone = NULL; propSoundReverb = NULL;
     propSoundPan    = NULL; propSoundStart = NULL; propSoundRecStart = NULL; propSoundRecEnd = NULL; propSoundLoop = NULL; propSoundPos = NULL;
     propSoundRadius = NULL; propSoundRange = NULL;
-    propFog = NULL; propFogActive = NULL; propFogMode = NULL; propFogStart = NULL; propFogEnd = NULL;
-    propFogDens = NULL; propFogColor = NULL; propFogBackground = NULL;
+    panels = NULL;
     propCullDistMax = NULL; propCullOrderAlpha = NULL; propCullCellSize = NULL; propCullMode3D = NULL; propCullRecalc = NULL;
-    propCollection = NULL; propCollOrderCam = NULL; propCollOrderOnce = NULL; // Collection (orden transparentes)
     propMirror = NULL; propMirrorTarget = NULL;                               // objeto Mirror (target + ejes + rect)
     propBoolOp = NULL; propBoolTarget = NULL;                                 // modificador Boolean
     propMirrorX = NULL; propMirrorY = NULL; propMirrorZ = NULL; propMirrorChildren = NULL;
     propMirrorLimits = NULL; propMirrorU0 = NULL; propMirrorU1 = NULL; propMirrorV0 = NULL; propMirrorV1 = NULL;
     propParticles = NULL; propPartTexture = NULL; propPartCount = NULL;     // objeto Particulas
-    propPartLife = NULL; propPartSize = NULL; propPartVel = NULL; propPartDispersion = NULL;
-    propPartGravity = NULL; propPartMix = NULL; propPartColor = NULL;
+    propPartLife = NULL;
+    propPartMix = NULL; propPartColor = NULL;
     propPartFade = NULL; propPartActive = NULL; propPartFiltering = NULL;
-    propPartVariation = NULL; propPartTurbulence = NULL;
-    propPartRotation = NULL; propPartVelRot = NULL;
-    propPartMovCard = NULL; propPartCardSize = NULL; propPartColCard = NULL; propPartRotCard = NULL; propPartShapeCard = NULL;
-    propPartDrag   = NULL; propPartCrec = NULL; propPartBrake = NULL; propPartAlphaDecays = NULL; propPartAlphaDeath = NULL;
+    propPartColCard = NULL; propPartShapeCard = NULL;
+    propPartAlphaDecays = NULL; propPartAlphaDeath = NULL;
     propPartAppear = NULL; propPartFadeNear[0] = propPartFadeNear[1] = NULL; propPartFadeFar[0] = propPartFadeFar[1] = NULL;
-    propPartUseColEnd = NULL; propPartEndColor = NULL; propPartRotStart = NULL; propPartRotRandom = NULL; propPartVelRotRandom = NULL;
-    propPartTurnSign = NULL; propPartShape = NULL; propPartStretch = NULL; propPartTrailPts = NULL; propPartTrailStep = NULL;
+    propPartUseColEnd = NULL; propPartEndColor = NULL; propPartShape = NULL; propPartStretch = NULL; propPartTrailPts = NULL; propPartTrailStep = NULL;
     propPartThickness = NULL; propPartFlipC = NULL; propPartFlipCols = NULL; propPartFlipRows = NULL; propPartFlipFps = NULL;
     propPartFlipOne = NULL;
-    for (int k = 0; k < 3; k++) { propPartAcc[k] = NULL; propPartVelBase[k] = NULL; propPartVelRandom[k] = NULL; propPartPosRandom[k] = NULL; }
     partFlipC = 0; partFlipCols = 1; partFlipRows = 1; partTrailPts = 4;
     propFlipAtlas = NULL; propFlipFrames = NULL; propFlipCols = NULL; propFlipRows = NULL; propFlipFps = NULL;
     propMix = NULL; propListMix = NULL; propRowMix = NULL; propRowMixMove = NULL; propMixStart = NULL; propMixEnd = NULL;
@@ -14336,7 +14062,7 @@ Properties::Properties() : ViewportBase() {
     propPhysBoxX = NULL; propPhysBoxY = NULL; propPhysBoxZ = NULL;
     propPhysCenterX = NULL; propPhysCenterY = NULL; propPhysCenterZ = NULL;
     propPhysFriction = NULL; propPhysBounce = NULL; propPhysRemove = NULL;
-    propBtnNewMaterial = NULL; propListLayersMat = NULL; propLayerMatAdd = NULL; propLayerMatChange = NULL;
+    propListLayersMat = NULL; propLayerMatAdd = NULL; propLayerMatChange = NULL;
     propBtnTexture = NULL;
     propBtnNormalTex = NULL; // (faltaba: normal map UI)
     for (int k = 0; k < 8; k++) propMap[k] = NULL;
@@ -14407,8 +14133,6 @@ Properties::Properties() : ViewportBase() {
     propBtnRenameUV = NULL; propBtnRenameColor = NULL; propNameObj = NULL;
     propRowPartOps = NULL; propRowDelRow = NULL; propRowPartMove = NULL;
     for (int i = 0; i < 11; i++) propMatChk[i] = NULL;   // los 11 (antes 10: [10] quedaba con basura)
-    for (int i = 0; i < 3; i++) propMatCol[i] = NULL;
-    propMatShin = NULL;
     activeTab = 1;      // arranca en "Objeto" (transforms); 0 = Render
     exportFormat = 2;             // por defecto glTF (el formato con rig + animaciones)
     exportSelectedOnly = true;    // por defecto ON: exporta solo lo seleccionado
@@ -14511,8 +14235,8 @@ void Properties::UpdateTabs(){
     bool isPost = (type == (int)ObjectType::postProcess);
     bool isRc = (type == (int)ObjectType::clip);
     bool isHb = (type == (int)ObjectType::hitbox);
-    bool isSl = (type == (int)ObjectType::sondaluz);   // la sonda de luz (PropsLightProbe.cpp)
-    bool isSr = (type == (int)ObjectType::sondareflejo);   // la sonda de reflejo (PropsReflectionProbe.cpp)
+    bool isSl = (type == (int)ObjectType::lightProbe);   // la sonda de luz (PropsLightProbe.cpp)
+    bool isSr = (type == (int)ObjectType::reflectionProbe);   // la sonda de reflejo (PropsReflectionProbe.cpp)
     bool isRu = (type == (int)ObjectType::routine);
     bool isPf = (type == (int)ObjectType::prefab);   // instancia de prefab (su tarjeta: PropsPrefab.cpp)
     bool isPx = (type == (int)ObjectType::proxy);    // proxy W3D (la misma tarjeta, con su libreria y su elemento)
@@ -14520,7 +14244,8 @@ void Properties::UpdateTabs(){
     bool isMirror = (type == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool isColl = (type == (int)ObjectType::collection && ActiveObj && ActiveObj->Parent);
-    bool hasTab3 = isMesh || isLight || isCam || isInst || isArm || isT2d || isImg || isRect || isCont || isS9 || isBtn || isExp || isVid || isUI || isScript || isLOD || isCull || isColl || isPart || isMirror || isFog || isSound || isEmpty || isLz || isRc || isHb || isSl || isPf || isPx || isRu || isPost || isSr;
+    bool hasTab3 = isMesh || isLight || isCam || isInst || isArm || isT2d || isImg || isRect || isCont || isS9 || isBtn || isExp || isVid || isUI || isScript || isLOD || isCull || isColl || isPart || isMirror || isFog || isSound || isEmpty || isLz || isRc || isHb || isSl || isPf || isPx || isRu || isPost || isSr ||
+                   W3dPanelsHasCard(panels, 2, ActiveObj);
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hasTab3;
@@ -14981,10 +14706,8 @@ void Properties::UpdateTabs(){
     if (propInstance)  propInstance->visible  = (activeTab == 2 && isInst);
     if (propLOD)       propLOD->visible       = (activeTab == 2 && isLOD);
     if (propCulling)   propCulling->visible   = (activeTab == 2 && isCull);
-    if (propFog)    propFog->visible    = (activeTab == 2 && isFog);
+    W3dPanelsShow(panels, activeTab, ActiveObj);   // (las tarjetas declaradas: ui/panels/PanelsText.cpp)
     if (propSound)    propSound->visible    = (activeTab == 2 && isSound);
-    if (propEmpty)     propEmpty->visible     = (activeTab == 2 && isEmpty);
-    if (propClearZ)  propClearZ->visible  = (activeTab == 2 && isLz);
     if (propClip)   propClip->visible   = (activeTab == 2 && isRc);
     PropsHitboxUpdate(this, activeTab == 2 && isHb);   // visibilidad + bindeo + textos
     PropsLightProbeUpdate(this, activeTab == 2 && isSl);
@@ -14992,12 +14715,8 @@ void Properties::UpdateTabs(){
     PropsBakeUpdate(this, activeTab == 2 && isMesh);
     PropsRoutineUpdate(this, activeTab == 2 && isRu);   // los pasos de la rutina
     PropsPrefabUpdate(this, activeTab);                 // (instancia: pestania 2; lo generado: la 1)
-    if (propCollection) propCollection->visible = (activeTab == 2 && isColl);
     if (propParticles) propParticles->visible = (activeTab == 2 && isPart);
-    if (propPartMovCard)   propPartMovCard->visible   = (activeTab == 2 && isPart);
-    if (propPartCardSize)   propPartCardSize->visible   = (activeTab == 2 && isPart);
     if (propPartColCard)   propPartColCard->visible   = (activeTab == 2 && isPart);
-    if (propPartRotCard)   propPartRotCard->visible   = (activeTab == 2 && isPart);
     if (propPartShapeCard) propPartShapeCard->visible = (activeTab == 2 && isPart);
     if (propMirror)     propMirror->visible     = (activeTab == 2 && isMirror);
     // tarjeta FISICA: para CUALQUIER objeto que tenga definicion (Add > Physics).
@@ -15636,6 +15355,8 @@ void Properties::Render(){
     // un click afuera): antes la foto del click se commiteaba vacia al soltar y lo tipeado quedaba sin Ctrl+Z.
     if (!leftMouseDown && !NumEditActive()) UndoMaterialModCommit();
     RefreshTargetProperties();
+    // (las tarjetas declaradas, en cada cuadro: tildar algo cambia sus 'when' ya, no al elegir otro objeto)
+    if (W3dPanelsBind(panels, ActiveObj)) PropertiesLayoutDirty = true;
     UpdateTabs(); // que grupo mostrar segun la pestania (Objeto/Mesh)
     // el '*' del nombre del proyecto en la tarjeta Archivo: hay cambios sin guardar (io/ProjectChanges.h)
     if (propProjName && propFile && propFile->visible) {
@@ -17524,7 +17245,8 @@ static void PropsForgetRow(PropertieBase* p) {
     // un rename EN CURSO sobre un boton de esta fila (el boton se volvio input): se cancela
     // antes de que el boton muera (RenameClear le escribe editField)
     if (g_renameButton) {
-        bool own = (p->GetType() == PropertyType::Button && ((PropButton*)p)->button == g_renameButton);
+        bool own = (p->GetType() == PropertyType::Button && ((PropButton*)p)->button == g_renameButton) ||
+                   (p->GetType() == PropertyType::List && ((PropList*)p)->RenameField() == g_renameButton);
         if (p->GetType() == PropertyType::ButtonRow) {
             PropButtonRow* r = (PropButtonRow*)p;
             for (size_t i = 0; i < r->buttons.size(); i++) if (r->buttons[i] == g_renameButton) own = true;
@@ -17552,6 +17274,7 @@ Properties::~Properties() {
     // (dangling) y cualquier lectura de PropsActive crashea (ej. al reemplazar este
     // panel por un UV Editor, que lee la parte activa via PropsActive).
     if (PropsActive == this) PropsActive = NULL;
+    W3dPanelsFree(panels); panels = NULL;   // (las tarjetas declaradas: sus tarjetas se liberan abajo, con las demas)
     // las filas de las tarjetas de curvas: si los punteros eran de este panel, se sueltan (ver CurveRowsUI)
     if (curveRows) { if (g_cfLinked == curveRows) CfLink(NULL); delete curveRows; curveRows = NULL; }
     // LAS TARJETAS SON DEL PANEL. BuildGroups las arma en el ctor (una por grupo, cada una
@@ -17575,4 +17298,22 @@ Properties::~Properties() {
     for (int i = 0; i < 11; i++)
         if (propMatChk[i] && !inCards.count(propMatChk[i])) { PropsForgetRow(propMatChk[i]); delete propMatChk[i]; }
     for (int i = 0; i < 11; i++) propMatChk[i] = NULL;
+    // (los botones "Rename" van en sus tarjetas solo en Symbian; en el resto sostienen la accion de renombrar -el doble
+    //  click en la fila de la lista, el harness- sin tarjeta: se perdian con cada panel, o sea con cada proyecto abierto)
+    PropButton** renames[] = { &propBtnRenameMat, &propBtnRenameUV, &propBtnRenameColor, &propBtnRenameUVGroup,
+                               &propBtnRenameAnim, &propBtnRenameGroup };
+    for (size_t i = 0; i < sizeof(renames) / sizeof(renames[0]); i++) {
+        PropButton*& b = *renames[i];
+        if (b && !inCards.count(b)) { PropsForgetRow(b); delete b; }
+        b = NULL;
+    }
+    // lo mismo con las filas de botones Borrar / Subir / Bajar de las listas: en tarjeta solo en Symbian (en el resto
+    // estan el tacho, el menu y el arrastre de la lista), pero se arman igual
+    PropButtonRow** rows[] = { &propRowDelRow, &propRowPartMove, &propRowGroupOps, &propRowUVGroupOps,
+                               &propRowAnimOps, &propRowUVOps, &propRowColorOps, &propRowModMove };
+    for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+        PropButtonRow*& r = *rows[i];
+        if (r && !inCards.count(r)) { PropsForgetRow(r); delete r; }
+        r = NULL;
+    }
 }

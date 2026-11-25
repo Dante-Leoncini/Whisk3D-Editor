@@ -41,6 +41,7 @@ void InstancePrefab::RenderObject() {
         w3dEngine::Color4f(0.45f, 0.65f, 0.95f, 1.0f);   // (DESCARGADA por el streaming: azulada)
     }
     w3dEngine::VertexPointer3f(0, cross);
+    w3dEngine::TexCoordPointer2f(12, cross);   // (dummy en los mismos datos: ver Empty::RenderObject)
     w3dEngine::DrawLines(6);
     w3dEngine::EnableArray(w3dEngine::NormalArray);
     if (lightWas) w3dEngine::Enable(w3dEngine::Lighting);

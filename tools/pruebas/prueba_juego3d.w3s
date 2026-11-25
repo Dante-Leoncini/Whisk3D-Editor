@@ -41,7 +41,7 @@
 window 640 480
 
 # --- 1) el juego 3D minimo, guardado y abierto como proyecto -----------------
-game3dmin /tmp/w3d_juego3d
+game3dmin /tmp/w3d_juego3d light
 savew3d /tmp/w3d_juego3d/juego3dmin.w3d
 openw3d /tmp/w3d_juego3d/juego3dmin.w3d
 

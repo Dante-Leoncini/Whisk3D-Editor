@@ -69,11 +69,11 @@ static bool PickSelectable(Object* obj) {
     if (t == ObjectType::empty  && !g_showEmpty)  return false;
     { extern bool g_showSounds; if (t == ObjectType::sound && !g_showSounds) return false; }   // (overlay "Sounds")
     if (t == ObjectType::hitbox && !HitboxDraws()) return false;   // la MISMA regla que su dibujo
-    if ((t == ObjectType::sondaluz || t == ObjectType::sondareflejo) && !LightProbeDraws()) return false;
+    if ((t == ObjectType::lightProbe || t == ObjectType::reflectionProbe) && !LightProbeDraws()) return false;
     return t == ObjectType::mesh || t == ObjectType::camera ||
            t == ObjectType::light || t == ObjectType::empty ||
            t == ObjectType::instance || t == ObjectType::armature ||
-           t == ObjectType::hitbox || t == ObjectType::sound || t == ObjectType::sondaluz || t == ObjectType::sondareflejo;
+           t == ObjectType::hitbox || t == ObjectType::sound || t == ObjectType::lightProbe || t == ObjectType::reflectionProbe;
 }
 // pick en 2 pasadas: primero NO-armatures (con z-buffer), despues armatures (XRAY, sin z, encima de todo)
 // para que el esqueleto se pickee EXACTAMENTE como se ve. 'armaturePass' filtra que se pinta/cuenta en cada pasada.

@@ -492,8 +492,15 @@ void W3dLayoutRender() {
     // renderiza el rootViewport COMPARTIDO (no gRoot): "Maximize" reemplaza rootViewport por el viewport
     // activo -> dibuja SOLO ese y los demas NO se renderizan ni recalculan (clave para el rendimiento del N95).
     // Sin maximizar rootViewport==gRoot (se sincronizan en el setup/expand), asi que el caso normal no cambia.
-    if (rootViewport) rootViewport->Render();
-    else gRoot->Render();
+    // (navegando una vista 3D: los paneles salen de la imagen guardada y se dibujan solo las vistas 3D, ver
+    // W3dViewCacheBegin en ViewPorts.h; en el N95 los paneles se llevaban buena parte de cada cuadro)
+    {
+        ViewportBase* root = rootViewport ? rootViewport : gRoot;
+        const bool only3D = W3dViewCacheBegin(root, gScreenW, gScreenH);
+        if (only3D) W3dViewCacheRender3D(root);
+        else root->Render();
+        W3dViewCacheEnd(gScreenW, gScreenH, only3D);
+    }
 
     // MODO JUEGO PURO (VERDE+0): ni menu ni toasts -- SOLO el juego en pantalla
     { extern int g_pureGame;

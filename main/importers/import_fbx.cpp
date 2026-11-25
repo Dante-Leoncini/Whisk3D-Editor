@@ -79,6 +79,9 @@ static void ReadProp(Rd& r, FProp& pr) {
         case 'f': case 'd': case 'l': case 'i': case 'b': {
             uint32_t len = r.u32(), enc = r.u32(), clen = r.u32();
             int esz = (pr.type == 'd' || pr.type == 'l') ? 8 : (pr.type == 'f' || pr.type == 'i') ? 4 : 1;
+            // (en 32 bits len * esz da la vuelta: un len de 0x20000001 con 8 bytes daba 8, pasaba los controles y el
+            //  ciclo de abajo leia 4 GB afuera)
+            if ((size_t)len > ((size_t)-1) / (size_t)esz) { r.p = r.end; break; }
             size_t rawBytes = (size_t)len * esz;
             std::vector<unsigned char> raw;
             const unsigned char* data = 0;
@@ -112,13 +115,20 @@ static void ReadProp(Rd& r, FProp& pr) {
 
 // lee UN nodo (recursivo). base = inicio del archivo (los offsets son ABSOLUTOS). w64 = version>=7500 (offsets 64-bit).
 // devuelve false si es el "null record" (fin de la lista de hijos) o si algo se rompio.
-static bool ReadNode(Rd& r, const unsigned char* base, bool w64, FNode& out) {
+// Los numeros del archivo no se creen: el final del nodo tiene que caer DESPUES de su comienzo y adentro del archivo (uno
+// que apuntaba para atras releia el mismo nodo para siempre, juntando hijos hasta quedarse sin memoria; uno gigante corria
+// el puntero fuera del buffer), las properties tienen que entrar, y no mas de 64 niveles (la pila de la PSP y del N95)
+static bool ReadNode(Rd& r, const unsigned char* base, bool w64, FNode& out, int depth) {
+    if (depth > 64) { r.p = r.end; return false; }
+    const uint64_t start = (uint64_t)(r.p - base), size = (uint64_t)(r.end - base);
     uint64_t endOff, numProps, propLen;
     if (w64) { endOff = r.u64(); numProps = r.u64(); propLen = r.u64(); }
     else     { endOff = r.u32(); numProps = r.u32(); propLen = r.u32(); }
     uint8_t nameLen = r.u8();
     if (endOff == 0) return false; // null record
+    if (endOff <= start || endOff > size) { r.p = r.end; return false; }
     if (r.avail(nameLen)) { out.name.assign((const char*)r.p, nameLen); r.p += nameLen; } else { r.p = r.end; return false; }
+    if (propLen > (uint64_t)(r.end - r.p)) { r.p = r.end; return false; }
     const unsigned char* propsEnd = r.p + propLen;
     for (uint64_t i = 0; i < numProps && r.p < r.end; i++) { FProp pr; ReadProp(r, pr); out.props.push_back(pr); }
     if (propsEnd <= r.end) r.p = propsEnd; // saltar cualquier property no leida
@@ -127,7 +137,7 @@ static bool ReadNode(Rd& r, const unsigned char* base, bool w64, FNode& out) {
         size_t rem = (size_t)((base + endOff) - r.p);
         if (rem < (w64 ? 25u : 13u)) break; // no entra ni el null record
         FNode kid;
-        if (!ReadNode(r, base, w64, kid)) break;
+        if (!ReadNode(r, base, w64, kid, depth + 1)) break;
         out.kids.push_back(kid);
     }
     if (base + endOff <= r.end) r.p = base + endOff; // saltar al final del nodo
@@ -297,7 +307,8 @@ static Mesh* MeshFromGeometry(const FNode& geo, const std::string& name, const s
         if (NRM) {
             int base = nByVert ? cp : c;
             int idx = base;
-            if (nRef == "IndexToDirect" && NIDX && base < (int)NIDX->size()) idx = (int)(*NIDX)[base];
+            // (base >= 0: un indice de 64 bits del archivo pasado a int puede salir negativo)
+            if (nRef == "IndexToDirect" && NIDX && base >= 0 && base < (int)NIDX->size()) idx = (int)(*NIDX)[base];
             if (idx >= 0 && (size_t)idx * 3 + 2 < NRM->size()) {
                 Wobj.normals.push_back(NrmB((*NRM)[idx*3]));
                 Wobj.normals.push_back(NrmB((*NRM)[idx*3+1]));
@@ -309,7 +320,7 @@ static Mesh* MeshFromGeometry(const FNode& geo, const std::string& name, const s
         if (UVA) {
             int base = uByVert ? cp : c;
             int idx = base;
-            if (uRef == "IndexToDirect" && UIDX && base < (int)UIDX->size()) idx = (int)(*UIDX)[base];
+            if (uRef == "IndexToDirect" && UIDX && base >= 0 && base < (int)UIDX->size()) idx = (int)(*UIDX)[base];
             if (idx >= 0 && (size_t)idx * 2 + 1 < UVA->size()) {
                 Wobj.uv.push_back((GLfloat)(*UVA)[idx*2]);
                 Wobj.uv.push_back((GLfloat)(1.0 - (*UVA)[idx*2+1])); // FBX V va al reves que OpenGL
@@ -692,16 +703,29 @@ struct MatsFBX {
 // por ARCHIVO. El nombre sale del RelativeFilename (conserva extension); si no, se detecta por magic bytes.
 static std::string MaterializeEmbeddedTexture(const std::string& fbxDir, const std::string& name, const std::string& bytes) {
     if (bytes.empty()) return std::string();
-    std::string fn = name;
-    if (fn.empty()) {
-        const unsigned char* b = (const unsigned char*)&bytes[0]; size_t n = bytes.size();
-        const char* ext = ".bin";
-        if      (n >= 4 && b[0]==0x89 && b[1]=='P' && b[2]=='N' && b[3]=='G') ext = ".png";
-        else if (n >= 3 && b[0]==0xFF && b[1]==0xD8 && b[2]==0xFF)            ext = ".jpg";
-        else if (n >= 2 && b[0]=='B'  && b[1]=='M')                           ext = ".bmp";
-        else if (n >= 4 && b[0]=='D'  && b[1]=='D' && b[2]=='S' && b[3]==' ') ext = ".dds";
-        static int cont = 0; char buf[40]; sprintf(buf, "embedded_%d%s", cont++, ext); fn = buf;
+    // LA EXTENSION la dicen los bytes, no el archivo: con el nombre que traia el FBX se podia dejar cualquier cosa al
+    // lado del modelo (un "x.lua", un "version.dll" en Descargas). Algo que no es una imagen conocida no se escribe
+    const unsigned char* b = (const unsigned char*)&bytes[0]; size_t n = bytes.size();
+    const char* ext = NULL;
+    if      (n >= 4 && b[0]==0x89 && b[1]=='P' && b[2]=='N' && b[3]=='G') ext = ".png";
+    else if (n >= 3 && b[0]==0xFF && b[1]==0xD8 && b[2]==0xFF)            ext = ".jpg";
+    else if (n >= 2 && b[0]=='B'  && b[1]=='M')                           ext = ".bmp";
+    else if (n >= 4 && b[0]=='D'  && b[1]=='D' && b[2]=='S' && b[3]==' ') ext = ".dds";
+    if (!ext) return std::string();
+    // el nombre: el del RelativeFilename sin carpetas ni extension, con letras, numeros, - _ . y espacios
+    std::string stem = name;
+    const size_t slash = stem.find_last_of("/\\");
+    if (slash != std::string::npos) stem = stem.substr(slash + 1);
+    const size_t dot = stem.find_last_of('.');
+    if (dot != std::string::npos) stem = stem.substr(0, dot);
+    std::string fn;
+    for (size_t i = 0; i < stem.size(); i++) {
+        const char c = stem[i];
+        fn += ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
+               c == '.' || c == ' ') ? c : '_';
     }
+    if (fn.empty() || fn[0] == '.') { static int cont = 0; char buf[40]; sprintf(buf, "embedded_%d", cont++); fn = buf; }
+    fn += ext;
     std::string path = w3dFileSystem::JoinPath(fbxDir, fn);
     if (w3dFileSystem::FileExists(path)) return path;          // ya existe (materializada antes o el autor la dejo)
     if (!w3dFileSystem::WriteTextFile(path, bytes)) return std::string();
@@ -815,7 +839,7 @@ bool ImportFBX(const std::string& filepath) {
         size_t rem = (size_t)(r.end - r.p);
         if (rem < (w64 ? 25u : 13u)) break;
         FNode n;
-        if (!ReadNode(r, base, w64, n)) break;
+        if (!ReadNode(r, base, w64, n, 0)) break;
         root.kids.push_back(n);
         ProgressUpdate(0.35f * (float)(r.p - base) / (float)bytes.size()); // avance por bytes consumidos
     }

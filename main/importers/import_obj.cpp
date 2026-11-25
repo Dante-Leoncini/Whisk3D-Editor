@@ -256,16 +256,21 @@ bool TexturesSleepMaterial(Material* m) {
         }
         m->layers.clear();
     }
-    if (d.base.empty() && d.normal.empty() && d.texB.empty() && d.layers.empty()) return false;
+    bool maps = false;
+    for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++) if (!d.maps[k].empty()) maps = true;
+    if (d.base.empty() && d.normal.empty() && d.texB.empty() && d.layers.empty() && !maps) return false;
     loose.push_back(m->texture);
     loose.push_back(m->normalTexture);
     loose.push_back(m->textureB);
     m->texture = NULL;
     m->normalTexture = NULL;
     m->textureB = NULL;
+    // los mapas (emision...) tambien: se anotaban pero seguian en la ranura, asi que no salian de la GPU y al despertar
+    // WakeOne los salteaba
+    for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++) { loose.push_back(m->mapTex[k]); m->mapTex[k] = NULL; }
     TexturesSleep(d);
-    // las ranuras sueltan su referencia (la textura que ningun otro material retiene se libera YA)
-    for (size_t i = 0; i < loose.size(); i++) TextureRelease(loose[i]);
+    // las ranuras sueltan su referencia (la textura que ningun otro material retiene se libera YA, tambien en el editor)
+    for (size_t i = 0; i < loose.size(); i++) TextureReleaseAsleep(loose[i]);
     return true;
 }
 int TexturesWakeUsed() {
@@ -866,9 +871,19 @@ bool ReadOBJ(const std::vector<const char*>& lines,
                 int parts[4]; bool has[4];
                 for (int i = 0; i < 4; i++) { parts[i] = 0; has[i] = false; }
                 // corner = v[/vt[/vn[/vc]]] (campos vacios en "v//vn")
+                const char* start = p;
                 for (int pi = 0; pi < 4; pi++) {
-                    if ((*p>='0'&&*p<='9') || *p=='-') { char* e; parts[pi] = (int)strtol(p, &e, 10); has[pi] = true; p = e; }
+                    if ((*p>='0'&&*p<='9') || *p=='-') {
+                        char* e; const long n = strtol(p, &e, 10);
+                        if (e != p) { parts[pi] = (int)n; has[pi] = true; p = e; }
+                    }
                     if (*p == '/') p++; else break; // proximo campo, o fin del corner
+                }
+                // (algo que no es un corner -"f 1 2 x", un "-" suelto-: antes 'p' no avanzaba y se juntaban corners
+                //  para siempre hasta quedarse sin memoria. Se saltea hasta el proximo espacio)
+                if (p == start || !has[0]) {
+                    while (*p && *p!=' ' && *p!='\t' && *p!='\r' && *p!='\n') p++;
+                    continue;
                 }
                 // indices GLOBALES del .obj -> LOCALES (resto lo acumulado antes)
                 fc.vertex = parts[0] - 1 - *accumulatedVertices;
@@ -895,7 +910,9 @@ bool ReadOBJ(const std::vector<const char*>& lines,
                 while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') p++;
                 if (!*p) break;
                 if (!((*p>='0'&&*p<='9') || *p=='-')) { p++; continue; }
-                char* e; long gv = strtol(p, &e, 10); p = e;
+                char* e; long gv = strtol(p, &e, 10);
+                if (e == p) { p++; continue; }   // (un "-" suelto: sin esto no avanzaba nunca)
+                p = e;
                 while (*p=='/' || (*p>='0'&&*p<='9')) p++; // por si viniera 'l v/vt' (raro): ignoramos vt
                 int loc = (int)gv - 1 - *accumulatedVertices;
                 if (prev >= 0 && prev != loc) { Wobj.looseEdges.push_back(prev); Wobj.looseEdges.push_back(loc); }

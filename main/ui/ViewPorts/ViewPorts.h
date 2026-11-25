@@ -61,6 +61,18 @@ extern ViewportBase* rootViewport;
 
 // Funciones globales
 void CalcBorderUV(int texW, int texH);
+// ---- LOS PANELES GUARDADOS MIENTRAS SE NAVEGA (ViewPorts.cpp): girar, mover o acercar una vista 3D no cambia nada de
+//      los paneles. En esos cuadros la pantalla de los paneles se pinta de una imagen guardada y se dibujan solo las
+//      vistas 3D (en el Galaxy Ace los paneles eran ~20 ms de cada cuadro). Lo usan los dos loops (main.cpp y Symbian)
+void W3dViewCacheNavigated();   // una vista 3D giro / se movio / se acerco en este cuadro (solo la vista)
+void W3dViewCacheChanged();     // algo de los paneles cambio en este cuadro aunque se navegue (la camara que sigue a la vista)
+// antes de dibujar el arbol: true = la imagen guardada ya esta en la pantalla y hay que dibujar solo las vistas 3D
+// (W3dViewCacheRender3D). w y h: el tamanio de la pantalla en pixeles
+bool W3dViewCacheBegin(ViewportBase* root, int w, int h);
+void W3dViewCacheRender3D(ViewportBase* root);
+// despues de dibujar el arbol (antes de los menus y los avisos): con el primer cuadro de una navegacion guarda la
+// pantalla; un cuadro entero sin navegar la descarta (los paneles pudieron cambiar)
+void W3dViewCacheEnd(int w, int h, bool only3D);
 ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my);
 void SetGlobalScale(int scale);
 void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp);

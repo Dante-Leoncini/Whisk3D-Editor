@@ -37,7 +37,7 @@ public:
 
     LightProbe(Object* parent = NULL, Vector3 pos = Vector3(0, 0, 0));
     ~LightProbe();
-    ObjectType getType() W3D_OVERRIDE { return ObjectType::sondaluz; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::lightProbe; }
     void RenderObject() W3D_OVERRIDE;
     bool DrawsSomething() W3D_OVERRIDE;
 

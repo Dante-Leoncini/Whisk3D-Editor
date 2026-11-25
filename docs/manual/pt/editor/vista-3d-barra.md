@@ -187,7 +187,7 @@ Cada opção está em [Modo Objeto](modo-objeto.md). No Modo Edição, este bot�
 | Prévia ZBuffer | A profundidade: claro perto, escuro longe. |
 | Vista Normal | As normais, em cores. |
 | Prévia Alpha | A transparência, em preto e branco. |
-| Vetores de movimento | Quanto cada pixel se moveu desde o quadro anterior (vermelho = X, verde = Y). É a mesma imagem da passada `_vectores` do render. |
+| Vetores de movimento | Quanto cada pixel se moveu desde o quadro anterior (vermelho = X, verde = Y). É a mesma imagem da passada `_vectors` do render. |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> passa para o modo seguinte. ![Nokia](../tutoriales/img/icono-nokia.svg) No N95, o <kbd>6</kbd>.
 

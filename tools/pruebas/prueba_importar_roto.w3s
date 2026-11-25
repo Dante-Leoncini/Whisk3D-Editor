@@ -1,0 +1,8 @@
+# ARCHIVOS ROTOS O ARMADOS A PROPOSITO: el import falla limpio (o importa lo que sirve), nunca cuelga ni revienta.
+#   roto_tokens.obj: "f 1 2 x", un "-" suelto en una cara y en una linea "l": el lector no avanzaba y juntaba
+#                    esquinas hasta quedarse sin memoria. Importa la cara buena.
+#   roto_hondo.gltf: 20 mil "[" anidados: el parser JSON recursivo agotaba la pila. Ahora corta a los 128 niveles.
+#   roto_ciclo.fbx:  un nodo cuyo final cae ANTES de su comienzo: el lector volvia atras y releia para siempre.
+import roto_tokens.obj
+fail import roto_hondo.gltf
+fail import roto_ciclo.fbx

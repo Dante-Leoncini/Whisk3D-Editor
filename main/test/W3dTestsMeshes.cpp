@@ -726,8 +726,17 @@ bool CmdMeshLook(std::istringstream& ss, std::string& err) {
     for (int pass = 0; pass < 2 && snapOk; pass++) {
         Vector3 c(0, 0, 0);
         if (pass == 0) {
-            const int a = (*A)[0], b = (*A)[1];
-            c = (Vector3(m->vertex[a*3], m->vertex[a*3+1], m->vertex[a*3+2]) + Vector3(m->vertex[b*3], m->vertex[b*3+1], m->vertex[b*3+2])) * 0.5f;
+            // la arista MAS LARGA en pantalla: la 0 de una esfera es del polo, donde 32 centros caen a menos de un pixel
+            // entre si y el cursor (redondeado a pixel) engancha al vecino
+            float bestLen = -1.0f;
+            for (size_t e = 0; e + 1 < A->size(); e += 2) {
+                const int a = (*A)[e], b = (*A)[e + 1];
+                const Vector3 va(m->vertex[a*3], m->vertex[a*3+1], m->vertex[a*3+2]), vb(m->vertex[b*3], m->vertex[b*3+1], m->vertex[b*3+2]);
+                float ax, ay, bx, by;
+                if (!vp->ProjectPoint(W * va, ax, ay) || !vp->ProjectPoint(W * vb, bx, by)) continue;
+                const float len = (bx - ax) * (bx - ax) + (by - ay) * (by - ay);
+                if (len > bestLen) { bestLen = len; c = (va + vb) * 0.5f; }
+            }
         } else {
             const std::vector<int>& id = (*F)[0].idx;
             for (size_t q = 0; q < id.size(); q++) c = c + Vector3(m->vertex[id[q]*3], m->vertex[id[q]*3+1], m->vertex[id[q]*3+2]);

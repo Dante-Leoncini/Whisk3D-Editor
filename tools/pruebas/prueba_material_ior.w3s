@@ -14,9 +14,9 @@ scale 2
 selobj Cubo
 propstab 2
 tick
+# el "+" de la tarjeta Material: un material nuevo en una capa nueva, que queda elegida (lo que edita la tarjeta)
 propclick New Material
 tick
-menupick New Material
 tick
 rtopt 1 1 4 1
 tick

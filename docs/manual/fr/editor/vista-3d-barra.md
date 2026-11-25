@@ -187,7 +187,7 @@ Chaque option se trouve dans [Mode Objet](modo-objeto.md). En Mode Édition, ce 
 | Aperçu ZBuffer | La profondeur : clair de près, sombre de loin. |
 | Vue normale | Les normales, en couleurs. |
 | Aperçu alpha | La transparence, en noir et blanc. |
-| Vecteurs de mouvement | De combien chaque pixel a bougé depuis l'image précédente (rouge = X, vert = Y). C'est la même image que la passe `_vectores` du rendu. |
+| Vecteurs de mouvement | De combien chaque pixel a bougé depuis l'image précédente (rouge = X, vert = Y). C'est la même image que la passe `_vectors` du rendu. |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> passe au mode suivant. ![Nokia](../tutoriales/img/icono-nokia.svg) Sur le N95, le <kbd>6</kbd>.
 

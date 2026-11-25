@@ -187,7 +187,7 @@
 | ZBuffer Preview | 深度：近处亮，远处暗。 |
 | Normal View | 用颜色显示法线。 |
 | Alpha Preview | 用黑白显示透明度。 |
-| Motion vectors | 每个像素自上一帧以来移动了多少（红 = X，绿 = Y）。与渲染的 `_vectores` 通道是同一张图。 |
+| Motion vectors | 每个像素自上一帧以来移动了多少（红 = X，绿 = Y）。与渲染的 `_vectors` 通道是同一张图。 |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> 切换到下一个模式。![Nokia](../tutoriales/img/icono-nokia.svg) 在 N95 上按 <kbd>6</kbd>。
 

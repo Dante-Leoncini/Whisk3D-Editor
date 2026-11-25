@@ -80,15 +80,17 @@ OPT  := -O2 -ffunction-sections -fdata-sections
 # pruebas de w3d_3ds.cpp (1 = rendimiento, 2 = el cierre). Solo las usa ese archivo: se recompila cuando cambian (prueba.flags)
 PRUEBA_DEFS :=
 ifneq ($(CAPTURA),)
-PRUEBA_DEFS += -DW3D_3DS_CAPTURA=$(CAPTURA)
+PRUEBA_DEFS += -DW3D_3DS_CAPTURE=$(CAPTURA)
 endif
 ifneq ($(PRUEBA),)
-PRUEBA_DEFS += -DW3D_3DS_PRUEBA=$(PRUEBA)
+PRUEBA_DEFS += -DW3D_3DS_TEST=$(PRUEBA)
 endif
 # (-include climits: el limits.h de newlib define LLONG_MAX solo en C; el <climits> de libstdc++ lo trae en C++. Sin
 # eso Lua dice que no hay 'long long' y el lua_Integer de C y el de C++ no coincidirian)
 # (-MMD -MP: cada objeto anota los headers que usa, en su .d; si un header cambia, se recompila lo que lo incluye)
-CXXFLAGS_W3D := $(ARCH) $(OPT) -std=gnu++17 -include climits $(DEFS) $(INCS) -w -MMD -MP
+# (-fno-exceptions: el codigo no lanza ni atrapa excepciones -salvo el harness de pruebas, que aca no va-; sus tablas
+#  eran casi 1 MB de la RAM de la Dreamcast)
+CXXFLAGS_W3D := $(ARCH) $(OPT) -std=gnu++17 -fno-exceptions -include climits $(DEFS) $(INCS) -w -MMD -MP
 CFLAGS_W3D   := $(ARCH) $(OPT) -std=gnu99 $(DEFS) $(INCS) -w -MMD -MP
 
 all: $(TARGET)

@@ -2120,7 +2120,7 @@ static bool CmdGame3DBool(std::istringstream& ss, std::string& err) {
     const std::string dir = PrReadPath(ss);
     if (dir.empty()) { err = "game3dbool: uso: game3dbool <carpeta>"; return false; }
     std::string e2;
-    if (!W3dRunCommand("game3dmin " + dir, e2)) { err = "game3dbool: " + e2; return false; }
+    if (!W3dRunCommand("game3dmin " + dir + " light", e2)) { err = "game3dbool: " + e2; return false; }   // (compara pixeles)
     Object* oc = SceneCollection ? FindObjectByName(SceneCollection, "Cubo") : NULL;
     if (!oc || oc->getType() != ObjectType::mesh) { err = "game3dbool: juego3dmin no dejo el 'Cubo'"; return false; }
     Mesh* cube = (Mesh*)oc;
@@ -2327,7 +2327,7 @@ static bool CmdW3dbGame(std::istringstream& ss, std::string& err) {
         g_w3dFormatForcedMeshes = forcedPrev;
         std::string e2;
         if (!g2) reason = "no pude guardar la escena abierta como el juego";
-        else if (!W3dRunCommand("w3dequal " + path + " " + path2 + " mallas/", e2))
+        else if (!W3dRunCommand("w3dequal " + path + " " + path2 + " meshes/", e2))
             reason = "guardar lo abierto como el juego no da las mismas mallas: " + e2;
     }
     // la escena abierta como el juego no es para editar: se cierra
@@ -2458,10 +2458,10 @@ static bool CmdW3dbForeign(std::istringstream& ss, std::string& err) {
     for (size_t g = 0; g < m->materialsGroup.size(); g++) m->materialsGroup[g].material = NULL;
     std::string txt;
     W3dMeshWrite(m, txt, 0);
-    const std::string reqDef = "requiere V F\n";
+    const std::string reqDef = "requires V F\n";
     const size_t pr = txt.find(reqDef);
-    if (pr == std::string::npos) { err = "w3dbforeign: el .w3dm del cubo no trae 'requiere V F'"; return false; }
-    txt.replace(pr, reqDef.size(), "requiere V F NRM UV\n");
+    if (pr == std::string::npos) { err = "w3dbforeign: el .w3dm del cubo no trae 'requires V F'"; return false; }
+    txt.replace(pr, reqDef.size(), "requires V F NRM UV\n");
     txt += "\n# bloques de una version mas nueva de Whisk3D\n";
     txt += "X.PC2.PLIEGUE 2 face peso=alto\n 0 0.25\n 1 0.75\nEND\n";
     txt += "X.PC2.NOTA 1 global\n hecho en 2029\nEND\n";
@@ -2480,7 +2480,7 @@ static bool CmdW3dbForeign(std::istringstream& ss, std::string& err) {
     // 1) texto: la referencia
     g_w3dFormatForcedMeshes = W3D_MESHES_TEXT;
     if (!SaveW3D(rT) || !PrEntryMesh(rT, ".w3dm", e0)) reason = "no pude guardar el texto de referencia";
-    else if (e0.find("requiere V F NRM UV\n") == std::string::npos || e0.find("X.PC2.PLIEGUE") == std::string::npos ||
+    else if (e0.find("requires V F NRM UV\n") == std::string::npos || e0.find("X.PC2.PLIEGUE") == std::string::npos ||
              e0.find("X.PC2.NOTA") == std::string::npos) reason = "el .w3dm de referencia no trae el requiere o los bloques ajenos";
     // 2) binario: van en AJEN
     if (reason.empty()) {

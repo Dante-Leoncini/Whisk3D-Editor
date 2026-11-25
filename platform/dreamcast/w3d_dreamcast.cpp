@@ -36,12 +36,16 @@ static _Unwind_Reason_Code AnnotateCall(struct _Unwind_Context* ctx, void* count
 }
 static void OnFinish() {
     printf("[cuelgue] excepcion de C++ sin atrapar");
+#if defined(__cpp_exceptions) || defined(__EXCEPTIONS)
+    // (el texto de la excepcion: solo compilando con excepciones; sin ellas -el Makefile- solo puede venir de la libreria
+    //  estandar, por ejemplo un new sin memoria)
     std::exception_ptr e = std::current_exception();
     if (e) {
         try { std::rethrow_exception(e); }
         catch (const std::exception& x) { printf(": %s", x.what()); }
         catch (...) {}
     }
+#endif
     printf("\n[cuelgue] pila (sh-elf-addr2line -Cfpe whisk3d_debug.elf ...):");
     int n = 0;
     _Unwind_Backtrace(AnnotateCall, &n);

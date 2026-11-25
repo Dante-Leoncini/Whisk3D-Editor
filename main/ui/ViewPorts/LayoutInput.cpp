@@ -1294,16 +1294,16 @@ static PopupMenu* LayoutCtxSelectMenu() {
 static void LayoutFillMenuSelect(PopupMenu* MenuSelect) {
     if (!MenuSelect) return;
     MenuSelect->Clear();
-    MenuSelect->Add(T("All"), 0)->shortcut = "@3d.seleccionarTodo";
-    MenuSelect->Add(T("None"), 1)->shortcut = "@3d.deseleccionar";
-    MenuSelect->Add(T("Invert"), 2)->shortcut = "@3d.invertir";
+    MenuSelect->Add(T("All"), 0)->shortcut = "@3d.selectAll";
+    MenuSelect->Add(T("None"), 1)->shortcut = "@3d.deselect";
+    MenuSelect->Add(T("Invert"), 2)->shortcut = "@3d.invert";
     // BOX SELECT: arma la caja (igual que la tecla). El atajo va en el item para que se
     // aprenda solo -- desde el menu hace exactamente lo mismo que apretar B.
-    MenuSelect->Add(T("Box Select"), 30)->shortcut = "@3d.caja";
+    MenuSelect->Add(T("Box Select"), 30)->shortcut = "@3d.box";
     // (sin "Ver seleccion": lo elegido se ve siempre con su contorno; que se ve y que no lo maneja el Outliner)
     if (InteractionMode == EditMode) {
         // Select Linked (L): selecciona la ISLA conexa. Desde el menu = guiado (pide click sobre el elemento).
-        MenuSelect->Add(T("Select Linked"), 15)->shortcut = "@3d.vinculado";
+        MenuSelect->Add(T("Select Linked"), 15)->shortcut = "@3d.linked";
         if (EditSelectMode == SelEdge) {
             MenuSelect->Add(T("Loop Select (Edge Loop)"), 11)->shortcut = "Shift Alt Click";
             MenuSelect->Add(T("Loop Select (Edge Ring)"), 12);
@@ -2412,7 +2412,7 @@ static void LayoutOpenMenuUV(UVEditor* uv, int x, int y) {
     gMenuUV->AddCheck(T("Repeat Texture"), 1, &uv->repeatTexture);
     gMenuUV->AddCheck(T("Show Chrome UV"), 2, &uv->showChromeUV); // overlay LIVE del reflejo equirect (demo)
     // ENCUADRAR (el UV era el UNICO viewport sin esto): la seleccion, o todo el mapa visible.
-    gMenuUV->Add(T("Frame Selected"), 10)->shortcut = "@uv.encuadrar";
+    gMenuUV->Add(T("Frame Selected"), 10)->shortcut = "@uv.focus";
     gMenuUV->Add(T("Frame All"), 11);
     gMenuUV->action = LayoutActionUVView;
     if (OpenMenu && OpenMenu != gMenuUV) OpenMenu->Close();
@@ -2502,10 +2502,10 @@ static void LayoutOpenMenuUVSelect(UVEditor* uv, int x, int y) {
         gMenuUVSelect = new PopupMenu();
         gMenuUVSelect->title  = T("Select");
         gMenuUVSelect->action = LayoutActionUVSelect;
-        gMenuUVSelect->Add(T("All"), 0)->shortcut = "@uv.seleccionarTodo";
-        gMenuUVSelect->Add(T("None"), 1)->shortcut = "@uv.deseleccionar";
-        gMenuUVSelect->Add(T("Invert"), 2)->shortcut = "@uv.invertir";
-        gMenuUVSelect->Add(T("Select Linked"), 15)->shortcut = "@uv.vinculado";
+        gMenuUVSelect->Add(T("All"), 0)->shortcut = "@uv.selectAll";
+        gMenuUVSelect->Add(T("None"), 1)->shortcut = "@uv.deselect";
+        gMenuUVSelect->Add(T("Invert"), 2)->shortcut = "@uv.invert";
+        gMenuUVSelect->Add(T("Select Linked"), 15)->shortcut = "@uv.linked";
     }
     if (OpenMenu && OpenMenu != gMenuUVSelect) OpenMenu->Close();
     gMenuUVSelect->Open(x, y, MenuScreenW, MenuScreenH);
@@ -2905,9 +2905,9 @@ static void LayoutOpenMenu2DSelect(int x, int y) {
         gMenu2DSelect = new PopupMenu();
         gMenu2DSelect->title  = T("Select");
         gMenu2DSelect->action = LayoutAction2DSelect;
-        gMenu2DSelect->Add(T("All"), 0)->shortcut = "@2d.seleccionarTodo";
-        gMenu2DSelect->Add(T("None"), 1)->shortcut = "@2d.deseleccionar";
-        gMenu2DSelect->Add(T("Invert"), 2)->shortcut = "@2d.invertir";
+        gMenu2DSelect->Add(T("All"), 0)->shortcut = "@2d.selectAll";
+        gMenu2DSelect->Add(T("None"), 1)->shortcut = "@2d.deselect";
+        gMenu2DSelect->Add(T("Invert"), 2)->shortcut = "@2d.invert";
     }
     if (OpenMenu && OpenMenu != gMenu2DSelect) OpenMenu->Close();
     gMenu2DSelect->Open(x, y, MenuScreenW, MenuScreenH);
@@ -2956,17 +2956,17 @@ static void LayoutOpenMenu2DObj(Editor2D* ed, int x, int y) {
     if (!gMenu2DObj) {
         gMenu2DXform = new PopupMenu();
         gMenu2DXform->action = LayoutAction2DObject;
-        gMenu2DXform->Add(T("Move"), 100)->shortcut = "@2d.mover";
-        gMenu2DXform->Add(T("Rotate"), 101)->shortcut = "@2d.rotar";
-        gMenu2DXform->Add(T("Scale"), 102)->shortcut = "@2d.escalar";
+        gMenu2DXform->Add(T("Move"), 100)->shortcut = "@2d.move";
+        gMenu2DXform->Add(T("Rotate"), 101)->shortcut = "@2d.rotate";
+        gMenu2DXform->Add(T("Scale"), 102)->shortcut = "@2d.scale";
         gMenu2DObj = new PopupMenu();
         gMenu2DObj->title  = T("Object");
         gMenu2DObj->action = LayoutAction2DObject;
         gMenu2DObj->Add(T("Transform"), 0, -1, gMenu2DXform);
-        gMenu2DObj->Add(T("Duplicate Objects"), 1)->shortcut = "@2d.duplicar";
+        gMenu2DObj->Add(T("Duplicate Objects"), 1)->shortcut = "@2d.duplicate";
         gMenu2DObj->Add(T("Set Parent"), 40);
         gMenu2DObj->Add(T("Clear Parent"), 41);
-        gMenu2DObj->Add(T("Delete"), 3, IconType::trash)->shortcut = "@2d.borrar";
+        gMenu2DObj->Add(T("Delete"), 3, IconType::trash)->shortcut = "@2d.delete";
     }
     if (OpenMenu && OpenMenu != gMenu2DObj) OpenMenu->Close();
     gMenu2DObj->Open(x, y, MenuScreenW, MenuScreenH);
@@ -2994,8 +2994,8 @@ static void LayoutOpenMenu2DView(Editor2D* ed, int x, int y) {
         // todos los Editor2D -> el checkbox se RE-APUNTA abajo, en cada apertura.
         gItem2DGameView = gMenu2DView->AddCheck(T("Game View"), 11,
                                                       ed ? &ed->gameView : NULL);
-        gItem2DGameView->shortcut = "@2d.vistaJuego";
-        gMenu2DView->Add(T("Frame Selected"), 10)->shortcut = "@2d.encuadrar";
+        gItem2DGameView->shortcut = "@2d.gameView";
+        gMenu2DView->Add(T("Frame Selected"), 10)->shortcut = "@2d.focus";
         gMenu2DView->Add(T("Zoom 1:1"), 1);   // pixel-perfect: un px del lienzo = uno real
         gMenu2DView->Add(T("Zoom 2:1"), 2);
         gMenu2DView->Add(T("Zoom 3:1"), 3);
@@ -3250,13 +3250,13 @@ static void LayoutOpenMenuIDEEdit(IDE* ide, int x, int y) {
     gIDEEditFrom = ide;
     if (!gMenuIDEEdit) { gMenuIDEEdit = new PopupMenu(); gMenuIDEEdit->action = LayoutActionIDEEdit; }
     gMenuIDEEdit->Clear();
-    gMenuIDEEdit->Add(T("Undo"), IDEE_Undo, (int)IconType::undo)->shortcut = "@ide.deshacer";
-    gMenuIDEEdit->Add(T("Redo"), IDEE_Redo, (int)IconType::redo)->shortcut = "@ide.rehacer";
-    gMenuIDEEdit->Add(T("Cut"), IDEE_Cut, IconType::scissors)->shortcut = "@ide.cortar";
-    gMenuIDEEdit->Add(T("Copy"), IDEE_Copy, IconType::copy)->shortcut = "@ide.copiar";
-    gMenuIDEEdit->Add(T("Paste"), IDEE_Paste, IconType::paste)->shortcut = "@ide.pegar";
-    gMenuIDEEdit->Add(T("Find..."), IDEE_Find)->shortcut = "@ide.buscar";
-    gMenuIDEEdit->Add(T("Replace..."), IDEE_Replace)->shortcut = "@ide.reemplazar";
+    gMenuIDEEdit->Add(T("Undo"), IDEE_Undo, (int)IconType::undo)->shortcut = "@ide.undo";
+    gMenuIDEEdit->Add(T("Redo"), IDEE_Redo, (int)IconType::redo)->shortcut = "@ide.redo";
+    gMenuIDEEdit->Add(T("Cut"), IDEE_Cut, IconType::scissors)->shortcut = "@ide.cut";
+    gMenuIDEEdit->Add(T("Copy"), IDEE_Copy, IconType::copy)->shortcut = "@ide.copy";
+    gMenuIDEEdit->Add(T("Paste"), IDEE_Paste, IconType::paste)->shortcut = "@ide.paste";
+    gMenuIDEEdit->Add(T("Find..."), IDEE_Find)->shortcut = "@ide.find";
+    gMenuIDEEdit->Add(T("Replace..."), IDEE_Replace)->shortcut = "@ide.replace";
     if (OpenMenu && OpenMenu != gMenuIDEEdit) OpenMenu->Close();
     gMenuIDEEdit->Open(x, y, MenuScreenW, MenuScreenH);
     OpenMenu = gMenuIDEEdit;
@@ -3266,7 +3266,7 @@ static void LayoutOpenMenuIDESelect(IDE* ide, int x, int y) {
     gIDEEditFrom = ide;
     if (!gMenuIDESelect) { gMenuIDESelect = new PopupMenu(); gMenuIDESelect->action = LayoutActionIDEEdit; }
     gMenuIDESelect->Clear();
-    gMenuIDESelect->Add(T("Select All"), IDEE_All)->shortcut = "@ide.todo";
+    gMenuIDESelect->Add(T("Select All"), IDEE_All)->shortcut = "@ide.all";
     if (OpenMenu && OpenMenu != gMenuIDESelect) OpenMenu->Close();
     gMenuIDESelect->Open(x, y, MenuScreenW, MenuScreenH);
     OpenMenu = gMenuIDESelect;
@@ -3525,13 +3525,13 @@ static void LayoutOpenMenuUVArmature(UVEditor* uv, int x, int y) {
         gMenuUVArm = new PopupMenu();
         gMenuUVArm->title  = T("Armature");
         gMenuUVArm->action = LayoutActionUVArm;
-        gMenuUVArm->Add(T("Extrude"), 0)->shortcut = "@uv.extruir";
-        gMenuUVArm->Add(T("Duplicate"), 1)->shortcut = "@uv.duplicar";
-        gMenuUVArm->Add(T("Delete"), 2)->shortcut = "@uv.borrar";
+        gMenuUVArm->Add(T("Extrude"), 0)->shortcut = "@uv.extrude";
+        gMenuUVArm->Add(T("Duplicate"), 1)->shortcut = "@uv.duplicate";
+        gMenuUVArm->Add(T("Delete"), 2)->shortcut = "@uv.delete";
         // Set Parent y Clear Parent son SUBMENUS de 2 opciones cada uno (Keep Offset/Connected y
         // Disconnect Bone/Clear Parent): despachan por SU action propia (Parent.cpp)
-        gMenuUVArm->Add(T("Set Parent"), 3, -1, LayoutSubmenuBoneCtrlP())->shortcut = "@global.emparentar";
-        gMenuUVArm->Add(T("Clear Parent"), 4, -1, LayoutSubmenuBoneAltP())->shortcut = "@global.desemparentar";
+        gMenuUVArm->Add(T("Set Parent"), 3, -1, LayoutSubmenuBoneCtrlP())->shortcut = "@global.parent";
+        gMenuUVArm->Add(T("Clear Parent"), 4, -1, LayoutSubmenuBoneAltP())->shortcut = "@global.clearParent";
     }
     if (OpenMenu && OpenMenu != gMenuUVArm) OpenMenu->Close();
     gMenuUVArm->Open(x, y, MenuScreenW, MenuScreenH);
@@ -4077,16 +4077,16 @@ void LayoutMenuArmEdit(int mx, int my) {
         gMenuArmEdit = new PopupMenu();
         gMenuArmEdit->title  = T("Armature");
         gMenuArmEdit->action = LayoutActionObject;
-        gMenuArmEdit->Add(T("Extrude Bone"), 600)->shortcut = "@3d.extruir";
-        gMenuArmEdit->Add(T("Move"), 604)->shortcut = "@3d.mover";
-        gMenuArmEdit->Add(T("Rotate"), 605)->shortcut = "@3d.rotar";
-        gMenuArmEdit->Add(T("Scale"), 606)->shortcut = "@3d.escalar";
-        gMenuArmEdit->Add(T("Duplicate"), 601)->shortcut = "@3d.duplicar";
-        gMenuArmEdit->Add(T("Delete"), 602)->shortcut = "@3d.borrar";
+        gMenuArmEdit->Add(T("Extrude Bone"), 600)->shortcut = "@3d.extrude";
+        gMenuArmEdit->Add(T("Move"), 604)->shortcut = "@3d.move";
+        gMenuArmEdit->Add(T("Rotate"), 605)->shortcut = "@3d.rotate";
+        gMenuArmEdit->Add(T("Scale"), 606)->shortcut = "@3d.scale";
+        gMenuArmEdit->Add(T("Duplicate"), 601)->shortcut = "@3d.duplicate";
+        gMenuArmEdit->Add(T("Delete"), 602)->shortcut = "@3d.delete";
         // Set Parent y Clear Parent: submenus de 2 opciones cada uno (Keep Offset/Connected y
         // Disconnect Bone/Clear Parent); despachan por SU action (Parent.cpp), no por los 600s
-        gMenuArmEdit->Add(T("Set Parent"), 607, -1, LayoutSubmenuBoneCtrlP())->shortcut = "@global.emparentar";
-        gMenuArmEdit->Add(T("Clear Parent"), 608, -1, LayoutSubmenuBoneAltP())->shortcut = "@global.desemparentar";
+        gMenuArmEdit->Add(T("Set Parent"), 607, -1, LayoutSubmenuBoneCtrlP())->shortcut = "@global.parent";
+        gMenuArmEdit->Add(T("Clear Parent"), 608, -1, LayoutSubmenuBoneAltP())->shortcut = "@global.clearParent";
     }
     BoneAltPContext3D(); // el submenu Clear Parent opera sobre los huesos 3D en edicion
     gMenuArmEdit->Open(mx, my, MenuScreenW, MenuScreenH);
@@ -4116,8 +4116,8 @@ static void ContextWithUndo(int mx, int my) {
     c->title = base->title; c->action = base->action;
     g_ctxHasUndo = UndoHasSomething(); g_ctxHasRedo = UndoHasRedo();
     const int idUndo = 900001, idRedo = 900002;   // (no chocan con los de ningun menu)
-    MenuItem* u = c->Add(T("Undo"), idUndo, (int)IconType::undo); u->action = CtxUndo; u->shortcut = "@global.deshacer"; u->gray = &g_ctxHasUndo;
-    MenuItem* r = c->Add(T("Redo"), idRedo, (int)IconType::redo);  r->action = CtxRedo;  r->shortcut = "@global.rehacer";  r->gray = &g_ctxHasRedo;
+    MenuItem* u = c->Add(T("Undo"), idUndo, (int)IconType::undo); u->action = CtxUndo; u->shortcut = "@global.undo"; u->gray = &g_ctxHasUndo;
+    MenuItem* r = c->Add(T("Redo"), idRedo, (int)IconType::redo);  r->action = CtxRedo;  r->shortcut = "@global.redo";  r->gray = &g_ctxHasRedo;
     for (size_t i = 0; i < base->items.size(); i++) {
         const MenuItem* o = base->items[i];
         MenuItem* n = c->Add(o->text, o->id, o->icon, o->submenu);
@@ -4225,7 +4225,7 @@ PopupMenu* LayoutSubmenuEditFace() {
     if (!gMenuFace) {
         gMenuFace = new PopupMenu(); gMenuFace->title = T("Face"); gMenuFace->action = LayoutActionObject;
         gMenuFace->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());   // (loop, vinculado, camino... ver LayoutCtxSelectMenu)
-        gMenuFace->Add(T("Extrude Faces"), 300)->shortcut = "@3d.extruir";
+        gMenuFace->Add(T("Extrude Faces"), 300)->shortcut = "@3d.extrude";
         gMenuFace->Add(T("Inset Faces"), 344)->shortcut = "I";   // (texto: la I del 3D es Insert Keyframe en la tabla)
         gMenuFace->Add(T("Bevel"), 345)->shortcut = "Ctrl+B";      // (los bordes de las caras elegidas)
         gMenuFace->Add(T("Loop Cut and Slide"), 340)->shortcut = "@3d.loopcut";
@@ -4233,7 +4233,7 @@ PopupMenu* LayoutSubmenuEditFace() {
         gMenuFace->Add(T("Shade Smooth"), 320);
         gMenuFace->Add(T("Shade Flat"), 321);
         gMenuFace->Add(T("Recalculate Normals"), 322);
-        gMenuFace->Add(T("Triangulate Faces"), 323)->shortcut = "@3d.triangular";
+        gMenuFace->Add(T("Triangulate Faces"), 323)->shortcut = "@3d.triangulate";
         // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
     }
     return gMenuFace;
@@ -4242,7 +4242,7 @@ PopupMenu* LayoutSubmenuEditEdge() {
     if (!gMenuEdge) {
         gMenuEdge = new PopupMenu(); gMenuEdge->title = T("Edge"); gMenuEdge->action = LayoutActionObject;
         gMenuEdge->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());
-        gMenuEdge->Add(T("Extrude Edges"), 300)->shortcut = "@3d.extruir";
+        gMenuEdge->Add(T("Extrude Edges"), 300)->shortcut = "@3d.extrude";
         gMenuEdge->Add(T("Loop Cut and Slide"), 340)->shortcut = "@3d.loopcut";
         gMenuEdge->Add(T("Bevel Edges"), 345)->shortcut = "Ctrl+B";
         gMenuEdge->Add(T("Rip"), 341)->shortcut = "@3d.rip";
@@ -4258,9 +4258,9 @@ PopupMenu* LayoutSubmenuEditVertex() {
     if (!gMenuVertex) {
         gMenuVertex = new PopupMenu(); gMenuVertex->title = T("Vertex"); gMenuVertex->action = LayoutActionObject;
         gMenuVertex->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());
-        gMenuVertex->Add(T("New Edge/Face from Vertices"), 310)->shortcut = "@3d.cara";
-        gMenuVertex->Add(T("Connect Vertex Path"), 342)->shortcut = "@3d.conectar";
-        gMenuVertex->Add(T("Extrude Vertices"), 300)->shortcut = "@3d.extruir";
+        gMenuVertex->Add(T("New Edge/Face from Vertices"), 310)->shortcut = "@3d.face";
+        gMenuVertex->Add(T("Connect Vertex Path"), 342)->shortcut = "@3d.connect";
+        gMenuVertex->Add(T("Extrude Vertices"), 300)->shortcut = "@3d.extrude";
         gMenuVertex->Add(T("Bevel Vertices"), 346)->shortcut = "Ctrl+Shift+B";
         gMenuVertex->Add(T("Slide Vertices"), 343)->shortcut = "@3d.slide";
         gMenuVertex->Add(T("Rip"), 341)->shortcut = "@3d.rip";
@@ -4333,7 +4333,7 @@ static PopupMenu* gMenuProp = NULL;
 void LayoutProportionalMenu(int mx, int my){
     if (!gMenuProp){ gMenuProp = new PopupMenu(); gMenuProp->title = T("Proportional Editing"); gMenuProp->action = LayoutActionObject; }
     gMenuProp->Clear();
-    gMenuProp->AddCheck(T("Enable"), 0, &g_prop.on)->shortcut = "@3d.proporcional";
+    gMenuProp->AddCheck(T("Enable"), 0, &g_prop.on)->shortcut = "@3d.proportional";
     // el resto en GRIS con el proportional apagado (como el menu Snap)
     gMenuProp->AddCheck(T("Connected Only"), 0, &g_prop.connected)->gray = &g_prop.on;
     for (int t = 0; t < PropTypes; t++){
@@ -5539,7 +5539,7 @@ PopupMenu* LayoutSubmenuNormals() {
         gMenuNormals = new PopupMenu();
         gMenuNormals->title  = T("Normals");
         gMenuNormals->action = LayoutActionObject;
-        gMenuNormals->Add(T("Recalculate Normals"), 322)->shortcut = "@3d.normales"; // orienta hacia afuera (cubo/esfera OK)
+        gMenuNormals->Add(T("Recalculate Normals"), 322)->shortcut = "@3d.normals"; // orienta hacia afuera (cubo/esfera OK)
         gMenuNormals->Add(T("Flip"), 324);                                    // simplemente invierte las normales
     }
     return gMenuNormals;

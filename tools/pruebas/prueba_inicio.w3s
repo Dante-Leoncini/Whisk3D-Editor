@@ -27,19 +27,22 @@ start close
 projectpending inicio_a.w3d
 start open
 start row 1 inicio_a.w3d
-# Nuevo archivo: la escena de arranque, sin archivo (con el cartel apagado, como en el harness, lo agregado se va)
+# Nuevo archivo: la escena de arranque, sin archivo (con el cartel apagado, como en el harness, lo agregado se va). Con
+# layouts guardados (siempre hay uno: el de Animacion viene de fabrica) primero muestra la lista; su fila 0 es el de siempre
 add cube
 selobj Cubo.001
+start touch 0
 start touch 0
 projectpending nofile
 fail selobj Cubo.001
 selobj Cubo
 start close
-# el boton "Nuevo proyecto" de la tarjeta Archivo hace lo mismo
+# el boton "Nuevo proyecto" de la tarjeta Archivo hace lo mismo (con layouts guardados, un menu: "Default" es el de siempre)
 openw3d ../debug/inicio_b.w3d
 add cube
 propstab 0
 propclick New project
+menupick Default
 projectpending nofile
 fail selobj Cubo.001
 selobj Cubo
@@ -52,6 +55,7 @@ add cube
 dialogshow si
 propstab 0
 propclick New project
+menupick Default
 projectpending inicio_b.w3d
 selobj Cubo.001
 dialogrespond cancel
@@ -59,6 +63,7 @@ projectpending inicio_b.w3d
 selobj Cubo.001
 # otra vez, ahora "seguir sin guardar": la escena de arranque
 propclick New project
+menupick Default
 dialogrespond continue
 projectpending nofile
 fail selobj Cubo.001
@@ -66,5 +71,6 @@ selobj Cubo
 # recien creado no hay nada sin guardar: no pregunta
 propstab 0
 propclick New project
+menupick Default
 projectpending nofile
 dialogshow no

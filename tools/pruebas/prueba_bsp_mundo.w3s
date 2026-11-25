@@ -15,7 +15,8 @@
 #   1) desde el cluster 0 el mundo dibuja 2 hojas, 2 caras y 2 draws (uno por
 #      material visible); la pared roja sale a la mitad (el lightmap en la
 #      unidad 1) y la verde entera; las salas 2 y 3 (en el frustum, fuera del
-#      PVS) quedan en el color de fondo; el cubo dinamico no pasa el PVS
+#      PVS) quedan en el color de fondo (el Clear color del dato viejo paso a Auto: el fondo
+#      del render, negro); el cubo dinamico no pasa el PVS
 #   2) con la camara en el cluster 3: la amarilla aparece, la roja no, el cubo
 #      dinamico pasa
 #   3) con el Culling apagado se dibuja todo (4 hojas, 4 draws)
@@ -32,8 +33,8 @@ loadtex
 bspinfo MundoBsp cluster 0 pvs 0 leaves 2 faces 2 draws 2
 scenepx -2 0 -0.5 es 128 0 0 16
 scenepx 0 0 -0.5 es 0 255 0 16
-scenepx 2 0 -0.5 es 13 13 13 10
-scenepx 4.6 0.6 -0.5 es 13 13 13 10
+scenepx 2 0 -0.5 es 0 0 0 10
+scenepx 4.6 0.6 -0.5 es 0 0 0 10
 
 # cluster 3 (X = 4): hojas 2 y 3, el cubo dinamico pasa
 selobj CamBsp
@@ -41,7 +42,7 @@ objmove 6 0 0
 objat CamBsp 4 0 10 0.001
 bspinfo MundoBsp cluster 3 pvs 1 leaves 2 faces 2 draws 2
 scenepx 4.6 0.6 -0.5 es 255 255 0 16
-scenepx -2 0 -0.5 es 13 13 13 10
+scenepx -2 0 -0.5 es 0 0 0 10
 
 # Culling apagado: el mundo entero, sin PVS
 cullactive MundoBsp off

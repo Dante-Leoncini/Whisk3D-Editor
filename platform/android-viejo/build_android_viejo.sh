@@ -12,7 +12,7 @@ set -e
 cd "$(dirname "$0")"
 AQUI="$PWD"
 RAIZ="$(cd ../.. && pwd)"
-VIEJO="${W3D_ANDROID_VIEJO:-$HOME/android-viejo}"
+VIEJO="${W3D_ANDROID_OLD:-$HOME/android-viejo}"
 NDK="$VIEJO/android-ndk-r15c"
 SDL="$VIEJO/fuentes/SDL-release-2.0.7"
 SDK="${ANDROID_HOME:-$HOME/Android/Sdk}"

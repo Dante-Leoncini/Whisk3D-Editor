@@ -51,7 +51,55 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/stat.h>   // mkdir (MakeDirs)
 #endif
+
+// ============================================================================
+//  EL SHELL Y LAS RUTAS DEL PROYECTO. Los comandos de abajo (cp, rm) ponen las rutas entre comillas dobles, y adentro
+//  de ellas el shell todavia interpreta $ ` " \ . Muchas rutas salen del PROYECTO (nombres de entrada del contenedor,
+//  rutas de un .w3dui, literales de los scripts), y un proyecto puede venir de internet: una ruta con "$(...)"
+//  ejecutaba lo que quisiera al compilar el juego, y una con ".." leia o escribia afuera de la carpeta del juego.
+// ============================================================================
+// la ruta se puede poner entre comillas dobles en un comando del shell
+static bool ShellSafe(const std::string& s) {
+    for (size_t i = 0; i < s.size(); i++) {
+        const unsigned char c = (unsigned char)s[i];
+        if (c < 32 || c == 127 || c == '$' || c == '`' || c == '"' || c == '\\') return false;
+    }
+    return true;
+}
+// una ruta RELATIVA del proyecto que queda adentro de su carpeta: ni absoluta ni con un ".." que suba
+static bool SafeRelPath(const std::string& r) {
+    if (r.empty() || r[0] == '/' || (r.size() > 1 && r[1] == ':') || !ShellSafe(r)) return false;
+    for (size_t p = 0; p <= r.size();) {
+        size_t q = r.find('/', p);
+        if (q == std::string::npos) q = r.size();
+        if (q - p == 2 && r.compare(p, 2, "..") == 0) return false;
+        p = q + 1;
+    }
+    return true;
+}
+// corre un comando armado con estas rutas; si alguna no es ShellSafe no lo corre (-1)
+static int ShellRun(const char* cmd, const std::string& a, const std::string& b = std::string(),
+                    const std::string& c = std::string(), const std::string& d = std::string()) {
+    if (!ShellSafe(a) || !ShellSafe(b) || !ShellSafe(c) || !ShellSafe(d)) {
+        w3dLogfW("CompileGame: una ruta con caracteres que el shell interpreta: no se usa (%s)", cmd);
+        return -1;
+    }
+    return system(cmd);
+}
+// la carpeta y las de arriba (mkdir -p sin el shell)
+static void MakeDirs(const std::string& dir) {
+    for (size_t i = 1; i <= dir.size(); i++)
+        if (i == dir.size() || dir[i] == '/') {
+            const std::string p = dir.substr(0, i);
+#ifdef _WIN32
+            _mkdir(p.c_str());
+#else
+            mkdir(p.c_str(), 0755);
+#endif
+        }
+}
 
 // ============================================================================
 //  BUILD ASINCRONICO — reparto estricto de hilos:
@@ -416,8 +464,7 @@ static bool GenerateIcons(const std::string& pngPath, const std::string& out,
     unsigned char* src = 0; int sw = 0, sh = 0;
     if (!w3dEngine::DecodeImage(pngPath.c_str(), &src, &sw, &sh) || !src || sw < 1 || sh < 1)
         return false;
-    { char cmd[700]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s/icons\"", out.c_str());
-      if (system(cmd)) {} }
+    MakeDirs(out + "/icons");
     std::vector<unsigned char> buf;
     // hicolor (linux): solo hasta el tamano del original (no agrandar); si el
     // original es mas chico que 16 se genera igual el de 16 (que haya al menos uno)
@@ -449,7 +496,7 @@ static bool GenerateIcons(const std::string& pngPath, const std::string& out,
         char cmd[2500];
         snprintf(cmd, sizeof(cmd), "cp \"%s/icons/%dx%d.png\" \"%s/icono.png\"",
                  out.c_str(), greater, greater, out.c_str());
-        if (system(cmd)) {}
+        if (ShellRun(cmd, out)) {}
     }
     return greater > 0;
 }
@@ -458,7 +505,7 @@ static bool GenerateIcons(const std::string& pngPath, const std::string& out,
 static bool GenerateIcon(const std::string& src, const std::string& dst, int n) {
     unsigned char* px = 0; int w = 0, h = 0;
     if (!w3dEngine::DecodeImage(src.c_str(), &px, &w, &h) || !px || w < 1 || h < 1) return false;
-    { char cmd[1400]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Folder(dst).c_str()); if (system(cmd)) {} }
+    MakeDirs(Folder(dst));
     std::vector<unsigned char> buf((size_t)n * n * 4, 0);
     IcScale(px, w, h, &buf[0], n);
     w3dEngine::FreeImage(px);
@@ -818,21 +865,22 @@ static void CopyRelativeRefsOfLua(const std::string& out, const std::string& pro
     }
     int nA = 0, nC = 0;
     for (std::set<std::string>::iterator it = files.begin(); it != files.end(); ++it) {
-        if (w3dFileSystem::FileExists(out + "/" + *it)) continue;   // ya viajo
+        if (!SafeRelPath(*it) || w3dFileSystem::FileExists(out + "/" + *it)) continue;   // (afuera, raro, o ya viajo)
         char cmd[3000];
         snprintf(cmd, sizeof(cmd), "cp \"%s/%s\" \"%s/%s\"",
                  proj.c_str(), it->c_str(), out.c_str(), it->c_str());
-        if (system(cmd) == 0) nA++;
+        if (ShellRun(cmd, proj, out, *it) == 0) nA++;
     }
     for (std::set<std::string>::iterator it = folders.begin(); it != folders.end(); ++it) {
         // -n (no-clobber): lo que YA esta en el staging manda (el volcado del
         // contenedor y las escenas re-exportadas son la version viva). Esto
         // COMPLETA carpetas a medias -- el caso real: escenario/ llegaba con los
         // .obj y los .w3dvis que el .w3d nombra, sin un solo .mtl.
+        if (!SafeRelPath(*it)) continue;
         char cmd[3000];
         snprintf(cmd, sizeof(cmd), "mkdir -p \"%s/%s\" && cp -rn \"%s/%s/.\" \"%s/%s/\" 2>/dev/null || true",
                  out.c_str(), it->c_str(), proj.c_str(), it->c_str(), out.c_str(), it->c_str());
-        if (system(cmd) == 0) nC++;
+        if (ShellRun(cmd, out, proj, *it) == 0) nC++;
     }
     // (ni por su CARPETA: un texto que nombra la carpeta de las librerias -"autos/auto_1.w3d" en un comentario- la
     // copiaba entera, y cada .w3d viajaba dos veces, suelto y en libs/<nombre>/: +2.8 MB en el APK de Daytona)
@@ -867,7 +915,7 @@ static void ExtsOfText(const std::string& t, std::vector<std::string>* out) {
 static bool CopyToStaging(const std::string& src, const std::string& dst) {
     std::vector<unsigned char> d;
     if (!w3dFileSystem::ReadFileBytes(src, d)) return false;
-    { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Folder(dst).c_str()); if (system(cmd)) {} }
+    MakeDirs(Folder(dst));
     FILE* fh = fopen(dst.c_str(), "wb");
     if (!fh) return false;
     if (!d.empty()) fwrite(&d[0], 1, d.size(), fh);
@@ -1160,14 +1208,14 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     // ademas el estado NEUTRO a los scripts: sin eso el personaje se quedaba
     // caminando solo con el ultimo valor del stick.
     fputs("static const char* padType(SDL_GameController* gc){\n", f);
-    fputs(" if(!gc)return \"generico\";\n switch(SDL_GameControllerGetType(gc)){\n", f);
+    fputs(" if(!gc)return \"generic\";\n switch(SDL_GameControllerGetType(gc)){\n", f);
     fputs("  case SDL_CONTROLLER_TYPE_XBOX360: case SDL_CONTROLLER_TYPE_XBOXONE: return \"xbox\";\n", f);
     fputs("  case SDL_CONTROLLER_TYPE_PS3: case SDL_CONTROLLER_TYPE_PS4:\n", f);
     fputs("  case SDL_CONTROLLER_TYPE_PS5: return \"playstation\";\n", f);
     fputs("  case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO: return \"nintendo\";\n", f);
-    fputs("  default: return \"generico\";}}\n", f);
+    fputs("  default: return \"generic\";}}\n", f);
     fputs("static void padRelease(){W3dGameStick(0,0,0);W3dGameStick(1,0,0);W3dGameTrigger(0,0);W3dGameTrigger(1,0);\n", f);
-    fputs(" static const char* nn[8]={\"a\",\"b\",\"x\",\"y\",\"arriba\",\"abajo\",\"izquierda\",\"derecha\"};\n", f);
+    fputs(" static const char* nn[8]={\"a\",\"b\",\"x\",\"y\",\"up\",\"down\",\"left\",\"right\"};\n", f);
     fputs(" for(int i=0;i<8;i++)W3dGameButton(nn[i],false);}\n", f);
     fputs("static void padOpen(int idx){\n", f);
     fputs(" if(!SDL_IsGameController(idx))return;\n", f);
@@ -1327,8 +1375,8 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     fputs("W3dGameStick(0,lx,ly);W3dGameStick(1,rx,ry);W3dGameTrigger(0,gl);W3dGameTrigger(1,gr);\n", f);
     fputs("W3dGameButton(\"a\",ba!=0);W3dGameButton(\"b\",bb!=0);\n", f);
     fputs("W3dGameButton(\"x\",bx!=0);W3dGameButton(\"y\",by!=0);\n", f);
-    fputs("W3dGameButton(\"arriba\",du!=0);W3dGameButton(\"abajo\",dd!=0);\n", f);
-    fputs("W3dGameButton(\"izquierda\",dl!=0);W3dGameButton(\"derecha\",dr!=0);}\n", f);
+    fputs("W3dGameButton(\"up\",du!=0);W3dGameButton(\"down\",dd!=0);\n", f);
+    fputs("W3dGameButton(\"left\",dl!=0);W3dGameButton(\"right\",dr!=0);}\n", f);
     fputs("#ifdef __ANDROID__\nif(g_acel){const float M=1.0f/32767.0f;SDL_JoystickUpdate();\n"
           "W3dScriptTilt(SDL_JoystickGetAxis(g_acel,0)*M,SDL_JoystickGetAxis(g_acel,1)*M,SDL_JoystickGetAxis(g_acel,2)*M);}\n"
           "#endif\n", f);
@@ -2230,17 +2278,17 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fprintf(f, "NAME=\"%s\"\nPKG=\"com.whisk3d.%s\"\n", name.c_str(), pkg.c_str());
     fputs("W3D=\"$ROOT/Whisk3D\"\n", f);
     fputs("OLD=\"${W3D_ANDROID_OLD:-$HOME/android-viejo}\"\n", f);
-    fputs("NDK=\"$VIEJO/android-ndk-r15c\"\nSDLD=\"$VIEJO/fuentes/SDL-release-2.0.7\"\n", f);
+    fputs("NDK=\"$OLD/android-ndk-r15c\"\nSDLD=\"$OLD/fuentes/SDL-release-2.0.7\"\n", f);
     fputs("SDK=\"${ANDROID_HOME:-$HOME/Android/Sdk}\"\n", f);
     fputs("BT=\"$(ls -d \"$SDK\"/build-tools/* 2>/dev/null | sort -V | tail -1)\"\n", f);
     fputs("JAR=\"$(ls -d \"$SDK\"/platforms/android-*/android.jar 2>/dev/null | sort -V | tail -1)\"\n", f);
     fputs("KS=\"${W3D_KEYSTORE:-$HOME/.android/debug.keystore}\"\n", f);
     fputs("AND=\"$OUT/androidviejo\"\nB=\"$OUT/obj23\"\n", f);
     fputs("[ -x \"$NDK/ndk-build\" ] && [ -f \"$SDLD/Android.mk\" ] || { echo \"ERROR: falta el NDK r15c o SDL 2.0.7 en "
-          "$VIEJO (correr Whisk3D/platform/android-viejo/preparar_android_viejo.sh)\"; exit 1; }\n", f);
+          "$OLD (correr Whisk3D/platform/android-viejo/preparar_android_viejo.sh)\"; exit 1; }\n", f);
     fputs("[ -x \"$BT/aapt\" ] && [ -f \"$JAR\" ] || { echo \"ERROR: faltan las build-tools o android.jar en $SDK\"; exit 1; }\n", f);
     // (el clang del r15c pide libncurses.so.5: preparar_android_viejo.sh deja unos enlaces en host/lib)
-    fputs("export LD_LIBRARY_PATH=\"$VIEJO/host/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"\n", f);
+    fputs("export LD_LIBRARY_PATH=\"$OLD/host/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"\n", f);
     fputs("echo \"[W3D] 12 Preparing the Android 2.3 project\"\n", f);
     fputs("rm -rf \"$AND\"; mkdir -p \"$AND/jni\" \"$AND/java\" \"$AND/res/drawable\" \"$AND/assets\" \"$B\"\n", f);
     fputs("cp \"$OUT/main.cpp\" \"$AND/jni/main_generado.cpp\"\n", f);
@@ -2252,7 +2300,7 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fputs("# GENERADO por Whisk3D (Compilar juego -> Android 2.3). No hace falta editarlo.\n", f);
     fputs("ROOT  := $(W3DROOTABS)\n", f);
     fputs("W3D   := $(ROOT)/Whisk3D\nEXAMP := $(ROOT)/Whisk3D-Examples\n", f);
-    fputs("CORE  := $(W3D)/libs/Whisk3DCore\nUILIB := $(W3D)/libs/WhiskUI\nOLD := $(W3D)/platform/android-old\n", f);
+    fputs("CORE  := $(W3D)/libs/Whisk3DCore\nUILIB := $(W3D)/libs/WhiskUI\nOLD := $(W3D)/platform/android-viejo\n", f);
     fputs("include $(SDL_DIR)/Android.mk\n", f);
     fputs("LOCAL_PATH := $(MY_PATH)\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := main\n", f);
     fputs("LOCAL_SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
@@ -2291,7 +2339,7 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fputs("sed -i \"s#^ROOT  := .*#ROOT  := $ROOT#\" \"$AND/jni/Android.mk\"\n", f);
     // la actividad del juego: la de SDL 2.0.7 con las dos librerias (libSDL2.so y libmain.so)
     fputs("mkdir -p \"$AND/java/${PKG//.//}\"\n", f);
-    fputs("cat > \"$AND/java/${PKG//.//}/JuegoActivity.java\" <<W3DJAVA\n", f);
+    fputs("cat > \"$AND/java/${PKG//.//}/GameActivity.java\" <<W3DJAVA\n", f);
     fputs("package $PKG;\n// GENERADO por Whisk3D: la actividad de SDL 2.0.7 que carga libSDL2.so y libmain.so (el juego)\n", f);
     fputs("public class GameActivity extends org.libsdl.app.SDLActivity {\n", f);
     fputs("    @Override protected String[] getLibraries() { return new String[] { \"SDL2\", \"main\" }; }\n", f);
@@ -2344,19 +2392,19 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fputs("    <uses-feature android:glEsVersion=\"0x00020000\" />\n", f);
     fputs("    <uses-permission android:name=\"android.permission.INTERNET\" />\n", f);
     fputs("    <uses-permission android:name=\"android.permission.VIBRATE\" />\n", f);
-    fputs("    <application android:label=\"$NOMBRE\" android:icon=\"@drawable/icono\"\n", f);
+    fputs("    <application android:label=\"$NAME\" android:icon=\"@drawable/icono\"\n", f);
     fputs("                 android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\">\n", f);
-    fprintf(f, "        <activity android:name=\".JuegoActivity\" android:label=\"$NOMBRE\"%s\n", orient);
+    fprintf(f, "        <activity android:name=\".GameActivity\" android:label=\"$NAME\"%s\n", orient);
     fputs("                  android:configChanges=\"keyboardHidden|orientation\">\n", f);
     fputs("            <intent-filter>\n                <action android:name=\"android.intent.action.MAIN\" />\n", f);
     fputs("                <category android:name=\"android.intent.category.LAUNCHER\" />\n", f);
     fputs("            </intent-filter>\n        </activity>\n    </application>\n</manifest>\nW3DMAN\n", f);
     // el icono del launcher (48 x 48, la densidad de estas pantallas): el del juego o el de Whisk3D
     if (withIcon)
-        fputs("ICON=\"$OUT/icons/android-mdpi.png\"; [ -f \"$ICONO\" ] || ICON=\"$W3D/res/Whisk3D.png\"\n", f);
+        fputs("ICON=\"$OUT/icons/android-mdpi.png\"; [ -f \"$ICON\" ] || ICON=\"$W3D/res/Whisk3D.png\"\n", f);
     else
         fputs("ICON=\"$W3D/res/Whisk3D.png\"\n", f);
-    fputs("convert \"$ICONO\" -resize 48x48 \"$AND/res/drawable/icono.png\"\n", f);
+    fputs("convert \"$ICON\" -resize 48x48 \"$AND/res/drawable/icono.png\"\n", f);
     // los assets: como el Android de siempre (sueltos en assets/, o empaquetados adentro de libmain.so)
     if (!pack) {
         fputs("cp \"$OUT\"/*.w3dui \"$OUT\"/*.lua \"$OUT\"/*.png \"$OUT\"/*.json \"$AND/assets\"/ 2>/dev/null || true\n", f);
@@ -2383,7 +2431,7 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
           "-keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname \"CN=Android Debug,O=Android,C=US\"\n", f);
     fputs("\"$BT/zipalign\" -f 4 \"$B/sin_firmar.apk\" \"$B/alineado.apk\"\n", f);
     fputs("\"$BT/apksigner\" sign --ks \"$KS\" --ks-pass pass:android --key-pass pass:android --min-sdk-version 10 "
-          "--out \"$OUT/$NOMBRE-android23.apk\" \"$B/alineado.apk\"\n", f);
+          "--out \"$OUT/$NAME-android23.apk\" \"$B/alineado.apk\"\n", f);
     fputs("rm -f \"$B/sin_firmar.apk\" \"$B/alineado.apk\"\n", f);
     // un telefono conectado: se instala y se abre (sin telefono, el APK queda en build/android23)
     fputs("ADB=\"$SDK/platform-tools/adb\"\n", f);
@@ -2401,7 +2449,7 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fputs("    \"$ADB\" uninstall \"$PKG\" || true\n", f);
     fputs("    INST=\"$(\"$ADB\" install \"$OUT/$NAME-android23.apk\" 2>&1 || true)\"; echo \"$INST\"\n  fi\n", f);
     fputs("  if echo \"$INST\" | grep -q '^Success'; then\n", f);
-    fputs("    \"$ADB\" shell am start -n \"$PKG/.JuegoActivity\"\n", f);
+    fputs("    \"$ADB\" shell am start -n \"$PKG/.GameActivity\"\n", f);
     fputs("  else\n    echo \"[W3D] 95 COULD NOT INSTALL on the phone (low on space?): the APK stays in build/android23\"\n  fi\n", f);
     fputs("else\n  echo \"(sin un telefono conectado por adb: el APK queda en build/android23)\"\nfi\n", f);
     bool okSh = (ferror(f) == 0);
@@ -3049,8 +3097,8 @@ static bool IsObject3D(Object* o) {
         case ObjectType::fog:
         case ObjectType::clearz:   case ObjectType::clip:
         case ObjectType::hitbox:     case ObjectType::prefab:
-        case ObjectType::sondaluz:   // (la luz indirecta de lo 3D)
-        case ObjectType::sondareflejo:   // (los reflejos de lo 3D)
+        case ObjectType::lightProbe:   // (la luz indirecta de lo 3D)
+        case ObjectType::reflectionProbe:   // (los reflejos de lo 3D)
         case ObjectType::proxy:       // (un proxy de una libreria: lo que genera es contenido 3D)
         case ObjectType::routine:     // (una rutina dibuja 3D)
             return true;
@@ -3186,6 +3234,11 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
     const char* plat = (WithMakefile(platform) || platform == PlatSymbian) ? DirConsole(platform)
                      : (platform == 6) ? "android23" : (platform == 3) ? "android"
                      : (platform == 2) ? "web" : "linux";
+    // (las rutas del proyecto van a los comandos de cmake, cp y rm: una carpeta con $ ` " \ el shell la interpretaria)
+    if (!ShellSafe(proj)) {
+        Notify(T("Build: the project folder has characters the build can not use ($ ` \" \\)"), true);
+        return false;
+    }
     std::string out     = proj + "/platform-build/" + plat;
     std::string results = proj + "/build/" + plat;
     // nombre del JUEGO (proyecto CMake / binario / artefactos): el archivo .w3d ABIERTO
@@ -3197,7 +3250,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
     if (!w3dPath.empty()) { std::string b = BaseNoExt(w3dPath); if (!b.empty()) name = Slug(b); }
     if (name.empty())   { std::string b = Base(proj); if (!b.empty() && b != ".") name = Slug(b); }
     if (name.empty()) name = "game";
-    { char cmd[700]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", out.c_str()); if (system(cmd)) {} }
+    MakeDirs(out);
     EnsureGitignore(proj);   // platform-build/ y build/ fuera del repo del juego
 
     // SYMBIAN: el kit para compilar en Windows (ver WriteKitSymbian). No usa el staging: el telefono abre el .w3d
@@ -3254,7 +3307,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
                  "\"%s/out\"/*.deb \"%s/out\"/*.AppImage 2>/dev/null || true",
                  out.c_str(), out.c_str(), out.c_str(), out.c_str(),
                  out.c_str(), out.c_str(), out.c_str(), out.c_str());
-        if (system(cmd)) {}
+        if (ShellRun(cmd, out)) {}
     }
 
     // MULTI-ESCENA vs UNA sola: las escenas son los UI raiz de la escena (tipo ui). Con 2+ el
@@ -3308,7 +3361,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         if (W3dIsEntryName(pathsLua[i])) continue;   // sale del contenedor (mas abajo)
         char cmd[1400];
         snprintf(cmd, sizeof(cmd), "cp \"%s\" \"%s/%s\"", pathsLua[i].c_str(), out.c_str(), Base(pathsLua[i]).c_str());
-        if (system(cmd)) {}
+        if (ShellRun(cmd, pathsLua[i], out)) {}
     }
     // ==================================================================
     //  DE DONDE SACA SUS ARCHIVOS EL JUEGO COMPILADO: UNA SOLA PASADA.
@@ -3348,10 +3401,10 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         for (int c = 0; kFoldersAssets[c]; c++) {
             char cmd[1400];
             snprintf(cmd, sizeof(cmd), "rm -rf \"%s/%s\"", out.c_str(), kFoldersAssets[c]);
-            if (system(cmd)) {}
+            if (ShellRun(cmd, out)) {}
         }
         // y la scenes/ que pudo haber dejado una compilacion anterior (ya no se vuelca)
-        if (!with3D) { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/scenes\"", out.c_str()); if (system(cmd)) {} }
+        if (!with3D) { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/scenes\"", out.c_str()); if (ShellRun(cmd, out)) {} }
         int dumped = 0;
         for (size_t i = 0; i < ents.size(); i++) {
             // project.json ES la ESCENA 3D del juego: en un juego 3D viaja como un asset
@@ -3364,8 +3417,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
             std::vector<unsigned char> data;
             if (!lec->Read(ents[i], data)) continue;
             std::string dst = out + "/" + ents[i];
-            { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Folder(dst).c_str());
-              if (system(cmd)) {} }
+            MakeDirs(Folder(dst));
             FILE* fh = fopen(dst.c_str(), "wb");
             if (!fh) continue;
             if (!data.empty()) fwrite(&data[0], 1, data.size(), fh);
@@ -3379,13 +3431,13 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         //  Se abre y se MIGRA al primer guardado; hasta entonces compila igual.
         // ------------------------------------------------------------------
         // los .png de la carpeta del proyecto, planos (los .w3dui los referencian por nombre)
-        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "cp \"%s\"/*.png \"%s\"/ 2>/dev/null || true", proj.c_str(), out.c_str()); if (system(cmd)) {} }
+        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "cp \"%s\"/*.png \"%s\"/ 2>/dev/null || true", proj.c_str(), out.c_str()); if (ShellRun(cmd, proj, out)) {} }
         // la subcarpeta assets/ entera, CON su carpeta ("assets/xxx.png")
         { char cmd[2600]; snprintf(cmd, sizeof(cmd),
             "rm -rf \"%s/assets\" && if [ -d \"%s/assets\" ]; then cp -r \"%s/assets\" \"%s/\"; fi",
-            out.c_str(), proj.c_str(), proj.c_str(), out.c_str()); if (system(cmd)) {} }
+            out.c_str(), proj.c_str(), proj.c_str(), out.c_str()); if (ShellRun(cmd, out, proj)) {} }
         // y las rutas REALES que las escenas recien exportadas referencian (content/...)
-        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/content\"", out.c_str()); if (system(cmd)) {} }
+        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/content\"", out.c_str()); if (ShellRun(cmd, out)) {} }
         std::set<std::string> refs;
         if (multi)
             for (size_t i = 0; i < scenes.size(); i++)
@@ -3393,11 +3445,12 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         else
             SaveVersionCollectFrom(out + "/" + w3duiLegacy, "", proj, &refs);
         for (std::set<std::string>::iterator it = refs.begin(); it != refs.end(); ++it) {
+            if (!SafeRelPath(*it)) continue;   // (una ruta del proyecto que sale de su carpeta)
             char cmd[3000];
             snprintf(cmd, sizeof(cmd), "mkdir -p \"%s/%s\" && cp \"%s/%s\" \"%s/%s\"",
                      out.c_str(), Folder(*it).c_str(), proj.c_str(), it->c_str(),
                      out.c_str(), it->c_str());
-            if (system(cmd)) {}
+            if (ShellRun(cmd, out, proj, *it)) {}
         }
     }
     // ------------------------------------------------------------------
@@ -3421,16 +3474,14 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
             if (!W3dIsEntryName(rel) &&
                 (rel[0] == '/' || (rel.size() > 2 && rel[1] == ':') ||
                  rel.find("..") != std::string::npos)) continue;
-            char cmd[1400];
-            snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Folder(out + "/" + rel).c_str());
-            if (system(cmd)) {}
+            MakeDirs(Folder(out + "/" + rel));
             UI2DSave(e, out + "/" + rel, proj);
         }
         // y el PROYECTO.JSON de un .w3d v3 (json plano, sin contenedor): es el .w3d mismo
         if (!fromContainer && !w3dPath.empty()) {
             char cmd[1400];
             snprintf(cmd, sizeof(cmd), "cp \"%s\" \"%s/project.json\"", w3dPath.c_str(), out.c_str());
-            if (system(cmd)) {}
+            if (ShellRun(cmd, w3dPath, out)) {}
         }
         // CON QUE ARRANCA (el "Empieza con" de la tarjeta Juego): el de AHORA, aunque el proyecto no se haya guardado
         if (!W3dInitialRoot().empty()) JsonSetTextRoot(out + "/project.json", "initialScene3d", W3dInitialRoot());
@@ -3452,11 +3503,11 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         for (size_t i = 0; i < ext.size(); i++) {
             if (ext[i].compare(0, base.size(), base) != 0) { outside++; continue; }
             const std::string rel = ext[i].substr(base.size());
-            if (rel.empty() || rel.find("..") != std::string::npos) { outside++; continue; }
+            if (!SafeRelPath(rel)) { outside++; continue; }
             char cmd[3000];
             snprintf(cmd, sizeof(cmd), "mkdir -p \"%s/%s\" && cp \"%s\" \"%s/%s\"",
                      out.c_str(), Folder(rel).c_str(), ext[i].c_str(), out.c_str(), rel.c_str());
-            if (system(cmd) == 0) copied++;
+            if (ShellRun(cmd, out, ext[i], rel) == 0) copied++;
         }
         if (!ext.empty())
             w3dLogf("CompileGame: %d referencia(s) externa(s) copiadas al staging (%d afuera "
@@ -3482,7 +3533,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
     //      (W3dLibsNested del juego lo lee de ahi).
     // ------------------------------------------------------------------
     {
-        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/libs\"", out.c_str()); if (system(cmd)) {} }
+        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/libs\"", out.c_str()); if (ShellRun(cmd, out)) {} }
         // LA COLA: las vinculadas al nivel, y las de adentro de cada una (por su nombre en memoria)
         std::vector<std::string> queue;
         std::set<std::string> inQueue;
@@ -3514,7 +3565,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
                 std::vector<unsigned char> d;
                 if (!z.Read(e, d)) continue;
                 const std::string dst = out + "/" + W3dLibPathPacked(itemName, e);
-                { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Folder(dst).c_str()); if (system(cmd)) {} }
+                MakeDirs(Folder(dst));
                 FILE* fh = fopen(dst.c_str(), "wb");
                 if (fh) {
                     if (!d.empty()) fwrite(&d[0], 1, d.size(), fh);
@@ -3568,12 +3619,12 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
                     }
                     // (la CARPETA del literal: un script que ARMA la ruta con una variable, como en el proyecto)
                     const std::string dir = Folder(r);
-                    if (dir.empty() || dir == r || dir == "platform-build" || dir == "build") continue;
+                    if (dir.empty() || dir == r || dir == "platform-build" || dir == "build" || !SafeRelPath(dir)) continue;
                     if (!w3dFileSystem::IsDir(dirLib + "/" + dir)) continue;
                     char cmd[3000];
                     snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\" && cp -rn \"%s/%s/.\" \"%s/\" 2>/dev/null || true",
                              Folder(dst).c_str(), dirLib.c_str(), dir.c_str(), Folder(dst).c_str());
-                    if (system(cmd) == 0) nLoose++;
+                    if (ShellRun(cmd, Folder(dst), dirLib, dir) == 0) nLoose++;
                 }
             }
             // sus librerias de ADENTRO (todo su registro): con el nombre con que viven en memoria (W3dLibsNested)
@@ -3595,7 +3646,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         if (!nested.empty()) {
             const std::string j = "{\n  \"nested\": [" + nested + "\n  ]\n}\n";
             const std::string dst = out + "/" + kW3dNestedLibsEntry;
-            { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Folder(dst).c_str()); if (system(cmd)) {} }
+            MakeDirs(Folder(dst));
             FILE* fh = fopen(dst.c_str(), "wb");
             if (fh) { fwrite(j.data(), 1, j.size(), fh); fclose(fh); }
         }
@@ -3605,7 +3656,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         if (outside > 0)
             Notify(T("Build: a library uses files by absolute path; they do not travel with the game"), true);
     }
-    { char cmd[1200]; snprintf(cmd, sizeof(cmd), "cp \"%s/res/Skins/Whisk3D/font.png\" \"%s/font.png\"", repo.c_str(), out.c_str()); if (system(cmd)) {} }
+    { char cmd[1200]; snprintf(cmd, sizeof(cmd), "cp \"%s/res/Skins/Whisk3D/font.png\" \"%s/font.png\"", repo.c_str(), out.c_str()); if (ShellRun(cmd, repo, out)) {} }
     // ...y lo que SOLO nombra el lua por ruta relativa (sounds/, music/): ver
     // CopyRelativeRefsOfLua. Va DESPUES de todo lo demas (no pisa nada de lo que
     // ya viajo) y ANTES de descubrir las carpetas y de hornear el bytecode -- con
@@ -3639,7 +3690,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
     std::vector<int> iconsLinux;
     bool withIcon = false;
     { char cmd[1500]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/icons\" \"%s/icono.png\"",
-                               out.c_str(), out.c_str()); if (system(cmd)) {} }
+                               out.c_str(), out.c_str()); if (ShellRun(cmd, out)) {} }
     if (!g_projIcon.empty()) {
         std::string abs = g_projIcon;
         // v4: el icono es una ENTRADA del contenedor ("project/icono.png") y se lee
@@ -3848,7 +3899,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
             incW.c_str(), embeds, name.c_str());
         // (ya no redirige a build.log el mismo: el worker captura stdout+stderr y
         // escribe el MISMO build.log de siempre, leyendolo en vivo para la barra)
-        { char mk[700]; snprintf(mk, sizeof(mk), "mkdir -p \"%s/out\"", out.c_str()); if (system(mk)) {} }
+        MakeDirs(out + "/out");
         t.cmdBuild = cmd;
     } else {
         // PC (Linux): cmake (configurar) + cmake --build; luego cpack -G DEB (plataforma 0).

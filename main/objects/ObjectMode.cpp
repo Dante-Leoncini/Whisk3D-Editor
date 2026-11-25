@@ -1040,6 +1040,7 @@ void BeginTranslate(){
 // duplica los objetos seleccionados (deep copy). Implementacion NUEVA y
 // compartida: reemplaza al cuerpo viejo comentado (era del modelo viejo).
 #include "Instance.h"
+#include "objects/Fields.h"   // W3dFieldsCopy: duplicar los objetos con sus campos en la tabla
 #include "objects/Light.h"
 #include "Camera.h"
 #include "Empty.h"
@@ -1238,11 +1239,8 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
         newValue = d;
     }
     else if (src->getType() == ObjectType::fog) {
-        Fog* s    = (Fog*)src;
-        Fog* d    = new Fog(src->Parent, src->pos);
-        d->active = s->active; d->mode = s->mode; d->start = s->start; d->end = s->end;
-        d->density = s->density; d->background = s->background;
-        for (int k = 0; k < 4; k++) d->color[k] = s->color[k];
+        Fog* d = new Fog(src->Parent, src->pos);
+        W3dFieldsCopy(src, d);   // (sus campos: objects/Fields.cpp)
         newValue = d;
     }
     else if (src->getType() == ObjectType::postProcess) {
@@ -1252,7 +1250,7 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
     }
     else if (src->getType() == ObjectType::clearz) {
         ClearZ* d = new ClearZ(src->Parent, src->pos);
-        d->active = ((ClearZ*)src)->active;
+        W3dFieldsCopy(src, d);
         newValue = d;
     }
     else if (src->getType() == ObjectType::clip) {
@@ -1266,10 +1264,10 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
     else if (src->getType() == ObjectType::hitbox) {
         newValue = HitboxDuplicate((Hitbox*)src);   // los campos propios (la lista vive en Hitbox.cpp)
     }
-    else if (src->getType() == ObjectType::sondaluz) {
+    else if (src->getType() == ObjectType::lightProbe) {
         newValue = LightProbeDuplicate((LightProbe*)src);   // (la caja, la grilla y la luz horneada)
     }
-    else if (src->getType() == ObjectType::sondareflejo) {
+    else if (src->getType() == ObjectType::reflectionProbe) {
         newValue = ReflectionProbeDuplicate((ReflectionProbe*)src);   // (la caja, la captura y su imagen 360)
     }
     else if (src->getType() == ObjectType::routine) {
@@ -1349,8 +1347,7 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
         // OJO: la raiz Scene tambien reporta tipo collection (Scene.cpp) pero no
         // tiene Parent -> el cast de aca nunca la toca.
         Collection* d = new Collection(src->Parent, src->pos);
-        d->sortByCamera = ((Collection*)src)->sortByCamera;
-        d->sortOnce     = ((Collection*)src)->sortOnce;
+        W3dFieldsCopy(src, d);
         newValue = d;
     }
     else if (src->getType() == ObjectType::text2d) {

@@ -348,7 +348,7 @@ void RenderLightLines(){
     for (size_t l = 0; l < Lights.size(); l++) {
         if (!VisibleInTree(Lights[l]) || OutsideViewLocal(Lights[l])) continue;
         // mismo esquema de color que el icono de la luz
-        if (Lights[l] == (Light*)ActiveObj && Lights[l]->select)
+        if ((Object*)Lights[l] == ActiveObj && Lights[l]->select)
             w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
         else if (Lights[l]->select)
             w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
@@ -418,7 +418,7 @@ static void DrawIconProbe3D(Object* obj){
     w3dEngine::PushMatrix();
     Matrix4 local; obj->GetMatrix(local);
     w3dEngine::MultMatrix(local.m);
-    if (obj->getType() == ObjectType::sondaluz || obj->getType() == ObjectType::sondareflejo){
+    if (obj->getType() == ObjectType::lightProbe || obj->getType() == ObjectType::reflectionProbe){
         if (ActiveObj == obj && obj->select)  w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accent)]);
         else if (obj->select)                 w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::accentDark)]);
         else                                  w3dEngine::Color4fv(ColorList[static_cast<int>(ColorID::grayUI)]);

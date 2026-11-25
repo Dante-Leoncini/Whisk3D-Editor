@@ -71,14 +71,18 @@ OPT    := -Os -ffunction-sections -fdata-sections
 # CAPTURA=n: en el cuadro n la pantalla sale por la consola serie (en base64) para verla en la PC sin la consola
 # (tools: platform/dreamcast/captura_flycast.sh). Sin CAPTURA no hay nada de esto en el ejecutable.
 ifneq ($(CAPTURA),)
-DEFS   += -DW3D_DC_CAPTURA=$(CAPTURA)
+DEFS   += -DW3D_DC_CAPTURE=$(CAPTURA)
 endif
 # PRUEBA=n (con CAPTURA): antes de capturar se empujan eventos de teclado y mouse (ver w3d_dreamcast.cpp)
 ifneq ($(PRUEBA),)
-DEFS   += -DW3D_DC_PRUEBA=$(PRUEBA)
+DEFS   += -DW3D_DC_TEST=$(PRUEBA)
 endif
-CXXFLAGS_W3D := $(OPT) -std=gnu++17 $(DEFS) $(INCS) -w
-CFLAGS_W3D   := $(OPT) -std=gnu99 $(DEFS) $(INCS) -w
+# (-MMD -MP: cada objeto anota los headers que usa, en su .d; si un header cambia, se recompila lo que lo incluye. Sin
+#  esto un cambio en un header -los campos de una clase- dejaba objetos con la version vieja y el juego se colgaba)
+# (-fno-exceptions: el codigo no lanza ni atrapa excepciones -salvo el harness de pruebas, que aca no va-; sus tablas
+#  eran casi 1 MB de la RAM de la Dreamcast)
+CXXFLAGS_W3D := $(OPT) -std=gnu++17 -fno-exceptions $(DEFS) $(INCS) -w -MMD -MP
+CFLAGS_W3D   := $(OPT) -std=gnu99 $(DEFS) $(INCS) -w -MMD -MP
 
 all: $(TARGET)
 
@@ -97,6 +101,8 @@ $(SALIDA)/romdisk.img: $(addprefix $(RAIZ)/,$(shell cd $(RAIZ) && find res -type
 	@rm -rf $(SALIDA)/romdisk && mkdir -p $(SALIDA)/romdisk
 	@cp -r $(RAIZ)/res/. $(SALIDA)/romdisk/
 	@rm -rf $(SALIDA)/romdisk/installer $(SALIDA)/romdisk/*.ico $(SALIDA)/romdisk/*.svg
+	@# (los IDIOMAS van al CD, no aca: el romdisk queda en RAM entero y eran 777 KB de los 977, para usar uno)
+	@rm -rf $(SALIDA)/romdisk/languages
 	@$(KOS_GENROMFS) -f $@ -d $(SALIDA)/romdisk > /dev/null
 
 # (como la regla de KallistiOS: el arreglo 'romdisk_data' + libromdiskbase, que lo monta solo en /rd al arrancar)
@@ -123,10 +129,12 @@ MKDCDISC ?= $(HOME)/dc/mkdcdisc/build_manual/mkdcdisc
 cdi: $(SALIDA)/whisk3d.cdi
 $(SALIDA)/whisk3d.cdi: $(TARGET)
 	@rm -f $@
-	@$(MKDCDISC) -q -N -e $(TARGET) -o $@ -n "Whisk3D" -a "Dante Leoncini" -V WHISK3D
+	@$(MKDCDISC) -q -N -e $(TARGET) -d $(RAIZ)/res/languages -o $@ -n "Whisk3D" -a "Dante Leoncini" -V WHISK3D
 	@echo "  disco $@"
 
 clean:
 	rm -rf $(SALIDA)
 
 .PHONY: all clean cdi
+
+-include $(OBJS:.o=.d)

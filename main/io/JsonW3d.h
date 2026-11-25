@@ -69,11 +69,16 @@ struct JVal {
     }
 };
 
+// (depth: no mas de 256 niveles de { y [ -un proyecto, un .w3dui o una libreria de internet con unos pocos KB de
+//  "[[[[..." agotaba la pila, antes en la PSP y el N95-; tambien acota el borrado recursivo de ~JVal)
 struct JParser {
     const char* p;
     const char* end;
     bool error;
-    JParser(const char* start, size_t n) : p(start), end(start + n), error(false) {}
+    int depth;
+    JParser(const char* start, size_t n) : p(start), end(start + n), error(false), depth(0) {}
+    struct Level { int& d; explicit Level(int& x) : d(x) { ++d; } ~Level() { --d; } };
+    bool TooDeep() { if (depth > 256) error = true; return depth > 256; }
     void Whitespace() { while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++; }
     bool Is(char c) { Whitespace(); return p < end && *p == c; }
     bool Eat(char c) { if (!Is(c)) { error = true; return false; } p++; return true; }
@@ -130,13 +135,17 @@ struct JParser {
         return s;
     }
     JVal* Object() {
+        Level level(depth);
         JVal* v = new JVal(); v->type = 4;
+        if (TooDeep()) return v;
         Eat('{');
         if (Is('}')) { p++; return v; }
         for (;;) {
             std::string k = ReadString();
             Eat(':');
-            v->obj[k] = Value();
+            JVal*& slot = v->obj[k];
+            delete slot;   // (una clave repetida: la de antes no quedaba en ningun lado)
+            slot = Value();
             if (error) break;
             if (Is(',')) { p++; continue; }
             Eat('}');
@@ -150,7 +159,9 @@ struct JParser {
         return (p < end && *p == '[') ? Row() : Value();
     }
     JVal* List() {
+        Level level(depth);
         JVal* v = new JVal(); v->type = 5;
+        if (TooDeep()) return v;
         Eat('[');
         if (Is(']')) { p++; return v; }
         for (;;) {
@@ -170,7 +181,9 @@ struct JParser {
     // fila sigue como una lista comun.
     enum { DOUBLE_STACK = 32 };
     JVal* Row() {
+        Level level(depth);
         JVal* v = new JVal(); v->type = 5;
+        if (TooDeep()) return v;
         Eat('[');
         if (Is(']')) { p++; return v; }
         double stack[DOUBLE_STACK];

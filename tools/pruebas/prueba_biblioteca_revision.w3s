@@ -226,9 +226,10 @@ matcolor 0 0 1
 liblink prueba_revision_rtN_v4.w3d
 outview lib:prueba_revision_rtN_v4
 outgrid 1
-outmini Material no cell
+# (la libreria dibuja SU material -rojo-, no el homonimo azul del proyecto)
+outmini Material si cell red
 outview library
-outmini Material si cell
+outmini Material si cell blue
 
 # ---- O. la esfera de un material lleva su TEXTURA (dos blancos con texturas distintas ya no son iguales) ----
 scenedefault

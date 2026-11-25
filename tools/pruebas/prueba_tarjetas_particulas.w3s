@@ -1,0 +1,26 @@
+# LAS TARJETAS DECLARADAS DE LAS PARTICULAS (ui/panels/PanelsText.cpp): Movimiento, Tamanio y Rotacion apuntan a los campos del
+# emisor activo; el freno del crecimiento se ve solo si crece (when=particles.growth!=0) y el angulo inicial y su azar
+# solo sin el angulo al azar (when=particles.rotation==0). Tildar el angulo al azar los esconde YA.
+window 960 1400
+add particles
+propstab 2
+tick
+# movimiento (las filas de los vectores llevan "<etiqueta traducida> X/Y/Z": la frase entera no esta en los idiomas)
+propvalue 1.5 Velocity
+propvalue 30 Spread
+propvalue 1 Drag (speed kept per second)
+propvalue 0.3 Size
+propvalue 0 Variation
+propvalue 0 Growth (size per second)
+fail propvalue 1 Growth kept per second
+propvalue 0 Random angle (0-360)
+propvalue 0 Start angle
+propvalue 0 Angle random
+propvalue 1 Random spin direction
+# el angulo al azar: el inicial y su azar se van
+propclick Random angle (0-360)
+tick
+propvalue 1 Random angle (0-360)
+fail propvalue 0 Start angle
+fail propvalue 0 Angle random
+propvalue 0 Spin

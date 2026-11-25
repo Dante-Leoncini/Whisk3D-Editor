@@ -4,6 +4,7 @@
 #include "app/controls.h"             // SDL_Event + InputUserSDL3: la puerta real de la entrada
 #include "app/variables.h"            // window
 #include "ViewPorts/ViewPorts.h"      // ViewportBase / ViewportColumn (el arbol del layout)
+#include "w3dTexture.h"                // SavePNG (buffershot)
 #include "ViewPorts/ViewPort3D.h"     // Viewport3D (layoutpordefecto)
 #include "WhiskUI/widgets/PopupMenu.h"
 #include "WhiskUI/core/UI.h"         // RowHeightGS, gapGS, borderGS (las filas del menu)
@@ -58,6 +59,7 @@ extern int OutlinerYOfRow(int row);        // Outliner.cpp: su Y desde arriba de
 
 extern ViewportBase* rootViewport;
 extern int MenuScreenW, MenuScreenH;
+extern int W3dScreenHeight;
 // la tecla VERDE del N95 (platform/symbian/src/Whisk3DContainer.cpp): las MISMAS funciones que llama el telefono
 void LayoutCycleActiveViewport(int dir);                            // verde sola (al soltarla)
 void LayoutResizeActiveViewport(int dx, int dy, float step);        // verde + flecha, una vez por cuadro
@@ -83,7 +85,11 @@ namespace {
         // numeros de la Linea de tiempo cambiaba el cuadro pero el objeto seguia con la pose del cuadro anterior (y una
         // S despues escalaba esa pose). Solo trabaja al cambiar de cuadro
         ::ApplyAnimationObjects();   // (ObjectMode.h)
-        rootViewport->Render();
+        // (como el loop: navegando una vista 3D, los paneles de la imagen guardada y solo las vistas 3D)
+        const bool only3D = W3dViewCacheBegin(rootViewport, MenuScreenW, W3dScreenHeight);
+        if (only3D) W3dViewCacheRender3D(rootViewport);
+        else rootViewport->Render();
+        W3dViewCacheEnd(MenuScreenW, W3dScreenHeight, only3D);
         LayoutRenderMenu(MenuScreenW, MenuScreenH);
 #ifdef W3D_MCP
         W3dHistoryFrame();   // la grabadora de pasos (W3D_HISTORY): como en el loop del editor
@@ -410,6 +416,21 @@ namespace {
     }
     // la fila de Propiedades llamada 'nombre' (ya traducido): el centro de su valor. El MISMO recorrido que capinfo
     // y que Properties::ClickIn. false = no esta, o esta fuera de la pantalla
+    // las filas que se ven en Propiedades (para el mensaje de una fila que no esta: que hay en su lugar)
+    std::string VisibleRows() {
+        Properties* P = (Properties*)TypeLeaf(rootViewport, 3);
+        if (!P) return " (no hay panel de Propiedades)";
+        std::string r = " (se ven:";
+        for (size_t i = 0; i < P->GroupProperties.size(); i++) {
+            GroupPropertie* g = P->GroupProperties[i];
+            if (!g->visible) continue;
+            r += " [" + g->name + "]";
+            if (!g->open) { r += " cerrada"; continue; }
+            for (size_t j = 0; j < g->properties.size(); j++)
+                if (g->properties[j]->Resize(g->width) > 0) r += " '" + g->properties[j]->name + "'";
+        }
+        return r + ")";
+    }
     bool RowProperties(const std::string& name, int& x, int& y, PropertieBase** out) {
         Properties* P = (Properties*)TypeLeaf(rootViewport, 3);
         if (!P) return false;
@@ -1326,6 +1347,29 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
     if (cmd == "renderstripes") { int v = 1; ss >> v; extern bool g_renderNoStripes; g_renderNoStripes = (v == 0); return true; }
     // 'pngdiff <a> <b> <media maxima> [maximo]': dos imagenes del mismo tamano: la diferencia media por canal (0..255) y la
     // mayor. Rasterizadas por franjas y enteras tienen que ser iguales; trazadas, iguales salvo el ruido
+    // 'buffershot <archivo.png>': lo que hay en la pantalla AHORA, sin volver a dibujar (uishot redibuja todo): el
+    // cuadro que dejo el ultimo tick, por ejemplo uno de los paneles guardados mientras se navega
+    if (cmd == "buffershot") {
+        std::string path; ss >> path;
+        const int w = MenuScreenW, h = W3dScreenHeight;
+        if (path.empty() || w < 1 || h < 1) { err = "buffershot: falta la ruta o la pantalla no tiene tamano"; return false; }
+        w3dEngine::Finish();
+        std::vector<unsigned char> px((size_t)w * h * 4, 0);
+        w3dEngine::ReadPixelsRGBA(0, 0, w, h, &px[0]);
+        if (!w3dEngine::SavePNG(path.c_str(), &px[0], w, h, true)) { err = "buffershot: no se pudo escribir " + path; return false; }
+        printf("      [buffershot] %dx%d -> %s\n", w, h, path.c_str());
+        return true;
+    }
+    // 'viewcache <n>': cuantos cuadros salieron de la imagen guardada de los paneles desde el ultimo 'viewcache' (tiene
+    // que ser n)
+    if (cmd == "viewcache") {
+        int want = -1; ss >> want;
+        extern int g_viewCacheFrames;
+        const int got = g_viewCacheFrames; g_viewCacheFrames = 0;
+        printf("      [viewcache] %d cuadro(s) con los paneles guardados\n", got);
+        if (want >= 0 && got != want) { err = "viewcache: se esperaban " + std::to_string(want); return false; }
+        return true;
+    }
     if (cmd == "pngdiff") {
         std::string a, b; float meanMax = 0, maxMax = 255; ss >> a >> b >> meanMax >> maxMax;
         int wa = 0, ha = 0, wb = 0, hb = 0, c = 0;
@@ -1400,7 +1444,7 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
             P->event_mouse_wheel(y > P->y + P->height / 2 ? -1.0f : 1.0f, P->x + P->width / 2, P->y + P->height / 2);
             Frame();
         }
-        if (!RowProperties(t, x, y, NULL)) { err = "propclick: no se ve la fila '" + t + "' en Propiedades"; return false; }
+        if (!RowProperties(t, x, y, NULL)) { err = "propclick: no se ve la fila '" + t + "' en Propiedades" + VisibleRows(); return false; }
         ClickIn(x, y, 1);
         return true;
     }
@@ -1423,7 +1467,7 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
             Frame();
         }
         PropertieBase* row = NULL;
-        if (!RowProperties(t, x, y, &row)) { err = cmd + ": no se ve la fila '" + t + "' en Propiedades"; return false; }
+        if (!RowProperties(t, x, y, &row)) { err = cmd + ": no se ve la fila '" + t + "' en Propiedades" + VisibleRows(); return false; }
         // una fila BOTON con su numero en el medio (los mapas del material): el dedo, sobre el numero
         if (row && row->GetType() == PropertyType::Button && P) {
             PropButton* pb = (PropButton*)row;
@@ -1809,7 +1853,11 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
         PopupMenu* m = (OpenMenu && OpenMenu->open) ? OpenMenu : NULL;
         int row = -1;
         if (m) for (size_t i = 0; i < m->items.size(); i++) if (m->items[i]->text == t) row = (int)i;
-        if (row < 0) { err = "menupick: el menu abierto no tiene '" + t + "'"; return false; }
+        if (row < 0) {
+            err = "menupick: " + std::string(m ? "el menu abierto no tiene '" + t + "' (tiene:" : "no hay ningun menu abierto");
+            if (m) { for (size_t i = 0; i < m->items.size(); i++) err += " '" + m->items[i]->text + "'"; err += ")"; }
+            return false;
+        }
         m->selectIndex = row;
         const int id = m->Enter();
         if (id >= 0) m->Run(id);

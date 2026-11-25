@@ -903,7 +903,7 @@ bool CmdStreamVerdict(std::string& err) {
     gVerdictPlay.clear();
     for (int i = 0; i < W3dSharedScriptCount(); i++) {
         std::string n, v;
-        if (W3dSharedScriptPair(i, &n, &v) && n == "verdict") gVerdictPlay = v;
+        if (W3dSharedScriptPair(i, &n, &v) && n == "veredicto") gVerdictPlay = v;
     }
     printf("      [streamveredicto] el Play dijo: %s\n", gVerdictPlay.empty() ? "(nada)" : gVerdictPlay.c_str());
     if (gVerdictPlay.empty()) { err = "streamverdict: el Play no dejo compartido(\"veredicto\")"; return false; }

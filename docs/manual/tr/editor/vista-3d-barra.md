@@ -187,7 +187,7 @@ Her seçenek [Nesne Modu](modo-objeto.md) sayfasında. Düzenleme Modunda bu dü
 | ZBuffer Önizleme | Derinlik: yakın açık, uzak koyu. |
 | Normal Görünüm | Renklerle normaller. |
 | Alfa Önizleme | Siyah beyaz saydamlık. |
-| Hareket vektörleri | Her pikselin önceki kareden beri ne kadar hareket ettiği (kırmızı = X, yeşil = Y). Render'ın `_vectores` geçişiyle aynı görüntü. |
+| Hareket vektörleri | Her pikselin önceki kareden beri ne kadar hareket ettiği (kırmızı = X, yeşil = Y). Render'ın `_vectors` geçişiyle aynı görüntü. |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> sonraki moda geçer. ![Nokia](../tutoriales/img/icono-nokia.svg) N95'te <kbd>6</kbd>.
 

@@ -78,13 +78,15 @@ OPT  := -O2 -ffunction-sections -fdata-sections
 # emulador). Solo la usa w3d_vita.cpp: se recompila cuando cambia (prueba.flags)
 PRUEBA_DEFS :=
 ifneq ($(CAPTURA),)
-PRUEBA_DEFS += -DW3D_VITA_CAPTURA=$(CAPTURA)
+PRUEBA_DEFS += -DW3D_VITA_CAPTURE=$(CAPTURA)
 endif
 # (-include climits: el limits.h de newlib define LLONG_MAX solo en C; el <climits> de libstdc++ lo trae en C++. Sin
 # eso Lua dice que no hay 'long long' y el lua_Integer de C y el de C++ no coincidirian)
 # (-include sys/syslimits.h: el limits.h del gcc de VitaSDK no sigue al de newlib, y PATH_MAX queda en ese otro)
 # (-MMD -MP: cada objeto anota los headers que usa, en su .d; si un header cambia, se recompila lo que lo incluye)
-CXXFLAGS_W3D := $(ARCH) $(OPT) -std=gnu++17 -include climits -include sys/syslimits.h $(DEFS) $(INCS) -w -MMD -MP
+# (-fno-exceptions: el codigo no lanza ni atrapa excepciones -salvo el harness de pruebas, que aca no va-; sus tablas
+#  eran casi 1 MB de la RAM de la Dreamcast)
+CXXFLAGS_W3D := $(ARCH) $(OPT) -std=gnu++17 -fno-exceptions -include climits -include sys/syslimits.h $(DEFS) $(INCS) -w -MMD -MP
 CFLAGS_W3D   := $(ARCH) $(OPT) -std=gnu99 $(DEFS) $(INCS) -w -MMD -MP
 
 # SDL2 (con vitaGL) y lo que piden: vitaGL, el compilador de shaders (vitaShaRK) y las librerias del sistema

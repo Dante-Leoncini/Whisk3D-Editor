@@ -6,6 +6,8 @@
 # ==========================================================================
 scenedefault
 routineset Constructor 0 n 1 0 1 1
+# (su color, no el Auto: el Auto toma el fondo del render)
+routineset Constructor 0 mode 1
 frame 1
 # ---- JPG ----
 deletefile /tmp/w3d_fmt_0001.jpg

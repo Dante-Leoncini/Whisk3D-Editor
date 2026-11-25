@@ -345,6 +345,7 @@ static void DrawFocus(Camera* c) {
     w3dEngine::Color4f(1.0f, 0.75f, 0.2f, 1.0f);
     w3dEngine::LineWidth(1);
     w3dEngine::VertexPointer3f(0, v);
+    w3dEngine::TexCoordPointer2f(12, v);   // (dummy en los mismos datos: ver Empty::RenderObject)
     w3dEngine::DrawLines(6);
 }
 void Camera::RenderObject() {

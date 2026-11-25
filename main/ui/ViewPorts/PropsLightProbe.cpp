@@ -16,7 +16,7 @@ extern void Notify(const std::string& text, bool error);
 extern void PropsLayoutDirty();   // (el estado cambio de largo: rearmar la tarjeta)
 
 static LightProbe* SlActive() {
-    return (ActiveObj && ActiveObj->getType() == ObjectType::sondaluz) ? (LightProbe*)ActiveObj : NULL;
+    return (ActiveObj && ActiveObj->getType() == ObjectType::lightProbe) ? (LightProbe*)ActiveObj : NULL;
 }
 // Z-ARRIBA, como la tarjeta Transformar: el campo "Y" es la z interna y el "Z" la y
 static const int kAxis[3] = { 0, 2, 1 };

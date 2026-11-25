@@ -241,6 +241,10 @@ SOURCEPATH      ..\..\..\main\objects
 SOURCE          Culling.cpp Particles.cpp VisZone.cpp Gamepad.cpp Fog.cpp ClipRegion.cpp Sound.cpp PostProcessObj.cpp
 SOURCE          Routine.cpp // objeto Rutina: lista de pasos del render (C++03)
 SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
+SOURCE          Fields.cpp     // la TABLA de los campos de los objetos ("fog.density"): la usan las tarjetas declaradas
+SOURCEPATH      ..\..\..\main\ui\panels
+SOURCE          Panels.cpp PanelsText.cpp   // las tarjetas DECLARADAS de Properties (el motor y el texto)
+SOURCEPATH      ..\..\..\main\objects
 SOURCE          LightProbe.cpp   // objeto Sonda de luz (la luz indirecta horneada)
 SOURCE          ReflectionProbe.cpp   // objeto Sonda de reflejo (una imagen 360 horneada para los reflejos)
 SOURCEPATH      ..\..\..\main\render

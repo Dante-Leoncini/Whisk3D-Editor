@@ -46,17 +46,17 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Save project | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
-| Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.deshacer` |
-| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Right</kbd> | `global.rehacer` |
-| Object / Edit Mode | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.modo` |
+| Save project | <kbd>Ctrl+S</kbd> | — | `global.save` |
+| Undo | <kbd>Ctrl+Z</kbd> | <kbd>C+Left</kbd> | `global.undo` |
+| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Right</kbd> | `global.redo` |
+| Object / Edit Mode | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.mode` |
 | Toggle Snap | <kbd>Shift+Tab</kbd> | — | `global.snap` |
 | Snap menu | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
 | Play / Pause | <kbd>Space</kbd> | <kbd>Green+Left soft</kbd> | `global.play` |
-| Menu bar | <kbd>M</kbd> | <kbd>Left soft</kbd> | `global.barraMenu` |
-| Parent | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
-| Clear Parent | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
-| Fullscreen | <kbd>F11</kbd> | — | `global.pantalla` |
+| Menu bar | <kbd>M</kbd> | <kbd>Left soft</kbd> | `global.menuBar` |
+| Parent | <kbd>Ctrl+P</kbd> | — | `global.parent` |
+| Clear Parent | <kbd>Alt+P</kbd> | — | `global.clearParent` |
+| Fullscreen | <kbd>F11</kbd> | — | `global.screen` |
 | Render Image | <kbd>F12</kbd> | — | `global.render` |
 | Render Animation | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
@@ -64,161 +64,161 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
-| Box Select | <kbd>B</kbd> | — | `3d.caja` |
-| Select Linked | <kbd>L</kbd> | — | `3d.vinculado` |
-| Add | <kbd>Shift+A</kbd> | — | `3d.agregar` |
-| Apply | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
-| Clear Location (Pose) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
-| Clear Rotation (Pose) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
-| Shrink/Fatten / Clear Scale | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
-| Duplicate Linked | <kbd>Alt+D</kbd> | — | `3d.instancia` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
-| Hide / Show | <kbd>H</kbd> | — | `3d.ocultar` |
-| Join | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
+| Select All | <kbd>A</kbd> | <kbd>Pencil+Up</kbd> | `3d.selectAll` |
+| Deselect All | <kbd>Alt+A</kbd> | <kbd>Pencil+Up</kbd> | `3d.deselect` |
+| Invert Selection | <kbd>Ctrl+I</kbd> | — | `3d.invert` |
+| Box Select | <kbd>B</kbd> | — | `3d.box` |
+| Select Linked | <kbd>L</kbd> | — | `3d.linked` |
+| Add | <kbd>Shift+A</kbd> | — | `3d.add` |
+| Apply | <kbd>Ctrl+A</kbd> | — | `3d.apply` |
+| Move | <kbd>G</kbd> | <kbd>1</kbd> | `3d.move` |
+| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotate` |
+| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `3d.scale` |
+| Clear Location (Pose) | <kbd>Alt+G</kbd> | — | `3d.clearPos` |
+| Clear Rotation (Pose) | <kbd>Alt+R</kbd> | — | `3d.clearRot` |
+| Shrink/Fatten / Clear Scale | <kbd>Alt+S</kbd> | — | `3d.clearScale` |
+| Duplicate | <kbd>Shift+D</kbd> | — | `3d.duplicate` |
+| Duplicate Linked | <kbd>Alt+D</kbd> | — | `3d.instance` |
+| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.delete` |
+| Hide / Show | <kbd>H</kbd> | — | `3d.hide` |
+| Join | <kbd>Ctrl+J</kbd> | — | `3d.join` |
 | Insert Keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
-| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
-| Proportional Editing | <kbd>O</kbd> | — | `3d.proporcional` |
+| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `3d.keyframeAll` |
+| Proportional Editing | <kbd>O</kbd> | — | `3d.proportional` |
 | Overlays | <kbd>K</kbd> | — | `3d.overlays` |
-| Local View | <kbd>/</kbd> | — | `3d.vistaLocal` |
-| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
-| Front View | <kbd>Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaFrente` |
-| Back View | <kbd>Ctrl+Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaAtras` |
-| Right View | <kbd>Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaDerecha` |
-| Left View | <kbd>Ctrl+Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.vistaIzquierda` |
-| Top View | <kbd>Num7</kbd> | <kbd>#+Up</kbd> | `3d.vistaArriba` |
-| Bottom View | <kbd>Ctrl+Num7</kbd> | <kbd>#+Down</kbd> | `3d.vistaAbajo` |
-| Perspective / Orthographic | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
-| Roll Left | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
-| Roll Right | <kbd>Num6</kbd> | — | `3d.rodarDer` |
-| Camera View | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
-| Set Active Camera | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
-| Extrude | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
-| New Face from Vertices | <kbd>F</kbd> | — | `3d.cara` |
-| Recalculate Normals | <kbd>Shift+N</kbd> | — | `3d.normales` |
+| Local View | <kbd>/</kbd> | — | `3d.viewLocal` |
+| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.focus` |
+| Front View | <kbd>Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.viewFront` |
+| Back View | <kbd>Ctrl+Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.viewBack` |
+| Right View | <kbd>Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.viewRight` |
+| Left View | <kbd>Ctrl+Num3</kbd> | <kbd>#+Left/Right</kbd> | `3d.viewLeft` |
+| Top View | <kbd>Num7</kbd> | <kbd>#+Up</kbd> | `3d.viewTop` |
+| Bottom View | <kbd>Ctrl+Num7</kbd> | <kbd>#+Down</kbd> | `3d.viewBottom` |
+| Perspective / Orthographic | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspective` |
+| Roll Left | <kbd>Num4</kbd> | — | `3d.rollLeft` |
+| Roll Right | <kbd>Num6</kbd> | — | `3d.rollRight` |
+| Camera View | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.viewCamera` |
+| Set Active Camera | <kbd>Ctrl+Num0</kbd> | — | `3d.activeCamera` |
+| Extrude | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extrude` |
+| New Face from Vertices | <kbd>F</kbd> | — | `3d.face` |
+| Recalculate Normals | <kbd>Shift+N</kbd> | — | `3d.normals` |
 | Loop Cut and Slide | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
-| Connect Vertex Path | <kbd>J</kbd> | — | `3d.conectar` |
+| Connect Vertex Path | <kbd>J</kbd> | — | `3d.connect` |
 | Rip | <kbd>V</kbd> | — | `3d.rip` |
 | Vertex Slide | <kbd>Shift+V</kbd> | — | `3d.slide` |
-| Separate | <kbd>P</kbd> | — | `3d.separar` |
+| Separate | <kbd>P</kbd> | — | `3d.separate` |
 | Merge | <kbd>M</kbd> | — | `3d.merge` |
-| Context menu | <kbd>W</kbd> | — | `3d.menuContexto` |
-| Triangulate | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
+| Context menu | <kbd>W</kbd> | — | `3d.contextMenu` |
+| Triangulate | <kbd>Ctrl+T</kbd> | — | `3d.triangulate` |
 | UV menu | <kbd>U</kbd> | — | `3d.menuUV` |
 
 ### During a transform (move / rotate / scale)
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
-| Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
-| X axis | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
-| Y axis | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
-| Z axis | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
-| Exclude X (plane) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
-| Exclude Y (plane) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
-| Exclude Z (plane) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
-| Proportional radius + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
-| Proportional radius - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
+| Confirm | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirm` |
+| Cancel | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancel` |
+| X axis | <kbd>X</kbd> | <kbd>1</kbd> | `xf.axisX` |
+| Y axis | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.axisY` |
+| Z axis | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.axisZ` |
+| Exclude X (plane) | <kbd>Shift+X</kbd> | — | `xf.planeX` |
+| Exclude Y (plane) | <kbd>Shift+Y</kbd> | — | `xf.planeY` |
+| Exclude Z (plane) | <kbd>Shift+Z</kbd> | — | `xf.planeZ` |
+| Proportional radius + | <kbd>PageUp</kbd> | — | `xf.radiusPlus` |
+| Proportional radius - | <kbd>PageDown</kbd> | — | `xf.radiusMinus` |
 
 ### UV Editor
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
-| Select Linked | <kbd>L</kbd> | — | `uv.vinculado` |
-| Box Select | <kbd>B</kbd> | — | `uv.caja` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
+| Select All | <kbd>A</kbd> | — | `uv.selectAll` |
+| Deselect All | <kbd>Alt+A</kbd> | — | `uv.deselect` |
+| Invert Selection | <kbd>Ctrl+I</kbd> | — | `uv.invert` |
+| Select Linked | <kbd>L</kbd> | — | `uv.linked` |
+| Box Select | <kbd>B</kbd> | — | `uv.box` |
+| Move | <kbd>G</kbd> | <kbd>1</kbd> | `uv.move` |
+| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotate` |
+| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `uv.scale` |
 | Insert Keyframe | <kbd>I</kbd> | — | `uv.keyframe` |
-| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
-| Extrude | <kbd>E</kbd> | — | `uv.extruir` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
-| Frame Selected | <kbd>Num.</kbd> | — | `uv.encuadrar` |
+| Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `uv.keyframeAll` |
+| Extrude | <kbd>E</kbd> | — | `uv.extrude` |
+| Duplicate | <kbd>Shift+D</kbd> | — | `uv.duplicate` |
+| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.delete` |
+| Frame Selected | <kbd>Num.</kbd> | — | `uv.focus` |
 
 ### Timeline
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
-| Rotate handles | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
-| Delete | <kbd>X</kbd> | — | `tl.borrar` |
+| Select All | <kbd>A</kbd> | — | `tl.selectAll` |
+| Deselect All | <kbd>Alt+A</kbd> | — | `tl.deselect` |
+| Invert Selection | <kbd>Ctrl+I</kbd> | — | `tl.invert` |
+| Move | <kbd>G</kbd> | <kbd>1</kbd> | `tl.move` |
+| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `tl.scale` |
+| Rotate handles | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotate` |
+| Duplicate | <kbd>Shift+D</kbd> | — | `tl.duplicate` |
+| Delete | <kbd>X</kbd> | — | `tl.delete` |
 | Interpolation | <kbd>T</kbd> | — | `tl.interp` |
 | Handle type | <kbd>V</kbd> | — | `tl.handle` |
-| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
-| Previous frame | <kbd>Left</kbd> | — | `tl.frameAnt` |
-| Next frame | <kbd>Right</kbd> | — | `tl.frameSig` |
-| Previous keyframe | <kbd>Down</kbd> | — | `tl.keyAnt` |
-| Next keyframe | <kbd>Up</kbd> | — | `tl.keySig` |
-| Go to start | <kbd>Home</kbd> | — | `tl.inicio` |
-| Go to end | <kbd>End</kbd> | — | `tl.fin` |
+| Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.focus` |
+| Previous frame | <kbd>Left</kbd> | — | `tl.prevFrame` |
+| Next frame | <kbd>Right</kbd> | — | `tl.nextFrame` |
+| Previous keyframe | <kbd>Down</kbd> | — | `tl.prevKey` |
+| Next keyframe | <kbd>Up</kbd> | — | `tl.nextKey` |
+| Go to start | <kbd>Home</kbd> | — | `tl.start` |
+| Go to end | <kbd>End</kbd> | — | `tl.end` |
 
 ### Outliner
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `out.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
-| Move (reorder) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
-| Rename | <kbd>F2</kbd> | — | `out.renombrar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `out.duplicar` |
-| Duplicate Linked | <kbd>Alt+D</kbd> | — | `out.instancia` |
-| Hide / Show | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
-| Show active | <kbd>Num.</kbd> | — | `out.encuadrar` |
+| Select All | <kbd>A</kbd> | — | `out.selectAll` |
+| Deselect All | <kbd>Alt+A</kbd> | — | `out.deselect` |
+| Invert Selection | <kbd>Ctrl+I</kbd> | — | `out.invert` |
+| Move (reorder) | <kbd>G</kbd> | <kbd>1</kbd> | `out.move` |
+| Rename | <kbd>F2</kbd> | — | `out.rename` |
+| Duplicate | <kbd>Shift+D</kbd> | — | `out.duplicate` |
+| Duplicate Linked | <kbd>Alt+D</kbd> | — | `out.instance` |
+| Hide / Show | <kbd>H</kbd> | <kbd>2</kbd> | `out.hide` |
+| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.delete` |
+| Show active | <kbd>Num.</kbd> | — | `out.focus` |
 
 ### 2D Editor
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Select All | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
-| Deselect All | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
-| Invert Selection | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
-| Move | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
-| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
-| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
-| Duplicate | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
-| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
-| Frame Selected | <kbd>Num.</kbd> | — | `2d.encuadrar` |
-| Game View | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
+| Select All | <kbd>A</kbd> | — | `2d.selectAll` |
+| Deselect All | <kbd>Alt+A</kbd> | — | `2d.deselect` |
+| Invert Selection | <kbd>Ctrl+I</kbd> | — | `2d.invert` |
+| Move | <kbd>G</kbd> | <kbd>1</kbd> | `2d.move` |
+| Rotate | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotate` |
+| Scale | <kbd>S</kbd> | <kbd>3</kbd> | `2d.scale` |
+| Duplicate | <kbd>Shift+D</kbd> | — | `2d.duplicate` |
+| Delete | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.delete` |
+| Frame Selected | <kbd>Num.</kbd> | — | `2d.focus` |
+| Game View | <kbd>Num0</kbd> | — | `2d.gameView` |
 
 ### Properties (routine steps)
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Grab step | <kbd>G</kbd> | — | `props.agarrar` |
-| Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
+| Grab step | <kbd>G</kbd> | — | `props.grab` |
+| Delete step | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.delete` |
 | Insert Keyframe | <kbd>I</kbd> | — | `props.keyframe` |
 
 ### Script Editor
 
 | Function | Default shortcut | Nokia N95 (phone keypad) | Name in shortcuts.ini |
 |---|---|---|---|
-| Save script | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
-| Undo | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
-| Copy | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
-| Cut | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
-| Paste | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
-| Select All | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
-| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
-| Find | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
-| Replace | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
+| Save script | <kbd>Ctrl+S</kbd> | — | `ide.save` |
+| Undo | <kbd>Ctrl+Z</kbd> | — | `ide.undo` |
+| Copy | <kbd>Ctrl+C</kbd> | — | `ide.copy` |
+| Cut | <kbd>Ctrl+X</kbd> | — | `ide.cut` |
+| Paste | <kbd>Ctrl+V</kbd> | — | `ide.paste` |
+| Select All | <kbd>Ctrl+A</kbd> | — | `ide.all` |
+| Redo | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.redo` |
+| Find | <kbd>Ctrl+F</kbd> | — | `ide.find` |
+| Replace | <kbd>Ctrl+H</kbd> | — | `ide.replace` |
 
 <!--ATAJOS-FIN-->
 

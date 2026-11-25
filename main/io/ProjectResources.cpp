@@ -871,7 +871,7 @@ static void UsersTextures(std::map<std::string, TexUse>& use, bool withObjects) 
             case ObjectType::slice9:     r = ((Slice9*)o)->texture; break;
             // la SONDA DE REFLEJO: su imagen 360 horneada (tambien la de una de tiempo real que se horneo antes: el .w3d
             // la sigue nombrando). Sin esto Purge Orphans se la llevaba y el guardado se cancelaba por la entrada que falta
-            case ObjectType::sondareflejo: r = ((ReflectionProbe*)o)->texture; break;
+            case ObjectType::reflectionProbe: r = ((ReflectionProbe*)o)->texture; break;
             case ObjectType::text2d: {
                 r = ((Text2D*)o)->fontBitmap;   // el png del atlas de glifos (o su .json)
                 // y el HERMANO del par (el .json del png, o el png del .json)

@@ -46,17 +46,17 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Projeyi kaydet | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
-| Geri Al | <kbd>Ctrl+Z</kbd> | <kbd>C+Sol</kbd> | `global.deshacer` |
-| Yinele | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Sağ</kbd> | `global.rehacer` |
-| Nesne / Düzenleme Modu | <kbd>Tab</kbd> | <kbd>Tamam</kbd> | `global.modo` |
+| Projeyi kaydet | <kbd>Ctrl+S</kbd> | — | `global.save` |
+| Geri Al | <kbd>Ctrl+Z</kbd> | <kbd>C+Sol</kbd> | `global.undo` |
+| Yinele | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Sağ</kbd> | `global.redo` |
+| Nesne / Düzenleme Modu | <kbd>Tab</kbd> | <kbd>Tamam</kbd> | `global.mode` |
 | Mıknatısı aç/kapat | <kbd>Shift+Tab</kbd> | — | `global.snap` |
 | Mıknatıs menüsü (Snap) | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
 | Oynat / Duraklat | <kbd>Space</kbd> | <kbd>Yeşil+Sol soft</kbd> | `global.play` |
-| Menü çubuğu | <kbd>M</kbd> | <kbd>Sol soft</kbd> | `global.barraMenu` |
-| Ebeveyn | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
-| Ebeveyni Kaldır | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
-| Tam ekran | <kbd>F11</kbd> | — | `global.pantalla` |
+| Menü çubuğu | <kbd>M</kbd> | <kbd>Sol soft</kbd> | `global.menuBar` |
+| Ebeveyn | <kbd>Ctrl+P</kbd> | — | `global.parent` |
+| Ebeveyni Kaldır | <kbd>Alt+P</kbd> | — | `global.clearParent` |
+| Tam ekran | <kbd>F11</kbd> | — | `global.screen` |
 | Görüntü Render Al | <kbd>F12</kbd> | — | `global.render` |
 | Animasyon Render Al | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
@@ -64,161 +64,161 @@ Tuş adları: harfler ve rakamlar olduğu gibi, `Enter`, `Esc`, `Tab`, `Space`, 
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Tümünü Seç | <kbd>A</kbd> | <kbd>Kalem+Yukarı</kbd> | `3d.seleccionarTodo` |
-| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | <kbd>Kalem+Yukarı</kbd> | `3d.deseleccionar` |
-| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
-| Kutu Seçimi | <kbd>B</kbd> | — | `3d.caja` |
-| Bağlantılıyı Seç | <kbd>L</kbd> | — | `3d.vinculado` |
-| Ekle | <kbd>Shift+A</kbd> | — | `3d.agregar` |
-| Uygula | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
-| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
-| Döndür | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
-| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
-| Konumu Temizle (Poz) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
-| Dönmeyi Temizle (Poz) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
-| Daralt/Şişir / Ölçeği Temizle | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
-| Çoğalt | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
-| Bağlantılı Çoğalt | <kbd>Alt+D</kbd> | — | `3d.instancia` |
-| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
-| Gizle / Göster | <kbd>H</kbd> | — | `3d.ocultar` |
-| Birleştir | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
+| Tümünü Seç | <kbd>A</kbd> | <kbd>Kalem+Yukarı</kbd> | `3d.selectAll` |
+| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | <kbd>Kalem+Yukarı</kbd> | `3d.deselect` |
+| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `3d.invert` |
+| Kutu Seçimi | <kbd>B</kbd> | — | `3d.box` |
+| Bağlantılıyı Seç | <kbd>L</kbd> | — | `3d.linked` |
+| Ekle | <kbd>Shift+A</kbd> | — | `3d.add` |
+| Uygula | <kbd>Ctrl+A</kbd> | — | `3d.apply` |
+| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `3d.move` |
+| Döndür | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotate` |
+| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `3d.scale` |
+| Konumu Temizle (Poz) | <kbd>Alt+G</kbd> | — | `3d.clearPos` |
+| Dönmeyi Temizle (Poz) | <kbd>Alt+R</kbd> | — | `3d.clearRot` |
+| Daralt/Şişir / Ölçeği Temizle | <kbd>Alt+S</kbd> | — | `3d.clearScale` |
+| Çoğalt | <kbd>Shift+D</kbd> | — | `3d.duplicate` |
+| Bağlantılı Çoğalt | <kbd>Alt+D</kbd> | — | `3d.instance` |
+| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.delete` |
+| Gizle / Göster | <kbd>H</kbd> | — | `3d.hide` |
+| Birleştir | <kbd>Ctrl+J</kbd> | — | `3d.join` |
 | Anahtar Kare Ekle | <kbd>I</kbd> | — | `3d.keyframe` |
-| Anahtar kare ekle (tümü) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
-| Orantılı Düzenleme | <kbd>O</kbd> | — | `3d.proporcional` |
+| Anahtar kare ekle (tümü) | <kbd>Shift+I</kbd> | — | `3d.keyframeAll` |
+| Orantılı Düzenleme | <kbd>O</kbd> | — | `3d.proportional` |
 | Bindirmeler | <kbd>K</kbd> | — | `3d.overlays` |
-| Yerel görünüm | <kbd>/</kbd> | — | `3d.vistaLocal` |
-| Seçileni Çerçevele | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
-| Ön görünüm | <kbd>Num1</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.vistaFrente` |
-| Arka görünüm | <kbd>Ctrl+Num1</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.vistaAtras` |
-| Sağ görünüm | <kbd>Num3</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.vistaDerecha` |
-| Sol görünüm | <kbd>Ctrl+Num3</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.vistaIzquierda` |
-| Üst görünüm | <kbd>Num7</kbd> | <kbd>#+Yukarı</kbd> | `3d.vistaArriba` |
-| Alt görünüm | <kbd>Ctrl+Num7</kbd> | <kbd>#+Aşağı</kbd> | `3d.vistaAbajo` |
-| Perspektif / Ortografik | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
-| Görünümü sola döndür | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
-| Görünümü sağa döndür | <kbd>Num6</kbd> | — | `3d.rodarDer` |
-| Kamera görünümü | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
-| Etkin Kamera Yap | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
-| Ekstrüde | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
-| Köşelerden yeni yüz | <kbd>F</kbd> | — | `3d.cara` |
-| Normalleri Yeniden Hesapla | <kbd>Shift+N</kbd> | — | `3d.normales` |
+| Yerel görünüm | <kbd>/</kbd> | — | `3d.viewLocal` |
+| Seçileni Çerçevele | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.focus` |
+| Ön görünüm | <kbd>Num1</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.viewFront` |
+| Arka görünüm | <kbd>Ctrl+Num1</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.viewBack` |
+| Sağ görünüm | <kbd>Num3</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.viewRight` |
+| Sol görünüm | <kbd>Ctrl+Num3</kbd> | <kbd>#+Sol/Sağ</kbd> | `3d.viewLeft` |
+| Üst görünüm | <kbd>Num7</kbd> | <kbd>#+Yukarı</kbd> | `3d.viewTop` |
+| Alt görünüm | <kbd>Ctrl+Num7</kbd> | <kbd>#+Aşağı</kbd> | `3d.viewBottom` |
+| Perspektif / Ortografik | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspective` |
+| Görünümü sola döndür | <kbd>Num4</kbd> | — | `3d.rollLeft` |
+| Görünümü sağa döndür | <kbd>Num6</kbd> | — | `3d.rollRight` |
+| Kamera görünümü | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.viewCamera` |
+| Etkin Kamera Yap | <kbd>Ctrl+Num0</kbd> | — | `3d.activeCamera` |
+| Ekstrüde | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extrude` |
+| Köşelerden yeni yüz | <kbd>F</kbd> | — | `3d.face` |
+| Normalleri Yeniden Hesapla | <kbd>Shift+N</kbd> | — | `3d.normals` |
 | Döngü Kes ve Kaydır | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
-| Köşe Yolunu Bağla | <kbd>J</kbd> | — | `3d.conectar` |
+| Köşe Yolunu Bağla | <kbd>J</kbd> | — | `3d.connect` |
 | Yırt | <kbd>V</kbd> | — | `3d.rip` |
 | Köşe Kaydır | <kbd>Shift+V</kbd> | — | `3d.slide` |
-| Ayır | <kbd>P</kbd> | — | `3d.separar` |
+| Ayır | <kbd>P</kbd> | — | `3d.separate` |
 | Kaynaştır | <kbd>M</kbd> | — | `3d.merge` |
-| Bağlam menüsü | <kbd>W</kbd> | — | `3d.menuContexto` |
-| Üçgenle | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
+| Bağlam menüsü | <kbd>W</kbd> | — | `3d.contextMenu` |
+| Üçgenle | <kbd>Ctrl+T</kbd> | — | `3d.triangulate` |
 | UV menüsü | <kbd>U</kbd> | — | `3d.menuUV` |
 
 ### Dönüşüm sırasında (taşıma / döndürme / ölçekleme)
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Onayla | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>Tamam</kbd> | `xf.confirmar` |
-| İptal | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
-| X ekseni | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
-| Y ekseni | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
-| Z ekseni | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
-| X hariç (düzlem) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
-| Y hariç (düzlem) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
-| Z hariç (düzlem) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
-| Orantılı yarıçap + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
-| Orantılı yarıçap - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
+| Onayla | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>Tamam</kbd> | `xf.confirm` |
+| İptal | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancel` |
+| X ekseni | <kbd>X</kbd> | <kbd>1</kbd> | `xf.axisX` |
+| Y ekseni | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.axisY` |
+| Z ekseni | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.axisZ` |
+| X hariç (düzlem) | <kbd>Shift+X</kbd> | — | `xf.planeX` |
+| Y hariç (düzlem) | <kbd>Shift+Y</kbd> | — | `xf.planeY` |
+| Z hariç (düzlem) | <kbd>Shift+Z</kbd> | — | `xf.planeZ` |
+| Orantılı yarıçap + | <kbd>PageUp</kbd> | — | `xf.radiusPlus` |
+| Orantılı yarıçap - | <kbd>PageDown</kbd> | — | `xf.radiusMinus` |
 
 ### UV Düzenleyici
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Tümünü Seç | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
-| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
-| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
-| Bağlantılıyı Seç | <kbd>L</kbd> | — | `uv.vinculado` |
-| Kutu Seçimi | <kbd>B</kbd> | — | `uv.caja` |
-| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
-| Döndür | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
-| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
+| Tümünü Seç | <kbd>A</kbd> | — | `uv.selectAll` |
+| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `uv.deselect` |
+| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `uv.invert` |
+| Bağlantılıyı Seç | <kbd>L</kbd> | — | `uv.linked` |
+| Kutu Seçimi | <kbd>B</kbd> | — | `uv.box` |
+| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `uv.move` |
+| Döndür | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotate` |
+| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `uv.scale` |
 | Anahtar Kare Ekle | <kbd>I</kbd> | — | `uv.keyframe` |
-| Anahtar kare ekle (tümü) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
-| Ekstrüde | <kbd>E</kbd> | — | `uv.extruir` |
-| Çoğalt | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
-| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
-| Seçileni Çerçevele | <kbd>Num.</kbd> | — | `uv.encuadrar` |
+| Anahtar kare ekle (tümü) | <kbd>Shift+I</kbd> | — | `uv.keyframeAll` |
+| Ekstrüde | <kbd>E</kbd> | — | `uv.extrude` |
+| Çoğalt | <kbd>Shift+D</kbd> | — | `uv.duplicate` |
+| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.delete` |
+| Seçileni Çerçevele | <kbd>Num.</kbd> | — | `uv.focus` |
 
 ### Zaman Çizelgesi
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Tümünü Seç | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
-| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
-| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
-| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
-| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
-| Tutamaçları döndür | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
-| Çoğalt | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
-| Sil | <kbd>X</kbd> | — | `tl.borrar` |
+| Tümünü Seç | <kbd>A</kbd> | — | `tl.selectAll` |
+| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `tl.deselect` |
+| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `tl.invert` |
+| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `tl.move` |
+| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `tl.scale` |
+| Tutamaçları döndür | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotate` |
+| Çoğalt | <kbd>Shift+D</kbd> | — | `tl.duplicate` |
+| Sil | <kbd>X</kbd> | — | `tl.delete` |
 | Enterpolasyon | <kbd>T</kbd> | — | `tl.interp` |
 | Tutamaç türü | <kbd>V</kbd> | — | `tl.handle` |
-| Seçileni Çerçevele | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
-| Önceki kare | <kbd>Left</kbd> | — | `tl.frameAnt` |
-| Sonraki kare | <kbd>Right</kbd> | — | `tl.frameSig` |
-| Önceki anahtar kare | <kbd>Down</kbd> | — | `tl.keyAnt` |
-| Sonraki anahtar kare | <kbd>Up</kbd> | — | `tl.keySig` |
-| Başa git | <kbd>Home</kbd> | — | `tl.inicio` |
-| Sona git | <kbd>End</kbd> | — | `tl.fin` |
+| Seçileni Çerçevele | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.focus` |
+| Önceki kare | <kbd>Left</kbd> | — | `tl.prevFrame` |
+| Sonraki kare | <kbd>Right</kbd> | — | `tl.nextFrame` |
+| Önceki anahtar kare | <kbd>Down</kbd> | — | `tl.prevKey` |
+| Sonraki anahtar kare | <kbd>Up</kbd> | — | `tl.nextKey` |
+| Başa git | <kbd>Home</kbd> | — | `tl.start` |
+| Sona git | <kbd>End</kbd> | — | `tl.end` |
 
 ### Outliner
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Tümünü Seç | <kbd>A</kbd> | — | `out.seleccionarTodo` |
-| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
-| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
-| Taşı (yeniden sırala) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
-| Yeniden adlandır | <kbd>F2</kbd> | — | `out.renombrar` |
-| Çoğalt | <kbd>Shift+D</kbd> | — | `out.duplicar` |
-| Bağlantılı Çoğalt | <kbd>Alt+D</kbd> | — | `out.instancia` |
-| Gizle / Göster | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
-| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
-| Etkini göster | <kbd>Num.</kbd> | — | `out.encuadrar` |
+| Tümünü Seç | <kbd>A</kbd> | — | `out.selectAll` |
+| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `out.deselect` |
+| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `out.invert` |
+| Taşı (yeniden sırala) | <kbd>G</kbd> | <kbd>1</kbd> | `out.move` |
+| Yeniden adlandır | <kbd>F2</kbd> | — | `out.rename` |
+| Çoğalt | <kbd>Shift+D</kbd> | — | `out.duplicate` |
+| Bağlantılı Çoğalt | <kbd>Alt+D</kbd> | — | `out.instance` |
+| Gizle / Göster | <kbd>H</kbd> | <kbd>2</kbd> | `out.hide` |
+| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.delete` |
+| Etkini göster | <kbd>Num.</kbd> | — | `out.focus` |
 
 ### 2D Düzenleyici
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Tümünü Seç | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
-| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
-| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
-| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
-| Döndür | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
-| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
-| Çoğalt | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
-| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
-| Seçileni Çerçevele | <kbd>Num.</kbd> | — | `2d.encuadrar` |
-| Oyun görünümü | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
+| Tümünü Seç | <kbd>A</kbd> | — | `2d.selectAll` |
+| Tüm seçimi kaldır | <kbd>Alt+A</kbd> | — | `2d.deselect` |
+| Seçimi tersine çevir | <kbd>Ctrl+I</kbd> | — | `2d.invert` |
+| Taşı | <kbd>G</kbd> | <kbd>1</kbd> | `2d.move` |
+| Döndür | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotate` |
+| Ölçekle | <kbd>S</kbd> | <kbd>3</kbd> | `2d.scale` |
+| Çoğalt | <kbd>Shift+D</kbd> | — | `2d.duplicate` |
+| Sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.delete` |
+| Seçileni Çerçevele | <kbd>Num.</kbd> | — | `2d.focus` |
+| Oyun görünümü | <kbd>Num0</kbd> | — | `2d.gameView` |
 
 ### Özellikler (rutin adımları)
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Adımı tut | <kbd>G</kbd> | — | `props.agarrar` |
-| Adımı sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
+| Adımı tut | <kbd>G</kbd> | — | `props.grab` |
+| Adımı sil | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.delete` |
 | Anahtar Kare Ekle | <kbd>I</kbd> | — | `props.keyframe` |
 
 ### Betik Düzenleyici
 
 | İşlev | Varsayılan kısayol | Nokia N95 (telefon tuş takımı) | shortcuts.ini içindeki adı |
 |---|---|---|---|
-| Betiği kaydet | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
-| Geri Al | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
-| Kopyala | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
-| Kes | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
-| Yapıştır | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
-| Tümünü Seç | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
-| Yinele | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
-| Bul | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
-| Değiştir | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
+| Betiği kaydet | <kbd>Ctrl+S</kbd> | — | `ide.save` |
+| Geri Al | <kbd>Ctrl+Z</kbd> | — | `ide.undo` |
+| Kopyala | <kbd>Ctrl+C</kbd> | — | `ide.copy` |
+| Kes | <kbd>Ctrl+X</kbd> | — | `ide.cut` |
+| Yapıştır | <kbd>Ctrl+V</kbd> | — | `ide.paste` |
+| Tümünü Seç | <kbd>Ctrl+A</kbd> | — | `ide.all` |
+| Yinele | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.redo` |
+| Bul | <kbd>Ctrl+F</kbd> | — | `ide.find` |
+| Değiştir | <kbd>Ctrl+H</kbd> | — | `ide.replace` |
 
 <!--ATAJOS-FIN-->
 

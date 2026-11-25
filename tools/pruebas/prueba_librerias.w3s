@@ -128,7 +128,10 @@ undo
 prefablive 0
 redo
 prefablive 1
-prefabadd proxy
+# Add > Proxy W3D: el explorador elige el .w3d (ya vinculado) y adentro, el elemento
+proxyw3d /tmp/w3d_f8_lib/lib/personajes.w3d
+fbenter Enemigo
+fbaccept
 libproxyinfo Enemigo lib personajes element Enemigo generated 5
 prefabmenu has personajes/Enemigo has personajes/Arbol
 prefabmenupick personajes/Arbol

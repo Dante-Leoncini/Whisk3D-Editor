@@ -187,7 +187,7 @@ Edit Modeでは、代わりに**Mesh**（モデリングの操作。[Edit Mode](
 | ZBuffer Preview | 深度です。近いほど明るく、遠いほど暗くなります。 |
 | Normal View | 法線をカラーで表示します。 |
 | Alpha Preview | 透明度を白黒で表示します。 |
-| Motion vectors | 前のフレームから各ピクセルがどれだけ動いたか（赤 = X、緑 = Y）。レンダーの`_vectores`パスと同じ画像です。 |
+| Motion vectors | 前のフレームから各ピクセルがどれだけ動いたか（赤 = X、緑 = Y）。レンダーの`_vectors`パスと同じ画像です。 |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd>で次のモードに切り替わります。![Nokia](../tutoriales/img/icono-nokia.svg) N95では<kbd>6</kbd>です。
 

@@ -187,7 +187,7 @@ Edit Mode में इसकी जगह **Mesh** (मॉडलिंग क�
 | ZBuffer Preview | गहराई: पास उजला, दूर गहरा। |
 | Normal View | नॉर्मल, रंगों में। |
 | Alpha Preview | पारदर्शिता, काले-सफ़ेद में। |
-| Motion vectors | पिछले फ़्रेम से हर पिक्सेल कितना हिला (लाल = X, हरा = Y)। यह रेंडर के `_vectores` पास वाली ही इमेज है। |
+| Motion vectors | पिछले फ़्रेम से हर पिक्सेल कितना हिला (लाल = X, हरा = Y)। यह रेंडर के `_vectors` पास वाली ही इमेज है। |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> अगले मोड पर ले जाता है। ![Nokia](../tutoriales/img/icono-nokia.svg) N95 पर, <kbd>6</kbd>।
 

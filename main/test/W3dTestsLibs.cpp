@@ -602,7 +602,7 @@ bool CmdLibPropsMat(std::istringstream& ss, std::string& err) {
     rootViewport->Render();
     if (ActiveObj && ActiveObj->getType() == ObjectType::mesh) p->Rebind();
     const bool reading = p->propMsgDefault && !p->propMsgDefault->hidden && p->propMsgDefault->name == T("It belongs to a library (read-only): open the library to edit it") &&
-                         p->propBtnNewMaterial && p->propBtnNewMaterial->hidden;
+                         p->propLayerMatAdd && p->propLayerMatAdd->hidden;
     std::string card = "-";
     if (p->propPrefab && p->propPrefab->visible)
         card = (p->propPxLib && !p->propPxLib->hidden) ? "proxy" : "prefab";

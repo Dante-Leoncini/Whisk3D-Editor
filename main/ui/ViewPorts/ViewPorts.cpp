@@ -819,3 +819,136 @@ bool ViewportBase::BarClick(int mx, int my){
     // por ahora los botones no hacen nada: la barra solo consume el click
     return true;
 }
+
+// ============================================================================
+//  LOS PANELES GUARDADOS MIENTRAS SE NAVEGA (ver ViewPorts.h)
+// ============================================================================
+#include "graphics/w3dTexture.h"     // UploadRGBA / UpdateRGBA: la imagen guardada
+#include "WhiskUI/draw/glesdraw.h"   // W3dDrawStrip4
+#include "base/w3dlog.h"            // w3dLogfW
+#include "ViewPorts/LayoutInput.h"   // LayoutMenuOpen
+#include "ViewPorts/Notifications.h" // NotificationsVisible
+#include "WhiskUI/widgets/TextField.h"   // g_activeTextField (el cursor que parpadea)
+#include "animation/Animation.h"     // PlayAnimation
+#include "animation/VertexAnimation.h"
+#include "objects/Materials.h"       // HasAnimationActive
+#include "importers/import_obj.h"    // PendingTextures
+#include <vector>
+extern int g_pureGame;   // (render/RenderOptions.h: el modo juego puro no tiene paneles)
+namespace {
+bool gCacheNav = false, gCacheChanged = false, gCacheValid = false;
+bool gCacheOff = false;   // (la lectura de la pantalla volvio negra: en esta GPU no se guarda, se dibuja todo)
+int gCacheW = 0, gCacheH = 0, gCacheTexW = 0, gCacheTexH = 0;
+unsigned int gCacheTex = 0;
+std::vector<unsigned char> gCachePx;
+int PowerOfTwo(int v) { int p = 1; while (p < v) p <<= 1; return p; }
+// lo que tambien cambia la pantalla mientras se navega: ahi se dibuja todo
+bool CacheQuiet() {
+    return !g_pureGame && !PlayAnimation && !HasAnimationActive() && VertexAnimationActives.empty() && !LayoutMenuOpen() &&
+           !NotificationsVisible() && PendingTextures() == 0 && !g_activeTextField;
+}
+}
+int g_viewCacheFrames = 0;   // (los cuadros que salieron de la imagen guardada: el harness lo mira)
+void W3dViewCacheNavigated() { gCacheNav = true; }
+void W3dViewCacheChanged() { gCacheChanged = true; }
+
+// las vistas 3D del arbol (las que se vuelven a dibujar encima de la imagen guardada)
+static void Views3D(ViewportBase* node, std::vector<ViewportBase*>& out) {
+    if (!node) return;
+    if (!node->isLeaf()) {
+        const int k = node->ContainerKind();
+        if (k == 1) { Views3D(((ViewportRow*)node)->childA, out); Views3D(((ViewportRow*)node)->childB, out); }
+        else if (k == 2) { Views3D(((ViewportColumn*)node)->childA, out); Views3D(((ViewportColumn*)node)->childB, out); }
+        return;
+    }
+    if (node->ViewportKind() == 1) out.push_back(node);
+}
+// un rectangulo de la imagen guardada (x, y, w, h de la pantalla, arriba a la izquierda) en el mismo lugar
+static void CacheRect(int x, int y, int rw, int rh, int h) {
+    if (rw <= 0 || rh <= 0) return;
+    // (las filas de la lectura van de abajo para arriba: la de arriba de la pantalla es la ultima de la imagen)
+    const float u0 = (float)x / (float)gCacheTexW, u1 = (float)(x + rw) / (float)gCacheTexW;
+    const float v0 = (float)(h - y) / (float)gCacheTexH, v1 = (float)(h - y - rh) / (float)gCacheTexH;
+    const GLshort v[8] = { (GLshort)x, (GLshort)y, (GLshort)(x + rw), (GLshort)y,
+                           (GLshort)x, (GLshort)(y + rh), (GLshort)(x + rw), (GLshort)(y + rh) };
+    const GLfloat uv[8] = { u0, v0, u1, v0, u0, v1, u1, v1 };
+    W3dDrawStrip4(v, uv);
+}
+
+bool W3dViewCacheBegin(ViewportBase* root, int w, int h) {
+    if (gCacheOff || !gCacheValid || !gCacheNav || gCacheChanged || !gCacheTex || w != gCacheW || h != gCacheH ||
+        !CacheQuiet())
+        return false;
+    namespace gfx = w3dEngine;
+    gfx::Viewport(0, 0, w, h);
+    gfx::Disable(gfx::ScissorTest);
+    gfx::MatrixMode(gfx::Projection); gfx::PushMatrix(); gfx::LoadIdentity();
+    gfx::Ortho(0, w, h, 0, -1, 1);
+    gfx::MatrixMode(gfx::ModelView); gfx::PushMatrix(); gfx::LoadIdentity();
+    gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Fog); gfx::Disable(gfx::CullFace);
+    gfx::Disable(gfx::Blend); gfx::Enable(gfx::Texture2D);
+    gfx::EnableArray(gfx::VertexArray); gfx::EnableArray(gfx::TexCoordArray);
+    gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
+    gfx::Color4f(1, 1, 1, 1);
+    gfx::BindTexture(gCacheTex);
+    // con UNA vista 3D, la imagen solo alrededor (la vista se dibuja entera encima: pintarla dos veces era la mitad de
+    // la GPU del cuadro en el Ace); con varias, toda
+    std::vector<ViewportBase*> v3;
+    Views3D(root, v3);
+    if (v3.size() == 1) {
+        const ViewportBase* vp = v3[0];
+        const int x0 = vp->x, y0 = vp->y, x1 = vp->x + vp->width, y1 = vp->y + vp->height;
+        CacheRect(0, 0, w, y0, h);              // arriba
+        CacheRect(0, y1, w, h - y1, h);         // abajo
+        CacheRect(0, y0, x0, y1 - y0, h);       // izquierda
+        CacheRect(x1, y0, w - x1, y1 - y0, h);  // derecha
+    } else CacheRect(0, 0, w, h, h);
+    gfx::BindTexture(0);
+    gfx::MatrixMode(gfx::Projection); gfx::PopMatrix();
+    gfx::MatrixMode(gfx::ModelView); gfx::PopMatrix();
+    gfx::Enable(gfx::DepthTest);
+    g_viewCacheFrames++;
+    return true;
+}
+
+void W3dViewCacheRender3D(ViewportBase* node) {
+    if (!node) return;
+    if (!node->isLeaf()) {
+        const int k = node->ContainerKind();
+        if (k == 1) { W3dViewCacheRender3D(((ViewportRow*)node)->childA); W3dViewCacheRender3D(((ViewportRow*)node)->childB); }
+        else if (k == 2) { W3dViewCacheRender3D(((ViewportColumn*)node)->childA); W3dViewCacheRender3D(((ViewportColumn*)node)->childB); }
+        return;
+    }
+    if (node->ViewportKind() == 1) node->Render();   // (las vistas 3D)
+}
+
+// guarda la pantalla de ahora (los paneles) en la textura
+static void CacheSave(int w, int h) {
+    namespace gfx = w3dEngine;
+    gCachePx.resize((size_t)w * h * 4);
+    gfx::ReadPixelsRGBA(0, 0, w, h, &gCachePx[0]);
+    // (una lectura toda negra: esta GPU no deja leer la pantalla asi. Se apaga para la sesion: los paneles negros
+    //  mientras se navega serian peores que dibujarlos)
+    bool any = false;
+    for (size_t i = 0; i < gCachePx.size() && !any; i += 4) any = (gCachePx[i] | gCachePx[i + 1] | gCachePx[i + 2]) != 0;
+    if (!any) { gCacheOff = true; w3dLogfW("[paneles] la pantalla se lee negra: se dibujan enteros al navegar"); return; }
+    // (potencias de dos: GLES 1.1 -el N95- no tiene otras; la imagen ocupa la esquina)
+    const int tw = PowerOfTwo(w), th = PowerOfTwo(h);
+    if (!gCacheTex || tw != gCacheTexW || th != gCacheTexH) {
+        if (gCacheTex) gfx::DeleteTexture(gCacheTex);
+        std::vector<unsigned char> empty((size_t)tw * th * 4, 0);
+        gCacheTex = gfx::UploadRGBA(&empty[0], tw, th, false, false, false, false);
+        gCacheTexW = tw; gCacheTexH = th;
+    }
+    if (gCacheTex && gfx::UpdateRGBA(gCacheTex, 0, 0, w, h, &gCachePx[0], false)) { gCacheValid = true; gCacheW = w; gCacheH = h; }
+}
+
+void W3dViewCacheEnd(int w, int h, bool only3D) {
+    if (!only3D) {
+        // un cuadro entero: si arranco una navegacion se guarda (la imagen de los paneles para los cuadros que siguen);
+        // si no, la guardada ya no vale
+        gCacheValid = false;
+        if (!gCacheOff && gCacheNav && !gCacheChanged && CacheQuiet() && w > 0 && h > 0) CacheSave(w, h);
+    }
+    gCacheNav = false; gCacheChanged = false;
+}

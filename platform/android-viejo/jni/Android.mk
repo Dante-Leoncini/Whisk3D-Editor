@@ -85,13 +85,13 @@ $(PROJECT_ROOT)/thirdparty \
 $(PROJECT_ROOT)/thirdparty/lua/src \
 $(SDL_DIR)/include
 
-LOCAL_CPP_FEATURES := exceptions rtti
+LOCAL_CPP_FEATURES := rtti
 # instrucciones ARM y no Thumb: en un ARMv6 el Thumb es el de 16 bits, sin la FPU, y el clang del r15c se cae
 # armando algunas funciones grandes del editor (Properties, LayoutInput...) en ese modo
 LOCAL_ARM_MODE := arm
 # el ARM11 del telefono tiene FPU (VFP): sin esto armeabi hace las cuentas de punto flotante por software.
 # softfp = las mismas llamadas que armeabi (anda con las librerias del sistema)
-LOCAL_CFLAGS := -march=armv6 -mfpu=vfp -mfloat-abi=softfp -DW3D_ANDROID_VIEJO \
+LOCAL_CFLAGS := -march=armv6 -mfpu=vfp -mfloat-abi=softfp -fno-exceptions -DW3D_ANDROID_OLD \
                 -DLUA_USE_POSIX -DW3D_ENABLE_AUDIO '-Dl_fseek(f,o,w)=fseek(f,o,w)' '-Dl_ftell(f)=ftell(f)' -Dl_seeknum=long
 LOCAL_CPPFLAGS := -std=c++1z -include $(MY_PATH)/shim/w3d_sdl207.h -DW3D_VERSION=\"$(shell date +%y.%m.%d)\"
 

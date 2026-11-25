@@ -46,17 +46,17 @@ xf.cancelar = Esc, Q
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Сохранить проект | <kbd>Ctrl+S</kbd> | — | `global.guardar` |
-| Отменить | <kbd>Ctrl+Z</kbd> | <kbd>C+Влево</kbd> | `global.deshacer` |
-| Повторить | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Вправо</kbd> | `global.rehacer` |
-| Объект / Редактирование | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.modo` |
+| Сохранить проект | <kbd>Ctrl+S</kbd> | — | `global.save` |
+| Отменить | <kbd>Ctrl+Z</kbd> | <kbd>C+Влево</kbd> | `global.undo` |
+| Повторить | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | <kbd>C+Вправо</kbd> | `global.redo` |
+| Объект / Редактирование | <kbd>Tab</kbd> | <kbd>OK</kbd> | `global.mode` |
 | Вкл/выкл привязку | <kbd>Shift+Tab</kbd> | — | `global.snap` |
 | Меню привязки | <kbd>Shift+S</kbd> | — | `global.menuSnap` |
 | Пуск / Пауза | <kbd>Space</kbd> | <kbd>Зелёная+Лев. софт</kbd> | `global.play` |
-| Строка меню | <kbd>M</kbd> | <kbd>Лев. софт</kbd> | `global.barraMenu` |
-| Родитель | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
-| Снять родителя | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
-| Полный экран | <kbd>F11</kbd> | — | `global.pantalla` |
+| Строка меню | <kbd>M</kbd> | <kbd>Лев. софт</kbd> | `global.menuBar` |
+| Родитель | <kbd>Ctrl+P</kbd> | — | `global.parent` |
+| Снять родителя | <kbd>Alt+P</kbd> | — | `global.clearParent` |
+| Полный экран | <kbd>F11</kbd> | — | `global.screen` |
 | Рендер изображения | <kbd>F12</kbd> | — | `global.render` |
 | Рендер анимации | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
@@ -64,161 +64,161 @@ xf.cancelar = Esc, Q
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Выделить всё | <kbd>A</kbd> | <kbd>Карандаш+Вверх</kbd> | `3d.seleccionarTodo` |
-| Снять всё выделение | <kbd>Alt+A</kbd> | <kbd>Карандаш+Вверх</kbd> | `3d.deseleccionar` |
-| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `3d.invertir` |
-| Выделение рамкой | <kbd>B</kbd> | — | `3d.caja` |
-| Выделить связанное | <kbd>L</kbd> | — | `3d.vinculado` |
-| Добавить | <kbd>Shift+A</kbd> | — | `3d.agregar` |
-| Применить | <kbd>Ctrl+A</kbd> | — | `3d.aplicar` |
-| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `3d.mover` |
-| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotar` |
-| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `3d.escalar` |
-| Сбросить положение (поза) | <kbd>Alt+G</kbd> | — | `3d.limpiarPos` |
-| Сбросить вращение (поза) | <kbd>Alt+R</kbd> | — | `3d.limpiarRot` |
-| Сжать/раздуть / Сбросить масштаб | <kbd>Alt+S</kbd> | — | `3d.limpiarEsc` |
-| Дублировать | <kbd>Shift+D</kbd> | — | `3d.duplicar` |
-| Дублировать связанно | <kbd>Alt+D</kbd> | — | `3d.instancia` |
-| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.borrar` |
-| Скрыть / Показать | <kbd>H</kbd> | — | `3d.ocultar` |
-| Объединить | <kbd>Ctrl+J</kbd> | — | `3d.unir` |
+| Выделить всё | <kbd>A</kbd> | <kbd>Карандаш+Вверх</kbd> | `3d.selectAll` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | <kbd>Карандаш+Вверх</kbd> | `3d.deselect` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `3d.invert` |
+| Выделение рамкой | <kbd>B</kbd> | — | `3d.box` |
+| Выделить связанное | <kbd>L</kbd> | — | `3d.linked` |
+| Добавить | <kbd>Shift+A</kbd> | — | `3d.add` |
+| Применить | <kbd>Ctrl+A</kbd> | — | `3d.apply` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `3d.move` |
+| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `3d.rotate` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `3d.scale` |
+| Сбросить положение (поза) | <kbd>Alt+G</kbd> | — | `3d.clearPos` |
+| Сбросить вращение (поза) | <kbd>Alt+R</kbd> | — | `3d.clearRot` |
+| Сжать/раздуть / Сбросить масштаб | <kbd>Alt+S</kbd> | — | `3d.clearScale` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `3d.duplicate` |
+| Дублировать связанно | <kbd>Alt+D</kbd> | — | `3d.instance` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.delete` |
+| Скрыть / Показать | <kbd>H</kbd> | — | `3d.hide` |
+| Объединить | <kbd>Ctrl+J</kbd> | — | `3d.join` |
 | Вставить ключевой кадр | <kbd>I</kbd> | — | `3d.keyframe` |
-| Вставить ключевой кадр (всё) | <kbd>Shift+I</kbd> | — | `3d.keyframeTodo` |
-| Пропорциональное редактирование | <kbd>O</kbd> | — | `3d.proporcional` |
+| Вставить ключевой кадр (всё) | <kbd>Shift+I</kbd> | — | `3d.keyframeAll` |
+| Пропорциональное редактирование | <kbd>O</kbd> | — | `3d.proportional` |
 | Наложения | <kbd>K</kbd> | — | `3d.overlays` |
-| Локальный вид | <kbd>/</kbd> | — | `3d.vistaLocal` |
-| Показать выделенное | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.encuadrar` |
-| Вид спереди | <kbd>Num1</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaFrente` |
-| Вид сзади | <kbd>Ctrl+Num1</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaAtras` |
-| Вид справа | <kbd>Num3</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaDerecha` |
-| Вид слева | <kbd>Ctrl+Num3</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.vistaIzquierda` |
-| Вид сверху | <kbd>Num7</kbd> | <kbd>#+Вверх</kbd> | `3d.vistaArriba` |
-| Вид снизу | <kbd>Ctrl+Num7</kbd> | <kbd>#+Вниз</kbd> | `3d.vistaAbajo` |
-| Перспектива / Орто | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspectiva` |
-| Крен влево | <kbd>Num4</kbd> | — | `3d.rodarIzq` |
-| Крен вправо | <kbd>Num6</kbd> | — | `3d.rodarDer` |
-| Вид из камеры | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.vistaCamara` |
-| Сделать активной камерой | <kbd>Ctrl+Num0</kbd> | — | `3d.camaraActiva` |
-| Выдавить | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extruir` |
-| Новая грань из вершин | <kbd>F</kbd> | — | `3d.cara` |
-| Пересчитать нормали | <kbd>Shift+N</kbd> | — | `3d.normales` |
+| Локальный вид | <kbd>/</kbd> | — | `3d.viewLocal` |
+| Показать выделенное | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.focus` |
+| Вид спереди | <kbd>Num1</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.viewFront` |
+| Вид сзади | <kbd>Ctrl+Num1</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.viewBack` |
+| Вид справа | <kbd>Num3</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.viewRight` |
+| Вид слева | <kbd>Ctrl+Num3</kbd> | <kbd>#+Влево/Вправо</kbd> | `3d.viewLeft` |
+| Вид сверху | <kbd>Num7</kbd> | <kbd>#+Вверх</kbd> | `3d.viewTop` |
+| Вид снизу | <kbd>Ctrl+Num7</kbd> | <kbd>#+Вниз</kbd> | `3d.viewBottom` |
+| Перспектива / Орто | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspective` |
+| Крен влево | <kbd>Num4</kbd> | — | `3d.rollLeft` |
+| Крен вправо | <kbd>Num6</kbd> | — | `3d.rollRight` |
+| Вид из камеры | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.viewCamera` |
+| Сделать активной камерой | <kbd>Ctrl+Num0</kbd> | — | `3d.activeCamera` |
+| Выдавить | <kbd>E</kbd> | <kbd>7</kbd> | `3d.extrude` |
+| Новая грань из вершин | <kbd>F</kbd> | — | `3d.face` |
+| Пересчитать нормали | <kbd>Shift+N</kbd> | — | `3d.normals` |
 | Петлевой разрез и сдвиг | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
-| Соединить путь вершин | <kbd>J</kbd> | — | `3d.conectar` |
+| Соединить путь вершин | <kbd>J</kbd> | — | `3d.connect` |
 | Разорвать | <kbd>V</kbd> | — | `3d.rip` |
 | Сдвиг вершин | <kbd>Shift+V</kbd> | — | `3d.slide` |
-| Разделить | <kbd>P</kbd> | — | `3d.separar` |
+| Разделить | <kbd>P</kbd> | — | `3d.separate` |
 | Слить | <kbd>M</kbd> | — | `3d.merge` |
-| Контекстное меню | <kbd>W</kbd> | — | `3d.menuContexto` |
-| Триангулировать | <kbd>Ctrl+T</kbd> | — | `3d.triangular` |
+| Контекстное меню | <kbd>W</kbd> | — | `3d.contextMenu` |
+| Триангулировать | <kbd>Ctrl+T</kbd> | — | `3d.triangulate` |
 | Меню UV | <kbd>U</kbd> | — | `3d.menuUV` |
 
 ### Во время трансформации (перемещение / вращение / масштабирование)
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Подтвердить | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirmar` |
-| Отмена | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancelar` |
-| Ось X | <kbd>X</kbd> | <kbd>1</kbd> | `xf.ejeX` |
-| Ось Y | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.ejeY` |
-| Ось Z | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.ejeZ` |
-| Исключить X (плоскость) | <kbd>Shift+X</kbd> | — | `xf.planoX` |
-| Исключить Y (плоскость) | <kbd>Shift+Y</kbd> | — | `xf.planoY` |
-| Исключить Z (плоскость) | <kbd>Shift+Z</kbd> | — | `xf.planoZ` |
-| Пропорциональный радиус + | <kbd>PageUp</kbd> | — | `xf.radioMas` |
-| Пропорциональный радиус - | <kbd>PageDown</kbd> | — | `xf.radioMenos` |
+| Подтвердить | <kbd>Enter</kbd>, <kbd>NumEnter</kbd> | <kbd>OK</kbd> | `xf.confirm` |
+| Отмена | <kbd>Esc</kbd> | <kbd>C</kbd> | `xf.cancel` |
+| Ось X | <kbd>X</kbd> | <kbd>1</kbd> | `xf.axisX` |
+| Ось Y | <kbd>Y</kbd> | <kbd>2</kbd> | `xf.axisY` |
+| Ось Z | <kbd>Z</kbd> | <kbd>3</kbd> | `xf.axisZ` |
+| Исключить X (плоскость) | <kbd>Shift+X</kbd> | — | `xf.planeX` |
+| Исключить Y (плоскость) | <kbd>Shift+Y</kbd> | — | `xf.planeY` |
+| Исключить Z (плоскость) | <kbd>Shift+Z</kbd> | — | `xf.planeZ` |
+| Пропорциональный радиус + | <kbd>PageUp</kbd> | — | `xf.radiusPlus` |
+| Пропорциональный радиус - | <kbd>PageDown</kbd> | — | `xf.radiusMinus` |
 
 ### UV-редактор
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Выделить всё | <kbd>A</kbd> | — | `uv.seleccionarTodo` |
-| Снять всё выделение | <kbd>Alt+A</kbd> | — | `uv.deseleccionar` |
-| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `uv.invertir` |
-| Выделить связанное | <kbd>L</kbd> | — | `uv.vinculado` |
-| Выделение рамкой | <kbd>B</kbd> | — | `uv.caja` |
-| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `uv.mover` |
-| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotar` |
-| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `uv.escalar` |
+| Выделить всё | <kbd>A</kbd> | — | `uv.selectAll` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `uv.deselect` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `uv.invert` |
+| Выделить связанное | <kbd>L</kbd> | — | `uv.linked` |
+| Выделение рамкой | <kbd>B</kbd> | — | `uv.box` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `uv.move` |
+| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `uv.rotate` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `uv.scale` |
 | Вставить ключевой кадр | <kbd>I</kbd> | — | `uv.keyframe` |
-| Вставить ключевой кадр (всё) | <kbd>Shift+I</kbd> | — | `uv.keyframeTodo` |
-| Выдавить | <kbd>E</kbd> | — | `uv.extruir` |
-| Дублировать | <kbd>Shift+D</kbd> | — | `uv.duplicar` |
-| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.borrar` |
-| Показать выделенное | <kbd>Num.</kbd> | — | `uv.encuadrar` |
+| Вставить ключевой кадр (всё) | <kbd>Shift+I</kbd> | — | `uv.keyframeAll` |
+| Выдавить | <kbd>E</kbd> | — | `uv.extrude` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `uv.duplicate` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `uv.delete` |
+| Показать выделенное | <kbd>Num.</kbd> | — | `uv.focus` |
 
 ### Таймлайн
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Выделить всё | <kbd>A</kbd> | — | `tl.seleccionarTodo` |
-| Снять всё выделение | <kbd>Alt+A</kbd> | — | `tl.deseleccionar` |
-| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `tl.invertir` |
-| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `tl.mover` |
-| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `tl.escalar` |
-| Вращать рукоятки | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotar` |
-| Дублировать | <kbd>Shift+D</kbd> | — | `tl.duplicar` |
-| Удалить | <kbd>X</kbd> | — | `tl.borrar` |
+| Выделить всё | <kbd>A</kbd> | — | `tl.selectAll` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `tl.deselect` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `tl.invert` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `tl.move` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `tl.scale` |
+| Вращать рукоятки | <kbd>R</kbd> | <kbd>2</kbd> | `tl.rotate` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `tl.duplicate` |
+| Удалить | <kbd>X</kbd> | — | `tl.delete` |
 | Интерполяция | <kbd>T</kbd> | — | `tl.interp` |
 | Тип рукоятки | <kbd>V</kbd> | — | `tl.handle` |
-| Показать выделенное | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.encuadrar` |
-| Предыдущий кадр | <kbd>Left</kbd> | — | `tl.frameAnt` |
-| Следующий кадр | <kbd>Right</kbd> | — | `tl.frameSig` |
-| Предыдущий ключевой кадр | <kbd>Down</kbd> | — | `tl.keyAnt` |
-| Следующий ключевой кадр | <kbd>Up</kbd> | — | `tl.keySig` |
-| В начало | <kbd>Home</kbd> | — | `tl.inicio` |
-| В конец | <kbd>End</kbd> | — | `tl.fin` |
+| Показать выделенное | <kbd>Num.</kbd> | <kbd>0</kbd> | `tl.focus` |
+| Предыдущий кадр | <kbd>Left</kbd> | — | `tl.prevFrame` |
+| Следующий кадр | <kbd>Right</kbd> | — | `tl.nextFrame` |
+| Предыдущий ключевой кадр | <kbd>Down</kbd> | — | `tl.prevKey` |
+| Следующий ключевой кадр | <kbd>Up</kbd> | — | `tl.nextKey` |
+| В начало | <kbd>Home</kbd> | — | `tl.start` |
+| В конец | <kbd>End</kbd> | — | `tl.end` |
 
 ### Аутлайнер
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Выделить всё | <kbd>A</kbd> | — | `out.seleccionarTodo` |
-| Снять всё выделение | <kbd>Alt+A</kbd> | — | `out.deseleccionar` |
-| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `out.invertir` |
-| Переместить (порядок) | <kbd>G</kbd> | <kbd>1</kbd> | `out.mover` |
-| Переименовать | <kbd>F2</kbd> | — | `out.renombrar` |
-| Дублировать | <kbd>Shift+D</kbd> | — | `out.duplicar` |
-| Дублировать связанно | <kbd>Alt+D</kbd> | — | `out.instancia` |
-| Скрыть / Показать | <kbd>H</kbd> | <kbd>2</kbd> | `out.ocultar` |
-| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.borrar` |
-| Показать активный | <kbd>Num.</kbd> | — | `out.encuadrar` |
+| Выделить всё | <kbd>A</kbd> | — | `out.selectAll` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `out.deselect` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `out.invert` |
+| Переместить (порядок) | <kbd>G</kbd> | <kbd>1</kbd> | `out.move` |
+| Переименовать | <kbd>F2</kbd> | — | `out.rename` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `out.duplicate` |
+| Дублировать связанно | <kbd>Alt+D</kbd> | — | `out.instance` |
+| Скрыть / Показать | <kbd>H</kbd> | <kbd>2</kbd> | `out.hide` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `out.delete` |
+| Показать активный | <kbd>Num.</kbd> | — | `out.focus` |
 
 ### 2D-редактор
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Выделить всё | <kbd>A</kbd> | — | `2d.seleccionarTodo` |
-| Снять всё выделение | <kbd>Alt+A</kbd> | — | `2d.deseleccionar` |
-| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `2d.invertir` |
-| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `2d.mover` |
-| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotar` |
-| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `2d.escalar` |
-| Дублировать | <kbd>Shift+D</kbd> | — | `2d.duplicar` |
-| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.borrar` |
-| Показать выделенное | <kbd>Num.</kbd> | — | `2d.encuadrar` |
-| Вид игры | <kbd>Num0</kbd> | — | `2d.vistaJuego` |
+| Выделить всё | <kbd>A</kbd> | — | `2d.selectAll` |
+| Снять всё выделение | <kbd>Alt+A</kbd> | — | `2d.deselect` |
+| Инвертировать выделение | <kbd>Ctrl+I</kbd> | — | `2d.invert` |
+| Переместить | <kbd>G</kbd> | <kbd>1</kbd> | `2d.move` |
+| Вращать | <kbd>R</kbd> | <kbd>2</kbd> | `2d.rotate` |
+| Масштаб | <kbd>S</kbd> | <kbd>3</kbd> | `2d.scale` |
+| Дублировать | <kbd>Shift+D</kbd> | — | `2d.duplicate` |
+| Удалить | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `2d.delete` |
+| Показать выделенное | <kbd>Num.</kbd> | — | `2d.focus` |
+| Вид игры | <kbd>Num0</kbd> | — | `2d.gameView` |
 
 ### Свойства (шаги процедуры)
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Захватить шаг | <kbd>G</kbd> | — | `props.agarrar` |
-| Удалить шаг | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.borrar` |
+| Захватить шаг | <kbd>G</kbd> | — | `props.grab` |
+| Удалить шаг | <kbd>X</kbd>, <kbd>Delete</kbd> | — | `props.delete` |
 | Вставить ключевой кадр | <kbd>I</kbd> | — | `props.keyframe` |
 
 ### Редактор скриптов
 
 | Функция | Сочетание по умолчанию | Nokia N95 (клавиатура телефона) | Имя в shortcuts.ini |
 |---|---|---|---|
-| Сохранить скрипт | <kbd>Ctrl+S</kbd> | — | `ide.guardar` |
-| Отменить | <kbd>Ctrl+Z</kbd> | — | `ide.deshacer` |
-| Копировать | <kbd>Ctrl+C</kbd> | — | `ide.copiar` |
-| Вырезать | <kbd>Ctrl+X</kbd> | — | `ide.cortar` |
-| Вставить | <kbd>Ctrl+V</kbd> | — | `ide.pegar` |
-| Выделить всё | <kbd>Ctrl+A</kbd> | — | `ide.todo` |
-| Повторить | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.rehacer` |
-| Найти | <kbd>Ctrl+F</kbd> | — | `ide.buscar` |
-| Заменить | <kbd>Ctrl+H</kbd> | — | `ide.reemplazar` |
+| Сохранить скрипт | <kbd>Ctrl+S</kbd> | — | `ide.save` |
+| Отменить | <kbd>Ctrl+Z</kbd> | — | `ide.undo` |
+| Копировать | <kbd>Ctrl+C</kbd> | — | `ide.copy` |
+| Вырезать | <kbd>Ctrl+X</kbd> | — | `ide.cut` |
+| Вставить | <kbd>Ctrl+V</kbd> | — | `ide.paste` |
+| Выделить всё | <kbd>Ctrl+A</kbd> | — | `ide.all` |
+| Повторить | <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+Shift+Z</kbd> | — | `ide.redo` |
+| Найти | <kbd>Ctrl+F</kbd> | — | `ide.find` |
+| Заменить | <kbd>Ctrl+H</kbd> | — | `ide.replace` |
 
 <!--ATAJOS-FIN-->
 

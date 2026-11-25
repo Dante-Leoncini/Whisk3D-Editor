@@ -91,6 +91,9 @@ void Empty::RenderObject() {
         w3dEngine::Color4f(0.85f, 0.85f, 0.85f, 1.0f);
     }
     w3dEngine::VertexPointer3f(0, &v[0]);
+    // (las coordenadas de textura, a los MISMOS datos: con el arreglo prendido el driver las lee aunque no haya textura,
+    //  y si no se fijan quedan las del que dibujo antes -el Hitbox: su arreglo de 24 vertices- y se leia de mas)
+    w3dEngine::TexCoordPointer2f(12, &v[0]);
     w3dEngine::DrawLines((int)(v.size() / 3));
     w3dEngine::EnableArray(w3dEngine::NormalArray);
     if (lightWas) w3dEngine::Enable(w3dEngine::Lighting);

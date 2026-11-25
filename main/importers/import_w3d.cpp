@@ -5507,6 +5507,9 @@ bool W3dProjectLoadScene3D(const void* data, size_t n) {
 //  REINICIAR la escena (cerrar el proyecto actual) para abrir otro EN CALIENTE
 // ---------------------------------------------------------------------------
 void RestartScene() {
+    // un RENOMBRADO en curso escribe en un nombre del proyecto que se va (un material, una malla): se descarta antes
+    // de soltarlo (sino el Enter siguiente escribia en memoria liberada)
+    { extern bool RenameActive(); extern void RenameCancel(); if (RenameActive()) RenameCancel(); }
     // parar el juego/simulacion y soltar los scripts
     extern bool SimActive(); extern void SimStop();
     if (SimActive()) SimStop();
@@ -6110,7 +6113,7 @@ void OpenW3D(const std::string& path) {
               g_wobjCount, g_wobjParseMs, g_wobjBordersMs); }
     // idem las mallas del contenedor: .w3db (listas para memoria, sin derivar) contra .w3dm de texto
     // (derivadas al abrir), y los .w3db que este build no puede usar (en el N95: mas de 65535 vertices)
-    w3dLogf("[CARGA] mallas .w3db=%d (listas, sin derivar)  .w3dm=%d (derivadas al abrir)  .w3db rejected=%d",
+    w3dLogf("[CARGA] mallas .w3db=%d (listas, sin derivar)  .w3dm=%d (derivadas al abrir)  .w3db rechazadas=%d",
             s_binaryMeshes, s_derivedMeshes, s_meshesRejectedBin);
 
     // PRECARGA de texturas 2D (emisores de particulas + imagenes del HUD): sin

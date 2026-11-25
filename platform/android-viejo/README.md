@@ -12,7 +12,7 @@ Para Android 5.0 o más nuevo está el [APK de siempre](../android/README.md). E
 - **La interfaz a escala 1** (la densidad de estas pantallas es la del N95) y **sin antialiasing**.
 - Los permisos se otorgan al instalar (Android 2.3 no los pide aparte).
 
-Lo propio de esta plataforma va con `#ifdef W3D_ANDROID_VIEJO`.
+Lo propio de esta plataforma va con `#ifdef W3D_ANDROID_OLD`.
 
 ## Cómo dibuja
 
@@ -34,7 +34,7 @@ Con la escena de inicio, orbitar con el cubo seleccionado lleva unos 27 ms por c
 bash platform/android-viejo/preparar_android_viejo.sh
 ```
 
-Deja en `~/android-viejo` (o en `W3D_ANDROID_VIEJO`) el NDK r15c y las fuentes de SDL 2.0.7, sin root. Del sistema hacen falta además el SDK de Android (las build-tools y cualquier plataforma, en `~/Android/Sdk` o `ANDROID_HOME`), un JDK e ImageMagick.
+Deja en `~/android-viejo` (o en `W3D_ANDROID_OLD`) el NDK r15c y las fuentes de SDL 2.0.7, sin root. Del sistema hacen falta además el SDK de Android (las build-tools y cualquier plataforma, en `~/Android/Sdk` o `ANDROID_HOME`), un JDK e ImageMagick.
 
 ## Compilar
 

@@ -385,6 +385,43 @@ EM_JS(void, WebUnloadFile, (const char* pathPtr, const char* namePtr), {
 #include <sstream>
 #include <iostream>
 #include "base/w3dlog.h"   // w3dLogf: para redirigir cout/cerr al log propio (no la consola blanca de Windows)
+// LA CAPTURA DE PRUEBA (W3D_CAPTURE=n): el cuadro n dibujado queda en un .ppm (W3D_CAPTURE_FILE, o en Android
+// /sdcard/w3d_captura.ppm), antes de mostrarlo. Es para ver la pantalla donde no se puede sacar una captura (Android 2.3
+// sin root); sin la variable no hace nada. W3D_CAPTURE=n:k guarda k cuadros seguidos desde el n (archivo.0, archivo.1...)
+static void W3dCaptureFrame(SDL_Window* w) {
+#if defined(W3D_PSP) || defined(W3D_3DS)
+    (void)w;
+#else
+    static int target = -2, count = 1, frame = 0;
+    if (target == -2) {
+        const char* e = getenv("W3D_CAPTURE");
+        target = (e && *e) ? atoi(e) : -1;
+        const char* c = e ? strchr(e, ':') : NULL;
+        if (c && atoi(c + 1) > 1) count = atoi(c + 1);
+    }
+    ++frame;
+    if (target < 0 || frame < target || frame >= target + count) return;
+    int pw = 0, ph = 0;
+    SDL_GL_GetDrawableSize(w, &pw, &ph);
+    if (pw <= 0 || ph <= 0) return;
+    std::vector<unsigned char> px((size_t)pw * ph * 4);
+    w3dEngine::ReadPixelsRGBA(0, 0, pw, ph, &px[0]);
+    const char* f = getenv("W3D_CAPTURE_FILE");
+#ifdef __ANDROID__
+    std::string path = (f && *f) ? f : "/sdcard/w3d_captura.ppm";
+#else
+    std::string path = (f && *f) ? f : "w3d_captura.ppm";
+#endif
+    if (count > 1) { char n[16]; snprintf(n, sizeof(n), ".%d", frame - target); path += n; }
+    FILE* o = fopen(path.c_str(), "wb");
+    if (!o) { w3dLogfE("[captura] no se pudo escribir %s", path.c_str()); return; }
+    fprintf(o, "P6\n%d %d\n255\n", pw, ph);
+    for (int y = ph - 1; y >= 0; y--)   // (GL lee de abajo para arriba)
+        for (int x = 0; x < pw; x++) fwrite(&px[((size_t)y * pw + x) * 4], 1, 3, o);
+    fclose(o);
+    w3dLogf("[captura] cuadro %d (%dx%d) -> %s", frame, pw, ph, path.c_str());
+#endif
+}
 #include <iomanip>
 
 
@@ -1074,7 +1111,7 @@ static void MainLoopFrame() {
       extern bool W3dInertiaActive();   // un panel que sigue deslizando solo despues de soltarlo (controls.cpp)
       bool _animPre = HasAnimationActive() || !VertexAnimationActives.empty() || PlayAnimation || W3dInertiaActive() ||
                       _partAnim;
-      if (!_animPre && !_needRender && !g_redraw && SDL_WaitEventTimeout(&e, 200)) ProcessEvent(e); }
+      if (!_animPre && !_needRender && !g_redraw && !W3dProfLogOn() && SDL_WaitEventTimeout(&e, 200)) ProcessEvent(e); }
 #endif
 #ifdef W3D_DREAMCAST
     {   // el control de la consola como mouse (fuera del modo juego; con el juego corriendo el control es del juego)
@@ -1266,7 +1303,22 @@ static void MainLoopFrame() {
     // tabs ocultas, asi que no quema GPU de fondo. (En escritorio se mantiene el event-driven.)
     bool doRender = true; (void)animating; (void)_renderNowMs;
 #else
-    bool doRender = (_needRender || g_redraw || animating); // _needRender = del frame previo; g_redraw = eventos/subsistemas de este.
+    // (W3D_PROF_ORBIT=1 con el log del perfil: la vista 3D activa gira sola, para medir la navegacion donde no se puede
+    // arrastrar a mano: el telefono por adb)
+    // (W3D_PROF_MOVE=1: el objeto activo va y viene, como arrastrarlo con el gizmo)
+    if (W3dProfLogOn()) {
+        static int orbit = -1, move = -1, step = 0;
+        if (orbit < 0) { const char* e = getenv("W3D_PROF_ORBIT"); orbit = (e && *e == '1') ? 1 : 0; }
+        if (move < 0) { const char* e = getenv("W3D_PROF_MOVE"); move = (e && *e == '1') ? 1 : 0; }
+        extern Viewport3D* Viewport3DActive;
+        if (orbit && Viewport3DActive) Viewport3DActive->OrbitArrow(2, 0);
+        if (move && ActiveObj) {
+            ActiveObj->pos.x += ((step++ / 30) & 1) ? -0.03f : 0.03f;
+            extern bool g_objectsMoved; g_objectsMoved = true;
+        }
+    }
+    bool doRender = (_needRender || g_redraw || animating || W3dProfLogOn()); // _needRender = del frame previo; g_redraw = eventos/subsistemas de este.
+    // (con el log del perfil se dibujan todos los cuadros: son los que se miden)
     // El CAP a 60fps lo hace el LOOP (paceo por sleep), no aca -> sin busy-spin.
 #endif
     g_didRender = doRender; // el loop de escritorio lo lee: si dibujo -> pacea 60fps; si no -> bloquea en eventos (0% CPU)
@@ -1283,7 +1335,12 @@ static void MainLoopFrame() {
 #endif
         { extern void KeyboardsWatch(); KeyboardsWatch(); }   // (el teclado de Whisk3D del IDE se fue: el IDE vuelve)
         if (rootViewport){
-            rootViewport->Render();
+            // (navegando una vista 3D: los paneles salen de la imagen guardada y se dibujan solo las vistas 3D, ver
+            // W3dViewCacheBegin en ViewPorts.h)
+            const bool only3D = W3dViewCacheBegin(rootViewport, winW, winH);
+            if (only3D) W3dViewCacheRender3D(rootViewport);
+            else rootViewport->Render();
+            W3dViewCacheEnd(winW, winH, only3D);
         }
         // popups y desplegables (los dibuja el modulo compartido)
         LayoutRenderMenu(winW, winH);
@@ -1316,6 +1373,7 @@ static void MainLoopFrame() {
 #ifdef W3D_VITA
         { extern void W3dVitaDrawnFrame(); W3dVitaDrawnFrame(); }   // (la captura de prueba, antes de mostrarlo)
 #endif
+        W3dCaptureFrame(window);
         W3dPresent(window);
 #endif
 #ifdef W3D_DREAMCAST
@@ -1370,6 +1428,19 @@ int main(int argc, char* argv[]) {
     Uint32 initFlags = SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER;
 #endif
 #ifdef __ANDROID__
+    // MEDIR EN EL TELEFONO sin recompilar: las variables de /data/local/tmp/w3d_env.txt (NOMBRE=valor por linea, con adb
+    // push), como en los juegos compilados en modo debug: W3D_PROF_LOG=1 (el perfil cada 2 s en el log), W3D_CAPTURE=n
+    // (la pantalla del cuadro n en /sdcard/w3d_captura.ppm)
+    { FILE* fe = fopen("/data/local/tmp/w3d_env.txt", "r");
+      if (fe) {
+          char l[512];
+          while (fgets(l, sizeof(l), fe)) {
+              l[strcspn(l, "\r\n")] = 0;
+              char* eq = strchr(l, '=');
+              if (eq && eq != l) { *eq = 0; setenv(l, eq + 1, 1); }
+          }
+          fclose(fe);
+      } }
     // Al minimizar: SDL BLOQUEA el loop de main (NO mata el hilo nativo) y conserva el contexto GL. Sin esto, al volver
     // a abrir se relanzaba main() con los globals C++ estaticos vivos -> ConstructUniversal duplicaba la escena (otro
     // cubo/camara/luz) y las texturas quedaban negras (contexto GL nuevo). Junto con launchMode=singleTask del manifest.

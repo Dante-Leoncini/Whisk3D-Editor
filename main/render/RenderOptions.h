@@ -157,10 +157,9 @@ extern W3dRenderOpt g_render;
 // sube cuando las opciones cambian de golpe (se abrio un proyecto): los paneles rearman sus filas
 extern unsigned g_renderGen;
 
-// DIBUJAR FUERA DE LA PANTALLA: lo que se dibuja para LEERLO y nunca se muestra (el pase de colores de las sombras en
-// tiempo real, las franjas del render a archivo). NULL = en la ventana (la PC, Android: nada se ve hasta el swap). En el
-// N95 lo dibujado en la ventana SE VEIA antes del swap -los colores planos de las sombras, las franjas del render en la
-// barra de progreso-: ahi va a una superficie aparte (pbuffer). Se puede anidar (una franja con sombras adentro).
+// DIBUJAR FUERA DE LA PANTALLA: lo que se dibuja para LEERLO y nunca se muestra (las franjas del render a archivo). NULL =
+// en la ventana (la PC, Android: nada se ve hasta el swap). En el N95 lo dibujado en la ventana SE VEIA antes del swap -las
+// franjas del render en la barra de progreso-: ahi va a una superficie aparte (pbuffer). Se puede anidar.
 // Empezar devuelve false si no hay superficie aparte (entonces se dibuja en la ventana, como siempre)
 extern bool (*W3dOutsideScreenBegin)(int w, int h);
 extern void (*W3dOutsideScreenFinish)();

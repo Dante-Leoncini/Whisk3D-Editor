@@ -202,7 +202,11 @@ static void ScriptDumpScene(Object* o, int level) {
     for (size_t i=0;i<o->Childrens.size();i++) ScriptDumpScene(o->Childrens[i], level+1);
 }
 
+// el material ACTIVO: el que edita la tarjeta Material (la capa elegida de la parte elegida); sin panel, el de la
+// primera parte de la malla activa
 static Material* ScriptActiveMaterial() {
+    extern Material* PropsEditedMaterial();
+    if (Material* e = PropsEditedMaterial()) return e;
     Mesh* m = ScriptActiveMesh();
     if (!m || m->materialsGroup.empty()) return NULL;
     return m->materialsGroup[0].material;
@@ -1544,6 +1548,8 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         // (no son mallas: Agregar > Camara / Luz, como el menu, en el cursor 3D)
         if (prim == "camera") { extern void AddCamera(); AddCamera(); return true; }
         if (prim == "light")  { extern void AddLight();  AddLight();  return true; }
+        if (prim == "fog")    { extern void AddFog();    AddFog();    return true; }
+        if (prim == "particles") { extern void AddParticles(); AddParticles(); return true; }
         MeshType::Enum type;
         if (!MeshTypeFromName(prim, type)) { err = "primitiva desconocida: '" + prim + "'"; return false; }
         Object* o = NewMesh(MeshType(type), NULL, false);
@@ -5110,12 +5116,14 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         if (cmd == "routinesel") { int i = 0; ss >> i; r->activeStep = i; return true; }   // el paso elegido (0..)
         // rutinarepetir <rutina> <n> : el BUCLE de rutina (la lista corre n veces)
         if (cmd == "routinerepeat") { int n = 1; ss >> n; r->repeat = (float)n; g_w3dRoutinesGen++; return true; }
-        // rutinaset <rutina> <i> on 0|1 | n v1 v2...   un campo del paso i (0..) de la lista que se edita (como setStep)
+        // routineset <rutina> <i> on 0|1 | mode N | n v1 v2...   un campo del paso i (0..) de la lista que se edita (como
+        // setStep). mode: la opcion del paso (Clear color: 0 Auto, 1 el color propio)
         if (cmd == "routineset") {
             int i = 0; std::string field; ss >> i >> field;
             std::vector<W3dStep>& L = r->lists[r->editedList];
             if (i < 0 || i >= (int)L.size()) { err = "routineset: no hay ese paso"; return false; }
             if (field == "on") { int v = 1; ss >> v; L[(size_t)i].on = (v != 0); }
+            else if (field == "mode") { int v = 0; ss >> v; L[(size_t)i].mode = v; }
             else { float v; int k = 0; while (k < 5 && (ss >> v)) { L[(size_t)i].n[k].v = v; L[(size_t)i].n[k].ref.clear(); k++; } }
             g_w3dRoutinesGen++;
             return true;
@@ -6452,7 +6460,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     if (cmd == "probe") {
         std::string q; ss >> q;
         if (q == "add") { extern void AddLightProbe(); AddLightProbe(); return true; }
-        LightProbe* sl = (ActiveObj && ActiveObj->getType() == ObjectType::sondaluz) ? (LightProbe*)ActiveObj : NULL;
+        LightProbe* sl = (ActiveObj && ActiveObj->getType() == ObjectType::lightProbe) ? (LightProbe*)ActiveObj : NULL;
         if (!sl) { err = "probe: el objeto activo no es una sonda de luz"; return false; }
         if (q == "size") { ss >> sl->size[0] >> sl->size[1] >> sl->size[2]; sl->sh.clear(); }
         else if (q == "points") { ss >> sl->points[0] >> sl->points[1] >> sl->points[2]; sl->sh.clear(); }
@@ -6739,7 +6747,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //      tapa de cerca, cada cuanto se redibuja la de tiempo real) ----
     if (cmd == "srtype") {
         std::string t; float near = -1.0f, each = -1.0f; ss >> t >> near >> each;
-        if (!ActiveObj || ActiveObj->getType() != ObjectType::sondareflejo) { err = "srtype: el activo no es una sonda de reflejo"; return false; }
+        if (!ActiveObj || ActiveObj->getType() != ObjectType::reflectionProbe) { err = "srtype: el activo no es una sonda de reflejo"; return false; }
         ReflectionProbe* sr = (ReflectionProbe*)ActiveObj;
         sr->type = t == "realTime" ? W3D_REFLECTION_TIME_REAL : t == "custom" ? W3D_REFLECTION_CUSTOMIZED : W3D_REFLECTION_BAKED;
         if (near >= 0.0f) sr->near = near;
@@ -6751,7 +6759,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     }
     // ---- srbake : hornea la sonda de reflejo ACTIVA (la imagen 360 queda en una textura del proyecto, en memoria) ----
     if (cmd == "srbake") {
-        if (!ActiveObj || ActiveObj->getType() != ObjectType::sondareflejo) { err = "srbake: el activo no es una sonda de reflejo"; return false; }
+        if (!ActiveObj || ActiveObj->getType() != ObjectType::reflectionProbe) { err = "srbake: el activo no es una sonda de reflejo"; return false; }
         ReflectionProbe* sr = (ReflectionProbe*)ActiveObj;
         if (sr->resolution > 64) sr->resolution = 64;   // (chica: la prueba es del guardado, no de la imagen)
         std::string reason;
@@ -6774,7 +6782,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     // ---- srdump <archivo.png> : la IMAGEN 360 que dibujo la GPU (la sonda de tiempo real activa) a un png ----
     if (cmd == "srdump") {
         std::string output; ss >> output;
-        if (!ActiveObj || ActiveObj->getType() != ObjectType::sondareflejo) { err = "srdump: el activo no es una sonda de reflejo"; return false; }
+        if (!ActiveObj || ActiveObj->getType() != ObjectType::reflectionProbe) { err = "srdump: el activo no es una sonda de reflejo"; return false; }
         ReflectionProbe* sr = (ReflectionProbe*)ActiveObj;
         if (sr->livePx.empty() || !sr->live.iID) { err = "srdump: la GPU todavia no la dibujo"; return false; }
         printf("      [srvolcar] '%s' %dx%d (version %u)\n", sr->name.c_str(), sr->live.width, sr->live.height, sr->version);
@@ -7536,6 +7544,27 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //      con simstop, que ademas restaura la escena del editor. ----
     // ---- luarun "<objeto>" <codigo...> : corre codigo lua en el script de ese objeto (el juego tiene que estar
     //      corriendo: simplay). Para llevar al personaje a un lugar o a un estado y medir / capturar ahi ----
+    // 'luaprops <archivo.lua> <propiedad> <valor>': corre el cuerpo del script como la tarjeta del script del editor
+    // (W3dScriptReadProperties: las mismas librerias) y ASSERTEA el valor por defecto de una de sus propiedades.
+    // 'luaprops <archivo.lua> error': la lectura TIENE que fallar (un script que no termina, uno con error)
+    if (cmd == "luaprops") {
+        std::string file, name, expected; ss >> file >> name >> expected;
+        if (file.empty() || name.empty()) { err = "luaprops: uso: luaprops <archivo.lua> <propiedad> <valor> | error"; return false; }
+        std::vector<W3dScriptProp> props;
+        const bool ok = W3dScriptReadProperties(file, &props);
+        if (name == "error") {
+            printf("      [luaprops] %s: %s\n", file.c_str(), ok ? "se leyo" : "fallo (como se esperaba)");
+            if (ok) { err = "luaprops: la lectura de " + file + " tenia que fallar"; return false; }
+            return true;
+        }
+        if (!ok) { err = "luaprops: no se pudo leer " + file + " (ver el log)"; return false; }
+        for (size_t i = 0; i < props.size(); i++) if (props[i].name == name) {
+            printf("      [luaprops] %s = %s\n", name.c_str(), props[i].defaultValue.c_str());
+            if (props[i].defaultValue != expected) { err = "luaprops: " + name + " vale " + props[i].defaultValue + " y se esperaba " + expected; return false; }
+            return true;
+        }
+        err = "luaprops: " + file + " no tiene la propiedad " + name; return false;
+    }
     if (cmd == "luarun") {
         std::string rest; std::getline(ss, rest);
         size_t a = rest.find('"'), b2 = (a == std::string::npos) ? a : rest.find('"', a + 1);
@@ -9016,11 +9045,11 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         }
         printf("\n");
         // la PRIMERA fila es el submenu de mallas (8 primitivas); despues los objetos modificadores (espejo, array,
-        // instancia), los de los PREFABS y las ESCENAS del proyecto (Add > Prefab / Escena), Imports y, al final, el
-        // Nucleo (avanzado): 6 submenus
+        // instancia), las LUCES (luz, sol, foco y la sonda de luz), los de los PREFABS y las ESCENAS del proyecto
+        // (Add > Prefab / Escena), Imports y, al final, el Nucleo (avanzado): 7 submenus
         if (!MenuAdd->items.empty() && MenuAdd->items[0]->submenu)
             primitives = (int)MenuAdd->items[0]->submenu->items.size();
-        const bool menuOk = (primitives >= 6 && withSubmenu == 6 && iconGamepad == 0);
+        const bool menuOk = (primitives >= 6 && withSubmenu == 7 && iconGamepad == 0);
         printf("      [uxeditor] D primera fila = submenu de mallas con %d primitivas | submenus=%d "
                "| filas con el icono del viejo objeto Script=%d %s\n",
                primitives, withSubmenu, iconGamepad,
@@ -37367,14 +37396,14 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
                          std::string((const char*)&b[38], mt.size()) == mt;
             // STORE (metodo 0 en el offset 8) y sin campo extra (offset 28)
             bool store = b.size() > 29 && b[8] == 0 && b[9] == 0 && b[28] == 0 && b[29] == 0;
-            // los 36 bytes EXACTOS y SIN salto final: justo despues (offset 74)
-            // ya arranca el local header de la entrada siguiente
-            bool exact = mt.size() == 36 && b.size() > 75 &&
-                          b[73] != '\n' && b[74] == 'P' && b[75] == 'K';
+            // el tipo EXACTO y SIN salto final: justo despues ya arranca el local header de la entrada siguiente
+            // (el largo sale del tipo: con "proyecto" eran 36 bytes, con "project" 35)
+            const size_t end = 38 + mt.size();
+            bool exact = b.size() > end + 1 && b[end - 1] != '\n' && b[end] == 'P' && b[end + 1] == 'K';
             printf("      [contenedor] 1b) ODF: PK\\3\\4=%s | 'mimetype' en el offset 30=%s | "
-                   "'%s' en el 38=%s | STORE sin extra=%s | 36 bytes sin \\n (PK en el 74)=%s\n",
+                   "'%s' en el 38=%s | STORE sin extra=%s | %d bytes sin \\n (PK en el %d)=%s\n",
                    pk?"OK":"MAL", nameOk?"OK":"MAL", mt.c_str(), signature?"OK":"MAL",
-                   store?"OK":"MAL", exact?"OK":"MAL");
+                   store?"OK":"MAL", (int)mt.size(), (int)end, exact?"OK":"MAL");
             if (!pk || !nameOk || !signature || !store || !exact) ok = false;
             // el README.txt esta y describe el arbol (es lo que ve el dueno al abrirlo)
             std::vector<W3dZipEntry> z; W3dZipRead(p1, &z);
@@ -37524,7 +37553,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
             // (c) el texto viejo Whisk3D { ... }
             std::string pTx = dirV + "/texto.w3d";
             { FILE* f = fopen(pTx.c_str(), "wb");
-              if (f) { fputs("Whisk3D {\n  Escena {\n    Camera {\n      name: \"CamaraVieja\"\n    }\n  }\n"
+              if (f) { fputs("Whisk3D {\n  Scene {\n    Camera {\n      name: \"CamaraVieja\"\n    }\n  }\n"
                              "  Layout {\n    Viewport3D\n  }\n}\n", f); fclose(f); } }
             OpenProjectNow(pTx);
             int cams = 0;
@@ -38740,7 +38769,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         //  que 'truncado' no se prendia: la lectura "salia bien" con 0 vertices.
         // =====================================================================
         {
-            const std::string cut = "W3DMESH 1\nnombre Cortada\nV 3 point\n 0 0 0\n 1 0 0\n 0 1 0\nEND\n";
+            const std::string cut = "W3DMESH 1\nname Cortada\nV 3 point\n 0 0 0\n 1 0 0\n 0 1 0\nEND\n";
             RestartScene(); PlayAnimation = false;
             Mesh* z = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
             z->GenerateRender();
@@ -38754,8 +38783,8 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
             for (size_t i = 0; i < zi.notices.size(); i++) printf("      [perdida]   -> %s\n", zi.notices[i].c_str());
             if (opened || !intact || zi.notices.empty() || !zi.truncated) ok = false;
             // el gemelo POSITIVO: una malla legitimamente vacia SI se abre (escribe
-            // sus bloques "V 0 punto" y "F 0 cara"), o sea que el chequeo no miente
-            const std::string empty = "W3DMESH 1\nnombre Vacia\nV 0 point\nEND\nF 0 face\nEND\n";
+            // sus bloques "V 0 point" y "F 0 face"), o sea que el chequeo no miente
+            const std::string empty = "W3DMESH 1\nname Vacia\nV 0 point\nEND\nF 0 face\nEND\n";
             Mesh* z2 = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
             W3dMeshInfo zi2;
             bool opened2 = W3dMeshRead(empty.data(), empty.size(), z2, &zi2);
@@ -38785,7 +38814,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
                    (int)z->w3dmForeign.blocks.size(), foreignClean ? "si" : "NO <-- MAL");
             if (!opened || z->vertexSize != 3 || z->faces3d.size() != 1 || !foreignClean) ok = false;
             // ...y en cualquier caja: "end" tambien cierra
-            std::string t2 = "W3DMESH 1\nV 3 punto\n 0 0 0\n 1 0 0\n 0 1 0\nend\nF 1 cara\n 3 0 1 2\nEND\n";
+            std::string t2 = "W3DMESH 1\nV 3 point\n 0 0 0\n 1 0 0\n 0 1 0\nend\nF 1 face\n 3 0 1 2\nEND\n";
             Mesh* z2 = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
             W3dMeshInfo zi2;
             bool opened2 = W3dMeshRead(t2.data(), t2.size(), z2, &zi2);
@@ -39284,9 +39313,9 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         //        la linea vuelve entera y el guardado se FRENA.
         {
             std::string txt = plane;
-            size_t p = txt.find("requiere V F\n");
+            size_t p = txt.find("requires V F\n");
             if (p == std::string::npos) { err = "w3dmf3: el escritor no emitio la linea 'requiere'"; return false; }
-            txt.replace(p, 13, "requiere V F CREASE\n");
+            txt.replace(p, 13, "requires V F CREASE\n");
             txt += "\nCREASE 12 edge\n";
             for (int i = 0; i < 12; i++) txt += " 0 1 0.5\n";
             txt += "END\n";
@@ -39314,14 +39343,14 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         //        vuelve TAL CUAL vino (no reescrita a mano como "requiere V F").
         {
             std::string txt = plane;
-            size_t p = txt.find("requiere V F\n");
-            txt.replace(p, 13, "requiere V F NRM UV\n");
+            size_t p = txt.find("requires V F\n");
+            txt.replace(p, 13, "requires V F NRM UV\n");
             Mesh* r = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
             W3dMeshInfo info;
             if (!W3dMeshRead(txt.data(), txt.size(), r, &info)) { err = "w3dmf3: no pude leer el .w3dm con requiere conocido"; return false; }
             std::string turn;
             const bool wrote = W3dMeshWrite(r, turn, 0);
-            const bool intact = wrote && turn.find("\nrequiere V F NRM UV\n") != std::string::npos;
+            const bool intact = wrote && turn.find("\nrequires V F NRM UV\n") != std::string::npos;
             printf("      [w3dmf3] B) 'requiere V F NRM UV' | soloLectura=%s | guardar=%s | la linea vuelve %s\n",
                    info.readOnly ? "si <-- MAL" : "no", wrote ? "OK" : "FALLO <-- MAL",
                    intact ? "TAL CUAL OK" : "REESCRITA <-- MAL");
@@ -39337,7 +39366,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         // --- C) una malla NUEVA del editor lleva el default
         {
             std::string t; W3dMeshWrite(base, t, 0);
-            const bool def = t.find("\nrequiere V F\n") != std::string::npos;
+            const bool def = t.find("\nrequires V F\n") != std::string::npos;
             printf("      [w3dmf3] C) malla nueva -> 'requiere V F': %s\n", def ? "OK" : "NO <-- MAL");
             if (!def) ok = false;
         }
@@ -42054,9 +42083,11 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //                           el cubo en el centro, las barras del encuadre en
     //                           negro OPACO y el HUD encima del 3D.
     // ========================================================================
+    // game3dmin <carpeta> [light]: 'light' cuelga una linterna de la camara (para las pruebas que comparan los PIXELES
+    // del juego compilado; las demas miran la forma exacta de la escena: indices, hijos, lo que genera un prefab)
     if (cmd == "game3dmin") {
-        std::string dir; ss >> dir;
-        if (dir.empty()) { err = "game3dmin: uso: game3dmin <carpeta>"; return false; }
+        std::string dir, opt; ss >> dir >> opt;
+        if (dir.empty()) { err = "game3dmin: uso: game3dmin <carpeta> [light]"; return false; }
         std::error_code ec; std::filesystem::create_directories(dir, ec);
         // el script del HUD: minimo pero REAL (Compilar juego rechaza un proyecto sin scripts)
         { FILE* f = fopen((dir + "/juego3dmin.lua").c_str(), "w");
@@ -42129,8 +42160,12 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         // de probar solo "el 2D va encima del 3D" y prueba ademas "los scripts del
         // juego compilado corren con la MISMA API que en el Play".
         stripe->visible = false;
+        // --- con 'light', una LINTERNA colgada de la camara. El juego compilado dibuja SIEMPRE en modo Render
+        //     (w3drun.cpp), y ahi una escena sin luces solo tiene el ambiente del fondo -casi negro-: el Play del editor
+        //     la veia con la luz de su vista previa y la comparacion de pixeles fallaba por la escena, no por el runtime ---
+        if (opt == "light") { Light* lamp = Light::Create(cam, 0.0f, 0.0f, 0.0f); if (lamp) lamp->name = "Linterna"; }
         DeselectAll(); ActiveObj = NULL;
-        printf("      [juego3dmin] cubo + camara (aspecto 1:1) + HUD con script en '%s'\n", dir.c_str());
+        printf("      [juego3dmin] cubo + camara%s (aspecto 1:1) + HUD con script en '%s'\n", opt == "light" ? " con linterna" : "", dir.c_str());
         return true;
     }
 

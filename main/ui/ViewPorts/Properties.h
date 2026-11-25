@@ -127,10 +127,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // props del material como MEMBERS (Rebind los setea por nombre, NO por indice -> reordenar la
         // tarjeta no rompe nada): 8 checkboxes + 3 colores + shininess.
         PropBool*  propMatChk[11]; // Filtering, Transparent, VertexColor, Lighting, Repeat, Culling, DepthTest, Smooth, Chrome, Equirect360, NormalMapping
-        PropColor* propMatCol[3];  // Base Color, Specular, Emission
-        PropFloat* propMatShin;    // Shininess
-        PropFloat* propMatRough;   // trazado de rayos: Roughness 0..1 (solo con Ray Tracing tildado)
-        PropFloat* propMatMetal;   // trazado de rayos: Metallic 0..1 (solo con Ray Tracing tildado)
         // ---- CALCOMANIAS / MEZCLA / PROFUNDIDAD -----------------------------------
         // Hasta hoy `decal`, `mezcla`, `sesgoProfundidad` y `ordenPasada` solo se podian
         // poner desde el .mtl o el .w3d: en el editor no habia forma de ver como se porta
@@ -400,22 +396,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propCullCellSize;  // metodo Grid: lado de la celda (unidades de mundo)
         PropBool*   propCullMode3D;    // metodo Grid: grilla 3D (default 2D en XZ)
         PropButton* propCullRecalc;    // BOTON "Recalcular": rearma la grilla del metodo Grid
-        // pestania del objeto NIEBLA (glFog en el arbol, solo en Render)
-        GroupPropertie* propFog;
-        PropBool*   propFogActive;  // false = apaga la niebla desde este punto del arbol
-        PropButton* propFogMode;    // dropdown: Lineal / Exp / Exp2
-        PropFloat*  propFogStart;   // lineal: distancia donde empieza
-        PropFloat*  propFogEnd;     // lineal: distancia donde ya es toda niebla
-        PropFloat*  propFogDens;    // exp / exp2
-        PropColor*  propFogColor;
-        PropBool*   propFogBackground;   // el fondo del render toma el color de la niebla
+        struct W3dPanels* panels;   // LAS TARJETAS DECLARADAS (ui/panels/PanelsText.cpp): Niebla, Vacio, ...
         // SONIDO (objects/Sound.h): el archivo, como suena, desde cuando (segundos), el recorte, el bucle y el 3D
         GroupPropertie* propSound;
-        // VACIO: como se dibuja (la forma, el tamanio y el giro del dibujo). Solo la vista: no cambia el objeto
-        GroupPropertie* propEmpty;
-        PropButton* propEmptyShape;
-        PropFloat*  propEmptySize;
-        PropFloat*  propEmptyRotX; PropFloat* propEmptyRotY; PropFloat* propEmptyRotZ;
         PropButton* propSoundFile;    // desplegable: los sonidos del proyecto
         PropBool*   propSoundActive;
         PropFloat*  propSoundVol;         // animable (AnimSound X)
@@ -430,8 +413,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propSoundRadius;      // 3D: hasta aca entero
         PropFloat*  propSoundRange;       // 3D: desde aca no se oye
         // objetos ClearZ / Recorte (composicion de la pantalla en el arbol)
-        GroupPropertie* propClearZ;
-        PropBool*   propLzActive;
         GroupPropertie* propClip;
         PropBool*   propRcActive;
         PropFloat*  propRcX;
@@ -541,9 +522,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropText*   propPfTarget;
         PropBool*   propPfView;
         // pestania de la Collection: orden de dibujo para transparentes
-        GroupPropertie* propCollection;
-        PropBool*   propCollOrderCam;
-        PropBool*   propCollOrderOnce;
         // pestania del objeto Mirror (pedido del dueno: "el mirror no tiene
         // propiedades"): target por NOMBRE + ejes espejados + limites del rect
         GroupPropertie* propMirror;
@@ -580,32 +558,14 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propPartTexture;    // dropdown de texturas cargadas + "Load Texture" (file browser), como el material
         PropFloat*  propPartCount;   // particulas/seg (0 = solo rafagas emitir())
         PropFloat*  propPartLife;       // segundos
-        PropFloat*  propPartSize;        // lado del billboard (unidades de mundo)
-        PropFloat*  propPartVel;        // velocidad inicial (unidades/seg)
-        PropFloat*  propPartDispersion; // apertura del cono (grados)
-        PropFloat*  propPartGravity;   // + cae / - sube
         PropButton* propPartMix;     // dropdown del modo de mezcla (Normal/Aditiva/Substractiva/... del motor)
-        PropFloat*  propPartVariation;  // 0..1: jitter por particula sobre vel/vida/tam
-        PropFloat*  propPartTurbulence;// deriva azarosa suave por particula (unid/s^2)
-        PropBool*   propPartRotation;   // nace con angulo azaroso 0..360 fijo (rotz del original)
-        PropFloat*  propPartVelRot;     // giro continuo (grados/s), signo azaroso por particula
         PropColor*  propPartColor;      // tinte + alpha: swatch -> ColorPicker de Whisk3D (bindea a Particles::color[4])
         PropBool*   propPartFade; // alpha -> 0 con la vida
         PropBool*   propPartActive;     // false = no emite
         PropBool*   propPartFiltering;   // textura LINEAR (suave) vs NEAREST (pixelada)
         // ---- particulas AVANZADAS: tarjetas aparte (Movimiento / Tamanio / Color / Rotacion / Forma) ----
-        GroupPropertie* propPartMovCard;   // Movimiento
-        GroupPropertie* propPartCardSize;  // Tamanio y crecimiento
         GroupPropertie* propPartColCard;   // Color y alfa
-        GroupPropertie* propPartRotCard;   // Rotacion
         GroupPropertie* propPartShapeCard; // Forma y flipbook
-        PropFloat* propPartDrag;
-        PropFloat* propPartAcc[3];
-        PropFloat* propPartVelRandom[3];
-        PropFloat* propPartVelBase[3];
-        PropFloat* propPartPosRandom[3];
-        PropFloat* propPartCrec;
-        PropFloat* propPartBrake;
         PropFloat* propPartAlphaDecays;
         PropFloat* propPartAlphaDeath;
         PropFloat* propPartAppear;
@@ -613,10 +573,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propPartFadeFar[2];
         PropBool*  propPartUseColEnd;
         PropColor* propPartEndColor;
-        PropFloat* propPartRotStart;
-        PropFloat* propPartRotRandom;
-        PropFloat* propPartVelRotRandom;
-        PropBool*  propPartTurnSign;
         PropButton* propPartShape;       // dropdown Billboard / Estirada / Linea
         PropFloat* propPartStretch;
         PropFloat* propPartTrailPts;
@@ -918,7 +874,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnCamTarget;
         PropButton* propBtnInstTarget;
         PropFloat* propInstCopies;        // cuantas veces dibuja un Array a su target (Instance::count)
-        PropButton* propBtnNewMaterial;
         PropButton* propBtnTexture;
         PropButton* propBtnNormalTex; // selector de la textura del normal map (visible si Normal Mapping ON)
         // LOS MAPAS del trazado de rayos / PBR (W3dMatMap EMISION..ALFA; [0] y [1] = NULL: son propBtnTexture y

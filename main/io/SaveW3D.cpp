@@ -2182,12 +2182,12 @@ static void WriteObject(std::string& s, Object* o, int ind, CtxSave* cx, bool* f
         CommonFields(s, ind + 1, o);
         HitboxWriteFields(s, ind + 1, (Hitbox*)o);
     }
-    else if (t == ObjectType::sondaluz) {   // SONDA DE LUZ: la caja, la grilla y la luz horneada (objects/LightProbe.cpp)
+    else if (t == ObjectType::lightProbe) {   // SONDA DE LUZ: la caja, la grilla y la luz horneada (objects/LightProbe.cpp)
         JSang(s, ind + 1); s += "\"type\": \"sondaluz\",\n";
         CommonFields(s, ind + 1, o);
         LightProbeWriteFields(s, ind + 1, (LightProbe*)o);
     }
-    else if (t == ObjectType::sondareflejo) {   // SONDA DE REFLEJO: la caja, la captura y su imagen 360 (objects/ReflectionProbe.cpp)
+    else if (t == ObjectType::reflectionProbe) {   // SONDA DE REFLEJO: la caja, la captura y su imagen 360 (objects/ReflectionProbe.cpp)
         JSang(s, ind + 1); s += "\"type\": \"reflectionprobe\",\n";
         CommonFields(s, ind + 1, o);
         // (la imagen: la que de verdad entra al .w3d, o ninguna. El objeto no se toca si se fue)

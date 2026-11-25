@@ -2,7 +2,7 @@
 
 | Função | O que faz |
 |---|---|
-| `setViews(n [, "lado" \| "up"])` | `2` divide a tela em duas (uma ao lado da outra ou uma em cima da outra); `1` volta para a tela inteira. A interface 2D (o HUD) é desenhada uma vez, por cima das duas. |
+| `setViews(n [, "side" \| "up"])` | `2` divide a tela em duas (uma ao lado da outra ou uma em cima da outra); `1` volta para a tela inteira. A interface 2D (o HUD) é desenhada uma vez, por cima das duas. |
 | `setCameraView(i, camera)` | A câmera da vista `i` (1 ou 2). Se não for definida, a câmera ativa. |
 | `view() → i, n` | A vista que está sendo desenhada (1 ou 2; 0 fora do desenho) e quantas há. |
 | `beforeView(i)` | (Definida pelo seu script.) O motor a chama antes de desenhar cada vista, no script que chamou `setViews`. Ali você vira para ESSA câmera o que olha para a câmera (billboards, partículas) ou esconde o que essa vista não deve ver. Não mova nada que avance com o tempo: isso vai em `update`. |

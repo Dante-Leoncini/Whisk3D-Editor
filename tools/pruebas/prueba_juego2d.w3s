@@ -10,7 +10,7 @@
 #  cosas que solo traia el camino 3D:
 #    - importarW3D() (BindsJuego) llama al lector 3D W3dImportarW3DAnexo;
 #    - W3dAvisof (el aviso de mando conectado) llama a Notificar, que el runtime
-#      definia solo en su bloque W3D_JUEGO_3D.
+#      definia solo en su bloque W3D_GAME_3D.
 #  Ahora el runtime (w3drun.cpp) trae Notificar para los dos y, en 2D, la version
 #  de juego de W3dImportarW3DAnexo (avisa y devuelve nil: no hay lector 3D).
 #

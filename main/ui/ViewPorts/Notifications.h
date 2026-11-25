@@ -20,5 +20,6 @@ void NotificationsMotion(int mx, int my);             // hover de la 'x' (gray->
 // las que se ven ahora (no los hints): alguna contiene 'texto'? Para las pruebas (el harness: 'notif')
 bool NotificationVisible(const std::string& text);
 void NotificationsClear();                          // las cierra todas (una prueba arranca de cero)
+bool NotificationsVisible();                        // hay alguna en pantalla
 
 #endif

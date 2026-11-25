@@ -2,7 +2,8 @@
 # pantalla desde el cuadro anterior, y el desenfoque por CPU a lo largo de esos vectores. Un cubo que en el cuadro 2
 # esta 1 m mas a la derecha (X) que en el 1: en el pase, sus pixeles dicen "a la derecha" (dx > 0, dy ~ 0); sin
 # cuadro anterior todo sale quieto (128,128) y el desenfoque no toca nada.
-add cube
+# (el Cubo de la escena de arranque: uno agregado nacia en el mismo lugar y el de siempre, quieto, le tapaba media cara)
+selobj Cubo
 frame 1
 keychan 0 0
 frame 2
@@ -11,7 +12,9 @@ keychan 0 0
 vpview solid
 vporbit 0 0 0 12 0 0
 vectors still 160 120
-vectors 160 120 object 1.5 /tmp/w3d_vectores.png
+# (el promedio es el de lo que SE VE y la camara de la escena esta en perspectiva: las caras de este lado, mas cerca que
+#  el origen, se corren mas en pantalla -con esta camara, un 15-20 %-; 3 px de margen)
+vectors 160 120 object 3 /tmp/w3d_vectores.png
 # del 2 al 3 no hay clave nueva: queda quieto (dx = dy = 0)
 frame 3
 vectors 160 120 0 0 0.5
@@ -19,7 +22,7 @@ vectors 160 120 0 0 0.5
 renderopt 1 1 0.5
 frame 2
 renderimage /tmp w3d_vec.png
-exists /tmp/w3d_vec_vectores_0002.png
+exists /tmp/w3d_vec_vectors_0002.png
 exists /tmp/w3d_vec_0002.png
 renderopt 0 0 0.5
 # LA VISTA "Motion vectors" del viewport: en el cuadro 2 el cubo se movio a la derecha (rojo > 128, verde ~128); en el 3

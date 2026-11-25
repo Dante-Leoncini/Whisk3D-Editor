@@ -1,0 +1,27 @@
+# LA TARJETA NIEBLA, DECLARADA (ui/panels/PanelsText.cpp + objects/Fields.cpp): las filas apuntan a los campos del
+# objeto activo; Inicio y Fin se ven solo en lineal y Densidad solo en exponencial (when=); el desplegable Modo escribe
+# el numero de la opcion y las filas cambian YA.
+window 960 700
+add fog
+propstab 2
+tick
+propvalue 1 Active
+propvalue 5 Start
+propvalue 60 End
+fail propvalue 0.02 Density
+propvalue 0 Paint background
+# Modo: Exp -> se ve la densidad, no el inicio ni el fin
+propclick Mode
+tick
+menupick Exp
+tick
+propvalue 0.02 Density
+fail propvalue 5 Start
+fail propvalue 60 End
+# y de vuelta a lineal
+propclick Mode
+tick
+menupick Linear
+tick
+propvalue 5 Start
+fail propvalue 0.02 Density

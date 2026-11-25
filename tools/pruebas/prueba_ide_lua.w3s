@@ -1,6 +1,7 @@
 # "Load .lua..." del IDE: un script de afuera. Sin proyecto montado se edita el archivo tal cual; con un proyecto .w3d
-# queda IMPORTADO adentro (scripts/...) y aparece en el selector de scripts del IDE.
+# TAMBIEN queda afuera, como referencia externa (W3dLoadExternal, desde a68c433: los proyectos v3 no copian adentro lo
+# que se carga de afuera).
 vpkind 5 7
 ideload componente.lua componente.lua
 savew3d /tmp/w3d_prueba_ide_lua.w3d
-ideload componente.lua scripts/componente.lua
+ideload componente.lua componente.lua

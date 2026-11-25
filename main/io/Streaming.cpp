@@ -88,7 +88,9 @@ static void Rebuild() {
     gSpawnedList = spawned;
     gRootList = SceneCollection;
     gListDirty = false;
-    gCursor = 0;
+    // (el cursor de la tajada SIGUE donde estaba: la lista sale en el orden del arbol, el mismo de antes. Volverlo a 0
+    //  en cada rearmado -y se rearma con cada generacion- dejaba sin mirar las de indice alto mientras se generaba: una
+    //  instancia que la camara pasaba de largo no se pedia nunca. El tick lo acota si la lista se achico)
     gRequesting.clear();
     for (size_t i = 0; i < gList.size(); i++)
         if (gList[i].ip->streamState == W3D_STREAM_REQUESTING) gRequesting.push_back(i);

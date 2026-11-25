@@ -221,7 +221,14 @@ static void Load(W3dLanguage id){
 }
 
 void W3dLanguageFolder(const std::string& skinDir){
-    // res/Skins/<skin>/ -> res/languages/ (PC, web, Android, 3DS, Dreamcast: res/ entero va con el programa).
+#ifdef W3D_DREAMCAST
+    // (la Dreamcast los lee del CD: en el romdisk -que queda en RAM entero- eran 777 KB para usar uno. Sin el disco
+    //  -el .elf suelto en un emulador- queda el ingles)
+    (void)skinDir;
+    s_folder = "/cd/languages/";
+    return;
+#endif
+    // res/Skins/<skin>/ -> res/languages/ (PC, web, Android, 3DS: res/ entero va con el programa).
     // Symbian instala todo en la carpeta privada -> <privada>\languages\ (ver los .pkg).
     const char sep = skinDir.empty() ? '/' : skinDir[skinDir.size() - 1];
     const std::string mark = std::string(1, sep) + "Skins" + sep;

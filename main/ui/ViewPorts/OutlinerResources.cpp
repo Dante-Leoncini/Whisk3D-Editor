@@ -963,17 +963,17 @@ static void BuildMenuObject(Outliner* o) {
     if (o->view == OUT_VIEW_SCENE) {
         const bool has = (ActiveObj != NULL) || !ObjSelects.empty();
         MenuItem* it;
-        it = WithShortcut(gMenuObject->Add(T("Delete"), OBJ_DELETE, IconType::trash), "@out.borrar");
+        it = WithShortcut(gMenuObject->Add(T("Delete"), OBJ_DELETE, IconType::trash), "@out.delete");
         Gray(it, !has);
-        it = WithShortcut(gMenuObject->Add(T("Rename"), OBJ_RENAME, IconType::list), "@out.renombrar");
+        it = WithShortcut(gMenuObject->Add(T("Rename"), OBJ_RENAME, IconType::list), "@out.rename");
         Gray(it, (ActiveObj == NULL));
-        it = WithShortcut(gMenuObject->Add(T("Move"), OBJ_MOVE, IconType::arrowRight), "@out.mover");
+        it = WithShortcut(gMenuObject->Add(T("Move"), OBJ_MOVE, IconType::arrowRight), "@out.move");
         Gray(it, (ActiveObj == NULL));
-        it = WithShortcut(gMenuObject->Add(T("Hide/Show"), OBJ_HIDE, IconType::visible), "@out.ocultar");
+        it = WithShortcut(gMenuObject->Add(T("Hide/Show"), OBJ_HIDE, IconType::visible), "@out.hide");
         Gray(it, !has);
-        it = WithShortcut(gMenuObject->Add(T("Duplicate"), OBJ_DUPLICATE, IconType::object), "@out.duplicar");
+        it = WithShortcut(gMenuObject->Add(T("Duplicate"), OBJ_DUPLICATE, IconType::object), "@out.duplicate");
         Gray(it, !has);
-        it = WithShortcut(gMenuObject->Add(T("Duplicate Linked"), OBJ_DUPLICATE_VINC, IconType::instance), "@out.instancia");
+        it = WithShortcut(gMenuObject->Add(T("Duplicate Linked"), OBJ_DUPLICATE_VINC, IconType::instance), "@out.instance");
         Gray(it, !has);
         // PREFABS: lo elegido pasa a un prefab nuevo / la instancia activa se desempaqueta
         it = gMenuObject->Add(T("Create Prefab"), OBJ_CREATE_PREFAB, IconType::prefab);
@@ -991,15 +991,15 @@ static void BuildMenuObject(Outliner* o) {
     o->GetTarget(rec, ch, false);
     const bool ro = o->ViewReadOnly();
     MenuItem* it;
-    it = WithShortcut(gMenuObject->Add(T("Delete"), REC_DELETE, IconType::trash), "@out.borrar");
+    it = WithShortcut(gMenuObject->Add(T("Delete"), REC_DELETE, IconType::trash), "@out.delete");
     Gray(it, ro || (rec.empty() && ch.empty()));
-    it = WithShortcut(gMenuObject->Add(T("Rename"), REC_RENAME, IconType::list), "@out.renombrar");
+    it = WithShortcut(gMenuObject->Add(T("Rename"), REC_RENAME, IconType::list), "@out.rename");
     Gray(it, ro || !f || (!f->folder && !f->renamable));
     if (!ro && (!recM.empty() || !charM.empty())) {
         BuildMenuMove(gMenuMove, OriginFolder(recM, charM), charM);
-        WithShortcut(gMenuObject->Add(T("Move to Folder"), 0, IconType::folder, gMenuMove), "@out.mover");
+        WithShortcut(gMenuObject->Add(T("Move to Folder"), 0, IconType::folder, gMenuMove), "@out.move");
     } else {
-        it = WithShortcut(gMenuObject->Add(T("Move to Folder"), 0, IconType::folder), "@out.mover");
+        it = WithShortcut(gMenuObject->Add(T("Move to Folder"), 0, IconType::folder), "@out.move");
         Gray(it, true);
     }
     it = gMenuObject->Add(T("Duplicate Resource"), REC_DUPLICATE, IconType::object);
@@ -1073,9 +1073,9 @@ static void BuildMenuSelection(Outliner* o) {
     if (!gMenuSelection) { gMenuSelection = new PopupMenu(); gMenuSelection->action = ActionPickedSelection; }
     gMenuSelection->Clear();
     gMenuSelection->title = T("Select");
-    WithShortcut(gMenuSelection->Add(T("Select All"), SEL_ALL, IconType::selection), "@out.seleccionarTodo");
-    WithShortcut(gMenuSelection->Add(T("Deselect All"), SEL_NOTHING, IconType::selection), "@out.deseleccionar");
-    WithShortcut(gMenuSelection->Add(T("Invert Selection"), SEL_INVERT, IconType::selection), "@out.invertir");
+    WithShortcut(gMenuSelection->Add(T("Select All"), SEL_ALL, IconType::selection), "@out.selectAll");
+    WithShortcut(gMenuSelection->Add(T("Deselect All"), SEL_NOTHING, IconType::selection), "@out.deselect");
+    WithShortcut(gMenuSelection->Add(T("Invert Selection"), SEL_INVERT, IconType::selection), "@out.invert");
 }
 
 // ---- "+": las raices nuevas (RaicesEditor) + carpeta y material de la biblioteca ----

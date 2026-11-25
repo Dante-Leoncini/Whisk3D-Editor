@@ -81,7 +81,7 @@ shortcutswindow 8 2
 menushortcut @3d.move G
 menushortcut @3d.viewCamera Num 0
 menushortcut @3d.focus Num .
-menushortcut @global.emparentar Ctrl P
+menushortcut @global.parent Ctrl P
 shortcut 3d.move Ctrl+M, G
 menushortcut @3d.move Ctrl M
 shortcut 3d.move

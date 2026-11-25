@@ -57,6 +57,7 @@ struct Notif {
     int xx, xy, xw, xh;   // rect de la 'x' (cerrar), solo error
 };
 static std::vector<Notif> gNotifs;
+bool NotificationsVisible() { return !gNotifs.empty(); }
 static Card* gNotifCard = NULL;
 static int  gNotifMx = -1, gNotifMy = -1; // mouse (para el hover de la 'x')
 static bool gNotifOverX = false;          // estaba sobre alguna 'x' el frame previo

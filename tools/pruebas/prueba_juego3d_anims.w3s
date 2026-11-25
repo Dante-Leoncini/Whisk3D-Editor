@@ -29,7 +29,7 @@
 window 640 480
 
 # --- 1) el juego 3D minimo con personajes animados, guardado y abierto ---------
-game3dmin /tmp/w3d_juego3danims
+game3dmin /tmp/w3d_juego3danims light
 animsetsynthetic 3 add
 animsetluagame /tmp/w3d_juego3danims
 savew3d /tmp/w3d_juego3danims/juego3dmin.w3d

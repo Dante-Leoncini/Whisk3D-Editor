@@ -2,7 +2,7 @@
 
 | Fonksiyon | Ne yapar |
 |---|---|
-| `setViews(n [, "lado" \| "up"])` | `2` ekranı ikiye böler (yan yana ya da biri diğerinin üstünde); `1` tam ekrana döner. 2D arayüz (HUD) ikisinin üstüne bir kez çizilir. |
+| `setViews(n [, "side" \| "up"])` | `2` ekranı ikiye böler (yan yana ya da biri diğerinin üstünde); `1` tam ekrana döner. 2D arayüz (HUD) ikisinin üstüne bir kez çizilir. |
 | `setCameraView(i, camera)` | `i` görünümünün (1 ya da 2) kamerası. Ayarlanmazsa etkin kamera. |
 | `view() → i, n` | O an çizilen görünüm (1 ya da 2; çizimin dışında 0) ve kaç görünüm olduğu. |
 | `beforeView(i)` | (Onu senin script'in tanımlar.) Motor onu, her görünümü çizmeden önce, `setViews`'ı çağıran script'te çağırır. Orada kameraya bakan şeyleri (tabelalar, parçacıklar) O kameraya doğru çevirir ya da o görünümün görmemesi gerekenleri gizlersin. Zamanla ilerleyen hiçbir şeyi hareket ettirme: o, `update`'a gider. |

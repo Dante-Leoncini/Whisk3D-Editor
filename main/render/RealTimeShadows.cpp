@@ -15,6 +15,8 @@
 #include "script/W3dScript.h"       // W3dScriptHasSession: jugando solo se ve la base
 #endif
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <vector>
 #include <map>
@@ -345,28 +347,34 @@ bool PassCascades(Light* sun, const std::vector<Piece>& pieces) {
 // ============================================================================
 //  SIN SHADERS (GL ES 1.1 del N95, el GL fijo): LA SOMBRA PROYECTADA POR OBJETO
 // ============================================================================
-// la textura de sombra de un objeto que recibe: oscura donde algo le tapa el sol. au / av pasan un punto LOCAL de la malla
-// a la UV de la textura (u = au . p + au[3])
-struct Mask { unsigned tex; int w, h; float au[4], av[4]; bool active; };
+// LO QUE ESTA EN LA GPU de una mascara: su textura (w x h), au / av (un punto LOCAL de la malla -> la UV de la textura:
+// u = au . p + au[3]), las UV de cada vertice (uvVbo, uvN vertices) y los triangulos de la malla que tocan la parte OSCURA
+// (idxVbo: idxN indices de una malla de geoN; el gancho dibuja solo esos: en una esfera con un poco de sombra, unos cientos)
+struct MaskGPU { unsigned tex; int w, h; float au[4], av[4]; unsigned uvVbo; int uvN; unsigned idxVbo; int idxN, geoN; };
+void FreeMaskGPU(MaskGPU& s) {
+    if (s.tex) gfx::DeleteTexture(s.tex);
+    if (s.uvVbo) gfx::DeleteBuffer(s.uvVbo);
+    if (s.idxVbo) gfx::DeleteBuffer(s.idxVbo);
+    memset(&s, 0, sizeof(s));
+}
+// la textura de sombra de un objeto que recibe: oscura donde algo le tapa el sol. Tres juegos en la GPU que se van turnando
+// (cur = el de ahora); key = de que salio el de ahora (si sale igual, no se vuelve a subir)
+struct Mask { MaskGPU gpu[3]; int cur; unsigned key; bool active; };
 std::map<Mesh*, Mask> gMasks;
 bool gProjActive = false;
 unsigned gSignature = 0;
-std::vector<unsigned char> gIds, gMore, gTmp;
+std::vector<unsigned char> gMore, gBlur;
+std::vector<unsigned> gRGBA;
+std::vector<MeshIndex> gSub;
+std::vector<int> gSat;
 std::vector<float> gUV;
 
 inline void Mix(unsigned& h, const void* p, size_t n) {
     const unsigned char* b = (const unsigned char*)p;
     for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 16777619u; }
 }
-// el numero de cada objeto en colores de 5 y 6 bits (entra igual en una pantalla de 16 bits: el N95): rojo y verde
-inline void ColorById(int id, unsigned char& r, unsigned char& g) {
-    const int r5 = (id >> 6) & 31, g6 = id & 63;
-    r = (unsigned char)((r5 * 255 + 15) / 31); g = (unsigned char)((g6 * 255 + 31) / 63);
-}
-inline int IdOfColor(unsigned char r, unsigned char g) {
-    const int r5 = ((int)r * 31 + 127) / 255, g6 = ((int)g * 63 + 127) / 255;
-    return (r5 << 6) | g6;   // (2047: el fondo, nadie)
-}
+// el numero de "nadie" en el mapa de lo que ve el sol (los objetos van del 1 en adelante)
+const int kIdBackground = 1023;
 
 // lo que ve el sol en un texel (id) le tapa la luz al objeto 'yo': otro objeto que proyecta (sobre la luz horneada, solo
 // si se mueve: la sombra de lo estatico ya esta en la textura)
@@ -375,16 +383,95 @@ inline bool Cap(const std::vector<Piece>& pieces, int id, int yo, bool baked) {
     const Piece& q = pieces[(size_t)id - 1];
     return q.projects && !(baked && q.m->isStatic);
 }
-void DrawRAM(const Piece& p) {
-    Geo g; if (!GeoOf(p.m, g)) return;
-    gfx::LoadMatrix(p.W.m);
-    gfx::VertexPointer3f(0, g.pos);
-    gfx::DrawTriangles(g.n, g.idx);
+// LO QUE VE EL SOL, armado en la CPU: en cada texel el numero del objeto mas cercano al sol (y su profundidad). Antes se
+// dibujaba con la GPU en la pantalla y se leia: la lectura frenaba el cuadro hasta que la GPU terminara todo lo anterior
+// (en el Ace, ~40 ms de 50 al mover un objeto), el driver convertia cada pixel y el tramado de 16 bits corria los numeros
+std::vector<unsigned short> gIdMap;
+std::vector<int> gIdZ, gTI, gBox;
+std::vector<float> gTV;
+std::vector<unsigned char> gFar;
+const float kZOne = 1048576.0f;   // (la profundidad en enteros: 0..2 de la caja -> 0..2^21)
+// redondeo de una coordenada del mapa (mas de -65536 dieciseisavos): sin floorf -una llamada a libm en el Ace- ni comparar
+// floats -cada comparacion frena la FPU del ARM11-
+inline int Round(float f) { return (int)(f + 65536.5f) - 65536; }
+// UN TRIANGULO, ya en el mapa: x, y en dieciseisavos de texel (a lo sumo un margen afuera, ver RasterFar) y z (mas chica = mas
+// cerca del sol). Los texeles con el centro adentro, de las dos caras. En enteros: el ARM11 del Ace compara los float muy lento
+// (cada comparacion frena la FPU) y eran cuatro por texel
+void RasterTri(const int* a, const int* b, const int* c, unsigned short id, int tw, int th) {
+    int area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    if (area < 0) { const int* t = b; b = c; c = t; area = -area; }
+    if (area == 0) return;
+    const int mnx = a[0] < b[0] ? (a[0] < c[0] ? a[0] : c[0]) : (b[0] < c[0] ? b[0] : c[0]);
+    const int mxx = a[0] > b[0] ? (a[0] > c[0] ? a[0] : c[0]) : (b[0] > c[0] ? b[0] : c[0]);
+    const int mny = a[1] < b[1] ? (a[1] < c[1] ? a[1] : c[1]) : (b[1] < c[1] ? b[1] : c[1]);
+    const int mxy = a[1] > b[1] ? (a[1] > c[1] ? a[1] : c[1]) : (b[1] > c[1] ? b[1] : c[1]);
+    // (los texeles cuyo centro -x * 16 + 8- cae en la caja del triangulo)
+    int x0 = (mnx + 7) >> 4, x1 = (mxx - 8) >> 4, y0 = (mny + 7) >> 4, y1 = (mxy - 8) >> 4;
+    if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > tw - 1) x1 = tw - 1; if (y1 > th - 1) y1 = th - 1;
+    if (x1 < x0 || y1 < y0) return;
+    // los pesos de cada vertice (lo que da su lado opuesto en el punto: los tres >= 0 adentro) y cuanto cambian por texel
+    const int d0x = (b[1] - c[1]) * 16, d0y = (c[0] - b[0]) * 16;
+    const int d1x = (c[1] - a[1]) * 16, d1y = (a[0] - c[0]) * 16;
+    const int d2x = (a[1] - b[1]) * 16, d2y = (b[0] - a[0]) * 16;
+    const int px = x0 * 16 + 8, py = y0 * 16 + 8;
+    int r0 = (c[0] - b[0]) * (py - b[1]) - (c[1] - b[1]) * (px - b[0]);
+    int r1 = (a[0] - c[0]) * (py - c[1]) - (a[1] - c[1]) * (px - c[0]);
+    int r2 = (b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0]);
+    // la profundidad en el plano del triangulo: la del primer vertice mas lo que agregan los otros dos por su peso
+    const float inv = 1.0f / (float)area, zb = (float)(b[2] - a[2]), zc = (float)(c[2] - a[2]);
+    const int dzx = (int)(((float)d1x * inv) * zb + ((float)d2x * inv) * zc);
+    const int dzy = (int)(((float)d1y * inv) * zb + ((float)d2y * inv) * zc);
+    int rz = a[2] + (int)(((float)r1 * inv) * zb + ((float)r2 * inv) * zc);
+    for (int y = y0; y <= y1; y++) {
+        int w0 = r0, w1 = r1, w2 = r2, z = rz;
+        unsigned short* ids = &gIdMap[(size_t)y * tw];
+        int* zs = &gIdZ[(size_t)y * tw];
+        for (int x = x0; x <= x1; x++) {
+            if ((w0 | w1 | w2) >= 0 && z <= zs[x]) { zs[x] = z; ids[x] = id; }
+            w0 += d0x; w1 += d1x; w2 += d2x; z += dzx;
+        }
+        r0 += d0y; r1 += d1y; r2 += d2y; rz += dzy;
+    }
+}
+// el margen alrededor del mapa (en dieciseisavos): adentro de el las cuentas de RasterTri entran en 32 bits
+const float kFarMargin = 4096.0f;
+// un triangulo con algun vertice lejos del mapa (en float): se recorta contra el margen (los lados nuevos caen sobre los del
+// triangulo: adentro cubre lo mismo) y se dibuja en abanico
+void RasterFar(const float* a, const float* b, const float* c, unsigned short id, int tw, int th) {
+    const float lo = -kFarMargin, hx = tw * 16.0f + kFarMargin, hy = th * 16.0f + kFarMargin;
+    float P[2][9][3]; int n = 3;
+    for (int k = 0; k < 3; k++) { P[0][0][k] = a[k]; P[0][1][k] = b[k]; P[0][2][k] = c[k]; }
+    int cur = 0;
+    for (int plane = 0; plane < 4; plane++) {
+        const int ax = plane & 1;                 // (0: x, 1: y)
+        const bool low = plane < 2;               // (el borde de abajo o el de arriba)
+        const float lim = low ? lo : (ax ? hy : hx);
+        int m = 0;
+        for (int i = 0; i < n; i++) {
+            const float* u = P[cur][i]; const float* v = P[cur][(i + 1) % n];
+            const bool iu = low ? u[ax] >= lim : u[ax] <= lim, iv = low ? v[ax] >= lim : v[ax] <= lim;
+            if (iu) { for (int k = 0; k < 3; k++) P[1 - cur][m][k] = u[k]; m++; }
+            if (iu != iv) {
+                const float t = (lim - u[ax]) / (v[ax] - u[ax]);
+                for (int k = 0; k < 3; k++) P[1 - cur][m][k] = u[k] + (v[k] - u[k]) * t;
+                m++;
+            }
+        }
+        cur = 1 - cur; n = m;
+        if (n < 3) return;
+    }
+    int I[9][3];
+    for (int i = 0; i < n; i++) {
+        I[i][0] = Round(P[cur][i][0]); I[i][1] = Round(P[cur][i][1]);
+        const float z = P[cur][i][2] < 0.0f ? 0.0f : (P[cur][i][2] > 2.0f ? 2.0f : P[cur][i][2]);
+        I[i][2] = (int)(z * kZOne);
+    }
+    for (int i = 1; i + 1 < n; i++) RasterTri(I[0], I[i], I[i + 1], id, tw, th);
 }
 
 bool PassProjected(Light* sun, const std::vector<Piece>& pieces) {
     const W3dShadowsOpt& o = g_shadows;
-    if (pieces.empty() || pieces.size() > 2046) return false;
+    if (pieces.empty() || pieces.size() >= (size_t)kIdBackground) return false;
     bool hasReceives = false, hasProjects = false;
     for (size_t i = 0; i < pieces.size(); i++) { if (pieces[i].receives) hasReceives = true; if (pieces[i].projects) hasProjects = true; }
     if (!hasReceives || !hasProjects) return false;
@@ -405,6 +492,9 @@ bool PassProjected(Light* sun, const std::vector<Piece>& pieces) {
         if (py - p.r < y0) y0 = py - p.r; if (py + p.r > y1) y1 = py + p.r;
         if (pz - p.r < z0) z0 = pz - p.r; if (pz + p.r > z1) z1 = pz + p.r;
     }
+    // (recortada a lo que ve la camara solo si la escena es mas grande que la distancia de las sombras: una que entra
+    //  entera se toma entera, y girar la vista no cambia la caja -ni hay que volver a armar las mascaras en cada cuadro-)
+    if ((x1 - x0) > dist || (y1 - y0) > dist)
     { V3 is[8]; CornersSegment(Pm, Vinv, near, dist, is);
       float a0 = 1e30f, a1 = -1e30f, b0 = 1e30f, b1 = -1e30f;
       for (int k = 0; k < 8; k++) {
@@ -414,7 +504,7 @@ bool PassProjected(Light* sun, const std::vector<Piece>& pieces) {
       if (a0 > x0) x0 = a0; if (a1 < x1) x1 = a1; if (b0 > y0) y0 = b0; if (b1 < y1) y1 = b1; }
     if (!(x1 > x0) || !(y1 > y0)) return false;
     z0 -= 0.01f; z1 += 0.01f;
-    // EL TAMANIO: potencias de dos que entren en el viewport (se dibuja ahi y se lee)
+    // EL TAMANIO: potencias de dos hasta el tamanio de la vista (mas detalle no se veria)
     int vp[4]; gfx::GetViewport(vp);
     const int lim = o.resolution < 512 ? (o.resolution < 64 ? 64 : o.resolution) : 512;
     const int tw = PowerDown(vp[2] < lim ? vp[2] : lim), th = PowerDown(vp[3] < lim ? vp[3] : lim);
@@ -438,153 +528,242 @@ bool PassProjected(Light* sun, const std::vector<Piece>& pieces) {
     }
     if (signature == gSignature && gProjActive) return true;
 
-    // ---- 1. LA GPU: cada objeto de su color, desde el sol, con z-buffer ----
-    const bool antDither = gfx::IsEnabled(gfx::Dither), antMs = gfx::IsEnabled(gfx::Multisample);
-    const bool antCull = gfx::IsEnabled(gfx::CullFace), antBlend = gfx::IsEnabled(gfx::Blend), antTex = gfx::IsEnabled(gfx::Texture2D);
-    const bool antLight = gfx::IsEnabled(gfx::Lighting), antZ = gfx::IsEnabled(gfx::DepthTest), antFog = gfx::IsEnabled(gfx::Fog);
-    const bool antSc = gfx::IsEnabled(gfx::ScissorTest);
-    gfx::Disable(gfx::Dither); gfx::Disable(gfx::Multisample);   // (los colores exactos: son numeros)
-    gfx::Disable(gfx::CullFace); gfx::Disable(gfx::Blend); gfx::Disable(gfx::Texture2D); gfx::Disable(gfx::Lighting);
-    gfx::Disable(gfx::Fog); gfx::Disable(gfx::ColorMaterial);
-    gfx::Enable(gfx::DepthTest); gfx::DepthFunc(gfx::DepthLEqual); gfx::DepthMask(true); gfx::ColorMask(true, true, true, true);
-    // (en el N95, en una superficie APARTE: dibujado en la ventana se veia -los colores planos- antes del swap)
-    const bool outside = W3dOutsideScreenBegin && W3dOutsideScreenBegin(tw, th);
-    const int ox = outside ? 0 : vp[0], oy = outside ? 0 : vp[1];
-    gfx::Viewport(ox, oy, tw, th);
-    gfx::Scissor(ox, oy, tw, th); gfx::Enable(gfx::ScissorTest);
-    gfx::ClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer);
-    gfx::UnbindVBOs();
-    gfx::EnableArray(gfx::VertexArray);
-    gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray); gfx::DisableArray(gfx::TexCoordArray);
-    gfx::MatrixMode(gfx::Projection); gfx::PushMatrix();
+    // ---- 1. LO QUE VE EL SOL: cada objeto con su numero, con profundidad (la caja de la luz -x0..x1, y0..y1- a los texeles,
+    //         z0..z1 a -1..1 como un z-buffer: mas chico, mas cerca del sol) ----
+    gIdMap.assign((size_t)tw * th, (unsigned short)kIdBackground);
+    gIdZ.assign((size_t)tw * th, 0x7fffffff);
+    Matrix4 Ml;
     { const float hx = (x1 - x0) * 0.5f, hy = (y1 - y0) * 0.5f, zr = z1 - z0;
       const float r0[4] = { lx.x / hx, lx.y / hx, lx.z / hx, -(x0 + hx) / hx };
       const float r1[4] = { ly.x / hy, ly.y / hy, ly.z / hy, -(y0 + hy) / hy };
       const float r2[4] = { -2.0f * lz.x / zr, -2.0f * lz.y / zr, -2.0f * lz.z / zr, 2.0f * z1 / zr - 1.0f };
-      Matrix4 Ml; FromRows(Ml, r0, r1, r2); gfx::LoadMatrix(Ml.m); }
-    gfx::MatrixMode(gfx::ModelView); gfx::PushMatrix();
+      FromRows(Ml, r0, r1, r2); }
+    const float htw = tw * 0.5f, hth = th * 0.5f;
     for (size_t i = 0; i < pieces.size(); i++) {
-        unsigned char r, g; ColorById((int)i + 1, r, g);
-        gfx::Color4ub(r, g, 0, 255);
-        DrawRAM(pieces[i]);
+        Geo g; if (!GeoOf(pieces[i].m, g)) continue;
+        const Matrix4 M = Ml * pieces[i].W;
+        const float* k = M.m;
+        gTV.resize((size_t)g.nv * 3); gTI.resize((size_t)g.nv * 3); gFar.resize((size_t)g.nv);
+        const float hx = tw * 16.0f + kFarMargin, hy = th * 16.0f + kFarMargin;
+        for (int v = 0; v < g.nv; v++) {
+            const float* q = &g.pos[v * 3];
+            float* t = &gTV[(size_t)v * 3];   // (x, y del texel en dieciseisavos; z de 0 a 2 adentro de la caja)
+            t[0] = (k[0] * q[0] + k[4] * q[1] + k[8] * q[2] + k[12] + 1.0f) * htw * 16.0f;
+            t[1] = (k[1] * q[0] + k[5] * q[1] + k[9] * q[2] + k[13] + 1.0f) * hth * 16.0f;
+            t[2] = k[2] * q[0] + k[6] * q[1] + k[10] * q[2] + k[14] + 1.0f;
+            const bool far = t[0] < -kFarMargin || t[0] > hx || t[1] < -kFarMargin || t[1] > hy;
+            gFar[(size_t)v] = far ? 1 : 0;
+            if (far) continue;
+            int* e = &gTI[(size_t)v * 3];
+            e[0] = Round(t[0]); e[1] = Round(t[1]);
+            e[2] = (int)((t[2] < 0.0f ? 0.0f : (t[2] > 2.0f ? 2.0f : t[2])) * kZOne);
+        }
+        const unsigned short id = (unsigned short)(i + 1);
+        for (int f = 0; f + 2 < g.n; f += 3) {
+            const size_t ia = g.idx[f], ib = g.idx[f + 1], ic = g.idx[f + 2];
+            if (gFar[ia] | gFar[ib] | gFar[ic]) RasterFar(&gTV[ia * 3], &gTV[ib * 3], &gTV[ic * 3], id, tw, th);
+            else RasterTri(&gTI[ia * 3], &gTI[ib * 3], &gTI[ic * 3], id, tw, th);
+        }
     }
-    gfx::MatrixMode(gfx::Projection); gfx::PopMatrix();
-    gfx::MatrixMode(gfx::ModelView); gfx::PopMatrix();
-    // ---- 2. LA CPU: los pixeles ----
-    gIds.resize((size_t)tw * th * 4);
-    gfx::ReadPixelsRGBA(ox, oy, tw, th, &gIds[0]);
-    // la pantalla como estaba: el fondo del render y la profundidad al fondo (el cielo 360, si hay, se dibuja encima)
-    { float bg[4] = { 0, 0, 0, 1 };
-      if (!W3dBackgroundAutoColor(bg)) { bg[0] = g_renderBg[0]; bg[1] = g_renderBg[1]; bg[2] = g_renderBg[2]; bg[3] = 1.0f; }
-      gfx::ClearColor(bg[0], bg[1], bg[2], bg[3]);
-      gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer); }
-    if (outside) W3dOutsideScreenFinish();   // (de vuelta a la ventana)
-    gfx::Viewport(vp[0], vp[1], vp[2], vp[3]);
-    if (!antSc) gfx::Disable(gfx::ScissorTest);
-    if (antDither) gfx::Enable(gfx::Dither);
-    if (antMs) gfx::Enable(gfx::Multisample);
-    if (antCull) gfx::Enable(gfx::CullFace);
-    if (antBlend) gfx::Enable(gfx::Blend);
-    if (antTex) gfx::Enable(gfx::Texture2D);
-    if (antLight) gfx::Enable(gfx::Lighting);
-    if (!antZ) gfx::Disable(gfx::DepthTest);
-    if (antFog) gfx::Enable(gfx::Fog);
-    gfx::DepthFunc(gfx::DepthLess);
-    gfx::Color4f(1, 1, 1, 1);
-    // de color a numero (en el lugar: 1 byte por texel)
-    const int nt = tw * th;
-    for (int t = 0; t < nt; t++) {
-        const int id = IdOfColor(gIds[(size_t)t * 4], gIds[(size_t)t * 4 + 1]);
-        gIds[(size_t)t * 2] = (unsigned char)(id & 255); gIds[(size_t)t * 2 + 1] = (unsigned char)(id >> 8);
+    {   // (W3D_CAPTURE_IDS=<archivo.ppm>: lo que vio el sol, una vez, un color por objeto; para ver la sombra de la CPU donde
+        //  no hay depurador)
+        static bool dumped = false;
+        const char* f = dumped ? NULL : getenv("W3D_CAPTURE_IDS");
+        FILE* out = (f && *f) ? fopen(f, "wb") : NULL;
+        if (out) {
+            fprintf(out, "P6\n%d %d\n255\n", tw, th);
+            for (int y = th - 1; y >= 0; y--)
+                for (int x = 0; x < tw; x++) {
+                    const int id = gIdMap[(size_t)y * tw + x];
+                    const unsigned char px[3] = { (unsigned char)(id == kIdBackground ? 255 : id * 97), (unsigned char)(id == kIdBackground ? 255 : id * 57),
+                                                  (unsigned char)(id == kIdBackground ? 255 : id * 31) };
+                    fwrite(px, 1, 3, out);
+                }
+            fclose(out);
+            dumped = true;
+        }
     }
 
-    // ---- 3. CADA OBJETO QUE RECIBE: su textura, solo del pedazo que le toca ----
+    // ---- 3. CADA OBJETO QUE RECIBE: su textura, solo del pedazo OSCURO ----
     for (std::map<Mesh*, Mask>::iterator it = gMasks.begin(); it != gMasks.end(); ++it) it->second.active = false;
     const float sx = (float)tw / (x1 - x0), sy = (float)th / (y1 - y0);
     const float inten = o.intensity < 0.0f ? 0.0f : (o.intensity > 1.0f ? 1.0f : o.intensity);
-    // (la mascara marca la sombra ENTERA -0-; el color y la intensidad se ponen al pasarla a la textura, como los shaders:
-    //  sobre la luz horneada queda al menos un 25%, la luz indirecta tambien esta en la textura)
-    const unsigned char darkRT = 0, darkBake = 0;
+    // EL COLOR de cada nivel de la mascara (0 = la sombra entera, 255 = luz): una tabla con la cuenta de los shaders, de la
+    // luz entera al color de la sombra segun cuanto tapa. Sobre la luz horneada queda al menos un 25% (la luz indirecta
+    // tambien esta en la textura). Antes eran cuentas de punto flotante por texel
+    unsigned lutLight[2][256];
+    for (int b = 0; b < 2; b++) {
+        const float floor = b ? 0.25f : 0.0f;
+        float c[3];
+        for (int k = 0; k < 3; k++) { const float cc = o.color[k] < 0.0f ? 0.0f : (o.color[k] > 1.0f ? 1.0f : o.color[k]); c[k] = floor + (1.0f - floor) * cc; }
+        for (int v = 0; v < 256; v++) {
+            const float a = (1.0f - v / 255.0f) * inten;   // (cuanto tapa)
+            unsigned char px[4];
+            for (int k = 0; k < 3; k++) px[k] = (unsigned char)((1.0f + (c[k] - 1.0f) * a) * 255.0f + 0.5f);
+            px[3] = 255;
+            memcpy(&lutLight[b][v], px, 4);
+        }
+    }
+    // LA CAJA DE CADA OBJETO en lo que ve el sol (una pasada por el mapa): lo oscuro de cada uno que recibe sale de juntar las
+    // de los que le tapan el sol, sin recorrer su pedazo entero (el piso y las paredes cubren casi todo el mapa)
+    const int nIds = (int)pieces.size() + 1;
+    gBox.assign((size_t)nIds * 4, 0);
+    for (int id = 0; id < nIds; id++) { gBox[(size_t)id * 4] = tw; gBox[(size_t)id * 4 + 2] = th; }
+    for (int y = 0; y < th; y++) {
+        const unsigned short* row = &gIdMap[(size_t)y * tw];
+        for (int x = 0; x < tw; x++) {
+            const int id = row[x];
+            if (id >= nIds) continue;   // (el fondo)
+            int* bx = &gBox[(size_t)id * 4];
+            if (x < bx[0]) bx[0] = x; if (x >= bx[1]) bx[1] = x + 1;
+            if (y < bx[2]) bx[2] = y; bx[3] = y + 1;
+        }
+    }
+    unsigned char capT[kIdBackground + 1];
     for (size_t i = 0; i < pieces.size(); i++) {
         const Piece& p = pieces[i];
         if (!p.receives) continue;
         const int yo = (int)i + 1;
-        const unsigned char dark = p.baked ? darkBake : darkRT;
+        // quien le tapa el sol, por numero (una tabla: no se pregunta en cada texel)
+        memset(capT, 0, sizeof(capT));
+        for (size_t q = 0; q < pieces.size(); q++) capT[q + 1] = Cap(pieces, (int)q + 1, yo, p.baked) ? 1 : 0;
         const float px = (Dot(p.c, lx) - x0) * sx, py = (Dot(p.c, ly) - y0) * sy;
         int rx0 = (int)floorf(px - p.r * sx) - 1, rx1 = (int)ceilf(px + p.r * sx) + 1;
         int ry0 = (int)floorf(py - p.r * sy) - 1, ry1 = (int)ceilf(py + p.r * sy) + 1;
         if (rx0 < 0) rx0 = 0; if (ry0 < 0) ry0 = 0; if (rx1 > tw) rx1 = tw; if (ry1 > th) ry1 = th;
         if (rx1 <= rx0 || ry1 <= ry0) continue;
-        // la sombra: lo que ve el sol ahi es OTRO objeto que proyecta
-        int has = 0;
-        for (int y = ry0; y < ry1; y++)
-            for (int x = rx0; x < rx1; x++) {
-                const int t = y * tw + x;
-                const int id = (int)gIds[(size_t)t * 2] | ((int)gIds[(size_t)t * 2 + 1] << 8);
-                if (Cap(pieces, id, yo, p.baked)) has++;
-            }
-        if (!has) continue;
-        // la textura: el pedazo con un texel de luz alrededor (afuera queda iluminado)
-        const int mw = PowerUp(rx1 - rx0 + 2), mh = PowerUp(ry1 - ry0 + 2);
+        // LO OSCURO (lo que ve el sol ahi es OTRO objeto que proyecta): su caja. La textura cubre solo esa caja con un texel
+        // de luz alrededor; afuera la UV se sale y se estira el borde, que es luz. El piso con la sombra de una esfera es una
+        // textura chica, no el piso entero (era el doble del pedazo por redondear, y se subia entera en cada cuadro)
+        int dx0 = rx1, dx1 = rx0, dy0 = ry1, dy1 = ry0;
+        for (int q = 1; q < nIds; q++) {
+            if (!capT[q]) continue;
+            const int* bx = &gBox[(size_t)q * 4];
+            const int ax0 = bx[0] > rx0 ? bx[0] : rx0, ax1 = bx[1] < rx1 ? bx[1] : rx1;
+            const int ay0 = bx[2] > ry0 ? bx[2] : ry0, ay1 = bx[3] < ry1 ? bx[3] : ry1;
+            if (ax1 <= ax0 || ay1 <= ay0) continue;
+            if (ax0 < dx0) dx0 = ax0; if (ax1 > dx1) dx1 = ax1; if (ay0 < dy0) dy0 = ay0; if (ay1 > dy1) dy1 = ay1;
+        }
+        if (dx1 <= dx0) continue;
+        Mask& m = gMasks[p.m];
+        // la textura: la caja + el borde de luz (+ uno mas con los bordes suaves, que el promedio corre la sombra un texel)
+        const int pad = o.smooth ? 2 : 1;
+        const int mw = PowerUp(dx1 - dx0 + 2 * pad), mh = PowerUp(dy1 - dy0 + 2 * pad);
+        const int ox = dx0 - pad, oy = dy0 - pad;   // (el texel de la ID que cae en la esquina de la textura)
+        const unsigned char dark = 0;   // (la mascara marca la sombra ENTERA: el color y la intensidad salen de la tabla)
         gMore.assign((size_t)mw * mh, 255);
-        for (int y = ry0; y < ry1; y++)
-            for (int x = rx0; x < rx1; x++) {
-                const int t = y * tw + x;
-                const int id = (int)gIds[(size_t)t * 2] | ((int)gIds[(size_t)t * 2 + 1] << 8);
-                if (Cap(pieces, id, yo, p.baked)) gMore[(size_t)(y - ry0 + 1) * mw + (x - rx0 + 1)] = dark;
-            }
+        for (int y = dy0; y < dy1; y++) {
+            const unsigned short* row = &gIdMap[(size_t)y * tw];
+            const int base = (y - oy) * mw - ox;   // (x >= dx0 > ox: base + x no es negativo)
+            for (int x = dx0; x < dx1; x++)
+                if (capT[row[x]]) gMore[(size_t)(base + x)] = dark;
+        }
         if (o.smooth) {   // (los bordes suaves: un promedio de 3 x 3; el borde de afuera sigue con luz)
-            gTmp = gMore;
+            gBlur = gMore;
             for (int y = 1; y < mh - 1; y++)
                 for (int x = 1; x < mw - 1; x++) {
                     int s = 0;
-                    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) s += gTmp[(size_t)(y + dy) * mw + (x + dx)];
+                    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) s += gBlur[(size_t)(y + dy) * mw + (x + dx)];
                     gMore[(size_t)y * mw + x] = (unsigned char)(s / 9);
                 }
             for (int x = 0; x < mw; x++) { gMore[(size_t)x] = 255; gMore[(size_t)(mh - 1) * mw + x] = 255; }
             for (int y = 0; y < mh; y++) { gMore[(size_t)y * mw] = 255; gMore[(size_t)y * mw + mw - 1] = 255; }
         }
-        gTmp.resize((size_t)mw * mh * 4);
-        {   // el COLOR de la sombra por la intensidad: de la luz entera (255) al color, segun cuanto tapa
-            const float floor = p.baked ? 0.25f : 0.0f;
-            float c[3];
-            for (int k = 0; k < 3; k++) { const float cc = o.color[k] < 0.0f ? 0.0f : (o.color[k] > 1.0f ? 1.0f : o.color[k]); c[k] = floor + (1.0f - floor) * cc; }
-            for (int t = 0; t < mw * mh; t++) {
-                const float a = (1.0f - gMore[(size_t)t] / 255.0f) * inten;   // (cuanto tapa)
-                for (int k = 0; k < 3; k++) gTmp[(size_t)t * 4 + k] = (unsigned char)((1.0f + (c[k] - 1.0f) * a) * 255.0f + 0.5f);
-                gTmp[(size_t)t * 4 + 3] = 255;
+        // un punto LOCAL de la malla -> la UV de su textura: u = ((x_sol(W p) - x0) * sx - ox) / mw
+        float au[4], av[4];
+        const float ku = sx / (float)mw, kv = sy / (float)mh;
+        const float bu = (-x0 * sx - (float)ox) / (float)mw, bv = (-y0 * sy - (float)oy) / (float)mh;
+        for (int c = 0; c < 3; c++) {
+            au[c] = (p.W.m[c * 4] * lx.x + p.W.m[c * 4 + 1] * lx.y + p.W.m[c * 4 + 2] * lx.z) * ku;
+            av[c] = (p.W.m[c * 4] * ly.x + p.W.m[c * 4 + 1] * ly.y + p.W.m[c * 4 + 2] * ly.z) * kv;
+        }
+        au[3] = (p.W.m[12] * lx.x + p.W.m[13] * lx.y + p.W.m[14] * lx.z) * ku + bu;
+        av[3] = (p.W.m[12] * ly.x + p.W.m[13] * ly.y + p.W.m[14] * ly.z) * kv + bv;
+        // SI NADA CAMBIO (la sombra que le cae, como cae sobre la malla y la malla misma: se movio otro objeto, o este sin
+        // cambiar lo que le tapa), queda lo que ya esta en la GPU
+        Geo g;
+        const bool vbo = gfx::VBOSupported() && GeoOf(p.m, g);
+        unsigned key = 2166136261u;
+        Mix(key, &gMore[0], gMore.size());
+        { const float mk[7] = { (float)mw, (float)mh, inten, o.color[0], o.color[1], o.color[2], p.baked ? 1.0f : 0.0f }; Mix(key, mk, sizeof(mk)); }
+        Mix(key, au, sizeof(au)); Mix(key, av, sizeof(av));
+        if (vbo) {
+            Mix(key, &g.pos, sizeof(g.pos)); Mix(key, &g.idx, sizeof(g.idx)); Mix(key, &g.n, sizeof(g.n)); Mix(key, &g.nv, sizeof(g.nv));
+            Mix(key, &p.m->genVersion, sizeof(p.m->genVersion));
+            const int step = g.nv > 16 ? g.nv / 16 : 1;
+            for (int k = 0; k < g.nv; k += step) Mix(key, &g.pos[k * 3], sizeof(float) * 3);
+        }
+        m.active = true;
+        if (m.gpu[m.cur].tex && m.key == key) continue;
+        // LO NUEVO, EN RECURSOS NUEVOS: la textura y los buffers de esta mascara se crean de cero, y los de hace tres
+        // mascaras se sueltan. Pisar uno que la GPU uso hace que el driver espere a que termine todo lo anterior (en el Ace,
+        // 10 a 15 ms por cuadro al mover un objeto, aunque fuera de hace dos cuadros); uno nuevo no espera. En el MBX del N95
+        // pisar el que el cuadro anterior todavia leia daba parpadeos por baldosas
+        m.cur = (m.cur + 1) % 3;
+        MaskGPU& s = m.gpu[m.cur];
+        FreeMaskGPU(s);
+        const unsigned* lut = lutLight[p.baked ? 1 : 0];
+        gRGBA.resize((size_t)mw * mh);
+        for (size_t t = 0; t < gRGBA.size(); t++) gRGBA[t] = lut[gMore[t]];
+        s.tex = gfx::UploadRGBA((const unsigned char*)&gRGBA[0], mw, mh, true, false, false, false);
+        if (!s.tex) continue;
+        gfx::BindTexture(s.tex); gfx::TexWrap(false); gfx::TexFilter(true); gfx::BindTexture(0);
+        s.w = mw; s.h = mh;
+        memcpy(s.au, au, sizeof(au)); memcpy(s.av, av, sizeof(av));
+        m.key = key;
+        if (!vbo) continue;
+        gUV.resize((size_t)g.nv * 2);
+        for (int k = 0; k < g.nv; k++) {
+            const float* q = &g.pos[k * 3];
+            gUV[(size_t)k * 2]     = au[0] * q[0] + au[1] * q[1] + au[2] * q[2] + au[3];
+            gUV[(size_t)k * 2 + 1] = av[0] * q[0] + av[1] * q[1] + av[2] * q[2] + av[3];
+        }
+        s.uvVbo = gfx::GenBuffer();
+        gfx::ArrayBufferData(s.uvVbo, &gUV[0], g.nv * 2 * (int)sizeof(float));
+        s.uvN = g.nv;
+        // LOS TRIANGULOS QUE TOCAN LO OSCURO: los texeles de la mascara debajo de cada uno (su caja, con uno de margen por el
+        // filtro de la textura), contados con una tabla de sumas. Lo oscuro de la mascara que cae afuera de la malla (lo que
+        // el sol ve alrededor: el piso, una pared) no la toca: esos triangulos no se dibujan
+        gSat.assign((size_t)(mw + 1) * (mh + 1), 0);
+        for (int y = 0; y < mh; y++) {
+            int row = 0;
+            for (int x = 0; x < mw; x++) {
+                row += gMore[(size_t)y * mw + x] < 255 ? 1 : 0;
+                gSat[(size_t)(y + 1) * (mw + 1) + x + 1] = gSat[(size_t)y * (mw + 1) + x + 1] + row;
             }
         }
-        Mask& m = gMasks[p.m];
-#ifdef W3D_SYMBIAN
-        // (el MBX del N95 dibuja en diferido: pisar la mascara que el cuadro anterior todavia lee daba parpadeos por
-        // baldosas. Se espera a que termine: mas lento, sin parpadeos)
-        if (m.tex && m.w == mw && m.h == mh) gfx::Finish();
-#endif
-        if (m.tex && m.w == mw && m.h == mh) gfx::UpdateRGBA(m.tex, 0, 0, mw, mh, &gTmp[0], false);
-        else {
-            if (m.tex) gfx::DeleteTexture(m.tex);
-            m.tex = gfx::UploadRGBA(&gTmp[0], mw, mh, true, false, false, false);
-            m.w = mw; m.h = mh;
-            if (m.tex) { gfx::BindTexture(m.tex); gfx::TexWrap(false); gfx::TexFilter(true); gfx::BindTexture(0); }
+        gSub.clear();
+        for (int k = 0; k + 2 < g.n; k += 3) {
+            const float* a = &gUV[(size_t)g.idx[k] * 2];
+            const float* b = &gUV[(size_t)g.idx[k + 1] * 2];
+            const float* c = &gUV[(size_t)g.idx[k + 2] * 2];
+            const float tu0 = a[0] < b[0] ? (a[0] < c[0] ? a[0] : c[0]) : (b[0] < c[0] ? b[0] : c[0]);
+            const float tu1 = a[0] > b[0] ? (a[0] > c[0] ? a[0] : c[0]) : (b[0] > c[0] ? b[0] : c[0]);
+            const float tv0 = a[1] < b[1] ? (a[1] < c[1] ? a[1] : c[1]) : (b[1] < c[1] ? b[1] : c[1]);
+            const float tv1 = a[1] > b[1] ? (a[1] > c[1] ? a[1] : c[1]) : (b[1] > c[1] ? b[1] : c[1]);
+            int x0 = (int)floorf(tu0 * mw) - 1, x1 = (int)floorf(tu1 * mw) + 1;
+            int y0 = (int)floorf(tv0 * mh) - 1, y1 = (int)floorf(tv1 * mh) + 1;
+            if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > mw - 1) x1 = mw - 1; if (y1 > mh - 1) y1 = mh - 1;
+            if (x1 < x0 || y1 < y0) continue;
+            const int W1 = mw + 1;
+            const int n = gSat[(size_t)(y1 + 1) * W1 + x1 + 1] - gSat[(size_t)y0 * W1 + x1 + 1]
+                        - gSat[(size_t)(y1 + 1) * W1 + x0] + gSat[(size_t)y0 * W1 + x0];
+            if (n <= 0) continue;
+            gSub.push_back(g.idx[k]); gSub.push_back(g.idx[k + 1]); gSub.push_back(g.idx[k + 2]);
         }
-        if (!m.tex) continue;
-        // un punto LOCAL de la malla -> la UV de su textura: u = ((x_sol(W p) - x0) * sx - (rx0 - 1)) / mw
-        const float ku = sx / (float)mw, kv = sy / (float)mh;
-        const float bu = (-x0 * sx - (float)(rx0 - 1)) / (float)mw, bv = (-y0 * sy - (float)(ry0 - 1)) / (float)mh;
-        for (int c = 0; c < 3; c++) {
-            m.au[c] = (p.W.m[c * 4] * lx.x + p.W.m[c * 4 + 1] * lx.y + p.W.m[c * 4 + 2] * lx.z) * ku;
-            m.av[c] = (p.W.m[c * 4] * ly.x + p.W.m[c * 4 + 1] * ly.y + p.W.m[c * 4 + 2] * ly.z) * kv;
+        if (!gSub.empty()) {
+            s.idxVbo = gfx::GenBuffer();
+            gfx::IndexBufferData(s.idxVbo, &gSub[0], (int)gSub.size() * (int)sizeof(MeshIndex));
         }
-        m.au[3] = (p.W.m[12] * lx.x + p.W.m[13] * lx.y + p.W.m[14] * lx.z) * ku + bu;
-        m.av[3] = (p.W.m[12] * ly.x + p.W.m[13] * ly.y + p.W.m[14] * ly.z) * kv + bv;
-        m.active = true;
+        s.idxN = (int)gSub.size(); s.geoN = g.n;
     }
     // (las texturas de lo que ya no esta: se sueltan cuando se juntan muchas)
     if (gMasks.size() > 64) {
         for (std::map<Mesh*, Mask>::iterator it = gMasks.begin(); it != gMasks.end();) {
-            if (!it->second.active) { if (it->second.tex) gfx::DeleteTexture(it->second.tex); gMasks.erase(it++); }
+            if (!it->second.active) {
+                for (int k = 0; k < 3; k++) FreeMaskGPU(it->second.gpu[k]);
+                gMasks.erase(it++);
+            }
             else ++it;
         }
     }
@@ -597,14 +776,24 @@ bool PassProjected(Light* sun, const std::vector<Piece>& pieces) {
 void HookMesh(Mesh* m) {
     if (!gProjActive || gfx::ShadowsSupported()) return;
     std::map<Mesh*, Mask>::iterator it = gMasks.find(m);
-    if (it == gMasks.end() || !it->second.active || !it->second.tex) return;
-    const Mask& ms = it->second;
+    if (it == gMasks.end() || !it->second.active) return;
+    const MaskGPU& ms = it->second.gpu[it->second.cur];
+    if (!ms.tex) return;
     Geo g; if (!GeoOf(m, g)) return;
-    gUV.resize((size_t)g.nv * 2);
-    for (int i = 0; i < g.nv; i++) {
-        const float* q = &g.pos[i * 3];
-        gUV[(size_t)i * 2]     = ms.au[0] * q[0] + ms.au[1] * q[1] + ms.au[2] * q[2] + ms.au[3];
-        gUV[(size_t)i * 2 + 1] = ms.av[0] * q[0] + ms.av[1] * q[1] + ms.av[2] * q[2] + ms.av[3];
+    // LA MALLA GENERADA (subdiv...) Y LAS UV DE SIEMPRE DESDE LA GPU: la geometria de sus VBOs (Mesh::UploadGenVBO) y las UV
+    // de la mascara (armadas con ella). Sin esto cada cuadro recalculaba las UV y mandaba la malla de RAM otra vez
+    const bool genGPU = g.pos == m->genVertex && g.idx == m->genFaces && m->vboGenPos && m->vboGenIdx &&
+                        m->vboGenVer == m->genVersion;
+    const bool uvGPU = ms.uvVbo && ms.uvN == g.nv;
+    const bool subGPU = uvGPU && ms.idxVbo && ms.geoN == g.n;   // (solo los triangulos que tocan lo oscuro)
+    if (subGPU && ms.idxN <= 0) return;
+    if (!uvGPU) {
+        gUV.resize((size_t)g.nv * 2);
+        for (int i = 0; i < g.nv; i++) {
+            const float* q = &g.pos[i * 3];
+            gUV[(size_t)i * 2]     = ms.au[0] * q[0] + ms.au[1] * q[1] + ms.au[2] * q[2] + ms.au[3];
+            gUV[(size_t)i * 2 + 1] = ms.av[0] * q[0] + ms.av[1] * q[1] + ms.av[2] * q[2] + ms.av[3];
+        }
     }
     const bool antFog = gfx::IsEnabled(gfx::Fog);
     gfx::UnbindVBOs();
@@ -616,10 +805,14 @@ void HookMesh(Mesh* m) {
     gfx::Color4f(1, 1, 1, 1);
     gfx::EnableArray(gfx::VertexArray); gfx::EnableArray(gfx::TexCoordArray);
     gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
-    gfx::VertexPointer3f(0, g.pos); gfx::TexCoordPointer2f(0, &gUV[0]);
+    if (genGPU) gfx::VertexVBO(m->vboGenPos); else gfx::VertexPointer3f(0, g.pos);
+    if (uvGPU) gfx::TexCoordVBO(ms.uvVbo); else gfx::TexCoordPointer2f(0, &gUV[0]);
     gfx::Enable(gfx::Blend); gfx::SetMix(gfx::MixMultiply);
     gfx::DepthMask(false); gfx::DepthFunc(gfx::DepthLEqual);
-    gfx::DrawTriangles(g.n, g.idx);
+    if (subGPU) { gfx::BindIndexVBO(ms.idxVbo); gfx::DrawTrianglesVBO(ms.idxN, 0); }
+    else if (genGPU) { gfx::BindIndexVBO(m->vboGenIdx); gfx::DrawTrianglesVBO(g.n, 0); }
+    else gfx::DrawTriangles(g.n, g.idx);
+    if (genGPU || uvGPU) gfx::UnbindVBOs();
     gfx::DepthMask(true); gfx::DepthFunc(gfx::DepthLess);
     gfx::SetMix(gfx::MixAlpha); gfx::Disable(gfx::Blend);
     gfx::MatrixMode(gfx::TextureMatrix); gfx::PopMatrix(); gfx::MatrixMode(gfx::ModelView);

@@ -16,5 +16,7 @@ extern W3dProf g_profShow;  // promedio EXPONENCIAL suavizado -> lo que dibuja e
 double W3dNowMs();          // reloj de pared en milisegundos (alta resolucion)
 void W3dProfBegin();        // arranca el frame: resetea g_prof (lo llaman los DOS main loops: PC main.cpp y Symbian w3dlayout.cpp)
 void W3dProfEnd();          // cierra el frame: suaviza g_profShow hacia g_prof
+bool W3dProfLogOn();        // W3D_PROF_LOG=1: el editor dibuja todos los cuadros y loguea el perfil cada 2 segundos
+void W3dProfLog();          // (lo llama W3dProfEnd con el log prendido)
 
 #endif // W3DPROFILE_H

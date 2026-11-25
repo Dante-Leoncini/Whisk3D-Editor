@@ -296,16 +296,16 @@ Viewport3D::Viewport3D(Vector3 pos){
     if (!MenuSelect){
         MenuSelect = new PopupMenu();
         MenuSelect->title = T("Select");   // el boton es un icono sin texto -> el menu lleva titulo
-        MenuSelect->Add(T("All"), 0)->shortcut = "@3d.seleccionarTodo";
-        MenuSelect->Add(T("None"), 1)->shortcut = "@3d.deseleccionar";
-        MenuSelect->Add(T("Invert"), 2)->shortcut = "@3d.invertir";
+        MenuSelect->Add(T("All"), 0)->shortcut = "@3d.selectAll";
+        MenuSelect->Add(T("None"), 1)->shortcut = "@3d.deselect";
+        MenuSelect->Add(T("Invert"), 2)->shortcut = "@3d.invert";
     }
     if (!MenuObject){
         // submenu Transform (Move/Rotate/Scale = G/R/S)
         MenuTransform = new PopupMenu();
-        MenuTransform->Add(T("Move"), 100)->shortcut = "@3d.mover";
-        MenuTransform->Add(T("Rotate"), 101)->shortcut = "@3d.rotar";
-        MenuTransform->Add(T("Scale"), 102)->shortcut = "@3d.escalar";
+        MenuTransform->Add(T("Move"), 100)->shortcut = "@3d.move";
+        MenuTransform->Add(T("Rotate"), 101)->shortcut = "@3d.rotate";
+        MenuTransform->Add(T("Scale"), 102)->shortcut = "@3d.scale";
         // submenu Set Origin (mueve el origen y/o la geometria)
         MenuSetOrigin = new PopupMenu();
         MenuSetOrigin->Add(T("Geometry to Origin"), 200);
@@ -329,7 +329,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject = new PopupMenu(); MenuObject->title = T("Object");
         MenuObject->Add(T("Transform"), 0, -1, MenuTransform);    // abre submenu
         MenuObject->Add(T("Set Origin"), 4, -1, MenuSetOrigin);  // abre submenu
-        MenuObject->Add(T("Apply"), 6, -1, MenuApply)->shortcut = "@3d.aplicar"; // submenu Location/Rotation/Scale/All
+        MenuObject->Add(T("Apply"), 6, -1, MenuApply)->shortcut = "@3d.apply"; // submenu Location/Rotation/Scale/All
         // IMAN (Shift+S): el cursor 3D a lo seleccionado / al origen, lo seleccionado al cursor... En Modo Objeto solo
         // se abria con el atajo: en pantallas tactiles y en el N95 no habia forma de mover el cursor 3D. Sus opciones
         // se ejecutan en el propio submenu (ActionSnap): los ids 0-7 no chocan con los de este menu.
@@ -338,15 +338,15 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Add(T("Cut"), 720, IconType::scissors)->shortcut = "Ctrl+X";
         MenuObject->Add(T("Copy"), 721, IconType::copy)->shortcut = "Ctrl+C";
         MenuObject->Add(T("Paste"), 722, IconType::paste)->shortcut = "Ctrl+V";
-        MenuObject->Add(T("Duplicate Objects"), 1)->shortcut = "@3d.duplicar";
+        MenuObject->Add(T("Duplicate Objects"), 1)->shortcut = "@3d.duplicate";
         MenuObject->items[MenuObject->items.size() - 1]->lineUp = true;
-        MenuObject->Add(T("Duplicate Linked"), 2)->shortcut = "@3d.instancia";
-        MenuObject->Add(T("Join"), 5)->shortcut = "@3d.unir"; // une las mallas seleccionadas en el objeto activo
+        MenuObject->Add(T("Duplicate Linked"), 2)->shortcut = "@3d.instance";
+        MenuObject->Add(T("Join"), 5)->shortcut = "@3d.join"; // une las mallas seleccionadas en el objeto activo
         // Set/Clear Parent (Ctrl P / Alt P): submenus construidos en LayoutInput.cpp (reusan los mismos que
         // los atajos). Solo aparecen aca -> solo en Object Mode (MenuObject no se muestra en Edit).
-        MenuObject->Add(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->shortcut = "@global.emparentar";
-        MenuObject->Add(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->shortcut = "@global.desemparentar";
-        MenuObject->Add(T("Delete"), 3, IconType::trash)->shortcut = "@3d.borrar";
+        MenuObject->Add(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->shortcut = "@global.parent";
+        MenuObject->Add(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->shortcut = "@global.clearParent";
+        MenuObject->Add(T("Delete"), 3, IconType::trash)->shortcut = "@3d.delete";
         // PREFABS (io/PrefabsEditor.h): lo elegido pasa a un prefab nuevo (queda una instancia) / la instancia
         // activa se desempaqueta en objetos comunes
         MenuObject->Add(T("Create Prefab"), 700, IconType::prefab);
@@ -393,27 +393,27 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuClearPose = new PopupMenu();
         { extern void LayoutActionObject(int); MenuClearPose->action = LayoutActionObject; }   // (ids 520-523: ver MenuInsertKey)
         MenuClearPose->Add(T("All"), 520, IconType::armature);          // T+R+S -> PoseClearTransform(0)
-        MenuClearPose->Add(T("Translation"), 521)->shortcut = "@3d.limpiarPos";     // PoseClearTransform(1)
-        MenuClearPose->Add(T("Rotation"), 522)->shortcut = "@3d.limpiarRot";        // PoseClearTransform(2)
-        MenuClearPose->Add(T("Scale"), 523)->shortcut = "@3d.limpiarEsc";           // PoseClearTransform(3)
+        MenuClearPose->Add(T("Translation"), 521)->shortcut = "@3d.clearPos";     // PoseClearTransform(1)
+        MenuClearPose->Add(T("Rotation"), 522)->shortcut = "@3d.clearRot";        // PoseClearTransform(2)
+        MenuClearPose->Add(T("Scale"), 523)->shortcut = "@3d.clearScale";           // PoseClearTransform(3)
         MenuPose->Add(T("Clear Transform"), 0, -1, MenuClearPose);
         // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
         // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutActionMesh) se asigna al abrirlo.
         // submenu Transform de EDIT (como el de objeto pero + Shrink/Fatten, que solo tiene sentido en malla)
         static PopupMenu* MenuTransformEdit = NULL;
         MenuTransformEdit = new PopupMenu();
-        MenuTransformEdit->Add(T("Move"), 100)->shortcut = "@3d.mover";
-        MenuTransformEdit->Add(T("Rotate"), 101)->shortcut = "@3d.rotar";
-        MenuTransformEdit->Add(T("Scale"), 102)->shortcut = "@3d.escalar";
-        MenuTransformEdit->Add(T("Shrink/Fatten"), 103)->shortcut = "@3d.limpiarEsc"; // cada vert por su normal
+        MenuTransformEdit->Add(T("Move"), 100)->shortcut = "@3d.move";
+        MenuTransformEdit->Add(T("Rotate"), 101)->shortcut = "@3d.rotate";
+        MenuTransformEdit->Add(T("Scale"), 102)->shortcut = "@3d.scale";
+        MenuTransformEdit->Add(T("Shrink/Fatten"), 103)->shortcut = "@3d.clearScale"; // cada vert por su normal
         MenuMesh = new PopupMenu();
         MenuMesh->title = T("Mesh");
         MenuMesh->Add(T("Transform"), 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
         MenuMesh->Add(T("Vertex"), 0, -1, LayoutSubmenuEditVertex());   // los de W, los tres (como las barras de Blender)
         MenuMesh->Add(T("Edge"), 0, -1, LayoutSubmenuEditEdge());
         MenuMesh->Add(T("Face"), 0, -1, LayoutSubmenuEditFace());
-        MenuMesh->Add(T("Duplicate"), 314)->shortcut = "@3d.duplicar";          // comun a vertice/borde/cara
-        MenuMesh->Add(T("Separate"), 316)->shortcut = "@3d.separar";                 // caras selec -> mesh NUEVO
+        MenuMesh->Add(T("Duplicate"), 314)->shortcut = "@3d.duplicate";          // comun a vertice/borde/cara
+        MenuMesh->Add(T("Separate"), 316)->shortcut = "@3d.separate";                 // caras selec -> mesh NUEVO
         MenuMesh->Add(T("Merge"), 0, -1, LayoutSubmenuMerge())->shortcut = "@3d.merge"; // suelda verts (limpia duplicados)
         // Auto Merge (opt-in, OFF por defecto): al confirmar un move suelda los verts movidos con los que queden
         // a <= Threshold. Con el auto merge apagado, "Threshold" se ve en gris (->gray = &g_autoMerge).
@@ -423,33 +423,33 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuMesh->AddFloat(T("Threshold"), 391, &g_autoMergeThreshold, 0.0f, 0.1f)->gray = &g_autoMerge;
         MenuMesh->Add(T("Normals"), 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
         MenuMesh->Add(T("Snap"), 0, -1, LayoutSubmenuSnap())->shortcut = "@global.menuSnap";
-        MenuMesh->Add(T("Delete"), 360, -1, LayoutSubmenuDelete())->shortcut = "@3d.borrar"; // abajo de todo
+        MenuMesh->Add(T("Delete"), 360, -1, LayoutSubmenuDelete())->shortcut = "@3d.delete"; // abajo de todo
     }
     if (!MenuView){
         // boton "View" (antes de Select): submenu Viewpoint con los 7 puntos de vista (mismos atajos del numpad).
         // ids 400-406 -> LayoutActionView -> Viewport3DActive->SetViewpoint(...). Antes eran atajos "ocultos".
         MenuViewpoint = new PopupMenu();
-        MenuViewpoint->Add(T("Camera"), 400)->shortcut = "@3d.vistaCamara";
-        MenuViewpoint->Add(T("Top"),    401)->shortcut = "@3d.vistaArriba";
-        MenuViewpoint->Add(T("Bottom"), 402)->shortcut = "@3d.vistaAbajo";
-        MenuViewpoint->Add(T("Front"),  403)->shortcut = "@3d.vistaFrente";
-        MenuViewpoint->Add(T("Back"),   404)->shortcut = "@3d.vistaAtras";
-        MenuViewpoint->Add(T("Right"),  405)->shortcut = "@3d.vistaDerecha";
-        MenuViewpoint->Add(T("Left"),   406)->shortcut = "@3d.vistaIzquierda";
+        MenuViewpoint->Add(T("Camera"), 400)->shortcut = "@3d.viewCamera";
+        MenuViewpoint->Add(T("Top"),    401)->shortcut = "@3d.viewTop";
+        MenuViewpoint->Add(T("Bottom"), 402)->shortcut = "@3d.viewBottom";
+        MenuViewpoint->Add(T("Front"),  403)->shortcut = "@3d.viewFront";
+        MenuViewpoint->Add(T("Back"),   404)->shortcut = "@3d.viewBack";
+        MenuViewpoint->Add(T("Right"),  405)->shortcut = "@3d.viewRight";
+        MenuViewpoint->Add(T("Left"),   406)->shortcut = "@3d.viewLeft";
         // submenu Cameras: setear el objeto activo como camara / ver desde la camara activa
         MenuCameras = new PopupMenu();
-        MenuCameras->Add(T("Set Active Object as Camera"), 410)->shortcut = "@3d.camaraActiva";
-        MenuCameras->Add(T("Active Camera"),               411)->shortcut = "@3d.vistaCamara";
+        MenuCameras->Add(T("Set Active Object as Camera"), 410)->shortcut = "@3d.activeCamera";
+        MenuCameras->Add(T("Active Camera"),               411)->shortcut = "@3d.viewCamera";
         // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
         // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
         // decia el texto, NO lleva: repetirlo es ruido. El boton View ahora es un icono -> titulo.
         MenuView = new PopupMenu(); MenuView->title = T("View");
         MenuView->Add(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint)
         MenuView->Add(T("Viewpoint"), 0, -1, MenuViewpoint); // abre submenu
-        MenuView->Add(T("Frame Selected"), 420)->shortcut = "@3d.encuadrar"; // enfocar la seleccion (FocusObject)
+        MenuView->Add(T("Frame Selected"), 420)->shortcut = "@3d.focus"; // enfocar la seleccion (FocusObject)
         MenuItemLocalView = MenuView->Add(T("Local View"), 422); // aisla la seleccion en ESTE viewport (tilde = activo)
-        MenuItemLocalView->shortcut = "@3d.vistaLocal";
-        MenuView->Add(T("Perspective/Ortho"), 407)->shortcut = "@3d.perspectiva"; // alterna perspectiva/ortografica
+        MenuItemLocalView->shortcut = "@3d.viewLocal";
+        MenuView->Add(T("Perspective/Ortho"), 407)->shortcut = "@3d.perspective"; // alterna perspectiva/ortografica
         // Lock Orbit: item REGULAR (no checkbox) -> al tocarlo togglea Y CIERRA el menu. El
         // tilde (verde) se refresca al abrir el menu, con el estado del viewport activo (LayoutInput).
         MenuItemLockOrbit = MenuView->Add(T("Lock Orbit"), 421);
@@ -783,6 +783,7 @@ void Viewport3D::Zoom(float delta){
         }
         camViewZoom *= expf(delta * 0.03f);
         if (camViewZoom < 0.2f) camViewZoom = 0.2f; if (camViewZoom > 20.0f) camViewZoom = 20.0f;
+        W3dViewCacheNavigated();
         g_redraw = true; return;
     }
     // zoom PROPORCIONAL a la distancia (multiplicativo/exponencial): el paso se adapta al tamaño de
@@ -792,6 +793,7 @@ void Viewport3D::Zoom(float delta){
     if (orbitDistance < 0.02f)   orbitDistance = 0.02f;
     if (orbitDistance > farClip) orbitDistance = farClip;
     RecalcOrbitPosition();
+    W3dViewCacheNavigated();
 }
 
 // LA VISTA DE ESTE VIEWPORT como camara BASE del core (CameraBase): la camara activa de la
@@ -887,6 +889,7 @@ void Viewport3D::RotateOrbit() {
     viewRot.normalize();
 
     RecalcOrbitPosition();
+    W3dViewCacheNavigated();   // (solo cambio la vista: los paneles quedan como estaban)
 }
 
 void Viewport3D::OrbitArrow(int ndx, int ndy){
@@ -914,6 +917,7 @@ void Viewport3D::Pan(){
         }
         camViewPanX += 2.0f * dx / (float)(width  > 0 ? width  : 1);
         camViewPanY -= 2.0f * dy / (float)(height > 0 ? height : 1);
+        W3dViewCacheNavigated();
         g_redraw = true; return;
     }
     ShiftCount = 100;
@@ -927,6 +931,7 @@ void Viewport3D::Pan(){
     pivot = pivot + up    * (dy * speed);
 
     RecalcOrbitPosition();
+    W3dViewCacheNavigated();
 }
 
 // paneo por TECLADO (mismo patron que OrbitArrow): setea dx/dy, panea, restaura. Lo usa el keypad del N95.
@@ -984,6 +989,7 @@ void Viewport3D::OrbitFromCamera(){
 }
 void Viewport3D::CameraFromOrbit(){
     if (!CameraActive) return;
+    W3dViewCacheChanged();   // (se mueve el objeto camara: sus valores en Properties cambian)
     CameraActive->pos = viewPos;
     CameraActive->SetRot(viewRot);
     extern void W3dTouchedChanges();
@@ -2635,8 +2641,8 @@ void Viewport3D::RenderArmaturesOnTop(Object* node){
             // (multi-seleccion). En Object Mode todos van a 'buf' con el color del armature (verde/azul de objeto).
             // EDIT MODE de armature (Fase 3): mismos colores por seleccion PERO sobre head/tail CRUDOS (el rest que
             // se edita, no la pose) + PUNTOS en cada extremo (los agarraderos del drag).
-            bool poseMode = (InteractionMode == PoseMode && arm == (Armature*)ActiveObj);
-            bool editArm  = (InteractionMode == EditMode && arm == (Armature*)ActiveObj);
+            bool poseMode = (InteractionMode == PoseMode && (Object*)arm == ActiveObj);
+            bool editArm  = (InteractionMode == EditMode && (Object*)arm == ActiveObj);
             std::vector<GLfloat> buf, dash, bufSel, bufAct; buf.reserve(arm->bones.size() * 6);
             std::vector<GLfloat> pts, ptsSel; // extremos (solo editArm): normal / del hueso seleccionado-activo
             for (size_t i = 0; i < arm->bones.size(); i++){
@@ -2671,7 +2677,7 @@ void Viewport3D::RenderArmaturesOnTop(Object* node){
             }
             // color de 'buf': en Pose/Edit = AZUL (huesos sin seleccionar); en Object Mode = color del armature
             // (ACTIVO verde / seleccionado verde-secundario / no seleccionado azul, como el resto de objetos).
-            bool active = (arm == (Armature*)ActiveObj);
+            bool active = ((Object*)arm == ActiveObj);
             const float* col;
             if (poseMode || editArm){ static const float blueH[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = blueH; } // sin seleccionar = AZUL (el negro se perdia en el fondo)
             else if (active)         col = ColorList[(int)ColorID::accent];
@@ -4531,14 +4537,21 @@ void Viewport3D::event_mouse_motion(int mx, int my){
 
 // LAS FLECHAS DE LA VISTA 3D, iguales en la PC y en el telefono (el keypad del N95 llega por W3dNewOrbit /
 // W3dNewTransformMove; un teclado -el de la PC, uno Bluetooth en Symbian- llega aca):
-//  - navegando: ORBITAN (el cuadro anterior / siguiente es del Timeline: sus izq/der, y arr/ab saltan de keyframe)
+//  - navegando: IZQUIERDA / DERECHA = el cuadro anterior / siguiente (pedido del duenio: lo usan el tutorial de la
+//    pelota y prueba_candado_camara); ARRIBA / ABAJO orbitan
 //  - con un transform y el IMAN prendido, moviendo: SALTAN al siguiente nivel de la geometria (SnapStepArrow); sin nada
 //    mas adelante, se quedan donde estan
 //  - si no: mueven / rotan / escalan de a un paso; la malla en Edit Mode (el objeto sigue en cada flecha)
 // true = la flecha ya se uso
 bool Viewport3D::ArrowCommon(int fx, int fy){
     if (BoneGrabActive()) return true;   // (transform de huesos: las flechas no tocan los objetos)
-    if (state == editNavigation){ OrbitArrow(fx * 8, fy * 8); g_redraw = true; return true; }
+    if (state == editNavigation){
+        extern void W3dStepFrame(int d);   // Timeline.cpp
+        if (fx != 0) W3dStepFrame(fx);
+        else         OrbitArrow(0, fy * 8);
+        g_redraw = true;
+        return true;
+    }
     if (state != translation && state != rotation && state != EditScale) return false;
     if (SnapByArrows()){ SnapStepArrow(fx, fy); return true; }
     if (InteractionMode == EditMode && EditXformActive()){

@@ -187,7 +187,7 @@ Cada opción está en [Modo Objeto](modo-objeto.md). En el Modo Edición, este b
 | Vista ZBuffer | La profundidad: claro cerca, oscuro lejos. |
 | Vista Normal | Las normales, en colores. |
 | Vista Alpha | La transparencia, en blanco y negro. |
-| Vectores de movimiento | Cuánto se movió cada píxel desde el cuadro anterior (rojo = X, verde = Y). Es la misma imagen que el pase `_vectores` del render. |
+| Vectores de movimiento | Cuánto se movió cada píxel desde el cuadro anterior (rojo = X, verde = Y). Es la misma imagen que el pase `_vectors` del render. |
 
 ![PC](../tutoriales/img/icono-pc.svg) <kbd>Z</kbd> pasa al modo siguiente. ![Nokia](../tutoriales/img/icono-nokia.svg) En el N95, el <kbd>6</kbd>.
 
