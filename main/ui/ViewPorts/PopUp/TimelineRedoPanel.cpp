@@ -54,7 +54,7 @@ static const char* PivotName(int p) {
 }
 
 TimelineRedoPanel::TimelineRedoPanel()
-    : PopUpBase(""), group(NULL), dragField(NULL), dragMoved(false), lastDragMx(0), frame(NULL) {
+    : frame(NULL) {
     frame = new Card();
     Build();
 }
@@ -124,11 +124,6 @@ void TimelineRedoPanel::Relocate() {   // abajo a la izquierda del timeline, enc
     if (y < gapGS) y = gapGS;   // (un timeline mas bajo que la tarjeta: sube por encima de el)
     if (x < gapGS) x = gapGS;
 }
-int TimelineRedoPanel::RowY(int idx) const {
-    int yRow = borderGS + RowHeightGS + gapGS;
-    for (int j = 0; j < idx && j < (int)group->properties.size(); j++) yRow += group->properties[j]->Resize(group->width);
-    return yRow;
-}
 
 void TimelineRedoPanel::Render() {
     if (!group) return;
@@ -172,73 +167,6 @@ bool TimelineRedoPanel::Click(int mx, int my) {
     ClickRow(mx, my, true);
     return true;
 }
-void TimelineRedoPanel::ClickRow(int mx, int my, bool onlyBuild) {
-    const int myL = my - y + dz.scroll, lx = mx - x;
-    const int boxStart = group->colLabel + 2 * borderGS;
-    int yRow = borderGS + RowHeightGS + gapGS;
-    for (size_t j = 0; j < group->properties.size(); j++) {
-        PropertieBase* p = group->properties[j];
-        const int h = p->Resize(group->width);
-        if (p->Selectable() && myL >= yRow && myL < yRow + h) {
-            const PropertyType::Enum type = p->GetType();
-            if (type == PropertyType::Float) {
-                group->selectIndex = (int)j;
-                g_activeTextField = NULL;
-                dragField = static_cast<PropFloat*>(p); dragMoved = false; lastDragMx = mx;
-                g_redraw = true;
-                return;
-            }
-            if (onlyBuild) return;
-            group->selectIndex = (int)j;
-            g_activeTextField = NULL;
-            if (type == PropertyType::ButtonRow) {
-                PropButtonRow* row = static_cast<PropButtonRow*>(p);
-                const int cw = row->CellWidth(group->width), x0 = boxStart - group->colLabel;
-                int cell = -1, vis = 0;
-                for (size_t b = 0; b < row->buttons.size(); b++) {
-                    if (!row->buttons[b]->visible) continue;
-                    const int cx = x0 + vis * (cw + gapGS);
-                    if (lx >= cx && lx < cx + cw) { cell = (int)b; break; }
-                    vis++;
-                }
-                if (cell >= 0) { row->active = cell; if (row->actions[(size_t)cell]) row->actions[(size_t)cell](); }
-                return;
-            }
-            g_redraw = true;
-            return;
-        }
-        yRow += h;
-    }
-}
-bool TimelineRedoPanel::Motion(int mx, int my) {
-    if (!dragMoved && dz.Move(mx, my)) { dragField = NULL; g_redraw = true; return true; }
-    if (dz.scrolling) return true;
-    if (dragField && dragField->value) {
-        if (dz.Scrollable() && !dragMoved) {
-            const int threshold = 6 * (GlobalScale > 0 ? GlobalScale : 1);
-            if (mx - dz.pressX < threshold && dz.pressX - mx < threshold) return true;
-            lastDragMx = mx;
-        }
-        const int dmx = mx - lastDragMx; lastDragMx = mx;
-        if (dmx != 0 || (dz.Scrollable() && !dragMoved)) dragMoved = true;
-        if (dmx != 0) { dragField->Set(*dragField->value + dmx * dragField->dragStep); g_redraw = true; }
-    }
-    return true;
-}
-void TimelineRedoPanel::Release() {
-    const bool touch = dz.Up();
-    if (dragField) {
-        if (!dragMoved && dragField->value) {
-            dragField->StartEditText();            // mouse: se escribe el valor exacto
-            if (ToolbarUsesTouch()) KeyboardNumberOpen();       // tactil: el teclado numerico en pantalla
-        }
-        dragField = NULL;
-        return;
-    }
-    if (touch && dz.Scrollable()) ClickRow(dz.pressX, dz.pressY, false);
-}
-void TimelineRedoPanel::Wheel(int delta) { dz.Wheel(delta); g_redraw = true; }
-bool TimelineRedoPanel::Dragging() { return dragField != NULL || dz.pressed; }
 bool TimelineRedoPanel::Key(int key) {
     if (!group) return true;
     if (!group->open) {
@@ -246,38 +174,8 @@ bool TimelineRedoPanel::Key(int key) {
         if (key == LayoutKey::Cancel) { Accept_(); return true; }
         return false;   // plegada: las demas teclas siguen de largo (se sigue trabajando)
     }
-    const int n = (int)group->properties.size();
-    switch (key) {
-        case LayoutKey::Up:
-        case LayoutKey::Down: {
-            const int dir = (key == LayoutKey::Down) ? +1 : -1;
-            int s = group->selectIndex; if (s < 0) s = (dir > 0) ? -1 : 0;
-            for (int k = 0; k < n; k++) { s += dir; if (s < 0) s = n - 1; if (s >= n) s = 0; if (group->properties[s]->Selectable()) break; }
-            group->selectIndex = s;
-            dz.ToView(RowY(s), group->properties[(size_t)s]->Resize(group->width));
-            break;
-        }
-        case LayoutKey::Left:
-        case LayoutKey::Right: {
-            PropertieBase* sel = (group->selectIndex >= 0 && group->selectIndex < n) ? group->properties[group->selectIndex] : NULL;
-            if (!sel) break;
-            if (sel->GetType() == PropertyType::Float) { PropFloat* pf = static_cast<PropFloat*>(sel); pf->Set(*pf->value + (key == LayoutKey::Right ? pf->fineStep : -pf->fineStep)); }
-            else if (sel->GetType() == PropertyType::ButtonRow) { PropButtonRow* row = static_cast<PropButtonRow*>(sel); row->active += (key == LayoutKey::Right) ? 1 : -1; row->ActiveClamp(); }
-            break;
-        }
-        case LayoutKey::Enter: {
-            PropertieBase* sel = (group->selectIndex >= 0 && group->selectIndex < n) ? group->properties[group->selectIndex] : NULL;
-            if (sel && sel->GetType() == PropertyType::ButtonRow) {
-                PropButtonRow* row = static_cast<PropButtonRow*>(sel); row->ActiveClamp();
-                if (row->active >= 0 && row->active < (int)row->actions.size() && row->actions[row->active]) row->actions[row->active]();
-                return true;
-            }
-            if (sel && sel->GetType() == PropertyType::Float) static_cast<PropFloat*>(sel)->StartEditText();
-            break;
-        }
-        case LayoutKey::Cancel: Accept_(); return true;   // Esc: cierra aceptando (solo Cancelar deshace)
-    }
-    g_redraw = true;
+    if (key == LayoutKey::Cancel) { Accept_(); return true; }   // Esc: cierra aceptando (solo Cancelar deshace)
+    if (!KeyRows(key)) g_redraw = true;
     return true;
 }
 void TimelineRedoPanel::Close() {

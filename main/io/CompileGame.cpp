@@ -283,16 +283,19 @@ static int BldRun(const std::string& cmd, FILE* log, int mode, int pctStart, int
 }
 
 // ---- lo que el proyecto referencia: los objetos con script + sus refs -------
-struct ObjScript { std::string name; std::vector<W3dScriptEntry> scripts; };
+// (inUI: el objeto vive adentro de una UI -la raiz o un elemento 2D-: sus scripts viajan DENTRO del .w3dui y los carga
+//  UI2DLoad; agregarlos otra vez con W3dGameScript los duplicaba: el start() de la consola corria dos veces)
+struct ObjScript { std::string name; std::vector<W3dScriptEntry> scripts; bool inUI; };
 
 // ---- una ESCENA a compilar: su archivo .w3dui (relativo a platform-build/<plat>) + su nombre ----
 struct SceneGen { std::string file; std::string name; };
 
 static void CollectScripts(Object* o, std::vector<ObjScript>* out,
-                              std::vector<std::string>* pathsLua) {
+                              std::vector<std::string>* pathsLua, bool inUI = false) {
     if (!o) return;
+    if (o->getType() == ObjectType::ui) inUI = true;
     if (o->scriptData && !o->scriptData->scripts.empty()) {
-        ObjScript os; os.name = o->name;
+        ObjScript os; os.name = o->name; os.inUI = inUI;
         for (size_t i = 0; i < o->scriptData->scripts.size(); i++) {
             os.scripts.push_back(o->scriptData->scripts[i]);
             if (!o->scriptData->scripts[i].path.empty())
@@ -304,7 +307,7 @@ static void CollectScripts(Object* o, std::vector<ObjScript>* out,
     //  ella en libs/<nombre>/, no sueltos en el staging)
     if (o->getType() == ObjectType::proxy) return;
     for (size_t i = 0; i < o->Childrens.size(); i++)
-        CollectScripts(o->Childrens[i], out, pathsLua);
+        CollectScripts(o->Childrens[i], out, pathsLua, inUI);
 }
 
 static std::string Base(const std::string& path) {
@@ -1604,10 +1607,11 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
             fprintf(f, "if(!W3dGameLoadScene(\"%s\"))return 1;\n", Esc(scenes[i].file).c_str());
         fprintf(f, "W3dGameInitialScene(\"%s\");\n", Esc(initial).c_str());
     } else {
-        // UNA sola escena / legacy: cargar la UI + agregar los scripts + sus referencias
+        // UNA sola escena / legacy: cargar la UI + agregar los scripts de AFUERA de ella y sus referencias (los de la
+        // UI y sus elementos ya vienen dentro del .w3dui: W3dGameLoadUI los carga)
         fprintf(f, "if(!W3dGameLoadUI(\"%s\"))return 1;\n", Esc(w3duiRel).c_str());
         for (size_t o = 0; o < objs.size(); o++)
-            for (size_t s = 0; s < objs[o].scripts.size(); s++) {
+            for (size_t s = 0; s < objs[o].scripts.size() && !objs[o].inUI; s++) {
                 // FORMATO v4: la ruta es el NOMBRE DE ENTRADA del contenedor
                 // ("scripts/menu.lua") y el staging es su espejo, asi que va COMPLETA.
                 // Aplanar por basename no alcanza: project/icono.png y
@@ -1866,6 +1870,9 @@ static bool WriteCMake(const std::string& path, const std::string& name,
     fputs("cmake_minimum_required(VERSION 3.16)\n", f);
     fprintf(f, "project(%s CXX C)\n", name.c_str());
     fputs("set(CMAKE_CXX_STANDARD 17)\n", f);
+    // OPTIMIZADO, como el editor y los otros sistemas (-O2 en el Makefile de Windows y las consolas, emcc -O2): sin
+    // tipo de build, cmake compila SIN -O y el juego corria a -O0. FORCE pisa el "" que quedo en el cache de antes
+    fputs("if(NOT CMAKE_BUILD_TYPE)\n  set(CMAKE_BUILD_TYPE Release CACHE STRING \"\" FORCE)\nendif()\n", f);
     fputs("if(NOT DEFINED W3DROOT)\n  message(FATAL_ERROR \"pasa -DW3DROOT=<raiz del repo Whisk3D>\")\nendif()\n", f);
     fputs("set(CORE ${W3DROOT}/libs/Whisk3DCore)\n", f);
     fputs("set(UILIB ${W3DROOT}/libs/WhiskUI)\n", f);
@@ -3907,9 +3914,13 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         char cfg[1200], bld[900];
         // un configure cortado a la mitad deja el cache con la lista de includes implicitos de C++ VACIA: cmake
         // ya no filtra /usr/include, lo pasa como -isystem y el #include_next <stdlib.h> de <cstdlib> no
-        // encuentra nada (todas las compilaciones fallan para siempre). Ese cache se tira y se configura de nuevo
+        // encuentra nada (todas las compilaciones fallan para siempre). Ese cache se tira y se configura de nuevo.
+        // Lo mismo si el cache es de OTRA carpeta (el proyecto se movio o se copio con su platform-build/): cmake se
+        // niega a usarlo ("does not match the source") y la compilacion fallaba siempre
         snprintf(cfg, sizeof(cfg), "cd \"%s\" && { grep -qs 'CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES \"\"' "
                  "out/CMakeFiles/*/CMakeCXXCompiler.cmake && rm -rf out/CMakeCache.txt out/CMakeFiles; true; } && "
+                 "{ [ ! -f out/CMakeCache.txt ] || grep -qsxF \"CMAKE_HOME_DIRECTORY:INTERNAL=$(pwd -P)\" out/CMakeCache.txt "
+                 "|| rm -rf out/CMakeCache.txt out/CMakeFiles; } && "
                  "cmake -S . -B out -DW3DROOT=\"%s\"",
                  out.c_str(), repo.c_str());
         // -j ACOTADO (nunca pelado): ver W3dCompileJobs en CompileGame.h

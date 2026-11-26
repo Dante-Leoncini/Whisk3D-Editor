@@ -71,6 +71,12 @@ UVEditor* UVEditorInPoseMode() {
         if (gUVEditors[i] && gUVEditors[i]->uvMode == UVModePose) return gUVEditors[i];
     return NULL;
 }
+// algun editor UV PINTANDO la textura (UVModeTexture): mientras haya uno, las texturas en edicion no sueltan sus pixeles
+bool UVEditorPaintingTexture() {
+    for (size_t i = 0; i < gUVEditors.size(); i++)
+        if (gUVEditors[i] && gUVEditors[i]->uvMode == UVModeTexture) return true;
+    return false;
+}
 // algun editor UV en modo EDICION de UVs (el contexto donde la 'i' keyframea la capa uv)
 UVEditor* UVEditorInEditModeUV() {
     for (size_t i = 0; i < gUVEditors.size(); i++)

@@ -18,8 +18,8 @@
 struct RTGpuScene {
     std::vector<float> verts;    // por vertice 12 floats: pos.xyz u, nrm.xyz v, tan.xyzw
     std::vector<int> tris;       // por triangulo 4: v0 v1 v2 material
-    std::vector<float> mats;     // por material 20 floats (ver el shader: Mat)
-    std::vector<float> lights;    // por luz 20 floats (Luz)
+    std::vector<float> mats;     // por material 28 floats (ver el shader: Mat)
+    std::vector<float> lights;    // por luz 24 floats (Luz)
     std::vector<float> nodes;    // por nodo del BVH 12 floats (bmin izq, bmax der, primero cantidad)
     std::vector<int> order;      // los triangulos en el orden de las hojas
     std::vector<int> texInfo;    // por textura 4: desde, w, h, 0
@@ -43,7 +43,7 @@ bool RTGpuImage(int w, int h);  // la imagen a acumular (en cero)
 // solo los VERTICES y los NODOS del BVH de nuevo (los mismos triangulos, otra pose): con los nucleos de trazado, sus
 // estructuras se rehacen de los vertices nuevos
 bool RTGpuUpdateGeometry(const std::vector<float>& verts, const std::vector<float>& nodes);
-bool RTGpuUpdateLights(const std::vector<float>& lights);   // solo las luces (20 floats cada una)
+bool RTGpuUpdateLights(const std::vector<float>& lights);   // solo las luces (24 floats cada una)
 // un PASE: 'samples' muestras por pixel sumadas al acumulador. 'paso' = pases ya hechos (semilla y promedio); con aov
 // calcula ademas el albedo y la normal del primer impacto (para el denoiser)
 bool RTGpuPass(const RTGpuCamera& c, int step, int samples, bool aov, int layers, int bounces = 0);   // rebotes: los de la luz (g_rt.bounces)   // capas: las transparentes que se atraviesan

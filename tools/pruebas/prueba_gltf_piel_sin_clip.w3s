@@ -1,0 +1,34 @@
+# ===========================================================================
+#  glTF: UN ESQUELETO SIN ANIMACIONES (main/importers/import_gltf.cpp + animation/SkeletalAnimation.cpp)
+#
+#  prueba_gltf_piel_sin_clip.gltf (gen_prueba_gltf_piel_sin_clip.py): "raiz" -> "punta" (1 m arriba), "suelto" (una
+#  raiz sin hijos en x = 2, girada 90 grados sobre Z: su +Y apunta a -X) y un quad pesado a raiz/punta. Sin clips.
+#  Es lo que deja el convertidor de Blender cuando el rig va NATIVO (los constraints se evaluan en el motor): los
+#  huesos de deformacion no tienen padre ni hijos.
+#
+#  Lo que se verifica:
+#   1) la malla queda PEGADA al esqueleto aunque no haya clips (skinexport falla si ninguna malla tiene armature).
+#      Antes solo se pegaba con animaciones: posar o un constraint movian los huesos y la malla no.
+#   2) la PUNTA de cada hueso, por su +Y: "raiz" hasta la cabeza de su hijo, "punta" con el largo del padre y
+#      "suelto" una decima del esqueleto (0.2236 m) hacia -X. Antes era la cabeza y el motor la dibujaba 5 unidades
+#      hacia +Z (las rayas azules de 5 m que cruzaban la escena del Bongo Cat).
+#   3) el round-trip por el .w3d conserva las puntas y la piel
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_gltf_piel_sin_clip.w3s
+# ===========================================================================
+selobj Cubo
+delete
+importgltf prueba_gltf_piel_sin_clip.gltf
+skinexport 1 /tmp/w3d_prueba_gltf_piel_sin_clip_skin.txt
+bonepose raiz 1 0 0 0 0 1 0
+bonepose punta 1 0 1 0 0 2 0
+bonepose suelto 1 2 0 0 1.7764 0 0
+
+# --- round-trip ---
+savew3d /tmp/w3d_prueba_gltf_piel_sin_clip.w3d
+openw3d /tmp/w3d_prueba_gltf_piel_sin_clip.w3d
+skinexport 1 /tmp/w3d_prueba_gltf_piel_sin_clip_skin.txt
+bonepose raiz 1 0 0 0 0 1 0
+bonepose punta 1 0 1 0 0 2 0
+bonepose suelto 1 2 0 0 1.7764 0 0

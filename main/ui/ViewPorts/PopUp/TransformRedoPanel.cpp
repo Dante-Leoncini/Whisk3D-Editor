@@ -213,7 +213,7 @@ static const char* AxisName(int e) {
     switch (e) { case X: return "X"; case Y: return "Y"; case Z: return "Z"; case OrbitalAxis: return "Free"; default: return "View"; }
 }
 TransformRedoPanel::TransformRedoPanel()
-    : PopUpBase(""), group(NULL), dragField(NULL), dragMoved(false), lastDragMx(0), listOpen(0), listSel(0), list(NULL), frame(NULL) {
+    : listOpen(0), listSel(0), list(NULL), frame(NULL) {
     list  = new Card();
     frame = new Card();
     Build();
@@ -298,11 +298,6 @@ void TransformRedoPanel::Relocate() {   // abajo a la izquierda del viewport (do
         y = PopUpActive->y - height - gapGS * 2;   // el teclado numerico abierto encima: el panel sube
     if (y < gTRvp->y + gapGS) y = gTRvp->y + gapGS;
     if (x < gapGS) x = gapGS;
-}
-int TransformRedoPanel::RowY(int idx) const {
-    int yRow = borderGS + RowHeightGS + gapGS;
-    for (int j = 0; j < idx && j < (int)group->properties.size(); j++) yRow += group->properties[j]->Resize(group->width);
-    return yRow;
 }
 int TransformRedoPanel::ListCount() const { return (listOpen == 1) ? 2 : (listOpen == 2) ? PropTypes : 0; }
 void TransformRedoPanel::ListRect(int& lx, int& ly, int& lw, int& lh) const {
@@ -410,77 +405,6 @@ bool TransformRedoPanel::Click(int mx, int my) {
 }
 // el click sobre una fila. onlyBuild: un valor numerico queda listo para arrastrar y nada mas (el resto espera a
 // saber si el gesto es un toque o un desplazamiento)
-void TransformRedoPanel::ClickRow(int mx, int my, bool onlyBuild) {
-    const int myL = my - y + dz.scroll, lx = mx - x;
-    const int boxStart = group->colLabel + 2 * borderGS;
-    int yRow = borderGS + RowHeightGS + gapGS;
-    for (size_t j = 0; j < group->properties.size(); j++) {
-        PropertieBase* p = group->properties[j];
-        const int h = p->Resize(group->width);
-        if (p->Selectable() && myL >= yRow && myL < yRow + h) {
-            const PropertyType::Enum type = p->GetType();
-            if (type == PropertyType::Float) {
-                group->selectIndex = (int)j;
-                g_activeTextField = NULL;
-                dragField = static_cast<PropFloat*>(p); dragMoved = false; lastDragMx = mx;
-                g_redraw = true;
-                return;
-            }
-            if (onlyBuild) return;
-            group->selectIndex = (int)j;
-            g_activeTextField = NULL;
-            if (type == PropertyType::Bool || type == PropertyType::Button) {
-                p->EditPropertie();
-            } else if (type == PropertyType::ButtonRow) {
-                PropButtonRow* row = static_cast<PropButtonRow*>(p);
-                const int cw = row->CellWidth(group->width), x0 = boxStart - group->colLabel;
-                int cell = -1, vis = 0;
-                for (size_t b = 0; b < row->buttons.size(); b++) {
-                    if (!row->buttons[b]->visible) continue;
-                    const int cx = x0 + vis * (cw + gapGS);
-                    if (lx >= cx && lx < cx + cw) { cell = (int)b; break; }
-                    vis++;
-                }
-                if (cell >= 0) { row->active = cell; if (row->actions[(size_t)cell]) row->actions[(size_t)cell](); }
-                return;
-            }
-            g_redraw = true;
-            return;
-        }
-        yRow += h;
-    }
-}
-bool TransformRedoPanel::Motion(int mx, int my) {
-    // arrastre VERTICAL en un panel desplazable: desplaza (y suelta el valor que estaba por arrastrarse)
-    if (!dragMoved && dz.Move(mx, my)) { dragField = NULL; g_redraw = true; return true; }
-    if (dz.scrolling) return true;
-    if (dragField && dragField->value) {
-        // desplazable: el valor recien se arrastra cuando el gesto se va claramente de costado
-        if (dz.Scrollable() && !dragMoved) {
-            const int threshold = 6 * (GlobalScale > 0 ? GlobalScale : 1);
-            if (mx - dz.pressX < threshold && dz.pressX - mx < threshold) return true;
-            lastDragMx = mx;
-        }
-        const int dmx = mx - lastDragMx; lastDragMx = mx;
-        if (dmx != 0 || (dz.Scrollable() && !dragMoved)) dragMoved = true;
-        if (dmx != 0) { dragField->Set(*dragField->value + dmx * dragField->dragStep); g_redraw = true; }
-    }
-    return true;
-}
-void TransformRedoPanel::Release() {
-    const bool touch = dz.Up();
-    if (dragField) {
-        if (!dragMoved && dragField->value) {
-            dragField->StartEditText();            // mouse: se escribe el valor exacto
-            if (ToolbarUsesTouch()) KeyboardNumberOpen();       // tactil: el teclado numerico en pantalla
-        }
-        dragField = NULL;
-        return;
-    }
-    if (touch && dz.Scrollable()) ClickRow(dz.pressX, dz.pressY, false);   // fue un toque: el click de verdad
-}
-void TransformRedoPanel::Wheel(int delta) { dz.Wheel(delta); g_redraw = true; }
-bool TransformRedoPanel::Dragging() { return dragField != NULL || dz.pressed; }
 bool TransformRedoPanel::Key(int key) {
     if (!group) return true;
     // PLEGADO: OK / derecha lo despliega, C lo cierra; lo demas sigue de largo (se sigue trabajando)
@@ -489,7 +413,6 @@ bool TransformRedoPanel::Key(int key) {
         if (key == LayoutKey::Cancel) { Close(); return true; }
         return false;
     }
-    const int n = (int)group->properties.size();
     if (listOpen) {
         const int nl = ListCount();
         switch (key) {
@@ -502,39 +425,8 @@ bool TransformRedoPanel::Key(int key) {
         g_redraw = true;
         return true;
     }
-    switch (key) {
-        case LayoutKey::Up:
-        case LayoutKey::Down: {
-            const int dir = (key == LayoutKey::Down) ? +1 : -1;
-            int s = group->selectIndex; if (s < 0) s = (dir > 0) ? -1 : 0;
-            for (int k = 0; k < n; k++) { s += dir; if (s < 0) s = n - 1; if (s >= n) s = 0; if (group->properties[s]->Selectable()) break; }
-            group->selectIndex = s;
-            dz.ToView(RowY(s), group->properties[(size_t)s]->Resize(group->width));   // la fila elegida, a la vista
-            break;
-        }
-        case LayoutKey::Left:
-        case LayoutKey::Right: {
-            PropertieBase* sel = (group->selectIndex >= 0 && group->selectIndex < n) ? group->properties[group->selectIndex] : NULL;
-            if (!sel) break;
-            if (sel->GetType() == PropertyType::Float) { PropFloat* pf = static_cast<PropFloat*>(sel); pf->Set(*pf->value + (key == LayoutKey::Right ? pf->fineStep : -pf->fineStep)); }
-            else if (sel->GetType() == PropertyType::ButtonRow) { PropButtonRow* row = static_cast<PropButtonRow*>(sel); row->active += (key == LayoutKey::Right) ? 1 : -1; row->ActiveClamp(); }
-            else if (sel->GetType() == PropertyType::Bool) sel->EditPropertie();
-            break;
-        }
-        case LayoutKey::Enter: {
-            PropertieBase* sel = (group->selectIndex >= 0 && group->selectIndex < n) ? group->properties[group->selectIndex] : NULL;
-            if (sel && sel->GetType() == PropertyType::ButtonRow) {
-                PropButtonRow* row = static_cast<PropButtonRow*>(sel); row->ActiveClamp();
-                if (row->active >= 0 && row->active < (int)row->actions.size() && row->actions[row->active]) row->actions[row->active]();
-                return true;
-            }
-            if (sel && sel->GetType() == PropertyType::Float) static_cast<PropFloat*>(sel)->StartEditText();
-            else if (sel) sel->EditPropertie();
-            break;
-        }
-        case LayoutKey::Cancel: Accept_(); return true;   // Esc / Supr / C del telefono: cierra aceptando (solo Cancelar deshace)
-    }
-    g_redraw = true;
+    if (key == LayoutKey::Cancel) { Accept_(); return true; }   // Esc / Supr / C del telefono: cierra aceptando (solo Cancelar deshace)
+    if (!KeyRows(key)) g_redraw = true;
     return true;
 }
 void TransformRedoPanel::Close() {

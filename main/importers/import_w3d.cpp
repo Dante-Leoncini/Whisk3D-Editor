@@ -936,7 +936,6 @@ void W3dPrefabsClear() {
         PrefabDeleteNode(it->second);
     gPrefabs.clear();
 }
-int W3dPrefabsRegistered() { return (int)gPrefabs.size(); }
 
 // instancia el prefab bajo 'parent': overrides = props del Clon (pisan la raiz),
 // childrenExtra = hijos propios del Clon (se agregan). NULL si no hay tal prefab.
@@ -2019,6 +2018,7 @@ static void LoadAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
 //  "modArmature" de las mallas (se resuelve POR NOMBRE al final de la carga,
 //  cuando ya existen todos los objetos) + los "vgroups" por POSICION.
 // ===========================================================================
+static W3dConstraint* ReadConstraintOne(JVal* e, bool bone, const std::string& owner);   // (con ReadConstraints, mas abajo)
 static void JVec3(JVal* j, const char* k, Vector3& v) {
     JVal* x = JChild(j, k, 5);
     if (x && x->list.size() >= 3) { v.x = (float)x->list[0]->num; v.y = (float)x->list[1]->num; v.z = (float)x->list[2]->num; }
@@ -2716,6 +2716,68 @@ static void JsonObject(JVal* j, Object* parent, const std::string& base);
 //  NULL = el nodo no creo ningun objeto (tipo desconocido, o la carga fallo):
 //  sus hijos cuelgan del padre, que es lo que ya hacia el fallback generico.
 // ---------------------------------------------------------------------------
+// ---- las SPLINES de una Curve (Bezier / poly), formato/curvas.md. false = el nodo no trae ----
+static int CurveHandleOf(const std::string& n) {
+    if (n == "free") return W3dHandleFree;
+    if (n == "aligned") return W3dHandleAligned;
+    if (n == "vector") return W3dHandleVector;
+    return W3dHandleAuto;   // (y cualquier cosa desconocida: la que no rompe la forma)
+}
+static float CurveNum(JVal* l, size_t i, float def) { return (l && i < l->list.size() && l->list[i]) ? (float)l->list[i]->num : def; }
+static bool ReadCurveSplines(JVal* j, Curve* cv) {
+    JVal* spl = JChild(j, "splines", 5);
+    if (!spl) return false;
+    cv->splines.clear();
+    for (size_t k = 0; k < spl->list.size(); k++) {
+        JVal* e = spl->list[k];
+        if (!e || e->type != 4) continue;
+        CurveSpline sp;
+        sp.type = (JS(e, "type", "bezier") == "poly") ? W3dSplinePoly : W3dSplineBezier;
+        sp.cyclic = JB(e, "cyclic", false);
+        sp.resolution = JI(e, "resolution", 0);
+        if (sp.resolution < 0) sp.resolution = 0;
+        JVal* pts = JChild(e, "points", 5);
+        JVal* hl = JChild(e, "handlesLeft", 5);
+        JVal* hr = JChild(e, "handlesRight", 5);
+        JVal* ht = JChild(e, "handleTypes", 5);
+        JVal* ra = JChild(e, "radius", 5);
+        JVal* ti = JChild(e, "tilt", 5);
+        const size_t n = pts ? pts->list.size() / 3 : 0;
+        const bool handles = hl && hr && hl->list.size() >= n * 3 && hr->list.size() >= n * 3;
+        for (size_t i = 0; i < n; i++) {
+            CurvePoint q;
+            q.co = Vector3(CurveNum(pts, i*3, 0), CurveNum(pts, i*3+1, 0), CurveNum(pts, i*3+2, 0));
+            if (handles) {
+                q.left  = Vector3(CurveNum(hl, i*3, 0), CurveNum(hl, i*3+1, 0), CurveNum(hl, i*3+2, 0));
+                q.right = Vector3(CurveNum(hr, i*3, 0), CurveNum(hr, i*3+1, 0), CurveNum(hr, i*3+2, 0));
+            } else { q.left = q.co; q.right = q.co; }
+            if (ht && ht->list.size() >= i*2 + 2) {
+                JVal* a = ht->list[i*2]; JVal* b = ht->list[i*2+1];
+                q.typeL = (unsigned char)CurveHandleOf((a && a->type == 2) ? a->str : std::string());
+                q.typeR = (unsigned char)CurveHandleOf((b && b->type == 2) ? b->str : std::string());
+            }
+            q.radius = CurveNum(ra, i, 1.0f);
+            q.tilt = CurveNum(ti, i, 0.0f);
+            sp.points.push_back(q);
+        }
+        cv->splines.push_back(sp);
+        // SIN MANIJAS en el archivo (un .w3d escrito a mano): salen como las Auto y despues cada punto toma su tipo
+        // (Free/Aligned se quedan donde las dejo la cuenta Auto, Vector apunta a su vecino). CON manijas se
+        // respetan tal cual: las de Blender ya vienen calculadas y recalcularlas aca podria correrlas.
+        if (!handles && sp.type == W3dSplineBezier) {
+            CurveSpline& c = cv->splines.back();
+            std::vector<unsigned char> tl(c.points.size()), tr(c.points.size());
+            for (size_t i = 0; i < c.points.size(); i++) { tl[i] = c.points[i].typeL; tr[i] = c.points[i].typeR; c.points[i].typeL = c.points[i].typeR = W3dHandleAuto; }
+            cv->CalcHandlesSpline((int)cv->splines.size() - 1);
+            for (size_t i = 0; i < c.points.size(); i++) { c.points[i].typeL = tl[i]; c.points[i].typeR = tr[i]; }
+            cv->CalcHandlesSpline((int)cv->splines.size() - 1);
+        }
+    }
+    if (cv->splines.empty()) return false;
+    cv->signZ = 1.0f;   // autorada en el espacio del motor (sin espejo de .cap)
+    return true;
+}
+
 static Object* JsonObjectCreate(JVal* j, Object* parent, const std::string& base) {
     std::string type = JS(j, "type", "");
 
@@ -2816,9 +2878,19 @@ static Object* JsonObjectCreate(JVal* j, Object* parent, const std::string& base
         std::string rel = JS(j, "file", "");
         Curve* cv = new Curve(parent);
         CommonJson(j, cv);
+        // LA FORMA (tubo / cinta) y su material (ausentes = solo la linea, como siempre). Antes que las splines:
+        // la primera teselacion ya arma la geometria con todo esto
+        cv->resolution      = JF(j, "resolution", cv->resolution);
+        cv->bevelDepth      = JF(j, "bevelDepth", 0.0f);
+        cv->bevelResolution = JF(j, "bevelResolution", cv->bevelResolution);
+        cv->extrude         = JF(j, "extrude", 0.0f);
+        cv->fillCaps        = JB(j, "fillCaps", false);
+        { const std::string mn = JS(j, "material", ""); if (!mn.empty()) cv->material = MaterialByName(mn); }
         // curva AUTORADA (Add > Path / riel editado): los nodos vienen INLINE en "puntos"
         JVal* pts = JChild(j, "points", 5);
-        if (pts && pts->list.size() >= 3) {
+        // CURVA DE SPLINES (Bezier / poly): los puntos de control mandan; la polilinea es su teselacion
+        if (ReadCurveSplines(j, cv)) cv->Tessellate(true);
+        else if (pts && pts->list.size() >= 3) {
             int n = (int)pts->list.size() / 3;
             cv->vertexSize = n;
             cv->vertex = new GLfloat[n * 3];
@@ -2857,6 +2929,14 @@ static Object* JsonObjectCreate(JVal* j, Object* parent, const std::string& base
         if (col && col->list.size() >= 3)
             for (int i = 0; i < 3; i++) l->diffuse[i] = (float)col->list[i]->num;
         l->directional = JB(j, "directional", l->directional);
+        // LUZ DE AREA (ausente = no es de area): la forma y el ancho y el alto en metros (SaveW3D)
+        { const std::string ar = JS(j, "area", "");
+          if (!ar.empty() && !l->directional) {
+              l->area = true;
+              l->areaShape = (ar == "rectangle") ? 1 : (ar == "disk") ? 2 : (ar == "ellipse") ? 3 : 0;
+              JVal* as = JChild(j, "areaSize", 5);
+              if (as && JRowLen(as) >= 2) { l->areaSizeX = JRowNum(as, 0, l->areaSizeX); l->areaSizeY = JRowNum(as, 1, l->areaSizeY); }
+          } }
         l->ignoreOrder = JB(j, "ignoreOrder", true);   // ausente = alumbra toda la escena (el pre-pase)
         JVal* at = JChild(j, "atenuacion", 5);   // (5 = lista)
         if (at && JRowLen(at) >= 3) { l->attConstant = JRowNum(at, 0, l->attConstant); l->attLinear = JRowNum(at, 1, l->attLinear); l->attQuadratic = JRowNum(at, 2, l->attQuadratic); }
@@ -3168,6 +3248,15 @@ static Object* JsonObjectCreate(JVal* j, Object* parent, const std::string& base
                 }
             }
             b.poseT = b.restT; b.poseR = b.restR; b.poseS = b.restS;
+            // el roll del marco (solo constraints) y el STACK de constraints del hueso (ausentes = sin)
+            b.roll = JF(e, "roll", 0.0f);
+            { JVal* jc = JChild(e, "constraints", 5);
+              if (jc) for (size_t k = 0; k < jc->list.size(); k++) {
+                  JVal* ec = jc->list[k]; if (!ec || ec->type != 4) continue;
+                  W3dConstraint* c = ReadConstraintOne(ec, true, a->name + ":" + b.name);
+                  if (c) b.constraints.list.push_back(c);
+              }
+              b.constraints.active = b.constraints.size() - 1; }
             a->bones.push_back(b);
         }
         // jerarquia SANEADA (indices fuera de rango / ciclos -> raiz): los recorridos que suben
@@ -3247,6 +3336,7 @@ static Object* JsonObjectCreate(JVal* j, Object* parent, const std::string& base
         if (dl) for (size_t i = 0; i < dl->list.size(); i++)
             if (dl->list[i]) l->distances.push_back((float)dl->list[i]->num);
         l->onlyCameraActive = JB(j, "activeCameraOnly", false); // ausente en los .w3d viejos
+        l->renderFirst = JB(j, "renderFirst", false);           // (el render final con el primer hijo)
         return l;
     }
     if (type == "sound") {    // SONIDO: audio puesto en la escena (los tiempos en segundos)
@@ -3558,7 +3648,138 @@ static int ConsTypeInt(const std::string& t) {
     if (t == "copyRotation") return W3dConstraintType::CopyRotation;
     if (t == "billboard")    return W3dConstraintType::Billboard;
     if (t == "childOf")      return W3dConstraintType::ChildOf;
+    if (t == "copyScale")      return W3dConstraintType::CopyScale;
+    if (t == "copyTransforms") return W3dConstraintType::CopyTransforms;
+    if (t == "trackTo")        return W3dConstraintType::TrackTo;
+    if (t == "dampedTrack")    return W3dConstraintType::DampedTrack;
+    if (t == "lockedTrack")    return W3dConstraintType::LockedTrack;
+    if (t == "stretchTo")      return W3dConstraintType::StretchTo;
+    if (t == "limitLocation")  return W3dConstraintType::LimitLocation;
+    if (t == "limitRotation")  return W3dConstraintType::LimitRotation;
+    if (t == "limitScale")     return W3dConstraintType::LimitScale;
+    if (t == "limitDistance")  return W3dConstraintType::LimitDistance;
+    if (t == "maintainVolume") return W3dConstraintType::MaintainVolume;
+    if (t == "floor")          return W3dConstraintType::Floor;
+    if (t == "transformation") return W3dConstraintType::Transformation;
+    if (t == "pivot")          return W3dConstraintType::Pivot;
+    if (t == "followPath")     return W3dConstraintType::FollowPath;
+    if (t == "clampTo")        return W3dConstraintType::ClampTo;
+    if (t == "ik")             return W3dConstraintType::IK;
     return -1;   // desconocido (un .w3d de una version mas nueva)
+}
+
+// las TABLAS de los enums de la fase 2: las MISMAS que escribe SaveW3D.cpp (kCons*). Un string que no
+// esta en la tabla deja el default (un archivo de una version mas nueva no rompe el constraint entero).
+static const char* const kConsSpaceR[3]   = { "world", "local", "pose" };
+static const char* const kConsAxis6R[6]   = { "x", "y", "z", "-x", "-y", "-z" };
+static const char* const kConsMixR[4]     = { "replace", "add", "before", "after" };
+static const char* const kConsVolumeR[4]  = { "xz", "x", "z", "none" };
+static const char* const kConsKeepR[3]    = { "planeX", "planeZ", "swing" };
+static const char* const kConsDistR[3]    = { "inside", "outside", "surface" };
+static const char* const kConsVolModeR[3] = { "strict", "uniform", "single" };
+static const char* const kConsChanR[3]    = { "location", "rotation", "scale" };
+static const char* const kConsClampR[4]   = { "auto", "x", "y", "z" };
+static const char* const kConsPivotR[7]   = { "always", "-x", "-y", "-z", "x", "y", "z" };
+static int ConsEnum(JVal* e, const char* k, const char* const* names, int n, int def) {
+    JVal* v = JChild(e, k, 2);   // (2 = string)
+    if (!v) return def;
+    for (int i = 0; i < n; i++) if (v->str == names[i]) return i;
+    return def;
+}
+
+// UN constraint (de objeto o de HUESO) desde su objeto JSON. NULL = tipo desconocido (se avisa y se saltea:
+// perder un constraint es perder un efecto; abortar el nodo seria perder el objeto y su subarbol).
+// Los defaults son los del tipo (y del dueno, si es un hueso): una clave ausente = el default, que es
+// exactamente lo que el guardado omite.
+static W3dConstraint* ReadConstraintOne(JVal* e, bool bone, const std::string& owner) {
+    const std::string ts = JS(e, "type", "");
+    const int type = ConsTypeInt(ts);
+    if (type < 0 || (bone ? !W3dConstraintTypeForBone(type) : !W3dConstraintTypeForObject(type))) {
+        w3dLogfW("[W3D] '%s': constraint de tipo desconocido (o que no va en un %s) '%s': se ignora (abre igual)",
+                 owner.c_str(), bone ? "hueso" : "objeto", ts.c_str());
+        return NULL;
+    }
+    W3dConstraint* c = new W3dConstraint(type);
+    if (bone) W3dConstraintBoneDefaults(c);
+    c->name       = JS(e, "name", W3dConstraintTypeName(type));
+    c->active     = JB(e, "active", true);
+    c->showEdit = JB(e, "vered", false);   // ausente = OFF (el default; ver W3dConstraint.h)
+    c->influence = JF(e, "influence", c->influence);
+    if (type == W3dConstraintType::Billboard) {
+        c->bbYaw   = JB(e, "yaw",   c->bbYaw);
+        c->bbPitch = JB(e, "pitch", c->bbPitch);
+    } else {
+        // "fuente" es el TIPO de fuente y es explicito: cualquier cosa que no sea
+        // "vista" es un objeto (que es el default y el caso del 99%).
+        c->sourceType = (JS(e, "font", "object") == "view")
+                            ? W3dConstraintSource::View : W3dConstraintSource::Object;
+        if (c->sourceType == W3dConstraintSource::Object)
+            c->sourceName = JS(e, "object", "");
+        JBools3(e, "axes", &c->axisX, &c->axisY, &c->axisZ);
+    }
+    if (type == W3dConstraintType::ChildOf) {
+        JBools3(e, "inherits", &c->coLoc, &c->coRot, &c->coEsc);
+        JMat16(e, "inverse", c->inverse);   // ausente = identidad (el default del ctor)
+    }
+    // ---- la FASE 2 (todas opcionales) ----
+    c->bone = JS(e, "bone", "");
+    c->headTail = JF(e, "headTail", c->headTail);
+    c->ownerSpace  = ConsEnum(e, "ownerSpace",  kConsSpaceR, 3, c->ownerSpace);
+    c->targetSpace = ConsEnum(e, "targetSpace", kConsSpaceR, 3, c->targetSpace);
+    JBools3(e, "invert", &c->invX, &c->invY, &c->invZ);
+    c->useOffset = JB(e, "offset", c->useOffset);
+    c->mixMode = ConsEnum(e, "mix", kConsMixR, 4, c->mixMode);
+    c->power = JF(e, "power", c->power);
+    c->scaleAdd = JB(e, "scaleAdd", c->scaleAdd);
+    c->trackAxis = ConsEnum(e, "trackAxis", kConsAxis6R, 6, c->trackAxis);
+    c->upAxis    = ConsEnum(e, "upAxis",    kConsAxis6R, 3, c->upAxis);
+    c->lockAxis  = ConsEnum(e, "lockAxis",  kConsAxis6R, 3, c->lockAxis);
+    c->targetUp = JB(e, "targetUp", c->targetUp);
+    c->restLength = JF(e, "restLength", c->restLength);
+    c->bulge = JF(e, "bulge", c->bulge);
+    c->volumeMode = ConsEnum(e, "volumeMode", kConsVolumeR, 4, c->volumeMode);
+    c->keepAxis   = ConsEnum(e, "keepAxis",   kConsKeepR,   3, c->keepAxis);
+    JBools3(e, "useMin", &c->useMin[0], &c->useMin[1], &c->useMin[2]);
+    JBools3(e, "useMax", &c->useMax[0], &c->useMax[1], &c->useMax[2]);
+    JVec3(e, "min", c->vmin); JVec3(e, "max", c->vmax);
+    c->distance = JF(e, "distance", c->distance);
+    c->distMode = ConsEnum(e, "distMode", kConsDistR, 3, c->distMode);
+    c->volume = JF(e, "volume", c->volume);
+    c->freeAxis = ConsEnum(e, "freeAxis", kConsAxis6R, 3, c->freeAxis);
+    c->volMode  = ConsEnum(e, "volMode",  kConsVolModeR, 3, c->volMode);
+    c->floorOffset = JF(e, "floorOffset", c->floorOffset);
+    c->useRotation = JB(e, "useRotation", c->useRotation);
+    c->mapFrom = ConsEnum(e, "mapFrom", kConsChanR, 3, c->mapFrom);
+    c->mapTo   = ConsEnum(e, "mapTo",   kConsChanR, 3, c->mapTo);
+    { JVal* ma = JChild(e, "mapAxes", 5);
+      if (ma) for (size_t k = 0; k < ma->list.size() && k < 3; k++) {
+          const std::string t = (ma->list[k] && ma->list[k]->type == 2) ? ma->list[k]->str : std::string();
+          for (int q = 0; q < 3; q++) if (t == kConsAxis6R[q]) c->mapAxis[k] = q;
+      } }
+    JVec3(e, "fromMin", c->fromMin); JVec3(e, "fromMax", c->fromMax);
+    JVec3(e, "toMin", c->toMin);     JVec3(e, "toMax", c->toMax);
+    c->extrapolate = JB(e, "extrapolate", c->extrapolate);
+    JVec3(e, "pivotOffset", c->pivotOffset);
+    c->pivotAbs = JB(e, "pivotAbsolute", c->pivotAbs);
+    c->pivotRotAxis = ConsEnum(e, "pivotRotAxis", kConsPivotR, 7, c->pivotRotAxis + 1) - 1;
+    c->fixedPosition = JB(e, "fixedPosition", c->fixedPosition);
+    c->offsetFactor = JF(e, "offsetFactor", c->offsetFactor);
+    c->pathOffset = JF(e, "pathOffset", c->pathOffset);
+    c->pathDuration = JF(e, "pathDuration", c->pathDuration);
+    c->followCurve = JB(e, "followCurve", c->followCurve);
+    c->clampAxis = ConsEnum(e, "clampAxis", kConsClampR, 4, c->clampAxis);
+    c->cyclic = JB(e, "cyclic", c->cyclic);
+    c->chainLength = JI(e, "chainLength", c->chainLength);
+    c->iterations = JI(e, "iterations", c->iterations);
+    c->useTail = JB(e, "useTail", c->useTail);
+    c->useStretch = JB(e, "stretch", c->useStretch);
+    c->poleAngle = JF(e, "poleAngle", c->poleAngle);
+    c->poleName = JS(e, "pole", "");
+    c->poleBone = JS(e, "poleBone", "");
+    // el archivo lo pudo editar cualquiera: clampea la influencia a [0,100], arregla
+    // el billboard que no gira en ningun eje y acota los enums (ver W3dConstraint::Normalize)
+    c->Normalize();
+    return c;
 }
 
 // capas del MIX (ver WriteLayers en SaveW3D.cpp): la misma forma para armatures y escenas
@@ -3585,42 +3806,26 @@ static void ReadConstraints(JVal* j, Object* o) {
     if (!jc || !o) return;
     for (size_t i = 0; i < jc->list.size(); i++) {
         JVal* e = jc->list[i]; if (!e || e->type != 4) continue;
-        const std::string ts = JS(e, "type", "");
-        const int type = ConsTypeInt(ts);
-        if (type < 0) {
-            w3dLogfW("[W3D] '%s': constraint de tipo desconocido '%s': se ignora (el objeto abre igual)",
-                     o->name.c_str(), ts.c_str());
-            continue;
-        }
-        W3dConstraint* c = new W3dConstraint(type);
-        c->name       = JS(e, "name", W3dConstraintTypeName(type));
-        c->active     = JB(e, "active", true);
-        c->showEdit = JB(e, "vered", false);   // ausente = OFF (el default; ver W3dConstraint.h)
-        c->influence = JF(e, "influence", c->influence);
-        if (type == W3dConstraintType::Billboard) {
-            c->bbYaw   = JB(e, "yaw",   c->bbYaw);
-            c->bbPitch = JB(e, "pitch", c->bbPitch);
-        } else {
-            // "fuente" es el TIPO de fuente y es explicito: cualquier cosa que no sea
-            // "vista" es un objeto (que es el default y el caso del 99%).
-            c->sourceType = (JS(e, "font", "object") == "view")
-                                ? W3dConstraintSource::View : W3dConstraintSource::Object;
-            if (c->sourceType == W3dConstraintSource::Object)
-                c->sourceName = JS(e, "object", "");
-            JBools3(e, "axes", &c->axisX, &c->axisY, &c->axisZ);
-        }
-        if (type == W3dConstraintType::ChildOf) {
-            c->bone = JS(e, "bone", "");
-            JBools3(e, "inherits", &c->coLoc, &c->coRot, &c->coEsc);
-            JMat16(e, "inverse", c->inverse);   // ausente = identidad (el default del ctor)
-        }
-        // el archivo lo pudo editar cualquiera: clampea la influencia a [0,100] y arregla
-        // el billboard que no gira en ningun eje (ver W3dConstraint::Normalizar)
-        c->Normalize();
-        o->constraints.push_back(c);
+        W3dConstraint* c = ReadConstraintOne(e, false, o->name);
+        if (c) o->constraints.push_back(c);
     }
     if (!o->constraints.empty()) o->activeConstraint = (int)o->constraints.size() - 1;
 }
+
+// ---- el gancho de la POLILINEA de una Curve para Follow Path / Clamp To (ver g_w3dCurvePoly en
+//      W3dConstraint.h). Se registra ACA porque este archivo esta en el editor y en los juegos 3D (los
+//      unicos que tienen la clase Curve) y ya la incluye; asi Curve.cpp no se toca. Lee SOLO la
+//      teselacion evaluada (vertex/vertexSize) y las aristas de las ramas. ----
+static bool W3dCurvePolyOf(const Object* o, const float** verts, int* count, const unsigned short** edges, int* edgeCount) {
+    if (!o || const_cast<Object*>(o)->getType() != ObjectType::curve) return false;
+    const Curve* cv = (const Curve*)o;
+    if (!cv->vertex || cv->vertexSize <= 0) return false;
+    *verts = cv->vertex; *count = cv->vertexSize;
+    *edges = cv->edges.empty() ? NULL : &cv->edges[0];
+    *edgeCount = (int)cv->edges.size() / 2;
+    return true;
+}
+namespace { struct CurvePolyHookReg { CurvePolyHookReg() { g_w3dCurvePoly = W3dCurvePolyOf; } } gCurvePolyHookReg; }
 
 static void ReadClipsObject(JVal* j, Object* o);   // los "clips" del nodo (definida con las animaciones de escena)
 
@@ -3745,6 +3950,11 @@ static void JColor4(JVal* j, const char* k, float* out) {
     JVal* v = JChild(j, k, 5);
     if (v && v->list.size() >= 4) for (int i = 0; i < 4; i++) out[i] = (float)v->list[i]->num;
 }
+// un par [a, b] (la transformacion UV del material: "uvOffset", "uvScale", "uvPivot"); ausente = lo que habia
+static void JPair(JVal* j, const char* k, float* out) {
+    JVal* v = JChild(j, k, 5);
+    if (v && v->list.size() >= 2) for (int i = 0; i < 2; i++) out[i] = (float)v->list[i]->num;
+}
 // la ruta de la textura de un material YA existente: la cargada, o la que tiene ENCOLADA (la
 // carga es diferida: recien cargado, mat->texture sigue NULL).
 static std::string W3dMatTexPath(const Material* m) {
@@ -3774,6 +3984,10 @@ static bool W3dSameMaterial(const Material* v, const Material& n, const std::str
     if (v->perPixel != n.perPixel) return false;
     if (v->lightIndirect != n.lightIndirect) return false;
     if (!W3dMatAlmost(v->ior, n.ior) || !W3dMatAlmost(v->transmission, n.transmission)) return false;
+    if (!W3dMatAlmost(v->emissionStrength, n.emissionStrength) || !W3dMatAlmost(v->uvRotation, n.uvRotation)) return false;
+    for (int k = 0; k < 2; k++)
+        if (!W3dMatAlmost(v->uvOffset[k], n.uvOffset[k]) || !W3dMatAlmost(v->uvScale[k], n.uvScale[k]) ||
+            !W3dMatAlmost(v->uvPivot[k], n.uvPivot[k])) return false;
     if (v->ssr != n.ssr) return false;
     if (v->shaderOn != n.shaderOn || v->shaderFile != n.shaderFile) return false;
     for (int k = 0; k < W3D_MAPS; k++) if (v->uvMap[k] != n.uvMap[k] || v->mapWithTexture[k] != n.mapWithTexture[k]) return false;
@@ -3799,6 +4013,8 @@ static void W3dCopyMaterial(const Material& src, Material* dst) {
     dst->perPixel = src.perPixel;
     dst->lightIndirect = src.lightIndirect;
     dst->ior = src.ior; dst->transmission = src.transmission; dst->ssr = src.ssr;
+    dst->emissionStrength = src.emissionStrength; dst->uvRotation = src.uvRotation;
+    for (int k = 0; k < 2; k++) { dst->uvOffset[k] = src.uvOffset[k]; dst->uvScale[k] = src.uvScale[k]; dst->uvPivot[k] = src.uvPivot[k]; }
     if (dst->shaderFile != src.shaderFile) { dst->shaderId = 0; dst->shaderState = 0; }   // (se compila al dibujar)
     dst->shaderOn = src.shaderOn; dst->shaderFile = src.shaderFile;
     for (int k = 0; k < W3D_MAPS; k++) { dst->uvMap[k] = src.uvMap[k]; dst->mapWithTexture[k] = src.mapWithTexture[k]; }
@@ -3835,6 +4051,10 @@ static void LoadMaterials(JVal* root, const std::string& base, const std::string
         tmp.mixB         = JF(e, "mixB",          tmp.mixB);         // mezcla de texturas (textureB); ausente = 0
         tmp.ior          = JF(e, "ior",              tmp.ior);          // indice de refraccion; ausente = 1 (sin refraccion)
         tmp.transmission = JF(e, "transmission",      tmp.transmission); // lo que es vidrio (trazado); ausente = 0
+        // LA FUERZA DE LA EMISION y LA TRANSFORMACION UV (formato/material-animado.md); ausentes = el default
+        tmp.emissionStrength = JF(e, "emissionStrength", tmp.emissionStrength);
+        JPair(e, "uvOffset", tmp.uvOffset); JPair(e, "uvScale", tmp.uvScale); JPair(e, "uvPivot", tmp.uvPivot);
+        tmp.uvRotation = JF(e, "uvRotation", tmp.uvRotation);
         tmp.shaderFile   = JS(e, "shader", "");                         // el shader escrito (objects/WrittenShader.h)
         tmp.shaderOn     = JB(e, "shaderOn", false);
         // LOS MAPAS: la capa UV y numero / textura de cada uno (las texturas van dormidas, abajo)
@@ -3895,47 +4115,27 @@ static void LoadMaterials(JVal* root, const std::string& base, const std::string
         const std::string folder = W3dMeshFolderNormalize(JS(e, "folder", ""));
         // UN MATERIAL DE LIBRERIA: uno por nombre con prefijo en toda la sesion (si la libreria se vuelve a
         // registrar -otra vez vinculada- se reusa el que ya estaba: sus usuarios lo siguen nombrando)
+        Material* mat;
         if (!lib.empty()) {
             if (W3dLibMaterial(name)) continue;
-            Material* mat = new Material(name);   // (el prefijo lo aparta de los del proyecto)
+            mat = new Material(name);   // (el prefijo lo aparta de los del proyecto)
             W3dCopyMaterial(tmp, mat);
             mat->folder = folder;
             mat->lib = lib;
-            W3dLibMaterialRegister(name, mat);
-            AsleepTex dz;
-            dz.mat = mat;
-            dz.base = texPath;
-            std::string nrm = JS(e, "normalTexture", "");
-            if (!nrm.empty()) dz.normal = JsonPath(nrm, base);
-            std::string tb = JS(e, "textureB", "");
-            if (!tb.empty() && texBMigrated.empty() && tmp.toon != 0) dz.texB = JsonPath(tb, base);
-            for (int k = 0; k < W3D_MAPS; k++) dz.maps[k] = mapTexs[k];
-            JVal* jc = JChild(e, "layers", 5);
-            if (jc) for (size_t c = 0; c < jc->list.size(); c++) {
-                JVal* ce = jc->list[c]; if (!ce || ce->type != 4) continue;
-                const std::string ct = JS(ce, "texture", "");
-                if (ct.empty()) continue;
-                TexAsleepLayer cd; cd.texture = JsonPath(ct, base); cd.mix = JI(ce, "mix", 0); cd.on = JB(ce, "on", true);
-                cd.uv = JI(ce, "uv", 0);
-                cd.force = JF(ce, "force", 1.0f); cd.baked = JB(ce, "baked", false);
-                cd.maskSun = JB(ce, "sunMask", false);
-                dz.layers.push_back(cd);
+            W3dLibMaterialRegister(name, mat);   // (sus texturas despiertan cuando una malla generada por un proxy lo usa)
+        } else {
+            Material* old = FindMaterialByName(name);
+            if (old && W3dSameMaterial(old, tmp, texPath)) {
+                if (!folder.empty()) old->folder = folder;
+                gMatByName[name] = old; continue;
             }
-            if (!texBMigrated.empty()) {   // (la textura B de antes: la primera capa, Mix con su factor)
-                TexAsleepLayer cd; cd.texture = texBMigrated; cd.mix = W3D_LAYER_MIX; cd.force = factorBMigrated;
-                dz.layers.insert(dz.layers.begin(), cd);
-            }
-            TexturesSleep(dz);   // (despiertan cuando una malla generada por un proxy los usa)
-            continue;
+            mat = new Material(name);   // el ctor uniquifica: homonimo DISTINTO -> "X.001"
+            W3dCopyMaterial(tmp, mat);
+            mat->folder = folder;
+            if (old) w3dLogfW("[W3D] ya habia un material '%s' con OTRO contenido -> se creo '%s'",
+                                name.c_str(), mat->name.c_str());
+            gMatByName[name] = mat;
         }
-        Material* old = FindMaterialByName(name);
-        if (old && W3dSameMaterial(old, tmp, texPath)) {
-            if (!folder.empty()) old->folder = folder;
-            gMatByName[name] = old; continue;
-        }
-        Material* mat = new Material(name);   // el ctor uniquifica: homonimo DISTINTO -> "X.001"
-        W3dCopyMaterial(tmp, mat);
-        mat->folder = folder;
         // SUS TEXTURAS QUEDAN DORMIDAS (import_obj.h) hasta saber si alguna malla lo usa: el proyecto
         // guarda tambien los materiales HUERFANOS y no tienen por que ocupar la GPU (ni en el editor ni
         // en el juego compilado). Al terminar de armar la escena, TexturesWakeUsed manda las de
@@ -3964,9 +4164,6 @@ static void LoadMaterials(JVal* root, const std::string& base, const std::string
             dz.layers.insert(dz.layers.begin(), cd);
         }
         TexturesSleep(dz);
-        if (old) w3dLogfW("[W3D] ya habia un material '%s' con OTRO contenido -> se creo '%s'",
-                            name.c_str(), mat->name.c_str());
-        gMatByName[name] = mat;
     }
 }
 
@@ -4246,6 +4443,46 @@ static void LoadFlipbooksScene(JVal* root) {
     }
 }
 
+// las PISTAS DE MATERIAL de una animacion de escena ("materials": [{material, curves}], formato/material-animado.md).
+// El material va por NOMBRE (el del archivo: si al cargar se renombro, gMatByName dice cual quedo). Uno que no esta se
+// descarta con aviso, como un objeto que no aparecio: colgar sus curvas de otro seria animar algo que nadie eligio.
+// Devuelve cuantas pistas cargo
+static int LoadMaterialTracks(JVal* je, SceneAnimation* esc) {
+    JVal* jm = JChild(je, "materials", 5);
+    if (!jm || !esc) return 0;
+    size_t nMat = jm->list.size();
+    if (nMat > (size_t)kAnimMaxObjects) nMat = (size_t)kAnimMaxObjects;
+    int n = 0;
+    for (size_t i = 0; i < nMat; i++) {
+        JVal* jo = jm->list[i];
+        if (!jo || jo->type != 4) continue;
+        const std::string name = JS(jo, "material", "");
+        std::map<std::string, Material*>::iterator f = gMatByName.find(name);
+        Material* m = (f != gMatByName.end()) ? f->second : (name.empty() ? NULL : FindMaterialByName(name));
+        if (!m) {
+            w3dLogfW("[W3D] la animacion '%s' anima al material '%s', que no esta: sus curvas se descartan",
+                     esc->name.c_str(), name.c_str());
+            continue;
+        }
+        AnimationMaterial am;
+        am.mat = m;
+        JVal* jcur = JChild(jo, "curves", 5);
+        size_t nCur = jcur ? jcur->list.size() : 0;
+        if (nCur > (size_t)kAnimMaxCurves) nCur = (size_t)kAnimMaxCurves;
+        for (size_t c = 0; c < nCur; c++) {
+            AnimProperty ap;
+            if (!LoadCurveJson(jcur->list[c], ap) || ap.keyframes.empty()) continue;
+            if (!W3dIsMatChannel(ap.Property)) continue;   // (un canal que no es de material: no hay donde aplicarlo)
+            ap.SortKeyFrames();
+            am.Properties.push_back(ap);
+        }
+        if (am.Properties.empty()) continue;
+        esc->materials.push_back(am);
+        n++;
+    }
+    return n;
+}
+
 static void LoadAnimationsScene(JVal* root) {
     JVal* ja = JChild(root, "animations", 4);
     if (!ja) { InitSceneAnimations(); return; }   // .w3d viejo: sin bloque, abre igual
@@ -4264,6 +4501,7 @@ static void LoadAnimationsScene(JVal* root) {
         nEsc = (size_t)kAnimMaxScenes;
     }
     int lost = 0;             // curvas cuyo objeto no aparecio
+    int matTracks = 0;        // pistas de material cargadas
     std::string firstLost;
     for (size_t i = 0; i < nEsc; i++) {
         JVal* je = jes->list[i];
@@ -4296,6 +4534,7 @@ static void LoadAnimationsScene(JVal* root) {
               SceneAnimation::SkeletonTrack p; p.armature = JS(jk, "armature", ""); p.clip = JS(jk, "clip", ""); p.frame = JI(jk, "frame", 1);
               if (!p.armature.empty() && !p.clip.empty()) esc->skeletons.push_back(p);
           } }
+        matTracks += LoadMaterialTracks(je, esc);   // los MATERIALES animados (antes del corte de abajo: sin objetos igual)
         JVal* jobjs = JChild(je, "objects", 5);
         if (!jobjs) continue;
         size_t nObj = jobjs->list.size();
@@ -4363,6 +4602,9 @@ static void LoadAnimationsScene(JVal* root) {
     AnimationObjects.swap(SceneAnimations[active]->objects);
     // rango + fps PROPIOS de la animacion activa -> StartFrame/EndFrame/AnimFPS
     AnimLoadActiveRange();
+    // con materiales animados el cabezal tiene que posarlos aunque el frame sea el de antes de abrir (el material quedo
+    // con el valor de su reposo, el del frame de inicio)
+    if (matTracks > 0) W3dAnimCurvesInvalidate();
     if (lost > 0)
         W3dAvisof(true, T("%d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log"),
                   lost, W3dShortName(firstLost).c_str());
@@ -4814,6 +5056,7 @@ static void AppendAnimationsScene(JVal* root) {
         if (esc->fps < 1) esc->fps = 1;
         if (esc->fps > 120) esc->fps = 120;
         SceneAnimations.push_back(esc);
+        LoadMaterialTracks(je, esc);   // (los materiales animados: como en LoadAnimationsScene)
         JVal* jobjs = JChild(je, "objects", 5);
         if (!jobjs) continue;
         size_t nObj = jobjs->list.size();
@@ -5575,7 +5818,7 @@ void RestartScene() {
     InitSceneAnimations();
     AnimationObjects.clear();
     for (size_t i = 0; i < SceneAnimations.size(); i++)
-        if (SceneAnimations[i]) SceneAnimations[i]->objects.clear();
+        if (SceneAnimations[i]) { SceneAnimations[i]->objects.clear(); SceneAnimations[i]->materials.clear(); }   // (las pistas de MATERIAL tambien: sus materiales se liberan abajo)
     // idem las BASES del MIX DE ESCENAS (Animation.cpp): la transform de cada objeto que el mix toco,
     // guardada POR PUNTERO. Quedaban apuntando a los objetos borrados y salir del Mix (W3dMixScenesRelease)
     // les escribia encima. Se olvidan sin mover nada: esos objetos se van a borrar.

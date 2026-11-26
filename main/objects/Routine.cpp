@@ -686,6 +686,8 @@ static void PointerPose(const W3dStep& p) {
     if (k == ArrayVertices || k == ArrayNormals || k == ArrayUV) W3dUpToDatePose(m);
     if (k == ArrayVertices) m->drawnPass = g_w3dPass;   // (se dibuja este cuadro: un espejo la puede reflejar)
     const bool skin = (m->skinArmature != NULL);
+    // (la pose al dia: con la piel rigida RenderObject no deforma vertices y skinVertex podia quedar de antes)
+    if (skin && (k == ArrayVertices || k == ArrayNormals)) { extern void SkinMesh(Mesh*); SkinMesh(m); }
     { static int dbg = 0; if (k == ArrayUV && (m->name == "Wumpa_22" || m->name == "Banderines") && dbg++ < 4)
         printf("DBGUV %s comp=%u uv=%p rec=%p uv0=%f,%f rec0=%f,%f flip=%p\n", m->name.c_str(), (unsigned)m->dataComp, (void*)m->uv,
                (void*)(m->mesh ? m->mesh->uv : 0), m->uv ? m->uv[0] : -1.f, m->uv ? m->uv[1] : -1.f,

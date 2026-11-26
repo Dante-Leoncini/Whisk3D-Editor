@@ -21,6 +21,7 @@
 #include "edit/MeshEdit.h" // Separate: CompactLayers (cirugia del mesh nuevo)
 #include "objects/Camera.h"   // AnimFov: fov/ortografica de la camara (animables)
 #include "objects/Light.h"    // AnimColor: color (diffuse) de la luz (animable)
+#include "objects/Materials.h" // los canales de un MATERIAL (AnimMat*): MaterialDefault, Material::lib
 #include "objects/Armature.h" // Apply Transform sobre armature: hornear en los huesos
 #include "animation/SkeletalAnimation.h" // BakeTransformInBones
 #include "animation/VertexAnimation.h"   // curvas propias de la animacion del objeto (kind 3)
@@ -464,6 +465,102 @@ bool AnimChannelPasteKey(Object* o, int prop, int comp, int frame, const std::ve
 	return true;
 }
 
+// ============================================================================
+//  LOS CANALES DE UN MATERIAL (las pistas de material de la animacion de ESCENA activa: Animation.h)
+//  El mismo modelo que los canales de un objeto o de una luz: el campo del material es lo que se ve; el rombo de la
+//  fila pone o saca el keyframe con el valor actual; el menu de la fila inserta / borra todos / copia / pega. Un
+//  material no tiene animacion propia ni va en un clip (de esqueleto, de objeto, de jerarquia): solo en una
+//  animacion de escena, asi que con otra cosa en el timeline se avisa en vez de keyear donde no se ve.
+// ============================================================================
+static bool MatAnimEditable(Material* m, bool notify){
+	if (!m || m == MaterialDefault || !m->lib.empty()){
+		if (notify) Notify(T("This material can not be animated (default or from a library)"), true);
+		return false;
+	}
+	if (notify ? KeysInGame() : (ActiveAnimKind == 2)) return false;
+	if (ActiveAnimKind != 0 || W3dAnimIsClip(ActiveSceneAnim)){
+		if (notify) Notify(T("Materials are animated in a scene animation: choose one in the timeline"), true);
+		return false;
+	}
+	return true;
+}
+// la curva (prop, comp) del material en la escena activa; 'crear' = la arma si falta (la pista y la curva)
+static AnimProperty* MatCurve(Material* m, int prop, int comp, bool create){
+	InitSceneAnimations();
+	AnimationMaterial* t = W3dMatTrack(ActiveSceneAnim, m, create);
+	if (!t) return NULL;
+	if (create) return &ListProperty(t->Properties, prop, comp);
+	for (size_t k = 0; k < t->Properties.size(); k++)
+		if (t->Properties[k].Property == prop && t->Properties[k].component == comp) return &t->Properties[k];
+	return NULL;
+}
+// el rombo: 0 = sin animar; 1 = animado sin key en 'frame'; 2 = key en 'frame' (un color: lo dice su R)
+int AnimMatChannelState(Material* m, int prop, int comp, int frame){
+	if (!m || !MatAnimEditable(m, false)) return 0;
+	int cs[3]; W3dMatChannelComps(prop, comp, cs);
+	const AnimProperty* c = MatCurve(m, prop, cs[0], false);
+	if (!c || c->keyframes.empty()) return 0;
+	for (size_t i = 0; i < c->keyframes.size(); i++) if (c->keyframes.Frame(i) == frame) return 2;
+	return 1;
+}
+void AnimMatChannelToggle(Material* m, int prop, int comp, int frame){
+	if (!MatAnimEditable(m, true)) return;
+	const int est = AnimMatChannelState(m, prop, comp, frame);
+	int cs[3]; const int n = W3dMatChannelComps(prop, comp, cs);
+	for (int i = 0; i < n; i++){
+		if (est == 2){ AnimProperty* ap = MatCurve(m, prop, cs[i], false); if (ap) DeleteKeyframeKeepingShape(*ap, frame); }
+		else SetKeyCurve(*MatCurve(m, prop, cs[i], true), frame, W3dMatChannelGet(m, prop, cs[i]), HPlane);
+	}
+	g_redraw = true;
+}
+bool AnimMatChannelInsertKey(Material* m, int prop, int comp, int frame){
+	if (!MatAnimEditable(m, true)) return false;
+	int cs[3]; const int n = W3dMatChannelComps(prop, comp, cs);
+	for (int i = 0; i < n; i++)
+		SetKeyCurve(*MatCurve(m, prop, cs[i], true), frame, W3dMatChannelGet(m, prop, cs[i]), HPlane);   // (si habia, lo actualiza)
+	g_redraw = true;
+	return true;
+}
+bool AnimMatChannelDeleteAll(Material* m, int prop, int comp){
+	if (!MatAnimEditable(m, true)) return false;
+	int cs[3]; const int n = W3dMatChannelComps(prop, comp, cs);
+	bool something = false;
+	for (int i = 0; i < n; i++){
+		AnimProperty* ap = MatCurve(m, prop, cs[i], false);
+		if (ap && !ap->keyframes.empty()){ ap->keyframes.clear(); something = true; }
+	}
+	g_redraw = true;
+	return something;   // (el material se queda con el valor que tenia: ya no hay curva que lo mueva)
+}
+bool AnimMatChannelCopyKey(Material* m, int prop, int comp, int frame, std::vector<keyFrame>& out){
+	out.clear();
+	if (!m) return false;
+	int cs[3]; const int n = W3dMatChannelComps(prop, comp, cs);
+	for (int i = 0; i < n; i++){
+		const AnimProperty* c = MatCurve(m, prop, cs[i], false);
+		bool has = false;
+		if (c) for (size_t k = 0; k < c->keyframes.size(); k++)
+			if (c->keyframes.Frame(k) == frame){ out.push_back(c->keyframes.Key(k)); has = true; break; }
+		if (!has){ out.clear(); return false; }
+	}
+	return true;
+}
+bool AnimMatChannelPasteKey(Material* m, int prop, int comp, int frame, const std::vector<keyFrame>& in){
+	int cs[3]; const int n = W3dMatChannelComps(prop, comp, cs);
+	if ((int)in.size() != n || !MatAnimEditable(m, true)) return false;
+	for (int i = 0; i < n; i++){
+		AnimProperty& ap = *MatCurve(m, prop, cs[i], true);
+		SetKeyCurve(ap, frame, in[(size_t)i].value, HPlane);
+		for (size_t k = 0; k < ap.keyframes.size(); k++)
+			if (ap.keyframes[k].frame == frame){ keyFrame kf = in[(size_t)i]; kf.frame = frame; ap.keyframes[k] = kf; break; }
+	}
+	// el material toma el valor pegado (el cabezal no se movio: nadie mas lo aplica)
+	AnimationMaterial* t = W3dMatTrack(ActiveSceneAnim, m, false);
+	if (t) W3dApplyMaterialCurves(m, t->Properties, (float)frame);
+	g_redraw = true;
+	return true;
+}
+
 // ---- los PASOS de una RUTINA (canal AnimStep: componente = id del paso * 8 + campo) ----
 // los campos ANIMABLES de un paso: su on/off y sus numeros FIJOS (uno que nombra una memoria lo escribe lua)
 static void FieldsStep(const W3dStep& p, std::vector<int>& fields) {
@@ -761,8 +858,22 @@ static bool ApplyMixScenes(){
 	return W3dMixScenesApply(CurrentFrame, false);
 }
 
+// LAS PISTAS DE MATERIAL de la animacion de escena activa (Animation.h: AnimationMaterial). Como las curvas de objeto:
+// solo con kind 0 y solo al CAMBIAR de frame, de escena o de curvas (g_animCurvesGen): un material editado a mano entre
+// frames no se pisa. Sin pistas no cuesta nada (W3dApplyMaterialTracks mira si la lista esta vacia)
+static void ApplyMaterialTracksEditor(){
+	if (ActiveAnimKind != 0) return;
+	static int lastFrame = -999999, lastScene = -1;
+	static unsigned int lastGen = 0;
+	if (CurrentFrame == lastFrame && ActiveSceneAnim == lastScene && lastGen == g_animCurvesGen) return;
+	lastFrame = CurrentFrame; lastScene = ActiveSceneAnim; lastGen = g_animCurvesGen;
+	W3dApplyMaterialTracks(ActiveSceneAnim, (float)CurrentFrame);
+}
+
 void ApplyAnimationObjects(){
 	extern int ActiveAnimKind; extern class Mesh* ActiveAnimMesh;
+	// (los materiales van aparte de los objetos: tambien con el Mix de escenas, que solo mezcla transformaciones)
+	ApplyMaterialTracksEditor();
 	// MIX: las capas de escena mandan (sobre cualquier kind); se recalcula siempre (las capas se editan en vivo)
 	if (ApplyMixScenes()) return;
 	// kind 3 (una VERTEX/OBJETO animation en el timeline): aplica SOLO las curvas
@@ -1210,6 +1321,7 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
             l->directional = sl->directional;
             l->attConstant = sl->attConstant; l->attLinear = sl->attLinear; l->attQuadratic = sl->attQuadratic;
             l->spotCutoff = sl->spotCutoff; l->spotExponent = sl->spotExponent; l->intensity = sl->intensity; l->distance = sl->distance;
+            l->area = sl->area; l->areaShape = sl->areaShape; l->areaSizeX = sl->areaSizeX; l->areaSizeY = sl->areaSizeY;   // (la de area)
         }
         newValue = l;
     }
@@ -1264,6 +1376,9 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
     else if (src->getType() == ObjectType::hitbox) {
         newValue = HitboxDuplicate((Hitbox*)src);   // los campos propios (la lista vive en Hitbox.cpp)
     }
+    else if (src->getType() == ObjectType::curve) {
+        newValue = CurveDuplicate((Curve*)src);   // sus nodos o sus splines, su forma y su material (Curve.cpp)
+    }
     else if (src->getType() == ObjectType::lightProbe) {
         newValue = LightProbeDuplicate((LightProbe*)src);   // (la caja, la grilla y la luz horneada)
     }
@@ -1305,6 +1420,14 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
         Armature* sa = (Armature*)src;
         Armature* d = new Armature(src->Parent, src->pos);
         d->bones = sa->bones;
+        // los constraints de HUESO que apuntaban a un hueso del ORIGINAL apuntan al de la copia (como
+        // Blender): sin esto el IK de la copia seguiria al controlador del original
+        for (size_t b = 0; b < d->bones.size(); b++)
+            for (size_t k = 0; k < d->bones[b].constraints.list.size(); k++) {
+                W3dConstraint* c = d->bones[b].constraints.list[k];
+                if (c->sourceObj == (Object*)sa) { c->sourceObj = d; c->boneCache = -1; }
+                if (c->poleObj == (Object*)sa)   { c->poleObj = d; c->poleBoneCache = -1; }
+            }
         d->skinUsesBind = sa->skinUsesBind; d->skinRebuildFK = sa->skinRebuildFK;
         d->skinGltf = sa->skinGltf; d->skinAuthored = sa->skinAuthored;
         d->figureScale = sa->figureScale;

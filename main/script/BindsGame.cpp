@@ -647,6 +647,45 @@ static int LMixTexture(lua_State* L) {
     lua_pushnumber(L, cap ? cap->force : (mt ? mt->mixB : 0.0));
     return 1;
 }
+// ---- LA TRANSFORMACION UV y LA FUERZA DE LA EMISION de un MATERIAL (por nombre; formato/material-animado.md) ----
+//      setMaterialUV(material, offU, offV [, scaleU, scaleV [, rot]]): desplazamiento, escala y rotacion (grados) de la
+//      UV de la textura base y de los mapas; lo que no se pasa queda como estaba. false = no hay un material con ese
+//      nombre. getMaterialUV(material) -> offU, offV, scaleU, scaleV, rot. setEmissionStrength(material, k) /
+//      getEmissionStrength(material): la emision es emission x k (1 = la de siempre). Cambiarlas por cuadro no cuesta
+//      mas que un numero: la matriz se arma al dibujar (la pantalla con el texto que pasa, sin rutina ni curva)
+static int LSetMaterialUV(lua_State* L) {
+    Material* mt = FindMaterialByName(luaL_checkstring(L, 1));
+    if (!mt) { lua_pushboolean(L, 0); return 1; }
+    mt->uvOffset[0] = (float)luaL_optnumber(L, 2, mt->uvOffset[0]);
+    mt->uvOffset[1] = (float)luaL_optnumber(L, 3, mt->uvOffset[1]);
+    mt->uvScale[0]  = (float)luaL_optnumber(L, 4, mt->uvScale[0]);
+    mt->uvScale[1]  = (float)luaL_optnumber(L, 5, mt->uvScale[1]);
+    mt->uvRotation  = (float)luaL_optnumber(L, 6, mt->uvRotation);
+    g_redraw = true;
+    lua_pushboolean(L, 1);
+    return 1;
+}
+static int LMaterialUV(lua_State* L) {
+    const Material* mt = FindMaterialByName(luaL_checkstring(L, 1));
+    lua_pushnumber(L, mt ? mt->uvOffset[0] : 0.0);
+    lua_pushnumber(L, mt ? mt->uvOffset[1] : 0.0);
+    lua_pushnumber(L, mt ? mt->uvScale[0] : 1.0);
+    lua_pushnumber(L, mt ? mt->uvScale[1] : 1.0);
+    lua_pushnumber(L, mt ? mt->uvRotation : 0.0);
+    return 5;
+}
+static int LSetEmissionStrength(lua_State* L) {
+    Material* mt = FindMaterialByName(luaL_checkstring(L, 1));
+    if (!mt) return 0;
+    const float k = (float)luaL_checknumber(L, 2);
+    if (mt->emissionStrength != k) { mt->emissionStrength = k; g_redraw = true; }
+    return 0;
+}
+static int LEmissionStrength(lua_State* L) {
+    const Material* mt = FindMaterialByName(luaL_checkstring(L, 1));
+    lua_pushnumber(L, mt ? mt->emissionStrength : 1.0);
+    return 1;
+}
 // setFlipbook(objeto, cuadros, fps [, cols [, filas [, desfase [, ancho, alto, u0, v0]]]]):
 // convierte una Image2D en un FLIPBOOK animado por el MOTOR sobre su textura-atlas. El motor
 // avanza la celda cada frame (UpdateFlipbooks); Lua llama esto UNA vez y no toca mas la textura.
@@ -703,7 +742,14 @@ static std::map<std::string, w3dEngine::W3dSound*> gSounds;
 // cada sample lo cargaba y decodificaba EN PLENO GAMEPLAY -- los picos de
 // "Musica:10ms" del [PERF] del N95 eran eso, no el secuenciador. Con el
 // contenedor v4 montado se precargan sus entradas .wav; con proyecto de texto,
-// los .wav de sounds/ y music/. Se llama al ABRIR el proyecto.
+// los .wav de sounds/ y music/. Se llama al ABRIR el proyecto. (Y los .mp3: el mixer los decodifica igual, ver
+// W3dAudio.cpp; antes un .mp3 no se precargaba y el primer Play lo decodificaba en pleno cuadro.)
+static bool W3dIsSoundFile(const std::string& n) {
+    if (n.size() < 5) return false;
+    std::string e = n.substr(n.size() - 4);
+    for (size_t i = 0; i < e.size(); i++) if (e[i] >= 'A' && e[i] <= 'Z') e[i] = (char)(e[i] - 'A' + 'a');
+    return e == ".wav" || e == ".mp3";
+}
 void W3dSoundsPreload() {
     std::vector<std::string> paths;
     W3dStore* alm = W3dMountedStore();
@@ -711,7 +757,7 @@ void W3dSoundsPreload() {
         std::vector<std::string> ent;
         alm->List(ent);
         for (size_t i = 0; i < ent.size(); i++)
-            if (ent[i].size() > 4 && ent[i].compare(ent[i].size() - 4, 4, ".wav") == 0)
+            if (W3dIsSoundFile(ent[i]))
                 paths.push_back(ent[i]);
     } else if (!g_w3dDirProject.empty()) {
         static const char* DIRS[] = { "sounds", "music" };
@@ -721,7 +767,7 @@ void W3dSoundsPreload() {
             if (!w3dFileSystem::ListDir(dir, ents)) continue;
             for (size_t i = 0; i < ents.size(); i++) {
                 const std::string& n = ents[i].name;
-                if (!ents[i].isDir && n.size() > 4 && n.compare(n.size() - 4, 4, ".wav") == 0)
+                if (!ents[i].isDir && W3dIsSoundFile(n))
                     paths.push_back(dir + "/" + n);
             }
         }
@@ -732,7 +778,7 @@ void W3dSoundsPreload() {
             gSounds[paths[i]] = w3dEngine::W3dSoundLoad(paths[i].c_str());
             newValue++;
         }
-    if (newValue) w3dLogf("[CARGA] sonidos precargados: %d wav", newValue);
+    if (newValue) w3dLogf("[CARGA] sonidos precargados: %d (wav/mp3)", newValue);
 }
 
 // cierre del proyecto (ver BindsGame.h). W3dSoundFree corta antes las voces que lo usan.
@@ -1840,6 +1886,10 @@ void BindsGameRegister(void* Lv) {
     lua_pushcfunction(L, LSetTextureB);      lua_setglobal(L, "setTextureB");       // mezcla de texturas (material)
     lua_pushcfunction(L, LSetMixTexture); lua_setglobal(L, "setTextureMix");
     lua_pushcfunction(L, LMixTexture);    lua_setglobal(L, "getTextureMix");
+    lua_pushcfunction(L, LSetMaterialUV);       lua_setglobal(L, "setMaterialUV");        // transformacion UV (material)
+    lua_pushcfunction(L, LMaterialUV);          lua_setglobal(L, "getMaterialUV");
+    lua_pushcfunction(L, LSetEmissionStrength); lua_setglobal(L, "setEmissionStrength");  // fuerza de la emision
+    lua_pushcfunction(L, LEmissionStrength);    lua_setglobal(L, "getEmissionStrength");
     lua_pushcfunction(L, LSetOpacity); lua_setglobal(L, "setOpacity");
     lua_pushcfunction(L, LSetTint);    lua_setglobal(L, "setTint");
     lua_pushcfunction(L, LSetRot2D);    lua_setglobal(L, "setRot2D");

@@ -1,0 +1,113 @@
+# ==========================================================================
+#  LA LUZ DE AREA (Light.h: tipo 3, la "Area" de Blender): una superficie que alumbra de UN lado hacia su -Z local.
+#  Escena: un piso blanco de 12 x 12 y una lampara de area a 2 m, mirando para abajo, sin las luces ni el cubo de la
+#  escena inicial (lo que se ve es solo la de area).
+#    A) TRAZADO DE RAYOS (CPU). La cuenta de la superficie, en las unidades de una puntual de caida 1 / d^2: debajo de un
+#       cuadrado de 1 m a 2 m, 0.231 de la intensidad (58.9 de 255; una puntual daria 63.7), una elipse de 2 x 1 m 0.217
+#       (55.3), un cuadrado de 2 m a 1 m 0.435 (111). Con UN rayo lo que no tiene sombra sale limpio (la difusa es
+#       exacta: los rayos solo dicen que parte de la lampara se ve). Dada vuelta (mirando para arriba) no alumbra el piso.
+#    B) SOMBRA BLANDA: el borde de un techo entre la lampara y el piso: en el borde llega la mitad de la luz y la penumbra
+#       se abre lo que dice la geometria (con los rayos estratificados sobre la lampara).
+#    C) GUARDAR Y ABRIR: la forma y el tamanio vuelven.
+#    D) EL VIEWPORT (el GL fijo como un foco; con shaders la cuenta de la superficie por pixel): una esfera debajo de la
+#       lampara, clara arriba; con la lampara dada vuelta, apagada.
+#    E) EL TRAZADO EN LA GPU (Vulkan, si la maquina lo tiene): la misma imagen que en la CPU.
+# ==========================================================================
+window 640 480
+deselectall
+selobj Luz
+delete
+selobj Cubo
+delete
+add plane
+objscale 6 1 6
+matnew
+# (sin brillo: la difusa sola, la que se compara con la cuenta)
+matrt 0 0
+addlight
+objpos 0 2 0
+objrot -90 1 0 0
+lightarea square 1
+rtopt 1 1 16
+rtlight 0 1 0
+vpview rendered
+vporbit 0 0 0 14 -90 0
+deselectall
+# ---- A) la cuenta de la superficie ----
+rtrender 64 64 1
+rtsave /tmp/w3d_rt_area.png
+rtpixel 32 32 61 61 61 7
+rtpixel 2 2 0 0 0 8
+# (un rayo da lo mismo que 64: sin nada en el medio no hay ruido, la difusa es exacta)
+rtref
+rtlight 0 64 0
+rtrender 64 64 1
+rtdiff 8 0 16
+rtlight 0 1 0
+lightarea ellipse 2 1
+rtrender 64 64 1
+rtpixel 32 32 57 57 57 7
+lightarea square 2
+objpos 0 1 0
+rtrender 64 64 1
+rtpixel 32 32 113 113 113 9
+# (dada vuelta: alumbra para arriba, el piso no recibe nada)
+objrot 90 1 0 0
+rtrender 64 64 1
+rtpixel 32 32 0 0 0 2
+objrot -90 1 0 0
+# ---- B) la SOMBRA BLANDA: la lampara de 2 m a 3 m y un techo a 2 m que tapa todo lo de x < 0. Justo en el borde del techo
+#         (x = 0) el piso ve MEDIA lampara: la mitad de la luz (13 de 25, sin el techo); la penumbra sigue 2 m (10 pixeles)
+#         con lo que se ve de la lampara: a 0.8 m (x = 36) 17 de 22. Una puntual daria una sombra dura en x = 0 ----
+objpos 0 3 0
+rtlight 0 16 0
+rtrender 64 64 4
+rtpixel 32 32 25 25 25 4
+rtpixel 36 32 22 22 22 4
+add plane
+objscale 3 1 6
+objpos -3 2 0
+matnew
+matrt 0 0
+deselectall
+rtrender 64 64 8
+rtsave /tmp/w3d_rt_area_sombra.png
+rtpixel 32 32 13 13 13 4
+rtpixel 36 32 17 17 17 4
+rtpixel 46 32 11 11 11 3
+# ---- C) guardar y abrir ----
+selobj Light
+lightarea ellipse 1.5 0.5
+savew3d /tmp/w3d_luz_area.w3d
+openw3d /tmp/w3d_luz_area.w3d
+selobj Light
+lightarea es ellipse 1.5 0.5
+# ---- D) el viewport (sin trazar; el GL fijo la dibuja como el foco que la reemplaza, con shaders la cuenta de la
+#         superficie): una esfera debajo, lo de arriba mas claro que el costado; dada vuelta la lampara (alumbra para
+#         arriba) la esfera se apaga ----
+deselectall
+add uvsphere
+deselectall
+vpview rendered
+vporbit 0 0 0 14 -90 0
+scenepx 0.2 0.98 0.1 lighterthan 0.97 0.2 0.1 20
+vpref
+selobj Light
+objrot 90 1 0 0
+deselectall
+vpdiff 30 300
+# ---- E) LA MISMA CUENTA EN LA GPU (RTGpuShader.inc: LuzArea), si esta maquina tiene Vulkan (si no, termina aca): la
+#         misma imagen que en la CPU (la esfera, el techo y la penumbra), salvo el ruido de la penumbra ----
+selobj Light
+objrot -90 1 0 0
+deselectall
+rtgpu 0
+rtrender 64 64 16
+rtongpu no
+rtref
+rtgpu 1 skip
+rtrender 64 64 16
+rtongpu si
+rtsave /tmp/w3d_rt_area_gpu.png
+rtdiff 10 0 120
+rtpixel 46 32

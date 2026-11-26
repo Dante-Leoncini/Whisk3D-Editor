@@ -41,15 +41,23 @@ public:
     // umbrales de distancia, en unidades de mundo, ordenados de cerca a lejos
     std::vector<float> distances;
     bool onlyCameraActive; // medir desde la Camera activa (mismo flag que Culling). Default false.
+    // EL RENDER CON EL PRIMERO: en el render final (Render Image / Animation, el trazado de rayos, las sondas) se dibuja
+    // SIEMPRE el primer hijo -el mas detallado- y en el viewport el que toque por distancia (sin umbrales: el ULTIMO).
+    // Es el "Simplificar" de Blender: un personaje o un escenario completo para la foto y uno liviano (decimado, la luz
+    // horneada) para animar en un telefono en tiempo real. Default false (el LOD de siempre)
+    bool renderFirst;
 
     LOD(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
-        : Object(parent, "LOD", pos), onlyCameraActive(false), cacheVal(false), lastPicked(-1) {
+        : Object(parent, "LOD", pos), onlyCameraActive(false), renderFirst(false), cacheVal(false), lastPicked(-1) {
         for (int i = 0; i < 16; i++) cacheW[i] = 0.0f;
     }
     ObjectType getType() W3D_OVERRIDE { return ObjectType::lod; }
     void RenderChildren() W3D_OVERRIDE;
 
     int PickedChild() const; // indice del hijo a dibujar con la vista bindeada (-1 = sin hijos)
+    // el hijo que va en un render FINAL que no pasa por RenderChildren (el trazado de rayos): con renderFirst el
+    // primero, si no el de la distancia (-1 = sin hijos)
+    int RenderPick() const { return Childrens.empty() ? -1 : (renderFirst ? 0 : PickedChild()); }
     // el hijo que quedo DIBUJADO en el ultimo render (sin re-medir nada): es lo
     // que el harness necesita para asertar decisiones que solo existen DURANTE
     // el render (p.ej. la herencia de onlyCameraActive de un Culling padre).

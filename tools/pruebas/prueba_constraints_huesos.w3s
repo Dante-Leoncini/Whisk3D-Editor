@@ -1,0 +1,35 @@
+# ==========================================================================
+#  CONSTRAINTS FASE 2: EL IK, LOS CONSTRAINTS DE HUESO Y LOS TIPOS NUEVOS DE OBJETO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_constraints_huesos.w3s
+#
+#  Todo es SINTETICO (los rigs se arman en el harness: head/tail + el skin autorado),
+#  asi que no necesita ningun archivo al lado. Los comandos viven juntos en
+#  main/test/W3dScript.cpp (buscar "consik"):
+#
+#    consik        el IK: llega al target, respeta el largo de la cadena, el pole manda el
+#                  plano de la dobladura (y poleAngle lo gira), influencia 0 = el FK bit a
+#                  bit, FABRIK de 3 huesos, inalcanzable = recto, stretch, sin la punta, y un
+#                  target OBJETO que se mueve sin cambiar el frame (la firma de los targets).
+#    consbones     Copy Location/Rotation/Transforms (World y Local), Track To, Damped,
+#                  Locked, Stretch To, Limit Rotation/Location/Distance, Child Of + Set Inverse.
+#    consobjnew    los tipos nuevos de OBJETO (Copy Scale/Transforms, Track/Damped/Locked,
+#                  Limit*, Maintain Volume, Floor, Transformation, Pivot, Stretch To, Follow
+#                  Path y Clamp To sobre una Curve) y la influencia 0 = la base bit a bit.
+#    consbonesave  guardar y reabrir: cada campo vuelve y re-guardar da el MISMO archivo.
+#    consboneundo  Add/Remove/Move con Ctrl+Z/Ctrl+Y; borrar el target y el pole del IK y
+#                  deshacerlo (por serial, el puntero Y el nombre, cada uno a su lugar).
+#    consbonebake  hornear a keyframes del clip da la MISMA pose sin los constraints, y
+#                  renombrar el hueso target arrastra el subtarget de los constraints.
+#    consbonetab   la pestania 7 en Pose Mode: el stack del HUESO activo (Target + Bone, sin
+#                  "Show in Edit Mode"), y en Object Mode vuelve el del objeto.
+# ==========================================================================
+
+consik
+consbones
+consobjnew
+consbonesave /tmp/w3d_consbonesave
+consboneundo
+consbonebake
+consbonetab

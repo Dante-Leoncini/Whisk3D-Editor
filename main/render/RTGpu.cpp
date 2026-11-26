@@ -399,7 +399,7 @@ bool RTGpuLoadScene(const RTGpuScene& e) {
     if (!UploadVec(gB[BVerts], e.verts) || !UploadVec(gB[BTris], e.tris) || !UploadVec(gB[BMats], e.mats) || !UploadVec(gB[BLights], e.lights) ||
         !UploadVec(gB[BNodes], e.nodes) || !UploadVec(gB[BOrder], e.order) || !UploadVec(gB[BTexInfo], e.texInfo) || !UploadVec(gB[BTexels], e.texels)) return false;
     if (gRtx && !BuildAllAS(e)) { w3dLogfE("[rtgpu] no se pudieron armar las estructuras de aceleracion"); return false; }
-    gNLights = (int)(e.lights.size() / 20); gNNodes = (int)(e.nodes.size() / 12);
+    gNLights = (int)(e.lights.size() / 24); gNNodes = (int)(e.nodes.size() / 12);
     gTransp  = e.hasTransparent;
     gBg[0] = e.bg[0]; gBg[1] = e.bg[1]; gBg[2] = e.bg[2];
     gEnvMat = e.envMat;
@@ -410,7 +410,7 @@ bool RTGpuUpdateLights(const std::vector<float>& lights) {
     if (gState != 1) return false;
     const VkBuffer prev = gB[BLights].b;
     if (!UploadVec(gB[BLights], lights)) return false;
-    gNLights = (int)(lights.size() / 20);
+    gNLights = (int)(lights.size() / 24);
     if (gB[BLights].b != prev) gSet = VK_NULL_HANDLE;   // (crecio: es otro buffer)
     return true;
 }

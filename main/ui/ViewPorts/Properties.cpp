@@ -348,9 +348,6 @@ static void ActionMeshPartDown(){
 // nombre, para que renombrar al mismo valor no choque). Cada scope junta los punteros a sus nombres.
 // TODOS delegan en LA regla comun (base/W3dNames.h): la version vieja de aca NO pelaba el ".NNN"
 // previo y producia "Cubo.001.001", mientras Object::SetName y BoneUniqueName si lo pelaban. =====
-static std::string UniqueName(const std::string& n, std::string* excl, const std::vector<std::string*>& names){
-    return W3dUniqueNameInList(n, "Object", names, excl);
-}
 static std::string UniqMaterial(const std::string& n, std::string* excl){
     std::vector<std::string*> v; for (size_t i = 0; i < Materials.size(); i++) v.push_back(&Materials[i]->name);
     return W3dUniqueNameInList(n, "Material", v, excl);
@@ -735,14 +732,14 @@ static void SyncTextButton(Properties* p){
 static void SyncObjectName(Properties* p){
     if (!p) return;
     SyncFieldName(p->propNameObj);
-    SyncFieldName(p->propT2dName);   // los elementos 2D no muestran el tab Objeto:
-    SyncFieldName(p->propImgName);   // su Name vive arriba de su tarjeta contextual
-    SyncFieldName(p->propRectName);
-    SyncFieldName(p->propContName);
-    SyncFieldName(p->propS9Name);
-    SyncFieldName(p->propBtnName);
+    SyncFieldName(p->rowsT2d.name);   // los elementos 2D no muestran el tab Objeto:
+    SyncFieldName(p->rowsImg.name);   // su Name vive arriba de su tarjeta contextual
+    SyncFieldName(p->rowsRect.name);
+    SyncFieldName(p->rowsCont.name);
+    SyncFieldName(p->rowsS9.name);
+    SyncFieldName(p->rowsBtn.name);
     SyncFieldName(p->propExpName);
-    SyncFieldName(p->propVidName);
+    SyncFieldName(p->rowsVid.name);
     SyncFieldName(p->propUIName);
     // (la tarjeta Control ya no tiene campo Name: el nombre se edita en el outliner
     //  y en la pestania Objeto, que es donde vive para TODOS los demas tipos)
@@ -866,6 +863,150 @@ static void ActionPhysRemove(){
 static std::string TextureName(Texture* t);
 static std::string FileName(const std::string& path);
 static void OpenMenuUnderButton(PopupMenu* menu, Button* button);
+// ============================================================================
+//  la tarjeta "Curve" (pestania 2 de una Curve): la FORMA -resolucion de las Bezier, el tubo (bevel), la
+//  cinta (extrude), las tapas-, su MATERIAL y "Convert to Mesh". En Edit Mode sobre una curva de splines,
+//  ademas el RADIO y el GIRO (tilt) de los puntos elegidos. Vive aca (y no como tarjeta declarada) por el
+//  desplegable del material, el boton y los enteros (lados del tubo, resolucion).
+// ============================================================================
+bool LayoutConvertCurveToMesh();      // (LayoutInput.cpp: Object > Convert to Mesh)
+bool LayoutCurveBezSync();            // (LayoutInput.cpp: el proxy de edicion -> las splines)
+Curve* LayoutCurveInEdit();
+// las filas son de CADA panel (puede haber varios Properties abiertos y cada uno libera sus tarjetas al cerrarse):
+// guardarlas en estaticos compartidos dejaba punteros a filas ya liberadas del panel anterior
+struct PropsCurveRows {
+    GroupPropertie* card;
+    PropFloat *res, *bevel, *bevelRes, *extrude, *radius, *tilt;
+    PropBool* caps;
+    PropButton *mat, *convert;
+};
+static std::map<Properties*, PropsCurveRows> gCvRows;
+// las copias de lo que el panel muestra distinto de como se guarda (los puntos elegidos; el giro en grados)
+static float gCvRadiusVal = 1.0f, gCvTiltDeg = 0.0f;
+static Curve* PropsCurveActive() {
+    return (ActiveObj && ActiveObj->getType() == ObjectType::curve) ? (Curve*)ActiveObj : NULL;
+}
+// la forma cambio: la geometria se rehace sola (Curve::UpdateGeometry compara); la RESOLUCION es de la
+// teselacion, asi que esa si hay que rehacerla
+static void PropsCurveShape() { W3dTouchedChanges(); g_redraw = true; }
+static void PropsCurveRes() {
+    Curve* cv = PropsCurveActive();
+    if (cv && cv->HasSplines()) { if (LayoutCurveInEdit() == cv) LayoutCurveBezSync(); cv->Tessellate(true); }
+    PropsCurveShape();
+}
+// radio / giro: a TODOS los puntos elegidos (el valor que se ve es el del primero)
+static void PropsCurvePointsApply(bool radius) {
+    Curve* cv = PropsCurveActive();
+    if (!cv || LayoutCurveInEdit() != cv || !cv->HasSplines()) return;
+    LayoutCurveBezSync();
+    for (size_t s = 0; s < cv->splines.size(); s++)
+        for (size_t i = 0; i < cv->splines[s].points.size(); i++) {
+            CurvePoint& q = cv->splines[s].points[i];
+            if (!(q.sel & W3dCurveSelP)) continue;
+            if (radius) q.radius = gCvRadiusVal < 0.0f ? 0.0f : gCvRadiusVal;
+            else q.tilt = gCvTiltDeg * 3.14159265f / 180.0f;
+        }
+    cv->Tessellate(true);
+    PropsCurveShape();
+}
+static void PropsCurveRadius() { PropsCurvePointsApply(true); }
+static void PropsCurveTilt()   { PropsCurvePointsApply(false); }
+// el MATERIAL: ninguno (el por defecto), uno del proyecto o uno nuevo
+static PopupMenu* gCvMatMenu = NULL;
+static std::vector<Material*> gCvMatList;
+static void PropsCurveMatPicked(int id) {
+    Curve* cv = PropsCurveActive();
+    if (!cv) return;
+    if (id == 0) cv->material = NULL;
+    else if (id == 1) cv->material = FactoryMaterial(new Material(FreeMaterialName()));
+    else if (id - 2 >= 0 && id - 2 < (int)gCvMatList.size()) cv->material = gCvMatList[(size_t)(id - 2)];
+    PropsCurveShape();
+}
+static void PropsCurveMatMenu() {
+    PropButton* b = PropButton::running;   // (la fila de ESTE panel que se toco)
+    if (!b) return;
+    Curve* cv = PropsCurveActive();
+    if (!gCvMatMenu) { gCvMatMenu = new PopupMenu(); gCvMatMenu->action = PropsCurveMatPicked; }
+    gCvMatMenu->Clear();
+    gCvMatMenu->title = T("Material");
+    gCvMatMenu->Add(T("Default"), 0)->green = (cv && !cv->material);
+    gCvMatMenu->Add(T("New Material"), 1, IconType::material);
+    gCvMatList.clear();
+    for (size_t i = (size_t)MaterialsBase(); i < Materials.size(); i++) {
+        Material* mt = Materials[i];
+        if (!mt || mt == MaterialDefault) continue;
+        gCvMatList.push_back(mt);
+        gCvMatMenu->Add(mt->name, (int)gCvMatList.size() + 1)->green = (cv && cv->material == mt);
+    }
+    OpenMenuUnderButton(gCvMatMenu, b->button);
+}
+static void PropsCurveConvert() { LayoutConvertCurveToMesh(); }
+static PropFloat* PropsCurveFloat(GroupPropertie* card, const char* name, const char* unit, float mn, float mx, float fine,
+                                  float thick, float drag, bool integer, void (*change)()) {
+    PropFloat* f = new PropFloat(T(name), unit);
+    f->SetRange(mn, mx);
+    f->fineStep = fine; f->thickStep = thick; f->dragStep = drag;
+    f->integer = integer;
+    f->onChange = change;
+    card->properties.push_back(f);
+    return f;
+}
+static void PropsCurveBuild(Properties* p) {
+    PropsCurveRows r;
+    r.card = new GroupPropertie(T("Curve"));
+    r.res      = PropsCurveFloat(r.card, "Resolution", "", 1.0f, 256.0f, 1.0f, 4.0f, 0.1f, true, PropsCurveRes);
+    r.bevel    = PropsCurveFloat(r.card, "Bevel Depth", "m", 0.0f, 100000.0f, 0.01f, 0.1f, 0.002f, false, PropsCurveShape);
+    r.bevelRes = PropsCurveFloat(r.card, "Bevel Resolution", "", 0.0f, 31.0f, 1.0f, 4.0f, 0.1f, true, PropsCurveShape);
+    r.extrude  = PropsCurveFloat(r.card, "Extrude", "m", 0.0f, 100000.0f, 0.01f, 0.1f, 0.002f, false, PropsCurveShape);
+    r.caps = new PropBool(T("Fill Caps"));
+    r.caps->onChange = PropsCurveShape;
+    r.card->properties.push_back(r.caps);
+    r.mat = new PropButton(T("Material"));
+    r.mat->withLabel = true; r.mat->inColumn = true;
+    r.mat->button->dropdown = true;
+    r.mat->action = PropsCurveMatMenu;
+    r.card->properties.push_back(r.mat);
+    r.radius = PropsCurveFloat(r.card, "Point Radius", "", 0.0f, 1000.0f, 0.1f, 1.0f, 0.01f, false, PropsCurveRadius);
+    r.tilt   = PropsCurveFloat(r.card, "Point Tilt", "\xc2\xb0", -36000.0f, 36000.0f, 5.0f, 45.0f, 0.5f, false, PropsCurveTilt);
+    r.convert = new PropButton(T("Convert to Mesh"), IconType::mesh);
+    r.convert->action = PropsCurveConvert;
+    r.card->properties.push_back(r.convert);
+    p->GroupProperties.push_back(r.card);
+    gCvRows[p] = r;   // (un panel nuevo en la direccion de uno cerrado pisa la entrada vieja: se arma antes de usarse)
+}
+static void PropsCurveBindF(PropFloat* f, float* v) { if (f && f->value != v) { f->value = v; PropsLayoutDirty(); } }
+static void PropsCurveUpdate(Properties* p, bool visible) {
+    std::map<Properties*, PropsCurveRows>::iterator it = gCvRows.find(p);
+    if (it == gCvRows.end()) return;
+    PropsCurveRows& r = it->second;
+    Curve* cv = visible ? PropsCurveActive() : NULL;
+    if (r.card->visible != (cv != NULL)) { r.card->visible = (cv != NULL); PropsLayoutDirty(); }
+    PropsCurveBindF(r.res, (cv && cv->HasSplines()) ? &cv->resolution : NULL);   // (la resolucion es de las Bezier)
+    PropsCurveBindF(r.bevel, cv ? &cv->bevelDepth : NULL);
+    PropsCurveBindF(r.bevelRes, (cv && cv->bevelDepth > 0.0f) ? &cv->bevelResolution : NULL);
+    PropsCurveBindF(r.extrude, cv ? &cv->extrude : NULL);
+    { bool* v = (cv && cv->bevelDepth > 0.0f) ? &cv->fillCaps : NULL; if (r.caps->value != v) { r.caps->value = v; PropsLayoutDirty(); } }
+    {
+        const bool hide = !cv || (cv->bevelDepth <= 0.0f && cv->extrude <= 0.0f);   // (sin forma no hay superficie que pintar)
+        if (r.mat->hidden != hide) { r.mat->hidden = hide; PropsLayoutDirty(); }
+        const std::string txt = (cv && cv->material) ? cv->material->name : std::string(T("Default"));
+        if (r.mat->button->text != txt) { r.mat->button->text = txt; g_redraw = true; }
+    }
+    // los puntos elegidos (solo editando las splines de ESTA curva)
+    CurvePoint* first = NULL;
+    if (cv && LayoutCurveInEdit() == cv && cv->HasSplines())
+        for (size_t s = 0; s < cv->splines.size() && !first; s++)
+            for (size_t i = 0; i < cv->splines[s].points.size(); i++)
+                if (cv->splines[s].points[i].sel & W3dCurveSelP) { first = &cv->splines[s].points[i]; break; }
+    if (first) {
+        if (g_propFloatEditing != r.radius) gCvRadiusVal = first->radius;
+        if (g_propFloatEditing != r.tilt) gCvTiltDeg = first->tilt * 180.0f / 3.14159265f;
+    }
+    PropsCurveBindF(r.radius, first ? &gCvRadiusVal : NULL);
+    PropsCurveBindF(r.tilt, first ? &gCvTiltDeg : NULL);
+    { const bool hide = !cv || InteractionMode == EditMode; if (r.convert->hidden != hide) { r.convert->hidden = hide; PropsLayoutDirty(); } }
+}
+
 // tarjeta HITBOX (ViewPorts/PropsHitbox.cpp)
 void PropsHitboxBuild(Properties* p);
 void PropsHitboxUpdate(Properties* p, bool visible);
@@ -1261,6 +1402,19 @@ static PropButton* MapButton(Properties* p, int k) {
     return p->propMap[k];
 }
 static bool MaterialEditableUI(Material* m) { return m && m != MaterialDefault && m->lib.empty(); }
+// LA FUERZA DE LA EMISION y LA TRANSFORMACION UV del material (formato/material-animado.md): filas de la tarjeta
+// Material enlazadas DIRECTO a sus campos (como Transmission). gPropMatUV: desplazamiento U/V, escala U/V, rotacion y
+// pivote U/V. Las animables llevan su rombo (canales AnimMat*)
+static PropFloat* gPropMatEmitK = NULL;
+static PropLabel* gPropMatUVTitle = NULL;
+static PropFloat* gPropMatUV[7] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+// los canales de un MATERIAL en la animacion de escena activa (objects/ObjectMode.cpp)
+extern int  AnimMatChannelState(Material* m, int prop, int comp, int frame);
+extern void AnimMatChannelToggle(Material* m, int prop, int comp, int frame);
+extern bool AnimMatChannelInsertKey(Material* m, int prop, int comp, int frame);
+extern bool AnimMatChannelDeleteAll(Material* m, int prop, int comp);
+extern bool AnimMatChannelCopyKey(Material* m, int prop, int comp, int frame, std::vector<keyFrame>& out);
+extern bool AnimMatChannelPasteKey(Material* m, int prop, int comp, int frame, const std::vector<keyFrame>& in);
 // el NUMERO de un mapa de valor (la rugosidad, el metalico, el alfa; la emision es un color)
 static float* MapValue(Material* m, int k) {
     if (!m) return NULL;
@@ -1288,11 +1442,6 @@ static bool NumMapRead(const std::string& t, float& out) {
     if (!any) return false;
     out = (float)(ent + frac / div);
     return true;
-}
-static std::string ColorHex(const float* c) {
-    char b[16];
-    sprintf(b, "#%02X%02X%02X", (int)(c[0] * 255.0f + 0.5f) & 255, (int)(c[1] * 255.0f + 0.5f) & 255, (int)(c[2] * 255.0f + 0.5f) & 255);
-    return b;
 }
 // ---- el NUMERO en el lugar: el boton se vuelve un campo; al soltar el foco (Enter, click afuera) se aplica, con undo
 static TextField g_mapNum;
@@ -1459,29 +1608,6 @@ static void SetUVPersonalWithUndo(Mesh* m, Material* mat, int k, const std::stri
     UndoExternal f; f.apply = UndoUVPersonalApply; f.unlink = UndoUVPersonalUnlink; f.free = UndoUVPersonalFree;
     UndoPushExternal(f, u);
     W3dTouchedChanges();
-}
-// la UV del mapa (el boton chico con la malla). Arriba, el INDICE (del material, compartido: el de siempre); abajo de
-// la linea, los UV de ESTE objeto por nombre (PERSONALIZADO: solo este objeto, el boton se pone amarillo)
-enum { UVMAPA_PERSONAL = 100 };
-static void ActionUVPickedMap(int id) {
-    Material* mat = ActiveMaterialUI();
-    Mesh* m = ActiveMeshUI();
-    const int k = gMapMenu;
-    if (!MaterialEditableUI(mat) || k < 0 || k >= W3D_MAPS || id < 0) return;
-    if (id >= UVMAPA_PERSONAL) {   // un UV de este objeto, por nombre
-        const int j = id - UVMAPA_PERSONAL;
-        if (!m || j >= (int)m->uvMaps.size() || !m->uvMaps[(size_t)j]) return;
-        SetUVPersonalWithUndo(m, mat, k, m->uvMaps[(size_t)j]->name);
-    } else {                       // el INDICE (y este objeto vuelve a usarlo)
-        UndoGroupStart();
-        if (m) SetUVPersonalWithUndo(m, mat, k, std::string());
-        UndoMaterialModStart(mat);
-        mat->uvMap[k] = id;
-        UndoMaterialModCommit();
-        UndoGroupSequentialEnd();
-    }
-    RTInvalidate();
-    RebindMaterialMeshPart();
 }
 static std::string LayerNameUV(int k);
 static Mesh* ActiveMeshUI();
@@ -2370,7 +2496,19 @@ static Object* ObjConstraintsUI(){
     if (!ActiveObj) return NULL;
     return TypeNoTransform3D((int)ActiveObj->getType()) ? NULL : ActiveObj;
 }
+// MODO HUESO: con un armature en POSE MODE y un hueso activo, la pestania muestra el stack de ESE hueso
+// (los "Bone Constraints" de Blender) con las MISMAS dos tarjetas. NULL = el stack del objeto, como siempre.
+static Armature* BoneConsArmUI(){
+    Object* o = ObjConstraintsUI();
+    if (!o || o->getType() != ObjectType::armature || InteractionMode != PoseMode) return NULL;
+    Armature* a = (Armature*)o;
+    return (a->activeBone >= 0 && a->activeBone < (int)a->bones.size()) ? a : NULL;
+}
 static W3dConstraint* ConstraintActiveUI(){
+    if (Armature* a = BoneConsArmUI()) {
+        W3dBoneConstraints& bc = a->bones[a->activeBone].constraints;
+        return (bc.active >= 0 && bc.active < (int)bc.list.size()) ? bc.list[bc.active] : NULL;
+    }
     Object* o = ObjConstraintsUI(); if (!o) return NULL;
     if (o->activeConstraint < 0 || o->activeConstraint >= (int)o->constraints.size()) return NULL;
     return o->constraints[o->activeConstraint];
@@ -2380,14 +2518,16 @@ static W3dConstraint* ConstraintActiveUI(){
 static void SelInListConstraint(){
     if (!PropsActive || !PropsActive->propListConstraints) return;
     Object* o = ObjConstraintsUI(); if (!o) return;
-    PropsActive->propListConstraints->selectIndex = o->activeConstraint;
+    Armature* ba = BoneConsArmUI();
+    PropsActive->propListConstraints->selectIndex = ba ? ba->ActiveBoneConstraint() : o->activeConstraint;
     PropsActive->propListConstraints->FitWindow();
     g_redraw = true;
 }
 static PopupMenu* MenuAddConstraint = NULL;
 static void ActionAddPickedConstraint(int id){
     Object* o = ObjConstraintsUI(); if (!o) return;
-    UndoConstraintAdd(o, id); // id = W3dConstraintType. Ctrl+Z: puerta unica (Undo.h)
+    if (Armature* ba = BoneConsArmUI()) UndoBoneConstraintAdd(ba, ba->activeBone, id);   // el stack del HUESO
+    else UndoConstraintAdd(o, id); // id = W3dConstraintType. Ctrl+Z: puerta unica (Undo.h)
     SelInListConstraint();
     PropertiesLayoutDirty = true;   // re-layout (aparecen Remove / Move / la 2da tarjeta)
 }
@@ -2396,50 +2536,77 @@ static void ActionMenuAddConstraint(){
     if (!MenuAddConstraint){
         MenuAddConstraint = new PopupMenu();
         MenuAddConstraint->action = ActionAddPickedConstraint;
-        // los nombres de los tipos NO se traducen: son los MISMOS que van al .w3d y a la lista
-        // (W3dConstraintTypeName, Core), y el nombre por defecto de la entrada sale de ahi.
-        MenuAddConstraint->Add(W3dConstraintTypeName(W3dConstraintType::CopyLocation), W3dConstraintType::CopyLocation, (int)IconType::constraint);
-        MenuAddConstraint->Add(W3dConstraintTypeName(W3dConstraintType::CopyRotation), W3dConstraintType::CopyRotation, (int)IconType::constraint);
-        MenuAddConstraint->Add(W3dConstraintTypeName(W3dConstraintType::Billboard),    W3dConstraintType::Billboard,    (int)IconType::constraint);
-        MenuAddConstraint->Add(W3dConstraintTypeName(W3dConstraintType::ChildOf),      W3dConstraintType::ChildOf,      (int)IconType::constraint);
+    }
+    // se rearma CADA vez: lo que se puede agregar depende del DUENO (un hueso no tiene Billboard -su pose
+    // no depende de la vista- y el IK es solo de huesos). Los nombres de los tipos NO se traducen: son los
+    // MISMOS que van al .w3d y a la lista (W3dConstraintTypeName, Core).
+    MenuAddConstraint->Clear();
+    {
+        const bool bone = (BoneConsArmUI() != NULL);
+        // el orden del menu: el de Blender (Motion Tracking / Transform / Tracking / Relationship), con los
+        // tipos de la fase 1 primero porque son los que ya conoce el dueno
+        static const int order[] = {
+            W3dConstraintType::IK, W3dConstraintType::CopyLocation, W3dConstraintType::CopyRotation,
+            W3dConstraintType::CopyScale, W3dConstraintType::CopyTransforms, W3dConstraintType::Billboard,
+            W3dConstraintType::ChildOf, W3dConstraintType::TrackTo, W3dConstraintType::DampedTrack,
+            W3dConstraintType::LockedTrack, W3dConstraintType::StretchTo, W3dConstraintType::LimitLocation,
+            W3dConstraintType::LimitRotation, W3dConstraintType::LimitScale, W3dConstraintType::LimitDistance,
+            W3dConstraintType::MaintainVolume, W3dConstraintType::Transformation, W3dConstraintType::Floor,
+            W3dConstraintType::Pivot, W3dConstraintType::FollowPath, W3dConstraintType::ClampTo };
+        for (size_t k = 0; k < sizeof(order) / sizeof(order[0]); k++) {
+            const int t = order[k];
+            if (bone ? !W3dConstraintTypeForBone(t) : !W3dConstraintTypeForObject(t)) continue;
+            MenuAddConstraint->Add(W3dConstraintTypeName(t), t, (int)IconType::constraint);
+        }
     }
     if (PropsActive->propRowConstraint && !PropsActive->propRowConstraint->buttons.empty())
         OpenMenuUnderButton(MenuAddConstraint, PropsActive->propRowConstraint->buttons[0]); // el boton "Add"
 }
 static void ActionRemoveConstraint(){
     Object* o = ObjConstraintsUI(); if (!o) return;
-    UndoConstraintRemove(o); // Ctrl+Z: el constraint NO se libera, lo adopta el paso de undo (Undo.h)
+    if (Armature* ba = BoneConsArmUI()) UndoBoneConstraintRemove(ba, ba->activeBone);
+    else UndoConstraintRemove(o); // Ctrl+Z: el constraint NO se libera, lo adopta el paso de undo (Undo.h)
     SelInListConstraint();
     PropertiesLayoutDirty = true;
 }
 static void ActionConstraintUp(){
     Object* o = ObjConstraintsUI(); if (!o) return;
-    UndoConstraintMove(o, -1); // sube en el stack (el orden importa: el de abajo pisa al de arriba)
+    if (Armature* ba = BoneConsArmUI()) UndoBoneConstraintMove(ba, ba->activeBone, -1);
+    else UndoConstraintMove(o, -1); // sube en el stack (el orden importa: el de abajo pisa al de arriba)
     SelInListConstraint();
     PropertiesLayoutDirty = true;
 }
 static void ActionConstraintDown(){
     Object* o = ObjConstraintsUI(); if (!o) return;
-    UndoConstraintMove(o, +1);
+    if (Armature* ba = BoneConsArmUI()) UndoBoneConstraintMove(ba, ba->activeBone, +1);
+    else UndoConstraintMove(o, +1);
     SelInListConstraint();
     PropertiesLayoutDirty = true;
 }
 // un parametro del constraint cambio (checkbox / influencia): NO hay nada que regenerar -- se
 // evalua al dibujar, POR VISTA. Solo hay que redibujar.
-static void ActionConstraintParamChanged(){ g_redraw = true; }
+// Los de HUESO si cachean: la pose se recalcula por frame, asi que hay que avisarle al armature.
+static void ActionConstraintParamChanged(){
+    if (Armature* ba = BoneConsArmUI()) ba->poseDirty = true;
+    g_redraw = true;
+}
 
 // ---- "Source": los objetos de la escena + la opcion "la vista" (la camara que esta dibujando).
 // EXCLUYE al propio objeto y a TODOS sus descendientes: es la 1ra barrera contra ciclos (la
 // segunda, la de verdad, es la guardia de reentrada del evaluador). Saltear el subarbol entero
 // es lo que saca a los descendientes: al no bajar por el objeto excluido, sus hijos no entran. ----
 static std::vector<Object*> gConstraintSourceCand;   // id - 2 -> objeto (0 = None, 1 = la vista)
-static void CollectSourcesWith(Object* node, Object* exclude){
+// 'onlyCurves': Follow Path / Clamp To solo tienen sentido con una Curve de fuente.
+// Un constraint de HUESO no excluye a nadie (exclude = NULL): su fuente MAS comun es el propio armature
+// (un hueso controlador), y los ciclos los corta la guardia de reentrada de EvaluatePoseSkeleton.
+static void CollectSourcesWith(Object* node, Object* exclude, bool onlyCurves = false){
     if (!node) return;
     for (size_t i = 0; i < node->Childrens.size(); i++){
         Object* c = node->Childrens[i];
         if (c == exclude) continue;   // el propio objeto Y su subarbol (no se recursa adentro)
-        if (c->getType() != ObjectType::collection) gConstraintSourceCand.push_back(c);
-        CollectSourcesWith(c, exclude);
+        if (c->getType() != ObjectType::collection && (!onlyCurves || c->getType() == ObjectType::curve))
+            gConstraintSourceCand.push_back(c);
+        CollectSourcesWith(c, exclude, onlyCurves);
     }
 }
 // gConstraintSourceCand sobrevive ENTRE FRAMES (se llena al abrir el menu y se lee al elegir una
@@ -2490,9 +2657,15 @@ static void ActionMenuConstraintSource(){
     MenuConstraintSource->Clear();
     MenuConstraintSource->title = T("Source");
     MenuConstraintSource->Add(T("None"), 0);
-    if (ConstraintActiveUI()->type != W3dConstraintType::ChildOf)          // Child Of: la vista no es un padre posible
+    const int ty = ConstraintActiveUI()->type;
+    const bool bone = (BoneConsArmUI() != NULL);
+    // la vista: solo Copy Location / Rotation de un OBJETO (un Child Of no tiene un padre "vista", y la pose
+    // de un hueso no depende de la vista)
+    if (!bone && (ty == W3dConstraintType::CopyLocation || ty == W3dConstraintType::CopyRotation))
         MenuConstraintSource->Add(T("View"), 1, (int)IconType::camera); // la camara que esta dibujando
-    gConstraintSourceCand.clear(); CollectSourcesWith(SceneCollection, o);
+    gConstraintSourceCand.clear();
+    CollectSourcesWith(SceneCollection, bone ? NULL : o,
+                       ty == W3dConstraintType::FollowPath || ty == W3dConstraintType::ClampTo);
     for (size_t i = 0; i < gConstraintSourceCand.size(); i++)
         MenuConstraintSource->Add(gConstraintSourceCand[i]->name, 2 + (int)i, (int)ObjectIcon(gConstraintSourceCand[i]));
     OpenMenuUnderButton(MenuConstraintSource, PropsActive->propConstraintSource->button);
@@ -2542,12 +2715,410 @@ static void ActionMenuConstraintBone(){
 }
 static void ActionConstraintSetInverse(){
     W3dConstraint* c = ConstraintActiveUI(); Object* o = ObjConstraintsUI();
+    if (Armature* ba = BoneConsArmUI()) {
+        // HUESO: mundo' = target * inversa * pose -> la inversa del target (con lo NO heredado sacado), asi el
+        // hueso queda donde esta en el momento de fijarla
+        Matrix4 T, iT;
+        if (c && W3dBoneConstraintTarget(ba, c, T)) {
+            W3dChildOfMaskMatrix(c, T);
+            if (Matrix4::InvertAffine(T, iT)) { c->inverse = iT; ActionConstraintParamChanged(); }
+        }
+        return;
+    }
     if (c && o && W3dChildOfSetInverse(o, c)) ActionConstraintParamChanged();
 }
 static void ActionConstraintClearInverse(){
     W3dConstraint* c = ConstraintActiveUI(); if (!c) return;
     c->inverse.Identity();
     ActionConstraintParamChanged();
+}
+// ============================================================================
+//  LAS FILAS DE LOS TIPOS DE LA FASE 2 (Copy Scale .. IK) + EL BAKE DE LOS HUESOS
+//
+//  Viven en un struct propio de cada panel (Properties::consUI) y no como miembros sueltos: son ~90
+//  filas y agregarlas a Properties.h recompilaria medio editor por cada una. Mismo idioma que el resto
+//  de la tarjeta: se crean UNA vez en BuildGroups y cada frame se BINDEAN al constraint elegido; ocultar
+//  es value = NULL (PropFloat/PropBool) u hidden = true (PropButton).
+//  Los ENUMS (espacios, ejes, modos) son desplegables con UNA accion compartida (ActionConsEnumMenu, que
+//  sabe que fila la llamo por PropButton::running) y una tabla de opciones por campo.
+//  LOS EJES: un OBJETO se muestra en Z-arriba como el resto del panel (la "Y" es el eje z interno, ver
+//  propConstraintAxisX); un HUESO no: sus ejes son los de su MARCO (+Y a lo largo del hueso, como Blender).
+// ============================================================================
+enum { CE_OwnerSpace, CE_TargetSpace, CE_Mix, CE_Track, CE_Up, CE_Lock, CE_VolumeMode, CE_Keep, CE_DistMode,
+       CE_FreeAxis, CE_VolMode, CE_MapFrom, CE_MapTo, CE_MapX, CE_MapY, CE_MapZ, CE_PivotAxis, CE_ClampAxis,
+       CE_COUNT };
+struct W3dConsUI {
+    PropButton* en[CE_COUNT];
+    PropFloat *headTail, *power, *restLength, *bulge, *distance, *volume, *floorOffset;
+    PropFloat *offsetFactor, *pathOffset, *pathDuration, *poleAngle, *chainLength, *iterations;
+    float chainF, iterF;   // los int del constraint, vistos como float por PropFloat (sync por frame)
+    PropBool  *inv[3], *offset, *scaleAdd, *targetUp, *useRotation, *extrapolate, *pivotAbs;
+    PropBool  *fixedPosition, *followCurve, *cyclic, *useTail, *stretch;
+    PropBool  *useMin[3], *useMax[3];
+    PropFloat *vmin[3], *vmax[3], *fromMin[3], *fromMax[3], *toMin[3], *toMax[3], *pivot[3];
+    PropButton *pole, *poleBone;
+    PropButtonRow* bakeRow;   // tarjeta 1, solo en modo hueso
+    PropBool* bakeClear;
+    bool bakeClearV;
+};
+// el nombre de un eje: internos (hueso) o en Z-arriba (objeto: el panel cruza Y<->Z)
+static const char* ConsAxisLabel(int axis6, bool bone){
+    static const char* const raw[6]  = { "X", "Y", "Z", "-X", "-Y", "-Z" };
+    static const char* const zup[6]  = { "X", "Z", "Y", "-X", "-Z", "-Y" };
+    return (axis6 >= 0 && axis6 < 6) ? (bone ? raw[axis6] : zup[axis6]) : "?";
+}
+// las opciones de un campo enum: (texto, valor). Devuelve cuantas.
+static int ConsEnumOptions(int f, bool bone, const char** txt, int* val){
+    int n = 0;
+    #define OPT(t, v) { txt[n] = (t); val[n] = (v); n++; }
+    switch (f) {
+        case CE_OwnerSpace: case CE_TargetSpace:
+            // (cortos a proposito: el panel es angosto y en el N95 mas)
+            OPT(T("World"), W3dConstraintSpace::World); OPT(T("Local"), W3dConstraintSpace::Local);
+            if (bone) OPT(T("Pose"), W3dConstraintSpace::Pose);
+            break;
+        case CE_Mix:
+            OPT(T("Replace"), 0); OPT(T("Add"), 1); OPT(T("Before Original"), 2); OPT(T("After Original"), 3); break;
+        case CE_Track: for (int k = 0; k < 6; k++) OPT(ConsAxisLabel(k, bone), k); break;
+        case CE_Up: case CE_Lock: case CE_FreeAxis: case CE_MapX: case CE_MapY: case CE_MapZ:
+            for (int k = 0; k < 3; k++) OPT(ConsAxisLabel(k, bone), k);
+            break;
+        case CE_VolumeMode: OPT("XZ", 0); OPT("X", 1); OPT("Z", 2); OPT(T("None"), 3); break;
+        case CE_Keep: OPT(T("Plane X"), 0); OPT(T("Plane Z"), 1); OPT(T("Swing"), 2); break;
+        case CE_DistMode: OPT(T("Inside"), 0); OPT(T("Outside"), 1); OPT(T("On Surface"), 2); break;
+        case CE_VolMode: OPT(T("Strict"), 0); OPT(T("Uniform"), 1); OPT(T("Single Axis"), 2); break;
+        case CE_MapFrom: case CE_MapTo: OPT(T("Location"), 0); OPT(T("Rotation"), 1); OPT(T("Scale"), 2); break;
+        case CE_PivotAxis:
+            OPT(T("Always"), -1);
+            for (int k = 0; k < 6; k++) OPT(ConsAxisLabel(k < 3 ? k + 3 : k - 3, bone), k);   // 0-2 = "-X".., 3-5 = "X"..
+            break;
+        case CE_ClampAxis: OPT(T("Auto"), 0); for (int k = 0; k < 3; k++) OPT(ConsAxisLabel(k, bone), k + 1); break;
+    }
+    #undef OPT
+    return n;
+}
+// el int del constraint detras de cada campo (MapX/Y/Z: el eje del target que maneja ese eje del dueno,
+// con el cruce Z-arriba de un objeto)
+static int* ConsEnumPtr(W3dConstraint* c, int f, bool bone){
+    switch (f) {
+        case CE_OwnerSpace: return &c->ownerSpace;   case CE_TargetSpace: return &c->targetSpace;
+        case CE_Mix: return &c->mixMode;             case CE_Track: return &c->trackAxis;
+        case CE_Up: return &c->upAxis;               case CE_Lock: return &c->lockAxis;
+        case CE_VolumeMode: return &c->volumeMode;   case CE_Keep: return &c->keepAxis;
+        case CE_DistMode: return &c->distMode;       case CE_FreeAxis: return &c->freeAxis;
+        case CE_VolMode: return &c->volMode;         case CE_MapFrom: return &c->mapFrom;
+        case CE_MapTo: return &c->mapTo;             case CE_PivotAxis: return &c->pivotRotAxis;
+        case CE_ClampAxis: return &c->clampAxis;
+        case CE_MapX: return &c->mapAxis[0];
+        case CE_MapY: return &c->mapAxis[bone ? 1 : 2];
+        case CE_MapZ: return &c->mapAxis[bone ? 2 : 1];
+    }
+    return NULL;
+}
+static int gConsEnumField = -1;
+static PopupMenu* MenuConsEnum = NULL;
+static void ActionConsEnumPicked(int id){
+    W3dConstraint* c = ConstraintActiveUI(); if (!c || gConsEnumField < 0) return;
+    int* v = ConsEnumPtr(c, gConsEnumField, BoneConsArmUI() != NULL);
+    if (v) *v = id;
+    ActionConstraintParamChanged();
+}
+static void ActionConsEnumMenu(){
+    if (!PropsActive || !PropsActive->consUI || !PropButton::running) return;
+    W3dConstraint* c = ConstraintActiveUI(); if (!c) return;
+    int f = -1;
+    for (int k = 0; k < CE_COUNT; k++) if (PropsActive->consUI->en[k] == PropButton::running) f = k;
+    if (f < 0) return;
+    gConsEnumField = f;
+    if (!MenuConsEnum){ MenuConsEnum = new PopupMenu(); MenuConsEnum->action = ActionConsEnumPicked; }
+    MenuConsEnum->Clear();
+    MenuConsEnum->title = PropButton::running->name;
+    const char* txt[8]; int val[8];
+    const int n = ConsEnumOptions(f, BoneConsArmUI() != NULL, txt, val);
+    for (int k = 0; k < n; k++) MenuConsEnum->Add(txt[k], val[k]);
+    OpenMenuUnderButton(MenuConsEnum, PropButton::running->button);
+}
+// ---- el POLE TARGET del IK (mismo patron que Source) y su hueso ----
+static PopupMenu* MenuConsPole = NULL;
+static void ActionConsPolePicked(int id){
+    W3dConstraint* c = ConstraintActiveUI(); if (!c) return;
+    if (id <= 0) { c->poleObj = NULL; c->poleName.clear(); c->poleBone.clear(); }
+    else {
+        const int idx = id - 1;
+        if (idx < 0 || idx >= (int)gConstraintSourceCand.size()) return;
+        Object* o = gConstraintSourceCand[idx];
+        if (!ConstraintLiveCandidate(o)) return;
+        c->poleObj = o; c->poleName = o->name;
+        if (o->getType() != ObjectType::armature) c->poleBone.clear();
+    }
+    c->poleBoneCache = -1;
+    ActionConstraintParamChanged();
+}
+static void ActionConsPoleMenu(){
+    if (!PropsActive || !PropsActive->consUI || !ConstraintActiveUI()) return;
+    if (!MenuConsPole){ MenuConsPole = new PopupMenu(); MenuConsPole->action = ActionConsPolePicked; }
+    MenuConsPole->Clear();
+    MenuConsPole->title = T("Pole Target");
+    MenuConsPole->Add(T("None"), 0);
+    gConstraintSourceCand.clear(); CollectSourcesWith(SceneCollection, NULL);
+    for (size_t i = 0; i < gConstraintSourceCand.size(); i++)
+        MenuConsPole->Add(gConstraintSourceCand[i]->name, 1 + (int)i, (int)ObjectIcon(gConstraintSourceCand[i]));
+    OpenMenuUnderButton(MenuConsPole, PropsActive->consUI->pole->button);
+}
+static PopupMenu* MenuConsPoleBone = NULL;
+static void ActionConsPoleBonePicked(int id){
+    W3dConstraint* c = ConstraintActiveUI();
+    if (!c || !c->poleObj || c->poleObj->getType() != ObjectType::armature) return;
+    Armature* a = (Armature*)c->poleObj;
+    if (id <= 0) c->poleBone.clear();
+    else if (id - 1 < (int)a->bones.size()) c->poleBone = a->bones[id - 1].name;
+    c->poleBoneCache = -1;
+    ActionConstraintParamChanged();
+}
+static void ActionConsPoleBoneMenu(){
+    W3dConstraint* c = ConstraintActiveUI();
+    if (!PropsActive || !PropsActive->consUI || !c || !c->poleObj || c->poleObj->getType() != ObjectType::armature) return;
+    Armature* a = (Armature*)c->poleObj;
+    if (!MenuConsPoleBone){ MenuConsPoleBone = new PopupMenu(); MenuConsPoleBone->action = ActionConsPoleBonePicked; }
+    MenuConsPoleBone->Clear();
+    MenuConsPoleBone->title = T("Pole Bone");
+    MenuConsPoleBone->Add(T("None"), 0);
+    for (size_t i = 0; i < a->bones.size(); i++) MenuConsPoleBone->Add(a->bones[i].name, 1 + (int)i);
+    OpenMenuUnderButton(MenuConsPoleBone, PropsActive->consUI->poleBone->button);
+}
+// los int (chain length, iterations) se editan por un float del panel: al cambiar, se bajan al constraint
+static void ActionConsIntChanged(){
+    W3dConstraint* c = ConstraintActiveUI();
+    if (!c || !PropsActive || !PropsActive->consUI) return;
+    W3dConsUI* u = PropsActive->consUI;
+    c->chainLength = (int)(u->chainF + 0.5f); if (c->chainLength < 0) c->chainLength = 0;
+    c->iterations  = (int)(u->iterF + 0.5f);  if (c->iterations < 1) c->iterations = 1;
+    ActionConstraintParamChanged();
+}
+// BAKE: la pose CON constraints de todo el rango del clip activo pasa a keyframes (W3dBakeBoneConstraints).
+// Un solo paso de undo (UndoBonesCapture guarda los huesos -con sus constraints- y las curvas de los clips).
+static void ActionConsBake(){
+    Object* o = ObjConstraintsUI();
+    if (!o || o->getType() != ObjectType::armature || !PropsActive || !PropsActive->consUI) return;
+    Armature* a = (Armature*)o;
+    if (a->activeAnim < 0 || a->activeAnim >= (int)a->animations.size() || !a->animations[a->activeAnim]) {
+        Notify(T("Bake needs an active animation clip"), true); return; }
+    SkeletalAnimation* clip = a->animations[a->activeAnim];
+    UndoBonesCapture(a);
+    const int n = W3dBakeBoneConstraints(a, clip->startFrame, clip->endFrame > clip->startFrame ? clip->endFrame : clip->startFrame,
+                                         PropsActive->consUI->bakeClearV);
+    if (n < 0) Notify(T("This rig can not be baked (no rest pose, or a rebuilt biped)"), true);
+    else if (n == 0) Notify(T("No bone constraints to bake"), false);
+    else { char b[160]; snprintf(b, sizeof b, T("Baked %d bone(s) into the clip"), n); Notify(b, false); }
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+
+static PropFloat* ConsUIFloat(GroupPropertie* g, const char* name, const char* unit, float lo, float hi, bool integer = false){
+    PropFloat* p = new PropFloat(T(name), unit);
+    if (lo < hi) p->SetRange(lo, hi);
+    p->integer = integer;
+    p->onChange = integer ? ActionConsIntChanged : ActionConstraintParamChanged;
+    p->value = NULL;
+    g->properties.push_back(p);
+    return p;
+}
+static PropBool* ConsUIBool(GroupPropertie* g, const char* name){
+    PropBool* p = new PropBool(T(name)); p->onChange = ActionConstraintParamChanged; p->value = NULL;
+    g->properties.push_back(p);
+    return p;
+}
+static PropButton* ConsUIDrop(GroupPropertie* g, const char* name, void (*action)()){
+    PropButton* p = new PropButton(T(name));
+    // con su NOMBRE a la izquierda: varias de estas filas son ejes ("Y", "Z") y sin el rotulo no se sabe cual es cual
+    p->withLabel = true;
+    p->button->dropdown = true; p->action = action; p->hidden = true;
+    g->properties.push_back(p);
+    return p;
+}
+// arma las filas (UNA vez, en BuildGroups). Los nombres de las filas estan en ingles (la clave de T()).
+static W3dConsUI* ConsUIBuild(GroupPropertie* card1, GroupPropertie* g){
+    W3dConsUI* u = new W3dConsUI();
+    // IK primero: es lo que se abre en un rig (target ya esta arriba, en Source + Bone)
+    u->pole     = ConsUIDrop(g, "Pole Target", ActionConsPoleMenu);
+    u->poleBone = ConsUIDrop(g, "Pole Bone", ActionConsPoleBoneMenu);
+    u->poleAngle = ConsUIFloat(g, "Pole Angle", "\xC2\xB0", -180.0f, 180.0f);
+    u->chainLength = ConsUIFloat(g, "Chain Length", "", 0.0f, 255.0f, true);
+    u->iterations  = ConsUIFloat(g, "Iterations", "", 1.0f, 1000.0f, true);
+    u->useTail = ConsUIBool(g, "Use Tail");
+    u->stretch = ConsUIBool(g, "Stretch");
+    u->headTail = ConsUIFloat(g, "Head/Tail", "", 0.0f, 1.0f);
+    u->en[CE_OwnerSpace]  = ConsUIDrop(g, "Owner Space", ActionConsEnumMenu);
+    u->en[CE_TargetSpace] = ConsUIDrop(g, "Target Space", ActionConsEnumMenu);
+    u->inv[0] = ConsUIBool(g, "Invert X"); u->inv[1] = ConsUIBool(g, "Invert Y"); u->inv[2] = ConsUIBool(g, "Invert Z");
+    u->offset = ConsUIBool(g, "Offset");
+    u->en[CE_Mix] = ConsUIDrop(g, "Mix", ActionConsEnumMenu);
+    u->power = ConsUIFloat(g, "Power", "", -100.0f, 100.0f);
+    u->scaleAdd = ConsUIBool(g, "Additive");
+    u->en[CE_Track] = ConsUIDrop(g, "Track Axis", ActionConsEnumMenu);
+    u->en[CE_Up]    = ConsUIDrop(g, "Up Axis", ActionConsEnumMenu);
+    u->en[CE_Lock]  = ConsUIDrop(g, "Lock Axis", ActionConsEnumMenu);
+    u->targetUp = ConsUIBool(g, "Target Up");
+    u->restLength = ConsUIFloat(g, "Rest Length", "", 0.0f, 100000.0f);
+    u->bulge = ConsUIFloat(g, "Volume Variation", "", 0.0f, 100.0f);
+    u->en[CE_VolumeMode] = ConsUIDrop(g, "Maintain Volume", ActionConsEnumMenu);
+    u->en[CE_Keep] = ConsUIDrop(g, "Keep Axis", ActionConsEnumMenu);
+    u->useMin[0] = ConsUIBool(g, "Minimum X"); u->vmin[0] = ConsUIFloat(g, "Min X", "", 0, 0);
+    u->useMin[1] = ConsUIBool(g, "Minimum Y"); u->vmin[1] = ConsUIFloat(g, "Min Y", "", 0, 0);
+    u->useMin[2] = ConsUIBool(g, "Minimum Z"); u->vmin[2] = ConsUIFloat(g, "Min Z", "", 0, 0);
+    u->useMax[0] = ConsUIBool(g, "Maximum X"); u->vmax[0] = ConsUIFloat(g, "Max X", "", 0, 0);
+    u->useMax[1] = ConsUIBool(g, "Maximum Y"); u->vmax[1] = ConsUIFloat(g, "Max Y", "", 0, 0);
+    u->useMax[2] = ConsUIBool(g, "Maximum Z"); u->vmax[2] = ConsUIFloat(g, "Max Z", "", 0, 0);
+    u->distance = ConsUIFloat(g, "Distance", "", 0.0f, 100000.0f);
+    u->en[CE_DistMode] = ConsUIDrop(g, "Clamp Region", ActionConsEnumMenu);
+    u->volume = ConsUIFloat(g, "Volume", "", 0.001f, 100000.0f);
+    u->en[CE_FreeAxis] = ConsUIDrop(g, "Free Axis", ActionConsEnumMenu);
+    u->en[CE_VolMode]  = ConsUIDrop(g, "Mode", ActionConsEnumMenu);
+    u->floorOffset = ConsUIFloat(g, "Offset", "", 0, 0);
+    u->useRotation = ConsUIBool(g, "Use Rotation");
+    u->en[CE_MapFrom] = ConsUIDrop(g, "Map From", ActionConsEnumMenu);
+    u->fromMin[0] = ConsUIFloat(g, "From Min X", "", 0, 0); u->fromMax[0] = ConsUIFloat(g, "From Max X", "", 0, 0);
+    u->fromMin[1] = ConsUIFloat(g, "From Min Y", "", 0, 0); u->fromMax[1] = ConsUIFloat(g, "From Max Y", "", 0, 0);
+    u->fromMin[2] = ConsUIFloat(g, "From Min Z", "", 0, 0); u->fromMax[2] = ConsUIFloat(g, "From Max Z", "", 0, 0);
+    u->en[CE_MapTo] = ConsUIDrop(g, "Map To", ActionConsEnumMenu);
+    u->en[CE_MapX] = ConsUIDrop(g, "X From", ActionConsEnumMenu);
+    u->en[CE_MapY] = ConsUIDrop(g, "Y From", ActionConsEnumMenu);
+    u->en[CE_MapZ] = ConsUIDrop(g, "Z From", ActionConsEnumMenu);
+    u->toMin[0] = ConsUIFloat(g, "To Min X", "", 0, 0); u->toMax[0] = ConsUIFloat(g, "To Max X", "", 0, 0);
+    u->toMin[1] = ConsUIFloat(g, "To Min Y", "", 0, 0); u->toMax[1] = ConsUIFloat(g, "To Max Y", "", 0, 0);
+    u->toMin[2] = ConsUIFloat(g, "To Min Z", "", 0, 0); u->toMax[2] = ConsUIFloat(g, "To Max Z", "", 0, 0);
+    u->extrapolate = ConsUIBool(g, "Extrapolate");
+    u->pivot[0] = ConsUIFloat(g, "Pivot X", "", 0, 0);
+    u->pivot[1] = ConsUIFloat(g, "Pivot Y", "", 0, 0);
+    u->pivot[2] = ConsUIFloat(g, "Pivot Z", "", 0, 0);
+    u->pivotAbs = ConsUIBool(g, "Absolute Pivot");
+    u->en[CE_PivotAxis] = ConsUIDrop(g, "Pivot When", ActionConsEnumMenu);
+    u->fixedPosition = ConsUIBool(g, "Fixed Position");
+    u->offsetFactor = ConsUIFloat(g, "Offset Factor", "", 0.0f, 1.0f);
+    u->pathOffset = ConsUIFloat(g, "Offset", "", 0, 0);
+    u->pathDuration = ConsUIFloat(g, "Frames", "", 1.0f, 1000000.0f);
+    u->followCurve = ConsUIBool(g, "Follow Curve");
+    u->en[CE_ClampAxis] = ConsUIDrop(g, "Main Axis", ActionConsEnumMenu);
+    u->cyclic = ConsUIBool(g, "Cyclic");
+    u->chainF = 0.0f; u->iterF = 20.0f;
+    // tarjeta 1 (modo hueso): hornear los constraints del armature en el clip activo
+    u->bakeClearV = true;
+    u->bakeClear = new PropBool(T("Remove Constraints After Bake")); u->bakeClear->value = NULL;
+    card1->properties.push_back(u->bakeClear);
+    u->bakeRow = new PropButtonRow();
+    u->bakeRow->Add(T("Bake to Keyframes"), ActionConsBake);
+    card1->properties.push_back(u->bakeRow);
+    return u;
+}
+// bindeo por frame (UpdateTabs). c = NULL: todo oculto. 'arm' = el armature del modo hueso (o NULL).
+static void ConsUIBind(W3dConsUI* u, W3dConstraint* c, bool bone, Armature* arm){
+    if (!u) return;
+    const int t = c ? c->type : -1;
+    #define TY(x) (t == W3dConstraintType::x)
+    const bool copyLR   = TY(CopyLocation) || TY(CopyRotation);
+    const bool spacesO  = copyLR || TY(CopyScale) || TY(CopyTransforms) || TY(LimitLocation) || TY(LimitRotation) ||
+                          TY(LimitScale) || TY(Transformation) || TY(MaintainVolume);
+    const bool spacesT  = copyLR || TY(CopyScale) || TY(CopyTransforms) || TY(Transformation);
+    const bool limits   = TY(LimitLocation) || TY(LimitRotation) || TY(LimitScale);
+    const bool isIK = TY(IK), isPath = TY(FollowPath), isTrans = TY(Transformation), isPivot = TY(Pivot);
+    // el cruce Z-arriba de un objeto (ver arriba): la fila "Y" es el eje z interno
+    const int ax1 = bone ? 1 : 2, ax2 = bone ? 2 : 1;
+    const int dax[3] = { 0, ax1, ax2 };
+    // ---- enums: visibles + el texto de la opcion actual ----
+    bool show[CE_COUNT];
+    for (int k = 0; k < CE_COUNT; k++) show[k] = false;
+    show[CE_OwnerSpace] = spacesO; show[CE_TargetSpace] = spacesT;
+    show[CE_Mix] = TY(CopyRotation) || TY(CopyTransforms) || isTrans;
+    show[CE_Track] = TY(TrackTo) || TY(DampedTrack) || TY(LockedTrack) || TY(Floor) || (isPath && c && c->followCurve);
+    show[CE_Up] = TY(TrackTo) || (isPath && c && c->followCurve);
+    show[CE_Lock] = TY(LockedTrack);
+    show[CE_VolumeMode] = show[CE_Keep] = TY(StretchTo);
+    show[CE_DistMode] = TY(LimitDistance);
+    show[CE_FreeAxis] = show[CE_VolMode] = TY(MaintainVolume);
+    show[CE_MapFrom] = show[CE_MapTo] = show[CE_MapX] = show[CE_MapY] = show[CE_MapZ] = isTrans;
+    show[CE_PivotAxis] = isPivot;
+    show[CE_ClampAxis] = TY(ClampTo);
+    for (int k = 0; k < CE_COUNT; k++) {
+        PropButton* b = u->en[k]; if (!b) continue;
+        b->hidden = !show[k];
+        if (!show[k]) continue;
+        int* v = ConsEnumPtr(c, k, bone);
+        const char* txt[8]; int val[8];
+        const int n = ConsEnumOptions(k, bone, txt, val);
+        std::string cur = "?";
+        for (int q = 0; q < n; q++) if (v && val[q] == *v) cur = txt[q];
+        if (b->button->text != cur) { b->button->text = cur; g_redraw = true; }
+    }
+    // el nombre de la fila del eje cambia con el tipo (Floor: el piso; Follow Path: hacia donde avanza)
+    if (u->en[CE_Track]) u->en[CE_Track]->name = TY(Floor) ? T("Floor Axis") : isPath ? T("Forward Axis") : T("Track Axis");
+    if (u->en[CE_Mix] && c && TY(CopyTransforms) && c->mixMode == 1) c->mixMode = 0;   // (Add no existe ahi)
+    // ---- floats / bools ----
+    #define BF(p, cond, ptr) do { if (p) (p)->value = (c && (cond)) ? (ptr) : NULL; } while (0)
+    #define BB(p, cond, ptr) do { if (p) (p)->value = (c && (cond)) ? (ptr) : NULL; } while (0)
+    const bool usesPos = TY(CopyLocation) || TY(CopyTransforms) || TY(TrackTo) || TY(DampedTrack) || TY(LockedTrack) ||
+                         TY(StretchTo) || TY(LimitDistance) || isIK || isPivot || TY(Floor);
+    const bool tgtArm = c && c->sourceObj && c->sourceObj->getType() == ObjectType::armature && !c->bone.empty();
+    BF(u->headTail, usesPos && tgtArm, &c->headTail);
+    BB(u->inv[0], copyLR, &c->invX);
+    BB(u->inv[1], copyLR, ax1 == 1 ? &c->invY : &c->invZ);
+    BB(u->inv[2], copyLR, ax2 == 1 ? &c->invY : &c->invZ);
+    BB(u->offset, TY(CopyLocation) || TY(CopyScale), &c->useOffset);
+    BF(u->power, TY(CopyScale), &c->power);
+    BB(u->scaleAdd, TY(CopyScale) && c->useOffset, &c->scaleAdd);
+    BB(u->targetUp, TY(TrackTo), &c->targetUp);
+    BF(u->restLength, TY(StretchTo), &c->restLength);
+    BF(u->bulge, TY(StretchTo), &c->bulge);
+    for (int k = 0; k < 3; k++) {
+        BB(u->useMin[k], limits, &c->useMin[dax[k]]);
+        BF(u->vmin[k], limits && c->useMin[dax[k]], &c->vmin[dax[k]]);
+        BB(u->useMax[k], limits, &c->useMax[dax[k]]);
+        BF(u->vmax[k], limits && c->useMax[dax[k]], &c->vmax[dax[k]]);
+        BF(u->fromMin[k], isTrans, &c->fromMin[dax[k]]); BF(u->fromMax[k], isTrans, &c->fromMax[dax[k]]);
+        BF(u->toMin[k], isTrans, &c->toMin[dax[k]]);     BF(u->toMax[k], isTrans, &c->toMax[dax[k]]);
+        BF(u->pivot[k], isPivot, &c->pivotOffset[dax[k]]);
+    }
+    for (int k = 0; k < 3; k++) if (u->vmin[k]) u->vmin[k]->unit = TY(LimitRotation) ? "\xC2\xB0" : "";
+    for (int k = 0; k < 3; k++) if (u->vmax[k]) u->vmax[k]->unit = TY(LimitRotation) ? "\xC2\xB0" : "";
+    BF(u->distance, TY(LimitDistance), &c->distance);
+    BF(u->volume, TY(MaintainVolume), &c->volume);
+    BF(u->floorOffset, TY(Floor), &c->floorOffset);
+    BB(u->useRotation, TY(Floor), &c->useRotation);
+    BB(u->extrapolate, isTrans, &c->extrapolate);
+    BB(u->pivotAbs, isPivot && !c->sourceObj, &c->pivotAbs);
+    BB(u->fixedPosition, isPath, &c->fixedPosition);
+    BF(u->offsetFactor, isPath && c->fixedPosition, &c->offsetFactor);
+    BF(u->pathOffset, isPath && !c->fixedPosition, &c->pathOffset);
+    BF(u->pathDuration, isPath && !c->fixedPosition, &c->pathDuration);
+    BB(u->followCurve, isPath, &c->followCurve);
+    BB(u->cyclic, TY(ClampTo), &c->cyclic);
+    // ---- IK ----
+    BB(u->useTail, isIK, &c->useTail);
+    BB(u->stretch, isIK, &c->useStretch);
+    BF(u->poleAngle, isIK && c->poleObj, &c->poleAngle);
+    if (isIK) {
+        // los int se ven por un float: se sincroniza salvo que el usuario lo este editando
+        if (g_propFloatEditing != u->chainLength) u->chainF = (float)c->chainLength;
+        if (g_propFloatEditing != u->iterations)  u->iterF  = (float)c->iterations;
+    }
+    BF(u->chainLength, isIK, &u->chainF);
+    BF(u->iterations, isIK, &u->iterF);
+    if (u->pole) {
+        u->pole->hidden = !isIK;
+        if (isIK) { const std::string txt = c->poleObj ? c->poleObj->name : std::string(T("None"));
+                    if (u->pole->button->text != txt) { u->pole->button->text = txt; g_redraw = true; } }
+    }
+    if (u->poleBone) {
+        const bool pb = isIK && c->poleObj && c->poleObj->getType() == ObjectType::armature;
+        u->poleBone->hidden = !pb;
+        if (pb) { const std::string txt = c->poleBone.empty() ? std::string(T("None")) : c->poleBone;
+                  if (u->poleBone->button->text != txt) { u->poleBone->button->text = txt; g_redraw = true; } }
+    }
+    // ---- el BAKE (tarjeta 1): con un armature en Pose Mode ----
+    BB(u->bakeClear, arm != NULL, &u->bakeClearV);
+    if (u->bakeRow) for (size_t k = 0; k < u->bakeRow->buttons.size(); k++) u->bakeRow->buttons[k]->visible = (arm != NULL);
+    #undef BF
+    #undef BB
+    #undef TY
 }
 
 
@@ -2564,7 +3135,6 @@ static const char* T2dAlignName(int v, bool horizontal){
 static PopupMenu* MenuT2dAlignH = NULL;
 static PopupMenu* MenuT2dAlignV = NULL;
 static PopupMenu* MenuT2dFont   = NULL;
-static PopupMenu* MenuT2dAnchor = NULL;
 
 static const char* T2dAnchorName(int v){
     switch (v){
@@ -2575,21 +3145,25 @@ static const char* T2dAnchorName(int v){
         default: return T("Center");
     }
 }
-static void ActionT2dPickedAnchor(int id){
-    Text2D* t = T2dActive(); if (!t) return;
-    // el ancla cambia SOLO el punto de referencia: X, Y y Z quedan como estan
-    // (el elemento salta al nuevo punto, sin tocarle los valores)
-    t->anchor = id;
-    if (PropsActive && PropsActive->propT2dAnchor) PropsActive->propT2dAnchor->button->text = T2dAnchorName(id);
+// EL ANCLA de cualquier elemento 2D (texto, imagen, rectangulo, contenedor, boton, video, 9-slice): cambia SOLO el
+// punto de referencia; X, Y y Z quedan como estan (el elemento salta al nuevo punto, sin tocarle los valores)
+static PopupMenu* MenuAnchor2D = NULL;
+static PropButton* gAnchor2DButton = NULL;   // la fila que abrio el menu (su texto dice el ancla)
+static Element2D* ActiveElem2D() { return (ActiveObj && UI2D_IsElement2D(ActiveObj)) ? (Element2D*)ActiveObj : NULL; }
+static void ActionPickedAnchor2D(int id){
+    Element2D* e = ActiveElem2D(); if (!e) return;
+    e->anchor = id;
+    if (gAnchor2DButton) gAnchor2DButton->button->text = T2dAnchorName(id);
     g_redraw = true;
 }
-static void ActionMenuT2dAnchor(){
-    if (!PropsActive || !T2dActive()) return;
-    if (!MenuT2dAnchor){ MenuT2dAnchor = new PopupMenu(); MenuT2dAnchor->action = ActionT2dPickedAnchor; }
-    MenuT2dAnchor->Clear();
-    MenuT2dAnchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuT2dAnchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuT2dAnchor, PropsActive->propT2dAnchor->button);
+static void ActionMenuAnchor2D(){
+    if (!PropsActive || !ActiveElem2D() || !PropButton::running) return;
+    gAnchor2DButton = PropButton::running;
+    if (!MenuAnchor2D){ MenuAnchor2D = new PopupMenu(); MenuAnchor2D->action = ActionPickedAnchor2D; }
+    MenuAnchor2D->Clear();
+    MenuAnchor2D->title = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuAnchor2D->Add(T2dAnchorName(i), i);
+    OpenMenuUnderButton(MenuAnchor2D, gAnchor2DButton->button);
 }
 
 static void ActionT2dAlignHPicked(int id){
@@ -2621,8 +3195,8 @@ static void ActionMenuT2dAlignV(){
 // FUENTE: la de Whisk3D o un .ttf elegido con el file browser (se hornea al vuelo, ver Fuente2D)
 static void T2dFontPicked(const std::string& pickedPath){
     Text2D* t = T2dActive(); if (!t) return;
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
+    // CARGAR = QUEDA AFUERA (igual en todos los selectores de archivo 2D): el archivo que el usuario acaba de elegir de su
+    // disco se referencia como EXTERNO (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
     // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
     const std::string path = W3dLoadExternal(pickedPath);
     t->source = path;
@@ -2672,27 +3246,10 @@ static void ActionMenuImgMode(){
     MenuImgMode->Add(T("Cover"), 2);     // llena recortando
     OpenMenuUnderButton(MenuImgMode, PropsActive->propImgMode->button);
 }
-static PopupMenu* MenuImgAnchor = NULL;
-static void ActionImgPickedAnchor(int id){
-    Image2D* im = Img2dActive(); if (!im) return;
-    im->anchor = id;   // igual que el texto: el ancla NO toca X/Y/Z
-    if (PropsActive && PropsActive->propImgAnchor) PropsActive->propImgAnchor->button->text = T2dAnchorName(id);
-    g_redraw = true;
-}
-static void ActionMenuImgAnchor(){
-    if (!PropsActive || !Img2dActive()) return;
-    if (!MenuImgAnchor){ MenuImgAnchor = new PopupMenu(); MenuImgAnchor->action = ActionImgPickedAnchor; }
-    MenuImgAnchor->Clear();
-    MenuImgAnchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuImgAnchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuImgAnchor, PropsActive->propImgAnchor->button);
-}
 // TEXTURA: elegir el archivo con el file browser; una imagen recien creada toma su tamano natural
 static void ImgPickedTexture(const std::string& pickedPath){
     Image2D* im = Img2dActive(); if (!im) return;
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     im->texture = path;
     int w = 0, h = 0;
@@ -3006,9 +3563,7 @@ static std::string IconNameGame(){
     return (s == std::string::npos) ? g_projIcon : g_projIcon.substr(s + 1);
 }
 static void ActionPickedIcon(const std::string& pickedPath){
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     std::string r = path;
     // relativa al .w3d si el archivo cae bajo su carpeta (asi el proyecto viaja entero)
@@ -3043,9 +3598,6 @@ static void ActionUIRotate(){   // el ancho se vuelve el alto y viceversa
 // PROXY que se sincroniza por frame y el onChange escribe de vuelta en pos.
 static bool  g_pos2dAbs = false;
 static float g_pos2dX = 0.0f, g_pos2dY = 0.0f;
-static Object* ActiveElem2D(){
-    return (ActiveObj && UI2D_IsElement2D(ActiveObj)) ? ActiveObj : NULL;
-}
 static void ActionPos2DEdited(){
     Object* o = ActiveElem2D(); if (!o) return;
     // la posicion GUARDADA es RELATIVA (el numero que no se toca); el modo px es la
@@ -3171,11 +3723,11 @@ static const char* ModeNameSize(int m){
 static PropButton* PropActiveUnit(){
     if (!PropsActive || !ActiveObj) return NULL;
     ObjectType t = ActiveObj->getType();
-    if (t == ObjectType::image2d) return PropsActive->propImgUnit;
-    if (t == ObjectType::rect2d)   return PropsActive->propRectUnit;
-    if (t == ObjectType::cont2d)   return PropsActive->propContUnit;
-    if (t == ObjectType::slice9)   return PropsActive->propS9Unit;
-    if (t == ObjectType::video2d)  return PropsActive->propVidUnit;
+    if (t == ObjectType::image2d) return PropsActive->rowsImg.unit;
+    if (t == ObjectType::rect2d)   return PropsActive->rowsRect.unit;
+    if (t == ObjectType::cont2d)   return PropsActive->rowsCont.unit;
+    if (t == ObjectType::slice9)   return PropsActive->rowsS9.unit;
+    if (t == ObjectType::video2d)  return PropsActive->rowsVid.unit;
     return NULL;
 }
 static PopupMenu* MenuSizeMode = NULL;
@@ -3379,26 +3931,9 @@ static void ActionMenuVidMode(){
     MenuVidMode->Add(T("Cover"), 2);
     OpenMenuUnderButton(MenuVidMode, PropsActive->propVidMode->button);
 }
-static PopupMenu* MenuVidAnchor = NULL;
-static void ActionVidPickedAnchor(int id){
-    Video2D* v = Vid2dActive(); if (!v) return;
-    v->anchor = id;
-    if (PropsActive && PropsActive->propVidAnchor) PropsActive->propVidAnchor->button->text = T2dAnchorName(id);
-    g_redraw = true;
-}
-static void ActionMenuVidAnchor(){
-    if (!PropsActive || !Vid2dActive()) return;
-    if (!MenuVidAnchor){ MenuVidAnchor = new PopupMenu(); MenuVidAnchor->action = ActionVidPickedAnchor; }
-    MenuVidAnchor->Clear();
-    MenuVidAnchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuVidAnchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuVidAnchor, PropsActive->propVidAnchor->button);
-}
 static void VidPickedFile(const std::string& pickedPath){
     Video2D* v = Vid2dActive(); if (!v) return;
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     v->video = path;
     const VideoPreview* pv = Video2DPreview(path);   // extrae la preview + tamano real
@@ -3436,9 +3971,7 @@ static void PickedScript(const std::string& pickedPath) {
     // lo GENERADO por una instancia de prefab: sus scripts son los del prefab (uno agregado o cambiado no se
     // guarda y corria los valores de los demas al guardar sus overrides). Se edita el prefab
     if (W3dPrefabIsGeneratedNotice(ActiveObj, true)) { g_scriptChangeIdx = -1; return; }
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     if (!ActiveObj->scriptData) ActiveObj->scriptData = new W3dScriptData();
     if (g_scriptChangeIdx >= 0 && g_scriptChangeIdx < (int)ActiveObj->scriptData->scripts.size()) {
@@ -3641,7 +4174,6 @@ static bool ScriptToggleEye(int i) {
     g_redraw = true;
     return true;
 }
-void _ScriptToggleEyeFwd(int i){ ScriptToggleEye(i); }   // (el harness: el mismo click)
 static void MoveScript(int i, int j) { MoveScriptOf(ActiveObj, i, j); }
 static void ActionScriptUp()   { int a = ActiveScriptIdx(); if (a > 0) MoveScript(a, a - 1); }
 static void ActionScriptDown() {
@@ -3879,26 +4411,9 @@ static void SyncPaletteName(Properties* p){
 static Button2D* Btn2dActive(){
     return (ActiveObj && ActiveObj->getType() == ObjectType::button2d) ? (Button2D*)ActiveObj : NULL;
 }
-static PopupMenu* MenuBtnAnchor = NULL;
-static void ActionBtnPickedAnchor(int id){
-    Button2D* b = Btn2dActive(); if (!b) return;
-    b->anchor = id;
-    if (PropsActive && PropsActive->propBtnAnchor) PropsActive->propBtnAnchor->button->text = T2dAnchorName(id);
-    g_redraw = true;
-}
-static void ActionMenuBtnAnchor(){
-    if (!PropsActive || !Btn2dActive()) return;
-    if (!MenuBtnAnchor){ MenuBtnAnchor = new PopupMenu(); MenuBtnAnchor->action = ActionBtnPickedAnchor; }
-    MenuBtnAnchor->Clear();
-    MenuBtnAnchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuBtnAnchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuBtnAnchor, PropsActive->propBtnAnchor->button);
-}
 static void PickedBtnTex(const std::string& pickedPath){
     Button2D* b = Btn2dActive(); if (!b) return;
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     b->textureBackground = path;
     if (PropsActive && PropsActive->propBtnTex)
@@ -3913,9 +4428,7 @@ static void ActionBtnTex(){
 }
 static void BtnPickedIcon(const std::string& pickedPath){
     Button2D* b = Btn2dActive(); if (!b) return;
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     b->icon = path;
     if (PropsActive && PropsActive->propBtnIcon)
@@ -3951,46 +4464,14 @@ static void ActionMenuChildrenLayout(){
 static Container2D* Cont2dActive(){
     return (ActiveObj && ActiveObj->getType() == ObjectType::cont2d) ? (Container2D*)ActiveObj : NULL;
 }
-static PopupMenu* MenuContAnchor = NULL;
-static void ActionContPickedAnchor(int id){
-    Container2D* c = Cont2dActive(); if (!c) return;
-    c->anchor = id;
-    if (PropsActive && PropsActive->propContAnchor) PropsActive->propContAnchor->button->text = T2dAnchorName(id);
-    g_redraw = true;
-}
-static void ActionMenuContAnchor(){
-    if (!PropsActive || !Cont2dActive()) return;
-    if (!MenuContAnchor){ MenuContAnchor = new PopupMenu(); MenuContAnchor->action = ActionContPickedAnchor; }
-    MenuContAnchor->Clear();
-    MenuContAnchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuContAnchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuContAnchor, PropsActive->propContAnchor->button);
-}
 
 // ============================ SLICE 9 ============================
 static Slice9* S9Active(){
     return (ActiveObj && ActiveObj->getType() == ObjectType::slice9) ? (Slice9*)ActiveObj : NULL;
 }
-static PopupMenu* MenuS9Anchor = NULL;
-static void ActionS9PickedAnchor(int id){
-    Slice9* s9 = S9Active(); if (!s9) return;
-    s9->anchor = id;
-    if (PropsActive && PropsActive->propS9Anchor) PropsActive->propS9Anchor->button->text = T2dAnchorName(id);
-    g_redraw = true;
-}
-static void ActionMenuS9Anchor(){
-    if (!PropsActive || !S9Active()) return;
-    if (!MenuS9Anchor){ MenuS9Anchor = new PopupMenu(); MenuS9Anchor->action = ActionS9PickedAnchor; }
-    MenuS9Anchor->Clear();
-    MenuS9Anchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuS9Anchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuS9Anchor, PropsActive->propS9Anchor->button);
-}
 static void S9PickedTexture(const std::string& pickedPath){
     Slice9* s9 = S9Active(); if (!s9) return;
-    // CARGAR = QUEDA AFUERA: el archivo que el usuario acaba de elegir de su disco se referencia como EXTERNO
-    // (W3dLoadExternal); a meterlo adentro del .w3d se lo pasa desde la Biblioteca
-    // ("textures/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
+    // (queda afuera: ver T2dFontPicked)
     const std::string path = W3dLoadExternal(pickedPath);
     s9->texture = path;
     int w = 0, h = 0;
@@ -4006,21 +4487,6 @@ static void ActionS9Texture(){
     OpenFileBrowser(T("Load image"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", S9PickedTexture);
 }
 
-static PopupMenu* MenuRectAnchor = NULL;
-static void ActionRectPickedAnchor(int id){
-    Rect2D* r = Rect2dActive(); if (!r) return;
-    r->anchor = id;   // igual que el resto: el ancla NO toca X/Y/Z
-    if (PropsActive && PropsActive->propRectAnchor) PropsActive->propRectAnchor->button->text = T2dAnchorName(id);
-    g_redraw = true;
-}
-static void ActionMenuRectAnchor(){
-    if (!PropsActive || !Rect2dActive()) return;
-    if (!MenuRectAnchor){ MenuRectAnchor = new PopupMenu(); MenuRectAnchor->action = ActionRectPickedAnchor; }
-    MenuRectAnchor->Clear();
-    MenuRectAnchor->title = T("Anchor");
-    for (int i = 0; i <= 8; i++) MenuRectAnchor->Add(T2dAnchorName(i), i);
-    OpenMenuUnderButton(MenuRectAnchor, PropsActive->propRectAnchor->button);
-}
 
 // ====================================================================
 static PopupMenu* MenuRotMode = NULL;
@@ -4796,109 +5262,18 @@ static void VideosClose(int& failed) {
 }
 #endif // W3D_VIDEO_FFMPEG
 
-#ifdef W3D_VIDEO_ANDROID
-// ANDROID: H.264 y AAC con el codificador del TELEFONO (MediaCodec), por JNI a la actividad (Whisk3DActivity.video*,
-// W3dVideo.java). Solo MP4 (MediaMuxer no escribe MKV)
-#include <jni.h>
-#include <SDL2/SDL.h>
-static int AudioKbps();
-static void RenderRange(int& f0, int& f1, int& fps);
-namespace {
-struct W3dJni {   // el JNIEnv del hilo de SDL y la actividad, con sus referencias locales liberadas al salir
-    JNIEnv* env; jobject act; jclass cls;
-    W3dJni() : env((JNIEnv*)SDL_AndroidGetJNIEnv()), act(NULL), cls(NULL) {
-        if (env) { act = (jobject)SDL_AndroidGetActivity(); if (act) cls = env->GetObjectClass(act); }
-    }
-    ~W3dJni() {
-        if (!env) return;
-        if (env->ExceptionCheck()) env->ExceptionClear();
-        if (cls) env->DeleteLocalRef(cls);
-        if (act) env->DeleteLocalRef(act);
-    }
-    jmethodID M(const char* n, const char* f) { jmethodID m = cls ? env->GetMethodID(cls, n, f) : NULL; if (env && env->ExceptionCheck()) { env->ExceptionClear(); m = NULL; } return m; }
-    bool Good(jboolean r) { if (env->ExceptionCheck()) { env->ExceptionClear(); return false; } return r != JNI_FALSE; }
-};
-}
-static bool g_openVideoAndroid = false, g_videoAndroidOk = true;
-static jbyteArray g_videoAndroidFrame = NULL;   // (referencia global: el mismo arreglo para todos los cuadros)
-static int g_videoAndroidBytes = 0;
-// el bitrate del video: el de la tarjeta
-static int VideoKbps(int, int, int) { return PickedVideoKbps(); }
-static bool VideoFrame(const char* tag, const unsigned char* rgba, int w, int h) {
-    (void)tag;   // (un video es la composicion final)
-    W3dJni j;
-    if (!j.cls) return false;
-    if (!g_openVideoAndroid) {
-        int f0, f1, fps; RenderRange(f0, f1, fps);
-        jstring r = j.env->NewStringUTF(RenderFileNamePNG("").c_str());
-        jmethodID m = j.M("videoOpen", "(Ljava/lang/String;IIII)Z");
-        g_videoAndroidOk = m && j.Good(j.env->CallBooleanMethod(j.act, m, r, (jint)w, (jint)h, (jint)fps, (jint)VideoKbps(w, h, fps)));
-        j.env->DeleteLocalRef(r);
-        g_openVideoAndroid = true;
-    }
-    if (!g_videoAndroidOk) return false;
-    const int n = w * h * 4;
-    if (!g_videoAndroidFrame || g_videoAndroidBytes != n) {
-        if (g_videoAndroidFrame) j.env->DeleteGlobalRef(g_videoAndroidFrame);
-        jbyteArray loc = j.env->NewByteArray(n);
-        g_videoAndroidFrame = loc ? (jbyteArray)j.env->NewGlobalRef(loc) : NULL;
-        if (loc) j.env->DeleteLocalRef(loc);
-        g_videoAndroidBytes = g_videoAndroidFrame ? n : 0;
-        if (!g_videoAndroidFrame) { g_videoAndroidOk = false; return false; }
-    }
-    j.env->SetByteArrayRegion(g_videoAndroidFrame, 0, n, (const jbyte*)rgba);
-    jmethodID m = j.M("videoFrame", "([BII)Z");
-    g_videoAndroidOk = m && j.Good(j.env->CallBooleanMethod(j.act, m, g_videoAndroidFrame, (jint)w, (jint)h));
-    return g_videoAndroidOk;
-}
-static void VideosClose(int& failed) {
-    if (!g_openVideoAndroid) return;
-    bool ok = false;
-    W3dJni j;
-    if (j.cls) {
-        jstring wav = j.env->NewStringUTF(g_renderAudioTmp.c_str());
-        jmethodID m = j.M("videoClose", "(Ljava/lang/String;I)Z");
-        ok = m && j.Good(j.env->CallBooleanMethod(j.act, m, wav, (jint)AudioKbps()));
-        j.env->DeleteLocalRef(wav);
-        if (g_videoAndroidFrame) { j.env->DeleteGlobalRef(g_videoAndroidFrame); g_videoAndroidFrame = NULL; g_videoAndroidBytes = 0; }
-    }
-    if (!ok || !g_videoAndroidOk) failed++;
-    g_openVideoAndroid = false; g_videoAndroidOk = true;
-}
-// "Renderizar audio" en AAC: el WAV de la escena al codificador del telefono
-static bool AndroidAudioAac(const std::string& wav, const std::string& output) {
-    W3dJni j;
-    if (!j.cls) return false;
-    jstring a = j.env->NewStringUTF(wav.c_str()), b = j.env->NewStringUTF(output.c_str());
-    jmethodID m = j.M("audioAac", "(Ljava/lang/String;Ljava/lang/String;I)Z");
-    const bool ok = m && j.Good(j.env->CallBooleanMethod(j.act, m, a, b, (jint)AudioKbps()));
-    j.env->DeleteLocalRef(a); j.env->DeleteLocalRef(b);
-    return ok;
-}
-#endif // W3D_VIDEO_ANDROID
-
-#ifdef W3D_VIDEO_SYMBIAN
-// SYMBIAN: el codificador del telefono (platform/symbian/src/w3dvideoenc.cpp: MPEG-4 hasta 720x576) o el PROPIO
-// (io/W3dH264.h: H.264 a cualquier resolucion), y el contenedor (io/W3dMp4.h). El SONIDO: el AAC propio (io/W3dAac.h)
-#include <e32def.h>
+#if defined(W3D_VIDEO_ANDROID) || defined(W3D_VIDEO_SYMBIAN)
+// EL CODIFICADOR PROPIO, compartido por los telefonos: en Symbian cuando el del telefono no llega (H.264 o mas de
+// 720x576) y en Android cuando el telefono no tiene MediaCodec (Android 2.3: la actividad de platform/android-viejo no
+// trae video*). Sin el, Render Animation a MP4 fallaba en el Galaxy Ace
 #include "io/W3dH264.h"
 #include "io/W3dMp4.h"
 #include "io/W3dAac.h"
 #include <cstdio>
-TBool W3dVideoSymbianHas();
-TInt W3dVideoSymbianCodecs();   // 1 = H.264, 2 = MPEG-4 (los que tiene el telefono)
-TBool W3dVideoSymbianFrame(const char* path, const unsigned char* rgba, TInt w, TInt h, TInt fps, TInt kbps, TInt codec);
-TBool W3dVideoSymbianAudio(const char* wav, TInt frequency, TInt kbps);
-TBool W3dAudioSymbianAac(const char* wav, const char* output, TInt frequency, TInt kbps);
-TBool W3dVideoSymbianClose();
-namespace w3dEngine { int W3dAudioRate(); }
 static int AudioKbps();
 static void RenderRange(int& f0, int& f1, int& fps);
-static bool g_openVideoSymbian = false;
-// el bitrate del video: el de la tarjeta
-static int VideoKbps(int, int, int) { return PickedVideoKbps(); }
-// EL CODIFICADOR PROPIO (io/W3dH264.h): H.264 a CUALQUIER resolucion (720p, 1080p, 4K), sin el del telefono -que es
-// MPEG-4 hasta 720x576-. Mas lento, pero sale. El sonido, con el AAC propio (io/W3dAac.h)
+// (io/W3dH264.h): H.264 a CUALQUIER resolucion (720p, 1080p, 4K), sin el codificador del telefono. Mas lento, pero
+// sale. El sonido, con el AAC propio (io/W3dAac.h)
 struct W3dOwnVideo {
     W3dH264Encoder cod; W3dMp4Writer mp4; std::vector<unsigned char> nal; bool failed;
     W3dOwnVideo() : failed(false) {}
@@ -4939,6 +5314,113 @@ static bool OwnVideoClose() {
     delete v;
     return ok;
 }
+#endif // W3D_VIDEO_ANDROID || W3D_VIDEO_SYMBIAN
+
+#ifdef W3D_VIDEO_ANDROID
+// ANDROID: H.264 y AAC con el codificador del TELEFONO (MediaCodec), por JNI a la actividad (Whisk3DActivity.video*,
+// W3dVideo.java). Solo MP4 (MediaMuxer no escribe MKV)
+#include <jni.h>
+#include <SDL2/SDL.h>
+static int AudioKbps();
+static void RenderRange(int& f0, int& f1, int& fps);
+namespace {
+struct W3dJni {   // el JNIEnv del hilo de SDL y la actividad, con sus referencias locales liberadas al salir
+    JNIEnv* env; jobject act; jclass cls;
+    W3dJni() : env((JNIEnv*)SDL_AndroidGetJNIEnv()), act(NULL), cls(NULL) {
+        if (env) { act = (jobject)SDL_AndroidGetActivity(); if (act) cls = env->GetObjectClass(act); }
+    }
+    ~W3dJni() {
+        if (!env) return;
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (cls) env->DeleteLocalRef(cls);
+        if (act) env->DeleteLocalRef(act);
+    }
+    jmethodID M(const char* n, const char* f) { jmethodID m = cls ? env->GetMethodID(cls, n, f) : NULL; if (env && env->ExceptionCheck()) { env->ExceptionClear(); m = NULL; } return m; }
+    bool Good(jboolean r) { if (env->ExceptionCheck()) { env->ExceptionClear(); return false; } return r != JNI_FALSE; }
+};
+}
+static bool g_openVideoAndroid = false, g_videoAndroidOk = true;
+static jbyteArray g_videoAndroidFrame = NULL;   // (referencia global: el mismo arreglo para todos los cuadros)
+static int g_videoAndroidBytes = 0;
+// el bitrate del video: el de la tarjeta
+static int VideoKbps(int, int, int) { return PickedVideoKbps(); }
+static bool VideoFrame(const char* tag, const unsigned char* rgba, int w, int h) {
+    (void)tag;   // (un video es la composicion final)
+    if (g_ownVideo) return VideoOwnFrame(rgba, w, h);
+    W3dJni j;
+    if (!j.cls) return false;
+    if (!g_openVideoAndroid) {
+        jmethodID m = j.M("videoOpen", "(Ljava/lang/String;IIII)Z");
+        if (!m) {
+            // el telefono no tiene codificador de video: Android 2.3 (sin MediaCodec ni MediaMuxer, que son de la 4.1 /
+            // 4.3) y su actividad (platform/android-viejo) no trae video*. Va el H.264 propio, con el AAC propio
+            w3dLogf("[video] sin el codificador del telefono (MediaCodec): va el propio");
+            return VideoOwnFrame(rgba, w, h);
+        }
+        int f0, f1, fps; RenderRange(f0, f1, fps);
+        jstring r = j.env->NewStringUTF(RenderFileNamePNG("").c_str());
+        g_videoAndroidOk = j.Good(j.env->CallBooleanMethod(j.act, m, r, (jint)w, (jint)h, (jint)fps, (jint)VideoKbps(w, h, fps)));
+        j.env->DeleteLocalRef(r);
+        g_openVideoAndroid = true;
+    }
+    if (!g_videoAndroidOk) return false;
+    const int n = w * h * 4;
+    if (!g_videoAndroidFrame || g_videoAndroidBytes != n) {
+        if (g_videoAndroidFrame) j.env->DeleteGlobalRef(g_videoAndroidFrame);
+        jbyteArray loc = j.env->NewByteArray(n);
+        g_videoAndroidFrame = loc ? (jbyteArray)j.env->NewGlobalRef(loc) : NULL;
+        if (loc) j.env->DeleteLocalRef(loc);
+        g_videoAndroidBytes = g_videoAndroidFrame ? n : 0;
+        if (!g_videoAndroidFrame) { g_videoAndroidOk = false; return false; }
+    }
+    j.env->SetByteArrayRegion(g_videoAndroidFrame, 0, n, (const jbyte*)rgba);
+    jmethodID m = j.M("videoFrame", "([BII)Z");
+    g_videoAndroidOk = m && j.Good(j.env->CallBooleanMethod(j.act, m, g_videoAndroidFrame, (jint)w, (jint)h));
+    return g_videoAndroidOk;
+}
+static void VideosClose(int& failed) {
+    if (g_ownVideo && !OwnVideoClose()) failed++;   // (el propio: Android 2.3)
+    if (!g_openVideoAndroid) return;
+    bool ok = false;
+    W3dJni j;
+    if (j.cls) {
+        jstring wav = j.env->NewStringUTF(g_renderAudioTmp.c_str());
+        jmethodID m = j.M("videoClose", "(Ljava/lang/String;I)Z");
+        ok = m && j.Good(j.env->CallBooleanMethod(j.act, m, wav, (jint)AudioKbps()));
+        j.env->DeleteLocalRef(wav);
+        if (g_videoAndroidFrame) { j.env->DeleteGlobalRef(g_videoAndroidFrame); g_videoAndroidFrame = NULL; g_videoAndroidBytes = 0; }
+    }
+    if (!ok || !g_videoAndroidOk) failed++;
+    g_openVideoAndroid = false; g_videoAndroidOk = true;
+}
+// "Renderizar audio" en AAC: el WAV de la escena al codificador del telefono
+static bool AndroidAudioAac(const std::string& wav, const std::string& output) {
+    W3dJni j;
+    if (!j.cls) return false;
+    jstring a = j.env->NewStringUTF(wav.c_str()), b = j.env->NewStringUTF(output.c_str());
+    jmethodID m = j.M("audioAac", "(Ljava/lang/String;Ljava/lang/String;I)Z");
+    const bool ok = m && j.Good(j.env->CallBooleanMethod(j.act, m, a, b, (jint)AudioKbps()));
+    j.env->DeleteLocalRef(a); j.env->DeleteLocalRef(b);
+    return ok;
+}
+#endif // W3D_VIDEO_ANDROID
+
+#ifdef W3D_VIDEO_SYMBIAN
+// SYMBIAN: el codificador del telefono (platform/symbian/src/w3dvideoenc.cpp: MPEG-4 hasta 720x576) o el PROPIO
+// (io/W3dH264.h: H.264 a cualquier resolucion), y el contenedor (io/W3dMp4.h). El SONIDO: el AAC propio (io/W3dAac.h)
+#include <e32def.h>
+TBool W3dVideoSymbianHas();
+TInt W3dVideoSymbianCodecs();   // 1 = H.264, 2 = MPEG-4 (los que tiene el telefono)
+TBool W3dVideoSymbianFrame(const char* path, const unsigned char* rgba, TInt w, TInt h, TInt fps, TInt kbps, TInt codec);
+TBool W3dVideoSymbianAudio(const char* wav, TInt frequency, TInt kbps);
+TBool W3dAudioSymbianAac(const char* wav, const char* output, TInt frequency, TInt kbps);
+TBool W3dVideoSymbianClose();
+namespace w3dEngine { int W3dAudioRate(); }
+static int AudioKbps();
+static void RenderRange(int& f0, int& f1, int& fps);
+static bool g_openVideoSymbian = false;
+// el bitrate del video: el de la tarjeta
+static int VideoKbps(int, int, int) { return PickedVideoKbps(); }
 // el telefono codifica MPEG-4 hasta 720x576 (DevVideoRecord); H.264 o algo mas grande, el propio
 static bool VideoUsesOwn(int w, int h) {
     return VideoCodec() == 0 || w > 720 || h > 576 || !(W3dVideoSymbianCodecs() & 2);
@@ -5509,27 +5991,32 @@ void RTRowsPanel(Properties* P){
         }
     }
     if (P->propRTGpu) {
+        // (la GPU se prueba recien con el trazado prendido: probarla arranca Vulkan y compila sus shaders, 24 MB de RAM y
+        //  el arranque mas lento en la PC, y en la PC 'gpu' viene prendido de fabrica. Con el trazado apagado la fila ni
+        //  se ve, y su texto no importa)
         const bool show = g_rt.on && RTGpuAvailable();
         if (P->propRTGpu->hidden != !show) { P->propRTGpu->hidden = !show; PropertiesLayoutDirty = true; }
-        P->propRTGpu->button->text = (g_rt.gpu && RTGpuAvailable()) ? std::string("GPU (") + RTGpuName() + (RTGpuWithCoresRT() ? ", RTX)" : ")") : std::string("CPU");
+        if (show) P->propRTGpu->button->text = g_rt.gpu ? std::string("GPU (") + RTGpuName() + (RTGpuWithCoresRT() ? ", RTX)" : ")") : std::string("CPU");
     }
     if (P->propRTDenoiser) {
         // (solo si en ESTA maquina hay alguno ademas de "Ninguno": en Symbian, la web o un Android sin el de la GPU la
-        //  opcion no lleva a nada. Cada uno se prueba una vez: preguntar en cada cuadro no cuesta)
+        //  opcion no lleva a nada. Cada uno se prueba una vez, y recien con el trazado de rayos prendido: probar el de
+        //  la GPU arranca Vulkan y compila sus shaders -24 MB de RAM y el arranque mas lento en la PC- y el de Intel
+        //  carga su biblioteca, para una fila que con el trazado apagado ni se ve)
         bool has = false;
-        for (int d = W3D_DENOISER_NONE + 1; d < W3D_DENOISERS && !has; d++) has = W3dDenoiserAvailable(d);
+        for (int d = W3D_DENOISER_NONE + 1; g_rt.on && d < W3D_DENOISERS && !has; d++) has = W3dDenoiserAvailable(d);
         const bool show = g_rt.on && has;
         if (P->propRTDenoiser->hidden != !show) { P->propRTDenoiser->hidden = !show; PropertiesLayoutDirty = true; }
         P->propRTDenoiser->button->text = T(W3dDenoiserName(g_rt.denoiser));
     }
 }
-// EL TIPO DE LUZ: 0 Punto, 1 Sol (direccional), 2 Foco (cono: spotCutoff < 180)
-static const char* kLightTypes[3] = { "Point", "Sun", "Spot" };
-static int LightType(const Light* l) { return l->directional ? 1 : (l->spotCutoff < 179.5f ? 2 : 0); }
+// EL TIPO DE LUZ: 0 Punto, 1 Sol (direccional), 2 Foco (cono: spotCutoff < 180), 3 Area (una superficie: Light::area)
+static const char* kLightTypes[4] = { "Point", "Sun", "Spot", "Area" };
+static int LightType(const Light* l) { return l->directional ? 1 : (l->area ? 3 : (l->spotCutoff < 179.5f ? 2 : 0)); }
 static PopupMenu* MenuLightType = NULL;
 static void ActionLightPickedType(int id) {
     Light* l = (ActiveObj && ActiveObj->getType() == ObjectType::light) ? static_cast<Light*>(ActiveObj) : NULL;
-    if (!l || id < 0 || id > 2) return;
+    if (!l || id < 0 || id > 3) return;
     W3dLightSetType(l, id);
     // la tarjeta se vuelve a enlazar: el texto del boton y las filas que dependen del tipo (el cono, la atenuacion).
     // Solo marcar el layout no alcanzaba: el boton seguia diciendo "Puntual" aunque la luz ya habia cambiado
@@ -5544,8 +6031,30 @@ static void ActionMenuLightType() {
     if (!MenuLightType) { MenuLightType = new PopupMenu(); MenuLightType->action = ActionLightPickedType; }
     MenuLightType->Clear();
     MenuLightType->title = T("Type");
-    for (int i = 0; i < 3; i++) { MenuItem* it = MenuLightType->Add(T(kLightTypes[i]), i, IconType::light); if (it) it->green = (LightType(l) == i); }
+    for (int i = 0; i < 4; i++) { MenuItem* it = MenuLightType->Add(T(kLightTypes[i]), i, IconType::light); if (it) it->green = (LightType(l) == i); }
     OpenMenuUnderButton(MenuLightType, PropsActive->propLightType->button);
+}
+// LA FORMA de la luz de area (Light::areaShape): las de Blender. El cuadrado y el disco tienen un solo tamanio
+static const char* kLightAreaShapes[4] = { "Square", "Rectangle", "Disk", "Ellipse" };
+static PopupMenu* MenuLightAreaShape = NULL;
+static void ActionLightPickedAreaShape(int id) {
+    Light* l = (ActiveObj && ActiveObj->getType() == ObjectType::light) ? static_cast<Light*>(ActiveObj) : NULL;
+    if (!l || id < 0 || id > 3) return;
+    l->areaShape = id;
+    // (las filas del tamanio cambian: "Size" o "Size X" + "Size Y")
+    if (PropsActive) { PropsActive->target = NULL; PropsActive->RefreshTargetProperties(); }
+    RTInvalidate();
+    g_redraw = true;
+}
+static void ActionMenuLightAreaShape() {
+    if (!PropsActive || !PropsActive->propLightAreaShape) return;
+    Light* l = (ActiveObj && ActiveObj->getType() == ObjectType::light) ? static_cast<Light*>(ActiveObj) : NULL;
+    if (!l) return;
+    if (!MenuLightAreaShape) { MenuLightAreaShape = new PopupMenu(); MenuLightAreaShape->action = ActionLightPickedAreaShape; }
+    MenuLightAreaShape->Clear();
+    MenuLightAreaShape->title = T("Shape");
+    for (int i = 0; i < 4; i++) { MenuItem* it = MenuLightAreaShape->Add(T(kLightAreaShapes[i]), i, IconType::light); if (it) it->green = (l->areaShape == i); }
+    OpenMenuUnderButton(MenuLightAreaShape, PropsActive->propLightAreaShape->button);
 }
 // EL REESCALADO: trazar a la mitad (x2), un tercio (x3) o un cuarto (x4) de la resolucion del viewport y agrandar
 static PopupMenu* MenuRTScale = NULL;
@@ -5907,8 +6416,20 @@ static void RenderPreheatParticles(){
     if (W3dParticlesAlive()) return;
     for (int i = 0; i < 90; i++) W3dParticlesTick(RenderFrameDt());
 }
+// EL RENDER A ARCHIVO CON TODAS LAS TEXTURAS. Al abrir, el editor decodifica las texturas de a una por cuadro (el
+// proyecto abre en el acto y las texturas "aparecen"); un render apenas abierto -o el de --render-animation, o en un
+// telefono donde la cola tarda- salia con las que todavia faltaban en gris. Como el Play (GameWaitTextures): la cola se
+// vacia antes de dibujar, con los materiales que una malla paso a usar recien despertados
+static void RenderWaitTextures(){
+    TexturesWakeUsed();
+    const int pend = PendingTextures();
+    if (pend <= 0) return;
+    w3dLogf("[render] cargando %d textura(s) antes de renderizar", pend);
+    LoadAllPendingTextures();
+}
 // hace el render REAL de UNA imagen (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
 static void DoRenderImage(){
+    RenderWaitTextures();
     RenderPreheatParticles();
     Viewport3D* vp = RenderView();
     int w = (int)(g_render.w + 0.5f); if (w < 1) w = 1;
@@ -6117,6 +6638,7 @@ bool W3dWebRenderTick() {
 
 static void DoRenderAnimation(){
     if (RenderIsGame()) return;   // (el boton esta en gris: un juego no tiene animacion)
+    RenderWaitTextures();
     Viewport3D* vp = RenderView();
     extern int CurrentFrame, StartFrame, EndFrame;
     extern void ApplyAnimationObjects();
@@ -6201,6 +6723,15 @@ static void ActionRenderAnimation(){
             return;
         }
     }
+    DoRenderAnimation();
+}
+// "whisk3d --open x.w3d --render-animation" (o --render-image): renderiza al abrir, con la tarjeta Render del proyecto
+// (tamanio, formato, sonido, carpeta), sin preguntar si pisa el archivo -como "blender -b x.blend -a"-. En un telefono
+// sin pantalla a mano es la forma de lanzarlo por adb (platform/android-viejo: el extra "args" del intent)
+void W3dRenderAtStart(bool animation){
+    ComputeRenderBase();
+    if (!animation) { if (RenderFirstFile().empty()) { Notify(T("Nothing to render: tick Final composite or a pass"), true); return; } DoRenderImage(); return; }
+    if (RenderIsGame()) { Notify(T("A game has no animation to render"), true); return; }
     DoRenderAnimation();
 }
 // los atajos F12 / Ctrl+F12 (app/W3dShortcuts.cpp): lo mismo que los botones, con o sin panel de Propiedades (las opciones
@@ -7176,7 +7707,6 @@ static void MixMove(int d){
 }
 static void ActionMixUpload(){ MixMove(-1); }
 static void ActionMixLower(){ MixMove(+1); }
-static void ActionMixRange(){ MixApplyRange(); InvalidateSkinScene(); g_redraw = true; }
 static void ActionLayerChange(){ InvalidateSkinScene(); g_redraw = true; }
 // ---- la tarjeta Capa: animacion / modo / hueso (dropdowns) ----
 static PopupMenu* MenuLayerAnim = NULL;
@@ -8492,6 +9022,8 @@ static void ActiveCamToggle(){
 }
 static int PropKeyStateHook(int prop, int comp){
     if (ActiveAnimKind == 2) return 0;   // "Juego": los rombos no muestran keyframes (no tiene)
+    // un canal de MATERIAL (la tarjeta Material): el material que muestra la tarjeta, en la animacion de escena activa
+    if (W3dIsMatChannel(prop)) return AnimMatChannelState(ActiveMaterialUI(), prop, comp, CurrentFrame);
     if (prop == AnimCamActive) return comp == AnimY ? CamCheckState(ActiveObj) : ActiveCamState();
     extern int AnimChannelState(Object*, int, int, int);
     // el FONDO (tarjeta Render): sus curvas son de la COLECCION de la escena, no del objeto elegido
@@ -8501,6 +9033,13 @@ static int PropKeyStateHook(int prop, int comp){
 }
 static void PropKeyToggleHook(int prop, int comp){
     if (prop == AnimCamActive) { if (comp == AnimY) CamCheckToggle(ActiveObj); else ActiveCamToggle(); return; }
+    if (W3dIsMatChannel(prop)) {   // un canal de MATERIAL: pone / saca su keyframe en el frame actual (con Ctrl+Z)
+        UndoKeyframesStart();
+        AnimMatChannelToggle(ActiveMaterialUI(), prop, comp, CurrentFrame);
+        UndoKeyframesConfirm();
+        PropertiesLayoutDirty = true; g_redraw = true; RTInvalidate();
+        return;
+    }
     extern void AnimChannelToggle(Object*, int, int, int);
     if (prop == AnimBackground || prop == AnimBackgroundRot || prop == AnimBackgroundTex) {   // el FONDO: en la coleccion de la escena
         if (SceneCollection) { AnimChannelToggle(SceneCollection, prop, comp, CurrentFrame); PropertiesLayoutDirty = true; g_redraw = true; RTInvalidate(); }
@@ -8768,7 +9307,7 @@ static void BrowserSoundFile(const std::string& pickedPath){
 static const int kSoundLoadId = 1000000;   // (lejos de los sonidos: 1..N)
 static void ActionSoundPickedFile(int id){
     // (el "Cargar..." va con un id POSITIVO: los menus no ejecutan los negativos -con -2 no abria el explorador-)
-    if (id == kSoundLoadId) { OpenFileBrowser(T("Load sound"), T("Open"), ".wav", BrowserSoundFile); return; }
+    if (id == kSoundLoadId) { OpenFileBrowser(T("Load sound"), T("Open"), ".wav .mp3", BrowserSoundFile); return; }
     if (id < 0 || !ActiveObj || ActiveObj->getType() != ObjectType::sound) return;
     Sound* s = static_cast<Sound*>(ActiveObj);
     s->file = (id >= 1 && id <= (int)gSoundFiles.size()) ? gSoundFiles[(size_t)id - 1] : std::string();
@@ -8816,6 +9355,50 @@ static const char* CullMethodLabel(int m){
     }
 }
 
+// LAS FILAS COMUNES de las tarjetas de los elementos 2D (Rows2D en Properties.h), en el orden en que van en cada tarjeta
+static void AddHead2D(GroupPropertie* g, Rows2D& r){   // nombre, posicion, pixeles y peso: arriba de todo
+    r.name = new PropText(T("Name"), "");          g->properties.push_back(r.name);
+    r.posX = new PropFloat(T("Location X"));       g->properties.push_back(r.posX);
+    r.posY = new PropFloat("Y");                   g->properties.push_back(r.posY);
+    r.posZ = new PropFloat("Z");                   g->properties.push_back(r.posZ);
+    r.posAbs = new PropBool(T("Pixels"));          g->properties.push_back(r.posAbs);   // off = relativa al tamano de la UI
+    r.posAbs->onChange = ActionPos2DAbsToggle;
+    r.weight = new PropFloat(T("Weight"));         g->properties.push_back(r.weight);   // reparto en filas/columnas del padre
+    r.weight->SetRange(0.01f, 100.0f);
+}
+static void AddSize2D(GroupPropertie* g, Rows2D& r){   // ancho, alto y su unidad (fraccion / px / escalado)
+    r.width = new PropFloat(T("Width"), "px");     g->properties.push_back(r.width);  r.width->SetRange(1.0f, 8192.0f);
+    r.height = new PropFloat(T("Height"), "px");   g->properties.push_back(r.height); r.height->SetRange(1.0f, 8192.0f);
+    r.unit = new PropButton(T("Unit"));            g->properties.push_back(r.unit);
+    r.unit->withLabel = true; r.unit->button->dropdown = true; r.unit->action = ActionMenuSizeMode;
+}
+static void AddRot2D(GroupPropertie* g, Rows2D& r){ r.rot = new PropFloat(T("Rotation"), "o"); g->properties.push_back(r.rot); }
+static void AddAnchor2D(GroupPropertie* g, Rows2D& r){
+    r.anchor = new PropButton(T("Anchor"));        g->properties.push_back(r.anchor);
+    r.anchor->withLabel = true; r.anchor->button->dropdown = true; r.anchor->action = ActionMenuAnchor2D;
+}
+static void AddOpac2D(GroupPropertie* g, Rows2D& r){
+    r.opac = new PropFloat(T("Opacity"));          g->properties.push_back(r.opac);
+    r.opac->SetRange(0.0f, 1.0f); r.opac->fineStep = 0.01f; r.opac->thickStep = 0.1f; r.opac->dragStep = 0.005f;
+}
+
+// enlaza las filas COMUNES de un tipo 2D (Rows2D) a su elemento; NULL = el activo no es de ese tipo (las filas se van)
+static void Bind2D(Rows2D& r, Element2D* e){
+    if (r.posX){ r.posX->value = e ? &g_pos2dX : NULL; r.posX->onChange = ActionPos2DEdited; }
+    if (r.posY){ r.posY->value = e ? &g_pos2dY : NULL; r.posY->onChange = ActionPos2DEdited; }
+    if (r.posZ) r.posZ->value = e ? &e->pos.z : NULL;
+    if (r.posAbs) r.posAbs->value = e ? &g_pos2dAbs : NULL;
+    if (r.rot) r.rot->value = e ? &e->rot2d : NULL;
+    if (r.opac) r.opac->value = e ? &e->opacity : NULL;
+    if (r.width){   // (el texto y el boton no tienen tamano: se miden por su contenido)
+        r.width->value = e ? &e->width : NULL;
+        r.height->value = e ? &e->height : NULL;
+        if (e) r.unit->button->text = ModeNameSize(e->sizeMode);
+        FitRowSize(r.width, e ? e->sizeMode : TAM2D_PX);
+        FitRowSize(r.height, e ? e->sizeMode : TAM2D_PX);
+    }
+    if (e && r.anchor) r.anchor->button->text = T2dAnchorName(e->anchor);
+}
 void Properties::BuildGroups(){
     propTransform = new GroupPropertie(T("Transform"));
     propTransform->reserveKeyBtn = true;   // columna del boton de keyframe a la derecha
@@ -8946,20 +9529,7 @@ void Properties::BuildGroups(){
     // era lo unico que se usaba de ahi)
     propText2D = new GroupPropertie(T("Text"));
     propText2D->icon = (int)IconType::list;
-    propT2dName = new PropText(T("Name"), "");
-    propText2D->properties.push_back(propT2dName);
-    propT2dPosX = new PropFloat(T("Location X"));
-    propText2D->properties.push_back(propT2dPosX);
-    propT2dPosY = new PropFloat("Y");
-    propText2D->properties.push_back(propT2dPosY);
-    propT2dPosZ = new PropFloat("Z");
-    propText2D->properties.push_back(propT2dPosZ);
-    propT2dPosAbs = new PropBool(T("Pixels"));   // off = relativa al tamano de la UI
-    propT2dPosAbs->onChange = ActionPos2DAbsToggle;
-    propText2D->properties.push_back(propT2dPosAbs);
-    propT2dWeight = new PropFloat(T("Weight"));    // reparto en filas/columnas del padre
-    propT2dWeight->SetRange(0.01f, 100.0f);
-    propText2D->properties.push_back(propT2dWeight);
+    AddHead2D(propText2D, rowsT2d);
     propT2dText = new PropText(T("Text"), "");
     propText2D->properties.push_back(propT2dText);
     // TIPO del contenido (string / number / float) + decimales del float
@@ -8974,8 +9544,7 @@ void Properties::BuildGroups(){
     propT2dSize = new PropFloat(T("Size"), "px");
     propT2dSize->SetRange(1.0f, 2000.0f);
     propText2D->properties.push_back(propT2dSize);
-    propT2dRot = new PropFloat(T("Rotation"), "o");   // debajo de Tamano
-    propText2D->properties.push_back(propT2dRot);
+    AddRot2D(propText2D, rowsT2d);
     // desplegables: label a la IZQUIERDA, el boton del menu a la DERECHA (withLabel)
     // la FUENTE va entre Rotacion y Align X (molestaba entre ancla y alineacion)
     propT2dFont = new PropButton(T("Font"));
@@ -9003,15 +9572,7 @@ void Properties::BuildGroups(){
     propText2D->properties.push_back(propT2dAlignV);
     // ANCLA: desde donde se mide la posicion (el centro del padre por defecto, o bordes/esquinas).
     // Es lo que hace que la interfaz se ADAPTE al tamano de la ventana.
-    propT2dAnchor = new PropButton(T("Anchor"));
-    propT2dAnchor->withLabel = true;
-    propT2dAnchor->button->dropdown = true;
-    propT2dAnchor->action = ActionMenuT2dAnchor;
-    propText2D->properties.push_back(propT2dAnchor);
-    propT2dOpac = new PropFloat(T("Opacity"));
-    propT2dOpac->SetRange(0.0f, 1.0f);
-    propT2dOpac->fineStep = 0.01f; propT2dOpac->thickStep = 0.1f; propT2dOpac->dragStep = 0.005f;
-    propText2D->properties.push_back(propT2dOpac);
+    AddAnchor2D(propText2D, rowsT2d); AddOpac2D(propText2D, rowsT2d);
     propT2dPal = new PropButton(T("Palette"));   // color de la paleta del UI (o propio)
     propT2dPal->withLabel = true;
     propT2dPal->button->dropdown = true;
@@ -9024,52 +9585,19 @@ void Properties::BuildGroups(){
     // ===== Tarjeta "Imagen" (elemento Image2D del Editor 2D) =====
     propImage2D = new GroupPropertie(T("Image"));
     propImage2D->icon = (int)IconType::photo;
-    propImgName = new PropText(T("Name"), "");
-    propImage2D->properties.push_back(propImgName);
-    propImgPosX = new PropFloat(T("Location X"));
-    propImage2D->properties.push_back(propImgPosX);
-    propImgPosY = new PropFloat("Y");
-    propImage2D->properties.push_back(propImgPosY);
-    propImgPosZ = new PropFloat("Z");
-    propImage2D->properties.push_back(propImgPosZ);
-    propImgPosAbs = new PropBool(T("Pixels"));
-    propImgPosAbs->onChange = ActionPos2DAbsToggle;
-    propImage2D->properties.push_back(propImgPosAbs);
-    propImgWeight = new PropFloat(T("Weight"));
-    propImgWeight->SetRange(0.01f, 100.0f);
-    propImage2D->properties.push_back(propImgWeight);
+    AddHead2D(propImage2D, rowsImg);
     propImgTexture = new PropButton(T("Texture"));   // abre el file browser (con vista previa)
     propImgTexture->withLabel = true;
     propImgTexture->action = ActionImgTexture;
     propImage2D->properties.push_back(propImgTexture);
-    propImgWidth = new PropFloat(T("Width"), "px");
-    propImgWidth->SetRange(1.0f, 8192.0f);
-    propImage2D->properties.push_back(propImgWidth);
-    propImgHeight = new PropFloat(T("Height"), "px");
-    propImgHeight->SetRange(1.0f, 8192.0f);
-    propImage2D->properties.push_back(propImgHeight);
-    propImgUnit = new PropButton(T("Unit"));   // unidad del tamano (fraccion/px/escalado)
-    propImgUnit->withLabel = true;
-    propImgUnit->button->dropdown = true;
-    propImgUnit->action = ActionMenuSizeMode;
-    propImage2D->properties.push_back(propImgUnit);
-    propImgRot = new PropFloat(T("Rotation"), "o");
-    propImage2D->properties.push_back(propImgRot);
+    AddSize2D(propImage2D, rowsImg); AddRot2D(propImage2D, rowsImg);
     // como se acomoda la textura en el rect: estirar / ajustar (bandas) / cover (recorta)
     propImgMode = new PropButton(T("Mode"));
     propImgMode->withLabel = true;
     propImgMode->button->dropdown = true;
     propImgMode->action = ActionMenuImgMode;
     propImage2D->properties.push_back(propImgMode);
-    propImgAnchor = new PropButton(T("Anchor"));
-    propImgAnchor->withLabel = true;
-    propImgAnchor->button->dropdown = true;
-    propImgAnchor->action = ActionMenuImgAnchor;
-    propImage2D->properties.push_back(propImgAnchor);
-    propImgOpac = new PropFloat(T("Opacity"));
-    propImgOpac->SetRange(0.0f, 1.0f);
-    propImgOpac->fineStep = 0.01f; propImgOpac->thickStep = 0.1f; propImgOpac->dragStep = 0.005f;
-    propImage2D->properties.push_back(propImgOpac);
+    AddAnchor2D(propImage2D, rowsImg); AddOpac2D(propImage2D, rowsImg);
     propImgAlpha = new PropBool(T("Alpha"));   // usar el canal alpha de la textura
     propImage2D->properties.push_back(propImgAlpha);
     propImgMix = new PropButton(T("Blend"), IconType::material);
@@ -9090,42 +9618,7 @@ void Properties::BuildGroups(){
     // ===== Tarjeta "Rectangulo" (color solido o transparente: acomoda hijos) =====
     propRect2D = new GroupPropertie(T("Rectangle"));
     propRect2D->icon = (int)IconType::plane;
-    propRectName = new PropText(T("Name"), "");
-    propRect2D->properties.push_back(propRectName);
-    propRectPosX = new PropFloat(T("Location X"));
-    propRect2D->properties.push_back(propRectPosX);
-    propRectPosY = new PropFloat("Y");
-    propRect2D->properties.push_back(propRectPosY);
-    propRectPosZ = new PropFloat("Z");
-    propRect2D->properties.push_back(propRectPosZ);
-    propRectPosAbs = new PropBool(T("Pixels"));
-    propRectPosAbs->onChange = ActionPos2DAbsToggle;
-    propRect2D->properties.push_back(propRectPosAbs);
-    propRectWeight = new PropFloat(T("Weight"));
-    propRectWeight->SetRange(0.01f, 100.0f);
-    propRect2D->properties.push_back(propRectWeight);
-    propRectWidth = new PropFloat(T("Width"), "px");
-    propRectWidth->SetRange(1.0f, 8192.0f);
-    propRect2D->properties.push_back(propRectWidth);
-    propRectHeight = new PropFloat(T("Height"), "px");
-    propRectHeight->SetRange(1.0f, 8192.0f);
-    propRect2D->properties.push_back(propRectHeight);
-    propRectUnit = new PropButton(T("Unit"));
-    propRectUnit->withLabel = true;
-    propRectUnit->button->dropdown = true;
-    propRectUnit->action = ActionMenuSizeMode;
-    propRect2D->properties.push_back(propRectUnit);
-    propRectRot = new PropFloat(T("Rotation"), "o");
-    propRect2D->properties.push_back(propRectRot);
-    propRectAnchor = new PropButton(T("Anchor"));
-    propRectAnchor->withLabel = true;
-    propRectAnchor->button->dropdown = true;
-    propRectAnchor->action = ActionMenuRectAnchor;
-    propRect2D->properties.push_back(propRectAnchor);
-    propRectOpac = new PropFloat(T("Opacity"));
-    propRectOpac->SetRange(0.0f, 1.0f);
-    propRectOpac->fineStep = 0.01f; propRectOpac->thickStep = 0.1f; propRectOpac->dragStep = 0.005f;
-    propRect2D->properties.push_back(propRectOpac);
+    AddHead2D(propRect2D, rowsRect); AddSize2D(propRect2D, rowsRect); AddRot2D(propRect2D, rowsRect); AddAnchor2D(propRect2D, rowsRect); AddOpac2D(propRect2D, rowsRect);
     propRectPal = new PropButton(T("Palette"));
     propRectPal->withLabel = true;
     propRectPal->button->dropdown = true;
@@ -9138,76 +9631,18 @@ void Properties::BuildGroups(){
     // ===== Tarjeta "Contenedor" (rectangulo invisible: solo ordena a sus hijos) =====
     propCont2D = new GroupPropertie(T("Container"));
     propCont2D->icon = (int)IconType::folder;
-    propContName = new PropText(T("Name"), "");
-    propCont2D->properties.push_back(propContName);
-    propContPosX = new PropFloat(T("Location X"));
-    propCont2D->properties.push_back(propContPosX);
-    propContPosY = new PropFloat("Y");
-    propCont2D->properties.push_back(propContPosY);
-    propContPosZ = new PropFloat("Z");
-    propCont2D->properties.push_back(propContPosZ);
-    propContPosAbs = new PropBool(T("Pixels"));
-    propContPosAbs->onChange = ActionPos2DAbsToggle;
-    propCont2D->properties.push_back(propContPosAbs);
-    propContWeight = new PropFloat(T("Weight"));
-    propContWeight->SetRange(0.01f, 100.0f);
-    propCont2D->properties.push_back(propContWeight);
-    propContWidth = new PropFloat(T("Width"), "px");
-    propContWidth->SetRange(1.0f, 8192.0f);
-    propCont2D->properties.push_back(propContWidth);
-    propContHeight = new PropFloat(T("Height"), "px");
-    propContHeight->SetRange(1.0f, 8192.0f);
-    propCont2D->properties.push_back(propContHeight);
-    propContUnit = new PropButton(T("Unit"));
-    propContUnit->withLabel = true;
-    propContUnit->button->dropdown = true;
-    propContUnit->action = ActionMenuSizeMode;
-    propCont2D->properties.push_back(propContUnit);
-    propContRot = new PropFloat(T("Rotation"), "o");
-    propCont2D->properties.push_back(propContRot);
-    propContAnchor = new PropButton(T("Anchor"));
-    propContAnchor->withLabel = true;
-    propContAnchor->button->dropdown = true;
-    propContAnchor->action = ActionMenuContAnchor;
-    propCont2D->properties.push_back(propContAnchor);
-    propContOpac = new PropFloat(T("Opacity"));
-    propContOpac->SetRange(0.0f, 1.0f);
-    propContOpac->fineStep = 0.01f; propContOpac->thickStep = 0.1f; propContOpac->dragStep = 0.005f;
-    propCont2D->properties.push_back(propContOpac);
+    AddHead2D(propCont2D, rowsCont); AddSize2D(propCont2D, rowsCont); AddRot2D(propCont2D, rowsCont); AddAnchor2D(propCont2D, rowsCont); AddOpac2D(propCont2D, rowsCont);
     GroupProperties.push_back(propCont2D);
 
     // ===== Tarjeta "Slice 9" (imagen con bordes fijos) =====
     propS9card = new GroupPropertie("Slice 9");
     propS9card->icon = (int)IconType::grid;
-    propS9Name = new PropText(T("Name"), "");
-    propS9card->properties.push_back(propS9Name);
-    propS9PosX = new PropFloat(T("Location X"));
-    propS9card->properties.push_back(propS9PosX);
-    propS9PosY = new PropFloat("Y");
-    propS9card->properties.push_back(propS9PosY);
-    propS9PosZ = new PropFloat("Z");
-    propS9card->properties.push_back(propS9PosZ);
-    propS9PosAbs = new PropBool(T("Pixels"));
-    propS9PosAbs->onChange = ActionPos2DAbsToggle;
-    propS9card->properties.push_back(propS9PosAbs);
-    propS9Weight = new PropFloat(T("Weight"));
-    propS9Weight->SetRange(0.01f, 100.0f);
-    propS9card->properties.push_back(propS9Weight);
+    AddHead2D(propS9card, rowsS9);
     propS9Texture = new PropButton(T("Texture"));
     propS9Texture->withLabel = true;
     propS9Texture->action = ActionS9Texture;
     propS9card->properties.push_back(propS9Texture);
-    propS9Width = new PropFloat(T("Width"), "px");
-    propS9Width->SetRange(1.0f, 8192.0f);
-    propS9card->properties.push_back(propS9Width);
-    propS9Height = new PropFloat(T("Height"), "px");
-    propS9Height->SetRange(1.0f, 8192.0f);
-    propS9card->properties.push_back(propS9Height);
-    propS9Unit = new PropButton(T("Unit"));
-    propS9Unit->withLabel = true;
-    propS9Unit->button->dropdown = true;
-    propS9Unit->action = ActionMenuSizeMode;
-    propS9card->properties.push_back(propS9Unit);
+    AddSize2D(propS9card, rowsS9);
     // el borde: cuanto mide en el ARCHIVO (por eje: esquinas rectangulares si difieren;
     // minimo 1, maximo la mitad de la imagen menos 1) y a que escala se dibuja
     propS9BorderX = new PropFloat(T("Border X"), "px");
@@ -9220,17 +9655,7 @@ void Properties::BuildGroups(){
     propS9EscBorder->SetRange(0.05f, 16.0f);
     propS9EscBorder->fineStep = 0.05f; propS9EscBorder->thickStep = 0.5f; propS9EscBorder->dragStep = 0.01f;
     propS9card->properties.push_back(propS9EscBorder);
-    propS9Rot = new PropFloat(T("Rotation"), "o");
-    propS9card->properties.push_back(propS9Rot);
-    propS9Anchor = new PropButton(T("Anchor"));
-    propS9Anchor->withLabel = true;
-    propS9Anchor->button->dropdown = true;
-    propS9Anchor->action = ActionMenuS9Anchor;
-    propS9card->properties.push_back(propS9Anchor);
-    propS9Opac = new PropFloat(T("Opacity"));
-    propS9Opac->SetRange(0.0f, 1.0f);
-    propS9Opac->fineStep = 0.01f; propS9Opac->thickStep = 0.1f; propS9Opac->dragStep = 0.005f;
-    propS9card->properties.push_back(propS9Opac);
+    AddRot2D(propS9card, rowsS9); AddAnchor2D(propS9card, rowsS9); AddOpac2D(propS9card, rowsS9);
     propS9Filter = new PropBool(T("Filtering"));
     propS9card->properties.push_back(propS9Filter);
     propS9Pal = new PropButton(T("Palette"));
@@ -9245,20 +9670,7 @@ void Properties::BuildGroups(){
     // ===== Tarjeta "Boton" (card con texto y/o icono, estilo Whisk3D) =====
     propBtn2D = new GroupPropertie(T("Button"));
     propBtn2D->icon = (int)IconType::object;
-    propBtnName = new PropText(T("Name"), "");
-    propBtn2D->properties.push_back(propBtnName);
-    propBtnPosX = new PropFloat(T("Location X"));
-    propBtn2D->properties.push_back(propBtnPosX);
-    propBtnPosY = new PropFloat("Y");
-    propBtn2D->properties.push_back(propBtnPosY);
-    propBtnPosZ = new PropFloat("Z");
-    propBtn2D->properties.push_back(propBtnPosZ);
-    propBtnPosAbs = new PropBool(T("Pixels"));
-    propBtnPosAbs->onChange = ActionPos2DAbsToggle;
-    propBtn2D->properties.push_back(propBtnPosAbs);
-    propBtnWeight = new PropFloat(T("Weight"));
-    propBtnWeight->SetRange(0.01f, 100.0f);
-    propBtn2D->properties.push_back(propBtnWeight);
+    AddHead2D(propBtn2D, rowsBtn);
     propBtnText = new PropText(T("Text"), "");
     propBtn2D->properties.push_back(propBtnText);
     propBtnIcon = new PropButton(T("Icon"));   // un png (10x10 estilo Whisk3D, o el que sea)
@@ -9271,17 +9683,7 @@ void Properties::BuildGroups(){
     propBtnPad = new PropFloat(T("Padding"), "px");
     propBtnPad->SetRange(0.0f, 256.0f);
     propBtn2D->properties.push_back(propBtnPad);
-    propBtnAnchor = new PropButton(T("Anchor"));
-    propBtnAnchor->withLabel = true;
-    propBtnAnchor->button->dropdown = true;
-    propBtnAnchor->action = ActionMenuBtnAnchor;
-    propBtn2D->properties.push_back(propBtnAnchor);
-    propBtnRot = new PropFloat(T("Rotation"), "o");
-    propBtn2D->properties.push_back(propBtnRot);
-    propBtnOpac = new PropFloat(T("Opacity"));
-    propBtnOpac->SetRange(0.0f, 1.0f);
-    propBtnOpac->fineStep = 0.01f; propBtnOpac->thickStep = 0.1f; propBtnOpac->dragStep = 0.005f;
-    propBtn2D->properties.push_back(propBtnOpac);
+    AddAnchor2D(propBtn2D, rowsBtn); AddRot2D(propBtn2D, rowsBtn); AddOpac2D(propBtn2D, rowsBtn);
     // cada color puede ser PROPIO o apuntar a la PALETA del UI (un puntero, no una copia).
     // El swatch de abajo lleva el MISMO label que su desplegable (sin nombre no se sabia
     // cual era cual).
@@ -9334,35 +9736,12 @@ void Properties::BuildGroups(){
     // ===== Tarjeta "Video" (fondos animados y festejos; sin sonido) =====
     propVid2D = new GroupPropertie(T("Video"));
     propVid2D->icon = (int)IconType::camera;
-    propVidName = new PropText(T("Name"), "");
-    propVid2D->properties.push_back(propVidName);
-    propVidPosX = new PropFloat(T("Location X"));
-    propVid2D->properties.push_back(propVidPosX);
-    propVidPosY = new PropFloat("Y");
-    propVid2D->properties.push_back(propVidPosY);
-    propVidPosZ = new PropFloat("Z");
-    propVid2D->properties.push_back(propVidPosZ);
-    propVidPosAbs = new PropBool(T("Pixels"));
-    propVidPosAbs->onChange = ActionPos2DAbsToggle;
-    propVid2D->properties.push_back(propVidPosAbs);
-    propVidWeight = new PropFloat(T("Weight"));
-    propVidWeight->SetRange(0.01f, 100.0f);
-    propVid2D->properties.push_back(propVidWeight);
+    AddHead2D(propVid2D, rowsVid);
     propVidFile = new PropButton(T("Video"));
     propVidFile->withLabel = true;
     propVidFile->action = ActionVidFile;
     propVid2D->properties.push_back(propVidFile);
-    propVidWidth = new PropFloat(T("Width"), "px");
-    propVidWidth->SetRange(1.0f, 8192.0f);
-    propVid2D->properties.push_back(propVidWidth);
-    propVidHeight = new PropFloat(T("Height"), "px");
-    propVidHeight->SetRange(1.0f, 8192.0f);
-    propVid2D->properties.push_back(propVidHeight);
-    propVidUnit = new PropButton(T("Unit"));
-    propVidUnit->withLabel = true;
-    propVidUnit->button->dropdown = true;
-    propVidUnit->action = ActionMenuSizeMode;
-    propVid2D->properties.push_back(propVidUnit);
+    AddSize2D(propVid2D, rowsVid);
     propVidMode = new PropButton(T("Mode"));
     propVidMode->withLabel = true;
     propVidMode->button->dropdown = true;
@@ -9376,17 +9755,7 @@ void Properties::BuildGroups(){
     propVid2D->properties.push_back(propVidPlay);
     propVidFilter = new PropBool(T("Filtering"));
     propVid2D->properties.push_back(propVidFilter);
-    propVidRot = new PropFloat(T("Rotation"), "o");
-    propVid2D->properties.push_back(propVidRot);
-    propVidAnchor = new PropButton(T("Anchor"));
-    propVidAnchor->withLabel = true;
-    propVidAnchor->button->dropdown = true;
-    propVidAnchor->action = ActionMenuVidAnchor;
-    propVid2D->properties.push_back(propVidAnchor);
-    propVidOpac = new PropFloat(T("Opacity"));
-    propVidOpac->SetRange(0.0f, 1.0f);
-    propVidOpac->fineStep = 0.01f; propVidOpac->thickStep = 0.1f; propVidOpac->dragStep = 0.005f;
-    propVid2D->properties.push_back(propVidOpac);
+    AddRot2D(propVid2D, rowsVid); AddAnchor2D(propVid2D, rowsVid); AddOpac2D(propVid2D, rowsVid);
     GroupProperties.push_back(propVid2D);
 
     // ===== Tarjeta "Expandir" (resorte de layout: absorbe el espacio libre) =====
@@ -9686,7 +10055,6 @@ void Properties::BuildGroups(){
     propResource->properties.push_back(propRecName);
     propRecFolder = new PropText(T("Folder"));
     propResource->properties.push_back(propRecFolder);
-    propRecType = NULL;   // (antes una linea con todo junto: ahora cada dato en su caja)
     // USUARIOS (0 en rojo: nadie lo usa), TIPO y GUARDADO: cajas de solo lectura como las de un valor
     propRecUsers = new PropText(T("Users"));
     propRecUsers->field.readOnly = true;
@@ -9739,14 +10107,12 @@ void Properties::BuildGroups(){
     propRecSaveAs->action = ActionRecSaveAs;
     propRecSaveAs->hidden = true;
     propResource->properties.push_back(propRecSaveAs);
-    propRecExtract = NULL;   // (era una copia afuera: lo mismo que Guardar como)
     // lo del tipo: escuchar/parar un sonido, abrir una escena/prefab, abrir un script en el IDE
     propRecActions2 = new PropButtonRow();
     propRecActions2->Add(T("Play"), ActionRecActionType);
     propRecActions2->Add(T("Stop"), ActionRecStop);
     propResource->properties.push_back(propRecActions2);
     // abajo de todo: SELECCIONAR USUARIOS (el icono de los usuarios) y BORRAR (el tacho), una fila cada uno
-    propRecActions = NULL;
     propRecSelUsers = new PropButton(T("Select Users"), IconType::users);
     propRecSelUsers->action = ActionRecSelectUsers;
     propResource->properties.push_back(propRecSelUsers);
@@ -9758,6 +10124,7 @@ void Properties::BuildGroups(){
 
     propMaterial = new GroupPropertie(T("Material"));
     propMaterial->icon = (int)IconType::material;   // (el icono a la izquierda del titulo)
+    propMaterial->reserveKeyBtn = true;   // columna del rombo: los canales animables del material (formato/material-animado.md)
     propMaterial->valueWidth = 0.30f;
     // LAS CAPAS DE MATERIAL del mesh part: una lista con el material ADENTRO (la capa 1 arranca en el por defecto y
     // siempre queda una). Cada fila: doble click = renombrar el material, la FLECHA = cambiarlo por otro, el TACHO =
@@ -9843,12 +10210,40 @@ void Properties::BuildGroups(){
         propMatTrans = new PropFloat(T("Transmission")); propMatTrans->SetRange(0.0f, 1.0f);
         propMatTrans->fineStep = 0.05f; propMatTrans->thickStep = 0.1f; propMatTrans->dragStep = 0.01f;
         propMatTrans->onChange = ActionMatTransmission;
+        propMatTrans->animProp = AnimMatTransmission; propMatTrans->animComp = AnimX;   // animable
         propMaterial->properties.push_back(propMatTrans);
         propMaterial->properties.push_back(propMatIOR);
         // REFLEJOS EN PANTALLA: lo dibujado se refleja (segun la rugosidad, el metalico y el angulo). Con shaders
         propMatSSR = new PropBool(T("Screen Space Reflections"));
         propMatSSR->onChange = ActionRTValues;
         propMaterial->properties.push_back(propMatSSR);
+        // LA FUERZA DE LA EMISION (la emision es color x fuerza, como el Strength de Blender): debajo de la fila Emision.
+        // Animable (una luz que parpadea: 0 <-> 1 en escalon)
+        gPropMatEmitK = new PropFloat(T("Emission Strength")); gPropMatEmitK->SetRange(0.0f, 10000.0f);
+        gPropMatEmitK->fineStep = 0.1f; gPropMatEmitK->thickStep = 1.0f; gPropMatEmitK->dragStep = 0.01f;
+        gPropMatEmitK->onChange = ActionRTValues;
+        gPropMatEmitK->animProp = AnimMatEmitStrength; gPropMatEmitK->animComp = AnimX;
+        { std::vector<PropertieBase*>& v = propMaterial->properties;
+          for (size_t q = 0; q < v.size(); q++) if (v[q] == propMap[W3D_MAP_EMISSION]) { v.insert(v.begin() + (long)q + 1, gPropMatEmitK); break; } }
+        // LA TRANSFORMACION UV (la textura base y los mapas): desplazamiento, escala y rotacion (animables: la pantalla con
+        // el texto que pasa) y el pivote de la rotacion y la escala
+        gPropMatUVTitle = new PropLabel(T("UV Transform"));
+        propMaterial->properties.push_back(gPropMatUVTitle);
+        {
+            static const char* const kName[7] = { "UV Offset", "UV Offset", "UV Scale", "UV Scale", "UV Rotation", "UV Pivot", "UV Pivot" };
+            static const char* const kAxis[7] = { " U", " V", " U", " V", "", " U", " V" };
+            static const int kProp[7] = { AnimMatUVOffset, AnimMatUVOffset, AnimMatUVScale, AnimMatUVScale, AnimMatUVRotation, -1, -1 };
+            static const int kComp[7] = { AnimX, AnimY, AnimX, AnimY, AnimX, AnimX, AnimY };
+            for (int i = 0; i < 7; i++) {
+                PropFloat* f = new PropFloat(std::string(T(kName[i])) + kAxis[i], i == 4 ? "\xC2\xB0" : "");
+                if (i == 4) { f->SetRange(-36000.0f, 36000.0f); f->fineStep = 1.0f; f->thickStep = 15.0f; f->dragStep = 0.5f; }
+                else { f->SetRange(-10000.0f, 10000.0f); f->fineStep = 0.01f; f->thickStep = 0.1f; f->dragStep = 0.005f; }
+                f->onChange = ActionRTValues;
+                f->animProp = kProp[i]; f->animComp = kComp[i];
+                gPropMatUV[i] = f;
+                propMaterial->properties.push_back(f);
+            }
+        }
     }
     // Se CONSTRUYE todo primero (el bind es por member, no importa el orden de construccion); el PUSH define el
     // orden VISUAL, que se reorganizo: Lighting arriba de todo, Vertex Color sobre Base Color, y los
@@ -10057,6 +10452,20 @@ void Properties::BuildGroups(){
     propLightSpotExp->fineStep = 1.0f; propLightSpotExp->thickStep = 8.0f; propLightSpotExp->dragStep = 1.0f;
     propLightSpotExp->animProp = AnimSpot; propLightSpotExp->animComp = AnimY;
     propLight->properties.push_back(propLightSpotExp);
+    // LA DE AREA: la forma y el tamanio en metros (con la escala del objeto, como en Blender). Solo en una de Area
+    propLightAreaShape = new PropButton(T("Shape"));
+    propLightAreaShape->withLabel = true;
+    propLightAreaShape->button->dropdown = true;
+    propLightAreaShape->action = ActionMenuLightAreaShape;
+    propLight->properties.push_back(propLightAreaShape);
+    propLightAreaX = new PropFloat(T("Size X"), "m"); propLightAreaX->SetRange(0.001f, 1000.0f);
+    propLightAreaX->fineStep = 0.05f; propLightAreaX->thickStep = 0.5f; propLightAreaX->dragStep = 0.01f;
+    propLightAreaX->onChange = ActionRTValues;
+    propLight->properties.push_back(propLightAreaX);
+    propLightAreaY = new PropFloat(T("Size Y"), "m"); propLightAreaY->SetRange(0.001f, 1000.0f);
+    propLightAreaY->fineStep = 0.05f; propLightAreaY->thickStep = 0.5f; propLightAreaY->dragStep = 0.01f;
+    propLightAreaY->onChange = ActionRTValues;
+    propLight->properties.push_back(propLightAreaY);
     // DISTANCIA (m): hasta donde alumbra la puntual/foco = el largo del cono. 0 = sin limite
     propLightDist = new PropFloat(T("Distance"), "m"); propLightDist->SetRange(0.0f, 1000.0f);
     propLightDist->fineStep = 0.1f; propLightDist->thickStep = 1.0f; propLightDist->dragStep = 0.05f;
@@ -10145,6 +10554,9 @@ void Properties::BuildGroups(){
     // distintas (el LOD leia la vista del ultimo viewport dibujado).
     propLodOnlyCam = new PropBool(T("Only active camera"));
     propLOD->properties.push_back(propLodOnlyCam);
+    // el render final con el primer hijo (el detallado) y el viewport con el liviano: ver LOD::renderFirst
+    propLodRender = new PropBool(T("Render with the first"));
+    propLOD->properties.push_back(propLodRender);
     GroupProperties.push_back(propLOD);
 
     // pestania del objeto Culling UNIFICADO: un solo objeto con SELECTOR de metodo (Frustum/Grid/Triangulo/BSP)
@@ -10259,6 +10671,7 @@ void Properties::BuildGroups(){
     GroupProperties.push_back(propClip);
     // HITBOX: caja de deteccion (la tarjeta entera vive en PropsHitbox.cpp)
     PropsHitboxBuild(this);
+    PropsCurveBuild(this);        // la CURVA: su forma (tubo / cinta), su material, Convert to Mesh
     PropsLightProbeBuild(this);   // LA SONDA DE LUZ (PropsLightProbe.cpp)
     PropsReflectionProbeBuild(this);   // LA SONDA DE REFLEJO (PropsReflectionProbe.cpp)
     PropsRoutineBuild(this);
@@ -11771,6 +12184,8 @@ void Properties::BuildGroups(){
     propRowConstraintInverse->Add(T("Set Inverse"),   ActionConstraintSetInverse);
     propRowConstraintInverse->Add(T("Clear Inverse"), ActionConstraintClearInverse);
     propConstraintProps->properties.push_back(propRowConstraintInverse);
+    // las filas de los tipos de la fase 2 (Copy Scale .. IK) y el Bake de los huesos (ver W3dConsUI)
+    consUI = ConsUIBuild(propConstraints, propConstraintProps);
     GroupProperties.push_back(propConstraintProps);
     // LAS TARJETAS DECLARADAS (ui/panels/PanelsText.cpp): la Niebla, ...
     panels = W3dPanelsBuild(GroupProperties);
@@ -12224,12 +12639,6 @@ static void ActionRecActionType() {
         if (!IDEOpenScript(id)) Notify(T("There is no script editor (IDE) in the layout"), true);
         return;
     }
-}
-// el texto de una fila informativa cambio: se reescribe y se pide re-layout (las WRAP cambian de alto)
-static void RecLabel(PropLabel* l, const std::string& t) {
-    if (!l) return;
-    const bool hide = t.empty();
-    if (l->name != t || l->hidden != hide) { l->name = t; l->hidden = hide; PropertiesLayoutDirty = true; g_redraw = true; }
 }
 // una CAJA de solo lectura (etiqueta | valor): NULL = oculta. Mientras se esta seleccionando el texto no se toca
 static void RecBox(PropText* c, const char* label, const std::string& value) {
@@ -12965,6 +13374,21 @@ void Properties::Rebind(){
         if (propMatIOR) propMatIOR->value = (!rt || !(material->transmission > 0.0f || material->transparent)) ? NULL : &material->ior;
         if (propMatTrans) propMatTrans->value = rt ? &material->transmission : NULL;
         if (propMatSSR) propMatSSR->value = (rt && w3dEngine::ShadingPerPixelSupported()) ? &material->ssr : NULL;
+        // LOS CANALES ANIMABLES (el rombo de cada fila, formato/material-animado.md): el color base siempre; la emision,
+        // la rugosidad, el metalico y el alfa en modo NUMERO (con su textura el numero no se usa). El material por
+        // defecto y el de una libreria no se animan: sin rombos
+        static const int kAnimMap[W3D_MAPS] = { -1, -1, AnimMatEmission, AnimMatRoughness, AnimMatMetallic, AnimMatAlpha };
+        if (propBtnTexture) { propBtnTexture->animProp = hasMat ? AnimMatColor : -1; propBtnTexture->animComp = AnimX; }
+        for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++)
+            if (propMap[k]) { propMap[k]->animProp = (hasMat && !material->mapWithTexture[k]) ? kAnimMap[k] : -1; propMap[k]->animComp = AnimX; }
+        if (gPropMatEmitK) gPropMatEmitK->value = hasMat ? &material->emissionStrength : NULL;
+        if (gPropMatUVTitle) gPropMatUVTitle->hidden = !hasMat;
+        for (int i = 0; i < 7; i++) {
+            if (!gPropMatUV[i]) continue;
+            float* v = NULL;
+            if (hasMat) v = (i < 2) ? &material->uvOffset[i] : (i < 4) ? &material->uvScale[i - 2] : (i == 4) ? &material->uvRotation : &material->uvPivot[i - 5];
+            gPropMatUV[i]->value = v;
+        }
     }
     // CAPAS DE TEXTURA: una fila por capa + la de "Add Layer" (si quedan filas); el resto oculto
     if (propLayersTitle) {
@@ -12979,6 +13403,8 @@ void Properties::Rebind(){
             propLayerUV[i]->hidden = !has;
             propLayerMix[i]->hidden = !has;
             propLayerForce[i]->value = has ? &gLayerForcePct : NULL;
+            propLayerForce[i]->animProp = has ? AnimMatLayerForce : -1;   // (animable: el factor de ESA capa)
+            propLayerForce[i]->animComp = has ? sel : 0;
             if (has && !(g_propFloatEditing == propLayerForce[i])) gLayerForcePct = material->layers[(size_t)sel].force * 100.0f;
             propLayerOn[i]->value = has ? &material->layers[(size_t)sel].on : NULL;
             if (has) {
@@ -13006,7 +13432,7 @@ void Properties::Rebind(){
                 case PropertyType::Button: ((PropButton*)p)->hidden = true; break;
                 default:
                     if (p == propSepMat) propSepMat->hidden = true;
-                    else if (p == propMsgDefault || p == propLayersTitle) ((PropLabel*)p)->hidden = true;
+                    else if (p == propMsgDefault || p == propLayersTitle || p == gPropMatUVTitle) ((PropLabel*)p)->hidden = true;
                     else if (p == propListLayers) propListLayers->hidden = true;   // (con el shader: sin las capas de textura)
                     break;
             }
@@ -13103,8 +13529,8 @@ void Properties::RefreshTargetProperties(){
             float vw, vh; UI2D_CanvasSize(&vw, &vh);
             g_pos2dX = g_pos2dAbs ? e2d->pos.x * vw : e2d->pos.x;
             g_pos2dY = g_pos2dAbs ? e2d->pos.y * vh : e2d->pos.y;
-            PropFloat* xs[6] = { propT2dPosX, propT2dPosY, propImgPosX, propImgPosY,
-                                 propRectPosX, propRectPosY };
+            PropFloat* xs[6] = { rowsT2d.posX, rowsT2d.posY, rowsImg.posX, rowsImg.posY,
+                                 rowsRect.posX, rowsRect.posY };
             for (int i = 0; i < 6; i++) if (xs[i]){
                 xs[i]->unit = g_pos2dAbs ? "px" : "";
                 xs[i]->fineStep  = g_pos2dAbs ? 1.0f  : 0.01f;
@@ -13207,12 +13633,7 @@ void Properties::RefreshTargetProperties(){
         propT2dColor->value = (t && t->palColor < 0) ? t->color : NULL;
         propT2dColor->palRef = t ? &t->palColor : NULL; propT2dColor->palObj = t;
         if (propT2dPal && t) propT2dPal->button->text = PalName(t, t->palColor);
-        if (propT2dRot)  propT2dRot->value  = t ? &t->rot2d : NULL;
-        if (propT2dPosX){ propT2dPosX->value = t ? &g_pos2dX : NULL; propT2dPosX->onChange = ActionPos2DEdited; }
-        if (propT2dPosY){ propT2dPosY->value = t ? &g_pos2dY : NULL; propT2dPosY->onChange = ActionPos2DEdited; }
-        if (propT2dPosZ) propT2dPosZ->value = t ? &t->pos.z : NULL;
-        if (propT2dPosAbs) propT2dPosAbs->value = t ? &g_pos2dAbs : NULL;
-        if (propT2dOpac) propT2dOpac->value = t ? &t->opacity : NULL;
+        Bind2D(rowsT2d, t);
         if (propT2dDec)  propT2dDec->value  = (t && t->type == 2) ? &t->decimals : NULL;
         if (propT2dAutoSize) propT2dAutoSize->value = t ? &t->autoSize : NULL;
         if (propT2dLines && t) propT2dLines->button->text = T2dLineName(t->lines);
@@ -13221,97 +13642,52 @@ void Properties::RefreshTargetProperties(){
             propT2dAlignH->button->text = T2dAlignName(t->alignH, true);
             propT2dAlignV->button->text = T2dAlignName(t->alignV, false);
             propT2dFont->button->text   = Font2DName(t->source);
-            propT2dAnchor->button->text = T2dAnchorName(t->anchor);
             if (propT2dType) propT2dType->button->text = T2dTypeName(t->type);
         }
     }
     // IMAGEN 2D: bindea la tarjeta (NULL/labels segun el activo sea o no una Image2D)
-    if (propImage2D && propImgWidth){
+    if (propImage2D && rowsImg.width){
         Image2D* im = (ActiveObj && ActiveObj->getType() == ObjectType::image2d) ? (Image2D*)ActiveObj : NULL;
-        propImgWidth->value  = im ? &im->width : NULL;
-        propImgHeight->value = im ? &im->height  : NULL;
-        propImgRot->value    = im ? &im->rot2d : NULL;
-        if (propImgPosX){ propImgPosX->value = im ? &g_pos2dX : NULL; propImgPosX->onChange = ActionPos2DEdited; }
-        if (propImgPosY){ propImgPosY->value = im ? &g_pos2dY : NULL; propImgPosY->onChange = ActionPos2DEdited; }
-        if (propImgPosZ) propImgPosZ->value = im ? &im->pos.z : NULL;
-        if (propImgPosAbs) propImgPosAbs->value = im ? &g_pos2dAbs : NULL;
-        if (propImgOpac) propImgOpac->value = im ? &im->opacity : NULL;
-        if (propImgUnit && im) propImgUnit->button->text = ModeNameSize(im->sizeMode);
+        Bind2D(rowsImg, im);
         if (propImgColor){ propImgColor->value = (im && im->palTint < 0) ? im->color : NULL;
                            propImgColor->palRef = im ? &im->palTint : NULL; propImgColor->palObj = im; }
         if (propImgPal && im) propImgPal->button->text = PalName(im, im->palTint);
         if (propImgAlpha) propImgAlpha->value = im ? &im->useAlpha : NULL;
         if (propImgMix) propImgMix->button->text = im ? MixName(im->mix) : std::string(T("Blend"));
         if (propImgFilter) propImgFilter->value = im ? &im->filtered : NULL;
-        FitRowSize(propImgWidth, im ? im->sizeMode : TAM2D_PX);
-        FitRowSize(propImgHeight,  im ? im->sizeMode : TAM2D_PX);
         if (im){
             propImgTexture->button->text = im->texture.empty() ? std::string(T("Choose..."))
                                                                : FileName(im->texture);
             propImgMode->button->text   = ImgModeName(im->mode);
-            propImgAnchor->button->text = T2dAnchorName(im->anchor);
         }
     }
     // RECTANGULO 2D
-    if (propRect2D && propRectWidth){
+    if (propRect2D && rowsRect.width){
         Rect2D* r = (ActiveObj && ActiveObj->getType() == ObjectType::rect2d) ? (Rect2D*)ActiveObj : NULL;
-        propRectWidth->value  = r ? &r->width : NULL;
-        propRectHeight->value = r ? &r->height  : NULL;
-        propRectRot->value    = r ? &r->rot2d : NULL;
-        if (propRectPosX){ propRectPosX->value = r ? &g_pos2dX : NULL; propRectPosX->onChange = ActionPos2DEdited; }
-        if (propRectPosY){ propRectPosY->value = r ? &g_pos2dY : NULL; propRectPosY->onChange = ActionPos2DEdited; }
-        if (propRectPosZ) propRectPosZ->value = r ? &r->pos.z : NULL;
-        if (propRectPosAbs) propRectPosAbs->value = r ? &g_pos2dAbs : NULL;
-        if (propRectOpac)  propRectOpac->value  = r ? &r->opacity : NULL;
+        Bind2D(rowsRect, r);
         if (propRectColor){ propRectColor->value = (r && r->palColor < 0) ? r->color : NULL;
                             propRectColor->palRef = r ? &r->palColor : NULL; propRectColor->palObj = r; }
         if (propRectPal && r) propRectPal->button->text = PalName(r, r->palColor);
-        if (propRectUnit && r) propRectUnit->button->text = ModeNameSize(r->sizeMode);
-        FitRowSize(propRectWidth, r ? r->sizeMode : TAM2D_PX);
-        FitRowSize(propRectHeight,  r ? r->sizeMode : TAM2D_PX);
-        if (r && propRectAnchor) propRectAnchor->button->text = T2dAnchorName(r->anchor);
     }
     // CONTENEDOR 2D
-    if (propCont2D && propContWidth){
+    if (propCont2D && rowsCont.width){
         Container2D* c = (ActiveObj && ActiveObj->getType() == ObjectType::cont2d) ? (Container2D*)ActiveObj : NULL;
-        propContWidth->value  = c ? &c->width : NULL;
-        propContHeight->value = c ? &c->height  : NULL;
-        propContRot->value    = c ? &c->rot2d : NULL;
-        if (propContPosX){ propContPosX->value = c ? &g_pos2dX : NULL; propContPosX->onChange = ActionPos2DEdited; }
-        if (propContPosY){ propContPosY->value = c ? &g_pos2dY : NULL; propContPosY->onChange = ActionPos2DEdited; }
-        if (propContPosZ) propContPosZ->value = c ? &c->pos.z : NULL;
-        if (propContPosAbs) propContPosAbs->value = c ? &g_pos2dAbs : NULL;
-        if (propContOpac) propContOpac->value = c ? &c->opacity : NULL;
-        if (propContUnit && c) propContUnit->button->text = ModeNameSize(c->sizeMode);
-        FitRowSize(propContWidth, c ? c->sizeMode : TAM2D_PX);
-        FitRowSize(propContHeight,  c ? c->sizeMode : TAM2D_PX);
-        if (c && propContAnchor) propContAnchor->button->text = T2dAnchorName(c->anchor);
+        Bind2D(rowsCont, c);
     }
     // SLICE 9
-    if (propS9card && propS9Width){
+    if (propS9card && rowsS9.width){
         Slice9* s9 = (ActiveObj && ActiveObj->getType() == ObjectType::slice9) ? (Slice9*)ActiveObj : NULL;
-        propS9Width->value  = s9 ? &s9->width : NULL;
-        propS9Height->value = s9 ? &s9->height  : NULL;
-        propS9Rot->value    = s9 ? &s9->rot2d : NULL;
-        if (propS9PosX){ propS9PosX->value = s9 ? &g_pos2dX : NULL; propS9PosX->onChange = ActionPos2DEdited; }
-        if (propS9PosY){ propS9PosY->value = s9 ? &g_pos2dY : NULL; propS9PosY->onChange = ActionPos2DEdited; }
-        if (propS9PosZ) propS9PosZ->value = s9 ? &s9->pos.z : NULL;
-        if (propS9PosAbs) propS9PosAbs->value = s9 ? &g_pos2dAbs : NULL;
-        if (propS9Unit && s9) propS9Unit->button->text = ModeNameSize(s9->sizeMode);
+        Bind2D(rowsS9, s9);
         if (propS9BorderX) propS9BorderX->value = s9 ? &s9->borderX : NULL;
         if (propS9BorderY) propS9BorderY->value = s9 ? &s9->borderY : NULL;
         if (propS9EscBorder) propS9EscBorder->value = s9 ? &s9->borderScale : NULL;
-        if (propS9Opac) propS9Opac->value = s9 ? &s9->opacity : NULL;
         if (propS9Color){ propS9Color->value = (s9 && s9->palTint < 0) ? s9->color : NULL;
                           propS9Color->palRef = s9 ? &s9->palTint : NULL; propS9Color->palObj = s9; }
         if (propS9Pal && s9) propS9Pal->button->text = PalName(s9, s9->palTint);
         if (propS9Filter) propS9Filter->value = s9 ? &s9->filtered : NULL;
-        FitRowSize(propS9Width, s9 ? s9->sizeMode : TAM2D_PX);
-        FitRowSize(propS9Height,  s9 ? s9->sizeMode : TAM2D_PX);
         if (s9){
             propS9Texture->button->text = s9->texture.empty() ? std::string(T("Choose..."))
                                                               : FileName(s9->texture);
-            if (propS9Anchor) propS9Anchor->button->text = T2dAnchorName(s9->anchor);
         }
     }
     // BOTON 2D
@@ -13319,12 +13695,7 @@ void Properties::RefreshTargetProperties(){
         Button2D* b = (ActiveObj && ActiveObj->getType() == ObjectType::button2d) ? (Button2D*)ActiveObj : NULL;
         propBtnSize->value = b ? &b->size : NULL;
         if (propBtnPad)  propBtnPad->value  = b ? &b->pad : NULL;
-        if (propBtnPosX){ propBtnPosX->value = b ? &g_pos2dX : NULL; propBtnPosX->onChange = ActionPos2DEdited; }
-        if (propBtnPosY){ propBtnPosY->value = b ? &g_pos2dY : NULL; propBtnPosY->onChange = ActionPos2DEdited; }
-        if (propBtnPosZ) propBtnPosZ->value = b ? &b->pos.z : NULL;
-        if (propBtnPosAbs) propBtnPosAbs->value = b ? &g_pos2dAbs : NULL;
-        if (propBtnRot) propBtnRot->value = b ? &b->rot2d : NULL;
-        if (propBtnOpac) propBtnOpac->value = b ? &b->opacity : NULL;
+        Bind2D(rowsBtn, b);
         if (propBtnColBackground){ propBtnColBackground->value = (b && b->palBackground < 0) ? b->backgroundColor : NULL;
                               propBtnColBackground->palRef = b ? &b->palBackground : NULL; propBtnColBackground->palObj = b; }
         if (propBtnColText){ propBtnColText->value = (b && b->palText < 0) ? b->textColor : NULL;
@@ -13347,32 +13718,20 @@ void Properties::RefreshTargetProperties(){
                                                                             : FileName(b->icon);
             if (propBtnTex) propBtnTex->button->text = b->textureBackground.empty() ? std::string(T("Choose..."))
                                                                                : FileName(b->textureBackground);
-            if (propBtnAnchor) propBtnAnchor->button->text = T2dAnchorName(b->anchor);
         }
     }
     // VIDEO 2D
-    if (propVid2D && propVidWidth){
+    if (propVid2D && rowsVid.width){
         Video2D* v = (ActiveObj && ActiveObj->getType() == ObjectType::video2d) ? (Video2D*)ActiveObj : NULL;
-        propVidWidth->value  = v ? &v->width : NULL;
-        propVidHeight->value = v ? &v->height  : NULL;
-        if (propVidPosX){ propVidPosX->value = v ? &g_pos2dX : NULL; propVidPosX->onChange = ActionPos2DEdited; }
-        if (propVidPosY){ propVidPosY->value = v ? &g_pos2dY : NULL; propVidPosY->onChange = ActionPos2DEdited; }
-        if (propVidPosZ) propVidPosZ->value = v ? &v->pos.z : NULL;
-        if (propVidPosAbs) propVidPosAbs->value = v ? &g_pos2dAbs : NULL;
-        if (propVidUnit && v) propVidUnit->button->text = ModeNameSize(v->sizeMode);
+        Bind2D(rowsVid, v);
         if (propVidLoop) propVidLoop->value = v ? &v->loop : NULL;
         if (propVidAlpha) propVidAlpha->value = v ? &v->useAlpha : NULL;
         if (propVidPlay) propVidPlay->value = v ? &v->play : NULL;
         if (propVidFilter) propVidFilter->value = v ? &v->filtered : NULL;
-        if (propVidRot) propVidRot->value = v ? &v->rot2d : NULL;
-        if (propVidOpac) propVidOpac->value = v ? &v->opacity : NULL;
-        FitRowSize(propVidWidth, v ? v->sizeMode : TAM2D_PX);
-        FitRowSize(propVidHeight,  v ? v->sizeMode : TAM2D_PX);
         if (v){
             if (propVidFile) propVidFile->button->text = v->video.empty() ? std::string(T("Choose..."))
                                                                                 : FileName(v->video);
             if (propVidMode) propVidMode->button->text = ImgModeName(v->mode);
-            if (propVidAnchor) propVidAnchor->button->text = T2dAnchorName(v->anchor);
         }
     }
     // EXPANDIR
@@ -13699,36 +14058,15 @@ void Properties::RefreshTargetProperties(){
         Object* e2d = (ActiveObj && UI2D_IsElement2D(ActiveObj)) ? ActiveObj : NULL;
         int* layParent = e2d ? ChildrenLayoutOf(e2d->Parent) : NULL;
         bool inLayout  = (layParent && *layParent != 0);
-        if (inLayout){
-            if (propT2dPosX)  propT2dPosX->value  = NULL;
-            if (propT2dPosY)  propT2dPosY->value  = NULL;
-            if (propT2dPosAbs)  propT2dPosAbs->value  = NULL;
-            if (propImgPosX)  propImgPosX->value  = NULL;
-            if (propImgPosY)  propImgPosY->value  = NULL;
-            if (propImgPosAbs)  propImgPosAbs->value  = NULL;
-            if (propRectPosX) propRectPosX->value = NULL;
-            if (propRectPosY) propRectPosY->value = NULL;
-            if (propRectPosAbs) propRectPosAbs->value = NULL;
-            if (propContPosX) propContPosX->value = NULL;
-            if (propContPosY) propContPosY->value = NULL;
-            if (propContPosAbs) propContPosAbs->value = NULL;
-            if (propS9PosX) propS9PosX->value = NULL;
-            if (propS9PosY) propS9PosY->value = NULL;
-            if (propS9PosAbs) propS9PosAbs->value = NULL;
-        }
-        // el PESO solo cuenta (y se muestra) cuando el padre esta en filas/columnas
+        // el PESO solo cuenta (y se muestra) cuando el padre esta en filas/columnas; ahi la posicion no se edita (antes
+        // el Video quedaba afuera de esa regla)
         float* weight = (e2d && inLayout) ? &((Element2D*)e2d)->weight : NULL;
-        if (propT2dWeight)  propT2dWeight->value  = (e2d && e2d->getType() == ObjectType::text2d)  ? weight : NULL;
-        if (propImgWeight)  propImgWeight->value  = (e2d && e2d->getType() == ObjectType::image2d) ? weight : NULL;
-        if (propRectWeight) propRectWeight->value = (e2d && e2d->getType() == ObjectType::rect2d)   ? weight : NULL;
-        if (propContWeight) propContWeight->value = (e2d && e2d->getType() == ObjectType::cont2d)   ? weight : NULL;
-        if (propS9Weight)   propS9Weight->value   = (e2d && e2d->getType() == ObjectType::slice9)   ? weight : NULL;
-        if (propVidWeight)  propVidWeight->value  = (e2d && e2d->getType() == ObjectType::video2d)  ? weight : NULL;
-        if (propBtnWeight)  propBtnWeight->value  = (e2d && e2d->getType() == ObjectType::button2d)  ? weight : NULL;
-        if (propBtnPosX && e2d && e2d->getType() == ObjectType::button2d && inLayout){
-            propBtnPosX->value = NULL;
-            if (propBtnPosY) propBtnPosY->value = NULL;
-            if (propBtnPosAbs) propBtnPosAbs->value = NULL;
+        Rows2D* rows[7] = { &rowsT2d, &rowsImg, &rowsRect, &rowsCont, &rowsS9, &rowsVid, &rowsBtn };
+        const int types[7] = { ObjectType::text2d, ObjectType::image2d, ObjectType::rect2d, ObjectType::cont2d,
+                               ObjectType::slice9, ObjectType::video2d, ObjectType::button2d };
+        for (int k = 0; k < 7; k++) {
+            if (rows[k]->weight) rows[k]->weight->value = (e2d && (int)e2d->getType() == types[k]) ? weight : NULL;
+            if (inLayout && rows[k]->posX) { rows[k]->posX->value = NULL; rows[k]->posY->value = NULL; rows[k]->posAbs->value = NULL; }
         }
     }
 
@@ -13737,7 +14075,8 @@ void Properties::RefreshTargetProperties(){
     if (propLight && propLightType){
         bool isLight = ActiveObj->getType() == ObjectType::light;
         Light* l = isLight ? static_cast<Light*>(ActiveObj) : NULL;
-        // (las filas del cono solo en un Foco, la atenuacion no en un Sol)
+        // (las filas del cono solo en un Foco, la atenuacion no en un Sol ni en una de Area -la de area cae sola, como una
+        //  superficie-, la forma y el tamanio solo en una de Area)
         const int type = l ? LightType(l) : 0;
         const bool hide = (l == NULL);
         if (propLightType->hidden != hide) { propLightType->hidden = hide; PropertiesLayoutDirty = true; }
@@ -13751,13 +14090,25 @@ void Properties::RefreshTargetProperties(){
         if (propLightIntens) propLightIntens->value = l ? &l->intensity : NULL;
         propLightAmbient->value  = l ? l->ambient        : NULL;
         propLightSpecular->value = l ? l->specular       : NULL;
-        propLightAttC->value     = (l && type != 1) ? &l->attConstant   : NULL;
-        propLightAttL->value     = (l && type != 1) ? &l->attLinear     : NULL;
-        propLightAttQ->value     = (l && type != 1) ? &l->attQuadratic  : NULL;
+        propLightAttC->value     = (l && type != 1 && type != 3) ? &l->attConstant   : NULL;
+        propLightAttL->value     = (l && type != 1 && type != 3) ? &l->attLinear     : NULL;
+        propLightAttQ->value     = (l && type != 1 && type != 3) ? &l->attQuadratic  : NULL;
         propLightSpotCut->value  = (l && type == 2) ? &l->spotCutoff    : NULL;
         propLightSpotExp->value  = (l && type == 2) ? &l->spotExponent  : NULL;
+        if (propLightAreaShape) {
+            const bool hideShape = (type != 3);
+            if (propLightAreaShape->hidden != hideShape) { propLightAreaShape->hidden = hideShape; PropertiesLayoutDirty = true; }
+            const int f = (l && l->areaShape >= 0 && l->areaShape < 4) ? l->areaShape : 0;
+            propLightAreaShape->button->text = T(kLightAreaShapes[f]);
+            // (el cuadrado y el disco: un solo tamanio, "Size"; el rectangulo y la elipse: "Size X" y "Size Y")
+            const bool two = (f == 1 || f == 3);
+            propLightAreaX->name = two ? T("Size X") : T("Size");
+            propLightAreaX->value = (l && type == 3) ? &l->areaSizeX : NULL;
+            propLightAreaY->value = (l && type == 3 && two) ? &l->areaSizeY : NULL;
+        }
         if (propLightDist) propLightDist->value = (l && type != 1) ? &l->distance : NULL;
-        if (propLightRTRadius) propLightRTRadius->value = l ? &l->rtRadius : NULL;
+        // (el RADIO del trazado de rayos no va en la de area: el tamanio de la lampara ya es el de su superficie)
+        if (propLightRTRadius) propLightRTRadius->value = (l && type != 3) ? &l->rtRadius : NULL;
         if (propLightRTRays) propLightRTRays->value = l ? &l->rtRays : NULL;
     }
 
@@ -13782,6 +14133,7 @@ void Properties::RefreshTargetProperties(){
     if (propLodOnlyCam){
         LOD* lo = (ActiveObj->getType() == ObjectType::lod) ? static_cast<LOD*>(ActiveObj) : NULL;
         propLodOnlyCam->value = lo ? &lo->onlyCameraActive : NULL;
+        if (propLodRender) propLodRender->value = lo ? &lo->renderFirst : NULL;
     }
 
     // MIRROR: checkboxes y limites bindean directo (NULL = no editable); el target
@@ -13922,228 +14274,27 @@ void Properties::RefreshTargetProperties(){
 
 // Constructor
 Properties::Properties() : ViewportBase() {
+    memset(static_cast<PropertiesRows*>(this), 0, sizeof(PropertiesRows));   // (todas las filas en NULL: Properties.h)
     // (eran inicializadores de clase: C++03)
     target = NULL;
     maxPixelsTitle = 1920;
     selectIndex = 0;
     editing = false;
-    propTransform = NULL;
-    propMeshParts = NULL;
-    propLight = NULL;
-    propText2D = NULL; propT2dText = NULL; propT2dSize = NULL;
-    propT2dAlignH = NULL; propT2dAlignV = NULL; propT2dColor = NULL; propT2dFont = NULL;
-    propT2dAnchor = NULL; propT2dRot = NULL; propUIcard = NULL; propUIShow3D = NULL;
-    propImage2D   = NULL; propImgTexture = NULL; propImgWidth = NULL; propImgHeight = NULL;
-    propImgRot = NULL; propImgMode = NULL; propImgAnchor = NULL;
-    propUIEqualRender = NULL; propUIInTree = NULL; propUIWidth = NULL; propUIHeight = NULL;
-    propUIres = NULL; propUIAspect = NULL; propUIRotate = NULL;
-    propT2dName = NULL; propT2dPosX = NULL; propT2dPosY = NULL; propT2dPosZ = NULL;
-    propT2dOpac = NULL; propImgName = NULL; propImgPosX = NULL; propImgPosY = NULL;
-    propImgPosZ = NULL; propImgOpac = NULL; propUIName = NULL; propUIopac = NULL;
-    propChildren = NULL; propChildrenLayout = NULL; propChildrenGap = NULL;
-    propChildrenPadLeft = NULL; propChildrenPadRight = NULL; propChildrenPadTop = NULL; propChildrenPadBottom = NULL;
-    propChildrenPx = NULL;
-    propT2dPosAbs = NULL; propT2dType = NULL; propT2dDec = NULL; propImgPosAbs = NULL;
-    propUIScale = NULL; propUIScaleEqual = NULL; propUIexport = NULL;
-    propRect2D = NULL; propRectName = NULL; propRectPosX = NULL; propRectPosY = NULL;
-    propRectPosZ = NULL; propRectPosAbs = NULL; propRectWidth = NULL; propRectHeight = NULL;
-    propRectRot   = NULL; propRectAnchor = NULL; propRectOpac = NULL; propRectColor = NULL;
-    propT2dWeight = NULL; propT2dLines = NULL; propT2dAutoSize = NULL;
-    propImgWeight = NULL; propRectWeight = NULL;
-    propCont2D = NULL; propContName = NULL; propContPosX = NULL; propContPosY = NULL;
-    propContPosZ   = NULL; propContPosAbs = NULL; propContWeight = NULL; propContWidth = NULL;
-    propContHeight = NULL; propContRot = NULL; propContAnchor = NULL; propContOpac = NULL;
-    propChildrenFit = NULL; propChildrenAlign = NULL; propChildrenDistrib = NULL;
-    propBtn2D = NULL; propBtnName = NULL; propBtnPosX = NULL; propBtnPosY = NULL;
-    propBtnPosZ = NULL; propBtnPosAbs = NULL; propBtnWeight = NULL; propBtnText = NULL;
-    propBtnIcon = NULL; propBtnSize = NULL; propBtnPad = NULL; propBtnAnchor = NULL;
-    propBtnOpac = NULL; propBtnColBackground = NULL; propBtnColText = NULL; propBtnColBorder = NULL;
-    propExp2D = NULL; propExpName = NULL; propExpWeight = NULL;
-    propVid2D = NULL; propVidName = NULL; propVidPosX = NULL; propVidPosY = NULL;
-    propVidPosZ = NULL; propVidPosAbs = NULL; propVidWeight = NULL; propVidFile = NULL;
-    propVidWidth = NULL; propVidHeight = NULL; propVidUnit = NULL; propVidMode = NULL;
-    propVidLoop = NULL; propVidAlpha = NULL; propVidPlay = NULL; propVidFilter = NULL;
-    propVidAnchor = NULL; propVidRot = NULL; propVidOpac = NULL;
-    propBtnRot = NULL;
-    propMargin = NULL; propMarginExp = NULL; propMarginUni = NULL; propMarginAll = NULL;
-    propMarginLeft = NULL; propMarginRight = NULL; propMarginTop = NULL; propMarginBottom = NULL;
-    propChildrenPadUni = NULL; propChildrenPadAll = NULL;
-    propPalette = NULL; paletteRows = -1; propPaletteSel = NULL; propPaletteName = NULL;
-    propPaletteObj = NULL; propPaletteObjSel = NULL;
-    propControl = NULL; scriptSignature = -1;
-    propListScripts = NULL; propRowScript = NULL; propRowScriptMove = NULL;
-    for (int i = 0; i < kMaxScriptCards; i++) propScriptCards[i] = NULL;
-    propGame = NULL; propGameCompile = NULL; propGamePlat = NULL; propGameVentMode = NULL; propGameStart = NULL; propGameBackend = NULL;
-    propGameOrient = NULL; propGameIcon = NULL; propGamePhysics = NULL; propGameSound = NULL;
-    propObjAnim = NULL; propListObjAnims = NULL; propHierLib = NULL; propClipRetarget = NULL; propObjRetarget = NULL;
-    propBtnPalBackground = NULL; propBtnPalText = NULL; propBtnPalBorder = NULL;
-    propBtnPalHover      = NULL; propBtnColHover = NULL;
-    propBtnTex = NULL; propBtnTexBX = NULL; propBtnTexBY = NULL; propBtnTexEsc = NULL;
-    propT2dPal = NULL; propImgPal = NULL; propRectPal = NULL; propS9Pal = NULL;
-    propChildrenClipX = NULL; propChildrenClipY = NULL; propChildrenScroll = NULL;
-    propChildrenScrollX = NULL; propChildrenScrollY = NULL;
-    propImgUnit = NULL; propImgColor = NULL; propImgAlpha = NULL; propImgMix = NULL;
-    propRectUnit = NULL; propContUnit = NULL; propUIcolor = NULL;
-    propS9card = NULL; propS9Name = NULL; propS9PosX = NULL; propS9PosY = NULL;
-    propS9PosZ = NULL; propS9PosAbs = NULL; propS9Weight = NULL; propS9Texture = NULL;
-    propS9Width = NULL; propS9Height = NULL; propS9Unit = NULL;
-    propS9BorderX = NULL; propS9BorderY = NULL;
-    propS9EscBorder = NULL; propS9Rot = NULL; propS9Anchor = NULL; propS9Opac = NULL;
-    propS9Color = NULL; propImgFilter = NULL; propS9Filter = NULL;
-    propCamera = NULL;
-    propActiveCamChk = NULL; propCamOrtho = NULL; propCamFov = NULL; propCamNear = NULL; propCamFar = NULL;
-    propCamDof = NULL; propCamFStop = NULL; propCamFocus = NULL; propBtnCamFocusObj = NULL;
-    propInstance = NULL;
-    propLOD = NULL; propLodDist = NULL;           // objeto LOD (umbrales de distancia)
-    propObjRelLines = NULL;                                            // lineas parentales (tarjeta generica)
-    propObjStatic   = NULL;                                            // estatico/dinamico (tarjeta generica, culling grid)
-    propObjProjShadow = NULL; propObjRecShadow = NULL; propObjBounces = NULL; propObjPicker = NULL; propObjInProbes = NULL;                 // las sombras en tiempo real (solo mallas)
-    propShadows = NULL; propShadowOn = NULL; propShadowDist = NULL; propShadowCascades = NULL; propShadowBorder = NULL; propShadowBlur = NULL;
-    propShadowRes = NULL; propShadowSoft = NULL; propShadowInt = NULL; propShadowColor = NULL; propShadowBias = NULL; propShadowState = NULL;
-    for (int k = 0; k < 3; k++) propShadowCut[k] = NULL;
-    propLodOnlyCam = NULL;                                             // objeto LOD (camara de medida)
-    propCulling = NULL; propCullMethod = NULL; propCullActive = NULL; propCullOnlyCam = NULL; // objeto Culling unificado
-    propCullOrderNear = NULL;
-    propCamActive = NULL; propActiveCamSel = NULL; propActiveCamKey = NULL;
-    propCurve = NULL; propCurveMods = NULL; propCurveModProps = NULL; propListCurveMods = NULL; curveRows = NULL;
-    propClip = NULL; propRcActive = NULL; propRcX = NULL; propRcY = NULL;
-    propMatLightInd = NULL;
-    propHitbox = NULL; propHbActive = NULL; propHbLabel = NULL; propHbFilter = NULL; propHbBodies = NULL;
-    propProbe = NULL; propSlRays = NULL; propSlBake = NULL; propSlState = NULL; propSlBar = NULL; propSlCancel = NULL;
-    propProbeRef = NULL; propSrType = NULL; propSrImportance = NULL; propSrIntensity = NULL; propSrBox = NULL;
-    for (int k = 0; k < 3; k++) { propSrSize[k] = NULL; propSrOrigin[k] = NULL; }
-    propSrRes = NULL; propSrNear = NULL; propSrEach = NULL; propSrImage = NULL; propSrSamples = NULL; propSrBounces = NULL;
-    propSrBake = NULL; propSrState = NULL; propSrBar = NULL; propSrCancel = NULL;
-    propBake = NULL; propBakeTex = NULL; propBakeUV = NULL; propBakeSamples = NULL; propBakeIndirect = NULL; propBakeBounces = NULL; propBakeDenoiser = NULL; propBakeButton = NULL; propBakeBar = NULL; propBakeCancel = NULL; propBakeNoticeTex = NULL; propBakeNotice = NULL;
-    for (int k = 0; k < 3; k++) { propSlSize[k] = NULL; propSlPoints[k] = NULL; }
-    propRoutine = NULL; propRuList = NULL; propRuUse = NULL; propRuSteps = NULL; propRuRowAdd = NULL;
-    propRuOn = NULL; propRuRef = NULL; propRuInteger = NULL; propRuReason = NULL;
-    propRuRef2 = NULL; propRuText = NULL; propRuNotice = NULL; propRuColor = NULL; propRuColorNum = NULL;
-    for (int k = 0; k < 5; k++) propRuInfo[k] = NULL;
-    propRuLight = NULL; propRuOption = NULL; propRuManual = NULL; propRuArray = NULL;
-    propRuMax   = NULL; for (int k = 0; k < 3; k++) propRuBuffer[k] = NULL;
-    for (int k = 0; k < 5; k++) propRuNum[k] = NULL;
-    propPrefab = NULL; propPfSel = NULL; propPfInfo = NULL; propPfEdit = NULL; propPfUnpack = NULL; propPfReset = NULL;
-    propPxLib = NULL;
-    propPfInstance = NULL;
-    propPfLoad = NULL; propPfDistance = NULL; propPfTarget = NULL; propPfView = NULL;   // (el streaming de la tarjeta)
-    for (int k = 0; k < 3; k++) { propHbSize[k] = NULL; propHbCenter[k] = NULL; }
-    propRcWidth = NULL; propRcHeight = NULL; propRcCamera = NULL; propRcClearZ = NULL; propRcBackground = NULL; propRcColor = NULL;
-    propSound = NULL; propSoundFile = NULL; propSoundActive = NULL; propSoundVol = NULL; propSoundTone = NULL; propSoundReverb = NULL;
-    propSoundPan    = NULL; propSoundStart = NULL; propSoundRecStart = NULL; propSoundRecEnd = NULL; propSoundLoop = NULL; propSoundPos = NULL;
-    propSoundRadius = NULL; propSoundRange = NULL;
-    panels = NULL;
-    propCullDistMax = NULL; propCullOrderAlpha = NULL; propCullCellSize = NULL; propCullMode3D = NULL; propCullRecalc = NULL;
-    propMirror = NULL; propMirrorTarget = NULL;                               // objeto Mirror (target + ejes + rect)
-    propBoolOp = NULL; propBoolTarget = NULL;                                 // modificador Boolean
-    propMirrorX = NULL; propMirrorY = NULL; propMirrorZ = NULL; propMirrorChildren = NULL;
-    propMirrorLimits = NULL; propMirrorU0 = NULL; propMirrorU1 = NULL; propMirrorV0 = NULL; propMirrorV1 = NULL;
-    propParticles = NULL; propPartTexture = NULL; propPartCount = NULL;     // objeto Particulas
-    propPartLife = NULL;
-    propPartMix = NULL; propPartColor = NULL;
-    propPartFade = NULL; propPartActive = NULL; propPartFiltering = NULL;
-    propPartColCard = NULL; propPartShapeCard = NULL;
-    propPartAlphaDecays = NULL; propPartAlphaDeath = NULL;
-    propPartAppear = NULL; propPartFadeNear[0] = propPartFadeNear[1] = NULL; propPartFadeFar[0] = propPartFadeFar[1] = NULL;
-    propPartUseColEnd = NULL; propPartEndColor = NULL; propPartShape = NULL; propPartStretch = NULL; propPartTrailPts = NULL; propPartTrailStep = NULL;
-    propPartThickness = NULL; propPartFlipC = NULL; propPartFlipCols = NULL; propPartFlipRows = NULL; propPartFlipFps = NULL;
-    propPartFlipOne = NULL;
-    partFlipC = 0; partFlipCols = 1; partFlipRows = 1; partTrailPts = 4;
-    propFlipAtlas = NULL; propFlipFrames = NULL; propFlipCols = NULL; propFlipRows = NULL; propFlipFps = NULL;
-    propMix = NULL; propListMix = NULL; propRowMix = NULL; propRowMixMove = NULL; propMixStart = NULL; propMixEnd = NULL;
-    propLayer = NULL; propLayerAnim = NULL; propLayerInfl = NULL; propLayerMode = NULL; propLayerBone = NULL;
-    propLayerFrom   = NULL; propLayerVel = NULL; propLayerLoop = NULL; propLayerVisible = NULL;
-    propRenderStart = NULL; propRenderEnd = NULL; propRenderFps = NULL;
-    propBtnCamTarget = NULL;
-    propBtnInstTarget = NULL;
-    propInstCopies = NULL;
-    // tarjeta Fisica (cuerpo rigido)
-    propPhysics = NULL; propPhysType = NULL; propPhysMass = NULL;
-    propPhysBoxX = NULL; propPhysBoxY = NULL; propPhysBoxZ = NULL;
-    propPhysCenterX = NULL; propPhysCenterY = NULL; propPhysCenterZ = NULL;
-    propPhysFriction = NULL; propPhysBounce = NULL; propPhysRemove = NULL;
-    propListLayersMat = NULL; propLayerMatAdd = NULL; propLayerMatChange = NULL;
-    propBtnTexture = NULL;
-    propBtnNormalTex = NULL; // (faltaba: normal map UI)
-    for (int k = 0; k < 8; k++) propMap[k] = NULL;
-    propMatIOR = NULL; propMatTrans = NULL; propMatSSR = NULL;
-    propMatShaderOn = NULL; propBtnShader = NULL; propBtnShaderComp = NULL; propMatShaderMsg = NULL;
-    propBtnTexB = NULL; propMatMixB = NULL;   // (mezcla de texturas)
-    propBtnReflectMode = NULL; // dropdown del modo de Reflection
-    propBtnShading = NULL;     // dropdown del sombreado (por vertice / por pixel)
-    // luz: punteros nuevos a NULL (si no se inicializan quedan BASURA y el rebind crashea antes de BuildGroups)
-    propLightType = NULL; propLightIgnOrder = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
-    propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightIntens = NULL; propLightSpotExp = NULL; propLightDist = NULL;
-    propLightRTRadius = NULL; propLightRTRays = NULL;
-    propRT = NULL; propRTRays = NULL; propRTSamples = NULL; propRTPasses = NULL; propRTLayers = NULL; propRTBounces = NULL; propRTGpu = NULL; propRTOnlyFinal = NULL; propRTSeed = NULL;
-    propRTBlur = NULL; propRTShutter = NULL; propRTObtPos = NULL;
-    renderSeenGen = 0;
-    propPost = NULL; propPostOn = NULL; propPostCPU = NULL; propListPost = NULL; propRowPost = NULL; propRowPostMove = NULL;
-    propPostActive = NULL; propPostGrainInt = NULL; propPostGrainSize = NULL; propPostGrainColor = NULL;
-    propPostFocusDist = NULL; propPostFocusRange = NULL; propPostFocusBlur = NULL; propPostFocusCam = NULL; propPostMovObt = NULL; for (int k = 0; k < 6; k++) propPostBloom[k] = NULL; propPostBloomColor = NULL; propPostFastBloom = NULL; propRTScale = NULL; propRTUpscaler = NULL; propRTDenoiser = NULL;
+    paletteRows = -1;
+    scriptSignature = -1;
+    partFlipCols = 1; partFlipRows = 1; partTrailPts = 4;
     rtRays = (float)g_rt.rays; rtSamples = (float)g_rt.samples; rtPasses = (float)g_rt.passes; rtLayers = (float)g_rt.layers;
     rtBounces = (float)g_rt.bounces;
-    propEditItem = NULL; editPosX = editPosY = editPosZ = 0.0f;
-    propUVTransform = NULL; uvPosU = uvPosV = 0.0f; // tarjeta "Transform UV" (pestania Transformar)
-    propUVMaps = NULL; propColorLayers = NULL; propVertexGroups = NULL; propUVGroups = NULL; propModifiers = NULL;
-    propListModifiers = NULL; propRowMod = NULL; propRowModMove = NULL; propModifierProps = NULL;
-    propModShowViewport = NULL; propModShowEdit = NULL;
-    propRuRepeat = NULL; propModEmpty = NULL; propMirX = NULL; propMirY = NULL; propMirZ = NULL; propMirTarget = NULL; propArmTarget = NULL;
-    propArrCount = NULL; propArrRelOn = NULL; propArrRelX = NULL; propArrRelY = NULL; propArrRelZ = NULL;
-    propArrConstOn = NULL; propArrConstX = NULL; propArrConstY = NULL; propArrConstZ = NULL;
-    propArrTarget = NULL; propArrMerge = NULL; propArrMergeDist = NULL;
-    propMirMerge = NULL; propMirDist = NULL; propMirClip = NULL; propBtnApplyMod = NULL;
-    propPvsMethod = NULL; propPvsRecalc = NULL; propPvsInfo = NULL; // modificador Oclusion (PVS por triangulo)
-    propPvsPath = NULL; propPvsOnlyCam = NULL; propPvsNode = NULL; propPvsBranches = NULL;
-    propMeshEdit = NULL; propBtnMeshEditable = NULL; propMeshLockNormals = NULL; // card "Edicion"
-    propMesh3D = NULL; propBtnMeshSel = NULL; // card "3D Mesh"
-    propLblMeshUses = NULL; propBtnMeshUnique = NULL;
-    propLblMeshLib = NULL; propLblModsLib = NULL; propBtnNewPart = NULL;   // (lo de una libreria: solo lectura)
-    propBtnAddVG = NULL; propBtnAddUVG = NULL; propBtnAddUV = NULL; propBtnAddCol = NULL;
-    propSubSimple = NULL; propSubLevel = NULL; propSubRender = NULL;
-    propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
-    propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
-    propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
-    propListUV = NULL; propListColor = NULL; propListVertGroups = NULL; propListUVGroups = NULL; propBtnColorMode = NULL;
-    propRowUVOps = NULL; propRowColorOps = NULL; propRowGroupOps = NULL; propBtnRenameGroup = NULL;
-    propRowUVGroupOps = NULL; propBtnRenameUVGroup = NULL;
-    propRowGroupAssign = NULL; propRowGroupSel = NULL;
-    propRowUVGroupAssign = NULL; propRowUVGroupSel = NULL;
-    propArmAnim = NULL; propListAnims = NULL; propBtnRenameAnim = NULL; propBtnDupAnim = NULL; propRowAnimOps = NULL;
-    propArmBones = NULL; propListBones = NULL; propBoneName = NULL; propBoneParent = NULL;
-    propBones2D = NULL; propListBones2D = NULL; propBone2DName = NULL; propBone2DParent = NULL;
-    propListArm2Ds = NULL; propBtnRenameArm2D = NULL;
-    propBone2DConnected = NULL; propBoneConnected = NULL;
-    propBone2DPosX = NULL; propBone2DPosY = NULL; propBone2DRot = NULL; propBone2DSclX = NULL; propBone2DSclY = NULL;
-    propConstraints = NULL; propListConstraints = NULL; propRowConstraint = NULL; propRowConstraintMove = NULL;
-    propConstraintProps = NULL; propConstraintActive = NULL; propConstraintShowEdit = NULL; propConstraintSource = NULL;
-    propConstraintNoticeSource = NULL; propConstraintInfluence = NULL;
-    propConstraintAxisX = NULL; propConstraintAxisY = NULL; propConstraintAxisZ = NULL; propConstraintNoticeAxes = NULL;
-    propConstraintBBMode = NULL; propConstraintNoticeBB = NULL;
-    propConstraintBone = NULL; propConstraintCoLoc = NULL; propConstraintCoRot = NULL; propConstraintCoEsc = NULL; propRowConstraintInverse = NULL;
-    propRotMode = NULL;
-    propMsgDefault = NULL; propSepMat = NULL;
-    propMaterial = NULL; propBtnRenameMat = NULL;
-    propResource = NULL; propRecName = NULL; propRecFolder = NULL; propRecType = NULL;   // pestania RECURSO
-    propRecEntry = NULL; propRecLocation = NULL; propRecPreview = NULL; propRecActions = NULL; propRecActions2 = NULL;
-    propRecMeshText = NULL; propRecExtract = NULL; propRecSaveAs = NULL;
-    propRecUsers = NULL; propRecBoxType = NULL; propRecSaved = NULL; propRecSave = NULL;
-    propRecSelUsers = NULL; propRecDelete = NULL;
-    recVersionBind = 0;
-    propBtnRenameUV = NULL; propBtnRenameColor = NULL; propNameObj = NULL;
-    propRowPartOps = NULL; propRowDelRow = NULL; propRowPartMove = NULL;
-    for (int i = 0; i < 11; i++) propMatChk[i] = NULL;   // los 11 (antes 10: [10] quedaba con basura)
-    activeTab = 1;      // arranca en "Objeto" (transforms); 0 = Render
-    exportFormat = 2;             // por defecto glTF (el formato con rig + animaciones)
-    exportSelectedOnly = true;    // por defecto ON: exporta solo lo seleccionado
-    OnSelectAnimClip = SyncAnimClipFromList; // la lista de anims (tab Armature) sincroniza el timeline
-    OnSelectAnimVertex = SyncAnimVertexFromList; // lista de anims del OBJETO -> timeline (kind 3)
+    activeTab = 1;   // arranca en "Objeto" (transforms); 0 = Render
+    exportFormat = 2;   // por defecto glTF (el formato con rig + animaciones)
+    exportSelectedOnly = true;   // por defecto ON: exporta solo lo seleccionado
+    OnSelectAnimClip = SyncAnimClipFromList;   // la lista de anims (tab Armature) sincroniza el timeline
+    OnSelectAnimVertex = SyncAnimVertexFromList;   // lista de anims del OBJETO -> timeline (kind 3)
     W3dKeyframeState  = PropKeyStateHook;   // el rombo de keyframe del panel
     W3dKeyframeToggle = PropKeyToggleHook;
-    ActiveAnimVertexOf = ActiveAnimMeshVertex;               // la lista marca la activa
-    exportApplyModifiers = true;  // por defecto ON
-    exportApplyTransforms = true; // por defecto ON
-    exportLastSerial = 0;
+    ActiveAnimVertexOf = ActiveAnimMeshVertex;   // la lista marca la activa
+    exportApplyModifiers = true;   // por defecto ON
+    exportApplyTransforms = true;   // por defecto ON
     focusInTabs = false;
     BuildGroups(); // grupos PROPIOS: panel independiente
     BarCreate();
@@ -14242,9 +14393,10 @@ void Properties::UpdateTabs(){
     bool isPx = (type == (int)ObjectType::proxy);    // proxy W3D (la misma tarjeta, con su libreria y su elemento)
     bool isPart = (type == (int)ObjectType::particles);
     bool isMirror = (type == (int)ObjectType::mirror);
+    bool isCurve = (type == (int)ObjectType::curve);   // (la tarjeta Curve: la forma y el material)
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool isColl = (type == (int)ObjectType::collection && ActiveObj && ActiveObj->Parent);
-    bool hasTab3 = isMesh || isLight || isCam || isInst || isArm || isT2d || isImg || isRect || isCont || isS9 || isBtn || isExp || isVid || isUI || isScript || isLOD || isCull || isColl || isPart || isMirror || isFog || isSound || isEmpty || isLz || isRc || isHb || isSl || isPf || isPx || isRu || isPost || isSr ||
+    bool hasTab3 = isMesh || isLight || isCam || isInst || isArm || isT2d || isImg || isRect || isCont || isS9 || isBtn || isExp || isVid || isUI || isScript || isLOD || isCull || isColl || isPart || isMirror || isFog || isSound || isEmpty || isLz || isRc || isHb || isSl || isPf || isPx || isRu || isPost || isSr || isCurve ||
                    W3dPanelsHasCard(panels, 2, ActiveObj);
 
     if (BarTabs.size() >= 3){
@@ -14281,6 +14433,7 @@ void Properties::UpdateTabs(){
         else if (isRu) icon = (int)IconType::list;
         else if (isPf) icon = (int)IconType::prefab;
         else if (isPx) icon = (int)IconType::lib;
+        else if (isCurve) icon = (int)IconType::curve;
         BarTabs[2]->icon = icon;
     }
     // los objetos 2D no muestran el tab Objeto (su Nombre y Posicion viven arriba de su
@@ -14710,6 +14863,7 @@ void Properties::UpdateTabs(){
     if (propSound)    propSound->visible    = (activeTab == 2 && isSound);
     if (propClip)   propClip->visible   = (activeTab == 2 && isRc);
     PropsHitboxUpdate(this, activeTab == 2 && isHb);   // visibilidad + bindeo + textos
+    PropsCurveUpdate(this, activeTab == 2 && isCurve);
     PropsLightProbeUpdate(this, activeTab == 2 && isSl);
     PropsReflectionProbeUpdate(this, activeTab == 2 && isSr);
     PropsBakeUpdate(this, activeTab == 2 && isMesh);
@@ -15016,10 +15170,21 @@ void Properties::UpdateTabs(){
     // puntero que ya puede estar liberado.
     {
         const bool consTab = (activeTab == 7 && consObj != NULL);
-        if (propListConstraints) propListConstraints->obj = consTab ? consObj : NULL;
-        if (propConstraints) propConstraints->visible = consTab;
+        // MODO HUESO: armature en Pose Mode con un hueso activo -> las MISMAS tarjetas muestran el stack del
+        // hueso (la lista va por 'arm', modo 19)
+        Armature* boneArm = consTab ? BoneConsArmUI() : NULL;
+        if (propListConstraints) {
+            propListConstraints->mode = boneArm ? 19 : 11;
+            propListConstraints->obj  = (consTab && !boneArm) ? consObj : NULL;
+            propListConstraints->arm  = boneArm;
+        }
+        if (propConstraints) {
+            propConstraints->visible = consTab;
+            const std::string title = boneArm ? std::string(T("Bone Constraints")) : std::string(T("Constraints"));
+            if (propConstraints->name != title) { propConstraints->name = title; g_redraw = true; }
+        }
         if (consTab){
-            const int nc = consObj->ConstraintsCount();
+            const int nc = boneArm ? boneArm->BoneConstraintsCount() : consObj->ConstraintsCount();
             if (propRowConstraint && propRowConstraint->buttons.size() >= 2)
                 propRowConstraint->buttons[1]->visible = (nc >= 1);        // Remove: solo si hay 1+
             if (propRowConstraintMove && propRowConstraintMove->buttons.size() >= 2){
@@ -15028,9 +15193,8 @@ void Properties::UpdateTabs(){
                 propRowConstraintMove->buttons[1]->visible = has2;
             }
         }
-        const bool hasSel = consTab && consObj->activeConstraint >= 0 &&
-                            consObj->activeConstraint < consObj->ConstraintsCount();
-        W3dConstraint* c = hasSel ? consObj->constraints[consObj->activeConstraint] : NULL;
+        W3dConstraint* c = consTab ? ConstraintActiveUI() : NULL;
+        const bool hasSel = (c != NULL);
         if (propConstraintProps){
             propConstraintProps->visible = hasSel;   // 2da tarjeta: solo con un constraint elegido
             if (c) propConstraintProps->name = c->name;   // titulo = su nombre
@@ -15038,20 +15202,27 @@ void Properties::UpdateTabs(){
         // QUE SE VE POR TIPO (la tabla): Enabled e Influence en los 3; Source y Copy X/Y/Z en
         // Copy Location y Copy Rotation; Mode solo en el Billboard.
         const bool isCopy = (c && (c->type == W3dConstraintType::CopyLocation ||
-                                    c->type == W3dConstraintType::CopyRotation));
+                                    c->type == W3dConstraintType::CopyRotation ||
+                                    c->type == W3dConstraintType::CopyScale));
         const bool isBB    = (c && c->type == W3dConstraintType::Billboard);
         const bool isCO    = (c && c->type == W3dConstraintType::ChildOf);
-        const bool withSource = isCopy || isCO;   // Source: Copy* y Child Of
+        // Source: todo tipo que lee un target (los Copy*, Child Of, Track To, IK, ...). El Pivot tambien (opcional).
+        const bool withSource = c && !isBB && (W3dConsNeedsTarget(c->type) || c->type == W3dConstraintType::Pivot);
         if (propConstraintActive)     propConstraintActive->value     = c ? &c->active      : NULL;
-        if (propConstraintShowEdit)    propConstraintShowEdit->value    = c ? &c->showEdit : NULL;
+        // "Show in Edit Mode" es del Edit Mode de un OBJETO: un hueso no tiene (su stack se ve en Pose Mode)
+        if (propConstraintShowEdit)    propConstraintShowEdit->value    = (c && !boneArm) ? &c->showEdit : NULL;
         if (propConstraintInfluence) propConstraintInfluence->value = c ? &c->influence : NULL;
         // EL CRUCE Y<->Z: el panel muestra todo en Z-arriba (posicion, rotacion y escala), asi que "Copy Y" es el
         // eje Z interno y "Copy Z" el Y (el por que completo esta en BuildGroups, arriba de propConstraintAxisX).
+        // Un HUESO no cruza: sus ejes son los de su marco (+Y a lo largo del hueso, como Blender).
         if (propConstraintAxisX) propConstraintAxisX->value = isCopy ? &c->axisX : NULL;
-        if (propConstraintAxisY) propConstraintAxisY->value = isCopy ? &c->axisZ : NULL;
-        if (propConstraintAxisZ) propConstraintAxisZ->value = isCopy ? &c->axisY : NULL;
+        if (propConstraintAxisY) propConstraintAxisY->value = isCopy ? (boneArm ? &c->axisY : &c->axisZ) : NULL;
+        if (propConstraintAxisZ) propConstraintAxisZ->value = isCopy ? (boneArm ? &c->axisZ : &c->axisY) : NULL;
         if (propConstraintSource){
             propConstraintSource->hidden = !withSource;
+            // (en un HUESO se llama "Target", como en Blender: es lo que el rigger busca en un IK o un Copy Transforms)
+            { const std::string nm = boneArm ? std::string(T("Target")) : std::string(T("Source"));
+              if (propConstraintSource->name != nm) { propConstraintSource->name = nm; PropertiesLayoutDirty = true; } }
             // EL TEXTO SE REFRESCA POR FRAME, y ese es el punto: cuando borran el objeto fuente,
             // la puerta de refs (Object::SetRefObject) deja sourceObj en NULL y el boton pasa a
             // decir "None" solo. Es donde se ve, sin abrir nada, que el vinculo se corto.
@@ -15077,7 +15248,8 @@ void Properties::UpdateTabs(){
             propConstraintNoticeSource->hidden = !(withSource && c->sourceType == W3dConstraintSource::Object && !c->sourceObj);
         // CHILD OF: Bone solo con fuente armature; Location/Rotation/Scale e inversa siempre
         if (propConstraintBone){
-            const bool isArm = isCO && ConstraintArmSource(c);
+            // el HUESO de la fuente, para cualquier tipo con fuente armature (el subtarget de Blender)
+            const bool isArm = withSource && ConstraintArmSource(c);
             propConstraintBone->hidden = !isArm;
             if (isArm){
                 const std::string txt = c->bone.empty() ? std::string(T("None")) : c->bone;
@@ -15093,6 +15265,8 @@ void Properties::UpdateTabs(){
             propConstraintNoticeAxes->hidden = !(isCopy && !c->axisX && !c->axisY && !c->axisZ);
         if (propConstraintNoticeBB)
             propConstraintNoticeBB->hidden = !(isBB && c->influence > 0.0f && c->influence < 100.0f);
+        // las filas de la fase 2 y el Bake (ver W3dConsUI)
+        ConsUIBind(consUI, c, boneArm != NULL, boneArm);
     }
 
     // pestaña Vertices activa: las listas siguen a la malla activa (modo 1=uvmaps, 2=colors) + el toggle
@@ -15343,12 +15517,37 @@ static void SyncIOR(Properties* p){
     if (p->propMatIOR->value != want) { p->propMatIOR->value = want; PropertiesLayoutDirty = true; g_redraw = true; }
 }
 
+// LOS NUMEROS DE LA TARJETA MATERIAL siguen al material ANIMADO: el cabezal le cambia los valores y Rebind solo los
+// escribia al elegir otro material. Los mapas en modo numero (su texto y su barra) y el factor de la capa elegida (que
+// se muestra en %); los demas campos apuntan directo al material
+static void SyncMatAnim(Properties* p){
+    if (!p || !p->propMaterial || !p->propMaterial->visible) return;
+    Material* m = ActiveMaterialUI();
+    if (!m) return;
+    for (int k = W3D_MAP_ROUGHNESS; k < W3D_MAPS; k++) {
+        PropButton* b = p->propMap[k];
+        if (!b || b->hidden || m->mapWithTexture[k] || b->button->editField) continue;
+        float* v = MapValue(m, k);
+        if (!v) continue;
+        const std::string t = NumMapText(*v);
+        if (b->button->text != t) { b->button->text = t; b->button->bar = *v; g_redraw = true; }
+    }
+    const int sel = LayerPickedTex();
+    PropFloat* f = p->propLayerForce[0];
+    if (f && f->value == &gLayerForcePct && g_propFloatEditing != f && sel >= 0 && sel < (int)m->layers.size()) {
+        const float pct = m->layers[(size_t)sel].force * 100.0f;
+        if (gLayerForcePct != pct) { gLayerForcePct = pct; g_redraw = true; }
+        f->animComp = sel;
+    }
+}
+
 void Properties::Render(){
     // (sin puntero -se levanto el dedo, el mouse salio de la ventana-: nada queda resaltado)
     { extern int g_mouseHoverX; if (g_mouseHoverX < -9000 && gHighlightedSide) { gHighlightedSide->hover = false; gHighlightedSide = NULL; g_redraw = true; } }
     RowDragTick();   // (arrastrando una fila contra el borde de su lista: scrollea)
     MapNumContinue();
     SyncIOR(this);
+    SyncMatAnim(this);   // (los numeros de un material animado)
     SyncBackground(this);
     // Ctrl+Z: al soltar el mouse, pushea el cambio de material (si difiere). Con un numero EDITANDOSE POR TEXTO
     // (click sin arrastrar o OK del teclado sobre Shininess / Alpha Test / ...) espera a que termine (Enter, Esc o
@@ -15408,16 +15607,16 @@ void Properties::Render(){
     // la pestania Render (0) tiene ajustes GLOBALES (salida/pases): se dibuja SIEMPRE, con o sin seleccion.
     // Las demas pestanias son del objeto activo -> sin seleccion no hay contenido.
     if (ActiveObj || TabGlobal()){
-        // los GRUPOS son globales y otro panel de propiedades pudo
-        // haberlos acomodado con OTRO ancho: relayout con el propio
-        // antes de dibujar (mitigacion hasta hacerlos por-instancia)
+        // los GRUPOS son globales y otro panel de propiedades pudo haberlos acomodado con OTRO ancho: relayout con el
+        // propio antes de dibujar (mitigacion hasta hacerlos por-instancia). Solo los que se ven: eran las ~70 tarjetas
+        // en cada cuadro, con todas sus filas (las de las otras pestanias y las de otros tipos de objeto); la que se
+        // vuelve visible se mide aca mismo, en el cuadro en que aparece (UpdateTabs ya corrio)
         {
             int WidthCard = width - bordersGS - gapGS
-        - (scrollY ? GlobalScale*8 : 0); // la reserva de la barra
-    // (incluso GRANDE) solo cuando la barra existe
+                          - (scrollY ? GlobalScale*8 : 0); // la reserva de la barra (incluso GRANDE) solo cuando la barra existe
             int heightCard = borderGS * 3 + (RowHeightGS + gapGS) * 10;
             for (size_t i = 0; i < GroupProperties.size(); i++){
-                GroupProperties[i]->Resize(WidthCard, heightCard);
+                if (GroupProperties[i]->visible) GroupProperties[i]->Resize(WidthCard, heightCard);
             }
         }
         w3dEngine::PushMatrix();
@@ -15452,10 +15651,13 @@ void Properties::Render(){
             if (yLocal + step < 0 || yLocal > height) {
                 w3dEngine::Translatef(0, (GLfloat)step, 0); // fuera: solo avanzar
             } else {
+                // ...y de la que entra a medias, solo las filas a la vista (en Y local a la tarjeta)
+                g_propClipTop = -yLocal; g_propClipBottom = height - yLocal;
                 g->Render();
             }
             yLocal += step;
         }
+        g_propClipTop = -1000000000; g_propClipBottom = 1000000000;
 
 
         w3dEngine::PopMatrix();
@@ -15924,6 +16126,13 @@ void Properties::event_key_down(int keyCode, bool repeat){
     const int key = keyCode;
     // la lista de pasos de una rutina: X / Supr borra el paso, G lo agarra (y agarrado, las flechas lo mueven)
     if (!editing && PropsRoutineKey(key)) { g_redraw = true; return; }
+    // la 'I' con el mouse ENCIMA de una fila animable (la que tiene rombo): pone / saca su keyframe en el frame actual,
+    // como el click en el rombo (objetos, luces, camaras, el fondo, los canales de un material)
+    if (!editing && repeat == 0 && key == W3dK_I && PropHoverGroup && PropHoverGroup->reserveKeyBtn &&
+        PropHoverRow >= 0 && PropHoverRow < (int)PropHoverGroup->properties.size() && W3dKeyframeToggle) {
+        PropertieBase* hp = PropHoverGroup->properties[(size_t)PropHoverRow];
+        if (hp && hp->AnimProp() >= 0) { W3dKeyframeToggle(hp->AnimProp(), hp->AnimComp()); g_redraw = true; return; }
+    }
     if (repeat == 0) {
         switch (key) {
             case W3dK_LEFT:
@@ -16872,6 +17081,20 @@ static void CopyToSelection(PropertieBase* p) {
 
 static void ActionPropCtx(int id){
     PropertieBase* p = gCtxProp;
+    // los KEYFRAMES de un canal de MATERIAL (su fila puede ser un mapa: va antes que el numero / color del mapa)
+    if (p && W3dIsMatChannel(p->AnimProp()) &&
+        (id == PCTX_KEY_INSERT || id == PCTX_KEY_DELETE || id == PCTX_KEY_COPY || id == PCTX_KEY_PASTE)) {
+        Material* mm = ActiveMaterialUI();
+        const int ap = p->AnimProp(), ac = p->AnimComp();
+        switch (id) {
+            case PCTX_KEY_INSERT: UndoKeyframesStart(); AnimMatChannelInsertKey(mm, ap, ac, CurrentFrame); UndoKeyframesConfirm(); break;
+            case PCTX_KEY_DELETE: UndoKeyframesStart(); AnimMatChannelDeleteAll(mm, ap, ac); UndoKeyframesConfirm(); break;
+            case PCTX_KEY_COPY:   if (AnimMatChannelCopyKey(mm, ap, ac, CurrentFrame, gCarrierKeys)) Notify(T("Copied"), false); break;
+            case PCTX_KEY_PASTE:  UndoKeyframesStart(); AnimMatChannelPasteKey(mm, ap, ac, CurrentFrame, gCarrierKeys); UndoKeyframesConfirm(); break;
+        }
+        PropertiesLayoutDirty = true; g_redraw = true; RTInvalidate();
+        return;
+    }
     if (id == PCTX_A_SELECTION) { CopyToSelection(p); PropertiesLayoutDirty = true; return; }
     if (id == PCTX_UPDATE_TEX) {   // (se edito afuera: se vuelve a leer de su archivo)
         const std::string c = W3dTextureKey(gCtxTex);
@@ -17165,11 +17388,13 @@ bool Properties::MenuContext(int mx, int my, int menuX, int menuY){
     }
     // ANIMACION: solo si la fila es un canal (tiene rombo) y hay un objeto activo (la camara activa es otra cosa)
     const int ap = p->AnimProp(), ac = p->AnimComp();
-    if (gCtxMap < 0 && ap >= 0 && ap != AnimCamActive && ActiveObj) {
-        const int est = AnimChannelState(ActiveObj, ap, ac, CurrentFrame);
+    const bool matCh = W3dIsMatChannel(ap);   // (un canal de MATERIAL: tambien en la fila de un mapa)
+    if (ap >= 0 && ap != AnimCamActive && (matCh || (gCtxMap < 0 && ActiveObj))) {
+        int cs[3];
+        const int est = matCh ? AnimMatChannelState(ActiveMaterialUI(), ap, ac, CurrentFrame) : AnimChannelState(ActiveObj, ap, ac, CurrentFrame);
         sKeyDelete = est != 0;
         sKeyCopy   = est == 2;
-        sKeyPaste = !gCarrierKeys.empty() && gCarrierKeys.size() == ChannelCurves(ap);
+        sKeyPaste = !gCarrierKeys.empty() && gCarrierKeys.size() == (matCh ? (size_t)W3dMatChannelComps(ap, ac, cs) : ChannelCurves(ap));
         it = gMenuPropCtx->Add(T("Insert Keyframe"), PCTX_KEY_INSERT, (int)IconType::keyframe); it->gray = &sYes;
         it->lineUp = true;
         it = gMenuPropCtx->Add(T("Delete All Keyframes"), PCTX_KEY_DELETE, (int)IconType::trash); it->gray = &sKeyDelete;

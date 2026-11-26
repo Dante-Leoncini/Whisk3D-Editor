@@ -148,13 +148,6 @@ void BoneSelTip(Armature* a, int b, int tip, bool sel){
         if (a->bones[c].parent == dueTail && BoneIsConnected(a, (int)c))
             SelTipRaw(a, (int)c, 1, sel);
 }
-// hay alguna punta o hueso seleccionado?
-static bool BoneHasSelection(Armature* a){
-    if (!a) return false;
-    for (size_t i = 0; i < a->bones.size(); i++)
-        if (a->bones[i].select || a->bones[i].selHead || a->bones[i].selTail) return true;
-    return false;
-}
 
 // arma la lista bones/masks del transform desde la SELECCION (hueso entero = mask 3; puntas = 1/2).
 // Sin seleccion cae al hueso activo entero. Luego SUELDA: todo tail que se mueve arrastra el head de
@@ -270,6 +263,7 @@ int BoneEditDuplicate(Armature* a){
     for (size_t k = 0; k < sel.size(); k++){
         W3dBone nb = a->bones[sel[k]];             // copia por valor (head/tail/rest/pose)
         nb.name = BoneUniqueName(a, nb.name, -1);
+        nb.constraints.RenewSerials();             // sus constraints vienen con el: son OTROS (otra identidad)
         nb.select = true; nb.selHead = true; nb.selTail = true;
         newOf[sel[k]] = (int)a->bones.size();
         a->bones.push_back(nb);
@@ -594,6 +588,8 @@ void RenamedBoneFromUI(Armature* a, int idx, const std::string& old){
       UndoCaptureRenames(v); }
     int nvg = BoneRenameGroups(SceneCollection, a, old, newValue);
     if (nvg > 0) W3dNoticeDrag(nvg, T("vertex group(s)"), old, newValue);
+    // los constraints que nombran este hueso como target/pole (de huesos o de objetos) siguen al nombre nuevo
+    W3dConstraintsRenameBone(SceneCollection, a, old, newValue);
     AppliedBoneEdit(a);
 }
 
@@ -615,6 +611,9 @@ bool BoneRename(Armature* a, int idx, const std::string& newValue){
     a->bones[idx].name = unique;
     int nvg = BoneRenameGroups(SceneCollection, a, old, unique);
     if (nvg > 0) W3dNoticeDrag(nvg, T("vertex group(s)"), old, unique);
+    // los constraints que nombran este hueso como target/pole siguen al nombre nuevo (los de ESTE armature
+    // vuelven con el Ctrl+Z: estan en el snapshot de huesos de arriba)
+    W3dConstraintsRenameBone(SceneCollection, a, old, unique);
     AppliedBoneEdit(a);
     return true;
 }

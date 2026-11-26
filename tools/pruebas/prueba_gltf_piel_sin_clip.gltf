@@ -1,0 +1,158 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "gen_prueba_gltf_piel_sin_clip.py"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "malla",
+   "mesh": 0,
+   "skin": 0
+  },
+  {
+   "name": "armadura",
+   "children": [
+    2,
+    4
+   ]
+  },
+  {
+   "name": "raiz",
+   "children": [
+    3
+   ]
+  },
+  {
+   "name": "punta",
+   "translation": [
+    0,
+    1,
+    0
+   ]
+  },
+  {
+   "name": "suelto",
+   "translation": [
+    2,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0.7071067811865476,
+    0.7071067811865476
+   ]
+  }
+ ],
+ "skins": [
+  {
+   "name": "armadura",
+   "joints": [
+    2,
+    3,
+    4
+   ],
+   "inverseBindMatrices": 3
+  }
+ ],
+ "meshes": [
+  {
+   "name": "malla",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "JOINTS_0": 1,
+      "WEIGHTS_0": 2
+     },
+     "indices": 4
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    -0.5,
+    0,
+    0
+   ],
+   "max": [
+    0.5,
+    2,
+    0
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5121,
+   "count": 4,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 3,
+   "type": "MAT4"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 48,
+   "byteLength": 16
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 64,
+   "byteLength": 64
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 128,
+   "byteLength": 192
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 320,
+   "byteLength": 12
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 332,
+   "uri": "data:application/octet-stream;base64,AAAAvwAAAAAAAAAAAAAAPwAAAAAAAAAAAAAAPwAAAEAAAAAAAAAAvwAAAEAAAAAAAAAAAAAAAAABAAAAAQAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAgL8AAAAAAACAPwAAAAAAAIC/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAABAAAAAAAAAgD8AAAEAAgAAAAIAAwA="
+  }
+ ]
+}

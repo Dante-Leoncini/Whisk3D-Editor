@@ -13,12 +13,22 @@ public class Whisk3DActivity extends SDLActivity {
 
     // un .w3d que llega en el intent se abre al arrancar ("whisk3d --open"): sin tarjeta SD no hay donde buscarlo con
     // el explorador, asi que se le pasa desde la PC: adb shell am start -n ... -d file:///data/local/tmp/x.w3d
+    // y el extra "args" (separado por espacios) va detras, como en la linea de comandos de la PC: por ejemplo
+    // -e args "--render-animation" renderiza la animacion al abrir, con la tarjeta Render del proyecto
     @Override
     protected String[] getArguments() {
-        android.net.Uri u = getIntent() != null ? getIntent().getData() : null;
-        if (u != null && "file".equals(u.getScheme()) && u.getPath() != null)
-            return new String[] { "--open", u.getPath() };
-        return new String[0];
+        java.util.ArrayList<String> a = new java.util.ArrayList<String>();
+        android.content.Intent it = getIntent();
+        android.net.Uri u = it != null ? it.getData() : null;
+        if (u != null && "file".equals(u.getScheme()) && u.getPath() != null) {
+            a.add("--open");
+            a.add(u.getPath());
+        }
+        String extra = it != null ? it.getStringExtra("args") : null;
+        if (extra != null)
+            for (String s : extra.trim().split("\\s+"))
+                if (s.length() > 0) a.add(s);
+        return a.toArray(new String[a.size()]);
     }
 
     // EL TECLADO DEL SISTEMA: cuanto de la superficie de SDL tapa, en pixeles (W3dKeyboard.cpp). La app va en pantalla

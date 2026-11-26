@@ -941,6 +941,9 @@ static void ProcessEvent(SDL_Event& e) {
     }
 }
 
+// "--render-image" / "--render-animation" (main, abajo): 1 = una imagen, 2 = la animacion. Se lanza desde el bucle,
+// con el proyecto ya dibujado una vez (la vista del render, el contexto y el tamanio de la ventana ya estan)
+static int g_renderAtStart = 0, g_renderAtStartFrames = 0;
 static void MainLoopFrame() {
 #ifdef W3D_MCP
     W3dHistoryFrame();   // la grabadora de pasos: lo que cambio (sin W3D_HISTORY no hace nada)
@@ -1398,12 +1401,24 @@ static void MainLoopFrame() {
 #endif
     }
 
+    // --render-image / --render-animation: al tercer cuadro dibujado (el render bloquea con su barra hasta terminar)
+    if (g_renderAtStart && g_didRender && ++g_renderAtStartFrames >= 3) {
+        const bool anim = g_renderAtStart == 2; g_renderAtStart = 0;
+        extern void W3dRenderAtStart(bool); W3dRenderAtStart(anim);
+        g_redraw = true;
+    }
+
     // (el Delay(8) fijo que vivia aca era un vestigio del busy-spin viejo: sumado al
     // vsync del swap clavaba el editor en ~30 fps. El paceo real lo hace el loop de
     // escritorio: duerme hasta el proximo frame de 60 y en reposo bloquea en eventos.)
 }
 
 namespace w3dEngine { bool W3dAudioInit(int); }  // audio/W3dAudio.h (evita meter el dir al include path)
+#ifdef __ANDROID__
+// las franjas del render a archivo en la imagen fuera de pantalla del backend (ver main, despues de GLES2Init)
+static bool W3dOutsideScreenFbo(int w, int h) { return w3dEngine::CaptureBegin(w, h); }
+static void W3dOutsideScreenFboEnd() { w3dEngine::CaptureFinish(); }
+#endif
 
 int main(int argc, char* argv[]) {
 #ifdef W3D_MCP
@@ -1747,6 +1762,17 @@ int main(int argc, char* argv[]) {
 #endif
 #ifdef __ANDROID__
     w3dEngine::GLES2Init(nullptr);
+    // EL RENDER A ARCHIVO, FUERA DE LA VENTANA si la ventana tiene menos de 8 bits por canal: en Android 2.3 la
+    // superficie de SDL 2.0.7 es RGB_565 y las franjas del render (que se leen de donde se dibujan) salian con el grano
+    // del tramado de 16 bits -el MP4 de 720p del Galaxy Ace-. Van a la imagen fuera de pantalla del backend (un FBO
+    // RGBA de 8 bits por canal). Con una ventana de 8 bits no hace falta (y asi la sonda de reflejo en tiempo real
+    // sigue saliendo en el render: dentro de la captura no se puede capturar otra)
+    {
+        int r = 8, g = 8, b = 8;
+        SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r); SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g); SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b);
+        w3dLogf("[gl] la ventana: R%d G%d B%d", r, g, b);
+        if (r < 8 || g < 8 || b < 8) { W3dOutsideScreenBegin = W3dOutsideScreenFbo; W3dOutsideScreenFinish = W3dOutsideScreenFboEnd; }
+    }
 #endif
 
     //hay que ver que onda estos dos
@@ -1888,6 +1914,9 @@ int main(int argc, char* argv[]) {
             g_redraw = true;
         }
         if (std::string(argv[ai]) == "--play")  { extern bool PlayAnimation;     PlayAnimation = true;     g_redraw = true; }
+        // "--render-image" / "--render-animation": renderiza al abrir con la tarjeta Render del proyecto (y sigue abierto)
+        if (std::string(argv[ai]) == "--render-image")     { g_renderAtStart = 1; g_redraw = true; }
+        if (std::string(argv[ai]) == "--render-animation") { g_renderAtStart = 2; g_redraw = true; }
         // "whisk3d proyecto.w3d --juego": abre DIRECTO jugando (el selector del
         // timeline en "Juego" + play): para probar un juego sin tocar nada
         if (std::string(argv[ai]) == "--juego") {

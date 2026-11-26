@@ -343,6 +343,12 @@ private:
     // Compara BYTE A BYTE: la huella crc:tam solo sirve para no comparar contra
     // todo el mundo (ver el comentario de 'byFootprint').
     size_t FindByContent(const std::string& footprint, const std::vector<unsigned char>& data) const;
+    // anota la entrada 'e' (con su crc y su tamano) y, con 'dedup', tambien en el indice por contenido
+    void AddPend(const W3dEntryPend& e, bool dedup);
+    // anota una entrada EDITADA en memoria (W3dContainerWriteEntry: van sus bytes nuevos). false = no esta
+    bool PendEdited(const std::string& name, bool dedup);
+    // anota una entrada del zip VIEJO (se reenvasa tal cual; ver 'named' en el .cpp). false = no se anoto
+    bool PendOld(const std::string& name, bool named);
 
     std::string    dirDestination;
     std::string    destinationPath;

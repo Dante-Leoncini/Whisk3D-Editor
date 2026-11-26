@@ -75,4 +75,32 @@ class PopUpBase {
 
 extern PopUpBase* PopUpActive;
 
+// LOS PANELES DE AJUSTAR LA ULTIMA OPERACION (el del timeline y el de mover / rotar / escalar): una tarjeta plegable con
+// sus filas. Lo comun a los dos: tocar una fila, arrastrar un numero (un toque sin arrastrar lo escribe), desplazarse
+// con el dedo o la rueda y las flechas / OK sobre las filas. Cada panel arma su tarjeta, se dibuja y decide que hace
+// Cancelar (y si tiene algo mas, como la lista de Transformar)
+#include "ScrollablePanel.h"
+class GroupPropertie; class PropFloat;
+class CardPanel : public PopUpBase {
+    public:
+        CardPanel();
+        bool Motion(int mx, int my);
+        void Release();
+        void Wheel(int delta);
+        bool Dragging();
+        bool ClosesWithViewport() { return true; }   // click afuera = aceptar (y el click sigue)
+        bool Collapsible() { return group != 0; }
+        bool Collapsed();
+        void Expand(bool open);
+
+        GroupPropertie* group;
+        PropFloat* dragField; bool dragMoved; int lastDragMx;
+        ScrollablePanel dz;          // mas alto que media pantalla: recortado y con desplazamiento
+        // la fila bajo el puntero: un numero arma el arrastre; lo demas se toca (onlyBuild: solo arma el arrastre, el
+        // toque se resuelve al soltar si el panel se desplaza)
+        void ClickRow(int mx, int my, bool onlyBuild);
+        int  RowY(int idx) const;
+        bool KeyRows(int key);       // flechas y OK sobre las filas (la tarjeta abierta); false = la tecla no es de ellas
+};
+
 #endif

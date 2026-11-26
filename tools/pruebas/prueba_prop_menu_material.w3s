@@ -17,7 +17,8 @@ menuopen si
 menuitem Reset
 menuitem Copy
 menuitem Paste
-fail menuitem Insert Keyframe
+# (los numeros del material se ANIMAN: la fila tiene su rombo y su menu, los keyframes -formato/material-animado.md-)
+menuitem Insert Keyframe
 menupick Copy
 matrt 0.2 0
 tick

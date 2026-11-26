@@ -1,4 +1,6 @@
 #include "EditMesh.h"
+#include "edit/ModeMemory.h"   // (N95) lo que dibuja la jaula se suelta al salir de Edit Mode
+#include "base/W3dInteractionState.h"   // EditMode
 #include <math.h>                // sqrtf (loop select geometrico)
 #include "objects/Mesh.h"        // lee la geometria de la malla de render (vertex/edges/faces3d)
 #include "objects/Objects.h"     // EditSelectMode + SelVertex/SelEdge/SelFace
@@ -43,15 +45,22 @@ void EditMesh::Build(Mesh* m) {
     // (lambda no en C++03; helper inline abajo con repToEdit + posRep)
 
     // ARISTAS unicas (m->edges son pares de representantes GPU) -> indices editables
-    std::map<std::pair<int,int>, int> edgeMap; // (min,max editable) -> indice de arista
     for (size_t e = 0; e + 1 < m->edges.size(); e += 2) {
         int a = (m->edges[e]   >= 0 && m->edges[e]   < nV) ? repToEdit[m->edges[e]]   : -1;
         int b = (m->edges[e+1] >= 0 && m->edges[e+1] < nV) ? repToEdit[m->edges[e+1]] : -1;
         if (a < 0 || b < 0) continue;
-        int idx = (int)(lineIdx.size() / 2);
         lineIdx.push_back((GLushort)a); lineIdx.push_back((GLushort)b);
-        int lo = a < b ? a : b, hi = a < b ? b : a;
-        edgeMap[std::make_pair(lo, hi)] = idx;
+    }
+    // la arista de un PAR de vertices (para las de cada cara): las aristas de cada vertice -el menor de sus dos- en un
+    // solo arreglo. Antes era un std::map de todas las aristas (un malloc y unos 48 bytes por arista, solo para armar la
+    // jaula: en el Galaxy Ace se notaba al entrar a Edit Mode). Si un par se repite, vale la ULTIMA, como con el map
+    const int nEd = (int)editVerts.size();
+    std::vector<int> adjStart((size_t)nEd + 1, 0), adjEdge(lineIdx.size() / 2);
+    for (size_t e = 0; e + 1 < lineIdx.size(); e += 2) adjStart[(size_t)std::min(lineIdx[e], lineIdx[e+1]) + 1]++;
+    for (int k = 0; k < nEd; k++) adjStart[(size_t)k + 1] += adjStart[(size_t)k];
+    {
+        std::vector<int> fill(adjStart.begin(), adjStart.end() - 1);
+        for (size_t e = 0; e + 1 < lineIdx.size(); e += 2) adjEdge[(size_t)fill[std::min(lineIdx[e], lineIdx[e+1])]++] = (int)(e / 2);
     }
     // lineas EXPANDIDAS (posiciones; el color lo arma Recolorear)
     linePos.reserve(lineIdx.size() * 3);
@@ -62,6 +71,11 @@ void EditMesh::Build(Mesh* m) {
     }
 
     // CARAS: 1 por cara logica (faces3d). Cada corner GPU -> editable (via posRep).
+    {
+        size_t corners = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) corners += m->faces3d[f].idx.size();
+        faces.reserve(m->faces3d.size(), corners); faceEdges.reserve(m->faces3d.size(), corners);
+    }
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         const std::vector<int>& ring = m->faces3d[f].idx;
         std::vector<int> poly;
@@ -80,10 +94,14 @@ void EditMesh::Build(Mesh* m) {
         bool ok = true;
         for (size_t c = 0; c < poly.size(); c++) {
             int a = poly[c], b = poly[(c+1) % poly.size()];
-            int lo = a < b ? a : b, hi = a < b ? b : a;
-            std::map<std::pair<int,int>,int>::iterator it = edgeMap.find(std::make_pair(lo, hi));
-            if (it == edgeMap.end()) { ok = false; break; }
-            fe.push_back(it->second);
+            const int lo = a < b ? a : b, hi = a < b ? b : a;
+            int found = -1;
+            for (int j = adjStart[(size_t)lo]; j < adjStart[(size_t)lo + 1]; j++) {
+                const int ed = adjEdge[(size_t)j];
+                if ((int)lineIdx[(size_t)ed * 2] + (int)lineIdx[(size_t)ed * 2 + 1] - lo == hi) found = ed;   // (la otra punta)
+            }
+            if (found < 0) { ok = false; break; }
+            fe.push_back(found);
         }
         if (!ok) continue;
         // centro de la cara
@@ -132,19 +150,19 @@ void EditMesh::PushPositions(){
 // true si la cara f esta "seleccionada" segun el MODO: face=faceSel; vertex=todos
 // sus vertices sel; edge=todas sus aristas sel.
 static bool FaceSel(int mode, size_t f,
-                    const std::vector<std::vector<int> >& faces,
-                    const std::vector<std::vector<int> >& faceEdges,
+                    const IntRows& faces,
+                    const IntRows& faceEdges,
                     const std::vector<unsigned char>& vertSel,
                     const std::vector<unsigned char>& edgeSel,
                     const std::vector<unsigned char>& faceSel) {
     if (mode == SelFace) return f < faceSel.size() && faceSel[f];
     if (mode == SelVertex) {
-        const std::vector<int>& p = faces[f];
+        const IntRows::Row p = faces[f];
         for (size_t c = 0; c < p.size(); c++) if (p[c] >= (int)vertSel.size() || !vertSel[p[c]]) return false;
         return !p.empty();
     }
     // edge
-    const std::vector<int>& fe = faceEdges[f];
+    const IntRows::Row fe = faceEdges[f];
     for (size_t c = 0; c < fe.size(); c++) if (fe[c] >= (int)edgeSel.size() || !edgeSel[fe[c]]) return false;
     return !fe.empty();
 }
@@ -197,7 +215,7 @@ void EditMesh::Recolor() {
             unsigned char lv = (activeIdx == (int)f) ? 2
                              : ((f < faceSel.size() && faceSel[f]) ? 1 : 0);
             if (lv == 0) continue;
-            const std::vector<int>& fe = faceEdges[f];
+            const IntRows::Row fe = faceEdges[f];
             for (size_t c = 0; c < fe.size(); c++) {
                 int ei = fe[c];
                 if (ei >= 0 && ei < (int)E && edgeLevel[ei] < lv) edgeLevel[ei] = lv;
@@ -249,7 +267,7 @@ void EditMesh::Recolor() {
     // FILL: triangular (abanico) las caras "seleccionadas" segun el modo
     for (size_t f = 0; f < F; f++) {
         if (!FaceSel(mode, f, faces, faceEdges, vertSel, edgeSel, faceSel)) continue;
-        const std::vector<int>& p = faces[f];
+        const IntRows::Row p = faces[f];
         for (size_t t = 1; t + 1 < p.size(); t++) {
             faceTriDyn.push_back((MeshIndex)p[0]);
             faceTriDyn.push_back((MeshIndex)p[t]);
@@ -260,6 +278,20 @@ void EditMesh::Recolor() {
 
 // dibuja PRIMERO las caras seleccionadas (verde semitransparente 50%), DESPUES las
 // lineas, y arriba los vertices (modo vertex) o los puntitos de cara (modo face).
+
+#if defined(W3D_SYMBIAN)
+// lo de la jaula que da a la camara (ver el Render de abajo): crece con la malla editada y se suelta al salir de Edit
+// Mode (edit/ModeMemory.h), en vez de quedar tomado en la RAM del telefono
+static std::vector<GLfloat> gVisLP, gVisVP, gVisFP; static std::vector<GLubyte> gVisLC, gVisVC, gVisFC;
+static std::vector<unsigned char> gFront, gEUse, gVUse;
+static void EditOverlayRelease() {
+    std::vector<GLfloat>().swap(gVisLP); std::vector<GLfloat>().swap(gVisVP); std::vector<GLfloat>().swap(gVisFP);
+    std::vector<GLubyte>().swap(gVisLC); std::vector<GLubyte>().swap(gVisVC); std::vector<GLubyte>().swap(gVisFC);
+    std::vector<unsigned char>().swap(gFront); std::vector<unsigned char>().swap(gEUse); std::vector<unsigned char>().swap(gVUse);
+}
+W3D_MODE_MEMORY(W3D_MODE_BIT(EditMode), EditOverlayRelease);
+#endif
+
 void EditMesh::Render() {
     if (pos.empty()) return;
     namespace gfx = w3dEngine;
@@ -308,8 +340,9 @@ void EditMesh::Render() {
     // del lado de adentro de su plano, en coordenadas LOCALES: vale con espejo y escala) Y es de un pedazo CERRADO de la
     // malla esta tapada por la propia malla: lo que solo toca caras asi no se dibuja. Un pedazo ABIERTO (un plano, una
     // grilla) visto de atras se ve entero. Lo de adelante tapado lo sigue resolviendo el z
-    static std::vector<GLfloat> visLP, visVP, visFP; static std::vector<GLubyte> visLC, visVC, visFC;
-    static std::vector<unsigned char> front, eUse, vUse;   // (uso: bit 1 = tiene cara, bit 2 = tiene cara de frente)
+    std::vector<GLfloat>& visLP = gVisLP; std::vector<GLfloat>& visVP = gVisVP; std::vector<GLfloat>& visFP = gVisFP;
+    std::vector<GLubyte>& visLC = gVisLC; std::vector<GLubyte>& visVC = gVisVC; std::vector<GLubyte>& visFC = gVisFC;
+    std::vector<unsigned char>& front = gFront; std::vector<unsigned char>& eUse = gEUse; std::vector<unsigned char>& vUse = gVUse;   // (uso: bit 1 = tiene cara, bit 2 = tiene cara de frente)
     if (!g_xray && !faces.empty()) {
         float M[16], P[16];
         gfx::GetMatrix(gfx::ModelView, M); gfx::GetMatrix(gfx::Projection, P);
@@ -350,7 +383,7 @@ void EditMesh::Render() {
         }
         front.assign(F, 0); eUse.assign(lineIdx.size() / 2, 0); vUse.assign(pos.size() / 3, 0);
         for (size_t fi = 0; fi < F && fi*3+2 < faceCenter.size(); fi++) {
-            const std::vector<int>& p = faces[fi];
+            const IntRows::Row p = faces[fi];
             float nx = 0, ny = 0, nz = 0;   // normal de Newell (sirve para n-gons)
             for (size_t q = 0; q < p.size(); q++) {
                 const float* u = &pos[p[q]*3]; const float* v = &pos[p[(q+1) % p.size()]*3];
@@ -443,7 +476,7 @@ void EditMesh::RefreshOverlay() {
     }
     // centro de cada cara
     for (size_t f = 0; f < faces.size(); f++) {
-        const std::vector<int>& p = faces[f];
+        const IntRows::Row p = faces[f];
         if (p.empty() || f*3+2 >= faceCenter.size()) continue;
         float cx=0, cy=0, cz=0;
         for (size_t c = 0; c < p.size(); c++) { int e=p[c]; cx+=pos[e*3]; cy+=pos[e*3+1]; cz+=pos[e*3+2]; }
@@ -487,7 +520,7 @@ static std::vector<int> EsEdgeKey(const EditMesh* m, int eg) {
 }
 static std::vector<int> EsFaceKey(const EditMesh* m, int f) {
     std::vector<std::vector<int> > vs;
-    const std::vector<int>& p = m->faces[f];
+    const IntRows::Row p = m->faces[f];
     for (size_t c = 0; c < p.size(); c++) { std::vector<int> k; EsVertKey(m, p[c], k); vs.push_back(k); }
     std::sort(vs.begin(), vs.end());
     std::vector<int> r; for (size_t i = 0; i < vs.size(); i++) r.insert(r.end(), vs[i].begin(), vs[i].end());
@@ -544,9 +577,9 @@ void EditMesh::ConvertSelection(int fromMode, int toMode) {
     bool haveEdges = false;
     if (fromMode == SelFace) {
         for (int f = 0; f < nF; f++) { if (!faceSel[f]) continue;
-            const std::vector<int>& p = faces[f];
+            const IntRows::Row p = faces[f];
             for (size_t c = 0; c < p.size(); c++) if (p[c] >= 0 && p[c] < nV) v[p[c]] = 1;
-            if (f < (int)faceEdges.size()) { const std::vector<int>& fe = faceEdges[f];
+            if (f < (int)faceEdges.size()) { const IntRows::Row fe = faceEdges[f];
                 for (size_t c = 0; c < fe.size(); c++) if (fe[c] >= 0 && fe[c] < nE) e[fe[c]] = 1; } }
         haveEdges = true;
     } else if (fromMode == SelEdge) {
@@ -568,10 +601,10 @@ void EditMesh::ConvertSelection(int fromMode, int toMode) {
         for (int f = 0; f < nF; f++) {
             bool all = true;
             if (f < (int)faceEdges.size() && !faceEdges[f].empty()) {
-                const std::vector<int>& fe = faceEdges[f];
+                const IntRows::Row fe = faceEdges[f];
                 for (size_t c = 0; c < fe.size() && all; c++) all = fe[c] >= 0 && fe[c] < nE && e[fe[c]];
             } else {
-                const std::vector<int>& p = faces[f];
+                const IntRows::Row p = faces[f];
                 for (size_t c = 0; c < p.size() && all; c++) all = p[c] >= 0 && p[c] < nV && v[p[c]];
                 if (p.empty()) all = false;
             }
@@ -627,7 +660,7 @@ void EditMesh::SelectLinked(int k, int mode, bool onlyThis) {
     std::vector<int> stack;
     if (mode == SelFace) {
         if (k < 0 || k >= (int)faces.size()) return;
-        const std::vector<int>& p = faces[k];
+        const IntRows::Row p = faces[k];
         for (size_t c=0;c<p.size();c++) if (p[c]>=0 && p[c]<nV && !inIsland[p[c]]){ inIsland[p[c]]=1; stack.push_back(p[c]); }
     } else if (mode == SelEdge) {
         if (k < 0 || k >= nE) return;
@@ -650,7 +683,7 @@ void EditMesh::SelectLinked(int k, int mode, bool onlyThis) {
     if (onlyThis){ vertSel.assign(nV,0); edgeSel.assign(nE,0); faceSel.assign(faces.size(),0); }
 
     if (mode == SelFace){
-        for (size_t f=0;f<faces.size();f++){ const std::vector<int>& p=faces[f]; if (p.empty()) continue;
+        for (size_t f=0;f<faces.size();f++){ const IntRows::Row p = faces[f]; if (p.empty()) continue;
             bool all=true; for (size_t c=0;c<p.size();c++) if (p[c]<0||p[c]>=nV||!inIsland[p[c]]){all=false;break;}
             if (all) faceSel[f]=1; }
     } else if (mode == SelEdge){
@@ -674,7 +707,7 @@ void EditMesh::SelectLoopFace(int edgeK, bool onlyThis) {
 
     // borde -> caras que lo contienen (normalmente 1 o 2)
     std::vector<std::vector<int> > edgeFaces(nE);
-    for (int f=0; f<nF; f++){ const std::vector<int>& fe=faceEdges[f];
+    for (int f=0; f<nF; f++){ const IntRows::Row fe = faceEdges[f];
         for (size_t i=0;i<fe.size();i++){ int eg=fe[i]; if (eg>=0&&eg<nE) edgeFaces[eg].push_back(f); } }
 
     std::vector<unsigned char> inLoop(nF, 0);
@@ -684,7 +717,7 @@ void EditMesh::SelectLoopFace(int edgeK, bool onlyThis) {
         int entering = edgeK;
         while (cur >= 0 && cur < nF && !inLoop[cur]) {
             inLoop[cur] = 1;                              // selecciono esta cara
-            const std::vector<int>& fe = faceEdges[cur];
+            const IntRows::Row fe = faceEdges[cur];
             if ((int)fe.size() != 4) break;              // no-quad: el loop corta aca
             int idx = -1; for (int i=0;i<4;i++) if (fe[i]==entering){ idx=i; break; }
             if (idx < 0) break;
@@ -779,7 +812,7 @@ void EditMesh::SelectRingEdge(int edgeK, bool onlyThis) {
     const int nF = (int)faces.size();
     if (edgeK < 0 || edgeK >= nE || nF == 0) return;
     std::vector<std::vector<int> > edgeFaces(nE);
-    for (int f=0; f<nF; f++){ const std::vector<int>& fe=faceEdges[f];
+    for (int f=0; f<nF; f++){ const IntRows::Row fe = faceEdges[f];
         for (size_t i=0;i<fe.size();i++){ int eg=fe[i]; if (eg>=0&&eg<nE) edgeFaces[eg].push_back(f); } }
 
     std::vector<unsigned char> inRing(nE, 0);
@@ -788,7 +821,7 @@ void EditMesh::SelectRingEdge(int edgeK, bool onlyThis) {
         int cur = edgeFaces[edgeK][s];
         int entering = edgeK;
         while (cur >= 0 && cur < nF){
-            const std::vector<int>& fe = faceEdges[cur];
+            const IntRows::Row fe = faceEdges[cur];
             if ((int)fe.size() != 4) break;                         // no-quad: corta
             int idx=-1; for (int i=0;i<4;i++) if (fe[i]==entering){ idx=i; break; }
             if (idx < 0) break;
@@ -850,7 +883,7 @@ void EditMesh::SelectShortestPath(int toIdx, bool fillRegion) {
         N = nF; if (toIdx<0 || toIdx>=N) return;
         adj.assign(nF, std::vector<int>());                       // caras adyacentes si comparten arista
         std::vector<std::vector<int> > edgeFaces(nE);
-        for (int f=0;f<nF;f++){ const std::vector<int>& fe=faceEdges[f];
+        for (int f=0;f<nF;f++){ const IntRows::Row fe = faceEdges[f];
             for (size_t i=0;i<fe.size();i++){ int eg=fe[i]; if (eg>=0&&eg<nE) edgeFaces[eg].push_back(f); } }
         for (int e=0;e<nE;e++){ const std::vector<int>& ef=edgeFaces[e];
             for (size_t i=0;i<ef.size();i++) for (size_t j=i+1;j<ef.size();j++){ adj[ef[i]].push_back(ef[j]); adj[ef[j]].push_back(ef[i]); } }
@@ -894,7 +927,7 @@ bool EditMesh::SelectionCenter(float& cx, float& cy, float& cz) const {
         }
     } else { // face
         for (size_t f = 0; f < faces.size(); f++) if (f < faceSel.size() && faceSel[f]) {
-            const std::vector<int>& p = faces[f];
+            const IntRows::Row p = faces[f];
             for (size_t c = 0; c < p.size(); c++) if (p[c] >= 0 && p[c] < (int)N) inv[p[c]] = 1;
         }
     }
@@ -918,7 +951,7 @@ bool EditMesh::SelectionCenterRadius(float& cx, float& cy, float& cz, float& rLo
         for (size_t e = 0; e < E; e++) if (e < edgeSel.size() && edgeSel[e]) { inv[lineIdx[e*2]] = 1; inv[lineIdx[e*2+1]] = 1; }
     } else {
         for (size_t f = 0; f < faces.size(); f++) if (f < faceSel.size() && faceSel[f]) {
-            const std::vector<int>& p = faces[f];
+            const IntRows::Row p = faces[f];
             for (size_t c = 0; c < p.size(); c++) if (p[c] >= 0 && p[c] < (int)N) inv[p[c]] = 1;
         }
     }

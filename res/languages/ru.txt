@@ -168,6 +168,7 @@ Apply Scale	Применить масштаб
 Apply Transforms	Применить трансформации
 Apply: select mesh or armature object(s)	Применить: выберите меши или арматуры
 Arc	Дуга
+Area	Площадь
 Armature	Арматура
 Armature 2D	Арматура 2D
 Armature Animation	Анимация арматуры
@@ -549,6 +550,7 @@ Directional	Направленный
 Discard the unsaved changes of	Сбросить несохранённые изменения в
 Disconnect	Отсоединить
 Disconnect Bone	Отсоединить кость
+Disk	Диск
 Display in Edit Mode	Показ в Режиме редактирования
 Display in Viewport	Показывать во вьюпорте
 Distance	Расстояние
@@ -603,8 +605,10 @@ Elastic	Упругая
 Elegir archivo	Выбрать файл
 Element	Элемент
 Element of	Элемент объекта
+Ellipse	Эллипс
 Emission	Излучение
 Emission Map	Карта излучения
+Emission Strength	Сила излучения
 Empty	Пустышка
 Empty routine	Пустая процедура
 Enable	Включить
@@ -1037,6 +1041,7 @@ Material color	Цвет материала
 Material index	Индекс материала
 Material of	Материал объекта
 Materials	Материалы
+Materials are animated in a scene animation: choose one in the timeline	Материалы анимируются в анимации сцены: выберите её на шкале времени
 Max (last triangle of the mesh)	Макс. (последний треугольник меша)
 Max (last triangle of the part)	Макс. (последний треугольник части)
 Max distance	Макс. расстояние
@@ -1858,6 +1863,7 @@ This graphics backend has no shaders: the @vertice section runs on the CPU and t
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	В этом графическом бэкенде нет шейдеров: материал рисуется как обычно (в GLES 2.0 и Vulkan они есть)
 This hierarchy clip only animates its root and its children	Этот клип иерархии анимирует только свой корень и его потомков
 This is a scene: convert it to a game to simulate it	Это сцена: преобразуйте её в игру для симуляции
+This material can not be animated (default or from a library)	Этот материал нельзя анимировать (по умолчанию или из библиотеки)
 This mesh does not have this array: do not draw with the array on	В этом меше нет такого массива: не рисуйте с включённым массивом
 This phone can only clone the screen on the external display	Этот телефон может только клонировать экран на внешний дисплей
 This phone has no video encoder for MP4	В этом телефоне нет видеокодера для MP4
@@ -1912,7 +1918,12 @@ UV Group	UV-группа
 UV Groups	UV-группы
 UV Map	UV-карта
 UV Maps	UV-карты
+UV Offset	Смещение UV
+UV Pivot	Опорная точка UV
+UV Rotation	Поворот UV
+UV Scale	Масштаб UV
 UV Sphere	UV-сфера
+UV Transform	Преобразование UV
 UV array	массив UV
 UV group(s)	UV-группа(ы)
 UV layer (0 = active)	UV-слой (0 = активный)
@@ -2208,3 +2219,4 @@ Documents	Документы
 Downloads	Загрузки
 Pictures	Изображения
 Music	Музыка
+Render with the first	Рендер с первым

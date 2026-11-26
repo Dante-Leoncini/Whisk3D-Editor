@@ -1,0 +1,27 @@
+// ==========================================================================
+//  PRUEBA del LOD "Render con el primero" (prueba_lod_render.w3s): un LOD con
+//  umbral 0.01 -> desde cualquier vista el viewport dibuja el SEGUNDO hijo
+//  ("Liviana"); el render final tiene que ir con el PRIMERO ("Completa")
+//  cuando renderFirst esta prendido, y con el de la distancia cuando no.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Scene {
+        Camera {
+            name: "Camara"
+            x: 0.0
+            y: -8.0
+            z: 2.0
+        }
+        LOD {
+            name: "Vista"
+            distances: "0.01"
+            Mesh {
+                name: "Completa"
+            }
+            Mesh {
+                name: "Liviana"
+            }
+        }
+    }
+}

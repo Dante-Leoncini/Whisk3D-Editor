@@ -166,9 +166,6 @@ void UI2D_PointAnchor(int anchor, float x0, float y0, float w, float h, float* a
 }
 
 // ---- accesores UI-o-elemento (el UI no deriva de Element2D: es la ventana) ----------------
-static float OpacityOf(Object* o) {
-    return UI2D_IsElement2D(o) ? E2(o)->opacity : 1.0f;
-}
 // el padding POR LADO, ya en px de pantalla (proporcional: fraccion del LADO MENOR)
 static void PaddingSides(Object* o, float scale, float rw, float rh,
                          float* left, float* right, float* arr, float* bottom) {
@@ -386,14 +383,44 @@ static void QuadState(unsigned tex, bool withDepth) {
     }
 }
 
+// VARIOS quads con el MISMO estado y color en UNA llamada al driver (el slice9 eran 9 llamadas, el borde de un boton
+// 4: en un telefono cada una cuesta). Cada quad son 8 floats: x0,y0,x1,y1 y u0,v0,u1,v1. Los triangulos van en el
+// mismo orden que antes, asi que la mezcla da lo mismo (tambien donde se pisan las esquinas de un borde)
+static const int kQuadsMax = 9;
+static void QuadsUV(const float* q, int n) {
+    float V[kQuadsMax * 12], U[kQuadsMax * 12];
+    if (n > kQuadsMax) n = kQuadsMax;
+    for (int i = 0; i < n; i++, q += 8) {
+        const float x0 = q[0], y0 = q[1], x1 = q[2], y1 = q[3], u0 = q[4], v0 = q[5], u1 = q[6], v1 = q[7];
+        float* v = V + i * 12;
+        float* u = U + i * 12;
+        v[0] = x0; v[1] = y0; v[2] = x1; v[3] = y0; v[4]  = x1; v[5]  = y1;
+        v[6] = x0; v[7] = y0; v[8] = x1; v[9] = y1; v[10] = x0; v[11] = y1;
+        u[0] = u0; u[1] = v0; u[2] = u1; u[3] = v0; u[4]  = u1; u[5]  = v1;
+        u[6] = u0; u[7] = v0; u[8] = u1; u[9] = v1; u[10] = u0; u[11] = v1;
+    }
+    gfx::VertexPointer2f(0, V);
+    gfx::TexCoordPointer2f(0, U);
+    gfx::DrawTrianglesArray(n * 6);
+}
+
 // quad (x0,y0)-(x1,y1) con UV (u0,v0)-(u1,v1)
 static void QuadUV(float x0, float y0, float x1, float y1,
                    float u0, float v0, float u1, float v1) {
-    float V[12] = { x0,y0, x1,y0, x1,y1,  x0,y0, x1,y1, x0,y1 };
-    float U[12] = { u0,v0, u1,v0, u1,v1,  u0,v0, u1,v1, u0,v1 };
-    gfx::VertexPointer2f(0, V);
-    gfx::TexCoordPointer2f(0, U);
-    gfx::DrawTrianglesArray(6);
+    const float q[8] = { x0, y0, x1, y1, u0, v0, u1, v1 };
+    QuadsUV(q, 1);
+}
+
+// los 9 pedazos de un SLICE 9 (cortes xs/ys en pantalla, us/vs en la textura) en una llamada
+static void Slice9UV(const float* xs, const float* ys, const float* us, const float* vs) {
+    float q[9 * 8];
+    int k = 0;
+    for (int j = 0; j < 3; j++)
+        for (int i = 0; i < 3; i++) {
+            q[k++] = xs[i]; q[k++] = ys[j]; q[k++] = xs[i + 1]; q[k++] = ys[j + 1];
+            q[k++] = us[i]; q[k++] = vs[j]; q[k++] = us[i + 1]; q[k++] = vs[j + 1];
+        }
+    QuadsUV(q, 9);
 }
 
 // como QuadUV pero remapea los UV 0..1 a un SUB-RECT del atlas (celda de un flipbook):
@@ -574,9 +601,7 @@ static void DrawSlice9Rect(Slice9* s9, float x0, float y0, float x1, float y1,
     float ys[4] = { y0, y0 + dY, y1 - dY, y1 };
     float us[4] = { 0.0f, bu, 1.0f - bu, 1.0f };
     float vs[4] = { 0.0f, bv, 1.0f - bv, 1.0f };
-    for (int j = 0; j < 3; j++)
-        for (int i = 0; i < 3; i++)
-            QuadUV(xs[i], ys[j], xs[i+1], ys[j+1], us[i], vs[j], us[i+1], vs[j+1]);
+    Slice9UV(xs, ys, us, vs);
 }
 
 // quad de color solido del RECTANGULO (alpha 0 = invisible)
@@ -800,7 +825,10 @@ static void DrawTextBlock(Text2D* t, float sx, float sy, float rw, float rh,
     outB[0] = sx; outB[1] = sy; outB[2] = sx; outB[3] = sy;
     const float pxRequest = t->size * scale * FactorText(t->sizeMode);
     w3dui::W3dTextAtlas* at = Text2DFont(t, pxRequest);
-    std::string txt = TextByType(t);
+    // el texto del elemento tal cual, SIN copiarlo (esto corre por texto y por cuadro; se copia al armado solo si
+    // cambio), o el numero formateado
+    std::string number;
+    const std::string& txt = (t->type == 0) ? t->text : (number = TextByType(t));
     if (!at || txt.empty()) return;
     const bool fits = t->autoSize && rw > 4.0f && rh > 4.0f;
     if (gBuilt.size() > 1024) gBuilt.clear();   // (los de elementos que ya no existen)
@@ -902,9 +930,7 @@ static void DrawButton(Button2D* b, float x0, float y0, float x1, float y1,
         float ys[4] = { y0, y0 + dY, y1 - dY, y1 };
         float us[4] = { 0, bu, 1.0f - bu, 1 };
         float vs[4] = { 0, bv, 1.0f - bv, 1 };
-        for (int j = 0; j < 3; j++)
-            for (int i = 0; i < 3; i++)
-                QuadUV(xs[i], ys[j], xs[i+1], ys[j+1], us[i], vs[j], us[i+1], vs[j+1]);
+        Slice9UV(xs, ys, us, vs);
     } else {
         // fondo plano
         QuadState(0, false);
@@ -913,10 +939,9 @@ static void DrawButton(Button2D* b, float x0, float y0, float x1, float y1,
         // borde de 1px de lienzo (escalado): 4 rectangulos finos (GEOMETRIA, como el editor)
         float g = scale; if (g < 1.0f) g = 1.0f;
         gfx::Color4f(cBorder[0], cBorder[1], cBorder[2], cBorder[3] * op);
-        QuadUV(x0, y0, x1, y0 + g, 0, 0, 1, 1);
-        QuadUV(x0, y1 - g, x1, y1, 0, 0, 1, 1);
-        QuadUV(x0, y0, x0 + g, y1, 0, 0, 1, 1);
-        QuadUV(x1 - g, y0, x1, y1, 0, 0, 1, 1);
+        const float q[4 * 8] = { x0, y0, x1, y0 + g, 0, 0, 1, 1,      x0, y1 - g, x1, y1, 0, 0, 1, 1,
+                                 x0, y0, x0 + g, y1, 0, 0, 1, 1,      x1 - g, y0, x1, y1, 0, 0, 1, 1 };
+        QuadsUV(q, 4);
     }
     // contenido: icono a la izquierda + texto, CENTRADO en el boton (horizontal y
     // vertical): con el boton mas ancho que su natural (celda estirada) el contenido
@@ -966,10 +991,9 @@ static void DrawButton(Button2D* b, float x0, float y0, float x1, float y1,
         QuadState(0, false);
         gfx::Color4f(cHover[0], cHover[1], cHover[2],
                      cHover[3] * op);
-        QuadUV(x0, y0, x1, y0 + g2, 0, 0, 1, 1);
-        QuadUV(x0, y1 - g2, x1, y1, 0, 0, 1, 1);
-        QuadUV(x0, y0 + g2, x0 + g2, y1 - g2, 0, 0, 1, 1);
-        QuadUV(x1 - g2, y0 + g2, x1, y1 - g2, 0, 0, 1, 1);
+        const float q[4 * 8] = { x0, y0, x1, y0 + g2, 0, 0, 1, 1,             x0, y1 - g2, x1, y1, 0, 0, 1, 1,
+                                 x0, y0 + g2, x0 + g2, y1 - g2, 0, 0, 1, 1,   x1 - g2, y0 + g2, x1, y1 - g2, 0, 0, 1, 1 };
+        QuadsUV(q, 4);
     }
 }
 

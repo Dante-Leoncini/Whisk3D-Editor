@@ -22,13 +22,23 @@ extern const char* W3dGameFontPng();
 #include <set>
 #include <vector>
 #include <math.h>
-#include <string.h>   // memcpy (padding POT del atlas)
-#include <stdio.h>    // snprintf (la clave de una fuente por tamano)
+#include <string.h>   // memcpy (padding POT del atlas), memset
 
 namespace gfx = w3dEngine;
 
 // cache: una fuente se hornea UNA vez por proyecto abierto ("" = la default de Whisk3D)
 static std::map<std::string, w3dui::W3dTextAtlas*> gFonts;
+// las TTF horneadas al tamano de PANTALLA (Font2DGetPx), por ruta: at[n] = la de n px (6..63); tried[n] = ya se horneo
+// (si fallo queda NULL: no se reintenta por cuadro). Una busqueda por la ruta y el tamano es el indice: lo pide cada
+// texto y cada boton en cada cuadro, y antes era armar una clave nueva ("@n|ruta", heap) para buscarla
+namespace {
+struct FontSizes {
+    w3dui::W3dTextAtlas* at[64];
+    bool tried[64];
+    FontSizes() { memset(at, 0, sizeof(at)); memset(tried, 0, sizeof(tried)); }
+};
+}
+static std::map<std::string, FontSizes> gFontsPx;
 // las que usan una textura AJENA (atlas_unico: el id es del cache 2D/3D): al liberar no se borra
 static std::set<w3dui::W3dTextAtlas*> gBorrowedFonts;
 
@@ -400,13 +410,18 @@ static w3dui::W3dTextAtlas* LoadBitmapJson(const std::string& path) {
 }
 
 // true si la ruta pinta a fuente BITMAP (png/json) y no a ttf
+// (sin copiar la extension: se pregunta por cada texto en cada cuadro)
+static bool EndsWithNoCase(const std::string& r, size_t p, const char* ext) {
+    for (const char* c = r.c_str() + p; ; c++, ext++) {
+        const char a = (*c >= 'A' && *c <= 'Z') ? (char)(*c + 32) : *c;
+        if (a != *ext) return false;
+        if (!a) return true;
+    }
+}
 static bool IsBitmapPath(const std::string& r) {
     size_t p = r.find_last_of('.');
     if (p == std::string::npos) return false;
-    std::string ext = r.substr(p);
-    for (size_t i = 0; i < ext.size(); i++)
-        if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] = (char)(ext[i] + 32);
-    return ext == ".png" || ext == ".json";
+    return EndsWithNoCase(r, p, ".png") || EndsWithNoCase(r, p, ".json");
 }
 
 w3dui::W3dTextAtlas* Font2DGet(const std::string& path) {
@@ -425,25 +440,25 @@ w3dui::W3dTextAtlas* Font2DGetPx(const std::string& path, float px) {
     int n = (int)(px + 0.5f);
     if (n >= 64) return Font2DGet(path);
     if (n < 6) n = 6;
-    char key[24]; snprintf(key, sizeof(key), "@%d|", n);
-    const std::string k = key + path;
-    std::map<std::string, w3dui::W3dTextAtlas*>::iterator it = gFonts.find(k);
-    if (it != gFonts.end()) return it->second ? it->second : Font2DGet(path);
-    w3dui::W3dTextAtlas* at = BakeTTF(path, n);
-    gFonts[k] = at;   // (NULL tambien: no reintentar por cuadro)
-    return at ? at : Font2DGet(path);
+    FontSizes& s = gFontsPx[path];
+    if (!s.tried[n]) { s.tried[n] = true; s.at[n] = BakeTTF(path, n); }   // (NULL tambien: no reintentar por cuadro)
+    return s.at[n] ? s.at[n] : Font2DGet(path);
 }
 
 // cierre del proyecto (ver Font2D.h): el arbol ya se destruyo, nadie guarda un atlas
 // (UIOverlay lo pide por ruta en cada dibujo) y la proxima vez se vuelve a cargar solo
+static void FreeAtlas(w3dui::W3dTextAtlas* at) {
+    if (!at) return;
+    if (at->tex && gBorrowedFonts.find(at) == gBorrowedFonts.end()) gfx::DeleteTexture(at->tex);
+    delete at;
+}
 void Font2DFreeAll() {
-    for (std::map<std::string, w3dui::W3dTextAtlas*>::iterator it = gFonts.begin(); it != gFonts.end(); ++it) {
-        w3dui::W3dTextAtlas* at = it->second;
-        if (!at) continue;
-        if (at->tex && gBorrowedFonts.find(at) == gBorrowedFonts.end()) gfx::DeleteTexture(at->tex);
-        delete at;
-    }
+    for (std::map<std::string, w3dui::W3dTextAtlas*>::iterator it = gFonts.begin(); it != gFonts.end(); ++it)
+        FreeAtlas(it->second);
+    for (std::map<std::string, FontSizes>::iterator it = gFontsPx.begin(); it != gFontsPx.end(); ++it)
+        for (int n = 0; n < 64; n++) FreeAtlas(it->second.at[n]);
     gFonts.clear();
+    gFontsPx.clear();
     gBorrowedFonts.clear();
 }
 

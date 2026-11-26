@@ -1,0 +1,97 @@
+# PROPIEDADES: SOLTAR la barra de scroll termina el scroll y la teletransportacion del cursor. El reporte:
+# "si usas la barra de scroll con el mouse y luego volves (el de propiedades) despues no podes usar mas la app y
+#  quedas atrapado. pero si yo solte el click! tendria que haber terminado el scroll y la teletransportacion..."
+# Todo con eventos de mouse REALES (evmouse -> InputUserSDL3). 'inputstate' dice que quedo apretado/agarrado/congelado
+# y si el cursor se teletransporto (en --script el mouse de SDL solo lo mueve CheckWarpMouseInViewport).
+# Ventana del harness 1920x1080 (GlobalScale 2): la vista 3D arriba a la izquierda (x 0-1382, y 0-950) y Propiedades
+# abajo a la derecha (x 1382-1920, y 432-1080), con su barra vertical pegada al borde derecho de la VENTANA: la zona de
+# agarre arranca en x 1894 y los ultimos pixeles (x >= 1914) son el margen que FindViewportUnderMouse no le da a nadie.
+add cube
+propscroll 0
+evmouse move 1700 700 none
+inputstate active 3
+
+# 1) el agarre de siempre: arrastra, se va del panel y de la ventana, VUELVE y suelta adentro
+evmouse move 1905 700 none
+evmouse down 1905 700
+inputstate bar 1 press 1 left 1
+evmouse move 1905 760
+evmouse move 1000 800
+evmouse move -40 800
+evmouse move 1700 650
+evmouse up 1700 650
+inputstate bar 0 press 0 left 0 frozen 0 mark
+evmouse move 1650 600 none
+evmouse move 1700 900 none
+inputstate posy mark warped 0 active 3
+evmouse move 600 500 none
+inputstate active 1 warped 0
+
+# 2) suelta AFUERA de la ventana (el soltar llega, con las coordenadas de afuera)
+evmouse move 1905 700 none
+evmouse down 1905 700
+evmouse move 1905 800
+evmouse move 2100 1200
+evmouse up 2100 1200
+inputstate bar 0 press 0 left 0 frozen 0 mark
+evmouse move 1700 700 none
+evmouse move 1700 900 none
+inputstate posy mark warped 0 active 3
+
+# 3) el SOLTAR SE PIERDE afuera de la ventana y vuelve con el boton ya levantado (SDL: el movimiento sin el izquierdo).
+#    Antes la barra seguia agarrada y el panel scrolleaba detras del mouse
+evmouse move 1905 700 none
+evmouse down 1905 700
+evmouse move 1905 800
+evmouse move 2100 1200
+inputstate bar 1 left 1
+evmouse move 1700 700 none
+inputstate bar 0 press 0 left 0 frozen 0 mark
+evmouse move 1700 900 none
+evmouse move 1650 500 none
+inputstate posy mark warped 0 active 3
+evmouse move 600 500 none
+inputstate active 1 warped 0
+
+# 4) contra el BORDE de la ventana (donde frena el mouse al ir a buscar la barra) el click AGARRA la barra. Antes no era
+#    de nadie: le llegaba al viewport activo (button_left: en Propiedades plegaba la tarjeta), el arrastre teletransportaba
+#    el cursor a la otra punta de ese viewport y lo dejaba atrapado adentro
+#    a) llegando desde el panel
+evmouse move 1700 700 none
+evmouse move 1919 700 none
+inputstate mark
+evmouse down 1919 700
+inputstate bar 1 press 1
+evmouse move 1919 760
+evmouse move 1919 820
+inputstate bar 1 scrolled 1 warped 0
+evmouse up 1919 820
+inputstate bar 0 press 0 left 0 frozen 0 mark
+evmouse move 1700 700 none
+inputstate posy mark warped 0 active 3
+#    b) llegando RAPIDO desde el 3D (un solo movimiento hasta el borde: el 3D sigue siendo el activo)
+evmouse move 600 500 none
+evmouse move 1919 600 none
+inputstate active 1 mark
+evmouse down 1919 600
+inputstate bar 1
+evmouse move 1919 700
+evmouse move 1919 800
+inputstate bar 1 scrolled 1 warped 0
+evmouse up 1919 800
+inputstate bar 0 left 0 frozen 0 mark
+evmouse move 600 500 none
+inputstate active 1 warped 0 posy mark
+
+# 5) un arrastre que NO es de la barra (el del medio orbita el 3D y ENVUELVE el cursor en sus bordes) con el soltar
+#    perdido: el primer movimiento sin el boton lo termina y el cursor ya no se envuelve
+evmouse move 700 500 none
+evmouse down 700 500 middle
+evmouse move 720 510 middle
+inputstate middle 1 frozen 1 mark
+evmouse move 740 520 none
+inputstate middle 0 frozen 0
+evmouse move 1376 520 none
+inputstate warped 0
+evmouse move 1700 700 none
+inputstate active 3 warped 0

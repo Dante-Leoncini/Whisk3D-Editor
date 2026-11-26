@@ -64,10 +64,12 @@ INCS := -I$(RAIZ) -I$(RAIZ)/main -I$(RAIZ)/main/app -I$(RAIZ)/main/config -I$(RA
         -I$(SDL2_DC)/include -I$(SDL2_DC)/include/SDL2
 
 # -Os + secciones por funcion: el linker tira lo que no se usa (la Dreamcast tiene 16 MB de RAM para todo)
+# -flto: el enlace ve el programa entero y saca o junta lo que sobra entre archivos: el codigo baja ~390 KB (de 5 MB),
+#  que en la consola son RAM libre (el ejecutable entero vive en la RAM). Va tambien en el enlace (ver whisk3d_debug.elf)
 # LUA_32BITS: enteros de 32 bits y float (el SH-4 hace float por hardware; double es por software, lentisimo).
 # Tiene que ir IGUAL en C y en C++ (cambia el tamanio de lua_Integer / lua_Number)
 DEFS   := -DW3D_DREAMCAST -DW3D_OPENGL -DDREAMCAST -DLUA_32BITS=1 -DW3D_VERSION=\"$(VERSION)\"
-OPT    := -Os -ffunction-sections -fdata-sections
+OPT    := -Os -flto=auto -ffunction-sections -fdata-sections
 # CAPTURA=n: en el cuadro n la pantalla sale por la consola serie (en base64) para verla en la PC sin la consola
 # (tools: platform/dreamcast/captura_flycast.sh). Sin CAPTURA no hay nada de esto en el ejecutable.
 ifneq ($(CAPTURA),)
@@ -86,12 +88,18 @@ CFLAGS_W3D   := $(OPT) -std=gnu99 $(DEFS) $(INCS) -w -MMD -MP
 
 all: $(TARGET)
 
-$(OBJDIR)/%.o: $(RAIZ)/%.cpp
+# LAS OPCIONES con que se compilo: si cambian (por ejemplo al sumar -flto) se recompila todo. Make no mira las opciones,
+# y un objeto viejo se seguia usando tal cual (sin -flto el enlace no lo optimiza con el resto)
+$(SALIDA)/opciones: FORCE
+	@mkdir -p $(SALIDA)
+	@echo '$(OPT)' | cmp -s - $@ || echo '$(OPT)' > $@
+
+$(OBJDIR)/%.o: $(RAIZ)/%.cpp $(SALIDA)/opciones
 	@mkdir -p $(dir $@)
 	@echo "  c++ $*"
 	@kos-c++ $(CXXFLAGS_W3D) -c $< -o $@
 
-$(OBJDIR)/%.o: $(RAIZ)/%.c
+$(OBJDIR)/%.o: $(RAIZ)/%.c $(SALIDA)/opciones
 	@mkdir -p $(dir $@)
 	@echo "  cc  $*"
 	@kos-cc $(CFLAGS_W3D) -c $< -o $@
@@ -116,7 +124,7 @@ $(SALIDA)/romdisk.o: $(SALIDA)/romdisk.img
 # whisk3d.elf es el mismo sin simbolos (lo que se carga: Flycast no abre un ELF de casi 100 MB)
 $(SALIDA)/whisk3d_debug.elf: $(OBJS) $(SALIDA)/romdisk.o
 	@echo "  link $@"
-	@kos-c++ -o $@ $(OBJS) $(SALIDA)/romdisk.o -Wl,--gc-sections -L$(SDL2_DC)/lib \
+	@kos-c++ -Os -flto=auto -o $@ $(OBJS) $(SALIDA)/romdisk.o -Wl,--gc-sections -L$(SDL2_DC)/lib \
 	    -lSDL2 -lSDL2main -lGL -lGLU -lm -lkosutils -lpthread
 
 $(TARGET): $(SALIDA)/whisk3d_debug.elf
@@ -135,6 +143,7 @@ $(SALIDA)/whisk3d.cdi: $(TARGET)
 clean:
 	rm -rf $(SALIDA)
 
-.PHONY: all clean cdi
+.PHONY: all clean cdi FORCE
+FORCE:
 
 -include $(OBJS:.o=.d)

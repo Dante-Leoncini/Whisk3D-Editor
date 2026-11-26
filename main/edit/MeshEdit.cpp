@@ -88,6 +88,32 @@ void Mesh::InvalidateEdit() {
 void Mesh::EditSelectAll(bool sel) { EnsureEdit(); if (edit) edit->SelectAll(sel); }
 void Mesh::EditInvert()                { EnsureEdit(); if (edit) edit->Invert(); }
 
+// los representantes GPU (los render-verts que guarda editVerts) SELECCIONADOS segun el modo (vertice / borde / cara):
+// los vertices elegidos, las puntas de las aristas elegidas o las esquinas de las caras elegidas. Lo leen el borrar,
+// el extrude, el separar, la sincronizacion con el editor UV...
+static void SelRepByMode(const EditMesh* e, int mode, int nV, std::vector<char>& selRep) {
+    selRep.assign(nV > 0 ? (size_t)nV : 0, 0);
+    const int nE = (int)e->editVerts.size();
+    if (mode == SelVertex) {
+        for (int k = 0; k < nE; k++)
+            if (k < (int)e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1;
+    } else if (mode == SelEdge) {
+        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) {
+            if (!e->edgeSel[eg]) continue;
+            const int ends[2] = { e->lineIdx[eg * 2], e->lineIdx[eg * 2 + 1] };
+            for (int c = 0; c < 2; c++)
+                if (ends[c] >= 0 && ends[c] < nE && e->editVerts[ends[c]] < nV) selRep[e->editVerts[ends[c]]] = 1;
+        }
+    } else {
+        for (size_t fe = 0; fe < e->faces.size(); fe++) {
+            if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
+            const IntRows::Row poly = e->faces[fe];
+            for (size_t c = 0; c < poly.size(); c++)
+                if (poly[c] >= 0 && poly[c] < nE && e->editVerts[poly[c]] < nV) selRep[e->editVerts[poly[c]]] = 1;
+        }
+    }
+}
+
 // BORRA la seleccion de Edit Mode. 'deleteType' (SelVertex/SelEdge/SelFace) dice
 // QUE borrar; la SELECCION se lee del MODO ACTUAL (EditSelectMode) como un set de
 // vertices seleccionados (un quad con sus 4 vertices sel = cara seleccionada), asi
@@ -105,30 +131,7 @@ void Mesh::DeleteSelectionEdit(int deleteType, bool noRests) {
     const bool hasRep = ((int)posRep.size() == nV);
 
     // ---- 0) selRep: representante GPU "seleccionado" segun el MODO ACTUAL ----
-    std::vector<char> selRep(nV, 0);
-    if (EditSelectMode == SelVertex) {
-        for (size_t k = 0; k < e->editVerts.size(); k++)
-            if (k < e->vertSel.size() && e->vertSel[k] &&
-                e->editVerts[k] >= 0 && e->editVerts[k] < nV)
-                selRep[e->editVerts[k]] = 1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) {
-            if (!e->edgeSel[eg]) continue;
-            int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
-            if (ea >= 0 && ea < (int)e->editVerts.size() && e->editVerts[ea] < nV) selRep[e->editVerts[ea]] = 1;
-            if (eb >= 0 && eb < (int)e->editVerts.size() && e->editVerts[eb] < nV) selRep[e->editVerts[eb]] = 1;
-        }
-    } else { // SelFace
-        for (size_t fe = 0; fe < e->faces.size(); fe++) {
-            if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
-            const std::vector<int>& poly = e->faces[fe];
-            for (size_t c = 0; c < poly.size(); c++) {
-                int ev = poly[c];
-                if (ev >= 0 && ev < (int)e->editVerts.size() && e->editVerts[ev] < nV)
-                    selRep[e->editVerts[ev]] = 1;
-            }
-        }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);
     #define SELG(gi) (selRep[ hasRep ? posRep[gi] : (gi) ])
 
     // ---- 1) ofV (GPU verts a borrar) y ofF (caras a borrar) segun deleteType ----
@@ -461,7 +464,7 @@ bool Mesh::DeleteEdgeLoopEdit() {
             if (ra!=rb) loopE.insert(ra<rb?std::make_pair(ra,rb):std::make_pair(rb,ra)); }
     } else {
         std::vector<char> selRep(nV,0);
-        if (EditSelectMode==SelFace){ for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>&p=e->faces[fe]; for(size_t c=0;c<p.size();c++) selRep[LREP(e->editVerts[p[c]])]=1; } }
+        if (EditSelectMode==SelFace){ for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const IntRows::Row p = e->faces[fe]; for(size_t c=0;c<p.size();c++) selRep[LREP(e->editVerts[p[c]])]=1; } }
         else { for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]) selRep[LREP(e->editVerts[k])]=1; }
         for (size_t i=0;i+1<edges.size();i+=2){ int ra=edges[i],rb=edges[i+1]; if(ra<0||rb<0||ra==rb||ra>=nV||rb>=nV)continue; if(selRep[ra]&&selRep[rb]) loopE.insert(ra<rb?std::make_pair(ra,rb):std::make_pair(rb,ra)); }
     }
@@ -581,7 +584,7 @@ void Mesh::RebuildEditSel(const std::vector<char>& newSelVert) {
         ne->edgeSel[eg] = (sa && sb) ? 1 : 0;
     }
     for (size_t f = 0; f < ne->faces.size(); f++) {
-        const std::vector<int>& poly = ne->faces[f];
+        const IntRows::Row poly = ne->faces[f];
         bool all = !poly.empty();
         for (size_t c = 0; c < poly.size(); c++)
             if (poly[c]<0 || poly[c]>=(int)ne->vertSel.size() || !ne->vertSel[poly[c]]) { all=false; break; }
@@ -657,24 +660,7 @@ bool Mesh::ExtrudeEdit(Vector3& outDirLocal, bool& outConstrain) {
     const int selModeUI = EditSelectMode;
 
     // ---- selRep: representantes GPU "seleccionados" segun el MODO de la UI ----
-    std::vector<char> selRep(nV, 0);
-    if (selModeUI == SelVertex) {
-        for (size_t k = 0; k < e->editVerts.size(); k++)
-            if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV)
-                selRep[e->editVerts[k]] = 1;
-    } else if (selModeUI == SelEdge) {
-        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) { if (!e->edgeSel[eg]) continue;
-            int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
-            if (ea >= 0 && ea < (int)e->editVerts.size()) selRep[e->editVerts[ea]] = 1;
-            if (eb >= 0 && eb < (int)e->editVerts.size()) selRep[e->editVerts[eb]] = 1;
-        }
-    } else {
-        for (size_t fe = 0; fe < e->faces.size(); fe++) { if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
-            const std::vector<int>& poly = e->faces[fe];
-            for (size_t c = 0; c < poly.size(); c++)
-                if (poly[c] >= 0 && poly[c] < (int)e->editVerts.size()) selRep[e->editVerts[poly[c]]] = 1;
-        }
-    }
+    std::vector<char> selRep; SelRepByMode(e, selModeUI, nV, selRep);
     #define XSELG(gi) (selRep[ hasRep ? posRep[gi] : (gi) ])
     #define XREP(gi)  (hasRep ? posRep[gi] : (gi))
 
@@ -980,7 +966,7 @@ static void CollectEdgesSel(EditMesh* e, std::vector<int>& out) {
         std::set<int> views;
         for (size_t f = 0; f < e->faceSel.size() && f < e->faceEdges.size(); f++) {
             if (!e->faceSel[f]) continue;
-            const std::vector<int>& fe = e->faceEdges[f];
+            const IntRows::Row fe = e->faceEdges[f];
             for (size_t j = 0; j < fe.size(); j++)
                 if (views.insert(fe[j]).second) out.push_back(fe[j]);
         }
@@ -1149,28 +1135,7 @@ void Mesh::VertsSelByMode(std::vector<char>& selVert) {
     const int nV = vertexSize;
     const bool hasRep = ((int)posRep.size() == nV);
     // 1) selRep[rep] = representante seleccionado, segun el modo (vertice/borde/cara)
-    std::vector<char> selRep(nV, 0);
-    if (EditSelectMode == SelVertex) {
-        for (size_t k = 0; k < e->editVerts.size(); k++)
-            if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV)
-                selRep[e->editVerts[k]] = 1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) {
-            if (!e->edgeSel[eg]) continue;
-            int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
-            if (ea >= 0 && ea < (int)e->editVerts.size() && e->editVerts[ea] < nV) selRep[e->editVerts[ea]] = 1;
-            if (eb >= 0 && eb < (int)e->editVerts.size() && e->editVerts[eb] < nV) selRep[e->editVerts[eb]] = 1;
-        }
-    } else { // SelFace
-        for (size_t fe = 0; fe < e->faces.size(); fe++) {
-            if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
-            const std::vector<int>& poly = e->faces[fe];
-            for (size_t c = 0; c < poly.size(); c++) {
-                int ev = poly[c];
-                if (ev >= 0 && ev < (int)e->editVerts.size() && e->editVerts[ev] < nV) selRep[e->editVerts[ev]] = 1;
-            }
-        }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);
     // 2) expandir a TODOS los render-verts via posRep (las copias por costura tambien quedan)
     for (int gi = 0; gi < nV; gi++) {
         int rep = (hasRep ? posRep[gi] : gi);
@@ -1294,14 +1259,7 @@ bool Mesh::DuplicateSelectionEdit() {
     const bool hasRep = ((int)posRep.size() == nV);
     const int mode = EditSelectMode;
 
-    std::vector<char> selRep(nV, 0);
-    if (mode == SelVertex) {
-        for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]&&e->editVerts[k]>=0&&e->editVerts[k]<nV) selRep[e->editVerts[k]]=1;
-    } else if (mode == SelEdge) {
-        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]) { selRep[e->editVerts[e->lineIdx[eg*2]]]=1; selRep[e->editVerts[e->lineIdx[eg*2+1]]]=1; }
-    } else {
-        for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]) { const std::vector<int>& p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[e->editVerts[p[c]]]=1; }
-    }
+    std::vector<char> selRep; SelRepByMode(e, mode, nV, selRep);
     #define DREP(gi) (hasRep ? posRep[gi] : (gi))
 
     // que ELEMENTOS copiar + que reps duplicar. CARAS: toda cara con TODOS sus verts seleccionados (directa en modo
@@ -1440,7 +1398,7 @@ bool Mesh::RipSelectionEdit() {
             if (ra!=rb) cutEdges.insert(ra<rb?std::make_pair(ra,rb):std::make_pair(rb,ra)); }
     } else { // VERTICE o CARA: las aristas de la malla con AMBOS reps seleccionados
         std::vector<char> selRep(nV,0);
-        if (mode==SelFace){ for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>&p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[RREP(e->editVerts[p[c]])]=1; } }
+        if (mode==SelFace){ for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const IntRows::Row p = e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[RREP(e->editVerts[p[c]])]=1; } }
         else { for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]) selRep[RREP(e->editVerts[k])]=1; }
         for (size_t i=0;i+1<edges.size();i+=2){ int ra=edges[i], rb=edges[i+1]; if (ra<0||rb<0||ra==rb||ra>=nV||rb>=nV) continue;
             if (selRep[ra] && selRep[rb]) cutEdges.insert(ra<rb?std::make_pair(ra,rb):std::make_pair(rb,ra)); }
@@ -1549,7 +1507,7 @@ bool Mesh::CreateFaceEdit() {
         }
     } else if (EditSelectMode == SelFace) {
         for (size_t fe=0; fe<e->faces.size(); fe++) if (fe<e->faceSel.size() && e->faceSel[fe]) {
-            const std::vector<int>& p=e->faces[fe];
+            const IntRows::Row p = e->faces[fe];
             for (size_t c=0;c<p.size();c++){ int r=e->editVerts[p[c]]; if (r>=0&&r<nV&&seen.insert(r).second) reps.push_back(r); }
         }
     } else {
@@ -1626,8 +1584,8 @@ bool Mesh::CreateFaceEdit() {
 static bool CrossQuadEdit(EditMesh* e, int editF, int egIn, int Ain, int Bin,
                            int& egOut, int& Aout, int& Bout) {
     if (editF < 0 || editF >= (int)e->faces.size()) return false;
-    const std::vector<int>& poly = e->faces[editF];
-    const std::vector<int>& fe   = e->faceEdges[editF];
+    const IntRows::Row poly = e->faces[editF];
+    const IntRows::Row fe = e->faceEdges[editF];
     if (poly.size() != 4 || fe.size() != 4) return false;
     int li = -1; for (int c=0;c<4;c++) if (fe[c]==egIn){ li=c; break; }
     if (li < 0) return false;
@@ -1652,7 +1610,7 @@ bool Mesh::LoopCutTraversal(int startEditEdge, std::vector<int>& rungEg, std::ve
     rungEg.clear(); rungA.clear(); rungB.clear(); loopFaces.clear(); closed=false;
 
     std::vector<std::vector<int> > edgeFaces(nE);
-    for (int f=0; f<nEF; f++){ const std::vector<int>& fe=e->faceEdges[f];
+    for (int f=0; f<nEF; f++){ const IntRows::Row fe = e->faceEdges[f];
         for (size_t i=0;i<fe.size();i++){ int eg=fe[i]; if (eg>=0&&eg<nE) edgeFaces[eg].push_back(f); } }
     int ea = e->lineIdx[startEditEdge*2], eb = e->lineIdx[startEditEdge*2+1];
     std::vector<char> usedFace(nEF, 0);
@@ -1871,7 +1829,7 @@ bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor, bool correc
     // al lado seguia con la arista entera y quedaba un AGUJERO (3 bordes donde tenia que haber 2).
     std::vector<std::vector<int> > faceRungs(faces3d.size());
     for (size_t i=0;i<rungEg.size();i++){ const int eg=rungEg[i];
-        for (size_t ef=0; ef<e->faceEdges.size(); ef++){ const std::vector<int>& fe=e->faceEdges[ef]; bool has=false;
+        for (size_t ef=0; ef<e->faceEdges.size(); ef++){ const IntRows::Row fe = e->faceEdges[ef]; bool has=false;
             for (size_t k=0;k<fe.size();k++) if (fe[k]==eg){ has=true; break; }
             if (!has) continue;
             const int fs = (ef < e->faceSrc.size()) ? e->faceSrc[ef] : -1;
@@ -1998,14 +1956,7 @@ bool Mesh::RecalculateOrientationEdit(bool inside) {
     #define RREP(gi) (hasRep ? posRep[gi] : (gi))
 
     // verts seleccionados (segun el modo) -> elegir caras objetivo + preservar la seleccion
-    std::vector<char> selRep(nV, 0);
-    if (EditSelectMode == SelVertex) {
-        for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]&&e->editVerts[k]>=0&&e->editVerts[k]<nV) selRep[e->editVerts[k]]=1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]){ selRep[e->editVerts[e->lineIdx[eg*2]]]=1; selRep[e->editVerts[e->lineIdx[eg*2+1]]]=1; }
-    } else {
-        for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>& p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[e->editVerts[p[c]]]=1; }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);
 
     // caras objetivo = las que tienen TODAS sus puntas seleccionadas; si no hay, TODAS
     std::vector<char> target(faces3d.size(), 0); int nObj=0;
@@ -2058,14 +2009,7 @@ bool Mesh::FlipNormalsEdit() {
     const int nV = vertexSize;
     const bool hasRep = ((int)posRep.size() == nV);
     #define FREP(gi) (hasRep ? posRep[gi] : (gi))
-    std::vector<char> selRep(nV, 0);
-    if (EditSelectMode == SelVertex) {
-        for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]&&e->editVerts[k]>=0&&e->editVerts[k]<nV) selRep[e->editVerts[k]]=1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]){ selRep[e->editVerts[e->lineIdx[eg*2]]]=1; selRep[e->editVerts[e->lineIdx[eg*2+1]]]=1; }
-    } else {
-        for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>& p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[e->editVerts[p[c]]]=1; }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);
     std::vector<char> target(faces3d.size(), 0); int nObj=0;
     for (size_t f=0;f<faces3d.size();f++){ const std::vector<int>& idx=faces3d[f].idx; if (idx.size()<3) continue;
         bool all=true; for (size_t c=0;c<idx.size();c++){ int gi=idx[c]; if (gi<0||gi>=nV||!selRep[FREP(gi)]){all=false;break;} }
@@ -2102,14 +2046,7 @@ bool Mesh::ShadeEdit(bool smooth) {
     const int nV = vertexSize;
     const bool hasRep = ((int)posRep.size() == nV);
 
-    std::vector<char> selRep(nV, 0);
-    if (EditSelectMode == SelVertex) {
-        for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]&&e->editVerts[k]>=0&&e->editVerts[k]<nV) selRep[e->editVerts[k]]=1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]){ selRep[e->editVerts[e->lineIdx[eg*2]]]=1; selRep[e->editVerts[e->lineIdx[eg*2+1]]]=1; }
-    } else {
-        for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>& p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[e->editVerts[p[c]]]=1; }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);
     #define SREP(gi)  (hasRep ? posRep[gi] : (gi))
     #define SSELG(gi) (selRep[ hasRep ? posRep[gi] : (gi) ])
 
@@ -2145,14 +2082,7 @@ bool Mesh::TriangulateSelectionEdit() {
     const bool hasRep = ((int)posRep.size() == nV);
 
     // verts seleccionados (por REP de posicion), segun el modo de sub-elemento
-    std::vector<char> selRep(nV, 0);
-    if (EditSelectMode == SelVertex) {
-        for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]&&e->editVerts[k]>=0&&e->editVerts[k]<nV) selRep[e->editVerts[k]]=1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]){ selRep[e->editVerts[e->lineIdx[eg*2]]]=1; selRep[e->editVerts[e->lineIdx[eg*2+1]]]=1; }
-    } else {
-        for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>& p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[e->editVerts[p[c]]]=1; }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);
     #define GSELG(gi) (selRep[ hasRep ? posRep[gi] : (gi) ])
 
     // caras COMPLETAMENTE seleccionadas y con > 3 lados (las unicas que hay que triangular)
@@ -4132,6 +4062,8 @@ void RebuildLayersFrom(Mesh* m, const std::vector<CornerSrc>& src) {
 // enfocaba una nube colapsada (LISA parada enfocaba los pies). Bounding LOCAL de skinVertex. false si no hay
 // skinning o todavia no se skinneo (se skinnea en el render; si aun no se dibujo, cae al bind).
 static bool RadiusCenterSkinLocal(const Mesh* m, Vector3& c, float& r) {
+    // (la pose al dia: con la piel rigida el dibujo no deforma vertices y skinVertex podia quedar de antes)
+    if (m->skinArmature) { extern void SkinMesh(Mesh*); SkinMesh(const_cast<Mesh*>(m)); }
     if (!m->skinArmature || !m->skinVertex || m->vertexSize <= 0) return false;
     const GLfloat* sv = m->skinVertex;
     Vector3 mn(sv[0], sv[1], sv[2]), mx = mn;
@@ -5438,23 +5370,7 @@ bool Mesh::SelectedFaces3d(std::vector<char>& selFace) {
     EditMesh* e = edit;
     const int nV = vertexSize;
     const bool hasRep = ((int)posRep.size() == nV);
-    std::vector<char> selRep(nV, 0);   // (la misma lectura de la seleccion que el extrude, segun el modo de la UI)
-    if (EditSelectMode == SelVertex) {
-        for (size_t k = 0; k < e->editVerts.size(); k++)
-            if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1;
-    } else if (EditSelectMode == SelEdge) {
-        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) { if (!e->edgeSel[eg]) continue;
-            const int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
-            if (ea >= 0 && ea < (int)e->editVerts.size()) selRep[e->editVerts[ea]] = 1;
-            if (eb >= 0 && eb < (int)e->editVerts.size()) selRep[e->editVerts[eb]] = 1;
-        }
-    } else {
-        for (size_t fe = 0; fe < e->faces.size(); fe++) { if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
-            const std::vector<int>& poly = e->faces[fe];
-            for (size_t c = 0; c < poly.size(); c++)
-                if (poly[c] >= 0 && poly[c] < (int)e->editVerts.size()) selRep[e->editVerts[poly[c]]] = 1;
-        }
-    }
+    std::vector<char> selRep; SelRepByMode(e, EditSelectMode, nV, selRep);   // (la misma lectura de la seleccion que el extrude, segun el modo de la UI)
     int n = 0;
     for (size_t f = 0; f < faces3d.size(); f++) {
         const std::vector<int>& idx = faces3d[f].idx;
@@ -5485,7 +5401,7 @@ void Mesh::SelectFacesByCenter(const std::vector<Vector3>& centers) {
         }
         if (!is) continue;
         e->faceSel[f] = 1;
-        const std::vector<int>& p = e->faces[f];
+        const IntRows::Row p = e->faces[f];
         for (size_t k = 0; k < p.size(); k++) if (p[k] >= 0 && p[k] < (int)e->vertSel.size()) e->vertSel[p[k]] = 1;
         if (f < e->faceEdges.size())
             for (size_t k = 0; k < e->faceEdges[f].size(); k++) { const int eg = e->faceEdges[f][k]; if (eg >= 0 && eg < (int)e->edgeSel.size()) e->edgeSel[eg] = 1; }
@@ -5791,9 +5707,9 @@ bool Mesh::BevelSelection(std::vector<char>& selRep, std::vector<std::pair<int,i
     std::vector<char> faceEdge(e->lineIdx.size() / 2, 0);
     if (EditSelectMode == SelFace) {
         for (size_t f = 0; f < e->faces.size(); f++) { if (f >= e->faceSel.size() || !e->faceSel[f]) continue;
-            const std::vector<int>& p = e->faces[f];
+            const IntRows::Row p = e->faces[f];
             for (size_t c = 0; c < p.size(); c++) if (p[c] >= 0 && p[c] < nEV && e->editVerts[p[c]] >= 0 && e->editVerts[p[c]] < nV) selRep[e->editVerts[p[c]]] = 1;
-            if (f < e->faceEdges.size()) { const std::vector<int>& fe = e->faceEdges[f];
+            if (f < e->faceEdges.size()) { const IntRows::Row fe = e->faceEdges[f];
                 for (size_t c = 0; c < fe.size(); c++) if (fe[c] >= 0 && fe[c] < (int)faceEdge.size()) faceEdge[fe[c]] = 1; } }
     } else if (EditSelectMode == SelEdge) {
         // (los vertices: las puntas de las aristas elegidas, no la seleccion del modo vertice, que es otra)

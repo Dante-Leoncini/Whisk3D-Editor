@@ -307,6 +307,14 @@ std::string DopeIdOwner(const Object* o){
     char b[24]; snprintf(b, sizeof b, "#%u", o->serial);
     return std::string(b);
 }
+// LA PISTA DE UN MATERIAL (Animation.h: AnimationMaterial). Su clave: "mat#<serial>" DEBAJO de la escena
+// ("obj:e<ESCENA>/mat#<serial>"). Por serial y no por nombre (el mismo motivo que los objetos: un nombre se recicla al
+// renombrar); colgada de "obj:e<N>/" hereda el remapeo de las escenas (DopeRemapIndexKey("obj:e")) y DopeCovers corta
+// en el '/' como siempre
+static std::string DopeIdMaterial(const Material* m){
+    char b[24]; snprintf(b, sizeof b, "mat#%u", m ? m->serial : 0u);
+    return std::string(b);
+}
 // Los TRES prefijos salen de ACA, una sola vez: el que ARMA las claves de las filas y el que las
 // RESUELVE usan la misma funcion, asi no puede haber dos formatos.
 // "obj:e<ESCENA>/" = las curvas de objeto de la escena activa
@@ -486,7 +494,6 @@ std::string _DopeActiveOwnerFwd(){ return g_dopeActHas ? g_dopeActOwner : std::s
 bool _DopeKeySelHasFwd(const std::string& ownerKey, int propId, int compId, int frame){
     return g_dopeKeySel.count(DopeKeyId(ownerKey, propId, compId, frame)) > 0;
 }
-int  _DopeKeySelCountFwd(){ return (int)g_dopeKeySel.size(); }
 // LA OTRA MITAD: las filas de una vertex anim NO dicen de QUE vertex anim son (se resuelve por la
 // ACTIVA al usarlas) y su seleccion sobrevive a todo. Cambiar de vertex anim con keyframes
 // elegidos aplicaba esa seleccion -mover / borrar / interpolacion, y la tarjeta Keyframe- a la
@@ -775,6 +782,19 @@ static AnimProperty* DopeResolveProp(const std::string& ownerKey, int propId, in
         const std::string pref = DopePrefScene();
         if (ownerKey.size() <= pref.size() || ownerKey.compare(0, pref.size(), pref) != 0) return NULL;
         std::string n = ownerKey.substr(pref.size());
+        // una PISTA DE MATERIAL de la escena activa ("mat#<serial>": no es un objeto). Vive en su SceneAnimation
+        // (no se swapea como las de objeto), asi que se busca ahi
+        if (n.compare(0, 4, "mat#") == 0){
+            if (ActiveSceneAnim < 0 || ActiveSceneAnim >= (int)SceneAnimations.size() || !SceneAnimations[ActiveSceneAnim]) return NULL;
+            std::vector<AnimationMaterial>& mts = SceneAnimations[ActiveSceneAnim]->materials;
+            for (size_t i=0;i<mts.size();i++){
+                if (!mts[i].mat || DopeIdMaterial(mts[i].mat) != n) continue;
+                for (size_t p=0;p<mts[i].Properties.size();p++)
+                    if (mts[i].Properties[p].Property==propId && mts[i].Properties[p].component==compId)
+                        return &mts[i].Properties[p];
+            }
+            return NULL;
+        }
         for (size_t i=0;i<AnimationObjects.size();i++){
             if (!AnimationObjects[i].obj || DopeIdOwner(AnimationObjects[i].obj) != n) continue;
             for (size_t p=0;p<AnimationObjects[i].Properties.size();p++)
@@ -953,6 +973,56 @@ static std::string DopeChannelName(int prop, int comp){
     if (prop == AnimVisible && comp == AnimX) return T("Visible");
     if (prop == AnimRender && comp == AnimX)  return T("Renderable");
     return std::string();
+}
+
+// ---- LAS PISTAS DE MATERIAL de la escena activa (Animation.h: AnimationMaterial) ----
+// el material lo usa alguna malla SELECCIONADA (o es el que muestra la tarjeta Material)? Es el criterio de las
+// filas de objeto del dope (solo lo seleccionado): elegir la pantalla muestra los canales de SU material
+static bool DopeMaterialInSelection(const Material* m){
+    extern Material* PropsEditedMaterial();
+    if (!m) return false;
+    if (PropsEditedMaterial() == m) return true;
+    for (size_t i = 0; i < ObjSelects.size(); i++){
+        Object* o = ObjSelects[i];
+        if (!o || o->getType() != ObjectType::mesh) continue;
+        const Mesh* me = (const Mesh*)o;
+        for (size_t g = 0; g < me->materialsGroup.size(); g++){
+            if (me->materialsGroup[g].material == m) return true;
+            for (size_t k = 0; k < me->materialsGroup[g].layersMat.size(); k++)
+                if (me->materialsGroup[g].layersMat[k] == m) return true;
+        }
+    }
+    return false;
+}
+// el nombre de un canal de material como se lista ("Base Color R", "UV Offset U", "Layer 2 · Factor")
+static std::string DopeMatChannelName(int prop, int comp){
+    if (prop == AnimMatLayerForce){
+        char b[16]; snprintf(b, sizeof b, " %d", comp + 1);
+        return std::string(T("Layer")) + b + " \xC2\xB7 " + T("Factor");
+    }
+    const char* base = W3dMatChannelBase(prop);
+    const char* suf = W3dMatChannelSuffix(prop, comp);
+    std::string n = base ? std::string(T(base)) : std::string("?");
+    if (suf && *suf) { n += " "; n += suf; }
+    return n;
+}
+// las filas de CANAL de una pista de material: una por curva con keyframes, en el orden del enum y de la componente
+// (el de la tarjeta Material)
+static void DopeChannelsMat(const std::vector<AnimProperty>& props, std::vector<Timeline::DopeRow>& out, int level,
+                            const std::string& ownerKey){
+    std::vector<std::pair<int,int> > ch;
+    for (size_t p = 0; p < props.size(); p++)
+        if (!props[p].keyframes.empty() && W3dIsMatChannel(props[p].Property))
+            ch.push_back(std::make_pair(props[p].Property, props[p].component));
+    std::sort(ch.begin(), ch.end()); ch.erase(std::unique(ch.begin(), ch.end()), ch.end());
+    for (size_t i = 0; i < ch.size(); i++){
+        std::vector<int> ks; DopeCurveKeys(props, ch[i].first, ch[i].second, ks);
+        Timeline::DopeRow r; r.type=3; r.level=level; r.name=DopeMatChannelName(ch[i].first, ch[i].second); r.icon=-1; r.keys=ks;
+        r.ownerKey = ownerKey; r.propId = ch[i].first; r.compId = ch[i].second;
+        char cb[32]; snprintf(cb, sizeof cb, "|p%d|c%d", ch[i].first, ch[i].second);
+        r.keyRow = ownerKey + cb;
+        out.push_back(r);
+    }
 }
 
 void Timeline::BuildDopeRows(){
@@ -1186,6 +1256,28 @@ void Timeline::BuildDopeRows(){
                     rows.insert(rows.begin() + (long)f + 1, c);
                 }
             }
+        // ---- LOS MATERIALES ANIMADOS (Animation.h: AnimationMaterial): una fila por material que usa algo seleccionado
+        // (como los objetos: solo lo elegido) con sus canales debajo. Son curvas como cualquiera: mover / borrar /
+        // escalar / interpolacion / handles y Ctrl+Z van por el camino de siempre (DopeResolveProp: "mat#<serial>") ----
+        if (ActiveSceneAnim >= 0 && ActiveSceneAnim < (int)SceneAnimations.size() && SceneAnimations[ActiveSceneAnim]){
+            std::vector<AnimationMaterial>& mts = SceneAnimations[ActiveSceneAnim]->materials;
+            for (size_t i = 0; i < mts.size(); i++){
+                Material* m = mts[i].mat;
+                if (!m || !DopeMaterialInSelection(m)) continue;
+                std::vector<int> u;
+                for (size_t p = 0; p < mts[i].Properties.size(); p++){
+                    const AnimProperty& ap = mts[i].Properties[p];
+                    for (size_t k = 0; k < ap.keyframes.size(); k++) u.push_back(ap.keyframes.Frame(k));
+                }
+                std::sort(u.begin(), u.end()); u.erase(std::unique(u.begin(), u.end()), u.end());
+                if (u.empty()) continue;
+                const std::string k = prefEsc + DopeIdMaterial(m);
+                DopeRow r; r.type=1; r.level=0; r.name=m->name; r.icon=(int)IconType::material;
+                r.keyExpansion = k; r.keyRow = k; r.ownerKey = k; r.propId=-1; r.compId=-1; r.keys = u;
+                rows.push_back(r);
+                if (!DopeCollapsed(k)) DopeChannelsMat(mts[i].Properties, rows, 1, k);
+            }
+        }
         // ---- PISTA "CAMARA ACTIVA" (los cortes de la cinematica): aparece con una CAMARA seleccionada. Es una curva
         // mas (SceneAnimation::camTrack): mover / borrar / escalar y Ctrl+Z van por el camino de siempre
         // (DopeResolveProp la resuelve por el prefijo "camact:e<escena>"). ----
@@ -2449,45 +2541,12 @@ bool Timeline::CurveClickStrip(int mx, int my){
     if (dopeRows.empty()) return false;
     int lx = mx - x, ly = my - y;
     if (lx < panelW || ly < stripY || ly >= height) return false;
-    const float rHandle = GrabRadius(), rKey = GrabRadius();
+    const float rKey = GrabRadius();
 
-    // 1) HANDLES (tienen prioridad: estan encima del keyframe y son mas chicos). Gana el MAS CERCANO, no el primero
-    //    que entre en el radio: los dos handles de un keyframe estan a la misma distancia de el y con keyframes
-    //    juntos se solapan -> si se cortaba en el primero, el de ENTRADA se comia siempre al de SALIDA.
-    { float bestD = 1e30f; bool has = false;
-      std::string bOwner; int bProp=-1, bComp=-1, bFrame=0; bool bOutput=true;
-      static AnimProperty s_vtxTmp;
-      for (size_t r=0; r<dopeRows.size(); r++){
-        const DopeRow& d = dopeRows[r]; if (d.propId < 0 || d.hidden) continue;
-        // canal VERTEX: sus handles se agarran sobre la curva temporal (valor = indice). Es solo el
-        // hit-test: si se agarra un handle, el UndoKeyframesStart de abajo y HandleApply copian
-        AnimProperty* ap = VertexChannelTemp(d.ownerKey, s_vtxTmp) ? &s_vtxTmp
-                         : DopeResolveProp(d.ownerKey, d.propId, d.compId, false);
-        if (!ap) continue;
-        for (size_t i=0;i<ap->keyframes.size();i++){
-            const keyFrame& kf = ap->keyframes[i];
-            if (!g_dopeKeySel.count(DopeKeyId(d.ownerKey, d.propId, d.compId, kf.frame))) continue; // sin seleccionar no hay handle
-            for (int side=0; side<2; side++){
-                bool output = (side==1);
-                if (!HandleVisible(ap, i, output)) continue;   // MISMA condicion que el dibujo: no se agarra lo que no se ve
-                float hx, hy; HandlePos(ap, i, output, hx, hy);   // y la MISMA posicion
-                float ddx = hx-(float)lx, ddy = hy-(float)ly;
-                if (fabsf(ddx) > rHandle || fabsf(ddy) > rHandle) continue;
-                float dd = ddx*ddx + ddy*ddy;
-                if (dd >= bestD) continue;
-                bestD  = dd; has = true;
-                bOwner = d.ownerKey; bProp = d.propId; bComp = d.compId; bFrame = kf.frame; bOutput = output;
-            }
-        }
-      }
-      if (has){
-        g_hOn = true; g_hDirOk = false; g_hOwner = bOwner; g_hProp = bProp; g_hComp = bComp; g_hFrame = bFrame; g_hOutput = bOutput;
-        g_hVirtX = mx; g_hVirtY = my;   // el cursor virtual arranca donde esta el real
-        g_hVirtFirst = true;
-        UndoKeyframesStart();     // Ctrl+Z: curvar es editable/deshacible como todo lo demas
-        return true;
-      } }
-    // 2) KEYFRAMES (hit-test 2D). Igual que los handles: gana el MAS CERCANO, no el primero que caiga en el radio.
+    // los HANDLES primero (estan encima del keyframe y son mas chicos): la misma busqueda que hace button_left antes
+    // que el gizmo
+    if (HandleUnder(mx, my, true)) return true;
+    // KEYFRAMES (hit-test 2D): gana el MAS CERCANO, no el primero que caiga en el radio.
     //    (en el modo CURVA el click no toma keyframes: toma el tramo, mas abajo)
     if (g_tlSelMode != TL_SEL_CURVE)
     //    Con varias curvas encimadas, cortar en el primero hacia ganar siempre a la fila de mas arriba aunque su

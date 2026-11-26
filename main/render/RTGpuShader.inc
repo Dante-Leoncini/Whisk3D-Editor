@@ -7,11 +7,13 @@
 static const char* kRTCommonGpu = R"GLSL(
 layout(local_size_x = 8, local_size_y = 8) in;
 struct Vert { vec4 p; vec4 n; vec4 t; };          // p.w = u, n.w = v
-struct Mat { vec4 m0; vec4 m1; vec4 m2; vec4 m3; vec4 m4; };
+struct Mat { vec4 m0; vec4 m1; vec4 m2; vec4 m3; vec4 m4; vec4 m5; vec4 m6; };
 // m0 = difuso.rgb alfa | m1 = emision.rgb rugosidad | m2 = metalico f0 banderas ior | m3 = tex nmTex emTex rugTex | m4 = metTex alfaTex recorte transmision
-struct Luz { vec4 p; vec4 d; vec4 c; vec4 amb; vec4 att; };
-// p = pos.xyz direccional | d = dir.xyz (la del sol, o hacia donde alumbra un foco) radio | c = color.rgb rayos |
-// amb = ambiente.rgb, coseno del cono del foco (-1 = sin cono) | att = constante lineal cuadratica, exponente del foco
+// m5 = la transformacion UV (u' = x*u + z*v + m6.x, v' = y*u + w*v + m6.y) | m6 = su desplazamiento, -, la fuerza de la emision
+struct Luz { vec4 p; vec4 d; vec4 c; vec4 amb; vec4 att; vec4 area; };
+// p = pos.xyz direccional | d = dir.xyz (la del sol, o hacia donde alumbra un foco o una de area) radio | c = color.rgb rayos |
+// amb = ambiente.rgb, coseno del cono del foco (-1 = sin cono) | att = constante lineal cuadratica, exponente del foco |
+// area = la LUZ DE AREA (Light.h): su medio ancho (xyz, en el mundo) y su medio alto (w; negativo = elipse). 0 = no es de area
 struct Nodo { vec4 a; vec4 b; vec4 c; };          // a = bmin izq, b = bmax der, c = primero cantidad
 layout(std430, binding = 0) readonly buffer BVerts { Vert verts[]; };
 layout(std430, binding = 1) readonly buffer BTris { ivec4 tris[]; };
@@ -148,7 +150,9 @@ vec4 Muestrear(int ti, vec2 uv) {
 }
 vec2 UVEn(Hit h) {
     ivec4 T = tris[h.tri]; float b0 = 1.0 - h.b1 - h.b2;
-    return vec2(verts[T.x].p.w, verts[T.x].n.w) * b0 + vec2(verts[T.y].p.w, verts[T.y].n.w) * h.b1 + vec2(verts[T.z].p.w, verts[T.z].n.w) * h.b2;
+    vec2 uv = vec2(verts[T.x].p.w, verts[T.x].n.w) * b0 + vec2(verts[T.y].p.w, verts[T.y].n.w) * h.b1 + vec2(verts[T.z].p.w, verts[T.z].n.w) * h.b2;
+    Mat r = mats[T.w];   // la TRANSFORMACION UV de su material (la identidad si no tiene; RayTracer.cpp: UVIn)
+    return vec2(r.m5.x * uv.x + r.m5.z * uv.y, r.m5.y * uv.x + r.m5.w * uv.y) + r.m6.xy;
 }
 struct M { vec3 dif; vec3 em; float alfa; float rug; float met; float f0; int tex; int nm; bool sinLuz; bool transp; bool aditivo; float recorte; float ior; float trans; };
 // el borde del RECORTADO: una rampa corta alrededor del umbral (con el bilineal queda suave; ver RayTracer.cpp)
@@ -162,7 +166,7 @@ M MaterialEn(Hit h) {
     int emT = int(r.m3.z), rugT = int(r.m3.w), metT = int(r.m4.x), alfaT = int(r.m4.y);
     if (emT >= 0 || rugT >= 0 || metT >= 0 || alfaT >= 0) {
         vec2 uv = UVEn(h);
-        if (emT >= 0) m.em = Muestrear(emT, uv).rgb;
+        if (emT >= 0) m.em = Muestrear(emT, uv).rgb * r.m6.w;   // (x la fuerza de la emision)
         if (rugT >= 0) m.rug = Muestrear(rugT, uv).r;
         if (metT >= 0) m.met = Muestrear(metT, uv).r;
         if (alfaT >= 0) { vec4 t = Muestrear(alfaT, uv); m.alfa = (t.a < 0.999) ? t.a : t.r; m.transp = true; }
@@ -242,6 +246,82 @@ float VentanaDistancia(float d, float D) {
     float x = d / D; if (x >= 1.0) return 0.0;
     float x2 = x * x; float w = 1.0 - x2 * x2; return w * w;
 }
+// LA LUZ DE AREA (como AreaIn de RayTracer.cpp): la difusa EXACTA sin nada en el medio (el factor de forma del poligono
+// recortado por el horizonte del punto) por la parte de la lampara que ven los rayos de sombra, y el brillo con los
+// mismos rayos. L.area = el medio ancho (xyz) y el medio alto (w; negativo = elipse); L.d.xyz = hacia donde alumbra
+vec3 AristaArea(vec3 a, vec3 b) {
+    vec3 cr = cross(a, b); float l = length(cr);
+    return l > 1e-12 ? cr * (atan(l, dot(a, b)) / (l * 6.2831853)) : vec3(0.0);
+}
+void AristaAreaH(vec3 a, vec3 b, vec3 n, inout vec3 F, inout vec3 sal, inout vec3 ent) {
+    float za = dot(n, a), zb = dot(n, b);
+    if (za >= 0.0 && zb >= 0.0) { F += AristaArea(a, b); return; }
+    if (za < 0.0 && zb < 0.0) return;
+    vec3 x = normalize(za < zb ? a * zb - b * za : b * za - a * zb);
+    if (za >= 0.0) { F += AristaArea(a, x); sal = x; } else { F += AristaArea(x, b); ent = x; }
+}
+// (el disco/la elipse: [-1,1]^2 -> el circulo sin deformar los estratos, Shirley-Chiu)
+vec2 DiscoConcentrico(vec2 u) {
+    if (u.x == 0.0 && u.y == 0.0) return u;
+    float r, a;
+    if (abs(u.x) > abs(u.y)) { r = u.x; a = 0.78539816 * (u.y / u.x); }
+    else { r = u.y; a = 1.5707963 - 0.78539816 * (u.x / u.y); }
+    return r * vec2(cos(a), sin(a));
+}
+void LuzArea(Luz L, vec3 po, vec3 n, vec3 haciaCam, float expo, bool conBrillo, out float lambert, out float spec) {
+    lambert = 0.0; spec = 0.0;
+    vec3 c = L.p.xyz, nl = L.d.xyz, ax = L.area.xyz;
+    bool elip = L.area.w < 0.0;
+    vec3 ay = normalize(cross(ax, nl)) * abs(L.area.w);
+    float S = (elip ? 3.14159265 : 4.0) * length(ax) * abs(L.area.w);
+    float h = dot(po - c, nl);
+    if (h <= 0.0 || S <= 0.0) return;   // (detras: alumbra de un solo lado)
+    vec3 F = vec3(0.0), sal = vec3(0.0), ent = vec3(0.0);
+    if (!elip) {
+        vec3 v0 = normalize(c + ax + ay - po), v1 = normalize(c - ax + ay - po), v2 = normalize(c - ax - ay - po), v3 = normalize(c + ax - ay - po);
+        AristaAreaH(v0, v1, n, F, sal, ent); AristaAreaH(v1, v2, n, F, sal, ent); AristaAreaH(v2, v3, n, F, sal, ent); AristaAreaH(v3, v0, n, F, sal, ent);
+    } else {   // (la elipse: el poligono de 12 lados con su misma superficie, 1.02333 = sqrt(pi / 3))
+        vec3 va = normalize(c + ax * 1.0233267 - po);
+        for (int k = 1; k <= 12; k++) {
+            float a = float(k) * 0.52359878;
+            vec3 vb = normalize(c + (ax * cos(a) + ay * sin(a)) * 1.0233267 - po);
+            AristaAreaH(va, vb, n, F, sal, ent); va = vb;
+        }
+    }
+    if (dot(sal, sal) > 0.5 && dot(ent, ent) > 0.5) F += AristaArea(sal, ent);
+    float E = max(dot(n, F), 0.0) * 3.14159265 / S;
+    if (E <= 0.0) return;
+    int nRayos = max(int(L.c.w), 1);
+    int sx = max(int(ceil(sqrt(float(nRayos)))), 1), sy = (nRayos + sx - 1) / sx, celdas = sx * sy;
+    int desde = min(int(Azar() * float(celdas)), celdas - 1);
+    float gMax = 6.2831853 * float(nRayos) / S;   // (un pedazo de la lampara no tapa mas que medio cielo)
+    float sg = 0.0, sgv = 0.0;
+    for (int r = 0; r < nRayos; r++) {
+        int celda = (r + desde) % celdas;
+        vec2 u = vec2((float(celda % sx) + Azar()) / float(sx), (float(celda / sx) + Azar()) / float(sy)) * 2.0 - 1.0;
+        if (elip) u = DiscoConcentrico(u);
+        vec3 a = c + ax * u.x + ay * u.y - po;
+        float dist = length(a); if (dist < 1e-6) continue;
+        vec3 ld = a / dist;
+        float ndl = dot(n, ld), cl = -dot(ld, nl);
+        if (ndl <= 0.0 || cl <= 0.0) continue;
+        float g = min(cl / (dist * dist), gMax);
+        float vis = Visibilidad(po, ld, dist);
+        sg += ndl * g; sgv += ndl * g * vis;
+        if (conBrillo && vis > 0.0) {
+            float nh = dot(n, normalize(ld + haciaCam));
+            if (nh > 0.0) spec += pow(nh, expo) * (expo + 2.0) * 0.125 * vis * g;
+        }
+    }
+    spec /= float(nRayos);
+    float parte;
+    if (sg > 0.0) parte = sgv / sg;
+    else {   // (ningun rayo cayo del lado del punto: uno en la direccion media de la luz que llega)
+        vec3 d = normalize(F); float dn = -dot(d, nl);
+        parte = (dn > 1e-4) ? Visibilidad(po, d, h / dn) : 0.0;
+    }
+    lambert = E * parte;
+}
 vec3 LuzEn(vec3 p, vec3 n, vec3 haciaCam, vec3 alb, M m) {
     if (m.sinLuz) return alb;
     vec3 luz = vec3(0.0), brillo = vec3(0.0);
@@ -258,6 +338,12 @@ vec3 LuzEn(vec3 p, vec3 n, vec3 haciaCam, vec3 alb, M m) {
     for (int s = 0; s < K; s++) {
         int i = N > kPorImpacto ? min(int(Azar() * float(N)), N - 1) : s;
         Luz L = luces[i];
+        if (dot(L.area.xyz, L.area.xyz) > 0.0) {   // LUZ DE AREA (sin la atenuacion C/L/Q: la caida es la de la superficie)
+            float la, sp; LuzArea(L, po, n, haciaCam, expo, pesoBrillo > 0.0, la, sp);
+            float w = VentanaDistancia(length(L.p.xyz - po), -L.p.w);
+            luz += L.c.rgb * la * w * pesoMuestra; brillo += L.c.rgb * sp * w * pesoMuestra;
+            continue;
+        }
         float lambert = 0.0, spec = 0.0, att = 1.0;
         bool dirl = L.p.w > 0.5; float radio = L.d.w;
         float distMax = dirl ? 0.0 : -L.p.w;   // (la distancia de la luz: 0 = sin limite)
@@ -497,7 +583,7 @@ void main() {
     ivec2 q = ivec2(gl_GlobalInvocationID.xy);
     if (q.x >= pc.dims.x || q.y >= pc.dims.y) return;
     int i = q.y * pc.dims.x + q.x;
-    vec3 c = clamp(acum[i].rgb / float(max(pc.dims.z, 1)), 0.0, 1.0);
+    vec3 c = clamp(accum[i].rgb / float(max(pc.dims.z, 1)), 0.0, 1.0);
     sal[i] = vec4(c / max(alb[i].rgb, vec3(0.02)), 0.0);
 }
 )GLSL";

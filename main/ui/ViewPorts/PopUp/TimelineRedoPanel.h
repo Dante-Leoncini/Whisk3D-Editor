@@ -12,7 +12,6 @@
 //  Cambiar un valor vuelve a aplicar el transform desde la foto de antes sobre el MISMO paso de undo (Timeline.cpp).
 // ============================================================================
 #include "PopUpBase.h"
-#include "ScrollablePanel.h"
 #include "WhiskUI/Propieties/GroupPropertie.h"
 class Card;
 
@@ -23,28 +22,17 @@ bool TimelineRedoPanelOpen();
 bool TimelineRedoSet(int field, float value);
 void TimelineRedoButton(bool accept);
 
-class TimelineRedoPanel : public PopUpBase {
+class TimelineRedoPanel : public CardPanel {
     public:
         TimelineRedoPanel();
         ~TimelineRedoPanel();
         void Render() W3D_OVERRIDE;
         bool Click(int mx, int my) W3D_OVERRIDE;
-        bool Motion(int mx, int my) W3D_OVERRIDE;
         bool Key(int key) W3D_OVERRIDE;
-        void Release() W3D_OVERRIDE;
-        bool Dragging() W3D_OVERRIDE;
-        bool ClosesWithViewport() W3D_OVERRIDE { return true; } bool Collapsible() W3D_OVERRIDE { return group != 0; } bool Collapsed() W3D_OVERRIDE { return group && !group->open; } void Expand(bool open) W3D_OVERRIDE { if (group) group->open = open; }   // click afuera = aceptar (y el click sigue)
-        void Wheel(int delta) W3D_OVERRIDE;
         void Close() W3D_OVERRIDE;
-
-        GroupPropertie* group;
-        class PropFloat* dragField; bool dragMoved; int lastDragMx;
         Card* frame;
-        ScrollablePanel dz;
-        void ClickRow(int mx, int my, bool onlyBuild);
         void Build();
         void ResizeGroup();
         void Relocate();
-        int  RowY(int idx) const;
 };
 #endif // TIMELINEREDOPANEL_H

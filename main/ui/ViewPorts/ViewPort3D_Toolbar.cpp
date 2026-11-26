@@ -58,6 +58,7 @@ extern bool g_redraw;
 static std::vector<int> gToolHistObj;
 static std::vector<int> gToolHistEdit;
 static std::vector<int> gToolHistBone; // Edit de ARMATURE: Extrude / Move / Delete (contextual, Fase 3)
+static std::vector<int> gToolHistCurve; // Edit de una CURVA: puntos y manijas (sin Loop Cut: no hay caras que cortar)
 static std::vector<int>& ToolbarHist(){
     // EDIT MODE de ARMATURE: la barra ofrece las acciones de HUESOS (extruir/mover/rotar/escalar/borrar)
     if (BoneEditActive()){
@@ -65,6 +66,13 @@ static std::vector<int>& ToolbarHist(){
         if (hb.empty()){ hb.push_back(TBExtrude); hb.push_back(TBMove); hb.push_back(TBRotate); hb.push_back(TBScale); hb.push_back(TBDelete); }
         return hb;
     }
+    // EDIT MODE de una CURVA: Extrude agrega un punto en la punta y Delete abre Vertices / Segments (LayoutInput.cpp)
+    { extern bool LayoutCurveEditing();
+      if (InteractionMode == EditMode && LayoutCurveEditing()){
+          std::vector<int>& hc = gToolHistCurve;
+          if (hc.empty()){ hc.push_back(TBMove); hc.push_back(TBRotate); hc.push_back(TBScale); hc.push_back(TBExtrude); hc.push_back(TBDelete); }
+          return hc;
+      } }
     std::vector<int>& h = (InteractionMode == EditMode) ? gToolHistEdit : gToolHistObj;
     if (h.empty()){
         h.push_back(TBMove); h.push_back(TBRotate); h.push_back(TBScale);

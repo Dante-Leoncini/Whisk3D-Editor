@@ -1,0 +1,25 @@
+# ===========================================================================
+#  SONIDO EN MP3 (libs/Whisk3DCore/audio/W3dAudio.cpp: decodeMp3, con thirdparty/dr_libs/dr_mp3.h)
+#
+#  Antes el mixer solo decodificaba .wav: un objeto Sonido con un .mp3 quedaba mudo y con duracion 0.
+#  Fixtures (ffmpeg + libmp3lame, tonos sinteticos):
+#    prueba_sonido_mp3.mp3       1.0 s, 440 Hz, estereo, 44.1 kHz
+#    prueba_sonido_mp3_mono.mp3  0.5 s, 660 Hz, mono, 22.05 kHz (el mixer remuestrea)
+#    prueba_sonido_mp3_roto.mp3  una etiqueta ID3 y basura: no se decodifica, pero NO cuelga ni rompe nada
+#  (la tolerancia de la duracion cubre el relleno del codificador: un mp3 empieza y termina en un frame entero)
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_sonido_mp3.w3s
+# ===========================================================================
+sound new prueba_sonido_mp3.mp3 0 0 0
+sound info
+sound dur 1.0 0.08
+sound new prueba_sonido_mp3_mono.mp3 0 0 0
+sound info
+sound dur 0.5 0.08
+sound new prueba_sonido_mp3_roto.mp3 0 0 0
+sound info
+sound dur 0 0.001
+# el .wav de siempre sigue andando
+sound new prueba_sonido.wav 0 0 0
+sound dur 2.0 0.01

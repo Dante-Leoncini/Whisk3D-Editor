@@ -687,6 +687,24 @@ static std::set<int> gKeysGame;
 #ifdef W3D_MCP
 #include "test/W3dHistory.h"   // la grabadora de pasos (W3D_HISTORY=<ruta>): anota cada tecla y cada click
 #endif
+#ifndef W3D_SYMBIAN
+// EL SOLTAR QUE NO LLEGO (ver "UP PERDIDO" en el movimiento): se arma el evento y entra por InputUserSDL3 como cualquier
+// otro, asi corre lo MISMO que con un soltar real (la barra de scroll, el foco congelado, la caja, el mouse_button_up
+// del viewport...) sin una segunda copia de ese camino
+static void MouseUpLost(const SDL_Event& motion, Uint8 button) {
+    SDL_Event up; memset(&up, 0, sizeof(up));
+    up.type = SDL_EVENT_MOUSE_BUTTON_UP;
+    up.button.timestamp = motion.motion.timestamp;
+    up.button.windowID = motion.motion.windowID;
+    up.button.which = motion.motion.which;
+    up.button.button = button;
+    up.button.state = SDL_RELEASED;
+    up.button.clicks = 1;
+    up.button.x = motion.motion.x;
+    up.button.y = motion.motion.y;
+    InputUserSDL3(up);
+}
+#endif
 void InputUserSDL3(SDL_Event &e){
 #ifdef W3D_MCP
     if (W3dHistoryActive()) W3dHistoryEvent(e);   // ANTES de procesarlo: lo que hay debajo del click
@@ -888,6 +906,18 @@ void InputUserSDL3(SDL_Event &e){
     // viewports (timeline, paneles) el editor sigue normal; SPACE pausa. (g_touchGameVp: file-scope arriba)
 
     if (e.type == SDL_EVENT_MOUSE_MOTION){
+#ifndef W3D_SYMBIAN
+        // UP PERDIDO: se mueve el MOUSE (no un dedo: ese lo maneja su gesto) y SDL dice que el boton YA NO esta apretado,
+        // pero el editor nunca vio el soltar (se solto afuera de la ventana, un evento que se comio algun filtro...). Sin
+        // esto seguia todo como con el boton abajo: la barra de scroll agarrada scrolleando detras del mouse, el foco
+        // congelado en el viewport del click y el cursor ENVOLVIENDOSE en sus bordes (CheckWarpMouseInViewport): atrapado
+        // aunque ya se hubiera soltado. Primero ese soltar (por la misma puerta que uno real) y despues el movimiento.
+        // (el izquierdo solo si lo apreto el mouse: el de un dedo se suelta con el dedo)
+        if (e.motion.which != SDL_TOUCH_MOUSEID && fingers.empty()) {
+            if (leftMouseDown && !g_lastDownTouch && !(e.motion.state & SDL_BUTTON_LMASK)) MouseUpLost(e, SDL_BUTTON_LEFT);
+            if (middleMouseDown && !(e.motion.state & SDL_BUTTON_MMASK)) MouseUpLost(e, SDL_BUTTON_MIDDLE);
+        }
+#endif
         { extern int g_mouseHoverX, g_mouseHoverY; g_mouseHoverX = (int)e.motion.x; g_mouseHoverY = (int)e.motion.y; }   // (el cartelito de ayuda)
         // arrastrar sobre la caja de texto enfocada: selecciona (con el boton apretado desde que se apreto ahi)
         if ((e.motion.state & SDL_BUTTON_LMASK) && TextFieldMouseDrag((int)e.motion.x)) { g_redraw = true; return; }

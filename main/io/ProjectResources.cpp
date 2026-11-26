@@ -175,7 +175,6 @@ static std::string BaseFromPath(const std::string& r) {
 
 // "yes" / "no" en el idioma de la UI
 static std::string IfNo(bool b) { return std::string(T(b ? "Yes" : "No")); }
-static std::string Plural(long n, const char* one, const char* several) { return Count(n, one, several); }
 
 // el TAMANO de un archivo del proyecto: una entrada (la editada en la sesion o la del zip montado) o
 // un archivo de disco (una referencia externa). -1 = no esta.

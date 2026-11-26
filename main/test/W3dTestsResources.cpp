@@ -907,6 +907,49 @@ static bool CmdLayoutMaximize(std::istringstream& ss, std::string& err) {
     return true;
 }
 
+// ---- inputstate [mark] [clave valor]... : lo que deja TRABADO un soltar del mouse que no se proceso: el boton izq/medio
+//      apretados, el foco congelado (ViewPortClickDown), la barra de scroll agarrada (LayoutInDrag), el viewport activo,
+//      el scroll del panel de propiedades (PosY, hover y agarre de su barra) y la posicion del mouse de SDL (en --script
+//      solo la mueve la TELETRANSPORTACION del cursor: CheckWarpMouseInViewport). 'mark' anota PosY y el mouse de SDL;
+//      despues 'posy mark' / 'scrolled 1' / 'warped 0' comparan contra eso.
+//      Claves: left middle frozen bar press active posy scrolled warped ----
+static int gInputMarkPosY = 0, gInputMarkMx = 0, gInputMarkMy = 0;
+static bool CmdInputState(std::istringstream& ss, std::string& err) {
+    Properties* pr = (Properties*)PrFirstLeaf(3);
+    int smx = 0, smy = 0; SDL_GetMouseState(&smx, &smy);
+    const int active = viewPortActive ? viewPortActive->ViewportKind() : -1;
+    const int posY = pr ? pr->PosY : 0;
+    const bool press = pr && (pr->mouseOverScrollYpress || pr->mouseOverScrollXpress);
+    printf("      [inputstate] izq=%d medio=%d congelado=%d barra=%d activo=%d | props PosY=%d (max %d%s) sobreBarra=%d agarre=%d"
+           " zonaBarra x>=%d | mouseSDL=%d,%d\n",
+           leftMouseDown ? 1 : 0, middleMouseDown ? 1 : 0, ViewPortClickDown ? 1 : 0, LayoutInDrag() ? 1 : 0, active,
+           posY, pr ? pr->MaxPosY : 0, (pr && pr->scrollY) ? "" : ", sin scroll", (pr && pr->mouseOverScrollY) ? 1 : 0, press ? 1 : 0,
+           pr ? pr->x + pr->width - (borderGS + GlobalScale * 9) : -1, smx, smy);
+    std::string key;
+    while (ss >> key) {
+        if (key == "mark") { gInputMarkPosY = posY; gInputMarkMx = smx; gInputMarkMy = smy; continue; }
+        std::string val;
+        if (!(ss >> val)) { err = "inputstate: falta el valor de '" + key + "'"; return false; }
+        int want = (val == "mark") ? gInputMarkPosY : atoi(val.c_str());
+        int got = 0;
+        if (key == "left") got = leftMouseDown ? 1 : 0;
+        else if (key == "middle") got = middleMouseDown ? 1 : 0;
+        else if (key == "frozen") got = ViewPortClickDown ? 1 : 0;
+        else if (key == "bar") got = LayoutInDrag() ? 1 : 0;
+        else if (key == "press") got = press ? 1 : 0;
+        else if (key == "active") got = active;
+        else if (key == "posy") got = posY;
+        else if (key == "scrolled") got = (posY != gInputMarkPosY) ? 1 : 0;
+        else if (key == "warped") got = (smx != gInputMarkMx || smy != gInputMarkMy) ? 1 : 0;
+        else { err = "inputstate: clave desconocida '" + key + "' (left middle frozen bar press active posy scrolled warped)"; return false; }
+        if (got != want) {
+            char b[160]; sprintf(b, "inputstate: %s=%d y se esperaba %d", key.c_str(), got, want);
+            err = b; return false;
+        }
+    }
+    return true;
+}
+
 static bool CmdPropsFocus(std::istringstream& ss, std::string& err) {
     std::string arg; ss >> arg;
     if (arg == "null") {
@@ -2587,6 +2630,7 @@ bool W3dTestsResourcesCmd(const std::string& cmd, std::istringstream& ss,
     if (cmd == "viewports")       return CmdViewports(ss, err);
     if (cmd == "layoutmaximize") return CmdLayoutMaximize(ss, err);
     if (cmd == "propsfocus")       return CmdPropsFocus(ss, err);
+    if (cmd == "inputstate")      return CmdInputState(ss, err);
     if (cmd == "propsrename")     return CmdPropsRename(ss, err);
     if (cmd == "redopanel")       return CmdRedoPanel(ss, err);
     if (cmd == "propsarm2d")      return CmdPropsArm2D(ss, err);

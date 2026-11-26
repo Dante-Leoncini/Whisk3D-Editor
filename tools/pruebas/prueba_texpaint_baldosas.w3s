@@ -1,0 +1,117 @@
+# EL DESHACER DE LA PINTURA DE TEXTURA, POR BALDOSAS: cada trazo guarda solo las baldosas de 64x64 que toca (antes, la
+# textura entera por trazo: con los 100 pasos del historial, una de 1024x1024 llegaba a 400 MB). La textura de 300x200
+# no es multiplo de 64: las baldosas del borde derecho y de abajo van recortadas. Deshacer y rehacer varios pasos
+# seguidos tienen que dejar cada pixel como estaba.
+add cube
+selobj Cubo.001
+newtex lienzo 300 200 blank
+# 1) rojo en el centro
+brushcolor 1 0 0 1 1
+texdab 0.5 0.5 6
+texpixel 0.5 0.5 255 0 0 10
+# 2) verde en la esquina de abajo a la derecha (una baldosa recortada)
+brushcolor 0 1 0 1 1
+texdab 0.98 0.98 8
+texpixel 0.98 0.98 0 255 0 10
+# 3) azul encima del rojo (la misma baldosa del paso 1)
+brushcolor 0 0 1 1 1
+texdab 0.5 0.5 6
+texpixel 0.5 0.5 0 0 255 10
+texpixel 0.1 0.1 128 128 128 1
+# deshacer de a uno
+undo
+texpixel 0.5 0.5 255 0 0 10
+texpixel 0.98 0.98 0 255 0 10
+undo
+texpixel 0.98 0.98 128 128 128 1
+texpixel 0.5 0.5 255 0 0 10
+undo
+texpixel 0.5 0.5 128 128 128 1
+# rehacer todo
+redo
+redo
+redo
+texpixel 0.5 0.5 0 0 255 10
+texpixel 0.98 0.98 0 255 0 10
+texpixel 0.1 0.1 128 128 128 1
+# 4) LA MEMORIA: 60 toques chicos en una de 1024x1024 son 60 pasos del historial. Con la textura entera por paso eran
+#    240 MB; por baldosas, una o dos de 16 KB por paso
+newtex grande 1024 1024 blank
+heap  antes de los 60 pasos
+texdab 0.050 0.3 5
+texdab 0.065 0.3 5
+texdab 0.080 0.3 5
+texdab 0.095 0.3 5
+texdab 0.110 0.3 5
+texdab 0.125 0.3 5
+texdab 0.140 0.3 5
+texdab 0.155 0.3 5
+texdab 0.170 0.3 5
+texdab 0.185 0.3 5
+texdab 0.200 0.3 5
+texdab 0.215 0.3 5
+texdab 0.230 0.3 5
+texdab 0.245 0.3 5
+texdab 0.260 0.3 5
+texdab 0.275 0.3 5
+texdab 0.290 0.3 5
+texdab 0.305 0.3 5
+texdab 0.320 0.3 5
+texdab 0.335 0.3 5
+texdab 0.350 0.3 5
+texdab 0.365 0.3 5
+texdab 0.380 0.3 5
+texdab 0.395 0.3 5
+texdab 0.410 0.3 5
+texdab 0.425 0.3 5
+texdab 0.440 0.3 5
+texdab 0.455 0.3 5
+texdab 0.470 0.3 5
+texdab 0.485 0.3 5
+texdab 0.500 0.3 5
+texdab 0.515 0.3 5
+texdab 0.530 0.3 5
+texdab 0.545 0.3 5
+texdab 0.560 0.3 5
+texdab 0.575 0.3 5
+texdab 0.590 0.3 5
+texdab 0.605 0.3 5
+texdab 0.620 0.3 5
+texdab 0.635 0.3 5
+texdab 0.650 0.3 5
+texdab 0.665 0.3 5
+texdab 0.680 0.3 5
+texdab 0.695 0.3 5
+texdab 0.710 0.3 5
+texdab 0.725 0.3 5
+texdab 0.740 0.3 5
+texdab 0.755 0.3 5
+texdab 0.770 0.3 5
+texdab 0.785 0.3 5
+texdab 0.800 0.3 5
+texdab 0.815 0.3 5
+texdab 0.830 0.3 5
+texdab 0.845 0.3 5
+texdab 0.860 0.3 5
+texdab 0.875 0.3 5
+texdab 0.890 0.3 5
+texdab 0.905 0.3 5
+texdab 0.920 0.3 5
+texdab 0.935 0.3 5
+heap  despues de los 60 pasos
+undo
+texpixel 0.05 0.3 0 0 255 10
+texpixel 0.935 0.3 128 128 128 1
+# 5) AL SALIR DE PINTAR, la textura sin nada sin guardar (aca: hecha externa, ya esta en su PNG) suelta sus pixeles de la
+#    RAM (512x512 = 1 MB); la proxima lectura la vuelve a traer de su archivo, con lo pintado
+newtex suelta 512 512 blank
+brushcolor 0 1 0 1 1
+texdab 0.25 0.25 6
+texext /tmp/w3d_textura_suelta.png
+texlabel w3d_textura_suelta.png
+mode texture
+heap  pintando
+mode object
+heap  despues de salir de pintar
+texpixel 0.25 0.25 0 255 0 10
+texpixel 0.75 0.75 128 128 128 1

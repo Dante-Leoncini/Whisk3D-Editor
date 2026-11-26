@@ -153,6 +153,10 @@ extern "C" {                     // chocantest: los binds se prueban sobre un lu
 #include <chrono>   // w3dcotas: tope de TIEMPO por apertura (un .w3d roto no puede colgar)
 #include <string>
 #include <cstdio>
+#if defined(__GLIBC__)
+#include <malloc.h>   // heap: mallinfo2
+#include <dlfcn.h>    // heap: el perfilador de heap (tools/perfil/heap.c), si esta cargado
+#endif
 
 // ============================================================================
 //  Helpers
@@ -2251,6 +2255,51 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         printf("      [importgltf] %s -> %s\n", path.c_str(), ok?"OK":"FALLO");
         return ok;
     }
+    // ---- valorde <objeto | material:NOMBRE> <campo> <esperado> [tol] : ASSERTA un numero de lo importado.
+    //      objeto: fov aspecto (camara) | intensidad sol corte exponente (luz) | tipo (0 malla 1 camara 2 luz 3 vacio)
+    //      material: difR difG difB alfa emiR emiG emiB rugosidad metalico | normal textura mapaEmision mapaRugosidad
+    //      mapaMetalico transparente (0/1: si lo tiene) ----
+    if (cmd == "valorde") {
+        std::string who, field; float expected = 0.0f, tol = 0.001f; ss >> who >> field >> expected >> tol;
+        float v = 0.0f; bool known = true;
+        if (who.compare(0, 9, "material:") == 0) {
+            Material* m = FindMaterialByName(who.substr(9));
+            if (!m) { err = "valorde: no hay un material '" + who.substr(9) + "'"; return false; }
+            if      (field == "difR") v = m->diffuse[0];
+            else if (field == "difG") v = m->diffuse[1];
+            else if (field == "difB") v = m->diffuse[2];
+            else if (field == "alfa") v = m->diffuse[3];
+            else if (field == "emiR") v = m->emission[0];
+            else if (field == "emiG") v = m->emission[1];
+            else if (field == "emiB") v = m->emission[2];
+            else if (field == "rugosidad") v = m->rtRoughness;
+            else if (field == "metalico") v = m->rtMetallic;
+            else if (field == "normal") v = (m->normalMap && m->normalTexture) ? 1.0f : 0.0f;
+            else if (field == "textura") v = (m->texture || !PendingTextureOf(m).empty()) ? 1.0f : 0.0f;
+            else if (field == "mapaEmision") v = (m->mapWithTexture[W3D_MAP_EMISSION] && m->mapTex[W3D_MAP_EMISSION]) ? 1.0f : 0.0f;
+            else if (field == "mapaRugosidad") v = (m->mapWithTexture[W3D_MAP_ROUGHNESS] && m->mapTex[W3D_MAP_ROUGHNESS]) ? 1.0f : 0.0f;
+            else if (field == "mapaMetalico") v = (m->mapWithTexture[W3D_MAP_METALLIC] && m->mapTex[W3D_MAP_METALLIC]) ? 1.0f : 0.0f;
+            else if (field == "transparente") v = m->transparent ? 1.0f : 0.0f;
+            else known = false;
+        } else {
+            Object* o = SceneCollection ? FindObjectByName(SceneCollection, who) : NULL;
+            if (!o) { err = "valorde: no hay un objeto '" + who + "'"; return false; }
+            const ObjectType t = o->getType();
+            if (field == "tipo") v = (t == ObjectType::mesh) ? 0.0f : (t == ObjectType::camera) ? 1.0f : (t == ObjectType::light) ? 2.0f
+                                   : (t == ObjectType::empty) ? 3.0f : -1.0f;
+            else if (t == ObjectType::camera && field == "fov") v = ((Camera*)o)->fov;
+            else if (t == ObjectType::camera && field == "aspecto") v = ((Camera*)o)->aspect;
+            else if (t == ObjectType::light && field == "intensidad") v = ((Light*)o)->intensity;
+            else if (t == ObjectType::light && field == "sol") v = ((Light*)o)->directional ? 1.0f : 0.0f;
+            else if (t == ObjectType::light && field == "corte") v = ((Light*)o)->spotCutoff;
+            else if (t == ObjectType::light && field == "exponente") v = ((Light*)o)->spotExponent;
+            else known = false;
+        }
+        if (!known) { err = "valorde: campo desconocido '" + field + "' para '" + who + "'"; return false; }
+        printf("      [valorde] %s %s = %g (se esperaba %g)\n", who.c_str(), field.c_str(), v, expected);
+        if (fabsf(v - expected) > tol) { char b[200]; snprintf(b, sizeof b, "valorde: %s %s = %g, se esperaba %g", who.c_str(), field.c_str(), v, expected); err = b; return false; }
+        return true;
+    }
     // ---- exportgltf/exportglb <ruta> : exporta la escena a glTF (texto) o GLB (binario) para round-trip headless ----
     // ---- savew3d <ruta> : guarda el PROYECTO .w3d (JSON plano + .w3dui externos) ----
     // ---- keychan <prop> <comp> : toggle keyframe del canal del objeto activo en el frame actual ----
@@ -3508,6 +3557,183 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         bool ok = okDiff && okMore;
         printf("      [lightcol] %s (diffuse/ambient/atenuacion/direccional animados)\n", ok?"OK":"FALLO");
         return ok;
+    }
+    // ======================================================================================================
+    //  MATERIALES ANIMADOS ("se tendria que poder animar los materiales"): las pistas de material de la animacion de
+    //  escena activa (animation/Animation.h: AnimationMaterial, canales AnimMat*), la transformacion UV y la fuerza
+    //  de la emision (objects/Materials.h). Los canales van por nombre: color alpha emission strength specular
+    //  roughness metallic transmission layer uvoffset uvscale uvrot; la componente es 0/1/2 = R/G/B (o U/V), y en
+    //  'layer' el indice de la capa de textura. Todo sobre el material ACTIVO (el que muestra la tarjeta Material).
+    // ======================================================================================================
+    struct MatAnimH {
+        static int Chan(const std::string& n) {
+            static const char* const kNames[12] = { "color", "alpha", "emission", "strength", "specular", "roughness",
+                                                    "metallic", "transmission", "layer", "uvoffset", "uvscale", "uvrot" };
+            for (int i = 0; i < 12; i++) if (n == kNames[i]) return AnimMatColor + i;   // (el orden del enum)
+            return -1;
+        }
+        static int Interp(const std::string& n) {
+            return n == "constant" ? KfConstant : n == "linear" ? KfLinear : n == "bezier" ? KfBezier : -1;
+        }
+        // la curva (canal, componente) del material en la animacion de escena activa (NULL = no tiene)
+        static AnimProperty* Curve(Material* m, int p, int c) {
+            AnimationMaterial* t = W3dMatTrack(ActiveSceneAnim, m, false);
+            if (!t) return NULL;
+            for (size_t k = 0; k < t->Properties.size(); k++)
+                if (t->Properties[k].Property == p && t->Properties[k].component == c) return &t->Properties[k];
+            return NULL;
+        }
+        // un dope sheet nuevo con las filas de hoy (los materiales de las mallas SELECCIONADAS)
+        static Timeline* Dope() { Timeline* tl = new Timeline(); tl->Resize(900, 300); tl->BuildDopeRows(); return tl; }
+        static bool RowMat(const Timeline::DopeRow& d) { return d.ownerKey.find("/mat#") != std::string::npos; }
+        // elige los keyframes de los MATERIALES en el frame f (solo esos: un objeto animado no entra)
+        static int PickFrame(Timeline* tl, int f) {
+            extern void _DopePickKeyFwd(const std::string&, int, int, int);
+            tl->DopeSelectNone();
+            int n = 0;
+            for (size_t i = 0; i < tl->dopeRows.size(); i++) {
+                const Timeline::DopeRow& d = tl->dopeRows[i];
+                if (!RowMat(d) || d.propId < 0) continue;
+                for (size_t k = 0; k < d.keys.size(); k++) if (d.keys[k] == f) { _DopePickKeyFwd(d.ownerKey, d.propId, d.compId, f); n++; }
+            }
+            return n;
+        }
+    };
+    // ---- matkey <canal> <comp> <frame> <valor> [constant|linear|bezier] : el valor en el material activo y un keyframe
+    //      en ese frame, como el "Insert Keyframe" del menu de la fila (un paso de Ctrl+Z). Un color se keyea entero ----
+    if (cmd == "matkey") {
+        std::string cn, in; int comp = 0, f = 1; float v = 0.0f; ss >> cn >> comp >> f >> v >> in;
+        Material* m = ScriptActiveMaterial();
+        const int p = MatAnimH::Chan(cn);
+        if (!m || p < 0) { err = "matkey: sin material activo o canal desconocido"; return false; }
+        extern bool AnimMatChannelInsertKey(Material*, int, int, int);
+        CurrentFrame = f;
+        W3dMatChannelSet(m, p, comp, v);
+        UndoKeyframesStart();
+        const bool ok = AnimMatChannelInsertKey(m, p, comp, f);
+        const int ip = MatAnimH::Interp(in);
+        AnimProperty* ap = ok ? MatAnimH::Curve(m, p, comp) : NULL;
+        if (ap && ip >= 0)
+            for (size_t k = 0; k < ap->keyframes.size(); k++) if (ap->keyframes[k].frame == f) ap->keyframes[k].Interpolation = ip;
+        UndoKeyframesConfirm();
+        if (!ok) { err = "matkey: no se pudo insertar el keyframe"; return false; }
+        printf("      [matkey] '%s' %s.%d @%d = %.3f%s%s\n", m->name.c_str(), cn.c_str(), comp, f, v, in.empty() ? "" : " ", in.c_str());
+        return true;
+    }
+    // ---- matset <canal> <comp> <valor> : cambia el valor SIN keyframe (como tocar el numero en el panel) ----
+    if (cmd == "matset") {
+        std::string cn; int comp = 0; float v = 0.0f; ss >> cn >> comp >> v;
+        Material* m = ScriptActiveMaterial();
+        const int p = MatAnimH::Chan(cn);
+        if (!m || p < 0) { err = "matset: sin material activo o canal desconocido"; return false; }
+        W3dMatChannelSet(m, p, comp, v);
+        RTInvalidate(); g_redraw = true;
+        return true;
+    }
+    // ---- matchan <canal> <comp> <esperado> [tol] : ASSERT del valor del canal en el material activo ----
+    if (cmd == "matchan") {
+        std::string cn; int comp = 0; float e = 0.0f, tol = 0.001f; ss >> cn >> comp >> e; if (!(ss >> tol)) tol = 0.001f;
+        Material* m = ScriptActiveMaterial();
+        const int p = MatAnimH::Chan(cn);
+        if (!m || p < 0) { err = "matchan: sin material activo o canal desconocido"; return false; }
+        const float got = W3dMatChannelGet(m, p, comp);
+        char b[200]; snprintf(b, sizeof b, "matchan '%s' %s.%d @%d = %.4f (esperado %.4f)", m->name.c_str(), cn.c_str(), comp, CurrentFrame, got, e);
+        printf("      [%s]\n", b);
+        if (fabsf(got - e) > tol) { err = b; return false; }
+        return true;
+    }
+    // ---- matkeys <canal> <comp> <n> : ASSERT de cuantos keyframes tiene esa curva del material activo ----
+    if (cmd == "matkeys") {
+        std::string cn; int comp = 0, n = 0; ss >> cn >> comp >> n;
+        Material* m = ScriptActiveMaterial();
+        const int p = MatAnimH::Chan(cn);
+        if (!m || p < 0) { err = "matkeys: sin material activo o canal desconocido"; return false; }
+        AnimProperty* ap = MatAnimH::Curve(m, p, comp);
+        const int has = ap ? (int)ap->keyframes.size() : 0;
+        printf("      [matkeys] '%s' %s.%d: %d keyframe(s):", m->name.c_str(), cn.c_str(), comp, has);
+        for (int k = 0; k < has; k++) printf(" %d=%.3f/i%d", ap->keyframes.Frame(k), ap->keyframes.Value(k), ap->keyframes.Interp(k));
+        printf("\n");
+        if (has != n) { char b[96]; snprintf(b, sizeof b, "matkeys: %d keyframes, se esperaban %d", has, n); err = b; return false; }
+        return true;
+    }
+    // ---- matkeystate <canal> <comp> <0|1|2> : el ROMBO de la fila (el gancho del panel: sin animar / animado / key aca) ----
+    // ---- matkeytoggle <canal> <comp> : el CLICK en el rombo (pone o saca el keyframe en el frame actual, con Ctrl+Z) ----
+    if (cmd == "matkeystate" || cmd == "matkeytoggle") {
+        std::string cn; int comp = 0, e = -1; ss >> cn >> comp >> e;
+        const int p = MatAnimH::Chan(cn);
+        if (!ScriptProps() || p < 0 || !W3dKeyframeState || !W3dKeyframeToggle) { err = cmd + ": sin panel o canal desconocido"; return false; }
+        if (cmd == "matkeytoggle") { W3dKeyframeToggle(p, comp); return true; }
+        const int has = W3dKeyframeState(p, comp);
+        printf("      [matkeystate] %s.%d @%d: %d (esperado %d)\n", cn.c_str(), comp, CurrentFrame, has, e);
+        if (has != e) { err = "matkeystate: el rombo no esta como se esperaba"; return false; }
+        return true;
+    }
+    // ---- matuv <desplU> <desplV> <escU> <escV> <rot> [pivoteU pivoteV] : la TRANSFORMACION UV del material activo
+    //      (con Ctrl+Z, como los campos de la tarjeta) ----
+    if (cmd == "matuv") {
+        float o0 = 0, o1 = 0, s0 = 1, s1 = 1, r = 0, p0 = -1e9f, p1 = -1e9f; ss >> o0 >> o1 >> s0 >> s1 >> r >> p0 >> p1;
+        Material* m = ScriptActiveMaterial();
+        if (!m || m == MaterialDefault) { err = "matuv: sin material activo"; return false; }
+        UndoMaterialModStart(m);
+        m->uvOffset[0] = o0; m->uvOffset[1] = o1; m->uvScale[0] = s0; m->uvScale[1] = s1; m->uvRotation = r;
+        if (p0 > -1e8f && p1 > -1e8f) { m->uvPivot[0] = p0; m->uvPivot[1] = p1; }
+        UndoMaterialModCommit();
+        RTInvalidate(); g_redraw = true;
+        return true;
+    }
+    // ---- matgame <frame> : el REPRODUCTOR DEL JUEGO (animScene de lua) toca la animacion de escena activa en ese
+    //      frame (manual, como animSceneFrame) y la apaga: lo que deja en el material es lo del juego, no lo del editor ----
+    if (cmd == "matgame") {
+        float f = 1.0f; ss >> f;
+        InitSceneAnimations();
+        if (!W3dAnimScenePlay(ActiveSceneAnim, false)) { err = "matgame: no se pudo reproducir la animacion activa"; return false; }
+        W3dAnimSceneSet(f);
+        W3dAnimSceneTick(0.0f);
+        W3dAnimSceneReset();
+        return true;
+    }
+    // ---- matdope <n> : el DOPE SHEET lista n canales de material (los de las mallas seleccionadas) ----
+    if (cmd == "matdope") {
+        int n = 0; ss >> n;
+        Timeline* tl = MatAnimH::Dope();
+        int has = 0;
+        for (size_t i = 0; i < tl->dopeRows.size(); i++) {
+            const Timeline::DopeRow& d = tl->dopeRows[i];
+            if (!MatAnimH::RowMat(d)) continue;
+            printf("      [matdope] %s '%s' keys:", d.propId < 0 ? "material" : "  canal ", d.name.c_str());
+            for (size_t k = 0; k < d.keys.size(); k++) printf(" %d", d.keys[k]);
+            printf("\n");
+            if (d.propId >= 0) has++;
+        }
+        delete tl;
+        if (has != n) { char b[96]; snprintf(b, sizeof b, "matdope: %d canales de material, se esperaban %d", has, n); err = b; return false; }
+        return true;
+    }
+    // ---- matdopemove <frame> <frame nuevo> : en el dope sheet, elige los keyframes de los materiales en ese frame y los
+    //      MUEVE con 'g' + el numero tipeado (el camino de siempre: undo incluido) ----
+    // ---- matdopeinterp <frame> <constant|linear|bezier> : la interpolacion de esos keyframes (menu Interpolation) ----
+    // ---- matdopedelete <frame> : los borra ('x') ----
+    if (cmd == "matdopemove" || cmd == "matdopeinterp" || cmd == "matdopedelete") {
+        int f = 0; std::string q; ss >> f >> q;
+        Timeline* tl = MatAnimH::Dope();
+        const int n = MatAnimH::PickFrame(tl, f);
+        if (!n) { delete tl; err = cmd + ": no hay keyframes de material en ese frame"; return false; }
+        if (cmd == "matdopemove") {
+            char b[24]; snprintf(b, sizeof b, "%d", atoi(q.c_str()) - f);
+            tl->DopeMoveStart(Timeline::DOPE_MOV);
+            for (const char* c = b; *c; c++) tl->DopeNumChar((unsigned char)*c);
+            tl->DopeNumApply();
+            tl->DopeMoveConfirm();
+        } else if (cmd == "matdopeinterp") {
+            const int ip = MatAnimH::Interp(q);
+            if (ip < 0) { delete tl; err = "matdopeinterp: constant|linear|bezier"; return false; }
+            tl->SetInterpolationSel(ip);
+        } else tl->DopeDeleteSelection();
+        printf("      [%s] %d keyframe(s) de material en el frame %d\n", cmd.c_str(), n, f);
+        tl->DopeSelectNone();
+        delete tl;
+        { extern void ApplyAnimationObjects(); ApplyAnimationObjects(); }   // (el material sigue a la curva editada)
+        return true;
     }
     // ---- vtxsetup : crea una vertex anim con keyframes (para probar el guardado) ----
     if (cmd == "vtxsetup") {
@@ -4933,6 +5159,60 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
                stCh / n, upB / n, trO / n, trB / n, catP / n, catU / n);
         return true;
     }
+    // ---- heap [etiqueta] : la memoria del heap EN USO ahora (malloc de glibc: lo pedido y no liberado, mas los bloques
+    //      grandes que van por mmap). Para ver cuanto queda tomado despues de entrar y salir de un modo, de abrir un
+    //      proyecto o de cerrar un panel. Fuera de glibc no imprime nada. ----
+    if (cmd == "heap") {
+        std::string label; std::getline(ss, label);
+#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 33))
+        struct mallinfo2 mi = mallinfo2();
+        printf("      [heap]%s en uso: %.2f MB (arena %.2f MB + mmap %.2f MB)\n", label.c_str(),
+               (double)(mi.uordblks + mi.hblkhd) / 1048576.0, (double)mi.uordblks / 1048576.0, (double)mi.hblkhd / 1048576.0);
+        // con el perfilador de heap cargado (LD_PRELOAD=tools/perfil/heap.so): QUIEN tiene tomada esa memoria
+        { void (*dump)(const char*) = (void (*)(const char*))dlsym(RTLD_DEFAULT, "w3d_heapdump"); if (dump) dump(label.c_str()); }
+#endif
+        return true;
+    }
+    // ---- benchui <frames> [tipo] : el cuadro ENTERO del layout, sin escena obligatoria (los paneles de
+    //      propiedades, outliner, timeline...). Con 'tipo' (1=3D 2=outliner 3=propiedades 5=timeline...)
+    //      maximiza ese viewport antes (y lo restaura al final): es lo que se ve en un telefono. Imprime la
+    //      CPU por cuadro (sin glFinish), las llamadas de dibujo y en cuantos cuadros el dibujo dejo pedido
+    //      OTRO cuadro (g_redraw): si son todos, el panel no deja dormir al editor. ----
+    if (cmd == "benchui") {
+        int n = 60, kind = 0; ss >> n >> kind; if (n < 1) n = 1;
+        namespace gfx = w3dEngine;
+        double W3dNowMs();
+        if (!rootViewport) { err = "benchui: no hay layout de viewports"; return false; }
+        bool maxed = false;
+        if (kind > 0 && !LayoutIsMaximized()) {
+            struct VK { static ViewportBase* Find(ViewportBase* v, int k) { if (!v) return NULL; if (v->isLeaf()) return v->ViewportKind() == k ? v : NULL;
+                            ViewportBase* a = Find(((ViewportColumn*)v)->childA, k); return a ? a : Find(((ViewportColumn*)v)->childB, k); } };
+            ViewportBase* v = VK::Find(rootViewport, kind);
+            if (!v) { err = "benchui: no hay un viewport de ese tipo"; return false; }
+            viewPortActive = v;
+            LayoutMaximize(); maxed = true;
+        }
+        { extern void LoadPendingTextures(); LoadPendingTextures(); }
+        SDL_GL_SetSwapInterval(0);
+        for (int i = 0; i < 5; i++) { rootViewport->Render(); gfx::Finish(); }
+        double msCpu = 0.0, msAll = 0.0; long dc = 0, st = 0; int asked = 0;
+        for (int i = 0; i < n; i++) {
+            gfx::StatsReset(); g_redraw = false;
+            const double t0 = W3dNowMs();
+            rootViewport->Render();
+            const double t1 = W3dNowMs();
+            gfx::Finish();
+            msCpu += t1 - t0; msAll += W3dNowMs() - t0;
+            dc += gfx::g_statDrawTris; st += gfx::g_statStateChanges;
+            if (g_redraw) asked++;
+            if (LayoutSwapBuffers) LayoutSwapBuffers();
+        }
+        SDL_GL_SetSwapInterval(1);
+        if (maxed) LayoutMaximize();
+        printf("      [benchui] %d cuadros | cpu=%.3f ms/cuadro | con glFinish=%.3f ms | drawcalls=%ld stateChanges=%ld | pidieron otro cuadro: %d/%d\n",
+               n, msCpu / n, msAll / n, dc / n, st / n, asked, n);
+        return true;
+    }
     // ---- benchgame <frames> [noswap] : como bench pero JUGANDO: arranca el modo juego
     //      (--juego: sim + scripts lua + fisica + snapshot de rewind) y mide el frame
     //      COMPLETO con su desglose: sim (lua+fisica+snapshot), anims (esqueletos/
@@ -5403,6 +5683,34 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //      decisiones que solo existen DURANTE el render, como la herencia de
     //      onlyCameraActive de un Culling padre (el re-computo del harness corre fuera de
     //      ese scope y mentiria). ----
+    // ---- lodrender <lod> 0|1 : el flag "Render con el primero" (LOD::renderFirst) ----
+    // ---- lodfinal <lod> <esperado> : el hijo que dibuja el render FINAL (w3dRenderFinal) y el que toma el trazado de
+    //      rayos (RenderPick), y que el viewport sigue eligiendo por distancia ----
+    if (cmd == "lodrender" || cmd == "lodfinal") {
+        std::string name; int v = -1; ss >> name >> v;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, name) : NULL;
+        if (!o || o->getType() != ObjectType::lod) { err = cmd + ": no hay un LOD '" + name + "'"; return false; }
+        LOD* l = (LOD*)o;
+        if (cmd == "lodrender") { l->renderFirst = (v != 0); printf("      [lodrender] '%s' %d\n", name.c_str(), v); return true; }
+        const int vista = l->PickedChild();
+        const bool final0 = w3dEngine::w3dRenderFinal;
+        w3dEngine::w3dRenderFinal = true;
+        const int fin = l->PickedChild();
+        w3dEngine::w3dRenderFinal = final0;
+        const int rt = l->RenderPick();
+        printf("      [lodfinal] '%s' render=%d trazado=%d vista=%d (renderFirst %d)\n", name.c_str(), fin, rt, vista,
+               l->renderFirst ? 1 : 0);
+        if (!l->renderFirst && (fin != vista || rt != vista)) {   // (sin el flag: la distancia, como siempre)
+            char buf[160]; snprintf(buf, sizeof(buf), "lodfinal: '%s' sin renderFirst render=%d trazado=%d y la vista %d",
+                                    name.c_str(), fin, rt, vista);
+            err = buf; return false;
+        }
+        if (v >= 0 && (fin != v || rt != v)) {
+            char buf[160]; snprintf(buf, sizeof(buf), "lodfinal: '%s' render=%d trazado=%d, se esperaba %d", name.c_str(), fin, rt, v);
+            err = buf; return false;
+        }
+        return true;
+    }
     if (cmd == "lodpicked") {
         std::string name; int expected = -1; std::string mode; ss >> name >> expected >> mode;
         Object* o = SceneCollection ? FindObjectByName(SceneCollection, name) : NULL;
@@ -7603,6 +7911,632 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         printf("      [simplay] %d tick(s); sim %s\n", n, SimActive() ? "active" : "SIN scripts (no arranco)");
         return true;
     }
+    // ======================================================================
+    //  CURVAS BEZIER / POLY (objects/Curve.h; la edicion con manijas en LayoutInput.cpp). Todo el bloque:
+    //    beztess                     la teselacion contra la Bezier cubica ANALITICA + Evaluate/Length +
+    //                                las manijas Auto / Vector / Aligned (los numeros de Blender)
+    //    bezadd <bezier|circle|path> Add > Curve > ... (la misma funcion del menu, con su undo)
+    //    bezinfo                     imprime las splines de la curva activa (puntos, manijas, tipos, seleccion)
+    //    bezsel <s> <p> <left|point|right> [add]   elige un vertice del proxy de edicion, como el click
+    //    bezop <extrude|subdivide|delverts|delsegs|cyclic|switch|segment|duplicate|handle <auto|vector|aligned|free|toggle>|
+    //          type <poly|bezier>>   una op de Edit Mode por la misma puerta que el menu Curve / las teclas
+    //    bezshape <bevelDepth> <bevelRes> <extrude> <caps 0|1>   la forma de la curva activa (tubo / cinta)
+    //    bezclick <s> <p> <left|point|right> [shift]   CLICK DE VERDAD (eventos SDL) sobre ese vertice en la vista
+    //    bezdrag <dx> <dy>           mueve el mouse (evento SDL) dx,dy pixeles desde el ultimo bezclick/bezdrag
+    //    bezsnap                     guarda las splines de la curva activa (para 'bezexpect same|differs')
+    //    bezexpect <selcount n | points s n | splines n | cyclic s 0|1 | type s p left|right auto|vector|aligned|free |
+    //               aligned s p | pos s p left|point|right x y z [tol] | same | differs | menu "<titulo>">   ASSERTS
+    //    bezedit / bezops / bezsave / bezmesh / bezrail : escenarios completos (asserts adentro)
+    // ======================================================================
+    if (cmd == "beztess" || cmd == "bezadd" || cmd == "bezinfo" || cmd == "bezsel" || cmd == "bezop" || cmd == "bezshape" ||
+        cmd == "bezclick" || cmd == "bezdrag" || cmd == "bezsnap" || cmd == "bezexpect" ||
+        cmd == "bezedit" || cmd == "bezops" || cmd == "bezsave" || cmd == "bezmesh" || cmd == "bezrail") {
+        // (las puertas del editor que se ejercitan: LayoutInput.cpp)
+        extern Curve* LayoutCurveInEdit(); extern bool LayoutCurveBezSync(); extern void LayoutCurveOp(int);
+        extern void AddBezierCurve(); extern void AddBezierCircle(); extern void AddPath(); extern Curve* AddBezierCurveObj();
+        extern bool LayoutConvertCurveToMesh(); extern Object* W3dActiveCurveProxy();
+        struct BZ {
+            static Curve* Active() { return (ActiveObj && ActiveObj->getType() == ObjectType::curve) ? (Curve*)ActiveObj : NULL; }
+            static bool Near(const Vector3& a, const Vector3& b, float tol) { return (a - b).Length() <= tol; }
+            static std::string V(const Vector3& v) { char b[96]; snprintf(b, sizeof(b), "(%.4f, %.4f, %.4f)", v.x, v.y, v.z); return b; }
+            // de Casteljau: la cuenta INDEPENDIENTE de Curve::BezierPoint (otra formula, mismo resultado)
+            static Vector3 Cast(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t) {
+                const Vector3 a = p0 + (p1 - p0) * t, b = p1 + (p2 - p1) * t, c = p2 + (p3 - p2) * t;
+                const Vector3 d = a + (b - a) * t, e = b + (c - b) * t;
+                return d + (e - d) * t;
+            }
+            // un punto de spline suelto (para armar curvas a mano)
+            static CurvePoint P(float x, float y, float z, int tl = W3dHandleFree, int tr = W3dHandleFree) {
+                CurvePoint q; q.co = Vector3(x, y, z); q.left = q.co; q.right = q.co; q.typeL = (unsigned char)tl; q.typeR = (unsigned char)tr; return q;
+            }
+            static Curve* NewCurve(const char* name) {
+                Curve* cv = new Curve(NULL); cv->SetNameObj(name); cv->signZ = 1.0f; return cv;
+            }
+            static void Free(Curve* cv) {   // (sacarla del arbol y liberarla: los escenarios no dejan basura)
+                if (!cv) return;
+                if (cv->Parent) { std::vector<Object*>& ch = cv->Parent->Childrens;
+                    for (size_t i = 0; i < ch.size(); i++) if (ch[i] == cv) { ch.erase(ch.begin() + (long)i); break; } cv->Parent = NULL; }
+                if (ActiveObj == (Object*)cv) ActiveObj = NULL;
+                delete cv;
+            }
+            static int ProxyIdx(int s, int p, int role) { extern int LayoutCurveProxyIndex(int, int, int); return LayoutCurveProxyIndex(s, p, role); }
+            static bool Sel(int s, int p, int role, bool add) {
+                Curve* cv = Active(); if (!cv || !cv->edit) return false;
+                const int k = ProxyIdx(s, p, role); if (k < 0) return false;
+                cv->edit->EnsureEdit(); if (!cv->edit->edit) return false;
+                UndoCaptureSelectionEdit(cv->edit);
+                cv->edit->edit->ToggleVert(k, !add);
+                LayoutCurveBezSync();
+                return true;
+            }
+            static int NSel() {
+                Curve* cv = Active(); if (!cv || !cv->edit || !cv->edit->edit) return -1;
+                int n = 0; for (size_t k = 0; k < cv->edit->edit->vertSel.size(); k++) if (cv->edit->edit->vertSel[k]) n++; return n;
+            }
+            static bool SameSplines(const std::vector<CurveSpline>& a, const std::vector<CurveSpline>& b, float tol) {
+                if (a.size() != b.size()) return false;
+                for (size_t s = 0; s < a.size(); s++) {
+                    if (a[s].type != b[s].type || a[s].cyclic != b[s].cyclic || a[s].points.size() != b[s].points.size()) return false;
+                    const bool bez = (a[s].type == W3dSplineBezier);   // (una poly no tiene manijas: no se comparan)
+                    for (size_t i = 0; i < a[s].points.size(); i++) {
+                        const CurvePoint& p = a[s].points[i]; const CurvePoint& q = b[s].points[i];
+                        if (!Near(p.co, q.co, tol) || fabsf(p.radius - q.radius) > tol || fabsf(p.tilt - q.tilt) > tol) return false;
+                        if (bez && (!Near(p.left, q.left, tol) || !Near(p.right, q.right, tol) || p.typeL != q.typeL || p.typeR != q.typeR)) return false;
+                    }
+                }
+                return true;
+            }
+            static void Info(Curve* cv) {
+                static const char* kT[4] = { "free", "aligned", "vector", "auto" };
+                printf("      [bezinfo] '%s': %d spline(s), %d vertices teselados, %d aristas%s\n", cv->name.c_str(),
+                       (int)cv->splines.size(), cv->vertexSize, (int)cv->edges.size() / 2, cv->geom ? ", con geometria" : "");
+                for (size_t s = 0; s < cv->splines.size(); s++) {
+                    const CurveSpline& sp = cv->splines[s];
+                    printf("        spline %d: %s%s res=%d, %d puntos\n", (int)s, sp.type == W3dSplineBezier ? "bezier" : "poly",
+                           sp.cyclic ? " cerrada" : "", sp.resolution, (int)sp.points.size());
+                    for (size_t i = 0; i < sp.points.size(); i++) {
+                        const CurvePoint& q = sp.points[i];
+                        printf("          %d: %s izq %s %s der %s %s sel=%d r=%.3f tilt=%.3f\n", (int)i, V(q.co).c_str(), V(q.left).c_str(),
+                               kT[q.typeL & 3], V(q.right).c_str(), kT[q.typeR & 3], (int)q.sel, q.radius, q.tilt);
+                    }
+                }
+            }
+        };
+        bool ok = true;
+        // ---- primitivas ----
+        if (cmd == "bezadd") {
+            std::string what; ss >> what;
+            if (what == "bezier") AddBezierCurve(); else if (what == "circle") AddBezierCircle(); else if (what == "path") AddPath();
+            else { err = "bezadd bezier|circle|path"; return false; }
+            Curve* cv = BZ::Active();
+            if (!cv) { err = "bezadd: no quedo una curva activa"; return false; }
+            printf("      [bezadd] '%s' (%d splines, %d vertices)\n", cv->name.c_str(), (int)cv->splines.size(), cv->vertexSize);
+            return true;
+        }
+        if (cmd == "bezinfo") {
+            Curve* cv = BZ::Active(); if (!cv) { err = "bezinfo: la activa no es una curva"; return false; }
+            LayoutCurveBezSync();
+            BZ::Info(cv); return true;
+        }
+        if (cmd == "bezsel") {
+            int s = 0, p = 0; std::string role, add; ss >> s >> p >> role >> add;
+            const int r = role == "left" ? 0 : role == "right" ? 2 : 1;
+            if (!BZ::Sel(s, p, r, add == "add")) { err = "bezsel: no hay una curva de splines en Edit Mode (o el punto no existe)"; return false; }
+            printf("      [bezsel] spline %d punto %d %s -> %d vertices elegidos\n", s, p, role.c_str(), BZ::NSel());
+            return true;
+        }
+        // ---- entrada REAL: el click y el mouse pasan por InputUserSDL3 como los de SDL ----
+        static int bzMouseX = 0, bzMouseY = 0;
+        static std::vector<CurveSpline> bzSnap;
+        if (cmd == "bezclick") {
+            int s = 0, p = 0; std::string role, mod; ss >> s >> p >> role >> mod;
+            const int r = role == "left" ? 0 : role == "right" ? 2 : 1;
+            Curve* cv = BZ::Active();
+            const int k = BZ::ProxyIdx(s, p, r);
+            if (!cv || !cv->edit || k < 0) { err = "bezclick: no hay una curva de splines en Edit Mode (o el punto no existe)"; return false; }
+            if (!rootViewport) { err = "bezclick: sin layout"; return false; }
+            rootViewport->Render();
+            extern Viewport3D* Viewport3DActive;
+            Viewport3D* vp = Viewport3DActive;
+            cv->edit->EnsureEdit();
+            if (!vp || !cv->edit->edit) { err = "bezclick: sin viewport 3D"; return false; }
+            const std::vector<GLfloat>& P = cv->edit->edit->pos;
+            float px = 0, py = 0;
+            if (!vp->ProjectPoint(cv->edit->LocalToWorld(Vector3(P[k*3], P[k*3+1], P[k*3+2])), px, py)) { err = "bezclick: el vertice no se ve"; return false; }
+            bzMouseX = vp->x + (int)(px + 0.5f); bzMouseY = vp->y + (int)(py + 0.5f);
+            extern void InputUserSDL3(SDL_Event&);
+            SDL_Event ev; memset(&ev, 0, sizeof(ev));
+            if (mod == "shift") { ev.type = SDL_KEYDOWN; ev.key.keysym.sym = SDLK_LSHIFT; ev.key.keysym.mod = KMOD_LSHIFT; ev.key.state = SDL_PRESSED; InputUserSDL3(ev); }
+            memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEMOTION; ev.motion.x = bzMouseX; ev.motion.y = bzMouseY; InputUserSDL3(ev);
+            memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEBUTTONDOWN; ev.button.button = SDL_BUTTON_LEFT; ev.button.x = bzMouseX; ev.button.y = bzMouseY;
+            ev.button.clicks = 1; ev.button.state = SDL_PRESSED; InputUserSDL3(ev);
+            ev.type = SDL_MOUSEBUTTONUP; ev.button.state = SDL_RELEASED; InputUserSDL3(ev);
+            if (mod == "shift") { memset(&ev, 0, sizeof(ev)); ev.type = SDL_KEYUP; ev.key.keysym.sym = SDLK_LSHIFT; ev.key.state = SDL_RELEASED; InputUserSDL3(ev); }
+            rootViewport->Render();
+            LayoutCurveBezSync();
+            printf("      [bezclick] spline %d punto %d %s en (%d, %d): %d vertice(s) elegido(s)\n", s, p, role.c_str(), bzMouseX, bzMouseY, BZ::NSel());
+            return true;
+        }
+        if (cmd == "bezdrag") {
+            int dx = 0, dy = 0; ss >> dx >> dy;
+            bzMouseX += dx; bzMouseY += dy;
+            extern void InputUserSDL3(SDL_Event&);
+            SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEMOTION; ev.motion.x = bzMouseX; ev.motion.y = bzMouseY;
+            ev.motion.xrel = dx; ev.motion.yrel = dy;
+            InputUserSDL3(ev);
+            if (rootViewport) rootViewport->Render();
+            LayoutCurveBezSync();
+            return true;
+        }
+        if (cmd == "bezsnap") {
+            Curve* cv = BZ::Active(); if (!cv) { err = "bezsnap: la activa no es una curva"; return false; }
+            LayoutCurveBezSync();
+            bzSnap = cv->splines;
+            return true;
+        }
+        if (cmd == "bezexpect") {
+            std::string what; ss >> what;
+            Curve* cv = BZ::Active(); if (!cv) { err = "bezexpect: la activa no es una curva"; return false; }
+            LayoutCurveBezSync();
+            static const char* kT[4] = { "free", "aligned", "vector", "auto" };
+            bool good = false; std::string got;
+            char b[160];
+            if (what == "selcount") { int n = 0; ss >> n; good = BZ::NSel() == n; snprintf(b, sizeof(b), "%d", BZ::NSel()); got = b; }
+            else if (what == "splines") { int n = 0; ss >> n; good = (int)cv->splines.size() == n; snprintf(b, sizeof(b), "%d", (int)cv->splines.size()); got = b; }
+            else if (what == "points" || what == "cyclic" || what == "type" || what == "aligned" || what == "pos") {
+                int s = 0; ss >> s;
+                if (s < 0 || s >= (int)cv->splines.size()) { err = "bezexpect: no hay spline " + what; return false; }
+                const CurveSpline& sp = cv->splines[s];
+                if (what == "points") { int n = 0; ss >> n; good = (int)sp.points.size() == n; snprintf(b, sizeof(b), "%d", (int)sp.points.size()); got = b; }
+                else if (what == "cyclic") { int c = 0; ss >> c; good = sp.cyclic == (c != 0); got = sp.cyclic ? "1" : "0"; }
+                else {
+                    int p = 0; ss >> p;
+                    if (p < 0 || p >= (int)sp.points.size()) { err = "bezexpect: no hay ese punto"; return false; }
+                    const CurvePoint& q = sp.points[p];
+                    if (what == "type") { std::string side, t; ss >> side >> t; const int ty = side == "left" ? q.typeL : q.typeR; got = kT[ty & 3]; good = (got == t); }
+                    else if (what == "aligned") {
+                        const Vector3 a = (q.left - q.co).Normalized(), c = (q.right - q.co).Normalized();
+                        good = BZ::Near(a, -c, 1e-3f); got = BZ::V(q.left) + " / " + BZ::V(q.right);
+                    } else {
+                        std::string role; float x = 0, y = 0, z = 0, tol = 1e-4f; ss >> role >> x >> y >> z; if (!(ss >> tol)) tol = 1e-4f;
+                        const Vector3 v = role == "left" ? q.left : role == "right" ? q.right : q.co;
+                        good = BZ::Near(v, Vector3(x, y, z), tol); got = BZ::V(v);
+                    }
+                }
+            }
+            else if (what == "same" || what == "differs") {
+                const bool same = BZ::SameSplines(cv->splines, bzSnap, 1e-6f);
+                good = (what == "same") == same; got = same ? "iguales" : "distintas";
+            }
+            else if (what == "menu") {
+                std::string title; std::getline(ss, title);
+                while (!title.empty() && (title[0] == ' ' || title[0] == '"')) title.erase(0, 1);
+                while (!title.empty() && (title[title.size() - 1] == '"' || title[title.size() - 1] == ' ')) title.erase(title.size() - 1);
+                got = (OpenMenu && OpenMenu->open) ? OpenMenu->title : std::string("(ninguno)");
+                good = (got == T(title.c_str()));
+            }
+            else { err = "bezexpect: que? '" + what + "'"; return false; }
+            printf("      [bezexpect] %s -> %s (%s)\n", what.c_str(), got.c_str(), good ? "OK" : "MAL");
+            if (!good) { BZ::Info(cv); err = "bezexpect " + what + ": no da (" + got + ")"; return false; }
+            return true;
+        }
+        if (cmd == "bezshape") {
+            Curve* cv = BZ::Active(); if (!cv) { err = "bezshape: la activa no es una curva"; return false; }
+            float d = 0.0f, r = 4.0f, e = 0.0f; int caps = 0; ss >> d >> r >> e >> caps;
+            cv->bevelDepth = d; cv->bevelResolution = r; cv->extrude = e; cv->fillCaps = (caps != 0);
+            cv->UpdateGeometry();
+            printf("      [bezshape] '%s': geometria %d vertices, %d caras\n", cv->name.c_str(), cv->geom ? cv->geom->vertexSize : 0, cv->geom ? (int)cv->geom->faces3d.size() : 0);
+            return true;
+        }
+        if (cmd == "bezop") {
+            std::string op, arg; ss >> op >> arg;
+            int id = -1;
+            if (op == "extrude") id = 1; else if (op == "subdivide") id = 2; else if (op == "delverts") id = 3;
+            else if (op == "delsegs") id = 4; else if (op == "cyclic") id = 5; else if (op == "switch") id = 6;
+            else if (op == "segment") id = 7; else if (op == "duplicate") id = 8;
+            else if (op == "handle") id = arg == "auto" ? 10 : arg == "vector" ? 11 : arg == "aligned" ? 12 : arg == "free" ? 13 : 14;
+            else if (op == "type") id = (arg == "poly") ? 20 : 21;
+            if (id < 0) { err = "bezop: op desconocida '" + op + "'"; return false; }
+            LayoutCurveOp(id);
+            if ((id == 1 || id == 8) && EditXformActive()) EditXformConfirm();   // (extrude/duplicate dejan el move abierto: queda donde nacio)
+            return true;
+        }
+        // ---- beztess: la matematica, sin UI ----
+        if (cmd == "beztess") {
+            Curve* cv = BZ::NewCurve("BezTess");
+            // (1) UN tramo con manijas libres arbitrarias: la teselacion ES la cubica analitica en t = j/8
+            CurveSpline sp; sp.resolution = 8;
+            CurvePoint a = BZ::P(0, 0, 0), b = BZ::P(4, 0, 1);
+            a.right = Vector3(1, 2, 0); b.left = Vector3(3, 2, 1);
+            a.left = Vector3(-1, -2, 0); b.right = Vector3(5, -2, 1);
+            sp.points.push_back(a); sp.points.push_back(b);
+            cv->splines.push_back(sp);
+            cv->Tessellate(true);
+            float maxErr = 0.0f;
+            for (int j = 0; j <= 8; j++) {
+                const Vector3 want = BZ::Cast(a.co, a.right, b.left, b.co, (float)j / 8.0f);
+                const float e = (cv->GetPoint(j) - want).Length(); if (e > maxErr) maxErr = e;
+            }
+            { const bool good = cv->vertexSize == 9 && cv->edges.empty() && maxErr < 1e-5f;
+              printf("      [beztess] 1 tramo res 8: %d vertices (esp 9), aristas %d (esp 0: polilinea implicita), error max vs de Casteljau %.2g -> %s\n",
+                     cv->vertexSize, (int)cv->edges.size(), maxErr, good ? "OK" : "MAL"); if (!good) ok = false; }
+            // (2) Evaluate / EvalSegment: punto y tangente exactos (la tangente contra la diferencia finita)
+            { Vector3 p, t; cv->Evaluate(0.37f, &p, &t);
+              const Vector3 want = BZ::Cast(a.co, a.right, b.left, b.co, 0.37f);
+              const Vector3 fd = (BZ::Cast(a.co, a.right, b.left, b.co, 0.3701f) - BZ::Cast(a.co, a.right, b.left, b.co, 0.3699f)).Normalized();
+              const bool good = BZ::Near(p, want, 1e-5f) && BZ::Near(t, fd, 1e-3f);
+              printf("      [beztess] Evaluate(0.37) = %s tangente %s (esp %s / %s) -> %s\n", BZ::V(p).c_str(), BZ::V(t).c_str(), BZ::V(want).c_str(), BZ::V(fd).c_str(), good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // (3) Length: con resolucion alta, el largo de la teselacion ~ la integral del arco
+            { cv->splines[0].resolution = 64; cv->Tessellate(true);
+              double L = 0; Vector3 prev = a.co;
+              for (int i = 1; i <= 20000; i++) { const Vector3 q = BZ::Cast(a.co, a.right, b.left, b.co, (float)i / 20000.0f); L += (q - prev).Length(); prev = q; }
+              const float got = cv->Length(), rel = fabsf(got - (float)L) / (float)L;
+              Vector3 p0, p1, pm; cv->EvaluateAtLength(0.0f, &p0, NULL); cv->EvaluateAtLength(got, &p1, NULL); cv->EvaluateAtLength(got * 0.5f, &pm, NULL);
+              // el punto del medio por LARGO: la mitad del recorrido de la polilinea queda de cada lado
+              float half = 0; int k = 0; for (k = 0; k + 1 < cv->vertexSize; k++) { const float l = (cv->GetPoint(k + 1) - cv->GetPoint(k)).Length(); if (half + l >= got * 0.5f) break; half += l; }
+              const float side = half + (pm - cv->GetPoint(k)).Length();
+              const bool good = rel < 0.002f && BZ::Near(p0, a.co, 1e-5f) && BZ::Near(p1, b.co, 1e-4f) && fabsf(side - got * 0.5f) < 1e-3f;
+              printf("      [beztess] Length %.5f vs integral %.5f (rel %.2g), EvaluateAtLength 0/L/L2 -> %s\n", got, (float)L, rel, good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // (4) AUTO: tres puntos en linea a 1 m -> manijas a 1/2.5614 = 0.39041 m (la constante de Blender), las
+            //     puntas reflejadas igual; y una esquina en angulo recto
+            { CurveSpline s2; s2.points.push_back(BZ::P(0,0,0, W3dHandleAuto, W3dHandleAuto)); s2.points.push_back(BZ::P(1,0,0, W3dHandleAuto, W3dHandleAuto));
+              s2.points.push_back(BZ::P(2,0,0, W3dHandleAuto, W3dHandleAuto));
+              cv->splines.clear(); cv->splines.push_back(s2); cv->CalcHandles();
+              const CurveSpline& r = cv->splines[0]; const float h = 1.0f / 2.5614f;
+              const bool good = BZ::Near(r.points[1].left, Vector3(1 - h, 0, 0), 1e-5f) && BZ::Near(r.points[1].right, Vector3(1 + h, 0, 0), 1e-5f) &&
+                                BZ::Near(r.points[0].right, Vector3(h, 0, 0), 1e-5f) && BZ::Near(r.points[0].left, Vector3(-h, 0, 0), 1e-5f) &&
+                                BZ::Near(r.points[2].left, Vector3(2 - h, 0, 0), 1e-5f);
+              printf("      [beztess] Auto en linea: medio izq %s der %s, punta %s (esp +-0.39041) -> %s\n", BZ::V(r.points[1].left).c_str(),
+                     BZ::V(r.points[1].right).c_str(), BZ::V(r.points[0].right).c_str(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            { CurveSpline s3; s3.points.push_back(BZ::P(0,0,0, W3dHandleAuto, W3dHandleAuto)); s3.points.push_back(BZ::P(1,0,0, W3dHandleAuto, W3dHandleAuto));
+              s3.points.push_back(BZ::P(1,0,1, W3dHandleAuto, W3dHandleAuto));
+              cv->splines.clear(); cv->splines.push_back(s3); cv->CalcHandles();
+              // tvec = (1,0,0) + (0,0,1); largo = |tvec| * 2.5614 = 3.62238 -> izq = (1,0,0) - tvec/3.62238
+              const float f = 1.0f / (sqrtf(2.0f) * 2.5614f);
+              const CurvePoint& m = cv->splines[0].points[1];
+              const bool good = BZ::Near(m.left, Vector3(1 - f, 0, -f), 1e-5f) && BZ::Near(m.right, Vector3(1 + f, 0, f), 1e-5f);
+              printf("      [beztess] Auto en la esquina: izq %s der %s (esp (%.5f,0,%.5f) / (%.5f,0,%.5f)) -> %s\n", BZ::V(m.left).c_str(), BZ::V(m.right).c_str(),
+                     1 - f, -f, 1 + f, f, good ? "OK" : "MAL"); if (!good) ok = false; }
+            // (5) VECTOR: a un tercio del vecino; ALIGNED con la otra Free no se toca; Aligned+Aligned: la derecha
+            //     queda opuesta a la izquierda con SU largo
+            { CurveSpline s4; s4.points.push_back(BZ::P(0,0,0)); CurvePoint m = BZ::P(3,0,0, W3dHandleVector, W3dHandleVector); s4.points.push_back(m);
+              s4.points.push_back(BZ::P(3,0,3));
+              cv->splines.clear(); cv->splines.push_back(s4); cv->CalcHandles();
+              const CurvePoint& r = cv->splines[0].points[1];
+              bool good = BZ::Near(r.left, Vector3(2, 0, 0), 1e-5f) && BZ::Near(r.right, Vector3(3, 0, 1), 1e-5f);
+              CurvePoint& al = cv->splines[0].points[1];
+              al.typeL = al.typeR = W3dHandleAligned; al.left = Vector3(3, 1, 0); al.right = Vector3(5, 0, 0); al.sel = W3dCurveSelL;
+              cv->CalcHandles();
+              good = good && BZ::Near(al.left, Vector3(3, 1, 0), 1e-5f) && BZ::Near(al.right, Vector3(3, -2, 0), 1e-5f);
+              printf("      [beztess] Vector izq %s der %s (esp (2,0,0)/(3,0,1)); Aligned: la der opuesta a la izq elegida, largo 2 -> %s %s\n",
+                     BZ::V(r.left).c_str(), BZ::V(r.right).c_str(), BZ::V(al.right).c_str(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            // (6) CERRADA + varias splines: aristas explicitas, cada spline su rango, ramas = splines
+            { CurveSpline c; c.cyclic = true; c.resolution = 4;
+              for (int i = 0; i < 4; i++) { const float an = 1.5707963f * i; c.points.push_back(BZ::P(cosf(an), 0, sinf(an), W3dHandleAuto, W3dHandleAuto)); }
+              CurveSpline pl; pl.type = W3dSplinePoly; pl.points.push_back(BZ::P(5,0,0)); pl.points.push_back(BZ::P(6,0,0)); pl.points.push_back(BZ::P(6,1,0));
+              cv->splines.clear(); cv->splines.push_back(c); cv->splines.push_back(pl); cv->CalcHandles(); cv->Tessellate(true);
+              const bool good = cv->vertexSize == 16 + 3 && cv->splineFirst[1] == 16 && cv->splineCount[1] == 3 &&
+                                (int)cv->edges.size() == 2 * (16 + 2) && cv->nBranches == 2 && cv->FindNearest(Vector3(6.1f, 1.2f, 0)) == 18;
+              printf("      [beztess] cerrada res 4 (16) + poly (3): %d vertices, %d aristas (esp 18), %d ramas (esp 2), nearest (6,1,0) = %d (esp 18) -> %s\n",
+                     cv->vertexSize, (int)cv->edges.size() / 2, cv->nBranches, cv->FindNearest(Vector3(6.1f, 1.2f, 0)), good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            BZ::Free(cv);
+            if (!ok) { err = "beztess: ver los MAL de arriba"; return false; }
+            return true;
+        }
+        // ---- bezedit: mover manijas por la maquinaria de Edit Mode de verdad ----
+        if (cmd == "bezedit") {
+            std::string e2;
+            AddBezierCurve();
+            Curve* cv = BZ::Active();
+            if (!cv || !cv->HasSplines()) { err = "bezedit: Add > Bezier no dejo una curva de splines activa"; return false; }
+            if (!W3dRunCommand("mode edit", e2)) { err = "bezedit: " + e2; return false; }
+            { const bool good = LayoutCurveInEdit() == cv && cv->edit && cv->edit->vertexSize == 6 && cv->editing;
+              printf("      [bezedit] Edit Mode: proxy de %d vertices (esp 6: 2 puntos x [izq, punto, der]) -> %s\n", cv->edit ? cv->edit->vertexSize : -1, good ? "OK" : "MAL");
+              if (!good) { err = "bezedit: no entro a editar la curva"; return false; } }
+            std::vector<GLfloat> tess0(cv->vertex, cv->vertex + cv->vertexSize * 3);
+            const CurvePoint p0 = cv->splines[0].points[0];
+            // (a) SOLO la manija derecha del punto 0: el G la mueve y la izquierda (Aligned) la sigue opuesta, con su largo
+            BZ::Sel(0, 0, 2, false);
+            { const bool good = BZ::NSel() == 1; printf("      [bezedit] elegida la manija der del punto 0: %d vertice(s) (esp 1) -> %s\n", BZ::NSel(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            if (!W3dRunCommand("move 0.5", e2)) { err = "bezedit: " + e2; return false; }
+            LayoutCurveBezSync();
+            { const CurvePoint& q = cv->splines[0].points[0];
+              const Vector3 dl = (q.left - q.co), dr = (q.right - q.co);
+              const float lenL0 = (p0.left - p0.co).Length();
+              const bool opp = BZ::Near(dl.Normalized(), -dr.Normalized(), 1e-4f);
+              bool changed = false; for (int i = 0; i < cv->vertexSize * 3 && i < (int)tess0.size(); i++) if (fabsf(cv->vertex[i] - tess0[i]) > 1e-6f) changed = true;
+              const bool good = BZ::Near(q.right, p0.right + Vector3(0.5f, 0, 0), 1e-4f) && BZ::Near(q.co, p0.co, 1e-6f) && opp &&
+                                fabsf(dl.Length() - lenL0) < 1e-4f && changed && q.typeL == W3dHandleAligned && q.typeR == W3dHandleAligned;
+              printf("      [bezedit] manija der %s (esp %s); la izq %s queda OPUESTA=%s con su largo %.4f (esp %.4f); la curva cambio=%s -> %s\n",
+                     BZ::V(q.right).c_str(), BZ::V(p0.right + Vector3(0.5f, 0, 0)).c_str(), BZ::V(q.left).c_str(), opp ? "si" : "no", dl.Length(), lenL0,
+                     changed ? "si" : "no", good ? "OK" : "MAL"); if (!good) ok = false; }
+            // (b) Ctrl+Z: las dos manijas vuelven EXACTAS
+            W3dRunCommand("undo", e2); LayoutCurveBezSync();
+            { const CurvePoint& q = cv->splines[0].points[0];
+              const bool good = BZ::Near(q.left, p0.left, 1e-6f) && BZ::Near(q.right, p0.right, 1e-6f) &&
+                                BZ::Near(cv->edit->edit ? Vector3(cv->edit->edit->pos[6], cv->edit->edit->pos[7], cv->edit->edit->pos[8]) : Vector3(99,99,99), p0.right, 1e-6f);
+              printf("      [bezedit] undo: izq %s der %s (esp las de antes, tambien en el proxy) -> %s\n", BZ::V(q.left).c_str(), BZ::V(q.right).c_str(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            // (c) el PUNTO 1 a Auto: elegir el punto se lleva sus manijas (3 vertices) y V > Automatic las recalcula
+            //     (punta de la spline: la manija refleja al vecino, a 1/2.5614 del tramo)
+            BZ::Sel(0, 1, 1, false);
+            { const bool good = BZ::NSel() == 3; printf("      [bezedit] click en el punto 1: %d vertices elegidos (esp 3: el punto y sus manijas) -> %s\n", BZ::NSel(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("bezop handle auto", e2);
+            { const CurvePoint& q = cv->splines[0].points[1]; const CurvePoint& o = cv->splines[0].points[0];
+              const Vector3 d = (q.co - o.co) * (1.0f / 2.5614f);
+              const bool good = q.typeL == W3dHandleAuto && q.typeR == W3dHandleAuto && BZ::Near(q.left, q.co - d, 1e-4f) && BZ::Near(q.right, q.co + d, 1e-4f);
+              printf("      [bezedit] V > Automatic: izq %s der %s (esp %s / %s) -> %s\n", BZ::V(q.left).c_str(), BZ::V(q.right).c_str(), BZ::V(q.co - d).c_str(), BZ::V(q.co + d).c_str(), good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // mover el punto ENTERO (con sus manijas elegidas): siguen Auto y se recalculan
+            W3dRunCommand("move 0.25", e2); LayoutCurveBezSync();
+            { const CurvePoint& q = cv->splines[0].points[1];
+              const bool good = q.typeL == W3dHandleAuto && q.typeR == W3dHandleAuto && BZ::Near(q.co, Vector3(1.25f, 0, 0), 1e-4f);
+              printf("      [bezedit] mover el punto Auto entero: sigue Auto/Auto=%s, punto %s -> %s\n", (q.typeL == W3dHandleAuto && q.typeR == W3dHandleAuto) ? "si" : "no", BZ::V(q.co).c_str(), good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // SOLO su manija izquierda: la seleccion parcial la pasa a Aligned (las dos) y la derecha queda opuesta
+            BZ::Sel(0, 1, 0, false);
+            W3dRunCommand("move -0.3", e2); LayoutCurveBezSync();
+            { const CurvePoint& q = cv->splines[0].points[1];
+              const bool opp = BZ::Near((q.left - q.co).Normalized(), -(q.right - q.co).Normalized(), 1e-4f);
+              const bool good = q.typeL == W3dHandleAligned && q.typeR == W3dHandleAligned && opp;
+              printf("      [bezedit] mover solo la manija Auto: tipos %d/%d (esp 1/1 = Aligned), der opuesta=%s -> %s\n", q.typeL, q.typeR, opp ? "si" : "no", good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // (d) SOLO el punto 0 (sin sus manijas): moverlo las arrastra igual (el offset no cambia)
+            BZ::Sel(0, 0, 1, false); BZ::Sel(0, 0, 0, true); BZ::Sel(0, 0, 2, true);   // (click en el punto, shift-click saca cada manija)
+            { const CurvePoint q0 = cv->splines[0].points[0];
+              const bool selOk = BZ::NSel() == 1;
+              W3dRunCommand("move 1", e2); LayoutCurveBezSync();
+              const CurvePoint& q = cv->splines[0].points[0];
+              const bool good = selOk && BZ::Near(q.co, q0.co + Vector3(1, 0, 0), 1e-5f) && BZ::Near(q.left - q.co, q0.left - q0.co, 1e-5f) && BZ::Near(q.right - q.co, q0.right - q0.co, 1e-5f);
+              printf("      [bezedit] solo el punto (%d elegido, esp 1): punto %s, las manijas lo acompanian -> %s\n", BZ::NSel(), BZ::V(q.co).c_str(), good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // (e) un G CANCELADO (Esc) deja TODO como estaba (tambien lo que la regla movio sin estar elegido)
+            BZ::Sel(0, 1, 2, false);
+            { const std::vector<CurveSpline> before = cv->splines;
+              EditXformStart(translation, X); EditXformNumValue(2.0f); LayoutCurveBezSync();
+              const bool moved = !BZ::SameSplines(before, cv->splines, 1e-6f);
+              EditXformCancel(); LayoutCurveBezSync();
+              const bool good = moved && BZ::SameSplines(before, cv->splines, 1e-6f);
+              printf("      [bezedit] G cancelado: durante el arrastre cambio=%s, despues identico=%s -> %s\n", moved ? "si" : "no", good ? "si" : "no", good ? "OK" : "MAL");
+              if (!good) ok = false; }
+            // (f) salir de Edit: la curva se queda con su forma (teselacion completa), sin proxy
+            if (!W3dRunCommand("mode object", e2)) { err = "bezedit: " + e2; return false; }
+            { const bool good = !cv->editing && W3dActiveCurveProxy() == NULL && cv->vertexSize == 13 && cv->kdRoot != NULL;
+              printf("      [bezedit] Modo Objeto: editando=%s, proxy=%s, %d vertices (esp 13 = 12 por tramo + 1) -> %s\n", cv->editing ? "si" : "no",
+                     W3dActiveCurveProxy() ? "si" : "no", cv->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            if (!ok) { err = "bezedit: ver los MAL de arriba"; return false; }
+            return true;
+        }
+        // ---- bezops: extrude / subdivide / borrar / cerrar / invertir / tipos / el path de nodos ----
+        if (cmd == "bezops") {
+            std::string e2;
+            AddBezierCurve();
+            Curve* cv = BZ::Active();
+            if (!cv || !W3dRunCommand("mode edit", e2)) { err = "bezops: no entro a editar"; return false; }
+            // SUBDIVIDE: la forma NO cambia (el tramo nuevo 0 = la primera mitad del viejo, el 1 = la segunda)
+            const std::vector<CurveSpline> s0 = cv->splines;
+            BZ::Sel(0, 0, 1, false); BZ::Sel(0, 1, 1, true);
+            W3dRunCommand("bezop subdivide", e2);
+            { const CurvePoint& a = s0[0].points[0]; const CurvePoint& b = s0[0].points[1];
+              float maxE = 0.0f;
+              for (int i = 0; i <= 10; i++) {
+                  const float u = i / 10.0f; Vector3 p0, p1;
+                  cv->EvalSegment(0, 0, u, &p0, NULL); cv->EvalSegment(0, 1, u, &p1, NULL);
+                  const float e0 = (p0 - BZ::Cast(a.co, a.right, b.left, b.co, u * 0.5f)).Length(), e1 = (p1 - BZ::Cast(a.co, a.right, b.left, b.co, 0.5f + u * 0.5f)).Length();
+                  if (e0 > maxE) maxE = e0; if (e1 > maxE) maxE = e1;
+              }
+              const bool good = cv->splines[0].points.size() == 3 && maxE < 1e-5f && (cv->splines[0].points[1].sel & W3dCurveSelP);
+              printf("      [bezops] subdivide: %d puntos (esp 3), error de forma %.2g (esp 0) -> %s\n", (int)cv->splines[0].points.size(), maxE, good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("undo", e2);
+            { const bool good = BZ::SameSplines(cv->splines, s0, 1e-6f); printf("      [bezops] undo del subdivide: identica=%s -> %s\n", good ? "si" : "no", good ? "OK" : "MAL"); if (!good) ok = false; }
+            // EXTRUDE desde la punta: un punto nuevo, elegido, encima de la punta; el G lo lleva
+            BZ::Sel(0, 1, 1, false);
+            W3dRunCommand("bezop extrude", e2);
+            { const CurveSpline& sp = cv->splines[0];
+              const bool good = sp.points.size() == 3 && BZ::Near(sp.points[2].co, sp.points[1].co, 1e-6f) && (sp.points[2].sel & W3dCurveSelP) && !(sp.points[1].sel & W3dCurveSelP);
+              printf("      [bezops] extrude: %d puntos (esp 3), el nuevo elegido y encima de la punta -> %s\n", (int)sp.points.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("move 2", e2); LayoutCurveBezSync();
+            { const CurveSpline& sp = cv->splines[0];
+              const bool good = BZ::Near(sp.points[2].co, sp.points[1].co + Vector3(2, 0, 0), 1e-5f) && cv->vertexSize == 2 * 12 + 1;
+              printf("      [bezops] el punto extruido se mueve: %s, %d vertices (esp 25) -> %s\n", BZ::V(sp.points[2].co).c_str(), cv->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            // CYCLIC (Alt+C): cerrada -> aristas explicitas y un tramo mas
+            W3dRunCommand("bezop cyclic", e2);
+            { const bool good = cv->splines[0].cyclic && cv->vertexSize == 3 * 12 && (int)cv->edges.size() == 2 * 36;
+              printf("      [bezops] cyclic: cerrada=%s, %d vertices (esp 36), %d aristas (esp 36) -> %s\n", cv->splines[0].cyclic ? "si" : "no", cv->vertexSize, (int)cv->edges.size() / 2, good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("bezop cyclic", e2);
+            // SWITCH DIRECTION: el orden se invierte y cada manija cambia de lado
+            { const std::vector<CurveSpline> b = cv->splines;
+              W3dRunCommand("bezop switch", e2);
+              const CurveSpline& sp = cv->splines[0]; const size_t n = sp.points.size();
+              bool good = n == b[0].points.size();
+              for (size_t i = 0; good && i < n; i++) {
+                  const CurvePoint& p = sp.points[i]; const CurvePoint& q = b[0].points[n - 1 - i];
+                  good = BZ::Near(p.co, q.co, 1e-6f) && BZ::Near(p.left, q.right, 1e-6f) && BZ::Near(p.right, q.left, 1e-6f) && p.typeL == q.typeR;
+              }
+              printf("      [bezops] switch direction: invertida con las manijas cruzadas -> %s\n", good ? "OK" : "MAL"); if (!good) ok = false; }
+            // SPLINE TYPE: poly (la teselacion son los puntos) y de vuelta a Bezier (manijas Auto)
+            W3dRunCommand("bezop type poly", e2);
+            { const bool good = cv->splines[0].type == W3dSplinePoly && cv->vertexSize == 3;
+              printf("      [bezops] a poly: %d vertices (esp 3) -> %s\n", cv->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("bezop type bezier", e2);
+            { const bool good = cv->splines[0].type == W3dSplineBezier && cv->vertexSize == 25 && cv->splines[0].points[1].typeL == W3dHandleAuto && cv->edit->vertexSize == 9;
+              printf("      [bezops] a Bezier: %d vertices (esp 25), Auto, proxy %d (esp 9) -> %s\n", cv->vertexSize, cv->edit->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            // DELETE SEGMENTS: el tramo entre los puntos 0 y 1 se va -> queda [1, 2]
+            BZ::Sel(0, 0, 1, false); BZ::Sel(0, 1, 1, true);
+            { const Vector3 c1 = cv->splines[0].points[1].co;
+              W3dRunCommand("bezop delsegs", e2);
+              const bool good = cv->splines.size() == 1 && cv->splines[0].points.size() == 2 && BZ::Near(cv->splines[0].points[0].co, c1, 1e-6f);
+              printf("      [bezops] delete segments: %d spline(s), %d puntos (esp 1, 2) -> %s\n", (int)cv->splines.size(), (int)cv->splines[0].points.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            // DELETE VERTICES: borrar uno de los dos
+            BZ::Sel(0, 1, 1, false);
+            W3dRunCommand("bezop delverts", e2);
+            { const bool good = cv->splines.size() == 1 && cv->splines[0].points.size() == 1 && cv->vertexSize == 1;
+              printf("      [bezops] delete vertices: %d punto(s) (esp 1), %d vertices -> %s\n", (int)cv->splines[0].points.size(), cv->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            // ...y el undo vuelve atras en orden: el delete de vertices, el CLICK de antes (la seleccion tambien es un
+            // paso) y el delete de tramos
+            W3dRunCommand("undo", e2); W3dRunCommand("undo", e2); W3dRunCommand("undo", e2);
+            { const bool good = cv->splines[0].points.size() == 3 && cv->edit->vertexSize == 9;
+              printf("      [bezops] tres undo: %d puntos (esp 3), proxy %d (esp 9) -> %s\n", (int)cv->splines[0].points.size(), cv->edit->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            // DUPLICATE (Shift+D): los puntos 1 y 2 como una spline nueva, elegida; MAKE SEGMENT (F) une las dos puntas
+            BZ::Sel(0, 1, 1, false); BZ::Sel(0, 2, 1, true);
+            W3dRunCommand("bezop duplicate", e2);
+            { const bool good = cv->splines.size() == 2 && cv->splines[1].points.size() == 2 && (cv->splines[1].points[0].sel & W3dCurveSelP) &&
+                                !(cv->splines[0].points[1].sel & W3dCurveSelP) && cv->nBranches == 2;
+              printf("      [bezops] duplicate: %d splines (esp 2), la nueva de %d puntos elegida, %d ramas (esp 2) -> %s\n", (int)cv->splines.size(),
+                     cv->splines.size() > 1 ? (int)cv->splines[1].points.size() : 0, cv->nBranches, good ? "OK" : "MAL"); if (!good) ok = false; }
+            BZ::Sel(0, 2, 1, false); BZ::Sel(1, 1, 1, true);
+            W3dRunCommand("bezop segment", e2);
+            { const bool good = cv->splines.size() == 1 && cv->splines[0].points.size() == 5 && cv->edges.empty() &&
+                                BZ::Near(cv->splines[0].points[3].co, cv->splines[0].points[2].co, 1e-6f);
+              printf("      [bezops] make segment: %d spline(s), %d puntos (esp 1, 5: la copia unida al final, dada vuelta) -> %s\n", (int)cv->splines.size(),
+                     (int)cv->splines[0].points.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("mode object", e2);
+            // EL PATH DE NODOS (Add > Path) se convierte en spline desde Edit Mode, y Ctrl+Z lo devuelve a nodos
+            AddPath();
+            Curve* pth = BZ::Active();
+            { const bool inEdit = pth && LayoutCurveInEdit() == pth;
+              W3dRunCommand("bezop type bezier", e2);
+              const bool good = inEdit && pth->HasSplines() && pth->splines[0].points.size() == 2 && pth->vertexSize == 13 && pth->edit && pth->edit->vertexSize == 6;
+              printf("      [bezops] path de nodos -> Bezier: splines=%d, %d puntos (esp 2), %d vertices (esp 13) -> %s\n", (int)pth->splines.size(),
+                     pth->splines.empty() ? 0 : (int)pth->splines[0].points.size(), pth->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("undo", e2);
+            { const bool good = !pth->HasSplines() && pth->vertexSize == 2 && pth->edit && pth->edit->vertexSize == 2;
+              printf("      [bezops] undo: de vuelta a nodos (splines=%d, %d nodos, esp 0/2) -> %s\n", (int)pth->splines.size(), pth->vertexSize, good ? "OK" : "MAL"); if (!good) ok = false; }
+            W3dRunCommand("mode object", e2);
+            if (!ok) { err = "bezops: ver los MAL de arriba"; return false; }
+            return true;
+        }
+        // ---- bezsave: ida y vuelta por el .w3d (todas las claves) + un riel de nodos al lado ----
+        if (cmd == "bezsave") {
+            std::string e2;
+            Curve* cv = BZ::NewCurve("Cable");
+            cv->pos = Vector3(1, 2, 3);
+            CurveSpline a; a.cyclic = true; a.resolution = 6;
+            CurvePoint q0 = BZ::P(0, 0, 0, W3dHandleFree, W3dHandleAligned); q0.left = Vector3(-0.5f, 0.25f, 0); q0.right = Vector3(0.5f, 0.125f, -0.25f); q0.radius = 0.5f; q0.tilt = 0.75f;
+            CurvePoint q1 = BZ::P(2, 1, 0, W3dHandleVector, W3dHandleAuto);
+            CurvePoint q2 = BZ::P(2, 0, 2, W3dHandleAuto, W3dHandleAuto); q2.radius = 2.0f;
+            a.points.push_back(q0); a.points.push_back(q1); a.points.push_back(q2);
+            CurveSpline b; b.type = W3dSplinePoly; b.points.push_back(BZ::P(5, 0, 0)); b.points.push_back(BZ::P(6, 0.5f, 0));
+            cv->splines.push_back(a); cv->splines.push_back(b);
+            cv->resolution = 10.0f; cv->bevelDepth = 0.05f; cv->bevelResolution = 2.0f; cv->extrude = 0.01f; cv->fillCaps = true;
+            Material* mt = FactoryMaterial(new Material("CableMat")); mt->diffuse[0] = 0.25f;
+            cv->material = mt;
+            cv->CalcHandles(); cv->Tessellate(true);
+            // un riel de NODOS al lado: tiene que volver exactamente como siempre (inline, sin splines)
+            Curve* rail = BZ::NewCurve("RielNodos");
+            rail->vertexSize = 3; rail->vertex = new GLfloat[9];
+            const float rv[9] = { 0,0,0, 1,0,0, 2,1,0 }; for (int i = 0; i < 9; i++) rail->vertex[i] = rv[i];
+            rail->indices = new GLushort[3]; for (int i = 0; i < 3; i++) rail->indices[i] = (GLushort)i;
+            const std::vector<CurveSpline> want = cv->splines;
+            const std::vector<GLfloat> tessWant(cv->vertex, cv->vertex + cv->vertexSize * 3);
+            const int geomV = cv->geom ? cv->geom->vertexSize : -1;
+            const std::string path = W3dDebugFile("bezsave.w3d");
+            if (!W3dRunCommand("savew3d " + path, e2)) { err = "bezsave: " + e2; return false; }
+            if (!W3dRunCommand("openw3d " + path, e2)) { err = "bezsave: " + e2; return false; }
+            Object* o = SceneCollection ? FindObjectByName(SceneCollection, "Cable") : NULL;
+            Object* r = SceneCollection ? FindObjectByName(SceneCollection, "RielNodos") : NULL;
+            Curve* c2 = (o && o->getType() == ObjectType::curve) ? (Curve*)o : NULL;
+            Curve* r2 = (r && r->getType() == ObjectType::curve) ? (Curve*)r : NULL;
+            if (!c2 || !r2) { err = "bezsave: no volvieron las curvas"; return false; }
+            bool tessSame = c2->vertexSize * 3 == (int)tessWant.size();
+            for (int i = 0; tessSame && i < c2->vertexSize * 3; i++) if (fabsf(c2->vertex[i] - tessWant[i]) > 1e-6f) tessSame = false;
+            const bool good = BZ::SameSplines(c2->splines, want, 0.0f) && c2->splines[0].resolution == 6 && tessSame &&
+                              c2->resolution == 10.0f && c2->bevelDepth == 0.05f && c2->bevelResolution == 2.0f && c2->extrude == 0.01f && c2->fillCaps &&
+                              c2->material && c2->material->name == "CableMat" && c2->material->diffuse[0] == 0.25f &&
+                              c2->geom && c2->geom->vertexSize == geomV && BZ::Near(c2->pos, Vector3(1, 2, 3), 1e-6f);
+            printf("      [bezsave] Cable: splines identicas=%s, teselacion identica=%s, forma/material=%s, geometria %d verts (esp %d) -> %s\n",
+                   BZ::SameSplines(c2->splines, want, 0.0f) ? "si" : "no", tessSame ? "si" : "no", (c2->material && c2->fillCaps) ? "si" : "no",
+                   c2->geom ? c2->geom->vertexSize : -1, geomV, good ? "OK" : "MAL");
+            if (!good) { BZ::Info(c2); ok = false; }
+            const bool goodR = !r2->HasSplines() && r2->vertexSize == 3 && r2->vertex[6] == 2.0f && r2->vertex[7] == 1.0f && !r2->geom;
+            printf("      [bezsave] el riel de nodos vuelve igual (sin splines, 3 nodos) -> %s\n", goodR ? "OK" : "MAL"); if (!goodR) ok = false;
+            if (!ok) { err = "bezsave: ver los MAL de arriba"; return false; }
+            return true;
+        }
+        // ---- bezmesh: la geometria (tubo / cinta / tapas) y Convert to Mesh ----
+        if (cmd == "bezmesh") {
+            std::string e2;
+            Curve* cv = BZ::NewCurve("Tubo");
+            CurveSpline s; s.resolution = 4;
+            s.points.push_back(BZ::P(0, 0, 0, W3dHandleVector, W3dHandleVector)); s.points.push_back(BZ::P(2, 0, 0, W3dHandleVector, W3dHandleVector));
+            cv->splines.push_back(s); cv->CalcHandles();
+            cv->bevelDepth = 0.1f; cv->bevelResolution = 2.0f; cv->fillCaps = true;   // (4 + 2*2 = 8 lados)
+            cv->Tessellate(true);
+            Mesh* g = cv->geom;
+            // 5 anillos de 8 lados (+1 de costura) + 2 tapas de 8; caras: 4 x 8 + 2
+            bool good = g && g->vertexSize == 5 * 9 + 16 && (int)g->faces3d.size() == 4 * 8 + 2;
+            float maxR = 0.0f, minR = 1.0f; int inward = 0;
+            if (g) {
+                for (int i = 0; i < 45; i++) { const float rr = sqrtf(g->vertex[i*3+1] * g->vertex[i*3+1] + g->vertex[i*3+2] * g->vertex[i*3+2]); if (rr > maxR) maxR = rr; if (rr < minR) minR = rr; }
+                for (size_t f = 0; f < g->faces3d.size(); f++) {
+                    const std::vector<int>& id = g->faces3d[f].idx;
+                    Vector3 n(0, 0, 0), c(0, 0, 0);
+                    for (size_t k = 0; k < id.size(); k++) {
+                        const float* p = &g->vertex[id[k]*3]; const float* q = &g->vertex[id[(k + 1) % id.size()]*3];
+                        n.x += (p[1] - q[1]) * (p[2] + q[2]); n.y += (p[2] - q[2]) * (p[0] + q[0]); n.z += (p[0] - q[0]) * (p[1] + q[1]);
+                        c += Vector3(p[0], p[1], p[2]);
+                    }
+                    c = c * (1.0f / id.size());
+                    // afuera = lejos del eje X (los costados) o hacia afuera de las puntas (las tapas)
+                    const Vector3 out = (id.size() == 8) ? Vector3(c.x < 1.0f ? -1.0f : 1.0f, 0, 0) : Vector3(0, c.y, c.z);
+                    if (n.Dot(out) <= 0.0f) inward++;
+                }
+            }
+            good = good && fabsf(maxR - 0.1f) < 1e-4f && fabsf(minR - 0.1f) < 1e-4f && inward == 0;
+            printf("      [bezmesh] tubo: %d verts (esp 61), %d caras (esp 34), radio %.4f..%.4f (esp 0.1), caras hacia adentro %d (esp 0) -> %s\n",
+                   g ? g->vertexSize : -1, g ? (int)g->faces3d.size() : -1, minR, maxR, inward, good ? "OK" : "MAL"); if (!good) ok = false;
+            // CINTA (extrude sin bevel): una tira vertical de 2 vertices por anillo
+            cv->bevelDepth = 0.0f; cv->extrude = 0.2f; cv->UpdateGeometry(); g = cv->geom;
+            { bool ys = g != NULL; if (g) for (int i = 0; i < g->vertexSize; i++) if (fabsf(fabsf(g->vertex[i*3+1]) - 0.2f) > 1e-5f) ys = false;
+              const bool gd = g && g->vertexSize == 10 && g->faces3d.size() == 4 && ys;
+              printf("      [bezmesh] cinta: %d verts (esp 10), %d caras (esp 4), alto +-0.2=%s -> %s\n", g ? g->vertexSize : -1, g ? (int)g->faces3d.size() : -1, ys ? "si" : "no", gd ? "OK" : "MAL");
+              if (!gd) ok = false; }
+            // CONVERT TO MESH: la malla toma el lugar y el nombre de la curva; Ctrl+Z devuelve la curva
+            cv->bevelDepth = 0.1f; cv->extrude = 0.0f;
+            DeselectAll(); cv->Select();
+            const bool conv = LayoutConvertCurveToMesh();
+            Object* o = SceneCollection ? FindObjectByName(SceneCollection, "Tubo") : NULL;
+            { const bool gd = conv && o && o->getType() == ObjectType::mesh && ((Mesh*)o)->vertexSize == 61 && ((Mesh*)o)->faces3d.size() == 34 && ActiveObj == o;
+              printf("      [bezmesh] Convert to Mesh: '%s' es %s con %d verts (esp una malla de 61) -> %s\n", o ? o->name.c_str() : "?", (o && o->getType() == ObjectType::mesh) ? "malla" : "otra cosa",
+                     (o && o->getType() == ObjectType::mesh) ? ((Mesh*)o)->vertexSize : -1, gd ? "OK" : "MAL"); if (!gd) ok = false; }
+            W3dRunCommand("undo", e2);
+            o = SceneCollection ? FindObjectByName(SceneCollection, "Tubo") : NULL;
+            { const bool gd = o == (Object*)cv;
+              printf("      [bezmesh] undo: 'Tubo' vuelve a ser la curva -> %s\n", gd ? "OK" : "MAL"); if (!gd) ok = false; }
+            // SIN forma: la linea como aristas sueltas
+            cv->bevelDepth = 0.0f; DeselectAll(); cv->Select();
+            LayoutConvertCurveToMesh();
+            o = SceneCollection ? FindObjectByName(SceneCollection, "Tubo") : NULL;
+            { const bool gd = o && o->getType() == ObjectType::mesh && ((Mesh*)o)->vertexSize == 5 && ((Mesh*)o)->looseEdges.size() == 8;
+              printf("      [bezmesh] Convert sin forma: aristas sueltas %d (esp 4) -> %s\n", (o && o->getType() == ObjectType::mesh) ? (int)((Mesh*)o)->looseEdges.size() / 2 : -1, gd ? "OK" : "MAL");
+              if (!gd) ok = false; }
+            if (!ok) { err = "bezmesh: ver los MAL de arriba"; return false; }
+            return true;
+        }
+        // ---- bezrail: una Bezier como RIEL (la camara, Oclusion y el seguir-camino leen la TESELACION) ----
+        if (cmd == "bezrail") {
+            Curve* cv = AddBezierCurveObj();
+            cv->SetNameObj("RielBezier");
+            // el nodo mas cercano del arbol KD = el de la busqueda lineal, en varios puntos alrededor
+            int bad = 0;
+            for (int k = 0; k < 40; k++) {
+                const Vector3 t((k % 8) * 0.4f - 1.6f, (k % 3) * 0.3f - 0.3f, (k / 8) * 0.3f - 0.6f);
+                int best = -1; float bd = 1e30f;
+                for (int i = 0; i < cv->vertexSize; i++) { const float d = (cv->GetPoint(i) - t).LengthSq(); if (d < bd) { bd = d; best = i; } }
+                const int got = cv->FindNearest(t), filt = cv->FindNearestFiltered(t, NULL);
+                if ((cv->GetPoint(got) - t).LengthSq() > bd + 1e-9f || (cv->GetPoint(filt) - t).LengthSq() > bd + 1e-9f) bad++;
+            }
+            Camera* cam = new Camera(NULL, Vector3(0, 1, 5), Vector3(0, 0, 0));
+            const bool railOk = cam->SetRailObject(cv);
+            const bool good = bad == 0 && railOk && cam->Rail == cv && cv->nBranches == 1 && cv->edges.empty();
+            printf("      [bezrail] nearest KD/filtrado = lineal en 40 puntos (fallas %d), la camara toma el riel=%s, 1 rama -> %s\n",
+                   bad, railOk ? "si" : "no", good ? "OK" : "MAL");
+            if (!good) { err = "bezrail: ver el MAL de arriba"; return false; }
+            return true;
+        }
+    }
     // ---- camrail [sub] : EL RIEL DE LA CAMARA ACTIVA (binds lua setRail/setRailNode/getRail).
     //      Sin subcomando solo informa. Subcomandos (todos ASERTAN: devuelven error si no da):
     //        camriel riel <nombre>              el riel actual se llama asi
@@ -9045,11 +9979,12 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         }
         printf("\n");
         // la PRIMERA fila es el submenu de mallas (8 primitivas); despues los objetos modificadores (espejo, array,
-        // instancia), las LUCES (luz, sol, foco y la sonda de luz), los de los PREFABS y las ESCENAS del proyecto
-        // (Add > Prefab / Escena), Imports y, al final, el Nucleo (avanzado): 7 submenus
+        // instancia), las CURVAS (Bezier, circulo y el path de nodos), las LUCES (luz, sol, foco y la sonda de luz),
+        // los de los PREFABS y las ESCENAS del proyecto (Add > Prefab / Escena), Imports y, al final, el Nucleo
+        // (avanzado): 8 submenus
         if (!MenuAdd->items.empty() && MenuAdd->items[0]->submenu)
             primitives = (int)MenuAdd->items[0]->submenu->items.size();
-        const bool menuOk = (primitives >= 6 && withSubmenu == 7 && iconGamepad == 0);
+        const bool menuOk = (primitives >= 6 && withSubmenu == 8 && iconGamepad == 0);
         printf("      [uxeditor] D primera fila = submenu de mallas con %d primitivas | submenus=%d "
                "| filas con el icono del viejo objeto Script=%d %s\n",
                primitives, withSubmenu, iconGamepad,
@@ -20419,6 +21354,687 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         if (!ok) { err = "consreal: la migracion no da lo mismo que el objeto viejo en " + path; return false; }
         printf("      [consreal] OK (%s: %d nodo(s) migrado(s), censo intacto, mismo efecto que la formula vieja con 5 camaras, y el round-trip no hornea nada)\n",
                base.c_str(), (int)nodes.size());
+        return true;
+    }
+
+    // ============================================================================
+    //  CONSTRAINTS FASE 2: LOS TIPOS NUEVOS DE OBJETO Y LOS CONSTRAINTS DE HUESO (IK, Copy*, Track...)
+    //
+    //  consik        : el IK (llega, respeta el largo de la cadena, el pole manda el plano, influencia 0 =
+    //                  FK bit a bit, 50% a mitad de camino, FABRIK de 3, inalcanzable recto, stretch, sin
+    //                  la punta, target OBJETO que se mueve sin cambiar el frame, armature girado)
+    //  consbones     : los demas de hueso (Copy Location/Rotation/Transforms en World y Local, Track To,
+    //                  Damped, Locked, Stretch To, Limit Rotation/Location/Distance, Child Of con Set Inverse)
+    //  consobjnew    : los tipos nuevos de OBJETO (Copy Scale/Transforms, Track/Damped/Locked, Limit*, Maintain
+    //                  Volume, Floor, Transformation, Pivot, Stretch To, Follow Path, Clamp To) + influencia 0
+    //  consbonesave  : guardar/reabrir (todos los campos, IK que sigue llegando) y re-guardar BYTE A BYTE igual
+    //  consboneundo  : Add/Remove/Move con Ctrl+Z/Ctrl+Y, borrar el target y el pole y deshacerlo
+    //  consbonebake  : hornear a keyframes da la MISMA pose sin los constraints; renombrar el hueso target
+    //
+    //  Todos arman rigs AUTORADOS (head/tail + PrepareAuthoredSkin): es lo que produce el editor y el conversor.
+    // ============================================================================
+    struct W3dBCT {
+        static Armature* Arm(const char* name) {
+            Armature* a = new Armature(NULL, Vector3(0, 0, 0));
+            a->SetNameObj(name);
+            return a;
+        }
+        static int Bone(Armature* a, const char* n, int parent, const Vector3& h, const Vector3& t) {
+            W3dBone b; b.name = n; b.parent = parent; b.head = h; b.tail = t;
+            a->bones.push_back(b);
+            return (int)a->bones.size() - 1;
+        }
+        // re-evaluar SIN refrescar los canales desde la curva (poseDirty, como posando a mano): los tests
+        // mueven huesos por poseT/poseR. (lastPoseFrame = -999999 haria que el FK vuelva a leer el clip/rest)
+        static void Eval(Armature* a) { a->poseDirty = true; EvaluatePoseSkeleton(a, CurrentFrame); }
+        static W3dConstraint* Add(Armature* a, int bone, int type) {
+            W3dConstraint* c = new W3dConstraint(type);
+            W3dConstraintBoneDefaults(c);
+            a->bones[bone].constraints.list.push_back(c);
+            a->bones[bone].constraints.active = a->bones[bone].constraints.size() - 1;
+            return c;
+        }
+        static void Tgt(W3dConstraint* c, Object* o, const char* bone) {
+            c->sourceObj = o; c->sourceName = o ? o->name : std::string(); c->bone = bone ? bone : ""; c->boneCache = -1;
+        }
+        static void Pole(W3dConstraint* c, Object* o, const char* bone) {
+            c->poleObj = o; c->poleName = o ? o->name : std::string(); c->poleBone = bone ? bone : ""; c->poleBoneCache = -1;
+        }
+        static float D(const Vector3& a, const Vector3& b) { return (a - b).Length(); }
+        static std::string V(const Vector3& v) { char s[96]; snprintf(s, sizeof s, "(%.3f,%.3f,%.3f)", v.x, v.y, v.z); return s; }
+        static Vector3 Dir(const W3dBone& b) { return (b.poseTail - b.poseHead).Normalized(); }
+        static bool Check(bool& ok, bool cond, const char* tag, const std::string& msg) {
+            printf("      [%s] %s %s\n", tag, msg.c_str(), cond ? "OK" : "<-- MAL");
+            if (!cond) ok = false;
+            return cond;
+        }
+        static Empty* Emp(const char* name, const Vector3& p) { Empty* e = new Empty(NULL, p); e->SetNameObj(name); return e; }
+        static Armature* FindArm(const char* name) {
+            std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+            while (!st.empty()) { Object* o = st.back(); st.pop_back();
+                if (o->getType() == ObjectType::armature && o->name == name) return (Armature*)o;
+                for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]); }
+            return NULL;
+        }
+        static Object* FindObj(const char* name) {
+            std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+            while (!st.empty()) { Object* o = st.back(); st.pop_back();
+                if (o != SceneCollection && o->name == name) return o;
+                for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]); }
+            return NULL;
+        }
+        // la pierna de siempre: cadera (0,2,0)->(0,1,0), canilla ->(0,0,0), un hueso target y uno pole sueltos
+        static Armature* Leg(int& hip, int& shin, int& tgt, int& pole, const Vector3& target) {
+            Armature* a = Arm("Rig");
+            hip  = Bone(a, "hip",  -1,  Vector3(0, 2, 0), Vector3(0, 1, 0));
+            shin = Bone(a, "shin", hip, Vector3(0, 1, 0), Vector3(0, 0, 0));
+            tgt  = Bone(a, "ik",   -1,  target, target + Vector3(0, 0, 0.3f));
+            pole = Bone(a, "pole", -1,  Vector3(0, 1, 2), Vector3(0, 1, 2.3f));
+            PrepareAuthoredSkin(a);
+            return a;
+        }
+    };
+
+    if (cmd == "consik") {
+        bool ok = true;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        int hip, shin, tgt, pole;
+        const Vector3 T0(0.4f, 0.4f, 0.3f);
+        Armature* a = W3dBCT::Leg(hip, shin, tgt, pole, T0);
+        W3dBCT::Eval(a);
+        std::vector<Matrix4> fk(a->bones.size());
+        for (size_t i = 0; i < a->bones.size(); i++) fk[i] = a->bones[i].poseWorld;
+        const Vector3 tailFK = a->bones[shin].poseTail;
+
+        // --- A: llega, conserva los largos, la raiz queda quieta ---
+        W3dConstraint* ik = W3dBCT::Add(a, shin, W3dConstraintType::IK);
+        W3dBCT::Tgt(ik, a, "ik"); ik->chainLength = 2;
+        W3dBCT::Eval(a);
+        {
+            const W3dBone& h = a->bones[hip]; const W3dBone& s = a->bones[shin];
+            const Vector3 goal = a->bones[tgt].poseHead;
+            W3dBCT::Check(ok, W3dBCT::D(s.poseTail, goal) < 1e-3f, "consik", "A la punta llega al target: " + W3dBCT::V(s.poseTail) + " vs " + W3dBCT::V(goal));
+            W3dBCT::Check(ok, fabsf(W3dBCT::D(h.poseHead, s.poseHead) - 1.0f) < 1e-3f && fabsf(W3dBCT::D(s.poseHead, s.poseTail) - 1.0f) < 1e-3f,
+                          "consik", "A los huesos no cambian de largo");
+            W3dBCT::Check(ok, W3dBCT::D(h.poseHead, Vector3(0, 2, 0)) < 1e-5f, "consik", "A la raiz de la cadena no se mueve");
+            W3dBCT::Check(ok, a->bones[shin].poseT.x == a->bones[shin].restT.x && a->bones[shin].poseR.x == 0.0f &&
+                              a->bones[shin].poseR.y == 0.0f && a->bones[shin].poseR.z == 0.0f,
+                          "consik", "A el IK NO escribio poseT/poseR (los canales del FK)");
+        }
+        // --- B: el POLE manda el plano de la dobladura (y su lado) ---
+        W3dBCT::Pole(ik, a, "pole");
+        W3dBCT::Eval(a);
+        {
+            const Vector3 hh = a->bones[hip].poseHead, knee = a->bones[shin].poseHead;
+            const Vector3 goal = a->bones[tgt].poseHead, pp = a->bones[pole].poseHead;
+            const Vector3 n = Vector3::Cross(goal - hh, pp - hh).Normalized();
+            W3dBCT::Check(ok, fabsf((knee - hh).Dot(n)) < 1e-3f && knee.z > 0.05f, "consik",
+                          "B la rodilla en el plano (cadera, target, pole) y del lado del pole: " + W3dBCT::V(knee));
+            W3dBCT::Check(ok, W3dBCT::D(a->bones[shin].poseTail, goal) < 1e-3f, "consik", "B con pole sigue llegando");
+            a->bones[pole].poseT = a->bones[pole].restT + Vector3(0, 0, -4.0f);   // el pole pasa ATRAS
+            W3dBCT::Eval(a);
+            const Vector3 knee2 = a->bones[shin].poseHead;
+            W3dBCT::Check(ok, knee2.z < -0.05f, "consik", "B el pole atras dobla la rodilla para atras: " + W3dBCT::V(knee2));
+            ik->poleAngle = 90.0f;
+            W3dBCT::Eval(a);
+            const Vector3 knee3 = a->bones[shin].poseHead;
+            W3dBCT::Check(ok, W3dBCT::D(knee3, knee2) > 0.05f && W3dBCT::D(a->bones[shin].poseTail, goal) < 1e-3f, "consik",
+                          "B poleAngle 90 gira la cadena alrededor del eje y sigue llegando: " + W3dBCT::V(knee3));
+            ik->poleAngle = 0.0f;
+            a->bones[pole].poseT = a->bones[pole].restT;
+        }
+        // --- C: influencia 0 = el FK BIT A BIT; 50% = a mitad de camino ---
+        ik->influence = 0.0f;
+        W3dBCT::Eval(a);
+        { bool same = true;
+          for (size_t i = 0; i < a->bones.size(); i++) if (!W3dConstraintTest::EqualMatExact(fk[i], a->bones[i].poseWorld)) same = false;
+          W3dBCT::Check(ok, same, "consik", "C influencia 0 -> la pose del FK bit a bit"); }
+        ik->influence = 50.0f;
+        W3dBCT::Eval(a);
+        { const Vector3 goal = a->bones[tgt].poseHead; const float d50 = W3dBCT::D(a->bones[shin].poseTail, goal), dFK = W3dBCT::D(tailFK, goal);
+          W3dBCT::Check(ok, d50 > 1e-3f && d50 < dFK, "consik", "C influencia 50 queda entre el FK y el target"); }
+        ik->influence = 100.0f;
+        // --- D: el largo de la cadena se respeta (3 huesos, chain 2 no toca la columna) y FABRIK (chain 0) llega ---
+        {
+            Armature* b = W3dBCT::Arm("Rig3");
+            const int sp = W3dBCT::Bone(b, "spine", -1, Vector3(0, 3, 0), Vector3(0, 2, 0));
+            const int h3 = W3dBCT::Bone(b, "hip",   sp, Vector3(0, 2, 0), Vector3(0, 1.0f, 0.1f));
+            const int s3 = W3dBCT::Bone(b, "shin",  h3, Vector3(0, 1.0f, 0.1f), Vector3(0, 0, 0));
+            const int t3 = W3dBCT::Bone(b, "goal",  -1, Vector3(1.2f, 1.2f, 0.4f), Vector3(1.2f, 1.2f, 0.7f));
+            PrepareAuthoredSkin(b);
+            W3dBCT::Eval(b);
+            const Matrix4 spFK = b->bones[sp].poseWorld;
+            W3dConstraint* k3 = W3dBCT::Add(b, s3, W3dConstraintType::IK);
+            W3dBCT::Tgt(k3, b, "goal"); k3->chainLength = 2;
+            W3dBCT::Eval(b);
+            W3dBCT::Check(ok, W3dConstraintTest::EqualMatExact(spFK, b->bones[sp].poseWorld) &&
+                              W3dBCT::D(b->bones[s3].poseTail, b->bones[t3].poseHead) < 1e-3f,
+                          "consik", "D chain 2 en una pata de 3: la columna NO se mueve y la punta llega");
+            k3->chainLength = 0; k3->iterations = 50;
+            W3dBCT::Eval(b);
+            W3dBCT::Check(ok, !W3dConstraintTest::EqualMatExact(spFK, b->bones[sp].poseWorld) &&
+                              W3dBCT::D(b->bones[s3].poseTail, b->bones[t3].poseHead) < 2e-3f &&
+                              W3dBCT::D(b->bones[sp].poseHead, Vector3(0, 3, 0)) < 1e-5f,
+                          "consik", "D chain 0 (hasta la raiz, FABRIK de 3): la columna gira y llega: " + W3dBCT::V(b->bones[s3].poseTail) +
+                          " columna " + W3dBCT::V(b->bones[sp].poseTail) + " cabeza " + W3dBCT::V(b->bones[sp].poseHead) +
+                          (W3dConstraintTest::EqualMatExact(spFK, b->bones[sp].poseWorld) ? " (columna QUIETA)" : "") +
+                          " err " + W3dBCT::V(b->bones[s3].poseTail - b->bones[t3].poseHead));
+            // inalcanzable: la cadena queda RECTA apuntando al target; con stretch, llega estirandose
+            b->bones[t3].poseT = b->bones[t3].restT + Vector3(4.0f, -6.0f, 0);
+            W3dBCT::Eval(b);
+            const Vector3 g = b->bones[t3].poseHead, r = b->bones[sp].poseHead;
+            const Vector3 tip = b->bones[s3].poseTail;
+            const float straight = (tip - r).Normalized().Dot((g - r).Normalized());
+            W3dBCT::Check(ok, straight > 0.9999f && W3dBCT::D(tip, g) > 1.0f, "consik", "E inalcanzable: recta hacia el target");
+            k3->useStretch = true;
+            W3dBCT::Eval(b);
+            W3dBCT::Check(ok, W3dBCT::D(b->bones[s3].poseTail, g) < 2e-3f, "consik",
+                          "E con stretch se estira hasta el target: " + W3dBCT::V(b->bones[s3].poseTail) + " vs " + W3dBCT::V(g));
+        }
+        // --- F: sin la punta (useTail off): el efector es la CABEZA del dueno y el dueno no gira ---
+        {
+            ik->useTail = false; W3dBCT::Pole(ik, NULL, NULL);
+            const Vector3 goal(0.6f, 1.2f, 0.0f);   // a 1 m de la cadera: la cadera sola llega
+            a->bones[tgt].poseT = goal;              // (el hueso target es raiz: poseT = su cabeza)
+            W3dBCT::Eval(a);
+            W3dBCT::Check(ok, W3dBCT::D(a->bones[shin].poseHead, goal) < 1e-3f, "consik",
+                          "F useTail off: la cabeza de la canilla llega al target: " + W3dBCT::V(a->bones[shin].poseHead));
+            ik->useTail = true; a->bones[tgt].poseT = a->bones[tgt].restT;
+        }
+        // --- G: target OBJETO que se mueve SIN cambiar el frame (la firma de los targets externos) ---
+        {
+            Empty* e = W3dBCT::Emp("Mano", Vector3(0.3f, 0.6f, 0.2f));
+            W3dBCT::Tgt(ik, e, NULL);
+            W3dBCT::Eval(a);
+            const bool r1 = W3dBCT::D(a->bones[shin].poseTail, e->pos) < 1e-3f;
+            e->pos = Vector3(-0.5f, 0.5f, 0.4f);
+            EvaluatePoseSkeleton(a, CurrentFrame);   // SIN poseDirty: lo tiene que detectar la firma
+            const bool r2 = W3dBCT::D(a->bones[shin].poseTail, e->pos) < 1e-3f;
+            W3dBCT::Check(ok, r1 && r2, "consik", "G target objeto: llega, y al moverlo (mismo frame) la pose se recalcula sola");
+            // el armature girado y corrido: la punta llega al target en MUNDO
+            a->pos = Vector3(3.0f, 0.0f, -2.0f); a->SetRotEuler(Vector3(0, 40.0f, 0));
+            e->pos = Vector3(3.2f, 0.7f, -1.5f);
+            EvaluatePoseSkeleton(a, CurrentFrame);
+            Matrix4 W; a->GetWorldMatrix(W);
+            const Vector3 tipW = W * a->bones[shin].poseTail;
+            W3dBCT::Check(ok, W3dBCT::D(tipW, e->pos) < 2e-3f, "consik", "G armature girado: la punta llega al target en mundo: " + W3dBCT::V(tipW));
+        }
+        RestartScene();
+        if (!ok) { err = "consik: el IK no cumple"; return false; }
+        printf("      [consik] OK\n");
+        return true;
+    }
+
+    if (cmd == "consbones") {
+        bool ok = true;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        Armature* a = W3dBCT::Arm("Rig");
+        const int def = W3dBCT::Bone(a, "DEF", -1, Vector3(0, 0, 0), Vector3(0, 1, 0));
+        const int tg  = W3dBCT::Bone(a, "TGT", -1, Vector3(2, 0, 0), Vector3(2, 1, 0));
+        const int ctl = W3dBCT::Bone(a, "CTL", -1, Vector3(-2, 3, 1), Vector3(-2, 3.5f, 1));
+        PrepareAuthoredSkin(a);
+        W3dBCT::Eval(a);   // (la 1ra evaluacion lee los canales del reposo: recien despues se posa a mano)
+        a->bones[tg].poseT = a->bones[tg].restT + Vector3(0.5f, 0.2f, -0.3f);
+        a->bones[tg].poseR = Vector3(10.0f, 20.0f, 30.0f);
+        W3dConstraint* c = W3dBCT::Add(a, def, W3dConstraintType::CopyTransforms);
+        W3dBCT::Tgt(c, a, "TGT");
+        W3dBCT::Eval(a);
+        W3dBCT::Check(ok, W3dBCT::D(a->bones[def].poseHead, a->bones[tg].poseHead) < 1e-4f && W3dBCT::D(a->bones[def].poseTail, a->bones[tg].poseTail) < 1e-4f,
+                      "consbones", "Copy Transforms (DEF <- TGT): misma cabeza y misma punta");
+        c->type = W3dConstraintType::CopyLocation;
+        W3dBCT::Eval(a);
+        W3dBCT::Check(ok, W3dBCT::D(a->bones[def].poseHead, a->bones[tg].poseHead) < 1e-4f &&
+                          W3dBCT::Dir(a->bones[def]).Dot(Vector3(0, 1, 0)) > 0.9999f, "consbones", "Copy Location: la cabeza y nada mas");
+        c->type = W3dConstraintType::CopyRotation;
+        W3dBCT::Eval(a);
+        W3dBCT::Check(ok, W3dBCT::D(a->bones[def].poseHead, Vector3(0, 0, 0)) < 1e-5f &&
+                          W3dBCT::Dir(a->bones[def]).Dot(W3dBCT::Dir(a->bones[tg])) > 0.9999f, "consbones", "Copy Rotation (world): la orientacion y nada mas");
+        // LOCAL -> LOCAL: copia la rotacion de POSE (relativa al reposo), aunque los reposos apunten distinto
+        a->bones[def].tail = Vector3(1, 0, 0); PrepareAuthoredSkin(a); W3dBCT::Eval(a);
+        c->ownerSpace = c->targetSpace = W3dConstraintSpace::Local;
+        a->bones[tg].poseR = Vector3(0, 0, 0); a->bones[tg].poseT = a->bones[tg].restT;
+        W3dBCT::Eval(a);
+        W3dBCT::Check(ok, W3dBCT::Dir(a->bones[def]).Dot(Vector3(1, 0, 0)) > 0.9999f, "consbones", "Copy Rotation local: target en reposo -> el dueno en reposo");
+        a->bones[tg].poseR = Vector3(0, 0, 90.0f);   // el target gira 90 sobre Z: el dueno gira 90 sobre SU Z (marco del hueso)
+        W3dBCT::Eval(a);
+        W3dBCT::Check(ok, fabsf(W3dBCT::Dir(a->bones[def]).Dot(Vector3(1, 0, 0))) < 1e-3f && W3dBCT::D(a->bones[def].poseHead, Vector3(0, 0, 0)) < 1e-5f,
+                      "consbones", "Copy Rotation local: 90 de pose del target -> 90 de pose del dueno: " + W3dBCT::V(W3dBCT::Dir(a->bones[def])));
+        a->bones[def].tail = Vector3(0, 1, 0); PrepareAuthoredSkin(a); W3dBCT::Eval(a);
+        a->bones[tg].poseR = Vector3(0, 0, 0);
+        // TRACK TO / DAMPED / LOCKED: el eje del hueso (+Y del marco) apunta al hueso CTL
+        const int tracks[3] = { W3dConstraintType::TrackTo, W3dConstraintType::DampedTrack, W3dConstraintType::LockedTrack };
+        const char* const tn[3] = { "Track To", "Damped Track", "Locked Track" };
+        for (int k = 0; k < 3; k++) {
+            W3dConstraint* t = new W3dConstraint(tracks[k]); W3dConstraintBoneDefaults(t);
+            *c = *t; delete t;                      // (c conserva su identidad: el operator= del serial no la pisa)
+            W3dBCT::Tgt(c, a, "CTL");
+            if (k == 2) c->lockAxis = W3dConstraintAxis::Z;
+            W3dBCT::Eval(a);
+            Vector3 want = (a->bones[ctl].poseHead - a->bones[def].poseHead);
+            if (k == 2) want.z = 0.0f;              // locked en Z: solo puede apuntar a la proyeccion
+            const float d = W3dBCT::Dir(a->bones[def]).Dot(want.Normalized());
+            char m[160]; snprintf(m, sizeof m, "%s: el hueso apunta al controlador (cos=%.5f)", tn[k], d);
+            W3dBCT::Check(ok, d > 0.9999f, "consbones", m);
+        }
+        // STRETCH TO: la punta llega al target (largo de reposo = el del hueso)
+        { W3dConstraint* t = new W3dConstraint(W3dConstraintType::StretchTo); *c = *t; delete t; W3dBCT::Tgt(c, a, "CTL");
+          W3dBCT::Eval(a);
+          W3dBCT::Check(ok, W3dBCT::D(a->bones[def].poseTail, a->bones[ctl].poseHead) < 1e-3f, "consbones",
+                        "Stretch To: la punta llega al target " + W3dBCT::V(a->bones[def].poseTail)); }
+        // LIMIT ROTATION local (Z max 10): una pose de 45 queda en 10
+        { W3dConstraint* t = new W3dConstraint(W3dConstraintType::LimitRotation); *c = *t; delete t;
+          c->ownerSpace = W3dConstraintSpace::Local; c->useMax[2] = true; c->vmax.z = 10.0f;
+          a->bones[def].poseR = Vector3(0, 0, 45.0f);
+          W3dBCT::Eval(a);
+          const Vector3 d = W3dBCT::Dir(a->bones[def]);
+          const float ang = atan2f(-d.x, d.y) * 57.2957795f;
+          char m[120]; snprintf(m, sizeof m, "Limit Rotation: 45 -> %.3f (max 10)", ang);
+          W3dBCT::Check(ok, fabsf(ang - 10.0f) < 0.01f, "consbones", m);
+          a->bones[def].poseR = Vector3(0, 0, 0); }
+        // LIMIT LOCATION pose (max Y 0.5): una pose que la sube 2 queda en 0.5
+        { W3dConstraint* t = new W3dConstraint(W3dConstraintType::LimitLocation); *c = *t; delete t;
+          c->ownerSpace = W3dConstraintSpace::Pose; c->useMax[1] = true; c->vmax.y = 0.5f;
+          a->bones[def].poseT = a->bones[def].restT + Vector3(0, 2, 0);
+          W3dBCT::Eval(a);
+          W3dBCT::Check(ok, fabsf(a->bones[def].poseHead.y - 0.5f) < 1e-4f, "consbones", "Limit Location: y 2 -> 0.5");
+          a->bones[def].poseT = a->bones[def].restT; }
+        // LIMIT DISTANCE inside 1 del CTL
+        { W3dConstraint* t = new W3dConstraint(W3dConstraintType::LimitDistance); *c = *t; delete t; W3dBCT::Tgt(c, a, "CTL");
+          c->distance = 1.0f;
+          W3dBCT::Eval(a);
+          W3dBCT::Check(ok, fabsf(W3dBCT::D(a->bones[def].poseHead, a->bones[ctl].poseHead) - 1.0f) < 1e-4f, "consbones", "Limit Distance: queda a 1 del target"); }
+        // CHILD OF hueso -> hueso con Set Inverse: queda donde estaba y despues sigue al padre
+        { W3dConstraint* t = new W3dConstraint(W3dConstraintType::ChildOf); *c = *t; delete t; W3dBCT::Tgt(c, a, "CTL");
+          W3dBCT::Eval(a);
+          Matrix4 T, iT;
+          if (W3dBoneConstraintTarget(a, c, T)) { W3dChildOfMaskMatrix(c, T); Matrix4::InvertAffine(T, iT); c->inverse = iT; }
+          W3dBCT::Eval(a);
+          const Vector3 h0 = a->bones[def].poseHead;
+          W3dBCT::Check(ok, W3dBCT::D(h0, Vector3(0, 0, 0)) < 1e-4f, "consbones", "Child Of + Set Inverse: el hueso no salta " + W3dBCT::V(h0));
+          a->bones[ctl].poseT = a->bones[ctl].restT + Vector3(0, 0, 2.0f);
+          W3dBCT::Eval(a);
+          W3dBCT::Check(ok, W3dBCT::D(a->bones[def].poseHead, Vector3(0, 0, 2.0f)) < 1e-4f, "consbones", "Child Of: el padre se mueve 2 en Z y el hueso lo sigue");
+          a->bones[ctl].poseT = a->bones[ctl].restT; }
+        RestartScene();
+        if (!ok) { err = "consbones: algun constraint de hueso no cumple"; return false; }
+        printf("      [consbones] OK\n");
+        return true;
+    }
+
+    if (cmd == "consobjnew") {
+        bool ok = true;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        Empty* own = W3dBCT::Emp("Dueno", Vector3(0, 0, 0));
+        Empty* tgt = W3dBCT::Emp("Target", Vector3(5, 0, 0));
+        W3dConstraint* c = new W3dConstraint(W3dConstraintType::CopyScale);
+        own->constraints.push_back(c);
+        Matrix4 base; own->GetMatrixBase(base);
+        W3dBCT::Tgt(c, tgt, NULL);
+        tgt->scale = Vector3(2, 3, 4);
+        Matrix4 M; own->GetWorldMatrix(M);
+        W3dBCT::Check(ok, W3dConstraintTest::Near(Vector3(M.m[0], M.m[1], M.m[2]).Length(), 2, 1e-4f) &&
+                          W3dConstraintTest::Near(Vector3(M.m[4], M.m[5], M.m[6]).Length(), 3, 1e-4f) &&
+                          W3dConstraintTest::Near(Vector3(M.m[8], M.m[9], M.m[10]).Length(), 4, 1e-4f), "consobjnew", "Copy Scale");
+        c->influence = 0.0f; own->GetMatrix(M);
+        W3dBCT::Check(ok, W3dConstraintTest::EqualMatExact(M, base), "consobjnew", "influencia 0 = la base bit a bit");
+        c->influence = 100.0f; tgt->scale = Vector3(1, 1, 1);
+        // Copy Transforms
+        { W3dConstraint t(W3dConstraintType::CopyTransforms); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          tgt->SetRotEuler(Vector3(10, 20, 30));
+          Matrix4 Wt; tgt->GetWorldMatrix(Wt); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::MatNear(M, Wt, 1e-4f), "consobjnew", "Copy Transforms: el mundo del target");
+          tgt->SetRotEuler(Vector3(0, 0, 0)); }
+        // Track To (default: -Z al target, +Y arriba)
+        { W3dConstraint t(W3dConstraintType::TrackTo); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          own->GetWorldMatrix(M);
+          const Vector3 fwd = -Vector3(M.m[8], M.m[9], M.m[10]).Normalized(), up = Vector3(M.m[4], M.m[5], M.m[6]).Normalized();
+          W3dBCT::Check(ok, fwd.Dot(Vector3(1, 0, 0)) > 0.9999f && up.Dot(Vector3(0, 1, 0)) > 0.9999f, "consobjnew", "Track To: -Z al target, +Y arriba " + W3dBCT::V(fwd)); }
+        { W3dConstraint t(W3dConstraintType::DampedTrack); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          tgt->pos = Vector3(3, 4, 0);
+          own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, Vector3(M.m[4], M.m[5], M.m[6]).Normalized().Dot(Vector3(0.6f, 0.8f, 0)) > 0.9999f, "consobjnew", "Damped Track: el +Y al target"); }
+        { W3dConstraint t(W3dConstraintType::LockedTrack); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          c->trackAxis = W3dConstraintAxis::X; c->lockAxis = W3dConstraintAxis::Y;
+          tgt->pos = Vector3(0, 7, 5);
+          own->GetWorldMatrix(M);
+          const Vector3 x = Vector3(M.m[0], M.m[1], M.m[2]).Normalized(), y = Vector3(M.m[4], M.m[5], M.m[6]).Normalized();
+          W3dBCT::Check(ok, x.Dot(Vector3(0, 0, 1)) > 0.9999f && y.Dot(Vector3(0, 1, 0)) > 0.9999f, "consobjnew", "Locked Track: gira solo en Y, el X a la proyeccion"); }
+        tgt->pos = Vector3(5, 0, 0);
+        // Limit Location / Rotation / Scale
+        { W3dConstraint t(W3dConstraintType::LimitLocation); *c = t; c->useMax[0] = true; c->vmax.x = 2.0f;
+          own->pos = Vector3(5, 1, 0); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(M.m[12], 2, 1e-5f) && W3dConstraintTest::Near(M.m[13], 1, 1e-5f), "consobjnew", "Limit Location");
+          own->pos = Vector3(0, 0, 0); }
+        { W3dConstraint t(W3dConstraintType::LimitRotation); *c = t; c->useMax[1] = true; c->vmax.y = 30.0f;
+          own->SetRotEuler(Vector3(0, 80, 0)); own->GetWorldMatrix(M);
+          const float yaw = atan2f(M.m[8], M.m[10]) * 57.2957795f;
+          char m[96]; snprintf(m, sizeof m, "Limit Rotation: 80 -> %.3f (max 30)", yaw);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(yaw, 30, 0.01f), "consobjnew", m);
+          own->SetRotEuler(Vector3(0, 0, 0)); }
+        { W3dConstraint t(W3dConstraintType::LimitScale); *c = t; c->useMin[0] = true; c->vmin.x = 0.5f;
+          own->scale = Vector3(0.1f, 1, 1); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(Vector3(M.m[0], M.m[1], M.m[2]).Length(), 0.5f, 1e-5f), "consobjnew", "Limit Scale");
+          own->scale = Vector3(1, 1, 1); }
+        { W3dConstraint t(W3dConstraintType::LimitDistance); *c = t; W3dBCT::Tgt(c, tgt, NULL); c->distance = 3.0f;
+          own->pos = Vector3(-10, 0, 0); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(M.m[12], 2, 1e-4f), "consobjnew", "Limit Distance inside 3");
+          own->pos = Vector3(0, 0, 0); }
+        { W3dConstraint t(W3dConstraintType::MaintainVolume); *c = t;
+          own->scale = Vector3(1, 4, 1); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(Vector3(M.m[0], M.m[1], M.m[2]).Length(), 0.5f, 1e-4f) &&
+                            W3dConstraintTest::Near(Vector3(M.m[8], M.m[9], M.m[10]).Length(), 0.5f, 1e-4f), "consobjnew", "Maintain Volume (Y libre: X y Z = 1/sqrt(4))");
+          own->scale = Vector3(1, 1, 1); }
+        { W3dConstraint t(W3dConstraintType::Floor); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          tgt->pos = Vector3(5, 1, 0); own->pos = Vector3(0, -2, 0); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(M.m[13], 1, 1e-5f), "consobjnew", "Floor: no baja del piso del target");
+          own->pos = Vector3(0, 0, 0); tgt->pos = Vector3(5, 0, 0); }
+        { W3dConstraint t(W3dConstraintType::Transformation); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          c->mapTo = 1; c->fromMin = Vector3(0, 0, 0); c->fromMax = Vector3(10, 1, 1); c->toMin = Vector3(0, 0, 0); c->toMax = Vector3(0, 90, 0);
+          c->mapAxis[1] = 0;   // la rotacion Y del dueno la maneja la X del target
+          own->GetWorldMatrix(M);
+          const float yaw = atan2f(M.m[8], M.m[10]) * 57.2957795f;
+          char m[96]; snprintf(m, sizeof m, "Transformation: target x 5 de 10 -> rot Y %.3f (45)", yaw);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(yaw, 45, 0.01f), "consobjnew", m); }
+        { W3dConstraint t(W3dConstraintType::Pivot); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          own->SetRotEuler(Vector3(0, 90, 0)); own->GetWorldMatrix(M);
+          // gira 90 en Y alrededor de (5,0,0): el origen va a (5,0,5)
+          W3dBCT::Check(ok, W3dBCT::D(W3dConstraintTest::Translation(M), Vector3(5, 0, 5)) < 1e-4f, "consobjnew", "Pivot: rota alrededor del target " + W3dBCT::V(W3dConstraintTest::Translation(M)));
+          own->SetRotEuler(Vector3(0, 0, 0)); }
+        { W3dConstraint t(W3dConstraintType::StretchTo); *c = t; W3dBCT::Tgt(c, tgt, NULL);
+          tgt->pos = Vector3(0, 2, 0); own->GetWorldMatrix(M);    // 1er frame: anota el largo de reposo
+          tgt->pos = Vector3(0, 4, 0); own->GetWorldMatrix(M);
+          W3dBCT::Check(ok, W3dConstraintTest::Near(Vector3(M.m[4], M.m[5], M.m[6]).Length(), 2, 1e-4f), "consobjnew", "Stretch To: el doble de lejos -> escala Y 2");
+          tgt->pos = Vector3(5, 0, 0); }
+        // Follow Path / Clamp To sobre una Curve (0,0,0)-(10,0,0)-(10,0,10)
+        {
+            Curve* cv = new Curve(NULL, Vector3(0, 0, 0)); cv->SetNameObj("Camino");
+            delete[] cv->vertex; cv->vertexSize = 3; cv->vertex = new GLfloat[9];
+            const float pts[9] = { 0,0,0, 10,0,0, 10,0,10 };
+            for (int i = 0; i < 9; i++) cv->vertex[i] = pts[i];
+            W3dConstraint t(W3dConstraintType::FollowPath); *c = t; W3dBCT::Tgt(c, cv, NULL);
+            c->fixedPosition = true; c->offsetFactor = 0.75f;
+            own->GetWorldMatrix(M);
+            W3dBCT::Check(ok, W3dBCT::D(W3dConstraintTest::Translation(M), Vector3(10, 0, 5)) < 1e-4f, "consobjnew", "Follow Path al 75%: " + W3dBCT::V(W3dConstraintTest::Translation(M)));
+            c->followCurve = true; own->GetWorldMatrix(M);
+            const Vector3 fwd = -Vector3(M.m[8], M.m[9], M.m[10]).Normalized();
+            W3dBCT::Check(ok, fwd.Dot(Vector3(0, 0, 1)) > 0.9999f, "consobjnew", "Follow Path + Follow Curve: mira por la tangente " + W3dBCT::V(fwd));
+            c->followCurve = false; c->fixedPosition = false; c->pathDuration = 40.0f;
+            const int frameSaved = CurrentFrame; CurrentFrame = 11;
+            own->GetWorldMatrix(M);
+            W3dBCT::Check(ok, W3dBCT::D(W3dConstraintTest::Translation(M), Vector3(5, 0, 0)) < 1e-4f, "consobjnew", "Follow Path animado: frame 11 de 40 = 25%");
+            CurrentFrame = frameSaved;
+            W3dConstraint t2(W3dConstraintType::ClampTo); *c = t2; W3dBCT::Tgt(c, cv, NULL);
+            own->pos = Vector3(2.5f, 3, 0);     // eje X (el mas largo... empata con Z: gana X), 25% del camino
+            own->GetWorldMatrix(M);
+            W3dBCT::Check(ok, W3dBCT::D(W3dConstraintTest::Translation(M), Vector3(5, 0, 0)) < 1e-4f, "consobjnew", "Clamp To: " + W3dBCT::V(W3dConstraintTest::Translation(M)));
+            own->pos = Vector3(0, 0, 0);
+        }
+        // el objeto NO cambio sus campos
+        W3dBCT::Check(ok, own->pos.x == 0.0f && own->pos.y == 0.0f && own->pos.z == 0.0f && own->scale.y == 1.0f, "consobjnew", "los campos del dueno quedaron intactos");
+        RestartScene();
+        if (!ok) { err = "consobjnew: algun tipo nuevo de objeto no cumple"; return false; }
+        printf("      [consobjnew] OK\n");
+        return true;
+    }
+
+    if (cmd == "consbonesave") {
+        bool ok = true;
+        std::string pref; ss >> pref;
+        if (pref.empty()) pref = W3dDebugFile("consbonesave");
+        const std::string f1 = pref + "_1.w3d", f2 = pref + "_2.w3d";
+        extern void RestartScene();
+        extern bool SaveW3D(const std::string&);
+        extern void OpenProjectNow(const std::string&);
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        int hip, shin, tgt, pole;
+        Armature* a = W3dBCT::Leg(hip, shin, tgt, pole, Vector3(0.4f, 0.4f, 0.3f));
+        a->bones[shin].roll = 12.5f;
+        W3dConstraint* ik = W3dBCT::Add(a, shin, W3dConstraintType::IK);
+        W3dBCT::Tgt(ik, a, "ik"); W3dBCT::Pole(ik, a, "pole");
+        ik->chainLength = 2; ik->poleAngle = -90.0f; ik->iterations = 33; ik->useStretch = true; ik->name = "IK Pierna";
+        W3dConstraint* tt = W3dBCT::Add(a, hip, W3dConstraintType::TrackTo);
+        Empty* e = W3dBCT::Emp("Mira", Vector3(1, 2, 3));
+        W3dBCT::Tgt(tt, e, NULL); tt->upAxis = W3dConstraintAxis::X; tt->trackAxis = W3dConstraintAxis::NegY; tt->influence = 40.0f; tt->active = false;
+        W3dConstraint* cr = W3dBCT::Add(a, hip, W3dConstraintType::CopyRotation);
+        W3dBCT::Tgt(cr, a, "pole"); cr->ownerSpace = W3dConstraintSpace::Local; cr->targetSpace = W3dConstraintSpace::Pose;
+        cr->mixMode = 3; cr->axisY = false; cr->invZ = true; cr->headTail = 0.25f;
+        W3dConstraint* lr = W3dBCT::Add(a, tgt, W3dConstraintType::LimitRotation);
+        lr->useMin[0] = true; lr->vmin.x = -15.0f; lr->useMax[2] = true; lr->vmax.z = 45.5f;
+        // tipos nuevos de OBJETO
+        Empty* o2 = W3dBCT::Emp("Seguidor", Vector3(0, 0, 0));
+        W3dConstraint* fp = new W3dConstraint(W3dConstraintType::FollowPath); o2->constraints.push_back(fp);
+        W3dBCT::Tgt(fp, e, NULL); fp->followCurve = true; fp->pathDuration = 72.0f; fp->pathOffset = 3.0f; fp->trackAxis = W3dConstraintAxis::X;
+        W3dConstraint* tr = new W3dConstraint(W3dConstraintType::Transformation); o2->constraints.push_back(tr);
+        W3dBCT::Tgt(tr, e, NULL); tr->mapFrom = 2; tr->mapTo = 1; tr->mapAxis[0] = 2; tr->toMax = Vector3(1, 2, 3); tr->extrapolate = true; tr->mixMode = 1;
+        W3dConstraint* pv = new W3dConstraint(W3dConstraintType::Pivot); o2->constraints.push_back(pv);
+        pv->pivotOffset = Vector3(1, -2, 0.5f); pv->pivotAbs = true; pv->pivotRotAxis = 4;
+        W3dBCT::Eval(a);
+        const Vector3 tipBefore = a->bones[shin].poseTail;
+        if (!SaveW3D(f1)) { err = "consbonesave: no se pudo guardar"; return false; }
+        OpenProjectNow(f1);
+        Armature* r = W3dBCT::FindArm("Rig");
+        if (!r || r->bones.size() != 4) { err = "consbonesave: el armature no volvio"; return false; }
+        const W3dBoneConstraints& bs = r->bones[shin].constraints;
+        const W3dBoneConstraints& bh = r->bones[hip].constraints;
+        bool f = bs.size() == 1 && bh.size() == 2 && r->bones[tgt].constraints.size() == 1 && r->bones[pole].constraints.size() == 0;
+        W3dBCT::Check(ok, f, "consbonesave", "los stacks de cada hueso volvieron con su cantidad");
+        if (f) {
+            const W3dConstraint* k = bs.list[0];
+            W3dBCT::Check(ok, k->type == W3dConstraintType::IK && k->name == "IK Pierna" && k->sourceObj == r && k->bone == "ik" &&
+                              k->poleObj == r && k->poleBone == "pole" && k->chainLength == 2 && k->poleAngle == -90.0f &&
+                              k->iterations == 33 && k->useStretch && k->useTail, "consbonesave", "IK: target, pole, cadena, angulo, iteraciones, stretch");
+            const W3dConstraint* t2 = bh.list[0];
+            Object* mira = W3dBCT::FindObj("Mira");
+            W3dBCT::Check(ok, t2->type == W3dConstraintType::TrackTo && t2->sourceObj == mira && mira && t2->upAxis == W3dConstraintAxis::X &&
+                              t2->trackAxis == W3dConstraintAxis::NegY && t2->influence == 40.0f && !t2->active, "consbonesave", "Track To: target objeto, ejes, influencia, apagado");
+            const W3dConstraint* c2 = bh.list[1];
+            W3dBCT::Check(ok, c2->type == W3dConstraintType::CopyRotation && c2->ownerSpace == W3dConstraintSpace::Local &&
+                              c2->targetSpace == W3dConstraintSpace::Pose && c2->mixMode == 3 && !c2->axisY && c2->axisX && c2->invZ &&
+                              !c2->invX && c2->headTail == 0.25f && c2->bone == "pole", "consbonesave", "Copy Rotation: espacios, mezcla, ejes, invertir, head/tail");
+            const W3dConstraint* l2 = r->bones[tgt].constraints.list[0];
+            W3dBCT::Check(ok, l2->useMin[0] && !l2->useMin[1] && l2->useMax[2] && l2->vmin.x == -15.0f && l2->vmax.z == 45.5f, "consbonesave", "Limit Rotation: limites");
+            W3dBCT::Check(ok, r->bones[shin].roll == 12.5f && r->bones[hip].roll == 0.0f, "consbonesave", "el roll del hueso");
+        }
+        Object* s2 = W3dBCT::FindObj("Seguidor");
+        if (s2 && s2->constraints.size() == 3) {
+            const W3dConstraint* a2 = s2->constraints[0]; const W3dConstraint* b2 = s2->constraints[1]; const W3dConstraint* c3 = s2->constraints[2];
+            W3dBCT::Check(ok, a2->type == W3dConstraintType::FollowPath && a2->followCurve && a2->pathDuration == 72.0f && a2->pathOffset == 3.0f &&
+                              a2->trackAxis == W3dConstraintAxis::X && a2->upAxis == W3dConstraintAxis::Y, "consbonesave", "Follow Path (objeto)");
+            W3dBCT::Check(ok, b2->type == W3dConstraintType::Transformation && b2->mapFrom == 2 && b2->mapTo == 1 && b2->mapAxis[0] == 2 &&
+                              b2->mapAxis[1] == 1 && b2->toMax.z == 3.0f && b2->extrapolate && b2->mixMode == 1, "consbonesave", "Transformation (objeto)");
+            W3dBCT::Check(ok, c3->type == W3dConstraintType::Pivot && c3->pivotOffset.y == -2.0f && c3->pivotAbs && c3->pivotRotAxis == 4, "consbonesave", "Pivot (objeto)");
+        } else W3dBCT::Check(ok, false, "consbonesave", "los constraints del objeto volvieron");
+        W3dBCT::Eval(r);
+        W3dBCT::Check(ok, W3dBCT::D(r->bones[shin].poseTail, tipBefore) < 1e-4f, "consbonesave", "despues de reabrir el IK deja la pierna IGUAL");
+        if (!SaveW3D(f2)) { err = "consbonesave: no se pudo re-guardar"; return false; }
+        { std::vector<unsigned char> b1, b2;
+          const bool same = W3dConstraintTest::Bytes(f1, b1) && W3dConstraintTest::Bytes(f2, b2) && b1 == b2;
+          W3dBCT::Check(ok, same, "consbonesave", "re-guardar da el MISMO archivo byte a byte"); }
+        RestartScene();
+        if (!ok) { err = "consbonesave: el round-trip pierde o cambia algo"; return false; }
+        printf("      [consbonesave] OK\n");
+        return true;
+    }
+
+    if (cmd == "consboneundo") {
+        bool ok = true;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        UndoClear();
+        int hip, shin, tgt, pole;
+        Armature* a = W3dBCT::Leg(hip, shin, tgt, pole, Vector3(0.4f, 0.4f, 0.3f));
+        W3dBoneConstraints& bc = a->bones[shin].constraints;
+        UndoBoneConstraintAdd(a, shin, W3dConstraintType::IK);
+        W3dBCT::Check(ok, bc.size() == 1 && bc.list[0]->sourceObj == a && bc.list[0]->name == "IK", "consboneundo", "Add IK (target por defecto = el propio armature)");
+        const unsigned s1 = bc.size() ? bc.list[0]->serial.v : 0;
+        UndoUndo();
+        W3dBCT::Check(ok, a->bones[shin].constraints.size() == 0, "consboneundo", "Ctrl+Z del Add");
+        UndoRedo();
+        W3dBCT::Check(ok, a->bones[shin].constraints.size() == 1 && a->bones[shin].constraints.list[0]->serial.v == s1, "consboneundo", "Ctrl+Y: vuelve EL MISMO (mismo serial)");
+        UndoBoneConstraintAdd(a, shin, W3dConstraintType::CopyRotation);
+        UndoBoneConstraintAdd(a, shin, W3dConstraintType::IK);
+        W3dBoneConstraints& b2 = a->bones[shin].constraints;
+        W3dBCT::Check(ok, b2.size() == 3 && b2.list[2]->name == "IK.001" && b2.active == 2, "consboneundo", "dos IK en el mismo hueso: IK e IK.001");
+        UndoBoneConstraintMove(a, shin, -1);
+        W3dBCT::Check(ok, a->bones[shin].constraints.list[1]->name == "IK.001" && a->bones[shin].constraints.active == 1, "consboneundo", "Move Up");
+        UndoBoneConstraintRemove(a, shin);
+        W3dBCT::Check(ok, a->bones[shin].constraints.size() == 2, "consboneundo", "Remove");
+        UndoUndo(); UndoUndo();
+        W3dBCT::Check(ok, a->bones[shin].constraints.size() == 3 && a->bones[shin].constraints.list[2]->name == "IK.001", "consboneundo", "Ctrl+Z x2: el orden de antes");
+        UndoUndo(); UndoUndo();
+        W3dBCT::Check(ok, a->bones[shin].constraints.size() == 1, "consboneundo", "Ctrl+Z hasta el primero");
+        // BORRAR el target y el pole (objetos) y deshacerlo: por serial, con el puntero Y el nombre
+        W3dConstraint* ik = a->bones[shin].constraints.list[0];
+        Empty* et = W3dBCT::Emp("IKTarget", Vector3(0.3f, 0.5f, 0.2f));
+        Empty* ep = W3dBCT::Emp("IKPole", Vector3(0, 1, 3));
+        W3dBCT::Tgt(ik, et, NULL); W3dBCT::Pole(ik, ep, NULL);
+        DtDelete(ep);
+        DtDelete(et);
+        ik = a->bones[shin].constraints.list[0];
+        W3dBCT::Check(ok, ik->sourceObj == NULL && ik->sourceName.empty() && ik->poleObj == NULL && ik->poleName.empty(), "consboneundo", "borrar target y pole los suelta (puntero y nombre)");
+        // en el medio, otro paso de constraints de hueso (el stack se COPIA y vuelve: el serial tiene que sobrevivir)
+        UndoBoneConstraintAdd(a, hip, W3dConstraintType::DampedTrack);
+        UndoUndo();
+        UndoUndo();   // vuelve 'IKTarget'
+        ik = a->bones[shin].constraints.list[0];
+        Object* et2 = W3dBCT::FindObj("IKTarget");
+        W3dBCT::Check(ok, et2 && ik->sourceObj == et2 && ik->sourceName == "IKTarget", "consboneundo", "Ctrl+Z del borrado del target: vuelve al constraint correcto");
+        UndoUndo();   // vuelve 'IKPole'
+        Object* ep2 = W3dBCT::FindObj("IKPole");
+        ik = a->bones[shin].constraints.list[0];
+        W3dBCT::Check(ok, ep2 && ik->poleObj == ep2 && ik->poleName == "IKPole", "consboneundo", "Ctrl+Z del borrado del pole: vuelve el POLE (no el target)");
+        W3dBCT::Eval(a);
+        W3dBCT::Check(ok, W3dBCT::D(a->bones[shin].poseTail, et2 ? et2->pos : Vector3(0, 0, 0)) < 1e-3f, "consboneundo", "y el IK vuelve a llegar");
+        UndoClear();
+        RestartScene();
+        if (!ok) { err = "consboneundo: el undo de los constraints de hueso no cumple"; return false; }
+        printf("      [consboneundo] OK\n");
+        return true;
+    }
+
+    if (cmd == "consbonebake") {
+        bool ok = true;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        UndoClear();
+        int hip, shin, tgt, pole;
+        Armature* a = W3dBCT::Leg(hip, shin, tgt, pole, Vector3(0.4f, 0.4f, 0.3f));
+        CreateAnimation(a);
+        SkeletalAnimation* clip = a->animations[a->activeAnim];
+        clip->startFrame = 1; clip->endFrame = 10;
+        // el target ANIMADO (curva en el clip): el IK sigue un recorrido
+        { BoneTrack& tr = clip->TrackOf(tgt);
+          SetKeyCurve(tr.PropertyOf(AnimPosition, AnimX), 1, 0.4f);  SetKeyCurve(tr.PropertyOf(AnimPosition, AnimX), 10, -0.5f);
+          SetKeyCurve(tr.PropertyOf(AnimPosition, AnimY), 1, 0.4f);  SetKeyCurve(tr.PropertyOf(AnimPosition, AnimY), 10, 0.8f);
+          SetKeyCurve(tr.PropertyOf(AnimPosition, AnimZ), 1, 0.3f);  SetKeyCurve(tr.PropertyOf(AnimPosition, AnimZ), 10, 0.6f); }
+        W3dConstraint* ik = W3dBCT::Add(a, shin, W3dConstraintType::IK);
+        W3dBCT::Tgt(ik, a, "ik"); W3dBCT::Pole(ik, a, "pole"); ik->chainLength = 2;
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        ActiveAnimKind = 1; ActiveAnimArm = a;
+        const int fr[3] = { 1, 5, 10 };
+        Vector3 tipC[3], kneeC[3];
+        for (int k = 0; k < 3; k++) { CurrentFrame = fr[k]; W3dBCT::Eval(a); tipC[k] = a->bones[shin].poseTail; kneeC[k] = a->bones[shin].poseHead; }
+        const int n = W3dBakeBoneConstraints(a, 1, 10, true);
+        W3dBCT::Check(ok, n == 2 && a->bones[shin].constraints.empty(), "consbonebake", "hornea los 2 huesos de la cadena y quita el IK");
+        float worst = 0.0f;
+        for (int k = 0; k < 3; k++) {
+            CurrentFrame = fr[k]; W3dBCT::Eval(a);
+            const float d = W3dBCT::D(a->bones[shin].poseTail, tipC[k]) + W3dBCT::D(a->bones[shin].poseHead, kneeC[k]);
+            if (d > worst) worst = d;
+        }
+        char m[120]; snprintf(m, sizeof m, "sin constraints, las curvas horneadas dan la MISMA pose (peor %.6f)", worst);
+        W3dBCT::Check(ok, worst < 1e-3f, "consbonebake", m);
+        // renombrar el hueso target: el subtarget del constraint lo sigue (el de otro hueso y el de un OBJETO)
+        W3dConstraint* ct = W3dBCT::Add(a, hip, W3dConstraintType::CopyLocation); W3dBCT::Tgt(ct, a, "pole");
+        Empty* e = W3dBCT::Emp("Colgado", Vector3(0, 0, 0));
+        W3dConstraint* co = new W3dConstraint(W3dConstraintType::ChildOf); e->constraints.push_back(co); W3dBCT::Tgt(co, a, "pole");
+        BoneRename(a, pole, "rodilla");
+        W3dBCT::Check(ok, ct->bone == "rodilla" && co->bone == "rodilla", "consbonebake", "renombrar el hueso arrastra el subtarget de los constraints");
+        UndoClear();
+        RestartScene();
+        if (!ok) { err = "consbonebake: el horneado o el rename no cumplen"; return false; }
+        printf("      [consbonebake] OK\n");
+        return true;
+    }
+
+    // ---- consbonetab: la PESTANIA 7 en POSE MODE muestra el stack del HUESO activo (lista modo 19), con
+    //      "Target" en vez de "Source", sin "Show in Edit Mode", con el desplegable del hueso del target; y al
+    //      volver a Object Mode vuelve a ser el stack del OBJETO ----
+    if (cmd == "consbonetab") {
+        bool ok = true;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        UndoClear();
+        int hip, shin, tgt, pole;
+        Armature* a = W3dBCT::Leg(hip, shin, tgt, pole, Vector3(0.4f, 0.4f, 0.3f));
+        UndoConstraintAdd(a, W3dConstraintType::CopyLocation);   // uno del OBJETO, para distinguir las listas
+        Properties* pr = new Properties();
+        PropsActive = pr;
+        pr->Resize(300, 700);
+        DeselectAll(); ObjSelects.clear(); a->Select(); ObjSelects.push_back(a); ActiveObj = a;
+        InteractionMode = PoseMode; a->activeBone = shin;
+        pr->activeTab = 7; pr->UpdateTabs();
+        W3dBCT::Check(ok, pr->propListConstraints->mode == 19 && pr->propListConstraints->ListCount() == 0 &&
+                          pr->propConstraints->visible && pr->propConstraints->name == T("Bone Constraints") &&
+                          !pr->propConstraintProps->visible,
+                      "consbonetab", "Pose Mode: la lista es la del hueso (vacia) y la 2da tarjeta no esta");
+        UndoBoneConstraintAdd(a, shin, W3dConstraintType::IK);
+        pr->UpdateTabs();
+        W3dBCT::Check(ok, pr->propListConstraints->ListCount() == 1 && pr->propListConstraints->ListName(0) == "IK" &&
+                          pr->propConstraintProps->visible && pr->propConstraintProps->name == "IK" &&
+                          pr->propConstraintSource->name == T("Target") && !pr->propConstraintSource->hidden &&
+                          !pr->propConstraintBone->hidden && pr->propConstraintShowEdit->value == NULL &&
+                          pr->propConstraintInfluence->value == &a->bones[shin].constraints.list[0]->influence,
+                      "consbonetab", "Add IK: la lista lo muestra, la tarjeta lo bindea (Target + Bone, sin Show in Edit Mode)");
+        a->activeBone = hip; pr->UpdateTabs();
+        W3dBCT::Check(ok, pr->propListConstraints->ListCount() == 0 && !pr->propConstraintProps->visible,
+                      "consbonetab", "otro hueso activo: su stack (vacio)");
+        InteractionMode = ObjectMode; pr->UpdateTabs();
+        W3dBCT::Check(ok, pr->propListConstraints->mode == 11 && pr->propListConstraints->ListCount() == 1 &&
+                          pr->propListConstraints->ListName(0) == "Copy Location" && pr->propConstraints->name == T("Constraints"),
+                      "consbonetab", "Object Mode: vuelve el stack del OBJETO");
+        delete pr;
+        DeselectAll(); ObjSelects.clear(); ActiveObj = NULL;
+        UndoClear();
+        RestartScene();
+        if (!ok) { err = "consbonetab: la pestania de constraints en Pose Mode no cumple"; return false; }
+        printf("      [consbonetab] OK\n");
+        return true;
+    }
+
+    // ---- consboneui <tipo> : arma la pierna con un constraint de hueso del tipo pedido (ik | trackTo |
+    //      copyTransforms | limitRotation | stretchTo ...), la deja en POSE MODE con la canilla activa y el
+    //      panel de propiedades en la pestania 7. Es para MIRAR la tarjeta con un 'uishot' despues ----
+    if (cmd == "consboneui") {
+        std::string ty; ss >> ty;
+        extern void RestartScene();
+        RestartScene();
+        InteractionMode = ObjectMode; state = editNavigation; PlayAnimation = false;
+        int hip, shin, tgt, pole;
+        Armature* a = W3dBCT::Leg(hip, shin, tgt, pole, Vector3(0.4f, 0.4f, 0.3f));
+        int type = W3dConstraintType::IK;
+        for (int t = 0; t < W3dConstraintType::Count; t++)
+            if (ty == W3dConstraintTypeName(t) || (ty == "ik" && t == W3dConstraintType::IK)) type = t;
+        { static const char* const js[] = { "copyLocation", "copyRotation", "billboard", "childOf", "copyScale", "copyTransforms",
+              "trackTo", "dampedTrack", "lockedTrack", "stretchTo", "limitLocation", "limitRotation", "limitScale",
+              "limitDistance", "maintainVolume", "floor", "transformation", "pivot", "followPath", "clampTo", "ik" };
+          for (int t = 0; t < W3dConstraintType::Count; t++) if (ty == js[t]) type = t; }
+        UndoBoneConstraintAdd(a, shin, type);
+        W3dConstraint* c = a->bones[shin].constraints.list.empty() ? NULL : a->bones[shin].constraints.list[0];
+        if (c) { c->bone = "ik"; if (type == W3dConstraintType::IK) { W3dBCT::Pole(c, a, "pole"); c->chainLength = 2; } }
+        DeselectAll(); ObjSelects.clear(); a->Select(); ObjSelects.push_back(a); ActiveObj = a;
+        InteractionMode = PoseMode; a->activeBone = shin; a->bones[shin].select = true;
+        if (ScriptProps()) { PropsActive->activeTab = 7; PropsActive->UpdateTabs(); }
         return true;
     }
 
@@ -31833,6 +33449,16 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
             if (d > 0.01f) { char m[200]; snprintf(m, sizeof m, "bonepose: '%s' en (%.3f,%.3f,%.3f), se esperaba (%.3f,%.3f,%.3f)",
                                                     b.name.c_str(), b.poseHead.x, b.poseHead.y, b.poseHead.z, ex, ey, ez);
                              err = m; return false; }
+            // bonepose <hueso> <frame> x y z tx ty tz : y la PUNTA (lo que se dibuja y de donde sale el marco de sus
+            // constraints), tambien a 1 cm
+            float tx, ty, tz;
+            if (ss >> tx >> ty >> tz) {
+                printf("      [bonepose] '%s' punta=(%.3f,%.3f,%.3f)\n", b.name.c_str(), b.poseTail.x, b.poseTail.y, b.poseTail.z);
+                d = sqrtf((b.poseTail.x-tx)*(b.poseTail.x-tx) + (b.poseTail.y-ty)*(b.poseTail.y-ty) + (b.poseTail.z-tz)*(b.poseTail.z-tz));
+                if (d > 0.01f) { char m[200]; snprintf(m, sizeof m, "bonepose: la punta de '%s' en (%.3f,%.3f,%.3f), se esperaba (%.3f,%.3f,%.3f)",
+                                                        b.name.c_str(), b.poseTail.x, b.poseTail.y, b.poseTail.z, tx, ty, tz);
+                                 err = m; return false; }
+            }
         }
         return true;
     }
@@ -32452,16 +34078,22 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     }
     // ---- textreal <vista> <texto> : texto TIPEADO por la misma puerta que el teclado (SDL_TEXTINPUT), con el foco en
     //      el viewport <vista> (3d uv timeline outliner 2d props ide) ----
-    // ---- evmouse abajo|arriba|mover <x> <y> [izq|der] [clicks] : un evento de mouse REAL por la entrada de siempre
-    //      (InputUserSDL3), en coordenadas de la ventana ----
+    // ---- evmouse down|up|move <x> <y> [left|right|middle] [clicks] : un evento de mouse REAL por la entrada de siempre
+    //      (InputUserSDL3), en coordenadas de la ventana. En 'move' el 4to argumento es lo que SDL dice que esta
+    //      apretado (e.motion.state): left (el de siempre), right, middle o none (el mouse SIN boton: el soltar ya paso) ----
     if (cmd == "evmouse") {
         std::string q, b = "left"; int x = 0, y = 0, clicks = 1; ss >> q >> x >> y >> b >> clicks;
         extern void InputUserSDL3(SDL_Event&);
         SDL_Event ev; memset(&ev, 0, sizeof(ev));
-        const Uint8 button = (b == "right") ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
-        if (q == "move") { ev.type = SDL_MOUSEMOTION; ev.motion.x = x; ev.motion.y = y; ev.motion.state = SDL_BUTTON_LMASK; }
+        const Uint8 button = (b == "right") ? SDL_BUTTON_RIGHT : (b == "middle") ? SDL_BUTTON_MIDDLE : SDL_BUTTON_LEFT;
+        static int prevX = 0, prevY = 0;   // (el xrel / yrel del movimiento: desde el evento anterior)
+        if (q == "move") {
+            ev.type = SDL_MOUSEMOTION; ev.motion.x = x; ev.motion.y = y; ev.motion.xrel = x - prevX; ev.motion.yrel = y - prevY;
+            ev.motion.state = (b == "none") ? 0 : (b == "right") ? SDL_BUTTON_RMASK : (b == "middle") ? SDL_BUTTON_MMASK : SDL_BUTTON_LMASK;
+        }
         else { ev.type = (q == "down") ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP; ev.button.x = x; ev.button.y = y;
                ev.button.button = button; ev.button.clicks = (Uint8)clicks; ev.button.state = (q == "down") ? SDL_PRESSED : SDL_RELEASED; }
+        prevX = x; prevY = y;
         InputUserSDL3(ev);
         if (rootViewport) rootViewport->Render();
         if (PopUpActive) PopUpActive->Render();
@@ -34754,6 +36386,67 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         if (!l) { err = "rtlight: sin luz en la escena"; return false; }
         l->rtRadius = radius; l->rtRays = rays; l->directional = (dir != 0); l->distance = dist;
         RTInvalidate();
+        return true;
+    }
+    // ---- lightarea <square|rectangle|disk|ellipse|off> [ancho] [alto] : la luz activa (o la primera) pasa a ser DE AREA
+    //      (Light::area) con esa forma y ese tamanio en metros; 'off' = vuelve a puntual ----
+    // ---- lightarea es <forma|off> [ancho alto] : assert de como esta (p.ej. despues de guardar y volver a abrir) ----
+    if (cmd == "lightarea") {
+        static const char* kShapes[4] = { "square", "rectangle", "disk", "ellipse" };
+        std::string a; ss >> a;
+        Light* l = (ActiveObj && ActiveObj->getType() == ObjectType::light) ? (Light*)ActiveObj : NULL;
+        if (!l) for (size_t i = 0; i < Lights.size() && !l; i++) l = Lights[i];
+        if (!l) { err = "lightarea: sin luz en la escena"; return false; }
+        const bool check = (a == "es");
+        if (check) ss >> a;
+        int f = -1;
+        for (int k = 0; k < 4; k++) if (a == kShapes[k]) f = k;
+        if (f < 0 && a != "off") { err = "lightarea: forma '" + a + "' (square|rectangle|disk|ellipse|off)"; return false; }
+        float sx = -1.0f, sy = -1.0f; ss >> sx >> sy;
+        if (check) {
+            printf("      [lightarea] '%s': %s %s %.3f x %.3f\n", l->name.c_str(), l->area ? "area" : "no es de area",
+                   kShapes[(l->areaShape >= 0 && l->areaShape < 4) ? l->areaShape : 0], l->areaSizeX, l->areaSizeY);
+            if (f < 0) { if (l->area) { err = "lightarea: es de area"; return false; } return true; }
+            if (!l->area || l->areaShape != f) { err = "lightarea: no es de area con esa forma"; return false; }
+            if ((sx >= 0.0f && fabsf(l->areaSizeX - sx) > 1e-4f) || (sy >= 0.0f && fabsf(l->areaSizeY - sy) > 1e-4f)) {
+                err = "lightarea: el tamanio no es el esperado"; return false; }
+            return true;
+        }
+        if (f < 0) W3dLightSetType(l, 0);
+        else {
+            W3dLightSetType(l, 3); l->areaShape = f;
+            if (sx > 0.0f) l->areaSizeX = sx;
+            l->areaSizeY = (sy > 0.0f) ? sy : l->areaSizeX;
+        }
+        RTInvalidate(); g_redraw = true;
+        return true;
+    }
+    // ---- skinbox <grados> : un CUBO SKINNEADO ("CajaPiel": todo su peso en el unico hueso de "EsqPiel") con el hueso
+    //      POSADO <grados> en X (como en el modo Pose): lo que se dibuja NO es la malla de reposo. Queda activo (prueba
+    //      del normal map por la pasada DOT3 sobre una malla con esqueleto) ----
+    if (cmd == "skinbox") {
+        float deg = 90.0f; ss >> deg;
+        Armature* a = new Armature(NULL, Vector3(0, 0, 0)); a->SetNameObj("EsqPiel");
+        { W3dBone r; r.name = "raiz"; r.parent = -1; r.head = Vector3(0, 0, 0); r.tail = Vector3(0, 1, 0); a->bones.push_back(r); }
+        Mesh* m = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!m) { err = "skinbox: NewMesh fallo"; return false; }
+        m->SetNameObj("CajaPiel");
+        m->GenerateRender();
+        WeightPaintEnsureMap(m);
+        VertexGroup* vg = new VertexGroup("raiz");
+        { std::vector<char> done(m->vertexSize, 0);
+          for (int i = 0; i < m->vertexSize && i < (int)m->vertCtrlPoint.size(); i++) {
+              const int cp = m->vertCtrlPoint[i];
+              if (cp < 0 || cp >= (int)done.size() || done[cp]) continue;
+              done[cp] = 1; vg->verts.push_back(cp); vg->weights.push_back(1.0f);
+          } }
+        m->vertexGroups.push_back(vg);
+        m->skinArmature = a;
+        PrepareAuthoredSkin(a);
+        EvaluatePoseSkeleton(a, CurrentFrame);
+        a->bones[0].poseR = Vector3(deg, 0, 0); a->poseDirty = true;
+        m->lastSkinFrame = -999999;
+        DeselectAll(); m->Select(); ActiveObj = (Object*)m;
         return true;
     }
     // ---- post on|off | post agregar <grano|foco|mov> [v0 v1 v2 v3] | post limpiar | post cpu [si|no] : la pila de
@@ -40893,7 +42586,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
             const int kInt = 0;                                   // el vertice que va a quedar interior
             int faces = 0;
             for (int f = 0; f < e->NumFaces(); f++) {
-                const std::vector<int>& poly = e->faces[f];
+                const IntRows::Row poly = e->faces[f];
                 bool has = false;
                 for (size_t c = 0; c < poly.size(); c++) if (poly[c] == kInt) has = true;
                 if (has) { e->ToggleFace(f, false); faces++; }

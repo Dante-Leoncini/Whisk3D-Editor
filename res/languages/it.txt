@@ -168,6 +168,7 @@ Apply Scale	Applica scala
 Apply Transforms	Applica trasformazioni
 Apply: select mesh or armature object(s)	Applica: seleziona oggetti mesh o armatura
 Arc	Arco
+Area	Area
 Armature	Armatura
 Armature 2D	Armatura 2D
 Armature Animation	Animazione armatura
@@ -549,6 +550,7 @@ Directional	Direzionale
 Discard the unsaved changes of	Scartare le modifiche non salvate di
 Disconnect	Disconnetti
 Disconnect Bone	Disconnetti osso
+Disk	Disco
 Display in Edit Mode	Mostra in Modalità Modifica
 Display in Viewport	Mostra nella vista
 Distance	Distanza
@@ -603,8 +605,10 @@ Elastic	Elastica
 Elegir archivo	Scegli file
 Element	Elemento
 Element of	Elemento di
+Ellipse	Ellisse
 Emission	Emissione
 Emission Map	Mappa di emissione
+Emission Strength	Intensità emissione
 Empty	Vuoto
 Empty routine	Routine vuota
 Enable	Attiva
@@ -1037,6 +1041,7 @@ Material color	Colore materiale
 Material index	Indice del materiale
 Material of	Materiale di
 Materials	Materiali
+Materials are animated in a scene animation: choose one in the timeline	I materiali si animano in un'animazione di scena: scegline una nella timeline
 Max (last triangle of the mesh)	Max (ultimo triangolo della mesh)
 Max (last triangle of the part)	Max (ultimo triangolo della parte)
 Max distance	Distanza massima
@@ -1858,6 +1863,7 @@ This graphics backend has no shaders: the @vertice section runs on the CPU and t
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Questo backend grafico non ha shader: il materiale si disegna come sempre (GLES 2.0 e Vulkan li hanno)
 This hierarchy clip only animates its root and its children	Questa clip di gerarchia anima solo la sua radice e i suoi figli
 This is a scene: convert it to a game to simulate it	È una scena: convertila in gioco per simularla
+This material can not be animated (default or from a library)	Questo materiale non si può animare (predefinito o di una libreria)
 This mesh does not have this array: do not draw with the array on	Questa mesh non ha quell'array: non disegnare con l'array attivo
 This phone can only clone the screen on the external display	Questo telefono può solo clonare lo schermo sul display esterno
 This phone has no video encoder for MP4	Questo telefono non ha un codificatore video per MP4
@@ -1912,7 +1918,12 @@ UV Group	Gruppo UV
 UV Groups	Gruppi UV
 UV Map	Mappa UV
 UV Maps	Mappe UV
+UV Offset	Spostamento UV
+UV Pivot	Perno UV
+UV Rotation	Rotazione UV
+UV Scale	Scala UV
 UV Sphere	Sfera UV
+UV Transform	Trasformazione UV
 UV array	array UV
 UV group(s)	gruppo/i UV
 UV layer (0 = active)	Livello UV (0 = attivo)
@@ -2208,3 +2219,4 @@ Documents	Documenti
 Downloads	Download
 Pictures	Immagini
 Music	Musica
+Render with the first	Render con il primo

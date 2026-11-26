@@ -64,6 +64,7 @@ static float FrameAspect(float va) {
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/UVEditor.h"    // roles TBR_Pincel*/TBR_Group (toolbar del modo Weight Paint, compartidos con el UV)
 #include "edit/WeightPaint.h"      // pincel + escritura de pesos (modo Weight Paint)
+#include "edit/ModeMemory.h"     // la memoria de la pintura se suelta al dejar sus modos
 #include "edit/BoxSelect.h"        // B: caja de seleccion (compartida con los otros editores)
 #include "edit/BoneEdit.h"         // Edit Mode de ARMATURE: ops de huesos + grab de head/tail (Fase 3)
 #include "ViewPorts/PopUp/NumPad.h" // NumPadOpenTransform (teclado tactil sobre la barra de estado)
@@ -351,6 +352,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         // activa se desempaqueta en objetos comunes
         MenuObject->Add(T("Create Prefab"), 700, IconType::prefab);
         MenuObject->Add(T("Unpack Prefab"), 701, IconType::prefab);
+        // CURVAS: la activa pasa a ser una malla comun (su tubo / cinta, o su linea como aristas)
+        MenuObject->Add(T("Convert to Mesh"), 702, IconType::mesh);
         // menu "Animation" (barra, Object Mode): keyframes del TRANSFORM del objeto + Motion Trail. Antes era un
         // SUBMENU de "Object"; es su propio menu de la barra (queda a un click, no a dos).
         // SUBMENU de canales de Insert Keyframe (compartido por el menu Animation, el menu Pose, el
@@ -1814,6 +1817,15 @@ static void BoxSelectRender3D(Viewport3D* vp) {
 //  la malla + un ReadPixels del viewport por frame, solo mientras se pinta.
 // ============================================================================
 static std::vector<unsigned char> g_wpOclBuf;
+static std::vector<GLfloat> g_wpOclPos; static std::vector<GLubyte> g_wpOclCol; static std::vector<MeshIndex> g_wpOclTri;
+// AL DEJAR LOS MODOS DE PINTURA (edit/ModeMemory.h): el mapa es del tamanio del viewport (con 1280x720, 3,5 MB) y los
+// triangulos, de toda la malla pintada
+static void WP3DOcclusionRelease() {
+    WPOcclusionClear();
+    std::vector<unsigned char>().swap(g_wpOclBuf);
+    std::vector<GLfloat>().swap(g_wpOclPos); std::vector<GLubyte>().swap(g_wpOclCol); std::vector<MeshIndex>().swap(g_wpOclTri);
+}
+W3D_MODE_MEMORY(W3D_MODE_BIT(VertexPaint) | W3D_MODE_BIT(WeightPaint) | W3D_MODE_BIT(TexturePaint), WP3DOcclusionRelease);
 static void WP3DOcclusionPass(Viewport3D* vp) {
     Mesh* m = (WP3DPaintMode() && ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
     if (!m || g_xray || m->vertexSize <= 0 || vp->width <= 0 || vp->height <= 0) { WPOcclusionClear(); return; }
@@ -1845,7 +1857,7 @@ static void WP3DOcclusionPass(Viewport3D* vp) {
     // triangulos de cada cara (la misma triangulacion que el render), en MUNDO, con el ID de la cara
     const GLfloat* pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
     Matrix4 W; m->GetWorldMatrix(W);
-    static std::vector<GLfloat> tp; static std::vector<GLubyte> tc; static std::vector<MeshIndex> tri;
+    std::vector<GLfloat>& tp = g_wpOclPos; std::vector<GLubyte>& tc = g_wpOclCol; std::vector<MeshIndex>& tri = g_wpOclTri;
     tp.clear(); tc.clear();
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         tri.clear(); W3dTriangulateFace(pos, m->faces3d[f].idx, tri);
@@ -2643,7 +2655,7 @@ void Viewport3D::RenderArmaturesOnTop(Object* node){
             // se edita, no la pose) + PUNTOS en cada extremo (los agarraderos del drag).
             bool poseMode = (InteractionMode == PoseMode && (Object*)arm == ActiveObj);
             bool editArm  = (InteractionMode == EditMode && (Object*)arm == ActiveObj);
-            std::vector<GLfloat> buf, dash, bufSel, bufAct; buf.reserve(arm->bones.size() * 6);
+            std::vector<GLfloat> buf, dash, bufSel, bufAct, ikDash; buf.reserve(arm->bones.size() * 6);
             std::vector<GLfloat> pts, ptsSel; // extremos (solo editArm): normal / del hueso seleccionado-activo
             for (size_t i = 0; i < arm->bones.size(); i++){
                 const W3dBone& b = arm->bones[i];
@@ -2663,6 +2675,25 @@ void Viewport3D::RenderArmaturesOnTop(Object* node){
                     PH.push_back(H.x); PH.push_back(H.y); PH.push_back(H.z);
                     std::vector<GLfloat>& PT = b.selTail ? ptsSel : pts;
                     PT.push_back(T.x); PT.push_back(T.y); PT.push_back(T.z);
+                }
+                // IK (Pose Mode): linea PUNTEADA del efector (la punta, o la cabeza sin useTail) al TARGET, como la
+                // de Blender. El target es un hueso de este armature o el mundo de un objeto que el evaluador ya
+                // junto (cacheT): no se recalcula nada aca.
+                if (poseMode) for (size_t k = 0; k < b.constraints.list.size(); k++){
+                    const W3dConstraint* c = b.constraints.list[k];
+                    if (!c || c->type != W3dConstraintType::IK || !W3dConsTypeEffective(c, true)) continue;
+                    Vector3 G; bool okG = false;
+                    if (c->sourceObj == (Object*)arm && !c->bone.empty()){
+                        for (size_t q = 0; q < arm->bones.size() && !okG; q++)
+                            if (arm->bones[q].name == c->bone){ G = arm->bones[q].poseHead; okG = true; }
+                    } else if (c->cacheTOk){
+                        Matrix4 iW; Matrix4::InvertAffine(W, iW);
+                        G = iW * Vector3(c->cacheT.m[12], c->cacheT.m[13], c->cacheT.m[14]); okG = true;
+                    }
+                    if (!okG) continue;
+                    const Vector3 E = c->useTail ? T : H;
+                    ikDash.push_back(E.x); ikDash.push_back(E.y); ikDash.push_back(E.z);
+                    ikDash.push_back(G.x); ikDash.push_back(G.y); ikDash.push_back(G.z);
                 }
                 if (b.parent >= 0 && b.parent < (int)arm->bones.size()){
                     Vector3 A = editArm ? arm->bones[b.parent].tail : arm->bones[b.parent].poseTail;
@@ -2710,7 +2741,7 @@ void Viewport3D::RenderArmaturesOnTop(Object* node){
             // el mismo GRIS UI -- de OTRO color que el hueso, que con el punteado azul a mano se
             // confundia con una linea cortada (reporte del dueno). Un draw por linea (cada una
             // lleva su largo en la coord V); los huesos son pocos, no pesa.
-            if (!dash.empty() && (int)Textures.size() > 3 && Textures[3] && Textures[3]->iID){
+            if ((!dash.empty() || !ikDash.empty()) && (int)Textures.size() > 3 && Textures[3] && Textures[3]->iID){
                 gfx::Enable(gfx::Texture2D);
                 gfx::EnableArray(gfx::TexCoordArray);
                 gfx::Enable(gfx::Blend); gfx::BlendAlpha();
@@ -2726,6 +2757,16 @@ void Viewport3D::RenderArmaturesOnTop(Object* node){
                     Vector3 Bw = W * Vector3(dash[k+3], dash[k+4], dash[k+5]);
                     GLfloat tuv[4] = { 0.0f, 0.0f, 0.0f, (Bw - Aw).Length() * 8.0f };
                     gfx::VertexPointer3f(0, &dash[k]);
+                    gfx::TexCoordPointer2f(0, tuv);
+                    gfx::DrawLines(2);
+                }
+                // la del IK: el MISMO punteado, en naranja (el color de las lineas de IK de Blender)
+                gfx::Color4f(1.0f, 0.62f, 0.15f, 1.0f);
+                for (size_t k = 0; k + 5 < ikDash.size(); k += 6){
+                    Vector3 Aw = W * Vector3(ikDash[k],   ikDash[k+1], ikDash[k+2]);
+                    Vector3 Bw = W * Vector3(ikDash[k+3], ikDash[k+4], ikDash[k+5]);
+                    GLfloat tuv[4] = { 0.0f, 0.0f, 0.0f, (Bw - Aw).Length() * 8.0f };
+                    gfx::VertexPointer3f(0, &ikDash[k]);
                     gfx::TexCoordPointer2f(0, tuv);
                     gfx::DrawLines(2);
                 }
@@ -3232,6 +3273,9 @@ bool Viewport3D::RenderStripes(int outW, int outH, RenderType::Enum pass, W3dStr
     view = pass; showOverlays = false;
     ReloadLights();
     g_showOverlays = false; w3dRenderOverlays = false;
+    // EL RENDER FINAL: lo que no es "Renderizar" no sale y un LOD con renderFirst dibuja su primer hijo (el detallado)
+    const bool finalPrev = w3dEngine::w3dRenderFinal;
+    w3dEngine::w3dRenderFinal = true;
     w3dRenderWireframe   = false;
     w3dRenderSolid       = (pass == RenderType::Solid);
     w3dRenderNormalColor = (pass == RenderType::NormalView);
@@ -3269,6 +3313,13 @@ bool Viewport3D::RenderStripes(int outW, int outH, RenderType::Enum pass, W3dStr
             float b = bottom + (top    - bottom) * (float)ty        / (float)outH;
             float t = bottom + (top    - bottom) * (float)(ty + th) / (float)outH;
 
+            // LA FRANJA SE DIBUJA DE NUEVO si la GPU perdio lo dibujado (w3dDrawsLost): en la VideoCore IV (Android 2.3)
+            // el primer draw de un programa que no le entra falla con GL_OUT_OF_MEMORY y se lleva lo que ya estaba en la
+            // franja (el borrado y los draws de antes). El backend achica el programa y repite ESE draw, pero la franja
+            // quedaba con restos de otra cosa: el primer cuadro del MP4 del Galaxy Ace salia con dos franjas rotas. Pasa en
+            // las primeras franjas, mientras se arman los programas (despues quedan achicados en el cache)
+            for (int attempt = 0; ; attempt++) {
+            const unsigned lost0 = w3dEngine::w3dDrawsLost;
             // (en el N95, la franja en una superficie APARTE: dibujada en la ventana se veia entre la barra de progreso)
             const bool outsideTile = W3dOutsideScreenBegin && W3dOutsideScreenBegin(tileW * S, tileH * S);
             w3dEngine::MatrixMode(w3dEngine::Projection);
@@ -3348,6 +3399,9 @@ bool Viewport3D::RenderStripes(int outW, int outH, RenderType::Enum pass, W3dStr
                     }
             } else w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
             if (outsideTile) W3dOutsideScreenFinish();   // (la barra de progreso, en la ventana)
+            if (w3dEngine::w3dDrawsLost == lost0 || attempt >= 5) break;   // (cada achique queda en el cache: se terminan)
+            w3dLogf("[render] la franja %d se dibuja de nuevo: la GPU perdio lo que tenia", tileIdx + 1);
+            }
             for (int row = 0; row < th; row++){   // (GL lee de ABAJO hacia arriba: la franja va al derecho)
                 memcpy(stripe + (size_t)((th - 1 - row) * outW + tx) * 4,
                        tile + (size_t)(row * tw) * 4,
@@ -3366,6 +3420,7 @@ bool Viewport3D::RenderStripes(int outW, int outH, RenderType::Enum pass, W3dStr
     view = viewPrev; showOverlays = overlaysPrev; ViewFromCameraActive = camPrev;
     w3dRenderAlpha = false; w3dRenderNoLight = false; w3dRenderNormalColor = false;
     g_w3dClearColorFixed = clearFixedPrev;
+    w3dEngine::w3dRenderFinal = finalPrev;
     ReloadLights();
 
     delete[] stripe;
@@ -3652,11 +3707,14 @@ void Viewport3D::SyncButtonContext(){
     bool inEdit  = (isMesh && InteractionMode == EditMode);
     bool poseM   = (InteractionMode == PoseMode && isArm);
     bool editArm = (InteractionMode == EditMode && isArm); // Edit de huesos: el boton abre el menu "Armature"
+    // Edit de una CURVA: el boton abre el menu "Curve" (puntos y manijas)
+    bool editCurve = (InteractionMode == EditMode && ActiveObj && ActiveObj->getType() == ObjectType::curve);
     // en los modos de PINTURA el menu Object no va (no se puede seleccionar ni transformar): oculto
     const bool paint = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
     bObj->visible = (HasObjectsSelected() || poseM) && !paint;
     bObj->text.clear();
     bObj->icon = (poseM || editArm) ? (int)IconType::armature :
+        editCurve ? (int)IconType::curve :
         !inEdit ? (int)IconType::object :
         (EditSelectMode == SelEdge) ? (int)IconType::selEdge :
         (EditSelectMode == SelFace) ? (int)IconType::selFace : (int)IconType::selVertex;
@@ -3924,14 +3982,19 @@ void Viewport3D::RenderUI() {
               } }
             bool isMesh = ActiveObj && ActiveObj->getType() == ObjectType::mesh;
             bool isArm  = ActiveObj && ActiveObj->getType() == ObjectType::armature;
+            // una CURVA tambien tiene Edit Mode (sus nodos, o sus puntos y manijas): sin esto, el primer cuadro
+            // despues del Tab la devolvia a Object Mode y la edicion de la curva no duraba nada
+            bool isCurve = ActiveObj && ActiveObj->getType() == ObjectType::curve;
             // la escena/prefab que se edita (en un juego empaquetado no se cambia de escena a mano)
             { Button* bR = BarRoleBtn(BarButtons, BR_Root);
               if (bR) { extern bool g_gameMode; bR->visible = !g_gameMode; W3dRootsButtonSync(bR); } }
             // se buscan por ROL (no por indice) -> reordenar la barra no rompe esto.
             Button* bMode = BarRoleBtn(BarButtons, BR_Mode);
             if (bMode) {
-                bMode->visible = isMesh || isArm;
-                if (!isMesh && !isArm) InteractionMode = ObjectMode;
+                bMode->visible = isMesh || isArm || isCurve;
+                if (!isMesh && !isArm && !isCurve) InteractionMode = ObjectMode;
+                // una curva solo tiene Object / Edit
+                if (isCurve && InteractionMode != EditMode) InteractionMode = ObjectMode;
                 // un armature no tiene Paint: si quedo en un modo de malla, volver a Object
                 if (isArm && InteractionMode != EditMode && InteractionMode != PoseMode) InteractionMode = ObjectMode;
                 // una malla no tiene Pose: si venia de un armature en Pose, volver a Object
@@ -3942,7 +4005,8 @@ void Viewport3D::RenderUI() {
                               (InteractionMode == WeightPaint)  ? T("Weight Paint") :
                               (InteractionMode == TexturePaint) ? T("Texture Paint") : T("Object Mode");
                 bMode->icon = (InteractionMode == ObjectMode) ? (int)IconType::object :
-                              isArm                            ? (int)IconType::armature : (int)IconType::mesh;
+                              isArm                            ? (int)IconType::armature :
+                              isCurve                          ? (int)IconType::curve : (int)IconType::mesh;
             }
             bool inEdit = (isMesh && InteractionMode == EditMode);
             Button* bSelM = BarRoleBtn(BarButtons, BR_SelMode); // sub-elemento, SOLO en edit (icono)
@@ -5124,6 +5188,12 @@ void Viewport3D::event_key_down(int keyCode, bool repeat){
                 if (state == editNavigation && InteractionMode == EditMode && g_editMesh){
                     if (LShiftPressed) LayoutSlideVerticesEdit();
                     else               LayoutRipEdit();
+                }
+                break;
+            case W3dK_C:
+                // Alt+C (Edit Mode de una curva de splines): abrir / cerrar las splines elegidas (Toggle Cyclic)
+                if (LAltPressed && !LCtrlPressed && state == editNavigation && InteractionMode == EditMode) {
+                    extern bool LayoutCurveToggleCyclic(); LayoutCurveToggleCyclic();
                 }
                 break;
             case W3dK_P:

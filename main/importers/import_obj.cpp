@@ -34,10 +34,6 @@ static std::string FloatStr(float v) {
     return std::string(buf);
 }
 
-// int -> string (para los indices de las caras del export). SSO (sin heap para enteros chicos).
-static std::string IntStr(int n) {
-    char buf[16]; sprintf(buf, "%d", n); return std::string(buf);
-}
 
 // ===== APPEND directo al buffer del export, SIN sprintf (era el cuello: ~2.6M sprintf para 200k verts = ~7s) ni
 // std::string temporal. Extraen los digitos a mano. AppendFloat replica EXACTO el formato de FloatStr (signo +

@@ -1,0 +1,70 @@
+# ===========================================================================
+#  glTF: JERARQUIA, NOMBRES, CAMARAS, LUCES, PBR Y ANIMACIONES DE OBJETO (main/importers/import_gltf.cpp)
+#
+#  prueba_gltf_jerarquia.gltf (lo arma gen_prueba_gltf_jerarquia.py, ver ahi el detalle). Lo que se verifica:
+#   1) cada nodo es un objeto con SU nombre, colgado de su padre con el transform LOCAL (antes: "<archivo>.NNN",
+#      todos sueltos en la coleccion con el transform de mundo)
+#   2) camara (yfov 0.5 rad = 28.65 grados, aspecto 1.5) y luces de KHR_lights_punctual (sol: 683 lux -> 1, girado
+#      +90 en X porque el sol de Whisk3D alumbra desde su +Y; foco: 683*pi cd -> 1, cono 0.5 rad, exponente 4)
+#   3) el material: color base LINEAL -> pantalla (0.214 -> 0.5), metalico / rugosidad, emision, textura EMBEBIDA
+#      (data: URI: se extrae a prueba_gltf_jerarquia_cuadros.png, al lado)
+#   4) la rotacion animada en DOS ejes entra con el euler de los objetos (R = Rx*Ry*Rz: 30, 40, 0) y respeta STEP
+#   5) las dos animaciones (no tocan el mismo nodo) van a UNA escena: ninguna escena se llama como una animacion
+#   6) el round-trip por el contenedor conserva la jerarquia y la animacion
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_gltf_jerarquia.w3s
+# ===========================================================================
+selobj Cubo
+delete
+importgltf prueba_gltf_jerarquia.gltf
+
+# --- 1) jerarquia y nombres ---
+children Padre : Hijo | Camara
+objat Hijo 0 1 0 0.001
+objat Camara 0 0 5 0.001
+valorde Padre tipo 3
+valorde Hijo tipo 0
+valorde Girador tipo 0
+
+# --- 2) camara y luces ---
+valorde Camara fov 28.6479 0.01
+valorde Camara aspecto 1.5
+valorde Sol sol 1
+valorde Sol intensidad 1 0.001
+selname Sol
+objroteuler 90 0 0 0.05
+valorde Foco intensidad 1 0.001
+valorde Foco corte 28.6479 0.01
+valorde Foco exponente 4 0.001
+
+# --- 3) material ---
+valorde material:Mat difR 0.5 0.003
+valorde material:Mat metalico 0.25
+valorde material:Mat rugosidad 0.75
+valorde material:Mat emiR 1
+valorde material:Mat emiG 0
+valorde material:Mat textura 1
+valorde material:Mat transparente 0
+exists prueba_gltf_jerarquia_cuadros.png
+
+# --- 4) rotacion en dos ejes (STEP) y traslacion (LINEAR) ---
+frame 24
+selname Girador
+objroteuler 0 0 0 0.05
+frame 25
+objroteuler 30 40 0 0.05
+frame 13
+objat Padre 2 0 0 0.01
+
+# --- 5) una sola escena para las dos animaciones ---
+savew3d /tmp/w3d_prueba_gltf_jerarquia.w3d
+jsonhas /tmp/w3d_prueba_gltf_jerarquia.w3d GiraAction 0
+jsonhas /tmp/w3d_prueba_gltf_jerarquia.w3d PadreAction 0
+
+# --- 6) round-trip ---
+openw3d /tmp/w3d_prueba_gltf_jerarquia.w3d
+children Padre : Hijo | Camara
+frame 25
+selname Girador
+objroteuler 30 40 0 0.05

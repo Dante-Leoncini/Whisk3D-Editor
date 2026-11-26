@@ -324,7 +324,7 @@ void UndoWeightsConfirm();
 // VERTEX COLOR (pincel de color): mismo trato que los pesos -- un paso de undo POR TRAZO.
 // Snapshot de la capa 'capa' (colores + indices de paleta) al apoyar, commit al soltar.
 struct TextureEditable;
-void UndoTextureStart(TextureEditable* te);   // PINTURA DE TEXTURA: snapshot de los pixeles al empezar el trazo
+void UndoTextureStart(TextureEditable* te, bool whole = false);   // PINTURA DE TEXTURA: graba el antes de lo que toque el trazo (whole: todo ya, el horneado)
 void UndoTextureConfirm(bool change);         // fin del trazo: pushea si pinto algo
 void UndoColorStart(Mesh* m, int layer);
 void UndoColorConfirm(bool change);
@@ -407,6 +407,14 @@ void UndoModEmpty(Mesh* m);          // saca TODOS (el "Apply" que hornea el sta
 void UndoConstraintAdd(Object* o, int type); // tipo = W3dConstraintType::Enum
 void UndoConstraintRemove(Object* o);        // quita el ACTIVO (sin liberarlo: lo adopta el undo)
 void UndoConstraintMove(Object* o, int dir); // -1 = sube, +1 = baja (el orden del stack importa)
+// ---- el STACK DE CONSTRAINTS DE UN HUESO (W3dBone::constraints, Pose Mode) ----
+// Snapshot POR VALOR de los stacks de TODOS los huesos del armature (W3dBoneConstraints copia en profundidad
+// conservando el serial: lo que vuelve es el MISMO constraint, y un RefEntry pendiente lo sigue encontrando).
+// 'bone' = el hueso del stack; Remove/Move actuan sobre su constraint ACTIVO.
+void UndoBoneConstraintAdd(Armature* a, int bone, int type);
+void UndoBoneConstraintRemove(Armature* a, int bone);
+void UndoBoneConstraintMove(Armature* a, int bone, int dir);
+void UndoBoneConstraintsCapture(Armature* a);   // un paso con el estado actual (antes de editar a mano)
 
 // transform (object mode): pendiente hasta confirmar, asi un transform CANCELADO no deja un undo no-op.
 // Los elementos 2D capturan ademas rot2d/ancho/alto (o el tam del texto y el lienzo del UI).

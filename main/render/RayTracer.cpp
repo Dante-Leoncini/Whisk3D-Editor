@@ -26,6 +26,7 @@
 #include "animation/SkeletalAnimation.h"   // SkinMesh: la pose de cada instante del obturador
 #include "animation/VertexAnimation.h"     // W3dUpToDatePose
 #include "objects/Armature.h"              // lastPoseFrame: la pose de otro instante no se cachea
+#include "objects/LOD.h"                   // un LOD: solo el hijo que va en el render (RenderPick)
 #include "WhiskUI/theme/colors.h"   // SetColorID
 #include "io/EditedTexture.h"      // los pixeles CPU de una textura (para muestrearla)
 #include "render/RenderOptions.h"  // g_renderBg
@@ -94,7 +95,9 @@ struct RTMaterial { float diffuse[3]; float emission[3]; int tex; int nmTex; boo
                    float f0;                              // reflejo de frente del dielectrico (del IOR: ((n-1)/(n+1))^2)
                    float clip;                            // > 0: RECORTADO por alfa (como GL: el texel con alfa menor no esta)
                    float ior;                             // > 1: lo transparente REFRACTA (1.33 agua, 1.5 vidrio)
-                   float trans; };                        // TRANSMISION 0..1 (Material::transmision): lo que es vidrio
+                   float trans;                           // TRANSMISION 0..1 (Material::transmision): lo que es vidrio
+                   float uvm[6]; bool uvXf;               // la TRANSFORMACION UV (Material::UVMatrix; uvXf = no es la identidad)
+                   float emK; };                          // la FUERZA de la emision (ya va en 'emission'; el mapa la multiplica)
 // EL BORDE DEL RECORTADO: en vez de todo o nada en el umbral, una rampa corta alrededor (con el filtro bilineal el
 // borde queda suave y los pases lo promedian: sin escalones de texel ni el serruchado del pelo y las hojas)
 static inline float Crop(float a, float threshold) { a = (a - threshold) * 8.0f + 0.5f; return a < 0.0f ? 0.0f : (a > 1.0f ? 1.0f : a); }
@@ -103,6 +106,9 @@ struct RTTexture { const unsigned char* px; int w, h; bool filtered; };   // fil
 // concentrado del haz (como GL: (cos)^expo adentro del cono)
 struct RTLight { RTV pos; RTV dir; bool directional; float color[3]; float ambient[3]; float radius; int rays; float attC, attL, attQ;
                float spotCos, spotExpo; RTV spotDir; float distance;   // distancia: 0 = sin limite (Light::distancia)
+               // LUZ DE AREA (Light::area): alumbra hacia spotDir desde el rectangulo (o la elipse) de medios lados areaX /
+               // areaY alrededor de pos (en el mundo, con la escala del objeto); areaS = su superficie en m2
+               bool area, areaRound; RTV areaX, areaY; float areaS;
                const void* source; };   // (la lampara de la escena: el horneado busca cual es el SOL)
 struct RTNode { float bmin[3], bmax[3]; int left, right; int first, count; };   // hoja: cantidad > 0
 
@@ -288,6 +294,12 @@ static int MaterialIdx(RTScene& e, Material* mt, std::vector<Material*>& seen) {
     RTMaterial rm;
     rm.diffuse[0] = mt ? mt->diffuse[0] : 0.8f; rm.diffuse[1] = mt ? mt->diffuse[1] : 0.8f; rm.diffuse[2] = mt ? mt->diffuse[2] : 0.8f;
     rm.emission[0] = mt ? mt->emission[0] : 0.0f; rm.emission[1] = mt ? mt->emission[1] : 0.0f; rm.emission[2] = mt ? mt->emission[2] : 0.0f;
+    // la emision es color x FUERZA (Material::emissionStrength) y la UV pasa por la TRANSFORMACION del material (UVIn)
+    rm.emK = mt ? mt->emissionStrength : 1.0f;
+    for (int c = 0; c < 3; c++) rm.emission[c] *= rm.emK;
+    rm.uvXf = mt && mt->UVTransformed();
+    if (rm.uvXf) mt->UVMatrix(rm.uvm);
+    else { rm.uvm[0] = 1.0f; rm.uvm[1] = 0.0f; rm.uvm[2] = 0.0f; rm.uvm[3] = 1.0f; rm.uvm[4] = 0.0f; rm.uvm[5] = 0.0f; }
     rm.tex = -1; rm.nmTex = -1;
     rm.emTex = rm.rugTex = rm.metTex = rm.alphaTex = -1;
     // el reflejo de frente (f0) sale del IOR; con IOR 1 (sin refraccion) el de un dielectrico comun (0.04)
@@ -297,14 +309,14 @@ static int MaterialIdx(RTScene& e, Material* mt, std::vector<Material*>& seen) {
         int* dst[W3D_MAPS] = { 0, 0, &rm.emTex, &rm.rugTex, &rm.metTex, &rm.alphaTex };
         for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++) {
             if (!mt->mapWithTexture[k] || !mt->mapTex[k] || !mt->mapTex[k]->iID) continue;
-            TextureEditable* tm = TexEditGet(mt->mapTex[k]);
+            TextureEditable* tm = TexEditGetPinned(mt->mapTex[k]);
             if (tm && tm->w > 0 && tm->h > 0) { RTTexture tx; tx.px = &tm->rgba[0]; tx.w = tm->w; tx.h = tm->h; tx.filtered = mt->filtered; e.texs.push_back(tx); *dst[k] = (int)e.texs.size() - 1; }
         }
         if (rm.alphaTex >= 0) e.hasTransparent = true;
     }
     rm.noLight = mt ? !mt->lighting : false;
     if (mt && mt->normalMap && mt->normalTexture) {
-        TextureEditable* tn = TexEditGet(mt->normalTexture);
+        TextureEditable* tn = TexEditGetPinned(mt->normalTexture);
         if (tn && tn->w > 0 && tn->h > 0) { RTTexture tx; tx.px = &tn->rgba[0]; tx.w = tn->w; tx.h = tn->h; tx.filtered = mt->filtered; e.texs.push_back(tx); rm.nmTex = (int)e.texs.size() - 1; }
     }
     rm.roughness = mt ? mt->rtRoughness : 0.5f; if (rm.roughness < 0.0f) rm.roughness = 0.0f; if (rm.roughness > 1.0f) rm.roughness = 1.0f;
@@ -320,7 +332,7 @@ static int MaterialIdx(RTScene& e, Material* mt, std::vector<Material*>& seen) {
     rm.trans = (mt && !rm.additive) ? mt->transmission : 0.0f; if (rm.trans < 0.0f) rm.trans = 0.0f; if (rm.trans > 1.0f) rm.trans = 1.0f;
     if (rm.transparent || rm.trans > 0.0f) e.hasTransparent = true;
     if (mt && mt->textureOn && mt->texture && mt->texture->iID) {
-        TextureEditable* te = TexEditGet(mt->texture);   // los pixeles CPU (se decodifican una vez)
+        TextureEditable* te = TexEditGetPinned(mt->texture);   // los pixeles CPU (se decodifican una vez)
         if (te && te->w > 0 && te->h > 0) { RTTexture tx; tx.px = &te->rgba[0]; tx.w = te->w; tx.h = te->h; tx.filtered = mt->filtered; e.texs.push_back(tx); rm.tex = (int)e.texs.size() - 1; }
     }
     e.mats.push_back(rm); seen.push_back(mt);
@@ -473,6 +485,19 @@ static void TraverseScene(RTScene& e, Object* o, std::vector<Material*>& seen) {
     if (o != (Object*)SceneCollection && W3dViewLocalHidden(o)) return;
     if (o->getType() == ObjectType::mesh && (o == (Object*)SceneCollection || !W3dViewLocalOnlyStep(o)) &&
         !(g_rtOnlyStatic && !o->isStatic) && !(g_rtForProbe && !o->inProbes)) AddMesh(e, (Mesh*)o, seen);
+    // una CURVA con forma (tubo / cinta): su malla generada es interna (no esta en el arbol) pero su matriz de
+    // mundo es la de la curva, asi que entra como cualquier malla
+    if (o->getType() == ObjectType::curve && !W3dViewLocalOnlyStep(o) && !(g_rtOnlyStatic && !o->isStatic) && !(g_rtForProbe && !o->inProbes)) {
+        Curve* cv = (Curve*)o;
+        cv->UpdateGeometry();
+        if (cv->geom) AddMesh(e, cv->geom, seen);
+    }
+    // un LOD: SOLO el hijo que va en el render (antes entraban todos sus niveles juntos, uno encima del otro)
+    if (o->getType() == ObjectType::lod) {
+        const int k = ((LOD*)o)->RenderPick();
+        if (k >= 0 && k < (int)o->Childrens.size()) TraverseScene(e, o->Childrens[(size_t)k], seen);
+        return;
+    }
     for (size_t i = 0; i < o->Childrens.size(); i++) TraverseScene(e, o->Childrens[i], seen);
 }
 static void AddLights(RTScene& e) {
@@ -492,6 +517,19 @@ static void AddLights(RTScene& e) {
         L.spotCos = (!l->directional && l->spotCutoff < 179.9f) ? cosf(l->spotCutoff * 3.14159265f / 180.0f) : -1.0f;
         L.spotExpo = l->spotExponent;
         L.spotDir = Norm(V3(-W.m[8], -W.m[9], -W.m[10]));
+        // LUZ DE AREA: sus medios lados en el mundo (la escala del objeto la agranda, como en Blender). El alto va siempre
+        // de X a "X x adelante" (asi el poligono queda en el orden que espera AreaIn, aunque la escala de vuelta un eje)
+        L.area = l->area && !l->directional; L.areaRound = false; L.areaX = L.areaY = V3(0, 0, 0); L.areaS = 0.0f;
+        if (L.area) {
+            float hx = 0.0f, hy = 0.0f; W3dLightAreaHalf(l, hx, hy);
+            L.areaRound = W3dLightAreaRound(l);
+            const RTV ex = V3(W.m[0], W.m[1], W.m[2]), ey = V3(W.m[4], W.m[5], W.m[6]);
+            L.areaX = Norm(ex) * (hx * Length(ex));
+            L.areaY = Norm(Cross(L.areaX, L.spotDir)) * (hy * Length(ey));
+            L.areaS = (L.areaRound ? 3.14159265f : 4.0f) * Length(L.areaX) * Length(L.areaY);
+            L.spotCos = -1.0f;   // (sin cono: la de area ya alumbra de un solo lado)
+            if (L.areaS <= 1e-12f) L.area = false;
+        }
         L.source = l;
         e.lights.push_back(L);
     }
@@ -506,7 +544,7 @@ static void BuildRTScene(RTScene& e) {
     // el FONDO 360: sus pixeles CPU (los de la textura) y su rotacion
     e.bgTex = -1; W3dBackgroundMatrix(e.bgRot);
     if (W3dBackgroundWithTexture()) {
-        TextureEditable* tf = TexEditGet(g_renderBgTex);
+        TextureEditable* tf = TexEditGetPinned(g_renderBgTex);
         if (tf && tf->w > 0 && tf->h > 0) { RTTexture tx; tx.px = &tf->rgba[0]; tx.w = tf->w; tx.h = tf->h; tx.filtered = true; e.texs.push_back(tx); e.bgTex = (int)e.texs.size() - 1; }
     }
     BVHBuild(e);
@@ -781,7 +819,7 @@ bool RTBakeBegin(Mesh* m, int uvLayer, int w, int h, int samples, std::string* r
         for (size_t i = 0; i < gBake.e.lights.size(); i++) {
             const int r = gBake.e.lights[i].rays;
             gBake.raysBounce.push_back(r);
-            gBake.directRays.push_back((gBake.e.lights[i].radius > 0.0f && r < rs) ? rs : r);
+            gBake.directRays.push_back(((gBake.e.lights[i].radius > 0.0f || gBake.e.lights[i].area) && r < rs) ? rs : r);
         }
     }
     gBake.indirect = indirect; gBake.denoiser = denoiser;
@@ -1047,6 +1085,9 @@ static inline void UVIn(const RTScene& e, const RTHit& h, float& u, float& v) {
     const RTTri& T = e.tris[(size_t)h.tri]; const float b0 = 1.0f - h.b1 - h.b2;
     u = e.uv[(size_t)T.v0*2]*b0 + e.uv[(size_t)T.v1*2]*h.b1 + e.uv[(size_t)T.v2*2]*h.b2;
     v = e.uv[(size_t)T.v0*2+1]*b0 + e.uv[(size_t)T.v1*2+1]*h.b1 + e.uv[(size_t)T.v2*2+1]*h.b2;
+    // la TRANSFORMACION UV de su material (desplazamiento, escala, rotacion): la misma matriz que la de textura de GL
+    const RTMaterial& m = e.mats[(size_t)T.mat];
+    if (m.uvXf) { const float a = u; u = m.uvm[0] * a + m.uvm[2] * v + m.uvm[4]; v = m.uvm[1] * a + m.uvm[3] * v + m.uvm[5]; }
 }
 // el material EN ESE IMPACTO: los mapas en modo textura reemplazan a sus numeros (la emision, la rugosidad, el metalico
 // y el alfa leidos de su textura en el UV del impacto)
@@ -1054,7 +1095,7 @@ static inline RTMaterial MaterialIn(const RTScene& e, const RTHit& h, const RTMa
     RTMaterial m = m0;
     if (m.emTex < 0 && m.rugTex < 0 && m.metTex < 0 && m.alphaTex < 0) return m;
     float u, v, tx[4]; UVIn(e, h, u, v);
-    if (m.emTex >= 0) { Sample(e.texs[(size_t)m.emTex], u, v, tx); m.emission[0] = tx[0]; m.emission[1] = tx[1]; m.emission[2] = tx[2]; }
+    if (m.emTex >= 0) { Sample(e.texs[(size_t)m.emTex], u, v, tx); m.emission[0] = tx[0] * m.emK; m.emission[1] = tx[1] * m.emK; m.emission[2] = tx[2] * m.emK; }
     if (m.rugTex >= 0) { Sample(e.texs[(size_t)m.rugTex], u, v, tx); m.roughness = tx[0]; }
     if (m.metTex >= 0) { Sample(e.texs[(size_t)m.metTex], u, v, tx); m.metallic = tx[0]; }
     if (m.alphaTex >= 0) { Sample(e.texs[(size_t)m.alphaTex], u, v, tx); m.alpha = (tx[3] < 0.999f) ? tx[3] : tx[0]; m.transparent = true; }
@@ -1117,6 +1158,98 @@ static inline RTV DirRandomSphere(RTRng& rng) {   // punto uniforme sobre la esf
 // (rtRays > 1) recien se muestrean en los pases a resolucion completa. En el N95 esto mantiene el
 // primer pantallazo en ~1 rayo por bloque aunque haya lamparas de area.
 static bool g_rtPreviewFast = false;
+// ============================================================================
+//  LA LUZ DE AREA (Light.h): una superficie que alumbra de un lado. La DIFUSA es la cuenta EXACTA de la superficie sin
+//  nada en el medio (el factor de forma del poligono -el rectangulo, o la elipse como uno de 12 lados con su misma
+//  superficie- recortado por el horizonte del punto: la integral de cada arista), en las unidades de una puntual de la
+//  misma intensidad (I / d^2 de lejos), por la PARTE de la lampara que ven los rayos de sombra (estratificados sobre la
+//  lampara, pesados por lo que aporta cada punto: los dos cosenos / d^2). Asi lo que no tiene sombra sale LIMPIO aunque
+//  sea un solo rayo, y la penumbra sale de los rayos. El BRILLO, con los mismos rayos: cada punto como una puntual que
+//  mira para alla. (La misma cuenta en la GPU: LuzArea de RTGpuShader.inc)
+// ============================================================================
+static const int kAreaSides = 12;
+static const float kAreaRadius12 = 1.0233267f;   // sqrt(pi / 3): el de 12 lados con la superficie de la elipse
+// el poligono, con la normal de su orden (regla de la mano derecha) del lado de ATRAS: la integral de las aristas sale
+// positiva vista desde adelante
+static int AreaPolygon(const RTLight& L, RTV* q) {
+    if (!L.areaRound) {
+        q[0] = L.pos + L.areaX + L.areaY; q[1] = L.pos - L.areaX + L.areaY;
+        q[2] = L.pos - L.areaX - L.areaY; q[3] = L.pos + L.areaX - L.areaY;
+        return 4;
+    }
+    for (int k = 0; k < kAreaSides; k++) {
+        const float a = k * (6.2831853f / kAreaSides);
+        q[k] = L.pos + (L.areaX * cosf(a) + L.areaY * sinf(a)) * kAreaRadius12;
+    }
+    return kAreaSides;
+}
+// una arista (a, b: direcciones desde el punto) de la integral: su angulo por la normal de su plano, / 2 pi
+static inline RTV AreaEdge(const RTV& a, const RTV& b) {
+    const RTV cr = Cross(a, b); const float l = Length(cr);
+    return l > 1e-12f ? cr * (atan2f(l, Dot(a, b)) / (l * 6.2831853f)) : V3(0, 0, 0);
+}
+// la arista sin lo que queda bajo el horizonte del punto; 'sal' / 'ent' = donde el poligono cruza el horizonte (el
+// recortado se cierra con la arista que va por el horizonte de una a la otra)
+static inline void AreaEdgeH(const RTV& a, const RTV& b, const RTV& n, RTV& F, RTV& sal, RTV& ent, bool& hasSal, bool& hasEnt) {
+    const float za = Dot(n, a), zb = Dot(n, b);
+    if (za >= 0.0f && zb >= 0.0f) { F = F + AreaEdge(a, b); return; }
+    if (za < 0.0f && zb < 0.0f) return;
+    const RTV x = Norm(za < zb ? a * zb - b * za : b * za - a * zb);
+    if (za >= 0.0f) { F = F + AreaEdge(a, x); sal = x; hasSal = true; } else { F = F + AreaEdge(x, b); ent = x; hasEnt = true; }
+}
+// [-1,1]^2 -> el circulo sin deformar los estratos (Shirley-Chiu): los puntos de la elipse
+static inline void ConcentricDisk(float& u, float& v) {
+    if (u == 0.0f && v == 0.0f) return;
+    float r, a;
+    if (fabsf(u) > fabsf(v)) { r = u; a = 0.78539816f * (v / u); }
+    else { r = v; a = 1.5707963f - 0.78539816f * (u / v); }
+    u = r * cosf(a); v = r * sinf(a);
+}
+static void AreaIn(const RTScene& e, const RTLight& L, const RTV& po, const RTV& n, const RTV& towardsCam, float expo, bool withBrightness,
+                   int nRays, RTRng& rng, float& lambert, float& spec) {
+    lambert = 0.0f; spec = 0.0f;
+    const float h = Dot(po - L.pos, L.spotDir);
+    if (h <= 0.0f) return;   // (detras: alumbra de un solo lado)
+    RTV q[kAreaSides]; const int nq = AreaPolygon(L, q);
+    RTV F = V3(0, 0, 0), sal = V3(0, 0, 0), ent = V3(0, 0, 0); bool hasSal = false, hasEnt = false;
+    for (int k = 0; k < nq; k++) AreaEdgeH(Norm(q[k] - po), Norm(q[(k + 1) % nq] - po), n, F, sal, ent, hasSal, hasEnt);
+    if (hasSal && hasEnt) F = F + AreaEdge(sal, ent);
+    const float E = Dot(n, F) * 3.14159265f / L.areaS;   // (el factor de forma por pi / S: I / d^2 de lejos)
+    if (E <= 0.0f) return;
+    if (nRays < 1) nRays = 1;
+    // los rayos ESTRATIFICADOS: una grilla sobre la lampara, un punto al azar en cada celda (de una celda al azar en
+    // adelante: con menos rayos que celdas todas tocan igual a lo largo de los pases)
+    int sx = (int)ceilf(sqrtf((float)nRays)); if (sx < 1) sx = 1;
+    const int sy = (nRays + sx - 1) / sx, cells = sx * sy;
+    int from = (int)(rng.F() * cells); if (from >= cells) from = cells - 1;
+    const float gMax = 6.2831853f * nRays / L.areaS;   // (un pedazo de la lampara no tapa mas que medio cielo)
+    float sg = 0.0f, sgv = 0.0f;
+    for (int r = 0; r < nRays; r++) {
+        const int cell = (r + from) % cells;
+        float u = ((cell % sx) + rng.F()) / sx * 2.0f - 1.0f, v = ((cell / sx) + rng.F()) / sy * 2.0f - 1.0f;
+        if (L.areaRound) ConcentricDisk(u, v);
+        const RTV a = L.pos + L.areaX * u + L.areaY * v - po;
+        const float dist = Length(a); if (dist < 1e-6f) continue;
+        const RTV ld = a * (1.0f / dist);
+        const float nl = Dot(n, ld), cl = -Dot(ld, L.spotDir);
+        if (nl <= 0.0f || cl <= 0.0f) continue;
+        float g = cl / (dist * dist); if (g > gMax) g = gMax;
+        const float vis = g_rtNoShadows ? 1.0f : Visibility(e, po, ld, dist);
+        sg += nl * g; sgv += nl * g * vis;
+        if (withBrightness && vis > 0.0f) {
+            const float nh = Dot(n, Norm(ld + towardsCam));
+            if (nh > 0.0f) spec += powf(nh, expo) * (expo + 2.0f) * 0.125f * vis * g;
+        }
+    }
+    spec /= (float)nRays;
+    float part;
+    if (sg > 0.0f) part = sgv / sg;
+    else {   // (ningun rayo cayo del lado del punto: uno en la direccion media de la luz que llega)
+        const RTV d = Norm(F); const float dn = -Dot(d, L.spotDir);
+        part = (dn > 1e-4f) ? (g_rtNoShadows ? 1.0f : Visibility(e, po, d, h / dn)) : 0.0f;
+    }
+    lambert = E * part;
+}
 // luz directa en el impacto (difuso: color x (ambiente + suma de luces visibles) + emision). 'alb' ya trae la textura.
 static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& towardsCam, const float* alb, const RTMaterial& m, RTRng& rng, float* out) {
     if (m.noLight) { out[0] = alb[0]; out[1] = alb[1]; out[2] = alb[2]; return; }   // "unlit": el color tal cual
@@ -1135,6 +1268,13 @@ static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& tow
         float lambert = 0.0f, spec = 0.0f, att = 1.0f, covered = 0.0f;
         const bool sunBake = (int)i == g_rtLightSun && L.directional;
         const int nRays = g_rtPreviewFast ? 1 : L.rays;
+        if (L.area) {   // LUZ DE AREA (sin la atenuacion C/L/Q: la caida es la de la superficie; la distancia si)
+            AreaIn(e, L, po, n, towardsCam, expo, brightnessWeight > 0.0f, nRays, rng, lambert, spec);
+            if (lambert <= 0.0f && spec <= 0.0f) continue;
+            att = WindowDistance(Length(L.pos - po), L.distance);
+            for (int c = 0; c < 3; c++) { light[c] += L.color[c] * lambert * att; brightness[c] += L.color[c] * spec * att; }
+            continue;
+        }
         for (int r = 0; r < nRays; r++) {
             RTV ldir; float dist;
             if (L.directional) {
@@ -1367,22 +1507,25 @@ static bool SceneToGpu(const RTScene& e) {
     VertsAGpu(e, g.verts);
     g.tris.resize(e.tris.size() * 4);
     for (size_t t = 0; t < e.tris.size(); t++) { g.tris[t*4] = e.tris[t].v0; g.tris[t*4+1] = e.tris[t].v1; g.tris[t*4+2] = e.tris[t].v2; g.tris[t*4+3] = e.tris[t].mat; }
-    g.mats.assign(e.mats.size() * 20, 0.0f);
+    g.mats.assign(e.mats.size() * 28, 0.0f);
     for (size_t i = 0; i < e.mats.size(); i++) {
-        const RTMaterial& m = e.mats[i]; float* d = &g.mats[i * 20];
+        const RTMaterial& m = e.mats[i]; float* d = &g.mats[i * 28];
         d[0] = m.diffuse[0]; d[1] = m.diffuse[1]; d[2] = m.diffuse[2]; d[3] = m.alpha;
         d[4] = m.emission[0]; d[5] = m.emission[1]; d[6] = m.emission[2]; d[7] = m.roughness;
         d[8] = m.metallic; d[9] = m.f0; d[10] = (float)((m.noLight ? 1 : 0) | (m.transparent ? 2 : 0) | (m.additive ? 4 : 0));
         d[12] = (float)m.tex; d[13] = (float)m.nmTex; d[14] = (float)m.emTex; d[15] = (float)m.rugTex;
         d[11] = m.ior;
         d[16] = (float)m.metTex; d[17] = (float)m.alphaTex; d[18] = m.clip; d[19] = m.trans;
+        // m5 / m6: la TRANSFORMACION UV (la identidad si no tiene) y la fuerza de la emision (RTGpuShader.inc: UVEn)
+        for (int k = 0; k < 6; k++) d[20 + k] = m.uvm[k];
+        d[27] = m.emK;
     }
     // el FONDO 360: un material extra al final (la rotacion en d[0..8], la textura en d[12]); ningun triangulo lo usa
     g.envMat = -1;
     if (e.bgTex >= 0) {
         g.envMat = (int)e.mats.size();
-        g.mats.resize(g.mats.size() + 20, 0.0f);
-        float* d = &g.mats[(size_t)g.envMat * 20];
+        g.mats.resize(g.mats.size() + 28, 0.0f);
+        float* d = &g.mats[(size_t)g.envMat * 28];
         for (int k = 0; k < 9; k++) d[k] = e.bgRot[k];
         d[12] = (float)e.bgTex;
     }
@@ -1394,9 +1537,9 @@ static bool SceneToGpu(const RTScene& e) {
     return SceneToGpuEnd(e, g);
 }
 static void LightsToGpu(const RTScene& e, std::vector<float>& out) {
-    out.assign(e.lights.size() * 20, 0.0f);
+    out.assign(e.lights.size() * 24, 0.0f);
     for (size_t i = 0; i < e.lights.size(); i++) {
-        const RTLight& L = e.lights[i]; float* d = &out[i * 20];
+        const RTLight& L = e.lights[i]; float* d = &out[i * 24];
         d[0] = L.pos.x; d[1] = L.pos.y; d[2] = L.pos.z; d[3] = L.directional ? 1.0f : -L.distance;   // (<= 0: -distancia)
         if (L.directional) { d[4] = L.dir.x; d[5] = L.dir.y; d[6] = L.dir.z; }
         else { d[4] = L.spotDir.x; d[5] = L.spotDir.y; d[6] = L.spotDir.z; }
@@ -1404,6 +1547,9 @@ static void LightsToGpu(const RTScene& e, std::vector<float>& out) {
         d[8] = L.color[0]; d[9] = L.color[1]; d[10] = L.color[2]; d[11] = (float)L.rays;
         d[12] = L.ambient[0]; d[13] = L.ambient[1]; d[14] = L.ambient[2]; d[15] = L.spotCos;
         d[16] = L.attC; d[17] = L.attL; d[18] = L.attQ; d[19] = L.spotExpo;
+        if (L.area) {   // (la de area: el medio ancho y el medio alto, negativo = elipse; ver Luz en RTGpuShader.inc)
+            d[20] = L.areaX.x; d[21] = L.areaX.y; d[22] = L.areaX.z; d[23] = Length(L.areaY) * (L.areaRound ? -1.0f : 1.0f);
+        }
     }
 }
 // (las texturas, el fondo y a la GPU)
@@ -1742,6 +1888,7 @@ static double SignatureLights() {
            + l->ambient[0] * 0.41 + l->ambient[1] * 0.43 + l->ambient[2] * 0.47 + l->spotCutoff * 0.013 + l->spotExponent * 0.17
            + l->intensity * 1.7 + l->distance * 2.3
            + l->attConstant * 0.19 + l->attLinear * 0.23 + l->attQuadratic * 0.29 + (l->visible ? 0.77 : 0.0)
+           + (l->area ? 5.3 + l->areaShape * 1.9 + l->areaSizeX * 0.67 + l->areaSizeY * 0.89 + W.m[0] * 0.41 + W.m[1] * 0.47 : 0.0)
            + W.m[12] * 0.31 + W.m[13] * 0.53 + W.m[14] * 0.71 + W.m[4] * 0.13 + W.m[5] * 0.17 + W.m[8] * 0.37 + W.m[10] * 0.59;
         f *= 1.0000013;   // (que importe cual es cual)
     }
@@ -1764,6 +1911,7 @@ static double SignatureView(Viewport3D* vp) {
     double f = vp->width * 0.001 + vp->height * 0.0013;
     // escena: cuantos objetos y donde estan (posiciones de mundo) + luces + version de las mallas
     struct S { static void Rec(Object* o, double& f) { if (!o) return; if (o->getType() == ObjectType::mesh) { Mesh* m = (Mesh*)o; f += m->geoVersion * 0.019 + (m->genValid ? 0.5 : 0.0); }
+                 if (o->getType() == ObjectType::curve && ((Curve*)o)->geom) f += ((Curve*)o)->geom->geoVersion * 0.023 + 0.29;   // (el tubo de una curva)
                  const ObjectType t = o->getType();
                  // (las luces van en SignatureLights, la camara en SignatureCamera y donde esta cada malla en SignaturePoses: aca
                  // solo lo que esta y si se ve)
@@ -1781,7 +1929,10 @@ static double SignatureView(Viewport3D* vp) {
         // (los MAPAS: numero / textura, su textura y el IOR tambien cambian lo que se ve)
         for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++)
             f += (mt->mapWithTexture[k] ? 3.1 * (k + 1) : 0.0) + (mt->mapTex[k] ? mt->mapTex[k]->iID * 0.019 * (k + 1) : 0.0);
-        f += mt->ior * 0.47 + mt->transmission * 0.53; }
+        f += mt->ior * 0.47 + mt->transmission * 0.53;
+        // (la fuerza de la emision y la transformacion UV: un material animado vuelve a trazar)
+        f += mt->emissionStrength * 0.59 + mt->uvOffset[0] * 0.61 + mt->uvOffset[1] * 0.67 + mt->uvScale[0] * 0.71 +
+             mt->uvScale[1] * 0.73 + mt->uvRotation * 0.0079 + mt->uvPivot[0] * 0.79 + mt->uvPivot[1] * 0.83; }
     return f;
 }
 void RTInvalidate() { g_rtForce = true; }

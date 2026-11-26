@@ -962,13 +962,22 @@ class MaterialModUndo : public UndoCmd {
     float acorte;                          // alphaTest (recorte por alfa, 0 = apagado): fila "Alpha Test" del panel
     float mezb;                            // mixB (mezcla de texturas, 0 = solo la base): fila "Texture mix"
     // LOS MAPAS: numero / textura y la capa UV de cada uno, sus numeros (rugosidad, metalico, alfa) y el IOR
-    struct Maps { bool ct[W3D_MAPS]; int uv[W3D_MAPS]; float rug, met, alpha, ior;
+    // (+ la fuerza de la emision y la TRANSFORMACION UV: sus filas de la tarjeta. xf = desplazamiento U/V, escala U/V,
+    //  rotacion, pivote U/V)
+    struct Maps { bool ct[W3D_MAPS]; int uv[W3D_MAPS]; float rug, met, alpha, ior; float emK, xf[7];
         void Read(const Material* m) { for (int k = 0; k < W3D_MAPS; k++) { ct[k] = m->mapWithTexture[k]; uv[k] = m->uvMap[k]; }
-                                       rug = m->rtRoughness; met = m->rtMetallic; alpha = m->diffuse[3]; ior = m->ior; }
+                                       rug = m->rtRoughness; met = m->rtMetallic; alpha = m->diffuse[3]; ior = m->ior;
+                                       emK = m->emissionStrength; xf[0] = m->uvOffset[0]; xf[1] = m->uvOffset[1];
+                                       xf[2] = m->uvScale[0]; xf[3] = m->uvScale[1]; xf[4] = m->uvRotation;
+                                       xf[5] = m->uvPivot[0]; xf[6] = m->uvPivot[1]; }
         void Write(Material* m) const { for (int k = 0; k < W3D_MAPS; k++) { m->mapWithTexture[k] = ct[k]; m->uvMap[k] = uv[k]; }
-                                           m->rtRoughness = rug; m->rtMetallic = met; m->diffuse[3] = alpha; m->ior = ior; }
+                                           m->rtRoughness = rug; m->rtMetallic = met; m->diffuse[3] = alpha; m->ior = ior;
+                                           m->emissionStrength = emK; m->uvOffset[0] = xf[0]; m->uvOffset[1] = xf[1];
+                                           m->uvScale[0] = xf[2]; m->uvScale[1] = xf[3]; m->uvRotation = xf[4];
+                                           m->uvPivot[0] = xf[5]; m->uvPivot[1] = xf[6]; }
         bool Equal(const Maps& o) const { for (int k = 0; k < W3D_MAPS; k++) if (ct[k] != o.ct[k] || uv[k] != o.uv[k]) return false;
-                                           return rug == o.rug && met == o.met && alpha == o.alpha && ior == o.ior; } };
+                                           for (int k = 0; k < 7; k++) if (xf[k] != o.xf[k]) return false;
+                                           return rug == o.rug && met == o.met && alpha == o.alpha && ior == o.ior && emK == o.emK; } };
     Maps maps;
     // LAS CAPAS DE TEXTURA (borrar, agregar, subir/bajar, la mezcla, la UV, el factor, prendida, la luz horneada): una copia
     // de la lista con su PROPIA referencia de cada textura (asi no se libera mientras el paso exista). Aplicar
@@ -1113,6 +1122,7 @@ struct RefEntry {
     Modifier* mod;      // solo slot < 0
     unsigned int modSerial;  // identidad ESTABLE de ese modificador (ver LiveModIn abajo)
     unsigned int withSerial; // != 0: la ref es la fuente del constraint con ESE serial (el slot se ignora)
+    int which;               // con withSerial: CUAL puntero del constraint (0 = la fuente/target, 1 = el pole del IK)
     int slot;         // -1 = ref de malla; >= 0 = indice de Object::RefObject
     Object* target;   // a quien apuntaba
     std::string name; // solo slot >= 0: el vinculo por nombre que acompania al puntero
@@ -1169,13 +1179,13 @@ static void CollectRefs(Object* node, const std::vector<DelEntry>& ents, std::ve
     for (int i = 0; i < nref; i++){
         Object* t = node->RefObject(i);
         if (!PointsToDeleted(t, ents)) continue;
-        RefEntry r; r.owner=node; r.mod=NULL; r.modSerial=0; r.withSerial=0; r.slot=i; r.target=t;
+        RefEntry r; r.owner=node; r.mod=NULL; r.modSerial=0; r.withSerial=0; r.which=0; r.slot=i; r.target=t;
         // del bloque de constraints para arriba, el slot es una POSICION en una lista que se reordena
-        // y se borra: la identidad de la entrada es el serial (ver RefWrite).
-        if (i >= own){
-            const size_t k = (size_t)(i - own);
-            if (k < node->constraints.size() && node->constraints[k]) r.withSerial = node->constraints[k]->serial.v;
-        }
+        // y se borra: la identidad de la entrada es el serial (ver RefWrite). Lo mismo los slots PROPIOS de
+        // un armature, que son el target y el pole de los constraints de sus HUESOS (W3dConstraintAtRef).
+        (void)own;
+        { int w = 0; W3dConstraint* c = W3dConstraintAtRef(node, i, &w);
+          if (c) { r.withSerial = c->serial.v; r.which = w; } }
         std::string* name = node->RefObjectName(i); if (name) r.name = *name;
         out.push_back(r);
     }
@@ -1206,10 +1216,10 @@ static void RefWrite(RefEntry& r, bool restore){
         // esto el usuario pudo agregar, borrar o mover entradas del stack, y entonces el slot apunta
         // a OTRO constraint: escribirlo ahi es la misma corrupcion muda que el 'mod' reciclado. Si el
         // constraint ya no existe no se escribe en ningun lado (patron LiveModIn, test 'modtargetuaf').
-        W3dConstraint* c = r.owner->ConstraintBySerial(r.withSerial);
+        W3dConstraint* c = W3dConstraintBySerialAny(r.owner, r.withSerial);   // (de objeto o de hueso)
         if (!c) return;
-        c->sourceObj  = restore ? r.target : NULL;
-        c->sourceName = restore ? r.name : std::string();
+        W3dConstraintSetRef(c, r.which, restore ? r.target : NULL, restore ? r.name : std::string());
+        if (r.owner->getType() == ObjectType::armature) ((Armature*)r.owner)->poseDirty = true;
         return;
     }
     r.owner->SetRefObject(r.slot, restore ? r.target : NULL);
@@ -2710,17 +2720,20 @@ struct KFList {
 //        compara contra los punteros vivos de la lista.
 // bone : kind 1 y 4, el hueso del track (BoneTrack::bone / Bone2DTrack::bone).
 // prop/comp: la curva (AnimPosition/AnimRotation/..., AnimX/Y/Z).
+// mat  : kind 0, una PISTA DE MATERIAL de la escena (Animation.h: AnimationMaterial; bone = -3): su material. Como
+//        'obj', solo se compara (los materiales no se liberan mientras haya undo: MaterialPurge los deja vivos).
 // ocur : la k-esima curva de la lista con esos mismos cuatro datos. Un clip puede traer DOS pistas
 //        del mismo hueso (un archivo importado; el FK usa la primera): sin esto las dos curvas
 //        tenian la MISMA identidad, el Ctrl+Z le devolvia el snapshot a la primera y a la segunda
 //        la vaciaba como "curva nueva" (se perdian sus keyframes). Lo numera KFResolve.
 struct KFId {
-    Object* obj; int bone; int prop, comp; int ocur;
-    KFId() : obj(0), bone(-1), prop(-1), comp(-1), ocur(0) {}
+    Object* obj; int bone; int prop, comp; int ocur; const Material* mat;
+    KFId() : obj(0), bone(-1), prop(-1), comp(-1), ocur(0), mat(0) {}
     bool operator==(const KFId& o) const {
-        return obj == o.obj && bone == o.bone && prop == o.prop && comp == o.comp && ocur == o.ocur;
+        return obj == o.obj && bone == o.bone && prop == o.prop && comp == o.comp && ocur == o.ocur && mat == o.mat;
     }
     bool operator<(const KFId& o) const {   // solo los cuatro datos (la clave para numerar 'ocur')
+        if (mat != o.mat) return mat < o.mat;
         if (obj != o.obj) return obj < o.obj;
         if (bone != o.bone) return bone < o.bone;
         if (prop != o.prop) return prop < o.prop;
@@ -2788,6 +2801,15 @@ static void KFResolve(const KFList& id, std::vector<KFCurve>& out, bool write){
         for (size_t i = 0; i < lst.size(); i++) KFAdd(out, lst[i].Properties, lst[i].obj, -1);
         // la pista "Camara activa" de esa escena (dope: mover / borrar sus cortes -> Ctrl+Z)
         if (SceneAnimations[id.idx]) KFAdd(out, SceneAnimations[id.idx]->camTrack, NULL, -2);
+        // las PISTAS DE MATERIAL de esa escena (viven siempre en su SceneAnimation): cada curva por su material
+        if (SceneAnimations[id.idx]) {
+            std::vector<AnimationMaterial>& mts = SceneAnimations[id.idx]->materials;
+            for (size_t i = 0; i < mts.size(); i++) {
+                const size_t n0 = out.size();
+                KFAdd(out, mts[i].Properties, NULL, -3);
+                for (size_t q = n0; q < out.size(); q++) out[q].id.mat = mts[i].mat;
+            }
+        }
     }
     // las curvas REPETIDAS (misma identidad) se distinguen por su orden en la lista (ver KFId::ocur)
     std::map<KFId, int> views;
@@ -3686,6 +3708,93 @@ void UndoConstraintMove(Object* o, int dir) {   // -1 = sube (hacia el principio
     ConstraintPushSync(c);
 }
 
+// ============================================================================
+//  STACK DE CONSTRAINTS DE LOS HUESOS (W3dBone::constraints)
+//
+//  NO es un clon de ConstraintStackUndo y a proposito: los constraints de un hueso viven ADENTRO de un
+//  W3dBone, que el editor copia POR VALOR (el snapshot de BonesUndo, Shift+D, el borrado, el realloc
+//  del vector). Un paso que guardara punteros crudos a esos constraints quedaria colgado en cuanto un
+//  Ctrl+Z de huesos reemplaza el vector entero. Por eso el snapshot es POR VALOR tambien: un
+//  W3dBoneConstraints por hueso (copia profunda que CONSERVA el serial, ver W3dConstraint.h), y Apply
+//  INTERCAMBIA listas con los huesos vivos. Lo que vuelve a la escena es el MISMO constraint (mismo
+//  serial): un RefEntry del borrado de su target lo sigue encontrando.
+//  Los indices de 'snap' son los de Armature::bones: el historial es LIFO, asi que cuando este paso se
+//  aplica los huesos estan como cuando se capturo (el chequeo de tamano es solo defensa).
+// ============================================================================
+class BoneConstraintsUndo : public UndoCmd {
+    Armature* a;                              // (a) se suelta si lo destruyen (UnlinkDetached)
+    std::vector<W3dBoneConstraints> snap;     // (b) los stacks de TODOS los huesos, por valor
+public:
+    BoneConstraintsUndo(Armature* A) : a(A) {
+        if (!a) return;
+        snap.resize(a->bones.size());
+        for (size_t i = 0; i < a->bones.size(); i++) snap[i] = a->bones[i].constraints;
+    }
+    void Apply() {
+        if (!a || a->bones.size() != snap.size()) return;
+        for (size_t i = 0; i < snap.size(); i++) a->bones[i].constraints.Swap(snap[i]);
+        // la pose se recalcula con el stack de vuelta. poseDirty y NO lastPoseFrame: este ultimo refresca
+        // poseT/R/S desde la curva y se comeria la pose a mano (sin keyear) que el usuario esta armando
+        a->poseDirty = true;
+        g_redraw = true;
+    }
+    // los del snapshot NO estan en la escena: la puerta de refs no los enumera. Si su target se destruye
+    // de verdad hay que soltarlo aca (la familia 'modtargetuaf').
+    void UnlinkDetached(Object* deleted) {
+        if (deleted == (Object*)a) { a = NULL; snap.clear(); return; }
+        for (size_t i = 0; i < snap.size(); i++)
+            for (size_t k = 0; k < snap[i].list.size(); k++) {
+                W3dConstraint* c = snap[i].list[k];
+                if (c && c->sourceObj == deleted) c->sourceObj = NULL;
+                if (c && c->poleObj == deleted)   c->poleObj = NULL;
+            }
+    }
+    // 'snap' es PARALELO a Armature::bones, pero los huesos no son una lista con destinos de rename por
+    // indice (W3dRenameDest) y se restaura siempre en orden LIFO (ver arriba): nada que remapear.
+    W3D_UNDO_NO_INDICES
+};
+static bool WithBoneConsNameExists(const std::string& n, void* ctx) {
+    const W3dBoneConstraints* bc = (const W3dBoneConstraints*)ctx;
+    for (size_t i = 0; i < bc->list.size(); i++) if (bc->list[i] && bc->list[i]->name == n) return true;
+    return false;
+}
+void UndoBoneConstraintsCapture(Armature* a) { if (a) Push(new BoneConstraintsUndo(a)); }
+void UndoBoneConstraintAdd(Armature* a, int bone, int type) {
+    if (!a || bone < 0 || bone >= (int)a->bones.size() || !W3dConstraintTypeForBone(type)) return;
+    Push(new BoneConstraintsUndo(a));
+    W3dBoneConstraints& bc = a->bones[bone].constraints;
+    W3dConstraint* nc = new W3dConstraint(type);
+    W3dConstraintBoneDefaults(nc);
+    // el nombre, unico en el stack de ESTE hueso (dos IK en huesos distintos se llaman "IK" los dos)
+    nc->name = W3dUniqueName(W3dConstraintTypeName(type), "Constraint", WithBoneConsNameExists, &bc);
+    // el target por defecto de un constraint de hueso es el PROPIO armature (lo usual en un rig: IK a un
+    // hueso controlador, Copy Transforms de DEF a TGT); falta elegir el hueso
+    if (W3dConsNeedsTarget(type)) { nc->sourceObj = a; nc->sourceName = a->name; }
+    bc.list.push_back(nc);
+    bc.active = (int)bc.list.size() - 1;
+    a->poseDirty = true;
+}
+void UndoBoneConstraintRemove(Armature* a, int bone) {
+    if (!a || bone < 0 || bone >= (int)a->bones.size()) return;
+    W3dBoneConstraints& bc = a->bones[bone].constraints;
+    if (bc.active < 0 || bc.active >= (int)bc.list.size()) return;
+    Push(new BoneConstraintsUndo(a));   // (el snapshot ya tiene su copia: el de la escena se puede liberar)
+    delete bc.list[bc.active];
+    bc.list.erase(bc.list.begin() + bc.active);
+    if (bc.active >= (int)bc.list.size()) bc.active = (int)bc.list.size() - 1;
+    a->poseDirty = true;
+}
+void UndoBoneConstraintMove(Armature* a, int bone, int dir) {
+    if (!a || bone < 0 || bone >= (int)a->bones.size()) return;
+    W3dBoneConstraints& bc = a->bones[bone].constraints;
+    const int i = bc.active, j = i + dir;
+    if (i < 0 || i >= (int)bc.list.size() || j < 0 || j >= (int)bc.list.size()) return;
+    Push(new BoneConstraintsUndo(a));
+    W3dConstraint* t = bc.list[i]; bc.list[i] = bc.list[j]; bc.list[j] = t;
+    bc.active = j;
+    a->poseDirty = true;
+}
+
 extern void RedoMeshPanelClose();    // RedoMeshPanel.cpp: el panel redo (Add/Normales/Loop Cut) trabaja sobre un snapshot que el undo deja viejo
 void (*g_undoChangeHook)() = NULL;   // el panel de la ultima operacion (TransformRedoPanel) se cierra con Ctrl+Z / Ctrl+Y
 const void* UndoLast() { return g_undo.empty() ? NULL : (const void*)g_undo.back(); }
@@ -3944,29 +4053,32 @@ static void RemapInPending(const W3dRenameDest& list, int a, int b) {
 }
 
 // ============================================================================
-//  PINTURA DE TEXTURA: un trazo = un paso de undo con los pixeles enteros de antes (se intercambian)
+//  PINTURA DE TEXTURA: un trazo = un paso de undo con los pixeles de antes de lo que toco (se intercambian)
 // ============================================================================
+// (solo lo que el trazo toco, por baldosas: ver TexEditTiles. La textura se busca por su Texture*: su edicion pudo
+//  soltarse al salir de pintar -TexEditReleaseIdle- y se vuelve a leer de su archivo, que es lo que tenia)
 class PaintedTextureUndo : public UndoCmd {
-    TextureEditable* te;
-    std::vector<unsigned char> px;
+    Texture* tex;
+    TexEditTiles tiles;
 public:
-    PaintedTextureUndo(TextureEditable* T) : te(T) { if (T) px = T->rgba; }
-    bool IsEmpty() const { return px.empty(); }
+    PaintedTextureUndo(TextureEditable* T, bool whole) : tex(T ? T->tex : NULL) { TexEditRecordStart(T, &tiles, whole); }
+    ~PaintedTextureUndo() { Stop(); }
+    void Stop() { TextureEditable* te = TexEditFind(tex); if (te && te->rec == &tiles) TexEditRecordStop(te); }
+    bool IsEmpty() const { return tiles.index.empty(); }
     void Apply() {
-        if (!te || !TexEditFind(te->tex)) return;   // la textura se libero: no hay nada que deshacer
-        te->rgba.swap(px);
-        TexEditUpload(te, 0, 0, te->w, te->h);
-        te->modified = true;
-        g_redraw = true;
+        TextureEditable* te = TexEditGet(tex);
+        if (!te) return;   // la textura se libero: no hay nada que deshacer
+        if (TexEditSwapTiles(te, tiles)) g_redraw = true;
     }
-    W3D_UNDO_NO_INDICES // te: puntero al editable (se revalida por su Texture* en Textures[]); px: propio
+    W3D_UNDO_NO_INDICES // tex: se revalida en TexEditFind/TexEditGet (Textures[]); tiles: propias
 };
 static PaintedTextureUndo* g_pendingTex = NULL;
-void UndoTextureStart(TextureEditable* te) {
+void UndoTextureStart(TextureEditable* te, bool whole) {
     delete g_pendingTex; g_pendingTex = NULL;
-    if (te) g_pendingTex = new PaintedTextureUndo(te);
+    if (te) g_pendingTex = new PaintedTextureUndo(te, whole);
 }
 void UndoTextureConfirm(bool change) {
+    if (g_pendingTex) g_pendingTex->Stop();
     if (change && g_pendingTex && !g_pendingTex->IsEmpty()) { Push(g_pendingTex); g_pendingTex = NULL; }
     delete g_pendingTex; g_pendingTex = NULL;
 }

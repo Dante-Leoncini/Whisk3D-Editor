@@ -2,6 +2,7 @@
 #include "objects/CameraBase.h" // g_renderCamPos: la vista que se esta dibujando
 #include "Camera.h"             // CameraActive (la camara del juego)
 #include "Culling.h"            // W3dBoundsSubtree / W3dDist2PointAabb (las MISMAS del Culling)
+#include "graphics/w3dGraphics.h" // w3dRenderFinal (el render final: renderFirst)
 #include <math.h>
 #include <sstream>
 #include <algorithm> // std::replace (parseo "20, 45, 90" -> numeros)
@@ -73,6 +74,8 @@ float LOD::DistanceToChild(int i) const {
 int LOD::PickedChild() const {
     int n = (int)Childrens.size();
     if (n == 0) { lastPicked = -1; return -1; }
+    // el render final con el primero (el detallado); no toca la histeresis del viewport
+    if (renderFirst && w3dEngine::w3dRenderFinal) return 0;
     RefreshCache();
     const Vector3 eye = MeasureEye();
     Vector3 dOrigin = GetGlobalPosition() - eye;

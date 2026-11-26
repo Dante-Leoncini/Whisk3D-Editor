@@ -3,6 +3,8 @@
 //  control-point. Ver WeightPaint.h para el contrato. C++03 (compila en Symbian).
 // ============================================================================
 #include "edit/WeightPaint.h"
+#include "edit/ModeMemory.h"     // los buferes del pincel se sueltan al dejar los modos de pintura
+#include "base/W3dInteractionState.h" // VertexPaint / WeightPaint / TexturePaint
 #include "edit/MeshEdit.h"      // CreateVertexGroup / CreateUVGroup (grupo automatico al primer trazo)
 #include "objects/Mesh.h"       // Mesh, VertexGroup, UVGroup, vertCtrlPoint, posRep
 #include "objects/EditMesh.h"   // faceSel/faceSrc (mascara "solo lo seleccionado")
@@ -30,6 +32,18 @@ BrushState& BrushGet() { return g_brush; }
 // pincel solo, asi que un vector alcanza. Se vacia al arrancar cada trazo.
 static std::vector<float> g_strokeApply;
 void BrushStrokeReset() { g_strokeApply.clear(); }
+// los buferes de trabajo de los pinceles y sus marcas (crecen con la malla pintada): se sueltan al dejar los modos de
+// pintura (edit/ModeMemory.h)
+static std::vector<float> g_wpPx, g_wpPy;                       // el poligono de una cara, en pantalla
+static std::vector<float> g_wpTriBack, g_wpTriFill, g_wpTriLocked;
+static std::vector<unsigned char> g_wpColFill;
+static void BrushMemoryRelease() {
+    std::vector<float>().swap(g_strokeApply);
+    std::vector<float>().swap(g_wpPx); std::vector<float>().swap(g_wpPy);
+    std::vector<float>().swap(g_wpTriBack); std::vector<float>().swap(g_wpTriFill); std::vector<float>().swap(g_wpTriLocked);
+    std::vector<unsigned char>().swap(g_wpColFill);
+}
+W3D_MODE_MEMORY(W3D_MODE_BIT(VertexPaint) | W3D_MODE_BIT(WeightPaint) | W3D_MODE_BIT(TexturePaint), BrushMemoryRelease);
 
 // cuanto FALTA aplicarle al elemento i para llegar a 'a' en este trazo (0 = ya recibio eso o
 // mas). Deja anotado el nuevo maximo. 'n' es el tamano del dominio (para dimensionar el vector).
@@ -155,7 +169,7 @@ void WPCornersInScreen(Mesh* m, WPProjector proj, void* ctx,
         const size_t n = idx.size();
         if (L + (int)n > nC) break;
         if (n < 3) { L += (int)n; continue; }
-        static std::vector<float> px, py;
+        std::vector<float>& px = g_wpPx; std::vector<float>& py = g_wpPy;
         px.clear(); py.clear();
         float sumX = 0.0f, sumY = 0.0f;
         bool all   = true;
@@ -200,8 +214,8 @@ void BrushDrawMarks(Mesh* m, int mode, float sidePx, const unsigned char* colorR
     const float half = sidePx * 0.5f;
     const float halfBorder = half + 1.0f * (float)GlobalScale; // el borde negro asoma alrededor
 
-    static std::vector<float> triBackground, triFill;
-    static std::vector<unsigned char> colFill;
+    std::vector<float>& triBackground = g_wpTriBack; std::vector<float>& triFill = g_wpTriFill;
+    std::vector<unsigned char>& colFill = g_wpColFill;
     triBackground.clear(); triFill.clear(); colFill.clear();
 
     if (mode == MarksVertex) {
@@ -359,14 +373,14 @@ void BrushDrawFacesLocked(Mesh* m, WPProjector proj, void* ctx,
     std::vector<char> sel;
     WPFacesSel(m, onlyFaces, sel);
 
-    static std::vector<float> tri;
+    std::vector<float>& tri = g_wpTriLocked;
     tri.clear();
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         if (f < sel.size() && sel[f]) continue;          // esta cara SI se puede pintar
         const std::vector<int>& id = m->faces3d[f].idx;
         const size_t n = id.size();
         if (n < 3) continue;
-        static std::vector<float> px, py;
+        std::vector<float>& px = g_wpPx; std::vector<float>& py = g_wpPy;
         px.clear(); py.clear();
         bool all = true;
         for (size_t k = 0; k < n; k++) {

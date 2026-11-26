@@ -29,7 +29,7 @@ scenepx -0.5 0.5 0 es 64 0 0 16
 scenepx 0.5 0.5 0 es 190 0 0 16
 
 # la misma superficie por una rutina (la malla clasica oculta): punteros, textura base en la unidad 0 y el lightmap en la 1
-visible 0 prueba_mezcla_lightmap
+visible 0 mezcla_lm
 routine LmRut
 routinestep LmRut array mode=0 on=1
 routinestep LmRut array mode=2 on=1
@@ -37,13 +37,13 @@ routinestep LmRut array mode=1 on=0
 routinestep LmRut array mode=3 on=0
 routinestep LmRut light on=0
 routinestep LmRut color n0=1 n1=1 n2=1 n3=1
-routinestep LmRut vertexPointer ref=prueba_mezcla_lightmap
-routinestep LmRut uvPointer ref=prueba_mezcla_lightmap
+routinestep LmRut vertexPointer ref=mezcla_lm
+routinestep LmRut uvPointer ref=mezcla_lm
 routinestep LmRut texture on=1
 routinestep LmRut bindTexture ref=mezcla_a.png
 routinestep LmRut textureMode mode=0
 routinestep LmRut textureMix ref=capas_lightmap.png mode=2 integer=1 n0=1 on=1
-routinestep LmRut draw ref=prueba_mezcla_lightmap
+routinestep LmRut draw ref=mezcla_lm
 routineinfo LmRut
 scenepx -0.5 0.5 0 es 64 0 0 16
 scenepx 0.5 0.5 0 es 190 0 0 16
@@ -60,7 +60,7 @@ memory fl 0 0
 routinestep LmRut skipIfNone integer=3 n0=@rg[0] n1=@fl[0]
 routinestep LmRut testZ on=0
 routinestep LmRut bindTexture ref=mezcla_b.png
-routinestep LmRut draw ref=prueba_mezcla_lightmap
+routinestep LmRut draw ref=mezcla_lm
 routineinfo LmRut
 scenepx -0.5 0.5 0 es 64 0 0 16
 scenepx 0.5 0.5 0 es 190 0 0 16

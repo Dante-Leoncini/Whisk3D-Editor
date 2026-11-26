@@ -432,6 +432,7 @@ UVEditor* UVEditorWithRig2D();
 // para rutear la 'i' y el menu Animation al insert que corresponde.
 UVEditor* UVEditorInPoseMode();
 UVEditor* UVEditorInEditModeUV();
+bool UVEditorPaintingTexture();   // algun editor UV en la pintura de textura (UVModeTexture)
 // ESTE viewport se queda con el TAB? true solo para un UV EDITOR operativo cuya malla YA tiene
 // armature 2D. Es un PREDICADO (no cambia nada): lo consulta controls.cpp para NO disparar el Tab
 // global (Object<->Edit Mode del 3D / ciclar viewport) y dejar que la tecla siga su ruteo normal

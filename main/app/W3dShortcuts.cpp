@@ -92,6 +92,7 @@ static const W3dShortcutDef kShortcuts[] = {
     { "3d.contextMenu",      W3dATC_3D,       "Context menu",               "W" },
     { "3d.triangulate",        W3dATC_3D_EDIT,  "Triangulate",                "Ctrl+T" },
     { "3d.menuUV",            W3dATC_3D_EDIT,  "UV menu",                    "U" },
+    { "3d.cyclic",            W3dATC_3D_EDIT,  "Toggle Cyclic (curve)",      "Alt+C" },
     // ---- vista 3D: lo que hacia falta y sale del teclado del handler (estaba solo como texto en el menu) ----
     { "3d.inset",             W3dATC_3D_EDIT,  "Inset Faces",                "I" },
     { "3d.bevel",             W3dATC_3D_EDIT,  "Bevel Edges",                "Ctrl+B" },

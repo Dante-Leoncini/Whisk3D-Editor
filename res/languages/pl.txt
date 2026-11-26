@@ -168,6 +168,7 @@ Apply Scale	Zastosuj skalę
 Apply Transforms	Zastosuj transformacje
 Apply: select mesh or armature object(s)	Zastosuj: zaznacz obiekty siatki lub szkieletu
 Arc	Łuk
+Area	Obszarowe
 Armature	Szkielet
 Armature 2D	Szkielet 2D
 Armature Animation	Animacja szkieletu
@@ -549,6 +550,7 @@ Directional	Kierunkowe
 Discard the unsaved changes of	Odrzucić niezapisane zmiany w
 Disconnect	Rozłącz
 Disconnect Bone	Rozłącz kość
+Disk	Dysk
 Display in Edit Mode	Pokaż w Trybie edycji
 Display in Viewport	Pokaż w widoku
 Distance	Odległość
@@ -603,8 +605,10 @@ Elastic	Elastyczny
 Elegir archivo	Wybierz plik
 Element	Element
 Element of	Element obiektu
+Ellipse	Elipsa
 Emission	Emisja
 Emission Map	Mapa emisji
+Emission Strength	Siła emisji
 Empty	Pusty
 Empty routine	Pusta procedura
 Enable	Włącz
@@ -1037,6 +1041,7 @@ Material color	Kolor materiału
 Material index	Indeks materiału
 Material of	Materiał obiektu
 Materials	Materiały
+Materials are animated in a scene animation: choose one in the timeline	Materiały animuje się w animacji sceny: wybierz ją na osi czasu
 Max (last triangle of the mesh)	Maks. (ostatni trójkąt siatki)
 Max (last triangle of the part)	Maks. (ostatni trójkąt części)
 Max distance	Maks. odległość
@@ -1858,6 +1863,7 @@ This graphics backend has no shaders: the @vertice section runs on the CPU and t
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Ten backend graficzny nie ma shaderów: materiał rysuje się normalnie (GLES 2.0 i Vulkan je mają)
 This hierarchy clip only animates its root and its children	Ten klip hierarchii animuje tylko swój korzeń i jego dzieci
 This is a scene: convert it to a game to simulate it	To scena: przekonwertuj ją na grę, by ją symulować
+This material can not be animated (default or from a library)	Tego materiału nie można animować (domyślny lub z biblioteki)
 This mesh does not have this array: do not draw with the array on	Ta siatka nie ma tego array: nie rysuj z włączonym array
 This phone can only clone the screen on the external display	Ten telefon może tylko klonować ekran na wyjście zewnętrzne
 This phone has no video encoder for MP4	Ten telefon nie ma kodera wideo dla MP4
@@ -1912,7 +1918,12 @@ UV Group	Grupa UV
 UV Groups	Grupy UV
 UV Map	Mapa UV
 UV Maps	Mapy UV
+UV Offset	Przesunięcie UV
+UV Pivot	Punkt obrotu UV
+UV Rotation	Obrót UV
+UV Scale	Skala UV
 UV Sphere	Sfera UV
+UV Transform	Transformacja UV
 UV array	array UV
 UV group(s)	grupa(y) UV
 UV layer (0 = active)	Warstwa UV (0 = aktywna)
@@ -2208,3 +2219,4 @@ Documents	Dokumenty
 Downloads	Pobrane
 Pictures	Obrazy
 Music	Muzyka
+Render with the first	Renderuj pierwszym

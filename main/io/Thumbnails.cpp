@@ -373,7 +373,7 @@ static bool PixelsMaterial(const std::string& id, Canvas& L) {
             }
             const size_t i = ((size_t)y * (size_t)L.n + (size_t)x) * 4;
             for (int k = 0; k < 3; k++) {
-                float v = base[k] * (0.25f + 0.75f * l) + m->specular[k] * s * 0.6f + m->emission[k];
+                float v = base[k] * (0.25f + 0.75f * l) + m->specular[k] * s * 0.6f + m->emission[k] * m->emissionStrength;   // (emision x su fuerza)
                 if (v > 1.0f) v = 1.0f;
                 L.px[i + k] = (unsigned char)(v * 255.0f);
             }
@@ -405,7 +405,7 @@ static std::string Signature(int type, const std::string& id) {
         case W3D_VIEW_MATERIALS: {
             Material* m = W3dMaterialById(id);
             if (!m) return std::string();
-            snprintf(b, sizeof(b), "%.3f,%.3f,%.3f,%.2f,%.3f;", m->diffuse[0], m->diffuse[1], m->diffuse[2], m->shininess, m->emission[0] + m->emission[1] + m->emission[2]);
+            snprintf(b, sizeof(b), "%.3f,%.3f,%.3f,%.2f,%.3f;", m->diffuse[0], m->diffuse[1], m->diffuse[2], m->shininess, (m->emission[0] + m->emission[1] + m->emission[2]) * m->emissionStrength);
             return std::string(b) + TexturePathOf(m);   // (otra textura = otra esfera)
         }
         case W3D_VIEW_SCENES: case W3D_VIEW_PREFABS: {

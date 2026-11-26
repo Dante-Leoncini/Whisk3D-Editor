@@ -243,11 +243,26 @@ static void DrawSky(Texture* tex = NULL, const float* turn = NULL) {
 // UNA COPIA REDUCIDA del fondo 360: sus pixeles (W x H, RGBA), cada uno el promedio de su zona; con 'pasadas' de
 // desenfoque que da la vuelta a lo ancho (la imagen es un cilindro). Sale de los pixeles de la CPU: en el juego compilado
 // (sin ellos) no hay copias y se usa la imagen misma
+#ifndef W3D_NO_EDITOR
+// LOS PIXELES DEL FONDO 360, leidos UNA vez para todas sus copias (la reducida, la irradiancia, el cubo) y soltados al
+// terminar el pase (W3dScene3DBackgroundFileEnd): antes quedaban en la RAM hasta cerrar el proyecto (TexEditGet), y un
+// 360 de 4096x2048 son 32 MB para sacar copias de 256x128 y 64x32
+static TexPixels gBgPixels;
+static unsigned int gBgPixelsOf = 0;
+static const TexPixels* BackgroundPixels() {
+    if (!g_renderBgTex || !g_renderBgTex->iID) return NULL;
+    if (gBgPixels.px && gBgPixelsOf == g_renderBgTex->iID) return &gBgPixels;
+    gBgPixelsOf = 0;
+    if (!TexEditPixels(g_renderBgTex, gBgPixels)) return NULL;
+    gBgPixelsOf = g_renderBgTex->iID;
+    return &gBgPixels;
+}
+static void BackgroundPixelsFree() { if (gBgPixels.px) { TexEditPixels(NULL, gBgPixels); gBgPixelsOf = 0; } }
+#endif
 static bool ReduceBackground(int W, int H, int passes, std::vector<unsigned char>& px) {
 #ifndef W3D_NO_EDITOR
-    if (!g_renderBgTex || !g_renderBgTex->iID) return false;
-    TextureEditable* te = TexEditGet(g_renderBgTex);
-    if (!te || te->w <= 0 || te->h <= 0) return false;
+    const TexPixels* te = BackgroundPixels();
+    if (!te) return false;
     std::vector<float> a((size_t)W * H * 3, 0.0f);
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
@@ -255,7 +270,7 @@ static bool ReduceBackground(int W, int H, int passes, std::vector<unsigned char
             double sm[3] = { 0, 0, 0 }; int n = 0;
             for (int yy = y0; yy < (y1 > y0 ? y1 : y0 + 1); yy++)
                 for (int xx = x0; xx < (x1 > x0 ? x1 : x0 + 1); xx++) {
-                    const unsigned char* p = &te->rgba[((size_t)yy * te->w + xx) * 4];
+                    const unsigned char* p = &te->px[((size_t)yy * te->w + xx) * 4];
                     sm[0] += p[0]; sm[1] += p[1]; sm[2] += p[2]; n++;
                 }
             for (int k = 0; k < 3; k++) a[((size_t)y * W + x) * 3 + k] = n ? (float)(sm[k] / n) : 0.0f;
@@ -348,9 +363,9 @@ static const IrrBackground* BackgroundIrradiance() {
 #ifndef W3D_NO_EDITOR
     if (!g_renderBgTex || !g_renderBgTex->iID) return NULL;
     if (gIrr.ok && gIrr.of == g_renderBgTex->iID) return &gIrr;
-    TextureEditable* te = TexEditGet(g_renderBgTex);
-    if (!te || te->w <= 0 || te->h <= 0) return NULL;
-    IrradianceOf(&te->rgba[0], te->w, te->h, gIrr.px, gIrr.prom);
+    const TexPixels* te = BackgroundPixels();
+    if (!te) return NULL;
+    IrradianceOf(te->px, te->w, te->h, gIrr.px, gIrr.prom);
     gIrr.of = g_renderBgTex->iID; gIrr.ok = true;
     return &gIrr;
 #else
@@ -460,9 +475,9 @@ static unsigned int EnvironmentSharpCube() {
 #ifndef W3D_NO_EDITOR
     if (!g_renderBgTex || !g_renderBgTex->iID) return 0;
     if (gSharpCube.tex && gSharpCube.of == g_renderBgTex->iID) return gSharpCube.tex;
-    TextureEditable* te = TexEditGet(g_renderBgTex);
-    if (!te || te->w <= 0 || te->h <= 0) return 0;
-    return CubeOf(gSharpCube, 64, &te->rgba[0], te->w, te->h);
+    const TexPixels* te = BackgroundPixels();
+    if (!te) return 0;
+    return CubeOf(gSharpCube, 64, te->px, te->w, te->h);
 #else
     return 0;
 #endif
@@ -498,10 +513,10 @@ static void EnvironmentScene(unsigned int tex, unsigned int texB, const float* C
 static unsigned int BlurryProbe(ReflectionProbe* s, Texture* t) {
     if (s->blurryTex && s->blurryVersion == s->version) return s->blurryTex;   // (la de tiempo real la deja lista)
 #ifndef W3D_NO_EDITOR
-    TextureEditable* te = TexEditGet(t);
-    if (!te || te->w <= 0 || te->h <= 0 || (int)te->rgba.size() < te->w * te->h * 4) return 0;
+    TexPixels te;   // (leida para esta copia y soltada al salir: la imagen de la sonda no queda en la RAM)
+    if (!TexEditPixels(t, te)) return 0;
     std::vector<unsigned char> px; float prom[3];
-    IrradianceOf(&te->rgba[0], te->w, te->h, px, prom);
+    IrradianceOf(te.px, te.w, te.h, px, prom);
     if (s->blurryTex) gfx::DeleteTexture(s->blurryTex);
     s->blurryTex = gfx::UploadRGBA(&px[0], kIrrW, kIrrH, true, false, false, false);
     s->blurryVersion = s->version;
@@ -745,6 +760,9 @@ void W3dScene3DBackgroundFile() {
 void W3dScene3DBackgroundFileEnd() {
     gSkyInPass = false;
     gInPass = false;
+#ifndef W3D_NO_EDITOR
+    BackgroundPixelsFree();   // (sus copias ya estan hechas)
+#endif
     gfx::Environment(0, 0, NULL);
     gEnvProbe = NULL;
 }
@@ -774,6 +792,12 @@ void W3dScene3DPass() {
     W3dLightsPrePass(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
 #ifndef W3D_NO_EDITOR
+    // PROXY de edicion de una Curve (sus nodos, o sus puntos y manijas): vive FUERA del arbol a proposito y se
+    // dibuja explicito, solo mientras se edita (como en el render a archivo, ViewPort3D::RenderStripes). Sin esto
+    // la vista no mostraba los puntos que se estaban editando.
+    { extern Object* W3dActiveCurveProxy();
+      Object* px = W3dActiveCurveProxy();
+      if (px) px->Render(); }
     // LAS OTRAS ESCENAS ABIERTAS en el editor (varias a la vez, W3dRoots.h): se ven juntas, en su orden, con las luces
     // de la activa. Jugando no: el Play dibuja su base y lo que cargo encima (cargarEscena)
     if (!W3dScriptHasSession()) {

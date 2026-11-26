@@ -1,0 +1,52 @@
+# ==========================================================================
+#  EL NORMAL MAP SIN SHADERS (la pasada DOT3 del GL fijo / GLES 1.1) NO DEJA NEGRO lo que le da la espalda a la
+#  lampara PRINCIPAL (la primera de la escena) aunque otra lo alumbre.
+#  EL CASO: el traje del gato (una malla con esqueleto de una escena de Blender) salia NEGRO con su normal map, con
+#  solo el borde iluminado; sin el normal map, o el mismo mapa en la silla, bien. No era el esqueleto: la pasada
+#  multiplicaba lo ya iluminado (por TODAS las lamparas) por n.L de UNA sola, y la primera lampara de esa escena estaba
+#  detras del gato. Ahora multiplica por n.L / N.L (el relieve relativo a la normal de la malla): un mapa plano deja
+#  todo como sin el mapa. Y con esqueleto usa la POSE del cuadro (no la de reposo) y la luz en el espacio de la malla.
+#    A) un plano FIJO mirando a la camara, la primera lampara DEBAJO y otra arriba: con un normal map PLANO se ve igual
+#       que sin el (antes: negro)
+#    B) lo mismo con un cubo SKINNEADO con el hueso girado 90 grados
+#  (Con shaders el normal map va en el shader por pixel y esta pasada no corre: la prueba vale igual)
+# ==========================================================================
+window 640 480
+deselectall
+selobj Luz
+delete
+selobj Cubo
+delete
+add plane
+objscale 3 1 3
+matnew
+# la PRIMERA lampara (la del normal map) abajo, mirando el plano de atras; otra arriba, la que lo alumbra
+addlight
+objpos 0 -3 0
+addlight
+objpos 1 3 1
+vpview rendered
+vporbit 0 0 0 12 -90 0
+# ---- A) el plano: sin normal map (la referencia) y con uno plano (el mismo objeto activo en las dos: su marca) ----
+selobj Plano
+deselectall
+vpref
+selobj Plano
+matmap normal texture prueba_normal_plano.png
+deselectall
+scenepx 1 0 1 noes 0 0 0 12
+vpdiff 16 0 40 obj Plano 120
+# ---- B) un cubo con esqueleto, posado (girado 90 en X): su tapa de arriba, igual con y sin el mapa ----
+selobj Plano
+delete
+skinbox 90
+skindump
+objpos 0 0 0
+matnew
+deselectall
+vpref
+selobj CajaPiel
+matmap normal texture prueba_normal_plano.png
+deselectall
+scenepx 0.5 1 0.5 noes 0 0 0 12
+vpdiff 16 0 40 obj CajaPiel 60

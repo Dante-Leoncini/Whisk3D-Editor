@@ -9,6 +9,7 @@
 #include "w3dlog.h"
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>   // std::sort
 #ifdef _WIN32
     #include <direct.h>
     #define W3D_MKDIR(p) _mkdir(p)
@@ -207,9 +208,7 @@ void W3dContainerListFolder(const std::string& folder, std::vector<std::string>&
             all[i].compare(0, folder.size(), folder) == 0)
             out.push_back(all[i]);
     // ORDEN ALFABETICO: la lista que ve el usuario no puede depender del orden del zip
-    for (size_t i = 0; i + 1 < out.size(); i++)
-        for (size_t k = i + 1; k < out.size(); k++)
-            if (out[k] < out[i]) { std::string t = out[i]; out[i] = out[k]; out[k] = t; }
+    std::sort(out.begin(), out.end());
 }
 
 // crea la ruta de carpetas completa ("a/b/c"): mkdir por segmento (existente = ok)
@@ -335,7 +334,6 @@ std::string W3dImportAsset(const std::string& diskPath, const char* category) {
         return diskPath;
     }
     if (!category || !*category) category = W3dCategoryByExtension(diskPath);
-    const unsigned crc  = data.empty() ? 0u : Crc32(&data[0], data.size());
     const unsigned size = (unsigned)data.size();
     // DEDUP POR CONTENIDO: la misma imagen importada dos veces es UNA entrada
     // (misma regla que el guardado; si no, cada "Cargar textura" engordaba el .w3d)
@@ -344,10 +342,8 @@ std::string W3dImportAsset(const std::string& diskPath, const char* category) {
         gStore->List(all);
         for (size_t i = 0; i < all.size(); i++) {
             if (gStore->Size(all[i]) != size) continue;
-            std::vector<unsigned char> other;
-            if (!gStore->Read(all[i], other) || other.size() != data.size()) continue;
-            unsigned c2 = other.empty() ? 0u : Crc32(&other[0], other.size());
-            if (c2 == crc && other == data) { W3dAssetOriginAnnotate(all[i], diskPath); return all[i]; }
+            std::vector<unsigned char> other;   // (mismo tamano: decide la comparacion byte a byte)
+            if (gStore->Read(all[i], other) && other == data) { W3dAssetOriginAnnotate(all[i], diskPath); return all[i]; }
         }
     }
     // nombre de entrada libre ("textures/piso.png", "textures/piso-2.png"...)
@@ -515,9 +511,6 @@ static std::string BaseOf(const std::string& r) {
     size_t s = r.find_last_of("/\\");
     return (s == std::string::npos) ? r : r.substr(s + 1);
 }
-static bool IsAbsolute(const std::string& r) {
-    return !r.empty() && (r[0] == '/' || r[0] == '\\' || (r.size() > 2 && r[1] == ':'));
-}
 
 W3dContainerWriter::W3dContainerWriter() : old(NULL), tmpCounter(0) {}
 W3dContainerWriter::~W3dContainerWriter() { ClearTemp(); }
@@ -601,6 +594,43 @@ size_t W3dContainerWriter::FindByContent(const std::string& footprint,
     return (size_t)-1;
 }
 
+// la huella "crc:tam" del indice por contenido (ver byFootprint en el .h)
+static std::string Footprint(unsigned crc, unsigned size) {
+    char h[40]; snprintf(h, sizeof(h), "%08x:%u", crc, size);
+    return h;
+}
+
+void W3dContainerWriter::AddPend(const W3dEntryPend& e, bool dedup) {
+    byName[e.name] = pend.size();
+    if (dedup) byFootprint[Footprint(e.crc, e.size)].push_back(pend.size());
+    pend.push_back(e);
+}
+
+bool W3dContainerWriter::PendEdited(const std::string& name, bool dedup) {
+    W3dEntryPend e;
+    e.name = name; e.origin = 0;
+    if (!W3dContainerReadEdited(name, e.bytes)) return false;
+    e.size = (unsigned)e.bytes.size();
+    e.crc  = e.bytes.empty() ? 0u : Crc32(&e.bytes[0], e.bytes.size());
+    AddPend(e, dedup);
+    return true;
+}
+
+// 'named' = la NOMBRA lo que se esta guardando (Ingest): entra al indice por contenido y, si esta ROTA en el zip
+// viejo, se anota igual (crc 0) para que el guardado se corte al copiarla (CopyFrom dice cual fue). Las que solo se
+// PRESERVAN no van al indice y, rotas, no se anotan
+bool W3dContainerWriter::PendOld(const std::string& name, bool named) {
+    if (!old) return false;
+    W3dEntryPend e;
+    e.name = name; e.origin = 2; e.source = name;
+    if (!old->Info(name, &e.crc, &e.size)) {
+        if (!named) return false;
+        e.crc = 0; e.size = old->Size(name);
+    }
+    AddPend(e, named);
+    return true;
+}
+
 std::vector<W3dExternal> g_w3dExternalMissing;
 void W3dContainerWriter::MissingExternals(std::vector<W3dExternal>& out) const {
     out.clear();
@@ -678,18 +708,7 @@ std::string W3dContainerWriter::Ingest(std::string& path, const char* category,
     //          siguiente copiaria los del zip VIEJO y guardar el proyecto tiraria
     //          silenciosamente lo que el usuario acaba de escribir.
     if (W3dIsEntryName(path) && W3dContainerEntryEdited(path)) {
-        if (!Has(path)) {
-            std::vector<unsigned char> d;
-            W3dContainerReadEdited(path, d);
-            W3dEntryPend e;
-            e.name = path; e.origin = 0; e.bytes = d;
-            e.size = (unsigned)d.size();
-            e.crc  = d.empty() ? 0u : Crc32(&d[0], d.size());
-            byName[e.name] = pend.size();
-            char h[40]; snprintf(h, sizeof(h), "%08x:%u", e.crc, e.size);
-            byFootprint[h].push_back(pend.size());
-            pend.push_back(e);
-        }
+        if (!Has(path)) PendEdited(path, true);
         alreadyResolved[original] = path;
         return path;
     }
@@ -704,17 +723,7 @@ std::string W3dContainerWriter::Ingest(std::string& path, const char* category,
             alreadyResolved[original] = path;
             return path;
         }
-        if (!Has(path)) {
-            W3dEntryPend e;
-            e.name = path; e.origin = 2; e.source = path;
-            e.size = old->Size(path);
-            std::vector<unsigned char> raw; unsigned met = 0, crc = 0, olen = 0;
-            if (old->ReadRaw(path, raw, &met, &crc, &olen)) { e.crc = crc; e.size = olen; }
-            byName[e.name] = pend.size();
-            char h[40]; snprintf(h, sizeof(h), "%08x:%u", e.crc, e.size);
-            byFootprint[h].push_back(pend.size());
-            pend.push_back(e);
-        }
+        if (!Has(path)) PendOld(path, true);
         alreadyResolved[original] = path;
         return path;
     }
@@ -731,18 +740,7 @@ std::string W3dContainerWriter::Ingest(std::string& path, const char* category,
     if (W3dIsEntryName(path) && !(old && old->Exists(path))) {
         std::string alt = "extra/" + BaseOf(path);
         if (alt != path && W3dContainerEntryEdited(alt)) {
-            if (!Has(alt)) {
-                std::vector<unsigned char> d;
-                W3dContainerReadEdited(alt, d);
-                W3dEntryPend e;
-                e.name = alt; e.origin = 0; e.bytes = d;
-                e.size = (unsigned)d.size();
-                e.crc  = d.empty() ? 0u : Crc32(&d[0], d.size());
-                byName[e.name] = pend.size();
-                char h2[40]; snprintf(h2, sizeof(h2), "%08x:%u", e.crc, e.size);
-                byFootprint[h2].push_back(pend.size());
-                pend.push_back(e);
-            }
+            if (!Has(alt)) PendEdited(alt, true);
             alreadyResolved[original] = alt;
             return alt;
         }
@@ -750,17 +748,7 @@ std::string W3dContainerWriter::Ingest(std::string& path, const char* category,
     if (W3dIsEntryName(path) && old && !old->Exists(path)) {
         std::string alt = "extra/" + BaseOf(path);
         if (alt != path && old->Exists(alt)) {
-            if (!Has(alt)) {
-                W3dEntryPend e;
-                e.name = alt; e.origin = 2; e.source = alt;
-                e.size = old->Size(alt);
-                std::vector<unsigned char> raw; unsigned met = 0, crc2 = 0, olen = 0;
-                if (old->ReadRaw(alt, raw, &met, &crc2, &olen)) { e.crc = crc2; e.size = olen; }
-                byName[e.name] = pend.size();
-                char h2[40]; snprintf(h2, sizeof(h2), "%08x:%u", e.crc, e.size);
-                byFootprint[h2].push_back(pend.size());
-                pend.push_back(e);
-            }
+            if (!Has(alt)) PendOld(alt, true);
             alreadyResolved[original] = alt;
             return alt;
         }
@@ -783,7 +771,7 @@ std::string W3dContainerWriter::Ingest(std::string& path, const char* category,
     }
     unsigned crc  = data.empty() ? 0u : Crc32(&data[0], data.size());
     unsigned size = (unsigned)data.size();
-    char h[40]; snprintf(h, sizeof(h), "%08x:%u", crc, size);
+    const std::string h = Footprint(crc, size);
     // DEDUP POR CONTENIDO: el mismo archivo referenciado desde tres escenas es
     // UNA entrada (y sonidos.lua no tiene que "pertenecerle" a nadie).
     // "Por CONTENIDO" es literal: se comparan LOS BYTES. La huella crc:tam solo
@@ -813,9 +801,7 @@ std::string W3dContainerWriter::Ingest(std::string& path, const char* category,
     e.source = path;
     e.temp = false;
     e.crc = crc; e.size = size;
-    byName[e.name] = pend.size();
-    byFootprint[h].push_back(pend.size());
-    pend.push_back(e);
+    AddPend(e, true);
     alreadyResolved[original] = e.name;
     path = e.name;
     return e.name;
@@ -832,12 +818,7 @@ bool W3dContainerWriter::AddBytes(const std::string& name, const std::string& te
     e.bytes.assign(text.begin(), text.end());
     e.size = (unsigned)e.bytes.size();
     e.crc  = e.bytes.empty() ? 0u : Crc32(&e.bytes[0], e.bytes.size());
-    byName[name] = pend.size();
-    if (dedup) {
-        char h[40]; snprintf(h, sizeof(h), "%08x:%u", e.crc, e.size);
-        byFootprint[h].push_back(pend.size());
-    }
-    pend.push_back(e);
+    AddPend(e, dedup);
     return true;
 }
 
@@ -865,10 +846,7 @@ bool W3dContainerWriter::AddTemp(const std::string& name, const std::string& tmp
     e.name = name; e.origin = 1; e.source = tmpPath; e.temp = true;
     e.size = (unsigned)data.size();
     e.crc  = data.empty() ? 0u : Crc32(&data[0], data.size());
-    byName[name] = pend.size();
-    char h[40]; snprintf(h, sizeof(h), "%08x:%u", e.crc, e.size);
-    byFootprint[h].push_back(pend.size());
-    pend.push_back(e);
+    AddPend(e, true);
     return true;
 }
 
@@ -892,7 +870,7 @@ bool W3dContainerWriter::AddTemp(const std::string& name, const std::string& tmp
 //  POR NOMBRE, no una entrada perdida. Una entrada que falta de verdad y no se
 //  llama como nada del proyecto sigue abortando igual que siempre.
 // ---------------------------------------------------------------------------
-static bool IsNameKey(const std::string& k) { return k == "name" || k == "name"; }
+static bool IsNameKey(const std::string& k) { return k == "name"; }
 static void TextRefs(const std::vector<unsigned char>& b, std::set<std::string>& out,
                          std::set<std::string>& names) {
     std::string s, key;
@@ -966,14 +944,7 @@ bool W3dContainerWriter::Verify(std::string& missing) {
 
 bool W3dContainerWriter::CopyFromOld(const std::string& n) {
     if (!old || n.empty() || Has(n)) return false;
-    W3dEntryPend e;
-    e.name = n; e.origin = 2; e.source = n;
-    std::vector<unsigned char> raw; unsigned met = 0, crc = 0, olen = 0;
-    if (!old->ReadRaw(n, raw, &met, &crc, &olen)) return false;
-    e.crc = crc; e.size = olen;
-    byName[n] = pend.size();
-    pend.push_back(e);
-    return true;
+    return PendOld(n, false);
 }
 
 void W3dContainerWriter::PreserveTransient() {
@@ -993,24 +964,8 @@ void W3dContainerWriter::PreserveTransient() {
         if (n.compare(0, 11, "animations/") == 0) continue;
         // EDITADA EN CALIENTE y que nadie referencia (un .lua suelto que el usuario
         // abrio y guardo desde el IDE): se preserva lo NUEVO, no lo del zip viejo.
-        if (W3dContainerEntryEdited(n)) {
-            std::vector<unsigned char> d;
-            W3dContainerReadEdited(n, d);
-            W3dEntryPend ed;
-            ed.name = n; ed.origin = 0; ed.bytes = d;
-            ed.size = (unsigned)d.size();
-            ed.crc  = d.empty() ? 0u : Crc32(&d[0], d.size());
-            byName[n] = pend.size();
-            pend.push_back(ed);
-            continue;
-        }
-        W3dEntryPend e;
-        e.name = n; e.origin = 2; e.source = n;
-        std::vector<unsigned char> raw; unsigned met = 0, crc = 0, olen = 0;
-        if (!old->ReadRaw(n, raw, &met, &crc, &olen)) continue;
-        e.crc = crc; e.size = olen;
-        byName[n] = pend.size();
-        pend.push_back(e);
+        if (W3dContainerEntryEdited(n)) PendEdited(n, false);
+        else                            PendOld(n, false);
     }
     // LO IMPORTADO EN ESTA SESION que nadie referencia (una imagen que se trajo al proyecto y
     // todavia no se asigno): vive solo en el overlay de editadas y no esta en el zip viejo, asi
@@ -1023,14 +978,7 @@ void W3dContainerWriter::PreserveTransient() {
         if (Has(n) || forgotten.count(n) || W3dIsServiceEntry(n)) continue;
         if (n.compare(0, 7, "meshes/") == 0 || n.compare(0, 11, "animations/") == 0) continue;
         if (!W3dContainerEntryEdited(n) || (old && old->Exists(n))) continue;
-        std::vector<unsigned char> d;
-        if (!W3dContainerReadEdited(n, d)) continue;
-        W3dEntryPend ed;
-        ed.name = n; ed.origin = 0; ed.bytes = d;
-        ed.size = (unsigned)d.size();
-        ed.crc  = d.empty() ? 0u : Crc32(&d[0], d.size());
-        byName[n] = pend.size();
-        pend.push_back(ed);
+        PendEdited(n, false);
     }
 }
 
@@ -1040,14 +988,11 @@ size_t W3dContainerWriter::MissingExternalCount() const {
     return n;
 }
 
+static bool ExternalByRef(const W3dExternal& a, const W3dExternal& b) { return a.ref < b.ref; }
 void W3dContainerWriter::WriteExternal() {
     if (external.empty()) return;
-    // ORDEN ALFABETICO: el archivo tiene que ser determinista igual que el zip
-    for (size_t i = 0; i + 1 < external.size(); i++)
-        for (size_t k = i + 1; k < external.size(); k++)
-            if (external[k].ref < external[i].ref) {
-                W3dExternal t = external[i]; external[i] = external[k]; external[k] = t;
-            }
+    // ORDEN ALFABETICO: el archivo tiene que ser determinista igual que el zip (RegisterExternal no repite refs)
+    std::sort(external.begin(), external.end(), ExternalByRef);
     std::string s;
     s += "# Archivos que este proyecto usa pero que NO estan adentro del .w3d.\n";
     s += "# Si mandas este .w3d a otra maquina, estos archivos NO viajan.\n";
@@ -1082,9 +1027,7 @@ bool W3dContainerWriter::Write(const std::string& tmpPathZip) {
         for (int p = 0; kFirst[p]; p++) if (pend[i].name == kFirst[p]) fixed = true;
         if (!fixed) names.push_back(pend[i].name);
     }
-    for (size_t i = 0; i + 1 < names.size(); i++)
-        for (size_t k = i + 1; k < names.size(); k++)
-            if (names[k] < names[i]) { std::string t = names[i]; names[i] = names[k]; names[k] = t; }
+    std::sort(names.begin(), names.end());   // (los nombres no se repiten: son las claves de byName)
     for (size_t i = 0; i < names.size(); i++) order.push_back(byName[names[i]]);
 
     W3dZipWriter w;

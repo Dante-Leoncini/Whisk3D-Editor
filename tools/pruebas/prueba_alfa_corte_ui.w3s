@@ -25,7 +25,7 @@ selobj Cubo
 delete
 importgltf prueba_alfa_corte.glb
 loadtex
-selobj prueba_alfa_corte
+selobj alfa_reja
 matalphacut alfa_reja es 0.3
 
 # --- 1) la fila muestra el valor del material
@@ -72,6 +72,6 @@ savew3d /tmp/w3d_prueba_alfa_corte_ui.w3d
 jsonhas /tmp/w3d_prueba_alfa_corte_ui.w3d alphaCut 1
 openw3d /tmp/w3d_prueba_alfa_corte_ui.w3d
 loadtex
-selobj prueba_alfa_corte
+selobj alfa_reja
 matalphacut alfa_reja es 0.75
 propsalpha row 0.75

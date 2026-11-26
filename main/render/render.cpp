@@ -280,11 +280,15 @@ static bool VisibleInTree(Object* o) {
 //   SOL: una linea hacia donde alumbra HASTA EL PISO (la altura 0), SIEMPRE (seleccionado o no); si no apunta al
 //        piso, 10 m. FOCO: su cono (8 aristas y el circulo del borde) del largo de su distancia. PUNTUAL: la esfera
 //        de su distancia (tres circulos). El cono y la esfera, solo con la luz seleccionada ('sel').
+//   AREA: su FORMA (el rectangulo o la elipse, con la escala del objeto como en Blender) y una linea desde el centro
+//        hacia donde alumbra (su -Z local: de su distancia, o 1 m), SIEMPRE (como la de Blender, sin la forma no se sabe
+//        que tan grande es)
 // Pool propio rotativo (como el de las lineas: el driver puede leer tarde)
 static void DrawGuideLight(Light* L, bool sel) {
-    const bool focus = !L->directional && L->spotCutoff < 179.5f;
-    const bool point = !L->directional && !focus;
-    if (!L->directional && !sel) return;
+    const bool area = L->area && !L->directional;
+    const bool focus = !L->directional && !area && L->spotCutoff < 179.5f;
+    const bool point = !L->directional && !focus && !area;
+    if (!L->directional && !area && !sel) return;
     if (point && L->distance <= 0.0f) return;   // (sin limite: no hay esfera que mostrar)
     static GLfloat pool[8][192 * 3];
     static int slot = 0;
@@ -294,7 +298,30 @@ static void DrawGuideLight(Light* L, bool sel) {
     Vector3 ex(W.m[0], W.m[1], W.m[2]), ey(W.m[4], W.m[5], W.m[6]), ez(W.m[8], W.m[9], W.m[10]);
     ex = ex.Normalized(); ey = ey.Normalized(); ez = ez.Normalized();
     int n = 0;
-    if (L->directional) {   // SOL: alumbra hacia su -Y local, hasta cortar el piso
+    if (area) {   // AREA: la forma en su plano XY local y la linea hacia su -Z
+        float hx = 0.0f, hy = 0.0f; W3dLightAreaHalf(L, hx, hy);
+        const Vector3 ax(W.m[0] * hx, W.m[1] * hx, W.m[2] * hx), ay(W.m[4] * hy, W.m[5] * hy, W.m[6] * hy);   // (con la escala)
+        const int N = W3dLightAreaRound(L) ? 48 : 4;
+        for (int i = 0; i < N; i++) {
+            float c0, s0, c1, s1;
+            if (N == 4) {   // (las esquinas: +x+y, -x+y, -x-y, +x-y)
+                static const float kx[5] = { 1, -1, -1, 1, 1 }, ky[5] = { 1, 1, -1, -1, 1 };
+                c0 = kx[i]; s0 = ky[i]; c1 = kx[i + 1]; s1 = ky[i + 1];
+            } else {
+                const float a0 = i * (6.2831853f / N), a1 = (i + 1) * (6.2831853f / N);
+                c0 = cosf(a0); s0 = sinf(a0); c1 = cosf(a1); s1 = sinf(a1);
+            }
+            GLfloat* q = &v[n * 3];
+            q[0] = p.x + ax.x * c0 + ay.x * s0; q[1] = p.y + ax.y * c0 + ay.y * s0; q[2] = p.z + ax.z * c0 + ay.z * s0;
+            q[3] = p.x + ax.x * c1 + ay.x * s1; q[4] = p.y + ax.y * c1 + ay.y * s1; q[5] = p.z + ax.z * c1 + ay.z * s1;
+            n += 2;
+        }
+        float length = L->distance > 0.0f ? L->distance : 1.0f; if (length > 1000.0f) length = 1000.0f;
+        GLfloat* e = &v[n * 3];
+        e[0] = p.x; e[1] = p.y; e[2] = p.z;
+        e[3] = p.x - ez.x * length; e[4] = p.y - ez.y * length; e[5] = p.z - ez.z * length;
+        n += 2;
+    } else if (L->directional) {   // SOL: alumbra hacia su -Y local, hasta cortar el piso
         float length = 10.0f;
         if (ey.y > 0.02f && p.y > 0.0f) { length = p.y / ey.y; if (length > 1000.0f) length = 1000.0f; }
         v[0] = p.x; v[1] = p.y; v[2] = p.z;

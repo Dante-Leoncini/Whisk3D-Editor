@@ -49,7 +49,7 @@ static std::string BasePath(const Material* m) {
     return p.empty() ? std::string() : W3dTextureKey(p);
 }
 // el contenido de un material (lo que se guarda de el; la carpeta es de la biblioteca)
-static std::string SignatureMaterial(const Material* m) {
+static std::string SignatureMaterialFields(const Material* m) {
     std::string s = m->name + "\x01";
     Col(s, m->diffuse); Col(s, m->specular); Col(s, m->emission); Col(s, m->ambient);
     Num(s, m->shininess); Num(s, m->interpolation); Num(s, m->reflectMode); Num(s, m->rtRoughness); Num(s, m->rtMetallic);
@@ -61,6 +61,18 @@ static std::string SignatureMaterial(const Material* m) {
     for (int k = 0; k < W3D_MAPS; k++) { s += "\x01" + Path(m->mapTex[k]); Num(s, (float)m->uvMap[k]); Num(s, m->mapWithTexture[k] ? 1.0f : 0.0f); }
     Num(s, m->ior); Num(s, m->transmission); s += std::string("\x01") + m->shaderFile + (m->shaderOn ? "1" : "0");
     for (size_t c = 0; c < m->layers.size(); c++) { s += "\x02" + Path(m->layers[c].tex); Num(s, m->layers[c].blend); Num(s, m->layers[c].uvMap); s += m->layers[c].on ? '1' : '0'; }
+    // la fuerza de la emision y la transformacion UV (formato/material-animado.md)
+    Num(s, m->emissionStrength); Num(s, m->uvOffset[0]); Num(s, m->uvOffset[1]); Num(s, m->uvScale[0]); Num(s, m->uvScale[1]);
+    Num(s, m->uvRotation); Num(s, m->uvPivot[0]); Num(s, m->uvPivot[1]);
+    return s;
+}
+// ...firmado en su REPOSO si esta animado (lo que se guarda, ver W3dMaterialsRestBegin): mover el cabezal le cambia los
+// numeros a un material animado, y eso no es un cambio sin guardar
+static std::string SignatureMaterial(const Material* m) {
+    std::vector<W3dMatRest> rest;
+    W3dMaterialsRestBegin(rest, m);
+    const std::string s = SignatureMaterialFields(m);
+    W3dMaterialsRestEnd(rest);
     return s;
 }
 // el contenido de un animset CARGADO (sus clips y la version de cada clip de jerarquia)

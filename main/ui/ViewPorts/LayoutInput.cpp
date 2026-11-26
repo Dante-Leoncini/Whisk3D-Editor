@@ -14,6 +14,7 @@
 #include "edit/Proportional.h"
 #include "PopUp/NewTexturePopup.h"
 #include "ViewPorts/PopUp/ExportUVPopup.h"   // Export UV Layout (menu guardar del editor UV)
+#include "edit/ModeMemory.h"            // la memoria de los modos: se suelta al dejarlos
 #include "io/EditedTexture.h"          // Save Texture / Make External / Make Internal + el "*" de las sin guardar // "New Texture..." del dropdown Texture del UV editor    // proportional editing: pesos de los vertices no seleccionados
 #include <queue>
 #include <set>             // el iman con las flechas: los vertices que se mueven
@@ -442,8 +443,6 @@ static void LayoutSwap(ViewportBase* aVp) {
     }
     LayoutRescan(aVp, w, h);
 }
-// (harness) el Swap por la misma puerta que el menu de tipo
-void LayoutSwapViewport(ViewportBase* v) { LayoutSwap(v); }
 
 // Split: en el lugar del viewport aparece una fila/columna con el
 // original y un viewport NUEVO del mismo tipo (no se clona)
@@ -738,19 +737,838 @@ static bool ObjectInScene(Object* root, Object* o){
     return false;
 }
 
-static void CurveEnterEdit(Curve* cv){
-    if (!cv || gCurveInEdit) return;
+static void CurveEnterEdit(Curve* cv);
+static void CurveFinishEdit();
+// ============================================================================
+//  EDICION DE SPLINES (Bezier / poly) CON MANIJAS (pedido del dueno: "falta poder editar los handlers y
+//  esas cosas al entrar en modo edicion").
+//
+//  Mismo esquema que el path: la malla de edicion interna de la curva es el proxy, asi que seleccionar
+//  (click, B, A), mover / rotar / escalar (G/R/S, gizmo, numeros, snap, proportional) y el undo de la
+//  seleccion son los de siempre. Lo que cambia es QUE hay en el proxy: por cada punto Bezier tres
+//  vertices sueltos -manija izquierda, punto, manija derecha- y por cada punto poly uno solo. Ninguna
+//  arista: la linea que se ve es la teselacion de la curva, y las manijas las dibuja la curva con el
+//  color de su tipo (Curve::RenderObject).
+//
+//  CurveBezSync corre en cada cuadro (UpdateActiveEditMesh) y antes de cada operacion: compara el proxy
+//  con como lo dejo la vez anterior y le aplica a las splines las reglas de Blender:
+//   - elegir un punto elige sus dos manijas (y soltarlo las suelta);
+//   - mover el punto lleva las manijas que no se movieron;
+//   - una seleccion PARCIAL del trio que se mueve pasa las Auto a Aligned y la Vector movida a Free
+//     (BKE_nurb_bezt_handle_test);
+//   - despues recalcula Auto / Vector / Aligned (Curve::CalcHandles) y devuelve al proxy lo corregido.
+//  Las operaciones de topologia (extrude, borrar, subdividir, cerrar, invertir, tipos) se hacen sobre
+//  las splines y el proxy se rearma entero. Una op de MALLA que cambie la cantidad de vertices del
+//  proxy (merge, duplicar...) no tiene a que punto mapear lo nuevo: se descarta y se rearma.
+// ============================================================================
+struct BezVtx { int s, p, role; };                // role: 0 = manija izq, 1 = punto, 2 = manija der
+static std::vector<BezVtx> gBezMap;               // vertice del proxy -> su punto
+static std::vector<float> gBezLast;               // posiciones del proxy tras la ultima sincronizacion
+static std::vector<unsigned char> gBezLastSel;    // ...y su seleccion
+static bool gBezNeedFull = false;                 // un arrastre teselo "en vivo": falta el arbol KD
+
+static bool CurveBezEditing() { return gCurveInEdit && gCurveInEdit->HasSplines() && gCurveInEdit->edit; }
+bool LayoutCurveEditing() { return gCurveInEdit != NULL; }
+bool LayoutCurveBezEditing() { return CurveBezEditing(); }
+Curve* LayoutCurveInEdit() { return gCurveInEdit; }
+
+// el holder de la malla de edicion (se crea una vez y se reusa en cada sesion)
+static Mesh* CurveEditHolder(Curve* cv) {
     if (!cv->edit) {
+        // SUELTO desde que nace (W3dRootCreating): es un MIEMBRO de la curva, no un objeto de escena (muere con
+        // la curva en ~Curve). Asi el ctor de Object tampoco lo ELIGE: antes la seleccion pasaba al proxy, la
+        // curva dejaba de ser la activa y la sesion de edicion se cerraba apenas se abria
+        W3dRootCreating = true;
         cv->edit = new Mesh(NULL, Vector3(0,0,0));
-        // el ctor lo colgo de SceneCollection: DESCOLGARLO ya (es un MIEMBRO de la curva,
-        // no un objeto de escena; muere con la curva en ~Curve)
-        if (cv->edit->Parent) {
-            std::vector<Object*>& ch = cv->edit->Parent->Childrens;
-            for (size_t i = 0; i < ch.size(); i++) if (ch[i] == cv->edit) { ch.erase(ch.begin() + i); break; }
-            cv->edit->Parent = NULL;
+        W3dRootCreating = false;
+    }
+    return cv->edit;
+}
+// el proxy en el MISMO lugar que la curva: posicion, giro y escala de MUNDO (esta suelto: su local ES su
+// global). Con solo la posicion, una curva girada mostraba sus puntos en otro lado y el G los movia mal.
+static void CurveEditPlace(Curve* cv, Mesh* m) {
+    m->pos = cv->GetGlobalPosition();
+    m->SetRot(RotGlobalOf(cv));
+    m->scale = ScaleGlobalOf(cv);
+}
+
+static Vector3 BezRolePos(const CurvePoint& q, int role) { return role == 0 ? q.left : (role == 2 ? q.right : q.co); }
+static unsigned char BezRoleBit(int role) { return role == 0 ? W3dCurveSelL : (role == 2 ? W3dCurveSelR : W3dCurveSelP); }
+
+// arma el proxy desde las splines (posiciones + seleccion de cada punto)
+static void CurveBezBuildProxy(Curve* cv) {
+    Mesh* m = CurveEditHolder(cv);
+    m->InvalidateEdit();
+    delete[] m->vertex; delete[] m->normals; delete[] m->uv; delete[] m->vertexColor; delete[] m->faces;
+    m->vertex = NULL; m->normals = NULL; m->uv = NULL; m->vertexColor = NULL; m->faces = NULL; m->facesSize = 0;
+    m->looseVerts.clear(); m->looseEdges.clear(); m->materialsGroup.clear(); m->faces3d.clear();
+    gBezMap.clear();
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        const CurveSpline& sp = cv->splines[s];
+        for (size_t p = 0; p < sp.points.size(); p++) {
+            BezVtx b; b.s = (int)s; b.p = (int)p;
+            if (sp.type == W3dSplineBezier) {
+                b.role = 0; gBezMap.push_back(b); b.role = 1; gBezMap.push_back(b); b.role = 2; gBezMap.push_back(b);
+            } else { b.role = 1; gBezMap.push_back(b); }
         }
     }
-    Mesh* m = cv->edit;
+    const int n = (int)gBezMap.size();
+    m->vertexSize = n;
+    if (n > 0) {
+        m->vertex = new GLfloat[n * 3]; m->normals = new GLbyte[n * 3];
+        m->uv = new GLfloat[n * 2];     m->vertexColor = new GLubyte[n * 4];
+        for (int i = 0; i < n; i++) {
+            const BezVtx& b = gBezMap[i];
+            const Vector3 v = BezRolePos(cv->splines[b.s].points[b.p], b.role);
+            m->vertex[i*3] = v.x; m->vertex[i*3+1] = v.y; m->vertex[i*3+2] = v.z;
+            m->normals[i*3] = 0; m->normals[i*3+1] = 127; m->normals[i*3+2] = 0;
+            m->uv[i*2] = m->uv[i*2+1] = 0.0f;
+            m->vertexColor[i*4] = m->vertexColor[i*4+1] = m->vertexColor[i*4+2] = m->vertexColor[i*4+3] = 255;
+            m->looseVerts.push_back(i);
+        }
+    }
+    MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefault;
+    m->materialsGroup.push_back(g);
+    m->name = cv->name;
+    CurveEditPlace(cv, m);
+    m->noEditable = false; m->visible = true;
+    // UN VERTICE POR MANIJA aunque esten encima del punto (una Vector recien creada, una manija de largo
+    // cero): el agrupamiento por posicion del editor los fundiria en uno y el mapeo se perderia. Se fija la
+    // identidad y ComputeBorders la conserva (regroupPosRep = false).
+    m->posRep.resize(n);
+    for (int i = 0; i < n; i++) m->posRep[i] = i;
+    m->ComputeBorders(true, false);
+    m->EnsureEdit();
+    if (m->edit) {
+        for (int i = 0; i < n && i < (int)m->edit->vertSel.size(); i++) {
+            const BezVtx& b = gBezMap[i];
+            m->edit->vertSel[i] = (cv->splines[b.s].points[b.p].sel & BezRoleBit(b.role)) ? 1 : 0;
+        }
+        m->edit->activeIdx = -1;
+        m->edit->Recolor();
+        gBezLast.assign(m->edit->pos.begin(), m->edit->pos.end());
+        gBezLastSel = m->edit->vertSel;
+    } else { gBezLast.clear(); gBezLastSel.clear(); }
+    g_redraw = true;
+}
+
+// el proxy -> las splines (ver el bloque de arriba). true = la forma cambio.
+static bool CurveBezSync(Curve* cv) {
+    Mesh* m = cv ? cv->edit : NULL;
+    if (!m || !cv->HasSplines()) return false;
+    const int n = (int)gBezMap.size();
+    if (m->vertexSize != n || (n > 0 && !m->vertex)) { CurveBezBuildProxy(cv); return true; }
+    m->EnsureEdit();
+    EditMesh* e = m->edit;
+    if (!e || e->NumVerts() != n || (int)e->pos.size() != n * 3 || (int)e->vertSel.size() != n ||
+        (int)gBezLast.size() != n * 3 || (int)gBezLastSel.size() != n) { CurveBezBuildProxy(cv); return true; }
+    // 1) SELECCION (como Blender): el punto recien elegido se lleva sus dos manijas (click, caja). Soltar SOLO el
+    //    punto (shift-click) suelta las manijas; si en la misma pasada cambio una manija, el usuario eligio esa
+    //    (el click en una manija de un punto entero elegido deja elegida solo la manija).
+    bool selChanged = false;
+    for (int k = 1; k + 1 < n; k++) {
+        if (gBezMap[k].role != 1 || gBezMap[k-1].role != 0) continue;   // (un punto poly no tiene manijas)
+        const bool now = e->vertSel[k] != 0, before = gBezLastSel[k] != 0;
+        if (now == before) continue;
+        if (now) { e->vertSel[k-1] = e->vertSel[k+1] = 1; selChanged = true; }
+        else if (e->vertSel[k-1] == gBezLastSel[k-1] && e->vertSel[k+1] == gBezLastSel[k+1]) {
+            e->vertSel[k-1] = e->vertSel[k+1] = 0; selChanged = true;
+        }
+    }
+    for (int k = 0; k < n; k++) {
+        if (e->vertSel[k] != gBezLastSel[k]) selChanged = true;
+        CurvePoint& q = cv->splines[gBezMap[k].s].points[gBezMap[k].p];
+        const unsigned char bit = BezRoleBit(gBezMap[k].role);
+        if (e->vertSel[k]) q.sel |= bit; else q.sel &= (unsigned char)~bit;
+    }
+    if (selChanged) e->Recolor();
+    // 2) POSICIONES
+    std::vector<char> touched(cv->splines.size(), 0);
+    bool moved = false;
+    for (int k = 0; k < n; k++) {
+        const BezVtx& b = gBezMap[k];
+        if (b.role != 1) continue;
+        CurvePoint& q = cv->splines[b.s].points[b.p];
+        const float* P = &e->pos[k*3]; const float* L0 = &gBezLast[k*3];
+        const Vector3 K(P[0], P[1], P[2]), Kl(L0[0], L0[1], L0[2]);
+        const bool mK = (P[0] != L0[0] || P[1] != L0[1] || P[2] != L0[2]);
+        const bool bez = (k > 0 && gBezMap[k-1].role == 0);
+        if (!bez) { if (mK) { q.co = K; touched[b.s] = 1; moved = true; } continue; }
+        const float* PL = &e->pos[(k-1)*3]; const float* LL = &gBezLast[(k-1)*3];
+        const float* PR = &e->pos[(k+1)*3]; const float* LR = &gBezLast[(k+1)*3];
+        const bool mL = (PL[0] != LL[0] || PL[1] != LL[1] || PL[2] != LL[2]);
+        const bool mR = (PR[0] != LR[0] || PR[1] != LR[1] || PR[2] != LR[2]);
+        if (!mK && !mL && !mR) continue;
+        touched[b.s] = 1; moved = true;
+        Vector3 L(PL[0], PL[1], PL[2]), R(PR[0], PR[1], PR[2]);
+        // SELECCION PARCIAL del trio que se mueve (BKE_nurb_bezt_handle_test de Blender): la Auto deja de
+        // serlo (pasa a Aligned: el usuario la esta acomodando a mano) y la Vector que se separa de su
+        // punto pasa a Free
+        const bool sL = e->vertSel[k-1] != 0, sK = e->vertSel[k] != 0, sR = e->vertSel[k+1] != 0;
+        if (!(sL == sK && sK == sR)) {
+            if (q.typeL == W3dHandleAuto) q.typeL = W3dHandleAligned;
+            if (q.typeR == W3dHandleAuto) q.typeR = W3dHandleAligned;
+            if (q.typeL == W3dHandleVector && sL != sK) q.typeL = W3dHandleFree;
+            if (q.typeR == W3dHandleVector && sR != sK) q.typeR = W3dHandleFree;
+        }
+        // el punto se lleva las manijas que no se movieron solas
+        if (mK) { const Vector3 d = K - Kl; if (!mL) L += d; if (!mR) R += d; }
+        q.co = K; q.left = L; q.right = R;
+    }
+    if (moved) {
+        for (size_t s = 0; s < touched.size(); s++) if (touched[s]) cv->CalcHandlesSpline((int)s);
+        // lo corregido (manijas que acompanian, Auto/Vector/Aligned recalculadas) vuelve al proxy
+        bool wrote = false;
+        for (int k = 0; k < n; k++) {
+            const BezVtx& b = gBezMap[k];
+            const Vector3 v = BezRolePos(cv->splines[b.s].points[b.p], b.role);
+            float* P = &e->pos[k*3];
+            if (P[0] != v.x || P[1] != v.y || P[2] != v.z) { P[0] = v.x; P[1] = v.y; P[2] = v.z; wrote = true; }
+        }
+        if (wrote) { e->PushPositions(); e->RefreshOverlay(); }
+        // arrastrando, la teselacion va EN VIVO (sin el arbol KD); al soltar se completa
+        const bool live = EditXformActive();
+        cv->Tessellate(!live);
+        gBezNeedFull = live;
+    } else if (gBezNeedFull && !EditXformActive()) {
+        cv->Tessellate(true);
+        gBezNeedFull = false;
+    }
+    if (moved || selChanged) {
+        gBezLast.assign(e->pos.begin(), e->pos.end());
+        gBezLastSel = e->vertSel;
+        g_redraw = true;
+    }
+    return moved;
+}
+// el harness lo llama para no depender de que se dibuje un cuadro
+bool LayoutCurveBezSync() { return CurveBezEditing() ? CurveBezSync(gCurveInEdit) : false; }
+
+// ---- UNDO de las splines: un paso que intercambia el estado guardado con el vivo -----------------------
+// Se guarda TODO lo que una op de curva puede tocar: las splines (con su seleccion) y, por si la op
+// convirtio una curva de NODOS en splines, los nodos de antes con sus canales y su origen (.cap).
+struct BezState {
+    std::vector<CurveSpline> splines;
+    std::vector<GLfloat> nodes, rot, fov;
+    std::vector<GLushort> edges;
+    std::string origin;
+};
+static void BezCapture(Curve* cv, BezState& st) {
+    st.splines = cv->splines;
+    st.nodes.clear(); st.rot.clear(); st.fov.clear(); st.edges.clear();
+    if (!cv->HasSplines() && cv->vertex) {   // (de una curva de splines los nodos son derivados: no hace falta)
+        st.nodes.assign(cv->vertex, cv->vertex + cv->vertexSize * 3);
+        if (cv->rotNode) st.rot.assign(cv->rotNode, cv->rotNode + cv->vertexSize * 3);
+        if (cv->fovNode) st.fov.assign(cv->fovNode, cv->fovNode + cv->vertexSize);
+        st.edges = cv->edges;
+    }
+    st.origin = cv->origin;
+}
+static void CurveReenterEdit(Curve* cv);
+static void BezRestore(Curve* cv, const BezState& st) {
+    cv->splines = st.splines;
+    cv->origin = st.origin;
+    if (cv->HasSplines()) cv->Tessellate(true);
+    else {
+        const int n = (int)st.nodes.size() / 3;
+        delete[] cv->vertex; cv->vertex = NULL; delete[] cv->indices; cv->indices = NULL;
+        delete[] cv->rotNode; cv->rotNode = NULL; delete[] cv->fovNode; cv->fovNode = NULL;
+        cv->vertexSize = n;
+        if (n > 0) {
+            cv->vertex = new GLfloat[n * 3]; for (int i = 0; i < n * 3; i++) cv->vertex[i] = st.nodes[i];
+            cv->indices = new GLushort[n]; for (int i = 0; i < n; i++) cv->indices[i] = (GLushort)i;
+            if ((int)st.rot.size() == n * 3) { cv->rotNode = new GLfloat[n * 3]; for (int i = 0; i < n * 3; i++) cv->rotNode[i] = st.rot[i]; }
+            if ((int)st.fov.size() == n) { cv->fovNode = new GLfloat[n]; for (int i = 0; i < n; i++) cv->fovNode[i] = st.fov[i]; }
+        }
+        cv->edges = st.edges;
+        cv->tessVersion++;
+        cv->BuildKDTree();
+        cv->RecalculateBranches();
+    }
+    if (gCurveInEdit == cv) CurveReenterEdit(cv);
+    g_redraw = true;
+}
+struct BezUndo { Curve* cv; BezState st; };
+static void BezUndoApply(void* d) {
+    BezUndo* u = (BezUndo*)d;
+    if (!u->cv) return;
+    BezState now; BezCapture(u->cv, now);
+    BezRestore(u->cv, u->st);
+    u->st = now;
+}
+static void BezUndoUnlink(void* d, Object* deleted) { BezUndo* u = (BezUndo*)d; if ((Object*)u->cv == deleted) u->cv = NULL; }
+static void BezUndoFree(void* d) { delete (BezUndo*)d; }
+static void BezUndoPushState(Curve* cv, const BezState& before) {
+    UndoExternal f; f.apply = BezUndoApply; f.unlink = BezUndoUnlink; f.free = BezUndoFree;
+    BezUndo* u = new BezUndo(); u->cv = cv; u->st = before;
+    UndoPushExternal(f, u);
+}
+// el paso de undo de una op de curva: el estado de ANTES (llamar antes de tocar nada)
+static void CurveBezUndoPush(Curve* cv) {
+    if (!cv) return;
+    if (CurveBezEditing() && gCurveInEdit == cv) CurveBezSync(cv);
+    BezState st; BezCapture(cv, st);
+    BezUndoPushState(cv, st);
+}
+static bool BezSameShape(const std::vector<CurveSpline>& a, const std::vector<CurveSpline>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t s = 0; s < a.size(); s++) {
+        const CurveSpline& x = a[s]; const CurveSpline& y = b[s];
+        if (x.type != y.type || x.cyclic != y.cyclic || x.resolution != y.resolution || x.points.size() != y.points.size()) return false;
+        for (size_t i = 0; i < x.points.size(); i++) {
+            const CurvePoint& p = x.points[i]; const CurvePoint& q = y.points[i];
+            if (p.co.x != q.co.x || p.co.y != q.co.y || p.co.z != q.co.z) return false;
+            if (p.left.x != q.left.x || p.left.y != q.left.y || p.left.z != q.left.z) return false;
+            if (p.right.x != q.right.x || p.right.y != q.right.y || p.right.z != q.right.z) return false;
+            if (p.typeL != q.typeL || p.typeR != q.typeR || p.radius != q.radius || p.tilt != q.tilt) return false;
+        }
+    }
+    return true;
+}
+// G/R/S sobre una curva de splines: el undo es de las SPLINES (no de las posiciones del proxy), asi deshace
+// tambien los tipos que el arrastre cambio (Auto -> Aligned) y cancelar devuelve todo exacto
+static bool gBezXformPending = false;
+static BezState gBezXformBefore;
+static void CurveBezXformBegin() {
+    if (!CurveBezEditing()) return;
+    CurveBezSync(gCurveInEdit);
+    BezCapture(gCurveInEdit, gBezXformBefore);
+    gBezXformPending = true;
+}
+static void CurveBezXformEnd(bool confirm) {
+    if (!gBezXformPending) return;
+    gBezXformPending = false;
+    if (!CurveBezEditing()) return;
+    Curve* cv = gCurveInEdit;
+    if (confirm) {
+        CurveBezSync(cv);
+        if (!BezSameShape(cv->splines, gBezXformBefore.splines)) BezUndoPushState(cv, gBezXformBefore);
+    } else {
+        cv->splines = gBezXformBefore.splines;   // (el cancel de la malla repone despues las posiciones: son estas)
+        cv->Tessellate(true);
+        CurveBezBuildProxy(cv);
+    }
+}
+
+// ---- OPERACIONES DE CURVA (Edit Mode) -------------------------------------------------------------------
+static bool BezKnotSel(const CurvePoint& q) { return (q.sel & W3dCurveSelP) != 0; }
+static bool BezSplineHasSel(const CurveSpline& sp) {
+    for (size_t i = 0; i < sp.points.size(); i++) if (sp.points[i].sel) return true;
+    return false;
+}
+static void BezSelectPoint(CurvePoint& q, bool on) { q.sel = on ? (W3dCurveSelL | W3dCurveSelP | W3dCurveSelR) : 0; }
+// cierre comun de una op de topologia: manijas, teselacion y el proxy rearmado
+void W3dTouchedChanges();   // (io/ProjectChanges.h: el proyecto tiene cambios sin guardar)
+static void CurveBezAfterOp(Curve* cv) {
+    cv->CalcHandles();
+    cv->Tessellate(true);
+    if (gCurveInEdit == cv) CurveBezBuildProxy(cv);
+    W3dTouchedChanges();
+    g_redraw = true;
+}
+
+// E: un punto NUEVO despues de cada punta seleccionada (copia de la punta, encima de ella). El move libre
+// que lo lleva lo arranca LayoutExtrudeFaces (la puerta de E y del toolbar): como el extrude de la malla,
+// extruir + mover es UN paso de undo. Una curva sin puntos (se borraron todos) arranca uno en el cursor 3D.
+static bool CurveBezExtrude() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    bool any = false, empty = false;
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        const CurveSpline& sp = cv->splines[s];
+        if (sp.points.empty()) { empty = true; continue; }
+        if (sp.cyclic) continue;
+        if (BezKnotSel(sp.points.front()) || BezKnotSel(sp.points.back())) any = true;
+    }
+    if (!any && !empty) { Notify(T("Select an end point of an open spline"), true); return false; }
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        CurveSpline& sp = cv->splines[s];
+        if (sp.points.empty()) {
+            if (any) continue;
+            Matrix4 W; cv->GetWorldMatrixBase(W);
+            CurvePoint q; q.co = W.Inverse() * cursor3D.pos; q.left = q.co; q.right = q.co;
+            BezSelectPoint(q, true);
+            sp.points.push_back(q);
+            continue;
+        }
+        if (sp.cyclic) { for (size_t i = 0; i < sp.points.size(); i++) sp.points[i].sel = 0; continue; }
+        const bool atEnd = BezKnotSel(sp.points.back());
+        const bool atStart = BezKnotSel(sp.points.front()) && sp.points.size() > 1;
+        for (size_t i = 0; i < sp.points.size(); i++) sp.points[i].sel = 0;   // (queda elegido SOLO lo nuevo)
+        if (atEnd)   { CurvePoint q = sp.points.back();  BezSelectPoint(q, true); sp.points.push_back(q); }
+        if (atStart) { CurvePoint q = sp.points.front(); BezSelectPoint(q, true); sp.points.insert(sp.points.begin(), q); }
+    }
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// X > Vertices: borra los puntos elegidos (una spline sin puntos se va; si no queda ninguna, queda una
+// vacia: la curva sigue siendo de splines y E arranca de nuevo en el cursor)
+static bool CurveBezDeleteVertices() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    bool any = false;
+    for (size_t s = 0; s < cv->splines.size(); s++)
+        for (size_t i = 0; i < cv->splines[s].points.size(); i++) if (BezKnotSel(cv->splines[s].points[i])) any = true;
+    if (!any) return false;
+    CurveBezUndoPush(cv);
+    std::vector<CurveSpline> out;
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        CurveSpline sp = cv->splines[s];
+        std::vector<CurvePoint> keep;
+        for (size_t i = 0; i < sp.points.size(); i++) if (!BezKnotSel(sp.points[i])) keep.push_back(sp.points[i]);
+        if (keep.empty()) continue;
+        sp.points.swap(keep);
+        if (sp.points.size() < 3) sp.cyclic = false;
+        out.push_back(sp);
+    }
+    if (out.empty()) { CurveSpline e; e.type = cv->splines.empty() ? (int)W3dSplineBezier : cv->splines[0].type; out.push_back(e); }
+    cv->splines.swap(out);
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// X > Segments: borra los TRAMOS entre dos puntos elegidos seguidos (la spline se parte; los pedazos de un
+// solo punto se van)
+static bool CurveBezDeleteSegments() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    bool any = false;
+    for (size_t s = 0; s < cv->splines.size() && !any; s++) {
+        const CurveSpline& sp = cv->splines[s];
+        const int np = (int)sp.points.size(), nseg = cv->SegmentCount((int)s);
+        for (int g = 0; g < nseg; g++) if (BezKnotSel(sp.points[g]) && BezKnotSel(sp.points[(g + 1) % np])) { any = true; break; }
+    }
+    if (!any) return false;
+    CurveBezUndoPush(cv);
+    std::vector<CurveSpline> out;
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        const CurveSpline& sp = cv->splines[s];
+        const int np = (int)sp.points.size(), nseg = cv->SegmentCount((int)s);
+        std::vector<char> del(nseg > 0 ? nseg : 0, 0); int ndel = 0;
+        for (int g = 0; g < nseg; g++) if (BezKnotSel(sp.points[g]) && BezKnotSel(sp.points[(g + 1) % np])) { del[g] = 1; ndel++; }
+        if (ndel == 0) { out.push_back(sp); continue; }
+        // la secuencia de puntos a recorrer: una cerrada arranca justo despues del primer tramo borrado
+        int start = 0;
+        if (sp.cyclic) { for (int g = 0; g < nseg; g++) if (del[g]) { start = (g + 1) % np; break; } }
+        CurveSpline piece = sp; piece.cyclic = false; piece.points.clear();
+        for (int c = 0; c < np; c++) {
+            const int i = (start + c) % np;
+            piece.points.push_back(sp.points[i]);
+            const int g = i;   // el tramo que sale de este punto
+            const bool last = (c == np - 1);
+            if (last || (g < nseg && del[g])) {
+                if (piece.points.size() >= 2) out.push_back(piece);
+                piece.points.clear();
+            }
+        }
+    }
+    cv->splines.swap(out);
+    if (cv->splines.empty()) { CurveSpline e; cv->splines.push_back(e); }
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// SUBDIVIDE: un punto en el medio de cada tramo con sus dos puntas elegidas. Bezier: de Casteljau en 0.5
+// (la forma NO cambia: las manijas vecinas se acortan a la mitad y el punto nuevo queda alineado)
+static bool CurveBezSubdivide() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    bool any = false;
+    for (size_t s = 0; s < cv->splines.size() && !any; s++) {
+        const CurveSpline& sp = cv->splines[s];
+        const int np = (int)sp.points.size(), nseg = cv->SegmentCount((int)s);
+        for (int g = 0; g < nseg; g++) if (BezKnotSel(sp.points[g]) && BezKnotSel(sp.points[(g + 1) % np])) { any = true; break; }
+    }
+    if (!any) { Notify(T("Select two adjacent points"), true); return false; }
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        CurveSpline& sp = cv->splines[s];
+        const int np = (int)sp.points.size(), nseg = cv->SegmentCount((int)s);
+        if (nseg <= 0) continue;
+        std::vector<CurvePoint> out;
+        for (int i = 0; i < np; i++) {
+            out.push_back(sp.points[i]);
+            if (i >= nseg) continue;
+            const int j = (i + 1) % np;
+            if (!BezKnotSel(sp.points[i]) || !BezKnotSel(sp.points[j])) continue;
+            CurvePoint& a = out.back();
+            const CurvePoint& b = sp.points[j];
+            CurvePoint mid;
+            BezSelectPoint(mid, true);
+            mid.radius = (a.radius + b.radius) * 0.5f; mid.tilt = (a.tilt + b.tilt) * 0.5f;
+            if (sp.type == W3dSplineBezier) {
+                const Vector3 p01 = (a.co + a.right) * 0.5f, p12 = (a.right + b.left) * 0.5f, p23 = (b.left + b.co) * 0.5f;
+                const Vector3 p012 = (p01 + p12) * 0.5f, p123 = (p12 + p23) * 0.5f;
+                mid.co = (p012 + p123) * 0.5f; mid.left = p012; mid.right = p123;
+                const bool autoBoth = (a.typeR == W3dHandleAuto && b.typeL == W3dHandleAuto);
+                if (autoBoth) { mid.typeL = mid.typeR = W3dHandleAuto; }
+                else {
+                    mid.typeL = mid.typeR = W3dHandleAligned;
+                    // las manijas vecinas pasan a las de de Casteljau: dejan de ser automaticas (si no, la
+                    // forma se iria apenas se recalculen)
+                    a.right = p01;
+                    if (a.typeR == W3dHandleAuto) { a.typeR = W3dHandleAligned; if (a.typeL == W3dHandleAuto) a.typeL = W3dHandleAligned; }
+                    if (a.typeR == W3dHandleVector) a.typeR = W3dHandleFree;
+                    CurvePoint& bb = (j == 0) ? out[0] : sp.points[j];   // (cerrada: el siguiente del ultimo ya esta en 'out')
+                    bb.left = p23;
+                    if (bb.typeL == W3dHandleAuto) { bb.typeL = W3dHandleAligned; if (bb.typeR == W3dHandleAuto) bb.typeR = W3dHandleAligned; }
+                    if (bb.typeL == W3dHandleVector) bb.typeL = W3dHandleFree;
+                }
+            } else {
+                mid.co = (a.co + b.co) * 0.5f; mid.left = mid.co; mid.right = mid.co;
+            }
+            out.push_back(mid);
+        }
+        sp.points.swap(out);
+    }
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// V: el tipo de las manijas elegidas (las dos de un punto elegido, o la manija sola). 0 Auto, 1 Vector,
+// 2 Aligned, 3 Free, 4 = alternar Free / Aligned (como Blender)
+static bool CurveBezSetHandleType(int t) {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    // alternar: si alguna afectada no es Free, todas a Free; si no, todas a Aligned
+    bool anyNotFree = false, any = false;
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        if (cv->splines[s].type != W3dSplineBezier) continue;
+        for (size_t i = 0; i < cv->splines[s].points.size(); i++) {
+            const CurvePoint& q = cv->splines[s].points[i];
+            const bool l = (q.sel & (W3dCurveSelP | W3dCurveSelL)) != 0, r = (q.sel & (W3dCurveSelP | W3dCurveSelR)) != 0;
+            if (l) { any = true; if (q.typeL != W3dHandleFree) anyNotFree = true; }
+            if (r) { any = true; if (q.typeR != W3dHandleFree) anyNotFree = true; }
+        }
+    }
+    if (!any) return false;
+    static const unsigned char kType[4] = { W3dHandleAuto, W3dHandleVector, W3dHandleAligned, W3dHandleFree };
+    const unsigned char want = (t == 4) ? (anyNotFree ? W3dHandleFree : W3dHandleAligned) : kType[(t >= 0 && t < 4) ? t : 0];
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        if (cv->splines[s].type != W3dSplineBezier) continue;
+        for (size_t i = 0; i < cv->splines[s].points.size(); i++) {
+            CurvePoint& q = cv->splines[s].points[i];
+            if (q.sel & (W3dCurveSelP | W3dCurveSelL)) q.typeL = want;
+            if (q.sel & (W3dCurveSelP | W3dCurveSelR)) q.typeR = want;
+        }
+    }
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// Alt+C: abre / cierra las splines con algo elegido
+static bool CurveBezToggleCyclic() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    bool any = false;
+    for (size_t s = 0; s < cv->splines.size(); s++) if (BezSplineHasSel(cv->splines[s]) && cv->splines[s].points.size() >= 2) any = true;
+    if (!any) return false;
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++)
+        if (BezSplineHasSel(cv->splines[s]) && cv->splines[s].points.size() >= 2) cv->splines[s].cyclic = !cv->splines[s].cyclic;
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// da vuelta una spline: el orden de los puntos y, en cada uno, sus manijas (y sus tipos) cambian de lado
+static void BezReverse(CurveSpline& sp) {
+    std::reverse(sp.points.begin(), sp.points.end());
+    for (size_t i = 0; i < sp.points.size(); i++) {
+        CurvePoint& q = sp.points[i];
+        const Vector3 t = q.left; q.left = q.right; q.right = t;
+        const unsigned char ty = q.typeL; q.typeL = q.typeR; q.typeR = ty;
+        const unsigned char sl = q.sel & W3dCurveSelL, sr = q.sel & W3dCurveSelR;
+        q.sel = (unsigned char)((q.sel & W3dCurveSelP) | (sl ? W3dCurveSelR : 0) | (sr ? W3dCurveSelL : 0));
+    }
+}
+
+// F (Make Segment, como Blender): dos PUNTAS elegidas se unen con un tramo. De la misma spline -> se cierra;
+// de dos splines -> quedan una sola (las del mismo tipo)
+static bool CurveBezMakeSegment() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    std::vector<int> es, ee;   // spline y punta (0 = principio, 1 = final) de cada punta elegida
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        const CurveSpline& sp = cv->splines[s];
+        if (sp.cyclic || sp.points.empty()) continue;
+        if (BezKnotSel(sp.points.front())) { es.push_back((int)s); ee.push_back(0); }
+        if (sp.points.size() > 1 && BezKnotSel(sp.points.back())) { es.push_back((int)s); ee.push_back(1); }
+    }
+    if (es.size() != 2) { Notify(T("Select two end points"), true); return false; }
+    if (es[0] == es[1]) {
+        if (cv->splines[es[0]].points.size() < 3) { Notify(T("Select two end points"), true); return false; }
+        CurveBezUndoPush(cv);
+        cv->splines[es[0]].cyclic = true;
+        CurveBezAfterOp(cv);
+        return true;
+    }
+    if (cv->splines[es[0]].type != cv->splines[es[1]].type) { Notify(T("Both splines must be of the same type"), true); return false; }
+    CurveBezUndoPush(cv);
+    CurveSpline a = cv->splines[es[0]], b = cv->splines[es[1]];
+    if (ee[0] == 0) BezReverse(a);   // la punta elegida de 'a' tiene que ser su final...
+    if (ee[1] == 1) BezReverse(b);   // ...y la de 'b' su principio
+    for (size_t i = 0; i < b.points.size(); i++) a.points.push_back(b.points[i]);
+    std::vector<CurveSpline> out;
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        if ((int)s == es[0]) out.push_back(a);
+        else if ((int)s != es[1]) out.push_back(cv->splines[s]);
+    }
+    cv->splines.swap(out);
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// Shift+D: los tramos elegidos (puntos seguidos con el punto elegido) se copian como splines NUEVAS, quedan
+// elegidas solo ellas y arranca el move libre (lo arranca LayoutDuplicateEdit, como en la malla)
+static bool CurveBezDuplicate() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    std::vector<CurveSpline> add;
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        const CurveSpline& sp = cv->splines[s];
+        const int np = (int)sp.points.size();
+        bool all = np > 0;
+        for (int i = 0; i < np; i++) if (!BezKnotSel(sp.points[i])) all = false;
+        if (all) { CurveSpline c = sp; add.push_back(c); continue; }   // (entera: con su cierre)
+        CurveSpline run = sp; run.cyclic = false; run.points.clear();
+        for (int i = 0; i <= np; i++) {
+            if (i < np && BezKnotSel(sp.points[i])) { run.points.push_back(sp.points[i]); continue; }
+            if (!run.points.empty()) { add.push_back(run); run.points.clear(); }
+        }
+    }
+    if (add.empty()) return false;
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++)
+        for (size_t i = 0; i < cv->splines[s].points.size(); i++) cv->splines[s].points[i].sel = 0;
+    for (size_t k = 0; k < add.size(); k++) {
+        for (size_t i = 0; i < add[k].points.size(); i++) BezSelectPoint(add[k].points[i], true);
+        cv->splines.push_back(add[k]);
+    }
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// Switch Direction: da vuelta las splines con algo elegido (el principio del riel pasa a ser el final)
+static bool CurveBezSwitchDirection() {
+    if (!CurveBezEditing()) return false;
+    Curve* cv = gCurveInEdit;
+    CurveBezSync(cv);
+    bool any = false;
+    for (size_t s = 0; s < cv->splines.size(); s++) if (BezSplineHasSel(cv->splines[s])) any = true;
+    if (!any) return false;
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++)
+        if (BezSplineHasSel(cv->splines[s])) BezReverse(cv->splines[s]);
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// una curva de NODOS -> splines (una por cadena del grafo; un nodo con mas de dos vecinos es una rama y
+// una spline no las tiene). false + aviso si no se puede.
+static bool CurveNodesToSplines(Curve* cv, int type) {
+    const int n = cv->vertexSize;
+    std::vector< std::vector<int> > ady(n > 0 ? n : 0);
+    if (cv->edges.empty()) { for (int i = 0; i + 1 < n; i++) { ady[i].push_back(i + 1); ady[i + 1].push_back(i); } }
+    else for (size_t k = 0; k + 1 < cv->edges.size(); k += 2) {
+        const int a = cv->edges[k], b = cv->edges[k + 1];
+        if (a < 0 || b < 0 || a >= n || b >= n || a == b) continue;
+        ady[a].push_back(b); ady[b].push_back(a);
+    }
+    for (int i = 0; i < n; i++) if (ady[i].size() > 2) { Notify(T("A path with branches can't become a spline"), true); return false; }
+    std::vector<char> seen(n > 0 ? n : 0, 0);
+    std::vector<CurveSpline> out;
+    // primero las cadenas abiertas (desde una punta), despues los ciclos
+    for (int pass = 0; pass < 2; pass++)
+        for (int s0 = 0; s0 < n; s0++) {
+            if (seen[s0] || (pass == 0 && ady[s0].size() == 2)) continue;
+            CurveSpline sp; sp.type = type; sp.cyclic = (pass == 1);
+            int prev = -1, cur = s0;
+            while (cur >= 0 && !seen[cur]) {
+                seen[cur] = 1;
+                CurvePoint q; q.co = cv->GetPoint(cur); q.left = q.co; q.right = q.co;
+                sp.points.push_back(q);
+                int nx = -1;
+                for (size_t k = 0; k < ady[cur].size(); k++) if (ady[cur][k] != prev && !seen[ady[cur][k]]) { nx = ady[cur][k]; break; }
+                prev = cur; cur = nx;
+            }
+            if (sp.points.size() < 3) sp.cyclic = false;
+            out.push_back(sp);
+        }
+    if (out.empty()) { CurveSpline e; e.type = type; out.push_back(e); }
+    cv->splines.swap(out);
+    cv->signZ = 1.0f;
+    if (!cv->origin.empty()) {
+        w3dLogf("[Curve] '%s' pasa a splines: AUTORADA (se guarda inline, ya no sigue al .cap)", cv->name.c_str());
+        cv->origin.clear();
+    }
+    return true;
+}
+
+// Set Spline Type: poly <-> Bezier de las splines con algo elegido (o todas si no hay nada elegido). Sobre
+// una curva de NODOS (un path / un riel), la convierte entera.
+static bool CurveSetSplineType(int type) {
+    Curve* cv = gCurveInEdit;
+    if (!cv) return false;
+    if (!cv->HasSplines()) {
+        CurveFinishEdit();               // los nodos editados vuelven a la curva
+        BezState before; BezCapture(cv, before);
+        if (!CurveNodesToSplines(cv, type)) { CurveEnterEdit(cv); return false; }
+        BezUndoPushState(cv, before);
+        for (size_t s = 0; s < cv->splines.size(); s++)
+            for (size_t i = 0; i < cv->splines[s].points.size(); i++) BezSelectPoint(cv->splines[s].points[i], true);
+        cv->CalcHandles();
+        cv->Tessellate(true);
+        CurveEnterEdit(cv);
+        W3dTouchedChanges();
+        return true;
+    }
+    CurveBezSync(cv);
+    bool anySel = false;
+    for (size_t s = 0; s < cv->splines.size(); s++) if (BezSplineHasSel(cv->splines[s])) anySel = true;
+    CurveBezUndoPush(cv);
+    for (size_t s = 0; s < cv->splines.size(); s++) {
+        CurveSpline& sp = cv->splines[s];
+        if ((anySel && !BezSplineHasSel(sp)) || sp.type == type) continue;
+        sp.type = type;
+        if (type == W3dSplineBezier)   // de poly: manijas automaticas (la curva suaviza los quiebres)
+            for (size_t i = 0; i < sp.points.size(); i++) {
+                CurvePoint& q = sp.points[i];
+                q.typeL = q.typeR = W3dHandleAuto; q.left = q.co; q.right = q.co;
+                if (q.sel & W3dCurveSelP) q.sel = W3dCurveSelL | W3dCurveSelP | W3dCurveSelR;
+            }
+    }
+    CurveBezAfterOp(cv);
+    return true;
+}
+
+// LA PUERTA DE LAS TECLAS / MENUS de curvas (la llaman el harness y los menus): id de CurveMenuAction
+void LayoutCurveOp(int id);
+void LayoutActionObject(int aId);   // (mas abajo: Delete > Vertices de la malla, para el path de nodos)
+void LayoutDuplicateEdit();          // (mas abajo: Shift+D)
+
+// ---- el menu "Curve" (boton de contexto de la barra en Edit Mode y la tecla W) --------------------------
+static PopupMenu* gMenuCurve = NULL;
+static PopupMenu* gMenuCurveHandles = NULL;
+static PopupMenu* gMenuCurveType = NULL;
+static PopupMenu* gMenuCurveDelete = NULL;
+enum {
+    CURVE_EXTRUDE = 1, CURVE_SUBDIVIDE, CURVE_DEL_VERTS, CURVE_DEL_SEGS, CURVE_CYCLIC, CURVE_SWITCH,
+    CURVE_SEGMENT, CURVE_DUPLICATE,
+    CURVE_HANDLE_AUTO = 10, CURVE_HANDLE_VECTOR, CURVE_HANDLE_ALIGNED, CURVE_HANDLE_FREE, CURVE_HANDLE_TOGGLE,
+    CURVE_TYPE_POLY = 20, CURVE_TYPE_BEZIER
+};
+static void CurveMenuAction(int id) { LayoutCurveOp(id); }
+void LayoutCurveOp(int id) {
+    switch (id) {
+        case CURVE_EXTRUDE:   LayoutExtrudeFaces(); break;   // (la misma puerta que E y el boton del toolbar)
+        case CURVE_SUBDIVIDE: CurveBezSubdivide(); break;
+        case CURVE_DEL_VERTS:
+            if (CurveBezEditing()) CurveBezDeleteVertices();
+            else LayoutActionObject(361);   // (path de nodos: el Delete > Vertices de la malla, con su undo)
+            break;
+        case CURVE_DEL_SEGS:  CurveBezDeleteSegments(); break;
+        case CURVE_CYCLIC:    CurveBezToggleCyclic(); break;
+        case CURVE_SWITCH:    CurveBezSwitchDirection(); break;
+        case CURVE_SEGMENT:   CurveBezMakeSegment(); break;
+        case CURVE_DUPLICATE: LayoutDuplicateEdit(); break;   // (la misma puerta que Shift+D: arranca el move)
+        case CURVE_HANDLE_AUTO: case CURVE_HANDLE_VECTOR: case CURVE_HANDLE_ALIGNED: case CURVE_HANDLE_FREE: case CURVE_HANDLE_TOGGLE:
+            CurveBezSetHandleType(id - CURVE_HANDLE_AUTO); break;
+        case CURVE_TYPE_POLY:   CurveSetSplineType(W3dSplinePoly); break;
+        case CURVE_TYPE_BEZIER: CurveSetSplineType(W3dSplineBezier); break;
+    }
+    g_redraw = true;
+}
+static PopupMenu* CurveMenuHandles() {
+    if (!gMenuCurveHandles) {
+        gMenuCurveHandles = new PopupMenu(); gMenuCurveHandles->title = T("Set Handle Type"); gMenuCurveHandles->action = CurveMenuAction;
+        gMenuCurveHandles->Add(T("Automatic"), CURVE_HANDLE_AUTO);
+        gMenuCurveHandles->Add(T("Vector"), CURVE_HANDLE_VECTOR);
+        gMenuCurveHandles->Add(T("Aligned"), CURVE_HANDLE_ALIGNED);
+        gMenuCurveHandles->Add(T("Free"), CURVE_HANDLE_FREE);
+        gMenuCurveHandles->Add(T("Toggle Free/Aligned"), CURVE_HANDLE_TOGGLE);
+    }
+    return gMenuCurveHandles;
+}
+static PopupMenu* CurveMenuType() {
+    if (!gMenuCurveType) {
+        gMenuCurveType = new PopupMenu(); gMenuCurveType->title = T("Set Spline Type"); gMenuCurveType->action = CurveMenuAction;
+        gMenuCurveType->Add(T("Poly"), CURVE_TYPE_POLY);
+        gMenuCurveType->Add(T("Bezier"), CURVE_TYPE_BEZIER);
+    }
+    return gMenuCurveType;
+}
+static PopupMenu* CurveMenuDelete() {
+    if (!gMenuCurveDelete) {
+        gMenuCurveDelete = new PopupMenu(); gMenuCurveDelete->title = T("Delete"); gMenuCurveDelete->action = CurveMenuAction;
+        gMenuCurveDelete->Add(T("Vertices"), CURVE_DEL_VERTS);
+        gMenuCurveDelete->Add(T("Segments"), CURVE_DEL_SEGS);
+    }
+    return gMenuCurveDelete;
+}
+static void CurveMenuOpen(PopupMenu* m, int mx, int my) {
+    if (OpenMenu) OpenMenu->Close();
+    m->Open(mx, my, MenuScreenW, MenuScreenH);
+    OpenMenu = m;
+}
+// el menu de contexto de la curva: con splines, todas las ops; sobre un path de NODOS, lo que tiene sentido
+// para el (extruir, borrar) y convertirlo en spline
+void LayoutMenuCurveEdit(int mx, int my) {
+    if (!gCurveInEdit) return;
+    if (!gMenuCurve) { gMenuCurve = new PopupMenu(); gMenuCurve->title = T("Curve"); gMenuCurve->action = CurveMenuAction; }
+    gMenuCurve->Clear();
+    const bool bez = gCurveInEdit->HasSplines();
+    gMenuCurve->Add(T("Extrude"), CURVE_EXTRUDE)->shortcut = "@3d.extrude";
+    if (bez) {
+        gMenuCurve->Add(T("Subdivide"), CURVE_SUBDIVIDE);
+        gMenuCurve->Add(T("Make Segment"), CURVE_SEGMENT)->shortcut = "@3d.face";
+        gMenuCurve->Add(T("Duplicate"), CURVE_DUPLICATE)->shortcut = "@3d.duplicate";
+        gMenuCurve->Add(T("Delete"), 0, IconType::trash, CurveMenuDelete())->shortcut = "@3d.delete";
+        gMenuCurve->Add(T("Set Handle Type"), 0, -1, CurveMenuHandles())->shortcut = "V";
+        gMenuCurve->Add(T("Toggle Cyclic"), CURVE_CYCLIC)->shortcut = "@3d.cyclic";
+        gMenuCurve->Add(T("Switch Direction"), CURVE_SWITCH);
+    } else {
+        gMenuCurve->Add(T("Delete Vertices"), CURVE_DEL_VERTS, IconType::trash)->shortcut = "@3d.delete";
+    }
+    gMenuCurve->Add(T("Set Spline Type"), 0, -1, CurveMenuType());
+    CurveMenuOpen(gMenuCurve, mx, my);
+}
+// atajos directos (los consulta el handler de teclado del 3D antes que los de malla)
+bool LayoutCurveHandleMenu(int mx, int my) {   // V
+    if (!CurveBezEditing()) return false;
+    CurveMenuOpen(CurveMenuHandles(), mx, my);
+    return true;
+}
+bool LayoutCurveToggleCyclic() {   // Alt+C
+    if (!CurveBezEditing()) return false;
+    CurveBezToggleCyclic();
+    return true;
+}
+
+static void CurveEnterEdit(Curve* cv){
+    if (!cv || gCurveInEdit) return;
+    if (cv->HasSplines()) {   // CURVA DE SPLINES: el proxy de puntos + manijas (ver el bloque de arriba)
+        CurveBezBuildProxy(cv);
+        gCurveInEdit = cv;
+        cv->editing = true;
+        gBezNeedFull = false; gBezXformPending = false;
+        if (EditSelectMode != SelVertex) EditSelectMode = SelVertex;   // (puntos sueltos: no hay aristas ni caras)
+        InteractionMode = EditMode;
+        UpdateActiveEditMesh();
+        g_redraw = true;
+        return;
+    }
+    Mesh* m = CurveEditHolder(cv);
     // REUSO del holder: limpiar lo del uso anterior y cargar los nodos de ESTA curva
     m->InvalidateEdit();
     delete[] m->vertex; delete[] m->normals; delete[] m->uv; delete[] m->vertexColor;
@@ -778,10 +1596,11 @@ static void CurveEnterEdit(Curve* cv){
     MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefault;
     m->materialsGroup.push_back(g);
     m->name = cv->name;                    // (interno: solo para logs/overlays)
-    m->pos  = cv->GetGlobalPosition();     // suelto: su pos ES su global
+    CurveEditPlace(cv, m);                 // suelto: su transform ES la global de la curva
     m->noEditable = false; m->visible = true;
     m->ComputeBorders();
     gCurveInEdit = cv;
+    cv->editing = true;   // (la geometria no tapa los nodos)
     // NO se toca la seleccion (la curva sigue siendo el objeto activo) ni su visibilidad:
     // la linea del riel queda abajo y encima se dibujan los nodos editables.
     if (EditSelectMode == SelFace) EditSelectMode = SelVertex;   // un path no tiene caras
@@ -795,11 +1614,20 @@ static void CurveFinishEdit(){
     Curve* cv = gCurveInEdit;
     gCurveInEdit = NULL;
     if (!cv) return;
+    cv->editing = false;
     // la curva pudo BORRARSE mientras se editaba (X): el camino real de borrado la deja viva
     // en el undo (y su malla interna con ella), asi que aca solo hay que no volcar nada.
     bool curveLive = ObjectInScene(SceneCollection, cv);
     Mesh* m = cv->edit;
     if (!m) return;
+    if (cv->HasSplines()) {   // SPLINES: lo ultimo del proxy a las splines y la teselacion completa (arbol KD)
+        if (curveLive) { CurveBezSync(cv); cv->Tessellate(true); }
+        gBezMap.clear(); gBezLast.clear(); gBezLastSel.clear();
+        gBezNeedFull = false; gBezXformPending = false;
+        m->InvalidateEdit();
+        g_redraw = true;
+        return;
+    }
     if (curveLive && m->vertex && m->vertexSize > 0) {
         // WRITE-BACK EN ORDEN DE VERTICES (1:1 con el proxy): los nodos existentes CONSERVAN su
         // indice (el mapeo con las celdas del .w3dvis no se rompe con un move) y los extruidos
@@ -824,6 +1652,7 @@ static void CurveFinishEdit(){
         }
         cv->BuildKDTree();
         cv->RecalculateBranches();
+        cv->tessVersion++;   // (los nodos cambiaron: el tubo / la cinta, si tiene, se rehace)
     }
     // la malla interna queda en la curva (se reusa en la proxima edicion); solo soltar el cage
     m->InvalidateEdit();
@@ -834,6 +1663,21 @@ static void CurveFinishEdit(){
 // editados tienen que estar volcados en la curva ANTES de serializarla)
 void W3dCurveEditClose() {
     if (gCurveInEdit) { InteractionMode = ObjectMode; CurveFinishEdit(); }
+}
+// volver a armar la sesion de edicion de 'cv' SIN volcar el proxy (lo vivo de la curva ya es lo que vale:
+// lo acaba de reponer el undo de una op de curva)
+static void CurveReenterEdit(Curve* cv) {
+    gCurveInEdit = NULL;
+    gBezMap.clear(); gBezXformPending = false; gBezNeedFull = false;
+    if (cv->edit) cv->edit->InvalidateEdit();
+    CurveEnterEdit(cv);
+}
+// el vertice del proxy de un punto (role 0 = manija izq, 1 = punto, 2 = manija der); -1 = no esta (harness)
+int LayoutCurveProxyIndex(int s, int p, int role) {
+    if (!CurveBezEditing()) return -1;
+    for (size_t k = 0; k < gBezMap.size(); k++)
+        if (gBezMap[k].s == s && gBezMap[k].p == p && gBezMap[k].role == role) return (int)k;
+    return -1;
 }
 
 void AddPlane(){    AfterCreateAdd(NewMesh(MeshType::plane, NULL, false)); }
@@ -993,7 +1837,7 @@ void AddLight(){
     if (l){ l->pos = cursor3D.pos; l->SetNameObj(T("Light")); }
     AfterCreateAdd(l);
 }
-// el SOL y el FOCO: la misma luz con otro tipo (el sol mira hacia abajo en diagonal; el foco, hacia abajo)
+// el SOL, el FOCO y la de AREA: la misma luz con otro tipo (el sol mira hacia abajo en diagonal; el foco y la de area, hacia abajo)
 static void AddLightType(int type, const char* name, float rotX) {
     Light* l = Light::Create(NULL, 0, 0, 0);
     if (l){ l->pos = cursor3D.pos; l->SetNameObj(T(name)); W3dLightSetType(l, type); l->SetRotEuler(Vector3(rotX, 0.0f, 0.0f)); }
@@ -1001,6 +1845,7 @@ static void AddLightType(int type, const char* name, float rotX) {
 }
 void AddLightSun(){  AddLightType(1, "Sun", -45.0f); }
 void AddLightFocus(){ AddLightType(2, "Spot", -90.0f); }
+void AddLightArea(){ AddLightType(3, "Area", -90.0f); }   // (alumbra hacia abajo, como un panel en el techo)
 void AddArmature(){
     // un solo hueso desde el origen, 0.3 hacia arriba (Y), en el cursor 3D.
     Armature* arm = new Armature(NULL, cursor3D.pos);
@@ -1098,6 +1943,109 @@ void AddPath(){
     AfterCreateAdd(cv);
     CurveEnterEdit(cv);
 }
+// ---- Add > Curve: BEZIER y CIRCULO (curvas de splines con manijas) -------------------------------------
+// Como en Blender nacen en Modo Objeto (Tab para editarlas) y acostadas en el piso: el plano XY de Blender
+// es el XZ de aca (Y arriba). La Bezier trae las manijas Aligned de la de Blender; el circulo, 4 puntos Auto.
+static Curve* NewSplineCurve(const char* name) {
+    Curve* cv = new Curve(NULL, cursor3D.pos);
+    cv->SetNameObj(name);
+    cv->signZ = 1.0f;               // autorada en el espacio del motor (sin espejo de .cap)
+    cv->splines.push_back(CurveSpline());
+    return cv;
+}
+Curve* AddBezierCurveObj() {
+    Curve* cv = NewSplineCurve("BezierCurve");
+    CurveSpline& sp = cv->splines[0];
+    static const float K[2][3][3] = {   // { izq, punto, der } de cada punto
+        { { -1.5f, 0.0f, 0.5f }, { -1.0f, 0.0f, 0.0f }, { -0.5f, 0.0f, -0.5f } },
+        { {  0.5f, 0.0f, 0.5f }, {  1.0f, 0.0f, 0.0f }, {  1.5f, 0.0f, -0.5f } },
+    };
+    for (int i = 0; i < 2; i++) {
+        CurvePoint q;
+        q.left = Vector3(K[i][0][0], K[i][0][1], K[i][0][2]);
+        q.co   = Vector3(K[i][1][0], K[i][1][1], K[i][1][2]);
+        q.right = Vector3(K[i][2][0], K[i][2][1], K[i][2][2]);
+        q.typeL = q.typeR = W3dHandleAligned;
+        q.sel = W3dCurveSelL | W3dCurveSelP | W3dCurveSelR;   // (como Blender: al entrar a editarla, todo elegido)
+        sp.points.push_back(q);
+    }
+    cv->Tessellate(true);
+    return cv;
+}
+Curve* AddBezierCircleObj() {
+    Curve* cv = NewSplineCurve("BezierCircle");
+    CurveSpline& sp = cv->splines[0];
+    sp.cyclic = true;
+    for (int i = 0; i < 4; i++) {
+        const float a = 6.2831853f * (float)i / 4.0f;
+        CurvePoint q; q.co = Vector3(cosf(a), 0.0f, -sinf(a));   // (antihorario visto desde arriba, como Blender)
+        q.left = q.right = q.co;
+        q.sel = W3dCurveSelL | W3dCurveSelP | W3dCurveSelR;
+        sp.points.push_back(q);
+    }
+    cv->CalcHandles();
+    cv->Tessellate(true);
+    return cv;
+}
+void AddBezierCurve()  { AfterCreateAdd(AddBezierCurveObj()); }
+void AddBezierCircle() { AfterCreateAdd(AddBezierCircleObj()); }
+
+// ============================================================================
+//  CONVERT TO MESH (Object > Convert to Mesh, tarjeta Curve): la curva activa pasa a ser una MALLA comun con
+//  su forma (el tubo / la cinta) o, sin forma, su linea como aristas sueltas. UN paso de undo: la malla nueva
+//  aparece en el lugar de la curva (mismo padre, transform, nombre y material) y la curva se va al undo.
+// ============================================================================
+bool LayoutConvertCurveToMesh() {
+    Curve* cv = (ActiveObj && ActiveObj->getType() == ObjectType::curve) ? (Curve*)ActiveObj : NULL;
+    if (!cv) { Notify(T("Select a curve"), true); return false; }
+    if (!cv->Childrens.empty()) { Notify(T("The curve has children: unparent them first"), true); return false; }
+    if (gCurveInEdit == cv) { InteractionMode = ObjectMode; UpdateActiveEditMesh(); }   // (vuelca la edicion)
+    if (cv->HasSplines()) cv->Tessellate(true);
+    if (!cv->vertex || cv->vertexSize < 1) { Notify(T("The curve is empty"), true); return false; }
+    Object* parent = cv->Parent;
+    Mesh* m = new Mesh(parent, cv->pos);
+    m->SetRotSnapshot(cv->Rot(), cv->rotEuler);
+    m->rotMode = cv->rotMode;
+    m->scale = cv->scale;
+    if (!cv->BuildShapeMesh(m)) {
+        // SIN FORMA: la linea teselada como vertices + aristas sueltas (como un path de malla)
+        const int n = cv->vertexSize;
+        m->vertexSize = n;
+        m->vertex = new GLfloat[n * 3]; m->normals = new GLbyte[n * 3];
+        m->uv = new GLfloat[n * 2];     m->vertexColor = new GLubyte[n * 4];
+        for (int i = 0; i < n; i++) {
+            m->vertex[i*3] = cv->vertex[i*3]; m->vertex[i*3+1] = cv->vertex[i*3+1]; m->vertex[i*3+2] = cv->vertex[i*3+2];
+            m->normals[i*3] = 0; m->normals[i*3+1] = 127; m->normals[i*3+2] = 0;
+            m->uv[i*2] = m->uv[i*2+1] = 0.0f;
+            m->vertexColor[i*4] = m->vertexColor[i*4+1] = m->vertexColor[i*4+2] = m->vertexColor[i*4+3] = 255;
+        }
+        if (!cv->edges.empty()) for (size_t k = 0; k < cv->edges.size(); k++) m->looseEdges.push_back((int)cv->edges[k]);
+        else for (int i = 0; i + 1 < n; i++) { m->looseEdges.push_back(i); m->looseEdges.push_back(i + 1); }
+        if (n == 1) m->looseVerts.push_back(0);
+        MaterialGroup g; g.startDrawn = 0; g.material = cv->material ? cv->material : MaterialDefault;
+        m->materialsGroup.push_back(g);
+        m->ComputeBorders();
+    }
+    const std::string name = cv->name;
+    UndoGroupStart();
+    UndoCaptureSelection();
+    // la malla nueva, en el lugar de la curva en su padre (el outliner no la manda al final)
+    if (W3dMeshSpawnedHook) W3dMeshSpawnedHook();
+    MoveNextTo(m, cv, true);
+    DeselectAll(); m->Select();
+    UndoCaptureCreation();
+    // la curva se va (detachada: Ctrl+Z la devuelve)
+    DeselectAll(); cv->Select();
+    UndoCaptureDeleted(false);
+    // con la curva afuera, la malla se queda con su nombre
+    if (m->FreeName(name) == name) W3dRenameObject(m, name, false);
+    DeselectAll(); m->Select();
+    UndoGroupSequentialEnd();
+    W3dTouchedChanges();
+    g_redraw = true;
+    return true;
+}
+
 void AddReference(){
     // un plano PARADO (90 en X) = de frente en la vista, con su material y el selector de textura ya abierto:
     // imagen de referencia en un paso. NO abre el panel "Add Plane" (el selector ocupa la pantalla).
@@ -1197,11 +2145,20 @@ static const MenuDef ADD_MODIFIERS[] = {
     { "Instance",   AddDuplicateLinked, NULL, ICON(IconType::instance) },
 };
 
+// submenu Curve: las curvas (Bezier y circulo con manijas; el path de nodos de siempre, que admite ramas)
+static PopupMenu* MenuCurvesAdd = NULL;
+static const MenuDef ADD_CURVES[] = {
+    { "Bezier",     AddBezierCurve,     NULL, ICON(IconType::curve) },
+    { "Circle",     AddBezierCircle,    NULL, ICON(IconType::circle) },
+    { "Path",       AddPath,            NULL, ICON(IconType::curve) },
+};
+
 // submenu Lights: las luces y la sonda de luz (la luz indirecta horneada)
 static const MenuDef ADD_LIGHTS[] = {
     { "Light",       AddLight,          NULL, ICON(IconType::light) },
     { "Sun",         AddLightSun,         NULL, ICON(IconType::light) },
     { "Spot",        AddLightFocus,        NULL, ICON(IconType::light) },
+    { "Area",        AddLightArea,         NULL, ICON(IconType::light) },
     { "Light Probe", AddLightProbe,       NULL, ICON(IconType::sphere) },
     { "Reflection Probe", AddReflectionProbe, NULL, ICON(IconType::photo) },
 };
@@ -1218,7 +2175,7 @@ static const MenuDef ADD[] = {
     { "Particles",  AddParticles,      NULL, ICON(IconType::circle) },
     { "Physics",    AddPhysics,          NULL, ICON(IconType::object) },
     { "Hitbox",     AddHitbox,          NULL, ICON(IconType::hitbox) },
-    { "Path",       AddPath,            NULL, ICON(IconType::curve) },
+    { "Curve",      NULL,               NULL, ICON(IconType::curve),  &MenuCurvesAdd },   // Bezier, circulo y el path de nodos
     { "Armature",   AddArmature,        NULL, ICON(IconType::armature) },
     { "Camera",     AddCamera,          NULL, ICON(IconType::camera) },
     { "Lights",     NULL,               NULL, ICON(IconType::light),  &MenuLightsAdd },   // luz, sol, foco y la sonda de luz
@@ -1250,6 +2207,8 @@ void LayoutBuildMenuAdd(){
         MenuModifiers->Build(ADD_MODIFIERS, (int)(sizeof(ADD_MODIFIERS)/sizeof(ADD_MODIFIERS[0])));
     if (MenuLightsAdd)
         MenuLightsAdd->Build(ADD_LIGHTS, (int)(sizeof(ADD_LIGHTS)/sizeof(ADD_LIGHTS[0])));
+    if (!MenuCurvesAdd) MenuCurvesAdd = new PopupMenu();   // (tiene que existir antes de armar el Add: la fila apunta a el)
+    MenuCurvesAdd->Build(ADD_CURVES, (int)(sizeof(ADD_CURVES)/sizeof(ADD_CURVES[0])));
     if (MenuCore) W3dRoutineMenuSteps(MenuCore, gSubsCore, AddRoutineWith, true);
     MenuAdd->Build(ADD, (int)(sizeof(ADD)/sizeof(ADD[0])));
 }
@@ -1333,7 +2292,9 @@ bool EditXformStart(int est, int axis) { // expuesto (lo usa el harness para tes
     if (EditXformActive()) EditXformConfirm();
     state = est; axisSelect = axis;
     if (est == rotation) gTrackballCap = false; // re-captura el angulo del trackball
-    UndoEditMoveStart((Mesh*)g_editMesh); // Ctrl+Z: captura posiciones PREVIAS (move PURO; se confirma al aceptar)
+    // Ctrl+Z: captura posiciones PREVIAS (move PURO; se confirma al aceptar). Una curva de splines guarda sus
+    // SPLINES (tipos de manija incluidos), no las posiciones del proxy
+    if (CurveBezEditing()) CurveBezXformBegin(); else UndoEditMoveStart((Mesh*)g_editMesh);
     EditXformSnapshot();
     if (!EditXformActive()) state = editNavigation; // sin seleccion: no-op
     else ToolbarRegisterAction(est == rotation ? TBRotate : est == EditScale ? TBScale : TBMove); // historial
@@ -1488,6 +2449,16 @@ bool SnapFindTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& ou
 // (verts/aristas sueltas) es LIBRE (plano de la camara). Solo en Edit Mode.
 void LayoutExtrudeFaces() {
     if (InteractionMode != EditMode || !g_editMesh) return;
+    // CURVA DE SPLINES: un punto nuevo en cada punta elegida, y el move libre que lo lleva (un solo undo)
+    if (CurveBezEditing()) {
+        if (EditXformActive()) EditXformConfirm();
+        if (!CurveBezExtrude()) return;
+        state = translation; axisSelect = ViewAxis;
+        EditXformSnapshot();
+        if (!EditXformActive()) state = editNavigation;
+        else { ToolbarRegisterAction(TBExtrude); g_extrudeInProgress = true; }
+        return;
+    }
     Mesh* m = (Mesh*)g_editMesh;
     Vector3 dir; bool constrain = false;
     if (!m->ExtrudeEdit(dir, constrain)) return;
@@ -1504,6 +2475,14 @@ void LayoutExtrudeFaces() {
 // DUPLICATE en Edit Mode (Shift+D): copia la seleccion y arranca un move LIBRE.
 void LayoutDuplicateEdit() {
     if (InteractionMode != EditMode || !g_editMesh) return;
+    if (CurveBezEditing()) {   // curva de splines: los tramos elegidos como splines nuevas + el move libre
+        if (EditXformActive()) EditXformConfirm();
+        if (!CurveBezDuplicate()) return;
+        state = translation; axisSelect = ViewAxis;
+        EditXformSnapshot();
+        if (!EditXformActive()) state = editNavigation;
+        return;
+    }
     Mesh* m = (Mesh*)g_editMesh;
     if (!m->DuplicateSelectionEdit()) return;
     state = translation; axisSelect = ViewAxis;
@@ -1515,6 +2494,7 @@ void LayoutDuplicateEdit() {
 // seleccionada la pieza nueva (separada). No arranca move: la idea es separar -> L una mitad -> borrar.
 void LayoutRipEdit() {
     if (InteractionMode != EditMode || !g_editMesh) return;
+    if (LayoutCurveHandleMenu(lastMouseX, lastMouseY)) return;   // curva de splines: V = Set Handle Type (Blender)
     Mesh* m = (Mesh*)g_editMesh;
     if (!m->RipSelectionEdit()) { Notify(T("Rip: the selection does not separate the mesh"), true); g_redraw = true; return; }
     Notify(T("Rip: mesh separated"), false);
@@ -1547,6 +2527,7 @@ void LayoutSeparateEdit() {
 // F = "New Edge/Face from Vertices" (menu Vertex): conecta los verts seleccionados.
 void LayoutNewFaceEdit() {
     if (InteractionMode != EditMode || !g_editMesh) return;
+    if (CurveBezEditing()) { CurveBezMakeSegment(); return; }   // curva de splines: F = Make Segment (Blender)
     Mesh* m = (Mesh*)g_editMesh;
     m->CreateFaceEdit();
 }
@@ -1892,6 +2873,7 @@ void LayoutActionObject(int aId) {
                     if (!W3dPrefabCreateFromSelection(&name, &reason)) Notify(std::string(T(reason.c_str())), true);
                     else Notify(std::string(T("Prefab created")) + ": " + name, false);
                     break; }
+        case 702: LayoutConvertCurveToMesh(); break;   // Convert to Mesh (la curva activa -> malla)
         case 701: { std::string reason;
                     InstancePrefab* ip = (ActiveObj && ActiveObj->getType() == ObjectType::prefab) ? (InstancePrefab*)ActiveObj : NULL;
                     if (!ip) Notify(std::string(T("Select a prefab instance")), true);
@@ -2084,6 +3066,25 @@ static void RegenerateBooleansWithEditedTargetRec(Object* node){
     }
 }
 
+// ---- la memoria de los modos (ver edit/ModeMemory.h) ----
+namespace {
+struct ModeRelease { unsigned modes; W3dModeReleaseFn release; };
+std::vector<ModeRelease>& ModeReleases() { static std::vector<ModeRelease> v; return v; }   // (antes que los static que anotan)
+}
+int W3dModeMemoryRegister(unsigned modes, W3dModeReleaseFn release) {
+    if (release && modes) { ModeRelease r = { modes, release }; ModeReleases().push_back(r); }
+    return (int)ModeReleases().size();
+}
+void W3dModeMemoryTick(unsigned activeModes) {
+    static unsigned prev = 0;
+    const unsigned left = prev & ~activeModes;   // los modos que se dejaron en este cuadro
+    prev = activeModes;
+    if (!left) return;
+    const std::vector<ModeRelease>& v = ModeReleases();
+    for (size_t i = 0; i < v.size(); i++)
+        if ((v[i].modes & left) && !(v[i].modes & activeModes)) v[i].release();   // (salvo que siga en otro de los suyos)
+}
+
 void UpdateActiveEditMesh() {
     // EDICION DE CURVE: si la curva dejo de ser el objeto activo en Edit (Tab afuera,
     // click en otro objeto, cambio de modo), volcar los nodos y cerrar la sesion.
@@ -2096,6 +3097,9 @@ void UpdateActiveEditMesh() {
     // curva en edicion: la MALLA INTERNA de la curva es la editable (el activo sigue siendo la curva)
     if (gCurveInEdit && InteractionMode == EditMode && ActiveObj == (Object*)gCurveInEdit)
         g_editMesh = (Object*)gCurveInEdit->edit;
+    // SPLINES: lo que la maquinaria de malla hizo con el proxy (mover, elegir) pasa a las manijas
+    if (CurveBezEditing() && InteractionMode == EditMode && g_editMesh == (Object*)gCurveInEdit->edit)
+        CurveBezSync(gCurveInEdit);
     // el modo Face del menu SelMode se grisa editando una malla sin caras (path/riel)
     g_selFaceAvailable = !(g_editMesh && ((Mesh*)g_editMesh)->facesSize == 0);
     // CONSTRAINTS + EDIT MODE: el evaluador del Core necesita saber CUAL objeto se esta editando
@@ -2134,6 +3138,9 @@ void UpdateActiveEditMesh() {
         g_meshesEdited = false;
         if (SceneCollection) RegenerateBooleansWithEditedTargetRec(SceneCollection);
     }
+    // LA MEMORIA DE LOS MODOS (edit/ModeMemory.h): lo que las herramientas reservaron para el modo que se deja se suelta
+    // (la pintura de textura del editor UV cuenta como Texture Paint)
+    W3dModeMemoryTick(W3D_MODE_BIT(InteractionMode) | (UVEditorPaintingTexture() ? W3D_MODE_BIT(TexturePaint) : 0u));
     // Esta funcion se llama CADA FRAME (ViewPort3D::Render). El UNICO motivo para regenerar aca es el CAMBIO DE MODO
     // (entrar/salir de Edit): el filtro showEdit puede saltear un modificador en Edit, asi que el preview cambia.
     // NO se regenera por seleccionar/activar un objeto (seleccionar no cambia la geometria -> el preview ya esta
@@ -2224,11 +3231,12 @@ static void LayoutRebuildMenuMode() {
     if (!MenuMode) return;
     MenuMode->Clear();
     bool isArm = (ActiveObj && ActiveObj->getType() == ObjectType::armature);
+    bool isCurve = (ActiveObj && ActiveObj->getType() == ObjectType::curve);   // (curva: Object / Edit, nada mas)
     MenuMode->Add(T("Object Mode"), ObjectMode, IconType::object);
-    MenuMode->Add(T("Edit Mode"),   EditMode,   isArm ? IconType::armature : IconType::mesh);
+    MenuMode->Add(T("Edit Mode"),   EditMode,   isArm ? IconType::armature : isCurve ? IconType::curve : IconType::mesh);
     if (isArm) {
         MenuMode->Add(T("Pose Mode"), PoseMode, IconType::armature);
-    } else {
+    } else if (!isCurve) {
         MenuMode->Add(T("Vertex Paint"),  VertexPaint,  IconType::mesh);
         MenuMode->Add(T("Weight Paint"),  WeightPaint,  IconType::mesh);
         MenuMode->Add(T("Texture Paint"), TexturePaint, IconType::mesh);
@@ -4051,6 +5059,7 @@ static void EnsureMenuDelete() {
 bool LayoutDeleteEdit(int mx, int my) {
     if (state != editNavigation) return false;
     if (InteractionMode != EditMode || !g_editMesh) return false;
+    if (CurveBezEditing()) { CurveMenuOpen(CurveMenuDelete(), mx, my); return true; }   // curva: Vertices / Segments
     EnsureMenuDelete();
     gMenuDelete->Open(mx, my, MenuScreenW, MenuScreenH);
     OpenMenu = gMenuDelete;
@@ -4270,6 +5279,7 @@ PopupMenu* LayoutSubmenuEditVertex() {
 }
 void LayoutMenuEditContext(int mx, int my) {
     if (InteractionMode != EditMode) return;
+    if (gCurveInEdit) { LayoutMenuCurveEdit(mx, my); return; }   // una curva: el menu Curve (puntos y manijas)
     PopupMenu* m = (EditSelectMode == SelFace) ? LayoutSubmenuEditFace()
                  : (EditSelectMode == SelEdge) ? LayoutSubmenuEditEdge() : LayoutSubmenuEditVertex();
     LayoutCtxSelectMenu();   // (el submenu Select, segun el sub-modo de ahora)
@@ -4294,6 +5304,7 @@ void LayoutMenuAdd(int mx, int my) {
 static PopupMenu* gMenuSharp = NULL;
 void LayoutMenuSharp(int mx, int my) {
     if (InteractionMode != EditMode || !g_editMesh) return;
+    if (gCurveInEdit) { LayoutMenuCurveEdit(mx, my); return; }   // (una curva no tiene bordes que afilar: su menu)
     if (!gMenuSharp) {
         gMenuSharp = new PopupMenu(); gMenuSharp->title = T("Edge"); gMenuSharp->action = LayoutActionObject;
         gMenuSharp->Add(T("Mark Sharp"), 330);
@@ -4636,7 +5647,7 @@ void EditXformSnapshot(){
         const size_t nE = e->editVerts.size();
         vnEd.assign(nE * 3, 0.0f);
         for (size_t f = 0; f < e->faces.size(); f++) {
-            const std::vector<int>& F = e->faces[f];
+            const IntRows::Row F = e->faces[f];
             const size_t n = F.size(); if (n < 3) continue;
             float nx = 0, ny = 0, nz = 0;   // Newell (sirve para poligonos de n lados)
             for (size_t j = 0; j < n; j++) {
@@ -5246,7 +6257,7 @@ void LayoutShrinkFatten() {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (EditXformActive()) EditXformConfirm(); // encadenar: confirma el transform anterior
     state = EditScale; axisSelect = XYZ;       // libre (la direccion la da la normal de cada vertice)
-    UndoEditMoveStart((Mesh*)g_editMesh);      // Ctrl+Z: captura posiciones previas
+    if (CurveBezEditing()) CurveBezXformBegin(); else UndoEditMoveStart((Mesh*)g_editMesh);   // Ctrl+Z: posiciones previas
     gEVshrinkRequest = true;
     EditXformSnapshot();                          // snapshot de la seleccion (calcula las normales por vert)
     gEVshrinkRequest = false;
@@ -5387,6 +6398,7 @@ void EditXformConfirm(){
     extern bool AutoKeyOn;
     const bool akGroup = AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh;
     if (akGroup) UndoGroupStart();
+    CurveBezXformEnd(true); // (curva de splines: su paso de undo, si el move cambio algo)
     UndoEditMoveConfirm(); // Ctrl+Z: el move PURO se acepto -> pushea el pendiente (NULL si fue extrude)
     if (gEVmesh){
         Mesh* m = gEVmesh;
@@ -5420,6 +6432,7 @@ void EditXformConfirm(){
 
 // descarta: restaura las posiciones del snapshot (mundo -> local) y limpia.
 void EditXformCancel(){
+    CurveBezXformEnd(false); // (curva de splines: vuelven EXACTAS, tambien lo que la regla movio sin estar elegido)
     UndoEditMoveCancel(); // Ctrl+Z: move cancelado -> descarta el pendiente (no deja undo no-op)
     if (gEVmesh){
         Mesh* m = gEVmesh;
@@ -5577,6 +6590,67 @@ static int gScrollPrevY = 0;
 // mano por ViewportKind() y habia que acordarse de venir a tocarla aca por cada viewport nuevo.
 static Scrollable* AsScrollable(ViewportBase* v) { return v ? v->AsScrollable() : NULL; }
 
+// suelta la barra agarrada (si habia): el panel deja de seguir al mouse
+static void ScrollBarDragRelease() {
+    Scrollable* sc = AsScrollable(gScrollBarDrag);
+    if (sc) {
+        sc->mouseOverScrollYpress = false;
+        sc->mouseOverScrollXpress = false;
+    }
+    gScrollBarDrag = NULL;
+}
+
+// la ZONA de la barra de scroll de un panel (un "scrollbar area" reservada al borde derecho / de abajo): la MISMA para
+// el hover y para el agarre del click
+static bool ScrollBarZone(ViewportBase* v, Scrollable* sc, int mx, int my, bool& zoneV, bool& zoneH) {
+    int areaScroll = borderGS + GlobalScale * 9;
+    zoneV = sc->scrollY &&
+        mx >= v->x + v->width - areaScroll &&
+        my >= v->y + v->BarTopOffset();
+    zoneH = !zoneV && sc->scrollX &&
+        my >= v->y + v->height - areaScroll &&
+        mx < v->x + v->width - (sc->scrollY ? areaScroll : 0);
+    return zoneV || zoneH;
+}
+
+// EL BORDE DE LA VENTANA: FindViewportUnderMouse le descuenta a cada viewport un margen (paddingViewportGS) que es para
+// la division con el vecino, pero contra el borde de la ventana no hay vecino ni division y ahi termina la barra de
+// scroll de un panel pegado a la derecha (o abajo). Empujar el mouse contra el borde de la pantalla para agarrarla es
+// lo natural y caia en ese margen: el click no era de nadie, seguia de largo al viewport ACTIVO (button_left: en
+// Propiedades es la flecha izquierda del teclado y plegaba la tarjeta; viniendo rapido del 3D, el 3D) y el arrastre
+// ENVOLVIA el cursor en los bordes de ESE viewport (lo teletransportaba a la otra punta y no lo dejaba salir). La hoja
+// que tiene el punto, sin el margen: solo cuando FindViewportUnderMouse no devolvio nada (sobre una division devuelve
+// el contenedor, y eso sigue siendo para redimensionar)
+static ViewportBase* LeafAtWindowEdge(ViewportBase* aNode, int mx, int my) {
+    if (!aNode || mx < aNode->x || mx >= aNode->x + aNode->width || my < aNode->y || my >= aNode->y + aNode->height)
+        return NULL;
+    if (aNode->isLeaf()) return aNode;
+    if (aNode->ContainerKind() == 1) {
+        ViewportBase* a = LeafAtWindowEdge(((ViewportRow*)aNode)->childA, mx, my);
+        return a ? a : LeafAtWindowEdge(((ViewportRow*)aNode)->childB, mx, my);
+    }
+    if (aNode->ContainerKind() == 2) {
+        ViewportBase* a = LeafAtWindowEdge(((ViewportColumn*)aNode)->childA, mx, my);
+        return a ? a : LeafAtWindowEdge(((ViewportColumn*)aNode)->childB, mx, my);
+    }
+    return NULL;
+}
+
+// el click en la zona de la barra de scroll de un panel la AGARRA (y en el riel, el agarre salta ahi: TeleportY)
+static bool ScrollBarGrab(ViewportBase* v, int mx, int my) {
+    Scrollable* sc = AsScrollable(v);
+    bool zoneV = false, zoneH = false;
+    if (!sc || !ScrollBarZone(v, sc, mx, my, zoneV, zoneH)) return false;
+    gScrollBarDrag = v;
+    gScrollBarVertical = zoneV;
+    gScrollMoved = false; // el up del MISMO tap no la suelta
+    gScrollPrevX = mx;
+    gScrollPrevY = my;
+    if (zoneV) { sc->mouseOverScrollYpress = true; sc->TeleportY(my - v->y, v->height); g_redraw = true; }
+    else sc->mouseOverScrollXpress = true;
+    return true;
+}
+
 bool LayoutInDrag() {
     return gScrollBarDrag != NULL;
 }
@@ -5610,17 +6684,10 @@ void LayoutRelease(int mx, int my) {
     // suelta: sino un click sin movimiento dejaba la barra AGARRADA y el panel
     // scrolleaba siguiendo al mouse con el boton levantado.
 #ifdef W3D_SYMBIAN
-    if (gScrollBarDrag && gScrollMoved) {
+    if (gScrollBarDrag && gScrollMoved) ScrollBarDragRelease();
 #else
-    if (gScrollBarDrag) {
+    ScrollBarDragRelease();
 #endif
-        Scrollable* sc = AsScrollable(gScrollBarDrag);
-        if (sc) {
-            sc->mouseOverScrollYpress = false;
-            sc->mouseOverScrollXpress = false;
-        }
-        gScrollBarDrag = NULL;
-    }
     if (PopUpActive) PopUpActive->Release(); // el picker (hold-drag PC)
     // drop del arrastre del outliner (reordenar / emparentar)
     if (rootViewport) ReleaseDragOutliners(rootViewport, mx, my);
@@ -5801,6 +6868,12 @@ bool LayoutMotionUI(int mx, int my) {
               !PopUpActive->Contains(mx, my)))
             return true;
     }
+#ifndef W3D_SYMBIAN
+    // UP PERDIDO (se solto y el soltar no llego): sin el boton apretado la barra NO sigue agarrada, igual que el pincel
+    // y los menus de arriba. Antes el panel seguia scrolleando detras del mouse con el boton levantado. (Symbian agarra
+    // y suelta con dos taps: ahi la barra va suelta del boton y la suelta el 2do click, LayoutClickUI)
+    if (gScrollBarDrag && !leftMouseDown) ScrollBarDragRelease();
+#endif
     if (gScrollBarDrag) {
         // la barra agarrada sigue al mouse (factor del recorrido real)
         gScrollMoved = true;
@@ -5880,17 +6953,13 @@ bool LayoutMotionUI(int mx, int my) {
         Viewport3DActive = (Viewport3D*)leaf;
     }
     // hover de la barra de scroll: la MISMA zona que usa el agarre del
-    // click (un "scrollbar area" reservada al borde del panel)
-    if (leaf) {
-        Scrollable* sc = AsScrollable(leaf);
+    // click (un "scrollbar area" reservada al borde del panel), tambien contra el borde de la ventana
+    {
+        ViewportBase* barLeaf = leaf ? leaf : (!under ? LeafAtWindowEdge(rootViewport, mx, my) : NULL);
+        Scrollable* sc = AsScrollable(barLeaf);
         if (sc) {
-            int areaScroll = borderGS + GlobalScale * 9;
-            bool zoneV = sc->scrollY &&
-                mx >= leaf->x + leaf->width - areaScroll &&
-                my >= leaf->y + leaf->BarTopOffset();
-            bool zoneH = !zoneV && sc->scrollX &&
-                my >= leaf->y + leaf->height - areaScroll &&
-                mx < leaf->x + leaf->width - (sc->scrollY ? areaScroll : 0);
+            bool zoneV = false, zoneH = false;
+            ScrollBarZone(barLeaf, sc, mx, my, zoneV, zoneH);
             sc->mouseOverScrollY = zoneV;
             sc->mouseOverScrollX = zoneH;
         }
@@ -5924,17 +6993,14 @@ bool LayoutClickUI(int mx, int my) {
     }
     // un click con la barra de scroll agarrada la SUELTA (Symbian)
     if (gScrollBarDrag) {
-        Scrollable* sc = AsScrollable(gScrollBarDrag);
-        if (sc) {
-            sc->mouseOverScrollYpress = false;
-            sc->mouseOverScrollXpress = false;
-        }
-        gScrollBarDrag = NULL;
+        ScrollBarDragRelease();
         return true;
     }
 
     ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
-    if (!under || !under->isLeaf()) return false;
+    // contra el BORDE DE LA VENTANA (el margen que no es de ningun viewport): solo la barra de scroll que termina ahi
+    if (!under) return ScrollBarGrab(LeafAtWindowEdge(rootViewport, mx, my), mx, my);
+    if (!under->isLeaf()) return false;
 
     // 0) la barra de HERRAMIENTAS (abajo), COMPARTIDA: 3D (historial/orientacion/ejes/tilde-cruz),
     // UV editor y Editor 2D (G/R/S). El hit + despacho por rol viven en ViewportBase (ToolbarBase.cpp);
@@ -5970,28 +7036,7 @@ bool LayoutClickUI(int mx, int my) {
 
     // 2) la BARRA DE SCROLL: el click la agarra (antes caia en las
     // filas del panel y era imposible arrastrarla)
-    {
-        Scrollable* sc = AsScrollable(under);
-        if (sc) {
-            int areaScroll = borderGS + GlobalScale * 9;
-            bool zoneV = sc->scrollY &&
-                mx >= under->x + under->width - areaScroll &&
-                my >= under->y + under->BarTopOffset();
-            bool zoneH = !zoneV && sc->scrollX &&
-                my >= under->y + under->height - areaScroll &&
-                mx < under->x + under->width - (sc->scrollY ? areaScroll : 0);
-            if (zoneV || zoneH) {
-                gScrollBarDrag = under;
-                gScrollBarVertical = zoneV;
-                gScrollMoved = false; // el up del MISMO tap no la suelta
-                gScrollPrevX = mx;
-                gScrollPrevY = my;
-                if (zoneV) { sc->mouseOverScrollYpress = true; sc->TeleportY(my - under->y, under->height); g_redraw = true; }
-                else sc->mouseOverScrollXpress = true;
-                return true;
-            }
-        }
-    }
+    if (ScrollBarGrab(under, mx, my)) return true;
 
     // 3) los paneles
     if (under->ViewportKind() == 3) {

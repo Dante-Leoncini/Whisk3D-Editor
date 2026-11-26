@@ -37,6 +37,49 @@ struct KDNode {
 };
 
 class Mesh;   // la malla de edicion interna (miembro 'edicion', ver abajo)
+class Material; // el material de la geometria generada (tubo / cinta)
+
+// ============================================================================
+//  SPLINES (Bezier / poly): la curva AUTORADA con manijas, como las de Blender.
+//
+//  Una Curve puede ser de dos clases, y NUNCA las dos a la vez:
+//   - CURVA DE NODOS (la de siempre): 'splines' VACIO. Los nodos son 'vertex' (+ 'edges' si
+//     es un grafo con ramas); vienen de un .cap ('origin') o inline del .w3d ("points").
+//   - CURVA DE SPLINES: 'splines' con al menos una. Los puntos de control y sus manijas son
+//     la VERDAD, y 'vertex'/'vertexSize' (+ 'edges') pasan a ser su TESELACION en espacio
+//     local (Tessellate). Asi todo lo que ya consumia la polilinea -el riel de la camara,
+//     FindNearest, el modificador Oclusion, un constraint que sigue el camino- anda igual
+//     sobre una Bezier sin enterarse de que existen las manijas.
+//
+//  Las manijas son POSICIONES ABSOLUTAS (como handle_left/handle_right de Blender), en el
+//  mismo espacio local que el punto. Los tipos tambien son los de Blender: Free, Aligned
+//  (las dos opuestas, cada una con su largo), Vector (apunta a 1/3 del vecino) y Auto (las
+//  calcula la curva: CalcHandles, con la MISMA cuenta que Blender para que una curva traida
+//  de alla no cambie de forma al editarla aca).
+// ============================================================================
+enum { W3dHandleFree = 0, W3dHandleAligned = 1, W3dHandleVector = 2, W3dHandleAuto = 3 };
+enum { W3dSplinePoly = 0, W3dSplineBezier = 1 };
+// seleccion de Edit Mode de un punto (bits): manija izquierda, el punto, manija derecha. No se
+// guarda en el .w3d; vive en el punto para que el undo y el rearmado del proxy la conserven.
+enum { W3dCurveSelL = 1, W3dCurveSelP = 2, W3dCurveSelR = 4 };
+
+struct CurvePoint {
+    Vector3 co;               // el punto de control (espacio LOCAL de la curva)
+    Vector3 left, right;      // manijas: posiciones ABSOLUTAS en el mismo espacio (solo Bezier)
+    unsigned char typeL, typeR;   // W3dHandle*
+    unsigned char sel;        // W3dCurveSel* (Edit Mode)
+    float radius;             // escala del perfil del bevel en este punto (1 = el bevelDepth tal cual)
+    float tilt;               // giro del perfil alrededor de la tangente, en RADIANES (como Blender)
+    CurvePoint() : typeL(W3dHandleAuto), typeR(W3dHandleAuto), sel(0), radius(1.0f), tilt(0.0f) {}
+};
+
+struct CurveSpline {
+    std::vector<CurvePoint> points;
+    int  type;                // W3dSplinePoly / W3dSplineBezier
+    bool cyclic;              // cerrada: el ultimo punto vuelve al primero
+    int  resolution;          // segmentos por tramo Bezier; 0 = el de la curva (Curve::resolution)
+    CurveSpline() : type(W3dSplineBezier), cyclic(false), resolution(0) {}
+};
 
 class Curve : public Object {
     public:
@@ -152,6 +195,71 @@ class Curve : public Object {
         // crudo hace girar la camara entera en un frame). 'fovOut' puede ser NULL.
         // Devuelve false si la curva no trae rotacion (y no toca las salidas).
         bool RotationInNode(float index, Vector3* pitchYawRoll, float* fovOut) const;
+
+        // ==================================================================
+        //  SPLINES (ver el bloque de arriba de la clase)
+        // ==================================================================
+        std::vector<CurveSpline> splines;   // VACIO = curva de nodos de siempre
+        // Los enteros de la forma (resolucion, lados del tubo) se guardan en float a proposito: los
+        // edita la tarjeta declarada de Properties (ui/panels), que solo sabe de floats.
+        float resolution;       // segmentos por tramo Bezier de las splines sin resolucion propia (12)
+        // GEOMETRIA (como el Bevel / Extrude de Blender): un TUBO redondo de radio bevelDepth (los
+        // cables), una CINTA de ancho 2*extrude, o las dos juntas (un tubo estirado). 0 y 0 = solo
+        // la linea (un riel / un camino). Vale tambien para una curva de nodos.
+        float bevelDepth;       // radio del tubo (0 = sin tubo)
+        float bevelResolution;  // lados del tubo = 4 + 2 * bevelResolution, como Blender (entero; 4 = 12 lados)
+        float extrude;          // media altura de la cinta (0 = sin cinta)
+        bool  fillCaps;         // tapas en las puntas de un tubo abierto
+        Material* material;     // el de la geometria (NULL = el por defecto)
+        // la MALLA GENERADA: interna de la curva (no esta en el arbol, no se guarda, no la ve el
+        // outliner). Su Parent es la curva (sin estar en Childrens) para que su matriz de MUNDO sea
+        // la de la curva: el pase de transparentes, las sombras y el trazado de rayos la ubican
+        // solos. NULL sin bevel ni extrude.
+        Mesh* geom;
+        // la esta editando el Edit Mode (lo prende/apaga el editor, LayoutInput.cpp): dibuja las manijas y
+        // la geometria no escribe profundidad (si no, el tubo tapa los puntos que van por adentro)
+        bool editing;
+        // (derivado de Tessellate) cada spline ocupa vertex[splineFirst[s] .. +splineCount[s]-1]
+        std::vector<int> splineFirst, splineCount;
+        std::vector<float> evalRadius, evalTilt;   // radio / giro por vertice teselado
+        unsigned tessVersion;   // sube con cada Tessellate (la geometria se rehace si cambio)
+        // (lo que tenia la forma la ultima vez que se armo 'geom': si nada cambio no se rehace)
+        float geomKey[6];
+        const GLfloat* geomVertexPtr;
+        bool geomHad;
+
+        bool HasSplines() const { return !splines.empty(); }
+        // manijas AUTO y VECTOR (y la ALIGNED que hace pareja con una de esas) recalculadas desde los
+        // puntos, con la cuenta de Blender (calchandleNurb). La seleccion decide el orden de las
+        // Aligned: la manija ELEGIDA manda (la que el usuario esta moviendo).
+        void CalcHandles();
+        void CalcHandlesSpline(int s);
+        // splines -> vertex/vertexSize/indices/edges (+ ramas). 'full' = ademas el arbol KD y la
+        // geometria; un arrastre en vivo lo deja para cuando se suelta (no imprime ni aloca de mas).
+        void Tessellate(bool full = true);
+        // (re)arma 'geom' si cambio la teselacion o un parametro de la forma; barato si no cambio nada
+        void UpdateGeometry();
+        // arma la malla de la forma (tubo / cinta) en 'out' (una malla vacia). false = no hay forma
+        // (sin bevel ni extrude). La usan la geometria interna y "Convert to Mesh".
+        bool BuildShapeMesh(Mesh* out) const;
+
+        // ---- EVALUACION (espacio LOCAL de la curva) ----
+        // Bezier cubica: p0 = punto, p1 = su manija derecha, p2 = la manija izquierda del siguiente, p3 = el siguiente
+        static Vector3 BezierPoint(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
+        static Vector3 BezierDerivative(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3, float t);
+        int  SegmentCount(int s) const;   // tramos de la spline s (cerrada: uno mas)
+        // el tramo 'seg' de la spline s en u = 0..1, EXACTO (no sale de la teselacion)
+        bool EvalSegment(int s, int seg, float u, Vector3* point, Vector3* tangent) const;
+        // t = 0..1 sobre la spline s, repartido parejo POR TRAMO (como el parametro de Blender). En una
+        // curva de nodos, sobre la polilinea (s se ignora). tangent sale normalizada (puede ser NULL).
+        bool Evaluate(float t, Vector3* point, Vector3* tangent, int s = 0) const;
+        // largo de la teselacion: de la spline s, o de toda la curva (s < 0)
+        float Length(int s = -1) const;
+        // el punto a 'dist' metros del principio de la spline s, por LARGO de arco (velocidad pareja)
+        bool EvaluateAtLength(float dist, Vector3* point, Vector3* tangent, int s = 0) const;
 };
+
+// DUPLICAR (Shift+D, ObjectMode.cpp): una curva nueva con los mismos nodos o splines, forma y material
+Curve* CurveDuplicate(Curve* src);
 
 #endif

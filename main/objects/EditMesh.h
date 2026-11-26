@@ -32,6 +32,42 @@ struct EditSelSnap {
     EditSelSnap() : activeMode(0), has(false) {}
 };
 
+// LISTAS DE ENTEROS DE LARGO VARIABLE EN UN SOLO BLOQUE (los poligonos de la jaula y sus aristas): con un
+// vector<vector<int>> cada cara era un malloc aparte, con su cabecera (en una malla de 17 mil caras, 1,5 MB de mas en la
+// PC y medio MB en el Galaxy Ace al entrar a Edit Mode, y miles de mallocs al armar la jaula). Aca son dos arreglos: los
+// numeros de todas las filas, uno detras del otro, y donde empieza cada fila. Se lee igual que antes: rows.size(),
+// rows[f].size(), rows[f][k], y una fila se guarda como 'IntRows::Row p = rows[f];' (son dos punteros: no copia nada)
+class IntRows {
+    public:
+        struct Row {
+            const int* p; size_t n;
+            size_t size() const { return n; }
+            bool empty() const { return n == 0; }
+            int operator[](size_t k) const { return p[k]; }
+            int front() const { return p[0]; }
+            int back() const { return p[n - 1]; }
+            const int* begin() const { return p; }
+            const int* end() const { return p + n; }
+        };
+        size_t size() const { return start.empty() ? 0 : start.size() - 1; }
+        bool empty() const { return size() == 0; }
+        Row operator[](size_t i) const {
+            Row r; r.n = (size_t)(start[i + 1] - start[i]);
+            r.p = r.n ? &data[(size_t)start[i]] : (const int*)0;
+            return r;
+        }
+        void clear() { data.clear(); start.clear(); }
+        void push_back(const std::vector<int>& row) {
+            if (start.empty()) start.push_back(0);
+            data.insert(data.end(), row.begin(), row.end());
+            start.push_back((int)data.size());
+        }
+        void reserve(size_t rows, size_t numbers) { start.reserve(rows + 1); data.reserve(numbers); }
+    private:
+        std::vector<int> data;    // los numeros de todas las filas
+        std::vector<int> start;   // donde empieza cada fila en data (size() + 1: el ultimo es el final)
+};
+
 // ===================================================
 //  EditMesh: la malla de EDICION (separada de la malla de render de Whisk3DCore).
 // ===================================================
@@ -56,9 +92,9 @@ class EditMesh {
         std::vector<GLfloat> linePos;        // posiciones expandidas
         std::vector<GLubyte> lineCol;        // color expandido (vertex color o por-arista)
         // CARAS (1 por face3d): poligono de indices editables + sus aristas + centro
-        std::vector<std::vector<int> > faces;     // faces[f] = indices editables del poligono
+        IntRows faces;                            // faces[f] = indices editables del poligono
         std::vector<int> faceSrc;                 // faceSrc[f] = indice en src->faces3d (NO es 1:1: hay caras degeneradas que se saltean). Lo usa el borrado.
-        std::vector<std::vector<int> > faceEdges; // faceEdges[f] = indices de arista del poligono
+        IntRows faceEdges;                        // faceEdges[f] = indices de arista del poligono
         std::vector<GLfloat> faceCenter;          // centro xyz de cada cara (los puntitos)
         std::vector<GLubyte> facePtCol;           // color del puntito por cara (negro/verde/blanco)
         std::vector<unsigned char> closedFace;    // (telefono) la cara es de un pedazo CERRADO de la malla: si mira para

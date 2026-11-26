@@ -132,6 +132,7 @@ static void Finish() {
     Mesh* m = gBakeMesh;
     TextureEditable* te = gBakeTe;
     gBakeMesh = NULL; gBakeTe = NULL;
+    if (te) te->pins--;   // (el horneado ya no guarda el puntero)
     if (!m || !te || !TextureLive(te->tex)) return;
     const std::vector<float>& light = RTBakeLight();
     const std::vector<unsigned char>& cub = RTCoveredBake();
@@ -168,7 +169,7 @@ static void Finish() {
     // UN CAPTADOR DE SOMBRAS: la textura es la sombra (blanco = nada), para una capa Multiply comun
     const bool picker = RTBakePicker();
     const int mode = picker ? W3D_LAYER_MULTIPLY : W3D_LAYER_MULTIPLY2X;
-    UndoTextureStart(te);
+    UndoTextureStart(te, true);   // (el horneado escribe la textura entera, sin el pincel)
     for (int i = 0; i < w * h; i++) {
         if (!c[(size_t)i]) continue;
         for (int k = 0; k < 3; k++) {   // (la mitad: la capa es Multiply 2x, asi entra luz de hasta el doble de blanco)
@@ -256,7 +257,7 @@ static void Finish() {
 }
 static void ActionCancel() {
     if (!RTBakeActive()) return;
-    RTBakeCancel(); gBakeMesh = NULL; gBakeTe = NULL; Notify(T("Bake canceled"), true); PropsLayoutDirty(); g_redraw = true;
+    RTBakeCancel(); gBakeMesh = NULL; if (gBakeTe) gBakeTe->pins--; gBakeTe = NULL; Notify(T("Bake canceled"), true); PropsLayoutDirty(); g_redraw = true;
 }
 static void ActionBake() {
     if (RTBakeActive()) { ActionCancel(); return; }
@@ -272,7 +273,7 @@ static void ActionBake() {
         Notify(std::string(T("Not baked")) + ": " + T(reason.c_str()), true);
         return;
     }
-    gBakeMesh = m; gBakeTe = te; gBakeUsedUV = uv; gBakeProgress = 0.0f;
+    gBakeMesh = m; gBakeTe = te; te->pins++; gBakeUsedUV = uv; gBakeProgress = 0.0f;
     g_redraw = true;
 }
 
@@ -283,7 +284,7 @@ bool PropsBakeNow(Mesh* m, Texture* t, int uv, int samples, std::string* reason)
     if (!te || te->w <= 0 || te->h <= 0) { if (reason) *reason = "Could not read the image"; return false; }
     if (uv < 0) uv = UVPicked(m);
     if (!RTBakeBegin(m, uv, te->w, te->h, samples, reason, gBakeIndirect, (int)(gBakeBounces + 0.5f), gBakeDenoiser)) return false;
-    gBakeMesh = m; gBakeTe = te; gBakeUsedUV = uv;
+    gBakeMesh = m; gBakeTe = te; te->pins++; gBakeUsedUV = uv;
     while (RTBakeActive()) RTBakeStep(1000);
     Finish();
     return true;

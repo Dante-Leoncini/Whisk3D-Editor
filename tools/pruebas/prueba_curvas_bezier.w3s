@@ -1,0 +1,41 @@
+# ==========================================================================
+#  CURVAS BEZIER / POLY (objects/Curve.h; la edicion con manijas en
+#  ui/ViewPorts/LayoutInput.cpp; el formato en formato/curvas.md).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_curvas_bezier.w3s
+#
+#  beztess : la teselacion ES la Bezier cubica analitica (de Casteljau), la
+#            tangente, el largo contra la integral del arco, las manijas
+#            Auto/Vector/Aligned con los numeros de Blender, una cerrada +
+#            una poly (aristas, ramas, nearest).
+#  bezedit : Edit Mode de verdad (el proxy, la seleccion y el G de las mallas):
+#            mover una manija Aligned arrastra a la opuesta, undo exacto,
+#            V > Automatic, mover el punto entero (sigue Auto), mover solo la
+#            manija Auto la pasa a Aligned, mover solo el punto lleva las
+#            manijas, un G cancelado deja todo igual, salir completa la curva.
+#  bezops  : subdivide sin cambiar la forma, extrude + move, cyclic, switch
+#            direction, poly <-> Bezier, delete segments / vertices + undo, y
+#            un Path de nodos que pasa a spline (y vuelve con Ctrl+Z).
+#  bezmesh : el tubo (vertices, caras hacia afuera, tapas), la cinta, y
+#            Convert to Mesh (+ undo, + sin forma = aristas sueltas).
+#  bezrail : una Bezier como riel: el nearest del arbol KD = el lineal.
+#  bezsave : ida y vuelta por el .w3d con todas las claves (y un riel de nodos
+#            al lado, que vuelve igual que siempre). VA AL FINAL: abre el .w3d.
+# ==========================================================================
+# el TUBO de una curva entra al trazado de rayos como cualquier malla: el cubo de la escena (12 triangulos) +
+# 12 tramos x 10 lados (bevel resolution 3 = 4 + 2*3) x 2 + 2 tapas de 10 lados (8 triangulos cada una) = 268
+vpview rendered
+vporbit 0 0.5 0 12 -35 -23
+rtrender 32 24 1
+rttris 12
+bezadd bezier
+bezshape 0.08 3 0 1
+rtrender 32 24 1
+rttris 268
+vpview solid
+beztess
+bezedit
+bezops
+bezmesh
+bezrail
+bezsave

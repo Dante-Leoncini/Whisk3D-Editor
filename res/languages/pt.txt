@@ -69,6 +69,7 @@ A different file already exists there	Já existe outro arquivo lá
 A flipbook uses it	Um flipbook o usa
 A game has no animation to render	Um jogo não tem animação para renderizar
 A game has no keyframes: choose one of its clips in the timeline to animate	Um jogo não tem keyframes: escolha um de seus clipes na linha do tempo para animar
+A path with branches can't become a spline	Um caminho com ramos não pode virar uma spline
 A prefab can't be converted	Um prefab não pode ser convertido
 A prefab can't contain itself	Um prefab não pode conter a si mesmo
 A prefab instance only has what its prefab generates	Uma instância de prefab só tem o que seu prefab gera
@@ -168,6 +169,7 @@ Apply Scale	Aplicar escala
 Apply Transforms	Aplicar Transformações
 Apply: select mesh or armature object(s)	Aplicar: selecione malha(s) ou armação(ões)
 Arc	Arco
+Area	Área
 Armature	Armação
 Armature 2D	Armação 2D
 Armature Animation	Animação de Armature
@@ -229,7 +231,9 @@ Base Color	Cor Base
 Base velocity	Velocidade base
 Before Mode	Modo antes
 Bevel	Chanfro
+Bevel Depth	Espessura do tubo
 Bevel Edges	Chanfrar arestas
+Bevel Resolution	Resolução do tubo
 Bevel Vertices	Chanfrar vértices
 Bevel: enter Edit Mode first	Chanfro: entre no Modo Edição primeiro
 Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm	Chanfro: afastar do centro = largura, roda / cima-baixo = segmentos, V = vértices/arestas, clique para confirmar
@@ -263,6 +267,7 @@ Border X	Borda X
 Border Y	Borda Y
 Borderless	Sem bordas
 Both	Ambos
+Both splines must be of the same type	As duas splines têm de ser do mesmo tipo
 Bottom	Inferior
 Bottom View	Vista inferior
 Bottom-Left	Inferior esquerda
@@ -418,6 +423,7 @@ Continue without saving	Continuar sem salvar
 Control	Controle
 Controller disconnected: %s	Controle desconectado: %s
 Convert to Game	Converter em jogo
+Convert to Mesh	Converter em malha
 Convert to Scene	Converter em cena
 Convert to editable mesh	Converter em malha editável
 Copied	Copiado
@@ -549,6 +555,7 @@ Directional	Direcional
 Discard the unsaved changes of	Descartar as alterações não salvas de
 Disconnect	Desconectar
 Disconnect Bone	Desconectar osso
+Disk	Disco
 Display in Edit Mode	Mostrar no Modo Edição
 Display in Viewport	Mostrar na Viewport
 Distance	Distância
@@ -603,8 +610,10 @@ Elastic	Elástica
 Elegir archivo	Escolher Arquivo
 Element	Elemento
 Element of	Elemento de
+Ellipse	Elipse
 Emission	Emissão
 Emission Map	Mapa de emissão
+Emission Strength	Força da emissão
 Empty	Vazio
 Empty routine	Rotina vazia
 Enable	Ativar
@@ -689,6 +698,7 @@ File	Arquivo
 File name	Nome do arquivo
 File size	Tamanho do arquivo
 Fill	Fundo
+Fill Caps	Tampas
 Film grain	Grão de câmera
 Filter	Filtro
 Filter Width	Largura do filtro
@@ -1015,6 +1025,7 @@ Loose (editable)	Soltos (editáveis)
 MKV and MP4 need ffmpeg installed	MKV e MP4 precisam do ffmpeg instalado
 Make External...	Tornar Externa...
 Make Internal	Tornar Interna
+Make Segment	Unir pontas
 Make Single User	Tornar única
 Manual range	Intervalo manual
 Margin	Margem
@@ -1037,6 +1048,7 @@ Material color	Cor do material
 Material index	Índice do material
 Material of	Material de
 Materials	Materiais
+Materials are animated in a scene animation: choose one in the timeline	Os materiais são animados numa animação de cena: escolha uma na linha do tempo
 Max (last triangle of the mesh)	Máximo (o último triângulo da malha)
 Max (last triangle of the part)	Máximo (o último triângulo da parte)
 Max distance	Distância máxima
@@ -1346,11 +1358,14 @@ Play / Pause	Reproduzir / Pausa
 Play Reverse	Reproduzir ao contrário
 Play once (dies at the end)	Uma vez só (morre no fim)
 Point	Pontual
+Point Radius	Raio do ponto
+Point Tilt	Giro do ponto
 Point size	Tamanho do ponto
 Points	Pontos
 Points X	Pontos X
 Points Y	Pontos Y
 Points Z	Pontos Z
+Poly	Poligonal
 Polygon (simulated)	Polígono (simulado)
 Pop matrix	Desempilhar matriz
 Portrait only	Só vertical
@@ -1606,12 +1621,16 @@ Select Linked: select a bone first	Selecionar Vinculado: selecione um osso prime
 Select Mode	Modo Seleção
 Select Outer	Selecionar exterior
 Select Users	Selecionar usuários
+Select a curve	Selecione uma curva
 Select a prefab instance	Selecione uma instância de prefab
+Select an end point of an open spline	Selecione uma ponta de uma spline aberta
 Select an object first	Primeiro escolha um objeto
 Select faces with more than 3 sides to triangulate	Selecione faces com mais de 3 lados para triangular
 Select objects first	Selecione objetos primeiro
 Select symbol	Selecionar símbolo
 Select the objects of the prefab	Selecione os objetos do prefab
+Select two adjacent points	Selecione dois pontos vizinhos
+Select two end points	Selecione duas pontas
 Select with click and pencil	O que se escolhe com o clique e o lapis
 Selected only	Apenas selecionados
 Selection to Active	Seleção para o ativo
@@ -1625,6 +1644,7 @@ Separate: select only some faces	Separar: selecione só algumas faces
 Set Active Camera	Definir câmera ativa
 Set Active Camera: the active object is not a camera	Câmera ativa: o objeto ativo não é uma câmera
 Set Active Object as Camera	Objeto Ativo como Câmera
+Set Handle Type	Tipo de alça
 Set Inverse	Definir Inversa
 Set Keyframe Easing Type	Tipo de suavização
 Set Keyframe Handle Type	Definir Tipo de Alça
@@ -1632,6 +1652,7 @@ Set Keyframe Interpolation	Tipo de interpolação
 Set Origin	Definir Origem
 Set Parent	Parentear
 Set Parent To	Parentear Para
+Set Spline Type	Tipo de spline
 Set as Start Scene	Usar como cena inicial
 Settings	Ajustes
 Settings saved	Ajustes salvos
@@ -1756,6 +1777,7 @@ Stretch U	Esticar U
 Stretch V	Esticar V
 Stretched	Esticada
 String	Texto
+Subdivide	Subdividir
 Subdivision Surface	Superfície de Subdivisão
 Subtract	Subtrair
 Subtract (darkens)	Subtrair (escurece)
@@ -1763,6 +1785,7 @@ Summary	Resumo
 Sun	Sol
 Superellipse	Superelipse
 Swap	Trocar
+Switch Direction	Inverter direção
 Switch to 0-100%	Mudar para 0-100%
 Switch to 0-255	Mudar para 0-255
 Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: este destino ainda não está ligado a este botão.
@@ -1804,6 +1827,8 @@ The button's function failed	A função do botão falhou
 The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	As chamadas cambiarEscena() do seu .lua ainda apontam para a primeira: edite-as à mão.
 The clip library could not be read	Não foi possível ler a biblioteca de clipes
 The clipboard has no hex color	A área de transferência não tem uma cor hex
+The curve has children: unparent them first	A curva tem filhos: desfaça o parentesco antes
+The curve is empty	A curva está vazia
 The default material can not be edited. Create a new material.	O material padrão não pode ser editado. Crie um novo material.
 The default material can't be edited	O material padrão não pode ser editado
 The editor has unsaved changes. Discard them and reload the file?	Há alterações não salvas no editor. Descartá-las e recarregar o arquivo?
@@ -1858,6 +1883,7 @@ This graphics backend has no shaders: the @vertice section runs on the CPU and t
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Este backend gráfico não tem shaders: o material é desenhado como sempre (GLES 2.0 e Vulkan os têm)
 This hierarchy clip only animates its root and its children	Este clipe de hierarquia só anima sua raiz e seus filhos
 This is a scene: convert it to a game to simulate it	É uma cena: converta-a em jogo para simulá-la
+This material can not be animated (default or from a library)	Este material não pode ser animado (é o padrão ou de uma biblioteca)
 This mesh does not have this array: do not draw with the array on	Esta malha não tem esse array: não desenhe com o array ligado
 This phone can only clone the screen on the external display	Este telefone só pode clonar a tela na saída externa
 This phone has no video encoder for MP4	Este telefone não tem um codificador de vídeo para MP4
@@ -1873,6 +1899,9 @@ Threshold	Limiar
 Timeline	Linha do Tempo
 Times	Tempos
 Timing	Tempo
+Toggle Cyclic	Abrir / fechar
+Toggle Cyclic (curve)	Abrir / fechar (curva)
+Toggle Free/Aligned	Alternar livre/alinhada
 Toggle Snap	Ativar/desativar ímã
 Top	Superior
 Top View	Vista superior
@@ -1912,7 +1941,12 @@ UV Group	Grupo UV
 UV Groups	Grupos UV
 UV Map	Mapa UV
 UV Maps	Mapas UV
+UV Offset	Deslocamento UV
+UV Pivot	Pivô UV
+UV Rotation	Rotação UV
+UV Scale	Escala UV
 UV Sphere	Esfera UV
+UV Transform	Transformação UV
 UV array	array de UV
 UV group(s)	grupo(s) UV
 UV layer (0 = active)	Camada UV (0 = a ativa)
@@ -2208,3 +2242,87 @@ Documents	Documentos
 Downloads	Downloads
 Pictures	Imagens
 Music	Músicas
+Absolute Pivot	Pivô absoluto
+After Original	Depois do original
+Bake needs an active animation clip	O bake precisa de um clipe de animação ativo
+Bake to Keyframes	Fazer bake em keyframes
+Baked %d bone(s) into the clip	%d osso(s) com bake no clipe
+Before Original	Antes do original
+Bone Constraints	Restrições do osso
+Chain Length	Comprimento da cadeia
+Clamp Region	Região
+Cyclic	Cíclico
+Extrapolate	Extrapolar
+Fixed Position	Posição fixa
+Floor Axis	Eixo do piso
+Follow Curve	Seguir a curva
+Forward Axis	Eixo de avanço
+Free Axis	Eixo livre
+From Max X	De máx X
+From Max Y	De máx Y
+From Max Z	De máx Z
+From Min X	De mín X
+From Min Y	De mín Y
+From Min Z	De mín Z
+Head/Tail	Cabeça/Ponta
+Invert X	Inverter X
+Invert Y	Inverter Y
+Invert Z	Inverter Z
+Iterations	Iterações
+Keep Axis	Eixo mantido
+Lock Axis	Eixo travado
+Main Axis	Eixo principal
+Maintain Volume	Manter volume
+Map From	De
+Map To	Para
+Max X	Máx X
+Max Y	Máx Y
+Max Z	Máx Z
+Maximum X	Máximo X
+Maximum Y	Máximo Y
+Maximum Z	Máximo Z
+Min X	Mín X
+Min Y	Mín Y
+Min Z	Mín Z
+Minimum X	Mínimo X
+Minimum Y	Mínimo Y
+Minimum Z	Mínimo Z
+No bone constraints to bake	Não há restrições de osso para o bake
+Offset Factor	Fator de deslocamento
+On Surface	Na superfície
+Outside	Fora
+Owner Space	Espaço do dono
+Pivot When	Pivotar quando
+Pivot X	Pivô X
+Pivot Y	Pivô Y
+Pivot Z	Pivô Z
+Plane X	Plano X
+Plane Z	Plano Z
+Pole Angle	Ângulo do polo
+Pole Bone	Osso do polo
+Pole Target	Alvo do polo
+Power	Potência
+Remove Constraints After Bake	Remover as restrições ao fazer o bake
+Rest Length	Comprimento de repouso
+Single Axis	Eixo único
+Strict	Estrito
+Swing	Giro
+Target Space	Espaço do alvo
+Target Up	Cima do alvo
+This rig can not be baked (no rest pose, or a rebuilt biped)	Este rig não pode receber bake (sem pose de repouso, ou um biped reconstruído)
+To Max X	Para máx X
+To Max Y	Para máx Y
+To Max Z	Para máx Z
+To Min X	Para mín X
+To Min Y	Para mín Y
+To Min Z	Para mín Z
+Track Axis	Eixo que aponta
+Up Axis	Eixo para cima
+Use Rotation	Usar a rotação
+Use Tail	Usar a ponta
+Volume Variation	Variação de volume
+X From	X de
+Y From	Y de
+Z From	Z de
+World	Mundo
+Render with the first	Render com o primeiro

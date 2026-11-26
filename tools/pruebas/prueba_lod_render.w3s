@@ -1,0 +1,29 @@
+# ===========================================================================
+#  LOD "Render con el primero" (main/objects/LOD.h: renderFirst)
+#
+#  El render final (Render Image / Animation, el trazado de rayos, las sondas) dibuja el PRIMER hijo del LOD -el
+#  detallado- y el viewport el que toque por distancia. Es el "Simplificar" de Blender: el personaje o el escenario
+#  completo para la foto y uno liviano (decimado, con la luz horneada) para animar en un telefono en tiempo real
+#  (el Bongo Cat en el Galaxy Ace: la version completa a 3 fps, la liviana a 20).
+#
+#  prueba_lod_render.w3d: "Vista" con "Completa" (hasta 0.01) y "Liviana": el viewport dibuja la liviana.
+#  Lo que se verifica:
+#   1) sin el flag, el render final y el trazado de rayos siguen la distancia, como siempre
+#   2) con el flag, el render final y el trazado de rayos van con el hijo 0, se mire de donde se mire
+#   3) el flag se guarda y se reabre; un LOD sin el flag no escribe nada nuevo
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_lod_render.w3s
+# ===========================================================================
+openw3d prueba_lod_render.w3d
+lodpicked Vista 1
+lodfinal Vista 1
+lodrender Vista 1
+lodfinal Vista 0
+lodpicked Vista 1
+savew3d /tmp/w3d_prueba_lod_render.w3d
+openw3d /tmp/w3d_prueba_lod_render.w3d
+lodfinal Vista 0
+lodpicked Vista 1
+lodrender Vista 0
+lodfinal Vista 1

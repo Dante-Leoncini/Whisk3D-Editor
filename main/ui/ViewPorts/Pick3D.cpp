@@ -307,7 +307,7 @@ static int EditPickIndex(int mode, int mx, int my, int vx, int vy, int vw, int v
         for (int f = 0; f < N; f++) {
             int id = f + 1;
             GLubyte r=(GLubyte)((id&0x1F)<<3), g=(GLubyte)(((id>>5)&0x3F)<<2), b=(GLubyte)(((id>>11)&0x1F)<<3);
-            const std::vector<int>& p = e->faces[(size_t)f];
+            const IntRows::Row p = e->faces[(size_t)f];
             for (size_t t = 1; t + 1 < p.size(); t++) {
                 int tri[3] = { p[0], p[t], p[t+1] };
                 for (int j = 0; j < 3; j++) {
@@ -810,14 +810,16 @@ void BoxSelectApply3D(int x0, int y0, int x1, int y1, bool touch, bool add) {
         // esa cara mira para atras y lo que hay ahi no se ve. De ahi sale la visibilidad de sus
         // aristas y vertices (un vertice se ve si alguna de sus caras se ve). Con X-Ray prendido
         // no se filtra nada: justamente el modo esta para agarrar lo de atras.
-        const bool filterHidden = !g_xray;   // el X-Ray del menu Overlays (global, ya existia)
+        // (una malla SIN caras -los puntos y manijas de una curva, un path- no tiene nada que la tape a si misma:
+        // con el filtro ningun vertice "se veia" y la caja no agarraba nada)
+        const bool filterHidden = !g_xray && e->NumFaces() > 0;   // el X-Ray del menu Overlays (global, ya existia)
         std::vector<char> vertVis, edgeVis, faceVis;
         if (filterHidden) {
             vertVis.assign((size_t)nV, 0);
             edgeVis.assign((size_t)e->NumEdges(), 0);
             faceVis.assign((size_t)e->NumFaces(), 0);
             for (int f = 0; f < e->NumFaces(); f++) {
-                const std::vector<int>& id = e->faces[(size_t)f];
+                const IntRows::Row id = e->faces[(size_t)f];
                 if (id.size() < 3) continue;
                 float area = 0.0f;
                 bool allVis = true;
@@ -881,7 +883,7 @@ void BoxSelectApply3D(int x0, int y0, int x1, int y1, bool touch, bool add) {
                 return;
             }
             for (int f = 0; f < nF; f++) {
-                const std::vector<int>& id = e->faces[(size_t)f];
+                const IntRows::Row id = e->faces[(size_t)f];
                 if (id.empty()) continue;
                 bool all = true, any = false, crosses = false;
                 for (size_t k = 0; k < id.size(); k++) {
@@ -1055,7 +1057,7 @@ static void LCSave(Mesh* m){
       m->EnsureEdit(); EditMesh* e = m->edit;
       if (e && gLoopCutEdge >= 0 && gLoopCutEdge < e->NumEdges()) { gLoopCutEdgePos[0] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2]); gLoopCutEdgePos[1] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2+1]); }
       if (e && gLoopCutEdge >= 0 && m->LoopCutTraversal(gLoopCutEdge, rEg, rA, rB, lf, closed) && !lf.empty() && lf[0] < (int)e->faceEdges.size()) {
-          const std::vector<int>& fe = e->faceEdges[lf[0]];
+          const IntRows::Row fe = e->faceEdges[lf[0]];
           for (size_t k = 0; k < fe.size() && gLoopCutCandN < 4; k++) { const int c = fe[k]; if (c < 0 || c >= e->NumEdges()) continue;
               gLoopCutCand[gLoopCutCandN] = c; gLoopCutCandPos[gLoopCutCandN][0] = LCPosVert(e, e->lineIdx[(size_t)c*2]); gLoopCutCandPos[gLoopCutCandN][1] = LCPosVert(e, e->lineIdx[(size_t)c*2+1]);
               if (c == gLoopCutEdge) gLoopCutCandSel = gLoopCutCandN; gLoopCutCandN++; } } }

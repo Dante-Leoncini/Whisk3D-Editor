@@ -1,0 +1,52 @@
+# ==========================================================================
+#  CURVAS BEZIER CON LAS TECLAS Y EL MOUSE DE VERDAD (eventos SDL por
+#  InputUserSDL3, como los manda la ventana): Tab, click en una manija, G +
+#  arrastre + Enter, Ctrl+Z, V (menu de tipos), E + arrastre, Alt+C, X.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_curvas_bezier_teclas.w3s
+# ==========================================================================
+bezadd bezier
+keyreal 3d Tab
+# (Add > Bezier nace con todo elegido, como en Blender: 2 puntos x 3 vertices)
+bezexpect selcount 6
+bezsnap
+# click en la manija derecha del punto 0: queda elegida SOLA
+bezclick 0 0 right
+bezexpect selcount 1
+# G + mouse + Enter: la manija se mueve y la izquierda (Aligned) la sigue, opuesta
+# (cada movimiento aplica el delta que midio el ANTERIOR -el warp del cursor lo calcula despues- y el primero con
+#  delta del G se descarta: es la referencia. Por eso: cebar, mover y uno quieto que aplica el arrastre)
+keyreal 3d G
+bezdrag 1 0
+bezdrag 40 -20
+bezdrag 0 0
+keyreal 3d Enter
+bezexpect differs
+bezexpect aligned 0 0
+bezexpect type 0 0 left aligned
+# Ctrl+Z la devuelve exacta
+keyreal 3d Ctrl+Z
+bezexpect same
+# click en el punto 1: se lleva sus manijas; V abre el menu de tipos de manija
+bezclick 0 1 point
+bezexpect selcount 3
+keyreal 3d V
+bezexpect menu "Set Handle Type"
+keyreal 3d Esc
+# E desde la punta: un punto nuevo que sigue al mouse; Enter lo deja
+keyreal 3d E
+bezdrag 1 0
+bezdrag 30 0
+bezdrag 0 0
+keyreal 3d Enter
+bezexpect points 0 3
+# Alt+C cierra la spline; Ctrl+Z la vuelve a abrir
+keyreal 3d Alt+C
+bezexpect cyclic 0 1
+keyreal 3d Ctrl+Z
+bezexpect cyclic 0 0
+# X: el menu Delete de las curvas (Vertices / Segments)
+keyreal 3d X
+bezexpect menu "Delete"
+keyreal 3d Esc
+keyreal 3d Tab

@@ -168,6 +168,7 @@ Apply Scale	Appliquer l'échelle
 Apply Transforms	Appliquer transformations
 Apply: select mesh or armature object(s)	Appliquer : sélectionnez des maillages ou armatures
 Arc	Arc
+Area	Zone
 Armature	Armature
 Armature 2D	Armature 2D
 Armature Animation	Animation d'armature
@@ -549,6 +550,7 @@ Directional	Directionnelle
 Discard the unsaved changes of	Abandonner les modifications non enregistrées de
 Disconnect	Déconnecter
 Disconnect Bone	Déconnecter l'os
+Disk	Disque
 Display in Edit Mode	Afficher en Mode Édition
 Display in Viewport	Afficher dans la vue
 Distance	Distance
@@ -603,8 +605,10 @@ Elastic	Élastique
 Elegir archivo	Choisir fichier
 Element	Élément
 Element of	Élément de
+Ellipse	Ellipse
 Emission	Émission
 Emission Map	Carte d'émission
+Emission Strength	Intensité d'émission
 Empty	Vide
 Empty routine	Routine vide
 Enable	Activer
@@ -1037,6 +1041,7 @@ Material color	Couleur du matériau
 Material index	Index du matériau
 Material of	Matériau de
 Materials	Matériaux
+Materials are animated in a scene animation: choose one in the timeline	Les matériaux s'animent dans une animation de scène : choisissez-en une dans la timeline
 Max (last triangle of the mesh)	Max (dernier triangle du maillage)
 Max (last triangle of the part)	Max (dernier triangle de la partie)
 Max distance	Distance max
@@ -1858,6 +1863,7 @@ This graphics backend has no shaders: the @vertice section runs on the CPU and t
 This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Ce backend graphique n'a pas de shaders : le matériau est dessiné normalement (GLES 2.0 et Vulkan en ont)
 This hierarchy clip only animates its root and its children	Ce clip de hiérarchie n'anime que sa racine et ses enfants
 This is a scene: convert it to a game to simulate it	C'est une scène : convertissez-la en jeu pour la simuler
+This material can not be animated (default or from a library)	Ce matériau ne peut pas être animé (par défaut ou d'une bibliothèque)
 This mesh does not have this array: do not draw with the array on	Ce maillage n'a pas cet array : ne dessinez pas avec l'array activé
 This phone can only clone the screen on the external display	Ce téléphone ne peut que cloner l'écran sur la sortie externe
 This phone has no video encoder for MP4	Ce téléphone n'a pas d'encodeur vidéo pour MP4
@@ -1912,7 +1918,12 @@ UV Group	Groupe UV
 UV Groups	Groupes UV
 UV Map	Carte UV
 UV Maps	Cartes UV
+UV Offset	Décalage UV
+UV Pivot	Pivot UV
+UV Rotation	Rotation UV
+UV Scale	Échelle UV
 UV Sphere	Sphère UV
+UV Transform	Transformation UV
 UV array	array d'UV
 UV group(s)	groupe(s) UV
 UV layer (0 = active)	Calque UV (0 = actif)
@@ -2208,3 +2219,4 @@ Documents	Documents
 Downloads	Téléchargements
 Pictures	Images
 Music	Musique
+Render with the first	Rendu avec le premier
