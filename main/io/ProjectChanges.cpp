@@ -61,9 +61,8 @@ static std::string SignatureMaterialFields(const Material* m) {
     for (int k = 0; k < W3D_MAPS; k++) { s += "\x01" + Path(m->mapTex[k]); Num(s, (float)m->uvMap[k]); Num(s, m->mapWithTexture[k] ? 1.0f : 0.0f); }
     Num(s, m->ior); Num(s, m->transmission); s += std::string("\x01") + m->shaderFile + (m->shaderOn ? "1" : "0");
     for (size_t c = 0; c < m->layers.size(); c++) { s += "\x02" + Path(m->layers[c].tex); Num(s, m->layers[c].blend); Num(s, m->layers[c].uvMap); s += m->layers[c].on ? '1' : '0'; }
-    // la fuerza de la emision y la transformacion UV (formato/material-animado.md)
-    Num(s, m->emissionStrength); Num(s, m->uvOffset[0]); Num(s, m->uvOffset[1]); Num(s, m->uvScale[0]); Num(s, m->uvScale[1]);
-    Num(s, m->uvRotation); Num(s, m->uvPivot[0]); Num(s, m->uvPivot[1]);
+    // la fuerza de la emision (formato/material-animado.md)
+    Num(s, m->emissionStrength);
     return s;
 }
 // ...firmado en su REPOSO si esta animado (lo que se guarda, ver W3dMaterialsRestBegin): mover el cabezal le cambia los

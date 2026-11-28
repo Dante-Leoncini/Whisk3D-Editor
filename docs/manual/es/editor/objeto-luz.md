@@ -42,7 +42,8 @@ El sol y el foco se orientan rotando el objeto. El sol dibuja siempre una línea
 | Ángulo Spot ◆ | Solo en el Foco: qué tan abierto es el cono, en grados, desde el centro hasta el borde. Con 45 el cono abre 90° en total. |
 | Exponente Spot ◆ | Solo en el Foco: cómo se reparte la luz en el cono. 0 alumbra parejo; más alto la concentra en el centro y oscurece los bordes. |
 | Distancia | Hasta dónde alumbra una luz Puntual o un Foco en el trazado de rayos, en metros; también es el largo del cono que se dibuja. 0 es sin límite. No aparece en el Sol. |
-| Radio | Para el trazado de rayos: el tamaño de la lámpara. 0 da sombras duras, de borde filoso; más grande da sombras de borde suave. En el Sol son grados. |
+| Radio | Para el trazado de rayos: el tamaño de la lámpara. 0 da sombras duras, de borde filoso; más grande da sombras de borde suave. |
+| Ángulo | Solo el **Sol**: su tamaño en el cielo, de 0° a 180° (el *Angle* de Blender; el sol de verdad mide medio grado). Con más ángulo las sombras del trazado se ablandan y, en la vista con luz por píxel, el brillo del sol en lo pulido (un ojo, un vidrio) se abre en una mancha que se ve, en vez de un punto. |
 | Rayos | Para el trazado de rayos: cuántos rayos de sombra manda esta luz. Más rayos, sombras suaves más limpias pero más lentas. 0 usa los de la pestaña Archivo / Render. |
 
 ### Distancia y atenuación

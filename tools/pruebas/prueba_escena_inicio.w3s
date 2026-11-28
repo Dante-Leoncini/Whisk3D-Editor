@@ -1,0 +1,27 @@
+# ==========================================================================
+#  LA ESCENA CON LA QUE ARRANCA WHISK3D (W3dCreateDefaultScene, `escenadefecto editor`): el cubo APOYADO en el piso (su
+#  centro a 1 m), la camara y la luz 1 m mas arriba que antes, y el PISO: un plano de 8 x 8 m en el suelo (la medida en
+#  la malla, la escala en 1). Las demas pruebas arrancan con la escena de siempre (el cubo en el origen, sin piso).
+#  La orientacion de los transforms es GLOBAL, y escalar con un eje no la deja en Local.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escena_inicio.w3s
+# ==========================================================================
+scenedefault editor
+objat Cubo 0 1 0 0.001
+objat Plano 0 0 0 0.001
+selobj Plano
+meshbbox -4 4 0 0 -4 4
+selobj Cubo
+meshbbox -1 1 -1 1 -1 1
+facesout all
+# ---- la orientacion: GLOBAL, y una escala con un eje no la deja en Local ----
+orient global
+key s
+xformactive 1
+key x
+key x
+xformactive 1
+orient global
+key Escape
+xformactive 0
+orient global

@@ -1,0 +1,60 @@
+# ==========================================================================
+#  LAS SOMBRAS DEL SOL + LA INDIRECTA HORNEADAS, CON LA LUZ DE TIEMPO REAL (TexLayer::shadowmask, como el modo
+#  "Shadowmask" de Unity con la indirecta horneada). Correr DESDE ESTA CARPETA, con el backend de shaders (la capa la usa
+#  la luz por pixel; con OpenGL la prueba termina en 'pixelshading'):
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_shadowmask.w3s
+#
+#  La escena (prueba_shadowmask.w3d): un piso, un sol de costado (la sombra de lo que esta a 1 m de altura cae 1 m hacia
+#  -X) y dos cuadrados a 1 m del piso: la TABLA, quieta (estatica), y el MOVIL, que se mueve (no estatico). El horneado
+#  de siempre deja la luz ENTERA en la textura y el material sin luz de tiempo real: el normal map, el brillo, el metal y
+#  los reflejos se perdian (el suelo de Marte quedaba plano y el cohete sin su metal). Con shadowmask el material sigue
+#  con su luz y la textura le da cuanto ve al sol cada lugar (la sombra de lo QUIETO) y la luz indirecta; la sombra de lo
+#  que SE MUEVE sigue en tiempo real encima. Lo que se verifica:
+#    1) sin hornear ni sombras: el piso bajo la tabla y bajo el movil, como el piso al sol
+#    2) horneado: la sombra de la tabla queda en el piso (sin sombras en tiempo real); la del movil NO (no es estatico)
+#    3) la luz sigue siendo de tiempo real: sin el sol, el lugar a la sombra y el lugar al sol quedan iguales (con la luz
+#       entera horneada seguirian distintos)
+#    4) con las sombras en tiempo real: la del movil aparece sobre el piso horneado (la profundidad de lo que se mueve)
+#    5) todo sobrevive a guardar y volver a abrir el .w3d (la textura viaja en el proyecto, la capa con "shadowmask")
+# ==========================================================================
+openw3d prueba_shadowmask.w3d
+pixelshading
+deselectall
+view3d shading 2
+view3d gizmo 0
+view3d overlays 0
+vporbit 0 0 0 12 -40 0
+shadows off
+# ---- 1) sin hornear ----
+scenepx 1.2 0 0.2 sameas -1.5 0 1.5 3
+scenepx -2.8 0 0.2 sameas -1.5 0 1.5 3
+# ---- 2) el horneado del piso (capa UV 0, shadowmask) ----
+selname Piso
+bakelightnamed LuzPiso 128 128 8 0 1
+matlayersshow
+deselectall
+scenepx 1.2 0 0.2 darkerthan -1.5 0 1.5 30
+scenepx -2.8 0 0.2 sameas -1.5 0 1.5 6
+# ---- 3) la luz sigue siendo de tiempo real ----
+visible 0 Luz
+scenepx 1.2 0 0.2 sameas -1.5 0 1.5 8
+visible 1 Luz
+scenepx 1.2 0 0.2 darkerthan -1.5 0 1.5 30
+# ---- 4) la sombra en tiempo real de lo que se mueve, encima ----
+shadows on
+scenepx -2.8 0 0.2 darkerthan -1.5 0 1.5 30
+scenepx 1.2 0 0.2 darkerthan -1.5 0 1.5 30
+# ---- 5) guardar y volver a abrir ----
+savew3d /tmp/w3d_prueba_shadowmask.w3d
+openw3d /tmp/w3d_prueba_shadowmask.w3d
+deselectall
+view3d shading 2
+view3d gizmo 0
+view3d overlays 0
+vporbit 0 0 0 12 -40 0
+shadows off
+selname Piso
+matlayersshow
+deselectall
+scenepx 1.2 0 0.2 darkerthan -1.5 0 1.5 30
+scenepx -2.8 0 0.2 sameas -1.5 0 1.5 6

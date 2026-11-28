@@ -14,10 +14,15 @@
 // Variable global que estabas usando
 bool running = false;
 
-// LA ESCENA POR DEFECTO (arrancar sin archivo): una coleccion hija de la raiz (la del
-// usuario: CollectionActive != SceneCollection), camara, luz blanca y un cubo. UNA sola
-// definicion: la usa el arranque y el comando `escenadefecto` del harness (los tests que
-// trabajan "sobre la escena del usuario" la necesitan en un proceso que ya corrio otros).
+// LA ESCENA POR DEFECTO (arrancar sin archivo, Archivo > Nuevo): una coleccion hija de la raiz (la del usuario:
+// CollectionActive != SceneCollection), camara, luz blanca, el cubo APOYADO en el piso (su centro a 1 m) y abajo el PISO,
+// un plano de 8 x 8 m (pedido del duenio: "ese es el inicio de Whisk3D por defecto"). La camara, la luz y la vista
+// (W3dDefaultSceneView) suben con el cubo. UNA sola definicion: la usa el arranque, Archivo > Nuevo y el comando
+// `escenadefecto` del harness.
+// LAS PRUEBAS (--script, g_w3dTestScene) arrancan con la escena de siempre -el cubo en el origen, sin piso-: cientos de
+// pruebas cuentan con esas posiciones y con que el primer plano que agregan se llame "Plano". El harness arma la del
+// editor con `escenadefecto editor` (prueba_escena_inicio)
+bool g_w3dTestScene = false;
 void W3dCreateDefaultScene() {
     // arriba de todo: el CONSTRUCTOR (corre una vez al empezar el juego: fija el "Clear color", el fondo del tema) y,
     // afuera de el y antes de la coleccion, la rutina que LIMPIA la pantalla en cada cuadro (apagarla o quitarla = no
@@ -25,20 +30,38 @@ void W3dCreateDefaultScene() {
     W3dDefaultRoutines(SceneCollection, T("Constructor"), T("Clear screen"),
                          ColorList[static_cast<int>(ColorID::background)]);
     CollectionActive = new Collection(SceneCollection);
+    const float up = g_w3dTestScene ? 0.0f : 1.0f;   // (el cubo apoyado en el piso: todo 1 m mas arriba)
 
-    // la CAMARA mira al cubo (el origen) desde arriba y al costado, a 5,5 unidades: con sus 45 grados el cubo entra entero
+    // la CAMARA mira al cubo (su centro) desde arriba y al costado, a 5,5 unidades: con sus 45 grados el cubo entra entero
     // en el render (antes, a 4,3, se cortaban las puntas) y la camara se ve en la vista 3D. La rotacion se CALCULA: era
     // (-35, -45, 0) escrita a mano y no apuntaba al cubo
-    { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
-      new Camera(CollectionActive, posCam, CameraRotLooking(posCam, Vector3(0, 0, 0))); }
-    Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
+    { const Vector3 posCam(-3.8f, 3.2f + up, 2.3f);
+      new Camera(CollectionActive, posCam, CameraRotLooking(posCam, Vector3(0, up, 0))); }
+    Light* L = Light::Create(CollectionActive, 1, 2.25f + up, 2.25);
     L->SetNameObj(T("Light"));   // el Core la llama "Light"; el nombre lo pone el editor en su idioma (como Agregar > Luz)
     L->SetDiffuse(1, 1, 1); // luz BLANCA por defecto (antes era roja)
 
-    NewMesh(MeshType::cube, CollectionActive);
+    // EL PISO: un plano de 8 x 8 m en el suelo (la medida en la malla: la escala del objeto queda en 1)
+    if (!g_w3dTestScene) {
+        Mesh* floor = (Mesh*)NewMesh(MeshType::plane, CollectionActive);
+        if (floor) {
+            Matrix4 S; S.Identity(); S.m[0] = 4.0f; S.m[10] = 4.0f;   // (el plano de la primitiva mide 2: x4 = 8 m)
+            floor->ApplyMatrix(S);
+            floor->meshType = -1;   // (ya no es el plano de la primitiva: regenerarlo lo volveria de 2 m)
+            if (W3dMeshSpawnedHook) W3dMeshSpawnedHook();   // ("Plano", recurso de la biblioteca)
+        }
+    }
+    Mesh* cube = (Mesh*)NewMesh(MeshType::cube, CollectionActive);
+    if (cube && up != 0.0f) cube->pos = Vector3(0, up, 0);
     if (W3dMeshSpawnedHook) W3dMeshSpawnedHook();   // el cubo ya es el recurso "Cubo" de la biblioteca
     // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (ver W3dRootsSetTypesDeduced)
     { extern void W3dRootsSetTypesDeduced(); W3dRootsSetTypesDeduced(); }
+}
+// LA VISTA de la escena por defecto: mira al centro del cubo (1 m arriba del piso), no al suelo
+void W3dDefaultSceneView(Viewport3D* vp) {
+    if (!vp || g_w3dTestScene) return;
+    vp->pivot = Vector3(0, 1, 0);
+    vp->RecalcOrbitPosition();
 }
 
 void ConstructUniversal(int argc, char* argv[]) {
@@ -129,6 +152,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     // distinta en Symbian). El arranque sin archivo y el fallback de un .w3d sin bloque Layout arman lo mismo.
     Viewport3D* vp3dInitial = NULL;
     rootViewport = LayoutDefault(winW, winH, &vp3dInitial);
+    W3dDefaultSceneView(vp3dInitial);   // (la vista mira al cubo, apoyado en el piso)
     // siempre hay un viewport activo (borde verde) por defecto: sin mouse
     // (Symbian) es la unica referencia; con mouse el hover lo pisa enseguida.
     viewPortActive = vp3dInitial;

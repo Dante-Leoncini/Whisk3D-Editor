@@ -16,6 +16,7 @@ Qué puede hacer **Whisk3D Editor**, ordenado por panel y por modo. Borrador par
        - [Superficie de Subdivisión](modificador-subdivision.md)
        - [Booleano](modificador-booleano.md)
        - [Culling](modificador-culling.md)
+       - [Dispersar (Scatter)](modificador-scatter.md)
        - [Esqueleto (modificador)](modificador-esqueleto.md)
      - [Cámara](objeto-camara.md)
      - [Luz](objeto-luz.md)

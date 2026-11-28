@@ -2,6 +2,7 @@
 //  GIZMO DE TRANSFORMACION. Ver Gizmo.h para el contrato. C++03 (compila en Symbian).
 // ============================================================================
 #include "ui/ViewPorts/Gizmo.h"
+#include "importers/import_w3d.h"   // W3dSessionGizmoHook: el gizmo que recuerda el proyecto
 #include "ui/ViewPorts/ViewPort3D.h"
 #include "ui/ViewPorts/LayoutInput.h"   // EditXformStart / EditXformActive
 #include "ui/ViewPorts/TransformUI.h"   // ToolbarUsesTouch
@@ -21,9 +22,15 @@ extern bool g_redraw;
 
 #ifdef W3D_SYMBIAN
 bool g_gizmoOn = false;   // N95: apagado por defecto (pantalla chica, sin puntero)
+static const bool kGizmoDefault = false;
 #else
 bool g_gizmoOn = true;
+static const bool kGizmoDefault = true;
 #endif
+bool W3dGizmoDefault() { return kGizmoDefault; }
+// el proyecto que se abre trae (o no) su gizmo: sin el dato, el de fabrica (no se hereda del proyecto anterior)
+static void GizmoFromSession(int on) { g_gizmoOn = (on < 0) ? kGizmoDefault : (on != 0); g_redraw = true; }
+namespace { struct HookGizmoSession { HookGizmoSession() { W3dSessionGizmoHook = GizmoFromSession; } } gHookGizmoSession; }
 
 static bool g_gizmoDrag   = false;
 static int  g_gizmoHandle = GizmoNone;

@@ -1,0 +1,77 @@
+# ==========================================================================
+#  OCULTAR EN EDIT MODE (H / Shift+H / Alt+H y Mesh > Show/Hide, como Blender: EditMesh::Hide / Reveal). Correr DESDE
+#  ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_ocultar_edicion.w3s
+#
+#  Sobre el cubo de siempre (8 vertices, 12 aristas, 6 caras):
+#    1) H en modo cara: se oculta la cara elegida (sus aristas y vertices los siguen usando las otras: se ven) y la
+#       malla dibuja las 5 que quedan
+#    2) Alt+H: todo se ve otra vez
+#    3) H en modo vertice: el vertice se lleva sus 3 aristas y sus 3 caras
+#    4) Shift+H: se oculta lo NO elegido
+#    5) lo oculto sobrevive a una operacion que rearma la jaula (borrar otra cara)
+#    6) al volver a Modo Objeto la malla se ve entera (y al volver a Edit Mode, tambien)
+# ==========================================================================
+selobj Cubo
+mode edit
+# ---- 1) H en modo cara ----
+selmode face
+select face 0
+edithide hide
+edithidden 0 0 1
+# ---- 2) Alt+H ----
+edithide reveal
+edithidden 0 0 0
+# ---- 3) H en modo vertice ----
+selmode vertex
+select vert 0
+edithide hide
+edithidden 1 3 3
+edithide reveal
+# ---- 4) Shift+H: lo no elegido ----
+select vert 0
+edithide hideunselected
+edithidden 7 12 6
+edithide reveal
+edithidden 0 0 0
+# ---- 5) sobrevive a rearmar la jaula ----
+selmode face
+select face 0
+edithide hide
+select face 1
+editdelete
+edithidden 0 0 1
+expect faces 5
+# ---- 6) Modo Objeto: se ve todo ----
+mode object
+mode edit
+edithidden 0 0 0
+# ---- 7) CTRL+Z: ocultar y mostrar se deshacen (y se rehacen) como cualquier paso de la edicion ----
+selmode face
+select face 0
+edithide hide
+edithidden 0 0 1
+undo
+edithidden 0 0 0
+redo
+edithidden 0 0 1
+# (Alt+H: lo revelado vuelve a ocultarse con Ctrl+Z)
+edithide reveal
+edithidden 0 0 0
+undo
+edithidden 0 0 1
+edithide reveal
+# Shift+H en modo vertice: deshacer trae todo de vuelta (la jaula tiene 5 caras: el paso 5 borro una)
+selmode vertex
+select vert 0
+edithide hideunselected
+edithidden 7 12 5
+undo
+edithidden 0 0 0
+# ---- 8) Modo Objeto: la H (y el ojo del outliner) se deshacen ----
+mode object
+selobj Cubo
+key h
+objvisible 0
+undo
+objvisible 1

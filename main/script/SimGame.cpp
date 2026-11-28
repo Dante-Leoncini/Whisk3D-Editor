@@ -24,10 +24,10 @@
 #include "objects/Light.h"            // el snapshot guarda/restaura el color difuso (setColor/setEnergy)
 #include "objects/Particles.h"        // idem el activo del emisor (setEmitting)
 #include "objects/Camera.h"           // idem el RIEL de la camara (setRail/setRailNode son estado de juego)
-#include "objects/UI.h"
-#include "objects/Element2D.h"
-#include "objects/Text2D.h"
-#include "render/UIOverlay.h"
+#include "WhiskUI/objects/UI.h"
+#include "WhiskUI/objects/Element2D.h"
+#include "WhiskUI/objects/Text2D.h"
+#include "WhiskUI/render/UIOverlay.h"
 #include "render/RenderOptions.h"      // g_redraw
 #include "animation/Animation.h"       // CurrentFrame / StartFrame / EndFrame / PlayAnimation
 #include "objects/Gamepad.h"           // axisState / buttonState (el pad SDL del editor)

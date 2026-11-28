@@ -417,11 +417,17 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         size_t oi = 0;
         for (int g = 0; g < nGroups; g++) {
             std::vector<uint32_t> idx;
+            std::vector<int> polyRle;   // extras.w3d_polygons: [lados, cuantos, ...] -> el import rearma los quads/ngons
             while (oi < orderF.size()) { const MeshFace& F = m->faces3d[orderF[oi]];
                 int fm = (F.mat < 0 || F.mat >= (int)m->materialsGroup.size()) ? 0 : F.mat;
                 if (fm != g) break;   // orderF esta agrupado: en cuanto cambia el grupo, se corta
                 std::vector<MeshIndex> tri; W3dTriangulateFace(m->vertex, F.idx, tri);   // misma triangulacion que el render
                 for (size_t t = 0; t < tri.size(); t++) idx.push_back((uint32_t)tri[t]);
+                if (tri.size() >= 3) {   // (lados = triangulos + 2: lo que el import consume de seguido)
+                    const int n = (int)(tri.size() / 3) + 2;
+                    if (!polyRle.empty() && polyRle[polyRle.size() - 2] == n) polyRle.back()++;
+                    else { polyRle.push_back(n); polyRle.push_back(1); }
+                }
                 oi++;
             }
             if (idx.empty()) continue;
@@ -433,8 +439,20 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             // asi que va en "extras" (clave estandar, ignorada por Blender/viewers). Sin esto el
             // reimport lo rearmaba del material y una malla con DOS partes del mismo material volvia
             // con dos partes homonimas (y encima perdia los nombres que puso el usuario).
+            std::string ex;
             if (g < (int)m->materialsGroup.size() && !m->materialsGroup[g].name.empty())
-                pr += ",\"extras\":{\"w3d_part\":\"" + Jesc(m->materialsGroup[g].name) + "\"}";
+                ex = "\"w3d_part\":\"" + Jesc(m->materialsGroup[g].name) + "\"";
+            // LOS POLIGONOS: el glTF solo lleva triangulos; con esto el import de Whisk3D vuelve a armar los quads y
+            // ngons (ver PushPrimitiveFaces en import_gltf.cpp). Solo si hay alguno: todo triangulos no lo necesita.
+            bool anyPoly = false;
+            for (size_t r = 0; r < polyRle.size(); r += 2) if (polyRle[r] > 3) anyPoly = true;
+            if (anyPoly) {
+                if (!ex.empty()) ex += ",";
+                ex += "\"w3d_polygons\":[";
+                for (size_t r = 0; r < polyRle.size(); r++) { if (r) ex += ","; ex += Itos(polyRle[r]); }
+                ex += "]";
+            }
+            if (!ex.empty()) pr += ",\"extras\":{" + ex + "}";
             pr += "}"; prims.push_back(pr);
         }
         if (prims.empty()) continue;

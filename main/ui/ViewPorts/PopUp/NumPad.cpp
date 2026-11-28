@@ -442,7 +442,7 @@ static void QpIDEArrange(IDE* ide, int keyboardHeight){
     W3dKeyboardRearrange();
 }
 void QwertyPad::FeedStr(const char* s){
-    if (ide){ IDE* i = QpIDE(ide); if (i){ i->InsertTyped(s); QpIDECursorVisible(i, y); } g_redraw = true; return; }
+    if (ide){ IDE* i = QpIDE(ide); if (i){ i->TextTyped(s); QpIDECursorVisible(i, y); } g_redraw = true; return; }   // (TextTyped: tambien el autocompletado)
     if (!g_activeTextField) return;
     for (const char* p = s; *p; p++) g_activeTextField->InsertChar((unsigned char)*p); // byte a byte (ñ = 2 bytes)
     g_redraw = true;
@@ -565,8 +565,9 @@ void QwertyPad::ActionKey(int rowIdx, int col){
     if (ide){   // EL IDE: OK es un salto de linea; borrar y las flechas van al cursor del codigo (cerrar: tocar afuera / Atras)
         IDE* i = QpIDE(ide);
         if (i){
-            if      (!strcmp(t, "OK"))  { i->Enter();               QpIDECursorVisible(i, y); g_redraw = true; return; }
-            else if (!strcmp(t, "DEL")) { i->Backspace();           QpIDECursorVisible(i, y); g_redraw = true; return; }
+            // (con la lista del autocompletado abierta, OK escribe el elegido; DEL la sigue filtrando)
+            if      (!strcmp(t, "OK"))  { if (i->acOpen) i->CompletionAccept(); else i->Enter(); QpIDECursorVisible(i, y); g_redraw = true; return; }
+            else if (!strcmp(t, "DEL")) { i->Backspace(); if (i->acOpen) i->CompletionUpdate(false); QpIDECursorVisible(i, y); g_redraw = true; return; }
             else if (!strcmp(t, "<"))   { i->MoveCursor(0, -1, false); QpIDECursorVisible(i, y); g_redraw = true; return; }
             else if (!strcmp(t, ">"))   { i->MoveCursor(0, 1, false);  QpIDECursorVisible(i, y); g_redraw = true; return; }
         }
@@ -761,7 +762,7 @@ static void SymbolInsert(const char* s){
     IDE* ide = SymbolIDEDestination();
     if (!strcmp(s, "ent")){ if (ide) ide->Enter(); return; }   // nueva linea (solo IDE; el TextField es de una linea)
     char c = !strcmp(s, "esp") ? ' ' : s[0];
-    if (ide) ide->InsertChar(c);
+    if (ide) { const char t[2] = { c, 0 }; ide->TextTyped(t); }   // (un punto abre la lista de math.; otro signo la cierra)
     else if (g_activeTextField) TextFieldInputChar((int)c);
 }
 

@@ -18,7 +18,7 @@ Mientras dura, la barra superior muestra lo que se está haciendo, por ejemplo "
 
 ## El gizmo
 
-El gizmo aparece sobre el pivote en Modo Objeto y en Modo Edición (se prende y apaga en Superposiciones → Gizmo).
+El gizmo aparece sobre el pivote en Modo Objeto y en Modo Edición (se prende y apaga en Superposiciones → Gizmo). El proyecto **recuerda** si lo apagaste: al guardar queda en el `.w3d`, igual que la **Fusión automática** (menú Malla) prendida y su distancia. Un proyecto que no las trae abre con las de fábrica.
 
 | Función | Descripción |
 |---|---|

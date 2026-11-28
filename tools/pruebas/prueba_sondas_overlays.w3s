@@ -1,0 +1,53 @@
+# ==========================================================================
+#  LAS SONDAS SE APAGAN DESDE EL MENU OVERLAYS DE LA VISTA 3D ("Light Probes" / "Reflection Probes": el antes y despues
+#  sin tocar la escena). Correr DESDE ESTA CARPETA. Con OpenGL (el pipeline fijo) prueba la sonda de luz y termina en
+#  'pixelshading'; con el backend de shaders prueba tambien la de reflejo:
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_sondas_overlays.w3s
+#
+#  La escena es la de prueba_sondas_outliner.w3d (sin lamparas ni luz del fondo, un piso que BRILLA en rojo y dos esferas
+#  NO estaticas: la A adentro de una sonda de luz y de una de reflejo, la B lejos). Horneadas, la A toma el rojo del piso
+#  y la B queda negra. 'vpprobes' abre el menu Overlays de verdad, verifica que esten los dos items (y que apunten a las
+#  banderas de esa vista) y las pone: apagada la de luz, la A queda como la B; prendida, vuelve. Igual con la de reflejo.
+#  Las banderas viajan con el layout del .w3d
+# ==========================================================================
+openw3d prueba_sondas_outliner.w3d
+selname SondaLuz
+probe bake
+selname SondaReflejo
+srbake
+deselectall
+view3d shading 2
+view3d gizmo 0
+# ---- (1) la SONDA DE LUZ ----
+visible 0 SondaReflejo
+scenepx -3 0.45 0 noes 0 0 0 30
+vpprobes 0 1
+scenepx -3 0.45 0 sameas 3 0.45 0 3
+vpprobes 1 1
+scenepx -3 0.45 0 noes 0 0 0 30
+# ---- (2) la SONDA DE REFLEJO (el PBR de la luz por pixel): esferas de metal liso, sin la sonda de luz ----
+pixelshading
+visible 0 SondaLuz
+visible 1 SondaReflejo
+selname EsferaA
+matrt 0.05 1
+selname EsferaB
+matrt 0.05 1
+deselectall
+scenepx -3 0.45 0 noes 0 0 0 30
+vpprobes 1 0
+scenepx -3 0.45 0 es 0 0 0 3
+vpprobes 1 1
+scenepx -3 0.45 0 noes 0 0 0 30
+# ---- (3) apagada en el layout guardado: vuelve apagada ----
+vpprobes 1 0
+savew3d /tmp/w3d_prueba_sondas_overlays.w3d
+openw3d /tmp/w3d_prueba_sondas_overlays.w3d
+selname SondaReflejo
+srbake
+deselectall
+view3d shading 2
+view3d gizmo 0
+scenepx -3 0.45 0 es 0 0 0 3
+vpprobes 1 1
+scenepx -3 0.45 0 noes 0 0 0 30

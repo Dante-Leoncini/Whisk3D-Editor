@@ -386,6 +386,7 @@ static bool VpIsInside(ViewportBase* v, int mx, int my) {
 #ifndef W3D_SYMBIAN
 extern Uint32 g_lastFingerTicks;   // controls.cpp: el ultimo evento de dedo
 #endif
+int VpToleranceBorderMouse() { return 5 * GlobalScale * LineScaleUI(); }   // (la de siempre, sin el dedo)
 int VpToleranceBorder() {
     int t = 5;
 #ifndef W3D_SYMBIAN
@@ -424,18 +425,43 @@ static bool VpIsInPadding(ViewportBase* a, ViewportBase* b, bool isRow,
     return false;
 }
 
+// la BARRA (la de menus o la de herramientas) de la hoja que tiene el punto, sin efectos (OnBar marca el gesto)
+static bool VpBarAt(ViewportBase* v, int mx, int my) {
+    while (v && !v->isLeaf()) {
+        ViewportBase* a = v->ContainerKind() == 1 ? ((ViewportRow*)v)->childA : (v->ContainerKind() == 2 ? ((ViewportColumn*)v)->childA : NULL);
+        ViewportBase* b = v->ContainerKind() == 1 ? ((ViewportRow*)v)->childB : (v->ContainerKind() == 2 ? ((ViewportColumn*)v)->childB : NULL);
+        v = VpIsInside(a, mx, my) ? a : (VpIsInside(b, mx, my) ? b : NULL);
+    }
+    if (!v) return false;
+    if (v->barCard && !(v->BarButtons.empty() && v->BarTabs.empty())) {
+        const int barH = v->BarHeight(), yBar = v->barDown ? v->y + v->height - barH : v->y;
+        if (mx >= v->x && mx < v->x + v->width && my >= yBar && my < yBar + barH) return true;
+    }
+    return v->OnToolbar(mx, my);
+}
+// la division se agarra en su franja (VpToleranceBorder), pero la parte que se ENSANCHA con el dedo no le gana a una
+// BARRA: el boton de tipo del viewport de abajo (o el de la derecha) queda justo contra la division, y con la franja del
+// dedo (9 de la UI: 27 px en un telefono) el toque caia en la division y el menu no se abria. Pasaba en todos los
+// viewports menos el de arriba a la izquierda (en el iPhone, el de abajo no se podia cambiar)
+static bool VpGrabsDivision(ViewportBase* a, ViewportBase* b, bool isRow, ViewportBase* node, int mx, int my, int grab, int grabBase) {
+    if (!VpIsInPadding(a, b, isRow, mx, my, grab)) return false;
+    if (grab <= grabBase || VpIsInPadding(a, b, isRow, mx, my, grabBase)) return true;
+    return !VpBarAt(node, mx, my);
+}
+
 ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     if (!vp) return NULL;
 
     const int PADDING = paddingViewportGS;
     const int GRAB = VpToleranceBorder();   // (la division gana antes que el contenido de los dos lados)
+    const int GRAB_BASE = VpToleranceBorderMouse();
 
     // -----------------------------
     // ViewportRow (divide en columnas)
     // -----------------------------
     if (vp->ContainerKind() == 1) {
         ViewportRow* row = (ViewportRow*)vp;
-        if (VpIsInPadding(row->childA, row->childB, true, mx, my, GRAB))
+        if (VpGrabsDivision(row->childA, row->childB, true, vp, mx, my, GRAB, GRAB_BASE))
             return vp;
 
         if (VpIsInside(row->childA, mx, my))
@@ -449,7 +475,7 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     // -----------------------------
     else if (vp->ContainerKind() == 2) {
         ViewportColumn* col = (ViewportColumn*)vp;
-        if (VpIsInPadding(col->childA, col->childB, false, mx, my, GRAB))
+        if (VpGrabsDivision(col->childA, col->childB, false, vp, mx, my, GRAB, GRAB_BASE))
             return vp;
 
         if (VpIsInside(col->childA, mx, my))
@@ -652,7 +678,7 @@ void ViewportBase::UpdateBar(){
         if (!btn->visible) continue;
         btn->Resize(width - gapGS * 2);
         if (this == viewPortActive && (int)b == barFocusIndex){ focusX = total; focusW = btn->width; }
-        total += btn->width + btnGap;
+        total += btn->width + (btn->joinNext ? 0 : btnGap);
     }
     // las PESTAÑAS tambien cuentan para el ancho total (sino el scroll maximo salia mal: en propiedades hay
     // 1 boton + varias pestañas -> maxS quedaba ~0 y las pestañas NO scrolleaban aunque se salieran de pantalla).
@@ -684,7 +710,7 @@ void ViewportBase::UpdateBar(){
         btn->focusMenu = (this == viewPortActive && barFocusIndex >= 0 && (int)b == barFocusIndex); // solo el viewport ACTIVO resalta su barra
         btn->sx = x + bx;
         btn->sy = y + yBar + by;
-        bx += btn->width + btnGap;
+        bx += btn->width + (btn->joinNext ? 0 : btnGap);   // (joinNext: el que sigue va pegado)
     }
     for (size_t t = 0; t < BarTabs.size(); t++){
         Tab* tab = BarTabs[t];

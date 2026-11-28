@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ There are more, like the ones that tell you when an object collides with another
 
 What it does inside:
 
-**`if property("rotate") then` … `end`** is a **condition**. An `if` does just what it says: it runs the code inside it only if what goes between `if` and `then` is true. It can have an `elseif` ("if that isn't true, do this if…"), which tests another condition, and an `else` ("otherwise"), which runs when none of them was met; both are optional. It always ends with `end`. For example:
+**`if rotate then` … `end`** is a **condition**. An `if` does just what it says: it runs the code inside it only if what goes between `if` and `then` is true. It can have an `elseif` ("if that isn't true, do this if…"), which tests another condition, and an `else` ("otherwise"), which runs when none of them was met; both are optional. It always ends with `end`. For example:
 
 ```lua
 if puntos >= 100 then
@@ -71,11 +71,11 @@ end
 
 With 120 points the prize is gold; with 70, silver; and with 10, nothing. Only the first part that's met is done. (In Lua, `elseif` is written as one word.)
 
-In the script, the `if` has no `elseif` or `else`: if **rotate** is true (the checkbox is ticked), the cube spins; if it's false, nothing happens and the function ends. `property("rotate")` reads the value that object has in the panel. Since it's read on every frame, if you change it while the game is running, the script finds out right away.
+In the script, the `if` has no `elseif` or `else`: if **rotate** is true (the checkbox is ticked), the cube spins; if it's false, nothing happens and the function ends. `rotate` reads the value that object has in the panel. Every property is used like that, by its name; you can also read it with `property("rotate")`. Since it's read on every frame, if you change it while the game is running, the script finds out right away.
 
 - **`self()`** is the object that has the script: the cube. **`getRotationZ(self())`** gives its rotation in degrees around Z (the vertical axis, the same Z you see in the Properties panel), and **`setRotationZ`** gives it a new one: the same one, plus a little more. That way the cube spins like a top.
 
-`property`, `self`, `getRotationZ` and `setRotationZ` are functions too, but the other way around: Whisk3D provides them and you call them. They're in the [Lua manual](../lua/README.md).
+`self`, `getRotationZ` and `setRotationZ` are functions too, but the other way around: Whisk3D provides them and you call them. They're in the [Lua manual](../lua/README.md).
 
 ### The complete script
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

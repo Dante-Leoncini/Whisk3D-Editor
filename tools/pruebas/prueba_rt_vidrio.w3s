@@ -1,0 +1,60 @@
+# EL VIDRIO EN EL TRAZADO DE RAYOS (2026-11-26):
+#  - El COLOR del vidrio (el difuso) tine lo que se ve a traves y la luz que pasa: un vidrio verde se ve verde y su
+#    sombra es verde. Antes salia blanco, cambiara el color que cambiara, y no hacia sombra.
+#  - LAS CAUSTICAS: una esfera de vidrio con IOR junta la luz como una lente. Debajo queda un punto BRILLANTE (mas que el
+#    piso iluminado de al lado) rodeado de sombra. Los fotones los tira la CPU antes de cada pase (RayTracer.cpp,
+#    PhotonsShoot) y se juntan al sombrear (CausticsIn); en la GPU, lo mismo en el shader.
+#  - Sin IOR (1) el vidrio no dobla la luz: no hay punto brillante, solo la sombra teñida.
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_rt_vidrio.w3s
+window 640 480
+deselectall
+selobj Luz
+delete
+selobj Cubo
+delete
+# el piso GRIS (0.5): la luz directa lo deja a medio tono y la caustica, que junta luz, lo pasa
+add plane
+objscale 6 1 6
+matnew
+matcolor 0.5 0.5 0.5
+matrt 0 0
+add uvsphere
+objname EsferaVidrio
+objmove 0 1.3 0
+matnew
+matname Vidrio
+matcolor 0.3 1 0.3
+matrt 0.05 0
+mattrans 1
+matmap ior 1.5
+addlight
+objmove 3 4 0
+rtopt 1 1 24
+rtlight 0 0 0
+vpview rendered
+vporbit 0 0.5 0 9 -60 0
+rtgpu 0
+rtrender 128 96 24
+rtongpu no
+rtsave /tmp/w3d_rt_vidrio.png
+# el piso iluminado (gris), la SOMBRA de la esfera (oscura: la luz que la atraviesa se junto en la caustica) y el PUNTO
+# de la caustica: verde (el color del vidrio) y mucho mas brillante que el piso iluminado
+rtpixel 100 80 111 111 111 10
+rtpixel 33 46 0 5 0 14
+rtpixel 49 44 40 220 40 70
+# lo mismo en la GPU (si la maquina tiene Vulkan): la misma imagen
+rtgpu 1 skip
+rtrender 128 96 24
+rtpixel 100 80 111 111 111 10
+rtpixel 33 46 0 5 0 14
+rtpixel 49 44 40 220 40 70
+rtgpu 0
+# SIN IOR (1) el vidrio no dobla la luz: sin punto brillante, la sombra entera teñida de verde (el canal verde pasa)
+selobj EsferaVidrio
+matmap ior 1
+rtrender 128 96 24
+rtsave /tmp/w3d_rt_vidrio_ior1.png
+rtpixel 49 44 5 60 5 25
+rtpixel 33 46 5 60 5 25

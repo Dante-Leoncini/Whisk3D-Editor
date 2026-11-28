@@ -1,0 +1,9 @@
+# ==========================================================================
+#  EL EXPLORADOR DE ARCHIVOS: "Guardar como" arranca en la carpeta del proyecto abierto (no en el home), y lo que se
+#  elige queda en RECIENTES (arriba de los accesos). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_explorador_recientes.w3s
+# ==========================================================================
+savew3d /tmp/w3d_prueba_recientes.w3d
+w3dpath /tmp/w3d_prueba_recientes.w3d
+projectsaveas
+fbpath /tmp

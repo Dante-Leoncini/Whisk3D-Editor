@@ -528,6 +528,7 @@ Delete the orphan resource	¿Borrar el recurso huérfano
 Delete the orphan resources	¿Borrar los recursos huérfanos
 Deleted	Borrado
 Denoiser	Denoiser
+Shadowmask (real-time light)	Shadowmask (luz en tiempo real)
 Density	Densidad
 Depth	Profundidad
 Depth & clear	Profundidad y limpieza
@@ -757,6 +758,7 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Radio a volumen pleno
 Fullscreen	Pantalla completa
 Function	Función
+Function of Whisk3D (it isn't in this script)	Función de Whisk3D (no está en este script)
 GL Calls	Llamadas GL
 GL Light	Luz GL
 GLB saved successfully!	¡GLB guardado!
@@ -777,6 +779,7 @@ Give the project a name to save it	Ponele un nombre al proyecto para poder guard
 Gizmo	Gizmo
 Global	Global
 Go back	Ir atrás
+Go to Definition	Ir a la definición
 Go to end	Ir al final
 Go to start	Ir al inicio
 Grab step	Agarrar paso
@@ -947,6 +950,7 @@ Library unlinked	Librería desvinculada
 Lifetime	Vida
 Light	Luz
 Light Probe	Sonda de luz
+Light Probes	Sondas de luz
 Light bounce	Rebote de luz
 Light bounces	Rebotes de luz
 Light color	Color de luz
@@ -1892,6 +1896,7 @@ This resource can't be dropped in the 3D view	Este recurso no se puede soltar en
 This resource can't be renamed	Este recurso no se puede renombrar
 This resource type can't be deleted	Este tipo de recurso no se puede borrar
 This resource type can't be duplicated	Este tipo de recurso no se puede duplicar
+This script doesn't define	Este script no define
 This step has nothing to animate	Este paso no tiene nada para animar
 This texture already has the baked light of	Esta textura ya tiene la luz horneada de
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Esto modificará los grupos de vértices y los simplificará a 1 hueso por vértice (skinning más rápido). Puede haber pérdida de datos.
@@ -1941,12 +1946,7 @@ UV Group	Grupo UV
 UV Groups	Grupos UV
 UV Map	Mapa UV
 UV Maps	Mapas UV
-UV Offset	Desplazamiento UV
-UV Pivot	Pivote UV
-UV Rotation	Rotación UV
-UV Scale	Escala UV
 UV Sphere	Esfera UV
-UV Transform	Transformación UV
 UV array	array de UV
 UV group(s)	grupo(s) UV
 UV layer (0 = active)	Capa UV (0 = la activa)
@@ -2326,3 +2326,35 @@ Y From	Y desde
 Z From	Z desde
 World	Mundo
 Render with the first	Render con el primero
+Scatter	Dispersar
+External .w3d	.w3d externo
+Emit From	Desde
+Seed	Semilla
+Random Scale	Escala al azar
+Align to Normal	Alinear a la normal
+Random Rotation	Giro al azar
+Random Tilt	Inclinación al azar
+Merged	Unida
+Instances	Instancias
+Show Emitter	Mostrar emisor
+%d copies of %d source(s)	%d copias de %d fuente(s)
+Face Centers	Centros de caras
+Faces (anywhere)	Caras (cualquier punto)
+(the first one)	(la primera)
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Dispersar: las copias de un .w3d externo no pueden ser objetos (aplicalo como Unida)
+Scatter: there are no copies to apply	Dispersar: no hay copias para aplicar
+Scatter: %d copies are now objects	Dispersar: %d copias ahora son objetos
+Show/Hide	Mostrar/Ocultar
+Reveal Hidden	Mostrar lo oculto
+Hide Selected	Ocultar lo seleccionado
+Hide Unselected	Ocultar lo no seleccionado
+Recalculate Vertex Normals	Recalcular normales de vértices
+New File...	Nuevo archivo...
+New File	Nuevo archivo
+Recent	Recientes
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Cuchillo: click = punto, Enter = cortar, Esc = cancelar, Retroceso = sacar el punto, Z = cortar a través
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Cuchillo (a través): click = punto, Enter = cortar, Esc = cancelar, Retroceso = sacar el punto, Z = solo lo que se ve
+Knife: enter Edit Mode first	Cuchillo: entra primero en Modo Edición
+Knife: the cut does not cross any face	Cuchillo: el corte no cruza ninguna cara
+Knife	Cuchillo
+Merge by Distance: %d vertices merged	Fusionar por distancia: se fusionaron %d vértices

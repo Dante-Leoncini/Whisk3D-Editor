@@ -73,11 +73,8 @@ struct Config {
 };
 extern Config cfg;
 
-struct Cursor3D {
-    Vector3 pos;
-    Quaternion rot;
-};
-extern Cursor3D cursor3D;
+// el CURSOR 3D (struct Cursor3D) y las banderas de overlay del visor se DECLARAN en el Core (las usa su dibujo):
+#include "render/RenderOptions.h"
 
 // Enumeraciones
 // dialecto C++03 compartido

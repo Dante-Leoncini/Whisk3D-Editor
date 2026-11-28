@@ -1,0 +1,46 @@
+# EL TRAZADO DE RAYOS REFLEJA COMO BLENDER (pedido del duenio, 2026-11-27: "a nuestra nave le faltan los puntos blancos de
+# la luz del sol, el reflejo en los ojos de los marcianos, en el vidrio; el contorno de las puertas queda negro y sin
+# volumen; en EEVEE los bordes tienen volumen por los reflejos"):
+#  1. FRESNEL: lo que NO es metal tambien refleja, poco de frente (el F0 de su IOR, ~4%) y casi todo de costado. Antes
+#     solo reflejaba el metal: un piso negro brillante bajo un cielo blanco salia negro entero. Ahora el piso lejano
+#     (mirado de costado) toma el cielo y el cercano (mirado mas de arriba) refleja poquito.
+#  2. LA RUGOSIDAD es la de Blender/glTF (perceptual: alfa = r^2). Antes se usaba r como alfa: con rugosidad 0.3 el
+#     brillo de la lampara tenia exponente 21 en vez de 245, ~10 veces mas debil y ancho (su pico daba ~29 de 255).
+# CPU y GPU dan lo mismo (sin una GPU con Vulkan, la parte de la GPU no corre).
+# ---- 1. piso negro brillante, cielo blanco, la camara mirando el piso de costado ----
+add plane
+objscale 20 1 20
+matnew
+matcolor 0 0 0
+matrt 0.05 0
+visible 0 Cubo
+background color 1 1 1
+rtopt 1 1 4
+vpview rendered
+vporbit 0 0 0 6 -12 0
+rtgpu 0
+rtrender 96 72 4
+rtpixel 48 30 122 122 122 30
+rtpixel 48 66 11 11 11 8
+rtgpu 1 skip
+rtrender 96 72 4
+rtongpu si
+rtpixel 48 30 122 122 122 30
+rtpixel 48 66 11 11 11 8
+# ---- 2. el mismo piso con rugosidad 0.3, cielo negro, una lampara justo arriba y la camara mirando para abajo: el
+#      centro de la imagen es el pico del brillo (blanco; antes ~29) y a los costados se apaga enseguida ----
+matrt 0.3 0
+background color 0 0 0
+addlight
+objmove 0 5 0
+rtlight 0 0 1
+vporbit 0 0 0 6 -90 0
+rtgpu 0
+rtrender 96 72 1
+rtpixel 48 36 255 255 255 10
+rtpixel 90 36 0 0 0 8
+rtgpu 1 skip
+rtrender 96 72 1
+rtongpu si
+rtpixel 48 36 255 255 255 10
+rtpixel 90 36 0 0 0 8

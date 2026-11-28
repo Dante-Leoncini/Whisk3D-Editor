@@ -87,5 +87,7 @@ void SyncRenderColors() {
         gRenderColors[RC_normalVert][k]   = W3dColors[W3dColor_normalVertex][k];
         gRenderColors[RC_normalCustom][k] = W3dColors[W3dColor_normalCustom][k];
         gRenderColors[RC_gizmoDark][k]    = ColorList[static_cast<int>(ColorID::accentDark)][k];
+        gRenderColors[RC_editEdge][k]     = W3dColors[W3dColor_LineFloor][k];   // la jaula del Edit Mode (EditMesh, Core)
+        gRenderColors[RC_background][k]   = ColorList[static_cast<int>(ColorID::background)][k];
     }
 }

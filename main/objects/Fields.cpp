@@ -26,6 +26,8 @@ const W3dField kFields[] = {
     { "empty.shape",    FieldInt,   ObjectType::empty, &At<Empty, int, &Empty::shape> },
     { "empty.drawSize", FieldFloat, ObjectType::empty, &At<Empty, float, &Empty::drawingSize> },
     { "empty.drawRot",  FieldVec3,  ObjectType::empty, &At<Empty, Vector3, &Empty::rotDrawing> },
+    { "empty.image",    FieldImage, ObjectType::empty, &At<Empty, Texture*, &Empty::image> },          // (la referencia)
+    { "empty.opacity",  FieldFloat, ObjectType::empty, &At<Empty, float, &Empty::imageOpacity> },
     // LIMPIAR PROFUNDIDAD (objects/ClipRegion.h)
     { "clearz.active",  FieldBool,  ObjectType::clearz, &At<ClearZ, bool, &ClearZ::active> },
     // PARTICULAS (objects/Particles.h): movimiento, tamanio y rotacion
@@ -77,6 +79,7 @@ void W3dFieldsCopy(Object* src, Object* dst) {
             case FieldFloat: *(float*)b = *(const float*)a; break;
             case FieldColor: memcpy(b, a, sizeof(float) * 4); break;
             case FieldVec3:  *(Vector3*)b = *(const Vector3*)a; break;
+            case FieldImage: break;   // (la copia la RETIENE su dueno: Empty::CopyDrawing; un puntero copiado no tendria su ref)
         }
     }
 }

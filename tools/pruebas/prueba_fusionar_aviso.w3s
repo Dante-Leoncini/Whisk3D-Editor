@@ -1,0 +1,22 @@
+# ==========================================================================
+#  FUSIONAR POR DISTANCIA avisa cuantos vertices fusiono (pedido del duenio, 2026-11-27: "abajo un cartel que diga
+#  se fusionaron 0 vertices o 10 vertices, para saber que ocurrio"). Por el camino del menu (Mesh / W > Merge > By
+#  Distance). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_fusionar_aviso.w3s
+# ==========================================================================
+selobj Cubo
+mode edit
+selmode vertex
+select all
+notif clear
+menuobject 383
+notif has se fusionaron 0 vértices
+expect verts 8
+selverts 0
+extrude 0
+expect verts 9
+select all
+notif clear
+menuobject 383
+notif has se fusionaron 1 vértices
+expect verts 8

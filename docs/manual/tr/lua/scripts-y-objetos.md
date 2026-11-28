@@ -20,6 +20,8 @@ function start()
 end
 ```
 
+**Adıyla:** bir özellik yalnızca adı yazılarak da okunur: `speed`, `property("speed")` ile; `difficulty`, `option("difficulty")` ile ve `ball`, `object("ball")` ile aynıdır. O anda okunur; bu yüzden oyun çalışırken Özellikler'de değiştirdiğinizi görür. İki istisna: betikte o adda bir değişken varsa (`speed = 5`), değişken geçerlidir; özellik bir Whisk3D işleviyle aynı adı taşıyorsa (örneğin `target` veya `view`), ad işlevi gösterir: o özelliği `property()`, `option()` veya `object()` ile okuyun.
+
 > [!NOTE]
 > `properties`'i okumak için editör, oyun çalışmıyor olsa bile **dosyayı çalıştırır**. Bu yüzden fonksiyonların dışına yalnızca tanımlar koy (tablolar, sabitler, `local`), asla bir şey yapan kod koyma.
 

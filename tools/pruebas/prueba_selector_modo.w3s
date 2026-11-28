@@ -1,0 +1,15 @@
+# ==========================================================================
+#  EL SELECTOR VERTICE / ARISTA / CARA de la barra del 3D: un boton ALARGADO de tres iconos, el activo en VERDE; un
+#  click (un toque, o las flechas + OK en Symbian) cambia de modo sin abrir un menu (pedido del duenio, 2026-11-27:
+#  "detesto tener que ir al menu desplegable"). Y en Edit Mode de una malla ya no esta el boton de contexto
+#  Vertex/Edge/Face (sus menus estan adentro de "Mesh", con W y con el click derecho; su icono se confundia con este).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_selector_modo.w3s
+# ==========================================================================
+window 900 700
+selobj Cubo
+mode edit
+selmode vertex
+selmodebar edge
+selmodebar face
+selmodebar vertex

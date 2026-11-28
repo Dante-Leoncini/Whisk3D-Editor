@@ -5,6 +5,7 @@
 //  resolucion, bordes suaves, la intensidad y el sesgo. Abajo, un aviso si no hay luz solar o si las hace la CPU.
 //  Como PropsSondaLuz: el panel la ARMA (PropsShadowsBuild) y le pide el bindeo por frame (PropsShadowsUpdate).
 // ============================================================================
+#include "render/RayTracer.h"   // g_rt: con el trazado prendido la tarjeta no se muestra
 #include "ViewPorts/Properties.h"
 #include "WhiskUI/widgets/PopupMenu.h"   // el desplegable de la resolucion
 #include "render/RealTimeShadows.h"
@@ -121,6 +122,10 @@ static void BindB(PropBool* b, bool* v) {
 
 void PropsShadowsUpdate(Properties* p, bool visible) {
     if (!p || !p->propShadows) return;
+    // CON EL TRAZADO DE RAYOS prendido la tarjeta no esta: la vista Render y el render trazan sus propias sombras y estas
+    // no se usan (siguen guardadas en el proyecto: el juego y las vistas sin trazado las usan)
+    { extern W3dRTOptions g_rt; if (g_rt.on) visible = false; }
+    if (p->propShadows->visible != visible) PropsLayoutDirty();
     p->propShadows->visible = visible;
     if (!visible) return;
     const bool on = g_shadows.on;

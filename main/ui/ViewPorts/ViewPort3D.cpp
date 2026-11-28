@@ -1,3 +1,4 @@
+#include "objects/Empty.h"          // la REFERENCIA (Vacio con imagen) encima de la imagen trazada
 #include "objects/LightProbe.h"        // LightProbeNewPass: las sondas de luz tambien en el render a archivo
 #include "render/RealTimeShadows.h"    // W3dShadowsPass / Fin: las sombras en tiempo real en el render a archivo
 #include "objects/Routine.h"   // g_w3dOnlyGame / W3dHasConstructor: quien limpia la pantalla
@@ -17,7 +18,7 @@
 #include "ui/ViewPorts/UVEditor.h"  // UVShownPart: que parte (material) se pinta
 #include "W3dNotice.h"
 #include <stdlib.h>   // getenv (debug de oclusion)
-#include "render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
+#include "WhiskUI/render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
 #include "Undo.h" // Ctrl+Z: confirmar transform
 #include "objects/CameraBase.h" // camara base del core (la vista)
@@ -41,11 +42,11 @@
 #include "objects/EditMesh.h"     // foco al centro de la seleccion en edit mode
 #include "objects/Armature.h"     // dibujar huesos del esqueleto encima de todo
 #include "objects/Particles.h"    // pase de particulas: se dibujan DESPUES de los opacos
-#include "objects/UI.h"           // sameAsRender: el HUD del juego elige lienzo/letterbox
+#include "WhiskUI/objects/UI.h"           // sameAsRender: el HUD del juego elige lienzo/letterbox
 #include "animation/SkeletalAnimation.h" // EvaluatePoseSkeleton (pose al reproducir)
 #include "animation/Animation.h"          // CurrentFrame
 #include "w3dlog.h"                      // w3dLogMemory: la memoria antes / despues de las texturas del Play
-#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
+#include "base/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 // la sim del juego (scripts lua) esta cargada? (play O pausa; false tras Stop)
 static bool GameSimActive() { extern bool SimActive(); return SimActive(); }
 // dibujando una MITAD de la pantalla dividida (RenderSplit): la mitad es la imagen entera (sin encuadre ni bandas)
@@ -143,6 +144,8 @@ PopupMenu* MenuViewpoint = NULL; // submenu de View: Camera/Top/Bottom/Front/Bac
 PopupMenu* MenuCameras = NULL;   // submenu de View: Set Active Object as Camera / Active Camera
 PopupMenu* MenuOverlays = NULL;  // overlays del viewport (checkboxes)
 PopupMenu* MenuRender = NULL;    // modo de vista: Render/Material/Solid/Wireframe
+// la Z apretada SIN transform: al soltarla cicla el modo de vista; si se repite (mantenida) abre el menu de los modos
+static bool g_zViewHeld = false;
 PopupMenu* MenuOrient = NULL;    // orientacion de transform: Global/Local/View
 PopupMenu* MenuMode = NULL;      // modo del objeto activo: Object/Edit/Vertex/Weight/Texture
 PopupMenu* MenuSelMode = NULL;   // edit mode: sub-elemento Vertex/Edge/Face
@@ -178,8 +181,15 @@ Viewport3D::Viewport3D(Vector3 pos){
     Button* b;
     b = new Button(T("Object Mode"), (int)IconType::object); b->role = BR_Mode;
         b->dropdown = true; b->visible = false; BarButtons.push_back(b); // solo si el activo es malla
-    b = new Button("", (int)IconType::selVertex); b->role = BR_SelMode;     // SOLO icono (Vertex/Edge/Face)
-        b->dropdown = true; b->visible = false; BarButtons.push_back(b); // solo en edit mode
+    // VERTICE / ARISTA / CARA: un boton ALARGADO de tres iconos, el activo en VERDE; un click (o un toque, o las flechas +
+    // OK en Symbian) cambia de uno a otro sin abrir un menu (pedido del duenio, 2026-11-27: "detesto tener que ir al menu
+    // desplegable"). Solo en Edit Mode de una malla
+    b = new Button("", (int)IconType::selVertex); b->role = BR_SelMode; b->square = true; b->help = "Vertex";
+        b->joinNext = true; b->visible = false; BarButtons.push_back(b);
+    b = new Button("", (int)IconType::selEdge); b->role = BR_SelEdge; b->square = true; b->help = "Edge";
+        b->joinNext = true; b->visible = false; BarButtons.push_back(b);
+    b = new Button("", (int)IconType::selFace); b->role = BR_SelFace; b->square = true; b->help = "Face";
+        b->visible = false; BarButtons.push_back(b);
     b = new Button("", (int)IconType::pivotMedian); b->role = BR_Pivot;     // Transform Pivot (solo icono)
         b->dropdown = true; BarButtons.push_back(b);
     b = new Button(T("Orient")); b->role = BR_Orient;                          // orientacion del transform
@@ -425,6 +435,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuMesh->AddCheck(T("Auto Merge"), 390, &g_autoMerge);
         MenuMesh->AddFloat(T("Threshold"), 391, &g_autoMergeThreshold, 0.0f, 0.1f)->gray = &g_autoMerge;
         MenuMesh->Add(T("Normals"), 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
+        { extern PopupMenu* LayoutSubmenuShowHide();
+          MenuMesh->Add(T("Show/Hide"), 0, -1, LayoutSubmenuShowHide()); }   // H / Shift+H / Alt+H
         MenuMesh->Add(T("Snap"), 0, -1, LayoutSubmenuSnap())->shortcut = "@global.menuSnap";
         MenuMesh->Add(T("Delete"), 360, -1, LayoutSubmenuDelete())->shortcut = "@3d.delete"; // abajo de todo
     }
@@ -478,6 +490,9 @@ Viewport3D::Viewport3D(Vector3 pos){
         // ACTIVA de la celda, no todas las aristas. El flag es global del Core
         // (w3dGraphics.h): el checkbox lo togglea directo.
         MenuRender->AddCheck(T("Wireframe: Only Visible"), 7, &w3dRenderWireframeOnlyVisible);
+        // RAYOS X junto a los modos (es aparte de ellos: Solido, Material o Render, con o sin rayos X). Alt+Z. Sigue
+        // tambien en Superposiciones
+        MenuRender->AddCheck(T("X-Ray"), 9, &g_xray)->shortcut = "@3d.xray";
     }
     if (!MenuOrient){
         // orientacion usada al constrenir a un eje (X/Y/Z) y por el extrude. Default Global.
@@ -532,6 +547,8 @@ Viewport3D::Viewport3D(Vector3 pos){
     showCamera = true;
     showEmpty = true;
     showSounds = true;
+    useLightProbes = true;
+    useReflectionProbes = true;
     showParticles = true;   // los emisores de particulas SE VEN (al dar Play, GamePrepareViewports apaga los overlays)
     showCurves = true;      // las curvas/rieles se ven por defecto; el checkbox permite ocultarlas
     showHitbox = true;      // el alambre de los hitbox (sin apagar los demas overlays ni el hitbox)
@@ -626,6 +643,10 @@ void Viewport3D::OpenMenuOverlays(int x, int y){
     // para ver que hay afuera y auditar el culling. NO se grisa con Show Overlays
     // (es parte de la vista de juego, no un overlay de edicion).
     MenuOverlays->AddCheck(T("Black Letterbox"), 15, &letterboxBlack);
+    // LAS SONDAS (el antes y despues): apagadas no alumbran / no reflejan en ESTA vista. Cambian la luz, no son un dibujo
+    // encima: tampoco se grisan con Show Overlays
+    MenuOverlays->AddCheck(T("Light Probes"), 16, &useLightProbes, IconType::sphere);      // (los iconos del outliner)
+    MenuOverlays->AddCheck(T("Reflection Probes"), 17, &useReflectionProbes, IconType::photo);
     MenuOverlays->action = NULL; // el toggle lo hace el propio item (checkbox)
     MenuOverlays->Open(x, y, MenuScreenW, MenuScreenH);
     OpenMenu = MenuOverlays;
@@ -2180,7 +2201,7 @@ void Viewport3D::Render() {
                             (g_pureGame || (AnimIsGame && (PlayAnimation || GameSimActive())));
         // jugando encuadrado o sin la UI: sin aire (el marco toca los bordes)
         const float margin = (camFrameLetterbox || g_pureGame || gSessionView) ? 1.0f : 0.92f;
-        // LA cuenta del encuadre vive en main/render/SceneRender.cpp: el runtime del
+        // LA cuenta del encuadre vive en libs/Whisk3DCore/render/SceneRender.cpp: el runtime del
         // juego compilado llama a la MISMA, asi el .deb/APK encuadra igual que el Play.
         W3dFramingFrame(va, ra, margin, &camNX, &camNY);
         camFrameOn = true; camFrameNX = camNX; camFrameNY = camNY;
@@ -2345,6 +2366,9 @@ void Viewport3D::Render() {
     g_showParticles = showParticles && ovl; g_showCurves = showCurves && ovl;
     { extern bool g_showHitbox; g_showHitbox = showHitbox && ovl; }
     { extern bool g_showSounds; g_showSounds = showSounds && ovl; }   // objects/Sound.cpp (icono, esferas y pick)   // objects/Hitbox.cpp (dibujo y pick)
+    // LAS SONDAS de esta vista (menu Overlays): sin el corte por Show Overlays ni por el juego, cambian la luz
+    { extern bool g_w3dLightProbesOn, g_w3dReflectionProbesOn;
+      g_w3dLightProbesOn = useLightProbes; g_w3dReflectionProbesOn = useReflectionProbes; }
     // LOCAL VIEW de ESTE viewport -> globals que lee Object::Render (mismo patron que g_showOverlays). El set
     // vive en el viewport; otro viewport sin local view lo deja en false/NULL al publicar SU estado.
     // lo que NACE mientras dura la vista local (Separar con P, Shift+D, Aniadir, Pegar...) entra a la vista local de la
@@ -2388,7 +2412,7 @@ void Viewport3D::Render() {
       const int _stBind0 = w3dEngine::g_statTexBinds;
       const int _stEst0  = w3dEngine::g_statStateChanges;
       const int _stOtr0  = w3dEngine::g_otherStat;
-      // EL PASE DE ESCENA vive en main/render/SceneRender.cpp y lo llama TAMBIEN el
+      // EL PASE DE ESCENA vive en libs/Whisk3DCore/render/SceneRender.cpp y lo llama TAMBIEN el
       // runtime del juego compilado: recorrido del arbol (que adentro resuelve culling,
       // LOD, visibilidad por celdas, espejos, instancias, luces y lotes) y despues los
       // tres diferidos, en este orden:
@@ -2471,6 +2495,7 @@ void Viewport3D::Render() {
     if (ovl) RenderMotionTrail();
 
     LoopCutRenderPreview(); // preview del corte (loop cut) encima de la escena
+    KnifeRenderPreview();   // el cuchillo (K): el corte, los puntos y la arista enganchada
 
     if (ovl) RenderOverlay();
     RenderCamPassepartout(); // marco de camara (lo que se va a renderizar) + oscurecido afuera. Antes de la UI (queda debajo).
@@ -2494,6 +2519,7 @@ void Viewport3D::Render() {
     if (onlyScene) { State2D(); g_prof.viewport3d += W3dNowMs() - _tVp0; return; }
     RenderUI();
     RenderSnapIndicator(); // recuadro verde en el target de snap (encima de todo)
+    KnifeRenderOverlay(this); // el enganche del cuchillo bajo el mouse (recuadro / rombo / punto)
     WP3DRenderBrush(this); // circulo del pincel (modo Weight Paint), siguiendo al mouse
     BoxSelectRender3D(this); // cruz guia / caja de seleccion (tecla B)
     g_prof.viewport3d += W3dNowMs() - _tVp0; // profiler: cierra el tiempo de este viewport 3D
@@ -2518,6 +2544,12 @@ void Viewport3D::RTGizmosOnTop(Object* o) {
         if (t == ObjectType::camera) o->RenderObject();
         else if (g_lightOverlayHook) g_lightOverlayHook((Light*)o);
         w3dEngine::PopMatrix();
+    }
+    // LA REFERENCIA (un Vacio con imagen): para calcar tambien sobre la imagen trazada. Con el z de la escena GL de abajo
+    // (lo de adelante la tapa, como en las otras vistas)
+    if (t == ObjectType::empty && ((Empty*)o)->shape == EmptyImage) {
+        Matrix4 W; o->GetWorldMatrix(W);
+        w3dEngine::PushMatrix(); w3dEngine::MultMatrix(W.m); o->RenderObject(); w3dEngine::PopMatrix();
     }
     if (t == ObjectType::sound) {   // las ESFERAS del alcance de un sonido 3D (lo dibuja el propio Sonido)
         Matrix4 W; o->GetWorldMatrix(W);
@@ -2851,7 +2883,7 @@ void Viewport3D::RenderCamPassepartout(){
     gfx::EnableArray(gfx::VertexArray);
     float W = (float)width, H = (float)height;
     // afuera del marco: 4 bandas (arriba/abajo/izq/der), las MISMAS que dibuja el
-    // runtime del juego (main/render/SceneRender.cpp). EN EL EDITOR van ATENUADAS
+    // runtime del juego (libs/Whisk3DCore/render/SceneRender.cpp). EN EL EDITOR van ATENUADAS
     // (negro 0.5: se ve que hay afuera y se puede auditar el culling, reporte del
     // dueno); NEGRO OPACO -lo que ve el jugador en el aparato, y lo que el juego
     // compilado dibuja siempre- solo con el toggle 'letterboxBlack' prendido
@@ -3711,7 +3743,9 @@ void Viewport3D::SyncButtonContext(){
     bool editCurve = (InteractionMode == EditMode && ActiveObj && ActiveObj->getType() == ObjectType::curve);
     // en los modos de PINTURA el menu Object no va (no se puede seleccionar ni transformar): oculto
     const bool paint = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
-    bObj->visible = (HasObjectsSelected() || poseM) && !paint;
+    // (en Edit Mode de una MALLA no va: sus menus Vertex / Edge / Face ya estan adentro de "Mesh", con W y con el click
+    //  derecho; su icono se confundia con el del selector de vertice / arista / cara. Pedido del duenio, 2026-11-27)
+    bObj->visible = (HasObjectsSelected() || poseM) && !paint && !inEdit;
     bObj->text.clear();
     bObj->icon = (poseM || editArm) ? (int)IconType::armature :
         editCurve ? (int)IconType::curve :
@@ -3947,7 +3981,7 @@ void Viewport3D::RenderUI() {
             // ===== MODO JUEGO (sim corriendo): barra MINIMA. Se puede: parar/
             // pausar/reanudar, y los menus View (cambiar camara) / Overlays /
             // Render. Nada de editar. Con STOP la interfaz vuelve a la normal. =====
-            static const int kHide[] = { BR_Mode, BR_SelMode, BR_Pivot, BR_Orient, BR_Snap, BR_Proportional,
+            static const int kHide[] = { BR_Mode, BR_SelMode, BR_SelEdge, BR_SelFace, BR_Pivot, BR_Orient, BR_Snap, BR_Proportional,
                                             BR_Select, BR_Add, BR_Mesh, BR_Animation, BR_Object, BR_UV, BR_Root };
             for (size_t i = 0; i < sizeof(kHide) / sizeof(kHide[0]); i++) {
                 Button* bo = BarRoleBtn(BarButtons, kHide[i]);
@@ -4009,11 +4043,16 @@ void Viewport3D::RenderUI() {
                               isCurve                          ? (int)IconType::curve : (int)IconType::mesh;
             }
             bool inEdit = (isMesh && InteractionMode == EditMode);
-            Button* bSelM = BarRoleBtn(BarButtons, BR_SelMode); // sub-elemento, SOLO en edit (icono)
-            if (bSelM) {
-                bSelM->visible = inEdit;
-                bSelM->icon = (EditSelectMode == SelEdge) ? (int)IconType::selEdge :
-                              (EditSelectMode == SelFace) ? (int)IconType::selFace : (int)IconType::selVertex;
+            { // VERTICE / ARISTA / CARA (SOLO en edit): el del modo de ahora, en verde (como el iman prendido)
+              static float selGreen[3]; const float* acc = ColorList[static_cast<int>(ColorID::accent)];
+              for (int i = 0; i < 3; i++) selGreen[i] = acc[i] * 0.4f;
+              const int roles[3] = { BR_SelMode, BR_SelEdge, BR_SelFace }, modes[3] = { SelVertex, SelEdge, SelFace };
+              for (int i = 0; i < 3; i++) {
+                  Button* bs = BarRoleBtn(BarButtons, roles[i]); if (!bs) continue;
+                  bs->visible = inEdit;
+                  const bool on = (EditSelectMode == modes[i]);
+                  bs->tint = on ? selGreen : NULL; bs->textColor = on ? acc : NULL;
+              }
             }
             Button* bUV = BarRoleBtn(BarButtons, BR_UV);       // UV: SOLO en edit
             if (bUV) bUV->visible = inEdit;
@@ -4140,7 +4179,7 @@ static SaveState* W3dSavedState(Object* o){
 // el texto de la barra de estado: operacion + valores en vivo del objeto activo
 // (mismo mapeo de ejes que el panel Properties: Location Y=z, Z=y; Scale x/y/z)
 static const char* W3dOrientWord(){
-    if (transformOrientation == LocalOrient) return T("local");
+    if (state == EditScale || transformOrientation == LocalOrient) return T("local");   // (la escala es local siempre)
     if (transformOrientation == ViewOrient)  return T("view");
     return T("global");
 }
@@ -4915,6 +4954,15 @@ void Viewport3D::event_key_down(int keyCode, bool repeat){
     // refrescaban en el CLICK -> el menu salia de la ULTIMA posicion clickeada, no del mouse. Aca
     // (con SDL_GetMouseState = posicion ACTUAL) se ponen donde esta el mouse. No durante un transform.
     if (state == editNavigation) SaveMousePos();
+    // Z MANTENIDA: la primera repeticion del teclado abre el MENU de los modos de vista en el cursor (y la Z ya no cicla
+    // al soltarla). Un toque corto cicla al soltar (event_key_up)
+    if (key == W3dK_Z && repeat != 0 && g_zViewHeld) {
+        g_zViewHeld = false;
+        extern void LayoutMenuShading(int mx, int my);
+        LayoutMenuShading(lastMouseX, lastMouseY);
+        g_redraw = true;
+        return;
+    }
     // las FLECHAS se repiten al mantenerlas (mover/orbitar continuo); el resto
     // de las teclas ignora el auto-repeat.
     bool isArrow = (key == W3dK_UP || key == W3dK_DOWN || key == W3dK_LEFT || key == W3dK_RIGHT);
@@ -5055,11 +5103,20 @@ void Viewport3D::event_key_down(int keyCode, bool repeat){
                 else if (!LCtrlPressed && state == editNavigation && InteractionMode == EditMode && g_editMesh)
                     LayoutConnectVerticesEdit();
                 break;
-            case W3dK_H:
+            case W3dK_H: {
+                // EDIT MODE: H oculta lo elegido, Shift+H lo NO elegido, Alt+H muestra todo (la malla, no el objeto)
+                extern bool LayoutEditHide(int what);
+                if (InteractionMode == EditMode && LayoutEditHide(LAltPressed ? 2 : LShiftPressed ? 1 : 0)) break;
+                if (InteractionMode == EditMode) break;   // (en Edit Mode la H nunca oculta el OBJETO)
                 UndoCaptureVisibility();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
                 ChangeVisibilityObj();
-                break;
+                break; }
             case W3dK_K:
+                // EDIT MODE con malla: el CUCHILLO (como Blender). En el resto, K prende/apaga los overlays
+                if (InteractionMode == EditMode && g_editMesh && state == editNavigation && !LCtrlPressed && !LAltPressed) {
+                    if (!KnifeActive()) KnifeStart(lastMouseX, lastMouseY);
+                    break;
+                }
                 SetShowOverlays(!showOverlays);
                 break;
             case W3dK_X:
@@ -5113,8 +5170,12 @@ void Viewport3D::event_key_down(int keyCode, bool repeat){
                     if (EditXformActive()) EditXformRestart();
                 }
                 // sin transform: Z = el siguiente MODO DE VISTA (Material Preview -> Solid -> ... -> Rendered), el
-                // mismo ciclo que el 6 del keypad del telefono (Ctrl+Z es deshacer: lo agarra controles antes)
-                else if (!LCtrlPressed && !LAltPressed) { ChangeViewType(); g_redraw = true; }
+                // mismo ciclo que el 6 del keypad del telefono (Ctrl+Z es deshacer: lo agarra controles antes).
+                // TOCADA cicla al SOLTARLA; MANTENIDA (la repeticion del teclado) abre el menu de los modos en el cursor
+                // para elegir uno directo (event_key_down con repeat / event_key_up)
+                else if (!LCtrlPressed && !LAltPressed) g_zViewHeld = true;
+                // Alt+Z: RAYOS X, aparte del modo de vista (se ve a traves en Solido, Material, Render...)
+                else if (LAltPressed && !LCtrlPressed) { g_xray = !g_xray; g_redraw = true; }
                 break;
             case W3dK_R:
                 // Ctrl+R: Loop Cut and Slide (Edit Mode con malla)
@@ -5324,6 +5385,12 @@ void Viewport3D::event_key_down(int keyCode, bool repeat){
 
 void Viewport3D::event_key_up(int keyCode){
     const int key = keyCode;
+    // Z TOCADA (se solto antes de repetirse): el siguiente modo de vista, como siempre
+    if (key == W3dK_Z && g_zViewHeld) {
+        g_zViewHeld = false;
+        if (state == editNavigation) { ChangeViewType(); g_redraw = true; }
+        return;
+    }
     switch (key) {
         case W3dK_LSHIFT:
             // (el TAP de Shift que ciclaba la seleccion era un idioma del TELEFONO -sin mouse,

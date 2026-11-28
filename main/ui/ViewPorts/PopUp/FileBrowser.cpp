@@ -9,9 +9,9 @@
 #include "WhiskUI/draw/glesdraw.h" // W3dDrawStrip4 / W3dScreenHeight
 #include "objects/Textures.h"
 #include "w3dTexture.h"
-#include "io/Font2D.h"   // vista previa de .ttf (rasteriza con la fuente misma)  // miniaturas: DecodeThumbnail / UploadRGBA / DeleteTexture / FreeImage
+#include "WhiskUI/io/Font2D.h"   // vista previa de .ttf (rasteriza con la fuente misma)  // miniaturas: DecodeThumbnail / UploadRGBA / DeleteTexture / FreeImage
 #ifndef W3D_SYMBIAN
-#include "io/Texture2D.h"     // Texture2DDecodablePath (webp -> png para el thumb)
+#include "WhiskUI/io/Texture2D.h"     // Texture2DDecodablePath (webp -> png para el thumb)
 #include "io/Video2DCache.h"  // Video2DFramePng (un frame del video para el thumb)
 #endif
 #include "variables.h"
@@ -215,7 +215,7 @@ FileBrowser::FileBrowser(const std::string& title, const std::string& newActionL
     modeSave = false;
     withName = false; confirming = false; nameX = nameY = nameW = nameH = 0;
     projectView = -1;
-    histPos = -1; selected = -1; hover = -1; hoverBm = -1; selBm = -1;
+    histPos = -1; selected = -1; hover = -1; hoverBm = -1; selBm = -1; hoverRec = -1; dragSplit = false;
     gridView  = true; horizontal = true;
     focusZone = FZ_NONE; focusIdx = 0;
     topH = botH = 0; panelX = panelY = panelW = panelH = 0;
@@ -297,6 +297,49 @@ bool FileBrowser::PassesFilter(const w3dFileSystem::DirEntry& e) const {
         pos = sp + 1;
     }
     return false;
+}
+
+// ---------------------------------------------------------------- recientes
+// (recent_folders.txt en la carpeta de datos del usuario, una por linea, la mas nueva primero; hasta 12)
+static std::vector<std::string>& RecentList() {
+    static std::vector<std::string> v; static bool loaded = false;
+    if (!loaded) {
+        loaded = true;
+        FILE* f = fopen((w3dFileSystem::GetUserDataDir() + "/recent_folders.txt").c_str(), "r");
+        if (f) { char line[4096];
+            while (fgets(line, sizeof line, f)) { std::string l(line); while (!l.empty() && (l[l.size()-1] == '\n' || l[l.size()-1] == '\r')) l.erase(l.size()-1);
+                if (!l.empty()) v.push_back(l); }
+            fclose(f); }
+    }
+    return v;
+}
+const std::vector<std::string>& W3dRecentFolders() { return RecentList(); }
+void W3dRecentFolderAdd(const std::string& folderOrFile) {
+    if (folderOrFile.empty()) return;
+    std::string d = w3dFileSystem::IsDir(folderOrFile) ? folderOrFile : w3dFileSystem::ParentPath(folderOrFile);
+    while (d.size() > 1 && (d[d.size()-1] == '/' || d[d.size()-1] == '\\')) d.erase(d.size()-1);
+    if (d.empty() || !w3dFileSystem::IsDir(d)) return;
+    std::vector<std::string>& v = RecentList();
+    for (size_t i = 0; i < v.size(); i++) if (v[i] == d) { v.erase(v.begin() + (long)i); break; }
+    v.insert(v.begin(), d);
+    if (v.size() > 12) v.resize(12);
+    FILE* f = fopen((w3dFileSystem::GetUserDataDir() + "/recent_folders.txt").c_str(), "w");
+    if (f) { for (size_t i = 0; i < v.size(); i++) fprintf(f, "%s\n", v[i].c_str()); fclose(f); }
+}
+// DONDE ARRANCA el explorador: la carpeta del proyecto abierto (Guardar como...), sino la ultima usada, sino el home
+static std::string StartFolder() {
+    extern std::string w3dPath;
+    if (!w3dPath.empty()) { const std::string d = w3dFileSystem::ParentPath(w3dPath); if (w3dFileSystem::IsDir(d)) return d; }
+    const std::vector<std::string>& r = RecentList();
+    for (size_t i = 0; i < r.size(); i++) if (w3dFileSystem::IsDir(r[i])) return r[i];
+    return w3dFileSystem::GetHomeDir();
+}
+std::string W3dFileBrowserStartFolder() { return StartFolder(); }
+static float gFBSplit = 0.5f;   // la proporcion recientes / accesos (se recuerda mientras corre el editor)
+// el nombre que se muestra de una carpeta reciente: su ultimo tramo
+static std::string RecentLabel(const std::string& d) {
+    const size_t p = d.find_last_of("/\\");
+    return (p == std::string::npos || p + 1 >= d.size()) ? d : d.substr(p + 1);
 }
 
 void FileBrowser::Open(const std::string& startDir) {
@@ -439,6 +482,7 @@ void FileBrowser::Accept() {
         full = PickedLib();
         if (full.empty()) return;
         void (*cb)(const std::string&) = onAccept;
+        if (!Virtual()) W3dRecentFolderAdd(full);
         Close(); if (cb) cb(full);
         return;
     }
@@ -477,6 +521,7 @@ void FileBrowser::Accept() {
         confirming = false;
         if (g_activeTextField == &fileName) g_activeTextField = NULL;
         void (*cb)(const std::string&) = onAccept;
+        if (!Virtual()) W3dRecentFolderAdd(full);
         Close(); if (cb) cb(full);
         return;
     }
@@ -492,6 +537,7 @@ void FileBrowser::Accept() {
         full = w3dFileSystem::JoinPath(currentPath, entries[selected].name);
     }
     void (*cb)(const std::string&) = onAccept;
+    if (!Virtual()) W3dRecentFolderAdd(full);
     Close(); if (cb) cb(full);
 }
 void FileBrowser::AddBookmark() {
@@ -631,13 +677,40 @@ void FileBrowser::Render() {
     CardIn(panelX, panelY, panelW, panelH, background, NULL);
     int bmH = RowHeightGS + bordersGS;
     int botRow = RowHeightGS + bordersGS; // fila de +/- abajo
-    int bmZone = panelH - botRow - gapGS;
     int bmChipW = (panelW - 2 * gapGS) / bmCols; // ancho de cada acceso
+    int recTop, divY, bmTop, bmBottom; PanelZones(recTop, divY, bmTop, bmBottom);
+    (void)botRow;
+    // RECIENTES (arriba): las ultimas carpetas usadas; abajo, el divisor que reparte el panel (se arrastra)
+    if (!Virtual()) {
+        const std::vector<std::string>& rec = W3dRecentFolders();
+        // el titulo
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)(panelX + 2 * gapGS), (GLfloat)(recTop + (bmH - LetterHeightGS) / 2), 0);
+        w3dEngine::Color4f(grayUI[0], grayUI[1], grayUI[2], 1.0f);
+        RenderBitmapText(T("Recent"), textAlign::left, panelW - 4 * gapGS);
+        w3dEngine::PopMatrix();
+        for (int i = 0; i < (int)rec.size(); i++) {
+            int col = i % bmCols, row = i / bmCols;
+            int bx = panelX + gapGS + col * bmChipW;
+            int by = recTop + bmH + row * bmH;
+            if (by + bmH > divY) break;
+            int cw = bmChipW - gapGS;
+            if (i == hoverRec) CardIn(bx, by, cw, bmH - gapGS / 2, hov, NULL);
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef((GLfloat)(bx + gapGS), (GLfloat)(by + (bmH - gapGS / 2 - LetterHeightGS) / 2), 0);
+            w3dEngine::Color4f(white[0], white[1], white[2], 1.0f);
+            RenderBitmapText(RecentLabel(rec[(size_t)i]), textAlign::left, cw - 2 * gapGS);
+            w3dEngine::PopMatrix();
+        }
+        // el divisor: una linea (mas clara al arrastrarlo)
+        const float* lc = dragSplit ? accent : grayUI;
+        CardIn(panelX + gapGS, divY + gapGS / 2 - GlobalScale, panelW - 2 * gapGS, 2 * GlobalScale, lc, NULL);
+    }
     for (int i = 0; i < (int)bookmarks.size(); i++) {
         int col = i % bmCols, row = i / bmCols;
         int bx = panelX + gapGS + col * bmChipW;
-        int by = panelY + gapGS + row * bmH;
-        if (by + bmH > panelY + bmZone) break; // no entra (mas filas que alto)
+        int by = bmTop + row * bmH;
+        if (by + bmH > bmBottom) break; // no entra (mas filas que alto)
         int cw = bmChipW - gapGS;
         // sin recuadro normal: solo hover (gris) o seleccionado (accent)
         if (showSelBm && i == selBm) CardIn(bx, by, cw, bmH - gapGS / 2, accentDark, accent);
@@ -805,16 +878,37 @@ int FileBrowser::EntryAt(int mx, int my) {
     } else idx = rel / (RowHeightGS + GlobalScale);
     return (idx >= 0 && idx < (int)entries.size()) ? idx : -1;
 }
+void FileBrowser::PanelZones(int& recTop, int& divY, int& bmTop, int& bmBottom) const {
+    const int botRow = RowHeightGS + bordersGS;
+    recTop = panelY + gapGS;
+    bmBottom = panelY + panelH - botRow - gapGS;
+    if (Virtual()) { divY = recTop; bmTop = recTop; return; }   // (el proyecto por dentro: sin recientes)
+    const int total = bmBottom - recTop;
+    divY = recTop + (int)((float)total * gFBSplit);
+    bmTop = divY + gapGS;
+}
+int FileBrowser::RecentAt(int mx, int my) {
+    if (Virtual() || mx < panelX + gapGS || mx >= panelX + panelW - gapGS) return -1;
+    int recTop, divY, bmTop, bmBottom; PanelZones(recTop, divY, bmTop, bmBottom);
+    if (my < recTop || my >= divY) return -1;
+    const int bmH = RowHeightGS + bordersGS;
+    recTop += bmH;   // (el titulo "Recientes")
+    if (my < recTop) return -1;
+    const int chipW = (panelW - 2 * gapGS) / bmCols;
+    const int col = (mx - (panelX + gapGS)) / chipW; if (col < 0 || col >= bmCols) return -1;
+    const int idx = ((my - recTop) / bmH) * bmCols + col;
+    return (idx >= 0 && idx < (int)W3dRecentFolders().size()) ? idx : -1;
+}
 int FileBrowser::BookmarkAt(int mx, int my) {
     int bmH = RowHeightGS + bordersGS;
-    if (mx < panelX + gapGS || mx >= panelX + panelW - gapGS || my < panelY + gapGS) return -1;
+    int recTop, divY, bmTop, bmBottom; PanelZones(recTop, divY, bmTop, bmBottom);
+    if (mx < panelX + gapGS || mx >= panelX + panelW - gapGS || my < bmTop) return -1;
     // borde INFERIOR (misma bmZone que el render): sin esto se podian clickear
     // bookmarks NO dibujados (o el hueco antes de los botones +/-)
-    { int botRow = RowHeightGS + bordersGS;
-      if (my >= panelY + panelH - botRow - gapGS) return -1; }
+    if (my >= bmBottom) return -1;
     int bmChipW = (panelW - 2 * gapGS) / bmCols;
     int col = (mx - (panelX + gapGS)) / bmChipW; if (col < 0 || col >= bmCols) return -1;
-    int row = (my - (panelY + gapGS)) / bmH;
+    int row = (my - bmTop) / bmH;
     int idx = row * bmCols + col;
     return (idx >= 0 && idx < (int)bookmarks.size()) ? idx : -1;
 }
@@ -845,6 +939,13 @@ bool FileBrowser::Click(int mx, int my) {
     if (btnBmDel->Contains(mx, my)) { RemoveBookmark(); return true; }
     // arrastre del scroll
     if (mouseOverScrollY) { mouseOverScrollYpress = true; gDragMy = my; return true; }
+    // el DIVISOR recientes / accesos: se agarra cerca de la linea
+    if (!Virtual() && mx >= panelX && mx < panelX + panelW) {
+        int recTop, divY, bmTop, bmBottom; PanelZones(recTop, divY, bmTop, bmBottom);
+        if (my >= divY - 2 * GlobalScale && my <= bmTop + 2 * GlobalScale) { dragSplit = true; return true; }
+    }
+    int rc = RecentAt(mx, my);
+    if (rc >= 0) { const std::string d = W3dRecentFolders()[(size_t)rc]; if (d != currentPath && w3dFileSystem::IsDir(d)) Navigate(d, true); return true; }
     int bm = BookmarkAt(mx, my);
     if (bm >= 0) { selBm = bm; if (bookmarks[bm].path != currentPath) Navigate(bookmarks[bm].path, true); return true; }
     // Press dentro del area de la lista: NO abrir ahora. Se guarda y se abre al SOLTAR
@@ -857,6 +958,13 @@ bool FileBrowser::Click(int mx, int my) {
 
 bool FileBrowser::Motion(int mx, int my) {
     focusZone = FZ_NONE; // el mouse se movio: manda el mouse, no las flechas
+    if (dragSplit && leftMouseDown) {   // (arrastrando el divisor: la proporcion entre recientes y accesos)
+        ViewPortClickDown = true;
+        const int botRow = RowHeightGS + bordersGS;
+        const int top = panelY + gapGS, bottom = panelY + panelH - botRow - gapGS;
+        if (bottom > top) { float f = (float)(my - top) / (float)(bottom - top); if (f < 0.1f) f = 0.1f; if (f > 0.9f) f = 0.9f; gFBSplit = f; }
+        return true;
+    }
     ScrollMouseOver(pane, mx - fileX, my - fileY);
     if (leftMouseDown && mouseOverScrollYpress) {
         ViewPortClickDown = true;
@@ -876,6 +984,7 @@ bool FileBrowser::Motion(int mx, int my) {
     }
     hover = EntryAt(mx, my);
     hoverBm = BookmarkAt(mx, my);
+    hoverRec = RecentAt(mx, my);
     btnBack->hover = btnBack->Contains(mx, my); btnFwd->hover = btnFwd->Contains(mx, my);
     btnUp->hover = btnUp->Contains(mx, my); btnView->hover = btnView->Contains(mx, my);
     btnRefresh->hover = btnRefresh->Contains(mx, my);
@@ -892,7 +1001,7 @@ void FileBrowser::Wheel(int delta) {
 }
 
 void FileBrowser::Release() {
-    mouseOverScrollYpress = false; ViewPortClickDown = false;
+    mouseOverScrollYpress = false; ViewPortClickDown = false; dragSplit = false;
     // fue un TAP (press + soltar sin arrastrar) sobre una entrada -> recien ahi se abre
     if (gListPressed && !gListDragging && gListPressEntry >= 0) OpenEntry(gListPressEntry);
     gListPressed = false; gListPressEntry = -1; gListDragging = false;
@@ -1057,7 +1166,7 @@ const char* const kUseCurrentFolder = "Use current folder";
 
 void OpenFileBrowser(const std::string& title, const std::string& actionLabel,
                       const std::string& filter, void (*accept)(const std::string&),
-                      bool save) {
+                      bool save, const std::string& folder) {
 #ifdef __EMSCRIPTEN__
     // NAVEGADOR: el explorador del editor mostraria el disco virtual en memoria, que no le sirve a nadie. Abrir usa
     // el selector de archivos del navegador; guardar escribe en /descargas y cada punto de escritura lo descarga.
@@ -1072,7 +1181,7 @@ void OpenFileBrowser(const std::string& title, const std::string& actionLabel,
     FileBrowser* fb = new FileBrowser(title, actionLabel, filter, accept);
     fb->modeSave    = save;
     PopUpActive = fb;
-    fb->Open(w3dFileSystem::GetHomeDir());
+    fb->Open((!folder.empty() && w3dFileSystem::IsDir(folder)) ? folder : StartFolder());
 }
 
 void OpenFileBrowserSaveAs(const std::string& title, const std::string& actionLabel, const std::string& ext,
@@ -1090,7 +1199,7 @@ void OpenFileBrowserSaveAs(const std::string& title, const std::string& actionLa
     fb->extName  = ext;
     fb->fileName.SetText(name);
     PopUpActive = fb;
-    fb->Open((!folder.empty() && w3dFileSystem::IsDir(folder)) ? folder : w3dFileSystem::GetHomeDir());
+    fb->Open((!folder.empty() && w3dFileSystem::IsDir(folder)) ? folder : StartFolder());
 #ifndef W3D_SYMBIAN
     TextFieldFocus(&fb->fileName);   // (listo para tipear: el nombre entero seleccionado)
     fb->fileName.SelectAll();

@@ -29,3 +29,23 @@ saveas w3d_prueba_lienzo.png 0 /tmp 1
 texlabel w3d_prueba_lienzo.png
 uvsave 3
 texlabel w3d_prueba_lienzo.png
+# Guardar como... ENCIMA de un .lua que ya existe: el boton Guardar pregunta y con "Si" lo pisa con lo del IDE (que pasa
+# a editarlo). Se trababa: IDE::Save lo comparaba con el texto del archivo ANTERIOR, preguntaba "lo cambiaron afuera" y
+# no guardaba (y el "Si" de esa segunda pregunta pisaba el archivo de antes)
+ideload componente.lua componente.lua
+idefile 2
+saveas w3d_prueba_pisar.lua 0 /tmp 1
+ideload costura_grupo.lua costura_grupo.lua
+idefile 2
+saveaspress w3d_prueba_pisar.lua 0 /tmp
+confirm si w3d_prueba_pisar.lua
+popupinfo none
+ideinfo /tmp/w3d_prueba_pisar.lua
+samefile /tmp/w3d_prueba_pisar.lua costura_grupo.lua
+# con "No" no se toca nada (el IDE sigue en el suyo)
+ideload componente.lua componente.lua
+idefile 2
+saveaspress w3d_prueba_pisar.lua 0 /tmp
+confirm no w3d_prueba_pisar.lua
+samefile /tmp/w3d_prueba_pisar.lua costura_grupo.lua
+ideinfo componente.lua

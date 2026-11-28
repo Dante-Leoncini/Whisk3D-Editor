@@ -14,7 +14,8 @@ enum W3dFieldKind {
     FieldInt,     // int (un modo, una opcion de una lista)
     FieldFloat,   // float
     FieldColor,   // float[4]
-    FieldVec3     // Vector3 (x, y, z)
+    FieldVec3,    // Vector3 (x, y, z)
+    FieldImage    // Texture* (una IMAGEN: la fila muestra su archivo y un boton la cambia; la retiene el objeto)
 };
 
 struct W3dField {

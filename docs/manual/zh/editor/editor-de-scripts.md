@@ -13,6 +13,8 @@
 | 着色器（.glsl） | 可从材质（**Shader** 行的小按钮）、Library 或选择器中打开，并按 GLSL 语法高亮。名称旁边会出现 **Compile**：编译你正在编写的内容（如果有材质在用它，会先保存再编译该材质）。保存着色器会在所有使用它的材质中编译它，并提示是否编译成功，或显示错误及其行号。 | <kbd>Ctrl+S</kbd> |
 | 保存保护 | 如果外部文件在打开后被别处修改过，Save 会在覆盖前询问你。游戏运行时，Save 也会实时重新加载脚本。 | 自动 |
 | 缩进（Tab） | <kbd>Tab</kbd> 补齐到下一个 4 的倍数；选中多行时，为它们增加一级缩进，<kbd>Shift+Tab</kbd> 则减少一级。竖线标出每一级缩进；光标所在代码块的那条线更亮。 | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
+| 自动补全 | 输入名称时会出现可以填在那里的内容列表：Whisk3D 和 Lua 的函数、关键字，以及脚本自己的名称（它的属性、函数和变量）。每项旁边的字母表示类型（**f** 函数、**p** 属性、**v** 变量、**k** 关键字），下方显示所选项的用法和作用。用方向键选择，<kbd>Enter</kbd> 或 <kbd>Tab</kbd> 写入，<kbd>Esc</kbd> 关闭列表；也可以直接点选。在点号之后（`math.`）会显示其中的内容。输入括号中的内容时，行的上方会显示函数的形式。 | 输入时；<kbd>Ctrl+空格</kbd> |
+| 转到定义 | 跳到脚本声明光标下名称的位置（函数、`local` 变量、参数或属性），并选中它。如果是 Whisk3D 的函数，则显示其用法和作用。 | <kbd>F12</kbd>、<kbd>Ctrl</kbd>+单击或右键 → 转到定义 |
 | Edit 菜单 | Undo、Redo、Cut、Copy、Paste、Find… 和 Replace… | Edit 按钮 |
 | Select 菜单 | Select All。 | Select 按钮 |
 | Undo / Redo | 作用于脚本的文本（而不是场景）。 | <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> 或 <kbd>Ctrl+Shift+Z</kbd> |

@@ -102,9 +102,9 @@
 #include "io/W3dStore.h"           // W3dStoreByName / W3dSplitLibPath
 #include "importers/import_obj.h"      // LoadAllPendingTextures
 #include "io/W3dContainer.h"           // W3dImportAsset / W3dExternalRefMark (la libreria "extras")
-#include "io/UI2DFormat.h"
-#include "objects/UI.h"
-#include "objects/Image2D.h"
+#include "WhiskUI/io/UI2DFormat.h"
+#include "WhiskUI/objects/UI.h"
+#include "WhiskUI/objects/Image2D.h"
 #include "script/BindsGame.h"          // W3dSoundCached
 #include "objects/ObjectMode.h"        // W3dRenameObject
 #include "variables.h"                 // w3dPath (la libreria "extras" se guarda y se re-guarda)

@@ -24,7 +24,7 @@ El editor está hecho con Whisk3D UI, pero mucho de lo que se ve en él es suyo.
 | Los cartelitos de ayuda. El texto lo guarda `Button::help` | `W3dHelpRender`, en `main/ui/ViewPorts/LayoutInput.cpp` |
 | Qué tecla, click o toque va a cada widget, y las teclas del N95 | `main/ui/ViewPorts/LayoutInput.cpp`, `main/app/controls.cpp`, `platform/symbian/src/` |
 | Las funciones de foco de las cajas de texto | `main/ui/ViewPorts/NumInput.cpp` |
-| Las traducciones, `T()`. La UI solo tiene el gancho `W3dMenuTranslate` | `main/config/W3dLang.cpp` |
+| Las traducciones, `T()`. La UI solo tiene el gancho `W3dMenuTranslate` | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | El arranque de la UI | `main/app/W3dInitUI.cpp` |
 | Armar el atlas del skin con los íconos sueltos | `main/io/SkinAtlas.cpp` |
 | Recalcular la escala | `SetGlobalScale`, en `main/ui/ViewPorts/ViewPorts.cpp` |
@@ -32,9 +32,9 @@ El editor está hecho con Whisk3D UI, pero mucho de lo que se ve en él es suyo.
 | Los colores propios del editor: el piso, los ejes, las normales | `main/ui/W3dColors.cpp` |
 | Los archivos del skin: `font.png`, `font-ext.png`, `atlas/icons/`, `skin.ini` | `res/Skins/Whisk3D/` |
 | El generador del atlas extendido | `tools/fuente_ext.py` |
-| El [Editor 2D](../editor/editor-2d.md) y las interfaces `.w3dui` de los juegos: textos, imágenes, rectángulos, contenedores, slice 9, botones y videos | `main/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `main/render/UIOverlay.cpp`, `main/io/UI2DFormat.cpp`, `main/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
+| El [Editor 2D](../editor/editor-2d.md) y las interfaces `.w3dui` de los juegos: textos, imágenes, rectángulos, contenedores, slice 9, botones y videos | `libs/WhiskUI/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `libs/WhiskUI/render/UIOverlay.cpp`, `libs/WhiskUI/io/UI2DFormat.cpp`, `libs/WhiskUI/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
 
-El Editor 2D dibuja el texto con `W3dTextAtlas`, que es de la UI. Hornear una TTF mientras corre, con stb_truetype, es del editor (`main/io/Font2D.cpp`).
+El Editor 2D dibuja el texto con `W3dTextAtlas`, que es de la UI. Hornear una TTF mientras corre, con stb_truetype, es del editor (`libs/WhiskUI/io/Font2D.cpp`).
 
 ## En la UI, pero del editor
 

@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ Whisk3D 有一些**保留函数**：如果你的脚本中有一个函数用了�
 
 它在里面做了什么：
 
-**`if property("rotate") then` … `end`** 是一个**条件**。`if`（“如果”）只有在 `if` 和 `then` 之间的内容为真时，才执行它里面的代码。它可以有一个 `elseif`（“否则，如果……就做这个”），用来检查另一个条件；还可以有一个 `else`（“否则”），在所有条件都不满足时执行；这两个都是可选的。它总是以 `end` 结尾。例如：
+**`if rotate then` … `end`** 是一个**条件**。`if`（“如果”）只有在 `if` 和 `then` 之间的内容为真时，才执行它里面的代码。它可以有一个 `elseif`（“否则，如果……就做这个”），用来检查另一个条件；还可以有一个 `else`（“否则”），在所有条件都不满足时执行；这两个都是可选的。它总是以 `end` 结尾。例如：
 
 ```lua
 if puntos >= 100 then
@@ -71,11 +71,11 @@ end
 
 有 120 分时，奖品是金牌（gold）；有 70 分时，是银牌（silver）；有 10 分时，什么都没有（none）。只会执行第一个满足条件的部分。（在 Lua 中，`elseif` 是连在一起写的。）
 
-在这个脚本中，`if` 既没有 `elseif` 也没有 `else`：如果 **rotate** 为真（复选框已勾选），立方体就旋转；如果为假，什么也不会发生，函数就此结束。`property("rotate")` 读取该对象在面板中的值。因为每一帧都会读取，所以如果你在游戏运行时修改它，脚本会立刻知道。
+在这个脚本中，`if` 既没有 `elseif` 也没有 `else`：如果 **rotate** 为真（复选框已勾选），立方体就旋转；如果为假，什么也不会发生，函数就此结束。`rotate` 读取该对象在面板中的值。每个属性都可以这样直接用名字；也可以用 `property("rotate")` 读取。因为每一帧都会读取，所以如果你在游戏运行时修改它，脚本会立刻知道。
 
 - **`self()`** 是拥有这个脚本的对象：立方体。**`getRotationZ(self())`** 给出它绕 Z 轴的旋转角度，单位是度（Z 是竖直方向，和你在 Properties 面板中看到的 Z 是同一个），**`setRotationZ`** 给它设置一个新的旋转：在原来的基础上再多一点。这样，立方体就像陀螺一样旋转。
 
-`property`、`self`、`getRotationZ` 和 `setRotationZ` 也是函数，不过方向反过来：它们由 Whisk3D 提供，由你来调用。它们都在 [Lua 手册](../lua/README.md)里。
+`self`、`getRotationZ` 和 `setRotationZ` 也是函数，不过方向反过来：它们由 Whisk3D 提供，由你来调用。它们都在 [Lua 手册](../lua/README.md)里。
 
 ### 完整的脚本
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

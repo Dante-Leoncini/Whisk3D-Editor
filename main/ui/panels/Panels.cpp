@@ -11,6 +11,7 @@
 #include "io/ProjectChanges.h"      // W3dTouchedChanges
 #include "config/W3dLang.h"
 #include "base/w3dlog.h"
+#include "objects/Textures.h"       // la fila IMAGEN: el archivo de la textura (si sigue cargada)
 #include <string>
 #include <string.h>
 #include <stdlib.h>
@@ -19,6 +20,7 @@ extern const char* const kW3dPanelsText;               // ui/panels/PanelsText.c
 extern bool g_redraw;
 void PropsOpenMenuUnder(PopupMenu* menu, Button* button);   // ViewPorts/Properties.cpp
 void PropsLayoutDirty();
+void W3dPanelsImagePick(Object* o);   // ViewPorts/LayoutInput.cpp: la fila IMAGEN abre el selector para ese objeto
 
 namespace {
 enum { WhenNone, WhenEq, WhenNe };
@@ -99,6 +101,18 @@ void ChoicePicked(int id) {
     PropsLayoutDirty();
     g_redraw = true;
 }
+// LA FILA IMAGEN: el boton abre el selector de imagen para el objeto activo (ViewPorts/LayoutInput.cpp: el Vacio de la
+// referencia). El selector es asincronico: la imagen llega despues y el objeto la retiene
+void ImageOpen() { if (ActiveObj) W3dPanelsImagePick(ActiveObj); }
+// el NOMBRE del archivo de la imagen ("" = no hay, o ya no esta cargada: no se toca un puntero viejo)
+std::string ImageName(Texture* t) {
+    if (!t) return std::string();
+    bool alive = false;
+    for (size_t i = 0; i < Textures.size() && !alive; i++) alive = (Textures[i] == t);
+    if (!alive) return std::string();
+    const size_t s = t->path.find_last_of("/\\");
+    return s == std::string::npos ? t->path : t->path.substr(s + 1);
+}
 void ChoiceOpen() {
     PropButton* b = PropButton::running;
     gChoiceRow = 0;
@@ -140,6 +154,12 @@ PropertieBase* NewRow(const Words& ws, PanelRow& r, int line) {
     const std::string label = T(ws.w[1].c_str());
     const W3dFieldKind kind = r.field->kind;
     if (k == "bool" && kind == FieldBool) return new PropBool(label);
+    if (k == "image" && kind == FieldImage) {   // el nombre a la izquierda; el boton (el archivo, o "Cargar imagen") a la derecha
+        PropButton* b = new PropButton(label);
+        b->withLabel = true; b->inColumn = true;
+        b->action = ImageOpen;
+        return b;
+    }
     if (k == "color" && kind == FieldColor) return new PropColor(label);
     if (k == "float" && kind == FieldFloat) return NewFloat(label, ws);
     if (k == "choice" && kind == FieldInt && ws.w.size() >= 4) {
@@ -172,7 +192,7 @@ PropertieBase* NewRow(const Words& ws, PanelRow& r, int line) {
         b->action = ChoiceOpen;
         return b;
     }
-    Fail(line, "el control no corresponde al campo (bool/float/color/choice)");
+    Fail(line, "el control no corresponde al campo (bool/float/color/choice/image)");
     return 0;
 }
 }
@@ -265,6 +285,16 @@ bool W3dPanelsBind(W3dPanels* p, Object* active) {
                 case FieldColor: { PropColor* k = (PropColor*)r.prop; changed |= !k->value != !at; k->value = (float*)at; break; }
                 case FieldVec3:  { PropFloat* f = (PropFloat*)r.prop; changed |= !f->value != !at;
                                    f->value = at ? &((float*)at)[r.comp] : (float*)0; break; }
+                case FieldImage: {
+                    PropButton* b = (PropButton*)r.prop;
+                    changed |= b->hidden != !at;
+                    b->hidden = !at;
+                    const std::string n = at ? ImageName(*(Texture**)at) : std::string();
+                    const std::string txt = n.empty() ? std::string(T("Load image")) : n;
+                    if (b->button->text != txt) { b->button->text = txt; changed = true; }
+                    b->button->icon = -1;
+                    break;
+                }
                 case FieldInt: {
                     PropButton* b = (PropButton*)r.prop;
                     changed |= b->hidden != !at;

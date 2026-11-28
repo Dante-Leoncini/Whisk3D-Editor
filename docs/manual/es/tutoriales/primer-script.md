@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ Hay más, como las que avisan cuando un objeto choca con otro. Están todas en e
 
 Lo que hace adentro:
 
-**`if property("rotate") then` … `end`** es una **condición**. Un `if` («si») hace el código que tiene adentro solo si lo que va entre `if` y `then` es verdadero. Puede tener un `elseif` («si no es cierto, hace esto si…»), que prueba otra condición, y un `else` («si no»), que se hace cuando no se cumplió ninguna; los dos son opcionales. Siempre termina con `end`. Por ejemplo:
+**`if rotate then` … `end`** es una **condición**. Un `if` («si») hace el código que tiene adentro solo si lo que va entre `if` y `then` es verdadero. Puede tener un `elseif` («si no es cierto, hace esto si…»), que prueba otra condición, y un `else` («si no»), que se hace cuando no se cumplió ninguna; los dos son opcionales. Siempre termina con `end`. Por ejemplo:
 
 ```lua
 if puntos >= 100 then
@@ -71,11 +71,11 @@ end
 
 Con 120 puntos el premio es oro; con 70, plata, y con 10, nada. Se hace solo la primera parte que se cumple. (En Lua, `elseif` va todo junto.)
 
-En el script, el `if` no tiene `elseif` ni `else`: si **rotate** es verdadero (la casilla está tildada), el cubo gira; si es falso, no pasa nada y la función termina. `property("rotate")` lee el valor que tiene ese objeto en el panel. Como se lee en cada cuadro, si lo cambiás con el juego andando, el script se entera en ese momento.
+En el script, el `if` no tiene `elseif` ni `else`: si **rotate** es verdadero (la casilla está tildada), el cubo gira; si es falso, no pasa nada y la función termina. `rotate` lee el valor que tiene ese objeto en el panel. Cada propiedad se usa así, con su nombre; también se puede leer con `property("rotate")`. Como se lee en cada cuadro, si lo cambiás con el juego andando, el script se entera en ese momento.
 
 - **`self()`** es el objeto que tiene el script: el cubo. **`getRotationZ(self())`** da su rotación en grados sobre la Z (la vertical, la misma Z que ves en el panel de Propiedades), y **`setRotationZ`** le pone una nueva: la misma, un poco más. Así el cubo gira como un trompo.
 
-`property`, `self`, `getRotationZ` y `setRotationZ` también son funciones, pero al revés: las trae Whisk3D y las llamás vos. Están en el [manual de Lua](../lua/README.md).
+`self`, `getRotationZ` y `setRotationZ` también son funciones, pero al revés: las trae Whisk3D y las llamás vos. Están en el [manual de Lua](../lua/README.md).
 
 ### El script completo
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

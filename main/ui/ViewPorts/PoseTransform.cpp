@@ -48,6 +48,7 @@
 // se recalcula contra el padre -> multi-hueso rota/escala alrededor de un PIVOTE COMPARTIDO (por eso tambien se MUEVEN),
 // igual que Object Mode. Confirm = click/Enter/tick; Cancel = Esc/click-der/cruz. La pose se guarda con Insert Keyframe.
 int g_poseMode = 0; // 0=none 1=grab 2=rotate 3=scale (espejo de `estado`)
+static int g_poseOrientUser = GlobalOrient;   // la orientacion del menu antes del transform (vuelve al terminar)
 static int g_pose2dMode = 0; // POSE 2D del UV editor (comparte g_poseSnap con el 3D; ver al final del archivo)
 struct PoseSnap { int b, parent, prof; Vector3 T, R, S; Matrix4 world; }; // world = world NODO al arrancar; prof = profundidad
 static std::vector<PoseSnap> g_poseSnap;
@@ -161,6 +162,8 @@ void PoseXformStart(int mode){
     g_poseTrackCap = false; // trackball: se recaptura el angulo inicial del mouse
     UndoPoseStart(a); // Ctrl+Z: snapshot de la pose de TODOS los huesos antes del transform
     // estado COMPARTIDO con Object Mode -> header + numerico + touch keyboard + confirm/cancel se activan solos
+    // (la orientacion del MENU vuelve al terminar: la escala la pone en Local mientras dura y antes quedaba asi)
+    if (!g_poseMode) g_poseOrientUser = transformOrientation;
     g_poseMode = mode;
     state = (mode==1)?translation:(mode==2)?rotation:EditScale;
     axisSelect = (mode==3)?XYZ:ViewAxis;                     // scale libre = 3 ejes; move/rotate libre = vista
@@ -293,6 +296,7 @@ void PoseXformConfirm(){
     }
     if (akGroup) UndoKeyframesConfirm();
     g_poseMode = 0; g_poseSnap.clear(); state = editNavigation; NumInputReset(); UndoPoseConfirm();
+    transformOrientation = g_poseOrientUser;
     if (akGroup) UndoGroupEnd();
 } // deja la pose (Insert Keyframe la guarda a mano; con Auto Key se guarda sola)
 void PoseXformCancel(){
@@ -301,6 +305,7 @@ void PoseXformCancel(){
         a->bones[s.b].poseT=s.T; a->bones[s.b].poseR=s.R; a->bones[s.b].poseS=s.S; } }
     if (a) PoseInvalidate(a);
     g_poseMode = 0; g_poseSnap.clear(); state = editNavigation; NumInputReset();
+    transformOrientation = g_poseOrientUser;
 }
 // X/Y/Z durante un transform de pose: constriñe el eje (1er toque) y cicla Global->Local->View (mismo eje re-apretado),
 // luego RE-APLICA desde el snapshot (absoluto). No usa CycleAxisTransform de Object Mode (esa llama RestoreState,

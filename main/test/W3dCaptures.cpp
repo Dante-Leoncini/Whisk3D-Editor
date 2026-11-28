@@ -12,8 +12,10 @@
 #include "render/RayTracer.h"        // g_rt / RTInvalidate (vista3d trazado)
 #include "objects/Objects.h"         // g_editMesh, EditSelectMode (caras)
 #include "objects/Mesh.h"            // Mesh (caras)
+#include "ViewPorts/Pick3D.h"          // el cuchillo (Knife*)
 #include "edit/Modifier.h"           // Modifier (modeje)
 #include "objects/Empty.h"           // el dibujo del Vacio (vaciodibujo)
+#include "objects/Textures.h"        // la imagen de la referencia (emptyimage)
 #include "animation/Animation.h"     // las curvas de los keyframes (keyinterp)
 #include "script/W3dScript.h"        // W3dScriptData / W3dScriptEntry (scriptval: los valores de un script)
 #include "physics/W3dRigid.h"        // W3dRigidDef (objfisica)
@@ -705,13 +707,17 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
         for (size_t i = 0; i < name.size(); i++) if (name[i] == '_') name[i] = ' ';   // "Keypad_7" = "Keypad 7"
         const SDL_Keycode k = SDL_GetKeyFromName(name.c_str());
         if (k == SDLK_UNKNOWN) { err = "key: SDL no conoce '" + name + "'"; return false; }
+        // 'repeat' = la REPETICION de una tecla mantenida (otro keydown con repeat=1, sin soltarla): la Z mantenida abre el
+        // menu de los modos de vista
+        const bool rep = (as == "repeat");
         for (int step = 0; step < 2; step++) {
             const bool down = (step == 0);
-            if ((as == "down" && !down) || (as == "up" && down)) continue;
+            if ((as == "down" && !down) || (as == "up" && down) || (rep && !down)) continue;
             SDL_Event e; memset(&e, 0, sizeof(e));
             e.type = down ? SDL_KEYDOWN : SDL_KEYUP;
             e.key.timestamp = SDL_GetTicks();
             e.key.state = down ? SDL_PRESSED : SDL_RELEASED;
+            e.key.repeat = rep ? 1 : 0;
             e.key.keysym.sym = k;
             e.key.keysym.scancode = SDL_GetScancodeFromKey(k);
             e.key.keysym.mod = (Uint16)SDL_GetModState();   // los que dejo 'mod' (Ctrl + A = 'mod ctrl' y 'key a')
@@ -1339,6 +1345,337 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
         if (has != v) { err = "renders: " + c + " es " + has + ", se esperaba " + v; return false; }
         return true;
     }
+    // 'meshbbox <x0> <x1> <y0> <y1> <z0> <z1> [tol]': la caja de los vertices de la malla ACTIVA (en su espacio local)
+    if (cmd == "meshbbox") {
+        float e[6], tol = 0.001f; for (int k = 0; k < 6; k++) ss >> e[k]; ss >> tol;
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m || !m->vertex || m->vertexSize <= 0) { err = "meshbbox: no hay malla activa"; return false; }
+        float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f };
+        for (int i = 0; i < m->vertexSize; i++) for (int k = 0; k < 3; k++) { const float v = m->vertex[i * 3 + k]; if (v < mn[k]) mn[k] = v; if (v > mx[k]) mx[k] = v; }
+        printf("      [meshbbox] '%s': x[%.3f..%.3f] y[%.3f..%.3f] z[%.3f..%.3f], escala %.2f %.2f %.2f\n", m->name.c_str(), mn[0], mx[0], mn[1], mx[1], mn[2], mx[2],
+               m->scale.x, m->scale.y, m->scale.z);
+        const float got[6] = { mn[0], mx[0], mn[1], mx[1], mn[2], mx[2] };
+        for (int k = 0; k < 6; k++) if (fabsf(got[k] - e[k]) > tol) { err = "meshbbox: la caja no es la esperada"; return false; }
+        return true;
+    }
+    // 'orient <global|local|view|normal>': la ORIENTACION de los transforms (el menu de la barra) es esa
+    if (cmd == "orient") {
+        std::string q; ss >> q;
+        extern int transformOrientation;
+        const char* now = (transformOrientation == LocalOrient) ? "local" : (transformOrientation == ViewOrient) ? "view" :
+                          (transformOrientation == NormalOrient) ? "normal" : "global";
+        printf("      [orient] %s\n", now);
+        if (!q.empty() && q != now) { err = std::string("orient: es ") + now + ", se esperaba " + q; return false; }
+        return true;
+    }
+    // 'gentris <n>': los triangulos de la malla GENERADA por los modificadores de la malla activa (0 = no hay)
+    if (cmd == "gentris") {
+        int n = -1; ss >> n;
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m) { err = "gentris: no hay malla activa"; return false; }
+        const int got = m->genValid ? m->genFacesSize / 3 : 0;
+        printf("      [gentris] '%s': %d triangulos generados\n", m->name.c_str(), got);
+        if (n >= 0 && got != n) { char b[96]; snprintf(b, sizeof b, "gentris: hay %d, se esperaban %d", got, n); err = b; return false; }
+        return true;
+    }
+    // 'emptyimage <ancho> <alto> [opacidad]': el Vacio ACTIVO es una referencia (forma Imagen) con su imagen cargada, y su
+    // cuadro mide eso (y su opacidad, si se pide)
+    if (cmd == "emptyimage") {
+        float ew = -1, eh = -1, eo = -1; ss >> ew >> eh >> eo;
+        if (!ActiveObj || ActiveObj->getType() != ObjectType::empty) { err = "emptyimage: el activo no es un Vacio"; return false; }
+        Empty* e = (Empty*)ActiveObj;
+        float hw = 0, hh = 0; e->ImageHalfSize(hw, hh);
+        Texture* t = e->ImageAlive();
+        printf("      [emptyimage] '%s': forma %d, imagen %s (%dx%d), cuadro %.3f x %.3f, opacidad %.2f\n", e->name.c_str(), e->shape,
+               t ? t->path.c_str() : "(ninguna)", e->imageW, e->imageH, 2 * hw, 2 * hh, e->imageOpacity);
+        if (e->shape != EmptyImage || !t) { err = "emptyimage: no es una referencia con imagen"; return false; }
+        if (ew >= 0 && (fabsf(2 * hw - ew) > 0.01f || fabsf(2 * hh - eh) > 0.01f)) { err = "emptyimage: el cuadro no mide lo esperado"; return false; }
+        if (eo >= 0 && fabsf(e->imageOpacity - eo) > 0.01f) { err = "emptyimage: la opacidad no es la esperada"; return false; }
+        return true;
+    }
+    // 'cage': la jaula de la malla activa: cada vertice (posicion) y cada cara (sus vertices), y que las capas por esquina
+    // (UV, color) midan lo que dice la topologia de faces3d
+    if (cmd == "cage") {
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m) { err = "cage: no hay malla activa"; return false; }
+        m->EnsureEdit(); EditMesh* e = m->edit; if (!e) { err = "cage: sin jaula"; return false; }
+        for (int k = 0; k < e->NumVerts(); k++) printf("      [cage] v%d (%.3f, %.3f, %.3f)\n", k, e->pos[(size_t)k*3], e->pos[(size_t)k*3+1], e->pos[(size_t)k*3+2]);
+        for (int f = 0; f < e->NumFaces(); f++) { std::string t; for (size_t c = 0; c < e->faces[f].size(); c++) { char b[16]; snprintf(b, sizeof b, " %d", e->faces[f][c]); t += b; } printf("      [cage] f%d:%s\n", f, t.c_str()); }
+        int corners = 0; for (size_t f = 0; f < m->faces3d.size(); f++) corners += (int)m->faces3d[f].idx.size();
+        bool ok = true;
+        for (size_t k = 0; k < m->uvMaps.size(); k++) if ((int)m->uvMaps[k]->uv.size() != corners * 2) { ok = false; printf("      [cage] capa UV %d mide %d, las esquinas piden %d\n", (int)k, (int)m->uvMaps[k]->uv.size() / 2, corners); }
+        printf("      [cage] %d vertices de render, %d esquinas, capas %s\n", m->vertexSize, corners, ok ? "bien" : "DESPAREJAS");
+        if (!ok) { err = "cage: las capas por esquina no miden lo que la topologia"; return false; }
+        return true;
+    }
+    // 'selverts <i> <j> ...': en Edit Mode, elige SOLO esos vertices de la jaula (por su indice), en modo vertice
+    if (cmd == "selverts") {
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m || InteractionMode != EditMode) { err = "selverts: hace falta una malla en Edit Mode"; return false; }
+        m->EnsureEdit(); EditMesh* e = m->edit; if (!e) { err = "selverts: sin jaula"; return false; }
+        e->vertSel.assign((size_t)e->NumVerts(), 0); e->edgeSel.assign((size_t)e->NumEdges(), 0); e->faceSel.assign((size_t)e->NumFaces(), 0);
+        int k; std::string lst;
+        while (ss >> k) { if (k < 0 || k >= e->NumVerts()) { err = "selverts: vertice fuera de rango"; return false; } e->vertSel[(size_t)k] = 1; }
+        e->activeIdx = -1; e->Recolor(); g_redraw = true;
+        return true;
+    }
+    // 'windingcheck [n]': cuantas aristas compartidas por DOS caras las recorren las dos en el MISMO sentido (una de las
+    // dos caras quedo dada vuelta respecto de su vecina). Falla si no son n (0 por defecto: todo coherente)
+    if (cmd == "windingcheck") {
+        int want = 0; ss >> want;
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m || !m->vertex) { err = "windingcheck: no hay malla activa"; return false; }
+        const bool hasRep = ((int)m->posRep.size() == m->vertexSize);
+        std::map<std::pair<int,int>, int> dir;
+        for (size_t f = 0; f < m->faces3d.size(); f++) {
+            const std::vector<int>& idx = m->faces3d[f].idx; const int n = (int)idx.size(); if (n < 3) continue;
+            for (int c = 0; c < n; c++) {
+                int a = idx[(size_t)c], b = idx[(size_t)((c + 1) % n)];
+                if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) continue;
+                if (hasRep) { a = m->posRep[(size_t)a]; b = m->posRep[(size_t)b]; }
+                if (a != b) dir[std::make_pair(a, b)]++;
+            }
+        }
+        int bad = 0;
+        // (una arista recorrida DOS veces en el mismo sentido = dos caras vecinas incoherentes)
+        for (std::map<std::pair<int,int>, int>::const_iterator it = dir.begin(); it != dir.end(); ++it) if (it->second >= 2) {
+            bad++;
+            const float* A = &m->vertex[it->first.first * 3]; const float* B = &m->vertex[it->first.second * 3];
+            printf("      [windingcheck] arista (%.2f %.2f %.2f)->(%.2f %.2f %.2f) recorrida %d veces igual\n", A[0], A[1], A[2], B[0], B[1], B[2], it->second);
+        }
+        printf("      [windingcheck] '%s': %d aristas con dos caras en el mismo sentido\n", m->name.c_str(), bad);
+        if (bad != want) { err = "windingcheck: hay caras dadas vuelta respecto de su vecina"; return false; }
+        return true;
+    }
+    // 'paktest <archivo>...': EL PAK de un juego compilado (Assets: Empaquetados). Arma uno con el escritor de verdad
+    // (W3dPakBuildBytes, CompileGame.cpp) con esos archivos como "assets/<nombre>", lo registra en el Core y compara
+    // contra los originales: leer entero, leer TRAMOS (de a pedacitos, en offsets que no caen en multiplos de 4, el
+    // ultimo byte, largo 0) y "existe?" (sin descifrar). Al final lo desregistra. Imprime cuanto tardo leer a pedacitos
+    if (cmd == "paktest") {
+        extern void W3dPakBuildBytes(const std::vector<std::string>&, const std::vector< std::vector<unsigned char> >&,
+                                     unsigned, std::vector<unsigned char>&);
+        std::vector<std::string> names; std::vector< std::vector<unsigned char> > datas; std::string f;
+        while (ss >> f) {
+            std::vector<unsigned char> d;
+            if (!w3dFileSystem::ReadFileBytes(f, d)) { err = "paktest: no pude leer " + f; return false; }
+            const size_t sl = f.find_last_of("/\\");
+            names.push_back("assets/" + (sl == std::string::npos ? f : f.substr(sl + 1))); datas.push_back(d);
+        }
+        if (names.empty()) { err = "paktest: faltan archivos"; return false; }
+        static std::vector<unsigned char> pak;   // (vive mientras esta registrado)
+        W3dPakBuildBytes(names, datas, 0x1234567u, pak);
+        w3dFileSystem::W3dPakRegister(&pak[0], (unsigned)pak.size());
+        int bad = 0; double tChunks = 0;
+        for (size_t i = 0; i < names.size(); i++) {
+            const std::vector<unsigned char>& d = datas[i];
+            std::vector<unsigned char> got;
+            if (!w3dFileSystem::FileExists(names[i])) { printf("      [paktest] %s: no existe\n", names[i].c_str()); bad++; }
+            if (!w3dFileSystem::ReadFileBytes(names[i], got) || got != d) { printf("      [paktest] %s: entero distinto\n", names[i].c_str()); bad++; }
+            const unsigned n = (unsigned)d.size();
+            // los literales en u: con int, clang (web, Android) corta por "narrowing" dentro de las llaves
+            const unsigned tries[][2] = { {0, 0}, {0, n}, {1, n > 1 ? n - 1 : 0u}, {3, n > 10 ? 7u : 0u}, {n / 2 + 1, n - (n / 2 + 1)},
+                                          {n > 0 ? n - 1 : 0u, n > 0 ? 1u : 0u}, {n > 5 ? 5u : 0u, n > 9 ? 4u : 0u} };
+            for (size_t t = 0; t < sizeof(tries) / sizeof(tries[0]); t++) {
+                const unsigned from = tries[t][0], len = tries[t][1];
+                if (from > n || n - from < len) continue;
+                if (!w3dFileSystem::ReadFileRange(names[i], from, len, got) || got.size() != len ||
+                    (len && memcmp(&got[0], &d[from], len) != 0)) { printf("      [paktest] %s: tramo %u+%u distinto\n", names[i].c_str(), from, len); bad++; }
+            }
+            // a PEDACITOS de 1 KB, como un lector de mallas: todo lo leido tiene que armar el archivo
+            const double t0 = w3dGetTicks();
+            std::vector<unsigned char> all;
+            for (unsigned from = 0; from < n; from += 1024) {
+                const unsigned len = (n - from < 1024u) ? n - from : 1024u;
+                if (!w3dFileSystem::ReadFileRange(names[i], from, len, got)) { bad++; break; }
+                all.insert(all.end(), got.begin(), got.end());
+            }
+            tChunks += w3dGetTicks() - t0;
+            if (all != d) { printf("      [paktest] %s: a pedacitos distinto\n", names[i].c_str()); bad++; }
+        }
+        const bool fake = w3dFileSystem::FileExists("assets/no_esta_en_el_pak.xyz");
+        if (fake) { printf("      [paktest] un archivo que no esta EXISTE\n"); bad++; }
+        printf("      [paktest] %d archivo(s) en un pak de %u bytes: %d diferencias; a pedacitos de 1 KB en %.1f ms\n",
+               (int)names.size(), (unsigned)pak.size(), bad, tChunks);
+        w3dFileSystem::W3dPakRegister(NULL, 0);   // (desregistra: vuelve el disco de siempre)
+        if (bad) { err = "paktest: el pak no devuelve lo mismo"; return false; }
+        return true;
+    }
+    // 'gizmoon 0|1' prende / apaga el gizmo de transformacion (Overlays > Gizmo). 'workopts <gizmo 0|1> <automerge 0|1>
+    // [distancia]': verifica las OPCIONES DE TRABAJO que el proyecto recuerda en su sesion
+    if (cmd == "gizmoon") { extern bool g_gizmoOn; int v = 1; ss >> v; g_gizmoOn = (v != 0); return true; }
+    if (cmd == "workopts") {
+        extern bool g_gizmoOn; extern bool g_autoMerge; extern float g_autoMergeThreshold;
+        int g = -1, a = -1; float d = -1.0f; ss >> g >> a >> d;
+        printf("      [workopts] gizmo %d, fusion automatica %d (%.4f)\n", (int)g_gizmoOn, (int)g_autoMerge, g_autoMergeThreshold);
+        if ((g >= 0 && (int)g_gizmoOn != g) || (a >= 0 && (int)g_autoMerge != a) || (d > 0.0f && fabsf(g_autoMergeThreshold - d) > 1e-5f)) {
+            err = "workopts: no son esas opciones"; return false; }
+        return true;
+    }
+    // 'facecam n': cuantas caras de la malla activa le MUESTRAN su frente a la camara del 3D (la normal por el orden
+    // de sus vertices apunta al ojo). Falla si no son n
+    if (cmd == "facecam") {
+        int want = -1; ss >> want;
+        extern Viewport3D* Viewport3DActive;
+        if (rootViewport) rootViewport->Render();
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m || !m->vertex || !Viewport3DActive) { err = "facecam: hace falta una malla y un 3D"; return false; }
+        Matrix4 W, Wi; m->GetWorldMatrix(W); if (!Matrix4::InvertAffine(W, Wi)) { err = "facecam: matriz"; return false; }
+        const Viewport3D::Lens L = Viewport3DActive->CurrentLens();
+        const Vector3 eye = Wi * L.pos; Vector3 fw = (Wi * (L.pos + L.fwd)) - eye; fw = fw.Normalized();
+        int n = 0, tot = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) {
+            const std::vector<int>& idx = m->faces3d[f].idx; const int k = (int)idx.size(); if (k < 3) continue;
+            float nx = 0, ny = 0, nz = 0, cx = 0, cy = 0, cz = 0;
+            for (int c = 0; c < k; c++) {
+                const float* a = &m->vertex[idx[(size_t)c]*3]; const float* b = &m->vertex[idx[(size_t)((c+1)%k)]*3];
+                nx += (a[1]-b[1])*(a[2]+b[2]); ny += (a[2]-b[2])*(a[0]+b[0]); nz += (a[0]-b[0])*(a[1]+b[1]);
+                cx += a[0] / k; cy += a[1] / k; cz += a[2] / k;
+            }
+            const float d = L.ortho ? -(nx*fw.x + ny*fw.y + nz*fw.z) : (nx*(eye.x-cx) + ny*(eye.y-cy) + nz*(eye.z-cz));
+            tot++; if (d > 0) n++;
+        }
+        printf("      [facecam] '%s': %d de %d caras miran a la camara\n", m->name.c_str(), n, tot);
+        if (want >= 0 && n != want) { err = "facecam: no son esas"; return false; }
+        return true;
+    }
+    // 'selmodebar <vertex|edge|face>': el boton alargado VERTICE / ARISTA / CARA de la barra del 3D (Edit Mode de una
+    // malla): clickea el segmento por el camino REAL del click de la barra y verifica el modo, que el verde este SOLO en
+    // ese y que el boton de contexto (Vertex/Edge/Face, repetido adentro de "Mesh") no este en la barra
+    if (cmd == "selmodebar") {
+        std::string q; ss >> q;
+        extern Viewport3D* Viewport3DActive;
+        if (rootViewport) rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp || InteractionMode != EditMode) { err = "selmodebar: hace falta Edit Mode en un 3D"; return false; }
+        vp->UpdateBar();
+        const int roles[3] = { BR_SelMode, BR_SelEdge, BR_SelFace }, modes[3] = { SelVertex, SelEdge, SelFace };
+        const char* names[3] = { "vertex", "edge", "face" };
+        int want = -1; for (int i = 0; i < 3; i++) if (q == names[i]) want = i;
+        if (want < 0) { err = "selmodebar: vertex | edge | face"; return false; }
+        Button* b = BarRoleBtn(vp->BarButtons, roles[want]);
+        if (!b || !b->visible) { err = "selmodebar: el boton no esta en la barra"; return false; }
+        extern bool LayoutOpenBarMenu(ViewportBase* vp, int mx, int my);
+        LayoutOpenBarMenu(vp, b->sx + b->width / 2, b->sy + b->height / 2);
+        if (rootViewport) rootViewport->Render();   // (el verde lo pone RenderUI)
+        int green = -1, nGreen = 0;
+        for (int i = 0; i < 3; i++) { Button* x = BarRoleBtn(vp->BarButtons, roles[i]); if (x && x->tint) { green = i; nGreen++; } }
+        Button* bObj = BarRoleBtn(vp->BarButtons, BR_Object);
+        printf("      [selmodebar] modo %d, verde %s, boton de contexto %s\n", EditSelectMode, green >= 0 ? names[green] : "ninguno",
+               (bObj && bObj->visible) ? "VISIBLE" : "oculto");
+        if (EditSelectMode != modes[want]) { err = "selmodebar: no cambio el modo"; return false; }
+        if (nGreen != 1 || green != want) { err = "selmodebar: el verde no esta solo en el elegido"; return false; }
+        if (bObj && bObj->visible) { err = "selmodebar: el boton de contexto sigue en la barra"; return false; }
+        return true;
+    }
+    // 'knife start | at x y z [vertex|edge|face] | through | back | ok | cancel | points N': EL CUCHILLO de verdad (el modal
+    // de K, ver Pick3D.cpp). 'at' lleva el mouse al punto x y z (LOCAL de la malla en edicion, ejes del motor) y clickea;
+    // con el tipo, falla si el enganche no es ese
+    if (cmd == "knife") {
+        std::string q; ss >> q;
+        extern Viewport3D* Viewport3DActive;
+        if (rootViewport) rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (q == "start") { if (!vp) { err = "knife: no hay viewport 3D"; return false; } KnifeStart(vp->x + vp->width / 2, vp->y + vp->height / 2);
+            if (!KnifeActive()) { err = "knife: no arranco (Edit Mode con una malla?)"; return false; } return true; }
+        if (q == "through") { KnifeToggleThrough(); return true; }
+        if (q == "back") { KnifeBack(); return true; }
+        if (q == "ok") { KnifeConfirm(); return true; }
+        if (q == "cancel") { KnifeCancel(); return true; }
+        if (q == "points") { int want = -1; ss >> want; printf("      [knife] %d puntos\n", KnifePoints());
+            if (want >= 0 && KnifePoints() != want) { err = "knife: no son esos puntos"; return false; } return true; }
+        if (q == "at") {
+            float x = 0, y = 0, z = 0; std::string kind; ss >> x >> y >> z >> kind;
+            Mesh* m = (Mesh*)g_editMesh;
+            if (!vp || !m || !KnifeActive()) { err = "knife at: el cuchillo no esta activo"; return false; }
+            Matrix4 W; m->GetWorldMatrix(W);
+            float sx, sy; if (!vp->ProjectPoint(W * Vector3(x, y, z), sx, sy)) { err = "knife at: el punto no se ve"; return false; }
+            const int mx = vp->x + (int)(sx + 0.5f), my = vp->y + (int)(sy + 0.5f);
+            KnifeMotion(mx, my);
+            const int hk = KnifeHoverKind();
+            const char* names[] = { "vertex", "edge", "face" };
+            printf("      [knife] en (%.2f, %.2f, %.2f) -> pantalla (%d, %d): %s\n", x, y, z, mx, my, hk >= 0 && hk <= 2 ? names[hk] : "nada");
+            if (!kind.empty() && (hk < 0 || hk > 2 || kind != names[hk])) { err = "knife at: engancho otra cosa (se esperaba " + kind + ")"; return false; }
+            KnifeClickLeft(mx, my);
+            return true;
+        }
+        err = "knife: start | at x y z [vertex|edge|face] | through | back | ok | cancel | points N"; return false;
+    }
+    // 'editactive [none | x y z [tol]]': el ACTIVO de la edicion (en el modo de seleccion): imprime su indice y el centro
+    // de sus vertices (local, ejes del motor). Con 'none' falla si hay activo; con x y z, si no lo hay o esta en otro lado
+    if (cmd == "editactive") {
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m || InteractionMode != EditMode) { err = "editactive: hace falta una malla en Edit Mode"; return false; }
+        m->EnsureEdit(); EditMesh* e = m->edit; if (!e) { err = "editactive: sin jaula"; return false; }
+        std::string a; ss >> a;
+        const int k = e->activeIdx;
+        std::vector<int> vs;
+        if (k >= 0) {
+            if (EditSelectMode == SelVertex && k < e->NumVerts()) vs.push_back(k);
+            else if (EditSelectMode == SelEdge && k < e->NumEdges()) { vs.push_back(e->lineIdx[(size_t)k * 2]); vs.push_back(e->lineIdx[(size_t)k * 2 + 1]); }
+            else if (EditSelectMode == SelFace && k < e->NumFaces()) { const IntRows::Row p = e->faces[(size_t)k]; for (size_t c = 0; c < p.size(); c++) vs.push_back(p[c]); }
+        }
+        float c[3] = { 0, 0, 0 };
+        for (size_t i = 0; i < vs.size(); i++) for (int q = 0; q < 3; q++) c[q] += e->pos[(size_t)vs[i] * 3 + q] / (float)vs.size();
+        printf("      [editactive] %d (%s) en (%.3f, %.3f, %.3f)\n", k, vs.empty() ? "ninguno" : "elegido", c[0], c[1], c[2]);
+        if (a == "none") { if (!vs.empty()) { err = "editactive: no tendria que haber activo"; return false; } return true; }
+        if (a.empty()) return true;
+        float x = (float)atof(a.c_str()), y = 0, z = 0, tol = 0.01f; ss >> y >> z >> tol;
+        if (vs.empty()) { err = "editactive: no hay activo"; return false; }
+        if (fabsf(c[0] - x) > tol || fabsf(c[1] - y) > tol || fabsf(c[2] - z) > tol) { err = "editactive: el activo esta en otro lado"; return false; }
+        return true;
+    }
+    // 'vpshading <solid|material|rendered|wire|zbuffer|normal|alpha|vectors> [xray 0|1]': ASSERTA el modo de vista del 3D
+    // activo (y los rayos X, que van aparte)
+    if (cmd == "vpshading") {
+        std::string q, k; int xr = -1; ss >> q >> k >> xr;
+        extern bool g_xray;
+        if (!Viewport3DActive && rootViewport) rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "vpshading: no hay viewport 3D"; return false; }
+        const RenderType::Enum v = vp->view.v;
+        const char* name = (v == RenderType::Solid) ? "solid" : (v == RenderType::MaterialPreview) ? "material" :
+                           (v == RenderType::Rendered) ? "rendered" : (v == RenderType::Wireframe) ? "wire" :
+                           (v == RenderType::ZBuffer) ? "zbuffer" : (v == RenderType::NormalView) ? "normal" :
+                           (v == RenderType::Alpha) ? "alpha" : (v == RenderType::Vectors) ? "vectors" : "?";
+        printf("      [vpshading] %s, rayos X %d\n", name, (int)g_xray);
+        if (!q.empty() && q != name) { err = "vpshading: el modo es '" + std::string(name) + "', no '" + q + "'"; return false; }
+        if (k == "xray" && xr >= 0 && (int)g_xray != xr) { err = "vpshading: los rayos X no son los esperados"; return false; }
+        return true;
+    }
+    // 'facesout [all]': de la malla ACTIVA (una cerrada y convexa, como el cubo), cuantas caras tienen el ORDEN de sus
+    // vertices mirando hacia AFUERA (la normal de Newell contra el centro de la malla) y cuantas tienen su normal
+    // guardada (la del render, en sus esquinas) del mismo lado que ese orden. Con 'all' las exige a todas: despues de
+    // aplicar una escala negativa (Apply Scale) las caras no pueden quedar al reves
+    if (cmd == "facesout") {
+        std::string q; ss >> q;
+        Mesh* m = (ActiveObj && ActiveObj->getType() == ObjectType::mesh) ? (Mesh*)ActiveObj : NULL;
+        if (!m || !m->vertex || m->vertexSize <= 0) { err = "facesout: no hay malla activa"; return false; }
+        double c[3] = { 0, 0, 0 };
+        for (int i = 0; i < m->vertexSize; i++) for (int a = 0; a < 3; a++) c[a] += m->vertex[i * 3 + a];
+        for (int a = 0; a < 3; a++) c[a] /= m->vertexSize;
+        int n = 0, out = 0, agree = 0;
+        const bool list = (q == "list");   // (cada cara: su centro y si mira afuera)
+        for (size_t f = 0; f < m->faces3d.size(); f++) {
+            const std::vector<int>& idx = m->faces3d[f].idx; const int k = (int)idx.size();
+            if (k < 3) continue;
+            double nw[3] = { 0, 0, 0 }, fc[3] = { 0, 0, 0 }, ns[3] = { 0, 0, 0 };
+            for (int j = 0; j < k; j++) {
+                const float* p = &m->vertex[idx[j] * 3]; const float* p2 = &m->vertex[idx[(j + 1) % k] * 3];
+                nw[0] += (p[1] - p2[1]) * (p[2] + p2[2]); nw[1] += (p[2] - p2[2]) * (p[0] + p2[0]); nw[2] += (p[0] - p2[0]) * (p[1] + p2[1]);
+                for (int a = 0; a < 3; a++) fc[a] += p[a] / k;
+                if (m->normals) for (int a = 0; a < 3; a++) ns[a] += m->normals[idx[j] * 3 + a];
+            }
+            n++;
+            const bool o = nw[0] * (fc[0] - c[0]) + nw[1] * (fc[1] - c[1]) + nw[2] * (fc[2] - c[2]) > 0;
+            if (o) out++;
+            if (list) printf("      [facesout] cara %d: centro (%.2f, %.2f, %.2f) %s\n", (int)f, fc[0], fc[1], fc[2], o ? "afuera" : "ADENTRO");
+            if (nw[0] * ns[0] + nw[1] * ns[1] + nw[2] * ns[2] > 0) agree++;
+        }
+        printf("      [facesout] '%s': %d caras, %d con el orden hacia afuera, %d con la normal del mismo lado que el orden\n",
+               m->name.c_str(), n, out, agree);
+        if (q == "all" && (out != n || agree != n)) { err = "facesout: hay caras al reves"; return false; }
+        return true;
+    }
     // 'rendersize <ancho> <alto>': el tamano del render a archivo (las filas Ancho / Alto de la tarjeta Render)
     // ---- renderaa <1..4> : el ANTIALIASING del render rasterizado (supermuestreo; 1 = apagado) ----
     if (cmd == "renderaa") { int v = 1; ss >> v; g_render.antialias = v < 1 ? 1 : (v > 4 ? 4 : v); return true; }
@@ -1864,14 +2201,15 @@ bool W3dCapturesCmd(const std::string& cmd, std::istringstream& ss, std::string&
         g_redraw = true; Frame();
         return true;
     }
-    // 'emptyset <forma> <tamanio> <rx> <ry> <rz>': prepara el dibujo del Vacio activo (para armar una escena, como
+    // 'emptyset <forma> <tamanio> <rx> <ry> <rz> [opacidad]': prepara el dibujo del Vacio activo (para armar una escena, como
     // 'cursor3d' u 'origin'; lo que hace la persona se prueba con propclic + menuelegir)
     if (cmd == "emptyset") {
-        int fo = 2; float t = 1, rx = 0, ry = 0, rz = 0; ss >> fo >> t >> rx >> ry >> rz;
+        int fo = 2; float t = 1, rx = 0, ry = 0, rz = 0, op = -1; ss >> fo >> t >> rx >> ry >> rz >> op;
         if (!ActiveObj || ActiveObj->getType() != ObjectType::empty) { err = "emptyset: el activo no es un Vacio"; return false; }
         Empty* e = (Empty*)ActiveObj;
         if (fo >= 0 && fo < EmptyShapes) e->shape = fo;
         e->drawingSize = t; e->rotDrawing = Vector3(rx, ry, rz);
+        if (op >= 0) e->imageOpacity = op;   // (6to, opcional: la opacidad de la imagen de una referencia)
         g_redraw = true; Frame();
         return true;
     }

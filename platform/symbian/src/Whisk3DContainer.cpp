@@ -563,6 +563,21 @@ static void OkLongTick() {
     }
     g_redraw = true;
 }
+// EL 6 MANTENIDO = el MENU de los modos de vista (como la Z mantenida de la PC): un toque cicla el modo al SOLTARLO;
+// mantenido medio segundo (el mismo tiempo que el OK), vibra y sale el menu para elegir uno directo con las flechas y OK
+static TBool g6Waiting = EFalse, g6LongDone = EFalse;
+static TUint g6Tick = 0;
+extern void LayoutMenuShadingKeyboard();
+static void Key6LongTick() {
+    if (!g6Waiting) return;
+    const TUint ms = OkTicksToMs(User::NTickCount() - g6Tick);
+    if (ms < kOkLongMs) { g_redraw = true; return; }
+    g6Waiting = EFalse;
+    g6LongDone = ETrue;
+    w3dEngine::VibrateMs(60, 0.6f);
+    LayoutMenuShadingKeyboard();   // (sin mouse: adentro de la vista 3D activa)
+    g_redraw = true;
+}
 // mouse virtual (w3dmouse.cpp): si esta visible, las flechas/OK del telefono lo manejan
 extern bool mouseVisible;
 extern GLshort mouseX, mouseY; // pos del cursor virtual a nivel de archivo (el OK del loop cut la usa)
@@ -1287,7 +1302,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			}
 			if (sc == '*'){ gStarHeld = ETrue; return EKeyWasConsumed; } // * = MODIFICADOR de PANEO (mantener + flechas)
 			if (sc == '6'){
-				W3dNewSceneToggleRenderMode(); // 6 = cicla Material Preview/Render/Wireframe/Solid
+				// 6 = el modo de vista: un toque cicla al SOLTARLO; mantenido, el menu de los modos (Key6LongTick)
+				g6Waiting = ETrue; g6LongDone = EFalse; g6Tick = User::NTickCount();
 				return EKeyWasConsumed;
 			}
 			// EDIT MODE: 7 = Extrude, 8 = Loop Cut, 4 = nada. Las funciones se protegen
@@ -1461,6 +1477,11 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				if (mouseVisible) W3dLayoutReleaseViewport(mouseX, mouseY);
 				return EKeyWasConsumed;
 			}
+			if (usc == '6' && (g6Waiting || g6LongDone)){ // 6 soltada: un toque = el siguiente modo de vista
+				if (g6Waiting) W3dNewSceneToggleRenderMode(); // (cicla Material Preview/Render/Wireframe/Solid)
+				g6Waiting = EFalse; g6LongDone = EFalse;
+				return EKeyWasConsumed;
+			}
 			if (usc == '0'){ // 0 soltada: tap SIN flecha = enfocar (como antes); con flecha ya hizo zoom
 				if (g0Held && !g0ArrowUsed) W3dNewFocus();
 				g0Held = EFalse;
@@ -1627,6 +1648,7 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     { extern bool ProgressActive(); if (ProgressActive()) return 0; }
     instance->iFrame++;
     OkLongTick();  // el OK mantenido: vibrar y, al terminar, el menu contextual
+    Key6LongTick();   // el 6 mantenido: el menu de los modos de vista
     TiltTick();    // el lapiz mantenido en un transform: inclinar el telefono
     // LOS SONIDOS DEL EDITOR (el timeline, el audio scrubbing): en la PC los mueve main.cpp en cada cuadro; el telefono
     // no lo llamaba y la escena no sonaba en el editor

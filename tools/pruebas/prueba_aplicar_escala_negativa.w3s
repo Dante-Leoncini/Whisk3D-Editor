@@ -1,0 +1,28 @@
+# ==========================================================================
+#  APLICAR UNA ESCALA NEGATIVA (Ctrl+A > Scale, Mesh::ApplyMatrix): un objeto espejado con escala -1 se ve bien, y al
+#  aplicarle la escala tiene que seguir viendose igual. El espejo da vuelta el sentido de cada cara (el orden de sus
+#  vertices); antes la malla quedaba con las caras al reves, como con las normales invertidas. Ahora se revierte el orden
+#  de cada cara (y sus UV / colores por esquina), como Flip Normals. Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_aplicar_escala_negativa.w3s
+# ==========================================================================
+selobj Cubo
+facesout all
+# ---- espejo en un eje ----
+objscale -1 1 1
+apply scale
+facesout all
+# ---- en los tres ejes (tambien es un espejo) ----
+objscale -1 -1 -1
+apply scale
+facesout all
+# ---- en dos ejes NO es espejo (es un giro de 180 grados): las caras quedan como estaban ----
+objscale -1 -1 1
+apply scale
+facesout all
+# ---- con otra escala encima ----
+objscale 2 0.5 -3
+apply scale
+facesout all
+# ---- Ctrl+Z vuelve a la malla de antes, tambien bien ----
+undo
+facesout all

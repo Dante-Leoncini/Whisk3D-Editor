@@ -93,8 +93,11 @@ bool  RTProbeTakeReflection(std::vector<unsigned char>& rgba);
 #include <string>
 class Mesh;
 // indirecta: la luz que rebota (el fondo y lo de alrededor), con 'rebotes' rebotes (1 a 8); denoiser: la indirecta suavizada
+// shadowmask: SOMBRAS DEL SOL + INDIRECTA (TexLayer::shadowmask): Luz queda con la INDIRECTA sola y la mascara del sol
+// (RTBakeSun) con cuanto VE AL SOL cada texel (la directa del sol con sombras / sin sombras, 0..1)
 bool  RTBakeBegin(Mesh* m, int uvLayer, int w, int h, int samples, std::string* reason,
-                        bool indirect = true, int bounces = 3, bool denoiser = true);
+                        bool indirect = true, int bounces = 3, bool denoiser = true, bool shadowmask = false);
+bool  RTBakeShadowmask();   // (el horneado terminado era de sombras + indirecta)
 float RTBakeStep(int msBudget);
 bool  RTBakeActive();
 void  RTBakeCancel();
@@ -116,6 +119,10 @@ const char* RTUpscalerName(int r);  // "Linear" / "FSR 1 (AMD)"             // l
 double RTRaysPerSecond();               // los rayos por segundo de la GPU mientras traza (0 = por CPU)
 
 // --- render a archivo ("Render Image" con Ray Tracing tildado): todos los pases, bloqueante, con progreso ---
+// RENDER ANIMATION: entre Begin y End la escena trazada se arma una vez y cada cuadro renueva solo las poses, las luces y
+// la camara (si cambia otra cosa, ese cuadro la arma de nuevo). Sin esto cada cuadro la armaba y la subia entera
+void RTSequenceBegin();
+void RTSequenceEnd();
 bool RTRenderToPNG(Viewport3D* vp, int w, int h, const std::string& path, std::string& msg);
 // lo mismo a un buffer RGBA (filas de arriba hacia abajo), sin guardar (para post-procesarlo: el desenfoque de movimiento)
 bool RTRenderToBuffer(Viewport3D* vp, int w, int h, std::vector<unsigned char>& rgba, std::string& msg);

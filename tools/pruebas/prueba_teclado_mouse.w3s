@@ -1,0 +1,43 @@
+# EL TECLADO EN PANTALLA SOLO CON EL DEDO (2026-11-26):
+#  En una PC con Windows, un click de MOUSE en un numero abria el teclado numerico tactil. Dos causas:
+#   - el panel de la ultima operacion de una malla nueva (Anadir Circulo: Radio, Vertices) lo abria SIEMPRE;
+#   - "se usa el tactil" queria decir "hubo un dedo alguna vez": una notebook con pantalla tactil (o algo que mando un
+#     toque) quedaba en modo tactil para siempre. Ahora un click de mouse de verdad vuelve a la UI de mouse.
+#  El panel nace plegado: su titulo esta en (40,590) y el valor del Radio, desplegado, en (300,556).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_teclado_mouse.w3s
+window 1280 720
+tick
+# 1) con el mouse: se edita el valor en el campo, sin teclado en pantalla
+addmenu circle
+tick
+tapxy 40 590 mouse
+tick
+tapxy 300 556 mouse
+tick
+keyboardopen none
+key Escape
+key Escape
+tick
+# 2) con el dedo: el teclado numerico
+addmenu circle
+tick
+tapxy 40 590
+tick
+tapxy 300 556
+tick
+keyboardopen numpad
+key Escape
+key Escape
+tick
+# 3) un dedo y despues el mouse (la notebook con pantalla tactil): el mouse ya no abre el teclado
+wait 600
+addmenu circle
+tick
+tapxy 40 590
+tick
+wait 600
+tapxy 300 556 mouse
+tick
+keyboardopen none

@@ -523,6 +523,7 @@ Delete the orphan resource	Die verwaiste Ressource löschen
 Delete the orphan resources	Die verwaisten Ressourcen löschen
 Deleted	Gelöscht
 Denoiser	Denoiser
+Shadowmask (real-time light)	Shadowmask (Echtzeitlicht)
 Density	Dichte
 Depth	Tiefe
 Depth & clear	Tiefe & Leeren
@@ -751,6 +752,7 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Radius volle Lautstärke
 Fullscreen	Vollbild
 Function	Funktion
+Function of Whisk3D (it isn't in this script)	Funktion von Whisk3D (nicht in diesem Skript)
 GL Calls	GL-Aufrufe
 GL Light	GL-Licht
 GLB saved successfully!	GLB gespeichert!
@@ -771,6 +773,7 @@ Give the project a name to save it	Dem Projekt einen Namen geben, um zu speicher
 Gizmo	Gizmo
 Global	Global
 Go back	Zurück
+Go to Definition	Gehe zu Definition
 Go to end	Zum Ende
 Go to start	Zum Anfang
 Grab step	Verschiebe-Schritt
@@ -941,6 +944,7 @@ Library unlinked	Bibliothek gelöst
 Lifetime	Lebensdauer
 Light	Licht
 Light Probe	Lichtsonde
+Light Probes	Lichtsonden
 Light bounce	Lichtreflexion
 Light bounces	Lichtreflexionen
 Light color	Lichtfarbe
@@ -1872,6 +1876,7 @@ This resource can't be dropped in the 3D view	Diese Ressource kann nicht in der 
 This resource can't be renamed	Diese Ressource kann nicht umbenannt werden
 This resource type can't be deleted	Dieser Ressourcentyp kann nicht gelöscht werden
 This resource type can't be duplicated	Dieser Ressourcentyp kann nicht dupliziert werden
+This script doesn't define	Dieses Skript definiert nicht
 This step has nothing to animate	Dieser Schritt hat nichts zu animieren
 This texture already has the baked light of	Diese Textur enthält bereits das gebackene Licht von
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Das ändert die Vertexgruppen und vereinfacht sie auf 1 Knochen pro Vertex (schnelleres Skinning). Dabei können Daten verloren gehen.
@@ -1918,12 +1923,7 @@ UV Group	UV-Gruppe
 UV Groups	UV-Gruppen
 UV Map	UV-Map
 UV Maps	UV-Maps
-UV Offset	UV-Versatz
-UV Pivot	UV-Drehpunkt
-UV Rotation	UV-Drehung
-UV Scale	UV-Skalierung
 UV Sphere	UV-Kugel
-UV Transform	UV-Transformation
 UV array	UV-Array
 UV group(s)	UV-Gruppe(n)
 UV layer (0 = active)	UV-Schicht (0 = aktive)
@@ -2220,3 +2220,35 @@ Downloads	Downloads
 Pictures	Bilder
 Music	Musik
 Render with the first	Rendern mit dem ersten
+Scatter	Streuen
+External .w3d	Externe .w3d
+Emit From	Ausgabe von
+Seed	Startwert
+Random Scale	Zufällige Skalierung
+Align to Normal	An Normale ausrichten
+Random Rotation	Zufällige Drehung
+Random Tilt	Zufällige Neigung
+Merged	Zusammengeführt
+Instances	Instanzen
+Show Emitter	Emitter anzeigen
+%d copies of %d source(s)	%d Kopien von %d Quelle(n)
+Face Centers	Flächenmitten
+Faces (anywhere)	Flächen (überall)
+(the first one)	(die erste)
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Streuen: Kopien aus einer externen .w3d können keine Objekte werden (als Zusammengeführt anwenden)
+Scatter: there are no copies to apply	Streuen: keine Kopien zum Anwenden
+Scatter: %d copies are now objects	Streuen: %d Kopien sind jetzt Objekte
+Show/Hide	Anzeigen/Ausblenden
+Reveal Hidden	Ausgeblendetes zeigen
+Hide Selected	Auswahl ausblenden
+Hide Unselected	Nicht Ausgewähltes ausblenden
+Recalculate Vertex Normals	Vertexnormalen neu berechnen
+New File...	Neue Datei...
+New File	Neue Datei
+Recent	Zuletzt
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Messer: Klick = Punkt, Enter = schneiden, Esc = abbrechen, Rücktaste = Punkt entfernen, Z = durchschneiden
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Messer (durch): Klick = Punkt, Enter = schneiden, Esc = abbrechen, Rücktaste = Punkt entfernen, Z = nur Sichtbares
+Knife: enter Edit Mode first	Messer: erst in den Bearbeitungsmodus wechseln
+Knife: the cut does not cross any face	Messer: der Schnitt kreuzt keine Fläche
+Knife	Messer
+Merge by Distance: %d vertices merged	Nach Abstand zusammenführen: %d Vertices zusammengeführt

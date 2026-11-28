@@ -54,6 +54,10 @@ static float    gBakeSamples = 32.0f;
 static bool     gBakeIndirect = true;   // la luz que rebota (el fondo y lo de alrededor)
 static float    gBakeBounces = 3.0f;    // cuantas veces rebota (con mas, la sombra recibe la luz que rebota en lo que la tapa)
 static bool     gBakeDenoiser = true;   // la indirecta suavizada (sin granulado)
+// SHADOWMASK: la textura lleva las SOMBRAS del sol (alfa) y la luz INDIRECTA (RGB) y el material sigue con su luz de tiempo
+// real (el normal map, el brillo, el metal y los reflejos no se pierden: ver TexLayer::shadowmask). Sin tildar, la luz
+// entera queda en la textura y el material va sin luz de tiempo real (el horneado de siempre)
+static bool     gBakeShadowmask = false;
 static Mesh*    gBakeMesh = NULL;   // la malla que se esta horneando
 static TextureEditable* gBakeTe = NULL;
 static int      gBakeUsedUV = 0;
@@ -168,6 +172,7 @@ static void Finish() {
     }
     // UN CAPTADOR DE SOMBRAS: la textura es la sombra (blanco = nada), para una capa Multiply comun
     const bool picker = RTBakePicker();
+    const bool sm = RTBakeShadowmask();   // (sombras del sol en el alfa + la indirecta en el RGB, con la luz de tiempo real)
     const int mode = picker ? W3D_LAYER_MULTIPLY : W3D_LAYER_MULTIPLY2X;
     UndoTextureStart(te, true);   // (el horneado escribe la textura entera, sin el pincel)
     for (int i = 0; i < w * h; i++) {
@@ -240,13 +245,17 @@ static void Finish() {
         for (size_t k = 0; k < mat->layers.size(); k++)
             if (mat->layers[k].tex == te->tex) { mat->layers[k].blend = mode; mat->layers[k].uvMap = gBakeUsedUV;
                                                 mat->layers[k].on = true; mat->layers[k].baked = true;
-                                                mat->layers[k].maskSun = withSun; has = true; }
+                                                mat->layers[k].maskSun = withSun && !sm; mat->layers[k].shadowmask = sm;
+                                                mat->layers[k].force = 1.0f; has = true; }
         if (!has) {
-            TexLayer tl; tl.blend = mode; tl.uvMap = gBakeUsedUV; tl.force = 1.0f; tl.baked = true; tl.maskSun = withSun;
+            TexLayer tl; tl.blend = mode; tl.uvMap = gBakeUsedUV; tl.force = 1.0f; tl.baked = true; tl.maskSun = withSun && !sm;
+            tl.shadowmask = sm;
             TextureSetIn(tl.tex, te->tex);
             mat->layers.push_back(tl);
         }
-        // (la capa es de LUZ HORNEADA: mientras este prendida el material va sin la luz de tiempo real. Sacarla la devuelve)
+        // (la capa es de LUZ HORNEADA: mientras este prendida el material va sin la luz de tiempo real. Sacarla la devuelve.
+        //  La de SOMBRAS + INDIRECTA la usa la luz POR PIXEL: el material pasa a tenerla)
+        if (sm) mat->perPixel = true;
         UndoMaterialModCommit();
     }
     UndoGroupEnd();
@@ -269,7 +278,8 @@ static void ActionBake() {
     if (!te || te->w <= 0 || te->h <= 0) { Notify(T("Could not read the image"), true); return; }
     const int uv = UVPicked(m);
     std::string reason;
-    if (!RTBakeBegin(m, uv, te->w, te->h, (int)(gBakeSamples + 0.5f), &reason, gBakeIndirect, (int)(gBakeBounces + 0.5f), gBakeDenoiser)) {
+    if (!RTBakeBegin(m, uv, te->w, te->h, (int)(gBakeSamples + 0.5f), &reason, gBakeIndirect, (int)(gBakeBounces + 0.5f), gBakeDenoiser,
+                     gBakeShadowmask)) {
         Notify(std::string(T("Not baked")) + ": " + T(reason.c_str()), true);
         return;
     }
@@ -277,17 +287,22 @@ static void ActionBake() {
     g_redraw = true;
 }
 
-// DE UNA SOLA VEZ (el harness): sin la barra, hasta terminar
-bool PropsBakeNow(Mesh* m, Texture* t, int uv, int samples, std::string* reason) {
+// DE UNA SOLA VEZ (el harness): sin la barra, hasta terminar. shadowmask: las sombras del sol + la indirecta (con la luz de
+// tiempo real, TexLayer::shadowmask); -1 = lo que diga la casilla de la tarjeta
+bool PropsBakeNowMode(Mesh* m, Texture* t, int uv, int samples, int shadowmask, std::string* reason) {
     if (!m || !TextureLive(t)) { if (reason) *reason = "Choose a texture to bake into"; return false; }
     TextureEditable* te = TexEditGet(t);
     if (!te || te->w <= 0 || te->h <= 0) { if (reason) *reason = "Could not read the image"; return false; }
     if (uv < 0) uv = UVPicked(m);
-    if (!RTBakeBegin(m, uv, te->w, te->h, samples, reason, gBakeIndirect, (int)(gBakeBounces + 0.5f), gBakeDenoiser)) return false;
+    const bool sm = shadowmask < 0 ? gBakeShadowmask : (shadowmask != 0);
+    if (!RTBakeBegin(m, uv, te->w, te->h, samples, reason, gBakeIndirect, (int)(gBakeBounces + 0.5f), gBakeDenoiser, sm)) return false;
     gBakeMesh = m; gBakeTe = te; te->pins++; gBakeUsedUV = uv;
     while (RTBakeActive()) RTBakeStep(1000);
     Finish();
     return true;
+}
+bool PropsBakeNow(Mesh* m, Texture* t, int uv, int samples, std::string* reason) {
+    return PropsBakeNowMode(m, t, uv, samples, -1, reason);
 }
 
 void PropsBakeBuild(Properties* p) {
@@ -320,6 +335,8 @@ void PropsBakeBuild(Properties* p) {
     p->propBake->properties.push_back(p->propBakeBounces);
     p->propBakeDenoiser = new PropBool(T("Denoiser"));
     p->propBake->properties.push_back(p->propBakeDenoiser);
+    p->propBakeShadowmask = new PropBool(T("Shadowmask (real-time light)"));
+    p->propBake->properties.push_back(p->propBakeShadowmask);
     p->propBakeButton = new PropButton(T("Bake"), IconType::sphere);
     p->propBakeButton->action = ActionBake;
     p->propBake->properties.push_back(p->propBakeButton);
@@ -364,6 +381,14 @@ void PropsBakeUpdate(Properties* p, bool visible) {
         g_redraw = true;
     }
     Mesh* m = visible ? ActiveMesh() : NULL;
+    // CON EL MATERIAL POR DEFECTO no hay donde hornear: la luz va a una capa de textura de SU material, y el de fabrica
+    // es de todas las mallas que no tienen uno (no se toca). Sin un material propio en alguna parte, la tarjeta no esta
+    if (m) {
+        bool own = false;
+        for (size_t g = 0; g < m->materialsGroup.size() && !own; g++) { Material* mt = m->materialsGroup[g].material; own = mt && mt != MaterialDefault; }
+        if (!own) m = NULL;
+    }
+    if (p->propBake->visible != (m != NULL)) PropsLayoutDirty();
     p->propBake->visible = (m != NULL);
     if (!m) return;
     PickedBake& el = PickedOf(m);
@@ -392,6 +417,7 @@ void PropsBakeUpdate(Properties* p, bool visible) {
     p->propBakeSamples->value = (working || !gBakeIndirect) ? NULL : &gBakeSamples;
     p->propBakeBounces->value = (working || !gBakeIndirect) ? NULL : &gBakeBounces;
     p->propBakeDenoiser->value = (working || !gBakeIndirect) ? NULL : &gBakeDenoiser;
+    if (p->propBakeShadowmask) p->propBakeShadowmask->value = working ? NULL : &gBakeShadowmask;
     // MIENTRAS HORNEA: sin la textura ni la capa UV (no se cambian a mitad de camino) ni el boton Bake; la barra y abajo
     // Cancelar
     {

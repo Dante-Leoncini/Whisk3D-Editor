@@ -24,7 +24,7 @@
 | ヘルプのツールチップ。テキストは`Button::help`が保持します | `main/ui/ViewPorts/LayoutInput.cpp`の`W3dHelpRender` |
 | どのキー、クリック、タップをどのウィジェットに送るか、N95のキー | `main/ui/ViewPorts/LayoutInput.cpp`、`main/app/controls.cpp`、`platform/symbian/src/` |
 | テキストボックスのフォーカス用の関数 | `main/ui/ViewPorts/NumInput.cpp` |
-| 翻訳、`T()`。UIにあるのは`W3dMenuTranslate`というフックだけです | `main/config/W3dLang.cpp` |
+| 翻訳、`T()`。UIにあるのは`W3dMenuTranslate`というフックだけです | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | UIの起動 | `main/app/W3dInitUI.cpp` |
 | 個別のアイコンからスキンのアトラスを組み立てる処理 | `main/io/SkinAtlas.cpp` |
 | スケールの再計算 | `main/ui/ViewPorts/ViewPorts.cpp`の`SetGlobalScale` |
@@ -32,9 +32,9 @@
 | エディター独自の色：床、軸、法線 | `main/ui/W3dColors.cpp` |
 | スキンのファイル：`font.png`、`font-ext.png`、`atlas/icons/`、`skin.ini` | `res/Skins/Whisk3D/` |
 | 拡張アトラスの生成ツール | `tools/fuente_ext.py` |
-| [2D Editor](../editor/editor-2d.md)と、ゲームの`.w3dui`インターフェース：テキスト、画像、矩形、コンテナー、Slice 9、ボタン、動画 | `main/objects/`（`UI.h`、`Text2D.h`、`Button2D.h`...）、`main/render/UIOverlay.cpp`、`main/io/UI2DFormat.cpp`、`main/io/Font2D.cpp`、`main/ui/ViewPorts/Editor2D.cpp` |
+| [2D Editor](../editor/editor-2d.md)と、ゲームの`.w3dui`インターフェース：テキスト、画像、矩形、コンテナー、Slice 9、ボタン、動画 | `libs/WhiskUI/objects/`（`UI.h`、`Text2D.h`、`Button2D.h`...）、`libs/WhiskUI/render/UIOverlay.cpp`、`libs/WhiskUI/io/UI2DFormat.cpp`、`libs/WhiskUI/io/Font2D.cpp`、`main/ui/ViewPorts/Editor2D.cpp` |
 
-2D Editorはテキストを`W3dTextAtlas`で描画していて、これはUIのものです。実行中にstb_truetypeでTTFをベイクする処理は、エディターのもの（`main/io/Font2D.cpp`）です。
+2D Editorはテキストを`W3dTextAtlas`で描画していて、これはUIのものです。実行中にstb_truetypeでTTFをベイクする処理は、エディターのもの（`libs/WhiskUI/io/Font2D.cpp`）です。
 
 ## UIの中にあるが、エディターのもの
 

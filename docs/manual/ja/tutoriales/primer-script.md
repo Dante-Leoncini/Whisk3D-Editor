@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ Whisk3Dには**予約された関数**があります。スクリプトにその
 
 中でしていること：
 
-**`if property("rotate") then` … `end`**は**条件**です。`if`（「もし」）は、`if`と`then`の間に書いたことが真のときだけ、中のコードを実行します。`elseif`（「そうでなければ、もし…ならこれをする」）を付けて別の条件を調べたり、`else`（「そうでなければ」）を付けて、どの条件も満たされなかったときに実行するコードを書いたりできます。どちらも省略できます。最後は必ず`end`で終わります。たとえば：
+**`if rotate then` … `end`**は**条件**です。`if`（「もし」）は、`if`と`then`の間に書いたことが真のときだけ、中のコードを実行します。`elseif`（「そうでなければ、もし…ならこれをする」）を付けて別の条件を調べたり、`else`（「そうでなければ」）を付けて、どの条件も満たされなかったときに実行するコードを書いたりできます。どちらも省略できます。最後は必ず`end`で終わります。たとえば：
 
 ```lua
 if puntos >= 100 then
@@ -71,11 +71,11 @@ end
 
 120点なら賞は金（gold）、70点なら銀（silver）、10点ならなし（none）です。実行されるのは、条件を満たした最初の部分だけです。（Luaでは、`elseif`は続けて書きます。）
 
-このスクリプトの`if`には、`elseif`も`else`もありません。**rotate**が真なら（チェックボックスにチェックが入っていれば）立方体が回転し、偽なら何も起きずに関数が終わります。`property("rotate")`は、そのオブジェクトのパネルの値を読み取ります。毎フレーム読み取るので、ゲームの実行中に値を変えると、スクリプトはその瞬間に気づきます。
+このスクリプトの`if`には、`elseif`も`else`もありません。**rotate**が真なら（チェックボックスにチェックが入っていれば）立方体が回転し、偽なら何も起きずに関数が終わります。`rotate`は、そのオブジェクトのパネルの値を読み取ります。どのプロパティもこのように名前で使えます。`property("rotate")`で読み取ることもできます。毎フレーム読み取るので、ゲームの実行中に値を変えると、スクリプトはその瞬間に気づきます。
 
 - **`self()`**は、スクリプトを持っているオブジェクト、つまり立方体です。**`getRotationZ(self())`**は、Z軸（垂直の軸で、Propertiesパネルに表示されるのと同じZ）まわりの回転を度で返します。**`setRotationZ`**は新しい回転を設定します。今の回転に少し足した値です。こうして、立方体はコマのように回ります。
 
-`property`、`self`、`getRotationZ`、`setRotationZ`も関数ですが、向きが逆です。Whisk3Dに用意されていて、あなたが呼び出します。[Luaのマニュアル](../lua/README.md)に載っています。
+`self`、`getRotationZ`、`setRotationZ`も関数ですが、向きが逆です。Whisk3Dに用意されていて、あなたが呼び出します。[Luaのマニュアル](../lua/README.md)に載っています。
 
 ### スクリプト全体
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

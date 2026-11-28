@@ -1,0 +1,44 @@
+# ==========================================================================
+#  LA Z Y LOS MODOS DE VISTA (Viewport3D: event_key_down / event_key_up; LayoutMenuShading). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_vista_menu_z.w3s
+#  - Z TOCADA (apretar y soltar): el siguiente modo, como siempre (Material -> Solido -> ...)
+#  - Z MANTENIDA (la repeticion del teclado): el MENU de los modos en el cursor, para elegir uno directo; al soltarla
+#    ya no cicla
+#  - Alt+Z: los RAYOS X, aparte del modo de vista (se puede estar en Solido o en Material con o sin rayos X). Tambien
+#    estan en ese menu
+# ==========================================================================
+vpview material
+vpshading material
+# ---- tocada: cicla ----
+key z
+vpshading solid
+key z
+vpshading normal
+# ---- mantenida: el menu, sin ciclar ----
+vpview material
+key z down
+vpshading material
+key z repeat
+menuopen si
+key z up
+vpshading material
+menupick Wireframe Preview
+vpshading wire
+menuopen no
+# ---- Alt+Z: rayos X, el modo no cambia ----
+vpview solid
+mod alt
+key z
+mod
+vpshading solid xray 1
+key z
+vpshading normal xray 1
+mod alt
+key z
+mod
+vpshading normal xray 0
+# ---- en el menu tambien (el tilde no lo cierra) ----
+key z down
+key z repeat
+menupick X-Ray
+vpshading normal xray 1

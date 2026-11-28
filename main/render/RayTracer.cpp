@@ -4,7 +4,7 @@
 //  Estructura (pensada para portar el nucleo a CUDA/RTX):
 //    RTScene  = arrays planos: posiciones/normales/uv de mundo, triangulos (3 indices + material),
 //                materiales (color difuso, emision, textura), texturas (pixeles CPU), luces, y un BVH
-//                (cajas alineadas, particion por la mediana del eje mas largo, recorrido iterativo).
+//                (cajas alineadas, particion por SAH con cubetas, recorrido iterativo).
 //    RTCamera  = la LENTE del viewport (Viewport3D::CurrentLens: la misma cuenta que ProjectPoint y que la proyeccion
 //                de GL, con el marco de la camara y el zoom / pan de inspeccion), al reves: de un pixel a un rayo.
 //    RTRender  = acumulador float RGB + imagen de 8 bits + tiles; Advance(presupuesto) hace tiles hasta
@@ -53,7 +53,7 @@
     #include <thread>
     #include <atomic>
 #endif
-#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
+#include "base/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 extern bool g_redraw;
 W3dRTOptions g_rt;
@@ -96,7 +96,6 @@ struct RTMaterial { float diffuse[3]; float emission[3]; int tex; int nmTex; boo
                    float clip;                            // > 0: RECORTADO por alfa (como GL: el texel con alfa menor no esta)
                    float ior;                             // > 1: lo transparente REFRACTA (1.33 agua, 1.5 vidrio)
                    float trans;                           // TRANSMISION 0..1 (Material::transmision): lo que es vidrio
-                   float uvm[6]; bool uvXf;               // la TRANSFORMACION UV (Material::UVMatrix; uvXf = no es la identidad)
                    float emK; };                          // la FUERZA de la emision (ya va en 'emission'; el mapa la multiplica)
 // EL BORDE DEL RECORTADO: en vez de todo o nada en el umbral, una rampa corta alrededor (con el filtro bilineal el
 // borde queda suave y los pases lo promedian: sin escalones de texel ni el serruchado del pelo y las hojas)
@@ -111,6 +110,19 @@ struct RTLight { RTV pos; RTV dir; bool directional; float color[3]; float ambie
                bool area, areaRound; RTV areaX, areaY; float areaS;
                const void* source; };   // (la lampara de la escena: el horneado busca cual es el SOL)
 struct RTNode { float bmin[3], bmax[3]; int left, right; int first, count; };   // hoja: cantidad > 0
+// LAS CAUSTICAS: los FOTONES de un pase (PhotonsShoot). Cada uno es luz que paso doblada (o reflejada) por un vidrio
+// con IOR y cayo en una superficie: donde cayo, con cuanta luz (por canal) y la normal de esa cara. Van ordenados por
+// celda de una grilla con hash (lado = el radio de busqueda) para juntar los de alrededor de un punto (CausticsIn)
+struct RTPhoton { float p[3], pw[3], n[3]; };
+struct RTCaustics {
+    bool on;                         // hay vidrio con IOR y luces: la luz que pasa por el vidrio la traen los fotones
+    int glass;                       // la escena tiene vidrio con IOR? (-1 = sin mirar; se mira una vez por escena armada)
+    std::vector<RTPhoton> ph;
+    std::vector<int> start;          // por celda (hash & (H - 1)): el primero en 'ph' (H + 1 entradas)
+    float r, inv; int H;             // el radio de busqueda, 1 / lado de la celda, la cantidad de celdas (potencia de 2)
+    RTCaustics() : on(false), glass(-1), r(0.0f), inv(0.0f), H(0) {}
+    void Clear() { on = false; ph.clear(); start.clear(); H = 0; }   // (los del pase; 'glass' queda)
+};
 
 struct RTScene {
     std::vector<float> pos, nrm, uv;      // por vertice (mundo)
@@ -126,15 +138,16 @@ struct RTScene {
     float lightBackground;   // LA LUZ DEL FONDO (g_renderLightBackground): cuanto ilumina (lo que se ve del fondo no cambia)
     float bgRot[9];          // la rotacion del fondo (mundo -> imagen, ver W3dBackgroundMatrix)
     bool hasTransparent;                // algun material transparente: los rayos de sombra atraviesan (sin any-hit)
+    RTCaustics caus;                    // los fotones del pase en curso (las causticas)
     // LAS MALLAS (sin modificadores): donde quedaron sus vertices y con que matriz / pose. Cuando solo se MUEVEN (la
     // pose de un esqueleto, o la posicion: el publico que salta) se renuevan sus vertices y se reajustan las cajas del
     // BVH (UpdatePosesYLights) en vez de armar todo de nuevo
     struct Live { Mesh* m; int base, nV; float W[16]; unsigned pose; };
     std::vector<Live> live;
-    void Clear() { pos.clear(); nrm.clear(); uv.clear(); tan.clear(); tris.clear(); mats.clear(); texs.clear(); lights.clear(); nodes.clear(); order.clear(); live.clear(); hasTransparent = false; }
+    void Clear() { pos.clear(); nrm.clear(); uv.clear(); tan.clear(); tris.clear(); mats.clear(); texs.clear(); lights.clear(); nodes.clear(); order.clear(); live.clear(); hasTransparent = false; caus = RTCaustics(); }
 };
 
-// ---- BVH: mediana del eje mas largo, hojas de hasta 4 triangulos ----
+// ---- BVH: SAH por cubetas (BVHSAHBuild, mas abajo), hojas de hasta 4 triangulos ----
 static void BVHBox(const RTScene& e, int tri, float* bmin, float* bmax) {
     const RTTri& t = e.tris[(size_t)tri];
     const int vs[3] = { t.v0, t.v1, t.v2 };
@@ -145,26 +158,6 @@ static void BVHBox(const RTScene& e, int tri, float* bmin, float* bmax) {
     }
 }
 struct BVHOrderAxis { const std::vector<float>* center; int axis; bool operator()(int a, int b) const { return (*center)[(size_t)a*3 + axis] < (*center)[(size_t)b*3 + axis]; } };
-static int BVHBuildNode(RTScene& e, std::vector<float>& center, int first, int count) {
-    RTNode n; n.left = n.right = -1; n.first = first; n.count = 0;
-    for (int a = 0; a < 3; a++) { n.bmin[a] = 1e30f; n.bmax[a] = -1e30f; }
-    for (int i = 0; i < count; i++) {
-        float bmin[3], bmax[3]; BVHBox(e, e.order[(size_t)(first + i)], bmin, bmax);
-        for (int a = 0; a < 3; a++) { if (bmin[a] < n.bmin[a]) n.bmin[a] = bmin[a]; if (bmax[a] > n.bmax[a]) n.bmax[a] = bmax[a]; }
-    }
-    const int idx = (int)e.nodes.size();
-    e.nodes.push_back(n);
-    if (count <= 4) { e.nodes[(size_t)idx].count = count; return idx; }
-    int axis = 0; float ext = n.bmax[0] - n.bmin[0];
-    for (int a = 1; a < 3; a++) if (n.bmax[a] - n.bmin[a] > ext) { ext = n.bmax[a] - n.bmin[a]; axis = a; }
-    BVHOrderAxis cmp; cmp.center = &center; cmp.axis = axis;
-    std::sort(e.order.begin() + first, e.order.begin() + first + count, cmp);
-    const int half = count / 2;
-    const int left  = BVHBuildNode(e, center, first, half);
-    const int right = BVHBuildNode(e, center, first + half, count - half);
-    e.nodes[(size_t)idx].left = left; e.nodes[(size_t)idx].right = right;
-    return idx;
-}
 // REAJUSTAR el BVH (los vertices se movieron, los triangulos son los mismos): cada caja de nuevo, de las hojas para
 // arriba (los hijos siempre estan despues que su padre: BVHBuildNode agrega el padre antes de recursar). Mucho mas
 // rapido que construir; con la banda moviendose en su lugar las cajas casi no crecen
@@ -211,19 +204,112 @@ static void UpdateLive(RTScene& e) {
         }
     }
 }
+// ---- BVH CON SAH (la heuristica de la superficie, por cubetas): en cada nodo se prueba cortar en 16 lugares de cada eje
+// y se queda con el corte que menos cuesta = la superficie de cada lado x sus triangulos (la probabilidad de que un rayo
+// entre por ahi x lo que paga adentro). La MEDIANA (BVHBuildNode) partia por la cantidad y en una escena real -un piso
+// enorme, 1200 piedritas, triangulos grandes y chicos mezclados- dejaba cajas que se pisaban y cada rayo visitaba miles
+// de nodos: ~1 millon de rayos por segundo, en la CPU y en la GPU (la Iris Xe iba mas lenta que la CPU). Mismos nodos,
+// mismas hojas de hasta 4: la GPU, el reajuste (BVHFit: el padre antes que los hijos) y el trazado no cambian.
+// Lo hondo esta topado (la pila del recorrido es de 64): pasado kSAHDepth, la mediana, que baja log2(n) como mucho
+struct BVHSAHBuild {
+    RTScene& e;
+    std::vector<float> center, box;   // 3 y 6 por triangulo
+    explicit BVHSAHBuild(RTScene& es) : e(es) {}
+    static float Area(const float* mn, const float* mx) {
+        const float dx = mx[0] - mn[0], dy = mx[1] - mn[1], dz = mx[2] - mn[2];
+        if (dx < 0.0f || dy < 0.0f || dz < 0.0f) return 0.0f;
+        return dx * dy + dy * dz + dz * dx;
+    }
+    int Node(int first, int count, int depth) {
+        static const int kBins = 16, kSAHDepth = 34;
+        RTNode n; n.left = n.right = -1; n.first = first; n.count = 0;
+        float cmin[3], cmax[3];
+        for (int a = 0; a < 3; a++) { n.bmin[a] = cmin[a] = 1e30f; n.bmax[a] = cmax[a] = -1e30f; }
+        for (int i = 0; i < count; i++) {
+            const int t = e.order[(size_t)(first + i)];
+            const float* b = &box[(size_t)t * 6]; const float* c = &center[(size_t)t * 3];
+            for (int a = 0; a < 3; a++) {
+                if (b[a] < n.bmin[a]) n.bmin[a] = b[a]; if (b[3 + a] > n.bmax[a]) n.bmax[a] = b[3 + a];
+                if (c[a] < cmin[a]) cmin[a] = c[a]; if (c[a] > cmax[a]) cmax[a] = c[a];
+            }
+        }
+        const int idx = (int)e.nodes.size();
+        e.nodes.push_back(n);
+        if (count <= 2) { e.nodes[(size_t)idx].count = count; return idx; }
+        int axis = -1, split = -1; float best = 1e30f;
+        if (depth < kSAHDepth) {
+            for (int a = 0; a < 3; a++) {
+                const float ext = cmax[a] - cmin[a];
+                if (ext <= 1e-9f) continue;
+                const float k = (float)kBins / ext;
+                int cnt[kBins]; float bmn[kBins][3], bmx[kBins][3];
+                for (int b = 0; b < kBins; b++) { cnt[b] = 0; for (int q = 0; q < 3; q++) { bmn[b][q] = 1e30f; bmx[b][q] = -1e30f; } }
+                for (int i = 0; i < count; i++) {
+                    const int t = e.order[(size_t)(first + i)];
+                    int b = (int)((center[(size_t)t * 3 + a] - cmin[a]) * k); if (b >= kBins) b = kBins - 1; if (b < 0) b = 0;
+                    cnt[b]++;
+                    const float* bb = &box[(size_t)t * 6];
+                    for (int q = 0; q < 3; q++) { if (bb[q] < bmn[b][q]) bmn[b][q] = bb[q]; if (bb[3 + q] > bmx[b][q]) bmx[b][q] = bb[3 + q]; }
+                }
+                // de derecha a izquierda: lo que queda a la derecha de cada corte
+                float rArea[kBins]; int rCnt[kBins];
+                float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f }; int c = 0;
+                for (int b = kBins - 1; b > 0; b--) {
+                    c += cnt[b];
+                    for (int q = 0; q < 3; q++) { if (bmn[b][q] < mn[q]) mn[q] = bmn[b][q]; if (bmx[b][q] > mx[q]) mx[q] = bmx[b][q]; }
+                    rArea[b] = c ? Area(mn, mx) : 0.0f; rCnt[b] = c;
+                }
+                for (int q = 0; q < 3; q++) { mn[q] = 1e30f; mx[q] = -1e30f; } c = 0;
+                for (int b = 0; b < kBins - 1; b++) {   // el corte entre la cubeta b y la b+1
+                    c += cnt[b];
+                    for (int q = 0; q < 3; q++) { if (bmn[b][q] < mn[q]) mn[q] = bmn[b][q]; if (bmx[b][q] > mx[q]) mx[q] = bmx[b][q]; }
+                    if (c == 0 || rCnt[b + 1] == 0) continue;
+                    const float cost = Area(mn, mx) * (float)c + rArea[b + 1] * (float)rCnt[b + 1];
+                    if (cost < best) { best = cost; axis = a; split = b; }
+                }
+            }
+        }
+        // hoja si partir no conviene (el costo relativo a la caja del nodo: recorrerlo vale 1, cada triangulo 1)
+        const float area = Area(n.bmin, n.bmax);
+        if (axis >= 0 && count <= 4 && area > 0.0f && 1.0f + best / area >= (float)count) { e.nodes[(size_t)idx].count = count; return idx; }
+        int mid = first + count / 2;
+        if (axis >= 0) {
+            const float k = (float)kBins / (cmax[axis] - cmin[axis]);
+            const float c0 = cmin[axis]; const std::vector<float>& cen = center;
+            struct Left { const std::vector<float>* cen; int axis, split; float c0, k;
+                          bool operator()(int t) const { int b = (int)(((*cen)[(size_t)t * 3 + axis] - c0) * k); if (b >= kBins) b = kBins - 1; return b <= split; } };
+            Left izq; izq.cen = &cen; izq.axis = axis; izq.split = split; izq.c0 = c0; izq.k = k;
+            mid = (int)(std::partition(e.order.begin() + first, e.order.begin() + first + count, izq) - e.order.begin());
+            if (mid <= first || mid >= first + count) mid = first + count / 2;
+        } else {
+            // LA MEDIANA (los centros todos iguales, o muy hondo): por el eje mas largo, mitad y mitad
+            int ax = 0; float ext = cmax[0] - cmin[0];
+            for (int a = 1; a < 3; a++) if (cmax[a] - cmin[a] > ext) { ext = cmax[a] - cmin[a]; ax = a; }
+            BVHOrderAxis cmp; cmp.center = &center; cmp.axis = ax;
+            std::nth_element(e.order.begin() + first, e.order.begin() + mid, e.order.begin() + first + count, cmp);
+        }
+        const int left = Node(first, mid - first, depth + 1);
+        const int right = Node(mid, first + count - mid, depth + 1);
+        e.nodes[(size_t)idx].left = left; e.nodes[(size_t)idx].right = right;
+        return idx;
+    }
+};
 static void BVHBuild(RTScene& e) {
     e.nodes.clear(); e.order.clear();
     const int n = (int)e.tris.size();
     if (n == 0) return;
-    std::vector<float> center((size_t)n * 3);
+    BVHSAHBuild b(e);
+    b.center.resize((size_t)n * 3); b.box.resize((size_t)n * 6);
     e.order.resize((size_t)n);
     for (int i = 0; i < n; i++) {
         e.order[(size_t)i] = i;
-        const RTTri& t = e.tris[(size_t)i];
-        for (int a = 0; a < 3; a++) center[(size_t)i*3 + a] = (e.pos[(size_t)t.v0*3 + a] + e.pos[(size_t)t.v1*3 + a] + e.pos[(size_t)t.v2*3 + a]) / 3.0f;
+        float mn[3], mx[3]; BVHBox(e, i, mn, mx);
+        for (int a = 0; a < 3; a++) { b.box[(size_t)i*6 + a] = mn[a]; b.box[(size_t)i*6 + 3 + a] = mx[a]; b.center[(size_t)i*3 + a] = (mn[a] + mx[a]) * 0.5f; }
     }
     e.nodes.reserve((size_t)n * 2);
-    BVHBuildNode(e, center, 0, n);
+    const double t0 = W3dNowMs();
+    b.Node(0, n, 0);
+    if (getenv("W3D_RT_PROFILE")) w3dLogf("[rt perfil] BVH (SAH): %d triangulos, %d nodos, %.1f ms", n, (int)e.nodes.size(), W3dNowMs() - t0);
 }
 
 // ---- interseccion ----
@@ -258,6 +344,18 @@ static inline bool RayBox(const float* bmin, const float* bmax, const RTV& o, co
     }
     return true;
 }
+// donde ENTRA el rayo a la caja (1e30 = no la toca antes de tMax): el recorrido va primero al hijo mas cercano
+static inline float EnterBox(const float* bmin, const float* bmax, const RTV& o, const RTV& invD, float tMax) {
+    float t0 = 0.0f, t1 = tMax;
+    const float ox[3] = { o.x, o.y, o.z }, id[3] = { invD.x, invD.y, invD.z };
+    for (int a = 0; a < 3; a++) {
+        float ta = (bmin[a] - ox[a]) * id[a], tb = (bmax[a] - ox[a]) * id[a];
+        if (ta > tb) { const float c = ta; ta = tb; tb = c; }
+        if (ta > t0) t0 = ta; if (tb < t1) t1 = tb;
+        if (t0 > t1) return 1e30f;
+    }
+    return t0;
+}
 // el mas cercano (sombra=false) o CUALQUIERA antes de tMax (sombra=true). Con tMin/excluido se sigue el MISMO rayo
 // detras de una superficie transparente: no se avanza el origen (eso saltaba una cara opaca coplanar, p.ej. una
 // calcomania pegada a una pared), se descarta solo el triangulo ya atravesado.
@@ -278,9 +376,17 @@ static bool Trace(const RTScene& e, const RTV& o, const RTV& d, float tMin, floa
                 RTHit h;
                 if (RayTri(e, tri, o, d, tMin, best.t, h)) { best = h; has = true; if (shadow) return true; }
             }
-        } else {
+        } else if (shadow) {   // (cualquiera sirve: el orden no importa)
             if (n.left >= 0 && sp < 63) stack[sp++] = n.left;
             if (n.right >= 0 && sp < 63) stack[sp++] = n.right;
+        } else {
+            // EL MAS CERCANO PRIMERO (como el shader de la GPU): lo que pega ahi acorta el rayo y lo de atras se descarta
+            int a = n.left, b = n.right;
+            float ta = a >= 0 ? EnterBox(e.nodes[(size_t)a].bmin, e.nodes[(size_t)a].bmax, o, invD, best.t) : 1e30f;
+            float tb = b >= 0 ? EnterBox(e.nodes[(size_t)b].bmin, e.nodes[(size_t)b].bmax, o, invD, best.t) : 1e30f;
+            if (ta > tb) { const int x = a; a = b; b = x; const float y = ta; ta = tb; tb = y; }
+            if (tb < 1e29f && sp < 63) stack[sp++] = b;
+            if (ta < 1e29f && sp < 63) stack[sp++] = a;
         }
     }
     return has;
@@ -294,12 +400,9 @@ static int MaterialIdx(RTScene& e, Material* mt, std::vector<Material*>& seen) {
     RTMaterial rm;
     rm.diffuse[0] = mt ? mt->diffuse[0] : 0.8f; rm.diffuse[1] = mt ? mt->diffuse[1] : 0.8f; rm.diffuse[2] = mt ? mt->diffuse[2] : 0.8f;
     rm.emission[0] = mt ? mt->emission[0] : 0.0f; rm.emission[1] = mt ? mt->emission[1] : 0.0f; rm.emission[2] = mt ? mt->emission[2] : 0.0f;
-    // la emision es color x FUERZA (Material::emissionStrength) y la UV pasa por la TRANSFORMACION del material (UVIn)
+    // la emision es color x FUERZA (Material::emissionStrength)
     rm.emK = mt ? mt->emissionStrength : 1.0f;
     for (int c = 0; c < 3; c++) rm.emission[c] *= rm.emK;
-    rm.uvXf = mt && mt->UVTransformed();
-    if (rm.uvXf) mt->UVMatrix(rm.uvm);
-    else { rm.uvm[0] = 1.0f; rm.uvm[1] = 0.0f; rm.uvm[2] = 0.0f; rm.uvm[3] = 1.0f; rm.uvm[4] = 0.0f; rm.uvm[5] = 0.0f; }
     rm.tex = -1; rm.nmTex = -1;
     rm.emTex = rm.rugTex = rm.metTex = rm.alphaTex = -1;
     // el reflejo de frente (f0) sale del IOR; con IOR 1 (sin refraccion) el de un dielectrico comun (0.04)
@@ -470,8 +573,13 @@ static bool g_rtOnlyStatic = false;
 // EL HORNEADO DE UNA SONDA (de luz o de reflejo): lo que no sale en las sondas (Object::inProbes) no entra en la escena
 static bool g_rtForProbe = false;
 // SIN SOMBRAS: la luz directa del punto que se esta sombreando no prueba si algo tapa las lamparas (un objeto que no
-// recibe sombras; el horneado de uno que no las recibe)
+// recibe sombras; el horneado de uno que no las recibe). UNO POR HILO: lo prende y lo apaga cada impacto, y con los tiles
+// en varios hilos uno pisaba al otro (un objeto que no recibe sombras le sacaba, a veces, las sombras a otro que si)
+#ifdef RT_THREADS
+static thread_local bool g_rtNoShadows = false;
+#else
 static bool g_rtNoShadows = false;
+#endif
 // EL SOL APARTE (el horneado de la luz, RTBakeStep): la luz difusa directa de la lampara g_rtLightSun (un indice de
 // e.lights; -1 = nada) se suma ademas en g_rtSunLight
 static int g_rtLightSun = -1;
@@ -758,7 +866,8 @@ bool RTBakeProbes(const std::vector<float>& pos, int rays, std::vector<float>& s
 //  coseno: el fondo y lo que rebota). Solo con lo ESTATICO, como las sondas. Se hace de a pedazos (RTBakeStep) para
 //  que el editor muestre el progreso
 // ---------------------------------------------------------------------------
-static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& towardsCam, const float* alb, const RTMaterial& m, RTRng& rng, float* out);
+static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& towardsCam, const float* alb, const RTMaterial& m, RTRng& rng, float* out,
+                    float* specOut = NULL);
 static inline RTV DirRandomSphere(RTRng& rng);
 struct RTBakeTexel { int idx; RTV p, n; };
 struct RTBake {
@@ -771,13 +880,14 @@ struct RTBake {
     // llega entera); captador = la textura sale BLANCA con solo las sombras (directa con sombras / sin sombras) por la
     // oclusion ambiental (lo que la tapa alrededor, a menos de un metro)
     bool noShadows, picker;
+    bool shadowmask;   // SOMBRAS DEL SOL + INDIRECTA (RTBakeBegin): la luz es la indirecta sola y sunL, cuanto ve al sol
     // LA MASCARA DEL SOL (TexLayer::maskSun): de cada texel, la luz directa del SOL (la lampara que da las sombras en
     // tiempo real: la primera direccional) -su brillo; en un captador, que parte de la directa es del sol- y al terminar,
     // que fraccion de toda su luz es esa (0..1)
     int sunIdx;
     std::vector<float> sunL, frac;
     RTBake() : active(false), next(0), w(0), h(0), samples(16), rng(4242u), indirect(true), denoiser(true), bounces(3), bouncesPrev(0),
-                   noShadows(false), picker(false), sunIdx(-1) {}
+                   noShadows(false), picker(false), shadowmask(false), sunIdx(-1) {}
 };
 static RTBake gBake;
 bool RTBakeActive() { return gBake.active; }
@@ -798,7 +908,9 @@ static Light* SunOfScene(Object* o) {
 }
 const std::vector<unsigned char>& RTCoveredBake() { return gBake.covered; }
 bool RTBakePicker() { return gBake.picker; }
-bool RTBakeBegin(Mesh* m, int uvLayer, int w, int h, int samples, std::string* reason, bool indirect, int bounces, bool denoiser) {
+bool RTBakeShadowmask() { return gBake.shadowmask; }
+bool RTBakeBegin(Mesh* m, int uvLayer, int w, int h, int samples, std::string* reason, bool indirect, int bounces, bool denoiser,
+                 bool shadowmask) {
     RTBakeCancel();
     if (!m || !m->vertex || !m->normals || !m->faces || m->facesSize < 3 || w < 1 || h < 1) { if (reason) *reason = "The mesh has no faces"; return false; }
     const GLfloat* uvs = m->UVOfLayer(uvLayer);
@@ -825,6 +937,7 @@ bool RTBakeBegin(Mesh* m, int uvLayer, int w, int h, int samples, std::string* r
     gBake.indirect = indirect; gBake.denoiser = denoiser;
     gBake.noShadows = !m->receivesShadow;
     gBake.picker = m->catchesShadows;
+    gBake.shadowmask = shadowmask && !gBake.picker;   // (un captador de sombras hornea lo suyo)
     gBake.bounces = bounces < 1 ? 1 : (bounces > 8 ? 8 : bounces);
     gBake.light.assign((size_t)w * h * 3, 0.0f);
     gBake.ind.assign((size_t)w * h * 3, 0.0f);
@@ -907,6 +1020,19 @@ float RTBakeStep(int msBudget) {
         g_rtNoShadows = false;
         const float sunLum = g_rtSunLight[0] * 0.299f + g_rtSunLight[1] * 0.587f + g_rtSunLight[2] * 0.114f;
         const RTV o = T.p + T.n * 1e-3f;
+        // SOMBRAS DEL SOL + INDIRECTA: cuanto ve al sol (la directa del sol con sombras / la misma sin sombras). Donde el sol
+        // no le llega de frente (de espaldas) la luz de tiempo real ya es cero: ve entero (1), asi no se oscurece de mas
+        float sunVis = 1.0f;
+        if (gBake.shadowmask && gBake.sunIdx >= 0) {
+            float sin[3];
+            g_rtNoShadows = true;
+            g_rtLightSun = gBake.sunIdx; g_rtSunLight[0] = g_rtSunLight[1] = g_rtSunLight[2] = 0.0f;
+            LightIn(gBake.e, T.p, T.n, T.n, one, white, gBake.rng, sin);
+            g_rtLightSun = -1;
+            g_rtNoShadows = false;
+            const float sunFree = g_rtSunLight[0] * 0.299f + g_rtSunLight[1] * 0.587f + g_rtSunLight[2] * 0.114f;
+            if (sunFree > 1e-5f) { sunVis = sunLum / sunFree; if (sunVis < 0.0f) sunVis = 0.0f; if (sunVis > 1.0f) sunVis = 1.0f; }
+        }
         if (gBake.picker) {
             // CAPTADOR DE SOMBRAS: cuanto de la luz directa le tapan (con sombras / sin sombras) y la oclusion ambiental.
             // Gris: la textura es blanca donde no le cae nada
@@ -945,9 +1071,10 @@ float RTBakeStep(int msBudget) {
         const float k = 1.0f / (float)gBake.samples;
         float* out = &gBake.light[(size_t)T.idx * 3];
         float* oi = &gBake.ind[(size_t)T.idx * 3];
-        out[0] = dir[0]; out[1] = dir[1]; out[2] = dir[2];
+        if (gBake.shadowmask) { out[0] = out[1] = out[2] = 0.0f; }   // (la directa va en tiempo real: solo la indirecta)
+        else { out[0] = dir[0]; out[1] = dir[1]; out[2] = dir[2]; }
         oi[0] = ind[0] * k; oi[1] = ind[1] * k; oi[2] = ind[2] * k;
-        gBake.sunL[(size_t)T.idx] = sunLum;
+        gBake.sunL[(size_t)T.idx] = gBake.shadowmask ? sunVis : sunLum;
         if ((++done & 15) == 0 && (int)(w3dGetTicks() - t0) >= msBudget) break;
     }
     if (gBake.next >= gBake.tx.size()) {
@@ -983,7 +1110,7 @@ float RTBakeStep(int msBudget) {
         // LA MASCARA DEL SOL: que fraccion de la luz de cada texel es la directa del sol (el captador ya la tiene)
         for (size_t i = 0; i < gBake.frac.size(); i++) {
             float f;
-            if (gBake.picker) f = gBake.sunL[i];
+            if (gBake.picker || gBake.shadowmask) f = gBake.sunL[i];   // (el captador ya la tiene; shadowmask: cuanto ve al sol)
             else {
                 const float* l = &gBake.light[i * 3];
                 const float tot = l[0] * 0.299f + l[1] * 0.587f + l[2] * 0.114f;
@@ -1085,9 +1212,6 @@ static inline void UVIn(const RTScene& e, const RTHit& h, float& u, float& v) {
     const RTTri& T = e.tris[(size_t)h.tri]; const float b0 = 1.0f - h.b1 - h.b2;
     u = e.uv[(size_t)T.v0*2]*b0 + e.uv[(size_t)T.v1*2]*h.b1 + e.uv[(size_t)T.v2*2]*h.b2;
     v = e.uv[(size_t)T.v0*2+1]*b0 + e.uv[(size_t)T.v1*2+1]*h.b1 + e.uv[(size_t)T.v2*2+1]*h.b2;
-    // la TRANSFORMACION UV de su material (desplazamiento, escala, rotacion): la misma matriz que la de textura de GL
-    const RTMaterial& m = e.mats[(size_t)T.mat];
-    if (m.uvXf) { const float a = u; u = m.uvm[0] * a + m.uvm[2] * v + m.uvm[4]; v = m.uvm[1] * a + m.uvm[3] * v + m.uvm[5]; }
 }
 // el material EN ESE IMPACTO: los mapas en modo textura reemplazan a sus numeros (la emision, la rugosidad, el metalico
 // y el alfa leidos de su textura en el UV del impacto)
@@ -1112,8 +1236,41 @@ static inline float OpacityIn(const RTScene& e, const RTHit& h) {
     if (m.clip > 0.0f) a = Crop(a, m.clip);
     return a * (1.0f - m.trans);   // (el vidrio deja pasar la luz)
 }
+// la normal INTERPOLADA del impacto (sin normal map; la que dobla los rayos del vidrio)
+static inline RTV NormalIn(const RTScene& e, const RTHit& h) {
+    const RTTri& T = e.tris[(size_t)h.tri]; const float b0 = 1.0f - h.b1 - h.b2;
+    return Norm(V3(e.nrm[(size_t)T.v0*3]*b0 + e.nrm[(size_t)T.v1*3]*h.b1 + e.nrm[(size_t)T.v2*3]*h.b2,
+                   e.nrm[(size_t)T.v0*3+1]*b0 + e.nrm[(size_t)T.v1*3+1]*h.b1 + e.nrm[(size_t)T.v2*3+1]*h.b2,
+                   e.nrm[(size_t)T.v0*3+2]*b0 + e.nrm[(size_t)T.v1*3+2]*h.b1 + e.nrm[(size_t)T.v2*3+2]*h.b2));
+}
+static inline float Max3(const float* v) { return v[0] > v[1] ? (v[0] > v[2] ? v[0] : v[2]) : (v[1] > v[2] ? v[1] : v[2]); }
+// FRESNEL (Schlick): cuanto REFLEJA un dielectrico con ese coseno; de frente f0 (del IOR), de costado casi todo
+static inline float Fresnel(float f0, float c) {
+    if (c < 0.0f) c = -c; if (c > 1.0f) c = 1.0f;
+    const float k = 1.0f - c, k2 = k * k;
+    return f0 + (1.0f - f0) * k2 * k2 * k;
+}
+// lo que DEJA PASAR la superficie en ese impacto, por canal, para un rayo de sombra en direccion 'd': lo que el alfa
+// saca pasa entero; la parte de VIDRIO (Material::transmission) pasa TENIDA de su color (difuso x textura: el verde deja
+// pasar el verde) menos lo que refleja (Fresnel). Antes el vidrio dejaba pasar toda la luz, blanca: no hacia sombra
+static inline void TransmitIn(const RTScene& e, const RTHit& h, const RTV& d, float* t) {
+    const RTMaterial m = MaterialIn(e, h, e.mats[(size_t)e.tris[(size_t)h.tri].mat]);
+    if (!m.transparent && m.trans <= 0.0f) { t[0] = t[1] = t[2] = 0.0f; return; }
+    if (m.additive) { t[0] = t[1] = t[2] = 1.0f; return; }
+    float a = m.transparent ? m.alpha : 1.0f, tx[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    if (m.tex >= 0 && ((m.transparent && a > 0.0f) || m.trans > 0.0f)) { float u, v; UVIn(e, h, u, v); Sample(e.texs[(size_t)m.tex], u, v, tx); }
+    if (m.transparent) a *= tx[3];
+    if (m.clip > 0.0f) a = Crop(a, m.clip);
+    const float straight = 1.0f - a;
+    float glass = a * m.trans;
+    // (con las CAUSTICAS, la luz que el vidrio con IOR dobla la traen los fotones: el rayo de sombra no la cuenta otra vez)
+    // (con IOR 1 no hay superficie que refleje: pasa todo, "transparente perfecto")
+    if (glass > 0.0f && m.ior > 1.0001f) glass *= e.caus.on ? 0.0f : 1.0f - Fresnel(m.f0, Dot(NormalIn(e, h), d));
+    for (int c = 0; c < 3; c++) t[c] = straight + glass * m.diffuse[c] * tx[c];
+}
 // VISIBILIDAD de una luz desde 'o' en direccion 'd' (0 = tapada, 1 = libre): los opacos cortan; los transparentes
-// dejan pasar (1 - opacidad) y se sigue atravesando (hasta 8 capas)
+// dejan pasar (1 - opacidad) y se sigue atravesando (hasta 8 capas); el vidrio deja pasar su color. 'rgb' (puede ser
+// NULL): lo que llega de cada canal; devuelve el promedio
 // la DISTANCIA de una luz: se apaga suave hasta 0 justo ahi, (1 - (d/D)^4)^2 (sin escalon en el borde). D <= 0 = sin limite
 static inline float WindowDistance(float d, float D) {
     if (D <= 0.0f) return 1.0f;
@@ -1132,21 +1289,26 @@ static void BackgroundIn(const RTScene& e, const RTV& d, float* out) {
     float rgba[4]; Sample(e.texs[(size_t)e.bgTex], u, v, rgba);
     out[0] = rgba[0]; out[1] = rgba[1]; out[2] = rgba[2];
 }
-static float Visibility(const RTScene& e, const RTV& o, const RTV& d, float tMax) {
+static float Visibility(const RTScene& e, const RTV& o, const RTV& d, float tMax, float* rgb = NULL) {
     RTHit h;
-    if (!e.hasTransparent) return Trace(e, o, d, 1e-4f, tMax, true, h, -1, RT_PROJECTS) ? 0.0f : 1.0f;
-    float vis = 1.0f; float tMin = 1e-4f; int excl = -1;
+    if (!e.hasTransparent) {
+        const float v = Trace(e, o, d, 1e-4f, tMax, true, h, -1, RT_PROJECTS) ? 0.0f : 1.0f;
+        if (rgb) rgb[0] = rgb[1] = rgb[2] = v;
+        return v;
+    }
+    float vis[3] = { 1.0f, 1.0f, 1.0f }; float tMin = 1e-4f; int excl = -1;
     // (lo que en ese punto es TOTALMENTE transparente no gasta capa: el pelo son muchas tarjetas superpuestas y el rayo
     // se quedaba sin capas en los huecos, lo de atras salia negro. 'vuelta' es el tope por si nada tapa nunca)
     for (int layer = 0, turn = 0; layer < g_rt.layers && turn < 256; turn++) {
-        if (!Trace(e, o, d, tMin, tMax, false, h, excl, RT_PROJECTS)) return vis;
-        const float op = OpacityIn(e, h);
-        if (op > 0.0f) layer++;
-        vis *= (1.0f - op);
-        if (vis < 0.004f) return 0.0f;
+        if (!Trace(e, o, d, tMin, tMax, false, h, excl, RT_PROJECTS)) break;
+        float t[3]; TransmitIn(e, h, d, t);
+        if (t[0] < 1.0f || t[1] < 1.0f || t[2] < 1.0f) layer++;
+        vis[0] *= t[0]; vis[1] *= t[1]; vis[2] *= t[2];
+        if (vis[0] < 0.004f && vis[1] < 0.004f && vis[2] < 0.004f) { vis[0] = vis[1] = vis[2] = 0.0f; break; }
         tMin = h.t * (1.0f - 1e-5f); excl = h.tri;   // seguir el mismo rayo: solo se descarta lo ya atravesado
     }
-    return vis;
+    if (rgb) { rgb[0] = vis[0]; rgb[1] = vis[1]; rgb[2] = vis[2]; }
+    return (vis[0] + vis[1] + vis[2]) * (1.0f / 3.0f);
 }
 static inline RTV DirRandomSphere(RTRng& rng) {   // punto uniforme sobre la esfera unitaria
     const float z = 1.0f - 2.0f * rng.F();
@@ -1206,8 +1368,8 @@ static inline void ConcentricDisk(float& u, float& v) {
     u = r * cosf(a); v = r * sinf(a);
 }
 static void AreaIn(const RTScene& e, const RTLight& L, const RTV& po, const RTV& n, const RTV& towardsCam, float expo, bool withBrightness,
-                   int nRays, RTRng& rng, float& lambert, float& spec) {
-    lambert = 0.0f; spec = 0.0f;
+                   int nRays, RTRng& rng, float* lambert, float* spec) {   // (por canal: lo que pasa por un vidrio va con su color)
+    lambert[0] = lambert[1] = lambert[2] = 0.0f; spec[0] = spec[1] = spec[2] = 0.0f;
     const float h = Dot(po - L.pos, L.spotDir);
     if (h <= 0.0f) return;   // (detras: alumbra de un solo lado)
     RTV q[kAreaSides]; const int nq = AreaPolygon(L, q);
@@ -1223,7 +1385,7 @@ static void AreaIn(const RTScene& e, const RTLight& L, const RTV& po, const RTV&
     const int sy = (nRays + sx - 1) / sx, cells = sx * sy;
     int from = (int)(rng.F() * cells); if (from >= cells) from = cells - 1;
     const float gMax = 6.2831853f * nRays / L.areaS;   // (un pedazo de la lampara no tapa mas que medio cielo)
-    float sg = 0.0f, sgv = 0.0f;
+    float sg = 0.0f, sgv[3] = { 0.0f, 0.0f, 0.0f };
     for (int r = 0; r < nRays; r++) {
         const int cell = (r + from) % cells;
         float u = ((cell % sx) + rng.F()) / sx * 2.0f - 1.0f, v = ((cell / sx) + rng.F()) / sy * 2.0f - 1.0f;
@@ -1234,45 +1396,253 @@ static void AreaIn(const RTScene& e, const RTLight& L, const RTV& po, const RTV&
         const float nl = Dot(n, ld), cl = -Dot(ld, L.spotDir);
         if (nl <= 0.0f || cl <= 0.0f) continue;
         float g = cl / (dist * dist); if (g > gMax) g = gMax;
-        const float vis = g_rtNoShadows ? 1.0f : Visibility(e, po, ld, dist);
-        sg += nl * g; sgv += nl * g * vis;
-        if (withBrightness && vis > 0.0f) {
+        float vis[3] = { 1.0f, 1.0f, 1.0f };
+        if (!g_rtNoShadows) Visibility(e, po, ld, dist, vis);
+        sg += nl * g; for (int c = 0; c < 3; c++) sgv[c] += nl * g * vis[c];
+        if (withBrightness && (vis[0] > 0.0f || vis[1] > 0.0f || vis[2] > 0.0f)) {
             const float nh = Dot(n, Norm(ld + towardsCam));
-            if (nh > 0.0f) spec += powf(nh, expo) * (expo + 2.0f) * 0.125f * vis * g;
+            if (nh > 0.0f) { const float s = powf(nh, expo) * (expo + 2.0f) * 0.125f * g; for (int c = 0; c < 3; c++) spec[c] += s * vis[c]; }
         }
     }
-    spec /= (float)nRays;
-    float part;
-    if (sg > 0.0f) part = sgv / sg;
+    for (int c = 0; c < 3; c++) spec[c] /= (float)nRays;
+    float part[3] = { 0.0f, 0.0f, 0.0f };
+    if (sg > 0.0f) { for (int c = 0; c < 3; c++) part[c] = sgv[c] / sg; }
     else {   // (ningun rayo cayo del lado del punto: uno en la direccion media de la luz que llega)
         const RTV d = Norm(F); const float dn = -Dot(d, L.spotDir);
-        part = (dn > 1e-4f) ? (g_rtNoShadows ? 1.0f : Visibility(e, po, d, h / dn)) : 0.0f;
+        if (dn > 1e-4f) { part[0] = part[1] = part[2] = 1.0f; if (!g_rtNoShadows) Visibility(e, po, d, h / dn, part); }
     }
-    lambert = E * part;
+    for (int c = 0; c < 3; c++) lambert[c] = E * part[c];
+}
+
+// ---------------------------------------------------------------------------
+//  LAS CAUSTICAS: un mapa de FOTONES por pase
+// ---------------------------------------------------------------------------
+// Un vidrio con IOR es una LENTE: la luz que lo atraviesa sale doblada y se JUNTA en algunos lugares (el punto brillante
+// adentro de la sombra de una esfera de vidrio) y falta en otros. El rayo de sombra va derecho a la lampara y no puede
+// encontrar ese camino, asi que antes de cada pase se tiran FOTONES desde cada luz hacia el vidrio: se doblan (y se
+// reflejan, Fresnel) como los rayos de la camara, toman el color del vidrio, y donde caen en una superficie se guardan.
+// Al sombrear un punto, los fotones de alrededor dicen cuanta luz le llego por el vidrio (CausticsIn). El rayo de sombra
+// ya no cuenta la parte doblada (TransmitIn). Con cada pase el radio de busqueda se achica: la caustica se afina.
+// Lo que da la luz de las lamparas en Whisk3D (LightIn: color x coseno x atenuacion) es lo que suman los fotones cuando el
+// vidrio no dobla nada: cada uno lleva la luz de su pedazo del haz y la atenuacion de la lampara por el camino recorrido.
+static inline unsigned int PhotonCell(int x, int y, int z) { return (unsigned int)x * 73856093u ^ (unsigned int)y * 19349663u ^ (unsigned int)z * 83492791u; }
+static inline int FloorI(float v) { const int i = (int)v; return (v < (float)i) ? i - 1 : i; }
+// la luz que trajeron los fotones a 'p' (cara con normal 'n'), sumada a 'light' (como la de una lampara mas)
+static void CausticsIn(const RTScene& e, const RTV& p, const RTV& n, float* light) {
+    const RTCaustics& C = e.caus;
+    if (C.ph.empty() || C.H <= 0) return;
+    const int ix = FloorI(p.x * C.inv), iy = FloorI(p.y * C.inv), iz = FloorI(p.z * C.inv);
+    const float r2 = C.r * C.r, invR = 1.0f / C.r;
+    float sum[3] = { 0.0f, 0.0f, 0.0f };
+    unsigned int seen[27]; int nSeen = 0;   // (dos celdas vecinas pueden caer en el mismo hash: cada una se suma una vez)
+    for (int dz = -1; dz <= 1; dz++) for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+        const unsigned int k = PhotonCell(ix + dx, iy + dy, iz + dz) & (unsigned int)(C.H - 1);
+        bool rep = false; for (int s = 0; s < nSeen; s++) if (seen[s] == k) { rep = true; break; }
+        if (rep) continue;
+        seen[nSeen++] = k;
+        for (int i = C.start[k], i1 = C.start[k + 1]; i < i1; i++) {
+            const RTPhoton& f = C.ph[(size_t)i];
+            const float ex = f.p[0] - p.x, ey = f.p[1] - p.y, ez = f.p[2] - p.z, d2 = ex * ex + ey * ey + ez * ez;
+            if (d2 >= r2) continue;
+            if (f.n[0] * n.x + f.n[1] * n.y + f.n[2] * n.z < 0.5f) continue;   // (otra cara: el otro lado de una pared, una esquina)
+            const float w = 1.0f - sqrtf(d2) * invR;   // (cono: los de cerca pesan mas, el borde no se ve)
+            sum[0] += f.pw[0] * w; sum[1] += f.pw[1] * w; sum[2] += f.pw[2] * w;
+        }
+    }
+    const float k = 3.0f / (3.14159265f * r2);   // (la densidad: por la superficie del circulo y el peso del cono, 1/3)
+    for (int c = 0; c < 3; c++) light[c] += sum[c] * k;
+}
+// un punto del CONO de direcciones que va de 'o' a la esfera (c, R); devuelve el angulo solido del cono (4 pi: adentro)
+static float DirCone(RTRng& rng, const RTV& o, const RTV& c, float R, RTV& d) {
+    const RTV a = c - o; const float dist = Length(a);
+    if (dist <= R * 1.0001f) { d = DirRandomSphere(rng); return 12.566371f; }
+    const RTV w = a * (1.0f / dist);
+    const float s = R / dist, cosMax = sqrtf(1.0f - s * s);
+    const float ct = 1.0f - rng.F() * (1.0f - cosMax), st = sqrtf(1.0f - ct * ct), ph = 6.2831853f * rng.F();
+    const RTV u = Norm(fabsf(w.x) > 0.9f ? Cross(w, V3(0, 1, 0)) : Cross(w, V3(1, 0, 0))), v = Cross(w, u);
+    d = Norm(u * (st * cosf(ph)) + v * (st * sinf(ph)) + w * ct);
+    return 6.2831853f * (1.0f - cosMax);
+}
+// un FOTON: sale de 'o' en direccion 'd' con la luz 'pw'; se guarda (en 'out') donde cae despues de pasar por un vidrio
+static void PhotonTrace(const RTScene& e, const RTLight& L, RTV o, RTV d, float* pw, RTRng& rng, std::vector<RTPhoton>& out) {
+    bool viaGlass = false; float path = 0.0f; int excl = -1;
+    for (int b = 0; b < 16; b++) {
+        RTHit h;
+        if (!Trace(e, o, d, 1e-4f, 1e30f, false, h, excl, 0)) return;
+        path += h.t;
+        const RTTri& T = e.tris[(size_t)h.tri];
+        const RTMaterial m = MaterialIn(e, h, e.mats[(size_t)T.mat]);
+        const RTV p = o + d * h.t;
+        // (un vidrio que no proyecta sombras no desvia la luz: el foton lo atraviesa)
+        if (m.trans > 0.0f && !(T.fl & RT_PROJECTS)) { o = p; excl = h.tri; continue; }
+        float alb[3] = { m.diffuse[0], m.diffuse[1], m.diffuse[2] }, alpha = m.transparent ? m.alpha : 1.0f;
+        if (m.tex >= 0) { float u, v, tx[4]; UVIn(e, h, u, v); Sample(e.texs[(size_t)m.tex], u, v, tx); for (int c = 0; c < 3; c++) alb[c] *= tx[c]; if (m.transparent) alpha *= tx[3]; }
+        if (m.clip > 0.0f) alpha = Crop(alpha, m.clip);
+        o = p; excl = h.tri;
+        if (m.additive) continue;
+        const float u = rng.F();
+        if (u < 1.0f - alpha) continue;   // (por el hueco: sigue derecho)
+        if (m.trans > 0.0f && u < 1.0f - alpha + alpha * m.trans) {   // la parte de VIDRIO
+            RTV nr = NormalIn(e, h);
+            const bool enters = Dot(nr, d) < 0.0f;
+            if (!enters) nr = nr * -1.0f;
+            if (m.ior <= 1.0001f) { for (int c = 0; c < 3; c++) pw[c] *= alb[c]; continue; }   // (sin IOR pasa derecho con su color)
+            const float c = -Dot(nr, d), eta = enters ? 1.0f / m.ior : m.ior, k = 1.0f - eta * eta * (1.0f - c * c);
+            float F = Fresnel(m.f0, c); bool reflects = (k < 0.0f);
+            if (!reflects && !enters) F = Fresnel(m.f0, sqrtf(k));
+            if (!reflects && rng.F() < F) reflects = true;
+            if (reflects) d = Norm(d + nr * (2.0f * c));
+            else { d = Norm(d * eta + nr * (eta * c - sqrtf(k))); for (int q = 0; q < 3; q++) pw[q] *= alb[q]; }
+            if (m.roughness > 0.0f) {   // (esmerilado)
+                const RTV dr = Norm(d + DirRandomSphere(rng) * (m.roughness * m.roughness));
+                if (Dot(dr, nr) * Dot(d, nr) > 0.0f) d = dr;
+            }
+            viaGlass = true;
+            if (pw[0] + pw[1] + pw[2] < 1e-6f) return;
+            continue;
+        }
+        // una superficie que no es vidrio: ahi queda la luz (si llego doblada por un vidrio y la cara recibe sombras)
+        if (!viaGlass || !(T.fl & RT_RECEIVES)) return;
+        float fall = 1.0f;   // la caida de la lampara por el camino recorrido (la de area y el sol ya caen solos)
+        if (!L.directional && !L.area) {
+            fall = 1.0f / (L.attC + L.attL * path + L.attQ * path * path); if (fall > 1.0f) fall = 1.0f;
+            fall *= path * path;   // (la densidad de los fotones ya cae con la distancia al cuadrado: se compensa)
+        }
+        if (!L.directional) fall *= WindowDistance(path, L.distance);
+        if (fall <= 0.0f) return;
+        RTV n = NormalIn(e, h); if (Dot(n, d) > 0.0f) n = n * -1.0f;
+        RTPhoton f; f.p[0] = p.x; f.p[1] = p.y; f.p[2] = p.z; f.n[0] = n.x; f.n[1] = n.y; f.n[2] = n.z;
+        for (int c = 0; c < 3; c++) f.pw[c] = pw[c] * fall;
+        out.push_back(f);
+        return;
+    }
+}
+// los fotones de UN pase (antes de sus tiles). 'pass' achica el radio; 'preview' tira menos (la primera imagen rapida)
+static void PhotonsShoot(RTScene& e, int pass, bool preview, unsigned int seed) {
+    RTCaustics& C = e.caus;
+    C.Clear();
+    if (C.glass == 0 || e.lights.empty() || e.tris.empty() || e.nodes.empty()) return;
+    // la esfera que encierra al vidrio con IOR (el que dobla la luz): hacia ahi van los fotones
+    float bmin[3] = { 1e30f, 1e30f, 1e30f }, bmax[3] = { -1e30f, -1e30f, -1e30f };
+    bool any = false;
+    for (size_t i = 0; i < e.tris.size(); i++) {
+        const RTTri& T = e.tris[i]; const RTMaterial& m = e.mats[(size_t)T.mat];
+        if (m.trans <= 0.0f || m.ior <= 1.0001f || m.additive || !(T.fl & RT_PROJECTS)) continue;
+        any = true;
+        const int vs[3] = { T.v0, T.v1, T.v2 };
+        for (int k = 0; k < 3; k++) for (int a = 0; a < 3; a++) {
+            const float v = e.pos[(size_t)vs[k] * 3 + a];
+            if (v < bmin[a]) bmin[a] = v; if (v > bmax[a]) bmax[a] = v;
+        }
+    }
+    C.glass = any ? 1 : 0;
+    if (!any) return;
+    const RTV c = V3((bmin[0] + bmax[0]) * 0.5f, (bmin[1] + bmax[1]) * 0.5f, (bmin[2] + bmax[2]) * 0.5f);
+    const float R = Length(V3(bmax[0] - bmin[0], bmax[1] - bmin[1], bmax[2] - bmin[2])) * 0.5f + 1e-3f;
+    const RTNode& root = e.nodes[0];
+    const float sceneD = Length(V3(root.bmax[0] - root.bmin[0], root.bmax[1] - root.bmin[1], root.bmax[2] - root.bmin[2])) + R;
+    // el RADIO de busqueda: chico contra el vidrio, y se achica con los pases (r ~ pase^(-1/6): la caustica se afina)
+    C.r = R * 0.06f * powf(1.0f / (float)(pass + 1), 1.0f / 6.0f);
+    if (C.r < R * 0.012f) C.r = R * 0.012f;
+#if defined(W3D_SYMBIAN)
+    const int total = preview ? 500 : 2500;     // (el N95: pocos, si no el pase tarda una eternidad)
+#elif defined(__EMSCRIPTEN__)
+    const int total = preview ? 4000 : 15000;   // (el navegador: un solo hilo)
+#else
+    const int total = preview ? 10000 : 40000;
+#endif
+    int nLights = 0;
+    for (size_t i = 0; i < e.lights.size(); i++) if (e.lights[i].color[0] + e.lights[i].color[1] + e.lights[i].color[2] > 0.0f) nLights++;
+    if (!nLights) return;
+    const int perLight = total / nLights;
+    C.ph.reserve((size_t)total / 2);
+    RTRng rng(seed * 2654435761u ^ (unsigned int)(pass * 7919 + 12345));
+    for (size_t li = 0; li < e.lights.size(); li++) {
+        const RTLight& L = e.lights[li];
+        if (L.color[0] + L.color[1] + L.color[2] <= 0.0f) continue;
+        for (int k = 0; k < perLight; k++) {
+            RTV o, d; float pw[3], w;
+            if (L.directional) {   // EL SOL: un disco del ancho del vidrio, de lejos, todos paralelos
+                RTV toward = L.dir;
+                if (L.radius > 0.0f) toward = Norm(L.dir + DirRandomSphere(rng) * tanf(L.radius * 3.14159265f / 180.0f));
+                d = toward * -1.0f;
+                const RTV u = Norm(fabsf(d.x) > 0.9f ? Cross(d, V3(0, 1, 0)) : Cross(d, V3(1, 0, 0))), v = Cross(d, u);
+                float du = rng.F() * 2.0f - 1.0f, dv = rng.F() * 2.0f - 1.0f; ConcentricDisk(du, dv);
+                o = c + u * (du * R) + v * (dv * R) + toward * sceneD;
+                w = 3.14159265f * R * R / (float)perLight;
+            } else if (L.area) {   // DE AREA: un punto de la lampara, hacia el vidrio, por el coseno de su cara
+                float du = rng.F() * 2.0f - 1.0f, dv = rng.F() * 2.0f - 1.0f;
+                if (L.areaRound) ConcentricDisk(du, dv);
+                o = L.pos + L.areaX * du + L.areaY * dv;
+                const float omega = DirCone(rng, o, c, R, d);
+                const float cl = Dot(d, L.spotDir);
+                if (cl <= 0.0f) continue;
+                w = cl * omega / (float)perLight;
+            } else {   // PUNTUAL o FOCO
+                o = L.pos;
+                if (L.radius > 0.0f) o = o + DirRandomSphere(rng) * L.radius;
+                const float omega = DirCone(rng, o, c, R, d);
+                w = omega / (float)perLight;
+                if (L.spotCos > -1.0f) {
+                    const float sd = Dot(d, L.spotDir);
+                    if (sd < L.spotCos) continue;
+                    if (L.spotExpo > 0.0f) w *= powf(sd, L.spotExpo);
+                }
+            }
+            for (int q = 0; q < 3; q++) pw[q] = L.color[q] * w;
+            PhotonTrace(e, L, o, d, pw, rng, C.ph);
+        }
+    }
+    if (C.ph.empty()) return;   // (ningun foton cayo: la luz del vidrio va por el rayo de sombra, como sin causticas)
+    C.on = true;
+    // la GRILLA: el lado de la celda es el radio (alrededor de un punto alcanza con las 27 vecinas), ordenados por celda
+    C.inv = 1.0f / C.r;
+    int H = 1; while (H < (int)C.ph.size() * 2) H <<= 1;
+    C.H = H;
+    std::vector<unsigned int> key(C.ph.size());
+    C.start.assign((size_t)H + 1, 0);
+    for (size_t i = 0; i < C.ph.size(); i++) {
+        const RTPhoton& f = C.ph[i];
+        key[i] = PhotonCell(FloorI(f.p[0] * C.inv), FloorI(f.p[1] * C.inv), FloorI(f.p[2] * C.inv)) & (unsigned int)(H - 1);
+        C.start[key[i] + 1]++;
+    }
+    for (int k = 0; k < H; k++) C.start[(size_t)k + 1] += C.start[(size_t)k];
+    std::vector<int> pos(C.start.begin(), C.start.end() - 1);
+    std::vector<RTPhoton> sorted(C.ph.size());
+    for (size_t i = 0; i < C.ph.size(); i++) sorted[(size_t)pos[key[i]]++] = C.ph[i];
+    C.ph.swap(sorted);
 }
 // luz directa en el impacto (difuso: color x (ambiente + suma de luces visibles) + emision). 'alb' ya trae la textura.
-static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& towardsCam, const float* alb, const RTMaterial& m, RTRng& rng, float* out) {
+// specOut (puede ser NULL): ademas, SOLO el brillo de las lamparas (el VIDRIO lo muestra aunque no tenga difuso)
+static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& towardsCam, const float* alb, const RTMaterial& m, RTRng& rng, float* out,
+                    float* specOut) {
+    if (specOut) specOut[0] = specOut[1] = specOut[2] = 0.0f;
     if (m.noLight) { out[0] = alb[0]; out[1] = alb[1]; out[2] = alb[2]; return; }   // "unlit": el color tal cual
     float light[3] = { 0, 0, 0 };
     float brightness[3] = { 0, 0, 0 };   // el reflejo de las LAMPARAS (no son geometria: el rayo de reflejo no las ve)
     // exponente del brillo desde la rugosidad: mate (1) = ancho y debil; pulido (0.05) = chico e intenso. Un espejo
     // perfecto (rugosidad 0) no tiene brillo de lampara puntual (seria un punto infinitesimal).
+    // La rugosidad (la de Blender/glTF) es PERCEPTUAL: el alfa de la microfaceta es r^2, y el Blinn-Phong que le
+    // corresponde tiene exponente 2/alfa^2 - 2 (mismo pico que el GGX de EEVEE). Antes se usaba r como alfa: con r = 0.3
+    // daba 21 en vez de 245 y el brillo del sol salia ~10 veces mas debil y ancho ("faltan los puntos blancos")
     const float rug = (m.roughness < 0.05f) ? 0.05f : m.roughness;
-    const float expo = 2.0f / (rug * rug) - 2.0f + 1.0f;
+    const float rugA = rug * rug;
+    float expo = 2.0f / (rugA * rugA) - 2.0f; if (expo > 8192.0f) expo = 8192.0f;
     const float brightnessWeight = (m.roughness <= 0.0f) ? 0.0f : (m.metallic + (1.0f - m.metallic) * m.f0);   // (f0: del IOR)
     float colBrightness[3] = { m.metallic * alb[0] + (1.0f - m.metallic), m.metallic * alb[1] + (1.0f - m.metallic), m.metallic * alb[2] + (1.0f - m.metallic) };
     const RTV po = p + n * 1e-3f;   // origen de los rayos de sombra, apenas afuera de la superficie
     for (size_t i = 0; i < e.lights.size(); i++) {
         const RTLight& L = e.lights[i];
         light[0] += L.ambient[0]; light[1] += L.ambient[1]; light[2] += L.ambient[2];
-        float lambert = 0.0f, spec = 0.0f, att = 1.0f, covered = 0.0f;
+        // (por canal: lo que llega a traves de un vidrio trae su color)
+        float lambert[3] = { 0.0f, 0.0f, 0.0f }, spec[3] = { 0.0f, 0.0f, 0.0f }, att = 1.0f, covered = 0.0f;
         const bool sunBake = (int)i == g_rtLightSun && L.directional;
         const int nRays = g_rtPreviewFast ? 1 : L.rays;
         if (L.area) {   // LUZ DE AREA (sin la atenuacion C/L/Q: la caida es la de la superficie; la distancia si)
             AreaIn(e, L, po, n, towardsCam, expo, brightnessWeight > 0.0f, nRays, rng, lambert, spec);
-            if (lambert <= 0.0f && spec <= 0.0f) continue;
+            if (lambert[0] + lambert[1] + lambert[2] <= 0.0f && spec[0] + spec[1] + spec[2] <= 0.0f) continue;
             att = WindowDistance(Length(L.pos - po), L.distance);
-            for (int c = 0; c < 3; c++) { light[c] += L.color[c] * lambert * att; brightness[c] += L.color[c] * spec * att; }
+            for (int c = 0; c < 3; c++) { light[c] += L.color[c] * lambert[c] * att; brightness[c] += L.color[c] * spec[c] * att; }
             continue;
         }
         for (int r = 0; r < nRays; r++) {
@@ -1295,28 +1665,32 @@ static void LightIn(const RTScene& e, const RTV& p, const RTV& n, const RTV& tow
                 if (sd < L.spotCos) continue;
                 if (L.spotExpo > 0.0f) cone = powf(sd, L.spotExpo);
             }
-            const float vis = (g_rtNoShadows ? 1.0f : Visibility(e, po, ldir, dist)) * cone;   // 0..1: lo transparente deja pasar parte de la luz
+            float vis3[3] = { 1.0f, 1.0f, 1.0f };   // 0..1: lo transparente deja pasar parte de la luz (el vidrio, su color)
+            const float vis = (g_rtNoShadows ? 1.0f : Visibility(e, po, ldir, dist, vis3)) * cone;
             if (sunBake) covered += nl * (cone - vis);
             if (vis <= 0.0f) continue;
-            lambert += nl * vis;
+            for (int c = 0; c < 3; c++) lambert[c] += nl * vis3[c] * cone;
             if (brightnessWeight > 0.0f) {   // Blinn-Phong: (n . h)^expo, normalizado para que el pulido concentre la misma energia
                 const RTV hv = Norm(ldir + towardsCam);
                 const float nh = Dot(n, hv);
-                if (nh > 0.0f) spec += powf(nh, expo) * (expo + 2.0f) * 0.125f * vis;
+                if (nh > 0.0f) { const float s = powf(nh, expo) * (expo + 2.0f) * 0.125f * cone; for (int c = 0; c < 3; c++) spec[c] += s * vis3[c]; }
             }
         }
         // (la parte tapada del sol entra con el color de la sombra; la mascara del sol -g_rtSunLight- es solo la que llega)
         if (sunBake && covered > 0.0f)
             for (int c = 0; c < 3; c++) light[c] += L.color[c] * covered / (float)nRays * g_rtShadowColorSun[c];
-        if (lambert <= 0.0f && spec <= 0.0f) continue;
-        lambert /= (float)nRays; spec /= (float)nRays;
+        if (lambert[0] + lambert[1] + lambert[2] <= 0.0f && spec[0] + spec[1] + spec[2] <= 0.0f) continue;
+        for (int c = 0; c < 3; c++) { lambert[c] /= (float)nRays; spec[c] /= (float)nRays; }
         if (!L.directional) { const float dd = Length(L.pos - po); att = 1.0f / (L.attC + L.attL * dd + L.attQ * dd * dd); if (att > 1.0f) att = 1.0f;
             att *= WindowDistance(dd, L.distance); }
-        for (int c = 0; c < 3; c++) { light[c] += L.color[c] * lambert * att; brightness[c] += L.color[c] * spec * att; }
-        if ((int)i == g_rtLightSun) for (int c = 0; c < 3; c++) g_rtSunLight[c] += L.color[c] * lambert * att;
+        for (int c = 0; c < 3; c++) { light[c] += L.color[c] * lambert[c] * att; brightness[c] += L.color[c] * spec[c] * att; }
+        if ((int)i == g_rtLightSun) for (int c = 0; c < 3; c++) g_rtSunLight[c] += L.color[c] * lambert[c] * att;
     }
+    // LAS CAUSTICAS: la luz que llego doblada por un vidrio (los fotones de alrededor; ver PhotonsShoot)
+    if (e.caus.on && !g_rtNoShadows) CausticsIn(e, p, n, light);   // (sin sombras la luz ya llega entera)
     const float diffuseWeight = 1.0f - m.metallic;   // el metal no tiene difuso: todo es reflejo
     for (int c = 0; c < 3; c++) out[c] = alb[c] * light[c] * diffuseWeight + colBrightness[c] * brightness[c] * brightnessWeight + m.emission[c];
+    if (specOut) for (int c = 0; c < 3; c++) specOut[c] = colBrightness[c] * brightness[c] * brightnessWeight;
 }
 // un rayo de camara: la primera superficie; si es transparente, su color pesa 'alpha' y el resto lo pone lo que hay
 // detras (se sigue el mismo rayo, hasta 8 capas); lo aditivo se suma y no tapa
@@ -1325,13 +1699,15 @@ static void Shade(const RTScene& e, const RTV& o0, const RTV& d, RTRng& rng, flo
 static void Radiance(const RTScene& e, const RTV& o0, const RTV& d0, RTRng& rng, int depth, float* out) {
     out[0] = out[1] = out[2] = 0.0f;
     float weight = 1.0f; RTV o = o0, d = d0; float tMin = 1e-4f; int excl = -1;
+    float tw[3] = { 1.0f, 1.0f, 1.0f };   // el COLOR de lo atravesado: lo que se ve a traves de un vidrio verde sale verde
     // (pasadas las capas transparentes que se permiten, lo de atras queda negro: no se suma nada mas)
     // (lo TOTALMENTE transparente en ese punto no gasta capa: ver Visibilidad)
     for (int layer = 0, turn = 0; layer < g_rt.layers && turn < 256; turn++) {
         RTHit h;
         if (!Trace(e, o, d, tMin, 1e30f, false, h, excl, depth > 0 ? (unsigned char)RT_BOUNCES : (unsigned char)0)) {   // (un REBOTE que llega al fondo trae su luz: por el factor)
             float f[3]; BackgroundIn(e, d, f); const float s = depth > 0 ? e.lightBackground : 1.0f;
-            out[0] += weight * f[0] * s; out[1] += weight * f[1] * s; out[2] += weight * f[2] * s; return; }
+            for (int c = 0; c < 3; c++) out[c] += weight * tw[c] * f[c] * s;
+            return; }
         const RTTri& T = e.tris[(size_t)h.tri];
         const RTMaterial m = MaterialIn(e, h, e.mats[(size_t)T.mat]);   // (con los mapas leidos en el impacto)
         const float b0 = 1.0f - h.b1 - h.b2;
@@ -1351,6 +1727,7 @@ static void Radiance(const RTScene& e, const RTV& o0, const RTV& d0, RTRng& rng,
                        e.nrm[(size_t)T.v0*3+2]*b0 + e.nrm[(size_t)T.v1*3+2]*h.b1 + e.nrm[(size_t)T.v2*3+2]*h.b2);
             n = Norm(n);
             if (Dot(n, d) > 0.0f) n = n * -1.0f;   // la cara de atras se ilumina como si mirara a la camara (dos caras)
+            const RTV nSmooth = n;   // (la de antes del normal map: la usa el Fresnel)
             if (m.nmTex >= 0 && e.tan.size() >= e.pos.size() / 3 * 4) {
                 // NORMAL MAP: la normal de la textura (tangent-space) llevada al mundo con la base T/B/N del impacto
                 float u, v, tx[4]; UVIn(e, h, u, v); Sample(e.texs[(size_t)m.nmTex], u, v, tx);
@@ -1367,13 +1744,28 @@ static void Radiance(const RTScene& e, const RTV& o0, const RTV& d0, RTRng& rng,
                     if (Dot(np, np) > 1e-12f) n = Norm(np);
                 }
             }
-            float col[3];
+            // FRESNEL (Schlick, como Blender): lo que NO es metal refleja de frente su F0 (el del IOR, ~4%) y de costado
+            // casi todo: los bordes de las cosas toman el cielo -el "volumen"- y un ojo negro muestra el reflejo. El metal
+            // refleja su color, que de costado tiende a blanco. Lo que se refleja no es difuso: el difuso baja en esa parte.
+            // (El vidrio con transmision ya refleja en su propio camino; lo sin luz y lo aditivo no reflejan)
+            // (con la normal LISA: la del normal map puede quedar de canto a la camara, F = 1 y el difuso a cero)
+            float cosV = -Dot(d, nSmooth); if (cosV < 0.0f) cosV = 0.0f; if (cosV > 1.0f) cosV = 1.0f;
+            const float edge = powf(1.0f - cosV, 5.0f);
+            const float fDie = (m.noLight || m.additive || m.trans > 0.0f) ? 0.0f : m.f0 + (1.0f - m.f0) * edge;
+            float kRefl[3];
+            for (int c = 0; c < 3; c++) kRefl[c] = m.metallic * (alb[c] + (1.0f - alb[c]) * edge) + (1.0f - m.metallic) * fDie;
+            { const float kd = 1.0f - (1.0f - m.metallic) * fDie; for (int c = 0; c < 3; c++) alb[c] *= kd; }
+            float col[3], spec[3];
             g_rtNoShadows = !(T.fl & RT_RECEIVES);   // (un objeto que no recibe sombras: las lamparas le llegan enteras)
-            LightIn(e, p, n, d * -1.0f, alb, m, rng, col);
+            LightIn(e, p, n, d * -1.0f, alb, m, rng, col, spec);
             g_rtNoShadows = false;
-            // METALICO: reflejo de la escena (hasta 4 rebotes), teñido por el color; la rugosidad desparrama la
-            // direccion reflejada (un rayo por muestra: los pases lo promedian)
-            if (m.metallic > 0.0f && depth < 4) {
+            // EL REFLEJO de la escena, con ese Fresnel: el metal hasta 4 rebotes; lo que no es metal (refleja poco de
+            // frente) en los 2 primeros y con PROBABILIDAD (pesando en proporcion: el promedio es el mismo y no duplica los
+            // rayos). La rugosidad desparrama la direccion reflejada (un rayo por muestra: los pases lo promedian)
+            const float kMax = kRefl[0] > kRefl[1] ? (kRefl[0] > kRefl[2] ? kRefl[0] : kRefl[2]) : (kRefl[1] > kRefl[2] ? kRefl[1] : kRefl[2]);
+            const bool metal = m.metallic > 0.0f;
+            float prob = metal ? 1.0f : 0.25f + 2.0f * fDie; if (prob > 1.0f) prob = 1.0f;
+            if (kMax > 0.0f && depth < (metal ? 4 : 2) && (metal || !g_rtPreviewFast) && (prob >= 1.0f || rng.F() < prob)) {
                 RTV r = d - n * (2.0f * Dot(d, n));
                 if (m.roughness > 0.0f) {
                     const float k = m.roughness * m.roughness;
@@ -1381,7 +1773,7 @@ static void Radiance(const RTScene& e, const RTV& o0, const RTV& d0, RTRng& rng,
                     if (Dot(r, n) <= 0.0f) r = Norm(r - n * (2.0f * Dot(r, n)));   // no meterse en la superficie
                 }
                 float refl[3]; Radiance(e, p + n * 1e-3f, r, rng, depth + 1, refl);
-                for (int c = 0; c < 3; c++) col[c] += m.metallic * alb[c] * refl[c];
+                for (int c = 0; c < 3; c++) col[c] += kRefl[c] / prob * refl[c];
             }
             // LA LUZ DEL FONDO 360 sin rebotes: un rayo al cielo pesado por el coseno; si no lo tapa nada, trae lo que se ve
             // de la imagen en esa direccion (el cielo alumbra de arriba, el piso de la imagen de abajo). Con rebotes, el
@@ -1391,8 +1783,9 @@ static void Radiance(const RTScene& e, const RTV& o0, const RTV& d0, RTRng& rng,
             if (backgroundLights && g_rt.bounces == 0 && !m.noLight && m.metallic < 1.0f && !g_rtPreviewFast) {
                 RTV dir = Norm(n + DirRandomSphere(rng));
                 if (Dot(dir, n) <= 0.0f) dir = n;
-                const float vis = Visibility(e, p + n * 1e-3f, dir, 1e30f);
-                if (vis > 0.0f) { float f[3]; BackgroundIn(e, dir, f); for (int c = 0; c < 3; c++) col[c] += vis * (1.0f - m.metallic) * alb[c] * f[c] * e.lightBackground; }
+                float vis[3];
+                if (Visibility(e, p + n * 1e-3f, dir, 1e30f, vis) > 0.0f) {
+                    float f[3]; BackgroundIn(e, dir, f); for (int c = 0; c < 3; c++) col[c] += vis[c] * (1.0f - m.metallic) * alb[c] * f[c] * e.lightBackground; }
             }
             // REBOTES DE LA LUZ (g_rt.bounces): la parte difusa sigue en UNA direccion al azar pesada por el coseno (n +
             // un punto de la esfera) y trae lo que ve alla (su luz directa, su emision, el fondo y sus propios rebotes).
@@ -1403,36 +1796,53 @@ static void Radiance(const RTScene& e, const RTV& o0, const RTV& d0, RTRng& rng,
                 float ind[3]; Radiance(e, p + n * 1e-3f, dir, rng, depth + 1, ind);
                 for (int c = 0; c < 3; c++) col[c] += (1.0f - m.metallic) * alb[c] * ind[c];
             }
-            if (m.additive) { for (int c = 0; c < 3; c++) out[c] += weight * col[c]; }   // suma y no tapa
-            else           { for (int c = 0; c < 3; c++) out[c] += weight * alpha * (1.0f - m.trans) * col[c]; if (m.trans <= 0.0f) weight *= (1.0f - alpha); }
+            if (m.additive) { for (int c = 0; c < 3; c++) out[c] += weight * tw[c] * col[c]; }   // suma y no tapa
+            else {
+                // (la parte de VIDRIO no tiene difuso, pero las lamparas se le reflejan: el brillo que lo hace ver de vidrio)
+                for (int c = 0; c < 3; c++) out[c] += weight * tw[c] * alpha * ((1.0f - m.trans) * col[c] + m.trans * spec[c]);
+                if (m.trans <= 0.0f) weight *= (1.0f - alpha);
+            }
         }
         // TRANSMISION: lo que el alfa saca (1 - alfa) pasa DERECHO; la parte que es vidrio (alfa * transmision) pasa
-        // REFRACTADA. Cada muestra sigue uno de los dos caminos al azar, con su probabilidad (los pases lo promedian)
+        // REFRACTADA y TENIDA de su color (el difuso x la textura). Cada muestra sigue uno de los dos caminos al azar, con
+        // su probabilidad (los pases lo promedian). Antes el vidrio salia siempre blanco, cambiara el color que cambiara
         if (m.trans > 0.0f && !m.additive) {
             const float right = 1.0f - alpha, glass = alpha * m.trans, passes = right + glass;
             weight *= passes;
-            if (weight < 0.004f) return;
-            if (m.ior > 1.0001f && rng.F() * passes < glass) {
-                RTV nr = Norm(V3(e.nrm[(size_t)T.v0*3]*b0 + e.nrm[(size_t)T.v1*3]*h.b1 + e.nrm[(size_t)T.v2*3]*h.b2,
-                                 e.nrm[(size_t)T.v0*3+1]*b0 + e.nrm[(size_t)T.v1*3+1]*h.b1 + e.nrm[(size_t)T.v2*3+1]*h.b2,
-                                 e.nrm[(size_t)T.v0*3+2]*b0 + e.nrm[(size_t)T.v1*3+2]*h.b1 + e.nrm[(size_t)T.v2*3+2]*h.b2));
+            if (weight * Max3(tw) < 0.004f) return;
+            if (rng.F() * passes < glass) {
+                RTV nr = NormalIn(e, h);
                 const bool enters = Dot(nr, d) < 0.0f;
                 if (!enters) nr = nr * -1.0f;
-                const float eta = enters ? 1.0f / m.ior : m.ior;
-                const float c = -Dot(nr, d), k = 1.0f - eta * eta * (1.0f - c * c);
-                d = (k < 0.0f) ? Norm(d + nr * (2.0f * c)) : Norm(d * eta + nr * (eta * c - sqrtf(k)));
-                // VIDRIO ESMERILADO: la rugosidad desparrama la direccion refractada (como el reflejo del metal)
+                const float c = -Dot(nr, d);
+                // FRESNEL: de frente el vidrio refleja poco (f0, del IOR); de costado, casi todo (el borde de una esfera
+                // de vidrio refleja la escena). La muestra REFLEJA con esa probabilidad; si no, pasa (doblada y con color)
+                float F = (m.ior > 1.0001f) ? Fresnel(m.f0, c) : 0.0f;   // (IOR 1: transparente perfecto, no refleja)
+                RTV through = d; bool reflects = false;
+                if (m.ior > 1.0001f) {
+                    const float eta = enters ? 1.0f / m.ior : m.ior, k = 1.0f - eta * eta * (1.0f - c * c);
+                    if (k < 0.0f) reflects = true;   // (reflexion total interna)
+                    else {
+                        through = Norm(d * eta + nr * (eta * c - sqrtf(k)));
+                        if (!enters) F = Fresnel(m.f0, sqrtf(k));   // (saliendo: el angulo de afuera)
+                    }
+                }
+                if (!reflects && rng.F() < F) reflects = true;
+                if (reflects) d = Norm(d + nr * (2.0f * c));
+                else { d = through; for (int k = 0; k < 3; k++) tw[k] *= alb[k]; }
+                // VIDRIO ESMERILADO: la rugosidad desparrama la direccion (como el reflejo del metal)
                 if (m.roughness > 0.0f) {
                     const RTV dr = Norm(d + DirRandomSphere(rng) * (m.roughness * m.roughness));
-                    if (Dot(dr, nr) * Dot(d, nr) > 0.0f) d = dr;   // (sin volver para el lado de donde vino)
+                    if (Dot(dr, nr) * Dot(d, nr) > 0.0f) d = dr;   // (sin cambiar de lado)
                 }
+                if (weight * Max3(tw) < 0.004f) return;
                 o = p; tMin = 1e-4f; excl = h.tri;
                 continue;
             }
             tMin = h.t * (1.0f - 1e-5f); excl = h.tri;
             continue;
         }
-        if (!m.transparent || weight < 0.004f) return;
+        if (!m.transparent || weight * Max3(tw) < 0.004f) return;
         if (m.ior > 1.0001f && !m.additive && m.clip <= 0.0f) {
             // REFRACCION (agua, vidrio): el rayo se dobla al entrar (o salir) y sigue desde aca
             RTV nr = Norm(V3(e.nrm[(size_t)T.v0*3]*b0 + e.nrm[(size_t)T.v1*3]*h.b1 + e.nrm[(size_t)T.v2*3]*h.b2,
@@ -1502,11 +1912,28 @@ static void NodesToGpu(const RTScene& e, std::vector<float>& out) {
 }
 static void LightsToGpu(const RTScene& e, std::vector<float>& out);
 static bool SceneToGpuEnd(const RTScene& e, RTGpuScene& g);
+// LAS CAUSTICAS A LA GPU: los fotones (12 floats) y la grilla (cabecera radio, 1/lado, celdas, prendidas + los comienzos)
+static bool CausticsToGpu(const RTCaustics& C) {
+    std::vector<float> ph(C.ph.size() * 12 + 12, 0.0f);
+    for (size_t i = 0; i < C.ph.size(); i++) {
+        const RTPhoton& f = C.ph[i]; float* d = &ph[i * 12];
+        d[0] = f.p[0]; d[1] = f.p[1]; d[2] = f.p[2]; d[4] = f.pw[0]; d[5] = f.pw[1]; d[6] = f.pw[2]; d[8] = f.n[0]; d[9] = f.n[1]; d[10] = f.n[2];
+    }
+    const bool on = C.on && !C.ph.empty() && C.H > 0;
+    std::vector<int> grid(4 + (on ? C.start.size() : 1), 0);
+    const float hdr[4] = { C.r, C.inv, (float)C.H, on ? 1.0f : 0.0f };
+    memcpy(&grid[0], hdr, sizeof(hdr));   // (los floats de la cabecera van tal cual, el shader los lee como vec4)
+    if (on) memcpy(&grid[4], &C.start[0], C.start.size() * sizeof(int));
+    return RTGpuUpdateCaustics(ph, grid);
+}
 static bool SceneToGpu(const RTScene& e) {
     RTGpuScene g;
     VertsAGpu(e, g.verts);
     g.tris.resize(e.tris.size() * 4);
-    for (size_t t = 0; t < e.tris.size(); t++) { g.tris[t*4] = e.tris[t].v0; g.tris[t*4+1] = e.tris[t].v1; g.tris[t*4+2] = e.tris[t].v2; g.tris[t*4+3] = e.tris[t].mat; }
+    // (el 4to: el material abajo y, en los 8 bits altos, lo que hace el objeto con la luz -RTTri::fl-: el shader lo
+    // respeta igual que la CPU. Sin eso la GPU trazaba todo como si proyectara, recibiera y rebotara)
+    for (size_t t = 0; t < e.tris.size(); t++) { g.tris[t*4] = e.tris[t].v0; g.tris[t*4+1] = e.tris[t].v1; g.tris[t*4+2] = e.tris[t].v2;
+                                                  g.tris[t*4+3] = (e.tris[t].mat & 0xFFFFFF) | ((int)e.tris[t].fl << 24); }
     g.mats.assign(e.mats.size() * 28, 0.0f);
     for (size_t i = 0; i < e.mats.size(); i++) {
         const RTMaterial& m = e.mats[i]; float* d = &g.mats[i * 28];
@@ -1516,8 +1943,7 @@ static bool SceneToGpu(const RTScene& e) {
         d[12] = (float)m.tex; d[13] = (float)m.nmTex; d[14] = (float)m.emTex; d[15] = (float)m.rugTex;
         d[11] = m.ior;
         d[16] = (float)m.metTex; d[17] = (float)m.alphaTex; d[18] = m.clip; d[19] = m.trans;
-        // m5 / m6: la TRANSFORMACION UV (la identidad si no tiene) y la fuerza de la emision (RTGpuShader.inc: UVEn)
-        for (int k = 0; k < 6; k++) d[20 + k] = m.uvm[k];
+        // m6.w: la fuerza de la emision (m5 y m6.xyz sin uso)
         d[27] = m.emK;
     }
     // el FONDO 360: un material extra al final (la rotacion en d[0..8], la textura en d[12]); ningun triangulo lo usa
@@ -1590,6 +2016,10 @@ static const int kTile = 32;
 // 1/16 y 1/4 del costo) y se va afinando; recien despues arranca la acumulacion real de samples.
 static const int kPrevSteps[3] = { 6, 4, 2 };
 static const int kPrevLevels = 3;   // nivel 0..2 = preview; kPrevLevels = resolucion completa
+// ENTRE PASE Y PASE en la GPU (el render a archivo, RenderComplete): la barra avanza y se atiende la ventana. Sin pausa
+// (presupuesto 0) la GPU hacia los 16 pases de un tiron, ~20 s en 720p en una Iris Xe sin leer un solo evento: el
+// escritorio daba la ventana por colgada ("Whisk3D no responde") y Cancelar no llegaba. true = cancelaron: se corta
+static bool (*g_rtBetweenPasses)(int step) = NULL;
 struct RTRender {
     RTScene esc; RTCamera cam;
     int w, h, tilesX, tilesY;
@@ -1609,7 +2039,7 @@ struct RTRender {
     // ANTES DE CADA PASE (el desenfoque de movimiento: mueve la escena y la camara al instante de ese pase); NULL = nada
     void (*prevOfPass)(RTRender& r, void* ctx);
     void* prevCtx;
-    RTRender() : w(0), h(0), tilesX(0), tilesY(0), step(0), level(kPrevLevels), nextTile(0), denoiser(0), denoiserFailed(false), gpu(false), aovGpu(false), lastDenoise(0.0), prevOfPass(NULL), prevCtx(NULL), seed(0) {}
+    RTRender() : w(0), h(0), tilesX(0), tilesY(0), step(0), level(kPrevLevels), nextTile(0), denoiser(0), denoiserFailed(false), gpu(false), aovGpu(false), lastDenoise(0.0), prevOfPass(NULL), prevCtx(NULL), seed(0), gpuRow(0), gpuMsRow(0.0) {}
     // la SEMILLA del ruido de una imagen nueva: con "otro ruido en cada imagen" cambia (si no, 0: la misma siempre)
     unsigned int seed;
     void NewSeed() { static unsigned int cont = 0; seed = g_rt.seedVariable ? ++cont : 0u; }
@@ -1634,14 +2064,15 @@ struct RTRender {
         if (g_rtProfile) w3dLogf("[rt perfil] armar %.1f ms, a la gpu %.1f ms (%d tris, %d texturas)", tp1 - tp0, W3dNowMs() - tp1,
                                              (int)esc.tris.size(), (int)esc.texs.size());
         aovGpu = false;
-        if (gpu) { level = kPrevLevels; g_rtGpuOwner = this; }
+        if (gpu) g_rtGpuOwner = this;   // (la escalera de preview tambien en la GPU: ver AdvanceGpu)
+        gpuRow = 0;
         g_rtLastInGpu = gpu;
     }
     // la GPU la uso el otro render: la escena y la imagen de este otra vez, y la acumulacion de cero (la de la GPU se
     // perdio). false = no se pudo: sigue por CPU
     bool ResumeGpu() {
         if (g_rtGpuOwner == this) return true;
-        step = 0; nextTile = 0; aovGpu = false;
+        step = 0; nextTile = 0; aovGpu = false; gpuRow = 0;
         if (!(RTGpuAvailable() && SceneToGpu(esc) && RTGpuImage(w, h))) {
             gpu = false; g_rtLastInGpu = false; accum.assign(accum.size(), 0.0f);
             return false;
@@ -1649,39 +2080,79 @@ struct RTRender {
         g_rtGpuOwner = this;
         return true;
     }
-    // EN LA GPU: pases enteros hasta agotar el presupuesto; despues la imagen (y el color y los AOV si hay denoiser)
-    // baja una vez. Si la GPU falla, el render sigue por CPU desde cero
+    // EN LA GPU. A ARCHIVO (presupuesto 0): pases enteros. EN EL VISOR (con presupuesto): primero la VISTA PREVIA
+    // pixelada -un rayo por bloque de 6, 4 y 2 pixeles, uno por cuadro, como la CPU- y despues cada pase de a FRANJAS
+    // de filas, las que entran en el tiempo del cuadro. Antes el visor hacia pases enteros de una: en una Iris Xe cada
+    // uno era mas de un segundo a la resolucion de la vista, la UI se trababa y no habia vista previa. Despues la imagen
+    // (y el color y los AOV si hay denoiser) baja: a mitad de un pase solo sin denoiser (cada pixel ya va con su cuenta).
+    // Si la GPU falla, el render sigue por CPU desde cero
+    int gpuRow;                        // (visor) la proxima fila del pase en curso: 0 = arranca un pase
+    double gpuMsRow;                   // (visor) lo que tardo una fila en el ultimo pedazo: para medir la franja que entra
+    void GpuCamera(RTGpuCamera& c) const {
+        c.pos[0] = cam.pos.x; c.pos[1] = cam.pos.y; c.pos[2] = cam.pos.z; c.right[0] = cam.right.x; c.right[1] = cam.right.y; c.right[2] = cam.right.z;
+        c.arr[0] = cam.arr.x; c.arr[1] = cam.arr.y; c.arr[2] = cam.arr.z; c.forward[0] = cam.forward.x; c.forward[1] = cam.forward.y; c.forward[2] = cam.forward.z;
+        c.sx = cam.sx; c.sy = cam.sy; c.zoom = cam.zoom; c.panX = cam.panX; c.panY = cam.panY; c.ortho = cam.ortho;
+        c.lens = cam.lens; c.focus = cam.focus;
+        c.seed = seed;
+    }
     bool AdvanceGpu(double budgetMs) {
         if (!ResumeGpu()) return true;
         const double t0 = W3dNowMs();
         RTGpuCamera c;
         const int ns = (g_rt.samples < 1) ? 1 : g_rt.samples;
+        // LA VISTA PREVIA (un nivel por llamada): la imagen de bloques, sin acumular ni limpiar
+        if (level < kPrevLevels) {
+            GpuCamera(c);
+            if (!RTGpuPass(c, 0, 1, false, g_rt.layers, g_rt.bounces, kPrevSteps[level])) { gpu = false; g_rtLastInGpu = false; step = 0; level = kPrevLevels; accum.assign(accum.size(), 0.0f); return true; }
+            level++;
+            if (!RTGpuRead(&img[0], 0, 0, 0, 1)) { gpu = false; g_rtLastInGpu = false; step = 0; accum.assign(accum.size(), 0.0f); return true; }
+            for (size_t t = 0; t < dirtyTile.size(); t++) dirtyTile[t] = 1;
+            return true;
+        }
+        const bool bands = budgetMs > 0 && h <= 4096;   // (el visor; las filas van en 12 bits)
         double msPasses = 0.0;
+        bool passDone = false;
         while (!Finished()) {
-            if (prevOfPass) { prevOfPass(*this, prevCtx); if (!gpu) return true; }   // (si la GPU fallo, sigue por CPU)
-            c.pos[0] = cam.pos.x; c.pos[1] = cam.pos.y; c.pos[2] = cam.pos.z; c.right[0] = cam.right.x; c.right[1] = cam.right.y; c.right[2] = cam.right.z;
-            c.arr[0] = cam.arr.x; c.arr[1] = cam.arr.y; c.arr[2] = cam.arr.z; c.forward[0] = cam.forward.x; c.forward[1] = cam.forward.y; c.forward[2] = cam.forward.z;
-            c.sx = cam.sx; c.sy = cam.sy; c.zoom = cam.zoom; c.panX = cam.panX; c.panY = cam.panY; c.ortho = cam.ortho;
-            c.lens = cam.lens; c.focus = cam.focus;
-            c.seed = seed;
+            if (!bands || gpuRow == 0) {   // (al EMPEZAR un pase: el instante del desenfoque y los fotones de las causticas)
+                if (prevOfPass) { prevOfPass(*this, prevCtx); if (!gpu) return true; }   // (si la GPU fallo, sigue por CPU)
+                // LAS CAUSTICAS: los fotones los tira la CPU (con el BVH de la escena plana) y la GPU los junta al sombrear
+                if (esc.caus.glass != 0) { PhotonsShoot(esc, step, false, seed); if (!CausticsToGpu(esc.caus)) { gpu = false; g_rtLastInGpu = false; step = 0; accum.assign(accum.size(), 0.0f); return true; } }
+            }
+            GpuCamera(c);
+            // la FRANJA: las filas que entran en lo que queda del cuadro (la primera vez, un octavo de la imagen)
+            int rows = h;
+            if (bands) {
+                const double left = budgetMs - (W3dNowMs() - t0);
+                rows = gpuMsRow > 0.0 ? (int)(left / gpuMsRow) : h / 8;
+                if (rows < 8) rows = 8;
+                if (rows > h - gpuRow) rows = h - gpuRow;
+            }
             const double tq = W3dNowMs();
-            const bool ok = RTGpuPass(c, step, ns, denoiser && step == 0, g_rt.layers, g_rt.bounces);
-            msPasses += W3dNowMs() - tq;
-            if (g_rtProfile) w3dLogf("[rt perfil] pase %d: %.1f ms", step, W3dNowMs() - tq);
+            // (con denoiser, el albedo y la normal se promedian en CADA pase: ver el shader)
+            const bool ok = RTGpuPass(c, step, ns, denoiser != 0, g_rt.layers, g_rt.bounces, 0, bands ? gpuRow : 0, rows);
+            const double ms = W3dNowMs() - tq;
+            msPasses += ms;
+            if (bands && rows > 0) gpuMsRow = ms / (double)rows;
             if (!ok) { gpu = false; g_rtLastInGpu = false; step = 0; accum.assign(accum.size(), 0.0f); return true; }
-            step++;
+            if (bands) { gpuRow += rows; if (gpuRow < h) { if (W3dNowMs() - t0 > budgetMs) break; continue; } gpuRow = 0; }
+            if (g_rtProfile) w3dLogf("[rt perfil] pase %d: %.1f ms", step, msPasses);
+            step++; passDone = true;
+            if (g_rtBetweenPasses && !Finished() && g_rtBetweenPasses(step)) break;
             if (budgetMs > 0 && W3dNowMs() - t0 > budgetMs) break;
         }
         RTCountRays(RTGpuRays(), msPasses);
+        // A MITAD DE UN PASE con denoiser: la imagen limpia del pase anterior sigue (lo trazado es de cuentas distintas). En
+        // el PRIMER pase todavia no hay limpia: se ve como se va formando, franja por franja, sobre la vista previa
+        if (!passDone && denoiser && !denoiserFailed && step > 0) return true;
         // EL DENOISER: el de la GPU trabaja sobre lo acumulado sin bajarlo (va en tiempo real); los otros (OIDN, OptiX)
         // necesitan el color en la CPU: mientras se forma la imagen, como mucho cada 250 ms, y siempre al terminar
-        bool den = denoiser && !denoiserFailed;
+        bool den = denoiser && !denoiserFailed && passDone;
         if (den && denoiser == W3D_DENOISER_GPU) {
             if (!RTGpuDenoiseAccumulated(step)) { denoiserFailed = true; w3dLogfW("[rt] el denoiser de la GPU fallo"); }
             den = false;
         } else if (den && !Finished() && W3dNowMs() - lastDenoise < 250.0) den = false;
         if (den) { middleColor.resize((size_t)w * h * 3); clean.resize((size_t)w * h * 3); }
-        const bool lowerAov = den && !aovGpu;
+        const bool lowerAov = den;   // (los AOV cambian en cada pase: se bajan con el color)
         if (!RTGpuRead(&img[0], den ? &middleColor[0] : 0, lowerAov ? &aovAlb[0] : 0, lowerAov ? &aovNrm[0] : 0, step)) {
             gpu = false; g_rtLastInGpu = false; step = 0; accum.assign(accum.size(), 0.0f); return true;
         }
@@ -1720,7 +2191,8 @@ struct RTRender {
         CameraOf(vp, w, h, cam, true);
         step = 0; nextTile = 0; aovGpu = false;
         NewSeed();
-        if (!gpu) { accum.assign(accum.size(), 0.0f); level = 0; }   // (la CPU vuelve a la escalera de preview)
+        if (!gpu) accum.assign(accum.size(), 0.0f);
+        level = 0; gpuRow = 0;   // (la escalera de preview otra vez, en la CPU y en la GPU)
         for (size_t t = 0; t < dirtyTile.size(); t++) dirtyTile[t] = 0;
     }
     // un tile de PREVIEW: 1 rayo por bloque de s x s (al centro del bloque), pinta el bloque entero.
@@ -1759,11 +2231,18 @@ struct RTRender {
             }
             float* a = &accum[((size_t)y * w + x) * 3];
             a[0] += c[0] / ns; a[1] += c[1] / ns; a[2] += c[2] / ns;
-            // el DENOISER: en el primer pase, el albedo y la normal del centro del pixel; despues, la imagen que se
-            // ve es la LIMPIA de cada pase terminado (los tiles con ruido no se muestran)
-            if (denoiser && step == 0) {
-                RTV o, d; RayPixel(cam, x + 0.5f, y + 0.5f, w, h, o, d);
-                FirstImpact(esc, o, d, &aovAlb[((size_t)y * w + x) * 3], &aovNrm[((size_t)y * w + x) * 3]);
+            // el DENOISER: el albedo y la normal del primer impacto, PROMEDIADOS en cada pase con un punto al azar del
+            // pixel (como el color: si salian del centro, el denoiser le devolvia los dientes de sierra a los bordes); la
+            // imagen que se ve es la LIMPIA de cada pase terminado (los tiles con ruido no se muestran)
+            if (denoiser) {
+                RTV o, d; RayPixel(cam, x + rng.F(), y + rng.F(), w, h, o, d);
+                float al[3], nr[3]; FirstImpact(esc, o, d, al, nr);
+                float* A = &aovAlb[((size_t)y * w + x) * 3]; float* N = &aovNrm[((size_t)y * w + x) * 3];
+                const float k = 1.0f / (float)donePasses;
+                for (int q = 0; q < 3; q++) {
+                    if (step == 0) { A[q] = al[q]; N[q] = nr[q]; }
+                    else { A[q] += (al[q] - A[q]) * k; N[q] += (nr[q] - N[q]) * k; }
+                }
             }
             if (denoiser && !denoiserFailed && step > 0) continue;
             unsigned char* p = &img[((size_t)y * w + x) * 4];
@@ -1780,6 +2259,7 @@ struct RTRender {
         const int total = tilesX * tilesY;
         const double t0 = W3dNowMs();
         g_rtPreviewFast = (level < kPrevLevels);   // preview: 1 rayo de sombra por luz (ver LightIn)
+        if (nextTile == 0) PhotonsShoot(esc, step, level < kPrevLevels, seed);   // LAS CAUSTICAS de este pase (si hay vidrio)
         int threads = (g_rt.threads > 0) ? g_rt.threads : 1;
 #ifdef RT_THREADS
         if (g_rt.threads <= 0) { threads = (int)std::thread::hardware_concurrency(); if (threads < 1) threads = 1; if (threads > 16) threads = 16; }
@@ -1930,9 +2410,8 @@ static double SignatureView(Viewport3D* vp) {
         for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++)
             f += (mt->mapWithTexture[k] ? 3.1 * (k + 1) : 0.0) + (mt->mapTex[k] ? mt->mapTex[k]->iID * 0.019 * (k + 1) : 0.0);
         f += mt->ior * 0.47 + mt->transmission * 0.53;
-        // (la fuerza de la emision y la transformacion UV: un material animado vuelve a trazar)
-        f += mt->emissionStrength * 0.59 + mt->uvOffset[0] * 0.61 + mt->uvOffset[1] * 0.67 + mt->uvScale[0] * 0.71 +
-             mt->uvScale[1] * 0.73 + mt->uvRotation * 0.0079 + mt->uvPivot[0] * 0.79 + mt->uvPivot[1] * 0.83; }
+        // (la fuerza de la emision: un material animado vuelve a trazar)
+        f += mt->emissionStrength * 0.59; }
     return f;
 }
 void RTInvalidate() { g_rtForce = true; }
@@ -2054,8 +2533,9 @@ void RTViewportStep(Viewport3D* vp) {
 #ifdef W3D_SYMBIAN
     const double kBudgetMs = 80.0;
 #else
-    // (en la GPU cada pase es de pocos ms: con un cuadro de 60 Hz la vista sigue a la camara en tiempo real)
-    const double kBudgetMs = g_rtVp->gpu ? 14.0 : 40.0;
+    // (en la GPU cada cuadro traza una FRANJA del pase -AdvanceGpu-: ~30 ms deja la UI a unos 30 cuadros por segundo y el
+    //  pase avanza; con 14 una Iris Xe tardaba mas de cien cuadros en completar uno)
+    const double kBudgetMs = g_rtVp->gpu ? 30.0 : 40.0;
 #endif
     if (!g_rtVp->Finished()) { g_rtVp->Advance(kBudgetMs); g_redraw = true; if (g_rtVp->Finished()) RTCountImage(); }
     // "solo la imagen final": la textura se queda con la ultima terminada hasta que esta tambien termine
@@ -2223,22 +2703,75 @@ static void PassMotion(RTRender& r, void* ctx) {
     MotionIn(r, mv, mv.t0 + (mv.t1 - mv.t0) * t);
 }
 
+// RENDER ANIMATION (RTSequenceBegin / RTSequenceEnd): la escena del render a archivo se arma UNA vez y en cada cuadro
+// se renueva solo lo que se mueve -las poses, las mallas que cambian de lugar, las luces- y la camara, como la vista
+// Render con Play. Armarla y subirla a la GPU en CADA cuadro costaba ~3 s en una escena de 800.000 triangulos (Marte),
+// mas que los pases. Si cambia otra cosa (lo que se ve, los materiales, la geometria, el nivel de un LOD, una malla con
+// modificadores que se movio: la FIRMA), ese cuadro la arma de nuevo
+static bool g_rtSeq = false, g_rtSeqBuilt = false;
+static double g_rtSeqSig = 0.0, g_rtSeqLights = 0.0;
+void RTSequenceBegin() { g_rtSeq = true; g_rtSeqBuilt = false; }
+void RTSequenceEnd() { g_rtSeq = false; g_rtSeqBuilt = false; }
+// lo que armar la escena lee y renovar las poses NO: la firma de la vista (lo visible, los materiales, la geometria) + lo
+// que se renderiza + el hijo elegido de cada LOD + donde esta cada malla que no se renueva sola (las que no son 'vivas':
+// las de modificadores, la de una curva)
+static double SignatureSequence(Viewport3D* vp, const RTScene& e) {
+    std::set<const Mesh*> live;
+    for (size_t k = 0; k < e.live.size(); k++) live.insert(e.live[k].m);
+    struct S { static void Rec(Object* o, const std::set<const Mesh*>& live, double& f) {
+        if (!o) return;
+        f += (o->renderable ? 0.37 : 0.0) + 0.011;
+        const ObjectType t = o->getType();
+        if (t == ObjectType::lod) f += ((LOD*)o)->RenderPick() * 0.83 + 0.07;
+        if ((t == ObjectType::mesh && !live.count((const Mesh*)o)) || t == ObjectType::curve) {
+            Matrix4 W; o->GetWorldMatrix(W);
+            for (int i = 0; i < 16; i++) f += W.m[i] * (0.013 + i * 0.0007);
+        }
+        f *= 1.0000003;
+        for (size_t i = 0; i < o->Childrens.size(); i++) Rec(o->Childrens[i], live, f);
+    } };
+    double f = SignatureView(vp);
+    S::Rec(SceneCollection, live, f);
+    return f;
+}
+// (la barra y la ventana entre pase y pase en la GPU: g_rtBetweenPasses)
+static float g_rtPassP0 = 0.0f, g_rtPassP1 = 1.0f;
+static bool RTPassProgress(int step) {
+    ProgressUpdate(g_rtPassP0 + (g_rtPassP1 - g_rtPassP0) * (float)step / (float)(g_rt.passes > 0 ? g_rt.passes : 1));
+    return ProgressCanceled();
+}
 // (prog0..prog1: la parte de la barra de progreso que le toca, para las franjas)
 static bool RenderComplete(Viewport3D* vp, int w, int h, int passes, bool progress, bool reuseScene = false,
                            float prog0 = 0.0f, float prog1 = 1.0f) {
     if (!vp || w <= 0 || h <= 0) return false;
     if (!g_rtOff) g_rtOff = new RTRender();
     const int passesPrev = g_rt.passes; g_rt.passes = (passes > 0) ? passes : g_rt.passes;
-    g_rtOff->Start(vp, w, h, false, reuseScene);   // a archivo: sin preview, directo a resolucion completa
+    // el CUADRO SIGUIENTE de una animacion con la misma escena: sus poses y luces, sin armarla de nuevo
+    bool reuse = reuseScene;
+    if (g_rtSeq && !reuseScene) {
+        const double lights = SignatureLights();
+        if (g_rtSeqBuilt && SignatureSequence(vp, g_rtOff->esc) == g_rtSeqSig) {
+            const double t0 = W3dNowMs();
+            ForgetPoses(g_rtOff->esc); PosesToFrame(g_rtOff->esc);   // (los esqueletos en ESTE cuadro)
+            g_rtOff->UpdatePosesYLights(vp, true, lights != g_rtSeqLights);
+            reuse = true;
+            if (g_rtProfile) w3dLogf("[rt perfil] cuadro siguiente con la misma escena: %.1f ms", W3dNowMs() - t0);
+        }
+        g_rtSeqLights = lights;
+    }
+    g_rtOff->Start(vp, w, h, false, reuse);   // a archivo: sin preview, directo a resolucion completa
+    if (g_rtSeq && !reuseScene) { g_rtSeqSig = SignatureSequence(vp, g_rtOff->esc); g_rtSeqBuilt = true; }
     if (g_rt.blur && g_rt.shutter > 0.0f) {
         MotionBuild(*g_rtOff, vp, w, h, g_rtMov);
         g_rtOff->prevOfPass = PassMotion; g_rtOff->prevCtx = &g_rtMov;
     }
+    if (progress) { g_rtPassP0 = prog0; g_rtPassP1 = prog1; g_rtBetweenPasses = RTPassProgress; }
     while (!g_rtOff->Finished()) {
         g_rtOff->Advance(0.0);
         if (progress) ProgressUpdate(prog0 + (prog1 - prog0) * (float)g_rtOff->step / (float)g_rt.passes);
         if (progress && ProgressCanceled()) break;   // (el boton Cancelar de la barra)
     }
+    g_rtBetweenPasses = NULL;
     if (g_rtOff->prevOfPass) { ForgetPoses(g_rtOff->esc); PosesToFrame(g_rtOff->esc); }   // (la pose del cuadro, otra vez)
     g_rtOff->prevOfPass = NULL; g_rtOff->prevCtx = NULL;
     g_rt.passes = passesPrev;

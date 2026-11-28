@@ -44,9 +44,14 @@ bool RTGpuImage(int w, int h);  // la imagen a acumular (en cero)
 // estructuras se rehacen de los vertices nuevos
 bool RTGpuUpdateGeometry(const std::vector<float>& verts, const std::vector<float>& nodes);
 bool RTGpuUpdateLights(const std::vector<float>& lights);   // solo las luces (24 floats cada una)
+// las CAUSTICAS de un pase: los fotones (12 floats: posicion, luz, normal; con su w) y la grilla (cabecera de 4 floats: radio,
+// 1/lado, celdas, prendidas; despues el primer foton de cada celda). La cabecera en cero = sin causticas
+bool RTGpuUpdateCaustics(const std::vector<float>& photons, const std::vector<int>& grid);
 // un PASE: 'samples' muestras por pixel sumadas al acumulador. 'paso' = pases ya hechos (semilla y promedio); con aov
 // calcula ademas el albedo y la normal del primer impacto (para el denoiser)
-bool RTGpuPass(const RTGpuCamera& c, int step, int samples, bool aov, int layers, int bounces = 0);   // rebotes: los de la luz (g_rt.bounces)   // capas: las transparentes que se atraviesan
+// block > 1: la VISTA PREVIA (un rayo por bloque de block x block pixeles, sin tocar lo acumulado). row0 / rows: solo esa
+// FRANJA de filas del pase (rows 0 = la imagen entera; row0 hasta 4095): el visor traza de a franjas y la UI no se traba
+bool RTGpuPass(const RTGpuCamera& c, int step, int samples, bool aov, int layers, int bounces = 0, int block = 0, int row0 = 0, int rows = 0);   // rebotes: los de la luz (g_rt.bounces)   // capas: las transparentes que se atraviesan
 // lo acumulado: la imagen de 8 bits (el promedio de 'pasos'), y si se piden, el color medio y los AOV (3 floats/px)
 bool RTGpuRead(unsigned char* rgba, float* middleColor, float* alb, float* nrm, int steps);
 unsigned long long RTGpuRays();   // los rayos trazados desde la ultima vez (primarios, de sombra, reflejos)

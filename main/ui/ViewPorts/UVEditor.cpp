@@ -4,7 +4,7 @@
 #include "objects/Mesh.h"          // Mesh, MaterialGroup, Material, Texture
 #include "objects/EditMesh.h"      // EditMesh (seleccion de caras para el Sync Selection)
 #include "objects/Textures.h"      // Textures[] (atlas de iconos = Textures[0])
-#include "io/Texture2D.h"          // Texture2DGet: la UI del JUEGO en el dropdown Texture
+#include "WhiskUI/io/Texture2D.h"          // Texture2DGet: la UI del JUEGO en el dropdown Texture
 #include "w3dGraphics.h"           // w3dEngine (abstraccion grafica)
 #include "WhiskUI/draw/glesdraw.h"      // W3dScreenHeight + helpers de dibujo
 #include "WhiskUI/theme/colors.h"       // ColorList / ColorID
@@ -3514,7 +3514,7 @@ bool UVEditor::UVSelectLinked(Mesh* m, int seed, bool extend) {
             for (size_t i = 0; i < sel.size(); i++) if (sel[i]) { k = (int)i; break; }
         }
         if (k < 0) return false;
-        e->SelectLinked(k, EditSelectMode, !extend);
+        e->SelectLinked(k, EditSelectMode, false);   // (suma a lo elegido, como en el 3D)
         SyncSelFrom3D(m);
         g_redraw = true;
         return true;

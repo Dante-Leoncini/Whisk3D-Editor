@@ -1,0 +1,43 @@
+# LO QUE HACE CADA OBJETO CON LA LUZ, TAMBIEN EN LA GPU (pestana Objeto: Proyectar sombras / Recibir sombras): un cubo
+# que no proyecta no le tapa la luz al piso, y un piso que no recibe no se oscurece. Antes el shader de la GPU no lo sabia
+# (solo la CPU): en Marte el cuadro del fondo de la camara, sin proyectar sombras, le tapaba el sol a toda la escena y
+# el render con trazado salia plano, sin sol ni sombras. Piso + cubo + una lampara de costado (la sombra del cubo cae en
+# el piso, a la vista). Sin una GPU con Vulkan la prueba termina bien sin hacer nada.
+add plane
+objscale 6 1 6
+add cube
+objmove 0 1 0
+addlight
+objmove 3 3 0
+rtopt 1 1 8
+rtlight 0 0 0
+vpview rendered
+vporbit 0 0.5 0 12 -35 -23
+rtgpu 1 skip
+# la sombra del cubo en el piso
+rtrender 96 72 8
+rtongpu si
+rtpixel 23 38 0 0 0 12
+# el cubo NO PROYECTA: el piso queda iluminado donde estaba la sombra (la escena inicial ya trae un "Cubo")
+selobj Cubo.001
+objshadow projects 0
+rtrender 96 72 8
+rtongpu si
+rtpixel 23 38 180 180 180 45
+objshadow projects 1
+rtrender 96 72 8
+rtpixel 23 38 0 0 0 12
+# el piso NO RECIBE: la luz le llega entera aunque el cubo la tape
+selobj Plano
+objshadow receives 0
+rtrender 96 72 8
+rtongpu si
+rtpixel 23 38 180 180 180 45
+objshadow receives 1
+# la CPU da lo mismo
+selobj Cubo.001
+objshadow projects 0
+rtgpu 0
+rtrender 96 72 8
+rtongpu no
+rtpixel 23 38 180 180 180 45

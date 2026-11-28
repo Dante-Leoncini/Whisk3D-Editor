@@ -24,7 +24,7 @@
 | मदद वाले छोटे टूलटिप। टेक्स्ट `Button::help` में रहता है | `W3dHelpRender`, `main/ui/ViewPorts/LayoutInput.cpp` में |
 | कौन-सी कुंजी, क्लिक या टच किस विजेट को जाता है, और N95 की कुंजियाँ | `main/ui/ViewPorts/LayoutInput.cpp`, `main/app/controls.cpp`, `platform/symbian/src/` |
 | टेक्स्ट बॉक्स के फ़ोकस वाले फ़ंक्शन | `main/ui/ViewPorts/NumInput.cpp` |
-| अनुवाद, `T()`। UI में सिर्फ़ `W3dMenuTranslate` हुक है | `main/config/W3dLang.cpp` |
+| अनुवाद, `T()`। UI में सिर्फ़ `W3dMenuTranslate` हुक है | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | UI का स्टार्टअप | `main/app/W3dInitUI.cpp` |
 | अलग-अलग आइकन से स्किन का एटलस बनाना | `main/io/SkinAtlas.cpp` |
 | स्केल दोबारा गणना करना | `SetGlobalScale`, `main/ui/ViewPorts/ViewPorts.cpp` में |
@@ -32,9 +32,9 @@
 | एडिटर के अपने रंग: फ़र्श, अक्ष, नॉर्मल | `main/ui/W3dColors.cpp` |
 | स्किन की फ़ाइलें: `font.png`, `font-ext.png`, `atlas/icons/`, `skin.ini` | `res/Skins/Whisk3D/` |
 | एक्सटेंडेड एटलस का जनरेटर | `tools/fuente_ext.py` |
-| [2D Editor](../editor/editor-2d.md) और गेम के `.w3dui` इंटरफ़ेस: टेक्स्ट, इमेज, आयत, कंटेनर, slice 9, बटन और वीडियो | `main/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `main/render/UIOverlay.cpp`, `main/io/UI2DFormat.cpp`, `main/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
+| [2D Editor](../editor/editor-2d.md) और गेम के `.w3dui` इंटरफ़ेस: टेक्स्ट, इमेज, आयत, कंटेनर, slice 9, बटन और वीडियो | `libs/WhiskUI/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `libs/WhiskUI/render/UIOverlay.cpp`, `libs/WhiskUI/io/UI2DFormat.cpp`, `libs/WhiskUI/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
 
-2D Editor टेक्स्ट को `W3dTextAtlas` से ड्रॉ करता है, जो UI का है। चलते समय stb_truetype से किसी TTF को बेक करना एडिटर का है (`main/io/Font2D.cpp`)।
+2D Editor टेक्स्ट को `W3dTextAtlas` से ड्रॉ करता है, जो UI का है। चलते समय stb_truetype से किसी TTF को बेक करना एडिटर का है (`libs/WhiskUI/io/Font2D.cpp`)।
 
 ## UI में, लेकिन एडिटर का
 

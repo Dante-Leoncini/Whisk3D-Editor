@@ -185,6 +185,7 @@ static void PickedTexture(const std::string& pickedPath) {
             if (gLoadTextureAsNormal) { gTexMat->normalTexture = t; gTexMat->normalMap = true; }
             else { gTexMat->texture = t; gTexMat->textureOn = true; }
             if (prev && prev != t) TextureRelease(prev);
+            if (!gLoadTextureAsNormal) LayoutReferenceTexture(gTexMat, pickedPath, t);   // (Add > Reference: su proporcion)
         }
         RebindMaterialMeshPart();
     }
@@ -1258,7 +1259,7 @@ static void MainLoopFrame() {
         }
         // Actualizar frame
     }
-    // LOS SONIDOS de la escena (objetos Sonido): suenan con el Play del timeline, en segundos (main/objects/Sound.cpp)
+    // LOS SONIDOS de la escena (objetos Sonido): suenan con el Play del timeline, en segundos (libs/Whisk3DCore/objects/Sound.cpp)
     { extern void W3dSoundsTickEditor(); W3dSoundsTickEditor(); }
     // ANIMACION DE OBJETOS (transform pos/rot/escala): aplica los keyframes al frame actual (play o scrub del timeline).
     // Guard interno: solo trabaja al CAMBIAR de frame -> editar/keyframear un objeto en un frame fijo no lo resnapea.
@@ -1788,6 +1789,8 @@ int main(int argc, char* argv[]) {
     loadColors(skinPath);
 
     // Constructor de Whisk3D universal (Android, PC)
+    // LAS PRUEBAS arrancan con la escena de siempre (el cubo en el origen, sin piso): ver W3dCreateDefaultScene
+    { extern bool g_w3dTestScene; for (int ai = 1; ai < argc; ai++) if (std::string(argv[ai]) == "--script") g_w3dTestScene = true; }
     ConstructUniversal(argc, argv);
 
     // "Add > import Wavefront" del menu + Load Texture + warp/swap: hooks de ESCRITORIO (Windows + Linux). En Android

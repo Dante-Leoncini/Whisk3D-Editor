@@ -336,7 +336,7 @@ void UVGroupClearWeights(Mesh* m, int uvGroup) {
     ug->verts.clear(); ug->weights.clear();
 }
 
-// (WeightPaintEnsureMap se MUDO a main/edit/MeshEdit.cpp. Motivo: la llama la
+// (WeightPaintEnsureMap se MUDO a libs/Whisk3DCore/edit/MeshEdit.cpp. Motivo: la llama la
 //  CARGA de una malla con esqueleto, o sea tambien el runtime de un juego
 //  compilado, y este .cpp es todo herramienta INTERACTIVA del editor -- pincel,
 //  popup, undo -- que un juego no linkea. Es dato de la malla, no del pincel.)

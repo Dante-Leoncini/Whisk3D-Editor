@@ -24,7 +24,7 @@ L'éditeur est construit avec Whisk3D UI, mais une grande partie de ce qu'on y v
 | Les infobulles. Le texte est conservé dans `Button::help` | `W3dHelpRender`, dans `main/ui/ViewPorts/LayoutInput.cpp` |
 | Quelle touche, quel clic ou quel toucher va à chaque widget, et les touches du N95 | `main/ui/ViewPorts/LayoutInput.cpp`, `main/app/controls.cpp`, `platform/symbian/src/` |
 | Les fonctions de focus des champs de texte | `main/ui/ViewPorts/NumInput.cpp` |
-| Les traductions, `T()`. L'UI n'a que le point d'accroche `W3dMenuTranslate` | `main/config/W3dLang.cpp` |
+| Les traductions, `T()`. L'UI n'a que le point d'accroche `W3dMenuTranslate` | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | Le démarrage de l'UI | `main/app/W3dInitUI.cpp` |
 | Construire l'atlas du skin avec les icônes séparées | `main/io/SkinAtlas.cpp` |
 | Recalculer l'échelle | `SetGlobalScale`, dans `main/ui/ViewPorts/ViewPorts.cpp` |
@@ -32,9 +32,9 @@ L'éditeur est construit avec Whisk3D UI, mais une grande partie de ce qu'on y v
 | Les couleurs propres à l'éditeur : le sol, les axes, les normales | `main/ui/W3dColors.cpp` |
 | Les fichiers du skin : `font.png`, `font-ext.png`, `atlas/icons/`, `skin.ini` | `res/Skins/Whisk3D/` |
 | Le générateur de l'atlas étendu | `tools/fuente_ext.py` |
-| L'[Éditeur 2D](../editor/editor-2d.md) et les interfaces `.w3dui` des jeux : textes, images, rectangles, conteneurs, slice 9, boutons et vidéos | `main/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `main/render/UIOverlay.cpp`, `main/io/UI2DFormat.cpp`, `main/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
+| L'[Éditeur 2D](../editor/editor-2d.md) et les interfaces `.w3dui` des jeux : textes, images, rectangles, conteneurs, slice 9, boutons et vidéos | `libs/WhiskUI/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `libs/WhiskUI/render/UIOverlay.cpp`, `libs/WhiskUI/io/UI2DFormat.cpp`, `libs/WhiskUI/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
 
-L'Éditeur 2D dessine le texte avec `W3dTextAtlas`, qui relève de l'UI. Précalculer une TTF pendant l'exécution, avec stb_truetype, relève de l'éditeur (`main/io/Font2D.cpp`).
+L'Éditeur 2D dessine le texte avec `W3dTextAtlas`, qui relève de l'UI. Précalculer une TTF pendant l'exécution, avec stb_truetype, relève de l'éditeur (`libs/WhiskUI/io/Font2D.cpp`).
 
 ## Dans l'UI, mais propre à l'éditeur
 

@@ -60,12 +60,12 @@ static const W3dShortcutDef kShortcuts[] = {
     { "3d.duplicate",          W3dATC_3D,       "Duplicate",                  "Shift+D", NULL, "Shift D" },
     { "3d.instance",         W3dATC_3D,       "Duplicate Linked",           "Alt+D", NULL, "Alt D" },
     { "3d.delete",            W3dATC_3D,       "Delete",                     "X, Delete", "C", "X" },
-    { "3d.hide",           W3dATC_3D,       "Hide / Show",                "H" },
+    { "3d.hide",           W3dATC_3D_OBJ,   "Hide / Show",                "H" },   // (en Edit Mode la H oculta la seleccion: 3d.hideSelected)
     { "3d.join",              W3dATC_3D_OBJ,   "Join",                       "Ctrl+J" },
     { "3d.keyframe",          W3dATC_3D_OBJ,   "Insert Keyframe",            "I" },
     { "3d.keyframeAll",      W3dATC_3D_OBJ,   "Insert Keyframe (all)",      "Shift+I" },
     { "3d.proportional",      W3dATC_3D,       "Proportional Editing",       "O" },
-    { "3d.overlays",          W3dATC_3D,       "Overlays",                   "K" },
+    { "3d.overlays",          W3dATC_3D_OBJ,   "Overlays",                   "K" },   // (en Edit Mode de una malla la K es el cuchillo: 3d.knife)
     { "3d.viewLocal",        W3dATC_3D,       "Local View",                 "/" },
     { "3d.focus",         W3dATC_3D,       "Frame Selected",             "Num.", "0", "." },
     { "3d.viewFront",       W3dATC_3D,       "Front View",                 "Num1", "#+Left/Right", NULL },
@@ -75,7 +75,8 @@ static const W3dShortcutDef kShortcuts[] = {
     { "3d.viewTop",       W3dATC_3D,       "Top View",                   "Num7", "#+Up", NULL },
     { "3d.viewBottom",        W3dATC_3D,       "Bottom View",                "Ctrl+Num7", "#+Down", NULL },
     { "3d.perspective",       W3dATC_3D,       "Perspective / Orthographic", "Num5", "#", NULL },
-    { "3d.viewMode",         W3dATC_3D,       "Next Viewport Shading",      "Z", "6", NULL },
+    { "3d.viewMode",         W3dATC_3D,       "Next Viewport Shading",      "Z", "6", NULL },   // (mantenida: el menu de los modos)
+    { "3d.xray",             W3dATC_3D,       "X-Ray",                      "Alt+Z" },   // (aparte del modo de vista)
     { "3d.rollLeft",          W3dATC_3D,       "Roll Left",                  "Num4" },
     { "3d.rollRight",          W3dATC_3D,       "Roll Right",                 "Num6" },
     { "3d.viewCamera",       W3dATC_3D,       "Camera View",                "Num0", "8", NULL },
@@ -83,7 +84,11 @@ static const W3dShortcutDef kShortcuts[] = {
     { "3d.extrude",           W3dATC_3D_EDIT,  "Extrude",                    "E", "7", NULL },
     { "3d.face",              W3dATC_3D_EDIT,  "New Face from Vertices",     "F" },
     { "3d.normals",          W3dATC_3D_EDIT,  "Recalculate Normals",        "Shift+N" },
+    { "3d.hideSelected",     W3dATC_3D_EDIT,  "Hide Selected",              "H" },
+    { "3d.hideUnselected",   W3dATC_3D_EDIT,  "Hide Unselected",            "Shift+H" },
+    { "3d.reveal",           W3dATC_3D_EDIT,  "Reveal Hidden",              "Alt+H" },
     { "3d.loopcut",           W3dATC_3D_EDIT,  "Loop Cut and Slide",         "Ctrl+R", "8", NULL },
+    { "3d.knife",             W3dATC_3D_EDIT,  "Knife",                      "K" },   // (fuera de Edit Mode, K = Overlays)
     { "3d.connect",          W3dATC_3D_EDIT,  "Connect Vertex Path",        "J" },
     { "3d.rip",               W3dATC_3D_EDIT,  "Rip",                        "V" },
     { "3d.slide",             W3dATC_3D_EDIT,  "Vertex Slide",               "Shift+V" },

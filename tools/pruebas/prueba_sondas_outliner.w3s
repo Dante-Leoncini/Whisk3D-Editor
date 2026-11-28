@@ -1,0 +1,59 @@
+# ==========================================================================
+#  LAS SONDAS SE APAGAN DESDE EL OUTLINER (el antes y despues de la luz indirecta y los reflejos)
+#  Correr DESDE ESTA CARPETA. Con OpenGL (el pipeline fijo) prueba la sonda de luz y termina en 'pixelshading'; con
+#  el backend de shaders prueba tambien la de reflejo:
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_sondas_outliner.w3s
+#
+#  La escena (prueba_sondas_outliner.w3d): sin lamparas ni luz del fondo (negro), un piso que BRILLA en rojo y dos
+#  esferas NO estaticas (lo que se mueve: la sonda de luz solo alumbra eso). La A esta adentro de una sonda de luz y de
+#  una de reflejo, las dos en la coleccion "Sondas"; la B, lejos de las dos. Horneadas, la A toma el rojo del piso y la
+#  B queda negra. Apagar el OJO de la sonda, o el de su COLECCION, la apaga (la A queda como la B). Antes:
+#    - la sonda de reflejo miraba solo su propio ojo: oculta la coleccion, seguia reflejando
+#    - la de luz se seguia usando un cuadro mas despues de apagarla, y el editor no vuelve a dibujar solo: el ojo no
+#      cambiaba nada hasta mover la vista (esto no lo ve scenepx, que dibuja dos veces: lo cubre ProbeOn)
+# ==========================================================================
+openw3d prueba_sondas_outliner.w3d
+selname SondaLuz
+probe bake
+selname SondaReflejo
+srbake
+deselectall
+view3d shading 2
+view3d gizmo 0
+# ---- (1) la SONDA DE LUZ: la esfera de adentro, roja de abajo; la de afuera, negra. (Sin la de reflejo: con shaders
+#      el PBR le suma un poco de reflejo a la esfera de adentro) ----
+visible 0 SondaReflejo
+scenepx -3 0.45 0 noes 0 0 0 30
+scenepx 3 0.45 0 es 0 0 0 3
+# el ojo de la sonda
+visible 0 SondaLuz
+scenepx -3 0.45 0 sameas 3 0.45 0 3
+visible 1 SondaLuz
+scenepx -3 0.45 0 noes 0 0 0 30
+# el ojo de la coleccion (apaga las dos sondas)
+visible 0 Sondas
+scenepx -3 0.45 0 sameas 3 0.45 0 3
+visible 1 Sondas
+scenepx -3 0.45 0 noes 0 0 0 30
+# ---- (2) la SONDA DE REFLEJO (el PBR de la luz por pixel): esferas de metal liso, sin la sonda de luz ----
+pixelshading
+visible 0 SondaLuz
+visible 1 SondaReflejo
+selname EsferaA
+matrt 0.05 1
+selname EsferaB
+matrt 0.05 1
+deselectall
+# la A refleja el piso rojo (la imagen horneada); la B, el fondo negro
+scenepx -3 0.45 0 noes 0 0 0 30
+scenepx 3 0.45 0 es 0 0 0 3
+# el ojo de la sonda
+visible 0 SondaReflejo
+scenepx -3 0.45 0 es 0 0 0 3
+visible 1 SondaReflejo
+scenepx -3 0.45 0 noes 0 0 0 30
+# el ojo de la coleccion (antes seguia reflejando)
+visible 0 Sondas
+scenepx -3 0.45 0 es 0 0 0 3
+visible 1 Sondas
+scenepx -3 0.45 0 noes 0 0 0 30

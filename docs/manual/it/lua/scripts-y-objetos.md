@@ -20,6 +20,8 @@ function start()
 end
 ```
 
+**Per nome:** una proprietà si legge anche scrivendo solo il suo nome: `speed` equivale a `property("speed")`, `difficulty` a `option("difficulty")` e `ball` a `object("ball")`. Viene letta al momento, quindi vede ciò che cambi in Proprietà con il gioco in esecuzione. Due eccezioni: se lo script ha una variabile con quel nome (`speed = 5`), vale la variabile; e se la proprietà si chiama come una funzione di Whisk3D (per esempio `target` o `view`), il nome è la funzione: quella proprietà si legge con `property()`, `option()` o `object()`.
+
 > [!NOTE]
 > Per leggere `properties`, l'editor **esegue il file** anche se il gioco non è in esecuzione. Per questo, fuori dalle funzioni metti solo dichiarazioni (tabelle, costanti, `local`), mai codice che fa qualcosa.
 

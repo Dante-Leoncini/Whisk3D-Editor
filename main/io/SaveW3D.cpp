@@ -39,7 +39,7 @@
 #include "W3dLang.h"   // T(): los avisos salen en el idioma del editor
 #include "io/SaveW3D.h"
 #include "io/JsonW3d.h"                // JsonNumText: floats con round-trip EXACTO
-#include "io/UI2DFormat.h"
+#include "WhiskUI/io/UI2DFormat.h"
 #include "io/W3dContainer.h"          // FORMATO v4: el .w3d ES un zip y todo va adentro
 #include "io/W3dZip.h"                // el contenedor VIEJO (las entradas de escenas/prefabs que ya no son de nadie)
 #include "io/EditedTexture.h"   // texturas generadas/pintadas que solo viven en memoria: entran al zip
@@ -51,7 +51,7 @@
 #include "objects/Empty.h"          // el dibujo del Vacio (forma, tamanio, giro)
 #include "objects/ObjectMode.h"        // W3dApplyCurvesInFrame: el objeto se guarda EN REPOSO
 #include "physics/W3dRigid.h"          // W3dRigidDef: el bloque "fisica" del objeto
-#include "objects/UI.h"
+#include "WhiskUI/objects/UI.h"
 #include "objects/Camera.h"
 #include <errno.h>
 #include "objects/Light.h"
@@ -91,7 +91,7 @@
 #include "importers/import_obj.h"     // PendingTextureOf: la carga de texturas es DIFERIDA
 #include "objects/Materials.h"         // los MATERIALES viajaban dentro del GLB: ahora van al JSON
 #include "objects/Textures.h"
-#include "render/UIOverlay.h"          // UI2D_IsElement2D: los hijos 2D de un UI viajan en SU .w3dui
+#include "WhiskUI/render/UIOverlay.h"          // UI2D_IsElement2D: los hijos 2D de un UI viajan en SU .w3dui
 #include "ViewPorts/Notifications.h"
 #include "W3dNotice.h"                // W3dAvisof: los avisos del guardado se VEN, no solo se loguean
 #include "ViewPorts/ViewPorts.h"      // rootViewport: el arbol VIVO de viewports (layout)
@@ -898,15 +898,8 @@ static void WriteMaterials(std::string& s, CtxSave* cx) {
             if (mt->ior < 0.9999f || mt->ior > 1.0001f) { s += ",\n      \"ior\": "; JNum(s, mt->ior); }     // (1 = sin refraccion)
             if (mt->transmission > 0.0f) { s += ",\n      \"transmission\": "; JNum(s, mt->transmission); }   // (0 = nada de vidrio)
         }
-        // LA FUERZA DE LA EMISION y LA TRANSFORMACION UV (formato/material-animado.md): solo lo que no es el default
+        // LA FUERZA DE LA EMISION (formato/material-animado.md): solo si no es el default
         if (mt->emissionStrength != 1.0f) { s += ",\n      \"emissionStrength\": "; JNum(s, mt->emissionStrength); }
-        if (mt->uvOffset[0] != 0.0f || mt->uvOffset[1] != 0.0f) {
-            s += ",\n      \"uvOffset\": ["; JNum(s, mt->uvOffset[0]); s += ", "; JNum(s, mt->uvOffset[1]); s += "]"; }
-        if (mt->uvScale[0] != 1.0f || mt->uvScale[1] != 1.0f) {
-            s += ",\n      \"uvScale\": ["; JNum(s, mt->uvScale[0]); s += ", "; JNum(s, mt->uvScale[1]); s += "]"; }
-        if (mt->uvRotation != 0.0f) { s += ",\n      \"uvRotation\": "; JNum(s, mt->uvRotation); }
-        if (mt->uvPivot[0] != 0.5f || mt->uvPivot[1] != 0.5f) {
-            s += ",\n      \"uvPivot\": ["; JNum(s, mt->uvPivot[0]); s += ", "; JNum(s, mt->uvPivot[1]); s += "]"; }
         // SHADER ESCRITO (objects/WrittenShader.h): el archivo (la entrada "shaders/x.glsl" o una ruta del disco) y el tilde
         if (!mt->shaderFile.empty()) {
             // (uno del disco -el de un proyecto que todavia no se habia guardado- entra al .w3d como las texturas, y el
@@ -948,6 +941,10 @@ static void WriteMaterials(std::string& s, CtxSave* cx) {
                 if (force != 1.0f) { s += ", \"force\": "; JNum(s, force); }       // el factor de la mezcla (ausente = 1)
                 if (baked) s += ", \"baked\": true";   // (la luz horneada: el material sin luz de tiempo real)
                 if (baked && maskSun) s += ", \"sunMask\": true";   // (su alfa: cuanto de la luz es del sol)
+                {   // (las SOMBRAS del sol en el alfa + la INDIRECTA, con la luz de tiempo real: TexLayer::shadowmask)
+                    const bool smk = asleep ? dz->layers[c].shadowmask : mt->layers[c - nDorm].shadowmask;
+                    if (baked && smk) s += ", \"shadowmask\": true";
+                }
                 s += ", \"on\": "; s += on ? "true" : "false"; s += " }";
             }
             s += " ]";
@@ -1139,6 +1136,7 @@ static void LayoutWriteNode(std::string& s, ViewportBase* v, int ind) {
             { "showCamera", v3->showCamera, true }, { "showEmpty", v3->showEmpty, true },
             { "showParticles", v3->showParticles, true }, { "showCurves", v3->showCurves, true },
             { "showHitbox", v3->showHitbox, true }, { "showSounds", v3->showSounds, true },
+            { "useLightProbes", v3->useLightProbes, true }, { "useReflectionProbes", v3->useReflectionProbes, true },
             { "ShowRelationshipsLines", v3->ShowRelationshipsLines, true },
             // el PISO, los EJES X / Y, los ORIGENES y el CURSOR 3D: el lector los entendia y tampoco se escribian (apagar el
             // piso o los ejes volvia a prenderse al abrir el proyecto)
@@ -1146,6 +1144,10 @@ static void LayoutWriteNode(std::string& s, ViewportBase* v, int ind) {
             { "showOrigins", v3->showOrigins, true }, { "show3DCursor", v3->show3DCursor, true } };
         for (size_t k = 0; k < sizeof(ov) / sizeof(ov[0]); k++)
             if (ov[k].v != ov[k].def) { JSang(s, ind + 1); s += ov[k].k; s += ": "; s += ov[k].v ? "true" : "false"; s += "\n"; }
+        // el GIZMO de transformacion (Overlays > Gizmo), si no es el de fabrica de la plataforma (en la PC: apagado).
+        // Pedido del duenio, 2026-11-27: "que el w3d recuerde que desactive el gizmo", en las propiedades de la vista
+        { extern bool g_gizmoOn; extern bool W3dGizmoDefault();
+          if (g_gizmoOn != W3dGizmoDefault()) { JSang(s, ind + 1); s += "gizmo: "; s += g_gizmoOn ? "true" : "false"; s += "\n"; } }
         // MIRAR POR LA CAMARA, el MODO de sombreado y el FAR: el lector (ApplyViewport3DProps) ya los entendia pero
         // no se escribian -> un layout de dos vistas (una por la camara en Rendered, otra libre para ver aparecer y
         // desaparecer el culling) volvia como dos vistas iguales. Solo si difieren del default del viewport.
@@ -1301,6 +1303,9 @@ static void WriteSession(std::string& s) {
         }
     }
     s += "]";
+    // la FUSION AUTOMATICA (menu Mesh), si esta prendida, con su distancia: una opcion de la herramienta, del proyecto
+    // (no de una vista). Pedido del duenio, 2026-11-27. (El GIZMO va en la vista 3D del layout)
+    if (g_autoMerge) { s += ",\n    \"autoMerge\": true, \"autoMergeDist\": "; JNum(s, g_autoMergeThreshold); }
     // la RAIZ que se esta editando, si no es la escena del bloque (la seleccion de arriba es suya).
     // Ausente = la del bloque: un proyecto de una sola escena sale como siempre.
     {
@@ -1686,6 +1691,7 @@ static const char* ModTypeStr(int t) {
         case ModifierType::SubdivisionSurface: return "subsurf";
         case ModifierType::Boolean:            return "boolean";
         case ModifierType::CullingTri:         return "cullingtri";
+        case ModifierType::Scatter:            return "scatter";
     }
     return NULL;   // Armature va aparte (modArmature); un tipo nuevo se agrega aca y en el lector
 }
@@ -1769,6 +1775,30 @@ static void WriteModifiers(std::string& s, Mesh* m, int ind) {
             // el target POR NOMBRE, como el del Mirror (se resuelve al final de la carga)
             s += ", \"op\": "; JEsc(s, std::string(md->boolOp == 0 ? "intersect" : md->boolOp == 1 ? "union" : "difference"));
             if (md->target) { s += ", \"target\": "; JEsc(s, md->target->name); }
+        }
+        else if (md->type == ModifierType::Scatter) {
+            // SCATTER (edit/ScatterMod.h): todo como texto/numero (los enums como STRING, como el tipo). La fuente: el
+            // objeto o la coleccion POR NOMBRE (se resuelve al final de la carga), la escena por nombre, la libreria por
+            // su nombre en el proyecto (su archivo viaja en el registro de librerias)
+            static const char* kSrc[] = { "object", "collection", "scene", "library" };
+            static const char* kEmit[] = { "verts", "edges", "faceCenters", "faces" };
+            const int sc = (md->scatSource >= 0 && md->scatSource <= 3) ? md->scatSource : 0;
+            const int em = (md->scatEmit >= 0 && md->scatEmit <= 3) ? md->scatEmit : 3;
+            s += ", \"source\": "; JEsc(s, std::string(kSrc[sc]));
+            if (md->target && (sc == ScatterSource::Obj || sc == ScatterSource::Coll)) { s += ", \"target\": "; JEsc(s, md->target->name); }
+            if (!md->scatScene.empty()) { s += ", \"scene\": "; JEsc(s, md->scatScene); }
+            if (!md->scatLib.empty())   { s += ", \"library\": "; JEsc(s, md->scatLib); }
+            s += ", \"emit\": "; JEsc(s, std::string(kEmit[em]));
+            s += ", \"count\": "; JNum(s, md->scatCount);
+            s += ", \"seed\": "; JNum(s, md->scatSeed);
+            s += ", \"scale\": "; JNum(s, md->scatScale);
+            s += ", \"scaleRandom\": "; JNum(s, md->scatScaleRand);
+            s += ", \"alignNormal\": "; s += md->scatAlign ? "true" : "false";
+            s += ", \"rotationRandom\": "; JNum(s, md->scatRotRand);
+            s += ", \"tiltRandom\": "; JNum(s, md->scatTiltRand);
+            s += ", \"offset\": "; JNum(s, md->scatOffset);
+            s += ", \"mode\": "; JEsc(s, std::string(md->scatMode == 1 ? "instances" : "merged"));
+            s += ", \"showEmitter\": "; s += md->scatShowEmitter ? "true" : "false";
         }
         // Array: todavia sin params ni generacion (se guarda tipo/nombre para no perder el stack)
         s += " }";
@@ -2716,7 +2746,6 @@ static void WriteObject(std::string& s, Object* o, int ind, CtxSave* cx, bool* f
         // (edges 0 -> N) y la malla dejaba de ser identica a la original.
         if (m->noEditable) { s += ",\n"; JSang(s, ind + 1); s += "\"noEditable\": true"; }
         if (m->onlyRoutine) { s += ",\n"; JSang(s, ind + 1); s += "\"routineOnly\": true"; }
-        if (m->lockNormals) { s += ",\n"; JSang(s, ind + 1); s += "\"lockNormals\": true"; }
         // LAS CAPAS DE MATERIAL de encima de cada parte (MaterialGroup::layersMat), POR NOMBRE: la capa 1 es la de siempre
         // (el bloque PARTMAT de la malla); estas van con el objeto
         { bool has = false;
@@ -2805,6 +2834,16 @@ static void WriteObject(std::string& s, Object* o, int ind, CtxSave* cx, bool* f
             s += ",\n"; JSang(s, ind + 1); s += "\"drawSize\": "; JNum(s, e->drawingSize);
             s += ",\n"; JSang(s, ind + 1); s += "\"drawRot\": ["; JNum(s, e->rotDrawing.x); s += ", "; JNum(s, e->rotDrawing.y);
             s += ", "; JNum(s, e->rotDrawing.z); s += "]";
+            // LA IMAGEN de la referencia: entra al contenedor como cualquier textura (o queda afuera si es externa), con el
+            // tamanio de la imagen (para su proporcion sin abrirla) y la opacidad
+            if (e->shape == EmptyImage) {
+                Texture* im = e->ImageAlive();
+                if (im && !im->path.empty()) { s += ",\n"; JSang(s, ind + 1); s += "\"image\": "; JEsc(s, Asset(cx, im->path)); }
+                if (e->imageW > 0 && e->imageH > 0) {
+                    s += ",\n"; JSang(s, ind + 1); s += "\"imageSize\": ["; JNum(s, (float)e->imageW); s += ", "; JNum(s, (float)e->imageH); s += "]";
+                }
+                s += ",\n"; JSang(s, ind + 1); s += "\"imageOpacity\": "; JNum(s, e->imageOpacity);
+            }
         }
     }
 

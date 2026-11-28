@@ -25,6 +25,7 @@
 #include "objects/MeshData.h" // mallacache/meminfo: geometria compartida (A/B + medicion)
 #include "io/W3dResources.h"  // meminfo: el almacen de recursos (descriptores por tipo)
 #include "edit/Modifier.h"     // Modifier (params del Mirror en el harness)
+#include "edit/ScatterMod.h"   // el modificador Scatter (modscatter / scatterinfo / scattercopy / scatterapply)
 #include "edit/MeshEdit.h"
 #include "edit/UVUnwrap.h"
 #include "edit/Proportional.h"
@@ -53,7 +54,7 @@
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
 #include "input/W3dTouch.h"        // tactiltest: la pantalla tactil del Core (Symbian: dedos -> eventos SDL)
 #include "app/W3dTouchEditor.h"    // W3dEventTouch
-#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
+#include "base/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 extern int W3dActiveFingers();     // (controls.cpp) dedos apoyados segun el editor
 #include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva
 #include "ViewPorts/Pick3D.h"              // test 'boxtest': BoxSelectApply3D
@@ -81,7 +82,7 @@ bool LayoutOpenBarMenu(ViewportBase* vp, int mx, int my); // LayoutInput.cpp (an
 bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Image2D/particulas), junto a UpdateUVAnims
 #include "importers/import_obj.h"   // ExportOBJ
 #include "importers/import_fbx.h"  // ImportFBX
-#include "objects/UI.h"        // compilarjuego: la UI raiz que compila la tarjeta Juego
+#include "WhiskUI/objects/UI.h"        // compilarjuego: la UI raiz que compila la tarjeta Juego
 #include "objects/LOD.h"       // lodinfo: los objetos LOD del arbol (umbrales + hijo elegido)
 #include "objects/Culling.h"   // lodinfo: los objetos Culling (onlyCameraActive)
 #include "objects/Routine.h"
@@ -90,9 +91,9 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Image2
 #include "objects/MeshFlows.h"    // rutina/rutinapaso/rutinainfo: los objetos avanzados
 #include "objects/Particles.h"  // partinfo: los emisores de particulas (config + vivas)
 #include "objects/Collection.h" // lodinfo: las Collection (sortByCamera/sortOnce)
-#include "io/Font2D.h"          // uifuente: forzar la carga del atlas + verificar POT
+#include "WhiskUI/io/Font2D.h"          // uifuente: forzar la carga del atlas + verificar POT
 #include "WhiskUI/text/W3dTextAtlas.h" // uifuente: atlasW/atlasH del atlas cargado
-#include "objects/Image2D.h" // copiaasset: un widget con textura (el asset que tiene que viajar)
+#include "WhiskUI/objects/Image2D.h" // copiaasset: un widget con textura (el asset que tiene que viajar)
 #include "io/SaveW3D.h"      // compilarjuego: g_projCompile (la config de la tarjeta Juego)
 #include "io/SaveVersion.h"  // versave: guardado por versiones (boton "Guardar version vN")
 #include "io/W3dZip.h"       // versave/ziphard/contenedor: leer y fabricar zips
@@ -106,7 +107,7 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Image2
 #include <set>                 // bevel arrows: los anchos distintos
 #include <algorithm>           // vissettest: std::sort (comparar sets del bitset)
 #include "io/W3dStore.h"       // zipidx/montaje: lector por indice + contenedor montado (formato v4)
-#include "io/UI2DFormat.h"     // ziphard: guardar/streamLoad un .w3dui (prefijo de las rutas relativas)
+#include "WhiskUI/io/UI2DFormat.h"     // ziphard: guardar/streamLoad un .w3dui (prefijo de las rutas relativas)
 #include "objects/Instance.h"  // modsave: round-trip de espejo/instancia/curva
 #include "objects/Mirror.h"
 #include "objects/Curve.h"
@@ -116,8 +117,8 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Image2
 #include "w3dlog.h"            // consciclo: el ring del log (el aviso de ciclo tiene que ser UNO, no por frame)
 #include "W3dPalettes.h"       // paltest: los invariantes de las paletas del proyecto
 #include "config/W3dProfile.h" // bench: g_prof.scene (desglose del traversal) + W3dNowMs
-#include "objects/Text2D.h"    // paltest: elementos con campos pal*
-#include "objects/Rect2D.h"
+#include "WhiskUI/objects/Text2D.h"    // paltest: elementos con campos pal*
+#include "WhiskUI/objects/Rect2D.h"
 #include "objects/ClipRegion.h"   // addlimpiarz
 #include "ViewPorts/PopUp/ColorPicker.h"     // uipunteros: target/palRef/palObj apuntan adentro del elemento
 #include "ViewPorts/PopUp/RedoMeshPanel.h"   // uipunteros: sus campos apuntan a miembros de la malla
@@ -125,14 +126,14 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Image2
 #include "ViewPorts/ExternalScreens.h"    // pantalla: el popup y el dibujo de las pantallas externas (TV/HDMI)
 #include "objects/Empty.h"     // nombresmover/nombresscope: objetos sueltos del scope global
 #include "objects/Collection.h" // delarbol: 'delete col' (la coleccion es la raiz del borrado)
-#include "objects/Button2D.h"
-#include "objects/Slice9.h"    // migrar: la huella del arbol 2D incluye sus rutas de asset
-#include "objects/Video2D.h"
+#include "WhiskUI/objects/Button2D.h"
+#include "WhiskUI/objects/Slice9.h"    // migrar: la huella del arbol 2D incluye sus rutas de asset
+#include "WhiskUI/objects/Video2D.h"
 #include "W3dScene.h"          // migrar: la escena inicial es parte de la huella
-#include "objects/Container2D.h" // chocantest: contenedor con layout en filas (flex)
+#include "WhiskUI/objects/Container2D.h" // chocantest: contenedor con layout en filas (flex)
 #include "script/BindsGame.h"    // chocantest: los binds de juego REALES (collide/uiBox/limit)
 #include "physics/W3dPhysics.h"  // chocantest: bounce() contra un obstaculo puesto por el layout
-#include "render/UIOverlay.h"    // chocantest: resolver el layout con el dibujador real
+#include "WhiskUI/render/UIOverlay.h"    // chocantest: resolver el layout con el dibujador real
 extern "C" {                     // chocantest: los binds se prueban sobre un lua_State propio
 #include "lua.h"
 #include "lauxlib.h"
@@ -3560,16 +3561,15 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     }
     // ======================================================================================================
     //  MATERIALES ANIMADOS ("se tendria que poder animar los materiales"): las pistas de material de la animacion de
-    //  escena activa (animation/Animation.h: AnimationMaterial, canales AnimMat*), la transformacion UV y la fuerza
-    //  de la emision (objects/Materials.h). Los canales van por nombre: color alpha emission strength specular
-    //  roughness metallic transmission layer uvoffset uvscale uvrot; la componente es 0/1/2 = R/G/B (o U/V), y en
-    //  'layer' el indice de la capa de textura. Todo sobre el material ACTIVO (el que muestra la tarjeta Material).
+    //  escena activa (animation/Animation.h: AnimationMaterial, canales AnimMat*) y la fuerza de la emision
+    //  (objects/Materials.h). Los canales van por nombre: color alpha emission strength specular roughness metallic
+    //  transmission layer; la componente es 0/1/2 = R/G/B, y en 'layer' el indice de la capa de textura. Todo sobre el material ACTIVO (el que muestra la tarjeta Material).
     // ======================================================================================================
     struct MatAnimH {
         static int Chan(const std::string& n) {
-            static const char* const kNames[12] = { "color", "alpha", "emission", "strength", "specular", "roughness",
-                                                    "metallic", "transmission", "layer", "uvoffset", "uvscale", "uvrot" };
-            for (int i = 0; i < 12; i++) if (n == kNames[i]) return AnimMatColor + i;   // (el orden del enum)
+            static const char* const kNames[9] = { "color", "alpha", "emission", "strength", "specular", "roughness",
+                                                   "metallic", "transmission", "layer" };
+            for (int i = 0; i < 9; i++) if (n == kNames[i]) return AnimMatColor + i;   // (el orden del enum)
             return -1;
         }
         static int Interp(const std::string& n) {
@@ -3666,19 +3666,6 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         const int has = W3dKeyframeState(p, comp);
         printf("      [matkeystate] %s.%d @%d: %d (esperado %d)\n", cn.c_str(), comp, CurrentFrame, has, e);
         if (has != e) { err = "matkeystate: el rombo no esta como se esperaba"; return false; }
-        return true;
-    }
-    // ---- matuv <desplU> <desplV> <escU> <escV> <rot> [pivoteU pivoteV] : la TRANSFORMACION UV del material activo
-    //      (con Ctrl+Z, como los campos de la tarjeta) ----
-    if (cmd == "matuv") {
-        float o0 = 0, o1 = 0, s0 = 1, s1 = 1, r = 0, p0 = -1e9f, p1 = -1e9f; ss >> o0 >> o1 >> s0 >> s1 >> r >> p0 >> p1;
-        Material* m = ScriptActiveMaterial();
-        if (!m || m == MaterialDefault) { err = "matuv: sin material activo"; return false; }
-        UndoMaterialModStart(m);
-        m->uvOffset[0] = o0; m->uvOffset[1] = o1; m->uvScale[0] = s0; m->uvScale[1] = s1; m->uvRotation = r;
-        if (p0 > -1e8f && p1 > -1e8f) { m->uvPivot[0] = p0; m->uvPivot[1] = p1; }
-        UndoMaterialModCommit();
-        RTInvalidate(); g_redraw = true;
         return true;
     }
     // ---- matgame <frame> : el REPRODUCTOR DEL JUEGO (animScene de lua) toca la animacion de escena activa en ese
@@ -7065,14 +7052,20 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         g_redraw = true;
         return true;
     }
-    // ---- srbake : hornea la sonda de reflejo ACTIVA (la imagen 360 queda en una textura del proyecto, en memoria) ----
+    // ---- srbake [full] : hornea la sonda de reflejo ACTIVA (la imagen 360 queda en una textura del proyecto, en memoria).
+    //      Sin 'full', a 64 px como mucho (las pruebas son del guardado y de la logica, no de la imagen); con 'full', con
+    //      SU resolucion (lo que hace el boton Hornear: el convertidor de escenas la usa asi) ----
     if (cmd == "srbake") {
         if (!ActiveObj || ActiveObj->getType() != ObjectType::reflectionProbe) { err = "srbake: el activo no es una sonda de reflejo"; return false; }
         ReflectionProbe* sr = (ReflectionProbe*)ActiveObj;
-        if (sr->resolution > 64) sr->resolution = 64;   // (chica: la prueba es del guardado, no de la imagen)
+        std::string q; ss >> q;
+        extern unsigned int w3dGetTicks();
+        const unsigned t0 = w3dGetTicks();
+        if (q != "full" && sr->resolution > 64) sr->resolution = 64;   // (chica: la prueba es del guardado, no de la imagen)
         std::string reason;
         if (!ReflectionProbeBake(sr, &reason)) { err = "srhornear: " + reason; return false; }
-        printf("      [srhornear] '%s' -> %s\n", sr->name.c_str(), sr->texture.c_str());
+        printf("      [srhornear] '%s' %dx%d, %d rayos por pixel, %u ms -> %s\n", sr->name.c_str(), sr->resolution,
+               sr->resolution / 2, sr->samples, w3dGetTicks() - t0, sr->texture.c_str());
         return true;
     }
     // ---- srcount <n> : ASERTA cuantas sondas de reflejo hay EN LA ESCENA (una borrada la guarda el Ctrl+Z fuera del
@@ -7126,7 +7119,7 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
                    mm->texture ? mm->texture->path.c_str() : "-", us.c_str());
             for (size_t k = 0; k < mm->layers.size(); k++)
                 printf("      [matcapasver]    capa %d: %s mezcla %d uv %d %s%s\n", (int)k, mm->layers[k].tex ? mm->layers[k].tex->path.c_str() : "-",
-                       mm->layers[k].blend, mm->layers[k].uvMap, mm->layers[k].on ? "on" : "off", mm->layers[k].baked ? (mm->layers[k].maskSun ? " horneada mascaraSol" : " horneada") : "");
+                       mm->layers[k].blend, mm->layers[k].uvMap, mm->layers[k].on ? "on" : "off", mm->layers[k].baked ? (mm->layers[k].shadowmask ? " horneada shadowmask" : (mm->layers[k].maskSun ? " horneada mascaraSol" : " horneada")) : "");
         }
         return true;
     }
@@ -7773,6 +7766,56 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         // sin tocar, y el skinning compacto no se escribe). Ver W3dMeshesSavePrepare.
         extern bool g_w3dRebakeMeshes; g_w3dRebakeMeshes = true;
         printf("      [mallasnoedit] %d malla(s) marcadas no-editables + re-horneado activado (el .w3db saldra compacto)\n", n);
+        return true;
+    }
+    // ---- meshpolys [tris quads ngons] : las CARAS LOGICAS (faces3d) de la malla activa por cantidad de lados. Con los
+    //      tres numeros, ademas verifica (falla si no coinciden). La malla de un recurso con la edicion pendiente se
+    //      lee primero (como el export) ----
+    if (cmd == "meshpolys") {
+        int et = -1, eq = -1, en = -1; ss >> et >> eq >> en;
+        if (!ActiveObj || ActiveObj->getType() != ObjectType::mesh) { err = "meshpolys: el activo no es una malla"; return false; }
+        Mesh* m = (Mesh*)ActiveObj;
+        if (!m->pendingEdit.empty()) W3dMeshBinMaterializeEdit(m);
+        int t = 0, q = 0, n = 0, maxSides = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) {
+            const int s = (int)m->faces3d[f].idx.size();
+            if (s == 3) t++; else if (s == 4) q++; else if (s > 4) n++;
+            if (s > maxSides) maxSides = s;
+        }
+        printf("      [meshpolys] '%s' tris=%d quads=%d ngons=%d (max %d lados) render=%d triangulos\n",
+               m->name.c_str(), t, q, n, maxSides, m->facesSize / 3);
+        if (et >= 0 && (t != et || q != eq || n != en)) {
+            char b[200]; snprintf(b, sizeof b, "meshpolys: tris=%d quads=%d ngons=%d, se esperaba %d %d %d", t, q, n, et, eq, en);
+            err = b; return false;
+        }
+        return true;
+    }
+    // ---- edithide <hide|hideunselected|reveal> : H / Shift+H / Alt+H en Edit Mode (LayoutEditHide) ----
+    // ---- edithidden <vertices> <aristas> <caras> : ASSERT de lo oculto en la jaula (y de lo que dibuja la malla) ----
+    if (cmd == "edithide") {
+        std::string q; ss >> q;
+        extern bool LayoutEditHide(int what);
+        const int w = (q == "reveal") ? 2 : (q == "hideunselected") ? 1 : 0;
+        if (!LayoutEditHide(w)) { err = "edithide: no hay malla en Edit Mode"; return false; }
+        return true;
+    }
+    if (cmd == "edithidden") {
+        int ev = -1, ee = -1, ef = -1; ss >> ev >> ee >> ef;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "edithidden: no hay malla activa"; return false; }
+        m->EnsureEdit();
+        EditMesh* e = m->edit; if (!e) { err = "edithidden: sin jaula"; return false; }
+        int v = 0, ed = 0, f = 0, sel = 0;
+        for (size_t k = 0; k < e->vertHid.size(); k++) v += e->vertHid[k];
+        for (size_t k = 0; k < e->edgeHid.size(); k++) ed += e->edgeHid[k];
+        for (size_t k = 0; k < e->faceHid.size(); k++) f += e->faceHid[k];
+        for (size_t k = 0; k < e->vertSel.size(); k++) sel += e->vertSel[k];
+        printf("      [edithidden] '%s': %d vertices, %d aristas, %d caras ocultas (de %d/%d/%d); %d vertices elegidos; "
+               "la malla dibuja %d indices\n", m->name.c_str(), v, ed, f, e->NumVerts(), e->NumEdges(), e->NumFaces(), sel,
+               e->numHidden > 0 ? (int)e->visTris.size() : m->facesSize);
+        if (ev >= 0 && (v != ev || ed != ee || f != ef)) {
+            char b[160]; snprintf(b, sizeof b, "edithidden: %d/%d/%d ocultos, se esperaba %d/%d/%d", v, ed, f, ev, ee, ef);
+            err = b; return false;
+        }
         return true;
     }
     if (cmd == "meshinfo") {
@@ -10246,7 +10289,8 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     if (cmd == "modadd") {
         Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
         std::string t; ss >> t;
-        int type = (t=="screw")?0:(t=="mirror")?1:(t=="array")?2:(t=="subsurf")?3:(t=="boolean")?4:(t=="cullingtri")?(int)ModifierType::CullingTri:-1;
+        int type = (t=="screw")?0:(t=="mirror")?1:(t=="array")?2:(t=="subsurf")?3:(t=="boolean")?4:(t=="cullingtri")?(int)ModifierType::CullingTri:
+                   (t=="scatter")?(int)ModifierType::Scatter:-1;
         if (type < 0) { err = "tipo de modificador desconocido: '" + t + "'"; return false; }
         UndoModAdd(m, type); m->GenerateMeshModified(); return true; // la MISMA puerta que el boton Add (deja paso de undo)
     }
@@ -10274,6 +10318,127 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         md->arrCount = n; md->arrRelX = rx; md->arrRelY = ry; md->arrRelZ = rz; md->arrRelOn = true;
         if (ss >> cx >> cy >> cz) { md->arrConstOn = true; md->arrConstX = cx; md->arrConstY = cy; md->arrConstZ = cz; if (ss >> mg) md->arrMerge = (mg != 0); }
         m->GenerateMeshModified(); return true;
+    }
+    // ---- modscatter <clave> <valor> [<clave> <valor> ...] : los parametros del SCATTER activo (edit/ScatterMod.h) y
+    //      regenera. source object|collection|scene|library, target <nombre>, scene <nombre>, library <nombre>,
+    //      emit verts|edges|faceCenters|faces, count, seed, scale, scaleRandom, align 0|1, rotRandom, tilt, offset,
+    //      mode merged|instances, showEmitter 0|1 ----
+    if (cmd == "modscatter") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        if (m->activeModifier < 0 || m->activeModifier >= (int)m->modifiers.size()) { err = "sin modificador activo"; return false; }
+        Modifier* md = m->modifiers[(size_t)m->activeModifier];
+        if (md->type != ModifierType::Scatter) { err = "modscatter: el activo no es un Scatter"; return false; }
+        std::string k, v;
+        while (ss >> k >> v) {
+            const float f = (float)atof(v.c_str());
+            if (k == "source") md->scatSource = v == "collection" ? ScatterSource::Coll : v == "scene" ? ScatterSource::Scene
+                                              : v == "library" ? ScatterSource::Lib : ScatterSource::Obj;
+            else if (k == "target") {
+                Object* t = SceneCollection ? FindObjectByName(SceneCollection, v) : NULL;
+                if (!t) { err = "modscatter: no hay un objeto '" + v + "'"; return false; }
+                md->target = t;
+            }
+            else if (k == "scene") md->scatScene = v;
+            else if (k == "library") md->scatLib = v;
+            else if (k == "emit") md->scatEmit = v == "verts" ? ScatterEmit::Verts : v == "edges" ? ScatterEmit::Edges
+                                              : v == "faceCenters" ? ScatterEmit::FaceCenters : ScatterEmit::Faces;
+            else if (k == "count") md->scatCount = f;
+            else if (k == "seed") md->scatSeed = f;
+            else if (k == "scale") md->scatScale = f;
+            else if (k == "scaleRandom") md->scatScaleRand = f;
+            else if (k == "align") md->scatAlign = f != 0.0f;
+            else if (k == "rotRandom") md->scatRotRand = f;
+            else if (k == "tilt") md->scatTiltRand = f;
+            else if (k == "offset") md->scatOffset = f;
+            else if (k == "mode") md->scatMode = (v == "instances") ? 1 : 0;
+            else if (k == "showEmitter") md->scatShowEmitter = f != 0.0f;
+            else { err = "modscatter: clave desconocida '" + k + "'"; return false; }
+        }
+        m->GenerateMeshModified();
+        g_redraw = true;
+        return true;
+    }
+    // ---- scatterinfo [copias fuentes] : las copias y las fuentes del Scatter activo (y la posicion LOCAL de las
+    //      primeras); con los dos numeros, ademas verifica ----
+    if (cmd == "scatterinfo") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        Modifier* md = NULL;
+        for (size_t i = 0; i < m->modifiers.size(); i++) if (m->modifiers[i]->type == ModifierType::Scatter) md = m->modifiers[i];
+        if (!md) { err = "scatterinfo: la malla no tiene un Scatter"; return false; }
+        int ec = -1, ef = -1, et = -1; ss >> ec >> ef >> et;
+        std::vector<Object*> pool; W3dScatterPool(md, m, pool);
+        const int n = (int)md->scatRt.pick.size();
+        const int genTris = m->genValid ? m->genFacesSize / 3 : -1;
+        printf("      [scatterinfo] '%s': %d copias, %d fuentes (%s), modo %s, malla generada %d triangulos en %d partes\n",
+               m->name.c_str(), n, (int)pool.size(),
+               md->scatSource == ScatterSource::Lib ? "libreria" : md->scatSource == ScatterSource::Scene ? "escena"
+               : md->scatSource == ScatterSource::Coll ? "coleccion" : "objeto", md->scatMode == 1 ? "instancias" : "unida",
+               genTris, (int)m->genMaterialsGroup.size());
+        if (et >= 0 && genTris != et) {
+            char b[160]; snprintf(b, sizeof b, "scatterinfo: la malla generada tiene %d triangulos, se esperaban %d", genTris, et);
+            err = b; return false;
+        }
+        for (int i = 0; i < n && i < 3; i++) {
+            const float* M = &md->scatRt.mats[(size_t)i * 16];
+            Object* src = pool.empty() ? NULL : pool[(size_t)md->scatRt.pick[(size_t)i] % pool.size()];
+            printf("         copia %d: (%.4f, %.4f, %.4f) fuente '%s' (tipo %d)\n", i, M[12], M[13], M[14],
+                   src ? src->name.c_str() : "-", src ? (int)src->getType() : -1);
+        }
+        if (ec >= 0 && (n != ec || (int)pool.size() != ef)) {
+            char b[160]; snprintf(b, sizeof b, "scatterinfo: %d copias y %d fuentes, se esperaba %d y %d", n, (int)pool.size(), ec, ef);
+            err = b; return false;
+        }
+        return true;
+    }
+    // ---- scattercopy <i> <x> <y> <z> [tol] : la copia i esta en esa posicion LOCAL del emisor (la semilla manda) ----
+    if (cmd == "scattercopy") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        Modifier* md = NULL;
+        for (size_t i = 0; i < m->modifiers.size(); i++) if (m->modifiers[i]->type == ModifierType::Scatter) md = m->modifiers[i];
+        if (!md) { err = "scattercopy: la malla no tiene un Scatter"; return false; }
+        int i = 0; float x = 0, y = 0, z = 0, tol = 0.001f; ss >> i >> x >> y >> z; ss >> tol;
+        if (i < 0 || (size_t)i >= md->scatRt.pick.size()) { err = "scattercopy: no hay esa copia"; return false; }
+        const float* M = &md->scatRt.mats[(size_t)i * 16];
+        printf("      [scattercopy] %d: (%.4f, %.4f, %.4f)\n", i, M[12], M[13], M[14]);
+        if (fabsf(M[12] - x) > tol || fabsf(M[13] - y) > tol || fabsf(M[14] - z) > tol) {
+            char b[160]; snprintf(b, sizeof b, "scattercopy: la copia %d esta en (%.4f, %.4f, %.4f), se esperaba (%.4f, %.4f, %.4f)", i, M[12], M[13], M[14], x, y, z);
+            err = b; return false;
+        }
+        return true;
+    }
+    // ---- newcollection <nombre> [objeto ...] : una COLECCION nueva en la raiz con esos objetos adentro ----
+    if (cmd == "newcollection") {
+        std::string n; ss >> n;
+        if (n.empty() || !SceneCollection) { err = "newcollection: falta el nombre"; return false; }
+        Collection* col = new Collection(SceneCollection);
+        col->SetNameObj(n);
+        std::string on;
+        while (ss >> on) {
+            Object* o = FindObjectByName(SceneCollection, on);
+            if (!o) { err = "newcollection: no hay un objeto '" + on + "'"; return false; }
+            ReparentSimple(o, col);
+        }
+        printf("      [newcollection] '%s' con %d objeto(s)\n", col->name.c_str(), (int)col->Childrens.size());
+        return true;
+    }
+    // ---- scatterapply [objetos] : el "Apply" del panel con el Scatter activo (instancias -> objetos; unida -> la
+    //      malla). Con el numero, en modo instancias verifica cuantos objetos salieron ----
+    if (cmd == "scatterapply") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        if (m->activeModifier < 0 || m->activeModifier >= (int)m->modifiers.size()) { err = "sin modificador activo"; return false; }
+        Modifier* md = m->modifiers[(size_t)m->activeModifier];
+        if (md->type != ModifierType::Scatter) { err = "scatterapply: el activo no es un Scatter"; return false; }
+        int expect = -1; ss >> expect;
+        if (md->scatMode == 1) {
+            const int n = W3dScatterApplyAsObjects(m);
+            printf("      [scatterapply] %d objetos\n", n);
+            if (n < 0) { err = "scatterapply: no se pudo"; return false; }
+            if (expect >= 0 && n != expect) { char b[96]; snprintf(b, sizeof b, "scatterapply: %d objetos, se esperaban %d", n, expect); err = b; return false; }
+        } else {
+            m->ApplyActiveModifier();
+            printf("      [scatterapply] unida en la malla\n");
+        }
+        return true;
     }
     if (cmd == "genbbox") {
         Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
@@ -27376,6 +27541,194 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         if (!ok) { err = "iderefresh: Refresh / Guardar no se comportan como se pidio"; return false; }
         return true;
     }
+    // ---- luapropsvars armar | tarjeta <propiedad> | agregar : LAS PROPIEDADES COMO VARIABLES (speed en vez de
+    //      property("speed")) y la tarjeta del script que se rearma sola cuando el script cambia.
+    //      armar: un vacio "PropVars" con /tmp/w3d_propvars.lua (speed = 120 en ESE objeto); con simplay, el start()
+    //      deja en los valores compartidos lo que leyo (los mira sharednum).
+    //      tarjeta: la tarjeta del script del objeto activo tiene una fila con ese nombre.
+    //      agregar: un IDE abre el script, le agrega "jump = 3" a properties y lo guarda (como el usuario) ----
+    if (cmd == "luapropsvars") {
+        std::string phase; ss >> phase;
+        const char* path = "/tmp/w3d_propvars.lua";
+        if (phase == "armar") {
+            FILE* f = fopen(path, "wb");
+            if (!f) { err = "luapropsvars: no se pudo escribir el script"; return false; }
+            fputs("properties = {\n"
+                  "  rotate     = true,\n"
+                  "  speed      = 90,\n"
+                  "  label      = \"caja\",\n"
+                  "  difficulty = { \"facil\", \"normal\" },\n"
+                  "  goal       = \"object\",\n"
+                  "}\n"
+                  "function start()\n"
+                  "  setShared(\"speed\", speed)                  -- 120: el de este objeto\n"
+                  "  setShared(\"fromprop\", property(\"speed\"))   -- lo mismo, por property()\n"
+                  "  setShared(\"rotate\", rotate and 1 or 0)\n"
+                  "  setShared(\"label\", label == \"caja\" and 1 or 0)\n"
+                  "  setShared(\"dif\", difficulty == \"facil\" and 1 or 0)\n"
+                  "  setShared(\"goal\", goal == nil and 1 or 0)       -- (un objeto sin elegir: nil)\n"
+                  "  setShared(\"nothing\", nothingHere == nil and 1 or 0)\n"
+                  "  speed = 5                                   -- una variable del script tapa a la propiedad\n"
+                  "  setShared(\"shadow\", speed)\n"
+                  "end\n", f);
+            fclose(f);
+            Empty* e = new Empty(SceneCollection, Vector3(0, 0, 0));
+            e->SetNameObj("PropVars");
+            e->scriptData = new W3dScriptData();
+            W3dScriptEntry en; en.path = path;
+            en.refs.push_back(std::make_pair(std::string("speed"), std::string("120")));
+            e->scriptData->scripts.push_back(en);
+            DeselectAll(); e->Select(); ActiveObj = e;
+            g_redraw = true;
+            return true;
+        }
+        if (phase == "tarjeta") {
+            std::string name; ss >> name;
+            Properties* P = ScriptProps();
+            if (!P || !P->propScriptCards[0]) { err = "luapropsvars: sin panel de propiedades"; return false; }
+            if (rootViewport) rootViewport->Render();
+            GroupPropertie* g = P->propScriptCards[0];
+            printf("      [luapropsvars] tarjeta '%s':", g->name.c_str());
+            bool has = false;
+            for (size_t i = 0; i < g->properties.size(); i++) {
+                printf(" %s", g->properties[i]->name.c_str());
+                if (g->properties[i]->name == name) has = true;
+            }
+            printf("\n");
+            if (!has) { err = "luapropsvars: la tarjeta del script no tiene '" + name + "'"; return false; }
+            return true;
+        }
+        if (phase == "agregar") {
+            IDE* ide = new IDE();
+            ide->x = 0; ide->y = 0; ide->Resize(900, 600);
+            if (!ide->OpenFile(path)) { delete ide; err = "luapropsvars: el IDE no abrio el script"; return false; }
+            ide->CursorA(0, (int)ide->lines[0].size(), false);
+            ide->Enter();
+            ide->InsertText("jump = 3,");
+            const bool saved = ide->Save(true);
+            delete ide;
+            if (!saved) { err = "luapropsvars: el IDE no guardo"; return false; }
+            g_redraw = true;
+            return true;
+        }
+        err = "luapropsvars: armar | tarjeta <propiedad> | agregar"; return false;
+    }
+    // ---- idelayout texto <codigo con \n> | escribir <texto> | tecla down|up|enter|tab|esc|f12|ctrlspace |
+    //      cursor <renglon> <columna> | definicion <renglon> <columna> : maneja el IDE del LAYOUT (el primero) como el
+    //      usuario, para mirarlo con uishot (la lista del autocompletado, la ayuda de una funcion) ----
+    if (cmd == "idelayout") {
+        struct VK { static ViewportBase* Find(ViewportBase* v) { if (!v) return NULL; if (v->isLeaf()) return v->ViewportKind() == 8 ? v : NULL;
+                        ViewportBase* a = Find(((ViewportColumn*)v)->childA); return a ? a : Find(((ViewportColumn*)v)->childB); } };
+        IDE* ide = (IDE*)VK::Find(rootViewport);
+        if (!ide) { err = "idelayout: no hay un IDE en el layout (vpkind <tipo> 7)"; return false; }
+        std::string what; ss >> what;
+        if (what == "texto") {
+            std::string rest; std::getline(ss, rest);
+            if (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
+            std::string t;
+            for (size_t i = 0; i < rest.size(); i++) {
+                if (rest[i] == '\\' && i + 1 < rest.size() && rest[i + 1] == 'n') { t += '\n'; i++; } else t += rest[i];
+            }
+            ide->SetText(t);
+        } else if (what == "escribir") {
+            std::string rest; std::getline(ss, rest);
+            if (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
+            for (size_t i = 0; i < rest.size(); i++) { char b[2] = { rest[i], 0 }; ide->TextTyped(b); }
+        } else if (what == "tecla") {
+            std::string k; ss >> k;
+            if (k == "ctrlspace") { extern bool LCtrlPressed; LCtrlPressed = true; ide->KeyEditor(W3dK_SPACE, false); LCtrlPressed = false; }
+            else {
+                const int key = k == "down" ? W3dK_DOWN : k == "up" ? W3dK_UP : k == "enter" ? W3dK_RETURN : k == "tab" ? W3dK_TAB
+                              : k == "esc" ? W3dK_ESCAPE : k == "f12" ? W3dK_F12 : -1;
+                if (key < 0) { err = "idelayout: tecla desconocida '" + k + "'"; return false; }
+                ide->KeyEditor(key, false);
+            }
+        } else if (what == "cursor" || what == "definicion") {
+            int l = 0, c = 0; ss >> l >> c;
+            ide->CursorA(l, c, false);
+            if (what == "definicion") ide->GoToDefinition(l, c);
+        } else { err = "idelayout: texto | escribir | tecla | cursor | definicion"; return false; }
+        viewPortActive = ide;   // (la firma de la funcion que se llama se muestra en el IDE enfocado)
+        g_redraw = true;
+        printf("      [idelayout] %s: renglon %d col %d, lista %s (%d)\n", what.c_str(), ide->curLin, ide->curCol,
+               ide->acOpen ? "abierta" : "cerrada", (int)ide->acItems.size());
+        return true;
+    }
+    // ---- idecompletar : el AUTOCOMPLETADO y IR A LA DEFINICION del IDE, headless: escribe letra por letra como el
+    //      teclado (TextTyped), elige con las flechas, completa con Enter y busca definiciones. Falla si algo no da ----
+    if (cmd == "idecompletar") {
+        IDE* ide = new IDE();
+        ide->x = 0; ide->y = 0; ide->Resize(900, 600);
+        bool ok = true;
+        std::string why;
+        struct H {
+            static void Type(IDE* e, const char* t) { for (const char* p = t; *p; ++p) { char b[2] = { *p, 0 }; e->TextTyped(b); } }
+            static int Find(IDE* e, const char* n) { for (size_t i = 0; i < e->acItems.size(); i++) if (e->acItems[i].name == n) return (int)i; return -1; }
+            static void Print(IDE* e, const char* label) {
+                printf("      [idecompletar] %s:", label);
+                for (size_t i = 0; i < e->acItems.size() && i < 6; i++) printf(" %s(%d)", e->acItems[i].name.c_str(), e->acItems[i].kind);
+                printf("%s\n", e->acOpen ? "" : " (cerrada)");
+            }
+        };
+        ide->SetText("properties = {\n  rotate = true,\n  speed  = 90,\n}\n\nlocal turned = 0\n\n"
+                     "function spin(obj, amount)\n  turned = turned + amount\nend\n\nfunction update(dt)\n  \nend");
+        // 1) "setRot" -> la lista con las funciones del motor que empiezan asi, con su ayuda
+        ide->CursorA(12, 2, false);
+        H::Type(ide, "setRot");
+        H::Print(ide, "setRot");
+        const int iz = H::Find(ide, "setRotationZ");
+        if (!ide->acOpen || iz < 0 || ide->acItems[0].name.compare(0, 6, "setRot") != 0) { ok = false; why += " [setRot sin lista]"; }
+        else if (ide->acItems[(size_t)iz].signature.empty()) { ok = false; why += " [setRotationZ sin firma]"; }
+        // 2) flechas hasta setRotationZ y Enter: queda escrito
+        while (ide->acOpen && ide->acSel != iz && iz >= 0) ide->KeyEditor(W3dK_DOWN, false);
+        ide->KeyEditor(W3dK_RETURN, false);
+        if (ide->lines[12] != "  setRotationZ" || ide->acOpen) { ok = false; why += " [Enter no completo: '" + ide->lines[12] + "']"; }
+        // 3) "(sel" -> self; despues "spe" -> la PROPIEDAD speed primero
+        H::Type(ide, "(sel");
+        if (H::Find(ide, "self") < 0) { ok = false; why += " [sin self]"; }
+        ide->KeyEditor(W3dK_TAB, false);
+        H::Type(ide, "(), getRotationZ(self()) + spe");
+        H::Print(ide, "spe");
+        if (!ide->acOpen || ide->acItems[0].name != "speed" || ide->acItems[0].kind != 3) { ok = false; why += " [speed no es la primera propiedad]"; }
+        ide->KeyEditor(W3dK_RETURN, false);
+        H::Type(ide, " * dt)");
+        if (ide->lines[12] != "  setRotationZ(self(), getRotationZ(self()) + speed * dt)") { ok = false; why += " [renglon: '" + ide->lines[12] + "']"; }
+        // 4) "math." -> sus campos; Esc cierra
+        ide->Enter(); H::Type(ide, "local f = math.fl");
+        H::Print(ide, "math.fl");
+        if (H::Find(ide, "floor") < 0) { ok = false; why += " [math.fl sin floor]"; }
+        ide->KeyEditor(W3dK_ESCAPE, false);
+        if (ide->acOpen) { ok = false; why += " [Esc no cerro]"; }
+        // 5) en un comentario no sale nada
+        ide->Enter(); H::Type(ide, "-- setRot");
+        if (ide->acOpen) { ok = false; why += " [lista en un comentario]"; }
+        // 6) IR A LA DEFINICION: una propiedad, una funcion del script, un local, un parametro y una del motor
+        struct D { int lin, col, wantLin, wantCol; const char* what; };
+        const D defs[] = {
+            { 12, 48, 2, 2, "speed (la propiedad)" },
+            { 8, 4, 5, 6, "turned (el local)" },
+            { 8, 24, 7, 19, "amount (el parametro)" },
+        };
+        for (size_t i = 0; i < sizeof(defs) / sizeof(defs[0]); i++) {
+            ide->hasSel = false;
+            ide->GoToDefinition(defs[i].lin, defs[i].col);
+            const int l0 = ide->hasSel ? ide->selLin : ide->curLin, c0 = ide->hasSel ? ide->selCol : ide->curCol;
+            printf("      [idecompletar] definicion de %s -> %d:%d\n", defs[i].what, l0, c0);
+            if (l0 != defs[i].wantLin || c0 != defs[i].wantCol) { ok = false; why += std::string(" [") + defs[i].what + "]"; }
+        }
+        ide->SetText(ide->GetText() + "\nspin(self(), 1)");
+        const int lastLin = (int)ide->lines.size() - 1;
+        ide->GoToDefinition(lastLin, 1);
+        printf("      [idecompletar] definicion de spin -> %d:%d\n", ide->selLin, ide->selCol);
+        if (ide->selLin != 7 || ide->selCol != 9) { ok = false; why += " [spin]"; }
+        ide->GoToDefinition(12, 5);   // setRotationZ: es del motor -> su ayuda
+        printf("      [idecompletar] definicion de setRotationZ -> ayuda: %s\n", ide->defHelp.substr(0, ide->defHelp.find('\n')).c_str());
+        if (ide->defHelp.find("setRotationZ(") == std::string::npos) { ok = false; why += " [sin ayuda de setRotationZ]"; }
+        delete ide;
+        if (!ok) { err = "idecompletar:" + why; return false; }
+        printf("      [idecompletar] OK\n");
+        return true;
+    }
     if (cmd == "idetest") {
         extern PopupMenu* OpenMenu;
         bool ok = true;
@@ -30138,18 +30491,17 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         g_autoMerge = amPrev; g_autoMergeThreshold = thPrev;
         { const bool good = m->vertexSize < 32 && UF::Sel(m) == 1;
           printf("      [undoflow] tras mover y fusionar: verts=%d sel=%d (esp menos de 32: fusiono; 1) -> %s\n", m->vertexSize, UF::Sel(m), good ? "OK" : "MAL"); if (!good) ok = false; }
+        // (el move y su Auto Merge son UN paso: el primer Ctrl+Z vuelve al vertice ANTES de moverlo, sin pasar por los
+        //  vertices encimados sin fusionar -lo que se veia como "la malla rota"-; ver EditXformConfirm)
         W3dRunCommand("undo", e2);
-        { const bool good = m->vertexSize == 32 && UF::Sel(m) == 1 && UF::Has(m, 1, -1, 1) && !UF::Has(m, 0, -1, 1);
-          printf("      [undoflow] undo 1 (des-fusionar): verts=%d sel=%d, vert movido sigue en (1,-1,1)=%s (esp 32, 1, si) -> %s\n", m->vertexSize, UF::Sel(m), UF::Has(m, 1, -1, 1) ? "si" : "no", good ? "OK" : "MAL"); if (!good) ok = false; }
-        W3dRunCommand("undo", e2);
-        { const bool good = UF::Has(m, 0, -1, 1) && UF::Sel(m) == 1;
-          printf("      [undoflow] undo 2 (mover): vert de vuelta en (0,-1,1)=%s sel=%d (esp si, 1) -> %s\n", UF::Has(m, 0, -1, 1) ? "si" : "no", UF::Sel(m), good ? "OK" : "MAL"); if (!good) ok = false; }
+        { const bool good = m->vertexSize == 32 && UF::Sel(m) == 1 && UF::Has(m, 0, -1, 1);
+          printf("      [undoflow] undo 1 (mover y fusionar, juntos): verts=%d sel=%d, vert de vuelta en (0,-1,1)=%s (esp 32, 1, si) -> %s\n", m->vertexSize, UF::Sel(m), UF::Has(m, 0, -1, 1) ? "si" : "no", good ? "OK" : "MAL"); if (!good) ok = false; }
         W3dRunCommand("undo", e2);
         { const bool good = UF::Sel(m) == 4 && m->faces3d.size() == 10;
-          printf("      [undoflow] undo 3 (click): sel=%d caras=%d (esp 4 = los verts del corte, 10) -> %s\n", UF::Sel(m), (int)m->faces3d.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
+          printf("      [undoflow] undo 2 (click): sel=%d caras=%d (esp 4 = los verts del corte, 10) -> %s\n", UF::Sel(m), (int)m->faces3d.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
         W3dRunCommand("undo", e2);
         { const bool good = m->vertexSize == 24 && m->faces3d.size() == 6;
-          printf("      [undoflow] undo 4 (loop cut): verts=%d caras=%d (esp 24, 6) -> %s\n", m->vertexSize, (int)m->faces3d.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
+          printf("      [undoflow] undo 3 (loop cut): verts=%d caras=%d (esp 24, 6) -> %s\n", m->vertexSize, (int)m->faces3d.size(), good ? "OK" : "MAL"); if (!good) ok = false; }
         W3dRunCommand("mode object", e2);
         UndoClear();
         if (!ok) { err = "undoflow: ver los MAL de arriba"; return false; }
@@ -30166,6 +30518,16 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
                 for (size_t f=0;f<m->faces3d.size();f++){ const std::vector<int>& id=m->faces3d[f].idx; const int n=(int)id.size();
                     for (int i=0;i<n;i++){ int a=id[i], b=id[(i+1)%n]; a=hasRep?m->posRep[a]:a; b=hasRep?m->posRep[b]:b; if (a==b) continue; if (a>b){int t=a;a=b;b=t;} cnt[std::make_pair(a,b)]++; } }
                 int ab=0; for (std::map<std::pair<int,int>,int>::iterator it=cnt.begin(); it!=cnt.end(); ++it) if (it->second==1) ab++; return ab; }
+            // caras que pasan dos veces por el mismo lugar (la "explosion" del disolver en una cruz)
+            static int Repeated(const Mesh* m) { const int nV=m->vertexSize; const bool hasRep=((int)m->posRep.size()==nV); int bad=0;
+                for (size_t f=0;f<m->faces3d.size();f++){ std::set<int> seen; const std::vector<int>& id=m->faces3d[f].idx;
+                    for (size_t c=0;c<id.size();c++){ const int r=hasRep?m->posRep[id[c]]:id[c]; if (!seen.insert(r).second) { bad++; break; } } }
+                return bad; }
+            // una arista de dos esquinas del cubo, en un eje distinto de 'ejeNo' (0/1/2): para el segundo loop cut
+            static int CornerEdgeAxis(EditMesh* e, int ejeNo) { for (int eg=0; eg<e->NumEdges(); eg++){ const float* a=&e->pos[(size_t)e->lineIdx[(size_t)eg*2]*3]; const float* b=&e->pos[(size_t)e->lineIdx[(size_t)eg*2+1]*3];
+                    if (!Corner(a) || !Corner(b)) continue; int ax=-1; for (int k=0;k<3;k++) if (fabsf(a[k]-b[k])>1.5f) ax=k; if (ax>=0 && ax!=ejeNo) return eg; } return -1; }
+            static int EdgeAxis(EditMesh* e, int eg) { const float* a=&e->pos[(size_t)e->lineIdx[(size_t)eg*2]*3]; const float* b=&e->pos[(size_t)e->lineIdx[(size_t)eg*2+1]*3];
+                for (int k=0;k<3;k++) if (fabsf(a[k]-b[k])>1e-3f) return k; return -1; }
             static int SelEdges(EditMesh* e, int mode) { int n=0; e->edgeSel.assign((size_t)e->NumEdges(), 0);
                 for (int eg=0; eg<e->NumEdges(); eg++){ const float* a=&e->pos[(size_t)e->lineIdx[(size_t)eg*2]*3]; const float* b=&e->pos[(size_t)e->lineIdx[(size_t)eg*2+1]*3]; bool sel=false;
                     if (mode==0) sel = Corner(a) && Corner(b) && fabsf(a[1]-1.0f)<1e-3f && fabsf(b[1]-1.0f)<1e-3f && fabsf(a[0]-b[0])>1.5f && fabsf(a[2]-b[2])>1.5f;
@@ -30195,6 +30557,23 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
           const bool r = m->DeleteEdgeLoopEdit(); m->EnsureEdit();
           const bool good = nsel == 2 && r && m->faces3d.size() == 8 && m->edit->NumVerts() == 11 && DT::Open(m) == 0;
           printf("      [dissolvetest] 2 aristas del corte: seleccionadas=%d, %s -> caras=%d verts=%d abiertas=%d (esp 2, 8, 11, 0) -> %s\n", nsel, r ? "disolvio" : "NO disolvio", (int)m->faces3d.size(), m->edit->NumVerts(), DT::Open(m), good ? "OK" : "MAL");
+          if (!good) ok = false; W3dRunCommand("mode object", e2); }
+        // UNA CRUZ: dos loop cuts perpendiculares (se cruzan en dos caras) y los dos loops enteros elegidos. Las caras
+        // alrededor de cada cruce comparten DOS aristas con lo ya fundido: el empalme de a pares dejaba poligonos que
+        // pasaban dos veces por el cruce y la malla "explotaba". Tiene que volver al cubo
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeselectAll(); o->Select(); ActiveObj = m; m->GenerateRender();
+          W3dRunCommand("mode edit", e2); m->EnsureEdit();
+          const int ax0 = DT::EdgeAxis(m->edit, 0);
+          W3dRunCommand("loopcut 0 1 0.5", e2); m->EnsureEdit();
+          const int eg2 = DT::CornerEdgeAxis(m->edit, ax0);
+          char lc[64]; snprintf(lc, sizeof lc, "loopcut %d 1 0.5", eg2); W3dRunCommand(lc, e2); m->EnsureEdit();
+          W3dRunCommand("selmode edge", e2);
+          const int nsel = DT::SelEdges(m->edit, 1);
+          const bool r = m->DeleteEdgeLoopEdit(); m->EnsureEdit();
+          const bool good = nsel == 12 && r && m->faces3d.size() == 6 && DT::Sides(m,4) == 6 && m->edit->NumVerts() == 8 &&
+                            DT::Open(m) == 0 && DT::Repeated(m) == 0;
+          printf("      [dissolvetest] cruz (dos loops que se cruzan): seleccionadas=%d, %s -> caras=%d quads=%d verts=%d abiertas=%d repetidas=%d (esp 12, 6, 6, 8, 0, 0) -> %s\n",
+                 nsel, r ? "disolvio" : "NO disolvio", (int)m->faces3d.size(), DT::Sides(m,4), m->edit->NumVerts(), DT::Open(m), DT::Repeated(m), good ? "OK" : "MAL");
           if (!good) ok = false; W3dRunCommand("mode object", e2); }
         UndoClear();
         if (!ok) { err = "dissolvetest: ver los MAL de arriba"; return false; }
@@ -32793,6 +33172,52 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
             err="symbkeys: las teclas del timeline en symbian no andan"; return false; }
         return true;
     }
+    // ---- addrefimage <imagen> [ancho alto] : Add > Reference DE VERDAD: el explorador que abre va a la carpeta de la
+    //      imagen y la elige (doble click). La referencia es un VACIO con imagen (forma Imagen, objects/Empty.h): imprime
+    //      el cuadro de la imagen (ancho x alto, el lado largo = el tamanio del dibujo) y el giro del objeto; con ancho y
+    //      alto, los verifica. El objeto nace girado 90 en X (la imagen va acostada en su X-Y, como Blender) y en el MUNDO
+    //      queda parada mirando al frente: el lado de abajo a lo ancho de X (sin espejar) y el izquierdo para arriba ----
+    if (cmd == "addrefimage") {
+        std::string img; float ew = -1, eh = -1; ss >> img >> ew >> eh;
+        if (img.empty()) { err = "addrefimage: falta la imagen"; return false; }
+        std::string abs;
+        try { abs = std::filesystem::absolute(std::filesystem::path(img)).generic_string(); } catch (...) { abs = img; }
+        AddReference();
+        Object* r = ActiveObj;
+        FileBrowser* fb = dynamic_cast<FileBrowser*>(PopUpActive);
+        if (!fb) { err = "addrefimage: no se abrio el selector de imagen"; return false; }
+        const size_t sl = abs.find_last_of('/');
+        fb->Navigate(abs.substr(0, sl), true);
+        const std::string name = abs.substr(sl + 1);
+        if (!fb->EnterName(name) || !fb->EnterName(name)) { err = "addrefimage: el explorador no tiene " + name; return false; }
+        if (PopUpActive == fb) { err = "addrefimage: el explorador no la acepto"; return false; }
+        if (!r || r != ActiveObj || r->getType() != ObjectType::empty) { err = "addrefimage: la referencia (un Vacio) no quedo activa"; return false; }
+        Empty* e = (Empty*)r;
+        Texture* t = e->ImageAlive();
+        if (e->shape != EmptyImage || !t) { err = "addrefimage: la imagen no llego al Vacio"; return false; }
+        float hw = 0, hh = 0; e->ImageHalfSize(hw, hh);
+        const float w = 2 * hw, h = 2 * hh;
+        const Vector3 rot = r->rotEuler;
+        printf("      [addrefimage] %s (textura %dx%d, imagen %dx%d) -> cuadro %.3f x %.3f, giro %.1f %.1f %.1f, escala %.2f, opacidad %.2f\n",
+               name.c_str(), t->width, t->height, e->imageW, e->imageH, w, h, rot.x, rot.y, rot.z, r->scale.x, e->imageOpacity);
+        if (ew >= 0 && (fabsf(w - ew) > 0.01f || fabsf(h - eh) > 0.01f)) {
+            char b[160]; snprintf(b, sizeof b, "addrefimage: la imagen mide %.3f x %.3f, se esperaba %.3f x %.3f", w, h, ew, eh);
+            err = b; return false;
+        }
+        if (fabsf(rot.x - 90) > 1e-3f || fabsf(rot.y) > 1e-3f || fabsf(rot.z) > 1e-3f || fabsf(r->scale.x - 1) > 1e-4f) {
+            err = "addrefimage: la referencia tiene que nacer girada 90 en X y con escala 1"; return false;
+        }
+        // las esquinas en el MUNDO (ejes del motor: Y arriba, la vista de frente mira desde +Z con X a la derecha)
+        float c[12]; e->ImageCorners(c);
+        const Vector3 bl = r->LocalToWorld(Vector3(c[0], c[1], c[2])), br = r->LocalToWorld(Vector3(c[3], c[4], c[5]));
+        const Vector3 tl = r->LocalToWorld(Vector3(c[6], c[7], c[8]));
+        printf("      [addrefimage] en el mundo: abajo de %.2f a %.2f en X, alto %.2f en Y, profundidad %.3f\n",
+               bl.x, br.x, tl.y - bl.y, fabsf(tl.z - bl.z) + fabsf(br.z - bl.z));
+        if (fabsf((br.x - bl.x) - w) > 0.01f || fabsf((tl.y - bl.y) - h) > 0.01f || fabsf(tl.z - bl.z) > 0.01f || fabsf(br.z - bl.z) > 0.01f) {
+            err = "addrefimage: en el mundo la imagen no queda parada mirando al frente (derecha y sin espejar)"; return false;
+        }
+        return true;
+    }
     // ---- addref : Add > Reference (plano parado + material + selector de textura) y Add > Vertex (entra a
     //      Edit Mode con el vertice ya elegido). ----
     if (cmd == "addref") {
@@ -32802,27 +33227,23 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         void (*prev)(Material*) = DialogLoadTexture;
         DialogLoadTexture = H::Open; gRequest = NULL;
 
-        // ---- Reference ----
-        int before = (int)AnimationObjects.size(); (void)before;
+        // ---- Reference: un VACIO con imagen (no una malla: no va a "Mallas 3D" ni al render), girado 90 en X (la imagen
+        //      va acostada en su X-Y, como Blender: asi queda parada), con el selector de imagen abierto (el puente: un
+        //      material que NO entra a la lista) ----
+        const size_t matsBefore = Materials.size();
         AddReference();
         Object* r = ActiveObj;
-        bool isMesh = (r && r->getType() == ObjectType::mesh);
-        printf("      [addref] Reference creada: name='%s' | tipo malla=%s\n",
-               r ? r->name.c_str() : "(nada)", isMesh ? "si" : "NO");
-        bool okName = (r && r->name == "Reference");
+        const bool isEmpty = (r && r->getType() == ObjectType::empty && ((Empty*)r)->shape == EmptyImage);
+        printf("      [addref] Reference creada: name='%s' | Vacio con imagen=%s\n",
+               r ? r->name.c_str() : "(nada)", isEmpty ? "si" : "NO");
+        bool okName = (r && r->name == T("Reference"));   // (en el idioma del editor: "Referencia")
         Vector3 e = r ? r->rotEuler : Vector3(0,0,0);
-        printf("      [addref] rotacion: X=%.1f Y=%.1f Z=%.1f -> %s\n", e.x, e.y, e.z,
-               (fabsf(e.x - 90.0f) < 0.01f && fabsf(e.y) < 0.01f && fabsf(e.z) < 0.01f)
-                   ? "parada (90 en X) OK" : "MAL");
-        bool okRot = (r && fabsf(e.x - 90.0f) < 0.01f && fabsf(e.y) < 0.01f && fabsf(e.z) < 0.01f);
-        Material* mat = (isMesh && !((Mesh*)r)->materialsGroup.empty())
-                        ? ((Mesh*)r)->materialsGroup[0].material : NULL;
-        printf("      [addref] material propio: %s | selector de textura abierto para ESE material: %s\n",
-               mat ? mat->name.c_str() : "NINGUNO!", (gRequest && gRequest == mat) ? "OK" : "NO SE ABRIO!");
-        bool okMat = (mat != NULL) && (gRequest == mat) && mat->textureOn;
-        printf("      [addref] lighting del material: %s -> %s\n", (mat && mat->lighting) ? "PRENDIDO" : "off",
-               (mat && !mat->lighting) ? "OK (la referencia no se sombrea)" : "MAL");
-        if (mat && mat->lighting) okMat = false;
+        bool okRot = (r && fabsf(e.x - 90) < 0.01f && fabsf(e.y) < 0.01f && fabsf(e.z) < 0.01f);
+        printf("      [addref] rotacion: X=%.1f Y=%.1f Z=%.1f -> %s\n", e.x, e.y, e.z, okRot ? "90 en X OK" : "MAL");
+        bool okMat = (gRequest != NULL) && (Materials.size() == matsBefore);
+        printf("      [addref] selector de imagen abierto: %s | materiales del proyecto %d -> %d (%s)\n", gRequest ? "OK" : "NO SE ABRIO!",
+               (int)matsBefore, (int)Materials.size(), Materials.size() == matsBefore ? "ninguno nuevo OK" : "MAL");
+        const bool isMesh = isEmpty;   // (el chequeo de abajo)
 
         // ---- Vertex ----
         InteractionMode = ObjectMode;
@@ -33430,9 +33851,11 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //      cuyo nombre contiene <substr>. Para comparar la rotacion de un hueso (ej brazo) baseline vs reimportado. ----
     if (cmd == "bonepose") {
         std::string sub; int frame=15; ss >> sub >> frame;
+        // "<armature>:<hueso>" elige el armature (con varios -un glTF con dos personajes-); sin ':' el primero
+        std::string armN; { size_t dp = sub.find(':'); if (dp != std::string::npos) { armN = sub.substr(0, dp); sub = sub.substr(dp + 1); } }
         Armature* a=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
-          while(!st.empty() && !a){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) a=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
-        if(!a){err="bonepose: sin armature";return false;}
+          while(!st.empty() && !a){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature && (armN.empty() || o->name == armN)) a=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!a){err="bonepose: sin armature" + (armN.empty() ? std::string() : " '" + armN + "'");return false;}
         int bi=-1; for(size_t b=0;b<a->bones.size();b++) if(a->bones[b].name.find(sub)!=std::string::npos){ bi=(int)b; break; }
         if(bi<0){err="bonepose: hueso '"+sub+"' no encontrado";return false;}
         extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
@@ -33463,6 +33886,30 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         return true;
     }
     // ---- meshskin : lista cada malla de la escena con su nombre, verts, si tiene skinArmature y cuantos vertex groups. ----
+    // ---- meshpiel <malla> <armature> : la malla va pegada a ESE armature (su piel: modificador Armature + skinArmature).
+    //      Un glTF con varios personajes arma un armature por piel y cada malla con el suyo ----
+    if (cmd == "meshpiel") {
+        std::string mn, an; ss >> mn >> an;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, mn) : NULL;
+        if (!o || o->getType() != ObjectType::mesh) { err = "meshpiel: no hay malla '" + mn + "'"; return false; }
+        Mesh* m = (Mesh*)o;
+        const std::string tiene = m->skinArmature ? m->skinArmature->name : std::string("(ninguno)");
+        printf("      [meshpiel] '%s' -> armature '%s' (grupos=%d)\n", mn.c_str(), tiene.c_str(), (int)m->vertexGroups.size());
+        if (tiene != an) { err = "meshpiel: '" + mn + "' va con '" + tiene + "', se esperaba '" + an + "'"; return false; }
+        return true;
+    }
+    // ---- armclips <armature> <n> : el armature existe y tiene n clips ----
+    if (cmd == "armclips") {
+        std::string an; int n = -1; ss >> an >> n;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, an) : NULL;
+        if (!o || o->getType() != ObjectType::armature) { err = "armclips: no hay armature '" + an + "'"; return false; }
+        Armature* a = (Armature*)o;
+        printf("      [armclips] '%s': %d hueso(s), %d clip(s):", an.c_str(), (int)a->bones.size(), (int)a->animations.size());
+        for (size_t i = 0; i < a->animations.size(); i++) printf(" '%s'", a->animations[i] ? a->animations[i]->name.c_str() : "?");
+        printf("\n");
+        if (n >= 0 && (int)a->animations.size() != n) { char m[160]; snprintf(m, sizeof m, "armclips: '%s' tiene %d clips, se esperaban %d", an.c_str(), (int)a->animations.size(), n); err = m; return false; }
+        return true;
+    }
     if (cmd == "meshskin") {
         int n = 0; std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
         while(!st.empty()){ Object* o=st.back(); st.pop_back();
@@ -33831,6 +34278,54 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //      hay forma de medir por script lo que ve el JUGADOR: `vporbita` justamente
     //      lo apaga. Lo necesita la prueba del LOD (que conmuta segun donde esta la
     //      camara del juego) y cualquier assert de pixel "como se ve jugando". ----
+    // ---- vpprobes <luz 0|1> <reflejo 0|1> : las SONDAS de la Vista 3D (el menu Overlays: "Light Probes" / "Reflection
+    //      Probes", el antes y despues). Abre el menu Overlays de verdad y ASSERTA que los dos items esten y apunten a esas
+    //      banderas; despues las pone como se pide ----
+    if (cmd == "vpprobes") {
+        int lu = 1, re = 1; ss >> lu >> re;
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "vpprobes: no hay layout de viewports"; return false; }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "vpprobes: no hay viewport 3D"; return false; }
+        vp->OpenMenuOverlays(0, 0);
+        extern PopupMenu* OpenMenu;
+        PopupMenu* m = OpenMenu;
+        bool itLight = false, itRefl = false;
+        if (m) for (size_t i = 0; i < m->items.size(); i++) {
+            const MenuItem* it = m->items[i];
+            if (it->text == T("Light Probes") && it->checkbox == &vp->useLightProbes) itLight = true;
+            if (it->text == T("Reflection Probes") && it->checkbox == &vp->useReflectionProbes) itRefl = true;
+        }
+        if (m) m->Close();
+        if (!itLight || !itRefl) { err = "vpprobes: el menu Overlays no tiene los items de las sondas"; return false; }
+        vp->useLightProbes = (lu != 0); vp->useReflectionProbes = (re != 0);
+        g_redraw = true;
+        printf("      [vpsondas] luz=%s reflejo=%s (menu Overlays OK)\n", lu ? "si" : "no", re ? "si" : "no");
+        return true;
+    }
+    // ---- bakelightnamed <nombre> <ancho> <alto> <muestras> [capaUV] [shadowmask 0|1] : como bakelight, en una textura NUEVA
+    //      con ese nombre (una por objeto, para hornear la escena entera), en esa capa UV (-1 o sin ella: la activa) y, con
+    //      shadowmask 1, las SOMBRAS del sol + la indirecta con la luz de tiempo real (TexLayer::shadowmask) ----
+    if (cmd == "bakelightnamed") {
+        std::string name; int w = 256, h = 256, mu = 32, uv = -1, smk = 0; ss >> name >> w >> h >> mu >> uv >> smk;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "bakelightnamed: no hay malla activa"; return false; }
+        if (name.empty()) { err = "bakelightnamed: falta el nombre"; return false; }
+        extern std::string W3dCreateTextureProject(const std::string&, int, int, int, const float*, bool, std::string&);
+        static const float white[4] = { 1, 1, 1, 1 };
+        std::string msg;
+        const std::string path = W3dCreateTextureProject(name, 0, w, h, white, false, msg);
+        Texture* t = path.empty() ? NULL : TextureFind(path);
+        if (!t) { err = "bakelightnamed: no pude crear la textura: " + msg; return false; }
+        extern bool PropsBakeNowMode(Mesh*, Texture*, int, int, int, std::string*);
+        extern unsigned int w3dGetTicks();
+        const unsigned int t0 = w3dGetTicks();
+        std::string reason;
+        if (!PropsBakeNowMode(m, t, uv, mu, smk ? 1 : 0, &reason)) { err = "bakelightnamed: " + reason; return false; }
+        printf("      [hornearluz] '%s' en '%s' %dx%d, capa UV %d, %d muestras%s: %u ms\n", m->name.c_str(), t->path.c_str(), w, h, uv, mu,
+               smk ? ", shadowmask" : "", w3dGetTicks() - t0);
+        return true;
+    }
     if (cmd == "vpcamera") {
         std::string sub; ss >> sub;
         extern Viewport3D* Viewport3DActive;
@@ -34097,6 +34592,26 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         InputUserSDL3(ev);
         if (rootViewport) rootViewport->Render();
         if (PopUpActive) PopUpActive->Render();
+        return true;
+    }
+    // ---- projectsaveas : el "Guardar como" del proyecto (el explorador abierto, para fbshow / fbaccept) ----
+    if (cmd == "projectsaveas") { extern void SaveProjectAs(); SaveProjectAs(); g_redraw = true; return true; }
+    // ---- fbpath <carpeta> : ASSERT de la carpeta en la que esta el explorador abierto ----
+    if (cmd == "fbpath") {
+        std::string want; ss >> want;
+        FileBrowser* fb = dynamic_cast<FileBrowser*>(PopUpActive);
+        if (!fb) { err = "fbpath: no hay un explorador abierto"; return false; }
+        printf("      [fbpath] '%s' (esperada '%s')\n", fb->currentPath.c_str(), want.c_str());
+        if (fb->currentPath != want) { err = "fbpath: el explorador esta en '" + fb->currentPath + "'"; return false; }
+        return true;
+    }
+    // ---- fieldis <texto|none> : ASSERT del campo de texto enfocado (su texto; none = ninguno enfocado) ----
+    if (cmd == "fieldis") {
+        std::string want; std::getline(ss, want);
+        size_t p0 = want.find_first_not_of(" \t"); want = (p0 == std::string::npos) ? std::string() : want.substr(p0);
+        const std::string got = g_activeTextField ? g_activeTextField->text : std::string("none");
+        printf("      [fieldis] '%s' (esperado '%s')\n", got.c_str(), want.c_str());
+        if (got != want) { err = "fieldis: el campo enfocado es '" + got + "', se esperaba '" + want + "'"; return false; }
         return true;
     }
     // ---- field [enfocar-nombre] : el campo de texto ENFOCADO (texto, cursor, seleccion) y donde se dibujo ----
@@ -35875,6 +36390,40 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         if (esp == "none" && PopUpActive) { err = "popupinfo: hay un popup activo"; return false; }
         return true;
     }
+    // ---- tapxy <x> <y> [mouse] [menu|nomenu] : un TOQUE (o un click de mouse) en ese punto de la ventana, con los eventos
+    //      en el orden de SDL (el mouse sintetizado y despues el dedo) y su tiempo (el toque se suelta un rato despues).
+    //      Con menu/nomenu falla si al soltar no quedo (o quedo) un menu desplegable abierto ----
+    if (cmd == "tapxy") {
+        int x = -1, y = -1; std::string a, b; ss >> x >> y >> a >> b;
+        if (x < 0 || y < 0) { err = "tapxy: uso: tapxy <x> <y> [mouse] [menu|nomenu]"; return false; }
+        const bool mouse = (a == "mouse" || b == "mouse");
+        const std::string expect = (a == "menu" || a == "nomenu") ? a : b;
+        extern void InputUserSDL3(SDL_Event&);
+        struct T {
+            static void Button(Uint32 type, int x, int y, bool mouse) {
+                SDL_Event e; memset(&e, 0, sizeof(e)); e.type = type; e.button.which = mouse ? 0 : SDL_TOUCH_MOUSEID;
+                e.button.button = SDL_BUTTON_LEFT; e.button.clicks = 1; e.button.state = (type == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+                e.button.x = x; e.button.y = y; InputUserSDL3(e); }
+            static void Finger(Uint32 type, int x, int y) {
+                int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+                if (ww <= 0 || hh <= 0) { ww = MenuScreenW; hh = MenuScreenH; }
+                SDL_Event e; memset(&e, 0, sizeof(e)); e.type = type; e.tfinger.fingerId = 1;
+                e.tfinger.x = ((float)x + 0.5f) / (float)ww; e.tfinger.y = ((float)y + 0.5f) / (float)hh;
+                e.tfinger.pressure = (type == SDL_FINGERUP) ? 0.0f : 1.0f; InputUserSDL3(e); }
+        };
+        if (window) SDL_WarpMouseInWindow(window, (float)x, (float)y);
+        T::Button(SDL_MOUSEBUTTONDOWN, x, y, mouse);
+        if (!mouse) T::Finger(SDL_FINGERDOWN, x, y);
+        SDL_Delay(90);
+        if (!mouse) T::Finger(SDL_FINGERUP, x, y);
+        T::Button(SDL_MOUSEBUTTONUP, x, y, mouse);
+        extern bool LayoutMenuOpen();
+        const bool open = LayoutMenuOpen();
+        printf("      [tapxy] %s en (%d,%d): menu %s\n", mouse ? "click" : "toque", x, y, open ? "ABIERTO" : "cerrado");
+        if (expect == "menu" && !open) { err = "tapxy: no quedo ningun menu abierto"; return false; }
+        if (expect == "nomenu" && open) { err = "tapxy: quedo un menu abierto"; return false; }
+        return true;
+    }
     // ---- touch 1|0 : simula que hubo (o no) pantalla tactil (ToolbarUsesTouch) para probar la UI tactil ----
     if (cmd == "touch") {
         int v = 1; ss >> v; extern Uint32 g_lastFingerTicks; g_lastFingerTicks = v ? SDL_GetTicks() : 0;
@@ -37563,6 +38112,41 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         const bool ok = SaveAsNow(force != 0, msg);
         printf("      [guardarcomo] %s %s\n", ok ? "OK" : "NO", msg.c_str());
         if (!ok) { err = "guardarcomo: " + msg; return false; }
+        return true;
+    }
+    // ---- saveaspress nombre internal(0|1|-1) [folderDisk] : lo mismo pero con el BOTON Guardar (si ya existe, pregunta) ----
+    if (cmd == "saveaspress") {
+        std::string name, folderDisk; int internal = -1; ss >> name >> internal >> folderDisk;
+        if (folderDisk == "-") folderDisk.clear();
+        if (!SaveAsOpen()) { err = "saveaspress: el formulario no esta abierto"; return false; }
+        SaveAsSet(name, internal, std::string(), folderDisk);
+        SaveAsPress();
+        const bool asked = PopUpActive && PopUpActive == confirmPopup;
+        printf("      [guardarcomo] boton Guardar: %s%s\n", asked ? "pregunta: " : (SaveAsOpen() ? "el formulario sigue abierto" : "guardado"),
+               asked ? confirmPopup->message.c_str() : "");
+        return true;
+    }
+    // ---- confirm si|no [texto] : contesta la pregunta abierta (Si/No del cartel, como Enter/Esc). Con texto, la
+    //      pregunta tiene que contenerlo ----
+    if (cmd == "confirm") {
+        std::string r, text; ss >> r; std::getline(ss, text);
+        { const size_t a = text.find_first_not_of(" \t"); text = (a == std::string::npos) ? std::string() : text.substr(a); }
+        if (!PopUpActive || PopUpActive != confirmPopup) { err = "confirm: no hay pregunta abierta"; return false; }
+        if (!text.empty() && confirmPopup->message.find(text) == std::string::npos) {
+            err = "confirm: la pregunta es '" + confirmPopup->message + "', se esperaba que dijera '" + text + "'"; return false;
+        }
+        printf("      [confirmar] %s a: %s\n", r.c_str(), confirmPopup->message.c_str());
+        confirmPopup->Key(r == "si" ? LayoutKey::Accept : LayoutKey::Cancel);
+        return true;
+    }
+    // ---- samefile a b : los dos archivos del disco tienen los mismos bytes ----
+    if (cmd == "samefile") {
+        std::string a, b; ss >> a >> b;
+        std::vector<unsigned char> da, db;
+        if (!w3dFileSystem::ReadFileBytes(a, da)) { err = "samefile: no se pudo leer " + a; return false; }
+        if (!w3dFileSystem::ReadFileBytes(b, db)) { err = "samefile: no se pudo leer " + b; return false; }
+        printf("      [mismoarchivo] %s (%d bytes) / %s (%d bytes)\n", a.c_str(), (int)da.size(), b.c_str(), (int)db.size());
+        if (da != db) { err = "samefile: distintos"; return false; }
         return true;
     }
     // ---- uvsave n : accion del menu guardar del editor UV (1 Guardar 3 en el w3d 4 exportar mapa 5 guardar como) ----
@@ -43776,13 +44360,45 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
     //                           el cubo en el centro, las barras del encuadre en
     //                           negro OPACO y el HUD encima del 3D.
     // ========================================================================
-    // game3dmin <carpeta> [light]: 'light' cuelga una linterna de la camara (para las pruebas que comparan los PIXELES
-    // del juego compilado; las demas miran la forma exacta de la escena: indices, hijos, lo que genera un prefab)
+    // game3dmin <carpeta> [light] [free]: 'light' cuelga una linterna de la camara (para las pruebas que comparan los
+    // PIXELES del juego compilado; las demas miran la forma exacta de la escena: indices, hijos, lo que genera un prefab).
+    // 'free': la camara NO declara aspecto (manda el de la ventana), el juego abre en VENTANA (600x600, no 4:3) y el
+    // script, en vez de los binds, verifica que screenPoint proyecte con el aspecto de la imagen dibujada (prende la
+    // franja solo si da bien). Ver prueba_juego3d_aspecto.w3s
     if (cmd == "game3dmin") {
-        std::string dir, opt; ss >> dir >> opt;
-        if (dir.empty()) { err = "game3dmin: uso: game3dmin <carpeta> [light]"; return false; }
+        std::string dir, tok; ss >> dir;
+        bool light = false, freeAspect = false;
+        while (ss >> tok) { if (tok == "light") light = true; else if (tok == "free") freeAspect = true; }
+        if (dir.empty()) { err = "game3dmin: uso: game3dmin <carpeta> [light] [free]"; return false; }
         std::error_code ec; std::filesystem::create_directories(dir, ec);
         // el script del HUD: minimo pero REAL (Compilar juego rechaza un proyecto sin scripts)
+        if (freeAspect) {
+          FILE* f = fopen((dir + "/juego3dmin.lua").c_str(), "w");
+          if (!f) { err = "game3dmin: no pude escribir el .lua"; return false; }
+          // EL ASPECTO DEL JUEGO COMPILADO. screenPoint/screenOf/screenRay (MatrixScreen) proyectan con g_renderAspect,
+          // que en el editor lo fija el panel del render y en el juego compilado se quedaba en el 4:3 por defecto: con
+          // una ventana de otro aspecto el rayo no pasaba por donde se tocaba. Con pixeles cuadrados, 1 m a la derecha
+          // y 1 m arriba del cubo (a la misma distancia de la camara) tienen que dar los MISMOS pixeles. Se mira en el
+          // start() (antes del primer cuadro dibujado) y en el cuadro 10; con el bug, en la ventana 1:1 daba 0.75.
+          fputs("-- juego 3D minimo: el aspecto de screenPoint en el juego compilado\n"
+                "local n, alInicio = 0, 0\n"
+                "local function relacion()\n"
+                "  local x1 = screenPoint(1, 0, 0)      -- 1 m a la derecha (Lua: Z arriba)\n"
+                "  local _, y2 = screenPoint(0, 0, 1)   -- 1 m arriba\n"
+                "  if math.abs(y2) < 1 then return 0 end\n"
+                "  return math.abs(x1) / math.abs(y2)\n"
+                "end\n"
+                "function start() alInicio = relacion() end\n"
+                "function update(dt)\n"
+                "  n = n + 1\n"
+                "  if n == 10 then\n"
+                "    local r = relacion()\n"
+                "    print(string.format('[aspecto] al inicio %.4f, en el cuadro 10 %.4f (tiene que dar 1)', alInicio, r))\n"
+                "    show(object(\"franja\"), math.abs(r - 1) < 0.01 and math.abs(alInicio - 1) < 0.01)\n"
+                "  end\n"
+                "end\n", f);
+          fclose(f);
+        } else
         { FILE* f = fopen((dir + "/juego3dmin.lua").c_str(), "w");
           if (!f) { err = "game3dmin: no pude escribir el .lua"; return false; }
           // El script NO es decorativo: es el que PRENDE la franja del HUD, y para
@@ -43827,8 +44443,10 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         //     apaisada el juego tiene que dibujar barras negras a los costados ---
         Camera* cam = new Camera(NULL, Vector3(0, 0, 8), Vector3(0, 0, 0));
         cam->name = "Camara";
-        cam->aspect = 1.0f;
+        cam->aspect = freeAspect ? 0.0f : 1.0f;   // 'free': no declara (0) -> manda el aspecto de la ventana
         cam->fov = 45.0f; cam->nearClip = 0.1f; cam->farClip = 100.0f;
+        // 'free': el juego abre en VENTANA (600x600: 1:1, distinto del 4:3 por defecto), no en pantalla completa
+        if (freeAspect) g_projCompile.windowMode = 0;
         extern Camera* CameraActive; CameraActive = cam;
         // --- el HUD: una franja de color arriba, con el script colgado ---
         UI* ui = new UI(NULL, Vector3(0, 0, 0));
@@ -43856,9 +44474,10 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         // --- con 'light', una LINTERNA colgada de la camara. El juego compilado dibuja SIEMPRE en modo Render
         //     (w3drun.cpp), y ahi una escena sin luces solo tiene el ambiente del fondo -casi negro-: el Play del editor
         //     la veia con la luz de su vista previa y la comparacion de pixeles fallaba por la escena, no por el runtime ---
-        if (opt == "light") { Light* lamp = Light::Create(cam, 0.0f, 0.0f, 0.0f); if (lamp) lamp->name = "Linterna"; }
+        if (light) { Light* lamp = Light::Create(cam, 0.0f, 0.0f, 0.0f); if (lamp) lamp->name = "Linterna"; }
         DeselectAll(); ActiveObj = NULL;
-        printf("      [juego3dmin] cubo + camara%s (aspecto 1:1) + HUD con script en '%s'\n", opt == "light" ? " con linterna" : "", dir.c_str());
+        printf("      [juego3dmin] cubo + camara%s (%s) + HUD con script en '%s'\n", light ? " con linterna" : "",
+               freeAspect ? "sin aspecto declarado, en ventana" : "aspecto 1:1", dir.c_str());
         return true;
     }
 
@@ -43904,9 +44523,132 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         return true;
     }
 
+    // ---- exampleclock <carpeta> : el EJEMPLO del reloj (Whisk3D-Examples/w3d_format/reloj): una esfera con las 12 marcas
+    //      y una AGUJA que da una vuelta por minuto, con la HORA DEL SISTEMA (unixTime/date de lua). El script (reloj.lua,
+    //      colgado de la aguja) guarda la hora de arranque en start() y en cada cuadro calcula cuanto paso: gira la aguja
+    //      (60 segundos = 360 grados, y vuelve a cero) y escribe abajo las horas, minutos y segundos que lleva corriendo,
+    //      con la hora de ahora. Despues "savew3d <carpeta>/reloj.w3d" lo deja en un solo archivo (el .lua va adentro) ----
+    if (cmd == "exampleclock") {
+        std::string dir; ss >> dir;
+        if (dir.empty()) { err = "exampleclock: uso: exampleclock <carpeta>"; return false; }
+        std::error_code ec; std::filesystem::create_directories(dir, ec);
+        const std::string lua = dir + "/reloj.lua";
+        { FILE* f = fopen(lua.c_str(), "w");
+          if (!f) { err = "exampleclock: no pude escribir el .lua"; return false; }
+          fputs("-- UN RELOJ que mide cuanto tiempo lleva corriendo el juego (o el Play del editor).\n"
+                "-- Este script esta colgado de la AGUJA: un objeto vacio en el centro de la esfera, con la varilla de hija.\n"
+                "-- self() es la aguja, asi que girarla gira la varilla alrededor del centro.\n"
+                "--\n"
+                "-- unixTimeSec() da la hora del sistema como tiempo UNIX: los segundos desde el 1/1/1970 en UTC, con decimales.\n"
+                "-- start() guarda la hora de arranque; en cada cuadro, lo que paso es la de ahora menos esa.\n"
+                "-- Es la hora de PARED: mide el tiempo real aunque el juego vaya lento o se trabe un cuadro.\n"
+                "\n"
+                "local inicio      -- la hora de arranque\n"
+                "local mensaje     -- el texto de abajo\n"
+                "\n"
+                "function start()\n"
+                "  inicio = unixTimeSec()\n"
+                "  mensaje = find(\"Mensaje\")\n"
+                "end\n"
+                "\n"
+                "function update(dt)\n"
+                "  local t = unixTimeSec() - inicio    -- los segundos que pasaron, con decimales\n"
+                "  -- LA AGUJA: 60 segundos = una vuelta (360 grados), 6 grados por segundo. El resto (%) la vuelve a cero\n"
+                "  -- cada minuto. Gira sobre el eje que apunta a la camara; el signo la hace ir como las agujas del reloj.\n"
+                "  setRotation(self(), 0, -(t % 60) * 6, 0)\n"
+                "  -- EL MENSAJE: las horas, minutos y segundos que pasaron, y la hora de ahora (local y en UTC)\n"
+                "  local h = math.floor(t / 3600)\n"
+                "  local m = math.floor(t / 60) % 60\n"
+                "  local s = math.floor(t) % 60\n"
+                "  local ahora = date()            -- la hora local de la maquina\n"
+                "  local utc = date(nil, true)     -- la misma, en UTC\n"
+                "  setText(mensaje, string.format(\"Corriendo hace %d h %02d min %02d s     Son las %02d:%02d:%02d (UTC %02d:%02d)\",\n"
+                "                                 h, m, s, ahora.hour, ahora.min, ahora.sec, utc.hour, utc.min))\n"
+                "end\n", f);
+          fclose(f); }
+        extern void RestartScene();
+        RestartScene();
+        // los MATERIALES (uno por color, compartidos) y como se le pone uno a la malla (su primera parte)
+        struct Paint {
+            static Material* New(const char* nom, float r, float g, float b) {
+                Material* mt = FactoryMaterial(new Material(nom));
+                mt->diffuse[0] = r; mt->diffuse[1] = g; mt->diffuse[2] = b; mt->diffuse[3] = 1.0f;
+                return mt;
+            }
+            static void On(Mesh* m, Material* mt) {
+                if (!m->materialsGroup.empty()) { m->materialsGroup[0].material = mt; m->materialsGroup[0].name = mt->name; }
+            }
+        };
+        Material* matFace = Paint::New("Esfera", 0.92f, 0.90f, 0.84f);
+        Material* matMark = Paint::New("Marca", 0.15f, 0.15f, 0.18f);
+        Material* matHand = Paint::New("Aguja", 0.85f, 0.12f, 0.10f);
+        // LA ESFERA: un cilindro chato que mira a la camara (su eje, el Y, se acuesta sobre el Z)
+        Mesh* face = (Mesh*)NewMesh(MeshType(MeshType::cylinder), NULL, false);
+        if (!face) { err = "exampleclock: NewMesh (esfera) fallo"; return false; }
+        face->SetNameObj("Esfera");
+        face->meshVerts = 48; face->Regenerate();   // redonda (el cilindro de fabrica tiene 8 lados)
+        face->SetRotEuler(Vector3(90.0f, 0.0f, 0.0f));
+        face->scale = Vector3(1.2f, 0.04f, 1.2f);
+        Paint::On(face, matFace);
+        // las 12 MARCAS de las horas (las de 12, 3, 6 y 9, mas grandes)
+        for (int i = 0; i < 12; i++) {
+            Mesh* mk = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
+            if (!mk) { err = "exampleclock: NewMesh (marca) fallo"; return false; }
+            char nom[16]; snprintf(nom, sizeof(nom), "Marca%d", i == 0 ? 12 : i);
+            mk->SetNameObj(nom);
+            const float a = (float)i * 30.0f * 3.14159265f / 180.0f;
+            mk->pos = Vector3(sinf(a) * 1.02f, cosf(a) * 1.02f, 0.06f);
+            const float s = (i % 3 == 0) ? 0.06f : 0.035f;
+            mk->scale = Vector3(s, s, 0.02f);
+            Paint::On(mk, matMark);
+        }
+        // LA AGUJA: un vacio en el centro (el pivote: girarlo gira la varilla alrededor del centro), con la varilla de hija
+        Empty* hand = new Empty(NULL, Vector3(0.0f, 0.0f, 0.09f));
+        hand->SetNameObj("Aguja");
+        Mesh* rod = (Mesh*)NewMesh(MeshType(MeshType::cube), hand, false);
+        if (!rod) { err = "exampleclock: NewMesh (varilla) fallo"; return false; }
+        rod->SetNameObj("Varilla");
+        rod->pos = Vector3(0.0f, 0.45f, 0.0f);
+        rod->scale = Vector3(0.025f, 0.45f, 0.02f);
+        Paint::On(rod, matHand);
+        if (!hand->scriptData) hand->scriptData = new W3dScriptData();
+        { W3dScriptEntry e; e.path = lua; hand->scriptData->scripts.push_back(e); }
+        // el BOTON del centro (tapa el pivote)
+        Mesh* hub = (Mesh*)NewMesh(MeshType(MeshType::cylinder), NULL, false);
+        if (!hub) { err = "exampleclock: NewMesh (centro) fallo"; return false; }
+        hub->SetNameObj("Centro");
+        hub->meshVerts = 24; hub->Regenerate();
+        hub->SetRotEuler(Vector3(90.0f, 0.0f, 0.0f));
+        hub->pos = Vector3(0.0f, 0.0f, 0.12f);
+        hub->scale = Vector3(0.06f, 0.03f, 0.06f);
+        Paint::On(hub, matMark);
+        Light* light = Light::Create(NULL, 1.5f, 2.0f, 4.0f);
+        light->SetNameObj("Luz");
+        // la CAMARA, de frente a la esfera
+        Camera* cam = new Camera(NULL, Vector3(0.0f, 0.0f, 4.3f), Vector3(0.0f, 0.0f, 0.0f));
+        cam->SetNameObj("Camara");
+        cam->fov = 45.0f; cam->nearClip = 0.1f; cam->farClip = 100.0f;
+        extern Camera* CameraActive; CameraActive = cam;
+        // el HUD: el MENSAJE abajo (pos en fraccion de la pantalla, centro = 0,0 e y para abajo)
+        UI* ui = new UI(NULL, Vector3(0, 0, 0));
+        ui->SetNameObj("HUD");
+        ui->sameAsRender = true;
+        Text2D* msg = new Text2D(ui, Vector3(0.0f, 0.43f, 0.0f));
+        msg->SetNameObj("Mensaje");
+        msg->text = "";
+        msg->size = 20.0f;
+        msg->color[0] = 1.0f; msg->color[1] = 1.0f; msg->color[2] = 1.0f; msg->color[3] = 1.0f;
+        DeselectAll(); ActiveObj = NULL;
+        printf("      [ejemploreloj] esfera + 12 marcas + aguja (con reloj.lua) + luz + camara + mensaje en '%s'\n", dir.c_str());
+        return true;
+    }
+
+    // game3dpx <carpeta> <nombre> [hud]: 'hud' (para un juego de "game3dmin ... free", sin aspecto declarado) no mira la
+    // banda del encuadre -no hay letterbox-: solo que el 3D se dibuje y que el script haya prendido la franja
     if (cmd == "game3dpx") {
-        std::string dir, name; ss >> dir >> name;
-        if (dir.empty() || name.empty()) { err = "game3dpx: uso: game3dpx <carpeta> <nombre>"; return false; }
+        std::string dir, name, mode; ss >> dir >> name >> mode;
+        const bool onlyHud = (mode == "hud");
+        if (dir.empty() || name.empty()) { err = "game3dpx: uso: game3dpx <carpeta> <nombre> [hud]"; return false; }
         const std::string bin = dir + "/build/linux/" + name;
         if (!w3dFileSystem::FileExists(bin)) {
             err = "game3dpx: no existe el binario compilado '" + bin + "'"; return false;
@@ -43940,13 +44682,15 @@ bool W3dRunCommand(const std::string& line, std::string& err) {
         LP::Get(px, iw, ih, 0.88f, 0.50f, band);     // ahi cae el cubo TESTIGO, fuera del encuadre
         LP::Get(px, iw, ih, 0.50f, 0.50f, hud);      // la franja verde del HUD, sobre el cubo
         bool okCube = LP::Sum(center) > 30;                    // hay geometria dibujada
-        bool okBand = LP::Sum(band) == 0;                      // negro OPACO: el testigo NO se ve
+        bool okBand = onlyHud || LP::Sum(band) == 0;           // negro OPACO: el testigo NO se ve
         bool okHud  = (hud[1] > 150 && hud[0] < 120 && hud[2] < 120);  // verde del HUD
         printf("      [juego3dpx] %dx%d | cubo rgb=%d,%d,%d %s | banda rgb=%d,%d,%d %s | "
                "hud rgb=%d,%d,%d %s\n", iw, ih,
                center[0], center[1], center[2], okCube  ? "OK" : "<-- MAL (escena 3D EN NEGRO)",
-               band[0],  band[1],  band[2],  okBand ? "OK" : "<-- MAL (se ve fuera del encuadre)",
-               hud[0],    hud[1],    hud[2],    okHud   ? "OK" : "<-- MAL (HUD no esta encima)");
+               band[0],  band[1],  band[2],  onlyHud ? "(no se mira)" : okBand ? "OK" : "<-- MAL (se ve fuera del encuadre)",
+               hud[0],    hud[1],    hud[2],    okHud   ? "OK" : onlyHud ? "<-- MAL (el script no prendio la franja: "
+                                                                 "ver [aspecto] en el whisk3d.log del juego)"
+                                                               : "<-- MAL (HUD no esta encima)");
         w3dEngine::FreeImage(px);
         if (!okCube || !okBand || !okHud) {
             err = "game3dpx: el juego compilado NO dibuja lo que dibuja el Play "

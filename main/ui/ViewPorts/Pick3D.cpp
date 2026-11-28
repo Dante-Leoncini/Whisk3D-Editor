@@ -137,6 +137,15 @@ static void PickPaint(Object* obj, bool armaturePass) {
             w3dEngine::VertexPointer3f(0, lines);
             w3dEngine::DrawLines(24);
             w3dEngine::LineWidth(1.0f);
+        } else if (obj->getType() == ObjectType::empty && ((Empty*)obj)->shape == EmptyImage) {
+            // LA REFERENCIA: la IMAGEN entera se clickea (no solo su origen), de los dos lados
+            float c[12]; ((Empty*)obj)->ImageCorners(c);
+            static const MeshIndex idx[6] = { 0, 1, 2, 2, 1, 3 };
+            const GLboolean cull = w3dEngine::IsEnabled(w3dEngine::CullFace);
+            w3dEngine::Disable(w3dEngine::CullFace);
+            w3dEngine::VertexPointer3f(0, c);
+            w3dEngine::DrawTriangles(6, idx);
+            if (cull) w3dEngine::Enable(w3dEngine::CullFace);
         } else {
             // icono (camara/luz/empty/instancia): un punto clickeable en el
             // origen, del MISMO tamaño que el icono 3D (16 * GlobalScale)
@@ -287,7 +296,9 @@ static int EditPickIndex(int mode, int mx, int my, int vx, int vy, int vw, int v
         w3dEngine::Enable(w3dEngine::PolygonOffsetFill);
         w3dEngine::PolygonOffset(1.0f, 1.0f);
         w3dEngine::VertexPointer3f(0, m->vertex);
-        w3dEngine::DrawTriangles(m->facesSize, m->faces);
+        // (con caras OCULTAS -H- tapan solo las que se ven)
+        if (e->numHidden > 0) { if (!e->visTris.empty()) w3dEngine::DrawTriangles((int)e->visTris.size(), &e->visTris[0]); }
+        else w3dEngine::DrawTriangles(m->facesSize, m->faces);
         w3dEngine::Disable(w3dEngine::PolygonOffsetFill);
         w3dEngine::ColorMask(true, true, true, true);
         w3dEngine::EnableArray(w3dEngine::ColorArray);
@@ -378,6 +389,7 @@ static int EditPickIndex(int mode, int mx, int my, int vx, int vy, int vw, int v
             GLubyte* px = &area[(dy*WD + dx) * 4];
             int cand = (px[0] >> 3) | ((px[1] >> 2) << 5) | ((px[2] >> 3) << 11);
             if (cand <= 0 || cand > N) continue;
+            if (e->Hidden(mode, cand - 1)) continue;   // (lo oculto con H no se elige)
             long ex = dx - ccx, ey = dy - ccy, d = ex*ex + ey*ey;
             cnt[cand]++;
             std::map<int,long>::iterator itn = nearest.find(cand);
@@ -570,7 +582,8 @@ void LayoutSelectLinked(int mx, int my) {
     int vx = Viewport3DActive->x, vy = Viewport3DActive->y;
     int vw = Viewport3DActive->width, vh = Viewport3DActive->height;
     int k = EditPickIndex(EditSelectMode, mx, my, vx, vy, vw, vh, W3dScreenHeight);
-    if (k >= 0) { m->edit->SelectLinked(k, EditSelectMode, !LShiftPressed); g_redraw = true; }
+    // SUMA a lo que ya estaba elegido (pedido del duenio, 2026-11-27: "no deselecciones lo que ya este seleccionado")
+    if (k >= 0) { m->edit->SelectLinked(k, EditSelectMode, false); g_redraw = true; }
 }
 
 // ===== LOOP SELECT desde el sub-elemento ACTIVO (menu Select / Symbian lapiz+OK) =====
@@ -956,7 +969,7 @@ static bool GuidedUnClickClick(int mx,int my,int vx,int vy,int vw,int vh,int scr
         int k = EditPickIndex(EditSelectMode, mx,my,vx,vy,vw,vh,screenH);
         if (k < 0) return true; // click al vacio: sigue esperando
         UndoCaptureSelectionEdit(m);
-        m->edit->SelectLinked(k, EditSelectMode, !LShiftPressed);
+        m->edit->SelectLinked(k, EditSelectMode, false);   // (suma a lo elegido, como la L)
     } else { // Loop Select en la posicion clickeada (face->Face Loop, border->Edge Loop; el cursor da la direccion)
         if (!LayoutLoopSelectInPos(mx,my,vx,vy,vw,vh,screenH)) return true; // click al vacio: sigue esperando
     }
@@ -1474,7 +1487,10 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
                     bool onlyThis = !LShiftPressed; // Shift = agrega a la seleccion; sino reemplaza
                     if (EditSelectMode == SelFace)      m->edit->SelectLoopFace(eg, onlyThis);
                     else if (EditSelectMode == SelEdge) m->edit->SelectLoopEdge(eg, onlyThis);
-                    else                                m->edit->SelectLoopEdgeVerts(eg, true); // VERTICE: REEMPLAZA (Shift es el atajo, no un "add"; ademas no acumula el edgeSel)
+                    // VERTICE: igual que en borde, Shift AGREGA el loop a los verts que ya estaban (varios loops seguidos,
+                    // como en Blender). Antes reemplazaba y cada Shift+Alt+Click borraba lo anterior. El edgeSel intermedio
+                    // igual arranca limpio en cada llamada (SelectLoopEdgeVerts): no se acumulan loops viejos
+                    else                                m->edit->SelectLoopEdgeVerts(eg, onlyThis);
                 }
             }
             return true;
@@ -1964,4 +1980,268 @@ bool BevelKey(int key) {
         case W3dK_V: gBevelOp.affects = gBevelOp.affects ? 0 : 1; BevelApply(); return true;
     }
     return true;   // (el resto no hace nada mientras dura)
+}
+
+// =====================================================================================================================
+//  EL CUCHILLO (K en Edit Mode): el modal. La op es Mesh::KnifeCutEdit (MeshEdit.cpp). Pasando el mouse por la malla se
+//  engancha a un VERTICE (recuadro verde, como el snap), a una ARISTA (que se pinta de amarillo: el corte va a caer justo
+//  sobre ella) o queda en la CARA, tambien en el medio. Click = un punto; Enter/Espacio = cortar; Esc/click der =
+//  cancelar; Backspace = saca el ultimo punto; Z = cortar tambien lo de atras (lo que no se ve)
+// =====================================================================================================================
+static bool gKnifeOn = false, gKnifeThrough = false;
+static std::vector<KnifePoint> gKnifePts;          // los clicks (LOCAL de la malla)
+static KnifePoint gKnifeHover; static bool gKnifeHoverOk = false;
+static float gKnifeHoverSx = 0.0f, gKnifeHoverSy = 0.0f;   // el enganche en la pantalla (coords del viewport)
+static Vector3 gKnifeEdgeA, gKnifeEdgeB;           // la arista enganchada (LOCAL), para pintarla de amarillo
+static std::vector<GLfloat> gKnifeCrossFixed, gKnifeCrossHover;   // los cruces (LOCAL): donde van a nacer vertices
+bool KnifeActive() { return gKnifeOn; }
+bool KnifeThrough() { return gKnifeThrough; }
+int  KnifePoints() { return (int)gKnifePts.size(); }
+int  KnifeHoverKind() { return gKnifeHoverOk ? gKnifeHover.kind : -1; }
+
+// el ojo y hacia donde mira, en el espacio LOCAL de la malla
+static bool KnifeView(Mesh* m, Vector3& eye, Vector3& fwd, bool& ortho, Matrix4& W, Matrix4& Wi) {
+    if (!Viewport3DActive || !m) return false;
+    m->GetWorldMatrix(W);
+    if (!Matrix4::InvertAffine(W, Wi)) return false;
+    const Viewport3D::Lens L = Viewport3DActive->CurrentLens();
+    eye = Wi * L.pos;
+    fwd = (Wi * (L.pos + L.fwd)) - eye;
+    const float l = fwd.Length(); if (l < 1e-12f) return false;
+    fwd = fwd * (1.0f / l); ortho = L.ortho;
+    return true;
+}
+// el rayo de mundo del pixel (lx,ly) del viewport (la inversa de ProjectPoint, como el del gizmo)
+static bool KnifePixelRay(Viewport3D* vp, float lx, float ly, Vector3& o, Vector3& d) {
+    if (vp->width <= 0 || vp->height <= 0) return false;
+    const Viewport3D::Lens L = vp->CurrentLens();
+    const float z = (L.zoom > 1e-4f) ? L.zoom : 1.0f;
+    const float u = ((lx / (float)vp->width * 2.0f - 1.0f) - L.panX) / z * L.sx;
+    const float v = ((1.0f - ly / (float)vp->height * 2.0f) - L.panY) / z * L.sy;
+    if (L.ortho) { o = L.pos + L.right * u + L.arr * v; d = L.fwd; }
+    else { o = L.pos; d = (L.fwd + L.right * u + L.arr * v).Normalized(); }
+    return true;
+}
+// lo que hay bajo el mouse (mx,my: coords de ventana): vertice, arista o cara
+static bool KnifePick(int mx, int my, KnifePoint& out, float& sx, float& sy) {
+    Viewport3D* vp = Viewport3DActive; Mesh* m = (Mesh*)g_editMesh;
+    if (!vp || !m || !m->vertex) return false;
+    vp->BindView();
+    Vector3 eye, fwd; bool ortho; Matrix4 W, Wi;
+    if (!KnifeView(m, eye, fwd, ortho, W, Wi)) return false;
+    const float lx = (float)(mx - vp->x), ly = (float)(my - vp->y);
+    Vector3 o, d; if (!KnifePixelRay(vp, lx, ly, o, d)) return false;
+    const Vector3 oL = Wi * o; Vector3 dL = (Wi * (o + d)) - oL; dL = dL.Normalized();
+    Vector3 hit; int face = -1;
+    const bool onFace = m->KnifeRayFace(oL, dL, hit, face);
+    // las caras donde buscar vertices y aristas cerca del mouse: la de abajo del mouse o, si el mouse esta afuera de la
+    // malla (en una SILUETA, como el borde de un cubo visto de frente), todas, pero solo lo que se VE
+    std::vector<int> cand;
+    if (onFace) cand.push_back(face);
+    else for (size_t f = 0; f < m->faces3d.size(); f++) cand.push_back((int)f);
+    const bool hasRep = ((int)m->posRep.size() == m->vertexSize);
+    extern bool ToolbarUsesTouch();
+    const float R = (float)((ToolbarUsesTouch() ? 22 : 11) * (GlobalScale > 0 ? GlobalScale : 1));
+    struct Vis { static bool Of(Mesh* m, const Vector3& P, const Vector3& eye, const Vector3& fwd, bool ortho) {
+        Vector3 o, d; float tP;
+        if (ortho) { tP = 1e4f; o = P - fwd * tP; d = fwd; }
+        else { d = P - eye; tP = d.Length(); if (tP < 1e-9f) return true; d = d * (1.0f / tP); o = eye; }
+        Vector3 h; int f; if (!m->KnifeRayFace(o, d, h, f)) return true;
+        return (h - o).Length() >= tP * (1.0f - 1e-3f) - 1e-4f; } };
+    // 1) un VERTICE cerca del mouse (en pantalla)
+    int bestV = -1; float bestD = R * R;
+    for (size_t ci = 0; ci < cand.size(); ci++) {
+        const std::vector<int>& idx = m->faces3d[(size_t)cand[ci]].idx;
+        for (size_t c = 0; c < idx.size(); c++) {
+            const int g = idx[c]; if (g < 0 || g >= m->vertexSize) continue;
+            const Vector3 P(m->vertex[g*3], m->vertex[g*3+1], m->vertex[g*3+2]);
+            float px, py; if (!vp->ProjectPoint(W * P, px, py)) continue;
+            const float dd = (px - lx) * (px - lx) + (py - ly) * (py - ly);
+            if (dd < bestD && (onFace || Vis::Of(m, P, eye, fwd, ortho))) { bestD = dd; bestV = g; }
+        }
+    }
+    if (bestV >= 0) {
+        out = KnifePoint(); out.kind = KnifePoint::Vertex; out.a = hasRep ? m->posRep[(size_t)bestV] : bestV;
+        out.p = Vector3(m->vertex[out.a*3], m->vertex[out.a*3+1], m->vertex[out.a*3+2]);
+    } else {
+        // 2) una ARISTA cerca del mouse: el punto de la arista mas cercano al rayo (en 3D: la perspectiva no lo corre)
+        int bestG0 = -1, bestG1 = -1; bestD = R * R * 0.5f; float bestT = 0.5f;
+        for (size_t ci = 0; ci < cand.size(); ci++) {
+            const std::vector<int>& idx = m->faces3d[(size_t)cand[ci]].idx; const int n = (int)idx.size();
+            for (int c = 0; c < n; c++) {
+                const int g0 = idx[(size_t)c], g1 = idx[(size_t)((c + 1) % n)];
+                if (g0 < 0 || g0 >= m->vertexSize || g1 < 0 || g1 >= m->vertexSize) continue;
+                const Vector3 A(m->vertex[g0*3], m->vertex[g0*3+1], m->vertex[g0*3+2]), B(m->vertex[g1*3], m->vertex[g1*3+1], m->vertex[g1*3+2]);
+                float ax, ay, bx, by;
+                if (!vp->ProjectPoint(W * A, ax, ay) || !vp->ProjectPoint(W * B, bx, by)) continue;
+                const float ex = bx - ax, ey = by - ay, l2 = ex * ex + ey * ey; if (l2 < 1e-6f) continue;
+                float s2 = ((lx - ax) * ex + (ly - ay) * ey) / l2; if (s2 < 0) s2 = 0; if (s2 > 1) s2 = 1;
+                const float qx = ax + ex * s2 - lx, qy = ay + ey * s2 - ly, dd = qx * qx + qy * qy;
+                if (dd >= bestD) continue;
+                const Vector3 u = B - A, w0 = A - oL;
+                const float a = u.Dot(u), b = u.Dot(dL), d2 = u.Dot(w0), e = dL.Dot(w0), den = a - b * b;
+                float t = (den > 1e-12f) ? (b * e - d2) / den : s2; if (t < 0) t = 0; if (t > 1) t = 1;
+                if (!onFace && !Vis::Of(m, A + u * t, eye, fwd, ortho)) continue;
+                bestD = dd; bestG0 = g0; bestG1 = g1; bestT = t;
+            }
+        }
+        if (bestG0 >= 0) {
+            const Vector3 A(m->vertex[bestG0*3], m->vertex[bestG0*3+1], m->vertex[bestG0*3+2]), B(m->vertex[bestG1*3], m->vertex[bestG1*3+1], m->vertex[bestG1*3+2]);
+            out = KnifePoint(); out.kind = KnifePoint::Edge;
+            out.a = hasRep ? m->posRep[(size_t)bestG0] : bestG0; out.b = hasRep ? m->posRep[(size_t)bestG1] : bestG1; out.t = bestT;
+            out.p = A + (B - A) * bestT;
+            gKnifeEdgeA = A; gKnifeEdgeB = B;
+        } else if (onFace) {
+            // 3) la CARA, donde la toca el rayo
+            out = KnifePoint(); out.kind = KnifePoint::Face; out.face = face; out.p = hit;
+        } else return false;
+    }
+    if (!vp->ProjectPoint(W * out.p, sx, sy)) { sx = lx; sy = ly; }
+    return true;
+}
+static void KnifeCrossesOf(Mesh* m, const std::vector<KnifePoint>& seq, size_t from, std::vector<GLfloat>& out) {
+    out.clear();
+    Vector3 eye, fwd; bool ortho; Matrix4 W, Wi;
+    if (!KnifeView(m, eye, fwd, ortho, W, Wi)) return;
+    for (size_t i = from; i + 1 < seq.size(); i++) {
+        std::vector<KnifePoint> cr; m->KnifeCrossings(seq[i], seq[i + 1], eye, fwd, ortho, gKnifeThrough, cr);
+        for (size_t j = 0; j < cr.size(); j++) { out.push_back(cr[j].p.x); out.push_back(cr[j].p.y); out.push_back(cr[j].p.z); }
+    }
+}
+static void KnifeHint() {
+    if (!gKnifeOn) { NotifyHintClear(); return; }
+    NotifyHint(gKnifeThrough ? T("Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see")
+                             : T("Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through"));
+}
+static void KnifeRefreshHover(int mx, int my) {
+    gKnifeHoverOk = KnifePick(mx, my, gKnifeHover, gKnifeHoverSx, gKnifeHoverSy);
+    gKnifeCrossHover.clear();
+    if (gKnifeHoverOk && !gKnifePts.empty() && g_editMesh) {
+        std::vector<KnifePoint> seq; seq.push_back(gKnifePts.back()); seq.push_back(gKnifeHover);
+        KnifeCrossesOf((Mesh*)g_editMesh, seq, 0, gKnifeCrossHover);
+    }
+}
+void KnifeCancel() {
+    if (!gKnifeOn) return;
+    gKnifeOn = false; gKnifePts.clear(); gKnifeHoverOk = false; gKnifeCrossFixed.clear(); gKnifeCrossHover.clear();
+    NotifyHintClear(); g_redraw = true;
+}
+void KnifeStart(int mx, int my) {
+    if (InteractionMode != EditMode || !g_editMesh) { Notify(T("Knife: enter Edit Mode first"), true); return; }
+    gKnifeOn = true; gKnifeThrough = false; gKnifePts.clear(); gKnifeCrossFixed.clear();   // (cada K arranca viendo solo lo de adelante)
+    KnifeRefreshHover(mx, my);
+    KnifeHint(); g_redraw = true;
+}
+void KnifeMotion(int mx, int my) {
+    if (!gKnifeOn) return;
+    if (!g_editMesh || InteractionMode != EditMode) { KnifeCancel(); return; }
+    KnifeRefreshHover(mx, my);
+    g_redraw = true;
+}
+void KnifeClickLeft(int mx, int my) {
+    if (!gKnifeOn) return;
+    KnifeRefreshHover(mx, my);
+    if (!gKnifeHoverOk) return;   // (afuera de la malla: nada)
+    if (!gKnifePts.empty() && (gKnifePts.back().p - gKnifeHover.p).Length() < 1e-6f) return;
+    gKnifePts.push_back(gKnifeHover);
+    KnifeCrossesOf((Mesh*)g_editMesh, gKnifePts, 0, gKnifeCrossFixed);
+    gKnifeCrossHover.clear();
+    g_redraw = true;
+}
+void KnifeBack() {
+    if (!gKnifeOn || gKnifePts.empty()) return;
+    gKnifePts.pop_back();
+    if (g_editMesh) KnifeCrossesOf((Mesh*)g_editMesh, gKnifePts, 0, gKnifeCrossFixed);
+    gKnifeCrossHover.clear(); g_redraw = true;
+}
+void KnifeToggleThrough() {
+    if (!gKnifeOn) return;
+    gKnifeThrough = !gKnifeThrough;
+    if (g_editMesh) KnifeCrossesOf((Mesh*)g_editMesh, gKnifePts, 0, gKnifeCrossFixed);
+    gKnifeCrossHover.clear(); KnifeHint(); g_redraw = true;
+}
+void KnifeConfirm() {
+    if (!gKnifeOn) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    bool cut = false;
+    if (m && gKnifePts.size() >= 2) {
+        Vector3 eye, fwd; bool ortho; Matrix4 W, Wi;
+        if (KnifeView(m, eye, fwd, ortho, W, Wi)) cut = m->KnifeCutEdit(gKnifePts, eye, fwd, ortho, gKnifeThrough);
+    }
+    const bool hadPoints = gKnifePts.size() >= 2;
+    KnifeCancel();
+    if (hadPoints && !cut) Notify(T("Knife: the cut does not cross any face"), true);
+}
+// el corte encima de la escena (LOCAL de la malla): las lineas, los puntos, los cruces y la arista enganchada
+void KnifeRenderPreview() {
+    if (!gKnifeOn || !g_editMesh) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    Matrix4 W; m->GetWorldMatrix(W);
+    namespace gfx = w3dEngine;
+    gfx::PushMatrix(); gfx::MultMatrix(W.m);
+    gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Texture2D); gfx::Disable(gfx::DepthTest);
+    gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray); gfx::DisableArray(gfx::TexCoordArray);
+    gfx::EnableArray(gfx::VertexArray);
+    const float gs = (float)(GlobalScale > 0 ? GlobalScale : 1);
+    // la ARISTA enganchada, en amarillo: el corte va a caer sobre ella
+    if (gKnifeHoverOk && gKnifeHover.kind == KnifePoint::Edge) {
+        const GLfloat e[6] = { gKnifeEdgeA.x, gKnifeEdgeA.y, gKnifeEdgeA.z, gKnifeEdgeB.x, gKnifeEdgeB.y, gKnifeEdgeB.z };
+        gfx::Color4f(1.0f, 0.9f, 0.1f, 1.0f); gfx::LineWidth(3.0f * gs);
+        gfx::VertexPointer3f(0, e); gfx::DrawLines(2);
+    }
+    // el corte: los puntos puestos y el tramo hasta el mouse
+    std::vector<GLfloat> L;
+    for (size_t i = 0; i < gKnifePts.size(); i++) { L.push_back(gKnifePts[i].p.x); L.push_back(gKnifePts[i].p.y); L.push_back(gKnifePts[i].p.z); }
+    const size_t nFixed = gKnifePts.size();
+    if (gKnifeHoverOk && !gKnifePts.empty()) { L.push_back(gKnifeHover.p.x); L.push_back(gKnifeHover.p.y); L.push_back(gKnifeHover.p.z); }
+    if (L.size() >= 6) {
+        std::vector<GLfloat> seg;
+        for (size_t i = 0; i + 5 < L.size(); i += 3) for (int q = 0; q < 6; q++) seg.push_back(L[i + (size_t)q]);
+        gfx::Color4f(0.2f, 1.0f, 0.35f, 1.0f); gfx::LineWidth(2.0f * gs);
+        gfx::VertexPointer3f(0, &seg[0]); gfx::DrawLines((int)(seg.size() / 3));
+    }
+    gfx::LineWidth(1.0f);
+    // donde van a nacer los vertices (cruces): rojo; los clicks: verde
+    gfx::PointSize(6.0f * gs);
+    gfx::Color4f(1.0f, 0.3f, 0.25f, 1.0f);
+    if (!gKnifeCrossFixed.empty()) { gfx::VertexPointer3f(0, &gKnifeCrossFixed[0]); gfx::DrawPoints((int)(gKnifeCrossFixed.size() / 3)); }
+    if (!gKnifeCrossHover.empty()) { gfx::VertexPointer3f(0, &gKnifeCrossHover[0]); gfx::DrawPoints((int)(gKnifeCrossHover.size() / 3)); }
+    if (nFixed > 0) { gfx::Color4f(0.2f, 1.0f, 0.35f, 1.0f); gfx::PointSize(8.0f * gs); gfx::VertexPointer3f(0, &L[0]); gfx::DrawPoints((int)nFixed); }
+    gfx::PointSize(1.0f);
+    gfx::Enable(gfx::DepthTest);
+    gfx::PopMatrix();
+}
+// el ENGANCHE bajo el mouse, en la pantalla: el recuadro verde del snap en un vertice; un rombo en una arista; un punto
+// en la cara
+void KnifeRenderOverlay(Viewport3D* vp) {
+    if (!gKnifeOn || !gKnifeHoverOk || !vp || vp != Viewport3DActive) return;
+    namespace gfx = w3dEngine;
+    gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
+    gfx::Ortho(0, vp->width, vp->height, 0, -1, 1);
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
+    gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Texture2D);
+    gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
+    gfx::EnableArray(gfx::VertexArray);
+    extern bool ToolbarUsesTouch();
+    const int gs = GlobalScale > 0 ? GlobalScale : 1;
+    const float h = (float)((ToolbarUsesTouch() ? 9 : 5) * gs), x = gKnifeHoverSx, y = gKnifeHoverSy;
+    if (gKnifeHover.kind == KnifePoint::Vertex) gfx::Color4f(0.15f, 1.0f, 0.2f, 1.0f);
+    else if (gKnifeHover.kind == KnifePoint::Edge) gfx::Color4f(1.0f, 0.9f, 0.1f, 1.0f);
+    else gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+    for (int k = 0; k < gs; k++) {
+        const float r = h + (float)k;
+        if (gKnifeHover.kind == KnifePoint::Vertex) {
+            const GLfloat b[] = { x-r,y-r, x+r,y-r,  x+r,y-r, x+r,y+r,  x+r,y+r, x-r,y+r,  x-r,y+r, x-r,y-r };
+            gfx::VertexPointer2f(0, b); gfx::DrawLines(8);
+        } else if (gKnifeHover.kind == KnifePoint::Edge) {
+            const GLfloat b[] = { x,y-r, x+r,y,  x+r,y, x,y+r,  x,y+r, x-r,y,  x-r,y, x,y-r };
+            gfx::VertexPointer2f(0, b); gfx::DrawLines(8);
+        } else {
+            const float q = r * 0.5f;
+            const GLfloat b[] = { x-q,y, x+q,y,  x,y-q, x,y+q };
+            gfx::VertexPointer2f(0, b); gfx::DrawLines(4);
+        }
+    }
+    gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray);
+    gfx::Invalidate();
 }

@@ -523,6 +523,7 @@ Delete the orphan resource	Supprimer la ressource orpheline
 Delete the orphan resources	Supprimer les ressources orphelines
 Deleted	Supprimé
 Denoiser	Débruiteur
+Shadowmask (real-time light)	Shadowmask (lumière en temps réel)
 Density	Densité
 Depth	Profondeur
 Depth & clear	Profondeur et effacement
@@ -751,6 +752,7 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Rayon à plein volume
 Fullscreen	Plein écran
 Function	Fonction
+Function of Whisk3D (it isn't in this script)	Fonction de Whisk3D (elle n'est pas dans ce script)
 GL Calls	Appels GL
 GL Light	Lumière GL
 GLB saved successfully!	GLB enregistré !
@@ -771,6 +773,7 @@ Give the project a name to save it	Donnez un nom au projet pour l'enregistrer
 Gizmo	Gizmo
 Global	Global
 Go back	Retour
+Go to Definition	Aller à la définition
 Go to end	Aller à la fin
 Go to start	Aller au début
 Grab step	Saisir étape
@@ -941,6 +944,7 @@ Library unlinked	Bibliothèque déliée
 Lifetime	Durée de vie
 Light	Lumière
 Light Probe	Sonde de lumière
+Light Probes	Sondes de lumière
 Light bounce	Rebond de lumière
 Light bounces	Rebonds de lumière
 Light color	Couleur lumière
@@ -1872,6 +1876,7 @@ This resource can't be dropped in the 3D view	Cette ressource ne peut pas être 
 This resource can't be renamed	Cette ressource ne peut pas être renommée
 This resource type can't be deleted	Ce type de ressource ne peut pas être supprimé
 This resource type can't be duplicated	Ce type de ressource ne peut pas être dupliqué
+This script doesn't define	Ce script ne définit pas
 This step has nothing to animate	Cette étape n'a rien à animer
 This texture already has the baked light of	Cette texture contient déjà la lumière précalculée de
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Cela va modifier les groupes de sommets et les simplifier à 1 os par sommet (skinning plus rapide). Des données peuvent être perdues.
@@ -1918,12 +1923,7 @@ UV Group	Groupe UV
 UV Groups	Groupes UV
 UV Map	Carte UV
 UV Maps	Cartes UV
-UV Offset	Décalage UV
-UV Pivot	Pivot UV
-UV Rotation	Rotation UV
-UV Scale	Échelle UV
 UV Sphere	Sphère UV
-UV Transform	Transformation UV
 UV array	array d'UV
 UV group(s)	groupe(s) UV
 UV layer (0 = active)	Calque UV (0 = actif)
@@ -2220,3 +2220,35 @@ Downloads	Téléchargements
 Pictures	Images
 Music	Musique
 Render with the first	Rendu avec le premier
+Scatter	Disperser
+External .w3d	.w3d externe
+Emit From	Émettre depuis
+Seed	Graine
+Random Scale	Échelle aléatoire
+Align to Normal	Aligner sur la normale
+Random Rotation	Rotation aléatoire
+Random Tilt	Inclinaison aléatoire
+Merged	Fusionné
+Instances	Instances
+Show Emitter	Afficher l'émetteur
+%d copies of %d source(s)	%d copies de %d source(s)
+Face Centers	Centres des faces
+Faces (anywhere)	Faces (n'importe où)
+(the first one)	(la première)
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Disperser : les copies d'un .w3d externe ne peuvent pas devenir des objets (appliquez en Fusionné)
+Scatter: there are no copies to apply	Disperser : aucune copie à appliquer
+Scatter: %d copies are now objects	Disperser : %d copies sont maintenant des objets
+Show/Hide	Afficher/Masquer
+Reveal Hidden	Révéler le masqué
+Hide Selected	Masquer la sélection
+Hide Unselected	Masquer le non sélectionné
+Recalculate Vertex Normals	Recalculer les normales des sommets
+New File...	Nouveau fichier...
+New File	Nouveau fichier
+Recent	Récents
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Couteau : clic = point, Entrée = couper, Échap = annuler, Retour arrière = retirer le point, Z = couper à travers
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Couteau (à travers) : clic = point, Entrée = couper, Échap = annuler, Retour arrière = retirer le point, Z = seulement le visible
+Knife: enter Edit Mode first	Couteau : entrez d'abord en Mode Édition
+Knife: the cut does not cross any face	Couteau : la coupe ne traverse aucune face
+Knife	Couteau
+Merge by Distance: %d vertices merged	Fusionner par distance : %d sommets fusionnés

@@ -20,6 +20,8 @@ function start()
 end
 ```
 
+**By name:** a property can also be read just by writing its name: `speed` is the same as `property("speed")`, `difficulty` as `option("difficulty")` and `ball` as `object("ball")`. It's read at that moment, so it sees what you change in Properties while the game runs. Two exceptions: if the script has a variable with that name (`speed = 5`), the variable wins; and if the property is named like a Whisk3D function (for example `target` or `view`), the name is the function: read that property with `property()`, `option()` or `object()`.
+
 > [!NOTE]
 > To read `properties`, the editor **runs the file** even when the game isn't running. That's why, outside the functions, you should only put declarations (tables, constants, `local`), never code that does things.
 

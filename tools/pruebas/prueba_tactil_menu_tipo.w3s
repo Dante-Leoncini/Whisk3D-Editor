@@ -1,0 +1,25 @@
+# EL MENU DE TIPO DE CADA VIEWPORT CON EL DEDO (2026-11-26):
+#  En el iPhone el viewport de abajo no se podia cambiar: solo el de arriba. Con el dedo, la division entre viewports se
+#  agarra en una franja mas ancha (9 de la UI a cada lado: 18 px con la UI x2) y esa franja tapaba el boton de tipo del
+#  viewport de abajo y el de la derecha, que esta justo contra la division. El toque se decidia en la barra al apoyar y
+#  al soltar caia "en la division": el menu no se abria. Ahora la franja ancha del dedo no le gana a una barra.
+#  Los botones de tipo de esta ventana: la Vista 3D (10,10), el Outliner (291,10) y Propiedades (291,348).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_tactil_menu_tipo.w3s
+window 390 844
+tick
+tapxy 10 10 menu
+key Escape
+tick
+tapxy 291 10 menu
+key Escape
+tick
+tapxy 291 348 menu
+key Escape
+tick
+# (con el mouse tambien)
+wait 600
+tapxy 291 348 mouse menu
+key Escape
+tick

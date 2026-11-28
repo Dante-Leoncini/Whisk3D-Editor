@@ -78,7 +78,8 @@ enum BarRole3D {
     BR_Animation, // menu "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado.
     BR_Proportional, // PROPORTIONAL EDITING (tecla O): el icono de la curva, verde si esta ON; abre su menu
     BR_Root,         // la ESCENA 3D o el PREFAB que se edita (W3dRoots.h): su menu cambia de raiz / crea otra
-    BR_TexSave       // PINTURA DE TEXTURA: guardar la textura pintada (Guardar / Guardar como / dentro o fuera del w3d)
+    BR_TexSave,      // PINTURA DE TEXTURA: guardar la textura pintada (Guardar / Guardar como / dentro o fuera del w3d)
+    BR_SelEdge, BR_SelFace   // el selector de VERTICE / ARISTA / CARA es un boton alargado de 3 (BR_SelMode = el de vertice)
 };
 // roles de la barra de HERRAMIENTAS (abajo) del 3D. TBR_Hist+i = boton i del historial de acciones.
 enum ToolbarRole3D {
@@ -184,6 +185,10 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showParticles;   // overlay "Objects": gizmo (flecha) de los emisores de particulas. Default ON.
         bool showCurves;      // overlay "Objects": la LINEA de las curvas/rieles. Default ON (se puede ocultar).
         bool showSounds;      // overlay "Objects": el icono de parlante de los Sonido (oculto = tampoco se clickea)
+        // LAS SONDAS en esta vista (menu Overlays): apagadas, las de luz no alumbran / las de reflejo no reflejan aca (el
+        // antes y despues, sin tocar la escena ni las otras vistas). No dependen de "Show Overlays": cambian la luz
+        bool useLightProbes;
+        bool useReflectionProbes;
         bool showHitbox;      // overlay "Objects": el alambre de los hitbox. Default ON (oculto = tampoco se clickea).
         bool show3DCursor;
         bool ShowRelationshipsLines; 

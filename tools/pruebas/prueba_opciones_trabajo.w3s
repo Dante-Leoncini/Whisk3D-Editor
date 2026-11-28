@@ -1,0 +1,20 @@
+# ==========================================================================
+#  EL .w3d RECUERDA EL GIZMO Y LA FUSION AUTOMATICA (pedido del duenio, 2026-11-27: "que el w3d recuerde que desactive
+#  el gizmo de transformacion, que me vuelve loco en PC"; "el auto fusionar que tambien se guarde si se activa o no").
+#  Solo si no son las de fabrica: el GIZMO va en las propiedades de la vista 3D del layout ("gizmo: false", junto a
+#  "showOverlays"); la FUSION AUTOMATICA (una opcion de la herramienta, del proyecto) en el bloque "session", con su
+#  distancia. Un proyecto que no las trae abre con las de fabrica: no hereda las del que estaba abierto.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_opciones_trabajo.w3s
+# ==========================================================================
+workopts 1 0
+savew3d /tmp/w3d_opciones_fabrica.w3d
+gizmoon 0
+automerge on 0.05
+savew3d /tmp/w3d_opciones_mias.w3d
+gizmoon 1
+automerge off
+openw3d /tmp/w3d_opciones_mias.w3d
+workopts 0 1 0.05
+openw3d /tmp/w3d_opciones_fabrica.w3d
+workopts 1 0

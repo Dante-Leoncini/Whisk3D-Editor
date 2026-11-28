@@ -1,0 +1,22 @@
+# ==========================================================================
+#  EL VIDRIO REFLEJA ENTERO (la luz por pixel PBR)
+#  Correr DESDE ESTA CARPETA, con el backend de shaders (con OpenGL, el pipeline fijo, termina en 'pixelshading'):
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_vidrio_reflejo.w3s
+#
+#  Dos esferas de metal liso sobre un fondo negro, adentro de una sonda de reflejo con una imagen gris clara (200): la
+#  de la derecha opaca, la de la izquierda un VIDRIO (transparente, alfa 0.1). El reflejo y el brillo PBR se sumaban al
+#  color pero la mezcla los multiplicaba por el alfa: el vidrio reflejaba el 10% (20 en vez de 200) y el casco del gato
+#  de Marte casi no se veia (con el trazado de rayos, si). Ahora, como el "Transparent + Glossy" de Blender, lo que
+#  refleja se suma entero (el alfa sube ahi): el vidrio refleja como el metal opaco y el fondo sigue negro
+# ==========================================================================
+openw3d prueba_vidrio_reflejo.w3d
+deselectall
+view3d shading 2
+view3d gizmo 0
+view3d overlays 0
+vporbit 0 0 0 8
+pixelshading
+# el vidrio refleja lo mismo que el metal opaco
+scenepx -1.3 0 0 sameas 1.3 0 0 25
+# y mucho mas que el fondo negro de al lado
+scenepx -1.3 0 0 lighterthan -1.3 2.5 0 300

@@ -40,7 +40,8 @@ The sun and the spot are aimed by rotating the object. The sun always draws a li
 | Spot Cutoff ◆ | Spot only: how wide the cone is, in degrees, from the center to the edge. With 45 the cone opens 90° in total. |
 | Spot Exponent ◆ | Spot only: how the light is spread in the cone. 0 shines evenly; higher concentrates it in the center and darkens the edges. |
 | Distance | How far a Point light or a Spot reaches in ray tracing, in meters; it's also the length of the cone that's drawn. 0 means no limit. It doesn't appear for the Sun. |
-| Radius | For ray tracing: the size of the lamp. 0 gives hard shadows, with sharp edges; larger gives soft-edged shadows. For the Sun it's in degrees. |
+| Radius | For ray tracing: the size of the lamp. 0 gives hard shadows, with sharp edges; larger gives soft-edged shadows. |
+| Angle | **Sun** only: its size in the sky, from 0° to 180° (Blender's *Angle*; the real sun is half a degree). A larger angle softens ray-traced shadows and, with per-pixel lighting, opens the sun's highlight on glossy things (an eye, a glass) into a visible spot instead of a point. |
 | Rays | For ray tracing: how many shadow rays this light casts. More rays give cleaner but slower soft shadows. 0 uses the ones from the File / Render tab. |
 
 ### Distance and attenuation

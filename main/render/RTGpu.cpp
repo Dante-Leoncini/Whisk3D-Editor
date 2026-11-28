@@ -63,6 +63,9 @@ static VkDescriptorPool gDescPoolDen = VK_NULL_HANDLE;   // (los del denoiser: s
 static VkDescriptorPool gDescPool = VK_NULL_HANDLE;
 
 // ---- buffers: en la GPU (los datos) o visibles desde la CPU (el ida y vuelta) ----
+// los buffers del trazado (sus bindings en el shader, en este orden)
+// (BPhotons / BCaustics: LAS CAUSTICAS, los fotones del pase que tira la CPU -RayTracer.cpp, PhotonsShoot- y su grilla)
+enum { BVerts, BTris, BMats, BLights, BNodes, BOrder, BTexInfo, BTexels, BAccum, BImg, BAlb, BNrm, BRays, BPhotons, BCaustics, BCount };
 struct BufG { VkBuffer b; VkDeviceMemory m; VkDeviceSize size; void* p; };
 static void Release(BufG& b) {
     if (b.b) vkDestroyBuffer_(gDev, b.b, 0);
@@ -288,7 +291,7 @@ static bool Start() {
     if (vkAllocateCommandBuffers_(gDev, &cai, &gCmd) != VK_SUCCESS) return false;
     VkFenceCreateInfo fci = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     if (vkCreateFence_(gDev, &fci, 0, &gFence) != VK_SUCCESS) return false;
-    if (!Layout(13, 128, gSetTrace, gLayTrace, gRtx) || !Layout(4, 32, gSetAtrous, gLayAtrous)) return false;
+    if (!Layout(BCount, 128, gSetTrace, gLayTrace, gRtx) || !Layout(4, 32, gSetAtrous, gLayAtrous)) return false;
     { const char* p[2] = { kRTCommonGpu, kRTGpuTrace };
       if (gRtx) {
           gPipeTrace = Program(p, 2, gLayTrace, "#version 460\n#extension GL_EXT_ray_query : require\n#define W3D_RTX 1\n", 2);
@@ -320,7 +323,6 @@ bool RTGpuWithCoresRT() { return RTGpuAvailable() && gRtx; }
 // ============================================================================
 //  la escena y la imagen
 // ============================================================================
-enum { BVerts, BTris, BMats, BLights, BNodes, BOrder, BTexInfo, BTexels, BAccum, BImg, BAlb, BNrm, BRays, BCount };
 static BufG gB[BCount];
 static int gW = 0, gH = 0, gNLights = 0, gNNodes = 0;
 static bool gTransp = false;
@@ -404,6 +406,17 @@ bool RTGpuLoadScene(const RTGpuScene& e) {
     gBg[0] = e.bg[0]; gBg[1] = e.bg[1]; gBg[2] = e.bg[2];
     gEnvMat = e.envMat;
     gSet = VK_NULL_HANDLE;   // (los buffers pudieron cambiar)
+    // (sin causticas hasta que la CPU tire los fotones de un pase: la cabecera en cero = apagadas)
+    { const float none[16] = { 0 }; if (!UploadTo(gB[BPhotons], none, sizeof(none)) || !UploadTo(gB[BCaustics], none, sizeof(none))) return false; }
+    return true;
+}
+// LAS CAUSTICAS de un pase: los fotones (12 floats cada uno: posicion, luz, normal) y la grilla (4 floats de cabecera
+// -radio, 1/lado de la celda, celdas, prendidas- y despues el primer foton de cada celda, como enteros)
+bool RTGpuUpdateCaustics(const std::vector<float>& photons, const std::vector<int>& grid) {
+    if (gState != 1) return false;
+    const VkBuffer p0 = gB[BPhotons].b, g0 = gB[BCaustics].b;
+    if (!UploadVec(gB[BPhotons], photons) || !UploadVec(gB[BCaustics], grid)) return false;
+    if (gB[BPhotons].b != p0 || gB[BCaustics].b != g0) gSet = VK_NULL_HANDLE;   // (crecieron: son otros buffers)
     return true;
 }
 bool RTGpuUpdateLights(const std::vector<float>& lights) {
@@ -453,14 +466,18 @@ static bool SetTrace() {
     return true;
 }
 struct PCTrace { float camPos[4], camRight[4], camArr[4], camForward[4]; int dims[4], info[4]; float bg[4], lens[4]; };
-bool RTGpuPass(const RTGpuCamera& c, int step, int samples, bool aov, int layers, int bounces) {
+bool RTGpuPass(const RTGpuCamera& c, int step, int samples, bool aov, int layers, int bounces, int block, int row0, int rows) {
     if (gState != 1 || !gW || !SetTrace()) return false;
     PCTrace pc;
     for (int k = 0; k < 3; k++) { pc.camPos[k] = c.pos[k]; pc.camRight[k] = c.right[k]; pc.camArr[k] = c.arr[k]; pc.camForward[k] = c.forward[k]; pc.bg[k] = gBg[k]; }
     pc.camPos[3] = c.sx; pc.camRight[3] = c.sy; pc.camArr[3] = c.zoom; pc.camForward[3] = c.ortho ? 1.0f : 0.0f; pc.bg[3] = c.lens;
     pc.lens[0] = c.panX; pc.lens[1] = c.panY; pc.lens[2] = (float)(c.seed & 0xFFFFFu); pc.lens[3] = c.focus;
     // (las muestras y los REBOTES de la luz en el mismo entero: el bloque de 128 bytes esta lleno)
-    pc.dims[0] = gW; pc.dims[1] = gH; pc.dims[2] = step; pc.dims[3] = (samples & 255) | ((bounces & 255) << 8);
+    // (y el BLOQUE de la vista previa y la PRIMERA FILA de la franja, en los bits de arriba: ver el shader)
+    if (row0 < 0 || row0 > 4095) { row0 = 0; rows = 0; }
+    if (rows <= 0 || row0 + rows > gH) rows = gH - row0;
+    pc.dims[0] = gW; pc.dims[1] = gH; pc.dims[2] = step;
+    pc.dims[3] = (samples & 255) | ((bounces & 255) << 8) | ((block & 15) << 16) | ((row0 & 0xFFF) << 20);
     pc.info[0] = gNLights; pc.info[1] = gNNodes; pc.info[2] = gTransp ? (layers < 1 ? 1 : layers) : 0;
     // (el denoiser, el material del fondo 360 + 1 y LA LUZ DEL FONDO en % -arriba del bit 16-, juntos: las constantes ya
     //  ocupan los 128 bytes)
@@ -470,7 +487,7 @@ bool RTGpuPass(const RTGpuCamera& c, int step, int samples, bool aov, int layers
     vkCmdBindPipeline_(cb, VK_PIPELINE_BIND_POINT_COMPUTE, gPipeTrace);
     vkCmdBindDescriptorSets_(cb, VK_PIPELINE_BIND_POINT_COMPUTE, gLayTrace, 0, 1, &gSet, 0, 0);
     vkCmdPushConstants_(cb, gLayTrace, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
-    vkCmdDispatch_(cb, (uint32_t)(gW + 7) / 8, (uint32_t)(gH + 7) / 8, 1);
+    vkCmdDispatch_(cb, (uint32_t)(gW + 7) / 8, (uint32_t)(rows + 7) / 8, 1);   // (solo las filas de la franja)
     return Finish();
 }
 // los rayos trazados desde la ultima vez (y el contador vuelve a cero)
@@ -594,10 +611,11 @@ bool RTGpuAvailable() { return false; }
 const char* RTGpuName() { return ""; }
 bool RTGpuWithCoresRT() { return false; }
 bool RTGpuLoadScene(const RTGpuScene&) { return false; }
+bool RTGpuUpdateCaustics(const std::vector<float>&, const std::vector<int>&) { return false; }
 bool RTGpuImage(int, int) { return false; }
 bool RTGpuUpdateGeometry(const std::vector<float>&, const std::vector<float>&) { return false; }
 bool RTGpuUpdateLights(const std::vector<float>&) { return false; }
-bool RTGpuPass(const RTGpuCamera&, int, int, bool, int, int) { return false; }
+bool RTGpuPass(const RTGpuCamera&, int, int, bool, int, int, int, int, int) { return false; }
 bool RTGpuRead(unsigned char*, float*, float*, float*, int) { return false; }
 bool RTGpuDenoise(const float*, const float*, const float*, int, int, float*, std::string* err) { if (err) *err = "sin GPU"; return false; }
 bool RTGpuDenoiseAccumulated(int) { return false; }

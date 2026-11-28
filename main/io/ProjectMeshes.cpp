@@ -544,7 +544,6 @@ Mesh* W3dMeshDuplicateLinked(Mesh* src) {
     // copia de la de src, que coincide con el recurso: se conserva si la hay.
     d->noEditable  = src->noEditable;
     d->onlyRoutine = src->onlyRoutine;
-    d->lockNormals = src->lockNormals;
     if (!W3dMeshLink(d, src->mesh, HasEdit(d))) {
         W3dAvisof(true, T("Could not link the copy of '%s' to its mesh"), W3dShortName(src->name).c_str());
     }
@@ -567,7 +566,6 @@ Mesh* W3dMeshDuplicateWithOwnResource(Mesh* src) {
     MaterialsOf(src, newValue->materials);
     d->noEditable  = src->noEditable;
     d->onlyRoutine = src->onlyRoutine;
-    d->lockNormals = src->lockNormals;
     W3dMeshLink(d, newValue, HasEdit(d));
     if (!d->modifiers.empty()) d->GenerateMeshModified();
     return d;

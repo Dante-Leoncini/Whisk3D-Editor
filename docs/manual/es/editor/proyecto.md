@@ -3,7 +3,7 @@
 | Función | Descripción | Dónde |
 |---|---|---|
 | Pantalla de inicio | Al abrir el editor sin un archivo aparece una tarjeta al medio, con el editor oscurecido detrás: el logo (el engranaje gira) con el nombre a la derecha, la página y la versión, **Nuevo archivo**, **Abrir...** y los últimos 5 **Archivos recientes** (un toque abre uno; si todavía no hay ninguno, no aparecen). Un toque afuera o <kbd>Esc</kbd> la cierran. | Al arrancar |
-| Nuevo proyecto | Deja la escena con la que arranca el editor, sin archivo. Si hay algo sin guardar, primero pregunta (guardar, seguir sin guardar o cancelar). | Tarjeta Archivo, pantalla de inicio |
+| Nuevo proyecto | Deja la escena con la que arranca el editor, sin archivo: un cubo de 2 m apoyado en un piso de 8 × 8 m, con su cámara y su luz, y la vista mirándolo. Si hay algo sin guardar, primero pregunta (guardar, seguir sin guardar o cancelar). | Tarjeta Archivo, pantalla de inicio |
 | Abrir proyecto | Abre un .w3d (también con doble click desde el sistema). | Propiedades → Archivo/Render → Archivo |
 | Guardar / Guardar como | Guarda en la carpeta y con el nombre de la tarjeta; Guardar como pide otro. Si falta el nombre, el campo se pone rojo. | Tarjeta Archivo, <kbd>Ctrl+S</kbd> |
 | Guardar versión | Guarda y además deja una copia numerada (`proyecto_v03.w3d`). | Tarjeta Archivo |

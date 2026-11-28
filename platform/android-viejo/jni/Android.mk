@@ -18,9 +18,18 @@ LOCAL_MODULE := main
 CORE := Whisk3DCore
 
 # main/ entero menos main/test (el harness de pruebas corre solo en la PC; W3dRunScript va en w3d_android_old.cpp)
+# (las mismas carpetas del Core que el Android 5+: render, config, edit e importers se mudaron de main/ al Core)
 SRC_FILES := $(shell find $(PROJECT_ROOT)/main $(PROJECT_ROOT)/libs/$(CORE)/objects \
-$(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/WhiskUI \
+$(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/$(CORE)/render $(PROJECT_ROOT)/libs/$(CORE)/config \
+$(PROJECT_ROOT)/libs/$(CORE)/edit $(PROJECT_ROOT)/libs/$(CORE)/importers $(PROJECT_ROOT)/libs/WhiskUI \
 -name '*.cpp' -not -path '*/main/test/*')
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/W3dRoots.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/W3dScene.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/Libraries.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/Prefabs.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/Streaming.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dContainer.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/script/BindsGame.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dFilesystem.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/graphics/w3dTexture.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dCompress.cpp
@@ -52,7 +61,7 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRagdoll.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dNav.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/net/W3dNet.cpp
-SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
+SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/libs/Whisk3DCore/thirdparty/lua/src/*.c))
 SRC_FILES += $(MY_PATH)/w3d_android_old.cpp
 
 LOCAL_SRC_FILES := $(SRC_FILES)
@@ -74,6 +83,12 @@ $(PROJECT_ROOT)/libs/$(CORE) \
 $(PROJECT_ROOT)/libs/$(CORE)/base \
 $(PROJECT_ROOT)/libs/$(CORE)/graphics \
 $(PROJECT_ROOT)/libs/$(CORE)/io \
+$(PROJECT_ROOT)/libs/$(CORE)/objects \
+$(PROJECT_ROOT)/libs/$(CORE)/render \
+$(PROJECT_ROOT)/libs/$(CORE)/config \
+$(PROJECT_ROOT)/libs/$(CORE)/edit \
+$(PROJECT_ROOT)/libs/$(CORE)/script \
+$(PROJECT_ROOT)/libs/$(CORE)/importers \
 $(PROJECT_ROOT)/libs/$(CORE)/thirdparty \
 $(PROJECT_ROOT)/libs \
 $(PROJECT_ROOT)/libs/WhiskUI/widgets \
@@ -82,7 +97,7 @@ $(PROJECT_ROOT)/libs/WhiskUI/draw \
 $(PROJECT_ROOT)/libs/WhiskUI/theme \
 $(PROJECT_ROOT)/libs/WhiskUI/core \
 $(PROJECT_ROOT)/thirdparty \
-$(PROJECT_ROOT)/thirdparty/lua/src \
+$(PROJECT_ROOT)/libs/Whisk3DCore/thirdparty/lua/src \
 $(SDL_DIR)/include
 
 LOCAL_CPP_FEATURES := rtti

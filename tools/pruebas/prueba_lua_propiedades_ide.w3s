@@ -1,0 +1,27 @@
+# LAS PROPIEDADES COMO VARIABLES y el IDE (2026-11-26):
+#  - En un script alcanza con escribir el nombre de la propiedad: speed es property("speed") (el valor de ESE objeto, o
+#    el de fabrica), difficulty es option("difficulty") y goal es object("goal"). Una variable del script con el
+#    mismo nombre la tapa, y una funcion de Whisk3D con el mismo nombre tambien (target() sigue siendo la funcion).
+#  - La tarjeta del script en Propiedades se rearma cuando el script cambia: una propiedad agregada despues de poner el
+#    script en el objeto aparece sin sacarlo y volver a ponerlo.
+#  - El AUTOCOMPLETADO del IDE (la lista, flechas, Enter) e IR A LA DEFINICION (idecompletar).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_lua_propiedades_ide.w3s
+window 1280 720
+luapropsvars armar
+simplay 1
+sharednum speed 119.99 120.01
+sharednum fromprop 119.99 120.01
+sharednum rotate 1
+sharednum label 1
+sharednum dif 1
+sharednum goal 1
+sharednum nothing 1
+sharednum shadow 5
+simstop
+propstab 8
+luapropsvars tarjeta speed
+luapropsvars agregar
+luapropsvars tarjeta jump
+idecompletar

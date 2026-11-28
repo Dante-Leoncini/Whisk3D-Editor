@@ -1,0 +1,25 @@
+# ===========================================================================
+#  glTF: EL ARMATURE ESCALADO GIRA BIEN (main/importers/import_gltf.cpp)
+#
+#  prueba_gltf_armature_escalado.gltf (gen_prueba_gltf_armature_escalado.py): un personaje con el ARMATURE a escala 0.5
+#  (como los aliens de Marte de Bongo Cat: los de Mixamo vienen a 0.22) y una animacion que gira la raiz 60 grados en Y.
+#  El importador lleva la transformacion del nodo del armature a las claves de la raiz (el "prefijo") y sacaba el euler
+#  de esa matriz CON LA ESCALA adentro: el seno de Y salia por 0.5 y giraba 25.7 grados en vez de 60. En Marte la cadera
+#  de los aliens quedaba hasta 70 grados torcida cuando se agachaban o se daban vuelta.
+#  Lo que se verifica: la punta del hueso (1 m de la raiz en el mundo) en el cuadro 1 y despues de girar (cuadro 25),
+#  recien importado y despues de guardar y volver a abrir el .w3d
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_gltf_armature_escalado.w3s
+# ===========================================================================
+selobj Cubo
+delete
+importgltf prueba_gltf_armature_escalado.gltf
+armclips Personaje 1
+bonepose Personaje:punta 1 1 0 0
+bonepose Personaje:punta 25 0.5 0 -0.866
+
+savew3d /tmp/w3d_prueba_gltf_armature_escalado.w3d
+openw3d /tmp/w3d_prueba_gltf_armature_escalado.w3d
+bonepose Personaje:punta 1 1 0 0
+bonepose Personaje:punta 25 0.5 0 -0.866

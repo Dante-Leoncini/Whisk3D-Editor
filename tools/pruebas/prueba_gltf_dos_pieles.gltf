@@ -1,0 +1,367 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "gen_prueba_gltf_dos_pieles.py"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    4,
+    5
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "mallaA",
+   "mesh": 0,
+   "skin": 0
+  },
+  {
+   "name": "PersonajeA",
+   "translation": [
+    0.0,
+    0,
+    0
+   ],
+   "children": [
+    2
+   ]
+  },
+  {
+   "name": "A_raiz",
+   "children": [
+    3
+   ]
+  },
+  {
+   "name": "A_punta",
+   "translation": [
+    0,
+    1,
+    0
+   ]
+  },
+  {
+   "name": "mallaB",
+   "mesh": 1,
+   "skin": 1
+  },
+  {
+   "name": "PersonajeB",
+   "translation": [
+    3.0,
+    0,
+    0
+   ],
+   "children": [
+    6
+   ]
+  },
+  {
+   "name": "B_raiz",
+   "children": [
+    7
+   ]
+  },
+  {
+   "name": "B_punta",
+   "translation": [
+    0,
+    1,
+    0
+   ]
+  }
+ ],
+ "meshes": [
+  {
+   "name": "mallaA",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "JOINTS_0": 1,
+      "WEIGHTS_0": 2
+     },
+     "indices": 4
+    }
+   ]
+  },
+  {
+   "name": "mallaB",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 7,
+      "JOINTS_0": 8,
+      "WEIGHTS_0": 9
+     },
+     "indices": 11
+    }
+   ]
+  }
+ ],
+ "skins": [
+  {
+   "name": "PersonajeA",
+   "joints": [
+    2,
+    3
+   ],
+   "inverseBindMatrices": 3
+  },
+  {
+   "name": "PersonajeB",
+   "joints": [
+    6,
+    7
+   ],
+   "inverseBindMatrices": 10
+  }
+ ],
+ "animations": [
+  {
+   "name": "BailaA",
+   "extras": {
+    "frameRate": 24
+   },
+   "samplers": [
+    {
+     "input": 5,
+     "output": 6,
+     "interpolation": "LINEAR"
+    }
+   ],
+   "channels": [
+    {
+     "sampler": 0,
+     "target": {
+      "node": 2,
+      "path": "translation"
+     }
+    }
+   ]
+  },
+  {
+   "name": "BailaB",
+   "extras": {
+    "frameRate": 24
+   },
+   "samplers": [
+    {
+     "input": 12,
+     "output": 13,
+     "interpolation": "LINEAR"
+    }
+   ],
+   "channels": [
+    {
+     "sampler": 0,
+     "target": {
+      "node": 6,
+      "path": "rotation"
+     }
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    -0.5,
+    0,
+    0
+   ],
+   "max": [
+    0.5,
+    2,
+    0
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5121,
+   "count": 4,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 2,
+   "type": "MAT4"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5126,
+   "count": 2,
+   "type": "SCALAR",
+   "min": [
+    0.0
+   ],
+   "max": [
+    1.0
+   ]
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 2,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 7,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    2.5,
+    0,
+    0
+   ],
+   "max": [
+    3.5,
+    2,
+    0
+   ]
+  },
+  {
+   "bufferView": 8,
+   "componentType": 5121,
+   "count": 4,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 9,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 10,
+   "componentType": 5126,
+   "count": 2,
+   "type": "MAT4"
+  },
+  {
+   "bufferView": 11,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 12,
+   "componentType": 5126,
+   "count": 2,
+   "type": "SCALAR",
+   "min": [
+    0.0
+   ],
+   "max": [
+    1.0
+   ]
+  },
+  {
+   "bufferView": 13,
+   "componentType": 5126,
+   "count": 2,
+   "type": "VEC4"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 48,
+   "byteLength": 16
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 64,
+   "byteLength": 64
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 128,
+   "byteLength": 128
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 256,
+   "byteLength": 12
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 268,
+   "byteLength": 8
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 276,
+   "byteLength": 24
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 300,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 348,
+   "byteLength": 16
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 364,
+   "byteLength": 64
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 428,
+   "byteLength": 128
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 556,
+   "byteLength": 12
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 568,
+   "byteLength": 8
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 576,
+   "byteLength": 32
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 608,
+   "uri": "data:application/octet-stream;base64,AAAAvwAAAAAAAAAAAAAAPwAAAAAAAAAAAAAAPwAAAEAAAAAAAAAAvwAAAEAAAAAAAAAAAAAAAAABAAAAAQAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAgAAAgL8AAAAAAACAPwAAAQACAAAAAgADAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA/AAAgQAAAAAAAAAAAAABgQAAAAAAAAAAAAABgQAAAAEAAAAAAAAAgQAAAAEAAAAAAAAAAAAAAAAABAAAAAQAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAEDAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAABAwAAAgL8AAAAAAACAPwAAAQACAAAAAgADAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAA8wQ1P/MENT8="
+  }
+ ]
+}

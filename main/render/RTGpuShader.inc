@@ -9,7 +9,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 struct Vert { vec4 p; vec4 n; vec4 t; };          // p.w = u, n.w = v
 struct Mat { vec4 m0; vec4 m1; vec4 m2; vec4 m3; vec4 m4; vec4 m5; vec4 m6; };
 // m0 = difuso.rgb alfa | m1 = emision.rgb rugosidad | m2 = metalico f0 banderas ior | m3 = tex nmTex emTex rugTex | m4 = metTex alfaTex recorte transmision
-// m5 = la transformacion UV (u' = x*u + z*v + m6.x, v' = y*u + w*v + m6.y) | m6 = su desplazamiento, -, la fuerza de la emision
+// m5 = (sin uso) | m6 = -, -, -, la fuerza de la emision
 struct Luz { vec4 p; vec4 d; vec4 c; vec4 amb; vec4 att; vec4 area; };
 // p = pos.xyz direccional | d = dir.xyz (la del sol, o hacia donde alumbra un foco o una de area) radio | c = color.rgb rayos |
 // amb = ambiente.rgb, coseno del cono del foco (-1 = sin cono) | att = constante lineal cuadratica, exponente del foco |
@@ -28,6 +28,11 @@ layout(std430, binding = 9) buffer BImg { uint img[]; };
 layout(std430, binding = 10) buffer BAlb { vec4 aovAlb[]; };
 layout(std430, binding = 11) buffer BNrm { vec4 aovNrm[]; };
 layout(std430, binding = 12) buffer BRayos { uint rayosTotal[]; };   // los rayos trazados (para medir)
+// LAS CAUSTICAS (RayTracer.cpp, PhotonsShoot / CausticsIn): los fotones del pase, ordenados por celda, y la grilla
+// (causInfo = radio, 1/lado de la celda, celdas, prendidas; celdas[k] = el primer foton de la celda k)
+struct Foton { vec4 p; vec4 pw; vec4 n; };
+layout(std430, binding = 13) readonly buffer BFotones { Foton fotones[]; };
+layout(std430, binding = 14) readonly buffer BCaus { vec4 causInfo; int celdas[]; };
 uint gRayos = 0u;
 layout(push_constant) uniform PC {
     vec4 camPos;    // w = sx de la lente (ndc = e.x / sx [/ ez] * zoom + pan)
@@ -44,6 +49,14 @@ uint gRng;
 float Azar() { gRng ^= gRng << 13; gRng ^= gRng >> 17; gRng ^= gRng << 5; return float(gRng & 0xFFFFFFu) / 16777216.0; }
 
 struct Hit { float t; float b1; float b2; int tri; };
+// LO QUE HACE CADA OBJETO CON LA LUZ (RTTri::fl de RayTracer.cpp, en los 8 bits altos de tris[].w; los de abajo son el
+// material): un rayo de SOMBRA solo ve lo que PROYECTA, uno de REBOTE solo lo que REBOTA, y en lo que no RECIBE las
+// lamparas llegan enteras. Antes la GPU no lo sabia: el cuadro del fondo de la camara (sin proyectar sombras) le tapaba
+// el sol a toda la escena y el render salia sin sol ni sombras
+const int RT_PROYECTA = 1, RT_REBOTA = 2, RT_RECIBE = 4;
+int MaterialDe(int tri) { return tris[tri].w & 0xFFFFFF; }
+int BanderasDe(int tri) { return (tris[tri].w >> 24) & 255; }
+bool PasaDeLargo(int tri, int mascara) { return mascara != 0 && (BanderasDe(tri) & mascara) != mascara; }
 bool RayoTri(int tri, vec3 o, vec3 d, float tMin, float tMax, inout Hit h) {
     ivec4 T = tris[tri];
     vec3 p0 = verts[T.x].p.xyz, p1 = verts[T.y].p.xyz, p2 = verts[T.z].p.xyz;
@@ -78,18 +91,21 @@ float EntraCaja(vec3 bmin, vec3 bmax, vec3 o, vec3 invD, float tMax) {
 // CON LOS NUCLEOS DE TRAZADO (VK_KHR_ray_query): la busqueda la hace el hardware sobre su propia estructura (la
 // escena entera en un BLAS, con los triangulos en el MISMO orden: el indice de primitiva es el del triangulo). Opaco
 // salvo cuando hay que saltear el triangulo ya atravesado (las capas transparentes)
-layout(binding = 13) uniform accelerationStructureEXT gTlas;
-bool Trazar(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, int excluido) {
+layout(binding = 15) uniform accelerationStructureEXT gTlas;
+// (mascara: RT_PROYECTA / RT_REBOTA, o 0 = ve todo; lo que no la tiene le pasa de largo)
+bool TrazarM(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, int excluido, int mascara) {
     gRayos++;
     mejor.t = tMax; mejor.b1 = 0.0; mejor.b2 = 0.0; mejor.tri = -1;
     if (pc.info.y == 0) return false;
-    uint flags = (excluido >= 0) ? gl_RayFlagsNoOpaqueEXT : gl_RayFlagsOpaqueEXT;
-    if (sombra && excluido < 0) flags |= gl_RayFlagsTerminateOnFirstHitEXT;
+    const bool filtra = excluido >= 0 || mascara != 0;   // (hay triangulos que saltear: cada candidato pasa por aca)
+    uint flags = filtra ? gl_RayFlagsNoOpaqueEXT : gl_RayFlagsOpaqueEXT;
+    if (sombra && !filtra) flags |= gl_RayFlagsTerminateOnFirstHitEXT;
     rayQueryEXT q;
     rayQueryInitializeEXT(q, gTlas, flags, 0xFF, o, tMin, d, tMax);
     while (rayQueryProceedEXT(q)) {
-        if (rayQueryGetIntersectionTypeEXT(q, false) == gl_RayQueryCandidateIntersectionTriangleEXT &&
-            rayQueryGetIntersectionPrimitiveIndexEXT(q, false) != excluido) {
+        if (rayQueryGetIntersectionTypeEXT(q, false) == gl_RayQueryCandidateIntersectionTriangleEXT) {
+            int tri = rayQueryGetIntersectionPrimitiveIndexEXT(q, false);
+            if (tri == excluido || PasaDeLargo(tri, mascara)) continue;
             rayQueryConfirmIntersectionEXT(q);
             if (sombra) rayQueryTerminateEXT(q);
         }
@@ -101,7 +117,7 @@ bool Trazar(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, 
     return true;
 }
 #else
-bool Trazar(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, int excluido) {
+bool TrazarM(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, int excluido, int mascara) {
     gRayos++;
     mejor.t = tMax; mejor.b1 = 0.0; mejor.b2 = 0.0; mejor.tri = -1;
     if (pc.info.y == 0) return false;
@@ -116,7 +132,7 @@ bool Trazar(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, 
             int primero = int(n.c.x);
             for (int i = 0; i < cant; i++) {
                 int tri = orden[primero + i];
-                if (tri == excluido) continue;
+                if (tri == excluido || PasaDeLargo(tri, mascara)) continue;
                 Hit h;
                 if (RayoTri(tri, o, d, tMin, mejor.t, h)) { mejor = h; hay = true; if (sombra) return true; }
             }
@@ -133,6 +149,9 @@ bool Trazar(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, 
     return hay;
 }
 #endif
+bool Trazar(vec3 o, vec3 d, float tMin, float tMax, bool sombra, out Hit mejor, int excluido) {
+    return TrazarM(o, d, tMin, tMax, sombra, mejor, excluido, 0);
+}
 vec4 Texel(ivec4 I, int x, int y) { return unpackUnorm4x8(texels[I.x + y * I.y + x]); }
 vec4 Muestrear(int ti, vec2 uv) {
     ivec4 I = texInfo[ti];   // desde, ancho, alto, filtrado
@@ -150,15 +169,13 @@ vec4 Muestrear(int ti, vec2 uv) {
 }
 vec2 UVEn(Hit h) {
     ivec4 T = tris[h.tri]; float b0 = 1.0 - h.b1 - h.b2;
-    vec2 uv = vec2(verts[T.x].p.w, verts[T.x].n.w) * b0 + vec2(verts[T.y].p.w, verts[T.y].n.w) * h.b1 + vec2(verts[T.z].p.w, verts[T.z].n.w) * h.b2;
-    Mat r = mats[T.w];   // la TRANSFORMACION UV de su material (la identidad si no tiene; RayTracer.cpp: UVIn)
-    return vec2(r.m5.x * uv.x + r.m5.z * uv.y, r.m5.y * uv.x + r.m5.w * uv.y) + r.m6.xy;
+    return vec2(verts[T.x].p.w, verts[T.x].n.w) * b0 + vec2(verts[T.y].p.w, verts[T.y].n.w) * h.b1 + vec2(verts[T.z].p.w, verts[T.z].n.w) * h.b2;
 }
 struct M { vec3 dif; vec3 em; float alfa; float rug; float met; float f0; int tex; int nm; bool sinLuz; bool transp; bool aditivo; float recorte; float ior; float trans; };
 // el borde del RECORTADO: una rampa corta alrededor del umbral (con el bilineal queda suave; ver RayTracer.cpp)
 float Recortar(float a, float umbral) { return clamp((a - umbral) * 8.0 + 0.5, 0.0, 1.0); }
 M MaterialEn(Hit h) {
-    Mat r = mats[tris[h.tri].w];
+    Mat r = mats[MaterialDe(h.tri)];
     M m;
     m.dif = r.m0.rgb; m.alfa = r.m0.a; m.em = r.m1.rgb; m.rug = r.m1.a; m.met = r.m2.x; m.f0 = r.m2.y;
     int b = int(r.m2.z); m.sinLuz = (b & 1) != 0; m.transp = (b & 2) != 0; m.aditivo = (b & 4) != 0;
@@ -182,13 +199,35 @@ float OpacidadEn(Hit h) {
     if (m.recorte > 0.0) a = Recortar(a, m.recorte);
     return a * (1.0 - m.trans);   // (el vidrio deja pasar la luz)
 }
+// la normal INTERPOLADA del impacto (sin dar vuelta)
+vec3 NormalLisa(Hit h) {
+    ivec4 T = tris[h.tri]; float b0 = 1.0 - h.b1 - h.b2;
+    return normalize(verts[T.x].n.xyz * b0 + verts[T.y].n.xyz * h.b1 + verts[T.z].n.xyz * h.b2);
+}
+// FRESNEL (Schlick, como RayTracer.cpp): cuanto refleja un dielectrico con ese coseno
+float Fresnel(float f0, float c) { float k = 1.0 - clamp(abs(c), 0.0, 1.0); float k2 = k * k; return f0 + (1.0 - f0) * k2 * k2 * k; }
+// lo que DEJA PASAR la superficie, por canal (TransmitIn de RayTracer.cpp): el hueco del alfa entero; el VIDRIO con su
+// color y menos lo que refleja; con las causticas prendidas, la parte que el vidrio con IOR dobla la traen los fotones
+vec3 TransmiteEn(Hit h, vec3 d) {
+    M m = MaterialEn(h);
+    if (!m.transp && m.trans <= 0.0) return vec3(0.0);
+    if (m.aditivo) return vec3(1.0);
+    float a = m.transp ? m.alfa : 1.0;
+    vec4 tx = vec4(1.0);
+    if (m.tex >= 0 && ((m.transp && a > 0.0) || m.trans > 0.0)) tx = Muestrear(m.tex, UVEn(h));
+    if (m.transp) a *= tx.a;
+    if (m.recorte > 0.0) a = Recortar(a, m.recorte);
+    float vidrio = a * m.trans;
+    if (vidrio > 0.0 && m.ior > 1.0001) vidrio *= causInfo.w > 0.5 ? 0.0 : 1.0 - Fresnel(m.f0, dot(NormalLisa(h), d));   // (IOR 1: pasa todo)
+    return vec3(1.0 - a) + vidrio * m.dif * tx.rgb;
+}
 // LA SOMBRA CON TRANSPARENCIAS EN UN SOLO RECORRIDO: lo que deja pasar cada superficie se MULTIPLICA (el orden no
 // importa), asi que no hace falta ir de la mas cercana a la siguiente (eran hasta 8 recorridos por rayo de sombra):
 // se visita todo lo que corta el rayo hasta la luz y se corta apenas no pasa nada
 #ifdef W3D_RTX
-float VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
+vec3 VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
     gRayos++;
-    float vis = 1.0;
+    vec3 vis = vec3(1.0);
     rayQueryEXT q;
     rayQueryInitializeEXT(q, gTlas, gl_RayFlagsNoOpaqueEXT, 0xFF, o, 1e-4, d, tMax);
     while (rayQueryProceedEXT(q)) {
@@ -197,17 +236,18 @@ float VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
         vec2 b = rayQueryGetIntersectionBarycentricsEXT(q, false);
         h.t = rayQueryGetIntersectionTEXT(q, false); h.b1 = b.x; h.b2 = b.y;
         h.tri = rayQueryGetIntersectionPrimitiveIndexEXT(q, false);
-        vis *= 1.0 - OpacidadEn(h);
-        if (vis < 0.004) { rayQueryTerminateEXT(q); return 0.0; }
+        if (PasaDeLargo(h.tri, RT_PROYECTA)) continue;   // (no proyecta sombras: no tapa)
+        vis *= TransmiteEn(h, d);
+        if (max(max(vis.r, vis.g), vis.b) < 0.004) { rayQueryTerminateEXT(q); return vec3(0.0); }
     }
     return vis;
 }
 #else
-float VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
+vec3 VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
     gRayos++;
     vec3 invD = vec3(1.0 / (abs(d.x) > 1e-12 ? d.x : 1e-12), 1.0 / (abs(d.y) > 1e-12 ? d.y : 1e-12), 1.0 / (abs(d.z) > 1e-12 ? d.z : 1e-12));
     int pila[64]; int sp = 0; pila[sp++] = 0;
-    float vis = 1.0;
+    vec3 vis = vec3(1.0);
     while (sp > 0) {
         Nodo n = nodos[pila[--sp]];
         if (!RayoCaja(n.a.xyz, n.b.xyz, o, invD, tMax)) continue;
@@ -216,9 +256,11 @@ float VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
             int primero = int(n.c.x);
             for (int i = 0; i < cant; i++) {
                 Hit h;
-                if (!RayoTri(orden[primero + i], o, d, 1e-4, tMax, h)) continue;
-                vis *= 1.0 - OpacidadEn(h);
-                if (vis < 0.004) return 0.0;
+                int tri = orden[primero + i];
+                if (PasaDeLargo(tri, RT_PROYECTA)) continue;   // (no proyecta sombras: no tapa)
+                if (!RayoTri(tri, o, d, 1e-4, tMax, h)) continue;
+                vis *= TransmiteEn(h, d);
+                if (max(max(vis.r, vis.g), vis.b) < 0.004) return vec3(0.0);
             }
         } else {
             int izq = int(n.a.w), der = int(n.b.w);
@@ -229,11 +271,35 @@ float VisibilidadUnaPasada(vec3 o, vec3 d, float tMax) {
     return vis;
 }
 #endif
-float Visibilidad(vec3 o, vec3 d, float tMax) {
+// la superficie que se esta iluminando NO RECIBE sombras (RT_RECIBE): las lamparas le llegan enteras (ver Radiancia)
+bool gSinSombras = false;
+vec3 Visibilidad(vec3 o, vec3 d, float tMax) {   // (por canal: lo que pasa por un vidrio trae su color)
+    if (gSinSombras) return vec3(1.0);
     Hit h;
-    if (pc.info.z == 0) return Trazar(o, d, 1e-4, tMax, true, h, -1) ? 0.0 : 1.0;
-    if (pc.info.y == 0) return 1.0;
+    if (pc.info.z == 0) return TrazarM(o, d, 1e-4, tMax, true, h, -1, RT_PROYECTA) ? vec3(0.0) : vec3(1.0);
+    if (pc.info.y == 0) return vec3(1.0);
     return VisibilidadUnaPasada(o, d, tMax);
+}
+// LAS CAUSTICAS en 'p' (cara con normal 'n'): los fotones de las 27 celdas de alrededor (CausticsIn de RayTracer.cpp)
+uint CeldaFoton(ivec3 c) { return uint(c.x) * 73856093u ^ uint(c.y) * 19349663u ^ uint(c.z) * 83492791u; }
+vec3 CausticasEn(vec3 p, vec3 n) {
+    if (causInfo.w < 0.5) return vec3(0.0);
+    float r = causInfo.x, inv = causInfo.y; uint H = uint(causInfo.z);
+    ivec3 ic = ivec3(floor(p * inv));
+    vec3 suma = vec3(0.0); uint vistos[27]; int nv = 0;
+    for (int dz = -1; dz <= 1; dz++) for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+        uint k = CeldaFoton(ic + ivec3(dx, dy, dz)) & (H - 1u);
+        bool rep = false; for (int s = 0; s < nv; s++) if (vistos[s] == k) rep = true;
+        if (rep) continue;
+        vistos[nv++] = k;
+        for (int i = celdas[k], i1 = celdas[k + 1u]; i < i1; i++) {
+            Foton f = fotones[i];
+            vec3 e = f.p.xyz - p; float d2 = dot(e, e);
+            if (d2 >= r * r || dot(f.n.xyz, n) < 0.5) continue;
+            suma += f.pw.rgb * (1.0 - sqrt(d2) / r);
+        }
+    }
+    return suma * (3.0 / (3.14159265 * r * r));
 }
 vec3 DirAzarEsfera() {
     float z = 1.0 - 2.0 * Azar();
@@ -268,8 +334,8 @@ vec2 DiscoConcentrico(vec2 u) {
     else { r = u.y; a = 1.5707963 - 0.78539816 * (u.x / u.y); }
     return r * vec2(cos(a), sin(a));
 }
-void LuzArea(Luz L, vec3 po, vec3 n, vec3 haciaCam, float expo, bool conBrillo, out float lambert, out float spec) {
-    lambert = 0.0; spec = 0.0;
+void LuzArea(Luz L, vec3 po, vec3 n, vec3 haciaCam, float expo, bool conBrillo, out vec3 lambert, out vec3 spec) {
+    lambert = vec3(0.0); spec = vec3(0.0);
     vec3 c = L.p.xyz, nl = L.d.xyz, ax = L.area.xyz;
     bool elip = L.area.w < 0.0;
     vec3 ay = normalize(cross(ax, nl)) * abs(L.area.w);
@@ -295,7 +361,7 @@ void LuzArea(Luz L, vec3 po, vec3 n, vec3 haciaCam, float expo, bool conBrillo, 
     int sx = max(int(ceil(sqrt(float(nRayos)))), 1), sy = (nRayos + sx - 1) / sx, celdas = sx * sy;
     int desde = min(int(Azar() * float(celdas)), celdas - 1);
     float gMax = 6.2831853 * float(nRayos) / S;   // (un pedazo de la lampara no tapa mas que medio cielo)
-    float sg = 0.0, sgv = 0.0;
+    float sg = 0.0; vec3 sgv = vec3(0.0);
     for (int r = 0; r < nRayos; r++) {
         int celda = (r + desde) % celdas;
         vec2 u = vec2((float(celda % sx) + Azar()) / float(sx), (float(celda / sx) + Azar()) / float(sy)) * 2.0 - 1.0;
@@ -306,27 +372,30 @@ void LuzArea(Luz L, vec3 po, vec3 n, vec3 haciaCam, float expo, bool conBrillo, 
         float ndl = dot(n, ld), cl = -dot(ld, nl);
         if (ndl <= 0.0 || cl <= 0.0) continue;
         float g = min(cl / (dist * dist), gMax);
-        float vis = Visibilidad(po, ld, dist);
+        vec3 vis = Visibilidad(po, ld, dist);
         sg += ndl * g; sgv += ndl * g * vis;
-        if (conBrillo && vis > 0.0) {
+        if (conBrillo && max(max(vis.r, vis.g), vis.b) > 0.0) {
             float nh = dot(n, normalize(ld + haciaCam));
             if (nh > 0.0) spec += pow(nh, expo) * (expo + 2.0) * 0.125 * vis * g;
         }
     }
     spec /= float(nRayos);
-    float parte;
+    vec3 parte;
     if (sg > 0.0) parte = sgv / sg;
     else {   // (ningun rayo cayo del lado del punto: uno en la direccion media de la luz que llega)
         vec3 d = normalize(F); float dn = -dot(d, nl);
-        parte = (dn > 1e-4) ? Visibilidad(po, d, h / dn) : 0.0;
+        parte = (dn > 1e-4) ? Visibilidad(po, d, h / dn) : vec3(0.0);
     }
     lambert = E * parte;
 }
-vec3 LuzEn(vec3 p, vec3 n, vec3 haciaCam, vec3 alb, M m) {
+// soloBrillo: ademas, el brillo de las lamparas solo (el VIDRIO lo muestra aunque no tenga difuso)
+vec3 LuzEn(vec3 p, vec3 n, vec3 haciaCam, vec3 alb, M m, out vec3 soloBrillo) {
+    soloBrillo = vec3(0.0);
     if (m.sinLuz) return alb;
     vec3 luz = vec3(0.0), brillo = vec3(0.0);
     float rug = max(m.rug, 0.05);
-    float expo = 2.0 / (rug * rug) - 2.0 + 1.0;
+    float rugA = rug * rug;   // (rugosidad PERCEPTUAL, la de Blender/glTF: alfa = r^2; ver LightIn en RayTracer.cpp)
+    float expo = min(2.0 / (rugA * rugA) - 2.0, 8192.0);
     float pesoBrillo = (m.rug <= 0.0) ? 0.0 : (m.met + (1.0 - m.met) * m.f0);
     vec3 colBrillo = m.met * alb + vec3(1.0 - m.met);
     vec3 po = p + n * 1e-3;
@@ -339,12 +408,12 @@ vec3 LuzEn(vec3 p, vec3 n, vec3 haciaCam, vec3 alb, M m) {
         int i = N > kPorImpacto ? min(int(Azar() * float(N)), N - 1) : s;
         Luz L = luces[i];
         if (dot(L.area.xyz, L.area.xyz) > 0.0) {   // LUZ DE AREA (sin la atenuacion C/L/Q: la caida es la de la superficie)
-            float la, sp; LuzArea(L, po, n, haciaCam, expo, pesoBrillo > 0.0, la, sp);
+            vec3 la, sp; LuzArea(L, po, n, haciaCam, expo, pesoBrillo > 0.0, la, sp);
             float w = VentanaDistancia(length(L.p.xyz - po), -L.p.w);
             luz += L.c.rgb * la * w * pesoMuestra; brillo += L.c.rgb * sp * w * pesoMuestra;
             continue;
         }
-        float lambert = 0.0, spec = 0.0, att = 1.0;
+        vec3 lambert = vec3(0.0), spec = vec3(0.0); float att = 1.0;
         bool dirl = L.p.w > 0.5; float radio = L.d.w;
         float distMax = dirl ? 0.0 : -L.p.w;   // (la distancia de la luz: 0 = sin limite)
         int nRayos = int(L.c.w);
@@ -373,20 +442,22 @@ vec3 LuzEn(vec3 p, vec3 n, vec3 haciaCam, vec3 alb, M m) {
                 float at0 = min(1.0 / (L.att.x + L.att.y * dist + L.att.z * dist * dist), 1.0) * VentanaDistancia(dist, distMax);
                 if (nl * cono * at0 * max(max(L.c.r, L.c.g), L.c.b) * pesoMuestra < 0.002) continue;
             }
-            float vis = Visibilidad(po, ldir, dist) * cono;
-            if (vis <= 0.0) continue;
+            vec3 vis = Visibilidad(po, ldir, dist) * cono;
+            if (max(max(vis.r, vis.g), vis.b) <= 0.0) continue;
             lambert += nl * vis;
             if (pesoBrillo > 0.0) {
                 float nh = dot(n, normalize(ldir + haciaCam));
                 if (nh > 0.0) spec += pow(nh, expo) * (expo + 2.0) * 0.125 * vis;
             }
         }
-        if (lambert <= 0.0 && spec <= 0.0) continue;
+        if (max(max(lambert.r, lambert.g), lambert.b) <= 0.0 && max(max(spec.r, spec.g), spec.b) <= 0.0) continue;
         lambert /= float(nRayos); spec /= float(nRayos);
         if (!dirl) { float dd = length(L.p.xyz - po); att = min(1.0 / (L.att.x + L.att.y * dd + L.att.z * dd * dd), 1.0) * VentanaDistancia(dd, distMax); }
         luz += L.c.rgb * lambert * att * pesoMuestra; brillo += L.c.rgb * spec * att * pesoMuestra;
     }
-    return alb * luz * (1.0 - m.met) + colBrillo * brillo * pesoBrillo + m.em;
+    if (!gSinSombras) luz += CausticasEn(p, n);   // LAS CAUSTICAS: la luz que llego doblada por un vidrio
+    soloBrillo = colBrillo * brillo * pesoBrillo;
+    return alb * luz * (1.0 - m.met) + soloBrillo + m.em;
 }
 vec3 NormalEn(Hit h, vec3 d) {
     ivec4 T = tris[h.tri]; float b0 = 1.0 - h.b1 - h.b2;
@@ -425,7 +496,8 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
         int capa = 0;
         for (int vuelta = 0; vuelta < 256 && capa < capas; vuelta++) {
             Hit h;
-            if (!Trazar(o, d, tMin, 1e30, false, h, excl)) { total += thr * peso * Fondo(d) * (prof > 0 ? gLuzFondo : 1.0); break; }
+            // (los rayos de la camara ven todo; un REBOTE o un reflejo, solo lo que rebota la luz)
+            if (!TrazarM(o, d, tMin, 1e30, false, h, excl, prof > 0 ? RT_REBOTA : 0)) { total += thr * peso * Fondo(d) * (prof > 0 ? gLuzFondo : 1.0); break; }
             ivec4 T = tris[h.tri];
             M m = MaterialEn(h);
             float b0 = 1.0 - h.b1 - h.b2;
@@ -437,6 +509,7 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
             if (alfa > 0.0) capa++;
             if (alfa > 0.0) {
                 vec3 n = NormalEn(h, d);
+                vec3 nLisa = n;   // (la de antes del normal map: la usa el Fresnel)
                 if (m.nm >= 0) {   // NORMAL MAP (tangent-space), base T/B/N del impacto
                     vec4 tx = Muestrear(m.nm, UVEn(h));
                     vec3 Tg = verts[T.x].t.xyz * b0 + verts[T.y].t.xyz * h.b1 + verts[T.z].t.xyz * h.b2;
@@ -449,23 +522,40 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
                         if (dot(np, np) > 1e-12) n = normalize(np);
                     }
                 }
-                vec3 col = LuzEn(p, n, -d, alb, m);
+                // FRESNEL (Schlick, como Blender; ver Radiance en RayTracer.cpp): lo que no es metal refleja su F0 de frente
+                // y casi todo de costado; el metal, su color (blanco de costado). Lo reflejado no es difuso
+                // (con la normal LISA: la del normal map puede quedar de canto a la camara, F = 1 y el difuso a cero)
+                float cosV = clamp(-dot(d, nLisa), 0.0, 1.0);
+                float borde = pow(1.0 - cosV, 5.0);
+                float fDie = (m.sinLuz || m.aditivo || m.trans > 0.0) ? 0.0 : m.f0 + (1.0 - m.f0) * borde;
+                vec3 kRefl = m.met * (alb + (vec3(1.0) - alb) * borde) + vec3((1.0 - m.met) * fDie);
+                alb *= 1.0 - (1.0 - m.met) * fDie;
+                vec3 soloBrillo;
+                gSinSombras = (BanderasDe(h.tri) & RT_RECIBE) == 0;
+                vec3 col = LuzEn(p, n, -d, alb, m, soloBrillo);
+                gSinSombras = false;
                 // LA LUZ DEL FONDO 360 sin rebotes: un rayo al cielo pesado por el coseno (si no lo tapa nada)
                 if ((gEnvMat >= 0 || dot(pc.bg.rgb, vec3(1.0)) > 0.0) && gLuzFondo > 0.0 && gRebotes == 0 && !m.sinLuz && m.met < 1.0) {
                     vec3 sd = normalize(n + DirAzarEsfera());
                     if (dot(sd, n) <= 0.0) sd = n;
                     Hit hs;
-                    if (!Trazar(p + n * 1e-3, sd, 1e-4, 1e30, true, hs, -1)) col += (1.0 - m.met) * alb * Fondo(sd) * gLuzFondo;
+                    if (!TrazarM(p + n * 1e-3, sd, 1e-4, 1e30, true, hs, -1, RT_PROYECTA)) col += (1.0 - m.met) * alb * Fondo(sd) * gLuzFondo;
                 }
                 float w = m.aditivo ? peso : peso * alfa * (1.0 - m.trans);
                 total += thr * w * col;
-                if (m.met > 0.0 && prof < 4 && sp < 8) {
+                // (la parte de VIDRIO no tiene difuso, pero las lamparas se le reflejan: el brillo que lo hace ver de vidrio)
+                if (!m.aditivo && m.trans > 0.0) total += thr * (peso * alfa * m.trans) * soloBrillo;
+                // EL REFLEJO con ese Fresnel: el metal hasta 4 rebotes; lo que no es metal en los 2 primeros y con
+                // probabilidad (pesando en proporcion: mismo promedio sin duplicar los rayos)
+                bool metal = m.met > 0.0;
+                float prob = metal ? 1.0 : min(0.25 + 2.0 * fDie, 1.0);
+                if (max(max(kRefl.r, kRefl.g), kRefl.b) > 0.0 && prof < (metal ? 4 : 2) && sp < 8 && (prob >= 1.0 || Azar() < prob)) {
                     vec3 r = d - n * (2.0 * dot(d, n));
                     if (m.rug > 0.0) {
                         r = normalize(r + DirAzarEsfera() * (m.rug * m.rug));
                         if (dot(r, n) <= 0.0) r = normalize(r - n * (2.0 * dot(r, n)));
                     }
-                    pO[sp] = p + n * 1e-3; pD[sp] = r; pT[sp] = thr * w * m.met * alb; pP[sp] = prof + 1; sp++;
+                    pO[sp] = p + n * 1e-3; pD[sp] = r; pT[sp] = thr * w * kRefl / prob; pP[sp] = prof + 1; sp++;
                 }
                 // REBOTES DE LA LUZ (como RayTracer.cpp): la parte difusa sigue en una direccion pesada por el coseno
                 if (gRebotes > 0 && prof < gRebotes && !m.sinLuz && m.met < 1.0 && sp < 8) {
@@ -475,21 +565,32 @@ vec3 Radiancia(vec3 o0, vec3 d0) {
                 }
                 if (!m.aditivo && m.trans <= 0.0) peso *= (1.0 - alfa);
             }
-            // TRANSMISION (como RayTracer.cpp): lo que el alfa saca pasa derecho, la parte de vidrio pasa refractada
+            // TRANSMISION (como RayTracer.cpp): lo que el alfa saca pasa derecho; la parte de vidrio REFLEJA (Fresnel) o pasa
+            // refractada y TENIDA de su color
             if (m.trans > 0.0 && !m.aditivo) {
                 float derecho = 1.0 - alfa, vidrio = alfa * m.trans, pasa = derecho + vidrio;
                 peso *= pasa;
-                if (peso < 0.004) break;
-                if (m.ior > 1.0001 && Azar() * pasa < vidrio) {
-                    vec3 nr = normalize(verts[T.x].n.xyz * b0 + verts[T.y].n.xyz * h.b1 + verts[T.z].n.xyz * h.b2);
+                if (peso * max(max(thr.r, thr.g), thr.b) < 0.004) break;
+                if (Azar() * pasa < vidrio) {
+                    vec3 nr = NormalLisa(h);
                     bool entra = dot(nr, d) < 0.0;
                     if (!entra) nr = -nr;
-                    vec3 rd = refract(d, nr, entra ? 1.0 / m.ior : m.ior);
-                    d = (dot(rd, rd) < 1e-8) ? reflect(d, nr) : normalize(rd);
+                    float c = -dot(nr, d);
+                    float F = m.ior > 1.0001 ? Fresnel(m.f0, c) : 0.0;   // (IOR 1: transparente perfecto, no refleja)
+                    vec3 pasaDir = d; bool refleja = false;
+                    if (m.ior > 1.0001) {
+                        float eta = entra ? 1.0 / m.ior : m.ior, k = 1.0 - eta * eta * (1.0 - c * c);
+                        if (k < 0.0) refleja = true;   // (reflexion total interna)
+                        else { pasaDir = normalize(d * eta + nr * (eta * c - sqrt(k))); if (!entra) F = Fresnel(m.f0, sqrt(k)); }
+                    }
+                    if (!refleja && Azar() < F) refleja = true;
+                    if (refleja) d = normalize(d + nr * (2.0 * c));
+                    else { d = pasaDir; thr *= alb; }
                     if (m.rug > 0.0) {   // VIDRIO ESMERILADO (como RayTracer.cpp)
                         vec3 dr = normalize(d + DirAzarEsfera() * (m.rug * m.rug));
                         if (dot(dr, nr) * dot(d, nr) > 0.0) d = dr;
                     }
+                    if (peso * max(max(thr.r, thr.g), thr.b) < 0.004) break;
                     o = p; tMin = 1e-4; excl = h.tri;
                     continue;
                 }
@@ -530,7 +631,12 @@ void RayoPixel(float px, float py, out vec3 o, out vec3 d) {
     else { o = pc.camPos.xyz; d = normalize(pc.camAdel.xyz + pc.camDer.xyz * ex + pc.camArr.xyz * ey); }
 }
 void main() {
-    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    // pc.dims.w = muestras (8 bits) | rebotes (8) | BLOQUE de la vista previa (4: 0 = pase de verdad) | PRIMERA FILA (12):
+    // el visor traza un pase de a FRANJAS de filas (cada cuadro las que entran en su tiempo: la UI sigue fluida) y, antes,
+    // la VISTA PREVIA pixelada (un rayo por bloque de 6, 4 y 2 pixeles, como la CPU). El render a archivo, pases enteros
+    int blk = (pc.dims.w >> 16) & 15;
+    int row0 = (pc.dims.w >> 20) & 0xFFF;
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, row0);
     if (q.x >= pc.dims.x || q.y >= pc.dims.y) return;
     int i = q.y * pc.dims.x + q.x;
     gRng = uint(q.x * 1973 + q.y * 9277 + pc.dims.z * 26699 + 1) ^ (uint(pc.lente.z) * 2654435761u);
@@ -539,6 +645,15 @@ void main() {
     gRebotes = (pc.dims.w >> 8) & 255;
     gEnvMat = ((pc.info.w >> 1) & 0x7FFF) - 1;
     gLuzFondo = float(pc.info.w >> 16) * 0.01;
+    if (blk > 1) {   // LA VISTA PREVIA: un rayo al medio del bloque pinta el bloque entero (no toca lo acumulado)
+        if ((q.x % blk) != 0 || (q.y % blk) != 0) return;
+        vec3 o, d; RayoPixel(float(q.x) + float(blk) * 0.5, float(q.y) + float(blk) * 0.5, o, d);
+        uint px = packUnorm4x8(vec4(clamp(Radiancia(o, d), 0.0, 1.0), 1.0));
+        for (int yy = 0; yy < blk && q.y + yy < pc.dims.y; yy++)
+            for (int xx = 0; xx < blk && q.x + xx < pc.dims.x; xx++) img[(q.y + yy) * pc.dims.x + q.x + xx] = px;
+        atomicAdd(rayosTotal[0], gRayos);
+        return;
+    }
     vec3 c = vec3(0.0);
     for (int s = 0; s < ns; s++) {
         vec3 o, d; RayoPixel(float(q.x) + Azar(), float(q.y) + Azar(), o, d); RayoLente(o, d);
@@ -547,8 +662,12 @@ void main() {
     vec4 a = (pc.dims.z == 0 ? vec4(0.0) : acum[i]) + vec4(c / float(ns), 0.0);
     acum[i] = a;
     img[i] = packUnorm4x8(vec4(clamp(a.rgb / float(pc.dims.z + 1), 0.0, 1.0), 1.0));
-    if ((pc.info.w & 1) != 0) {   // el ALBEDO y la NORMAL del primer impacto (para el denoiser)
-        vec3 o, d; RayoPixel(float(q.x) + 0.5, float(q.y) + 0.5, o, d);
+    // el ALBEDO y la NORMAL del primer impacto (para el denoiser), PROMEDIADOS EN CADA PASE con un punto al azar adentro
+    // del pixel, como el color. Antes salian del CENTRO del pixel y solo en el primer pase: el denoiser divide el color
+    // por el albedo, limpia y lo vuelve a multiplicar, y ese albedo sin suavizar le devolvia a los bordes los DIENTES DE
+    // SIERRA que las muestras repartidas en el pixel ya habian borrado (el antialiasing de los 16 pases se perdia)
+    if ((pc.info.w & 1) != 0) {
+        vec3 o, d; RayoPixel(float(q.x) + Azar(), float(q.y) + Azar(), o, d);
         // (la primera superficie que TAPA al menos la mitad: lo transparente y lo recortado se atraviesa, si no el
         // denoiser borroneaba lo que se ve a traves de un vidrio o de las hojas)
         Hit h; bool hay = false; float tMin = 1e-4; int excl = -1;
@@ -557,13 +676,18 @@ void main() {
             if (!hay || pc.info.z == 0 || capa + 1 >= pc.info.z || OpacidadEn(h) >= 0.5) break;
             tMin = h.t * (1.0 - 1e-5); excl = h.tri;
         }
-        if (!hay) { aovAlb[i] = vec4(Fondo(d), 0.0); aovNrm[i] = vec4(0.0); }
+        vec3 alb, nrm;
+        if (!hay) { alb = Fondo(d); nrm = vec3(0.0); }
         else {
             M m = MaterialEn(h);
-            vec3 alb = m.dif;
+            alb = m.dif;
             if (m.tex >= 0) alb *= Muestrear(m.tex, UVEn(h)).rgb;
-            aovAlb[i] = vec4(alb, 0.0); aovNrm[i] = vec4(NormalEn(h, d), 0.0);
+            nrm = NormalEn(h, d);
         }
+        // (el promedio de los pases hechos: pc.dims.z es el pase, 0 = el primero)
+        float k = 1.0 / float(pc.dims.z + 1);
+        if (pc.dims.z == 0) { aovAlb[i] = vec4(alb, 0.0); aovNrm[i] = vec4(nrm, 0.0); }
+        else { aovAlb[i] = vec4(mix(aovAlb[i].rgb, alb, k), 0.0); aovNrm[i] = vec4(mix(aovNrm[i].xyz, nrm, k), 0.0); }
     }
     atomicAdd(rayosTotal[0], gRayos);
 }

@@ -30,8 +30,11 @@
 #include <stdio.h>                       // guardado atomico: fopen/fwrite/rename
 #include <map>                           // los borradores (lo escrito sin guardar, por archivo)
 #include <string.h>                      // strncmp: las keywords del lexer
+#include <ctype.h>                       // tolower: el autocompletado no mira mayusculas
 #include <math.h>                        // cosf/sinf: las agarraderas
-#include "app/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
+#include <algorithm>                     // el orden de la lista del autocompletado
+#include <set>
+#include "base/W3dNoNearFar.h"   // (Windows: windows.h define near/far como macros vacias)
 
 namespace gfx = w3dEngine;
 
@@ -323,6 +326,8 @@ IDE::IDE() {
     lastLines = -1; lastMaxWidth = 0; widthMaxCols = 0;
     selDrag = false; silent = false; hasTextDisk = false;
     consecutiveTaps = 0; tLastTap = 0; lastTapX = -1000; lastTapY = -1000; touchGesture = 0; magnifierX = 0; magnifierY = 0;
+    acOpen = false; acSel = 0; acTop = 0; acLin = 0; acStartCol = 0; acBox[0] = acBox[1] = acBox[2] = acBox[3] = 0;
+    defHelpLin = 0; defHelpCol = 0;
     lines.push_back(std::string()); // el buffer nunca esta vacio (1 linea vacia)
     BarCreate(); // [0] = icono de getType/split
     // botones por ROL (no por indice), como la barra del 2D/UV
@@ -360,6 +365,9 @@ IDE::IDE() {
 //     y el IDE que lo vuelve a abrir los recupera (sin proyecto montado, un script nuevo tambien queda de borrador)
 //   - el IDE que nace abre el ULTIMO script que se estaba editando (no el primero de la lista)
 // ---------------------------------------------------------------------------------------------------------------
+// sube cada vez que el texto de un script queda en el proyecto o en el disco (el panel de Propiedades rearma sus
+// tarjetas: una propiedad escrita en el script aparece sin sacar y volver a poner el script)
+unsigned g_ideScriptVersion = 0;
 static std::map<std::string, std::string> gIdeDrafts;   // archivo ("" = nuevo sin proyecto) -> texto sin guardar
 static std::string gIdeLast;                               // el ultimo script abierto / creado en un IDE
 static std::string IdeFreeEntry() {
@@ -381,7 +389,7 @@ void IDE::SyncMemory() {
     const std::string t = GetText();
     if (!W3dContainerWriteEntry(file, t.empty() ? "" : t.c_str(), t.size())) return;
     dirty = false;
-    textDisk = t; hasTextDisk = true;
+    textDisk = t; hasTextDisk = true; g_ideScriptVersion++;
     g_redraw = true;
 }
 IDE::~IDE() {
@@ -469,6 +477,9 @@ static std::string IdeCollapse(const std::string& s) {
     }
     return o;
 }
+// las letras de un NOMBRE de Lua (el autocompletado y la definicion: ASCII, como Lua)
+static bool IdeIdentChar(unsigned char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'; }
+static bool IdeIdentStart(unsigned char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 static bool IdeIsLetterWord(unsigned char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c >= 0x80; }
 
 // las coincidencias de 'aguja' (ya plegada si !mayus) en la linea que EMPIEZAN en los bytes [desde, hasta): Buscar
@@ -518,7 +529,7 @@ bool IDE::OpenFile(const std::string& path) {
     IdeSplitInLines(raw, &lines);
     file = path;
     dirty = false;
-    textDisk = raw; hasTextDisk = true;
+    textDisk = raw; hasTextDisk = true; g_ideScriptVersion++;
     gIdeLast = path;
     // un BORRADOR (lo que se habia escrito y no se guardo antes de cerrar el IDE): vuelve, sin guardar
     { std::map<std::string, std::string>::iterator b = gIdeDrafts.find(path);
@@ -607,7 +618,7 @@ bool IDE::Save(bool force) {
             return false;
         }
         dirty = false;
-        textDisk = t; hasTextDisk = true;
+        textDisk = t; hasTextDisk = true; g_ideScriptVersion++;
         if (!silent) Notify(IDEScriptName(file) + " " + T("saved (save the project so it stays in the .w3d)"), false);
         IdeSavedShader(file);
         ReloadLive(false);
@@ -634,7 +645,7 @@ bool IDE::Save(bool force) {
         return false;
     }
     dirty = false;
-    textDisk = t; hasTextDisk = true;
+    textDisk = t; hasTextDisk = true; g_ideScriptVersion++;
     gIdeDrafts.erase(file);
     W3dDownloadIfWeb(file);   // navegador: el .lua externo guardado baja a la PC
     if (!silent) Notify(IDEScriptName(file) + " " + T("saved"), false);
@@ -691,7 +702,7 @@ void IDE::Refresh(bool force) {
         Notify(IDEScriptName(file) + ": " + T("no new changes in the file"), false);
     }
     dirty = false;
-    textDisk = raw; hasTextDisk = true;
+    textDisk = raw; hasTextDisk = true; g_ideScriptVersion++;
     ReloadLive(true);
     g_redraw = true;
 }
@@ -817,7 +828,7 @@ void IDE::SpawnInProject() {
     const std::string t = GetText();
     if (!W3dContainerWriteEntry(entry, t.empty() ? "" : t.c_str(), t.size())) return;
     file = entry;
-    textDisk = t; hasTextDisk = true;
+    textDisk = t; hasTextDisk = true; g_ideScriptVersion++;
     { extern void W3dResourcesViewInvalidate(); W3dResourcesViewInvalidate(); }
     g_redraw = true;
 }
@@ -1144,11 +1155,16 @@ void IDE::Paste() {
 //  teclado: el ruteo de PC (controls.cpp) le da al IDE enfocado por hover la
 //  PRIMERA palabra: si KeyEditor consume, ningun atajo global corre.
 // ---------------------------------------------------------------------------
+static unsigned int gIdeSwallowSpace = 0;   // cuando se apreto Ctrl+Espacio: el espacio que manda el sistema no se escribe
 bool IDE::KeyEditor(int key, bool repeat) {
     (void)repeat;
     bool shift = LShiftPressed;
+    if (!defHelp.empty() && key != W3dK_F12) { defHelp.clear(); g_redraw = true; }   // (la ayuda se va con cualquier tecla)
+    if (acOpen && !LCtrlPressed && CompletionKey(key)) return true;   // la lista del autocompletado, abierta
+    if (key == W3dK_F12) { GoToDefinition(curLin, curCol); return true; }   // ir a la definicion (como VS Code)
     if (LCtrlPressed) {
         switch (key) {
+            case W3dK_SPACE: CompletionUpdate(true); gIdeSwallowSpace = w3dGetTicks() | 1u; return true;   // la lista, a mano
             case W3dK_C: Copy(); return true;
             case W3dK_X: Cut(); return true;
             case W3dK_V: Paste(); return true;
@@ -1177,8 +1193,8 @@ bool IDE::KeyEditor(int key, bool repeat) {
         case W3dK_RETURN:
         case W3dK_KP_ENTER: Enter(); return true;
         case W3dK_TAB:      TabKey(shift); return true;   // Shift+Tab = sacar un nivel de sangria
-        case W3dK_BACKSPACE: Backspace(); return true;
-        case W3dK_DELETE:    DelForward(); return true;
+        case W3dK_BACKSPACE: Backspace(); if (acOpen) CompletionUpdate(false); return true;   // (la lista sigue a lo escrito)
+        case W3dK_DELETE:    DelForward(); CompletionClose(); return true;
         case W3dK_ESCAPE:
             if (hasSel) { hasSel = false; g_redraw = true; return true; }
             return false; // sin seleccion, el ESC sigue siendo global (pausa, etc.)
@@ -1192,12 +1208,412 @@ bool IDE::KeyEditor(int key, bool repeat) {
 
 void IDE::TextTyped(const char* utf8) {
     if (!utf8) return;
-    InsertTyped(IdeFilterText(utf8, false));   // tambien la n~ y los acentos (llegan en UTF-8)
+    if (gIdeSwallowSpace && utf8[0] == ' ' && !utf8[1] && w3dGetTicks() - gIdeSwallowSpace < 250) { gIdeSwallowSpace = 0; return; }
+    gIdeSwallowSpace = 0;
+    const std::string t = IdeFilterText(utf8, false);
+    InsertTyped(t);   // tambien la n~ y los acentos (llegan en UTF-8)
+    // EL AUTOCOMPLETADO: una letra de un nombre (o el punto de math.) abre o filtra la lista; cualquier otra cosa
+    // (un espacio, un parentesis) la cierra
+    bool name = !t.empty();
+    for (size_t i = 0; i < t.size() && name; i++) name = IdeIdentChar((unsigned char)t[i]) || t[i] == '.' || t[i] == ':';
+    if (name) CompletionUpdate(false); else CompletionClose();
 }
 
 void IDE::event_key_down(int keyCode, bool repeat) {
     // ruta normal de viewports (Symbian / fallback): mismas teclas de edicion
     KeyEditor(keyCode, repeat);
+}
+
+// ===========================================================================
+//  AUTOCOMPLETADO e IR A LA DEFINICION (ver IDE.h)
+// ===========================================================================
+
+// LA API: los nombres que ve un script (los arma el Core una vez, de un lua_State como el de un script) y la AYUDA de
+// cada funcion en el idioma del editor: res/languages/lua-<idioma>.txt (tools/genlua_api.py, desde el manual). Sin el
+// de ese idioma va el de ingles; sin ninguno, solo los nombres. Se lee recien cuando el IDE la necesita
+struct IdeApiHelp { std::string sig, desc; };
+static std::vector<std::string> gIdeApi;
+static std::map<std::string, IdeApiHelp> gIdeHelp;
+static int gIdeHelpLang = -1;
+static bool IdeReadText(const std::string& path, std::string& out) {
+    std::vector<unsigned char> b;
+    if (!w3dFileSystem::ReadFileBytes(path, b) || b.empty()) return false;
+    out.assign((const char*)&b[0], b.size());
+    return true;
+}
+static void IdeApiLoad() {
+    if (gIdeApi.empty()) {
+        W3dScriptApiNames(&gIdeApi);
+        // (las tablas -math, string, table- tambien se completan solas: "ma" -> math)
+        std::set<std::string> tables;
+        for (size_t i = 0; i < gIdeApi.size(); i++) {
+            const size_t d = gIdeApi[i].find('.');
+            if (d != std::string::npos) tables.insert(gIdeApi[i].substr(0, d));
+        }
+        gIdeApi.insert(gIdeApi.end(), tables.begin(), tables.end());
+    }
+    if (gIdeHelpLang == (int)g_language) return;
+    gIdeHelpLang = (int)g_language;
+    gIdeHelp.clear();
+    const std::string& dir = W3dLanguageFolderPath();
+    std::string txt;
+    if (dir.empty() || (!IdeReadText(dir + "lua-" + W3dLanguageCode(g_language) + ".txt", txt) &&
+                        !IdeReadText(dir + "lua-en.txt", txt))) return;
+    size_t p = 0;
+    while (p < txt.size()) {
+        size_t e = txt.find('\n', p); if (e == std::string::npos) e = txt.size();
+        if (txt[p] != '#') {
+            const size_t t1 = txt.find('\t', p), t2 = (t1 < e) ? txt.find('\t', t1 + 1) : std::string::npos;
+            if (t1 < e && t2 < e) {
+                IdeApiHelp& h = gIdeHelp[txt.substr(p, t1 - p)];
+                h.sig = txt.substr(t1 + 1, t2 - t1 - 1);
+                h.desc = txt.substr(t2 + 1, e - t2 - 1);
+            }
+        }
+        p = e + 1;
+    }
+}
+static const IdeApiHelp* IdeHelpOf(const std::string& name) {
+    std::map<std::string, IdeApiHelp>::const_iterator it = gIdeHelp.find(name);
+    return it == gIdeHelp.end() ? NULL : &it->second;
+}
+static const char* const kIdeLuaKeywords[] = { "and", "break", "do", "else", "elseif", "end", "false", "for", "function",
+    "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while" };
+
+// LOS TOKENS de un renglon, sin lo que cae en un comentario o un string (los tipos del lexer): los nombres -con sus
+// puntos: math.floor, M:foo- y los signos sueltos
+struct IdeTk { int b0, b1; std::string t; bool name; };
+static void IdeTokens(const std::string& s, const std::vector<unsigned char>& types, std::vector<IdeTk>* out) {
+    out->clear();
+    const int n = (int)s.size();
+    int i = 0;
+    while (i < n) {
+        const unsigned char c = (unsigned char)s[(size_t)i];
+        if ((i < (int)types.size() && (types[(size_t)i] == 1 || types[(size_t)i] == 2)) || c == ' ') { i++; continue; }
+        IdeTk k; k.b0 = i;
+        if (IdeIdentStart(c)) {
+            int j = i;
+            for (;;) {
+                while (j < n && IdeIdentChar((unsigned char)s[(size_t)j])) j++;
+                // un punto (o dos puntos) PEGADO y otro nombre: es parte del mismo (math.floor, M:foo)
+                if (j + 1 < n && (s[(size_t)j] == '.' || s[(size_t)j] == ':') && IdeIdentStart((unsigned char)s[(size_t)j + 1])) { j++; continue; }
+                break;
+            }
+            k.b1 = j; k.name = true;
+        } else if (c >= '0' && c <= '9') {
+            int j = i; while (j < n && (IdeIdentChar((unsigned char)s[(size_t)j]) || s[(size_t)j] == '.')) j++;
+            k.b1 = j; k.name = false;
+        } else {
+            k.b1 = (c == '=' && i + 1 < n && s[(size_t)i + 1] == '=') ? i + 2 : i + 1;   // (== no es una asignacion)
+            k.name = false;
+        }
+        k.t = s.substr((size_t)k.b0, (size_t)(k.b1 - k.b0));
+        out->push_back(k);
+        i = k.b1;
+    }
+}
+static bool IdeIsKw(const std::string& w) {
+    for (size_t i = 0; i < sizeof(kIdeLuaKeywords) / sizeof(kIdeLuaKeywords[0]); i++) if (w == kIdeLuaKeywords[i]) return true;
+    return false;
+}
+
+// LOS NOMBRES DEL SCRIPT: cada uno una vez, con lo que es -una propiedad (en la tabla properties), una funcion del
+// script o cualquier otra variable-. Las que tienen puntos (M.foo) quedan enteras: sirven para completar "M."
+static void IdeScriptNames(const std::vector<std::string>& lines, int skipLin, int skipB0,
+                           std::map<std::string, unsigned char>* out) {
+    std::vector<unsigned char> types;
+    std::vector<IdeTk> tk;
+    bool blq = false;
+    int propsDepth = 0;   // > 0: adentro de la tabla properties (1 = su primer nivel)
+    int propsStep = 0;    // 1 = se leyo "properties", 2 = y el "="
+    for (size_t l = 0; l < lines.size(); l++) {
+        IDE::LexLine(lines[l], &blq, &types);
+        IdeTokens(lines[l], types, &tk);
+        for (size_t k = 0; k < tk.size(); k++) {
+            const IdeTk& t = tk[k];
+            if (!t.name) {
+                if (propsStep == 2 && t.t == "{") { propsDepth = 1; propsStep = 0; continue; }
+                propsStep = (propsStep == 1 && t.t == "=") ? 2 : 0;
+                if (propsDepth > 0) { if (t.t == "{") propsDepth++; else if (t.t == "}") propsDepth--; }
+                continue;
+            }
+            propsStep = (t.t == "properties" && propsDepth == 0) ? 1 : 0;
+            if (IdeIsKw(t.t) || t.t.size() < 2) continue;
+            if ((int)l == skipLin && t.b0 == skipB0) continue;   // (la palabra que se esta escribiendo)
+            unsigned char kind = 0;
+            if (k > 0 && tk[k - 1].t == "function") kind = 4;
+            else if (propsDepth == 1 && k + 1 < tk.size() && tk[k + 1].t == "=") kind = 3;
+            std::map<std::string, unsigned char>::iterator it = out->find(t.t);
+            if (it == out->end()) (*out)[t.t] = kind;
+            else if (kind && !it->second) it->second = kind;   // (lo que la declara manda)
+        }
+    }
+}
+
+// que tan bien calza lo escrito con un nombre: 0 empieza igual (mayusculas incluidas), 1 empieza igual sin mirar
+// mayusculas, 2 sus letras aparecen en orden empezando por la primera ("sRZ" -> setRotationZ), -1 no calza
+static int IdeMatch(const std::string& typed, const std::string& name) {
+    if (typed.empty()) return 1;
+    if (name.size() < typed.size()) return -1;
+    if (name.compare(0, typed.size(), typed) == 0) return 0;
+    bool ci = true;
+    for (size_t i = 0; i < typed.size() && ci; i++) ci = tolower((unsigned char)typed[i]) == tolower((unsigned char)name[i]);
+    if (ci) return 1;
+    if (tolower((unsigned char)typed[0]) != tolower((unsigned char)name[0])) return -1;
+    size_t j = 1;
+    for (size_t i = 1; i < typed.size(); i++) {
+        while (j < name.size() && tolower((unsigned char)name[j]) != tolower((unsigned char)typed[i])) j++;
+        if (j >= name.size()) return -1;
+        j++;
+    }
+    return 2;
+}
+struct IdeRanked { IDE::Completion c; int score; bool used; };
+static bool IdeRankLess(const IdeRanked& a, const IdeRanked& b) {
+    if (a.score != b.score) return a.score < b.score;
+    // a igual calce: lo que ya se usa en ESTE script primero; despues lo que declara el script (sus propiedades y
+    // funciones), sus otras palabras, el motor y las palabras clave; y el nombre mas corto ("sel" -> self, no select)
+    if (a.used != b.used) return a.used;
+    static const int order[5] = { 1, 2, 3, 0, 0 };
+    const int oa = order[a.c.kind], ob = order[b.c.kind];
+    if (oa != ob) return oa < ob;
+    if (a.c.name.size() != b.c.name.size()) return a.c.name.size() < b.c.name.size();
+    std::string x = a.c.name, y = b.c.name;
+    for (size_t i = 0; i < x.size(); i++) x[i] = (char)tolower((unsigned char)x[i]);
+    for (size_t i = 0; i < y.size(); i++) y[i] = (char)tolower((unsigned char)y[i]);
+    return x != y ? x < y : a.c.name < b.c.name;
+}
+
+void IDE::CompletionClose() {
+    if (!acOpen) return;
+    acOpen = false; acItems.clear();
+    g_redraw = true;
+}
+
+void IDE::CompletionUpdate(bool force) {
+    if (IdeIsGLSL(file) || hasSel) { CompletionClose(); return; }
+    const std::string& s = lines[(size_t)curLin];
+    // ni en un comentario ni en un string
+    {
+        std::vector<unsigned char> types;
+        bool blq = (curLin < (int)blockToStart.size()) ? (blockToStart[(size_t)curLin] != 0) : false;
+        LexLine(s, &blq, &types, (size_t)curCol);
+        if (curCol > 0 && curCol <= (int)types.size() && (types[(size_t)curCol - 1] == 1 || types[(size_t)curCol - 1] == 2)) {
+            CompletionClose(); return;
+        }
+    }
+    // la palabra que se esta escribiendo (hasta el cursor) y, si va despues de un punto, su base: math. -> "math"
+    int b0 = curCol;
+    while (b0 > 0 && IdeIdentChar((unsigned char)s[(size_t)b0 - 1])) b0--;
+    const std::string typed = s.substr((size_t)b0, (size_t)(curCol - b0));
+    if (!typed.empty() && !IdeIdentStart((unsigned char)typed[0])) { CompletionClose(); return; }   // (un numero)
+    std::string base;
+    if (b0 > 0 && (s[(size_t)b0 - 1] == '.' || s[(size_t)b0 - 1] == ':')) {
+        int a = b0 - 1;
+        while (a > 0 && (IdeIdentChar((unsigned char)s[(size_t)a - 1]) || s[(size_t)a - 1] == '.')) a--;
+        base = s.substr((size_t)a, (size_t)(b0 - 1 - a));
+        if (base.empty() || !IdeIdentStart((unsigned char)base[0])) { CompletionClose(); return; }
+    }
+    if (typed.empty() && base.empty() && !force) { CompletionClose(); return; }
+
+    IdeApiLoad();
+    std::vector<IdeRanked> found;
+    std::set<std::string> seen;
+    const std::string pre = base.empty() ? std::string() : base + ".";
+    // lo del script
+    std::map<std::string, unsigned char> names;
+    IdeScriptNames(lines, curLin, b0 - (int)pre.size(), &names);
+    std::set<std::string> api;   // (los del motor de primer nivel: setRotationZ, math...)
+    for (size_t i = 0; i < gIdeApi.size(); i++) if (gIdeApi[i].find('.') == std::string::npos) api.insert(gIdeApi[i]);
+    for (std::map<std::string, unsigned char>::const_iterator it = names.begin(); it != names.end(); ++it) {
+        if (it->second == 0 && pre.empty() && api.count(it->first)) continue;   // (sale abajo, del motor, con su ayuda)
+        std::string n = it->first;
+        if (!pre.empty()) {   // despues de "M.": los campos de M que aparecen en el script
+            if (n.compare(0, pre.size(), pre) != 0) continue;
+            n = n.substr(pre.size());
+            const size_t d = n.find_first_of(".:"); if (d != std::string::npos) n = n.substr(0, d);
+        } else if (n.find_first_of(".:") != std::string::npos) n = n.substr(0, n.find_first_of(".:"));
+        const int sc = IdeMatch(typed, n);
+        if (sc < 0 || n == typed || !seen.insert(n).second) continue;
+        IdeRanked r; r.c.name = n; r.c.kind = (pre.empty() && n == it->first) ? it->second : 0; r.score = sc; r.used = true;
+        found.push_back(r);
+    }
+    // el motor y Lua
+    for (size_t i = 0; i < gIdeApi.size(); i++) {
+        const std::string& full = gIdeApi[i];
+        std::string n;
+        if (!pre.empty()) { if (full.compare(0, pre.size(), pre) != 0) continue; n = full.substr(pre.size()); }
+        else { if (full.find('.') != std::string::npos) continue; n = full; }
+        const int sc = IdeMatch(typed, n);
+        if (sc < 0 || n == typed || !seen.insert(n).second) continue;
+        IdeRanked r; r.c.name = n; r.c.kind = 1; r.score = sc; r.used = names.count(full) > 0;
+        if (const IdeApiHelp* h = IdeHelpOf(full)) { r.c.signature = h->sig; r.c.desc = h->desc; }
+        found.push_back(r);
+    }
+    // las palabras clave
+    if (pre.empty())
+        for (size_t i = 0; i < sizeof(kIdeLuaKeywords) / sizeof(kIdeLuaKeywords[0]); i++) {
+            const std::string n = kIdeLuaKeywords[i];
+            const int sc = IdeMatch(typed, n);
+            if (sc < 0 || n == typed || !seen.insert(n).second) continue;
+            IdeRanked r; r.c.name = n; r.c.kind = 2; r.score = sc; r.used = false;
+            found.push_back(r);
+        }
+    if (found.empty()) { CompletionClose(); return; }
+    std::sort(found.begin(), found.end(), IdeRankLess);
+    if (found.size() > 200) found.resize(200);
+    // (lo que estaba elegido sigue elegido si sigue en la lista: escribir una letra mas no salta al primero... salvo
+    //  que el primero calce mejor, como en VS Code)
+    const std::string prevSel = (acOpen && acSel >= 0 && acSel < (int)acItems.size()) ? acItems[(size_t)acSel].name : std::string();
+    acItems.clear();
+    for (size_t i = 0; i < found.size(); i++) acItems.push_back(found[i].c);
+    acSel = 0;
+    if (!prevSel.empty() && found[0].score > 0)
+        for (size_t i = 0; i < acItems.size(); i++) if (acItems[i].name == prevSel) { acSel = (int)i; break; }
+    acTop = 0;
+    acOpen = true; acLin = curLin; acStartCol = b0;
+    defHelp.clear();
+    g_redraw = true;
+}
+
+bool IDE::CompletionAccept() {
+    if (!acOpen || acSel < 0 || acSel >= (int)acItems.size()) { CompletionClose(); return false; }
+    const std::string name = acItems[(size_t)acSel].name;
+    CompletionClose();
+    if (acLin != curLin || acStartCol > curCol) return false;
+    // lo escrito hasta el cursor se reemplaza por el nombre (y lo que sigue de la misma palabra tambien: completar en
+    // el medio de "setRotXYZ" no deja la cola)
+    int b1 = curCol;
+    const std::string& s = lines[(size_t)curLin];
+    while (b1 < (int)s.size() && IdeIdentChar((unsigned char)s[(size_t)b1])) b1++;
+    Mutate(0);
+    lines[(size_t)curLin].replace((size_t)acStartCol, (size_t)(b1 - acStartCol), name);
+    curCol = acStartCol + (int)name.size();
+    undoLastOp = 0;
+    RecalculateBlocks();
+    EnsureCursorVisible();
+    g_redraw = true;
+    return true;
+}
+
+bool IDE::CompletionKey(int key) {
+    if (!acOpen) return false;
+    const int n = (int)acItems.size();
+    const int page = 8;
+    switch (key) {
+        case W3dK_UP:   acSel = (acSel - 1 + n) % n; break;
+        case W3dK_DOWN: acSel = (acSel + 1) % n; break;
+        case W3dK_PGUP: acSel = acSel - page < 0 ? 0 : acSel - page; break;
+        case W3dK_PGDN: acSel = acSel + page >= n ? n - 1 : acSel + page; break;
+        case W3dK_RETURN: case W3dK_KP_ENTER: case W3dK_TAB: CompletionAccept(); return true;
+        case W3dK_ESCAPE: CompletionClose(); return true;
+        case W3dK_LEFT: case W3dK_RIGHT: case W3dK_HOME: case W3dK_END: CompletionClose(); return false;   // (y el cursor se mueve)
+        default: return false;
+    }
+    if (acSel < acTop) acTop = acSel;
+    if (acSel >= acTop + page) acTop = acSel - page + 1;
+    g_redraw = true;
+    return true;
+}
+
+// la palabra en (lin, col): un nombre con sus puntos (math.floor); col puede estar justo despues de la ultima letra
+bool IDE::WordAt(int lin, int col, int* b0, int* b1) const {
+    if (lin < 0 || lin >= (int)lines.size()) return false;
+    const std::string& s = lines[(size_t)lin];
+    if (col > (int)s.size()) col = (int)s.size();
+    int a = col, b = col;
+    while (a > 0 && (IdeIdentChar((unsigned char)s[(size_t)a - 1]) || s[(size_t)a - 1] == '.' || s[(size_t)a - 1] == ':')) a--;
+    while (b < (int)s.size() && IdeIdentChar((unsigned char)s[(size_t)b])) b++;
+    while (a < b && !IdeIdentStart((unsigned char)s[(size_t)a])) a++;   // (no arranca en un punto ni en un numero)
+    while (b > a && (s[(size_t)b - 1] == '.' || s[(size_t)b - 1] == ':')) b--;
+    if (a >= b) return false;
+    *b0 = a; *b1 = b;
+    return true;
+}
+
+// IR A LA DEFINICION. Se buscan en el script (sin mirar comentarios ni strings) las maneras de declarar un nombre:
+//   - function nombre(  /  local function nombre(  /  function M.nombre(  /  function M:nombre(
+//   - local a, nombre = ...      - for nombre / for k, nombre in      - un parametro: function f(a, nombre)
+//   - nombre = ... al principio de una sentencia (una global, o un campo de una tabla: las propiedades)
+// Un local, un for o un parametro valen si estan ANTES de donde se pidio (el mas cercano: el que tapa a los demas). Si
+// no hay ninguno, la primera funcion o asignacion del archivo. Si el script no lo declara y es del motor, se muestra
+// su ayuda al lado de la palabra
+bool IDE::GoToDefinition(int lin, int col) {
+    int w0 = 0, w1 = 0;
+    defHelp.clear();
+    if (!WordAt(lin, col, &w0, &w1)) return false;
+    std::string word = lines[(size_t)lin].substr((size_t)w0, (size_t)(w1 - w0));
+    std::string wordDot = word;   // M:foo se declara como function M:foo o M.foo
+    for (size_t i = 0; i < wordDot.size(); i++) if (wordDot[i] == ':') wordDot[i] = '.';
+    // (si se pidio sobre la BASE de un nombre con puntos -el "math" de math.floor- se busca la base)
+    {
+        int upto = col; const std::string& s = lines[(size_t)lin];
+        while (upto < w1 && IdeIdentChar((unsigned char)s[(size_t)upto])) upto++;
+        if (upto < w1) { word = s.substr((size_t)w0, (size_t)(upto - w0)); wordDot = word; }
+    }
+    const bool dotted = word.find_first_of(".:") != std::string::npos;
+    int localLin = -1, localB = 0, globalLin = -1, globalB = 0;
+    std::vector<unsigned char> types;
+    std::vector<IdeTk> tk;
+    bool blq = false;
+    for (size_t l = 0; l < lines.size(); l++) {
+        LexLine(lines[l], &blq, &types);
+        IdeTokens(lines[l], types, &tk);
+        for (size_t k = 0; k < tk.size(); k++) {
+            const IdeTk& t = tk[k];
+            if (!t.name) continue;
+            std::string td = t.t; for (size_t i = 0; i < td.size(); i++) if (td[i] == ':') td[i] = '.';
+            const bool before = (int)l < lin || ((int)l == lin && t.b0 <= w0);
+            if (t.t == "function") {
+                // function nombre(...) y sus parametros
+                size_t q = k + 1;
+                if (q < tk.size() && tk[q].name) {
+                    std::string fd = tk[q].t; for (size_t i = 0; i < fd.size(); i++) if (fd[i] == ':') fd[i] = '.';
+                    if (fd == wordDot && globalLin < 0 && (k == 0 || tk[k - 1].t != "local")) { globalLin = (int)l; globalB = tk[q].b0; }
+                    if (fd == wordDot && k > 0 && tk[k - 1].t == "local" && before) { localLin = (int)l; localB = tk[q].b0; }
+                    q++;
+                }
+                if (!dotted && q < tk.size() && tk[q].t == "(")
+                    for (size_t r = q + 1; r < tk.size() && tk[r].t != ")"; r++)
+                        if (tk[r].name && tk[r].t == word && before) { localLin = (int)l; localB = tk[r].b0; }
+            } else if ((t.t == "local" || t.t == "for") && !dotted) {
+                for (size_t r = k + 1; r < tk.size(); r++) {
+                    if (tk[r].t == "," ) continue;
+                    if (!tk[r].name || tk[r].t == "function" || tk[r].t == "in") break;
+                    if (tk[r].t == word && before) { localLin = (int)l; localB = tk[r].b0; }
+                }
+            } else if (td == wordDot && globalLin < 0 && k + 1 < tk.size() && tk[k + 1].t == "=" &&
+                       (k == 0 || tk[k - 1].t == "{" || tk[k - 1].t == "," || tk[k - 1].t == ";")) {
+                globalLin = (int)l; globalB = t.b0;   // nombre = ... (una global, o un campo: las propiedades)
+            }
+        }
+    }
+    int dl = localLin >= 0 ? localLin : globalLin, db = localLin >= 0 ? localB : globalB;
+    if (dl >= 0) {
+        // el cursor va a la declaracion, con el nombre elegido (como VS Code)
+        const std::string& s = lines[(size_t)dl];
+        int e = db; while (e < (int)s.size() && (IdeIdentChar((unsigned char)s[(size_t)e]) || s[(size_t)e] == '.' || s[(size_t)e] == ':')) e++;
+        CompletionClose();
+        CursorA(dl, db, false);
+        selLin = dl; selCol = db; curCol = e; hasSel = e > db;
+        EnsureCursorVisible();
+        g_redraw = true;
+        return true;
+    }
+    IdeApiLoad();
+    const IdeApiHelp* h = IdeHelpOf(wordDot);
+    bool inApi = h != NULL;
+    for (size_t i = 0; i < gIdeApi.size() && !inApi; i++) inApi = gIdeApi[i] == wordDot;
+    if (inApi) {
+        defHelp = h ? h->sig : wordDot;
+        defHelp += std::string("\n") + T("Function of Whisk3D (it isn't in this script)");
+        if (h && !h->desc.empty()) defHelp += "\n" + h->desc;
+        defHelpLin = lin; defHelpCol = w0;
+        g_redraw = true;
+        return true;
+    }
+    Notify(std::string(T("This script doesn't define")) + " " + word, true);
+    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -1258,8 +1674,21 @@ void IDE::SelectLine() {
 }
 
 void IDE::ClickContent(int mx, int my, bool shift) {
+    // la lista del autocompletado: tocar uno lo escribe; tocar afuera la cierra
+    if (acOpen) {
+        const int lh = (RowHeightGS > 0) ? RowHeightGS : 12, lx = mx - x, ly = my - y;
+        if (lx >= acBox[0] && lx < acBox[2] && ly >= acBox[1] && ly < acBox[3]) {
+            const int i = acTop + (ly - acBox[1]) / lh;
+            if (i >= 0 && i < (int)acItems.size()) { acSel = i; CompletionAccept(); }
+            return;
+        }
+        CompletionClose();
+    }
+    if (!defHelp.empty()) { defHelp.clear(); g_redraw = true; }
     int lin = 0, col = 0;
     PointToText(mx, my, &lin, &col);
+    // Ctrl+click: ir a la definicion (como VS Code)
+    if (LCtrlPressed && !shift) { CursorA(lin, col, false); GoToDefinition(lin, col); return; }
     // DOBLE / TRIPLE toque (o click): rapido y en el mismo lugar
     const unsigned int now = w3dGetTicks();
     const int near = 12 * (GlobalScale > 0 ? GlobalScale : 1);
@@ -1399,6 +1828,17 @@ void IDE::mouse_button_up(int button) {
 }
 
 void IDE::event_mouse_wheel(float dy, int mx, int my) {
+    // sobre la lista del autocompletado: la rueda la recorre
+    if (acOpen && mx - x >= acBox[0] && mx - x < acBox[2] && my - y >= acBox[1] && my - y < acBox[3]) {
+        const int n = (int)acItems.size();
+        acTop += dy > 0 ? -1 : 1;
+        if (acTop > n - 8) acTop = n - 8;
+        if (acTop < 0) acTop = 0;
+        if (acSel < acTop) acSel = acTop;
+        if (acSel >= acTop + 8) acSel = acTop + 7;
+        g_redraw = true;
+        return;
+    }
     if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; // sobre la barra superior
     int step = (int)(dy * 6 * GlobalScale);
     if (LShiftPressed) ScrollByTouch(step, 0); // shift+rueda = horizontal
@@ -1521,6 +1961,166 @@ static void IdeDrawSegment(const std::string& s, const std::vector<unsigned char
         col += IdeLettersBetween(s, i, j);
         i = j;
     }
+}
+
+// ---- las cajas que flotan sobre el codigo: la lista del autocompletado, la ayuda de la funcion que se esta llamando
+//      y la de "Ir a la definicion" ----
+// un texto cortado en renglones de hasta 'cols' letras (por palabras; una palabra mas larga se corta)
+static void IdeWrap(const std::string& s, int cols, int maxLines, std::vector<std::string>* out) {
+    out->clear();
+    if (cols < 4) cols = 4;
+    size_t p = 0;
+    std::string cur;
+    while (p < s.size() && (int)out->size() < maxLines) {
+        size_t e = s.find(' ', p); if (e == std::string::npos) e = s.size();
+        std::string w = s.substr(p, e - p);
+        p = e + 1;
+        while (IdeLettersBetween(w, 0, (int)w.size()) > cols) {   // una palabra que no entra sola
+            if (!cur.empty()) { out->push_back(cur); cur.clear(); }
+            const int b = IdeAdvanceLetters(w, 0, cols);
+            out->push_back(w.substr(0, (size_t)b)); w = w.substr((size_t)b);
+        }
+        const std::string t = cur.empty() ? w : cur + " " + w;
+        if (IdeLettersBetween(t, 0, (int)t.size()) > cols && !cur.empty()) { out->push_back(cur); cur = w; }
+        else cur = t;
+    }
+    if (!cur.empty() && (int)out->size() < maxLines) out->push_back(cur);
+    if ((int)out->size() >= maxLines && p < s.size() && !out->empty()) out->back() += "...";
+}
+static void IdeBox(float x0, float y0, float x1, float y1) {
+    const float g = (float)((GlobalScale > 0) ? GlobalScale : 1);
+    IdeQuad(x0, y0, x1, y1, ColorList[static_cast<int>(ColorID::headerColor)]);
+    const float* b = ColorList[static_cast<int>(ColorID::grayUI)];
+    IdeQuad(x0, y0, x1, y0 + g, b); IdeQuad(x0, y1 - g, x1, y1, b);
+    IdeQuad(x0, y0, x0 + g, y1, b); IdeQuad(x1 - g, y0, x1, y1, b);
+}
+// renglones de texto en una caja, abajo (o arriba, si no entra) del renglon 'lin', empezando en la letra 'col'
+static void IdeTextBox(IDE* ide, const std::vector<std::string>& txt, const std::vector<const float*>& colors,
+                       int lin, int col, int textX0, int py0, int lh, int LW, bool above) {
+    if (txt.empty()) return;
+    int cols = 0;
+    for (size_t i = 0; i < txt.size(); i++) { const int c = IdeLettersBetween(txt[i], 0, (int)txt[i].size()); if (c > cols) cols = c; }
+    const int pad = marginGS;
+    const int bw = cols * LW + pad * 2, bh = (int)txt.size() * lh + pad * 2;
+    int bx = textX0 + IdeColVisual(ide->lines[(size_t)lin], col) * LW - pad;
+    if (bx + bw > ide->width - pad) bx = ide->width - pad - bw;
+    if (bx < pad) bx = pad;
+    int by = above ? py0 + lin * lh - bh : py0 + lin * lh + lh;
+    if (!above && by + bh > ide->height) by = py0 + lin * lh - bh;
+    if (above && by < ide->BarTopOffset()) by = py0 + lin * lh + lh;
+    gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
+    IdeBox((float)bx, (float)by, (float)(bx + bw), (float)(by + bh));
+    gfx::EnableArray(gfx::TexCoordArray); gfx::Enable(gfx::Texture2D);
+    for (size_t i = 0; i < txt.size(); i++) IdeText(bx + pad, by + pad + (int)i * lh, txt[i], colors[i < colors.size() ? i : colors.size() - 1]);
+}
+// la funcion que se esta llamando en el renglon del cursor: el nombre antes del "(" que todavia no se cerro
+static std::string IdeCallAtCursor(const std::string& s, int curCol, int* nameB0) {
+    int depth = 0;
+    for (int i = curCol - 1; i >= 0; i--) {
+        const char c = s[(size_t)i];
+        if (c == '"' || c == '\'') return std::string();   // (adentro o despues de un string: no se adivina)
+        if (c == ')') depth++;
+        else if (c == '(') {
+            if (depth > 0) { depth--; continue; }
+            int b = i;
+            while (b > 0 && s[(size_t)b - 1] == ' ') b--;
+            const int e = b;
+            while (b > 0 && (IdeIdentChar((unsigned char)s[(size_t)b - 1]) || s[(size_t)b - 1] == '.')) b--;
+            if (b == e || !IdeIdentStart((unsigned char)s[(size_t)b])) return std::string();
+            *nameB0 = b;
+            return s.substr((size_t)b, (size_t)(e - b));
+        }
+    }
+    return std::string();
+}
+static void IdeRenderPopups(IDE* ide, int textX0, int py0, int lh, int LW) {
+    const float* white = ColorList[static_cast<int>(ColorID::white)];
+    const float* gray = ColorList[static_cast<int>(ColorID::grayUI)];
+    const float* accent = ColorList[static_cast<int>(ColorID::accent)];
+    const bool focused = ::viewPortActive == (ViewportBase*)ide;
+    // LA AYUDA DE "IR A LA DEFINICION" (una funcion del motor): firma, de donde es y para que sirve
+    if (!ide->defHelp.empty() && ide->defHelpLin < (int)ide->lines.size()) {
+        std::vector<std::string> txt, part; std::vector<const float*> colors;
+        size_t p = 0; int k = 0;
+        while (p <= ide->defHelp.size()) {
+            size_t e = ide->defHelp.find('\n', p); if (e == std::string::npos) e = ide->defHelp.size();
+            IdeWrap(ide->defHelp.substr(p, e - p), 56, k == 2 ? 5 : 2, &part);
+            for (size_t i = 0; i < part.size(); i++) { txt.push_back(part[i]); colors.push_back(k == 0 ? white : k == 1 ? accent : gray); }
+            p = e + 1; k++;
+        }
+        IdeTextBox(ide, txt, colors, ide->defHelpLin, ide->defHelpCol, textX0, py0, lh, LW, false);
+    }
+    // LA FIRMA DE LA FUNCION QUE SE ESTA LLAMANDO (escribiendo sus argumentos): arriba del renglon, como VS Code
+    if (focused && !ide->acOpen && ide->defHelp.empty() && !ide->hasSel) {
+        int b0 = 0;
+        const std::string call = IdeCallAtCursor(ide->lines[(size_t)ide->curLin], ide->curCol, &b0);
+        if (!call.empty()) {
+            IdeApiLoad();
+            if (const IdeApiHelp* h = IdeHelpOf(call)) {
+                std::vector<std::string> txt; std::vector<const float*> colors(1, white);
+                IdeWrap(h->sig, 70, 2, &txt);
+                IdeTextBox(ide, txt, colors, ide->curLin, b0, textX0, py0, lh, LW, true);
+            }
+        }
+    }
+    // LA LISTA DEL AUTOCOMPLETADO, debajo de la palabra que se completa (o arriba, si no entra), y la ayuda del elegido
+    ide->acBox[0] = ide->acBox[1] = ide->acBox[2] = ide->acBox[3] = 0;
+    if (!ide->acOpen || ide->acItems.empty() || ide->acLin >= (int)ide->lines.size()) return;
+    const int n = (int)ide->acItems.size(), rows = n < 8 ? n : 8, pad = marginGS;
+    const std::string typed = ide->lines[(size_t)ide->acLin].substr((size_t)ide->acStartCol,
+        (size_t)(ide->curCol > ide->acStartCol ? ide->curCol - ide->acStartCol : 0));
+    int cols = 14;
+    for (int i = 0; i < n; i++) { const int c = IdeLettersBetween(ide->acItems[(size_t)i].name, 0, (int)ide->acItems[(size_t)i].name.size()); if (c > cols) cols = c; }
+    const int tagW = LW * 2;
+    int lw = tagW + cols * LW + pad * 2;
+    if (lw > ide->width - pad * 2) lw = ide->width - pad * 2;
+    // la ayuda del elegido: su firma y para que sirve (las funciones del motor)
+    const IDE::Completion& sel = ide->acItems[(size_t)ide->acSel];
+    std::vector<std::string> doc, part; std::vector<const float*> docColors;
+    const int docCols = (lw - pad * 2) / LW > 40 ? (lw - pad * 2) / LW : 40;
+    if (!sel.signature.empty()) { IdeWrap(sel.signature, docCols, 2, &part); for (size_t i = 0; i < part.size(); i++) { doc.push_back(part[i]); docColors.push_back(white); } }
+    if (!sel.desc.empty()) { IdeWrap(sel.desc, docCols, 4, &part); for (size_t i = 0; i < part.size(); i++) { doc.push_back(part[i]); docColors.push_back(gray); } }
+    int dw = 0;
+    for (size_t i = 0; i < doc.size(); i++) { const int c = IdeLettersBetween(doc[i], 0, (int)doc[i].size()); if (c * LW + pad * 2 > dw) dw = c * LW + pad * 2; }
+    if (dw > ide->width - pad * 2) dw = ide->width - pad * 2;
+    const int lh2 = rows * lh + pad * 2, dh = doc.empty() ? 0 : (int)doc.size() * lh + pad * 2;
+    int bx = textX0 + IdeColVisual(ide->lines[(size_t)ide->acLin], ide->acStartCol) * LW - tagW - pad;
+    const int widest = lw > dw ? lw : dw;
+    if (bx + widest > ide->width - pad) bx = ide->width - pad - widest;
+    if (bx < pad) bx = pad;
+    int by = py0 + ide->acLin * lh + lh;
+    if (by + lh2 + dh > ide->height && py0 + ide->acLin * lh - lh2 - dh >= ide->BarTopOffset()) by = py0 + ide->acLin * lh - lh2 - dh;
+    gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
+    IdeBox((float)bx, (float)by, (float)(bx + lw), (float)(by + lh2));
+    const int r0 = ide->acTop;
+    if (ide->acSel >= r0 && ide->acSel < r0 + rows)
+        IdeQuad((float)(bx + pad / 2), (float)(by + pad + (ide->acSel - r0) * lh), (float)(bx + lw - pad / 2),
+                (float)(by + pad + (ide->acSel - r0 + 1) * lh), kIdeSelection);
+    if (n > rows) {   // la barrita: donde esta lo que se ve, en toda la lista
+        const float g = (float)((GlobalScale > 0) ? GlobalScale : 1) * 2.0f;
+        const float t0 = (float)(by + pad) + (float)(rows * lh) * (float)r0 / (float)n;
+        const float t1 = (float)(by + pad) + (float)(rows * lh) * (float)(r0 + rows) / (float)n;
+        IdeQuad((float)(bx + lw) - g * 2.0f, t0, (float)(bx + lw) - g, t1, gray);
+    }
+    if (!doc.empty()) IdeBox((float)bx, (float)(by + lh2), (float)(bx + dw), (float)(by + lh2 + dh));
+    gfx::EnableArray(gfx::TexCoordArray); gfx::Enable(gfx::Texture2D);
+    for (int i = 0; i < rows && r0 + i < n; i++) {
+        const IDE::Completion& c = ide->acItems[(size_t)(r0 + i)];
+        const int ry = by + pad + i * lh;
+        // QUE ES: f = funcion (celeste la del motor, verde la del script), p = propiedad, k = palabra clave, v = variable
+        const char* tag = (c.kind == 1 || c.kind == 4) ? "f" : c.kind == 3 ? "p" : c.kind == 2 ? "k" : "v";
+        const float* tc = c.kind == 1 ? kIdeNumber : (c.kind == 3 || c.kind == 4) ? accent : c.kind == 2 ? kIdeKeyword : gray;
+        IdeText(bx + pad, ry, tag, tc);
+        IdeText(bx + pad + tagW, ry, c.name, white);
+        // lo que ya se escribio, resaltado (si el nombre empieza asi)
+        if (!typed.empty() && c.name.size() >= typed.size()) {
+            bool same = true;
+            for (size_t k = 0; k < typed.size() && same; k++) same = tolower((unsigned char)c.name[k]) == tolower((unsigned char)typed[k]);
+            if (same) IdeText(bx + pad + tagW, ry, c.name.substr(0, typed.size()), accent);
+        }
+    }
+    for (size_t i = 0; i < doc.size(); i++) IdeText(bx + pad, by + lh2 + pad + (int)i * lh, doc[i], docColors[i]);
+    ide->acBox[0] = bx; ide->acBox[1] = by + pad; ide->acBox[2] = bx + lw; ide->acBox[3] = by + pad + rows * lh;
 }
 
 void IDE::Render() {
@@ -1686,6 +2286,12 @@ void IDE::Render() {
         LexLine(s, &blq, &types, (size_t)b1);   // el color depende de lo anterior del renglon: hasta lo visible
         IdeDrawSegment(s, types, b0, b1, colStart, textX0, py0 + l * lh, LW);
     }
+
+    // la lista del autocompletado, la firma de la funcion que se llama y la ayuda de "Ir a la definicion" (sobre todo
+    // el viewport: pueden tapar el margen de los numeros)
+    if (acOpen && (acLin != curLin || curCol < acStartCol || hasSel)) CompletionClose();   // (el cursor se fue de la palabra)
+    gfx::Scissor(x, glY, width, height);
+    IdeRenderPopups(this, textX0, py0, lh, LW);
 
     const float* accent = ColorList[static_cast<int>(ColorID::accent)];
     // AGARRADERAS de la seleccion (tactil): un palito + un circulo colgando de cada punta

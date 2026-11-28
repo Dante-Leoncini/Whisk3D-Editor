@@ -1352,13 +1352,21 @@ static void Frame(int rx, int ry, int rw, int rh, int g) {
     SmoothRect(rx, ry, rw, g); SmoothRect(rx, ry + rh - g, rw, g);
     SmoothRect(rx, ry, g, rh); SmoothRect(rx + rw - g, ry, g, rh);
 }
-// una textura (una miniatura) estirada a un cuadrado de 's' px en (px, py)
-static void DrawTexture(unsigned int tex, int px, int py, int s) {
+// una textura (una miniatura) adentro de un cuadrado de 's' px en (px, py), CON SU PROPORCION: una imagen de 2:1 ocupa
+// todo el ancho y la mitad del alto, centrada (lo demas queda con el fondo de la celda). Antes se estiraba al cuadrado y
+// una textura apaisada o alta se veia deformada. tw / th = el tamano de la imagen (0 = no se sabe: el cuadrado entero)
+static void DrawTexture(unsigned int tex, int px, int py, int s, int tw, int th) {
+    int w = s, h = s;
+    if (tw > 0 && th > 0 && tw != th) {
+        if (tw > th) { h = (int)((long)s * th / tw); if (h < 1) h = 1; }
+        else         { w = (int)((long)s * tw / th); if (w < 1) w = 1; }
+    }
+    const int x0 = px + (s - w) / 2, y0 = py + (s - h) / 2;
     GLshort v[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-    v[0] = (GLshort)px;       v[1] = (GLshort)py;
-    v[2] = (GLshort)(px + s); v[3] = (GLshort)py;
-    v[4] = (GLshort)px;       v[5] = (GLshort)(py + s);
-    v[6] = (GLshort)(px + s); v[7] = (GLshort)(py + s);
+    v[0] = (GLshort)x0;       v[1] = (GLshort)y0;
+    v[2] = (GLshort)(x0 + w); v[3] = (GLshort)y0;
+    v[4] = (GLshort)x0;       v[5] = (GLshort)(y0 + h);
+    v[6] = (GLshort)(x0 + w); v[7] = (GLshort)(y0 + h);
     static const GLfloat uv[8] = { 0, 0, 1, 0, 0, 1, 1, 1 };
     w3dEngine::BindTexture(tex);
     w3dEngine::Color4f(1, 1, 1, 1);
@@ -1618,7 +1626,7 @@ void Outliner::RenderResources(int glY, const std::vector<OutRowRec>& rows) {
             // lo de ADENTRO: la miniatura, o el icono en grande (la carpeta, "Ir atras", un sonido, un script...)
             int tw = 0, th = 0;
             const unsigned int tex = f.folder ? 0u : RowThumbnail(f, &tw, &th);
-            if (tex) DrawTexture(tex, rx, ry, side);
+            if (tex) DrawTexture(tex, rx, ry, side, tw, th);
             else {
                 // "Ir atras" = una FLECHA hacia atras; una carpeta, la carpeta; un recurso sin miniatura, su tipo
                 const int icon = f.back ? (int)IconType::arrowRight : f.folder ? (int)IconType::folder : f.icon;
@@ -2147,8 +2155,29 @@ void Outliner::ReleaseResources(int mx, int my) {
 // la fila (la flechita, el icono, el ojo, la camara, la columna de estado) no: esos clicks ya hicieron lo suyo
 // (un doble click rapido sobre el ojo lo apaga y lo prende) y no piden un renombrar. Una CELDA de la cuadricula
 // no tiene nada que alternar: vale entera.
+// la CLAVE de la fila bajo el puntero ("o:<serial>" en la escena, "r:<clave>" en la biblioteca; "" = ninguna): el doble
+// click la compara con la del click anterior (Outliner.cpp, g_outClickPrev)
+std::string OutlinerRowKeyAt(Outliner* o, int mx, int my) {
+    if (!o || !o->Contains(mx, my)) return std::string();
+    if (o->view == OUT_VIEW_SCENE) {
+        const int rel = my - o->y - borderGS - o->PosY - o->BarTopOffset();
+        if (rel < 0) return std::string();
+        extern int OutlinerRowOfY(int rel);
+        extern Object* OutlinerObjectInRow(int row);
+        Object* ob = OutlinerObjectInRow(OutlinerRowOfY(rel));
+        if (!ob) return std::string();
+        char b[32]; snprintf(b, sizeof b, "o:%u", ob->serial);
+        return b;
+    }
+    std::vector<OutRowRec> rows; o->RowsResources(rows);
+    const int row = o->RowInPoint(rows, mx, my);
+    return row < 0 ? std::string() : "r:" + rows[(size_t)row].key;
+}
 bool Outliner::DoubleClick(int mx, int my) {
     if (!Contains(mx, my) || OnBar(mx, my)) return false;
+    // (los dos clicks en la MISMA fila: dos filas vecinas rapidas no son un doble click)
+    { extern std::string g_outClickPrev, g_outClickLast;
+      if (g_outClickLast.empty() || g_outClickPrev != g_outClickLast) return false; }
     const int reserveBar = scrollY ? (GlobalScale * 9 + gapGS) : 0;
     if (view == OUT_VIEW_SCENE) {
         const int rel = my - y - borderGS - PosY - BarTopOffset();

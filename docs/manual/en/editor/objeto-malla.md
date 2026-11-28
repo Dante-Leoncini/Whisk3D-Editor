@@ -66,7 +66,7 @@ The material decides how the part looks: its color, its texture and how light hi
 |---|---|
 | Rename Material | Renames the material. |
 | Color | The part's texture, the **Base Color** swatch and the UV map the texture uses. |
-| Metallic, Roughness, Emission, Normal, Alpha | Each one can be a number or a texture (the **Number / Texture** button). Alpha is transparency: below 1, or with an alpha texture, the material becomes transparent. |
+| Metallic, Roughness, Emission, Normal, Alpha | Each one can be a number or a texture (the **Number / Texture** button). With **Per-pixel** lighting, highlights and reflections add up like light, in **linear**: they show on dark things (the little a black eye or a window glass reflects no longer stays black, as in EEVEE). Alpha is transparency: below 1, or with an alpha texture, the material becomes transparent. |
 | Alpha Test | Cuts out whatever has low alpha, without blending: for railings, wire fences or leaves. 0 turns it off. |
 | Transmission, IOR | Glass and refraction. Only with **Ray Tracing** on (File / Render tab). |
 | Lighting | Whether the scene's lights affect it. When off, the color looks flat, always the same. If the graphics backend has shaders, **Shading** appears: Per vertex or Per pixel. |

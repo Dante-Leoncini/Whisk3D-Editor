@@ -127,16 +127,30 @@ SOURCE          Light.cpp
 
 // Fase C re-split: los objetos del EDITOR se movieron a main\objects (no son del core)
 SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Scene.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Collection.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          EditMesh.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Primitives.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Empty.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Camera.cpp Target.cpp Curve.cpp ObjectMode.cpp Instance.cpp
+SOURCEPATH      ..\..\..\main\objects
 
 // Fase 4: importador OBJ compartido con PC
 SOURCEPATH      ..\..\..\main\importers
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\importers
 SOURCE          import_obj.cpp
+SOURCEPATH      ..\..\..\main\importers
 
 // ViewportBase REAL de PC (fase outliner)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts
@@ -158,20 +172,29 @@ SOURCE          Console.cpp // viewport Consola (log del editor); las partes SDL
 // Fase A re-split core/editor: la logica de EDICION de la malla (deref EditMesh) se movio
 // de Mesh.cpp a main/edit/ para que el core (Mesh) no dependa del editor (EditMesh)
 SOURCEPATH      ..\..\..\main\edit
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\edit
 SOURCE          MeshEdit.cpp
+SOURCEPATH      ..\..\..\main\edit
 SOURCE          WeightPaint.cpp // Fase 2 weight paint: pincel + escritura de pesos (undo por trazo)
 SOURCE          BoneEdit.cpp // Fase 3: Edit Mode de huesos (extrude/duplicar/borrar/grab + rename con vgroup)
 SOURCE          UVUnwrap.cpp // menu U: unwrap (conforme + relajacion), smart project, lightmap, follow quads, reset
 SOURCE          Proportional.cpp // proportional editing (tecla O): pesos por distancia + circulo de influencia
 SOURCE          BoxSelect.cpp // B: caja de seleccion (compartida por 3D/UV/2D)
 SOURCE          W3dFalloff.cpp // curvas de falloff del pincel (pesos + vertex color)
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\edit
 SOURCE          BooleanMod.cpp // modificador booleano (C++03, compila en Symbian)
+SOURCE          ScatterMod.cpp // modificador Scatter: copias de otros objetos sobre la malla (C++03)
+SOURCEPATH      ..\..\..\main\edit
 SOURCE          RoutineEditor.cpp // validacion de las rutinas antes de dibujarlas (solo el editor)
 
 SOURCEPATH      ..\..\..\main\render
 SOURCE          render.cpp RenderOptions.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\render
 SOURCE          SceneRender.cpp // el pase 3D compartido con el runtime de los juegos
+SOURCEPATH      ..\..\..\main\render
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\render
 SOURCE          RealTimeShadows.cpp // las sombras en tiempo real (en el N95: la sombra proyectada por la CPU)
+SOURCEPATH      ..\..\..\main\render
 
 SOURCEPATH      ..\..\..\main\app
 SOURCE          variables.cpp
@@ -182,12 +205,16 @@ SOURCE          controls.cpp // el input de PC/Android: los gestos tactiles (Sym
 SOURCE          W3dTouchEditor.cpp // los dedos del Core (input/W3dTactil) -> SDL_Event -> controls.cpp
 SOURCE          W3dMouseEditor.cpp // el mouse Bluetooth -> SDL_Event -> controls.cpp (como el mouse de la PC)
 SOURCEPATH      ..\..\..\main\config
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\config
 SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
+SOURCEPATH      ..\..\..\main\config
 SOURCE          W3dConfigSave.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
 SOURCE          W3dRecent.cpp     // los ultimos proyectos abiertos/guardados (recientes.txt)
 SOURCE          W3dLayouts.cpp       // los layouts guardados de los viewports (layouts.txt)
 SOURCE          W3dNetPermissions.cpp   // el permiso de la red de cada proyecto y el nombre del dispositivo
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\config
 SOURCE          W3dProfile.cpp // reloj de pared + tiempos por categoria del frame (overlay Statistics)
+SOURCEPATH      ..\..\..\main\config
 SOURCEPATH      ..\..\..\main\undo
 SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
 
@@ -224,8 +251,12 @@ SOURCE          VertexAnimation.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          TextureCache.cpp
 SOURCEPATH      ..\..\..\main
+SOURCEPATH      ..\..\..\libs\Whisk3DCore
 SOURCE          W3dScene.cpp
+SOURCEPATH      ..\..\..\main
+SOURCEPATH      ..\..\..\libs\Whisk3DCore
 SOURCE          W3dRoots.cpp   // las ESCENAS 3D y los PREFABS del proyecto (raices, carga perezosa, cambiarEscena)
+SOURCEPATH      ..\..\..\main
 SOURCEPATH      ..\..\..\main\io
 SOURCE          SaveW3D.cpp W3dContainer.cpp UI2DFormat.cpp Texture2D.cpp Font2D.cpp SkinAtlas.cpp Video2DCache.cpp GeneratedTexture.cpp UVExport.cpp EditedTexture.cpp W3dWeb.cpp W3dMp4.cpp W3dAac.cpp W3dH264.cpp
 SOURCE          ProjectMeshes.cpp // editor: publicar/hacer unica/duplicar y el guardado de las mallas como recurso
@@ -238,17 +269,29 @@ SOURCE          ExternalLibrary.cpp // la biblioteca: los .w3d VINCULADOS (explo
 SOURCE          ProjectChanges.cpp   // lo SIN GUARDAR ('*' por recurso y por raiz) y el cartel al salir / abrir
 SOURCE          Thumbnails.cpp        // las miniaturas de la cuadricula de la biblioteca (perezosas, en memoria)
 SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Culling.cpp Particles.cpp VisZone.cpp Gamepad.cpp Fog.cpp ClipRegion.cpp Sound.cpp PostProcessObj.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Routine.cpp // objeto Rutina: lista de pasos del render (C++03)
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
+SOURCEPATH      ..\..\..\main\objects
 SOURCE          Fields.cpp     // la TABLA de los campos de los objetos ("fog.density"): la usan las tarjetas declaradas
 SOURCEPATH      ..\..\..\main\ui\panels
 SOURCE          Panels.cpp PanelsText.cpp   // las tarjetas DECLARADAS de Properties (el motor y el texto)
 SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          LightProbe.cpp   // objeto Sonda de luz (la luz indirecta horneada)
+SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          ReflectionProbe.cpp   // objeto Sonda de reflejo (una imagen 360 horneada para los reflejos)
+SOURCEPATH      ..\..\..\main\objects
 SOURCEPATH      ..\..\..\main\render
+SOURCEPATH      ..\..\..\libs\WhiskUI\render
 SOURCE          UIOverlay.cpp RayTracer.cpp Denoiser.cpp RTGpu.cpp MotionVectors.cpp UpscalingFSR.cpp PostProcess.cpp   // Postproceso: la pila de efectos (por CPU en el N95); VectoresMovimiento: el pase de vectores (GL 1.1) y el desenfoque por CPU; RayTracer: trazado de rayos por CPU (un hilo en el N95); Denoiser y RTGpu: vacios en Symbian
+SOURCEPATH      ..\..\..\main\render
 // audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
 // (CMdaAudioOutputStream en su propio hilo, doble-buffer). Con W3D_ENABLE_AUDIO arriba
 // compilan el camino REAL; sin el, W3dAudio.cpp cae a stubs no-op.
@@ -281,19 +324,23 @@ SOURCEPATH      ..\..\..\libs\WhiskUI\draw
 SOURCE          W3dAtlasPacker.cpp
 // objetos del editor que faltaban: LOD (niveles de detalle) y el espejo/agua
 SOURCEPATH      ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          LOD.cpp Mirror.cpp
+SOURCEPATH      ..\..\..\main\objects
 // import_w3d.cpp (cargador del proyecto .w3d): portado a C++03 (functors en vez de
 // lambdas, loops por indice, tipos explicitos, w3dMapAt en vez de map::at de C++11).
 // import_wobj.cpp (.wobj + normales/color de vertice) tambien portado a C++03.
 SOURCEPATH      ..\..\..\main\importers
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\importers
 SOURCE          import_w3d.cpp import_wobj.cpp
+SOURCEPATH      ..\..\..\main\importers
 // dispatcher de import por extension (.fbx/.gltf/.obj): lo llama import_w3d
 SOURCEPATH      ..\..\..\main\io
 SOURCE          lectura-escritura.cpp
 
 // --- LUA 5.4 EMBEBIDO (C89 portable: corre hasta en el N95) + los binds del juego,
 //     la fisica y la simulacion. Sin lua.c/luac.c (son los programas standalone). ---
-SOURCEPATH      ..\..\..\thirdparty\lua\src
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\thirdparty\lua\src
 SOURCE          lapi.c lauxlib.c lbaselib.c lcode.c lcorolib.c lctype.c ldblib.c ldebug.c ldo.c ldump.c
 SOURCE          lfunc.c lgc.c linit.c liolib.c llex.c lmathlib.c lmem.c loadlib.c lobject.c lopcodes.c
 SOURCE          loslib.c lparser.c lstate.c lstring.c lstrlib.c ltable.c ltablib.c ltm.c lundump.c lutf8lib.c
@@ -321,7 +368,9 @@ SOURCE          W3dNet.cpp
 SOURCEPATH      ..\..\..\main\script
 // ScriptUI.cpp: engancha gBindExtra (constructor estatico) -> registra los binds de JUEGO
 // (sonido/setTexto/posPx/pantalla/...). Sin esto, un .lua que llama sonido() da "nil value".
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\script
 SOURCE          BindsGame.cpp SimGame.cpp ScriptUI.cpp
+SOURCEPATH      ..\..\..\main\script
 
 // OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
 // resuelven contra el ultimo SOURCEPATH)
@@ -348,9 +397,14 @@ USERINCLUDE     ..\..\..\libs\Whisk3DCore
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\base
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\graphics
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\io
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\objects
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\render
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\config
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\edit
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\script
 // thirdparty del Core (stb) + lua src (lua.h/lauxlib.h/lualib.h del interprete embebido)
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\thirdparty
-USERINCLUDE     ..\..\..\thirdparty\lua\src
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\thirdparty\lua\src
 USERINCLUDE     ..\..\..\main
 USERINCLUDE     ..\..\..\main\ui
 USERINCLUDE     ..\..\..\main\ui\ViewPorts
@@ -438,7 +492,9 @@ SOURCE NumPad.cpp
 // --- subsistema de ANIMACION (pull FBX/skinning): las piezas C++03 se compilan de verdad;
 //     el ESQUELETO/SKINNING (C++11) va como stubs no-op (ver w3dskelstubs.cpp). ---
 SOURCEPATH ..\..\..\main\config
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\config
 SOURCE w3dVersion.cpp              // W3dVersion() (header del .obj exportado)
+SOURCEPATH      ..\..\..\main\config
 
 SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
 SOURCE Animation.cpp              // globales de playback: CurrentFrame / AnimFPS / Start-EndFrame / PlayAnimation + keyframes
@@ -492,9 +548,13 @@ SOURCE LuaCompile.cpp           // compilar .lua a bytecode (Compilar juego): st
 // --- PREFABS: la INSTANCIA (sus hijos se generan del prefab), la generacion + instanciar()/destruir() de lua,
 //     el editor (lo generado no se toca, Add > Prefab, Create Prefab, Unpack) y su tarjeta de Properties ---
 SOURCEPATH ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE InstancePrefab.cpp       // INSTANCIA DE PREFAB (ObjectType::prefab)
+SOURCEPATH      ..\..\..\main\objects
 SOURCEPATH ..\..\..\main\io
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE Prefabs.cpp               // la definicion de cada prefab y la generacion de sus instancias
+SOURCEPATH      ..\..\..\main\io
 SOURCE PrefabsEditor.cpp         // el editor sobre las instancias de prefab
 SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE PropsPrefab.cpp           // tarjeta "Prefab Instance" del panel de propiedades
@@ -502,11 +562,17 @@ SOURCE PropsPrefab.cpp           // tarjeta "Prefab Instance" del panel de propi
 // --- LIBRERIAS EXTERNAS: el PROXY W3D (un prefab o una escena de otro .w3d de solo lectura) y el registro /
 //     montaje / recursos con prefijo de las librerias ("lib:<nombre>/...") ---
 SOURCEPATH ..\..\..\main\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE ProxyW3d.cpp              // PROXY W3D (ObjectType::proxy): genera sus hijos como una instancia de prefab
+SOURCEPATH      ..\..\..\main\objects
 SOURCEPATH ..\..\..\main\io
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE Libraries.cpp             // el registro de las librerias, su montaje y sus prefabs/escenas
+SOURCEPATH      ..\..\..\main\io
 
 // --- STREAMING: las instancias de prefab y los proxies DIFERIDOS ("carga": "distancia") cargan y descargan en
 //     tiempo real segun la distancia a su objetivo (pedidos async al almacen + refcount) ---
 SOURCEPATH ..\..\..\main\io
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE Streaming.cpp             // el tick del streaming, la partida (Play/Stop) y cargar()/descargar() de lua
+SOURCEPATH      ..\..\..\main\io

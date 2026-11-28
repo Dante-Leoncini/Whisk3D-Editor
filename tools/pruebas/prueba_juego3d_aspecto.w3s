@@ -1,0 +1,33 @@
+# ==========================================================================
+#  EL JUEGO COMPILADO PROYECTA CON EL ASPECTO DE SU VENTANA
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_aspecto.w3s
+#
+#  EL PROBLEMA QUE ESTA PRUEBA CIERRA. screenPoint/screenOf/screenRay (MatrixScreen
+#  en Camera.cpp) y el culling de la camara usan g_renderAspect cuando la camara no
+#  declara aspecto. En el editor lo fija el panel del render; en el juego compilado
+#  nadie lo tocaba y se quedaba en el 4:3 por defecto. Con una ventana de otro
+#  aspecto (16:9, el celular parado) el rayo no pasaba por donde se tocaba y lo que
+#  se ponia "debajo" de un objeto 3D quedaba corrido. Ahora w3drun.cpp lo pone en
+#  cada cuadro con el aspecto de la imagen dibujada (y en 0 hasta el primer cuadro:
+#  los start() caen al aspecto del lienzo).
+#
+#  Como: el juego 3D minimo con la camara SIN aspecto declarado, en una ventana de
+#  600x600 (1:1). Su script mide con screenPoint cuantos pixeles da 1 m a la derecha
+#  y 1 m arriba del cubo: con pixeles cuadrados tienen que ser iguales. Lo mira en
+#  el start() y en el cuadro 10, y solo si los dos dan 1 prende la franja verde
+#  del HUD, que game3dpx busca en la captura. Con el bug daba 0.75.
+#
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+window 640 480
+
+game3dmin /tmp/w3d_juego3d_aspecto light free
+savew3d /tmp/w3d_juego3d_aspecto/juego3dmin.w3d
+openw3d /tmp/w3d_juego3d_aspecto/juego3dmin.w3d
+
+compilegame 0 0
+
+game3dpx /tmp/w3d_juego3d_aspecto juego3dmin hud

@@ -3,7 +3,7 @@
 
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/WithBorder.h" // borde (verde si activo), igual que UV/Outliner
-#include "render/UIOverlay.h"     // dibujo compartido de la UI 2D (mismo que el viewport 3D)
+#include "WhiskUI/render/UIOverlay.h"     // dibujo compartido de la UI 2D (mismo que el viewport 3D)
 #include "ViewPorts/Gizmo.h"       // Gizmo2DClient: el gizmo 2D sobre los elementos elegidos
 #include <vector>
 

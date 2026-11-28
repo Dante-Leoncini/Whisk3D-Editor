@@ -10,6 +10,9 @@
 #include "ViewPorts/LayoutInput.h"
 #include "ViewPorts/LayoutTree.h" // aviso de destruccion de viewports + borrar un arbol entero
 #include "edit/MeshEdit.h"
+#include "objects/WrittenShader.h" // W3dShaderTemplate: el IDE crea un shader nuevo (New File...)
+#include <string.h>
+#include <ctype.h>
 #include "edit/UVUnwrap.h"
 #include "edit/Proportional.h"
 #include "PopUp/NewTexturePopup.h"
@@ -47,7 +50,7 @@
 #include "objects/Materials.h" // Material (mat->texture) para el dropdown "Texture" del UV editor
 #include "importers/import_obj.h" // PendingTextureOf: texturas encoladas y aun sin subir (dropdown Texture)
 #include "w3dTexture.h"        // w3dEngine::TextureSize (los niveles del menu Mipmap)
-#include "io/Texture2D.h"      // Texture2DList: la UI del JUEGO en el dropdown Texture
+#include "WhiskUI/io/Texture2D.h"      // Texture2DList: la UI del JUEGO en el dropdown Texture
 #include "objects/Textures.h"  // Texture (path) para las etiquetas del dropdown
 #include "objects/EditMesh.h"
 #include "objects/Light.h"
@@ -67,25 +70,26 @@
 #include "objects/ProxyW3d.h"   // Add > Proxy W3D (un prefab o una escena de una libreria externa)
 #include "io/Libraries.h"
 #include "io/ExternalLibrary.h"   // W3dExtLibLink: Add > Proxy W3D vincula el .w3d elegido
+#include "edit/ScatterMod.h"      // W3dScatterStale: un Scatter (modo unida) cuya fuente se edito se regenera
 #include "objects/Particles.h" // Add > Particles (emisor de particulas del Core)
-#include "objects/UI.h"
-#include "objects/Text2D.h"
-#include "objects/Image2D.h"
-#include "objects/Rect2D.h"
-#include "objects/Container2D.h"
-#include "objects/Slice9.h"
-#include "objects/Button2D.h"
-#include "objects/Expand2D.h"
-#include "objects/Video2D.h"
+#include "WhiskUI/objects/UI.h"
+#include "WhiskUI/objects/Text2D.h"
+#include "WhiskUI/objects/Image2D.h"
+#include "WhiskUI/objects/Rect2D.h"
+#include "WhiskUI/objects/Container2D.h"
+#include "WhiskUI/objects/Slice9.h"
+#include "WhiskUI/objects/Button2D.h"
+#include "WhiskUI/objects/Expand2D.h"
+#include "WhiskUI/objects/Video2D.h"
 #include "objects/Gamepad.h"   // entrada cruda del mando + el objeto Script
-#include "io/UI2DFormat.h"      // cargar interfaces .w3dui
+#include "WhiskUI/io/UI2DFormat.h"      // cargar interfaces .w3dui
 #include "W3dPalettes.h"        // paletas del proyecto (AddUI adopta la default)
 #include "PopUp/FileBrowser.h"  // OpenFileBrowser (elegir el archivo)
 #include "io/W3dContainer.h"     // W3dImportAsset ("Load .lua..." del IDE copia el script adentro del proyecto)
 #include "io/ProjectResources.h"   // menu Archivo: carpeta de la biblioteca / dentro o fuera del .w3d (W3dViewRec*)
 #include "io/SaveW3D.h"            // SaveW3D: "Guardar" de un archivo INTERNO guarda tambien el .w3d
 #include "ViewPorts/PopUp/SaveAsPopup.h"   // "Guardar como..." (scripts del IDE y texturas del editor UV)
-#include "io/Texture2D.h"       // tamano real de la imagen elegida al crearla
+#include "WhiskUI/io/Texture2D.h"       // tamano real de la imagen elegida al crearla
 #include "io/Video2DCache.h"    // tamano real del video elegido al crearlo
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertKeyframeSkeleton (Pose Mode: Insert Keyframe)
@@ -2046,19 +2050,99 @@ bool LayoutConvertCurveToMesh() {
     return true;
 }
 
+// LA REFERENCIA (Add > Reference): un VACIO que muestra una IMAGEN (forma EmptyImage, objects/Empty.h), como el "Image
+// Empty" de Blender. Antes era un plano (una malla con su material): iba a "Mallas 3D" de la biblioteca, salia en el
+// render, en alambre no se veia la imagen, y nacia girado 90 grados en X para quedar parado. Ahora la imagen se dibuja
+// parada mirando al frente con el objeto SIN girar, con su proporcion, en todos los modos de vista; no sale en el render
+// ni en el juego (es para calcar). El selector de imagen ya queda abierto: imagen de referencia en un paso
+//
+// EL PUENTE DEL SELECTOR: el de texturas de cada plataforma (PC, web, telefono) carga a un MATERIAL. Uno propio, que no
+// entra a la lista del proyecto, la recibe y LayoutReferenceTexture se la pasa al Vacio que la pidio (por su serial: el
+// selector es asincronico y el objeto puede morir mientras tanto)
+static Material* gRefBridge = NULL;
+static unsigned gRefEmptySerial = 0;
+static Empty* EmptyBySerial(Object* o, unsigned serial) {
+    if (!o) return NULL;
+    if (o->serial == serial && o->getType() == ObjectType::empty) return (Empty*)o;
+    for (size_t i = 0; i < o->Childrens.size(); i++) { Empty* e = EmptyBySerial(o->Childrens[i], serial); if (e) return e; }
+    return NULL;
+}
+// abre el selector de imagen para ESE Vacio (Add > Reference y la fila Imagen de su tarjeta)
+void LayoutPickEmptyImage(Empty* e) {
+    if (!e || !DialogLoadTexture) return;
+    if (!gRefBridge) gRefBridge = new Material("Reference", true);   // (true = no entra a la lista de materiales)
+    gRefEmptySerial = e->serial;
+    extern int gLoadTextureMap, gLoadTextureLayer; extern bool gLoadTextureAsB;
+    gLoadTextureAsNormal = false; gLoadTextureAsB = false; gLoadTextureMap = -1; gLoadTextureLayer = -1;
+    DialogLoadTexture(gRefBridge);
+}
+// la fila IMAGEN de la tarjeta (ui/panels/Panels.cpp): el Vacio activo elige su imagen (y pasa a la forma Imagen)
+void W3dPanelsImagePick(Object* o) {
+    if (o && o->getType() == ObjectType::empty) LayoutPickEmptyImage((Empty*)o);
+}
 void AddReference(){
-    // un plano PARADO (90 en X) = de frente en la vista, con su material y el selector de textura ya abierto:
-    // imagen de referencia en un paso. NO abre el panel "Add Plane" (el selector ocupa la pantalla).
-    Mesh* m = (Mesh*)NewMesh(MeshType::plane, NULL, false);
-    if (!m) return;
-    m->SetNameObj("Reference");
-    m->SetRotEuler(Vector3(90.0f, 0.0f, 0.0f));
-    DeselectAll(); m->Select();
-    Material* mat = NewMaterialInMeshPart(m, 0);
-    // sin LIGHTING: una referencia es una imagen, no una superficie. Sombreada por la luz de la escena se ve mas
-    // oscura de un lado y no es fiel a lo que estas calcando.
-    if (mat){ mat->textureOn = true; mat->lighting = false; }
-    if (mat && DialogLoadTexture) DialogLoadTexture(mat);
+    Empty* e = new Empty(NULL, cursor3D.pos);
+    e->shape = EmptyImage;
+    e->drawingSize = 2.0f;   // (el lado largo de la imagen: 2 m, como el plano de antes)
+    e->SetRotEuler(Vector3(90.0f, 0.0f, 0.0f));   // PARADA mirando al frente (la imagen va acostada en su X-Y, como Blender)
+    e->SetNameObj(T("Reference"));
+    AfterCreateAdd(e);
+    LayoutPickEmptyImage(e);
+}
+// el ANCHO y el ALTO de la imagen, de su encabezado (PNG, JPEG, BMP, TGA): el de la textura subida puede no servir (el
+// N95 no lo anota y un telefono viejo la estira a potencia de 2)
+static bool RefImageSize(const std::string& path, int& w, int& h) {
+    std::vector<unsigned char> b;
+    if (!w3dFileSystem::ReadFileBytes(path, b) || b.size() < 26) return false;
+    const unsigned char* p = &b[0]; const size_t n = b.size();
+    #define W3D_BE16(q) ((int)((q)[0] << 8 | (q)[1]))
+    #define W3D_LE16(q) ((int)((q)[0] | (q)[1] << 8))
+    if (p[0] == 0x89 && p[1] == 'P' && p[2] == 'N' && p[3] == 'G') {   // PNG: el IHDR va primero
+        w = (int)((unsigned)p[16] << 24 | (unsigned)p[17] << 16 | (unsigned)p[18] << 8 | p[19]);
+        h = (int)((unsigned)p[20] << 24 | (unsigned)p[21] << 16 | (unsigned)p[22] << 8 | p[23]);
+    } else if (p[0] == 0xFF && p[1] == 0xD8) {   // JPEG: los segmentos hasta el SOF (C0..CF menos C4 C8 CC)
+        size_t i = 2; w = h = 0;
+        while (i + 9 < n) {
+            if (p[i] != 0xFF) { i++; continue; }
+            const unsigned char mk = p[i + 1];
+            if (mk == 0xFF) { i++; continue; }
+            if (mk == 0xD8 || mk == 0x01 || (mk >= 0xD0 && mk <= 0xD7)) { i += 2; continue; }   // (sin largo)
+            if (mk >= 0xC0 && mk <= 0xCF && mk != 0xC4 && mk != 0xC8 && mk != 0xCC) {
+                h = W3D_BE16(p + i + 5); w = W3D_BE16(p + i + 7); break;
+            }
+            i += 2 + (size_t)W3D_BE16(p + i + 2);
+        }
+    } else if (p[0] == 'B' && p[1] == 'M') {   // BMP: BITMAPINFOHEADER (el alto negativo = de arriba a abajo)
+        w = (int)((unsigned)p[18] | (unsigned)p[19] << 8 | (unsigned)p[20] << 16 | (unsigned)p[21] << 24);
+        h = (int)((unsigned)p[22] | (unsigned)p[23] << 8 | (unsigned)p[24] << 16 | (unsigned)p[25] << 24);
+        if (h < 0) h = -h;
+    } else {   // TGA (no tiene firma: por la extension)
+        std::string e = path.size() > 4 ? path.substr(path.size() - 4) : std::string();
+        for (size_t k = 0; k < e.size(); k++) e[k] = (char)tolower((unsigned char)e[k]);
+        if (e != ".tga") return false;
+        w = W3D_LE16(p + 12); h = W3D_LE16(p + 14);
+    }
+    #undef W3D_BE16
+    #undef W3D_LE16
+    return w > 0 && h > 0;
+}
+// LA IMAGEN LLEGO (el selector de textura, en cada plataforma, despues de ponerla en el material): si el material es
+// el PUENTE de la referencia, la textura pasa al Vacio que la pidio, con el tamanio de la imagen sacado de su
+// ENCABEZADO (el de la textura subida puede no servir: el N95 no lo anota y un telefono viejo la estira a potencia de 2)
+void LayoutReferenceTexture(Material* mat, const std::string& path, const Texture* t) {
+    if (!mat || mat != gRefBridge) return;
+    Texture* got = mat->texture;   // (la del selector: una ref que ahora es del puente)
+    mat->texture = NULL;
+    Empty* e = gRefEmptySerial ? EmptyBySerial((Object*)SceneCollection, gRefEmptySerial) : NULL;
+    gRefEmptySerial = 0;
+    if (e && got) {
+        int w = 0, h = 0;
+        if (!RefImageSize(path, w, h) && t) { w = t->width; h = t->height; }
+        e->SetImage(got, w, h);   // (el Vacio retiene la suya)
+        e->shape = EmptyImage;
+    }
+    if (got) TextureRelease(got);
+    g_redraw = true;
 }
 void AddImportObj(){  if (LayoutImportObj)  LayoutImportObj(); }
 void AddImportFbx(){  if (LayoutImportFbx)  LayoutImportFbx(); }
@@ -2135,7 +2219,6 @@ static const MenuDef ADD_MESHES[] = {
     { "Cone",       AddCone,            NULL, ICON(IconType::cone) },
     { "Cylinder",   AddCylinder,        NULL, ICON(IconType::cylinder) },
     { "Vertex",     AddVertex,          NULL, ICON(IconType::mesh) },
-    { "Reference",  AddReference,       NULL, ICON(IconType::texture) },
 };
 
 // submenu Modifier Objects: los objetos que dibujan a otro (el activo al crearlos)
@@ -2168,6 +2251,7 @@ static const MenuDef ADD_LIGHTS[] = {
 static const MenuDef ADD[] = {
     { "Mesh",       NULL,               NULL, ICON(IconType::mesh),   &MenuMeshes },
     { "Empty",      AddEmpty,           NULL, ICON(IconType::empty) },
+    { "Reference",  AddReference,       NULL, ICON(IconType::photo) },   // (un Vacio con una imagen: no es una malla)
     { "Modifier Objects", NULL,         NULL, ICON(IconType::instance), &MenuModifiers },
     { "LOD",        AddLOD,             NULL, ICON(IconType::array) },
     { "Culling",    AddCulling,         NULL, ICON(IconType::visible) },
@@ -2529,7 +2613,19 @@ void LayoutNewFaceEdit() {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (CurveBezEditing()) { CurveBezMakeSegment(); return; }   // curva de splines: F = Make Segment (Blender)
     Mesh* m = (Mesh*)g_editMesh;
-    m->CreateFaceEdit();
+    // LA VISTA en el espacio de la malla: la cara nueva queda mirandola (CreateFaceEdit)
+    if (Viewport3DActive) {
+        const Viewport3D::Lens L = Viewport3DActive->CurrentLens();
+        Matrix4 W; m->GetWorldMatrix(W);
+        const Matrix4 I = W.Inverse();
+        const Vector3 e = I * L.pos;
+        const float eye[3] = { e.x, e.y, e.z };
+        // (una direccion: solo la 3x3 de la inversa, columna-mayor)
+        const float fwd[3] = { I.m[0]*L.fwd.x + I.m[4]*L.fwd.y + I.m[8]*L.fwd.z,
+                               I.m[1]*L.fwd.x + I.m[5]*L.fwd.y + I.m[9]*L.fwd.z,
+                               I.m[2]*L.fwd.x + I.m[6]*L.fwd.y + I.m[10]*L.fwd.z };
+        m->CreateFaceEdit(eye, fwd, L.ortho);
+    } else m->CreateFaceEdit();
 }
 
 // Shade Smooth/Flat (menu Face): redondea/aplana las caras seleccionadas.
@@ -2859,6 +2955,7 @@ void LayoutObjectsPaste() {
 }
 
 // opcion del menu Object/Mesh y su submenu Transform (ids 100-102, 300=extrude)
+bool LayoutEditHide(int what);   // (mas abajo: H / Shift+H / Alt+H en Edit Mode)
 void LayoutActionObject(int aId) {
     switch (aId) {
         case 720: LayoutObjectsCopy(true); break;    // Cut (Ctrl+X)
@@ -2936,9 +3033,14 @@ void LayoutActionObject(int aId) {
         case 322: LayoutRecalcNormals(); break;  // Recalculate Normals (Face / Mesh>Normals)
         case 323: LayoutTriangulate();    break; // Face > Triangulate Faces (Ctrl T)
         case 324: LayoutFlipNormals();   break;  // Mesh > Normals > Flip
+        case 326: if (InteractionMode == EditMode && g_editMesh) { W3dRecalcNormalsEdited((Mesh*)g_editMesh, true); g_redraw = true; } break;
+        case 395: LayoutEditHide(0); break;      // Mesh > Show/Hide > Hide Selected (H)
+        case 396: LayoutEditHide(1); break;      // Mesh > Show/Hide > Hide Unselected (Shift+H)
+        case 397: LayoutEditHide(2); break;      // Mesh > Show/Hide > Reveal Hidden (Alt+H)
         case 330: LayoutMarkSharp(true);  break; // Edge > Mark Sharp
         case 331: LayoutMarkSharp(false); break; // Edge > Clear Sharp
         case 340: LayoutLoopCutFromActive(); break; // Edge/Face > Loop Cut and Slide (elemento activo)
+        case 347: KnifeStart(lastMouseX, lastMouseY); break; // Edge/Face > Cuchillo (K)
         case 350: LayoutUVOperation(0); break; // UV > Unwrap Angle Based
         case 365: LayoutUVOperation(1); break; // UV > Unwrap Conformal
         case 366: LayoutUVOperation(2); break; // UV > Unwrap Minimum Stretch
@@ -2990,6 +3092,32 @@ static void LayoutActionRender(int aId) {
         case 6: Viewport3DActive->view = RenderType::Alpha;           break;
         case 8: Viewport3DActive->view = RenderType::Vectors;        break;
     }
+}
+// EL MENU DE LOS MODOS DE VISTA en el cursor: la Z mantenida (la 6 mantenida en el N95) en vez de ciclarlos de a uno. Es
+// el mismo desplegable que el boton de la barra (con los rayos X, que van aparte del modo); el elegido sale en verde
+// (el modo de vista del 3D activo, en verde: lo comparten la Z mantenida y el boton de la barra)
+static void MarkShadingMenu() {
+    extern PopupMenu* MenuRender;
+    if (!MenuRender || !Viewport3DActive) return;
+    const RenderType::Enum v = Viewport3DActive->view.v;
+    const int cur = (v == RenderType::Rendered) ? 0 : (v == RenderType::MaterialPreview) ? 1 : (v == RenderType::Solid) ? 2 :
+                    (v == RenderType::Wireframe) ? 3 : (v == RenderType::ZBuffer) ? 4 : (v == RenderType::NormalView) ? 5 :
+                    (v == RenderType::Alpha) ? 6 : (v == RenderType::Vectors) ? 8 : -1;
+    for (size_t i = 0; i < MenuRender->items.size(); i++) { MenuItem* it = MenuRender->items[i]; if (it && !it->checkbox) it->green = (it->id == cur); }
+}
+void LayoutMenuShading(int mx, int my) {
+    extern PopupMenu* MenuRender;
+    if (!MenuRender || !Viewport3DActive) return;
+    MenuRender->action = LayoutActionRender;
+    MarkShadingMenu();
+    if (OpenMenu) OpenMenu->Close();
+    MenuRender->Open(mx, my, MenuScreenW, MenuScreenH);
+    OpenMenu = MenuRender;
+}
+// (el telefono, sin cursor: el menu sale adentro de la vista 3D activa)
+void LayoutMenuShadingKeyboard() {
+    if (!Viewport3DActive) return;
+    LayoutMenuShading(Viewport3DActive->x + Viewport3DActive->width / 3, Viewport3DActive->y + Viewport3DActive->height / 4);
 }
 
 // opcion del menu Orient: orientacion usada al constrenir a un eje (X/Y/Z)
@@ -3056,11 +3184,15 @@ static void RegenerateBooleansWithEditedTargetRec(Object* node){
         Object* o = node->Childrens[i];
         if (o->getType()==ObjectType::mesh){
             Mesh* m=(Mesh*)o;
-            for (size_t k=0;k<m->modifiers.size();k++){
+            bool regen = false;
+            for (size_t k=0;k<m->modifiers.size() && !regen;k++){
                 Modifier* md = m->modifiers[k];
                 if (md->type!=ModifierType::Boolean || !md->target || md->target->getType()!=ObjectType::mesh) continue;
-                if (((Mesh*)md->target)->geoVersion != md->boolTargetGeoVer){ m->GenerateMeshModified(); break; }
+                if (((Mesh*)md->target)->geoVersion != md->boolTargetGeoVer) regen = true;
             }
+            // (y un SCATTER en modo unida cuya fuente se edito: la piedra que se simplifico, edit/ScatterMod.h)
+            if (!regen && W3dScatterStale(m)) regen = true;
+            if (regen) m->GenerateMeshModified();
         }
         RegenerateBooleansWithEditedTargetRec(o);
     }
@@ -3100,6 +3232,12 @@ void UpdateActiveEditMesh() {
     // SPLINES: lo que la maquinaria de malla hizo con el proxy (mover, elegir) pasa a las manijas
     if (CurveBezEditing() && InteractionMode == EditMode && g_editMesh == (Object*)gCurveInEdit->edit)
         CurveBezSync(gCurveInEdit);
+    // LO OCULTO en Edit Mode (H) es de esa edicion: la malla que deja de editarse se ve entera (Modo Objeto, otra malla)
+    { static Object* sPrevEdit = NULL; static unsigned sPrevSerial = 0;
+      if (sPrevEdit && sPrevEdit != g_editMesh && W3dObjectLive(sPrevEdit) && sPrevEdit->serial == sPrevSerial &&
+          sPrevEdit->getType() == ObjectType::mesh)
+          W3dEditHiddenForget((Mesh*)sPrevEdit);
+      sPrevEdit = g_editMesh; sPrevSerial = g_editMesh ? g_editMesh->serial : 0; }
     // el modo Face del menu SelMode se grisa editando una malla sin caras (path/riel)
     g_selFaceAvailable = !(g_editMesh && ((Mesh*)g_editMesh)->facesSize == 0);
     // CONSTRAINTS + EDIT MODE: el evaluador del Core necesita saber CUAL objeto se esta editando
@@ -3659,7 +3797,7 @@ static void LayoutOpenMenuUVSave(UVEditor* uv, int x, int y) {
     // Guardar como... y dentro / fuera del .w3d, cualquiera
     if (t) {
         if (TexEditFind(t)) gMenuUVSave->Add(T("Save"), 1, (int)IconType::save);
-        gMenuUVSave->Add(T("Save As..."), 5);
+        gMenuUVSave->Add(T("Save As..."), 5, (int)IconType::save);
         if (TexEditIsExternal(t)) gMenuUVSave->Add(T("Save inside the .w3d"), 3);       // vuelve al .w3d
         else                     gMenuUVSave->Add(T("Save outside the .w3d..."), 2);    // un PNG afuera (se referencia por ruta)
     }
@@ -4113,7 +4251,7 @@ static void LayoutOpenMenuIDEScript(IDE* ide, int x, int y) {
 // ===== menu ARCHIVO del IDE: Guardar / Guardar como... / Guardar en el w3d (o fuera) / Cargar .lua... =====
 static PopupMenu* gMenuIDEFile = NULL;
 static IDE* gIDEFileOf = NULL;
-enum { IDEA_Save = 1, IDEA_SaveAs, IDEA_ToW3d, IDEA_OutsideW3d, IDEA_Load };
+enum { IDEA_Save = 1, IDEA_SaveAs, IDEA_ToW3d, IDEA_OutsideW3d, IDEA_Load, IDEA_New };
 // la carpeta de la biblioteca en la que esta un archivo ("" = la raiz o no esta en la biblioteca)
 static std::string FolderLibraryOf(int view, const std::string& id) {
     if (id.empty()) return std::string();
@@ -4160,9 +4298,57 @@ static bool IDESaveAsAction(const SaveAsDestination& d, bool force, bool* exists
     if (path != ide->file && w3dFileSystem::FileExists(path) && !force) { if (exists) *exists = true; return false; }
     const std::string prev = ide->file;
     ide->file = path;
-    if (!ide->Save()) { ide->file = prev; msg = "Could not write the file"; return false; }
+    // OTRO archivo: pisarlo ya se confirmo (o no existia). IDE::Save sin forzar lo comparaba con el texto del archivo
+    // ANTERIOR, creia que lo habian cambiado afuera y preguntaba de nuevo: no se guardaba y el "Si" de esa pregunta pisaba
+    // el archivo de antes. El MISMO archivo si conserva ese aviso (otro programa lo pudo cambiar)
+    if (!ide->Save(path != prev)) {
+        ide->file = prev;
+        if (path == prev && PopUpActive == confirmPopup) return true;   // (pregunto "lo cambiaron afuera": decide eso)
+        msg = "Could not write the file";
+        return false;
+    }
     g_redraw = true;
     return true;
+}
+// "New File...": un archivo NUEVO con el nombre y la extension que se elijan (sin extension: .lua), adentro del .w3d
+// (scripts/ o, un shader -.glsl .frag .vert .shader-, shaders/) o afuera, con su plantilla; y se abre en el IDE
+static bool IDENewFileAction(const SaveAsDestination& d, bool force, bool* exists, std::string& msg) {
+    std::string name = d.name;
+    if (name.empty()) { msg = "No name"; return false; }
+    std::string ext;
+    { const size_t p = name.find_last_of('.'), sl = name.find_last_of("/\\");
+      if (p != std::string::npos && p > 0 && (sl == std::string::npos || p > sl)) ext = name.substr(p); }
+    if (ext.empty()) { ext = ".lua"; name += ext; }
+    std::string low = ext; for (size_t i = 0; i < low.size(); i++) low[i] = (char)tolower((unsigned char)low[i]);
+    const bool shader = (low == ".glsl" || low == ".frag" || low == ".vert" || low == ".shader");
+    const char* tmpl = shader ? W3dShaderTemplate()
+                              : (low == ".lua" ? "-- un script de Whisk3D: start() una vez al empezar, update(dt) en cada cuadro\n"
+                                                 "function start()\nend\n\nfunction update(dt)\nend\n" : "");
+    std::string path;
+    if (d.internal) {
+        W3dContainerEnsure();   // (un proyecto que todavia no es un archivo: queda en memoria)
+        const std::string base = name.substr(0, name.size() - ext.size());
+        path = std::string(shader ? "shaders/" : "scripts/") + W3dSlugEntry(base) + low;
+        if (W3dContainerExists(path) && !force) { if (exists) *exists = true; return false; }
+        if (!W3dContainerWriteEntry(path, tmpl, strlen(tmpl))) { msg = "Could not write the file"; return false; }
+        W3dResourcesViewInvalidate();
+        W3dViewRecMove(shader ? W3D_VIEW_SHADERS : W3D_VIEW_SCRIPTS, path, d.folderProject);
+    } else {
+        path = W3dPathInFolder(d.folderDisk, name, "");
+        if (w3dFileSystem::FileExists(path) && !force) { if (exists) *exists = true; return false; }
+        FILE* f = fopen(path.c_str(), "wb");
+        const size_t n = strlen(tmpl);
+        const bool ok = f && fwrite(tmpl, 1, n, f) == n;
+        if (f) fclose(f);
+        if (!ok) { msg = "Could not write the file"; return false; }
+    }
+    extern bool IDEOpenScript(const std::string& path);
+    IDEOpenScript(path);
+    g_redraw = true;
+    return true;
+}
+void IDEOpenNewFile() {
+    OpenSaveAsPopup(T("New File"), "script.lua", "", true, std::string(), IDENewFileAction);
 }
 void IDEOpenSaveAs(IDE* ide) {
     if (!ide) return;
@@ -4170,7 +4356,10 @@ void IDEOpenSaveAs(IDE* ide) {
     const std::string name = ide->file.empty() ? std::string("script.lua") : IDEScriptName(ide->file);
     // (uno nuevo va adentro del proyecto: aunque no haya .w3d todavia, queda en memoria)
     const bool internal = ide->file.empty() ? true : W3dIsEntryName(ide->file);
-    OpenSaveAsPopup(T("Save As..."), name, ".lua", internal, FolderLibraryOf(W3D_VIEW_SCRIPTS, ide->file), IDESaveAsAction);
+    // uno de AFUERA arranca en SU carpeta (guardar encima o al lado); si no, la del explorador (la del .w3d abierto)
+    const std::string folderDisk = (ide->file.empty() || internal) ? std::string() : w3dFileSystem::ParentPath(ide->file);
+    OpenSaveAsPopup(T("Save As..."), name, ".lua", internal, FolderLibraryOf(W3D_VIEW_SCRIPTS, ide->file), IDESaveAsAction,
+                    folderDisk);
 }
 // un script de AFUERA pasa ADENTRO del .w3d (las referencias de los objetos lo siguen) y se guarda el proyecto
 static void IDEMoveToW3d(IDE* ide) {
@@ -4213,6 +4402,7 @@ static void LayoutActionIDEFile(int id) {
         case IDEA_ToW3d:       IDEMoveToW3d(ide); break;
         case IDEA_OutsideW3d:    OpenFileBrowser(T("Save outside the .w3d..."), T("Use this folder"), ".lua", IDEOutsidePicked, true); break;
         case IDEA_Load:      gIDEMenuOf = ide; OpenFileBrowser(T("Load script"), T("Open"), ".lua", IDELoadLuaPicked); break;
+        case IDEA_New:       IDEOpenNewFile(); break;
     }
     g_redraw = true;
 }
@@ -4221,8 +4411,9 @@ static void LayoutOpenMenuIDEFile(IDE* ide, int x, int y) {
     gIDEFileOf = ide;
     if (!gMenuIDEFile) { gMenuIDEFile = new PopupMenu(); gMenuIDEFile->action = LayoutActionIDEFile; }
     gMenuIDEFile->Clear();
+    gMenuIDEFile->Add(T("New File..."), IDEA_New, (int)IconType::plus);
     gMenuIDEFile->Add(T("Save"), IDEA_Save, (int)IconType::save);
-    gMenuIDEFile->Add(T("Save As..."), IDEA_SaveAs);
+    gMenuIDEFile->Add(T("Save As..."), IDEA_SaveAs, (int)IconType::save);
     if (!ide->file.empty()) {
         if (W3dIsEntryName(ide->file)) gMenuIDEFile->Add(T("Save outside the .w3d..."), IDEA_OutsideW3d);
         else                                    gMenuIDEFile->Add(T("Save inside the .w3d"), IDEA_ToW3d);
@@ -4671,6 +4862,7 @@ bool LayoutOpenBarMenu(ViewportBase* vp, int mx, int my) {
     bool overlays  = false;       // el de overlays se abre distinto (flags)
     // botones por ROL (NO por indice): reordenar la barra (mover Orient, etc.) no rompe esto.
     Button* bMode = BarRoleBtn(B, BR_Mode);   Button* bSelM = BarRoleBtn(B, BR_SelMode);
+    Button* bSelE = BarRoleBtn(B, BR_SelEdge); Button* bSelF = BarRoleBtn(B, BR_SelFace);
     Button* bPiv  = BarRoleBtn(B, BR_Pivot);  Button* bSel  = BarRoleBtn(B, BR_Select);
     Button* bAdd  = BarRoleBtn(B, BR_Add);    Button* bObj  = BarRoleBtn(B, BR_Object);
     Button* bOvl  = BarRoleBtn(B, BR_Overlays); Button* bRnd = BarRoleBtn(B, BR_Render);
@@ -4699,9 +4891,13 @@ bool LayoutOpenBarMenu(ViewportBase* vp, int mx, int my) {
         target = MenuMode; button = bMode;
         LayoutRebuildMenuMode();   // mode-aware: malla -> Paints ; armature -> Pose
         if (!MenuMode->action) MenuMode->action = LayoutActionMode;
-    } else if (MenuSelMode && bSelM && bSelM->visible && bSelM->Contains(mx, my)) {
-        target = MenuSelMode; button = bSelM;
-        if (!MenuSelMode->action) MenuSelMode->action = LayoutActionSelMode;
+    } else if ((bSelM && bSelM->visible && bSelM->Contains(mx, my)) || (bSelE && bSelE->visible && bSelE->Contains(mx, my)) ||
+               (bSelF && bSelF->visible && bSelF->Contains(mx, my))) {
+        // VERTICE / ARISTA / CARA: un click cambia directo (sin menu)
+        if (OpenMenu) OpenMenu->Close();
+        LayoutActionSelMode((bSelE && bSelE->Contains(mx, my)) ? SelEdge : (bSelF && bSelF->Contains(mx, my)) ? SelFace : SelVertex);
+        g_redraw = true;
+        return true;
     } else if (bPiv && bPiv->visible && bPiv->Contains(mx, my)) {
         // Pivot: el menu se REARMA cada vez (marca el activo) -> via LayoutMenuPivot
         if (OpenMenu) OpenMenu->Close();
@@ -4770,6 +4966,7 @@ bool LayoutOpenBarMenu(ViewportBase* vp, int mx, int my) {
     } else if (MenuRender && bRnd && bRnd->visible && bRnd->Contains(mx, my)) {
         target = MenuRender; button = bRnd;
         if (!MenuRender->action) MenuRender->action = LayoutActionRender;
+        MarkShadingMenu();
     } else if (MenuOrient && bOri && bOri->visible && bOri->Contains(mx, my)) {
         target = MenuOrient; button = bOri;
         if (!MenuOrient->action) MenuOrient->action = LayoutActionOrient;
@@ -5238,6 +5435,8 @@ PopupMenu* LayoutSubmenuEditFace() {
         gMenuFace->Add(T("Inset Faces"), 344)->shortcut = "I";   // (texto: la I del 3D es Insert Keyframe en la tabla)
         gMenuFace->Add(T("Bevel"), 345)->shortcut = "Ctrl+B";      // (los bordes de las caras elegidas)
         gMenuFace->Add(T("Loop Cut and Slide"), 340)->shortcut = "@3d.loopcut";
+        gMenuFace->Add(T("Knife"), 347)->shortcut = "@3d.knife";
+        gMenuFace->Add(T("Merge"), 0, -1, LayoutSubmenuMerge())->shortcut = "@3d.merge";   // (en los tres menus de la W)
         gMenuFace->Add(T("Rip"), 341)->shortcut = "@3d.rip";
         gMenuFace->Add(T("Shade Smooth"), 320);
         gMenuFace->Add(T("Shade Flat"), 321);
@@ -5253,6 +5452,8 @@ PopupMenu* LayoutSubmenuEditEdge() {
         gMenuEdge->Add(T("Select"), 0, -1, LayoutCtxSelectMenu());
         gMenuEdge->Add(T("Extrude Edges"), 300)->shortcut = "@3d.extrude";
         gMenuEdge->Add(T("Loop Cut and Slide"), 340)->shortcut = "@3d.loopcut";
+        gMenuEdge->Add(T("Knife"), 347)->shortcut = "@3d.knife";
+        gMenuEdge->Add(T("Merge"), 0, -1, LayoutSubmenuMerge())->shortcut = "@3d.merge";   // (en los tres menus de la W)
         gMenuEdge->Add(T("Bevel Edges"), 345)->shortcut = "Ctrl+B";
         gMenuEdge->Add(T("Rip"), 341)->shortcut = "@3d.rip";
         gMenuEdge->Add(T("Mark Sharp"), 330);
@@ -5272,6 +5473,7 @@ PopupMenu* LayoutSubmenuEditVertex() {
         gMenuVertex->Add(T("Extrude Vertices"), 300)->shortcut = "@3d.extrude";
         gMenuVertex->Add(T("Bevel Vertices"), 346)->shortcut = "Ctrl+Shift+B";
         gMenuVertex->Add(T("Slide Vertices"), 343)->shortcut = "@3d.slide";
+        gMenuVertex->Add(T("Merge"), 0, -1, LayoutSubmenuMerge())->shortcut = "@3d.merge";   // (en los tres menus de la W)
         gMenuVertex->Add(T("Rip"), 341)->shortcut = "@3d.rip";
         // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
     }
@@ -5319,7 +5521,7 @@ void LayoutMenuSharp(int mx, int my) {
 
 // ====================================================================
 // menu TRANSFORM PIVOT POINT (objeto + edit): desde donde/como rotan-escalan.
-// 4 modos (Bloquear normales es de la malla: Propiedades > Malla 3D > Edicion). Sale en el cursor.
+// 4 modos (Bloquear normales esta en Mesh > Normals). Sale en el cursor.
 // (gMenuPivot se declara mas arriba, junto al dispatch de la barra.)
 // ====================================================================
 static void ActionPivot(int aId) {
@@ -5446,7 +5648,7 @@ void LayoutMenuPivotUV(int mx, int my) {
 // el TARGET son los vertices. Trabaja en MUNDO (TRS global de la malla, constante
 // durante el drag): snapshot de las posiciones de mundo al empezar, acumula la
 // transform y reescribe desde el snapshot (sin drift). Al CONFIRMAR recalcula
-// bordes + normales (salvo Bloquear normales); al CANCELAR restaura el snapshot.
+// bordes + normales de lo que se movio (salvo Bloquear normales); al CANCELAR restaura el snapshot.
 
 struct EditVtxSnap {
     int editK;      // indice del vertice editable; su pos[] es autoritativa (un valor por
@@ -6391,13 +6593,17 @@ bool EditSlideKey(int which){
 }
 
 // fija el resultado: recalcula bordes/centro/posRep (sin invalidar el edit) y las
-// NORMALES (salvo Bloquear normales, de la malla). El overlay ya esta sincronizado (SyncPos).
+// NORMALES de lo que se movio (W3dRecalcNormalsEdited; nada con Bloquear normales). El overlay ya esta sincronizado (SyncPos).
 void EditXformConfirm(){
     // un solo Ctrl+Z: el move Y el keyframe del auto key de vertices (solo si va a haber keyframe: sin auto key el
     // Auto Merge sigue siendo su propio paso)
     extern bool AutoKeyOn;
     const bool akGroup = AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh;
-    if (akGroup) UndoGroupStart();
+    // CON AUTO MERGE el move y la fusion son UN paso: antes la fusion era el suyo y el primer Ctrl+Z la deshacia sola,
+    // dejando los vertices encimados (escalar a cero dos esquinas de un quad: la cara doblada sobre si misma, "la
+    // malla rota"). SECUENCIAL: la fusion se hizo sobre el resultado del move (deshacer al reves, rehacer al derecho)
+    const bool mergeGroup = g_autoMerge && gEVmesh;
+    if (akGroup || mergeGroup) UndoGroupStart();
     CurveBezXformEnd(true); // (curva de splines: su paso de undo, si el move cambio algo)
     UndoEditMoveConfirm(); // Ctrl+Z: el move PURO se acepto -> pushea el pendiente (NULL si fue extrude)
     if (gEVmesh){
@@ -6405,9 +6611,19 @@ void EditXformConfirm(){
         // CONSERVA posRep (regroupPosRep=false): un move NO cambia la topologia, y si el snap dejo 2 verts
         // INDEPENDIENTES encimados, rederivar posRep por posicion los SOLDARIA (caras y edit desincronizados).
         m->ComputeBorders(false, false);      // posRep(conserva)/centerGeom/bordes; conserva el edit
-        if (!m->lockNormals) m->RecalculateNormals();
+        W3dRecalcNormalsEdited(m);            // las normales de lo que se movio; el resto queda (Mesh > Normals > Lock Normals)
         // AUTO MERGE (opt-in, OFF por defecto): recien AHORA, si el usuario lo pidio, se sueldan los verts movidos
         // con cualquier vert a <= threshold. No-op si no hay nada cerca (MergeVertsEdit retorna sin tocar nada).
+        // el extrude de una arista SUELTA: su cara nueva mira hacia la vista (no tiene vecina que le de el sentido)
+        if (!m->extrudeFreeFaces.empty()) {
+            std::vector<int> fl; fl.swap(m->extrudeFreeFaces);
+            Matrix4 W, Wi; m->GetWorldMatrix(W);
+            if (Viewport3DActive && Matrix4::InvertAffine(W, Wi)) {
+                const Viewport3D::Lens L = Viewport3DActive->CurrentLens();
+                const Vector3 eye = Wi * L.pos; Vector3 fw = (Wi * (L.pos + L.fwd)) - eye; fw = fw.Normalized();
+                m->OrientFacesToward(fl, eye, fw, L.ortho);
+            }
+        }
         if (g_autoMerge) MergeVertsEdit(m, 3 /*By Distance*/, g_autoMergeThreshold, Vector3(0,0,0));
         if (!m->modifiers.empty()) m->GenerateMeshModified(); // regen final (toma las normales recalculadas)
     }
@@ -6417,7 +6633,7 @@ void EditXformConfirm(){
     { extern bool AutoKeyOn; extern void VertexAnimInsertKeyframe();
       if (AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh)
           VertexAnimInsertKeyframe(); }
-    if (akGroup) UndoGroupEnd();
+    if (mergeGroup) UndoGroupSequentialEnd(); else if (akGroup) UndoGroupEnd();
     gEVsnap.clear(); gEVprop.clear(); gEVmesh = NULL;
     gEVslide = false; gEVslideCand.clear(); gEVslideDest.clear();
     state = editNavigation;
@@ -6436,6 +6652,7 @@ void EditXformCancel(){
     UndoEditMoveCancel(); // Ctrl+Z: move cancelado -> descarta el pendiente (no deja undo no-op)
     if (gEVmesh){
         Mesh* m = gEVmesh;
+        m->extrudeFreeFaces.clear();
         for (size_t i=0;i<gEVsnap.size();i++){
             EditVtxSnap& s = gEVsnap[i];
             Vector3 ln = EVWorldToLocal(s.world0);
@@ -6527,7 +6744,17 @@ static void ActionMerge(int mode) {
     Quaternion rg = RotGlobalOf(m); Vector3 sg = ScaleGlobalOf(m);
     Vector3 dloc = rg.Inverted() * (cursor3D.pos - m->GetGlobalPositionBase());
     Vector3 cursorLocal(sg.x!=0.0f?dloc.x/sg.x:dloc.x, sg.y!=0.0f?dloc.y/sg.y:dloc.y, sg.z!=0.0f?dloc.z/sg.z:dloc.z);
+    m->EnsureEdit();
+    const int before = m->edit ? m->edit->NumVerts() : 0;
     MergeVertsEdit(m, mode, g_mergeDist, cursorLocal);
+    // POR DISTANCIA: un cartel con cuantos se fusionaron (0 = no habia nada encimado), para saber que paso (pedido del
+    // duenio, 2026-11-27)
+    if (mode == 3) {
+        m->EnsureEdit();
+        const int after = m->edit ? m->edit->NumVerts() : before;
+        char b[160]; snprintf(b, sizeof(b), T("Merge by Distance: %d vertices merged"), before - after);
+        Notify(b, false);
+    }
     g_redraw = true;
 }
 
@@ -6547,6 +6774,19 @@ PopupMenu* LayoutSubmenuMerge() {
 
 // submenu Normals (Recalculate + Flip) para embeber en el menu "Mesh". Ids 322/324 + accion LayoutActionObject.
 static PopupMenu* gMenuNormals = NULL;
+// Mesh > Show/Hide (Edit Mode): ocultar lo elegido / lo no elegido / mostrar todo (LayoutEditHide)
+static PopupMenu* gMenuShowHide = NULL;
+PopupMenu* LayoutSubmenuShowHide() {
+    if (!gMenuShowHide) {
+        gMenuShowHide = new PopupMenu();
+        gMenuShowHide->title  = T("Show/Hide");
+        gMenuShowHide->action = LayoutActionObject;
+        gMenuShowHide->Add(T("Reveal Hidden"), 397)->shortcut = "@3d.reveal";
+        gMenuShowHide->Add(T("Hide Selected"), 395)->shortcut = "@3d.hideSelected";
+        gMenuShowHide->Add(T("Hide Unselected"), 396)->shortcut = "@3d.hideUnselected";
+    }
+    return gMenuShowHide;
+}
 PopupMenu* LayoutSubmenuNormals() {
     if (!gMenuNormals) {
         gMenuNormals = new PopupMenu();
@@ -6554,6 +6794,10 @@ PopupMenu* LayoutSubmenuNormals() {
         gMenuNormals->action = LayoutActionObject;
         gMenuNormals->Add(T("Recalculate Normals"), 322)->shortcut = "@3d.normals"; // orienta hacia afuera (cubo/esfera OK)
         gMenuNormals->Add(T("Flip"), 324);                                    // simplemente invierte las normales
+        // LAS NORMALES DE LOS VERTICES (W3dRecalcNormalsEdited): rehacer las de lo elegido, y el candado: editando, no
+        // se recalculan (sin el candado, solo las de lo que se edita; el resto nunca)
+        gMenuNormals->Add(T("Recalculate Vertex Normals"), 326);
+        gMenuNormals->AddCheck(T("Lock Normals"), 327, &g_w3dLockNormals);
     }
     return gMenuNormals;
 }
@@ -6968,8 +7212,17 @@ bool LayoutMotionUI(int mx, int my) {
     return false;
 }
 
+// (el doble click del outliner: la fila de este click y la del anterior, ver g_outClickPrev en Outliner.cpp)
+static void OutlinerNoteClick(int mx, int my) {
+    extern std::string g_outClickPrev, g_outClickLast;
+    extern std::string OutlinerRowKeyAt(Outliner* o, int mx, int my);
+    g_outClickPrev = g_outClickLast;
+    ViewportBase* under = rootViewport ? FindViewportUnderMouse(rootViewport, mx, my) : NULL;
+    g_outClickLast = (under && under->isLeaf() && VpIsOutliner(under)) ? OutlinerRowKeyAt((Outliner*)under, mx, my) : std::string();
+}
 bool LayoutClickUI(int mx, int my) {
     if (!rootViewport) return false;
+    OutlinerNoteClick(mx, my);   // (antes de que un popup, un menu o un campo se queden con el click)
     if (PopUpActive) {
         if (PopUpActive->Click(mx, my)) return true; // adentro: el popup lo maneja
         // afuera: cerrarlo. Si es semi-modal (redo-panel) el click ademas cae al
@@ -7657,6 +7910,21 @@ void LayoutTickFPS(unsigned long wallMs) {
 // Tab (PC) / tecla equivalente (Symbian BT): alterna Object <-> Edit Mode del
 // objeto ACTIVO si es una malla. Devuelve true si alterno (sino el caller hace
 // otra cosa, p.ej. ciclar el viewport). La logica va aca -> PC y Symbian la usan.
+// OCULTAR EN EDIT MODE (H / Shift+H / Alt+H y el menu Mesh, como Blender): 0 = lo elegido, 1 = lo NO elegido, 2 = mostrar
+// todo (y dejarlo elegido). Es de la edicion: en Modo Objeto la malla se ve entera (UpdateActiveEditMesh lo olvida)
+bool LayoutEditHide(int what) {
+    if (InteractionMode != EditMode || !g_editMesh || g_editMesh->getType() != ObjectType::mesh) return false;
+    Mesh* m = (Mesh*)g_editMesh;
+    m->EnsureEdit();
+    if (!m->edit) return false;
+    if (what == 2 && m->edit->numHidden <= 0) return true;   // (Alt+H sin nada oculto: ni un paso de undo vacio)
+    UndoCaptureSelectionEdit(m);   // Ctrl+Z: la seleccion Y lo oculto (SelectEditUndo guarda los dos)
+    if (what == 2) m->edit->Reveal(); else m->edit->Hide(what == 1);
+    if (!m->modifiers.empty()) m->GenerateMeshModified();   // (con modificadores: el resultado, sin lo oculto)
+    g_redraw = true;
+    return true;
+}
+
 bool LayoutToggleEditMode() {
     if (state != editNavigation) return false; // no en medio de un transform
     if (!ActiveObj) return false;

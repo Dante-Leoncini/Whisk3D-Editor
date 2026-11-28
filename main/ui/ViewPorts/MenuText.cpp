@@ -17,7 +17,9 @@ static PopupMenu* gMenu = NULL;
 static IDE* gIde = NULL;             // NULL = el campo enfocado
 static TextField* gField = NULL;     // el campo con el que se abrio (si el foco cambio, no se toca)
 static bool gHasSel = false, gHasPaste = false, gHasText = false, gHasCut = false;
-enum { MT_CUT = 1, MT_COPY, MT_PASTE, MT_ALL };
+static bool gNoWord = true;          // el IDE: no hay un nombre donde se toco (Ir a la definicion, en gris)
+static int gDefLin = 0, gDefCol = 0;  // donde se toco (ahi se busca la definicion)
+enum { MT_CUT = 1, MT_COPY, MT_PASTE, MT_ALL, MT_DEFINITION };
 
 static void Picked(int id) {
     if (gIde) {
@@ -26,6 +28,7 @@ static void Picked(int id) {
             case MT_COPY: gIde->Copy(); break;
             case MT_PASTE:  gIde->Paste(); break;
             case MT_ALL:   gIde->SelectAll(); break;
+            case MT_DEFINITION: gIde->GoToDefinition(gDefLin, gDefCol); break;
         }
         g_redraw = true;
         return;
@@ -51,6 +54,8 @@ static void Open(int x, int y) {
     it = gMenu->Add(T("Paste"), MT_PASTE, (int)IconType::paste);   if (it) it->gray = &gHasPaste;
     it = gMenu->Add(T("Select All"), MT_ALL, (int)IconType::selection);
     if (it) { it->gray = &gHasText; it->lineUp = true; }
+    // (el codigo de un IDE: ir a donde el script declara el nombre que se toco, o ver su ayuda si es del motor)
+    if (gIde) { it = gMenu->Add(T("Go to Definition"), MT_DEFINITION, (int)IconType::arrowRight); if (it) { it->gray = &gNoWord; it->lineUp = true; it->shortcut = "F12"; } }
     if (OpenMenu && OpenMenu != gMenu) OpenMenu->Close();
     gMenu->Open(x, y, MenuScreenW, MenuScreenH);
     OpenMenu = gMenu;
@@ -78,6 +83,7 @@ bool MenuTextIDE(IDE* ide, int mx, int my) {
     }
     if (!inSel) ide->ClickContent(mx, my, false);
     gIde = ide; gField = NULL;
+    { int lin = 0, col = 0, b0, b1; ide->PointToText(mx, my, &lin, &col); gDefLin = lin; gDefCol = col; gNoWord = !ide->WordAt(lin, col, &b0, &b1); }
     gHasSel = ide->hasSel;
     gHasText = true;
     gHasCut = gHasSel; gHasPaste = true;

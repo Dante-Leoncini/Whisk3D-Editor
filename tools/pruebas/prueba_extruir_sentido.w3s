@@ -1,0 +1,46 @@
+# ==========================================================================
+#  EL SENTIDO DE LA CARA QUE SALE DE EXTRUIR UNA ARISTA (pedido del duenio, 2026-11-27: "hago un extrude de 2 vertices
+#  y la cara no mira hacia mi... vuelvo a hacerlo y ahora si... re inconsistente"). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_extruir_sentido.w3s
+#  1. una arista con una cara al lado: el quad nuevo sigue el orden de su vecina (windingcheck: ninguna arista con dos
+#     caras en el mismo sentido), extruyendo una y otra vez
+#  2. una arista SUELTA (sin vecina): al confirmar el movimiento el quad mira hacia la vista, de un lado y del otro
+# ==========================================================================
+window 900 700
+add plane
+mode edit
+selmode vertex
+selverts 0 1
+extrude 1
+expect faces 2
+windingcheck 0
+extrude 1
+expect faces 3
+windingcheck 0
+selverts 2 3
+extrude 1
+expect faces 4
+windingcheck 0
+mode object
+delete
+visible 0 Cubo
+add plane
+mode edit
+selmode face
+select all
+editdelete
+expect faces 0
+expect edges 4
+vporbit 0 0 0 6 -30 20
+selmode vertex
+selverts 0 1
+extrude 1
+expect faces 1
+facecam 1
+undo
+expect faces 0
+vporbit 0 0 0 6 30 200
+selverts 0 1
+extrude 1
+expect faces 1
+facecam 1

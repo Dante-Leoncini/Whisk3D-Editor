@@ -169,6 +169,7 @@ Cada opción está en [Modo Objeto](modo-objeto.md). En el Modo Edición, este b
 | Estadísticas | Los cuadros por segundo, los vértices, las caras, las llamadas de dibujo y los tiempos. | Menú |
 | Rayos X | En el Modo Edición, la malla se ve semitransparente y se pueden elegir los elementos de atrás. | Menú |
 | Bandas negras | Mirando por una cámara con otra proporción que la pantalla, tapa lo que queda afuera de la toma. | Menú |
+| Sondas de luz, Sondas de reflejo | Destildadas, las [sondas de luz](objeto-sonda-luz.md) o las [de reflejo](objeto-sonda-reflejo.md) no alumbran ni reflejan en **esta** vista: el antes y el después sin tocar la escena. No dependen de Mostrar Superposiciones. | Menú |
 
 ## Render
 

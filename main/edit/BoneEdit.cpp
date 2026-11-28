@@ -629,6 +629,7 @@ struct BoneGrabEntry { int b; int mask; Vector3 head0, tail0; Vector3 piv; }; //
 static std::vector<BoneGrabEntry> g_grab;
 static Armature* g_grabArm = NULL;
 static bool g_grabActive = false;
+static int g_grabOrientUser = GlobalOrient;   // la orientacion del menu antes del G/R/S de huesos
 static bool g_grabClick  = false;  // true: termina al soltar el mouse; false: modal (click/Enter confirma)
 static Vector3 g_grabAcc;          // delta acumulado en espacio LOCAL del armature (sabor sin ejes)
 static int g_grabLastX = 0, g_grabLastY = 0;
@@ -729,6 +730,7 @@ static void BoneGrabStartEx(Armature* a, const std::vector<int>& bones, const st
     }
     if (g_grab.empty()) return;
     UndoBonesStart(a); // pendiente: se pushea al confirmar (si cambio)
+    if (!g_grabActive) g_grabOrientUser = transformOrientation;   // (la del menu vuelve al terminar: BoneGrabFinished)
     g_grabArm = a; g_grabActive = true; g_grabClick = byClick;
     g_grabMode = mode; g_grabAxes = withAxes;
     g_grabAcc = Vector3(0, 0, 0);
@@ -977,7 +979,7 @@ bool BoneAxesWorld(Vector3& ex, Vector3& ey, Vector3& ez){
 
 static void BoneGrabFinished(){
     g_grabActive = false; g_grabArm = NULL; g_grab.clear();
-    if (g_grabAxes){ state = editNavigation; NumInputReset(); }
+    if (g_grabAxes){ state = editNavigation; NumInputReset(); transformOrientation = g_grabOrientUser; }
     g_grabAxes = false; g_grabMode = 1;
 }
 void BoneGrabConfirm(){

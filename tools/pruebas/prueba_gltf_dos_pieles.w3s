@@ -1,0 +1,36 @@
+# ===========================================================================
+#  glTF: DOS PERSONAJES, CADA UNO CON SU ESQUELETO (main/importers/import_gltf.cpp)
+#
+#  prueba_gltf_dos_pieles.gltf (gen_prueba_gltf_dos_pieles.py): dos armatures con su malla y su animacion, como una
+#  escena de Blender con varios personajes (la de Marte de Bongo Cat: el gato y tres aliens bailando). El importador
+#  leia SOLO LA PRIMERA PIEL: el segundo personaje quedaba sin esqueleto (en reposo) y su malla, pegada al primero.
+#  Lo que se verifica:
+#   1) un armature por piel, cada uno con SU clip (la animacion que mueve sus huesos)
+#   2) cada malla pegada a SU armature
+#   3) las dos animaciones mueven lo que tienen que mover: A sube su raiz 1 m en Z; B gira la suya 90 grados en Z (su
+#      punta pasa de (3, 1, 0) a (2, 0, 0))
+#   4) todo eso sobrevive a guardar y volver a abrir el .w3d
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_gltf_dos_pieles.w3s
+# ===========================================================================
+selobj Cubo
+delete
+importgltf prueba_gltf_dos_pieles.gltf
+armclips PersonajeA 1
+armclips PersonajeB 1
+meshpiel mallaA PersonajeA
+meshpiel mallaB PersonajeB
+bonepose PersonajeA:A_raiz 1 0 0 0
+bonepose PersonajeA:A_raiz 25 0 0 1
+bonepose PersonajeB:B_punta 1 3 1 0
+bonepose PersonajeB:B_punta 25 2 0 0
+
+savew3d /tmp/w3d_prueba_gltf_dos_pieles.w3d
+openw3d /tmp/w3d_prueba_gltf_dos_pieles.w3d
+armclips PersonajeA 1
+armclips PersonajeB 1
+meshpiel mallaA PersonajeA
+meshpiel mallaB PersonajeB
+bonepose PersonajeA:A_raiz 25 0 0 1
+bonepose PersonajeB:B_punta 25 2 0 0

@@ -83,7 +83,7 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Borrar | <kbd>X</kbd>, <kbd>Delete</kbd> | <kbd>C</kbd> | `3d.delete` |
 | Ocultar / Mostrar | <kbd>H</kbd> | — | `3d.hide` |
 | Edición Proporcional | <kbd>O</kbd> | — | `3d.proportional` |
-| Superposiciones | <kbd>K</kbd> | — | `3d.overlays` |
+| Superposiciones | <kbd>K</kbd> (fuera de Modo Edición) | — | `3d.overlays` |
 | Vista local | <kbd>/</kbd> | — | `3d.viewLocal` |
 | Encuadrar Selección | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.focus` |
 | Vista frontal | <kbd>Num1</kbd> | <kbd>#+Izq/Der</kbd> | `3d.viewFront` |
@@ -93,7 +93,8 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Vista superior | <kbd>Num7</kbd> | <kbd>#+Arriba</kbd> | `3d.viewTop` |
 | Vista inferior | <kbd>Ctrl+Num7</kbd> | <kbd>#+Abajo</kbd> | `3d.viewBottom` |
 | Perspectiva / Ortográfica | <kbd>Num5</kbd> | <kbd>#</kbd> | `3d.perspective` |
-| Siguiente modo de vista | <kbd>Z</kbd> | <kbd>6</kbd> | `3d.viewMode` |
+| Siguiente modo de vista (mantenida: el menú de los modos, para elegir uno directo) | <kbd>Z</kbd> | <kbd>6</kbd> | `3d.viewMode` |
+| Rayos X (aparte del modo de vista) | <kbd>Alt+Z</kbd> | — | `3d.xray` |
 | Girar vista a la izquierda | <kbd>Num4</kbd> | — | `3d.rollLeft` |
 | Girar vista a la derecha | <kbd>Num6</kbd> | — | `3d.rollRight` |
 | Vista de cámara | <kbd>Num0</kbd> | <kbd>8</kbd> | `3d.viewCamera` |
@@ -138,6 +139,7 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Nueva cara desde vértices | <kbd>F</kbd> | — | `3d.face` |
 | Recalcular Normales | <kbd>Shift+N</kbd> | — | `3d.normals` |
 | Loop Cut y Deslizar | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
+| Cuchillo | <kbd>K</kbd> | — | `3d.knife` |
 | Conectar camino de vértices | <kbd>J</kbd> | — | `3d.connect` |
 | Rasgar | <kbd>V</kbd> | — | `3d.rip` |
 | Deslizar vértices | <kbd>Shift+V</kbd> | — | `3d.slide` |

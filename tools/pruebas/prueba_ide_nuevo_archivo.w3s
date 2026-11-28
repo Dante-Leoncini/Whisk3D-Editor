@@ -1,0 +1,29 @@
+# ==========================================================================
+#  EL IDE: Archivo > New File... (un archivo NUEVO con el nombre y la extension que se elijan, adentro del .w3d o afuera,
+#  con su plantilla, y se abre en el IDE). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_ide_nuevo_archivo.w3s
+#
+#    1) un script lua ADENTRO del .w3d: scripts/<nombre>.lua
+#    2) un shader ADENTRO (la extension .glsl lo manda a shaders/)
+#    3) AFUERA, en una carpeta del disco
+#    4) sin extension: .lua
+# ==========================================================================
+vpkind 5 7
+savew3d /tmp/w3d_prueba_ide_nuevo.w3d
+w3dpath /tmp/w3d_prueba_ide_nuevo.w3d
+# ---- 1) lua adentro ----
+idefile 6
+saveas jugador.lua 1 - 1
+ideinfo scripts/jugador.lua
+# ---- 2) shader adentro ----
+idefile 6
+saveas agua.glsl 1 - 1
+ideinfo shaders/agua.glsl
+# ---- 3) afuera ----
+idefile 6
+saveas w3d_prueba_ide_nuevo.lua 0 /tmp 1
+ideinfo /tmp/w3d_prueba_ide_nuevo.lua
+# ---- 4) sin extension ----
+idefile 6
+saveas enemigo 1 - 1
+ideinfo scripts/enemigo.lua

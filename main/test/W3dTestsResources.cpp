@@ -152,7 +152,7 @@
 #include "objects/Light.h"
 #include "objects/Collection.h"
 #include "io/W3dResources.h"
-#include "io/Texture2D.h"             // Texture2DList: el cache de imagenes 2D del proyecto
+#include "WhiskUI/io/Texture2D.h"             // Texture2DList: el cache de imagenes 2D del proyecto
 #include "w3dFilesystem.h"
 #include "graphics/w3dGraphics.h"           // Finish: drenar la GPU (la subida de VBOs es perezosa)
 #include "w3dTexture.h"                // juego2dpx: DecodeImage de la captura del binario
@@ -166,8 +166,8 @@
 #include "ViewPorts/PopUp/RedoMeshPanel.h" // redopanel: OpenRedoMeshPanel / RedoMeshPanelActive
 #include "ViewPorts/PopUp/ProgressPopup.h" // LayoutSwapBuffers: la barra de progreso hace swaps
 #include <SDL2/SDL.h>                 // SDL_GL_SetSwapInterval: vsync apagado mientras se mide
-#include "objects/UI.h"               // juego2dmin: la UI raiz (lo que compila "Compilar juego")
-#include "objects/Rect2D.h"           // juego2dmin: la franja que prende el script
+#include "WhiskUI/objects/UI.h"               // juego2dmin: la UI raiz (lo que compila "Compilar juego")
+#include "WhiskUI/objects/Rect2D.h"           // juego2dmin: la franja que prende el script
 #include "script/W3dScript.h"         // juego2dmin: W3dScriptData / W3dScriptEntry
 #include "io/W3dMesh.h"               // .w3dm: el escritor de texto (w3dbcorrupto: lo que el texto no puede llevar)
 #include "io/W3dMeshBin.h"            // .w3db: la malla binaria (formato, equivalencia, robustez)
@@ -773,12 +773,18 @@ static bool CmdGame2DPx(std::istringstream& ss, std::string& err) {
 // usa el arranque). Los tests que trabajan "sobre la escena del usuario" (la coleccion
 // activa no es la raiz: w3dmf2, w3dmf10, *marcas) la necesitan para poder correr en un
 // mismo proceso despues de otros tests.
-static bool CmdSceneDefault(std::string& err) {
-    extern void W3dCreateDefaultScene();
+// 'scenedefault [editor]': la escena por defecto. Las pruebas usan la de SIEMPRE (el cubo en el origen, sin piso); con
+// 'editor', la que ve la persona al abrir Whisk3D (el cubo apoyado en el piso de 8 x 8 m, todo 1 m arriba)
+static bool CmdSceneDefault(std::istringstream& ss, std::string& err) {
+    extern void W3dCreateDefaultScene(); extern bool g_w3dTestScene;
+    std::string q; ss >> q;
+    const bool prev = g_w3dTestScene;
+    if (q == "editor") g_w3dTestScene = false;
     RestartScene();
     W3dCreateDefaultScene();
+    g_w3dTestScene = prev;
     if (CollectionActive == SceneCollection) { err = "scenedefault: la coleccion activa quedo en la raiz"; return false; }
-    printf("      [escenadefecto] coleccion del usuario + camara + luz + cubo\n");
+    printf("      [escenadefecto] coleccion del usuario + camara + luz + cubo%s\n", q == "editor" ? " + piso (la del editor)" : "");
     return true;
 }
 
@@ -2622,7 +2628,7 @@ bool W3dTestsResourcesCmd(const std::string& cmd, std::istringstream& ss,
     if (cmd == "scenesynthetic") return CmdSceneSynthetic(ss, err);
     if (cmd == "heapusage")         return CmdHeapUse(ss, err);
     if (cmd == "projectcaches")  return CmdCachesProject(ss, err);
-    if (cmd == "scenedefault")   return CmdSceneDefault(err);
+    if (cmd == "scenedefault")   return CmdSceneDefault(ss, err);
     if (cmd == "nostackbuild")    return CmdNotStacksBuild(err);
     if (cmd == "nostack")         return CmdNotStacks(ss, err);
     if (cmd == "game2dmin")      return CmdGame2DMin(ss, err);

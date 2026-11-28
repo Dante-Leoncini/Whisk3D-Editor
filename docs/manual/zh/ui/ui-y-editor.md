@@ -24,7 +24,7 @@
 | 帮助提示框。文本由 `Button::help` 保存 | `W3dHelpRender`，位于 `main/ui/ViewPorts/LayoutInput.cpp` |
 | 哪个按键、单击或触摸发给哪个控件，以及 N95 的按键 | `main/ui/ViewPorts/LayoutInput.cpp`、`main/app/controls.cpp`、`platform/symbian/src/` |
 | 文本框的焦点函数 | `main/ui/ViewPorts/NumInput.cpp` |
-| 翻译 `T()`。UI 只有 `W3dMenuTranslate` 这个钩子 | `main/config/W3dLang.cpp` |
+| 翻译 `T()`。UI 只有 `W3dMenuTranslate` 这个钩子 | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | UI 的启动 | `main/app/W3dInitUI.cpp` |
 | 用单独的图标拼出皮肤图集 | `main/io/SkinAtlas.cpp` |
 | 重新计算缩放 | `SetGlobalScale`，位于 `main/ui/ViewPorts/ViewPorts.cpp` |
@@ -32,9 +32,9 @@
 | 编辑器自己的颜色：地面、坐标轴、法线 | `main/ui/W3dColors.cpp` |
 | 皮肤文件：`font.png`、`font-ext.png`、`atlas/icons/`、`skin.ini` | `res/Skins/Whisk3D/` |
 | 扩展图集的生成器 | `tools/fuente_ext.py` |
-| [2D Editor](../editor/editor-2d.md) 以及游戏的 `.w3dui` 界面：文本、图片、矩形、容器、九宫格（slice 9）、按钮和视频 | `main/objects/`（`UI.h`、`Text2D.h`、`Button2D.h`……）、`main/render/UIOverlay.cpp`、`main/io/UI2DFormat.cpp`、`main/io/Font2D.cpp`、`main/ui/ViewPorts/Editor2D.cpp` |
+| [2D Editor](../editor/editor-2d.md) 以及游戏的 `.w3dui` 界面：文本、图片、矩形、容器、九宫格（slice 9）、按钮和视频 | `libs/WhiskUI/objects/`（`UI.h`、`Text2D.h`、`Button2D.h`……）、`libs/WhiskUI/render/UIOverlay.cpp`、`libs/WhiskUI/io/UI2DFormat.cpp`、`libs/WhiskUI/io/Font2D.cpp`、`main/ui/ViewPorts/Editor2D.cpp` |
 
-2D Editor 用 `W3dTextAtlas` 绘制文本，它属于 UI。在运行时用 stb_truetype 烘焙 TTF 则属于编辑器（`main/io/Font2D.cpp`）。
+2D Editor 用 `W3dTextAtlas` 绘制文本，它属于 UI。在运行时用 stb_truetype 烘焙 TTF 则属于编辑器（`libs/WhiskUI/io/Font2D.cpp`）。
 
 ## 在 UI 中，但属于编辑器
 

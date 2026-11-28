@@ -20,6 +20,8 @@ function start()
 end
 ```
 
+**直接用名字：** 只写属性的名字也能读取它：`speed` 等同于 `property("speed")`，`difficulty` 等同于 `option("difficulty")`，`ball` 等同于 `object("ball")`。它读取的是当时的值，所以游戏运行中在属性面板里的修改也能看到。有两个例外：如果脚本里有同名变量（`speed = 5`），以变量为准；如果属性与 Whisk3D 的某个函数同名（例如 `target` 或 `view`），这个名字指的是函数，这时请用 `property()`、`option()` 或 `object()` 读取该属性。
+
 > [!NOTE]
 > 为了读取 `properties`，即使游戏没有运行，编辑器也会**执行该文件**。所以在函数之外只放声明（表、常量、`local`），绝不要放会实际做事情的代码。
 

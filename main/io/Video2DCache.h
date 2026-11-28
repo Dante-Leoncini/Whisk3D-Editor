@@ -9,22 +9,12 @@
 //  placeholder. El juego real NO usa esto: reproduce el video nativo.
 // ============================================================================
 
-struct VideoPreview {
-    unsigned* frames;   // ids de textura GL (NULL si no se pudo)
-    int numFrames;
-    int w, h;           // tamano de los frames extraidos
-    int widthReal, heightReal;   // el tamano REAL del video (para el elemento)
-    float fps;
-};
-
-// la preview del video (se extrae y sube UNA vez por sesion; "" o fallo = NULL)
-const VideoPreview* Video2DPreview(const std::string& path);
+// VideoPreview, Video2DPreview y W3dMsNow los DECLARA el Core (los usa el dibujo de la UI 2D: WhiskUI/render/UIOverlay)
+#include "base/W3dHost.h"
 
 // un png con UN frame del medio del video (miniaturas del explorador, como nautilus).
 // Cacheado en /tmp; "" si no se pudo extraer (sin ffmpeg).
 std::string Video2DFramePng(const std::string& path);
 
-// milisegundos monotonicos (para avanzar la animacion)
-unsigned W3dMsNow();
 
 #endif // VIDEO2D_CACHE_H

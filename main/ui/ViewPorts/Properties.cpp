@@ -23,20 +23,20 @@
 #include "w3dlog.h"
 #include "W3dLang.h"
 #include "ui/panels/Panels.h"   // las tarjetas declaradas (la Niebla, ...)
-#include "objects/Text2D.h"   // panel del elemento de texto del Editor 2D
-#include "objects/Image2D.h"  // panel del elemento de imagen
-#include "objects/Rect2D.h"   // panel del elemento rectangulo
-#include "objects/Container2D.h" // panel del contenedor (rect invisible)
-#include "objects/Slice9.h"      // panel del slice 9 (imagen con bordes fijos)
-#include "objects/Button2D.h"    // panel del boton
-#include "objects/Expand2D.h"    // panel del expandir (resorte de layout)
-#include "objects/Video2D.h"     // panel del video
+#include "WhiskUI/objects/Text2D.h"   // panel del elemento de texto del Editor 2D
+#include "WhiskUI/objects/Image2D.h"  // panel del elemento de imagen
+#include "WhiskUI/objects/Rect2D.h"   // panel del elemento rectangulo
+#include "WhiskUI/objects/Container2D.h" // panel del contenedor (rect invisible)
+#include "WhiskUI/objects/Slice9.h"      // panel del slice 9 (imagen con bordes fijos)
+#include "WhiskUI/objects/Button2D.h"    // panel del boton
+#include "WhiskUI/objects/Expand2D.h"    // panel del expandir (resorte de layout)
+#include "WhiskUI/objects/Video2D.h"     // panel del video
 #include "io/Video2DCache.h"     // tamano real del video al elegirlo
-#include "io/Font2D.h"
-#include "io/Texture2D.h"     // tamano natural del archivo al elegir la textura
+#include "WhiskUI/io/Font2D.h"
+#include "WhiskUI/io/Texture2D.h"     // tamano natural del archivo al elegir la textura
 #include "io/W3dNodes.h"      // modificador Oclusion: sincronizar el nodo elegido
 #include "objects/Curve.h"    // ramas del path (dropdown Ramas del modificador Oclusion)
-#include "io/UI2DFormat.h"    // guardar/cargar interfaces (.w3dui)
+#include "WhiskUI/io/UI2DFormat.h"    // guardar/cargar interfaces (.w3dui)
 #include "io/W3dContainer.h"  // importar un asset = COPIARLO adentro del .w3d (ver el header)
 #include "io/ProjectMeshes.h" // tarjeta "3D Mesh": la malla como recurso (hacer unica, elegir, copiar)
 #include "config/W3dRecent.h" // los archivos recientes (pantalla de inicio): se anotan al abrir / guardar
@@ -46,9 +46,9 @@
 #include "io/ProjectChanges.h"  // el '*' de lo no guardado (el selector de malla, el recurso, el proyecto)
 #include "io/EditorRoots.h"     // "Open" de una escena / un prefab de la biblioteca
 #include "objects/MeshResource.h"
-#include "objects/UI.h"
+#include "WhiskUI/objects/UI.h"
 #include "W3dPalettes.h"   // paletas a nivel PROYECTO (gestion + resolucion efectiva)
-#include "render/UIOverlay.h"   // UI2D_PointAnchor (rebase del ancla)   // T(): los textos salen en el idioma del sistema
+#include "WhiskUI/render/UIOverlay.h"   // UI2D_PointAnchor (rebase del ancla)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/Timeline.h"   // keyframe ACTIVO + InvalidateAnimAndRedraw (tarjeta "Keyframe")
 #include "Properties.h"
 #include "Undo.h" // Ctrl+Z: capturar rename
@@ -86,6 +86,13 @@
 static void ActionRTToggle();   // tilde "Ray Tracing" (tarjeta Render)
 void RTRowsPanel(Properties* P); // muestra/oculta Rays/Samples/Passes segun g_rt.on
 static void ActionRTValues();  // Rays / Samples / Passes -> g_rt
+// el ANGULO del sol que se ve en la tarjeta (el doble de su rtRadius) y su escritura
+static float g_sunAngleUI = 0.0f;
+static void ActionSunAngle() {
+    Light* l = (ActiveObj && ActiveObj->getType() == ObjectType::light) ? static_cast<Light*>(ActiveObj) : NULL;
+    if (l && l->directional) l->rtRadius = (g_sunAngleUI > 0.0f ? g_sunAngleUI : 0.0f) * 0.5f;
+    ActionRTValues();
+}
 static void ActionMatTransmission();   // (la Transmision de la tarjeta Material: ver abajo)
 static void ActionBackgroundMode(); static void ActionMainBackground(); static void ActionBackgroundRot();   // (el FONDO: ver abajo)
 // LA LUZ DEL FONDO en % para su fila (g_renderLightBackground va de 0 a 2)
@@ -106,6 +113,7 @@ static void ActionLightBackground() {
 #include "objects/Particles.h"  // tarjeta del objeto Particulas (emisor: textura + cono)
 #include "physics/W3dRigid.h"   // tarjeta Fisica (cuerpo rigido): W3dRigidDef + Olvidar
 #include "edit/Modifier.h"    // ModifierType (ids del menu Add del stack de modificadores)
+#include "edit/ScatterMod.h"  // el modificador Scatter: sus fuentes (W3dScatterPool) para el panel
 #include "objects/Armature.h" // pestania Animation: clips del esqueleto
 #include "animation/SkeletalAnimation.h" // CreateAnimation/DeleteActiveAnimation/MoveActiveAnimation
 #include "animation/W3dAnimSet.h"        // clips COMPARTIDOS: el rename copia antes de tomar el puntero al nombre
@@ -1203,7 +1211,11 @@ static void ActionTexPickedProbe(int id) {
     if (id == 0) {   // la mas cercana: la textura queda la de la sonda de la malla activa (o la primera), por si no hay gancho
         float p[3] = { 0, 0, 0 };
         if (ActiveObj) { Matrix4 W; ActiveObj->GetWorldMatrix(W); p[0] = W.m[12]; p[1] = W.m[13]; p[2] = W.m[14]; }
+        // (con las sondas apagadas en el menu Overlays de la vista igual se elige: eso es solo para mirar)
+        extern bool g_w3dReflectionProbesOn;
+        const bool before = g_w3dReflectionProbesOn; g_w3dReflectionProbesOn = true;
         s = ReflectionProbeFor(p);
+        g_w3dReflectionProbesOn = before;
     } else if (id - 1 < (int)gMenuProbes.size()) s = gMenuProbes[(size_t)(id - 1)];
     Texture* t = s ? s->Image() : NULL;
     if (!t) { Notify(T("Bake the reflection probe first"), true); return; }
@@ -1402,12 +1414,9 @@ static PropButton* MapButton(Properties* p, int k) {
     return p->propMap[k];
 }
 static bool MaterialEditableUI(Material* m) { return m && m != MaterialDefault && m->lib.empty(); }
-// LA FUERZA DE LA EMISION y LA TRANSFORMACION UV del material (formato/material-animado.md): filas de la tarjeta
-// Material enlazadas DIRECTO a sus campos (como Transmission). gPropMatUV: desplazamiento U/V, escala U/V, rotacion y
-// pivote U/V. Las animables llevan su rombo (canales AnimMat*)
+// LA FUERZA DE LA EMISION del material (formato/material-animado.md): fila de la tarjeta Material enlazada DIRECTO a su
+// campo (como Transmission), animable (su rombo: AnimMatEmitStrength)
 static PropFloat* gPropMatEmitK = NULL;
-static PropLabel* gPropMatUVTitle = NULL;
-static PropFloat* gPropMatUV[7] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 // los canales de un MATERIAL en la animacion de escena activa (objects/ObjectMode.cpp)
 extern int  AnimMatChannelState(Material* m, int prop, int comp, int frame);
 extern void AnimMatChannelToggle(Material* m, int prop, int comp, int frame);
@@ -2444,6 +2453,7 @@ static void ActionMenuAddModifier(){
         MenuAddModifier->Add(T("Subdivision Surface"), ModifierType::SubdivisionSurface);
         MenuAddModifier->Add(T("Boolean"),             ModifierType::Boolean);
         MenuAddModifier->Add(T("Culling"),             ModifierType::CullingTri); // PVS por triangulo (estilo PS1)
+        MenuAddModifier->Add(T("Scatter"),             ModifierType::Scatter);    // copias de otros objetos sobre la malla
         MenuAddModifier->Add(T("Armature"),            ModifierType::Armature, (int)IconType::armature);
     }
     if (PropsActive->propRowMod && !PropsActive->propRowMod->buttons.empty()){
@@ -4786,9 +4796,149 @@ static void ActionMenuPvsMethod(){
       if (it) it->gray = &gBspOff; }
     OpenMenuUnderButton(MenuPvsMethod, PropsActive->propPvsMethod->button);
 }
+// --- modificador SCATTER (edit/ScatterMod.h): de donde salen las copias y desde donde de la malla ---
+static PopupMenu* MenuScatSource = NULL;
+static void ActionPickedScatSource(int id){
+    Modifier* mod = ActiveModUI(); if (!mod || id < 0 || id > 3) return;
+    if (mod->scatSource != id) {
+        mod->scatSource = id;
+        mod->target = NULL;        // (un objeto no sirve de coleccion ni al reves)
+        mod->scatScene.clear();
+    }
+    PropertiesLayoutDirty = true;
+    ActionModParamChanged();
+}
+static void ActionMenuScatSource(){
+    if (!PropsActive || !PropsActive->propScatSource) return;
+    if (!MenuScatSource){ MenuScatSource = new PopupMenu(); MenuScatSource->action = ActionPickedScatSource; }
+    MenuScatSource->Clear();
+    MenuScatSource->Add(T("Object"), ScatterSource::Obj, (int)IconType::object);
+    MenuScatSource->Add(T("Collection"), ScatterSource::Coll);
+    MenuScatSource->Add(T("Scene"), ScatterSource::Scene);
+    MenuScatSource->Add(T("External .w3d"), ScatterSource::Lib, (int)IconType::lib);
+    OpenMenuUnderButton(MenuScatSource, PropsActive->propScatSource->button);
+}
+static const char* ScatSourceName(int s){
+    return s == ScatterSource::Coll ? T("Collection") : s == ScatterSource::Scene ? T("Scene")
+         : s == ScatterSource::Lib ? T("External .w3d") : T("Object");
+}
+// el OBJETO (lo que tenga alguna malla) o la COLECCION fuente
+static std::vector<Object*> gScatTargets;
+static bool ScatHasMesh(Object* o){
+    if (!o) return false;
+    if (o->getType() == ObjectType::mesh) return true;
+    for (size_t i = 0; i < o->Childrens.size(); i++) if (ScatHasMesh(o->Childrens[i])) return true;
+    return false;
+}
+static void CollectScatTargets(Object* node, bool colls, Object* skip){
+    if (!node) return;
+    for (size_t i = 0; i < node->Childrens.size(); i++){ Object* c = node->Childrens[i];
+        if (!c || c == skip) continue;
+        const bool isCol = c->getType() == ObjectType::collection;
+        if (colls ? isCol : (!isCol && ScatHasMesh(c))) gScatTargets.push_back(c);
+        CollectScatTargets(c, colls, skip); }
+}
+static PopupMenu* MenuScatTarget = NULL;
+static void ActionPickedScatTarget(int id){
+    Modifier* mod = ActiveModUI(); if (!mod) return;
+    const int idx = id - 1;
+    mod->target = (idx >= 0 && idx < (int)gScatTargets.size()) ? gScatTargets[(size_t)idx] : NULL;
+    ActionModParamChanged();
+}
+static void ActionMenuScatTarget(){
+    Modifier* mod = ActiveModUI();
+    if (!mod || !PropsActive || !PropsActive->propScatTarget) return;
+    if (!MenuScatTarget){ MenuScatTarget = new PopupMenu(); MenuScatTarget->action = ActionPickedScatTarget; }
+    MenuScatTarget->Clear();
+    MenuScatTarget->Add(T("None"), 0);
+    gScatTargets.clear();
+    CollectScatTargets(SceneCollection, mod->scatSource == ScatterSource::Coll, ActiveObj);
+    for (size_t i = 0; i < gScatTargets.size(); i++)
+        MenuScatTarget->Add(gScatTargets[i]->name, 1 + (int)i, (int)ObjectIcon(gScatTargets[i]));
+    OpenMenuUnderButton(MenuScatTarget, PropsActive->propScatTarget->button);
+}
+// la ESCENA: del proyecto (fuente Escena) o de la libreria (fuente .w3d externo)
+static std::vector<std::string> gScatScenes;
+static PopupMenu* MenuScatScene = NULL;
+static void ActionPickedScatScene(int id){
+    Modifier* mod = ActiveModUI(); if (!mod) return;
+    const int idx = id - 1;
+    if (idx < 0 || idx >= (int)gScatScenes.size()) return;
+    mod->scatScene = gScatScenes[(size_t)idx];
+    ActionModParamChanged();
+}
+static void ActionMenuScatScene(){
+    Modifier* mod = ActiveModUI();
+    if (!mod || !PropsActive || !PropsActive->propScatScene) return;
+    if (!MenuScatScene){ MenuScatScene = new PopupMenu(); MenuScatScene->action = ActionPickedScatScene; }
+    MenuScatScene->Clear();
+    gScatScenes.clear();
+    if (mod->scatSource == ScatterSource::Lib) W3dLibsElements(mod->scatLib, W3D_LIB_SCENE, gScatScenes);
+    else {
+        const std::vector<W3dRootRow>& rows = W3dRoots();
+        for (size_t i = 0; i < rows.size(); i++) if (W3dRootClass(rows[i].type) == W3D_ROOT_SCENE) gScatScenes.push_back(rows[i].name);
+    }
+    for (size_t i = 0; i < gScatScenes.size(); i++) {
+        MenuItem* it = MenuScatScene->Add(gScatScenes[i], 1 + (int)i);
+        if (it) it->green = (gScatScenes[i] == mod->scatScene);
+    }
+    OpenMenuUnderButton(MenuScatScene, PropsActive->propScatScene->button);
+}
+// la LIBRERIA: las vinculadas + "Link .w3d..." (la vincula con undo, como el proxy)
+static PopupMenu* MenuScatLib = NULL;
+static void ScatUseLib(const std::string& lib){
+    Modifier* mod = ActiveModUI(); if (!mod) return;
+    mod->scatLib = lib;
+    mod->scatScene.clear();   // (la primera escena de la libreria)
+    PropertiesLayoutDirty = true;
+    ActionModParamChanged();
+}
+static void ScatPickedLibFile(const std::string& path){
+    std::string reason;
+    if (W3dExtLibLink(path, &reason)) { if (W3dLibsCount() > 0) ScatUseLib(W3dLibsRow(W3dLibsCount() - 1).name); return; }
+    for (int i = 0; i < W3dLibsCount(); i++)   // (ya vinculada: se usa esa)
+        if (W3dLibsDiskPath(i) == path) { ScatUseLib(W3dLibsRow(i).name); return; }
+    Notify(std::string(T("Not linked")) + ": " + T(reason.c_str()), true);
+}
+static void ActionPickedScatLib(int id){
+    if (id == 1000) { OpenFileBrowser(T("Link .w3d..."), T("Link"), ".w3d", ScatPickedLibFile, false); return; }
+    if (id < 1 || id > W3dLibsCount()) return;
+    ScatUseLib(W3dLibsRow(id - 1).name);
+}
+static void ActionMenuScatLib(){
+    Modifier* mod = ActiveModUI();
+    if (!mod || !PropsActive || !PropsActive->propScatLib) return;
+    if (!MenuScatLib){ MenuScatLib = new PopupMenu(); MenuScatLib->action = ActionPickedScatLib; }
+    MenuScatLib->Clear();
+    for (int i = 0; i < W3dLibsCount(); i++) {
+        const bool current = (W3dLibsRow(i).name == mod->scatLib);
+        MenuItem* it = MenuScatLib->Add(W3dLibsRow(i).name, i + 1, current ? (int)IconType::notifOk : (int)IconType::lib);
+        if (it) it->green = current;
+    }
+    MenuScatLib->Add(T("Link .w3d..."), 1000, (int)IconType::lib);
+    OpenMenuUnderButton(MenuScatLib, PropsActive->propScatLib->button);
+}
+// DESDE DONDE de la malla
+static PopupMenu* MenuScatEmit = NULL;
+static void ActionPickedScatEmit(int id){ Modifier* mod = ActiveModUI(); if (!mod || id < 0 || id > 3) return; mod->scatEmit = id; ActionModParamChanged(); }
+static const char* ScatEmitName(int e){
+    return e == ScatterEmit::Verts ? T("Vertices") : e == ScatterEmit::Edges ? T("Edges")
+         : e == ScatterEmit::FaceCenters ? T("Face Centers") : T("Faces (anywhere)");
+}
+static void ActionMenuScatEmit(){
+    if (!PropsActive || !PropsActive->propScatEmit) return;
+    if (!MenuScatEmit){ MenuScatEmit = new PopupMenu(); MenuScatEmit->action = ActionPickedScatEmit; }
+    MenuScatEmit->Clear();
+    for (int e = 0; e < 4; e++) MenuScatEmit->Add(ScatEmitName(e), e);
+    OpenMenuUnderButton(MenuScatEmit, PropsActive->propScatEmit->button);
+}
+// el MODO: Unida (una malla) | Instancias (un dibujo por copia, sin memoria por copia)
+static void ActionScatMode(int mode){ Modifier* mod = ActiveModUI(); if (!mod) return; mod->scatMode = mode; ActionModParamChanged(); }
+static void ActionScatMerged(){ ActionScatMode(0); }
+static void ActionScatInstances(){ ActionScatMode(1); }
 static void ActionPvsRecalculate(){
     if (!ActiveObj || ActiveObj->getType() != ObjectType::mesh) return;
-    extern int W3dPVSRecalculate(Mesh*);   // main/edit/MeshEdit.cpp
+    extern int W3dPVSRecalculate(Mesh*);   // libs/Whisk3DCore/edit/MeshEdit.cpp
     int n = W3dPVSRecalculate((Mesh*)ActiveObj);
     g_redraw = true;
     if (n > 0) Notify(T("PVS recalculated"), false);
@@ -4890,6 +5040,18 @@ static void ActionMeshEditableToggle(){
 static void ActionApplyModifier(){
     if (!ActiveObj || ActiveObj->getType()!=ObjectType::mesh) return;
     if (W3dReadOnlyMeshNotice((Mesh*)ActiveObj, true)) return;   // (hornear toca la geometria: la del recurso)
+    // un SCATTER en modo instancias: cada copia pasa a ser un objeto (la malla no cambia)
+    { Mesh* mm = (Mesh*)ActiveObj;
+      Modifier* am = (mm->activeModifier >= 0 && mm->activeModifier < (int)mm->modifiers.size()) ? mm->modifiers[(size_t)mm->activeModifier] : NULL;
+      if (am && am->type == ModifierType::Scatter && am->scatMode == 1) {
+          const int n = W3dScatterApplyAsObjects(mm);
+          if (n >= 0) {
+              PropertiesLayoutDirty = true; g_redraw = true;
+              char b[160]; snprintf(b, sizeof b, T("Scatter: %d copies are now objects"), n);
+              Notify(b, false);
+          }
+          return;
+      } }
     ((Mesh*)ActiveObj)->ApplyActiveModifier();
     PropertiesLayoutDirty = true; g_redraw = true;
     Notify(T("Modifier applied"), false);
@@ -4900,7 +5062,7 @@ static void ActionApplyModifier(){
 static Mesh* g_pendingOptVGMesh = NULL;
 static void DoOptimizeVG(){
     if (!g_pendingOptVGMesh) return;
-    extern void OptimizeVertexGroups1Bone(Mesh*); // main/edit/MeshEdit.cpp
+    extern void OptimizeVertexGroups1Bone(Mesh*); // libs/Whisk3DCore/edit/MeshEdit.cpp
     OptimizeVertexGroups1Bone(g_pendingOptVGMesh);
     g_pendingOptVGMesh = NULL;
     g_redraw = true;
@@ -6575,6 +6737,7 @@ static void WebVideoEnd() {
     if (!g_renderAudioTmp.empty()) { remove(g_renderAudioTmp.c_str()); g_renderAudioTmp.clear(); }
     g_renderSequenceVideo = false;
     t.active = false;
+    RTSequenceEnd();
     ProgressEnd();
     CurrentFrame = t.saved;
     ApplyAnimationObjects();   // (la escena vuelve al cuadro que estaba)
@@ -6612,6 +6775,7 @@ bool W3dWebRenderTick() {
         }
         t.phase = 1;
         PreparePrev(t.vp, t.w, t.h, t.f0);   // (los vectores del primer cuadro: desde f0-1)
+        RTSequenceBegin();   // (el trazado arma la escena una vez: ver DoRenderAnimation)
     }
     if (t.phase == 1) {
         // unos cuadros por vuelta (hasta ~40 ms: el navegador respira y la barra avanza), sin llenarle la cola al
@@ -6689,6 +6853,7 @@ static void DoRenderAnimation(){
     // LAS PARTICULAS van con el reloj de la ANIMACION: un paso de 1/fps por cuadro (en la ventana las mueve el tiempo
     // real, y aca cada cuadro tarda lo que tarda: sin esto salian congeladas)
     RenderPreheatParticles();
+    RTSequenceBegin();   // (el trazado arma la escena una vez y despues solo renueva lo que se mueve)
     for (int f = f0; f <= f1; f++){
         ProgressFrame(f - f0 + 1, nFrames);   // "Cuadro N de M", lo que tarda cada uno y lo que falta
         if (ProgressCanceled()) { canceled = true; break; }
@@ -6697,6 +6862,7 @@ static void DoRenderAnimation(){
         if (f > f0) W3dParticlesTick(RenderFrameDt());
         base += RenderPassesFrame(vp, w, h, base, total, failed); // rendea el frame; avanza la barra GLOBAL
     }
+    RTSequenceEnd();
 #ifdef W3D_VIDEO
     if (g_renderSequenceVideo) {
         VideosClose(failed); g_renderSequenceVideo = false;
@@ -9992,10 +10158,6 @@ void Properties::BuildGroups(){
     propBtnMeshEditable = new PropButton(T("Delete editing data"), IconType::trash);
     propBtnMeshEditable->action = ActionMeshEditableToggle;
     propMeshEdit->properties.push_back(propBtnMeshEditable);
-    // BLOQUEAR NORMALES: en el Modo Edicion, al confirmar un movimiento no se recalculan las normales de ESTA malla
-    // (estaba en el menu del pivote, como opcion global: no tenia nada que ver con el pivote)
-    propMeshLockNormals = new PropBool(T("Lock Normals"));
-    propMeshEdit->properties.push_back(propMeshLockNormals);
     GroupProperties.push_back(propMeshEdit);
 
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
@@ -10225,25 +10387,6 @@ void Properties::BuildGroups(){
         gPropMatEmitK->animProp = AnimMatEmitStrength; gPropMatEmitK->animComp = AnimX;
         { std::vector<PropertieBase*>& v = propMaterial->properties;
           for (size_t q = 0; q < v.size(); q++) if (v[q] == propMap[W3D_MAP_EMISSION]) { v.insert(v.begin() + (long)q + 1, gPropMatEmitK); break; } }
-        // LA TRANSFORMACION UV (la textura base y los mapas): desplazamiento, escala y rotacion (animables: la pantalla con
-        // el texto que pasa) y el pivote de la rotacion y la escala
-        gPropMatUVTitle = new PropLabel(T("UV Transform"));
-        propMaterial->properties.push_back(gPropMatUVTitle);
-        {
-            static const char* const kName[7] = { "UV Offset", "UV Offset", "UV Scale", "UV Scale", "UV Rotation", "UV Pivot", "UV Pivot" };
-            static const char* const kAxis[7] = { " U", " V", " U", " V", "", " U", " V" };
-            static const int kProp[7] = { AnimMatUVOffset, AnimMatUVOffset, AnimMatUVScale, AnimMatUVScale, AnimMatUVRotation, -1, -1 };
-            static const int kComp[7] = { AnimX, AnimY, AnimX, AnimY, AnimX, AnimX, AnimY };
-            for (int i = 0; i < 7; i++) {
-                PropFloat* f = new PropFloat(std::string(T(kName[i])) + kAxis[i], i == 4 ? "\xC2\xB0" : "");
-                if (i == 4) { f->SetRange(-36000.0f, 36000.0f); f->fineStep = 1.0f; f->thickStep = 15.0f; f->dragStep = 0.5f; }
-                else { f->SetRange(-10000.0f, 10000.0f); f->fineStep = 0.01f; f->thickStep = 0.1f; f->dragStep = 0.005f; }
-                f->onChange = ActionRTValues;
-                f->animProp = kProp[i]; f->animComp = kComp[i];
-                gPropMatUV[i] = f;
-                propMaterial->properties.push_back(f);
-            }
-        }
     }
     // Se CONSTRUYE todo primero (el bind es por member, no importa el orden de construccion); el PUSH define el
     // orden VISUAL, que se reorganizo: Lighting arriba de todo, Vertex Color sobre Base Color, y los
@@ -10476,6 +10619,13 @@ void Properties::BuildGroups(){
     propLightRTRadius->fineStep = 0.05f; propLightRTRadius->thickStep = 0.5f; propLightRTRadius->dragStep = 0.02f;
     propLightRTRadius->onChange = ActionRTValues;
     propLight->properties.push_back(propLightRTRadius);
+    // EL SOL: su ANGULO, el diametro aparente de 0 a 180 grados (el "Angle" de Blender). Por dentro es el radio del trazado
+    // (rtRadius = la mitad: el medio angulo del cono), y en la luz por pixel abre el brillo en lo pulido (pedido del duenio,
+    // 2026-11-27: "que la luz solar diga angulo, de 0 a 180, estilo Blender, asi machea mejor los reflejos")
+    propLightSunAngle = new PropFloat(T("Angle"), "\xc2\xb0"); propLightSunAngle->SetRange(0.0f, 180.0f);
+    propLightSunAngle->fineStep = 0.1f; propLightSunAngle->thickStep = 1.0f; propLightSunAngle->dragStep = 0.1f;
+    propLightSunAngle->onChange = ActionSunAngle;
+    propLight->properties.push_back(propLightSunAngle);
     propLightRTRays = new PropFloat(T("Rays")); propLightRTRays->SetRange(0.0f, 256.0f); propLightRTRays->integer = true;
     propLightRTRays->fineStep = 1.0f; propLightRTRays->thickStep = 4.0f; propLightRTRays->dragStep = 1.0f;
     propLightRTRays->onChange = ActionRTValues;
@@ -12005,6 +12155,48 @@ void Properties::BuildGroups(){
     propModifierProps->properties.push_back(propPvsRecalc);
     propPvsInfo = new PropLabel("");   // "N sectores, sector activo S" / "sin .pvs.json"
     propModifierProps->properties.push_back(propPvsInfo);
+    // SCATTER: de donde (objeto/coleccion/escena/.w3d) + cual, desde donde de la malla, cuantas, semilla, escala / giro /
+    // inclinacion al azar, alinear a la normal, corrimiento, el modo (Unida | Instancias) y si el emisor se ve
+    propScatSource = new PropButton(T("Source")); propScatSource->button->dropdown = true; propScatSource->action = ActionMenuScatSource;
+    propModifierProps->properties.push_back(propScatSource);
+    propScatTarget = new PropButton(T("Object"), IconType::object); propScatTarget->button->dropdown = true;
+    propScatTarget->action = ActionMenuScatTarget; propModifierProps->properties.push_back(propScatTarget);
+    propScatLib = new PropButton(T("Library"), IconType::lib); propScatLib->button->dropdown = true;
+    propScatLib->action = ActionMenuScatLib; propModifierProps->properties.push_back(propScatLib);
+    propScatScene = new PropButton(T("Scene")); propScatScene->button->dropdown = true;
+    propScatScene->action = ActionMenuScatScene; propModifierProps->properties.push_back(propScatScene);
+    propScatEmit = new PropButton(T("Emit From")); propScatEmit->button->dropdown = true;
+    propScatEmit->action = ActionMenuScatEmit; propModifierProps->properties.push_back(propScatEmit);
+    propScatCount = new PropFloat(T("Count")); propScatCount->SetRange(0.0f, 1000000.0f); propScatCount->integer = true;
+    propScatCount->fineStep = 1.0f; propScatCount->thickStep = 10.0f; propScatCount->dragStep = 1.0f; propScatCount->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatCount);
+    propScatSeed = new PropFloat(T("Seed")); propScatSeed->SetRange(0.0f, 1000000.0f); propScatSeed->integer = true;
+    propScatSeed->fineStep = 1.0f; propScatSeed->thickStep = 10.0f; propScatSeed->dragStep = 0.2f; propScatSeed->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatSeed);
+    propScatScale = new PropFloat(T("Scale")); propScatScale->SetRange(0.0f, 1000.0f);
+    propScatScale->fineStep = 0.01f; propScatScale->thickStep = 0.1f; propScatScale->dragStep = 0.005f; propScatScale->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatScale);
+    propScatScaleRand = new PropFloat(T("Random Scale")); propScatScaleRand->SetRange(0.0f, 1.0f);
+    propScatScaleRand->fineStep = 0.01f; propScatScaleRand->thickStep = 0.1f; propScatScaleRand->dragStep = 0.005f; propScatScaleRand->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatScaleRand);
+    propScatAlign = new PropBool(T("Align to Normal")); propScatAlign->onChange = ActionModParamChanged; propModifierProps->properties.push_back(propScatAlign);
+    propScatRotRand = new PropFloat(T("Random Rotation")); propScatRotRand->SetRange(0.0f, 1.0f);
+    propScatRotRand->fineStep = 0.01f; propScatRotRand->thickStep = 0.1f; propScatRotRand->dragStep = 0.005f; propScatRotRand->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatRotRand);
+    propScatTilt = new PropFloat(T("Random Tilt"), "\xc2\xb0"); propScatTilt->SetRange(0.0f, 180.0f);
+    propScatTilt->fineStep = 1.0f; propScatTilt->thickStep = 10.0f; propScatTilt->dragStep = 0.5f; propScatTilt->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatTilt);
+    propScatOffset = new PropFloat(T("Offset"), "m"); propScatOffset->SetRange(-1000.0f, 1000.0f);
+    propScatOffset->fineStep = 0.01f; propScatOffset->thickStep = 0.1f; propScatOffset->dragStep = 0.005f; propScatOffset->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatOffset);
+    propScatMode = new PropButtonRow();
+    propScatMode->Add(T("Merged"), ActionScatMerged);
+    propScatMode->Add(T("Instances"), ActionScatInstances);
+    propModifierProps->properties.push_back(propScatMode);
+    propScatShowEmitter = new PropBool(T("Show Emitter")); propScatShowEmitter->onChange = ActionModParamChanged;
+    propModifierProps->properties.push_back(propScatShowEmitter);
+    propScatInfo = new PropLabel("");   // "N copias de M fuentes"
+    propModifierProps->properties.push_back(propScatInfo);
     // PATH del recorrido (el motor elige el nodo solo) + desde que ojo + nodo actual
     propPvsPath = new PropButton(T("Path"), IconType::curve);
     propPvsPath->button->dropdown = true;
@@ -13382,13 +13574,6 @@ void Properties::Rebind(){
         for (int k = W3D_MAP_EMISSION; k < W3D_MAPS; k++)
             if (propMap[k]) { propMap[k]->animProp = (hasMat && !material->mapWithTexture[k]) ? kAnimMap[k] : -1; propMap[k]->animComp = AnimX; }
         if (gPropMatEmitK) gPropMatEmitK->value = hasMat ? &material->emissionStrength : NULL;
-        if (gPropMatUVTitle) gPropMatUVTitle->hidden = !hasMat;
-        for (int i = 0; i < 7; i++) {
-            if (!gPropMatUV[i]) continue;
-            float* v = NULL;
-            if (hasMat) v = (i < 2) ? &material->uvOffset[i] : (i < 4) ? &material->uvScale[i - 2] : (i == 4) ? &material->uvRotation : &material->uvPivot[i - 5];
-            gPropMatUV[i]->value = v;
-        }
     }
     // CAPAS DE TEXTURA: una fila por capa + la de "Add Layer" (si quedan filas); el resto oculto
     if (propLayersTitle) {
@@ -13432,7 +13617,7 @@ void Properties::Rebind(){
                 case PropertyType::Button: ((PropButton*)p)->hidden = true; break;
                 default:
                     if (p == propSepMat) propSepMat->hidden = true;
-                    else if (p == propMsgDefault || p == propLayersTitle || p == gPropMatUVTitle) ((PropLabel*)p)->hidden = true;
+                    else if (p == propMsgDefault || p == propLayersTitle) ((PropLabel*)p)->hidden = true;
                     else if (p == propListLayers) propListLayers->hidden = true;   // (con el shader: sin las capas de textura)
                     break;
             }
@@ -13573,6 +13758,21 @@ void Properties::RefreshTargetProperties(){
         }
         return;
     }
+    // LO ESCRITO EN UN SCRIPT DEL OBJETO (un IDE, Guardar, Refresh): sus tarjetas se rearman con las propiedades nuevas.
+    // Todo lo de abajo corre solo al cambiar de objeto, asi que una propiedad agregada al script despues de ponerlo en
+    // el objeto no aparecia (ni cambiando de pestania, ni con Refresh) hasta sacarlo y volver a ponerlo. Solo si sus
+    // scripts corren sin error: a medio escribir (un renglon todavia invalido) quedan las filas que habia
+    { extern unsigned g_ideScriptVersion;
+      if (scriptTextSeen != g_ideScriptVersion) {
+          scriptTextSeen = g_ideScriptVersion;
+          W3dScriptData* d = ActiveObj->scriptData;
+          bool run = d && !d->scripts.empty();
+          for (size_t i = 0; run && i < d->scripts.size(); i++) {
+              std::vector<W3dScriptProp> tmp;
+              run = W3dScriptReadProperties(d->scripts[i].path, &tmp);
+          }
+          if (run) { target = NULL; scriptSignature = -1; }
+      } }
     if (ActiveObj == target) return;
     target = ActiveObj;
 
@@ -14108,7 +14308,11 @@ void Properties::RefreshTargetProperties(){
         }
         if (propLightDist) propLightDist->value = (l && type != 1) ? &l->distance : NULL;
         // (el RADIO del trazado de rayos no va en la de area: el tamanio de la lampara ya es el de su superficie)
-        if (propLightRTRadius) propLightRTRadius->value = (l && type != 3) ? &l->rtRadius : NULL;
+        if (propLightRTRadius) propLightRTRadius->value = (l && type != 3 && type != 1) ? &l->rtRadius : NULL;   // (el sol: su Angulo)
+        if (propLightSunAngle) {
+            if (l && type == 1 && g_propFloatEditing != propLightSunAngle) g_sunAngleUI = l->rtRadius * 2.0f;
+            propLightSunAngle->value = (l && type == 1) ? &g_sunAngleUI : NULL;
+        }
         if (propLightRTRays) propLightRTRays->value = l ? &l->rtRays : NULL;
     }
 
@@ -14282,6 +14486,7 @@ Properties::Properties() : ViewportBase() {
     editing = false;
     paletteRows = -1;
     scriptSignature = -1;
+    scriptTextSeen = 0;
     partFlipCols = 1; partFlipRows = 1; partTrailPts = 4;
     rtRays = (float)g_rt.rays; rtSamples = (float)g_rt.samples; rtPasses = (float)g_rt.passes; rtLayers = (float)g_rt.layers;
     rtBounces = (float)g_rt.bounces;
@@ -14843,8 +15048,6 @@ void Properties::UpdateTabs(){
     if (propMeshEdit) {
         // (los datos de edicion de una malla de una LIBRERIA son de ella: sin la tarjeta)
         propMeshEdit->visible = tabMesh && !(ActiveObj->getType() == ObjectType::mesh && W3dMeshReadOnly((Mesh*)ActiveObj, true));
-        if (propMeshLockNormals)
-            propMeshLockNormals->value = (isMesh && ActiveObj->getType() == ObjectType::mesh) ? &((Mesh*)ActiveObj)->lockNormals : NULL;
         if (isMesh && propBtnMeshEditable && ActiveObj->getType() == ObjectType::mesh) {
             bool noEd = ((Mesh*)ActiveObj)->noEditable;
             propBtnMeshEditable->button->text = noEd ? T("Convert to editable mesh") : T("Delete editing data");
@@ -15051,7 +15254,44 @@ void Properties::UpdateTabs(){
         if (propModShowEdit)     propModShowEdit->value     = hasSel ? &mod->showEdit : NULL;
         bool isBool   = (mod && mod->type == ModifierType::Boolean);
         bool isArray  = (mod && mod->type == ModifierType::Array);
-        if (propModEmpty) propModEmpty->hidden = (isMirror || isSub || isScrew || isPvs || isBool || isArray || (mod && mod->type==ModifierType::Armature)); // "(no properties yet)" solo tipos sin params
+        const bool isScat = (mod && mod->type == ModifierType::Scatter);
+        if (propModEmpty) propModEmpty->hidden = (isMirror || isSub || isScrew || isPvs || isBool || isArray || isScat || (mod && mod->type==ModifierType::Armature)); // "(no properties yet)" solo tipos sin params
+        // SCATTER: lo de la fuente segun su tipo (objeto/coleccion: cual; escena: cual; .w3d: libreria + escena)
+        { const int src = isScat ? mod->scatSource : -1;
+          if (propScatSource) { propScatSource->hidden = !isScat; if (isScat) propScatSource->button->text = ScatSourceName(src); }
+          if (propScatTarget) { propScatTarget->hidden = !(src == ScatterSource::Obj || src == ScatterSource::Coll);
+              if (!propScatTarget->hidden) {
+                  propScatTarget->name = (src == ScatterSource::Coll) ? T("Collection") : T("Object");
+                  propScatTarget->button->text = mod->target ? mod->target->name : std::string(T("None")); } }
+          if (propScatLib) { propScatLib->hidden = (src != ScatterSource::Lib);
+              if (!propScatLib->hidden) propScatLib->button->text = mod->scatLib.empty() ? std::string(T("None")) : mod->scatLib; }
+          if (propScatScene) { propScatScene->hidden = !(src == ScatterSource::Scene || src == ScatterSource::Lib);
+              if (!propScatScene->hidden) propScatScene->button->text = !mod->scatScene.empty() ? mod->scatScene
+                  : std::string(src == ScatterSource::Lib ? T("(the first one)") : T("None")); }
+          if (propScatEmit) { propScatEmit->hidden = !isScat; if (isScat) propScatEmit->button->text = ScatEmitName(mod->scatEmit); }
+          if (propScatCount)     propScatCount->value     = isScat ? &mod->scatCount : NULL;
+          if (propScatSeed)      propScatSeed->value      = isScat ? &mod->scatSeed : NULL;
+          if (propScatScale)     propScatScale->value     = isScat ? &mod->scatScale : NULL;
+          if (propScatScaleRand) propScatScaleRand->value = isScat ? &mod->scatScaleRand : NULL;
+          if (propScatAlign)     propScatAlign->value     = isScat ? &mod->scatAlign : NULL;
+          if (propScatRotRand)   propScatRotRand->value   = isScat ? &mod->scatRotRand : NULL;
+          if (propScatTilt)      propScatTilt->value      = isScat ? &mod->scatTiltRand : NULL;
+          if (propScatOffset)    propScatOffset->value    = isScat ? &mod->scatOffset : NULL;
+          if (propScatShowEmitter) propScatShowEmitter->value = isScat ? &mod->scatShowEmitter : NULL;
+          if (propScatMode) {
+              for (size_t k = 0; k < propScatMode->buttons.size(); k++) {
+                  propScatMode->buttons[k]->visible = isScat;
+                  const bool on = isScat && ((int)k == mod->scatMode);
+                  propScatMode->buttons[k]->tint = on ? TbGreenBg() : NULL;
+                  propScatMode->buttons[k]->textColor = on ? ColorList[static_cast<int>(ColorID::accent)] : NULL;
+              } }
+          if (propScatInfo) { propScatInfo->hidden = !isScat;
+              if (isScat) {
+                  std::vector<Object*> pool; W3dScatterPool(mod, mm, pool);
+                  char inf[160];
+                  snprintf(inf, sizeof inf, T("%d copies of %d source(s)"), (int)mod->scatRt.pick.size(), (int)pool.size());
+                  propScatInfo->name = inf;
+              } } }
         // ARRAY (value = NULL oculta la fila: solo se ven en un Array; las X/Y/Z solo con su desplazamiento prendido)
         if (propArrCount)   propArrCount->value   = isArray ? &mod->arrCount : NULL;
         if (propArrRelOn)   propArrRelOn->value   = isArray ? &mod->arrRelOn : NULL;

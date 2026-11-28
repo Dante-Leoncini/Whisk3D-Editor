@@ -44,11 +44,15 @@ class SaveAsPopup : public PopUpBase {
         int  VisibleList() const;
         void SyncFolder();
 };
-// ext = ".lua" / ".png" (se agrega al nombre si falta). interno = la opcion inicial.
+// ext = ".lua" / ".png" (se agrega al nombre si falta). interno = la opcion inicial. carpetaDisco = la de afuera con la
+// que arranca (la del archivo que se guarda); sin ella, la ultima elegida o la del explorador (la del .w3d abierto)
 void OpenSaveAsPopup(const std::string& title, const std::string& name, const std::string& ext, bool internal,
-                           const std::string& folderProject, SaveAsAction action);
+                           const std::string& folderProject, SaveAsAction action,
+                           const std::string& folderDisk = std::string());
 // (harness) guarda con lo que dice el formulario abierto; forzar = pisar si existe
 bool SaveAsNow(bool force, std::string& msg);
+// (harness) el boton Guardar: si el destino ya existe, abre la pregunta de pisarlo (confirmPopup)
+void SaveAsPress();
 bool SaveAsOpen();
 // (harness) completar el formulario abierto: interno -1 = no tocar
 void SaveAsSet(const std::string& name, int internal, const std::string& folderProj, const std::string& folderDisk);

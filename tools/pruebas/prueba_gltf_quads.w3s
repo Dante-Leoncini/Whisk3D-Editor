@@ -1,0 +1,41 @@
+# ==========================================================================
+#  QUADS Y NGONS DESDE UN glTF (extras.w3d_polygons). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_gltf_quads.w3s
+#
+#  El glTF solo lleva triangulos. Con extras.w3d_polygons en la primitiva (lo escriben el convertidor de Blender de
+#  Bongo Cat y ExportGLTF de Whisk3D) el import rearma los poligonos: un quad entra como UNA cara para editarla, como en
+#  Blender (antes entraban dos triangulos y para simplificar una malla a mano habia que juntarlos uno por uno). El
+#  contorno sale de los triangulos (las aristas internas van dos veces, una en cada sentido): sirve el corte en abanico
+#  y el de Blender (la diagonal mas corta). Ver gen_prueba_gltf_quads.py para la escena. Lo que se verifica:
+#    1) "Poligonos": 1 triangulo, 3 quads y 1 pentagono, los 8 triangulos de render de siempre
+#    2) sin extras, con la cuenta mal o degenerado: queda en triangulos, como antes
+#    3) export glTF -> import: los quads vuelven (ExportGLTF escribe sus w3d_polygons)
+#    4) guardar y abrir el .w3d: los poligonos viajan nativos
+# ==========================================================================
+selobj Cubo
+delete
+importgltf prueba_gltf_quads.gltf
+# ---- 1) los poligonos ----
+selname Poligonos
+meshpolys 1 3 1
+# ---- 2) lo que queda en triangulos ----
+selname SinExtras
+meshpolys 2 0 0
+selname CuentaMal
+meshpolys 2 0 0
+selname Degenerado
+meshpolys 2 0 0
+# ---- 3) ida y vuelta por glTF ----
+exportgltf /tmp/w3d_prueba_gltf_quads_rt.gltf
+selectall
+delete
+importgltf /tmp/w3d_prueba_gltf_quads_rt.gltf
+selname Poligonos
+meshpolys 1 3 1
+selname SinExtras
+meshpolys 2 0 0
+# ---- 4) guardar y abrir ----
+savew3d /tmp/w3d_prueba_gltf_quads.w3d
+openw3d /tmp/w3d_prueba_gltf_quads.w3d
+selname Poligonos
+meshpolys 1 3 1

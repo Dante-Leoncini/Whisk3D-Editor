@@ -1,0 +1,33 @@
+# ==========================================================================
+#  OCULTAR (H) CON MODIFICADORES: lo que se oculta en Edit Mode desaparece tambien del RESULTADO del stack (Subdivision,
+#  Mirror, Array...), no solo de la jaula. Antes la malla generada se armaba con todas las caras y ocultar no servia.
+#  Solo mientras se edita: al salir de Edit Mode (o con Alt+H) vuelve entera; aplicar el modificador usa la malla entera.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_ocultar_modificadores.w3s
+#  El cubo con Subdivision 1: 6 quads -> 24 quads = 48 triangulos. Ocultar un vertice saca sus 3 caras: quedan 3 quads
+#  -> 12 quads = 24 triangulos
+# ==========================================================================
+selobj Cubo
+modadd subsurf
+modsubsurf 1
+gentris 48
+mode edit
+selmode vertex
+select vert 0
+edithide hide
+edithidden 1 3 3
+gentris 24
+# ---- Ctrl+Z / Ctrl+Y ----
+undo
+gentris 48
+redo
+gentris 24
+# ---- Alt+H ----
+edithide reveal
+gentris 48
+# ---- al salir de Edit Mode vuelve entera ----
+select vert 0
+edithide hide
+gentris 24
+mode object
+gentris 48

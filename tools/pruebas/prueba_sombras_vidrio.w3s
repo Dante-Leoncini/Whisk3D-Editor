@@ -1,0 +1,39 @@
+# ==========================================================================
+#  EL VIDRIO NO TAPA AL SOL (las sombras en tiempo real)
+#  Correr DESDE ESTA CARPETA (con OpenGL prueba la sombra proyectada en la CPU; con shaders, las cascadas y ademas la
+#  malla con una parte de vidrio):
+#    ../../platform/linux/build/whisk3d --backend es2 --script prueba_sombras_vidrio.w3s
+#
+#  La escena (prueba_sombras_vidrio.w3d): un piso, un sol de costado (la sombra de lo que esta a 1 m de altura cae 1 m
+#  hacia -X) y dos cuadrados a 1 m del piso: la TABLA (opaca) y el VIDRIO (transparente, alfa 0.1). El pase de sombras
+#  dibujaba la malla entera sin mirar el material: el casco de vidrio del gato de Marte (alfa 0.1) le dejaba la cabeza
+#  en sombra y el gato salia negro con el backend de shaders (con el OpenGL viejo, sin cascadas, se veia bien). Ahora
+#  lo transparente de verdad (alfa < 0.5) y lo aditivo no proyectan: una malla toda de vidrio no entra en el mapa y, con
+#  shaders, de una malla mixta se dibujan solo las partes que tapan
+# ==========================================================================
+openw3d prueba_sombras_vidrio.w3d
+deselectall
+view3d shading 2
+view3d gizmo 0
+view3d overlays 0
+vporbit 0 0 0 12 -40 0
+# ---- la tabla hace sombra; el vidrio no (el piso de abajo queda como el piso al sol) ----
+scenepx 1.2 0 0.2 darkerthan -1.5 0 1.5 40
+scenepx -2.8 0 0.2 sameas -1.5 0 1.5 3
+# ---- el control: el mismo vidrio OPACO si la hace (el pase lo ve; lo que lo saca es el material) ----
+selname Vidrio
+matalpha 1 0
+deselectall
+scenepx -2.8 0 0.2 darkerthan -1.5 0 1.5 40
+selname Vidrio
+matalpha 0.1 1
+deselectall
+scenepx -2.8 0 0.2 sameas -1.5 0 1.5 3
+# ---- (con shaders) UNA malla con las dos partes: la de la tabla hace sombra, la del vidrio no ----
+pixelshading
+selname Vidrio
+selname Tabla
+join
+deselectall
+scenepx 1.2 0 0.2 darkerthan -1.5 0 1.5 40
+scenepx -2.8 0 0.2 sameas -1.5 0 1.5 3

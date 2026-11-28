@@ -18,7 +18,7 @@ While it lasts, the top bar shows what is being done, for example "Move X 1.5 al
 
 ## The gizmo
 
-The gizmo appears over the pivot in Object Mode and in Edit Mode (it's turned on and off in Overlays → Gizmo).
+The gizmo appears over the pivot in Object Mode and in Edit Mode (it's turned on and off in Overlays → Gizmo). The project **remembers** if you turned it off: saving keeps it in the `.w3d`, like **Auto Merge** (Mesh menu) switched on and its distance. A project without them opens with the defaults.
 
 | Function | Description |
 |---|---|

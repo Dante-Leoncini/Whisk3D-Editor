@@ -58,6 +58,10 @@ file(GLOB_RECURSE SRC_FILES
     # el modelo de datos (antes en core/) se unio al engine: engine/objects, animation, ui
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/objects/*.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/animation/*.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/importers/*.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/render/*.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/config/*.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/edit/*.cpp
     ${CMAKE_SOURCE_DIR}/libs/WhiskUI/*.cpp
 )
 
@@ -97,6 +101,13 @@ list(APPEND SRC_FILES
     # almacen de RECURSOS (refcount + streaming): la contabilidad generica que
     # comparten texturas (TexturaCache es su fachada), mallas y animaciones.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dResources.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/Libraries.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/Prefabs.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/Streaming.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dContainer.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/script/BindsGame.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/W3dRoots.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/W3dScene.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics/opengl/w3dGraphics.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/w3dlog.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dInteractionState.cpp
@@ -272,6 +283,12 @@ target_include_directories(whisk3d PRIVATE
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/graphics
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/importers
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/objects
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/render
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/config
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/edit
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/script
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty # stb: dep del engine, vive CON el core ("stb/stb_image.h")
     ${CMAKE_SOURCE_DIR}/libs
     # WhiskUI reorganizado por tema: sus subcarpetas son include dirs para que los includes INTERNOS pelados
@@ -297,6 +314,15 @@ if(WIN32)
     # Icono embebido en el exe (menu inicio, Explorador, barra de tareas, Alt+Tab). El .rc se genera
     # con la ruta absoluta del .ico y se compila junto al exe (MSVC compila los .rc del target solo).
     set(W3D_ICON_ABS "${CMAKE_SOURCE_DIR}/res/Whisk3D.ico")
+    # la VERSION del exe (Propiedades > Detalles): la fecha AA.MM.DD, como el instalador. En FILEVERSION van sin el
+    # cero de adelante (el compilador de recursos podria leer "08" como octal)
+    string(TIMESTAMP W3D_RC_VERSION "%y.%m.%d")
+    string(TIMESTAMP W3D_RC_YY "%y")
+    string(TIMESTAMP W3D_RC_MM "%m")
+    string(TIMESTAMP W3D_RC_DD "%d")
+    string(REGEX REPLACE "^0" "" W3D_RC_YY "${W3D_RC_YY}")
+    string(REGEX REPLACE "^0" "" W3D_RC_MM "${W3D_RC_MM}")
+    string(REGEX REPLACE "^0" "" W3D_RC_DD "${W3D_RC_DD}")
     configure_file(
         ${CMAKE_SOURCE_DIR}/platform/windows/whisk3d.rc.in
         ${CMAKE_BINARY_DIR}/whisk3d.rc @ONLY)

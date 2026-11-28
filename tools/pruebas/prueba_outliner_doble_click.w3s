@@ -1,0 +1,21 @@
+# ==========================================================================
+#  EL DOBLE CLICK DEL OUTLINER RENOMBRA SOLO SI LOS DOS CLICKS FUERON EN LA MISMA FILA. Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_outliner_doble_click.w3s
+#
+#  SDL cuenta como doble click dos clicks rapidos a menos de ~32 px aunque caigan en filas vecinas: elegir la coleccion
+#  y enseguida el Cubo abria el renombrar del Cubo, y la X que iba a borrarlo en la vista 3D se escribia en su nombre.
+#  (Eventos SDL de verdad: la fila de la Coleccion en y=166, la del Cubo en y=190, con la ventana de 1280 x 720)
+# ==========================================================================
+window 1280 720
+# ---- dos clicks rapidos en filas VECINAS: no renombra ----
+evmouse down 1044 166 left 1
+evmouse up 1044 166 left 1
+evmouse down 1044 190 left 2
+evmouse up 1044 190 left 2
+fieldis none
+# ---- un doble click en la MISMA fila: si ----
+evmouse down 1044 190 left 1
+evmouse up 1044 190 left 1
+evmouse down 1044 190 left 2
+evmouse up 1044 190 left 2
+fieldis Cubo

@@ -873,6 +873,11 @@ void InputUserSDL3(SDL_Event &e){
         if ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
             e.button.which != SDL_TOUCH_MOUSEID) return;
     }
+    // UN CLICK DE MOUSE DE VERDAD (el fantasma del navegador ya se descarto arriba) vuelve a la UI de MOUSE: ToolbarUsesTouch
+    // decia "hubo un dedo alguna vez en la sesion", asi que la PC con pantalla tactil (o con algo que mando un toque una
+    // vez) seguia abriendo el teclado en pantalla al hacer click en un numero, y con el gizmo y las agarraderas grandes
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.which != SDL_TOUCH_MOUSEID && fingers.empty())
+        g_lastFingerTicks = 0;
 
     // POPUP en TACTIL: lo maneja el path de FINGER directo (abajo), porque la sintesis touch->mouse de SDL
     // se DESINCRONIZA con toques rapidos (deja de mandar mouse-down y el explorador quedaba "atrapado").
@@ -978,6 +983,8 @@ void InputUserSDL3(SDL_Event &e){
 
         // loop cut en curso: el motion maneja el preview (sigue la arista) o el slide
         if (LoopCutActive()) { LoopCutMotion(mx, my); return; }
+        // cuchillo: el enganche sigue al mouse (y la navegacion sigue andando: no se corta aca)
+        if (KnifeActive()) KnifeMotion(mx, my);
         // inset / bevel en curso: el mouse maneja el grosor (o la profundidad con Ctrl) / el ancho. Con el DEDO, el mouse
         // sintetizado llega al lugar del toque ANTES del toque y sin boton: ese salto no cuenta (el toque agarra desde ahi)
         if (InsetActive() || BevelActive()) {
@@ -1330,6 +1337,13 @@ void InputUserSDL3(SDL_Event &e){
             else if (e.button.button == SDL_BUTTON_LEFT)  { if (inset) InsetConfirm(); else BevelConfirm(); }
             else if (e.button.button == SDL_BUTTON_RIGHT) { if (inset) InsetCancel();  else BevelCancel(); }
             if (e.button.which == SDL_TOUCH_MOUSEID && PopUpActive) g_popupOpenedByMouseDown = true;
+            SaveMousePos();
+            return;
+        }
+        // cuchillo: izq pone un punto, der cancela (la rueda y el boton del medio siguen navegando)
+        if (KnifeActive() && (e.button.button == SDL_BUTTON_LEFT || e.button.button == SDL_BUTTON_RIGHT)) {
+            if (e.button.button == SDL_BUTTON_LEFT) KnifeClickLeft((int)e.button.x, (int)e.button.y);
+            else KnifeCancel();
             SaveMousePos();
             return;
         }
@@ -1959,6 +1973,14 @@ void InputUserSDL3(SDL_Event &e){
         // TECLADO durante un INSET: Enter confirma, Esc cancela, I/B/O cambian Individual/Boundary/Outset
         if (InsetActive() && InsetKey(W3dKeyFromSDL(e.key.keysym.sym))) return;
         if (BevelActive() && BevelKey(W3dKeyFromSDL(e.key.keysym.sym))) return;
+        // TECLADO del CUCHILLO: Enter/Espacio corta, Esc cancela, Backspace saca un punto, Z corta a traves
+        if (KnifeActive()) {
+            const SDL_Keycode k = e.key.keysym.sym;
+            if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE) { KnifeConfirm(); return; }
+            if (k == SDLK_ESCAPE) { KnifeCancel(); return; }
+            if (k == SDLK_BACKSPACE) { KnifeBack(); return; }
+            if (k == SDLK_z && !LCtrlPressed) { KnifeToggleThrough(); return; }
+        }
         if (LoopCutActive()) {
             SDL_Keycode k = e.key.keysym.sym;
             if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE)      { LoopCutClickRight(); return; }

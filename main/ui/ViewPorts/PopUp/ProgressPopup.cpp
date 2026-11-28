@@ -22,6 +22,7 @@ static bool  g_canceled = false;
 // los tiempos de una animacion (ProgressFrame)
 static int   g_frame = 0, g_frames = 0;
 static unsigned g_tFrame = 0, g_tLast = 0, g_tSum = 0, g_done = 0;
+static unsigned g_tFirst = 0;   // lo que tardo el PRIMER cuadro (arma la escena, sube texturas): no entra en el promedio
 static unsigned g_tPoll  = 0;
 void (*W3dProgressPoll)() = NULL;
 extern unsigned int w3dGetTicks();
@@ -187,7 +188,9 @@ static void BuildLines() {
     snprintf(b, sizeof b, T("Frame %d of %d"), g_frame, g_frames);
     L.push_back(b);
     if (g_done > 0) {
-        const unsigned prom = g_tSum / g_done;
+        // EL PROMEDIO sin el primer cuadro (con dos o mas hechos): el primero arma la escena trazada, sube las texturas a
+        // la GPU... y con el trazado tardaba varias veces lo que los demas: "lo que falta" salia inflado
+        const unsigned prom = (g_done >= 2) ? (g_tSum - g_tFirst) / (g_done - 1) : g_tSum / g_done;
         std::string s = std::string(T("Last: ")) + Duration(g_tLast) + "   " + T("Average: ") + Duration(prom);
         L.push_back(s);
         const unsigned inProgress = w3dGetTicks() - g_tFrame;
@@ -234,7 +237,7 @@ void ProgressStart(const std::string& msg) {
     g_lastProgress   = 0.0f;
     g_rangeA = 0.0f; g_rangeB = 1.0f;
     g_canceled = false;
-    g_frame = g_frames = 0; g_tLast = g_tSum = g_done = 0; g_tFrame = w3dGetTicks();
+    g_frame = g_frames = 0; g_tLast = g_tSum = g_done = g_tFirst = 0; g_tFrame = w3dGetTicks();
     progressPopup->lines.clear();
     progressPopup->withCancel = false;
     // dibujamos el popup completo DOS veces (un swap entre medio) para que LOS DOS buffers del doble-buffer
@@ -271,6 +274,7 @@ void ProgressFrame(int current, int total) {
     const unsigned t = w3dGetTicks();
     if (g_frames > 0 && current > g_frame && g_frame > 0) {   // (termino el anterior)
         g_tLast = t - g_tFrame; g_tSum += g_tLast; g_done++;
+        if (g_done == 1) g_tFirst = g_tLast;
     }
     g_frame = current; g_frames = total; g_tFrame = t;
     if (g_progressActive && progressPopup) ProgressDrawAll();

@@ -286,7 +286,7 @@ static void W3dPickedTexture(const std::string& aPath) {
         }
         else if (gLoadTextureAsNormal) { gSymTexMat->normalTexture = t; gSymTexMat->normalMap = true; } // MISMO browser, destino segun el flag
         else if (gLoadTextureAsB) { gSymTexMat->textureB = t; }        // (la textura B de la mezcla de texturas)
-        else { gSymTexMat->texture = t; gSymTexMat->textureOn = true; }
+        else { gSymTexMat->texture = t; gSymTexMat->textureOn = true; LayoutReferenceTexture(gSymTexMat, aPath, t); }   // (Add > Reference: su proporcion)
         RebindMaterialMeshPart();
     } else {
         // que el fallo se VEA: antes el browser se cerraba y la textura no aparecia, sin ninguna pista
@@ -422,8 +422,9 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     // EL layout por defecto COMPARTIDO (LayoutDefault, por TAMANO DE PANTALLA): la MISMA logica que PC,
     // no una propia de Symbian. En el N95 (240x320, lado < 320) da 2 viewports (3D + Propiedades). El
     // bookkeeping (gRoot/gView3D/gProps/gContRoot/...) lo arma W3dChangedTreeHook recorriendo el arbol.
-    { extern ViewportBase* LayoutDefault(int, int, Viewport3D**);
-      rootViewport = LayoutDefault(aWidth, aHeight, &gView3D); }
+    { extern ViewportBase* LayoutDefault(int, int, Viewport3D**); extern void W3dDefaultSceneView(Viewport3D*);
+      rootViewport = LayoutDefault(aWidth, aHeight, &gView3D);
+      W3dDefaultSceneView(gView3D); }   // (la vista mira al cubo, apoyado en el piso)
     W3dChangedTreeHook();
     Viewport3DActive = gView3D;
     // sin mouse SIEMPRE hay un viewport activo (borde verde): el 3D. La tecla verde lo cicla.
@@ -1003,7 +1004,8 @@ void W3dOutlinerToggleVisible() {
     if (!W3dActiveOutliner()) return;
     // en una vista de RECURSOS (mallas, materiales...) no hay ojo: el 2 no toca la escena
     if (((Outliner*)viewPortActive)->view != W3D_VIEW_SCENE) return;
-    extern void ChangeVisibilityObj();
+    extern void ChangeVisibilityObj(); extern void UndoCaptureVisibility();
+    UndoCaptureVisibility();   // Ctrl+Z (C + flecha): el 2 tambien se deshace, como la H de la PC
     ChangeVisibilityObj();
 }
 // "5" sobre el outliner en una vista de RECURSOS: marca/desmarca la fila del cursor (la SELECCION
@@ -1027,7 +1029,8 @@ TBool W3dOutlinerResourcesDelete() {
 void W3dOutlinerToggleRender() {
     if (!W3dActiveOutliner()) return;
     if (((Outliner*)viewPortActive)->view != W3D_VIEW_SCENE) return;   // idem: sin camara en los recursos
-    extern void ChangeRenderableObj();
+    extern void ChangeRenderableObj(); extern void UndoCaptureVisibility();
+    UndoCaptureVisibility();   // (el paso guarda tambien si sale en el render)
     ChangeRenderableObj();
 }
 

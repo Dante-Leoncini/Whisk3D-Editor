@@ -164,6 +164,33 @@ class IDE : public ViewportBase, public WithBorder, public Scrollable {
 
         void NormalizeSel(int* l0, int* c0, int* l1, int* c1) const;   // la seleccion de principio a fin (Buscar la usa)
 
+        // ---- AUTOCOMPLETADO (como VS Code): al escribir un nombre sale la lista de lo que puede ir ahi -las funciones
+        //      de Whisk3D y de Lua, las palabras clave y los nombres del propio script (sus propiedades, funciones y
+        //      variables)- con la firma y la descripcion del elegido. Flechas para elegir, Enter o Tab para escribirlo,
+        //      Esc para cerrarla; Ctrl+Espacio la abre a mano. Con el dedo, se toca el que se quiere ----
+        struct Completion {
+            std::string name;        // lo que se escribe
+            std::string signature;   // la firma (las funciones de Whisk3D, del manual)
+            std::string desc;        // para que sirve
+            unsigned char kind;      // 0 palabra del script, 1 funcion del motor, 2 palabra clave, 3 propiedad, 4 funcion del script
+        };
+        bool acOpen;
+        std::vector<Completion> acItems;
+        int acSel, acTop;            // el elegido y el primero que se ve
+        int acLin, acStartCol;       // donde empieza la palabra que se completa (renglon y byte)
+        int acBox[4];                // donde se dibujo la lista (x0, y0, x1, y1, local al viewport): el toque la usa
+        void CompletionUpdate(bool force);   // arma o filtra la lista con la palabra del cursor (force: Ctrl+Espacio)
+        void CompletionClose();
+        bool CompletionAccept();             // escribe el elegido (false = no habia lista)
+        bool CompletionKey(int key);         // una tecla con la lista abierta (true = consumida)
+        // ---- IR A LA DEFINICION (click derecho, F12 o Ctrl+click): el nombre de esa posicion. Si esta en el script
+        //      (una funcion, un local, un parametro, una propiedad) el cursor va ahi; si es del motor, se muestra su
+        //      firma y para que sirve al lado de la palabra ----
+        bool GoToDefinition(int lin, int col);
+        bool WordAt(int lin, int col, int* b0, int* b1) const;   // la palabra en esa posicion (con sus puntos: math.floor)
+        std::string defHelp;         // la ayuda de una funcion del motor (vacia = no se muestra)
+        int defHelpLin, defHelpCol;
+
         // ---- TACTIL: doble toque = palabra, triple = renglon; PULSACION LARGA = lupa para poner el cursor justo; con
         //      una seleccion, AGARRADERAS en sus dos puntas para ajustarla (las maneja controls.cpp) ----
         int consecutiveTaps; unsigned int tLastTap; int lastTapX, lastTapY;
@@ -191,6 +218,10 @@ class IDE : public ViewportBase, public WithBorder, public Scrollable {
 };
 
 // ---- helpers globales (los usan controls.cpp / LayoutInput.cpp / idetest) ----
+
+// sube cada vez que el texto de un script cambia en el proyecto o en el disco (lo escrito en un IDE, Guardar, Refresh): el
+// panel de Propiedades rearma las tarjetas de los scripts con sus propiedades nuevas
+extern unsigned g_ideScriptVersion;
 
 // TELEFONO: el lapiz (shift) apretado mientras se edita: abajo aparece la barra "Copiar | Pegar" (las dos softkeys)
 void IDEHeldPencil(bool pressed);

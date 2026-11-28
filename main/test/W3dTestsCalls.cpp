@@ -39,8 +39,8 @@
 #include "objects/Culling.h"
 #include "objects/Camera.h"
 #include "objects/Particles.h"
-#include "objects/UI.h"
-#include "objects/Rect2D.h"
+#include "WhiskUI/objects/UI.h"
+#include "WhiskUI/objects/Rect2D.h"
 #include "edit/Modifier.h"
 #include "edit/WeightPaint.h"            // WeightPaintEnsureMap
 #include "animation/SkeletalAnimation.h" // EvaluatePoseSkeleton / PrepareAuthoredSkin

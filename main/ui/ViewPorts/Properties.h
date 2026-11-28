@@ -247,6 +247,7 @@ struct PropertiesRows {
     enum { kMaxScriptCards = 8 };
     GroupPropertie* propScriptCards[kMaxScriptCards];
     int scriptSignature;             // rebuild de las tarjetas al cambiar de script/objeto
+    unsigned scriptTextSeen;         // la version del texto de los scripts que ya se vio (g_ideScriptVersion)
     // tarjeta PALETAS (del PROYECTO, pestania 0): filas dinamicas
     // nombre+color por entrada; la gestion respeta los invariantes
     // (misma cantidad en todas; borrar corrige referencias)
@@ -294,6 +295,7 @@ struct PropertiesRows {
     PropFloat*  propLightSpotCut;  // spot: angulo del cono
     PropFloat*  propLightSpotExp;  // spot: concentracion del haz
     PropFloat*  propLightRTRadius; // trazado de rayos: tamano de la lampara (0 = puntual, sombra dura)
+    PropFloat*  propLightSunAngle; // el SOL: su Angulo (0..180, como Blender) = 2 x rtRadius
     PropFloat*  propLightRTRays;   // trazado de rayos: rayos de sombra hacia esta lampara (0 = global)
     PropButton* propLightAreaShape; // la de area: la forma (cuadrado / rectangulo / disco / elipse)
     PropFloat*  propLightAreaX;     // la de area: el ancho en metros ("Size" en el cuadrado y el disco)
@@ -389,6 +391,7 @@ struct PropertiesRows {
     PropBool*   propBakeIndirect;
     PropFloat*  propBakeBounces;
     PropBool*   propBakeDenoiser;
+    PropBool*   propBakeShadowmask;  // las SOMBRAS del sol + la indirecta, con la luz de tiempo real (TexLayer::shadowmask)
     PropButton* propBakeButton;
     PropButton* propBakeBar;
     PropButton* propBakeCancel;      // Cancelar (la cruz), abajo de la barra mientras hornea
@@ -644,9 +647,16 @@ struct PropertiesRows {
     PropButton* propPvsMethod;
     PropButton* propPvsRecalc;
     PropLabel*  propPvsInfo;
+    // SCATTER (edit/ScatterMod.h): de donde (objeto/coleccion/escena/.w3d externo) + cual, desde donde de la malla,
+    // cuantas, semilla, escala/giro/inclinacion al azar, alinear, corrimiento, modo (Unida | Instancias), emisor visible
+    PropButton* propScatSource; PropButton* propScatTarget; PropButton* propScatScene; PropButton* propScatLib;
+    PropButton* propScatEmit;
+    PropFloat* propScatCount; PropFloat* propScatSeed; PropFloat* propScatScale; PropFloat* propScatScaleRand;
+    PropBool*  propScatAlign; PropFloat* propScatRotRand; PropFloat* propScatTilt; PropFloat* propScatOffset;
+    PropButtonRow* propScatMode; PropBool* propScatShowEmitter;
+    PropLabel* propScatInfo;
     GroupPropertie* propMeshEdit;      // card "Edicion" (pestania Mesh): interruptor editable/no-editable
     PropButton* propBtnMeshEditable;   // "Borrar datos para edicion" / "Convertir en mesh editable"
-    PropBool* propMeshLockNormals; // casilla "Bloquear normales" (Mesh::lockNormals)
     // card "3D Mesh" (la PRIMERA de la pestania "Malla 3D", la 3): que malla 3D (un RECURSO de la
     // biblioteca, objects/MeshResource.h) usa el objeto. SOLO se elige: el nombre y la carpeta del
     // recurso se editan en la biblioteca (el outliner)

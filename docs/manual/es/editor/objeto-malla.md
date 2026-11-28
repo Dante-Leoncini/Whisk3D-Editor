@@ -71,7 +71,7 @@ El material decide cómo se ve la parte: su color, su textura y cómo le pega la
 |---|---|
 | Renombrar Material | Le cambia el nombre al material. |
 | Color | La textura de la parte, el cuadradito del **Color Base** y el mapa UV que usa la textura. |
-| Metálico, Rugosidad, Emisión, Normal, Alfa | Cada uno puede ser un número o una textura (el botón **Número / textura**). Con la luz **Por píxel** el metálico y la rugosidad se ven en la Vista 3D como en el trazado de rayos: lo metálico pierde el color difuso y su brillo toma el color del material, y lo rugoso abre el brillo (sin el trazado, un metal no refleja la escena: se ve oscuro con su brillo). Alfa es la transparencia: con menos de 1, o con una textura de alfa, el material pasa a ser transparente. El número se arrastra de costado (con el mouse o con el dedo) y un toque lo deja escribir. Mantener apretado (o el click derecho) da **Restablecer**, **Copiar** y **Pegar**, también para el color de la Emisión y el color base. |
+| Metálico, Rugosidad, Emisión, Normal, Alfa | Cada uno puede ser un número o una textura (el botón **Número / textura**). Con la luz **Por píxel** el metálico y la rugosidad se ven en la Vista 3D como en el trazado de rayos: lo metálico pierde el color difuso y su brillo toma el color del material, y lo rugoso abre el brillo (sin el trazado, un metal no refleja la escena: se ve oscuro con su brillo). El brillo y el reflejo se suman como la luz, en **lineal**: sobre algo oscuro se ven (el poquito que refleja un ojo negro o el vidrio de una ventana ya no queda negro, como en EEVEE). Alfa es la transparencia: con menos de 1, o con una textura de alfa, el material pasa a ser transparente. Con la luz por píxel, lo que un material transparente **refleja** (el brillo de las luces y el reflejo de la sonda o del fondo) se ve entero, como un vidrio: un casco con alfa 0.1 deja ver lo de adentro y igual muestra su reflejo (como el "Transparent + Glossy" de Blender). Un vidrio (alfa por debajo de la mitad) tampoco proyecta sombra en tiempo real. El número se arrastra de costado (con el mouse o con el dedo) y un toque lo deja escribir. Mantener apretado (o el click derecho) da **Restablecer**, **Copiar** y **Pegar**, también para el color de la Emisión y el color base. |
 | Recorte alfa | Corta lo que tiene alfa bajo, sin mezclar: para rejas, alambrados u hojas. 0 lo apaga. |
 | Transmisión, IOR | Vidrio. La **Transmisión** (0 a 1) es cuánto del material es vidrio; el **IOR** (aparece con transmisión) es cuánto dobla la luz: 1 no la dobla, 1.33 es agua, 1.5 vidrio. Al subir la transmisión con el IOR en 1, pasa solo a 1.5. Con el **Trazado de rayos** el vidrio refracta lo de atrás; en la Vista 3D con luz **Por píxel** (OpenGL ES 2.0, Vulkan, la web), en la **Vista Material** y en la **Vista Render**, también se ve lo de atrás corrido por el IOR y borroso según la **Rugosidad**, y refleja más de costado. En una placa chica (la de los Android 2.3) lo que no entra se va sacando solo: primero el reflejo del fondo 360, después el vidrio; la malla se sigue viendo. Sin shaders (OpenGL, el N95) baja la opacidad. |
 | Reflejos en pantalla | Con luz **Por píxel**: lo que ya está dibujado se refleja en el material (un piso mojado, un metal pulido), más con poca rugosidad, con el metálico y mirando de costado. En la PC usa también la profundidad de la pantalla: sigue el rayo reflejado hasta lo que toca, así que funciona como un espejo (lo que está arriba de un piso sale dado vuelta, a su distancia). En Android y en la web es una aproximación, porque no puede leer la profundidad. Lo que no está en la pantalla, o queda hacia la cámara, se toma del fondo 360. |
@@ -89,7 +89,7 @@ Si el objeto tiene física (Añadir → Física), su tarjeta **Física** aparece
 
 ### Precalcular iluminación
 
-Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a la malla: la de las lámparas (con las **sombras** de lo que haya en el medio) y la **luz indirecta** (el fondo y lo que rebota). Solo cuentan los objetos tildados como **Estático**. Es lo que se usa para un escenario: la luz se calcula una vez y después no cuesta nada, ni en el N95.
+Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a la malla: la de las lámparas (con las **sombras** de lo que haya en el medio) y la **luz indirecta** (el fondo y lo que rebota). Solo cuentan los objetos tildados como **Estático**. Es lo que se usa para un escenario: la luz se calcula una vez y después no cuesta nada, ni en el N95. La luz queda en una capa del material, así que la tarjeta aparece solo si la malla tiene un **material propio** (con el material por defecto no está: asignale uno).
 
 | Propiedad | Qué hace |
 |---|---|
@@ -99,6 +99,7 @@ Debajo de la tarjeta Material. Guarda en una **textura** la luz que le llega a l
 | Muestras | Cuántos rayos de luz indirecta se tiran por cada píxel. Más muestras, menos granulado, más tiempo. |
 | Rebotes | Cuántas veces rebota la luz (de 1 a 8). Con más rebotes las sombras reciben la luz que rebota en lo que las tapa (la sombra de un cubo no queda negra), y se tarda más. |
 | Denoiser | Suaviza la luz indirecta para que no quede granulada. Las sombras de las lámparas quedan nítidas igual. |
+| Shadowmask (luz en tiempo real) | Hornea solo las **sombras del sol** y la **luz indirecta**, y el material **sigue con su luz de tiempo real**. Ver abajo. |
 | Hornear | Calcula la luz. Mientras trabaja, la barra muestra el avance y abajo de la barra está **Cancelar** (la cruz). |
 
 Solo se pisan los píxeles de las caras de la malla en esa UV (y dos de margen alrededor); el resto de la textura queda como estaba. Se puede deshacer con Ctrl+Z.
@@ -106,6 +107,19 @@ Solo se pisan los píxeles de las caras de la malla en esa UV (y dos de margen a
 Al terminar, la textura queda como **capa de textura de luz horneada** (mezcla *Multiply 2x*, con esa UV) en todos los materiales de la malla, y **reemplaza** la luz que tenían horneada en otra textura (no se multiplican las dos). Mientras esa capa esté prendida, el material no usa la luz de tiempo real (la luz ya está en la textura y se sumaría dos veces); si sacás o apagás la capa, vuelve la luz de siempre. Si movés una lámpara o un objeto estático, volvé a hornear.
 
 Los objetos **no estáticos** (los que se mueven) no se hornean: toman la luz de una [Sonda de luz](objeto-sonda-luz.md).
+
+#### Shadowmask: las sombras horneadas, la luz en tiempo real
+
+Con la luz entera en la textura, el material pierde lo que la luz de tiempo real le da: el relieve del **normal map** (las ondas de un suelo de arena), el **brillo**, el **metal** y los **reflejos**. Un cohete de metal queda chato, como pintado. Con **Shadowmask** tildado se hornea otra cosa, como el modo *Shadowmask* de Unity con la luz indirecta horneada:
+
+- En el **alfa** de la textura, **cuánto ve al sol** cada lugar: 0 donde algo estático le tapa el sol. Multiplica la luz de las lámparas **direccionales** (el sol).
+- En el **color**, la **luz indirecta** que le llega (el fondo y lo que rebota, hasta el doble de blanco, como *Multiply 2x*). **Reemplaza** a la luz ambiente.
+
+El material sigue con su luz de tiempo real: el normal map, el brillo, el metal y los reflejos (del fondo o de una [Sonda de reflejo](objeto-sonda-reflejo.md)) se ven como siempre, con las sombras de lo quieto encima. Al hornear, el material pasa a **luz por píxel**, porque la capa la usa ese shader. Las sombras de lo que **se mueve** siguen en tiempo real sobre la capa, sin oscurecer dos veces lo que ya está en sombra.
+
+Va con el backend de shaders (el de la PC, Android con GL ES 2, Vulkan). En el pipeline fijo (N95, PSP) la capa no hace nada y el material queda con su luz de siempre, sin las sombras horneadas.
+
+Un escenario entero se hornea así, objeto por objeto, cada uno en su textura y por una capa UV propia sin caras encimadas. Así lo hace el convertidor de Blender de Bongo Cat con la escena de Marte.
 
 Cada objeto decide, en su pestaña **Objeto**, qué hace con la luz al hornear:
 

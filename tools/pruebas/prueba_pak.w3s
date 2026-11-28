@@ -1,0 +1,11 @@
+# ==========================================================================
+#  EL PAK DE UN JUEGO COMPILADO (Assets: Empaquetados) se lee a TRAMOS sin descifrar el archivo entero (reporte de
+#  Kitten Dungeon, 2026-11-27: el juego tardaba ~15 s en mostrar el titulo). Antes, cada pedacito que pedia el lector
+#  de mallas descifraba el archivo ENTERO, "existe?" tambien lo descifraba, y buscar un archivo recorria la lista. Ahora:
+#  un indice por nombre, "existe?" sin descifrar, y el flujo XOR SALTA hasta el tramo pedido (xorshift lineal: potencias
+#  de su matriz). paktest arma un pak con el escritor de verdad (CompileGame.cpp) y compara contra los originales:
+#  entero, tramos sueltos (offsets que no son multiplo de 4, el ultimo byte, largo 0), a pedacitos de 1 KB, y que un
+#  archivo que no esta no exista. Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_pak.w3s
+# ==========================================================================
+paktest prueba_sonido.wav fondo360_prueba.png

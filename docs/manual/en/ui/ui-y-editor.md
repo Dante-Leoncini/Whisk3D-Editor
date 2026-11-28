@@ -24,7 +24,7 @@ The editor is built with Whisk3D UI, but much of what you see in it is its own. 
 | Tooltips. The text is stored in `Button::help` | `W3dHelpRender`, in `main/ui/ViewPorts/LayoutInput.cpp` |
 | Which key, click or tap goes to each widget, and the N95's keys | `main/ui/ViewPorts/LayoutInput.cpp`, `main/app/controls.cpp`, `platform/symbian/src/` |
 | The text boxes' focus functions | `main/ui/ViewPorts/NumInput.cpp` |
-| Translations, `T()`. The UI only has the `W3dMenuTranslate` hook | `main/config/W3dLang.cpp` |
+| Translations, `T()`. The UI only has the `W3dMenuTranslate` hook | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | Starting up the UI | `main/app/W3dInitUI.cpp` |
 | Building the skin atlas with the separate icons | `main/io/SkinAtlas.cpp` |
 | Recalculating the scale | `SetGlobalScale`, in `main/ui/ViewPorts/ViewPorts.cpp` |
@@ -32,9 +32,9 @@ The editor is built with Whisk3D UI, but much of what you see in it is its own. 
 | The editor's own colors: the floor, the axes, the normals | `main/ui/W3dColors.cpp` |
 | The skin files: `font.png`, `font-ext.png`, `atlas/icons/`, `skin.ini` | `res/Skins/Whisk3D/` |
 | The extended atlas generator | `tools/fuente_ext.py` |
-| The [2D Editor](../editor/editor-2d.md) and games' `.w3dui` interfaces: texts, images, rectangles, containers, 9-slice, buttons and videos | `main/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `main/render/UIOverlay.cpp`, `main/io/UI2DFormat.cpp`, `main/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
+| The [2D Editor](../editor/editor-2d.md) and games' `.w3dui` interfaces: texts, images, rectangles, containers, 9-slice, buttons and videos | `libs/WhiskUI/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `libs/WhiskUI/render/UIOverlay.cpp`, `libs/WhiskUI/io/UI2DFormat.cpp`, `libs/WhiskUI/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
 
-The 2D Editor draws text with `W3dTextAtlas`, which belongs to the UI. Baking a TTF at runtime, with stb_truetype, belongs to the editor (`main/io/Font2D.cpp`).
+The 2D Editor draws text with `W3dTextAtlas`, which belongs to the UI. Baking a TTF at runtime, with stb_truetype, belongs to the editor (`libs/WhiskUI/io/Font2D.cpp`).
 
 ## In the UI, but the editor's
 

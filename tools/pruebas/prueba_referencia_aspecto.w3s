@@ -1,0 +1,31 @@
+# ==========================================================================
+#  ADD > REFERENCE: un VACIO con IMAGEN (forma Imagen, objects/Empty.h; como el "Image Empty" de Blender), no una malla:
+#  no va a "Mallas 3D" de la biblioteca ni sale en el render. La imagen no se deforma: su cuadro toma la proporcion de la
+#  imagen al cargarla (LayoutReferenceTexture), con el lado largo en 2 m. Como en Blender, la imagen va acostada en el
+#  X-Y del objeto y la referencia nace GIRADA 90 EN X (escala 1): en el mundo queda parada, mirando a la vista de frente,
+#  derecha y sin espejar (addrefimage lo verifica con las esquinas). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_referencia_aspecto.w3s
+#
+#  El tamano sale del ENCABEZADO de la imagen (el de la textura subida puede no servir: el N95 no lo anota y un telefono
+#  viejo la estira a potencia de 2), asi que va un archivo de cada formato del selector:
+#    PNG ancho 256x128 -> 2 x 1     JPEG alto 72x128 -> 1.125 x 2     BMP ancho 48x16 -> 2 x 0.667
+#    TGA alto 20x50 -> 0.8 x 2
+#  y una imagen cuadrada queda cuadrada (2 x 2)
+#  Despues: la imagen, su tamanio y la opacidad viajan en el .w3d
+# ==========================================================================
+addrefimage fondo360_prueba.png 2 1
+addrefimage ref_alta.jpg 1.125 2
+addrefimage ref_ancha.bmp 2 0.667
+addrefimage ref_alta.tga 0.8 2
+addrefimage alfa_reja.png 2 2
+# ---- guardar y abrir: vuelve la referencia con su imagen, su proporcion y su opacidad ----
+selobj Referencia
+emptyimage 2 1
+emptyset 5 2 0 0 0 0.4
+emptyimage 2 1 0.4
+savew3d /tmp/w3d_prueba_referencia.w3d
+openw3d /tmp/w3d_prueba_referencia.w3d
+selobj Referencia
+emptyimage 2 1 0.4
+selobj Referencia.001
+emptyimage 1.125 2 1

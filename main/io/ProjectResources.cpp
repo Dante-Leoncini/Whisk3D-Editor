@@ -13,7 +13,7 @@
 #include "io/JsonW3d.h"
 #include "io/SaveAnimSets.h"           // usuarios / renombrar / carpeta de los animsets
 #include "io/ProjectMeshes.h"          // TODA malla es un recurso: se asegura antes de listar
-#include "io/UI2DFormat.h"             // la carpeta del .w3d abierto (base de las rutas "ext:")
+#include "WhiskUI/io/UI2DFormat.h"             // la carpeta del .w3d abierto (base de las rutas "ext:")
 #include "io/ResourceData.h"           // los datos de imagenes y sonidos (Properties)
 #include "w3dTexture.h"                // TextureMemoryOf (lo que ocupa una textura en la GPU)
 #include "io/Thumbnails.h"             // las miniaturas de la cuadricula se sueltan al cerrar el proyecto
@@ -26,11 +26,11 @@
 #include "objects/Textures.h"
 #include "objects/Armature.h"
 #include "objects/Particles.h"
-#include "objects/Image2D.h"
-#include "objects/Slice9.h"
-#include "objects/Button2D.h"
-#include "objects/Text2D.h"            // la FUENTE BITMAP de un texto 2D es un usuario de textura
-#include "objects/Video2D.h"           // el archivo de un video 2D
+#include "WhiskUI/objects/Image2D.h"
+#include "WhiskUI/objects/Slice9.h"
+#include "WhiskUI/objects/Button2D.h"
+#include "WhiskUI/objects/Text2D.h"            // la FUENTE BITMAP de un texto 2D es un usuario de textura
+#include "WhiskUI/objects/Video2D.h"           // el archivo de un video 2D
 #include "objects/Sound.h"             // el archivo de un objeto Sonido
 #include "animation/W3dAnimSet.h"
 #include "animation/SkeletalAnimation.h" // W3D_RETARGET_*: el retarget por defecto de un clip de jerarquia

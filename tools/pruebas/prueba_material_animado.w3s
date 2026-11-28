@@ -6,13 +6,13 @@
 #  1. la FUERZA DE LA EMISION que parpadea (interpolacion constante): cambia justo en los frames de sus keyframes, se
 #     ve en el trazado de rayos, y volver atras con el cabezal devuelve el valor de la curva (sin quedar corrido)
 #  2. el rombo de la tarjeta (el gancho del panel): estado, poner / sacar, y el Ctrl+Z del keyframe insertado
-#  3. la TRANSFORMACION UV animada (el desplazamiento U) mueve la textura: trazado de rayos, raster (GL) y render
-#  4. el reproductor del JUEGO (animScene) tambien aplica las pistas de material
-#  5. el dope sheet lista los canales del material de la malla elegida y los edita (mover, interpolacion, borrar)
-#  6. se GUARDA: curvas y campos nuevos vuelven iguales al abrir, y el material se guarda en su reposo (frame de inicio)
-#  7. lua: setMaterialUV / getMaterialUV / setEmissionStrength / getEmissionStrength
-#  8. el menu de la fila (click derecho): Insert Keyframe / Delete All Keyframes, con Ctrl+Z; y la 'I' encima de la fila
-#  9. con shaders (--backend es2): el mapa de emision va por la fuerza y por la transformacion UV sin textura base
+#  3. el reproductor del JUEGO (animScene) tambien aplica las pistas de material
+#  4. el dope sheet lista los canales del material de la malla elegida y los edita (mover, interpolacion, borrar)
+#  5. se GUARDA: curvas y campos nuevos vuelven iguales al abrir, y el material se guarda en su reposo (frame de inicio)
+#  6. lua: setEmissionStrength / getEmissionStrength
+#  7. el menu de la fila (click derecho): Insert Keyframe / Delete All Keyframes, con Ctrl+Z; y la 'I' encima de la fila
+#  8. con shaders (--backend es2): el mapa de emision va por la fuerza sin textura base
+#  (MOVER una textura no es del material: es la UV de la malla -su animacion por vertice, el flipbook o un armature 2D-)
 # ==========================================================================
 window 1280 720
 add plane
@@ -79,134 +79,64 @@ matkeys metallic 0 0
 undo
 matkeys metallic 0 1
 
-# ---- 3) la TRANSFORMACION UV: una textura roja | azul que se corre en U ----
-# (el metalico animado de arriba vuelve a 0: un metal refleja y no deja ver la textura)
-matkey metallic 0 11 0
-matset emission 0 0
-matset emission 1 0
-matset emission 2 0
-matset color 0 1
-matset color 1 1
-matset color 2 1
-matmap base texture mat_anim_uv.png
-textures
-# el desplazamiento U animado: 0 en el frame 1, 0.5 en el 30 (lineal)
-matkey uvoffset 0 1 0 linear
-matkey uvoffset 0 30 0.5 linear
-frame 15
-matchan uvoffset 0 0.2414 0.01
-# frame 1: la mitad izquierda del plano ROJA y la derecha AZUL (trazado de rayos: debajo del cubo)
-frame 1
-matchan uvoffset 0 0
-rtrender 96 72 1
-rtpixel 24 60 60 0 0 30
-rtpixel 72 60 0 0 80 30
-# frame 30: la textura corrida media vuelta -> los colores cambian de lado
-frame 30
-matchan uvoffset 0 0.5
-rtrender 96 72 1
-rtpixel 24 60 0 0 80 30
-rtpixel 72 60 60 0 0 30
-# lo mismo en el RASTER (la matriz de textura de GL / el shader): la vista Material
-vpview material
-frame 1
-tick 2
-uishot /tmp/w3d_matanim_gl1.png
-pngpx /tmp/w3d_matanim_gl1.png 300 470 247 0 0 - 40
-pngpx /tmp/w3d_matanim_gl1.png 620 470 0 0 247 - 40
-frame 30
-tick 2
-uishot /tmp/w3d_matanim_gl30.png
-pngpx /tmp/w3d_matanim_gl30.png 300 470 0 0 247 - 40
-pngpx /tmp/w3d_matanim_gl30.png 620 470 247 0 0 - 40
-# ...y en Render Image (el render de la imagen, desde la vista)
-rendersize 320 180
-frame 1
-renderimage /tmp w3d_matanim_ri.png
-pngpx /tmp/w3d_matanim_ri_0001.png 110 140 80 0 0 - 45
-pngpx /tmp/w3d_matanim_ri_0001.png 210 140 0 0 90 - 45
-frame 30
-renderimage /tmp w3d_matanim_ri.png
-pngpx /tmp/w3d_matanim_ri_0030.png 110 140 0 0 90 - 45
-pngpx /tmp/w3d_matanim_ri_0030.png 210 140 80 0 0 - 45
-# la ROTACION de la UV (180 grados alrededor del centro: tambien da vuelta los lados) sin animar
-frame 1
-matuv 0 0 1 1 180
-rtrender 96 72 1
-rtpixel 24 60 0 0 80 30
-rtpixel 72 60 60 0 0 30
-undo
-rtrender 96 72 1
-rtpixel 24 60 60 0 0 30
-
-# ---- 4) el reproductor del JUEGO (animScene de lua) tambien mueve los materiales ----
+# ---- 3) el reproductor del JUEGO (animScene de lua) tambien mueve los materiales ----
 matgame 30
-matchan uvoffset 0 0.5
+matchan strength 0 0
 matgame 15
 matchan strength 0 1
-matchan uvoffset 0 0.2414 0.01
 
-# ---- 5) el DOPE SHEET: los canales del material del plano (elegido) ----
+# ---- 4) el DOPE SHEET: los canales del material del plano (elegido): la fuerza y el metalico ----
 frame 1
-matdope 3
-# moverlos (el keyframe del 30 al 40), la interpolacion, borrarlos: todo con Ctrl+Z
-matdopemove 30 40
-frame 40
-matchan uvoffset 0 0.5
-frame 30
-matchan uvoffset 0 0.3718 0.01
-undo
-frame 29
-frame 30
-matchan uvoffset 0 0.5
-matdopeinterp 1 constant
-frame 20
-matchan uvoffset 0 0
+matdope 2
+# moverlos (el keyframe del 20 al 25), la interpolacion, borrarlos: todo con Ctrl+Z
+matdopemove 20 25
+frame 22
+matchan strength 0 1
+frame 25
+matchan strength 0 0
 undo
 frame 21
-frame 20
-matchan uvoffset 0 0.3276 0.01
-matdopedelete 30
-matkeys uvoffset 0 1
+frame 22
+matchan strength 0 0
+# el keyframe del 10 pasa a LINEAL: de 1 en el 10 a 0 en el 20 (0.5 en el 15)
+matdopeinterp 10 linear
+frame 15
+matchan strength 0 0.5 0.01
 undo
-matkeys uvoffset 0 2
+frame 14
+frame 15
+matchan strength 0 1
+matdopedelete 20
+matkeys strength 0 2
+undo
+matkeys strength 0 3
 
-# ---- 6) se GUARDA (en su reposo: el frame de inicio) y vuelve igual ----
-matuv 0 0 2 1 0 0 1
+# ---- 5) se GUARDA (en su reposo: el frame de inicio) y vuelve igual ----
 frame 15
 matchan strength 0 1
 savew3d /tmp/w3d_matanim_1.w3d
 # (el guardado no se llevo la pose del cabezal: el material sigue como estaba)
 matchan strength 0 1
-matchan uvoffset 0 0.2414 0.01
 jsonhas /tmp/w3d_matanim_1.w3d "materials":
 jsonhas /tmp/w3d_matanim_1.w3d "emissionStrength":
-jsonhas /tmp/w3d_matanim_1.w3d "uvScale":
-jsonhas /tmp/w3d_matanim_1.w3d "uvPivot":
 openw3d /tmp/w3d_matanim_1.w3d
 selobj Plano
-# recien abierto el material tiene su REPOSO (frame 1: apagado y sin desplazar) hasta que el cabezal lo pose
+# recien abierto el material tiene su REPOSO (frame 1: apagado) hasta que el cabezal lo pose
 matkeys strength 0 3
-matkeys uvoffset 0 2
 matkeys metallic 0 1
-matchan uvscale 0 2
 frame 2
 frame 15
 matchan strength 0 1
-matchan uvoffset 0 0.2414 0.01
-matdope 3
+matdope 2
 savew3d /tmp/w3d_matanim_2.w3d
 w3dequal /tmp/w3d_matanim_1.w3d /tmp/w3d_matanim_2.w3d
 
-# ---- 7) lua (el cuerpo del script corre con la API: prueba_material_animado.lua) ----
-luaprops prueba_material_animado.lua uvOk 1
+# ---- 6) lua (el cuerpo del script corre con la API: prueba_material_animado.lua) ----
 luaprops prueba_material_animado.lua strength 3.5
-luaprops prueba_material_animado.lua missing 0
+luaprops prueba_material_animado.lua missing 1
 matchan strength 0 3.5
-matchan uvoffset 1 0.5
-matchan uvrot 0 45
 
-# ---- 8) el MENU de la fila (click derecho sobre la Rugosidad de la tarjeta): Insert Keyframe / Delete All Keyframes,
+# ---- 7) el MENU de la fila (click derecho sobre la Rugosidad de la tarjeta): Insert Keyframe / Delete All Keyframes,
 #      con Ctrl+Z (una ventana alta: la tarjeta Material entera a la vista) ----
 window 1200 1800
 propstab 2
@@ -231,8 +161,8 @@ matkeys roughness 0 0
 key i
 matkeys roughness 0 1
 
-# ---- 9) con SHADERS (GLES 2.0 / WebGL / Vulkan: correr con --backend es2): el MAPA de emision tambien va por la fuerza
-#      animada y por la transformacion UV aunque no haya textura base (el pipeline fijo no dibuja los mapas: ahi termina) ----
+# ---- 8) con SHADERS (GLES 2.0 / WebGL / Vulkan: correr con --backend es2): el MAPA de emision tambien va por la fuerza
+#      animada aunque no haya textura base (el pipeline fijo no dibuja los mapas: ahi termina) ----
 pixelshading
 window 1280 720
 vpview material
@@ -258,9 +188,3 @@ frame 2
 tick 2
 uishot /tmp/w3d_matanim_es2.png
 pngpx /tmp/w3d_matanim_es2.png 300 470 24 24 24 - 40
-frame 1
-matuv 0.5 0 1 1 0
-tick 2
-uishot /tmp/w3d_matanim_es3.png
-pngpx /tmp/w3d_matanim_es3.png 300 470 24 24 255 - 40
-pngpx /tmp/w3d_matanim_es3.png 620 470 255 24 24 - 40

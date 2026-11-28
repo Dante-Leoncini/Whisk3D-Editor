@@ -1,0 +1,31 @@
+# ==========================================================================
+#  UNA MALLA ESCALADA SE ILUMINA BIEN EN EL JUEGO COMPILADO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_escala.w3s
+#
+#  EL PROBLEMA QUE ESTA PRUEBA CIERRA. El editor prende al arrancar la renormalizacion de las normales
+#  (W3dInitUI.cpp: Enable(Normalize), "renormalizar tras escalar"); el runtime de los juegos compilados no la
+#  prendia. En el pipeline fijo las normales de una malla ESCALADA salian estiradas por la escala: con escala < 1
+#  mas claro, con > 1 mas oscuro, y con un eje muy fino (una tapa chata, una varilla, una marca de un reloj) las
+#  caras que miran por ese eje quedaban NEGRAS. En el editor se veia bien y en el juego no (asi aparecio: el
+#  ejemplo del reloj salia todo negro compilado). Ahora game/w3drun.cpp la prende en el pase 3D.
+#
+#  Como: el juego 3D minimo (cubo en el centro, linterna en la camara) con el cubo CHATO (z = 0.05, la cara de
+#  adelante mira por ese eje). game3dpx mira que el centro de la captura no sea negro, ademas del encuadre y el HUD.
+#
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+window 640 480
+
+game3dmin /tmp/w3d_juego3d_escala light
+# el CUBO (el primer objeto de la escena) chato: la cara de adelante mira por el eje fino
+active 0
+objscale 2 2 0.05
+savew3d /tmp/w3d_juego3d_escala/juego3dmin.w3d
+openw3d /tmp/w3d_juego3d_escala/juego3dmin.w3d
+
+compilegame 0 0
+
+game3dpx /tmp/w3d_juego3d_escala juego3dmin

@@ -4,7 +4,7 @@
 // ============================================================================
 #include "W3dLang.h"   // T(): los avisos salen en el idioma del editor
 #include "io/CompileGame.h"
-#include "io/UI2DFormat.h"
+#include "WhiskUI/io/UI2DFormat.h"
 #include "io/SaveW3D.h"            // g_projIcon: el icono del juego (ruta externa)
 #include "io/SaveVersion.h"        // SaveVersionCollectFrom: rutas reales que referencian las escenas
 #include "io/W3dContainer.h"      // FORMATO v4: el staging es un espejo del contenedor
@@ -13,7 +13,7 @@
 #include "io/Libraries.h"            // las LIBRERIAS externas que usa el proyecto viajan con el juego
 #include "io/W3dStore.h"             // W3dLibPathPacked: donde las busca el runtime
 #include "objects/Objects.h"
-#include "objects/UI.h"
+#include "WhiskUI/objects/UI.h"
 #include "objects/Gamepad.h"
 #include "script/W3dScript.h"
 #include "W3dScene.h"                // escena inicial (multi-escena) al compilar
@@ -583,6 +583,15 @@ static std::string RepoRoot(std::string* via) {
 }
 std::string CompileGameRepoRoot(std::string* via) { return RepoRoot(via); }
 
+// LOS RECURSOS DEL EDITOR que viajan con un juego (la fuente por defecto, el icono de Whisk3D si el proyecto no trae):
+// los del EDITOR QUE COMPILA (su res/, tambien el instalado) y, si no estan, los del repo. Asi un juego que solo
+// tiene el Core y la UI (W3D_REPO = la carpeta con libs/Whisk3DCore y libs/WhiskUI) compila con el editor instalado
+static std::string EditorRes(const std::string& repo) {
+    const std::string own = w3dFileSystem::GetResDir();
+    if (!own.empty() && w3dFileSystem::FileExists(own + "/Whisk3D.png")) return own;
+    return repo + "/res";
+}
+
 // asegura el .gitignore de la carpeta del juego: platform-build/ (todo lo generado
 // para compilar) y build/ (los resultados) se REGENERAN con "Compilar juego", asi que
 // no van al repo. Si el .gitignore no existe se crea con un comentario breve; si
@@ -1015,25 +1024,11 @@ static bool CompileLuasStaging(const std::string& out, std::string* err,
 // arma el pak con los archivos del juego y lo escribe como <out>/pak.cpp
 // (array de bytes + tamano; el main generado lo registra). false si no hay
 // archivos o no se pudo leer/escribir algo ('err' cuenta que paso).
-static bool WritePak(const std::string& out, const std::string& name, std::string* err) {
-    std::vector<std::string> paths;
-    PakListRoot(out, &paths);
-    // EL PAK SE ARMA DEL MISMO ESPEJO QUE COPIAN LOS OTROS TRES TARGETS: las
-    // carpetas del contenedor volcado (textures/, scripts/, fonts/, meshes/...)
-    // mas las dos de los proyectos v3. Si una carpeta no existe, no agrega nada.
-    for (int c = 0; CarpAsset(c); c++)
-        PakListAssets(out, CarpAsset(c), &paths);
-    if (paths.empty()) { *err = T("there are no game files to pack"); return false; }
-
-    // contenido de cada archivo (en memoria: los juegos Whisk3D son chicos)
-    std::vector< std::vector<unsigned char> > data(paths.size());
-    for (size_t i = 0; i < paths.size(); i++) {
-        if (!w3dFileSystem::ReadFileBytes(out + "/" + paths[i], data[i])) {
-            *err = BldFmt(T("could not read %s"), paths[i]); return false;
-        }
-    }
-    unsigned seed = PakSeed(name);
-
+// ARMA los bytes de un pak (formato en libs/Whisk3DCore/io/w3dFilesystem.cpp, W3dPakRegister): cabecera + TOC +
+// cada archivo con su flujo XOR. La usa WritePak y la prueba del lector (paktest): UN solo escritor
+void W3dPakBuildBytes(const std::vector<std::string>& paths, const std::vector< std::vector<unsigned char> >& data,
+                      unsigned seed, std::vector<unsigned char>& pak) {
+    pak.clear();
     // layout: 12 de cabecera + (4 + entradas) de TOC + los datos seguidos
     unsigned tocSize = 4;
     for (size_t i = 0; i < paths.size(); i++) tocSize += 2 + (unsigned)paths[i].size() + 8;
@@ -1041,7 +1036,6 @@ static bool WritePak(const std::string& out, const std::string& name, std::strin
     std::vector<unsigned> offs(paths.size());
     for (size_t i = 0; i < paths.size(); i++) { offs[i] = off; off += (unsigned)data[i].size(); }
 
-    std::vector<unsigned char> pak;
     pak.reserve(off);
     static const unsigned char magic[8] = { 'W','3','D','P','A','K','1','\n' };
     pak.insert(pak.end(), magic, magic + 8);
@@ -1065,6 +1059,29 @@ static bool WritePak(const std::string& out, const std::string& name, std::strin
         for (size_t k = 0; k < data[i].size(); k++)
             pak.push_back((unsigned char)(data[i][k] ^ PakFlowByte(&f)));
     }
+
+}
+
+static bool WritePak(const std::string& out, const std::string& name, std::string* err) {
+    std::vector<std::string> paths;
+    PakListRoot(out, &paths);
+    // EL PAK SE ARMA DEL MISMO ESPEJO QUE COPIAN LOS OTROS TRES TARGETS: las
+    // carpetas del contenedor volcado (textures/, scripts/, fonts/, meshes/...)
+    // mas las dos de los proyectos v3. Si una carpeta no existe, no agrega nada.
+    for (int c = 0; CarpAsset(c); c++)
+        PakListAssets(out, CarpAsset(c), &paths);
+    if (paths.empty()) { *err = T("there are no game files to pack"); return false; }
+
+    // contenido de cada archivo (en memoria: los juegos Whisk3D son chicos)
+    std::vector< std::vector<unsigned char> > data(paths.size());
+    for (size_t i = 0; i < paths.size(); i++) {
+        if (!w3dFileSystem::ReadFileBytes(out + "/" + paths[i], data[i])) {
+            *err = BldFmt(T("could not read %s"), paths[i]); return false;
+        }
+    }
+    unsigned seed = PakSeed(name);
+    std::vector<unsigned char> pak;
+    W3dPakBuildBytes(paths, data, seed, pak);
 
     // pak.cpp: el array + su tamano (el main generado los declara extern y llama
     // a W3dPakRegister antes de cargar nada)
@@ -1134,7 +1151,7 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     fputs("#if !defined(__ANDROID__) && !defined(W3D_PSP) && !defined(W3D_3DS)\n#define SDL_MAIN_HANDLED\n#endif\n", f);
     fputs("#include <SDL2/SDL.h>\n#include \"w3drun.h\"\n", f);
     // LAS CONSOLAS (PSP, PS Vita, 3DS, Dreamcast): la ventana, los graficos, cada cuadro y la carpeta de los assets
-    // van por la capa de consola del runtime (Whisk3D-Examples/game/w3dconsola.h)
+    // van por la capa de consola del runtime (libs/Whisk3DCore/game/w3dconsola.h)
     fputs("#ifdef W3D_CONSOLE\n#include \"w3dconsola.h\"\n#endif\n", f);
     fputs("#include \"w3dGraphics.h\"\n", f);
     fputs("#include \"io/w3dFilesystem.h\"\n#include \"base/W3dConfig.h\"\n", f);
@@ -1741,24 +1758,24 @@ static const char* kSourcesBase[] = {
     "${UILIB}/text/W3dFont.cpp", "${UILIB}/text/bitmapText.cpp", "${UILIB}/text/font.cpp",
     "${UILIB}/draw/glesdraw.cpp", "${UILIB}/draw/W3dAtlasPacker.cpp",
     "${UILIB}/core/UI.cpp", "${UILIB}/theme/colors.cpp",
-    "${W3DROOT}/main/render/UIOverlay.cpp", "${W3DROOT}/main/script/BindsGame.cpp",
+    "${UILIB}/render/UIOverlay.cpp", "${CORE}/script/BindsGame.cpp",
     // Rutina va SIEMPRE: BindsJuego la usa sin ifdef (memorias, paso/setPaso). Los planos del paso "Test de
     // visibilidad" le llegan por hook desde Culling.cpp (solo 3D)
-    "${W3DROOT}/main/objects/Routine.cpp",        // Rutina: lista de pasos del render (sin la validacion del editor)
-    "${W3DROOT}/main/config/W3dProfile.cpp",      // W3dNowMs: el reloj de las rutinas (CloseRun)
-    "${W3DROOT}/main/config/W3dLang.cpp",         // T(): los avisos del juego (un mando se conecta) en su idioma
-    "${W3DROOT}/main/W3dScene.cpp",
-    "${W3DROOT}/main/io/UI2DFormat.cpp", "${W3DROOT}/main/io/Font2D.cpp",
-    "${W3DROOT}/main/io/Texture2D.cpp",
+    "${CORE}/objects/Routine.cpp",        // Rutina: lista de pasos del render (sin la validacion del editor)
+    "${CORE}/config/W3dProfile.cpp",      // W3dNowMs: el reloj de las rutinas (CloseRun)
+    "${CORE}/config/W3dLang.cpp",         // T(): los avisos del juego (un mando se conecta) en su idioma
+    "${CORE}/W3dScene.cpp",
+    "${UILIB}/io/UI2DFormat.cpp", "${UILIB}/io/Font2D.cpp",
+    "${UILIB}/io/Texture2D.cpp",
     0
 };
 // LOS INCLUDES comunes (misma razon: uno solo para las dos plataformas).
 static const char* kIncludesBase[] = {
-    "${W3DROOT}", "${W3DROOT}/libs", "${W3DROOT}/main", "${W3DROOT}/main/render", "${W3DROOT}/main/io",
-    // (main/config y main/app tambien en un juego 2D: BindsJuego incluye W3dNotice.h -> W3dLang.h, y Rutina incluye
-    // objects/Camera.h -> variables.h. Sin esto un juego solo 2D no compilaba)
-    "${W3DROOT}/main/config", "${W3DROOT}/main/app",
+    // UN JUEGO SE COMPILA SOLO CON EL CORE Y LA UI: ninguna carpeta del editor (main/). "${UILIB}/.." es la carpeta que
+    // CONTIENE a WhiskUI, para los includes "WhiskUI/objects/UI.h" (la convencion de la UI)
+    "${UILIB}/..",
     "${CORE}", "${CORE}/base", "${CORE}/graphics", "${CORE}/io", "${CORE}/math", "${CORE}/objects",
+    "${CORE}/render", "${CORE}/config", "${CORE}/edit", "${CORE}/importers", "${CORE}/game",
     "${CORE}/script", "${CORE}/animation", "${CORE}/thirdparty",
     "${UILIB}", "${UILIB}/text", "${UILIB}/draw", "${UILIB}/core", "${UILIB}/theme", "${UILIB}/widgets",
     0
@@ -1770,61 +1787,59 @@ static const char* kSources3D[] = {
     "${CORE}/objects/WorldBsp.cpp",            // el MUNDO del .w3dbsp v2 (geometria por hoja y material, un draw por material)
     "${CORE}/io/W3dZip.cpp",                   // el .w3d es un zip (rutas/entradas del proyecto)
     "${CORE}/io/W3dStore.cpp",
-    "${W3DROOT}/main/render/RenderOptions.cpp",  // g_renderBg + los flags de dibujo del Core
-    "${W3DROOT}/main/render/SceneRender.cpp",    // EL pase 3D compartido con el viewport del editor
-    "${W3DROOT}/main/render/RealTimeShadows.cpp",   // las sombras en tiempo real (el pase las arma antes de la escena)
-    "${W3DROOT}/main/importers/import_w3d.cpp",   // EL MISMO lector de proyecto que el editor
-    "${W3DROOT}/main/importers/import_obj.cpp",   // carga diferida de texturas + materiales
-    "${W3DROOT}/main/importers/import_wobj.cpp",  // mallas .obj referenciadas (proyectos viejos)
-    "${W3DROOT}/main/edit/MeshEdit.cpp",          // genera la malla de render (modificadores, bordes, PVS)
-    "${W3DROOT}/main/edit/BooleanMod.cpp",        // BooleanPoly: el modificador booleano de Mesh_ApplyStack
-    "${W3DROOT}/main/objects/EditMesh.cpp",
-    "${W3DROOT}/main/objects/Primitives.cpp",
-    "${W3DROOT}/main/objects/Camera.cpp",         // camara + riel (el encuadre del juego sale de aca)
-    "${W3DROOT}/main/objects/Curve.cpp",
-    "${W3DROOT}/main/objects/Culling.cpp",
-    "${W3DROOT}/main/objects/LOD.cpp",
-    "${W3DROOT}/main/objects/Fog.cpp",            // la niebla puesta en el arbol (solo en Render)
-    "${W3DROOT}/main/objects/Sound.cpp",          // el audio puesto en la escena (objeto Sonido)
-    "${W3DROOT}/main/objects/ClipRegion.cpp",     // ClearZ / Recorte (composicion de la pantalla)
-    "${W3DROOT}/main/objects/PostProcessObj.cpp", // el objeto Postproceso (el arbol lo trae)
-    "${W3DROOT}/main/render/PostProcess.cpp",     // su pila de efectos
-    "${W3DROOT}/main/render/MotionVectors.cpp",  // el desenfoque de movimiento del postproceso (en la CPU)
-    "${W3DROOT}/main/objects/Hitbox.cpp",            // Hitbox: caja de deteccion (el motor esta en el Core)
-    "${W3DROOT}/main/objects/LightProbe.cpp",        // la sonda de luz: la luz indirecta horneada (el lector y el pase la usan)
-    "${W3DROOT}/main/objects/ReflectionProbe.cpp",   // la sonda de reflejo: su imagen 360 (los materiales la usan)
-    "${W3DROOT}/main/objects/VisZone.cpp",
-    "${W3DROOT}/main/objects/Collection.cpp",
-    "${W3DROOT}/main/objects/Mirror.cpp",
-    "${W3DROOT}/main/objects/Instance.cpp",
-    "${W3DROOT}/main/objects/Particles.cpp",
-    "${W3DROOT}/main/objects/Empty.cpp",
-    "${W3DROOT}/main/objects/Target.cpp",
-    "${W3DROOT}/main/objects/Gamepad.cpp",
-    "${W3DROOT}/main/objects/Scene.cpp",
-    "${W3DROOT}/main/W3dRoots.cpp",              // las escenas 3D del proyecto: cambiarEscena() las carga/descarga
-    "${W3DROOT}/main/io/W3dContainer.cpp",
+    "${CORE}/render/RenderOptions.cpp",  // g_renderBg + los flags de dibujo del Core
+    "${CORE}/render/SceneRender.cpp",    // EL pase 3D compartido con el viewport del editor
+    "${CORE}/render/RealTimeShadows.cpp",   // las sombras en tiempo real (el pase las arma antes de la escena)
+    "${CORE}/importers/import_w3d.cpp",   // EL MISMO lector de proyecto que el editor
+    "${CORE}/importers/import_obj.cpp",   // carga diferida de texturas + materiales
+    "${CORE}/importers/import_wobj.cpp",  // mallas .obj referenciadas (proyectos viejos)
+    "${CORE}/edit/MeshEdit.cpp",          // genera la malla de render (modificadores, bordes, PVS)
+    "${CORE}/edit/BooleanMod.cpp",        // BooleanPoly: el modificador booleano de Mesh_ApplyStack
+    "${CORE}/edit/ScatterMod.cpp",        // W3dScatterRun: el modificador Scatter (copias de otros objetos sobre la malla)
+    "${CORE}/objects/EditMesh.cpp",
+    "${CORE}/objects/Primitives.cpp",
+    "${CORE}/objects/Camera.cpp",         // camara + riel (el encuadre del juego sale de aca)
+    "${CORE}/objects/Curve.cpp",
+    "${CORE}/objects/Culling.cpp",
+    "${CORE}/objects/LOD.cpp",
+    "${CORE}/objects/Fog.cpp",            // la niebla puesta en el arbol (solo en Render)
+    "${CORE}/objects/Sound.cpp",          // el audio puesto en la escena (objeto Sonido)
+    "${CORE}/objects/ClipRegion.cpp",     // ClearZ / Recorte (composicion de la pantalla)
+    "${CORE}/objects/PostProcessObj.cpp", // el objeto Postproceso (el arbol lo trae)
+    "${CORE}/render/PostProcess.cpp",     // su pila de efectos
+    "${CORE}/render/MotionVectors.cpp",  // el desenfoque de movimiento del postproceso (en la CPU)
+    "${CORE}/objects/Hitbox.cpp",            // Hitbox: caja de deteccion (el motor esta en el Core)
+    "${CORE}/objects/LightProbe.cpp",        // la sonda de luz: la luz indirecta horneada (el lector y el pase la usan)
+    "${CORE}/objects/ReflectionProbe.cpp",   // la sonda de reflejo: su imagen 360 (los materiales la usan)
+    "${CORE}/objects/VisZone.cpp",
+    "${CORE}/objects/Collection.cpp",
+    "${CORE}/objects/Mirror.cpp",
+    "${CORE}/objects/Instance.cpp",
+    "${CORE}/objects/Particles.cpp",
+    "${CORE}/objects/Empty.cpp",
+    "${CORE}/objects/Target.cpp",
+    "${CORE}/objects/Gamepad.cpp",
+    "${CORE}/objects/Scene.cpp",
+    "${CORE}/W3dRoots.cpp",              // las escenas 3D del proyecto: cambiarEscena() las carga/descarga
+    "${CORE}/io/W3dContainer.cpp",
     // volumen inicial por proyecto (`volumen:` del .w3d, lo aplica el lector): W3dVolumen reenvia el cambio
     // a la musica, asi que viaja con su dispatcher (sin W3D_ENABLE_MUSIC son stubs mudos)
     "${CORE}/audio/W3dVolume.cpp", "${CORE}/audio/W3dMusic.cpp",
-    "${W3DROOT}/main/ui/W3dColors.cpp",
-    "${W3DROOT}/main/config/w3dVersion.cpp",
+    "${CORE}/config/w3dVersion.cpp",
     // (fase de prefabs) la INSTANCIA de prefab y la generacion de sus hijos + instanciar()/destruir() de lua
-    "${W3DROOT}/main/objects/InstancePrefab.cpp",
-    "${W3DROOT}/main/io/Prefabs.cpp",
+    "${CORE}/objects/InstancePrefab.cpp",
+    "${CORE}/io/Prefabs.cpp",
     // (fase de librerias) el PROXY W3D (un prefab o una escena de una libreria externa) y el registro/lectura de
     // las librerias: sus prefijos "lib:" y sus recursos con nombre de libreria
-    "${W3DROOT}/main/objects/ProxyW3d.cpp",
-    "${W3DROOT}/main/io/Libraries.cpp",
+    "${CORE}/objects/ProxyW3d.cpp",
+    "${CORE}/io/Libraries.cpp",
     // (fase de streaming) las instancias DIFERIDAS: cargar/descargar en tiempo real segun la distancia
-    "${W3DROOT}/main/io/Streaming.cpp",
+    "${CORE}/io/Streaming.cpp",
     0
 };
 // LOS DIRECTORIOS DE INCLUDE que agrega el 3D (misma razon que arriba: uno solo).
 static const char* kIncludes3D[] = {
-    "${W3DROOT}/main/app", "${W3DROOT}/main/config", "${W3DROOT}/main/objects",
-    "${W3DROOT}/main/edit", "${W3DROOT}/main/importers", "${W3DROOT}/main/script",
-    "${W3DROOT}/main/ui", "${W3DROOT}/main/ui/ViewPorts", "${W3DROOT}/main/undo",
+    // (nada: el 3D ya no necesita carpetas propias, todo esta en el Core -ver kIncludesBase-)
     0
 };
 
@@ -1873,11 +1888,14 @@ static bool WriteCMake(const std::string& path, const std::string& name,
     // OPTIMIZADO, como el editor y los otros sistemas (-O2 en el Makefile de Windows y las consolas, emcc -O2): sin
     // tipo de build, cmake compila SIN -O y el juego corria a -O0. FORCE pisa el "" que quedo en el cache de antes
     fputs("if(NOT CMAKE_BUILD_TYPE)\n  set(CMAKE_BUILD_TYPE Release CACHE STRING \"\" FORCE)\nendif()\n", f);
-    fputs("if(NOT DEFINED W3DROOT)\n  message(FATAL_ERROR \"pasa -DW3DROOT=<raiz del repo Whisk3D>\")\nendif()\n", f);
-    fputs("set(CORE ${W3DROOT}/libs/Whisk3DCore)\n", f);
-    fputs("set(UILIB ${W3DROOT}/libs/WhiskUI)\n", f);
-    fputs("set(GAME ${W3DROOT}/../Whisk3D-Examples/game)\n", f);
-    fputs("set(LUA ${W3DROOT}/thirdparty/lua/src)\n", f);
+    // EL JUEGO SOLO NECESITA EL CORE Y LA UI: -DW3D_CORE=<Whisk3DCore> -DW3D_UI=<WhiskUI> (un juego que los tiene
+    // como submodulos), o -DW3DROOT=<repo Whisk3D> como siempre (los toma de su libs/)
+    fputs("if(DEFINED W3D_CORE AND DEFINED W3D_UI)\n  set(CORE ${W3D_CORE})\n  set(UILIB ${W3D_UI})\n"
+          "elseif(DEFINED W3DROOT)\n  set(CORE ${W3DROOT}/libs/Whisk3DCore)\n  set(UILIB ${W3DROOT}/libs/WhiskUI)\n"
+          "else()\n  message(FATAL_ERROR \"pasa -DW3D_CORE=<Whisk3DCore> -DW3D_UI=<WhiskUI> (o -DW3DROOT=<repo Whisk3D>)\")\n"
+          "endif()\n", f);
+    fputs("set(GAME ${CORE}/game)\n", f);
+    fputs("set(LUA ${CORE}/thirdparty/lua/src)\n", f);
     fputs("find_package(SDL2 REQUIRED)\nfind_package(OpenGL REQUIRED)\n", f);
     fputs("file(GLOB LUA_SRC ${LUA}/*.c)\nlist(REMOVE_ITEM LUA_SRC ${LUA}/lua.c ${LUA}/luac.c)\n", f);
     fprintf(f, "add_executable(%s\n", name.c_str());
@@ -2132,7 +2150,7 @@ static bool WriteBuildAndroid(const std::string& path, const std::string& repo,
     fputs("LOCAL_MODULE := main\n", f);
     fputs("SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
     if (pack) fputs("  $(MY_PATH)/pak_generado.cpp \\\n", f);
-    fputs("  $(EXAMP)/game/w3drun.cpp \\\n", f);
+    fputs("  $(W3D)/libs/Whisk3DCore/game/w3drun.cpp \\\n", f);
     // EL BACKEND GRAFICO: OpenGL ES 1.1 (el pipeline fijo), OpenGL ES 2.0 (los shaders) o Vulkan. Con Vulkan van los tres,
     // como en la PC (graphics/w3dBackend.h), y si el telefono no lo tiene sigue con ES 2.0. Cada uno en su namespace: lo
     // ponen los backend_*.cpp que escribe este script (ndk-build no tiene flags por archivo)
@@ -2147,14 +2165,14 @@ static bool WriteBuildAndroid(const std::string& path, const std::string& repo,
     else            fputs("  $(CORE)/audio/W3dAudio.cpp \\\n", f);
     if (with3D)
         for (int i = 0; kSources3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kSources3D[i]).c_str());
-    fputs("  $(filter-out %/lua.c %/luac.c,$(wildcard $(W3D)/thirdparty/lua/src/*.c))\n", f);
+    fputs("  $(filter-out %/lua.c %/luac.c,$(wildcard $(W3D)/libs/Whisk3DCore/thirdparty/lua/src/*.c))\n", f);
     // ndk-build quiere LOCAL_SRC_FILES relativo a LOCAL_PATH (acepta '..')
     fputs("LOCAL_SRC_FILES := $(patsubst $(MY_PATH)/%,%,$(SRC_FILES))\n", f);
-    fputs("LOCAL_C_INCLUDES := \\\n  $(MY_PATH)/shim \\\n  $(EXAMP)/game \\\n", f);
+    fputs("LOCAL_C_INCLUDES := \\\n  $(MY_PATH)/shim \\\n  $(W3D)/libs/Whisk3DCore/game \\\n", f);
     for (int i = 0; kIncludesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludesBase[i]).c_str());
     if (with3D)
         for (int i = 0; kIncludes3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludes3D[i]).c_str());
-    fputs("  $(W3D)/thirdparty/lua/src \\\n  $(W3D)/thirdparty/SDL2/include", f);
+    fputs("  $(W3D)/libs/Whisk3DCore/thirdparty/lua/src \\\n  $(W3D)/thirdparty/SDL2/include", f);
     fputs(backend == 2 ? " \\\n  $(CORE)/thirdparty/vulkan/include\n" : "\n", f);
     fputs("LOCAL_CPP_FEATURES := exceptions rtti\n", f);
     // lua (C): Android es linux -> posix. En armeabi-v7a el NDK 27 fuerza
@@ -2312,20 +2330,20 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fputs("LOCAL_PATH := $(MY_PATH)\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := main\n", f);
     fputs("LOCAL_SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
     if (pack) fputs("  $(MY_PATH)/pak_generado.cpp \\\n", f);
-    fputs("  $(EXAMP)/game/w3drun.cpp \\\n  $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp \\\n", f);
+    fputs("  $(W3D)/libs/Whisk3DCore/game/w3drun.cpp \\\n  $(CORE)/graphics/gles2/w3dGraphicsGLES2.cpp \\\n", f);
     for (int i = 0; kSourcesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kSourcesBase[i]).c_str());
     if (usePhysics) fputs("  $(CORE)/physics/W3dPhysics.cpp \\\n", f);
     if (useSound) fputs("  $(CORE)/audio/W3dAudio.cpp $(CORE)/audio/W3dAudioSDL.cpp \\\n", f);
     else            fputs("  $(CORE)/audio/W3dAudio.cpp \\\n", f);
     if (with3D)
         for (int i = 0; kSources3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kSources3D[i]).c_str());
-    fputs("  $(filter-out %/lua.c %/luac.c,$(wildcard $(W3D)/thirdparty/lua/src/*.c))\n", f);
+    fputs("  $(filter-out %/lua.c %/luac.c,$(wildcard $(W3D)/libs/Whisk3DCore/thirdparty/lua/src/*.c))\n", f);
     // (el shim de android-viejo primero: su <filesystem> le gana al que falta en el r15c)
-    fputs("LOCAL_C_INCLUDES := \\\n  $(OLD)/jni/shim \\\n  $(W3D)/platform/android/jni/shim \\\n  $(EXAMP)/game \\\n", f);
+    fputs("LOCAL_C_INCLUDES := \\\n  $(OLD)/jni/shim \\\n  $(W3D)/platform/android/jni/shim \\\n  $(W3D)/libs/Whisk3DCore/game \\\n", f);
     for (int i = 0; kIncludesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludesBase[i]).c_str());
     if (with3D)
         for (int i = 0; kIncludes3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludes3D[i]).c_str());
-    fputs("  $(W3D)/thirdparty/lua/src \\\n  $(SDL_DIR)/include\n", f);
+    fputs("  $(W3D)/libs/Whisk3DCore/thirdparty/lua/src \\\n  $(SDL_DIR)/include\n", f);
     fputs("LOCAL_CPP_FEATURES := exceptions rtti\n", f);
     // instrucciones ARM (no Thumb: el de 16 bits del ARMv6 no tiene la FPU) y la FPU VFP del ARM11
     fputs("LOCAL_ARM_MODE := arm\n", f);
@@ -2472,7 +2490,7 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
 //  Se generan dos archivos en platform-build/<consola>:
 //    Makefile                  las MISMAS listas de fuentes que los otros destinos (kSourcesBase, kSources3D...),
 //                              con el backend grafico de la consola y la capa de consola del runtime
-//                              (Whisk3D-Examples/game/w3dconsola: la ventana, los graficos, cada cuadro), y el paquete
+//                              (libs/Whisk3DCore/game/w3dconsola: la ventana, los graficos, cada cuadro), y el paquete
 //    build_<consola>.sh        arma el entorno del kit y corre make (con las marcas "[W3D] <pct> <etapa>" de la barra)
 //  Los assets del juego van donde los lee cada consola: al lado del EBOOT.PBP (PSP), adentro del .vpk (Vita), en el
 //  romfs del .3dsx (3DS) y en el romdisk del ejecutable (Dreamcast). Empaquetados, van adentro del binario (pak.cpp).
@@ -2542,7 +2560,7 @@ static bool WriteMakefileConsole(const std::string& path, int plat, const std::s
             DirConsole(plat));
     fprintf(f, "W3D    := %s\n", repo.c_str());
     fputs("EXAMP  := $(abspath $(W3D)/../Whisk3D-Examples)\nCORE   := $(W3D)/libs/Whisk3DCore\n"
-          "UILIB  := $(W3D)/libs/WhiskUI\nGAME   := $(EXAMP)/game\nLUA    := $(W3D)/thirdparty/lua/src\n", f);
+          "UILIB  := $(W3D)/libs/WhiskUI\nGAME   := $(CORE)/game\nLUA    := $(CORE)/thirdparty/lua/src\n", f);
     fprintf(f, "NAME := %s\n", name.c_str());
     fputs("OUT    := out\nOBJDIR := $(OUT)/obj\nDATA  := $(OUT)/datos\n\n", f);
 
@@ -3663,7 +3681,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         if (outside > 0)
             Notify(T("Build: a library uses files by absolute path; they do not travel with the game"), true);
     }
-    { char cmd[1200]; snprintf(cmd, sizeof(cmd), "cp \"%s/res/Skins/Whisk3D/font.png\" \"%s/font.png\"", repo.c_str(), out.c_str()); if (ShellRun(cmd, repo, out)) {} }
+    { char cmd[1200]; snprintf(cmd, sizeof(cmd), "cp \"%s/Skins/Whisk3D/font.png\" \"%s/font.png\"", EditorRes(repo).c_str(), out.c_str()); if (ShellRun(cmd, repo, out)) {} }
     // ...y lo que SOLO nombra el lua por ruta relativa (sounds/, music/): ver
     // CopyRelativeRefsOfLua. Va DESPUES de todo lo demas (no pisa nada de lo que
     // ya viajo) y ANTES de descubrir las carpetas y de hornear el bytecode -- con
@@ -3802,7 +3820,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
         // (la 3DS: el icono de 48x48 del menu. Sin icono en el proyecto -o uno tan chico que no dio ese tamano-, el de
         // Whisk3D)
         if (platform == Plat3DS && !w3dFileSystem::FileExists(out + "/icons/48x48.png") &&
-            !GenerateIcon(repo + "/res/Whisk3D.png", out + "/icons/48x48.png", 48)) {
+            !GenerateIcon(EditorRes(repo) + "/Whisk3D.png", out + "/icons/48x48.png", 48)) {
             Notify(std::string(T("Build: could not read the icon; continuing without it")) + " (Whisk3D.png)", true);
             return false;
         }
@@ -3878,8 +3896,8 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
             // emcc reparte las ~75 unidades entre EMCC_CORES procesos y por default agarra
             // TODOS los nucleos: misma cota que el resto (ver W3dCompileJobs)
             "export EMCC_CORES=%d; "
-            "W3D=\"%s\"; GAME=\"$W3D/../Whisk3D-Examples/game\"; "
-            "CORE=$W3D/libs/Whisk3DCore; UILIB=$W3D/libs/WhiskUI; LUA=$W3D/thirdparty/lua/src; "
+            "W3D=\"%s\"; GAME=\"$W3D/libs/Whisk3DCore/game\"; "
+            "CORE=$W3D/libs/Whisk3DCore; UILIB=$W3D/libs/WhiskUI; LUA=$CORE/thirdparty/lua/src; "
             "LUASRC=$(ls $LUA/*.c | grep -vE '/lua\\.c|/luac\\.c'); "
             "emcc main.cpp %s$GAME/w3drun.cpp "
             "$CORE/graphics/gles2/w3dGraphicsGLES2.cpp "   // backend de shaders (WebGL)
@@ -3940,7 +3958,7 @@ bool CompileGame(UI* u, int platform, int windowMode, int orientation,
                 char r[1200]; snprintf(r, sizeof(r), "%s/icons/%dx%d.png", out.c_str(), sizes[i], sizes[i]);
                 if (w3dFileSystem::FileExists(r)) icon = r;
             }
-            if (icon.empty() && GenerateIcon(repo + "/res/Whisk3D.png", out + "/icons/256x256.png", 256))
+            if (icon.empty() && GenerateIcon(EditorRes(repo) + "/Whisk3D.png", out + "/icons/256x256.png", 256))
                 icon = out + "/icons/256x256.png";
             const std::string sh = out + "/armar_appimage.sh";
             if (icon.empty() ||

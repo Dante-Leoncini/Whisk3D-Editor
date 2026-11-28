@@ -324,6 +324,83 @@ struct GltfDoc {
 struct WeightCP { int cp; int joint; float w; };
 
 // ---------------------------------------------------------------------------
+//  QUADS / NGONS DESDE UN glTF. El glTF solo lleva triangulos; si la primitiva trae extras.w3d_polygons se rearman
+//  los poligonos originales y la malla entra editable como en el programa de origen (un quad = UNA cara en Edit Mode,
+//  no dos triangulos). Formato RLE: [lados, cuantos, lados, cuantos, ...] en el ORDEN en que salen los triangulos: un
+//  poligono de n lados consume sus n-2 triangulos SEGUIDOS. Asi los emiten el exportador de Blender (loop_triangles,
+//  poligono por poligono, filtrados por material) y ExportGLTF de Whisk3D (abanico de cada cara de faces3d). Lo escribe
+//  el convertidor de Blender (bongo_cat/convertir_w3d) y ExportGLTF.
+//
+//  El contorno de cada poligono sale de sus triangulos y no de suponer una triangulacion (Blender corta cada quad por
+//  su diagonal mas corta, no en abanico): las aristas internas aparecen dos veces, una en cada sentido, y se descartan;
+//  las que quedan son el borde, que se recorre en el sentido de los triangulos (la normal no cambia). Un poligono cuyo
+//  borde no es UN lazo de n vertices (degenerado: dos esquinas iguales) queda en triangulos; si la cuenta total no da
+//  (el archivo no es pareja de sus extras), la primitiva entera queda en triangulos, como antes.
+// ---------------------------------------------------------------------------
+static bool PolygonFromTris(const std::vector<Face>& tris, size_t t0, int n, Face& out) {
+    out.corners.clear();
+    std::vector<int> from, to; from.reserve((size_t)(n - 2) * 3); to.reserve((size_t)(n - 2) * 3);
+    std::map<int, FaceCorner> cornerOf;
+    for (int k = 0; k < n - 2; k++) {
+        const Face& f = tris[t0 + (size_t)k];
+        for (int c = 0; c < 3; c++) {
+            from.push_back(f.corners[(size_t)c].vertex); to.push_back(f.corners[(size_t)((c + 1) % 3)].vertex);
+            cornerOf[f.corners[(size_t)c].vertex] = f.corners[(size_t)c];
+        }
+    }
+    if ((int)cornerOf.size() != n) return false;           // esquinas repetidas o de mas: degenerado
+    std::map<int, int> next;                               // borde: vertice -> el siguiente
+    for (size_t i = 0; i < from.size(); i++) {
+        bool inner = false;
+        for (size_t j = 0; j < from.size() && !inner; j++) inner = (from[j] == to[i] && to[j] == from[i]);
+        if (inner) continue;
+        if (next.count(from[i])) return false;             // dos aristas de borde salen del mismo vertice
+        next[from[i]] = to[i];
+    }
+    if ((int)next.size() != n) return false;
+    int v = tris[t0].corners[0].vertex;
+    for (int k = 0; k < n; k++) {
+        std::map<int, int>::const_iterator it = next.find(v);
+        if (it == next.end()) { out.corners.clear(); return false; }
+        out.corners.push_back(cornerOf[v]);
+        v = it->second;
+    }
+    if (v != tris[t0].corners[0].vertex) { out.corners.clear(); return false; }   // mas de un lazo
+    return true;
+}
+
+// los triangulos de UNA primitiva -> sus poligonos (con extras.w3d_polygons) o tal cual (sin)
+static void PushPrimitiveFaces(const JVal& prim, const std::vector<Face>& tris, bool anyDropped, std::vector<Face>& faces) {
+    const JVal* ex = prim.find("extras");
+    const JVal* rle = ex ? ex->find("w3d_polygons") : NULL;
+    bool ok = rle && rle->t == JVal::ARR && rle->size() % 2 == 0 && !anyDropped;
+    if (ok) {
+        size_t total = 0;
+        for (size_t i = 0; i + 1 < rle->size() && ok; i += 2) {
+            const int n = rle->arr[i].intOr(0), cnt = rle->arr[i + 1].intOr(-1);
+            if (n < 3 || cnt < 0) ok = false; else total += (size_t)(n - 2) * (size_t)cnt;
+        }
+        if (ok && total != tris.size()) {
+            w3dLogfW("[glTF] extras.w3d_polygons no coincide con los triangulos de la primitiva (%d vs %d): queda triangulada",
+                     (int)total, (int)tris.size());
+            ok = false;
+        }
+    }
+    if (!ok) { faces.insert(faces.end(), tris.begin(), tris.end()); return; }
+    size_t t = 0; int split = 0;
+    for (size_t i = 0; i + 1 < rle->size(); i += 2) {
+        const int n = rle->arr[i].intOr(3), cnt = rle->arr[i + 1].intOr(0);
+        for (int c = 0; c < cnt; c++, t += (size_t)(n - 2)) {
+            if (n == 3) { faces.push_back(tris[t]); continue; }
+            Face poly;
+            if (PolygonFromTris(tris, t, n, poly)) faces.push_back(poly);
+            else { split++; for (int k = 0; k < n - 2; k++) faces.push_back(tris[t + (size_t)k]); }
+        }
+    }
+    if (split) w3dLogfW("[glTF] %d poligonos degenerados quedaron en triangulos", split);
+}
+
+// ---------------------------------------------------------------------------
 //  COLOR: los factores de glTF (baseColorFactor, emissiveFactor, el color de las luces) son LINEALES; Whisk3D trabaja
 //  en valores de PANTALLA (sin gestion de color). Pasados tal cual, todo lo que traia un color plano de Blender entraba
 //  mas oscuro y saturado. Las TEXTURAS no se tocan: ya vienen en sRGB. Un .glb que escribio el propio Whisk3D (trae
@@ -464,13 +541,14 @@ std::string CopiaCanal(const std::string& src, int canal, const float fac[3], co
 //  cuelga de el va al armature, que esta en el origen.
 // ---------------------------------------------------------------------------
 Object* PadreDeNodo(int nd, const std::vector<int>& parentNode, const std::vector<Object*>& nodeObj,
-                    const std::vector<char>& sinObjeto, const std::vector<Matrix4>& globalM, Object* arm,
-                    Object* coleccion, Matrix4& mundoPadre) {
+                    const std::vector<char>& sinObjeto, const std::vector<Matrix4>& globalM,
+                    const std::vector<Object*>& armDeNodo, Object* coleccion, Matrix4& mundoPadre) {
     mundoPadre.Identity();
     int p = parentNode[nd], guard = 0;
     while (p >= 0 && guard++ < (int)parentNode.size()) {
         if (nodeObj[p]) { mundoPadre = globalM[p]; return nodeObj[p]; }
-        if (sinObjeto[p] && arm) return arm;   // (un hueso o el nodo del armature: el armature, en el origen)
+        // (un hueso o el nodo del armature: SU armature -el de esa piel-, en el origen)
+        if (sinObjeto[p] && armDeNodo[(size_t)p]) return armDeNodo[(size_t)p];
         p = parentNode[p];
     }
     return coleccion;
@@ -739,12 +817,19 @@ bool ImportGLTF(const std::string& filepath) {
     Object* collection = CollectionActive;
     std::string baseName = ExtractBaseName(filepath);
 
-    // ---- skin -> Armature ----
-    Armature* arm = NULL;
-    std::map<int, int> jointOfNode; // nodo glTF -> indice de hueso
+    // ---- las pieles -> un Armature POR PIEL ----
+    //  Antes solo la primera: en un glTF con varios personajes (la escena de Marte de Bongo Cat: el gato y tres aliens
+    //  bailando, cada uno con su armature de Blender) los demas quedaban sin esqueleto, en la pose de reposo, y sus
+    //  canales de animacion se perdian
     const JVal* skins = doc.arr("skins");
-    if (skins && skins->size() > 0) {
-        const JVal& sk = skins->arr[0];
+    const size_t nSkins = (skins && skins->t == JVal::ARR) ? skins->size() : 0;
+    std::vector<Armature*> arms(nSkins, (Armature*)NULL);      // el de cada piel (NULL: una piel sin joints)
+    std::vector< std::map<int, int> > jointsOfSkin(nSkins);    // por piel: nodo glTF -> indice de hueso
+    std::map<int, int> skinOfJoint;                            // nodo glTF -> su piel (la primera que lo nombra)
+    for (size_t si = 0; si < nSkins; si++) {
+        Armature*& arm = arms[si];
+        std::map<int, int>& jointOfNode = jointsOfSkin[si];
+        const JVal& sk = skins->arr[si];
         const JVal* joints = sk.find("joints");
         int nJoints = (joints && joints->t == JVal::ARR) ? (int)joints->size() : 0;
         if (nJoints > 0) {
@@ -846,11 +931,17 @@ bool ImportGLTF(const std::string& filepath) {
             for (int j = 0; j < nBones; j++) { arm->bones[j].poseHead = arm->bones[j].head; arm->bones[j].poseTail = arm->bones[j].tail; }
             if (nBones > nJoints) w3dLogf("ImportGLTF: %d hueso(s) animado(s) que no pesan en la piel", nBones - nJoints);
         }
+        for (std::map<int, int>::iterator it = jointOfNode.begin(); it != jointOfNode.end(); ++it)
+            if (!skinOfJoint.count(it->first)) skinOfJoint[it->first] = (int)si;
     }
 
     // ---- animaciones -> clips ----
     const JVal* anims = doc.arr("animations");
-    if (arm && anims) {
+    for (size_t si = 0; si < arms.size() && anims; si++) {
+        // (cada piel con SU armature: una animacion que mueve huesos de dos pieles da un clip en cada una)
+        Armature* arm = arms[si];
+        if (!arm) continue;
+        std::map<int, int>& jointOfNode = jointsOfSkin[si];
         for (size_t ai = 0; ai < anims->size(); ai++) {
             const JVal& an = anims->arr[ai];
             const JVal* chans = an.find("channels"); const JVal* samps = an.find("samplers");
@@ -918,7 +1009,17 @@ bool ImportGLTF(const std::string& filepath) {
                     if (prop == AnimRotation) {
                         size_t o = ((size_t)k * stepV + voff) * 4;
                         Matrix4 Rm = QuatMat(vals[o], vals[o+1], vals[o+2], vals[o+3]);
-                        if (hasPrefix) Rm = prefix * Rm; // solo rota (la traslacion/escala del prefix no afecta la rotacion pura)
+                        if (hasPrefix) {
+                            Rm = prefix * Rm;
+                            // SIN LA ESCALA del prefijo (esa va en la pista de escala, por psp): SkelMatrixToEulerFBX lee el
+                            // seno de Y directo de la matriz y con la escala adentro salia achicado. Los aliens de Marte
+                            // (armature a escala 0.22) tenian la Y de la cadera en 7.5 grados en vez de 37: al agacharse o
+                            // girar, el cuerpo entero quedaba torcido hasta 70 grados
+                            for (int c = 0; c < 3; c++) {
+                                const float l = sqrtf(Rm.m[c*4]*Rm.m[c*4] + Rm.m[c*4+1]*Rm.m[c*4+1] + Rm.m[c*4+2]*Rm.m[c*4+2]);
+                                if (l > 1e-8f) { Rm.m[c*4] /= l; Rm.m[c*4+1] /= l; Rm.m[c*4+2] /= l; }
+                            }
+                        }
                         kv[k] = SkelMatrixToEulerFBX(Rm, 0);
                     } else {
                         size_t o = ((size_t)k * stepV + voff) * 3;
@@ -1128,11 +1229,17 @@ bool ImportGLTF(const std::string& filepath) {
     // ---- QUE NODOS SON OBJETOS (ver PadreDeNodo) ----
     // sin objeto: los huesos y sus ancestros sin malla (el nodo del armature: horneado en el reposo de los huesos)
     std::vector<char> sinObjeto((size_t)nNodes, 0);
-    for (std::map<int, int>::iterator it = jointOfNode.begin(); it != jointOfNode.end(); ++it) {
+    std::vector<Object*> armDeNodo((size_t)nNodes, (Object*)NULL);   // el armature de un hueso (o de su nodo armature)
+    for (std::map<int, int>::iterator it = skinOfJoint.begin(); it != skinOfJoint.end(); ++it) {
         int k = it->first; if (k < 0 || k >= nNodes) continue;
+        Object* a = arms[(size_t)it->second];
         sinObjeto[(size_t)k] = 1;
+        if (!armDeNodo[(size_t)k]) armDeNodo[(size_t)k] = a;
         int p = parentNode[k], guard = 0;
-        while (p >= 0 && guard++ < nNodes) { if (nodes->arr[p].getI("mesh", -1) < 0) sinObjeto[(size_t)p] = 1; p = parentNode[p]; }
+        while (p >= 0 && guard++ < nNodes) {
+            if (nodes->arr[p].getI("mesh", -1) < 0) { sinObjeto[(size_t)p] = 1; if (!armDeNodo[(size_t)p]) armDeNodo[(size_t)p] = a; }
+            p = parentNode[p];
+        }
     }
     // los nodos que mueve alguna animacion (un vacio animado es un objeto aunque no tenga hijos)
     std::set<int> animadosObj;
@@ -1171,7 +1278,7 @@ bool ImportGLTF(const std::string& filepath) {
         if (!meshes || mi < 0 || mi >= (int)meshes->size()) {
             // ---- CAMARA, LUZ o VACIO ----
             Matrix4 mp;
-            Object* padre = PadreDeNodo(nd, parentNode, nodeObj, sinObjeto, globalM, arm, collection, mp);
+            Object* padre = PadreDeNodo(nd, parentNode, nodeObj, sinObjeto, globalM, armDeNodo, collection, mp);
             bool esSol = false;
             Object* o = node.has("camera") ? CrearCamara(doc, node, padre) : NULL;
             if (!o) o = CrearLuz(doc, node, padre, esSol);
@@ -1187,7 +1294,9 @@ bool ImportGLTF(const std::string& filepath) {
             continue;
         }
         ProgressUpdate(0.4f + 0.6f * (nMeshNodes ? (float)(meshNodeIdx++) / (float)nMeshNodes : 0.0f)); // 40%..100% por malla
-        bool skinned = node.has("skin") && arm;
+        const int skinIdx = node.getI("skin", -1);
+        Armature* arm = (skinIdx >= 0 && skinIdx < (int)arms.size()) ? arms[(size_t)skinIdx] : NULL;   // (el de SU piel)
+        bool skinned = arm != NULL;
         const JVal& gm = meshes->arr[mi];
         const JVal* prims = gm.find("primitives"); if (!prims || prims->t != JVal::ARR) continue;
 
@@ -1243,7 +1352,7 @@ bool ImportGLTF(const std::string& filepath) {
               } }
 
             // pesos por control-point (skinned): joint LOCAL de la primitiva -> hueso global
-            const JVal* jointsArr = (skins && skins->size() > 0) ? skins->arr[0].find("joints") : NULL;
+            const JVal* jointsArr = skinned ? skins->arr[(size_t)skinIdx].find("joints") : NULL;
             // (jc / wc >= pc: un accessor de pesos o de joints mas corto que las posiciones se leia afuera)
             if (skinned && jnc >= 4 && wnc >= 4 && jc >= pc && wc >= pc && jointsArr) {
                 for (int i = 0; i < pc; i++) for (int e = 0; e < 4; e++) {
@@ -1260,6 +1369,8 @@ bool ImportGLTF(const std::string& filepath) {
             // entrada por esquina salian 3 vertices por triangulo (3 a 5 veces mas memoria, VBO y skinning)
             int matGroupStart = (int)Wobj.faces.size();
             std::vector<int> nrmOf((size_t)pc, -1), uvOf((size_t)pc, -1), uv2Of((size_t)pc, -1);
+            std::vector<Face> primTris; primTris.reserve(IDX.size() / 3);   // (-> poligonos con extras.w3d_polygons)
+            bool primDropped = false;
             for (size_t f = 0; f + 2 < IDX.size(); f += 3) {
                 Face face;
                 for (int t = 0; t < 3; t++) { int vi = (int)IDX[f + t];
@@ -1288,8 +1399,9 @@ bool ImportGLTF(const std::string& filepath) {
                         fc.uv2 = uv2Of[(size_t)vi]; }
                     face.corners.push_back(fc);
                 }
-                if (face.corners.size() == 3) Wobj.faces.push_back(face);
+                if (face.corners.size() == 3) primTris.push_back(face); else primDropped = true;
             }
+            PushPrimitiveFaces(pr, primTris, primDropped, Wobj.faces);
             // material group de esta primitiva. El NOMBRE de la parte viaja en "extras" (lo escribe
             // ExportGLTF: el glTF no tiene un "name" por primitiva). Sin ese dato se rearmaba del
             // material -> una malla con DOS partes del mismo material volvia con dos partes homonimas
@@ -1312,7 +1424,7 @@ bool ImportGLTF(const std::string& filepath) {
         // la piel va colgada del armature, en el origen (la ubica el esqueleto); lo demas, de su padre del glTF
         Matrix4 mp;
         Object* parentMesh = skinned ? (Object*)arm
-                                     : PadreDeNodo(nd, parentNode, nodeObj, sinObjeto, globalM, arm, collection, mp);
+                                     : PadreDeNodo(nd, parentNode, nodeObj, sinObjeto, globalM, armDeNodo, collection, mp);
         Mesh* mesh = new Mesh(parentMesh, Vector3(0, 0, 0));
         mesh->SetNameObj(NombreNodo(node, &gm, baseName, imported)); // el nombre del NODO, UNICO en la escena destino
         nodeToObj[nd] = mesh;   // para las animaciones de objeto (channels que apuntan a este nodo)
@@ -1498,8 +1610,10 @@ bool ImportGLTF(const std::string& filepath) {
                 }
             }
             // la TIRA del esqueleto: con UN solo clip es la animacion del personaje en esta misma linea de tiempo
-            if (arm && arm->animations.size() == 1 && arm->animations[0] && ActiveSceneAnim >= 0 &&
-                ActiveSceneAnim < (int)SceneAnimations.size() && SceneAnimations[(size_t)ActiveSceneAnim]) {
+            for (size_t si = 0; si < arms.size(); si++) {
+                Armature* arm = arms[si];
+                if (!(arm && arm->animations.size() == 1 && arm->animations[0] && ActiveSceneAnim >= 0 &&
+                      ActiveSceneAnim < (int)SceneAnimations.size() && SceneAnimations[(size_t)ActiveSceneAnim])) continue;
                 SceneAnimation::SkeletonTrack tira;
                 tira.armature = arm->name; tira.clip = arm->animations[0]->name; tira.frame = 1;
                 SceneAnimations[(size_t)ActiveSceneAnim]->skeletons.push_back(tira);
@@ -1510,7 +1624,8 @@ bool ImportGLTF(const std::string& filepath) {
         }
     }
 
-    if (imported == 0 && !arm) { w3dLogfE("ImportGLTF: sin mallas ni esqueleto"); ProgressEnd(); Notify(T("glTF: nothing to import"), true); return false; }
+    bool anyArm = false; for (size_t si = 0; si < arms.size(); si++) if (arms[si]) anyArm = true;
+    if (imported == 0 && !anyArm) { w3dLogfE("ImportGLTF: sin mallas ni esqueleto"); ProgressEnd(); Notify(T("glTF: nothing to import"), true); return false; }
     ProgressEnd();
     w3dLogf("ImportGLTF: %d malla(s), %s", imported, filepath.c_str());
     Notify(T("glTF imported successfully!"), false);

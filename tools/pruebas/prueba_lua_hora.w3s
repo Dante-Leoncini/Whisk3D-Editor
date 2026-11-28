@@ -1,0 +1,36 @@
+# ==========================================================================
+#  LA HORA DEL SISTEMA EN LUA: unixTime() y date()
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_lua_hora.w3s
+#
+#  Lua no abre la libreria os (un juego no toca el disco), asi que no hay os.time ni os.date. El Core da:
+#    unixTime() -> segundos, ms   el tiempo UNIX (desde el 1/1/1970 en UTC) y los milisegundos, en DOS enteros:
+#                                 con el lua de 32 bits (Dreamcast) un solo numero no alcanza para los de hoy
+#    date([segundos [, utc]])     la fecha y la hora de ese tiempo (ahora si no se pasa), local o en UTC
+#    unixTimeMs(), unixTimeSec()  el mismo tiempo en UN numero (ms entero / segundos con decimales): medir
+#                                 es una resta (exactos con lua de 64 bits: todas menos la Dreamcast)
+#
+#  Se arma el ejemplo del reloj (exampleclock: su aguja tiene un script) y se le corre lua:
+#    - unixTime da dos ENTEROS, una fecha de estos anios y milisegundos de 0 a 999;
+#    - date en UTC de fechas conocidas: el 0 es el jueves 1/1/1970; 951782400 es el martes 29/2/2000 (bisiesto);
+#    - date() sin argumentos es la misma fecha que date(unixTime());
+#    - unixTimeMs() y unixTimeSec() dicen lo mismo que unixTime(), y restar dos lecturas da lo que paso.
+# ==========================================================================
+
+window 640 480
+
+exampleclock /tmp/w3d_lua_hora
+# el Play: los scripts corren (start() del reloj ya guardo la hora de arranque)
+simplay 2
+
+luarun "Aguja" local s, ms = unixTime(); assert(math.type(s) == "integer" and math.type(ms) == "integer", "unixTime: no son enteros"); assert(s > 1700000000, "unixTime: " .. s); assert(ms >= 0 and ms <= 999, "ms: " .. ms)
+luarun "Aguja" local d = date(0, true); assert(d.year == 1970 and d.month == 1 and d.day == 1 and d.hour == 0 and d.min == 0 and d.sec == 0, "date(0)"); assert(d.wday == 5 and d.yday == 1, "date(0): jueves, dia 1")
+luarun "Aguja" local d = date(951782400, true); assert(d.year == 2000 and d.month == 2 and d.day == 29, "29/2/2000"); assert(d.wday == 3 and d.yday == 60, "29/2/2000: martes, dia 60")
+luarun "Aguja" local d = date(951782400 + 3600 * 13 + 60 * 7 + 9, true); assert(d.hour == 13 and d.min == 7 and d.sec == 9, "la hora")
+luarun "Aguja" local a = date(); local s = unixTime(); local b = date(s); assert(a.year == b.year and a.yday == b.yday, "date() = date(unixTime())")
+luarun "Aguja" local s, ms = unixTime(); local t = unixTimeMs(); assert(math.type(t) == "integer", "unixTimeMs: no es entero"); assert(math.abs(t - (s * 1000 + ms)) < 2000, "unixTimeMs: " .. t)
+luarun "Aguja" local s, ms = unixTime(); local t = unixTimeSec(); assert(math.type(t) == "float", "unixTimeSec: no tiene decimales"); assert(math.abs(t - (s + ms / 1000)) < 2, "unixTimeSec: " .. t)
+luarun "Aguja" local a = unixTimeSec(); local b = unixTimeSec(); assert(b >= a and b - a < 5, "restar dos lecturas"); local c = unixTimeMs(); local d = unixTimeMs(); assert(d >= c and d - c < 5000, "restar en ms")
+
+simstop

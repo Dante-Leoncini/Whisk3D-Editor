@@ -27,7 +27,8 @@ Object Mode only. New things appear at the 3D cursor and stay selected. Primitiv
 
 | Function | Description |
 |---|---|
-| Mesh | Plane, Cube, Circle, UV Sphere, Cone, Cylinder (with size, radius, segments, smooth shading). Also Vertex (a single loose point to start modeling from) and Reference (a plane with an image, for tracing). |
+| Mesh | Plane, Cube, Circle, UV Sphere, Cone, Cylinder (with size, radius, segments, smooth shading). Also Vertex (a single loose point to start modeling from). |
+| Reference | An image to trace over (an Empty with the **Image** shape, like Blender's *Image Empty*). It opens the image picker; the image stands upright facing the front and keeps its proportion (long side 2 m); like Blender, the object starts at 90° on X (at 0, 0, 0 the image lies flat). It shows in every viewport shading, wireframe included, but not in renders or the game, and it is not a mesh. |
 | Empty | An object without a mesh, for grouping or as a reference point. |
 | Camera / Light / Fog | The scene's camera, light and fog. Lights have a **Type**: Point, Sun (directional) or Spot (a cone, drawn in the viewport); Add also offers Sun and Spot directly. **Intensity** makes it stronger (animatable); **Distance** (m) is how far a point or spot light reaches and the length of its cone (0 = no limit; ray tracing fades it out there). While the light is selected, a spot shows its cone and a point light a sphere of that distance; a sun always shows a line down to the floor, toward where it shines. |
 | Sound | A sound placed in the scene (speaker icon). Plays with the timeline in **seconds**, not frames; **Positional (3D)** makes it sound from where it is (louder when the camera is closer, from the side it is on); without it, it is like music. Dropping a .wav on the 3D view creates one there. |

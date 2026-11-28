@@ -1,0 +1,23 @@
+# ==========================================================================
+#  BORRAR ARISTAS se lleva tambien las aristas SUELTAS elegidas (pedido del duenio, 2026-11-27: "selecciono una
+#  arista, borrar arista y no se borra"; en gato_bruja.w3d era una arista sin cara). Antes solo borraba las caras
+#  que usaban la arista. En modo arista, la elegida; en modo vertice, la de los dos extremos elegidos.
+#    ../../platform/linux/build/whisk3d --script prueba_borrar_arista_suelta.w3s
+# ==========================================================================
+window 900 700
+visible 0 Cubo
+add plane
+mode edit
+selmode face
+select all
+editdelete
+expect faces 0
+expect edges 4
+selmode edge
+select edge 0
+menuobject 362
+expect edges 3
+selmode vertex
+selverts 0 1
+menuobject 362
+expect edges 2

@@ -1,0 +1,38 @@
+# ==========================================================================
+#  LO EXTRUIDO QUEDA ACTIVO + CTRL+CLICK SIN ACTIVO (pedido del duenio, 2026-11-27: "hago extruir un vertice y lo que
+#  extrui tendria que ser el nuevo vertice activo. Igual aunque no sea el activo, dejame hacer Ctrl+Click para
+#  seleccionar el camino mas corto"). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_extruir_activo.w3s
+#  - Extruir pasa el ACTIVO a lo extruido (Mesh::ExtrudeEdit, EditActiveByPos): el del activo de antes o, sin activo, el
+#    unico elemento extruido. Antes no quedaba activo y el Ctrl+Click elegia solo el vertice clickeado
+#  - Ctrl+Click (path = Pick Shortest Path) sin activo sale del seleccionado MAS CERCANO por la malla
+#  El vertice 0 del cubo esta en (-1, -1, 1) y el 6 en (-1, 1, -1): comparten la cara x = -1 (2 aristas de por medio)
+# ==========================================================================
+selobj Cubo
+mode edit
+selmode vertex
+# ---- 1. extruir un vertice sin activo: el nuevo queda elegido y ACTIVO ----
+selverts 0
+editactive none
+extrude 1
+expect verts 9
+selcount 1
+editactive 0 0 2
+# ---- el Ctrl+Click sale del nuevo: 8 -> 0 -> (una esquina de la cara) -> 6 ----
+path 6
+selcount 4
+editactive -1 1 -1
+# ---- 2. sin activo (solo el 0 elegido): el camino igual sale del elegido mas cercano ----
+selverts 0
+editactive none
+path 6
+selcount 3
+editactive -1 1 -1
+# ---- 3. con el activo elegido, extruir lo mantiene en lo extruido (el activo es el 6) ----
+selverts 6
+path 6
+editactive -1 1 -1
+extrude 1
+expect verts 10
+selcount 1
+editactive 0 2 0

@@ -97,21 +97,33 @@ void W3dCreateDefaultScene() {
                          ColorList[static_cast<int>(ColorID::background)]);
     // todo cuelga de una "Collection" (igual que el constructor de PC)
     CollectionActive = new Collection(SceneCollection);
+    // EL CUBO APOYADO EN EL PISO (como la PC): todo 1 m mas arriba y un plano de 8 x 8 m en el suelo
     // luz de escena default: arriba-derecha-atras
     Light* l = Light::Create(CollectionActive, 0, 0, 0);
-    if (l) { l->pos = Vector3(3.0f, 4.0f, 2.0f); }
+    if (l) { l->pos = Vector3(3.0f, 5.0f, 2.0f); }
     // camara default, misma pose que el constructor de PC
     // (la misma camara que el editor de la PC: main/app/constructor.cpp, mirando al cubo)
-    { const Vector3 posCam(-3.8f, 3.2f, 2.3f);
-      new Camera(CollectionActive, posCam, CameraRotLooking(posCam, Vector3(0.0f, 0.0f, 0.0f))); }
+    { const Vector3 posCam(-3.8f, 4.2f, 2.3f);
+      new Camera(CollectionActive, posCam, CameraRotLooking(posCam, Vector3(0.0f, 1.0f, 0.0f))); }
+    // el PISO (la medida en la malla: la escala del objeto queda en 1)
+    { Mesh* floor = (Mesh*)NewMesh(MeshType::plane, CollectionActive, false);
+      if (floor) { Matrix4 S; S.Identity(); S.m[0] = 4.0f; S.m[10] = 4.0f; floor->ApplyMatrix(S); floor->meshType = -1; } }
     // el cubo se crea ULTIMO y arranca seleccionado
     Object* cube = NewMesh(MeshType::cube, CollectionActive, false);
     if (cube) {
+        cube->pos = Vector3(0.0f, 1.0f, 0.0f);
         DeselectAll();
         cube->Select();
     }
     // la escena de fabrica ES una escena, y sigue siendolo aunque le pongan scripts (igual que la de PC)
     { extern void W3dRootsSetTypesDeduced(); W3dRootsSetTypesDeduced(); }
+}
+
+// la vista de la escena por defecto mira al centro del cubo (1 m arriba del piso): Nuevo proyecto (import_w3d.cpp)
+void W3dDefaultSceneView(Viewport3D* vp) {
+    if (!vp) return;
+    vp->pivot = Vector3(0.0f, 1.0f, 0.0f);
+    vp->RecalcOrbitPosition();
 }
 
 // raiz (SceneCollection) + escena default, como ConstructUniversal de PC

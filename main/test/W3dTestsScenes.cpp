@@ -179,7 +179,7 @@
 #include "WhiskUI/Propieties/PropList.h"   // las filas del arbol del Mix (MixRowsCount / MixRowText)
 #include "WhiskUI/Propieties/PropertieBase.h"   // los hooks del rombo de keyframe (W3dKeyframeToggle / Estado)
 #include "ViewPorts/Notifications.h"   // lo que se le dijo al usuario (notif)
-#include "objects/UI.h"                // pruebacapas: las escenas 2D
+#include "WhiskUI/objects/UI.h"                // pruebacapas: las escenas 2D
 #include "W3dScene.h"                  // pruebacapas: la escena 2D inicial
 #include "ViewPorts/W3dInput.h"        // escenatecla: W3dK_H
 #include "io/ProjectChanges.h"         // escenatildar: el cartel de los cambios sin guardar al cerrar una escena

@@ -101,3 +101,6 @@ void InitCursors() {
     #endif
 }
 #endif // !W3D_SYMBIAN
+
+// el MIPMAPPING por defecto de un proyecto que no lo declara (lo pide el lector del Core: base/W3dHost.h)
+bool W3dHostMipmapsDefault() { return cfg.mipmaps; }

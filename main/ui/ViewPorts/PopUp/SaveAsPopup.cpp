@@ -38,7 +38,7 @@ static void GCSave();
 static void GCReopen();
 static std::string GCLabelFolder() {
     if (gGCInternal) return gGCFolderProj.empty() ? std::string(T("(root)")) : gGCFolderProj;
-    return gGCFolderDisk.empty() ? w3dFileSystem::GetDefaultOutputDir() : gGCFolderDisk;
+    return gGCFolderDisk.empty() ? W3dFileBrowserStartFolder() : gGCFolderDisk;
 }
 static void GCReadFields() { if (gGC && gGC->pName) gGCName = gGC->pName->field.text; }
 static void GCFolderPickedDisk(const std::string& picked) {
@@ -57,7 +57,7 @@ static void GCTouchFolder() {
     if (gGCInternal) { gGC->listOpen = !gGC->listOpen; gGC->listScroll = 0; g_redraw = true; return; }
     GCReadFields();
     GCClose();
-    OpenFileBrowser(gGCTitle, T("Use this folder"), gGCext, GCFolderPickedDisk, true);
+    OpenFileBrowser(gGCTitle, T("Use this folder"), gGCext, GCFolderPickedDisk, true, gGCFolderDisk);
 }
 static void GCInternalChange() {
     if (gGCInternal && !W3dContainerHasMounted()) {   // sin proyecto guardado no hay .w3d donde meterlo
@@ -303,7 +303,7 @@ static SaveAsDestination GCDestination() {
     d.name = name;
     d.internal = gGCInternal;
     d.folderProject = gGCFolderProj;
-    d.folderDisk = gGCFolderDisk.empty() ? w3dFileSystem::GetDefaultOutputDir() : gGCFolderDisk;
+    d.folderDisk = gGCFolderDisk.empty() ? W3dFileBrowserStartFolder() : gGCFolderDisk;
     return d;
 }
 static void GCConfirmedOverwrite() {
@@ -345,6 +345,7 @@ static void GCSave() {
     }
     if (!msg.empty()) Notify(T(msg.c_str()), true);
 }
+void SaveAsPress() { GCSave(); }
 static void GCReopen() {
     gGCFolders.clear();
     gGCFolders.push_back(std::string());
@@ -356,8 +357,9 @@ static void GCReopen() {
     g_redraw = true;
 }
 void OpenSaveAsPopup(const std::string& title, const std::string& name, const std::string& ext, bool internal,
-                           const std::string& folderProject, SaveAsAction action) {
+                           const std::string& folderProject, SaveAsAction action, const std::string& folderDisk) {
     gGCTitle = title; gGCName = name; gGCext = ext;
+    if (!folderDisk.empty() && w3dFileSystem::IsDir(folderDisk)) gGCFolderDisk = folderDisk;
     gGCInternal = internal && W3dContainerHasMounted();
     gGCFolderProj = folderProject;
     gGCAction = action;

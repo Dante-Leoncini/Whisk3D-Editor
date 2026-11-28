@@ -44,6 +44,20 @@ void LoopCutCancel();
 void LoopCutRedoApply(int cuts, float factor);
 float LoopCutGetFactor();
 void LoopCutRenderPreview();
+// EL CUCHILLO (K en Edit Mode): ver Mesh::KnifeCutEdit. mx,my = coords de ventana
+bool KnifeActive();
+bool KnifeThrough();
+int  KnifePoints();      // los puntos puestos
+int  KnifeHoverKind();   // lo que engancha el mouse: KnifePoint::Vertex / Edge / Face, -1 = nada
+void KnifeStart(int mx, int my);
+void KnifeMotion(int mx, int my);
+void KnifeClickLeft(int mx, int my);
+void KnifeBack();          // Backspace: saca el ultimo punto
+void KnifeToggleThrough(); // Z: corta tambien lo que no se ve
+void KnifeConfirm();       // Enter / Espacio
+void KnifeCancel();        // Esc / click derecho
+void KnifeRenderPreview(); // (el viewport 3D, en 3D)
+void KnifeRenderOverlay(class Viewport3D* vp);   // (el viewport 3D, en 2D: el enganche bajo el mouse)
 bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
 
 // INSET FACES (I en Edit Mode / menu Face): el modal + el panel redo (la op de malla: Mesh::InsetEdit)

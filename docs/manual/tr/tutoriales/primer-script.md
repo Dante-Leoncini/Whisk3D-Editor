@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ Bir nesne başka bir nesneye çarptığında haber verenler gibi başkaları da 
 
 İçinde yaptığı şey:
 
-**`if property("rotate") then` … `end`** bir **koşuldur**. Bir `if` («eğer»), içindeki kodu yalnızca `if` ile `then` arasındaki şey doğruysa çalıştırır. Başka bir koşulu deneyen bir `elseif` («değilse, şu doğruysa bunu yap…») ve hiçbiri sağlanmadığında çalışan bir `else` («değilse») içerebilir; ikisi de isteğe bağlıdır. Her zaman `end` ile biter. Örneğin:
+**`if rotate then` … `end`** bir **koşuldur**. Bir `if` («eğer»), içindeki kodu yalnızca `if` ile `then` arasındaki şey doğruysa çalıştırır. Başka bir koşulu deneyen bir `elseif` («değilse, şu doğruysa bunu yap…») ve hiçbiri sağlanmadığında çalışan bir `else` («değilse») içerebilir; ikisi de isteğe bağlıdır. Her zaman `end` ile biter. Örneğin:
 
 ```lua
 if puan >= 100 then
@@ -71,11 +71,11 @@ end
 
 120 puanla madalya altın; 70'le gümüş, 10'la da yok. Yalnızca koşulu sağlanan ilk bölüm çalışır. (Lua'da `elseif` bitişik yazılır.)
 
-Script'teki `if`'te ne `elseif` ne de `else` var: **rotate** doğruysa (onay kutusu işaretliyse) küp döner; yanlışsa hiçbir şey olmaz ve fonksiyon biter. `property("rotate")`, o nesnenin paneldeki değerini okur. Değer her karede okunduğu için, oyun çalışırken onu değiştirirsen script bunu o anda fark eder.
+Script'teki `if`'te ne `elseif` ne de `else` var: **rotate** doğruysa (onay kutusu işaretliyse) küp döner; yanlışsa hiçbir şey olmaz ve fonksiyon biter. `rotate`, o nesnenin paneldeki değerini okur. Her özellik böyle, adıyla kullanılır; `property("rotate")` ile de okunabilir. Değer her karede okunduğu için, oyun çalışırken onu değiştirirsen script bunu o anda fark eder.
 
 - **`self()`**, script'in sahibi olan nesnedir: küp. **`getRotationZ(self())`** onun Z etrafındaki dönüşünü derece olarak verir (dikey eksen, Özellikler panelinde gördüğün Z'nin ta kendisi); **`setRotationZ`** de ona yeni bir dönüş verir: aynısını, biraz fazlasıyla. Böylece küp bir topaç gibi döner.
 
-`property`, `self`, `getRotationZ` ve `setRotationZ` de fonksiyondur, ama tersi: onları Whisk3D sağlar, sen çağırırsın. Hepsi [Lua kılavuzunda](../lua/README.md).
+`self`, `getRotationZ` ve `setRotationZ` de fonksiyondur, ama tersi: onları Whisk3D sağlar, sen çağırırsın. Hepsi [Lua kılavuzunda](../lua/README.md).
 
 ### Script'in tamamı
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

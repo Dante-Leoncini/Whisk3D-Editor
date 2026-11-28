@@ -1,0 +1,394 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "gen_prueba_gltf_quads.py"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0,
+    1,
+    2,
+    3
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "Poligonos",
+   "mesh": 0,
+   "translation": [
+    0,
+    0,
+    -0.0
+   ]
+  },
+  {
+   "name": "SinExtras",
+   "mesh": 1,
+   "translation": [
+    0,
+    0,
+    -5.0
+   ]
+  },
+  {
+   "name": "CuentaMal",
+   "mesh": 2,
+   "translation": [
+    0,
+    0,
+    -10.0
+   ]
+  },
+  {
+   "name": "Degenerado",
+   "mesh": 3,
+   "translation": [
+    0,
+    0,
+    -15.0
+   ]
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Poligonos",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1
+     },
+     "indices": 2,
+     "material": 0,
+     "extras": {
+      "w3d_polygons": [
+       4,
+       2,
+       3,
+       1,
+       5,
+       1
+      ]
+     }
+    },
+    {
+     "attributes": {
+      "POSITION": 3,
+      "NORMAL": 4
+     },
+     "indices": 5,
+     "material": 1,
+     "extras": {
+      "w3d_polygons": [
+       4,
+       1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "SinExtras",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 6,
+      "NORMAL": 7
+     },
+     "indices": 8,
+     "material": 0
+    }
+   ]
+  },
+  {
+   "name": "CuentaMal",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10
+     },
+     "indices": 11,
+     "material": 0,
+     "extras": {
+      "w3d_polygons": [
+       4,
+       2
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Degenerado",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 12,
+      "NORMAL": 13
+     },
+     "indices": 14,
+     "material": 0,
+     "extras": {
+      "w3d_polygons": [
+       4,
+       1
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "A",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.8,
+     0.2,
+     0.2,
+     1
+    ]
+   }
+  },
+  {
+   "name": "B",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.2,
+     0.2,
+     0.8,
+     1
+    ]
+   }
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 16,
+   "type": "VEC3",
+   "min": [
+    0,
+    0,
+    0
+   ],
+   "max": [
+    7,
+    0,
+    1.5
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 16,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5123,
+   "count": 24,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0,
+    0,
+    3
+   ],
+   "max": [
+    1,
+    0,
+    4
+   ]
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0,
+    0,
+    3
+   ],
+   "max": [
+    1,
+    0,
+    4
+   ]
+  },
+  {
+   "bufferView": 7,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 8,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 9,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0,
+    0,
+    3
+   ],
+   "max": [
+    1,
+    0,
+    4
+   ]
+  },
+  {
+   "bufferView": 10,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 11,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 12,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3",
+   "min": [
+    0,
+    0,
+    3
+   ],
+   "max": [
+    1,
+    0,
+    4
+   ]
+  },
+  {
+   "bufferView": 13,
+   "componentType": 5126,
+   "count": 4,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 14,
+   "componentType": 5123,
+   "count": 6,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 192
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 192,
+   "byteLength": 192
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 384,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 432,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 480,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 528,
+   "byteLength": 12
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 540,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 588,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 636,
+   "byteLength": 12
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 648,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 696,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 744,
+   "byteLength": 12
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 756,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 804,
+   "byteLength": 48
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 852,
+   "byteLength": 12
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 864,
+   "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAIA/AACAPwAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAQAAAAAAAAIA/AABAQAAAAAAAAIA/AABAQAAAAAAAAAAAAACAQAAAAAAAAAAAAACAQAAAAAAAAIA/AACgQAAAAAAAAAAAAADAQAAAAAAAAAAAAADAQAAAAAAAAIA/AADQQAAAAAAAAMA/AADgQAAAAAAAAIA/AADgQAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAABAAIAAAACAAMABAAFAAcABQAGAAcACAAJAAoADAANAA4ACwAMAA4ACwAOAA8AAAAAAAAAAAAAAEBAAAAAAAAAAAAAAIBAAACAPwAAAAAAAIBAAACAPwAAAAAAAEBAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAABAAIAAAACAAMAAAAAAAAAAAAAAEBAAAAAAAAAAAAAAIBAAACAPwAAAAAAAIBAAACAPwAAAAAAAEBAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAABAAIAAAACAAMAAAAAAAAAAAAAAEBAAAAAAAAAAAAAAIBAAACAPwAAAAAAAIBAAACAPwAAAAAAAEBAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAABAAIAAAACAAMAAAAAAAAAAAAAAEBAAAAAAAAAAAAAAIBAAACAPwAAAAAAAIBAAACAPwAAAAAAAEBAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAABAAIAAAABAAMA"
+  }
+ ]
+}

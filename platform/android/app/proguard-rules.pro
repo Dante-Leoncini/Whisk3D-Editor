@@ -88,15 +88,17 @@
 }
 
 # --- Whisk3D: lo que el C++ llama sobre la actividad (GetMethodID sobre la clase de la actividad) ---
-#     videoAbrir/videoCuadro/videoCerrar/audioAac: main/ui/ViewPorts/Properties.cpp (exportar video)
-#     tieneNotch: main/app/W3dKeyboard.cpp   -   vibrar: libs/Whisk3DCore/input/W3dVibrate.cpp
+#     videoOpen/videoFrame/videoClose/audioAac: main/ui/ViewPorts/Properties.cpp (exportar video)
+#     hasNotch: main/app/W3dKeyboard.cpp   -   vibrate: libs/Whisk3DCore/input/W3dVibrate.cpp
+#     (los nombres tienen que ser los de Whisk3DActivity.java: si se renombran alla, aca tambien; lo verifica
+#      tools/android_jni_check.py despues de cada bundleRelease)
 -keep,includedescriptorclasses class com.whisk3d.Whisk3DActivity {
-    boolean videoAbrir(java.lang.String, int, int, int, int);
-    boolean videoCuadro(byte[], int, int);
-    boolean videoCerrar(java.lang.String, int);
+    boolean videoOpen(java.lang.String, int, int, int, int);
+    boolean videoFrame(byte[], int, int);
+    boolean videoClose(java.lang.String, int);
     boolean audioAac(java.lang.String, java.lang.String, int);
-    boolean tieneNotch();
-    void vibrar(int);
+    boolean hasNotch();
+    void vibrate(int);
 }
 # (y el aviso del teclado que el C++ exporta como Java_com_whisk3d_Whisk3DActivity_nativeTecladoTapado: W3dKeyboard.cpp)
 -keepclasseswithmembernames,includedescriptorclasses class com.whisk3d.Whisk3DActivity {

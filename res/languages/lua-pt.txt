@@ -1,0 +1,195 @@
+# Whisk3D: la ayuda de la API de Lua para el IDE. La genera tools/genlua_api.py desde docs/manual/pt/lua: no editar a mano
+accelerate	accelerate(obj, factor [, tope])	Acelera-o multiplicando a sua velocidade.
+adjustSound	adjustSound(h, vol [, pitch])	Interromper ou ajustar sons.
+animate	animate(mesh, n [, frame])	Muda a animação de vértices de uma malha.
+animClip	animClip(armature, clip [, loop])	Animações de uma armação (andar, pular...) e a transição suave entre elas.
+animLayer	animLayer(esq, n, clip [, weight, mode])	Misturar várias animações ao mesmo tempo em camadas (1 a 16), por exemplo correr + atirar.
+animObject	animObject(root, "clip" [, loop])	Clipes de animação de um objeto e seus filhos.
+animScene	animScene(name [, loop])	Animações da cena inteira.
+animSceneFrame	animSceneFrame(f)	Animações da cena inteira.
+beep	beep(freq [, ms, vol])	Um bipe (sem arquivo).
+beforeView	beforeView(i)	(Definida pelo seu script.) O motor a chama antes de desenhar cada vista, no script que chamou setViews. Ali você vira para ESSA câmera o que olha para a câmera (billboards, partículas) ou esconde o que essa vista não deve ver. Não mova nada que avance com o tempo: isso vai em update.
+bonePoint	bonePoint(esq, "hueso" [, x, y, z]) -> x, y, z	Onde está um osso (para colocar uma arma na mão).
+bounce	bounce(obj, other)	Quiques contra outro objeto ou contra as bordas de uma área (devolvem true se quicou).
+bounceInside	bounceInside(obj, area)	Quiques contra outro objeto ou contra as bordas de uma área (devolvem true se quicou).
+bounceOn	bounceOn(obj, area [, sides])	Quiques contra outro objeto ou contra as bordas de uma área (devolvem true se quicou).
+box	box(obj [, x, y, z])	O tamanho da sua caixa de colisão: em 3D, a largura (X), a profundidade (Y) e a altura (Z); em 2D, a largura e a altura em pixels.
+button	button(name [, gamepad])	O mesmo com um botão do controle. Com gamepad (1 a 4), o desse controle; sem ele, o de qualquer um.
+buttonPressed	buttonPressed(name [, gamepad])	O mesmo com um botão do controle. Com gamepad (1 a 4), o desse controle; sem ele, o de qualquer um.
+cameraXZ	cameraXZ() -> fx, fy, rx, ry	Para onde a câmera olha sobre o chão, em X e Y: para a frente (fx, fy) e para a direita (rx, ry), para mover o personagem de acordo com a câmera. (O nome é de quando o chão era XZ.)
+captureMouse	captureMouse(bool)	Mouse capturado para olhar com o mouse (jogos em primeira pessoa). No PC e no navegador; no navegador, o mouse é capturado com o primeiro clique ou tecla no jogo. Esc o solta e pausa o jogo.
+captureScreen	captureScreen(name [, withHud]) -> path	Copia a imagem 3D deste quadro (ao terminar a cena; com withHud, depois do HUD) para uma textura. O caminho ("pantalla:") serve para setTexture, para um material ou para o passo "Bind texture" de uma rotina.
+captureUV	captureUV(name) -> u0, v0, u1, v1	A parte da textura capturada com a imagem na orientação certa, para setUVRect (ou nil se a cópia ainda não foi feita: ela é feita ao desenhar o quadro).
+changeScene	changeScene(name [, restart])	Passa para outra cena (menu, nível 2...) no fim do quadro.
+clockMs	clockMs() -> ms	Milissegundos, para medir quanto algo demora.
+colGround	colGround(mesh, x, y, z)	Colisão contra os triângulos de uma malha (pisar no chão, não atravessar paredes).
+collide	collide(a, b) -> bool	Se dois elementos 2D se sobrepõem na tela.
+colRay	colRay(...)	Colisão contra os triângulos de uma malha (pisar no chão, não atravessar paredes).
+colWall	colWall(...)	Colisão contra os triângulos de uma malha (pisar no chão, não atravessar paredes).
+contacts	contacts() -> list	Todas as colisões deste quadro.
+control	control([n]) -> name, tipo	Quantos controles há e de que tipo ("xbox", "playstation", "nintendo", "generico").
+controls	controls() -> n	Quantos controles há e de que tipo ("xbox", "playstation", "nintendo", "generico").
+createLine	createLine(name, points)	Uma curva suave fechada calculada pelo motor (percursos).
+createSound	createSound("sounds/x.wav" [, parent]) -> obj	Um objeto Som novo (destroy(obj) o remove). Num prefab é instanciado como qualquer objeto.
+date	date([seconds [, utc]]) -> table	A data e a hora de um tempo Unix (agora, se não passar), local, ou em UTC com utc = true: year, month, day, hour, min, sec, wday (1 = domingo), yday.
+debugLog	debugLog(msg)	Mensagens só em versões de depuração.
+destroy	destroy(obj) -> bool	Apaga o objeto no fim do quadro.
+draw3D	draw3D([on])	Desliga ou liga todo o 3D (por exemplo, atrás de um menu opaco).
+emit	emit(obj [, n])	Uma rajada de partículas, ou ligar/desligar um emissor.
+error	error(msg)	Mensagens de informação, aviso ou erro no registro. error não interrompe o script.
+fade	fade(obj, objetivo, paso)	Transparência e fades.
+find	find(name [, root]) -> obj | nil	Busca um objeto pelo nome no Outliner (ou só dentro de root).
+finger	finger([n]) -> x, y, active	Multitoque: o dedo número n (1 a 4).
+getColor	getColor(light) -> r, g, b	A cor de uma luz.
+getConfig	getConfig(clave [, def]) -> text	Ler e escrever opções do jogo (recorde, volume...).
+getEnergy	getEnergy(light) -> e	O seu brilho, de 0 a 1 (para piscar ou se apagar aos poucos).
+getFog	getFog(obj)	Ler e mudar a névoa.
+getLens	getLens(cam) -> fov, near, far	Ângulo de visão e distâncias de recorte.
+getMemory	getMemory(name, i)	Escrever e ler memórias (o índice vai de 0 a 255).
+getName	getName(obj) -> text	O nome do objeto.
+getPosition	getPosition(obj) -> x, y, z	Onde ele está.
+getPosPx	getPosPx(obj) -> x, y	Posição de um elemento 2D (um nil deixa esse eixo como está).
+getRotation	getRotation(obj) -> x, y, z	A sua rotação em graus.
+getRotationX	getRotationX(obj)	A rotação de um só eixo. getRotationZ é o giro em torno da vertical.
+getRotationY	getRotationY(obj)	A rotação de um só eixo. getRotationZ é o giro em torno da vertical.
+getRotationZ	getRotationZ(obj) -> graus	A rotação de um só eixo. getRotationZ é o giro em torno da vertical.
+getScale	getScale() -> f	Sem argumentos: fator para adaptar tamanhos à tela (lado menor / 480).
+getShared	getShared(clave) -> value	Lê o espaço compartilhado por todos os scripts.
+getSizePx	getSizePx(obj) -> w, h	Tamanho de um elemento 2D.
+getStep	getStep(routine, i, field)	Mudar ou ler um passo de uma rotina (campos: "on", "n", "color", "ref", "modo", "entero").
+getType	getType(obj) -> text	O que ele é: "mesh", "light", "camera", "empty", "armature", "text", "image", "button", "hitbox", "prefab", "rutina"... ("" se não existir).
+getVelocity	getVelocity(obj, vx [, vy, vz])	Você dá uma velocidade, e o motor o move sozinho.
+importW3D	importW3D(path) -> obj | nil	Adiciona à cena outro arquivo .w3d enquanto o jogo roda.
+info	info(msg)	Mensagens de informação, aviso ou erro no registro. error não interrompe o script.
+inside	inside(area, x [, y])	Manter um elemento dentro de outro, ou perguntar se um ponto está dentro.
+instantiate	instantiate(prefab [, x, y, z [, rotY [, parent]]]) -> obj | nil	Cria uma cópia de um prefab nessa posição (rotY em graus). "Libreria/Escena" cria a de uma biblioteca vinculada. Com parent, ela fica pendurada nesse objeto (posição e rotação relativas a ele).
+isDebug	isDebug()	Mensagens só em versões de depuração.
+isLoaded	isLoaded(obj) -> bool	Se essa parte já está carregada.
+isMuted	isMuted()	Silêncio geral.
+isVisible	isVisible(obj) -> bool	Mostra-o ou oculta-o. Um objeto oculto deixa de receber update.
+key	key(name) -> bool	A tecla está pressionada (enquanto você a mantém).
+keyPressed	keyPressed(name) -> bool	Foi pressionada exatamente neste quadro (uma única vez por pressionamento).
+limit	limit(obj, area [, axis])	Manter um elemento dentro de outro, ou perguntar se um ponto está dentro.
+linePoint	linePoint(id, s)	Uma curva suave fechada calculada pelo motor (percursos).
+loadConfig	loadConfig()	Salvá-las no disco (ou no navegador) e lê-las de novo.
+logCount	logCount()	Ler o registro a partir do jogo (um console próprio).
+logLine	logLine(i)	Ler o registro a partir do jogo (um console próprio).
+lookAt	lookAt(obj, x, y, z)	Aponta-o para um ponto (a frente de uma câmera).
+luaProfile	luaProfile(frames [, label])	Mede quais partes do script são lentas (luaProfile(0) o desliga).
+mouse	mouse() -> x, y, dentro	Onde está o mouse.
+mouseCaptured	mouseCaptured()	Mouse capturado para olhar com o mouse (jogos em primeira pessoa). No PC e no navegador; no navegador, o mouse é capturado com o primeiro clique ou tecla no jogo. Esc o solta e pausa o jogo.
+mouseRel	mouseRel() -> dx, dy	Mouse capturado para olhar com o mouse (jogos em primeira pessoa). No PC e no navegador; no navegador, o mouse é capturado com o primeiro clique ou tecla no jogo. Esc o solta e pausa o jogo.
+move	move(obj, dx, dy, dz)	Desloca-o a partir de onde está (use com dt).
+mute	mute(bool)	Silêncio geral.
+muteSound	muteSound(obj)	Toca de novo um objeto Som (a partir de seg segundos do seu trecho) ou o cala.
+netAddress	netAddress() -> text	O IP deste aparelho na rede local (para entrar pela internet ou digitando-o).
+netAvailable	netAvailable() -> bool [, reason]	Se este jogo pode usar a rede. Se não puder, o motivo: "no permission" (o editor não deu permissão a este projeto) ou "no network" (esta plataforma ainda não tem rede).
+netClose	netClose()	Sai da partida (para o anfitrião: a fecha para todos). O Stop do editor também a fecha.
+netDevice	netDevice() -> text	O nome deste dispositivo (o que os outros veem ao procurar partidas). Muda-se no editor: cartão Ajustes, *Nome do dispositivo*.
+netFind	netFind([game]) -> bool	Começa a procurar partidas na rede local. Chamá-la de novo atualiza a lista.
+netHost	netHost(name [, max [, game]]) -> bool [, error]	Cria uma partida e espera jogadores (max contando o anfitrião: 2 por padrão). game é o nome do seu jogo: só aparecem as partidas do mesmo jogo.
+netJoin	netJoin(address) -> bool	Entra numa partida: a address de netMatches() ou uma digitada ("192.168.0.10", "x.x.x.x:puerto").
+netMatches	netMatches() -> { {name, device, players, max, address}, ... }	As partidas que responderam (a lista se atualiza sozinha enquanto você procura).
+netOpen	netOpen(bool)	O anfitrião aparece nas buscas e aceita jogadores (true) ou não (por exemplo, quando a partida já começou).
+netPlayers	netPlayers() -> { {id, name, isSelf}, ... }	Quem está na partida (o nome é o do dispositivo de cada um).
+netReceive	netReceive() -> { {from, data}, ... }	Tudo o que chegou desde a última vez, em ordem.
+netSelf	netSelf() -> id	O seu número na partida (0 = o anfitrião; -1 sem partida).
+netSend	netSend(value [, para [, reliable]]) -> bool	Envia um valor de Lua (número, texto, booleano ou tabela, com tabelas dentro) para um jogador (para = seu id) ou para todos (nil). Confiável (padrão): chega com certeza e em ordem. Com false, não é reenviado se for perdido: para o que você envia a cada quadro (posições, o controle), em que o seguinte o substitui.
+netSilence	netSilence([id]) -> seconds, limite	Há quanto tempo não chega nada desse jogador (sem id: do que está há mais tempo calado). Quem entra só ouve o anfitrião, então para ele é o silêncio do anfitrião. Passado o limite (8 s), o jogador é dado como ausente: o anfitrião o tira da partida e, para quem entrou, netState() retorna "error".
+netState	netState() -> state, error	"none", "searching", "waiting" (você é o anfitrião), "connecting", "connected" ou "error" (com o motivo).
+object	object(prop) -> obj | nil	O objeto escolhido no campo prop de properties.
+onEnter	onEnter(other, myHitbox, otherHitbox)	Quando um hitbox começa a tocar em outro.
+onExit	onExit(other, myHitbox, otherHitbox)	Quando deixam de se tocar (também se um deles é ocultado ou desativado).
+onStay	onStay(other, myHitbox, otherHitbox)	A cada quadro, enquanto continuam se tocando.
+onTouch	onTouch(other, impulse, x, y, z, nx, ny, nz)	Quando dois corpos rígidos colidem. x, y, z é o ponto de contato e nx, ny, nz a direção para o outro.
+option	option(prop) -> text	A opção escolhida em uma lista suspensa de properties; se nenhuma foi escolhida, a primeira da lista (a padrão).
+param	param(prop [, def]) -> número	Como property, mas sempre número; se não existir, devolve def (ou 0).
+physicsActive	physicsActive(obj, bool)	Gravidade (9.81 por padrão), ligar/desligar a física de um objeto.
+physicsAwake	physicsAwake(obj)	Gravidade (9.81 por padrão), ligar/desligar a física de um objeto.
+physicsGravity	physicsGravity([g])	Gravidade (9.81 por padrão), ligar/desligar a física de um objeto.
+physicsRay	physicsRay(ox, oy, oz, dx, dy, dz, max) -> dist, nx, ny, nz, obj	Lança um raio e diz com o que ele colide.
+playScene	playScene(name [, "funcion"])	Reproduz uma cena 3D como cinemática com o jogo em pausa; ao terminar, chama essa função.
+playSound	playSound(obj [, seg])	Toca de novo um objeto Som (a partir de seg segundos do seu trecho) ou o cala.
+pressed	pressed(obj) -> bool	Esse elemento 2D foi tocado ou clicado neste quadro (botões).
+print	print(...)	Escreve no registro (log) do motor, não na tela.
+property	property(prop) -> value	O número, sim/não ou texto próprio deste objeto (ou o padrão declarado).
+quit	quit()	Fecha o jogo (no editor não faz nada).
+random	random() -> 0..1	Números aleatórios.
+releaseSound	releaseSound(h)	Solta a nota: o envelope passa para a liberação.
+resolution	resolution() -> width, height	Tamanho real da imagem 3D em pixels.
+reverb	reverb(room, damping, level)	A reverberação geral: tamanho da sala, amortecimento e nível (0 a 1 cada; nível 0 a desliga).
+rotate	rotate(obj, dx, dy, dz)	Gira-o sobre os seus próprios eixos.
+rotateTowards	rotateTowards(obj, dx, dy [, factor])	Vai girando-o suavemente em direção a uma direção do chão (X e Y).
+safeArea	safeArea() -> x, y, w, h	A parte da tela sem notch (não usar em start).
+saveConfig	saveConfig()	Salvá-las no disco (ou no navegador) e lê-las de novo.
+scale	scale(obj, f)	Multiplica a escala atual.
+scenePlaying	scenePlaying()	Interrompe a cinemática / diz qual está sendo vista.
+screen	screen() -> width, height	Tamanho do canvas.
+screenFrame	screenFrame() -> x, y, width, height	O quadro da imagem 3D (o enquadramento da câmera, sem as faixas) em unidades do canvas, a partir do centro dele.
+screenMargin	screenMargin() -> mx, my	Quanto de tela sobra de cada lado ao redor de um canvas de tamanho fixo, em unidades do canvas, até as bordas reais (as faixas do enquadramento também são tela). Na vertical, com um canvas 4:3: mover um medidor my para cima o encosta na borda de cima.
+screenOf	screenOf(obj) -> x, y, front	Onde um objeto 3D aparece na tela (para colocar uma etiqueta 2D em cima).
+scrollUV	scrollUV(m, du, dv)	Mover as UV (água, esteiras transportadoras...).
+selected	selected() -> { obj, ... }	Os objetos selecionados no editor (para os botões que funcionam como complementos do editor).
+self	self() -> obj	O objeto dono deste script.
+setActiveCamera	setActiveCamera(cam)	Muda a câmera pela qual o jogo é visto.
+setCameraView	setCameraView(i, camera)	A câmera da vista i (1 ou 2). Se não for definida, a câmera ativa.
+setColor	setColor(light, r, g, b)	A cor de uma luz.
+setConfig	setConfig(clave, value)	Ler e escrever opções do jogo (recorde, volume...).
+setEmitting	setEmitting(obj, bool)	Uma rajada de partículas, ou ligar/desligar um emissor.
+setEnergy	setEnergy(light, e)	O seu brilho, de 0 a 1 (para piscar ou se apagar aos poucos).
+setFog	setFog(obj, density [, r, g, b, inicio, fin])	Ler e mudar a névoa.
+setLens	setLens(cam [, fov, near, far])	Ângulo de visão e distâncias de recorte.
+setMemories	setMemories(name, i, v1, v2, ...)	Escrever e ler memórias (o índice vai de 0 a 255).
+setMemory	setMemory(name, i, v)	Escrever e ler memórias (o índice vai de 0 a 255).
+setOpacity	setOpacity(obj, 0..1)	Transparência e fades.
+setPosition	setPosition(obj, x, y, z)	Coloca-o em um lugar exato (ignora a física).
+setPosPx	setPosPx(obj, x, y)	Posição de um elemento 2D (um nil deixa esse eixo como está).
+setRail	setRail(cam, curve [, offset])	Fazer a câmera seguir uma curva (trilho).
+setRot2D	setRot2D(obj, degrees)	Gira um elemento 2D.
+setRotation	setRotation(obj, x, y, z [, order])	Rotação exata, a mesma do cartão Transformar. Com order se escolhe em que ordem os eixos são aplicados, por exemplo "ZXY" (primeiro o rumo em torno da vertical, como um veículo).
+setRotationX	setRotationX(obj, g)	Muda um só eixo; os outros dois ficam iguais. Por exemplo, setRotationZ(obj, getRotationZ(obj) + 90 * dt) faz ele girar em torno da vertical.
+setRotationY	setRotationY(obj, g)	Muda um só eixo; os outros dois ficam iguais. Por exemplo, setRotationZ(obj, getRotationZ(obj) + 90 * dt) faz ele girar em torno da vertical.
+setRotationZ	setRotationZ(obj, g)	Muda um só eixo; os outros dois ficam iguais. Por exemplo, setRotationZ(obj, getRotationZ(obj) + 90 * dt) faz ele girar em torno da vertical.
+setScale	setScale(obj, s [, sy, sz])	Escala exata; com um só número, escala por igual.
+setShared	setShared(clave, value)	Escreve um número, sim/não ou texto no espaço compartilhado; nil o apaga.
+setSize	setSize(text, px)	Muda o texto de um texto ou botão, e o tamanho da letra.
+setSizePx	setSizePx(obj, w, h)	Tamanho de um elemento 2D.
+setSoundObject	setSoundObject(obj, t)	Ler / mudar um objeto Som: file (a fonte), active, volume, pitch, reverb, pan, start, clipStart, clipEnd, loop, positional, radius, range (e ao ler duration, playing).
+setStep	setStep(routine, i, field, ...)	Mudar ou ler um passo de uma rotina (campos: "on", "n", "color", "ref", "modo", "entero").
+setText	setText(obj, value)	Muda o texto de um texto ou botão, e o tamanho da letra.
+setTexture	setTexture(img, "ruta.png")	Muda a imagem, recorta uma parte (com u1 < u0 ou v1 < v0, espelhada) ou anima uma folha de quadros.
+setTint	setTint(obj, r, g, b [, a])	Muda a sua cor (valores de 0 a 1).
+setVertexPos	setVertexPos(m, i, x, y, z)	Ler e mover vértices um por um.
+setVertices	setVertices(m, {i, x, y, z, ...})	Mover muitos vértices de uma vez (muito mais rápido).
+setViews	setViews(n [, "side" | "up"])	2 divide a tela em duas (uma ao lado da outra ou uma em cima da outra); 1 volta para a tela inteira. A interface 2D (o HUD) é desenhada uma vez, por cima das duas.
+setVisible	setVisible(obj, bool)	Mostra-o ou oculta-o. Um objeto oculto deixa de receber update.
+showHitboxes	showHitboxes(bool)	Desenha os hitboxes para depurar.
+sound	sound("sounds/x.wav" [, vol, pitch, loop, pan]) -> h	Reproduz um som; devolve um identificador.
+soundObject	soundObject(obj) -> t	Ler / mudar um objeto Som: file (a fonte), active, volume, pitch, reverb, pan, start, clipStart, clipEnd, loop, positional, radius, range (e ao ler duration, playing).
+start	start()	Uma vez, ao dar Play (ou assim que o objeto é criado com instantiate). Serve para buscar objetos e preparar variáveis.
+step	step(name, ...)	Executa um passo de desenho; só vale dentro de uma função chamada pelo passo "Chamar Lua" de uma rotina.
+stick	stick(["left"|"right"] [, gamepad]) -> x, y	Alavanca do controle, de -1 a 1 (para cima é -1).
+stopScene	stopScene()	Animações da cena inteira.
+stopScene3D	stopScene3D()	Interrompe a cinemática / diz qual está sendo vista.
+stopSound	stopSound(h [, fundido])	Interromper ou ajustar sons.
+stopSounds	stopSounds()	Interromper ou ajustar sons.
+streamAuto	streamAuto(obj)	Carrega ou descarrega manualmente uma parte do nível (streaming), ou a devolve ao modo automático.
+streamLoad	streamLoad(obj)	Carrega ou descarrega manualmente uma parte do nível (streaming), ou a devolve ao modo automático.
+streamUnload	streamUnload(obj)	Carrega ou descarrega manualmente uma parte do nível (streaming), ou a devolve ao modo automático.
+tap	tap() -> x, y, touching	O dedo (ou o clique do mouse) na tela.
+target	target() -> obj | nil	O alvo ("target") do objeto dono.
+tilt	tilt() -> x, y, z	O acelerômetro do telefone, em g, nos eixos da tela do jeito que ela é vista (já girada): x é o quanto ele está girado para a direita, como um volante (o seno do ângulo); em pé e reto dá y = 1, deitado de barriga para cima z = 1. nil se o aparelho não tiver acelerômetro.
+touch	touch() -> bool	A tela é de toque: um telefone ou um tablet (Android, o navegador de um iPhone...) ou qualquer aparelho em que a tela já foi tocada. Para mostrar controles na tela só onde eles fazem falta.
+trigger	trigger(["left"|"right"] [, gamepad]) -> 0..1	Gatilho analógico.
+uiBox	uiBox(obj) -> x, y, w, h	O retângulo que ele ocupa de verdade (x, y = centro).
+unixTime	unixTime() -> seconds, ms	A hora do sistema como tempo Unix: os segundos desde 1/1/1970 em UTC, e à parte os milissegundos (0-999).
+unixTimeMs	unixTimeMs() -> ms	O mesmo tempo Unix em um só número: em milissegundos (inteiro) ou em segundos com decimais. Medir é uma subtração: t = unixTimeSec() - inicio. Exatos com Lua de 64 bits (todas as plataformas menos o Dreamcast; lá, unixTime()).
+unixTimeSec	unixTimeSec() -> seconds	O mesmo tempo Unix em um só número: em milissegundos (inteiro) ou em segundos com decimais. Medir é uma subtração: t = unixTimeSec() - inicio. Exatos com Lua de 64 bits (todas as plataformas menos o Dreamcast; lá, unixTime()).
+update	update(dt)	A cada quadro, enquanto o objeto estiver visível e na cena ativa. dt são os segundos que passaram desde o quadro anterior (entre 0.001 e 0.1).
+vertexCount	vertexCount(m)	Ler e mover vértices um por um.
+vertexGroup	vertexGroup(m, "grupo") -> {índices}	Os vértices de um grupo (chame-a uma única vez, em start).
+vertexPos	vertexPos(m, i)	Ler e mover vértices um por um.
+vibrate	vibrate(ms [, force])	Vibra por ms milissegundos com force de 0 a 1: o vibrador do telefone (Android, o navegador) e o motor dos controles (PC). Em um telefone, a força encurta o pulso. Não faz nada onde não há com o que vibrar, nem se o jogador desligou a vibração.
+view	view() -> i, n	A vista que está sendo desenhada (1 ou 2; 0 fora do desenho) e quantas há.
+warning	warning(msg)	Mensagens de informação, aviso ou erro no registro. error não interrompe o script.
+worldPoint	worldPoint(obj, x, y, z) -> x, y, z	Passa um ponto do objeto para coordenadas do mundo.

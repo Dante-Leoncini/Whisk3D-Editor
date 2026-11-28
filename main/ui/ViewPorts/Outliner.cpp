@@ -1439,6 +1439,13 @@ void Outliner::MoveCancel() {
     moving = false; moveObj = NULL; gMoveNames.clear();
 }
 
+// QUE FILA se clickeo (la de ESTE click y la del anterior): el doble click solo renombra si los DOS clicks fueron en la
+// misma fila. SDL cuenta como doble dos clicks rapidos a menos de ~32 px aunque sean filas vecinas: elegir un objeto y
+// enseguida el de abajo abria el renombrar del segundo, y la X que iba a borrarlo en la vista 3D se escribia en el nombre.
+// Se anotan al EMPEZAR cada click (LayoutClickUI -> OutlinerNoteClick), antes de que nada se lo quede: si el primer
+// click lo consumia otra cosa (cerrar un menu, soltar un campo) quedaba anotada la fila de un click VIEJO y el doble
+// click sobre una carpeta de la biblioteca ya no la renombraba
+std::string g_outClickPrev, g_outClickLast;
 void Outliner::ClickSelect(int mx, int my) {
     if (view != OUT_VIEW_SCENE) { ClickResources(mx, my); return; }   // la biblioteca
     if (!SceneCollection) return;
@@ -1498,8 +1505,10 @@ void Outliner::ClickSelect(int mx, int my) {
                 dragY0 = my;
             }
             if (inCamera) {
+                UndoCaptureVisibilityOf(hit);   // Ctrl+Z: la camarita tambien se deshace
                 hit->renderable = !hit->renderable;
             } else if (inEye) {
+                UndoCaptureVisibilityOf(hit);   // Ctrl+Z: el ojo tambien (antes solo la H)
                 hit->visible = !hit->visible;
             } else if (LShiftPressed) {
                 // shift+click: RANGO desde el activo hasta la fila

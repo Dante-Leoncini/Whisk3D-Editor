@@ -523,6 +523,7 @@ Delete the orphan resource	Sahipsiz kaynağı sil:
 Delete the orphan resources	Sahipsiz kaynakları sil
 Deleted	Silindi
 Denoiser	Gürültü giderici
+Shadowmask (real-time light)	Shadowmask (gerçek zamanlı ışık)
 Density	Yoğunluk
 Depth	Derinlik
 Depth & clear	Derinlik ve temizleme
@@ -751,6 +752,7 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Tam ses yarıçapı
 Fullscreen	Tam ekran
 Function	Fonksiyon
+Function of Whisk3D (it isn't in this script)	Whisk3D işlevi (bu betikte değil)
 GL Calls	GL çağrıları
 GL Light	GL Işığı
 GLB saved successfully!	GLB kaydedildi!
@@ -771,6 +773,7 @@ Give the project a name to save it	Kaydetmek için projeye bir ad verin
 Gizmo	Gizmo
 Global	Global
 Go back	Geri git
+Go to Definition	Tanıma git
 Go to end	Sona git
 Go to start	Başa git
 Grab step	Adımı tut
@@ -941,6 +944,7 @@ Library unlinked	Kütüphane bağlantısı kesildi
 Lifetime	Ömür
 Light	Işık
 Light Probe	Işık sondası
+Light Probes	Işık sondaları
 Light bounce	Işık sekmesi
 Light bounces	Işık sekmeleri
 Light color	Işık rengi
@@ -1872,6 +1876,7 @@ This resource can't be dropped in the 3D view	Bu kaynak 3D görünüme bırakıl
 This resource can't be renamed	Bu kaynak yeniden adlandırılamaz
 This resource type can't be deleted	Bu kaynak türü silinemez
 This resource type can't be duplicated	Bu kaynak türü çoğaltılamaz
+This script doesn't define	Bu betik şunu tanımlamıyor:
 This step has nothing to animate	Bu adımda canlandırılacak bir şey yok
 This texture already has the baked light of	Bu doku zaten şunun önceden hesaplanmış ışığını içeriyor
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	Bu işlem köşe gruplarını değiştirip köşe başına 1 kemiğe indirger (daha hızlı skinning). Bazı veriler kaybolabilir.
@@ -1918,12 +1923,7 @@ UV Group	UV Grubu
 UV Groups	UV Grupları
 UV Map	UV Haritası
 UV Maps	UV Haritaları
-UV Offset	UV kaydırma
-UV Pivot	UV pivotu
-UV Rotation	UV döndürme
-UV Scale	UV ölçeği
 UV Sphere	UV Küre
-UV Transform	UV dönüşümü
 UV array	UV dizisi
 UV group(s)	UV grubu
 UV layer (0 = active)	UV katmanı (0 = etkin)
@@ -2220,3 +2220,35 @@ Downloads	İndirilenler
 Pictures	Resimler
 Music	Müzik
 Render with the first	İlk ile render
+Scatter	Saçma
+External .w3d	Harici .w3d
+Emit From	Şuradan yay
+Seed	Tohum
+Random Scale	Rastgele ölçek
+Align to Normal	Normale hizala
+Random Rotation	Rastgele döndürme
+Random Tilt	Rastgele eğim
+Merged	Birleşik
+Instances	Örnekler
+Show Emitter	Yayıcıyı göster
+%d copies of %d source(s)	%d kaynaktan %d kopya
+Face Centers	Yüz merkezleri
+Faces (anywhere)	Yüzler (her yer)
+(the first one)	(ilki)
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Saçma: harici .w3d kopyaları nesne olamaz (Birleşik olarak uygulayın)
+Scatter: there are no copies to apply	Saçma: uygulanacak kopya yok
+Scatter: %d copies are now objects	Saçma: %d kopya artık nesne
+Show/Hide	Göster/Gizle
+Reveal Hidden	Gizlileri göster
+Hide Selected	Seçileni gizle
+Hide Unselected	Seçili olmayanı gizle
+Recalculate Vertex Normals	Köşe normallerini yeniden hesapla
+New File...	Yeni dosya...
+New File	Yeni dosya
+Recent	Son kullanılanlar
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Bıçak: tık = nokta, Enter = kes, Esc = iptal, Geri = noktayı sil, Z = içinden kes
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Bıçak (içinden): tık = nokta, Enter = kes, Esc = iptal, Geri = noktayı sil, Z = sadece görünen
+Knife: enter Edit Mode first	Bıçak: önce Düzenleme Moduna girin
+Knife: the cut does not cross any face	Bıçak: kesim hiçbir yüzeyi geçmiyor
+Knife	Bıçak
+Merge by Distance: %d vertices merged	Mesafeye göre birleştir: %d köşe birleştirildi

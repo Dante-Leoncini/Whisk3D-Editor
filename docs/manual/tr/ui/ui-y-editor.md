@@ -24,7 +24,7 @@ Editör Whisk3D UI ile yapılmıştır, ama onda görülenlerin çoğu editörü
 | Yardım balonları. Metni `Button::help` saklar | `W3dHelpRender`, `main/ui/ViewPorts/LayoutInput.cpp` içinde |
 | Hangi tuşun, tıklamanın ya da dokunuşun hangi widget'a gittiği ve N95'in tuşları | `main/ui/ViewPorts/LayoutInput.cpp`, `main/app/controls.cpp`, `platform/symbian/src/` |
 | Metin kutularının odak fonksiyonları | `main/ui/ViewPorts/NumInput.cpp` |
-| Çeviriler, `T()`. UI'da yalnızca `W3dMenuTranslate` kancası vardır | `main/config/W3dLang.cpp` |
+| Çeviriler, `T()`. UI'da yalnızca `W3dMenuTranslate` kancası vardır | `libs/Whisk3DCore/config/W3dLang.cpp` |
 | UI'ın başlatılması | `main/app/W3dInitUI.cpp` |
 | Ayrı simgelerle skin atlasını kurmak | `main/io/SkinAtlas.cpp` |
 | Ölçeği yeniden hesaplamak | `SetGlobalScale`, `main/ui/ViewPorts/ViewPorts.cpp` içinde |
@@ -32,9 +32,9 @@ Editör Whisk3D UI ile yapılmıştır, ama onda görülenlerin çoğu editörü
 | Editörün kendi renkleri: zemin, eksenler, normaller | `main/ui/W3dColors.cpp` |
 | Skin dosyaları: `font.png`, `font-ext.png`, `atlas/icons/`, `skin.ini` | `res/Skins/Whisk3D/` |
 | Genişletilmiş atlasın üreteci | `tools/fuente_ext.py` |
-| [2D Düzenleyici](../editor/editor-2d.md) ve oyunların `.w3dui` arayüzleri: metinler, görüntüler, dikdörtgenler, kapsayıcılar, slice 9, düğmeler ve videolar | `main/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `main/render/UIOverlay.cpp`, `main/io/UI2DFormat.cpp`, `main/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
+| [2D Düzenleyici](../editor/editor-2d.md) ve oyunların `.w3dui` arayüzleri: metinler, görüntüler, dikdörtgenler, kapsayıcılar, slice 9, düğmeler ve videolar | `libs/WhiskUI/objects/` (`UI.h`, `Text2D.h`, `Button2D.h`...), `libs/WhiskUI/render/UIOverlay.cpp`, `libs/WhiskUI/io/UI2DFormat.cpp`, `libs/WhiskUI/io/Font2D.cpp`, `main/ui/ViewPorts/Editor2D.cpp` |
 
-2D Düzenleyici metni, UI'a ait olan `W3dTextAtlas` ile çizer. Bir TTF'yi çalışırken stb_truetype ile pişirmek ise editöre aittir (`main/io/Font2D.cpp`).
+2D Düzenleyici metni, UI'a ait olan `W3dTextAtlas` ile çizer. Bir TTF'yi çalışırken stb_truetype ile pişirmek ise editöre aittir (`libs/WhiskUI/io/Font2D.cpp`).
 
 ## UI'ın içinde, ama editöre ait
 

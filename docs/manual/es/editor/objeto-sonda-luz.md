@@ -34,6 +34,12 @@ Con shaders llega a **todos** los materiales con luz, con la luz por píxel o po
 - Si hay varias sondas, una malla toma la luz de la más chica que la contiene.
 - Un objeto fuera de toda sonda usa la luz del fondo (la **Luz del fondo** de la tarjeta Render).
 
+## Prenderla y apagarla (el antes y después)
+
+El **ojo** de la sonda en el outliner la apaga: lo que estaba adentro vuelve a la luz del fondo en el mismo momento, sin perder lo horneado. El ojo de la **colección** que la contiene apaga todas las sondas de adentro, de luz y de reflejo: poné las sondas en una colección propia y comparás la escena con y sin ellas de un click. La **cámara** del outliner (no renderizar) la apaga solo en el render final; en la vista sigue alumbrando.
+
+Para comparar sin tocar la escena, el menú **Overlays** de la Vista 3D tiene **Sondas de luz** y **Sondas de reflejo**: destildadas, ninguna sonda de ese tipo alumbra (o refleja) en **esa** vista. Las otras vistas y el render no cambian, y la escena tampoco: con dos vistas una al lado de la otra se ve el antes y el después a la vez. Se guarda con el layout del proyecto.
+
 ## En el Nokia N95 (OpenGL ES 1.1)
 
 Sin luz por píxel, la sonda llega igual como la luz ambiente de cada objeto (su promedio), sin costo. Para que la luz siga la forma del objeto, tildá **Luz indirecta** en el material: la CPU calcula la luz de cada vértice (las lámparas más la luz de la sonda según hacia dónde mira el vértice). Usala en los objetos donde se nota; cuesta CPU en cada cuadro.

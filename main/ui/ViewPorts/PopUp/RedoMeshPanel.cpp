@@ -8,6 +8,7 @@
 #include "ViewPorts/LayoutTree.h"  // aviso de destruccion de viewports (vpCreator)
 #include "WhiskUI/widgets/PopupMenu.h"          // MenuScreenW / MenuScreenH (tamano ventana)
 #include "NumPad.h"                     // teclado numerico (editar el valor por texto/formula)
+#include "ViewPorts/TransformUI.h"     // ToolbarUsesTouch: el teclado en pantalla solo con el dedo
 #include "edit/MeshEdit.h"              // InsetOptions (el panel "Inset Faces")
 #include "ViewPorts/Pick3D.h"           // InsetRedoApply / InsetCurrentOptions
 
@@ -515,11 +516,12 @@ bool RedoMeshPanel::Key(int key){
 }
 
 void RedoMeshPanel::Release(){
-    // TAP sobre el value box (sin arrastrar) -> abrir el TECLADO NUMERICO para editar el valor por
-    // texto/formula. El numpad restaura ESTE panel al cerrar (prevPopup), y su onChange re-corta en vivo.
+    // TAP sobre el value box (sin arrastrar) -> la edicion del valor por texto/formula. Con el MOUSE alcanza el campo (el
+    // teclado fisico); con el DEDO ademas el TECLADO NUMERICO en pantalla, que restaura ESTE panel al cerrar (prevPopup)
+    // y su onChange re-corta en vivo. (Antes lo abria siempre: en la PC salia el teclado tactil con un click de mouse)
     if (dragField && !dragMoved && dragField->value){
         dragField->StartEditText();
-        KeyboardNumberOpen();
+        if (ToolbarUsesTouch()) KeyboardNumberOpen();
     }
     dragField = NULL;
 }

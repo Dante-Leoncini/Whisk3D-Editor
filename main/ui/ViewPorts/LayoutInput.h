@@ -186,7 +186,7 @@ void ClipMirrorReset();              // (def. en MeshEdit.cpp) olvida los verts 
 // (def. en MeshEdit.cpp) MERGE de la seleccion: 0 At Center, 1 At Cursor (cursorLocal), 2 Collapse, 3 By Distance(<dist)
 void MergeVertsEdit(Mesh* m, int mode, float dist, const Vector3& cursorLocal);
 void EditXformRestart();          // restaura al snapshot (cambio de eje X/Y/Z)
-void EditXformConfirm();          // fija: recalcula bordes + normales (salvo Mesh::lockNormals)
+void EditXformConfirm();          // fija: recalcula bordes + normales de lo movido (salvo Mesh > Normals > Lock Normals)
 void EditXformCancel();           // descarta: restaura el snapshot
 void EditXformStartExtrude(const Vector3& normalLocal); // move de la tapa del extrude
 void EditXformNumValue(float v); // entrada numerica: aplica el valor exacto (malla)
@@ -323,6 +323,10 @@ void LayoutBuildMenuAdd();
 class Viewport3D;
 ViewportBase* LayoutDefault(int w, int h, Viewport3D** vp3dOut);
 void AddCube(); void AddPlane(); void AddVertex(); void AddReference();
+// el selector de textura le dio su imagen ('path', ya cargada en 't') a 'mat': si es la de una Reference recien creada,
+// el plano toma la proporcion de la imagen (ver LayoutInput.cpp). Lo llama cada plataforma al cargar la textura base
+class Material; class Texture;
+void LayoutReferenceTexture(Material* mat, const std::string& path, const Texture* t);
 // Lock Orbit: arrastrar PANEA en vez de orbitar. Togglea y avisa con un cartel. false = no hay viewport3d.
 bool LayoutLockOrbitToggle();
 

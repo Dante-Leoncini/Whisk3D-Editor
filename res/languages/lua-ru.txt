@@ -1,0 +1,195 @@
+# Whisk3D: la ayuda de la API de Lua para el IDE. La genera tools/genlua_api.py desde docs/manual/ru/lua: no editar a mano
+accelerate	accelerate(obj, factor [, tope])	Ускоряет объект, умножая его скорость.
+adjustSound	adjustSound(h, vol [, pitch])	Остановить или настроить звуки.
+animate	animate(mesh, n [, frame])	Меняет вершинную анимацию меша.
+animClip	animClip(armature, clip [, loop])	Анимации скелета (ходьба, прыжок...) и плавный переход между ними.
+animLayer	animLayer(esq, n, clip [, weight, mode])	Смешивание нескольких анимаций одновременно по слоям (от 1 до 16), например бег + стрельба.
+animObject	animObject(root, "clip" [, loop])	Клипы анимации объекта и его потомков.
+animScene	animScene(name [, loop])	Анимации всей сцены.
+animSceneFrame	animSceneFrame(f)	Анимации всей сцены.
+beep	beep(freq [, ms, vol])	Звуковой сигнал (без файла).
+beforeView	beforeView(i)	(Её определяет твой скрипт.) Движок вызывает её перед рисованием каждого вида, в скрипте, который вызвал setViews. Здесь ты разворачиваешь к ЭТОЙ камере то, что смотрит на камеру (таблички, частицы), или прячешь то, что этому виду видеть не нужно. Не двигай ничего, что меняется со временем: это делается в update.
+bonePoint	bonePoint(esq, "hueso" [, x, y, z]) -> x, y, z	Где находится кость (чтобы вложить оружие в руку).
+bounce	bounce(obj, other)	Отскоки от другого объекта или от границ области (возвращают true, если отскок был).
+bounceInside	bounceInside(obj, area)	Отскоки от другого объекта или от границ области (возвращают true, если отскок был).
+bounceOn	bounceOn(obj, area [, sides])	Отскоки от другого объекта или от границ области (возвращают true, если отскок был).
+box	box(obj [, x, y, z])	Размер его коробки столкновений: в 3D - ширина (X), глубина (Y) и высота (Z); в 2D - ширина и высота в пикселях.
+button	button(name [, gamepad])	То же самое для кнопки геймпада. С gamepad (от 1 до 4) - кнопка этого геймпада; без него - любого.
+buttonPressed	buttonPressed(name [, gamepad])	То же самое для кнопки геймпада. С gamepad (от 1 до 4) - кнопка этого геймпада; без него - любого.
+cameraXZ	cameraXZ() -> fx, fy, rx, ry	Куда смотрит камера в плоскости пола, по X и Y: вперёд (fx, fy) и вправо (rx, ry), чтобы двигать персонажа относительно камеры. (Название осталось с тех времён, когда полом была плоскость XZ.)
+captureMouse	captureMouse(bool)	Захват мыши, чтобы осматриваться мышью (игры от первого лица). На ПК и в браузере; в браузере мышь захватывается при первом клике или нажатии клавиши в игре. Esc освобождает её и ставит игру на паузу.
+captureScreen	captureScreen(name [, withHud]) -> path	Копирует 3D-изображение этого кадра (когда сцена отрисована; с withHud - после HUD) в текстуру. Путь ("pantalla:") подходит для setTexture, материала или шага "Привязать текстуру" процедуры.
+captureUV	captureUV(name) -> u0, v0, u1, v1	Часть захваченной текстуры, где изображение не перевёрнуто, для setUVRect (или nil, если копия ещё не сделана: она делается при отрисовке кадра).
+changeScene	changeScene(name [, restart])	Переходит к другой сцене (меню, уровень 2...) в конце кадра.
+clockMs	clockMs() -> ms	Миллисекунды, чтобы измерить, сколько времени что-то занимает.
+colGround	colGround(mesh, x, y, z)	Столкновение с треугольниками меша (стоять на полу, не проходить сквозь стены).
+collide	collide(a, b) -> bool	Перекрываются ли два 2D-элемента на экране.
+colRay	colRay(...)	Столкновение с треугольниками меша (стоять на полу, не проходить сквозь стены).
+colWall	colWall(...)	Столкновение с треугольниками меша (стоять на полу, не проходить сквозь стены).
+contacts	contacts() -> list	Все столкновения этого кадра.
+control	control([n]) -> name, tipo	Сколько геймпадов подключено и какого они типа ("xbox", "playstation", "nintendo", "generico").
+controls	controls() -> n	Сколько геймпадов подключено и какого они типа ("xbox", "playstation", "nintendo", "generico").
+createLine	createLine(name, points)	Плавная замкнутая кривая, которую рассчитывает движок (маршруты).
+createSound	createSound("sounds/x.wav" [, parent]) -> obj	Новый объект Звук (destroy(obj) удаляет его). В префабе создаётся как любой объект.
+date	date([seconds [, utc]]) -> table	Дата и время для времени Unix (если не передать - текущее), местное или по UTC при utc = true: year, month, day, hour, min, sec, wday (1 = воскресенье), yday.
+debugLog	debugLog(msg)	Сообщения только в отладочных сборках.
+destroy	destroy(obj) -> bool	Удаляет объект в конце кадра.
+draw3D	draw3D([on])	Выключает или включает весь 3D (например, за непрозрачным меню).
+emit	emit(obj [, n])	Выброс частиц или включение/выключение излучателя.
+error	error(msg)	Информационные сообщения, предупреждения или ошибки в журнале. error не прерывает скрипт.
+fade	fade(obj, objetivo, paso)	Прозрачность и плавные переходы.
+find	find(name [, root]) -> obj | nil	Ищет объект по имени в Аутлайнере (или только внутри root).
+finger	finger([n]) -> x, y, active	Мультитач: палец номер n (от 1 до 4).
+getColor	getColor(light) -> r, g, b	Цвет источника света.
+getConfig	getConfig(clave [, def]) -> text	Читать и записывать настройки игры (рекорд, громкость...).
+getEnergy	getEnergy(light) -> e	Его яркость, от 0 до 1 (чтобы он мерцал или постепенно гас).
+getFog	getFog(obj)	Чтение и изменение тумана.
+getLens	getLens(cam) -> fov, near, far	Угол обзора и расстояния отсечения.
+getMemory	getMemory(name, i)	Запись и чтение памяти (индекс от 0 до 255).
+getName	getName(obj) -> text	Имя объекта.
+getPosition	getPosition(obj) -> x, y, z	Где находится объект.
+getPosPx	getPosPx(obj) -> x, y	Положение 2D-элемента (nil оставляет эту ось без изменений).
+getRotation	getRotation(obj) -> x, y, z	Его вращение в градусах.
+getRotationX	getRotationX(obj)	Поворот по одной оси. getRotationZ - поворот вокруг вертикали.
+getRotationY	getRotationY(obj)	Поворот по одной оси. getRotationZ - поворот вокруг вертикали.
+getRotationZ	getRotationZ(obj) -> градусы	Поворот по одной оси. getRotationZ - поворот вокруг вертикали.
+getScale	getScale() -> f	Без аргументов: коэффициент для подгонки размеров под экран (меньшая сторона / 480).
+getShared	getShared(clave) -> value	Читает общее пространство всех скриптов.
+getSizePx	getSizePx(obj) -> w, h	Размер 2D-элемента.
+getStep	getStep(routine, i, field)	Изменить или прочитать шаг процедуры (поля: "on", "n", "color", "ref", "modo", "entero").
+getType	getType(obj) -> text	Что это: "mesh", "light", "camera", "empty", "armature", "text", "image", "button", "hitbox", "prefab", "rutina"... ("", если объекта нет).
+getVelocity	getVelocity(obj, vx [, vy, vz])	Задаёшь скорость, и движок сам двигает объект.
+importW3D	importW3D(path) -> obj | nil	Добавляет в сцену другой файл .w3d во время игры.
+info	info(msg)	Информационные сообщения, предупреждения или ошибки в журнале. error не прерывает скрипт.
+inside	inside(area, x [, y])	Удерживать элемент внутри другого или проверить, находится ли точка внутри.
+instantiate	instantiate(prefab [, x, y, z [, rotY [, parent]]]) -> obj | nil	Создаёт копию префаба в этой позиции (rotY в градусах). "Libreria/Escena" создаёт копию из подключённой библиотеки. С parent копия становится потомком этого объекта (положение и поворот задаются относительно него).
+isDebug	isDebug()	Сообщения только в отладочных сборках.
+isLoaded	isLoaded(obj) -> bool	Загружена ли уже эта часть.
+isMuted	isMuted()	Общее отключение звука.
+isVisible	isVisible(obj) -> bool	Показывает или скрывает его. Скрытый объект перестаёт получать update.
+key	key(name) -> bool	Клавиша нажата (пока ты её удерживаешь).
+keyPressed	keyPressed(name) -> bool	Клавиша нажата именно в этом кадре (один раз за нажатие).
+limit	limit(obj, area [, axis])	Удерживать элемент внутри другого или проверить, находится ли точка внутри.
+linePoint	linePoint(id, s)	Плавная замкнутая кривая, которую рассчитывает движок (маршруты).
+loadConfig	loadConfig()	Сохранить их на диск (или в браузере) и прочитать снова.
+logCount	logCount()	Читать журнал из игры (собственная консоль).
+logLine	logLine(i)	Читать журнал из игры (собственная консоль).
+lookAt	lookAt(obj, x, y, z)	Направляет его на точку (перед камеры).
+luaProfile	luaProfile(frames [, label])	Измеряет, какие части скрипта работают медленно (luaProfile(0) выключает замер).
+mouse	mouse() -> x, y, dentro	Где находится мышь.
+mouseCaptured	mouseCaptured()	Захват мыши, чтобы осматриваться мышью (игры от первого лица). На ПК и в браузере; в браузере мышь захватывается при первом клике или нажатии клавиши в игре. Esc освобождает её и ставит игру на паузу.
+mouseRel	mouseRel() -> dx, dy	Захват мыши, чтобы осматриваться мышью (игры от первого лица). На ПК и в браузере; в браузере мышь захватывается при первом клике или нажатии клавиши в игре. Esc освобождает её и ставит игру на паузу.
+move	move(obj, dx, dy, dz)	Сдвигает его от текущего места (используй вместе с dt).
+mute	mute(bool)	Общее отключение звука.
+muteSound	muteSound(obj)	Запустить объект Звук заново (с seg секунд его отрезка) или заглушить.
+netAddress	netAddress() -> text	IP этого устройства в локальной сети (чтобы присоединиться через интернет или вписать его вручную).
+netAvailable	netAvailable() -> bool [, reason]	Может ли эта игра использовать сеть. Если нет - причина: "no permission" (редактор не дал этому проекту разрешение) или "no network" (на этой платформе сети пока нет).
+netClose	netClose()	Выходит из партии (у хоста - закрывает её для всех). Stop в редакторе тоже её закрывает.
+netDevice	netDevice() -> text	Имя этого устройства (его видят другие, когда ищут партии). Меняется в редакторе: карточка Настройки, *Имя устройства*.
+netFind	netFind([game]) -> bool	Начинает искать партии в локальной сети. Повторный вызов обновляет список.
+netHost	netHost(name [, max [, game]]) -> bool [, error]	Создаёт партию и ждёт игроков (max с учётом хоста: по умолчанию 2). game - название твоей игры: видны только партии той же игры.
+netJoin	netJoin(address) -> bool	Входит в партию: address из netMatches() или введённый адрес ("192.168.0.10", "x.x.x.x:puerto").
+netMatches	netMatches() -> { {name, device, players, max, address}, ... }	Партии, которые ответили (список обновляется сам, пока ты ищешь).
+netOpen	netOpen(bool)	Хост появляется в поиске и принимает игроков (true) или нет (например, когда партия уже началась).
+netPlayers	netPlayers() -> { {id, name, isSelf}, ... }	Те, кто в партии (имя - это имя их устройства).
+netReceive	netReceive() -> { {from, data}, ... }	Всё, что пришло с прошлого раза, по порядку.
+netSelf	netSelf() -> id	Твой номер в партии (0 = хост; -1 - нет партии).
+netSend	netSend(value [, para [, reliable]]) -> bool	Отправляет значение Lua (число, текст, логическое значение или таблицу, в том числе с вложенными таблицами) одному игроку (para = его id) или всем (nil). Надёжно (по умолчанию): доходит гарантированно и по порядку. С false не отправляется повторно, если потерялось: для того, что ты отправляешь каждый кадр (позиции, геймпад), где следующее сообщение заменяет предыдущее.
+netSilence	netSilence([id]) -> seconds, limite	Сколько времени от этого игрока ничего не приходит (без id: от того, кто молчит дольше всех). Присоединившийся слышит только хоста, поэтому для него это молчание хоста. После limite (8 с) игрок считается ушедшим: хост убирает его из партии, а у присоединившегося netState() возвращает "error".
+netState	netState() -> state, error	"none", "searching", "waiting" (ты хост), "connecting", "connected" или "error" (с причиной).
+object	object(prop) -> obj | nil	Объект, выбранный в поле prop таблицы properties.
+onEnter	onEnter(other, myHitbox, otherHitbox)	Когда хитбокс начинает касаться другого.
+onExit	onExit(other, myHitbox, otherHitbox)	Когда они перестают касаться (а также если один из них скрывается или отключается).
+onStay	onStay(other, myHitbox, otherHitbox)	В каждом кадре, пока они продолжают касаться друг друга.
+onTouch	onTouch(other, impulse, x, y, z, nx, ny, nz)	Когда сталкиваются два твёрдых тела. x, y, z - точка контакта, а nx, ny, nz - направление к другому телу.
+option	option(prop) -> text	Вариант, выбранный в выпадающем списке из properties; если ничего не выбрано - первый в списке (по умолчанию).
+param	param(prop [, def]) -> número	Как property, но всегда число; если такого нет, возвращает def (или 0).
+physicsActive	physicsActive(obj, bool)	Гравитация (по умолчанию 9.81), включение/выключение физики объекта.
+physicsAwake	physicsAwake(obj)	Гравитация (по умолчанию 9.81), включение/выключение физики объекта.
+physicsGravity	physicsGravity([g])	Гравитация (по умолчанию 9.81), включение/выключение физики объекта.
+physicsRay	physicsRay(ox, oy, oz, dx, dy, dz, max) -> dist, nx, ny, nz, obj	Пускает луч и сообщает, во что он попал.
+playScene	playScene(name [, "funcion"])	Воспроизводит 3D-сцену как кат-сцену, поставив игру на паузу; по окончании вызывает указанную функцию.
+playSound	playSound(obj [, seg])	Запустить объект Звук заново (с seg секунд его отрезка) или заглушить.
+pressed	pressed(obj) -> bool	Этого 2D-элемента коснулись или кликнули по нему в этом кадре (кнопки).
+print	print(...)	Пишет в журнал (лог) движка, а не на экран.
+property	property(prop) -> value	Собственное число, да/нет или текст этого объекта (или объявленное значение по умолчанию).
+quit	quit()	Закрывает игру (в редакторе ничего не делает).
+random	random() -> 0..1	Случайные числа.
+releaseSound	releaseSound(h)	Отпускает ноту: огибающая переходит к затуханию.
+resolution	resolution() -> width, height	Реальный размер 3D-изображения в пикселях.
+reverb	reverb(room, damping, level)	Общая реверберация: размер зала, демпфирование и уровень (каждый от 0 до 1; уровень 0 выключает).
+rotate	rotate(obj, dx, dy, dz)	Поворачивает его вокруг собственных осей.
+rotateTowards	rotateTowards(obj, dx, dy [, factor])	Плавно поворачивает его к направлению в плоскости пола (X и Y).
+safeArea	safeArea() -> x, y, w, h	Часть экрана без выреза (не использовать в start).
+saveConfig	saveConfig()	Сохранить их на диск (или в браузере) и прочитать снова.
+scale	scale(obj, f)	Умножает текущий масштаб.
+scenePlaying	scenePlaying()	Прерывает кат-сцену / сообщает, какая сейчас воспроизводится.
+screen	screen() -> width, height	Размер холста.
+screenFrame	screenFrame() -> x, y, width, height	Прямоугольник 3D-изображения (кадр камеры, без полос) в единицах холста, от его центра.
+screenMargin	screenMargin() -> mx, my	Сколько экрана остаётся с каждой стороны вокруг холста фиксированного размера, в единицах холста, до настоящих краёв (полосы вокруг кадра - тоже экран). В вертикальной ориентации с холстом 4:3 индикатор, сдвинутый на my вверх, прижимается к верхнему краю.
+screenOf	screenOf(obj) -> x, y, front	Где 3D-объект находится на экране (чтобы поставить над ним 2D-метку).
+scrollUV	scrollUV(m, du, dv)	Сдвигать UV (вода, конвейерные ленты...).
+selected	selected() -> { obj, ... }	Объекты, выделенные в редакторе (для кнопок, которые работают как дополнения редактора).
+self	self() -> obj	Объект, которому принадлежит этот скрипт.
+setActiveCamera	setActiveCamera(cam)	Меняет камеру, через которую видна игра.
+setCameraView	setCameraView(i, camera)	Камера вида i (1 или 2). Если не задана - активная.
+setColor	setColor(light, r, g, b)	Цвет источника света.
+setConfig	setConfig(clave, value)	Читать и записывать настройки игры (рекорд, громкость...).
+setEmitting	setEmitting(obj, bool)	Выброс частиц или включение/выключение излучателя.
+setEnergy	setEnergy(light, e)	Его яркость, от 0 до 1 (чтобы он мерцал или постепенно гас).
+setFog	setFog(obj, density [, r, g, b, inicio, fin])	Чтение и изменение тумана.
+setLens	setLens(cam [, fov, near, far])	Угол обзора и расстояния отсечения.
+setMemories	setMemories(name, i, v1, v2, ...)	Запись и чтение памяти (индекс от 0 до 255).
+setMemory	setMemory(name, i, v)	Запись и чтение памяти (индекс от 0 до 255).
+setOpacity	setOpacity(obj, 0..1)	Прозрачность и плавные переходы.
+setPosition	setPosition(obj, x, y, z)	Ставит его в точное место (игнорируя физику).
+setPosPx	setPosPx(obj, x, y)	Положение 2D-элемента (nil оставляет эту ось без изменений).
+setRail	setRail(cam, curve [, offset])	Заставить камеру следовать по кривой (рельсу).
+setRot2D	setRot2D(obj, degrees)	Поворачивает 2D-элемент.
+setRotation	setRotation(obj, x, y, z [, order])	Точное вращение, то же, что в карточке Трансформация. order задаёт порядок, в котором применяются оси, например "ZXY" (сначала курс вокруг вертикали, как у машины).
+setRotationX	setRotationX(obj, g)	Меняет только одну ось; две другие остаются как были. Например, setRotationZ(obj, getRotationZ(obj) + 90 * dt) вращает объект вокруг вертикали.
+setRotationY	setRotationY(obj, g)	Меняет только одну ось; две другие остаются как были. Например, setRotationZ(obj, getRotationZ(obj) + 90 * dt) вращает объект вокруг вертикали.
+setRotationZ	setRotationZ(obj, g)	Меняет только одну ось; две другие остаются как были. Например, setRotationZ(obj, getRotationZ(obj) + 90 * dt) вращает объект вокруг вертикали.
+setScale	setScale(obj, s [, sy, sz])	Точный масштаб; с одним числом масштабирует равномерно.
+setShared	setShared(clave, value)	Записывает число, да/нет или текст в общее пространство; nil удаляет значение.
+setSize	setSize(text, px)	Меняет текст у текста или кнопки, а также размер шрифта.
+setSizePx	setSizePx(obj, w, h)	Размер 2D-элемента.
+setSoundObject	setSoundObject(obj, t)	Прочитать / изменить объект Звук: file (источник), active, volume, pitch, reverb, pan, start, clipStart, clipEnd, loop, positional, radius, range (при чтении ещё duration, playing).
+setStep	setStep(routine, i, field, ...)	Изменить или прочитать шаг процедуры (поля: "on", "n", "color", "ref", "modo", "entero").
+setText	setText(obj, value)	Меняет текст у текста или кнопки, а также размер шрифта.
+setTexture	setTexture(img, "ruta.png")	Меняет изображение, вырезает его часть (при u1 < u0 или v1 < v0 - зеркально) или анимирует лист кадров.
+setTint	setTint(obj, r, g, b [, a])	Меняет его цвет (значения от 0 до 1).
+setVertexPos	setVertexPos(m, i, x, y, z)	Читать и перемещать вершины по одной.
+setVertices	setVertices(m, {i, x, y, z, ...})	Переместить много вершин за раз (намного быстрее).
+setViews	setViews(n [, "side" | "up"])	2 делит экран на два (рядом друг с другом или один над другим); 1 возвращает целый экран. 2D-интерфейс (HUD) рисуется один раз, поверх обоих.
+setVisible	setVisible(obj, bool)	Показывает или скрывает его. Скрытый объект перестаёт получать update.
+showHitboxes	showHitboxes(bool)	Рисует хитбоксы для отладки.
+sound	sound("sounds/x.wav" [, vol, pitch, loop, pan]) -> h	Воспроизводит звук; возвращает идентификатор.
+soundObject	soundObject(obj) -> t	Прочитать / изменить объект Звук: file (источник), active, volume, pitch, reverb, pan, start, clipStart, clipEnd, loop, positional, radius, range (при чтении ещё duration, playing).
+start	start()	Один раз, при нажатии Play (или сразу после создания объекта через instantiate). Нужна, чтобы найти объекты и подготовить переменные.
+step	step(name, ...)	Выполняет шаг отрисовки; работает только внутри функции, вызванной шагом процедуры "Вызвать Lua".
+stick	stick(["left"|"right"] [, gamepad]) -> x, y	Стик геймпада, от -1 до 1 (вверх - это -1).
+stopScene	stopScene()	Анимации всей сцены.
+stopScene3D	stopScene3D()	Прерывает кат-сцену / сообщает, какая сейчас воспроизводится.
+stopSound	stopSound(h [, fundido])	Остановить или настроить звуки.
+stopSounds	stopSounds()	Остановить или настроить звуки.
+streamAuto	streamAuto(obj)	Вручную загружает или выгружает часть уровня (стриминг) или возвращает её в автоматический режим.
+streamLoad	streamLoad(obj)	Вручную загружает или выгружает часть уровня (стриминг) или возвращает её в автоматический режим.
+streamUnload	streamUnload(obj)	Вручную загружает или выгружает часть уровня (стриминг) или возвращает её в автоматический режим.
+tap	tap() -> x, y, touching	Палец (или клик мыши) на экране.
+target	target() -> obj | nil	Цель ("target") объекта-владельца.
+tilt	tilt() -> x, y, z	Акселерометр телефона, в g, по осям экрана так, как его видно (уже с учётом поворота): x - насколько он повёрнут вправо, как руль (синус угла); если держать его вертикально и ровно, получается y = 1, а если положить экраном вверх - z = 1. nil, если у устройства нет акселерометра.
+touch	touch() -> bool	Экран сенсорный: телефон или планшет (Android, браузер на iPhone...) или любое устройство, на котором уже касались экрана. Чтобы показывать экранные элементы управления только там, где они нужны.
+trigger	trigger(["left"|"right"] [, gamepad]) -> 0..1	Аналоговый курок.
+uiBox	uiBox(obj) -> x, y, w, h	Прямоугольник, который элемент реально занимает (x, y = центр).
+unixTime	unixTime() -> seconds, ms	Системное время в формате Unix: секунды с 1.1.1970 по UTC и отдельно миллисекунды (0-999).
+unixTimeMs	unixTimeMs() -> ms	То же время Unix одним числом: в миллисекундах (целое) или в секундах с дробной частью. Измерить - значит вычесть: t = unixTimeSec() - start. Точно с 64-битным Lua (все платформы, кроме Dreamcast; там - unixTime()).
+unixTimeSec	unixTimeSec() -> seconds	То же время Unix одним числом: в миллисекундах (целое) или в секундах с дробной частью. Измерить - значит вычесть: t = unixTimeSec() - start. Точно с 64-битным Lua (все платформы, кроме Dreamcast; там - unixTime()).
+update	update(dt)	В каждом кадре, пока объект видим и находится в активной сцене. dt - секунды, прошедшие с предыдущего кадра (от 0.001 до 0.1).
+vertexCount	vertexCount(m)	Читать и перемещать вершины по одной.
+vertexGroup	vertexGroup(m, "grupo") -> {índices}	Вершины группы (вызывать один раз, в start).
+vertexPos	vertexPos(m, i)	Читать и перемещать вершины по одной.
+vibrate	vibrate(ms [, force])	Вибрация длительностью ms миллисекунд с силой force от 0 до 1: вибромотор телефона (Android, браузер) и моторы геймпадов (ПК). На телефоне сила укорачивает импульс. Ничего не делает, если вибрировать нечем или если игрок отключил вибрацию.
+view	view() -> i, n	Вид, который сейчас рисуется (1 или 2; 0 вне рисования), и сколько всего видов.
+warning	warning(msg)	Информационные сообщения, предупреждения или ошибки в журнале. error не прерывает скрипт.
+worldPoint	worldPoint(obj, x, y, z) -> x, y, z	Переводит точку объекта в мировые координаты.

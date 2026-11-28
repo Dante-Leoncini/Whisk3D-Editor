@@ -994,7 +994,7 @@ static bool DopeMaterialInSelection(const Material* m){
     }
     return false;
 }
-// el nombre de un canal de material como se lista ("Base Color R", "UV Offset U", "Layer 2 · Factor")
+// el nombre de un canal de material como se lista ("Base Color R", "Emission Strength", "Layer 2 · Factor")
 static std::string DopeMatChannelName(int prop, int comp){
     if (prop == AnimMatLayerForce){
         char b[16]; snprintf(b, sizeof b, " %d", comp + 1);

@@ -23,9 +23,9 @@ extern bool g_redraw;   // el frame se redibuja cuando un undo/redo/borrado camb
 #include "animation/Animation.h"         // AnimationObjects / keyFrame / ActiveAnimKind
 #include "animation/Armature2DAnimation.h" // clips del armature 2D (kind 4): undo de sus keyframes
 #include "animation/VertexAnimation.h"   // KeyframesUndo: snapshot binario de los frames de la vertex anim de objeto
-#include "render/UIOverlay.h"    // UI2D_IsElement2D / Rot2dDe / TamanoElem (campos 2D del transform)
-#include "objects/Text2D.h"      // el texto 2D escala por su 'tam'
-#include "objects/UI.h"          // resize del lienzo (UI::ancho/alto)
+#include "WhiskUI/render/UIOverlay.h"    // UI2D_IsElement2D / Rot2dDe / TamanoElem (campos 2D del transform)
+#include "WhiskUI/objects/Text2D.h"      // el texto 2D escala por su 'tam'
+#include "WhiskUI/objects/UI.h"          // resize del lienzo (UI::ancho/alto)
 #include "objects/MeshResource.h" // el registro de mallas (destino MeshG de un rename) + publicar tras el undo
 #include "io/ProjectResources.h"  // lo PURGADO (material / textura en caliente) que el undo vuelve a poner en uso
 #include "io/W3dResources.h"      // las bibliotecas de clips de jerarquia que retiene un paso (referencias del historial)
@@ -509,17 +509,19 @@ public:
 private:
     Object* obj;
     bool    visible;   // estado GUARDADO (para el swap)
+    bool    renderable;   // (la camarita del outliner: si sale en el render; va en el mismo paso)
 public:
-    VisibilityUndo(Object* o) : obj(o), visible(o ? o->visible : true) {}
+    VisibilityUndo(Object* o) : obj(o), visible(o ? o->visible : true), renderable(o ? o->renderable : true) {}
     void Apply() {
         if (!obj) return;
         bool cur = obj->visible;
         obj->visible = visible;
         visible = cur;                        // guarda lo vivo (para rehacer)
+        cur = obj->renderable; obj->renderable = renderable; renderable = cur;
         extern bool w3dRenderLights;          // fwd-decl: evita el header pesado de gfx en el build de Symbian
         if (!obj->visible && w3dRenderLights) TurnOffChildLights(obj);
     }
-    W3D_UNDO_NO_INDICES // obj: puntero a Object; visible: valor propio -> no indexa ninguna lista
+    W3D_UNDO_NO_INDICES // obj: puntero a Object; visible / renderable: valores propios -> no indexa ninguna lista
 };
 
 // transform en OBJECT MODE: pos/rot/escala de los seleccionados al EMPEZAR
@@ -652,6 +654,8 @@ public:
 
 // SELECCION de sub-elementos en EDIT MODE (verts/edges/faces): intercambia los 3 vectores de seleccion
 // + el activo de la EditMesh (solo si el size matchea -> robusto al rearmado de la edit).
+// Y LO OCULTO (H / Shift+H / Alt+H, EditMesh::Hide / Reveal): ocultar cambia la seleccion Y lo que se ve, asi que va en el
+// mismo paso. Antes Ctrl+Z no traia de vuelta lo ocultado (ni volvia a ocultar lo revelado con Alt+H)
 class SelectEditUndo : public UndoCmd {
     // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
     //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
@@ -660,19 +664,40 @@ public:
 private:
     Mesh* m;
     std::vector<unsigned char> vs, is, fs;
+    std::vector<unsigned char> vh, eh, fh;   // lo oculto (vacio = nada oculto todavia: los vectores se arman al ocultar)
     int active;
+    // lo oculto se intercambia solo si los TRES calzan con la jaula de ahora (vacios o del tamano justo)
+    static bool Fits(const std::vector<unsigned char>& a, int n) { return a.empty() || (int)a.size() == n; }
 public:
     SelectEditUndo(Mesh* M) : m(M), active(-1) {
         if (m) { m->EnsureEdit();
-                 if (m->edit) { vs = m->edit->vertSel; is = m->edit->edgeSel; fs = m->edit->faceSel; active = m->edit->activeIdx; } }
+                 if (m->edit) { vs = m->edit->vertSel; is = m->edit->edgeSel; fs = m->edit->faceSel; active = m->edit->activeIdx;
+                                if (m->edit->numHidden > 0) { vh = m->edit->vertHid; eh = m->edit->edgeHid; fh = m->edit->faceHid; } } }
     }
     void Apply() {
         if (!m) return; m->EnsureEdit(); if (!m->edit) return;
-        if (m->edit->vertSel.size() == vs.size()) m->edit->vertSel.swap(vs);
-        if (m->edit->edgeSel.size() == is.size()) m->edit->edgeSel.swap(is);
-        if (m->edit->faceSel.size() == fs.size()) m->edit->faceSel.swap(fs);
-        int cur = m->edit->activeIdx; m->edit->activeIdx = active; active = cur;
-        m->edit->Recolor(); // re-tinta los buffers segun la seleccion restaurada
+        EditMesh* e = m->edit;
+        if (e->vertSel.size() == vs.size()) e->vertSel.swap(vs);
+        if (e->edgeSel.size() == is.size()) e->edgeSel.swap(is);
+        if (e->faceSel.size() == fs.size()) e->faceSel.swap(fs);
+        int cur = e->activeIdx; e->activeIdx = active; active = cur;
+        const int nV = e->NumVerts(), nE = e->NumEdges(), nF = e->NumFaces();
+        // (sin nada oculto ni antes ni ahora no hay nada que tocar: el click de siempre)
+        const bool hiddenNow = e->numHidden > 0, hiddenSaved = !vh.empty() || !eh.empty() || !fh.empty();
+        if ((hiddenNow || hiddenSaved) && Fits(e->vertHid, nV) && Fits(e->edgeHid, nE) && Fits(e->faceHid, nF) &&
+            Fits(vh, nV) && Fits(eh, nE) && Fits(fh, nF)) {
+            std::vector<unsigned char> v2, e2, f2;   // lo de ahora (para rehacer); vacio si no habia nada oculto
+            if (hiddenNow) { v2 = e->vertHid; e2 = e->edgeHid; f2 = e->faceHid; }
+            e->vertHid = vh; e->edgeHid = eh; e->faceHid = fh;
+            vh.swap(v2); eh.swap(e2); fh.swap(f2);
+            e->numHidden = 0;
+            for (size_t k = 0; k < e->vertHid.size(); k++) e->numHidden += e->vertHid[k];
+            for (size_t k = 0; k < e->edgeHid.size(); k++) e->numHidden += e->edgeHid[k];
+            for (size_t k = 0; k < e->faceHid.size(); k++) e->numHidden += e->faceHid[k];
+            e->RebuildVisible();   // (lo que dibuja la malla: sin lo oculto)
+            if (!m->modifiers.empty()) m->GenerateMeshModified();   // (y el resultado de los modificadores)
+        }
+        e->Recolor(); // re-tinta los buffers segun la seleccion restaurada
     }
     // vs/es/fs: (b) snapshot completo de los 3 vectores de seleccion (con guard de tamano).
     // 'activo' es (c) una posicion en la EDIT MESH, pero esa no es una lista con nombre ni
@@ -962,21 +987,15 @@ class MaterialModUndo : public UndoCmd {
     float acorte;                          // alphaTest (recorte por alfa, 0 = apagado): fila "Alpha Test" del panel
     float mezb;                            // mixB (mezcla de texturas, 0 = solo la base): fila "Texture mix"
     // LOS MAPAS: numero / textura y la capa UV de cada uno, sus numeros (rugosidad, metalico, alfa) y el IOR
-    // (+ la fuerza de la emision y la TRANSFORMACION UV: sus filas de la tarjeta. xf = desplazamiento U/V, escala U/V,
-    //  rotacion, pivote U/V)
-    struct Maps { bool ct[W3D_MAPS]; int uv[W3D_MAPS]; float rug, met, alpha, ior; float emK, xf[7];
+    // (+ la fuerza de la emision: su fila de la tarjeta)
+    struct Maps { bool ct[W3D_MAPS]; int uv[W3D_MAPS]; float rug, met, alpha, ior; float emK;
         void Read(const Material* m) { for (int k = 0; k < W3D_MAPS; k++) { ct[k] = m->mapWithTexture[k]; uv[k] = m->uvMap[k]; }
                                        rug = m->rtRoughness; met = m->rtMetallic; alpha = m->diffuse[3]; ior = m->ior;
-                                       emK = m->emissionStrength; xf[0] = m->uvOffset[0]; xf[1] = m->uvOffset[1];
-                                       xf[2] = m->uvScale[0]; xf[3] = m->uvScale[1]; xf[4] = m->uvRotation;
-                                       xf[5] = m->uvPivot[0]; xf[6] = m->uvPivot[1]; }
+                                       emK = m->emissionStrength; }
         void Write(Material* m) const { for (int k = 0; k < W3D_MAPS; k++) { m->mapWithTexture[k] = ct[k]; m->uvMap[k] = uv[k]; }
                                            m->rtRoughness = rug; m->rtMetallic = met; m->diffuse[3] = alpha; m->ior = ior;
-                                           m->emissionStrength = emK; m->uvOffset[0] = xf[0]; m->uvOffset[1] = xf[1];
-                                           m->uvScale[0] = xf[2]; m->uvScale[1] = xf[3]; m->uvRotation = xf[4];
-                                           m->uvPivot[0] = xf[5]; m->uvPivot[1] = xf[6]; }
+                                           m->emissionStrength = emK; }
         bool Equal(const Maps& o) const { for (int k = 0; k < W3D_MAPS; k++) if (ct[k] != o.ct[k] || uv[k] != o.uv[k]) return false;
-                                           for (int k = 0; k < 7; k++) if (xf[k] != o.xf[k]) return false;
                                            return rug == o.rug && met == o.met && alpha == o.alpha && ior == o.ior && emK == o.emK; } };
     Maps maps;
     // LAS CAPAS DE TEXTURA (borrar, agregar, subir/bajar, la mezcla, la UV, el factor, prendida, la luz horneada): una copia
@@ -3851,6 +3870,8 @@ void UndoCaptureVisibility() {
     if (InteractionMode == ObjectMode && state == editNavigation && SceneCollection && ActiveObj)
         Push(new VisibilityUndo(ActiveObj));
 }
+// el OJO y la CAMARITA del outliner sobre una fila (cualquier objeto, no solo el activo; en cualquier modo)
+void UndoCaptureVisibilityOf(Object* o) { if (o && SceneCollection) Push(new VisibilityUndo(o)); }
 void UndoCaptureRename(const W3dRenameDest& destination) { if (W3dDestResolve(destination)) Push(new RenameUndo(destination)); }
 // N nombres en UN SOLO paso de undo: un rename que arrastra su contraparte por
 // nombre (vertex group <-> hueso, UV group <-> hueso 2D, refs de scripts, riel de
@@ -3910,8 +3931,8 @@ bool UndoCaptureDeleted(bool incCol) {
     return true;
 }
 
-bool UndoCaptureCreation() {
-    DeleteUndo* d = new DeleteUndo(false, DeleteUndo::Creation());
+bool UndoCaptureCreation(bool incCol) {
+    DeleteUndo* d = new DeleteUndo(incCol, DeleteUndo::Creation());
     if (d->IsEmpty()) { delete d; return false; }
     Push(d);
     return true;

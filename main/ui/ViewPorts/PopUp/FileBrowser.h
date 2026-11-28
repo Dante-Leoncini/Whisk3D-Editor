@@ -64,6 +64,10 @@ class FileBrowser : public PopUpBase, public Scrollable {
         int hover;      // entrada bajo el mouse (-1)
         int hoverBm;    // bookmark bajo el mouse (-1)
         int selBm;      // bookmark seleccionado (para el boton -)
+        // RECIENTES: las ultimas carpetas donde se eligio algo (arriba de los accesos, recent_folders.txt). El panel se
+        // reparte entre las dos listas con un divisor que se arrastra (la proporcion se recuerda: W3dFBSplit)
+        int hoverRec;   // reciente bajo el mouse (-1)
+        bool dragSplit; // arrastrando el divisor recientes / accesos
         bool gridView;
 
         // --- foco de teclado/keypad (4 OS) -----------------------------------
@@ -139,6 +143,9 @@ class FileBrowser : public PopUpBase, public Scrollable {
         void OpenEntry(int idx);
         int  EntryAt(int mx, int my);
         int  BookmarkAt(int mx, int my);
+        int  RecentAt(int mx, int my);
+        // las dos zonas del panel lateral: recientes [recTop, divY) y accesos [bmTop, bmBottom)
+        void PanelZones(int& recTop, int& divY, int& bmTop, int& bmBottom) const;
         int  ContentH() const;
         void EnsureVisible(int idx);
         bool PassesFilter(const w3dFileSystem::DirEntry& e) const;
@@ -146,9 +153,17 @@ class FileBrowser : public PopUpBase, public Scrollable {
         void CardIn(int x, int y, int w, int h, const float* bg, const float* bd);
 };
 
+// las CARPETAS RECIENTES del explorador (la primera, la ultima usada). La suma el explorador al aceptar; abrir y guardar
+// un proyecto tambien (su carpeta)
+void W3dRecentFolderAdd(const std::string& folderOrFile);
+const std::vector<std::string>& W3dRecentFolders();
+
 void OpenFileBrowser(const std::string& title, const std::string& actionLabel,
                       const std::string& filter, void (*accept)(const std::string&),
-                      bool save = false); // guardar=true: elegir carpeta destino
+                      bool save = false,                        // guardar=true: elegir carpeta destino
+                      const std::string& folder = std::string()); // donde arranca ("" = W3dFileBrowserStartFolder)
+// la carpeta donde arranca el explorador: la del .w3d abierto, si no la ultima reciente, si no el home
+std::string W3dFileBrowserStartFolder();
 // GUARDAR COMO: el explorador con la barra del NOMBRE del archivo (arranca con 'nombre', sin la extension, en
 // 'carpeta' o en la del proyecto). Devuelve la ruta COMPLETA (carpeta + nombre + ext); si ya existe, antes pregunta
 void OpenFileBrowserSaveAs(const std::string& title, const std::string& actionLabel, const std::string& ext,

@@ -6,14 +6,14 @@
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "render/RenderOptions.h" // g_transformPivot + enum TransformPivot (editor)
 #include "objects/Mesh.h"     // snap del cursor al centro de la malla en Edit Mode
-#include "objects/Text2D.h"   // W3dDuplicateOne: copiar elementos 2D
-#include "objects/Image2D.h"
-#include "objects/Rect2D.h"
-#include "objects/Container2D.h"
-#include "objects/Slice9.h"
-#include "objects/Button2D.h"
-#include "objects/Expand2D.h"
-#include "objects/Video2D.h"
+#include "WhiskUI/objects/Text2D.h"   // W3dDuplicateOne: copiar elementos 2D
+#include "WhiskUI/objects/Image2D.h"
+#include "WhiskUI/objects/Rect2D.h"
+#include "WhiskUI/objects/Container2D.h"
+#include "WhiskUI/objects/Slice9.h"
+#include "WhiskUI/objects/Button2D.h"
+#include "WhiskUI/objects/Expand2D.h"
+#include "WhiskUI/objects/Video2D.h"
 #include "EditMesh.h"  // SelectionCenter
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 #include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapFindTarget, g_snap, enums)
@@ -156,8 +156,9 @@ void CycleAxisTransform(int axis){
 	}
 	if (state == EditScale){
 		// la ESCALA es siempre local: solo eje-unico (local) <-> 3 ejes. No tiene
-		// global ni "desde la vista" (no existe escalar desde la vista).
-		transformOrientation = LocalOrient;
+		// global ni "desde la vista" (no existe escalar desde la vista). Lo local lo pone AxisOriented (state ==
+		// EditScale): la orientacion del MENU no se toca. Antes se ponia en Local y QUEDABA asi (la barra decia
+		// "Local" y el proximo mover iba en local: parecia que el proyecto arrancaba en Local)
 		axisSelect = (axisSelect == axis) ? XYZ : axis; // re-apretar el mismo -> 3 ejes
 		RestoreState(false);
 		return;
@@ -192,8 +193,7 @@ void CyclePlaneTransform(int axis){
 	}
 	int plane = (axis == X) ? PlaneX : (axis == Y) ? PlaneY : PlaneZ;
 	if (state == EditScale){
-		// escala: plano siempre local, sin ciclar orientacion (re-apretar -> 3 ejes)
-		transformOrientation = LocalOrient;
+		// escala: plano siempre local (AxisOriented), sin ciclar ni tocar la orientacion del menu (re-apretar -> 3 ejes)
 		axisSelect = (axisSelect == plane) ? XYZ : plane;
 		RestoreState(false);
 		return;
@@ -1263,7 +1263,6 @@ Object* W3dDuplicateOne(Object* src, bool linked) {
         d->meshSize = m->meshSize; d->meshSize2 = m->meshSize2; d->meshDepth = m->meshDepth;
         d->meshVerts = m->meshVerts; d->meshVerts2 = m->meshVerts2;
         d->meshSmooth = m->meshSmooth;
-        d->lockNormals = m->lockNormals;
         // buffers PRECALCULADOS: se copian tal cual (mismas posiciones) -> el
         // duplicado queda identico (mismo contorno y MISMAS vertex-normals, sin
         // recalcular). Antes posRep no se copiaba y la vertex-normal del duplicado
@@ -2798,7 +2797,7 @@ void MoveSelectionEditLocal(Mesh* m, const Vector3& delta) {
     // persistir: empuja al render + rearma overlay + bordes/normales + preview de modificadores (igual que el confirm de un move)
     e->PushPositions(); e->RefreshOverlay();
     m->ComputeBorders(false);
-    if (!m->lockNormals) m->RecalculateNormals();
+    W3dRecalcNormalsEdited(m);   // (las de lo que se movio; el resto queda: Mesh > Normals > Lock Normals)
     if (!m->modifiers.empty()) m->GenerateMeshModified();
     g_redraw = true;
 }
@@ -3081,7 +3080,7 @@ void SnapCursorToActive() {
 #include "objects/Mirror.h"
 #include "objects/Gamepad.h"
 #include "w3dlog.h"
-#include "objects/UI.h"
+#include "WhiskUI/objects/UI.h"
 #include "W3dNames.h"
 #include "W3dPalettes.h"           // paletas + colores de paleta (globales de proyecto)
 #include "objects/Materials.h"     // Materials (global de proyecto)
@@ -3512,4 +3511,76 @@ int W3dNamesRepairScene(bool notify) {
                           "pointed to it by name still points there."),
                   n, first.c_str(), n > 3 ? ", ..." : "");
     return n;
+}
+
+// ============================================================================
+//  SCATTER: "Apply" en modo INSTANCIAS (edit/ScatterMod.h). Cada copia pasa a ser un objeto de verdad: el duplicado
+//  VINCULADO de su fuente (Alt+D: misma malla en memoria y en la GPU), con la matriz de la copia, adentro de una
+//  coleccion nueva "<emisor>_Scatter" que cuelga del padre del emisor. El modificador sale del stack. Un Ctrl+Z.
+//  Con un .w3d externo no: sus mallas son de la libreria (se aplica en modo Unida, o se traen las piedras al proyecto).
+// ============================================================================
+#include "edit/ScatterMod.h"
+static void ScatterSubtree(Object* o, std::vector<Object*>& out) {
+    if (!o) return;
+    out.push_back(o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) ScatterSubtree(o->Childrens[i], out);
+}
+// la transformacion LOCAL de 'o' sale de la matriz L (sin cizalla: la de una copia es giro x escala)
+static void ScatterSetLocal(Object* o, const Matrix4& L) {
+    Vector3 X(L.m[0], L.m[1], L.m[2]), Y(L.m[4], L.m[5], L.m[6]), Z(L.m[8], L.m[9], L.m[10]);
+    float sx = X.Length(), sy = Y.Length(), sz = Z.Length();
+    if (sx < 1e-12f) sx = 1e-12f; if (sy < 1e-12f) sy = 1e-12f; if (sz < 1e-12f) sz = 1e-12f;
+    const float det = X.Dot(Vector3::Cross(Y, Z));
+    if (det < 0.0f) sx = -sx;   // (un espejo va en la escala X)
+    Matrix4 R; R.Identity();
+    R.m[0] = X.x / sx; R.m[1] = X.y / sx; R.m[2] = X.z / sx;
+    R.m[4] = Y.x / sy; R.m[5] = Y.y / sy; R.m[6] = Y.z / sy;
+    R.m[8] = Z.x / sz; R.m[9] = Z.y / sz; R.m[10] = Z.z / sz;
+    o->pos = Vector3(L.m[12], L.m[13], L.m[14]);
+    o->scale = Vector3(sx, sy, sz);
+    o->SetRot(Quaternion::FromMatrix(R));
+}
+int W3dScatterApplyAsObjects(Mesh* m) {
+    if (!m || m->activeModifier < 0 || m->activeModifier >= (int)m->modifiers.size()) return -1;
+    Modifier* md = m->modifiers[(size_t)m->activeModifier];
+    if (!md || md->type != ModifierType::Scatter) return -1;
+    if (md->scatSource == ScatterSource::Lib) {
+        Notify(T("Scatter: the copies of an external .w3d can't become objects (apply it as Merged)"), true);
+        return -1;
+    }
+    m->GenerateMeshModified();   // (las copias al dia)
+    std::vector<Object*> pool; W3dScatterPool(md, m, pool);
+    const size_t n = md->scatRt.pick.size();
+    if (pool.empty() || n == 0 || md->scatRt.mats.size() < n * 16) { Notify(T("Scatter: there are no copies to apply"), true); return 0; }
+    Object* parent = m->Parent ? m->Parent : SceneCollection;
+    Matrix4 EW; m->GetWorldMatrix(EW);
+    Matrix4 PW; parent->GetWorldMatrix(PW);
+    const Matrix4 iPW = PW.Inverse();
+    UndoGroupStart();
+    Collection* col = new Collection(parent);
+    col->SetNameObj(m->name + "_Scatter");
+    int made = 0;
+    for (size_t k = 0; k < n; k++) {
+        Object* src = pool[(size_t)md->scatRt.pick[k] % pool.size()];
+        std::vector<Object*> origs; ScatterSubtree(src, origs);
+        std::vector<Object*> copies;
+        for (size_t i = 0; i < origs.size(); i++) {
+            Object* o = origs[i];
+            copies.push_back(o->getType() == ObjectType::mesh ? (Object*)W3dMeshDuplicateLinked((Mesh*)o) : W3dDuplicateOne(o, true));
+        }
+        std::vector<Object*> roots; LinkDuplicate(origs, copies, roots);
+        Object* root = copies.empty() ? NULL : copies[0];
+        if (!root) continue;
+        W3dAttachTo(root, col, NULL, true);
+        Matrix4 S; W3dScatterSourceMatrix(&md->scatRt.mats[k * 16], src, S);
+        ScatterSetLocal(root, iPW * EW * S);
+        made++;
+    }
+    DeselectAll(true);
+    col->Select();
+    UndoCaptureCreation(true);    // Ctrl+Z: la coleccion con todas las copias
+    UndoModRemove(m);             // y el modificador sale del stack (EN EL MISMO paso)
+    UndoGroupSequentialEnd();
+    m->GenerateMeshModified();
+    return made;
 }

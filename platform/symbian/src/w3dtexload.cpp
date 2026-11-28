@@ -2,7 +2,7 @@
  * ==============================================================================
  *  w3dtexload.cpp — LoadTexture COMPARTIDO (firma de PC) para Symbian
  *
- *  El importador de PC (main/importers/import_obj.cpp) llama a
+ *  El importador de PC (libs/Whisk3DCore/importers/import_obj.cpp) llama a
  *  LoadTexture(path, GLuint&) para las texturas del MTL. En PC/Android lo
  *  resuelve SDL/stb; aca lo resuelve ICL (CImageDecoder) de forma
  *  SINCRONICA con CActiveSchedulerWait, y se sube a GL con filtros (sin

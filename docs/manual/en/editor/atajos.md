@@ -85,7 +85,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 | Insert Keyframe | <kbd>I</kbd> | — | `3d.keyframe` |
 | Insert Keyframe (all) | <kbd>Shift+I</kbd> | — | `3d.keyframeAll` |
 | Proportional Editing | <kbd>O</kbd> | — | `3d.proportional` |
-| Overlays | <kbd>K</kbd> | — | `3d.overlays` |
+| Overlays | <kbd>K</kbd> (outside Edit Mode) | — | `3d.overlays` |
 | Local View | <kbd>/</kbd> | — | `3d.viewLocal` |
 | Frame Selected | <kbd>Num.</kbd> | <kbd>0</kbd> | `3d.focus` |
 | Front View | <kbd>Num1</kbd> | <kbd>#+Left/Right</kbd> | `3d.viewFront` |
@@ -103,6 +103,7 @@ Key names: letters and numbers as they are, `Enter`, `Esc`, `Tab`, `Space`, `Bac
 | New Face from Vertices | <kbd>F</kbd> | — | `3d.face` |
 | Recalculate Normals | <kbd>Shift+N</kbd> | — | `3d.normals` |
 | Loop Cut and Slide | <kbd>Ctrl+R</kbd> | <kbd>8</kbd> | `3d.loopcut` |
+| Knife | <kbd>K</kbd> | — | `3d.knife` |
 | Connect Vertex Path | <kbd>J</kbd> | — | `3d.connect` |
 | Rip | <kbd>V</kbd> | — | `3d.rip` |
 | Vertex Slide | <kbd>Shift+V</kbd> | — | `3d.slide` |

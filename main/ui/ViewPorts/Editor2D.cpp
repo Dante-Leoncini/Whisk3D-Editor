@@ -6,12 +6,12 @@
 #include "render/RenderOptions.h"    // g_redraw (render event-driven)
 #include "PopUp/PopUpBase.h"         // PopUpActive (los popups modales tienen prioridad)
 #include "objects/Objects.h"         // SceneCollection / ActiveObj (los UI viven en la escena)
-#include "objects/Text2D.h"          // el elemento de texto
-#include "objects/Image2D.h"         // el elemento de imagen (resize por puntos de agarre)
-#include "objects/Rect2D.h"          // el elemento rectangulo
-#include "objects/Container2D.h"     // el contenedor (rect invisible)
-#include "objects/Slice9.h"          // imagen con bordes fijos (guias de sus cortes)
-#include "io/Font2D.h"               // fuentes del editor 2D (atlas)
+#include "WhiskUI/objects/Text2D.h"          // el elemento de texto
+#include "WhiskUI/objects/Image2D.h"         // el elemento de imagen (resize por puntos de agarre)
+#include "WhiskUI/objects/Rect2D.h"          // el elemento rectangulo
+#include "WhiskUI/objects/Container2D.h"     // el contenedor (rect invisible)
+#include "WhiskUI/objects/Slice9.h"          // imagen con bordes fijos (guias de sus cortes)
+#include "WhiskUI/io/Font2D.h"               // fuentes del editor 2D (atlas)
 #include "Undo.h"                    // Ctrl+Z de los transforms/drags del editor 2D
 #include "WhiskUI/text/W3dTextAtlas.h"
 #include "W3dLang.h"                 // T()
@@ -27,7 +27,7 @@
 
 namespace gfx = w3dEngine;
 
-#include "objects/UI.h"
+#include "WhiskUI/objects/UI.h"
 
 // el tamano de la "ventana" que simula el lienzo: el del UI que se esta editando
 // ("como el render" en vivo, o su tamano propio si esta en modo responsive).
@@ -258,7 +258,7 @@ void Editor2D::ParamsCanvas(float& cx, float& cy, float& s) const {
     if (gameView) {
         // VISTA DE JUEGO: el lienzo ENCAJADO (letterbox) y centrado en el rect util, sin
         // zoom ni paneo. Es la MISMA cuenta que hace el runtime en W3dGameRender
-        // (Whisk3D-Examples/game/w3drun.cpp) con la ventana real: esc = min(ancho/lw, alto/lh).
+        // (libs/Whisk3DCore/game/w3drun.cpp) con la ventana real: esc = min(ancho/lw, alto/lh).
         // Con la UI "igual que el render" el override de UpdateOverrideCanvas hace que
         // CanvasSize devuelva justo el rect util -> esta cuenta degenera a esc=1 y el lienzo
         // LLENA el viewport (la rama sameAsRender de w3drun). Con la UI de tamano FIJO no hay

@@ -5,7 +5,7 @@
 #include "io/Libraries.h"              // EL registro de las librerias (el mismo que usan los proxies y el juego)
 #include "io/W3dZip.h"
 #include "io/JsonW3d.h"
-#include "io/UI2DFormat.h"            // g_w3dDirProject: la base de las rutas "ext:" relativas
+#include "WhiskUI/io/UI2DFormat.h"            // g_w3dDirProject: la base de las rutas "ext:" relativas
 #include "io/W3dContainer.h"          // W3dContainerIs, W3dCosmeticPathJson
 #include "undo/Undo.h"
 #include "config/W3dLang.h"

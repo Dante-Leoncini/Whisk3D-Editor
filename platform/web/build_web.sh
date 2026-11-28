@@ -19,7 +19,7 @@ OUT=platform/web/build
 mkdir -p "$OUT"
 
 # --- fuentes: mismo set que el CMakeLists, pero con el backend ES2 en vez del de desktop ---
-SRC=$(find main "$CORE/objects" "$CORE/animation" libs/WhiskUI -name '*.cpp')
+SRC=$(find main "$CORE/objects" "$CORE/animation" "$CORE/render" "$CORE/config" "$CORE/edit" "$CORE/importers" libs/WhiskUI -name '*.cpp')
 SRC="$SRC $CORE/io/w3dFilesystem.cpp $CORE/graphics/w3dTexture.cpp $CORE/io/w3dCompress.cpp $CORE/io/W3dZip.cpp"
 # OJO: los .cpp del Core de io/ NO entran por el find de arriba (que solo barre main/, objects/,
 # animation/ y WhiskUI) -> van A MANO, igual que en el CMakeLists. Estos tres son el formato v4
@@ -31,6 +31,7 @@ SRC="$SRC $CORE/io/W3dText.cpp $CORE/io/W3dMesh.cpp $CORE/io/W3dStore.cpp"
 # W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
 SRC="$SRC $CORE/io/W3dMeshBin.cpp"
 SRC="$SRC $CORE/io/W3dResources.cpp"
+SRC="$SRC $CORE/io/Libraries.cpp $CORE/io/Prefabs.cpp $CORE/io/Streaming.cpp $CORE/io/W3dContainer.cpp $CORE/script/BindsGame.cpp $CORE/W3dRoots.cpp $CORE/W3dScene.cpp"
 SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp $CORE/input/W3dTouch.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
 SRC="$SRC $CORE/graphics/gles2/w3dGraphicsGLES2.cpp"
@@ -57,11 +58,11 @@ SRC="$SRC $CORE/input/W3dClipboardSDL.cpp"
 # la vibracion (navigator.vibrate o el "tic" de iOS): controls.cpp la llama al agarrar algo en la biblioteca
 SRC="$SRC $CORE/input/W3dVibrate.cpp"
 LUA_A="$OUT/libw3dlua.a"
-if [[ ! -f "$LUA_A" || thirdparty/lua/src -nt "$LUA_A" ]]; then
+if [[ ! -f "$LUA_A" || libs/Whisk3DCore/thirdparty/lua/src -nt "$LUA_A" ]]; then
     echo "compilando lua (C) -> libw3dlua.a"
     rm -f "$OUT"/lua_*.o
-    for c in $(ls thirdparty/lua/src/*.c | grep -vE '/lua\.c|/luac\.c'); do
-        emcc -O2 -Ithirdparty/lua/src -c "$c" -o "$OUT/lua_$(basename "$c" .c).o"
+    for c in $(ls libs/Whisk3DCore/thirdparty/lua/src/*.c | grep -vE '/lua\.c|/luac\.c'); do
+        emcc -O2 -Ilibs/Whisk3DCore/thirdparty/lua/src -c "$c" -o "$OUT/lua_$(basename "$c" .c).o"
     done
     emar rcs "$LUA_A" "$OUT"/lua_*.o
 fi
@@ -69,9 +70,9 @@ fi
 # --- includes: los mismos del CMakeLists + platform/web (shim de <GL/gl.h> -> ES2) ---
 INC="-Iplatform/web -I. -Imain -Imain/app -Imain/config -Imain/io -Imain/undo"
 INC="$INC -Imain/ui -Imain/ui/ViewPorts -Imain/ui/GeometriaUI"
-INC="$INC -I$CORE -I$CORE/base -I$CORE/graphics -I$CORE/io -I$CORE/thirdparty"
+INC="$INC -I$CORE -I$CORE/base -I$CORE/graphics -I$CORE/io -I$CORE/objects -I$CORE/render -I$CORE/config -I$CORE/edit -I$CORE/script -I$CORE/importers -I$CORE/thirdparty"
 INC="$INC -Ilibs -Ilibs/WhiskUI/widgets -Ilibs/WhiskUI/text -Ilibs/WhiskUI/draw"
-INC="$INC -Ilibs/WhiskUI/theme -Ilibs/WhiskUI/core -Ithirdparty -Ithirdparty/lua/src"
+INC="$INC -Ilibs/WhiskUI/theme -Ilibs/WhiskUI/core -Ithirdparty -Ilibs/Whisk3DCore/thirdparty/lua/src"
 
 # --- defines: solo el backend WebGL. OJO: NO va -DW3D_STB_IMPL: en el editor la
 #     implementacion de stb_image ya la instancia constructor.cpp (una sola vez). Con

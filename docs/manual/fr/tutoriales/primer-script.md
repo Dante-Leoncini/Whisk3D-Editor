@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ Il y en a d'autres, comme celles qui préviennent quand un objet entre en collis
 
 Ce qu'elle fait à l'intérieur :
 
-**`if property("rotate") then` … `end`** est une **condition**. Un `if` (« si ») exécute le code qu'il contient seulement si ce qui se trouve entre `if` et `then` est vrai. Il peut avoir un `elseif` (« si ce n'est pas vrai, fais ceci si… »), qui teste une autre condition, et un `else` (« sinon »), qui s'exécute quand aucune n'a été remplie ; les deux sont facultatifs. Il se termine toujours par `end`. Par exemple :
+**`if rotate then` … `end`** est une **condition**. Un `if` (« si ») exécute le code qu'il contient seulement si ce qui se trouve entre `if` et `then` est vrai. Il peut avoir un `elseif` (« si ce n'est pas vrai, fais ceci si… »), qui teste une autre condition, et un `else` (« sinon »), qui s'exécute quand aucune n'a été remplie ; les deux sont facultatifs. Il se termine toujours par `end`. Par exemple :
 
 ```lua
 if puntos >= 100 then
@@ -71,11 +71,11 @@ end
 
 Avec 120 points, la récompense est l'or ; avec 70, l'argent, et avec 10, rien. Seule la première partie remplie s'exécute. (En Lua, `elseif` s'écrit en un seul mot.)
 
-Dans le script, le `if` n'a ni `elseif` ni `else` : si **rotate** est vrai (la case est cochée), le cube tourne ; s'il est faux, il ne se passe rien et la fonction se termine. `property("rotate")` lit la valeur que cet objet a dans le panneau. Comme elle est lue à chaque image, si vous la changez pendant que le jeu est en cours, le script le sait aussitôt.
+Dans le script, le `if` n'a ni `elseif` ni `else` : si **rotate** est vrai (la case est cochée), le cube tourne ; s'il est faux, il ne se passe rien et la fonction se termine. `rotate` lit la valeur que cet objet a dans le panneau. Chaque propriété s'utilise ainsi, par son nom ; on peut aussi la lire avec `property("rotate")`. Comme elle est lue à chaque image, si vous la changez pendant que le jeu est en cours, le script le sait aussitôt.
 
 - **`self()`** est l'objet qui a le script : le cube. **`getRotationZ(self())`** donne sa rotation en degrés autour de Z (l'axe vertical, le même Z que vous voyez dans le panneau Propriétés), et **`setRotationZ`** lui en donne une nouvelle : la même, un peu plus. Ainsi, le cube tourne comme une toupie.
 
-`property`, `self`, `getRotationZ` et `setRotationZ` sont aussi des fonctions, mais dans l'autre sens : c'est Whisk3D qui les fournit et c'est vous qui les appelez. Elles sont dans le [manuel Lua](../lua/README.md).
+`self`, `getRotationZ` et `setRotationZ` sont aussi des fonctions, mais dans l'autre sens : c'est Whisk3D qui les fournit et c'est vous qui les appelez. Elles sont dans le [manuel Lua](../lua/README.md).
 
 ### Le script complet
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

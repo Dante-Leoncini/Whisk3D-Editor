@@ -1,0 +1,92 @@
+# ==========================================================================
+#  EL MODIFICADOR SCATTER (libs/Whisk3DCore/edit/ScatterMod.h): copias de otros objetos repartidas sobre una malla
+#  (las piedras de un suelo). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_scatter.w3s
+#
+#  Lo que se verifica:
+#    1) de un OBJETO, en modo UNIDA: la geometria de las copias entra a la malla generada (2 + 10 x 12 triangulos)
+#    2) LA SEMILLA MANDA: la misma semilla, las mismas copias; el azar de la escala no las mueve de lugar; otra semilla,
+#       otro lugar
+#    3) desde donde: los vertices (una en cada uno), los centros de las caras, las aristas
+#    4) modo INSTANCIAS: la malla generada no crece pero el dibujo si (los mismos triangulos en pantalla); sin el
+#       emisor, dos menos
+#    5) de una COLECCION: cada copia elige una de sus piezas (aunque la coleccion este oculta)
+#    6) de un .w3d EXTERNO (una libreria): las piedras viven en otro archivo
+#    7) se GUARDA y vuelve igual (las mismas copias)
+#    8) Apply: en instancias, un objeto por copia en una coleccion (Ctrl+Z las saca); en unida, una malla con quads
+# ==========================================================================
+selobj Cubo
+delete
+# ---- la LIBRERIA: un .w3d con las piedras (una caja y una esfera) en la coleccion "Piedras" ----
+add cube
+objname Piedra
+objpos 0 0 -30
+add uvsphere
+objname Bola
+objpos 5 0 -30
+newcollection Piedras Piedra Bola
+savew3d /tmp/w3d_scatter_lib.w3d
+
+# ---- 1) de un objeto, modo unida ----
+add plane
+objname Suelo
+modadd scatter
+modscatter source object target Piedra count 10 seed 3 emit faces mode merged
+scatterinfo 10 1 122
+
+# ---- 2) la semilla manda ----
+scattercopy 0 0.2411 0 -0.1234
+modscatter scaleRandom 0.5
+scattercopy 0 0.2411 0 -0.1234
+modscatter seed 4
+fail scattercopy 0 0.2411 0 -0.1234
+modscatter seed 3 scaleRandom 0
+
+# ---- 3) desde donde ----
+modscatter emit verts count 100
+scatterinfo 4 1 50
+modscatter emit faceCenters
+scatterinfo 1 1 14
+scattercopy 0 0 0 0
+modscatter emit edges count 7
+scatterinfo 7 1 86
+modscatter emit faces count 10
+
+# ---- 4) instancias: la malla no crece, el dibujo si ----
+visible 0 Piedras
+tris3d
+modscatter mode instances
+scatterinfo 10 1 2
+tris3d 0
+modscatter showEmitter 0
+tris3d -2
+modscatter showEmitter 1
+
+# ---- 5) de una coleccion (oculta) ----
+modscatter source collection target Piedras
+scatterinfo 10 2 2
+
+# ---- 6) de un .w3d externo ----
+savew3d /tmp/w3d_scatter_main.w3d
+liblink /tmp/w3d_scatter_lib.w3d
+selobj Suelo
+modscatter source library library w3d_scatter_lib
+scatterinfo 10 2 2
+
+# ---- 7) se guarda y vuelve igual ----
+savew3d /tmp/w3d_scatter_main.w3d
+openw3d /tmp/w3d_scatter_main.w3d
+selobj Suelo
+scatterinfo 10 2 2
+scattercopy 0 0.2411 0 -0.1234
+
+# ---- 8) Apply ----
+modscatter source collection target Piedras
+scatterapply 10
+fail scatterinfo
+undo
+selobj Suelo
+scatterinfo 10 2 2
+modscatter source object target Piedra mode merged
+scatterapply
+meshpolys 0 61 0

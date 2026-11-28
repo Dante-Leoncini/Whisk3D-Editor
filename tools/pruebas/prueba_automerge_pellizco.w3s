@@ -1,0 +1,55 @@
+# ==========================================================================
+#  AUTO MERGE QUE COLAPSA UNA CARA (MergeVertsEdit + EditXformConfirm). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_automerge_pellizco.w3s
+#  Escalar a CERO dos esquinas de un quad con Auto Merge:
+#    - dos esquinas SEGUIDAS (un lado): el quad queda triangulo
+#    - dos esquinas OPUESTAS (la diagonal): la cara queda PELLIZCADA, sin area: se va (antes quedaba un triangulo de area
+#      cero atravesado). Sus lados que ninguna otra cara tiene quedan como aristas sueltas
+#    - UN Ctrl+Z vuelve a la malla de antes del escalado (antes el primero deshacia solo la fusion y dejaba los vertices
+#      encimados: "la malla rota"); Ctrl+Y la vuelve a fusionar
+#  La cara 0 del cubo es 0 1 2 3 (de la jaula): 0-1 es un lado, 0-2 la diagonal
+# ==========================================================================
+selobj Cubo
+mode edit
+selmode vertex
+automerge on
+# ---- la DIAGONAL: la cara se va, las otras 5 siguen cerradas y hacia afuera ----
+selverts 0 2
+xform scale 0
+expect faces 5
+expect verts 7
+cage
+facesout all
+undo
+expect faces 6
+expect verts 8
+cage
+facesout all
+redo
+expect faces 5
+undo
+# ---- un LADO: el quad (y el de al lado, que comparte ese lado) quedan triangulos ----
+selverts 0 1
+xform scale 0
+expect faces 6
+expect verts 7
+cage
+facesout all
+undo
+expect faces 6
+expect verts 8
+facesout all
+# ---- un PLANO solo, por la diagonal: sin caras, dos aristas sueltas que se juntan en el medio ----
+mode object
+add plane
+mode edit
+selmode vertex
+selverts 0 2
+xform scale 0
+expect faces 0
+expect verts 3
+expect edges 2
+undo
+expect faces 1
+expect verts 4
+automerge off

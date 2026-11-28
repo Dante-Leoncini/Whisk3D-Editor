@@ -523,6 +523,7 @@ Delete the orphan resource	Usunąć osierocony zasób
 Delete the orphan resources	Usunąć osierocone zasoby
 Deleted	Usunięto
 Denoiser	Odszumianie
+Shadowmask (real-time light)	Shadowmask (światło w czasie rzeczywistym)
 Density	Gęstość
 Depth	Głębia
 Depth & clear	Głębia i czyszczenie
@@ -751,6 +752,7 @@ Frustum (AABB)	Frustum (AABB)
 Full volume radius	Promień pełnej głośności
 Fullscreen	Pełny ekran
 Function	Funkcja
+Function of Whisk3D (it isn't in this script)	Funkcja Whisk3D (nie ma jej w tym skrypcie)
 GL Calls	Wywołania GL
 GL Light	Światło GL
 GLB saved successfully!	Zapisano GLB!
@@ -771,6 +773,7 @@ Give the project a name to save it	Nadaj projektowi nazwę, aby go zapisać
 Gizmo	Gizmo
 Global	Globalny
 Go back	Wstecz
+Go to Definition	Przejdź do definicji
 Go to end	Na koniec
 Go to start	Na początek
 Grab step	Chwyć krok
@@ -941,6 +944,7 @@ Library unlinked	Odłączono bibliotekę
 Lifetime	Czas życia
 Light	Światło
 Light Probe	Sonda światła
+Light Probes	Sondy światła
 Light bounce	Odbicie światła
 Light bounces	Odbicia światła
 Light color	Kolor światła
@@ -1872,6 +1876,7 @@ This resource can't be dropped in the 3D view	Tego zasobu nie można upuścić w
 This resource can't be renamed	Nie można zmienić nazwy tego zasobu
 This resource type can't be deleted	Nie można usunąć tego typu zasobu
 This resource type can't be duplicated	Nie można duplikować tego typu zasobu
+This script doesn't define	Ten skrypt nie definiuje
 This step has nothing to animate	Ten krok nie ma nic do animowania
 This texture already has the baked light of	Ta tekstura ma już wypalone światło z
 This will modify the vertex groups and simplify them to 1 bone per vertex (faster skinning). Some data may be lost.	To zmieni grupy wierzchołków i uprości je do 1 kości na wierzchołek (szybszy skinning). Część danych może zostać utracona.
@@ -1918,12 +1923,7 @@ UV Group	Grupa UV
 UV Groups	Grupy UV
 UV Map	Mapa UV
 UV Maps	Mapy UV
-UV Offset	Przesunięcie UV
-UV Pivot	Punkt obrotu UV
-UV Rotation	Obrót UV
-UV Scale	Skala UV
 UV Sphere	Sfera UV
-UV Transform	Transformacja UV
 UV array	array UV
 UV group(s)	grupa(y) UV
 UV layer (0 = active)	Warstwa UV (0 = aktywna)
@@ -2220,3 +2220,35 @@ Downloads	Pobrane
 Pictures	Obrazy
 Music	Muzyka
 Render with the first	Renderuj pierwszym
+Scatter	Rozrzucanie
+External .w3d	Zewnętrzny .w3d
+Emit From	Emituj z
+Seed	Ziarno
+Random Scale	Losowa skala
+Align to Normal	Wyrównaj do normalnej
+Random Rotation	Losowy obrót
+Random Tilt	Losowe nachylenie
+Merged	Scalone
+Instances	Instancje
+Show Emitter	Pokaż emiter
+%d copies of %d source(s)	%d kopii z %d źródeł
+Face Centers	Środki ścian
+Faces (anywhere)	Ściany (dowolnie)
+(the first one)	(pierwsza)
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Rozrzucanie: kopie z zewnętrznego .w3d nie mogą stać się obiektami (zastosuj jako Scalone)
+Scatter: there are no copies to apply	Rozrzucanie: brak kopii do zastosowania
+Scatter: %d copies are now objects	Rozrzucanie: %d kopii to teraz obiekty
+Show/Hide	Pokaż/Ukryj
+Reveal Hidden	Pokaż ukryte
+Hide Selected	Ukryj zaznaczone
+Hide Unselected	Ukryj niezaznaczone
+Recalculate Vertex Normals	Przelicz normalne wierzchołków
+New File...	Nowy plik...
+New File	Nowy plik
+Recent	Ostatnie
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Nóż: klik = punkt, Enter = tnij, Esc = anuluj, Backspace = usuń punkt, Z = tnij na wylot
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Nóż (na wylot): klik = punkt, Enter = tnij, Esc = anuluj, Backspace = usuń punkt, Z = tylko widoczne
+Knife: enter Edit Mode first	Nóż: najpierw wejdź w Tryb edycji
+Knife: the cut does not cross any face	Nóż: cięcie nie przecina żadnej ściany
+Knife	Nóż
+Merge by Distance: %d vertices merged	Scal według odległości: scalono %d wierzchołków

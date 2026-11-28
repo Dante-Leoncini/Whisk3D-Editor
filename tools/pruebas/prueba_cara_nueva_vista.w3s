@@ -1,0 +1,28 @@
+# ==========================================================================
+#  F (NEW FACE) MIRA A LA VISTA (Mesh::CreateFaceEdit): la cara nueva queda con su frente hacia la camara del
+#  viewport, que es desde donde la queres ver. Antes salia del orden en que se eligieron los vertices y muchas veces
+#  quedaba para atras (habia que hacer Ctrl+N). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_cara_nueva_vista.w3s
+#  Al cubo se le saca la cara de +Z (la 0: quedan elegidos sus 4 vertices) y se la rehace con F:
+#    - mirando DESDE AFUERA, del lado del hueco: la cara nueva mira afuera (las 6 hacia afuera)
+#    - mirando desde el OTRO lado (a traves del cubo): mira hacia la camara, o sea hacia adentro
+# ==========================================================================
+selobj Cubo
+facesout all
+mode edit
+selmode face
+select face 0
+editdelete
+expect faces 5
+selmode vertex
+vporbit 0 0 0 8 0 0
+key f
+expect faces 6
+facesout all
+# ---- de nuevo, mirando desde el otro lado ----
+undo
+expect faces 5
+vporbit 0 0 0 8 0 180
+key f
+expect faces 6
+facesout list

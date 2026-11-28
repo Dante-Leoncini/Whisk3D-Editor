@@ -44,6 +44,14 @@ En la tarjeta Material, el selector de la **Textura** tiene el submenú **Sondas
 
 Elegir una sonda prende el **Reflejo** del material en modo **Equirectangular 360**.
 
+## Prenderla y apagarla (el antes y después)
+
+El **ojo** de la sonda en el outliner la apaga: los materiales PBR de adentro vuelven a reflejar el fondo de la escena en el mismo momento, y la imagen horneada no se pierde. El ojo de la **colección** que la contiene apaga todas las sondas de adentro (de reflejo y de luz). La **cámara** del outliner (no renderizar) la apaga solo en el render final.
+
+(Un material con **Una sonda en particular**, o con **La sonda más cercana** cuando no queda ninguna prendida, sigue usando la imagen que se eligió: es su textura.)
+
+Sin tocar la escena: en el menú **Overlays** de la Vista 3D, **Sondas de reflejo** (y **Sondas de luz**) destildada apaga todas las sondas de ese tipo solo en esa vista. Ver [la sonda de luz](objeto-sonda-luz.md#prenderla-y-apagarla-el-antes-y-después).
+
 ## En el Nokia N95 (OpenGL ES 1.1)
 
 El reflejo 360 se calcula por vértice en la CPU, así que también anda en el N95 (más lento con muchas caras). La sonda de tiempo real no se dibuja ahí: usá una horneada.

@@ -35,8 +35,8 @@ properties = {
 
 ```lua
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```
@@ -57,7 +57,7 @@ Ce ne sono altre, come quelle che avvisano quando un oggetto urta un altro. Sono
 
 Cosa fa al suo interno:
 
-**`if property("rotate") then` … `end`** è una **condizione**. Un `if` («se») esegue il codice che ha dentro solo se ciò che sta tra `if` e `then` è vero. Può avere un `elseif` («altrimenti, se…»), che prova un'altra condizione, e un `else` («altrimenti»), che viene eseguito quando non se n'è verificata nessuna; sono facoltativi tutti e due. Finisce sempre con `end`. Per esempio:
+**`if rotate then` … `end`** è una **condizione**. Un `if` («se») esegue il codice che ha dentro solo se ciò che sta tra `if` e `then` è vero. Può avere un `elseif` («altrimenti, se…»), che prova un'altra condizione, e un `else` («altrimenti»), che viene eseguito quando non se n'è verificata nessuna; sono facoltativi tutti e due. Finisce sempre con `end`. Per esempio:
 
 ```lua
 if punti >= 100 then
@@ -71,11 +71,11 @@ end
 
 Con 120 punti il premio è oro; con 70, argento, e con 10, niente. Viene eseguita solo la prima parte che si verifica. (In Lua, `elseif` si scrive tutto attaccato.)
 
-Nello script, l'`if` non ha né `elseif` né `else`: se **rotate** è vero (la casella è spuntata), il cubo gira; se è falso, non succede niente e la funzione finisce. `property("rotate")` legge il valore che ha quell'oggetto nel pannello. Siccome viene letto a ogni fotogramma, se lo cambi con il gioco in esecuzione, lo script se ne accorge in quel momento.
+Nello script, l'`if` non ha né `elseif` né `else`: se **rotate** è vero (la casella è spuntata), il cubo gira; se è falso, non succede niente e la funzione finisce. `rotate` legge il valore che ha quell'oggetto nel pannello. Ogni proprietà si usa così, con il suo nome; si può anche leggere con `property("rotate")`. Siccome viene letto a ogni fotogramma, se lo cambi con il gioco in esecuzione, lo script se ne accorge in quel momento.
 
 - **`self()`** è l'oggetto che ha lo script: il cubo. **`getRotationZ(self())`** dà la sua rotazione in gradi attorno alla Z (la verticale, la stessa Z che vedi nel pannello Proprietà), e **`setRotationZ`** gliene mette una nuova: la stessa, un po' di più. Così il cubo gira come una trottola.
 
-Anche `property`, `self`, `getRotationZ` e `setRotationZ` sono funzioni, ma al contrario: le fornisce Whisk3D e le chiami tu. Sono nel [manuale di Lua](../lua/README.md).
+Anche `self`, `getRotationZ` e `setRotationZ` sono funzioni, ma al contrario: le fornisce Whisk3D e le chiami tu. Sono nel [manuale di Lua](../lua/README.md).
 
 ### Lo script completo
 
@@ -88,8 +88,8 @@ properties = {
 }
 
 function update(dt)
-  if property("rotate") then
-    setRotationZ(self(), getRotationZ(self()) + property("speed") * dt)
+  if rotate then
+    setRotationZ(self(), getRotationZ(self()) + speed * dt)
   end
 end
 ```

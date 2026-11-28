@@ -23,7 +23,7 @@ CC       := $(PSPDEV)/bin/psp-gcc
 
 # ---- fuentes: las mismas que el CMakeLists de PC (main entero, el modelo del Core, la UI y la lista a mano del
 #      Core), menos el harness de pruebas (main/test: solo corre en PC con --script). El dibujo: gu en vez de gfx ----
-FUENTES_CPP := $(shell cd $(RAIZ) && find main libs/Whisk3DCore/objects libs/Whisk3DCore/animation libs/WhiskUI \
+FUENTES_CPP := $(shell cd $(RAIZ) && find main libs/Whisk3DCore/objects libs/Whisk3DCore/animation libs/Whisk3DCore/render libs/Whisk3DCore/config libs/Whisk3DCore/edit libs/Whisk3DCore/importers libs/WhiskUI \
                    -name '*.cpp' -not -path 'main/test/*' | sort)
 FUENTES_CPP += \
     libs/Whisk3DCore/script/W3dScript.cpp \
@@ -43,6 +43,13 @@ FUENTES_CPP += \
     libs/Whisk3DCore/io/W3dMeshBin.cpp \
     libs/Whisk3DCore/io/W3dStore.cpp \
     libs/Whisk3DCore/io/W3dResources.cpp \
+    libs/Whisk3DCore/io/Libraries.cpp \
+    libs/Whisk3DCore/io/Prefabs.cpp \
+    libs/Whisk3DCore/io/Streaming.cpp \
+    libs/Whisk3DCore/io/W3dContainer.cpp \
+    libs/Whisk3DCore/script/BindsGame.cpp \
+    libs/Whisk3DCore/W3dRoots.cpp \
+    libs/Whisk3DCore/W3dScene.cpp \
     libs/Whisk3DCore/graphics/gu/w3dGraphicsGu.cpp \
     libs/Whisk3DCore/graphics/gu/w3dGLgu.cpp \
     libs/Whisk3DCore/base/w3dlog.cpp \
@@ -59,8 +66,8 @@ FUENTES_CPP += \
     libs/Whisk3DCore/audio/W3dMusic.cpp \
     libs/Whisk3DCore/input/W3dClipboardSDL.cpp \
     platform/psp/w3d_psp.cpp
-FUENTES_C := $(filter-out thirdparty/lua/src/lua.c thirdparty/lua/src/luac.c, \
-                 $(shell cd $(RAIZ) && ls thirdparty/lua/src/*.c))
+FUENTES_C := $(filter-out libs/Whisk3DCore/thirdparty/lua/src/lua.c libs/Whisk3DCore/thirdparty/lua/src/luac.c, \
+                 $(shell cd $(RAIZ) && ls libs/Whisk3DCore/thirdparty/lua/src/*.c))
 
 OBJS := $(addprefix $(OBJDIR)/,$(FUENTES_CPP:.cpp=.o) $(FUENTES_C:.c=.o))
 
@@ -69,9 +76,9 @@ INCS := -I$(RAIZ)/platform/psp/include \
         -I$(RAIZ) -I$(RAIZ)/main -I$(RAIZ)/main/app -I$(RAIZ)/main/config -I$(RAIZ)/main/io -I$(RAIZ)/main/undo \
         -I$(RAIZ)/main/ui -I$(RAIZ)/main/ui/ViewPorts -I$(RAIZ)/main/ui/GeometriaUI \
         -I$(RAIZ)/libs/Whisk3DCore -I$(RAIZ)/libs/Whisk3DCore/base -I$(RAIZ)/libs/Whisk3DCore/graphics \
-        -I$(RAIZ)/libs/Whisk3DCore/io -I$(RAIZ)/libs/Whisk3DCore/thirdparty -I$(RAIZ)/libs \
+        -I$(RAIZ)/libs/Whisk3DCore/io -I$(RAIZ)/libs/Whisk3DCore/objects -I$(RAIZ)/libs/Whisk3DCore/render -I$(RAIZ)/libs/Whisk3DCore/config -I$(RAIZ)/libs/Whisk3DCore/edit -I$(RAIZ)/libs/Whisk3DCore/script -I$(RAIZ)/libs/Whisk3DCore/importers -I$(RAIZ)/libs/Whisk3DCore/thirdparty -I$(RAIZ)/libs \
         -I$(RAIZ)/libs/WhiskUI/widgets -I$(RAIZ)/libs/WhiskUI/text -I$(RAIZ)/libs/WhiskUI/draw \
-        -I$(RAIZ)/libs/WhiskUI/theme -I$(RAIZ)/libs/WhiskUI/core -I$(RAIZ)/thirdparty -I$(RAIZ)/thirdparty/lua/src \
+        -I$(RAIZ)/libs/WhiskUI/theme -I$(RAIZ)/libs/WhiskUI/core -I$(RAIZ)/thirdparty -I$(RAIZ)/libs/Whisk3DCore/thirdparty/lua/src \
         -I$(PSPDEV)/psp/include/SDL2 -I$(PSPDEV)/psp/include -I$(PSPSDK)/include
 
 # el MIPS Allegrex de la PSP (FPU de precision simple: el double va por software). -G0: sin datos "chicos" (el

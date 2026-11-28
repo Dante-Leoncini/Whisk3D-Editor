@@ -1,0 +1,195 @@
+# Whisk3D: la ayuda de la API de Lua para el IDE. La genera tools/genlua_api.py desde docs/manual/tr/lua: no editar a mano
+accelerate	accelerate(obj, factor [, tope])	Hızını çarparak onu hızlandırır.
+adjustSound	adjustSound(h, vol [, pitch])	Sesleri kesme ya da ayarlama.
+animate	animate(mesh, n [, frame])	Bir örgünün köşe animasyonunu değiştirir.
+animClip	animClip(armature, clip [, loop])	Bir iskeletin animasyonları (yürüme, zıplama...) ve aralarındaki yumuşak geçiş.
+animLayer	animLayer(esq, n, clip [, weight, mode])	Birden fazla animasyonu aynı anda katmanlarda (1'den 16'ya) karıştırma, örneğin koşma + ateş etme.
+animObject	animObject(root, "clip" [, loop])	Bir nesnenin ve çocuklarının animasyon klipleri.
+animScene	animScene(name [, loop])	Tüm sahnenin animasyonları.
+animSceneFrame	animSceneFrame(f)	Tüm sahnenin animasyonları.
+beep	beep(freq [, ms, vol])	Bir bip sesi (dosyasız).
+beforeView	beforeView(i)	(Onu senin script'in tanımlar.) Motor onu, her görünümü çizmeden önce, setViews'ı çağıran script'te çağırır. Orada kameraya bakan şeyleri (tabelalar, parçacıklar) O kameraya doğru çevirir ya da o görünümün görmemesi gerekenleri gizlersin. Zamanla ilerleyen hiçbir şeyi hareket ettirme: o, update'a gider.
+bonePoint	bonePoint(esq, "hueso" [, x, y, z]) -> x, y, z	Bir kemiğin nerede olduğu (ele bir silah koymak için).
+bounce	bounce(obj, other)	Başka bir nesneden ya da bir alanın kenarlarından sekme (sektiyse true döndürürler).
+bounceInside	bounceInside(obj, area)	Başka bir nesneden ya da bir alanın kenarlarından sekme (sektiyse true döndürürler).
+bounceOn	bounceOn(obj, area [, sides])	Başka bir nesneden ya da bir alanın kenarlarından sekme (sektiyse true döndürürler).
+box	box(obj [, x, y, z])	Çarpışma kutusunun boyutu: 3D'de genişlik (X), derinlik (Y) ve yükseklik (Z); 2D'de piksel cinsinden genişlik ve yükseklik.
+button	button(name [, gamepad])	Aynısı, oyun kumandasının bir düğmesi için. gamepad (1'den 4'e) verilirse o kumandanınki; verilmezse herhangi birininki.
+buttonPressed	buttonPressed(name [, gamepad])	Aynısı, oyun kumandasının bir düğmesi için. gamepad (1'den 4'e) verilirse o kumandanınki; verilmezse herhangi birininki.
+cameraXZ	cameraXZ() -> fx, fy, rx, ry	Kameranın zemin üzerinde, X ve Y'de nereye baktığı: ileri (fx, fy) ve sağa (rx, ry); karakteri kameraya göre hareket ettirmek için. (Adı, zeminin XZ olduğu zamandan kalmadır.)
+captureMouse	captureMouse(bool)	Fareyle etrafa bakmak için yakalanmış fare (birinci şahıs oyunları). PC'de ve tarayıcıda; tarayıcıda fare, oyundaki ilk tıklamayla ya da ilk tuşla yakalanır. Esc onu serbest bırakır ve oyunu duraklatır.
+captureScreen	captureScreen(name [, withHud]) -> path	Bu karenin 3D görüntüsünü (sahne bittiğinde; withHud ile HUD'dan sonra) bir dokuya kopyalar. Yol ("pantalla:"), setTexture için, bir materyal için ya da bir rutinin "Bind texture" adımı için kullanılır.
+captureUV	captureUV(name) -> u0, v0, u1, v1	Yakalanan dokunun, görüntüyü doğru yönde veren kısmı, setUVRect için (kopya henüz yapılmadıysa nil: kare çizilirken yapılır).
+changeScene	changeScene(name [, restart])	Karenin sonunda başka bir sahneye (menü, 2. seviye...) geçer.
+clockMs	clockMs() -> ms	Bir şeyin ne kadar sürdüğünü ölçmek için milisaniye.
+colGround	colGround(mesh, x, y, z)	Bir örgünün üçgenlerine karşı çarpışma (zemine basma, duvarlardan geçmeme).
+collide	collide(a, b) -> bool	İki 2D öğenin ekranda üst üste binip binmediği.
+colRay	colRay(...)	Bir örgünün üçgenlerine karşı çarpışma (zemine basma, duvarlardan geçmeme).
+colWall	colWall(...)	Bir örgünün üçgenlerine karşı çarpışma (zemine basma, duvarlardan geçmeme).
+contacts	contacts() -> list	Bu karedeki tüm çarpışmalar.
+control	control([n]) -> name, tipo	Kaç kumanda olduğu ve türleri ("xbox", "playstation", "nintendo", "generico").
+controls	controls() -> n	Kaç kumanda olduğu ve türleri ("xbox", "playstation", "nintendo", "generico").
+createLine	createLine(name, points)	Motorun hesapladığı kapalı, yumuşak bir eğri (güzergâhlar).
+createSound	createSound("sounds/x.wav" [, parent]) -> obj	Yeni bir Ses nesnesi (destroy(obj) onu kaldırır). Bir prefab içinde her nesne gibi örneklenir.
+date	date([seconds [, utc]]) -> table	Bir Unix zamanının tarihi ve saati (verilmezse şu an), yerel saatle ya da utc = true ile UTC olarak: year, month, day, hour, min, sec, wday (1 = pazar), yday.
+debugLog	debugLog(msg)	Yalnızca hata ayıklama sürümlerinde görünen mesajlar.
+destroy	destroy(obj) -> bool	Nesneyi karenin sonunda siler.
+draw3D	draw3D([on])	Tüm 3D'yi kapatır ya da açar (örneğin opak bir menünün arkasında).
+emit	emit(obj [, n])	Bir parçacık patlaması ya da bir yayıcıyı açma/kapama.
+error	error(msg)	Günlüğe bilgi, uyarı ya da hata mesajları yazar. error script'i durdurmaz.
+fade	fade(obj, objetivo, paso)	Saydamlık ve yumuşak geçişler.
+find	find(name [, root]) -> obj | nil	Outliner'da bir nesneyi adıyla arar (ya da yalnızca root içinde).
+finger	finger([n]) -> x, y, active	Çoklu dokunma: n numaralı parmak (1'den 4'e).
+getColor	getColor(light) -> r, g, b	Bir ışığın rengi.
+getConfig	getConfig(clave [, def]) -> text	Oyun seçeneklerini okuma ve yazma (rekor, ses düzeyi...).
+getEnergy	getEnergy(light) -> e	Parlaklığı, 0'dan 1'e (titremesi ya da yavaş yavaş sönmesi için).
+getFog	getFog(obj)	Sisi okuma ve değiştirme.
+getLens	getLens(cam) -> fov, near, far	Görüş açısı ve kırpma mesafeleri.
+getMemory	getMemory(name, i)	Belleklere yazma ve onlardan okuma (dizin 0'dan 255'e gider).
+getName	getName(obj) -> text	Nesnenin adı.
+getPosition	getPosition(obj) -> x, y, z	Nerede olduğu.
+getPosPx	getPosPx(obj) -> x, y	Bir 2D öğenin konumu (nil o ekseni olduğu gibi bırakır).
+getRotation	getRotation(obj) -> x, y, z	Derece cinsinden dönüşü.
+getRotationX	getRotationX(obj)	Tek bir eksenin dönüşü. getRotationZ, dikey eksen etrafındaki dönüştür.
+getRotationY	getRotationY(obj)	Tek bir eksenin dönüşü. getRotationZ, dikey eksen etrafındaki dönüştür.
+getRotationZ	getRotationZ(obj) -> derece	Tek bir eksenin dönüşü. getRotationZ, dikey eksen etrafındaki dönüştür.
+getScale	getScale() -> f	Argümansız: boyutları ekrana uyarlamak için çarpan (kısa kenar / 480).
+getShared	getShared(clave) -> value	Tüm script'lerin paylaştığı ortak alandan okur.
+getSizePx	getSizePx(obj) -> w, h	Bir 2D öğenin boyutu.
+getStep	getStep(routine, i, field)	Bir rutinin bir adımını değiştirme ya da okuma (alanlar: "on", "n", "color", "ref", "modo", "entero").
+getType	getType(obj) -> text	Ne olduğu: "mesh", "light", "camera", "empty", "armature", "text", "image", "button", "hitbox", "prefab", "rutina"... (yoksa "").
+getVelocity	getVelocity(obj, vx [, vy, vz])	Ona bir hız verirsin, motor da onu kendiliğinden hareket ettirir.
+importW3D	importW3D(path) -> obj | nil	Oyun çalışırken sahneye başka bir .w3d dosyası ekler.
+info	info(msg)	Günlüğe bilgi, uyarı ya da hata mesajları yazar. error script'i durdurmaz.
+inside	inside(area, x [, y])	Bir öğeyi başka bir öğenin içinde tutma ya da bir noktanın içeride olup olmadığını sorma.
+instantiate	instantiate(prefab [, x, y, z [, rotY [, parent]]]) -> obj | nil	O konumda bir prefab'ın kopyasını oluşturur (rotY derece cinsinden). "Libreria/Escena", bağlı bir kütüphanedekini oluşturur. parent verilirse o nesneye bağlı olur (konumu ve dönüşü ona göre).
+isDebug	isDebug()	Yalnızca hata ayıklama sürümlerinde görünen mesajlar.
+isLoaded	isLoaded(obj) -> bool	O bölümün yüklenip yüklenmediği.
+isMuted	isMuted()	Genel sessize alma.
+isVisible	isVisible(obj) -> bool	Onu gösterir ya da gizler. Gizli bir nesne artık update çağrısı almaz.
+key	key(name) -> bool	Tuş basılı (basılı tuttuğun sürece).
+keyPressed	keyPressed(name) -> bool	Tam bu karede basıldı (her basışta yalnızca bir kez).
+limit	limit(obj, area [, axis])	Bir öğeyi başka bir öğenin içinde tutma ya da bir noktanın içeride olup olmadığını sorma.
+linePoint	linePoint(id, s)	Motorun hesapladığı kapalı, yumuşak bir eğri (güzergâhlar).
+loadConfig	loadConfig()	Onları diske (ya da tarayıcıya) kaydetme ve yeniden okuma.
+logCount	logCount()	Günlüğü oyunun içinden okuma (kendi konsolun).
+logLine	logLine(i)	Günlüğü oyunun içinden okuma (kendi konsolun).
+lookAt	lookAt(obj, x, y, z)	Onu bir noktaya doğru yöneltir (bir kameranın önü).
+luaProfile	luaProfile(frames [, label])	Script'in hangi kısımlarının yavaş olduğunu ölçer (luaProfile(0) onu kapatır).
+mouse	mouse() -> x, y, dentro	Farenin nerede olduğu.
+mouseCaptured	mouseCaptured()	Fareyle etrafa bakmak için yakalanmış fare (birinci şahıs oyunları). PC'de ve tarayıcıda; tarayıcıda fare, oyundaki ilk tıklamayla ya da ilk tuşla yakalanır. Esc onu serbest bırakır ve oyunu duraklatır.
+mouseRel	mouseRel() -> dx, dy	Fareyle etrafa bakmak için yakalanmış fare (birinci şahıs oyunları). PC'de ve tarayıcıda; tarayıcıda fare, oyundaki ilk tıklamayla ya da ilk tuşla yakalanır. Esc onu serbest bırakır ve oyunu duraklatır.
+move	move(obj, dx, dy, dz)	Onu bulunduğu yerden kaydırır (dt ile kullan).
+mute	mute(bool)	Genel sessize alma.
+muteSound	muteSound(obj)	Bir Ses nesnesini yeniden başlatır (bölümünün seg saniyesinden) ya da susturur.
+netAddress	netAddress() -> text	Bu cihazın yerel ağdaki IP'si (internet üzerinden ya da yazarak katılmak için).
+netAvailable	netAvailable() -> bool [, reason]	Bu oyunun ağı kullanıp kullanamayacağı. Kullanamıyorsa nedeni: "no permission" (editör bu projeye izin vermedi) ya da "no network" (bu platformda henüz ağ yok).
+netClose	netClose()	Oturumdan çıkar (ev sahibi için: oturumu herkes için kapatır). Editörün Durdur düğmesi de onu kapatır.
+netDevice	netDevice() -> text	Bu cihazın adı (diğerlerinin oturum ararken gördüğü ad). Editörde değiştirilir: Ayarlar kartı, *Cihaz adı*.
+netFind	netFind([game]) -> bool	Yerel ağda oturum aramaya başlar. Onu yeniden çağırmak listeyi günceller.
+netHost	netHost(name [, max [, game]]) -> bool [, error]	Bir oturum oluşturur ve oyuncu bekler (max ev sahibi de sayılarak: varsayılan 2). game oyununun adıdır: yalnızca aynı oyunun oturumları görünür.
+netJoin	netJoin(address) -> bool	Bir oturuma girer: netMatches()'tan gelen address ya da elle yazılmış bir adres ("192.168.0.10", "x.x.x.x:puerto").
+netMatches	netMatches() -> { {name, device, players, max, address}, ... }	Yanıt veren oturumlar (sen ararken liste kendiliğinden güncellenir).
+netOpen	netOpen(bool)	Ev sahibi aramalarda görünür ve oyuncu kabul eder (true) ya da etmez (örneğin oturum başladığında).
+netPlayers	netPlayers() -> { {id, name, isSelf}, ... }	Oturumdakiler (ad, cihazlarının adıdır).
+netReceive	netReceive() -> { {from, data}, ... }	Son seferden beri gelen her şey, sırayla.
+netSelf	netSelf() -> id	Oturumdaki numaran (0 = ev sahibi; oturum yoksa -1).
+netSend	netSend(value [, para [, reliable]]) -> bool	Bir Lua değerini (sayı, metin, boolean ya da içinde tablolar olabilen bir tablo) bir oyuncuya (para = onun id'si) ya da herkese (nil) gönderir. Güvenilir (varsayılan): kesin olarak ve sırayla ulaşır. false ile kaybolursa yeniden gönderilmez: bir sonrakinin öncekinin yerini aldığı, her karede gönderdiğin şeyler için (konumlar, kumanda).
+netSilence	netSilence([id]) -> seconds, limite	O oyuncudan ne zamandır hiçbir şey gelmediği (id olmadan: en uzun süredir sessiz olandan). Katılan yalnızca ev sahibini duyar, bu yüzden onun için bu, ev sahibinin sessizliğidir. limite (8 sn) aşılınca gitmiş sayılır: ev sahibi onu oturumdan çıkarır ve katılan için netState() "error" verir.
+netState	netState() -> state, error	"none", "searching", "waiting" (ev sahibi sensin), "connecting", "connected" ya da "error" (nedeniyle birlikte).
+object	object(prop) -> obj | nil	properties içindeki prop alanında seçilen nesne.
+onEnter	onEnter(other, myHitbox, otherHitbox)	Bir hitbox başka birine dokunmaya başladığında.
+onExit	onExit(other, myHitbox, otherHitbox)	Birbirlerine dokunmayı bıraktıklarında (biri gizlenirse ya da devre dışı bırakılırsa da).
+onStay	onStay(other, myHitbox, otherHitbox)	Birbirlerine dokunmaya devam ettikleri sürece her karede.
+onTouch	onTouch(other, impulse, x, y, z, nx, ny, nz)	İki katı cisim çarpıştığında. x, y, z temas noktası, nx, ny, nz ise diğerine doğru olan yöndür.
+option	option(prop) -> text	properties içindeki bir açılır listede seçilen seçenek; hiçbiri seçilmediyse listenin ilki (varsayılan).
+param	param(prop [, def]) -> número	property gibi ama her zaman sayı döndürür; yoksa def'i (ya da 0) döndürür.
+physicsActive	physicsActive(obj, bool)	Yerçekimi (varsayılan 9.81), bir nesnenin fiziğini açma/kapama.
+physicsAwake	physicsAwake(obj)	Yerçekimi (varsayılan 9.81), bir nesnenin fiziğini açma/kapama.
+physicsGravity	physicsGravity([g])	Yerçekimi (varsayılan 9.81), bir nesnenin fiziğini açma/kapama.
+physicsRay	physicsRay(ox, oy, oz, dx, dy, dz, max) -> dist, nx, ny, nz, obj	Bir ışın gönderir ve neye çarptığını söyler.
+playScene	playScene(name [, "funcion"])	Oyun duraklatılmışken bir 3D sahneyi ara sahne olarak oynatır; bitince o fonksiyonu çağırır.
+playSound	playSound(obj [, seg])	Bir Ses nesnesini yeniden başlatır (bölümünün seg saniyesinden) ya da susturur.
+pressed	pressed(obj) -> bool	Bu karede o 2D öğeye dokunuldu ya da tıklandı (düğmeler).
+print	print(...)	Ekrana değil, motorun günlüğüne (log) yazar.
+property	property(prop) -> value	Bu nesneye özel sayı, evet/hayır ya da metin (veya tanımlanan varsayılan değer).
+quit	quit()	Oyunu kapatır (editörde hiçbir şey yapmaz).
+random	random() -> 0..1	Rastgele sayılar.
+releaseSound	releaseSound(h)	Notayı bırakır: zarf bırakma aşamasına geçer.
+resolution	resolution() -> width, height	3D görüntünün piksel cinsinden gerçek boyutu.
+reverb	reverb(room, damping, level)	Genel yankı: oda boyutu, sönümleme ve seviye (her biri 0 ile 1 arası; seviye 0 kapatır).
+rotate	rotate(obj, dx, dy, dz)	Onu kendi eksenleri etrafında döndürür.
+rotateTowards	rotateTowards(obj, dx, dy [, factor])	Onu zemindeki bir yöne (X ve Y) doğru yumuşakça döndürür.
+safeArea	safeArea() -> x, y, w, h	Ekranın çentiksiz kısmı (start içinde kullanma).
+saveConfig	saveConfig()	Onları diske (ya da tarayıcıya) kaydetme ve yeniden okuma.
+scale	scale(obj, f)	Geçerli ölçeği çarpar.
+scenePlaying	scenePlaying()	Ara sahneyi keser / hangisinin oynatıldığını söyler.
+screen	screen() -> width, height	Tuvalin boyutu.
+screenFrame	screenFrame() -> x, y, width, height	3D görüntünün çerçevesi (kameranın kadrajı, şeritler olmadan), tuval birimleriyle, merkezinden itibaren.
+screenMargin	screenMargin() -> mx, my	Sabit boyutlu bir tuvalin etrafında, her yanda gerçek kenarlara kadar ne kadar ekran kaldığı, tuval birimleriyle (kadrajın şeritleri de ekrandır). Dikeyde 4:3 bir tuvalle: bir göstergeyi my kadar yukarı kaydırmak onu üst kenara yapıştırır.
+screenOf	screenOf(obj) -> x, y, front	Bir 3D nesnenin ekranda nerede göründüğü (üzerine 2D bir etiket koymak için).
+scrollUV	scrollUV(m, du, dv)	UV'leri kaydırma (su, taşıma bantları...).
+selected	selected() -> { obj, ... }	Editörde seçili nesneler (editör eklentisi gibi çalışan düğmeler için).
+self	self() -> obj	Bu script'in sahibi olan nesne.
+setActiveCamera	setActiveCamera(cam)	Oyunun görüntülendiği kamerayı değiştirir.
+setCameraView	setCameraView(i, camera)	i görünümünün (1 ya da 2) kamerası. Ayarlanmazsa etkin kamera.
+setColor	setColor(light, r, g, b)	Bir ışığın rengi.
+setConfig	setConfig(clave, value)	Oyun seçeneklerini okuma ve yazma (rekor, ses düzeyi...).
+setEmitting	setEmitting(obj, bool)	Bir parçacık patlaması ya da bir yayıcıyı açma/kapama.
+setEnergy	setEnergy(light, e)	Parlaklığı, 0'dan 1'e (titremesi ya da yavaş yavaş sönmesi için).
+setFog	setFog(obj, density [, r, g, b, inicio, fin])	Sisi okuma ve değiştirme.
+setLens	setLens(cam [, fov, near, far])	Görüş açısı ve kırpma mesafeleri.
+setMemories	setMemories(name, i, v1, v2, ...)	Belleklere yazma ve onlardan okuma (dizin 0'dan 255'e gider).
+setMemory	setMemory(name, i, v)	Belleklere yazma ve onlardan okuma (dizin 0'dan 255'e gider).
+setOpacity	setOpacity(obj, 0..1)	Saydamlık ve yumuşak geçişler.
+setPosition	setPosition(obj, x, y, z)	Onu tam bir konuma yerleştirir (fiziği yok sayar).
+setPosPx	setPosPx(obj, x, y)	Bir 2D öğenin konumu (nil o ekseni olduğu gibi bırakır).
+setRail	setRail(cam, curve [, offset])	Kameranın bir eğriyi (ray) takip etmesini sağlama.
+setRot2D	setRot2D(obj, degrees)	Bir 2D öğeyi döndürür.
+setRotation	setRotation(obj, x, y, z [, order])	Tam dönüş, Dönüştür kartındakiyle aynı. order ile eksenlerin hangi sırayla uygulanacağı seçilir, örneğin "ZXY" (önce dikey eksen etrafındaki yön, bir araçtaki gibi).
+setRotationX	setRotationX(obj, g)	Yalnızca bir ekseni değiştirir; diğer ikisi aynı kalır. Örneğin setRotationZ(obj, getRotationZ(obj) + 90 * dt) onu dikey eksen etrafında döndürür.
+setRotationY	setRotationY(obj, g)	Yalnızca bir ekseni değiştirir; diğer ikisi aynı kalır. Örneğin setRotationZ(obj, getRotationZ(obj) + 90 * dt) onu dikey eksen etrafında döndürür.
+setRotationZ	setRotationZ(obj, g)	Yalnızca bir ekseni değiştirir; diğer ikisi aynı kalır. Örneğin setRotationZ(obj, getRotationZ(obj) + 90 * dt) onu dikey eksen etrafında döndürür.
+setScale	setScale(obj, s [, sy, sz])	Tam ölçek; tek bir sayıyla eşit oranda ölçekler.
+setShared	setShared(clave, value)	Ortak alana bir sayı, evet/hayır ya da metin yazar; nil onu siler.
+setSize	setSize(text, px)	Bir metnin ya da düğmenin yazısını ve yazı boyutunu değiştirir.
+setSizePx	setSizePx(obj, w, h)	Bir 2D öğenin boyutu.
+setSoundObject	setSoundObject(obj, t)	Bir Ses nesnesini okur / değiştirir: file (kaynak), active, volume, pitch, reverb, pan, start, clipStart, clipEnd, loop, positional, radius, range (okurken duration, playing da).
+setStep	setStep(routine, i, field, ...)	Bir rutinin bir adımını değiştirme ya da okuma (alanlar: "on", "n", "color", "ref", "modo", "entero").
+setText	setText(obj, value)	Bir metnin ya da düğmenin yazısını ve yazı boyutunu değiştirir.
+setTexture	setTexture(img, "ruta.png")	Görüntüyü değiştirir, bir kısmını kırpar (u1 < u0 ya da v1 < v0 ile aynalanmış) ya da bir kare sayfasını canlandırır.
+setTint	setTint(obj, r, g, b [, a])	Rengini değiştirir (0 ile 1 arası değerler).
+setVertexPos	setVertexPos(m, i, x, y, z)	Köşeleri tek tek okuma ve taşıma.
+setVertices	setVertices(m, {i, x, y, z, ...})	Birçok köşeyi tek seferde taşıma (çok daha hızlı).
+setViews	setViews(n [, "side" | "up"])	2 ekranı ikiye böler (yan yana ya da biri diğerinin üstünde); 1 tam ekrana döner. 2D arayüz (HUD) ikisinin üstüne bir kez çizilir.
+setVisible	setVisible(obj, bool)	Onu gösterir ya da gizler. Gizli bir nesne artık update çağrısı almaz.
+showHitboxes	showHitboxes(bool)	Hata ayıklamak için hitbox'ları çizer.
+sound	sound("sounds/x.wav" [, vol, pitch, loop, pan]) -> h	Bir ses çalar; bir tanımlayıcı döndürür.
+soundObject	soundObject(obj) -> t	Bir Ses nesnesini okur / değiştirir: file (kaynak), active, volume, pitch, reverb, pan, start, clipStart, clipEnd, loop, positional, radius, range (okurken duration, playing da).
+start	start()	Bir kez, Oynat'a basıldığında (ya da nesne instantiate ile oluşturulur oluşturulmaz). Nesneleri bulmak ve değişkenleri hazırlamak için kullanılır.
+step	step(name, ...)	Bir çizim adımı yürütür; yalnızca bir rutinin "Lua çağır" adımının çağırdığı bir fonksiyonun içinde geçerlidir.
+stick	stick(["left"|"right"] [, gamepad]) -> x, y	Kumandanın analog çubuğu, -1'den 1'e (yukarı -1'dir).
+stopScene	stopScene()	Tüm sahnenin animasyonları.
+stopScene3D	stopScene3D()	Ara sahneyi keser / hangisinin oynatıldığını söyler.
+stopSound	stopSound(h [, fundido])	Sesleri kesme ya da ayarlama.
+stopSounds	stopSounds()	Sesleri kesme ya da ayarlama.
+streamAuto	streamAuto(obj)	Seviyenin bir bölümünü elle yükler ya da boşaltır (streaming) veya onu otomatiğe döndürür.
+streamLoad	streamLoad(obj)	Seviyenin bir bölümünü elle yükler ya da boşaltır (streaming) veya onu otomatiğe döndürür.
+streamUnload	streamUnload(obj)	Seviyenin bir bölümünü elle yükler ya da boşaltır (streaming) veya onu otomatiğe döndürür.
+tap	tap() -> x, y, touching	Ekrandaki parmak (ya da fare tıklaması).
+target	target() -> obj | nil	Sahip nesnenin hedefi ("target").
+tilt	tilt() -> x, y, z	Telefonun ivmeölçeri, g cinsinden, ekranın görüldüğü hâldeki (zaten döndürülmüş) eksenlerinde: x, bir direksiyon gibi sağa ne kadar döndürüldüğüdür (açının sinüsü); dik ve düz tutulduğunda y = 1, yüzü yukarı bakacak şekilde yatırıldığında z = 1 verir. Cihazda ivmeölçer yoksa nil.
+touch	touch() -> bool	Ekrana dokunuluyor: bir telefon ya da tablet (Android, bir iPhone'un tarayıcısı...) veya ekranına daha önce dokunulmuş herhangi bir cihaz. Ekran kontrollerini yalnızca gereken yerde göstermek için.
+trigger	trigger(["left"|"right"] [, gamepad]) -> 0..1	Analog tetik.
+uiBox	uiBox(obj) -> x, y, w, h	Gerçekte kapladığı dikdörtgen (x, y = merkez).
+unixTime	unixTime() -> seconds, ms	Sistem saati, Unix zamanı olarak: 1/1/1970 UTC'den bu yana geçen saniyeler ve ayrıca milisaniyeler (0-999).
+unixTimeMs	unixTimeMs() -> ms	Aynı Unix zamanı tek bir sayı olarak: milisaniye (tam sayı) ya da ondalıklı saniye. Ölçmek bir çıkarmadır: t = unixTimeSec() - baslangic. 64 bit Lua ile tam doğrudur (Dreamcast hariç tüm platformlar; orada unixTime()).
+unixTimeSec	unixTimeSec() -> seconds	Aynı Unix zamanı tek bir sayı olarak: milisaniye (tam sayı) ya da ondalıklı saniye. Ölçmek bir çıkarmadır: t = unixTimeSec() - baslangic. 64 bit Lua ile tam doğrudur (Dreamcast hariç tüm platformlar; orada unixTime()).
+update	update(dt)	Her karede, nesne görünür olduğu ve etkin sahnede bulunduğu sürece. dt, önceki kareden bu yana geçen saniyedir (0.001 ile 0.1 arasında).
+vertexCount	vertexCount(m)	Köşeleri tek tek okuma ve taşıma.
+vertexGroup	vertexGroup(m, "grupo") -> {índices}	Bir grubun köşeleri (yalnızca bir kez, start içinde çağır).
+vertexPos	vertexPos(m, i)	Köşeleri tek tek okuma ve taşıma.
+vibrate	vibrate(ms [, force])	ms milisaniye boyunca, 0'dan 1'e force ile titreştirir: telefonun titreşim motoru (Android, tarayıcı) ve kumandaların motoru (PC). Telefonda güç, darbeyi kısaltır. Titreştirecek bir şey olmayan yerde ya da oyuncu titreşimi kapattıysa hiçbir şey yapmaz.
+view	view() -> i, n	O an çizilen görünüm (1 ya da 2; çizimin dışında 0) ve kaç görünüm olduğu.
+warning	warning(msg)	Günlüğe bilgi, uyarı ya da hata mesajları yazar. error script'i durdurmaz.
+worldPoint	worldPoint(obj, x, y, z) -> x, y, z	Nesnenin bir noktasını dünya koordinatlarına çevirir.

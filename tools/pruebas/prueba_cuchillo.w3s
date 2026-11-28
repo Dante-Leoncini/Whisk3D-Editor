@@ -1,0 +1,70 @@
+# ==========================================================================
+#  EL CUCHILLO (K en Edit Mode; pedido del duenio, 2026-11-27). Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_cuchillo.w3s
+#  `knife at x y z [vertex|edge|face]` lleva el mouse a ese punto de la malla (local) y clickea; con el tipo verifica a
+#  que engancho (vertice = recuadro verde, arista = se pinta de amarillo, cara = tambien en el medio). Sobre el cubo de
+#  2 m visto de frente:
+#   1. de arista a arista por la cara de adelante: 2 vertices nuevos y la cara partida (la de atras, que no se ve, no)
+#   2. lo mismo con Z (a traves): el anillo entero, adelante, atras y los costados
+#   3. de esquina a esquina: la diagonal (ningun vertice nuevo)
+#   4. empezar en el MEDIO de una cara: queda como arista suelta (no parte la cara)
+#   5. de arista a arista pasando por el medio de la cara: la cara partida con el quiebre
+#   6. visto en 3/4, por dos caras: el corte cruza la arista que comparten (un vertice nuevo ahi) y parte las dos
+#  Siempre con las normales para afuera, y cada corte es UN Ctrl+Z
+# ==========================================================================
+window 900 700
+selobj Cubo
+mode edit
+selmode vertex
+vporbit 0 0 0 6 0 0
+expect verts 8
+expect faces 6
+knife start
+knife at -1 0 1 edge
+knife at 1 0 1 edge
+knife points 2
+knife ok
+expect verts 10
+expect faces 7
+undo
+expect verts 8
+knife start
+knife through
+knife at -1 0 1 edge
+knife at 1 0 1 edge
+knife ok
+expect verts 12
+expect faces 10
+undo
+knife start
+knife at -1 1 1 vertex
+knife at 1 -1 1 vertex
+knife ok
+expect verts 8
+expect faces 7
+undo
+knife start
+knife at 0 0.5 1 face
+knife at 1 0.5 1 edge
+knife ok
+expect verts 10
+expect faces 6
+undo
+expect verts 8
+knife start
+knife at -1 0.5 1 edge
+knife at 0 0 1 face
+knife at 1 0.5 1 edge
+knife ok
+expect verts 11
+expect faces 7
+facesout all
+undo
+vporbit 0 0 0 7 -25 40
+knife start
+knife at -1 0.3 1 edge
+knife at 1 -0.5 -1 edge
+knife ok
+facesout all
+expect faces 8
+expect verts 11

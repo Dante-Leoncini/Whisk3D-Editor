@@ -6,7 +6,7 @@ Las da la **primera luz Sol** de la escena (ver [Luz](objeto-luz.md)). Las luces
 
 ## La tarjeta Sombras en tiempo real
 
-Está en la pestaña **Render** (el disquete), debajo de la tarjeta Render. Viene **apagada**: tildá **Habilitado** y aparecen las opciones.
+Está en la pestaña **Render** (el disquete), debajo de la tarjeta Render. Viene **apagada**: tildá **Habilitado** y aparecen las opciones. Con el **Trazado de rayos** prendido la tarjeta no aparece: la vista Render y el render trazan sus propias sombras (lo que tenía se conserva para el juego y las vistas sin trazado).
 
 | Propiedad | Qué hace |
 |---|---|
@@ -35,6 +35,8 @@ Un piso que no hace falta que proyecte (no tiene nada abajo) puede ir sin **Proy
 
 Un material **sin luz** (la casilla **Luz** destildada) no recibe sombras.
 
+Lo **transparente de verdad** no tapa al sol: un material **Transparente** con el alfa del color por debajo de la mitad (un vidrio, el casco de un astronauta) o con la mezcla **Aditiva** (un brillo). Si la malla tiene partes de vidrio y partes opacas (una ventana con su marco), con las cascadas (shaders) proyectan solo las opacas; con la sombra proyectada en la CPU (sin shaders, como el N95) proyecta la malla entera, salvo que sea toda de vidrio. Lo que se recorta con el alfa de la textura (hojas, rejas) proyecta la parte entera.
+
 ## El color de las sombras: la luz del ambiente
 
 Como en Unity, lo que está en sombra no queda negro: le llega la **luz del ambiente**, y de ella sale su color. En Whisk3D el ambiente es el **fondo** de la escena (su color o su imagen 360) por la **Luz del fondo** de la tarjeta Render. Esa misma luz aclara el lado de los modelos que no ve el sol y entra en la [luz precalculada](objeto-malla.md#precalcular-iluminación) y en las [sondas de luz](objeto-sonda-luz.md).
@@ -54,6 +56,8 @@ El **Color de la sombra** y la **Intensidad** también se hornean (con las sombr
 Una textura horneada **antes** de esta versión no tiene esa información: ahí la sombra de lo que se mueve baja hasta el ambiente, sin oscurecer lo que ya estaba en sombra. Para que coincidan del todo, volvé a hornear.
 
 Lo que se movía cuando se horneó queda **pintado** en la textura: si después le sacás **Estático** a un objeto (un personaje), su sombra vieja sigue en el piso hasta que vuelvas a hornear.
+
+Con la luz horneada en modo **Shadowmask** (las sombras del sol y la luz indirecta, con la luz de tiempo real: ver [Precalcular iluminación](objeto-malla.md#shadowmask-las-sombras-horneadas-la-luz-en-tiempo-real)) pasa lo mismo: sobre esa capa solo hace sombra lo que se mueve. Si además destildás **Proyectar sombras** en lo estático, el mapa de sombras dibuja solo a los personajes: en una escena con cientos de piedras es mucho más rápido.
 
 La luz precalculada se guarda **por material**: si dos objetos comparten un material, al hornear uno el otro mostraría su luz (con sus propias UV, como una sombra que no es suya). Por eso, al hornear un objeto cuyo material usan otros, ese objeto pasa a una **copia** del material.
 

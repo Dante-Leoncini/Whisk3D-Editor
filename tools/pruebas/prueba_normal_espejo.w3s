@@ -1,0 +1,20 @@
+# ==========================================================================
+#  LA VISTA NORMAL DIBUJA LOS MODIFICADORES (pedido del duenio, 2026-11-27: "en la vista normal no se esta viendo el
+#  modificador espejo"). El pase de Normal usaba siempre la malla BASE; ahora usa la GENERADA (con sus normales), como
+#  Solido, Profundidad y Alfa. El cubo con sus vertices corridos +2 en X y un Espejo: la copia queda en x -3..-1; su
+#  techo (verde en la vista Normal) no puede ser el fondo azul de esa vista. Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_normal_espejo.w3s
+# ==========================================================================
+window 900 700
+selobj Cubo
+mode edit
+select all
+move 2
+mode object
+modadd mirror
+vporbit 0 0 0 12 -20 20
+vpview solid
+scenepx -2 1 0 noes 0 0 0 10
+vpview normal
+scenepx 2 1 0 noes 128 128 255 30
+scenepx -2 1 0 noes 128 128 255 30

@@ -121,6 +121,10 @@ void DuplicatedObject();
 // que se puede compartir sin dejar de ser una copia: un armature usa los MISMOS clips que el
 // original (W3dArmatureAnimsLink) en vez de una copia propia.
 Object* W3dDuplicateOne(Object* src, bool linked = false);
+// SCATTER (edit/ScatterMod.h): "Apply" en modo instancias: cada copia es un objeto (duplicado vinculado de su fuente)
+// en una coleccion nueva, y el modificador sale del stack. Devuelve cuantas copias (-1 = no es un Scatter / no se puede)
+class Mesh;
+int W3dScatterApplyAsObjects(Mesh* m);
 // Separate (Edit Mode: P / menu Mesh > Separate): mueve las caras SELECCIONADAS a un mesh NUEVO (misma
 // transform + materiales + vertex groups + modificadores) y las borra del actual. true si separo algo.
 bool SeparateSelectionEdit(Mesh* m);
