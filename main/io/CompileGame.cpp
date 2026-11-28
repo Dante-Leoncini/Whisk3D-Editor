@@ -1322,7 +1322,10 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
           "if(m)w3dLogf(\"[perfil] b%d%s\",lib,l);w3dLogf(\"[perfil] fin\");}\n#endif\n", f);
     fputs("static void frame(){SDL_Event e;while(SDL_PollEvent(&e)){\n", f);
     fputs("if(e.type==SDL_QUIT)g_run=false;\n", f);
-    fputs("else if(e.type==SDL_KEYDOWN&&e.key.keysym.sym==SDLK_ESCAPE)g_run=false;\n", f);
+    // Esc: con "Esc cierra el juego" (el default) cierra; apagado le llega al juego como la tecla "escape" (y el boton
+    // "atras" de Android como "back", ver el hint TRAP_BACK_BUTTON): el juego decide (volver de un menu, pausar, exit())
+    if (g_projCompile.escapeQuits)
+        fputs("else if(e.type==SDL_KEYDOWN&&e.key.keysym.sym==SDLK_ESCAPE)g_run=false;\n", f);
     fputs("else if(e.type==SDL_KEYDOWN)W3dGameKey(e.key.keysym.sym,true);\n", f);
     fputs("else if(e.type==SDL_KEYUP)W3dGameKey(e.key.keysym.sym,false);\n", f);
     // HOTPLUG: el MISMO camino que el editor (padAbrir/padCerrar usan el registro
@@ -1364,6 +1367,7 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     // jugador con dos mandos a mano.
     fputs("{const float DZ=0.2f,M=1.0f/32767.0f;\n", f);
     fputs("float lx=0,ly=0,rx=0,ry=0,gl=0,gr=0;int du=0,dd=0,dl=0,dr=0,ba=0,bb=0,bx=0,by=0;\n", f);
+    fputs("int bl1=0,br1=0,bl3=0,br3=0,bst=0,bse=0;\n", f);
     fputs("for(int ci=0;ci<W3dControlsCount();ci++){\n", f);
     fputs(" SDL_GameController* gc=(SDL_GameController*)W3dControlHandle(ci);if(!gc)continue;\n", f);
     fputs(" float ax=SDL_GameControllerGetAxis(gc,SDL_CONTROLLER_AXIS_LEFTX)*M;\n", f);
@@ -1384,7 +1388,15 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     fputs(" ba|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_A);\n", f);
     fputs(" bb|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_B);\n", f);
     fputs(" bx|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_X);\n", f);
-    fputs(" by|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_Y);}\n", f);
+    fputs(" by|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_Y);\n", f);
+    // los hombros, los sticks apretados, start y select (Back): como el Play del editor (SimGame.cpp, con los
+    // nombres de un mando de PlayStation). Antes el juego compilado no los recibia nunca
+    fputs(" bl1|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_LEFTSHOULDER);\n", f);
+    fputs(" br1|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);\n", f);
+    fputs(" bl3|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_LEFTSTICK);\n", f);
+    fputs(" br3|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_RIGHTSTICK);\n", f);
+    fputs(" bst|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_START);\n", f);
+    fputs(" bse|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_BACK);}\n", f);
     fputs("if(lx>-DZ&&lx<DZ)lx=0;if(ly>-DZ&&ly<DZ)ly=0;\n", f);
     fputs("if(rx>-DZ&&rx<DZ)rx=0;if(ry>-DZ&&ry<DZ)ry=0;\n", f);
     // EL D-PAD ENTRA COMO EL STICK IZQUIERDO (ver el comentario largo de SimGame.cpp):
@@ -1396,7 +1408,11 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     fputs("W3dGameButton(\"a\",ba!=0);W3dGameButton(\"b\",bb!=0);\n", f);
     fputs("W3dGameButton(\"x\",bx!=0);W3dGameButton(\"y\",by!=0);\n", f);
     fputs("W3dGameButton(\"up\",du!=0);W3dGameButton(\"down\",dd!=0);\n", f);
-    fputs("W3dGameButton(\"left\",dl!=0);W3dGameButton(\"right\",dr!=0);}\n", f);
+    fputs("W3dGameButton(\"left\",dl!=0);W3dGameButton(\"right\",dr!=0);\n", f);
+    fputs("W3dGameButton(\"l1\",bl1!=0);W3dGameButton(\"r1\",br1!=0);\n", f);
+    fputs("W3dGameButton(\"l2\",gl>0.5f);W3dGameButton(\"r2\",gr>0.5f);\n", f);
+    fputs("W3dGameButton(\"l3\",bl3!=0);W3dGameButton(\"r3\",br3!=0);\n", f);
+    fputs("W3dGameButton(\"start\",bst!=0);W3dGameButton(\"select\",bse!=0);}\n", f);
     fputs("#ifdef __ANDROID__\nif(g_acel){const float M=1.0f/32767.0f;SDL_JoystickUpdate();\n"
           "W3dScriptTilt(SDL_JoystickGetAxis(g_acel,0)*M,SDL_JoystickGetAxis(g_acel,1)*M,SDL_JoystickGetAxis(g_acel,2)*M);}\n"
           "#endif\n", f);
@@ -1463,6 +1479,16 @@ static bool WriteMain(const std::string& path, const std::string& fontRel,
     } else if (orientation == 2) {
         fputs("// orientacion: solo horizontal (Android/iOS; en desktop/web no aplica)\n", f);
         fputs("SDL_SetHint(SDL_HINT_ORIENTATIONS,\"LandscapeLeft LandscapeRight\");\n", f);
+    } else {
+        // "Todas": TODAS de verdad. Sin el hint, SDL clavaba la orientacion de la ventana al crearla (acostada si es
+        // mas ancha): el celular no giraba aunque la opcion dijera Todas. Con las dos, SDL pide FULL_USER (gira con el
+        // celular y respeta el bloqueo de rotacion); el manifiesto dice lo mismo (WriteBuildAndroid)
+        fputs("// orientacion: todas (gira con el celular; Android/iOS; en desktop/web no aplica)\n", f);
+        fputs("SDL_SetHint(SDL_HINT_ORIENTATIONS,\"LandscapeLeft LandscapeRight Portrait\");\n", f);
+    }
+    if (!g_projCompile.escapeQuits) {
+        // Esc le llega al juego: el boton "atras" de Android tambien (como la tecla "back"), sin que el sistema cierre la app
+        fputs("#ifdef SDL_HINT_ANDROID_TRAP_BACK_BUTTON\nSDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON,\"1\");\n#endif\n", f);
     }
     // ICONO EN EL DOCK (Linux): el app-id de la ventana debe coincidir con el
     // nombre del .desktop que instala el .deb (whisk3d-<juego>.desktop, ver
@@ -2126,8 +2152,11 @@ static bool WriteBuildAndroid(const std::string& path, const std::string& repo,
     fprintf(f, "sed -i -e 's#applicationId \".*\"#applicationId \"com.whisk3d.%s\"#' "
                "-e 's#output.outputFileName = .*#output.outputFileName = \"%s-android.apk\"#' "
                "\"$AND/app/build.gradle\"\n", name.c_str(), name.c_str());
-    fprintf(f, "sed -i 's#<string name=\"app_name\">.*</string>#<string name=\"app_name\">%s</string>#' "
-               "\"$AND/app/src/main/res/values/strings.xml\"\n", name.c_str());
+    // (el nombre VISIBLE: el titulo del proyecto si tiene, si no el nombre; con '#', '&' o '<' no: romperian el sed/xml)
+    { std::string label = g_projCompile.title.empty() ? name : g_projCompile.title;
+      if (label.find_first_of("#&<>\\'\"$`") != std::string::npos) label = name;
+      fprintf(f, "sed -i 's#<string name=\"app_name\">.*</string>#<string name=\"app_name\">%s</string>#' "
+                 "\"$AND/app/src/main/res/values/strings.xml\"\n", label.c_str()); }
     // 2) apuntar el build nativo al main.cpp GENERADO y las rutas absolutas del ecosistema
     fputs("cp \"$OUT/main.cpp\" \"$AND/jni/main_generado.cpp\"\n", f);
     // (el main del ejemplo vive en platform/main.cpp desde la limpieza de la
@@ -2227,13 +2256,12 @@ static bool WriteBuildAndroid(const std::string& path, const std::string& repo,
           "\"$AND/app/src/main/AndroidManifest.xml\"\n", f);
     // 2c) orientacion clavada: android:screenOrientation en la COPIA del manifest (la
     // referencia es la calculadora, que fija portrait en su manifest + hint del main)
-    if (orientation == 1 || orientation == 2) {
-        fprintf(f, "# orientacion: %s\n", (orientation == 1) ? "only vertical (portrait)"
-                                                             : "only horizontal (landscape)");
-        fprintf(f, "sed -i 's#android:launchMode=\"singleTask\"#android:launchMode=\"singleTask\" "
-                   "android:screenOrientation=\"%s\"#' \"$AND/app/src/main/AndroidManifest.xml\"\n",
-                (orientation == 1) ? "portrait" : "landscape");
-    }
+    // (orientacion "Todas": fullUser, gira con el celular y respeta el bloqueo de rotacion; ver el hint del main)
+    fprintf(f, "# orientacion: %s\n", (orientation == 1) ? "only vertical (portrait)"
+                                       : (orientation == 2) ? "only horizontal (landscape)" : "all (fullUser)");
+    fprintf(f, "sed -i 's#android:launchMode=\"singleTask\"#android:launchMode=\"singleTask\" "
+               "android:screenOrientation=\"%s\"#' \"$AND/app/src/main/AndroidManifest.xml\"\n",
+            (orientation == 1) ? "portrait" : (orientation == 2) ? "landscape" : "fullUser");
     if (pack) {
         // 3) assets EMPAQUETADOS: el APK va SIN assets visibles (todo viaja dentro
         //    de libmain.so via pak_generado.cpp); se limpia por si quedo una copia vieja
@@ -2301,6 +2329,10 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fprintf(f, "OUT=\"%s\"\n", Esc(out).c_str());
     fprintf(f, "ROOT=\"%s\"\n", Esc(root).c_str());
     fprintf(f, "NAME=\"%s\"\nPKG=\"com.whisk3d.%s\"\n", name.c_str(), pkg.c_str());
+    // el nombre VISIBLE (bajo el icono): el titulo del proyecto si tiene (sin lo que romperia el script o el xml)
+    { std::string label = g_projCompile.title.empty() ? name : g_projCompile.title;
+      if (label.find_first_of("#&<>\\'\"$`") != std::string::npos) label = name;
+      fprintf(f, "LABEL=\"%s\"\n", label.c_str()); }
     fputs("W3D=\"$ROOT/Whisk3D\"\n", f);
     fputs("OLD=\"${W3D_ANDROID_OLD:-$HOME/android-viejo}\"\n", f);
     fputs("NDK=\"$OLD/android-ndk-r15c\"\nSDLD=\"$OLD/fuentes/SDL-release-2.0.7\"\n", f);
@@ -2417,9 +2449,9 @@ static bool WriteBuildAndroidOld(const std::string& path, const std::string& rep
     fputs("    <uses-feature android:glEsVersion=\"0x00020000\" />\n", f);
     fputs("    <uses-permission android:name=\"android.permission.INTERNET\" />\n", f);
     fputs("    <uses-permission android:name=\"android.permission.VIBRATE\" />\n", f);
-    fputs("    <application android:label=\"$NAME\" android:icon=\"@drawable/icono\"\n", f);
+    fputs("    <application android:label=\"$LABEL\" android:icon=\"@drawable/icono\"\n", f);
     fputs("                 android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\">\n", f);
-    fprintf(f, "        <activity android:name=\".GameActivity\" android:label=\"$NAME\"%s\n", orient);
+    fprintf(f, "        <activity android:name=\".GameActivity\" android:label=\"$LABEL\"%s\n", orient);
     fputs("                  android:configChanges=\"keyboardHidden|orientation\">\n", f);
     fputs("            <intent-filter>\n                <action android:name=\"android.intent.action.MAIN\" />\n", f);
     fputs("                <category android:name=\"android.intent.category.LAUNCHER\" />\n", f);

@@ -1372,6 +1372,8 @@ void SimKeySDL(int sdlk, bool down) {
     else if (sdlk == SDLK_LSHIFT || sdlk == SDLK_RSHIFT) n = "shift";   // correr, agacharse...
     else if (sdlk == SDLK_LCTRL  || sdlk == SDLK_RCTRL)  n = "ctrl";
     else if (sdlk == SDLK_RETURN || sdlk == SDLK_KP_ENTER) n = "enter";
+    else if (sdlk == SDLK_ESCAPE)  n = "escape";   // (los mismos nombres que el juego compilado, W3dGameKey)
+    else if (sdlk == SDLK_AC_BACK) n = "back";
     else if (sdlk >= SDLK_0 && sdlk <= SDLK_9) { letter[0] = (char)('0' + (sdlk - SDLK_0)); n = letter; }
     if (n) W3dScriptKey(n, down);
 #endif

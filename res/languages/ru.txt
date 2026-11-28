@@ -8,6 +8,7 @@
 %d Push matrix without its Pop	«Сохранить матрицу» без «Восстановить матрицу»: %d
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Кривые анимации выделения (%d) больше ничего не анимируют (Отмена вернёт их)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	Кривые анимации (%d) остались без объекта (первая: '%s'): см. whisk3d.log
+%d copies of %d source(s)	%d копий из %d источник(ов)
 %d curves selected	Выбрано кривых: %d
 %d files are now external	Внешних файлов теперь: %d
 %d files are now inside the .w3d	Файлов внутри .w3d теперь: %d
@@ -47,6 +48,7 @@
 (not shared)	(не общий)
 (nothing to choose)	(нечего выбрать)
 (root)	(корень)
+(the first one)	(первая)
 (this routine)	(эта процедура)
 (unnamed)	(без имени)
 16-bit textures	16-битные текстуры
@@ -120,6 +122,7 @@ After Mode	Режим после
 Align	Выровнять
 Align X	Выровнять X
 Align Y	Выровнять Y
+Align to Normal	По нормали
 Aligned	Выровненная
 All	Все
 All Transforms	Все трансформации
@@ -523,7 +526,6 @@ Delete the orphan resource	Удалить неиспользуемый ресу�
 Delete the orphan resources	Удалить неиспользуемые ресурсы
 Deleted	Удалено
 Denoiser	Шумоподавление
-Shadowmask (real-time light)	Shadowmask (свет в реальном времени)
 Density	Плотность
 Depth	Глубина
 Depth & clear	Глубина и очистка
@@ -540,6 +542,7 @@ Depth test	Тест глубины
 Depth write	Запись глубины
 Deselect	Снять выделение
 Deselect All	Снять всё выделение
+Desktop	Рабочий стол
 Detect bodies	Обнаруживать тела
 Device	Устройство
 Device name	Имя устройства
@@ -558,10 +561,12 @@ Distance	Расстояние
 Distance X	Расстояние X
 Distances	Расстояния
 Distribution	Распределение
+Documents	Документы
 Don't allow	Не разрешать
 Done	Готово
 Done by CPU on this graphics backend (slow)	На этом графическом бэкенде делается на CPU (медленно)
 Dope Sheet	Лист экспозиции
+Downloads	Загрузки
 Drag (speed kept per second)	Сопротивление (остаток скорости в секунду)
 Drag the points, click to add	Перетаскивайте точки, клик — добавить
 Draw	Рисовать
@@ -610,6 +615,7 @@ Ellipse	Эллипс
 Emission	Излучение
 Emission Map	Карта излучения
 Emission Strength	Сила излучения
+Emit From	Излучать из
 Empty	Пустышка
 Empty routine	Пустая процедура
 Enable	Включить
@@ -628,6 +634,7 @@ Error: could not save the OBJ	Ошибка: не удалось сохранит
 Error: could not save the STL	Ошибка: не удалось сохранить STL
 Error: could not save the render	Ошибка: не удалось сохранить рендер
 Errors only	Только ошибки
+Esc closes the game	Esc закрывает игру
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Это изменит группу вершин и упростит её до 1 кости на вершину (скиннинг быстрее). Возможна потеря данных.
 Exclude X (plane)	Исключить X (плоскость)
 Exclude Y (plane)	Исключить Y (плоскость)
@@ -648,6 +655,7 @@ Exporting glTF...	Экспорт glTF...
 Exporting model...	Экспорт модели...
 External	Внешний
 External (choose where)...	Внешний (выбрать где)...
+External .w3d	Внешний .w3d
 External display	Внешний экран
 Extract	Извлечь
 Extract assets	Извлечь ассеты
@@ -671,6 +679,7 @@ FOV	FOV
 FPS	FPS
 Face	Грань
 Face Center	Центр грани
+Face Centers	Центры граней
 Face Nearest	Ближайшая грань
 Face Normal	Нормаль грани
 Face Project	Проекция на грань
@@ -678,6 +687,7 @@ Face Strength	Сила грани
 Face culling	Отсечение граней
 Face the camera	Смотреть на камеру
 Faces	Грани
+Faces (anywhere)	Грани (в любом месте)
 Faces triangulated	Грани триангулированы
 Factor	Коэффициент
 Factor X	Коэффициент X
@@ -694,6 +704,7 @@ File	Файл
 File name	Имя файла
 File size	Размер файла
 Fill	Заливка
+Fill the screen in the game	Заполнять экран в игре
 Film grain	Зерно плёнки
 Filter	Фильтр
 Filter Width	Ширина фильтра
@@ -801,6 +812,8 @@ Handles: Vector	Рукоятки: вектор
 Harden Normals	Упрочнить нормали
 Height	Высота
 Hide / Show	Скрыть / Показать
+Hide Selected	Скрыть выделенное
+Hide Unselected	Скрыть невыделенное
 Hide/Show	Скрыть/Показать
 Hierarchy Clip	Клип иерархии
 Hierarchy Clips	Клипы иерархии
@@ -860,6 +873,7 @@ Inside	Внутрь
 Inside the .w3d	Внутри .w3d
 Installing on the phone	Установка на телефон
 Instance	Экземпляр
+Instances	Экземпляры
 Intensity	Интенсивность
 Interpolate	Интерполировать
 Interpolate (mix)	Интерполировать (смешать)
@@ -916,6 +930,11 @@ Keyboard Shortcuts	Сочетания клавиш
 Keyboard Shortcuts...	Сочетания клавиш...
 Keyframe	Ключевой кадр
 Keyframes	Ключевые кадры
+Knife	Нож
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Нож (насквозь): клик = точка, Enter = разрезать, Esc = отмена, Backspace = убрать точку, Z = только видимое
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Нож: клик = точка, Enter = разрезать, Esc = отмена, Backspace = убрать точку, Z = резать насквозь
+Knife: enter Edit Mode first	Нож: сначала войдите в Режим редактирования
+Knife: the cut does not cross any face	Нож: разрез не пересекает ни одной грани
 LOD	LOD
 Lacunarity	Лакунарность
 Landscape only	Только альбомная
@@ -1060,6 +1079,8 @@ Merge Distance	Расстояние слияния
 Merge at Center	Слить в центре
 Merge at Cursor	Слить у курсора
 Merge by Distance	Слить по расстоянию
+Merge by Distance: %d vertices merged	Объединить по расстоянию: объединено вершин: %d
+Merged	Слитно
 Mesh	Меш
 Mesh Parts	Части меша
 Mesh as text	Меш текстом
@@ -1113,6 +1134,7 @@ Multiply	Умножение
 Multiply (darkens)	Умножение (затемняет)
 Multiply (lightmap)	Умножение (лайтмап)
 Multiply 2x	Умножение 2x
+Music	Музыка
 NRD (real time)	NRD (реальное время)
 Name	Имя
 Near	Ближняя
@@ -1127,6 +1149,8 @@ New Color Layer	Новый слой цвета
 New Copy	Новая копия
 New Edge/Face from Vertices	Новое ребро/грань из вершин
 New Face from Vertices	Новая грань из вершин
+New File	Новый файл
+New File...	Новый файл...
 New Flipbook	Новый флипбук
 New Folder	Новая папка
 New Game	Новая игра
@@ -1345,6 +1369,7 @@ Phase	Фаза
 Physics	Физика
 Pick Shortest Path	Кратчайший путь
 Pick Shortest Path: click the first	Кратчайший путь — первый щелчок:
+Pictures	Изображения
 Pitch	Высота тона
 Pivot	Опорная точка
 Pixels	Пиксели
@@ -1429,6 +1454,9 @@ Radius 1	Радиус 1
 Radius 2	Радиус 2
 Rail (nodes)	Рельс (узлы)
 Random	Случайный
+Random Rotation	Случайный поворот
+Random Scale	Случайный масштаб
+Random Tilt	Случайный наклон
 Random angle (0-360)	Случайный угол (0-360)
 Random spin direction	Случайное направление вращения
 Random velocity	Случайная скорость
@@ -1441,8 +1469,10 @@ Real-time shadows	Тени в реальном времени
 Realtime	В реальном времени
 Recalculate	Пересчитать
 Recalculate Normals	Пересчитать нормали
+Recalculate Vertex Normals	Пересчитать нормали вершин
 Recalculated by the editor (the game uses the last one)	Пересчитывается редактором (игра использует последнее)
 Receive shadows	Принимать тени
+Recent	Недавние
 Recent files	Недавние файлы
 Rectangle	Прямоугольник
 Red	Красный
@@ -1481,6 +1511,7 @@ Render mode	Режим рендера
 Render saved!	Рендер сохранён!
 Render start	Начало рендера
 Render to...	Рендер в...
+Render with the first	Рендер с первым
 Renderable	Рендерить
 Rendered	Рендер
 Rendering animation...	Рендер анимации...
@@ -1508,6 +1539,7 @@ Resource	Ресурс
 Restart Whisk3D for this change to take effect	Перезапустите Whisk3D, чтобы изменение вступило в силу
 Restrict Frame Range	Ограничить диапазон кадров
 Retarget	Ретаргетинг
+Reveal Hidden	Показать скрытое
 Reverb	Реверб
 Right	Справа
 Right Handle X	Прав. рукоятка X
@@ -1585,6 +1617,10 @@ Scale Y	Масштаб Y
 Scale Z	Масштаб Z
 Scale: %.2fx  (pivot %s)%s	Масштаб: %.2fx  (опора %s)%s
 Scaled	Масштабировано
+Scatter	Разброс
+Scatter: %d copies are now objects	Разброс: %d копий теперь объекты
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Разброс: копии из внешнего .w3d не могут стать объектами (примените как Слитно)
+Scatter: there are no copies to apply	Разброс: нет копий для применения
 Scene	Сцена
 Scene Animation	Анимация сцены
 Scene Instance	Экземпляр сцены
@@ -1603,6 +1639,7 @@ Scripts that name the texture	Скрипты, упоминающие текст�
 Scroll	Прокрутка
 Scroll X	Прокрутка X
 Scroll Y	Прокрутка Y
+Seed	Сид
 Segments	Сегменты
 Select	Выделить
 Select All	Выделить всё
@@ -1653,6 +1690,7 @@ Shading	Затенение
 Shadow catcher	Ловец теней
 Shadow color	Цвет тени
 Shadow strength	Интенсивность
+Shadowmask (real-time light)	Shadowmask (свет в реальном времени)
 Shape	Форма
 Shape keys	Ключи формы
 Sharp	Резкий
@@ -1663,12 +1701,14 @@ Shortest Path (Fill Region)	Кратчайший путь (заливка обл
 Shortest path selected	Кратчайший путь выделен
 Shortest path: region filled	Кратчайший путь: область заполнена
 Show Chrome UV	Показать Chrome UV
+Show Emitter	Показать излучатель
 Show Handles	Показать рукоятки
 Show Overlays	Показать наложения
 Show Panel	Показать панель
 Show active	Показать активный
 Show in Edit Mode	Показ в Режиме редактирования
 Show selection	Показать выделение
+Show/Hide	Показать/Скрыть
 Shrink/Fatten	Сжать/раздуть
 Shrink/Fatten / Clear Scale	Сжать/раздуть / Сбросить масштаб
 Shutter	Затвор
@@ -2214,41 +2254,3 @@ with mipmaps	с mipmap
 with transparency	с прозрачностью
 without mipmaps	без mipmap
 you want to select (Esc to cancel)	для выделения (Esc — отмена)
-Desktop	Рабочий стол
-Documents	Документы
-Downloads	Загрузки
-Pictures	Изображения
-Music	Музыка
-Render with the first	Рендер с первым
-Scatter	Разброс
-External .w3d	Внешний .w3d
-Emit From	Излучать из
-Seed	Сид
-Random Scale	Случайный масштаб
-Align to Normal	По нормали
-Random Rotation	Случайный поворот
-Random Tilt	Случайный наклон
-Merged	Слитно
-Instances	Экземпляры
-Show Emitter	Показать излучатель
-%d copies of %d source(s)	%d копий из %d источник(ов)
-Face Centers	Центры граней
-Faces (anywhere)	Грани (в любом месте)
-(the first one)	(первая)
-Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Разброс: копии из внешнего .w3d не могут стать объектами (примените как Слитно)
-Scatter: there are no copies to apply	Разброс: нет копий для применения
-Scatter: %d copies are now objects	Разброс: %d копий теперь объекты
-Show/Hide	Показать/Скрыть
-Reveal Hidden	Показать скрытое
-Hide Selected	Скрыть выделенное
-Hide Unselected	Скрыть невыделенное
-Recalculate Vertex Normals	Пересчитать нормали вершин
-New File...	Новый файл...
-New File	Новый файл
-Recent	Недавние
-Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Нож: клик = точка, Enter = разрезать, Esc = отмена, Backspace = убрать точку, Z = резать насквозь
-Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Нож (насквозь): клик = точка, Enter = разрезать, Esc = отмена, Backspace = убрать точку, Z = только видимое
-Knife: enter Edit Mode first	Нож: сначала войдите в Режим редактирования
-Knife: the cut does not cross any face	Нож: разрез не пересекает ни одной грани
-Knife	Нож
-Merge by Distance: %d vertices merged	Объединить по расстоянию: объединено вершин: %d

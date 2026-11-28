@@ -8,6 +8,7 @@
 %d Push matrix without its Pop	%d Apilar matriz sin su Desapilar matriz
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d curva(s) de animación de la selección ya no animan nada (Deshacer las devuelve)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d curva(s) de animación quedaron sin objeto (la primera: '%s'): ver whisk3d.log
+%d copies of %d source(s)	%d copias de %d fuente(s)
 %d curves selected	%d curvas seleccionadas
 %d files are now external	%d archivos ahora son externos
 %d files are now inside the .w3d	%d archivos ahora están dentro del .w3d
@@ -47,6 +48,7 @@
 (not shared)	(sin compartir)
 (nothing to choose)	(no hay nada para elegir)
 (root)	(raíz)
+(the first one)	(la primera)
 (this routine)	(esta rutina)
 (unnamed)	(sin nombre)
 16-bit textures	Texturas de 16 bits
@@ -82,6 +84,7 @@ A texture with that name already exists	Ya hay una textura con ese nombre
 APK (aapt, signing)	APK (aapt, firma)
 Above: once at start. Below: every frame.	Arriba: una vez al empezar. Abajo: cada cuadro.
 Absolute	Absoluto
+Absolute Pivot	Pivote absoluto
 Acceleration	Aceleración
 Accept	Aceptar
 Actions	Acciones
@@ -118,9 +121,11 @@ Affect Rotate	Afectar Rotar
 Affect Scale	Afectar Escalar
 Affected	Afectadas
 After Mode	Modo después
+After Original	Después del original
 Align	Alinear
 Align X	Alinear X
 Align Y	Alinear Y
+Align to Normal	Alinear a la normal
 Aligned	Alineada
 All	Todo
 All Transforms	Todas las Transformaciones
@@ -222,14 +227,18 @@ Background light	Luz del fondo
 Bake	Hornear
 Bake Lighting	Precalcular iluminación
 Bake canceled	Precálculo cancelado
+Bake needs an active animation clip	Para hornear hace falta un clip de animación activo
 Bake the reflection probe first	Primero horneá la sonda de reflejo
+Bake to Keyframes	Hornear a keyframes
 Baked	Horneada
+Baked %d bone(s) into the clip	%d hueso(s) horneado(s) en el clip
 Baked: %d points	Horneada: %d puntos
 Bakes the light of the static objects into the texture, through the UV of the mesh	Precalcula la luz de los objetos estáticos en la textura, por la UV de la malla
 Baking here overwrites where their UVs overlap	Hornear acá pisa donde se cruzan sus UV
 Base Color	Color Base
 Base velocity	Velocidad base
 Before Mode	Modo antes
+Before Original	Antes del original
 Bevel	Bisel
 Bevel Depth	Grosor del tubo
 Bevel Edges	Biselar aristas
@@ -257,6 +266,7 @@ Bloom	Bloom
 Blue	Azul
 Blur	Desenfoque
 Bone	Hueso
+Bone Constraints	Constraints del hueso
 Bones	Huesos
 Boolean	Booleano
 Boolean Object	Objeto del booleano
@@ -334,6 +344,7 @@ Center X	Centro X
 Center Y	Centro Y
 Center Z	Centro Z
 Center of frame	Centro del cuadro
+Chain Length	Largo de la cadena
 Change Material	Cambiar material
 Changes will be lost in:	Se perderán los cambios en:
 Channels	Canales
@@ -349,6 +360,7 @@ Circle	Círculo
 Circular	Circular
 Clamp	Recortar
 Clamp Overlap	Limitar superposición
+Clamp Region	Región
 Clear	Limpiar
 Clear Depth	Limpiar Z
 Clear Inverse	Limpiar Inversa
@@ -489,6 +501,7 @@ Cut	Cortar
 Cut the sound at the current frame (trim)	Cortar el sonido en el frame actual (trim)
 Cutoff	Corte
 Cycles	Ciclos
+Cyclic	Cíclico
 Cylinder	Cilindro
 Cylinder Projection	Proyección de Cilindro
 Debug mode	Modo debug
@@ -528,7 +541,6 @@ Delete the orphan resource	¿Borrar el recurso huérfano
 Delete the orphan resources	¿Borrar los recursos huérfanos
 Deleted	Borrado
 Denoiser	Denoiser
-Shadowmask (real-time light)	Shadowmask (luz en tiempo real)
 Density	Densidad
 Depth	Profundidad
 Depth & clear	Profundidad y limpieza
@@ -545,6 +557,7 @@ Depth test	Test de profundidad
 Depth write	Escribir profundidad
 Deselect	Deseleccionar
 Deselect All	Deseleccionar todo
+Desktop	Escritorio
 Detect bodies	Detectar cuerpos
 Device	Dispositivo
 Device name	Nombre del dispositivo
@@ -563,10 +576,12 @@ Distance	Distancia
 Distance X	Distancia X
 Distances	Distancias
 Distribution	Distribución
+Documents	Documentos
 Don't allow	No permitir
 Done	Listo
 Done by CPU on this graphics backend (slow)	Con este backend gráfico se hace por CPU (lento)
 Dope Sheet	Hoja de claves
+Downloads	Descargas
 Drag (speed kept per second)	Arrastre (velocidad que queda por segundo)
 Drag the points, click to add	Arrastrá los puntos, click para agregar
 Draw	Dibujar
@@ -615,6 +630,7 @@ Ellipse	Elipse
 Emission	Emisión
 Emission Map	Mapa de emisión
 Emission Strength	Fuerza de emisión
+Emit From	Desde
 Empty	Vacío
 Empty routine	Rutina vacía
 Enable	Activar
@@ -633,6 +649,7 @@ Error: could not save the OBJ	Error: no se pudo guardar el OBJ
 Error: could not save the STL	Error: no se pudo guardar el STL
 Error: could not save the render	Error: no se pudo guardar el render
 Errors only	Solo errores
+Esc closes the game	Esc cierra el juego
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Esto modificará el grupo de vértices y lo simplificará a 1 hueso por vértice (skinning más rápido). Puede haber pérdida de datos.
 Exclude X (plane)	Excluir X (plano)
 Exclude Y (plane)	Excluir Y (plano)
@@ -653,6 +670,7 @@ Exporting glTF...	Exportando glTF...
 Exporting model...	Exportando modelo...
 External	Externo
 External (choose where)...	Externo (elegir dónde)...
+External .w3d	.w3d externo
 External display	Pantalla externa
 Extract	Extraer
 Extract assets	Extraer assets
@@ -664,6 +682,7 @@ Extract: save the project first (the assets live inside the .w3d)	Extraer: prime
 Extracted	Extraído
 Extracted %d file(s). They are COPIES: for a change to go back into the project you have to import it again	Extraídos %d archivo(s). Son COPIAS: para que un cambio vuelva al proyecto hay que importarlo de nuevo
 Extracted %d file(s); %d failed (see the log)	Extraídos %d archivo(s); %d fallaron (ver el log)
+Extrapolate	Extrapolar
 Extrude	Extruir
 Extrude Bone	Extruir hueso
 Extrude Edges	Extruir Aristas
@@ -676,6 +695,7 @@ FOV	FOV
 FPS	FPS
 Face	Cara
 Face Center	Centro de cara
+Face Centers	Centros de caras
 Face Nearest	Cara más cercana
 Face Normal	Normal de Cara
 Face Project	Proyectar en cara
@@ -683,6 +703,7 @@ Face Strength	Fuerza de cara
 Face culling	Descarte de caras
 Face the camera	Mirar a la cámara
 Faces	Caras
+Faces (anywhere)	Caras (cualquier punto)
 Faces triangulated	Caras trianguladas
 Factor	Factor
 Factor X	Factor X
@@ -700,6 +721,7 @@ File name	Nombre de archivo
 File size	Tamaño del archivo
 Fill	Fondo
 Fill Caps	Tapas
+Fill the screen in the game	Llenar la pantalla en el juego
 Film grain	Grano de cámara
 Filter	Filtro
 Filter Width	Ancho del filtro
@@ -711,6 +733,7 @@ Find...	Buscar...
 Finish the current transform first	Termina primero la transformación en curso
 First triangle	Primer triángulo
 Fit	Ajuste
+Fixed Position	Posición fija
 Flags	Banderas
 Flags (memory)	Banderas (memoria)
 Flat	Plano
@@ -722,6 +745,7 @@ Flipbook frames	Cuadros del flipbook
 Flipbooks	Flipbooks
 Float	Decimal
 Floor	Piso
+Floor Axis	Eje del piso
 Focus distance	Distancia de foco
 Focus object	Objeto de foco
 Fog	Niebla
@@ -737,9 +761,11 @@ Follow Active Quads	Seguir Quads Activos
 Follow Active Quads: no neighbouring quads	Seguir Quads Activos: no hay quads vecinos
 Follow Active Quads: select faces first	Seguir Quads Activos: selecciona caras primero
 Follow Active Quads: the active face must be a selected quad	Seguir Quads Activos: la cara activa tiene que ser un quad seleccionado
+Follow Curve	Seguir la curva
 Font	Fuente
 Fonts	Fuentes
 Format	Formato
+Forward Axis	Eje de avance
 Fraction	Fracción
 Frame	Frame
 Frame %d of %d	Cuadro %d de %d
@@ -749,8 +775,15 @@ Frame X	Frame X
 Frame rate (0 = whole life)	Cuadros por segundo (0 = toda la vida)
 Frames	Cuadros
 Free	Libre
+Free Axis	Eje libre
 Freely	Libremente
 Friction	Fricción
+From Max X	Desde máx X
+From Max Y	Desde máx Y
+From Max Z	Desde máx Z
+From Min X	Desde mín X
+From Min Y	Desde mín Y
+From Min Z	Desde mín Z
 Front	Frontal
 Front View	Vista frontal
 Front to back	Adelante a atras
@@ -805,8 +838,11 @@ Handles: Flat	Manijas: planas
 Handles: Free	Manijas: libres
 Handles: Vector	Manijas: vector
 Harden Normals	Endurecer normales
+Head/Tail	Cabeza/Punta
 Height	Alto
 Hide / Show	Ocultar / Mostrar
+Hide Selected	Ocultar lo seleccionado
+Hide Unselected	Ocultar lo no seleccionado
 Hide/Show	Ocultar/Mostrar
 Hierarchy Clip	Clip de jerarquía
 Hierarchy Clips	Clips de jerarquía
@@ -866,6 +902,7 @@ Inside	Interior
 Inside the .w3d	Dentro del .w3d
 Installing on the phone	Instalando en el teléfono
 Instance	Instancia
+Instances	Instancias
 Intensity	Intensidad
 Interpolate	Interpolar
 Interpolate (mix)	Interpolar (mezcla)
@@ -880,6 +917,9 @@ Invalid size	Tamaño inválido
 Inverse Square	Cuadrado inverso
 Invert	Invertir
 Invert Selection	Invertir selección
+Invert X	Invertir X
+Invert Y	Invertir Y
+Invert Z	Invertir Z
 It already has physics	Ya tiene física
 It belongs to a library (read-only): open the library to edit it	Es de una librería (solo lectura): abrí la librería para editarlo
 It belongs to a prefab instance: edit the prefab or unpack the instance	Es de una instancia de prefab: editá el prefab o desempaquetá la instancia
@@ -904,6 +944,7 @@ It is the open project	Es el proyecto abierto
 It isn't a .w3d project	No es un proyecto .w3d
 It isn't linked	No está vinculada
 It isn't saved in the project yet	Todavía no está guardado en el proyecto
+Iterations	Iteraciones
 Its file couldn't be read	No se pudo leer su archivo
 Its geometry couldn't be read	No se pudo leer su geometría
 Its objects couldn't be deleted	No se pudieron borrar sus objetos
@@ -916,12 +957,18 @@ Join: select 2+ mesh objects (active is the target)	Unir: selecciona 2+ mallas (
 Joined into	Unido en
 Jump to End	Ir al final
 Jump to Start	Ir al inicio
+Keep Axis	Eje que se conserva
 Keep Offset	Mantener Offset
 Key	Key
 Keyboard Shortcuts	Atajos de teclado
 Keyboard Shortcuts...	Atajos de teclado...
 Keyframe	Keyframe
 Keyframes	Keyframes
+Knife	Cuchillo
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Cuchillo (a través): click = punto, Enter = cortar, Esc = cancelar, Retroceso = sacar el punto, Z = solo lo que se ve
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Cuchillo: click = punto, Enter = cortar, Esc = cancelar, Retroceso = sacar el punto, Z = cortar a través
+Knife: enter Edit Mode first	Cuchillo: entra primero en Modo Edición
+Knife: the cut does not cross any face	Cuchillo: el corte no cruza ninguna cara
 LOD	LOD
 Lacunarity	Lacunaridad
 Landscape only	Solo horizontal
@@ -998,6 +1045,7 @@ Local View	Vista local
 Location	Posición
 Location Only	Solo Localización
 Location X	Posición X
+Lock Axis	Eje bloqueado
 Lock Normals	Bloquear normales
 Lock Orbit	Bloquear Órbita
 Lock the camera to the view	Mover la cámara con la vista
@@ -1027,11 +1075,15 @@ Loop Slide	Deslizar por el loop
 Loop forever	Repetir siempre
 Loose (editable)	Sueltos (editables)
 MKV and MP4 need ffmpeg installed	MKV y MP4 necesitan ffmpeg instalado
+Main Axis	Eje principal
+Maintain Volume	Mantener volumen
 Make External...	Hacer Externa...
 Make Internal	Hacer Interna
 Make Segment	Unir puntas
 Make Single User	Hacer única
 Manual range	Rango manual
+Map From	Desde
+Map To	Hacia
 Margin	Margen
 Margin bottom	Marg abajo
 Margin left	Marg izq
@@ -1055,8 +1107,14 @@ Materials	Materiales
 Materials are animated in a scene animation: choose one in the timeline	Los materiales se animan en una animación de escena: elige una en la línea de tiempo
 Max (last triangle of the mesh)	Máximo (el último triángulo de la malla)
 Max (last triangle of the part)	Máximo (el último triángulo de la parte)
+Max X	Máx X
+Max Y	Máx Y
+Max Z	Máx Z
 Max distance	Distancia máxima
 Maximize	Maximizar
+Maximum X	Máximo X
+Maximum Y	Máximo Y
+Maximum Z	Máximo Z
 Median	Mediana
 Median Point	Punto medio
 Memory	Memoria
@@ -1067,6 +1125,8 @@ Merge Distance	Distancia de Fusión
 Merge at Center	Fusionar en el centro
 Merge at Cursor	Fusionar en el cursor
 Merge by Distance	Fusionar por distancia
+Merge by Distance: %d vertices merged	Fusionar por distancia: se fusionaron %d vértices
+Merged	Unida
 Mesh	Malla
 Mesh Parts	Partes de Malla
 Mesh as text	Malla en texto
@@ -1080,8 +1140,14 @@ Metallic	Metálico
 Metallic Map	Mapa metálico
 Meters	Metros
 Method	Método
+Min X	Mín X
+Min Y	Mín Y
+Min Z	Mín Z
 Minimize	Minimizar
 Minimum	Mínimo
+Minimum X	Mínimo X
+Minimum Y	Mínimo Y
+Minimum Z	Mínimo Z
 Mipmap	Mipmap
 Mipmaps	Mipmaps
 Mirror	Espejo
@@ -1120,6 +1186,7 @@ Multiply	Multiplicar
 Multiply (darkens)	Multiplicar (oscurece)
 Multiply (lightmap)	Multiplicar (lightmap)
 Multiply 2x	Multiplicar 2x
+Music	Música
 NRD (real time)	NRD (tiempo real)
 Name	Nombre
 Near	Cerca
@@ -1134,6 +1201,8 @@ New Color Layer	Nueva capa de color
 New Copy	Nueva copia
 New Edge/Face from Vertices	Nueva Arista/Cara desde Vértices
 New Face from Vertices	Nueva cara desde vértices
+New File	Nuevo archivo
+New File...	Nuevo archivo...
 New Flipbook	Nuevo flipbook
 New Folder	Carpeta nueva
 New Game	Nuevo juego
@@ -1182,6 +1251,7 @@ No UVs to export	No hay UV para exportar
 No active 3D viewport	No hay vista 3D activa
 No active object	No hay objeto activo
 No axes: this constraint does nothing.	Sin ejes: esta restricción no hace nada.
+No bone constraints to bake	No hay constraints de hueso para hornear
 No file	Sin archivo
 No library	Sin librería
 No mipmaps (off or NPOT texture)	Sin mipmaps (apagados o textura NPOT)
@@ -1257,8 +1327,10 @@ Off	Apagado
 Off (no test, no write)	Apagado (sin test ni escritura)
 Offset	Desplazamiento
 Offset Even	Desplazamiento parejo
+Offset Factor	Factor de offset
 Offset Relative	Desplazamiento relativo
 On	Activo
+On Surface	Sobre la superficie
 Only active camera	Solo cámara activa
 Only external display (faster)	Solo pantalla externa (más rápido)
 Only in Object Mode	Solo en Object Mode
@@ -1296,6 +1368,7 @@ Orphans purged	Huérfanos purgados
 Orthographic	Ortográfica
 Outliner	Outliner
 Outset	Hacia afuera
+Outside	Afuera
 Overflow X	Desborde X
 Overflow Y	Desborde Y
 Overlays	Superposiciones
@@ -1303,6 +1376,7 @@ Overrides	Overrides
 Overwrite	Sobrescribir
 Overwrite file?	¿Sobrescribir archivo?
 Own	Propio
+Owner Space	Espacio del dueño
 PVS recalculated	PVS recalculado
 PVS: <model>.pvs.json is missing next to the source .obj	PVS: falta <modelo>.pvs.json junto al .obj de origen
 Pack into the .w3d	Meter en el .w3d
@@ -1352,10 +1426,17 @@ Phase	Fase
 Physics	Física
 Pick Shortest Path	Camino Más Corto
 Pick Shortest Path: click the first	Camino más corto: clic inicial en
+Pictures	Imágenes
 Pitch	Tono
 Pivot	Pivote
+Pivot When	Pivotear cuando
+Pivot X	Pivote X
+Pivot Y	Pivote Y
+Pivot Z	Pivote Z
 Pixels	Píxeles
 Plane	Plano
+Plane X	Plano X
+Plane Z	Plano Z
 Platform	Plataforma
 Play	Reproducir
 Play / Pause	Reproducir / Pausa
@@ -1369,6 +1450,9 @@ Points	Puntos
 Points X	Puntos X
 Points Y	Puntos Y
 Points Z	Puntos Z
+Pole Angle	Ángulo del pole
+Pole Bone	Hueso del pole
+Pole Target	Pole target
 Poly	Poligonal
 Polygon (simulated)	Polígono (simulado)
 Pop matrix	Desapilar matriz
@@ -1381,6 +1465,7 @@ Pose Mode	Modo Pose
 Position	Posición
 Positional (3D)	Posicional (3D)
 Post Processing	Postprocesado
+Power	Potencia
 Prefab	Prefab
 Prefab "%s": %d object(s) are outside its root object and its instances don't show them	Prefab "%s": %d objeto(s) quedaron fuera de su objeto raíz y sus instancias no los muestran
 Prefab Instance	Instancia de prefab
@@ -1439,6 +1524,9 @@ Radius 1	Radio 1
 Radius 2	Radio 2
 Rail (nodes)	Riel (nodos)
 Random	Aleatorio
+Random Rotation	Giro al azar
+Random Scale	Escala al azar
+Random Tilt	Inclinación al azar
 Random angle (0-360)	Ángulo al azar (0-360)
 Random spin direction	Sentido de giro al azar
 Random velocity	Velocidad al azar
@@ -1451,8 +1539,10 @@ Real-time shadows	Sombras en tiempo real
 Realtime	Tiempo real
 Recalculate	Recalcular
 Recalculate Normals	Recalcular Normales
+Recalculate Vertex Normals	Recalcular normales de vértices
 Recalculated by the editor (the game uses the last one)	La recalcula el editor (el juego usa la última)
 Receive shadows	Recibir sombras
+Recent	Recientes
 Recent files	Archivos recientes
 Rectangle	Rectángulo
 Red	Rojo
@@ -1472,6 +1562,7 @@ Reload the project to generate mipmaps	Recargá el proyecto para generar los mip
 Reload the project to upload the textures again	Recargá el proyecto para volver a subir las texturas
 Remaining: ~	Falta: ~
 Remove	Quitar
+Remove Constraints After Bake	Quitar los constraints al hornear
 Remove Repeat	Quitar repetición
 Remove physics	Quitar física
 Remove script	Quitar script
@@ -1491,6 +1582,7 @@ Render mode	Modo de render
 Render saved!	¡Render guardado!
 Render start	Inicio del render
 Render to...	Renderizar en...
+Render with the first	Render con el primero
 Renderable	Renderizar
 Rendered	Render
 Rendering animation...	Renderizando animación...
@@ -1515,9 +1607,11 @@ Reset all	Restablecer todo
 Reset: select faces first	Restablecer: selecciona caras primero
 Resolution	Resolución
 Resource	Recurso
+Rest Length	Largo de reposo
 Restart Whisk3D for this change to take effect	Debes reiniciar Whisk3D para que este valor surta efecto
 Restrict Frame Range	Restringir rango de cuadros
 Retarget	Retarget
+Reveal Hidden	Mostrar lo oculto
 Reverb	Reverb
 Right	Derecha
 Right Handle X	Manija Der. X
@@ -1595,6 +1689,10 @@ Scale Y	Escala Y
 Scale Z	Escala Z
 Scale: %.2fx  (pivot %s)%s	Escalar: %.2fx  (pivote %s)%s
 Scaled	Escalado
+Scatter	Dispersar
+Scatter: %d copies are now objects	Dispersar: %d copias ahora son objetos
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Dispersar: las copias de un .w3d externo no pueden ser objetos (aplicalo como Unida)
+Scatter: there are no copies to apply	Dispersar: no hay copias para aplicar
 Scene	Escena
 Scene Animation	Animación de Escena
 Scene Instance	Instancia de escena
@@ -1613,6 +1711,7 @@ Scripts that name the texture	Scripts que nombran la textura
 Scroll	Desplazamiento
 Scroll X	Desplazamiento X
 Scroll Y	Desplazamiento Y
+Seed	Semilla
 Segments	Segmentos
 Select	Seleccionar
 Select All	Seleccionar todo
@@ -1669,6 +1768,7 @@ Shading	Sombreado
 Shadow catcher	Captador de sombras
 Shadow color	Color de la sombra
 Shadow strength	Intensidad
+Shadowmask (real-time light)	Shadowmask (luz en tiempo real)
 Shape	Forma
 Shape keys	Shape keys
 Sharp	Agudo
@@ -1679,12 +1779,14 @@ Shortest Path (Fill Region)	Camino Más Corto (Rellenar Región)
 Shortest path selected	Camino más corto seleccionado
 Shortest path: region filled	Camino más corto: región rellenada
 Show Chrome UV	Mostrar Chrome UV
+Show Emitter	Mostrar emisor
 Show Handles	Mostrar manijas
 Show Overlays	Mostrar Superposiciones
 Show Panel	Mostrar panel
 Show active	Mostrar el activo
 Show in Edit Mode	Ver en modo edicion
 Show selection	Ver selección
+Show/Hide	Mostrar/Ocultar
 Shrink/Fatten	Encoger/Engrosar
 Shrink/Fatten / Clear Scale	Engordar / Limpiar escala
 Shutter	Obturador
@@ -1692,6 +1794,7 @@ Shutter position	Posición del obturador
 Sigma	Sigma
 Simple	Simple
 Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Simulado: OpenGL ES 1.1 no tiene quads ni polígonos. Se convierten a triángulos (más índices, más lento).
+Single Axis	Un solo eje
 Single line	Una línea
 Sinusoidal	Sinusoidal
 Size	Tamaño
@@ -1780,6 +1883,7 @@ Stretch (seconds of velocity)	Estiramiento (segundos de velocidad)
 Stretch U	Estirar U
 Stretch V	Estirar V
 Stretched	Estirada
+Strict	Estricto
 String	Texto
 Subdivide	Subdividir
 Subdivision Surface	Superficie de Subdivisión
@@ -1789,6 +1893,7 @@ Summary	Resumen
 Sun	Sol
 Superellipse	Superelipse
 Swap	Intercambiar
+Swing	Giro
 Switch Direction	Invertir dirección
 Switch to 0-100%	Cambiar a 0-100%
 Switch to 0-255	Cambiar a 0-255
@@ -1797,6 +1902,8 @@ Symbian project ready: %s (build it on Windows with build_symbian.bat)	Proyecto 
 Sync Selection	Sincronizar Selección
 Tag	Etiqueta
 Target	Objetivo
+Target Space	Espacio del target
+Target Up	Arriba del target
 Test	Test
 Test + Write (opaque)	Test + escritura (opaco)
 Test, no Write (decal)	Test, sin escritura (calcomanía)
@@ -1896,6 +2003,7 @@ This resource can't be dropped in the 3D view	Este recurso no se puede soltar en
 This resource can't be renamed	Este recurso no se puede renombrar
 This resource type can't be deleted	Este tipo de recurso no se puede borrar
 This resource type can't be duplicated	Este tipo de recurso no se puede duplicar
+This rig can not be baked (no rest pose, or a rebuilt biped)	Este rig no se puede hornear (sin pose de reposo, o un biped reconstruido)
 This script doesn't define	Este script no define
 This step has nothing to animate	Este paso no tiene nada para animar
 This texture already has the baked light of	Esta textura ya tiene la luz horneada de
@@ -1904,6 +2012,12 @@ Threshold	Umbral
 Timeline	Línea de Tiempo
 Times	Tiempos
 Timing	Tiempo
+To Max X	Hacia máx X
+To Max Y	Hacia máx Y
+To Max Z	Hacia máx Z
+To Min X	Hacia mín X
+To Min Y	Hacia mín Y
+To Min Z	Hacia mín Z
 Toggle Cyclic	Abrir / cerrar
 Toggle Cyclic (curve)	Abrir / cerrar (curva)
 Toggle Free/Aligned	Alternar libre/alineada
@@ -1912,6 +2026,7 @@ Top	Superior
 Top View	Vista superior
 Top-Left	Arriba-Izquierda
 Top-Right	Arriba-Derecha
+Track Axis	Eje que apunta
 Tracks	Pistas
 Trail points	Puntos de estela
 Trail step	Paso de estela
@@ -1973,6 +2088,7 @@ Unwrap Conformal	Desplegar Conforme
 Unwrap Minimum Stretch	Desplegar Mínimo Estiramiento
 Unwrap: closed surface, mark seams first	Desplegar: superficie cerrada, marca costuras primero
 Unwrap: select faces first	Desplegar: selecciona caras primero
+Up Axis	Eje arriba
 Update every	Actualizar cada
 Upright (does not tilt)	Vertical (no se inclina)
 Upscaler	Reescalador
@@ -1980,7 +2096,9 @@ Upscaling	Reescalado
 Use	Usa
 Use End Frame	Usar cuadro final
 Use Influence	Usar influencia
+Use Rotation	Usar la rotación
 Use Start Frame	Usar cuadro inicial
+Use Tail	Usar la punta
 Use camera focus	Usar el foco de la cámara
 Use current folder	Usar carpeta actual
 Use custom color	Usar color personalizado
@@ -2029,6 +2147,7 @@ Visibility test	Test de visibilidad
 Visible	Visible
 Visible in probes	Se ve en las sondas
 Volume	Volumen
+Volume Variation	Variación de volumen
 Volume line	Línea de volumen
 Wait for the build to finish	Esperá a que termine la compilación
 Warning	Aviso
@@ -2049,10 +2168,12 @@ With alpha (RGBA)	Con alfa (RGBA)
 With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	Con influencia entre 0 y 100 el billboard puede girar 180 grados al cruzar la cámara. Con 100% no pasa.
 With its materials	Con sus materiales
 With sound	Con sonido
+World	Mundo
 Wrap	Repetición
 Write to	Escribir en
 X Axis	Eje X
 X Euler Rotation	X Rotación Euler
+X From	X desde
 X Location	X Posición
 X Scale	X Escala
 X axis	Eje X
@@ -2060,11 +2181,13 @@ X-Ray	Rayos X
 XYZ Euler	Euler XYZ
 Y Axis	Eje Y
 Y Euler Rotation	Y Rotación Euler
+Y From	Y desde
 Y Location	Y Posición
 Y Scale	Y Escala
 Y axis	Eje Y
 Yes	Sí
 Z Euler Rotation	Z Rotación Euler
+Z From	Z desde
 Z Location	Z Posición
 Z Scale	Z Escala
 Z axis	Eje Z
@@ -2237,124 +2360,3 @@ with mipmaps	con mipmaps
 with transparency	con transparencias
 without mipmaps	sin mipmaps
 you want to select (Esc to cancel)	a seleccionar (Esc para cancelar)
-Desktop	Escritorio
-Documents	Documentos
-Downloads	Descargas
-Pictures	Imágenes
-Music	Música
-Absolute Pivot	Pivote absoluto
-After Original	Después del original
-Bake needs an active animation clip	Para hornear hace falta un clip de animación activo
-Bake to Keyframes	Hornear a keyframes
-Baked %d bone(s) into the clip	%d hueso(s) horneado(s) en el clip
-Before Original	Antes del original
-Bone Constraints	Constraints del hueso
-Chain Length	Largo de la cadena
-Clamp Region	Región
-Cyclic	Cíclico
-Extrapolate	Extrapolar
-Fixed Position	Posición fija
-Floor Axis	Eje del piso
-Follow Curve	Seguir la curva
-Forward Axis	Eje de avance
-Free Axis	Eje libre
-From Max X	Desde máx X
-From Max Y	Desde máx Y
-From Max Z	Desde máx Z
-From Min X	Desde mín X
-From Min Y	Desde mín Y
-From Min Z	Desde mín Z
-Head/Tail	Cabeza/Punta
-Invert X	Invertir X
-Invert Y	Invertir Y
-Invert Z	Invertir Z
-Iterations	Iteraciones
-Keep Axis	Eje que se conserva
-Lock Axis	Eje bloqueado
-Main Axis	Eje principal
-Maintain Volume	Mantener volumen
-Map From	Desde
-Map To	Hacia
-Max X	Máx X
-Max Y	Máx Y
-Max Z	Máx Z
-Maximum X	Máximo X
-Maximum Y	Máximo Y
-Maximum Z	Máximo Z
-Min X	Mín X
-Min Y	Mín Y
-Min Z	Mín Z
-Minimum X	Mínimo X
-Minimum Y	Mínimo Y
-Minimum Z	Mínimo Z
-No bone constraints to bake	No hay constraints de hueso para hornear
-Offset Factor	Factor de offset
-On Surface	Sobre la superficie
-Outside	Afuera
-Owner Space	Espacio del dueño
-Pivot When	Pivotear cuando
-Pivot X	Pivote X
-Pivot Y	Pivote Y
-Pivot Z	Pivote Z
-Plane X	Plano X
-Plane Z	Plano Z
-Pole Angle	Ángulo del pole
-Pole Bone	Hueso del pole
-Pole Target	Pole target
-Power	Potencia
-Remove Constraints After Bake	Quitar los constraints al hornear
-Rest Length	Largo de reposo
-Single Axis	Un solo eje
-Strict	Estricto
-Swing	Giro
-Target Space	Espacio del target
-Target Up	Arriba del target
-This rig can not be baked (no rest pose, or a rebuilt biped)	Este rig no se puede hornear (sin pose de reposo, o un biped reconstruido)
-To Max X	Hacia máx X
-To Max Y	Hacia máx Y
-To Max Z	Hacia máx Z
-To Min X	Hacia mín X
-To Min Y	Hacia mín Y
-To Min Z	Hacia mín Z
-Track Axis	Eje que apunta
-Up Axis	Eje arriba
-Use Rotation	Usar la rotación
-Use Tail	Usar la punta
-Volume Variation	Variación de volumen
-X From	X desde
-Y From	Y desde
-Z From	Z desde
-World	Mundo
-Render with the first	Render con el primero
-Scatter	Dispersar
-External .w3d	.w3d externo
-Emit From	Desde
-Seed	Semilla
-Random Scale	Escala al azar
-Align to Normal	Alinear a la normal
-Random Rotation	Giro al azar
-Random Tilt	Inclinación al azar
-Merged	Unida
-Instances	Instancias
-Show Emitter	Mostrar emisor
-%d copies of %d source(s)	%d copias de %d fuente(s)
-Face Centers	Centros de caras
-Faces (anywhere)	Caras (cualquier punto)
-(the first one)	(la primera)
-Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Dispersar: las copias de un .w3d externo no pueden ser objetos (aplicalo como Unida)
-Scatter: there are no copies to apply	Dispersar: no hay copias para aplicar
-Scatter: %d copies are now objects	Dispersar: %d copias ahora son objetos
-Show/Hide	Mostrar/Ocultar
-Reveal Hidden	Mostrar lo oculto
-Hide Selected	Ocultar lo seleccionado
-Hide Unselected	Ocultar lo no seleccionado
-Recalculate Vertex Normals	Recalcular normales de vértices
-New File...	Nuevo archivo...
-New File	Nuevo archivo
-Recent	Recientes
-Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Cuchillo: click = punto, Enter = cortar, Esc = cancelar, Retroceso = sacar el punto, Z = cortar a través
-Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Cuchillo (a través): click = punto, Enter = cortar, Esc = cancelar, Retroceso = sacar el punto, Z = solo lo que se ve
-Knife: enter Edit Mode first	Cuchillo: entra primero en Modo Edición
-Knife: the cut does not cross any face	Cuchillo: el corte no cruza ninguna cara
-Knife	Cuchillo
-Merge by Distance: %d vertices merged	Fusionar por distancia: se fusionaron %d vértices

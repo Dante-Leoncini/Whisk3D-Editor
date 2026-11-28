@@ -149,7 +149,7 @@ extern std::string g_w3dUINotLoaded;
 
 // CONFIG de la tarjeta Juego (Compilar juego): viaja con el proyecto como
 // objeto raiz "compilar" del .w3d (ver SaveW3D.h). Arranca en los defaults.
-W3dCompileCfg g_projCompile = { 1, 0, 0, 0, true, true, false, 0, 100, 100, -1 };   // (volumen y resolucion al 100)
+W3dCompileCfg g_projCompile = { 1, 0, 0, 0, true, true, false, 0, 100, 100, -1, true, "" };   // (volumen y resolucion al 100)
 
 void W3dCompileReset() {
     g_projCompile.windowMode  = 1;      // Pantalla completa (el default de siempre)
@@ -163,6 +163,8 @@ void W3dCompileReset() {
     g_projCompile.volume      = 100;     // volumen del gameplay al maximo por defecto
     g_projCompile.resolution  = 100;     // la pantalla nativa
     g_projCompile.backend     = -1;      // el de siempre de cada plataforma
+    g_projCompile.escapeQuits = true;    // Esc cierra el juego (como siempre)
+    g_projCompile.title.clear();         // el nombre del proyecto
 }
 
 // int <-> string legible del bloque "compilar" (el JSON se edita a mano: nada
@@ -3817,6 +3819,8 @@ bool SaveW3D(const std::string& path) {
     s += "    \"assets\": ";  JEsc(s, W3dCompileAssetsStr(g_projCompile.assetsMode)); s += ",\n";
     s += "    \"platform\": "; JEsc(s, W3dCompilePlatformStr(g_projCompile.platform)); s += ",\n";
     s += "    \"backend\": "; JEsc(s, W3dCompileBackendStr(g_projCompile.backend)); s += ",\n";
+    if (!g_projCompile.escapeQuits) s += "    \"escapeQuits\": false,\n";   // (solo apagado: el default no cambia los .w3d de siempre)
+    if (!g_projCompile.title.empty()) { s += "    \"title\": "; JEsc(s, g_projCompile.title); s += ",\n"; }
     { char uidhex[16]; snprintf(uidhex, sizeof(uidhex), "0x%08X", g_projCompile.uid);
       s += "    \"uid\": "; JEsc(s, uidhex); s += "\n"; }   // UID3 de Symbian del juego (0 = sin asignar)
     s += "  },\n";

@@ -8,6 +8,7 @@
 %d Push matrix without its Pop	Matrisi çıkar (pop) olmadan %d Matrisi it (push)
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Seçimin %d animasyon eğrisi artık hiçbir şeyi canlandırmıyor (Geri Al geri getirir)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d animasyon eğrisi nesnesiz kaldı (ilki: '%s'): whisk3d.log'a bakın
+%d copies of %d source(s)	%d kaynaktan %d kopya
 %d curves selected	%d eğri seçili
 %d files are now external	%d dosya artık harici
 %d files are now inside the .w3d	%d dosya artık .w3d içinde
@@ -47,6 +48,7 @@
 (not shared)	(paylaşılmıyor)
 (nothing to choose)	(seçilecek bir şey yok)
 (root)	(kök)
+(the first one)	(ilki)
 (this routine)	(bu rutin)
 (unnamed)	(adsız)
 16-bit textures	16 bit dokular
@@ -120,6 +122,7 @@ After Mode	Sonraki mod
 Align	Hizala
 Align X	X Hizala
 Align Y	Y Hizala
+Align to Normal	Normale hizala
 Aligned	Hizalı
 All	Tümü
 All Transforms	Tüm Dönüşümler
@@ -523,7 +526,6 @@ Delete the orphan resource	Sahipsiz kaynağı sil:
 Delete the orphan resources	Sahipsiz kaynakları sil
 Deleted	Silindi
 Denoiser	Gürültü giderici
-Shadowmask (real-time light)	Shadowmask (gerçek zamanlı ışık)
 Density	Yoğunluk
 Depth	Derinlik
 Depth & clear	Derinlik ve temizleme
@@ -540,6 +542,7 @@ Depth test	Derinlik testi
 Depth write	Derinlik yazma
 Deselect	Seçimi kaldır
 Deselect All	Tüm seçimi kaldır
+Desktop	Masaüstü
 Detect bodies	Cisimleri algıla
 Device	Cihaz
 Device name	Cihaz adı
@@ -558,10 +561,12 @@ Distance	Mesafe
 Distance X	Mesafe X
 Distances	Mesafeler
 Distribution	Dağılım
+Documents	Belgeler
 Don't allow	İzin verme
 Done	Bitti
 Done by CPU on this graphics backend (slow)	Bu grafik arka ucunda CPU ile yapılır (yavaş)
 Dope Sheet	Anahtar Tablosu
+Downloads	İndirilenler
 Drag (speed kept per second)	Direnç (saniyede kalan hız)
 Drag the points, click to add	Noktaları sürükleyin, eklemek için tıklayın
 Draw	Çiz
@@ -610,6 +615,7 @@ Ellipse	Elips
 Emission	Işıma
 Emission Map	Işıma haritası
 Emission Strength	Yayılım gücü
+Emit From	Şuradan yay
 Empty	Boş
 Empty routine	Boş rutin
 Enable	Etkinleştir
@@ -628,6 +634,7 @@ Error: could not save the OBJ	Hata: OBJ kaydedilemedi
 Error: could not save the STL	Hata: STL kaydedilemedi
 Error: could not save the render	Hata: render kaydedilemedi
 Errors only	Yalnızca hatalar
+Esc closes the game	Esc oyunu kapatır
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Bu, köşe grubunu değiştirip köşe başına 1 kemiğe sadeleştirecek (daha hızlı skinning). Veri kaybı olabilir.
 Exclude X (plane)	X hariç (düzlem)
 Exclude Y (plane)	Y hariç (düzlem)
@@ -648,6 +655,7 @@ Exporting glTF...	glTF dışa aktarılıyor...
 Exporting model...	Model dışa aktarılıyor...
 External	Harici
 External (choose where)...	Harici (yer seç)...
+External .w3d	Harici .w3d
 External display	Harici ekran
 Extract	Çıkar
 Extract assets	Varlıkları çıkar
@@ -671,6 +679,7 @@ FOV	FOV
 FPS	FPS
 Face	Yüz
 Face Center	Yüz merkezi
+Face Centers	Yüz merkezleri
 Face Nearest	En yakın yüz
 Face Normal	Yüz Normali
 Face Project	Yüze yansıt
@@ -678,6 +687,7 @@ Face Strength	Yüz gücü
 Face culling	Yüz ayıklama
 Face the camera	Kameraya bak
 Faces	Yüzler
+Faces (anywhere)	Yüzler (her yer)
 Faces triangulated	Yüzler üçgenlendi
 Factor	Faktör
 Factor X	Faktör X
@@ -694,6 +704,7 @@ File	Dosya
 File name	Dosya adı
 File size	Dosya boyutu
 Fill	Doldur
+Fill the screen in the game	Oyunda ekranı doldur
 Film grain	Film greni
 Filter	Filtre
 Filter Width	Filtre genişliği
@@ -801,6 +812,8 @@ Handles: Vector	Tutamaçlar: vektör
 Harden Normals	Normalleri Sertleştir
 Height	Yükseklik
 Hide / Show	Gizle / Göster
+Hide Selected	Seçileni gizle
+Hide Unselected	Seçili olmayanı gizle
 Hide/Show	Gizle/Göster
 Hierarchy Clip	Hiyerarşi klibi
 Hierarchy Clips	Hiyerarşi klipleri
@@ -860,6 +873,7 @@ Inside	İç
 Inside the .w3d	.w3d'nin içinde
 Installing on the phone	Telefona yükleniyor
 Instance	Örnek
+Instances	Örnekler
 Intensity	Şiddet
 Interpolate	Enterpole et
 Interpolate (mix)	Enterpole et (karışım)
@@ -916,6 +930,11 @@ Keyboard Shortcuts	Klavye Kısayolları
 Keyboard Shortcuts...	Klavye Kısayolları...
 Keyframe	Anahtar kare
 Keyframes	Anahtar kareler
+Knife	Bıçak
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Bıçak (içinden): tık = nokta, Enter = kes, Esc = iptal, Geri = noktayı sil, Z = sadece görünen
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Bıçak: tık = nokta, Enter = kes, Esc = iptal, Geri = noktayı sil, Z = içinden kes
+Knife: enter Edit Mode first	Bıçak: önce Düzenleme Moduna girin
+Knife: the cut does not cross any face	Bıçak: kesim hiçbir yüzeyi geçmiyor
 LOD	LOD
 Lacunarity	Boşluklılık
 Landscape only	Yalnızca yatay
@@ -1060,6 +1079,8 @@ Merge Distance	Kaynaştırma Mesafesi
 Merge at Center	Merkezde kaynaştır
 Merge at Cursor	İmleçte kaynaştır
 Merge by Distance	Mesafeye göre kaynaştır
+Merge by Distance: %d vertices merged	Mesafeye göre birleştir: %d köşe birleştirildi
+Merged	Birleşik
 Mesh	Örgü
 Mesh Parts	Örgü Parçaları
 Mesh as text	Metin olarak örgü
@@ -1113,6 +1134,7 @@ Multiply	Çarp
 Multiply (darkens)	Çarp (koyulaştırır)
 Multiply (lightmap)	Çarp (lightmap)
 Multiply 2x	Çarp 2x
+Music	Müzik
 NRD (real time)	NRD (gerçek zamanlı)
 Name	Ad
 Near	Yakın
@@ -1127,6 +1149,8 @@ New Color Layer	Yeni renk katmanı
 New Copy	Yeni kopya
 New Edge/Face from Vertices	Köşelerden Yeni Kenar/Yüz
 New Face from Vertices	Köşelerden yeni yüz
+New File	Yeni dosya
+New File...	Yeni dosya...
 New Flipbook	Yeni flipbook
 New Folder	Yeni klasör
 New Game	Yeni oyun
@@ -1345,6 +1369,7 @@ Phase	Faz
 Physics	Fizik
 Pick Shortest Path	En Kısa Yolu Seç
 Pick Shortest Path: click the first	En Kısa Yol: ilkine tıklayın:
+Pictures	Resimler
 Pitch	Perde
 Pivot	Pivot
 Pixels	Piksel
@@ -1429,6 +1454,9 @@ Radius 1	Yarıçap 1
 Radius 2	Yarıçap 2
 Rail (nodes)	Ray (düğümler)
 Random	Rastgele
+Random Rotation	Rastgele döndürme
+Random Scale	Rastgele ölçek
+Random Tilt	Rastgele eğim
 Random angle (0-360)	Rastgele açı (0-360)
 Random spin direction	Rastgele dönüş yönü
 Random velocity	Rastgele hız
@@ -1441,8 +1469,10 @@ Real-time shadows	Gerçek zamanlı gölgeler
 Realtime	Gerçek zamanlı
 Recalculate	Yeniden hesapla
 Recalculate Normals	Normalleri Yeniden Hesapla
+Recalculate Vertex Normals	Köşe normallerini yeniden hesapla
 Recalculated by the editor (the game uses the last one)	Düzenleyici yeniden hesaplar (oyun sonuncuyu kullanır)
 Receive shadows	Gölge al
+Recent	Son kullanılanlar
 Recent files	Son dosyalar
 Rectangle	Dikdörtgen
 Red	Kırmızı
@@ -1481,6 +1511,7 @@ Render mode	Render modu
 Render saved!	Render kaydedildi!
 Render start	Render başı
 Render to...	Render al...
+Render with the first	İlk ile render
 Renderable	Render alınabilir
 Rendered	Render
 Rendering animation...	Animasyon render alınıyor...
@@ -1508,6 +1539,7 @@ Resource	Kaynak
 Restart Whisk3D for this change to take effect	Bu değişikliğin etkili olması için Whisk3D'yi yeniden başlatın
 Restrict Frame Range	Kare aralığını sınırla
 Retarget	Retarget
+Reveal Hidden	Gizlileri göster
 Reverb	Yankı
 Right	Sağ
 Right Handle X	Sağ Tutamaç X
@@ -1585,6 +1617,10 @@ Scale Y	Ölçek Y
 Scale Z	Ölçek Z
 Scale: %.2fx  (pivot %s)%s	Ölçekle: %.2fx  (pivot %s)%s
 Scaled	Ölçeklendi
+Scatter	Saçma
+Scatter: %d copies are now objects	Saçma: %d kopya artık nesne
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Saçma: harici .w3d kopyaları nesne olamaz (Birleşik olarak uygulayın)
+Scatter: there are no copies to apply	Saçma: uygulanacak kopya yok
 Scene	Sahne
 Scene Animation	Sahne Animasyonu
 Scene Instance	Sahne örneği
@@ -1603,6 +1639,7 @@ Scripts that name the texture	Dokuyu anan betikler
 Scroll	Kaydırma
 Scroll X	Kaydırma X
 Scroll Y	Kaydırma Y
+Seed	Tohum
 Segments	Bölüm
 Select	Seç
 Select All	Tümünü Seç
@@ -1653,6 +1690,7 @@ Shading	Gölgeleme
 Shadow catcher	Gölge yakalayıcı
 Shadow color	Gölge rengi
 Shadow strength	Yoğunluk
+Shadowmask (real-time light)	Shadowmask (gerçek zamanlı ışık)
 Shape	Şekil
 Shape keys	Şekil anahtarları
 Sharp	Keskin
@@ -1663,12 +1701,14 @@ Shortest Path (Fill Region)	En Kısa Yol (Bölgeyi Doldur)
 Shortest path selected	En kısa yol seçildi
 Shortest path: region filled	En kısa yol: bölge dolduruldu
 Show Chrome UV	Krom UV'yi göster
+Show Emitter	Yayıcıyı göster
 Show Handles	Tutamaçları göster
 Show Overlays	Bindirmeleri Göster
 Show Panel	Paneli göster
 Show active	Etkini göster
 Show in Edit Mode	Düzenleme Modunda göster
 Show selection	Seçimi göster
+Show/Hide	Göster/Gizle
 Shrink/Fatten	Daralt/Şişir
 Shrink/Fatten / Clear Scale	Daralt/Şişir / Ölçeği Temizle
 Shutter	Obtüratör
@@ -2214,41 +2254,3 @@ with mipmaps	mipmap ile
 with transparency	saydamlıklı
 without mipmaps	mipmap'siz
 you want to select (Esc to cancel)	seçilecek (İptal için Esc)
-Desktop	Masaüstü
-Documents	Belgeler
-Downloads	İndirilenler
-Pictures	Resimler
-Music	Müzik
-Render with the first	İlk ile render
-Scatter	Saçma
-External .w3d	Harici .w3d
-Emit From	Şuradan yay
-Seed	Tohum
-Random Scale	Rastgele ölçek
-Align to Normal	Normale hizala
-Random Rotation	Rastgele döndürme
-Random Tilt	Rastgele eğim
-Merged	Birleşik
-Instances	Örnekler
-Show Emitter	Yayıcıyı göster
-%d copies of %d source(s)	%d kaynaktan %d kopya
-Face Centers	Yüz merkezleri
-Faces (anywhere)	Yüzler (her yer)
-(the first one)	(ilki)
-Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Saçma: harici .w3d kopyaları nesne olamaz (Birleşik olarak uygulayın)
-Scatter: there are no copies to apply	Saçma: uygulanacak kopya yok
-Scatter: %d copies are now objects	Saçma: %d kopya artık nesne
-Show/Hide	Göster/Gizle
-Reveal Hidden	Gizlileri göster
-Hide Selected	Seçileni gizle
-Hide Unselected	Seçili olmayanı gizle
-Recalculate Vertex Normals	Köşe normallerini yeniden hesapla
-New File...	Yeni dosya...
-New File	Yeni dosya
-Recent	Son kullanılanlar
-Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Bıçak: tık = nokta, Enter = kes, Esc = iptal, Geri = noktayı sil, Z = içinden kes
-Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Bıçak (içinden): tık = nokta, Enter = kes, Esc = iptal, Geri = noktayı sil, Z = sadece görünen
-Knife: enter Edit Mode first	Bıçak: önce Düzenleme Moduna girin
-Knife: the cut does not cross any face	Bıçak: kesim hiçbir yüzeyi geçmiyor
-Knife	Bıçak
-Merge by Distance: %d vertices merged	Mesafeye göre birleştir: %d köşe birleştirildi

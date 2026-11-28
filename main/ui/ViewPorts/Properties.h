@@ -233,6 +233,7 @@ struct PropertiesRows {
     PropButton* propUIres;      // desplegable de resoluciones (4k .. 240p)
     PropButton* propUIAspect;   // desplegable de aspecto (16:9 / 4:3 / 1:1)
     PropButton* propUIRotate;   // boton: intercambia ancho y alto
+    PropBool*   propUIFill;     // (tamano fijo) en el juego compilado el lienzo crece hasta llenar la pantalla (UI::fillScreen)
     PropColor*  propUIcolor;    // fondo de la ventana (transparente por defecto)
     PropFloat*  propUIScale;    // escala global del contenido (x1 N95 ... x4 pantallas grandes)
     PropBool*   propUIScaleEqual; // escala = GlobalScale del editor (por plataforma); tildado oculta el valor manual
@@ -599,6 +600,7 @@ struct PropertiesRows {
     PropBool*   propGamePhysics;   // checkbox: compilar CON el motor de fisica (default si)
     PropBool*   propGameSound;     // checkbox: compilar CON el audio (default si)
     PropBool*   propGameDebug;     // checkbox: modo debug W3D_DEV_LOG=1 (default NO = produccion)
+    PropBool*   propGameEsc;       // checkbox: Esc cierra el juego (default si); apagado le llega al juego ("escape"/"back")
     PropButton* propGameCompile;
     GroupPropertie* propExport;  // pestania RENDER: tarjeta "Export" (.obj)
     // pestania TRANSFORMAR (tab 5, icono del modo de seleccion; SOLO Edit Mode con malla activa):

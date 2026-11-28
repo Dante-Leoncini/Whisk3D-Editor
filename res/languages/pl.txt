@@ -8,6 +8,7 @@
 %d Push matrix without its Pop	%d Odłóż macierz bez pasującego Zdejmij macierz
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Krzywe animacji zaznaczenia (%d) już nic nie animują (Cofnij je przywróci)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	Krzywe animacji (%d) zostały bez obiektu (pierwsza: '%s'): zobacz whisk3d.log
+%d copies of %d source(s)	%d kopii z %d źródeł
 %d curves selected	Zaznaczone krzywe: %d
 %d files are now external	%d plików jest teraz zewnętrznych
 %d files are now inside the .w3d	%d plików jest teraz w .w3d
@@ -47,6 +48,7 @@
 (not shared)	(nieudostępnione)
 (nothing to choose)	(nic do wyboru)
 (root)	(korzeń)
+(the first one)	(pierwsza)
 (this routine)	(ta procedura)
 (unnamed)	(bez nazwy)
 16-bit textures	Tekstury 16-bitowe
@@ -120,6 +122,7 @@ After Mode	Tryb po
 Align	Wyrównaj
 Align X	Wyrównaj X
 Align Y	Wyrównaj Y
+Align to Normal	Wyrównaj do normalnej
 Aligned	Wyrównany
 All	Wszystko
 All Transforms	Wszystkie transformacje
@@ -523,7 +526,6 @@ Delete the orphan resource	Usunąć osierocony zasób
 Delete the orphan resources	Usunąć osierocone zasoby
 Deleted	Usunięto
 Denoiser	Odszumianie
-Shadowmask (real-time light)	Shadowmask (światło w czasie rzeczywistym)
 Density	Gęstość
 Depth	Głębia
 Depth & clear	Głębia i czyszczenie
@@ -540,6 +542,7 @@ Depth test	Test głębi
 Depth write	Zapis głębi
 Deselect	Odznacz
 Deselect All	Odznacz wszystko
+Desktop	Pulpit
 Detect bodies	Wykrywaj ciała
 Device	Urządzenie
 Device name	Nazwa urządzenia
@@ -558,10 +561,12 @@ Distance	Odległość
 Distance X	Odległość X
 Distances	Odległości
 Distribution	Rozkład
+Documents	Dokumenty
 Don't allow	Nie zezwalaj
 Done	Gotowe
 Done by CPU on this graphics backend (slow)	Na tym backendzie graficznym robi to CPU (wolno)
 Dope Sheet	Arkusz kluczy
+Downloads	Pobrane
 Drag (speed kept per second)	Opór (prędkość zachowana na sekundę)
 Drag the points, click to add	Przeciągaj punkty, klik dodaje
 Draw	Rysuj
@@ -610,6 +615,7 @@ Ellipse	Elipsa
 Emission	Emisja
 Emission Map	Mapa emisji
 Emission Strength	Siła emisji
+Emit From	Emituj z
 Empty	Pusty
 Empty routine	Pusta procedura
 Enable	Włącz
@@ -628,6 +634,7 @@ Error: could not save the OBJ	Błąd: nie udało się zapisać OBJ
 Error: could not save the STL	Błąd: nie udało się zapisać STL
 Error: could not save the render	Błąd: nie udało się zapisać renderu
 Errors only	Tylko błędy
+Esc closes the game	Esc zamyka grę
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	To zmieni grupę wierzchołków i uprości ją do 1 kości na wierzchołek (szybszy skinning). Możliwa utrata danych.
 Exclude X (plane)	Wyklucz X (płaszczyzna)
 Exclude Y (plane)	Wyklucz Y (płaszczyzna)
@@ -648,6 +655,7 @@ Exporting glTF...	Eksportowanie glTF...
 Exporting model...	Eksportowanie modelu...
 External	Zewnętrzny
 External (choose where)...	Zewnętrzny (wybierz gdzie)...
+External .w3d	Zewnętrzny .w3d
 External display	Ekran zewnętrzny
 Extract	Wyodrębnij
 Extract assets	Wyodrębnij assety
@@ -671,6 +679,7 @@ FOV	FOV
 FPS	FPS
 Face	Ściana
 Face Center	Środek ściany
+Face Centers	Środki ścian
 Face Nearest	Najbliższa ściana
 Face Normal	Normalna ściany
 Face Project	Rzut na ścianę
@@ -678,6 +687,7 @@ Face Strength	Siła ściany
 Face culling	Odrzucanie ścian
 Face the camera	Przodem do kamery
 Faces	Ściany
+Faces (anywhere)	Ściany (dowolnie)
 Faces triangulated	Ściany striangulowane
 Factor	Współczynnik
 Factor X	Współczynnik X
@@ -694,6 +704,7 @@ File	Plik
 File name	Nazwa pliku
 File size	Rozmiar pliku
 Fill	Wypełnienie
+Fill the screen in the game	Wypełnij ekran w grze
 Film grain	Ziarno filmu
 Filter	Filtr
 Filter Width	Szerokość filtra
@@ -801,6 +812,8 @@ Handles: Vector	Uchwyty: wektor
 Harden Normals	Utwardź normalne
 Height	Wysokość
 Hide / Show	Ukryj / Pokaż
+Hide Selected	Ukryj zaznaczone
+Hide Unselected	Ukryj niezaznaczone
 Hide/Show	Ukryj/Pokaż
 Hierarchy Clip	Klip hierarchii
 Hierarchy Clips	Klipy hierarchii
@@ -860,6 +873,7 @@ Inside	Wewnątrz
 Inside the .w3d	Wewnątrz .w3d
 Installing on the phone	Instalowanie na telefonie
 Instance	Instancja
+Instances	Instancje
 Intensity	Intensywność
 Interpolate	Interpoluj
 Interpolate (mix)	Interpoluj (mieszanie)
@@ -916,6 +930,11 @@ Keyboard Shortcuts	Skróty klawiszowe
 Keyboard Shortcuts...	Skróty klawiszowe...
 Keyframe	Klatka kluczowa
 Keyframes	Klatki kluczowe
+Knife	Nóż
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Nóż (na wylot): klik = punkt, Enter = tnij, Esc = anuluj, Backspace = usuń punkt, Z = tylko widoczne
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Nóż: klik = punkt, Enter = tnij, Esc = anuluj, Backspace = usuń punkt, Z = tnij na wylot
+Knife: enter Edit Mode first	Nóż: najpierw wejdź w Tryb edycji
+Knife: the cut does not cross any face	Nóż: cięcie nie przecina żadnej ściany
 LOD	LOD
 Lacunarity	Lakunarność
 Landscape only	Tylko poziomo
@@ -1060,6 +1079,8 @@ Merge Distance	Odległość scalania
 Merge at Center	Scal na środku
 Merge at Cursor	Scal przy kursorze
 Merge by Distance	Scal wg odległości
+Merge by Distance: %d vertices merged	Scal według odległości: scalono %d wierzchołków
+Merged	Scalone
 Mesh	Siatka
 Mesh Parts	Części siatki
 Mesh as text	Siatka jako tekst
@@ -1113,6 +1134,7 @@ Multiply	Mnóż
 Multiply (darkens)	Mnóż (przyciemnia)
 Multiply (lightmap)	Mnóż (lightmapa)
 Multiply 2x	Mnóż 2x
+Music	Muzyka
 NRD (real time)	NRD (czas rzeczywisty)
 Name	Nazwa
 Near	Blisko
@@ -1127,6 +1149,8 @@ New Color Layer	Nowa warstwa koloru
 New Copy	Nowa kopia
 New Edge/Face from Vertices	Nowa krawędź/ściana z wierzchołków
 New Face from Vertices	Nowa ściana z wierzchołków
+New File	Nowy plik
+New File...	Nowy plik...
 New Flipbook	Nowy flipbook
 New Folder	Nowy folder
 New Game	Nowa gra
@@ -1345,6 +1369,7 @@ Phase	Faza
 Physics	Fizyka
 Pick Shortest Path	Najkrótsza ścieżka
 Pick Shortest Path: click the first	Najkrótsza ścieżka: kliknij najpierw
+Pictures	Obrazy
 Pitch	Ton
 Pivot	Punkt obrotu
 Pixels	Piksele
@@ -1429,6 +1454,9 @@ Radius 1	Promień 1
 Radius 2	Promień 2
 Rail (nodes)	Szyna (węzły)
 Random	Losowy
+Random Rotation	Losowy obrót
+Random Scale	Losowa skala
+Random Tilt	Losowe nachylenie
 Random angle (0-360)	Losowy kąt (0-360)
 Random spin direction	Losowy kierunek wirowania
 Random velocity	Losowa prędkość
@@ -1441,8 +1469,10 @@ Real-time shadows	Cienie w czasie rzeczywistym
 Realtime	Czas rzeczywisty
 Recalculate	Przelicz
 Recalculate Normals	Przelicz normalne
+Recalculate Vertex Normals	Przelicz normalne wierzchołków
 Recalculated by the editor (the game uses the last one)	Przeliczana przez edytor (gra używa ostatniej)
 Receive shadows	Odbieraj cienie
+Recent	Ostatnie
 Recent files	Ostatnie pliki
 Rectangle	Prostokąt
 Red	Czerwony
@@ -1481,6 +1511,7 @@ Render mode	Tryb renderu
 Render saved!	Zapisano render!
 Render start	Początek renderu
 Render to...	Renderuj do...
+Render with the first	Renderuj pierwszym
 Renderable	Renderowalny
 Rendered	Renderowany
 Rendering animation...	Renderowanie animacji...
@@ -1508,6 +1539,7 @@ Resource	Zasób
 Restart Whisk3D for this change to take effect	Uruchom ponownie Whisk3D, aby zmiana zadziałała
 Restrict Frame Range	Ogranicz zakres klatek
 Retarget	Retarget
+Reveal Hidden	Pokaż ukryte
 Reverb	Pogłos
 Right	Prawo
 Right Handle X	Prawy uchwyt X
@@ -1585,6 +1617,10 @@ Scale Y	Skala Y
 Scale Z	Skala Z
 Scale: %.2fx  (pivot %s)%s	Skaluj: %.2fx  (punkt obrotu %s)%s
 Scaled	Przeskalowano
+Scatter	Rozrzucanie
+Scatter: %d copies are now objects	Rozrzucanie: %d kopii to teraz obiekty
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Rozrzucanie: kopie z zewnętrznego .w3d nie mogą stać się obiektami (zastosuj jako Scalone)
+Scatter: there are no copies to apply	Rozrzucanie: brak kopii do zastosowania
 Scene	Scena
 Scene Animation	Animacja sceny
 Scene Instance	Instancja sceny
@@ -1603,6 +1639,7 @@ Scripts that name the texture	Skrypty odwołujące się do tekstury
 Scroll	Przewijanie
 Scroll X	Przewijanie X
 Scroll Y	Przewijanie Y
+Seed	Ziarno
 Segments	Segmenty
 Select	Zaznacz
 Select All	Zaznacz wszystko
@@ -1653,6 +1690,7 @@ Shading	Cieniowanie
 Shadow catcher	Łapacz cieni
 Shadow color	Kolor cienia
 Shadow strength	Intensywność
+Shadowmask (real-time light)	Shadowmask (światło w czasie rzeczywistym)
 Shape	Kształt
 Shape keys	Klucze kształtu
 Sharp	Ostry
@@ -1663,12 +1701,14 @@ Shortest Path (Fill Region)	Najkrótsza ścieżka (wypełnij obszar)
 Shortest path selected	Zaznaczono najkrótszą ścieżkę
 Shortest path: region filled	Najkrótsza ścieżka: wypełniono obszar
 Show Chrome UV	Pokaż Chrome UV
+Show Emitter	Pokaż emiter
 Show Handles	Pokaż uchwyty
 Show Overlays	Pokaż nakładki
 Show Panel	Pokaż panel
 Show active	Pokaż aktywny
 Show in Edit Mode	Pokaż w Trybie edycji
 Show selection	Pokaż zaznaczenie
+Show/Hide	Pokaż/Ukryj
 Shrink/Fatten	Zmniejsz/Pogrub
 Shrink/Fatten / Clear Scale	Zmniejsz/Pogrub / Wyczyść skalę
 Shutter	Migawka
@@ -2214,41 +2254,3 @@ with mipmaps	z mipmapami
 with transparency	z przezroczystością
 without mipmaps	bez mipmap
 you want to select (Esc to cancel)	do zaznaczenia (Esc anuluje)
-Desktop	Pulpit
-Documents	Dokumenty
-Downloads	Pobrane
-Pictures	Obrazy
-Music	Muzyka
-Render with the first	Renderuj pierwszym
-Scatter	Rozrzucanie
-External .w3d	Zewnętrzny .w3d
-Emit From	Emituj z
-Seed	Ziarno
-Random Scale	Losowa skala
-Align to Normal	Wyrównaj do normalnej
-Random Rotation	Losowy obrót
-Random Tilt	Losowe nachylenie
-Merged	Scalone
-Instances	Instancje
-Show Emitter	Pokaż emiter
-%d copies of %d source(s)	%d kopii z %d źródeł
-Face Centers	Środki ścian
-Faces (anywhere)	Ściany (dowolnie)
-(the first one)	(pierwsza)
-Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Rozrzucanie: kopie z zewnętrznego .w3d nie mogą stać się obiektami (zastosuj jako Scalone)
-Scatter: there are no copies to apply	Rozrzucanie: brak kopii do zastosowania
-Scatter: %d copies are now objects	Rozrzucanie: %d kopii to teraz obiekty
-Show/Hide	Pokaż/Ukryj
-Reveal Hidden	Pokaż ukryte
-Hide Selected	Ukryj zaznaczone
-Hide Unselected	Ukryj niezaznaczone
-Recalculate Vertex Normals	Przelicz normalne wierzchołków
-New File...	Nowy plik...
-New File	Nowy plik
-Recent	Ostatnie
-Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Nóż: klik = punkt, Enter = tnij, Esc = anuluj, Backspace = usuń punkt, Z = tnij na wylot
-Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Nóż (na wylot): klik = punkt, Enter = tnij, Esc = anuluj, Backspace = usuń punkt, Z = tylko widoczne
-Knife: enter Edit Mode first	Nóż: najpierw wejdź w Tryb edycji
-Knife: the cut does not cross any face	Nóż: cięcie nie przecina żadnej ściany
-Knife	Nóż
-Merge by Distance: %d vertices merged	Scal według odległości: scalono %d wierzchołków

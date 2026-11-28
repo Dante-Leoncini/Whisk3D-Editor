@@ -137,6 +137,10 @@ struct W3dCompileCfg {
     int  backend;       // el backend grafico, donde la plataforma tiene varios: 0 el de pipeline fijo (OpenGL, OpenGL ES
                         // 1.1), 1 el de shaders (OpenGL ES 2.0), 2 Vulkan. -1 = el de siempre de cada plataforma (la PC el
                         // fijo, Android el de shaders). Las demas tienen uno solo (ver W3dCompileBackends)
+    bool escapeQuits;   // true (default): Esc cierra el juego compilado. false: Esc y el boton "atras" de Android le llegan
+                        // al JUEGO como las teclas "escape" y "back" (keyPressed): el juego decide (volver, pausa, exit())
+    std::string title;  // el nombre VISIBLE del juego (bajo el icono en Android). "" = el nombre del proyecto. No cambia la
+                        // carpeta de las partidas guardadas (esa sigue siendo la del nombre del proyecto)
 };
 extern W3dCompileCfg g_projCompile;
 

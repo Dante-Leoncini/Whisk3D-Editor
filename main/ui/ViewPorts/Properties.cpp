@@ -9975,6 +9975,9 @@ void Properties::BuildGroups(){
     propUIRotate = new PropButton(T("Rotate"));        // horizontal <-> vertical
     propUIRotate->action = ActionUIRotate;
     propUIcard->properties.push_back(propUIRotate);
+    // (tamano fijo) en el juego compilado el lienzo crece hasta llenar la pantalla en vez de ir con bandas
+    propUIFill = new PropBool(T("Fill the screen in the game")); propUIFill->onChange = ActionUIenTree;
+    propUIcard->properties.push_back(propUIFill);
     propUIopac = new PropFloat(T("Opacity"));         // atenua la interfaz entera
     propUIopac->SetRange(0.0f, 1.0f);
     propUIopac->fineStep = 0.01f; propUIopac->thickStep = 0.1f; propUIopac->dragStep = 0.005f;
@@ -11539,6 +11542,11 @@ void Properties::BuildGroups(){
     propGameSound = new PropBool(T("Use sound"));
     propGameSound->value = &g_projCompile.useSound;
     propGame->properties.push_back(propGameSound);
+    // Esc (y el boton "atras" de Android): tildado cierra el juego, como siempre; destildado le llega al juego como
+    // las teclas "escape" y "back" (para volver de un menu o pausar)
+    propGameEsc = new PropBool(T("Esc closes the game"));
+    propGameEsc->value = &g_projCompile.escapeQuits;
+    propGame->properties.push_back(propGameEsc);
     // el permiso de la RED de este archivo para jugar en red (lo pregunta el editor al abrirlo; aca se cambia despues).
     // Antes estaba en la tarjeta Archivo
     propProjNet = new PropBool(T("Network access"));
@@ -14141,6 +14149,7 @@ void Properties::RefreshTargetProperties(){
         if (propUIAspect){ propUIAspect->hidden = !resp;
                             if (u) propUIAspect->button->text = UIAspectName(u->aspectPreset); }
         if (propUIRotate)    propUIRotate->hidden = !resp;
+        if (propUIFill)      propUIFill->value = resp ? &u->fillScreen : NULL;
         if (propUIopac)     propUIopac->value = u ? &u->opacity : NULL;
         if (propUIcolor)    propUIcolor->value = u ? u->color : NULL;
         if (propUIScaleEqual) propUIScaleEqual->value = u ? &u->equalScaleEditor : NULL;

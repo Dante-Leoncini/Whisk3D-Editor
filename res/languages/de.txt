@@ -8,6 +8,7 @@
 %d Push matrix without its Pop	%d Matrix auf Stapel ohne zugehöriges Matrix vom Stapel
 %d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d Animationskurve(n) der Auswahl animieren nichts mehr (Rückgängig holt sie zurück)
 %d animation curve(s) were left without an object (the first one: '%s'): see whisk3d.log	%d Animationskurve(n) blieben ohne Objekt (die erste: '%s'): siehe whisk3d.log
+%d copies of %d source(s)	%d Kopien von %d Quelle(n)
 %d curves selected	%d Kurven ausgewählt
 %d files are now external	%d Dateien sind jetzt extern
 %d files are now inside the .w3d	%d Dateien sind jetzt in der .w3d
@@ -47,6 +48,7 @@
 (not shared)	(nicht geteilt)
 (nothing to choose)	(nichts zur Auswahl)
 (root)	(Wurzel)
+(the first one)	(die erste)
 (this routine)	(diese Routine)
 (unnamed)	(ohne Namen)
 16-bit textures	16-Bit-Texturen
@@ -120,6 +122,7 @@ After Mode	Modus danach
 Align	Ausrichten
 Align X	X ausrichten
 Align Y	Y ausrichten
+Align to Normal	An Normale ausrichten
 Aligned	Ausgerichtet
 All	Alle
 All Transforms	Alle Transformationen
@@ -523,7 +526,6 @@ Delete the orphan resource	Die verwaiste Ressource löschen
 Delete the orphan resources	Die verwaisten Ressourcen löschen
 Deleted	Gelöscht
 Denoiser	Denoiser
-Shadowmask (real-time light)	Shadowmask (Echtzeitlicht)
 Density	Dichte
 Depth	Tiefe
 Depth & clear	Tiefe & Leeren
@@ -540,6 +542,7 @@ Depth test	Tiefentest
 Depth write	Tiefe schreiben
 Deselect	Abwählen
 Deselect All	Alles abwählen
+Desktop	Schreibtisch
 Detect bodies	Körper erkennen
 Device	Gerät
 Device name	Gerätename
@@ -558,10 +561,12 @@ Distance	Abstand
 Distance X	Abstand X
 Distances	Abstände
 Distribution	Verteilung
+Documents	Dokumente
 Don't allow	Nicht erlauben
 Done	Fertig
 Done by CPU on this graphics backend (slow)	Bei diesem Grafik-Backend per CPU (langsam)
 Dope Sheet	Dope Sheet
+Downloads	Downloads
 Drag (speed kept per second)	Widerstand (erhaltenes Tempo pro Sek.)
 Drag the points, click to add	Punkte ziehen, Klick zum Hinzufügen
 Draw	Zeichnen
@@ -610,6 +615,7 @@ Ellipse	Ellipse
 Emission	Emission
 Emission Map	Emissions-Map
 Emission Strength	Emissionsstärke
+Emit From	Ausgabe von
 Empty	Empty
 Empty routine	Leere Routine
 Enable	Aktivieren
@@ -628,6 +634,7 @@ Error: could not save the OBJ	Fehler: OBJ konnte nicht gespeichert werden
 Error: could not save the STL	Fehler: STL konnte nicht gespeichert werden
 Error: could not save the render	Fehler: Render konnte nicht gespeichert werden
 Errors only	Nur Fehler
+Esc closes the game	Esc beendet das Spiel
 Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Dies ändert die Vertexgruppe und vereinfacht sie auf 1 Knochen pro Vertex (schnelleres Skinning). Datenverlust möglich.
 Exclude X (plane)	X ausschließen (Ebene)
 Exclude Y (plane)	Y ausschließen (Ebene)
@@ -648,6 +655,7 @@ Exporting glTF...	glTF wird exportiert...
 Exporting model...	Modell wird exportiert...
 External	Extern
 External (choose where)...	Extern (Ort wählen)...
+External .w3d	Externe .w3d
 External display	Externes Display
 Extract	Extrahieren
 Extract assets	Assets extrahieren
@@ -671,6 +679,7 @@ FOV	FOV
 FPS	FPS
 Face	Fläche
 Face Center	Flächenmitte
+Face Centers	Flächenmitten
 Face Nearest	Nächste Fläche
 Face Normal	Flächennormale
 Face Project	Flächenprojektion
@@ -678,6 +687,7 @@ Face Strength	Flächenstärke
 Face culling	Flächen-Culling
 Face the camera	Zur Kamera drehen
 Faces	Flächen
+Faces (anywhere)	Flächen (überall)
 Faces triangulated	Flächen trianguliert
 Factor	Faktor
 Factor X	Faktor X
@@ -694,6 +704,7 @@ File	Datei
 File name	Dateiname
 File size	Dateigröße
 Fill	Füllung
+Fill the screen in the game	Im Spiel den Bildschirm füllen
 Film grain	Filmkorn
 Filter	Filter
 Filter Width	Filterbreite
@@ -801,6 +812,8 @@ Handles: Vector	Anfasser: Vektor
 Harden Normals	Normalen härten
 Height	Höhe
 Hide / Show	Verbergen / Zeigen
+Hide Selected	Auswahl ausblenden
+Hide Unselected	Nicht Ausgewähltes ausblenden
 Hide/Show	Verbergen/Zeigen
 Hierarchy Clip	Hierarchie-Clip
 Hierarchy Clips	Hierarchie-Clips
@@ -860,6 +873,7 @@ Inside	Innen
 Inside the .w3d	Innerhalb der .w3d
 Installing on the phone	Wird auf dem Telefon installiert
 Instance	Instanz
+Instances	Instanzen
 Intensity	Intensität
 Interpolate	Interpolieren
 Interpolate (mix)	Interpolieren (Mischen)
@@ -916,6 +930,11 @@ Keyboard Shortcuts	Tastenkürzel
 Keyboard Shortcuts...	Tastenkürzel...
 Keyframe	Keyframe
 Keyframes	Keyframes
+Knife	Messer
+Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Messer (durch): Klick = Punkt, Enter = schneiden, Esc = abbrechen, Rücktaste = Punkt entfernen, Z = nur Sichtbares
+Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Messer: Klick = Punkt, Enter = schneiden, Esc = abbrechen, Rücktaste = Punkt entfernen, Z = durchschneiden
+Knife: enter Edit Mode first	Messer: erst in den Bearbeitungsmodus wechseln
+Knife: the cut does not cross any face	Messer: der Schnitt kreuzt keine Fläche
 LOD	LOD
 Lacunarity	Lakunarität
 Landscape only	Nur Querformat
@@ -1060,6 +1079,8 @@ Merge Distance	Zusammenführ-Abstand
 Merge at Center	In der Mitte zusammenführen
 Merge at Cursor	Am Cursor zusammenführen
 Merge by Distance	Nach Abstand zusammenführen
+Merge by Distance: %d vertices merged	Nach Abstand zusammenführen: %d Vertices zusammengeführt
+Merged	Zusammengeführt
 Mesh	Mesh
 Mesh Parts	Mesh-Teile
 Mesh as text	Mesh als Text
@@ -1113,6 +1134,7 @@ Multiply	Multiplizieren
 Multiply (darkens)	Multiplizieren (dunkelt ab)
 Multiply (lightmap)	Multiplizieren (Lightmap)
 Multiply 2x	Multiplizieren 2x
+Music	Musik
 NRD (real time)	NRD (Echtzeit)
 Name	Name
 Near	Nah
@@ -1127,6 +1149,8 @@ New Color Layer	Neue Farbschicht
 New Copy	Neue Kopie
 New Edge/Face from Vertices	Neue Kante/Fläche aus Vertices
 New Face from Vertices	Neue Fläche aus Vertices
+New File	Neue Datei
+New File...	Neue Datei...
 New Flipbook	Neues Flipbook
 New Folder	Neuer Ordner
 New Game	Neues Spiel
@@ -1345,6 +1369,7 @@ Phase	Phase
 Physics	Physik
 Pick Shortest Path	Kürzesten Pfad wählen
 Pick Shortest Path: click the first	Kürzester Pfad: erster Klick auf
+Pictures	Bilder
 Pitch	Tonhöhe
 Pivot	Drehpunkt
 Pixels	Pixel
@@ -1429,6 +1454,9 @@ Radius 1	Radius 1
 Radius 2	Radius 2
 Rail (nodes)	Schiene (Knoten)
 Random	Zufällig
+Random Rotation	Zufällige Drehung
+Random Scale	Zufällige Skalierung
+Random Tilt	Zufällige Neigung
 Random angle (0-360)	Zufallswinkel (0-360)
 Random spin direction	Zufällige Drehrichtung
 Random velocity	Zufallsgeschwindigkeit
@@ -1441,8 +1469,10 @@ Real-time shadows	Echtzeit-Schatten
 Realtime	Echtzeit
 Recalculate	Neu berechnen
 Recalculate Normals	Normalen neu berechnen
+Recalculate Vertex Normals	Vertexnormalen neu berechnen
 Recalculated by the editor (the game uses the last one)	Vom Editor neu berechnet (das Spiel nutzt die letzte)
 Receive shadows	Schatten empfangen
+Recent	Zuletzt
 Recent files	Zuletzt geöffnet
 Rectangle	Rechteck
 Red	Rot
@@ -1481,6 +1511,7 @@ Render mode	Render-Modus
 Render saved!	Render gespeichert!
 Render start	Render-Start
 Render to...	Rendern nach...
+Render with the first	Rendern mit dem ersten
 Renderable	Renderbar
 Rendered	Gerendert
 Rendering animation...	Animation wird gerendert...
@@ -1508,6 +1539,7 @@ Resource	Ressource
 Restart Whisk3D for this change to take effect	Whisk3D neu starten, damit die Änderung wirkt
 Restrict Frame Range	Framebereich beschränken
 Retarget	Retarget
+Reveal Hidden	Ausgeblendetes zeigen
 Reverb	Hall
 Right	Rechts
 Right Handle X	Rechter Anfasser X
@@ -1585,6 +1617,10 @@ Scale Y	Skalierung Y
 Scale Z	Skalierung Z
 Scale: %.2fx  (pivot %s)%s	Skalieren: %.2fx  (Drehpunkt %s)%s
 Scaled	Skaliert
+Scatter	Streuen
+Scatter: %d copies are now objects	Streuen: %d Kopien sind jetzt Objekte
+Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Streuen: Kopien aus einer externen .w3d können keine Objekte werden (als Zusammengeführt anwenden)
+Scatter: there are no copies to apply	Streuen: keine Kopien zum Anwenden
 Scene	Szene
 Scene Animation	Szenen-Animation
 Scene Instance	Szenen-Instanz
@@ -1603,6 +1639,7 @@ Scripts that name the texture	Skripte, die die Textur nennen
 Scroll	Scrollen
 Scroll X	Scrollen X
 Scroll Y	Scrollen Y
+Seed	Startwert
 Segments	Segmente
 Select	Auswählen
 Select All	Alles auswählen
@@ -1653,6 +1690,7 @@ Shading	Shading
 Shadow catcher	Schattenfänger
 Shadow color	Schattenfarbe
 Shadow strength	Intensität
+Shadowmask (real-time light)	Shadowmask (Echtzeitlicht)
 Shape	Form
 Shape keys	Shape Keys
 Sharp	Scharf
@@ -1663,12 +1701,14 @@ Shortest Path (Fill Region)	Kürzester Pfad (Bereich füllen)
 Shortest path selected	Kürzester Pfad ausgewählt
 Shortest path: region filled	Kürzester Pfad: Bereich gefüllt
 Show Chrome UV	Chrome-UV zeigen
+Show Emitter	Emitter anzeigen
 Show Handles	Anfasser zeigen
 Show Overlays	Overlays zeigen
 Show Panel	Panel zeigen
 Show active	Aktives zeigen
 Show in Edit Mode	Im Bearbeitungsmodus zeigen
 Show selection	Auswahl zeigen
+Show/Hide	Anzeigen/Ausblenden
 Shrink/Fatten	Schrumpfen/Aufblähen
 Shrink/Fatten / Clear Scale	Aufblähen / Skalierung zurücksetzen
 Shutter	Verschluss
@@ -2214,41 +2254,3 @@ with mipmaps	mit Mipmaps
 with transparency	mit Transparenz
 without mipmaps	ohne Mipmaps
 you want to select (Esc to cancel)	zum Auswählen (Esc zum Abbrechen)
-Desktop	Schreibtisch
-Documents	Dokumente
-Downloads	Downloads
-Pictures	Bilder
-Music	Musik
-Render with the first	Rendern mit dem ersten
-Scatter	Streuen
-External .w3d	Externe .w3d
-Emit From	Ausgabe von
-Seed	Startwert
-Random Scale	Zufällige Skalierung
-Align to Normal	An Normale ausrichten
-Random Rotation	Zufällige Drehung
-Random Tilt	Zufällige Neigung
-Merged	Zusammengeführt
-Instances	Instanzen
-Show Emitter	Emitter anzeigen
-%d copies of %d source(s)	%d Kopien von %d Quelle(n)
-Face Centers	Flächenmitten
-Faces (anywhere)	Flächen (überall)
-(the first one)	(die erste)
-Scatter: the copies of an external .w3d can't become objects (apply it as Merged)	Streuen: Kopien aus einer externen .w3d können keine Objekte werden (als Zusammengeführt anwenden)
-Scatter: there are no copies to apply	Streuen: keine Kopien zum Anwenden
-Scatter: %d copies are now objects	Streuen: %d Kopien sind jetzt Objekte
-Show/Hide	Anzeigen/Ausblenden
-Reveal Hidden	Ausgeblendetes zeigen
-Hide Selected	Auswahl ausblenden
-Hide Unselected	Nicht Ausgewähltes ausblenden
-Recalculate Vertex Normals	Vertexnormalen neu berechnen
-New File...	Neue Datei...
-New File	Neue Datei
-Recent	Zuletzt
-Knife: click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = cut through	Messer: Klick = Punkt, Enter = schneiden, Esc = abbrechen, Rücktaste = Punkt entfernen, Z = durchschneiden
-Knife (cutting through): click = point, Enter = cut, Esc = cancel, Backspace = undo point, Z = only what you see	Messer (durch): Klick = Punkt, Enter = schneiden, Esc = abbrechen, Rücktaste = Punkt entfernen, Z = nur Sichtbares
-Knife: enter Edit Mode first	Messer: erst in den Bearbeitungsmodus wechseln
-Knife: the cut does not cross any face	Messer: der Schnitt kreuzt keine Fläche
-Knife	Messer
-Merge by Distance: %d vertices merged	Nach Abstand zusammenführen: %d Vertices zusammengeführt
